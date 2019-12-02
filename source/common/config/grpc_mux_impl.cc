@@ -201,7 +201,7 @@ void GrpcMuxImpl::onDiscoveryResponse(
           Envoy::Config::ConfigUpdateFailureReason::UpdateRejected, &e);
     }
     ::google::rpc::Status* error_detail = api_state_[type_url].request_.mutable_error_detail();
-    error_detail->set_code(Grpc::Status::GrpcStatus::Internal);
+    error_detail->set_code(Grpc::Status::WellKnownGrpcStatus::Internal);
     error_detail->set_message(e.what());
   }
   api_state_[type_url].request_.set_response_nonce(message->nonce());

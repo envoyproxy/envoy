@@ -13,7 +13,9 @@
 #include "common/json/json_loader.h"
 #include "common/stream_info/utility.h"
 
+#include "absl/strings/match.h"
 #include "absl/strings/str_cat.h"
+#include "absl/strings/str_join.h"
 #include "absl/types/optional.h"
 
 namespace Envoy {
@@ -117,7 +119,7 @@ parseUpstreamMetadataField(absl::string_view params_str) {
     default:
       // Unsupported type or null value.
       ENVOY_LOG_MISC(debug, "unsupported value type for metadata [{}]",
-                     StringUtil::join(params, ", "));
+                     absl::StrJoin(params, ", "));
       return std::string();
     }
   };
@@ -162,6 +164,30 @@ parsePerRequestStateField(absl::string_view param_str) {
   };
 }
 
+// Parses the parameter for REQ and returns a function suitable for accessing the specified
+// request header from an StreamInfo::StreamInfo. Expects a string formatted as:
+//   (<header_name>)
+std::function<std::string(const Envoy::StreamInfo::StreamInfo&)>
+parseRequestHeader(absl::string_view param) {
+  param = StringUtil::trim(param);
+  if (param.empty() || param.front() != '(') {
+    throw EnvoyException(fmt::format("Invalid header configuration. Expected format "
+                                     "REQ(<header-name>), actual format REQ{}",
+                                     param));
+  }
+  ASSERT(param.back() == ')');               // Ensured by header_parser.
+  param = param.substr(1, param.size() - 2); // Trim parens.
+  Http::LowerCaseString header_name{std::string(param)};
+  return [header_name](const Envoy::StreamInfo::StreamInfo& stream_info) -> std::string {
+    if (const auto* request_headers = stream_info.getRequestHeaders()) {
+      if (const auto* entry = request_headers->get(header_name)) {
+        return std::string(entry->value().getStringView());
+      }
+    }
+    return std::string();
+  };
+}
+
 // Helper that handles the case when the ConnectionInfo is missing or if the desired value is
 // empty.
 StreamInfoHeaderFormatter::FieldExtractor sslConnectionInfoStringHeaderExtractor(
@@ -197,6 +223,10 @@ StreamInfoHeaderFormatter::StreamInfoHeaderFormatter(absl::string_view field_nam
   if (field_name == "PROTOCOL") {
     field_extractor_ = [](const Envoy::StreamInfo::StreamInfo& stream_info) {
       return Envoy::AccessLog::AccessLogFormatUtils::protocolToString(stream_info.protocol());
+    };
+  } else if (field_name == "DOWNSTREAM_REMOTE_ADDRESS") {
+    field_extractor_ = [](const StreamInfo::StreamInfo& stream_info) {
+      return stream_info.downstreamRemoteAddress()->asString();
     };
   } else if (field_name == "DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT") {
     field_extractor_ = [](const Envoy::StreamInfo::StreamInfo& stream_info) {
@@ -280,7 +310,7 @@ StreamInfoHeaderFormatter::StreamInfoHeaderFormatter(absl::string_view field_nam
       }
       return "";
     };
-  } else if (field_name.find("START_TIME") == 0) {
+  } else if (absl::StartsWith(field_name, "START_TIME")) {
     const std::string pattern = fmt::format("%{}%", field_name);
     if (start_time_formatters_.find(pattern) == start_time_formatters_.end()) {
       start_time_formatters_.emplace(
@@ -296,12 +326,14 @@ StreamInfoHeaderFormatter::StreamInfoHeaderFormatter(absl::string_view field_nam
       }
       return formatted;
     };
-  } else if (field_name.find("UPSTREAM_METADATA") == 0) {
+  } else if (absl::StartsWith(field_name, "UPSTREAM_METADATA")) {
     field_extractor_ =
         parseUpstreamMetadataField(field_name.substr(STATIC_STRLEN("UPSTREAM_METADATA")));
-  } else if (field_name.find("PER_REQUEST_STATE") == 0) {
+  } else if (absl::StartsWith(field_name, "PER_REQUEST_STATE")) {
     field_extractor_ =
         parsePerRequestStateField(field_name.substr(STATIC_STRLEN("PER_REQUEST_STATE")));
+  } else if (absl::StartsWith(field_name, "REQ")) {
+    field_extractor_ = parseRequestHeader(field_name.substr(STATIC_STRLEN("REQ")));
   } else {
     throw EnvoyException(fmt::format("field '{}' not supported as custom header", field_name));
   }

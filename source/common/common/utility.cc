@@ -168,7 +168,7 @@ DateFormatter::fromTimeAndPrepareSpecifierOffsets(time_t time, SpecifierOffsets&
                                                   const std::string& seconds_str) const {
   std::string formatted_time;
 
-  size_t previous = 0;
+  int32_t previous = 0;
   specifier_offsets.reserve(specifiers_.size());
   for (const auto& specifier : specifiers_) {
     std::string current_format =
@@ -263,6 +263,16 @@ absl::string_view StringUtil::rtrim(absl::string_view source) {
 
 absl::string_view StringUtil::trim(absl::string_view source) { return ltrim(rtrim(source)); }
 
+absl::string_view StringUtil::removeTrailingCharacters(absl::string_view source, char ch) {
+  const absl::string_view::size_type pos = source.find_last_not_of(ch);
+  if (pos != absl::string_view::npos) {
+    source.remove_suffix(source.size() - pos - 1);
+  } else {
+    source.remove_suffix(source.size());
+  }
+  return source;
+}
+
 bool StringUtil::findToken(absl::string_view source, absl::string_view delimiters,
                            absl::string_view key_token, bool trim_whitespace) {
   const auto tokens = splitToken(source, delimiters, trim_whitespace);
@@ -353,22 +363,13 @@ uint32_t StringUtil::itoa(char* out, size_t buffer_size, uint64_t i) {
   }
 
   *current = 0;
-  return current - out;
+  return static_cast<uint32_t>(current - out);
 }
 
 size_t StringUtil::strlcpy(char* dst, const char* src, size_t size) {
   strncpy(dst, src, size - 1);
   dst[size - 1] = '\0';
   return strlen(src);
-}
-
-std::string StringUtil::join(const std::vector<std::string>& source, const std::string& delimiter) {
-  std::ostringstream buf;
-  std::copy(source.begin(), source.end(),
-            std::ostream_iterator<std::string>(buf, delimiter.c_str()));
-  std::string ret = buf.str();
-  // copy will always end with an extra delimiter, we remove it here.
-  return ret.substr(0, ret.length() - delimiter.length());
 }
 
 std::string StringUtil::subspan(absl::string_view source, size_t start, size_t end) {

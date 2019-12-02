@@ -76,16 +76,16 @@ bool convertRequestHeadersForInternalRedirect(Http::HeaderMap& downstream_header
   }
 
   // Preserve the original request URL for the second pass.
-  downstream_headers.insertEnvoyOriginalUrl().value(
+  downstream_headers.setEnvoyOriginalUrl(
       absl::StrCat(scheme_is_http ? Http::Headers::get().SchemeValues.Http
                                   : Http::Headers::get().SchemeValues.Https,
                    "://", downstream_headers.Host()->value().getStringView(),
                    downstream_headers.Path()->value().getStringView()));
 
   // Replace the original host, scheme and path.
-  downstream_headers.insertScheme().value(std::string(absolute_url.scheme()));
-  downstream_headers.insertHost().value(std::string(absolute_url.host_and_port()));
-  downstream_headers.insertPath().value(std::string(absolute_url.path_and_query_params()));
+  downstream_headers.setScheme(absolute_url.scheme());
+  downstream_headers.setHost(absolute_url.host_and_port());
+  downstream_headers.setPath(absolute_url.path_and_query_params());
 
   return true;
 }
@@ -94,9 +94,9 @@ bool convertRequestHeadersForInternalRedirect(Http::HeaderMap& downstream_header
 
 void FilterUtility::setUpstreamScheme(Http::HeaderMap& headers, bool use_secure_transport) {
   if (use_secure_transport) {
-    headers.insertScheme().value().setReference(Http::Headers::get().SchemeValues.Https);
+    headers.setReferenceScheme(Http::Headers::get().SchemeValues.Https);
   } else {
-    headers.insertScheme().value().setReference(Http::Headers::get().SchemeValues.Http);
+    headers.setReferenceScheme(Http::Headers::get().SchemeValues.Http);
   }
 }
 
@@ -201,7 +201,7 @@ FilterUtility::finalTimeout(const RouteEntry& route, Http::HeaderMap& request_he
   }
 
   if (insert_envoy_expected_request_timeout_ms && expected_timeout > 0) {
-    request_headers.insertEnvoyExpectedRequestTimeoutMs().value(expected_timeout);
+    request_headers.setEnvoyExpectedRequestTimeoutMs(expected_timeout);
   }
 
   // If we've configured max_grpc_timeout, override the grpc-timeout header with
@@ -391,7 +391,11 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
         [this, direct_response,
          &request_headers = headers](Http::HeaderMap& response_headers) -> void {
           const auto new_path = direct_response->newPath(request_headers);
-          if (!new_path.empty()) {
+          // See https://tools.ietf.org/html/rfc7231#section-7.1.2.
+          const auto add_location =
+              direct_response->responseCode() == Http::Code::Created ||
+              Http::CodeUtility::is3xx(enumToInt(direct_response->responseCode()));
+          if (!new_path.empty() && add_location) {
             response_headers.addReferenceKey(Http::Headers::get().Location, new_path);
           }
           direct_response->finalizeResponseHeaders(response_headers, callbacks_->streamInfo());
@@ -470,7 +474,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
         Http::Code::ServiceUnavailable, "maintenance mode",
         [modify_headers, this](Http::HeaderMap& headers) {
           if (!config_.suppress_envoy_headers_) {
-            headers.insertEnvoyOverloaded().value(Http::Headers::get().EnvoyOverloadedValues.True);
+            headers.setReferenceEnvoyOverloaded(Http::Headers::get().EnvoyOverloadedValues.True);
           }
           // Note: append_cluster_info does not respect suppress_envoy_headers.
           modify_headers(headers);
@@ -526,7 +530,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
 
   include_attempt_count_ = route_entry_->includeAttemptCount();
   if (include_attempt_count_) {
-    headers.insertEnvoyAttemptCount().value(attempt_count_);
+    headers.setEnvoyAttemptCount(attempt_count_);
   }
 
   // Inject the active span's tracing context into the request headers.
@@ -565,7 +569,6 @@ Http::ConnectionPool::Instance* Filter::getConnPool() {
   // Choose protocol based on cluster configuration and downstream connection
   // Note: Cluster may downgrade HTTP2 to HTTP1 based on runtime configuration.
   Http::Protocol protocol = cluster_->upstreamHttpProtocol(callbacks_->streamInfo().protocol());
-
   transport_socket_options_ = Network::TransportSocketOptionsUtility::fromFilterState(
       callbacks_->streamInfo().filterState());
 
@@ -745,7 +748,7 @@ void Filter::onResponseTimeout() {
       // If this upstream request already hit a "soft" timeout, then it
       // already recorded a timeout into outlier detection. Don't do it again.
       if (!upstream_request->outlier_detection_timeout_recorded_) {
-        updateOutlierDetection(Upstream::Outlier::Result::LOCAL_ORIGIN_TIMEOUT, *upstream_request,
+        updateOutlierDetection(Upstream::Outlier::Result::LocalOriginTimeout, *upstream_request,
                                absl::optional<uint64_t>(enumToInt(timeout_response_code_)));
       }
 
@@ -763,7 +766,7 @@ void Filter::onResponseTimeout() {
 void Filter::onSoftPerTryTimeout(UpstreamRequest& upstream_request) {
   // Track this as a timeout for outlier detection purposes even though we didn't
   // cancel the request yet and might get a 2xx later.
-  updateOutlierDetection(Upstream::Outlier::Result::LOCAL_ORIGIN_TIMEOUT, upstream_request,
+  updateOutlierDetection(Upstream::Outlier::Result::LocalOriginTimeout, upstream_request,
                          absl::optional<uint64_t>(enumToInt(timeout_response_code_)));
   upstream_request.outlier_detection_timeout_recorded_ = true;
 
@@ -801,7 +804,7 @@ void Filter::onPerTryTimeout(UpstreamRequest& upstream_request) {
 
   upstream_request.resetStream();
 
-  updateOutlierDetection(Upstream::Outlier::Result::LOCAL_ORIGIN_TIMEOUT, upstream_request,
+  updateOutlierDetection(Upstream::Outlier::Result::LocalOriginTimeout, upstream_request,
                          absl::optional<uint64_t>(enumToInt(timeout_response_code_)));
 
   if (maybeRetryReset(Http::StreamResetReason::LocalReset, upstream_request)) {
@@ -870,7 +873,7 @@ void Filter::onUpstreamAbort(Http::Code code, StreamInfo::ResponseFlag response_
         code, body,
         [dropped, this](Http::HeaderMap& headers) {
           if (dropped && !config_.suppress_envoy_headers_) {
-            headers.insertEnvoyOverloaded().value(Http::Headers::get().EnvoyOverloadedValues.True);
+            headers.setReferenceEnvoyOverloaded(Http::Headers::get().EnvoyOverloadedValues.True);
           }
           modify_headers_(headers);
         },
@@ -914,7 +917,7 @@ void Filter::onUpstreamReset(Http::StreamResetReason reset_reason,
   // treated as external origin error and distinguished from local origin error.
   // This matters only when running OutlierDetection with split_external_local_origin_errors
   // config param set to true.
-  updateOutlierDetection(Upstream::Outlier::Result::LOCAL_ORIGIN_CONNECT_FAILED, upstream_request,
+  updateOutlierDetection(Upstream::Outlier::Result::LocalOriginConnectFailed, upstream_request,
                          absl::nullopt);
 
   if (maybeRetryReset(reset_reason, upstream_request)) {
@@ -1132,7 +1135,7 @@ void Filter::onUpstreamHeaders(uint64_t response_code, Http::HeaderMapPtr&& head
     std::chrono::milliseconds ms = std::chrono::duration_cast<std::chrono::milliseconds>(
         response_received_time - downstream_request_complete_time_);
     if (!config_.suppress_envoy_headers_) {
-      headers->insertEnvoyUpstreamServiceTime().value(ms.count());
+      headers->setEnvoyUpstreamServiceTime(ms.count());
     }
   }
 
@@ -1322,7 +1325,7 @@ void Filter::doRetry() {
   }
 
   if (include_attempt_count_) {
-    downstream_headers_->insertEnvoyAttemptCount().value(attempt_count_);
+    downstream_headers_->setEnvoyAttemptCount(attempt_count_);
   }
 
   ASSERT(response_timeout_ || timeout_.global_timeout_.count() == 0);
@@ -1617,7 +1620,7 @@ void Filter::UpstreamRequest::onPoolReady(Http::StreamEncoder& request_encoder,
   ScopeTrackerScopeState scope(&parent_.callbacks_->scope(), parent_.callbacks_->dispatcher());
   ENVOY_STREAM_LOG(debug, "pool ready", *parent_.callbacks_);
 
-  host->outlierDetector().putResult(Upstream::Outlier::Result::LOCAL_ORIGIN_CONNECT_SUCCESS);
+  host->outlierDetector().putResult(Upstream::Outlier::Result::LocalOriginConnectSuccess);
 
   // TODO(ggreenway): set upstream local address in the StreamInfo.
   onUpstreamHostSelected(host);

@@ -19,6 +19,10 @@ build --action_env=BAZEL_LINKLIBS=-l%:libstdc++.a
 build --action_env=BAZEL_LINKOPTS=-lm
 build --host_javabase=@bazel_tools//tools/jdk:remote_jdk11
 build --javabase=@bazel_tools//tools/jdk:remote_jdk11
+build --enable_platform_specific_config
+
+# Enable position independent code, this option is not supported on Windows and default on on macOS.
+build:linux --copt=-fPIC
 
 # We already have absl in the build, define absl=1 to tell googletest to use absl for backtrace.
 build --define absl=1
@@ -39,6 +43,7 @@ build:clang --action_env=BAZEL_COMPILER=clang
 build:clang --linkopt=-fuse-ld=lld
 
 # Basic ASAN/UBSAN that works for gcc
+build:asan --action_env=ENVOY_ASAN=1
 build:asan --config=sanitizer
 # ASAN install its signal handler, disable ours so the stacktrace will be printed by ASAN
 build:asan --define signal_trace=disabled
@@ -70,6 +75,7 @@ build:macos-asan --copt -DGRPC_BAZEL_BUILD
 build:macos-asan --dynamic_mode=off
 
 # Clang TSAN
+build:clang-tsan --action_env=ENVOY_TSAN=1
 build:clang-tsan --config=sanitizer
 build:clang-tsan --define ENVOY_CONFIG_TSAN=1
 build:clang-tsan --copt -fsanitize=thread
@@ -80,6 +86,7 @@ build:clang-tsan --copt -DEVENT__DISABLE_DEBUG_MODE
 
 # Clang MSAN - broken today since we need to rebuild lib[std]c++ and external deps with MSAN
 # support (see https://github.com/envoyproxy/envoy/issues/443).
+build:clang-msan --action_env=ENVOY_MSAN=1
 build:clang-msan --config=sanitizer
 build:clang-msan --define ENVOY_CONFIG_MSAN=1
 build:clang-msan --copt -fsanitize=memory
@@ -87,10 +94,9 @@ build:clang-msan --linkopt -fsanitize=memory
 build:clang-msan --copt -fsanitize-memory-track-origins=2
 
 # Clang with libc++
-# TODO(cmluciano) fix and re-enable _LIBCPP_VERSION testing for TCMALLOC in Envoy::Stats::TestUtil::hasDeterministicMallocStats
-# and update stats_integration_test with appropriate m_per_cluster value
 build:libc++ --config=clang
 build:libc++ --action_env=CXXFLAGS=-stdlib=libc++
+build:libc++ --action_env=LDFLAGS=-stdlib=libc++
 build:libc++ --action_env=BAZEL_CXXOPTS=-stdlib=libc++
 build:libc++ --action_env=BAZEL_LINKLIBS=-l%:libc++.a:-l%:libc++abi.a:-lm
 build:libc++ --define force_libcpp=enabled
@@ -115,6 +121,8 @@ build:rbe-toolchain-clang-libc++ --config=rbe-toolchain
 build:rbe-toolchain-clang-libc++ --crosstool_top=@rbe_ubuntu_clang_libcxx//cc:toolchain
 build:rbe-toolchain-clang-libc++ --extra_toolchains=@rbe_ubuntu_clang_libcxx//config:cc-toolchain
 build:rbe-toolchain-clang-libc++ --action_env=CC=clang --action_env=CXX=clang++ --action_env=PATH=/usr/sbin:/usr/bin:/sbin:/bin:/opt/llvm/bin
+build:rbe-toolchain-clang-libc++ --action_env=CXXFLAGS=-stdlib=libc++
+build:rbe-toolchain-clang-libc++ --action_env=LDFLAGS=-stdlib=libc++
 build:rbe-toolchain-clang-libc++ --define force_libcpp=enabled
 
 build:rbe-toolchain-gcc --config=rbe-toolchain
@@ -125,17 +133,22 @@ build:remote --spawn_strategy=remote,sandboxed,local
 build:remote --strategy=Javac=remote,sandboxed,local
 build:remote --strategy=Closure=remote,sandboxed,local
 build:remote --strategy=Genrule=remote,sandboxed,local
-build:remote --remote_timeout=3600
+build:remote --remote_timeout=7200
 build:remote --auth_enabled=true
-build:remote --experimental_inmemory_jdeps_files
-build:remote --experimental_inmemory_dotd_files
-build:remote --experimental_remote_download_outputs=toplevel
+build:remote --remote_download_toplevel
 
 build:remote-clang --config=remote
 build:remote-clang --config=rbe-toolchain-clang
 
+build:remote-clang-libc++ --config=remote
+build:remote-clang-libc++ --config=rbe-toolchain-clang-libc++
+
+build:remote-gcc --config=remote
+build:remote-gcc --config=rbe-toolchain-gcc
+
 # Docker sandbox
-build:docker-sandbox --experimental_docker_image=envoyproxy/envoy-build@sha256:3ca8acc35fdb57ab26e1bb5f9488f37095f45acd77a12602510410dbefa00b58
+# NOTE: Update this from https://github.com/envoyproxy/envoy-build-tools/blob/master/toolchains/rbe_toolchains_config.bzl#L7
+build:docker-sandbox --experimental_docker_image=envoyproxy/envoy-build-ubuntu@sha256:f0b2453c3587e3297f5caf5e97fbf57c97592c96136209ec13fe2795aae2c896
 build:docker-sandbox --spawn_strategy=docker
 build:docker-sandbox --strategy=Javac=docker
 build:docker-sandbox --strategy=Closure=docker
@@ -147,17 +160,23 @@ build:docker-sandbox --experimental_enable_docker_sandbox
 build:docker-clang --config=docker-sandbox
 build:docker-clang --config=rbe-toolchain-clang
 
+build:docker-clang-libc++ --config=docker-sandbox
+build:docker-clang-libc++ --config=rbe-toolchain-clang-libc++
+
+build:docker-gcc --config=docker-sandbox
+build:docker-gcc --config=rbe-toolchain-gcc
+
 # CI configurations
 build:remote-ci --remote_cache=grpcs://remotebuildexecution.googleapis.com
 build:remote-ci --remote_executor=grpcs://remotebuildexecution.googleapis.com
 
 # Fuzz builds
-build:asan-fuzzer --config=asan
+build:asan-fuzzer --config=clang-asan
 build:asan-fuzzer --define=FUZZING_ENGINE=libfuzzer
 build:asan-fuzzer --copt=-DFUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION
 build:asan-fuzzer --copt=-fsanitize=fuzzer-no-link
 # Remove UBSAN halt_on_error to avoid crashing on protobuf errors.
 build:asan-fuzzer --test_env=UBSAN_OPTIONS=print_stacktrace=1
 
-try-import clang.bazelrc
-try-import user.bazelrc
+try-import %workspace%/clang.bazelrc
+try-import %workspace%/user.bazelrc

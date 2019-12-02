@@ -241,14 +241,16 @@ message GrpcStatusFilter {
 
 // Extension filter is statically registered at runtime.
 message ExtensionFilter {
+  reserved 2;
+
+  reserved "config";
+
   // The name of the filter implementation to instantiate. The name must
   // match a statically registered filter.
   string name = 1;
 
   // Custom configuration that depends on the filter being instantiated.
   oneof config_type {
-    google.protobuf.Struct config = 2;
-
     google.protobuf.Any typed_config = 3;
   }
 }

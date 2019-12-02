@@ -152,6 +152,7 @@ envoy_cc_library(
         "//include/envoy/grpc:google_grpc_creds_interface",
         "//include/envoy/thread:thread_interface",
         "//include/envoy/thread_local:thread_local_interface",
+        "//source/common/common:base64_lib",
         "//source/common/common:empty_string",
         "//source/common/common:linked_object",
         "//source/common/common:thread_annotations",
@@ -181,5 +182,6 @@ envoy_cc_library(
         "//include/envoy/grpc:google_grpc_creds_interface",
         "//include/envoy/registry",
         "//source/common/config:datasource_lib",
+        "@envoy_api//envoy/api/v2/core:pkg_cc_proto",
     ],
 )

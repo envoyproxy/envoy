@@ -146,7 +146,6 @@ envoy_cc_library(
         "//source/common/common:utility_lib",
         "//source/common/protobuf",
         "//source/common/singleton:const_singleton",
-        "@envoy_api//envoy/config/metrics/v2:pkg_cc_proto",
     ],
 )
 
@@ -244,6 +243,7 @@ envoy_cc_library(
         "//include/envoy/common:time_interface",
         "//include/envoy/stats:stats_interface",
         "//include/envoy/stats:timespan_interface",
+        "//source/common/common:assert_lib",
     ],
 )
 

@@ -49,9 +49,9 @@ int32_t QueryMessageInfo::parseMaxTime(const QueryMessage& query) {
     return 0;
   }
 
-  if (field->type() == Bson::Field::Type::INT32) {
+  if (field->type() == Bson::Field::Type::Int32) {
     return field->asInt32();
-  } else if (field->type() == Bson::Field::Type::INT64) {
+  } else if (field->type() == Bson::Field::Type::Int64) {
     return static_cast<int32_t>(field->asInt64());
   } else {
     return 0;
@@ -65,7 +65,7 @@ const Bson::Document* QueryMessageInfo::parseCommand(const QueryMessage& query) 
 
   // See if there is a $query document, and use that to find the command if so.
   const Bson::Document* doc_to_use = query.query();
-  const Bson::Field* field = query.query()->find("$query", Bson::Field::Type::DOCUMENT);
+  const Bson::Field* field = query.query()->find("$query", Bson::Field::Type::Document);
   if (field) {
     doc_to_use = &field->asDocument();
   }
@@ -78,7 +78,7 @@ const Bson::Document* QueryMessageInfo::parseCommand(const QueryMessage& query) 
 }
 
 std::string QueryMessageInfo::parseCallingFunction(const QueryMessage& query) {
-  const Bson::Field* field = query.query()->find("$comment", Bson::Field::Type::STRING);
+  const Bson::Field* field = query.query()->find("$comment", Bson::Field::Type::String);
   if (!field) {
     return "";
   }
@@ -101,7 +101,7 @@ QueryMessageInfo::QueryType QueryMessageInfo::parseType(const QueryMessage& quer
   if (type == QueryType::ScatterGet) {
     // If we didn't find it in the top level, see if we have a top level $query element and look
     // there.
-    const Bson::Field* field = query.query()->find("$query", Bson::Field::Type::DOCUMENT);
+    const Bson::Field* field = query.query()->find("$query", Bson::Field::Type::Document);
     if (field) {
       type = parseTypeFromDocument(field->asDocument());
     }
@@ -118,7 +118,7 @@ QueryMessageInfo::parseTypeFromDocument(const Bson::Document& document) {
   }
 
   // For now we call any query where _id is equal to a non-scalar value a multi get.
-  if (field->type() == Bson::Field::Type::DOCUMENT || field->type() == Bson::Field::Type::ARRAY) {
+  if (field->type() == Bson::Field::Type::Document || field->type() == Bson::Field::Type::Array) {
     return QueryType::MultiGet;
   }
 
@@ -127,12 +127,12 @@ QueryMessageInfo::parseTypeFromDocument(const Bson::Document& document) {
 
 void QueryMessageInfo::parseFindCommand(const Bson::Document& command) {
   collection_ = command.values().front()->asString();
-  const Bson::Field* comment = command.find("comment", Bson::Field::Type::STRING);
+  const Bson::Field* comment = command.find("comment", Bson::Field::Type::String);
   if (comment) {
     callsite_ = parseCallingFunctionJson(comment->asString());
   }
 
-  const Bson::Field* filter = command.find("filter", Bson::Field::Type::DOCUMENT);
+  const Bson::Field* filter = command.find("filter", Bson::Field::Type::Document);
   if (filter) {
     type_ = parseTypeFromDocument(filter->asDocument());
   }

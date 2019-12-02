@@ -115,7 +115,8 @@ MockWorkerFactory::~MockWorkerFactory() = default;
 MockWorker::MockWorker() {
   ON_CALL(*this, addListener(_, _))
       .WillByDefault(
-          Invoke([this](Network::ListenerConfig&, AddListenerCompletion completion) -> void {
+          Invoke([this](Network::ListenerConfig& config, AddListenerCompletion completion) -> void {
+            config.listenSocketFactory().getListenSocket();
             EXPECT_EQ(nullptr, add_listener_completion_);
             add_listener_completion_ = completion;
           }));
@@ -126,6 +127,13 @@ MockWorker::MockWorker() {
             EXPECT_EQ(nullptr, remove_listener_completion_);
             remove_listener_completion_ = completion;
           }));
+
+  ON_CALL(*this, stopListener(_, _))
+      .WillByDefault(Invoke([](Network::ListenerConfig&, std::function<void()> completion) -> void {
+        if (completion != nullptr) {
+          completion();
+        }
+      }));
 }
 MockWorker::~MockWorker() = default;
 

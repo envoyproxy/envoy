@@ -23,8 +23,12 @@
 #include "envoy/thread_local/thread_local.h"
 
 #include "common/common/callback_impl.h"
+#include "common/common/cleanup.h"
 #include "common/common/logger.h"
+#include "common/config/resources.h"
+#include "common/init/manager_impl.h"
 #include "common/init/target_impl.h"
+#include "common/init/watcher_impl.h"
 #include "common/protobuf/utility.h"
 #include "common/router/route_config_update_receiver_impl.h"
 #include "common/router/vhds.h"
@@ -111,6 +115,9 @@ public:
     return route_config_providers_;
   }
   RouteConfigUpdatePtr& routeConfigUpdate() { return config_update_info_; }
+  void maybeCreateInitManager(const std::string& version_info,
+                              std::unique_ptr<Init::ManagerImpl>& init_manager,
+                              std::unique_ptr<Cleanup>& resume_rds);
 
 private:
   // Config::SubscriptionCallbacks

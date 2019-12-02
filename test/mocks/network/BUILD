@@ -21,6 +21,15 @@ envoy_cc_mock(
 )
 
 envoy_cc_mock(
+    name = "io_handle_mocks",
+    srcs = ["io_handle.cc"],
+    hdrs = ["io_handle.h"],
+    deps = [
+        "//include/envoy/network:io_handle_interface",
+    ],
+)
+
+envoy_cc_mock(
     name = "network_mocks",
     srcs = ["mocks.cc"],
     hdrs = ["mocks.h"],
@@ -51,6 +60,5 @@ envoy_cc_mock(
     deps = [
         "//include/envoy/network:transport_socket_interface",
         "//source/common/network:utility_lib",
-        "@envoy_api//envoy/api/v2/core:pkg_cc_proto",
     ],
 )

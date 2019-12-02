@@ -1,16 +1,5 @@
 #include "utility.h"
 
-#ifdef WIN32
-#include <windows.h>
-// <windows.h> uses macros to #define a ton of symbols, two of which (DELETE and GetMessage)
-// interfere with our code. DELETE shows up in the base.pb.h header generated from
-// api/envoy/api/core/base.proto. Since it's a generated header, we can't #undef DELETE at
-// the top of that header to avoid the collision. Similarly, GetMessage shows up in generated
-// protobuf code so we can't #undef the symbol there.
-#undef DELETE
-#undef GetMessage
-#endif
-
 #include <cstdint>
 #include <fstream>
 #include <iomanip>
@@ -26,6 +15,7 @@
 #include "envoy/api/v2/rds.pb.h"
 #include "envoy/api/v2/route/route.pb.h"
 #include "envoy/buffer/buffer.h"
+#include "envoy/common/platform.h"
 #include "envoy/http/codec.h"
 #include "envoy/service/discovery/v2/rtds.pb.h"
 
@@ -37,18 +27,18 @@
 #include "common/common/thread_impl.h"
 #include "common/common/utility.h"
 #include "common/config/resources.h"
+#include "common/filesystem/directory.h"
+#include "common/filesystem/filesystem_impl.h"
 #include "common/json/json_loader.h"
 #include "common/network/address_impl.h"
 #include "common/network/utility.h"
-#include "common/filesystem/directory.h"
-#include "common/filesystem/filesystem_impl.h"
 
+#include "test/mocks/stats/mocks.h"
 #include "test/test_common/printers.h"
 #include "test/test_common/test_time.h"
 
 #include "absl/strings/str_cat.h"
 #include "absl/strings/string_view.h"
-#include "test/mocks/stats/mocks.h"
 #include "gtest/gtest.h"
 
 using testing::GTEST_FLAG(random_seed);
@@ -450,9 +440,11 @@ std::string TestHeaderMapImpl::get_(const LowerCaseString& key) const {
   }
 }
 
-bool TestHeaderMapImpl::has(const std::string& key) { return get(LowerCaseString(key)) != nullptr; }
+bool TestHeaderMapImpl::has(const std::string& key) const {
+  return get(LowerCaseString(key)) != nullptr;
+}
 
-bool TestHeaderMapImpl::has(const LowerCaseString& key) { return get(key) != nullptr; }
+bool TestHeaderMapImpl::has(const LowerCaseString& key) const { return get(key) != nullptr; }
 
 } // namespace Http
 

@@ -9,10 +9,10 @@
 #include "common/common/fmt.h"
 #include "common/common/hex.h"
 #include "common/common/utility.h"
-#include "common/config/json_utility.h"
+#include "common/config/api_type_db.h"
 #include "common/config/resources.h"
+#include "common/config/version_converter.h"
 #include "common/config/well_known_names.h"
-#include "common/json/config_schemas.h"
 #include "common/protobuf/protobuf.h"
 #include "common/protobuf/utility.h"
 #include "common/stats/stats_matcher_impl.h"
@@ -185,20 +185,6 @@ Utility::configSourceInitialFetchTimeout(const envoy::api::v2::core::ConfigSourc
       PROTOBUF_GET_MS_OR_DEFAULT(config_source, initial_fetch_timeout, 15000));
 }
 
-void Utility::translateRdsConfig(
-    const Json::Object& json_rds,
-    envoy::config::filter::network::http_connection_manager::v2::Rds& rds) {
-  json_rds.validateSchema(Json::Schema::RDS_CONFIGURATION_SCHEMA);
-
-  const std::string name = json_rds.getString("route_config_name", "");
-  rds.set_route_config_name(name);
-
-  translateApiConfigSource(json_rds.getString("cluster"),
-                           json_rds.getInteger("refresh_delay_ms", 30000),
-                           json_rds.getString("api_type", ApiType::get().UnsupportedRestLegacy),
-                           *rds.mutable_config_source()->mutable_api_config_source());
-}
-
 RateLimitSettings
 Utility::parseRateLimitSettings(const envoy::api::v2::core::ApiConfigSource& api_config_source) {
   RateLimitSettings rate_limit_settings;
@@ -256,20 +242,26 @@ envoy::api::v2::ClusterLoadAssignment Utility::translateClusterHosts(
   return load_assignment;
 }
 
-namespace {
-absl::string_view protoTypeUrlToDescriptorFullName(absl::string_view type_url) {
-  size_t pos = type_url.find_last_of('/');
-  if (pos != absl::string_view::npos) {
-    type_url = type_url.substr(pos + 1);
-  }
-  return type_url;
-}
-} // namespace
-
-void Utility::translateOpaqueConfig(const ProtobufWkt::Any& typed_config,
+void Utility::translateOpaqueConfig(absl::string_view extension_name,
+                                    const ProtobufWkt::Any& typed_config,
                                     const ProtobufWkt::Struct& config,
                                     ProtobufMessage::ValidationVisitor& validation_visitor,
                                     Protobuf::Message& out_proto) {
+  const Protobuf::Descriptor* earlier_version_desc = ApiTypeDb::inferEarlierVersionDescriptor(
+      extension_name, typed_config, out_proto.GetDescriptor()->full_name());
+
+  if (earlier_version_desc != nullptr) {
+    Protobuf::DynamicMessageFactory dmf;
+    // Create a previous version message.
+    auto message = ProtobufTypes::MessagePtr(dmf.GetPrototype(earlier_version_desc)->New());
+    ASSERT(message != nullptr);
+    // Recurse and translateOpaqueConfig for previous version.
+    translateOpaqueConfig(extension_name, typed_config, config, validation_visitor, *message);
+    // Update from previous version to current version.
+    VersionConverter::upgrade(*message, out_proto);
+    return;
+  }
+
   static const std::string struct_type =
       ProtobufWkt::Struct::default_instance().GetDescriptor()->full_name();
   static const std::string typed_struct_type =
@@ -279,16 +271,16 @@ void Utility::translateOpaqueConfig(const ProtobufWkt::Any& typed_config,
 
     // Unpack methods will only use the fully qualified type name after the last '/'.
     // https://github.com/protocolbuffers/protobuf/blob/3.6.x/src/google/protobuf/any.proto#L87
-    absl::string_view type = protoTypeUrlToDescriptorFullName(typed_config.type_url());
+    absl::string_view type = TypeUtil::typeUrlToDescriptorFullName(typed_config.type_url());
 
     if (type == typed_struct_type) {
       udpa::type::v1::TypedStruct typed_struct;
-      typed_config.UnpackTo(&typed_struct);
+      MessageUtil::unpackTo(typed_config, typed_struct);
       // if out_proto is expecting Struct, return directly
       if (out_proto.GetDescriptor()->full_name() == struct_type) {
         out_proto.CopyFrom(typed_struct.value());
       } else {
-        type = protoTypeUrlToDescriptorFullName(typed_struct.type_url());
+        type = TypeUtil::typeUrlToDescriptorFullName(typed_struct.type_url());
         if (type != out_proto.GetDescriptor()->full_name()) {
           throw EnvoyException("Invalid proto type.\nExpected " +
                                out_proto.GetDescriptor()->full_name() +
@@ -298,10 +290,10 @@ void Utility::translateOpaqueConfig(const ProtobufWkt::Any& typed_config,
       }
     } // out_proto is expecting Struct, unpack directly
     else if (type != struct_type || out_proto.GetDescriptor()->full_name() == struct_type) {
-      typed_config.UnpackTo(&out_proto);
+      MessageUtil::unpackTo(typed_config, out_proto);
     } else {
       ProtobufWkt::Struct struct_config;
-      typed_config.UnpackTo(&struct_config);
+      MessageUtil::unpackTo(typed_config, struct_config);
       MessageUtil::jsonConvert(struct_config, validation_visitor, out_proto);
     }
   }
@@ -309,28 +301,6 @@ void Utility::translateOpaqueConfig(const ProtobufWkt::Any& typed_config,
   if (!config.fields().empty()) {
     MessageUtil::jsonConvert(config, validation_visitor, out_proto);
   }
-}
-
-bool Utility::allowDeprecatedV1Config(Runtime::Loader& runtime, const Json::Object& config) {
-  if (!config.getBoolean("deprecated_v1", false)) {
-    return false;
-  }
-
-  constexpr char error[] =
-      "Using deprecated v1 JSON config load via 'deprecated_v1: true'. This configuration will "
-      "be removed from Envoy soon. Please see "
-      "https://www.envoyproxy.io/docs/envoy/latest/intro/deprecated for details. The "
-      "`envoy.deprecated_features.v1_filter_json_config` runtime key can be used to temporarily "
-      "enable this feature once the deprecation becomes fail by default.";
-
-  if (!runtime.snapshot().deprecatedFeatureEnabled(
-          "envoy.deprecated_features.v1_filter_json_config")) {
-    throw EnvoyException(error);
-  } else {
-    ENVOY_LOG_MISC(warn, "{}", error);
-  }
-
-  return true;
 }
 
 BackOffStrategyPtr Utility::prepareDnsRefreshStrategy(const envoy::api::v2::Cluster& cluster,
