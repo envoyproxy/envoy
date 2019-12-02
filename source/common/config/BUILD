@@ -9,6 +9,17 @@ load(
 envoy_package()
 
 envoy_cc_library(
+    name = "api_type_db_lib",
+    srcs = ["api_type_db.cc"],
+    hdrs = ["api_type_db.h"],
+    deps = [
+        "//source/common/protobuf",
+        "//source/common/protobuf:utility_lib",
+        "@com_github_cncf_udpa//udpa/type/v1:typed_struct_cc",
+    ],
+)
+
+envoy_cc_library(
     name = "config_provider_lib",
     srcs = ["config_provider_impl.cc"],
     hdrs = ["config_provider_impl.h"],
@@ -289,7 +300,9 @@ envoy_cc_library(
     srcs = ["utility.cc"],
     hdrs = ["utility.h"],
     deps = [
+        ":api_type_db_lib",
         ":resources_lib",
+        ":version_converter_lib",
         "//include/envoy/config:grpc_mux_interface",
         "//include/envoy/config:subscription_interface",
         "//include/envoy/local_info:local_info_interface",
