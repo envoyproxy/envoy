@@ -86,7 +86,6 @@ envoy_cc_test(
     srcs = ["grpc_mux_impl_test.cc"],
     deps = [
         "//source/common/config:grpc_mux_lib",
-        "//source/common/config:protobuf_link_hacks",
         "//source/common/config:resources_lib",
         "//source/common/protobuf",
         "//source/common/stats:isolated_store_lib",
@@ -108,7 +107,6 @@ envoy_cc_test(
     srcs = ["new_grpc_mux_impl_test.cc"],
     deps = [
         "//source/common/config:new_grpc_mux_lib",
-        "//source/common/config:protobuf_link_hacks",
         "//source/common/config:resources_lib",
         "//source/common/protobuf",
         "//source/common/stats:isolated_store_lib",

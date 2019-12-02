@@ -8,7 +8,6 @@
 #include "envoy/grpc/status.h"
 #include "envoy/service/discovery/v2/ads.pb.h"
 
-#include "common/config/protobuf_link_hacks.h"
 #include "common/config/resources.h"
 #include "common/protobuf/protobuf.h"
 #include "common/protobuf/utility.h"

@@ -27,7 +27,6 @@ envoy_cc_test_library(
     ],
     deps = [
         ":http_integration_lib",
-        "//source/common/config:protobuf_link_hacks",
         "//source/common/config:resources_lib",
         "//source/common/protobuf:utility_lib",
         "//source/extensions/filters/network/redis_proxy:config",
@@ -45,7 +44,6 @@ envoy_cc_test(
     deps = [
         ":ads_integration_lib",
         ":http_integration_lib",
-        "//source/common/config:protobuf_link_hacks",
         "//source/common/config:resources_lib",
         "//source/common/protobuf:utility_lib",
         "//test/common/grpc:grpc_client_integration_lib",
@@ -83,7 +81,6 @@ envoy_cc_test(
     ],
     deps = [
         ":http_integration_lib",
-        "//source/common/config:protobuf_link_hacks",
         "//source/common/config:resources_lib",
         "//source/common/protobuf:utility_lib",
         "//test/common/grpc:grpc_client_integration_lib",
@@ -165,7 +162,6 @@ envoy_cc_test(
     ],
     deps = [
         ":http_integration_lib",
-        "//source/common/config:protobuf_link_hacks",
         "//source/common/config:resources_lib",
         "//source/common/protobuf:utility_lib",
         "//test/common/grpc:grpc_client_integration_lib",
@@ -712,7 +708,6 @@ envoy_cc_test(
     ],
     deps = [
         ":http_integration_lib",
-        "//source/common/config:protobuf_link_hacks",
         "//source/common/config:resources_lib",
         "//source/common/event:dispatcher_includes",
         "//source/common/event:dispatcher_lib",

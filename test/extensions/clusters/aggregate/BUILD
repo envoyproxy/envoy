@@ -50,7 +50,6 @@ envoy_extension_cc_test(
     srcs = ["cluster_integration_test.cc"],
     extension_name = "envoy.clusters.aggregate",
     deps = [
-        "//source/common/config:protobuf_link_hacks",
         "//source/common/config:resources_lib",
         "//source/common/protobuf:utility_lib",
         "//source/extensions/clusters/aggregate:cluster",

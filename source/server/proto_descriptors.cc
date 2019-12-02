@@ -11,7 +11,6 @@
 
 #include "common/common/assert.h"
 #include "common/common/fmt.h"
-#include "common/config/protobuf_link_hacks.h"
 #include "common/protobuf/protobuf.h"
 
 namespace Envoy {

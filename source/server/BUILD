@@ -353,7 +353,6 @@ envoy_cc_library(
     hdrs = ["proto_descriptors.h"],
     deps = [
         "//source/common/common:assert_lib",
-        "//source/common/config:protobuf_link_hacks",
         "//source/common/protobuf",
         "@envoy_api//envoy/api/v2:pkg_cc_proto",
         "@envoy_api//envoy/service/discovery/v2:pkg_cc_proto",

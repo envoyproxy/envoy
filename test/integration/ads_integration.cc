@@ -6,7 +6,6 @@
 #include "envoy/api/v2/lds.pb.h"
 #include "envoy/api/v2/rds.pb.h"
 
-#include "common/config/protobuf_link_hacks.h"
 #include "common/config/resources.h"
 #include "common/protobuf/protobuf.h"
 #include "common/protobuf/utility.h"

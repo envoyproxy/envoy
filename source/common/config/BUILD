@@ -229,15 +229,6 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "protobuf_link_hacks",
-    hdrs = ["protobuf_link_hacks.h"],
-    deps = [
-        "@envoy_api//envoy/service/discovery/v2:pkg_cc_proto",
-        "@envoy_api//envoy/service/ratelimit/v2:pkg_cc_proto",
-    ],
-)
-
-envoy_cc_library(
     name = "remote_data_fetcher_lib",
     srcs = ["remote_data_fetcher.cc"],
     hdrs = ["remote_data_fetcher.h"],
