@@ -65,7 +65,7 @@ QUICHE_FLAG(bool, quic_reloadable_flag_quic_bbr_startup_rate_reduction, false,
             "BBR's pacing rate in STARTUP as more losses occur as a fraction of CWND.")
 
 QUICHE_FLAG(bool, quic_reloadable_flag_quic_close_all_encryptions_levels, true,
-            "If true, QUIC connection close packet will be sent at all avaiable "
+            "If true, QUIC connection close packet will be sent at all available "
             "encryption levels.")
 
 QUICHE_FLAG(bool, quic_reloadable_flag_quic_close_connection_and_discard_data_on_wrong_offset,
