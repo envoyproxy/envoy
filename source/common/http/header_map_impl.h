@@ -1,8 +1,14 @@
 #pragma once
 
+#define HEADER_MAP_USE_MULTI_MAP true
+#define HEADER_MAP_USE_FLAT_HASH_MAP false
+
 #include <array>
 #include <cstdint>
 #include <list>
+#if HEADER_MAP_USE_MULTI_MAP
+#include <map>
+#endif
 #include <memory>
 #include <string>
 
@@ -11,7 +17,9 @@
 #include "common/common/non_copyable.h"
 #include "common/http/headers.h"
 
+#if HEADER_MAP_USE_FLAT_HASH_MAP
 #include "absl/container/flat_hash_map.h"
+#endif
 
 namespace Envoy {
 namespace Http {
@@ -102,8 +110,14 @@ public:
 protected:
   struct HeaderEntryImpl;
   using HeaderNode = std::list<HeaderEntryImpl>::iterator;
+#if HEADER_MAP_USE_FLAT_HASH_MAP
   using HeaderNodeVector = std::vector<HeaderNode>;
   using HeaderLazyMap = absl::flat_hash_map<absl::string_view, HeaderNodeVector>;
+  //using HeaderLazyMap = std::map<absl::string_view, HeaderNodeVector>;
+#endif
+#if HEADER_MAP_USE_MULTI_MAP
+  using HeaderLazyMap = std::multimap<absl::string_view, HeaderNode>;
+#endif
 
   // For tests only, unoptimized, they aren't intended for regular HeaderMapImpl users.
   void copyFrom(const HeaderMap& rhs);
@@ -170,7 +184,12 @@ protected:
                                       std::forward<Key>(key), std::forward<Value>(value)...);
       addSize(i->key().size() + i->value().size());
       if (!lazy_map_.empty()) {
+#if HEADER_MAP_USE_FLAT_HASH_MAP
         lazy_map_[i->key().getStringView()].push_back(i);
+#endif
+#if HEADER_MAP_USE_MULTI_MAP
+        lazy_map_.insert(std::make_pair(i->key().getStringView(), i));
+#endif
       }
       if (!is_pseudo_header && pseudo_headers_end_ == headers_.end()) {
         pseudo_headers_end_ = i;

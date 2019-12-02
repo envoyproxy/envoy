@@ -456,10 +456,19 @@ void HeaderMapImpl::addCopy(const LowerCaseString& key, absl::string_view value)
 void HeaderMapImpl::append(const LowerCaseString& key, absl::string_view value) {
   HeaderLazyMap::iterator iter = headers_.find(key.get());
   if (iter != headers_.findEnd()) {
+#if HEADER_MAP_USE_FLAT_HASH_MAP
     HeaderNodeVector& v = iter->second;
     for (HeaderNode node : v) {
       headers_.appendToHeader(node->value(), value);
     }
+#endif
+#if HEADER_MAP_USE_MULTI_MAP
+    do {
+      HeaderNode node = iter->second;
+      headers_.appendToHeader(node->value(), value);
+      ++iter;
+    } while (iter != headers_.findEnd() && iter->second->key().getStringView() == key.get());
+#endif
   } else {
     addCopy(key, value);
   }
@@ -488,11 +497,21 @@ void HeaderMapImpl::setCopy(const LowerCaseString& key, absl::string_view value)
   // Replaces a header if it exists, otherwise adds by copy.
   HeaderLazyMap::iterator iter = headers_.find(key.get());
   if (iter != headers_.findEnd()) {
+#if HEADER_MAP_USE_FLAT_HASH_MAP
     HeaderNodeVector& v = iter->second;
     for (HeaderNode node : v) {
       headers_.updateSize(node->value().size(), value.size());
       node->value(value);
     }
+#endif
+#if HEADER_MAP_USE_MULTI_MAP
+    do {
+      HeaderNode node = iter->second;
+      headers_.updateSize(node->value().size(), value.size());
+      node->value(value);
+      ++iter;
+    } while (iter != headers_.findEnd() && iter->second->key().getStringView() == key.get());
+#endif
   } else {
     addCopy(key, value);
   }
@@ -512,9 +531,14 @@ uint64_t HeaderMapImpl::HeaderList::byteSizeInternal() const {
 const HeaderEntry* HeaderMapImpl::get(const LowerCaseString& key) const {
   HeaderLazyMap::iterator iter = headers_.find(key.get());
   if (iter != headers_.findEnd()) {
+#if HEADER_MAP_USE_FLAT_HASH_MAP
     const HeaderNodeVector& v = iter->second;
     ASSERT(!v.empty()); // It's impossible to have a map entry with an empty vector as its value.
     HeaderEntryImpl& header_entry = *v[0];
+#endif
+#if HEADER_MAP_USE_MULTI_MAP
+    HeaderEntryImpl& header_entry = *(iter->second);
+#endif
     return &header_entry;
   }
   return nullptr;
@@ -569,8 +593,13 @@ HeaderMapImpl::HeaderList::find(absl::string_view key) const {
   if (lazy_map_.empty()) {
     for (auto node = headers_.begin(); node != headers_.end(); ++node) {
       absl::string_view key = node->key().getStringView();
+#if HEADER_MAP_USE_FLAT_HASH_MAP
       HeaderNodeVector& v = lazy_map_[key];
       v.push_back(node);
+#endif
+#if HEADER_MAP_USE_MULTI_MAP
+      lazy_map_.insert(std::make_pair(key, node));
+#endif
     }
   }
   return lazy_map_.find(key);
@@ -590,12 +619,24 @@ void HeaderMapImpl::remove(const LowerCaseString& key) {
 void HeaderMapImpl::HeaderList::remove(absl::string_view key) {
   auto iter = find(key);
   if (iter != lazy_map_.end()) {
+#if HEADER_MAP_USE_FLAT_HASH_MAP
     HeaderNodeVector header_nodes = std::move(iter->second);
     lazy_map_.erase(iter);
     for (const HeaderNode& node : header_nodes) {
       ASSERT(node->key() == key);
       erase(node, false /* clear_from_map */);
     }
+#endif
+#if HEADER_MAP_USE_MULTI_MAP
+    ASSERT(iter->second->key() == key);
+    do {
+      auto iter_to_erase = iter;
+      ++iter;
+      HeaderNode& node = iter_to_erase->second;
+      erase(node, false /* clear_from_map */);
+      lazy_map_.erase(iter_to_erase);
+    } while (iter != lazy_map_.end() && iter->second->key() == key);
+#endif
   }
 }
 
