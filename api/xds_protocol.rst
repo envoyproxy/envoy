@@ -20,10 +20,10 @@ Filesystem subscriptions
 The simplest approach to delivering dynamic configuration is to place it
 at a well known path specified in the :ref:`ConfigSource <envoy_api_msg_core.ConfigSource>`.
 Envoy will use `inotify` (`kqueue` on macOS) to monitor the file for
-changes and parse the 
+changes and parse the
 :ref:`DiscoveryResponse <envoy_api_msg_DiscoveryResponse>` proto in the file on update.
 Binary protobufs, JSON, YAML and proto text are supported formats for
-the 
+the
 :ref:`DiscoveryResponse <envoy_api_msg_DiscoveryResponse>`.
 
 There is no mechanism available for filesystem subscriptions to ACK/NACK
@@ -39,7 +39,8 @@ Streaming gRPC subscriptions
 Resource Types
 ~~~~~~~~~~~~~~
 
-Every configuration resource in the xDS API has a type associated with it. The following types are supported:
+Every configuration resource in the xDS API has a type associated with it. The following types are
+supported:
 
 -  :ref:`envoy.api.v2.Listener <envoy_api_msg_Listener>`
 -  :ref:`envoy.api.v2.RouteConfiguration <envoy_api_msg_RouteConfiguration>`
@@ -50,25 +51,29 @@ Every configuration resource in the xDS API has a type associated with it. The f
 -  :ref:`envoy.api.v2.Auth.Secret <envoy_api_msg_Auth.Secret>`
 -  :ref:`envoy.service.discovery.v2.Runtime <envoy_api_msg_service.discovery.v2.Runtime>`
 
-The concept of `type URLs <https://developers.google.com/protocol-buffers/docs/proto3#any>`_ appears below, and takes the form
-`type.googleapis.com/<resource type>` -- e.g., `type.googleapis.com/envoy.api.v2.Cluster` for a `Cluster` resource. In various
-requests from Envoy and responses by the management server, the resource type URL is stated.
+The concept of `type URLs <https://developers.google.com/protocol-buffers/docs/proto3#any>`_
+appears below, and takes the form `type.googleapis.com/<resource type>` -- e.g.,
+`type.googleapis.com/envoy.api.v2.Cluster` for a `Cluster` resource. In various requests from
+Envoy and responses by the management server, the resource type URL is stated.
 
 API flow
 ~~~~~~~~
 
-The core resource types for the client's configuration are `Listener`, `RouteConfiguration`, `Cluster`, and
-`ClusterLoadAssignment`. Each `Listener` resource may point to a `RouteConfiguration` resource, which may point to one or more
-`Cluster` resources, and each `Cluster` resource may point to a `ClusterLoadAssignment` resource.
+The core resource types for the client's configuration are `Listener`, `RouteConfiguration`,
+`Cluster`, and `ClusterLoadAssignment`. Each `Listener` resource may point to a
+`RouteConfiguration` resource, which may point to one or more `Cluster` resources, and each
+Cluster` resource may point to a `ClusterLoadAssignment` resource.
 
-Envoy fetches all `Listener` and `Cluster` resources at startup. It then fetches whatever `RouteConfiguration` and
-`ClusterLoadAssignment` resources that are required by the `Listener` and `Cluster` resources. In effect, every `Listener`
-or `Cluster` resource is a root to part of Envoy's configuration tree.
+Envoy fetches all `Listener` and `Cluster` resources at startup. It then fetches whatever
+`RouteConfiguration` and `ClusterLoadAssignment` resources that are required by the `Listener` and
+`Cluster` resources. In effect, every `Listener` or `Cluster` resource is a root to part of Envoy's
+configuration tree.
 
-A non-proxy client such as gRPC will start by fetching only the one particular `Listener` resource that is the root of its
-configuration tree. It then fetches the `RouteConfiguration` resource required by that `Listener`, followed by whichever
-`Cluster` resources are required by the `RouteConfiguration`, followed by the `ClusterLoadAssignment` resources required by
-the `Cluster` resources. In effect, the original `Listener` resource is the one single root to the gRPC client's
+A non-proxy client such as gRPC will start by fetching only the one particular `Listener` resource
+that is the root of its configuration tree. It then fetches the `RouteConfiguration` resource
+required by that `Listener`, followed by whichever `Cluster` resources are required by the
+`RouteConfiguration`, followed by the `ClusterLoadAssignment` resources required by the `Cluster`
+resources. In effect, the original `Listener` resource is the one single root to the gRPC client's
 configuration tree.
 
 Variants of the xDS Transport Protocol
@@ -77,24 +82,29 @@ Variants of the xDS Transport Protocol
 Four Variants
 ^^^^^^^^^^^^^
 
-There are four variants of the xDS transport protocol used via streaming gRPC, which cover all combinations of two dimensions.
+There are four variants of the xDS transport protocol used via streaming gRPC, which cover all
+combinations of two dimensions.
 
-The first dimension is State of the World (SotW) vs. incremental. The SotW approach was the original mechanism used by xDS, in
-which the client must specify all resource names it is interested in with each request (except when making a wildcard
-request in LDS/CDS), and the server must return all resources the client has subscribed to in each request (in LDS/CDS).
-This means that if the client is already subscribing to 99 resources and wants to add an additional one, it must send a request
-with all 100 resource names, rather than just the one new one. And the server must then respond by sending all 100 resources,
-even if the 99 that were already subscribed to have not changed (in LDS/CDS). This mechanism can be a scalability limitation,
-which is why the incremental protocol variant was introduced. The incremental approach allows both the client and server to
-indicate only deltas relative to their previous state -- i.e., the client can say that it wants to add or remove its subscription
-to a particular resource name without resending those that have not changed, and the server can send updates only for those
-resources that have changed. The incremental protocol also provides a mechanism for lazy loading of resources. For details on the
-incremental protocol, see :ref:`Incremental xDS <xds_protocol_delta>` below.
+The first dimension is State of the World (SotW) vs. incremental. The SotW approach was the
+original mechanism used by xDS, in which the client must specify all resource names it is
+interested in with each request (except when making a wildcard request in LDS/CDS), and the server
+must return all resources the client has subscribed to in each request (in LDS/CDS). This means
+that if the client is already subscribing to 99 resources and wants to add an additional one, it
+must send a request with all 100 resource names, rather than just the one new one. And the server
+must then respond by sending all 100 resources, even if the 99 that were already subscribed to have
+not changed (in LDS/CDS). This mechanism can be a scalability limitation, which is why the
+incremental protocol variant was introduced. The incremental approach allows both the client and
+server to indicate only deltas relative to their previous state -- i.e., the client can say that
+it wants to add or remove its subscription to a particular resource name without resending those
+that have not changed, and the server can send updates only for those resources that have changed.
+The incremental protocol also provides a mechanism for lazy loading of resources. For details on
+the incremental protocol, see :ref:`Incremental xDS <xds_protocol_delta>` below.
 
-The second dimension is using a separate gRPC stream for each resource type vs. aggregating all resource types onto a
-single gRPC stream. The former approach was the original mechanism used by xDS, and it offers an eventual consistency
-model. The latter approach was added for environments in which explicit control of sequencing is required. For details, see
-:ref:`Eventual consistency considerations <xds_protocol_eventual_consistency_considerations>` below.
+The second dimension is using a separate gRPC stream for each resource type vs. aggregating all
+resource types onto a single gRPC stream. The former approach was the original mechanism used by
+xDS, and it offers an eventual consistency model. The latter approach was added for environments
+in which explicit control of sequencing is required. For details, see :ref:`Eventual consistency
+considerations <xds_protocol_eventual_consistency_considerations>` below.
 
 So, the four variants of the xDS transport protocol are:
 
@@ -106,9 +116,9 @@ So, the four variants of the xDS transport protocol are:
 RPC Services and Methods for Each Variant
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-For the non-aggregated protocol variants, there is a separate RPC service for each resource type. Each of these RPC services can
-provide a method for each of the SotW and Incremental protocol variants. Here are the RPC services and methods for each resource
-type:
+For the non-aggregated protocol variants, there is a separate RPC service for each resource type.
+Each of these RPC services can provide a method for each of the SotW and Incremental protocol
+variants. Here are the RPC services and methods for each resource type:
 
 -  Listener: Listener Discovery Service (LDS)
    -  SotW: ListenerDiscoveryService.StreamListeners
@@ -135,48 +145,58 @@ type:
    -  SotW: RuntimeDiscoveryService.StreamRuntime
    -  Incremental: RuntimeDiscoveryService.DeltaRuntime
 
-In the aggregated protocol variants, all resource types are multiplexed on a single gRPC stream, where each resource type is
-treated as a separate logical stream within the aggregated stream. In effect, it simply combines all of the above separate
-APIs into a single stream by treating requests and responses for each resource type as a separate sub-stream on the single
-aggregated stream. The RPC service and methods for the aggregated protocol variants are:
+In the aggregated protocol variants, all resource types are multiplexed on a single gRPC stream,
+where each resource type is treated as a separate logical stream within the aggregated stream.
+In effect, it simply combines all of the above separate APIs into a single stream by treating
+requests and responses for each resource type as a separate sub-stream on the single aggregated
+stream. The RPC service and methods for the aggregated protocol variants are:
 
 -  SotW: AggregatedDiscoveryService.StreamAggregatedResources
 -  Incremental: AggregatedDiscoveryService.DeltaAggregatedResources
 
-For all of the SotW methods, the request type is :ref:`DiscoveryRequest <envoy_api_msg_DiscoveryRequest>` and the response
-type is :ref:`DiscoveryResponse <envoy_api_msg_DiscoveryResponse>`.
+For all of the SotW methods, the request type is :ref:`DiscoveryRequest
+<envoy_api_msg_DiscoveryRequest>` and the response type is :ref:`DiscoveryResponse
+<envoy_api_msg_DiscoveryResponse>`.
 
-For all of the incremental methods, the request type is :ref:`DeltaDiscoveryRequest <envoy_api_msg_DeltaDiscoveryRequest>` and
-the response type is :ref:`DeltaDiscoveryResponse <envoy_api_msg_DeltaDiscoveryResponse>`.
+For all of the incremental methods, the request type is :ref:`DeltaDiscoveryRequest
+<envoy_api_msg_DeltaDiscoveryRequest>` and the response type is :ref:`DeltaDiscoveryResponse
+<envoy_api_msg_DeltaDiscoveryResponse>`.
 
 Configuring Which Variant to Use
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-In the xDS API, the :ref:`ConfigSource <envoy_api_msg_core.ConfigSource>` message indicates how to obtain resources of a
-particular type. If the :ref:`ConfigSource <envoy_api_msg_core.ConfigSource>` contains a gRPC :ref:`ApiConfigSource
-<envoy_api_msg_core.ApiConfigSource>`, it points to an upstream cluster for the management server; this will initiate an
-independent bidirectional gRPC stream for each xDS resource type, potentially to distinct management servers. If the
+In the xDS API, the :ref:`ConfigSource <envoy_api_msg_core.ConfigSource>` message indicates how to
+obtain resources of a particular type. If the :ref:`ConfigSource <envoy_api_msg_core.ConfigSource>`
+contains a gRPC :ref:`ApiConfigSource <envoy_api_msg_core.ApiConfigSource>`, it points to an
+upstream cluster for the management server; this will initiate an independent bidirectional gRPC
+stream for each xDS resource type, potentially to distinct management servers. If the
 :ref:`ConfigSource <envoy_api_msg_core.ConfigSource>` contains a :ref:`AggregatedConfigSource
-<envoy_api_msg_core.AggregatedConfigSource>`, it tells the client to use :ref:`ADS <xds_protocol_ads>`.
+<envoy_api_msg_core.AggregatedConfigSource>`, it tells the client to use :ref:`ADS
+<xds_protocol_ads>`.
 
-Currently, the client is expected to be given some local configuration that tells it how to obtain the :ref:`Listener
-<envoy_api_msg_Listener>` and :ref:`Cluster <envoy_api_msg_Cluster>` resources. :ref:`Listener <envoy_api_msg_Listener>`
-resources may include a :ref:`ConfigSource <envoy_api_msg_core.ConfigSource>` that indicates how the :ref:`RouteConfiguration
-<envoy_api_msg_RouteConfiguration>` resources are obtained, and :ref:`Cluster <envoy_api_msg_Cluster>` resources may include a
-:ref:`ConfigSource <envoy_api_msg_core.ConfigSource>` that indicates how the :ref:`ClusterLoadAssignment
-<envoy_api_msg_ClusterLoadAssignment>` resources are obtained.
+Currently, the client is expected to be given some local configuration that tells it how to obtain
+the :ref:`Listener <envoy_api_msg_Listener>` and :ref:`Cluster <envoy_api_msg_Cluster>` resources.
+:ref:`Listener <envoy_api_msg_Listener>` resources may include a
+:ref:`ConfigSource <envoy_api_msg_core.ConfigSource>` that indicates how the
+:ref:`RouteConfiguration <envoy_api_msg_RouteConfiguration>` resources are obtained, and
+:ref:`Cluster <envoy_api_msg_Cluster>` resources may include a
+:ref:`ConfigSource <envoy_api_msg_core.ConfigSource>` that indicates how the
+:ref:`ClusterLoadAssignment <envoy_api_msg_ClusterLoadAssignment>` resources are obtained.
 
-In Envoy, the bootstrap file contains two :ref:`ConfigSource <envoy_api_msg_core.ConfigSource>` messages,
-one indicating how :ref:`Listener <envoy_api_msg_Listener>` resources are obtained and another indicating how :ref:`Cluster
-<envoy_api_msg_Cluster>` resources are obtained. It also contains a separate :ref:`ApiConfigSource
-<envoy_api_msg_core.ApiConfigSource>` message indicating how to contact the ADS server, which will be used whenever a
-:ref:`ConfigSource <envoy_api_msg_core.ConfigSource>` message (either in the bootstrap file or in a :ref:`Listener
-<envoy_api_msg_Listener>` or :ref:`Cluster <envoy_api_msg_Cluster>` resource obtained from a management
-server) contains an :ref:`AggregatedConfigSource <envoy_api_msg_core.AggregatedConfigSource>` message.
+In Envoy, the bootstrap file contains two :ref:`ConfigSource <envoy_api_msg_core.ConfigSource>`
+messages, one indicating how :ref:`Listener <envoy_api_msg_Listener>` resources are obtained and
+another indicating how :ref:`Cluster <envoy_api_msg_Cluster>` resources are obtained. It also
+contains a separate :ref:`ApiConfigSource <envoy_api_msg_core.ApiConfigSource>` message indicating
+how to contact the ADS server, which will be used whenever a :ref:`ConfigSource
+<envoy_api_msg_core.ConfigSource>` message (either in the bootstrap file or in a :ref:`Listener
+<envoy_api_msg_Listener>` or :ref:`Cluster <envoy_api_msg_Cluster>` resource obtained from a
+management server) contains an :ref:`AggregatedConfigSource
+<envoy_api_msg_core.AggregatedConfigSource>` message.
 
-In a gRPC client that uses xDS, only ADS is supported, and the bootstrap file contains the name of the ADS server, which will
-be used for all resources. The :ref:`ConfigSource <envoy_api_msg_core.ConfigSource>` messages in the :ref:`Listener
-<envoy_api_msg_Listener>` and :ref:`Cluster <envoy_api_msg_Cluster>` resources must contain :ref:`AggregatedConfigSource
+In a gRPC client that uses xDS, only ADS is supported, and the bootstrap file contains the name of
+the ADS server, which will be used for all resources. The :ref:`ConfigSource
+<envoy_api_msg_core.ConfigSource>` messages in the :ref:`Listener <envoy_api_msg_Listener>` and
+:ref:`Cluster <envoy_api_msg_Cluster>` resources must contain :ref:`AggregatedConfigSource
 <envoy_api_msg_core.AggregatedConfigSource>` messages.
 
 The xDS Protocol
@@ -185,7 +205,7 @@ The xDS Protocol
 ACK/NACK and versioning
 ^^^^^^^^^^^^^^^^^^^^^^^
 
-Each xDS stream begins with a 
+Each xDS stream begins with a
 :ref:`DiscoveryRequest <envoy_api_msg_DiscoveryRequest>` from the client, specifying
 the list of resources to subscribe to, the type URL corresponding to the
 subscribed resources, the node identifier and an empty :ref:`version_info <envoy_api_field_DiscoveryRequest.version_info>`.
@@ -219,10 +239,10 @@ and the nonce provided by the management server. If the update was
 successfully applied, the :ref:`version_info <envoy_api_field_DiscoveryResponse.version_info>` will be **X**, as indicated
 in the sequence diagram:
 
-.. figure:: diagrams/simple-ack.svg 
+.. figure:: diagrams/simple-ack.svg
    :alt: Version update after ACK
 
-In this sequence diagram, and below, the following format is used to abbreviate messages: 
+In this sequence diagram, and below, the following format is used to abbreviate messages:
 
 - *DiscoveryRequest*: (V=version_info,R=resource_names,N=response_nonce,T=type_url)
 - *DiscoveryResponse*: (V=version_info,R=resources,N=nonce,T=type_url)
@@ -279,99 +299,119 @@ the management server only needs to respond to the latest
 How the client specifies what resources to return
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-xDS requests allow the client to specify a set of resource names as a hint to the server about which resources the client
-is interested in. In the SotW protocol variants, this is done via the :ref:`resource_names
-<envoy_api_field_DiscoveryRequest.resource_names>` specified in the :ref:`DiscoveryRequest
-<envoy_api_msg_DiscoveryRequest>`; in the incremental protocol variants, this is done via the
-:ref:`resource_names_subscribe <envoy_api_field_DeltaDiscoveryRequest.resource_names_subscribe>` and
-:ref:`resource_names_unsubscribe <envoy_api_field_DeltaDiscoveryRequest.resource_names_unsubscribe>` fields in the
+xDS requests allow the client to specify a set of resource names as a hint to the server about
+which resources the client is interested in. In the SotW protocol variants, this is done via the
+:ref:`resource_names <envoy_api_field_DiscoveryRequest.resource_names>` specified in the
+:ref:`DiscoveryRequest <envoy_api_msg_DiscoveryRequest>`; in the incremental protocol variants,
+this is done via the :ref:`resource_names_subscribe
+<envoy_api_field_DeltaDiscoveryRequest.resource_names_subscribe>` and
+:ref:`resource_names_unsubscribe
+<envoy_api_field_DeltaDiscoveryRequest.resource_names_unsubscribe>` fields in the
 :ref:`DeltaDiscoveryRequest <envoy_api_msg_DeltaDiscoveryRequest>`.
 
-Normally (see below for exceptions), requests must specify the set of resource names that the client is interested in. The
-management server must supply the requested resources if they exist. The client will silently ignore any supplied resources that
-were not explicitly requested. When the client sends a new request that changes the set of resources being requested, the server
-must resend any newly requested resources, even if it previously sent those resources without having been asked for them and the
-resources have not changed since that time. If the list of resource names becomes empty, that means that the client is no longer
-interested in any resources of the specified type.
+Normally (see below for exceptions), requests must specify the set of resource names that the
+client is interested in. The management server must supply the requested resources if they exist.
+The client will silently ignore any supplied resources that were not explicitly requested. When
+the client sends a new request that changes the set of resources being requested, the server must
+resend any newly requested resources, even if it previously sent those resources without having
+been asked for them and the resources have not changed since that time. If the list of resource
+names becomes empty, that means that the client is no longer interested in any resources of the
+specified type.
 
-For :ref:`Listener <envoy_api_msg_Listener>` and :ref:`Cluster <envoy_api_msg_Cluster>` resource types, there is also a
-"wildcard" mode, which is triggered when the initial request on the stream for that resource type contains no resource names.
-In this case, the server should use site-specific business logic to determine the full set of resources that the client is
-interested in, typically based on the client's :ref:`node <envoy_api_msg_Core.Node>` identification. Note that once a
-stream has entered wildcard mode for a given resource type, there is no way to change the stream out of wildcard mode;
-resource names specified in any subsequent request on the stream will be ignored.
+For :ref:`Listener <envoy_api_msg_Listener>` and :ref:`Cluster <envoy_api_msg_Cluster>` resource
+types, there is also a "wildcard" mode, which is triggered when the initial request on the stream
+for that resource type contains no resource names. In this case, the server should use
+site-specific business logic to determine the full set of resources that the client is interested
+in, typically based on the client's :ref:`node <envoy_api_msg_Core.Node>` identification. Note
+that once a stream has entered wildcard mode for a given resource type, there is no way to change
+the stream out of wildcard mode; resource names specified in any subsequent request on the stream
+will be ignored.
 
-Envoy will always use wildcard mode for :ref:`Listener <envoy_api_msg_Listener>` and :ref:`Cluster <envoy_api_msg_Cluster>`
-resources. However, other xDS clients (such as gRPC clients that use xDS) may specify explicit resource names for these
-resource types, for example if they only have a singleton listener and already know its name from some out-of-band configuration.
+Envoy will always use wildcard mode for :ref:`Listener <envoy_api_msg_Listener>` and
+:ref:`Cluster <envoy_api_msg_Cluster>` resources. However, other xDS clients (such as gRPC clients
+that use xDS) may specify explicit resource names for these resource types, for example if they
+only have a singleton listener and already know its name from some out-of-band configuration.
 
 Grouping Resources into Responses
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-In the incremental protocol variants, the server sends each resource in its own response. This means that if the server has
-previously sent 100 resources and only one of them has changed, it may send a response containing only the changed resource; it
-does not need to resend the 99 resources that have not changed, and the client must not delete the unchanged resources.
+In the incremental protocol variants, the server sends each resource in its own response. This
+means that if the server has previously sent 100 resources and only one of them has changed, it
+may send a response containing only the changed resource; it does not need to resend the 99
+resources that have not changed, and the client must not delete the unchanged resources.
 
-In the SotW protocol variants, all resource types except for :ref:`Listener <envoy_api_msg_Listener>` and :ref:`Cluster
-<envoy_api_msg_Cluster>` are grouped into responses in the same way as in the incremental protocol variants. However,
-:ref:`Listener <envoy_api_msg_Listener>` and :ref:`Cluster <envoy_api_msg_Cluster>` resource types are handled differently:
-the server must include the complete state of the world, meaning that all resources of the relevant type that are needed by the
-client must be included, even if they did not change since the last response. This means that if the server has previously sent
-100 resources and only one of them has changed, it must resend all 100 of them, even the 99 that were not modified.
+In the SotW protocol variants, all resource types except for :ref:`Listener
+<envoy_api_msg_Listener>` and :ref:`Cluster <envoy_api_msg_Cluster>` are grouped into responses
+in the same way as in the incremental protocol variants. However,
+:ref:`Listener <envoy_api_msg_Listener>` and :ref:`Cluster <envoy_api_msg_Cluster>` resource types
+are handled differently: the server must include the complete state of the world, meaning that all
+resources of the relevant type that are needed by the client must be included, even if they did
+not change since the last response. This means that if the server has previously sent 100
+resources and only one of them has changed, it must resend all 100 of them, even the 99 that were
+not modified.
 
 Deleting Resources
 ^^^^^^^^^^^^^^^^^^
 
-In the incremental proocol variants, the server signals the client that a resource should be deleted via the
-:ref:`removed_resources <envoy_api_field_DeltaDiscoveryResponse.removed_resources>` field of the response. This tells the client
-to remove the resource from its local cache.
+In the incremental proocol variants, the server signals the client that a resource should be
+deleted via the :ref:`removed_resources <envoy_api_field_DeltaDiscoveryResponse.removed_resources>`
+field of the response. This tells the client to remove the resource from its local cache.
 
-In the SotW protocol variants, the criteria for deleting resources is more complex. For :ref:`Listener <envoy_api_msg_Listener>`
-and :ref:`Cluster <envoy_api_msg_Cluster>` resource types, if a previously seen resource is not present in a new response, that
-indicates that the resource has been removed, and the client must delete it; a response containing no resources means to delete
-all resources of that type. However, for other resource types, the API provides no mechanism for the server to tell the client
-that resources have been deleted; instead, deletions are indicated implicitly by parent resources being changed to no longer
-refer to a child resource. For example, when the client receives an LDS update removing a :ref:`Listener <envoy_api_msg_Listener>`
-that was previously pointing to :ref:`RouteConfiguration <envoy_api_msg_RouteConfiguration>` A, if no other :ref:`Listener
-<envoy_api_msg_Listener>` is pointing to :ref:`RouteConfiguration <envoy_api_msg_RouteConfiguration>` A, then the client may
-delete A. For those resource types, an empty :ref:`DiscoveryResponse <envoy_api_msg_DiscoveryResponse>` is effectively a no-op
+In the SotW protocol variants, the criteria for deleting resources is more complex. For
+:ref:`Listener <envoy_api_msg_Listener>` and :ref:`Cluster <envoy_api_msg_Cluster>` resource types,
+if a previously seen resource is not present in a new response, that indicates that the resource
+has been removed, and the client must delete it; a response containing no resources means to delete
+all resources of that type. However, for other resource types, the API provides no mechanism for
+the server to tell the client that resources have been deleted; instead, deletions are indicated
+implicitly by parent resources being changed to no longer refer to a child resource. For example,
+when the client receives an LDS update removing a :ref:`Listener <envoy_api_msg_Listener>`
+that was previously pointing to :ref:`RouteConfiguration <envoy_api_msg_RouteConfiguration>` A,
+if no other :ref:`Listener <envoy_api_msg_Listener>` is pointing to :ref:`RouteConfiguration
+<envoy_api_msg_RouteConfiguration>` A, then the client may delete A. For those resource types,
+an empty :ref:`DiscoveryResponse <envoy_api_msg_DiscoveryResponse>` is effectively a no-op
 from the client's perspective.
 
 Knowing When a Requested Resource Does Not Exist
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-For :ref:`Listener <envoy_api_msg_Listener>` and :ref:`Cluster <envoy_api_msg_Cluster>` resource types, because each response
-needs to include all resources requested by the client, if a client requests a resource that does not exist, it can immediately
-tell this from the response.
+For :ref:`Listener <envoy_api_msg_Listener>` and :ref:`Cluster <envoy_api_msg_Cluster>` resource
+types, because each response needs to include all resources requested by the client, if a client
+requests a resource that does not exist, it can immediately tell this from the response.
 
-However, for other resource types, because each resource can be sent in its own response, there is no way to know from the
-next response whether the newly requested resource exists, because the next response could be an unrelated update for another
-resource that had already been subscribed to previously. As a result, clients are expected to use a timeout (recommended
-duration is 15 seconds) after sending a request for a new resource, after which they will consider the requested resource to
-not exist if they have not received the resource. In Envoy, this is done for :ref:`RouteConfiguration
-<envoy_api_msg_RouteConfiguration>` and :ref:`ClusterLoadAssignment <envoy_api_msg_ClusterLoadAssignment>` resources during
-:ref:`resource warming <xds_protocol_resource_warming>`.
+However, for other resource types, because each resource can be sent in its own response, there is
+no way to know from the next response whether the newly requested resource exists, because the next
+response could be an unrelated update for another resource that had already been subscribed to
+previously. As a result, clients are expected to use a timeout (recommended duration is 15
+seconds) after sending a request for a new resource, after which they will consider the requested
+resource to not exist if they have not received the resource. In Envoy, this is done for
+:ref:`RouteConfiguration <envoy_api_msg_RouteConfiguration>` and :ref:`ClusterLoadAssignment
+<envoy_api_msg_ClusterLoadAssignment>` resources during :ref:`resource warming
+<xds_protocol_resource_warming>`.
 
-Note that even if a requested resource does not exist at the moment when the client requests it, that resource could be
-created at any time. Management servers must remember the set of resources being requested by the client, and if one of
-those resources springs into existence later, the server must send an update to the client informing it of the new resource.
-Clients that initially see a resource that does not exist must be prepared for the resource to be created at any time.
+Note that even if a requested resource does not exist at the moment when the client requests it,
+that resource could be created at any time. Management servers must remember the set of resources
+being requested by the client, and if one of those resources springs into existence later, the
+server must send an update to the client informing it of the new resource. Clients that initially
+see a resource that does not exist must be prepared for the resource to be created at any time.
 
 Unsubscribing From Resources
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-In the incremental protocol variants, resources can be unsubscribed to via the :ref:`resource_names_unsubscribe
+In the incremental protocol variants, resources can be unsubscribed to via the
+:ref:`resource_names_unsubscribe
 <envoy_api_field_DeltaDiscoveryRequest.resource_names_unsubscribe>` field.
 
-In the SotW protocol variants, each request must contain the full list of resource names being subscribed to in the
-:ref:`resource_names <envoy_api_field_DiscoveryRequest.resource_names>` field, so unsubscribing to a set of resources is done
-by sending a new request containing all resource names that are still being subscribed to but not containing the resource names
-being unsubscribed to. For example, if the client had previously been subscribed to resources A and B but wishes to
+In the SotW protocol variants, each request must contain the full list of resource names being
+subscribed to in the :ref:`resource_names <envoy_api_field_DiscoveryRequest.resource_names>` field,
+so unsubscribing to a set of resources is done by sending a new request containing all resource
+names that are still being subscribed to but not containing the resource names being unsubscribed
+to. For example, if the client had previously been subscribed to resources A and B but wishes to
 unsubscribe from B, it must send a new request containing only resource A.
 
-Note that for :ref:`Listener <envoy_api_msg_Listener>` and :ref:`Cluster <envoy_api_msg_Cluster>` resource types where the
-stream is in "wildcard" mode (see :ref:`How the client specifies what resources to return <xds_protocol_resource_hints>` for
-details), the set of resources being subscribed to is determined by the server instead of the client, so there is no mechanism
+Note that for :ref:`Listener <envoy_api_msg_Listener>` and :ref:`Cluster <envoy_api_msg_Cluster>`
+resource types where the stream is in "wildcard" mode (see :ref:`How the client specifies what
+resources to return <xds_protocol_resource_hints>` for details), the set of resources being
+subscribed to is determined by the server instead of the client, so there is no mechanism
 for the client to unsubscribe from resources.
 
 Requesting Multiple Resources on a Single Stream
@@ -473,11 +513,11 @@ CDS/EDS update dropping **X**.
 In general, to avoid traffic drop, sequencing of updates should follow a
 make before break model, wherein:
 
-- CDS updates (if any) must always be pushed first. 
-- EDS updates (if any) must arrive after CDS updates for the respective clusters. 
-- LDS updates must arrive after corresponding CDS/EDS updates. 
-- RDS updates related to the newly added listeners must arrive after CDS/EDS/LDS updates. 
-- VHDS updates (if any) related to the newly added RouteConfigurations must arrive after RDS updates. 
+- CDS updates (if any) must always be pushed first.
+- EDS updates (if any) must arrive after CDS updates for the respective clusters.
+- LDS updates must arrive after corresponding CDS/EDS updates.
+- RDS updates related to the newly added listeners must arrive after CDS/EDS/LDS updates.
+- VHDS updates (if any) related to the newly added RouteConfigurations must arrive after RDS updates.
 - Stale CDS clusters and related EDS endpoints (ones no longer being referenced) can then be removed.
 
 xDS updates can be pushed independently if no new
@@ -569,10 +609,10 @@ to a :ref:`DeltaDiscoveryRequest <envoy_api_msg_DeltaDiscoveryRequest>`
 ACK or NACK. Optionally, a response message level :ref:`system_version_info <envoy_api_field_DeltaDiscoveryResponse.system_version_info>`
 is present for debugging purposes only.
 
-:ref:`DeltaDiscoveryRequest <envoy_api_msg_DeltaDiscoveryRequest>` can be sent in the following situations: 
+:ref:`DeltaDiscoveryRequest <envoy_api_msg_DeltaDiscoveryRequest>` can be sent in the following situations:
 
-- Initial message in a xDS bidirectional gRPC stream. 
-- As an ACK or NACK response to a previous :ref:`DeltaDiscoveryResponse <envoy_api_msg_DeltaDiscoveryResponse>`. In this case the :ref:`response_nonce <envoy_api_field_DiscoveryRequest.response_nonce>` is set to the nonce value in the Response. ACK or NACK is determined by the absence or presence of :ref:`error_detail <envoy_api_field_DiscoveryRequest.error_detail>`. 
+- Initial message in a xDS bidirectional gRPC stream.
+- As an ACK or NACK response to a previous :ref:`DeltaDiscoveryResponse <envoy_api_msg_DeltaDiscoveryResponse>`. In this case the :ref:`response_nonce <envoy_api_field_DiscoveryRequest.response_nonce>` is set to the nonce value in the Response. ACK or NACK is determined by the absence or presence of :ref:`error_detail <envoy_api_field_DiscoveryRequest.error_detail>`.
 - Spontaneous :ref:`DeltaDiscoveryRequests <envoy_api_msg_DeltaDiscoveryRequest>` from the client. This can be done to dynamically add or remove elements from the tracked :ref:`resource_names <envoy_api_field_DiscoveryRequest.resource_names>` set. In this case :ref:`response_nonce <envoy_api_field_DiscoveryRequest.response_nonce>` must be omitted.
 
 In this first example the client connects and receives a first update
