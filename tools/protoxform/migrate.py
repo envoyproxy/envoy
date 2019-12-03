@@ -88,6 +88,7 @@ class UpgradeVisitor(visitor.Visitor):
     upgraded_proto = copy.deepcopy(msg_proto)
     if upgraded_proto.options.deprecated:
       options.AddHideOption(upgraded_proto.options)
+    options.SetVersioningAnnotation(upgraded_proto.options, type_context.name)
     # Mark deprecated fields as ready for deletion by protoxform.
     for f in upgraded_proto.field:
       if f.options.deprecated:

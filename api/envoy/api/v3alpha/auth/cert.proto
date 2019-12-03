@@ -13,11 +13,16 @@ import "google/protobuf/any.proto";
 import "google/protobuf/struct.proto";
 import "google/protobuf/wrappers.proto";
 
+import "udpa/api/annotations/versioning.proto";
+
 import "validate/validate.proto";
 
 // [#protodoc-title: Common TLS configuration]
 
 message TlsParameters {
+  option (udpa.api.annotations.versioning).previous_message_type =
+      "envoy.api.v2.auth.TlsParameters";
+
   enum TlsProtocol {
     // Envoy will choose the optimal TLS version.
     TLS_AUTO = 0;
@@ -105,6 +110,9 @@ message TlsParameters {
 // (potentially asynchronous) signing and decryption operations. Some use cases for private key
 // methods would be TPM support and TLS acceleration.
 message PrivateKeyProvider {
+  option (udpa.api.annotations.versioning).previous_message_type =
+      "envoy.api.v2.auth.PrivateKeyProvider";
+
   reserved 2;
 
   reserved "config";
@@ -121,6 +129,9 @@ message PrivateKeyProvider {
 
 // [#next-free-field: 7]
 message TlsCertificate {
+  option (udpa.api.annotations.versioning).previous_message_type =
+      "envoy.api.v2.auth.TlsCertificate";
+
   // The TLS certificate chain.
   core.DataSource certificate_chain = 1;
 
@@ -148,6 +159,9 @@ message TlsCertificate {
 }
 
 message TlsSessionTicketKeys {
+  option (udpa.api.annotations.versioning).previous_message_type =
+      "envoy.api.v2.auth.TlsSessionTicketKeys";
+
   // Keys for encrypting and decrypting TLS session tickets. The
   // first key in the array contains the key to encrypt all new sessions created by this context.
   // All keys are candidates for decrypting received tickets. This allows for easy rotation of keys
@@ -177,6 +191,9 @@ message TlsSessionTicketKeys {
 
 // [#next-free-field: 9]
 message CertificateValidationContext {
+  option (udpa.api.annotations.versioning).previous_message_type =
+      "envoy.api.v2.auth.CertificateValidationContext";
+
   // TLS certificate data containing certificate authority certificates to use in verifying
   // a presented peer certificate (e.g. server certificate for clusters or client certificate
   // for listeners). If not specified and a peer certificate is presented it will not be
@@ -292,7 +309,13 @@ message CertificateValidationContext {
 // TLS context shared by both client and server TLS contexts.
 // [#next-free-field: 9]
 message CommonTlsContext {
+  option (udpa.api.annotations.versioning).previous_message_type =
+      "envoy.api.v2.auth.CommonTlsContext";
+
   message CombinedCertificateValidationContext {
+    option (udpa.api.annotations.versioning).previous_message_type =
+        "envoy.api.v2.auth.CommonTlsContext.CombinedCertificateValidationContext";
+
     // How to validate peer certificates.
     CertificateValidationContext default_validation_context = 1
         [(validate.rules).message = {required: true}];
@@ -350,6 +373,9 @@ message CommonTlsContext {
 }
 
 message UpstreamTlsContext {
+  option (udpa.api.annotations.versioning).previous_message_type =
+      "envoy.api.v2.auth.UpstreamTlsContext";
+
   // Common TLS context settings.
   //
   // .. attention::
@@ -378,6 +404,9 @@ message UpstreamTlsContext {
 
 // [#next-free-field: 6]
 message DownstreamTlsContext {
+  option (udpa.api.annotations.versioning).previous_message_type =
+      "envoy.api.v2.auth.DownstreamTlsContext";
+
   // Common TLS context settings.
   CommonTlsContext common_tls_context = 1;
 
@@ -399,6 +428,9 @@ message DownstreamTlsContext {
 }
 
 message SdsSecretConfig {
+  option (udpa.api.annotations.versioning).previous_message_type =
+      "envoy.api.v2.auth.SdsSecretConfig";
+
   // Name (FQDN, UUID, SPKI, SHA256, etc.) by which the secret can be uniquely referred to.
   // When both name and config are specified, then secret can be fetched and/or reloaded via SDS.
   // When only name is specified, then secret will be loaded from static
@@ -409,6 +441,8 @@ message SdsSecretConfig {
 }
 
 message Secret {
+  option (udpa.api.annotations.versioning).previous_message_type = "envoy.api.v2.auth.Secret";
+
   // Name (FQDN, UUID, SPKI, SHA256, etc.) by which the secret can be uniquely referred to.
   string name = 1;
 

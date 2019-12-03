@@ -9,6 +9,8 @@ option java_generic_services = true;
 
 import "envoy/api/v3alpha/discovery.proto";
 
+import "udpa/api/annotations/versioning.proto";
+
 // [#not-implemented-hide:] Discovery services for endpoints, clusters, routes,
 // and listeners are retained in the package `envoy.api.v2` for backwards
 // compatibility with existing management servers. New development in discovery
@@ -34,4 +36,6 @@ service AggregatedDiscoveryService {
 // [#not-implemented-hide:] Not configuration. Workaround c++ protobuf issue with importing
 // services: https://github.com/google/protobuf/issues/4221
 message AdsDummy {
+  option (udpa.api.annotations.versioning).previous_message_type =
+      "envoy.service.discovery.v2.AdsDummy";
 }

@@ -8,6 +8,8 @@ option java_package = "io.envoyproxy.envoy.config.accesslog.v3alpha";
 
 import "google/protobuf/struct.proto";
 
+import "udpa/api/annotations/versioning.proto";
+
 import "validate/validate.proto";
 
 // [#protodoc-title: File access log]
@@ -17,6 +19,9 @@ import "validate/validate.proto";
 // <envoy_api_msg_config.filter.accesslog.v3alpha.AccessLog>` that writes log entries directly to a
 // file. Configures the built-in *envoy.file_access_log* AccessLog.
 message FileAccessLog {
+  option (udpa.api.annotations.versioning).previous_message_type =
+      "envoy.config.accesslog.v2.FileAccessLog";
+
   // A path to a local file to which to write the access log entries.
   string path = 1 [(validate.rules).string = {min_bytes: 1}];
 

@@ -8,12 +8,16 @@ option java_package = "io.envoyproxy.envoy.api.v3alpha.core";
 
 import "google/protobuf/duration.proto";
 
+import "udpa/api/annotations/versioning.proto";
+
 import "validate/validate.proto";
 
 // [#protodoc-title: HTTP Service URI ]
 
 // Envoy external URI descriptor
 message HttpUri {
+  option (udpa.api.annotations.versioning).previous_message_type = "envoy.api.v2.core.HttpUri";
+
   // The HTTP server URI. It should be a full FQDN with protocol, host and path.
   //
   // Example:

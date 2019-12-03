@@ -261,10 +261,10 @@ REPOSITORY_LOCATIONS = dict(
         urls = ["https://files.pythonhosted.org/packages/dd/bf/4138e7bfb757de47d1f4b6994648ec67a51efe58fa907c1e11e350cddfca/six-1.12.0.tar.gz"],
     ),
     io_opencensus_cpp = dict(
-        sha256 = "8078195ce90925c142f5c030b9681771db7b7554ebe2156b08848adeb006c40e",
-        strip_prefix = "opencensus-cpp-d8ec569c6a9157e9cbc2c25021d1c61812891f91",
-        # 2019-11-04
-        urls = ["https://github.com/census-instrumentation/opencensus-cpp/archive/d8ec569c6a9157e9cbc2c25021d1c61812891f91.tar.gz"],
+        sha256 = "a9ba6027436cfa1264860c6be602da7633d9a1f9abcb8838f2ae6bda8c2c14f6",
+        strip_prefix = "opencensus-cpp-13b1a2f29f541b6b2c4cb8bc3f6fbf3589d44227",
+        # 2019-12-01
+        urls = ["https://github.com/census-instrumentation/opencensus-cpp/archive/13b1a2f29f541b6b2c4cb8bc3f6fbf3589d44227.tar.gz"],
     ),
     com_github_curl = dict(
         sha256 = "d0393da38ac74ffac67313072d7fe75b1fa1010eb5987f63f349b024a36b7ffb",
