@@ -104,7 +104,7 @@ public:
   std::string waitForAccessLog(const std::string& filename);
 
 protected:
-  void useAccessLog();
+  void useAccessLog(absl::string_view format = "");
 
   IntegrationCodecClientPtr makeHttpConnection(uint32_t port);
   // Makes a http connection object without checking its connected state.

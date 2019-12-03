@@ -28,11 +28,9 @@ namespace Event {
 /**
  * All dispatcher stats. @see stats_macros.h
  */
-// clang-format off
 #define ALL_DISPATCHER_STATS(HISTOGRAM)                                                            \
   HISTOGRAM(loop_duration_us, Microseconds)                                                        \
   HISTOGRAM(poll_delay_us, Microseconds)
-// clang-format on
 
 /**
  * Struct definition for all dispatcher stats. @see stats_macros.h

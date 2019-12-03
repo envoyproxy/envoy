@@ -230,9 +230,9 @@ HttpIntegrationTest::HttpIntegrationTest(Http::CodecClient::Type downstream_prot
   config_helper_.setClientCodec(typeToCodecType(downstream_protocol_));
 }
 
-void HttpIntegrationTest::useAccessLog() {
+void HttpIntegrationTest::useAccessLog(absl::string_view format) {
   access_log_name_ = TestEnvironment::temporaryPath(TestUtility::uniqueFilename());
-  ASSERT_TRUE(config_helper_.setAccessLog(access_log_name_));
+  ASSERT_TRUE(config_helper_.setAccessLog(access_log_name_, format));
 }
 
 HttpIntegrationTest::~HttpIntegrationTest() {

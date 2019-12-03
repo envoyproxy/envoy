@@ -114,6 +114,10 @@ CidrRange CidrRange::create(const envoy::api::v2::core::CidrRange& cidr) {
   return create(Utility::parseInternetAddress(cidr.address_prefix()), cidr.prefix_len().value());
 }
 
+CidrRange CidrRange::create(const envoy::api::v3alpha::core::CidrRange& cidr) {
+  return create(Utility::parseInternetAddress(cidr.address_prefix()), cidr.prefix_len().value());
+}
+
 // static
 CidrRange CidrRange::create(const std::string& range) {
   const auto parts = StringUtil::splitToken(range, "/");

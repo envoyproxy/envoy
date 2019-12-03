@@ -18,6 +18,8 @@ import "google/api/annotations.proto";
 import "google/protobuf/duration.proto";
 import "google/protobuf/wrappers.proto";
 
+import "udpa/api/annotations/versioning.proto";
+
 import "validate/validate.proto";
 
 // [#protodoc-title: Listener]
@@ -44,6 +46,8 @@ service ListenerDiscoveryService {
 
 // [#next-free-field: 21]
 message Listener {
+  option (udpa.api.annotations.versioning).previous_message_type = "envoy.api.v2.Listener";
+
   enum DrainType {
     // Drain in response to calling /healthcheck/fail admin endpoint (along with the health check
     // filter), listener removal/modification, and hot restart.
@@ -57,6 +61,9 @@ message Listener {
 
   // [#not-implemented-hide:]
   message DeprecatedV1 {
+    option (udpa.api.annotations.versioning).previous_message_type =
+        "envoy.api.v2.Listener.DeprecatedV1";
+
     // Whether the listener should bind to the port. A listener that doesn't
     // bind can only receive connections redirected from other listeners that
     // set use_original_dst parameter to true. Default is true.
@@ -72,6 +79,9 @@ message Listener {
 
   // Configuration for listener connection balancing.
   message ConnectionBalanceConfig {
+    option (udpa.api.annotations.versioning).previous_message_type =
+        "envoy.api.v2.Listener.ConnectionBalanceConfig";
+
     // A connection balancer implementation that does exact balancing. This means that a lock is
     // held during balancing so that connection counts are nearly exactly balanced between worker
     // threads. This is "nearly" exact in the sense that a connection might close in parallel thus
@@ -79,6 +89,8 @@ message Listener {
     // sacrifices accept throughput for accuracy and should be used when there are a small number of
     // connections that rarely cycle (e.g., service mesh gRPC egress).
     message ExactBalance {
+      option (udpa.api.annotations.versioning).previous_message_type =
+          "envoy.api.v2.Listener.ConnectionBalanceConfig.ExactBalance";
     }
 
     oneof balance_type {
