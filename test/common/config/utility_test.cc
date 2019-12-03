@@ -269,7 +269,7 @@ TEST(UtilityTest, AnyWrongType) {
   typed_config.PackFrom(source_duration);
   ProtobufWkt::Timestamp out;
   EXPECT_THROW_WITH_REGEX(
-      Utility::translateOpaqueConfig(typed_config, ProtobufWkt::Struct(),
+      Utility::translateOpaqueConfig("", typed_config, ProtobufWkt::Struct(),
                                      ProtobufMessage::getStrictValidationVisitor(), out),
       EnvoyException,
       R"(Unable to unpack as google.protobuf.Timestamp: \[type.googleapis.com/google.protobuf.Duration\] .*)");
@@ -291,7 +291,7 @@ TEST(UtilityTest, TypedStructToStruct) {
   packTypedStructIntoAny(typed_config, untyped_struct);
 
   ProtobufWkt::Struct out;
-  Utility::translateOpaqueConfig(typed_config, ProtobufWkt::Struct(),
+  Utility::translateOpaqueConfig("", typed_config, ProtobufWkt::Struct(),
                                  ProtobufMessage::getStrictValidationVisitor(), out);
 
   EXPECT_THAT(out, ProtoEq(untyped_struct));
@@ -312,7 +312,7 @@ TEST(UtilityTest, TypedStructToBootstrap) {
   packTypedStructIntoAny(typed_config, bootstrap);
 
   envoy::config::bootstrap::v2::Bootstrap out;
-  Utility::translateOpaqueConfig(typed_config, ProtobufWkt::Struct(),
+  Utility::translateOpaqueConfig("", typed_config, ProtobufWkt::Struct(),
                                  ProtobufMessage::getStrictValidationVisitor(), out);
   EXPECT_THAT(out, ProtoEq(bootstrap));
 }
@@ -333,7 +333,7 @@ TEST(UtilityTest, TypedStructToInvalidType) {
 
   ProtobufWkt::Any out;
   EXPECT_THROW_WITH_MESSAGE(
-      Utility::translateOpaqueConfig(typed_config, ProtobufWkt::Struct(),
+      Utility::translateOpaqueConfig("", typed_config, ProtobufWkt::Struct(),
                                      ProtobufMessage::getStrictValidationVisitor(), out),
       EnvoyException,
       "Invalid proto type.\nExpected google.protobuf.Any\nActual: "

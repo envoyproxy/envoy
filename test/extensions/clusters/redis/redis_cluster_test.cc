@@ -92,7 +92,8 @@ protected:
         singleton_manager_, tls_, validation_visitor_, *api_);
 
     envoy::config::cluster::redis::RedisClusterConfig config;
-    Config::Utility::translateOpaqueConfig(cluster_config.cluster_type().typed_config(),
+    Config::Utility::translateOpaqueConfig(cluster_config.cluster_type().name(),
+                                           cluster_config.cluster_type().typed_config(),
                                            ProtobufWkt::Struct::default_instance(),
                                            ProtobufMessage::getStrictValidationVisitor(), config);
     cluster_callback_ = std::make_shared<NiceMock<MockClusterSlotUpdateCallBack>>();
@@ -122,9 +123,9 @@ protected:
         singleton_manager_, tls_, validation_visitor_, *api_);
 
     envoy::config::cluster::redis::RedisClusterConfig config;
-    Config::Utility::translateOpaqueConfig(cluster_config.cluster_type().typed_config(),
-                                           ProtobufWkt::Struct::default_instance(),
-                                           validation_visitor_, config);
+    Config::Utility::translateOpaqueConfig(
+        cluster_config.cluster_type().name(), cluster_config.cluster_type().typed_config(),
+        ProtobufWkt::Struct::default_instance(), validation_visitor_, config);
 
     NiceMock<AccessLog::MockAccessLogManager> log_manager;
     NiceMock<Upstream::Outlier::EventLoggerSharedPtr> outlier_event_logger;

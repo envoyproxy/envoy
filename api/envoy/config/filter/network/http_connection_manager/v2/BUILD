@@ -10,5 +10,6 @@ api_proto_package(
         "//envoy/api/v2/core:pkg",
         "//envoy/config/filter/accesslog/v2:pkg",
         "//envoy/type:pkg",
+        "//envoy/type/tracing/v2:pkg",
     ],
 )

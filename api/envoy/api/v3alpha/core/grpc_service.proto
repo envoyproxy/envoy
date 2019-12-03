@@ -13,6 +13,8 @@ import "google/protobuf/duration.proto";
 import "google/protobuf/empty.proto";
 import "google/protobuf/struct.proto";
 
+import "udpa/api/annotations/versioning.proto";
+
 import "validate/validate.proto";
 
 // [#protodoc-title: gRPC services]
@@ -21,7 +23,12 @@ import "validate/validate.proto";
 // <envoy_api_msg_api.v3alpha.core.ApiConfigSource>` and filter configurations.
 // [#next-free-field: 6]
 message GrpcService {
+  option (udpa.api.annotations.versioning).previous_message_type = "envoy.api.v2.core.GrpcService";
+
   message EnvoyGrpc {
+    option (udpa.api.annotations.versioning).previous_message_type =
+        "envoy.api.v2.core.GrpcService.EnvoyGrpc";
+
     // The name of the upstream gRPC cluster. SSL credentials will be supplied
     // in the :ref:`Cluster <envoy_api_msg_api.v3alpha.Cluster>` :ref:`transport_socket
     // <envoy_api_field_api.v3alpha.Cluster.transport_socket>`.
@@ -30,8 +37,14 @@ message GrpcService {
 
   // [#next-free-field: 7]
   message GoogleGrpc {
+    option (udpa.api.annotations.versioning).previous_message_type =
+        "envoy.api.v2.core.GrpcService.GoogleGrpc";
+
     // See https://grpc.io/grpc/cpp/structgrpc_1_1_ssl_credentials_options.html.
     message SslCredentials {
+      option (udpa.api.annotations.versioning).previous_message_type =
+          "envoy.api.v2.core.GrpcService.GoogleGrpc.SslCredentials";
+
       // PEM encoded server root certificates.
       DataSource root_certs = 1;
 
@@ -45,11 +58,16 @@ message GrpcService {
     // Local channel credentials. Only UDS is supported for now.
     // See https://github.com/grpc/grpc/pull/15909.
     message GoogleLocalCredentials {
+      option (udpa.api.annotations.versioning).previous_message_type =
+          "envoy.api.v2.core.GrpcService.GoogleGrpc.GoogleLocalCredentials";
     }
 
     // See https://grpc.io/docs/guides/auth.html#credential-types to understand Channel and Call
     // credential types.
     message ChannelCredentials {
+      option (udpa.api.annotations.versioning).previous_message_type =
+          "envoy.api.v2.core.GrpcService.GoogleGrpc.ChannelCredentials";
+
       oneof credential_specifier {
         option (validate.required) = true;
 
@@ -64,19 +82,33 @@ message GrpcService {
 
     // [#next-free-field: 7]
     message CallCredentials {
+      option (udpa.api.annotations.versioning).previous_message_type =
+          "envoy.api.v2.core.GrpcService.GoogleGrpc.CallCredentials";
+
       message ServiceAccountJWTAccessCredentials {
+        option (udpa.api.annotations.versioning).previous_message_type =
+            "envoy.api.v2.core.GrpcService.GoogleGrpc.CallCredentials."
+            "ServiceAccountJWTAccessCredentials";
+
         string json_key = 1;
 
         uint64 token_lifetime_seconds = 2;
       }
 
       message GoogleIAMCredentials {
+        option (udpa.api.annotations.versioning).previous_message_type =
+            "envoy.api.v2.core.GrpcService.GoogleGrpc.CallCredentials.GoogleIAMCredentials";
+
         string authorization_token = 1;
 
         string authority_selector = 2;
       }
 
       message MetadataCredentialsFromPlugin {
+        option (udpa.api.annotations.versioning).previous_message_type =
+            "envoy.api.v2.core.GrpcService.GoogleGrpc.CallCredentials."
+            "MetadataCredentialsFromPlugin";
+
         reserved 2;
 
         reserved "config";
