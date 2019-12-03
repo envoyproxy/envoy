@@ -127,10 +127,10 @@ private:
   std::shared_ptr<ParameterRouteEntryImpl> parameter_route_;
 };
 
-class SignleRouteMatcherImpl : public RouteMatcher, public Logger::Loggable<Logger::Id::dubbo> {
+class SingleRouteMatcherImpl : public RouteMatcher, public Logger::Loggable<Logger::Id::dubbo> {
 public:
   using RouteConfig = envoy::config::filter::network::dubbo_proxy::v2alpha1::RouteConfiguration;
-  SignleRouteMatcherImpl(const RouteConfig& config, Server::Configuration::FactoryContext& context);
+  SingleRouteMatcherImpl(const RouteConfig& config, Server::Configuration::FactoryContext& context);
 
   RouteConstSharedPtr route(const MessageMetadata& metadata, uint64_t random_value) const override;
 

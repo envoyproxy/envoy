@@ -10,6 +10,8 @@ import "envoy/config/filter/network/dubbo_proxy/v3alpha/route.proto";
 
 import "google/protobuf/any.proto";
 
+import "udpa/api/annotations/versioning.proto";
+
 import "validate/validate.proto";
 
 // [#protodoc-title: Dubbo Proxy]
@@ -30,6 +32,9 @@ enum SerializationType {
 
 // [#next-free-field: 6]
 message DubboProxy {
+  option (udpa.api.annotations.versioning).previous_message_type =
+      "envoy.config.filter.network.dubbo_proxy.v2alpha1.DubboProxy";
+
   // The human readable prefix to use when emitting statistics.
   string stat_prefix = 1 [(validate.rules).string = {min_bytes: 1}];
 
@@ -51,6 +56,9 @@ message DubboProxy {
 
 // DubboFilter configures a Dubbo filter.
 message DubboFilter {
+  option (udpa.api.annotations.versioning).previous_message_type =
+      "envoy.config.filter.network.dubbo_proxy.v2alpha1.DubboFilter";
+
   // The name of the filter to instantiate. The name must match a supported
   // filter.
   string name = 1 [(validate.rules).string = {min_bytes: 1}];
