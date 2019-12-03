@@ -145,7 +145,7 @@ MockInstance::MockInstance()
       server_factory_context_(
           std::make_shared<NiceMock<Configuration::MockServerFactoryContext>>()),
       transport_socket_factory_context_(
-          std::make_shared<NiceMock<Configuration::MockTransportSocketFactoryContext>>()){
+          std::make_shared<NiceMock<Configuration::MockTransportSocketFactoryContext>>()) {
   ON_CALL(*this, threadLocal()).WillByDefault(ReturnRef(thread_local_));
   ON_CALL(*this, stats()).WillByDefault(ReturnRef(stats_store_));
   ON_CALL(*this, grpcContext()).WillByDefault(ReturnRef(grpc_context_));
