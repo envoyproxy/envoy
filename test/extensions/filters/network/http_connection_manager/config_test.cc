@@ -33,6 +33,7 @@ parseHttpConnectionManagerFromV2Yaml(const std::string& yaml) {
   return http_connection_manager;
 }
 
+// TODO(yittg): always validate config and split all cases using deprecated feature.
 envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager
 parseHttpConnectionManagerFromV2YamlAndValidate(const std::string& yaml) {
   envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager

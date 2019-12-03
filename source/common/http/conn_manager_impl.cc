@@ -1352,8 +1352,8 @@ void ConnectionManagerImpl::ActiveStream::refreshCachedTracingCustomTags() {
   if (hasCachedRoute() && cached_route_.value()->tracingConfig()) {
     route_tags = &cached_route_.value()->tracingConfig()->getCustomTags();
   }
-  bool configured_in_conn = !conn_manager_tags.empty();
-  bool configured_in_route = route_tags && !route_tags->empty();
+  const bool configured_in_conn = !conn_manager_tags.empty();
+  const bool configured_in_route = route_tags && !route_tags->empty();
   if (!configured_in_conn && !configured_in_route) {
     return;
   }
