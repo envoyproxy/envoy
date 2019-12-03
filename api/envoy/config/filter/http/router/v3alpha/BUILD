@@ -5,5 +5,8 @@ load("@envoy_api//bazel:api_build_system.bzl", "api_proto_package")
 licenses(["notice"])  # Apache 2
 
 api_proto_package(
-    deps = ["//envoy/config/filter/accesslog/v3alpha:pkg"],
+    deps = [
+        "//envoy/config/filter/accesslog/v3alpha:pkg",
+        "@com_github_cncf_udpa//udpa/api/annotations:pkg",
+    ],
 )

@@ -42,13 +42,10 @@ private:
 /**
  * All stats for the Jwt Authn filter. @see stats_macros.h
  */
-
-// clang-format off
 #define ALL_JWT_AUTHN_FILTER_STATS(COUNTER)                                                        \
   COUNTER(allowed)                                                                                 \
   COUNTER(cors_preflight_bypassed)                                                                 \
   COUNTER(denied)
-// clang-format on
 
 /**
  * Wrapper struct for jwt_authn filter stats. @see stats_macros.h

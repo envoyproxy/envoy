@@ -13,6 +13,8 @@ import "google/api/annotations.proto";
 import "google/protobuf/duration.proto";
 import "google/protobuf/wrappers.proto";
 
+import "udpa/api/annotations/versioning.proto";
+
 import "validate/validate.proto";
 
 // [#protodoc-title: Adaptive Concurrency]
@@ -22,9 +24,16 @@ import "validate/validate.proto";
 
 // Configuration parameters for the gradient controller.
 message GradientControllerConfig {
+  option (udpa.api.annotations.versioning).previous_message_type =
+      "envoy.config.filter.http.adaptive_concurrency.v2alpha.GradientControllerConfig";
+
   // Parameters controlling the periodic recalculation of the concurrency limit from sampled request
   // latencies.
   message ConcurrencyLimitCalculationParams {
+    option (udpa.api.annotations.versioning).previous_message_type =
+        "envoy.config.filter.http.adaptive_concurrency.v2alpha.GradientControllerConfig."
+        "ConcurrencyLimitCalculationParams";
+
     // The allowed upper-bound on the calculated concurrency limit. Defaults to 1000.
     google.protobuf.UInt32Value max_concurrency_limit = 2 [(validate.rules).uint32 = {gt: 0}];
 
@@ -38,6 +47,10 @@ message GradientControllerConfig {
   // Parameters controlling the periodic minRTT recalculation.
   // [#next-free-field: 6]
   message MinimumRTTCalculationParams {
+    option (udpa.api.annotations.versioning).previous_message_type =
+        "envoy.config.filter.http.adaptive_concurrency.v2alpha.GradientControllerConfig."
+        "MinimumRTTCalculationParams";
+
     // The time interval between recalculating the minimum request round-trip time.
     google.protobuf.Duration interval = 1 [(validate.rules).duration = {
       required: true
@@ -76,6 +89,9 @@ message GradientControllerConfig {
 }
 
 message AdaptiveConcurrency {
+  option (udpa.api.annotations.versioning).previous_message_type =
+      "envoy.config.filter.http.adaptive_concurrency.v2alpha.AdaptiveConcurrency";
+
   oneof concurrency_controller_config {
     option (validate.required) = true;
 
