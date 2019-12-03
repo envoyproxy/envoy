@@ -9,5 +9,6 @@ api_proto_package(
         "//envoy/api/v3alpha/route:pkg",
         "//envoy/config/filter/fault/v3alpha:pkg",
         "//envoy/type/v3alpha:pkg",
+        "@com_github_cncf_udpa//udpa/api/annotations:pkg",
     ],
 )

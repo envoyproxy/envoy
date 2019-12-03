@@ -180,6 +180,14 @@ elif [[ "$CI_TARGET" == "bazel.tsan" ]]; then
   bazel_with_collection test ${BAZEL_BUILD_OPTIONS} -c dbg --config=clang-tsan \
     //:echo2_integration_test //http-filter-example:http_filter_integration_test //:envoy_binary_test
   exit 0
+elif [[ "$CI_TARGET" == "bazel.msan" ]]; then
+  ENVOY_STDLIB=libc++
+  setup_clang_toolchain
+  # rbe-toolchain-msan must comes as first to win library link order.
+  BAZEL_BUILD_OPTIONS="--config=rbe-toolchain-msan ${BAZEL_BUILD_OPTIONS} -c dbg --build_tests_only"
+  echo "bazel MSAN debug build with tests"
+  echo "Building and testing envoy tests ${TEST_TARGETS}"
+  bazel_with_collection test ${BAZEL_BUILD_OPTIONS} ${TEST_TARGETS}
 elif [[ "$CI_TARGET" == "bazel.dev" ]]; then
   setup_clang_toolchain
   # This doesn't go into CI but is available for developer convenience.

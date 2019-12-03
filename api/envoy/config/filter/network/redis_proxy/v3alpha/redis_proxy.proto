@@ -11,6 +11,8 @@ import "envoy/api/v3alpha/core/base.proto";
 import "google/protobuf/duration.proto";
 import "google/protobuf/wrappers.proto";
 
+import "udpa/api/annotations/versioning.proto";
+
 import "validate/validate.proto";
 
 // [#protodoc-title: Redis Proxy]
@@ -19,9 +21,15 @@ import "validate/validate.proto";
 
 // [#next-free-field: 7]
 message RedisProxy {
+  option (udpa.api.annotations.versioning).previous_message_type =
+      "envoy.config.filter.network.redis_proxy.v2.RedisProxy";
+
   // Redis connection pool settings.
   // [#next-free-field: 9]
   message ConnPoolSettings {
+    option (udpa.api.annotations.versioning).previous_message_type =
+        "envoy.config.filter.network.redis_proxy.v2.RedisProxy.ConnPoolSettings";
+
     // ReadPolicy controls how Envoy routes read commands to Redis nodes. This is currently
     // supported for Redis Cluster. All ReadPolicy settings except MASTER may return stale data
     // because replication is asynchronous and requires some delay. You need to ensure that your
@@ -110,12 +118,22 @@ message RedisProxy {
   }
 
   message PrefixRoutes {
+    option (udpa.api.annotations.versioning).previous_message_type =
+        "envoy.config.filter.network.redis_proxy.v2.RedisProxy.PrefixRoutes";
+
     message Route {
+      option (udpa.api.annotations.versioning).previous_message_type =
+          "envoy.config.filter.network.redis_proxy.v2.RedisProxy.PrefixRoutes.Route";
+
       // The router is capable of shadowing traffic from one cluster to another. The current
       // implementation is "fire and forget," meaning Envoy will not wait for the shadow cluster to
       // respond before returning the response from the primary cluster. All normal statistics are
       // collected for the shadow cluster making this feature useful for testing.
       message RequestMirrorPolicy {
+        option (udpa.api.annotations.versioning).previous_message_type =
+            "envoy.config.filter.network.redis_proxy.v2.RedisProxy.PrefixRoutes.Route."
+            "RequestMirrorPolicy";
+
         // Specifies the cluster that requests will be mirrored to. The cluster must
         // exist in the cluster manager configuration.
         string cluster = 1 [(validate.rules).string = {min_bytes: 1}];
@@ -219,6 +237,9 @@ message RedisProxy {
 // :ref:`extension_protocol_options<envoy_api_field_api.v3alpha.Cluster.extension_protocol_options>`,
 // keyed by the name `envoy.redis_proxy`.
 message RedisProtocolOptions {
+  option (udpa.api.annotations.versioning).previous_message_type =
+      "envoy.config.filter.network.redis_proxy.v2.RedisProtocolOptions";
+
   // Upstream server password as defined by the `requirepass` directive
   // <https://redis.io/topics/config>`_ in the server's configuration file.
   api.v3alpha.core.DataSource auth_password = 1;

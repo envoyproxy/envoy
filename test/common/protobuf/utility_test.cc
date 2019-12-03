@@ -428,13 +428,27 @@ TEST_F(ProtobufUtilityTest, HashedValueStdHash) {
   EXPECT_NE(set.find(hv3), set.end());
 }
 
+// MessageUtility::anyConvert() with the wrong type throws.
 TEST_F(ProtobufUtilityTest, AnyConvertWrongType) {
   ProtobufWkt::Duration source_duration;
   source_duration.set_seconds(42);
   ProtobufWkt::Any source_any;
   source_any.PackFrom(source_duration);
-  EXPECT_THROW_WITH_REGEX(TestUtility::anyConvert<ProtobufWkt::Timestamp>(source_any),
-                          EnvoyException, "Unable to unpack .*");
+  EXPECT_THROW_WITH_REGEX(
+      TestUtility::anyConvert<ProtobufWkt::Timestamp>(source_any), EnvoyException,
+      R"(Unable to unpack as google.protobuf.Timestamp: \[type.googleapis.com/google.protobuf.Duration\] .*)");
+}
+
+// MessageUtility::unpackTo() with the wrong type throws.
+TEST_F(ProtobufUtilityTest, UnpackToWrongType) {
+  ProtobufWkt::Duration source_duration;
+  source_duration.set_seconds(42);
+  ProtobufWkt::Any source_any;
+  source_any.PackFrom(source_duration);
+  ProtobufWkt::Timestamp dst;
+  EXPECT_THROW_WITH_REGEX(
+      MessageUtil::unpackTo(source_any, dst), EnvoyException,
+      R"(Unable to unpack as google.protobuf.Timestamp: \[type.googleapis.com/google.protobuf.Duration\] .*)");
 }
 
 TEST_F(ProtobufUtilityTest, JsonConvertSuccess) {
@@ -807,6 +821,12 @@ TEST(StatusCode, Strings) {
   }
   ASSERT_EQ("",
             MessageUtil::CodeEnumToString(static_cast<ProtobufUtil::error::Code>(last_code + 1)));
+}
+
+TEST(TypeUtilTest, TypeUrlToDescriptorFullName) {
+  EXPECT_EQ("envoy.config.filter.http.ip_tagging.v2.IPTagging",
+            TypeUtil::typeUrlToDescriptorFullName(
+                "type.googleapis.com/envoy.config.filter.http.ip_tagging.v2.IPTagging"));
 }
 
 } // namespace Envoy

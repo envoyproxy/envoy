@@ -26,12 +26,9 @@
 namespace Envoy {
 namespace Router {
 
-// clang-format off
-#define ALL_VHDS_STATS(COUNTER)                                                                     \
+#define ALL_VHDS_STATS(COUNTER)                                                                    \
   COUNTER(config_reload)                                                                           \
   COUNTER(update_empty)
-
-// clang-format on
 
 struct VhdsStats {
   ALL_VHDS_STATS(GENERATE_COUNTER_STRUCT)
