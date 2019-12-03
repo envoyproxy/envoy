@@ -216,6 +216,7 @@ envoy_cc_test(
 envoy_cc_test(
     name = "original_dst_cluster_test",
     srcs = ["original_dst_cluster_test.cc"],
+    data = ["//test/extensions/transport_sockets/tls/test_data:certs"],
     deps = [
         ":utility_lib",
         "//source/common/event:dispatcher_lib",
@@ -223,6 +224,7 @@ envoy_cc_test(
         "//source/common/upstream:original_dst_cluster_lib",
         "//source/common/upstream:upstream_lib",
         "//source/extensions/transport_sockets/raw_buffer:config",
+        "//source/extensions/transport_sockets/tls:config",
         "//test/mocks:common_lib",
         "//test/mocks/local_info:local_info_mocks",
         "//test/mocks/network:network_mocks",
@@ -231,6 +233,7 @@ envoy_cc_test(
         "//test/mocks/server:server_mocks",
         "//test/mocks/ssl:ssl_mocks",
         "//test/mocks/upstream:upstream_mocks",
+        "//test/test_common:environment_lib",
         "//test/test_common:utility_lib",
     ],
 )

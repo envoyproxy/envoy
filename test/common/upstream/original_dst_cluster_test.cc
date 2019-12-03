@@ -23,6 +23,7 @@
 #include "test/mocks/server/mocks.h"
 #include "test/mocks/ssl/mocks.h"
 #include "test/mocks/upstream/mocks.h"
+#include "test/test_common/environment.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -65,9 +66,9 @@ public:
       : cleanup_timer_(new Event::MockTimer(&dispatcher_)),
         api_(Api::createApiForTest(stats_store_)) {}
 
-  void setupFromYaml(const std::string& yaml) { setup(parseClusterFromV2Yaml(yaml)); }
+  void setupFromYaml(const std::string& yaml, bool uses_tls = false) {
+    const envoy::api::v2::Cluster& cluster_config = parseClusterFromV2Yaml(yaml);
 
-  void setup(const envoy::api::v2::Cluster& cluster_config) {
     NiceMock<MockClusterManager> cm;
     Envoy::Stats::ScopePtr scope = stats_store_.createScope(fmt::format(
         "cluster.{}.", cluster_config.alt_stat_name().empty() ? cluster_config.name()
@@ -75,6 +76,10 @@ public:
     Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
         admin_, ssl_context_manager_, *scope, cm, local_info_, dispatcher_, random_, stats_store_,
         singleton_manager_, tls_, validation_visitor_, *api_);
+    if (uses_tls) {
+      EXPECT_CALL(ssl_context_manager_, createSslClientContext(_, _));
+    }
+
     cluster_.reset(new Cluster(cluster_config, runtime_, factory_context, std::move(scope), false));
     thread_aware_lb_ = std::make_unique<Cluster::ThreadAwareLoadBalancer>(cluster_);
     lb_factory_ = thread_aware_lb_->factory();
@@ -94,6 +99,11 @@ public:
 
   void refreshLb() { lb_ = lb_factory_->create(); }
 
+  const Network::TransportSocketOptionsSharedPtr
+  getDefaultTransportSocketOptions(const Cluster::Host* host) {
+    return host->default_transport_socket_options_;
+  }
+
   Stats::IsolatedStoreImpl stats_store_;
   Ssl::MockContextManager ssl_context_manager_;
   ClusterSharedPtr cluster_;
@@ -112,6 +122,24 @@ public:
   Upstream::ThreadAwareLoadBalancerPtr thread_aware_lb_;
   Upstream::LoadBalancerFactorySharedPtr lb_factory_;
   Upstream::LoadBalancerPtr lb_;
+
+  const std::string default_yaml_ = R"EOF(
+    name: name
+    connect_timeout: 1.250s
+    type: original_dst
+    lb_policy: cluster_provided
+  )EOF";
+
+  const std::string default_tls_yaml_ = default_yaml_ + TestEnvironment::substitute(R"EOF(
+    transport_socket:
+      name: envoy.transport_sockets.tls
+      typed_config:
+        "@type": type.googleapis.com/envoy.api.v2.auth.UpstreamTlsContext
+        common_tls_context:
+          validation_context:
+            trusted_ca:
+              filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"
+  )EOF");
 };
 
 TEST(ClusterConfigTest, GoodConfig) {
@@ -126,13 +154,57 @@ TEST(ClusterConfigTest, GoodConfig) {
   EXPECT_TRUE(parseClusterFromV2Yaml(yaml).has_cleanup_interval());
 }
 
+// Verify that using 'sni' causes a failure.
+TEST_F(ClusterTest, BadConfigWithInvalidSNI) {
+  const std::string yaml = TestEnvironment::substitute(R"EOF(
+    name: name
+    connect_timeout: 0.25s
+    type: original_dst
+    lb_policy: cluster_provided
+    transport_socket:
+      name: envoy.transport_sockets.tls
+      typed_config:
+        "@type": type.googleapis.com/envoy.api.v2.auth.UpstreamTlsContext
+        sni: api.lyft.com
+        common_tls_context:
+          validation_context:
+            trusted_ca:
+              filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"
+  )EOF");
+
+  EXPECT_THROW_WITH_MESSAGE(
+      setupFromYaml(yaml, true), EnvoyException,
+      "ORIGINAL_DST cluster cannot configure 'sni' or 'verify_subject_alt_name'");
+}
+
+TEST_F(ClusterTest, BadConfigWithInvalidVerifySubjectAltName) {
+  const std::string yaml = TestEnvironment::substitute(R"EOF(
+    name: name
+    connect_timeout: 0.25s
+    type: original_dst
+    lb_policy: CLUSTER_PROVIDED
+    transport_socket:
+      name: envoy.transport_sockets.tls
+      typed_config:
+        "@type": type.googleapis.com/envoy.api.v2.auth.UpstreamTlsContext
+        common_tls_context:
+          validation_context:
+            trusted_ca:
+              filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"
+            verify_subject_alt_name: [api.lyft.com]
+  )EOF");
+
+  EXPECT_THROW_WITH_MESSAGE(
+      setupFromYaml(yaml, true), EnvoyException,
+      "ORIGINAL_DST cluster cannot configure 'sni' or 'verify_subject_alt_name'");
+}
+
 TEST_F(ClusterTest, BadConfigWithLoadAssignment) {
   const std::string yaml = R"EOF(
     name: name
     connect_timeout: 0.25s
     type: ORIGINAL_DST
     lb_policy: ORIGINAL_DST_LB
-    cleanup_interval: 1s
     load_assignment:
       cluster_name: name
       endpoints:
@@ -155,7 +227,6 @@ TEST_F(ClusterTest, BadConfigWithDeprecatedHosts) {
     connect_timeout: 0.25s
     type: ORIGINAL_DST
     lb_policy: ORIGINAL_DST_LB
-    cleanup_interval: 1s
     hosts:
       - socket_address:
           address: 127.0.0.1
@@ -174,7 +245,7 @@ TEST_F(ClusterTest, CleanupInterval) {
     type: ORIGINAL_DST
     lb_policy: ORIGINAL_DST_LB
     cleanup_interval: 1s
-  )EOF"; // Help Emacs balance quotation marks: "
+  )EOF";
 
   EXPECT_CALL(initialized_, ready());
   EXPECT_CALL(membership_updated_, ready()).Times(0);
@@ -238,16 +309,9 @@ TEST_F(ClusterTest, NoContext) {
 }
 
 TEST_F(ClusterTest, Membership) {
-  std::string yaml = R"EOF(
-    name: name
-    connect_timeout: 1.250s
-    type: ORIGINAL_DST
-    lb_policy: ORIGINAL_DST_LB
-  )EOF";
-
   EXPECT_CALL(initialized_, ready());
   EXPECT_CALL(*cleanup_timer_, enableTimer(_, _));
-  setupFromYaml(yaml);
+  setupFromYaml(default_yaml_, false);
 
   EXPECT_EQ(0UL, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().size());
   EXPECT_EQ(0UL, cluster_->prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
@@ -326,16 +390,9 @@ TEST_F(ClusterTest, Membership) {
 }
 
 TEST_F(ClusterTest, Membership2) {
-  std::string yaml = R"EOF(
-    name: name
-    connect_timeout: 1.250s
-    type: ORIGINAL_DST
-    lb_policy: ORIGINAL_DST_LB
-  )EOF";
-
   EXPECT_CALL(initialized_, ready());
   EXPECT_CALL(*cleanup_timer_, enableTimer(_, _));
-  setupFromYaml(yaml);
+  setupFromYaml(default_yaml_);
 
   EXPECT_EQ(0UL, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().size());
   EXPECT_EQ(0UL, cluster_->prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
@@ -413,16 +470,9 @@ TEST_F(ClusterTest, Membership2) {
 }
 
 TEST_F(ClusterTest, Connection) {
-  std::string yaml = R"EOF(
-    name: name
-    connect_timeout: 1.250s
-    type: ORIGINAL_DST
-    lb_policy: ORIGINAL_DST_LB
-  )EOF";
-
   EXPECT_CALL(initialized_, ready());
   EXPECT_CALL(*cleanup_timer_, enableTimer(_, _));
-  setupFromYaml(yaml);
+  setupFromYaml(default_yaml_);
 
   EXPECT_EQ(0UL, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().size());
   EXPECT_EQ(0UL, cluster_->prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
@@ -452,16 +502,9 @@ TEST_F(ClusterTest, Connection) {
 }
 
 TEST_F(ClusterTest, MultipleClusters) {
-  std::string yaml = R"EOF(
-    name: name
-    connect_timeout: 1.250s
-    type: ORIGINAL_DST
-    lb_policy: ORIGINAL_DST_LB
-  )EOF";
-
   EXPECT_CALL(initialized_, ready());
   EXPECT_CALL(*cleanup_timer_, enableTimer(_, _));
-  setupFromYaml(yaml);
+  setupFromYaml(default_yaml_);
 
   PrioritySetImpl second;
   cluster_->prioritySet().addPriorityUpdateCb(
@@ -503,11 +546,7 @@ TEST_F(ClusterTest, MultipleClusters) {
 }
 
 TEST_F(ClusterTest, UseHttpHeaderEnabled) {
-  std::string yaml = R"EOF(
-    name: name
-    connect_timeout: 1.250s
-    type: ORIGINAL_DST
-    lb_policy: ORIGINAL_DST_LB
+  std::string yaml = default_yaml_ + R"EOF(
     original_dst_lb_config:
       use_http_header: true
   )EOF";
@@ -575,16 +614,9 @@ TEST_F(ClusterTest, UseHttpHeaderEnabled) {
 }
 
 TEST_F(ClusterTest, UseHttpHeaderDisabled) {
-  std::string yaml = R"EOF(
-    name: name
-    connect_timeout: 1.250s
-    type: ORIGINAL_DST
-    lb_policy: ORIGINAL_DST_LB
-  )EOF";
-
   EXPECT_CALL(initialized_, ready());
   EXPECT_CALL(*cleanup_timer_, enableTimer(_, _));
-  setupFromYaml(yaml);
+  setupFromYaml(default_yaml_);
 
   EXPECT_EQ(0UL, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().size());
   EXPECT_EQ(0UL, cluster_->prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
@@ -631,6 +663,151 @@ TEST_F(ClusterTest, UseHttpHeaderDisabled) {
   EXPECT_CALL(dispatcher_, post(_)).Times(0);
   HostConstSharedPtr host3 = lb_->chooseHost(&lb_context3);
   EXPECT_EQ(host3, nullptr);
+}
+
+TEST_F(ClusterTest, SNIFromHostHeader) {
+  EXPECT_CALL(initialized_, ready());
+  EXPECT_CALL(*cleanup_timer_, enableTimer(_, _));
+  setupFromYaml(default_tls_yaml_, true);
+
+  EXPECT_EQ(0UL, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().size());
+  EXPECT_EQ(0UL, cluster_->prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
+  EXPECT_EQ(0UL, cluster_->prioritySet().hostSetsPerPriority()[0]->hostsPerLocality().get().size());
+  EXPECT_EQ(
+      0UL,
+      cluster_->prioritySet().hostSetsPerPriority()[0]->healthyHostsPerLocality().get().size());
+
+  // SNI from Host header?
+  NiceMock<Network::MockConnection> connection;
+  connection.local_address_ = std::make_shared<Network::Address::Ipv4Instance>("10.10.11.11", 80);
+  EXPECT_CALL(connection, localAddressRestored()).WillRepeatedly(Return(true));
+  TestLoadBalancerContext lb_context(&connection, Http::Headers::get().Host.get(),
+                                     "www.google.com:80");
+  // Verify TestLoadBalancerContext works
+  auto downstream_headers = lb_context.downstreamHeaders();
+  ASSERT_NE(downstream_headers, nullptr);
+  auto host_header = downstream_headers->get(Http::Headers::get().Host);
+  ASSERT_NE(host_header, nullptr);
+  auto host_header_string = std::string(host_header->value().getStringView());
+  ASSERT_EQ("www.google.com:80", host_header_string);
+
+  Event::PostCb post_cb;
+  EXPECT_CALL(membership_updated_, ready());
+  EXPECT_CALL(dispatcher_, post(_)).WillOnce(SaveArg<0>(&post_cb));
+  HostConstSharedPtr host = lb_->chooseHost(&lb_context);
+  post_cb();
+  ASSERT_NE(host, nullptr);
+  EXPECT_EQ("10.10.11.11:80", host->address()->asString());
+  const Cluster::Host* options_host = dynamic_cast<const Cluster::Host*>(host.get());
+  ASSERT_NE(options_host, nullptr);
+  const Network::TransportSocketOptionsSharedPtr options =
+      getDefaultTransportSocketOptions(options_host);
+  ASSERT_NE(options, nullptr);
+  auto sni_override = options->serverNameOverride();
+  ASSERT_EQ(true, !!sni_override);
+  ASSERT_EQ("www.google.com", sni_override.value());
+}
+
+TEST_F(ClusterTest, NoSNIFromHostHeaderIP) {
+  EXPECT_CALL(initialized_, ready());
+  EXPECT_CALL(*cleanup_timer_, enableTimer(_, _));
+  setupFromYaml(default_tls_yaml_, true);
+
+  EXPECT_EQ(0UL, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().size());
+  EXPECT_EQ(0UL, cluster_->prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
+  EXPECT_EQ(0UL, cluster_->prioritySet().hostSetsPerPriority()[0]->hostsPerLocality().get().size());
+  EXPECT_EQ(
+      0UL,
+      cluster_->prioritySet().hostSetsPerPriority()[0]->healthyHostsPerLocality().get().size());
+
+  // SNI from Host header?
+  NiceMock<Network::MockConnection> connection;
+  connection.local_address_ = std::make_shared<Network::Address::Ipv4Instance>("10.10.11.11", 80);
+  EXPECT_CALL(connection, localAddressRestored()).WillRepeatedly(Return(true));
+  TestLoadBalancerContext lb_context(&connection, Http::Headers::get().Host.get(), "[ffd0::1]:80");
+
+  Event::PostCb post_cb;
+  EXPECT_CALL(membership_updated_, ready());
+  EXPECT_CALL(dispatcher_, post(_)).WillOnce(SaveArg<0>(&post_cb));
+  HostConstSharedPtr host = lb_->chooseHost(&lb_context);
+  post_cb();
+  ASSERT_NE(host, nullptr);
+  EXPECT_EQ("10.10.11.11:80", host->address()->asString());
+  const Cluster::Host* options_host = dynamic_cast<const Cluster::Host*>(host.get());
+  ASSERT_NE(options_host, nullptr);
+  const Network::TransportSocketOptionsSharedPtr options =
+      getDefaultTransportSocketOptions(options_host);
+  ASSERT_EQ(options, nullptr);
+}
+
+TEST_F(ClusterTest, NoTLSNoSNIFromHostHeader) {
+  EXPECT_CALL(initialized_, ready());
+  EXPECT_CALL(*cleanup_timer_, enableTimer(_, _));
+  setupFromYaml(default_yaml_, false);
+
+  EXPECT_EQ(0UL, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().size());
+  EXPECT_EQ(0UL, cluster_->prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
+  EXPECT_EQ(0UL, cluster_->prioritySet().hostSetsPerPriority()[0]->hostsPerLocality().get().size());
+  EXPECT_EQ(
+      0UL,
+      cluster_->prioritySet().hostSetsPerPriority()[0]->healthyHostsPerLocality().get().size());
+
+  // SNI from Host header?
+  NiceMock<Network::MockConnection> connection;
+  connection.local_address_ = std::make_shared<Network::Address::Ipv4Instance>("10.10.11.11", 80);
+  EXPECT_CALL(connection, localAddressRestored()).WillRepeatedly(Return(true));
+  TestLoadBalancerContext lb_context(&connection, Http::Headers::get().Host.get(),
+                                     "www.google.com:80");
+
+  Event::PostCb post_cb;
+  EXPECT_CALL(membership_updated_, ready());
+  EXPECT_CALL(dispatcher_, post(_)).WillOnce(SaveArg<0>(&post_cb));
+  HostConstSharedPtr host = lb_->chooseHost(&lb_context);
+  post_cb();
+  ASSERT_NE(host, nullptr);
+  EXPECT_EQ("10.10.11.11:80", host->address()->asString());
+  const Cluster::Host* options_host = dynamic_cast<const Cluster::Host*>(host.get());
+  ASSERT_NE(options_host, nullptr);
+  const Network::TransportSocketOptionsSharedPtr options =
+      getDefaultTransportSocketOptions(options_host);
+  ASSERT_EQ(options, nullptr);
+}
+
+TEST_F(ClusterTest, SNIFromDownstreamConnection) {
+  EXPECT_CALL(initialized_, ready());
+  EXPECT_CALL(*cleanup_timer_, enableTimer(_, _));
+  setupFromYaml(default_tls_yaml_, true);
+
+  EXPECT_EQ(0UL, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().size());
+  EXPECT_EQ(0UL, cluster_->prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
+  EXPECT_EQ(0UL, cluster_->prioritySet().hostSetsPerPriority()[0]->hostsPerLocality().get().size());
+  EXPECT_EQ(
+      0UL,
+      cluster_->prioritySet().hostSetsPerPriority()[0]->healthyHostsPerLocality().get().size());
+
+  // SNI from downstream connection, even if Host header is present
+  NiceMock<Network::MockConnection> connection;
+  connection.local_address_ = std::make_shared<Network::Address::Ipv4Instance>("10.10.11.11", 80);
+  EXPECT_CALL(connection, localAddressRestored()).WillRepeatedly(Return(true));
+  EXPECT_CALL(connection, requestedServerName()).WillRepeatedly(Return("www.isovalent.com"));
+  TestLoadBalancerContext lb_context(&connection, Http::Headers::get().Host.get(),
+                                     "www.google.com:80");
+
+  Event::PostCb post_cb;
+  EXPECT_CALL(membership_updated_, ready());
+  EXPECT_CALL(dispatcher_, post(_)).WillOnce(SaveArg<0>(&post_cb));
+  HostConstSharedPtr host = lb_->chooseHost(&lb_context);
+  post_cb();
+  ASSERT_NE(host, nullptr);
+  EXPECT_EQ("10.10.11.11:80", host->address()->asString());
+  const Cluster::Host* options_host = dynamic_cast<const Cluster::Host*>(host.get());
+  ASSERT_NE(options_host, nullptr);
+  const Network::TransportSocketOptionsSharedPtr options =
+      getDefaultTransportSocketOptions(options_host);
+  ASSERT_NE(options, nullptr);
+  auto sni_override = options->serverNameOverride();
+  ASSERT_EQ(true, !!sni_override);
+  ASSERT_EQ("www.isovalent.com", sni_override.value());
 }
 
 } // namespace OriginalDst

@@ -21,9 +21,6 @@ namespace Envoy {
 namespace Upstream {
 namespace OriginalDst {
 
-using HostMapSharedPtr = std::shared_ptr<HostMap>;
-using HostMapConstSharedPtr = std::shared_ptr<const HostMap>;
-
 /**
  * The OriginalDst Cluster is a dynamic cluster that automatically adds hosts as needed based on the
  * original destination address of the downstream connection. These hosts are also automatically
@@ -38,6 +35,37 @@ public:
 
   // Upstream::Cluster
   InitializePhase initializePhase() const override { return InitializePhase::Primary; }
+
+  /**
+   * A host implementation that supports default transport socket options.
+   */
+  class Host : public HostImpl {
+  public:
+    Host(const ClusterInfoConstSharedPtr& cluster, const std::string& hostname,
+         const Network::Address::InstanceConstSharedPtr& address,
+         const envoy::api::v2::core::Metadata& metadata, uint32_t initial_weight,
+         const envoy::api::v2::core::Locality& locality,
+         const envoy::api::v2::endpoint::Endpoint::HealthCheckConfig& health_check_config,
+         uint32_t priority, const envoy::api::v2::core::HealthStatus health_status,
+         const Network::TransportSocketOptionsSharedPtr& default_transport_socket_options)
+        : HostImpl(cluster, hostname, address, metadata, initial_weight, locality,
+                   health_check_config, priority, health_status),
+          default_transport_socket_options_(default_transport_socket_options) {}
+
+    // Upstream::Host
+    CreateConnectionData createConnection(
+        Event::Dispatcher& dispatcher, const Network::ConnectionSocket::OptionsSharedPtr& options,
+        Network::TransportSocketOptionsSharedPtr transport_socket_options) const override;
+
+  private:
+    const Network::TransportSocketOptionsSharedPtr default_transport_socket_options_;
+
+    friend class ClusterTest;
+  };
+  using HostSharedPtr = std::shared_ptr<Host>;
+  using HostMap = std::unordered_map<std::string, HostSharedPtr>;
+  using HostMapSharedPtr = std::shared_ptr<HostMap>;
+  using HostMapConstSharedPtr = std::shared_ptr<const HostMap>;
 
   /**
    * Special Load Balancer for Original Dst Cluster.
@@ -107,6 +135,7 @@ private:
   const std::chrono::milliseconds cleanup_interval_ms_;
   Event::TimerPtr cleanup_timer_;
   const bool use_http_header_;
+  const bool implements_secure_transport_;
 
   absl::Mutex host_map_lock_;
   HostMapConstSharedPtr host_map_ ABSL_GUARDED_BY(host_map_lock_);

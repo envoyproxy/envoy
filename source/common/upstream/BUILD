@@ -249,8 +249,10 @@ envoy_cc_library(
         "//include/envoy/upstream:cluster_factory_interface",
         "//source/common/common:empty_string",
         "//source/common/network:address_lib",
+        "//source/common/network:transport_socket_options_lib",
         "//source/common/network:utility_lib",
         "//source/extensions/clusters:well_known_names",
+        "@envoy_api//envoy/api/v2/auth:pkg_cc_proto",
     ],
 )
 
