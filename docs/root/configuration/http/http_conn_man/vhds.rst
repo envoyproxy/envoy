@@ -91,7 +91,7 @@ subscribed list of virtual hosts.
    :alt: Delta RDS request additional resources
 
 Compatibility with Scoped RDS
-----------------------------
+-----------------------------
 
 VHDS shouldn't present any compatibility issues with 
 :ref:`scoped RDS <envoy_api_msg_ScopedRouteConfiguration>`.
