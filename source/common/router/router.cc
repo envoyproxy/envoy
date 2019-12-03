@@ -103,6 +103,7 @@ void FilterUtility::setUpstreamScheme(Http::HeaderMap& headers, bool use_secure_
 
 bool FilterUtility::shouldShadow(const ShadowPolicyPtr& policy, Runtime::Loader& runtime,
                                  uint64_t stable_random) {
+  ASSERT(policy != nullptr);
   if (policy->cluster().empty()) {
     return false;
   }
