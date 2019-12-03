@@ -754,6 +754,7 @@ filegroup(
         build_file_content = KAFKASOURCE_BUILD_CONTENT,
         **REPOSITORY_LOCATIONS["kafka_source"]
     )
+
     # This archive provides Kafka (and Zookeeper) binaries, that are used during Kafka integration
     # tests.
     http_archive(
@@ -761,6 +762,7 @@ filegroup(
         build_file_content = BUILD_ALL_CONTENT,
         **REPOSITORY_LOCATIONS["kafka_server_binary"]
     )
+
     # This archive provides Kafka client in Python, so we can use it to interact with Kafka server
     # during interation tests.
     http_archive(

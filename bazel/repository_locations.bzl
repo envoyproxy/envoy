@@ -312,7 +312,7 @@ REPOSITORY_LOCATIONS = dict(
         urls = ["https://github.com/protocolbuffers/upb/archive/9effcbcb27f0a665f9f345030188c0b291e32482.tar.gz"],
     ),
     kafka_source = dict(
-        sha256 = "ae7a1696c0a0302b43c5b21e515c37e6ecd365941f68a510a7e442eebddf39a1", # 2.2.0-rc2
+        sha256 = "ae7a1696c0a0302b43c5b21e515c37e6ecd365941f68a510a7e442eebddf39a1",  # 2.2.0-rc2
         strip_prefix = "kafka-2.2.0-rc2/clients/src/main/resources/common/message",
         urls = ["https://github.com/apache/kafka/archive/2.2.0-rc2.zip"],
     ),
