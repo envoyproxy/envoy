@@ -49,7 +49,7 @@ BuilderPtr createBuilder(Protobuf::Arena* arena) {
   auto register_status =
       google::api::expr::runtime::RegisterBuiltinFunctions(builder->GetRegistry(), options);
   if (!register_status.ok()) {
-    throw EnvoyException(
+    throw CelException(
         absl::StrCat("failed to register built-in functions: ", register_status.message()));
   }
   return builder;
@@ -59,7 +59,7 @@ ExpressionPtr createExpression(Builder& builder, const google::api::expr::v1alph
   google::api::expr::v1alpha1::SourceInfo source_info;
   auto cel_expression_status = builder.CreateExpression(&expr, &source_info);
   if (!cel_expression_status.ok()) {
-    throw EnvoyException(
+    throw CelException(
         absl::StrCat("failed to create an expression: ", cel_expression_status.status().message()));
   }
   return std::move(cel_expression_status.ValueOrDie());
