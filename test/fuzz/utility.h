@@ -133,11 +133,14 @@ inline TestStreamInfo fromStreamInfo(const test::fuzz::StreamInfo& stream_info) 
       replaceInvalidStringValues(stream_info.upstream_metadata()));
   ON_CALL(*upstream_host, metadata()).WillByDefault(testing::Return(upstream_metadata));
   test_stream_info.upstream_host_ = upstream_host;
-  auto address = Envoy::Network::Address::resolveProtoAddress(stream_info.address());
-  test_stream_info.upstream_local_address_ = address;
-  test_stream_info.downstream_local_address_ = address;
-  test_stream_info.downstream_direct_remote_address_ = address;
-  test_stream_info.downstream_remote_address_ = address;
+  if (stream_info.has_address()) {
+    ENVOY_LOG_MISC(info, "has address {}", stream_info.address().DebugString());
+    auto address = Envoy::Network::Address::resolveProtoAddress(stream_info.address());
+    test_stream_info.upstream_local_address_ = address;
+    test_stream_info.downstream_local_address_ = address;
+    test_stream_info.downstream_direct_remote_address_ = address;
+    test_stream_info.downstream_remote_address_ = address;
+  }
   auto connection_info = std::make_shared<NiceMock<Ssl::MockConnectionInfo>>();
   ON_CALL(*connection_info, subjectPeerCertificate())
       .WillByDefault(testing::ReturnRef(TestSubjectPeer));

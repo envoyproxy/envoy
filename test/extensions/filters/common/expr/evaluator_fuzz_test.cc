@@ -25,22 +25,27 @@ DEFINE_PROTO_FUZZER(const test::extensions::filters::common::expr::EvaluatorTest
   try {
     // Validate that the input has an expression.
     TestUtility::validate(input);
+  } catch (const EnvoyException& e) {
+    ENVOY_LOG_MISC(debug, "EnvoyException: {}", e.what());
+    return;
+  }
 
+  // Create the headers and stream_info to test against.
+  TestStreamInfo stream_info = Fuzz::fromStreamInfo(input.stream_info());
+  Http::TestHeaderMapImpl request_headers = Fuzz::fromHeaders(input.request_headers());
+  Http::TestHeaderMapImpl response_headers = Fuzz::fromHeaders(input.response_headers());
+  Http::TestHeaderMapImpl response_trailers = Fuzz::fromHeaders(input.trailers());
+
+  try {
     // Create the CEL expression.
     Expr::ExpressionPtr expr = Expr::createExpression(*builder, input.expression());
-
-    // Create the headers and stream_info to test against.
-    TestStreamInfo stream_info = Fuzz::fromStreamInfo(input.stream_info());
-    Http::TestHeaderMapImpl request_headers = Fuzz::fromHeaders(input.request_headers());
-    Http::TestHeaderMapImpl response_headers = Fuzz::fromHeaders(input.response_headers());
-    Http::TestHeaderMapImpl response_trailers = Fuzz::fromHeaders(input.trailers());
 
     // Evaluate the CEL expression.
     Protobuf::Arena arena;
     Expr::evaluate(*expr, nullptr, stream_info, &request_headers, &response_headers,
                    &response_trailers);
-  } catch (const EnvoyException& e) {
-    ENVOY_LOG_MISC(debug, "EnvoyException: {}", e.what());
+  } catch (const CelException& e) {
+    ENVOY_LOG_MISC(debug, "CelException: {}", e.what());
   }
 }
 

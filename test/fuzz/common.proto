@@ -7,6 +7,8 @@ import "envoy/api/v2/core/address.proto";
 
 import "google/protobuf/wrappers.proto";
 
+import "validate/validate.proto";
+
 // Common fuzzing input types.
 
 message Headers {
