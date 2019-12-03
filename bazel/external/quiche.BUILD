@@ -1198,25 +1198,26 @@ envoy_cc_test_library(
 )
 
 envoy_cc_library(
-    name = "quiche_platform_endian",
+    name = "quiche_common_platform_endian",
     hdrs = ["quiche/common/platform/api/quiche_endian.h"],
     repository = "@envoy",
     tags = ["nofips"],
     visibility = ["//visibility:public"],
     deps =
         [
-            ":quiche_platform_export",
-            "@envoy//source/extensions/quic_listeners/quiche/platform:quiche_platform_endian_impl_lib",
+            ":quiche_common_platform_export",
+            "@envoy//source/extensions/quic_listeners/quiche/platform:quiche_common_platform_endian_impl_lib",
         ],
 )
 
 envoy_cc_library(
-    name = "quiche_platform_export",
+    name = "quiche_common_platform_export",
     hdrs = ["quiche/common/platform/api/quiche_export.h"],
     repository = "@envoy",
     tags = ["nofips"],
     visibility = ["//visibility:public"],
-    deps = ["@envoy//source/extensions/quic_listeners/quiche/platform:quiche_platform_export_impl_lib"],
+    deps =
+        ["@envoy//source/extensions/quic_listeners/quiche/platform:quiche_common_platform_export_impl_lib"],
 )
 
 #TODO(danzh) Figure out why using envoy_proto_library() fails.
@@ -2979,7 +2980,7 @@ envoy_cc_library(
         ":quic_core_error_codes_lib",
         ":quic_core_time_lib",
         ":quic_platform_base",
-        ":quiche_platform_endian",
+        ":quiche_common_platform_endian",
     ],
 )
 
@@ -3060,7 +3061,7 @@ envoy_cc_library(
         ":quic_core_tag_lib",
         ":quic_core_types_lib",
         ":quic_platform_base",
-        ":quiche_platform_endian",
+        ":quiche_common_platform_endian",
     ],
 )
 
@@ -3314,7 +3315,7 @@ envoy_cc_test_library(
     tags = ["nofips"],
     deps =
         [
-            ":quiche_platform_endian",
+            ":quiche_common_platform_endian",
             "@envoy//test/extensions/quic_listeners/quiche/platform:quiche_common_platform_test_impl_lib",
         ],
 )

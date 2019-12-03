@@ -318,19 +318,19 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "quiche_platform_export_impl_lib",
+    name = "quiche_common_platform_export_impl_lib",
     hdrs = ["quiche_export_impl.h"],
     tags = ["nofips"],
     visibility = ["//visibility:public"],
 )
 
 envoy_cc_library(
-    name = "quiche_platform_endian_impl_lib",
+    name = "quiche_common_platform_endian_impl_lib",
     hdrs = ["quiche_endian_impl.h"],
     tags = ["nofips"],
     visibility = ["//visibility:public"],
     deps = [
-        "quiche_platform_export_impl_lib",
+        "quiche_common_platform_export_impl_lib",
         "//source/common/common:byte_order_lib",
     ],
 )
