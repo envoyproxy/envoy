@@ -61,7 +61,7 @@ If a route for the contents of a host/authority header cannot be resolved,
 the active stream is paused while a :ref:`DeltaDiscoveryRequest <envoy_api_msg_DeltaDiscoveryRequest>` is sent. 
 When a :ref:`DeltaDiscoveryResponse <envoy_api_msg_DeltaDiscoveryResponse>` is
 recieved where the host/authority header values exactly matches the 
-:ref:`aliases <envoy_api_msg_DeltaDiscoveryResponse.aliases>`,
+:ref:`aliases <envoy_api_field_resource.aliases>`,
 the route configuration is updated, the stream is resumed and processing of the
 filter chain continues.
 
