@@ -2,6 +2,7 @@
 
 #include <http_parser.h>
 
+#include <cctype>
 #include <cstdint>
 #include <string>
 #include <vector>
@@ -755,64 +756,105 @@ const Utility::AuthorityAttributes Utility::parseAuthority(const absl::string_vi
   auth_attr.port = default_port;
   auth_attr.host = authority;
 
-  const auto colon_pos = authority.rfind(":");
-
+  bool is_ipv4 = true;
   bool is_ipv6 = false;
   bool have_port_ipv4 = false;
   bool have_port_ipv6 = false;
 
-  if (colon_pos != absl::string_view::npos && colon_pos != authority.find(":")) {
+  // This section applies first-match-wins algorithm described from
+  // RFC3986(https://tools.ietf.org/html/rfc3986#section-3.2.2). Host lireral include IP-literal,
+  // IPv4 Address or reg-name. In this function, We consider that IP-literal and IPv4 address as
+  // pure IP Address and return is_ip_address as true.
+
+  // check if passed authority matches IP-literal. IP-literal is constructed from bracket symbols
+  // and IPv6 address or IPvFuture. In this case, IPvFuture should be ignored
+  if (authority.find("[") != absl::string_view::npos) {
     is_ipv6 = true;
   }
 
-  if (authority.rfind("]:") != absl::string_view::npos) {
+  if (authority.rfind("]:") != absl::string_view::npos && is_ipv6) {
     have_port_ipv6 = true;
   }
 
-  if (colon_pos != absl::string_view::npos && colon_pos == authority.find(":")) {
-    have_port_ipv4 = true;
-  }
-
-  if (have_port_ipv4 || have_port_ipv6) {
-    try {
-      const Network::Address::InstanceConstSharedPtr instance =
-          Network::Utility::parseInternetAddressAndPort(authority);
-      auth_attr.host = Network::Utility::hostFromIpAddress(authority);
-      auth_attr.port = instance->ip()->port();
-      auth_attr.is_ip_address = true;
-
-      return auth_attr;
-    } catch (const EnvoyException&) {
-      // If authority has FQDN and port like localhost:8000,
-      // Network::Utility::parseInternetAddressAndPort should be failed so that we must parse
-      // authority on here
-
-      const auto port_str = Network::Utility::portFromIpAddress(authority);
-      uint64_t port64 = 0;
-
-      // This section should be false if authority is like example.com:abc, we can't regard as abc
-      // as port so that must regard example.com:abc as host and return them
-      if (port_str.empty() || !absl::SimpleAtoi(port_str, &port64) || port64 > 65535) {
-        auth_attr.port = default_port;
-        return auth_attr;
-      }
-
-      auth_attr.host = Network::Utility::hostFromIpAddress(authority);
-      auth_attr.port = static_cast<uint32_t>(port64);
+  // check if passed authority matches IPv4 Address. IPv4 address is separeted four section by dot
+  // deliminator, and each section has characters which is constructed from only digits
+  int delim_count = 0;
+  for (auto&& ch : authority) {
+    if (ch == '.') {
+      ++delim_count;
+      continue;
+    }
+    if (ch == ':') {
+      continue;
+    }
+    if (!std::isdigit(static_cast<unsigned char>(ch))) {
+      is_ipv4 = false;
+      break;
     }
   }
 
-  try {
-    // if authority is like ipv6 address with brackets without port like [::], we should extract ::
-    // as host because parse it validly on parseInternetAddress() because this function can't
-    // receive host with bracket but return exception
-    const auto extracted_host = !have_port_ipv6 && is_ipv6
-                                    ? Network::Utility::hostFromIpAddress(authority)
-                                    : auth_attr.host;
-    Network::Utility::parseInternetAddress(extracted_host, default_port);
-    auth_attr.host = extracted_host;
-    auth_attr.is_ip_address = true;
-  } catch (const EnvoyException&) {
+  if (delim_count != 3) {
+    is_ipv4 = false;
+  }
+
+  if (is_ipv4 && authority.find(":") != absl::string_view::npos) {
+    have_port_ipv4 = true;
+  }
+
+  if (have_port_ipv6 || have_port_ipv4) {
+    try {
+      const Network::Address::InstanceConstSharedPtr instance =
+          Network::Utility::parseInternetAddressAndPort(authority);
+      auth_attr.port = instance->ip()->port();
+      auth_attr.is_ip_address = true;
+    } catch (const EnvoyException&) {
+    }
+
+    auth_attr.host = Network::Utility::hostFromIpAddress(authority); // TODO
+    return auth_attr;
+  }
+
+  if (is_ipv6) {
+    try {
+      const Network::Address::InstanceConstSharedPtr instance =
+          Network::Utility::parseInternetAddress(Network::Utility::hostFromIpAddress(authority));
+      auth_attr.is_ip_address = true;
+    } catch (const EnvoyException&) {
+    }
+
+    auth_attr.host = Network::Utility::hostFromIpAddress(authority); // TODO
+    return auth_attr;
+  }
+
+  if (is_ipv4) {
+    try {
+      const Network::Address::InstanceConstSharedPtr instance =
+          Network::Utility::parseInternetAddress(authority);
+      auth_attr.is_ip_address = true;
+    } catch (const EnvoyException&) {
+    }
+
+    auth_attr.host = Network::Utility::hostFromIpAddress(authority); // TODO
+    return auth_attr;
+  }
+
+  // check if passed authority matches reg-name. Basicaly, authorities which is not matched IPv6 or
+  // IPv4, should be treated as reg-name
+  const auto colon_lpos = authority.find(":");
+  const auto colon_rpos = authority.rfind(":");
+
+  // If the number of colon is upper than 1, authority can't separate host and port correctly.
+  if (colon_lpos == colon_rpos) {
+    const auto port_str = Network::Utility::portFromIpAddress(authority);
+    uint64_t port64 = 0;
+
+    if (port_str.empty() || !absl::SimpleAtoi(port_str, &port64) || port64 > 65535) {
+      auth_attr.port = default_port;
+      return auth_attr;
+    }
+
+    auth_attr.host = Network::Utility::hostFromIpAddress(authority);
+    auth_attr.port = static_cast<uint32_t>(port64);
   }
 
   return auth_attr;
