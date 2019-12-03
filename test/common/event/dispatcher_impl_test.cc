@@ -10,6 +10,7 @@
 
 #include "test/mocks/common.h"
 #include "test/mocks/stats/mocks.h"
+#include "test/test_common/simulated_time_system.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -313,6 +314,52 @@ TEST(TimerImplTest, TimerEnabledDisabled) {
   EXPECT_TRUE(timer->enabled());
   dispatcher->run(Dispatcher::RunType::NonBlock);
   EXPECT_FALSE(timer->enabled());
+}
+
+class TimerImplTimingTest : public testing::Test {
+public:
+  std::chrono::nanoseconds getTimerTiming(Event::SimulatedTimeSystem& time_system,
+                                          Dispatcher& dispatcher, Event::Timer& timer) {
+    const auto start = time_system.monotonicTime();
+    EXPECT_TRUE(timer.enabled());
+    while (true) {
+      dispatcher.run(Dispatcher::RunType::NonBlock);
+      if (timer.enabled()) {
+        time_system.sleep(std::chrono::microseconds(1));
+      } else {
+        break;
+      }
+    }
+    return time_system.monotonicTime() - start;
+  }
+};
+
+// Test the timer with a series of timings and measure they fire accurately
+// using simulated time. enableTimer() should be precise at the millisecond
+// level, whereas enableHRTimer should be precise at the microsecond level.
+// For good measure, also check that '0'/immediate does what it says on the tin.
+TEST_F(TimerImplTimingTest, TheoreticalTimerTiming) {
+  Event::SimulatedTimeSystem time_system;
+  Api::ApiPtr api = Api::createApiForTest(time_system);
+  DispatcherPtr dispatcher(api->allocateDispatcher());
+  Event::TimerPtr timer = dispatcher->createTimer([&dispatcher] { dispatcher->exit(); });
+
+  const uint64_t timings[] = {0, 10, 50, 1234};
+  for (const uint64_t timing : timings) {
+    std::chrono::milliseconds ms(timing);
+    timer->enableTimer(ms);
+    EXPECT_EQ(std::chrono::duration_cast<std::chrono::milliseconds>(
+                  getTimerTiming(time_system, *dispatcher, *timer))
+                  .count(),
+              timing);
+
+    std::chrono::microseconds us(timing);
+    timer->enableHRTimer(us);
+    EXPECT_EQ(std::chrono::duration_cast<std::chrono::microseconds>(
+                  getTimerTiming(time_system, *dispatcher, *timer))
+                  .count(),
+              timing);
+  }
 }
 
 TEST(TimerImplTest, TimerValueConversion) {
