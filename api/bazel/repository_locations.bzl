@@ -52,11 +52,6 @@ REPOSITORY_LOCATIONS = dict(
         strip_prefix = "opencensus-proto-" + OPENCENSUS_PROTO_GIT_SHA + "/src",
         urls = ["https://github.com/census-instrumentation/opencensus-proto/archive/" + OPENCENSUS_PROTO_GIT_SHA + ".tar.gz"],
     ),
-    kafka_source = dict(
-        sha256 = KAFKA_SOURCE_SHA,
-        strip_prefix = "kafka-2.2.0-rc2/clients/src/main/resources/common/message",
-        urls = ["https://github.com/apache/kafka/archive/2.2.0-rc2.zip"],
-    ),
     com_github_openzipkin_zipkinapi = dict(
         sha256 = ZIPKINAPI_SHA256,
         strip_prefix = "zipkin-api-" + ZIPKINAPI_RELEASE,
