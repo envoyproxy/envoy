@@ -137,7 +137,7 @@ createProtocolOptionsConfig(const std::string& name, const ProtobufWkt::Any& typ
     throw EnvoyException(fmt::format("filter {} does not support protocol options", name));
   }
 
-  Envoy::Config::Utility::translateOpaqueConfig(name, typed_config, config, validation_visitor,
+  Envoy::Config::Utility::translateOpaqueConfig(typed_config, config, validation_visitor,
                                                 *proto_config);
 
   return factory->createProtocolOptionsConfig(*proto_config, validation_visitor);
@@ -1244,7 +1244,7 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(const HostVector& new_hosts,
   bool hosts_changed = false;
 
   // Go through and see if the list we have is different from what we just got. If it is, we make a
-  // new host list and raise a change observer. This uses an N^2 search given that this does not
+  // new host list and raise a change notification. This uses an N^2 search given that this does not
   // happen very often and the list sizes should be small (see
   // https://github.com/envoyproxy/envoy/issues/2874). We also check for duplicates here. It's
   // possible for DNS to return the same address multiple times, and a bad EDS implementation could

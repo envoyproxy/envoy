@@ -328,7 +328,7 @@ TEST_P(AdminRequestTest, AdminRequestBeforeRun) {
   // Now unblock the envoy thread so it can wake up and process outstanding posts.
   resume_.Notify();
 
-  // We don't get a observer when run(), so it's not safe to check whether the
+  // We don't get a notification when run(), so it's not safe to check whether the
   // admin handler is called until after we quit.
   adminRequest("/quitquitquit", "POST");
   EXPECT_TRUE(waitForEnvoyToExit());

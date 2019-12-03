@@ -93,7 +93,7 @@ TEST_F(TlsInspectorTest, ReadError) {
   EXPECT_EQ(1, cfg_->stats().read_error_.value());
 }
 
-// Test that a ClientHello with an SNI value causes the correct name observer.
+// Test that a ClientHello with an SNI value causes the correct name notification.
 TEST_F(TlsInspectorTest, SniRegistered) {
   init();
   const std::string servername("example.com");
@@ -115,7 +115,7 @@ TEST_F(TlsInspectorTest, SniRegistered) {
   EXPECT_EQ(1, cfg_->stats().alpn_not_found_.value());
 }
 
-// Test that a ClientHello with an ALPN value causes the correct name observer.
+// Test that a ClientHello with an ALPN value causes the correct name notification.
 TEST_F(TlsInspectorTest, AlpnRegistered) {
   init();
   const std::vector<absl::string_view> alpn_protos = {absl::string_view("h2"),

@@ -489,7 +489,7 @@ RunHelper::RunHelper(Instance& instance, const Options& options, Event::Dispatch
   // Start overload manager before workers.
   overload_manager.start();
 
-  // Register for cluster manager init observer. We don't start serving worker traffic until
+  // Register for cluster manager init notification. We don't start serving worker traffic until
   // upstream clusters are initialized which may involve running the event loop. Note however that
   // this can fire immediately if all clusters have already initialized. Also note that we need
   // to guard against shutdown at two different levels since SIGTERM can come in once the run loop

@@ -670,7 +670,7 @@ void EdfLoadBalancerBase::refresh(uint32_t priority) {
     // BaseDynamicClusterImpl::updateDynamicHostList about this.
     for (const auto& host : hosts) {
       // We use a fixed weight here. While the weight may change without
-      // observer, this will only be stale until this host is next picked,
+      // notification, this will only be stale until this host is next picked,
       // at which point it is reinserted into the EdfScheduler with its new
       // weight in chooseHost().
       scheduler.edf_->add(hostWeight(*host), host);

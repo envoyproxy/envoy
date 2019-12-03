@@ -154,7 +154,8 @@ void WatcherImpl::onKqueueEvent() {
       }
     }
 
-    ENVOY_LOG(debug, "observer: fd: {} flags: {:x} file: {}", file->fd_, event.fflags, file->file_);
+    ENVOY_LOG(debug, "notification: fd: {} flags: {:x} file: {}", file->fd_, event.fflags,
+              file->file_);
 
     if (events & file->events_) {
       ENVOY_LOG(debug, "matched callback: file: {}", file->file_);

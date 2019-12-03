@@ -396,7 +396,7 @@ TEST_P(ServerInstanceImplTest, NoLifecycleNotificationOnEarlyShutdown) {
   auto server_thread = Thread::threadFactoryForTest().createThread([&] {
     initialize("test/server/node_bootstrap.yaml");
 
-    // This shutdown observer should never be called because we will shutdown
+    // This shutdown notification should never be called because we will shutdown
     // early before the init manager finishes initializing and therefore before
     // the server starts worker threads.
     auto shutdown_handle = server_->registerCallback(ServerLifecycleNotifier::Stage::ShutdownExit,
