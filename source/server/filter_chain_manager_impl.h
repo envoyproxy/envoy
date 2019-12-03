@@ -13,9 +13,7 @@
 #include "common/init/manager_impl.h"
 #include "common/network/cidr_range.h"
 #include "common/network/lc_trie.h"
-
 #include "server/filter_chain_factory_context_callback.h"
-#include "server/tag_generator_batch_impl.h"
 
 #include "absl/container/flat_hash_map.h"
 

@@ -123,17 +123,8 @@ class ListenerManagerImpl : public ListenerManager, Logger::Loggable<Logger::Id:
 public:
   ListenerManagerImpl(Instance& server, ListenerComponentFactory& listener_factory,
                       WorkerFactory& worker_factory, bool enable_dispatcher_stats);
-  static bool isFilterChainOnlyUpdate(const envoy::api::v2::Listener& existing_config,
-                                      const envoy::api::v2::Listener& new_config);
 
   void onListenerWarmed(ListenerImpl& listener);
-
-  /**
-   * @param old_listener
-   * @param new_config
-   * @return true if the new_config is network filter chain only update to the existing listener.
-   */
-  bool couldTakeOver(ListenerImpl& existing_listener, const envoy::api::v2::Listener& new_config);
 
   // Server::ListenerManager
   bool addOrUpdateListener(const envoy::api::v2::Listener& config, const std::string& version_info,
@@ -150,15 +141,6 @@ public:
   void stopWorkers() override;
   void beginListenerUpdate() override { error_state_tracker_.clear(); }
   void endListenerUpdate(FailureStates&& failure_state) override;
-
-  /**
-   * @brief
-   * @return true if the filter chains are updated.
-   */
-  bool updateFilterChainManager(uint64_t listener_tag,
-                                ThreadLocalFilterChainManagerHelper& filter_chain_helper,
-                                TagGenerator::Tags filter_chain_tags);
-
   Http::Context& httpContext() { return server_.httpContext(); }
 
   Instance& server_;

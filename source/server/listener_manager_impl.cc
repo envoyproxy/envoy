@@ -338,13 +338,6 @@ bool ListenerManagerImpl::addOrUpdateListenerInternal(const envoy::api::v2::List
     ENVOY_LOG(debug, "duplicate/locked listener '{}'. no add/update", name);
     return false;
   }
-  if (existing_active_listener != active_listeners_.end() &&
-      couldTakeOver(**existing_active_listener, config)) {
-    //(*existing_active_listener)->takeOver(config);
-
-    // TODO: after take over
-    // metric, initialize
-  }
   ListenerImplPtr new_listener(new ListenerImpl(
       config, version_info, *this, name, added_via_api, workers_started_, hash,
       added_via_api ? server_.messageValidationContext().dynamicValidationVisitor()
@@ -444,21 +437,6 @@ bool ListenerManagerImpl::addOrUpdateListenerInternal(const envoy::api::v2::List
 
   new_listener_ref.initialize();
   return true;
-}
-
-// TODO(lambdai): Improve efficiency and false negative.
-bool ListenerManagerImpl::isFilterChainOnlyUpdate(const envoy::api::v2::Listener& existing_config,
-                                                  const envoy::api::v2::Listener& new_config) {
-  auto lhs = existing_config;
-  auto rhs = new_config;
-  lhs.clear_filter_chains();
-  rhs.clear_filter_chains();
-  return lhs.DebugString() == rhs.DebugString();
-}
-
-bool ListenerManagerImpl::couldTakeOver(ListenerImpl& existing_listener,
-                                        const envoy::api::v2::Listener& new_config) {
-  return isFilterChainOnlyUpdate(existing_listener.config(), new_config);
 }
 
 bool ListenerManagerImpl::hasListenerWithAddress(const ListenerList& list,
@@ -693,27 +671,6 @@ void ListenerManagerImpl::stopListener(Network::ListenerConfig& listener,
       }
     });
   }
-}
-
-bool ListenerManagerImpl::updateFilterChainManager(
-    uint64_t listener_tag, ThreadLocalFilterChainManagerHelper& filter_chain_helper,
-    TagGenerator::Tags filter_chain_tags) {
-  UNREFERENCED_PARAMETER(filter_chain_helper);
-  UNREFERENCED_PARAMETER(filter_chain_tags);
-  UNREFERENCED_PARAMETER(listener_tag);
-  // for (const auto& worker : workers_) {
-  //   worker->updateListener(
-  //       listener_tag,
-  //       /* update listener func */
-  //       [&filter_chain_helper,
-  //        filter_chain_tags](Network::ConnectionHandler::ActiveListener&) -> bool {
-  //         UNREFERENCED_PARAMETER(filter_chain_helper);
-  //         return true;
-  //       },
-  //       /* completion */
-  //       [](bool) {});
-  // }
-  return true;
 }
 
 void ListenerManagerImpl::stopListeners(StopListenersType stop_listeners_type) {

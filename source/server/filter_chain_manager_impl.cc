@@ -128,13 +128,9 @@ bool FilterChainManagerImpl::isWildcardServerName(const std::string& name) {
 void FilterChainManagerImpl::addFilterChain(
     absl::Span<const ::envoy::api::v2::listener::FilterChain* const> filter_chain_span,
     FilterChainFactoryBuilder& filter_chain_factory_builder) {
-  // ListenerContextBuilder context_builder;
-  // Contexts contexts = context_builder.build(filter_chain_span, filter_chain_factory_builder);
-
   std::unordered_set<envoy::api::v2::listener::FilterChainMatch, MessageUtil, MessageUtil>
       filter_chains;
   for (const auto& filter_chain : filter_chain_span) {
-
     const auto& filter_chain_match = filter_chain->filter_chain_match();
     if (!filter_chain_match.address_suffix().empty() || filter_chain_match.has_suffix_len()) {
       throw EnvoyException(fmt::format("error adding listener '{}': contains filter chains with "
@@ -183,9 +179,6 @@ void FilterChainManagerImpl::addFilterChain(
             filter_chain_factory_builder.buildFilterChain(*filter_chain)));
   }
   convertIPsToTries();
-  // get readyFCM
-  // get contexts
-  // get watcher
 }
 
 void FilterChainManagerImpl::addFilterChainForDestinationPorts(

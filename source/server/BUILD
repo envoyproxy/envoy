@@ -333,7 +333,6 @@ envoy_cc_library(
     hdrs = ["filter_chain_manager_impl.h"],
     deps = [
         ":filter_chain_factory_context_callback",
-        ":tag_generator_lib",
         "//include/envoy/server:listener_manager_interface",
         "//include/envoy/server:transport_socket_config_interface",
         "//source/common/common:empty_string",
@@ -504,19 +503,6 @@ envoy_cc_library(
         ":well_known_names_lib",
         "//include/envoy/registry",
         "//include/envoy/server:active_udp_listener_config_interface",
-    ],
-)
-
-envoy_cc_library(
-    name = "tag_generator_lib",
-    srcs = ["tag_generator_batch_impl.cc"],
-    hdrs = [
-        "tag_generator.h",
-        "tag_generator_batch_impl.h",
-    ],
-    deps = [
-        "//source/common/protobuf:utility_lib",
-        "@envoy_api//envoy/api/v2/listener:pkg_cc_proto",
     ],
 )
 
