@@ -2001,6 +2001,8 @@ TEST_F(ClusterManagerImplTest, DynamicHostRemoveWithTls) {
   factory_.tls_.shutdownThread();
 }
 
+// Test that default DNS resolver with TCP lookups is used, when there are no DNS custom resolvers
+// configured per cluster and `use_tcp_for_dns_lookups` is set in bootstrap config.
 TEST_F(ClusterManagerImplTest, UseTcpInDefaultDnsResolver) {
   const std::string yaml = R"EOF(
   use_tcp_for_dns_lookups: true
@@ -2024,6 +2026,8 @@ TEST_F(ClusterManagerImplTest, UseTcpInDefaultDnsResolver) {
   factory_.tls_.shutdownThread();
 }
 
+// Test that custom DNS resolver with UDP lookups is used, when custom resolver is configured
+// per cluster and `use_tcp_for_dns_lookups` is not specified.
 TEST_F(ClusterManagerImplTest, UseUdpWithCustomDnsResolver) {
   const std::string yaml = R"EOF(
   static_resources:
@@ -2049,6 +2053,8 @@ TEST_F(ClusterManagerImplTest, UseUdpWithCustomDnsResolver) {
   factory_.tls_.shutdownThread();
 }
 
+// Test that custom DNS resolver with TCP lookups is used, when custom resolver is configured
+// per cluster and `use_tcp_for_dns_lookups` is enabled for that cluster.
 TEST_F(ClusterManagerImplTest, UseTcpWithCustomDnsResolver) {
   const std::string yaml = R"EOF(
   static_resources:
