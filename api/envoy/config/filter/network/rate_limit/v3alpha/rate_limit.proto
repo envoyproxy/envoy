@@ -11,6 +11,8 @@ import "envoy/config/ratelimit/v3alpha/rls.proto";
 
 import "google/protobuf/duration.proto";
 
+import "udpa/api/annotations/versioning.proto";
+
 import "validate/validate.proto";
 
 // [#protodoc-title: Rate limit]
@@ -19,6 +21,9 @@ import "validate/validate.proto";
 
 // [#next-free-field: 7]
 message RateLimit {
+  option (udpa.api.annotations.versioning).previous_message_type =
+      "envoy.config.filter.network.rate_limit.v2.RateLimit";
+
   // The prefix to use when emitting :ref:`statistics <config_network_filters_rate_limit_stats>`.
   string stat_prefix = 1 [(validate.rules).string = {min_bytes: 1}];
 
