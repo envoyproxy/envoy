@@ -88,8 +88,6 @@ Network::Address::InstanceConstSharedPtr ConnectionManagerUtility::mutateRequest
   Network::Address::InstanceConstSharedPtr final_remote_address;
   bool single_xff_address;
   const uint32_t xff_num_trusted_hops = config.xffNumTrustedHops();
-  const bool trusted_forwarded_proto =
-      Runtime::runtimeFeatureEnabled("envoy.reloadable_features.trusted_forwarded_proto");
 
   if (config.useRemoteAddress()) {
     single_xff_address = request_headers.ForwardedFor() == nullptr;
@@ -113,18 +111,9 @@ Network::Address::InstanceConstSharedPtr ConnectionManagerUtility::mutateRequest
         Utility::appendXff(request_headers, *connection.remoteAddress());
       }
     }
-    if (trusted_forwarded_proto) {
-      // If the prior hop is not a trusted proxy, overwrite any x-forwarded-proto value it set as
-      // untrusted. Alternately if no x-forwarded-proto header exists, add one.
-      if (xff_num_trusted_hops == 0 || request_headers.ForwardedProto() == nullptr) {
-        request_headers.setReferenceForwardedProto(connection.ssl()
-                                                       ? Headers::get().SchemeValues.Https
-                                                       : Headers::get().SchemeValues.Http);
-      }
-    } else {
-      // Previously, before the trusted_forwarded_proto logic, Envoy would always overwrite the
-      // x-forwarded-proto header even if it was set by a trusted proxy. This code path is
-      // deprecated and will be removed.
+    // If the prior hop is not a trusted proxy, overwrite any x-forwarded-proto value it set as
+    // untrusted. Alternately if no x-forwarded-proto header exists, add one.
+    if (xff_num_trusted_hops == 0 || request_headers.ForwardedProto() == nullptr) {
       request_headers.setReferenceForwardedProto(
           connection.ssl() ? Headers::get().SchemeValues.Https : Headers::get().SchemeValues.Http);
     }
