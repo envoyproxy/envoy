@@ -43,7 +43,7 @@ Init::Manager& FilterChainFactoryContextImpl::initManager() {
   return parent_context_.initManager();
 }
 
-// Deligate to parent context
+// Delegate to parent context
 ThreadLocal::SlotAllocator& FilterChainFactoryContextImpl::threadLocal() {
   return parent_context_.threadLocal();
 }

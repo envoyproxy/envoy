@@ -84,8 +84,19 @@ void ConnectionHandlerImpl::enableListeners() {
 
 void ConnectionHandlerImpl::ActiveTcpListener::removeConnection(ActiveTcpConnection& connection) {
   ENVOY_CONN_LOG(debug, "adding to cleanup list", *connection.connection_);
-  ActiveTcpConnectionPtr removed = connection.removeFromList(connections_);
+  ActiveConnections& active_connections = connection.active_connections_;
+  ActiveTcpConnectionPtr removed = connection.removeFromList(active_connections.connections_);
   parent_.dispatcher_.deferredDelete(std::move(removed));
+  // Only lookup if defer delete is needed
+  if (active_connections.connections_.empty()) {
+    auto iter = connections_by_tag_.find(active_connections.tag_);
+    ASSERT(iter != connections_by_tag_.end());
+    parent_.dispatcher_.deferredDelete(std::move(iter->second));
+    // The erase will break the iteration over the connections_by_tag_ during the deletion.
+    if (!is_deleting_) {
+      connections_by_tag_.erase(iter);
+    }
+  }
 }
 
 ConnectionHandlerImpl::ActiveListenerImplBase::ActiveListenerImplBase(
@@ -116,6 +127,7 @@ ConnectionHandlerImpl::ActiveTcpListener::ActiveTcpListener(ConnectionHandlerImp
 }
 
 ConnectionHandlerImpl::ActiveTcpListener::~ActiveTcpListener() {
+  is_deleting_ = true;
   config_.connectionBalancer().unregisterHandler(*this);
 
   // Purge sockets that have not progressed to connections. This should only happen when
@@ -125,10 +137,13 @@ ConnectionHandlerImpl::ActiveTcpListener::~ActiveTcpListener() {
     parent_.dispatcher_.deferredDelete(std::move(removed));
   }
 
-  while (!connections_.empty()) {
-    connections_.front()->connection_->close(Network::ConnectionCloseType::NoFlush);
+  for (auto& tagAndConnections : connections_by_tag_) {
+    ASSERT(tagAndConnections.second != nullptr);
+    auto& connections = tagAndConnections.second->connections_;
+    while (!connections.empty()) {
+      connections.front()->connection_->close(Network::ConnectionCloseType::NoFlush);
+    }
   }
-
   parent_.dispatcher_.clearDeferredDeleteList();
 
   // By the time a listener is destroyed, in the common case, there should be no connections.
@@ -317,8 +332,9 @@ void ConnectionHandlerImpl::ActiveTcpListener::newConnection(
   }
 
   auto transport_socket = filter_chain->transportSocketFactory().createTransportSocket(nullptr);
+  auto& active_connections = getOrCreateActiveConnections(filter_chain->getTag());
   ActiveTcpConnectionPtr active_connection(new ActiveTcpConnection(
-      *this,
+      active_connections,
       parent_.dispatcher_.createServerConnection(std::move(socket), std::move(transport_socket)),
       parent_.dispatcher_.timeSource()));
   active_connection->connection_->setBufferLimits(config_.perConnectionBufferLimitBytes());
@@ -334,8 +350,18 @@ void ConnectionHandlerImpl::ActiveTcpListener::newConnection(
   if (active_connection->connection_->state() != Network::Connection::State::Closed) {
     ENVOY_CONN_LOG(debug, "new connection", *active_connection->connection_);
     active_connection->connection_->addConnectionCallbacks(*active_connection);
-    active_connection->moveIntoList(std::move(active_connection), connections_);
+    active_connection->moveIntoList(std::move(active_connection), active_connections.connections_);
   }
+  // TODO(lambdai): defer delete active_connections when supporting per tag drain
+}
+
+ConnectionHandlerImpl::ActiveConnections&
+ConnectionHandlerImpl::ActiveTcpListener::getOrCreateActiveConnections(uint64_t tag) {
+  ActiveConnectionsPtr& connections = connections_by_tag_[tag];
+  if (connections == nullptr) {
+    connections = std::make_unique<ConnectionHandlerImpl::ActiveConnections>(*this, tag);
+  }
+  return *connections;
 }
 
 namespace {
@@ -374,37 +400,47 @@ void ConnectionHandlerImpl::ActiveTcpListener::post(Network::ConnectionSocketPtr
   });
 }
 
+ConnectionHandlerImpl::ActiveConnections::ActiveConnections(
+    ConnectionHandlerImpl::ActiveTcpListener& listener, uint64_t tag)
+    : listener_(listener), tag_(tag) {}
+
+ConnectionHandlerImpl::ActiveConnections::~ActiveConnections() {
+  // connections should be defer deleted already.
+  ASSERT(connections_.empty());
+}
+
 ConnectionHandlerImpl::ActiveTcpConnection::ActiveTcpConnection(
-    ActiveTcpListener& listener, Network::ConnectionPtr&& new_connection, TimeSource& time_source)
-    : listener_(listener), connection_(std::move(new_connection)),
+    ActiveConnections& active_connections, Network::ConnectionPtr&& new_connection,
+    TimeSource& time_source)
+    : active_connections_(active_connections), connection_(std::move(new_connection)),
       conn_length_(new Stats::HistogramCompletableTimespanImpl(
-          listener_.stats_.downstream_cx_length_ms_, time_source)) {
+          active_connections_.listener_.stats_.downstream_cx_length_ms_, time_source)) {
   // We just universally set no delay on connections. Theoretically we might at some point want
   // to make this configurable.
   connection_->noDelay(true);
 
-  listener_.stats_.downstream_cx_total_.inc();
-  listener_.stats_.downstream_cx_active_.inc();
-  listener_.per_worker_stats_.downstream_cx_total_.inc();
-  listener_.per_worker_stats_.downstream_cx_active_.inc();
+  active_connections_.listener_.stats_.downstream_cx_total_.inc();
+  active_connections_.listener_.stats_.downstream_cx_active_.inc();
+  active_connections_.listener_.per_worker_stats_.downstream_cx_total_.inc();
+  active_connections_.listener_.per_worker_stats_.downstream_cx_active_.inc();
 
   // Active connections on the handler (not listener). The per listener connections have already
   // been incremented at this point either via the connection balancer or in the socket accept
   // path if there is no configured balancer.
-  ++listener_.parent_.num_handler_connections_;
+  ++active_connections_.listener_.parent_.num_handler_connections_;
 }
 
 ConnectionHandlerImpl::ActiveTcpConnection::~ActiveTcpConnection() {
-  listener_.stats_.downstream_cx_active_.dec();
-  listener_.stats_.downstream_cx_destroy_.inc();
-  listener_.per_worker_stats_.downstream_cx_active_.dec();
+  active_connections_.listener_.stats_.downstream_cx_active_.dec();
+  active_connections_.listener_.stats_.downstream_cx_destroy_.inc();
+  active_connections_.listener_.per_worker_stats_.downstream_cx_active_.dec();
   conn_length_->complete();
 
   // Active listener connections (not handler).
-  listener_.decNumConnections();
+  active_connections_.listener_.decNumConnections();
 
   // Active handler connections (not listener).
-  listener_.parent_.decNumConnections();
+  active_connections_.listener_.parent_.decNumConnections();
 }
 
 ActiveUdpListener::ActiveUdpListener(Network::ConnectionHandler& parent,

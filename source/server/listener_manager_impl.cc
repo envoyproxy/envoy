@@ -454,20 +454,6 @@ bool ListenerManagerImpl::isFilterChainOnlyUpdate(const envoy::api::v2::Listener
   lhs.clear_filter_chains();
   rhs.clear_filter_chains();
   return lhs.DebugString() == rhs.DebugString();
-
-  /* try below
-  bool IsEmptyDigitalMediaData(
-    const ads_proto::DigitalMediaData& digital_media_data) {
-  // Note that we set the app_id and vendor of the digital media data, so that
-  // the AppSignal is self-describing. Ignore these fields.
-  proto2::util::MessageDifferencer differ;
-  differ.IgnoreField(kAppIdFieldDescriptor);
-  differ.IgnoreField(kVendorFieldDescriptor);
-
-  return differ.Compare(digital_media_data,
-                        ads_proto::DigitalMediaData::default_instance());
-  }
-  */
 }
 
 bool ListenerManagerImpl::couldTakeOver(ListenerImpl& existing_listener,

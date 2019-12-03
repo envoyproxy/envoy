@@ -74,8 +74,6 @@ public:
   void enableListeners() override;
   const std::string& statPrefix() override { return per_handler_stat_prefix_; }
 
-  class FilterChainDrainManager {};
-
   /**
    * Wrapper for an active listener owned by this handler.
    */
@@ -96,6 +94,8 @@ private:
   using ActiveTcpConnectionPtr = std::unique_ptr<ActiveTcpConnection>;
   struct ActiveTcpSocket;
   using ActiveTcpSocketPtr = std::unique_ptr<ActiveTcpSocket>;
+  class ActiveConnections;
+  using ActiveConnectionsPtr = std::unique_ptr<ActiveConnections>;
 
   /**
    * Wrapper for an active tcp listener owned by this handler.
@@ -138,26 +138,38 @@ private:
      */
     void newConnection(Network::ConnectionSocketPtr&& socket);
 
+    ActiveConnections& getOrCreateActiveConnections(uint64_t tag);
+
     ConnectionHandlerImpl& parent_;
     Network::ListenerPtr listener_;
     const std::chrono::milliseconds listener_filters_timeout_;
     const bool continue_on_listener_filters_timeout_;
     std::list<ActiveTcpSocketPtr> sockets_;
-    std::list<ActiveTcpConnectionPtr> connections_;
+    std::unordered_map<uint64_t, ActiveConnectionsPtr> connections_by_tag_;
 
     // The number of connections currently active on this listener. This is typically used for
     // connection balancing across per-handler listeners.
     std::atomic<uint64_t> num_listener_connections_{};
+    bool is_deleting_{false};
   };
 
+  class ActiveConnections : public Event::DeferredDeletable {
+  public:
+    ActiveConnections(ActiveTcpListener& listener, uint64_t tag);
+    ~ActiveConnections();
+
+    ActiveTcpListener& listener_;
+    uint64_t tag_;
+    std::list<ActiveTcpConnectionPtr> connections_;
+  };
   /**
    * Wrapper for an active TCP connection owned by this handler.
    */
   struct ActiveTcpConnection : LinkedObject<ActiveTcpConnection>,
                                public Event::DeferredDeletable,
                                public Network::ConnectionCallbacks {
-    ActiveTcpConnection(ActiveTcpListener& listener, Network::ConnectionPtr&& new_connection,
-                        TimeSource& time_system);
+    ActiveTcpConnection(ActiveConnections& active_connections,
+                        Network::ConnectionPtr&& new_connection, TimeSource& time_system);
     ~ActiveTcpConnection() override;
 
     // Network::ConnectionCallbacks
@@ -165,13 +177,13 @@ private:
       // Any event leads to destruction of the connection.
       if (event == Network::ConnectionEvent::LocalClose ||
           event == Network::ConnectionEvent::RemoteClose) {
-        listener_.removeConnection(*this);
+        active_connections_.listener_.removeConnection(*this);
       }
     }
     void onAboveWriteBufferHighWatermark() override {}
     void onBelowWriteBufferLowWatermark() override {}
 
-    ActiveTcpListener& listener_;
+    ActiveConnections& active_connections_;
     Network::ConnectionPtr connection_;
     Stats::TimespanPtr conn_length_;
   };

@@ -11,7 +11,7 @@ namespace Server {
 
 /**
  * Generate tag for filter chain. The tag is used to identify the connections belong to the tag
- * asociated filter chain. If two filter chains are different, their tags must be different. Two
+ * associated filter chain. If two filter chains are different, their tags must be different. Two
  * identical filter chains should shared the same tag but it is not required.
  */
 class TagGeneratorBatchImpl : public TagGenerator {
