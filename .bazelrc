@@ -93,6 +93,7 @@ build:clang-msan --define ENVOY_CONFIG_MSAN=1
 build:clang-msan --copt -fsanitize=memory
 build:clang-msan --linkopt -fsanitize=memory
 build:clang-msan --copt -fsanitize-memory-track-origins=2
+# MSAN needs -O1 to get reasonable performance.
 build:clang-msan --copt -O1
 
 # Clang with libc++
