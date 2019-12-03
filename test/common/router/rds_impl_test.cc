@@ -470,8 +470,9 @@ virtual_hosts:
   server_factory_context_.cluster_manager_.subscription_factory_.callbacks_->onConfigUpdate(
       route_configs, "1");
 
-  RouteConfigProviderPtr provider2 = route_config_provider_manager_->createRdsRouteConfigProvider(
-      rds_, mock_factory_context_, "foo_prefix", outer_init_manager_);
+  RouteConfigProviderSharedPtr provider2 =
+      route_config_provider_manager_->createRdsRouteConfigProvider(
+          rds_, mock_factory_context_, "foo_prefix", outer_init_manager_);
 
   // provider2 should have route config immediately after create
   EXPECT_TRUE(provider2->configInfo().has_value());
@@ -487,8 +488,9 @@ virtual_hosts:
   envoy::config::filter::network::http_connection_manager::v2::Rds rds2;
   rds2.set_route_config_name("foo_route_config");
   rds2.mutable_config_source()->set_path("bar_path");
-  RouteConfigProviderPtr provider3 = route_config_provider_manager_->createRdsRouteConfigProvider(
-      rds2, mock_factory_context_, "foo_prefix", mock_factory_context_.initManager());
+  RouteConfigProviderSharedPtr provider3 =
+      route_config_provider_manager_->createRdsRouteConfigProvider(
+          rds2, mock_factory_context_, "foo_prefix", mock_factory_context_.initManager());
   EXPECT_NE(provider3, provider_);
   server_factory_context_.cluster_manager_.subscription_factory_.callbacks_->onConfigUpdate(
       route_configs, "provider3");
@@ -527,8 +529,8 @@ TEST_F(RouteConfigProviderManagerImplTest, SameProviderOnTwoInitManager) {
   Init::ManagerImpl real_init_manager("real");
 
   RouteConfigProviderSharedPtr provider2 =
-      route_config_provider_manager_->createRdsRouteConfigProvider(
-          rds_, mock_factory_context2, "foo_prefix", real_init_manager, false);
+      route_config_provider_manager_->createRdsRouteConfigProvider(rds_, mock_factory_context2,
+                                                                   "foo_prefix", real_init_manager);
 
   EXPECT_FALSE(provider2->configInfo().has_value());
 
