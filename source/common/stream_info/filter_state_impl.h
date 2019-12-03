@@ -15,7 +15,8 @@ class FilterStateImpl : public FilterState {
 public:
   // FilterState
   void setData(absl::string_view data_name, std::shared_ptr<Object> data,
-               FilterState::StateType state_type, FilterState::LifeSpan life_span) override;
+               FilterState::StateType state_type,
+               FilterState::LifeSpan life_span = FilterState::LifeSpan::FilterChain) override;
   void copyInto(FilterState& other, FilterState::LifeSpan life_span) override;
   bool hasDataWithName(absl::string_view) const override;
   const Object* getDataReadOnlyGeneric(absl::string_view data_name) const override;
