@@ -307,8 +307,7 @@ Network::FilterStatus ConnectionManagerImpl::onData(Buffer::Instance& data, bool
     const envoy::type::FractionalPercent default_value; // 0
     if (runtime_.snapshot().featureEnabled("http.connection_manager.log_flood_exception",
                                            default_value)) {
-      ENVOY_CONN_LOG(warn, "downstream HTTP flood from IP '{}': {}",
-                     read_callbacks_->connection(),
+      ENVOY_CONN_LOG(warn, "downstream HTTP flood from IP '{}': {}", read_callbacks_->connection(),
                      read_callbacks_->connection().remoteAddress()->asString(), e.what());
     }
 

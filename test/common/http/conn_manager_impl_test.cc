@@ -443,7 +443,7 @@ TEST_F(HttpConnectionManagerImplTest, HeaderOnlyRequestAndResponse) {
   Buffer::OwnedImpl fake_input("1234");
   conn_manager_->onData(fake_input, false);
   // If this were actual HTTP input, the codec would kick off a fake event after
-  // the first request was finished, triggering the second onData.  We do this
+  // the first request was finished, triggering the second onData. We do this
   // manually.
   conn_manager_->onData(fake_input, false);
 
