@@ -247,8 +247,7 @@ TEST_F(FilterStateImplTest, LifeSpan) {
   filter_state().setData("test_3", std::make_unique<SimpleType>(3),
                          FilterState::StateType::ReadOnly,
                          FilterState::LifeSpan::DownstreamRequest);
-  filter_state().setData("test_4", std::make_unique<SimpleType>(4),
-                         FilterState::StateType::Mutable,
+  filter_state().setData("test_4", std::make_unique<SimpleType>(4), FilterState::StateType::Mutable,
                          FilterState::LifeSpan::DownstreamRequest);
   {
     FilterStateImpl new_filter_state;
@@ -278,7 +277,6 @@ TEST_F(FilterStateImplTest, LifeSpan) {
         "FilterState::getDataMutable<T> tried to access immutable data as mutable.");
     EXPECT_EQ(4, new_filter_state.getDataMutable<SimpleType>("test_4").access());
   }
-
 }
 
 } // namespace StreamInfo

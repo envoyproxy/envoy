@@ -2222,8 +2222,9 @@ bool ConnectionManagerImpl::ActiveStreamDecoderFilter::recreateStream() {
 
   StreamDecoder& new_stream = parent_.connection_manager_.newStream(*response_encoder, true);
   parent_.stream_info_.filterState().copyInto(
-      ((*parent_.connection_manager_.streams_.begin())->stream_info_.filterState()),
+      (*parent_.connection_manager_.streams_.begin())->stream_info_.filterState(),
       StreamInfo::FilterState::LifeSpan::DownstreamRequest);
+
   new_stream.decodeHeaders(std::move(request_headers), true);
   return true;
 }

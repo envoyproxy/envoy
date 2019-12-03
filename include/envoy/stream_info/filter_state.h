@@ -26,7 +26,7 @@ public:
   // DownstreamRequest allows an object to survived across filter chain for book keeping.
   // Note that order matters in this enum because it's assumed that life span grows as enum number
   // grows.
-  enum class LifeSpan { FilterChain, DownstreamRequest , InvalidSpan};
+  enum class LifeSpan { FilterChain, DownstreamRequest };
 
   class Object {
   public:
@@ -63,7 +63,7 @@ public:
    * @param other the FilterState we want to copy current data into.
    * @param life_span the object life span above or equal to which will be copied.
    *
-   * This is useful for sharding filter state within bigger context than a upstream stream. For
+   * This is useful for sharing filter state within bigger life span than a filter chain create. For
    * example, we are going to use it to share router filter state across filter chains created on
    * the same downstream request for internal redirect handling.
    */
