@@ -21,7 +21,7 @@ Java tests
 
 To run the entire Java unit test suite locally, use the following Bazel command:
 
-``./bazelw test --test_output=all --build_tests_only //library/java/test/...``
+``bazel test --test_output=all --build_tests_only //library/java/test/...``
 
 ------------
 Kotlin tests
@@ -29,7 +29,7 @@ Kotlin tests
 
 To run the entire Kotlin unit test suite locally, use the following Bazel command:
 
-``./bazelw test --test_output=all --build_tests_only //library/kotlin/test/...``
+``bazel test --test_output=all --build_tests_only //library/kotlin/test/...``
 
 -----------
 Swift tests
@@ -37,4 +37,4 @@ Swift tests
 
 To run the entire Swift unit test suite locally, use the following Bazel command:
 
-``./bazelw test --test_output=all --build_tests_only //library/swift/test/...``
+``bazel test --test_output=all --build_tests_only //library/swift/test/...``

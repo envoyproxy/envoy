@@ -25,3 +25,7 @@ sudo update-alternatives --install /usr/bin/clang++ clang++ /usr/bin/clang++-8 1
 
 sudo apt-get install gnupg2
 gpg --version
+
+# bazelisk
+sudo wget -O /usr/local/bin/bazel https://github.com/bazelbuild/bazelisk/releases/download/v0.0.8/bazelisk-linux-amd64
+sudo chmod +x /usr/local/bin/bazel

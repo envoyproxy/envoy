@@ -2,6 +2,8 @@ name: format
 
 on:
   push:
+    branches:
+      - master
   pull_request:
 
 jobs:
@@ -10,15 +12,18 @@ jobs:
     runs-on: ubuntu-18.04
     timeout-minutes: 45
     container:
-      image: envoyproxy/envoy-build:cfc514546bc0284536893cca5fa43d7128edcd35
+      image: envoyproxy/envoy-build-ubuntu:5a096881181dbe478f642b7ac02a68e9591e933d
     steps:
       - uses: actions/checkout@v1
         with:
           submodules: true
       - name: 'Run formatters'
         run: |
-          export CLANG_FORMAT=clang-format-8
+          export PATH=/opt/llvm/bin:$PATH
+          export CLANG_FORMAT=clang-format
           export BUILDIFIER_BIN=/usr/local/bin/buildifier
+          export BUILDOZER_BIN=/usr/local/bin/buildozer
+          export ENVOY_BAZEL_PREFIX=@envoy
           ./tools/check_format.sh
   precommit:
     name: precommit

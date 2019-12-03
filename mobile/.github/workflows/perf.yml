@@ -2,6 +2,8 @@ name: perf
 
 on:
   push:
+    branches:
+      - master
   pull_request:
 
 jobs:
@@ -16,7 +18,7 @@ jobs:
       - name: 'Install dependencies'
         run: ./ci/linux_ci_setup.sh
       - name: 'Build test binary'
-        run: ./bazelw build //test/performance:test_binary_size --config=sizeopt
+        run: bazel build //test/performance:test_binary_size --config=sizeopt
       - uses: actions/upload-artifact@v1
         with:
           name: sizecurrent
@@ -34,7 +36,7 @@ jobs:
       - name: 'Build test binary'
         run: |
           git checkout master && git pull origin master && git submodule update
-          ./bazelw build //test/performance:test_binary_size --config=sizeopt
+          bazel build //test/performance:test_binary_size --config=sizeopt
       - uses: actions/upload-artifact@v1
         with:
           name: sizemaster

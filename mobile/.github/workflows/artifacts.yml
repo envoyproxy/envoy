@@ -23,7 +23,7 @@ jobs:
           export CXX=clang++
           export ANDROID_NDK_HOME=/usr/local/lib/android/sdk/ndk-bundle
           current_short_commit=$(git rev-parse --short HEAD)
-          ./bazelw build \
+          bazel build \
               --config=release-android \
               --fat_apk_cpu=x86,armeabi-v7a,arm64-v8a \
               --define=pom_version=master-$current_short_commit \
@@ -43,7 +43,7 @@ jobs:
       - name: 'Install dependencies'
         run: ./ci/mac_ci_setup.sh
       - name: 'Build Envoy.framework distributable'
-        run: ./bazelw build --config=release-ios --ios_multi_cpus=i386,x86_64,armv7,arm64 //:ios_dist
+        run: bazel build --config=release-ios --ios_multi_cpus=i386,x86_64,armv7,arm64 //:ios_dist
       - name: 'Create temporary directory for artifact to produce properly named zip'
         run: mkdir -p dist/ios_artifact/Envoy.framework
       - name: 'Move artifact to directory for zipping'

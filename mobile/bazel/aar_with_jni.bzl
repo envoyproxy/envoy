@@ -30,7 +30,7 @@ load("@google_bazel_common//tools/maven:pom_file.bzl", "pom_file")
 # creates a few underlying libraries, because of this the classes.jar in
 # the aar we built was empty. This rule separately builds the underlying
 # kt.jar file, and replaces the aar's classes.jar with the kotlin jar
-def aar_with_jni(name, android_library, proguard_rules = "", archive_name = "", visibility = None):
+def aar_with_jni(name, android_library, proguard_rules = "", archive_name = "", visibility = None, native_deps = []):
     if not archive_name:
         archive_name = name
 
@@ -52,7 +52,7 @@ EOF
         name = archive_name + "_jni",
         manifest = archive_name + "_generated_AndroidManifest.xml",
         custom_package = "does.not.matter",
-        deps = [android_library],
+        deps = [android_library] + native_deps,
     )
 
     pom_file(

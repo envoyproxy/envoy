@@ -20,7 +20,7 @@ if ! brew update; then
     exit 1
 fi
 
-DEPS="automake cmake coreutils go libtool wget ninja gpg"
+DEPS="automake cmake coreutils go libtool wget ninja gpg bazelbuild/tap/bazelisk"
 for DEP in ${DEPS}
 do
     is_installed "${DEP}" || install "${DEP}"
