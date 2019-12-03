@@ -348,8 +348,9 @@ private:
  * removePath() -> removes the header if it exists.
  *
  * For inline headers that use integers, we have:
- * // TODO(asraa): Remove this method for other inline headers.
  * setContentLength(5) -> sets the header value to the integer 5.
+ *
+ * TODO(asraa): Remove the integer set for inline headers that do not take integer values.
  */
 #define DEFINE_INLINE_HEADER(name)                                                                 \
   virtual const HeaderEntry* name() const PURE;                                                    \
@@ -438,10 +439,15 @@ public:
   /**
    * Appends data to header. If header already has a value, the string "," is added between the
    * existing value and data.
+   *
    * @param key specifies the name of the header to append; it WILL be copied.
    * @param value specifies the value of the header to add; it WILL be copied.
+   *
+   * Caution: This iterates over the HeaderMap to find the header to append. This will modify only
+   * the first occurrence of the header.
+   * TODO(asraa): Investigate whether necessary to append to all headers with the key.
    */
-  virtual void append(const LowerCaseString& key, absl::string_view value) PURE;
+  virtual void appendCopy(const LowerCaseString& key, absl::string_view value) PURE;
 
   /**
    * Set a reference header in the map. Both key and value MUST point to data that will live beyond
@@ -477,6 +483,10 @@ public:
    *
    * @param key specifies the name of the header to set; it WILL be copied.
    * @param value specifies the value of the header to set; it WILL be copied.
+   *
+   * Caution: This iterates over the HeaderMap to find the header to set. This will modify only the
+   * first occurrence of the header.
+   * TODO(asraa): Investigate whether necessary to set all headers with the key.
    */
   virtual void setCopy(const LowerCaseString& key, absl::string_view value) PURE;
 

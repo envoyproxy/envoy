@@ -970,7 +970,7 @@ void HttpIntegrationTest::testLargeRequestTrailers(uint32_t size, uint32_t max_s
 
 void HttpIntegrationTest::testManyRequestHeaders(std::chrono::milliseconds time) {
   max_request_headers_kb_ = 96;
-  max_request_headers_count_ = 20005;
+  max_request_headers_count_ = 10005;
 
   config_helper_.addConfigModifier(
       [&](envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager& hcm)
@@ -983,7 +983,7 @@ void HttpIntegrationTest::testManyRequestHeaders(std::chrono::milliseconds time)
   Http::TestHeaderMapImpl big_headers{
       {":method", "GET"}, {":path", "/test/long/url"}, {":scheme", "http"}, {":authority", "host"}};
 
-  for (int i = 0; i < 20000; i++) {
+  for (int i = 0; i < 10000; i++) {
     big_headers.addCopy(std::to_string(i), std::string(0, 'a'));
   }
   initialize();

@@ -81,7 +81,7 @@ public:
   void addReferenceKey(const LowerCaseString& key, absl::string_view value) override;
   void addCopy(const LowerCaseString& key, uint64_t value) override;
   void addCopy(const LowerCaseString& key, absl::string_view value) override;
-  void append(const LowerCaseString& key, absl::string_view value) override;
+  void appendCopy(const LowerCaseString& key, absl::string_view value) override;
   void setReference(const LowerCaseString& key, absl::string_view value) override;
   void setReferenceKey(const LowerCaseString& key, absl::string_view value) override;
   void setCopy(const LowerCaseString& key, absl::string_view value) override;
@@ -212,6 +212,7 @@ protected:
   HeaderEntryImpl& maybeCreateInline(HeaderEntryImpl** entry, const LowerCaseString& key);
   HeaderEntryImpl& maybeCreateInline(HeaderEntryImpl** entry, const LowerCaseString& key,
                                      HeaderString&& value);
+  HeaderEntry* getExisting(const LowerCaseString& key);
   HeaderEntryImpl* getExistingInline(absl::string_view key);
 
   void removeInline(HeaderEntryImpl** entry);

@@ -457,22 +457,18 @@ void HeaderMapImpl::addCopy(const LowerCaseString& key, absl::string_view value)
   insertByKey(std::move(new_key), std::move(new_value));
   ASSERT(new_key.empty());   // NOLINT(bugprone-use-after-move)
   ASSERT(new_value.empty()); // NOLINT(bugprone-use-after-move)
-  verifyByteSize();
+  // verifyByteSize();
 }
 
-void HeaderMapImpl::append(const LowerCaseString& key, absl::string_view value) {
-  bool found = false;
-  for (HeaderEntryImpl& header : headers_) {
-    if (header.key().getStringView() == key.get()) {
-      const uint64_t added_size = appendToHeader(header.value(), value);
-      addSize(added_size);
-      found = true;
-    }
-  }
-
-  if (!found) {
+void HeaderMapImpl::appendCopy(const LowerCaseString& key, absl::string_view value) {
+  auto* entry = getExisting(key);
+  if (entry) {
+    const uint64_t added_size = appendToHeader(entry->value(), value);
+    addSize(added_size);
+  } else {
     addCopy(key, value);
   }
+
   verifyByteSize();
 }
 
@@ -496,16 +492,11 @@ void HeaderMapImpl::setReferenceKey(const LowerCaseString& key, absl::string_vie
 
 void HeaderMapImpl::setCopy(const LowerCaseString& key, absl::string_view value) {
   // Replaces a header if it exists, otherwise adds by copy.
-  bool found = false;
-  for (HeaderEntryImpl& header : headers_) {
-    if (header.key().getStringView() == key.get()) {
-      updateSize(header.value().size(), value.size());
-      header.value(value);
-      found = true;
-    }
-  }
-
-  if (!found) {
+  auto* entry = getExisting(key);
+  if (entry) {
+    updateSize(entry->value().size(), value.size());
+    entry->value(value);
+  } else {
     addCopy(key, value);
   }
   verifyByteSize();
@@ -525,6 +516,16 @@ uint64_t HeaderMapImpl::byteSizeInternal() const {
 
 const HeaderEntry* HeaderMapImpl::get(const LowerCaseString& key) const {
   for (const HeaderEntryImpl& header : headers_) {
+    if (header.key() == key.get().c_str()) {
+      return &header;
+    }
+  }
+
+  return nullptr;
+}
+
+HeaderEntry* HeaderMapImpl::getExisting(const LowerCaseString& key) {
+  for (HeaderEntryImpl& header : headers_) {
     if (header.key() == key.get().c_str()) {
       return &header;
     }

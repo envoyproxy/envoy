@@ -77,6 +77,9 @@ void Utility::appendXff(HeaderMap& headers, const Network::Address::Instance& re
 }
 
 void Utility::appendVia(HeaderMap& headers, const std::string& via) {
+  // TODO(asraa): Investigate whether it is necessary to append with whitespace here by:
+  //     (a) Validating we do not expect whitespace in via headers
+  //     (b) Add runtime guarding in case users have upstreams which expect it.
   headers.appendVia(via, ", ");
 }
 

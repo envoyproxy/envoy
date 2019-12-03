@@ -664,7 +664,7 @@ TEST(HeaderMapImplTest, SetCopy) {
   headers.addCopy(foo, "monde2");
   EXPECT_EQ(headers.size(), 2);
 
-  // Make sure all foo headers are overridden.
+  // Only the first foo header is overridden.
   headers.setCopy(foo, "override-monde");
   EXPECT_EQ(headers.size(), 2);
 
@@ -673,7 +673,7 @@ TEST(HeaderMapImplTest, SetCopy) {
 
   InSequence seq;
   EXPECT_CALL(cb, Call("hello", "override-monde"));
-  EXPECT_CALL(cb, Call("hello", "override-monde"));
+  EXPECT_CALL(cb, Call("hello", "monde2"));
   headers.iterate(
       [](const Http::HeaderEntry& header, void* cb_v) -> HeaderMap::Iterate {
         static_cast<MockCb*>(cb_v)->Call(std::string(header.key().getStringView()),
@@ -897,7 +897,7 @@ TEST(HeaderMapImplTest, TestAppendHeader) {
     TestHeaderMapImpl headers;
     LowerCaseString foo("key1");
     headers.addCopy(foo, "some;");
-    headers.append(foo, "test");
+    headers.appendCopy(foo, "test");
     EXPECT_EQ(headers.get(foo)->value().getStringView(), "some;,test");
   }
 
@@ -905,7 +905,7 @@ TEST(HeaderMapImplTest, TestAppendHeader) {
   {
     TestHeaderMapImpl headers;
     LowerCaseString key2("key2");
-    headers.append(key2, "my tag data");
+    headers.appendCopy(key2, "my tag data");
     EXPECT_EQ(headers.get(key2)->value().getStringView(), "my tag data");
   }
 
@@ -914,7 +914,7 @@ TEST(HeaderMapImplTest, TestAppendHeader) {
     TestHeaderMapImpl headers;
     LowerCaseString key3("key3");
     headers.addCopy(key3, "empty");
-    headers.append(key3, "");
+    headers.appendCopy(key3, "");
     EXPECT_EQ(headers.get(key3)->value().getStringView(), "empty");
   }
   // Regression test for appending to an empty string with a short string, then
@@ -934,7 +934,7 @@ TEST(HeaderMapImplTest, TestAppendHeader) {
     TestHeaderMapImpl headers;
     headers.addCopy(Headers::get().Via, "1.0 fred");
     EXPECT_EQ(headers.Via()->value().getStringView(), "1.0 fred");
-    headers.append(Headers::get().Via, "1.1 p.example.net");
+    headers.appendCopy(Headers::get().Via, "1.1 p.example.net");
     EXPECT_EQ(headers.Via()->value().getStringView(), "1.0 fred,1.1 p.example.net");
     headers.appendVia("1.1 new.example.net", ",");
     EXPECT_EQ(headers.Via()->value().getStringView(),

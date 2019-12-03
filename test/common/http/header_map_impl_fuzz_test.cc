@@ -129,7 +129,7 @@ DEFINE_PROTO_FUZZER(const test::common::http::HeaderMapImplFuzzTestCase& input) 
       lower_case_strings.emplace_back(
           std::make_unique<Http::LowerCaseString>(replaceInvalidCharacters(append.key())));
       strings.emplace_back(std::make_unique<std::string>(replaceInvalidCharacters(append.value())));
-      header_map->append(*lower_case_strings.back(), *strings.back());
+      header_map->appendCopy(*lower_case_strings.back(), *strings.back());
       break;
     }
     case test::common::http::Action::kCopy: {
