@@ -143,7 +143,9 @@ MockInstance::MockInstance()
       singleton_manager_(new Singleton::ManagerImpl(Thread::threadFactoryForTest())),
       grpc_context_(stats_store_.symbolTable()), http_context_(stats_store_.symbolTable()),
       server_factory_context_(
-          std::make_shared<NiceMock<Configuration::MockServerFactoryContext>>()) {
+          std::make_shared<NiceMock<Configuration::MockServerFactoryContext>>()),
+      transport_socket_factory_context_(
+          std::make_shared<NiceMock<Configuration::MockTransportSocketFactoryContext>>()){
   ON_CALL(*this, threadLocal()).WillByDefault(ReturnRef(thread_local_));
   ON_CALL(*this, stats()).WillByDefault(ReturnRef(stats_store_));
   ON_CALL(*this, grpcContext()).WillByDefault(ReturnRef(grpc_context_));

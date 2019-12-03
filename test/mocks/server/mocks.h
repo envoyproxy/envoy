@@ -498,6 +498,7 @@ public:
   ~MockFactoryContext() override;
 
   MOCK_CONST_METHOD0(getServerFactoryContext, ServerFactoryContext&());
+  MOCK_CONST_METHOD0(getTransportSocketFactoryContext, TransportSocketFactoryContext&());
   MOCK_METHOD0(accessLogManager, AccessLog::AccessLogManager&());
   MOCK_METHOD0(clusterManager, Upstream::ClusterManager&());
   MOCK_METHOD0(dispatcher, Event::Dispatcher&());
