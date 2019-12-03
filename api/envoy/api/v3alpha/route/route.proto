@@ -854,7 +854,17 @@ message RetryPolicy {
     // This parameter is optional. Defaults to 20%.
     type.v3alpha.Percent percent_budget = 1;
 
-    // Specifies the minimum retry concurrency allowed for the retry budget.
+    // Specifies the minimum retry concurrency allowed for the retry budget. If the active request
+    // count is less than this value, there is no enforcement of the retry budget. However, once the
+    // request concurrency reaches or exceeds the configured value, the budget is enforced and the
+    // number of allowed retries is equal to a percentage of the request concurrency.
+    //
+    // .. note::
+    //
+    //    Consider a `percent_budget` of 20% and a `min_concurrency` of 15. If the number of
+    //    concurrent requests is 10, there is no limit to how many of those active requests may be
+    //    retries. If the number of concurrent requests is 25, the number of active retries is
+    //    limited to 20% of 25, so 5 active retries.
     //
     // This parameter is optional. Defaults to 15.
     google.protobuf.UInt32Value min_concurrency = 2;

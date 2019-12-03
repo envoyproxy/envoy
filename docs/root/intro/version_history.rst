@@ -23,8 +23,8 @@ Version history
 * tcp_proxy: added :ref:`hash_policy<envoy_api_field_config.filter.network.tcp_proxy.v2.TcpProxy.hash_policy>`
 * thrift_proxy: added support for cluster header based routing.
 * tls: remove TLS 1.0 and 1.1 from client defaults
-* router: exposed DOWNSTREAM_REMOTE_ADDRESS as custom HTTP request/response headers.
 * router: added support for percentage-based retry budgets
+* router: exposed DOWNSTREAM_REMOTE_ADDRESS as custom HTTP request/response headers.
 
 1.12.0 (October 31, 2019)
 =========================
