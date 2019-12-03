@@ -6,11 +6,15 @@ option java_outer_classname = "RangeProto";
 option java_multiple_files = true;
 option java_package = "io.envoyproxy.envoy.type.v3alpha";
 
+import "udpa/api/annotations/versioning.proto";
+
 // [#protodoc-title: Range]
 
 // Specifies the int64 start and end of the range using half-open interval semantics [start,
 // end).
 message Int64Range {
+  option (udpa.api.annotations.versioning).previous_message_type = "envoy.type.Int64Range";
+
   // start of the range (inclusive)
   int64 start = 1;
 
@@ -21,6 +25,8 @@ message Int64Range {
 // Specifies the double start and end of the range using half-open interval semantics [start,
 // end).
 message DoubleRange {
+  option (udpa.api.annotations.versioning).previous_message_type = "envoy.type.DoubleRange";
+
   // start of the range (inclusive)
   double start = 1;
 

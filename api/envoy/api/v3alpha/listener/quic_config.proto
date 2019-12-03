@@ -9,11 +9,16 @@ option java_package = "io.envoyproxy.envoy.api.v3alpha.listener";
 import "google/protobuf/duration.proto";
 import "google/protobuf/wrappers.proto";
 
+import "udpa/api/annotations/versioning.proto";
+
 // [#protodoc-title: QUIC listener Config]
 
 // Configuration specific to the QUIC protocol.
 // Next id: 4
 message QuicProtocolOptions {
+  option (udpa.api.annotations.versioning).previous_message_type =
+      "envoy.api.v2.listener.QuicProtocolOptions";
+
   // Maximum number of streams that the client can negotiate per connection. 100
   // if not specified.
   google.protobuf.UInt32Value max_concurrent_streams = 1;

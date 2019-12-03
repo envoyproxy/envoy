@@ -9,12 +9,20 @@ option java_package = "io.envoyproxy.envoy.data.tap.v3alpha";
 import "envoy/api/v3alpha/core/base.proto";
 import "envoy/data/tap/v3alpha/common.proto";
 
+import "udpa/api/annotations/versioning.proto";
+
 // [#protodoc-title: HTTP tap data]
 
 // A fully buffered HTTP trace message.
 message HttpBufferedTrace {
+  option (udpa.api.annotations.versioning).previous_message_type =
+      "envoy.data.tap.v2alpha.HttpBufferedTrace";
+
   // HTTP message wrapper.
   message Message {
+    option (udpa.api.annotations.versioning).previous_message_type =
+        "envoy.data.tap.v2alpha.HttpBufferedTrace.Message";
+
     // Message headers.
     repeated api.v3alpha.core.HeaderValue headers = 1;
 
@@ -35,6 +43,9 @@ message HttpBufferedTrace {
 // A streamed HTTP trace segment. Multiple segments make up a full trace.
 // [#next-free-field: 8]
 message HttpStreamedTraceSegment {
+  option (udpa.api.annotations.versioning).previous_message_type =
+      "envoy.data.tap.v2alpha.HttpStreamedTraceSegment";
+
   // Trace ID unique to the originating Envoy only. Trace IDs can repeat and should not be used
   // for long term stable uniqueness.
   uint64 trace_id = 1;
