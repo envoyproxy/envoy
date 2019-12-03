@@ -23,8 +23,8 @@ public:
                      Network::ListenerConfig& listener_config, const quic::QuicConfig& quic_config);
 
   ActiveQuicListener(Event::Dispatcher& dispatcher, Network::ConnectionHandler& parent,
-                     Network::UdpListenerPtr&& listener, Network::ListenerConfig& listener_config,
-                     const quic::QuicConfig& quic_config);
+                     Network::SocketSharedPtr listen_socket,
+                     Network::ListenerConfig& listener_config, const quic::QuicConfig& quic_config);
 
   // TODO(#7465): Make this a callback.
   void onListenerShutdown();
@@ -32,8 +32,7 @@ public:
   // Network::UdpListenerCallbacks
   void onData(Network::UdpRecvData& data) override;
   void onWriteReady(const Network::Socket& socket) override;
-  void onReceiveError(const Network::UdpListenerCallbacks::ErrorCode& /*error_code*/,
-                      Api::IoError::IoErrorCode /*err*/) override {
+  void onReceiveError(Api::IoError::IoErrorCode /*error_code*/) override {
     // No-op. Quic can't do anything upon listener error.
   }
 
@@ -44,17 +43,13 @@ public:
 private:
   friend class ActiveQuicListenerPeer;
 
-  ActiveQuicListener(Event::Dispatcher& dispatcher, Network::ConnectionHandler& parent,
-                     std::unique_ptr<quic::QuicPacketWriter> writer,
-                     Network::UdpListenerPtr&& listener, Network::ListenerConfig& listener_config,
-                     const quic::QuicConfig& quic_config);
-
   Network::UdpListenerPtr udp_listener_;
   uint8_t random_seed_[16];
   std::unique_ptr<quic::QuicCryptoServerConfig> crypto_config_;
   Event::Dispatcher& dispatcher_;
   quic::QuicVersionManager version_manager_;
   std::unique_ptr<EnvoyQuicDispatcher> quic_dispatcher_;
+  Network::Socket& listen_socket_;
 };
 
 using ActiveQuicListenerPtr = std::unique_ptr<ActiveQuicListener>;

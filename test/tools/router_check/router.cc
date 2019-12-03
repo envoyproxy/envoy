@@ -109,9 +109,17 @@ RouterCheckTool::RouterCheckTool(
       .WillByDefault(testing::Invoke(this, &RouterCheckTool::runtimeMock));
 }
 
+Json::ObjectSharedPtr loadFromFile(const std::string& file_path, Api::Api& api) {
+  std::string contents = api.fileSystem().fileReadToEnd(file_path);
+  if (absl::EndsWith(file_path, ".yaml")) {
+    contents = MessageUtil::getJsonStringFromMessage(ValueUtil::loadFromYaml(contents));
+  }
+  return Json::Factory::loadFromString(contents);
+}
+
 // TODO(jyotima): Remove this code path once the json schema code path is deprecated.
 bool RouterCheckTool::compareEntriesInJson(const std::string& expected_route_json) {
-  Json::ObjectSharedPtr loader = Json::Factory::loadFromFile(expected_route_json, *api_);
+  Json::ObjectSharedPtr loader = loadFromFile(expected_route_json, *api_);
   loader->validateSchema(Json::ToolSchema::routerCheckSchema());
   bool no_failures = true;
   for (const Json::ObjectSharedPtr& check_config : loader->asObjectArray()) {

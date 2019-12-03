@@ -1,5 +1,6 @@
 # 1. Fix linking with unbundled toolchain on macOS.
 # 2. Increase VSZ limit to 4TiB (allows us to start up to 370 VMs).
+# 3. Fix MSAN linking.
 --- wee8/build/toolchain/gcc_toolchain.gni
 +++ wee8/build/toolchain/gcc_toolchain.gni
 @@ -355,6 +355,8 @@ template("gcc_toolchain") {
@@ -31,3 +32,24 @@
  #else
  constexpr size_t kAddressSpaceLimit = 0xC0000000;  // 3 GiB
  #endif
+--- wee8/build/config/sanitizers/sanitizers.gni
++++ wee8/build/config/sanitizers/sanitizers.gni
+@@ -145,7 +145,7 @@ if (current_toolchain != default_toolchain) {
+ # standard system libraries. We have instrumented system libraries for msan,
+ # which requires them to prevent false positives.
+ # TODO(thakis): Maybe remove this variable.
+-use_prebuilt_instrumented_libraries = is_msan
++use_prebuilt_instrumented_libraries = false
+
+ # Whether we are doing a fuzzer build. Normally this should be checked instead
+ # of checking "use_libfuzzer || use_afl" because often developers forget to
+@@ -185,8 +185,7 @@ assert(!using_sanitizer || is_clang,
+ assert(!is_cfi || is_clang,
+        "is_cfi requires setting is_clang = true in 'gn args'")
+
+-prebuilt_instrumented_libraries_available =
+-    is_msan && (msan_track_origins == 0 || msan_track_origins == 2)
++prebuilt_instrumented_libraries_available = false
+
+ if (use_libfuzzer && is_linux) {
+   if (is_asan) {

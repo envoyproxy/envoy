@@ -357,6 +357,44 @@ TEST_F(ProtobufUtilityTest, ValueUtilHash) {
   EXPECT_NE(ValueUtil::hash(v), 0);
 }
 
+TEST_F(ProtobufUtilityTest, MessageUtilLoadYamlDouble) {
+  ProtobufWkt::DoubleValue v;
+  MessageUtil::loadFromYaml("value: 1.0", v, ProtobufMessage::getNullValidationVisitor());
+  EXPECT_DOUBLE_EQ(1.0, v.value());
+}
+
+TEST_F(ProtobufUtilityTest, ValueUtilLoadFromYamlScalar) {
+  EXPECT_EQ(ValueUtil::loadFromYaml("null").ShortDebugString(), "null_value: NULL_VALUE");
+  EXPECT_EQ(ValueUtil::loadFromYaml("true").ShortDebugString(), "bool_value: true");
+  EXPECT_EQ(ValueUtil::loadFromYaml("1").ShortDebugString(), "number_value: 1");
+  EXPECT_EQ(ValueUtil::loadFromYaml("9223372036854775807").ShortDebugString(),
+            "string_value: \"9223372036854775807\"");
+  EXPECT_EQ(ValueUtil::loadFromYaml("\"foo\"").ShortDebugString(), "string_value: \"foo\"");
+  EXPECT_EQ(ValueUtil::loadFromYaml("foo").ShortDebugString(), "string_value: \"foo\"");
+}
+
+TEST_F(ProtobufUtilityTest, ValueUtilLoadFromYamlObject) {
+  EXPECT_EQ(ValueUtil::loadFromYaml("[foo, bar]").ShortDebugString(),
+            "list_value { values { string_value: \"foo\" } values { string_value: \"bar\" } }");
+  EXPECT_EQ(ValueUtil::loadFromYaml("foo: bar").ShortDebugString(),
+            "struct_value { fields { key: \"foo\" value { string_value: \"bar\" } } }");
+}
+
+TEST_F(ProtobufUtilityTest, ValueUtilLoadFromYamlException) {
+  std::string bad_yaml = R"EOF(
+admin:
+  access_log_path: /dev/null
+  address:
+    socket_address:
+      address: {{ ntop_ip_loopback_address }}
+      port_value: 0
+)EOF";
+
+  EXPECT_THROW_WITH_REGEX(ValueUtil::loadFromYaml(bad_yaml), EnvoyException, "bad conversion");
+  EXPECT_THROW_WITHOUT_REGEX(ValueUtil::loadFromYaml(bad_yaml), EnvoyException,
+                             "Unexpected YAML exception");
+}
+
 TEST_F(ProtobufUtilityTest, HashedValue) {
   ProtobufWkt::Value v1, v2, v3;
   v1.set_string_value("s");
@@ -390,13 +428,27 @@ TEST_F(ProtobufUtilityTest, HashedValueStdHash) {
   EXPECT_NE(set.find(hv3), set.end());
 }
 
+// MessageUtility::anyConvert() with the wrong type throws.
 TEST_F(ProtobufUtilityTest, AnyConvertWrongType) {
   ProtobufWkt::Duration source_duration;
   source_duration.set_seconds(42);
   ProtobufWkt::Any source_any;
   source_any.PackFrom(source_duration);
-  EXPECT_THROW_WITH_REGEX(TestUtility::anyConvert<ProtobufWkt::Timestamp>(source_any),
-                          EnvoyException, "Unable to unpack .*");
+  EXPECT_THROW_WITH_REGEX(
+      TestUtility::anyConvert<ProtobufWkt::Timestamp>(source_any), EnvoyException,
+      R"(Unable to unpack as google.protobuf.Timestamp: \[type.googleapis.com/google.protobuf.Duration\] .*)");
+}
+
+// MessageUtility::unpackTo() with the wrong type throws.
+TEST_F(ProtobufUtilityTest, UnpackToWrongType) {
+  ProtobufWkt::Duration source_duration;
+  source_duration.set_seconds(42);
+  ProtobufWkt::Any source_any;
+  source_any.PackFrom(source_duration);
+  ProtobufWkt::Timestamp dst;
+  EXPECT_THROW_WITH_REGEX(
+      MessageUtil::unpackTo(source_any, dst), EnvoyException,
+      R"(Unable to unpack as google.protobuf.Timestamp: \[type.googleapis.com/google.protobuf.Duration\] .*)");
 }
 
 TEST_F(ProtobufUtilityTest, JsonConvertSuccess) {
@@ -769,6 +821,12 @@ TEST(StatusCode, Strings) {
   }
   ASSERT_EQ("",
             MessageUtil::CodeEnumToString(static_cast<ProtobufUtil::error::Code>(last_code + 1)));
+}
+
+TEST(TypeUtilTest, TypeUrlToDescriptorFullName) {
+  EXPECT_EQ("envoy.config.filter.http.ip_tagging.v2.IPTagging",
+            TypeUtil::typeUrlToDescriptorFullName(
+                "type.googleapis.com/envoy.config.filter.http.ip_tagging.v2.IPTagging"));
 }
 
 } // namespace Envoy

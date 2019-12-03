@@ -434,7 +434,7 @@ TEST_F(LightStepDriverTest, SerializeAndDeserializeContext) {
 
     // Supply bogus context, that will be simply ignored.
     const std::string invalid_context = "notvalidcontext";
-    request_headers_.insertOtSpanContext().value(invalid_context);
+    request_headers_.setOtSpanContext(invalid_context);
     stats_.counter("tracing.opentracing.span_context_extraction_error").reset();
     driver_->startSpan(config_, request_headers_, operation_name_, start_time_,
                        {Tracing::Reason::Sampling, true});

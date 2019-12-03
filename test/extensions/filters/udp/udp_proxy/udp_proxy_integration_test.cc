@@ -8,9 +8,8 @@ namespace {
  */
 class UdpSyncClient {
 public:
-  UdpSyncClient(Event::TestTimeSystem& time_system, Network::Address::IpVersion version)
-      : time_system_(time_system),
-        socket_(std::make_unique<Network::UdpListenSocket>(
+  UdpSyncClient(Network::Address::IpVersion version)
+      : socket_(std::make_unique<Network::UdpListenSocket>(
             Network::Test::getCanonicalLoopbackAddress(version), nullptr, true)) {
     // TODO(mattklein123): Right now all sockets are non-blocking. Move this non-blocking
     // modification black to the abstraction layer so it will work for multiple platforms.
@@ -24,31 +23,13 @@ public:
   }
 
   void recv(Network::UdpRecvData& datagram) {
-    SyncPacketProcessor processor(datagram);
+    datagram = Network::UdpRecvData();
     const auto rc =
-        Network::Utility::readFromSocket(socket_->ioHandle(), *socket_->localAddress(), processor,
-                                         time_system_.monotonicTime(), nullptr);
+        Network::Test::readFromSocket(socket_->ioHandle(), *socket_->localAddress(), datagram);
     ASSERT_TRUE(rc.ok());
   }
 
 private:
-  struct SyncPacketProcessor : public Network::UdpPacketProcessor {
-    SyncPacketProcessor(Network::UdpRecvData& data) : data_(data) {}
-
-    void processPacket(Network::Address::InstanceConstSharedPtr local_address,
-                       Network::Address::InstanceConstSharedPtr peer_address,
-                       Buffer::InstancePtr buffer, MonotonicTime receive_time) override {
-      data_.addresses_.local_ = std::move(local_address);
-      data_.addresses_.peer_ = std::move(peer_address);
-      data_.buffer_ = std::move(buffer);
-      data_.receive_time_ = receive_time;
-    }
-    uint64_t maxPacketSize() const override { return Network::MAX_UDP_PACKET_SIZE; }
-
-    Network::UdpRecvData& data_;
-  };
-
-  Event::TestTimeSystem& time_system_;
   const Network::SocketPtr socket_;
 };
 
@@ -63,6 +44,7 @@ public:
       name: envoy.filters.udp_listener.udp_proxy
       typed_config:
         '@type': type.googleapis.com/envoy.config.filter.udp.udp_proxy.v2alpha.UdpProxyConfig
+        stat_prefix: foo
         cluster: cluster_0
       )EOF";
   }
@@ -93,7 +75,7 @@ public:
 
   void requestResponseWithListenerAddress(const Network::Address::Instance& listener_address) {
     // Send datagram to be proxied.
-    UdpSyncClient client(timeSystem(), version_);
+    UdpSyncClient client(version_);
     client.write("hello", listener_address);
 
     // Wait for the upstream datagram.
@@ -102,11 +84,20 @@ public:
     EXPECT_EQ("hello", request_datagram.buffer_->toString());
 
     // Respond from the upstream.
-    fake_upstreams_[0]->sendUdpDatagram("world", *request_datagram.addresses_.peer_);
+    fake_upstreams_[0]->sendUdpDatagram("world1", *request_datagram.addresses_.peer_);
     Network::UdpRecvData response_datagram;
     client.recv(response_datagram);
-    EXPECT_EQ("world", response_datagram.buffer_->toString());
+    EXPECT_EQ("world1", response_datagram.buffer_->toString());
     EXPECT_EQ(listener_address.asString(), response_datagram.addresses_.peer_->asString());
+
+    EXPECT_EQ(5, test_server_->counter("udp.foo.downstream_sess_rx_bytes")->value());
+    EXPECT_EQ(1, test_server_->counter("udp.foo.downstream_sess_rx_datagrams")->value());
+    // The stat is incremented after the send so there is a race condition and we must wait for
+    // the counter to be incremented.
+    test_server_->waitForCounterEq("udp.foo.downstream_sess_tx_bytes", 6);
+    test_server_->waitForCounterEq("udp.foo.downstream_sess_tx_datagrams", 1);
+    EXPECT_EQ(1, test_server_->counter("udp.foo.downstream_sess_total")->value());
+    EXPECT_EQ(1, test_server_->gauge("udp.foo.downstream_sess_active")->value());
   }
 };
 
@@ -157,10 +148,10 @@ TEST_P(UdpProxyIntegrationTest, MultipleClients) {
   const auto listener_address = Network::Utility::resolveUrl(
       fmt::format("tcp://{}:{}", Network::Test::getLoopbackAddressUrlString(version_), port));
 
-  UdpSyncClient client1(timeSystem(), version_);
+  UdpSyncClient client1(version_);
   client1.write("client1_hello", *listener_address);
 
-  UdpSyncClient client2(timeSystem(), version_);
+  UdpSyncClient client2(version_);
   client2.write("client2_hello", *listener_address);
   client2.write("client2_hello_2", *listener_address);
 
@@ -201,7 +192,7 @@ TEST_P(UdpProxyIntegrationTest, MultipleUpstreams) {
   const auto listener_address = Network::Utility::resolveUrl(
       fmt::format("tcp://{}:{}", Network::Test::getLoopbackAddressUrlString(version_), port));
 
-  UdpSyncClient client(timeSystem(), version_);
+  UdpSyncClient client(version_);
   client.write("hello1", *listener_address);
   client.write("hello2", *listener_address);
   Network::UdpRecvData request_datagram;

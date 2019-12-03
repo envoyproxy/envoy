@@ -4,8 +4,10 @@ gRPC Statistics
 ===============
 
 * gRPC :ref:`architecture overview <arch_overview_grpc>`
-* :ref:`v2 API reference <envoy_api_field_config.filter.network.http_connection_manager.v2.HttpFilter.name>`
+* :ref:`v2 API reference <envoy_api_msg_config.filter.http.grpc_stats.v2alpha.FilterConfig>`
 * This filter should be configured with the name *envoy.filters.http.grpc_stats*.
+* This filter can be enabled to emit a :ref:`filter state object
+  <envoy_api_msg_config.filter.http.grpc_stats.v2alpha.FilterObject>`
 
 This is a filter which enables telemetry of gRPC calls. Additionally, the
 filter detects message boundaries in streaming gRPC calls and emits the message

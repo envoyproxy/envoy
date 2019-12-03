@@ -46,12 +46,10 @@ public:
 /**
  * All command level stats. @see stats_macros.h
  */
-// clang-format off
 #define ALL_COMMAND_STATS(COUNTER)                                                                 \
   COUNTER(total)                                                                                   \
   COUNTER(success)                                                                                 \
   COUNTER(error)
-// clang-format on
 
 /**
  * Struct definition for all command stats. @see stats_macros.h
@@ -276,11 +274,9 @@ public:
 /**
  * All splitter stats. @see stats_macros.h
  */
-// clang-format off
 #define ALL_COMMAND_SPLITTER_STATS(COUNTER)                                                        \
   COUNTER(invalid_request)                                                                         \
   COUNTER(unsupported_command)
-// clang-format on
 
 /**
  * Struct definition for all splitter stats. @see stats_macros.h

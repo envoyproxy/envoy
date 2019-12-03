@@ -25,7 +25,8 @@ RouteEntryImplBase::RouteEntryImplBase(
     : cluster_name_(route.route().cluster()),
       config_headers_(Http::HeaderUtility::buildHeaderDataVector(route.match().headers())),
       rate_limit_policy_(route.route().rate_limits()),
-      strip_service_name_(route.route().strip_service_name()) {
+      strip_service_name_(route.route().strip_service_name()),
+      cluster_header_(route.route().cluster_header()) {
   if (route.route().has_metadata_match()) {
     const auto filter_it = route.route().metadata_match().filter_metadata().find(
         Envoy::Config::MetadataFilters::get().ENVOY_LB);
@@ -51,12 +52,25 @@ const std::string& RouteEntryImplBase::clusterName() const { return cluster_name
 
 const RouteEntry* RouteEntryImplBase::routeEntry() const { return this; }
 
-RouteConstSharedPtr RouteEntryImplBase::clusterEntry(uint64_t random_value) const {
-  if (weighted_clusters_.empty()) {
-    return shared_from_this();
+RouteConstSharedPtr RouteEntryImplBase::clusterEntry(uint64_t random_value,
+                                                     const MessageMetadata& metadata) const {
+  if (!weighted_clusters_.empty()) {
+    return WeightedClusterUtil::pickCluster(weighted_clusters_, total_cluster_weight_, random_value,
+                                            false);
   }
-  return WeightedClusterUtil::pickCluster(weighted_clusters_, total_cluster_weight_, random_value,
-                                          false);
+
+  const auto& cluster_header = clusterHeader();
+  if (!cluster_header.get().empty()) {
+    const auto& headers = metadata.headers();
+    const auto* entry = headers.get(cluster_header);
+    if (entry != nullptr) {
+      return std::make_shared<DynamicRouteEntry>(*this, entry->value().getStringView());
+    }
+
+    return nullptr;
+  }
+
+  return shared_from_this();
 }
 
 bool RouteEntryImplBase::headersMatch(const Http::HeaderMap& headers) const {
@@ -100,7 +114,7 @@ RouteConstSharedPtr MethodNameRouteEntryImpl::matches(const MessageMetadata& met
         method_name_.empty() || (metadata.hasMethodName() && metadata.methodName() == method_name_);
 
     if (matches ^ invert_) {
-      return clusterEntry(random_value);
+      return clusterEntry(random_value, metadata);
     }
   }
 
@@ -130,7 +144,7 @@ RouteConstSharedPtr ServiceNameRouteEntryImpl::matches(const MessageMetadata& me
         (metadata.hasMethodName() && absl::StartsWith(metadata.methodName(), service_name_));
 
     if (matches ^ invert_) {
-      return clusterEntry(random_value);
+      return clusterEntry(random_value, metadata);
     }
   }
 
@@ -170,8 +184,8 @@ RouteConstSharedPtr RouteMatcher::route(const MessageMetadata& metadata,
 void Router::onDestroy() {
   if (upstream_request_ != nullptr) {
     upstream_request_->resetStream();
+    cleanup();
   }
-  cleanup();
 }
 
 void Router::setDecoderFilterCallbacks(ThriftFilters::DecoderFilterCallbacks& callbacks) {
@@ -210,25 +224,25 @@ FilterStatus Router::messageBegin(MessageMetadataSharedPtr metadata) {
   }
 
   route_entry_ = route_->routeEntry();
+  const std::string& cluster_name = route_entry_->clusterName();
 
-  Upstream::ThreadLocalCluster* cluster = cluster_manager_.get(route_entry_->clusterName());
+  Upstream::ThreadLocalCluster* cluster = cluster_manager_.get(cluster_name);
   if (!cluster) {
-    ENVOY_STREAM_LOG(debug, "unknown cluster '{}'", *callbacks_, route_entry_->clusterName());
-    callbacks_->sendLocalReply(
-        AppException(AppExceptionType::InternalError,
-                     fmt::format("unknown cluster '{}'", route_entry_->clusterName())),
-        true);
+    ENVOY_STREAM_LOG(debug, "unknown cluster '{}'", *callbacks_, cluster_name);
+    callbacks_->sendLocalReply(AppException(AppExceptionType::InternalError,
+                                            fmt::format("unknown cluster '{}'", cluster_name)),
+                               true);
     return FilterStatus::StopIteration;
   }
 
   cluster_ = cluster->info();
-  ENVOY_STREAM_LOG(debug, "cluster '{}' match for method '{}'", *callbacks_,
-                   route_entry_->clusterName(), metadata->methodName());
+  ENVOY_STREAM_LOG(debug, "cluster '{}' match for method '{}'", *callbacks_, cluster_name,
+                   metadata->methodName());
 
   if (cluster_->maintenanceMode()) {
     callbacks_->sendLocalReply(
         AppException(AppExceptionType::InternalError,
-                     fmt::format("maintenance mode for cluster '{}'", route_entry_->clusterName())),
+                     fmt::format("maintenance mode for cluster '{}'", cluster_name)),
         true);
     return FilterStatus::StopIteration;
   }
@@ -247,11 +261,11 @@ FilterStatus Router::messageBegin(MessageMetadataSharedPtr metadata) {
   ASSERT(protocol != ProtocolType::Auto);
 
   Tcp::ConnectionPool::Instance* conn_pool = cluster_manager_.tcpConnPoolForCluster(
-      route_entry_->clusterName(), Upstream::ResourcePriority::Default, this);
+      cluster_name, Upstream::ResourcePriority::Default, this);
   if (!conn_pool) {
     callbacks_->sendLocalReply(
         AppException(AppExceptionType::InternalError,
-                     fmt::format("no healthy upstream for '{}'", route_entry_->clusterName())),
+                     fmt::format("no healthy upstream for '{}'", cluster_name)),
         true);
     return FilterStatus::StopIteration;
   }
@@ -340,10 +354,12 @@ void Router::onEvent(Network::ConnectionEvent event) {
 
   switch (event) {
   case Network::ConnectionEvent::RemoteClose:
+    ENVOY_STREAM_LOG(debug, "upstream remote close", *callbacks_);
     upstream_request_->onResetStream(
         Tcp::ConnectionPool::PoolFailureReason::RemoteConnectionFailure);
     break;
   case Network::ConnectionEvent::LocalClose:
+    ENVOY_STREAM_LOG(debug, "upstream local close", *callbacks_);
     upstream_request_->onResetStream(
         Tcp::ConnectionPool::PoolFailureReason::LocalConnectionFailure);
     break;
@@ -351,6 +367,8 @@ void Router::onEvent(Network::ConnectionEvent event) {
     // Connected is consumed by the connection pool.
     NOT_REACHED_GCOVR_EXCL_LINE;
   }
+
+  upstream_request_->releaseConnection(false);
 }
 
 const Network::Connection* Router::downstreamConnection() const {
@@ -375,7 +393,11 @@ Router::UpstreamRequest::UpstreamRequest(Router& parent, Tcp::ConnectionPool::In
       protocol_(NamedProtocolConfigFactory::getFactory(protocol_type).createProtocol()),
       request_complete_(false), response_started_(false), response_complete_(false) {}
 
-Router::UpstreamRequest::~UpstreamRequest() = default;
+Router::UpstreamRequest::~UpstreamRequest() {
+  if (conn_pool_handle_) {
+    conn_pool_handle_->cancel(Tcp::ConnectionPool::CancelPolicy::Default);
+  }
+}
 
 FilterStatus Router::UpstreamRequest::start() {
   Tcp::ConnectionPool::Cancellable* handle = conn_pool_.newConnection(*this);
@@ -393,17 +415,23 @@ FilterStatus Router::UpstreamRequest::start() {
   return FilterStatus::Continue;
 }
 
-void Router::UpstreamRequest::resetStream() {
+void Router::UpstreamRequest::releaseConnection(const bool close) {
   if (conn_pool_handle_) {
     conn_pool_handle_->cancel(Tcp::ConnectionPool::CancelPolicy::Default);
+    conn_pool_handle_ = nullptr;
   }
 
-  if (conn_data_ != nullptr) {
-    conn_state_ = nullptr;
-    conn_data_->connection().close(Network::ConnectionCloseType::NoFlush);
-    conn_data_.reset();
+  conn_state_ = nullptr;
+
+  // The event triggered by close will also release this connection so clear conn_data_ before
+  // closing.
+  auto conn_data = std::move(conn_data_);
+  if (close && conn_data != nullptr) {
+    conn_data->connection().close(Network::ConnectionCloseType::NoFlush);
   }
 }
+
+void Router::UpstreamRequest::resetStream() { releaseConnection(true); }
 
 void Router::UpstreamRequest::onPoolFailure(Tcp::ConnectionPool::PoolFailureReason reason,
                                             Upstream::HostDescriptionConstSharedPtr host) {

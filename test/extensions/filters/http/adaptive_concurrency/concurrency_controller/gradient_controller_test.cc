@@ -88,7 +88,6 @@ TEST_F(GradientControllerConfigTest, BasicTest) {
 sample_aggregate_percentile:
   value: 42.5
 concurrency_limit_params:
-  max_gradient: 2.1
   max_concurrency_limit: 1337
   concurrency_update_interval: 0.123s
 min_rtt_calc_params:
@@ -96,6 +95,7 @@ min_rtt_calc_params:
     value: 13.2
   interval: 31s
   request_count: 52
+  min_concurrency: 8
 )EOF";
 
   auto config = makeConfig(yaml, runtime_);
@@ -104,9 +104,9 @@ min_rtt_calc_params:
   EXPECT_EQ(config.sampleRTTCalcInterval(), std::chrono::milliseconds(123));
   EXPECT_EQ(config.maxConcurrencyLimit(), 1337);
   EXPECT_EQ(config.minRTTAggregateRequestCount(), 52);
-  EXPECT_EQ(config.maxGradient(), 2.1);
   EXPECT_EQ(config.sampleAggregatePercentile(), .425);
   EXPECT_EQ(config.jitterPercent(), .132);
+  EXPECT_EQ(config.minConcurrency(), 8);
 }
 
 TEST_F(GradientControllerConfigTest, Clamping) {
@@ -114,7 +114,6 @@ TEST_F(GradientControllerConfigTest, Clamping) {
 sample_aggregate_percentile:
   value: 42.5
 concurrency_limit_params:
-  max_gradient: 2.1
   max_concurrency_limit: 1337
   concurrency_update_interval:
     nanos: 123000000
@@ -146,16 +145,18 @@ TEST_F(GradientControllerConfigTest, BasicTestOverrides) {
 sample_aggregate_percentile:
   value: 42.5
 concurrency_limit_params:
-  max_gradient: 2.1
   max_concurrency_limit: 1337
   concurrency_update_interval:
     nanos: 123000000
 min_rtt_calc_params:
+  buffer:
+    value: 33
   jitter:
     value: 13.2
   interval:
     seconds: 31
   request_count: 52
+  min_concurrency: 7
 )EOF";
 
   auto config = makeConfig(yaml, runtime_);
@@ -172,14 +173,17 @@ min_rtt_calc_params:
   EXPECT_CALL(runtime_.snapshot_, getInteger(_, 52)).WillOnce(Return(65));
   EXPECT_EQ(config.minRTTAggregateRequestCount(), 65);
 
-  EXPECT_CALL(runtime_.snapshot_, getDouble(_, 2.1)).WillOnce(Return(12.3));
-  EXPECT_EQ(config.maxGradient(), 12.3);
-
   EXPECT_CALL(runtime_.snapshot_, getDouble(_, 42.5)).WillOnce(Return(66.0));
   EXPECT_EQ(config.sampleAggregatePercentile(), .66);
 
   EXPECT_CALL(runtime_.snapshot_, getDouble(_, 13.2)).WillOnce(Return(15.5));
   EXPECT_EQ(config.jitterPercent(), .155);
+
+  EXPECT_CALL(runtime_.snapshot_, getInteger(_, 7)).WillOnce(Return(9));
+  EXPECT_EQ(config.minConcurrency(), 9);
+
+  EXPECT_CALL(runtime_.snapshot_, getDouble(_, 33.0)).WillOnce(Return(77.0));
+  EXPECT_EQ(config.minRTTBufferPercent(), .77);
 }
 
 TEST_F(GradientControllerConfigTest, DefaultValuesTest) {
@@ -196,9 +200,10 @@ min_rtt_calc_params:
   EXPECT_EQ(config.sampleRTTCalcInterval(), std::chrono::milliseconds(123));
   EXPECT_EQ(config.maxConcurrencyLimit(), 1000);
   EXPECT_EQ(config.minRTTAggregateRequestCount(), 50);
-  EXPECT_EQ(config.maxGradient(), 2.0);
   EXPECT_EQ(config.sampleAggregatePercentile(), .5);
   EXPECT_EQ(config.jitterPercent(), .15);
+  EXPECT_EQ(config.minConcurrency(), 3);
+  EXPECT_EQ(config.minRTTBufferPercent(), 0.25);
 }
 
 TEST_F(GradientControllerTest, MinRTTLogicTest) {
@@ -206,7 +211,6 @@ TEST_F(GradientControllerTest, MinRTTLogicTest) {
 sample_aggregate_percentile:
   value: 50
 concurrency_limit_params:
-  max_gradient: 2.0
   max_concurrency_limit:
   concurrency_update_interval: 0.1s
 min_rtt_calc_params:
@@ -214,12 +218,14 @@ min_rtt_calc_params:
     value: 0.0
   interval: 30s
   request_count: 50
+  min_concurrency: 1
 )EOF";
 
   auto controller = makeController(yaml);
   const auto min_rtt = std::chrono::milliseconds(13);
 
-  // The controller should be measuring minRTT upon creation, so the concurrency window is 1.
+  // The controller should be measuring minRTT upon creation, so the concurrency window is 1 (the
+  // min concurrency).
   EXPECT_EQ(
       1,
       stats_.gauge("test_prefix.min_rtt_calculation_active", Stats::Gauge::ImportMode::Accumulate)
@@ -252,7 +258,6 @@ TEST_F(GradientControllerTest, CancelLatencySample) {
 sample_aggregate_percentile:
   value: 50
 concurrency_limit_params:
-  max_gradient: 2.0
   max_concurrency_limit:
   concurrency_update_interval: 0.1s
 min_rtt_calc_params:
@@ -277,7 +282,6 @@ TEST_F(GradientControllerTest, SamplePercentileProcessTest) {
 sample_aggregate_percentile:
   value: 50
 concurrency_limit_params:
-  max_gradient: 2.0
   max_concurrency_limit:
   concurrency_update_interval: 0.1s
 min_rtt_calc_params:
@@ -289,6 +293,8 @@ min_rtt_calc_params:
 
   auto controller = makeController(yaml);
 
+  tryForward(controller, true);
+  tryForward(controller, true);
   tryForward(controller, true);
   tryForward(controller, false);
   controller->cancelLatencySample();
@@ -296,12 +302,11 @@ min_rtt_calc_params:
   tryForward(controller, false);
 }
 
-TEST_F(GradientControllerTest, ConcurrencyLimitBehaviorTestBasic) {
+TEST_F(GradientControllerTest, MinRTTBufferTest) {
   const std::string yaml = R"EOF(
 sample_aggregate_percentile:
   value: 50
 concurrency_limit_params:
-  max_gradient: 2.0
   max_concurrency_limit:
   concurrency_update_interval: 0.1s
 min_rtt_calc_params:
@@ -309,20 +314,63 @@ min_rtt_calc_params:
     value: 0.0
   interval: 30s
   request_count: 5
+  buffer:
+    value: 50
 )EOF";
 
   auto controller = makeController(yaml);
-  EXPECT_EQ(controller->concurrencyLimit(), 1);
+  EXPECT_EQ(controller->concurrencyLimit(), 3);
 
   // Force a minRTT of 5ms.
   advancePastMinRTTStage(controller, yaml, std::chrono::milliseconds(5));
   EXPECT_EQ(
       5, stats_.gauge("test_prefix.min_rtt_msecs", Stats::Gauge::ImportMode::NeverImport).value());
 
-  // Ensure that the concurrency window increases on its own due to the headroom calculation.
+  // Ensure that the minRTT doesn't decrease due to the buffer added.
+  for (int recalcs = 0; recalcs < 10; ++recalcs) {
+    const auto last_concurrency = controller->concurrencyLimit();
+    for (int i = 1; i <= 5; ++i) {
+      tryForward(controller, true);
+      // Recording sample that's technically higher than the minRTT, but the 50% buffer should
+      // prevent the concurrency limit from decreasing.
+      controller->recordLatencySample(std::chrono::milliseconds(6));
+    }
+    time_system_.sleep(std::chrono::milliseconds(101));
+    dispatcher_->run(Event::Dispatcher::RunType::Block);
+    EXPECT_GT(controller->concurrencyLimit(), last_concurrency);
+  }
+}
+
+TEST_F(GradientControllerTest, ConcurrencyLimitBehaviorTestBasic) {
+  const std::string yaml = R"EOF(
+sample_aggregate_percentile:
+  value: 50
+concurrency_limit_params:
+  max_concurrency_limit:
+  concurrency_update_interval: 0.1s
+min_rtt_calc_params:
+  jitter:
+    value: 0.0
+  interval: 30s
+  request_count: 5
+  buffer:
+    value: 10
+)EOF";
+
+  auto controller = makeController(yaml);
+  EXPECT_EQ(controller->concurrencyLimit(), 3);
+
+  // Force a minRTT of 5ms.
+  advancePastMinRTTStage(controller, yaml, std::chrono::milliseconds(5));
+  EXPECT_EQ(
+      5, stats_.gauge("test_prefix.min_rtt_msecs", Stats::Gauge::ImportMode::NeverImport).value());
+
+  // Ensure that the concurrency window increases on its own due to the headroom calculation with
+  // the max gradient.
   time_system_.sleep(std::chrono::milliseconds(101));
   dispatcher_->run(Event::Dispatcher::RunType::Block);
-  EXPECT_GT(controller->concurrencyLimit(), 1);
+  EXPECT_GE(controller->concurrencyLimit(), 3);
+  EXPECT_LE(controller->concurrencyLimit() / 3.0, 2.0);
 
   // Make it seem as if the recorded latencies are consistently lower than the measured minRTT.
   // Ensure that it grows.
@@ -334,7 +382,9 @@ min_rtt_calc_params:
     }
     time_system_.sleep(std::chrono::milliseconds(101));
     dispatcher_->run(Event::Dispatcher::RunType::Block);
-    EXPECT_GT(controller->concurrencyLimit(), last_concurrency);
+    // Verify the minimum gradient.
+    EXPECT_LE(last_concurrency, controller->concurrencyLimit());
+    EXPECT_GE(static_cast<double>(last_concurrency) / controller->concurrencyLimit(), 0.5);
   }
 
   // Verify that the concurrency limit can now shrink as necessary.
@@ -350,49 +400,11 @@ min_rtt_calc_params:
   }
 }
 
-TEST_F(GradientControllerTest, MaxGradientTest) {
-  const std::string yaml = R"EOF(
-sample_aggregate_percentile:
-  value: 50
-concurrency_limit_params:
-  max_gradient: 3.0
-  max_concurrency_limit:
-  concurrency_update_interval: 0.1s
-min_rtt_calc_params:
-  jitter:
-    value: 0.0
-  interval: 30s
-  request_count: 5
-)EOF";
-
-  auto controller = makeController(yaml);
-  EXPECT_EQ(controller->concurrencyLimit(), 1);
-
-  // Force a minRTT of 5 seconds.
-  advancePastMinRTTStage(controller, yaml, std::chrono::seconds(5));
-
-  // circllhist approximates the percentiles, so we can expect it to be within a certain range.
-  EXPECT_THAT(
-      stats_.gauge("test_prefix.min_rtt_msecs", Stats::Gauge::ImportMode::NeverImport).value(),
-      AllOf(Ge(4950), Le(5050)));
-
-  // Now verify max gradient value by forcing dramatically faster latency measurements..
-  for (int i = 1; i <= 5; ++i) {
-    tryForward(controller, true);
-    controller->recordLatencySample(std::chrono::milliseconds(4));
-  }
-  time_system_.sleep(std::chrono::milliseconds(101));
-  dispatcher_->run(Event::Dispatcher::RunType::Block);
-  EXPECT_EQ(3.0,
-            stats_.gauge("test_prefix.gradient", Stats::Gauge::ImportMode::NeverImport).value());
-}
-
 TEST_F(GradientControllerTest, MinRTTReturnToPreviousLimit) {
   const std::string yaml = R"EOF(
 sample_aggregate_percentile:
   value: 50
 concurrency_limit_params:
-  max_gradient: 3.0
   max_concurrency_limit:
   concurrency_update_interval: 0.1s
 min_rtt_calc_params:
@@ -403,7 +415,7 @@ min_rtt_calc_params:
 )EOF";
 
   auto controller = makeController(yaml);
-  EXPECT_EQ(controller->concurrencyLimit(), 1);
+  EXPECT_EQ(controller->concurrencyLimit(), 3);
 
   // Get initial minRTT measurement out of the way.
   advancePastMinRTTStage(controller, yaml, std::chrono::milliseconds(5));
@@ -426,11 +438,11 @@ min_rtt_calc_params:
   // Wait until the minRTT recalculation is triggered again and verify the limit drops.
   time_system_.sleep(std::chrono::seconds(31));
   dispatcher_->run(Event::Dispatcher::RunType::Block);
-  EXPECT_EQ(controller->concurrencyLimit(), 1);
+  EXPECT_EQ(controller->concurrencyLimit(), 3);
 
   // 49 more requests should cause the minRTT to be done calculating.
   for (int i = 0; i < 5; ++i) {
-    EXPECT_EQ(controller->concurrencyLimit(), 1);
+    EXPECT_EQ(controller->concurrencyLimit(), 3);
     tryForward(controller, true);
     controller->recordLatencySample(std::chrono::milliseconds(13));
   }
@@ -444,7 +456,6 @@ TEST_F(GradientControllerTest, MinRTTRescheduleTest) {
 sample_aggregate_percentile:
   value: 50
 concurrency_limit_params:
-  max_gradient: 3.0
   max_concurrency_limit:
   concurrency_update_interval: 0.1s
 min_rtt_calc_params:
@@ -455,7 +466,7 @@ min_rtt_calc_params:
 )EOF";
 
   auto controller = makeController(yaml);
-  EXPECT_EQ(controller->concurrencyLimit(), 1);
+  EXPECT_EQ(controller->concurrencyLimit(), 3);
 
   // Get initial minRTT measurement out of the way.
   advancePastMinRTTStage(controller, yaml, std::chrono::milliseconds(5));
@@ -476,12 +487,12 @@ min_rtt_calc_params:
   // Wait until the minRTT recalculation is triggered again and verify the limit drops.
   time_system_.sleep(std::chrono::seconds(31));
   dispatcher_->run(Event::Dispatcher::RunType::Block);
-  EXPECT_EQ(controller->concurrencyLimit(), 1);
+  EXPECT_EQ(controller->concurrencyLimit(), 3);
 
   // Verify sample recalculation doesn't occur during the minRTT window.
   time_system_.sleep(std::chrono::milliseconds(101));
   dispatcher_->run(Event::Dispatcher::RunType::Block);
-  EXPECT_EQ(controller->concurrencyLimit(), 1);
+  EXPECT_EQ(controller->concurrencyLimit(), 3);
 }
 
 TEST_F(GradientControllerTest, NoSamplesTest) {
@@ -489,7 +500,6 @@ TEST_F(GradientControllerTest, NoSamplesTest) {
 sample_aggregate_percentile:
   value: 50
 concurrency_limit_params:
-  max_gradient: 3.0
   max_concurrency_limit:
   concurrency_update_interval: 0.1s
 min_rtt_calc_params:
@@ -500,7 +510,7 @@ min_rtt_calc_params:
 )EOF";
 
   auto controller = makeController(yaml);
-  EXPECT_EQ(controller->concurrencyLimit(), 1);
+  EXPECT_EQ(controller->concurrencyLimit(), 3);
 
   // Get minRTT measurement out of the way.
   advancePastMinRTTStage(controller, yaml, std::chrono::milliseconds(5));
@@ -532,7 +542,6 @@ TEST_F(GradientControllerTest, TimerAccuracyTest) {
 sample_aggregate_percentile:
   value: 50
 concurrency_limit_params:
-  max_gradient: 3.0
   max_concurrency_limit:
   concurrency_update_interval: 0.123s
 min_rtt_calc_params:
@@ -575,7 +584,6 @@ TEST_F(GradientControllerTest, TimerAccuracyTestNoJitter) {
 sample_aggregate_percentile:
   value: 50
 concurrency_limit_params:
-  max_gradient: 3.0
   max_concurrency_limit:
   concurrency_update_interval: 0.123s
 min_rtt_calc_params:

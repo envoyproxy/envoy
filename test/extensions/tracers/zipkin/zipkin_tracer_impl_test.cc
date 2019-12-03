@@ -443,7 +443,7 @@ TEST_F(ZipkinDriverTest, ZipkinSpanTest) {
   const std::string context =
       trace_id + ";" + span_id + ";" + parent_id + ";" + ZipkinCoreConstants::get().CLIENT_SEND;
 
-  request_headers_.insertOtSpanContext().value(context);
+  request_headers_.setOtSpanContext(context);
 
   // New span will have an SR annotation
   Tracing::SpanPtr span2 = driver_->startSpan(config_, request_headers_, operation_name_,

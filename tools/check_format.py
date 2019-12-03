@@ -12,6 +12,8 @@ import subprocess
 import stat
 import sys
 import traceback
+import shutil
+import paths
 
 EXCLUDED_PREFIXES = ("./generated/", "./thirdparty/", "./build", "./.git/", "./bazel-", "./.cache",
                      "./source/extensions/extensions_build_config.bzl",
@@ -74,8 +76,8 @@ STD_REGEX_WHITELIST = ("./source/common/common/utility.cc", "./source/common/com
 GRPC_INIT_WHITELIST = ("./source/common/grpc/google_grpc_context.cc")
 
 CLANG_FORMAT_PATH = os.getenv("CLANG_FORMAT", "clang-format-9")
-BUILDIFIER_PATH = os.getenv("BUILDIFIER_BIN", "$GOPATH/bin/buildifier")
-BUILDOZER_PATH = os.getenv("BUILDOZER_BIN", "$GOPATH/bin/buildozer")
+BUILDIFIER_PATH = paths.getBuildifier()
+BUILDOZER_PATH = paths.getBuildozer()
 ENVOY_BUILD_FIXER_PATH = os.path.join(os.path.dirname(os.path.abspath(sys.argv[0])),
                                       "envoy_build_fixer.py")
 HEADER_ORDER_PATH = os.path.join(os.path.dirname(os.path.abspath(sys.argv[0])), "header_order.py")
@@ -305,6 +307,12 @@ def whitelistedForGrpcInit(file_path):
   return file_path in GRPC_INIT_WHITELIST
 
 
+def whitelistedForUnpackTo(file_path):
+  return file_path.startswith("./test") or file_path in [
+      "./source/common/protobuf/utility.cc", "./source/common/protobuf/utility.h"
+  ]
+
+
 def findSubstringAndReturnError(pattern, file_path, error_message):
   text = readFile(file_path)
   if pattern in text:
@@ -497,6 +505,9 @@ def checkSourceLine(line, file_path, reportError):
        "std::chrono::system_clock::now" in line or "std::chrono::steady_clock::now" in line or \
        "std::this_thread::sleep_for" in line or hasCondVarWaitFor(line):
       reportError("Don't reference real-world time sources from production code; use injection")
+  if not whitelistedForUnpackTo(file_path):
+    if "UnpackTo" in line:
+      reportError("Don't use UnpackTo() directly, use MessageUtil::unpackTo() instead")
   # Check that we use the absl::Time library
   if "std::get_time" in line:
     if "test/" in file_path:

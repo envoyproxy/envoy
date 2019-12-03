@@ -12,6 +12,7 @@
 #include <vector>
 
 #include "envoy/api/v2/core/base.pb.h"
+#include "envoy/api/v2/eds.pb.h"
 #include "envoy/api/v2/endpoint/endpoint.pb.h"
 #include "envoy/config/typed_metadata.h"
 #include "envoy/event/timer.h"
@@ -736,6 +737,9 @@ protected:
 protected:
   PrioritySetImpl priority_set_;
 
+  void validateEndpointsForZoneAwareRouting(
+      const envoy::api::v2::endpoint::LocalityLbEndpoints& endpoints) const;
+
 private:
   void finishInitialization();
   void reloadHealthyHosts(const HostSharedPtr& host);
@@ -743,6 +747,7 @@ private:
   bool initialization_started_{};
   std::function<void()> initialization_complete_callback_;
   uint64_t pending_initialize_health_checks_{};
+  const bool local_cluster_;
   Stats::SymbolTable& symbol_table_;
 };
 

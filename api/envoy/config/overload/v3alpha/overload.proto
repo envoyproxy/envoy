@@ -10,6 +10,8 @@ import "google/protobuf/any.proto";
 import "google/protobuf/duration.proto";
 import "google/protobuf/struct.proto";
 
+import "udpa/api/annotations/versioning.proto";
+
 import "validate/validate.proto";
 
 // [#protodoc-title: Overload Manager]
@@ -20,6 +22,9 @@ import "validate/validate.proto";
 // when triggers related to those resources fire.
 
 message ResourceMonitor {
+  option (udpa.api.annotations.versioning).previous_message_type =
+      "envoy.config.overload.v2alpha.ResourceMonitor";
+
   reserved 2;
 
   reserved "config";
@@ -40,12 +45,18 @@ message ResourceMonitor {
 }
 
 message ThresholdTrigger {
+  option (udpa.api.annotations.versioning).previous_message_type =
+      "envoy.config.overload.v2alpha.ThresholdTrigger";
+
   // If the resource pressure is greater than or equal to this value, the trigger
   // will fire.
   double value = 1 [(validate.rules).double = {lte: 1.0 gte: 0.0}];
 }
 
 message Trigger {
+  option (udpa.api.annotations.versioning).previous_message_type =
+      "envoy.config.overload.v2alpha.Trigger";
+
   // The name of the resource this is a trigger for.
   string name = 1 [(validate.rules).string = {min_bytes: 1}];
 
@@ -57,6 +68,9 @@ message Trigger {
 }
 
 message OverloadAction {
+  option (udpa.api.annotations.versioning).previous_message_type =
+      "envoy.config.overload.v2alpha.OverloadAction";
+
   // The name of the overload action. This is just a well-known string that listeners can
   // use for registering callbacks. Custom overload actions should be named using reverse
   // DNS to ensure uniqueness.
@@ -69,6 +83,9 @@ message OverloadAction {
 }
 
 message OverloadManager {
+  option (udpa.api.annotations.versioning).previous_message_type =
+      "envoy.config.overload.v2alpha.OverloadManager";
+
   // The interval for refreshing resource usage.
   google.protobuf.Duration refresh_interval = 1;
 

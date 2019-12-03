@@ -603,6 +603,27 @@ TEST_F(ThriftRouterTest, UnexpectedUpstreamLocalClose) {
   router_->onEvent(Network::ConnectionEvent::RemoteClose);
 }
 
+// Regression test for https://github.com/envoyproxy/envoy/issues/9037.
+TEST_F(ThriftRouterTest, DontCloseConnectionTwice) {
+  initializeRouter();
+  startRequest(MessageType::Call);
+  connectUpstream();
+  sendTrivialStruct(FieldType::String);
+
+  EXPECT_CALL(callbacks_, sendLocalReply(_, _))
+      .WillOnce(Invoke([&](const DirectResponse& response, bool end_stream) -> void {
+        auto& app_ex = dynamic_cast<const AppException&>(response);
+        EXPECT_EQ(AppExceptionType::InternalError, app_ex.type_);
+        EXPECT_THAT(app_ex.what(), ContainsRegex(".*connection failure.*"));
+        EXPECT_TRUE(end_stream);
+      }));
+  router_->onEvent(Network::ConnectionEvent::RemoteClose);
+
+  // Connection close shouldn't happen in onDestroy(), since it's been handled.
+  EXPECT_CALL(upstream_connection_, close(Network::ConnectionCloseType::NoFlush)).Times(0);
+  destroyRouter();
+}
+
 TEST_F(ThriftRouterTest, UnexpectedRouterDestroyBeforeUpstreamConnect) {
   initializeRouter();
   startRequest(MessageType::Call);
