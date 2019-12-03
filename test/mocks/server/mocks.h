@@ -55,7 +55,8 @@ namespace Server {
 
 namespace Configuration {
 class MockServerFactoryContext;
-}
+class MockTransportSocketFactoryContext;
+} // namespace Configuration
 
 class MockOptions : public Options {
 public:
@@ -397,6 +398,7 @@ public:
   MOCK_CONST_METHOD0(statsFlushInterval, std::chrono::milliseconds());
   MOCK_METHOD0(messageValidationContext, ProtobufMessage::ValidationContext&());
   MOCK_METHOD0(serverFactoryContext, Configuration::ServerFactoryContext&());
+  MOCK_METHOD0(transportSocketFactoryContext, Configuration::TransportSocketFactoryContext&());
 
   TimeSource& timeSource() override { return time_system_; }
 
@@ -429,6 +431,8 @@ public:
   testing::NiceMock<ProtobufMessage::MockValidationContext> validation_context_;
   std::shared_ptr<testing::NiceMock<Configuration::MockServerFactoryContext>>
       server_factory_context_;
+  std::shared_ptr<testing::NiceMock<Configuration::MockTransportSocketFactoryContext>>
+      transport_socket_factory_context_;
 };
 
 namespace Configuration {
@@ -552,9 +556,9 @@ public:
 
   MOCK_METHOD0(admin, Server::Admin&());
   MOCK_METHOD0(sslContextManager, Ssl::ContextManager&());
-  MOCK_CONST_METHOD0(statsScope, Stats::Scope&());
+  MOCK_METHOD0(scope, Stats::Scope&());
   MOCK_METHOD0(clusterManager, Upstream::ClusterManager&());
-  MOCK_METHOD0(localInfo, const LocalInfo::LocalInfo&());
+  MOCK_CONST_METHOD0(localInfo, const LocalInfo::LocalInfo&());
   MOCK_METHOD0(dispatcher, Event::Dispatcher&());
   MOCK_METHOD0(random, Envoy::Runtime::RandomGenerator&());
   MOCK_METHOD0(stats, Stats::Store&());

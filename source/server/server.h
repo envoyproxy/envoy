@@ -14,6 +14,7 @@
 #include "envoy/server/instance.h"
 #include "envoy/server/process_context.h"
 #include "envoy/server/tracer_config.h"
+#include "envoy/server/transport_socket_config.h"
 #include "envoy/ssl/context_manager.h"
 #include "envoy/stats/stats_macros.h"
 #include "envoy/stats/timespan.h"
@@ -143,11 +144,13 @@ private:
   Event::SignalEventPtr sig_hup_;
 };
 
-class ServerFactoryContextImpl : public Configuration::ServerFactoryContext {
+class ServerFactoryContextImpl : public Configuration::ServerFactoryContext,
+                                 public Configuration::TransportSocketFactoryContext {
 public:
   explicit ServerFactoryContextImpl(Instance& server)
       : server_(server), server_scope_(server_.stats().createScope("")) {}
 
+  // Configuration::ServerFactoryContext
   Upstream::ClusterManager& clusterManager() override { return server_.clusterManager(); }
   Event::Dispatcher& dispatcher() override { return server_.dispatcher(); }
   const LocalInfo::LocalInfo& localInfo() const override { return server_.localInfo(); }
@@ -159,6 +162,18 @@ public:
   Admin& admin() override { return server_.admin(); }
   TimeSource& timeSource() override { return api().timeSource(); }
   Api::Api& api() override { return server_.api(); }
+
+  // Configuration::TransportSocketFactoryContext
+  Ssl::ContextManager& sslContextManager() override { return server_.sslContextManager(); }
+  Secret::SecretManager& secretManager() override { return server_.secretManager(); }
+  Stats::Store& stats() override { return server_.stats(); }
+  void setInitManager(Init::Manager&) override {}
+  Init::Manager* initManager() override { return &server_.initManager(); }
+  ProtobufMessage::ValidationVisitor& messageValidationVisitor() override {
+    return initManager()->state() == Init::Manager::State::Initialized
+               ? server_.messageValidationContext().dynamicValidationVisitor()
+               : server_.messageValidationContext().staticValidationVisitor();
+  }
 
 private:
   Instance& server_;
@@ -224,6 +239,10 @@ public:
   TimeSource& timeSource() override { return time_source_; }
 
   Configuration::ServerFactoryContext& serverFactoryContext() override { return server_context_; }
+
+  Configuration::TransportSocketFactoryContext& transportSocketFactoryContext() override {
+    return server_context_;
+  }
 
   std::chrono::milliseconds statsFlushInterval() const override {
     return config_.statsFlushInterval();

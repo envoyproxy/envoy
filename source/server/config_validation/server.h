@@ -107,6 +107,9 @@ public:
     return validation_context_;
   }
   Configuration::ServerFactoryContext& serverFactoryContext() override { return server_context_; }
+  Configuration::TransportSocketFactoryContext& transportSocketFactoryContext() override {
+    return server_context_;
+  }
 
   // Server::ListenerComponentFactory
   LdsApiPtr createLdsApi(const envoy::api::v2::core::ConfigSource& lds_config) override {

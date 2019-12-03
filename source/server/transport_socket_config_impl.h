@@ -26,12 +26,12 @@ public:
   // TransportSocketFactoryContext
   Server::Admin& admin() override { return admin_; }
   Ssl::ContextManager& sslContextManager() override { return context_manager_; }
-  Stats::Scope& statsScope() const override { return stats_scope_; }
+  Stats::Scope& scope() override { return stats_scope_; }
   Secret::SecretManager& secretManager() override {
     return cluster_manager_.clusterManagerFactory().secretManager();
   }
   Upstream::ClusterManager& clusterManager() override { return cluster_manager_; }
-  const LocalInfo::LocalInfo& localInfo() override { return local_info_; }
+  const LocalInfo::LocalInfo& localInfo() const override { return local_info_; }
   Event::Dispatcher& dispatcher() override { return dispatcher_; }
   Envoy::Runtime::RandomGenerator& random() override { return random_; }
   Stats::Store& stats() override { return stats_; }

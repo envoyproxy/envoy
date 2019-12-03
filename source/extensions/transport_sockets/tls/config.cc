@@ -20,8 +20,8 @@ Network::TransportSocketFactoryPtr UpstreamSslSocketFactory::createTransportSock
       MessageUtil::downcastAndValidate<const envoy::api::v2::auth::UpstreamTlsContext&>(
           message, context.messageValidationVisitor()),
       context);
-  return std::make_unique<ClientSslSocketFactory>(
-      std::move(client_config), context.sslContextManager(), context.statsScope());
+  return std::make_unique<ClientSslSocketFactory>(std::move(client_config),
+                                                  context.sslContextManager(), context.scope());
 }
 
 ProtobufTypes::MessagePtr UpstreamSslSocketFactory::createEmptyConfigProto() {
@@ -39,7 +39,7 @@ Network::TransportSocketFactoryPtr DownstreamSslSocketFactory::createTransportSo
           message, context.messageValidationVisitor()),
       context);
   return std::make_unique<ServerSslSocketFactory>(
-      std::move(server_config), context.sslContextManager(), context.statsScope(), server_names);
+      std::move(server_config), context.sslContextManager(), context.scope(), server_names);
 }
 
 ProtobufTypes::MessagePtr DownstreamSslSocketFactory::createEmptyConfigProto() {

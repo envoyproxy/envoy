@@ -229,6 +229,11 @@ public:
    * @return Configuration::ServerFactoryContext& factory context for filters.
    */
   virtual Configuration::ServerFactoryContext& serverFactoryContext() PURE;
+
+  /**
+   * @return Configuration::TransportSocketFactoryContext& factory context for transport sockets.
+   */
+  virtual Configuration::TransportSocketFactoryContext& transportSocketFactoryContext() PURE;
 };
 
 } // namespace Server

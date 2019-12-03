@@ -105,6 +105,8 @@ public:
   ~ServerFactoryContext() override = default;
 };
 
+class TransportSocketFactoryContext;
+
 /**
  * Context passed to network and HTTP filters to access server resources.
  * TODO(mattklein123): When we lock down visibility of the rest of the code, filters should only
@@ -118,6 +120,11 @@ public:
    * @return ServerFactoryContext which lifetime is no shorter than the server.
    */
   virtual ServerFactoryContext& getServerFactoryContext() const PURE;
+
+  /**
+   * @return TransportSocketFactoryContext which lifetime is no shorter than the server.
+   */
+  virtual TransportSocketFactoryContext& getTransportSocketFactoryContext() const PURE;
 
   /**
    * @return AccessLogManager for use by the entire server.
