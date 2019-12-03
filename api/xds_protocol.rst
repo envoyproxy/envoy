@@ -485,7 +485,7 @@ which most are not needed by any individual proxy.
 In order to fix this issue, the Virtual Host Discovery Service (VHDS) protocol
 uses the delta xDS protocol to allow a route configuration to be subscribed to
 and the necessary virtual hosts to be requested as needed. Instead of sending
-allmvirtual hosts with a route config, using VHDS will allow an Envoy instance
+all virtual hosts with a route config, using VHDS will allow an Envoy instance
 to subscribe and unsubscribe from a list of virtual hosts stored internally in
 the xDS management server. The xDS management server will monitor this list and
 use it to filter the configuration sent to an individual Envoy instance to only
@@ -510,7 +510,7 @@ updates to these virtual hosts will be sent via spontaneous updates.
 
 Updates to the route configuration entry to which a virtual host belongs will
 clear the virtual host table and require all virtual hosts to be sent again. It
-may be useful for the management server to populate and RDS responses with the
+may be useful for the management server to populate RDS responses with the
 subscribed list of virtual hosts. 
 
 Joining/Reconnecting to a management server
@@ -525,8 +525,8 @@ resources on reconnect.
 .. figure:: diagrams/delta_rds_connection.svg
    :alt: Delta RDS connection
 
-Virtual Host Naming Convention
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Virtual Host Resource Naming Convention
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 Virtual hosts in VHDS are identified by a combination of the name of the route
 configuration to which the virtual host belong as well as the host HTTP "host"
 header (authority for HTTP2) entry. Resources should be named as follows:
@@ -541,9 +541,8 @@ Requesting Additional resources
 Envoy will send a
 :ref:`DeltaDiscoveryRequest <envoy_api_msg_DeltaDiscoveryRequest>` with the
 :ref:`resource_names_subscribe <envoy_api_field_DeltaDiscoveryRequest.resource_names_subscribe>`
-field populated with the route config names
-+ domains of each of the resources that it would like to subscribe to. Each of
-the virtual hosts contained in the
+field populated with the virtual host resource names of each of the resources
+that it would like to subscribe to. Each of the virtual hosts contained in the
 :ref:`DeltaDiscoveryRequest's <envoy_api_msg_DeltaDiscoveryRequest>`
 resources field will be added to the route configuration maintained by Envoy.
 If Envoy's route configuration already contains a given virtual host, it will
@@ -551,12 +550,10 @@ be overwritten by data received in the
 :ref:`DeltaDiscoveryResponse <envoy_api_msg_DeltaDiscoveryResponse>`
 but only if the updated virtual host is different from its current state.
 The :ref:`resource.aliases <envoy_api_field_resource.aliases>` field contains
-all host/authority header values used to create the on-demand request. During
-spontaneous updates configuration server will only send updates for virtual
-hosts that Envoy is aware of. The configuration server needs to keep track
-of virtual hosts known to Envoy.
+all host/authority header values used to create the on-demand request. The
+configuration server needs to keep track of virtual hosts known to Envoy.
 
-If a virtual host is requested for which the management sever does not know
+If a virtual host is requested for which the management server does not know
 about, then the management server should respond with a 
 :ref:`DeltaDiscoveryResponse <envoy_api_msg_DeltaDiscoveryResponse>` in which
 the :ref:`resources <envoy_api_field_DeltaDiscoveryResponse.resources>` entry
