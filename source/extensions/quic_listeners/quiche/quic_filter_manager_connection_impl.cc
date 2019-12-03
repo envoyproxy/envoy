@@ -8,10 +8,10 @@ namespace Quic {
 QuicFilterManagerConnectionImpl::QuicFilterManagerConnectionImpl(EnvoyQuicConnection* connection,
                                                                  Event::Dispatcher& dispatcher,
                                                                  uint32_t send_buffer_limit)
-    : quic_connection_(connection), dispatcher_(dispatcher), filter_manager_(*this),
-      // QUIC connection id can be 18 bytes. It's easier to use hash value instead
-      // of trying to map it into a 64-bit space.
-      stream_info_(dispatcher.timeSource()), id_(quic_connection_->connection_id().Hash()),
+    // Using this for purpose other than logging is not safe. Because QUIC connection id can be
+    // 18 bytes, so there might be collision when it's hashed to 8 bytes.
+    : Network::ConnectionImplBase(dispatcher, /*id=*/connection->connection_id().Hash()),
+      quic_connection_(connection), filter_manager_(*this), stream_info_(dispatcher.timeSource()),
       write_buffer_watermark_simulation_(
           send_buffer_limit / 2, send_buffer_limit, [this]() { onSendBufferLowWatermark(); },
           [this]() { onSendBufferHighWatermark(); }, ENVOY_LOGGER()) {
@@ -32,10 +32,6 @@ void QuicFilterManagerConnectionImpl::addReadFilter(Network::ReadFilterSharedPtr
 
 bool QuicFilterManagerConnectionImpl::initializeReadFilters() {
   return filter_manager_.initializeReadFilters();
-}
-
-void QuicFilterManagerConnectionImpl::addConnectionCallbacks(Network::ConnectionCallbacks& cb) {
-  network_connection_callbacks_.push_back(&cb);
 }
 
 void QuicFilterManagerConnectionImpl::enableHalfClose(bool enabled) {
@@ -61,9 +57,7 @@ void QuicFilterManagerConnectionImpl::close(Network::ConnectionCloseType type) {
     // Already detached from quic connection.
     return;
   }
-  quic_connection_->CloseConnection(quic::QUIC_NO_ERROR, "Closed by application",
-                                    quic::ConnectionCloseBehavior::SEND_CONNECTION_CLOSE_PACKET);
-  quic_connection_ = nullptr;
+  closeConnectionImmediately();
 }
 
 void QuicFilterManagerConnectionImpl::setDelayedCloseTimeout(std::chrono::milliseconds timeout) {
@@ -114,28 +108,28 @@ void QuicFilterManagerConnectionImpl::onConnectionCloseEvent(
                                            " with details: ", frame.error_details);
   if (quic_connection_ != nullptr) {
     // Tell network callbacks about connection close if not detached yet.
-    raiseEvent(source == quic::ConnectionCloseSource::FROM_PEER
-                   ? Network::ConnectionEvent::RemoteClose
-                   : Network::ConnectionEvent::LocalClose);
+    raiseConnectionEvent(source == quic::ConnectionCloseSource::FROM_PEER
+                             ? Network::ConnectionEvent::RemoteClose
+                             : Network::ConnectionEvent::LocalClose);
   }
 }
 
-void QuicFilterManagerConnectionImpl::raiseEvent(Network::ConnectionEvent event) {
-  for (auto callback : network_connection_callbacks_) {
-    callback->onEvent(event);
-  }
+void QuicFilterManagerConnectionImpl::closeConnectionImmediately() {
+  quic_connection_->CloseConnection(quic::QUIC_NO_ERROR, "Closed by application",
+                                    quic::ConnectionCloseBehavior::SEND_CONNECTION_CLOSE_PACKET);
+  quic_connection_ = nullptr;
 }
 
 void QuicFilterManagerConnectionImpl::onSendBufferHighWatermark() {
   ENVOY_CONN_LOG(trace, "onSendBufferHighWatermark", *this);
-  for (auto callback : network_connection_callbacks_) {
+  for (auto callback : callbacks_) {
     callback->onAboveWriteBufferHighWatermark();
   }
 }
 
 void QuicFilterManagerConnectionImpl::onSendBufferLowWatermark() {
   ENVOY_CONN_LOG(trace, "onSendBufferLowWatermark", *this);
-  for (auto callback : network_connection_callbacks_) {
+  for (auto callback : callbacks_) {
     callback->onBelowWriteBufferLowWatermark();
   }
 }

@@ -11,12 +11,17 @@ import "envoy/api/v3alpha/route/route.proto";
 
 import "google/protobuf/wrappers.proto";
 
+import "udpa/api/annotations/versioning.proto";
+
 import "validate/validate.proto";
 
 // [#protodoc-title: Thrift Proxy Route Configuration]
 // Thrift Proxy :ref:`configuration overview <config_network_filters_thrift_proxy>`.
 
 message RouteConfiguration {
+  option (udpa.api.annotations.versioning).previous_message_type =
+      "envoy.config.filter.network.thrift_proxy.v2alpha1.RouteConfiguration";
+
   // The name of the route configuration. Reserved for future use in asynchronous route discovery.
   string name = 1;
 
@@ -26,6 +31,9 @@ message RouteConfiguration {
 }
 
 message Route {
+  option (udpa.api.annotations.versioning).previous_message_type =
+      "envoy.config.filter.network.thrift_proxy.v2alpha1.Route";
+
   // Route matching parameters.
   RouteMatch match = 1 [(validate.rules).message = {required: true}];
 
@@ -34,6 +42,9 @@ message Route {
 }
 
 message RouteMatch {
+  option (udpa.api.annotations.versioning).previous_message_type =
+      "envoy.config.filter.network.thrift_proxy.v2alpha1.RouteMatch";
+
   oneof match_specifier {
     option (validate.required) = true;
 
@@ -69,8 +80,11 @@ message RouteMatch {
   repeated api.v3alpha.route.HeaderMatcher headers = 4;
 }
 
-// [#next-free-field: 6]
+// [#next-free-field: 7]
 message RouteAction {
+  option (udpa.api.annotations.versioning).previous_message_type =
+      "envoy.config.filter.network.thrift_proxy.v2alpha1.RouteAction";
+
   oneof cluster_specifier {
     option (validate.required) = true;
 
@@ -82,6 +96,13 @@ message RouteAction {
     // request is routed to one of the upstream clusters based on weights
     // assigned to each cluster.
     WeightedCluster weighted_clusters = 2;
+
+    // Envoy will determine the cluster to route to by reading the value of the
+    // Thrift header named by cluster_header from the request headers. If the
+    // header is not found or the referenced cluster does not exist Envoy will
+    // respond with an unknown method exception or an internal error exception,
+    // respectively.
+    string cluster_header = 6 [(validate.rules).string = {min_bytes: 1}];
   }
 
   // Optional endpoint metadata match criteria used by the subset load balancer. Only endpoints in
@@ -106,7 +127,13 @@ message RouteAction {
 // percentage of traffic to be forwarded to each cluster. The router selects an upstream cluster
 // based on these weights.
 message WeightedCluster {
+  option (udpa.api.annotations.versioning).previous_message_type =
+      "envoy.config.filter.network.thrift_proxy.v2alpha1.WeightedCluster";
+
   message ClusterWeight {
+    option (udpa.api.annotations.versioning).previous_message_type =
+        "envoy.config.filter.network.thrift_proxy.v2alpha1.WeightedCluster.ClusterWeight";
+
     // Name of the upstream cluster.
     string name = 1 [(validate.rules).string = {min_bytes: 1}];
 

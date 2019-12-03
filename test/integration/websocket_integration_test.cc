@@ -353,9 +353,7 @@ TEST_P(WebsocketIntegrationTest, WebsocketCustomFilterChain) {
         auto* foo_upgrade = hcm.add_upgrade_configs();
         foo_upgrade->set_upgrade_type("foo");
         auto* filter_list_back = foo_upgrade->add_filters();
-        const std::string json =
-            Json::Factory::loadFromYamlString("name: envoy.router")->asJsonString();
-        TestUtility::loadFromJson(json, *filter_list_back);
+        TestUtility::loadFromYaml("name: envoy.router", *filter_list_back);
       });
   initialize();
 

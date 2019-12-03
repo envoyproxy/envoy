@@ -438,11 +438,8 @@ void ActiveUdpListener::onWriteReady(const Network::Socket&) {
   // data
 }
 
-void ActiveUdpListener::onReceiveError(const Network::UdpListenerCallbacks::ErrorCode&,
-                                       Api::IoError::IoErrorCode) {
-  // TODO(sumukhs): Determine what to do on receive error.
-  // Would the filters need to know on error? Can't foresee a scenario where they
-  // would take an action
+void ActiveUdpListener::onReceiveError(Api::IoError::IoErrorCode error_code) {
+  read_filter_->onReceiveError(error_code);
 }
 
 void ActiveUdpListener::addReadFilter(Network::UdpListenerReadFilterPtr&& filter) {

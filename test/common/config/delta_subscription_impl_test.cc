@@ -11,7 +11,7 @@ protected:
   DeltaSubscriptionImplTest() = default;
 
   // We need to destroy the subscription before the test's destruction, because the subscription's
-  // destructor removes its watch from the GrpcMuxDelta, and that removal process involves
+  // destructor removes its watch from the NewGrpcMuxImpl, and that removal process involves
   // some things held by the test fixture.
   void TearDown() override { doSubscriptionTearDown(); }
 };
@@ -71,8 +71,8 @@ TEST_F(DeltaSubscriptionImplTest, PauseQueuesAcks) {
     message->set_nonce(nonce);
     message->set_type_url(Config::TypeUrl::get().ClusterLoadAssignment);
     nonce_acks_required_.push(nonce);
-    auto shared_mux = subscription_->getGrpcMuxForTest();
-    static_cast<GrpcMuxDelta*>(shared_mux.get())->onDiscoveryResponse(std::move(message));
+    static_cast<NewGrpcMuxImpl*>(subscription_->getContextForTest().get())
+        ->onDiscoveryResponse(std::move(message));
   }
   // The server gives us our first version of resource name2.
   // subscription_ now wants to ACK name1 and then name2 (but can't due to pause).
@@ -85,8 +85,8 @@ TEST_F(DeltaSubscriptionImplTest, PauseQueuesAcks) {
     message->set_nonce(nonce);
     message->set_type_url(Config::TypeUrl::get().ClusterLoadAssignment);
     nonce_acks_required_.push(nonce);
-    auto shared_mux = subscription_->getGrpcMuxForTest();
-    static_cast<GrpcMuxDelta*>(shared_mux.get())->onDiscoveryResponse(std::move(message));
+    static_cast<NewGrpcMuxImpl*>(subscription_->getContextForTest().get())
+        ->onDiscoveryResponse(std::move(message));
   }
   // The server gives us an updated version of resource name1.
   // subscription_ now wants to ACK name1A, then name2, then name1B (but can't due to pause).
@@ -99,8 +99,8 @@ TEST_F(DeltaSubscriptionImplTest, PauseQueuesAcks) {
     message->set_nonce(nonce);
     message->set_type_url(Config::TypeUrl::get().ClusterLoadAssignment);
     nonce_acks_required_.push(nonce);
-    auto shared_mux = subscription_->getGrpcMuxForTest();
-    static_cast<GrpcMuxDelta*>(shared_mux.get())->onDiscoveryResponse(std::move(message));
+    static_cast<NewGrpcMuxImpl*>(subscription_->getContextForTest().get())
+        ->onDiscoveryResponse(std::move(message));
   }
   // All ACK sendMessage()s will happen upon calling resume().
   EXPECT_CALL(async_stream_, sendMessageRaw_(_, _))
@@ -135,11 +135,11 @@ TEST(DeltaSubscriptionImplFixturelessTest, NoGrpcStream) {
   const Protobuf::MethodDescriptor* method_descriptor =
       Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
           "envoy.api.v2.EndpointDiscoveryService.StreamEndpoints");
-  std::shared_ptr<GrpcMuxDelta> xds_context = std::make_shared<GrpcMuxDelta>(
+  std::shared_ptr<NewGrpcMuxImpl> xds_context = std::make_shared<NewGrpcMuxImpl>(
       std::unique_ptr<Grpc::MockAsyncClient>(async_client), dispatcher, *method_descriptor, random,
-      stats_store, rate_limit_settings, local_info, true);
+      stats_store, rate_limit_settings, local_info);
 
-  auto subscription = std::make_unique<GrpcSubscriptionImpl>(
+  std::unique_ptr<DeltaSubscriptionImpl> subscription = std::make_unique<DeltaSubscriptionImpl>(
       xds_context, Config::TypeUrl::get().ClusterLoadAssignment, callbacks, stats,
       std::chrono::milliseconds(12345), false);
 

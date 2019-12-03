@@ -21,7 +21,7 @@
 #include "envoy/upstream/cluster_manager.h"
 
 #include "common/common/cleanup.h"
-#include "common/config/new_grpc_mux_impl.h"
+#include "common/config/grpc_mux_impl.h"
 #include "common/config/subscription_factory_impl.h"
 #include "common/http/async_client_impl.h"
 #include "common/upstream/load_stats_reporter.h"
@@ -229,7 +229,9 @@ public:
   Config::GrpcMuxSharedPtr adsMux() override { return ads_mux_; }
   Grpc::AsyncClientManager& grpcAsyncClientManager() override { return *async_client_manager_; }
 
-  const std::string& localClusterName() const override { return local_cluster_name_; }
+  const absl::optional<std::string>& localClusterName() const override {
+    return local_cluster_name_;
+  }
 
   ClusterUpdateCallbacksHandlePtr
   addThreadLocalClusterUpdateCallbacks(ClusterUpdateCallbacks&) override;
@@ -472,8 +474,8 @@ private:
   ClusterManagerInitHelper init_helper_;
   Config::GrpcMuxSharedPtr ads_mux_;
   LoadStatsReporterPtr load_stats_reporter_;
-  // The name of the local cluster of this Envoy instance if defined, else the empty string.
-  std::string local_cluster_name_;
+  // The name of the local cluster of this Envoy instance if defined.
+  absl::optional<std::string> local_cluster_name_;
   Grpc::AsyncClientManagerPtr async_client_manager_;
   Server::ConfigTracker::EntryOwnerPtr config_tracker_entry_;
   TimeSource& time_source_;

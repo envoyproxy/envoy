@@ -627,6 +627,7 @@ private:
 
     // Network::UdpListenerReadFilter
     void onData(Network::UdpRecvData& data) override { parent_.onRecvDatagram(data); }
+    void onReceiveError(Api::IoError::IoErrorCode) override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
 
   private:
     FakeUpstream& parent_;
