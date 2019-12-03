@@ -6,6 +6,8 @@ option java_outer_classname = "HttpStatusProto";
 option java_multiple_files = true;
 option java_package = "io.envoyproxy.envoy.type.v3alpha";
 
+import "udpa/api/annotations/versioning.proto";
+
 import "validate/validate.proto";
 
 // HTTP response codes supported in Envoy.
@@ -130,6 +132,8 @@ enum StatusCode {
 
 // HTTP status.
 message HttpStatus {
+  option (udpa.api.annotations.versioning).previous_message_type = "envoy.type.HttpStatus";
+
   // Supplies HTTP response code.
   StatusCode code = 1 [(validate.rules).enum = {defined_only: true not_in: 0}];
 }

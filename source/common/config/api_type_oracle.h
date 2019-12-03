@@ -7,7 +7,7 @@
 namespace Envoy {
 namespace Config {
 
-class ApiTypeDb {
+class ApiTypeOracle {
 public:
   /**
    * Based on the presented extension config and name, determine if this is

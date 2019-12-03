@@ -12,6 +12,8 @@ import "envoy/api/v3alpha/endpoint/load_report.proto";
 
 import "google/protobuf/duration.proto";
 
+import "udpa/api/annotations/versioning.proto";
+
 import "validate/validate.proto";
 
 // [#protodoc-title: Load reporting service]
@@ -52,6 +54,9 @@ service LoadReportingService {
 // A load report Envoy sends to the management server.
 // [#not-implemented-hide:] Not configuration. TBD how to doc proto APIs.
 message LoadStatsRequest {
+  option (udpa.api.annotations.versioning).previous_message_type =
+      "envoy.service.load_stats.v2.LoadStatsRequest";
+
   // Node identifier for Envoy instance.
   api.v3alpha.core.Node node = 1;
 
@@ -63,6 +68,9 @@ message LoadStatsRequest {
 // is interested in learning load stats about.
 // [#not-implemented-hide:] Not configuration. TBD how to doc proto APIs.
 message LoadStatsResponse {
+  option (udpa.api.annotations.versioning).previous_message_type =
+      "envoy.service.load_stats.v2.LoadStatsResponse";
+
   // Clusters to report stats for.
   repeated string clusters = 1 [(validate.rules).repeated = {min_items: 1}];
 
