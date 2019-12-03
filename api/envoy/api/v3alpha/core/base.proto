@@ -143,6 +143,7 @@ message Node {
 // * ``{"envoy.lb": {"canary": <bool> }}`` This indicates the canary status of an
 //   endpoint and is also used during header processing
 //   (x-envoy-upstream-canary) and for stats purposes.
+// [#next-major-version: move to type/metadata/v2]
 message Metadata {
   option (udpa.api.annotations.versioning).previous_message_type = "envoy.api.v2.core.Metadata";
 

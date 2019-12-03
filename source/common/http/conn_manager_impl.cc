@@ -1338,6 +1338,32 @@ void ConnectionManagerImpl::ActiveStream::refreshCachedRoute() {
         connection_manager_.cluster_manager_.get(stream_info_.route_entry_->clusterName());
     cached_cluster_info_ = (nullptr == local_cluster) ? nullptr : local_cluster->info();
   }
+
+  refreshCachedTracingCustomTags();
+}
+
+void ConnectionManagerImpl::ActiveStream::refreshCachedTracingCustomTags() {
+  if (!connection_manager_.config_.tracingConfig()) {
+    return;
+  }
+  const Tracing::CustomTagMap& conn_manager_tags =
+      connection_manager_.config_.tracingConfig()->custom_tags_;
+  const Tracing::CustomTagMap* route_tags = nullptr;
+  if (hasCachedRoute() && cached_route_.value()->tracingConfig()) {
+    route_tags = &cached_route_.value()->tracingConfig()->getCustomTags();
+  }
+  const bool configured_in_conn = !conn_manager_tags.empty();
+  const bool configured_in_route = route_tags && !route_tags->empty();
+  if (!configured_in_conn && !configured_in_route) {
+    return;
+  }
+  Tracing::CustomTagMap& custom_tag_map = getOrMakeTracingCustomTagMap();
+  if (configured_in_route) {
+    custom_tag_map.insert(route_tags->begin(), route_tags->end());
+  }
+  if (configured_in_conn) {
+    custom_tag_map.insert(conn_manager_tags.begin(), conn_manager_tags.end());
+  }
 }
 
 void ConnectionManagerImpl::ActiveStream::sendLocalReply(
@@ -1800,9 +1826,8 @@ Tracing::OperationName ConnectionManagerImpl::ActiveStream::operationName() cons
   return connection_manager_.config_.tracingConfig()->operation_name_;
 }
 
-const std::vector<Http::LowerCaseString>&
-ConnectionManagerImpl::ActiveStream::requestHeadersForTags() const {
-  return connection_manager_.config_.tracingConfig()->request_headers_for_tags_;
+const Tracing::CustomTagMap* ConnectionManagerImpl::ActiveStream::customTags() const {
+  return tracing_custom_tags_.get();
 }
 
 bool ConnectionManagerImpl::ActiveStream::verbose() const {
@@ -2075,6 +2100,9 @@ Router::RouteConstSharedPtr ConnectionManagerImpl::ActiveStreamFilterBase::route
 void ConnectionManagerImpl::ActiveStreamFilterBase::clearRouteCache() {
   parent_.cached_route_ = absl::optional<Router::RouteConstSharedPtr>();
   parent_.cached_cluster_info_ = absl::optional<Upstream::ClusterInfoConstSharedPtr>();
+  if (parent_.tracing_custom_tags_) {
+    parent_.tracing_custom_tags_->clear();
+  }
 }
 
 Buffer::WatermarkBufferPtr ConnectionManagerImpl::ActiveStreamDecoderFilter::createBuffer() {
