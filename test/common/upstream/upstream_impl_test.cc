@@ -2117,7 +2117,7 @@ public:
   // NamedNetworkFilterConfigFactory
   Network::FilterFactoryCb
   createFilterFactoryFromProto(const Protobuf::Message&,
-                               Server::Configuration::FilterChainFactoryContext&) override {
+                               Server::Configuration::FactoryContext&) override {
     NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
   }
   ProtobufTypes::MessagePtr createEmptyConfigProto() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }

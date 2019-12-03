@@ -161,7 +161,7 @@ public:
 private:
   Network::FilterFactoryCb createFilterFactoryFromProtoTyped(
       const test::integration::filter_manager::Throttler& proto_config,
-      Server::Configuration::FilterChainFactoryContext&) override {
+      Server::Configuration::FactoryContext&) override {
     return [proto_config](Network::FilterManager& filter_manager) -> void {
       filter_manager.addFilter(std::make_shared<ThrottlerFilter>(
           std::chrono::milliseconds(proto_config.tick_interval_ms()),
@@ -246,7 +246,7 @@ public:
   // NamedNetworkFilterConfigFactory
   Network::FilterFactoryCb
   createFilterFactoryFromProto(const Protobuf::Message&,
-                               Server::Configuration::FilterChainFactoryContext&) override {
+                               Server::Configuration::FactoryContext&) override {
     return [](Network::FilterManager& filter_manager) -> void {
       filter_manager.addFilter(std::make_shared<DispenserFilter>());
     };

@@ -24,7 +24,7 @@ public:
 private:
   Network::FilterFactoryCb createFilterFactoryFromProtoTyped(
       const envoy::config::filter::network::zookeeper_proxy::v1alpha1::ZooKeeperProxy& proto_config,
-      Server::Configuration::FilterChainFactoryContext& filter_chain_factory_context) override;
+      Server::Configuration::FactoryContext& context) override;
 };
 
 } // namespace ZooKeeperProxy

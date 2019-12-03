@@ -17,12 +17,11 @@ using ZooKeeperProxyProtoConfig =
     envoy::config::filter::network::zookeeper_proxy::v1alpha1::ZooKeeperProxy;
 
 TEST(ZookeeperFilterConfigTest, ValidateFail) {
-  testing::NiceMock<Server::Configuration::MockFilterChainFactoryContext>
-      filter_chain_factory_context;
-  EXPECT_THROW(ZooKeeperConfigFactory().createFilterFactoryFromProto(ZooKeeperProxyProtoConfig(),
-                                                                     filter_chain_factory_context),
-               ProtoValidationException);
-} // namespace ZooKeeperProxy
+  testing::NiceMock<Server::Configuration::MockFactoryContext> context;
+  EXPECT_THROW(
+      ZooKeeperConfigFactory().createFilterFactoryFromProto(ZooKeeperProxyProtoConfig(), context),
+      ProtoValidationException);
+}
 
 TEST(ZookeeperFilterConfigTest, InvalidStatPrefix) {
   const std::string yaml = R"EOF(
@@ -51,12 +50,10 @@ stat_prefix: test_prefix
   ZooKeeperProxyProtoConfig proto_config;
   TestUtility::loadFromYamlAndValidate(yaml, proto_config);
 
-  testing::NiceMock<Server::Configuration::MockFilterChainFactoryContext>
-      filter_chain_factory_context;
+  testing::NiceMock<Server::Configuration::MockFactoryContext> context;
   ZooKeeperConfigFactory factory;
 
-  Network::FilterFactoryCb cb =
-      factory.createFilterFactoryFromProto(proto_config, filter_chain_factory_context);
+  Network::FilterFactoryCb cb = factory.createFilterFactoryFromProto(proto_config, context);
   Network::MockConnection connection;
   EXPECT_CALL(connection, addFilter(_));
   cb(connection);

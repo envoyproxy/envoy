@@ -23,7 +23,7 @@ public:
 private:
   Network::FilterFactoryCb createFilterFactoryFromProtoTyped(
       const envoy::config::filter::network::rate_limit::v2::RateLimit& proto_config,
-      Server::Configuration::FilterChainFactoryContext& filter_chain_factory_context) override;
+      Server::Configuration::FactoryContext& context) override;
 };
 
 } // namespace RateLimitFilter

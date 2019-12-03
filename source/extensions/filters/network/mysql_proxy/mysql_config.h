@@ -23,7 +23,7 @@ public:
 private:
   Network::FilterFactoryCb createFilterFactoryFromProtoTyped(
       const envoy::config::filter::network::mysql_proxy::v1alpha1::MySQLProxy& proto_config,
-      Server::Configuration::FilterChainFactoryContext& filter_chain_factory_context) override;
+      Server::Configuration::FactoryContext& context) override;
 };
 
 } // namespace MySQLProxy

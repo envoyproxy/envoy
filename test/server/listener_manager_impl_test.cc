@@ -289,7 +289,7 @@ public:
   // Configuration::NamedNetworkFilterConfigFactory
   Network::FilterFactoryCb
   createFilterFactoryFromProto(const Protobuf::Message&,
-                               Server::Configuration::FilterChainFactoryContext&) override {
+                               Server::Configuration::FactoryContext&) override {
     return [](Network::FilterManager&) -> void {};
   }
 
@@ -362,7 +362,7 @@ public:
   // Configuration::NamedNetworkFilterConfigFactory
   Network::FilterFactoryCb createFilterFactoryFromProto(
       const Protobuf::Message&,
-      Configuration::FilterChainFactoryContext& filter_chain_factory_context) override {
+      Configuration::FactoryContext& filter_chain_factory_context) override {
     return commonFilterFactory(filter_chain_factory_context);
   }
 

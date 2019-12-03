@@ -26,21 +26,18 @@ inline void addUniqueClusters(
 
 Network::FilterFactoryCb RedisProxyFilterConfigFactory::createFilterFactoryFromProtoTyped(
     const envoy::config::filter::network::redis_proxy::v2::RedisProxy& proto_config,
-    Server::Configuration::FilterChainFactoryContext& filter_chain_factory_context) {
+    Server::Configuration::FactoryContext& context) {
 
   ASSERT(!proto_config.stat_prefix().empty());
   ASSERT(proto_config.has_settings());
 
   Extensions::Common::Redis::RedirectionManagerSharedPtr redirection_manager =
       Extensions::Common::Redis::getRedirectionManager(
-          filter_chain_factory_context.singletonManager(),
-          filter_chain_factory_context.dispatcher(), filter_chain_factory_context.clusterManager(),
-          filter_chain_factory_context.timeSource());
+          context.singletonManager(), context.dispatcher(), context.clusterManager(),
+          context.timeSource());
 
   ProxyFilterConfigSharedPtr filter_config(std::make_shared<ProxyFilterConfig>(
-      proto_config, filter_chain_factory_context.scope(),
-      filter_chain_factory_context.drainDecision(), filter_chain_factory_context.runtime(),
-      filter_chain_factory_context.api()));
+      proto_config, context.scope(), context.drainDecision(), context.runtime(), context.api()));
 
   envoy::config::filter::network::redis_proxy::v2::RedisProxy::PrefixRoutes prefix_routes(
       proto_config.prefix_routes());
@@ -64,30 +61,29 @@ Network::FilterFactoryCb RedisProxyFilterConfigFactory::createFilterFactoryFromP
   }
   addUniqueClusters(unique_clusters, prefix_routes.catch_all_route());
 
-  auto redis_command_stats = Common::Redis::RedisCommandStats::createRedisCommandStats(
-      filter_chain_factory_context.scope().symbolTable());
+  auto redis_command_stats =
+      Common::Redis::RedisCommandStats::createRedisCommandStats(context.scope().symbolTable());
 
   Upstreams upstreams;
   for (auto& cluster : unique_clusters) {
-    Stats::ScopePtr stats_scope = filter_chain_factory_context.scope().createScope(
-        fmt::format("cluster.{}.redis_cluster", cluster));
+    Stats::ScopePtr stats_scope =
+        context.scope().createScope(fmt::format("cluster.{}.redis_cluster", cluster));
 
     upstreams.emplace(cluster,
                       std::make_shared<ConnPool::InstanceImpl>(
-                          cluster, filter_chain_factory_context.clusterManager(),
+                          cluster, context.clusterManager(),
                           Common::Redis::Client::ClientFactoryImpl::instance_,
-                          filter_chain_factory_context.threadLocal(), proto_config.settings(),
-                          filter_chain_factory_context.api(), std::move(stats_scope),
-                          redis_command_stats, redirection_manager));
+                          context.threadLocal(), proto_config.settings(), context.api(),
+                          std::move(stats_scope), redis_command_stats, redirection_manager));
   }
 
-  auto router = std::make_unique<PrefixRoutes>(prefix_routes, std::move(upstreams),
-                                               filter_chain_factory_context.runtime());
+  auto router =
+      std::make_unique<PrefixRoutes>(prefix_routes, std::move(upstreams), context.runtime());
 
   std::shared_ptr<CommandSplitter::Instance> splitter =
       std::make_shared<CommandSplitter::InstanceImpl>(
-          std::move(router), filter_chain_factory_context.scope(), filter_config->stat_prefix_,
-          filter_chain_factory_context.timeSource(), proto_config.latency_in_micros());
+          std::move(router), context.scope(), filter_config->stat_prefix_, context.timeSource(),
+          proto_config.latency_in_micros());
   return [splitter, filter_config](Network::FilterManager& filter_manager) -> void {
     Common::Redis::DecoderFactoryImpl factory;
     filter_manager.addReadFilter(std::make_shared<ProxyFilter>(

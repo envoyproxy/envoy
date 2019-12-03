@@ -12,14 +12,13 @@ namespace ClientSslAuth {
 
 Network::FilterFactoryCb ClientSslAuthConfigFactory::createFilterFactoryFromProtoTyped(
     const envoy::config::filter::network::client_ssl_auth::v2::ClientSSLAuth& proto_config,
-    Server::Configuration::FilterChainFactoryContext& filter_chain_factory_context) {
+    Server::Configuration::FactoryContext& context) {
   ASSERT(!proto_config.auth_api_cluster().empty());
   ASSERT(!proto_config.stat_prefix().empty());
 
-  ClientSslAuthConfigSharedPtr filter_config(ClientSslAuthConfig::create(
-      proto_config, filter_chain_factory_context.threadLocal(),
-      filter_chain_factory_context.clusterManager(), filter_chain_factory_context.dispatcher(),
-      filter_chain_factory_context.scope(), filter_chain_factory_context.random()));
+  ClientSslAuthConfigSharedPtr filter_config(
+      ClientSslAuthConfig::create(proto_config, context.threadLocal(), context.clusterManager(),
+                                  context.dispatcher(), context.scope(), context.random()));
   return [filter_config](Network::FilterManager& filter_manager) -> void {
     filter_manager.addReadFilter(std::make_shared<ClientSslAuthFilter>(filter_config));
   };

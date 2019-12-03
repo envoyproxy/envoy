@@ -22,7 +22,7 @@ public:
 private:
   Network::FilterFactoryCb createFilterFactoryFromProtoTyped(
       const envoy::config::filter::network::ext_authz::v2::ExtAuthz& proto_config,
-      Server::Configuration::FilterChainFactoryContext& filter_chain_factory_context) override;
+      Server::Configuration::FactoryContext& context) override;
 };
 
 } // namespace ExtAuthz

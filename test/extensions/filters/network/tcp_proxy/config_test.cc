@@ -90,26 +90,24 @@ TEST_P(RouteIpListConfigTest, DEPRECATED_FEATURE_TEST(TcpProxy)) {
   envoy::config::filter::network::tcp_proxy::v2::TcpProxy proto_config;
   TestUtility::loadFromJson(json_string, proto_config);
 
-  NiceMock<Server::Configuration::MockFilterChainFactoryContext> filter_chain_factory_context;
+  NiceMock<Server::Configuration::MockFactoryContext> context;
   ConfigFactory factory;
-  Network::FilterFactoryCb cb =
-      factory.createFilterFactoryFromProto(proto_config, filter_chain_factory_context);
+  Network::FilterFactoryCb cb = factory.createFilterFactoryFromProto(proto_config, context);
   Network::MockConnection connection;
   EXPECT_CALL(connection, addReadFilter(_));
   cb(connection);
 }
 
 TEST(ConfigTest, ValidateFail) {
-  NiceMock<Server::Configuration::MockFilterChainFactoryContext> filter_chain_factory_context;
-  EXPECT_THROW(
-      ConfigFactory().createFilterFactoryFromProto(
-          envoy::config::filter::network::tcp_proxy::v2::TcpProxy(), filter_chain_factory_context),
-      ProtoValidationException);
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+  EXPECT_THROW(ConfigFactory().createFilterFactoryFromProto(
+                   envoy::config::filter::network::tcp_proxy::v2::TcpProxy(), context),
+               ProtoValidationException);
 }
 
 // Test that a minimal TcpProxy v2 config works.
 TEST(ConfigTest, ConfigTest) {
-  NiceMock<Server::Configuration::MockFilterChainFactoryContext> filter_chain_factory_context;
+  NiceMock<Server::Configuration::MockFactoryContext> context;
   ConfigFactory factory;
   envoy::config::filter::network::tcp_proxy::v2::TcpProxy config =
       *dynamic_cast<envoy::config::filter::network::tcp_proxy::v2::TcpProxy*>(
@@ -118,8 +116,7 @@ TEST(ConfigTest, ConfigTest) {
   config.set_cluster("cluster");
 
   EXPECT_TRUE(factory.isTerminalFilter());
-  Network::FilterFactoryCb cb =
-      factory.createFilterFactoryFromProto(config, filter_chain_factory_context);
+  Network::FilterFactoryCb cb = factory.createFilterFactoryFromProto(config, context);
   Network::MockConnection connection;
   EXPECT_CALL(connection, addReadFilter(_));
   cb(connection);

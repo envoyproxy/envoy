@@ -20,7 +20,7 @@ namespace ZooKeeperProxy {
  */
 Network::FilterFactoryCb ZooKeeperConfigFactory::createFilterFactoryFromProtoTyped(
     const envoy::config::filter::network::zookeeper_proxy::v1alpha1::ZooKeeperProxy& proto_config,
-    Server::Configuration::FilterChainFactoryContext& filter_chain_factory_context) {
+    Server::Configuration::FactoryContext& context) {
 
   ASSERT(!proto_config.stat_prefix().empty());
 
@@ -28,9 +28,9 @@ Network::FilterFactoryCb ZooKeeperConfigFactory::createFilterFactoryFromProtoTyp
   const uint32_t max_packet_bytes =
       PROTOBUF_GET_WRAPPED_OR_DEFAULT(proto_config, max_packet_bytes, 1024 * 1024);
 
-  ZooKeeperFilterConfigSharedPtr filter_config(std::make_shared<ZooKeeperFilterConfig>(
-      stat_prefix, max_packet_bytes, filter_chain_factory_context.scope()));
-  auto& time_source = filter_chain_factory_context.dispatcher().timeSource();
+  ZooKeeperFilterConfigSharedPtr filter_config(
+      std::make_shared<ZooKeeperFilterConfig>(stat_prefix, max_packet_bytes, context.scope()));
+  auto& time_source = context.dispatcher().timeSource();
 
   return [filter_config, &time_source](Network::FilterManager& filter_manager) -> void {
     filter_manager.addFilter(std::make_shared<ZooKeeperFilter>(filter_config, time_source));

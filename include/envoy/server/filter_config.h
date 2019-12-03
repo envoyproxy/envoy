@@ -346,7 +346,7 @@ public:
    */
   virtual Network::FilterFactoryCb createFilterFactoryFromProto(
       const Protobuf::Message& config,
-      Server::Configuration::FilterChainFactoryContext& filter_chain_factory_context) PURE;
+      FactoryContext& filter_chain_factory_context) PURE;
 
   /**
    * @return ProtobufTypes::MessagePtr create empty config proto message for v2. The filter

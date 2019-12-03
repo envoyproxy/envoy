@@ -17,11 +17,10 @@ namespace NetworkFilters {
 namespace ExtAuthz {
 
 TEST(ExtAuthzFilterConfigTest, ValidateFail) {
-  NiceMock<Server::Configuration::MockFilterChainFactoryContext> filter_chain_factory_context;
-  EXPECT_THROW(
-      ExtAuthzConfigFactory().createFilterFactoryFromProto(
-          envoy::config::filter::network::ext_authz::v2::ExtAuthz(), filter_chain_factory_context),
-      ProtoValidationException);
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+  EXPECT_THROW(ExtAuthzConfigFactory().createFilterFactoryFromProto(
+                   envoy::config::filter::network::ext_authz::v2::ExtAuthz(), context),
+               ProtoValidationException);
 }
 
 TEST(ExtAuthzFilterConfigTest, ExtAuthzCorrectProto) {
@@ -38,14 +37,13 @@ TEST(ExtAuthzFilterConfigTest, ExtAuthzCorrectProto) {
   ProtobufTypes::MessagePtr proto_config = factory.createEmptyConfigProto();
   TestUtility::loadFromYaml(yaml, *proto_config);
 
-  NiceMock<Server::Configuration::MockFilterChainFactoryContext> filter_chain_factory_context;
-  EXPECT_CALL(filter_chain_factory_context.cluster_manager_.async_client_manager_,
-              factoryForGrpcService(_, _, _))
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+
+  EXPECT_CALL(context.cluster_manager_.async_client_manager_, factoryForGrpcService(_, _, _))
       .WillOnce(Invoke([](const envoy::api::v2::core::GrpcService&, Stats::Scope&, bool) {
         return std::make_unique<NiceMock<Grpc::MockAsyncClientFactory>>();
       }));
-  Network::FilterFactoryCb cb =
-      factory.createFilterFactoryFromProto(*proto_config, filter_chain_factory_context);
+  Network::FilterFactoryCb cb = factory.createFilterFactoryFromProto(*proto_config, context);
   Network::MockConnection connection;
   EXPECT_CALL(connection, addReadFilter(_));
   cb(connection);

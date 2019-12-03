@@ -32,7 +32,7 @@ public:
 private:
   Network::FilterFactoryCb createFilterFactoryFromProtoTyped(
       const envoy::config::filter::network::tcp_proxy::v2::TcpProxy& /*proto_config*/,
-      Server::Configuration::FilterChainFactoryContext&) override {
+      Server::Configuration::FactoryContext& /*context*/) override {
     return Network::FilterFactoryCb();
   }
 
