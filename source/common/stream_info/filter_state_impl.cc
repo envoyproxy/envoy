@@ -5,8 +5,8 @@
 namespace Envoy {
 namespace StreamInfo {
 
-void FilterStateImpl::setData(absl::string_view data_name, std::unique_ptr<Object>&& data,
-                              FilterState::StateType state_type) {
+void FilterStateImpl::setData(absl::string_view data_name, std::shared_ptr<Object> data,
+                              FilterState::StateType state_type, FilterState::LifeSpan life_span) {
   const auto& it = data_storage_.find(data_name);
   if (it != data_storage_.end()) {
     // We have another object with same data_name. Check for mutability
@@ -25,7 +25,17 @@ void FilterStateImpl::setData(absl::string_view data_name, std::unique_ptr<Objec
   std::unique_ptr<FilterStateImpl::FilterObject> filter_object(new FilterStateImpl::FilterObject());
   filter_object->data_ = std::move(data);
   filter_object->state_type_ = state_type;
+  filter_object->life_span_ = life_span;
   data_storage_[data_name] = std::move(filter_object);
+}
+
+void FilterStateImpl::copyInto(FilterState& other, LifeSpan life_span) {
+  for (const auto& filter_object : data_storage_) {
+    if (filter_object.second->life_span_ >= life_span) {
+      other.setData(filter_object.first, filter_object.second->data_,
+                    filter_object.second->state_type_, filter_object.second->life_span_);
+    }
+  }
 }
 
 bool FilterStateImpl::hasDataWithName(absl::string_view data_name) const {

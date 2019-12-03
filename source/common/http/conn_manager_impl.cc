@@ -14,6 +14,7 @@
 #include "envoy/router/router.h"
 #include "envoy/ssl/connection.h"
 #include "envoy/stats/scope.h"
+#include "envoy/stream_info/filter_state.h"
 #include "envoy/tracing/http_tracer.h"
 
 #include "common/buffer/buffer_impl.h"
@@ -2220,6 +2221,9 @@ bool ConnectionManagerImpl::ActiveStreamDecoderFilter::recreateStream() {
   parent_.connection_manager_.doEndStream(this->parent_);
 
   StreamDecoder& new_stream = parent_.connection_manager_.newStream(*response_encoder, true);
+  parent_.stream_info_.filterState().copyInto(
+      ((*parent_.connection_manager_.streams_.begin())->stream_info_.filterState()),
+      StreamInfo::FilterState::LifeSpan::DownstreamRequest);
   new_stream.decodeHeaders(std::move(request_headers), true);
   return true;
 }

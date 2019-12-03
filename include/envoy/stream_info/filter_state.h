@@ -22,6 +22,11 @@ namespace StreamInfo {
 class FilterState {
 public:
   enum class StateType { ReadOnly, Mutable };
+  // When internal redirect is enabled, one downstream request may create multiple filter chains.
+  // DownstreamRequest allows an object to survived across filter chain for book keeping.
+  // Note that order matters in this enum because it's assumed that life span grows as enum number
+  // grows.
+  enum class LifeSpan { FilterChain, DownstreamRequest , InvalidSpan};
 
   class Object {
   public:
@@ -41,6 +46,8 @@ public:
    * @param data_name the name of the data being set.
    * @param data an owning pointer to the data to be stored.
    * @param state_type indicates whether the object is mutable or not.
+   * @param life_span indicates the life span of the object: bound to the filter chain or a
+   * downstream request.
    *
    * Note that it is an error to call setData() twice with the same
    * data_name, if the existing object is immutable. Similarly, it is an
@@ -49,8 +56,18 @@ public:
    * single authoritative source for each piece of immutable data stored in
    * FilterState.
    */
-  virtual void setData(absl::string_view data_name, std::unique_ptr<Object>&& data,
-                       StateType state_type) PURE;
+  virtual void setData(absl::string_view data_name, std::shared_ptr<Object> data,
+                       StateType state_type, LifeSpan life_span = LifeSpan::FilterChain) PURE;
+
+  /**
+   * @param other the FilterState we want to copy current data into.
+   * @param life_span the object life span above or equal to which will be copied.
+   *
+   * This is useful for sharding filter state within bigger context than a upstream stream. For
+   * example, we are going to use it to share router filter state across filter chains created on
+   * the same downstream request for internal redirect handling.
+   */
+  virtual void copyInto(FilterState& other, LifeSpan life_span) PURE;
 
   /**
    * @param data_name the name of the data being looked up (mutable/readonly).
