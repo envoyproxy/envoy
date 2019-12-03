@@ -63,9 +63,12 @@ public:
    * @param other the FilterState we want to copy current data into.
    * @param life_span the object life span above or equal to which will be copied.
    *
-   * This is useful for sharing filter state within bigger life span than a filter chain create. For
+   * This is useful for sharing filter state within bigger life span than a filter chain. For
    * example, we are going to use it to share router filter state across filter chains created on
    * the same downstream request for internal redirect handling.
+   *
+   * This can be extended to support connection level sharing fairly easily, but there is not a need
+   * yet.
    */
   virtual void copyInto(FilterState& other, LifeSpan life_span) PURE;
 

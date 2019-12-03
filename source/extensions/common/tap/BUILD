@@ -36,7 +36,10 @@ envoy_cc_library(
     name = "tap_matcher",
     srcs = ["tap_matcher.cc"],
     hdrs = ["tap_matcher.h"],
-    deps = ["//source/common/http:header_utility_lib"],
+    deps = [
+        "//source/common/http:header_utility_lib",
+        "@envoy_api//envoy/service/tap/v2alpha:pkg_cc_proto",
+    ],
 )
 
 envoy_cc_library(
