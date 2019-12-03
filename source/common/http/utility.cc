@@ -762,12 +762,13 @@ const Utility::AuthorityAttributes Utility::parseAuthority(const absl::string_vi
   bool have_port_ipv6 = false;
 
   // This section applies first-match-wins algorithm described from
-  // RFC3986(https://tools.ietf.org/html/rfc3986#section-3.2.2). Host lireral include IP-literal,
+  // RFC3986(https://tools.ietf.org/html/rfc3986#section-3.2.2). Host literal include IP-literal,
   // IPv4 Address or reg-name. In this function, We consider that IP-literal and IPv4 address as
   // pure IP Address and return is_ip_address as true.
 
   // check if passed authority matches IP-literal. IP-literal is constructed from bracket symbols
-  // and IPv6 address or IPvFuture. In this case, IPvFuture should be ignored
+  // and IPv6 address or future version of ip address. In this case, future version of ip address
+  // should be ignored
   if (authority.find("[") != absl::string_view::npos) {
     is_ipv6 = true;
   }
@@ -776,7 +777,7 @@ const Utility::AuthorityAttributes Utility::parseAuthority(const absl::string_vi
     have_port_ipv6 = true;
   }
 
-  // check if passed authority matches IPv4 Address. IPv4 address is separeted four section by dot
+  // check if passed authority matches IPv4 Address. IPv4 address is separated four section by dot
   // deliminator, and each section has characters which is constructed from only digits
   int delim_count = 0;
   for (auto&& ch : authority) {
@@ -805,12 +806,12 @@ const Utility::AuthorityAttributes Utility::parseAuthority(const absl::string_vi
     try {
       const Network::Address::InstanceConstSharedPtr instance =
           Network::Utility::parseInternetAddressAndPort(authority);
+      auth_attr.host = Network::Utility::hostFromIpAddress(authority);
       auth_attr.port = instance->ip()->port();
       auth_attr.is_ip_address = true;
     } catch (const EnvoyException&) {
     }
 
-    auth_attr.host = Network::Utility::hostFromIpAddress(authority); // TODO
     return auth_attr;
   }
 
@@ -818,11 +819,11 @@ const Utility::AuthorityAttributes Utility::parseAuthority(const absl::string_vi
     try {
       const Network::Address::InstanceConstSharedPtr instance =
           Network::Utility::parseInternetAddress(Network::Utility::hostFromIpAddress(authority));
+      auth_attr.host = Network::Utility::hostFromIpAddress(authority);
       auth_attr.is_ip_address = true;
     } catch (const EnvoyException&) {
     }
 
-    auth_attr.host = Network::Utility::hostFromIpAddress(authority); // TODO
     return auth_attr;
   }
 
@@ -830,15 +831,15 @@ const Utility::AuthorityAttributes Utility::parseAuthority(const absl::string_vi
     try {
       const Network::Address::InstanceConstSharedPtr instance =
           Network::Utility::parseInternetAddress(authority);
+      auth_attr.host = Network::Utility::hostFromIpAddress(authority);
       auth_attr.is_ip_address = true;
     } catch (const EnvoyException&) {
     }
 
-    auth_attr.host = Network::Utility::hostFromIpAddress(authority); // TODO
     return auth_attr;
   }
 
-  // check if passed authority matches reg-name. Basicaly, authorities which is not matched IPv6 or
+  // check if passed authority matches reg-name. Basically, authorities which is not matched IPv6 or
   // IPv4, should be treated as reg-name
   const auto colon_lpos = authority.find(":");
   const auto colon_rpos = authority.rfind(":");
