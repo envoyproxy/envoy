@@ -158,7 +158,9 @@ message Bootstrap {
 
   // Always use TCP queries instead of UDP queries for DNS lookups.
   // This may be overridden on a per-cluster basis in cds_config,
-  // when dns_resolvers and use_tcp_for_dns_lookups are specified.
+  // when :ref:`dns_resolvers <envoy_api_field_Cluster.dns_resolvers>` and
+  // :ref:`use_tcp_for_dns_lookups <envoy_api_field_Cluster.use_tcp_for_dns_lookups>` are
+  // specified.
   bool use_tcp_for_dns_lookups = 20;
 }
 

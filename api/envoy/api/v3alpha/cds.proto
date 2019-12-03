@@ -667,7 +667,7 @@ message Cluster {
   // this setting is ignored.
   repeated core.Address dns_resolvers = 18;
 
-  //[#next-major-version: reconcile DNS options in a single message]
+  // [#next-major-version: Reconcile DNS options in a single message.]
   // Always use TCP queries instead of UDP queries for DNS lookups.
   bool use_tcp_for_dns_lookups = 45;
 
