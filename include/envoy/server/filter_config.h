@@ -95,12 +95,6 @@ public:
   virtual Api::Api& api() PURE;
 };
 
-class FilterChainContext {
-public:
-  virtual ~FilterChainContext() = default;
-  virtual uint64_t getTag() const PURE;
-};
-
 /**
  * ServerFactoryContext is an specialization of common interface for downstream and upstream network
  * filters. The implementation guarantees the lifetime is no shorter than server. It could be used
@@ -206,12 +200,20 @@ public:
   virtual ProtobufMessage::ValidationVisitor& messageValidationVisitor() PURE;
 };
 
+/**
+ * An implementation of FactoryContext. It should be used to create NetworkFilterChain.
+ */
 class FilterChainFactoryContext : public virtual FactoryContext {
 public:
-  virtual ~FilterChainFactoryContext() = default;
+  /**
+   * @return uint64_t The tag assigned with this context at runtime.
+   */
   virtual uint64_t getTag() const PURE;
 };
 
+/**
+ * An implementation of FactoryContext. It can be used to create ListenerFilterChain.
+ */
 class ListenerFactoryContext : public virtual FactoryContext {
 public:
   /**
@@ -344,9 +346,9 @@ public:
    * @param context supplies the filter's context.
    * @return Network::FilterFactoryCb the factory creation function.
    */
-  virtual Network::FilterFactoryCb createFilterFactoryFromProto(
-      const Protobuf::Message& config,
-      FactoryContext& filter_chain_factory_context) PURE;
+  virtual Network::FilterFactoryCb
+  createFilterFactoryFromProto(const Protobuf::Message& config,
+                               FactoryContext& filter_chain_factory_context) PURE;
 
   /**
    * @return ProtobufTypes::MessagePtr create empty config proto message for v2. The filter
