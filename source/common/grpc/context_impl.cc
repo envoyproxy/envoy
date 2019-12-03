@@ -104,10 +104,7 @@ ContextImpl::resolveServiceAndMethod(const Http::HeaderEntry* path) {
     return request_names;
   }
   absl::string_view str = path->value().getStringView();
-  size_t query_offset = str.find('?');
-  if (query_offset != absl::string_view::npos) {
-    str = str.substr(0, query_offset);
-  }
+  str = str.substr(0, str.find('?'));
   const auto parts = StringUtil::splitToken(str, "/");
   if (parts.size() != 2) {
     return request_names;
