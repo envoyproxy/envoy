@@ -102,8 +102,7 @@ ListenerImpl::ListenerImpl(const envoy::api::v2::Listener& config, const std::st
                            bool workers_started, uint64_t hash,
                            ProtobufMessage::ValidationVisitor& validation_visitor)
     : parent_(parent), address_(Network::Address::resolveProtoAddress(config.address())),
-      filter_chain_manager_(address_),
-      global_scope_(parent_.server_.stats().createScope("")),
+      filter_chain_manager_(address_), global_scope_(parent_.server_.stats().createScope("")),
       listener_scope_(
           parent_.server_.stats().createScope(fmt::format("listener.{}.", address_->asString()))),
       bind_to_port_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config.deprecated_v1(), bind_to_port, true)),
