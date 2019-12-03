@@ -395,6 +395,8 @@ CrashOverride will vouch for the "Seven" distribution joining the distribution l
       individuals come and go. A good example is envoy-security@seven.com, a bad example is
       acidburn@seven.com. You must accept the invite sent to this address or you will not receive any
       e-mail updates. This e-mail address will be shared with the Envoy community.
+
+envoy-security@seven.com
 ```
 
 ### Review of membership criteria
