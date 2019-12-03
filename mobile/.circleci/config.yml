@@ -4,7 +4,7 @@ executors:
   ubuntu-build:
     description: "A regular build executor based on ubuntu image"
     docker:
-      - image: envoyproxy/envoy-build:cfc514546bc0284536893cca5fa43d7128edcd35
+      - image: envoyproxy/envoy-build-ubuntu:5a096881181dbe478f642b7ac02a68e9591e933d
     # TODO(mattklein123): Get xlarge class enabled
     resource_class: medium
     working_directory: /source

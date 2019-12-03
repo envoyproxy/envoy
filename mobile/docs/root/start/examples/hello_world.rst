@@ -23,7 +23,7 @@ Next, make sure you have an Android simulator running.
 
 Run the :repo:`sample app <examples/java/hello_world>` using the following Bazel build rule:
 
-``./bazelw mobile-install //examples/java/hello_world:hello_envoy --fat_apk_cpu=x86``
+``bazel mobile-install //examples/java/hello_world:hello_envoy --fat_apk_cpu=x86``
 
 You should see a new app installed on your simulator called ``Hello Envoy``.
 Open it up, and requests will start flowing!
@@ -38,7 +38,7 @@ Next, make sure you have an Android simulator running.
 
 Run the :repo:`sample app <examples/kotlin/hello_world>` using the following Bazel build rule:
 
-``./bazelw mobile-install //examples/kotlin/hello_world:hello_envoy_kt --fat_apk_cpu=x86``
+``bazel mobile-install //examples/kotlin/hello_world:hello_envoy_kt --fat_apk_cpu=x86``
 
 You should see a new app installed on your simulator called ``Hello Envoy Kotlin``.
 Open it up, and requests will start flowing!
@@ -51,7 +51,7 @@ First, build the :ref:`ios_framework` artifact.
 
 Next, run the :repo:`sample app <examples/objective-c/hello_world>` using the following Bazel build rule:
 
-``./bazelw run //examples/objective-c/hello_world:app --config=ios``
+``bazel run //examples/objective-c/hello_world:app --config=ios``
 
 This will start a simulator and open a new app. You should see requests start flowing!
 
@@ -63,6 +63,6 @@ First, build the :ref:`ios_framework` artifact.
 
 Next, run the :repo:`sample app <examples/swift/hello_world>` using the following Bazel build rule:
 
-``./bazelw run //examples/swift/hello_world:app --config=ios``
+``bazel run //examples/swift/hello_world:app --config=ios``
 
 This will start a simulator and open a new app. You should see requests start flowing!

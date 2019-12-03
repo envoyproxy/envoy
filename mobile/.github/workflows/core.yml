@@ -2,6 +2,8 @@ name: core
 
 on:
   push:
+    branches:
+      - master
   pull_request:
 
 jobs:
@@ -16,4 +18,4 @@ jobs:
       - name: 'Install dependencies'
         run: ./ci/mac_ci_setup.sh
       - name: 'Run tests'
-        run: ./bazelw test //test/common/...
+        run: bazel test //test/common/...

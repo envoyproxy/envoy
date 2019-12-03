@@ -100,8 +100,8 @@ android_ndk_repository(name = "androidndk")
 
 http_archive(
     name = "rules_jvm_external",
-    strip_prefix = "rules_jvm_external-2.10",
     sha256 = "1bbf2e48d07686707dd85357e9a94da775e1dbd7c464272b3664283c9c716d26",
+    strip_prefix = "rules_jvm_external-2.10",
     url = "https://github.com/bazelbuild/rules_jvm_external/archive/2.10.zip",
 )
 
@@ -131,12 +131,23 @@ http_archive(
     urls = ["https://github.com/google/bazel-common/archive/413b433b91f26dbe39cdbc20f742ad6555dd1e27.zip"],
 )
 
+rules_kotlin_version = "legacy-1.3.0-rc1"
+
+rules_kotlin_sha = "9de078258235ea48021830b1669bbbb678d7c3bdffd3435f4c0817c921a88e42"
+
 http_archive(
     name = "io_bazel_rules_kotlin",
-    sha256 = "52f88499cdd7db892a500951ea5cbb749245c5635e6da0b80a3b7ad4ea976f31",
-    strip_prefix = "rules_kotlin-200802f0525af6e3ff4d50985c4f105e0685b883",  # tag legacy-modded-0_26_1-02
-    urls = ["https://github.com/cgruber/rules_kotlin/archive/200802f0525af6e3ff4d50985c4f105e0685b883.tar.gz"],
+    sha256 = rules_kotlin_sha,
+    strip_prefix = "rules_kotlin-%s" % rules_kotlin_version,
+    type = "zip",
+    urls = ["https://github.com/bazelbuild/rules_kotlin/archive/%s.zip" % rules_kotlin_version],
 )
+
+load("@io_bazel_rules_kotlin//kotlin:kotlin.bzl", "kotlin_repositories", "kt_register_toolchains")
+
+kotlin_repositories()
+
+kt_register_toolchains()
 
 # gRPC java for @rules_proto_grpc
 # The current 0.2.0 uses v1.23.0 of gRPC java which has a buggy version of the grpc_java_repositories
@@ -159,12 +170,6 @@ grpc_java_repositories(
     omit_net_zlib = True,
 )
 
-load("@io_bazel_rules_kotlin//kotlin:kotlin.bzl", "kotlin_repositories")
-
-kotlin_repositories()
-
-register_toolchains(":kotlin_toolchain")
-
 http_archive(
     name = "rules_proto_grpc",
     sha256 = "1e08cd6c61f893417b14930ca342950f5f22f71f929a38a8c4bbfeae2a80d03e",
@@ -186,6 +191,6 @@ rules_proto_grpc_java_repos()
 
 http_jar(
     name = "kotlin_dokka",
-    url = "https://github.com/Kotlin/dokka/releases/download/0.9.18/dokka-fatjar-0.9.18.jar",
     sha256 = "4c73eee92dd652ea8e2afd7b20732cf863d4938a30f634d12c88fe64def89fd8",
+    url = "https://github.com/Kotlin/dokka/releases/download/0.9.18/dokka-fatjar-0.9.18.jar",
 )

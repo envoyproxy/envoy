@@ -5,9 +5,9 @@ build \
   --define=hot_restart=disabled \
   --define=signal_trace=disabled \
   --define=tcmalloc=disabled \
-  --distdir=bazel/distdir \
   --features=debug_prefix_map_pwd_is_dot \
   --features=swift.cacheable_swiftmodules \
+  --host_force_python=PY3 \
   --ios_minimum_os=10.0 \
   --ios_simulator_device="iPhone X" \
   --ios_simulator_version=13.1 \

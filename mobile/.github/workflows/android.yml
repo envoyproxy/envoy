@@ -2,6 +2,8 @@ name: android
 
 on:
   push:
+    branches:
+      - master
   pull_request:
 
 jobs:
@@ -21,16 +23,16 @@ jobs:
           export CC=clang
           export CXX=clang++
           export ANDROID_NDK_HOME=/usr/local/lib/android/sdk/ndk-bundle
-          ./bazelw build --fat_apk_cpu=x86 //:android_dist
+          bazel build --fat_apk_cpu=x86 //:android_dist
     # TODO: parallelize these two jobs
       - name: 'Build Java app'
         run: |
           export ANDROID_NDK_HOME=/usr/local/lib/android/sdk/ndk-bundle
-          ./bazelw build --fat_apk_cpu=x86 //examples/java/hello_world:hello_envoy
+          bazel build --fat_apk_cpu=x86 //examples/java/hello_world:hello_envoy
       - name: 'Build kotlin app'
         run: |
           export ANDROID_NDK_HOME=/usr/local/lib/android/sdk/ndk-bundle
-          ./bazelw build --fat_apk_cpu=x86 //examples/kotlin/hello_world:hello_envoy_kt
+          bazel build --fat_apk_cpu=x86 //examples/kotlin/hello_world:hello_envoy_kt
   macdist:
     name: mac_dist
     runs-on: macOS-10.14
@@ -42,7 +44,7 @@ jobs:
       - run: ./ci/mac_ci_setup.sh
         name: 'Install dependencies'
       - name: 'Build envoy.aar distributable'
-        run: ./bazelw build --fat_apk_cpu=x86 //:android_dist
+        run: bazel build --fat_apk_cpu=x86 //:android_dist
       - uses: actions/upload-artifact@v1
         with:
           name: envoy.aar
@@ -65,7 +67,7 @@ jobs:
       - run: ls -lh dist/
       - name: start simulator
         run: ./ci/mac_start_simulator.sh
-      - run: ./bazelw mobile-install --fat_apk_cpu=x86 --start_app //examples/java/hello_world:hello_envoy
+      - run: bazel mobile-install --fat_apk_cpu=x86 --start_app //examples/java/hello_world:hello_envoy
         name: 'Start java app'
       - run: 'adb logcat -e "successful response" -m 1'
         name: 'Check liveliness'
@@ -87,7 +89,7 @@ jobs:
       - run: ls -lh dist/
       - name: start simulator
         run: ./ci/mac_start_simulator.sh
-      - run: ./bazelw mobile-install --fat_apk_cpu=x86 --start_app //examples/kotlin/hello_world:hello_envoy_kt
+      - run: bazel mobile-install --fat_apk_cpu=x86 --start_app //examples/kotlin/hello_world:hello_envoy_kt
         name: 'Start kotlin app'
       - run: 'adb logcat -e "successful response" -m 1'
         name: 'Check liveliness'
@@ -101,7 +103,7 @@ jobs:
           submodules: true
       - name: 'Install dependencies'
         run: ./ci/linux_ci_setup.sh
-      - run: ./bazelw test --test_output=all --build_tests_only //library/kotlin/test/...
+      - run: bazel test --test_output=all --build_tests_only //library/kotlin/test/...
         name: 'Run Kotlin library tests'
   javatests:
     name: java_tests
@@ -113,5 +115,5 @@ jobs:
           submodules: true
       - name: 'Install dependencies'
         run: ./ci/linux_ci_setup.sh
-      - run: ./bazelw test --test_output=all --build_tests_only //library/java/test/...
+      - run: bazel test --test_output=all --build_tests_only //library/java/test/...
         name: 'Run Java library tests'
