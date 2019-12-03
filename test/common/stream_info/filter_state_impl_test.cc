@@ -239,5 +239,47 @@ TEST_F(FilterStateImplTest, HasData) {
   EXPECT_FALSE(filter_state().hasDataWithName("test_2"));
 }
 
+TEST_F(FilterStateImplTest, LifeSpan) {
+  filter_state().setData("test_1", std::make_unique<SimpleType>(1),
+                         FilterState::StateType::ReadOnly);
+  filter_state().setData("test_2", std::make_unique<SimpleType>(2),
+                         FilterState::StateType::Mutable);
+  filter_state().setData("test_3", std::make_unique<SimpleType>(3),
+                         FilterState::StateType::ReadOnly,
+                         FilterState::LifeSpan::DownstreamRequest);
+  filter_state().setData("test_4", std::make_unique<SimpleType>(4),
+                         FilterState::StateType::Mutable,
+                         FilterState::LifeSpan::DownstreamRequest);
+  {
+    FilterStateImpl new_filter_state;
+    filter_state().copyInto(new_filter_state, FilterState::LifeSpan::DownstreamRequest);
+    EXPECT_FALSE(new_filter_state.hasDataWithName("test_1"));
+    EXPECT_FALSE(new_filter_state.hasDataWithName("test_2"));
+    EXPECT_TRUE(new_filter_state.hasDataWithName("test_3"));
+    EXPECT_TRUE(new_filter_state.hasDataWithName("test_4"));
+    EXPECT_THROW_WITH_MESSAGE(
+        new_filter_state.getDataMutable<SimpleType>("test_3"), EnvoyException,
+        "FilterState::getDataMutable<T> tried to access immutable data as mutable.");
+    EXPECT_EQ(4, new_filter_state.getDataMutable<SimpleType>("test_4").access());
+  }
+  {
+    FilterStateImpl new_filter_state;
+    filter_state().copyInto(new_filter_state, FilterState::LifeSpan::FilterChain);
+    EXPECT_TRUE(new_filter_state.hasDataWithName("test_1"));
+    EXPECT_TRUE(new_filter_state.hasDataWithName("test_2"));
+    EXPECT_TRUE(new_filter_state.hasDataWithName("test_3"));
+    EXPECT_TRUE(new_filter_state.hasDataWithName("test_4"));
+    EXPECT_THROW_WITH_MESSAGE(
+        new_filter_state.getDataMutable<SimpleType>("test_1"), EnvoyException,
+        "FilterState::getDataMutable<T> tried to access immutable data as mutable.");
+    EXPECT_EQ(2, new_filter_state.getDataMutable<SimpleType>("test_2").access());
+    EXPECT_THROW_WITH_MESSAGE(
+        new_filter_state.getDataMutable<SimpleType>("test_3"), EnvoyException,
+        "FilterState::getDataMutable<T> tried to access immutable data as mutable.");
+    EXPECT_EQ(4, new_filter_state.getDataMutable<SimpleType>("test_4").access());
+  }
+
+}
+
 } // namespace StreamInfo
 } // namespace Envoy
