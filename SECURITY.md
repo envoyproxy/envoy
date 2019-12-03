@@ -280,10 +280,10 @@ use of Envoy should:
           determined by the Envoy maintainers and security team. The definition will not be
           discussed further in this document.
        3. You *must* smoke test and then widely deploy security patches promptly and report back
-          any issues ASAP. Furthermore, the Envoy maintainers may occasionally ask you to smoke test
-          especially risky public PRs before they are merged. Not performing these tasks in a
-          reasonably prompt timeframe will result in removal from the list. This is a more strict
-          variant of item 7 below.
+          success or failure ASAP. Furthermore, the Envoy maintainers may occasionally ask you to
+          smoke test especially risky public PRs before they are merged. Not performing these tasks
+          in a reasonably prompt timeframe will result in removal from the list. This is a more
+          strict variant of item 7 below.
        4. In order to balance inclusion in the list versus a greater chance of accidental
           disclosure, end users added to the list via this option will be limited to a total of
           **10** slots. Periodic review (see below) may allow new slots to open, so please continue
@@ -404,17 +404,17 @@ and security team to ensure they still qualify for inclusion on the list.
 
 ### Members
 
-| E-mail                                                | Organization  | Last Review |
-|-------------------------------------------------------|:-------------:|:-----------:|
-| envoy-security-team@aspenmesh.io                      | Aspen Mesh    | 12/19       |
-| aws-app-mesh-security@amazon.com                      | AWS           | 12/19       |
-| security@cilium.io                                    | Cilium        | 12/19       |
-| vulnerabilityreports@cloudfoundry.org                 | Cloud Foundry | 12/19       |
-| secalert@datawire.io                                  | Datawire      | 12/19       |
-| google-internal-envoy-security@google.com             | Google        | 12/19       |
-| argoprod@us.ibm.com                                   | IBM           | 12/19       |
-| istio-security-vulnerability-reports@googlegroups.com | Istio         | 12/19       |
-| secalert@redhat.com                                   | Red Hat       | 12/19       |
-| envoy-security@solo.io                                | solo.io       | 12/19       |
-| envoy-security@tetrate.io                             | Tetrate       | 12/19       |
-| security@vmware.com                                   | VMware        | 12/19       |
+| E-mail                                                | Organization  | End User | Last Review |
+|-------------------------------------------------------|:-------------:|:--------:|:-----------:|
+| envoy-security-team@aspenmesh.io                      | Aspen Mesh    | No       | 12/19       |
+| aws-app-mesh-security@amazon.com                      | AWS           | No       | 12/19       |
+| security@cilium.io                                    | Cilium        | No       | 12/19       |
+| vulnerabilityreports@cloudfoundry.org                 | Cloud Foundry | No       | 12/19       |
+| secalert@datawire.io                                  | Datawire      | No       | 12/19       |
+| google-internal-envoy-security@google.com             | Google        | No       | 12/19       |
+| argoprod@us.ibm.com                                   | IBM           | No       | 12/19       |
+| istio-security-vulnerability-reports@googlegroups.com | Istio         | No       | 12/19       |
+| secalert@redhat.com                                   | Red Hat       | No       | 12/19       |
+| envoy-security@solo.io                                | solo.io       | No       | 12/19       |
+| envoy-security@tetrate.io                             | Tetrate       | No       | 12/19       |
+| security@vmware.com                                   | VMware        | No       | 12/19       |
