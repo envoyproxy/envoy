@@ -347,6 +347,7 @@ cluster: fake_cluster
 
   // Remove a cluster we don't care about.
   cluster_update_callbacks_->onClusterRemoval("other_cluster");
+  EXPECT_EQ(1, config_->stats().downstream_sess_active_.value());
 
   // Remove the cluster we do care about. This should purge all sessions.
   cluster_update_callbacks_->onClusterRemoval("fake_cluster");

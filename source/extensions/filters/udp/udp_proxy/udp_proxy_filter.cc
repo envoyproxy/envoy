@@ -24,6 +24,7 @@ void UdpProxyFilter::onClusterAddOrUpdate(Upstream::ThreadLocalCluster& cluster)
   }
 
   ENVOY_LOG(debug, "udp proxy: attaching to cluster {}", cluster.info()->name());
+  ASSERT(cluster_info_ == absl::nullopt || &cluster_info_.value().cluster_ != &cluster);
   cluster_info_.emplace(*this, cluster);
 }
 
