@@ -11,7 +11,7 @@ sealed class BaseConfiguration(
 class Domain(domain: String) : BaseConfiguration(domain)
 class Yaml(yaml: String) : BaseConfiguration(yaml)
 
-open class EnvoyClientBuilder internal constructor(
+open class EnvoyClientBuilder(
     private val configuration: BaseConfiguration
 ) {
   private var logLevel = LogLevel.INFO
@@ -91,7 +91,7 @@ open class EnvoyClientBuilder internal constructor(
    *
    * A new instance of this engine will be created when `build()` is called.
    */
-  internal fun addEngineType(engineType: () -> EnvoyEngine): EnvoyClientBuilder {
+  fun addEngineType(engineType: () -> EnvoyEngine): EnvoyClientBuilder {
     this.engineType = engineType
     return this
   }
