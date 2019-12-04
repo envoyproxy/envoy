@@ -172,7 +172,7 @@ def GetImportDeps(proto_path):
 def GetPreviousMessageTypeDeps(proto_path):
   """Obtain the Bazel dependencies for the previous version of messages in a .proto file.
 
-  We need to link in earlier proto descriptors to support Envoy reflection ugprades.
+  We need to link in earlier proto descriptors to support Envoy reflection upgrades.
 
   Args:
     proto_path: path to .proto.
