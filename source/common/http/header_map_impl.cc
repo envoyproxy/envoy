@@ -457,7 +457,7 @@ void HeaderMapImpl::addCopy(const LowerCaseString& key, absl::string_view value)
   insertByKey(std::move(new_key), std::move(new_value));
   ASSERT(new_key.empty());   // NOLINT(bugprone-use-after-move)
   ASSERT(new_value.empty()); // NOLINT(bugprone-use-after-move)
-  // verifyByteSize();
+  verifyByteSize();
 }
 
 void HeaderMapImpl::appendCopy(const LowerCaseString& key, absl::string_view value) {

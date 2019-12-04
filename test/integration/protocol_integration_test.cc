@@ -1012,10 +1012,13 @@ TEST_P(DownstreamProtocolIntegrationTest, ManyRequestTrailersAccepted) {
   EXPECT_EQ("200", response->headers().Status()->value().getStringView());
 }
 
+#ifdef NDEBUG
+// Release build only. In debug mode, time-consuming assertions will timeout test.
 TEST_P(DownstreamProtocolIntegrationTest, ManyRequestHeadersTimeout) {
-  // Set timeout for 5 seconds, and ensure that a request with 20k+ headers can be sent.
+  // Set timeout for 5 seconds, and ensure that a request with 10k+ headers can be sent.
   testManyRequestHeaders(std::chrono::milliseconds(5000));
 }
+#endif
 
 TEST_P(DownstreamProtocolIntegrationTest, LargeRequestTrailersAccepted) {
   testLargeRequestTrailers(60, 96);
