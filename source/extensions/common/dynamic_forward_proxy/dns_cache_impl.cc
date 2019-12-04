@@ -91,24 +91,19 @@ void DnsCacheImpl::startCacheLoad(const std::string& host, uint16_t default_port
     return;
   }
 
-  const auto host_attributes = Http::Utility::parseAuthority(host, default_port);
-  bool is_ip_address = host_attributes.is_ip_address;
-  std::string host_to_resolve = std::string(host_attributes.host);
-
-  if (host_attributes.port != default_port) {
-    default_port = host_attributes.port;
-  }
+  const auto host_attributes = Http::Utility::parseAuthority(host);
 
   // TODO(mattklein123): Right now, the same host with different ports will become two
   // independent primary hosts with independent DNS resolutions. I'm not sure how much this will
   // matter, but we could consider collapsing these down and sharing the underlying DNS resolution.
-  auto& primary_host =
-      *primary_hosts_
-           // try_emplace() is used here for direct argument forwarding.
-           .try_emplace(host, std::make_unique<PrimaryHostInfo>(
-                                  *this, host_to_resolve, default_port, is_ip_address,
-                                  [this, host]() { onReResolve(host); }))
-           .first->second;
+  auto& primary_host = *primary_hosts_
+                            // try_emplace() is used here for direct argument forwarding.
+                            .try_emplace(host, std::make_unique<PrimaryHostInfo>(
+                                                   *this, std::string(host_attributes.host_),
+                                                   host_attributes.port_.value_or(default_port),
+                                                   host_attributes.is_ip_address_,
+                                                   [this, host]() { onReResolve(host); }))
+                            .first->second;
   startResolve(host, primary_host);
 }
 

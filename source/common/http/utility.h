@@ -407,23 +407,22 @@ getMergedPerFilterConfig(const std::string& filter_name, const Router::RouteCons
 struct AuthorityAttributes {
   // whether parsed authority is pure ip address(IPv4/IPv6), if it is true
   // passed that are not FQDN
-  bool is_ip_address{false};
+  bool is_ip_address_{};
 
-  // if parsed authority has host in authority, that is stored here
-  absl::string_view host;
+  // If parsed authority has host, that is stored here.
+  absl::string_view host_;
 
-  // if parsed authority has port in authority, that is stored here
-  // this value is stored default_port value if passed authority has no port
-  uint32_t port;
+  // If parsed authority has port, that is stored here.
+  absl::optional<uint16_t> port_;
 };
 
 /**
- * Parse passed authority, and get that is valid FQDN or IPv4/IPv6 address, hostname and port-name
+ * Parse passed authority, and get that is valid FQDN or IPv4/IPv6 address, hostname and port-name.
  * @param host host/authority
  * @param default_port If passed authority does not have port, this value is returned
  * @return hostname parse result. that includes whether host is IP Address, hostname and port-name
  */
-const AuthorityAttributes parseAuthority(const absl::string_view& host, uint32_t default_port = 0);
+AuthorityAttributes parseAuthority(absl::string_view host);
 } // namespace Utility
 } // namespace Http
 } // namespace Envoy

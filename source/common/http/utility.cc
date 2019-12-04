@@ -749,13 +749,13 @@ std::string Utility::PercentEncoding::decode(absl::string_view encoded) {
   return decoded;
 }
 
-const Utility::AuthorityAttributes Utility::parseAuthority(const absl::string_view& host,
-                                                           uint32_t default_port) {
+Utility::AuthorityAttributes Utility::parseAuthority(absl::string_view host) {
   // First try to see if there is a port included. This also checks to see that there is not a ']'
   // as the last character which is indicative of an IPv6 address without a port. This is a best
   // effort attempt.
   const auto colon_pos = host.rfind(':');
   absl::string_view host_to_resolve = host;
+  absl::optional<uint16_t> port;
   if (colon_pos != absl::string_view::npos && host_to_resolve.back() != ']') {
     const absl::string_view string_view_host = host;
     host_to_resolve = string_view_host.substr(0, colon_pos);
@@ -765,7 +765,7 @@ const Utility::AuthorityAttributes Utility::parseAuthority(const absl::string_vi
       // Just attempt to resolve whatever we were given. This will very likely fail.
       host_to_resolve = host;
     } else {
-      default_port = port64;
+      port = static_cast<uint16_t>(port64);
     }
   }
 
@@ -790,7 +790,7 @@ const Utility::AuthorityAttributes Utility::parseAuthority(const absl::string_vi
   } catch (const EnvoyException&) {
   }
 
-  return {is_ip_address, host_to_resolve, default_port};
+  return {is_ip_address, host_to_resolve, port};
 }
 
 } // namespace Http
