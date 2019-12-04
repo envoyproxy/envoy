@@ -25,19 +25,6 @@ envoy_cc_library(
     ],
 )
 
-cc_library(
-    name = "envoy_jni_interface_lib",
-    srcs = [
-        "libenvoy_jni.so",
-    ],
-    copts = ["-std=c++14"],
-    linkopts = [
-        "-lm",
-        "-llog",
-    ],
-)
-
-# TODO: https://github.com/lyft/envoy-mobile/issues/604
 cc_binary(
     name = "libenvoy_jni.so",
     srcs = [

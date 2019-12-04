@@ -1,8 +1,6 @@
 licenses(["notice"])  # Apache 2
 
-load("//bazel:kotlin_lib.bzl", "envoy_mobile_android_library", "envoy_mobile_java_library")
-
-envoy_mobile_android_library(
+android_library(
     name = "envoy_engine_lib",
     srcs = [
         "AndroidEngineImpl.java",
@@ -18,7 +16,7 @@ envoy_mobile_android_library(
     ],
 )
 
-envoy_mobile_java_library(
+java_library(
     name = "envoy_base_engine_lib",
     srcs = [
         "EnvoyConfiguration.java",
