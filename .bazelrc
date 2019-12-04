@@ -84,14 +84,17 @@ build:clang-tsan --linkopt -fuse-ld=lld
 # Needed due to https://github.com/libevent/libevent/issues/777
 build:clang-tsan --copt -DEVENT__DISABLE_DEBUG_MODE
 
-# Clang MSAN - broken today since we need to rebuild lib[std]c++ and external deps with MSAN
-# support (see https://github.com/envoyproxy/envoy/issues/443).
+# Clang MSAN - this is the base config for remote-msan and docker-msan. To run this config without
+# our build image, follow https://github.com/google/sanitizers/wiki/MemorySanitizerLibcxxHowTo
+# with libc++ instruction and provide corresponding `--copt` and `--linkopt` as well.
 build:clang-msan --action_env=ENVOY_MSAN=1
 build:clang-msan --config=sanitizer
 build:clang-msan --define ENVOY_CONFIG_MSAN=1
 build:clang-msan --copt -fsanitize=memory
 build:clang-msan --linkopt -fsanitize=memory
 build:clang-msan --copt -fsanitize-memory-track-origins=2
+# MSAN needs -O1 to get reasonable performance.
+build:clang-msan --copt -O1
 
 # Clang with libc++
 build:libc++ --config=clang
@@ -125,6 +128,10 @@ build:rbe-toolchain-clang-libc++ --action_env=CXXFLAGS=-stdlib=libc++
 build:rbe-toolchain-clang-libc++ --action_env=LDFLAGS=-stdlib=libc++
 build:rbe-toolchain-clang-libc++ --define force_libcpp=enabled
 
+build:rbe-toolchain-msan --linkopt=-L/opt/libcxx_msan/lib
+build:rbe-toolchain-msan --linkopt=-Wl,-rpath,/opt/libcxx_msan/lib
+build:rbe-toolchain-msan --config=clang-msan
+
 build:rbe-toolchain-gcc --config=rbe-toolchain
 build:rbe-toolchain-gcc --crosstool_top=@rbe_ubuntu_gcc//cc:toolchain
 build:rbe-toolchain-gcc --extra_toolchains=@rbe_ubuntu_gcc//config:cc-toolchain
@@ -146,6 +153,10 @@ build:remote-clang-libc++ --config=rbe-toolchain-clang-libc++
 build:remote-gcc --config=remote
 build:remote-gcc --config=rbe-toolchain-gcc
 
+build:remote-msan --config=remote
+build:remote-msan --config=rbe-toolchain-clang-libc++
+build:remote-msan --config=rbe-toolchain-msan
+
 # Docker sandbox
 # NOTE: Update this from https://github.com/envoyproxy/envoy-build-tools/blob/master/toolchains/rbe_toolchains_config.bzl#L7
 build:docker-sandbox --experimental_docker_image=envoyproxy/envoy-build-ubuntu@sha256:f0b2453c3587e3297f5caf5e97fbf57c97592c96136209ec13fe2795aae2c896
@@ -165,6 +176,10 @@ build:docker-clang-libc++ --config=rbe-toolchain-clang-libc++
 
 build:docker-gcc --config=docker-sandbox
 build:docker-gcc --config=rbe-toolchain-gcc
+
+build:docker-msan --config=docker-sandbox
+build:docker-msan --config=rbe-toolchain-clang-libc++
+build:docker-msan --config=rbe-toolchain-msan
 
 # CI configurations
 build:remote-ci --remote_cache=grpcs://remotebuildexecution.googleapis.com

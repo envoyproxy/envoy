@@ -16,11 +16,15 @@ import "envoy/config/bootstrap/v3alpha/bootstrap.proto";
 import "google/protobuf/any.proto";
 import "google/protobuf/timestamp.proto";
 
+import "udpa/api/annotations/versioning.proto";
+
 // [#protodoc-title: ConfigDump]
 
 // The :ref:`/config_dump <operations_admin_interface_config_dump>` admin endpoint uses this wrapper
 // message to maintain and serve arbitrary configuration information from any component in Envoy.
 message ConfigDump {
+  option (udpa.api.annotations.versioning).previous_message_type = "envoy.admin.v2alpha.ConfigDump";
+
   // This list is serialized and dumped in its entirety at the
   // :ref:`/config_dump <operations_admin_interface_config_dump>` endpoint.
   //
@@ -35,6 +39,9 @@ message ConfigDump {
 }
 
 message UpdateFailureState {
+  option (udpa.api.annotations.versioning).previous_message_type =
+      "envoy.admin.v2alpha.UpdateFailureState";
+
   // What the component configuration would have been if the update had succeeded.
   google.protobuf.Any failed_configuration = 1;
 
@@ -50,6 +57,9 @@ message UpdateFailureState {
 // the static portions of an Envoy configuration by reusing the output as the bootstrap
 // configuration for another Envoy.
 message BootstrapConfigDump {
+  option (udpa.api.annotations.versioning).previous_message_type =
+      "envoy.admin.v2alpha.BootstrapConfigDump";
+
   config.bootstrap.v3alpha.Bootstrap bootstrap = 1;
 
   // The timestamp when the BootstrapConfig was last updated.
@@ -60,8 +70,14 @@ message BootstrapConfigDump {
 // configuration information can be used to recreate an Envoy configuration by populating all
 // listeners as static listeners or by returning them in a LDS response.
 message ListenersConfigDump {
+  option (udpa.api.annotations.versioning).previous_message_type =
+      "envoy.admin.v2alpha.ListenersConfigDump";
+
   // Describes a statically loaded listener.
   message StaticListener {
+    option (udpa.api.annotations.versioning).previous_message_type =
+        "envoy.admin.v2alpha.ListenersConfigDump.StaticListener";
+
     // The listener config.
     api.v3alpha.Listener listener = 1;
 
@@ -70,6 +86,9 @@ message ListenersConfigDump {
   }
 
   message DynamicListenerState {
+    option (udpa.api.annotations.versioning).previous_message_type =
+        "envoy.admin.v2alpha.ListenersConfigDump.DynamicListenerState";
+
     // This is the per-resource version information. This version is currently taken from the
     // :ref:`version_info <envoy_api_field_api.v3alpha.DiscoveryResponse.version_info>` field at the
     // time that the listener was loaded. In the future, discrete per-listener versions may be
@@ -86,6 +105,9 @@ message ListenersConfigDump {
   // Describes a dynamically loaded listener via the LDS API.
   // [#next-free-field: 6]
   message DynamicListener {
+    option (udpa.api.annotations.versioning).previous_message_type =
+        "envoy.admin.v2alpha.ListenersConfigDump.DynamicListener";
+
     // The name or unique id of this listener, pulled from the DynamicListenerState config.
     string name = 1;
 
@@ -125,8 +147,14 @@ message ListenersConfigDump {
 // configuration information can be used to recreate an Envoy configuration by populating all
 // clusters as static clusters or by returning them in a CDS response.
 message ClustersConfigDump {
+  option (udpa.api.annotations.versioning).previous_message_type =
+      "envoy.admin.v2alpha.ClustersConfigDump";
+
   // Describes a statically loaded cluster.
   message StaticCluster {
+    option (udpa.api.annotations.versioning).previous_message_type =
+        "envoy.admin.v2alpha.ClustersConfigDump.StaticCluster";
+
     // The cluster config.
     api.v3alpha.Cluster cluster = 1;
 
@@ -136,6 +164,9 @@ message ClustersConfigDump {
 
   // Describes a dynamically loaded cluster via the CDS API.
   message DynamicCluster {
+    option (udpa.api.annotations.versioning).previous_message_type =
+        "envoy.admin.v2alpha.ClustersConfigDump.DynamicCluster";
+
     // This is the per-resource version information. This version is currently taken from the
     // :ref:`version_info <envoy_api_field_api.v3alpha.DiscoveryResponse.version_info>` field at the
     // time that the cluster was loaded. In the future, discrete per-cluster versions may be
@@ -174,7 +205,13 @@ message ClustersConfigDump {
 // to recreate an Envoy configuration by populating all routes as static routes or by returning them
 // in RDS responses.
 message RoutesConfigDump {
+  option (udpa.api.annotations.versioning).previous_message_type =
+      "envoy.admin.v2alpha.RoutesConfigDump";
+
   message StaticRouteConfig {
+    option (udpa.api.annotations.versioning).previous_message_type =
+        "envoy.admin.v2alpha.RoutesConfigDump.StaticRouteConfig";
+
     // The route config.
     api.v3alpha.RouteConfiguration route_config = 1;
 
@@ -183,6 +220,9 @@ message RoutesConfigDump {
   }
 
   message DynamicRouteConfig {
+    option (udpa.api.annotations.versioning).previous_message_type =
+        "envoy.admin.v2alpha.RoutesConfigDump.DynamicRouteConfig";
+
     // This is the per-resource version information. This version is currently taken from the
     // :ref:`version_info <envoy_api_field_api.v3alpha.DiscoveryResponse.version_info>` field at the
     // time that the route configuration was loaded.
@@ -207,7 +247,13 @@ message RoutesConfigDump {
 // the scopes defined inline with the higher order object (i.e., the HttpConnectionManager) and the
 // dynamically obtained scopes via the SRDS API.
 message ScopedRoutesConfigDump {
+  option (udpa.api.annotations.versioning).previous_message_type =
+      "envoy.admin.v2alpha.ScopedRoutesConfigDump";
+
   message InlineScopedRouteConfigs {
+    option (udpa.api.annotations.versioning).previous_message_type =
+        "envoy.admin.v2alpha.ScopedRoutesConfigDump.InlineScopedRouteConfigs";
+
     // The name assigned to the scoped route configurations.
     string name = 1;
 
@@ -219,6 +265,9 @@ message ScopedRoutesConfigDump {
   }
 
   message DynamicScopedRouteConfigs {
+    option (udpa.api.annotations.versioning).previous_message_type =
+        "envoy.admin.v2alpha.ScopedRoutesConfigDump.DynamicScopedRouteConfigs";
+
     // The name assigned to the scoped route configurations.
     string name = 1;
 
@@ -243,8 +292,14 @@ message ScopedRoutesConfigDump {
 
 // Envoys SDS implementation fills this message with all secrets fetched dynamically via SDS.
 message SecretsConfigDump {
+  option (udpa.api.annotations.versioning).previous_message_type =
+      "envoy.admin.v2alpha.SecretsConfigDump";
+
   // DynamicSecret contains secret information fetched via SDS.
   message DynamicSecret {
+    option (udpa.api.annotations.versioning).previous_message_type =
+        "envoy.admin.v2alpha.SecretsConfigDump.DynamicSecret";
+
     // The name assigned to the secret.
     string name = 1;
 
@@ -262,6 +317,9 @@ message SecretsConfigDump {
 
   // StaticSecret specifies statically loaded secret in bootstrap.
   message StaticSecret {
+    option (udpa.api.annotations.versioning).previous_message_type =
+        "envoy.admin.v2alpha.SecretsConfigDump.StaticSecret";
+
     // The name assigned to the secret.
     string name = 1;
 

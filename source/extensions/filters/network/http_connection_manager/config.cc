@@ -23,6 +23,7 @@
 #include "common/router/rds_impl.h"
 #include "common/router/scoped_rds.h"
 #include "common/runtime/runtime_impl.h"
+#include "common/tracing/http_tracer_impl.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -256,7 +257,6 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
     const auto& tracing_config = config.tracing();
 
     Tracing::OperationName tracing_operation_name;
-    std::vector<Http::LowerCaseString> request_headers_for_tags;
 
     // Listener level traffic direction overrides the operation name
     switch (context.direction()) {
@@ -285,8 +285,15 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
       NOT_REACHED_GCOVR_EXCL_LINE;
     }
 
+    Tracing::CustomTagMap custom_tags;
     for (const std::string& header : tracing_config.request_headers_for_tags()) {
-      request_headers_for_tags.push_back(Http::LowerCaseString(header));
+      envoy::type::tracing::v2::CustomTag::Header headerTag;
+      headerTag.set_name(header);
+      custom_tags.emplace(
+          header, std::make_shared<const Tracing::RequestHeaderCustomTag>(header, headerTag));
+    }
+    for (const auto& tag : tracing_config.custom_tags()) {
+      custom_tags.emplace(tag.tag(), Tracing::HttpTracerUtility::createCustomTag(tag));
     }
 
     envoy::type::FractionalPercent client_sampling;
@@ -308,8 +315,8 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
 
     tracing_config_ =
         std::make_unique<Http::TracingConnectionManagerConfig>(Http::TracingConnectionManagerConfig{
-            tracing_operation_name, request_headers_for_tags, client_sampling, random_sampling,
-            overall_sampling, tracing_config.verbose(), max_path_tag_length});
+            tracing_operation_name, custom_tags, client_sampling, random_sampling, overall_sampling,
+            tracing_config.verbose(), max_path_tag_length});
   }
 
   for (const auto& access_log : config.access_log()) {

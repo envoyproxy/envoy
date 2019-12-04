@@ -6,6 +6,8 @@ option java_outer_classname = "AwsIamProto";
 option java_multiple_files = true;
 option java_package = "io.envoyproxy.envoy.config.grpc_credential.v3alpha";
 
+import "udpa/api/annotations/versioning.proto";
+
 import "validate/validate.proto";
 
 // [#protodoc-title: Grpc Credentials AWS IAM]
@@ -13,6 +15,9 @@ import "validate/validate.proto";
 // [#extension: envoy.grpc_credentials.aws_iam]
 
 message AwsIamConfig {
+  option (udpa.api.annotations.versioning).previous_message_type =
+      "envoy.config.grpc_credential.v2alpha.AwsIamConfig";
+
   // The `service namespace
   // <https://docs.aws.amazon.com/general/latest/gr/aws-arns-and-namespaces.html#genref-aws-service-namespaces>`_
   // of the Grpc endpoint.
