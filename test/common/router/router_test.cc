@@ -1119,8 +1119,6 @@ TEST_F(RouterTest, UpstreamTimeout) {
 // Verify the timeout budget histograms are filled out correctly when using a
 // global and per-try timeout.
 TEST_F(RouterTest, TimeoutBudgetHistogramStat) {
-  // dispatcher.timeSource().monotonicTime() - downstream_request_complete_time_);
-  // So mock both?  and figure out how to ...
   NiceMock<Http::MockStreamEncoder> encoder;
   Http::StreamDecoder* response_decoder = nullptr;
   EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
@@ -1140,13 +1138,16 @@ TEST_F(RouterTest, TimeoutBudgetHistogramStat) {
   Buffer::OwnedImpl data;
   router_.decodeData(data, true);
 
+  // These are coming from CodeStatsImpl::chargeResponseTiming.
   EXPECT_CALL(cm_.thread_local_cluster_.cluster_.info_->stats_store_,
               deliverHistogramToSinks(_, 50ull))
-      .Times(3); // CodeStatsImpl::chargeResponseTiming
+      .Times(3);
+  // Global timeout budget used.
   EXPECT_CALL(cm_.thread_local_cluster_.cluster_.info_->stats_store_,
-              deliverHistogramToSinks(_, 2500ull)); // Global timeout budget used
+              deliverHistogramToSinks(_, 2500ull));
+  // Per-try budget used.
   EXPECT_CALL(cm_.thread_local_cluster_.cluster_.info_->stats_store_,
-              deliverHistogramToSinks(_, 5000ull)); // Per-try budget used
+              deliverHistogramToSinks(_, 5000ull));
 
   Http::HeaderMapPtr response_headers(new Http::TestHeaderMapImpl{{":status", "200"}});
   response_decoder->decodeHeaders(std::move(response_headers), false);
@@ -1173,13 +1174,16 @@ TEST_F(RouterTest, TimeoutBudgetHistogramStatOnlyGlobal) {
   Buffer::OwnedImpl data;
   router_.decodeData(data, true);
 
+  // These are coming from CodeStatsImpl::chargeResponseTiming.
   EXPECT_CALL(cm_.thread_local_cluster_.cluster_.info_->stats_store_,
               deliverHistogramToSinks(_, 50ull))
-      .Times(3); // CodeStatsImpl::chargeResponseTiming
+      .Times(3);
+  // Global timeout budget used.
   EXPECT_CALL(cm_.thread_local_cluster_.cluster_.info_->stats_store_,
-              deliverHistogramToSinks(_, 5000ull)); // Global timeout budget used
+              deliverHistogramToSinks(_, 5000ull));
+  // Per-try budget used.
   EXPECT_CALL(cm_.thread_local_cluster_.cluster_.info_->stats_store_,
-              deliverHistogramToSinks(_, 0ull)); // Per-try budget used
+              deliverHistogramToSinks(_, 0ull));
 
   Http::HeaderMapPtr response_headers(new Http::TestHeaderMapImpl{{":status", "200"}});
   response_decoder->decodeHeaders(std::move(response_headers), false);
