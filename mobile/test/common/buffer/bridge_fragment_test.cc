@@ -32,6 +32,7 @@ TEST(BridgeFragmentTest, Basic) {
   ASSERT_EQ(*sentinel, 0);
   buffer_wrapper.drain(buffer_wrapper.length());
   ASSERT_EQ(*sentinel, 1);
+  delete sentinel;
 }
 
 } // namespace Buffer

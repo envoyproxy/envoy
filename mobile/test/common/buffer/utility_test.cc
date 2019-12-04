@@ -33,6 +33,7 @@ TEST(DataConstructorTest, FromCppToCEmpty) {
   envoy_data c_data = Utility::toBridgeData(empty_data);
 
   ASSERT_EQ(c_data.length, 0);
+  c_data.release(c_data.context);
 }
 
 TEST(DataConstructorTest, FromCppToC) {
@@ -43,6 +44,7 @@ TEST(DataConstructorTest, FromCppToC) {
 
   ASSERT_EQ(c_data.length, s.size());
   ASSERT_EQ(Http::Utility::convertToString(c_data), s);
+  c_data.release(c_data.context);
 }
 
 } // namespace Buffer

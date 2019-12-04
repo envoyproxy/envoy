@@ -158,6 +158,7 @@ TEST_F(DispatcherTest, BasicStream) {
     ASSERT_EQ(Http::Utility::convertToString(c_data), "response body");
     callbacks_called* cc = static_cast<callbacks_called*>(context);
     cc->on_data_calls++;
+    c_data.release(c_data.context);
   };
   bridge_callbacks.on_complete = [](void* context) -> void {
     callbacks_called* cc = static_cast<callbacks_called*>(context);
@@ -752,10 +753,11 @@ TEST_F(DispatcherTest, MultipleDataStream) {
     callbacks_called* cc = static_cast<callbacks_called*>(context);
     cc->on_headers_calls++;
   };
-  bridge_callbacks.on_data = [](envoy_data, bool, void* context) -> void {
+  bridge_callbacks.on_data = [](envoy_data data, bool, void* context) -> void {
     // TODO: assert end_stream and contents of c_data for multiple calls of on_data.
     callbacks_called* cc = static_cast<callbacks_called*>(context);
     cc->on_data_calls++;
+    data.release(data.context);
   };
   bridge_callbacks.on_complete = [](void* context) -> void {
     callbacks_called* cc = static_cast<callbacks_called*>(context);
