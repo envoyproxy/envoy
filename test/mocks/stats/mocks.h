@@ -318,6 +318,9 @@ public:
   ~MockIsolatedStatsStore() override;
 
   MOCK_METHOD2(deliverHistogramToSinks, void(const Histogram& histogram, uint64_t value));
+  MOCK_METHOD2(histogram, Histogram&(const std::string&, Histogram::Unit));
+
+  std::vector<std::unique_ptr<MockHistogram>> histograms_;
 };
 
 class MockStatsMatcher : public StatsMatcher {

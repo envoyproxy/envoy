@@ -23,6 +23,7 @@
 #include "test/mocks/router/mocks.h"
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/ssl/mocks.h"
+#include "test/mocks/stats/mocks.h"
 #include "test/mocks/tracing/mocks.h"
 #include "test/mocks/upstream/mocks.h"
 #include "test/test_common/environment.h"
@@ -1113,6 +1114,77 @@ TEST_F(RouterTest, UpstreamTimeout) {
                 .value());
   EXPECT_EQ(1UL, cm_.conn_pool_.host_->stats().rq_timeout_.value());
   EXPECT_TRUE(verifyHostUpstreamStats(0, 1));
+}
+
+// Verify the timeout budget histograms are filled out correctly when using a
+// global and per-try timeout.
+TEST_F(RouterTest, TimeoutBudgetHistogramStat) {
+  // dispatcher.timeSource().monotonicTime() - downstream_request_complete_time_);
+  // So mock both?  and figure out how to ...
+  NiceMock<Http::MockStreamEncoder> encoder;
+  Http::StreamDecoder* response_decoder = nullptr;
+  EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
+      .WillOnce(Invoke([&](Http::StreamDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks)
+                           -> Http::ConnectionPool::Cancellable* {
+        response_decoder = &decoder;
+        callbacks.onPoolReady(encoder, cm_.conn_pool_.host_, upstream_stream_info_);
+        return nullptr;
+      }));
+  expectPerTryTimerCreate();
+  expectResponseTimerCreate();
+
+  Http::TestHeaderMapImpl headers{{"x-envoy-upstream-rq-timeout-ms", "200"},
+                                  {"x-envoy-upstream-rq-per-try-timeout-ms", "100"}};
+  HttpTestUtility::addDefaultHeaders(headers);
+  router_.decodeHeaders(headers, false);
+  Buffer::OwnedImpl data;
+  router_.decodeData(data, true);
+
+  EXPECT_CALL(cm_.thread_local_cluster_.cluster_.info_->stats_store_,
+              deliverHistogramToSinks(_, 50ull))
+      .Times(3); // CodeStatsImpl::chargeResponseTiming
+  EXPECT_CALL(cm_.thread_local_cluster_.cluster_.info_->stats_store_,
+              deliverHistogramToSinks(_, 2500ull)); // Global timeout budget used
+  EXPECT_CALL(cm_.thread_local_cluster_.cluster_.info_->stats_store_,
+              deliverHistogramToSinks(_, 5000ull)); // Per-try budget used
+
+  Http::HeaderMapPtr response_headers(new Http::TestHeaderMapImpl{{":status", "200"}});
+  response_decoder->decodeHeaders(std::move(response_headers), false);
+  test_time_.sleep(std::chrono::milliseconds(50));
+  response_decoder->decodeData(data, true);
+}
+
+// Verify the timeout budget histograms are filled out correctly when only using a global timeout.
+TEST_F(RouterTest, TimeoutBudgetHistogramStatOnlyGlobal) {
+  NiceMock<Http::MockStreamEncoder> encoder;
+  Http::StreamDecoder* response_decoder = nullptr;
+  EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
+      .WillOnce(Invoke([&](Http::StreamDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks)
+                           -> Http::ConnectionPool::Cancellable* {
+        response_decoder = &decoder;
+        callbacks.onPoolReady(encoder, cm_.conn_pool_.host_, upstream_stream_info_);
+        return nullptr;
+      }));
+  expectPerTryTimerCreate();
+
+  Http::TestHeaderMapImpl headers{{"x-envoy-upstream-rq-timeout-ms", "100"}};
+  HttpTestUtility::addDefaultHeaders(headers);
+  router_.decodeHeaders(headers, false);
+  Buffer::OwnedImpl data;
+  router_.decodeData(data, true);
+
+  EXPECT_CALL(cm_.thread_local_cluster_.cluster_.info_->stats_store_,
+              deliverHistogramToSinks(_, 50ull))
+      .Times(3); // CodeStatsImpl::chargeResponseTiming
+  EXPECT_CALL(cm_.thread_local_cluster_.cluster_.info_->stats_store_,
+              deliverHistogramToSinks(_, 5000ull)); // Global timeout budget used
+  EXPECT_CALL(cm_.thread_local_cluster_.cluster_.info_->stats_store_,
+              deliverHistogramToSinks(_, 0ull)); // Per-try budget used
+
+  Http::HeaderMapPtr response_headers(new Http::TestHeaderMapImpl{{":status", "200"}});
+  response_decoder->decodeHeaders(std::move(response_headers), false);
+  test_time_.sleep(std::chrono::milliseconds(50));
+  response_decoder->decodeData(data, true);
 }
 
 // Validate gRPC OK response stats are sane when response is trailers only.

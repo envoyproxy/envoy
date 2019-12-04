@@ -1,5 +1,6 @@
 #include "common/router/router.h"
 
+#include <algorithm>
 #include <chrono>
 #include <cstdint>
 #include <memory>
@@ -88,6 +89,21 @@ bool convertRequestHeadersForInternalRedirect(Http::HeaderMap& downstream_header
   downstream_headers.setPath(absolute_url.path_and_query_params());
 
   return true;
+}
+
+constexpr uint64_t TimeoutPrecisionFactor = 10000;
+
+// Express percentage as [0, TimeoutPrecisionFactor] because stats do not accept floating point
+// values, and getting multiple significant figures on the histogram would be nice.
+uint64_t percentageOfTimeout(const std::chrono::milliseconds response_time,
+                             const std::chrono::milliseconds timeout) {
+  if (timeout.count() == 0) {
+    return 0;
+  }
+
+  return std::min(
+      TimeoutPrecisionFactor,
+      static_cast<uint64_t>(response_time.count() * TimeoutPrecisionFactor / timeout.count()));
 }
 
 } // namespace
@@ -737,13 +753,15 @@ void Filter::onResponseTimeout() {
     UpstreamRequestPtr upstream_request =
         upstream_requests_.back()->removeFromList(upstream_requests_);
 
-    // Don't record a timeout for upstream requests we've already seen headers
-    // for.
+    // Don't do work for upstream requests we've already seen headers for.
     if (upstream_request->awaiting_headers_) {
       cluster_->stats().upstream_rq_timeout_.inc();
       if (upstream_request->upstream_host_) {
         upstream_request->upstream_host_->stats().rq_timeout_.inc();
       }
+
+      // Record the max-value into the histogram to say that the entire timeout budget was used.
+      cluster_->stats().upstream_rq_timeout_budget_per_try_.recordValue(TimeoutPrecisionFactor);
 
       // If this upstream request already hit a "soft" timeout, then it
       // already recorded a timeout into outlier detection. Don't do it again.
@@ -798,6 +816,7 @@ void Filter::onPerTryTimeout(UpstreamRequest& upstream_request) {
   }
 
   cluster_->stats().upstream_rq_per_try_timeout_.inc();
+  cluster_->stats().upstream_rq_timeout_budget_per_try_.recordValue(TimeoutPrecisionFactor);
   if (upstream_request.upstream_host_) {
     upstream_request.upstream_host_->stats().rq_timeout_.inc();
   }
@@ -849,6 +868,7 @@ void Filter::chargeUpstreamAbort(Http::Code code, bool dropped, UpstreamRequest&
 
 void Filter::onUpstreamTimeoutAbort(StreamInfo::ResponseFlag response_flags,
                                     absl::string_view details) {
+  cluster_->stats().upstream_rq_timeout_budget_global_.recordValue(TimeoutPrecisionFactor);
   const absl::string_view body =
       timeout_response_code_ == Http::Code::GatewayTimeout ? "upstream request timeout" : "";
   onUpstreamAbort(timeout_response_code_, response_flags, body, false, details);
@@ -1217,11 +1237,17 @@ void Filter::onUpstreamComplete(UpstreamRequest& upstream_request) {
   }
   callbacks_->streamInfo().setUpstreamTiming(final_upstream_request_->upstream_timing_);
 
+  Event::Dispatcher& dispatcher = callbacks_->dispatcher();
+  std::chrono::milliseconds response_time = std::chrono::duration_cast<std::chrono::milliseconds>(
+      dispatcher.timeSource().monotonicTime() - downstream_request_complete_time_);
+
+  cluster_->stats().upstream_rq_timeout_budget_global_.recordValue(
+      percentageOfTimeout(response_time, timeout_.global_timeout_));
+  cluster_->stats().upstream_rq_timeout_budget_per_try_.recordValue(
+      percentageOfTimeout(response_time, timeout_.per_try_timeout_));
+
   if (config_.emit_dynamic_stats_ && !callbacks_->streamInfo().healthCheck() &&
       DateUtil::timePointValid(downstream_request_complete_time_)) {
-    Event::Dispatcher& dispatcher = callbacks_->dispatcher();
-    std::chrono::milliseconds response_time = std::chrono::duration_cast<std::chrono::milliseconds>(
-        dispatcher.timeSource().monotonicTime() - downstream_request_complete_time_);
     upstream_request.upstream_host_->outlierDetector().putResponseTime(response_time);
     const bool internal_request = Http::HeaderUtility::isEnvoyInternalRequest(*downstream_headers_);
 
