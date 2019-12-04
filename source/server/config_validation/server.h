@@ -106,9 +106,9 @@ public:
   ProtobufMessage::ValidationContext& messageValidationContext() override {
     return validation_context_;
   }
-  Configuration::ServerFactoryContext& serverFactoryContext() override { return server_context_; }
+  Configuration::ServerFactoryContext& serverFactoryContext() override { return server_contexts_; }
   Configuration::TransportSocketFactoryContext& transportSocketFactoryContext() override {
-    return server_context_;
+    return server_contexts_;
   }
 
   // Server::ListenerComponentFactory
@@ -197,7 +197,7 @@ private:
   Grpc::ContextImpl grpc_context_;
   Http::ContextImpl http_context_;
   Event::TimeSystem& time_system_;
-  ServerFactoryContextImpl server_context_;
+  ServerFactoryContextImpl server_contexts_;
 };
 
 } // namespace Server

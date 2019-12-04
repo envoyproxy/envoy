@@ -144,6 +144,9 @@ private:
   Event::SignalEventPtr sig_hup_;
 };
 
+// ServerFactoryContextImpl implements both ServerFactoryContext and
+// TransportSocketFactoryContext for convenience as these two contexts
+// share common member functions and member variables.
 class ServerFactoryContextImpl : public Configuration::ServerFactoryContext,
                                  public Configuration::TransportSocketFactoryContext {
 public:
@@ -167,9 +170,15 @@ public:
   Ssl::ContextManager& sslContextManager() override { return server_.sslContextManager(); }
   Secret::SecretManager& secretManager() override { return server_.secretManager(); }
   Stats::Store& stats() override { return server_.stats(); }
+  // Server's init manager can't be changed via this shared TransportSocketFactoryContext
   void setInitManager(Init::Manager&) override {}
   Init::Manager* initManager() override { return &server_.initManager(); }
   ProtobufMessage::ValidationVisitor& messageValidationVisitor() override {
+    // Server has two message validation visitors, one for static and
+    // other for dynamic configuration. Choose the dynamic validation
+    // visitor if server's init manager indicates that the server is
+    // in the Initialized state, as this state is engaged right after
+    // the static configuration (e.g., bootstrap) has been completed.
     return initManager()->state() == Init::Manager::State::Initialized
                ? server_.messageValidationContext().dynamicValidationVisitor()
                : server_.messageValidationContext().staticValidationVisitor();
@@ -238,10 +247,10 @@ public:
   const LocalInfo::LocalInfo& localInfo() const override { return *local_info_; }
   TimeSource& timeSource() override { return time_source_; }
 
-  Configuration::ServerFactoryContext& serverFactoryContext() override { return server_context_; }
+  Configuration::ServerFactoryContext& serverFactoryContext() override { return server_contexts_; }
 
   Configuration::TransportSocketFactoryContext& transportSocketFactoryContext() override {
-    return server_context_;
+    return server_contexts_;
   }
 
   std::chrono::milliseconds statsFlushInterval() const override {
@@ -331,7 +340,7 @@ private:
   // whenever we have support for histogram merge across hot restarts.
   Stats::TimespanPtr initialization_timer_;
 
-  ServerFactoryContextImpl server_context_;
+  ServerFactoryContextImpl server_contexts_;
 
   using LifecycleNotifierCallbacks = std::list<StageCallback>;
   using LifecycleNotifierCompletionCallbacks = std::list<StageCallbackWithCompletion>;
