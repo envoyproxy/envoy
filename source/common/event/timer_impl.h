@@ -20,11 +20,11 @@ public:
    * Intended for consumption by enable(HR)Timer, this method is templated method to avoid implicit
    * duration conversions for its input arguments. This lets us have an opportunity to check bounds
    * before doing any conversions. When the passed in duration exceeds UINT32_T max days, the output
-   * timeval will be clipped to yield INT32_MAX days worth of seconds and and 0 usecs for the
-   * timeval output argument. ASSERTS on negative duration input.
+   * will be clipped to yield INT32_MAX days worth of seconds and 0 microseconds for the output
+   * argument. ASSERTS on negative duration input.
    * @tparam Duration std::chrono duration type, e.g. seconds, milliseconds, ...
    * @param d duration value
-   * @param tv timeval to update
+   * @param tv output parameter that will be updated
    */
   template <typename Duration> static void durationToTimeval(const Duration& d, timeval& tv) {
     if (d.count() < 0) {
@@ -32,7 +32,7 @@ public:
           fmt::format("Negative duration passed to durationToTimeval(): {}", d.count()));
     };
     // We need to worry about:
-    // - overflowing tv.tv_sec
+    // - overflowing tv
     // - overflowing when doing narrowing conversions, e.g. seconds -> nanoseconds
     // - practically, do we ever want to sleep for a super large amount of time?
     constexpr int64_t clip_to = INT32_MAX; // 136.102208 years
