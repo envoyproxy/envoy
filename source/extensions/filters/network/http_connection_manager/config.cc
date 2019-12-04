@@ -417,7 +417,7 @@ HttpConnectionManagerConfig::createCodec(Network::Connection& connection,
         connection, callbacks, context_.scope(), http2_settings_, maxRequestHeadersKb(),
         maxRequestHeadersCount());
   case CodecType::HTTP3:
-    // Hard code Quiche factory name here to instantiate a QUIC codec implmeneted.
+    // Hard code Quiche factory name here to instantiate a QUIC codec implemented.
     // TODO(danzh) Add support to get the factory name from config, possibly
     // from HttpConnectionManager protobuf. This is not essential till there are multiple
     // implementations of QUIC.
