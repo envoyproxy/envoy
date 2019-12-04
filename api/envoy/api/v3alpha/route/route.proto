@@ -904,6 +904,9 @@ message RetryPolicy {
   }
 
   message RetryBudget {
+    option (udpa.api.annotations.versioning).previous_message_type =
+        "envoy.api.v2.route.RetryPolicy.RetryBudget";
+
     // Specifies the limit on concurrent retries as a percentage of the sum of active requests and
     // active pending requests.
     //
