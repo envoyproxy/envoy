@@ -194,7 +194,7 @@ public:
 
   CodecStats& stats() { return stats_; }
 
-  const bool enable_trailers_ : 1;
+  bool enable_trailers() const { return enable_trailers_; }
 
 protected:
   ConnectionImpl(Network::Connection& connection, Stats::Scope& stats, http_parser_type type,
@@ -214,6 +214,7 @@ protected:
   bool reset_stream_called_ : 1;
   const bool strict_header_validation_ : 1;
   const bool connection_header_sanitization_ : 1;
+  const bool enable_trailers_ : 1;
 
 private:
   enum class HeaderParsingState { Field, Value, Done };
