@@ -147,13 +147,14 @@ protected:
    */
   void
   expectCreateListenSocket(const envoy::api::v2::core::SocketOption::SocketState& expected_state,
-                           Network::Socket::Options::size_type expected_num_options) {
-    EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, true))
-        .WillOnce(Invoke([this, expected_num_options,
-                          &expected_state](const Network::Address::InstanceConstSharedPtr&,
-                                           Network::Address::SocketType,
-                                           const Network::Socket::OptionsSharedPtr& options,
-                                           bool) -> Network::SocketSharedPtr {
+                           Network::Socket::Options::size_type expected_num_options,
+                           ListenSocketCreationParams expected_creation_params = {true, true}) {
+    EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, expected_creation_params))
+        .WillOnce(Invoke([this, expected_num_options, &expected_state](
+                             const Network::Address::InstanceConstSharedPtr&,
+                             Network::Address::SocketType,
+                             const Network::Socket::OptionsSharedPtr& options,
+                             const ListenSocketCreationParams&) -> Network::SocketSharedPtr {
           EXPECT_NE(options.get(), nullptr);
           EXPECT_EQ(options->size(), expected_num_options);
           EXPECT_TRUE(
