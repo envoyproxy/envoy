@@ -58,9 +58,8 @@ void EnvoyQuicClientSession::OnCryptoHandshakeEvent(CryptoHandshakeEvent event) 
 }
 
 std::unique_ptr<quic::QuicSpdyClientStream> EnvoyQuicClientSession::CreateClientStream() {
-  auto stream = std::make_unique<EnvoyQuicClientStream>(GetNextOutgoingBidirectionalStreamId(),
-                                                        this, quic::BIDIRECTIONAL);
-  return stream;
+  return std::make_unique<EnvoyQuicClientStream>(GetNextOutgoingBidirectionalStreamId(), this,
+                                                 quic::BIDIRECTIONAL);
 }
 
 quic::QuicSpdyStream* EnvoyQuicClientSession::CreateIncomingStream(quic::QuicStreamId /*id*/) {

@@ -46,7 +46,7 @@ public:
   absl::string_view requestedServerName() const override;
 
   // Network::ClientConnection
-  // Setup socket and start handshake.
+  // Set up socket and start handshake.
   void connect() override;
 
   // quic::QuicSession
@@ -67,7 +67,7 @@ protected:
   quic::QuicSpdyStream* CreateIncomingStream(quic::PendingStream* pending) override;
 
 private:
-  // These callbacks are owned by network filters and quic session should out live
+  // These callbacks are owned by network filters and quic session should outlive
   // them.
   Http::ConnectionCallbacks* http_connection_callbacks_{nullptr};
 };

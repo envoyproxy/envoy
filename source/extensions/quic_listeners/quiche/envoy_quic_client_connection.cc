@@ -42,12 +42,6 @@ EnvoyQuicClientConnection::EnvoyQuicClientConnection(
           std::move(connection_socket)),
       dispatcher_(dispatcher) {}
 
-EnvoyQuicClientConnection::~EnvoyQuicClientConnection() {
-  if (file_event_ != nullptr) {
-    file_event_->setEnabled(0);
-  }
-}
-
 void EnvoyQuicClientConnection::processPacket(
     Network::Address::InstanceConstSharedPtr local_address,
     Network::Address::InstanceConstSharedPtr peer_address, Buffer::InstancePtr buffer,
@@ -91,7 +85,7 @@ void EnvoyQuicClientConnection::setUpConnectionSocket() {
     }
   }
   if (!connectionSocket()->ioHandle().isOpen()) {
-    CloseConnection(quic::QUIC_CONNECTION_CANCELLED, "Fail to setup connection socket.",
+    CloseConnection(quic::QUIC_CONNECTION_CANCELLED, "Fail to set up connection socket.",
                     quic::ConnectionCloseBehavior::SILENT_CLOSE);
   }
 }

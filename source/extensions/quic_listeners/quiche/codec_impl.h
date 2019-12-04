@@ -79,8 +79,9 @@ private:
 // A factory to create QuicHttpClientConnection.
 class QuicHttpClientConnectionFactoryImpl : public Http::QuicHttpClientConnectionFactory {
 public:
-  Http::ClientConnection* createQuicClientConnection(Network::Connection& connection,
-                                                     Http::ConnectionCallbacks& callbacks) override;
+  std::unique_ptr<Http::ClientConnection>
+  createQuicClientConnection(Network::Connection& connection,
+                             Http::ConnectionCallbacks& callbacks) override;
 
   std::string name() const override { return Http::QuicCodecNames::get().Client; }
 };
@@ -88,8 +89,9 @@ public:
 // A factory to create QuicHttpServerConnection.
 class QuicHttpServerConnectionFactoryImpl : public Http::QuicHttpServerConnectionFactory {
 public:
-  Http::ServerConnection* createQuicServerConnection(Network::Connection& connection,
-                                                     Http::ConnectionCallbacks& callbacks) override;
+  std::unique_ptr<Http::ServerConnection>
+  createQuicServerConnection(Network::Connection& connection,
+                             Http::ConnectionCallbacks& callbacks) override;
 
   std::string name() const override { return Http::QuicCodecNames::get().Server; }
 };

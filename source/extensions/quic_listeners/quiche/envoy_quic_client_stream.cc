@@ -150,7 +150,6 @@ void EnvoyQuicClientStream::OnBodyAvailable() {
   // already delivered it or decodeTrailers will be called.
   bool skip_decoding = empty_payload_with_fin && (end_stream_decoded_ || !finished_reading);
   if (!skip_decoding) {
-    ASSERT(decoder() != nullptr);
     decoder()->decodeData(*buffer, finished_reading);
     if (finished_reading) {
       end_stream_decoded_ = true;

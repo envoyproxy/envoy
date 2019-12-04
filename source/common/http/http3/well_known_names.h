@@ -9,8 +9,8 @@ namespace Http {
 
 class QuicCodecNameValues {
 public:
-  const std::string Client = "client_codec";
-  const std::string Server = "server_codec";
+  const std::string Client = "quiche_client";
+  const std::string Server = "quiche_server";
 };
 
 using QuicCodecNames = ConstSingleton<QuicCodecNameValues>;

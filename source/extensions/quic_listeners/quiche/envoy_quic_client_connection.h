@@ -31,9 +31,6 @@ public:
                             Event::Dispatcher& dispatcher,
                             Network::ConnectionSocketPtr&& connection_socket);
 
-  // Overridden to un-register all file events.
-  ~EnvoyQuicClientConnection() override;
-
   // Network::UdpPacketProcessor
   void processPacket(Network::Address::InstanceConstSharedPtr local_address,
                      Network::Address::InstanceConstSharedPtr peer_address,
