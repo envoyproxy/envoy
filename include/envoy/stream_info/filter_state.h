@@ -57,7 +57,7 @@ public:
    * FilterState.
    */
   virtual void setData(absl::string_view data_name, std::shared_ptr<Object> data,
-                       StateType state_type, LifeSpan life_span = LifeSpan::FilterChain) PURE;
+                       StateType state_type, LifeSpan life_span) PURE;
 
   /**
    * @param other the FilterState we want to copy current data into.
