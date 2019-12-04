@@ -19,6 +19,7 @@ BSON
 CAS
 CB
 CDS
+CEL
 CHACHA
 CHLO
 CHLOS
@@ -83,6 +84,7 @@ EXPECTs
 EXPR
 FAQ
 FASTOPEN
+FB
 FCDS
 FFFF
 FIN
@@ -1123,3 +1125,4 @@ zag
 zig
 zipkin
 zlib
+OBQ

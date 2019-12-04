@@ -823,4 +823,10 @@ TEST(StatusCode, Strings) {
             MessageUtil::CodeEnumToString(static_cast<ProtobufUtil::error::Code>(last_code + 1)));
 }
 
+TEST(TypeUtilTest, TypeUrlToDescriptorFullName) {
+  EXPECT_EQ("envoy.config.filter.http.ip_tagging.v2.IPTagging",
+            TypeUtil::typeUrlToDescriptorFullName(
+                "type.googleapis.com/envoy.config.filter.http.ip_tagging.v2.IPTagging"));
+}
+
 } // namespace Envoy
