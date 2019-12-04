@@ -93,5 +93,7 @@ proto_library(
         "//envoy/service/trace/v2:pkg",
         "//envoy/type:pkg",
         "//envoy/type/matcher:pkg",
+        "//envoy/type/metadata/v2:pkg",
+        "//envoy/type/tracing/v2:pkg",
     ],
 )

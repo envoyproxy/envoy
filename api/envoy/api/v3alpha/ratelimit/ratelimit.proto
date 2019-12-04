@@ -6,6 +6,8 @@ option java_outer_classname = "RatelimitProto";
 option java_multiple_files = true;
 option java_package = "io.envoyproxy.envoy.api.v3alpha.ratelimit";
 
+import "udpa/api/annotations/versioning.proto";
+
 import "validate/validate.proto";
 
 // [#protodoc-title: Common rate limit components]
@@ -52,7 +54,13 @@ import "validate/validate.proto";
 // The idea behind the API is that (1)/(2)/(3) and (4)/(5) can be sent in 1 request if desired.
 // This enables building complex application scenarios with a generic backend.
 message RateLimitDescriptor {
+  option (udpa.api.annotations.versioning).previous_message_type =
+      "envoy.api.v2.ratelimit.RateLimitDescriptor";
+
   message Entry {
+    option (udpa.api.annotations.versioning).previous_message_type =
+        "envoy.api.v2.ratelimit.RateLimitDescriptor.Entry";
+
     // Descriptor key.
     string key = 1 [(validate.rules).string = {min_bytes: 1}];
 

@@ -8,12 +8,17 @@ option java_package = "io.envoyproxy.envoy.config.ratelimit.v3alpha";
 
 import "envoy/api/v3alpha/core/grpc_service.proto";
 
+import "udpa/api/annotations/versioning.proto";
+
 import "validate/validate.proto";
 
 // [#protodoc-title: Rate limit service]
 
 // Rate limit :ref:`configuration overview <config_rate_limit_service>`.
 message RateLimitServiceConfig {
+  option (udpa.api.annotations.versioning).previous_message_type =
+      "envoy.config.ratelimit.v2.RateLimitServiceConfig";
+
   reserved 1, 3;
 
   // Specifies the gRPC service that hosts the rate limit service. The client

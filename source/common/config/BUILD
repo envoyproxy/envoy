@@ -9,13 +9,14 @@ load(
 envoy_package()
 
 envoy_cc_library(
-    name = "api_type_db_lib",
-    srcs = ["api_type_db.cc"],
-    hdrs = ["api_type_db.h"],
+    name = "api_type_oracle_lib",
+    srcs = ["api_type_oracle.cc"],
+    hdrs = ["api_type_oracle.h"],
     deps = [
         "//source/common/protobuf",
         "//source/common/protobuf:utility_lib",
-        "@com_github_cncf_udpa//udpa/type/v1:typed_struct_cc",
+        "@com_github_cncf_udpa//udpa/api/annotations:pkg_cc_proto",
+        "@com_github_cncf_udpa//udpa/type/v1:pkg_cc_proto",
     ],
 )
 
@@ -215,6 +216,7 @@ envoy_cc_library(
         "//source/common/protobuf",
         "//source/common/protobuf:utility_lib",
         "@envoy_api//envoy/api/v2/core:pkg_cc_proto",
+        "@envoy_api//envoy/type/metadata/v2:pkg_cc_proto",
     ],
 )
 
@@ -300,7 +302,7 @@ envoy_cc_library(
     srcs = ["utility.cc"],
     hdrs = ["utility.h"],
     deps = [
-        ":api_type_db_lib",
+        ":api_type_oracle_lib",
         ":resources_lib",
         ":version_converter_lib",
         "//include/envoy/config:grpc_mux_interface",
@@ -320,7 +322,7 @@ envoy_cc_library(
         "//source/common/stats:stats_lib",
         "//source/common/stats:stats_matcher_lib",
         "//source/common/stats:tag_producer_lib",
-        "@com_github_cncf_udpa//udpa/type/v1:typed_struct_cc",
+        "@com_github_cncf_udpa//udpa/type/v1:pkg_cc_proto",
         "@envoy_api//envoy/api/v2/core:pkg_cc_proto",
         "@envoy_api//envoy/config/bootstrap/v2:pkg_cc_proto",
         "@envoy_api//envoy/config/filter/network/http_connection_manager/v2:pkg_cc_proto",

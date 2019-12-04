@@ -27,13 +27,11 @@ using DynamicMetadataKeysSingleton = ConstSingleton<DynamicMetadataKeys>;
 /**
  * All stats for the RBAC filter. @see stats_macros.h
  */
-// clang-format off
 #define ALL_RBAC_FILTER_STATS(COUNTER)                                                             \
   COUNTER(allowed)                                                                                 \
   COUNTER(denied)                                                                                  \
   COUNTER(shadow_allowed)                                                                          \
   COUNTER(shadow_denied)
-// clang-format on
 
 /**
  * Wrapper struct for RBAC filter stats. @see stats_macros.h
