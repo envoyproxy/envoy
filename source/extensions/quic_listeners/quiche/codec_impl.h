@@ -83,7 +83,7 @@ public:
   createQuicClientConnection(Network::Connection& connection,
                              Http::ConnectionCallbacks& callbacks) override;
 
-  std::string name() const override { return Http::QuicCodecNames::get().Client; }
+  std::string name() const override { return Http::QuicCodecNames::get().Quiche; }
 };
 
 // A factory to create QuicHttpServerConnection.
@@ -93,7 +93,7 @@ public:
   createQuicServerConnection(Network::Connection& connection,
                              Http::ConnectionCallbacks& callbacks) override;
 
-  std::string name() const override { return Http::QuicCodecNames::get().Server; }
+  std::string name() const override { return Http::QuicCodecNames::get().Quiche; }
 };
 
 DECLARE_FACTORY(QuicHttpClientConnectionFactoryImpl);

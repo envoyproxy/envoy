@@ -9,8 +9,8 @@ namespace Http {
 
 class QuicCodecNameValues {
 public:
-  const std::string Client = "quiche_client";
-  const std::string Server = "quiche_server";
+  // QUICHE is the only QUIC implementation for now.
+  const std::string Quiche = "quiche";
 };
 
 using QuicCodecNames = ConstSingleton<QuicCodecNameValues>;

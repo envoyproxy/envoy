@@ -417,9 +417,13 @@ HttpConnectionManagerConfig::createCodec(Network::Connection& connection,
         connection, callbacks, context_.scope(), http2_settings_, maxRequestHeadersKb(),
         maxRequestHeadersCount());
   case CodecType::HTTP3:
+    // Hard code Quiche factory name here to instantiate a QUIC codec implmeneted.
+    // TODO(danzh) Add support to get the factory name from config, possibly
+    // from HttpConnectionManager protobuf. This is not essential till there are multiple
+    // implementations of QUIC.
     return std::unique_ptr<Http::ServerConnection>(
         Config::Utility::getAndCheckFactory<Http::QuicHttpServerConnectionFactory>(
-            Http::QuicCodecNames::get().Server)
+            Http::QuicCodecNames::get().Quiche)
             .createQuicServerConnection(connection, callbacks));
   case CodecType::AUTO:
     return Http::ConnectionManagerUtility::autoCreateCodec(

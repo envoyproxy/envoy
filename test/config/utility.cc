@@ -116,6 +116,9 @@ const std::string ConfigHelper::HTTP_PROXY_CONFIG = BASE_CONFIG + R"EOF(
             name: route_config_0
 )EOF";
 
+// TODO(danzh): For better compatibility with HTTP integration test framework,
+// it's better to combine with HTTP_PROXY_CONFIG, and use config modifiers to
+// specify quic specific things.
 const std::string ConfigHelper::QUIC_HTTP_PROXY_CONFIG = BASE_UDP_LISTENER_CONFIG + R"EOF(
     filter_chains:
       transport_socket:
