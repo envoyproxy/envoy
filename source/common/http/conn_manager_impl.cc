@@ -296,53 +296,40 @@ Network::FilterStatus ConnectionManagerImpl::onData(Buffer::Instance& data, bool
     }
   }
 
-  // TODO(alyssawilk) clean this up after #8352 is well vetted.
-  bool redispatch;
-  do {
-    redispatch = false;
-
-    try {
-      codec_->dispatch(data);
-    } catch (const FrameFloodException& e) {
-      // TODO(mattklein123): This is an emergency substitute for the lack of connection level
-      // logging in the HCM. In a public follow up change we will add full support for connection
-      // level logging in the HCM, similar to what we have in tcp_proxy. This will allow abuse
-      // indicators to be stored in the connection level stream info, and then matched, sampled,
-      // etc. when logged.
-      const envoy::type::FractionalPercent default_value; // 0
-      if (runtime_.snapshot().featureEnabled("http.connection_manager.log_flood_exception",
-                                             default_value)) {
-        ENVOY_CONN_LOG(warn, "downstream HTTP flood from IP '{}': {}",
-                       read_callbacks_->connection(),
-                       read_callbacks_->connection().remoteAddress()->asString(), e.what());
-      }
-
-      handleCodecException(e.what());
-      return Network::FilterStatus::StopIteration;
-    } catch (const CodecProtocolException& e) {
-      stats_.named_.downstream_cx_protocol_error_.inc();
-      handleCodecException(e.what());
-      return Network::FilterStatus::StopIteration;
+  try {
+    codec_->dispatch(data);
+  } catch (const FrameFloodException& e) {
+    // TODO(mattklein123): This is an emergency substitute for the lack of connection level
+    // logging in the HCM. In a public follow up change we will add full support for connection
+    // level logging in the HCM, similar to what we have in tcp_proxy. This will allow abuse
+    // indicators to be stored in the connection level stream info, and then matched, sampled,
+    // etc. when logged.
+    const envoy::type::FractionalPercent default_value; // 0
+    if (runtime_.snapshot().featureEnabled("http.connection_manager.log_flood_exception",
+                                           default_value)) {
+      ENVOY_CONN_LOG(warn, "downstream HTTP flood from IP '{}': {}", read_callbacks_->connection(),
+                     read_callbacks_->connection().remoteAddress()->asString(), e.what());
     }
 
-    // Processing incoming data may release outbound data so check for closure here as well.
-    checkForDeferredClose();
+    handleCodecException(e.what());
+    return Network::FilterStatus::StopIteration;
+  } catch (const CodecProtocolException& e) {
+    stats_.named_.downstream_cx_protocol_error_.inc();
+    handleCodecException(e.what());
+    return Network::FilterStatus::StopIteration;
+  }
 
-    // The HTTP/1 codec will pause dispatch after a single message is complete. We want to
-    // either redispatch if there are no streams and we have more data. If we have a single
-    // complete non-WebSocket stream but have not responded yet we will pause socket reads
-    // to apply back pressure.
-    if (codec_->protocol() < Protocol::Http2) {
-      if (read_callbacks_->connection().state() == Network::Connection::State::Open &&
-          data.length() > 0 && streams_.empty()) {
-        redispatch = true;
-      }
+  // Processing incoming data may release outbound data so check for closure here as well.
+  checkForDeferredClose();
 
-      if (!streams_.empty() && streams_.front()->state_.remote_complete_) {
-        read_callbacks_->connection().readDisable(true);
-      }
+  // The HTTP/1 codec will pause parsing after a single message is complete. If we have a single
+  // complete non-WebSocket stream but have not responded yet we will pause socket reads
+  // to apply back pressure.
+  if (codec_->protocol() < Protocol::Http2) {
+    if (!streams_.empty() && streams_.front()->state_.remote_complete_) {
+      read_callbacks_->connection().readDisable(true);
     }
-  } while (redispatch);
+  }
 
   return Network::FilterStatus::StopIteration;
 }
