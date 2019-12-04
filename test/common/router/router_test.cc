@@ -1131,8 +1131,8 @@ TEST_F(RouterTest, TimeoutBudgetHistogramStat) {
   expectPerTryTimerCreate();
   expectResponseTimerCreate();
 
-  Http::TestHeaderMapImpl headers{{"x-envoy-upstream-rq-timeout-ms", "200"},
-                                  {"x-envoy-upstream-rq-per-try-timeout-ms", "100"}};
+  Http::TestHeaderMapImpl headers{{"x-envoy-upstream-rq-timeout-ms", "400"},
+                                  {"x-envoy-upstream-rq-per-try-timeout-ms", "200"}};
   HttpTestUtility::addDefaultHeaders(headers);
   router_.decodeHeaders(headers, false);
   Buffer::OwnedImpl data;
@@ -1140,18 +1140,18 @@ TEST_F(RouterTest, TimeoutBudgetHistogramStat) {
 
   // These are coming from CodeStatsImpl::chargeResponseTiming.
   EXPECT_CALL(cm_.thread_local_cluster_.cluster_.info_->stats_store_,
-              deliverHistogramToSinks(_, 50ull))
+              deliverHistogramToSinks(_, 80ull))
       .Times(3);
   // Global timeout budget used.
   EXPECT_CALL(cm_.thread_local_cluster_.cluster_.info_->stats_store_,
-              deliverHistogramToSinks(_, 2500ull));
+              deliverHistogramToSinks(_, 20ull));
   // Per-try budget used.
   EXPECT_CALL(cm_.thread_local_cluster_.cluster_.info_->stats_store_,
-              deliverHistogramToSinks(_, 5000ull));
+              deliverHistogramToSinks(_, 40ull));
 
   Http::HeaderMapPtr response_headers(new Http::TestHeaderMapImpl{{":status", "200"}});
   response_decoder->decodeHeaders(std::move(response_headers), false);
-  test_time_.sleep(std::chrono::milliseconds(50));
+  test_time_.sleep(std::chrono::milliseconds(80));
   response_decoder->decodeData(data, true);
 }
 
@@ -1168,7 +1168,7 @@ TEST_F(RouterTest, TimeoutBudgetHistogramStatOnlyGlobal) {
       }));
   expectPerTryTimerCreate();
 
-  Http::TestHeaderMapImpl headers{{"x-envoy-upstream-rq-timeout-ms", "100"}};
+  Http::TestHeaderMapImpl headers{{"x-envoy-upstream-rq-timeout-ms", "200"}};
   HttpTestUtility::addDefaultHeaders(headers);
   router_.decodeHeaders(headers, false);
   Buffer::OwnedImpl data;
@@ -1176,18 +1176,18 @@ TEST_F(RouterTest, TimeoutBudgetHistogramStatOnlyGlobal) {
 
   // These are coming from CodeStatsImpl::chargeResponseTiming.
   EXPECT_CALL(cm_.thread_local_cluster_.cluster_.info_->stats_store_,
-              deliverHistogramToSinks(_, 50ull))
+              deliverHistogramToSinks(_, 80ull))
       .Times(3);
   // Global timeout budget used.
   EXPECT_CALL(cm_.thread_local_cluster_.cluster_.info_->stats_store_,
-              deliverHistogramToSinks(_, 5000ull));
+              deliverHistogramToSinks(_, 40ull));
   // Per-try budget used.
   EXPECT_CALL(cm_.thread_local_cluster_.cluster_.info_->stats_store_,
               deliverHistogramToSinks(_, 0ull));
 
   Http::HeaderMapPtr response_headers(new Http::TestHeaderMapImpl{{":status", "200"}});
   response_decoder->decodeHeaders(std::move(response_headers), false);
-  test_time_.sleep(std::chrono::milliseconds(50));
+  test_time_.sleep(std::chrono::milliseconds(80));
   response_decoder->decodeData(data, true);
 }
 

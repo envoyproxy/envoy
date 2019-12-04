@@ -1,6 +1,5 @@
 #include "common/router/router.h"
 
-#include <algorithm>
 #include <chrono>
 #include <cstdint>
 #include <memory>
@@ -91,19 +90,19 @@ bool convertRequestHeadersForInternalRedirect(Http::HeaderMap& downstream_header
   return true;
 }
 
-constexpr uint64_t TimeoutPrecisionFactor = 10000;
+constexpr uint64_t TimeoutPrecisionFactor = 100;
 
 // Express percentage as [0, TimeoutPrecisionFactor] because stats do not accept floating point
 // values, and getting multiple significant figures on the histogram would be nice.
 uint64_t percentageOfTimeout(const std::chrono::milliseconds response_time,
                              const std::chrono::milliseconds timeout) {
+  // Timeouts of 0 are considered infinite.  Any portion of an infinite timeout used is still
+  // none of it.
   if (timeout.count() == 0) {
     return 0;
   }
 
-  return std::min(
-      TimeoutPrecisionFactor,
-      static_cast<uint64_t>(response_time.count() * TimeoutPrecisionFactor / timeout.count()));
+  return static_cast<uint64_t>(response_time.count() * TimeoutPrecisionFactor / timeout.count());
 }
 
 } // namespace
