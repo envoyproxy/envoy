@@ -1,0 +1,14 @@
+ifdef DOCKER_SDK
+  CPP_API:=${DOCKER_SDK}
+else
+  CPP_API:=$(shell git rev-parse --show-toplevel)/api/wasm/cpp
+endif
+
+foo:
+	echo $(CPP_API)
+
+%.wasm: %.cc ${CPP_API}/proxy_wasm_intrinsics.h ${CPP_API}/proxy_wasm_enums.h ${CPP_API}/proxy_wasm_externs.h ${CPP_API}/proxy_wasm_intrinsics.js
+	em++ -s STANDALONE_WASM=1 -s EMIT_EMSCRIPTEN_METADATA=1 -s EXPORTED_FUNCTIONS=['_malloc','_free'] --std=c++17 -O3 -I${CPP_API} -I/usr/local/include --js-library ${CPP_API}/proxy_wasm_intrinsics.js $*.cc -o $*.wasm
+
+clean:
+	rm *.wasm
