@@ -69,7 +69,7 @@ Envoy fetches all `Listener` and `Cluster` resources at startup. It then fetches
 `Cluster` resources. In effect, every `Listener` or `Cluster` resource is a root to part of Envoy's
 configuration tree.
 
-A non-proxy client such as gRPC will start by fetching only the specific `Listener` resources
+A non-proxy client such as gRPC might start by fetching only the specific `Listener` resources
 that it is interested in. It then fetches the `RouteConfiguration` resources required by those
 `Listener` resources, followed by whichever `Cluster` resources are required by those
 `RouteConfiguration` resources, followed by the `ClusterLoadAssignment` resources required
@@ -355,6 +355,11 @@ resources of the relevant type that are needed by the client must be included, e
 not change since the last response. This means that if the server has previously sent 100
 resources and only one of them has changed, it must resend all 100 of them, even the 99 that were
 not modified.
+
+Note that all of the protocol variants operate on units of whole named resources. There is
+no mechanism for providing incremental updates of repeated fields within a named resource.
+Most notably, there is currently no mechanism for incrementally updating individual
+endpoints within an EDS response.
 
 Deleting Resources
 ^^^^^^^^^^^^^^^^^^
