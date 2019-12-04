@@ -247,12 +247,12 @@ void BM_LeastRequestLoadBalancerChooseHost(benchmark::State& state) {
   }
 }
 BENCHMARK(BM_LeastRequestLoadBalancerChooseHost)
-    ->Args({10000, 1, 100000})
-    ->Args({10000, 2, 100000})
-    ->Args({10000, 3, 100000})
-    ->Args({10000, 10, 100000})
-    ->Args({10000, 100, 100000})
-    ->Args({10000, 1000, 100000})
+    ->Args({100, 1, 1000000})
+    ->Args({100, 2, 1000000})
+    ->Args({100, 3, 1000000})
+    ->Args({100, 10, 1000000})
+    ->Args({100, 50, 1000000})
+    ->Args({100, 100, 1000000})
     ->Unit(benchmark::kMillisecond);
 
 void BM_RingHashLoadBalancerChooseHost(benchmark::State& state) {
