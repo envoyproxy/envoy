@@ -327,8 +327,16 @@ void InstanceImpl::initialize(const Options& options,
   } else {
     ENVOY_LOG(warn, "No admin address given, so no admin HTTP server started.");
   }
-  config_tracker_entry_ =
+
+  bootstrap_config_entry_ =
       admin_->getConfigTracker().add("bootstrap", [this] { return dumpBootstrapConfig(); });
+
+  extensions_config_entry_ =
+      admin_->getConfigTracker().add("extensions", [this] { return dumpExtensionsConfig(); });
+
+  RELEASE_ASSERT(bootstrap_config_entry_, "'bootstrap' config key already present");
+  RELEASE_ASSERT(extensions_config_entry_, "'extensions' config key already present");
+
   if (initial_config.admin().address()) {
     admin_->addListenerToHandler(handler_.get());
   }
@@ -650,6 +658,18 @@ ProtobufTypes::MessagePtr InstanceImpl::dumpBootstrapConfig() {
   config_dump->mutable_bootstrap()->MergeFrom(bootstrap_);
   TimestampUtil::systemClockToTimestamp(bootstrap_config_update_time_,
                                         *(config_dump->mutable_last_updated()));
+  return config_dump;
+}
+
+ProtobufTypes::MessagePtr InstanceImpl::dumpExtensionsConfig() {
+  auto config_dump = std::make_unique<envoy::admin::v2alpha::ExtensionsConfigDump>();
+
+  for (const auto& ext : Envoy::Registry::FactoryCategoryRegistry::registeredFactories()) {
+    for (const auto& name : ext.second->registeredNames()) {
+      (*config_dump->mutable_categories())[ext.first].add_extensions(std::string(name));
+    }
+  }
+
   return config_dump;
 }
 

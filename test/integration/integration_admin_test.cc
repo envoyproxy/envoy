@@ -336,33 +336,48 @@ TEST_P(IntegrationAdminTest, Admin) {
 
   EXPECT_EQ("200", request("admin", "GET", "/config_dump", response));
   EXPECT_EQ("application/json", ContentType(response));
+
   json = Json::Factory::loadFromString(response->body());
-  size_t index = 0;
-  const std::string expected_types[] = {
+
+  const std::array<std::string, 7> expected_types = {
       "type.googleapis.com/envoy.admin.v2alpha.BootstrapConfigDump",
       "type.googleapis.com/envoy.admin.v2alpha.ClustersConfigDump",
+      "type.googleapis.com/envoy.admin.v2alpha.ExtensionsConfigDump",
       "type.googleapis.com/envoy.admin.v2alpha.ListenersConfigDump",
       "type.googleapis.com/envoy.admin.v2alpha.ScopedRoutesConfigDump",
       "type.googleapis.com/envoy.admin.v2alpha.RoutesConfigDump",
       "type.googleapis.com/envoy.admin.v2alpha.SecretsConfigDump"};
 
-  for (const Json::ObjectSharedPtr& obj_ptr : json->getObjectArray("configs")) {
-    EXPECT_TRUE(expected_types[index].compare(obj_ptr->getString("@type")) == 0);
-    index++;
-  }
+  const std::array<MessagePtr> messages = {
+      MessagePtr(new envoy::admin::v2alpha::BootstrapConfigDump()),
+      MessagePtr(new envoy::admin::v2alpha::ClustersConfigDump()),
+      MessagePtr(new envoy::admin::v2alpha::ExtensionsConfigDump()),
+      MessagePtr(new envoy::admin::v2alpha::ListenersConfigDump()),
+      MessagePtr(new envoy::admin::v2alpha::ScopedRoutesConfigDump()),
+      MessagePtr(new envoy::admin::v2alpha::RoutesConfigDump()),
+      MessagePtr(new envoy::admin::v2alpha::SecretsConfigDump()),
+  };
+
+  static_assert(expected_types.size() == messages.size(), "inconsistent config dump message types");
 
   // Validate we can parse as proto.
   envoy::admin::v2alpha::ConfigDump config_dump;
   TestUtility::loadFromJson(response->body(), config_dump);
-  EXPECT_EQ(6, config_dump.configs_size());
+  ASSERT_EQ(expected_types.size(), config_dump.configs_size());
+
+  // Check that each element has the expected type label and can be unmarshalled as the right type.
+  for (size_t index = 0; index < expected_types.size(); ++index) {
+    EXPECT_EQ(expected_types[index], json->getObjectArray("configs")[index]->getString("@type"));
+    EXPECT_TRUE(config_dump.configs(index).UnpackTo(messages[index].get()));
+  }
 
   // .. and that we can unpack one of the entries.
   envoy::admin::v2alpha::RoutesConfigDump route_config_dump;
-  config_dump.configs(4).UnpackTo(&route_config_dump);
+  ASSERT_TRUE(config_dump.configs(5).UnpackTo(&route_config_dump));
   EXPECT_EQ("route_config_0", route_config_dump.static_route_configs(0).route_config().name());
 
   envoy::admin::v2alpha::SecretsConfigDump secret_config_dump;
-  config_dump.configs(5).UnpackTo(&secret_config_dump);
+  ASSERT_TRUE(config_dump.configs(6).UnpackTo(&secret_config_dump));
   EXPECT_EQ("secret_static_0", secret_config_dump.static_secrets(0).name());
 
   // Validate that the "inboundonly" does not stop the default listener.

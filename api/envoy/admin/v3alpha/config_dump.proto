@@ -35,6 +35,7 @@ message ConfigDump {
   // * *clusters*: :ref:`ClustersConfigDump <envoy_api_msg_admin.v3alpha.ClustersConfigDump>`
   // * *listeners*: :ref:`ListenersConfigDump <envoy_api_msg_admin.v3alpha.ListenersConfigDump>`
   // * *routes*:  :ref:`RoutesConfigDump <envoy_api_msg_admin.v3alpha.RoutesConfigDump>`
+  // * *extensions*:  :ref:`ExtensionsConfigDump <envoy_api_msg_admin.v3alpha.ExtensionsConfigDump>`
   repeated google.protobuf.Any configs = 1;
 }
 
@@ -342,4 +343,21 @@ message SecretsConfigDump {
   // The dynamically loaded warming secrets. These are secrets that are currently undergoing
   // warming in preparation to service clusters or listeners.
   repeated DynamicSecret dynamic_warming_secrets = 3;
+}
+
+// This message lists the extensions that are available in the Envoy server.
+message ExtensionsConfigDump {
+  option (udpa.api.annotations.versioning).previous_message_type =
+      "envoy.admin.v2alpha.ExtensionsConfigDump";
+
+  message ExtensionList {
+    option (udpa.api.annotations.versioning).previous_message_type =
+        "envoy.admin.v2alpha.ExtensionsConfigDump.ExtensionList";
+
+    repeated string extensions = 1;
+  }
+
+  // A map of extension category name to a list of the names of the
+  // extensions that are available in this category.
+  map<string, ExtensionList> categories = 1;
 }

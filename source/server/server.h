@@ -240,6 +240,7 @@ public:
 
 private:
   ProtobufTypes::MessagePtr dumpBootstrapConfig();
+  ProtobufTypes::MessagePtr dumpExtensionsConfig();
   void flushStats();
   void flushStatsInternal();
   void updateServerStats();
@@ -296,7 +297,8 @@ private:
   bool terminated_;
   std::unique_ptr<Logger::FileSinkDelegate> file_logger_;
   envoy::config::bootstrap::v2::Bootstrap bootstrap_;
-  ConfigTracker::EntryOwnerPtr config_tracker_entry_;
+  ConfigTracker::EntryOwnerPtr bootstrap_config_entry_;
+  ConfigTracker::EntryOwnerPtr extensions_config_entry_;
   SystemTime bootstrap_config_update_time_;
   Grpc::AsyncClientManagerPtr async_client_manager_;
   Upstream::ProdClusterInfoFactory info_factory_;
