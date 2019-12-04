@@ -16,7 +16,37 @@ namespace Event {
  */
 class TimerUtils {
 public:
-  static void microsecondsToTimeval(const std::chrono::microseconds& d, timeval& tv);
+  /**
+   * Intended for consumption by enable(HR)Timer, this method is templated method to avoid implicit
+   * duration conversions for its input arguments. This lets us have an opportunity to check bounds
+   * before doing any conversions. When the passed in duration exceeds UINT32_T max days, the output
+   * timeval will be clipped to yield INT32_MAX days worth of seconds and and 0 usecs for the
+   * timeval output argument. ASSERTS on negative duration input.
+   * @tparam Duration std::chrono duration type, e.g. seconds, milliseconds, ...
+   * @param d duration value
+   * @param tv timeval to update
+   */
+  template <typename Duration> static void durationToTimeval(const Duration& d, timeval& tv) {
+    if (d.count() < 0) {
+      throw EnvoyException(
+          fmt::format("Negative duration passed to durationToTimeval(): {}", d.count()));
+    };
+    // We need to worry about:
+    // - overflowing tv.tv_sec
+    // - overflowing when doing narrowing conversions, e.g. seconds -> nanoseconds
+    // - practically, do we ever want to sleep for a super large amount of time?
+    constexpr int64_t clip_to = INT32_MAX; // 136.102208 years
+    auto secs = std::chrono::duration_cast<std::chrono::seconds>(d);
+    if (secs.count() > clip_to) {
+      tv.tv_sec = clip_to;
+      tv.tv_usec = 0;
+      return;
+    }
+
+    auto usecs = std::chrono::duration_cast<std::chrono::microseconds>(d - secs);
+    tv.tv_sec = secs.count();
+    tv.tv_usec = usecs.count();
+  }
 };
 
 /**
@@ -28,6 +58,7 @@ public:
 
   // Timer
   void disableTimer() override;
+
   void enableTimer(const std::chrono::milliseconds& d, const ScopeTrackedObject* scope) override;
   void enableHRTimer(const std::chrono::microseconds& us,
                      const ScopeTrackedObject* object) override;
@@ -35,6 +66,7 @@ public:
   bool enabled() override;
 
 private:
+  void internalEnableTimer(const timeval& tv, const ScopeTrackedObject* scope);
   TimerCb cb_;
   Dispatcher& dispatcher_;
   // This has to be atomic for alarms which are handled out of thread, for
