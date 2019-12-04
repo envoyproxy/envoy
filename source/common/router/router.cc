@@ -96,7 +96,7 @@ constexpr uint64_t TimeoutPrecisionFactor = 100;
 // values, and getting multiple significant figures on the histogram would be nice.
 uint64_t percentageOfTimeout(const std::chrono::milliseconds response_time,
                              const std::chrono::milliseconds timeout) {
-  // Timeouts of 0 are considered infinite.  Any portion of an infinite timeout used is still
+  // Timeouts of 0 are considered infinite. Any portion of an infinite timeout used is still
   // none of it.
   if (timeout.count() == 0) {
     return 0;
