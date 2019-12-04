@@ -29,13 +29,17 @@ namespace {
 // Before ASSERTS were added to ensure runtime features were restricted to
 // booleans, several integer features were added. isLegacyFeatures exempts
 // existing integer features from the checks until they can be cleaned up.
+// This includes
+// envoy.reloadable_features.max_[request|response]_headers_count from
+// include/envoy/http/codec.h as well as the http2_protocol_options overrides in
+// source/common/http/http2/codec_impl.cc
 bool isLegacyFeature(absl::string_view feature) {
   return absl::StartsWith(feature, "envoy.reloadable_features.http2_protocol_options.") ||
          absl::StartsWith(feature, "envoy.reloadable_features.max_re");
 }
 
 bool isRuntimeFeature(absl::string_view feature) {
-  return absl::StartsWith(feature, "envoy.reloadable_features");
+  return absl::StartsWith(feature, "envoy.reloadable_features.");
 }
 
 } // namespace
