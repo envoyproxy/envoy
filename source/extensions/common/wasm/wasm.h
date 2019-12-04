@@ -231,7 +231,7 @@ private:
   // Host Stats/Metrics
   WasmStats wasm_stats_;
 
-  // Plulgin Stats/Metrics
+  // Plugin Stats/Metrics
   Stats::StatNameSetSharedPtr stat_name_set_;
   uint32_t next_counter_metric_id_ = kMetricTypeCounter;
   uint32_t next_gauge_metric_id_ = kMetricTypeGauge;

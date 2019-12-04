@@ -20,7 +20,7 @@ message VmConfig {
   // VM. May be left blank.
   string vm_id = 1;
 
-  // The Wasm runtime type (see source/extensions/commmon/wasm/well_known_names.h).
+  // The Wasm runtime type (see source/extensions/common/wasm/well_known_names.h).
   string runtime = 2;
 
   // The Wasm code that Envoy will execute.
@@ -33,9 +33,9 @@ message VmConfig {
   bool allow_precompiled = 5;
 }
 
-// Base Configuration for Wasm Plugins e.g. fiters and services.
+// Base Configuration for Wasm Plugins e.g. filters and services.
 message PluginConfig {
-  // A unique name for a filters/services in a VM for use in identifiying the filter/service if
+  // A unique name for a filters/services in a VM for use in identifying the filter/service if
   // multiple filters/services are handled by the same vm_id and root_id and for logging/debugging.
   string name = 1;
 
@@ -52,7 +52,7 @@ message PluginConfig {
   string configuration = 4;
 }
 
-// WasmService is configured as a built-in *envoy.wasm_service* :ref:`ServiceConig
+// WasmService is configured as a built-in *envoy.wasm_service* :ref:`ServiceConfig
 // <envoy_api_msg_config.wasm.v2.ServiceConfig>`. This opaque configuration will be used to
 // create a Wasm Service.
 message WasmService {

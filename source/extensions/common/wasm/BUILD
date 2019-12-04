@@ -49,7 +49,7 @@ envoy_cc_library(
     hdrs = [
         "@envoy_api//wasm/cpp:common_hdrs",
     ],
-    strip_include_prefix="//external/envoy_api/wasm/cpp",
+    strip_include_prefix = "//external/envoy_api/wasm/cpp",
 )
 
 # NB: Used to break the circular dependency between wasm_lib and null_plugin_lib.
@@ -68,9 +68,9 @@ envoy_cc_library(
         "//source/common/common:stack_array",
         "//source/common/config:datasource_lib",
         "//source/common/stats:stats_lib",
+        "@envoy_api//envoy/config/wasm/v2:pkg_cc_proto",
     ],
 )
-
 
 envoy_cc_library(
     name = "wasm_interoperation_lib",

@@ -27,6 +27,5 @@ envoy_cc_library(
         "//source/extensions/common/wasm:wasm_hdr",
         "//source/extensions/common/wasm:well_known_names",
         "//source/extensions/common/wasm/null:null_plugin_lib",
-        "@envoy_api//envoy/config/wasm/v2:pkg_cc_proto",
     ],
 )

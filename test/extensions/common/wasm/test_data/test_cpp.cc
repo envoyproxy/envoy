@@ -1,7 +1,7 @@
 // NOLINT(namespace-envoy)
 #include <cmath>
-#include <string>
 #include <limits>
+#include <string>
 
 #ifndef NULL_PLUGIN
 #include "proxy_wasm_intrinsics.h"
@@ -92,7 +92,7 @@ WASM_EXPORT(uint32_t, proxy_on_start, (uint32_t, uint32_t context_id)) {
     CHECK_RESULT(proxy_get_metric(g, &value));
     message = std::string("get gauge = ") + std::to_string(value);
     proxy_log(LogLevel::warn, message.c_str(), message.size());
-    // Get on histograms is not suppoorted.
+    // Get on histograms is not supported.
     if (proxy_get_metric(h, &value) != WasmResult::Ok) {
       message = std::string("get histogram = Unsupported");
       proxy_log(LogLevel::error, message.c_str(), message.size());

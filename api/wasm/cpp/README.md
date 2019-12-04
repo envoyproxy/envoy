@@ -46,7 +46,7 @@ docker run -v $PWD:/work -w /work  wasmsdk:v2 /build_wasm.sh
 
 ### Caching the standard libraries
 
-The first time that emscripten runs it will generate the standard libraries.  To cache these in the docker image,
+The first time that emscripten runs it will generate the standard libraries. To cache these in the docker image,
 after the first successful compilation (e.g myproject.cc above), commit the image with the standard libraries:
 
 ```bash
@@ -111,7 +111,7 @@ all: plugin.wasm
 
 ### Ownership of the resulting .wasm files
 
-The compiled files may be owned by root.  To chown them add the follow lines to the Makefile and docker invocation:
+The compiled files may be owned by root. To chown them add the follow lines to the Makefile and docker invocation:
 
 ```
 DOCKER_SDK=/sdk
@@ -135,7 +135,7 @@ If you do not wish to use the Docker file, the dependencies can be installed by 
 
 ### protobuf v3.9.1
 
-You must install the version of protobuf on your build system that matches the libprotobuf.a files (without any patches) so that the generated code matches the .a library.  Currently this is based on tag v3.9.1 of https://github.com/protocolbuffers/protobuf.
+You must install the version of protobuf on your build system that matches the libprotobuf.a files (without any patches) so that the generated code matches the .a library. Currently this is based on tag v3.9.1 of https://github.com/protocolbuffers/protobuf.
 
 ```bash
 git clone https://github.com/protocolbuffers/protobuf
