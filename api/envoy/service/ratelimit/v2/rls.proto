@@ -102,7 +102,7 @@ message RateLimitResponse {
   repeated DescriptorStatus statuses = 2;
 
   // A list of headers to add to the response
-  // [#next-major-version: rename to response_headers_to_add]
+  // [#rename-at-next-major-version: response_headers_to_add]
   repeated api.v2.core.HeaderValue headers = 3;
 
   // A list of headers to add to the request when forwarded

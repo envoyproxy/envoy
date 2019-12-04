@@ -44,8 +44,7 @@ message PerRouteConfig {
     // that the value set here would be used for DNS lookups whereas the value set in the HCM would
     // be used for host header forwarding which is not the desired outcome.
     //
-    // [#next-major-version: host_rewrite_literal]
-    string host_rewrite = 1;
+    string host_rewrite_literal = 1;
 
     // Indicates that before DNS lookup, the host header will be swapped with
     // the value of this header. If not set or empty, the original host header
@@ -58,7 +57,6 @@ message PerRouteConfig {
     // value set here would be used for DNS lookups whereas the value set in the HCM would be used
     // for host header forwarding which is not the desired outcome.
     //
-    // [#next-major-version: host_rewrite_header]
-    string auto_host_rewrite_header = 2;
+    string host_rewrite_header = 2;
   }
 }

@@ -25,6 +25,7 @@ NEXT_FREE_FIELD_ANNOTATION = 'next-free-field'
 # Comment that allows for easy searching for things that need cleaning up in the next major
 # API version.
 NEXT_MAJOR_VERSION_ANNOTATION = 'next-major-version'
+RENAME_AT_NEXT_MAJOR_VERSION_ANNOTATION = 'rename-at-next-major-version'
 
 # Comment. Just used for adding text that will not go into the docs at all.
 COMMENT_ANNOTATION = 'comment'
@@ -35,6 +36,7 @@ VALID_ANNOTATIONS = set([
     NOT_IMPLEMENTED_HIDE_ANNOTATION,
     NEXT_FREE_FIELD_ANNOTATION,
     NEXT_MAJOR_VERSION_ANNOTATION,
+    RENAME_AT_NEXT_MAJOR_VERSION_ANNOTATION,
     COMMENT_ANNOTATION,
 ])
 

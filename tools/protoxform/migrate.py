@@ -3,14 +3,17 @@
 import copy
 import re
 
+from tools.api_proto_plugin import annotations
 from tools.api_proto_plugin import traverse
 from tools.api_proto_plugin import visitor
+from tools.api_proto_plugin.type_context import Comment
 from tools.protoxform import options
 from tools.protoxform import utils
 
 from google.api import annotations_pb2
 
 ENVOY_COMMENT_WITH_TYPE_REGEX = re.compile('<envoy_api_(msg|enum_value|field|enum)_([\w\.]+)>')
+COMMENT_ANNOTATION_XFORMS = {annotations.RENAME_AT_NEXT_MAJOR_VERSION_ANNOTATION: lambda _: None}
 
 
 class UpgradeVisitor(visitor.Visitor):
@@ -22,7 +25,9 @@ class UpgradeVisitor(visitor.Visitor):
   def __init__(self, typedb):
     self._typedb = typedb
 
-  def _UpgradedComment(self, c):
+  def _UpgradedComment(self, c, annotation_xforms=None):
+    if annotation_xforms:
+      c = Comment(c).getCommentWithTransforms(annotation_xforms).raw
 
     def UpgradeType(match):
       # We're upgrading a type within a RST anchor reference here. These are
@@ -72,6 +77,18 @@ class UpgradeVisitor(visitor.Visitor):
     proto.reserved_name.append(field_or_value.name)
     options.AddHideOption(field_or_value.options)
 
+  def _Rename(self, type_context, field_or_value):
+    """Rename a field or value in a message/enum proto.
+
+    Args:
+      type_context: TypeContext of the field or value.
+      field_or_value: field or value inside proto.
+    """
+
+    leading_comment = type_context.leading_comment
+    field_or_value.name = leading_comment.annotations.get(
+        annotations.RENAME_AT_NEXT_MAJOR_VERSION_ANNOTATION, field_or_value.name)
+
   def VisitService(self, service_proto, type_context):
     upgraded_proto = copy.deepcopy(service_proto)
     for m in upgraded_proto.method:
@@ -90,7 +107,7 @@ class UpgradeVisitor(visitor.Visitor):
       options.AddHideOption(upgraded_proto.options)
     options.SetVersioningAnnotation(upgraded_proto.options, type_context.name)
     # Mark deprecated fields as ready for deletion by protoxform.
-    for f in upgraded_proto.field:
+    for index, f in enumerate(upgraded_proto.field):
       if f.options.deprecated:
         self._Deprecate(upgraded_proto, f)
         # Make sure the type name is erased so it isn't picked up by protoxform
@@ -98,6 +115,7 @@ class UpgradeVisitor(visitor.Visitor):
         f.type_name = ""
       else:
         f.type_name = self._UpgradedType(f.type_name)
+      self._Rename(type_context.ExtendField(index, f.name), f)
     # Upgrade nested messages.
     del upgraded_proto.nested_type[:]
     upgraded_proto.nested_type.extend(nested_msgs)
@@ -126,7 +144,8 @@ class UpgradeVisitor(visitor.Visitor):
     upgraded_proto.name = self._typedb.next_version_proto_paths[upgraded_proto.name]
     # Upgrade comments.
     for location in upgraded_proto.source_code_info.location:
-      location.leading_comments = self._UpgradedComment(location.leading_comments)
+      location.leading_comments = self._UpgradedComment(location.leading_comments,
+                                                        COMMENT_ANNOTATION_XFORMS)
       location.trailing_comments = self._UpgradedComment(location.trailing_comments)
       for n, c in enumerate(location.leading_detached_comments):
         location.leading_detached_comments[n] = self._UpgradedComment(c)
