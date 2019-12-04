@@ -31,10 +31,6 @@ public:
       throw EnvoyException(
           fmt::format("Negative duration passed to durationToTimeval(): {}", d.count()));
     };
-    // We need to worry about:
-    // - overflowing tv
-    // - overflowing when doing narrowing conversions, e.g. seconds -> nanoseconds
-    // - practically, do we ever want to sleep for a super large amount of time?
     constexpr int64_t clip_to = INT32_MAX; // 136.102208 years
     auto secs = std::chrono::duration_cast<std::chrono::seconds>(d);
     if (secs.count() > clip_to) {
