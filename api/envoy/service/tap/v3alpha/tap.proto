@@ -10,6 +10,8 @@ option java_generic_services = true;
 import "envoy/api/v3alpha/core/base.proto";
 import "envoy/data/tap/v3alpha/wrapper.proto";
 
+import "udpa/api/annotations/versioning.proto";
+
 import "validate/validate.proto";
 
 // [#protodoc-title: Tap Sink Service]
@@ -27,7 +29,13 @@ service TapSinkService {
 // [#not-implemented-hide:] Stream message for the Tap API. Envoy will open a stream to the server
 // and stream taps without ever expecting a response.
 message StreamTapsRequest {
+  option (udpa.api.annotations.versioning).previous_message_type =
+      "envoy.service.tap.v2alpha.StreamTapsRequest";
+
   message Identifier {
+    option (udpa.api.annotations.versioning).previous_message_type =
+        "envoy.service.tap.v2alpha.StreamTapsRequest.Identifier";
+
     // The node sending taps over the stream.
     api.v3alpha.core.Node node = 1 [(validate.rules).message = {required: true}];
 
@@ -50,4 +58,6 @@ message StreamTapsRequest {
 
 // [#not-implemented-hide:]
 message StreamTapsResponse {
+  option (udpa.api.annotations.versioning).previous_message_type =
+      "envoy.service.tap.v2alpha.StreamTapsResponse";
 }

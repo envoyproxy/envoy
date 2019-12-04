@@ -12,6 +12,8 @@ import "envoy/type/v3alpha/percent.proto";
 import "google/protobuf/duration.proto";
 import "google/protobuf/wrappers.proto";
 
+import "udpa/api/annotations/versioning.proto";
+
 import "validate/validate.proto";
 
 // [#protodoc-title: Health check]
@@ -20,6 +22,9 @@ import "validate/validate.proto";
 
 // [#next-free-field: 6]
 message HealthCheck {
+  option (udpa.api.annotations.versioning).previous_message_type =
+      "envoy.config.filter.http.health_check.v2.HealthCheck";
+
   reserved 2;
 
   // Specifies whether the filter operates in pass through mode or not.

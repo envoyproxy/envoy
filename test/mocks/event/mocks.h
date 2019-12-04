@@ -147,6 +147,8 @@ public:
   MOCK_METHOD0(disableTimer, void());
   MOCK_METHOD2(enableTimer,
                void(const std::chrono::milliseconds&, const ScopeTrackedObject* scope));
+  MOCK_METHOD2(enableHRTimer,
+               void(const std::chrono::microseconds&, const ScopeTrackedObject* scope));
   MOCK_METHOD0(enabled, bool());
 
   MockDispatcher* dispatcher_{};

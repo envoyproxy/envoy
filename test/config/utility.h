@@ -139,7 +139,7 @@ public:
 
   // Set the HTTP access log for the first HCM (if present) to a given file. The default is
   // /dev/null.
-  bool setAccessLog(const std::string& filename);
+  bool setAccessLog(const std::string& filename, absl::string_view format = "");
 
   // Renames the first listener to the name specified.
   void renameListener(const std::string& name);

@@ -591,7 +591,7 @@ private:
 
     // Tracing::TracingConfig
     Tracing::OperationName operationName() const override;
-    const std::vector<Http::LowerCaseString>& requestHeadersForTags() const override;
+    const Tracing::CustomTagMap* customTags() const override;
     bool verbose() const override;
     uint32_t maxPathTagLength() const override;
 
@@ -619,6 +619,8 @@ private:
     void
     requestRouteConfigUpdate(Http::RouteConfigUpdatedCallbackSharedPtr route_config_updated_cb);
     bool canRequestRouteConfigUpdate();
+
+    void refreshCachedTracingCustomTags();
 
     // Pass on watermark callbacks to watermark subscribers. This boils down to passing watermark
     // events for this stream and the downstream connection to the router filter.
@@ -705,6 +707,13 @@ private:
       return request_metadata_map_vector_.get();
     }
 
+    Tracing::CustomTagMap& getOrMakeTracingCustomTagMap() {
+      if (tracing_custom_tags_ == nullptr) {
+        tracing_custom_tags_ = std::make_unique<Tracing::CustomTagMap>();
+      }
+      return *tracing_custom_tags_;
+    }
+
     ConnectionManagerImpl& connection_manager_;
     Router::RouteConfigProvider* route_config_provider_;
     Router::ConfigConstSharedPtr snapped_route_config_;
@@ -751,6 +760,7 @@ private:
     bool encoding_headers_only_{};
     Network::Socket::OptionsSharedPtr upstream_options_;
     std::unique_ptr<RouteConfigUpdateRequester> route_config_update_requester_;
+    std::unique_ptr<Tracing::CustomTagMap> tracing_custom_tags_{nullptr};
   };
 
   using ActiveStreamPtr = std::unique_ptr<ActiveStream>;

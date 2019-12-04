@@ -9,14 +9,22 @@ option java_package = "io.envoyproxy.envoy.config.common.tap.v3alpha";
 import "envoy/api/v3alpha/core/config_source.proto";
 import "envoy/service/tap/v3alpha/common.proto";
 
+import "udpa/api/annotations/versioning.proto";
+
 import "validate/validate.proto";
 
 // [#protodoc-title: Common tap extension configuration]
 
 // Common configuration for all tap extensions.
 message CommonExtensionConfig {
+  option (udpa.api.annotations.versioning).previous_message_type =
+      "envoy.config.common.tap.v2alpha.CommonExtensionConfig";
+
   // [#not-implemented-hide:]
   message TapDSConfig {
+    option (udpa.api.annotations.versioning).previous_message_type =
+        "envoy.config.common.tap.v2alpha.CommonExtensionConfig.TapDSConfig";
+
     // Configuration for the source of TapDS updates for this Cluster.
     api.v3alpha.core.ConfigSource config_source = 1 [(validate.rules).message = {required: true}];
 
@@ -42,6 +50,9 @@ message CommonExtensionConfig {
 // Configuration for the admin handler. See :ref:`here <config_http_filters_tap_admin_handler>` for
 // more information.
 message AdminConfig {
+  option (udpa.api.annotations.versioning).previous_message_type =
+      "envoy.config.common.tap.v2alpha.AdminConfig";
+
   // Opaque configuration ID. When requests are made to the admin handler, the passed opaque ID is
   // matched to the configured filter opaque ID to determine which filter to configure.
   string config_id = 1 [(validate.rules).string = {min_bytes: 1}];

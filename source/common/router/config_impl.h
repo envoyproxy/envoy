@@ -349,10 +349,13 @@ public:
   // Tracing::getOverallSampling
   const envoy::type::FractionalPercent& getOverallSampling() const override;
 
+  const Tracing::CustomTagMap& getCustomTags() const override;
+
 private:
   envoy::type::FractionalPercent client_sampling_;
   envoy::type::FractionalPercent random_sampling_;
   envoy::type::FractionalPercent overall_sampling_;
+  Tracing::CustomTagMap custom_tags_;
 };
 
 /**
