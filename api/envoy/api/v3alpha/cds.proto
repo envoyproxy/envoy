@@ -563,7 +563,7 @@ message Cluster {
   // :ref:`statistics <config_cluster_manager_cluster_stats>` if :ref:`alt_stat_name
   // <envoy_api_field_api.v3alpha.Cluster.alt_stat_name>` is not provided.
   // Any ``:`` in the cluster name will be converted to ``_`` when emitting statistics.
-  string name = 1 [(validate.rules).string = {min_bytes: 1}];
+  string name = 1 [(validate.rules).string = {min_bytes: 1 pattern: "^[^\000\n\r]+$"}];
 
   // An optional alternative to the cluster name to be used while emitting stats.
   // Any ``:`` in the name will be converted to ``_`` when emitting statistics. This should not be

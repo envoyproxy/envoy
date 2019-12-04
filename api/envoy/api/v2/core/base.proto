@@ -167,14 +167,14 @@ message RuntimeFeatureFlag {
 message HeaderValue {
   // Header name.
   string key = 1
-      [(validate.rules).string = {min_bytes: 1 max_bytes: 16384, pattern: "^[^\0\n\r]+$"}];
+      [(validate.rules).string = {min_bytes: 1 max_bytes: 16384 pattern: "^[^\000\n\r]+$"}];
 
   // Header value.
   //
   // The same :ref:`format specifier <config_access_log_format>` as used for
   // :ref:`HTTP access logging <config_access_log>` applies here, however
   // unknown header values are replaced with the empty string instead of `-`.
-  string value = 2 [(validate.rules).string = {max_bytes: 16384, pattern: "^[^\0\n\r]+$"}];
+  string value = 2 [(validate.rules).string = {max_bytes: 16384 pattern: "^[^\000\n\r]+$"}];
 }
 
 // Header name/value pair plus option to control append behavior.

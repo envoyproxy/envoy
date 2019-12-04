@@ -72,7 +72,10 @@ message VirtualHost {
   //   The longest wildcards match first.
   //   Only a single virtual host in the entire route configuration can match on ``*``. A domain
   //   must be unique across all virtual hosts or the config will fail to load.
-  repeated string domains = 2 [(validate.rules).repeated = {min_items: 1}];
+  repeated string domains = 2 [(validate.rules).repeated = {
+    min_items: 1
+    items {string {pattern: "^[^\000\n\r]+$"}}
+  }];
 
   // The list of routes that will be matched, in order, for incoming requests.
   // The first route that matches will be used.
@@ -101,7 +104,8 @@ message VirtualHost {
 
   // Specifies a list of HTTP headers that should be removed from each request
   // handled by this virtual host.
-  repeated string request_headers_to_remove = 13;
+  repeated string request_headers_to_remove = 13
+      [(validate.rules).repeated = {items {string {pattern: "^[^\000\n\r]+$"}}}];
 
   // Specifies a list of HTTP headers that should be added to each response
   // handled by this virtual host. Headers specified at this level are applied
@@ -114,7 +118,8 @@ message VirtualHost {
 
   // Specifies a list of HTTP headers that should be removed from each response
   // handled by this virtual host.
-  repeated string response_headers_to_remove = 11;
+  repeated string response_headers_to_remove = 11
+      [(validate.rules).repeated = {items {string {pattern: "^[^\000\n\r]+$"}}}];
 
   // Indicates that the virtual host has a CORS policy.
   CorsPolicy cors = 8;
@@ -667,7 +672,7 @@ message RouteAction {
     //
     //   Internally, Envoy always uses the HTTP/2 *:authority* header to represent the HTTP/1
     //   *Host* header. Thus, if attempting to match on *Host*, match on *:authority* instead.
-    string cluster_header = 2 [(validate.rules).string = {min_bytes: 1}];
+    string cluster_header = 2 [(validate.rules).string = {min_bytes: 1 pattern: "^[^\000\r\n]+$"}];
 
     // Multiple upstream clusters can be specified for a given route. The
     // request is routed to one of the upstream clusters based on weights
