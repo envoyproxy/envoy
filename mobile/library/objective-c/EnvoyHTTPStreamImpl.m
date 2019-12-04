@@ -15,7 +15,7 @@ typedef struct {
   // instances to be reused with multiple streams if desired.
   __unsafe_unretained EnvoyHTTPStreamImpl *stream;
   __unsafe_unretained EnvoyHTTPCallbacks *callbacks;
-  atomic_bool *canceled;
+  atomic_bool *closed;
 } ios_context;
 
 static envoy_data toNativeData(NSData *data) {
@@ -84,11 +84,22 @@ static EnvoyHeaders *to_ios_headers(envoy_headers headers) {
 
 #pragma mark - C callbacks
 
+// Return whether a callback should be allowed to continue with execution. This ensures at most one
+// 'terminal' callback is issued for any given stream.
+static bool dispatchable(atomic_bool *closed, bool close) {
+  if (close) {
+    // Set closed to true and return true if not previously closed.
+    return !atomic_exchange(closed, YES);
+  }
+  // Return true if not yet closed.
+  return !atomic_load(closed);
+}
+
 static void ios_on_headers(envoy_headers headers, bool end_stream, void *context) {
   ios_context *c = (ios_context *)context;
   EnvoyHTTPCallbacks *callbacks = c->callbacks;
   dispatch_async(callbacks.dispatchQueue, ^{
-    if (atomic_load(c->canceled) || !callbacks.onHeaders) {
+    if (!dispatchable(c->closed, end_stream) || !callbacks.onHeaders) {
       return;
     }
 
@@ -100,7 +111,7 @@ static void ios_on_data(envoy_data data, bool end_stream, void *context) {
   ios_context *c = (ios_context *)context;
   EnvoyHTTPCallbacks *callbacks = c->callbacks;
   dispatch_async(callbacks.dispatchQueue, ^{
-    if (atomic_load(c->canceled) || !callbacks.onData) {
+    if (!dispatchable(c->closed, end_stream) || !callbacks.onData) {
       return;
     }
 
@@ -112,7 +123,7 @@ static void ios_on_metadata(envoy_headers metadata, void *context) {
   ios_context *c = (ios_context *)context;
   EnvoyHTTPCallbacks *callbacks = c->callbacks;
   dispatch_async(callbacks.dispatchQueue, ^{
-    if (atomic_load(c->canceled) || !callbacks.onMetadata) {
+    if (atomic_load(c->closed) || !callbacks.onMetadata) {
       return;
     }
 
@@ -124,7 +135,7 @@ static void ios_on_trailers(envoy_headers trailers, void *context) {
   ios_context *c = (ios_context *)context;
   EnvoyHTTPCallbacks *callbacks = c->callbacks;
   dispatch_async(callbacks.dispatchQueue, ^{
-    if (atomic_load(c->canceled) || !callbacks.onTrailers) {
+    if (!dispatchable(c->closed, YES) || !callbacks.onTrailers) {
       return;
     }
 
@@ -165,7 +176,7 @@ static void ios_on_error(envoy_error error, void *context) {
   EnvoyHTTPCallbacks *callbacks = c->callbacks;
   EnvoyHTTPStreamImpl *stream = c->stream;
   dispatch_async(callbacks.dispatchQueue, ^{
-    if (!atomic_load(c->canceled) && callbacks.onError) {
+    if (!dispatchable(c->closed, YES) && callbacks.onError) {
       NSString *errorMessage = [[NSString alloc] initWithBytes:error.message.bytes
                                                         length:error.message.length
                                                       encoding:NSUTF8StringEncoding];
@@ -204,8 +215,8 @@ static void ios_on_error(envoy_error error, void *context) {
   ios_context *context = safe_malloc(sizeof(ios_context));
   context->callbacks = callbacks;
   context->stream = self;
-  context->canceled = safe_malloc(sizeof(atomic_bool));
-  atomic_store(context->canceled, NO);
+  context->closed = safe_malloc(sizeof(atomic_bool));
+  atomic_store(context->closed, NO);
 
   // Create native callbacks
   envoy_http_callbacks native_callbacks = {ios_on_headers,  ios_on_data,  ios_on_trailers,
@@ -228,7 +239,7 @@ static void ios_on_error(envoy_error error, void *context) {
 
 - (void)dealloc {
   ios_context *context = _nativeCallbacks.context;
-  free(context->canceled);
+  free(context->closed);
   free(context);
 }
 
@@ -252,13 +263,16 @@ static void ios_on_error(envoy_error error, void *context) {
   ios_context *context = _nativeCallbacks.context;
   // Step 1: atomically and synchronously prevent the execution of further callbacks other than
   // on_cancel.
-  if (!atomic_exchange(context->canceled, YES)) {
+  if (!dispatchable(context->closed, YES)) {
     // Step 2: directly fire the cancel callback.
     ios_on_cancel(context);
     // Step 3: propagate the reset into native code.
     reset_stream(_streamHandle);
     return 0;
   } else {
+    // Propagate reset, but don't worry about callbacks (another terminal callback has already
+    // fired).
+    reset_stream(_streamHandle);
     return 1;
   }
 }
