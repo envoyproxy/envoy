@@ -6,10 +6,15 @@ option java_outer_classname = "MetricsProto";
 option java_multiple_files = true;
 option java_package = "io.envoyproxy.envoy.admin.v3alpha";
 
+import "udpa/api/annotations/versioning.proto";
+
 // [#protodoc-title: Metrics]
 
 // Proto representation of an Envoy Counter or Gauge value.
 message SimpleMetric {
+  option (udpa.api.annotations.versioning).previous_message_type =
+      "envoy.admin.v2alpha.SimpleMetric";
+
   enum Type {
     COUNTER = 0;
     GAUGE = 1;

@@ -119,18 +119,23 @@ void ClusterManagerInitHelper::initializeSecondaryClusters() {
 void ClusterManagerInitHelper::maybeFinishInitialize() {
   // Do not do anything if we are still doing the initial static load or if we are waiting for
   // CDS initialize.
+  ENVOY_LOG(debug, "maybe finish initialize state: {}", enumToInt(state_));
   if (state_ == State::Loading || state_ == State::WaitingForCdsInitialize) {
     return;
   }
 
   // If we are still waiting for primary clusters to initialize, do nothing.
   ASSERT(state_ == State::WaitingForStaticInitialize || state_ == State::CdsInitialized);
+  ENVOY_LOG(debug, "maybe finish initialize primary init clusters empty: {}",
+            primary_init_clusters_.empty());
   if (!primary_init_clusters_.empty()) {
     return;
   }
 
   // If we are still waiting for secondary clusters to initialize, see if we need to first call
   // initialize on them. This is only done once.
+  ENVOY_LOG(debug, "maybe finish initialize secondary init clusters empty: {}",
+            secondary_init_clusters_.empty());
   if (!secondary_init_clusters_.empty()) {
     if (!started_secondary_initialize_) {
       ENVOY_LOG(info, "cm init: initializing secondary clusters");
@@ -153,6 +158,7 @@ void ClusterManagerInitHelper::maybeFinishInitialize() {
   // At this point, if we are doing static init, and we have CDS, start CDS init. Otherwise, move
   // directly to initialized.
   started_secondary_initialize_ = false;
+  ENVOY_LOG(debug, "maybe finish initialize cds api ready: {}", cds_ != nullptr);
   if (state_ == State::WaitingForStaticInitialize && cds_) {
     ENVOY_LOG(info, "cm init: initializing cds");
     state_ = State::WaitingForCdsInitialize;
@@ -218,6 +224,12 @@ ClusterManagerImpl::ClusterManagerImpl(
       outlier_event_logger_.reset(
           new Outlier::EventLoggerImpl(log_manager, event_log_file_path, time_source_));
     }
+  }
+
+  // We need to know whether we're zone aware early on, so make sure we do this lookup
+  // before we load any clusters.
+  if (!cm_config.local_cluster_name().empty()) {
+    local_cluster_name_ = cm_config.local_cluster_name();
   }
 
   const auto& dyn_resources = bootstrap.dynamic_resources();
@@ -288,19 +300,15 @@ ClusterManagerImpl::ClusterManagerImpl(
   cm_stats_.cluster_added_.add(bootstrap.static_resources().clusters().size());
   updateClusterCounts();
 
-  absl::optional<std::string> local_cluster_name;
-  if (!cm_config.local_cluster_name().empty()) {
-    local_cluster_name_ = cm_config.local_cluster_name();
-    local_cluster_name = cm_config.local_cluster_name();
-    if (active_clusters_.find(local_cluster_name.value()) == active_clusters_.end()) {
-      throw EnvoyException(
-          fmt::format("local cluster '{}' must be defined", local_cluster_name.value()));
-    }
+  if (local_cluster_name_ &&
+      (active_clusters_.find(local_cluster_name_.value()) == active_clusters_.end())) {
+    throw EnvoyException(
+        fmt::format("local cluster '{}' must be defined", local_cluster_name_.value()));
   }
 
   // Once the initial set of static bootstrap clusters are created (including the local cluster),
   // we can instantiate the thread local cluster manager.
-  tls_->set([this, local_cluster_name](
+  tls_->set([this, local_cluster_name = local_cluster_name_](
                 Event::Dispatcher& dispatcher) -> ThreadLocal::ThreadLocalObjectSharedPtr {
     return std::make_shared<ThreadLocalClusterManagerImpl>(*this, dispatcher, local_cluster_name);
   });
@@ -1060,7 +1068,6 @@ void ClusterManagerImpl::ThreadLocalClusterManagerImpl::updateClusterMembership(
     const std::string& name, uint32_t priority, PrioritySet::UpdateHostsParams update_hosts_params,
     LocalityWeightsConstSharedPtr locality_weights, const HostVector& hosts_added,
     const HostVector& hosts_removed, ThreadLocal::Slot& tls, uint64_t overprovisioning_factor) {
-
   ThreadLocalClusterManagerImpl& config = tls.getTyped<ThreadLocalClusterManagerImpl>();
 
   ASSERT(config.thread_local_clusters_.find(name) != config.thread_local_clusters_.end());

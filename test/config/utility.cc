@@ -603,7 +603,7 @@ void ConfigHelper::addSslConfig(const ServerSslOptions& options) {
   filter_chain->mutable_transport_socket()->mutable_typed_config()->PackFrom(tls_context);
 }
 
-bool ConfigHelper::setAccessLog(const std::string& filename) {
+bool ConfigHelper::setAccessLog(const std::string& filename, absl::string_view format) {
   if (getFilterFromListener("envoy.http_connection_manager") == nullptr) {
     return false;
   }
@@ -611,6 +611,9 @@ bool ConfigHelper::setAccessLog(const std::string& filename) {
   envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager hcm_config;
   loadHttpConnectionManager(hcm_config);
   envoy::config::accesslog::v2::FileAccessLog access_log_config;
+  if (!format.empty()) {
+    access_log_config.set_format(std::string(format));
+  }
   access_log_config.set_path(filename);
   hcm_config.mutable_access_log(0)->mutable_typed_config()->PackFrom(access_log_config);
   storeHttpConnectionManager(hcm_config);

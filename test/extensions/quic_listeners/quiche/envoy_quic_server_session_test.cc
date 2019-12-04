@@ -295,7 +295,8 @@ TEST_P(EnvoyQuicServerSessionTest, ConnectionClose) {
 
   std::string error_details("dummy details");
   quic::QuicErrorCode error(quic::QUIC_INVALID_FRAME_DATA);
-  quic::QuicConnectionCloseFrame frame(error, error_details);
+  quic::QuicConnectionCloseFrame frame(quic_version_[0].transport_version, error, error_details,
+                                       /* transport_close_frame_type = */ 0);
   EXPECT_CALL(network_connection_callbacks_, onEvent(Network::ConnectionEvent::RemoteClose));
   quic_connection_->OnConnectionCloseFrame(frame);
   EXPECT_EQ(absl::StrCat(quic::QuicErrorCodeToString(error), " with details: ", error_details),

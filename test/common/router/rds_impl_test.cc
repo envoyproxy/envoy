@@ -28,6 +28,7 @@ using testing::_;
 using testing::Eq;
 using testing::InSequence;
 using testing::Invoke;
+using testing::Return;
 using testing::ReturnRef;
 
 namespace Envoy {
@@ -261,6 +262,50 @@ TEST_F(RdsImplTest, FailureSubscription) {
   EXPECT_CALL(init_watcher_, ready());
   // onConfigUpdateFailed() should not be called for gRPC stream connection failure
   rds_callbacks_->onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason::FetchTimedout, {});
+}
+
+class RdsRouteConfigSubscriptionTest : public RdsTestBase {
+public:
+  RdsRouteConfigSubscriptionTest() {
+    EXPECT_CALL(server_factory_context_.admin_.config_tracker_, add_("routes", _));
+    route_config_provider_manager_ =
+        std::make_unique<RouteConfigProviderManagerImpl>(server_factory_context_.admin_);
+  }
+
+  ~RdsRouteConfigSubscriptionTest() override {
+    server_factory_context_.thread_local_.shutdownThread();
+  }
+
+  std::unique_ptr<RouteConfigProviderManagerImpl> route_config_provider_manager_;
+};
+
+// Verifies that maybeCreateInitManager() creates a noop init manager if the main init manager is in
+// Initialized state already
+TEST_F(RdsRouteConfigSubscriptionTest, CreatesNoopInitManager) {
+  const std::string rds_config = R"EOF(
+  route_config_name: my_route
+  config_source:
+    api_config_source:
+      api_type: GRPC
+      grpc_services:
+        envoy_grpc:
+          cluster_name: xds_cluster
+)EOF";
+  EXPECT_CALL(outer_init_manager_, state()).WillOnce(Return(Init::Manager::State::Initialized));
+  const auto rds =
+      TestUtility::parseYaml<envoy::config::filter::network::http_connection_manager::v2::Rds>(
+          rds_config);
+  const auto route_config_provider = route_config_provider_manager_->createRdsRouteConfigProvider(
+      rds, mock_factory_context_, "stat_prefix", outer_init_manager_);
+  RdsRouteConfigSubscription& subscription =
+      (dynamic_cast<RdsRouteConfigProviderImpl*>(route_config_provider.get()))->subscription();
+
+  std::unique_ptr<Init::ManagerImpl> noop_init_manager;
+  std::unique_ptr<Cleanup> init_vhds;
+  subscription.maybeCreateInitManager("version_info", noop_init_manager, init_vhds);
+
+  EXPECT_TRUE(init_vhds);
+  EXPECT_TRUE(noop_init_manager);
 }
 
 class RouteConfigProviderManagerImplTest : public RdsTestBase {

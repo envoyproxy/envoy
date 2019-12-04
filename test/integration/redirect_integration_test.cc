@@ -82,6 +82,49 @@ TEST_P(RedirectIntegrationTest, BasicInternalRedirect) {
                    ->value());
 }
 
+TEST_P(RedirectIntegrationTest, InternalRedirectToDestinationWithBody) {
+  // Validate that header sanitization is only called once.
+  config_helper_.addConfigModifier(
+      [](envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager& hcm) {
+        hcm.set_via("via_value");
+      });
+  config_helper_.addFilter(R"EOF(
+  name: pause-filter
+  typed_config:
+    "@type": type.googleapis.com/google.protobuf.Empty
+  )EOF");
+  initialize();
+  fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  default_request_headers_.setHost("handle.internal.redirect");
+  IntegrationStreamDecoderPtr response =
+      codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+
+  waitForNextUpstreamRequest();
+  upstream_request_->encodeHeaders(redirect_response_, true);
+
+  waitForNextUpstreamRequest();
+  ASSERT(upstream_request_->headers().EnvoyOriginalUrl() != nullptr);
+  EXPECT_EQ("http://handle.internal.redirect/test/long/url",
+            upstream_request_->headers().EnvoyOriginalUrl()->value().getStringView());
+  EXPECT_EQ("/new/url", upstream_request_->headers().Path()->value().getStringView());
+  EXPECT_EQ("authority2", upstream_request_->headers().Host()->value().getStringView());
+  EXPECT_EQ("via_value", upstream_request_->headers().Via()->value().getStringView());
+
+  Http::TestHeaderMapImpl response_with_big_body(
+      {{":status", "200"}, {"content-length", "2000000"}});
+  upstream_request_->encodeHeaders(response_with_big_body, false);
+  upstream_request_->encodeData(2000000, true);
+
+  response->waitForEndStream();
+  ASSERT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().Status()->value().getStringView());
+  EXPECT_EQ(1, test_server_->counter("cluster.cluster_0.upstream_internal_redirect_succeeded_total")
+                   ->value());
+}
+
 TEST_P(RedirectIntegrationTest, InvalidRedirect) {
   initialize();
 
