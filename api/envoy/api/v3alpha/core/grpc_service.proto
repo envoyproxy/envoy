@@ -120,6 +120,11 @@ message GrpcService {
         }
       }
 
+      // STS Service configuration that allows Google gRPC to fetch security token
+      // from an OAuth 2.0 authorization server.
+      // See https://tools.ietf.org/html/draft-ietf-oauth-token-exchange-16 and
+      // https://github.com/grpc/grpc/pull/19587.
+      // [#next-free-field: 10]
       message StsService {
         option (udpa.api.annotations.versioning).previous_message_type =
             "envoy.api.v2.core.GrpcService.GoogleGrpc.CallCredentials.StsService";
