@@ -151,7 +151,7 @@ ListenerImpl::ListenerImpl(const envoy::api::v2::Listener& config, const std::st
   if (PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, freebind, false)) {
     addListenSocketOptions(Network::SocketOptionFactory::buildIpFreebindOptions());
   }
-  if ((socket_type == Network::Address::SocketType::Datagram) ? true : config.reuse_port()) {
+  if ((socket_type == Network::Address::SocketType::Datagram) || config.reuse_port()) {
     addListenSocketOptions(Network::SocketOptionFactory::buildReusePortOptions());
   }
   if (!config.socket_options().empty()) {

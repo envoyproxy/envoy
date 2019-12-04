@@ -429,9 +429,8 @@ bool ListenerManagerImpl::addOrUpdateListenerInternal(const envoy::api::v2::List
         draining_listen_socket_factory
             ? draining_listen_socket_factory
             : createListenSocketFactory(config.address(), *new_listener,
-                                        (socket_type == Network::Address::SocketType::Datagram)
-                                            ? true
-                                            : config.reuse_port()));
+                                        (socket_type == Network::Address::SocketType::Datagram) ||
+                                            config.reuse_port()));
     if (workers_started_) {
       new_listener->debugLog("add warming listener");
       warming_listeners_.emplace_back(std::move(new_listener));
