@@ -30,7 +30,7 @@ import "validate/validate.proto";
 // <config_overview_v2_bootstrap>` for more detail.
 
 // Bootstrap :ref:`configuration overview <config_overview_v2_bootstrap>`.
-// [#next-free-field: 20]
+// [#next-free-field: 21]
 message Bootstrap {
   option (udpa.api.annotations.versioning).previous_message_type =
       "envoy.config.bootstrap.v2.Bootstrap";
@@ -162,6 +162,13 @@ message Bootstrap {
   // <server_statistics>` if specified. Envoy will not process this value, it will be sent as is to
   // :ref:`stats sinks <envoy_api_msg_config.metrics.v3alpha.StatsSink>`.
   google.protobuf.UInt64Value stats_server_version_override = 19;
+
+  // Always use TCP queries instead of UDP queries for DNS lookups.
+  // This may be overridden on a per-cluster basis in cds_config,
+  // when :ref:`dns_resolvers <envoy_api_field_api.v3alpha.Cluster.dns_resolvers>` and
+  // :ref:`use_tcp_for_dns_lookups <envoy_api_field_api.v3alpha.Cluster.use_tcp_for_dns_lookups>`
+  // are specified.
+  bool use_tcp_for_dns_lookups = 20;
 }
 
 // Administration interface :ref:`operations documentation
