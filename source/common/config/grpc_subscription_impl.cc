@@ -44,8 +44,8 @@ void GrpcSubscriptionImpl::onConfigUpdate(
     const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
     const std::string& version_info) {
   stats_.update_attempt_.inc();
-  callbacks_.onConfigUpdate(resources, version_info);
   grpc_mux_->disableInitFetchTimeoutTimer();
+  callbacks_.onConfigUpdate(resources, version_info);
   stats_.update_success_.inc();
   stats_.version_.set(HashUtil::xxHash64(version_info));
 }
@@ -55,8 +55,8 @@ void GrpcSubscriptionImpl::onConfigUpdate(
     const Protobuf::RepeatedPtrField<std::string>& removed_resources,
     const std::string& system_version_info) {
   stats_.update_attempt_.inc();
-  callbacks_.onConfigUpdate(added_resources, removed_resources, system_version_info);
   grpc_mux_->disableInitFetchTimeoutTimer();
+  callbacks_.onConfigUpdate(added_resources, removed_resources, system_version_info);
   stats_.update_success_.inc();
   stats_.version_.set(HashUtil::xxHash64(system_version_info));
 }
