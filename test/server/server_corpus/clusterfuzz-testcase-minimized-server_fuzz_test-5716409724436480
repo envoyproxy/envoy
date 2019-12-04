@@ -1,0 +1,12 @@
+static_resources {   clusters {     name: " "     connect_timeout {       nanos: 4     }     hosts {       pipe {       }     }     health_checks {       timeout {         nanos: 4       }       interval {         nanos: 4       }       unhealthy_threshold {
+      }
+      healthy_threshold {
+      }
+      grpc_health_check {
+        authority: "\000oy.ai.H"
+      }
+    }
+    http2_protocol_options {
+    }
+  }
+}

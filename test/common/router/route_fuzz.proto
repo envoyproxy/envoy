@@ -5,6 +5,8 @@ package test.common.router;
 import "envoy/api/v2/rds.proto";
 import "test/fuzz/common.proto";
 
+import "validate/validate.proto";
+
 // Structured input for route_fuzz_test.
 
 message RouteTestCase {

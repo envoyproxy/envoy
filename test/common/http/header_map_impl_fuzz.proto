@@ -10,13 +10,13 @@ import "validate/validate.proto";
 
 message AddReference {
   string key = 1;
-  string value = 2;
+  string value = 2 [(validate.rules).string.pattern = "^[^\0\n\r]+$"];
 }
 
 message AddReferenceKey {
   string key = 1;
   oneof value_selector {
-    string string_value = 2;
+    string string_value = 2 [(validate.rules).string.pattern = "^[^\0\n\r]+$"];
     uint64 uint64_value = 3;
   }
 }
@@ -24,30 +24,30 @@ message AddReferenceKey {
 message AddCopy {
   string key = 1;
   oneof value_selector {
-    string string_value = 2;
+    string string_value = 2 [(validate.rules).string.pattern = "^[^\0\n\r]+$"];
     uint64 uint64_value = 3;
   }
 }
 
 message SetReference {
   string key = 1;
-  string value = 2;
+  string value = 2 [(validate.rules).string.pattern = "^[^\0\n\r]+$"];
 }
 
 message SetReferenceKey {
   string key = 1;
-  string value = 2;
+  string value = 2 [(validate.rules).string.pattern = "^[^\0\n\r]+$"];
 }
 
 message GetAndMutate {
   string key = 1;
   oneof mutate_selector {
-    string append = 2;
+    string append = 2 [(validate.rules).string.pattern = "^[^\0\n\r]+$"];
     google.protobuf.Empty clear = 3;
     string find = 4;
-    string set_copy = 5;
+    string set_copy = 5 [(validate.rules).string.pattern = "^[^\0\n\r]+$"];
     uint64 set_integer = 6;
-    string set_reference = 7;
+    string set_reference = 7 [(validate.rules).string.pattern = "^[^\0\n\r]+$"];
   }
 }
 

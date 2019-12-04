@@ -1,0 +1,180 @@
+static_resources {
+  listeners {
+    address {
+      socket_address {
+        address: "127.0.0.1"
+        port_value: 4
+      }
+    }
+    filter_chains {
+      filter_chain_match {
+        server_names: ";"
+      }
+    }
+    filter_chains {
+      filter_chain_match {
+        transport_protocol: ":"
+        server_names: ""
+      }
+    }
+    per_connection_buffer_limit_bytes {
+      value: 3801088
+    }
+    listener_filters {
+      name: "z"
+      config {
+      }
+    }
+    listener_filters {
+      name: "z"
+      config {
+      }
+    }
+    listener_filters {
+      name: "z"
+      config {
+      }
+    }
+  }
+  clusters {
+    name: ";NNNHHNN\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\n    hosts {\n      pipe {\n 0      path: \"#\"\n      }\n    }\n    hosts {\n      pipe {\n        path: \"1\"\n      }\n    }\n    dns_lookup_family: V4_ONLY\n    outlier_detection {\n      success_rate_stdev_factor  { \n      value: 589950\n      }\n    }\n    upstream_connection_options {\n      tcp_keepali\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000\000"
+    connect_timeout {
+      nanos: 250000000
+    }
+    hosts {
+      pipe {
+        path: "R"
+      }
+    }
+    health_checks {
+      timeout {
+        seconds: 2321
+        nanos: 25
+      }
+      interval {
+        seconds: 2321
+        nanos: 25
+      }
+      unhealthy_threshold {
+      }
+      healthy_threshold {
+        value: 12032
+      }
+      http_health_check {
+        path: ":333333333333333333333\000\000\000\000\000\000\000"
+        receive {
+          text: "&"
+        }
+        service_name: "&"
+        request_headers_to_remove: "d"
+        request_headers_to_remove: "d"
+        request_headers_to_remove: "d"
+        request_headers_to_remove: "d"
+        request_headers_to_remove: "d"
+        request_headers_to_remove: "d"
+      }
+      event_log_path: "s"
+      interval_jitter_percent: 4194304
+    }
+  }
+  clusters {
+    name: "ss-rvie_google"
+    type: STRICT_DNS
+    connect_timeout {
+      nanos: 250000000
+    }
+    dns_lookup_family: V4_ONLY
+  }
+  clusters {
+    name: "se%vNce_goog0e"
+    connect_timeout {
+      nanos: 250000000
+    }
+    lb_policy: RING_HASH
+    hosts {
+      pipe {
+        path: "0"
+      }
+    }
+    health_checks {
+      timeout {
+        seconds: 2321
+        nanos: 25
+      }
+      interval {
+        seconds: 2321
+        nanos: 25
+      }
+      unhealthy_threshold {
+      }
+      healthy_threshold {
+        value: 12032
+      }
+      http_health_check {
+        path: ":333333333333333333333\000\000\000\000\000\000\000"
+        receive {
+          text: "&"
+        }
+        service_name: "&"
+        request_headers_to_remove: "d"
+        request_headers_to_remove: "d"
+        request_headers_to_remove: "d"
+        request_headers_to_remove: "d"
+        request_headers_to_remove: "d"
+        request_headers_to_remove: "d"
+      }
+      event_log_path: "s"
+      interval_jitter_percent: 4194304
+    }
+    dns_lookup_family: V4_ONLY
+    protocol_selection: USE_DOWNSTREAM_PROTOCOL
+  }
+}
+cluster_manager {
+  load_stats_config {
+    api_type: GRPC
+    grpc_services {
+      google_grpc {
+        target_uri: "\025"
+        call_credentials {
+          google_refresh_token: "4E67297296"
+        }
+        call_credentials {
+          google_refresh_token: "49672$7296"
+        }
+        call_credentials {
+          google_refresh_token: "49672$7296"
+        }
+        call_credentials {
+          google_refresh_token: "49612$7296"
+        }
+        call_credentials {
+          google_refresh_token: "4E67297296"
+        }
+        stat_prefix: "6"
+      }
+    }
+  }
+}
+flags_path: "i"
+stats_sinks {
+}
+stats_sinks {
+  name: "ggggggggggggg"
+}
+stats_sinks {
+}
+stats_sinks {
+}
+stats_sinks {
+}
+stats_sinks {
+}
+stats_sinks {
+}
+stats_sinks {
+}
+stats_sinks {
+}
+stats_sinks {
+}

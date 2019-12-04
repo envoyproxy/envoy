@@ -80,15 +80,8 @@ inline Http::TestHeaderMapImpl fromHeaders(
     const std::unordered_set<std::string>& ignore_headers = std::unordered_set<std::string>()) {
   Http::TestHeaderMapImpl header_map;
   for (const auto& header : headers.headers()) {
-    // HeaderMapImpl and places such as the route lookup should never see strings with embedded
-    // {NULL, CR, LF} values, the HTTP codecs should reject them. So, don't inject any such strings
-    // into the fuzz tests and replace these invalid characters with spaces.
-    // When we are injecting headers, we don't allow the key to ever be empty, since calling code is
-    // not supposed to do this.
-    const std::string key =
-        header.key().empty() ? "not-empty" : replaceInvalidCharacters(header.key());
-    if (ignore_headers.find(StringUtil::toLower(key)) == ignore_headers.end()) {
-      header_map.addCopy(key, replaceInvalidCharacters(header.value()));
+    if (ignore_headers.find(StringUtil::toLower(header.key())) == ignore_headers.end()) {
+      header_map.addCopy(header.key(), header.value());
     }
   }
   return header_map;
