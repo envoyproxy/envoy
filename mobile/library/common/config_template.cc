@@ -7,7 +7,6 @@ static_resources:
   - name: base # Note: the direct API depends on the existence of a cluster with this name.
     connect_timeout: {{ connect_timeout_seconds }}s
     dns_refresh_rate: {{ dns_refresh_rate_seconds }}s
-    dns_lookup_family: V4_ONLY
     http2_protocol_options: {}
     lb_policy: ROUND_ROBIN
     load_assignment:
@@ -32,7 +31,6 @@ R"(
   - name: base_wlan # Note: the direct API depends on the existence of a cluster with this name.
     connect_timeout: {{ connect_timeout_seconds }}s
     dns_refresh_rate: {{ dns_refresh_rate_seconds }}s
-    dns_lookup_family: V4_ONLY
     http2_protocol_options: {}
     lb_policy: ROUND_ROBIN
     load_assignment:
@@ -43,7 +41,6 @@ R"(
   - name: base_wwan # Note: the direct API depends on the existence of a cluster with this name.
     connect_timeout: {{ connect_timeout_seconds }}s
     dns_refresh_rate: {{ dns_refresh_rate_seconds }}s
-    dns_lookup_family: V4_ONLY
     http2_protocol_options: {}
     lb_policy: ROUND_ROBIN
     load_assignment:
@@ -54,7 +51,6 @@ R"(
   - name: stats
     connect_timeout: {{ connect_timeout_seconds }}s
     dns_refresh_rate: {{ dns_refresh_rate_seconds }}s
-    dns_lookup_family: V4_ONLY
     http2_protocol_options: {}
     lb_policy: ROUND_ROBIN
     load_assignment:
