@@ -1028,6 +1028,7 @@ TEST_P(DownstreamProtocolIntegrationTest, LargeRequestTrailersRejected) {
   testLargeRequestTrailers(66, 60);
 }
 
+#ifdef NDEBUG
 TEST_P(DownstreamProtocolIntegrationTest, ManyTrailerHeaders) {
   max_request_headers_kb_ = 96;
   max_request_headers_count_ = 20005;
@@ -1063,6 +1064,7 @@ TEST_P(DownstreamProtocolIntegrationTest, ManyTrailerHeaders) {
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().Status()->value().getStringView());
 }
+#endif
 
 // Tests StopAllIterationAndBuffer. Verifies decode-headers-return-stop-all-filter calls decodeData
 // once after iteration is resumed.
