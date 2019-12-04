@@ -875,6 +875,11 @@ if __name__ == "__main__":
   # error_messages.
   def ownedDirectories(error_messages):
     owned = []
+    maintainers = [
+        '@mattklein123', '@htuch', '@alyssawilk', '@zuercher', '@lizan', '@snowp', '@junr03',
+        '@dnoe', '@dio', '@jmarantz'
+    ]
+
     try:
       with open('./CODEOWNERS') as f:
         for line in f:
@@ -887,6 +892,15 @@ if __name__ == "__main__":
             if len(owners) < 2:
               error_messages.append("Extensions require at least 2 owners in CODEOWNERS:\n"
                                     "    {}".format(line))
+            maintainer = False
+            for owner in owners:
+              if owner in maintainers:
+                maintainer = True
+                break
+            if not maintainer:
+              error_messages.append("Extensions require at least 1 maintainer OWNER:\n"
+                                    "    {}".format(line))
+
       return owned
     except IOError:
       return []  # for the check format tests.
