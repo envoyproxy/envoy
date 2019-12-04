@@ -86,7 +86,7 @@ message GrpcService {
         }
       }
 
-      // Security token service (STS) configuration that allows Google gRPC to
+      // Security token service configuration that allows Google gRPC to
       // fetch security token from an OAuth 2.0 authorization server.
       // See https://tools.ietf.org/html/draft-ietf-oauth-token-exchange-16 and
       // https://github.com/grpc/grpc/pull/19587.
