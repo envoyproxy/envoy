@@ -129,9 +129,6 @@ ListenerImpl::ListenerImpl(const envoy::api::v2::Listener& config, const std::st
       listener_scope_(
           parent_.server_.stats().createScope(fmt::format("listener.{}.", address_->asString()))),
       bind_to_port_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config.deprecated_v1(), bind_to_port, true)),
-      socket_type_(Network::Utility::protobufAddressSocketType(config.address())),
-      reuse_port_((socket_type_ == Network::Address::SocketType::Datagram) ? true
-                                                                           : config.reuse_port()),
       hand_off_restored_destination_connections_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, use_original_dst, false)),
       per_connection_buffer_limit_bytes_(
@@ -146,21 +143,22 @@ ListenerImpl::ListenerImpl(const envoy::api::v2::Listener& config, const std::st
       listener_filters_timeout_(
           PROTOBUF_GET_MS_OR_DEFAULT(config, listener_filters_timeout, 15000)),
       continue_on_listener_filters_timeout_(config.continue_on_listener_filters_timeout()) {
+  Network::Address::SocketType socket_type =
+      Network::Utility::protobufAddressSocketType(config.address());
   if (PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, transparent, false)) {
     addListenSocketOptions(Network::SocketOptionFactory::buildIpTransparentOptions());
   }
   if (PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, freebind, false)) {
     addListenSocketOptions(Network::SocketOptionFactory::buildIpFreebindOptions());
   }
-  if (reuse_port_) {
+  if ((socket_type == Network::Address::SocketType::Datagram) ? true : config.reuse_port()) {
     addListenSocketOptions(Network::SocketOptionFactory::buildReusePortOptions());
   }
-
   if (!config.socket_options().empty()) {
     addListenSocketOptions(
         Network::SocketOptionFactory::buildLiteralOptions(config.socket_options()));
   }
-  if (socket_type_ == Network::Address::SocketType::Datagram) {
+  if (socket_type == Network::Address::SocketType::Datagram) {
     // Needed for recvmsg to return destination address in IP header.
     addListenSocketOptions(Network::SocketOptionFactory::buildIpPacketInfoOptions());
     // Needed to return receive buffer overflown indicator.
@@ -177,7 +175,7 @@ ListenerImpl::ListenerImpl(const envoy::api::v2::Listener& config, const std::st
   }
 
   if (!config.listener_filters().empty()) {
-    switch (socket_type_) {
+    switch (socket_type) {
     case Network::Address::SocketType::Datagram:
       if (config.listener_filters().size() > 1) {
         // Currently supports only 1 UDP listener
@@ -197,7 +195,7 @@ ListenerImpl::ListenerImpl(const envoy::api::v2::Listener& config, const std::st
     }
   }
 
-  if (config.filter_chains().empty() && (socket_type_ == Network::Address::SocketType::Stream ||
+  if (config.filter_chains().empty() && (socket_type == Network::Address::SocketType::Stream ||
                                          !udp_listener_factory_->isTransportConnectionless())) {
     // If we got here, this is a tcp listener or connection-oriented udp listener, so ensure there
     // is a filter chain specified
@@ -224,7 +222,7 @@ ListenerImpl::ListenerImpl(const envoy::api::v2::Listener& config, const std::st
   ListenerFilterChainFactoryBuilder builder(*this, factory_context);
   filter_chain_manager_.addFilterChain(config.filter_chains(), builder);
 
-  if (socket_type_ == Network::Address::SocketType::Datagram) {
+  if (socket_type == Network::Address::SocketType::Datagram) {
     return;
   }
 

@@ -423,10 +423,15 @@ bool ListenerManagerImpl::addOrUpdateListenerInternal(const envoy::api::v2::List
       draining_listen_socket_factory = existing_draining_listener->listener_->getSocketFactory();
     }
 
+    Network::Address::SocketType socket_type =
+        Network::Utility::protobufAddressSocketType(config.address());
     new_listener->setSocketFactory(
         draining_listen_socket_factory
             ? draining_listen_socket_factory
-            : createListenSocketFactory(config.address(), *new_listener));
+            : createListenSocketFactory(config.address(), *new_listener,
+                                        (socket_type == Network::Address::SocketType::Datagram)
+                                            ? true
+                                            : config.reuse_port()));
     if (workers_started_) {
       new_listener->debugLog("add warming listener");
       warming_listeners_.emplace_back(std::move(new_listener));
@@ -766,12 +771,12 @@ std::unique_ptr<Network::FilterChain> ListenerFilterChainFactoryBuilder::buildFi
 
 Network::ListenSocketFactorySharedPtr
 ListenerManagerImpl::createListenSocketFactory(const envoy::api::v2::core::Address& proto_address,
-                                               ListenerImpl& listener) {
+                                               ListenerImpl& listener, bool reuse_port) {
   Network::Address::SocketType socket_type =
       Network::Utility::protobufAddressSocketType(proto_address);
   return std::make_shared<ListenSocketFactoryImpl>(
       factory_, listener.address(), socket_type, listener.listenSocketOptions(),
-      listener.bindToPort(), listener.name(), listener.reusePort());
+      listener.bindToPort(), listener.name(), reuse_port);
 }
 
 } // namespace Server

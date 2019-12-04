@@ -208,7 +208,7 @@ private:
 
   Network::ListenSocketFactorySharedPtr
   createListenSocketFactory(const envoy::api::v2::core::Address& proto_address,
-                            ListenerImpl& listener);
+                            ListenerImpl& listener, bool reuse_port);
 
   // Active listeners are listeners that are currently accepting new connections on the workers.
   ListenerList active_listeners_;
