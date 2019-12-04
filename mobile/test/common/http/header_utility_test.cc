@@ -62,13 +62,15 @@ TEST(HeaderDataConstructorTest, FromCToCpp) {
     // Value for the key is the same.
     EXPECT_EQ(cpp_headers->get(expected_key)->value().getStringView(), expected_value);
   }
+  release_envoy_headers(c_headers_copy);
+  delete sentinel;
 }
 
 TEST(HeaderDataConstructorTest, FromCppToCEmpty) {
   HeaderMapImpl empty_headers;
   envoy_headers c_headers = Utility::toBridgeHeaders(std::move(empty_headers));
   ASSERT_EQ(0, c_headers.length);
-  delete[] c_headers.headers;
+  release_envoy_headers(c_headers);
 }
 
 TEST(HeaderDataConstructorTest, FromCppToC) {
@@ -92,7 +94,7 @@ TEST(HeaderDataConstructorTest, FromCppToC) {
     EXPECT_EQ(actual_value, cpp_headers.get(actual_key)->value().getStringView());
   }
 
-  delete c_headers.headers;
+  release_envoy_headers(c_headers);
 }
 
 } // namespace Http

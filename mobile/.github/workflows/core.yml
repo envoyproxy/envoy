@@ -19,3 +19,35 @@ jobs:
         run: ./ci/mac_ci_setup.sh
       - name: 'Run tests'
         run: bazel test //test/common/...
+  tsan:
+    name: tsan
+    runs-on: ubuntu-18.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v1
+        with:
+          submodules: true
+      - name: 'Install dependencies'
+        run: ./ci/linux_ci_setup.sh
+      - name: 'Run tests'
+        run: |
+          export PATH=/usr/lib/llvm-8/bin:$PATH
+          export CC=clang
+          export CXX=clang++
+          bazel test --config=clang-tsan //test/common/...
+  asan:
+    name: asan
+    runs-on: ubuntu-18.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v1
+        with:
+          submodules: true
+      - name: 'Install dependencies'
+        run: ./ci/linux_ci_setup.sh
+      - name: 'Run tests'
+        run: |
+          export PATH=/usr/lib/llvm-8/bin:$PATH
+          export CC=clang
+          export CXX=clang++
+          bazel test --config=clang-asan //test/common/...
