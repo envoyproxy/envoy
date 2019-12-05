@@ -121,6 +121,9 @@ def SyncV3Alpha(cmd, src_labels):
     if 'v2' in dst:
       dst = re.sub('v2alpha\d?|v2', 'v3alpha', dst)
       SyncProtoFile(cmd, src, dst)
+    if 'v1' in dst:
+      dst = re.sub('v1alpha\d?|v1', 'v3alpha', dst)
+      SyncProtoFile(cmd, src, dst)
     elif 'envoy/type/matcher' in dst:
       dst = re.sub('/type/matcher/', '/type/matcher/v3alpha/', dst)
       SyncProtoFile(cmd, src, dst)
