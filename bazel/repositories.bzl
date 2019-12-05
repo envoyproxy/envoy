@@ -110,9 +110,7 @@ _clang_tools = repository_rule(
     environ = ["LLVM_CONFIG"],
 )
 
-# Set developer_tools to True to enable build of Envoy developer facing tools
-# (not needed by any importing projects).
-def envoy_dependencies(skip_targets = [], developer_tools = False):
+def envoy_dependencies(skip_targets = []):
     # Treat Envoy's overall build config as an external repo, so projects that
     # build Envoy as a subcomponent can easily override the config.
     if "envoy_build_config" not in native.existing_rules().keys():
@@ -132,8 +130,7 @@ def envoy_dependencies(skip_targets = [], developer_tools = False):
         actual = "@envoy//bazel:boringssl",
     )
 
-    if developer_tools:
-        _clang_tools(name = "clang_tools")
+    _clang_tools(name = "clang_tools")
 
     # The long repo names (`com_github_fmtlib_fmt` instead of `fmtlib`) are
     # semi-standard in the Bazel community, intended to avoid both duplicate
