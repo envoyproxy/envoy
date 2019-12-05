@@ -5072,15 +5072,15 @@ TEST_F(HttpConnectionManagerImplTest, HeaderOnlyRequestAndResponseUsingHttp3) {
 namespace {
 
 class SimpleType : public StreamInfo::FilterState::Object {
- public:
+public:
   SimpleType(int value) : value_(value) {}
   int access() const { return value_; }
 
- private:
+private:
   int value_;
 };
 
-}  // namespace
+} // namespace
 
 TEST_F(HttpConnectionManagerImplTest, ConnectionFilterState) {
   setup(false, "envoy-custom-server", false);

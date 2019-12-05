@@ -10,6 +10,9 @@ namespace Network {
 namespace {
 
 class TransportSocketOptionsImplTest : public testing::Test {
+  TransportSocketOptionsImplTest()
+      : filter_state_(nullptr, StreamInfo::FilterState::LifeSpan::FilterChain);
+
 protected:
   StreamInfo::FilterStateImpl filter_state_;
 };

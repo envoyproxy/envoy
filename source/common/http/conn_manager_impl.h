@@ -90,9 +90,7 @@ public:
 
   TimeSource& timeSource() { return time_source_; }
 
-  std::shared_ptr<StreamInfo::FilterState> filter_state() const {
-    return filter_state_;
-  }
+  std::shared_ptr<StreamInfo::FilterState> filter_state() const { return filter_state_; }
 
 private:
   struct ActiveStream;
