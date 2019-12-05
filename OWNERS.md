@@ -26,7 +26,7 @@ routing PRs, questions, etc. to the right place.
 # Maintainers
 
 * Asra Ali ([asraa](https://github.com/asraa)) (asraa@google.com)
-  * Fuzzing, headers, HTTP/gRPC, router, access log, tests.
+  * Fuzzing, security, headers, HTTP/gRPC, router, access log, tests.
 * Jose Nino ([junr03](https://github.com/junr03)) (jnino@lyft.com)
   * Outlier detection, HTTP routing, xDS, configuration/operational questions.
 * Dan Noé ([dnoe](https://github.com/dnoe)) (dpn@google.com)
@@ -41,7 +41,6 @@ routing PRs, questions, etc. to the right place.
 * All maintainers
 * Piotr Sikora ([PiotrSikora](https://github.com/PiotrSikora)) (piotrsikora@google.com)
 * Yan Avlasov ([yanavlasov](https://github.com/yanavlasov)) (yavlasov@google.com)
-* Asra Ali ([asraa](https://github.com/asraa)) (asraa@google.com)
 
 # Emeritus maintainers
 
