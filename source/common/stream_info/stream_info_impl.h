@@ -15,16 +15,17 @@ namespace Envoy {
 namespace StreamInfo {
 
 struct StreamInfoImpl : public StreamInfo {
-  explicit StreamInfoImpl(TimeSource& time_source)
+  StreamInfoImpl(TimeSource& time_source,
+                 std::shared_ptr<FilterState> parent_filter_state = nullptr)
       : time_source_(time_source), start_time_(time_source.systemTime()),
-        start_time_monotonic_(time_source.monotonicTime()) {}
+        start_time_monotonic_(time_source.monotonicTime()),
+        filter_state_(std::make_shared<FilterStateImpl>(parent_filter_state,
+                                                        FilterState::LifeSpan::FilterChain)) {}
 
   StreamInfoImpl(Http::Protocol protocol, TimeSource& time_source,
                  std::shared_ptr<FilterState> parent_filter_state = nullptr)
-      : StreamInfoImpl(time_source) {
+      : StreamInfoImpl(time_source, parent_filter_state) {
     protocol_ = protocol;
-    filter_state_ =
-        std::make_shared<FilterStateImpl>(parent_filter_state, FilterState::LifeSpan::FilterChain);
   }
 
   SystemTime startTime() const override { return start_time_; }
