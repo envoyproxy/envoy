@@ -335,6 +335,7 @@ TEST_P(ConnectionImplTest, SocketOptions) {
 
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 
+  // Assert that upstream connection gets the socket options
   ASSERT(upstream_connection_ != nullptr);
   ASSERT(upstream_connection_->socketOptions() != nullptr);
   ASSERT(upstream_connection_->socketOptions()->front() == option);
