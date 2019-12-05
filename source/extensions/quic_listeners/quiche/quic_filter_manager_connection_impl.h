@@ -97,6 +97,9 @@ public:
   // streams, and run watermark check.
   void adjustBytesToSend(int64_t delta);
 
+  // Called after each write when a previous connection close call is postponed.
+  void maybeHandleDelayedClose();
+
 protected:
   // Propagate connection close to network_connection_callbacks_.
   void onConnectionCloseEvent(const quic::QuicConnectionCloseFrame& frame,

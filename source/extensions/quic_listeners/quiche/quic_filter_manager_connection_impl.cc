@@ -128,6 +128,20 @@ void QuicFilterManagerConnectionImpl::adjustBytesToSend(int64_t delta) {
   write_buffer_watermark_simulation_.checkLowWatermark(bytes_to_send_);
 }
 
+void QuicFilterManagerConnectionImpl::maybeHandleDelayedClose() {
+  if (!inDelayedClose()) {
+    return;
+  }
+  if (hasDataToWrite() || delayed_close_state_ == DelayedCloseState::CloseAfterFlushAndWait) {
+    // Re-arm delay close timer on every write event if there are still data
+    // buffered or the connection close is supposed to be delayed.
+    ASSERT(delayed_close_timer_ != nullptr);
+    delayed_close_timer_->enableTimer(delayed_close_timeout_);
+  } else {
+    closeConnectionImmediately();
+  }
+}
+
 void QuicFilterManagerConnectionImpl::onConnectionCloseEvent(
     const quic::QuicConnectionCloseFrame& frame, quic::ConnectionCloseSource source) {
   transport_failure_reason_ = absl::StrCat(quic::QuicErrorCodeToString(frame.quic_error_code),
