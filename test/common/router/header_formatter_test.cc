@@ -542,7 +542,8 @@ TEST_F(StreamInfoHeaderFormatterTest, TestFormatWithUpstreamMetadataVariableMiss
 }
 
 TEST_F(StreamInfoHeaderFormatterTest, TestFormatWithPerRequestStateVariable) {
-  Envoy::StreamInfo::FilterStateImpl filter_state;
+  Envoy::StreamInfo::FilterStateImpl filter_state(
+      nullptr, Envoy::StreamInfo::FilterState::LifeSpan::FilterChain);
   filter_state.setData("testing", std::make_unique<StringAccessorImpl>("test_value"),
                        StreamInfo::FilterState::StateType::ReadOnly,
                        StreamInfo::FilterState::LifeSpan::FilterChain);
@@ -558,7 +559,8 @@ TEST_F(StreamInfoHeaderFormatterTest, TestFormatWithPerRequestStateVariable) {
 }
 
 TEST_F(StreamInfoHeaderFormatterTest, TestFormatWithNonStringPerRequestStateVariable) {
-  Envoy::StreamInfo::FilterStateImpl filter_state;
+  Envoy::StreamInfo::FilterStateImpl filter_state(
+      nullptr, Envoy::StreamInfo::FilterState::LifeSpan::FilterChain);
   filter_state.setData("testing", std::make_unique<StreamInfo::TestIntAccessor>(1),
                        StreamInfo::FilterState::StateType::ReadOnly,
                        StreamInfo::FilterState::LifeSpan::FilterChain);
@@ -813,7 +815,8 @@ TEST(HeaderParserTest, TestParseInternal) {
   const SystemTime start_time(std::chrono::milliseconds(1522796769123));
   ON_CALL(stream_info, startTime()).WillByDefault(Return(start_time));
 
-  Envoy::StreamInfo::FilterStateImpl filter_state;
+  Envoy::StreamInfo::FilterStateImpl filter_state(
+      nullptr, Envoy::StreamInfo::FilterState::LifeSpan::FilterChain);
   filter_state.setData("testing", std::make_unique<StringAccessorImpl>("test_value"),
                        StreamInfo::FilterState::StateType::ReadOnly,
                        StreamInfo::FilterState::LifeSpan::FilterChain);
@@ -982,7 +985,8 @@ request_headers_to_remove: ["x-nope"]
       )EOF"));
   ON_CALL(*host, metadata()).WillByDefault(Return(metadata));
 
-  Envoy::StreamInfo::FilterStateImpl filter_state;
+  Envoy::StreamInfo::FilterStateImpl filter_state(
+      nullptr, Envoy::StreamInfo::FilterState::LifeSpan::FilterChain);
   filter_state.setData("testing", std::make_unique<StringAccessorImpl>("test_value"),
                        StreamInfo::FilterState::StateType::ReadOnly,
                        StreamInfo::FilterState::LifeSpan::FilterChain);
