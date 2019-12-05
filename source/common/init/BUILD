@@ -22,9 +22,6 @@ envoy_cc_library(
     name = "target_lib",
     srcs = ["target_impl.cc"],
     hdrs = ["target_impl.h"],
-    external_deps = [
-        "abseil_memory",
-    ],
     deps = [
         "//include/envoy/init:target_interface",
         "//source/common/common:logger_lib",
