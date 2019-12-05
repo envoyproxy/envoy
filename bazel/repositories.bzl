@@ -89,6 +89,27 @@ def _go_deps(skip_targets):
         _repository_impl("io_bazel_rules_go")
         _repository_impl("bazel_gazelle")
 
+def _clang_tools_impl(ctxt):
+    if "LLVM_CONFIG" in ctxt.os.environ:
+        llvm_config_path = ctxt.os.environ["LLVM_CONFIG"]
+        exec_result = ctxt.execute([llvm_config_path, "--includedir"])
+        if exec_result.return_code != 0:
+            fail(llvm_config_path + " --includedir returned %d" % exec_result.return_code)
+        clang_tools_include_path = exec_result.stdout.rstrip()
+        exec_result = ctxt.execute([llvm_config_path, "--libdir"])
+        if exec_result.return_code != 0:
+            fail(llvm_config_path + " --libdir returned %d" % exec_result.return_code)
+        clang_tools_lib_path = exec_result.stdout.rstrip()
+        for include_dir in ["clang", "clang-c", "llvm", "llvm-c"]:
+            ctxt.symlink(clang_tools_include_path + "/" + include_dir, include_dir)
+        ctxt.symlink(clang_tools_lib_path, "lib")
+        ctxt.symlink(Label("//tools/clang_tools/support:BUILD.prebuilt"), "BUILD")
+
+_clang_tools = repository_rule(
+    implementation = _clang_tools_impl,
+    environ = ["LLVM_CONFIG"],
+)
+
 def envoy_dependencies(skip_targets = []):
     # Treat Envoy's overall build config as an external repo, so projects that
     # build Envoy as a subcomponent can easily override the config.
@@ -108,6 +129,8 @@ def envoy_dependencies(skip_targets = []):
         name = "ssl",
         actual = "@envoy//bazel:boringssl",
     )
+
+    _clang_tools(name = "clang_tools")
 
     # The long repo names (`com_github_fmtlib_fmt` instead of `fmtlib`) are
     # semi-standard in the Bazel community, intended to avoid both duplicate

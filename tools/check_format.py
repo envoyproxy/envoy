@@ -860,7 +860,10 @@ if __name__ == "__main__":
   namespace_check = args.namespace_check
   namespace_check_excluded_paths = args.namespace_check_excluded_paths
   build_fixer_check_excluded_paths = args.build_fixer_check_excluded_paths + [
-      "./bazel/external/", "./bazel/toolchains/", "./bazel/BUILD"
+      "./bazel/external/",
+      "./bazel/toolchains/",
+      "./bazel/BUILD",
+      "./tools/clang_tools",
   ]
   include_dir_order = args.include_dir_order
   if args.add_excluded_prefixes:
