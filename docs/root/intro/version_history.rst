@@ -19,6 +19,7 @@ Version history
 * redis: performance improvement for larger split commands by avoiding string copies.
 * router: added support for REQ(header-name) :ref:`header formatter <config_http_conn_man_headers_custom_request_headers>`.
 * router: skip the Location header when the response code is not a 201 or a 3xx.
+* router: exposed DOWNSTREAM_REMOTE_ADDRESS as custom HTTP request/response headers.
 * server: fixed a bug in config validation for configs with runtime layers
 * tcp_proxy: added :ref:`ClusterWeight.metadata_match<envoy_api_field_config.filter.network.tcp_proxy.v2.TcpProxy.WeightedCluster.ClusterWeight.metadata_match>`
 * tcp_proxy: added :ref:`hash_policy<envoy_api_field_config.filter.network.tcp_proxy.v2.TcpProxy.hash_policy>`
@@ -26,7 +27,7 @@ Version history
 * thrift_proxy: added stats to the router filter.
 * tls: remove TLS 1.0 and 1.1 from client defaults
 * tracing: added the ability to set custom tags on both the :ref:`HTTP connection manager<envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.tracing>` and the :ref:`HTTP route <envoy_api_field_route.Route.tracing>`.
-* router: exposed DOWNSTREAM_REMOTE_ADDRESS as custom HTTP request/response headers.
+* udp: added initial support for :ref:`UDP proxy <config_udp_listener_filters_udp_proxy>`
 
 1.12.0 (October 31, 2019)
 =========================
