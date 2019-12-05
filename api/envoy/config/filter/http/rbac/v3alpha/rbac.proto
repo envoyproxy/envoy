@@ -8,6 +8,8 @@ option java_package = "io.envoyproxy.envoy.config.filter.http.rbac.v3alpha";
 
 import "envoy/config/rbac/v3alpha/rbac.proto";
 
+import "udpa/api/annotations/versioning.proto";
+
 import "validate/validate.proto";
 
 // [#protodoc-title: RBAC]
@@ -16,6 +18,9 @@ import "validate/validate.proto";
 
 // RBAC filter config.
 message RBAC {
+  option (udpa.api.annotations.versioning).previous_message_type =
+      "envoy.config.filter.http.rbac.v2.RBAC";
+
   // Specify the RBAC rules to be applied globally.
   // If absent, no enforcing RBAC policy will be applied.
   config.rbac.v3alpha.RBAC rules = 1;
@@ -27,6 +32,9 @@ message RBAC {
 }
 
 message RBACPerRoute {
+  option (udpa.api.annotations.versioning).previous_message_type =
+      "envoy.config.filter.http.rbac.v2.RBACPerRoute";
+
   reserved 1;
 
   // Override the global configuration of the filter with this new config.

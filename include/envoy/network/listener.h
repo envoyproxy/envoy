@@ -44,8 +44,7 @@ public:
   virtual const Address::InstanceConstSharedPtr& localAddress() const PURE;
 
   /**
-   * @return the socket if getListenSocket() returns a shared socket among each call,
-   * nullopt otherwise.
+   * @return the socket shared by worker threads if any; otherwise return null.
    */
   virtual absl::optional<std::reference_wrapper<Socket>> sharedSocket() const PURE;
 };

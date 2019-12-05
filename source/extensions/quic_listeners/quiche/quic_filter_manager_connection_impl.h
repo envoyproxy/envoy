@@ -17,7 +17,7 @@ namespace Quic {
 // Act as a Network::Connection to HCM and a FilterManager to FilterFactoryCb.
 class QuicFilterManagerConnectionImpl : public Network::ConnectionImplBase {
 public:
-  QuicFilterManagerConnectionImpl(EnvoyQuicConnection* connection, Event::Dispatcher& dispatcher,
+  QuicFilterManagerConnectionImpl(EnvoyQuicConnection& connection, Event::Dispatcher& dispatcher,
                                   uint32_t send_buffer_limit);
 
   // Network::FilterManager
@@ -109,7 +109,7 @@ protected:
 
   virtual bool hasDataToWrite() PURE;
 
-  EnvoyQuicConnection* quic_connection_;
+  EnvoyQuicConnection* quic_connection_{nullptr};
 
 private:
   // Called when aggregated buffered bytes across all the streams exceeds high watermark.

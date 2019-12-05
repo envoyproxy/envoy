@@ -11,6 +11,8 @@ import "envoy/api/v3alpha/discovery.proto";
 
 import "google/api/annotations.proto";
 
+import "udpa/api/annotations/versioning.proto";
+
 import "validate/validate.proto";
 
 // [#protodoc-title: HTTP scoped routing configuration]
@@ -98,13 +100,22 @@ service ScopedRoutesDiscoveryService {
 // RouteConfiguration being assigned to the HTTP request/stream.
 //
 message ScopedRouteConfiguration {
+  option (udpa.api.annotations.versioning).previous_message_type =
+      "envoy.api.v2.ScopedRouteConfiguration";
+
   // Specifies a key which is matched against the output of the
   // :ref:`scope_key_builder<envoy_api_field_config.filter.network.http_connection_manager.v3alpha.ScopedRoutes.scope_key_builder>`
   // specified in the HttpConnectionManager. The matching is done per HTTP
   // request and is dependent on the order of the fragments contained in the
   // Key.
   message Key {
+    option (udpa.api.annotations.versioning).previous_message_type =
+        "envoy.api.v2.ScopedRouteConfiguration.Key";
+
     message Fragment {
+      option (udpa.api.annotations.versioning).previous_message_type =
+          "envoy.api.v2.ScopedRouteConfiguration.Key.Fragment";
+
       oneof type {
         option (validate.required) = true;
 

@@ -7,6 +7,7 @@
 #pragma GCC diagnostic ignored "-Winvalid-offsetof"
 
 #include "quiche/quic/core/quic_dispatcher.h"
+#include "quiche/quic/test_tools/quic_dispatcher_peer.h"
 #include "quiche/quic/test_tools/crypto_test_utils.h"
 #include "quiche/quic/test_tools/quic_test_utils.h"
 #include "quiche/quic/platform/api/quic_text_utils.h"
@@ -35,18 +36,6 @@
 using testing::Invoke;
 using testing::Return;
 using testing::ReturnRef;
-
-namespace quic {
-namespace test {
-class QuicDispatcherPeer {
-public:
-  static quic::QuicTimeWaitListManager* time_wait_list_manager(QuicDispatcher* dispatcher) {
-    return dispatcher->time_wait_list_manager_.get();
-  }
-};
-
-} // namespace test
-} // namespace quic
 
 namespace Envoy {
 namespace Quic {
@@ -233,7 +222,7 @@ TEST_P(EnvoyQuicDispatcherTest, CloseConnectionDueToMissingFilterChain) {
       *received_packet);
   EXPECT_EQ(0u, envoy_quic_dispatcher_.session_map().size());
   EXPECT_EQ(0u, connection_handler_.numConnections());
-  EXPECT_TRUE(quic::test::QuicDispatcherPeer::time_wait_list_manager(&envoy_quic_dispatcher_)
+  EXPECT_TRUE(quic::test::QuicDispatcherPeer::GetTimeWaitListManager(&envoy_quic_dispatcher_)
                   ->IsConnectionIdInTimeWait(connection_id));
   EXPECT_EQ(1u, listener_stats_.no_filter_chain_match_.value());
 }
@@ -264,7 +253,7 @@ TEST_P(EnvoyQuicDispatcherTest, CloseConnectionDueToEmptyFilterChain) {
       *received_packet);
   EXPECT_EQ(0u, envoy_quic_dispatcher_.session_map().size());
   EXPECT_EQ(0u, connection_handler_.numConnections());
-  EXPECT_TRUE(quic::test::QuicDispatcherPeer::time_wait_list_manager(&envoy_quic_dispatcher_)
+  EXPECT_TRUE(quic::test::QuicDispatcherPeer::GetTimeWaitListManager(&envoy_quic_dispatcher_)
                   ->IsConnectionIdInTimeWait(connection_id));
 }
 
