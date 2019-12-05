@@ -9,6 +9,7 @@
 
 #include "common/common/assert.h"
 #include "common/common/fmt.h"
+#include "common/common/logger.h"
 
 #include "absl/base/attributes.h"
 #include "absl/container/flat_hash_map.h"
@@ -105,7 +106,7 @@ template <typename T> class InjectFactory;
  * Example lookup: BaseFactoryType *factory =
  * FactoryRegistry<BaseFactoryType>::getFactory("example_factory_name");
  */
-template <class Base> class FactoryRegistry {
+template <class Base> class FactoryRegistry : public Logger::Loggable<Logger::Id::config> {
 public:
   /**
    * Return a sorted vector of registered factory names.
@@ -132,10 +133,22 @@ public:
     return *factories;
   }
 
-  static void registerFactory(Base& factory, absl::string_view name) {
+  static absl::flat_hash_map<std::string, std::string>& deprecatedFactoryNames() {
+    static auto* deprecated_factory_names = new absl::flat_hash_map<std::string, std::string>;
+    return *deprecated_factory_names;
+  }
+
+  /**
+   * instead_value are used when passed name was deprecated.
+   */
+  static void registerFactory(Base& factory, absl::string_view name,
+                              absl::string_view instead_value = "") {
     auto result = factories().emplace(std::make_pair(name, &factory));
     if (!result.second) {
       throw EnvoyException(fmt::format("Double registration for name: '{}'", factory.name()));
+    }
+    if (!instead_value.empty()) {
+      deprecatedFactoryNames().emplace(std::make_pair(name, instead_value));
     }
   }
 
@@ -143,11 +156,20 @@ public:
    * Gets a factory by name. If the name isn't found in the registry, returns nullptr.
    */
   static Base* getFactory(absl::string_view name) {
+    checkDeprecated(name);
     auto it = factories().find(name);
     if (it == factories().end()) {
       return nullptr;
     }
     return it->second;
+  }
+
+  static void checkDeprecated(absl::string_view name) {
+    auto it = deprecatedFactoryNames().find(name);
+    const bool status = it != deprecatedFactoryNames().end();
+    if (status) {
+      ENVOY_LOG(warn, "{} is deprecated, use {} instead.", it->first, it->second);
+    }
   }
 
 private:
@@ -227,7 +249,7 @@ public:
 
     for (auto deprecated_name : deprecated_names) {
       ASSERT(!deprecated_name.empty());
-      FactoryRegistry<Base>::registerFactory(instance_, deprecated_name);
+      FactoryRegistry<Base>::registerFactory(instance_, deprecated_name, instance_.name());
     }
 
     if (!FactoryCategoryRegistry::isRegistered(Base::category())) {

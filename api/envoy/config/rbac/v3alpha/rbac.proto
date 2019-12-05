@@ -13,6 +13,8 @@ import "envoy/type/matcher/v3alpha/string.proto";
 
 import "google/api/expr/v1alpha1/syntax.proto";
 
+import "udpa/api/annotations/versioning.proto";
+
 import "validate/validate.proto";
 
 // [#protodoc-title: Role Based Access Control (RBAC)]
@@ -57,6 +59,8 @@ import "validate/validate.proto";
 //         - any: true
 //
 message RBAC {
+  option (udpa.api.annotations.versioning).previous_message_type = "envoy.config.rbac.v2.RBAC";
+
   // Should we do safe-list or block-list style access control?
   enum Action {
     // The policies grant access to principals. The rest is denied. This is safe-list style
@@ -82,6 +86,8 @@ message RBAC {
 // and only if at least one of its permissions match the action taking place AND at least one of its
 // principals match the downstream AND the condition is true if specified.
 message Policy {
+  option (udpa.api.annotations.versioning).previous_message_type = "envoy.config.rbac.v2.Policy";
+
   // Required. The set of permissions that define a role. Each permission is matched with OR
   // semantics. To match all actions for this policy, a single Permission with the `any` field set
   // to true should be used.
@@ -101,9 +107,15 @@ message Policy {
 // Permission defines an action (or actions) that a principal can take.
 // [#next-free-field: 10]
 message Permission {
+  option (udpa.api.annotations.versioning).previous_message_type =
+      "envoy.config.rbac.v2.Permission";
+
   // Used in the `and_rules` and `or_rules` fields in the `rule` oneof. Depending on the context,
   // each are applied with the associated behavior.
   message Set {
+    option (udpa.api.annotations.versioning).previous_message_type =
+        "envoy.config.rbac.v2.Permission.Set";
+
     repeated Permission rules = 1 [(validate.rules).repeated = {min_items: 1}];
   }
 
@@ -163,14 +175,22 @@ message Permission {
 // Principal defines an identity or a group of identities for a downstream subject.
 // [#next-free-field: 9]
 message Principal {
+  option (udpa.api.annotations.versioning).previous_message_type = "envoy.config.rbac.v2.Principal";
+
   // Used in the `and_ids` and `or_ids` fields in the `identifier` oneof. Depending on the context,
   // each are applied with the associated behavior.
   message Set {
+    option (udpa.api.annotations.versioning).previous_message_type =
+        "envoy.config.rbac.v2.Principal.Set";
+
     repeated Principal ids = 1 [(validate.rules).repeated = {min_items: 1}];
   }
 
   // Authentication attributes for a downstream.
   message Authenticated {
+    option (udpa.api.annotations.versioning).previous_message_type =
+        "envoy.config.rbac.v2.Principal.Authenticated";
+
     reserved 1;
 
     // The name of the principal. If set, The URI SAN or DNS SAN in that order is used from the

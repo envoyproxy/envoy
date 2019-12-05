@@ -28,6 +28,7 @@
 #include "absl/strings/str_cat.h"
 #include "absl/strings/str_split.h"
 #include "absl/strings/string_view.h"
+#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Http {
@@ -782,18 +783,17 @@ absl::string_view Utility::hostFromAuthority(absl::string_view authority) {
   }
 }
 
-absl::string_view Utility::portFromAuthority(absl::string_view authority, uint32_t default_port) {
+absl::optional<absl::string_view> Utility::portFromAuthority(absl::string_view authority) {
   const auto pos = authority.rfind(":");
   if (pos == absl::string_view::npos) {
-    return std::to_string(default_port);
+    return absl::nullopt;
   }
   return authority.substr(pos + 1);
 }
 
-const Utility::AuthorityAttributes Utility::parseAuthority(absl::string_view authority,
-                                                           uint32_t default_port) {
+const Utility::AuthorityAttributes Utility::parseAuthority(absl::string_view authority) {
   Utility::AuthorityAttributes auth_attr;
-  auth_attr.port = default_port;
+  auth_attr.port = absl::nullopt;
   auth_attr.host = authority;
 
   bool is_ipv4 = true;
@@ -887,15 +887,14 @@ const Utility::AuthorityAttributes Utility::parseAuthority(absl::string_view aut
 
   // If the number of colon is upper than 1, authority can't separate host and port correctly.
   if (colon_lpos != absl::string_view::npos && colon_lpos == colon_rpos) {
-    absl::string_view port_str = Http::Utility::portFromAuthority(authority);
+    absl::string_view port_str = Http::Utility::portFromAuthority(authority).value();
     uint64_t port64 = 0;
     if (port_str.empty() || !absl::SimpleAtoi(std::string(port_str).c_str(), &port64) ||
         port64 > 65535) {
-      auth_attr.port = default_port;
       return auth_attr;
     }
     auth_attr.host = Http::Utility::hostFromAuthority(authority);
-    auth_attr.port = static_cast<uint32_t>(port64);
+    auth_attr.port = static_cast<uint16_t>(port64);
   }
 
   return auth_attr;

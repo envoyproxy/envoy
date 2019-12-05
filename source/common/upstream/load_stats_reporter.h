@@ -13,12 +13,10 @@ namespace Upstream {
 /**
  * All load reporter stats. @see stats_macros.h
  */
-// clang-format off
 #define ALL_LOAD_REPORTER_STATS(COUNTER)                                                           \
   COUNTER(requests)                                                                                \
   COUNTER(responses)                                                                               \
   COUNTER(errors)
-// clang-format on
 
 /**
  * Struct definition for all load reporter stats. @see stats_macros.h

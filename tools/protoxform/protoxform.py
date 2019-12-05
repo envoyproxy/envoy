@@ -20,7 +20,7 @@ from tools.api_proto_plugin import plugin
 from tools.api_proto_plugin import traverse
 from tools.api_proto_plugin import visitor
 from tools.protoxform import migrate
-from tools.protoxform import options
+from tools.protoxform import options as protoxform_options
 from tools.protoxform import utils
 from tools.type_whisperer import type_whisperer
 from tools.type_whisperer.types_pb2 import Types
@@ -182,6 +182,9 @@ def FormatHeaderFromFile(source_code_info, file_proto):
     options += ['option java_generic_services = true;']
   options_block = FormatBlock('\n'.join(options))
 
+  requires_versioning_import = any(
+      protoxform_options.GetVersioningAnnotation(m.options) for m in file_proto.message_type)
+
   envoy_imports = list(envoy_proto_paths)
   google_imports = []
   infra_imports = []
@@ -196,8 +199,14 @@ def FormatHeaderFromFile(source_code_info, file_proto):
       google_imports.append(d)
     elif d.startswith('validate/'):
       infra_imports.append(d)
+    elif d in ['udpa/api/annotations/versioning.proto']:
+      # Skip, we decide to add this based on requires_versioning_import
+      pass
     else:
       misc_imports.append(d)
+
+  if requires_versioning_import:
+    misc_imports.append('udpa/api/annotations/versioning.proto')
 
   def FormatImportBlock(xs):
     if not xs:
@@ -362,7 +371,7 @@ def FormatField(type_context, field):
   Returns:
     Formatted proto field as a string.
   """
-  if options.HasHideOption(field.options):
+  if protoxform_options.HasHideOption(field.options):
     return ''
   leading_comment, trailing_comment = FormatTypeContextComments(type_context)
   annotations = []
@@ -386,7 +395,7 @@ def FormatEnumValue(type_context, value):
   Returns:
     Formatted proto enum value as a string.
   """
-  if options.HasHideOption(value.options):
+  if protoxform_options.HasHideOption(value.options):
     return ''
   leading_comment, trailing_comment = FormatTypeContextComments(type_context)
   annotations = []
@@ -397,17 +406,27 @@ def FormatEnumValue(type_context, value):
                                trailing_comment)
 
 
-def FormatOptions(options):
+def FormatOptions(options, is_message=False):
   """Format MessageOptions/EnumOptions message.
 
   Args:
     options: A MessageOptions/EnumOptions message.
+    is_message: is this a message type?
 
   Returns:
     Formatted options as a string.
   """
+  formatted_options = []
   if options.deprecated:
-    return FormatBlock('option deprecated = true;\n')
+    formatted_options.append('option deprecated = true;')
+  if is_message:
+    versioning_annotation = protoxform_options.GetVersioningAnnotation(options)
+    if versioning_annotation:
+      formatted_options.append(
+          'option (udpa.api.annotations.versioning).previous_message_type = "%s";' %
+          versioning_annotation.previous_message_type)
+  if formatted_options:
+    return FormatBlock('\n'.join(formatted_options) + '\n')
   return ''
 
 
@@ -459,13 +478,13 @@ class ProtoFormatVisitor(visitor.Visitor):
     # Skip messages synthesized to represent map types.
     if msg_proto.options.map_entry:
       return ''
-    if options.HasHideOption(msg_proto.options):
+    if protoxform_options.HasHideOption(msg_proto.options):
       return ''
     annotation_xforms = {
         annotations.NEXT_FREE_FIELD_ANNOTATION: CreateNextFreeFieldXform(msg_proto)
     }
     leading_comment, trailing_comment = FormatTypeContextComments(type_context, annotation_xforms)
-    formatted_options = FormatOptions(msg_proto.options)
+    formatted_options = FormatOptions(msg_proto.options, is_message=True)
     formatted_enums = FormatBlock('\n'.join(nested_enums))
     formatted_msgs = FormatBlock('\n'.join(nested_msgs))
     reserved_fields = FormatReserved(msg_proto)

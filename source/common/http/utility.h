@@ -414,7 +414,7 @@ struct AuthorityAttributes {
 
   // if parsed authority has port in authority, that is stored here
   // this value is stored default_port value if passed authority has no port
-  uint32_t port;
+  absl::optional<uint16_t> port;
 };
 
 /**
@@ -430,15 +430,15 @@ absl::string_view hostFromAuthority(absl::string_view authority);
  * @param default_port default port
  * @return std::string retrieved port
  */
-absl::string_view portFromAuthority(absl::string_view authority, uint32_t default_port = 0);
+absl::optional<absl::string_view> portFromAuthority(absl::string_view authority);
 
 /**
- * Parse passed authority, and get that is valid FQDN or IPv4/IPv6 address, hostname and port-name
+ * Parse passed authority, and get that is valid FQDN or IPv4/IPv6 address, hostname and port-name.
  * @param host host/authority
  * @param default_port If passed authority does not have port, this value is returned
  * @return hostname parse result. that includes whether host is IP Address, hostname and port-name
  */
-const AuthorityAttributes parseAuthority(absl::string_view host, uint32_t default_port = 0);
+const AuthorityAttributes parseAuthority(absl::string_view host);
 } // namespace Utility
 } // namespace Http
 } // namespace Envoy

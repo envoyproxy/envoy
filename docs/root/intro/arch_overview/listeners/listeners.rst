@@ -5,8 +5,11 @@ Listeners
 
 The Envoy configuration supports any number of listeners within a single process. Generally we
 recommend running a single Envoy per machine regardless of the number of configured listeners. This
-allows for easier operation and a single source of statistics. Currently Envoy only supports TCP
+allows for easier operation and a single source of statistics. Envoy supports both TCP and UDP
 listeners.
+
+TCP
+---
 
 Each listener is independently configured with some number :ref:`filter chains
 <envoy_api_msg_listener.FilterChain>`, where an individual chain is selected based on its
@@ -29,3 +32,14 @@ Listeners can also be fetched dynamically via the :ref:`listener discovery servi
 <config_listeners_lds>`.
 
 Listener :ref:`configuration <config_listeners>`.
+
+UDP
+---
+
+Envoy also supports UDP listeners and specifically :ref:`UDP listener filters
+<config_udp_listener_filters>`. UDP listener filters are instantiated once per worker and are global
+to that worker. Each listener filter processes each UDP datagram that is received by the worker
+listening on the port. In practice, UDP listeners are configured with the SO_REUSEPORT kernel option
+which will cause the kernel to consistently hash each UDP 4-tuple to the same worker. This allows a
+UDP listener filter to be "session" oriented if it so desires. A built-in example of this
+functionality is the :ref:`UDP proxy <config_udp_listener_filters_udp_proxy>` listener filter.
