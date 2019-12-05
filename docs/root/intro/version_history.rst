@@ -31,6 +31,8 @@ Version history
 * tls: remove TLS 1.0 and 1.1 from client defaults
 * tracing: added the ability to set custom tags on both the :ref:`HTTP connection manager<envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.tracing>` and the :ref:`HTTP route <envoy_api_field_route.Route.tracing>`.
 * udp: added initial support for :ref:`UDP proxy <config_udp_listener_filters_udp_proxy>`
+* router: exposed DOWNSTREAM_REMOTE_ADDRESS as custom HTTP request/response headers.
+* jwt_authn filter: added `allow_missing` option
 
 1.12.0 (October 31, 2019)
 =========================
