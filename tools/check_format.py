@@ -892,11 +892,7 @@ if __name__ == "__main__":
             if len(owners) < 2:
               error_messages.append("Extensions require at least 2 owners in CODEOWNERS:\n"
                                     "    {}".format(line))
-            maintainer = False
-            for owner in owners:
-              if owner in maintainers:
-                maintainer = True
-                break
+            maintainer = len(set(owners).intersection(set(maintainers))) > 0
             if not maintainer:
               error_messages.append("Extensions require at least 1 maintainer OWNER:\n"
                                     "    {}".format(line))
