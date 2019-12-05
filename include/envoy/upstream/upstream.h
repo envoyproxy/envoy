@@ -588,8 +588,8 @@ public:
   GAUGE(version, NeverImport)                                                                      \
   HISTOGRAM(upstream_cx_connect_ms, Milliseconds)                                                  \
   HISTOGRAM(upstream_cx_length_ms, Milliseconds)                                                   \
-  HISTOGRAM(upstream_rq_timeout_budget_global, Unspecified)                                        \
-  HISTOGRAM(upstream_rq_timeout_budget_per_try, Unspecified)
+  HISTOGRAM(upstream_rq_timeout_budget_percent_used, Unspecified)                                  \
+  HISTOGRAM(upstream_rq_timeout_budget_per_try_percent_used, Unspecified)
 
 /**
  * All cluster load report stats. These are only use for EDS load reporting and not sent to the

@@ -760,7 +760,8 @@ void Filter::onResponseTimeout() {
       }
 
       // Record the max-value into the histogram to say that the entire timeout budget was used.
-      cluster_->stats().upstream_rq_timeout_budget_per_try_.recordValue(TimeoutPrecisionFactor);
+      cluster_->stats().upstream_rq_timeout_budget_per_try_percent_used_.recordValue(
+          TimeoutPrecisionFactor);
 
       // If this upstream request already hit a "soft" timeout, then it
       // already recorded a timeout into outlier detection. Don't do it again.
@@ -815,7 +816,8 @@ void Filter::onPerTryTimeout(UpstreamRequest& upstream_request) {
   }
 
   cluster_->stats().upstream_rq_per_try_timeout_.inc();
-  cluster_->stats().upstream_rq_timeout_budget_per_try_.recordValue(TimeoutPrecisionFactor);
+  cluster_->stats().upstream_rq_timeout_budget_per_try_percent_used_.recordValue(
+      TimeoutPrecisionFactor);
   if (upstream_request.upstream_host_) {
     upstream_request.upstream_host_->stats().rq_timeout_.inc();
   }
@@ -867,7 +869,7 @@ void Filter::chargeUpstreamAbort(Http::Code code, bool dropped, UpstreamRequest&
 
 void Filter::onUpstreamTimeoutAbort(StreamInfo::ResponseFlag response_flags,
                                     absl::string_view details) {
-  cluster_->stats().upstream_rq_timeout_budget_global_.recordValue(TimeoutPrecisionFactor);
+  cluster_->stats().upstream_rq_timeout_budget_percent_used_.recordValue(TimeoutPrecisionFactor);
   const absl::string_view body =
       timeout_response_code_ == Http::Code::GatewayTimeout ? "upstream request timeout" : "";
   onUpstreamAbort(timeout_response_code_, response_flags, body, false, details);
@@ -1240,9 +1242,9 @@ void Filter::onUpstreamComplete(UpstreamRequest& upstream_request) {
   std::chrono::milliseconds response_time = std::chrono::duration_cast<std::chrono::milliseconds>(
       dispatcher.timeSource().monotonicTime() - downstream_request_complete_time_);
 
-  cluster_->stats().upstream_rq_timeout_budget_global_.recordValue(
+  cluster_->stats().upstream_rq_timeout_budget_percent_used_.recordValue(
       percentageOfTimeout(response_time, timeout_.global_timeout_));
-  cluster_->stats().upstream_rq_timeout_budget_per_try_.recordValue(
+  cluster_->stats().upstream_rq_timeout_budget_per_try_percent_used_.recordValue(
       percentageOfTimeout(response_time, timeout_.per_try_timeout_));
 
   if (config_.emit_dynamic_stats_ && !callbacks_->streamInfo().healthCheck() &&
