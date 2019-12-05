@@ -35,14 +35,16 @@ def BazelBinPathForOutputArtifact(label, suffix, repo_tag, root=''):
   # While we may have reformatted the file multiple times due to the transitive
   # dependencies in the aspect above, they all look the same. So, just pick an
   # arbitrary match and we're done.
-  glob_pattern = os.path.join(root, 'bazel-bin/**/%s%s' % (ProtoFileCanonicalFromLabel(label, repo_tag), suffix))
+  glob_pattern = os.path.join(
+      root, 'bazel-bin/**/%s%s' % (ProtoFileCanonicalFromLabel(label, repo_tag), suffix))
   return glob.glob(glob_pattern, recursive=True)[0]
 
+
 def ExtractRepoName(label):
-  """Extract repository name from label"""  
+  """Extract repository name from label"""
   repo = ""
   for i, ch in enumerate(label):
-    if label[i] == label[i+1]:
+    if label[i] == label[i + 1]:
       repo += "//"
       break
     else:

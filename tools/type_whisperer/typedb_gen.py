@@ -61,6 +61,7 @@ def UpgradedPath(proto_path):
     if s != proto_path:
       return s
 
+
 def LoadTypes(path):
   """Load a tools.type_whisperer.Types proto from the filesystem.
 
@@ -126,7 +127,10 @@ if __name__ == '__main__':
 
   # Load type descriptors for each .proto.
   type_desc_paths = [
-      BazelBinPathForOutputArtifact(label, '.types.pb_text', root=src_root, repo_tag=ExtractRepoName(label)) for label in src_labels
+      BazelBinPathForOutputArtifact(label,
+                                    '.types.pb_text',
+                                    root=src_root,
+                                    repo_tag=ExtractRepoName(label)) for label in src_labels
   ]
   type_whispers = map(LoadTypes, type_desc_paths)
   # Aggregate type descriptors to a single type map.

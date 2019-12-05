@@ -1,6 +1,7 @@
 import logging
 import subprocess
 
+
 # Echoes and runs an OS command, returning exit status and the captured
 # stdout+stderr as a string array.
 def runCommand(command):
