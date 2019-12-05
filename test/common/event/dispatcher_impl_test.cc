@@ -10,7 +10,6 @@
 
 #include "test/mocks/common.h"
 #include "test/mocks/stats/mocks.h"
-#include "test/test_common/simulated_time_system.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
@@ -81,33 +80,6 @@ protected:
   ~DispatcherImplTest() override {
     dispatcher_->exit();
     dispatcher_thread_->join();
-  }
-
-  void timerTest(std::function<void(Timer&)> enable_timer_delegate) {
-    TimerPtr timer;
-    dispatcher_->post([this, &timer]() {
-      {
-        Thread::LockGuard lock(mu_);
-        timer = dispatcher_->createTimer([this]() {
-          {
-            Thread::LockGuard lock(mu_);
-            work_finished_ = true;
-          }
-          cv_.notifyOne();
-        });
-        EXPECT_FALSE(timer->enabled());
-      }
-      cv_.notifyOne();
-    });
-
-    Thread::LockGuard lock(mu_);
-    while (timer == nullptr) {
-      cv_.wait(mu_);
-    }
-    enable_timer_delegate(*timer);
-    while (!work_finished_) {
-      cv_.wait(mu_);
-    }
   }
 
   NiceMock<Stats::MockStore> scope_; // Used in InitializeStats, must outlive dispatcher_->exit().
@@ -186,8 +158,31 @@ TEST_F(DispatcherImplTest, RunPostCallbacksLocking) {
 }
 
 TEST_F(DispatcherImplTest, Timer) {
-  timerTest([](Timer& timer) { timer.enableTimer(std::chrono::milliseconds(50)); });
-  timerTest([](Timer& timer) { timer.enableHRTimer(std::chrono::microseconds(50)); });
+  TimerPtr timer;
+  dispatcher_->post([this, &timer]() {
+    {
+      Thread::LockGuard lock(mu_);
+      timer = dispatcher_->createTimer([this]() {
+        {
+          Thread::LockGuard lock(mu_);
+          work_finished_ = true;
+        }
+        cv_.notifyOne();
+      });
+      EXPECT_FALSE(timer->enabled());
+    }
+    cv_.notifyOne();
+  });
+
+  Thread::LockGuard lock(mu_);
+  while (timer == nullptr) {
+    cv_.wait(mu_);
+  }
+  timer->enableTimer(std::chrono::milliseconds(50));
+
+  while (!work_finished_) {
+    cv_.wait(mu_);
+  }
 }
 
 TEST_F(DispatcherImplTest, TimerWithScope) {
@@ -310,56 +305,6 @@ TEST(TimerImplTest, TimerEnabledDisabled) {
   EXPECT_TRUE(timer->enabled());
   dispatcher->run(Dispatcher::RunType::NonBlock);
   EXPECT_FALSE(timer->enabled());
-  timer->enableHRTimer(std::chrono::milliseconds(0));
-  EXPECT_TRUE(timer->enabled());
-  dispatcher->run(Dispatcher::RunType::NonBlock);
-  EXPECT_FALSE(timer->enabled());
-}
-
-class TimerImplTimingTest : public testing::Test {
-public:
-  std::chrono::nanoseconds getTimerTiming(Event::SimulatedTimeSystem& time_system,
-                                          Dispatcher& dispatcher, Event::Timer& timer) {
-    const auto start = time_system.monotonicTime();
-    EXPECT_TRUE(timer.enabled());
-    while (true) {
-      dispatcher.run(Dispatcher::RunType::NonBlock);
-      if (timer.enabled()) {
-        time_system.sleep(std::chrono::microseconds(1));
-      } else {
-        break;
-      }
-    }
-    return time_system.monotonicTime() - start;
-  }
-};
-
-// Test the timer with a series of timings and measure they fire accurately
-// using simulated time. enableTimer() should be precise at the millisecond
-// level, whereas enableHRTimer should be precise at the microsecond level.
-// For good measure, also check that '0'/immediate does what it says on the tin.
-TEST_F(TimerImplTimingTest, TheoreticalTimerTiming) {
-  Event::SimulatedTimeSystem time_system;
-  Api::ApiPtr api = Api::createApiForTest(time_system);
-  DispatcherPtr dispatcher(api->allocateDispatcher());
-  Event::TimerPtr timer = dispatcher->createTimer([&dispatcher] { dispatcher->exit(); });
-
-  const uint64_t timings[] = {0, 10, 50, 1234};
-  for (const uint64_t timing : timings) {
-    std::chrono::milliseconds ms(timing);
-    timer->enableTimer(ms);
-    EXPECT_EQ(std::chrono::duration_cast<std::chrono::milliseconds>(
-                  getTimerTiming(time_system, *dispatcher, *timer))
-                  .count(),
-              timing);
-
-    std::chrono::microseconds us(timing);
-    timer->enableHRTimer(us);
-    EXPECT_EQ(std::chrono::duration_cast<std::chrono::microseconds>(
-                  getTimerTiming(time_system, *dispatcher, *timer))
-                  .count(),
-              timing);
-  }
 }
 
 TEST(TimerImplTest, TimerValueConversion) {
@@ -368,21 +313,21 @@ TEST(TimerImplTest, TimerValueConversion) {
 
   // Basic test with zero milliseconds.
   msecs = std::chrono::milliseconds(0);
-  TimerUtils::microsecondsToTimeval(msecs, tv);
+  TimerUtils::millisecondsToTimeval(msecs, tv);
   EXPECT_EQ(tv.tv_sec, 0);
   EXPECT_EQ(tv.tv_usec, 0);
 
   // 2050 milliseconds is 2 seconds and 50000 microseconds.
   msecs = std::chrono::milliseconds(2050);
-  TimerUtils::microsecondsToTimeval(msecs, tv);
+  TimerUtils::millisecondsToTimeval(msecs, tv);
   EXPECT_EQ(tv.tv_sec, 2);
   EXPECT_EQ(tv.tv_usec, 50000);
 
   // Check maximum value conversion.
-  const auto usecs = std::chrono::microseconds::duration::max();
-  TimerUtils::microsecondsToTimeval(usecs, tv);
-  EXPECT_EQ(tv.tv_sec, usecs.count() / 1000000);
-  EXPECT_EQ(tv.tv_usec, usecs.count() % tv.tv_sec);
+  msecs = std::chrono::milliseconds::duration::max();
+  TimerUtils::millisecondsToTimeval(msecs, tv);
+  EXPECT_EQ(tv.tv_sec, msecs.count() / 1000);
+  EXPECT_EQ(tv.tv_usec, (msecs.count() % tv.tv_sec) * 1000);
 }
 
 } // namespace

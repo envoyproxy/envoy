@@ -103,7 +103,9 @@ ContextImpl::resolveServiceAndMethod(const Http::HeaderEntry* path) {
   if (path == nullptr) {
     return request_names;
   }
-  const auto parts = StringUtil::splitToken(path->value().getStringView(), "/");
+  absl::string_view str = path->value().getStringView();
+  str = str.substr(0, str.find('?'));
+  const auto parts = StringUtil::splitToken(str, "/");
   if (parts.size() != 2) {
     return request_names;
   }

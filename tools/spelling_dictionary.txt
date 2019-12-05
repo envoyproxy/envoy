@@ -19,6 +19,7 @@ BSON
 CAS
 CB
 CDS
+CEL
 CHACHA
 CHLO
 CHLOS
@@ -284,6 +285,7 @@ UDP
 UDS
 URI
 URL
+USEVC
 UTC
 UTF
 UUID
@@ -967,6 +969,7 @@ superset
 symlink
 symlinked
 symlinks
+syncookie
 sys
 syscall
 syscalls
@@ -1059,6 +1062,7 @@ unreferenced
 unregister
 unregisters
 unresolvable
+unserializable
 unsetenv
 unsubscription
 unterminated

@@ -46,6 +46,9 @@ typeToCodecType(Http::CodecClient::Type type) {
   case Http::CodecClient::Type::HTTP2:
     return envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager::
         HTTP2;
+  case Http::CodecClient::Type::HTTP3:
+    return envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager::
+        HTTP3;
   default:
     RELEASE_ASSERT(0, "");
   }
@@ -180,6 +183,13 @@ void IntegrationCodecClient::ConnectionCallbacks::onEvent(Network::ConnectionEve
     parent_.disconnected_ = true;
     parent_.connection_->dispatcher().exit();
   } else {
+    if (parent_.type() == CodecClient::Type::HTTP3 && !parent_.connected_) {
+      // Before handshake gets established, any connection failure should exit the loop. I.e. a QUIC
+      // connection may fail of INVALID_VERSION if both this client doesn't support any of the
+      // versions the server advertised before handshake established. In this case the connection is
+      // closed locally and this is in a blocking event loop.
+      parent_.connection_->dispatcher().exit();
+    }
     parent_.disconnected_ = true;
   }
 }
@@ -203,7 +213,7 @@ HttpIntegrationTest::makeRawHttpConnection(Network::ClientConnectionPtr&& conn) 
 IntegrationCodecClientPtr
 HttpIntegrationTest::makeHttpConnection(Network::ClientConnectionPtr&& conn) {
   auto codec = makeRawHttpConnection(std::move(conn));
-  EXPECT_TRUE(codec->connected());
+  EXPECT_TRUE(codec->connected()) << codec->connection()->transportFailureReason();
   return codec;
 }
 
