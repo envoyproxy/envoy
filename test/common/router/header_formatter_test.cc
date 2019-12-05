@@ -544,7 +544,8 @@ TEST_F(StreamInfoHeaderFormatterTest, TestFormatWithUpstreamMetadataVariableMiss
 TEST_F(StreamInfoHeaderFormatterTest, TestFormatWithPerRequestStateVariable) {
   Envoy::StreamInfo::FilterStateImpl filter_state;
   filter_state.setData("testing", std::make_unique<StringAccessorImpl>("test_value"),
-                       StreamInfo::FilterState::StateType::ReadOnly);
+                       StreamInfo::FilterState::StateType::ReadOnly,
+                       StreamInfo::FilterState::LifeSpan::FilterChain);
   EXPECT_EQ("test_value", filter_state.getDataReadOnly<StringAccessor>("testing").asString());
 
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
@@ -559,7 +560,8 @@ TEST_F(StreamInfoHeaderFormatterTest, TestFormatWithPerRequestStateVariable) {
 TEST_F(StreamInfoHeaderFormatterTest, TestFormatWithNonStringPerRequestStateVariable) {
   Envoy::StreamInfo::FilterStateImpl filter_state;
   filter_state.setData("testing", std::make_unique<StreamInfo::TestIntAccessor>(1),
-                       StreamInfo::FilterState::StateType::ReadOnly);
+                       StreamInfo::FilterState::StateType::ReadOnly,
+                       StreamInfo::FilterState::LifeSpan::FilterChain);
   EXPECT_EQ(1, filter_state.getDataReadOnly<StreamInfo::TestIntAccessor>("testing").access());
 
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
@@ -813,7 +815,8 @@ TEST(HeaderParserTest, TestParseInternal) {
 
   Envoy::StreamInfo::FilterStateImpl filter_state;
   filter_state.setData("testing", std::make_unique<StringAccessorImpl>("test_value"),
-                       StreamInfo::FilterState::StateType::ReadOnly);
+                       StreamInfo::FilterState::StateType::ReadOnly,
+                       StreamInfo::FilterState::LifeSpan::FilterChain);
   ON_CALL(stream_info, filterState()).WillByDefault(ReturnRef(filter_state));
   ON_CALL(Const(stream_info), filterState()).WillByDefault(ReturnRef(filter_state));
 
@@ -981,7 +984,8 @@ request_headers_to_remove: ["x-nope"]
 
   Envoy::StreamInfo::FilterStateImpl filter_state;
   filter_state.setData("testing", std::make_unique<StringAccessorImpl>("test_value"),
-                       StreamInfo::FilterState::StateType::ReadOnly);
+                       StreamInfo::FilterState::StateType::ReadOnly,
+                       StreamInfo::FilterState::LifeSpan::FilterChain);
   ON_CALL(stream_info, filterState()).WillByDefault(ReturnRef(filter_state));
   ON_CALL(Const(stream_info), filterState()).WillByDefault(ReturnRef(filter_state));
 
