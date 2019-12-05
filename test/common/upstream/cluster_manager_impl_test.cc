@@ -359,7 +359,7 @@ static_resources:
 
 TEST_F(ClusterManagerImplTest, OriginalDstLbRestriction2) {
   const std::string yaml = R"EOF(
-static_resources:
+ static_resources:
   clusters:
   - name: cluster_1
     connect_timeout: 0.250s
@@ -413,7 +413,7 @@ public:
 // Test initialization of subset load balancer with every possible load balancer policy.
 TEST_P(ClusterManagerSubsetInitializationTest, SubsetLoadBalancerInitialization) {
   const std::string yamlPattern = R"EOF(
-static_resources:
+ static_resources:
   clusters:
   - name: cluster_1
     connect_timeout: 0.250s
@@ -447,7 +447,6 @@ static_resources:
     // This custom cluster type is registered by linking test/integration/custom/static_cluster.cc.
     cluster_type = "cluster_type: { name: envoy.clusters.custom_static_with_lb }";
   }
-
   const std::string yaml = fmt::format(yamlPattern, cluster_type, policy_name);
 
   if (GetParam() == envoy::api::v2::Cluster_LbPolicy_ORIGINAL_DST_LB ||
@@ -480,7 +479,7 @@ INSTANTIATE_TEST_SUITE_P(ClusterManagerSubsetInitializationTest,
 
 TEST_F(ClusterManagerImplTest, SubsetLoadBalancerOriginalDstRestriction) {
   const std::string yaml = R"EOF(
-static_resources:
+ static_resources:
   clusters:
   - name: cluster_1
     connect_timeout: 0.250s
@@ -499,7 +498,7 @@ static_resources:
 
 TEST_F(ClusterManagerImplTest, SubsetLoadBalancerClusterProvidedLbRestriction) {
   const std::string yaml = R"EOF(
-static_resources:
+ static_resources:
   clusters:
   - name: cluster_1
     connect_timeout: 0.250s
@@ -518,7 +517,7 @@ static_resources:
 
 TEST_F(ClusterManagerImplTest, SubsetLoadBalancerLocalityAware) {
   const std::string yaml = R"EOF(
-static_resources:
+ static_resources:
   clusters:
   - name: cluster_1
     connect_timeout: 0.250s
@@ -551,7 +550,7 @@ static_resources:
 
 TEST_F(ClusterManagerImplTest, RingHashLoadBalancerInitialization) {
   const std::string yaml = R"EOF(
-static_resources:
+ static_resources:
   clusters:
   - name: redis_cluster
     lb_policy: RING_HASH
@@ -688,7 +687,7 @@ TEST_F(ClusterManagerImplThreadAwareLbTest, MaglevLoadBalancerThreadAwareUpdate)
 
 TEST_F(ClusterManagerImplTest, TcpHealthChecker) {
   const std::string yaml = R"EOF(
-static_resources:
+ static_resources:
   clusters:
   - name: cluster_1
     connect_timeout: 0.250s
@@ -725,7 +724,7 @@ static_resources:
 
 TEST_F(ClusterManagerImplTest, HttpHealthChecker) {
   const std::string yaml = R"EOF(
-static_resources:
+ static_resources:
   clusters:
   - name: cluster_1
     connect_timeout: 0.250s
@@ -785,7 +784,7 @@ TEST_F(ClusterManagerImplTest, UnknownCluster) {
  */
 TEST_F(ClusterManagerImplTest, VerifyBufferLimits) {
   const std::string yaml = R"EOF(
-static_resources:
+ static_resources:
   clusters:
   - name: cluster_1
     connect_timeout: 0.250s
@@ -923,8 +922,8 @@ TEST_F(ClusterManagerImplTest, InitializeOrder) {
   cds->initialized_callback_();
   EXPECT_CALL(*cds, versionInfo()).WillOnce(Return("version3"));
   checkConfigDump(R"EOF(
-version_info: version3
-static_clusters:
+ version_info: version3
+ static_clusters:
   - cluster:
       name: "cds_cluster"
       type: "STATIC"
@@ -958,7 +957,7 @@ static_clusters:
     last_updated:
       seconds: 1234567891
       nanos: 234000000
-dynamic_active_clusters:
+ dynamic_active_clusters:
   - version_info: "version1"
     cluster:
       name: "cluster3"
@@ -995,7 +994,7 @@ dynamic_active_clusters:
     last_updated:
       seconds: 1234567891
       nanos: 234000000
-dynamic_warming_clusters:
+ dynamic_warming_clusters:
 )EOF");
 
   EXPECT_CALL(*cluster3, initialize(_));
@@ -1511,8 +1510,8 @@ TEST_F(ClusterManagerImplTest, CloseTcpConnectionPoolsOnHealthFailure) {
   EXPECT_TRUE(Mock::VerifyAndClearExpectations(cluster1.get()));
 }
 
-// Test that we close all TCP connection pool connections when there is a host health failure, when
-// configured to do so.
+// Test that we close all TCP connection pool connections when there is a host health failure,
+// when configured to do so.
 TEST_F(ClusterManagerImplTest, CloseTcpConnectionsOnHealthFailure) {
   const std::string yaml = R"EOF(
   static_resources:
@@ -1664,7 +1663,7 @@ TEST_F(ClusterManagerImplTest, DynamicHostRemove) {
   )EOF";
 
   std::shared_ptr<Network::MockDnsResolver> dns_resolver(new Network::MockDnsResolver());
-  EXPECT_CALL(factory_.dispatcher_, createDnsResolver(_)).WillOnce(Return(dns_resolver));
+  EXPECT_CALL(factory_.dispatcher_, createDnsResolver(_, _)).WillOnce(Return(dns_resolver));
 
   Network::DnsResolver::ResolveCb dns_callback;
   Event::MockTimer* dns_timer_ = new NiceMock<Event::MockTimer>(&factory_.dispatcher_);
@@ -1804,7 +1803,7 @@ TEST_F(ClusterManagerImplTest, DynamicHostRemoveWithTls) {
   )EOF";
 
   std::shared_ptr<Network::MockDnsResolver> dns_resolver(new Network::MockDnsResolver());
-  EXPECT_CALL(factory_.dispatcher_, createDnsResolver(_)).WillOnce(Return(dns_resolver));
+  EXPECT_CALL(factory_.dispatcher_, createDnsResolver(_, _)).WillOnce(Return(dns_resolver));
 
   Network::DnsResolver::ResolveCb dns_callback;
   Event::MockTimer* dns_timer_ = new NiceMock<Event::MockTimer>(&factory_.dispatcher_);
@@ -2002,6 +2001,86 @@ TEST_F(ClusterManagerImplTest, DynamicHostRemoveWithTls) {
   factory_.tls_.shutdownThread();
 }
 
+// Test that default DNS resolver with TCP lookups is used, when there are no DNS custom resolvers
+// configured per cluster and `use_tcp_for_dns_lookups` is set in bootstrap config.
+TEST_F(ClusterManagerImplTest, UseTcpInDefaultDnsResolver) {
+  const std::string yaml = R"EOF(
+  use_tcp_for_dns_lookups: true
+  static_resources:
+    clusters:
+    - name: cluster_1
+      connect_timeout: 0.250s
+      type: STRICT_DNS
+  )EOF";
+
+  std::shared_ptr<Network::MockDnsResolver> dns_resolver(new Network::MockDnsResolver());
+  // As custom resolvers are not specified in config, this method should not be called,
+  // resolver from context should be used instead.
+  EXPECT_CALL(factory_.dispatcher_, createDnsResolver(_, _)).Times(0);
+
+  Network::DnsResolver::ResolveCb dns_callback;
+  Network::MockActiveDnsQuery active_dns_query;
+  EXPECT_CALL(*dns_resolver, resolve(_, _, _))
+      .WillRepeatedly(DoAll(SaveArg<2>(&dns_callback), Return(&active_dns_query)));
+  create(parseBootstrapFromV2Yaml(yaml));
+  factory_.tls_.shutdownThread();
+}
+
+// Test that custom DNS resolver with UDP lookups is used, when custom resolver is configured
+// per cluster and `use_tcp_for_dns_lookups` is not specified.
+TEST_F(ClusterManagerImplTest, UseUdpWithCustomDnsResolver) {
+  const std::string yaml = R"EOF(
+  static_resources:
+    clusters:
+    - name: cluster_1
+      connect_timeout: 0.250s
+      type: STRICT_DNS
+      dns_resolvers:
+      - socket_address:
+          address: 1.2.3.4
+          port_value: 80
+  )EOF";
+
+  std::shared_ptr<Network::MockDnsResolver> dns_resolver(new Network::MockDnsResolver());
+  // `false` here stands for using udp
+  EXPECT_CALL(factory_.dispatcher_, createDnsResolver(_, false)).WillOnce(Return(dns_resolver));
+
+  Network::DnsResolver::ResolveCb dns_callback;
+  Network::MockActiveDnsQuery active_dns_query;
+  EXPECT_CALL(*dns_resolver, resolve(_, _, _))
+      .WillRepeatedly(DoAll(SaveArg<2>(&dns_callback), Return(&active_dns_query)));
+  create(parseBootstrapFromV2Yaml(yaml));
+  factory_.tls_.shutdownThread();
+}
+
+// Test that custom DNS resolver with TCP lookups is used, when custom resolver is configured
+// per cluster and `use_tcp_for_dns_lookups` is enabled for that cluster.
+TEST_F(ClusterManagerImplTest, UseTcpWithCustomDnsResolver) {
+  const std::string yaml = R"EOF(
+  static_resources:
+    clusters:
+    - name: cluster_1
+      use_tcp_for_dns_lookups: true
+      connect_timeout: 0.250s
+      type: STRICT_DNS
+      dns_resolvers:
+      - socket_address:
+          address: 1.2.3.4
+          port_value: 80
+  )EOF";
+
+  std::shared_ptr<Network::MockDnsResolver> dns_resolver(new Network::MockDnsResolver());
+  // `true` here stands for using tcp
+  EXPECT_CALL(factory_.dispatcher_, createDnsResolver(_, true)).WillOnce(Return(dns_resolver));
+
+  Network::DnsResolver::ResolveCb dns_callback;
+  Network::MockActiveDnsQuery active_dns_query;
+  EXPECT_CALL(*dns_resolver, resolve(_, _, _))
+      .WillRepeatedly(DoAll(SaveArg<2>(&dns_callback), Return(&active_dns_query)));
+  create(parseBootstrapFromV2Yaml(yaml));
+  factory_.tls_.shutdownThread();
+}
+
 // This is a regression test for a use-after-free in
 // ClusterManagerImpl::ThreadLocalClusterManagerImpl::drainConnPools(), where a removal at one
 // priority from the ConnPoolsContainer would delete the ConnPoolsContainer mid-iteration over the
@@ -2029,7 +2108,7 @@ TEST_F(ClusterManagerImplTest, DynamicHostRemoveDefaultPriority) {
   )EOF";
 
   std::shared_ptr<Network::MockDnsResolver> dns_resolver(new Network::MockDnsResolver());
-  EXPECT_CALL(factory_.dispatcher_, createDnsResolver(_)).WillOnce(Return(dns_resolver));
+  EXPECT_CALL(factory_.dispatcher_, createDnsResolver(_, _)).WillOnce(Return(dns_resolver));
 
   Network::DnsResolver::ResolveCb dns_callback;
   Event::MockTimer* dns_timer_ = new NiceMock<Event::MockTimer>(&factory_.dispatcher_);
@@ -2108,7 +2187,7 @@ TEST_F(ClusterManagerImplTest, ConnPoolDestroyWithDraining) {
   )EOF";
 
   std::shared_ptr<Network::MockDnsResolver> dns_resolver(new Network::MockDnsResolver());
-  EXPECT_CALL(factory_.dispatcher_, createDnsResolver(_)).WillOnce(Return(dns_resolver));
+  EXPECT_CALL(factory_.dispatcher_, createDnsResolver(_, _)).WillOnce(Return(dns_resolver));
 
   Network::DnsResolver::ResolveCb dns_callback;
   Event::MockTimer* dns_timer_ = new NiceMock<Event::MockTimer>(&factory_.dispatcher_);

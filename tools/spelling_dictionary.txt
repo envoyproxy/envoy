@@ -285,6 +285,7 @@ UDP
 UDS
 URI
 URL
+USEVC
 UTC
 UTF
 UUID
@@ -968,6 +969,7 @@ superset
 symlink
 symlinked
 symlinks
+syncookie
 sys
 syscall
 syscalls

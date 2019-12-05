@@ -14,6 +14,7 @@ Version history
 * http: support :ref:`auto_host_rewrite_header<envoy_api_field_config.filter.http.dynamic_forward_proxy.v2alpha.PerRouteConfig.auto_host_rewrite_header>` in the dynamic forward proxy.
 * jwt_authn: added :ref:`bypass_cors_preflight<envoy_api_field_config.filter.http.jwt_authn.v2alpha.JwtAuthentication.bypass_cors_preflight>` to allow bypassing the CORS preflight request.
 * lb_subset_config: new fallback policy for selectors: :ref:`KEYS_SUBSET<envoy_api_enum_value_Cluster.LbSubsetConfig.LbSubsetSelector.LbSubsetSelectorFallbackPolicy.KEYS_SUBSET>`
+* listeners: added :ref:`reuse_port<envoy_api_field_Listener.reuse_port>` option.
 * logger: added :ref:`--log-format-escaped <operations_cli>` command line option to escape newline characters in application logs.
 * redis: performance improvement for larger split commands by avoiding string copies.
 * router: added support for REQ(header-name) :ref:`header formatter <config_http_conn_man_headers_custom_request_headers>`.
@@ -22,6 +23,7 @@ Version history
 * tcp_proxy: added :ref:`ClusterWeight.metadata_match<envoy_api_field_config.filter.network.tcp_proxy.v2.TcpProxy.WeightedCluster.ClusterWeight.metadata_match>`
 * tcp_proxy: added :ref:`hash_policy<envoy_api_field_config.filter.network.tcp_proxy.v2.TcpProxy.hash_policy>`
 * thrift_proxy: added support for cluster header based routing.
+* thrift_proxy: added stats to the router filter.
 * tls: remove TLS 1.0 and 1.1 from client defaults
 * router: added support for percentage-based retry budgets
 * tracing: added the ability to set custom tags on both the :ref:`HTTP connection manager<envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.tracing>` and the :ref:`HTTP route <envoy_api_field_route.Route.tracing>`.

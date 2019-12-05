@@ -3,6 +3,7 @@
 # Diff or copy protoxform artifacts from Bazel cache back to the source tree.
 
 import os
+import pathlib
 import re
 import shutil
 import string
@@ -43,6 +44,7 @@ api_proto_package($fields)
 
 IMPORT_REGEX = re.compile('import "(.*)";')
 SERVICE_REGEX = re.compile('service \w+ {')
+PREVIOUS_MESSAGE_TYPE_REGEX = re.compile(r'previous_message_type\s+=\s+"([^"]*)";')
 
 
 class ProtoSyncError(Exception):
@@ -167,6 +169,26 @@ def GetImportDeps(proto_path):
   return imports
 
 
+def GetPreviousMessageTypeDeps(proto_path):
+  """Obtain the Bazel dependencies for the previous version of messages in a .proto file.
+
+  We need to link in earlier proto descriptors to support Envoy reflection upgrades.
+
+  Args:
+    proto_path: path to .proto.
+
+  Returns:
+    A list of Bazel targets reflecting the previous message types in the .proto at proto_path.
+  """
+  contents = pathlib.Path(proto_path).read_text(encoding='utf8')
+  matches = re.findall(PREVIOUS_MESSAGE_TYPE_REGEX, contents)
+  deps = []
+  for m in matches:
+    target = '//%s:pkg' % '/'.join(s for s in m.split('.') if s and s[0].islower())
+    deps.append(target)
+  return deps
+
+
 def HasServices(proto_path):
   """Does a .proto file have any service definitions?
 
@@ -194,17 +216,19 @@ def BuildFileContents(root, files):
     A string containing the canonical BUILD file content for root.
   """
   import_deps = set(sum([GetImportDeps(os.path.join(root, f)) for f in files], []))
+  history_deps = set(sum([GetPreviousMessageTypeDeps(os.path.join(root, f)) for f in files], []))
+  deps = import_deps.union(history_deps)
   has_services = any(HasServices(os.path.join(root, f)) for f in files)
   fields = []
   if has_services:
     fields.append('    has_services = True,')
-  if import_deps:
-    if len(import_deps) == 1:
-      formatted_deps = '"%s"' % list(import_deps)[0]
+  if deps:
+    if len(deps) == 1:
+      formatted_deps = '"%s"' % list(deps)[0]
     else:
       formatted_deps = '\n' + '\n'.join(
           '        "%s",' % dep
-          for dep in sorted(import_deps, key=lambda s: s.replace(':', '!'))) + '\n    '
+          for dep in sorted(deps, key=lambda s: s.replace(':', '!'))) + '\n    '
     fields.append('    deps = [%s],' % formatted_deps)
   formatted_fields = '\n' + '\n'.join(fields) + '\n' if fields else ''
   return BUILD_FILE_TEMPLATE.substitute(fields=formatted_fields)
@@ -217,9 +241,6 @@ def SyncBuildFiles(cmd):
     cmd: 'check' or 'fix'.
   """
   for root, dirs, files in os.walk('api/'):
-    # Skip support files.
-    if root == 'api/versioning':
-      continue
     is_proto_dir = any(f.endswith('.proto') for f in files)
     if not is_proto_dir:
       continue

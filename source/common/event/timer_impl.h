@@ -16,7 +16,7 @@ namespace Event {
  */
 class TimerUtils {
 public:
-  static void microsecondsToTimeval(const std::chrono::microseconds& d, timeval& tv);
+  static void millisecondsToTimeval(const std::chrono::milliseconds& d, timeval& tv);
 };
 
 /**
@@ -29,9 +29,6 @@ public:
   // Timer
   void disableTimer() override;
   void enableTimer(const std::chrono::milliseconds& d, const ScopeTrackedObject* scope) override;
-  void enableHRTimer(const std::chrono::microseconds& us,
-                     const ScopeTrackedObject* object) override;
-
   bool enabled() override;
 
 private:
