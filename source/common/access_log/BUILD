@@ -39,6 +39,7 @@ envoy_cc_library(
     name = "access_log_formatter_lib",
     srcs = ["access_log_formatter.cc"],
     hdrs = ["access_log_formatter.h"],
+    external_deps = ["abseil_str_format"],
     deps = [
         "//include/envoy/access_log:access_log_interface",
         "//include/envoy/stream_info:stream_info_interface",
@@ -46,6 +47,7 @@ envoy_cc_library(
         "//source/common/common:utility_lib",
         "//source/common/config:metadata_lib",
         "//source/common/http:utility_lib",
+        "//source/common/protobuf:message_validator_lib",
         "//source/common/stream_info:utility_lib",
     ],
 )

@@ -107,7 +107,7 @@ struct ConnectionManagerTracingStats {
  */
 struct TracingConnectionManagerConfig {
   Tracing::OperationName operation_name_;
-  std::vector<Http::LowerCaseString> request_headers_for_tags_;
+  Tracing::CustomTagMap custom_tags_;
   envoy::type::FractionalPercent client_sampling_;
   envoy::type::FractionalPercent random_sampling_;
   envoy::type::FractionalPercent overall_sampling_;

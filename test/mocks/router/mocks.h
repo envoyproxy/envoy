@@ -372,6 +372,7 @@ public:
   MOCK_CONST_METHOD0(getClientSampling, const envoy::type::FractionalPercent&());
   MOCK_CONST_METHOD0(getRandomSampling, const envoy::type::FractionalPercent&());
   MOCK_CONST_METHOD0(getOverallSampling, const envoy::type::FractionalPercent&());
+  MOCK_CONST_METHOD0(getCustomTags, const Tracing::CustomTagMap&());
 };
 
 class MockRoute : public Route {
