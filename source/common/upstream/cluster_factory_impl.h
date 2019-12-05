@@ -147,7 +147,7 @@ private:
    */
   virtual std::pair<ClusterImplBaseSharedPtr, ThreadAwareLoadBalancerPtr>
   createClusterImpl(const envoy::api::v2::Cluster& cluster, ClusterFactoryContext& context,
-                    Server::Configuration::TransportSocketFactoryContext& socket_factory_context,
+                    Server::Configuration::TransportSocketFactoryContextImpl& socket_factory_context,
                     Stats::ScopePtr&& stats_scope) PURE;
   const std::string name_;
 };
@@ -171,7 +171,7 @@ protected:
 private:
   std::pair<ClusterImplBaseSharedPtr, ThreadAwareLoadBalancerPtr>
   createClusterImpl(const envoy::api::v2::Cluster& cluster, ClusterFactoryContext& context,
-                    Server::Configuration::TransportSocketFactoryContext& socket_factory_context,
+                    Server::Configuration::TransportSocketFactoryContextImpl& socket_factory_context,
                     Stats::ScopePtr&& stats_scope) override {
     ProtobufTypes::MessagePtr config = createEmptyConfigProto();
     Config::Utility::translateOpaqueConfig(
@@ -187,7 +187,7 @@ private:
   virtual std::pair<ClusterImplBaseSharedPtr, ThreadAwareLoadBalancerPtr> createClusterWithConfig(
       const envoy::api::v2::Cluster& cluster, const ConfigProto& proto_config,
       ClusterFactoryContext& context,
-      Server::Configuration::TransportSocketFactoryContext& socket_factory_context,
+      Server::Configuration::TransportSocketFactoryContextImpl& socket_factory_context,
       Stats::ScopePtr&& stats_scope) PURE;
 };
 

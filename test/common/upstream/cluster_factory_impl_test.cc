@@ -37,7 +37,7 @@ public:
 
   std::pair<ClusterImplBaseSharedPtr, ThreadAwareLoadBalancerPtr>
   createClusterImpl(const envoy::api::v2::Cluster& cluster, ClusterFactoryContext& context,
-                    Server::Configuration::TransportSocketFactoryContext& socket_factory_context,
+                    Server::Configuration::TransportSocketFactoryContextImpl& socket_factory_context,
                     Stats::ScopePtr&& stats_scope) override {
     return std::make_pair(std::make_shared<CustomStaticCluster>(
                               cluster, context.runtime(), socket_factory_context,

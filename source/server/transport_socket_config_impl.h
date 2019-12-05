@@ -23,6 +23,12 @@ public:
         stats_(stats), singleton_manager_(singleton_manager), tls_(tls),
         validation_visitor_(validation_visitor), api_(api) {}
 
+  /**
+   * Pass an init manager to register dynamic secret provider.
+   * @param init_manager instance of init manager.
+   */
+  void setInitManager(Init::Manager& init_manager) { init_manager_ = &init_manager; }
+
   // TransportSocketFactoryContext
   Server::Admin& admin() override { return admin_; }
   Ssl::ContextManager& sslContextManager() override { return context_manager_; }
@@ -35,7 +41,6 @@ public:
   Event::Dispatcher& dispatcher() override { return dispatcher_; }
   Envoy::Runtime::RandomGenerator& random() override { return random_; }
   Stats::Store& stats() override { return stats_; }
-  void setInitManager(Init::Manager& init_manager) override { init_manager_ = &init_manager; }
   Init::Manager* initManager() override { return init_manager_; }
   Singleton::Manager& singletonManager() override { return singleton_manager_; }
   ThreadLocal::SlotAllocator& threadLocal() override { return tls_; }

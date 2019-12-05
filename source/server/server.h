@@ -170,8 +170,6 @@ public:
   Ssl::ContextManager& sslContextManager() override { return server_.sslContextManager(); }
   Secret::SecretManager& secretManager() override { return server_.secretManager(); }
   Stats::Store& stats() override { return server_.stats(); }
-  // Server's init manager can't be changed via this shared TransportSocketFactoryContext
-  void setInitManager(Init::Manager&) override {}
   Init::Manager* initManager() override { return &server_.initManager(); }
   ProtobufMessage::ValidationVisitor& messageValidationVisitor() override {
     // Server has two message validation visitors, one for static and

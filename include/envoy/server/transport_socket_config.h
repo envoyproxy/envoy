@@ -73,12 +73,6 @@ public:
   virtual Stats::Store& stats() PURE;
 
   /**
-   * Pass an init manager to register dynamic secret provider.
-   * @param init_manager instance of init manager.
-   */
-  virtual void setInitManager(Init::Manager& init_manager) PURE;
-
-  /**
    * @return a pointer pointing to the instance of an init manager, or nullptr
    * if not set.
    */

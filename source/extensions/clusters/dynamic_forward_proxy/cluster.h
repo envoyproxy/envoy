@@ -22,7 +22,7 @@ public:
           Runtime::Loader& runtime,
           Extensions::Common::DynamicForwardProxy::DnsCacheManagerFactory& cache_manager_factory,
           const LocalInfo::LocalInfo& local_info,
-          Server::Configuration::TransportSocketFactoryContext& factory_context,
+          Server::Configuration::TransportSocketFactoryContextImpl& factory_context,
           Stats::ScopePtr&& stats_scope, bool added_via_api);
 
   // Upstream::Cluster
@@ -126,7 +126,7 @@ private:
       const envoy::api::v2::Cluster& cluster,
       const envoy::config::cluster::dynamic_forward_proxy::v2alpha::ClusterConfig& proto_config,
       Upstream::ClusterFactoryContext& context,
-      Server::Configuration::TransportSocketFactoryContext& socket_factory_context,
+      Server::Configuration::TransportSocketFactoryContextImpl& socket_factory_context,
       Stats::ScopePtr&& stats_scope) override;
 };
 

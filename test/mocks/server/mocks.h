@@ -563,7 +563,6 @@ public:
   MOCK_METHOD0(dispatcher, Event::Dispatcher&());
   MOCK_METHOD0(random, Envoy::Runtime::RandomGenerator&());
   MOCK_METHOD0(stats, Stats::Store&());
-  MOCK_METHOD1(setInitManager, void(Init::Manager&));
   MOCK_METHOD0(initManager, Init::Manager*());
   MOCK_METHOD0(singletonManager, Singleton::Manager&());
   MOCK_METHOD0(threadLocal, ThreadLocal::SlotAllocator&());
