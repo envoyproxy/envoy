@@ -363,7 +363,7 @@ TEST(HeaderStringTest, All) {
 }
 
 TEST(HeaderMapImplTest, InlineInsert) {
-  HeaderMapImpl headers;
+  TestHeaderMapImpl headers;
   EXPECT_TRUE(headers.empty());
   EXPECT_EQ(0, headers.size());
   EXPECT_EQ(nullptr, headers.Host());
@@ -377,7 +377,7 @@ TEST(HeaderMapImplTest, InlineInsert) {
 
 TEST(HeaderMapImplTest, InlineAppend) {
   {
-    HeaderMapImpl headers;
+    TestHeaderMapImpl headers;
     // Create via header and append.
     headers.setVia("");
     headers.appendVia("1.0 fred", ",");
@@ -387,7 +387,7 @@ TEST(HeaderMapImplTest, InlineAppend) {
   }
   {
     // Append to via header without explicitly creating first.
-    HeaderMapImpl headers;
+    TestHeaderMapImpl headers;
     headers.appendVia("1.0 fred", ",");
     EXPECT_EQ(headers.Via()->value().getStringView(), "1.0 fred");
     headers.appendVia("1.1 nowhere.com", ",");
@@ -395,7 +395,7 @@ TEST(HeaderMapImplTest, InlineAppend) {
   }
   {
     // Custom delimiter.
-    HeaderMapImpl headers;
+    TestHeaderMapImpl headers;
     headers.setVia("");
     headers.appendVia("1.0 fred", ", ");
     EXPECT_EQ(headers.Via()->value().getStringView(), "1.0 fred");
@@ -404,7 +404,7 @@ TEST(HeaderMapImplTest, InlineAppend) {
   }
   {
     // Append and then later set.
-    HeaderMapImpl headers;
+    TestHeaderMapImpl headers;
     headers.appendVia("1.0 fred", ",");
     headers.appendVia("1.1 nowhere.com", ",");
     EXPECT_EQ(headers.Via()->value().getStringView(), "1.0 fred,1.1 nowhere.com");
@@ -413,7 +413,7 @@ TEST(HeaderMapImplTest, InlineAppend) {
   }
   {
     // Set and then append. This mimics how GrpcTimeout is set.
-    HeaderMapImpl headers;
+    TestHeaderMapImpl headers;
     headers.setGrpcTimeout(42);
     EXPECT_EQ(headers.GrpcTimeout()->value().getStringView(), "42");
     headers.appendGrpcTimeout("s", "");
@@ -422,7 +422,7 @@ TEST(HeaderMapImplTest, InlineAppend) {
 }
 
 TEST(HeaderMapImplTest, MoveIntoInline) {
-  HeaderMapImpl headers;
+  TestHeaderMapImpl headers;
   HeaderString key;
   key.setCopy(Headers::get().CacheControl.get());
   HeaderString value;
@@ -441,7 +441,7 @@ TEST(HeaderMapImplTest, MoveIntoInline) {
 }
 
 TEST(HeaderMapImplTest, Remove) {
-  HeaderMapImpl headers;
+  TestHeaderMapImpl headers;
 
   // Add random header and then remove by name.
   LowerCaseString static_key("hello");
@@ -486,7 +486,7 @@ TEST(HeaderMapImplTest, RemoveRegex) {
   LowerCaseString key2 = LowerCaseString(" x-prefix-foo");
   LowerCaseString key4 = LowerCaseString("y-x-prefix-foo");
 
-  HeaderMapImpl headers;
+  TestHeaderMapImpl headers;
   headers.addReference(key1, "value");
   headers.addReference(key2, "value");
   headers.addReference(key3, "value");
@@ -516,7 +516,7 @@ TEST(HeaderMapImplTest, RemoveRegex) {
 }
 
 TEST(HeaderMapImplTest, SetRemovesAllValues) {
-  HeaderMapImpl headers;
+  TestHeaderMapImpl headers;
 
   LowerCaseString key1("hello");
   LowerCaseString key2("olleh");
@@ -572,7 +572,7 @@ TEST(HeaderMapImplTest, SetRemovesAllValues) {
 
 TEST(HeaderMapImplTest, DoubleInlineAdd) {
   {
-    HeaderMapImpl headers;
+    TestHeaderMapImpl headers;
     const std::string foo("foo");
     const std::string bar("bar");
     headers.addReference(Headers::get().ContentLength, foo);
@@ -581,21 +581,21 @@ TEST(HeaderMapImplTest, DoubleInlineAdd) {
     EXPECT_EQ(1UL, headers.size());
   }
   {
-    HeaderMapImpl headers;
+    TestHeaderMapImpl headers;
     headers.addReferenceKey(Headers::get().ContentLength, "foo");
     headers.addReferenceKey(Headers::get().ContentLength, "bar");
     EXPECT_EQ("foo,bar", headers.ContentLength()->value().getStringView());
     EXPECT_EQ(1UL, headers.size());
   }
   {
-    HeaderMapImpl headers;
+    TestHeaderMapImpl headers;
     headers.addReferenceKey(Headers::get().ContentLength, 5);
     headers.addReferenceKey(Headers::get().ContentLength, 6);
     EXPECT_EQ("5,6", headers.ContentLength()->value().getStringView());
     EXPECT_EQ(1UL, headers.size());
   }
   {
-    HeaderMapImpl headers;
+    TestHeaderMapImpl headers;
     const std::string foo("foo");
     headers.addReference(Headers::get().ContentLength, foo);
     headers.addReferenceKey(Headers::get().ContentLength, 6);
@@ -607,7 +607,7 @@ TEST(HeaderMapImplTest, DoubleInlineAdd) {
 // Per https://github.com/envoyproxy/envoy/issues/7488 make sure we don't
 // combine set-cookie headers
 TEST(HeaderMapImplTest, DoubleCookieAdd) {
-  HeaderMapImpl headers;
+  TestHeaderMapImpl headers;
   const std::string foo("foo");
   const std::string bar("bar");
   const LowerCaseString& set_cookie = Http::Headers::get().SetCookie;
@@ -623,7 +623,7 @@ TEST(HeaderMapImplTest, DoubleCookieAdd) {
 }
 
 TEST(HeaderMapImplTest, DoubleInlineSet) {
-  HeaderMapImpl headers;
+  TestHeaderMapImpl headers;
   headers.setReferenceKey(Headers::get().ContentType, "blah");
   headers.setReferenceKey(Headers::get().ContentType, "text/html");
   EXPECT_EQ("text/html", headers.ContentType()->value().getStringView());
@@ -631,7 +631,7 @@ TEST(HeaderMapImplTest, DoubleInlineSet) {
 }
 
 TEST(HeaderMapImplTest, AddReferenceKey) {
-  HeaderMapImpl headers;
+  TestHeaderMapImpl headers;
   LowerCaseString foo("hello");
   headers.addReferenceKey(foo, "world");
   EXPECT_NE("world", headers.get(foo)->value().getStringView().data());
@@ -639,7 +639,7 @@ TEST(HeaderMapImplTest, AddReferenceKey) {
 }
 
 TEST(HeaderMapImplTest, SetReferenceKey) {
-  HeaderMapImpl headers;
+  TestHeaderMapImpl headers;
   LowerCaseString foo("hello");
   headers.setReferenceKey(foo, "world");
   EXPECT_NE("world", headers.get(foo)->value().getStringView().data());
@@ -651,7 +651,7 @@ TEST(HeaderMapImplTest, SetReferenceKey) {
 }
 
 TEST(HeaderMapImplTest, SetCopy) {
-  HeaderMapImpl headers;
+  TestHeaderMapImpl headers;
   LowerCaseString foo("hello");
   headers.setCopy(foo, "world");
   EXPECT_EQ("world", headers.get(foo)->value().getStringView());
@@ -703,7 +703,7 @@ TEST(HeaderMapImplTest, SetCopy) {
 }
 
 TEST(HeaderMapImplTest, AddCopy) {
-  HeaderMapImpl headers;
+  TestHeaderMapImpl headers;
 
   // Start with a string value.
   std::unique_ptr<LowerCaseString> lcKeyPtr(new LowerCaseString("hello"));
@@ -786,7 +786,7 @@ TEST(HeaderMapImplTest, Equality) {
 }
 
 TEST(HeaderMapImplTest, LargeCharInHeader) {
-  HeaderMapImpl headers;
+  TestHeaderMapImpl headers;
   LowerCaseString static_key("\x90hello");
   std::string ref_value("value");
   headers.addReference(static_key, ref_value);
@@ -1186,7 +1186,7 @@ TEST(HeaderMapImplTest, TestInlineHeaderAdd) {
 }
 
 TEST(HeaderMapImplTest, ClearHeaderMap) {
-  HeaderMapImpl headers;
+  TestHeaderMapImpl headers;
   LowerCaseString static_key("hello");
   std::string ref_value("value");
 
@@ -1229,14 +1229,14 @@ TEST(HeaderMapImplTest, ClearHeaderMap) {
 // Validates byte size is properly accounted for in different inline header setting scenarios.
 TEST(HeaderMapImplTest, InlineHeaderByteSize) {
   {
-    HeaderMapImpl headers;
+    TestHeaderMapImpl headers;
     std::string foo = "foo";
     headers.setHost(foo);
     EXPECT_EQ(headers.byteSize(), 13);
   }
   {
     // Overwrite an inline headers with set.
-    HeaderMapImpl headers;
+    TestHeaderMapImpl headers;
     std::string foo = "foo";
     headers.setHost(foo);
     std::string big_foo = "big_foo";
@@ -1245,7 +1245,7 @@ TEST(HeaderMapImplTest, InlineHeaderByteSize) {
   }
   {
     // Overwrite an inline headers with setReference and clear.
-    HeaderMapImpl headers;
+    TestHeaderMapImpl headers;
     std::string foo = "foo";
     headers.setHost(foo);
     std::string big_foo = "big_foo";
@@ -1256,7 +1256,7 @@ TEST(HeaderMapImplTest, InlineHeaderByteSize) {
   }
   {
     // Overwrite an inline headers with set integer value.
-    HeaderMapImpl headers;
+    TestHeaderMapImpl headers;
     uint64_t status = 200;
     headers.setStatus(status);
     EXPECT_EQ(headers.byteSize(), 10);
@@ -1268,7 +1268,7 @@ TEST(HeaderMapImplTest, InlineHeaderByteSize) {
   }
   {
     // Set an inline header, remove, and rewrite.
-    HeaderMapImpl headers;
+    TestHeaderMapImpl headers;
     uint64_t status = 200;
     headers.setStatus(status);
     EXPECT_EQ(headers.byteSize(), 10);
