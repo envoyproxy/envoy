@@ -39,17 +39,6 @@ Word get_configuration(void* raw_context, Word value_ptr_ptr, Word value_size_pt
   return wasmResultToWord(WasmResult::Ok);
 }
 
-Word set_effective_context(void* raw_context, Word context_id) {
-  auto context = WASM_CONTEXT(raw_context);
-  uint32_t cid = static_cast<uint32_t>(context_id.u64_);
-  auto c = context->wasm()->getContext(cid);
-  if (!c) {
-    return wasmResultToWord(WasmResult::BadArgument);
-  }
-  effective_context_id_ = cid;
-  return wasmResultToWord(WasmResult::Ok);
-}
-
 Word done(void* raw_context) {
   auto context = WASM_CONTEXT(raw_context);
   return wasmResultToWord(context->wasm()->done(context));

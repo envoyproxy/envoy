@@ -6,6 +6,5 @@ mergeInto(LibraryManager.library, {
     proxy_increment_metric: function () {},
     proxy_record_metric: function () {},
     proxy_get_metric: function () {},
-    proxy_set_effective_context : function () {},
     proxy_done: function () {},
 });

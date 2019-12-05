@@ -137,7 +137,6 @@ void Wasm::registerCallbacks() {
   _REGISTER_PROXY(record_metric);
   _REGISTER_PROXY(get_metric);
 
-  _REGISTER_PROXY(set_effective_context);
   _REGISTER_PROXY(done);
 #undef _REGISTER_PROXY
 }

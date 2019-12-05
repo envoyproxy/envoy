@@ -20,7 +20,6 @@ Word increment_metric(void* raw_context, Word metric_id, int64_t offset);
 Word record_metric(void* raw_context, Word metric_id, uint64_t value);
 Word get_metric(void* raw_context, Word metric_id, Word result_uint64_ptr);
 Word get_current_time_nanoseconds(void* raw_context, Word result_uint64_ptr);
-Word set_effective_context(void* raw_context, Word context_id);
 Word done(void* raw_context);
 
 // Runtime environment functions exported from envoy to wasm.
