@@ -49,14 +49,3 @@ git checkout 14550beb3b7b97195e483fb74b5efb906395c31e -b Jul302019 # Jul 30 2019
 emconfigure cmake -DCMAKE_CXX_STANDARD=17 "."
 emmake make
 cd
-
-# WAVM (optional)
-apt-get install -y --no-install-recommends llvm-6.0-dev
-git clone https://github.com/WAVM/WAVM
-cd WAVM
-git checkout 1ec06cd202a922015c9041c5ed84f875453c4dc7 -b Oct152019 # Oct 15 2019
-cmake "."
-make
-make install
-cd
-rm -rf WAVM
