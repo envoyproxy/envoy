@@ -15,9 +15,8 @@ namespace Envoy {
 namespace StreamInfo {
 
 /**
- * FilterState represents dynamically generated information regarding a
- * stream (TCP or HTTP level) by various filters in Envoy. FilterState can
- * be write-once or write-many.
+ * FilterState represents dynamically generated information regarding a stream (TCP or HTTP level)
+ * or a connection by various filters in Envoy. FilterState can be write-once or write-many.
  */
 class FilterState {
 public:
@@ -26,7 +25,12 @@ public:
   // DownstreamRequest allows an object to survived across filter chain for book keeping.
   // Note that order matters in this enum because it's assumed that life span grows as enum number
   // grows.
-  enum class LifeSpan { FilterChain, DownstreamRequest };
+  enum LifeSpan {
+    FilterChain,
+    DownstreamRequest,
+    DownstreamConnection,
+    TopSpan = DownstreamConnection
+  };
 
   class Object {
   public:
@@ -58,19 +62,6 @@ public:
    */
   virtual void setData(absl::string_view data_name, std::shared_ptr<Object> data,
                        StateType state_type, LifeSpan life_span) PURE;
-
-  /**
-   * @param other the FilterState we want to copy current data into.
-   * @param life_span the object life span above or equal to which will be copied.
-   *
-   * This is useful for sharing filter state within bigger life span than a filter chain. For
-   * example, we are going to use it to share router filter state across filter chains created on
-   * the same downstream request for internal redirect handling.
-   *
-   * This can be extended to support connection level sharing fairly easily, but there is not a need
-   * yet.
-   */
-  virtual void copyInto(FilterState& other, LifeSpan life_span) PURE;
 
   /**
    * @param data_name the name of the data being looked up (mutable/readonly).
@@ -121,6 +112,10 @@ public:
    * data store.
    */
   virtual bool hasDataWithName(absl::string_view data_name) const PURE;
+
+  virtual LifeSpan life_span() const PURE;
+
+  virtual std::shared_ptr<FilterState> parent() const PURE;
 
 protected:
   virtual const Object* getDataReadOnlyGeneric(absl::string_view data_name) const PURE;

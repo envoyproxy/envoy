@@ -48,7 +48,9 @@ class FilterStateImplTest : public testing::Test {
 public:
   FilterStateImplTest() { resetFilterState(); }
 
-  void resetFilterState() { filter_state_ = std::make_unique<FilterStateImpl>(); }
+  void resetFilterState() {
+    filter_state_ = std::make_unique<FilterStateImpl>(nullptr, FilterState::LifeSpan::FilterChain);
+  }
   FilterState& filter_state() { return *filter_state_; }
 
 private:
@@ -241,7 +243,7 @@ TEST_F(FilterStateImplTest, HasData) {
   EXPECT_FALSE(filter_state().hasDataWithName("test_2"));
 }
 
-TEST_F(FilterStateImplTest, LifeSpan) {
+TEST_F(FilterStateImplTest, LifeSpanInitFromParent) {
   filter_state().setData("test_1", std::make_unique<SimpleType>(1),
                          FilterState::StateType::ReadOnly, FilterState::LifeSpan::FilterChain);
   filter_state().setData("test_2", std::make_unique<SimpleType>(2), FilterState::StateType::Mutable,
@@ -251,34 +253,83 @@ TEST_F(FilterStateImplTest, LifeSpan) {
                          FilterState::LifeSpan::DownstreamRequest);
   filter_state().setData("test_4", std::make_unique<SimpleType>(4), FilterState::StateType::Mutable,
                          FilterState::LifeSpan::DownstreamRequest);
-  {
-    FilterStateImpl new_filter_state;
-    filter_state().copyInto(new_filter_state, FilterState::LifeSpan::DownstreamRequest);
-    EXPECT_FALSE(new_filter_state.hasDataWithName("test_1"));
-    EXPECT_FALSE(new_filter_state.hasDataWithName("test_2"));
-    EXPECT_TRUE(new_filter_state.hasDataWithName("test_3"));
-    EXPECT_TRUE(new_filter_state.hasDataWithName("test_4"));
-    EXPECT_THROW_WITH_MESSAGE(
-        new_filter_state.getDataMutable<SimpleType>("test_3"), EnvoyException,
-        "FilterState::getDataMutable<T> tried to access immutable data as mutable.");
-    EXPECT_EQ(4, new_filter_state.getDataMutable<SimpleType>("test_4").access());
-  }
-  {
-    FilterStateImpl new_filter_state;
-    filter_state().copyInto(new_filter_state, FilterState::LifeSpan::FilterChain);
-    EXPECT_TRUE(new_filter_state.hasDataWithName("test_1"));
-    EXPECT_TRUE(new_filter_state.hasDataWithName("test_2"));
-    EXPECT_TRUE(new_filter_state.hasDataWithName("test_3"));
-    EXPECT_TRUE(new_filter_state.hasDataWithName("test_4"));
-    EXPECT_THROW_WITH_MESSAGE(
-        new_filter_state.getDataMutable<SimpleType>("test_1"), EnvoyException,
-        "FilterState::getDataMutable<T> tried to access immutable data as mutable.");
-    EXPECT_EQ(2, new_filter_state.getDataMutable<SimpleType>("test_2").access());
-    EXPECT_THROW_WITH_MESSAGE(
-        new_filter_state.getDataMutable<SimpleType>("test_3"), EnvoyException,
-        "FilterState::getDataMutable<T> tried to access immutable data as mutable.");
-    EXPECT_EQ(4, new_filter_state.getDataMutable<SimpleType>("test_4").access());
-  }
+  filter_state().setData("test_5", std::make_unique<SimpleType>(5),
+                         FilterState::StateType::ReadOnly,
+                         FilterState::LifeSpan::DownstreamConnection);
+  filter_state().setData("test_6", std::make_unique<SimpleType>(6), FilterState::StateType::Mutable,
+                         FilterState::LifeSpan::DownstreamConnection);
+
+  FilterStateImpl new_filter_state(filter_state().parent(), FilterState::LifeSpan::FilterChain);
+  EXPECT_FALSE(new_filter_state.hasDataWithName("test_1"));
+  EXPECT_FALSE(new_filter_state.hasDataWithName("test_2"));
+  EXPECT_TRUE(new_filter_state.hasDataWithName("test_3"));
+  EXPECT_TRUE(new_filter_state.hasDataWithName("test_4"));
+  EXPECT_TRUE(new_filter_state.hasDataWithName("test_5"));
+  EXPECT_TRUE(new_filter_state.hasDataWithName("test_6"));
+  EXPECT_THROW_WITH_MESSAGE(
+      new_filter_state.getDataMutable<SimpleType>("test_3"), EnvoyException,
+      "FilterState::getDataMutable<T> tried to access immutable data as mutable.");
+  EXPECT_EQ(4, new_filter_state.getDataMutable<SimpleType>("test_4").access());
+  EXPECT_THROW_WITH_MESSAGE(
+      new_filter_state.getDataMutable<SimpleType>("test_5"), EnvoyException,
+      "FilterState::getDataMutable<T> tried to access immutable data as mutable.");
+  EXPECT_EQ(6, new_filter_state.getDataMutable<SimpleType>("test_6").access());
+}
+
+TEST_F(FilterStateImplTest, LifeSpanInitFromGrandparent) {
+  filter_state().setData("test_1", std::make_unique<SimpleType>(1),
+                         FilterState::StateType::ReadOnly, FilterState::LifeSpan::FilterChain);
+  filter_state().setData("test_2", std::make_unique<SimpleType>(2), FilterState::StateType::Mutable,
+                         FilterState::LifeSpan::FilterChain);
+  filter_state().setData("test_3", std::make_unique<SimpleType>(3),
+                         FilterState::StateType::ReadOnly,
+                         FilterState::LifeSpan::DownstreamRequest);
+  filter_state().setData("test_4", std::make_unique<SimpleType>(4), FilterState::StateType::Mutable,
+                         FilterState::LifeSpan::DownstreamRequest);
+  filter_state().setData("test_5", std::make_unique<SimpleType>(5),
+                         FilterState::StateType::ReadOnly,
+                         FilterState::LifeSpan::DownstreamConnection);
+  filter_state().setData("test_6", std::make_unique<SimpleType>(6), FilterState::StateType::Mutable,
+                         FilterState::LifeSpan::DownstreamConnection);
+
+  FilterStateImpl new_filter_state(filter_state().parent()->parent(),
+                                   FilterState::LifeSpan::FilterChain);
+  EXPECT_FALSE(new_filter_state.hasDataWithName("test_1"));
+  EXPECT_FALSE(new_filter_state.hasDataWithName("test_2"));
+  EXPECT_FALSE(new_filter_state.hasDataWithName("test_3"));
+  EXPECT_FALSE(new_filter_state.hasDataWithName("test_4"));
+  EXPECT_TRUE(new_filter_state.hasDataWithName("test_5"));
+  EXPECT_TRUE(new_filter_state.hasDataWithName("test_6"));
+  EXPECT_THROW_WITH_MESSAGE(
+      new_filter_state.getDataMutable<SimpleType>("test_5"), EnvoyException,
+      "FilterState::getDataMutable<T> tried to access immutable data as mutable.");
+  EXPECT_EQ(6, new_filter_state.getDataMutable<SimpleType>("test_6").access());
+}
+
+TEST_F(FilterStateImplTest, LifeSpanInitFromNonParent) {
+  filter_state().setData("test_1", std::make_unique<SimpleType>(1),
+                         FilterState::StateType::ReadOnly, FilterState::LifeSpan::FilterChain);
+  filter_state().setData("test_2", std::make_unique<SimpleType>(2), FilterState::StateType::Mutable,
+                         FilterState::LifeSpan::FilterChain);
+  filter_state().setData("test_3", std::make_unique<SimpleType>(3),
+                         FilterState::StateType::ReadOnly,
+                         FilterState::LifeSpan::DownstreamRequest);
+  filter_state().setData("test_4", std::make_unique<SimpleType>(4), FilterState::StateType::Mutable,
+                         FilterState::LifeSpan::DownstreamRequest);
+  filter_state().setData("test_5", std::make_unique<SimpleType>(5),
+                         FilterState::StateType::ReadOnly,
+                         FilterState::LifeSpan::DownstreamConnection);
+  filter_state().setData("test_6", std::make_unique<SimpleType>(6), FilterState::StateType::Mutable,
+                         FilterState::LifeSpan::DownstreamConnection);
+
+  FilterStateImpl new_filter_state(filter_state().parent(),
+                                   FilterState::LifeSpan::DownstreamRequest);
+  EXPECT_FALSE(new_filter_state.hasDataWithName("test_1"));
+  EXPECT_FALSE(new_filter_state.hasDataWithName("test_2"));
+  EXPECT_FALSE(new_filter_state.hasDataWithName("test_3"));
+  EXPECT_FALSE(new_filter_state.hasDataWithName("test_4"));
+  EXPECT_FALSE(new_filter_state.hasDataWithName("test_5"));
+  EXPECT_FALSE(new_filter_state.hasDataWithName("test_6"));
 }
 
 } // namespace StreamInfo

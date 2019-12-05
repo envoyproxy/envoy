@@ -90,6 +90,10 @@ public:
 
   TimeSource& timeSource() { return time_source_; }
 
+  std::shared_ptr<StreamInfo::FilterState> filter_state() const {
+    return filter_state_;
+  }
+
 private:
   struct ActiveStream;
 
@@ -691,6 +695,7 @@ private:
   const Server::OverloadActionState& overload_stop_accepting_requests_ref_;
   const Server::OverloadActionState& overload_disable_keepalive_ref_;
   TimeSource& time_source_;
+  std::shared_ptr<StreamInfo::FilterState> filter_state_;
 };
 
 } // namespace Http

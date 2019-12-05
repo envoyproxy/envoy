@@ -19,8 +19,12 @@ struct StreamInfoImpl : public StreamInfo {
       : time_source_(time_source), start_time_(time_source.systemTime()),
         start_time_monotonic_(time_source.monotonicTime()) {}
 
-  StreamInfoImpl(Http::Protocol protocol, TimeSource& time_source) : StreamInfoImpl(time_source) {
+  StreamInfoImpl(Http::Protocol protocol, TimeSource& time_source,
+                 std::shared_ptr<FilterState> parent_filter_state = nullptr)
+      : StreamInfoImpl(time_source) {
     protocol_ = protocol;
+    filter_state_ =
+        std::make_shared<FilterStateImpl>(parent_filter_state, FilterState::LifeSpan::FilterChain);
   }
 
   SystemTime startTime() const override { return start_time_; }
@@ -204,8 +208,8 @@ struct StreamInfoImpl : public StreamInfo {
     (*metadata_.mutable_filter_metadata())[name].MergeFrom(value);
   };
 
-  FilterState& filterState() override { return filter_state_; }
-  const FilterState& filterState() const override { return filter_state_; }
+  FilterState& filterState() override { return *filter_state_; }
+  const FilterState& filterState() const override { return *filter_state_; }
 
   void setRequestedServerName(absl::string_view requested_server_name) override {
     requested_server_name_ = std::string(requested_server_name);
@@ -249,7 +253,7 @@ struct StreamInfoImpl : public StreamInfo {
   bool health_check_request_{};
   const Router::RouteEntry* route_entry_{};
   envoy::api::v2::core::Metadata metadata_{};
-  FilterStateImpl filter_state_{};
+  std::shared_ptr<FilterStateImpl> filter_state_{};
   std::string route_name_;
 
 private:

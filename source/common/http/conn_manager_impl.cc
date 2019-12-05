@@ -116,7 +116,9 @@ ConnectionManagerImpl::ConnectionManagerImpl(ConnectionManagerConfig& config,
           overload_manager ? overload_manager->getThreadLocalOverloadState().getState(
                                  Server::OverloadActionNames::get().DisableHttpKeepAlive)
                            : Server::OverloadManager::getInactiveState()),
-      time_source_(time_source) {}
+      time_source_(time_source),
+      filter_state_(std::make_shared<StreamInfo::FilterStateImpl>(
+          nullptr, StreamInfo::FilterState::LifeSpan::DownstreamConnection)) {}
 
 const HeaderMapImpl& ConnectionManagerImpl::continueHeader() {
   CONSTRUCT_ON_FIRST_USE(HeaderMapImpl,
@@ -487,7 +489,8 @@ ConnectionManagerImpl::ActiveStream::ActiveStream(ConnectionManagerImpl& connect
       stream_id_(connection_manager.random_generator_.random()),
       request_response_timespan_(new Stats::HistogramCompletableTimespanImpl(
           connection_manager_.stats_.named_.downstream_rq_time_, connection_manager_.timeSource())),
-      stream_info_(connection_manager_.codec_->protocol(), connection_manager_.timeSource()),
+      stream_info_(connection_manager_.codec_->protocol(), connection_manager_.timeSource(),
+                   connection_manager.filter_state()),
       upstream_options_(std::make_shared<Network::Socket::Options>()) {
   ASSERT(!connection_manager.config_.isRoutable() ||
              ((connection_manager.config_.routeConfigProvider() == nullptr &&
@@ -2221,9 +2224,9 @@ bool ConnectionManagerImpl::ActiveStreamDecoderFilter::recreateStream() {
   parent_.connection_manager_.doEndStream(this->parent_);
 
   StreamDecoder& new_stream = parent_.connection_manager_.newStream(*response_encoder, true);
-  parent_.stream_info_.filterState().copyInto(
-      (*parent_.connection_manager_.streams_.begin())->stream_info_.filterState(),
-      StreamInfo::FilterState::LifeSpan::DownstreamRequest);
+  (*parent_.connection_manager_.streams_.begin())->stream_info_.filter_state_ =
+      std::make_shared<StreamInfo::FilterStateImpl>(parent_.stream_info_.filter_state_->parent(),
+                                                    StreamInfo::FilterState::LifeSpan::FilterChain);
 
   new_stream.decodeHeaders(std::move(request_headers), true);
   return true;
