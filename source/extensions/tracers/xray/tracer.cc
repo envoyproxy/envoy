@@ -38,8 +38,9 @@ constexpr auto XRaySerializationVersion = "1";
 //
 // For more details see:
 // https://docs.aws.amazon.com/xray/latest/devguide/xray-api-segmentdocuments.html#api-segmentdocuments-fields
-std::string generateTraceId(Envoy::SystemTime point_in_time) {
-  using namespace std::chrono;
+std::string generateTraceId(SystemTime point_in_time) {
+  using std::chrono::seconds;
+  using std::chrono::time_point_cast;
   Runtime::RandomGeneratorImpl rng;
   const auto epoch = time_point_cast<seconds>(point_in_time).time_since_epoch().count();
   std::string out;
@@ -168,6 +169,8 @@ XRay::SpanPtr Tracer::createNonSampledSpan() const {
 }
 
 void Span::setTag(absl::string_view name, absl::string_view value) {
+  // For the full set of values see:
+  // https://docs.aws.amazon.com/xray/latest/devguide/xray-api-segmentdocuments.html#api-segmentdocuments-http
   constexpr auto SpanContentLength = "content_length";
   constexpr auto SpanMethod = "method";
   constexpr auto SpanStatus = "status";

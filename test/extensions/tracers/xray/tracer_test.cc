@@ -1,4 +1,5 @@
 #include <string>
+#include <vector>
 
 #include "envoy/common/time.h"
 
@@ -12,6 +13,7 @@
 #include "test/mocks/server/mocks.h"
 #include "test/mocks/tracing/mocks.h"
 
+#include "absl/strings/str_split.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
@@ -151,6 +153,19 @@ TEST_F(XRayTracerTest, SpanInjectContextHasXRayHeaderNonSampled) {
   ASSERT_NE(header->value().getStringView().find("root="), absl::string_view::npos);
   ASSERT_NE(header->value().getStringView().find("parent="), absl::string_view::npos);
   ASSERT_NE(header->value().getStringView().find("sampled=0"), absl::string_view::npos);
+}
+
+TEST_F(XRayTracerTest, TraceIDFormatTest) {
+  constexpr auto span_name = "my span";
+  Tracer tracer{span_name, std::move(broker_), server_.timeSource()};
+  auto span = tracer.createNonSampledSpan(); // startSpan and createNonSampledSpan use the same
+                                             // logic to create a trace ID
+  XRay::Span* xray_span = span.get();
+  std::vector<std::string> parts = absl::StrSplit(xray_span->traceId(), absl::ByChar('-'));
+  ASSERT_EQ(3, parts.size());
+  ASSERT_EQ(1, parts[0].length());
+  ASSERT_EQ(8, parts[1].length());
+  ASSERT_EQ(24, parts[2].length());
 }
 
 } // namespace

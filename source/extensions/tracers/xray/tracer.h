@@ -26,12 +26,12 @@ constexpr auto XRayTraceHeader = "x-amzn-trace-id";
 class Span : public Tracing::Span {
 public:
   /**
-   * Creates a new Span.
+   * Create a new Span.
    *
    * @param time_source A time source to create Span IDs using the monotonic clock.
    * @param broker Facilitates communication with the X-Ray daemon.
    */
-  Span(Envoy::TimeSource& time_source, DaemonBroker& broker)
+  Span(TimeSource& time_source, DaemonBroker& broker)
       : time_source_(time_source), broker_(broker), sampled_(true) {}
 
   /**

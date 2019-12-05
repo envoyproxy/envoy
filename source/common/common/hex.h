@@ -38,6 +38,7 @@ public:
    * Converts the given 64-bit unsigned integer into a hexadecimal string.
    * The result is always a string of 16 characters left padded with zeroes.
    * @param value The unsigned integer to be converted.
+   * @return value as hexadecimal string
    */
   static std::string uint64ToHex(uint64_t value);
 
@@ -45,6 +46,7 @@ public:
    * Converts the given 32-bit unsigned integer into a hexadecimal string.
    * The result is always a string of 8 characters left padded with zeroes.
    * @param value The unsigned integer to be converted.
+   * @return value as hexadecimal string
    */
   static std::string uint32ToHex(uint32_t value);
 };

@@ -1,5 +1,7 @@
 #include "extensions/tracers/xray/daemon_broker.h"
 
+#include "envoy/network/address.h"
+
 #include "common/network/utility.h"
 
 #include "source/extensions/tracers/xray/daemon.pb.h"
@@ -14,8 +16,7 @@ namespace {
 // For example:
 // { "format": "json", "version": 1}
 std::string createHeader(const std::string& format, uint32_t version) {
-  using namespace envoy::tracers::xray;
-  daemon::Header header;
+  envoy::tracers::xray::daemon::Header header;
   header.set_format(format);
   header.set_version(version);
 
@@ -32,14 +33,15 @@ std::string createHeader(const std::string& format, uint32_t version) {
 } // namespace
 
 DaemonBrokerImpl::DaemonBrokerImpl(const std::string& daemon_endpoint) {
-  using Network::Utility;
   auto& logger = Logger::Registry::getLog(Logger::Id::tracing);
 
-  const auto address = Utility::parseInternetAddressAndPort(daemon_endpoint, false /*v6only*/);
+  const Network::Address::InstanceConstSharedPtr address =
+      Network::Utility::parseInternetAddressAndPort(daemon_endpoint, false /*v6only*/);
   io_handle_ = address->socket(Network::Address::SocketType::Datagram);
   if (io_handle_->fd() == -1) {
     ENVOY_LOG_TO_LOGGER(logger, error, "Failed to acquire UDP socket to X-Ray daemon at - {}",
                         daemon_endpoint);
+    return;
   }
   const auto result = address->connect(io_handle_->fd());
   if (result.rc_ == -1) {
@@ -48,7 +50,9 @@ DaemonBrokerImpl::DaemonBrokerImpl(const std::string& daemon_endpoint) {
 }
 
 void DaemonBrokerImpl::send(const std::string& data) const {
-  const auto payload = fmt::format("{}\n{}", createHeader("json" /*format*/, 1 /*version*/), data);
+  constexpr auto version = 1;
+  constexpr auto format = "json";
+  const std::string payload = absl::StrCat(createHeader(format, version), "\n", data);
   ::send(io_handle_->fd(), payload.c_str(), payload.size(), MSG_DONTWAIT);
 }
 
