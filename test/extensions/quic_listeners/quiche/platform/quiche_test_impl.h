@@ -8,3 +8,11 @@
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
+
+namespace quiche {
+namespace test {
+
+using QuicheTest = ::testing::Test;
+
+} // namespace test
+} // namespace quiche

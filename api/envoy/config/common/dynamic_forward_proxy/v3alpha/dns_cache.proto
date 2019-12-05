@@ -11,6 +11,8 @@ import "envoy/api/v3alpha/cds.proto";
 import "google/protobuf/duration.proto";
 import "google/protobuf/wrappers.proto";
 
+import "udpa/api/annotations/versioning.proto";
+
 import "validate/validate.proto";
 
 // [#protodoc-title: Dynamic forward proxy common configuration]
@@ -19,6 +21,9 @@ import "validate/validate.proto";
 // <arch_overview_http_dynamic_forward_proxy>` for more information.
 // [#next-free-field: 6]
 message DnsCacheConfig {
+  option (udpa.api.annotations.versioning).previous_message_type =
+      "envoy.config.common.dynamic_forward_proxy.v2alpha.DnsCacheConfig";
+
   // The name of the cache. Multiple named caches allow independent dynamic forward proxy
   // configurations to operate within a single Envoy process using different configurations. All
   // configurations with the same name *must* otherwise have the same settings when referenced

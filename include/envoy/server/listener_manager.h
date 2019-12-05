@@ -31,6 +31,20 @@ public:
 
 using LdsApiPtr = std::unique_ptr<LdsApi>;
 
+struct ListenSocketCreationParams {
+  ListenSocketCreationParams(bool bind_to_port, bool duplicate_parent_socket = true)
+      : bind_to_port(bind_to_port), duplicate_parent_socket(duplicate_parent_socket) {}
+
+  // For testing.
+  bool operator==(const ListenSocketCreationParams& rhs) const;
+  bool operator!=(const ListenSocketCreationParams& rhs) const;
+
+  // whether to actually bind the socket.
+  bool bind_to_port;
+  // whether to duplicate socket from hot restart parent.
+  bool duplicate_parent_socket;
+};
+
 /**
  * Factory for creating listener components.
  */
@@ -49,13 +63,14 @@ public:
    * @param address supplies the socket's address.
    * @param socket_type the type of socket (stream or datagram) to create.
    * @param options to be set on the created socket just before calling 'bind()'.
-   * @param bind_to_port supplies whether to actually bind the socket.
+   * @param params used to control how a socket being created.
    * @return Network::SocketSharedPtr an initialized and potentially bound socket.
    */
   virtual Network::SocketSharedPtr
   createListenSocket(Network::Address::InstanceConstSharedPtr address,
                      Network::Address::SocketType socket_type,
-                     const Network::Socket::OptionsSharedPtr& options, bool bind_to_port) PURE;
+                     const Network::Socket::OptionsSharedPtr& options,
+                     const ListenSocketCreationParams& params) PURE;
 
   /**
    * Creates a list of filter factories.

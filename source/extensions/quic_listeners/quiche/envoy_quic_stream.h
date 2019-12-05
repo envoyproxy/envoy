@@ -47,7 +47,26 @@ public:
       // Avoid calling this while decoding data because transient disabling and
       // enabling reading may trigger another decoding data inside the
       // callstack which messes up stream state.
-      switchStreamBlockState(disable);
+      if (disable) {
+        // Block QUIC stream right away. And if there are queued switching
+        // state callback, update the desired state as well.
+        switchStreamBlockState(true);
+        if (unblock_posted_) {
+          should_block_ = true;
+        }
+      } else {
+        should_block_ = false;
+        if (!unblock_posted_) {
+          // If this is the first time unblocking stream is desired, post a
+          // callback to do it in next loop. This is because unblocking QUIC
+          // stream can lead to immediate upstream encoding.
+          unblock_posted_ = true;
+          connection()->dispatcher().post([this] {
+            unblock_posted_ = false;
+            switchStreamBlockState(should_block_);
+          });
+        }
+      }
     }
   }
 
@@ -109,6 +128,15 @@ private:
   // OnBodyDataAvailable() hands all the ready-to-use request data from stream sequencer to HCM
   // directly and buffers them in filters if needed. Itself doesn't buffer request data.
   EnvoyQuicSimulatedWatermarkBuffer send_buffer_simulation_;
+
+  // True if there is posted unblocking QUIC stream callback. There should be
+  // only one such callback no matter how many times readDisable() is called.
+  bool unblock_posted_{false};
+  // The latest state an unblocking QUIC stream callback should look at. As
+  // more readDisable() calls may happen between the callback is posted and it's
+  // executed, the stream might be unblocked and blocked several times. Only the
+  // latest desired state should be considered by the callback.
+  bool should_block_{false};
 };
 
 } // namespace Quic

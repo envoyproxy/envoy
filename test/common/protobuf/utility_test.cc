@@ -495,6 +495,30 @@ TEST_F(ProtobufUtilityTest, JsonConvertCamelSnake) {
                        .string_value());
 }
 
+// Test the jsonConvertValue happy path. Failure modes are converted by jsonConvert tests.
+TEST_F(ProtobufUtilityTest, JsonConvertValueSuccess) {
+  {
+    envoy::config::bootstrap::v2::Bootstrap source;
+    source.set_flags_path("foo");
+    ProtobufWkt::Value tmp;
+    envoy::config::bootstrap::v2::Bootstrap dest;
+    MessageUtil::jsonConvertValue(source, tmp);
+    TestUtility::jsonConvert(tmp, dest);
+    EXPECT_EQ("foo", dest.flags_path());
+  }
+
+  {
+    ProtobufWkt::StringValue source;
+    source.set_value("foo");
+    ProtobufWkt::Value dest;
+    MessageUtil::jsonConvertValue(source, dest);
+
+    ProtobufWkt::Value expected;
+    expected.set_string_value("foo");
+    EXPECT_THAT(dest, ProtoEq(expected));
+  }
+}
+
 TEST_F(ProtobufUtilityTest, YamlLoadFromStringFail) {
   envoy::config::bootstrap::v2::Bootstrap bootstrap;
   // Verify loadFromYaml can parse valid YAML string.

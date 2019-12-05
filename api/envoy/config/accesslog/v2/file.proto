@@ -20,14 +20,20 @@ message FileAccessLog {
   // A path to a local file to which to write the access log entries.
   string path = 1 [(validate.rules).string = {min_bytes: 1}];
 
-  // Access log format. Envoy supports :ref:`custom access log formats
-  // <config_access_log_format>` as well as a :ref:`default format
-  // <config_access_log_default_format>`.
   oneof access_log_format {
-    // Access log :ref:`format string<config_access_log_format_strings>`
+    // Access log :ref:`format string<config_access_log_format_strings>`.
+    // Envoy supports :ref:`custom access log formats <config_access_log_format>` as well as a
+    // :ref:`default format <config_access_log_default_format>`.
     string format = 2;
 
-    // Access log :ref:`format dictionary<config_access_log_format_dictionaries>`
+    // Access log :ref:`format dictionary<config_access_log_format_dictionaries>`. All values
+    // are rendered as strings.
     google.protobuf.Struct json_format = 3;
+
+    // Access log :ref:`format dictionary<config_access_log_format_dictionaries>`. Values are
+    // rendered as strings, numbers, or boolean values as appropriate. Nested JSON objects may
+    // be produced by some command operators (e.g.FILTER_STATE or DYNAMIC_METADATA). See the
+    // documentation for a specific command operator for details.
+    google.protobuf.Struct typed_json_format = 4;
   }
 }

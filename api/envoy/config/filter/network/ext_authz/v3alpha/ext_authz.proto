@@ -8,6 +8,8 @@ option java_package = "io.envoyproxy.envoy.config.filter.network.ext_authz.v3alp
 
 import "envoy/api/v3alpha/core/grpc_service.proto";
 
+import "udpa/api/annotations/versioning.proto";
+
 import "validate/validate.proto";
 
 // [#protodoc-title: Network External Authorization ]
@@ -20,6 +22,9 @@ import "validate/validate.proto";
 // :ref:`CheckRequest <envoy_api_msg_service.auth.v3alpha.CheckRequest>`.
 // A failed check will cause this filter to close the TCP connection.
 message ExtAuthz {
+  option (udpa.api.annotations.versioning).previous_message_type =
+      "envoy.config.filter.network.ext_authz.v2.ExtAuthz";
+
   // The prefix to use when emitting statistics.
   string stat_prefix = 1 [(validate.rules).string = {min_bytes: 1}];
 

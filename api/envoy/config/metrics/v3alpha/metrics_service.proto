@@ -8,6 +8,8 @@ option java_package = "io.envoyproxy.envoy.config.metrics.v3alpha";
 
 import "envoy/api/v3alpha/core/grpc_service.proto";
 
+import "udpa/api/annotations/versioning.proto";
+
 import "validate/validate.proto";
 
 // [#protodoc-title: Metrics service]
@@ -17,6 +19,9 @@ import "validate/validate.proto";
 // create Metrics Service.
 // [#extension: envoy.stat_sinks.metrics_service]
 message MetricsServiceConfig {
+  option (udpa.api.annotations.versioning).previous_message_type =
+      "envoy.config.metrics.v2.MetricsServiceConfig";
+
   // The upstream gRPC cluster that hosts the metrics service.
   api.v3alpha.core.GrpcService grpc_service = 1 [(validate.rules).message = {required: true}];
 }
