@@ -1062,6 +1062,7 @@ unreferenced
 unregister
 unregisters
 unresolvable
+unserializable
 unsetenv
 unsubscription
 unterminated
