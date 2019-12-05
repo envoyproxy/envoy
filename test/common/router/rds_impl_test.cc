@@ -516,7 +516,6 @@ virtual_hosts:
 }
 
 TEST_F(RouteConfigProviderManagerImplTest, SameProviderOnTwoInitManager) {
-
   Buffer::OwnedImpl data;
   // Get a RouteConfigProvider. This one should create an entry in the RouteConfigProviderManager.
   setup();
