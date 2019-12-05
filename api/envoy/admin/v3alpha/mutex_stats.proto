@@ -6,6 +6,8 @@ option java_outer_classname = "MutexStatsProto";
 option java_multiple_files = true;
 option java_package = "io.envoyproxy.envoy.admin.v3alpha";
 
+import "udpa/api/annotations/versioning.proto";
+
 // [#protodoc-title: MutexStats]
 
 // Proto representation of the statistics collected upon absl::Mutex contention, if Envoy is run
@@ -16,6 +18,8 @@ option java_package = "io.envoyproxy.envoy.admin.v3alpha";
 // correspond to core clock frequency. For more information, see the `CycleClock`
 // [docs](https://github.com/abseil/abseil-cpp/blob/master/absl/base/internal/cycleclock.h).
 message MutexStats {
+  option (udpa.api.annotations.versioning).previous_message_type = "envoy.admin.v2alpha.MutexStats";
+
   // The number of individual mutex contentions which have occurred since startup.
   uint64 num_contentions = 1;
 

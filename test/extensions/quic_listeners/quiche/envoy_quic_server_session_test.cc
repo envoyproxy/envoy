@@ -47,8 +47,6 @@ using testing::Invoke;
 using testing::Return;
 using testing::ReturnRef;
 
-#include <iostream>
-
 namespace Envoy {
 namespace Quic {
 
@@ -131,7 +129,7 @@ public:
   bool installReadFilter() {
     // Setup read filter.
     envoy_quic_session_.addReadFilter(read_filter_);
-    EXPECT_EQ(Http::Protocol::Http2,
+    EXPECT_EQ(Http::Protocol::Http3,
               read_filter_->callbacks_->connection().streamInfo().protocol().value());
     EXPECT_EQ(envoy_quic_session_.id(), read_filter_->callbacks_->connection().id());
     EXPECT_EQ(&envoy_quic_session_, &read_filter_->callbacks_->connection());
@@ -143,7 +141,7 @@ public:
       // Create ServerConnection instance and setup callbacks for it.
       http_connection_ = std::make_unique<QuicHttpServerConnectionImpl>(envoy_quic_session_,
                                                                         http_connection_callbacks_);
-      EXPECT_EQ(Http::Protocol::Http2, http_connection_->protocol());
+      EXPECT_EQ(Http::Protocol::Http3, http_connection_->protocol());
       // Stop iteration to avoid calling getRead/WriteBuffer().
       return Network::FilterStatus::StopIteration;
     }));

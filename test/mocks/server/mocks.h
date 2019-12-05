@@ -259,7 +259,7 @@ public:
                Network::SocketSharedPtr(Network::Address::InstanceConstSharedPtr address,
                                         Network::Address::SocketType socket_type,
                                         const Network::Socket::OptionsSharedPtr& options,
-                                        bool bind_to_port));
+                                        const ListenSocketCreationParams& params));
   MOCK_METHOD1(createDrainManager_, DrainManager*(envoy::api::v2::Listener::DrainType drain_type));
   MOCK_METHOD0(nextListenerTag, uint64_t());
 

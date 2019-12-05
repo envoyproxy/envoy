@@ -59,6 +59,7 @@ envoy_cc_library(
         "//source/common/http:headers_lib",
         "//source/common/http:utility_lib",
         "//source/common/protobuf:utility_lib",
+        "//source/common/tracing:http_tracer_lib",
         "//source/extensions/filters/http:well_known_names",
         "@envoy_api//envoy/api/v2:pkg_cc_proto",
         "@envoy_api//envoy/api/v2/route:pkg_cc_proto",

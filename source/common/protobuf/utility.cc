@@ -450,6 +450,10 @@ void MessageUtil::jsonConvert(const ProtobufWkt::Struct& source,
   jsonConvertInternal(source, validation_visitor, dest);
 }
 
+void MessageUtil::jsonConvertValue(const Protobuf::Message& source, ProtobufWkt::Value& dest) {
+  jsonConvertInternal(source, ProtobufMessage::getNullValidationVisitor(), dest);
+}
+
 ProtobufWkt::Struct MessageUtil::keyValueStruct(const std::string& key, const std::string& value) {
   ProtobufWkt::Struct struct_obj;
   ProtobufWkt::Value val;

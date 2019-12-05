@@ -90,12 +90,10 @@ using HdsClusterPtr = std::shared_ptr<HdsCluster>;
 /**
  * All hds stats. @see stats_macros.h
  */
-// clang-format off
-#define ALL_HDS_STATS(COUNTER)                                                           \
+#define ALL_HDS_STATS(COUNTER)                                                                     \
   COUNTER(requests)                                                                                \
   COUNTER(responses)                                                                               \
   COUNTER(errors)
-// clang-format on
 
 /**
  * Struct definition for all hds stats. @see stats_macros.h
