@@ -12,6 +12,8 @@ import "envoy/service/tap/v3alpha/common.proto";
 
 import "google/api/annotations.proto";
 
+import "udpa/api/annotations/versioning.proto";
+
 import "validate/validate.proto";
 
 // [#protodoc-title: Tap discovery service]
@@ -37,6 +39,9 @@ service TapDiscoveryService {
 // [#not-implemented-hide:] A tap resource is essentially a tap configuration with a name
 // The filter TapDS config references this name.
 message TapResource {
+  option (udpa.api.annotations.versioning).previous_message_type =
+      "envoy.service.tap.v2alpha.TapResource";
+
   // The name of the tap configuration.
   string name = 1 [(validate.rules).string = {min_bytes: 1}];
 

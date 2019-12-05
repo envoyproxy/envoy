@@ -86,12 +86,9 @@ private:
 /**
  * All RDS stats. @see stats_macros.h
  */
-// clang-format off
 #define ALL_RDS_STATS(COUNTER)                                                                     \
   COUNTER(config_reload)                                                                           \
   COUNTER(update_empty)
-
-// clang-format on
 
 /**
  * Struct definition for all RDS stats. @see stats_macros.h

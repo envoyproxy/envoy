@@ -96,9 +96,10 @@ public:
                                  Network::Address::InstanceConstSharedPtr source_address,
                                  Network::TransportSocketPtr& transport_socket,
                                  const Network::ConnectionSocket::OptionsSharedPtr& options));
-  MOCK_METHOD1(createDnsResolver,
+  MOCK_METHOD2(createDnsResolver,
                Network::DnsResolverSharedPtr(
-                   const std::vector<Network::Address::InstanceConstSharedPtr>& resolvers));
+                   const std::vector<Network::Address::InstanceConstSharedPtr>& resolvers,
+                   const bool use_tcp_for_dns_lookups));
   MOCK_METHOD4(createFileEvent_,
                FileEvent*(int fd, FileReadyCb cb, FileTriggerType trigger, uint32_t events));
   MOCK_METHOD0(createFilesystemWatcher_, Filesystem::Watcher*());

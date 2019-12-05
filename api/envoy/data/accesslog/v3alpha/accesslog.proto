@@ -14,6 +14,8 @@ import "google/protobuf/duration.proto";
 import "google/protobuf/timestamp.proto";
 import "google/protobuf/wrappers.proto";
 
+import "udpa/api/annotations/versioning.proto";
+
 import "validate/validate.proto";
 
 // [#protodoc-title: gRPC access logs]
@@ -28,6 +30,9 @@ import "validate/validate.proto";
 // in their name.
 
 message TCPAccessLogEntry {
+  option (udpa.api.annotations.versioning).previous_message_type =
+      "envoy.data.accesslog.v2.TCPAccessLogEntry";
+
   // Common properties shared by all Envoy access logs.
   AccessLogCommon common_properties = 1;
 
@@ -36,6 +41,9 @@ message TCPAccessLogEntry {
 }
 
 message HTTPAccessLogEntry {
+  option (udpa.api.annotations.versioning).previous_message_type =
+      "envoy.data.accesslog.v2.HTTPAccessLogEntry";
+
   // HTTP version
   enum HTTPVersion {
     PROTOCOL_UNSPECIFIED = 0;
@@ -59,6 +67,9 @@ message HTTPAccessLogEntry {
 
 // Defines fields for a connection
 message ConnectionProperties {
+  option (udpa.api.annotations.versioning).previous_message_type =
+      "envoy.data.accesslog.v2.ConnectionProperties";
+
   // Number of bytes received from downstream.
   uint64 received_bytes = 1;
 
@@ -69,6 +80,9 @@ message ConnectionProperties {
 // Defines fields that are shared by all Envoy access logs.
 // [#next-free-field: 22]
 message AccessLogCommon {
+  option (udpa.api.annotations.versioning).previous_message_type =
+      "envoy.data.accesslog.v2.AccessLogCommon";
+
   // [#not-implemented-hide:]
   // This field indicates the rate at which this log entry was sampled.
   // Valid range is (0.0, 1.0].
@@ -173,7 +187,13 @@ message AccessLogCommon {
 // Flags indicating occurrences during request/response processing.
 // [#next-free-field: 20]
 message ResponseFlags {
+  option (udpa.api.annotations.versioning).previous_message_type =
+      "envoy.data.accesslog.v2.ResponseFlags";
+
   message Unauthorized {
+    option (udpa.api.annotations.versioning).previous_message_type =
+        "envoy.data.accesslog.v2.ResponseFlags.Unauthorized";
+
     // Reasons why the request was unauthorized
     enum Reason {
       REASON_UNSPECIFIED = 0;
@@ -247,6 +267,9 @@ message ResponseFlags {
 // Properties of a negotiated TLS connection.
 // [#next-free-field: 7]
 message TLSProperties {
+  option (udpa.api.annotations.versioning).previous_message_type =
+      "envoy.data.accesslog.v2.TLSProperties";
+
   enum TLSVersion {
     VERSION_UNSPECIFIED = 0;
     TLSv1 = 1;
@@ -256,7 +279,13 @@ message TLSProperties {
   }
 
   message CertificateProperties {
+    option (udpa.api.annotations.versioning).previous_message_type =
+        "envoy.data.accesslog.v2.TLSProperties.CertificateProperties";
+
     message SubjectAltName {
+      option (udpa.api.annotations.versioning).previous_message_type =
+          "envoy.data.accesslog.v2.TLSProperties.CertificateProperties.SubjectAltName";
+
       oneof san {
         string uri = 1;
 
@@ -297,6 +326,9 @@ message TLSProperties {
 
 // [#next-free-field: 14]
 message HTTPRequestProperties {
+  option (udpa.api.annotations.versioning).previous_message_type =
+      "envoy.data.accesslog.v2.HTTPRequestProperties";
+
   // The request method (RFC 7231/2616).
   api.v3alpha.core.RequestMethod request_method = 1 [(validate.rules).enum = {defined_only: true}];
 
@@ -350,6 +382,9 @@ message HTTPRequestProperties {
 
 // [#next-free-field: 7]
 message HTTPResponseProperties {
+  option (udpa.api.annotations.versioning).previous_message_type =
+      "envoy.data.accesslog.v2.HTTPResponseProperties";
+
   // The HTTP response code returned by Envoy.
   google.protobuf.UInt32Value response_code = 1;
 

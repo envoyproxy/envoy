@@ -1,4 +1,4 @@
-#include "common/config/api_type_db.h"
+#include "common/config/api_type_oracle.h"
 
 // For proto descriptors only
 #include "envoy/config/filter/http/ip_tagging/v2/ip_tagging.pb.h"
@@ -11,13 +11,13 @@ namespace Envoy {
 namespace Config {
 namespace {
 
-TEST(ApiTypeDbTest, All) {
-  EXPECT_EQ(nullptr, ApiTypeDb::inferEarlierVersionDescriptor("foo", {}, ""));
-  EXPECT_EQ(nullptr, ApiTypeDb::inferEarlierVersionDescriptor("envoy.ip_tagging", {}, ""));
+TEST(ApiTypeOracleTest, All) {
+  EXPECT_EQ(nullptr, ApiTypeOracle::inferEarlierVersionDescriptor("foo", {}, ""));
+  EXPECT_EQ(nullptr, ApiTypeOracle::inferEarlierVersionDescriptor("envoy.ip_tagging", {}, ""));
 
   // Struct upgrade to v3alpha.
   {
-    const auto* desc = ApiTypeDb::inferEarlierVersionDescriptor(
+    const auto* desc = ApiTypeOracle::inferEarlierVersionDescriptor(
         "envoy.ip_tagging", {}, "envoy.config.filter.http.ip_tagging.v3alpha.IPTagging");
     EXPECT_EQ("envoy.config.filter.http.ip_tagging.v2.IPTagging", desc->full_name());
   }
@@ -26,7 +26,7 @@ TEST(ApiTypeDbTest, All) {
   {
     ProtobufWkt::Any typed_config;
     typed_config.set_type_url("envoy.config.filter.http.ip_tagging.v2.IPTagging");
-    const auto* desc = ApiTypeDb::inferEarlierVersionDescriptor(
+    const auto* desc = ApiTypeOracle::inferEarlierVersionDescriptor(
         "envoy.ip_tagging", typed_config, "envoy.config.filter.http.ip_tagging.v3alpha.IPTagging");
     EXPECT_EQ("envoy.config.filter.http.ip_tagging.v2.IPTagging", desc->full_name());
   }
@@ -35,7 +35,7 @@ TEST(ApiTypeDbTest, All) {
   {
     ProtobufWkt::Any typed_config;
     typed_config.set_type_url("envoy.config.filter.http.ip_tagging.v3alpha.IPTagging");
-    EXPECT_EQ(nullptr, ApiTypeDb::inferEarlierVersionDescriptor(
+    EXPECT_EQ(nullptr, ApiTypeOracle::inferEarlierVersionDescriptor(
                            "envoy.ip_tagging", typed_config,
                            "envoy.config.filter.http.ip_tagging.v3alpha.IPTagging"));
   }
@@ -46,7 +46,7 @@ TEST(ApiTypeDbTest, All) {
     udpa::type::v1::TypedStruct typed_struct;
     typed_struct.set_type_url("envoy.config.filter.http.ip_tagging.v2.IPTagging");
     typed_config.PackFrom(typed_struct);
-    const auto* desc = ApiTypeDb::inferEarlierVersionDescriptor(
+    const auto* desc = ApiTypeOracle::inferEarlierVersionDescriptor(
         "envoy.ip_tagging", typed_config, "envoy.config.filter.http.ip_tagging.v3alpha.IPTagging");
     EXPECT_EQ("envoy.config.filter.http.ip_tagging.v2.IPTagging", desc->full_name());
   }
@@ -58,14 +58,14 @@ TEST(ApiTypeDbTest, All) {
     typed_struct.set_type_url(
         "type.googleapis.com/envoy.config.filter.http.ip_tagging.v3alpha.IPTagging");
     typed_config.PackFrom(typed_struct);
-    EXPECT_EQ(nullptr, ApiTypeDb::inferEarlierVersionDescriptor(
+    EXPECT_EQ(nullptr, ApiTypeOracle::inferEarlierVersionDescriptor(
                            "envoy.ip_tagging", typed_config,
                            "envoy.config.filter.http.ip_tagging.v3alpha.IPTagging"));
   }
 
   // There is no upgrade for v2.
   EXPECT_EQ(nullptr,
-            ApiTypeDb::inferEarlierVersionDescriptor(
+            ApiTypeOracle::inferEarlierVersionDescriptor(
                 "envoy.ip_tagging", {}, "envoy.config.filter.http.ip_tagging.v2.IPTagging"));
 }
 
