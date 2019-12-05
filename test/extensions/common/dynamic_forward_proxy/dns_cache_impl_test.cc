@@ -23,7 +23,7 @@ public:
     config_.set_name("foo");
     config_.set_dns_lookup_family(envoy::api::v2::Cluster::V4_ONLY);
 
-    EXPECT_CALL(dispatcher_, createDnsResolver(_)).WillOnce(Return(resolver_));
+    EXPECT_CALL(dispatcher_, createDnsResolver(_, _)).WillOnce(Return(resolver_));
     dns_cache_ = std::make_unique<DnsCacheImpl>(dispatcher_, tls_, store_, config_);
     update_callbacks_handle_ = dns_cache_->addUpdateCallbacks(update_callbacks_);
   }

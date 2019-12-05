@@ -68,6 +68,15 @@ void fillState(envoy::admin::v2alpha::ListenersConfigDump_DynamicListenerState& 
 
 } // namespace
 
+bool ListenSocketCreationParams::operator==(const ListenSocketCreationParams& rhs) const {
+  return (bind_to_port == rhs.bind_to_port) &&
+         (duplicate_parent_socket == rhs.duplicate_parent_socket);
+}
+
+bool ListenSocketCreationParams::operator!=(const ListenSocketCreationParams& rhs) const {
+  return !operator==(rhs);
+}
+
 std::vector<Network::FilterFactoryCb> ProdListenerComponentFactory::createNetworkFilterFactoryList_(
     const Protobuf::RepeatedPtrField<envoy::api::v2::listener::Filter>& filters,
     Configuration::FactoryContext& context) {
@@ -147,7 +156,7 @@ ProdListenerComponentFactory::createUdpListenerFilterFactoryList_(
 
 Network::SocketSharedPtr ProdListenerComponentFactory::createListenSocket(
     Network::Address::InstanceConstSharedPtr address, Network::Address::SocketType socket_type,
-    const Network::Socket::OptionsSharedPtr& options, bool bind_to_port) {
+    const Network::Socket::OptionsSharedPtr& options, const ListenSocketCreationParams& params) {
   ASSERT(address->type() == Network::Address::Type::Ip ||
          address->type() == Network::Address::Type::Pipe);
   ASSERT(socket_type == Network::Address::SocketType::Stream ||
@@ -178,7 +187,7 @@ Network::SocketSharedPtr ProdListenerComponentFactory::createListenSocket(
                                  : Network::Utility::UDP_SCHEME;
   const std::string addr = absl::StrCat(scheme, address->asString());
 
-  if (bind_to_port) {
+  if (params.bind_to_port && params.duplicate_parent_socket) {
     const int fd = server_.hotRestart().duplicateParentListenSocket(addr);
     if (fd != -1) {
       ENVOY_LOG(debug, "obtained socket for address {} from parent", addr);
@@ -192,9 +201,9 @@ Network::SocketSharedPtr ProdListenerComponentFactory::createListenSocket(
   }
 
   if (socket_type == Network::Address::SocketType::Stream) {
-    return std::make_shared<Network::TcpListenSocket>(address, options, bind_to_port);
+    return std::make_shared<Network::TcpListenSocket>(address, options, params.bind_to_port);
   } else {
-    return std::make_shared<Network::UdpListenSocket>(address, options, bind_to_port);
+    return std::make_shared<Network::UdpListenSocket>(address, options, params.bind_to_port);
   }
 }
 
@@ -414,10 +423,14 @@ bool ListenerManagerImpl::addOrUpdateListenerInternal(const envoy::api::v2::List
       draining_listen_socket_factory = existing_draining_listener->listener_->getSocketFactory();
     }
 
+    Network::Address::SocketType socket_type =
+        Network::Utility::protobufAddressSocketType(config.address());
     new_listener->setSocketFactory(
         draining_listen_socket_factory
             ? draining_listen_socket_factory
-            : createListenSocketFactory(config.address(), *new_listener));
+            : createListenSocketFactory(config.address(), *new_listener,
+                                        (socket_type == Network::Address::SocketType::Datagram) ||
+                                            config.reuse_port()));
     if (workers_started_) {
       new_listener->debugLog("add warming listener");
       warming_listeners_.emplace_back(std::move(new_listener));
@@ -757,20 +770,12 @@ std::unique_ptr<Network::FilterChain> ListenerFilterChainFactoryBuilder::buildFi
 
 Network::ListenSocketFactorySharedPtr
 ListenerManagerImpl::createListenSocketFactory(const envoy::api::v2::core::Address& proto_address,
-                                               ListenerImpl& listener) {
+                                               ListenerImpl& listener, bool reuse_port) {
   Network::Address::SocketType socket_type =
       Network::Utility::protobufAddressSocketType(proto_address);
-  switch (socket_type) {
-  case Network::Address::SocketType::Stream:
-    return std::make_shared<TcpListenSocketFactory>(factory_, listener.address(),
-                                                    listener.listenSocketOptions(),
-                                                    listener.bindToPort(), listener.name());
-  case Network::Address::SocketType::Datagram:
-    return std::make_shared<UdpListenSocketFactory>(factory_, listener.address(),
-                                                    listener.listenSocketOptions(),
-                                                    listener.bindToPort(), listener.name());
-  }
-  NOT_REACHED_GCOVR_EXCL_LINE;
+  return std::make_shared<ListenSocketFactoryImpl>(
+      factory_, listener.address(), socket_type, listener.listenSocketOptions(),
+      listener.bindToPort(), listener.name(), reuse_port);
 }
 
 } // namespace Server

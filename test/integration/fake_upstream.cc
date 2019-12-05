@@ -580,10 +580,10 @@ void FakeUpstream::onRecvDatagram(Network::UdpRecvData& data) {
 }
 
 void FakeUpstream::sendUdpDatagram(const std::string& buffer,
-                                   const Network::Address::Instance& peer) {
-  dispatcher_->post([this, buffer, &peer] {
+                                   const Network::Address::InstanceConstSharedPtr& peer) {
+  dispatcher_->post([this, buffer, peer] {
     const auto rc = Network::Utility::writeToSocket(socket_->ioHandle(), Buffer::OwnedImpl(buffer),
-                                                    nullptr, peer);
+                                                    nullptr, *peer);
     EXPECT_TRUE(rc.rc_ == buffer.length());
   });
 }

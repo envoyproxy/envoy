@@ -115,5 +115,12 @@ std::unique_ptr<Socket::Options> SocketOptionFactory::buildRxQueueOverFlowOption
   return options;
 }
 
+std::unique_ptr<Socket::Options> SocketOptionFactory::buildReusePortOptions() {
+  std::unique_ptr<Socket::Options> options = std::make_unique<Socket::Options>();
+  options->push_back(std::make_shared<Network::SocketOptionImpl>(
+      envoy::api::v2::core::SocketOption::STATE_PREBIND, ENVOY_SOCKET_SO_REUSEPORT, 1));
+  return options;
+}
+
 } // namespace Network
 } // namespace Envoy

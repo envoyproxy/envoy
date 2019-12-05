@@ -99,7 +99,6 @@ EXTENSIONS = {
     # UDP filters
     #
 
-    # WiP
     "envoy.filters.udp_listener.udp_proxy":             "//source/extensions/filters/udp/udp_proxy:config",
 
     #
