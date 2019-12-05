@@ -31,4 +31,4 @@ bazel build ${BAZEL_BUILD_OPTIONS} @envoy_api//docs:protos --aspects \
   tools/protoxform/protoxform.bzl%protoxform_aspect --output_groups=proto --action_env=CPROFILE_ENABLED=1 \
   --action_env=TYPE_DB_PATH --host_force_python=PY3
 
-./tools/proto_sync.py "$1" ${PROTO_TARGETS}
+./tools/proto_sync.py "$1" "@envoy_api" ${PROTO_TARGETS}

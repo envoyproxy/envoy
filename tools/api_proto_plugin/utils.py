@@ -2,7 +2,7 @@ import glob
 import os
 
 
-def ProtoFileCanonicalFromLabel(label):
+def ProtoFileCanonicalFromLabel(label, repo_tag):
   """Compute path from API root to a proto file from a Bazel proto label.
 
   Args:
@@ -12,11 +12,11 @@ def ProtoFileCanonicalFromLabel(label):
     A string with the path, e.g. for @envoy_api//envoy/type/matcher:metadata.proto
     this would be envoy/type/matcher/matcher.proto.
   """
-  assert (label.startswith('@envoy_api//'))
-  return label[len('@envoy_api//'):].replace(':', '/')
+  assert (label.startswith(repo_tag))
+  return label[len(repo_tag):].replace(':', '/')
 
 
-def BazelBinPathForOutputArtifact(label, suffix, root=''):
+def BazelBinPathForOutputArtifact(label, suffix, repo_tag, root=''):
   """Find the location in bazel-bin/ for an api_proto_plugin output file.
 
   Args:
@@ -35,6 +35,16 @@ def BazelBinPathForOutputArtifact(label, suffix, root=''):
   # While we may have reformatted the file multiple times due to the transitive
   # dependencies in the aspect above, they all look the same. So, just pick an
   # arbitrary match and we're done.
-  glob_pattern = os.path.join(
-      root, 'bazel-bin/external/envoy_api/**/%s%s' % (ProtoFileCanonicalFromLabel(label), suffix))
+  glob_pattern = os.path.join(root, 'bazel-bin/**/%s%s' % (ProtoFileCanonicalFromLabel(label, repo_tag), suffix))
   return glob.glob(glob_pattern, recursive=True)[0]
+
+def ExtractRepoName(label):
+  """Extract repository name from label"""  
+  repo = ""
+  for i, ch in enumerate(label):
+    if label[i] == label[i+1]:
+      repo += "//"
+      break
+    else:
+      repo += ch
+  return repo

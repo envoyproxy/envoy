@@ -5,9 +5,7 @@ from udpa.api.annotations import versioning_pb2
 
 def AddHideOption(options):
   """Mark message/enum/field/enum value as hidden.
-
   Hidden messages are ignored when generating output.
-
   Args:
     options: MessageOptions/EnumOptions/FieldOptions/EnumValueOptions message.
   """
@@ -17,9 +15,7 @@ def AddHideOption(options):
 
 def HasHideOption(options):
   """Is message/enum/field/enum value hidden?
-
   Hidden messages are ignored when generating output.
-
   Args:
     options: MessageOptions/EnumOptions/FieldOptions/EnumValueOptions message.
   Returns:
@@ -31,9 +27,7 @@ def HasHideOption(options):
 
 def SetVersioningAnnotation(options, previous_message_type):
   """Set the udpa.api.annotations.versioning option.
-
   Used by Envoy to chain back through the message type history.
-
   Args:
     options: MessageOptions message.
     previous_message_type: string with earlier API type name for the message.
@@ -43,9 +37,7 @@ def SetVersioningAnnotation(options, previous_message_type):
 
 def GetVersioningAnnotation(options):
   """Get the udpa.api.annotations.versioning option.
-
   Used by Envoy to chain back through the message type history.
-
   Args:
     options: MessageOptions message.
   Returns:

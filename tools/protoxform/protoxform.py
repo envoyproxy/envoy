@@ -41,10 +41,8 @@ class ProtoXformError(Exception):
 
 def ClangFormat(contents):
   """Run proto-style oriented clang-format over given string.
-
   Args:
     contents: a string with proto contents.
-
   Returns:
     clang-formatted string
   """
@@ -57,12 +55,9 @@ def ClangFormat(contents):
 
 def FormatBlock(block):
   """Append \n to a .proto section (e.g.
-
   comment, message definition, etc.) if non-empty.
-
   Args:
     block: a string representing the section.
-
   Returns:
     A string with appropriate whitespace.
   """
@@ -73,13 +68,10 @@ def FormatBlock(block):
 
 def FormatComments(comments):
   """Format a list of comment blocks from SourceCodeInfo.
-
   Prefixes // to each line, separates blocks by spaces.
-
   Args:
     comments: a list of blocks, each block is a list of strings representing
       lines in each block.
-
   Returns:
     A string reprenting the formatted comment blocks.
   """
@@ -98,10 +90,8 @@ def FormatComments(comments):
 
 def CreateNextFreeFieldXform(msg_proto):
   """Return the next free field number annotation transformer of a message.
-
   Args:
     msg_proto: DescriptorProto for message.
-
   Returns:
     the next free field number annotation transformer.
   """
@@ -116,11 +106,9 @@ def CreateNextFreeFieldXform(msg_proto):
 
 def FormatTypeContextComments(type_context, annotation_xforms=None):
   """Format the leading/trailing comments in a given TypeContext.
-
   Args:
     type_context: contextual information for message/enum/field.
     annotation_xforms: a dict of transformers for annotations in leading comment.
-
   Returns:
     Tuple of formatted leading and trailing comment blocks.
   """
@@ -134,11 +122,9 @@ def FormatTypeContextComments(type_context, annotation_xforms=None):
 
 def FormatHeaderFromFile(source_code_info, file_proto):
   """Format proto header.
-
   Args:
     source_code_info: SourceCodeInfo object.
     file_proto: FileDescriptorProto for file.
-
   Returns:
     Formatted proto header as a string.
   """
@@ -222,15 +208,11 @@ def FormatHeaderFromFile(source_code_info, file_proto):
 
 def NormalizeFieldTypeName(type_context, field_fqn):
   """Normalize a fully qualified field type name, e.g.
-
   .envoy.foo.bar is normalized to foo.bar.
-
   Considers type context to minimize type prefix.
-
   Args:
     field_fqn: a fully qualified type name from FieldDescriptorProto.type_name.
     type_context: contextual information for message/enum/field.
-
   Returns:
     Normalized type name as a string.
   """
@@ -276,11 +258,9 @@ def TypeNameFromFQN(fqn):
 
 def FormatFieldType(type_context, field):
   """Format a FieldDescriptorProto type description.
-
   Args:
     type_context: contextual information for message/enum/field.
     field: FieldDescriptor proto.
-
   Returns:
     Formatted proto field type as string.
   """
@@ -321,11 +301,9 @@ def FormatFieldType(type_context, field):
 
 def FormatServiceMethod(type_context, method):
   """Format a service MethodDescriptorProto.
-
   Args:
     type_context: contextual information for method.
     method: MethodDescriptorProto proto.
-
   Returns:
     Formatted service method as string.
   """
@@ -349,10 +327,8 @@ def FormatServiceMethod(type_context, method):
 
 def FormatValidateFieldRules(rules):
   """Format validate_pb2 rules.
-
   Args:
     rules: validate_pb2 rules proto.
-
   Returns:
     Formatted validation rules as string, suitable for proto field annotation.
   """
@@ -363,11 +339,9 @@ def FormatValidateFieldRules(rules):
 
 def FormatField(type_context, field):
   """Format FieldDescriptorProto as a proto field.
-
   Args:
     type_context: contextual information for message/enum/field.
     field: FieldDescriptor proto.
-
   Returns:
     Formatted proto field as a string.
   """
@@ -387,11 +361,9 @@ def FormatField(type_context, field):
 
 def FormatEnumValue(type_context, value):
   """Format a EnumValueDescriptorProto as a proto enum value.
-
   Args:
     type_context: contextual information for message/enum/field.
     value: EnumValueDescriptorProto.
-
   Returns:
     Formatted proto enum value as a string.
   """
@@ -408,11 +380,9 @@ def FormatEnumValue(type_context, value):
 
 def FormatOptions(options, is_message=False):
   """Format MessageOptions/EnumOptions message.
-
   Args:
     options: A MessageOptions/EnumOptions message.
     is_message: is this a message type?
-
   Returns:
     Formatted options as a string.
   """
@@ -432,10 +402,8 @@ def FormatOptions(options, is_message=False):
 
 def FormatReserved(enum_or_msg_proto):
   """Format reserved values/names in a [Enum]DescriptorProto.
-
   Args:
     enum_or_msg_proto: [Enum]DescriptorProto message.
-
   Returns:
     Formatted enum_or_msg_proto as a string.
   """
@@ -450,7 +418,6 @@ def FormatReserved(enum_or_msg_proto):
 
 class ProtoFormatVisitor(visitor.Visitor):
   """Visitor to generate a proto representation from a FileDescriptor proto.
-
   See visitor.Visitor for visitor method docs comments.
   """
 

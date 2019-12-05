@@ -59,7 +59,7 @@ class RequiresReformatError(ProtoSyncError):
         message)
 
 
-def LabelPaths(label, src_suffix):
+def LabelPaths(label, src_suffix, repo_tag):
   """Compute single proto file source/destination paths from a Bazel proto label.
 
   Args:
@@ -72,8 +72,8 @@ def LabelPaths(label, src_suffix):
       destination is a provisional path in the Envoy source tree for copying the
       contents of source when run in fix mode.
   """
-  src = utils.BazelBinPathForOutputArtifact(label, src_suffix)
-  dst = 'api/%s' % utils.ProtoFileCanonicalFromLabel(label)
+  src = utils.BazelBinPathForOutputArtifact(label, src_suffix, repo_tag=repo_tag)
+  dst = 'api/%s' % utils.ProtoFileCanonicalFromLabel(label, repo_tag)
   return src, dst
 
 
@@ -94,7 +94,7 @@ def SyncProtoFile(cmd, src, dst):
       raise RequiresReformatError('%s and %s do not match' % (src, dst))
 
 
-def SyncV2(cmd, src_labels):
+def SyncV2(cmd, src_labels, repo_tag):
   """Diff or in-place update v2 protos from protoxform.py Bazel cache artifacts."
 
   Args:
@@ -102,11 +102,11 @@ def SyncV2(cmd, src_labels):
     src_labels: Bazel label for source protos.
   """
   for s in src_labels:
-    src, dst = LabelPaths(s, '.v2.proto')
+    src, dst = LabelPaths(s, '.v2.proto', repo_tag)
     SyncProtoFile(cmd, src, dst)
 
 
-def SyncV3Alpha(cmd, src_labels):
+def SyncV3Alpha(cmd, src_labels, repo_tag):
   """Diff or in-place update v3alpha protos from protoxform.py Bazel cache artifacts."
 
   Args:
@@ -114,7 +114,7 @@ def SyncV3Alpha(cmd, src_labels):
     src_labels: Bazel label for source protos.
   """
   for s in src_labels:
-    src, dst = LabelPaths(s, '.v3alpha.proto')
+    src, dst = LabelPaths(s, '.v3alpha.proto', repo_tag)
     # Skip empty files, this indicates this file isn't modified in next version.
     if os.stat(src).st_size == 0:
       continue
@@ -257,10 +257,11 @@ def SyncBuildFiles(cmd):
 
 if __name__ == '__main__':
   cmd = sys.argv[1]
-  src_labels = sys.argv[2:]
+  repo_tag = sys.argv[2]
+  src_labels = sys.argv[3:]
   try:
-    SyncV2(cmd, src_labels)
-    SyncV3Alpha(cmd, src_labels)
+    SyncV2(cmd, src_labels, repo_tag)
+    SyncV3Alpha(cmd, src_labels, repo_tag)
     SyncBuildFiles(cmd)
   except ProtoSyncError as e:
     sys.stderr.write('%s\n' % e)
