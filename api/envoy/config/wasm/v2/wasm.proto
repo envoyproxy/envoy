@@ -53,7 +53,7 @@ message PluginConfig {
 }
 
 // WasmService is configured as a built-in *envoy.wasm_service* :ref:`ServiceConfig
-// <envoy_api_msg_config.wasm.v2.ServiceConfig>`. This opaque configuration will be used to
+// <envoy_api_msg_config.wasm.v2.WasmService>`. This opaque configuration will be used to
 // create a Wasm Service.
 message WasmService {
   // General plugin configuration.
