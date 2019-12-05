@@ -8,6 +8,7 @@
 
 #include "common/common/fmt.h"
 #include "common/profiler/profiler.h"
+#include "common/protobuf/protobuf.h"
 #include "common/stats/stats_matcher_impl.h"
 
 #include "test/common/stats/stat_test_utility.h"
@@ -348,14 +349,14 @@ TEST_P(IntegrationAdminTest, Admin) {
       "type.googleapis.com/envoy.admin.v2alpha.RoutesConfigDump",
       "type.googleapis.com/envoy.admin.v2alpha.SecretsConfigDump"};
 
-  const std::array<MessagePtr> messages = {
-      MessagePtr(new envoy::admin::v2alpha::BootstrapConfigDump()),
-      MessagePtr(new envoy::admin::v2alpha::ClustersConfigDump()),
-      MessagePtr(new envoy::admin::v2alpha::ExtensionsConfigDump()),
-      MessagePtr(new envoy::admin::v2alpha::ListenersConfigDump()),
-      MessagePtr(new envoy::admin::v2alpha::ScopedRoutesConfigDump()),
-      MessagePtr(new envoy::admin::v2alpha::RoutesConfigDump()),
-      MessagePtr(new envoy::admin::v2alpha::SecretsConfigDump()),
+  const std::array<ProtobufTypes::MessagePtr, 7> messages = {
+      ProtobufTypes::MessagePtr(new envoy::admin::v2alpha::BootstrapConfigDump()),
+      ProtobufTypes::MessagePtr(new envoy::admin::v2alpha::ClustersConfigDump()),
+      ProtobufTypes::MessagePtr(new envoy::admin::v2alpha::ExtensionsConfigDump()),
+      ProtobufTypes::MessagePtr(new envoy::admin::v2alpha::ListenersConfigDump()),
+      ProtobufTypes::MessagePtr(new envoy::admin::v2alpha::ScopedRoutesConfigDump()),
+      ProtobufTypes::MessagePtr(new envoy::admin::v2alpha::RoutesConfigDump()),
+      ProtobufTypes::MessagePtr(new envoy::admin::v2alpha::SecretsConfigDump()),
   };
 
   static_assert(expected_types.size() == messages.size(), "inconsistent config dump message types");
