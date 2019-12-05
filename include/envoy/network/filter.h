@@ -333,9 +333,9 @@ public:
   virtual const std::vector<FilterFactoryCb>& networkFilterFactories() const PURE;
 
   /**
-   * @brief Get the Tag object associated with this filter chain.
-   *
-   * @return int64_t
+   * @return int64_t The tag of the FilterChainFactoryContext which the FilterChain is built from.
+   * The default implementation is provided for those FilterChain not associated with
+   * FilterChainFactoryContext.
    */
   virtual int64_t getTag() const { return 0; }
 };

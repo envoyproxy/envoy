@@ -206,7 +206,8 @@ public:
 class FilterChainFactoryContext : public virtual FactoryContext {
 public:
   /**
-   * @return uint64_t The tag assigned with this context at runtime.
+   * @return uint64_t The tag assigned with this context at runtime. It will be used for connection
+   * handler tracking.
    */
   virtual uint64_t getTag() const PURE;
 };
