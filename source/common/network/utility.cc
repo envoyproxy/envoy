@@ -109,39 +109,7 @@ uint32_t Utility::portFromUdpUrl(const std::string& url) {
   return portFromUrl(url, UDP_SCHEME, "UDP");
 }
 
-absl::string_view Utility::hostFromIpAddress(const absl::string_view& authority) {
-  bool ipv6_flag = false;
-  size_t pos = authority.rfind(":");
-
-  if (pos == absl::string_view::npos) {
-    return authority;
-  }
-
-  if (authority[0] == '[') {
-    ipv6_flag = true;
-    pos = authority.rfind("]");
-  } else if (pos != authority.find(":")) {
-    return authority;
-  } else {
-    pos = authority.rfind(":");
-  }
-
-  size_t start = !ipv6_flag ? 0 : 1;
-
-  return authority.substr(start, pos - start);
-}
-
-absl::string_view Utility::portFromIpAddress(const absl::string_view& authority,
-                                             uint32_t default_port) {
-  const auto pos = authority.rfind(":");
-  if (pos == absl::string_view::npos) {
-    return std::to_string(default_port);
-  }
-
-  return authority.substr(pos + 1);
-}
-
-Address::InstanceConstSharedPtr Utility::parseInternetAddress(const absl::string_view& ip_address,
+Address::InstanceConstSharedPtr Utility::parseInternetAddress(absl::string_view ip_address,
                                                               uint16_t port, bool v6only) {
   if (ip_address.empty()) {
     throwWithMalformedIp(ip_address);
@@ -163,8 +131,8 @@ Address::InstanceConstSharedPtr Utility::parseInternetAddress(const absl::string
   NOT_REACHED_GCOVR_EXCL_LINE;
 }
 
-Address::InstanceConstSharedPtr
-Utility::parseInternetAddressAndPort(const absl::string_view& ip_address, bool v6only) {
+Address::InstanceConstSharedPtr Utility::parseInternetAddressAndPort(absl::string_view ip_address,
+                                                                     bool v6only) {
   if (ip_address.empty()) {
     throwWithMalformedIp(ip_address);
   }
@@ -174,8 +142,8 @@ Utility::parseInternetAddressAndPort(const absl::string_view& ip_address, bool v
     if (pos == std::string::npos) {
       throwWithMalformedIp(ip_address);
     }
-    const auto ip_str = hostFromIpAddress(ip_address);
-    const auto port_str = portFromIpAddress(ip_address);
+    const auto ip_str = ip_address.substr(1, pos - 1);
+    const auto port_str = ip_address.substr(pos + 2);
     uint64_t port64 = 0;
     if (port_str.empty() || !absl::SimpleAtoi(port_str, &port64) || port64 > 65535) {
       throwWithMalformedIp(ip_address);
@@ -194,8 +162,8 @@ Utility::parseInternetAddressAndPort(const absl::string_view& ip_address, bool v
   if (pos == std::string::npos) {
     throwWithMalformedIp(ip_address);
   }
-  const auto ip_str = hostFromIpAddress(ip_address);
-  const auto port_str = portFromIpAddress(ip_address);
+  const auto ip_str = ip_address.substr(0, pos);
+  const auto port_str = ip_address.substr(pos + 1);
   uint64_t port64 = 0;
   if (port_str.empty() || !absl::SimpleAtoi(port_str, &port64) || port64 > 65535) {
     throwWithMalformedIp(ip_address);
@@ -216,7 +184,7 @@ Address::InstanceConstSharedPtr Utility::copyInternetAddressAndPort(const Addres
   return std::make_shared<Address::Ipv6Instance>(ip.addressAsString(), ip.port());
 }
 
-void Utility::throwWithMalformedIp(const absl::string_view& ip_address) {
+void Utility::throwWithMalformedIp(absl::string_view ip_address) {
   throw EnvoyException(fmt::format("malformed IP address: {}", ip_address));
 }
 

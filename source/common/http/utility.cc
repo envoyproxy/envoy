@@ -750,7 +750,47 @@ std::string Utility::PercentEncoding::decode(absl::string_view encoded) {
   return decoded;
 }
 
-const Utility::AuthorityAttributes Utility::parseAuthority(const absl::string_view& authority,
+class MalformedAuthority {
+  static void throwException(absl::string_view authority) {
+    throw EnvoyException(fmt::format("malformed authority: {}", authority));
+  }
+
+  friend absl::string_view Utility::hostFromAuthority(absl::string_view authority);
+};
+
+absl::string_view Utility::hostFromAuthority(absl::string_view authority) {
+  bool ipv6_flag = false;
+
+  if (authority.find("[") != absl::string_view::npos) {
+    ipv6_flag = true;
+  }
+
+  auto bracket_close_pos = authority.rfind("]");
+  if (ipv6_flag) {
+    if (bracket_close_pos != absl::string_view::npos) {
+      return authority.substr(1, bracket_close_pos - 1);
+    } else {
+      MalformedAuthority::throwException(authority);
+    }
+  }
+
+  auto comma_pos = authority.rfind(":");
+  if (comma_pos != absl::string_view::npos) {
+    return authority.substr(0, comma_pos);
+  } else {
+    return authority;
+  }
+}
+
+absl::string_view Utility::portFromAuthority(absl::string_view authority, uint32_t default_port) {
+  const auto pos = authority.rfind(":");
+  if (pos == absl::string_view::npos) {
+    return std::to_string(default_port);
+  }
+  return authority.substr(pos + 1);
+}
+
+const Utility::AuthorityAttributes Utility::parseAuthority(absl::string_view authority,
                                                            uint32_t default_port) {
   Utility::AuthorityAttributes auth_attr;
   auth_attr.port = default_port;
@@ -786,7 +826,7 @@ const Utility::AuthorityAttributes Utility::parseAuthority(const absl::string_vi
       continue;
     }
     if (ch == ':') {
-      continue;
+      break;
     }
     if (!std::isdigit(static_cast<unsigned char>(ch))) {
       is_ipv4 = false;
@@ -806,7 +846,7 @@ const Utility::AuthorityAttributes Utility::parseAuthority(const absl::string_vi
     try {
       const Network::Address::InstanceConstSharedPtr instance =
           Network::Utility::parseInternetAddressAndPort(authority);
-      auth_attr.host = Network::Utility::hostFromIpAddress(authority);
+      auth_attr.host = Http::Utility::hostFromAuthority(authority);
       auth_attr.port = instance->ip()->port();
       auth_attr.is_ip_address = true;
     } catch (const EnvoyException&) {
@@ -817,9 +857,10 @@ const Utility::AuthorityAttributes Utility::parseAuthority(const absl::string_vi
 
   if (is_ipv6) {
     try {
+      auto extracted_host = Http::Utility::hostFromAuthority(authority);
       const Network::Address::InstanceConstSharedPtr instance =
-          Network::Utility::parseInternetAddress(Network::Utility::hostFromIpAddress(authority));
-      auth_attr.host = Network::Utility::hostFromIpAddress(authority);
+          Network::Utility::parseInternetAddress(extracted_host);
+      auth_attr.host = extracted_host;
       auth_attr.is_ip_address = true;
     } catch (const EnvoyException&) {
     }
@@ -831,7 +872,7 @@ const Utility::AuthorityAttributes Utility::parseAuthority(const absl::string_vi
     try {
       const Network::Address::InstanceConstSharedPtr instance =
           Network::Utility::parseInternetAddress(authority);
-      auth_attr.host = Network::Utility::hostFromIpAddress(authority);
+      auth_attr.host = Http::Utility::hostFromAuthority(authority);
       auth_attr.is_ip_address = true;
     } catch (const EnvoyException&) {
     }
@@ -845,16 +886,15 @@ const Utility::AuthorityAttributes Utility::parseAuthority(const absl::string_vi
   const auto colon_rpos = authority.rfind(":");
 
   // If the number of colon is upper than 1, authority can't separate host and port correctly.
-  if (colon_lpos == colon_rpos) {
-    const auto port_str = Network::Utility::portFromIpAddress(authority);
+  if (colon_lpos != absl::string_view::npos && colon_lpos == colon_rpos) {
+    absl::string_view port_str = Http::Utility::portFromAuthority(authority);
     uint64_t port64 = 0;
-
-    if (port_str.empty() || !absl::SimpleAtoi(port_str, &port64) || port64 > 65535) {
+    if (port_str.empty() || !absl::SimpleAtoi(std::string(port_str).c_str(), &port64) ||
+        port64 > 65535) {
       auth_attr.port = default_port;
       return auth_attr;
     }
-
-    auth_attr.host = Network::Utility::hostFromIpAddress(authority);
+    auth_attr.host = Http::Utility::hostFromAuthority(authority);
     auth_attr.port = static_cast<uint32_t>(port64);
   }
 
