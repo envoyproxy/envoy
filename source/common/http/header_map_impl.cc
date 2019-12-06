@@ -303,7 +303,7 @@ uint64_t HeaderMapImpl::appendToHeader(HeaderString& header, absl::string_view d
   return data.size() + byte_size;
 }
 
-HeaderMapImpl::HeaderMapImpl() { memset(&inline_headers_, 0, sizeof(inline_headers_)); }
+HeaderMapImpl::HeaderMapImpl() { inline_headers_.clear(); }
 
 HeaderMapImpl::HeaderMapImpl(
     const std::initializer_list<std::pair<LowerCaseString, std::string>>& values)
@@ -461,6 +461,7 @@ void HeaderMapImpl::addCopy(const LowerCaseString& key, absl::string_view value)
 }
 
 void HeaderMapImpl::appendCopy(const LowerCaseString& key, absl::string_view value) {
+  // TODO(#9221): converge on and document a policy for coalescing multiple headers.
   auto* entry = getExisting(key);
   if (entry) {
     const uint64_t added_size = appendToHeader(entry->value(), value);
@@ -491,7 +492,8 @@ void HeaderMapImpl::setReferenceKey(const LowerCaseString& key, absl::string_vie
 }
 
 void HeaderMapImpl::setCopy(const LowerCaseString& key, absl::string_view value) {
-  // Replaces a header if it exists, otherwise adds by copy.
+  // Replaces the first occurance of a header if it exists, otherwise adds by copy.
+  // TODO(#9221): converge on and document a policy for coalescing multiple headers.
   auto* entry = getExisting(key);
   if (entry) {
     updateSize(entry->value().size(), value.size());

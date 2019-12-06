@@ -16,6 +16,7 @@ namespace Http {
 
 /**
  * These are definitions of all of the inline header access functions described inside header_map.h
+ * TODO(asraa): Simplify code here so macros expand into single virtual calls.
  */
 #define DEFINE_INLINE_HEADER_FUNCS(name)                                                           \
 public:                                                                                            \
@@ -227,12 +228,12 @@ protected:
   uint64_t cached_byte_size_ = 0;
   // Performs a manual byte size count.
   uint64_t byteSizeInternal() const;
-  // In TestHeaderMapImpl, this method is overriden to performs a time-consuming manual byte size
-  // count on each operation to verify the byte size. For prod HeaderMaps, this verification is
-  // skipped.
+  // In TestHeaderMapImpl and VerifiedHeaderMapImpl, this method is overridden to performs a
+  // time-consuming manual byte size count on each operation to verify the byte size. For prod
+  // HeaderMaps, this verification is skipped.
   // TODO(asraa): Move this verification out of prod code and wrap virtual Http::HeaderMap methods
   // in Http::TestHeaderMapImpl with the verification.
-  virtual void verifyByteSize(){};
+  virtual void verifyByteSize() {}
 
   ALL_INLINE_HEADERS(DEFINE_INLINE_HEADER_FUNCS)
 };
