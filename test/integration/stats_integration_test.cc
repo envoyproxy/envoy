@@ -260,7 +260,7 @@ TEST_P(ClusterMemoryTestRunner, MemoryLargeClusterSizeWithFakeSymbolTable) {
   // 2019/11/01  8859     43563       44000   build: switch to libc++ by default
   // 2019/11/15  9040     43371       44000   build: update protobuf to 3.10.1
   // 2019/11/15  9031     43403       44000   upstream: track whether cluster is local
-  // 2019/12/04  9227     49340       50000   router: per-cluster histograms w/ timeout budget
+  // 2019/12/04  9227     49531       50000   router: per-cluster histograms w/ timeout budget
 
   // Note: when adjusting this value: EXPECT_MEMORY_EQ is active only in CI
   // 'release' builds, where we control the platform and tool-chain. So you
@@ -274,7 +274,7 @@ TEST_P(ClusterMemoryTestRunner, MemoryLargeClusterSizeWithFakeSymbolTable) {
   // If you encounter a failure here, please see
   // https://github.com/envoyproxy/envoy/blob/master/source/docs/stats.md#stats-memory-tests
   // for details on how to fix.
-  EXPECT_MEMORY_EQ(m_per_cluster, 49340); // 104 bytes higher than a debug build.
+  EXPECT_MEMORY_EQ(m_per_cluster, 49531); // 104 bytes higher than a debug build.
   EXPECT_MEMORY_LE(m_per_cluster, 50000);
 }
 
