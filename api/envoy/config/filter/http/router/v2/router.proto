@@ -2,9 +2,9 @@ syntax = "proto3";
 
 package envoy.config.filter.http.router.v2;
 
+option java_package = "io.envoyproxy.envoy.config.filter.http.router.v2";
 option java_outer_classname = "RouterProto";
 option java_multiple_files = true;
-option java_package = "io.envoyproxy.envoy.config.filter.http.router.v2";
 
 import "envoy/config/filter/accesslog/v2/accesslog.proto";
 

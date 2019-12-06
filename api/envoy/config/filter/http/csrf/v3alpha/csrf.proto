@@ -2,9 +2,9 @@ syntax = "proto3";
 
 package envoy.config.filter.http.csrf.v3alpha;
 
+option java_package = "io.envoyproxy.envoy.config.filter.http.csrf.v3alpha";
 option java_outer_classname = "CsrfProto";
 option java_multiple_files = true;
-option java_package = "io.envoyproxy.envoy.config.filter.http.csrf.v3alpha";
 
 import "envoy/api/v3alpha/core/base.proto";
 import "envoy/type/matcher/v3alpha/string.proto";

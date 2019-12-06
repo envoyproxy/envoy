@@ -11,6 +11,7 @@
 
 from collections import deque
 import functools
+import io
 import os
 import re
 import subprocess
@@ -163,24 +164,23 @@ def FormatHeaderFromFile(source_code_info, file_proto):
   package_line = 'package %s;\n' % file_proto.package
   file_block = '\n'.join(['syntax = "proto3";\n', package_line])
 
-  options = [
-      'option java_outer_classname = "%s";' % CamelCase(os.path.basename(file_proto.name)),
-      'option java_multiple_files = true;',
-      'option java_package = "io.envoyproxy.%s";' % file_proto.package,
-  ]
+  options = file_proto.options
+  options.java_outer_classname = CamelCase(os.path.basename(file_proto.name))
+  options.java_multiple_files = True
+  options.java_package = "io.envoyproxy." + file_proto.package
+
   # This is a workaround for C#/Ruby namespace conflicts between packages and
   # objects, see https://github.com/envoyproxy/envoy/pull/3854.
   # TODO(htuch): remove once v3 fixes this naming issue in
   # https://github.com/envoyproxy/envoy/issues/8120.
   if file_proto.package in ['envoy.api.v2.listener', 'envoy.api.v2.cluster']:
     qualified_package = '.'.join(s.capitalize() for s in file_proto.package.split('.')) + 'NS'
-    options += [
-        'option csharp_namespace = "%s";' % qualified_package,
-        'option ruby_package = "%s";' % qualified_package,
-    ]
+    options.csharp_namespace = qualified_package
+    options.ruby_package = qualified_package
+
   if file_proto.service:
-    options += ['option java_generic_services = true;']
-  options_block = FormatBlock('\n'.join(options))
+    options.java_generic_services = True
+  options_block = FormatOptions(options)
 
   requires_versioning_import = any(
       protoxform_options.GetVersioningAnnotation(m.options) for m in file_proto.message_type)
@@ -333,18 +333,12 @@ def FormatServiceMethod(type_context, method):
   def FormatStreaming(s):
     return 'stream ' if s else ''
 
-  def FormatHttpOptions(options):
-    if options.HasExtension(annotations_pb2.http):
-      http_options = options.Extensions[annotations_pb2.http]
-      return 'option (google.api.http) = { %s };' % str(http_options)
-    return ''
-
   leading_comment, trailing_comment = FormatTypeContextComments(type_context)
   return '%srpc %s(%s%s%s) returns (%s%s) {%s}\n' % (
       leading_comment, method.name, trailing_comment, FormatStreaming(
           method.client_streaming), NormalizeFieldTypeName(
               type_context, method.input_type), FormatStreaming(method.server_streaming),
-      NormalizeFieldTypeName(type_context, method.output_type), FormatHttpOptions(method.options))
+      NormalizeFieldTypeName(type_context, method.output_type), FormatOptions(method.options))
 
 
 def FormatValidateFieldRules(rules):
@@ -374,15 +368,9 @@ def FormatField(type_context, field):
   if protoxform_options.HasHideOption(field.options):
     return ''
   leading_comment, trailing_comment = FormatTypeContextComments(type_context)
-  annotations = []
-  if field.options.HasExtension(validate_pb2.rules):
-    rules = field.options.Extensions[validate_pb2.rules]
-    annotations.append('(validate.rules) %s' % FormatValidateFieldRules(rules))
-  if field.options.deprecated:
-    annotations.append('deprecated = true')
-  formatted_annotations = '[ %s]' % ','.join(annotations) if annotations else ''
-  return '%s%s %s = %d%s;\n%s' % (leading_comment, FormatFieldType(
-      type_context, field), field.name, field.number, formatted_annotations, trailing_comment)
+
+  return '%s%s %s = %d%s;\n%s' % (leading_comment, FormatFieldType(type_context, field), field.name,
+                                  field.number, FormatOptions(field.options), trailing_comment)
 
 
 def FormatEnumValue(type_context, value):
@@ -398,16 +386,19 @@ def FormatEnumValue(type_context, value):
   if protoxform_options.HasHideOption(value.options):
     return ''
   leading_comment, trailing_comment = FormatTypeContextComments(type_context)
-  annotations = []
-  if value.options.deprecated:
-    annotations.append('deprecated = true')
-  formatted_annotations = '[ %s]' % ','.join(annotations) if annotations else ''
+  formatted_annotations = FormatOptions(value.options)
   return '%s%s = %d%s;\n%s' % (leading_comment, value.name, value.number, formatted_annotations,
                                trailing_comment)
 
 
+def TextFormatValue(field, value):
+  out = io.StringIO()
+  text_format.PrintFieldValue(field, value, out)
+  return out.getvalue()
+
+
 def FormatOptions(options, is_message=False):
-  """Format MessageOptions/EnumOptions message.
+  """Format *Options message.
 
   Args:
     options: A MessageOptions/EnumOptions message.
@@ -417,6 +408,7 @@ def FormatOptions(options, is_message=False):
     Formatted options as a string.
   """
   formatted_options = []
+<<<<<<< HEAD
   if options.deprecated:
     formatted_options.append('option deprecated = true;')
   if is_message:
@@ -425,8 +417,27 @@ def FormatOptions(options, is_message=False):
       formatted_options.append(
           'option (udpa.annotations.versioning).previous_message_type = "%s";' %
           versioning_annotation.previous_message_type)
+=======
+  for option_descriptor, option_value in sorted(options.ListFields(), key=lambda x: x[0].number):
+    # TODO(lizan): consider whitelist specific options only
+    option_name = "({})".format(
+        option_descriptor.full_name) if option_descriptor.is_extension else option_descriptor.name
+    if option_descriptor.message_type and option_descriptor.label != option_descriptor.LABEL_REPEATED:
+      formatted_options.extend([
+          "{}.{} = {}".format(option_name, subfield.name, TextFormatValue(subfield, value))
+          for subfield, value in option_value.ListFields()
+      ])
+    else:
+      formatted_options.append("{} = {}".format(option_name,
+                                                TextFormatValue(option_descriptor, option_value)))
+
+>>>>>>> protoxform: format options generically
   if formatted_options:
-    return FormatBlock('\n'.join(formatted_options) + '\n')
+    if options.DESCRIPTOR.name in ('EnumValueOptions', 'FieldOptions'):
+      return '[{}]'.format(','.join(formatted_options))
+    else:
+      return FormatBlock(''.join(
+          "option {};\n".format(formatted_option) for formatted_option in formatted_options))
   return ''
 
 
@@ -484,7 +495,7 @@ class ProtoFormatVisitor(visitor.Visitor):
         annotations.NEXT_FREE_FIELD_ANNOTATION: CreateNextFreeFieldXform(msg_proto)
     }
     leading_comment, trailing_comment = FormatTypeContextComments(type_context, annotation_xforms)
-    formatted_options = FormatOptions(msg_proto.options, is_message=True)
+    formatted_options = FormatOptions(msg_proto.options)
     formatted_enums = FormatBlock('\n'.join(nested_enums))
     formatted_msgs = FormatBlock('\n'.join(nested_msgs))
     reserved_fields = FormatReserved(msg_proto)
@@ -501,14 +512,11 @@ class ProtoFormatVisitor(visitor.Visitor):
       if oneof_index is None and field.HasField('oneof_index'):
         oneof_index = field.oneof_index
         oneof_proto = msg_proto.oneof_decl[oneof_index]
-        if oneof_proto.options.HasExtension(validate_pb2.required):
-          oneof_options = 'option (validate.required) = true;\n\n'
-        else:
-          oneof_options = ''
         oneof_leading_comment, oneof_trailing_comment = FormatTypeContextComments(
             type_context.ExtendOneof(oneof_index, field.name))
         fields += '%soneof %s {\n%s%s' % (oneof_leading_comment, oneof_proto.name,
-                                          oneof_trailing_comment, oneof_options)
+                                          oneof_trailing_comment, FormatOptions(
+                                              oneof_proto.options))
       fields += FormatBlock(FormatField(type_context.ExtendField(index, field.name), field))
     if oneof_index is not None:
       fields += '}\n\n'
