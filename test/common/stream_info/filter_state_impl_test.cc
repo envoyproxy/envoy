@@ -332,5 +332,74 @@ TEST_F(FilterStateImplTest, LifeSpanInitFromNonParent) {
   EXPECT_FALSE(new_filter_state.hasDataWithName("test_6"));
 }
 
+TEST_F(FilterStateImplTest, HasDataAboveLifeSpan) {
+  filter_state().setData("test_1", std::make_unique<SimpleType>(1),
+                         FilterState::StateType::ReadOnly,
+                         FilterState::LifeSpan::FilterChain);
+  EXPECT_TRUE(filter_state().hasDataAboveLifeSpan(FilterState::LifeSpan::FilterChain));
+  EXPECT_FALSE(filter_state().hasDataAboveLifeSpan(FilterState::LifeSpan::DownstreamRequest));
+  EXPECT_FALSE(filter_state().hasDataAboveLifeSpan(FilterState::LifeSpan::DownstreamConnection));
+
+  filter_state().setData("test_2", std::make_unique<SimpleType>(2),
+                         FilterState::StateType::ReadOnly,
+                         FilterState::LifeSpan::DownstreamRequest);
+  EXPECT_TRUE(filter_state().hasDataAboveLifeSpan(FilterState::LifeSpan::FilterChain));
+  EXPECT_TRUE(filter_state().hasDataAboveLifeSpan(FilterState::LifeSpan::DownstreamRequest));
+  EXPECT_FALSE(filter_state().hasDataAboveLifeSpan(FilterState::LifeSpan::DownstreamConnection));
+
+  filter_state().setData("test_3", std::make_unique<SimpleType>(3),
+                         FilterState::StateType::ReadOnly, FilterState::LifeSpan::DownstreamConnection);
+  EXPECT_TRUE(filter_state().hasDataAboveLifeSpan(FilterState::LifeSpan::FilterChain));
+  EXPECT_TRUE(filter_state().hasDataAboveLifeSpan(FilterState::LifeSpan::DownstreamRequest));
+  EXPECT_TRUE(filter_state().hasDataAboveLifeSpan(FilterState::LifeSpan::DownstreamConnection));
+}
+
+TEST_F(FilterStateImplTest, SetSameDataWithDifferentLifeSpan) {
+  filter_state().setData("test_1", std::make_unique<SimpleType>(1),
+                         FilterState::StateType::Mutable,
+                         FilterState::LifeSpan::DownstreamConnection);
+  // Test reset on smaller LifeSpan
+  EXPECT_THROW_WITH_MESSAGE(
+      filter_state().setData("test_1", std::make_unique<SimpleType>(2),
+                             FilterState::StateType::Mutable, FilterState::LifeSpan::FilterChain),
+      EnvoyException,
+      "FilterState::setData<T> called twice with conflicting life_span on the same data_name.");
+  EXPECT_THROW_WITH_MESSAGE(
+      filter_state().setData("test_1", std::make_unique<SimpleType>(2),
+                             FilterState::StateType::Mutable,
+                             FilterState::LifeSpan::DownstreamRequest),
+      EnvoyException,
+      "FilterState::setData<T> called twice with conflicting life_span on the same data_name.");
+
+  // Still mutable on the correct LifeSpan.
+  filter_state().setData("test_1", std::make_unique<SimpleType>(2),
+                         FilterState::StateType::Mutable,
+                         FilterState::LifeSpan::DownstreamConnection);
+  EXPECT_EQ(2, filter_state().getDataMutable<SimpleType>("test_1").access());
+
+
+  filter_state().setData("test_2", std::make_unique<SimpleType>(1),
+                         FilterState::StateType::Mutable,
+                         FilterState::LifeSpan::DownstreamRequest);
+  // Test reset on smaller and greater LifeSpan
+  EXPECT_THROW_WITH_MESSAGE(
+      filter_state().setData("test_2", std::make_unique<SimpleType>(2),
+                             FilterState::StateType::Mutable, FilterState::LifeSpan::FilterChain),
+      EnvoyException,
+      "FilterState::setData<T> called twice with conflicting life_span on the same data_name.");
+  EXPECT_THROW_WITH_MESSAGE(
+      filter_state().setData("test_2", std::make_unique<SimpleType>(2),
+                             FilterState::StateType::Mutable,
+                             FilterState::LifeSpan::DownstreamConnection),
+      EnvoyException,
+      "FilterState::setData<T> called twice with conflicting life_span on the same data_name.");
+
+  // Still mutable on the correct LifeSpan.
+  filter_state().setData("test_2", std::make_unique<SimpleType>(2),
+                         FilterState::StateType::Mutable,
+                         FilterState::LifeSpan::DownstreamRequest);
+  EXPECT_EQ(2, filter_state().getDataMutable<SimpleType>("test_2").access());
+}
+
 } // namespace StreamInfo
 } // namespace Envoy

@@ -22,18 +22,22 @@ public:
   bool hasDataWithName(absl::string_view) const override;
   const Object* getDataReadOnlyGeneric(absl::string_view data_name) const override;
   Object* getDataMutableGeneric(absl::string_view data_name) override;
+  bool hasDataAboveLifeSpan(FilterState::LifeSpan life_span) const override;
 
-  FilterState::LifeSpan life_span() const override { return life_span_; }
+  FilterState::LifeSpan lifeSpan() const override { return life_span_; }
   std::shared_ptr<FilterState> parent() const override { return parent_; }
 
 private:
+  // This only checks the local data_storage_ for data_name existence.
+  bool hasDataWithNameInternally(absl::string_view data_name) const;
+
   struct FilterObject {
     std::shared_ptr<Object> data_;
     FilterState::StateType state_type_;
   };
 
   std::shared_ptr<FilterState> parent_;
-  FilterState::LifeSpan life_span_;
+  const FilterState::LifeSpan life_span_;
   absl::flat_hash_map<std::string, std::unique_ptr<FilterObject>> data_storage_;
 };
 

@@ -56,9 +56,9 @@ public:
    * Note that it is an error to call setData() twice with the same
    * data_name, if the existing object is immutable. Similarly, it is an
    * error to call setData() with same data_name but different state_types
-   * (mutable and readOnly, or readOnly and mutable). This is to enforce a
-   * single authoritative source for each piece of immutable data stored in
-   * FilterState.
+   * (mutable and readOnly, or readOnly and mutable) or different life_span.
+   * This is to enforce a single authoritative source for each piece of
+   * data stored in FilterState.
    */
   virtual void setData(absl::string_view data_name, std::shared_ptr<Object> data,
                        StateType state_type, LifeSpan life_span) PURE;
@@ -113,8 +113,22 @@ public:
    */
   virtual bool hasDataWithName(absl::string_view data_name) const PURE;
 
-  virtual LifeSpan life_span() const PURE;
+  /**
+   * @param life_span the LifeSpan above which data existence is checked againt.
+   * @return whether data of any type exist with LifeSpan greater than life_span.
+   */
+  virtual bool hasDataAboveLifeSpan(LifeSpan life_span) const PURE;
 
+  /**
+   * @return the LifeSpan of objects stored by this instance. Objects with
+   * LifeSpan longer than this are handled recursively.
+   */
+  virtual LifeSpan lifeSpan() const PURE;
+
+  /**
+   * @return the point of the parent FilterState that has longer life span. nullptr is means this is
+   * at the top LifeSpan.
+   */
   virtual std::shared_ptr<FilterState> parent() const PURE;
 
 protected:

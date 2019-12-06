@@ -2239,9 +2239,13 @@ bool ConnectionManagerImpl::ActiveStreamDecoderFilter::recreateStream() {
   parent_.connection_manager_.doEndStream(this->parent_);
 
   StreamDecoder& new_stream = parent_.connection_manager_.newStream(*response_encoder, true);
-  (*parent_.connection_manager_.streams_.begin())->stream_info_.filter_state_ =
-      std::make_shared<StreamInfo::FilterStateImpl>(parent_.stream_info_.filter_state_->parent(),
-                                                    StreamInfo::FilterState::LifeSpan::FilterChain);
+  if (parent_.stream_info_.filter_state_->hasDataAboveLifeSpan(
+          StreamInfo::FilterState::LifeSpan::DownstreamRequest)) {
+    (*parent_.connection_manager_.streams_.begin())->stream_info_.filter_state_ =
+        std::make_shared<StreamInfo::FilterStateImpl>(
+            parent_.stream_info_.filter_state_->parent(),
+            StreamInfo::FilterState::LifeSpan::FilterChain);
+  }
 
   new_stream.decodeHeaders(std::move(request_headers), true);
   return true;

@@ -1,6 +1,7 @@
 #include "common/stream_info/filter_state_impl.h"
 
 #include "envoy/common/exception.h"
+#include <type_traits>
 
 namespace Envoy {
 namespace StreamInfo {
@@ -14,7 +15,7 @@ FilterStateImpl::FilterStateImpl(std::shared_ptr<FilterState> parent,
   }
   // Recursively create parent FilterState if no parent is provided or parent is not the immediate
   // parent.
-  if (parent_ == nullptr || parent_->life_span() != life_span_ + 1) {
+  if (parent_ == nullptr || parent_->lifeSpan() != life_span_ + 1) {
     parent_ = std::make_shared<FilterStateImpl>(parent_, FilterState::LifeSpan(life_span_ + 1));
   }
 }
@@ -22,8 +23,16 @@ FilterStateImpl::FilterStateImpl(std::shared_ptr<FilterState> parent,
 void FilterStateImpl::setData(absl::string_view data_name, std::shared_ptr<Object> data,
                               FilterState::StateType state_type, FilterState::LifeSpan life_span) {
   if (life_span > life_span_) {
+    if (hasDataWithNameInternally(data_name)) {
+      throw EnvoyException(
+          "FilterState::setData<T> called twice with conflicting life_span on the same data_name.");
+    }
     parent_->setData(data_name, data, state_type, life_span);
     return;
+  }
+  if (parent_ && parent_->hasDataWithName(data_name)) {
+    throw EnvoyException(
+        "FilterState::setData<T> called twice with conflicting life_span on the same data_name.");
   }
   const auto& it = data_storage_.find(data_name);
   if (it != data_storage_.end()) {
@@ -47,7 +56,7 @@ void FilterStateImpl::setData(absl::string_view data_name, std::shared_ptr<Objec
 }
 
 bool FilterStateImpl::hasDataWithName(absl::string_view data_name) const {
-  return data_storage_.count(data_name) > 0 || (parent_ && parent_->hasDataWithName(data_name));
+  return hasDataWithNameInternally(data_name) || (parent_ && parent_->hasDataWithName(data_name));
 }
 
 const FilterState::Object*
@@ -82,6 +91,17 @@ FilterState::Object* FilterStateImpl::getDataMutableGeneric(absl::string_view da
   }
 
   return current->data_.get();
+}
+
+bool FilterStateImpl::hasDataAboveLifeSpan(FilterState::LifeSpan life_span) const {
+  if (life_span > life_span_) {
+    return parent_ && parent_->hasDataAboveLifeSpan(life_span);
+  }
+  return !data_storage_.empty() || (parent_ && parent_->hasDataAboveLifeSpan(life_span));
+}
+
+bool FilterStateImpl::hasDataWithNameInternally(absl::string_view data_name) const {
+  return data_storage_.count(data_name) > 0;
 }
 
 } // namespace StreamInfo

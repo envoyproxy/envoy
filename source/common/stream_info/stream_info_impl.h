@@ -254,7 +254,7 @@ struct StreamInfoImpl : public StreamInfo {
   bool health_check_request_{};
   const Router::RouteEntry* route_entry_{};
   envoy::api::v2::core::Metadata metadata_{};
-  std::shared_ptr<FilterStateImpl> filter_state_{};
+  std::shared_ptr<FilterStateImpl> filter_state_;
   std::string route_name_;
 
 private:
