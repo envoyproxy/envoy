@@ -10,8 +10,10 @@ from pathlib import Path
 
 
 def runBazelBuildForCompilationDatabase(bazel_options, bazel_targets):
-  query = 'attr(include_prefix, ".+", kind(cc_library, deps({})))'.format(
-      ' union '.join(bazel_targets))
+  dep_expr = ' union '.join(bazel_targets)
+  if not os.getenv('LLVM_CONFIG'):
+    dep_expr = '(%s) except //tools/clang_tools/...' % dep_expr
+  query = 'attr(include_prefix, ".+", kind(cc_library, deps({})))'.format(dep_expr)
   build_targets = subprocess.check_output(["bazel", "query", query]).decode().splitlines()
   subprocess.check_call(["bazel", "build"] + bazel_options + build_targets)
 
