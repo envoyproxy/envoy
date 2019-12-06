@@ -1,0 +1,68 @@
+syntax = "proto3";
+
+package envoy.config.wasm.v2;
+
+option java_outer_classname = "WasmProto";
+option java_multiple_files = true;
+option java_package = "io.envoyproxy.envoy.config.wasm.v2";
+
+import "envoy/api/v2/core/base.proto";
+
+import "validate/validate.proto";
+
+// [#protodoc-title: Wasm service]
+
+// Configuration for a Wasm VM.
+// [#next-free-field: 6]
+message VmConfig {
+  // An ID which will be used along with a hash of the wasm code (or null_vm_id) to determine which
+  // VM will be used for the plugin. All plugins which use the same vm_id and code will use the same
+  // VM. May be left blank.
+  string vm_id = 1;
+
+  // The Wasm runtime type (see source/extensions/common/wasm/well_known_names.h).
+  string runtime = 2;
+
+  // The Wasm code that Envoy will execute.
+  api.v2.core.AsyncDataSource code = 3;
+
+  // The Wasm configuration string used on initialization of a new VM (proxy_onStart).
+  string configuration = 4;
+
+  // Allow the wasm file to include pre-compiled code on VMs which support it.
+  bool allow_precompiled = 5;
+}
+
+// Base Configuration for Wasm Plugins e.g. filters and services.
+message PluginConfig {
+  // A unique name for a filters/services in a VM for use in identifying the filter/service if
+  // multiple filters/services are handled by the same vm_id and root_id and for logging/debugging.
+  string name = 1;
+
+  // A unique ID for a set of filters/services in a VM which will share a RootContext and Contexts
+  // if applicable (e.g. an Wasm HttpFilter and an Wasm AccessLog). If left blank, all
+  // filters/services with a blank root_id with the same vm_id will share Context(s).
+  string root_id = 2;
+
+  // Configuration for finding or starting VM.
+  VmConfig vm_config = 3;
+
+  // Filter/service configuration string e.g. a serialized protobuf which will be the
+  // argument to the proxy_onConfigure() call.
+  string configuration = 4;
+}
+
+// WasmService is configured as a built-in *envoy.wasm_service* :ref:`ServiceConfig
+// <envoy_api_msg_config.wasm.v2.WasmService>`. This opaque configuration will be used to
+// create a Wasm Service.
+message WasmService {
+  // General plugin configuration.
+  PluginConfig config = 1;
+
+  // If true, create a single VM rather than creating one VM per silo. Such a singleton can
+  // not be used with filters.
+  bool singleton = 2;
+
+  // If set add 'stat_prefix' as a prefix to all stats.
+  string stat_prefix = 3;
+}
