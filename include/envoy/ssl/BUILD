@@ -56,4 +56,7 @@ envoy_cc_library(
 envoy_cc_library(
     name = "certificate_validation_context_config_interface",
     hdrs = ["certificate_validation_context_config.h"],
+    deps = [
+        "//source/common/common:matchers_lib",
+    ],
 )
