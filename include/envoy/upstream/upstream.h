@@ -869,6 +869,11 @@ public:
   virtual Http::Protocol
   upstreamHttpProtocol(absl::optional<Http::Protocol> downstream_protocol) const PURE;
 
+  /**
+   *  Returns true if the configured retry budget has been exceeded.
+   */
+  const bool retryBudgetExceeded() const PURE;
+
 protected:
   /**
    * Invoked by extensionProtocolOptionsTyped.

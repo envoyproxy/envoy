@@ -904,29 +904,6 @@ message RetryPolicy {
     google.protobuf.Duration max_interval = 2 [(validate.rules).duration = {gt {}}];
   }
 
-  message RetryBudget {
-    // Specifies the limit on concurrent retries as a percentage of the sum of active requests and
-    // active pending requests.
-    //
-    // This parameter is optional. Defaults to 20%.
-    type.Percent percent_budget = 1;
-
-    // Specifies the minimum retry concurrency allowed for the retry budget. If the active request
-    // count is less than this value, there is no enforcement of the retry budget. However, once the
-    // request concurrency reaches or exceeds the configured value, the budget is enforced and the
-    // number of allowed retries is equal to a percentage of the request concurrency.
-    //
-    // .. note::
-    //
-    //    Consider a `percent_budget` of 20% and a `min_concurrency` of 15. If the number of
-    //    concurrent requests is 10, there is no limit to how many of those active requests may be
-    //    retries. If the number of concurrent requests is 25, the number of active retries is
-    //    limited to 20% of 25, so 5 active retries.
-    //
-    // This parameter is optional. Defaults to 15.
-    google.protobuf.UInt32Value min_concurrency = 2;
-  }
-
   // Specifies the conditions under which retry takes place. These are the same
   // conditions documented for :ref:`config_http_filters_router_x-envoy-retry-on` and
   // :ref:`config_http_filters_router_x-envoy-retry-grpc-on`.
@@ -983,14 +960,6 @@ message RetryPolicy {
 
   // HTTP headers which must be present in the request for retries to be attempted.
   repeated HeaderMatcher retriable_request_headers = 10;
-
-  // Specifies a limit on concurrent retries in relation to the number of active requests. This
-  // parameter is optional.
-  //
-  // .. note::
-  //
-  //    If this field is set, the retry budget will override any configured retry circuit breaker.
-  RetryBudget retry_budget = 11;
 }
 
 // HTTP request hedging :ref:`architecture overview <arch_overview_http_routing_hedging>`.

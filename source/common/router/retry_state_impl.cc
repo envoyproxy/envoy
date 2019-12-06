@@ -59,8 +59,7 @@ RetryStateImpl::RetryStateImpl(const RetryPolicy& route_policy, Http::HeaderMap&
       retry_priority_(route_policy.retryPriority()),
       retriable_status_codes_(route_policy.retriableStatusCodes()),
       retriable_headers_(route_policy.retriableHeaders()),
-      retriable_request_headers_(route_policy.retriableRequestHeaders()),
-      retry_budget_(route_policy.retryBudget()) {
+      retriable_request_headers_(route_policy.retriableRequestHeaders()) {
 
   retry_on_ = route_policy.retryOn();
   retries_remaining_ = std::max(retries_remaining_, route_policy.numRetries());
@@ -225,7 +224,7 @@ RetryStatus RetryStateImpl::shouldRetry(bool would_retry, DoRetryCallback callba
   retries_remaining_--;
 
   // We only use the max_retries circuit breaker when retry budgets are not configured.
-  if ((retry_budget_ && retryBudgetExceeded()) ||
+  if ((retry_budget_ && cluster_.retryBudgetExceeded()) ||
       (!retry_budget_ && !cluster_.resourceManager(priority_).retries().canCreate())) {
     cluster_.stats().upstream_rq_retry_overflow_.inc();
     return RetryStatus::NoOverflow;

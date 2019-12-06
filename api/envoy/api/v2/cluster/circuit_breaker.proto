@@ -21,8 +21,32 @@ import "validate/validate.proto";
 message CircuitBreakers {
   // A Thresholds defines CircuitBreaker settings for a
   // :ref:`RoutingPriority<envoy_api_enum_core.RoutingPriority>`.
-  // [#next-free-field: 8]
+  // [#next-free-field: 9]
   message Thresholds {
+
+    message RetryBudget {
+      // Specifies the limit on concurrent retries as a percentage of the sum of active requests and
+      // active pending requests.
+      //
+      // This parameter is optional. Defaults to 20%.
+      type.Percent percent_budget = 1;
+
+      // Specifies the minimum retry concurrency allowed for the retry budget. If the active request
+      // count is less than this value, there is no enforcement of the retry budget. However, once the
+      // request concurrency reaches or exceeds the configured value, the budget is enforced and the
+      // number of allowed retries is equal to a percentage of the request concurrency.
+      //
+      // .. note::
+      //
+      //    Consider a `percent_budget` of 20% and a `min_concurrency` of 15. If the number of
+      //    concurrent requests is 10, there is no limit to how many of those active requests may be
+      //    retries. If the number of concurrent requests is 25, the number of active retries is
+      //    limited to 20% of 25, so 5 active retries.
+      //
+      // This parameter is optional. Defaults to 15.
+      google.protobuf.UInt32Value min_concurrency = 2;
+    }
+
     // The :ref:`RoutingPriority<envoy_api_enum_core.RoutingPriority>`
     // the specified CircuitBreaker settings apply to.
     core.RoutingPriority priority = 1 [(validate.rules).enum = {defined_only: true}];
@@ -39,9 +63,21 @@ message CircuitBreakers {
     // upstream cluster. If not specified, the default is 1024.
     google.protobuf.UInt32Value max_requests = 4;
 
-    // The maximum number of parallel retries that Envoy will allow to the
-    // upstream cluster. If not specified, the default is 3.
-    google.protobuf.UInt32Value max_retries = 5;
+    // If neither max_retries or retry_budget is specified, a max_retries value
+    // of 3 is enforced.
+    oneof retry_threshold {
+      // The maximum number of parallel retries that Envoy will allow to the
+      // upstream cluster. If not specified, the default is 3.
+      google.protobuf.UInt32Value max_retries = 5;
+
+      // Specifies a limit on concurrent retries in relation to the number of active requests. This
+      // parameter is optional.
+      //
+      // .. note::
+      //
+      //    If this field is set, the retry budget will override any configured retry circuit breaker.
+      RetryBudget retry_budget = 8;
+    }
 
     // If track_remaining is true, then stats will be published that expose
     // the number of resources remaining until the circuit breakers open. If

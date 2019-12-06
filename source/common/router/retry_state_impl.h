@@ -93,7 +93,6 @@ private:
   void enableBackoffTimer();
   void resetRetry();
   bool wouldRetryFromReset(const Http::StreamResetReason reset_reason);
-  bool retryBudgetExceeded();
   RetryStatus shouldRetry(bool would_retry, DoRetryCallback callback);
 
   const Upstream::ClusterInfo& cluster_;
@@ -112,7 +111,6 @@ private:
   std::vector<uint32_t> retriable_status_codes_;
   std::vector<Http::HeaderMatcherSharedPtr> retriable_headers_;
   std::vector<Http::HeaderMatcherSharedPtr> retriable_request_headers_;
-  absl::optional<RetryPolicy::RetryBudget> retry_budget_;
 };
 
 } // namespace Router

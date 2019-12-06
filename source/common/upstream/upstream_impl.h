@@ -580,6 +580,8 @@ public:
   Http::Protocol
   upstreamHttpProtocol(absl::optional<Http::Protocol> downstream_protocol) const override;
 
+  bool retryBudgetExceeded() const override;
+
 private:
   struct ResourceManagers {
     ResourceManagers(const envoy::api::v2::Cluster& config, Runtime::Loader& runtime,
@@ -591,6 +593,11 @@ private:
     using Managers = std::array<ResourceManagerImplPtr, NumResourcePriorities>;
 
     Managers managers_;
+  };
+
+  struct RetryBudget {
+    double budget_percent;
+    uint32_t min_concurrency;
   };
 
   Runtime::Loader& runtime_;
@@ -629,6 +636,7 @@ private:
   const absl::optional<envoy::api::v2::Cluster::CustomClusterType> cluster_type_;
   const std::unique_ptr<Server::Configuration::CommonFactoryContext> factory_context_;
   std::vector<Network::FilterFactoryCb> filter_factories_;
+  absl::optional<RetryBudget> retry_budget_;
 };
 
 /**

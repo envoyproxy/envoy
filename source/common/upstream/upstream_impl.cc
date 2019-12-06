@@ -580,6 +580,10 @@ ClusterLoadReportStats ClusterInfoImpl::generateLoadReportStats(Stats::Scope& sc
   return {ALL_CLUSTER_LOAD_REPORT_STATS(POOL_COUNTER(scope))};
 }
 
+bool ClusterInfoImpl::retryBudgetExceeded() const {
+
+}
+
 // Implements the FactoryContext interface required by network filters.
 class FactoryContextImpl : public Server::Configuration::CommonFactoryContext {
 public:
@@ -758,6 +762,15 @@ ClusterInfoImpl::ClusterInfoImpl(
     Network::FilterFactoryCb callback =
         factory.createFilterFactoryFromProto(*message, *factory_context_);
     filter_factories_.push_back(callback);
+  }
+
+  if (config.has_circuit_breakers() && config.circuit_breakers().has_retry_budget()) {
+    retry_budget_ = RetryBudget{
+      .budget_percent =
+        PROTOBUF_GET_WRAPPED_OR_DEFAULT(config.circuit_breakers().retry_budget(), budget_percent, 20.0),
+      .min_concurrency =
+        PROTOBUF_GET_WRAPPED_OR_DEFAULT(config.circuit_breakers().retry_budget(), min_concurrency, 15),
+    };
   }
 }
 

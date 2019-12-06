@@ -164,17 +164,6 @@ public:
   static const uint32_t RETRY_ON_RETRIABLE_HEADERS       = 0x1000;
   // clang-format on
 
-  /**
-   * Limitations placed on concurrent retries as a percentage of the number of active requests.
-   */
-  struct RetryBudget {
-    // The percentage of active requests that are allowed to be retries.
-    double budget_percent;
-
-    // The minimum number of active requests before enforcing the retry budget.
-    uint32_t min_concurrency;
-  };
-
   virtual ~RetryPolicy() = default;
 
   /**
@@ -238,12 +227,6 @@ public:
    * @return absl::optional<std::chrono::milliseconds> maximum retry interval
    */
   virtual absl::optional<std::chrono::milliseconds> maxInterval() const PURE;
-
-  /**
-   * @return absl::optional<RetryBudget> limit on allowed concurrent retries in relation to current
-   * outstanding requests.
-   */
-  virtual const absl::optional<RetryBudget>& retryBudget() const PURE;
 };
 
 /**
