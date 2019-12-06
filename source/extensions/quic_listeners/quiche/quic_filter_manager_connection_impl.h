@@ -100,6 +100,8 @@ public:
   // Called after each write when a previous connection close call is postponed.
   void maybeHandleDelayedClose();
 
+  uint32_t bytesToSend() { return bytes_to_send_; }
+
 protected:
   // Propagate connection close to network_connection_callbacks_.
   void onConnectionCloseEvent(const quic::QuicConnectionCloseFrame& frame,
