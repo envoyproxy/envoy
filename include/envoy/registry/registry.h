@@ -2,7 +2,6 @@
 
 #include <algorithm>
 #include <functional>
-#include <map>
 #include <string>
 #include <vector>
 
@@ -54,7 +53,7 @@ public:
  */
 class BaseFactoryCategoryRegistry {
 protected:
-  using MapType = std::map<std::string, FactoryRegistryProxy*, std::less<>>;
+  using MapType = absl::flat_hash_map<std::string, FactoryRegistryProxy*>;
 
   static MapType& factories() {
     static auto* factories = new MapType();
@@ -179,7 +178,7 @@ public:
    * (deprecated) names, all the possible names are disabled.
    */
   static bool disableFactory(absl::string_view name) {
-    auto disable = [](absl::string_view name) -> bool {
+    const auto disable = [](absl::string_view name) -> bool {
       auto it = factories().find(name);
       if (it != factories().end()) {
         it->second = nullptr;
