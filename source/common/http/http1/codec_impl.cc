@@ -481,7 +481,6 @@ size_t ConnectionImpl::dispatchSlice(const char* slice, size_t len) {
 }
 
 void ConnectionImpl::onHeaderField(const char* data, size_t length) {
-  ENVOY_CONN_LOG(trace, "onHeaderField: data={}", connection_, absl::string_view(data, length));
   // We previously already finished up the headers, these headers are
   // now trailers
   if (header_parsing_state_ == HeaderParsingState::Done) {
@@ -500,9 +499,6 @@ void ConnectionImpl::onHeaderField(const char* data, size_t length) {
 }
 
 void ConnectionImpl::onHeaderValue(const char* data, size_t length) {
-  const absl::string_view header_value = absl::string_view(data, length);
-  ENVOY_CONN_LOG(trace, "onHeaderValue: data={}", connection_, header_value);
-
   if (header_parsing_state_ == HeaderParsingState::Done && !enable_trailers_) {
     // Ignore trailers.
     return;
@@ -511,6 +507,8 @@ void ConnectionImpl::onHeaderValue(const char* data, size_t length) {
   if (!current_header_map_) {
     current_header_map_ = std::make_unique<HeaderMapImpl>();
   }
+
+  const absl::string_view header_value = absl::string_view(data, length);
 
   if (strict_header_validation_) {
     if (!Http::HeaderUtility::headerIsValid(header_value)) {
