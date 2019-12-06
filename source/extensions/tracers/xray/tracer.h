@@ -26,7 +26,7 @@ constexpr auto XRayTraceHeader = "x-amzn-trace-id";
 class Span : public Tracing::Span {
 public:
   /**
-   * Create a new Span.
+   * Creates a new Span.
    *
    * @param time_source A time source to create Span IDs using the monotonic clock.
    * @param broker Facilitates communication with the X-Ray daemon.
@@ -35,22 +35,22 @@ public:
       : time_source_(time_source), broker_(broker), sampled_(true) {}
 
   /**
-   * Set the Span's trace ID.
+   * Sets the Span's trace ID.
    */
   void setTraceId(absl::string_view trace_id) { trace_id_ = std::string(trace_id); };
 
   /**
-   * Get the Span's trace ID.
+   * Gets the Span's trace ID.
    */
   const std::string& traceId() const { return trace_id_; }
 
   /**
-   * Complete the current span, serialize it and send it to the X-Ray daemon.
+   * Completes the current span, serialize it and send it to the X-Ray daemon.
    */
   void finishSpan() override;
 
   /**
-   * Set the current operation name on the Span.
+   * Sets the current operation name on the Span.
    * This information will be included in the X-Ray span's metadata.
    */
   void setOperation(absl::string_view operation) override {
@@ -58,18 +58,18 @@ public:
   }
 
   /**
-   * Set the name of the Span.
+   * Sets the name of the Span.
    */
   void setName(absl::string_view name) { name_ = std::string(name); }
 
   /**
-   * Add a key-value pair to either the Span's annotations or metadata.
+   * Adds a key-value pair to either the Span's annotations or metadata.
    * A whitelist of keys are added to the annotations, everything else is added to the metadata.
    */
   void setTag(absl::string_view name, absl::string_view value) override;
 
   /**
-   * Set the ID of the parent segment. This is different from the Trace ID.
+   * Sets the ID of the parent segment. This is different from the Trace ID.
    * The parent ID is used if the request originated from an instrumented application.
    * For more information see:
    * https://docs.aws.amazon.com/xray/latest/devguide/xray-concepts.html#xray-concepts-tracingheader
@@ -79,12 +79,12 @@ public:
   }
 
   /**
-   * Set the recording start time of the traced operation/request.
+   * Sets the recording start time of the traced operation/request.
    */
   void setStartTime(Envoy::SystemTime start_time) { start_time_ = start_time; }
 
   /**
-   * Set the Span ID.
+   * Sets the Span ID.
    * This ID is used as the (sub)segment ID.
    * A single Trace can have Multiple segments and each segment can have multiple sub-segments.
    * The id is converted to a hexadecimal string internally.
@@ -92,7 +92,7 @@ public:
   void setId(uint64_t id);
 
   /**
-   * Mark the span as either "sampled" or "not-sampled".
+   * Marks the span as either "sampled" or "not-sampled".
    * By default, Spans are "sampled".
    * This is handy in cases where the sampling decision has already been determined either by Envoy
    * or by a downstream service.
@@ -100,29 +100,29 @@ public:
   void setSampled(bool sampled) override { sampled_ = sampled; };
 
   /**
-   * Add X-Ray trace header to the set of outgoing headers.
+   * Adds X-Ray trace header to the set of outgoing headers.
    */
   void injectContext(Http::HeaderMap& request_headers) override;
 
   /**
-   * Get the start time of this Span.
+   * Gets the start time of this Span.
    */
   Envoy::SystemTime startTime() const { return start_time_; }
 
   /**
-   * Get this Span's ID.
+   * Gets this Span's ID.
    */
   const std::string& Id() const { return id_; }
 
   const std::string& parentId() const { return parent_segment_id_; }
 
   /**
-   * Get this Span's name.
+   * Gets this Span's name.
    */
   const std::string& name() const { return name_; }
 
   /**
-   * Determine whether this span is sampled.
+   * Determines whether this span is sampled.
    */
   bool sampled() const { return sampled_; }
 
@@ -132,7 +132,7 @@ public:
   void log(Envoy::SystemTime, const std::string&) override {}
 
   /**
-   * Create a child span.
+   * Creates a child span.
    * In X-Ray terms this creates a sub-segment and sets its parent ID to the current span's ID.
    * @param operation_name The span of the child span.
    * @param start_time The time at which this child span started.
@@ -164,13 +164,13 @@ public:
         time_source_(time_source) {}
 
   /**
-   * Start a tracing span for X-Ray
+   * Starts a tracing span for X-Ray
    */
   Tracing::SpanPtr startSpan(const std::string& span_name, const std::string& operation_name,
                              Envoy::SystemTime start_time,
                              const absl::optional<XRayHeader>& xray_header);
   /**
-   * Create a Span that is marked as not-sampled.
+   * Creates a Span that is marked as not-sampled.
    * This is useful when the sampling decision is done in Envoy's X-Ray and we want to avoid
    * overruling that decision in the upstream service in case that service itself uses X-Ray for
    * tracing.

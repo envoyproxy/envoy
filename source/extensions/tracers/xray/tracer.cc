@@ -107,7 +107,7 @@ void Span::finishSpan() {
 }
 
 void Span::injectContext(Http::HeaderMap& request_headers) {
-  const std::string& xray_header_value =
+  const std::string xray_header_value =
       fmt::format("root={};parent={};sampled={}", traceId(), Id(), sampled() ? "1" : "0");
 
   // Set the XRay header in to envoy header map.
