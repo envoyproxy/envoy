@@ -15,16 +15,25 @@ namespace Envoy {
 namespace StreamInfo {
 
 struct StreamInfoImpl : public StreamInfo {
-  StreamInfoImpl(TimeSource& time_source,
-                 std::shared_ptr<FilterState> parent_filter_state = nullptr)
+  StreamInfoImpl(TimeSource& time_source)
       : time_source_(time_source), start_time_(time_source.systemTime()),
         start_time_monotonic_(time_source.monotonicTime()),
-        filter_state_(std::make_shared<FilterStateImpl>(parent_filter_state,
-                                                        FilterState::LifeSpan::FilterChain)) {}
+        filter_state_(std::make_shared<FilterStateImpl>(FilterState::LifeSpan::FilterChain)) {}
+
+  StreamInfoImpl(Http::Protocol protocol, TimeSource& time_source)
+      : time_source_(time_source), start_time_(time_source.systemTime()),
+        start_time_monotonic_(time_source.monotonicTime()),
+        filter_state_(std::make_shared<FilterStateImpl>(FilterState::LifeSpan::FilterChain)) {
+    protocol_ = protocol;
+  }
 
   StreamInfoImpl(Http::Protocol protocol, TimeSource& time_source,
-                 std::shared_ptr<FilterState> parent_filter_state = nullptr)
-      : StreamInfoImpl(time_source, parent_filter_state) {
+                 std::shared_ptr<FilterState>& parent_filter_state)
+      : time_source_(time_source), start_time_(time_source.systemTime()),
+        start_time_monotonic_(time_source.monotonicTime()),
+        filter_state_(std::make_shared<FilterStateImpl>(
+            FilterStateImpl::LazyCreateAncestor(parent_filter_state, FilterState::LifeSpan::DownstreamConnection),
+            FilterState::LifeSpan::FilterChain)) {
     protocol_ = protocol;
   }
 

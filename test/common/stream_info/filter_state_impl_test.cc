@@ -49,7 +49,7 @@ public:
   FilterStateImplTest() { resetFilterState(); }
 
   void resetFilterState() {
-    filter_state_ = std::make_unique<FilterStateImpl>(nullptr, FilterState::LifeSpan::FilterChain);
+    filter_state_ = std::make_unique<FilterStateImpl>(FilterState::LifeSpan::FilterChain);
   }
   FilterState& filter_state() { return *filter_state_; }
 

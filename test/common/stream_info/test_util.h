@@ -11,7 +11,7 @@ namespace Envoy {
 
 class TestStreamInfo : public StreamInfo::StreamInfo {
 public:
-  TestStreamInfo() : filter_state_(nullptr, Envoy::StreamInfo::FilterState::LifeSpan::FilterChain) {
+  TestStreamInfo() : filter_state_(Envoy::StreamInfo::FilterState::LifeSpan::FilterChain) {
     tm fake_time;
     memset(&fake_time, 0, sizeof(fake_time));
     fake_time.tm_year = 99; // tm < 1901-12-13 20:45:52 is not valid on macOS

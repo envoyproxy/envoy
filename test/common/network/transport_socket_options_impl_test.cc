@@ -12,7 +12,7 @@ namespace {
 class TransportSocketOptionsImplTest : public testing::Test {
 public:
   TransportSocketOptionsImplTest()
-      : filter_state_(nullptr, StreamInfo::FilterState::LifeSpan::FilterChain) {}
+      : filter_state_(StreamInfo::FilterState::LifeSpan::FilterChain) {}
 
 protected:
   StreamInfo::FilterStateImpl filter_state_;

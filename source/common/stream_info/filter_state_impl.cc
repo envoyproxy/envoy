@@ -1,24 +1,13 @@
 #include "common/stream_info/filter_state_impl.h"
 
 #include "envoy/common/exception.h"
+#include <features.h>
 #include <type_traits>
+
+#include <iostream>
 
 namespace Envoy {
 namespace StreamInfo {
-
-FilterStateImpl::FilterStateImpl(std::shared_ptr<FilterState> parent,
-                                 FilterState::LifeSpan life_span)
-    : parent_(parent), life_span_(life_span) {
-  if (life_span >= FilterState::LifeSpan::TopSpan) {
-    parent_ = nullptr;
-    return;
-  }
-  // Recursively create parent FilterState if no parent is provided or parent is not the immediate
-  // parent.
-  if (parent_ == nullptr || parent_->lifeSpan() != life_span_ + 1) {
-    parent_ = std::make_shared<FilterStateImpl>(parent_, FilterState::LifeSpan(life_span_ + 1));
-  }
-}
 
 void FilterStateImpl::setData(absl::string_view data_name, std::shared_ptr<Object> data,
                               FilterState::StateType state_type, FilterState::LifeSpan life_span) {
@@ -27,6 +16,7 @@ void FilterStateImpl::setData(absl::string_view data_name, std::shared_ptr<Objec
       throw EnvoyException(
           "FilterState::setData<T> called twice with conflicting life_span on the same data_name.");
     }
+    maybeCreateParent(/* read_only = */ false);
     parent_->setData(data_name, data, state_type, life_span);
     return;
   }
@@ -102,6 +92,46 @@ bool FilterStateImpl::hasDataAboveLifeSpan(FilterState::LifeSpan life_span) cons
 
 bool FilterStateImpl::hasDataWithNameInternally(absl::string_view data_name) const {
   return data_storage_.count(data_name) > 0;
+}
+
+void FilterStateImpl::maybeCreateParent(bool read_only) {
+  if (parent_ != nullptr) {
+    return;
+  }
+  if (life_span_ >= FilterState::LifeSpan::TopSpan) {
+    return;
+  }
+  if (absl::holds_alternative<std::shared_ptr<FilterState>>(ancestor_)) {
+    std::shared_ptr<FilterState> ancestor = absl::get<std::shared_ptr<FilterState>>(ancestor_);
+    if (ancestor == nullptr || ancestor->lifeSpan() != life_span_ + 1) {
+      parent_ = std::make_shared<FilterStateImpl>(ancestor, FilterState::LifeSpan(life_span_ + 1));
+    } else {
+      parent_ = ancestor;
+    }
+    return;
+  }
+
+  auto lazy_create_ancestor = absl::get<LazyCreateAncestor>(ancestor_);
+  // If we're only going to get data from our parent, we don't need to create
+  // lazy ancestor, because they're empty anyways.
+  if (read_only && lazy_create_ancestor.first == nullptr) {
+    return;
+  }
+  
+  // Lazy ancestor is not our immediate parent.
+  if (lazy_create_ancestor.second != life_span_ + 1) {
+    parent_ = std::make_shared<FilterStateImpl>(lazy_create_ancestor,
+                                                FilterState::LifeSpan(life_span_ + 1));
+    return;
+  }
+  std::cout << "pengg: creating lazy ancestor" << std::endl;
+  // Lazy parent is our immediate parent.
+  if (lazy_create_ancestor.first == nullptr) {
+    std::cout << "pengg: creating lazy ancestor" << std::endl;
+    lazy_create_ancestor.first =
+        std::make_shared<FilterStateImpl>(FilterState::LifeSpan(life_span_ + 1));
+  }
+  parent_ = lazy_create_ancestor.first;
 }
 
 } // namespace StreamInfo
