@@ -2,9 +2,9 @@ syntax = "proto3";
 
 package envoy.type.matcher.v3alpha;
 
+option java_package = "io.envoyproxy.envoy.type.matcher.v3alpha";
 option java_outer_classname = "MetadataProto";
 option java_multiple_files = true;
-option java_package = "io.envoyproxy.envoy.type.matcher.v3alpha";
 
 import "envoy/type/matcher/v3alpha/value.proto";
 

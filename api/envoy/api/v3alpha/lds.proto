@@ -2,9 +2,9 @@ syntax = "proto3";
 
 package envoy.api.v3alpha;
 
+option java_package = "io.envoyproxy.envoy.api.v3alpha";
 option java_outer_classname = "LdsProto";
 option java_multiple_files = true;
-option java_package = "io.envoyproxy.envoy.api.v3alpha";
 option java_generic_services = true;
 
 import "envoy/api/v3alpha/core/address.proto";
@@ -37,10 +37,8 @@ service ListenerDiscoveryService {
   }
 
   rpc FetchListeners(DiscoveryRequest) returns (DiscoveryResponse) {
-    option (google.api.http) = {
-      post: "/v3alpha/discovery:listeners"
-      body: "*"
-    };
+    option (google.api.http).post = "/v3alpha/discovery:listeners";
+    option (google.api.http).body = "*";
   }
 }
 

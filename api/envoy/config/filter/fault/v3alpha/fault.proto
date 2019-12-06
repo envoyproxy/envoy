@@ -2,9 +2,9 @@ syntax = "proto3";
 
 package envoy.config.filter.fault.v3alpha;
 
+option java_package = "io.envoyproxy.envoy.config.filter.fault.v3alpha";
 option java_outer_classname = "FaultProto";
 option java_multiple_files = true;
-option java_package = "io.envoyproxy.envoy.config.filter.fault.v3alpha";
 
 import "envoy/type/v3alpha/percent.proto";
 

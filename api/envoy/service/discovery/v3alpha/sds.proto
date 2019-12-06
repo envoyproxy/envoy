@@ -2,9 +2,9 @@ syntax = "proto3";
 
 package envoy.service.discovery.v3alpha;
 
+option java_package = "io.envoyproxy.envoy.service.discovery.v3alpha";
 option java_outer_classname = "SdsProto";
 option java_multiple_files = true;
-option java_package = "io.envoyproxy.envoy.service.discovery.v3alpha";
 option java_generic_services = true;
 
 import "envoy/api/v3alpha/discovery.proto";
@@ -23,10 +23,8 @@ service SecretDiscoveryService {
   }
 
   rpc FetchSecrets(api.v3alpha.DiscoveryRequest) returns (api.v3alpha.DiscoveryResponse) {
-    option (google.api.http) = {
-      post: "/v3alpha/discovery:secrets"
-      body: "*"
-    };
+    option (google.api.http).post = "/v3alpha/discovery:secrets";
+    option (google.api.http).body = "*";
   }
 }
 

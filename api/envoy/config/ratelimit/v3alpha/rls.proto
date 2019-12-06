@@ -2,9 +2,9 @@ syntax = "proto3";
 
 package envoy.config.ratelimit.v3alpha;
 
+option java_package = "io.envoyproxy.envoy.config.ratelimit.v3alpha";
 option java_outer_classname = "RlsProto";
 option java_multiple_files = true;
-option java_package = "io.envoyproxy.envoy.config.ratelimit.v3alpha";
 
 import "envoy/api/v3alpha/core/grpc_service.proto";
 

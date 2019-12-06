@@ -2,9 +2,9 @@ syntax = "proto3";
 
 package envoy.data.tap.v3alpha;
 
+option java_package = "io.envoyproxy.envoy.data.tap.v3alpha";
 option java_outer_classname = "TransportProto";
 option java_multiple_files = true;
-option java_package = "io.envoyproxy.envoy.data.tap.v3alpha";
 
 import "envoy/api/v3alpha/core/address.proto";
 import "envoy/data/tap/v3alpha/common.proto";

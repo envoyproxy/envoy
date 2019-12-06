@@ -2,9 +2,9 @@ syntax = "proto3";
 
 package envoy.config.filter.network.mongo_proxy.v3alpha;
 
+option java_package = "io.envoyproxy.envoy.config.filter.network.mongo_proxy.v3alpha";
 option java_outer_classname = "MongoProxyProto";
 option java_multiple_files = true;
-option java_package = "io.envoyproxy.envoy.config.filter.network.mongo_proxy.v3alpha";
 
 import "envoy/config/filter/fault/v3alpha/fault.proto";
 

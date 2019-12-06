@@ -2,9 +2,9 @@ syntax = "proto3";
 
 package envoy.config.filter.http.health_check.v3alpha;
 
+option java_package = "io.envoyproxy.envoy.config.filter.http.health_check.v3alpha";
 option java_outer_classname = "HealthCheckProto";
 option java_multiple_files = true;
-option java_package = "io.envoyproxy.envoy.config.filter.http.health_check.v3alpha";
 
 import "envoy/api/v3alpha/route/route.proto";
 import "envoy/type/v3alpha/percent.proto";
