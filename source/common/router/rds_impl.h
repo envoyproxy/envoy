@@ -112,6 +112,7 @@ public:
   ~RdsRouteConfigSubscription() override;
 
   std::unordered_set<RouteConfigProvider*>& routeConfigProviders() {
+    ASSERT(route_config_providers_.size() == 1 || route_config_providers_.empty());
     return route_config_providers_;
   }
   RouteConfigUpdatePtr& routeConfigUpdate() { return config_update_info_; }
@@ -159,6 +160,7 @@ private:
   RdsStats stats_;
   RouteConfigProviderManagerImpl& route_config_provider_manager_;
   const uint64_t manager_identifier_;
+  // TODO(lambdai): Prove that a subscription has exactly one provider and remove the container.
   std::unordered_set<RouteConfigProvider*> route_config_providers_;
   VhdsSubscriptionPtr vhds_subscription_;
   RouteConfigUpdatePtr config_update_info_;

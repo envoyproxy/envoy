@@ -215,11 +215,15 @@ RdsRouteConfigProviderImpl::RdsRouteConfigProviderImpl(
   tls_->set([initial_config](Event::Dispatcher&) -> ThreadLocal::ThreadLocalObjectSharedPtr {
     return std::make_shared<ThreadLocalConfig>(initial_config);
   });
+  // It should be 1:1 mapping due to shared rds config.
+  ASSERT(subscription_->routeConfigProviders().empty());
   subscription_->routeConfigProviders().insert(this);
 }
 
 RdsRouteConfigProviderImpl::~RdsRouteConfigProviderImpl() {
   subscription_->routeConfigProviders().erase(this);
+  // It should be 1:1 mapping due to shared rds config.
+  ASSERT(subscription_->routeConfigProviders().empty());
 }
 
 Router::ConfigConstSharedPtr RdsRouteConfigProviderImpl::config() {

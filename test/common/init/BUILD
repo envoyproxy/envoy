@@ -20,7 +20,6 @@ envoy_cc_test(
     name = "target_impl_test",
     srcs = ["target_impl_test.cc"],
     deps = [
-        "//source/common/init:manager_lib",
         "//test/mocks/init:init_mocks",
     ],
 )
