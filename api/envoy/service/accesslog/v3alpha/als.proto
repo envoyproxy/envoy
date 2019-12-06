@@ -10,6 +10,8 @@ option java_generic_services = true;
 import "envoy/api/v3alpha/core/base.proto";
 import "envoy/data/accesslog/v3alpha/accesslog.proto";
 
+import "udpa/api/annotations/versioning.proto";
+
 import "validate/validate.proto";
 
 // [#protodoc-title: gRPC Access Log Service (ALS)]
@@ -28,12 +30,20 @@ service AccessLogService {
 
 // Empty response for the StreamAccessLogs API. Will never be sent. See below.
 message StreamAccessLogsResponse {
+  option (udpa.api.annotations.versioning).previous_message_type =
+      "envoy.service.accesslog.v2.StreamAccessLogsResponse";
 }
 
 // Stream message for the StreamAccessLogs API. Envoy will open a stream to the server and stream
 // access logs without ever expecting a response.
 message StreamAccessLogsMessage {
+  option (udpa.api.annotations.versioning).previous_message_type =
+      "envoy.service.accesslog.v2.StreamAccessLogsMessage";
+
   message Identifier {
+    option (udpa.api.annotations.versioning).previous_message_type =
+        "envoy.service.accesslog.v2.StreamAccessLogsMessage.Identifier";
+
     // The node sending the access log messages over the stream.
     api.v3alpha.core.Node node = 1 [(validate.rules).message = {required: true}];
 
@@ -44,12 +54,18 @@ message StreamAccessLogsMessage {
 
   // Wrapper for batches of HTTP access log entries.
   message HTTPAccessLogEntries {
+    option (udpa.api.annotations.versioning).previous_message_type =
+        "envoy.service.accesslog.v2.StreamAccessLogsMessage.HTTPAccessLogEntries";
+
     repeated data.accesslog.v3alpha.HTTPAccessLogEntry log_entry = 1
         [(validate.rules).repeated = {min_items: 1}];
   }
 
   // Wrapper for batches of TCP access log entries.
   message TCPAccessLogEntries {
+    option (udpa.api.annotations.versioning).previous_message_type =
+        "envoy.service.accesslog.v2.StreamAccessLogsMessage.TCPAccessLogEntries";
+
     repeated data.accesslog.v3alpha.TCPAccessLogEntry log_entry = 1
         [(validate.rules).repeated = {min_items: 1}];
   }

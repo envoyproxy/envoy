@@ -9,6 +9,8 @@ option java_package = "io.envoyproxy.envoy.data.tap.v3alpha";
 import "envoy/data/tap/v3alpha/http.proto";
 import "envoy/data/tap/v3alpha/transport.proto";
 
+import "udpa/api/annotations/versioning.proto";
+
 import "validate/validate.proto";
 
 // [#protodoc-title: Tap data wrappers]
@@ -16,6 +18,9 @@ import "validate/validate.proto";
 // Wrapper for all fully buffered and streamed tap traces that Envoy emits. This is required for
 // sending traces over gRPC APIs or more easily persisting binary messages to files.
 message TraceWrapper {
+  option (udpa.api.annotations.versioning).previous_message_type =
+      "envoy.data.tap.v2alpha.TraceWrapper";
+
   oneof trace {
     option (validate.required) = true;
 

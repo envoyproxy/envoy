@@ -8,6 +8,8 @@ option java_package = "io.envoyproxy.envoy.config.filter.http.tap.v3alpha";
 
 import "envoy/config/common/tap/v3alpha/common.proto";
 
+import "udpa/api/annotations/versioning.proto";
+
 import "validate/validate.proto";
 
 // [#protodoc-title: Tap]
@@ -16,6 +18,9 @@ import "validate/validate.proto";
 
 // Top level configuration for the tap filter.
 message Tap {
+  option (udpa.api.annotations.versioning).previous_message_type =
+      "envoy.config.filter.http.tap.v2alpha.Tap";
+
   // Common configuration for the HTTP tap filter.
   common.tap.v3alpha.CommonExtensionConfig common_config = 1
       [(validate.rules).message = {required: true}];

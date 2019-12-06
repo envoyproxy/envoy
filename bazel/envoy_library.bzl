@@ -12,7 +12,7 @@ load("@envoy_api//bazel:api_build_system.bzl", "api_cc_py_proto_library")
 # As above, but wrapped in list form for adding to dep lists. This smell seems needed as
 # SelectorValue values have to match the attribute type. See
 # https://github.com/bazelbuild/bazel/issues/2273.
-def _tcmalloc_external_deps(repository):
+def tcmalloc_external_deps(repository):
     return select({
         repository + "//bazel:disable_tcmalloc": [],
         "//conditions:default": [envoy_external_dep_path("gperftools")],
@@ -92,7 +92,7 @@ def envoy_cc_library(
         strip_include_prefix = None,
         textual_hdrs = None):
     if tcmalloc_dep:
-        deps += _tcmalloc_external_deps(repository)
+        deps += tcmalloc_external_deps(repository)
 
     native.cc_library(
         name = name,

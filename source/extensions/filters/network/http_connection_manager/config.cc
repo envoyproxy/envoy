@@ -18,11 +18,14 @@
 #include "common/http/default_server_string.h"
 #include "common/http/http1/codec_impl.h"
 #include "common/http/http2/codec_impl.h"
+#include "common/http/http3/quic_codec_factory.h"
+#include "common/http/http3/well_known_names.h"
 #include "common/http/utility.h"
 #include "common/protobuf/utility.h"
 #include "common/router/rds_impl.h"
 #include "common/router/scoped_rds.h"
 #include "common/runtime/runtime_impl.h"
+#include "common/tracing/http_tracer_impl.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -256,7 +259,6 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
     const auto& tracing_config = config.tracing();
 
     Tracing::OperationName tracing_operation_name;
-    std::vector<Http::LowerCaseString> request_headers_for_tags;
 
     // Listener level traffic direction overrides the operation name
     switch (context.direction()) {
@@ -285,8 +287,15 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
       NOT_REACHED_GCOVR_EXCL_LINE;
     }
 
+    Tracing::CustomTagMap custom_tags;
     for (const std::string& header : tracing_config.request_headers_for_tags()) {
-      request_headers_for_tags.push_back(Http::LowerCaseString(header));
+      envoy::type::tracing::v2::CustomTag::Header headerTag;
+      headerTag.set_name(header);
+      custom_tags.emplace(
+          header, std::make_shared<const Tracing::RequestHeaderCustomTag>(header, headerTag));
+    }
+    for (const auto& tag : tracing_config.custom_tags()) {
+      custom_tags.emplace(tag.tag(), Tracing::HttpTracerUtility::createCustomTag(tag));
     }
 
     envoy::type::FractionalPercent client_sampling;
@@ -308,8 +317,8 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
 
     tracing_config_ =
         std::make_unique<Http::TracingConnectionManagerConfig>(Http::TracingConnectionManagerConfig{
-            tracing_operation_name, request_headers_for_tags, client_sampling, random_sampling,
-            overall_sampling, tracing_config.verbose(), max_path_tag_length});
+            tracing_operation_name, custom_tags, client_sampling, random_sampling, overall_sampling,
+            tracing_config.verbose(), max_path_tag_length});
   }
 
   for (const auto& access_log : config.access_log()) {
@@ -415,8 +424,14 @@ HttpConnectionManagerConfig::createCodec(Network::Connection& connection,
         connection, callbacks, context_.scope(), http2_settings_, maxRequestHeadersKb(),
         maxRequestHeadersCount());
   case CodecType::HTTP3:
-    // TODO(danzh) create QUIC specific codec.
-    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+    // Hard code Quiche factory name here to instantiate a QUIC codec implemented.
+    // TODO(danzh) Add support to get the factory name from config, possibly
+    // from HttpConnectionManager protobuf. This is not essential till there are multiple
+    // implementations of QUIC.
+    return std::unique_ptr<Http::ServerConnection>(
+        Config::Utility::getAndCheckFactory<Http::QuicHttpServerConnectionFactory>(
+            Http::QuicCodecNames::get().Quiche)
+            .createQuicServerConnection(connection, callbacks));
   case CodecType::AUTO:
     return Http::ConnectionManagerUtility::autoCreateCodec(
         connection, data, callbacks, context_.scope(), http1_settings_, http2_settings_,

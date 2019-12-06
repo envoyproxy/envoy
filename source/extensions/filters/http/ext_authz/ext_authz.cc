@@ -169,19 +169,14 @@ void Filter::onComplete(Filters::Common::ExtAuthz::ResponsePtr&& response) {
       callbacks_->clearRouteCache();
     }
     for (const auto& header : response->headers_to_add) {
-      ENVOY_STREAM_LOG(trace, " '{}':'{}'", *callbacks_, header.first.get(), header.second);
-      Http::HeaderEntry* header_to_modify = request_headers_->get(header.first);
-      if (header_to_modify) {
-        header_to_modify->value(header.second.c_str(), header.second.size());
-      } else {
-        request_headers_->addCopy(header.first, header.second);
-      }
+      ENVOY_STREAM_LOG(trace, "'{}':'{}'", *callbacks_, header.first.get(), header.second);
+      request_headers_->setCopy(header.first, header.second);
     }
     for (const auto& header : response->headers_to_append) {
-      Http::HeaderEntry* header_to_modify = request_headers_->get(header.first);
+      const Http::HeaderEntry* header_to_modify = request_headers_->get(header.first);
       if (header_to_modify) {
-        ENVOY_STREAM_LOG(trace, " '{}':'{}'", *callbacks_, header.first.get(), header.second);
-        Http::HeaderMapImpl::appendToHeader(header_to_modify->value(), header.second);
+        ENVOY_STREAM_LOG(trace, "'{}':'{}'", *callbacks_, header.first.get(), header.second);
+        request_headers_->appendCopy(header.first, header.second);
       }
     }
     if (cluster_) {

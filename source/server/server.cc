@@ -67,7 +67,6 @@ InstanceImpl::InstanceImpl(
       handler_(new ConnectionHandlerImpl(*dispatcher_, "main_thread")),
       random_generator_(std::move(random_generator)), listener_component_factory_(*this),
       worker_factory_(thread_local_, *api_, hooks),
-      dns_resolver_(dispatcher_->createDnsResolver({})),
       access_log_manager_(options.fileFlushIntervalMsec(), *api_, *dispatcher_, access_log_lock,
                           store),
       terminated_(false),
@@ -370,6 +369,9 @@ void InstanceImpl::initialize(const Options& options,
 
   // Once we have runtime we can initialize the SSL context manager.
   ssl_context_manager_ = createContextManager(Ssl::ContextManagerFactory::name(), time_source_);
+
+  const bool use_tcp_for_dns_lookups = bootstrap_.use_tcp_for_dns_lookups();
+  dns_resolver_ = dispatcher_->createDnsResolver({}, use_tcp_for_dns_lookups);
 
   cluster_manager_factory_ = std::make_unique<Upstream::ProdClusterManagerFactory>(
       *admin_, Runtime::LoaderSingleton::get(), stats_store_, thread_local_, *random_generator_,

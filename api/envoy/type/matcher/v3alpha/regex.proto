@@ -8,16 +8,24 @@ option java_package = "io.envoyproxy.envoy.type.matcher.v3alpha";
 
 import "google/protobuf/wrappers.proto";
 
+import "udpa/api/annotations/versioning.proto";
+
 import "validate/validate.proto";
 
 // [#protodoc-title: RegexMatcher]
 
 // A regex matcher designed for safety when used with untrusted input.
 message RegexMatcher {
+  option (udpa.api.annotations.versioning).previous_message_type =
+      "envoy.type.matcher.RegexMatcher";
+
   // Google's `RE2 <https://github.com/google/re2>`_ regex engine. The regex string must adhere to
   // the documented `syntax <https://github.com/google/re2/wiki/Syntax>`_. The engine is designed
   // to complete execution in linear time as well as limit the amount of memory used.
   message GoogleRE2 {
+    option (udpa.api.annotations.versioning).previous_message_type =
+        "envoy.type.matcher.RegexMatcher.GoogleRE2";
+
     // This field controls the RE2 "program size" which is a rough estimate of how complex a
     // compiled regex is to evaluate. A regex that has a program size greater than the configured
     // value will fail to compile. In this case, the configured max program size can be increased

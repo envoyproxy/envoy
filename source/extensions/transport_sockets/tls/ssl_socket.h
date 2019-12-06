@@ -24,12 +24,10 @@ namespace Extensions {
 namespace TransportSockets {
 namespace Tls {
 
-// clang-format off
-#define ALL_SSL_SOCKET_FACTORY_STATS(COUNTER)                                 \
-  COUNTER(ssl_context_update_by_sds)                                          \
-  COUNTER(upstream_context_secrets_not_ready)                                 \
+#define ALL_SSL_SOCKET_FACTORY_STATS(COUNTER)                                                      \
+  COUNTER(ssl_context_update_by_sds)                                                               \
+  COUNTER(upstream_context_secrets_not_ready)                                                      \
   COUNTER(downstream_context_secrets_not_ready)
-// clang-format on
 
 /**
  * Wrapper struct for SSL socket factory stats. @see stats_macros.h

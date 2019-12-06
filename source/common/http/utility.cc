@@ -23,8 +23,10 @@
 #include "common/protobuf/utility.h"
 
 #include "absl/strings/match.h"
+#include "absl/strings/numbers.h"
 #include "absl/strings/str_cat.h"
 #include "absl/strings/str_split.h"
+#include "absl/strings/string_view.h"
 
 namespace Envoy {
 namespace Http {
@@ -73,17 +75,14 @@ void Utility::appendXff(HeaderMap& headers, const Network::Address::Instance& re
     return;
   }
 
-  HeaderString& header = headers.insertForwardedFor().value();
-  const std::string& address_as_string = remote_address.ip()->addressAsString();
-  HeaderMapImpl::appendToHeader(header, address_as_string.c_str());
+  headers.appendForwardedFor(remote_address.ip()->addressAsString(), ",");
 }
 
 void Utility::appendVia(HeaderMap& headers, const std::string& via) {
-  HeaderString& header = headers.insertVia().value();
-  if (!header.empty()) {
-    header.append(", ", 2);
-  }
-  header.append(via.c_str(), via.size());
+  // TODO(asraa): Investigate whether it is necessary to append with whitespace here by:
+  //     (a) Validating we do not expect whitespace in via headers
+  //     (b) Add runtime guarding in case users have upstreams which expect it.
+  headers.appendVia(via, ", ");
 }
 
 std::string Utility::createSslRedirectPath(const HeaderMap& headers) {
@@ -429,7 +428,7 @@ bool Utility::sanitizeConnectionHeader(Http::HeaderMap& headers) {
     bool keep_header = false;
 
     // Determine whether the nominated header contains invalid values
-    HeaderEntry* nominated_header = NULL;
+    const HeaderEntry* nominated_header = NULL;
 
     if (lcs_header_to_remove == Http::Headers::get().Connection) {
       // Remove the connection header from the nominated tokens if it's self nominated
@@ -483,8 +482,7 @@ bool Utility::sanitizeConnectionHeader(Http::HeaderMap& headers) {
         }
 
         if (keep_header) {
-          nominated_header->value().setCopy(Http::Headers::get().TEValues.Trailers.data(),
-                                            Http::Headers::get().TEValues.Trailers.size());
+          headers.setTE(Http::Headers::get().TEValues.Trailers);
         }
       }
     }
@@ -504,7 +502,7 @@ bool Utility::sanitizeConnectionHeader(Http::HeaderMap& headers) {
     if (new_value.empty()) {
       headers.removeConnection();
     } else {
-      headers.Connection()->value(new_value);
+      headers.setConnection(new_value);
     }
   }
 
@@ -745,6 +743,50 @@ std::string Utility::PercentEncoding::decode(absl::string_view encoded) {
     decoded.push_back(ch);
   }
   return decoded;
+}
+
+Utility::AuthorityAttributes Utility::parseAuthority(absl::string_view host) {
+  // First try to see if there is a port included. This also checks to see that there is not a ']'
+  // as the last character which is indicative of an IPv6 address without a port. This is a best
+  // effort attempt.
+  const auto colon_pos = host.rfind(':');
+  absl::string_view host_to_resolve = host;
+  absl::optional<uint16_t> port;
+  if (colon_pos != absl::string_view::npos && host_to_resolve.back() != ']') {
+    const absl::string_view string_view_host = host;
+    host_to_resolve = string_view_host.substr(0, colon_pos);
+    const auto port_str = string_view_host.substr(colon_pos + 1);
+    uint64_t port64;
+    if (port_str.empty() || !absl::SimpleAtoi(port_str, &port64) || port64 > 65535) {
+      // Just attempt to resolve whatever we were given. This will very likely fail.
+      host_to_resolve = host;
+    } else {
+      port = static_cast<uint16_t>(port64);
+    }
+  }
+
+  // Now see if this is an IP address. We need to know this because some things (such as setting
+  // SNI) are special cased if this is an IP address. Either way, we still go through the normal
+  // resolver flow. We could short-circuit the DNS resolver in this case, but the extra code to do
+  // so is not worth it since the DNS resolver should handle it for us.
+  bool is_ip_address = false;
+  try {
+    absl::string_view potential_ip_address = host_to_resolve;
+    // TODO(mattklein123): Optimally we would support bracket parsing in parseInternetAddress(),
+    // but we still need to trim the brackets to send the IPv6 address into the DNS resolver. For
+    // now, just do all the trimming here, but in the future we should consider whether we can
+    // have unified [] handling as low as possible in the stack.
+    if (potential_ip_address.front() == '[' && potential_ip_address.back() == ']') {
+      potential_ip_address.remove_prefix(1);
+      potential_ip_address.remove_suffix(1);
+    }
+    Network::Utility::parseInternetAddress(std::string(potential_ip_address));
+    is_ip_address = true;
+    host_to_resolve = potential_ip_address;
+  } catch (const EnvoyException&) {
+  }
+
+  return {is_ip_address, host_to_resolve, port};
 }
 
 } // namespace Http

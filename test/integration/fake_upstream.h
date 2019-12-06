@@ -569,7 +569,8 @@ public:
                      std::chrono::milliseconds timeout = TestUtility::DefaultTimeout);
 
   // Send a UDP datagram on the fake upstream thread.
-  void sendUdpDatagram(const std::string& buffer, const Network::Address::Instance& peer);
+  void sendUdpDatagram(const std::string& buffer,
+                       const Network::Address::InstanceConstSharedPtr& peer);
 
   // Network::FilterChainManager
   const Network::FilterChain* findFilterChain(const Network::ConnectionSocket&) const override {
