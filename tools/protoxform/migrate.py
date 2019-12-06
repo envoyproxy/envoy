@@ -124,9 +124,6 @@ class UpgradeVisitor(visitor.Visitor):
     # Upgrade package.
     upgraded_proto.package = self._typedb.next_version_packages[upgraded_proto.package]
     upgraded_proto.name = self._typedb.next_version_proto_paths[upgraded_proto.name]
-    # Upgrade options.
-    upgraded_proto.options.ClearField("csharp_namespace")
-    upgraded_proto.options.ClearField("ruby_package")
     # Upgrade comments.
     for location in upgraded_proto.source_code_info.location:
       location.leading_comments = self._UpgradedComment(location.leading_comments)
