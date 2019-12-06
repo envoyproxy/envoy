@@ -659,7 +659,8 @@ ClusterInfoImpl::ClusterInfoImpl(
                               config.cluster_type())
                         : absl::nullopt),
       factory_context_(
-          std::make_unique<FactoryContextImpl>(*stats_scope_, runtime, factory_context)) {
+          std::make_unique<FactoryContextImpl>(*stats_scope_, runtime, factory_context)),
+      track_timeout_budgets_(config.track_timeout_budgets()) {
   switch (config.lb_policy()) {
   case envoy::api::v2::Cluster::ROUND_ROBIN:
     lb_type_ = LoadBalancerType::RoundRobin;

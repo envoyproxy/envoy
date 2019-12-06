@@ -47,7 +47,7 @@ service ClusterDiscoveryService {
 }
 
 // Configuration for a single upstream cluster.
-// [#next-free-field: 46]
+// [#next-free-field: 47]
 message Cluster {
   // Refer to :ref:`service discovery type <arch_overview_service_discovery_types>`
   // for an explanation on each type.
@@ -804,6 +804,11 @@ message Cluster {
   // maybe by allowing LRS to go on the ADS stream, or maybe by moving some of the negotiation
   // from the LRS stream here.]
   core.ConfigSource lrs_server = 42;
+
+  // If track_timeout_budgets is true, the timeout budget histograms will be published for each
+  // request. These show what percentage of a request's timeout was used. If not specified, the
+  // default is false.
+  bool track_timeout_budgets = 46;
 }
 
 // [#not-implemented-hide:] Extensible load balancing policy configuration.

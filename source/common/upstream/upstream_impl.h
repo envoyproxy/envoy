@@ -580,6 +580,8 @@ public:
   Http::Protocol
   upstreamHttpProtocol(absl::optional<Http::Protocol> downstream_protocol) const override;
 
+  bool trackTimeoutBudgets() const override { return track_timeout_budgets_; }
+
 private:
   struct ResourceManagers {
     ResourceManagers(const envoy::api::v2::Cluster& config, Runtime::Loader& runtime,
@@ -629,6 +631,7 @@ private:
   const absl::optional<envoy::api::v2::Cluster::CustomClusterType> cluster_type_;
   const std::unique_ptr<Server::Configuration::CommonFactoryContext> factory_context_;
   std::vector<Network::FilterFactoryCb> filter_factories_;
+  const bool track_timeout_budgets_;
 };
 
 /**

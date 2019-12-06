@@ -871,6 +871,12 @@ public:
   virtual Http::Protocol
   upstreamHttpProtocol(absl::optional<Http::Protocol> downstream_protocol) const PURE;
 
+  /**
+   * @return true if the cluster was configured to track stats on timeout
+   *         use out of the available timeout.
+   */
+  virtual bool trackTimeoutBudgets() const PURE;
+
 protected:
   /**
    * Invoked by extensionProtocolOptionsTyped.

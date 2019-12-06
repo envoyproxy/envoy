@@ -86,6 +86,7 @@ MockClusterInfo::MockClusterInfo()
       }));
   ON_CALL(*this, clusterType()).WillByDefault(ReturnRef(cluster_type_));
   ON_CALL(*this, upstreamHttpProtocol(_)).WillByDefault(Return(Http::Protocol::Http11));
+  ON_CALL(*this, trackTimeoutBudgets()).WillByDefault(Return(false));
 }
 
 MockClusterInfo::~MockClusterInfo() = default;
