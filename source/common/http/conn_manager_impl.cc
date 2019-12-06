@@ -536,18 +536,6 @@ ConnectionManagerImpl::ActiveStream::~ActiveStream() {
   }
 
   connection_manager_.stats_.named_.downstream_rq_active_.dec();
-  // Refresh byte sizes of the HeaderMaps before logging.
-  // TODO(asraa): Remove this when entries in HeaderMap can no longer be modified by reference and
-  // HeaderMap holds an accurate internal byte size count.
-  if (request_headers_ != nullptr) {
-    request_headers_->refreshByteSize();
-  }
-  if (response_headers_ != nullptr) {
-    response_headers_->refreshByteSize();
-  }
-  if (response_trailers_ != nullptr) {
-    response_trailers_->refreshByteSize();
-  }
   for (const AccessLog::InstanceSharedPtr& access_log : connection_manager_.config_.accessLogs()) {
     access_log->log(request_headers_.get(), response_headers_.get(), response_trailers_.get(),
                     stream_info_);
