@@ -1,7 +1,8 @@
-def _default_envoy_dev_impl(ctx):
-    ctx.file("WORKSPACE", "")
-    ctx.file("BUILD.bazel", "")
-    ctx.symlink(ctx.path(ctx.attr.envoy_root).dirname.get_child("tools").get_child("clang_tools"), "clang_tools")
+def _default_envoy_dev_impl(ctxt):
+    if "LLVM_CONFIG" in ctxt.os.environ:
+        ctxt.file("WORKSPACE", "")
+        ctxt.file("BUILD.bazel", "")
+        ctxt.symlink(ctxt.path(ctxt.attr.envoy_root).dirname.get_child("tools").get_child("clang_tools"), "clang_tools")
 
 _default_envoy_dev = repository_rule(
     implementation = _default_envoy_dev_impl,
