@@ -34,18 +34,6 @@ header (authority for HTTP2) entry. Resources should be named as follows:
 Note that matching should be done from right to left since a host entry cannot
 contain slashes while a route configuration name can. 
 
-Joining/Reconnecting to a management server
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-When an Envoy instance forms a delta xDS connection to the xDS management
-server for the first time, it will receive a base configuration filtered down
-to a subset of routes that are likely useful to the Envoy instance. For
-example, these might be filtered down by routes that exist in the same
-application. The xDS management server will send this same collection of
-resources on reconnect.
-
-.. figure:: diagrams/delta_rds_connection.svg
-   :alt: Delta RDS connection
-
 Subscribing to Resources
 ^^^^^^^^^^^^^^^^^^^^^^^^
 VHDS allows resources to be :ref:`subscribed <xds_protocol_delta_subscribe>` to
@@ -58,11 +46,15 @@ set to a list of virtual host resource names for which it would like
 configuration. 
 
 If a route for the contents of a host/authority header cannot be resolved,
-the active stream is paused while a :ref:`DeltaDiscoveryRequest <envoy_api_msg_DeltaDiscoveryRequest>` is sent. 
+the active stream is paused while a
+:ref:`DeltaDiscoveryRequest <envoy_api_msg_DeltaDiscoveryRequest>` is sent. 
 When a :ref:`DeltaDiscoveryResponse <envoy_api_msg_DeltaDiscoveryResponse>` is
-recieved where the host/authority header values exactly matches the 
-:ref:`aliases <envoy_api_field_resource.aliases>`,
-the route configuration is updated, the stream is resumed and processing of the
+received where one of the :ref:`aliases <envoy_api_field_resource.aliases>` in
+the response exactly matches the
+:ref:`resource_names_subscribe <envoy_api_field_DeltaDiscoveryRequest.resource_names_subscribe>`
+entry from the 
+:ref:`DeltaDiscoveryRequest <envoy_api_msg_DeltaDiscoveryRequest>`,
+the route configuration is updated, the stream is resumed, and processing of the
 filter chain continues.
 
 Each of the virtual hosts contained in the
@@ -82,10 +74,13 @@ for that virtual host has the :ref:`name <envoy_api_field_resource.name>` and
 entry and the resource unpopulated. This will allow Envoy to match the
 requested resource to the response.
 
-Updates to the route configuration entry to which a virtual host belongs will
-clear the virtual host table and require all virtual hosts to be sent again. It
-may be useful for the management server to populate RDS responses with the
-subscribed list of virtual hosts. 
+When a route configuration entry is updated, if the vhds field has changed, 
+the virtual host table for that route configuration is cleared, which will
+require that all virtual hosts be sent again.
+
+Updates to virtual hosts occur in two ways. If a virtual host was originally
+sent over RDS, then the virtual host should be updated over RDS. If a virtual
+host was subscribed to over VHDS, then updates will take place over VHDS.
 
 .. figure:: diagrams/delta_rds_request_additional_resources.svg
    :alt: Delta RDS request additional resources

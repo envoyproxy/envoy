@@ -419,6 +419,7 @@ returned in the name field in the resource of a
 :ref:`DeltaDiscoveryResponse <envoy_api_msg_DeltaDiscoveryResponse>`.
 
 .. _xds_protocol_delta_subscribe:
+
 Subscribing to Resources
 ^^^^^^^^^^^^^^^^^^^^^^^^
 
