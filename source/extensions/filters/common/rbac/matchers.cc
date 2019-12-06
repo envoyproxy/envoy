@@ -140,22 +140,24 @@ bool AuthenticatedMatcher::matches(const Network::Connection& connection,
     return true;
   }
 
-  const auto uriSans = ssl->uriSanPeerCertificate();
-  std::string principal;
   // If set, The URI SAN  or DNS SAN in that order is used as Principal, otherwise the subject field
   // is used.
-  if (!uriSans.empty()) {
-    principal = uriSans[0];
-  } else {
-    const auto dnsSans = ssl->dnsSansPeerCertificate();
-    if (!dnsSans.empty()) {
-      principal = dnsSans[0];
-    } else {
-      principal = ssl->subjectPeerCertificate();
+  if (!ssl->uriSanPeerCertificate().empty()) {
+    for (const std::string& uri : ssl->uriSanPeerCertificate()) {
+      if (matcher_.value().match(uri)) {
+        return true;
+      }
     }
+  } else if (!ssl->dnsSansPeerCertificate().empty()) {
+    for (const std::string& dns : ssl->dnsSansPeerCertificate()) {
+      if (matcher_.value().match(dns)) {
+        return true;
+      }
+    }
+  } else {
+    return matcher_.value().match(ssl->subjectPeerCertificate());
   }
-
-  return matcher_.value().match(principal);
+  return false;
 }
 
 bool MetadataMatcher::matches(const Network::Connection&, const Envoy::Http::HeaderMap&,
