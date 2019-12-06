@@ -114,7 +114,7 @@ public:
   virtual bool hasDataWithName(absl::string_view data_name) const PURE;
 
   /**
-   * @param life_span the LifeSpan above which data existence is checked againt.
+   * @param life_span the LifeSpan above which data existence is checked.
    * @return whether data of any type exist with LifeSpan greater than life_span.
    */
   virtual bool hasDataAboveLifeSpan(LifeSpan life_span) const PURE;
