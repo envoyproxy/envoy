@@ -80,7 +80,7 @@ message GrpcService {
       }
     }
 
-    // [#next-free-field: 7]
+    // [#next-free-field: 8]
     message CallCredentials {
       option (udpa.api.annotations.versioning).previous_message_type =
           "envoy.api.v2.core.GrpcService.GoogleGrpc.CallCredentials";
@@ -120,6 +120,49 @@ message GrpcService {
         }
       }
 
+      // Security token service configuration that allows Google gRPC to
+      // fetch security token from an OAuth 2.0 authorization server.
+      // See https://tools.ietf.org/html/draft-ietf-oauth-token-exchange-16 and
+      // https://github.com/grpc/grpc/pull/19587.
+      // [#next-free-field: 10]
+      message StsService {
+        option (udpa.api.annotations.versioning).previous_message_type =
+            "envoy.api.v2.core.GrpcService.GoogleGrpc.CallCredentials.StsService";
+
+        // URI of the token exchange service that handles token exchange requests.
+        string token_exchange_service_uri = 1 [(validate.rules).string = {uri: true}];
+
+        // Location of the target service or resource where the client
+        // intends to use the requested security token.
+        string resource = 2;
+
+        // Logical name of the target service where the client intends to
+        // use the requested security token.
+        string audience = 3;
+
+        // The desired scope of the requested security token in the
+        // context of the service or resource where the token will be used.
+        string scope = 4;
+
+        // Type of the requested security token.
+        string requested_token_type = 5;
+
+        // The path of subject token, a security token that represents the
+        // identity of the party on behalf of whom the request is being made.
+        string subject_token_path = 6 [(validate.rules).string = {min_bytes: 1}];
+
+        // Type of the subject token.
+        string subject_token_type = 7 [(validate.rules).string = {min_bytes: 1}];
+
+        // The path of actor token, a security token that represents the identity
+        // of the acting party. The acting party is authorized to use the
+        // requested security token and act on behalf of the subject.
+        string actor_token_path = 8;
+
+        // Type of the actor token.
+        string actor_token_type = 9;
+      }
+
       oneof credential_specifier {
         option (validate.required) = true;
 
@@ -147,6 +190,11 @@ message GrpcService {
         // https://grpc.io/grpc/cpp/namespacegrpc.html#a823c6a4b19ffc71fb33e90154ee2ad07.
         // https://grpc.io/docs/guides/auth.html#extending-grpc-to-support-other-authentication-mechanisms.
         MetadataCredentialsFromPlugin from_plugin = 6;
+
+        // Custom security token service which implements OAuth 2.0 token exchange.
+        // https://tools.ietf.org/html/draft-ietf-oauth-token-exchange-16
+        // See https://github.com/grpc/grpc/pull/19587.
+        StsService sts_service = 7;
       }
     }
 
