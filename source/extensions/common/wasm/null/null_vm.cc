@@ -7,6 +7,7 @@
 #include "envoy/registry/registry.h"
 
 #include "common/common/assert.h"
+#include "common/singleton/threadsafe_singleton.h"
 
 #include "extensions/common/wasm/null/null_vm_plugin.h"
 #include "extensions/common/wasm/well_known_names.h"
@@ -16,6 +17,8 @@ namespace Extensions {
 namespace Common {
 namespace Wasm {
 namespace Null {
+
+ThreadSafeSingleton<VmGlobalStats> global_stats_;
 
 WasmVmPtr NullVm::clone() {
   auto cloned_null_vm = std::make_unique<NullVm>(*this);
