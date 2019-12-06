@@ -22,7 +22,7 @@ TYPE_UPGRADE_REGEXES = [
 
 # As with TYPE_UPGRADE_REGEXES but for API .proto paths.
 PATH_UPGRADE_REGEXES = [
-    (r'(envoy/[\w/]*/)(v2alpha\d?|v2)', r'\1v3alpha'),
+    (r'(envoy/([\w]*/|))(v2alpha\d?|v2)', r'\1v3alpha'),
     # These are special cases, e.g. upgrading versionless packages.
     ('envoy/type/matcher', 'envoy/type/matcher/v3alpha'),
     ('envoy/type', 'envoy/type/v3alpha'),
@@ -33,6 +33,7 @@ PATH_UPGRADE_REGEXES = [
 # structural change to have the APIs follow the x/y//vN/z.proto structure of
 # organization.
 PKG_FORCE_UPGRADE = [
+    'envoy.v2',
     'envoy.api.v2',
     'envoy.api.v2.auth',
     'envoy.api.v2.cluster',
@@ -144,7 +145,6 @@ if __name__ == '__main__':
       for type_name, type_desc in type_map.items()
       if NextVersionUpgrade(type_name, type_map, next_version_upgrade_memo)
   ])
-
   # Generate type map entries for upgraded types.
   upgraded_types = []
   for type_name, type_desc in type_map.items():

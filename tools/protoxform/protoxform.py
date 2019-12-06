@@ -57,6 +57,7 @@ def ClangFormat(contents):
 
 def FormatBlock(block):
   """Append \n to a .proto section (e.g.
+
   comment, message definition, etc.) if non-empty.
 
   Args:
@@ -72,6 +73,7 @@ def FormatBlock(block):
 
 def FormatComments(comments):
   """Format a list of comment blocks from SourceCodeInfo.
+
   Prefixes // to each line, separates blocks by spaces.
 
   Args:

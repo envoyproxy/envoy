@@ -7,7 +7,7 @@ def AddHideOption(options):
   """Mark message/enum/field/enum value as hidden.
 
   Hidden messages are ignored when generating output.
-  
+
   Args:
     options: MessageOptions/EnumOptions/FieldOptions/EnumValueOptions message.
   """

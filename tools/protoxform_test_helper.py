@@ -2,6 +2,7 @@
 
 from run_command import runCommand
 
+import logging
 import os
 import re
 import sys
@@ -9,9 +10,9 @@ import sys
 
 def PathAndFilename(label):
   if label.startswith('/'):
-    label = label.replace('//', '', 1)
+    label = label.replace('//', '/', 1)
   elif label.startswith('@'):
-    label = re.sub(r'@.*/', '', label)
+    label = re.sub(r'@.*/', '/', label)
   else:
     return label
   label = label.replace(":", "/")
@@ -20,31 +21,58 @@ def PathAndFilename(label):
 
 
 def GoldenProtoFile(path, file, version):
-  path += "/" + file + "." + version + ".gold"
-  return os.path.abspath(path)
-
-
-def ResultProtoFile(path, file, version):
-  base = "./bazel-bin/"
-  base += path + "/protos/" + path + "/" + filename + "." + version + ".proto"
+  base = "./"
+  base += path + "/" + file + "." + version + ".gold"
   return os.path.abspath(base)
 
 
-def diff(result_file, golden_file):
-  command = 'diff '
+def ResultProtoFile(path, file, version):
+  base = "./bazel-bin"
+  base += path + "/protos" + path + "/" + filename + "." + version + ".proto"
+  return os.path.abspath(base)
+
+
+def Diff(result_file, golden_file):
+  command = 'diff -u '
   command += result_file + ' '
   command += golden_file + ' '
-  print(command)
   status, stdout = runCommand(command)
   return [status, stdout]
 
 
-if __name__ == "__main__":
-  path, filename = PathAndFilename(sys.argv[1])
-  golden_path_v2 = GoldenProtoFile(path, filename, 'v2')
+def RunV3Alpha(path, filename):
+  message = ""
   golden_path_v3 = GoldenProtoFile(path, filename, 'v3alpha')
-  test_path_v2 = ResultProtoFile(path, filename, 'v2')
   test_path_v3 = ResultProtoFile(path, filename, 'v3alpha')
 
-  print(diff(test_path_v2, golden_path_v2))
-  print(diff(test_path_v3, golden_path_v3))
+  status, msg = Diff(test_path_v3, golden_path_v3)
+
+  if status != 0:
+    message = '\n'.join([str(line) for line in msg])
+
+  return message
+
+
+def RunV2(path, filename):
+  message = ""
+  golden_path_v2 = GoldenProtoFile(path, filename, 'v2')
+  test_path_v2 = ResultProtoFile(path, filename, 'v2')
+  status, msg = Diff(test_path_v2, golden_path_v2)
+
+  if status != 0:
+    message = '\n'.join([str(line) for line in msg])
+
+  return message
+
+
+if __name__ == "__main__":
+  messages = ""
+  logging.basicConfig(format='%(message)s')
+  path, filename = PathAndFilename(sys.argv[1])
+  messages += RunV2(path, filename)
+  messages += RunV3Alpha(path, filename)
+
+  if len(messages) == 0:
+    logging.warning("PASS")
+  else:
+    logging.error("FAILED:\n{}".format(messages))
