@@ -59,9 +59,13 @@ void GrpcMuxImpl::genericHandleResponse(const std::string& type_url,
   trySendDiscoveryRequests();
 }
 
-void GrpcMuxImpl::start() { establishGrpcStream(); }
+void GrpcMuxImpl::start() {
+  ENVOY_LOG(debug, "GrpcMuxImpl now trying to establish a stream");
+  establishGrpcStream();
+}
 
 void GrpcMuxImpl::handleEstablishedStream() {
+  ENVOY_LOG(debug, "GrpcMuxImpl stream successfully established");
   for (auto& sub : subscriptions_) {
     sub.second->markStreamFresh();
   }
@@ -76,6 +80,7 @@ void GrpcMuxImpl::disableInitFetchTimeoutTimer() {
 }
 
 void GrpcMuxImpl::handleStreamEstablishmentFailure() {
+  ENVOY_LOG(debug, "GrpcMuxImpl stream failed to establish");
   // If this happens while Envoy is still initializing, the onConfigUpdateFailed() we ultimately
   // call on CDS will cause LDS to start up, which adds to subscriptions_ here. So, to avoid a
   // crash, the iteration needs to dance around a little: collect pointers to all
@@ -118,6 +123,7 @@ Watch* GrpcMuxImpl::addWatch(const std::string& type_url, const std::set<std::st
 // subscription will enqueue and attempt to send an appropriate discovery request.
 void GrpcMuxImpl::updateWatch(const std::string& type_url, Watch* watch,
                               const std::set<std::string>& resources) {
+  ENVOY_LOG(debug, "GrpcMuxImpl::updateWatch for {}", type_url);
   ASSERT(watch != nullptr);
   SubscriptionState& sub = subscriptionStateFor(type_url);
   WatchMap& watch_map = watchMapFor(type_url);
@@ -157,6 +163,7 @@ void GrpcMuxImpl::trySendDiscoveryRequests() {
     // If so, which one (by type_url)?
     std::string next_request_type_url = request_type_if_any.value();
     SubscriptionState& sub = subscriptionStateFor(next_request_type_url);
+    ENVOY_LOG(debug, "GrpcMuxImpl wants to send discovery request for {}", next_request_type_url);
     // Try again later if paused/rate limited/stream down.
     if (!canSendDiscoveryRequest(next_request_type_url)) {
       break;
@@ -169,9 +176,11 @@ void GrpcMuxImpl::trySendDiscoveryRequests() {
       // getNextRequestWithAck() returns a raw unowned pointer, which sendGrpcMessage deletes.
       sendGrpcMessage(sub.getNextRequestWithAck(pausable_ack_queue_.front()));
       pausable_ack_queue_.pop();
+      ENVOY_LOG(debug, "GrpcMuxImpl sent ACK discovery request for {}", next_request_type_url);
     } else {
       // getNextRequestAckless() returns a raw unowned pointer, which sendGrpcMessage deletes.
       sendGrpcMessage(sub.getNextRequestAckless());
+      ENVOY_LOG(debug, "GrpcMuxImpl sent non-ACK discovery request for {}", next_request_type_url);
     }
   }
   maybeUpdateQueueSizeStat(pausable_ack_queue_.size());

@@ -54,6 +54,7 @@ UpdateAck SotwSubscriptionState::handleResponse(const void* response_proto_ptr) 
   // We *always* copy the response's nonce into the next request, even if we're going to make that
   // request a NACK by setting error_detail.
   UpdateAck ack(response->nonce(), type_url());
+  ENVOY_LOG(debug, "Handling response for {}", type_url());
   try {
     handleGoodResponse(*response);
   } catch (const EnvoyException& e) {
@@ -89,6 +90,7 @@ void SotwSubscriptionState::handleBadResponse(const EnvoyException& e, UpdateAck
 }
 
 void SotwSubscriptionState::handleEstablishmentFailure() {
+  ENVOY_LOG(debug, "SotwSubscriptionState establishment failed for {}", type_url());
   callbacks().onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason::ConnectionFailure,
                                    nullptr);
 }

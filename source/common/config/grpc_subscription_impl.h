@@ -25,7 +25,9 @@ namespace Config {
 // can write to SubscriptionStats (which needs to live out here in the GrpcSubscriptionImpl) upon a
 // config update. GrpcSubscriptionImpl presents itself to WatchMap as the SubscriptionCallbacks,
 // and then, after incrementing stats, passes through to the real callbacks_.
-class GrpcSubscriptionImpl : public Subscription, public SubscriptionCallbacks {
+class GrpcSubscriptionImpl : public Subscription,
+                             public SubscriptionCallbacks,
+                             Logger::Loggable<Logger::Id::config> {
 public:
   // is_aggregated: whether our GrpcMux is also providing ADS to other Subscriptions, or whether
   // it's all ours. The practical difference is that we ourselves must call start() on it only if

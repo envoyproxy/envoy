@@ -30,6 +30,7 @@ void GrpcSubscriptionImpl::start(const std::set<std::string>& resources) {
   }
   watch_ = grpc_mux_->addOrUpdateWatch(type_url_, watch_, resources, *this, init_fetch_timeout_);
   stats_.update_attempt_.inc();
+  ENVOY_LOG(debug, "{} subscription started", type_url_);
 }
 
 void GrpcSubscriptionImpl::updateResourceInterest(
@@ -43,9 +44,11 @@ void GrpcSubscriptionImpl::updateResourceInterest(
 void GrpcSubscriptionImpl::onConfigUpdate(
     const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
     const std::string& version_info) {
+  ENVOY_LOG(debug, "{} received SotW update", type_url_);
   stats_.update_attempt_.inc();
   grpc_mux_->disableInitFetchTimeoutTimer();
   callbacks_.onConfigUpdate(resources, version_info);
+  ENVOY_LOG(debug, "{} SotW update successful", type_url_);
   stats_.update_success_.inc();
   stats_.version_.set(HashUtil::xxHash64(version_info));
 }
@@ -72,6 +75,7 @@ void GrpcSubscriptionImpl::onConfigUpdateFailed(ConfigUpdateFailureReason reason
     // TODO(fredlas) remove; it only makes sense to count start() and updateResourceInterest()
     // as attempts.
     stats_.update_attempt_.inc();
+    ENVOY_LOG(debug, "{} update failed: ConnectionFailure", type_url_);
     break;
   case Envoy::Config::ConfigUpdateFailureReason::FetchTimedout:
     stats_.init_fetch_timeout_.inc();
@@ -80,6 +84,7 @@ void GrpcSubscriptionImpl::onConfigUpdateFailed(ConfigUpdateFailureReason reason
     // TODO(fredlas) remove; it only makes sense to count start() and updateResourceInterest()
     // as attempts.
     stats_.update_attempt_.inc();
+    ENVOY_LOG(debug, "{} update failed: FetchTimedout", type_url_);
     break;
   case Envoy::Config::ConfigUpdateFailureReason::UpdateRejected:
     // We expect Envoy exception to be thrown when update is rejected.
@@ -87,6 +92,7 @@ void GrpcSubscriptionImpl::onConfigUpdateFailed(ConfigUpdateFailureReason reason
     grpc_mux_->disableInitFetchTimeoutTimer();
     stats_.update_rejected_.inc();
     callbacks_.onConfigUpdateFailed(reason, e);
+    ENVOY_LOG(debug, "{} update failed: UpdateRejected", type_url_);
     break;
   }
 }
