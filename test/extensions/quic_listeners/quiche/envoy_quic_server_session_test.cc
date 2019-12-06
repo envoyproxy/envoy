@@ -47,8 +47,6 @@ using testing::Invoke;
 using testing::Return;
 using testing::ReturnRef;
 
-#include <iostream>
-
 namespace Envoy {
 namespace Quic {
 
@@ -131,7 +129,7 @@ public:
   bool installReadFilter() {
     // Setup read filter.
     envoy_quic_session_.addReadFilter(read_filter_);
-    EXPECT_EQ(Http::Protocol::Http2,
+    EXPECT_EQ(Http::Protocol::Http3,
               read_filter_->callbacks_->connection().streamInfo().protocol().value());
     EXPECT_EQ(envoy_quic_session_.id(), read_filter_->callbacks_->connection().id());
     EXPECT_EQ(&envoy_quic_session_, &read_filter_->callbacks_->connection());
@@ -143,7 +141,7 @@ public:
       // Create ServerConnection instance and setup callbacks for it.
       http_connection_ = std::make_unique<QuicHttpServerConnectionImpl>(envoy_quic_session_,
                                                                         http_connection_callbacks_);
-      EXPECT_EQ(Http::Protocol::Http2, http_connection_->protocol());
+      EXPECT_EQ(Http::Protocol::Http3, http_connection_->protocol());
       // Stop iteration to avoid calling getRead/WriteBuffer().
       return Network::FilterStatus::StopIteration;
     }));
@@ -295,7 +293,8 @@ TEST_P(EnvoyQuicServerSessionTest, ConnectionClose) {
 
   std::string error_details("dummy details");
   quic::QuicErrorCode error(quic::QUIC_INVALID_FRAME_DATA);
-  quic::QuicConnectionCloseFrame frame(error, error_details);
+  quic::QuicConnectionCloseFrame frame(quic_version_[0].transport_version, error, error_details,
+                                       /* transport_close_frame_type = */ 0);
   EXPECT_CALL(network_connection_callbacks_, onEvent(Network::ConnectionEvent::RemoteClose));
   quic_connection_->OnConnectionCloseFrame(frame);
   EXPECT_EQ(absl::StrCat(quic::QuicErrorCodeToString(error), " with details: ", error_details),

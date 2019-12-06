@@ -44,7 +44,7 @@ public:
                          *listener_config_.socket_),
         quic_session_(quic_config_, {quic_version_}, &quic_connection_, *dispatcher_,
                       quic_config_.GetInitialStreamFlowControlWindowToSend() * 2),
-        stream_id_(VersionUsesQpack(quic_version_.transport_version) ? 4u : 5u),
+        stream_id_(VersionUsesHttp3(quic_version_.transport_version) ? 4u : 5u),
         quic_stream_(new EnvoyQuicServerStream(stream_id_, &quic_session_, quic::BIDIRECTIONAL)),
         response_headers_{{":status", "200"}} {
     quic_stream_->setDecoder(stream_decoder_);
@@ -52,8 +52,8 @@ public:
     quic_session_.ActivateStream(std::unique_ptr<EnvoyQuicServerStream>(quic_stream_));
     EXPECT_CALL(quic_session_, WritevData(_, _, _, _, _))
         .WillRepeatedly(Invoke([](quic::QuicStream*, quic::QuicStreamId, size_t write_length,
-                                  quic::QuicStreamOffset, quic::StreamSendingState) {
-          return quic::QuicConsumedData{write_length, true};
+                                  quic::QuicStreamOffset, quic::StreamSendingState state) {
+          return quic::QuicConsumedData{write_length, state != quic::NO_FIN};
         }));
     EXPECT_CALL(writer_, WritePacket(_, _, _, _, _))
         .WillRepeatedly(Invoke([](const char*, size_t buf_len, const quic::QuicIpAddress&,
@@ -73,7 +73,7 @@ public:
 
     trailers_.OnHeaderBlockStart();
     trailers_.OnHeader("key1", "value1");
-    if (!quic::VersionUsesQpack(quic_version_.transport_version)) {
+    if (!quic::VersionUsesHttp3(quic_version_.transport_version)) {
       // ":final-offset" is required and stripped off by quic.
       trailers_.OnHeader(":final-offset", absl::StrCat("", request_body_.length()));
     }
@@ -88,11 +88,10 @@ public:
 
   std::string bodyToStreamPayload(const std::string& body) {
     std::string data = body;
-    if (quic::VersionUsesQpack(quic_version_.transport_version)) {
+    if (quic::VersionUsesHttp3(quic_version_.transport_version)) {
       std::unique_ptr<char[]> data_buffer;
-      quic::HttpEncoder encoder;
       quic::QuicByteCount data_frame_header_length =
-          encoder.SerializeDataFrameHeader(body.length(), &data_buffer);
+          quic::HttpEncoder::SerializeDataFrameHeader(body.length(), &data_buffer);
       quic::QuicStringPiece data_frame_header(data_buffer.get(), data_frame_header_length);
       data = absl::StrCat(data_frame_header, body);
     }
@@ -107,7 +106,7 @@ public:
           EXPECT_EQ(Http::Headers::get().MethodValues.Post,
                     headers->Method()->value().getStringView());
         }));
-    if (quic::VersionUsesQpack(quic_version_.transport_version)) {
+    if (quic::VersionUsesHttp3(quic_version_.transport_version)) {
       quic_stream_->OnHeadersDecoded(request_headers_);
     } else {
       quic_stream_->OnStreamHeaderList(/*fin=*/false, request_headers_.uncompressed_header_bytes(),
@@ -197,7 +196,7 @@ TEST_P(EnvoyQuicServerStreamTest, DecodeHeadersBodyAndTrailers) {
 
 TEST_P(EnvoyQuicServerStreamTest, OutOfOrderTrailers) {
   EXPECT_CALL(stream_callbacks_, onResetStream(_, _));
-  if (quic::VersionUsesQpack(quic_version_.transport_version)) {
+  if (quic::VersionUsesHttp3(quic_version_.transport_version)) {
     return;
   }
   EXPECT_CALL(stream_decoder_, decodeHeaders_(_, /*end_stream=*/false))
@@ -248,6 +247,7 @@ TEST_P(EnvoyQuicServerStreamTest, ReadDisableUponLargePost) {
 
   // Re-enable reading just once shouldn't unblock stream.
   quic_stream_->readDisable(false);
+  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
 
   // This data frame should also be buffered.
   std::string last_part_request = bodyToStreamPayload("ccc");
@@ -265,6 +265,8 @@ TEST_P(EnvoyQuicServerStreamTest, ReadDisableUponLargePost) {
         EXPECT_TRUE(finished_reading);
       }));
   quic_stream_->readDisable(false);
+  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+
   EXPECT_CALL(stream_callbacks_, onResetStream(_, _));
 }
 
@@ -277,7 +279,7 @@ TEST_P(EnvoyQuicServerStreamTest, ReadDisableAndReEnableImmediately) {
         EXPECT_EQ(Http::Headers::get().MethodValues.Post,
                   headers->Method()->value().getStringView());
       }));
-  if (quic::VersionUsesQpack(quic_version_.transport_version)) {
+  if (quic::VersionUsesHttp3(quic_version_.transport_version)) {
     quic_stream_->OnHeadersDecoded(request_headers_);
   } else {
     quic_stream_->OnStreamHeaderList(/*fin=*/false, request_headers_.uncompressed_header_bytes(),
@@ -315,10 +317,18 @@ TEST_P(EnvoyQuicServerStreamTest, ReadDisableAndReEnableImmediately) {
 TEST_P(EnvoyQuicServerStreamTest, WatermarkSendBuffer) {
   sendRequest(request_body_, true, request_body_.size() * 2);
 
+  // Bump connection flow control window large enough not to cause connection
+  // level flow control blocked.
+  quic::QuicWindowUpdateFrame window_update(
+      quic::kInvalidControlFrameId,
+      quic::QuicUtils::GetInvalidStreamId(quic_version_.transport_version), 1024 * 1024);
+  quic_session_.OnWindowUpdateFrame(window_update);
+
   // 32KB + 2 byte. The initial stream flow control window is 16k.
   response_headers_.addCopy(":content-length", "32770");
   quic_stream_->encodeHeaders(response_headers_, /*end_stream=*/false);
-  // encode 32kB response body. first 16KB should be written out right away. The
+
+  // Encode 32kB response body. first 16KB should be written out right away. The
   // rest should be buffered. The high watermark is 16KB, so this call should
   // make the send buffer reach its high watermark.
   std::string response(32 * 1024 + 1, 'a');
@@ -328,12 +338,6 @@ TEST_P(EnvoyQuicServerStreamTest, WatermarkSendBuffer) {
 
   EXPECT_EQ(0u, buffer.length());
   EXPECT_TRUE(quic_stream_->flow_controller()->IsBlocked());
-  // Bump connection flow control window large enough not to cause connection
-  // level flow control blocked.
-  quic::QuicWindowUpdateFrame window_update(
-      quic::kInvalidControlFrameId,
-      quic::QuicUtils::GetInvalidStreamId(quic_version_.transport_version), 1024 * 1024);
-  quic_session_.OnWindowUpdateFrame(window_update);
 
   // Receive a WINDOW_UPDATE frame not large enough to drain half of the send
   // buffer.

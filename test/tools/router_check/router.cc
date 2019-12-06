@@ -73,7 +73,7 @@ RouterCheckTool RouterCheckTool::create(const std::string& router_config_file,
   auto api = Api::createApiForTest(*stats);
   TestUtility::loadFromFile(router_config_file, route_config, *api);
   assignUniqueRouteNames(route_config);
-
+  assignRuntimeFraction(route_config);
   auto factory_context =
       std::make_unique<NiceMock<Server::Configuration::MockServerFactoryContext>>();
   auto config = std::make_unique<Router::ConfigImpl>(
@@ -97,6 +97,18 @@ void RouterCheckTool::assignUniqueRouteNames(envoy::api::v2::RouteConfiguration&
   }
 }
 
+void RouterCheckTool::assignRuntimeFraction(envoy::api::v2::RouteConfiguration& route_config) {
+  for (auto& host : *route_config.mutable_virtual_hosts()) {
+    for (auto& route : *host.mutable_routes()) {
+      if (route.match().has_runtime_fraction() &&
+          route.match().runtime_fraction().default_value().numerator() == 0) {
+        route.mutable_match()->mutable_runtime_fraction()->mutable_default_value()->set_numerator(
+            1);
+      }
+    }
+  }
+}
+
 RouterCheckTool::RouterCheckTool(
     std::unique_ptr<NiceMock<Server::Configuration::MockServerFactoryContext>> factory_context,
     std::unique_ptr<Router::ConfigImpl> config, std::unique_ptr<Stats::IsolatedStoreImpl> stats,
@@ -109,9 +121,17 @@ RouterCheckTool::RouterCheckTool(
       .WillByDefault(testing::Invoke(this, &RouterCheckTool::runtimeMock));
 }
 
+Json::ObjectSharedPtr loadFromFile(const std::string& file_path, Api::Api& api) {
+  std::string contents = api.fileSystem().fileReadToEnd(file_path);
+  if (absl::EndsWith(file_path, ".yaml")) {
+    contents = MessageUtil::getJsonStringFromMessage(ValueUtil::loadFromYaml(contents));
+  }
+  return Json::Factory::loadFromString(contents);
+}
+
 // TODO(jyotima): Remove this code path once the json schema code path is deprecated.
 bool RouterCheckTool::compareEntriesInJson(const std::string& expected_route_json) {
-  Json::ObjectSharedPtr loader = Json::Factory::loadFromFile(expected_route_json, *api_);
+  Json::ObjectSharedPtr loader = loadFromFile(expected_route_json, *api_);
   loader->validateSchema(Json::ToolSchema::routerCheckSchema());
   bool no_failures = true;
   for (const Json::ObjectSharedPtr& check_config : loader->asObjectArray()) {

@@ -67,7 +67,6 @@ InstanceImpl::InstanceImpl(
       handler_(new ConnectionHandlerImpl(*dispatcher_, "main_thread")),
       random_generator_(std::move(random_generator)), listener_component_factory_(*this),
       worker_factory_(thread_local_, *api_, hooks),
-      dns_resolver_(dispatcher_->createDnsResolver({})),
       access_log_manager_(options.fileFlushIntervalMsec(), *api_, *dispatcher_, access_log_lock,
                           store),
       terminated_(false),
@@ -187,7 +186,7 @@ void InstanceImpl::flushStats() {
   }
 }
 
-void InstanceImpl::flushStatsInternal() {
+void InstanceImpl::updateServerStats() {
   // mergeParentStatsIfAny() does nothing and returns a struct of 0s if there is no parent.
   HotRestart::ServerStatsFromParent parent_stats = restarter_.mergeParentStatsIfAny(stats_store_);
 
@@ -204,7 +203,10 @@ void InstanceImpl::flushStatsInternal() {
       enumToInt(Utility::serverState(initManager().state(), healthCheckFailed())));
   server_stats_->stats_recent_lookups_.set(
       stats_store_.symbolTable().getRecentLookups([](absl::string_view, uint64_t) {}));
+}
 
+void InstanceImpl::flushStatsInternal() {
+  updateServerStats();
   InstanceUtil::flushMetricsToSinks(config_.statsSinks(), stats_store_);
   // TODO(ramaraochavali): consider adding different flush interval for histograms.
   if (stat_flush_timer_ != nullptr) {
@@ -368,6 +370,9 @@ void InstanceImpl::initialize(const Options& options,
   // Once we have runtime we can initialize the SSL context manager.
   ssl_context_manager_ = createContextManager(Ssl::ContextManagerFactory::name(), time_source_);
 
+  const bool use_tcp_for_dns_lookups = bootstrap_.use_tcp_for_dns_lookups();
+  dns_resolver_ = dispatcher_->createDnsResolver({}, use_tcp_for_dns_lookups);
+
   cluster_manager_factory_ = std::make_unique<Upstream::ProdClusterManagerFactory>(
       *admin_, Runtime::LoaderSingleton::get(), stats_store_, thread_local_, *random_generator_,
       dns_resolver_, *ssl_context_manager_, *dispatcher_, *local_info_, *secret_manager_,
@@ -422,6 +427,8 @@ void InstanceImpl::initialize(const Options& options,
 void InstanceImpl::startWorkers() {
   listener_manager_->startWorkers(*guard_dog_);
   initialization_timer_->complete();
+  // Update server stats as soon as initialization is done.
+  updateServerStats();
   workers_started_ = true;
   // At this point we are ready to take traffic and all listening ports are up. Notify our parent
   // if applicable that they can stop listening and drain.

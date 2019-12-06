@@ -12,6 +12,7 @@ EXTENSIONS = {
     # Clusters
     #
 
+    "envoy.clusters.aggregate":                         "//source/extensions/clusters/aggregate:cluster",
     "envoy.clusters.dynamic_forward_proxy":             "//source/extensions/clusters/dynamic_forward_proxy:cluster",
     "envoy.clusters.redis":                             "//source/extensions/clusters/redis:redis_cluster",
 
@@ -97,7 +98,6 @@ EXTENSIONS = {
     # UDP filters
     #
 
-    # WiP
     "envoy.filters.udp_listener.udp_proxy":             "//source/extensions/filters/udp/udp_proxy:config",
 
     #

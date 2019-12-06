@@ -19,6 +19,7 @@ BSON
 CAS
 CB
 CDS
+CEL
 CHACHA
 CHLO
 CHLOS
@@ -83,6 +84,7 @@ EXPECTs
 EXPR
 FAQ
 FASTOPEN
+FB
 FCDS
 FFFF
 FIN
@@ -283,6 +285,7 @@ UDP
 UDS
 URI
 URL
+USEVC
 UTC
 UTF
 UUID
@@ -312,7 +315,6 @@ absl
 accesslog
 accessor
 accessors
-ackless
 acks
 acls
 addr
@@ -553,7 +555,6 @@ genrule
 getaddrinfo
 getaffinity
 getifaddrs
-getNextRequestAckless
 getpeername
 getsockname
 getsockopt
@@ -771,7 +772,6 @@ pkey
 plaintext
 pluggable
 pointee
-polymorphism
 popen
 pos
 posix
@@ -915,8 +915,6 @@ sockfd
 sockopt
 sockopts
 somestring
-SotW
-SotwSubscriptionState
 spanid
 spdlog
 splitter
@@ -955,7 +953,6 @@ submessages
 subnet
 subnets
 suboptimal
-SubscriptionStateFactory
 subsecond
 subseconds
 subsequence
@@ -972,6 +969,7 @@ superset
 symlink
 symlinked
 symlinks
+syncookie
 sys
 syscall
 syscalls
@@ -1064,6 +1062,7 @@ unreferenced
 unregister
 unregisters
 unresolvable
+unserializable
 unsetenv
 unsubscription
 unterminated
@@ -1129,3 +1128,4 @@ zag
 zig
 zipkin
 zlib
+OBQ

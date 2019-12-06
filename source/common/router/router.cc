@@ -27,7 +27,6 @@
 #include "common/network/application_protocol.h"
 #include "common/network/transport_socket_options_impl.h"
 #include "common/network/upstream_server_name.h"
-#include "common/network/utility.h"
 #include "common/router/config_impl.h"
 #include "common/router/debug_config.h"
 #include "common/router/retry_state_impl.h"
@@ -393,7 +392,11 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
         [this, direct_response,
          &request_headers = headers](Http::HeaderMap& response_headers) -> void {
           const auto new_path = direct_response->newPath(request_headers);
-          if (!new_path.empty()) {
+          // See https://tools.ietf.org/html/rfc7231#section-7.1.2.
+          const auto add_location =
+              direct_response->responseCode() == Http::Code::Created ||
+              Http::CodeUtility::is3xx(enumToInt(direct_response->responseCode()));
+          if (!new_path.empty() && add_location) {
             response_headers.addReferenceKey(Http::Headers::get().Location, new_path);
           }
           direct_response->finalizeResponseHeaders(response_headers, callbacks_->streamInfo());
@@ -486,7 +489,8 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
   // Fetch a connection pool for the upstream cluster.
   Http::ConnectionPool::Instance* conn_pool;
   auto url_str = headers.Host()->value().getStringView();
-  if (cluster_->auto_sni() && !Network::Utility::isIpAddress(url_str.data())) {
+  const auto parsed_authority = Http::Utility::parseAuthority(url_str.data());
+  if (cluster_->auto_sni() && !parsed_authority.is_ip_address_) {
     conn_pool = getConnPool(true, url_str);
   } else {
     conn_pool = getConnPool();

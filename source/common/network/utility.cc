@@ -515,7 +515,7 @@ Api::IoCallUint64Result Utility::writeToSocket(IoHandle& handle, Buffer::RawSlic
            send_result.err_->getErrorCode() == Api::IoError::IoErrorCode::Interrupt);
 
   if (send_result.ok()) {
-    ENVOY_LOG_MISC(trace, "sendmsg sent:{} bytes", send_result.rc_);
+    ENVOY_LOG_MISC(trace, "sendmsg bytes {}", send_result.rc_);
   } else {
     ENVOY_LOG_MISC(debug, "sendmsg failed with error code {}: {}",
                    static_cast<int>(send_result.err_->getErrorCode()),
@@ -564,22 +564,6 @@ Api::IoCallUint64Result Utility::readFromSocket(IoHandle& handle,
   return result;
 }
 
-bool Utility::isIpAddress(const std::string& host) {
-  const auto colon_pos = host.rfind(':');
-  auto pure_host = host;
-  if (colon_pos != absl::string_view::npos) {
-    if (host.front() == '[' || host.back() == ']') {
-      return true;
-    }
-    pure_host = host.substr(0, colon_pos);
-  }
-  try {
-    Network::Utility::parseInternetAddress(pure_host);
-    return true;
-  } catch (const EnvoyException&) {
-    return false;
-  }
-}
 Api::IoErrorPtr Utility::readPacketsFromSocket(IoHandle& handle,
                                                const Address::Instance& local_address,
                                                UdpPacketProcessor& udp_packet_processor,

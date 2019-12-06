@@ -7,6 +7,8 @@
 #include "envoy/http/header_map.h"
 #include "envoy/stream_info/stream_info.h"
 
+#include "common/protobuf/protobuf.h"
+
 namespace Envoy {
 namespace AccessLog {
 
@@ -139,6 +141,19 @@ public:
                              const Http::HeaderMap& response_headers,
                              const Http::HeaderMap& response_trailers,
                              const StreamInfo::StreamInfo& stream_info) const PURE;
+  /**
+   * Extract a value from the provided headers/trailers/stream, preserving the value's type.
+   * @param request_headers supplies the request headers.
+   * @param response_headers supplies the response headers.
+   * @param response_trailers supplies the response trailers.
+   * @param stream_info supplies the stream info.
+   * @return ProtobufWkt::Value containing a single value extracted from the given
+   *         headers/trailers/stream.
+   */
+  virtual ProtobufWkt::Value formatValue(const Http::HeaderMap& request_headers,
+                                         const Http::HeaderMap& response_headers,
+                                         const Http::HeaderMap& response_trailers,
+                                         const StreamInfo::StreamInfo& stream_info) const PURE;
 };
 
 using FormatterProviderPtr = std::unique_ptr<FormatterProvider>;

@@ -11,6 +11,7 @@ import "envoy/type/matcher/regex.proto";
 import "envoy/type/matcher/string.proto";
 import "envoy/type/percent.proto";
 import "envoy/type/range.proto";
+import "envoy/type/tracing/v2/custom_tag.proto";
 
 import "google/protobuf/any.proto";
 import "google/protobuf/duration.proto";
@@ -152,6 +153,11 @@ message VirtualHost {
   google.protobuf.UInt32Value per_request_buffer_limit_bytes = 18;
 }
 
+// A filter-defined action type.
+message FilterAction {
+  google.protobuf.Any action = 1;
+}
+
 // A route is both a specification of how to match a request as well as an indication of what to do
 // next (e.g., redirect, forward, rewrite, etc.).
 //
@@ -159,7 +165,7 @@ message VirtualHost {
 //
 //   Envoy supports routing on HTTP method via :ref:`header matching
 //   <envoy_api_msg_route.HeaderMatcher>`.
-// [#next-free-field: 17]
+// [#next-free-field: 18]
 message Route {
   reserved 6;
 
@@ -180,6 +186,11 @@ message Route {
 
     // Return an arbitrary HTTP response directly, without proxying.
     DirectResponseAction direct_response = 7;
+
+    // [#not-implemented-hide:]
+    // If true, a filter will define the action (e.g., it could dynamically generate the
+    // RouteAction).
+    FilterAction filter_action = 17;
   }
 
   // The Metadata field can be used to provide additional information
@@ -1090,6 +1101,14 @@ message Tracing {
   // :ref:`HTTP Connection Manager <config_http_conn_man_runtime>`.
   // Default: 100%
   type.FractionalPercent overall_sampling = 3;
+
+  // A list of custom tags with unique tag name to create tags for the active span.
+  // It will take effect after merging with the :ref:`corresponding configuration
+  // <envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.tracing.custom_tags>`
+  // configured in the HTTP connection manager. If two tags with the same name are configured
+  // each in the HTTP connection manager and the route level, the one configured here takes
+  // priority.
+  repeated type.tracing.v2.CustomTag custom_tags = 4;
 }
 
 // A virtual cluster is a way of specifying a regex matching rule against

@@ -3179,7 +3179,7 @@ virtual_hosts:
       hedge_policy: {hedge_on_per_try_timeout: true}
   - match: {prefix: /bar}
     route:
-      hedge_policy: {additional_request_chance: {numerator: 30.0, denominator: HUNDRED}}
+      hedge_policy: {additional_request_chance: {numerator: 30, denominator: HUNDRED}}
       cluster: www
   - match: {prefix: /}
     route: {cluster: www}
@@ -4502,8 +4502,8 @@ virtual_hosts:
   EXPECT_THROW_WITH_REGEX(
       TestConfigImpl(parseRouteConfigurationFromV2Yaml(yaml), factory_context_, true),
       EnvoyException,
-      "invalid value oneof field 'path_specifier' is already set. Cannot set 'prefix' for type "
-      "oneof");
+      "invalid value oneof field 'path_specifier' is already set. Cannot set '(prefix|path)' for "
+      "type oneof");
 }
 
 TEST_F(BadHttpRouteConfigurationsTest, BadRouteEntryConfigMissingPathSpecifier) {
@@ -4539,8 +4539,8 @@ virtual_hosts:
   EXPECT_THROW_WITH_REGEX(
       TestConfigImpl(parseRouteConfigurationFromV2Yaml(yaml), factory_context_, true),
       EnvoyException,
-      "invalid value oneof field 'path_specifier' is already set. Cannot set 'prefix' for type "
-      "oneof");
+      "invalid value oneof field 'path_specifier' is already set. Cannot set '(prefix|regex)' for "
+      "type oneof");
 }
 
 TEST_F(BadHttpRouteConfigurationsTest, BadRouteEntryConfigNoAction) {
@@ -4576,8 +4576,8 @@ virtual_hosts:
   EXPECT_THROW_WITH_REGEX(
       TestConfigImpl(parseRouteConfigurationFromV2Yaml(yaml), factory_context_, true),
       EnvoyException,
-      "invalid value oneof field 'path_specifier' is already set. Cannot set 'path' for type "
-      "oneof");
+      "invalid value oneof field 'path_specifier' is already set. Cannot set '(path|regex)' for "
+      "type oneof");
 }
 
 TEST_F(BadHttpRouteConfigurationsTest, BadRouteEntryConfigPrefixAndPathAndRegex) {
@@ -5094,6 +5094,37 @@ TEST(MetadataMatchCriteriaImpl, Merge) {
   EXPECT_EQ((*it)->value().value().string_value(), "override3");
 }
 
+TEST(MetadataMatchCriteriaImpl, Filter) {
+  auto pv1 = ProtobufWkt::Value();
+  pv1.set_string_value("v1");
+  auto pv2 = ProtobufWkt::Value();
+  pv2.set_number_value(2.0);
+  auto pv3 = ProtobufWkt::Value();
+  pv3.set_bool_value(true);
+
+  auto metadata_matches = ProtobufWkt::Struct();
+  auto parent_fields = metadata_matches.mutable_fields();
+  parent_fields->insert({"a", pv1});
+  parent_fields->insert({"b", pv2});
+  parent_fields->insert({"c", pv3});
+
+  auto matches = MetadataMatchCriteriaImpl(metadata_matches);
+  auto filtered_matches1 = matches.filterMatchCriteria({"b", "c"});
+  auto filtered_matches2 = matches.filterMatchCriteria({"a"});
+
+  EXPECT_EQ(matches.metadataMatchCriteria().size(), 3);
+  EXPECT_EQ(filtered_matches1->metadataMatchCriteria().size(), 2);
+  EXPECT_EQ(filtered_matches2->metadataMatchCriteria().size(), 1);
+
+  EXPECT_EQ(filtered_matches1->metadataMatchCriteria()[0]->name(), "b");
+  EXPECT_EQ(filtered_matches1->metadataMatchCriteria()[0]->value().value().number_value(), 2.0);
+  EXPECT_EQ(filtered_matches1->metadataMatchCriteria()[1]->name(), "c");
+  EXPECT_EQ(filtered_matches1->metadataMatchCriteria()[1]->value().value().bool_value(), true);
+
+  EXPECT_EQ(filtered_matches2->metadataMatchCriteria()[0]->name(), "a");
+  EXPECT_EQ(filtered_matches2->metadataMatchCriteria()[0]->value().value().string_value(), "v1");
+}
+
 class RouteEntryMetadataMatchTest : public testing::Test, public ConfigImplTestBase {};
 
 TEST_F(RouteEntryMetadataMatchTest, ParsesMetadata) {
@@ -5413,6 +5444,22 @@ virtual_hosts:
             denominator: 1
           overall_sampling:
             numerator: 3
+          custom_tags:
+          - tag: ltag
+            literal:
+              value: lvalue
+          - tag: etag
+            environment:
+              name: E_TAG
+          - tag: rtag
+            request_header:
+              name: X-Tag
+          - tag: mtag
+            metadata:
+              kind: { route: {} }
+              metadata_key:
+                key: com.bar.foo
+                path: [ { key: xx }, { key: yy } ]
         route: { cluster: ww2 }
   )EOF";
   BazFactory baz_factory;
@@ -5439,6 +5486,12 @@ virtual_hosts:
   EXPECT_EQ(1, route3->tracingConfig()->getRandomSampling().denominator());
   EXPECT_EQ(3, route3->tracingConfig()->getOverallSampling().numerator());
   EXPECT_EQ(0, route3->tracingConfig()->getOverallSampling().denominator());
+
+  std::vector<std::string> custom_tags{"ltag", "etag", "rtag", "mtag"};
+  const Tracing::CustomTagMap& map = route3->tracingConfig()->getCustomTags();
+  for (const std::string& custom_tag : custom_tags) {
+    EXPECT_NE(map.find(custom_tag), map.end());
+  }
 }
 
 // Test to check Prefix Rewrite for redirects
