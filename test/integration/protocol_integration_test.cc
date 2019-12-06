@@ -1013,7 +1013,7 @@ TEST_P(DownstreamProtocolIntegrationTest, ManyRequestTrailersAccepted) {
 }
 
 // This test uses an Http::HeaderMapImpl instead of an Http::TestHeaderMapImpl to avoid
-// time-consuming byte size verifications that will cause this test to timeout.
+// time-consuming byte size validations that will cause this test to timeout.
 TEST_P(DownstreamProtocolIntegrationTest, ManyRequestHeadersTimeout) {
   // Set timeout for 5 seconds, and ensure that a request with 10k+ headers can be sent.
   testManyRequestHeaders(std::chrono::milliseconds(5000));
@@ -1028,7 +1028,7 @@ TEST_P(DownstreamProtocolIntegrationTest, LargeRequestTrailersRejected) {
 }
 
 // This test uses an Http::HeaderMapImpl instead of an Http::TestHeaderMapImpl to avoid
-// time-consuming byte size verifications that will cause this test to timeout.
+// time-consuming byte size verification that will cause this test to timeout.
 TEST_P(DownstreamProtocolIntegrationTest, ManyTrailerHeaders) {
   max_request_headers_kb_ = 96;
   max_request_headers_count_ = 20005;
