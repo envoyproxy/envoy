@@ -5,7 +5,6 @@
 #include <vector>
 
 #include "envoy/common/pure.h"
-
 #include "envoy/type/matcher/string.pb.h"
 
 namespace Envoy {
@@ -42,6 +41,9 @@ public:
    */
   virtual const std::vector<std::string>& verifySubjectAltNameList() const PURE;
 
+  /**
+   * @return The subject alt name matchers to be verified, if enabled. Otherwise, ""
+   */
   virtual const std::vector<::envoy::type::matcher::StringMatcher>
   matchSubjectAltNameList() const PURE;
 

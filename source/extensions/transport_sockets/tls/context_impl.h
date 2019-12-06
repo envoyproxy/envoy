@@ -12,6 +12,7 @@
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats_macros.h"
 
+#include "common/common/matchers.h"
 #include "common/stats/symbol_table_impl.h"
 
 #include "extensions/transport_sockets/tls/context_manager_impl.h"
@@ -65,6 +66,16 @@ public:
   static bool verifySubjectAltName(X509* cert, const std::vector<std::string>& subject_alt_names);
 
   /**
+   * Performs subjectAltName matching with the provided matchers.
+   * @param ssl the certificate to verify
+   * @param match_subject_alt_name_list the configured matchers to match
+   * @return true if the verification succeeds
+   */
+  static bool
+  matchSubjectAltName(X509* cert,
+                      const std::vector<Matchers::StringMatcherImpl>& match_subject_alt_name_list);
+
+  /**
    * Determines whether the given name matches 'pattern' which may optionally begin with a wildcard.
    * NOTE:  public for testing
    * @param dns_name the DNS name to match
@@ -98,7 +109,9 @@ protected:
   // A SSL_CTX_set_cert_verify_callback for custom cert validation.
   static int verifyCallback(X509_STORE_CTX* store_ctx, void* arg);
 
-  int verifyCertificate(X509* cert, const std::vector<std::string>& verify_san_list);
+  int verifyCertificate(
+      X509* cert, const std::vector<std::string>& verify_san_list,
+      const std::vector<Matchers::StringMatcherImpl>& match_subject_alt_name_list);
 
   /**
    * Verifies certificate hash for pinning. The hash is a hex-encoded SHA-256 of the DER-encoded
@@ -158,6 +171,7 @@ protected:
   std::vector<TlsContext> tls_contexts_;
   bool verify_trusted_ca_{false};
   std::vector<std::string> verify_subject_alt_name_list_;
+  std::vector<Matchers::StringMatcherImpl> match_subject_alt_name_list_;
   std::vector<std::vector<uint8_t>> verify_certificate_hash_list_;
   std::vector<std::vector<uint8_t>> verify_certificate_spki_list_;
   Stats::Scope& scope_;

@@ -185,6 +185,15 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& c
   }
 
   if (config.certificateValidationContext() != nullptr &&
+      !config.certificateValidationContext()->matchSubjectAltNameList().empty()) {
+    for (const ::envoy::type::matcher::StringMatcher& matcher :
+         config.certificateValidationContext()->matchSubjectAltNameList()) {
+      match_subject_alt_name_list_.push_back(Matchers::StringMatcherImpl(matcher));
+    }
+    verify_mode = SSL_VERIFY_PEER | SSL_VERIFY_FAIL_IF_NO_PEER_CERT;
+  }
+
+  if (config.certificateValidationContext() != nullptr &&
       !config.certificateValidationContext()->verifyCertificateHashList().empty()) {
     for (auto hash : config.certificateValidationContext()->verifyCertificateHashList()) {
       // Remove colons from the 95 chars long colon-separated "fingerprint"
@@ -485,14 +494,24 @@ int ContextImpl::verifyCallback(X509_STORE_CTX* store_ctx, void* arg) {
   const Network::TransportSocketOptions* transport_socket_options =
       static_cast<const Network::TransportSocketOptions*>(SSL_get_app_data(ssl));
   return impl->verifyCertificate(
-      cert.get(), transport_socket_options &&
-                          !transport_socket_options->verifySubjectAltNameListOverride().empty()
-                      ? transport_socket_options->verifySubjectAltNameListOverride()
-                      : impl->verify_subject_alt_name_list_);
+      cert.get(),
+      transport_socket_options &&
+              !transport_socket_options->verifySubjectAltNameListOverride().empty()
+          ? transport_socket_options->verifySubjectAltNameListOverride()
+          : impl->verify_subject_alt_name_list_,
+      impl->match_subject_alt_name_list_);
 }
 
-int ContextImpl::verifyCertificate(X509* cert, const std::vector<std::string>& verify_san_list) {
+int ContextImpl::verifyCertificate(
+    X509* cert, const std::vector<std::string>& verify_san_list,
+    const std::vector<Matchers::StringMatcherImpl>& match_subject_alt_name_list) {
   if (!verify_san_list.empty() && !verifySubjectAltName(cert, verify_san_list)) {
+    stats_.fail_verify_san_.inc();
+    return 0;
+  }
+
+  if (!match_subject_alt_name_list.empty() &&
+      !matchSubjectAltName(cert, match_subject_alt_name_list)) {
     stats_.fail_verify_san_.inc();
     return 0;
   }
@@ -565,6 +584,66 @@ std::vector<Ssl::PrivateKeyMethodProviderSharedPtr> ContextImpl::getPrivateKeyMe
     }
   }
   return providers;
+}
+
+bool ContextImpl::matchSubjectAltName(
+    X509* cert, const std::vector<Matchers::StringMatcherImpl>& match_subject_alt_name_list) {
+  bssl::UniquePtr<GENERAL_NAMES> san_names(
+      static_cast<GENERAL_NAMES*>(X509_get_ext_d2i(cert, NID_subject_alt_name, nullptr, nullptr)));
+  if (san_names == nullptr) {
+    return false;
+  }
+  for (const GENERAL_NAME* san : san_names.get()) {
+    switch (san->type) {
+    case GEN_DNS: {
+      ASN1_STRING* str = san->d.dNSName;
+      const char* dns_name = reinterpret_cast<const char*>(ASN1_STRING_data(str));
+      for (auto& config_san_matcher : match_subject_alt_name_list) {
+        if (config_san_matcher.match(dns_name)) {
+          return true;
+        }
+      }
+      break;
+    }
+    case GEN_URI: {
+      ASN1_STRING* str = san->d.uniformResourceIdentifier;
+      const char* uri = reinterpret_cast<const char*>(ASN1_STRING_data(str));
+      for (auto& config_san_matcher : match_subject_alt_name_list) {
+        if (config_san_matcher.match(uri)) {
+          return true;
+        }
+      }
+      break;
+    }
+    case GEN_IPADD: {
+      if (san->d.ip->length == 4) {
+        sockaddr_in sin;
+        sin.sin_port = 0;
+        sin.sin_family = AF_INET;
+        memcpy(&sin.sin_addr, san->d.ip->data, sizeof(sin.sin_addr));
+        Network::Address::Ipv4Instance addr(&sin);
+        for (auto& config_san_matcher : match_subject_alt_name_list) {
+          if (config_san_matcher.match(addr.ip()->addressAsString())) {
+            return true;
+          }
+        }
+      } else if (san->d.ip->length == 16) {
+        sockaddr_in6 sin6;
+        sin6.sin6_port = 0;
+        sin6.sin6_family = AF_INET6;
+        memcpy(&sin6.sin6_addr, san->d.ip->data, sizeof(sin6.sin6_addr));
+        Network::Address::Ipv6Instance addr(sin6);
+        for (auto& config_san_matcher : match_subject_alt_name_list) {
+          if (config_san_matcher.match(addr.ip()->addressAsString())) {
+            return true;
+          }
+        }
+      }
+      break;
+    }
+    }
+  }
+  return false;
 }
 
 bool ContextImpl::verifySubjectAltName(X509* cert,
