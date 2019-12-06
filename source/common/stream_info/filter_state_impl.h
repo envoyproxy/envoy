@@ -34,9 +34,7 @@ public:
    * avoid creating a FilterState that's empty in most cases.
    * @param life_span the life span this is handling.
    */
-  FilterStateImpl(
-      LazyCreateAncestor lazy_create_ancestor,
-      FilterState::LifeSpan life_span)
+  FilterStateImpl(LazyCreateAncestor lazy_create_ancestor, FilterState::LifeSpan life_span)
       : ancestor_(lazy_create_ancestor), life_span_(life_span) {
     maybeCreateParent(/* read_only = */ true);
   }

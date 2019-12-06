@@ -4,8 +4,6 @@
 #include <features.h>
 #include <type_traits>
 
-#include <iostream>
-
 namespace Envoy {
 namespace StreamInfo {
 
@@ -117,17 +115,15 @@ void FilterStateImpl::maybeCreateParent(bool read_only) {
   if (read_only && lazy_create_ancestor.first == nullptr) {
     return;
   }
-  
+
   // Lazy ancestor is not our immediate parent.
   if (lazy_create_ancestor.second != life_span_ + 1) {
     parent_ = std::make_shared<FilterStateImpl>(lazy_create_ancestor,
                                                 FilterState::LifeSpan(life_span_ + 1));
     return;
   }
-  std::cout << "pengg: creating lazy ancestor" << std::endl;
   // Lazy parent is our immediate parent.
   if (lazy_create_ancestor.first == nullptr) {
-    std::cout << "pengg: creating lazy ancestor" << std::endl;
     lazy_create_ancestor.first =
         std::make_shared<FilterStateImpl>(FilterState::LifeSpan(life_span_ + 1));
   }
