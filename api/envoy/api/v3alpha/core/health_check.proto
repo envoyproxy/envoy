@@ -165,7 +165,7 @@ message HealthCheck {
     // The value of the :authority header in the gRPC health check request. If
     // left empty (default value), the name of the cluster this health check is associated
     // with will be used.
-    string authority = 2 [(validate.rules).string = {pattern: "^[^\000\n\r]+$"}];
+    string authority = 2 [(validate.rules).string = {pattern: "^[^\000\n\r]*$"}];
   }
 
   // Custom health check.

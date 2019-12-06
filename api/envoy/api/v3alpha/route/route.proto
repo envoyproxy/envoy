@@ -74,7 +74,7 @@ message VirtualHost {
   //   must be unique across all virtual hosts or the config will fail to load.
   repeated string domains = 2 [(validate.rules).repeated = {
     min_items: 1
-    items {string {pattern: "^[^\000\n\r]+$"}}
+    items {string {pattern: "^[^\000\n\r]*$"}}
   }];
 
   // The list of routes that will be matched, in order, for incoming requests.
