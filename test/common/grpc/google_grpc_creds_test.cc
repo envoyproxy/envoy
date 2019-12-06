@@ -122,6 +122,15 @@ TEST_F(CredsUtilityTest, DefaultChannelCredentials) {
     google_grpc->add_call_credentials()->mutable_from_plugin()->set_name("foo");
     EXPECT_NE(nullptr, CredsUtility::defaultChannelCredentials(config, *api_));
   }
+  {
+    envoy::api::v2::core::GrpcService config;
+    TestUtility::setTestSslGoogleGrpcConfig(config, true);
+    auto* sts_service = config.mutable_google_grpc()->add_call_credentials()->mutable_sts_service();
+    sts_service->set_token_exchange_service_uri("http://tokenexchangeservice.com");
+    sts_service->set_subject_token_path("/var/run/example_token");
+    sts_service->set_subject_token_type("urn:ietf:params:oauth:token-type:access_token");
+    EXPECT_NE(nullptr, CredsUtility::defaultChannelCredentials(config, *api_));
+  }
 }
 
 } // namespace
