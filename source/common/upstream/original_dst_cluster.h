@@ -122,10 +122,10 @@ public:
       : ClusterFactoryImplBase(Extensions::Clusters::ClusterTypes::get().OriginalDst) {}
 
 private:
-  std::pair<ClusterImplBaseSharedPtr, ThreadAwareLoadBalancerPtr>
-  createClusterImpl(const envoy::api::v2::Cluster& cluster, ClusterFactoryContext& context,
-                    Server::Configuration::TransportSocketFactoryContextImpl& socket_factory_context,
-                    Stats::ScopePtr&& stats_scope) override;
+  std::pair<ClusterImplBaseSharedPtr, ThreadAwareLoadBalancerPtr> createClusterImpl(
+      const envoy::api::v2::Cluster& cluster, ClusterFactoryContext& context,
+      Server::Configuration::TransportSocketFactoryContextImpl& socket_factory_context,
+      Stats::ScopePtr&& stats_scope) override;
 };
 
 } // namespace Upstream
