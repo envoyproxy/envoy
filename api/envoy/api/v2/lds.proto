@@ -42,7 +42,7 @@ service ListenerDiscoveryService {
   }
 }
 
-// [#next-free-field: 21]
+// [#next-free-field: 22]
 message Listener {
   enum DrainType {
     // Drain in response to calling /healthcheck/fail admin endpoint (along with the health check
@@ -238,4 +238,17 @@ message Listener {
   // If no configuration is specified, Envoy will not attempt to balance active connections between
   // worker threads.
   ConnectionBalanceConfig connection_balance_config = 20;
+
+  // When this flag is set to true, listeners set the *SO_REUSEPORT* socket option and
+  // create one socket for each worker thread. This makes inbound connections
+  // distribute among worker threads roughly evenly in cases where there are a high number
+  // of connections. When this flag is set to false, all worker threads share one socket.
+  // For UDP this flag is set to true forcibly.
+  //
+  // Before Linux v4.19-rc1, new TCP connections may be rejected during hot restart
+  // (see `3rd paragraph in 'soreuseport' commit message
+  // <https://github.com/torvalds/linux/commit/c617f398edd4db2b8567a28e89>`_).
+  // This issue was fixed by `tcp: Avoid TCP syncookie rejected by SO_REUSEPORT socket
+  // <https://github.com/torvalds/linux/commit/40a1227ea845a37ab197dd1caffb60b047fa36b1>`_.
+  bool reuse_port = 21;
 }

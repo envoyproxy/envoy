@@ -10,6 +10,7 @@
 #include "common/common/utility.h"
 #include "common/config/metadata.h"
 #include "common/http/utility.h"
+#include "common/protobuf/message_validator_impl.h"
 #include "common/stream_info/utility.h"
 
 #include "absl/strings/str_split.h"
@@ -21,47 +22,44 @@ namespace Envoy {
 namespace AccessLog {
 
 static const std::string UnspecifiedValueString = "-";
+static const std::string EmptyString = "";
 
 namespace {
+
+const ProtobufWkt::Value& unspecifiedValue() {
+  static const auto* v = []() -> ProtobufWkt::Value* {
+    auto* vv = new ProtobufWkt::Value();
+    vv->set_null_value(ProtobufWkt::NULL_VALUE);
+    return vv;
+  }();
+  return *v;
+}
+
+ProtobufWkt::Value stringValue(const std::string& str) {
+  ProtobufWkt::Value val;
+  val.set_string_value(str);
+  return val;
+}
+
+template <typename T> ProtobufWkt::Value numberValue(const T num) {
+  ProtobufWkt::Value val;
+  val.set_number_value(static_cast<double>(num));
+  return val;
+}
+
+void truncate(std::string& str, absl::optional<uint32_t> max_length) {
+  if (!max_length) {
+    return;
+  }
+
+  str = str.substr(0, max_length.value());
+}
 
 // Matches newline pattern in a StartTimeFormatter format string.
 const std::regex& getStartTimeNewlinePattern() {
   CONSTRUCT_ON_FIRST_USE(std::regex, "%[-_0^#]*[1-9]*n");
 }
 const std::regex& getNewlinePattern() { CONSTRUCT_ON_FIRST_USE(std::regex, "\n"); }
-
-// Helper that handles the case when the ConnectionInfo is missing or if the desired value is
-// empty.
-StreamInfoFormatter::FieldExtractor sslConnectionInfoStringExtractor(
-    std::function<std::string(const Ssl::ConnectionInfo& connection_info)> string_extractor) {
-  return [string_extractor](const StreamInfo::StreamInfo& stream_info) {
-    if (stream_info.downstreamSslConnection() == nullptr) {
-      return UnspecifiedValueString;
-    }
-
-    const auto value = string_extractor(*stream_info.downstreamSslConnection());
-    if (value.empty()) {
-      return UnspecifiedValueString;
-    } else {
-      return value;
-    }
-  };
-}
-
-// Helper that handles the case when the desired time field is empty.
-StreamInfoFormatter::FieldExtractor sslConnectionInfoStringTimeExtractor(
-    std::function<absl::optional<SystemTime>(const Ssl::ConnectionInfo& connection_info)>
-        time_extractor) {
-  return sslConnectionInfoStringExtractor(
-      [time_extractor](const Ssl::ConnectionInfo& connection_info) {
-        absl::optional<SystemTime> time = time_extractor(connection_info);
-        if (!time.has_value()) {
-          return UnspecifiedValueString;
-        }
-
-        return AccessLogDateTimeFormatter::fromTime(time.value());
-      });
-}
 
 } // namespace
 
@@ -74,19 +72,6 @@ const std::string AccessLogFormatUtils::DEFAULT_FORMAT =
 
 FormatterPtr AccessLogFormatUtils::defaultAccessLogFormatter() {
   return FormatterPtr{new FormatterImpl(DEFAULT_FORMAT)};
-}
-
-std::string
-AccessLogFormatUtils::durationToString(const absl::optional<std::chrono::nanoseconds>& time) {
-  if (time) {
-    return durationToString(time.value());
-  } else {
-    return UnspecifiedValueString;
-  }
-}
-
-std::string AccessLogFormatUtils::durationToString(const std::chrono::nanoseconds& time) {
-  return fmt::format_int(std::chrono::duration_cast<std::chrono::milliseconds>(time).count()).str();
 }
 
 const std::string&
@@ -115,10 +100,11 @@ std::string FormatterImpl::format(const Http::HeaderMap& request_headers,
   return log_line;
 }
 
-JsonFormatterImpl::JsonFormatterImpl(std::unordered_map<std::string, std::string>& format_mapping) {
+JsonFormatterImpl::JsonFormatterImpl(std::unordered_map<std::string, std::string>& format_mapping,
+                                     bool preserve_types)
+    : preserve_types_(preserve_types) {
   for (const auto& pair : format_mapping) {
-    auto providers = AccessLogFormatParser::parse(pair.second);
-    json_output_format_.emplace(pair.first, FormatterPtr{new FormatterImpl(pair.second)});
+    json_output_format_.emplace(pair.first, AccessLogFormatParser::parse(pair.second));
   }
 }
 
@@ -126,32 +112,39 @@ std::string JsonFormatterImpl::format(const Http::HeaderMap& request_headers,
                                       const Http::HeaderMap& response_headers,
                                       const Http::HeaderMap& response_trailers,
                                       const StreamInfo::StreamInfo& stream_info) const {
-  const auto output_map = toMap(request_headers, response_headers, response_trailers, stream_info);
+  const auto output_struct =
+      toStruct(request_headers, response_headers, response_trailers, stream_info);
 
-  ProtobufWkt::Struct output_struct;
-  for (const auto& pair : output_map) {
-    ProtobufWkt::Value string_value;
-    string_value.set_string_value(pair.second);
-    (*output_struct.mutable_fields())[pair.first] = string_value;
-  }
-
-  std::string log_line;
-  const auto conversion_status = Protobuf::util::MessageToJsonString(output_struct, &log_line);
-  if (!conversion_status.ok()) {
-    log_line =
-        fmt::format("Error serializing access log to JSON: {}", conversion_status.ToString());
-  }
-
+  std::string log_line = MessageUtil::getJsonStringFromMessage(output_struct, false, true);
   return absl::StrCat(log_line, "\n");
 }
 
-std::unordered_map<std::string, std::string> JsonFormatterImpl::toMap(
-    const Http::HeaderMap& request_headers, const Http::HeaderMap& response_headers,
-    const Http::HeaderMap& response_trailers, const StreamInfo::StreamInfo& stream_info) const {
-  std::unordered_map<std::string, std::string> output;
+ProtobufWkt::Struct JsonFormatterImpl::toStruct(const Http::HeaderMap& request_headers,
+                                                const Http::HeaderMap& response_headers,
+                                                const Http::HeaderMap& response_trailers,
+                                                const StreamInfo::StreamInfo& stream_info) const {
+  ProtobufWkt::Struct output;
+  auto* fields = output.mutable_fields();
   for (const auto& pair : json_output_format_) {
-    output.emplace(pair.first, pair.second->format(request_headers, response_headers,
-                                                   response_trailers, stream_info));
+    const auto& providers = pair.second;
+    ASSERT(providers.size() >= 1);
+
+    if (providers.size() == 1) {
+      const auto& provider = providers.front();
+      auto val = preserve_types_ ? provider->formatValue(request_headers, response_headers,
+                                                         response_trailers, stream_info)
+                                 : stringValue(provider->format(request_headers, response_headers,
+                                                                response_trailers, stream_info));
+
+      (*fields)[pair.first] = val;
+    } else {
+      // Multiple providers forces string output.
+      std::string str;
+      for (const auto& provider : providers) {
+        str += provider->format(request_headers, response_headers, response_trailers, stream_info);
+      }
+      (*fields)[pair.first] = stringValue(str);
+    }
   }
   return output;
 }
@@ -326,195 +319,398 @@ std::vector<FormatterProviderPtr> AccessLogFormatParser::parse(const std::string
   return formatters;
 }
 
-StreamInfoFormatter::StreamInfoFormatter(const std::string& field_name) {
+// StreamInfo std::string field extractor.
+class StreamInfoStringFieldExtractor : public StreamInfoFormatter::FieldExtractor {
+public:
+  using FieldExtractor = std::function<std::string(const StreamInfo::StreamInfo&)>;
 
-  if (field_name == "REQUEST_DURATION") {
-    field_extractor_ = [](const StreamInfo::StreamInfo& stream_info) {
-      return AccessLogFormatUtils::durationToString(stream_info.lastDownstreamRxByteReceived());
-    };
-  } else if (field_name == "RESPONSE_DURATION") {
-    field_extractor_ = [](const StreamInfo::StreamInfo& stream_info) {
-      return AccessLogFormatUtils::durationToString(stream_info.firstUpstreamRxByteReceived());
-    };
-  } else if (field_name == "RESPONSE_TX_DURATION") {
-    field_extractor_ = [](const StreamInfo::StreamInfo& stream_info) {
-      auto downstream = stream_info.lastDownstreamTxByteSent();
-      auto upstream = stream_info.firstUpstreamRxByteReceived();
+  StreamInfoStringFieldExtractor(FieldExtractor f) : field_extractor_(f) {}
 
-      if (downstream && upstream) {
-        auto val = downstream.value() - upstream.value();
-        return AccessLogFormatUtils::durationToString(val);
-      }
+  // StreamInfoFormatter::FieldExtractor
+  std::string extract(const StreamInfo::StreamInfo& stream_info) const override {
+    return field_extractor_(stream_info);
+  }
+  ProtobufWkt::Value extractValue(const StreamInfo::StreamInfo& stream_info) const override {
+    return stringValue(field_extractor_(stream_info));
+  }
 
+private:
+  FieldExtractor field_extractor_;
+};
+
+// StreamInfo absl::optional<std::string> field extractor.
+class StreamInfoOptionalStringFieldExtractor : public StreamInfoFormatter::FieldExtractor {
+public:
+  using FieldExtractor = std::function<absl::optional<std::string>(const StreamInfo::StreamInfo&)>;
+
+  StreamInfoOptionalStringFieldExtractor(FieldExtractor f) : field_extractor_(f) {}
+
+  // StreamInfoFormatter::FieldExtractor
+  std::string extract(const StreamInfo::StreamInfo& stream_info) const override {
+    auto str = field_extractor_(stream_info);
+    if (!str) {
       return UnspecifiedValueString;
-    };
-  } else if (field_name == "BYTES_RECEIVED") {
-    field_extractor_ = [](const StreamInfo::StreamInfo& stream_info) {
-      return fmt::format_int(stream_info.bytesReceived()).str();
-    };
-  } else if (field_name == "PROTOCOL") {
-    field_extractor_ = [](const StreamInfo::StreamInfo& stream_info) {
-      return AccessLogFormatUtils::protocolToString(stream_info.protocol());
-    };
-  } else if (field_name == "RESPONSE_CODE") {
-    field_extractor_ = [](const StreamInfo::StreamInfo& stream_info) {
-      return stream_info.responseCode() ? fmt::format_int(stream_info.responseCode().value()).str()
-                                        : "0";
-    };
-  } else if (field_name == "RESPONSE_CODE_DETAILS") {
-    field_extractor_ = [](const StreamInfo::StreamInfo& stream_info) {
-      return stream_info.responseCodeDetails() ? stream_info.responseCodeDetails().value()
-                                               : UnspecifiedValueString;
-    };
-  } else if (field_name == "BYTES_SENT") {
-    field_extractor_ = [](const StreamInfo::StreamInfo& stream_info) {
-      return fmt::format_int(stream_info.bytesSent()).str();
-    };
-  } else if (field_name == "DURATION") {
-    field_extractor_ = [](const StreamInfo::StreamInfo& stream_info) {
-      return AccessLogFormatUtils::durationToString(stream_info.requestComplete());
-    };
-  } else if (field_name == "RESPONSE_FLAGS") {
-    field_extractor_ = [](const StreamInfo::StreamInfo& stream_info) {
-      return StreamInfo::ResponseFlagUtils::toShortString(stream_info);
-    };
-  } else if (field_name == "UPSTREAM_HOST") {
-    field_extractor_ = [](const StreamInfo::StreamInfo& stream_info) {
-      if (stream_info.upstreamHost()) {
-        return stream_info.upstreamHost()->address()->asString();
-      } else {
-        return UnspecifiedValueString;
-      }
-    };
-  } else if (field_name == "UPSTREAM_CLUSTER") {
-    field_extractor_ = [](const StreamInfo::StreamInfo& stream_info) {
-      std::string upstream_cluster_name;
-      if (nullptr != stream_info.upstreamHost()) {
-        upstream_cluster_name = stream_info.upstreamHost()->cluster().name();
-      }
+    }
 
-      return upstream_cluster_name.empty() ? UnspecifiedValueString : upstream_cluster_name;
-    };
-  } else if (field_name == "UPSTREAM_LOCAL_ADDRESS") {
-    field_extractor_ = [](const StreamInfo::StreamInfo& stream_info) {
-      return stream_info.upstreamLocalAddress() != nullptr
-                 ? stream_info.upstreamLocalAddress()->asString()
-                 : UnspecifiedValueString;
-    };
-  } else if (field_name == "DOWNSTREAM_LOCAL_ADDRESS") {
-    field_extractor_ = [](const StreamInfo::StreamInfo& stream_info) {
-      return stream_info.downstreamLocalAddress()->asString();
-    };
-  } else if (field_name == "DOWNSTREAM_LOCAL_ADDRESS_WITHOUT_PORT") {
-    field_extractor_ = [](const Envoy::StreamInfo::StreamInfo& stream_info) {
-      return StreamInfo::Utility::formatDownstreamAddressNoPort(
-          *stream_info.downstreamLocalAddress());
-    };
-  } else if (field_name == "DOWNSTREAM_REMOTE_ADDRESS") {
-    field_extractor_ = [](const StreamInfo::StreamInfo& stream_info) {
-      return stream_info.downstreamRemoteAddress()->asString();
-    };
-  } else if (field_name == "DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT") {
-    field_extractor_ = [](const StreamInfo::StreamInfo& stream_info) {
-      return StreamInfo::Utility::formatDownstreamAddressNoPort(
-          *stream_info.downstreamRemoteAddress());
-    };
-  } else if (field_name == "DOWNSTREAM_DIRECT_REMOTE_ADDRESS") {
-    field_extractor_ = [](const StreamInfo::StreamInfo& stream_info) {
-      return stream_info.downstreamDirectRemoteAddress()->asString();
-    };
-  } else if (field_name == "DOWNSTREAM_DIRECT_REMOTE_ADDRESS_WITHOUT_PORT") {
-    field_extractor_ = [](const StreamInfo::StreamInfo& stream_info) {
-      return StreamInfo::Utility::formatDownstreamAddressNoPort(
-          *stream_info.downstreamDirectRemoteAddress());
-    };
-  } else if (field_name == "REQUESTED_SERVER_NAME") {
-    field_extractor_ = [](const StreamInfo::StreamInfo& stream_info) {
-      if (!stream_info.requestedServerName().empty()) {
-        return stream_info.requestedServerName();
-      } else {
-        return UnspecifiedValueString;
-      }
-    };
-  } else if (field_name == "ROUTE_NAME") {
-    field_extractor_ = [](const StreamInfo::StreamInfo& stream_info) {
-      std::string route_name = stream_info.getRouteName();
-      return route_name.empty() ? UnspecifiedValueString : route_name;
-    };
-  } else if (field_name == "DOWNSTREAM_PEER_URI_SAN") {
+    return str.value();
+  }
+  ProtobufWkt::Value extractValue(const StreamInfo::StreamInfo& stream_info) const override {
+    auto str = field_extractor_(stream_info);
+    if (!str) {
+      return unspecifiedValue();
+    }
+
+    return stringValue(str.value());
+  }
+
+private:
+  FieldExtractor field_extractor_;
+};
+
+// StreamInfo std::chrono_nanoseconds field extractor.
+class StreamInfoDurationFieldExtractor : public StreamInfoFormatter::FieldExtractor {
+public:
+  using FieldExtractor =
+      std::function<absl::optional<std::chrono::nanoseconds>(const StreamInfo::StreamInfo&)>;
+
+  StreamInfoDurationFieldExtractor(FieldExtractor f) : field_extractor_(f) {}
+
+  // StreamInfoFormatter::FieldExtractor
+  std::string extract(const StreamInfo::StreamInfo& stream_info) const override {
+    auto millis = extractMillis(stream_info);
+    if (!millis) {
+      return UnspecifiedValueString;
+    }
+
+    return fmt::format_int(millis.value()).str();
+  }
+  ProtobufWkt::Value extractValue(const StreamInfo::StreamInfo& stream_info) const override {
+    auto millis = extractMillis(stream_info);
+    if (!millis) {
+      return unspecifiedValue();
+    }
+
+    return numberValue(millis.value());
+  }
+
+private:
+  absl::optional<uint32_t> extractMillis(const StreamInfo::StreamInfo& stream_info) const {
+    auto time = field_extractor_(stream_info);
+    if (time) {
+      return std::chrono::duration_cast<std::chrono::milliseconds>(time.value()).count();
+    }
+    return absl::nullopt;
+  }
+
+  FieldExtractor field_extractor_;
+};
+
+// StreamInfo uint64_t field extractor.
+class StreamInfoUInt64FieldExtractor : public StreamInfoFormatter::FieldExtractor {
+public:
+  using FieldExtractor = std::function<uint64_t(const StreamInfo::StreamInfo&)>;
+
+  StreamInfoUInt64FieldExtractor(FieldExtractor f) : field_extractor_(f) {}
+
+  // StreamInfoFormatter::FieldExtractor
+  std::string extract(const StreamInfo::StreamInfo& stream_info) const override {
+    return fmt::format_int(field_extractor_(stream_info)).str();
+  }
+  ProtobufWkt::Value extractValue(const StreamInfo::StreamInfo& stream_info) const override {
+    return numberValue(field_extractor_(stream_info));
+  }
+
+private:
+  FieldExtractor field_extractor_;
+};
+
+// StreamInfo Envoy::Network::Address::InstanceConstSharedPtr field extractor.
+class StreamInfoAddressFieldExtractor : public StreamInfoFormatter::FieldExtractor {
+public:
+  using FieldExtractor =
+      std::function<Network::Address::InstanceConstSharedPtr(const StreamInfo::StreamInfo&)>;
+
+  static std::unique_ptr<StreamInfoAddressFieldExtractor> withPort(FieldExtractor f) {
+    return std::make_unique<StreamInfoAddressFieldExtractor>(f, true);
+  }
+
+  static std::unique_ptr<StreamInfoAddressFieldExtractor> withoutPort(FieldExtractor f) {
+    return std::make_unique<StreamInfoAddressFieldExtractor>(f, false);
+  }
+
+  StreamInfoAddressFieldExtractor(FieldExtractor f, bool include_port)
+      : field_extractor_(f), include_port_(include_port) {}
+
+  // StreamInfoFormatter::FieldExtractor
+  std::string extract(const StreamInfo::StreamInfo& stream_info) const override {
+    Network::Address::InstanceConstSharedPtr address = field_extractor_(stream_info);
+    if (!address) {
+      return UnspecifiedValueString;
+    }
+
+    return toString(*address);
+  }
+  ProtobufWkt::Value extractValue(const StreamInfo::StreamInfo& stream_info) const override {
+    Network::Address::InstanceConstSharedPtr address = field_extractor_(stream_info);
+    if (!address) {
+      return unspecifiedValue();
+    }
+
+    return stringValue(toString(*address));
+  }
+
+private:
+  std::string toString(const Network::Address::Instance& address) const {
+    if (include_port_) {
+      return address.asString();
+    }
+
+    return StreamInfo::Utility::formatDownstreamAddressNoPort(address);
+  }
+
+  FieldExtractor field_extractor_;
+  const bool include_port_;
+};
+
+// Ssl::ConnectionInfo std::string field extractor.
+class StreamInfoSslConnectionInfoFieldExtractor : public StreamInfoFormatter::FieldExtractor {
+public:
+  using FieldExtractor = std::function<std::string(const Ssl::ConnectionInfo& connection_info)>;
+
+  StreamInfoSslConnectionInfoFieldExtractor(FieldExtractor f) : field_extractor_(f) {}
+
+  std::string extract(const StreamInfo::StreamInfo& stream_info) const override {
+    if (stream_info.downstreamSslConnection() == nullptr) {
+      return UnspecifiedValueString;
+    }
+
+    const auto value = field_extractor_(*stream_info.downstreamSslConnection());
+    if (value.empty()) {
+      return UnspecifiedValueString;
+    }
+
+    return value;
+  }
+
+  ProtobufWkt::Value extractValue(const StreamInfo::StreamInfo& stream_info) const override {
+    if (stream_info.downstreamSslConnection() == nullptr) {
+      return unspecifiedValue();
+    }
+
+    const auto value = field_extractor_(*stream_info.downstreamSslConnection());
+    if (value.empty()) {
+      return unspecifiedValue();
+    }
+
+    return stringValue(value);
+  }
+
+private:
+  FieldExtractor field_extractor_;
+};
+
+StreamInfoFormatter::StreamInfoFormatter(const std::string& field_name) {
+  if (field_name == "REQUEST_DURATION") {
+    field_extractor_ = std::make_unique<StreamInfoDurationFieldExtractor>(
+        [](const StreamInfo::StreamInfo& stream_info) {
+          return stream_info.lastDownstreamRxByteReceived();
+        });
+  } else if (field_name == "RESPONSE_DURATION") {
+    field_extractor_ = std::make_unique<StreamInfoDurationFieldExtractor>(
+        [](const StreamInfo::StreamInfo& stream_info) {
+          return stream_info.firstUpstreamRxByteReceived();
+        });
+  } else if (field_name == "RESPONSE_TX_DURATION") {
+    field_extractor_ = std::make_unique<StreamInfoDurationFieldExtractor>(
+        [](const StreamInfo::StreamInfo& stream_info) {
+          auto downstream = stream_info.lastDownstreamTxByteSent();
+          auto upstream = stream_info.firstUpstreamRxByteReceived();
+
+          absl::optional<std::chrono::nanoseconds> result;
+          if (downstream && upstream) {
+            result = downstream.value() - upstream.value();
+          }
+
+          return result;
+        });
+  } else if (field_name == "BYTES_RECEIVED") {
+    field_extractor_ = std::make_unique<StreamInfoUInt64FieldExtractor>(
+        [](const StreamInfo::StreamInfo& stream_info) { return stream_info.bytesReceived(); });
+  } else if (field_name == "PROTOCOL") {
+    field_extractor_ = std::make_unique<StreamInfoStringFieldExtractor>(
+        [](const StreamInfo::StreamInfo& stream_info) {
+          return AccessLogFormatUtils::protocolToString(stream_info.protocol());
+        });
+  } else if (field_name == "RESPONSE_CODE") {
+    field_extractor_ = std::make_unique<StreamInfoUInt64FieldExtractor>(
+        [](const StreamInfo::StreamInfo& stream_info) {
+          return stream_info.responseCode() ? stream_info.responseCode().value() : 0;
+        });
+  } else if (field_name == "RESPONSE_CODE_DETAILS") {
+    field_extractor_ = std::make_unique<StreamInfoOptionalStringFieldExtractor>(
+        [](const StreamInfo::StreamInfo& stream_info) {
+          return stream_info.responseCodeDetails();
+        });
+  } else if (field_name == "BYTES_SENT") {
+    field_extractor_ = std::make_unique<StreamInfoUInt64FieldExtractor>(
+        [](const StreamInfo::StreamInfo& stream_info) { return stream_info.bytesSent(); });
+  } else if (field_name == "DURATION") {
+    field_extractor_ = std::make_unique<StreamInfoDurationFieldExtractor>(
+        [](const StreamInfo::StreamInfo& stream_info) { return stream_info.requestComplete(); });
+  } else if (field_name == "RESPONSE_FLAGS") {
+    field_extractor_ = std::make_unique<StreamInfoStringFieldExtractor>(
+        [](const StreamInfo::StreamInfo& stream_info) {
+          return StreamInfo::ResponseFlagUtils::toShortString(stream_info);
+        });
+  } else if (field_name == "UPSTREAM_HOST") {
     field_extractor_ =
-        sslConnectionInfoStringExtractor([](const Ssl::ConnectionInfo& connection_info) {
+        StreamInfoAddressFieldExtractor::withPort([](const StreamInfo::StreamInfo& stream_info) {
+          return stream_info.upstreamHost() ? stream_info.upstreamHost()->address() : nullptr;
+        });
+  } else if (field_name == "UPSTREAM_CLUSTER") {
+    field_extractor_ = std::make_unique<StreamInfoOptionalStringFieldExtractor>(
+        [](const StreamInfo::StreamInfo& stream_info) {
+          std::string upstream_cluster_name;
+          if (nullptr != stream_info.upstreamHost()) {
+            upstream_cluster_name = stream_info.upstreamHost()->cluster().name();
+          }
+
+          return upstream_cluster_name.empty()
+                     ? absl::nullopt
+                     : absl::make_optional<std::string>(upstream_cluster_name);
+        });
+  } else if (field_name == "UPSTREAM_LOCAL_ADDRESS") {
+    field_extractor_ =
+        StreamInfoAddressFieldExtractor::withPort([](const StreamInfo::StreamInfo& stream_info) {
+          return stream_info.upstreamLocalAddress();
+        });
+  } else if (field_name == "DOWNSTREAM_LOCAL_ADDRESS") {
+    field_extractor_ =
+        StreamInfoAddressFieldExtractor::withPort([](const StreamInfo::StreamInfo& stream_info) {
+          return stream_info.downstreamLocalAddress();
+        });
+  } else if (field_name == "DOWNSTREAM_LOCAL_ADDRESS_WITHOUT_PORT") {
+    field_extractor_ = StreamInfoAddressFieldExtractor::withoutPort(
+        [](const Envoy::StreamInfo::StreamInfo& stream_info) {
+          return stream_info.downstreamLocalAddress();
+        });
+  } else if (field_name == "DOWNSTREAM_REMOTE_ADDRESS") {
+    field_extractor_ =
+        StreamInfoAddressFieldExtractor::withPort([](const StreamInfo::StreamInfo& stream_info) {
+          return stream_info.downstreamRemoteAddress();
+        });
+  } else if (field_name == "DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT") {
+    field_extractor_ =
+        StreamInfoAddressFieldExtractor::withoutPort([](const StreamInfo::StreamInfo& stream_info) {
+          return stream_info.downstreamRemoteAddress();
+        });
+  } else if (field_name == "DOWNSTREAM_DIRECT_REMOTE_ADDRESS") {
+    field_extractor_ =
+        StreamInfoAddressFieldExtractor::withPort([](const StreamInfo::StreamInfo& stream_info) {
+          return stream_info.downstreamDirectRemoteAddress();
+        });
+  } else if (field_name == "DOWNSTREAM_DIRECT_REMOTE_ADDRESS_WITHOUT_PORT") {
+    field_extractor_ =
+        StreamInfoAddressFieldExtractor::withoutPort([](const StreamInfo::StreamInfo& stream_info) {
+          return stream_info.downstreamDirectRemoteAddress();
+        });
+  } else if (field_name == "REQUESTED_SERVER_NAME") {
+    field_extractor_ = std::make_unique<StreamInfoOptionalStringFieldExtractor>(
+        [](const StreamInfo::StreamInfo& stream_info) {
+          absl::optional<std::string> result;
+          if (!stream_info.requestedServerName().empty()) {
+            result = stream_info.requestedServerName();
+          }
+          return result;
+        });
+  } else if (field_name == "ROUTE_NAME") {
+    field_extractor_ = std::make_unique<StreamInfoOptionalStringFieldExtractor>(
+        [](const StreamInfo::StreamInfo& stream_info) {
+          absl::optional<std::string> result;
+          std::string route_name = stream_info.getRouteName();
+          if (!route_name.empty()) {
+            result = route_name;
+          }
+          return result;
+        });
+  } else if (field_name == "DOWNSTREAM_PEER_URI_SAN") {
+    field_extractor_ = std::make_unique<StreamInfoSslConnectionInfoFieldExtractor>(
+        [](const Ssl::ConnectionInfo& connection_info) {
           return absl::StrJoin(connection_info.uriSanPeerCertificate(), ",");
         });
   } else if (field_name == "DOWNSTREAM_LOCAL_URI_SAN") {
-    field_extractor_ =
-        sslConnectionInfoStringExtractor([](const Ssl::ConnectionInfo& connection_info) {
+    field_extractor_ = std::make_unique<StreamInfoSslConnectionInfoFieldExtractor>(
+        [](const Ssl::ConnectionInfo& connection_info) {
           return absl::StrJoin(connection_info.uriSanLocalCertificate(), ",");
         });
   } else if (field_name == "DOWNSTREAM_PEER_SUBJECT") {
-    field_extractor_ =
-        sslConnectionInfoStringExtractor([](const Ssl::ConnectionInfo& connection_info) {
+    field_extractor_ = std::make_unique<StreamInfoSslConnectionInfoFieldExtractor>(
+        [](const Ssl::ConnectionInfo& connection_info) {
           return connection_info.subjectPeerCertificate();
         });
   } else if (field_name == "DOWNSTREAM_LOCAL_SUBJECT") {
-    field_extractor_ =
-        sslConnectionInfoStringExtractor([](const Ssl::ConnectionInfo& connection_info) {
+    field_extractor_ = std::make_unique<StreamInfoSslConnectionInfoFieldExtractor>(
+        [](const Ssl::ConnectionInfo& connection_info) {
           return connection_info.subjectLocalCertificate();
         });
   } else if (field_name == "DOWNSTREAM_TLS_SESSION_ID") {
-    field_extractor_ = sslConnectionInfoStringExtractor(
+    field_extractor_ = std::make_unique<StreamInfoSslConnectionInfoFieldExtractor>(
         [](const Ssl::ConnectionInfo& connection_info) { return connection_info.sessionId(); });
   } else if (field_name == "DOWNSTREAM_TLS_CIPHER") {
-    field_extractor_ =
-        sslConnectionInfoStringExtractor([](const Ssl::ConnectionInfo& connection_info) {
+    field_extractor_ = std::make_unique<StreamInfoSslConnectionInfoFieldExtractor>(
+        [](const Ssl::ConnectionInfo& connection_info) {
           return connection_info.ciphersuiteString();
         });
   } else if (field_name == "DOWNSTREAM_TLS_VERSION") {
-    field_extractor_ = sslConnectionInfoStringExtractor(
+    field_extractor_ = std::make_unique<StreamInfoSslConnectionInfoFieldExtractor>(
         [](const Ssl::ConnectionInfo& connection_info) { return connection_info.tlsVersion(); });
   } else if (field_name == "DOWNSTREAM_PEER_FINGERPRINT_256") {
-    field_extractor_ =
-        sslConnectionInfoStringExtractor([](const Ssl::ConnectionInfo& connection_info) {
+    field_extractor_ = std::make_unique<StreamInfoSslConnectionInfoFieldExtractor>(
+        [](const Ssl::ConnectionInfo& connection_info) {
           return connection_info.sha256PeerCertificateDigest();
         });
   } else if (field_name == "DOWNSTREAM_PEER_SERIAL") {
-    field_extractor_ =
-        sslConnectionInfoStringExtractor([](const Ssl::ConnectionInfo& connection_info) {
+    field_extractor_ = std::make_unique<StreamInfoSslConnectionInfoFieldExtractor>(
+        [](const Ssl::ConnectionInfo& connection_info) {
           return connection_info.serialNumberPeerCertificate();
         });
   } else if (field_name == "DOWNSTREAM_PEER_ISSUER") {
-    field_extractor_ =
-        sslConnectionInfoStringExtractor([](const Ssl::ConnectionInfo& connection_info) {
+    field_extractor_ = std::make_unique<StreamInfoSslConnectionInfoFieldExtractor>(
+        [](const Ssl::ConnectionInfo& connection_info) {
           return connection_info.issuerPeerCertificate();
         });
-  } else if (field_name == "DOWNSTREAM_PEER_SUBJECT") {
-    field_extractor_ =
-        sslConnectionInfoStringExtractor([](const Ssl::ConnectionInfo& connection_info) {
-          return connection_info.subjectPeerCertificate();
-        });
   } else if (field_name == "DOWNSTREAM_PEER_CERT") {
-    field_extractor_ =
-        sslConnectionInfoStringExtractor([](const Ssl::ConnectionInfo& connection_info) {
+    field_extractor_ = std::make_unique<StreamInfoSslConnectionInfoFieldExtractor>(
+        [](const Ssl::ConnectionInfo& connection_info) {
           return connection_info.urlEncodedPemEncodedPeerCertificate();
         });
   } else if (field_name == "DOWNSTREAM_PEER_CERT_V_START") {
-    field_extractor_ =
-        sslConnectionInfoStringTimeExtractor([](const Ssl::ConnectionInfo& connection_info) {
-          return connection_info.validFromPeerCertificate();
+    field_extractor_ = std::make_unique<StreamInfoSslConnectionInfoFieldExtractor>(
+        [](const Ssl::ConnectionInfo& connection_info) {
+          absl::optional<SystemTime> time = connection_info.validFromPeerCertificate();
+          if (!time.has_value()) {
+            return EmptyString;
+          }
+          return AccessLogDateTimeFormatter::fromTime(time.value());
         });
   } else if (field_name == "DOWNSTREAM_PEER_CERT_V_END") {
-    field_extractor_ =
-        sslConnectionInfoStringTimeExtractor([](const Ssl::ConnectionInfo& connection_info) {
-          return connection_info.expirationPeerCertificate();
+    field_extractor_ = std::make_unique<StreamInfoSslConnectionInfoFieldExtractor>(
+        [](const Ssl::ConnectionInfo& connection_info) {
+          absl::optional<SystemTime> time = connection_info.expirationPeerCertificate();
+          if (!time.has_value()) {
+            return EmptyString;
+          }
+          return AccessLogDateTimeFormatter::fromTime(time.value());
         });
   } else if (field_name == "UPSTREAM_TRANSPORT_FAILURE_REASON") {
-    field_extractor_ = [](const StreamInfo::StreamInfo& stream_info) {
-      if (!stream_info.upstreamTransportFailureReason().empty()) {
-        return stream_info.upstreamTransportFailureReason();
-      } else {
-        return UnspecifiedValueString;
-      }
-    };
+    field_extractor_ = std::make_unique<StreamInfoOptionalStringFieldExtractor>(
+        [](const StreamInfo::StreamInfo& stream_info) {
+          absl::optional<std::string> result;
+          if (!stream_info.upstreamTransportFailureReason().empty()) {
+            result = stream_info.upstreamTransportFailureReason();
+          }
+          return result;
+        });
   } else {
     throw EnvoyException(fmt::format("Not supported field in StreamInfo: {}", field_name));
   }
@@ -523,14 +719,27 @@ StreamInfoFormatter::StreamInfoFormatter(const std::string& field_name) {
 std::string StreamInfoFormatter::format(const Http::HeaderMap&, const Http::HeaderMap&,
                                         const Http::HeaderMap&,
                                         const StreamInfo::StreamInfo& stream_info) const {
-  return field_extractor_(stream_info);
+  return field_extractor_->extract(stream_info);
 }
 
-PlainStringFormatter::PlainStringFormatter(const std::string& str) : str_(str) {}
+ProtobufWkt::Value
+StreamInfoFormatter::formatValue(const Http::HeaderMap&, const Http::HeaderMap&,
+                                 const Http::HeaderMap&,
+                                 const StreamInfo::StreamInfo& stream_info) const {
+  return field_extractor_->extractValue(stream_info);
+}
+
+PlainStringFormatter::PlainStringFormatter(const std::string& str) { str_.set_string_value(str); }
 
 std::string PlainStringFormatter::format(const Http::HeaderMap&, const Http::HeaderMap&,
                                          const Http::HeaderMap&,
                                          const StreamInfo::StreamInfo&) const {
+  return str_.string_value();
+}
+
+ProtobufWkt::Value PlainStringFormatter::formatValue(const Http::HeaderMap&, const Http::HeaderMap&,
+                                                     const Http::HeaderMap&,
+                                                     const StreamInfo::StreamInfo&) const {
   return str_;
 }
 
@@ -539,25 +748,36 @@ HeaderFormatter::HeaderFormatter(const std::string& main_header,
                                  absl::optional<size_t> max_length)
     : main_header_(main_header), alternative_header_(alternative_header), max_length_(max_length) {}
 
-std::string HeaderFormatter::format(const Http::HeaderMap& headers) const {
+const Http::HeaderEntry* HeaderFormatter::findHeader(const Http::HeaderMap& headers) const {
   const Http::HeaderEntry* header = headers.get(main_header_);
 
   if (!header && !alternative_header_.get().empty()) {
-    header = headers.get(alternative_header_);
+    return headers.get(alternative_header_);
   }
 
-  std::string header_value_string;
+  return header;
+}
+
+std::string HeaderFormatter::format(const Http::HeaderMap& headers) const {
+  const Http::HeaderEntry* header = findHeader(headers);
   if (!header) {
-    header_value_string = UnspecifiedValueString;
-  } else {
-    header_value_string = std::string(header->value().getStringView());
+    return UnspecifiedValueString;
   }
 
-  if (max_length_ && header_value_string.length() > max_length_.value()) {
-    return header_value_string.substr(0, max_length_.value());
+  std::string val = std::string(header->value().getStringView());
+  truncate(val, max_length_);
+  return val;
+}
+
+ProtobufWkt::Value HeaderFormatter::formatValue(const Http::HeaderMap& headers) const {
+  const Http::HeaderEntry* header = findHeader(headers);
+  if (!header) {
+    return unspecifiedValue();
   }
 
-  return header_value_string;
+  std::string val = std::string(header->value().getStringView());
+  truncate(val, max_length_);
+  return stringValue(val);
 }
 
 ResponseHeaderFormatter::ResponseHeaderFormatter(const std::string& main_header,
@@ -572,6 +792,13 @@ std::string ResponseHeaderFormatter::format(const Http::HeaderMap&,
   return HeaderFormatter::format(response_headers);
 }
 
+ProtobufWkt::Value ResponseHeaderFormatter::formatValue(const Http::HeaderMap&,
+                                                        const Http::HeaderMap& response_headers,
+                                                        const Http::HeaderMap&,
+                                                        const StreamInfo::StreamInfo&) const {
+  return HeaderFormatter::formatValue(response_headers);
+}
+
 RequestHeaderFormatter::RequestHeaderFormatter(const std::string& main_header,
                                                const std::string& alternative_header,
                                                absl::optional<size_t> max_length)
@@ -581,6 +808,13 @@ std::string RequestHeaderFormatter::format(const Http::HeaderMap& request_header
                                            const Http::HeaderMap&, const Http::HeaderMap&,
                                            const StreamInfo::StreamInfo&) const {
   return HeaderFormatter::format(request_headers);
+}
+
+ProtobufWkt::Value RequestHeaderFormatter::formatValue(const Http::HeaderMap& request_headers,
+                                                       const Http::HeaderMap&,
+                                                       const Http::HeaderMap&,
+                                                       const StreamInfo::StreamInfo&) const {
+  return HeaderFormatter::formatValue(request_headers);
 }
 
 ResponseTrailerFormatter::ResponseTrailerFormatter(const std::string& main_header,
@@ -594,33 +828,48 @@ std::string ResponseTrailerFormatter::format(const Http::HeaderMap&, const Http:
   return HeaderFormatter::format(response_trailers);
 }
 
+ProtobufWkt::Value ResponseTrailerFormatter::formatValue(const Http::HeaderMap&,
+                                                         const Http::HeaderMap&,
+                                                         const Http::HeaderMap& response_trailers,
+                                                         const StreamInfo::StreamInfo&) const {
+  return HeaderFormatter::formatValue(response_trailers);
+}
+
 MetadataFormatter::MetadataFormatter(const std::string& filter_namespace,
                                      const std::vector<std::string>& path,
                                      absl::optional<size_t> max_length)
     : filter_namespace_(filter_namespace), path_(path), max_length_(max_length) {}
 
-std::string MetadataFormatter::format(const envoy::api::v2::core::Metadata& metadata) const {
-  const Protobuf::Message* data;
+std::string
+MetadataFormatter::formatMetadata(const envoy::api::v2::core::Metadata& metadata) const {
+  ProtobufWkt::Value value = formatMetadataValue(metadata);
+  if (value.kind_case() == ProtobufWkt::Value::kNullValue) {
+    return UnspecifiedValueString;
+  }
+
+  std::string json = MessageUtil::getJsonStringFromMessage(value, false, true);
+  truncate(json, max_length_);
+  return json;
+}
+
+ProtobufWkt::Value
+MetadataFormatter::formatMetadataValue(const envoy::api::v2::core::Metadata& metadata) const {
   if (path_.empty()) {
     const auto filter_it = metadata.filter_metadata().find(filter_namespace_);
     if (filter_it == metadata.filter_metadata().end()) {
-      return UnspecifiedValueString;
+      return unspecifiedValue();
     }
-    data = &(filter_it->second);
-  } else {
-    const ProtobufWkt::Value& val = Metadata::metadataValue(metadata, filter_namespace_, path_);
-    if (val.kind_case() == ProtobufWkt::Value::KindCase::KIND_NOT_SET) {
-      return UnspecifiedValueString;
-    }
-    data = &val;
+    ProtobufWkt::Value output;
+    output.mutable_struct_value()->CopyFrom(filter_it->second);
+    return output;
   }
-  std::string json;
-  const auto status = Protobuf::util::MessageToJsonString(*data, &json);
-  RELEASE_ASSERT(status.ok(), "");
-  if (max_length_ && json.length() > max_length_.value()) {
-    return json.substr(0, max_length_.value());
+
+  const ProtobufWkt::Value& val = Metadata::metadataValue(metadata, filter_namespace_, path_);
+  if (val.kind_case() == ProtobufWkt::Value::KindCase::KIND_NOT_SET) {
+    return unspecifiedValue();
   }
-  return json;
+
+  return val;
 }
 
 // TODO(glicht): Consider adding support for route/listener/cluster metadata as suggested by @htuch.
@@ -633,23 +882,35 @@ DynamicMetadataFormatter::DynamicMetadataFormatter(const std::string& filter_nam
 std::string DynamicMetadataFormatter::format(const Http::HeaderMap&, const Http::HeaderMap&,
                                              const Http::HeaderMap&,
                                              const StreamInfo::StreamInfo& stream_info) const {
-  return MetadataFormatter::format(stream_info.dynamicMetadata());
+  return MetadataFormatter::formatMetadata(stream_info.dynamicMetadata());
+}
+
+ProtobufWkt::Value
+DynamicMetadataFormatter::formatValue(const Http::HeaderMap&, const Http::HeaderMap&,
+                                      const Http::HeaderMap&,
+                                      const StreamInfo::StreamInfo& stream_info) const {
+  return MetadataFormatter::formatMetadataValue(stream_info.dynamicMetadata());
 }
 
 FilterStateFormatter::FilterStateFormatter(const std::string& key,
                                            absl::optional<size_t> max_length)
     : key_(key), max_length_(max_length) {}
 
-std::string FilterStateFormatter::format(const Http::HeaderMap&, const Http::HeaderMap&,
-                                         const Http::HeaderMap&,
-                                         const StreamInfo::StreamInfo& stream_info) const {
+ProtobufTypes::MessagePtr
+FilterStateFormatter::filterState(const StreamInfo::StreamInfo& stream_info) const {
   const StreamInfo::FilterState& filter_state = stream_info.filterState();
   if (!filter_state.hasDataWithName(key_)) {
-    return UnspecifiedValueString;
+    return nullptr;
   }
 
   const auto& object = filter_state.getDataReadOnly<StreamInfo::FilterState::Object>(key_);
-  ProtobufTypes::MessagePtr proto = object.serializeAsProto();
+  return object.serializeAsProto();
+}
+
+std::string FilterStateFormatter::format(const Http::HeaderMap&, const Http::HeaderMap&,
+                                         const Http::HeaderMap&,
+                                         const StreamInfo::StreamInfo& stream_info) const {
+  ProtobufTypes::MessagePtr proto = filterState(stream_info);
   if (proto == nullptr) {
     return UnspecifiedValueString;
   }
@@ -661,10 +922,27 @@ std::string FilterStateFormatter::format(const Http::HeaderMap&, const Http::Hea
     // TODO(lizan): add support of unknown Any.
     return UnspecifiedValueString;
   }
-  if (max_length_.has_value() && value.length() > max_length_.value()) {
-    return value.substr(0, max_length_.value());
-  }
+
+  truncate(value, max_length_);
   return value;
+}
+
+ProtobufWkt::Value
+FilterStateFormatter::formatValue(const Http::HeaderMap&, const Http::HeaderMap&,
+                                  const Http::HeaderMap&,
+                                  const StreamInfo::StreamInfo& stream_info) const {
+  ProtobufTypes::MessagePtr proto = filterState(stream_info);
+  if (proto == nullptr) {
+    return unspecifiedValue();
+  }
+
+  ProtobufWkt::Value val;
+  try {
+    MessageUtil::jsonConvertValue(*proto, val);
+  } catch (EnvoyException& ex) {
+    return unspecifiedValue();
+  }
+  return val;
 }
 
 StartTimeFormatter::StartTimeFormatter(const std::string& format) : date_formatter_(format) {}
@@ -677,6 +955,12 @@ std::string StartTimeFormatter::format(const Http::HeaderMap&, const Http::Heade
   } else {
     return date_formatter_.fromTime(stream_info.startTime());
   }
+}
+
+ProtobufWkt::Value StartTimeFormatter::formatValue(
+    const Http::HeaderMap& request_headers, const Http::HeaderMap& response_headers,
+    const Http::HeaderMap& response_trailers, const StreamInfo::StreamInfo& stream_info) const {
+  return stringValue(format(request_headers, response_headers, response_trailers, stream_info));
 }
 
 } // namespace AccessLog

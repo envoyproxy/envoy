@@ -27,6 +27,13 @@ static_resources:
                   cluster: service1
                 decorator:
                   operation: checkAvailability
+              response_headers_to_add:
+              - header:
+                  key: "x-b3-traceid"
+                  value: "%REQ(x-b3-traceid)%"
+              - header:
+                  key: "x-request-id"
+                  value: "%REQ(x-request-id)%"
           http_filters:
           - name: envoy.router
             typed_config: {}
