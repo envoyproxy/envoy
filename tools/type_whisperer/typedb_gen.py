@@ -22,7 +22,7 @@ TYPE_UPGRADE_REGEXES = [
 
 # As with TYPE_UPGRADE_REGEXES but for API .proto paths.
 PATH_UPGRADE_REGEXES = [
-    (r'(envoy/([\w]*/|))(v2alpha\d?|v2)', r'\1v3alpha'),
+    (r'(envoy/([\w/]*/|))(v2alpha\d?|v2)', r'\1v3alpha'),
     # These are special cases, e.g. upgrading versionless packages.
     ('envoy/type/matcher', 'envoy/type/matcher/v3alpha'),
     ('envoy/type', 'envoy/type/v3alpha'),
@@ -65,10 +65,8 @@ def UpgradedPath(proto_path):
 
 def LoadTypes(path):
   """Load a tools.type_whisperer.Types proto from the filesystem.
-
   Args:
     path: filesystem path for a file in text proto format.
-
   Returns:
     tools.type_whisperer.Types proto loaded from path.
   """
@@ -80,16 +78,13 @@ def LoadTypes(path):
 
 def NextVersionUpgrade(type_name, type_map, next_version_upgrade_memo, visited=None):
   """Does a given type require upgrade between major version?
-
   Performs depth-first search through type dependency graph for any upgraded
   types that will force type_name to be upgraded.
-
   Args:
     type_name: fully qualified type name.
     type_map: map from type name to tools.type_whisperer.TypeDescription.
     next_version_upgrade_memo: a memo dictionary to avoid revisiting nodes across invocations.
     visited: a set of visited nodes in the current search, used to detect loops.
-
   Returns:
     A boolean indicating whether the type requires upgrade.
   """

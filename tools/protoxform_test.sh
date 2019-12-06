@@ -1,5 +1,7 @@
 #!/bin/bash
 
+rm -rf bazel-bin/tools
+
 declare -r PROTO_TARGETS=$(bazel query "labels(srcs, labels(deps, //tools/testdata/protoxform:protos))")
 
 BAZEL_BUILD_OPTIONS+=" --remote_download_outputs=all --strategy=protoxform=sandboxed,local"
