@@ -26,9 +26,12 @@ from tools.protoxform import utils
 from tools.type_whisperer import type_whisperer
 from tools.type_whisperer.types_pb2 import Types
 
-from google.api import annotations_pb2
 from google.protobuf import text_format
-from validate import validate_pb2
+
+# Note: we have to include those proto definitions to make FormatOptions work,
+# this also serves as whitelist of extended options.
+from google.api import annotations_pb2 as _
+from validate import validate_pb2 as _
 
 CLANG_FORMAT_STYLE = ('{ColumnLimit: 100, SpacesInContainerLiterals: false, '
                       'AllowShortFunctionsOnASingleLine: false}')
@@ -341,20 +344,6 @@ def FormatServiceMethod(type_context, method):
       NormalizeFieldTypeName(type_context, method.output_type), FormatOptions(method.options))
 
 
-def FormatValidateFieldRules(rules):
-  """Format validate_pb2 rules.
-
-  Args:
-    rules: validate_pb2 rules proto.
-
-  Returns:
-    Formatted validation rules as string, suitable for proto field annotation.
-  """
-  return ' '.join('.%s = { %s }' %
-                  (field.name, text_format.MessageToString(value, as_one_line=True))
-                  for field, value in rules.ListFields())
-
-
 def FormatField(type_context, field):
   """Format FieldDescriptorProto as a proto field.
 
@@ -419,7 +408,6 @@ def FormatOptions(options, is_message=False):
           versioning_annotation.previous_message_type)
 =======
   for option_descriptor, option_value in sorted(options.ListFields(), key=lambda x: x[0].number):
-    # TODO(lizan): consider whitelist specific options only
     option_name = "({})".format(
         option_descriptor.full_name) if option_descriptor.is_extension else option_descriptor.name
     if option_descriptor.message_type and option_descriptor.label != option_descriptor.LABEL_REPEATED:
