@@ -1,7 +1,7 @@
 def _default_envoy_dev_impl(ctx):
     ctx.file("WORKSPACE", "")
     ctx.file("BUILD.bazel", "")
-    ctx.symlink(ctx.path(ctx.attr.envoy_root).dirname.get_child('tools').get_child('clang_tools'), 'clang_tools')
+    ctx.symlink(ctx.path(ctx.attr.envoy_root).dirname.get_child("tools").get_child("clang_tools"), "clang_tools")
 
 _default_envoy_dev = repository_rule(
     implementation = _default_envoy_dev_impl,
