@@ -15,3 +15,7 @@ envoy_dependencies()
 load("//bazel:dependency_imports.bzl", "envoy_dependency_imports")
 
 envoy_dependency_imports()
+
+load("//bazel:dev_binding.bzl", "envoy_dev_binding")
+
+envoy_dev_binding()
