@@ -1,8 +1,6 @@
 #include "common/stream_info/filter_state_impl.h"
 
 #include "envoy/common/exception.h"
-#include <features.h>
-#include <type_traits>
 
 namespace Envoy {
 namespace StreamInfo {
