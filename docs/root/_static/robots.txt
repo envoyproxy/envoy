@@ -1,1 +1,13 @@
 User-agent: *
+Disallow: /docs/envoy/v1.12.0/
+Disallow: /docs/envoy/v1.11.2/
+Disallow: /docs/envoy/v1.11.1/
+Disallow: /docs/envoy/v1.11.0/
+Disallow: /docs/envoy/v1.10.0/
+Disallow: /docs/envoy/v1.9.1/
+Disallow: /docs/envoy/v1.9.0/
+Disallow: /docs/envoy/v1.8.0/
+Disallow: /docs/envoy/v1.7.1/
+Disallow: /docs/envoy/v1.7.0/
+Disallow: /docs/envoy/v1.6.0/
+Disallow: /docs/envoy/v1.5.0/
