@@ -117,11 +117,6 @@ public:
 
     EXPECT_CALL(active_request, cancel());
     request->cancel();
-    //    Common::Redis::RespValuePtr resp_value = std::make_unique<Common::Redis::RespValue>();
-    //    resp_value->type(Common::Redis::RespType::BulkString);
-    //    resp_value->asString() = "bar";
-    //    EXPECT_CALL(callbacks, onResponse_(_));
-    //    client_callbacks.back((->onResponse(std::move(resp_value));
   }
 
   void makeRequest(Common::Redis::Client::MockClient* client,
