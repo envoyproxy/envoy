@@ -321,6 +321,7 @@ public:
   static void jsonConvert(const ProtobufWkt::Struct& source,
                           ProtobufMessage::ValidationVisitor& validation_visitor,
                           Protobuf::Message& dest);
+  static void jsonConvertValue(const Protobuf::Message& source, ProtobufWkt::Value& dest);
 
   /**
    * Extract YAML as string from a google.protobuf.Message.

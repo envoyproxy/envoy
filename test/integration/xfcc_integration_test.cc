@@ -92,7 +92,7 @@ Network::TransportSocketFactoryPtr XfccIntegrationTest::createUpstreamSslContext
       std::move(cfg), *context_manager_, *upstream_stats_store, std::vector<std::string>{});
 }
 
-Network::ClientConnectionPtr XfccIntegrationTest::makeClientConnection() {
+Network::ClientConnectionPtr XfccIntegrationTest::makeTcpClientConnection() {
   Network::Address::InstanceConstSharedPtr address =
       Network::Utility::resolveUrl("tcp://" + Network::Test::getLoopbackAddressUrlString(version_) +
                                    ":" + std::to_string(lookupPort("http")));
@@ -147,7 +147,7 @@ void XfccIntegrationTest::initialize() {
 
 void XfccIntegrationTest::testRequestAndResponseWithXfccHeader(std::string previous_xfcc,
                                                                std::string expected_xfcc) {
-  Network::ClientConnectionPtr conn = tls_ ? makeMtlsClientConnection() : makeClientConnection();
+  Network::ClientConnectionPtr conn = tls_ ? makeMtlsClientConnection() : makeTcpClientConnection();
   Http::TestHeaderMapImpl header_map;
   if (previous_xfcc.empty()) {
     header_map = Http::TestHeaderMapImpl{{":method", "GET"},

@@ -175,9 +175,14 @@ public:
 // ConnectionSocket used with client connections.
 class ClientSocketImpl : public ConnectionSocketImpl {
 public:
-  ClientSocketImpl(const Address::InstanceConstSharedPtr& remote_address)
+  ClientSocketImpl(const Address::InstanceConstSharedPtr& remote_address,
+                   const OptionsSharedPtr& options)
       : ConnectionSocketImpl(remote_address->socket(Address::SocketType::Stream), nullptr,
-                             remote_address) {}
+                             remote_address) {
+    if (options) {
+      addOptions(options);
+    }
+  }
 };
 
 } // namespace Network

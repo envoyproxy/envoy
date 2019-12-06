@@ -8,12 +8,16 @@ option java_package = "io.envoyproxy.envoy.admin.v3alpha";
 
 import "google/protobuf/duration.proto";
 
+import "udpa/api/annotations/versioning.proto";
+
 // [#protodoc-title: Server State]
 
 // Proto representation of the value returned by /server_info, containing
 // server version/server status information.
 // [#next-free-field: 7]
 message ServerInfo {
+  option (udpa.api.annotations.versioning).previous_message_type = "envoy.admin.v2alpha.ServerInfo";
+
   enum State {
     // Server is live and serving traffic.
     LIVE = 0;
@@ -49,6 +53,9 @@ message ServerInfo {
 
 // [#next-free-field: 28]
 message CommandLineOptions {
+  option (udpa.api.annotations.versioning).previous_message_type =
+      "envoy.admin.v2alpha.CommandLineOptions";
+
   enum IpVersion {
     v4 = 0;
     v6 = 1;

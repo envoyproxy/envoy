@@ -68,7 +68,7 @@ def _api_py_proto_library(name, srcs = [], deps = []):
 
 # This defines googleapis py_proto_library. The repository does not provide its definition and requires
 # overriding it in the consuming project (see https://github.com/grpc/grpc/issues/19255 for more details).
-def py_proto_library(name, deps = []):
+def py_proto_library(name, deps = [], plugin = None):
     srcs = [dep[:-6] + ".proto" if dep.endswith("_proto") else dep for dep in deps]
     proto_deps = []
 
@@ -77,6 +77,10 @@ def py_proto_library(name, deps = []):
     # As a workaround, manually specify the proto dependencies for the imported python rules.
     if name == "annotations_py_proto":
         proto_deps = proto_deps + [":http_py_proto"]
+
+    # py_proto_library does not support plugin as an argument yet at gRPC v1.25.0:
+    # https://github.com/grpc/grpc/blob/v1.25.0/bazel/python_rules.bzl#L72.
+    # plugin should also be passed in here when gRPC version is greater than v1.25.x.
     _py_proto_library(
         name = name,
         srcs = srcs,

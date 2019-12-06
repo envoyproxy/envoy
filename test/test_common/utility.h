@@ -644,6 +644,8 @@ public:
   std::string get_(const LowerCaseString& key) const;
   bool has(const std::string& key) const;
   bool has(const LowerCaseString& key) const;
+
+  void verifyByteSize() override { ASSERT(cached_byte_size_ == byteSizeInternal()); }
 };
 
 // Helper method to create a header map from an initializer list. Useful due to make_unique's

@@ -15,6 +15,8 @@ import "google/protobuf/duration.proto";
 import "google/protobuf/struct.proto";
 import "google/protobuf/wrappers.proto";
 
+import "udpa/api/annotations/versioning.proto";
+
 import "validate/validate.proto";
 
 // [#protodoc-title: Health check]
@@ -50,8 +52,13 @@ enum HealthStatus {
 
 // [#next-free-field: 21]
 message HealthCheck {
+  option (udpa.api.annotations.versioning).previous_message_type = "envoy.api.v2.core.HealthCheck";
+
   // Describes the encoding of the payload bytes in the payload.
   message Payload {
+    option (udpa.api.annotations.versioning).previous_message_type =
+        "envoy.api.v2.core.HealthCheck.Payload";
+
     oneof payload {
       option (validate.required) = true;
 
@@ -65,6 +72,9 @@ message HealthCheck {
 
   // [#next-free-field: 11]
   message HttpHealthCheck {
+    option (udpa.api.annotations.versioning).previous_message_type =
+        "envoy.api.v2.core.HealthCheck.HttpHealthCheck";
+
     reserved 7;
 
     reserved "use_http2";
@@ -114,6 +124,9 @@ message HealthCheck {
   }
 
   message TcpHealthCheck {
+    option (udpa.api.annotations.versioning).previous_message_type =
+        "envoy.api.v2.core.HealthCheck.TcpHealthCheck";
+
     // Empty payloads imply a connect-only health check.
     Payload send = 1;
 
@@ -124,6 +137,9 @@ message HealthCheck {
   }
 
   message RedisHealthCheck {
+    option (udpa.api.annotations.versioning).previous_message_type =
+        "envoy.api.v2.core.HealthCheck.RedisHealthCheck";
+
     // If set, optionally perform ``EXISTS <key>`` instead of ``PING``. A return value
     // from Redis of 0 (does not exist) is considered a passing healthcheck. A return value other
     // than 0 is considered a failure. This allows the user to mark a Redis instance for maintenance
@@ -136,6 +152,9 @@ message HealthCheck {
   // healthcheck. See `gRPC doc <https://github.com/grpc/grpc/blob/master/doc/health-checking.md>`_
   // for details.
   message GrpcHealthCheck {
+    option (udpa.api.annotations.versioning).previous_message_type =
+        "envoy.api.v2.core.HealthCheck.GrpcHealthCheck";
+
     // An optional service name parameter which will be sent to gRPC service in
     // `grpc.health.v1.HealthCheckRequest
     // <https://github.com/grpc/grpc/blob/master/src/proto/grpc/health/v1/health.proto#L20>`_.
@@ -151,6 +170,9 @@ message HealthCheck {
 
   // Custom health check.
   message CustomHealthCheck {
+    option (udpa.api.annotations.versioning).previous_message_type =
+        "envoy.api.v2.core.HealthCheck.CustomHealthCheck";
+
     reserved 2;
 
     reserved "config";

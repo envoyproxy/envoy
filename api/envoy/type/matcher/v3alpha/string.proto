@@ -8,6 +8,8 @@ option java_package = "io.envoyproxy.envoy.type.matcher.v3alpha";
 
 import "envoy/type/matcher/v3alpha/regex.proto";
 
+import "udpa/api/annotations/versioning.proto";
+
 import "validate/validate.proto";
 
 // [#protodoc-title: StringMatcher]
@@ -15,6 +17,9 @@ import "validate/validate.proto";
 // Specifies the way to match a string.
 // [#next-free-field: 6]
 message StringMatcher {
+  option (udpa.api.annotations.versioning).previous_message_type =
+      "envoy.type.matcher.StringMatcher";
+
   reserved 4;
 
   reserved "regex";
@@ -52,5 +57,8 @@ message StringMatcher {
 
 // Specifies a list of ways to match a string.
 message ListStringMatcher {
+  option (udpa.api.annotations.versioning).previous_message_type =
+      "envoy.type.matcher.ListStringMatcher";
+
   repeated StringMatcher patterns = 1 [(validate.rules).repeated = {min_items: 1}];
 }

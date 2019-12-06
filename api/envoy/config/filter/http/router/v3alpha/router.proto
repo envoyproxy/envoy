@@ -10,6 +10,8 @@ import "envoy/config/filter/accesslog/v3alpha/accesslog.proto";
 
 import "google/protobuf/wrappers.proto";
 
+import "udpa/api/annotations/versioning.proto";
+
 import "validate/validate.proto";
 
 // [#protodoc-title: Router]
@@ -18,6 +20,9 @@ import "validate/validate.proto";
 
 // [#next-free-field: 7]
 message Router {
+  option (udpa.api.annotations.versioning).previous_message_type =
+      "envoy.config.filter.http.router.v2.Router";
+
   // Whether the router generates dynamic cluster statistics. Defaults to
   // true. Can be disabled in high performance scenarios.
   google.protobuf.BoolValue dynamic_stats = 1;

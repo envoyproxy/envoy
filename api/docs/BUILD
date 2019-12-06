@@ -66,6 +66,7 @@ proto_library(
         "//envoy/config/filter/network/zookeeper_proxy/v1alpha1:pkg",
         "//envoy/config/filter/thrift/rate_limit/v2alpha1:pkg",
         "//envoy/config/filter/thrift/router/v2alpha1:pkg",
+        "//envoy/config/filter/udp/udp_proxy/v2alpha:pkg",
         "//envoy/config/grpc_credential/v2alpha:pkg",
         "//envoy/config/health_checker/redis/v2:pkg",
         "//envoy/config/listener/v2:pkg",
@@ -93,5 +94,7 @@ proto_library(
         "//envoy/service/trace/v2:pkg",
         "//envoy/type:pkg",
         "//envoy/type/matcher:pkg",
+        "//envoy/type/metadata/v2:pkg",
+        "//envoy/type/tracing/v2:pkg",
     ],
 )

@@ -27,7 +27,6 @@ constexpr const char* runtime_features[] = {
     "envoy.reloadable_features.test_feature_true",
     "envoy.reloadable_features.strict_header_validation",
     "envoy.reloadable_features.buffer_filter_populate_content_length",
-    "envoy.reloadable_features.trusted_forwarded_proto",
     "envoy.reloadable_features.outlier_detection_support_for_grpc_status",
     "envoy.reloadable_features.connection_header_sanitization",
 };
