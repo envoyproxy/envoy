@@ -382,21 +382,30 @@ def FormatEnumValue(type_context, value):
 
 
 def TextFormatValue(field, value):
+  """Format the value as protobuf text format
+
+  Args:
+    field: a FieldDescriptor that describes the field
+    value: the value stored in the field
+
+  Returns:
+    value in protobuf text format
+  """
   out = io.StringIO()
   text_format.PrintFieldValue(field, value, out)
   return out.getvalue()
 
 
-def FormatOptions(options, is_message=False):
-  """Format *Options message.
+def FormatOptions(options):
+  """Format *Options (e.g. MessageOptions, FieldOptions) message.
 
   Args:
-    options: A MessageOptions/EnumOptions message.
-    is_message: is this a message type?
+    options: A *Options (e.g. MessageOptions, FieldOptions) message.
 
   Returns:
     Formatted options as a string.
   """
+
   formatted_options = []
   for option_descriptor, option_value in sorted(options.ListFields(), key=lambda x: x[0].number):
     option_name = "({})".format(
