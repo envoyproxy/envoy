@@ -18,6 +18,8 @@
 #include "common/http/default_server_string.h"
 #include "common/http/http1/codec_impl.h"
 #include "common/http/http2/codec_impl.h"
+#include "common/http/http3/quic_codec_factory.h"
+#include "common/http/http3/well_known_names.h"
 #include "common/http/utility.h"
 #include "common/protobuf/utility.h"
 #include "common/router/rds_impl.h"
@@ -422,8 +424,14 @@ HttpConnectionManagerConfig::createCodec(Network::Connection& connection,
         connection, callbacks, context_.scope(), http2_settings_, maxRequestHeadersKb(),
         maxRequestHeadersCount());
   case CodecType::HTTP3:
-    // TODO(danzh) create QUIC specific codec.
-    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+    // Hard code Quiche factory name here to instantiate a QUIC codec implemented.
+    // TODO(danzh) Add support to get the factory name from config, possibly
+    // from HttpConnectionManager protobuf. This is not essential till there are multiple
+    // implementations of QUIC.
+    return std::unique_ptr<Http::ServerConnection>(
+        Config::Utility::getAndCheckFactory<Http::QuicHttpServerConnectionFactory>(
+            Http::QuicCodecNames::get().Quiche)
+            .createQuicServerConnection(connection, callbacks));
   case CodecType::AUTO:
     return Http::ConnectionManagerUtility::autoCreateCodec(
         connection, data, callbacks, context_.scope(), http1_settings_, http2_settings_,
