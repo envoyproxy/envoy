@@ -50,7 +50,7 @@ private:
   struct RedisActiveHealthCheckSession
       : public ActiveHealthCheckSession,
         public Extensions::NetworkFilters::Common::Redis::Client::Config,
-        public Extensions::NetworkFilters::Common::Redis::Client::PoolCallbacks,
+        public Extensions::NetworkFilters::Common::Redis::Client::ClientCallbacks,
         public Network::ConnectionCallbacks {
     RedisActiveHealthCheckSession(RedisHealthChecker& parent, const Upstream::HostSharedPtr& host);
     ~RedisActiveHealthCheckSession() override;
@@ -85,10 +85,11 @@ private:
     uint32_t maxUpstreamUnknownConnections() const override { return 0; }
     bool enableCommandStats() const override { return false; }
 
-    // Extensions::NetworkFilters::Common::Redis::Client::PoolCallbacks
+    // Extensions::NetworkFilters::Common::Redis::Client::ClientCallbacks
     void onResponse(NetworkFilters::Common::Redis::RespValuePtr&& value) override;
     void onFailure() override;
-    bool onRedirection(const NetworkFilters::Common::Redis::RespValue& value) override;
+    bool onRedirection(NetworkFilters::Common::Redis::RespValuePtr&&, const std::string&,
+                       bool) override;
 
     // Network::ConnectionCallbacks
     void onEvent(Network::ConnectionEvent event) override;
