@@ -46,7 +46,7 @@ class RouteConfigProviderUtil {
 public:
   /**
    * @return RouteConfigProviderSharedPtr a new route configuration provider based on the supplied
-   * proto configuration.
+   * proto configuration. Notes the provider object could be shared among multiple listeners.
    */
   static RouteConfigProviderSharedPtr
   create(const envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager&

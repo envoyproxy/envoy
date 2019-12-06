@@ -477,8 +477,7 @@ virtual_hosts:
   // provider2 should have route config immediately after create
   EXPECT_TRUE(provider2->configInfo().has_value());
 
-  EXPECT_EQ(provider_.get(), provider2.get())
-      << "fail to obtain the same rds config provider object";
+  EXPECT_EQ(provider_, provider2) << "fail to obtain the same rds config provider object";
 
   // So this means that both provider have same subscription.
   EXPECT_EQ(&dynamic_cast<RdsRouteConfigProviderImpl&>(*provider_).subscription(),
@@ -533,8 +532,7 @@ TEST_F(RouteConfigProviderManagerImplTest, SameProviderOnTwoInitManager) {
 
   EXPECT_FALSE(provider2->configInfo().has_value());
 
-  EXPECT_EQ(provider_.get(), provider2.get())
-      << "fail to obtain the same rds config provider object";
+  EXPECT_EQ(provider_, provider2) << "fail to obtain the same rds config provider object";
   real_init_manager.initialize(real_watcher);
   EXPECT_EQ(Init::Manager::State::Initializing, real_init_manager.state());
 
