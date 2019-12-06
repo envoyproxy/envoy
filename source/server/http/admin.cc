@@ -176,12 +176,6 @@ bool filterParam(Http::Utility::QueryParams params, Buffer::Instance& response,
   return true;
 }
 
-// Helper method that returns true if the "list_keys" parameter is present.
-// The value is not kept and is assumed to be equivalent to true if the key exists.
-bool hasListKeysParam(Http::Utility::QueryParams params) {
-  return (params.find("list_keys") != params.end());
-}
-
 // Helper method to get a query parameter
 absl::optional<std::string> queryParam(Http::Utility::QueryParams params, std::string key) {
   return (params.find(key) != params.end()) ? absl::optional<std::string>{params.at(key)}
@@ -193,9 +187,14 @@ absl::optional<std::string> formatParam(Http::Utility::QueryParams params) {
   return queryParam(params, "format");
 }
 
-// Helper method to get the key parameter
-absl::optional<std::string> keyParam(Http::Utility::QueryParams params) {
-  return queryParam(params, "key");
+// Helper method to get the resource parameter
+absl::optional<std::string> resourceParam(Http::Utility::QueryParams params) {
+  return queryParam(params, "resource");
+}
+
+// Helper method to get the mask parameter
+absl::optional<std::string> maskParam(Http::Utility::QueryParams params) {
+  return queryParam(params, "mask");
 }
 
 // Helper method that ensures that we've setting flags based on all the health flag values on the
@@ -545,41 +544,60 @@ Http::Code AdminImpl::handlerClusters(absl::string_view url, Http::HeaderMap& re
   return Http::Code::OK;
 }
 
-void AdminImpl::writeDumpKeysAsJson(Envoy::Buffer::Instance& response) const {
-  envoy::admin::v2alpha::ConfigDumpKeys keys;
-  for (const auto& key_callback_pair : config_tracker_.getCallbacksMap()) {
-    keys.add_keys(key_callback_pair.first);
-  }
-  response.add(MessageUtil::getJsonStringFromMessage(keys, true)); // pretty-print
-}
-
 Http::Code AdminImpl::handlerConfigDump(absl::string_view url, Http::HeaderMap& response_headers,
                                         Buffer::Instance& response, AdminStream&) const {
   Http::Utility::QueryParams query_params = Http::Utility::parseQueryString(url);
-  if (hasListKeysParam(query_params)) {
-    writeDumpKeysAsJson(response);
-    return Http::Code::OK;
-  }
-
-  auto callbacks_map = config_tracker_.getCallbacksMap();
-  const auto desired_key = keyParam(query_params);
-  if (desired_key.has_value()) {
-    const auto iter = callbacks_map.find(desired_key.value());
-    if (iter == callbacks_map.end()) {
-      response.add(
-          fmt::format("Key \"{}\" not found. Try /config_dump?list_keys to view available keys",
-                      desired_key.value()));
-      return Http::Code::NotFound;
-    }
-    callbacks_map = {{iter->first, iter->second}};
-  }
+  const auto resource = resourceParam(query_params);
+  const auto mask = maskParam(query_params);
 
   envoy::admin::v2alpha::ConfigDump dump;
-  for (const auto& key_callback_pair : callbacks_map) {
+  bool resource_found = false;
+  for (const auto& key_callback_pair : config_tracker_.getCallbacksMap()) {
     ProtobufTypes::MessagePtr message = key_callback_pair.second();
     RELEASE_ASSERT(message, "");
+
+    Protobuf::FieldMask* field_mask = new Protobuf::FieldMask;
+    if (mask.has_value()) {
+      ProtobufUtil::FieldMaskUtil::FromString(mask.value(), field_mask);
+    }
+
+    if (resource.has_value()) {
+      auto field_descriptor = message.get()->GetDescriptor()->FindFieldByName(resource.value());
+      const Protobuf::Reflection* reflection = message.get()->GetReflection();
+      if (!field_descriptor) {
+        continue;
+      } else if (!field_descriptor->is_repeated()) {
+        response.add(fmt::format("{} is not a repeated field. Use ?mask={} to get only this field",
+                                 field_descriptor->name(), field_descriptor->name()));
+        return Http::Code::BadRequest;
+      }
+      resource_found = true;
+
+      auto repeated =
+          reflection->MutableRepeatedPtrField<Protobuf::Message>(message.get(), field_descriptor);
+      for (Protobuf::Message& msg : *repeated) {
+        if (mask.has_value()) {
+          ProtobufUtil::FieldMaskUtil::TrimMessage(*field_mask, &msg);
+        }
+        auto& any_message = *(dump.add_configs());
+        any_message.PackFrom(msg);
+      }
+
+      // We found the desired resource so there is no need to continue iterating over
+      // the other keys.
+      break;
+    }
+
+    if (mask.has_value()) {
+      ProtobufUtil::FieldMaskUtil::TrimMessage(*field_mask, message.get());
+    }
     auto& any_message = *(dump.add_configs());
     any_message.PackFrom(*message);
+  }
+
+  if (resource.has_value() && !resource_found) {
+    response.add(fmt::format("{} not found in config dump", resource.value()));
+    return Http::Code::NotFound;
   }
 
   response_headers.setReferenceContentType(Http::Headers::get().ContentTypeValues.Json);

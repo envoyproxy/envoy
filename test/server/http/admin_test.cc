@@ -931,73 +931,149 @@ TEST_P(AdminInstanceTest, ConfigDumpMaintainsOrder) {
   }
 }
 
-TEST_P(AdminInstanceTest, ConfigDumpFiltersByKey) {
+TEST_P(AdminInstanceTest, ConfigDumpFiltersByResource) {
   Buffer::OwnedImpl response;
   Http::HeaderMapImpl header_map;
-  auto listener_entry = admin_.getConfigTracker().add("listeners", [] {
-    auto msg = std::make_unique<ProtobufWkt::StringValue>();
-    msg->set_value("listeners_config");
-    return msg;
-  });
-  auto route_entry = admin_.getConfigTracker().add("routes", [] {
-    auto msg = std::make_unique<ProtobufWkt::StringValue>();
-    msg->set_value("routes_config");
-    return msg;
-  });
-  auto cluster_entry = admin_.getConfigTracker().add("clusters", [] {
-    auto msg = std::make_unique<ProtobufWkt::StringValue>();
-    msg->set_value("clusters_config");
+  auto listeners = admin_.getConfigTracker().add("listeners", [] {
+    auto msg = std::make_unique<envoy::admin::v2alpha::ListenersConfigDump>();
+    auto dyn_listener = msg->add_dynamic_listeners();
+    dyn_listener->set_name("foo");
+    auto stat_listener = msg->add_static_listeners();
+    auto listener = stat_listener->mutable_listener();
+    listener->set_name("bar");
     return msg;
   });
   const std::string expected_json = R"EOF({
  "configs": [
   {
-   "@type": "type.googleapis.com/google.protobuf.StringValue",
-   "value": "listeners_config"
+   "@type": "type.googleapis.com/envoy.admin.v2alpha.ListenersConfigDump.DynamicListener",
+   "name": "foo"
   }
  ]
 }
 )EOF";
-  EXPECT_EQ(Http::Code::OK, getCallback("/config_dump?key=listeners", header_map, response));
+  EXPECT_EQ(Http::Code::OK,
+            getCallback("/config_dump?resource=dynamic_listeners", header_map, response));
   std::string output = response.toString();
   EXPECT_EQ(expected_json, output);
 }
 
-TEST_P(AdminInstanceTest, ConfigDumpNonExistentKey) {
+TEST_P(AdminInstanceTest, ConfigDumpFiltersByMask) {
   Buffer::OwnedImpl response;
   Http::HeaderMapImpl header_map;
+  auto listeners = admin_.getConfigTracker().add("listeners", [] {
+    auto msg = std::make_unique<envoy::admin::v2alpha::ListenersConfigDump>();
+    auto dyn_listener = msg->add_dynamic_listeners();
+    dyn_listener->set_name("foo");
+    auto stat_listener = msg->add_static_listeners();
+    auto listener = stat_listener->mutable_listener();
+    listener->set_name("bar");
+    return msg;
+  });
+  const std::string expected_json = R"EOF({
+ "configs": [
+  {
+   "@type": "type.googleapis.com/envoy.admin.v2alpha.ListenersConfigDump",
+   "dynamic_listeners": [
+    {
+     "name": "foo"
+    }
+   ]
+  }
+ ]
+}
+)EOF";
+  EXPECT_EQ(Http::Code::OK,
+            getCallback("/config_dump?mask=dynamic_listeners", header_map, response));
+  std::string output = response.toString();
+  EXPECT_EQ(expected_json, output);
+}
+
+TEST_P(AdminInstanceTest, ConfigDumpFiltersByResourceAndMask) {
+  Buffer::OwnedImpl response;
+  Http::HeaderMapImpl header_map;
+  auto clusters = admin_.getConfigTracker().add("clusters", [] {
+    auto msg = std::make_unique<envoy::admin::v2alpha::ClustersConfigDump>();
+    auto static_cluster = msg->add_static_clusters();
+    auto inner_cluster = static_cluster->mutable_cluster();
+    inner_cluster->set_name("foo");
+    inner_cluster->set_drain_connections_on_host_removal(true);
+
+    auto dyn_cluster = msg->add_dynamic_active_clusters();
+    auto inner_dyn_cluster = dyn_cluster->mutable_cluster();
+    inner_dyn_cluster->set_name("bar");
+
+    return msg;
+  });
+  const std::string expected_json = R"EOF({
+ "configs": [
+  {
+   "@type": "type.googleapis.com/envoy.admin.v2alpha.ClustersConfigDump.StaticCluster",
+   "cluster": {
+    "name": "foo"
+   }
+  }
+ ]
+}
+)EOF";
+  EXPECT_EQ(Http::Code::OK, getCallback("/config_dump?resource=static_clusters&mask=cluster.name",
+                                        header_map, response));
+  std::string output = response.toString();
+  EXPECT_EQ(expected_json, output);
+}
+
+TEST_P(AdminInstanceTest, ConfigDumpNonExistentMask) {
+  Buffer::OwnedImpl response;
+  Http::HeaderMapImpl header_map;
+  auto clusters = admin_.getConfigTracker().add("clusters", [] {
+    auto msg = std::make_unique<envoy::admin::v2alpha::ClustersConfigDump>();
+    auto static_cluster = msg->add_static_clusters();
+    auto inner_cluster = static_cluster->mutable_cluster();
+    inner_cluster->set_name("foo");
+    inner_cluster->set_drain_connections_on_host_removal(true);
+
+    auto dyn_cluster = msg->add_dynamic_active_clusters();
+    auto inner_dyn_cluster = dyn_cluster->mutable_cluster();
+    inner_dyn_cluster->set_name("bar");
+
+    return msg;
+  });
+  const std::string expected_json = R"EOF({
+ "configs": [
+  {
+   "@type": "type.googleapis.com/envoy.admin.v2alpha.ClustersConfigDump.StaticCluster"
+  }
+ ]
+}
+)EOF";
+  EXPECT_EQ(Http::Code::OK,
+            getCallback("/config_dump?resource=static_clusters&mask=bad", header_map, response));
+  std::string output = response.toString();
+  EXPECT_EQ(expected_json, output);
+}
+
+TEST_P(AdminInstanceTest, ConfigDumpNonExistentResource) {
+  Buffer::OwnedImpl response;
+  Http::HeaderMapImpl header_map;
+  // TODO(spenceral): Update return type here?
   auto listeners = admin_.getConfigTracker().add("listeners", [] {
     auto msg = std::make_unique<ProtobufWkt::StringValue>();
     msg->set_value("listeners_config");
     return msg;
   });
-  EXPECT_EQ(Http::Code::NotFound, getCallback("/config_dump?key=routes", header_map, response));
+  EXPECT_EQ(Http::Code::NotFound, getCallback("/config_dump?resource=foo", header_map, response));
 }
 
-TEST_P(AdminInstanceTest, ConfigDumpListKeys) {
+TEST_P(AdminInstanceTest, ConfigDumpResourceNotRepeated) {
   Buffer::OwnedImpl response;
   Http::HeaderMapImpl header_map;
-  auto cluster_entry = admin_.getConfigTracker().add("clusters", [] {
-    auto msg = std::make_unique<ProtobufWkt::StringValue>();
-    msg->set_value("clusters_config");
+  auto clusters = admin_.getConfigTracker().add("clusters", [] {
+    auto msg = std::make_unique<envoy::admin::v2alpha::ClustersConfigDump>();
+    msg->set_version_info("foo");
     return msg;
   });
-  auto listener_entry = admin_.getConfigTracker().add("listeners", [] {
-    auto msg = std::make_unique<ProtobufWkt::StringValue>();
-    msg->set_value("listeners_config");
-    return msg;
-  });
-
-  const std::string expected_text = R"EOF({
- "keys": [
-  "clusters",
-  "listeners"
- ]
-}
-)EOF";
-  EXPECT_EQ(Http::Code::OK, getCallback("/config_dump?list_keys", header_map, response));
-  std::string output = response.toString();
-  EXPECT_EQ(expected_text, output);
+  EXPECT_EQ(Http::Code::BadRequest,
+            getCallback("/config_dump?resource=version_info", header_map, response));
 }
 
 TEST_P(AdminInstanceTest, Memory) {
