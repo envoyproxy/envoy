@@ -26,6 +26,7 @@ from tools.protoxform import utils
 from tools.type_whisperer import type_whisperer
 from tools.type_whisperer.types_pb2 import Types
 
+from google.protobuf import descriptor_pb2
 from google.protobuf import text_format
 
 # Note: we have to include those proto definitions to make FormatOptions work,
@@ -167,7 +168,7 @@ def FormatHeaderFromFile(source_code_info, file_proto):
   package_line = 'package %s;\n' % file_proto.package
   file_block = '\n'.join(['syntax = "proto3";\n', package_line])
 
-  options = file_proto.options
+  options = descriptor_pb2.FileOptions()
   options.java_outer_classname = CamelCase(os.path.basename(file_proto.name))
   options.java_multiple_files = True
   options.java_package = "io.envoyproxy." + file_proto.package
