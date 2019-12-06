@@ -27,10 +27,8 @@ public:
   // Http::FilterHeadersStatus::StopAllIterationAndWatermark for headers. Triggers a timer to
   // continue iteration after 5s.
   Http::FilterHeadersStatus encodeHeaders(Http::HeaderMap& header_map, bool) override {
-    const Http::HeaderEntry* entry_content =
-        header_map.get(Envoy::Http::LowerCaseString("content_size"));
-    const Http::HeaderEntry* entry_added =
-        header_map.get(Envoy::Http::LowerCaseString("added_size"));
+    Http::HeaderEntry* entry_content = header_map.get(Envoy::Http::LowerCaseString("content_size"));
+    Http::HeaderEntry* entry_added = header_map.get(Envoy::Http::LowerCaseString("added_size"));
     ASSERT(entry_content != nullptr && entry_added != nullptr);
     content_size_ = std::stoul(std::string(entry_content->value().getStringView()));
     added_size_ = std::stoul(std::string(entry_added->value().getStringView()));
@@ -41,8 +39,7 @@ public:
     Http::MetadataMapPtr metadata_map_ptr = std::make_unique<Http::MetadataMap>(metadata_map);
     encoder_callbacks_->addEncodedMetadata(std::move(metadata_map_ptr));
 
-    const Http::HeaderEntry* entry_buffer =
-        header_map.get(Envoy::Http::LowerCaseString("buffer_limit"));
+    Http::HeaderEntry* entry_buffer = header_map.get(Envoy::Http::LowerCaseString("buffer_limit"));
     if (entry_buffer == nullptr) {
       return Http::FilterHeadersStatus::StopAllIterationAndBuffer;
     } else {

@@ -67,6 +67,14 @@ public:                                                                         
  */
 class HeaderMapImpl : public HeaderMap, NonCopyable {
 public:
+  /**
+   * Appends data to header. If header already has a value, the string ',' is added between the
+   * existing value and data.
+   * @param header the header to append to.
+   * @param data to append to the header.
+   */
+  static uint64_t appendToHeader(HeaderString& header, absl::string_view data);
+
   HeaderMapImpl();
   explicit HeaderMapImpl(
       const std::initializer_list<std::pair<LowerCaseString, std::string>>& values);
@@ -121,6 +129,7 @@ protected:
 
   // For tests only, unoptimized, they aren't intended for regular HeaderMapImpl users.
   void copyFrom(const HeaderMap& rhs);
+  void clear() { removePrefix(LowerCaseString("")); }
 
   struct HeaderEntryImpl : public HeaderEntry, NonCopyable {
     HeaderEntryImpl(const LowerCaseString& key);
@@ -129,6 +138,7 @@ protected:
 
     // HeaderEntry
     const HeaderString& key() const override { return key_; }
+    void value(const char* value, uint32_t size) override;
     void value(absl::string_view value) override;
     void value(uint64_t value) override;
     void value(const HeaderEntry& header) override;
@@ -154,8 +164,6 @@ protected:
   struct StaticLookupTable; // Defined in header_map_impl.cc.
 
   struct AllInlineHeaders {
-    void clear() { memset(this, 0, sizeof(*this)); }
-
     ALL_INLINE_HEADERS(DEFINE_INLINE_HEADER_STRUCT)
   };
 

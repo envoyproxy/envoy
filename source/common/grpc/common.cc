@@ -170,7 +170,7 @@ std::chrono::milliseconds Common::getGrpcTimeout(const Http::HeaderMap& request_
   return timeout;
 }
 
-void Common::toGrpcTimeout(const std::chrono::milliseconds& timeout, Http::HeaderMap& headers) {
+void Common::toGrpcTimeout(const std::chrono::milliseconds& timeout, Http::HeaderString& value) {
   uint64_t time = timeout.count();
   static const char units[] = "mSMH";
   const char* unit = units; // start with milliseconds
@@ -187,7 +187,8 @@ void Common::toGrpcTimeout(const std::chrono::milliseconds& timeout, Http::Heade
       unit++;
     }
   }
-  headers.setGrpcTimeout(absl::StrCat(time, absl::string_view(unit, 1)));
+  value.setInteger(time);
+  value.append(unit, 1);
 }
 
 Http::MessagePtr Common::prepareHeaders(const std::string& upstream_cluster,
@@ -202,7 +203,7 @@ Http::MessagePtr Common::prepareHeaders(const std::string& upstream_cluster,
   // before Timeout and ContentType.
   message->headers().setReferenceTE(Http::Headers::get().TEValues.Trailers);
   if (timeout) {
-    toGrpcTimeout(timeout.value(), message->headers());
+    toGrpcTimeout(timeout.value(), message->headers().insertGrpcTimeout().value());
   }
   message->headers().setReferenceContentType(Http::Headers::get().ContentTypeValues.Grpc);
 

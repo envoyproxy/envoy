@@ -73,11 +73,17 @@ void Utility::appendXff(HeaderMap& headers, const Network::Address::Instance& re
     return;
   }
 
-  headers.appendForwardedFor(remote_address.ip()->addressAsString(), ",");
+  HeaderString& header = headers.insertForwardedFor().value();
+  const std::string& address_as_string = remote_address.ip()->addressAsString();
+  HeaderMapImpl::appendToHeader(header, address_as_string.c_str());
 }
 
 void Utility::appendVia(HeaderMap& headers, const std::string& via) {
-  headers.appendVia(via, ", ");
+  HeaderString& header = headers.insertVia().value();
+  if (!header.empty()) {
+    header.append(", ", 2);
+  }
+  header.append(via.c_str(), via.size());
 }
 
 std::string Utility::createSslRedirectPath(const HeaderMap& headers) {
@@ -423,7 +429,7 @@ bool Utility::sanitizeConnectionHeader(Http::HeaderMap& headers) {
     bool keep_header = false;
 
     // Determine whether the nominated header contains invalid values
-    const HeaderEntry* nominated_header = NULL;
+    HeaderEntry* nominated_header = NULL;
 
     if (lcs_header_to_remove == Http::Headers::get().Connection) {
       // Remove the connection header from the nominated tokens if it's self nominated
@@ -477,7 +483,8 @@ bool Utility::sanitizeConnectionHeader(Http::HeaderMap& headers) {
         }
 
         if (keep_header) {
-          headers.setTE(Http::Headers::get().TEValues.Trailers);
+          nominated_header->value().setCopy(Http::Headers::get().TEValues.Trailers.data(),
+                                            Http::Headers::get().TEValues.Trailers.size());
         }
       }
     }
@@ -497,7 +504,7 @@ bool Utility::sanitizeConnectionHeader(Http::HeaderMap& headers) {
     if (new_value.empty()) {
       headers.removeConnection();
     } else {
-      headers.setConnection(new_value);
+      headers.Connection()->value(new_value);
     }
   }
 

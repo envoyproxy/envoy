@@ -14,7 +14,7 @@ public:
   // This is an indirect way to build a header entry for
   // PathUtil::canonicalPath(), since we don't have direct access to the
   // HeaderMapImpl constructor.
-  const HeaderEntry& pathHeaderEntry(const std::string& path_value) {
+  HeaderEntry& pathHeaderEntry(const std::string& path_value) {
     headers_.setPath(path_value);
     return *headers_.Path();
   }
@@ -26,7 +26,7 @@ TEST_F(PathUtilityTest, AlreadyNormalPaths) {
   const std::vector<std::string> normal_paths{"/xyz", "/x/y/z"};
   for (const auto& path : normal_paths) {
     auto& path_header = pathHeaderEntry(path);
-    const auto result = PathUtil::canonicalPath(headers_);
+    const auto result = PathUtil::canonicalPath(path_header);
     EXPECT_TRUE(result) << "original path: " << path;
     EXPECT_EQ(path_header.value().getStringView(), absl::string_view(path));
   }
@@ -37,8 +37,8 @@ TEST_F(PathUtilityTest, InvalidPaths) {
   const std::vector<std::string> invalid_paths{"/xyz/.%00../abc", "/xyz/%00.%00./abc",
                                                "/xyz/AAAAA%%0000/abc"};
   for (const auto& path : invalid_paths) {
-    pathHeaderEntry(path);
-    EXPECT_FALSE(PathUtil::canonicalPath(headers_)) << "original path: " << path;
+    auto& path_header = pathHeaderEntry(path);
+    EXPECT_FALSE(PathUtil::canonicalPath(path_header)) << "original path: " << path;
   }
 }
 
@@ -57,7 +57,7 @@ TEST_F(PathUtilityTest, NormalizeValidPaths) {
 
   for (const auto& path_pair : non_normal_pairs) {
     auto& path_header = pathHeaderEntry(path_pair.first);
-    const auto result = PathUtil::canonicalPath(headers_);
+    const auto result = PathUtil::canonicalPath(path_header);
     EXPECT_TRUE(result) << "original path: " << path_pair.first;
     EXPECT_EQ(path_header.value().getStringView(), path_pair.second)
         << "original path: " << path_pair.second;
@@ -75,7 +75,7 @@ TEST_F(PathUtilityTest, NormalizeCasePath) {
 
   for (const auto& path_pair : non_normal_pairs) {
     auto& path_header = pathHeaderEntry(path_pair.first);
-    const auto result = PathUtil::canonicalPath(headers_);
+    const auto result = PathUtil::canonicalPath(path_header);
     EXPECT_TRUE(result) << "original path: " << path_pair.first;
     EXPECT_EQ(path_header.value().getStringView(), path_pair.second)
         << "original path: " << path_pair.second;
@@ -89,7 +89,7 @@ TEST_F(PathUtilityTest, NormalizeCasePath) {
 TEST_F(PathUtilityTest, MergeSlashes) {
   auto mergeSlashes = [this](const std::string& path_value) {
     auto& path_header = pathHeaderEntry(path_value);
-    PathUtil::mergeSlashes(headers_);
+    PathUtil::mergeSlashes(path_header);
     auto sanitized_path_value = path_header.value().getStringView();
     return std::string(sanitized_path_value);
   };

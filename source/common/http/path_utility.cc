@@ -29,8 +29,8 @@ absl::optional<std::string> canonicalizePath(absl::string_view original_path) {
 } // namespace
 
 /* static */
-bool PathUtil::canonicalPath(HeaderMap& headers) {
-  const auto original_path = headers.Path()->value().getStringView();
+bool PathUtil::canonicalPath(HeaderEntry& path_header) {
+  const auto original_path = path_header.value().getStringView();
   // canonicalPath is supposed to apply on path component in URL instead of :path header
   const auto query_pos = original_path.find('?');
   auto normalized_path_opt = canonicalizePath(
@@ -50,12 +50,12 @@ bool PathUtil::canonicalPath(HeaderMap& headers) {
   if (!query_suffix.empty()) {
     normalized_path.insert(normalized_path.end(), query_suffix.begin(), query_suffix.end());
   }
-  headers.setPath(normalized_path);
+  path_header.value(normalized_path);
   return true;
 }
 
-void PathUtil::mergeSlashes(HeaderMap& headers) {
-  const auto original_path = headers.Path()->value().getStringView();
+void PathUtil::mergeSlashes(HeaderEntry& path_header) {
+  const auto original_path = path_header.value().getStringView();
   // Only operate on path component in URL.
   const absl::string_view::size_type query_start = original_path.find('?');
   const absl::string_view path = original_path.substr(0, query_start);
@@ -65,7 +65,7 @@ void PathUtil::mergeSlashes(HeaderMap& headers) {
   }
   const absl::string_view prefix = absl::StartsWith(path, "/") ? "/" : absl::string_view();
   const absl::string_view suffix = absl::EndsWith(path, "/") ? "/" : absl::string_view();
-  headers.setPath(absl::StrCat(
+  path_header.value(absl::StrCat(
       prefix, absl::StrJoin(absl::StrSplit(path, '/', absl::SkipEmpty()), "/"), query, suffix));
 }
 

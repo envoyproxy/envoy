@@ -74,7 +74,7 @@ static void HeaderMapImplGetInline(benchmark::State& state) {
   const std::string value("01234567890123456789");
   HeaderMapImpl headers;
   addDummyHeaders(headers, state.range(0));
-  headers.setReferenceConnection(value);
+  headers.insertConnection().value().setReference(value);
   size_t size = 0;
   for (auto _ : state) {
     size += headers.Connection()->value().size();
@@ -82,6 +82,21 @@ static void HeaderMapImplGetInline(benchmark::State& state) {
   benchmark::DoNotOptimize(size);
 }
 BENCHMARK(HeaderMapImplGetInline)->Arg(0)->Arg(1)->Arg(10)->Arg(50)->Arg(200);
+
+/**
+ * Measure the speed of writing to a header for which HeaderMapImpl is expected to
+ * provide special optimizations.
+ */
+static void HeaderMapImplSetInline(benchmark::State& state) {
+  const std::string value("01234567890123456789");
+  HeaderMapImpl headers;
+  addDummyHeaders(headers, state.range(0));
+  for (auto _ : state) {
+    headers.insertConnection().value().setReference(value);
+  }
+  benchmark::DoNotOptimize(headers.size());
+}
+BENCHMARK(HeaderMapImplSetInline)->Arg(0)->Arg(1)->Arg(10)->Arg(50);
 
 /**
  * Measure the speed of writing to a header for which HeaderMapImpl is expected to
@@ -119,7 +134,7 @@ static void HeaderMapImplGetByteSize(benchmark::State& state) {
   addDummyHeaders(headers, state.range(0));
   uint64_t size = 0;
   for (auto _ : state) {
-    size += headers.byteSize();
+    size += headers.byteSize().value();
   }
   benchmark::DoNotOptimize(size);
 }

@@ -57,7 +57,7 @@ void adjustContentLength(Http::HeaderMap& headers,
   if (length_header != nullptr) {
     uint64_t length;
     if (absl::SimpleAtoi(length_header->value().getStringView(), &length)) {
-      headers.setContentLength(adjustment(length));
+      length_header->value(adjustment(length));
     }
   }
 }
@@ -137,7 +137,7 @@ Http::FilterHeadersStatus Filter::encodeHeaders(Http::HeaderMap& headers, bool) 
       headers.setStatus(enumToInt(Http::Code::OK));
 
       if (content_type != nullptr) {
-        headers.setContentType(content_type_);
+        content_type->value(content_type_);
       }
 
       decoder_callbacks_->streamInfo().setResponseCodeDetails(
@@ -146,7 +146,7 @@ Http::FilterHeadersStatus Filter::encodeHeaders(Http::HeaderMap& headers, bool) 
     }
 
     // Restore the content-type to match what the downstream sent.
-    headers.setContentType(content_type_);
+    content_type->value(content_type_);
 
     if (withhold_grpc_frames_) {
       // Adjust content-length to account for the frame header that's added.

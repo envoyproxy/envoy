@@ -178,7 +178,7 @@ void HealthCheckFilter::onComplete() {
       final_status, "",
       [degraded](auto& headers) {
         if (degraded) {
-          headers.setEnvoyDegraded("");
+          headers.insertEnvoyDegraded();
         }
       },
       absl::nullopt, *details);
