@@ -372,8 +372,9 @@ TEST_P(EnvoyQuicServerSessionTest, FlushCloseWithDataToWrite) {
   EXPECT_FALSE(quic_connection_->connected());
 }
 
+// Tests that a write event after flush close should update the delay close
+// timer.
 TEST_P(EnvoyQuicServerSessionTest, WriteUpdatesDelayCloseTimer) {
-  quic::SetVerbosityLogThreshold(1);
   installReadFilter();
   // Switch to a encryption forward secure crypto stream.
   quic::test::QuicServerSessionBasePeer::SetCryptoStream(&envoy_quic_session_, nullptr);
@@ -450,9 +451,6 @@ TEST_P(EnvoyQuicServerSessionTest, WriteUpdatesDelayCloseTimer) {
   // connection close, but it should update the timer.
   envoy_quic_session_.OnCanWrite();
   EXPECT_TRUE(envoy_quic_session_.HasDataToWrite());
-  EXPECT_EQ(Network::Connection::State::Open, envoy_quic_session_.state());
-  EXPECT_TRUE(envoy_quic_session_.WillingAndAbleToWrite());
-  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
 
   // Timer shouldn't fire at original deadline.
   time_system_.sleep(std::chrono::milliseconds(90));
@@ -468,6 +466,97 @@ TEST_P(EnvoyQuicServerSessionTest, WriteUpdatesDelayCloseTimer) {
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   EXPECT_EQ(Network::Connection::State::Closed, envoy_quic_session_.state());
   EXPECT_FALSE(quic_connection_->connected());
+}
+
+// Tests that if delay close timeout is not configured, flush close will not act
+// based on timeout.
+TEST_P(EnvoyQuicServerSessionTest, FlushCloseNoTimeout) {
+  installReadFilter();
+  // Switch to a encryption forward secure crypto stream.
+  quic::test::QuicServerSessionBasePeer::SetCryptoStream(&envoy_quic_session_, nullptr);
+  quic::test::QuicServerSessionBasePeer::SetCryptoStream(
+      &envoy_quic_session_,
+      new TestQuicCryptoServerStream(&crypto_config_, &compressed_certs_cache_,
+                                     &envoy_quic_session_, &crypto_stream_helper_));
+  quic_connection_->SetDefaultEncryptionLevel(quic::ENCRYPTION_FORWARD_SECURE);
+  quic_connection_->SetEncrypter(
+      quic::ENCRYPTION_FORWARD_SECURE,
+      std::make_unique<quic::NullEncrypter>(quic::Perspective::IS_SERVER));
+  // Drive congestion control manually.
+  auto send_algorithm = new testing::NiceMock<quic::test::MockSendAlgorithm>;
+  quic::test::QuicConnectionPeer::SetSendAlgorithm(quic_connection_, send_algorithm);
+  EXPECT_CALL(*send_algorithm, CanSend(_)).WillRepeatedly(Return(true));
+  EXPECT_CALL(*send_algorithm, GetCongestionWindow()).WillRepeatedly(Return(quic::kDefaultTCPMSS));
+  EXPECT_CALL(*send_algorithm, PacingRate(_)).WillRepeatedly(Return(quic::QuicBandwidth::Zero()));
+  EXPECT_CALL(*send_algorithm, BandwidthEstimate())
+      .WillRepeatedly(Return(quic::QuicBandwidth::Zero()));
+
+  EXPECT_CALL(*quic_connection_, SendControlFrame(_)).Times(AnyNumber());
+
+  // Bump connection flow control window large enough not to interfere
+  // stream writing.
+  envoy_quic_session_.flow_controller()->UpdateSendWindowOffset(
+      10 * quic::kDefaultFlowControlSendWindow);
+
+  Http::MockStreamDecoder request_decoder;
+  Http::MockStreamCallbacks stream_callbacks;
+  // Create a stream and write enough data to make it blocked.
+  auto stream =
+      dynamic_cast<EnvoyQuicServerStream*>(createNewStream(request_decoder, stream_callbacks));
+
+  // Receive a GET request on created stream.
+  quic::QuicHeaderList request_headers;
+  request_headers.OnHeaderBlockStart();
+  std::string host("www.abc.com");
+  request_headers.OnHeader(":authority", host);
+  request_headers.OnHeader(":method", "GET");
+  request_headers.OnHeader(":path", "/");
+  request_headers.OnHeaderBlockEnd(/*uncompressed_header_bytes=*/0, /*compressed_header_bytes=*/0);
+  // Request headers should be propagated to decoder.
+  EXPECT_CALL(request_decoder, decodeHeaders_(_, /*end_stream=*/true))
+      .WillOnce(Invoke([&host](const Http::HeaderMapPtr& decoded_headers, bool) {
+        EXPECT_EQ(host, decoded_headers->Host()->value().getStringView());
+        EXPECT_EQ("/", decoded_headers->Path()->value().getStringView());
+        EXPECT_EQ(Http::Headers::get().MethodValues.Get,
+                  decoded_headers->Method()->value().getStringView());
+      }));
+  stream->OnStreamHeaderList(/*fin=*/true, request_headers.uncompressed_header_bytes(),
+                             request_headers);
+
+  Http::TestHeaderMapImpl response_headers{{":status", "200"},
+                                           {":content-length", "32770"}}; // 32KB + 2 bytes
+
+  stream->encodeHeaders(response_headers, false);
+  std::string response(32 * 1024 + 1, 'a');
+  Buffer::OwnedImpl buffer(response);
+  stream->encodeData(buffer, true);
+  // Stream become write blocked.
+  EXPECT_TRUE(envoy_quic_session_.HasDataToWrite());
+  EXPECT_TRUE(stream->flow_controller()->IsBlocked());
+  EXPECT_FALSE(envoy_quic_session_.IsConnectionFlowControlBlocked());
+
+  // Connection shouldn't be closed right away as there is a stream write blocked.
+  envoy_quic_session_.close(Network::ConnectionCloseType::FlushWrite);
+  EXPECT_EQ(Network::Connection::State::Open, envoy_quic_session_.state());
+  // Another write event without updating flow control window shouldn't trigger
+  // connection close.
+  envoy_quic_session_.OnCanWrite();
+  EXPECT_TRUE(envoy_quic_session_.HasDataToWrite());
+
+  // No timeout set, so alarm shouldn't fire.
+  time_system_.sleep(std::chrono::milliseconds(100));
+  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+  EXPECT_EQ(Network::Connection::State::Open, envoy_quic_session_.state());
+
+  // Force close connection.
+  EXPECT_CALL(*quic_connection_,
+              SendConnectionClosePacket(quic::QUIC_NO_ERROR, "Closed by application"));
+  EXPECT_CALL(network_connection_callbacks_, onEvent(Network::ConnectionEvent::LocalClose));
+  EXPECT_CALL(stream_callbacks, onResetStream(Http::StreamResetReason::ConnectionTermination, _));
+  EXPECT_CALL(*quic_connection_, SendControlFrame(_))
+      .Times(testing::AtMost(1))
+      .WillOnce(Invoke([](const quic::QuicFrame&) { return false; }));
+  envoy_quic_session_.close(Network::ConnectionCloseType::NoFlush);
 }
 
 TEST_P(EnvoyQuicServerSessionTest, FlushCloseWithTimeout) {

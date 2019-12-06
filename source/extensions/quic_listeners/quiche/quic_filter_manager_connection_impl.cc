@@ -133,10 +133,11 @@ void QuicFilterManagerConnectionImpl::maybeHandleDelayedClose() {
     return;
   }
   if (hasDataToWrite() || delayed_close_state_ == DelayedCloseState::CloseAfterFlushAndWait) {
-    // Re-arm delay close timer on every write event if there are still data
-    // buffered or the connection close is supposed to be delayed.
-    ASSERT(delayed_close_timer_ != nullptr);
-    delayed_close_timer_->enableTimer(delayed_close_timeout_);
+    if (delayed_close_timer_ != nullptr) {
+      // Re-arm delay close timer on every write event if there are still data
+      // buffered or the connection close is supposed to be delayed.
+      delayed_close_timer_->enableTimer(delayed_close_timeout_);
+    }
   } else {
     closeConnectionImmediately();
   }
