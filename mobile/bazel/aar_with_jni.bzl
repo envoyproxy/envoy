@@ -126,16 +126,23 @@ EOF
         ],
         visibility = visibility,
         cmd = """
-origdir=$$PWD
-cd $$(mktemp -d)
-unzip $$origdir/$(location :{jni_apk}) > /dev/null
+orig_dir=$$PWD
+classes_dir=$$(mktemp -d)
+echo "Creating classes.jar from {jar}"
+cd $$classes_dir
+unzip $$orig_dir/$(location {jar}) "io/envoyproxy/*" "META-INF/" > /dev/null
+zip -r classes.jar * > /dev/null
+cd $$orig_dir
+echo "Constructing aar..."
+final_dir=$$(mktemp -d)
+cp $$classes_dir/classes.jar $$final_dir
+cd $$final_dir
+unzip $$orig_dir/$(location {jni_apk}) lib/* > /dev/null
 mv lib jni
-cp $$origdir/$(location {jar}) classes.jar
-cp $$origdir/$(location {proguard_rules}) ./proguard.txt
-rm AndroidManifest.xml
-cp $$origdir/$(location {manifest}) AndroidManifest.xml
+cp $$orig_dir/$(location {proguard_rules}) ./proguard.txt
+cp $$orig_dir/$(location {manifest}) AndroidManifest.xml
 zip -r tmp.aar * > /dev/null
-cp tmp.aar $$origdir/$@
+cp tmp.aar $$orig_dir/$@
 """.format(
             manifest = manifest_name + ".xml",
             jar = android_binary_name + "_deploy.jar",
