@@ -579,8 +579,7 @@ public:
   void createNetworkFilterChain(Network::Connection&) const override;
   Http::Protocol
   upstreamHttpProtocol(absl::optional<Http::Protocol> downstream_protocol) const override;
-
-  bool retryBudgetExceeded() const override;
+  RetryBudgetStatus retryBudgetStatus(ResourcePriority priority) const override;
 
 private:
   struct ResourceManagers {
@@ -636,7 +635,7 @@ private:
   const absl::optional<envoy::api::v2::Cluster::CustomClusterType> cluster_type_;
   const std::unique_ptr<Server::Configuration::CommonFactoryContext> factory_context_;
   std::vector<Network::FilterFactoryCb> filter_factories_;
-  absl::optional<RetryBudget> retry_budget_;
+  std::unordered_map<ResourcePriority, absl::optional<RetryBudget>> retry_budget_map_;
 };
 
 /**

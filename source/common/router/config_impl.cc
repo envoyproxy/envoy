@@ -122,14 +122,6 @@ RetryPolicyImpl::RetryPolicyImpl(const envoy::api::v2::route::RetryPolicy& retry
             "retry_policy.max_interval must greater than or equal to the base_interval");
       }
     }
-
-    if (retry_policy.has_retry_budget()) {
-      retry_budget_ = {};
-      retry_budget_->budget_percent =
-          PROTOBUF_PERCENT_TO_DOUBLE_OR_DEFAULT(retry_policy.retry_budget(), percent_budget, 20.0);
-      retry_budget_->min_concurrency =
-          PROTOBUF_GET_WRAPPED_OR_DEFAULT(retry_policy.retry_budget(), min_concurrency, 15);
-    }
   }
 }
 

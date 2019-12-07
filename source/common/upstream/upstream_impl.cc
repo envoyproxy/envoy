@@ -580,8 +580,28 @@ ClusterLoadReportStats ClusterInfoImpl::generateLoadReportStats(Stats::Scope& sc
   return {ALL_CLUSTER_LOAD_REPORT_STATS(POOL_COUNTER(scope))};
 }
 
-bool ClusterInfoImpl::retryBudgetExceeded() const {
+ClusterInfoImpl::RetryBudgetStatus ClusterInfoImpl::retryBudgetStatus(ResourcePriority priority) const {
+  const auto retry_budget_iter = retry_budget_map_.find(priority);
+  if (retry_budget_iter == retry_budget_map_.end()) {
+    return ClusterInfoImpl::RetryBudgetStatus::Unconfigured;
+  }
 
+  const auto& retry_budget = retry_budget_iter->second;
+  const uint64_t current_active = resourceManager(priority).requests().count() +
+                                  resourceManager(priority).pendingRequests().count();
+
+  // If the current number of active requests doesn't meet the concurrency minimum to begin
+  // enforcing the retry budget, we will simply enforce the budget as if the number of active
+  // requests is at the minimum. This does not honor the configured budget percentage accurately
+  // until the minimum concurrency is met, but allows for reasonable numbers of active retries when
+  // there are few outstanding requests.
+  const double budget = std::max<uint64_t>(current_active, retry_budget->min_concurrency) *
+    retry_budget->budget_percent / 100.0;
+
+  if (resourceManager(priority).retries().count() >= budget) {
+    return ClusterInfoImpl::RetryBudgetStatus::Exceeded;
+  }
+  return ClusterInfoImpl::RetryBudgetStatus::Available;
 }
 
 // Implements the FactoryContext interface required by network filters.
@@ -764,13 +784,19 @@ ClusterInfoImpl::ClusterInfoImpl(
     filter_factories_.push_back(callback);
   }
 
-  if (config.has_circuit_breakers() && config.circuit_breakers().has_retry_budget()) {
-    retry_budget_ = RetryBudget{
-      .budget_percent =
-        PROTOBUF_GET_WRAPPED_OR_DEFAULT(config.circuit_breakers().retry_budget(), budget_percent, 20.0),
-      .min_concurrency =
-        PROTOBUF_GET_WRAPPED_OR_DEFAULT(config.circuit_breakers().retry_budget(), min_concurrency, 15),
-    };
+  if (config.has_circuit_breakers()) {
+    const auto& thresholds =  config.circuit_breakers().thresholds();
+    for (const auto& threshold : thresholds) {
+      if (threshold.has_retry_budget()) {
+        const auto priority = PROTOBUF_GET_WRAPPED_REQUIRED(threshold, priority);
+        retry_budget_map_[priority] = RetryBudget{
+          .budget_percent =
+            PROTOBUF_GET_WRAPPED_OR_DEFAULT(threshold.retry_budget(), budget_percent, 20.0),
+          .min_concurrency =
+            PROTOBUF_GET_WRAPPED_OR_DEFAULT(threshold.retry_budget(), min_concurrency, 15),
+        };
+      }
+    }
   }
 }
 
