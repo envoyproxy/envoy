@@ -18,6 +18,7 @@ class Gauge;
 class Histogram;
 class Scope;
 class NullGaugeImpl;
+class NullHistogramImpl;
 
 using OptionalCounter = absl::optional<std::reference_wrapper<const Counter>>;
 using OptionalGauge = absl::optional<std::reference_wrapper<const Gauge>>;
@@ -78,6 +79,11 @@ public:
    * @return a null gauge within the scope's namespace.
    */
   virtual NullGaugeImpl& nullGauge(const std::string& name) PURE;
+
+  /**
+   * @return a null histogram within the scope's namespace.
+   */
+  virtual NullHistogramImpl& nullHistogram(const std::string& name, Histogram::Unit unit) PURE;
 
   /**
    * @param name The name of the stat, obtained from the SymbolTable.

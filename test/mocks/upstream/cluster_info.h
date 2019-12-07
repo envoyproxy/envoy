@@ -100,6 +100,7 @@ public:
   MOCK_CONST_METHOD0(stats, ClusterStats&());
   MOCK_CONST_METHOD0(statsScope, Stats::Scope&());
   MOCK_CONST_METHOD0(loadReportStats, ClusterLoadReportStats&());
+  MOCK_CONST_METHOD0(timeoutBudgetStats, ClusterTimeoutBudgetStats&());
   MOCK_CONST_METHOD0(sourceAddress, const Network::Address::InstanceConstSharedPtr&());
   MOCK_CONST_METHOD0(lbSubsetInfo, const LoadBalancerSubsetInfo&());
   MOCK_CONST_METHOD0(metadata, const envoy::api::v2::core::Metadata&());
@@ -124,6 +125,8 @@ public:
   Upstream::TransportSocketMatcherPtr transport_socket_matcher_;
   NiceMock<Stats::MockIsolatedStatsStore> load_report_stats_store_;
   ClusterLoadReportStats load_report_stats_;
+  NiceMock<Stats::MockIsolatedStatsStore> timeout_budget_stats_store_;
+  ClusterTimeoutBudgetStats timeout_budget_stats_;
   ClusterCircuitBreakersStats circuit_breakers_stats_;
   NiceMock<Runtime::MockLoader> runtime_;
   std::unique_ptr<Upstream::ResourceManager> resource_manager_;

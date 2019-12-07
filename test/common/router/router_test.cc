@@ -1141,17 +1141,13 @@ TEST_F(RouterTest, TimeoutBudgetHistogramStat) {
   Buffer::OwnedImpl data;
   router_.decodeData(data, true);
 
-  // These are coming from CodeStatsImpl::chargeResponseTiming.
-  EXPECT_CALL(cm_.thread_local_cluster_.cluster_.info_->stats_store_,
-              deliverHistogramToSinks(_, 80ull))
-      .Times(3);
   // Global timeout budget used.
   EXPECT_CALL(
-      cm_.thread_local_cluster_.cluster_.info_->stats_store_,
+      cm_.thread_local_cluster_.cluster_.info_->timeout_budget_stats_store_,
       deliverHistogramToSinks(
           Property(&Stats::Metric::name, "upstream_rq_timeout_budget_percent_used"), 20ull));
   // Per-try budget used.
-  EXPECT_CALL(cm_.thread_local_cluster_.cluster_.info_->stats_store_,
+  EXPECT_CALL(cm_.thread_local_cluster_.cluster_.info_->timeout_budget_stats_store_,
               deliverHistogramToSinks(
                   Property(&Stats::Metric::name, "upstream_rq_timeout_budget_per_try_percent_used"),
                   40ull));
@@ -1184,18 +1180,14 @@ TEST_F(RouterTest, TimeoutBudgetHistogramStatOnlyGlobal) {
   Buffer::OwnedImpl data;
   router_.decodeData(data, true);
 
-  // These are coming from CodeStatsImpl::chargeResponseTiming.
-  EXPECT_CALL(cm_.thread_local_cluster_.cluster_.info_->stats_store_,
-              deliverHistogramToSinks(_, 80ull))
-      .Times(3);
   // Global timeout budget used.
   EXPECT_CALL(
-      cm_.thread_local_cluster_.cluster_.info_->stats_store_,
+      cm_.thread_local_cluster_.cluster_.info_->timeout_budget_stats_store_,
       deliverHistogramToSinks(
           Property(&Stats::Metric::name, "upstream_rq_timeout_budget_percent_used"), 40ull));
   // Per-try budget used.
   EXPECT_CALL(
-      cm_.thread_local_cluster_.cluster_.info_->stats_store_,
+      cm_.thread_local_cluster_.cluster_.info_->timeout_budget_stats_store_,
       deliverHistogramToSinks(
           Property(&Stats::Metric::name, "upstream_rq_timeout_budget_per_try_percent_used"), 0ull));
 
@@ -1227,18 +1219,14 @@ TEST_F(RouterTest, TimeoutBudgetHistogramStatUnset) {
   Buffer::OwnedImpl data;
   router_.decodeData(data, true);
 
-  // These are coming from CodeStatsImpl::chargeResponseTiming.
-  EXPECT_CALL(cm_.thread_local_cluster_.cluster_.info_->stats_store_,
-              deliverHistogramToSinks(_, 80ull))
-      .Times(3);
   // Global timeout budget used.
-  EXPECT_CALL(cm_.thread_local_cluster_.cluster_.info_->stats_store_,
+  EXPECT_CALL(cm_.thread_local_cluster_.cluster_.info_->timeout_budget_stats_store_,
               deliverHistogramToSinks(
                   Property(&Stats::Metric::name, "upstream_rq_timeout_budget_percent_used"), 20ull))
       .Times(0);
   // Per-try budget used.
   EXPECT_CALL(
-      cm_.thread_local_cluster_.cluster_.info_->stats_store_,
+      cm_.thread_local_cluster_.cluster_.info_->timeout_budget_stats_store_,
       deliverHistogramToSinks(
           Property(&Stats::Metric::name, "upstream_rq_timeout_budget_per_try_percent_used"), 40ull))
       .Times(0);

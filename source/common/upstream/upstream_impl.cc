@@ -580,6 +580,14 @@ ClusterLoadReportStats ClusterInfoImpl::generateLoadReportStats(Stats::Scope& sc
   return {ALL_CLUSTER_LOAD_REPORT_STATS(POOL_COUNTER(scope))};
 }
 
+ClusterTimeoutBudgetStats
+ClusterInfoImpl::generateTimeoutBudgetStats(Stats::Scope& scope, const bool trackTimeoutBudgets) {
+  if (trackTimeoutBudgets) {
+    return {ALL_CLUSTER_TIMEOUT_BUDGET_STATS(POOL_HISTOGRAM(scope))};
+  }
+  return {ALL_CLUSTER_TIMEOUT_BUDGET_STATS(NULL_POOL_HISTOGRAM(scope))};
+}
+
 // Implements the FactoryContext interface required by network filters.
 class FactoryContextImpl : public Server::Configuration::CommonFactoryContext {
 public:
@@ -637,6 +645,10 @@ ClusterInfoImpl::ClusterInfoImpl(
       socket_matcher_(std::move(socket_matcher)), stats_scope_(std::move(stats_scope)),
       stats_(generateStats(*stats_scope_)), load_report_stats_store_(stats_scope_->symbolTable()),
       load_report_stats_(generateLoadReportStats(load_report_stats_store_)),
+      track_timeout_budgets_(config.track_timeout_budgets()),
+      timeout_budget_stats_store_(stats_scope_->symbolTable()),
+      timeout_budget_stats_(
+          generateTimeoutBudgetStats(timeout_budget_stats_store_, track_timeout_budgets_)),
       features_(parseFeatures(config)),
       http1_settings_(Http::Utility::parseHttp1Settings(config.http_protocol_options())),
       http2_settings_(Http::Utility::parseHttp2Settings(config.http2_protocol_options())),
@@ -659,8 +671,7 @@ ClusterInfoImpl::ClusterInfoImpl(
                               config.cluster_type())
                         : absl::nullopt),
       factory_context_(
-          std::make_unique<FactoryContextImpl>(*stats_scope_, runtime, factory_context)),
-      track_timeout_budgets_(config.track_timeout_budgets()) {
+          std::make_unique<FactoryContextImpl>(*stats_scope_, runtime, factory_context)) {
   switch (config.lb_policy()) {
   case envoy::api::v2::Cluster::ROUND_ROBIN:
     lb_type_ = LoadBalancerType::RoundRobin;

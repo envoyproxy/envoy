@@ -762,7 +762,7 @@ void Filter::onResponseTimeout() {
       // If we should be tracking timeout budget usage, record the max-value
       // into the histogram to say that the entire timeout budget was used.
       if (cluster_->trackTimeoutBudgets()) {
-        cluster_->stats().upstream_rq_timeout_budget_per_try_percent_used_.recordValue(
+        cluster_->timeoutBudgetStats().upstream_rq_timeout_budget_per_try_percent_used_.recordValue(
             TimeoutPrecisionFactor);
       }
 
@@ -820,7 +820,7 @@ void Filter::onPerTryTimeout(UpstreamRequest& upstream_request) {
 
   cluster_->stats().upstream_rq_per_try_timeout_.inc();
   if (cluster_->trackTimeoutBudgets()) {
-    cluster_->stats().upstream_rq_timeout_budget_per_try_percent_used_.recordValue(
+    cluster_->timeoutBudgetStats().upstream_rq_timeout_budget_per_try_percent_used_.recordValue(
         TimeoutPrecisionFactor);
   }
   if (upstream_request.upstream_host_) {
@@ -875,7 +875,8 @@ void Filter::chargeUpstreamAbort(Http::Code code, bool dropped, UpstreamRequest&
 void Filter::onUpstreamTimeoutAbort(StreamInfo::ResponseFlag response_flags,
                                     absl::string_view details) {
   if (cluster_->trackTimeoutBudgets()) {
-    cluster_->stats().upstream_rq_timeout_budget_percent_used_.recordValue(TimeoutPrecisionFactor);
+    cluster_->timeoutBudgetStats().upstream_rq_timeout_budget_percent_used_.recordValue(
+        TimeoutPrecisionFactor);
   }
   const absl::string_view body =
       timeout_response_code_ == Http::Code::GatewayTimeout ? "upstream request timeout" : "";
@@ -1250,9 +1251,9 @@ void Filter::onUpstreamComplete(UpstreamRequest& upstream_request) {
       dispatcher.timeSource().monotonicTime() - downstream_request_complete_time_);
 
   if (cluster_->trackTimeoutBudgets()) {
-    cluster_->stats().upstream_rq_timeout_budget_percent_used_.recordValue(
+    cluster_->timeoutBudgetStats().upstream_rq_timeout_budget_percent_used_.recordValue(
         percentageOfTimeout(response_time, timeout_.global_timeout_));
-    cluster_->stats().upstream_rq_timeout_budget_per_try_percent_used_.recordValue(
+    cluster_->timeoutBudgetStats().upstream_rq_timeout_budget_per_try_percent_used_.recordValue(
         percentageOfTimeout(response_time, timeout_.per_try_timeout_));
   }
 
