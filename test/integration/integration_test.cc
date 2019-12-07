@@ -490,6 +490,35 @@ TEST_P(IntegrationTest, Pipeline) {
   connection.close();
 }
 
+// Add a pipeline test where complete request headers in the first request merit
+// an inline sendLocalReply to make sure the "kick" works under the call stack
+// of dispatch as well as when a response is proxied from upstream.
+TEST_P(IntegrationTest, PipelineInline) {
+  autonomous_upstream_ = true;
+  initialize();
+  std::string response;
+
+  Buffer::OwnedImpl buffer("GET / HTTP/1.1\r\n\r\nGET / HTTP/1.1\r\n\r\n");
+  RawConnectionDriver connection(
+      lookupPort("http"), buffer,
+      [&](Network::ClientConnection&, const Buffer::Instance& data) -> void {
+        response.append(data.toString());
+      },
+      version_);
+  // First is an error: no host.
+  while (response.find("400") == std::string::npos) {
+    connection.run(Event::Dispatcher::RunType::NonBlock);
+  }
+  EXPECT_THAT(response, HasSubstr("HTTP/1.1 400 Bad Request\r\n"));
+
+  // Second response should be 400 (no host)
+  while (response.find("400") == std::string::npos) {
+    connection.run(Event::Dispatcher::RunType::NonBlock);
+  }
+  EXPECT_THAT(response, HasSubstr("HTTP/1.1 400 Bad Request\r\n"));
+  connection.close();
+}
+
 TEST_P(IntegrationTest, NoHost) {
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));

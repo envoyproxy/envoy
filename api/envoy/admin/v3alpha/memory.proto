@@ -6,6 +6,8 @@ option java_outer_classname = "MemoryProto";
 option java_multiple_files = true;
 option java_package = "io.envoyproxy.envoy.admin.v3alpha";
 
+import "udpa/api/annotations/versioning.proto";
+
 // [#protodoc-title: Memory]
 
 // Proto representation of the internal memory consumption of an Envoy instance. These represent
@@ -13,6 +15,8 @@ option java_package = "io.envoyproxy.envoy.admin.v3alpha";
 // docs entitled ["Generic Tcmalloc Status"](https://gperftools.github.io/gperftools/tcmalloc.html).
 // [#next-free-field: 6]
 message Memory {
+  option (udpa.api.annotations.versioning).previous_message_type = "envoy.admin.v2alpha.Memory";
+
   // The number of bytes allocated by the heap for Envoy. This is an alias for
   // `generic.current_allocated_bytes`.
   uint64 allocated = 1;

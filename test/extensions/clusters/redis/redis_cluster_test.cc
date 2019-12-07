@@ -163,7 +163,7 @@ protected:
       EXPECT_CALL(*client_, addConnectionCallbacks(_));
       EXPECT_CALL(*client_, close());
     }
-    EXPECT_CALL(*client_, makeRequest(Ref(RedisCluster::ClusterSlotsRequest::instance_), _))
+    EXPECT_CALL(*client_, makeRequest_(Ref(RedisCluster::ClusterSlotsRequest::instance_), _))
         .WillOnce(Return(&pool_request_));
   }
 
@@ -507,10 +507,11 @@ protected:
     EXPECT_EQ(discovery_session.bufferFlushTimeoutInMs(), std::chrono::milliseconds(0));
     EXPECT_EQ(discovery_session.maxUpstreamUnknownConnections(), 0);
 
-    NetworkFilters::Common::Redis::RespValue dummy_value;
-    dummy_value.type(NetworkFilters::Common::Redis::RespType::Error);
-    dummy_value.asString() = "dummy text";
-    EXPECT_TRUE(discovery_session.onRedirection(dummy_value));
+    NetworkFilters::Common::Redis::RespValuePtr dummy_value{
+        new NetworkFilters::Common::Redis::RespValue()};
+    dummy_value->type(NetworkFilters::Common::Redis::RespType::Error);
+    dummy_value->asString() = "dummy text";
+    EXPECT_TRUE(discovery_session.onRedirection(std::move(dummy_value), "dummy ip", false));
 
     RedisCluster::RedisDiscoveryClient discovery_client(discovery_session);
     EXPECT_NO_THROW(discovery_client.onAboveWriteBufferHighWatermark());
@@ -551,7 +552,7 @@ protected:
   Event::MockTimer* interval_timer_{};
   Extensions::NetworkFilters::Common::Redis::Client::MockClient* client_{};
   Extensions::NetworkFilters::Common::Redis::Client::MockPoolRequest pool_request_;
-  Extensions::NetworkFilters::Common::Redis::Client::PoolCallbacks* pool_callbacks_{};
+  Extensions::NetworkFilters::Common::Redis::Client::ClientCallbacks* pool_callbacks_{};
   std::shared_ptr<RedisCluster> cluster_;
   std::shared_ptr<NiceMock<MockClusterSlotUpdateCallBack>> cluster_callback_;
   Network::MockActiveDnsQuery active_dns_query_;

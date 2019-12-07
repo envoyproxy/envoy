@@ -10,7 +10,9 @@ import "google/protobuf/duration.proto";
 
 import "validate/validate.proto";
 
-// TODO(mattklein123): docs
+// [#protodoc-title: UDP proxy]
+// UDP proxy :ref:`configuration overview <config_udp_listener_filters_udp_proxy>`.
+// [#extension: envoy.filters.udp_listener.udp_proxy]
 
 // Configuration for the UDP proxy filter.
 message UdpProxyConfig {

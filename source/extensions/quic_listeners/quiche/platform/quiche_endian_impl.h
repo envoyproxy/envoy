@@ -10,9 +10,9 @@
 
 #include "common/common/byte_order.h"
 
-namespace quic {
+namespace quiche {
 
-class QuicEndianImpl {
+class QuicheEndianImpl {
 public:
   static uint16_t HostToNet16(uint16_t x) { return toEndianness<ByteOrder::BigEndian>(x); }
   static uint32_t HostToNet32(uint32_t x) { return toEndianness<ByteOrder::BigEndian>(x); }
@@ -25,4 +25,4 @@ public:
   static bool HostIsLittleEndian() { return NetToHost16(0x1234) != 0x1234; }
 };
 
-} // namespace quic
+} // namespace quiche
