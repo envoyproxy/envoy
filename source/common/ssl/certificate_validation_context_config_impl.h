@@ -25,7 +25,7 @@ public:
   const std::vector<std::string>& verifySubjectAltNameList() const override {
     return verify_subject_alt_name_list_;
   }
-  const std::vector<::envoy::type::matcher::StringMatcher>
+  const std::vector<::envoy::type::matcher::StringMatcher>&
   matchSubjectAltNameList() const override {
     return match_subject_alt_name_list_;
   }

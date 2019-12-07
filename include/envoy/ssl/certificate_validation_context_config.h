@@ -44,7 +44,7 @@ public:
   /**
    * @return The subject alt name matchers to be verified, if enabled. Otherwise, ""
    */
-  virtual const std::vector<::envoy::type::matcher::StringMatcher>
+  virtual const std::vector<::envoy::type::matcher::StringMatcher>&
   matchSubjectAltNameList() const PURE;
 
   /**

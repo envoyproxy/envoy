@@ -23,7 +23,6 @@
 #include "openssl/evp.h"
 #include "openssl/hmac.h"
 #include "openssl/rand.h"
-#include "openssl/x509v3.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -546,6 +545,41 @@ void ContextImpl::incCounter(const Stats::StatName name, absl::string_view value
 #endif
 }
 
+std::string ContextImpl::generalNameAsString(const GENERAL_NAME* general_name) {
+  std::string san;
+  switch (general_name->type) {
+  case GEN_DNS: {
+    ASN1_STRING* str = general_name->d.dNSName;
+    san = reinterpret_cast<const char*>(ASN1_STRING_data(str));
+    break;
+  }
+  case GEN_URI: {
+    ASN1_STRING* str = general_name->d.uniformResourceIdentifier;
+    san = reinterpret_cast<const char*>(ASN1_STRING_data(str));
+    break;
+  }
+  case GEN_IPADD: {
+    if (general_name->d.ip->length == 4) {
+      sockaddr_in sin;
+      sin.sin_port = 0;
+      sin.sin_family = AF_INET;
+      memcpy(&sin.sin_addr, general_name->d.ip->data, sizeof(sin.sin_addr));
+      Network::Address::Ipv4Instance addr(&sin);
+      san = addr.ip()->addressAsString();
+    } else if (general_name->d.ip->length == 16) {
+      sockaddr_in6 sin6;
+      sin6.sin6_port = 0;
+      sin6.sin6_family = AF_INET6;
+      memcpy(&sin6.sin6_addr, general_name->d.ip->data, sizeof(sin6.sin6_addr));
+      Network::Address::Ipv6Instance addr(sin6);
+      san = addr.ip()->addressAsString();
+    }
+    break;
+  }
+  }
+  return san;
+}
+
 void ContextImpl::logHandshake(SSL* ssl) const {
   stats_.handshake_.inc();
 
@@ -594,53 +628,10 @@ bool ContextImpl::matchSubjectAltName(
     return false;
   }
   for (const GENERAL_NAME* san : san_names.get()) {
-    switch (san->type) {
-    case GEN_DNS: {
-      ASN1_STRING* str = san->d.dNSName;
-      const char* dns_name = reinterpret_cast<const char*>(ASN1_STRING_data(str));
-      for (auto& config_san_matcher : match_subject_alt_name_list) {
-        if (config_san_matcher.match(dns_name)) {
-          return true;
-        }
+    for (auto& config_san_matcher : match_subject_alt_name_list) {
+      if (config_san_matcher.match(generalNameAsString(san))) {
+        return true;
       }
-      break;
-    }
-    case GEN_URI: {
-      ASN1_STRING* str = san->d.uniformResourceIdentifier;
-      const char* uri = reinterpret_cast<const char*>(ASN1_STRING_data(str));
-      for (auto& config_san_matcher : match_subject_alt_name_list) {
-        if (config_san_matcher.match(uri)) {
-          return true;
-        }
-      }
-      break;
-    }
-    case GEN_IPADD: {
-      if (san->d.ip->length == 4) {
-        sockaddr_in sin;
-        sin.sin_port = 0;
-        sin.sin_family = AF_INET;
-        memcpy(&sin.sin_addr, san->d.ip->data, sizeof(sin.sin_addr));
-        Network::Address::Ipv4Instance addr(&sin);
-        for (auto& config_san_matcher : match_subject_alt_name_list) {
-          if (config_san_matcher.match(addr.ip()->addressAsString())) {
-            return true;
-          }
-        }
-      } else if (san->d.ip->length == 16) {
-        sockaddr_in6 sin6;
-        sin6.sin6_port = 0;
-        sin6.sin6_family = AF_INET6;
-        memcpy(&sin6.sin6_addr, san->d.ip->data, sizeof(sin6.sin6_addr));
-        Network::Address::Ipv6Instance addr(sin6);
-        for (auto& config_san_matcher : match_subject_alt_name_list) {
-          if (config_san_matcher.match(addr.ip()->addressAsString())) {
-            return true;
-          }
-        }
-      }
-      break;
-    }
     }
   }
   return false;
@@ -654,53 +645,10 @@ bool ContextImpl::verifySubjectAltName(X509* cert,
     return false;
   }
   for (const GENERAL_NAME* san : san_names.get()) {
-    switch (san->type) {
-    case GEN_DNS: {
-      ASN1_STRING* str = san->d.dNSName;
-      const char* dns_name = reinterpret_cast<const char*>(ASN1_STRING_data(str));
-      for (auto& config_san : subject_alt_names) {
-        if (dnsNameMatch(config_san, dns_name)) {
-          return true;
-        }
-      }
-      break;
-    }
-    case GEN_URI: {
-      ASN1_STRING* str = san->d.uniformResourceIdentifier;
-      const char* uri = reinterpret_cast<const char*>(ASN1_STRING_data(str));
-      for (auto& config_san : subject_alt_names) {
-        if (config_san.compare(uri) == 0) {
-          return true;
-        }
-      }
-      break;
-    }
-    case GEN_IPADD: {
-      if (san->d.ip->length == 4) {
-        sockaddr_in sin;
-        sin.sin_port = 0;
-        sin.sin_family = AF_INET;
-        memcpy(&sin.sin_addr, san->d.ip->data, sizeof(sin.sin_addr));
-        Network::Address::Ipv4Instance addr(&sin);
-        for (auto& config_san : subject_alt_names) {
-          if (config_san == addr.ip()->addressAsString()) {
-            return true;
-          }
-        }
-      } else if (san->d.ip->length == 16) {
-        sockaddr_in6 sin6;
-        sin6.sin6_port = 0;
-        sin6.sin6_family = AF_INET6;
-        memcpy(&sin6.sin6_addr, san->d.ip->data, sizeof(sin6.sin6_addr));
-        Network::Address::Ipv6Instance addr(sin6);
-        for (auto& config_san : subject_alt_names) {
-          if (config_san == addr.ip()->addressAsString()) {
-            return true;
-          }
-        }
-      }
-      break;
-    }
+    for (auto& config_san : subject_alt_names) {
+      if (san->type == GEN_DNS ? dnsNameMatch(config_san, generalNameAsString(san).c_str())
+                               : config_san == generalNameAsString(san))
+        return true;
     }
   }
   return false;

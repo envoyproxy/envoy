@@ -29,7 +29,7 @@ Version history
 * thrift_proxy: added support for cluster header based routing.
 * thrift_proxy: added stats to the router filter.
 * tls: remove TLS 1.0 and 1.1 from client defaults
-* tls: add support for :ref:`generic string matcher <envoy_api_field_auth.v2.CertificateValidationContext.match_subject_alt_name>` for subject alternative names.
+* tls: add support for :ref:`generic string matcher <envoy_api_field_auth.CertificateValidationContext.match_subject_alt_name>` for subject alternative names.
 * tracing: added the ability to set custom tags on both the :ref:`HTTP connection manager<envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.tracing>` and the :ref:`HTTP route <envoy_api_field_route.Route.tracing>`.
 * udp: added initial support for :ref:`UDP proxy <config_udp_listener_filters_udp_proxy>`
 
