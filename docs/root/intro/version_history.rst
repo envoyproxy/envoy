@@ -19,6 +19,7 @@ Version history
 * logger: added :ref:`--log-format-escaped <operations_cli>` command line option to escape newline characters in application logs.
 * rbac: added support for matching all subject alt names instead of first in :ref:`principal_name <envoy_api_field_config.rbac.v2.Principal.Authenticated.principal_name>`.
 * redis: performance improvement for larger split commands by avoiding string copies.
+* redis: correctly follow MOVE/ASK redirection for mirrored clusters.
 * router: added support for REQ(header-name) :ref:`header formatter <config_http_conn_man_headers_custom_request_headers>`.
 * router: skip the Location header when the response code is not a 201 or a 3xx.
 * router: exposed DOWNSTREAM_REMOTE_ADDRESS as custom HTTP request/response headers.
