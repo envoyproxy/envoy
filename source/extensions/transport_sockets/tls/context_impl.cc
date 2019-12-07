@@ -627,9 +627,10 @@ bool ContextImpl::matchSubjectAltName(
   if (san_names == nullptr) {
     return false;
   }
-  for (const GENERAL_NAME* san : san_names.get()) {
+  for (const GENERAL_NAME* general_name : san_names.get()) {
+    const std::string san = generalNameAsString(general_name);
     for (auto& config_san_matcher : match_subject_alt_name_list) {
-      if (config_san_matcher.match(generalNameAsString(san))) {
+      if (config_san_matcher.match(san)) {
         return true;
       }
     }
@@ -644,10 +645,10 @@ bool ContextImpl::verifySubjectAltName(X509* cert,
   if (san_names == nullptr) {
     return false;
   }
-  for (const GENERAL_NAME* san : san_names.get()) {
+  for (const GENERAL_NAME* general_name : san_names.get()) {
+    const std::string san = generalNameAsString(general_name);
     for (auto& config_san : subject_alt_names) {
-      if (san->type == GEN_DNS ? dnsNameMatch(config_san, generalNameAsString(san).c_str())
-                               : config_san == generalNameAsString(san))
+      if (general_name->type == GEN_DNS ? dnsNameMatch(config_san, san.c_str()) : config_san == san)
         return true;
     }
   }
@@ -931,13 +932,13 @@ ServerContextImpl::ServerContextImpl(Stats::Scope& scope,
     }
 
     if (!parsed_alpn_protocols_.empty()) {
-      SSL_CTX_set_alpn_select_cb(
-          ctx.ssl_ctx_.get(),
-          [](SSL*, const unsigned char** out, unsigned char* outlen, const unsigned char* in,
-             unsigned int inlen, void* arg) -> int {
-            return static_cast<ServerContextImpl*>(arg)->alpnSelectCallback(out, outlen, in, inlen);
-          },
-          this);
+      SSL_CTX_set_alpn_select_cb(ctx.ssl_ctx_.get(),
+                                 [](SSL*, const unsigned char** out, unsigned char* outlen,
+                                    const unsigned char* in, unsigned int inlen, void* arg) -> int {
+                                   return static_cast<ServerContextImpl*>(arg)->alpnSelectCallback(
+                                       out, outlen, in, inlen);
+                                 },
+                                 this);
     }
 
     if (!session_ticket_keys_.empty()) {

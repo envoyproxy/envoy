@@ -34,7 +34,7 @@ CertificateValidationContextConfigImpl::CertificateValidationContextConfigImpl(
       throw EnvoyException(fmt::format("Failed to load CRL from {} without trusted CA",
                                        certificateRevocationListPath()));
     }
-    if (!verify_subject_alt_name_list_.empty()) {
+    if (!match_subject_alt_name_list_.empty() || !verify_subject_alt_name_list_.empty()) {
       throw EnvoyException(fmt::format("SAN-based verification of peer certificates without "
                                        "trusted CA is insecure and not allowed"));
     }
