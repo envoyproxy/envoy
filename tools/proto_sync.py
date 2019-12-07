@@ -149,8 +149,8 @@ def GetImportDeps(proto_path):
         # We can ignore imports provided implicitly by api_proto_package().
         if any(import_path.startswith(p) for p in API_BUILD_SYSTEM_IMPORT_PREFIXES):
           continue
-        # Special case handling for in-built versioning annotations.
-        if import_path == 'udpa/annotations/versioning.proto':
+        # Special case handling for UDPA annotations.
+        if import_path.startswith('udpa/annotations/'):
           imports.append('@com_github_cncf_udpa//udpa/annotations:pkg')
           continue
         # Explicit remapping for external deps, compute paths for envoy/*.
