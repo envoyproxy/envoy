@@ -1,7 +1,7 @@
 #pragma once
 
-#define HEADER_MAP_USE_MULTI_MAP false
-#define HEADER_MAP_USE_FLAT_HASH_MAP true
+#define HEADER_MAP_USE_MULTI_MAP true
+#define HEADER_MAP_USE_FLAT_HASH_MAP false
 
 #include <array>
 #include <cstdint>
@@ -198,7 +198,7 @@ protected:
       return i;
     }
 
-    void erase(HeaderNode i, bool clear_from_map);
+    HeaderNode erase(HeaderNode i, bool clear_from_map);
 
     template <class UnaryPredicate> void remove_if(UnaryPredicate p) {
       headers_.remove_if([&](const HeaderEntryImpl& entry) {
@@ -216,6 +216,9 @@ protected:
       // in the first place.
       lazy_map_.clear();
     }
+
+    // Makes a map.
+    bool maybeMakeMap() const;
 
     HeaderLazyMap::iterator find(absl::string_view key) const;
     HeaderLazyMap::iterator findEnd() const { return lazy_map_.end(); }
