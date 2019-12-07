@@ -11,7 +11,7 @@ import "envoy/api/v3alpha/route/route.proto";
 
 import "google/protobuf/wrappers.proto";
 
-import "udpa/api/annotations/versioning.proto";
+import "udpa/annotations/versioning.proto";
 
 import "validate/validate.proto";
 
@@ -19,7 +19,7 @@ import "validate/validate.proto";
 // Thrift Proxy :ref:`configuration overview <config_network_filters_thrift_proxy>`.
 
 message RouteConfiguration {
-  option (udpa.api.annotations.versioning).previous_message_type =
+  option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.network.thrift_proxy.v2alpha1.RouteConfiguration";
 
   // The name of the route configuration. Reserved for future use in asynchronous route discovery.
@@ -31,7 +31,7 @@ message RouteConfiguration {
 }
 
 message Route {
-  option (udpa.api.annotations.versioning).previous_message_type =
+  option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.network.thrift_proxy.v2alpha1.Route";
 
   // Route matching parameters.
@@ -42,7 +42,7 @@ message Route {
 }
 
 message RouteMatch {
-  option (udpa.api.annotations.versioning).previous_message_type =
+  option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.network.thrift_proxy.v2alpha1.RouteMatch";
 
   oneof match_specifier {
@@ -82,7 +82,7 @@ message RouteMatch {
 
 // [#next-free-field: 7]
 message RouteAction {
-  option (udpa.api.annotations.versioning).previous_message_type =
+  option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.network.thrift_proxy.v2alpha1.RouteAction";
 
   oneof cluster_specifier {
@@ -127,11 +127,11 @@ message RouteAction {
 // percentage of traffic to be forwarded to each cluster. The router selects an upstream cluster
 // based on these weights.
 message WeightedCluster {
-  option (udpa.api.annotations.versioning).previous_message_type =
+  option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.network.thrift_proxy.v2alpha1.WeightedCluster";
 
   message ClusterWeight {
-    option (udpa.api.annotations.versioning).previous_message_type =
+    option (udpa.annotations.versioning).previous_message_type =
         "envoy.config.filter.network.thrift_proxy.v2alpha1.WeightedCluster.ClusterWeight";
 
     // Name of the upstream cluster.

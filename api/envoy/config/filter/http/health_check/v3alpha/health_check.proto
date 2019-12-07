@@ -12,7 +12,7 @@ import "envoy/type/v3alpha/percent.proto";
 import "google/protobuf/duration.proto";
 import "google/protobuf/wrappers.proto";
 
-import "udpa/api/annotations/versioning.proto";
+import "udpa/annotations/versioning.proto";
 
 import "validate/validate.proto";
 
@@ -22,7 +22,7 @@ import "validate/validate.proto";
 
 // [#next-free-field: 6]
 message HealthCheck {
-  option (udpa.api.annotations.versioning).previous_message_type =
+  option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.http.health_check.v2.HealthCheck";
 
   reserved 2;

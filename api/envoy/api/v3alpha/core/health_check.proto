@@ -15,7 +15,7 @@ import "google/protobuf/duration.proto";
 import "google/protobuf/struct.proto";
 import "google/protobuf/wrappers.proto";
 
-import "udpa/api/annotations/versioning.proto";
+import "udpa/annotations/versioning.proto";
 
 import "validate/validate.proto";
 
@@ -52,11 +52,11 @@ enum HealthStatus {
 
 // [#next-free-field: 21]
 message HealthCheck {
-  option (udpa.api.annotations.versioning).previous_message_type = "envoy.api.v2.core.HealthCheck";
+  option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.core.HealthCheck";
 
   // Describes the encoding of the payload bytes in the payload.
   message Payload {
-    option (udpa.api.annotations.versioning).previous_message_type =
+    option (udpa.annotations.versioning).previous_message_type =
         "envoy.api.v2.core.HealthCheck.Payload";
 
     oneof payload {
@@ -72,7 +72,7 @@ message HealthCheck {
 
   // [#next-free-field: 11]
   message HttpHealthCheck {
-    option (udpa.api.annotations.versioning).previous_message_type =
+    option (udpa.annotations.versioning).previous_message_type =
         "envoy.api.v2.core.HealthCheck.HttpHealthCheck";
 
     reserved 7;
@@ -124,7 +124,7 @@ message HealthCheck {
   }
 
   message TcpHealthCheck {
-    option (udpa.api.annotations.versioning).previous_message_type =
+    option (udpa.annotations.versioning).previous_message_type =
         "envoy.api.v2.core.HealthCheck.TcpHealthCheck";
 
     // Empty payloads imply a connect-only health check.
@@ -137,7 +137,7 @@ message HealthCheck {
   }
 
   message RedisHealthCheck {
-    option (udpa.api.annotations.versioning).previous_message_type =
+    option (udpa.annotations.versioning).previous_message_type =
         "envoy.api.v2.core.HealthCheck.RedisHealthCheck";
 
     // If set, optionally perform ``EXISTS <key>`` instead of ``PING``. A return value
@@ -152,7 +152,7 @@ message HealthCheck {
   // healthcheck. See `gRPC doc <https://github.com/grpc/grpc/blob/master/doc/health-checking.md>`_
   // for details.
   message GrpcHealthCheck {
-    option (udpa.api.annotations.versioning).previous_message_type =
+    option (udpa.annotations.versioning).previous_message_type =
         "envoy.api.v2.core.HealthCheck.GrpcHealthCheck";
 
     // An optional service name parameter which will be sent to gRPC service in
@@ -170,7 +170,7 @@ message HealthCheck {
 
   // Custom health check.
   message CustomHealthCheck {
-    option (udpa.api.annotations.versioning).previous_message_type =
+    option (udpa.annotations.versioning).previous_message_type =
         "envoy.api.v2.core.HealthCheck.CustomHealthCheck";
 
     reserved 2;

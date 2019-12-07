@@ -15,7 +15,7 @@ import "envoy/api/v3alpha/route/route.proto";
 import "google/api/annotations.proto";
 import "google/protobuf/wrappers.proto";
 
-import "udpa/api/annotations/versioning.proto";
+import "udpa/annotations/versioning.proto";
 
 import "validate/validate.proto";
 
@@ -61,8 +61,7 @@ service VirtualHostDiscoveryService {
 
 // [#next-free-field: 11]
 message RouteConfiguration {
-  option (udpa.api.annotations.versioning).previous_message_type =
-      "envoy.api.v2.RouteConfiguration";
+  option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.RouteConfiguration";
 
   // The name of the route configuration. For example, it might match
   // :ref:`route_config_name
@@ -144,7 +143,7 @@ message RouteConfiguration {
 
 // [#not-implemented-hide:]
 message Vhds {
-  option (udpa.api.annotations.versioning).previous_message_type = "envoy.api.v2.Vhds";
+  option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.Vhds";
 
   // Configuration source specifier for VHDS.
   core.ConfigSource config_source = 1 [(validate.rules).message = {required: true}];

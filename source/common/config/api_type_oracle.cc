@@ -2,7 +2,7 @@
 
 #include "common/protobuf/utility.h"
 
-#include "udpa/api/annotations/versioning.pb.h"
+#include "udpa/annotations/versioning.pb.h"
 #include "udpa/type/v1/typed_struct.pb.h"
 
 namespace Envoy {
