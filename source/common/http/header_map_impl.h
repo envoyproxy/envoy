@@ -1,11 +1,12 @@
 #pragma once
 
-#define HEADER_MAP_USE_MULTI_MAP true
-#define HEADER_MAP_USE_FLAT_HASH_MAP false
+#define HEADER_MAP_USE_MULTI_MAP false
+#define HEADER_MAP_USE_FLAT_HASH_MAP true
 
 #include <array>
 #include <cstdint>
 #include <list>
+
 #if HEADER_MAP_USE_MULTI_MAP
 #include <map>
 #endif
@@ -114,7 +115,6 @@ protected:
 #if HEADER_MAP_USE_FLAT_HASH_MAP
   using HeaderNodeVector = std::vector<HeaderNode>;
   using HeaderLazyMap = absl::flat_hash_map<absl::string_view, HeaderNodeVector>;
-  //using HeaderLazyMap = std::map<absl::string_view, HeaderNodeVector>;
 #endif
 #if HEADER_MAP_USE_MULTI_MAP
   using HeaderLazyMap = std::multimap<absl::string_view, HeaderNode>;
@@ -243,6 +243,7 @@ protected:
     void subtractSize(uint64_t size);
     void appendToHeader(HeaderString& header, absl::string_view data,
                         absl::string_view delimiter = ",");
+    // Performs a manual byte size count.
     uint64_t byteSizeInternal() const;
 
   private:
@@ -270,15 +271,12 @@ protected:
   AllInlineHeaders inline_headers_;
   HeaderList headers_;
 
-  // Performs a manual byte size count.
-  //uint64_t byteSizeInternal() const { return headers_.byteSizeInternal(); }
-
   // In TestHeaderMapImpl and VerifiedHeaderMapImpl, this method is overridden to performs a
   // time-consuming manual byte size count on each operation to verify the byte size. For prod
   // HeaderMaps, this verification is skipped.
   // TODO(asraa): Move this verification out of prod code and wrap virtual Http::HeaderMap methods
   // in Http::TestHeaderMapImpl with the verification.
-  virtual void verifyByteSize() { }
+  virtual void verifyByteSize() {}
 
   ALL_INLINE_HEADERS(DEFINE_INLINE_HEADER_FUNCS)
 };
