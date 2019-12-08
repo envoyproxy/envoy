@@ -64,17 +64,13 @@ ProtobufWkt::Value parseYamlNode(const YAML::Node& node) {
         value.set_number_value(int_value);
       } else {
         // Proto3 JSON mapping allows use string for integer, this still has to be converted from
-        // int_value to support 0x and 0o literals.
+        // int_value to support hexadecimal and octal literals.
         value.set_string_value(std::to_string(int_value));
       }
       break;
     }
-    double double_value;
-    if (YAML::convert<double>::decode(node, double_value)) {
-      value.set_number_value(double_value);
-      break;
-    }
-    // Otherwise, fall back on string.
+    // Fall back on string, including float/double case. When protobuf parse the JSON into a message
+    // it will convert based on the type in the message definition.
     value.set_string_value(node.as<std::string>());
     break;
   }
@@ -433,6 +429,14 @@ std::string MessageUtil::getJsonStringFromMessage(const Protobuf::Message& messa
   return json;
 }
 
+void MessageUtil::unpackTo(const ProtobufWkt::Any& any_message, Protobuf::Message& message) {
+  if (!any_message.UnpackTo(&message)) {
+    throw EnvoyException(fmt::format("Unable to unpack as {}: {}",
+                                     message.GetDescriptor()->full_name(),
+                                     any_message.DebugString()));
+  }
+}
+
 void MessageUtil::jsonConvert(const Protobuf::Message& source, ProtobufWkt::Struct& dest) {
   // Any proto3 message can be transformed to Struct, so there is no need to check for unknown
   // fields. There is one catch; Duration/Timestamp etc. which have non-object canonical JSON
@@ -444,6 +448,10 @@ void MessageUtil::jsonConvert(const ProtobufWkt::Struct& source,
                               ProtobufMessage::ValidationVisitor& validation_visitor,
                               Protobuf::Message& dest) {
   jsonConvertInternal(source, validation_visitor, dest);
+}
+
+void MessageUtil::jsonConvertValue(const Protobuf::Message& source, ProtobufWkt::Value& dest) {
+  jsonConvertInternal(source, ProtobufMessage::getNullValidationVisitor(), dest);
 }
 
 ProtobufWkt::Struct MessageUtil::keyValueStruct(const std::string& key, const std::string& value) {
@@ -607,6 +615,14 @@ void TimestampUtil::systemClockToTimestamp(const SystemTime system_clock_time,
       std::chrono::time_point_cast<std::chrono::milliseconds>(system_clock_time)
           .time_since_epoch()
           .count()));
+}
+
+absl::string_view TypeUtil::typeUrlToDescriptorFullName(absl::string_view type_url) {
+  const size_t pos = type_url.rfind('/');
+  if (pos != absl::string_view::npos) {
+    type_url = type_url.substr(pos + 1);
+  }
+  return type_url;
 }
 
 } // namespace Envoy

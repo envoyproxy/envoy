@@ -79,12 +79,7 @@ int HeaderMapWrapper::luaReplace(lua_State* state) {
   const char* value = luaL_checkstring(state, 3);
   const Http::LowerCaseString lower_key(key);
 
-  Http::HeaderEntry* entry = headers_.get(lower_key);
-  if (entry != nullptr) {
-    entry->value(value, strlen(value));
-  } else {
-    headers_.addCopy(lower_key, value);
-  }
+  headers_.setCopy(lower_key, value);
 
   return 0;
 }

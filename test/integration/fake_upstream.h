@@ -569,7 +569,8 @@ public:
                      std::chrono::milliseconds timeout = TestUtility::DefaultTimeout);
 
   // Send a UDP datagram on the fake upstream thread.
-  void sendUdpDatagram(const std::string& buffer, const Network::Address::Instance& peer);
+  void sendUdpDatagram(const std::string& buffer,
+                       const Network::Address::InstanceConstSharedPtr& peer);
 
   // Network::FilterChainManager
   const Network::FilterChain* findFilterChain(const Network::ConnectionSocket&) const override {
@@ -627,6 +628,7 @@ private:
 
     // Network::UdpListenerReadFilter
     void onData(Network::UdpRecvData& data) override { parent_.onRecvDatagram(data); }
+    void onReceiveError(Api::IoError::IoErrorCode) override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
 
   private:
     FakeUpstream& parent_;

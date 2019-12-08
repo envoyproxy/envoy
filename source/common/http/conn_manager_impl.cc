@@ -296,53 +296,40 @@ Network::FilterStatus ConnectionManagerImpl::onData(Buffer::Instance& data, bool
     }
   }
 
-  // TODO(alyssawilk) clean this up after #8352 is well vetted.
-  bool redispatch;
-  do {
-    redispatch = false;
-
-    try {
-      codec_->dispatch(data);
-    } catch (const FrameFloodException& e) {
-      // TODO(mattklein123): This is an emergency substitute for the lack of connection level
-      // logging in the HCM. In a public follow up change we will add full support for connection
-      // level logging in the HCM, similar to what we have in tcp_proxy. This will allow abuse
-      // indicators to be stored in the connection level stream info, and then matched, sampled,
-      // etc. when logged.
-      const envoy::type::FractionalPercent default_value; // 0
-      if (runtime_.snapshot().featureEnabled("http.connection_manager.log_flood_exception",
-                                             default_value)) {
-        ENVOY_CONN_LOG(warn, "downstream HTTP flood from IP '{}': {}",
-                       read_callbacks_->connection(),
-                       read_callbacks_->connection().remoteAddress()->asString(), e.what());
-      }
-
-      handleCodecException(e.what());
-      return Network::FilterStatus::StopIteration;
-    } catch (const CodecProtocolException& e) {
-      stats_.named_.downstream_cx_protocol_error_.inc();
-      handleCodecException(e.what());
-      return Network::FilterStatus::StopIteration;
+  try {
+    codec_->dispatch(data);
+  } catch (const FrameFloodException& e) {
+    // TODO(mattklein123): This is an emergency substitute for the lack of connection level
+    // logging in the HCM. In a public follow up change we will add full support for connection
+    // level logging in the HCM, similar to what we have in tcp_proxy. This will allow abuse
+    // indicators to be stored in the connection level stream info, and then matched, sampled,
+    // etc. when logged.
+    const envoy::type::FractionalPercent default_value; // 0
+    if (runtime_.snapshot().featureEnabled("http.connection_manager.log_flood_exception",
+                                           default_value)) {
+      ENVOY_CONN_LOG(warn, "downstream HTTP flood from IP '{}': {}", read_callbacks_->connection(),
+                     read_callbacks_->connection().remoteAddress()->asString(), e.what());
     }
 
-    // Processing incoming data may release outbound data so check for closure here as well.
-    checkForDeferredClose();
+    handleCodecException(e.what());
+    return Network::FilterStatus::StopIteration;
+  } catch (const CodecProtocolException& e) {
+    stats_.named_.downstream_cx_protocol_error_.inc();
+    handleCodecException(e.what());
+    return Network::FilterStatus::StopIteration;
+  }
 
-    // The HTTP/1 codec will pause dispatch after a single message is complete. We want to
-    // either redispatch if there are no streams and we have more data. If we have a single
-    // complete non-WebSocket stream but have not responded yet we will pause socket reads
-    // to apply back pressure.
-    if (codec_->protocol() < Protocol::Http2) {
-      if (read_callbacks_->connection().state() == Network::Connection::State::Open &&
-          data.length() > 0 && streams_.empty()) {
-        redispatch = true;
-      }
+  // Processing incoming data may release outbound data so check for closure here as well.
+  checkForDeferredClose();
 
-      if (!streams_.empty() && streams_.front()->state_.remote_complete_) {
-        read_callbacks_->connection().readDisable(true);
-      }
+  // The HTTP/1 codec will pause parsing after a single message is complete. If we have a single
+  // complete non-WebSocket stream but have not responded yet we will pause socket reads
+  // to apply back pressure.
+  if (codec_->protocol() < Protocol::Http2) {
+    if (!streams_.empty() && streams_.front()->state_.remote_complete_) {
+      read_callbacks_->connection().readDisable(true);
     }
-  } while (redispatch);
+  }
 
   return Network::FilterStatus::StopIteration;
 }
@@ -549,18 +536,6 @@ ConnectionManagerImpl::ActiveStream::~ActiveStream() {
   }
 
   connection_manager_.stats_.named_.downstream_rq_active_.dec();
-  // Refresh byte sizes of the HeaderMaps before logging.
-  // TODO(asraa): Remove this when entries in HeaderMap can no longer be modified by reference and
-  // HeaderMap holds an accurate internal byte size count.
-  if (request_headers_ != nullptr) {
-    request_headers_->refreshByteSize();
-  }
-  if (response_headers_ != nullptr) {
-    response_headers_->refreshByteSize();
-  }
-  if (response_trailers_ != nullptr) {
-    response_trailers_->refreshByteSize();
-  }
   for (const AccessLog::InstanceSharedPtr& access_log : connection_manager_.config_.accessLogs()) {
     access_log->log(request_headers_.get(), response_headers_.get(), response_trailers_.get(),
                     stream_info_);
@@ -1338,6 +1313,32 @@ void ConnectionManagerImpl::ActiveStream::refreshCachedRoute() {
         connection_manager_.cluster_manager_.get(stream_info_.route_entry_->clusterName());
     cached_cluster_info_ = (nullptr == local_cluster) ? nullptr : local_cluster->info();
   }
+
+  refreshCachedTracingCustomTags();
+}
+
+void ConnectionManagerImpl::ActiveStream::refreshCachedTracingCustomTags() {
+  if (!connection_manager_.config_.tracingConfig()) {
+    return;
+  }
+  const Tracing::CustomTagMap& conn_manager_tags =
+      connection_manager_.config_.tracingConfig()->custom_tags_;
+  const Tracing::CustomTagMap* route_tags = nullptr;
+  if (hasCachedRoute() && cached_route_.value()->tracingConfig()) {
+    route_tags = &cached_route_.value()->tracingConfig()->getCustomTags();
+  }
+  const bool configured_in_conn = !conn_manager_tags.empty();
+  const bool configured_in_route = route_tags && !route_tags->empty();
+  if (!configured_in_conn && !configured_in_route) {
+    return;
+  }
+  Tracing::CustomTagMap& custom_tag_map = getOrMakeTracingCustomTagMap();
+  if (configured_in_route) {
+    custom_tag_map.insert(route_tags->begin(), route_tags->end());
+  }
+  if (configured_in_conn) {
+    custom_tag_map.insert(conn_manager_tags.begin(), conn_manager_tags.end());
+  }
 }
 
 void ConnectionManagerImpl::ActiveStream::sendLocalReply(
@@ -1800,9 +1801,8 @@ Tracing::OperationName ConnectionManagerImpl::ActiveStream::operationName() cons
   return connection_manager_.config_.tracingConfig()->operation_name_;
 }
 
-const std::vector<Http::LowerCaseString>&
-ConnectionManagerImpl::ActiveStream::requestHeadersForTags() const {
-  return connection_manager_.config_.tracingConfig()->request_headers_for_tags_;
+const Tracing::CustomTagMap* ConnectionManagerImpl::ActiveStream::customTags() const {
+  return tracing_custom_tags_.get();
 }
 
 bool ConnectionManagerImpl::ActiveStream::verbose() const {
@@ -2075,6 +2075,9 @@ Router::RouteConstSharedPtr ConnectionManagerImpl::ActiveStreamFilterBase::route
 void ConnectionManagerImpl::ActiveStreamFilterBase::clearRouteCache() {
   parent_.cached_route_ = absl::optional<Router::RouteConstSharedPtr>();
   parent_.cached_cluster_info_ = absl::optional<Upstream::ClusterInfoConstSharedPtr>();
+  if (parent_.tracing_custom_tags_) {
+    parent_.tracing_custom_tags_->clear();
+  }
 }
 
 Buffer::WatermarkBufferPtr ConnectionManagerImpl::ActiveStreamDecoderFilter::createBuffer() {
@@ -2214,6 +2217,7 @@ bool ConnectionManagerImpl::ActiveStreamDecoderFilter::recreateStream() {
   HeaderMapPtr request_headers(std::move(parent_.request_headers_));
   StreamEncoder* response_encoder = parent_.response_encoder_;
   parent_.response_encoder_ = nullptr;
+  response_encoder->getStream().removeCallbacks(parent_);
   // This functionally deletes the stream (via deferred delete) so do not
   // reference anything beyond this point.
   parent_.connection_manager_.doEndStream(this->parent_);

@@ -262,8 +262,7 @@ public:
   // Network::UdpListenerCallbacks
   void onData(Network::UdpRecvData& data) override;
   void onWriteReady(const Network::Socket& socket) override;
-  void onReceiveError(const Network::UdpListenerCallbacks::ErrorCode& error_code,
-                      Api::IoError::IoErrorCode err) override;
+  void onReceiveError(Api::IoError::IoErrorCode error_code) override;
 
   // ActiveListenerImplBase
   Network::Listener* listener() override { return udp_listener_.get(); }
