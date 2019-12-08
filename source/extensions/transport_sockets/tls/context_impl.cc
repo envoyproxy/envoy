@@ -46,6 +46,13 @@ bool cbsContainsU16(CBS& cbs, uint16_t n) {
   return false;
 }
 
+std::string lastCryptoError() {
+  char errbuf[256] = {0};
+
+  ERR_error_string_n(ERR_get_error(), errbuf, sizeof(errbuf));
+  return std::string(errbuf);
+}
+
 } // namespace
 
 ContextImpl::ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& config,
@@ -428,7 +435,7 @@ std::vector<uint8_t> ContextImpl::parseAlpnProtocols(const std::string& alpn_pro
   }
 
   if (alpn_protocols.size() >= 65535) {
-    throw EnvoyException("invalid ALPN protocol string");
+    throw EnvoyException("Invalid ALPN protocol string");
   }
 
   std::vector<uint8_t> out(alpn_protocols.size() + 1);
@@ -436,7 +443,7 @@ std::vector<uint8_t> ContextImpl::parseAlpnProtocols(const std::string& alpn_pro
   for (size_t i = 0; i <= alpn_protocols.size(); i++) {
     if (i == alpn_protocols.size() || alpn_protocols[i] == ',') {
       if (i - start > 255) {
-        throw EnvoyException("invalid ALPN protocol string");
+        throw EnvoyException("Invalid ALPN protocol string");
       }
 
       out[start] = i - start;
@@ -880,6 +887,12 @@ ServerContextImpl::ServerContextImpl(Stats::Scope& scope,
   if (config.tlsCertificates().empty()) {
     throw EnvoyException("Server TlsCertificates must have a certificate specified");
   }
+
+  // Compute the session context ID hash. We use all the certificate identities,
+  // since we should have a common ID for session resumption no matter what cert
+  // is used. We do this early because it can throw an EnvoyException.
+  const SessionContextID session_id = generateHashForSessionContexId(server_names);
+
   // First, configure the base context for ClientHello interception.
   // TODO(htuch): replace with SSL_IDENTITY when we have this as a means to do multi-cert in
   // BoringSSL.
@@ -890,12 +903,7 @@ ServerContextImpl::ServerContextImpl(Stats::Scope& scope,
                    SSL_CTX_get_app_data(SSL_get_SSL_CTX(client_hello->ssl)))
             ->selectTlsContext(client_hello);
       });
-  // Compute the session context ID hash. We use all the certificate identities,
-  // since we should have a common ID for session resumption no matter what cert
-  // is used.
-  uint8_t session_context_buf[EVP_MAX_MD_SIZE] = {};
-  unsigned session_context_len = 0;
-  generateHashForSessionContexId(server_names, session_context_buf, session_context_len);
+
   for (auto& ctx : tls_contexts_) {
     if (config.certificateValidationContext() != nullptr &&
         !config.certificateValidationContext()->caCert().empty()) {
@@ -927,18 +935,20 @@ ServerContextImpl::ServerContextImpl(Stats::Scope& scope,
           });
     }
 
-    int rc = SSL_CTX_set_session_id_context(ctx.ssl_ctx_.get(), session_context_buf,
-                                            session_context_len);
-    RELEASE_ASSERT(rc == 1, "");
+    int rc =
+        SSL_CTX_set_session_id_context(ctx.ssl_ctx_.get(), session_id.begin(), session_id.size());
+    RELEASE_ASSERT(rc == 1, lastCryptoError());
   }
 }
 
-void ServerContextImpl::generateHashForSessionContexId(const std::vector<std::string>& server_names,
-                                                       uint8_t* session_context_buf,
-                                                       unsigned& session_context_len) {
+ServerContextImpl::SessionContextID
+ServerContextImpl::generateHashForSessionContexId(const std::vector<std::string>& server_names) {
+  uint8_t hash_buffer[EVP_MAX_MD_SIZE];
+  unsigned hash_length;
+
   EVP_MD_CTX md;
   int rc = EVP_DigestInit(&md, EVP_sha256());
-  RELEASE_ASSERT(rc == 1, "");
+  RELEASE_ASSERT(rc == 1, lastCryptoError());
 
   // Hash the CommonName/SANs of all the server certificates. This makes sure that sessions can only
   // be resumed to certificate(s) for the same name(s), but allows resuming to unique certs in the
@@ -947,40 +957,66 @@ void ServerContextImpl::generateHashForSessionContexId(const std::vector<std::st
   // chain for resumption purposes.
   for (const auto& ctx : tls_contexts_) {
     X509* cert = SSL_CTX_get0_certificate(ctx.ssl_ctx_.get());
-    RELEASE_ASSERT(cert != nullptr, "");
+    RELEASE_ASSERT(cert != nullptr, "TLS context should have an active certificate");
+
     X509_NAME* cert_subject = X509_get_subject_name(cert);
-    RELEASE_ASSERT(cert_subject != nullptr, "");
+    RELEASE_ASSERT(cert_subject != nullptr, "TLS certificate should have a subject");
+
     int cn_index = X509_NAME_get_index_by_NID(cert_subject, NID_commonName, -1);
-    // It's possible that the certificate doesn't have CommonName, but has SANs.
     if (cn_index >= 0) {
       X509_NAME_ENTRY* cn_entry = X509_NAME_get_entry(cert_subject, cn_index);
-      RELEASE_ASSERT(cn_entry != nullptr, "");
+      RELEASE_ASSERT(cn_entry != nullptr, "certificate subject CN should be present");
+
       ASN1_STRING* cn_asn1 = X509_NAME_ENTRY_get_data(cn_entry);
-      RELEASE_ASSERT(ASN1_STRING_length(cn_asn1) > 0, "");
+      if (ASN1_STRING_length(cn_asn1) <= 0) {
+        EVP_MD_CTX_cleanup(&md);
+        throw EnvoyException("Invalid TLS context has an empty subject CN");
+      }
+
       rc = EVP_DigestUpdate(&md, ASN1_STRING_data(cn_asn1), ASN1_STRING_length(cn_asn1));
-      RELEASE_ASSERT(rc == 1, "");
+      RELEASE_ASSERT(rc == 1, lastCryptoError());
     }
 
+    unsigned san_count = 0;
     bssl::UniquePtr<GENERAL_NAMES> san_names(static_cast<GENERAL_NAMES*>(
         X509_get_ext_d2i(cert, NID_subject_alt_name, nullptr, nullptr)));
+
     if (san_names != nullptr) {
       for (const GENERAL_NAME* san : san_names.get()) {
-        if (san->type == GEN_DNS || san->type == GEN_URI) {
-          rc = EVP_DigestUpdate(&md, ASN1_STRING_data(san->d.ia5), ASN1_STRING_length(san->d.ia5));
-          RELEASE_ASSERT(rc == 1, "");
+        switch (san->type) {
+        case GEN_IPADD:
+          rc = EVP_DigestUpdate(&md, san->d.iPAddress->data, san->d.iPAddress->length);
+          RELEASE_ASSERT(rc == 1, lastCryptoError());
+          ++san_count;
+          break;
+        case GEN_DNS:
+          rc = EVP_DigestUpdate(&md, ASN1_STRING_data(san->d.dNSName),
+                                ASN1_STRING_length(san->d.dNSName));
+          RELEASE_ASSERT(rc == 1, lastCryptoError());
+          ++san_count;
+          break;
+        case GEN_URI:
+          rc = EVP_DigestUpdate(&md, ASN1_STRING_data(san->d.uniformResourceIdentifier),
+                                ASN1_STRING_length(san->d.uniformResourceIdentifier));
+          RELEASE_ASSERT(rc == 1, lastCryptoError());
+          ++san_count;
+          break;
         }
       }
-    } else {
-      // Make sure that we have either CommonName or SANs.
-      RELEASE_ASSERT(cn_index >= 0, "");
     }
 
-    X509_NAME* cert_issuer_name = X509_get_issuer_name(cert);
-    rc =
-        X509_NAME_digest(cert_issuer_name, EVP_sha256(), session_context_buf, &session_context_len);
-    RELEASE_ASSERT(rc == 1 && session_context_len == SHA256_DIGEST_LENGTH, "");
-    rc = EVP_DigestUpdate(&md, session_context_buf, session_context_len);
-    RELEASE_ASSERT(rc == 1, "");
+    // It's possible that the certificate doesn't have CommonName, but has SANs. Make
+    // sure that we have either CommonName or SANs.
+    if (cn_index < 0 && san_count == 0) {
+      EVP_MD_CTX_cleanup(&md);
+      throw EnvoyException("Invalid TLS context has neither subject CN nor SAN names");
+    }
+
+    rc = X509_NAME_digest(X509_get_issuer_name(cert), EVP_sha256(), hash_buffer, &hash_length);
+    RELEASE_ASSERT(rc == 1, lastCryptoError());
+
+    rc = EVP_DigestUpdate(&md, hash_buffer, hash_length);
+    RELEASE_ASSERT(rc == 1, lastCryptoError());
   }
 
   // Hash all the settings that affect whether the server will allow/accept
@@ -988,15 +1024,16 @@ void ServerContextImpl::generateHashForSessionContexId(const std::vector<std::st
   // the correct settings, even if session resumption across different listeners
   // is enabled.
   if (ca_cert_ != nullptr) {
-    rc = X509_digest(ca_cert_.get(), EVP_sha256(), session_context_buf, &session_context_len);
-    RELEASE_ASSERT(rc == 1 && session_context_len == SHA256_DIGEST_LENGTH, "");
-    rc = EVP_DigestUpdate(&md, session_context_buf, session_context_len);
-    RELEASE_ASSERT(rc == 1, "");
+    rc = X509_digest(ca_cert_.get(), EVP_sha256(), hash_buffer, &hash_length);
+    RELEASE_ASSERT(rc == 1, lastCryptoError());
+
+    rc = EVP_DigestUpdate(&md, hash_buffer, hash_length);
+    RELEASE_ASSERT(rc == 1, lastCryptoError());
 
     // verify_subject_alt_name_list_ can only be set with a ca_cert
     for (const std::string& name : verify_subject_alt_name_list_) {
       rc = EVP_DigestUpdate(&md, name.data(), name.size());
-      RELEASE_ASSERT(rc == 1, "");
+      RELEASE_ASSERT(rc == 1, lastCryptoError());
     }
   }
 
@@ -1004,25 +1041,37 @@ void ServerContextImpl::generateHashForSessionContexId(const std::vector<std::st
     rc = EVP_DigestUpdate(&md, hash.data(),
                           hash.size() *
                               sizeof(std::remove_reference<decltype(hash)>::type::value_type));
-    RELEASE_ASSERT(rc == 1, "");
+    RELEASE_ASSERT(rc == 1, lastCryptoError());
   }
 
   for (const auto& hash : verify_certificate_spki_list_) {
     rc = EVP_DigestUpdate(&md, hash.data(),
                           hash.size() *
                               sizeof(std::remove_reference<decltype(hash)>::type::value_type));
-    RELEASE_ASSERT(rc == 1, "");
+    RELEASE_ASSERT(rc == 1, lastCryptoError());
   }
 
   // Hash configured SNIs for this context, so that sessions cannot be resumed across different
   // filter chains, even when using the same server certificate.
   for (const auto& name : server_names) {
     rc = EVP_DigestUpdate(&md, name.data(), name.size());
-    RELEASE_ASSERT(rc == 1, "");
+    RELEASE_ASSERT(rc == 1, lastCryptoError());
   }
 
-  rc = EVP_DigestFinal(&md, session_context_buf, &session_context_len);
-  RELEASE_ASSERT(rc == 1, "");
+  SessionContextID session_id;
+
+  // Ensure that the output size of the hash we are using is no greater than
+  // SSL_MAX_SSL_SESSION_ID_LENGTH.
+  static_assert(session_id.size() == SHA256_DIGEST_LENGTH, "hash size mismatch");
+  static_assert(session_id.size() == SSL_MAX_SSL_SESSION_ID_LENGTH, "TLS session ID size mismatch");
+
+  // NOTE: EVP_DigestFinal automatically calls EVP_MD_CTX_cleanup.
+  rc = EVP_DigestFinal(&md, session_id.begin(), &hash_length);
+  RELEASE_ASSERT(rc == 1, lastCryptoError());
+  RELEASE_ASSERT(hash_length == session_id.size(),
+                 "SHA256 hash length must match SSL Session context size");
+
+  return session_id;
 }
 
 int ServerContextImpl::sessionTicketProcess(SSL*, uint8_t* key_name, uint8_t* iv,
