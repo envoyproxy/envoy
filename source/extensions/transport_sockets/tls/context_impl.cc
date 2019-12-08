@@ -176,49 +176,48 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& c
     }
   }
 
-  if (config.certificateValidationContext() != nullptr &&
-      !config.certificateValidationContext()->verifySubjectAltNameList().empty()) {
-    verify_subject_alt_name_list_ =
-        config.certificateValidationContext()->verifySubjectAltNameList();
-    verify_mode = SSL_VERIFY_PEER | SSL_VERIFY_FAIL_IF_NO_PEER_CERT;
-  }
-
-  if (config.certificateValidationContext() != nullptr &&
-      !config.certificateValidationContext()->matchSubjectAltNameList().empty()) {
-    for (const ::envoy::type::matcher::StringMatcher& matcher :
-         config.certificateValidationContext()->matchSubjectAltNameList()) {
-      match_subject_alt_name_list_.push_back(Matchers::StringMatcherImpl(matcher));
+  const Envoy::Ssl::CertificateValidationContextConfig* cert_validation_config =
+      config.certificateValidationContext();
+  if (cert_validation_config != nullptr) {
+    if (!cert_validation_config->verifySubjectAltNameList().empty()) {
+      verify_subject_alt_name_list_ = cert_validation_config->verifySubjectAltNameList();
+      verify_mode = SSL_VERIFY_PEER | SSL_VERIFY_FAIL_IF_NO_PEER_CERT;
     }
-    verify_mode = SSL_VERIFY_PEER | SSL_VERIFY_FAIL_IF_NO_PEER_CERT;
-  }
 
-  if (config.certificateValidationContext() != nullptr &&
-      !config.certificateValidationContext()->verifyCertificateHashList().empty()) {
-    for (auto hash : config.certificateValidationContext()->verifyCertificateHashList()) {
-      // Remove colons from the 95 chars long colon-separated "fingerprint"
-      // in order to get the hex-encoded string.
-      if (hash.size() == 95) {
-        hash.erase(std::remove(hash.begin(), hash.end(), ':'), hash.end());
+    if (!cert_validation_config->matchSubjectAltNameList().empty()) {
+      for (const ::envoy::type::matcher::StringMatcher& matcher :
+           cert_validation_config->matchSubjectAltNameList()) {
+        match_subject_alt_name_list_.push_back(Matchers::StringMatcherImpl(matcher));
       }
-      const auto& decoded = Hex::decode(hash);
-      if (decoded.size() != SHA256_DIGEST_LENGTH) {
-        throw EnvoyException(fmt::format("Invalid hex-encoded SHA-256 {}", hash));
-      }
-      verify_certificate_hash_list_.push_back(decoded);
+      verify_mode = SSL_VERIFY_PEER | SSL_VERIFY_FAIL_IF_NO_PEER_CERT;
     }
-    verify_mode = SSL_VERIFY_PEER | SSL_VERIFY_FAIL_IF_NO_PEER_CERT;
-  }
 
-  if (config.certificateValidationContext() != nullptr &&
-      !config.certificateValidationContext()->verifyCertificateSpkiList().empty()) {
-    for (const auto& hash : config.certificateValidationContext()->verifyCertificateSpkiList()) {
-      const auto decoded = Base64::decode(hash);
-      if (decoded.size() != SHA256_DIGEST_LENGTH) {
-        throw EnvoyException(fmt::format("Invalid base64-encoded SHA-256 {}", hash));
+    if (!cert_validation_config->verifyCertificateHashList().empty()) {
+      for (auto hash : cert_validation_config->verifyCertificateHashList()) {
+        // Remove colons from the 95 chars long colon-separated "fingerprint"
+        // in order to get the hex-encoded string.
+        if (hash.size() == 95) {
+          hash.erase(std::remove(hash.begin(), hash.end(), ':'), hash.end());
+        }
+        const auto& decoded = Hex::decode(hash);
+        if (decoded.size() != SHA256_DIGEST_LENGTH) {
+          throw EnvoyException(fmt::format("Invalid hex-encoded SHA-256 {}", hash));
+        }
+        verify_certificate_hash_list_.push_back(decoded);
       }
-      verify_certificate_spki_list_.emplace_back(decoded.begin(), decoded.end());
+      verify_mode = SSL_VERIFY_PEER | SSL_VERIFY_FAIL_IF_NO_PEER_CERT;
     }
-    verify_mode = SSL_VERIFY_PEER | SSL_VERIFY_FAIL_IF_NO_PEER_CERT;
+
+    if (!cert_validation_config->verifyCertificateSpkiList().empty()) {
+      for (const auto& hash : cert_validation_config->verifyCertificateSpkiList()) {
+        const auto decoded = Base64::decode(hash);
+        if (decoded.size() != SHA256_DIGEST_LENGTH) {
+          throw EnvoyException(fmt::format("Invalid base64-encoded SHA-256 {}", hash));
+        }
+        verify_certificate_spki_list_.emplace_back(decoded.begin(), decoded.end());
+      }
+      verify_mode = SSL_VERIFY_PEER | SSL_VERIFY_FAIL_IF_NO_PEER_CERT;
+    }
   }
 
   for (auto& ctx : tls_contexts_) {

@@ -130,7 +130,7 @@ per_connection_buffer_limit_bytes: 8192
   EXPECT_EQ(8192U, manager_->listeners().back().get().perConnectionBufferLimitBytes());
 }
 
-TEST_F(ListenerManagerImplWithRealFiltersTest, TlsTransportSocket) {
+TEST_F(ListenerManagerImplWithRealFiltersTest, DEPRECATED_FEATURE_TEST(TlsTransportSocket)) {
   const std::string yaml = TestEnvironment::substitute(R"EOF(
 address:
   socket_address:
