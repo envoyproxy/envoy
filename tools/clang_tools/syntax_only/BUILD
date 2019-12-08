@@ -1,4 +1,4 @@
-load("//tools/clang_tools/support:clang_tools.bzl", "envoy_clang_tools_cc_binary")
+load("//clang_tools/support:clang_tools.bzl", "envoy_clang_tools_cc_binary")
 
 licenses(["notice"])  # Apache 2
 
