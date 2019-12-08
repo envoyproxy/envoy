@@ -2,13 +2,18 @@
 
 #define HEADER_MAP_USE_MULTI_MAP true
 #define HEADER_MAP_USE_FLAT_HASH_MAP false
+#define HEADER_MAP_USE_BTREE true
 
 #include <array>
 #include <cstdint>
 #include <list>
 
 #if HEADER_MAP_USE_MULTI_MAP
-#include <map>
+# if HEADER_MAP_USE_BTREE
+#  include "absl/container/btree_map.h"
+# else
+#  include <map>
+# endif
 #endif
 #include <memory>
 #include <string>
@@ -117,7 +122,11 @@ protected:
   using HeaderLazyMap = absl::flat_hash_map<absl::string_view, HeaderNodeVector>;
 #endif
 #if HEADER_MAP_USE_MULTI_MAP
+# if HEADER_MAP_USE_BTREE
   using HeaderLazyMap = std::multimap<absl::string_view, HeaderNode>;
+# else
+  using HeaderLazyMap = absl::btree_multimap<absl::string_view, HeaderNode>;
+# endif
 #endif
 
   // For tests only, unoptimized, they aren't intended for regular HeaderMapImpl users.
