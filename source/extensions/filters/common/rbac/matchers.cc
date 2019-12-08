@@ -148,14 +148,14 @@ bool AuthenticatedMatcher::matches(const Network::Connection& connection,
         return true;
       }
     }
-  }  
+  }
   if (!ssl->dnsSansPeerCertificate().empty()) {
     for (const std::string& dns : ssl->dnsSansPeerCertificate()) {
       if (matcher_.value().match(dns)) {
         return true;
       }
     }
-  } 
+  }
   return matcher_.value().match(ssl->subjectPeerCertificate());
 }
 
