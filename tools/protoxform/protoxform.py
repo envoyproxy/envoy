@@ -526,8 +526,8 @@ class ProtoFormatVisitor(visitor.Visitor):
 
 def Main():
   plugin.Plugin([
-      plugin.DirectOutputDescriptor('.v2.proto', ProtoFormatVisitor()),
-      plugin.OutputDescriptor('.v3alpha.proto', ProtoFormatVisitor(), migrate.V3MigrationXform)
+      plugin.DirectOutputDescriptor('.v2.proto', ProtoFormatVisitor),
+      plugin.OutputDescriptor('.v3alpha.proto', ProtoFormatVisitor, migrate.V3MigrationXform)
   ])
 
 

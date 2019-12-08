@@ -17,9 +17,9 @@ OutputDescriptor = namedtuple(
         # Output files are generated alongside their corresponding input .proto,
         # with the output_suffix appended.
         'output_suffix',
-        # The visitor is a visitor.Visitor defining the business logic of the plugin
-        # for the specific output descriptor.
-        'visitor',
+        # The visitor is a function to create a visitor.Visitor defining the business
+        # logic of the plugin for the specific output descriptor.
+        'visitor_factory',
         # FileDescriptorProto transformer; this is applied to the input
         # before any output generation.
         'xform',
@@ -61,7 +61,8 @@ def Plugin(output_descriptors):
       f = response.file.add()
       f.name = file_proto.name + od.output_suffix
       xformed_proto = od.xform(file_proto)
-      f.content = traverse.TraverseFile(od.xform(file_proto), od.visitor) if xformed_proto else ''
+      f.content = traverse.TraverseFile(xformed_proto,
+                                        od.visitor_factory()) if xformed_proto else ''
     if cprofile_enabled:
       pr.disable()
       stats_stream = io.StringIO()
