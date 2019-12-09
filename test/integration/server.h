@@ -98,6 +98,9 @@ public:
   NullGaugeImpl& nullGauge(const std::string& str) override {
     return wrapped_scope_->nullGauge(str);
   }
+  NullHistogramImpl& nullHistogram(const std::string& str, Histogram::Unit unit) override {
+    return wrapped_scope_->nullHistogram(str, unit);
+  }
 
   Counter& counter(const std::string& name) override {
     StatNameManagedStorage storage(name, symbolTable());
@@ -171,6 +174,9 @@ public:
   Histogram& histogram(const std::string& name, Histogram::Unit unit) override {
     Thread::LockGuard lock(lock_);
     return store_.histogram(name, unit);
+  }
+  NullHistogramImpl& nullHistogram(const std::string& name, Histogram::Unit unit) override {
+    return store_.nullHistogram(name, unit);
   }
   OptionalCounter findCounter(StatName name) const override {
     Thread::LockGuard lock(lock_);
