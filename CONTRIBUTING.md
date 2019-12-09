@@ -301,13 +301,24 @@ should only be done to correct a DCO mistake.
 
 ## Triggering CI re-run without making changes
 
-To rerun failed tasks in CI, add a comment with the the line
+To rerun failed tasks in CI, add a comment with the line
 
 ```
 /retest
 ```
 
-in it. This should rebuild only the failed tasks.
+in it to rerun any CircleCi failures via the `repokitteh` bot. This should
+rebuild only the failed tasks. Further documentation on `repokitteh` can be
+found [here](source/docs/repokitteh.md).
+
+To rerun failed Azure Pipelines tasks, add a comment with the line
+
+```
+/azp run
+```
+
+Further documentation on Azure Pipelines Github integration can be found
+[here](https://docs.microsoft.com/en-us/azure/devops/pipelines/repos/github?view=azure-devops&tabs=yaml#comment-triggers).
 
 Sometimes tasks will be stuck in CI and won't be marked as failed, which means
 the above command won't work. Should this happen, pushing an empty commit should
