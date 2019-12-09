@@ -41,8 +41,8 @@ public:
   LuaTest() : yield_callback_([this]() { on_yield_.ready(); }) {}
 
   void setup(const std::string& code) {
-    state_ = std::make_unique<ThreadLocalState>(code, tls_);
-    state_->registerType<TestObject>();
+    state_ = std::make_unique<ThreadLocalState>(std::vector<SourceCode>{{GLOBAL, code}}, tls_);
+    state_->registerType<TestObject>(GLOBAL);
   }
 
   NiceMock<ThreadLocal::MockInstance> tls_;
@@ -60,13 +60,13 @@ TEST_F(LuaTest, CoroutineRefCounting) {
 
   InSequence s;
   setup(SCRIPT);
-  EXPECT_EQ(LUA_REFNIL, state_->getGlobalRef(state_->registerGlobal("not here")));
-  EXPECT_NE(LUA_REFNIL, state_->getGlobalRef(state_->registerGlobal("callMe")));
+  EXPECT_EQ(LUA_REFNIL, state_->getGlobalRef(GLOBAL, state_->registerGlobal(GLOBAL, "not here")));
+  EXPECT_NE(LUA_REFNIL, state_->getGlobalRef(GLOBAL, state_->registerGlobal(GLOBAL, "callMe")));
 
   // Start a coroutine but do not hold a reference to the object we pass.
-  CoroutinePtr cr1(state_->createCoroutine());
+  CoroutinePtr cr1(state_->createCoroutine(GLOBAL));
   TestObject* object1 = TestObject::create(cr1->luaState()).first;
-  cr1->start(state_->getGlobalRef(1), 1, yield_callback_);
+  cr1->start(state_->getGlobalRef(GLOBAL, 1), 1, yield_callback_);
   EXPECT_EQ(cr1->state(), Coroutine::State::Finished);
   EXPECT_CALL(*object1, onDestroy());
   lua_gc(cr1->luaState(), LUA_GCCOLLECT, 0);
@@ -74,9 +74,9 @@ TEST_F(LuaTest, CoroutineRefCounting) {
 
   // Start a second coroutine but do hold a reference. Do a gc after finish which should not
   // collect it. Then unref and collect and it should be gone.
-  CoroutinePtr cr2(state_->createCoroutine());
+  CoroutinePtr cr2(state_->createCoroutine(GLOBAL));
   LuaRef<TestObject> ref2(TestObject::create(cr2->luaState()), true);
-  cr2->start(state_->getGlobalRef(1), 1, yield_callback_);
+  cr2->start(state_->getGlobalRef(GLOBAL, 1), 1, yield_callback_);
   EXPECT_EQ(cr2->state(), Coroutine::State::Finished);
   lua_gc(cr2->luaState(), LUA_GCCOLLECT, 0);
   EXPECT_CALL(*ref2.get(), onDestroy());
@@ -95,12 +95,12 @@ TEST_F(LuaTest, YieldAndResume) {
 
   InSequence s;
   setup(SCRIPT);
-  EXPECT_NE(LUA_REFNIL, state_->getGlobalRef(state_->registerGlobal("callMe")));
+  EXPECT_NE(LUA_REFNIL, state_->getGlobalRef(GLOBAL, state_->registerGlobal(GLOBAL, "callMe")));
 
-  CoroutinePtr cr(state_->createCoroutine());
+  CoroutinePtr cr(state_->createCoroutine(GLOBAL));
   LuaRef<TestObject> ref(TestObject::create(cr->luaState()), true);
   EXPECT_CALL(on_yield_, ready());
-  cr->start(state_->getGlobalRef(0), 1, yield_callback_);
+  cr->start(state_->getGlobalRef(GLOBAL, 0), 1, yield_callback_);
   EXPECT_EQ(cr->state(), Coroutine::State::Yielded);
 
   EXPECT_CALL(*ref.get(), doTestCall(_));
@@ -130,19 +130,22 @@ TEST_F(LuaTest, MarkDead) {
 
   InSequence s;
   setup(SCRIPT);
-  EXPECT_NE(LUA_REFNIL, state_->getGlobalRef(state_->registerGlobal("callMeFirst")));
-  EXPECT_NE(LUA_REFNIL, state_->getGlobalRef(state_->registerGlobal("callMeSecond")));
+  EXPECT_NE(LUA_REFNIL,
+            state_->getGlobalRef(GLOBAL, state_->registerGlobal(GLOBAL, "callMeFirst")));
+  EXPECT_NE(LUA_REFNIL,
+            state_->getGlobalRef(GLOBAL, state_->registerGlobal(GLOBAL, "callMeSecond")));
 
-  CoroutinePtr cr1(state_->createCoroutine());
+  CoroutinePtr cr1(state_->createCoroutine(GLOBAL));
   LuaDeathRef<TestObject> ref(TestObject::create(cr1->luaState()), true);
   EXPECT_CALL(*ref.get(), doTestCall(_));
   EXPECT_CALL(on_yield_, ready());
-  cr1->start(state_->getGlobalRef(0), 1, yield_callback_);
+  cr1->start(state_->getGlobalRef(GLOBAL, 0), 1, yield_callback_);
   EXPECT_EQ(cr1->state(), Coroutine::State::Yielded);
 
   ref.markDead();
-  CoroutinePtr cr2(state_->createCoroutine());
-  EXPECT_THROW_WITH_MESSAGE(cr2->start(state_->getGlobalRef(1), 0, yield_callback_), LuaException,
+  CoroutinePtr cr2(state_->createCoroutine(GLOBAL));
+  EXPECT_THROW_WITH_MESSAGE(cr2->start(state_->getGlobalRef(GLOBAL, 1), 0, yield_callback_),
+                            LuaException,
                             "[string \"...\"]:10: object used outside of proper scope");
   EXPECT_EQ(cr2->state(), Coroutine::State::Finished);
 

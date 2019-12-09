@@ -18,16 +18,17 @@ template <class T> class LuaWrappersTestBase : public testing::Test {
 public:
   virtual void setup(const std::string& code) {
     coroutine_.reset();
-    state_.reset(new ThreadLocalState(code, tls_));
-    state_->registerType<T>();
-    coroutine_ = state_->createCoroutine();
+    state_.reset(new ThreadLocalState(std::vector<SourceCode>{{GLOBAL, code}}, tls_));
+    state_->registerType<T>(GLOBAL);
+    coroutine_ = state_->createCoroutine(GLOBAL);
     lua_pushlightuserdata(coroutine_->luaState(), this);
     lua_pushcclosure(coroutine_->luaState(), luaTestPrint, 1);
     lua_setglobal(coroutine_->luaState(), "testPrint");
   }
 
   void start(const std::string& method) {
-    coroutine_->start(state_->getGlobalRef(state_->registerGlobal(method)), 1, yield_callback_);
+    coroutine_->start(state_->getGlobalRef(GLOBAL, state_->registerGlobal(GLOBAL, method)), 1,
+                      yield_callback_);
   }
 
   static int luaTestPrint(lua_State* state) {

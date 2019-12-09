@@ -1,12 +1,14 @@
 syntax = "proto3";
 
-package envoy.config.filter.http.lua.v2;
+package envoy.config.filter.http.lua.v3alpha;
 
 option java_outer_classname = "LuaProto";
 option java_multiple_files = true;
-option java_package = "io.envoyproxy.envoy.config.filter.http.lua.v2";
+option java_package = "io.envoyproxy.envoy.config.filter.http.lua.v3alpha";
 
-import "envoy/api/v2/core/base.proto";
+import "envoy/api/v3alpha/core/base.proto";
+
+import "udpa/annotations/versioning.proto";
 
 import "validate/validate.proto";
 
@@ -15,6 +17,9 @@ import "validate/validate.proto";
 // [#extension: envoy.filters.http.lua]
 
 message Lua {
+  option (udpa.annotations.versioning).previous_message_type =
+      "envoy.config.filter.http.lua.v2.Lua";
+
   // The Lua code that Envoy will execute. This can be a very small script that
   // further loads code from disk if desired. Note that if JSON configuration is used, the code must
   // be properly escaped. YAML configuration may be easier to read since YAML supports multi-line
@@ -23,10 +28,13 @@ message Lua {
 
   // The Lua source codes that Envoy will execute based on name. Key is Lua code name, e.g. foo.lua,
   // this name can be referenced by Lua per route configuration.
-  map<string, api.v2.core.DataSource> source_codes = 2;
+  map<string, api.v3alpha.core.DataSource> source_codes = 2;
 }
 
 message LuaPerRoute {
+  option (udpa.annotations.versioning).previous_message_type =
+      "envoy.config.filter.http.lua.v2.LuaPerRoute";
+
   oneof override {
     option (validate.required) = true;
 

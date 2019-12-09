@@ -6,6 +6,7 @@
 
 #include "extensions/filters/http/lua/lua_filter.h"
 
+#include "test/mocks/api/mocks.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/ssl/mocks.h"
@@ -30,6 +31,13 @@ namespace Extensions {
 namespace HttpFilters {
 namespace Lua {
 namespace {
+
+const envoy::config::filter::http::lua::v2::Lua
+buildConfigFromLuaCode(const std::string& lua_code) {
+  envoy::config::filter::http::lua::v2::Lua config;
+  config.set_inline_code(lua_code);
+  return config;
+}
 
 class TestFilter : public Filter {
 public:
@@ -63,12 +71,13 @@ public:
           encoder_callbacks_.buffer_->move(data);
         }));
     EXPECT_CALL(encoder_callbacks_, encodingBuffer()).Times(AtLeast(0));
+    EXPECT_CALL(encoder_callbacks_, route()).Times(AtLeast(0));
   }
 
   ~LuaHttpFilterTest() override { filter_->onDestroy(); }
 
   void setup(const std::string& lua_code) {
-    config_.reset(new FilterConfig(lua_code, tls_, cluster_manager_));
+    config_.reset(new FilterConfig(buildConfigFromLuaCode(lua_code), tls_, cluster_manager_, api_));
     setupFilter();
   }
 
@@ -92,6 +101,7 @@ public:
 
   NiceMock<ThreadLocal::MockInstance> tls_;
   Upstream::MockClusterManager cluster_manager_;
+  Api::MockApi api_;
   std::shared_ptr<FilterConfig> config_;
   std::unique_ptr<TestFilter> filter_;
   Http::MockStreamDecoderFilterCallbacks decoder_callbacks_;
@@ -187,9 +197,11 @@ TEST(LuaHttpFilterConfigTest, BadCode) {
 
   NiceMock<ThreadLocal::MockInstance> tls;
   NiceMock<Upstream::MockClusterManager> cluster_manager;
-  EXPECT_THROW_WITH_MESSAGE(FilterConfig(SCRIPT, tls, cluster_manager),
-                            Filters::Common::Lua::LuaException,
-                            "script load error: [string \"...\"]:3: '=' expected near '<eof>'");
+  NiceMock<Api::MockApi> api;
+  EXPECT_THROW_WITH_MESSAGE(
+      FilterConfig(buildConfigFromLuaCode(SCRIPT), tls, cluster_manager, api),
+      Filters::Common::Lua::LuaException,
+      "script GLOBAL load error: [string \"...\"]:3: '=' expected near '<eof>'");
 }
 
 // Script touching headers only, request that is headers only.
@@ -1264,8 +1276,8 @@ TEST_F(LuaHttpFilterTest, ImmediateResponse) {
   setup(SCRIPT);
 
   // Perform a GC and snap bytes currently used by the runtime.
-  config_->runtimeGC();
-  const uint64_t mem_use_at_start = config_->runtimeBytesUsed();
+  config_->runtimeGC(Filters::Common::Lua::GLOBAL);
+  const uint64_t mem_use_at_start = config_->runtimeBytesUsed(Filters::Common::Lua::GLOBAL);
 
   uint64_t num_loops = 2000;
 #if defined(__has_feature) && (__has_feature(thread_sanitizer))
@@ -1293,8 +1305,8 @@ TEST_F(LuaHttpFilterTest, ImmediateResponse) {
   //       to do a soft comparison here. In my own testing, without a fix for #3570, the memory
   //       usage after is at least 20x higher after 2000 iterations so we just check to see if it's
   //       within 2x.
-  config_->runtimeGC();
-  EXPECT_TRUE(config_->runtimeBytesUsed() < mem_use_at_start * 2);
+  config_->runtimeGC(Filters::Common::Lua::GLOBAL);
+  EXPECT_TRUE(config_->runtimeBytesUsed(Filters::Common::Lua::GLOBAL) < mem_use_at_start * 2);
 }
 
 // Respond with bad status.

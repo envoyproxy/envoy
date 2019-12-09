@@ -1,5 +1,6 @@
 #include "common/buffer/buffer_impl.h"
 
+#include "extensions/filters/common/lua/lua.h"
 #include "extensions/filters/common/lua/wrappers.h"
 
 #include "test/extensions/filters/common/lua/lua_wrappers.h"
@@ -20,7 +21,7 @@ class LuaMetadataMapWrapperTest : public LuaWrappersTestBase<MetadataMapWrapper>
 public:
   void setup(const std::string& script) override {
     LuaWrappersTestBase<MetadataMapWrapper>::setup(script);
-    state_->registerType<MetadataMapIterator>();
+    state_->registerType<MetadataMapIterator>(GLOBAL);
   }
 
   envoy::api::v2::core::Metadata parseMetadataFromYaml(const std::string& yaml_string) {
@@ -34,7 +35,7 @@ class LuaConnectionWrapperTest : public LuaWrappersTestBase<ConnectionWrapper> {
 public:
   void setup(const std::string& script) override {
     LuaWrappersTestBase<ConnectionWrapper>::setup(script);
-    state_->registerType<SslConnectionWrapper>();
+    state_->registerType<SslConnectionWrapper>(GLOBAL);
     ssl_ = std::make_shared<NiceMock<Envoy::Ssl::MockConnectionInfo>>();
   }
 

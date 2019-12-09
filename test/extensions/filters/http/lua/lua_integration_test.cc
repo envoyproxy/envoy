@@ -1,3 +1,5 @@
+#include "envoy/config/filter/http/lua/v2/lua.pb.h"
+
 #include "extensions/filters/http/well_known_names.h"
 
 #include "test/integration/http_integration.h"
@@ -21,7 +23,7 @@ public:
         new FakeUpstream(0, FakeHttpConnection::Type::HTTP1, version_, timeSystem()));
   }
 
-  void initializeFilter(const std::string& filter_config) {
+  void initializeFilter(const std::string& filter_config, const std::string& lua_per_route_yaml) {
     config_helper_.addFilter(filter_config);
 
     config_helper_.addConfigModifier([](envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
@@ -35,13 +37,25 @@ public:
     });
 
     config_helper_.addConfigModifier(
-        [](envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager&
-               hcm) {
+        [lua_per_route_yaml](
+            envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager&
+                hcm) {
           hcm.mutable_route_config()
               ->mutable_virtual_hosts(0)
               ->mutable_routes(0)
               ->mutable_match()
               ->set_prefix("/test/long/url");
+
+          if (!lua_per_route_yaml.empty()) {
+            envoy::config::filter::http::lua::v2::LuaPerRoute lua_per_route;
+            TestUtility::loadFromYaml(lua_per_route_yaml, lua_per_route);
+
+            auto* per_filter_config = hcm.mutable_route_config()
+                                          ->mutable_virtual_hosts(0)
+                                          ->mutable_routes(0)
+                                          ->mutable_typed_per_filter_config();
+            (*per_filter_config)["envoy.lua"].PackFrom(lua_per_route);
+          }
 
           auto* new_route = hcm.mutable_route_config()->mutable_virtual_hosts(0)->add_routes();
           new_route->mutable_match()->set_prefix("/alt/route");
@@ -141,7 +155,7 @@ typed_config:
     end
 )EOF";
 
-  initializeFilter(FILTER_AND_CODE);
+  initializeFilter(FILTER_AND_CODE, "");
   codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
   Http::TestHeaderMapImpl request_headers{{":method", "POST"},
                                           {":path", "/test/long/url"},
@@ -240,7 +254,7 @@ typed_config:
     end
 )EOF";
 
-  initializeFilter(FILTER_AND_CODE);
+  initializeFilter(FILTER_AND_CODE, "");
 
   codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
   Http::TestHeaderMapImpl request_headers{{":method", "GET"},
@@ -300,7 +314,7 @@ typed_config:
     end
 )EOF";
 
-  initializeFilter(FILTER_AND_CODE);
+  initializeFilter(FILTER_AND_CODE, "");
 
   codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
   Http::TestHeaderMapImpl request_headers{{":method", "GET"},
@@ -338,7 +352,7 @@ typed_config:
     end
 )EOF";
 
-  initializeFilter(FILTER_AND_CODE);
+  initializeFilter(FILTER_AND_CODE, "");
 
   codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
   Http::TestHeaderMapImpl request_headers{{":method", "GET"},
@@ -371,7 +385,7 @@ typed_config:
     end
 )EOF";
 
-  initializeFilter(FILTER_AND_CODE);
+  initializeFilter(FILTER_AND_CODE, "");
 
   codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
   Http::TestHeaderMapImpl request_headers{{":method", "GET"},
@@ -442,7 +456,7 @@ typed_config:
       local sig = request_handle:headers():get("signature")
       local rawsig = sig:fromhex()
       local data = request_handle:headers():get("message")
-      local ok, error = request_handle:verifySignature(hash, pubkey, rawsig, string.len(rawsig), data, string.len(data)) 
+      local ok, error = request_handle:verifySignature(hash, pubkey, rawsig, string.len(rawsig), data, string.len(data))
 
       if ok then
         request_handle:headers():add("signature_verification", "approved")
@@ -455,7 +469,7 @@ typed_config:
     end
 )EOF";
 
-  initializeFilter(FILTER_AND_CODE);
+  initializeFilter(FILTER_AND_CODE, "");
 
   auto signature =
       "345ac3a167558f4f387a81c2d64234d901a7ceaa544db779d2f797b0ea4ef851b740905a63e2f4d5af42cee093a2"
@@ -489,6 +503,111 @@ typed_config:
 
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().Status()->value().getStringView());
+
+  cleanup();
+}
+
+// Per route disable.
+TEST_P(LuaIntegrationTest, PerRouteDisabled) {
+  const std::string FILTER_AND_CODE =
+      R"EOF(
+name: envoy.lua
+typed_config:
+  "@type": type.googleapis.com/envoy.config.filter.http.lua.v2.Lua
+  inline_code: |
+    function envoy_on_request(request_handle)
+    end
+
+    function envoy_on_response(response_handle)
+      response_handle:headers():remove("foo")
+    end
+)EOF";
+
+  initializeFilter(FILTER_AND_CODE, "disabled: true");
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+  Http::TestHeaderMapImpl request_headers{{":method", "POST"},
+                                          {":path", "/test/long/url"},
+                                          {":scheme", "http"},
+                                          {":authority", "host"},
+                                          {"x-forwarded-for", "10.0.0.1"}};
+
+  auto encoder_decoder = codec_client_->startRequest(request_headers);
+  Http::StreamEncoder& encoder = encoder_decoder.first;
+  auto response = std::move(encoder_decoder.second);
+  Buffer::OwnedImpl request_data1("hello");
+  encoder.encodeData(request_data1, false);
+  Buffer::OwnedImpl request_data2("world");
+  encoder.encodeData(request_data2, true);
+
+  waitForNextUpstreamRequest();
+
+  Http::TestHeaderMapImpl response_headers{{":status", "200"}, {"foo", "bar"}};
+  upstream_request_->encodeHeaders(response_headers, false);
+  Buffer::OwnedImpl response_data1("good");
+  upstream_request_->encodeData(response_data1, false);
+  Buffer::OwnedImpl response_data2("bye");
+  upstream_request_->encodeData(response_data2, true);
+
+  response->waitForEndStream();
+
+  EXPECT_EQ("bar", response->headers().get(Http::LowerCaseString("foo"))->value().getStringView());
+
+  cleanup();
+}
+
+// Per route script.
+TEST_P(LuaIntegrationTest, PerRouteScript) {
+  const std::string FILTER_AND_CODE =
+      R"EOF(
+name: envoy.lua
+typed_config:
+  "@type": type.googleapis.com/envoy.config.filter.http.lua.v2.Lua
+  inline_code: |
+    function envoy_on_request(request_handle)
+    end
+
+    function envoy_on_response(response_handle)
+    end
+  source_codes:
+    removefoo.lua:
+      inline_string: |
+        function envoy_on_request(request_handle)
+        end
+
+        function envoy_on_response(response_handle)
+          response_handle:headers():remove("foo")
+        end
+)EOF";
+
+  initializeFilter(FILTER_AND_CODE, "name: removefoo.lua");
+  codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
+  Http::TestHeaderMapImpl request_headers{{":method", "POST"},
+                                          {":path", "/test/long/url"},
+                                          {":scheme", "http"},
+                                          {":authority", "host"},
+                                          {"x-forwarded-for", "10.0.0.1"}};
+
+  auto encoder_decoder = codec_client_->startRequest(request_headers);
+  Http::StreamEncoder& encoder = encoder_decoder.first;
+  auto response = std::move(encoder_decoder.second);
+  Buffer::OwnedImpl request_data1("hello");
+  encoder.encodeData(request_data1, false);
+  Buffer::OwnedImpl request_data2("world");
+  encoder.encodeData(request_data2, true);
+
+  waitForNextUpstreamRequest();
+
+  Http::TestHeaderMapImpl response_headers{{":status", "200"}, {"foo", "bar"}};
+  upstream_request_->encodeHeaders(response_headers, false);
+  Buffer::OwnedImpl response_data1("good");
+  upstream_request_->encodeData(response_data1, false);
+  Buffer::OwnedImpl response_data2("bye");
+  upstream_request_->encodeData(response_data2, true);
+
+  response->waitForEndStream();
+
+  // Should remove foo header.
+  EXPECT_EQ(nullptr, response->headers().get(Http::LowerCaseString("foo")));
 
   cleanup();
 }

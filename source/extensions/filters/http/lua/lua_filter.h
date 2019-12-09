@@ -1,10 +1,14 @@
 #pragma once
 
+#include "envoy/api/api.h"
+#include "envoy/config/filter/http/lua/v2/lua.pb.h"
 #include "envoy/http/filter.h"
 #include "envoy/upstream/cluster_manager.h"
 
 #include "common/crypto/utility.h"
+#include "common/http/utility.h"
 
+#include "extensions/filters/common/lua/lua.h"
 #include "extensions/filters/common/lua/wrappers.h"
 #include "extensions/filters/http/lua/wrappers.h"
 #include "extensions/filters/http/well_known_names.h"
@@ -13,6 +17,19 @@ namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace Lua {
+
+class FilterConfigPerRoute : public Router::RouteSpecificFilterConfig {
+public:
+  FilterConfigPerRoute(const envoy::config::filter::http::lua::v2::LuaPerRoute& config)
+      : disabled_(config.disabled()), name_(config.name()) {}
+
+  bool disabled() const { return disabled_; }
+  std::string name() const { return name_; }
+
+private:
+  bool disabled_;
+  const std::string name_;
+};
 
 namespace {
 const ProtobufWkt::Struct& getMetadata(Http::StreamFilterCallbacks* callbacks) {
@@ -26,6 +43,17 @@ const ProtobufWkt::Struct& getMetadata(Http::StreamFilterCallbacks* callbacks) {
   }
   return filter_it->second;
 }
+
+const FilterConfigPerRoute* getConfigPerRoute(Http::StreamFilterCallbacks* callbacks) {
+  if (callbacks == nullptr || callbacks->route() == nullptr ||
+      callbacks->route()->routeEntry() == nullptr) {
+    return nullptr;
+  }
+
+  return Http::Utility::resolveMostSpecificPerFilterConfig<FilterConfigPerRoute>(
+      Extensions::HttpFilters::HttpFilterNames::get().Lua, callbacks->route());
+}
+
 } // namespace
 
 /**
@@ -291,17 +319,35 @@ private:
  */
 class FilterConfig : Logger::Loggable<Logger::Id::lua> {
 public:
-  FilterConfig(const std::string& lua_code, ThreadLocal::SlotAllocator& tls,
-               Upstream::ClusterManager& cluster_manager);
-  Filters::Common::Lua::CoroutinePtr createCoroutine() { return lua_state_.createCoroutine(); }
-  int requestFunctionRef() { return lua_state_.getGlobalRef(request_function_slot_); }
-  int responseFunctionRef() { return lua_state_.getGlobalRef(response_function_slot_); }
-  uint64_t runtimeBytesUsed() { return lua_state_.runtimeBytesUsed(); }
-  void runtimeGC() { return lua_state_.runtimeGC(); }
+  FilterConfig(const envoy::config::filter::http::lua::v2::Lua& proto_config,
+               ThreadLocal::SlotAllocator& tls, Upstream::ClusterManager& cluster_manager,
+               Api::Api& api);
+  Filters::Common::Lua::CoroutinePtr createCoroutine(absl::string_view name) {
+    return lua_state_.createCoroutine(name);
+  }
+  int requestFunctionRef(absl::string_view name) {
+    return lua_state_.getGlobalRef(name, request_function_slot_);
+  }
+  int responseFunctionRef(absl::string_view name) {
+    return lua_state_.getGlobalRef(name, response_function_slot_);
+  }
+  uint64_t runtimeBytesUsed(absl::string_view name) { return lua_state_.runtimeBytesUsed(name); }
+  void runtimeGC(absl::string_view name) { return lua_state_.runtimeGC(name); }
+  bool hasSourceCode(absl::string_view name) const {
+    return std::find_if(source_codes_.begin(), source_codes_.end(),
+                        [name](const Filters::Common::Lua::SourceCode& source) -> bool {
+                          return source.name == name;
+                        }) != source_codes_.end();
+  }
 
   Upstream::ClusterManager& cluster_manager_;
 
 private:
+  const std::vector<Filters::Common::Lua::SourceCode>
+  readSourceCodes(const envoy::config::filter::http::lua::v2::Lua& config, Api::Api& api) const;
+  void registerName(absl::string_view name);
+
+  const std::vector<Filters::Common::Lua::SourceCode> source_codes_;
   Filters::Common::Lua::ThreadLocalState lua_state_;
   uint64_t request_function_slot_;
   uint64_t response_function_slot_;
@@ -327,8 +373,20 @@ public:
 
   // Http::StreamDecoderFilter
   Http::FilterHeadersStatus decodeHeaders(Http::HeaderMap& headers, bool end_stream) override {
+    const auto config_per_route = getConfigPerRoute(decoder_callbacks_.callbacks_);
+    std::string name = Filters::Common::Lua::GLOBAL;
+    if (config_per_route != nullptr) {
+      if (config_per_route->disabled()) {
+        return Http::FilterHeadersStatus::Continue;
+      }
+
+      if (config_->hasSourceCode(config_per_route->name())) {
+        name = config_per_route->name();
+      }
+    }
+
     return doHeaders(request_stream_wrapper_, request_coroutine_, decoder_callbacks_,
-                     config_->requestFunctionRef(), headers, end_stream);
+                     config_->requestFunctionRef(name), headers, end_stream, name);
   }
   Http::FilterDataStatus decodeData(Buffer::Instance& data, bool end_stream) override {
     return doData(request_stream_wrapper_, data, end_stream);
@@ -345,8 +403,21 @@ public:
     return Http::FilterHeadersStatus::Continue;
   }
   Http::FilterHeadersStatus encodeHeaders(Http::HeaderMap& headers, bool end_stream) override {
+    const auto config_per_route = getConfigPerRoute(encoder_callbacks_.callbacks_);
+    std::string name = Filters::Common::Lua::GLOBAL;
+    if (config_per_route != nullptr) {
+      if (config_per_route->disabled()) {
+        return Http::FilterHeadersStatus::Continue;
+      }
+
+      if (config_->hasSourceCode(config_per_route->name())) {
+        name = config_per_route->name();
+      }
+    }
+
     return doHeaders(response_stream_wrapper_, response_coroutine_, encoder_callbacks_,
-                     config_->responseFunctionRef(), headers, end_stream);
+                     config_->responseFunctionRef(Filters::Common::Lua::GLOBAL), headers,
+                     end_stream, name);
   }
   Http::FilterDataStatus encodeData(Buffer::Instance& data, bool end_stream) override {
     return doData(response_stream_wrapper_, data, end_stream);
@@ -375,6 +446,7 @@ private:
     void respond(Http::HeaderMapPtr&& headers, Buffer::Instance* body, lua_State* state) override;
 
     const ProtobufWkt::Struct& metadata() const override { return getMetadata(callbacks_); }
+    const FilterConfigPerRoute* configPerRoute() { return getConfigPerRoute(callbacks_); }
     StreamInfo::StreamInfo& streamInfo() override { return callbacks_->streamInfo(); }
     const Network::Connection* connection() const override { return callbacks_->connection(); }
 
@@ -395,6 +467,7 @@ private:
     void respond(Http::HeaderMapPtr&& headers, Buffer::Instance* body, lua_State* state) override;
 
     const ProtobufWkt::Struct& metadata() const override { return getMetadata(callbacks_); }
+    const FilterConfigPerRoute* configPerRoute() { return getConfigPerRoute(callbacks_); }
     StreamInfo::StreamInfo& streamInfo() override { return callbacks_->streamInfo(); }
     const Network::Connection* connection() const override { return callbacks_->connection(); }
 
@@ -407,7 +480,8 @@ private:
   Http::FilterHeadersStatus doHeaders(StreamHandleRef& handle,
                                       Filters::Common::Lua::CoroutinePtr& coroutine,
                                       FilterCallbacks& callbacks, int function_ref,
-                                      Http::HeaderMap& headers, bool end_stream);
+                                      Http::HeaderMap& headers, bool end_stream,
+                                      absl::string_view name);
   Http::FilterDataStatus doData(StreamHandleRef& handle, Buffer::Instance& data, bool end_stream);
   Http::FilterTrailersStatus doTrailers(StreamHandleRef& handle, Http::HeaderMap& trailers);
 

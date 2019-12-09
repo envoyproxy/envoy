@@ -2,13 +2,17 @@
 
 #include <memory>
 
+#include "envoy/api/api.h"
 #include "envoy/http/codes.h"
 
 #include "common/buffer/buffer_impl.h"
 #include "common/common/assert.h"
 #include "common/common/enum_to_int.h"
+#include "common/config/datasource.h"
 #include "common/crypto/utility.h"
 #include "common/http/message_impl.h"
+
+#include "extensions/filters/common/lua/lua.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -484,29 +488,59 @@ int StreamHandleWrapper::luaImportPublicKey(lua_State* state) {
   return 1;
 }
 
-FilterConfig::FilterConfig(const std::string& lua_code, ThreadLocal::SlotAllocator& tls,
-                           Upstream::ClusterManager& cluster_manager)
-    : cluster_manager_(cluster_manager), lua_state_(lua_code, tls) {
-  lua_state_.registerType<Filters::Common::Lua::BufferWrapper>();
-  lua_state_.registerType<Filters::Common::Lua::MetadataMapWrapper>();
-  lua_state_.registerType<Filters::Common::Lua::MetadataMapIterator>();
-  lua_state_.registerType<Filters::Common::Lua::ConnectionWrapper>();
-  lua_state_.registerType<Filters::Common::Lua::SslConnectionWrapper>();
-  lua_state_.registerType<HeaderMapWrapper>();
-  lua_state_.registerType<HeaderMapIterator>();
-  lua_state_.registerType<StreamInfoWrapper>();
-  lua_state_.registerType<DynamicMetadataMapWrapper>();
-  lua_state_.registerType<DynamicMetadataMapIterator>();
-  lua_state_.registerType<StreamHandleWrapper>();
-  lua_state_.registerType<PublicKeyWrapper>();
+FilterConfig::FilterConfig(const envoy::config::filter::http::lua::v2::Lua& proto_config,
+                           ThreadLocal::SlotAllocator& tls,
+                           Upstream::ClusterManager& cluster_manager, Api::Api& api)
+    : cluster_manager_(cluster_manager), source_codes_(readSourceCodes(proto_config, api)),
+      lua_state_(source_codes_, tls) {
+  for (const auto& source : source_codes_) {
+    registerName(source.name);
+  }
+}
 
-  request_function_slot_ = lua_state_.registerGlobal("envoy_on_request");
-  if (lua_state_.getGlobalRef(request_function_slot_) == LUA_REFNIL) {
+const std::vector<Filters::Common::Lua::SourceCode>
+FilterConfig::readSourceCodes(const envoy::config::filter::http::lua::v2::Lua& config,
+                              Api::Api& api) const {
+  if (config.source_codes().empty()) {
+    return {Filters::Common::Lua::SourceCode{Filters::Common::Lua::GLOBAL, config.inline_code()}};
+  }
+
+  std::vector<Filters::Common::Lua::SourceCode> source_codes{
+      {Filters::Common::Lua::SourceCode{Filters::Common::Lua::GLOBAL, config.inline_code()}}};
+  source_codes.reserve(config.source_codes().size() + 1);
+  for (const auto& source : config.source_codes()) {
+    std::string code;
+    try {
+      code = Config::DataSource::read(source.second, true, api);
+      source_codes.push_back(Filters::Common::Lua::SourceCode{source.first, code});
+    } catch (EnvoyException& e) {
+      ENVOY_LOG(error, "failed to read {} because of {}", source.first, e.what());
+    }
+  }
+  return source_codes;
+}
+
+void FilterConfig::registerName(absl::string_view name) {
+  lua_state_.registerType<Filters::Common::Lua::BufferWrapper>(name);
+  lua_state_.registerType<Filters::Common::Lua::MetadataMapWrapper>(name);
+  lua_state_.registerType<Filters::Common::Lua::MetadataMapIterator>(name);
+  lua_state_.registerType<Filters::Common::Lua::ConnectionWrapper>(name);
+  lua_state_.registerType<Filters::Common::Lua::SslConnectionWrapper>(name);
+  lua_state_.registerType<HeaderMapWrapper>(name);
+  lua_state_.registerType<HeaderMapIterator>(name);
+  lua_state_.registerType<StreamInfoWrapper>(name);
+  lua_state_.registerType<DynamicMetadataMapWrapper>(name);
+  lua_state_.registerType<DynamicMetadataMapIterator>(name);
+  lua_state_.registerType<StreamHandleWrapper>(name);
+  lua_state_.registerType<PublicKeyWrapper>(name);
+
+  request_function_slot_ = lua_state_.registerGlobal(name, "envoy_on_request");
+  if (lua_state_.getGlobalRef(name, request_function_slot_) == LUA_REFNIL) {
     ENVOY_LOG(info, "envoy_on_request() function not found. Lua filter will not hook requests.");
   }
 
-  response_function_slot_ = lua_state_.registerGlobal("envoy_on_response");
-  if (lua_state_.getGlobalRef(response_function_slot_) == LUA_REFNIL) {
+  response_function_slot_ = lua_state_.registerGlobal(name, "envoy_on_response");
+  if (lua_state_.getGlobalRef(name, response_function_slot_) == LUA_REFNIL) {
     ENVOY_LOG(info, "envoy_on_response() function not found. Lua filter will not hook responses.");
   }
 }
@@ -524,12 +558,13 @@ void Filter::onDestroy() {
 Http::FilterHeadersStatus Filter::doHeaders(StreamHandleRef& handle,
                                             Filters::Common::Lua::CoroutinePtr& coroutine,
                                             FilterCallbacks& callbacks, int function_ref,
-                                            Http::HeaderMap& headers, bool end_stream) {
+                                            Http::HeaderMap& headers, bool end_stream,
+                                            absl::string_view name) {
   if (function_ref == LUA_REFNIL) {
     return Http::FilterHeadersStatus::Continue;
   }
 
-  coroutine = config_->createCoroutine();
+  coroutine = config_->createCoroutine(name);
   handle.reset(StreamHandleWrapper::create(coroutine->luaState(), *coroutine, headers, end_stream,
                                            *this, callbacks),
                true);

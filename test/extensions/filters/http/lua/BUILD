@@ -18,6 +18,7 @@ envoy_extension_cc_test(
     deps = [
         "//source/common/stream_info:stream_info_lib",
         "//source/extensions/filters/http/lua:lua_filter_lib",
+        "//test/mocks/api:api_mocks",
         "//test/mocks/http:http_mocks",
         "//test/mocks/network:network_mocks",
         "//test/mocks/ssl:ssl_mocks",
@@ -48,6 +49,7 @@ envoy_extension_cc_test(
         "//source/extensions/filters/http/lua:config",
         "//test/integration:http_integration_lib",
         "//test/test_common:utility_lib",
+        "@envoy_api//envoy/config/filter/http/lua/v2:pkg_cc_proto",
     ],
 )
 

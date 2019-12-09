@@ -19,6 +19,9 @@ namespace Filters {
 namespace Common {
 namespace Lua {
 
+// Lua code global symbol.
+constexpr char GLOBAL[] = "GLOBAL";
+
 /**
  * Some general notes on everything in this file. Lua/C bindings are functional, but not the most
  * beautiful interfaces. For more general overview information see the following:
@@ -353,6 +356,11 @@ private:
 
 using CoroutinePtr = std::unique_ptr<Coroutine>;
 
+struct SourceCode {
+  std::string name;
+  std::string code;
+};
+
 /**
  * This class wraps a Lua state that can be used safely across threads. The model is that every
  * worker gets its own independent state. There is no truly global state that a script can access.
@@ -360,50 +368,57 @@ using CoroutinePtr = std::unique_ptr<Coroutine>;
  */
 class ThreadLocalState : Logger::Loggable<Logger::Id::lua> {
 public:
-  ThreadLocalState(const std::string& code, ThreadLocal::SlotAllocator& tls);
+  ThreadLocalState(const std::vector<SourceCode>& codes, ThreadLocal::SlotAllocator& tls);
 
   /**
    * @return CoroutinePtr a new coroutine.
    */
-  CoroutinePtr createCoroutine();
+  CoroutinePtr createCoroutine(absl::string_view name);
 
   /**
    * @return a global reference previously registered via registerGlobal(). This may return
    *         LUA_REFNIL if there was no such global.
    * @param slot supplies the global slot/index to lookup.
    */
-  int getGlobalRef(uint64_t slot);
+  int getGlobalRef(absl::string_view name, uint64_t slot);
 
   /**
    * Register a global for later use.
    * @param global supplies the name of the global.
    * @return a slot/index for later use with getGlobalRef().
    */
-  uint64_t registerGlobal(const std::string& global);
+  uint64_t registerGlobal(absl::string_view name, const std::string& global);
 
   /**
    * Register a type with the thread local state. After this call the type will be available on
    * all threaded workers.
    */
-  template <class T> void registerType() {
-    tls_slot_->runOnAllThreads(
-        [this]() { T::registerType(tls_slot_->getTyped<LuaThreadLocal>().state_.get()); });
+  template <class T> void registerType(absl::string_view name) {
+    ASSERT(tls_slot_map_[name]);
+    tls_slot_map_[name]->runOnAllThreads([this, name]() {
+      T::registerType(tls_slot_map_[name]->getTyped<LuaThreadLocal>().state_.get());
+    });
   }
 
   /**
    * Return the number of bytes used by the runtime.
    */
-  uint64_t runtimeBytesUsed() {
+  uint64_t runtimeBytesUsed(absl::string_view name) {
+    const auto& tls_slot = tls_slot_map_.at(name);
+    ASSERT(tls_slot);
     uint64_t bytes_used =
-        lua_gc(tls_slot_->getTyped<LuaThreadLocal>().state_.get(), LUA_GCCOUNT, 0) * 1024;
-    bytes_used += lua_gc(tls_slot_->getTyped<LuaThreadLocal>().state_.get(), LUA_GCCOUNTB, 0);
+        lua_gc(tls_slot->getTyped<LuaThreadLocal>().state_.get(), LUA_GCCOUNT, 0) * 1024;
+    bytes_used += lua_gc(tls_slot->getTyped<LuaThreadLocal>().state_.get(), LUA_GCCOUNTB, 0);
     return bytes_used;
   }
 
   /**
    * Force a full runtime GC.
    */
-  void runtimeGC() { lua_gc(tls_slot_->getTyped<LuaThreadLocal>().state_.get(), LUA_GCCOLLECT, 0); }
+  void runtimeGC(absl::string_view name) {
+    ASSERT(tls_slot_map_[name]);
+    lua_gc(tls_slot_map_[name]->getTyped<LuaThreadLocal>().state_.get(), LUA_GCCOLLECT, 0);
+  }
 
 private:
   struct LuaThreadLocal : public ThreadLocal::ThreadLocalObject {
@@ -413,8 +428,8 @@ private:
     std::vector<int> global_slots_;
   };
 
-  ThreadLocal::SlotPtr tls_slot_;
-  uint64_t current_global_slot_{};
+  absl::flat_hash_map<std::string, ThreadLocal::SlotPtr> tls_slot_map_;
+  absl::flat_hash_map<std::string, uint64_t> current_global_slot_map_;
 };
 
 /**
