@@ -326,10 +326,9 @@ TEST_F(AsyncDataSourceTest, loadRemoteDataSourceExpectNetworkFailure) {
   auto provider = std::make_unique<Config::DataSource::RemoteAsyncDataProvider>(
       cm_, init_manager_, config.remote(), false, [](const std::string&) {});
 
-  EXPECT_THROW_WITH_MESSAGE(init_target_handle_->initialize(init_watcher_), EnvoyException,
-                            "Failed to fetch remote data. Failure reason: 0");
-  EXPECT_NE(nullptr, provider.get());
   EXPECT_CALL(init_watcher_, ready());
+  init_target_handle_->initialize(init_watcher_);
+  EXPECT_NE(nullptr, provider.get());
 }
 
 TEST_F(AsyncDataSourceTest, loadRemoteDataSourceExpectInvalidData) {
@@ -368,10 +367,9 @@ TEST_F(AsyncDataSourceTest, loadRemoteDataSourceExpectInvalidData) {
   auto provider = std::make_unique<Config::DataSource::RemoteAsyncDataProvider>(
       cm_, init_manager_, config.remote(), false, [](const std::string&) {});
 
-  EXPECT_THROW_WITH_MESSAGE(init_target_handle_->initialize(init_watcher_), EnvoyException,
-                            "Failed to fetch remote data. Failure reason: 1");
-  EXPECT_NE(nullptr, provider.get());
   EXPECT_CALL(init_watcher_, ready());
+  init_target_handle_->initialize(init_watcher_);
+  EXPECT_NE(nullptr, provider.get());
 }
 
 TEST_F(AsyncDataSourceTest, datasourceReleasedBeforeFetchingData) {
