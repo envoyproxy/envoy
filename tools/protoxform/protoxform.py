@@ -143,7 +143,7 @@ def FormatHeaderFromFile(source_code_info, file_proto):
     Formatted proto header as a string.
   """
   # Load the type database.
-  typedb = utils.LoadTypeDb()
+  typedb = utils.GetTypeDb()
   # Figure out type dependencies in this .proto.
   types = Types()
   text_format.Merge(traverse.TraverseFile(file_proto, type_whisperer.TypeWhispererVisitor()), types)
@@ -524,11 +524,17 @@ class ProtoFormatVisitor(visitor.Visitor):
     return ClangFormat(header + formatted_services + formatted_enums + formatted_msgs)
 
 
+def ParameterCallback(parameter):
+  params = dict(param.split('=') for param in parameter.split(','))
+  if params["type_db_path"]:
+    utils.LoadTypeDb(params["type_db_path"])
+
+
 def Main():
   plugin.Plugin([
       plugin.DirectOutputDescriptor('.v2.proto', ProtoFormatVisitor),
       plugin.OutputDescriptor('.v3alpha.proto', ProtoFormatVisitor, migrate.V3MigrationXform)
-  ])
+  ], ParameterCallback)
 
 
 if __name__ == '__main__':
