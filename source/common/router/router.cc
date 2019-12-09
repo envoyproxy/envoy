@@ -759,8 +759,8 @@ void Filter::onResponseTimeout() {
         upstream_request->upstream_host_->stats().rq_timeout_.inc();
       }
 
-      // If we should be tracking timeout budget usage, record the max-value
-      // into the histogram to say that the entire timeout budget was used.
+      // Record the max-value into the histogram to say that the entire timeout
+      // budget was used.
       cluster_->timeoutBudgetStats().upstream_rq_timeout_budget_per_try_percent_used_.recordValue(
           TimeoutPrecisionFactor);
 

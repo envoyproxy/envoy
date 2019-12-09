@@ -98,8 +98,8 @@ public:
   NullGaugeImpl& nullGauge(const std::string& str) override {
     return wrapped_scope_->nullGauge(str);
   }
-  NullHistogramImpl& nullHistogram(const std::string& str, Histogram::Unit unit) override {
-    return wrapped_scope_->nullHistogram(str, unit);
+  NullHistogramImpl& nullHistogram(const std::string& name, Histogram::Unit unit) override {
+    return wrapped_scope_->nullHistogram(name, unit);
   }
 
   Counter& counter(const std::string& name) override {

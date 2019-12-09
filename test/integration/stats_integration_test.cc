@@ -307,7 +307,7 @@ TEST_P(ClusterMemoryTestRunner, MemoryLargeClusterSizeWithRealSymbolTable) {
   // 2019/10/17  8484     34998       35000   stats: add unit support to histogram
   // 2019/11/01  8859     35221       36000   build: switch to libc++ by default
   // 2019/11/15  9040     35029       35500   build: update protobuf to 3.10.1
-  // 2019/11/15  9040     35061       35500   upstream: track whether cluster is local
+  // 2019/11/15  9031     35061       35500   upstream: track whether cluster is local
   // 2019/12/09  9227     36053       36500   router: per-cluster histograms w/ timeout budget
 
   // Note: when adjusting this value: EXPECT_MEMORY_EQ is active only in CI

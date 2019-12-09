@@ -1128,7 +1128,6 @@ TEST_F(RouterTest, TimeoutBudgetHistogramStat) {
         callbacks.onPoolReady(encoder, cm_.conn_pool_.host_, upstream_stream_info_);
         return nullptr;
       }));
-  // Create the histograms we're interested in testing.
   expectPerTryTimerCreate();
   expectResponseTimerCreate();
 
@@ -1167,7 +1166,6 @@ TEST_F(RouterTest, TimeoutBudgetHistogramStatOnlyGlobal) {
         callbacks.onPoolReady(encoder, cm_.conn_pool_.host_, upstream_stream_info_);
         return nullptr;
       }));
-  // Create the histograms we're interested in testing.
   expectPerTryTimerCreate();
 
   Http::TestHeaderMapImpl headers{{"x-envoy-upstream-rq-timeout-ms", "200"}};
