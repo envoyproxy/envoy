@@ -23,7 +23,7 @@ TEST(XRayTracerConfigTest, XRayHttpTracerWithTypedConfig) {
   http:
     name: envoy.tracers.xray
     typed_config:
-      "@type": type.googleapis.com/envoy.config.trace.v2.XRayConfig
+      "@type": type.googleapis.com/envoy.config.trace.v2alpha.xray.Config
       daemon_endpoint: 127.0.0.1:2020
       segment_name: AwsAppMesh
       sampling_rule_manifest:
@@ -54,7 +54,7 @@ TEST(XRayTracerConfigTest, XRayHttpTracerWithInvalidFileName) {
   http:
     name: envoy.tracers.xray
     typed_config:
-      "@type": type.googleapis.com/envoy.config.trace.v2.XRayConfig
+      "@type": type.googleapis.com/envoy.config.trace.v2alpha.xray.Config
       daemon_endpoint: 127.0.0.1:2030
       segment_name: AwsAppMesh
       sampling_rule_manifest:

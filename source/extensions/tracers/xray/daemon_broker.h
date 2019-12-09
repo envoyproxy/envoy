@@ -4,6 +4,7 @@
 #include <string>
 
 #include "envoy/common/pure.h"
+#include "envoy/network/address.h"
 
 #include "common/network/io_socket_handle_impl.h"
 
@@ -43,6 +44,7 @@ public:
 
 private:
   Network::IoHandlePtr io_handle_;
+  Network::Address::InstanceConstSharedPtr address_;
 };
 
 } // namespace XRay

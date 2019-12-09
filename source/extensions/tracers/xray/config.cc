@@ -18,9 +18,8 @@ namespace XRay {
 
 XRayTracerFactory::XRayTracerFactory() : FactoryBase(TracerNames::get().XRay) {}
 
-Tracing::HttpTracerPtr
-XRayTracerFactory::createHttpTracerTyped(const envoy::config::trace::v2::XRayConfig& proto_config,
-                                         Server::Instance& server) {
+Tracing::HttpTracerPtr XRayTracerFactory::createHttpTracerTyped(
+    const envoy::config::trace::v2alpha::xray::Config& proto_config, Server::Instance& server) {
   std::string sampling_rules_json;
   try {
     sampling_rules_json =
