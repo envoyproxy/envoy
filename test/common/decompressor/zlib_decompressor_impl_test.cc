@@ -156,7 +156,7 @@ TEST_F(ZlibDecompressorImplTest, CompressAndDecompress) {
   ASSERT_EQ(compressor.checksum(), decompressor.checksum());
   ASSERT_EQ(original_text.length(), decompressed_text.length());
   EXPECT_EQ(original_text, decompressed_text);
-  ASSERT_EQ(0, decompressor.decompression_error_)
+  ASSERT_EQ(0, decompressor.decompression_error_);
 }
 
 // Tests decompression_error_ set to True when Decompression Fails
