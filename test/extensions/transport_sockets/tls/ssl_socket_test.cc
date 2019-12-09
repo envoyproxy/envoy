@@ -2440,7 +2440,7 @@ void testTicketSessionResumption(const std::string& server_ctx_yaml1,
             dynamic_cast<const SslSocketInfo*>(client_connection->ssl().get());
         ssl_session = SSL_get1_session(ssl_socket->rawSslForTest());
         EXPECT_TRUE(SSL_SESSION_is_resumable(ssl_session));
-        if (expect_reuse && expected_lifetime_hint) {
+        if (expected_lifetime_hint) {
           auto lifetime_hint = SSL_SESSION_get_ticket_lifetime_hint(ssl_session);
           EXPECT_EQ(lifetime_hint, expected_lifetime_hint);
         }
