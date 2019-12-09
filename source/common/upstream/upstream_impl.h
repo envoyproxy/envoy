@@ -635,7 +635,7 @@ private:
   const absl::optional<envoy::api::v2::Cluster::CustomClusterType> cluster_type_;
   const std::unique_ptr<Server::Configuration::CommonFactoryContext> factory_context_;
   std::vector<Network::FilterFactoryCb> filter_factories_;
-  std::unordered_map<ResourcePriority, absl::optional<RetryBudget>> retry_budget_map_;
+  absl::flat_hash_map<ResourcePriority, absl::optional<RetryBudget>> retry_budget_map_;
 };
 
 /**

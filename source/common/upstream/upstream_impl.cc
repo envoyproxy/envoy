@@ -25,6 +25,7 @@
 #include "common/config/utility.h"
 #include "common/http/utility.h"
 #include "common/network/address_impl.h"
+#include "common/router/config_utility.h"
 #include "common/network/resolver_impl.h"
 #include "common/network/socket_option_factory.h"
 #include "common/protobuf/protobuf.h"
@@ -581,12 +582,11 @@ ClusterLoadReportStats ClusterInfoImpl::generateLoadReportStats(Stats::Scope& sc
 }
 
 ClusterInfoImpl::RetryBudgetStatus ClusterInfoImpl::retryBudgetStatus(ResourcePriority priority) const {
-  const auto retry_budget_iter = retry_budget_map_.find(priority);
-  if (retry_budget_iter == retry_budget_map_.end()) {
+  if (!retry_budget_map_.contains(priority)) {
     return ClusterInfoImpl::RetryBudgetStatus::Unconfigured;
   }
 
-  const auto& retry_budget = retry_budget_iter->second;
+  const auto& retry_budget = retry_budget_map_.at(priority);
   const uint64_t current_active = resourceManager(priority).requests().count() +
                                   resourceManager(priority).pendingRequests().count();
 
@@ -785,16 +785,15 @@ ClusterInfoImpl::ClusterInfoImpl(
   }
 
   if (config.has_circuit_breakers()) {
-    const auto& thresholds =  config.circuit_breakers().thresholds();
-    for (const auto& threshold : thresholds) {
+    for (const auto& threshold : config.circuit_breakers().thresholds()) {
       if (threshold.has_retry_budget()) {
-        const auto priority = PROTOBUF_GET_WRAPPED_REQUIRED(threshold, priority);
-        retry_budget_map_[priority] = RetryBudget{
+        const ResourcePriority priority = Router::ConfigUtility::parsePriority(threshold.priority());
+        retry_budget_map_.emplace(priority, RetryBudget{
           .budget_percent =
             PROTOBUF_GET_WRAPPED_OR_DEFAULT(threshold.retry_budget(), budget_percent, 20.0),
           .min_concurrency =
             PROTOBUF_GET_WRAPPED_OR_DEFAULT(threshold.retry_budget(), min_concurrency, 15),
-        };
+            });
       }
     }
   }
