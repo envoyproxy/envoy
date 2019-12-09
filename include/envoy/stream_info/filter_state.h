@@ -50,8 +50,8 @@ public:
    * @param data_name the name of the data being set.
    * @param data an owning pointer to the data to be stored.
    * @param state_type indicates whether the object is mutable or not.
-   * @param life_span indicates the life span of the object: bound to the filter chain or a
-   * downstream request.
+   * @param life_span indicates the life span of the object: bound to the filter chain, a
+   * downstream request, or a downstream connection.
    *
    * Note that it is an error to call setData() twice with the same
    * data_name, if the existing object is immutable. Similarly, it is an
@@ -61,7 +61,7 @@ public:
    * data stored in FilterState.
    */
   virtual void setData(absl::string_view data_name, std::shared_ptr<Object> data,
-                       StateType state_type, LifeSpan life_span) PURE;
+                       StateType state_type, LifeSpan life_span = LifeSpan::FilterChain) PURE;
 
   /**
    * @param data_name the name of the data being looked up (mutable/readonly).
@@ -126,8 +126,8 @@ public:
   virtual LifeSpan lifeSpan() const PURE;
 
   /**
-   * @return the point of the parent FilterState that has longer life span. nullptr is means this is
-   * at the top LifeSpan.
+   * @return the point of the parent FilterState that has longer life span. nullptr means this is
+   * at the top LifeSpan or the parent is not yet created.
    */
   virtual std::shared_ptr<FilterState> parent() const PURE;
 
