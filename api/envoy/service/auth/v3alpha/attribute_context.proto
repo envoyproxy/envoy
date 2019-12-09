@@ -11,7 +11,7 @@ import "envoy/api/v3alpha/core/base.proto";
 
 import "google/protobuf/timestamp.proto";
 
-import "udpa/api/annotations/versioning.proto";
+import "udpa/annotations/versioning.proto";
 
 // [#protodoc-title: Attribute Context ]
 
@@ -37,7 +37,7 @@ import "udpa/api/annotations/versioning.proto";
 // - which return values are copied into request_headers]
 // [#next-free-field: 12]
 message AttributeContext {
-  option (udpa.api.annotations.versioning).previous_message_type =
+  option (udpa.annotations.versioning).previous_message_type =
       "envoy.service.auth.v2.AttributeContext";
 
   // This message defines attributes for a node that handles a network request.
@@ -46,7 +46,7 @@ message AttributeContext {
   // `principal`, and `labels` as appropriate.
   // [#next-free-field: 6]
   message Peer {
-    option (udpa.api.annotations.versioning).previous_message_type =
+    option (udpa.annotations.versioning).previous_message_type =
         "envoy.service.auth.v2.AttributeContext.Peer";
 
     // The address of the peer, this is typically the IP address.
@@ -83,7 +83,7 @@ message AttributeContext {
 
   // Represents a network request, such as an HTTP request.
   message Request {
-    option (udpa.api.annotations.versioning).previous_message_type =
+    option (udpa.annotations.versioning).previous_message_type =
         "envoy.service.auth.v2.AttributeContext.Request";
 
     // The timestamp when the proxy receives the first byte of the request.
@@ -97,7 +97,7 @@ message AttributeContext {
   // HTTP/1.x, HTTP/2, gRPC are all considered as HTTP requests.
   // [#next-free-field: 12]
   message HttpRequest {
-    option (udpa.api.annotations.versioning).previous_message_type =
+    option (udpa.annotations.versioning).previous_message_type =
         "envoy.service.auth.v2.AttributeContext.HttpRequest";
 
     // The unique ID for a request, which can be propagated to downstream

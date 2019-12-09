@@ -6,7 +6,7 @@ option java_outer_classname = "PercentProto";
 option java_multiple_files = true;
 option java_package = "io.envoyproxy.envoy.type.v3alpha";
 
-import "udpa/api/annotations/versioning.proto";
+import "udpa/annotations/versioning.proto";
 
 import "validate/validate.proto";
 
@@ -14,7 +14,7 @@ import "validate/validate.proto";
 
 // Identifies a percentage, in the range [0.0, 100.0].
 message Percent {
-  option (udpa.api.annotations.versioning).previous_message_type = "envoy.type.Percent";
+  option (udpa.annotations.versioning).previous_message_type = "envoy.type.Percent";
 
   double value = 1 [(validate.rules).double = {lte: 100.0 gte: 0.0}];
 }
@@ -26,7 +26,7 @@ message Percent {
 // * **Example**: 1/100 = 1%.
 // * **Example**: 3/10000 = 0.03%.
 message FractionalPercent {
-  option (udpa.api.annotations.versioning).previous_message_type = "envoy.type.FractionalPercent";
+  option (udpa.annotations.versioning).previous_message_type = "envoy.type.FractionalPercent";
 
   // Fraction percentages support several fixed denominator values.
   enum DenominatorType {

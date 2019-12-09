@@ -83,6 +83,31 @@ public:
   }
 };
 
+class QueryParameterHashMethod : public HashMethodImplBase {
+public:
+  QueryParameterHashMethod(const std::string& parameter_name, bool terminal)
+      : HashMethodImplBase(terminal), parameter_name_(parameter_name) {}
+
+  absl::optional<uint64_t> evaluate(const Network::Address::Instance*, const HeaderMap& headers,
+                                    const HashPolicy::AddCookieCallback) const override {
+    absl::optional<uint64_t> hash;
+
+    const HeaderEntry* header = headers.Path();
+    if (header) {
+      Http::Utility::QueryParams query_parameters =
+          Http::Utility::parseQueryString(header->value().getStringView());
+      const auto& iter = query_parameters.find(parameter_name_);
+      if (iter != query_parameters.end()) {
+        hash = HashUtil::xxHash64(iter->second);
+      }
+    }
+    return hash;
+  }
+
+private:
+  const std::string parameter_name_;
+};
+
 HashPolicyImpl::HashPolicyImpl(
     absl::Span<const envoy::api::v2::route::RouteAction::HashPolicy* const> hash_policies) {
   // TODO(htuch): Add support for cookie hash policies, #1295
@@ -108,6 +133,10 @@ HashPolicyImpl::HashPolicyImpl(
       if (hash_policy->connection_properties().source_ip()) {
         hash_impls_.emplace_back(new IpHashMethod(hash_policy->terminal()));
       }
+      break;
+    case envoy::api::v2::route::RouteAction::HashPolicy::kQueryParameter:
+      hash_impls_.emplace_back(new QueryParameterHashMethod(hash_policy->query_parameter().name(),
+                                                            hash_policy->terminal()));
       break;
     default:
       throw EnvoyException(

@@ -498,24 +498,23 @@ TEST_P(IntegrationTest, PipelineInline) {
   initialize();
   std::string response;
 
-  Buffer::OwnedImpl buffer("GET / HTTP/1.1\r\n\r\nGET / HTTP/1.1\r\n\r\n");
+  Buffer::OwnedImpl buffer("GET / HTTP/1.1\r\n\r\nGET / HTTP/1.0\r\n\r\n");
   RawConnectionDriver connection(
       lookupPort("http"), buffer,
       [&](Network::ClientConnection&, const Buffer::Instance& data) -> void {
         response.append(data.toString());
       },
       version_);
-  // First is an error: no host.
+
   while (response.find("400") == std::string::npos) {
     connection.run(Event::Dispatcher::RunType::NonBlock);
   }
   EXPECT_THAT(response, HasSubstr("HTTP/1.1 400 Bad Request\r\n"));
 
-  // Second response should be 400 (no host)
-  while (response.find("400") == std::string::npos) {
+  while (response.find("426") == std::string::npos) {
     connection.run(Event::Dispatcher::RunType::NonBlock);
   }
-  EXPECT_THAT(response, HasSubstr("HTTP/1.1 400 Bad Request\r\n"));
+  EXPECT_THAT(response, HasSubstr("HTTP/1.1 426 Upgrade Required\r\n"));
   connection.close();
 }
 

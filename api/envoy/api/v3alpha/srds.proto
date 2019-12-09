@@ -11,7 +11,7 @@ import "envoy/api/v3alpha/discovery.proto";
 
 import "google/api/annotations.proto";
 
-import "udpa/api/annotations/versioning.proto";
+import "udpa/annotations/versioning.proto";
 
 import "validate/validate.proto";
 
@@ -100,7 +100,7 @@ service ScopedRoutesDiscoveryService {
 // RouteConfiguration being assigned to the HTTP request/stream.
 //
 message ScopedRouteConfiguration {
-  option (udpa.api.annotations.versioning).previous_message_type =
+  option (udpa.annotations.versioning).previous_message_type =
       "envoy.api.v2.ScopedRouteConfiguration";
 
   // Specifies a key which is matched against the output of the
@@ -109,11 +109,11 @@ message ScopedRouteConfiguration {
   // request and is dependent on the order of the fragments contained in the
   // Key.
   message Key {
-    option (udpa.api.annotations.versioning).previous_message_type =
+    option (udpa.annotations.versioning).previous_message_type =
         "envoy.api.v2.ScopedRouteConfiguration.Key";
 
     message Fragment {
-      option (udpa.api.annotations.versioning).previous_message_type =
+      option (udpa.annotations.versioning).previous_message_type =
           "envoy.api.v2.ScopedRouteConfiguration.Key.Fragment";
 
       oneof type {

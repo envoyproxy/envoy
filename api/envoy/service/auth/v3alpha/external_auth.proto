@@ -13,7 +13,7 @@ import "envoy/type/v3alpha/http_status.proto";
 
 import "google/rpc/status.proto";
 
-import "udpa/api/annotations/versioning.proto";
+import "udpa/annotations/versioning.proto";
 
 import "validate/validate.proto";
 
@@ -32,8 +32,7 @@ service Authorization {
 }
 
 message CheckRequest {
-  option (udpa.api.annotations.versioning).previous_message_type =
-      "envoy.service.auth.v2.CheckRequest";
+  option (udpa.annotations.versioning).previous_message_type = "envoy.service.auth.v2.CheckRequest";
 
   // The request attributes.
   AttributeContext attributes = 1;
@@ -41,7 +40,7 @@ message CheckRequest {
 
 // HTTP attributes for a denied response.
 message DeniedHttpResponse {
-  option (udpa.api.annotations.versioning).previous_message_type =
+  option (udpa.annotations.versioning).previous_message_type =
       "envoy.service.auth.v2.DeniedHttpResponse";
 
   // This field allows the authorization service to send a HTTP response status
@@ -59,7 +58,7 @@ message DeniedHttpResponse {
 
 // HTTP attributes for an ok response.
 message OkHttpResponse {
-  option (udpa.api.annotations.versioning).previous_message_type =
+  option (udpa.annotations.versioning).previous_message_type =
       "envoy.service.auth.v2.OkHttpResponse";
 
   // HTTP entity headers in addition to the original request headers. This allows the authorization
@@ -73,7 +72,7 @@ message OkHttpResponse {
 
 // Intended for gRPC and Network Authorization servers `only`.
 message CheckResponse {
-  option (udpa.api.annotations.versioning).previous_message_type =
+  option (udpa.annotations.versioning).previous_message_type =
       "envoy.service.auth.v2.CheckResponse";
 
   // Status `OK` allows the request. Any other status indicates the request should be denied.

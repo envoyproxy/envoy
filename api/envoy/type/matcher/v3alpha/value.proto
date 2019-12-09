@@ -9,7 +9,7 @@ option java_package = "io.envoyproxy.envoy.type.matcher.v3alpha";
 import "envoy/type/matcher/v3alpha/number.proto";
 import "envoy/type/matcher/v3alpha/string.proto";
 
-import "udpa/api/annotations/versioning.proto";
+import "udpa/annotations/versioning.proto";
 
 import "validate/validate.proto";
 
@@ -19,12 +19,11 @@ import "validate/validate.proto";
 // StructValue is not supported and is always not matched.
 // [#next-free-field: 7]
 message ValueMatcher {
-  option (udpa.api.annotations.versioning).previous_message_type =
-      "envoy.type.matcher.ValueMatcher";
+  option (udpa.annotations.versioning).previous_message_type = "envoy.type.matcher.ValueMatcher";
 
   // NullMatch is an empty message to specify a null value.
   message NullMatch {
-    option (udpa.api.annotations.versioning).previous_message_type =
+    option (udpa.annotations.versioning).previous_message_type =
         "envoy.type.matcher.ValueMatcher.NullMatch";
   }
 
@@ -60,7 +59,7 @@ message ValueMatcher {
 
 // Specifies the way to match a list value.
 message ListMatcher {
-  option (udpa.api.annotations.versioning).previous_message_type = "envoy.type.matcher.ListMatcher";
+  option (udpa.annotations.versioning).previous_message_type = "envoy.type.matcher.ListMatcher";
 
   oneof match_pattern {
     option (validate.required) = true;

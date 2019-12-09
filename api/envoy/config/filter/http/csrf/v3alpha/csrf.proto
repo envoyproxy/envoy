@@ -9,7 +9,7 @@ option java_package = "io.envoyproxy.envoy.config.filter.http.csrf.v3alpha";
 import "envoy/api/v3alpha/core/base.proto";
 import "envoy/type/matcher/v3alpha/string.proto";
 
-import "udpa/api/annotations/versioning.proto";
+import "udpa/annotations/versioning.proto";
 
 import "validate/validate.proto";
 
@@ -19,7 +19,7 @@ import "validate/validate.proto";
 
 // CSRF filter config.
 message CsrfPolicy {
-  option (udpa.api.annotations.versioning).previous_message_type =
+  option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.http.csrf.v2.CsrfPolicy";
 
   // Specifies the % of requests for which the CSRF filter is enabled.
