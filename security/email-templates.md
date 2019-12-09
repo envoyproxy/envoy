@@ -11,7 +11,7 @@ Cc: envoy-security@googlegroups.com, envoy-maintainers@googlegroups.com
 
 Hello Envoy Community,
 
-The Envoy maintainers would like to announce the forthcoming release of Envoy
+The Envoy security team would like to announce the forthcoming release of Envoy
 $VERSION.
 
 This release will be made available on the $ORDINALDAY of $MONTH $YEAR at
@@ -21,7 +21,7 @@ defect(s). The highest rated security defect is considered $SEVERITY severity.
 No further details or patches will be made available in advance of the release.
 
 Thanks,
-$PERSON (on behalf of the Envoy maintainers)
+$PERSON (on behalf of the Envoy security team and maintainers)
 ```
 
 ## Upcoming security release to cncf-envoy-distributors-announce@lists.cncf.io
@@ -61,7 +61,7 @@ or to envoy-security@googlegroups.com for direct communication with the Envoy
 security team.
 
 Thanks,
-$PERSON (on behalf of the Envoy security team)
+$PERSON (on behalf of the Envoy security team and maintainers)
 ```
 
 ## Candidate release patches to cncf-envoy-distributors-announce@lists.cncf.io
@@ -98,7 +98,7 @@ envoy-security@googlegroups.com for direct communication with the Envoy
 security team.
 
 Thanks,
-$PERSON (on behalf of the Envoy security team)
+$PERSON (on behalf of the Envoy security team and maintainers)
 ```
 
 ## Security Fix Announcement
@@ -110,7 +110,7 @@ Cc: envoy-security@googlegroups.com, envoy-maintainers@googlegroups.com
 
 Hello Envoy Community,
 
-The Envoy maintainers would like to announce the availability of Envoy $VERSION.
+The Envoy security team would like to announce the availability of Envoy $VERSION.
 This addresses the following CVE(s):
 
 * CVE-YEAR-ABCDEF (CVSS score $CVSS): $CVESUMMARY
@@ -164,5 +164,5 @@ coordination in making this release.
 
 Thanks,
 
-$PERSON (on behalf of the Envoy maintainers)
+$PERSON (on behalf of the Envoy security team and maintainers)
 ```

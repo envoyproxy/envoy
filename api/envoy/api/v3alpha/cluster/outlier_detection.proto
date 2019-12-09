@@ -9,7 +9,7 @@ option java_package = "io.envoyproxy.envoy.api.v3alpha.cluster";
 import "google/protobuf/duration.proto";
 import "google/protobuf/wrappers.proto";
 
-import "udpa/api/annotations/versioning.proto";
+import "udpa/annotations/versioning.proto";
 
 import "validate/validate.proto";
 
@@ -19,7 +19,7 @@ import "validate/validate.proto";
 // more information on outlier detection.
 // [#next-free-field: 21]
 message OutlierDetection {
-  option (udpa.api.annotations.versioning).previous_message_type =
+  option (udpa.annotations.versioning).previous_message_type =
       "envoy.api.v2.cluster.OutlierDetection";
 
   // The number of consecutive 5xx responses or local origin errors that are mapped

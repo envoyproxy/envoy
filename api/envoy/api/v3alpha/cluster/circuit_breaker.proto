@@ -10,7 +10,7 @@ import "envoy/api/v3alpha/core/base.proto";
 
 import "google/protobuf/wrappers.proto";
 
-import "udpa/api/annotations/versioning.proto";
+import "udpa/annotations/versioning.proto";
 
 import "validate/validate.proto";
 
@@ -19,14 +19,14 @@ import "validate/validate.proto";
 // :ref:`Circuit breaking<arch_overview_circuit_break>` settings can be
 // specified individually for each defined priority.
 message CircuitBreakers {
-  option (udpa.api.annotations.versioning).previous_message_type =
+  option (udpa.annotations.versioning).previous_message_type =
       "envoy.api.v2.cluster.CircuitBreakers";
 
   // A Thresholds defines CircuitBreaker settings for a
   // :ref:`RoutingPriority<envoy_api_enum_api.v3alpha.core.RoutingPriority>`.
   // [#next-free-field: 8]
   message Thresholds {
-    option (udpa.api.annotations.versioning).previous_message_type =
+    option (udpa.annotations.versioning).previous_message_type =
         "envoy.api.v2.cluster.CircuitBreakers.Thresholds";
 
     // The :ref:`RoutingPriority<envoy_api_enum_api.v3alpha.core.RoutingPriority>`

@@ -12,7 +12,7 @@ import "envoy/api/v3alpha/core/base.proto";
 import "google/api/annotations.proto";
 
 import "opencensus/proto/trace/v1/trace.proto";
-import "udpa/api/annotations/versioning.proto";
+import "udpa/annotations/versioning.proto";
 
 import "validate/validate.proto";
 
@@ -27,16 +27,16 @@ service TraceService {
 }
 
 message StreamTracesResponse {
-  option (udpa.api.annotations.versioning).previous_message_type =
+  option (udpa.annotations.versioning).previous_message_type =
       "envoy.service.trace.v2.StreamTracesResponse";
 }
 
 message StreamTracesMessage {
-  option (udpa.api.annotations.versioning).previous_message_type =
+  option (udpa.annotations.versioning).previous_message_type =
       "envoy.service.trace.v2.StreamTracesMessage";
 
   message Identifier {
-    option (udpa.api.annotations.versioning).previous_message_type =
+    option (udpa.annotations.versioning).previous_message_type =
         "envoy.service.trace.v2.StreamTracesMessage.Identifier";
 
     // The node sending the access log messages over the stream.
