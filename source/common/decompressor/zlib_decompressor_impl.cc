@@ -69,7 +69,7 @@ bool ZlibDecompressorImpl::inflateNext() {
   }
 
   if (result < 0) {
-    decompression_error_ = result; 
+    decompression_error_ = result;
     return false;
   }
 
