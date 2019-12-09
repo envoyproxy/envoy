@@ -79,11 +79,11 @@ FilterState::Object* FilterStateImpl::getDataMutableGeneric(absl::string_view da
   return current->data_.get();
 }
 
-bool FilterStateImpl::hasDataAboveLifeSpan(FilterState::LifeSpan life_span) const {
+bool FilterStateImpl::hasDataAtOrAboveLifeSpan(FilterState::LifeSpan life_span) const {
   if (life_span > life_span_) {
-    return parent_ && parent_->hasDataAboveLifeSpan(life_span);
+    return parent_ && parent_->hasDataAtOrAboveLifeSpan(life_span);
   }
-  return !data_storage_.empty() || (parent_ && parent_->hasDataAboveLifeSpan(life_span));
+  return !data_storage_.empty() || (parent_ && parent_->hasDataAtOrAboveLifeSpan(life_span));
 }
 
 bool FilterStateImpl::hasDataWithNameInternally(absl::string_view data_name) const {

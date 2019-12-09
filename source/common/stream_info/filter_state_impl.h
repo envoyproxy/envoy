@@ -46,7 +46,7 @@ public:
   bool hasDataWithName(absl::string_view) const override;
   const Object* getDataReadOnlyGeneric(absl::string_view data_name) const override;
   Object* getDataMutableGeneric(absl::string_view data_name) override;
-  bool hasDataAboveLifeSpan(FilterState::LifeSpan life_span) const override;
+  bool hasDataAtOrAboveLifeSpan(FilterState::LifeSpan life_span) const override;
 
   FilterState::LifeSpan lifeSpan() const override { return life_span_; }
   std::shared_ptr<FilterState> parent() const override { return parent_; }

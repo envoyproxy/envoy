@@ -332,26 +332,28 @@ TEST_F(FilterStateImplTest, LifeSpanInitFromNonParent) {
   EXPECT_FALSE(new_filter_state.hasDataWithName("test_6"));
 }
 
-TEST_F(FilterStateImplTest, HasDataAboveLifeSpan) {
+TEST_F(FilterStateImplTest, HasDataAtOrAboveLifeSpan) {
   filter_state().setData("test_1", std::make_unique<SimpleType>(1),
                          FilterState::StateType::ReadOnly, FilterState::LifeSpan::FilterChain);
-  EXPECT_TRUE(filter_state().hasDataAboveLifeSpan(FilterState::LifeSpan::FilterChain));
-  EXPECT_FALSE(filter_state().hasDataAboveLifeSpan(FilterState::LifeSpan::DownstreamRequest));
-  EXPECT_FALSE(filter_state().hasDataAboveLifeSpan(FilterState::LifeSpan::DownstreamConnection));
+  EXPECT_TRUE(filter_state().hasDataAtOrAboveLifeSpan(FilterState::LifeSpan::FilterChain));
+  EXPECT_FALSE(filter_state().hasDataAtOrAboveLifeSpan(FilterState::LifeSpan::DownstreamRequest));
+  EXPECT_FALSE(
+      filter_state().hasDataAtOrAboveLifeSpan(FilterState::LifeSpan::DownstreamConnection));
 
   filter_state().setData("test_2", std::make_unique<SimpleType>(2),
                          FilterState::StateType::ReadOnly,
                          FilterState::LifeSpan::DownstreamRequest);
-  EXPECT_TRUE(filter_state().hasDataAboveLifeSpan(FilterState::LifeSpan::FilterChain));
-  EXPECT_TRUE(filter_state().hasDataAboveLifeSpan(FilterState::LifeSpan::DownstreamRequest));
-  EXPECT_FALSE(filter_state().hasDataAboveLifeSpan(FilterState::LifeSpan::DownstreamConnection));
+  EXPECT_TRUE(filter_state().hasDataAtOrAboveLifeSpan(FilterState::LifeSpan::FilterChain));
+  EXPECT_TRUE(filter_state().hasDataAtOrAboveLifeSpan(FilterState::LifeSpan::DownstreamRequest));
+  EXPECT_FALSE(
+      filter_state().hasDataAtOrAboveLifeSpan(FilterState::LifeSpan::DownstreamConnection));
 
   filter_state().setData("test_3", std::make_unique<SimpleType>(3),
                          FilterState::StateType::ReadOnly,
                          FilterState::LifeSpan::DownstreamConnection);
-  EXPECT_TRUE(filter_state().hasDataAboveLifeSpan(FilterState::LifeSpan::FilterChain));
-  EXPECT_TRUE(filter_state().hasDataAboveLifeSpan(FilterState::LifeSpan::DownstreamRequest));
-  EXPECT_TRUE(filter_state().hasDataAboveLifeSpan(FilterState::LifeSpan::DownstreamConnection));
+  EXPECT_TRUE(filter_state().hasDataAtOrAboveLifeSpan(FilterState::LifeSpan::FilterChain));
+  EXPECT_TRUE(filter_state().hasDataAtOrAboveLifeSpan(FilterState::LifeSpan::DownstreamRequest));
+  EXPECT_TRUE(filter_state().hasDataAtOrAboveLifeSpan(FilterState::LifeSpan::DownstreamConnection));
 }
 
 TEST_F(FilterStateImplTest, SetSameDataWithDifferentLifeSpan) {

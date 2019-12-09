@@ -21,8 +21,22 @@ namespace StreamInfo {
 class FilterState {
 public:
   enum class StateType { ReadOnly, Mutable };
-  // When internal redirect is enabled, one downstream request may create multiple filter chains.
-  // DownstreamRequest allows an object to survived across filter chain for book keeping.
+  // Objects stored in the FilterState may have different life span. Life span is what controls
+  // how long an object stored in FilterState lives. Implementation of this interface actually
+  // stores objects in a (reverse) tree manner - multiple FilterStateImpl with shorter life span may
+  // share the same FilterStateImpl as parent, which may recursively share parent with other
+  // FilterStateImpl at the same life span. This interface is supposed to be accessed at the leaf
+  // level (FilterChain) for objects with any desired longer life span.
+  //
+  // - FilterChain has the shortest life span, which is as long as the http filter chain lives.
+  //
+  // - DownstreamRequest is longer than FilterChain. When internal redirect is enabled, one
+  //   downstream request may create multiple filter chains. DownstreamRequest allows an Object to
+  //   survived across filter chains for book needs.
+  //
+  // - DownstreamConnection makes an Object survive the entire duration of a downstream connection.
+  //   Any stream within this connection can see the same object.
+  //
   // Note that order matters in this enum because it's assumed that life span grows as enum number
   // grows.
   enum LifeSpan {
@@ -117,7 +131,7 @@ public:
    * @param life_span the LifeSpan above which data existence is checked.
    * @return whether data of any type exist with LifeSpan greater than life_span.
    */
-  virtual bool hasDataAboveLifeSpan(LifeSpan life_span) const PURE;
+  virtual bool hasDataAtOrAboveLifeSpan(LifeSpan life_span) const PURE;
 
   /**
    * @return the LifeSpan of objects stored by this instance. Objects with
