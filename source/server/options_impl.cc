@@ -19,7 +19,7 @@
 
 namespace Envoy {
 namespace {
-std::vector<std::string> toArgsVector(int argc, const char* const* argv) {
+std::vector<std::string> toArgsVector(std::size_t argc, const char* const* argv) {
   std::vector<std::string> args;
   for (int i = 0; i < argc; ++i) {
     args.emplace_back(argv[i]);
