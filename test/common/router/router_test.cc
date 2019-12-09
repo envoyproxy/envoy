@@ -23,7 +23,6 @@
 #include "test/mocks/router/mocks.h"
 #include "test/mocks/runtime/mocks.h"
 #include "test/mocks/ssl/mocks.h"
-#include "test/mocks/stats/mocks.h"
 #include "test/mocks/tracing/mocks.h"
 #include "test/mocks/upstream/mocks.h"
 #include "test/test_common/environment.h"
