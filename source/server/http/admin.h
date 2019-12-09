@@ -170,6 +170,15 @@ private:
   };
 
   /**
+   * Specifies the Http::Code and a message that should be added to the response
+   * if an error while handling an admin request occurs.
+   */
+  struct AdminException {
+    Http::Code code;
+    std::string message;
+  };
+
+  /**
    * Implementation of RouteConfigProvider that returns a static null route config.
    */
   struct NullRouteConfigProvider : public Router::RouteConfigProvider {
@@ -233,6 +242,15 @@ private:
    */
   void writeListenersAsJson(Buffer::Instance& response);
   void writeListenersAsText(Buffer::Instance& response);
+
+  /**
+   * Helper methods for the /config_dump url handler.
+   */
+  void addAllToDump(envoy::admin::v2alpha::ConfigDump& dump,
+                    const absl::optional<std::string>& mask) const;
+  void addResourceToDump(envoy::admin::v2alpha::ConfigDump& dump,
+                         const absl::optional<std::string>& mask,
+                         const std::string& resource) const;
 
   template <class StatType>
   static bool shouldShowMetric(const StatType& metric, const bool used_only,

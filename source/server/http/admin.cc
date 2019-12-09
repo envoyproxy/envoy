@@ -177,23 +177,24 @@ bool filterParam(Http::Utility::QueryParams params, Buffer::Instance& response,
 }
 
 // Helper method to get a query parameter
-absl::optional<std::string> queryParam(Http::Utility::QueryParams params, std::string key) {
+absl::optional<std::string> queryParam(const Http::Utility::QueryParams params,
+                                       const std::string key) {
   return (params.find(key) != params.end()) ? absl::optional<std::string>{params.at(key)}
                                             : absl::nullopt;
 }
 
 // Helper method to get the format parameter
-absl::optional<std::string> formatParam(Http::Utility::QueryParams params) {
+absl::optional<std::string> formatParam(const Http::Utility::QueryParams params) {
   return queryParam(params, "format");
 }
 
 // Helper method to get the resource parameter
-absl::optional<std::string> resourceParam(Http::Utility::QueryParams params) {
+absl::optional<std::string> resourceParam(const Http::Utility::QueryParams params) {
   return queryParam(params, "resource");
 }
 
 // Helper method to get the mask parameter
-absl::optional<std::string> maskParam(Http::Utility::QueryParams params) {
+absl::optional<std::string> maskParam(const Http::Utility::QueryParams params) {
   return queryParam(params, "mask");
 }
 
@@ -544,6 +545,64 @@ Http::Code AdminImpl::handlerClusters(absl::string_view url, Http::HeaderMap& re
   return Http::Code::OK;
 }
 
+void AdminImpl::addAllToDump(envoy::admin::v2alpha::ConfigDump& dump,
+                             const absl::optional<std::string>& mask) const {
+  for (const auto& key_callback_pair : config_tracker_.getCallbacksMap()) {
+    ProtobufTypes::MessagePtr message = key_callback_pair.second();
+    RELEASE_ASSERT(message, "");
+
+    if (mask.has_value()) {
+      Protobuf::FieldMask field_mask;
+      ProtobufUtil::FieldMaskUtil::FromString(mask.value(), &field_mask);
+      ProtobufUtil::FieldMaskUtil::TrimMessage(field_mask, message.get());
+    }
+
+    auto* config = dump.add_configs();
+    config->PackFrom(*message);
+  }
+}
+
+void AdminImpl::addResourceToDump(envoy::admin::v2alpha::ConfigDump& dump,
+                                  const absl::optional<std::string>& mask,
+                                  const std::string& resource) const {
+  bool resource_found = false;
+  for (const auto& key_callback_pair : config_tracker_.getCallbacksMap()) {
+    ProtobufTypes::MessagePtr message = key_callback_pair.second();
+    RELEASE_ASSERT(message, "");
+
+    auto field_descriptor = message.get()->GetDescriptor()->FindFieldByName(resource);
+    const Protobuf::Reflection* reflection = message.get()->GetReflection();
+    if (!field_descriptor) {
+      continue;
+    } else if (!field_descriptor->is_repeated()) {
+      throw AdminException{
+          Http::Code::BadRequest,
+          fmt::format("{} is not a repeated field. Use ?mask={} to get only this field",
+                      field_descriptor->name(), field_descriptor->name())};
+    }
+    resource_found = true;
+
+    auto repeated = reflection->GetRepeatedPtrField<Protobuf::Message>(*message, field_descriptor);
+    for (Protobuf::Message& msg : repeated) {
+      if (mask.has_value()) {
+        Protobuf::FieldMask field_mask;
+        ProtobufUtil::FieldMaskUtil::FromString(mask.value(), &field_mask);
+        ProtobufUtil::FieldMaskUtil::TrimMessage(field_mask, &msg);
+      }
+      auto* config = dump.add_configs();
+      config->PackFrom(msg);
+    }
+
+    // We found the desired resource so there is no need to continue iterating over
+    // the other keys.
+    break;
+  }
+  if (!resource_found) {
+    throw AdminException{Http::Code::NotFound,
+                         fmt::format("{} not found in config dump", resource)};
+  }
+}
+
 Http::Code AdminImpl::handlerConfigDump(absl::string_view url, Http::HeaderMap& response_headers,
                                         Buffer::Instance& response, AdminStream&) const {
   Http::Utility::QueryParams query_params = Http::Utility::parseQueryString(url);
@@ -551,53 +610,16 @@ Http::Code AdminImpl::handlerConfigDump(absl::string_view url, Http::HeaderMap& 
   const auto mask = maskParam(query_params);
 
   envoy::admin::v2alpha::ConfigDump dump;
-  bool resource_found = false;
-  for (const auto& key_callback_pair : config_tracker_.getCallbacksMap()) {
-    ProtobufTypes::MessagePtr message = key_callback_pair.second();
-    RELEASE_ASSERT(message, "");
 
-    Protobuf::FieldMask* field_mask = new Protobuf::FieldMask;
-    if (mask.has_value()) {
-      ProtobufUtil::FieldMaskUtil::FromString(mask.value(), field_mask);
+  if (resource.has_value()) {
+    try {
+      addResourceToDump(dump, mask, resource.value());
+    } catch (AdminException e) {
+      response.add(e.message);
+      return e.code;
     }
-
-    if (resource.has_value()) {
-      auto field_descriptor = message.get()->GetDescriptor()->FindFieldByName(resource.value());
-      const Protobuf::Reflection* reflection = message.get()->GetReflection();
-      if (!field_descriptor) {
-        continue;
-      } else if (!field_descriptor->is_repeated()) {
-        response.add(fmt::format("{} is not a repeated field. Use ?mask={} to get only this field",
-                                 field_descriptor->name(), field_descriptor->name()));
-        return Http::Code::BadRequest;
-      }
-      resource_found = true;
-
-      auto repeated =
-          reflection->MutableRepeatedPtrField<Protobuf::Message>(message.get(), field_descriptor);
-      for (Protobuf::Message& msg : *repeated) {
-        if (mask.has_value()) {
-          ProtobufUtil::FieldMaskUtil::TrimMessage(*field_mask, &msg);
-        }
-        auto& any_message = *(dump.add_configs());
-        any_message.PackFrom(msg);
-      }
-
-      // We found the desired resource so there is no need to continue iterating over
-      // the other keys.
-      break;
-    }
-
-    if (mask.has_value()) {
-      ProtobufUtil::FieldMaskUtil::TrimMessage(*field_mask, message.get());
-    }
-    auto& any_message = *(dump.add_configs());
-    any_message.PackFrom(*message);
-  }
-
-  if (resource.has_value() && !resource_found) {
-    response.add(fmt::format("{} not found in config dump", resource.value()));
-    return Http::Code::NotFound;
+  } else {
+    addAllToDump(dump, mask);
   }
 
   response_headers.setReferenceContentType(Http::Headers::get().ContentTypeValues.Json);

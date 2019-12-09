@@ -989,22 +989,23 @@ TEST_P(AdminInstanceTest, ConfigDumpFiltersByMask) {
   EXPECT_EQ(expected_json, output);
 }
 
+ProtobufTypes::MessagePtr testDumpClustersConfig() {
+  auto msg = std::make_unique<envoy::admin::v2alpha::ClustersConfigDump>();
+  auto static_cluster = msg->add_static_clusters();
+  auto inner_cluster = static_cluster->mutable_cluster();
+  inner_cluster->set_name("foo");
+  inner_cluster->set_drain_connections_on_host_removal(true);
+
+  auto dyn_cluster = msg->add_dynamic_active_clusters();
+  auto inner_dyn_cluster = dyn_cluster->mutable_cluster();
+  inner_dyn_cluster->set_name("bar");
+  return msg;
+}
+
 TEST_P(AdminInstanceTest, ConfigDumpFiltersByResourceAndMask) {
   Buffer::OwnedImpl response;
   Http::HeaderMapImpl header_map;
-  auto clusters = admin_.getConfigTracker().add("clusters", [] {
-    auto msg = std::make_unique<envoy::admin::v2alpha::ClustersConfigDump>();
-    auto static_cluster = msg->add_static_clusters();
-    auto inner_cluster = static_cluster->mutable_cluster();
-    inner_cluster->set_name("foo");
-    inner_cluster->set_drain_connections_on_host_removal(true);
-
-    auto dyn_cluster = msg->add_dynamic_active_clusters();
-    auto inner_dyn_cluster = dyn_cluster->mutable_cluster();
-    inner_dyn_cluster->set_name("bar");
-
-    return msg;
-  });
+  auto clusters = admin_.getConfigTracker().add("clusters", testDumpClustersConfig);
   const std::string expected_json = R"EOF({
  "configs": [
   {
@@ -1025,19 +1026,7 @@ TEST_P(AdminInstanceTest, ConfigDumpFiltersByResourceAndMask) {
 TEST_P(AdminInstanceTest, ConfigDumpNonExistentMask) {
   Buffer::OwnedImpl response;
   Http::HeaderMapImpl header_map;
-  auto clusters = admin_.getConfigTracker().add("clusters", [] {
-    auto msg = std::make_unique<envoy::admin::v2alpha::ClustersConfigDump>();
-    auto static_cluster = msg->add_static_clusters();
-    auto inner_cluster = static_cluster->mutable_cluster();
-    inner_cluster->set_name("foo");
-    inner_cluster->set_drain_connections_on_host_removal(true);
-
-    auto dyn_cluster = msg->add_dynamic_active_clusters();
-    auto inner_dyn_cluster = dyn_cluster->mutable_cluster();
-    inner_dyn_cluster->set_name("bar");
-
-    return msg;
-  });
+  auto clusters = admin_.getConfigTracker().add("clusters", testDumpClustersConfig);
   const std::string expected_json = R"EOF({
  "configs": [
   {
@@ -1055,7 +1044,6 @@ TEST_P(AdminInstanceTest, ConfigDumpNonExistentMask) {
 TEST_P(AdminInstanceTest, ConfigDumpNonExistentResource) {
   Buffer::OwnedImpl response;
   Http::HeaderMapImpl header_map;
-  // TODO(spenceral): Update return type here?
   auto listeners = admin_.getConfigTracker().add("listeners", [] {
     auto msg = std::make_unique<ProtobufWkt::StringValue>();
     msg->set_value("listeners_config");
