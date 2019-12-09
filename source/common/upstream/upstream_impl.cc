@@ -581,8 +581,8 @@ ClusterLoadReportStats ClusterInfoImpl::generateLoadReportStats(Stats::Scope& sc
 }
 
 ClusterTimeoutBudgetStats
-ClusterInfoImpl::generateTimeoutBudgetStats(Stats::Scope& scope, const bool trackTimeoutBudgets) {
-  if (trackTimeoutBudgets) {
+ClusterInfoImpl::generateTimeoutBudgetStats(Stats::Scope& scope, const bool track_timeout_budgets) {
+  if (track_timeout_budgets) {
     return {ALL_CLUSTER_TIMEOUT_BUDGET_STATS(POOL_HISTOGRAM(scope))};
   }
   return {ALL_CLUSTER_TIMEOUT_BUDGET_STATS(NULL_POOL_HISTOGRAM(scope))};
@@ -645,10 +645,9 @@ ClusterInfoImpl::ClusterInfoImpl(
       socket_matcher_(std::move(socket_matcher)), stats_scope_(std::move(stats_scope)),
       stats_(generateStats(*stats_scope_)), load_report_stats_store_(stats_scope_->symbolTable()),
       load_report_stats_(generateLoadReportStats(load_report_stats_store_)),
-      track_timeout_budgets_(config.track_timeout_budgets()),
       timeout_budget_stats_store_(stats_scope_->symbolTable()),
       timeout_budget_stats_(
-          generateTimeoutBudgetStats(timeout_budget_stats_store_, track_timeout_budgets_)),
+          generateTimeoutBudgetStats(timeout_budget_stats_store_, config.track_timeout_budgets())),
       features_(parseFeatures(config)),
       http1_settings_(Http::Utility::parseHttp1Settings(config.http_protocol_options())),
       http2_settings_(Http::Utility::parseHttp2Settings(config.http2_protocol_options())),

@@ -2092,6 +2092,35 @@ TEST_F(ClusterInfoImplTest, Timeouts) {
   EXPECT_FALSE(cluster3->info()->idleTimeout().has_value());
 }
 
+TEST_F(ClusterInfoImplTest, TestTrackTimeoutBudgets) {
+  // Check that without the flag specified, the histogram is null.
+  const std::string yaml_disabled = R"EOF(
+    name: name
+    connect_timeout: 0.25s
+    type: STRICT_DNS
+    lb_policy: ROUND_ROBIN
+  )EOF";
+
+  auto cluster = makeCluster(yaml_disabled);
+  // Null unit points to a rejected/null histogram.
+  EXPECT_EQ(Stats::Histogram::Unit::Null,
+            cluster->info()->timeoutBudgetStats().upstream_rq_timeout_budget_percent_used_.unit());
+
+  // Check that with the flag, the histogram is created.
+  const std::string yaml = R"EOF(
+    name: name
+    connect_timeout: 0.25s
+    type: STRICT_DNS
+    lb_policy: ROUND_ROBIN
+    track_timeout_budgets: true
+  )EOF";
+
+  cluster = makeCluster(yaml);
+  // The correct unit means that the histogram was created.
+  EXPECT_EQ(Stats::Histogram::Unit::Unspecified,
+            cluster->info()->timeoutBudgetStats().upstream_rq_timeout_budget_percent_used_.unit());
+}
+
 class TestFilterConfigFactoryBase {
 public:
   TestFilterConfigFactoryBase(

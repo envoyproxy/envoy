@@ -1128,9 +1128,7 @@ TEST_F(RouterTest, TimeoutBudgetHistogramStat) {
         callbacks.onPoolReady(encoder, cm_.conn_pool_.host_, upstream_stream_info_);
         return nullptr;
       }));
-  // Turn on the histograms we're interested in testing.
-  EXPECT_CALL(*cm_.thread_local_cluster_.cluster_.info_, trackTimeoutBudgets)
-      .WillRepeatedly(Return(true));
+  // Create the histograms we're interested in testing.
   expectPerTryTimerCreate();
   expectResponseTimerCreate();
 
@@ -1169,9 +1167,7 @@ TEST_F(RouterTest, TimeoutBudgetHistogramStatOnlyGlobal) {
         callbacks.onPoolReady(encoder, cm_.conn_pool_.host_, upstream_stream_info_);
         return nullptr;
       }));
-  // Turn on the histograms we're interested in testing.
-  EXPECT_CALL(*cm_.thread_local_cluster_.cluster_.info_, trackTimeoutBudgets)
-      .WillRepeatedly(Return(true));
+  // Create the histograms we're interested in testing.
   expectPerTryTimerCreate();
 
   Http::TestHeaderMapImpl headers{{"x-envoy-upstream-rq-timeout-ms", "200"}};
@@ -1190,46 +1186,6 @@ TEST_F(RouterTest, TimeoutBudgetHistogramStatOnlyGlobal) {
       cm_.thread_local_cluster_.cluster_.info_->timeout_budget_stats_store_,
       deliverHistogramToSinks(
           Property(&Stats::Metric::name, "upstream_rq_timeout_budget_per_try_percent_used"), 0ull));
-
-  Http::HeaderMapPtr response_headers(new Http::TestHeaderMapImpl{{":status", "200"}});
-  response_decoder->decodeHeaders(std::move(response_headers), false);
-  test_time_.sleep(std::chrono::milliseconds(80));
-  response_decoder->decodeData(data, true);
-}
-
-// Verify the timeout budget histograms are unpopulated when the cluster is
-// not configured to send them.
-TEST_F(RouterTest, TimeoutBudgetHistogramStatUnset) {
-  NiceMock<Http::MockStreamEncoder> encoder;
-  Http::StreamDecoder* response_decoder = nullptr;
-  EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
-      .WillOnce(Invoke([&](Http::StreamDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks)
-                           -> Http::ConnectionPool::Cancellable* {
-        response_decoder = &decoder;
-        callbacks.onPoolReady(encoder, cm_.conn_pool_.host_, upstream_stream_info_);
-        return nullptr;
-      }));
-  expectPerTryTimerCreate();
-  expectResponseTimerCreate();
-
-  Http::TestHeaderMapImpl headers{{"x-envoy-upstream-rq-timeout-ms", "400"},
-                                  {"x-envoy-upstream-rq-per-try-timeout-ms", "200"}};
-  HttpTestUtility::addDefaultHeaders(headers);
-  router_.decodeHeaders(headers, false);
-  Buffer::OwnedImpl data;
-  router_.decodeData(data, true);
-
-  // Global timeout budget used.
-  EXPECT_CALL(cm_.thread_local_cluster_.cluster_.info_->timeout_budget_stats_store_,
-              deliverHistogramToSinks(
-                  Property(&Stats::Metric::name, "upstream_rq_timeout_budget_percent_used"), 20ull))
-      .Times(0);
-  // Per-try budget used.
-  EXPECT_CALL(
-      cm_.thread_local_cluster_.cluster_.info_->timeout_budget_stats_store_,
-      deliverHistogramToSinks(
-          Property(&Stats::Metric::name, "upstream_rq_timeout_budget_per_try_percent_used"), 40ull))
-      .Times(0);
 
   Http::HeaderMapPtr response_headers(new Http::TestHeaderMapImpl{{":status", "200"}});
   response_decoder->decodeHeaders(std::move(response_headers), false);

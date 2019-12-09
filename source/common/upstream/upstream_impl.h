@@ -517,7 +517,7 @@ public:
                                                                   const std::string& stat_prefix,
                                                                   bool track_remaining);
   static ClusterTimeoutBudgetStats generateTimeoutBudgetStats(Stats::Scope&,
-                                                              const bool trackTimeoutBudgets);
+                                                              const bool track_timeout_budgets);
 
   // Upstream::ClusterInfo
   bool addedViaApi() const override { return added_via_api_; }
@@ -583,9 +583,6 @@ public:
   Http::Protocol
   upstreamHttpProtocol(absl::optional<Http::Protocol> downstream_protocol) const override;
 
-  // TODO remove this
-  bool trackTimeoutBudgets() const override { return track_timeout_budgets_; }
-
 private:
   struct ResourceManagers {
     ResourceManagers(const envoy::api::v2::Cluster& config, Runtime::Loader& runtime,
@@ -612,7 +609,6 @@ private:
   mutable ClusterStats stats_;
   Stats::IsolatedStoreImpl load_report_stats_store_;
   mutable ClusterLoadReportStats load_report_stats_;
-  const bool track_timeout_budgets_;
   Stats::IsolatedStoreImpl timeout_budget_stats_store_;
   mutable ClusterTimeoutBudgetStats timeout_budget_stats_;
   const uint64_t features_;
