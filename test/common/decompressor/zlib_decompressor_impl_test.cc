@@ -58,7 +58,7 @@ protected:
   static const uint64_t default_input_size{796};
 };
 
-class ZlibDecompressorImplDeathTest : public ZlibDecompressorImplTest {
+class ZlibDecompressorImplFailureTest : public ZlibDecompressorImplTest {
 protected:
   static void decompressorBadInitTestHelper(int64_t window_bits) {
     ZlibDecompressorImpl decompressor;
@@ -71,13 +71,15 @@ protected:
     ZlibDecompressorImpl decompressor;
     TestUtility::feedBufferWithRandomCharacters(input_buffer, 100);
     decompressor.decompress(input_buffer, output_buffer);
+    ASSERT_TRUE(decompressor.decompression_error_ < 0);
   }
 };
 
-// Exercises death by passing bad initialization params or by calling decompress before init.
-TEST_F(ZlibDecompressorImplDeathTest, DecompressorDeathTest) {
+// Test different failures by passing bad initialization params or by calling decompress before
+// init.
+TEST_F(ZlibDecompressorImplFailureTest, DecompressorFailureTest) {
   EXPECT_DEATH_LOG_TO_STDERR(decompressorBadInitTestHelper(100), "assert failure: result >= 0");
-  EXPECT_DEATH_LOG_TO_STDERR(unitializedDecompressorTestHelper(), "assert failure: result == Z_OK");
+  unitializedDecompressorTestHelper();
 }
 
 // Exercises decompressor's checksum by calling it before init or decompress.
