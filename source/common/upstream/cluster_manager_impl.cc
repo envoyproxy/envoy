@@ -480,7 +480,7 @@ bool ClusterManagerImpl::scheduleUpdate(const Cluster& cluster, uint32_t priorit
   }
 
   // Ensure there's a timer set to deliver these updates.
-  if (!updates->timer_enabled_) {
+  if (!updates->timer_->enabled()) {
     updates->enableTimer(timeout);
   }
 
@@ -500,7 +500,6 @@ void ClusterManagerImpl::applyUpdates(const Cluster& cluster, uint32_t priority,
   postThreadLocalClusterUpdate(cluster, priority, hosts_added, hosts_removed);
 
   cm_stats_.cluster_updated_via_merge_.inc();
-  updates.timer_enabled_ = false;
   updates.last_updated_ = time_source_.monotonicTime();
 }
 
