@@ -43,6 +43,11 @@ public:
   // Decompressor
   void decompress(const Buffer::Instance& input_buffer, Buffer::Instance& output_buffer) override;
 
+  // Int to track whether error occurred during decompression
+  // When an error occurs, the result (a negative int) will be stored in this variable
+  int decompression_error_{0};
+
+
 private:
   bool inflateNext();
   void updateOutput(Buffer::Instance& output_buffer);
