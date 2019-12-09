@@ -2,9 +2,9 @@ syntax = "proto3";
 
 package envoy.config.filter.thrift.rate_limit.v3alpha;
 
+option java_package = "io.envoyproxy.envoy.config.filter.thrift.rate_limit.v3alpha";
 option java_outer_classname = "RateLimitProto";
 option java_multiple_files = true;
-option java_package = "io.envoyproxy.envoy.config.filter.thrift.rate_limit.v3alpha";
 
 import "envoy/config/ratelimit/v3alpha/rls.proto";
 
