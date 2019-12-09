@@ -595,7 +595,7 @@ message RouteAction {
     }
 
     message QueryParameter {
-      option (udpa.api.annotations.versioning).previous_message_type =
+      option (udpa.annotations.versioning).previous_message_type =
           "envoy.api.v2.route.RouteAction.HashPolicy.QueryParameter";
 
       // The name of the URL query parameter that will be used to obtain the hash
