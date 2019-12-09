@@ -8,7 +8,7 @@ option java_package = "io.envoyproxy.envoy.type.matcher.v3alpha";
 
 import "envoy/type/matcher/v3alpha/value.proto";
 
-import "udpa/api/annotations/versioning.proto";
+import "udpa/annotations/versioning.proto";
 
 import "validate/validate.proto";
 
@@ -73,14 +73,13 @@ import "validate/validate.proto";
 // <envoy_api_msg_config.rbac.v3alpha.Permission>` and :ref:`Principal
 // <envoy_api_msg_config.rbac.v3alpha.Principal>`.
 message MetadataMatcher {
-  option (udpa.api.annotations.versioning).previous_message_type =
-      "envoy.type.matcher.MetadataMatcher";
+  option (udpa.annotations.versioning).previous_message_type = "envoy.type.matcher.MetadataMatcher";
 
   // Specifies the segment in a path to retrieve value from Metadata.
   // Note: Currently it's not supported to retrieve a value from a list in Metadata. This means that
   // if the segment key refers to a list, it has to be the last segment in a path.
   message PathSegment {
-    option (udpa.api.annotations.versioning).previous_message_type =
+    option (udpa.annotations.versioning).previous_message_type =
         "envoy.type.matcher.MetadataMatcher.PathSegment";
 
     oneof segment {

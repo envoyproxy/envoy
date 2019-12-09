@@ -56,6 +56,7 @@ public:
   const std::string ResponseSize = "response_size";
   const std::string RetryCount = "retry.count";
   const std::string Status = "status";
+  const std::string UpstreamAddress = "upstream_address";
   const std::string UpstreamCluster = "upstream_cluster";
   const std::string UserAgent = "user_agent";
   const std::string Zone = "zone";

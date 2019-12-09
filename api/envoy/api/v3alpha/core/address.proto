@@ -10,14 +10,14 @@ import "envoy/api/v3alpha/core/base.proto";
 
 import "google/protobuf/wrappers.proto";
 
-import "udpa/api/annotations/versioning.proto";
+import "udpa/annotations/versioning.proto";
 
 import "validate/validate.proto";
 
 // [#protodoc-title: Network addresses]
 
 message Pipe {
-  option (udpa.api.annotations.versioning).previous_message_type = "envoy.api.v2.core.Pipe";
+  option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.core.Pipe";
 
   // Unix Domain Socket path. On Linux, paths starting with '@' will use the
   // abstract namespace. The starting '@' is replaced by a null byte by Envoy.
@@ -28,8 +28,7 @@ message Pipe {
 
 // [#next-free-field: 7]
 message SocketAddress {
-  option (udpa.api.annotations.versioning).previous_message_type =
-      "envoy.api.v2.core.SocketAddress";
+  option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.core.SocketAddress";
 
   enum Protocol {
     TCP = 0;
@@ -77,7 +76,7 @@ message SocketAddress {
 }
 
 message TcpKeepalive {
-  option (udpa.api.annotations.versioning).previous_message_type = "envoy.api.v2.core.TcpKeepalive";
+  option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.core.TcpKeepalive";
 
   // Maximum number of keepalive probes to send without response before deciding
   // the connection is dead. Default is to use the OS level configuration (unless
@@ -95,7 +94,7 @@ message TcpKeepalive {
 }
 
 message BindConfig {
-  option (udpa.api.annotations.versioning).previous_message_type = "envoy.api.v2.core.BindConfig";
+  option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.core.BindConfig";
 
   // The address to bind to when creating a socket.
   SocketAddress source_address = 1 [(validate.rules).message = {required: true}];
@@ -118,7 +117,7 @@ message BindConfig {
 // used to tell Envoy where to bind/listen, connect to upstream and find
 // management servers.
 message Address {
-  option (udpa.api.annotations.versioning).previous_message_type = "envoy.api.v2.core.Address";
+  option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.core.Address";
 
   oneof address {
     option (validate.required) = true;
@@ -132,7 +131,7 @@ message Address {
 // CidrRange specifies an IP Address and a prefix length to construct
 // the subnet mask for a `CIDR <https://tools.ietf.org/html/rfc4632>`_ range.
 message CidrRange {
-  option (udpa.api.annotations.versioning).previous_message_type = "envoy.api.v2.core.CidrRange";
+  option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.core.CidrRange";
 
   // IPv4 or IPv6 address, e.g. ``192.0.0.0`` or ``2001:db8::``.
   string address_prefix = 1 [(validate.rules).string = {min_bytes: 1}];

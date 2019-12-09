@@ -16,8 +16,10 @@ public:
   constexpr static char name[] = "call-decodedata-once-filter";
 
   Http::FilterHeadersStatus decodeHeaders(Http::HeaderMap& header_map, bool) override {
-    Http::HeaderEntry* entry_content = header_map.get(Envoy::Http::LowerCaseString("content_size"));
-    Http::HeaderEntry* entry_added = header_map.get(Envoy::Http::LowerCaseString("added_size"));
+    const Http::HeaderEntry* entry_content =
+        header_map.get(Envoy::Http::LowerCaseString("content_size"));
+    const Http::HeaderEntry* entry_added =
+        header_map.get(Envoy::Http::LowerCaseString("added_size"));
     ASSERT(entry_content != nullptr && entry_added != nullptr);
     content_size_ = std::stoul(std::string(entry_content->value().getStringView()));
     added_size_ = std::stoul(std::string(entry_added->value().getStringView()));

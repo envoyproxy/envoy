@@ -9,7 +9,7 @@ option java_package = "io.envoyproxy.envoy.api.v3alpha.core";
 import "google/protobuf/duration.proto";
 import "google/protobuf/wrappers.proto";
 
-import "udpa/api/annotations/versioning.proto";
+import "udpa/annotations/versioning.proto";
 
 import "validate/validate.proto";
 
@@ -17,12 +17,12 @@ import "validate/validate.proto";
 
 // [#not-implemented-hide:]
 message TcpProtocolOptions {
-  option (udpa.api.annotations.versioning).previous_message_type =
+  option (udpa.annotations.versioning).previous_message_type =
       "envoy.api.v2.core.TcpProtocolOptions";
 }
 
 message HttpProtocolOptions {
-  option (udpa.api.annotations.versioning).previous_message_type =
+  option (udpa.annotations.versioning).previous_message_type =
       "envoy.api.v2.core.HttpProtocolOptions";
 
   // The idle timeout for connections. The idle timeout is defined as the
@@ -54,15 +54,15 @@ message HttpProtocolOptions {
 }
 
 message Http1ProtocolOptions {
-  option (udpa.api.annotations.versioning).previous_message_type =
+  option (udpa.annotations.versioning).previous_message_type =
       "envoy.api.v2.core.Http1ProtocolOptions";
 
   message HeaderKeyFormat {
-    option (udpa.api.annotations.versioning).previous_message_type =
+    option (udpa.annotations.versioning).previous_message_type =
         "envoy.api.v2.core.Http1ProtocolOptions.HeaderKeyFormat";
 
     message ProperCaseWords {
-      option (udpa.api.annotations.versioning).previous_message_type =
+      option (udpa.annotations.versioning).previous_message_type =
           "envoy.api.v2.core.Http1ProtocolOptions.HeaderKeyFormat.ProperCaseWords";
     }
 
@@ -102,7 +102,7 @@ message Http1ProtocolOptions {
 
 // [#next-free-field: 13]
 message Http2ProtocolOptions {
-  option (udpa.api.annotations.versioning).previous_message_type =
+  option (udpa.annotations.versioning).previous_message_type =
       "envoy.api.v2.core.Http2ProtocolOptions";
 
   // `Maximum table size <https://httpwg.org/specs/rfc7541.html#rfc.section.4.2>`_
@@ -207,7 +207,7 @@ message Http2ProtocolOptions {
 
 // [#not-implemented-hide:]
 message GrpcProtocolOptions {
-  option (udpa.api.annotations.versioning).previous_message_type =
+  option (udpa.annotations.versioning).previous_message_type =
       "envoy.api.v2.core.GrpcProtocolOptions";
 
   Http2ProtocolOptions http2_protocol_options = 1;
