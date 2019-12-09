@@ -119,6 +119,8 @@ def NextVersionUpgrade(type_name, type_map, next_version_upgrade_memo, visited=N
 if __name__ == '__main__':
   # Output path for type database.
   out_path = sys.argv[1]
+
+  # Load type descriptors for each type whisper
   type_desc_paths = sys.argv[2:]
   type_whispers = map(LoadTypes, type_desc_paths)
 
