@@ -8,7 +8,7 @@ option java_package = "io.envoyproxy.envoy.type.matcher.v3alpha";
 
 import "envoy/type/v3alpha/range.proto";
 
-import "udpa/api/annotations/versioning.proto";
+import "udpa/annotations/versioning.proto";
 
 import "validate/validate.proto";
 
@@ -16,8 +16,7 @@ import "validate/validate.proto";
 
 // Specifies the way to match a double value.
 message DoubleMatcher {
-  option (udpa.api.annotations.versioning).previous_message_type =
-      "envoy.type.matcher.DoubleMatcher";
+  option (udpa.annotations.versioning).previous_message_type = "envoy.type.matcher.DoubleMatcher";
 
   oneof match_pattern {
     option (validate.required) = true;

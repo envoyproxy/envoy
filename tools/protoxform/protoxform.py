@@ -143,7 +143,7 @@ def FormatHeaderFromFile(source_code_info, file_proto):
     Formatted proto header as a string.
   """
   # Load the type database.
-  typedb = utils.LoadTypeDb()
+  typedb = utils.GetTypeDb()
   # Figure out type dependencies in this .proto.
   types = Types()
   text_format.Merge(traverse.TraverseFile(file_proto, type_whisperer.TypeWhispererVisitor()), types)
@@ -199,14 +199,14 @@ def FormatHeaderFromFile(source_code_info, file_proto):
       google_imports.append(d)
     elif d.startswith('validate/'):
       infra_imports.append(d)
-    elif d in ['udpa/api/annotations/versioning.proto']:
+    elif d in ['udpa/annotations/versioning.proto']:
       # Skip, we decide to add this based on requires_versioning_import
       pass
     else:
       misc_imports.append(d)
 
   if requires_versioning_import:
-    misc_imports.append('udpa/api/annotations/versioning.proto')
+    misc_imports.append('udpa/annotations/versioning.proto')
 
   def FormatImportBlock(xs):
     if not xs:
@@ -423,7 +423,7 @@ def FormatOptions(options, is_message=False):
     versioning_annotation = protoxform_options.GetVersioningAnnotation(options)
     if versioning_annotation:
       formatted_options.append(
-          'option (udpa.api.annotations.versioning).previous_message_type = "%s";' %
+          'option (udpa.annotations.versioning).previous_message_type = "%s";' %
           versioning_annotation.previous_message_type)
   if formatted_options:
     return FormatBlock('\n'.join(formatted_options) + '\n')
@@ -524,11 +524,17 @@ class ProtoFormatVisitor(visitor.Visitor):
     return ClangFormat(header + formatted_services + formatted_enums + formatted_msgs)
 
 
+def ParameterCallback(parameter):
+  params = dict(param.split('=') for param in parameter.split(','))
+  if params["type_db_path"]:
+    utils.LoadTypeDb(params["type_db_path"])
+
+
 def Main():
   plugin.Plugin([
       plugin.DirectOutputDescriptor('.v2.proto', ProtoFormatVisitor),
       plugin.OutputDescriptor('.v3alpha.proto', ProtoFormatVisitor, migrate.V3MigrationXform)
-  ])
+  ], ParameterCallback)
 
 
 if __name__ == '__main__':

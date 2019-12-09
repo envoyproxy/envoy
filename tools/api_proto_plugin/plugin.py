@@ -30,7 +30,7 @@ def DirectOutputDescriptor(output_suffix, visitor):
   return OutputDescriptor(output_suffix, visitor, lambda x: x)
 
 
-def Plugin(output_descriptors):
+def Plugin(output_descriptors, parameter_callback=None):
   """Protoc plugin entry point.
 
   This defines protoc plugin and manages the stdin -> stdout flow. An
@@ -47,6 +47,9 @@ def Plugin(output_descriptors):
   request.ParseFromString(sys.stdin.buffer.read())
   response = plugin_pb2.CodeGeneratorResponse()
   cprofile_enabled = os.getenv('CPROFILE_ENABLED')
+
+  if request.HasField("parameter") and parameter_callback:
+    parameter_callback(request.parameter)
 
   # We use request.file_to_generate rather than request.file_proto here since we
   # are invoked inside a Bazel aspect, each node in the DAG will be visited once

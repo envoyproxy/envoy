@@ -14,7 +14,7 @@ import "envoy/api/v3alpha/endpoint/endpoint.proto";
 import "google/api/annotations.proto";
 import "google/protobuf/duration.proto";
 
-import "udpa/api/annotations/versioning.proto";
+import "udpa/annotations/versioning.proto";
 
 // HDS is Health Discovery Service. It compliments Envoy’s health checking
 // service by designating this Envoy to be a healthchecker for a subset of hosts
@@ -74,7 +74,7 @@ service HealthDiscoveryService {
 // Defines supported protocols etc, so the management server can assign proper
 // endpoints to healthcheck.
 message Capability {
-  option (udpa.api.annotations.versioning).previous_message_type =
+  option (udpa.annotations.versioning).previous_message_type =
       "envoy.service.discovery.v2.Capability";
 
   // Different Envoy instances may have different capabilities (e.g. Redis)
@@ -89,7 +89,7 @@ message Capability {
 }
 
 message HealthCheckRequest {
-  option (udpa.api.annotations.versioning).previous_message_type =
+  option (udpa.annotations.versioning).previous_message_type =
       "envoy.service.discovery.v2.HealthCheckRequest";
 
   api.v3alpha.core.Node node = 1;
@@ -98,7 +98,7 @@ message HealthCheckRequest {
 }
 
 message EndpointHealth {
-  option (udpa.api.annotations.versioning).previous_message_type =
+  option (udpa.annotations.versioning).previous_message_type =
       "envoy.service.discovery.v2.EndpointHealth";
 
   api.v3alpha.endpoint.Endpoint endpoint = 1;
@@ -107,14 +107,14 @@ message EndpointHealth {
 }
 
 message EndpointHealthResponse {
-  option (udpa.api.annotations.versioning).previous_message_type =
+  option (udpa.annotations.versioning).previous_message_type =
       "envoy.service.discovery.v2.EndpointHealthResponse";
 
   repeated EndpointHealth endpoints_health = 1;
 }
 
 message HealthCheckRequestOrEndpointHealthResponse {
-  option (udpa.api.annotations.versioning).previous_message_type =
+  option (udpa.annotations.versioning).previous_message_type =
       "envoy.service.discovery.v2.HealthCheckRequestOrEndpointHealthResponse";
 
   oneof request_type {
@@ -125,7 +125,7 @@ message HealthCheckRequestOrEndpointHealthResponse {
 }
 
 message LocalityEndpoints {
-  option (udpa.api.annotations.versioning).previous_message_type =
+  option (udpa.annotations.versioning).previous_message_type =
       "envoy.service.discovery.v2.LocalityEndpoints";
 
   api.v3alpha.core.Locality locality = 1;
@@ -138,7 +138,7 @@ message LocalityEndpoints {
 // Envoy instance (outside of HDS). For maximum usefulness, it should match the
 // same cluster structure as that provided by EDS.
 message ClusterHealthCheck {
-  option (udpa.api.annotations.versioning).previous_message_type =
+  option (udpa.annotations.versioning).previous_message_type =
       "envoy.service.discovery.v2.ClusterHealthCheck";
 
   string cluster_name = 1;
@@ -149,7 +149,7 @@ message ClusterHealthCheck {
 }
 
 message HealthCheckSpecifier {
-  option (udpa.api.annotations.versioning).previous_message_type =
+  option (udpa.annotations.versioning).previous_message_type =
       "envoy.service.discovery.v2.HealthCheckSpecifier";
 
   repeated ClusterHealthCheck cluster_health_checks = 1;

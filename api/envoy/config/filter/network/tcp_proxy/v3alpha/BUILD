@@ -10,6 +10,6 @@ api_proto_package(
         "//envoy/config/filter/accesslog/v3alpha:pkg",
         "//envoy/config/filter/network/tcp_proxy/v2:pkg",
         "//envoy/type/v3alpha:pkg",
-        "@com_github_cncf_udpa//udpa/api/annotations:pkg",
+        "@com_github_cncf_udpa//udpa/annotations:pkg",
     ],
 )

@@ -117,12 +117,8 @@ TEST_P(EnvoyQuicClientStreamTest, PostRequestAndResponse) {
       .WillOnce(Invoke([](const Http::HeaderMapPtr& headers, bool) {
         EXPECT_EQ("200", headers->Status()->value().getStringView());
       }));
-  if (quic_version_.transport_version == quic::QUIC_VERSION_99) {
-    quic_stream_->OnHeadersDecoded(response_headers_);
-  } else {
-    quic_stream_->OnStreamHeaderList(/*fin=*/false, response_headers_.uncompressed_header_bytes(),
-                                     response_headers_);
-  }
+  quic_stream_->OnStreamHeaderList(/*fin=*/false, response_headers_.uncompressed_header_bytes(),
+                                   response_headers_);
   EXPECT_TRUE(quic_stream_->FinishedReadingHeaders());
 
   EXPECT_CALL(stream_decoder_, decodeData(_, _))
@@ -168,12 +164,8 @@ TEST_P(EnvoyQuicClientStreamTest, OutOfOrderTrailers) {
       .WillOnce(Invoke([](const Http::HeaderMapPtr& headers, bool) {
         EXPECT_EQ("200", headers->Status()->value().getStringView());
       }));
-  if (quic_version_.transport_version == quic::QUIC_VERSION_99) {
-    quic_stream_->OnHeadersDecoded(response_headers_);
-  } else {
-    quic_stream_->OnStreamHeaderList(/*fin=*/false, response_headers_.uncompressed_header_bytes(),
-                                     response_headers_);
-  }
+  quic_stream_->OnStreamHeaderList(/*fin=*/false, response_headers_.uncompressed_header_bytes(),
+                                   response_headers_);
   EXPECT_TRUE(quic_stream_->FinishedReadingHeaders());
 
   // Trailer should be delivered to HCM later after body arrives.

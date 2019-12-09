@@ -8,7 +8,7 @@ option java_package = "io.envoyproxy.envoy.config.filter.http.ip_tagging.v3alpha
 
 import "envoy/api/v3alpha/core/address.proto";
 
-import "udpa/api/annotations/versioning.proto";
+import "udpa/annotations/versioning.proto";
 
 import "validate/validate.proto";
 
@@ -17,7 +17,7 @@ import "validate/validate.proto";
 // [#extension: envoy.filters.http.ip_tagging]
 
 message IPTagging {
-  option (udpa.api.annotations.versioning).previous_message_type =
+  option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.http.ip_tagging.v2.IPTagging";
 
   // The type of requests the filter should apply to. The supported types
@@ -39,7 +39,7 @@ message IPTagging {
 
   // Supplies the IP tag name and the IP address subnets.
   message IPTag {
-    option (udpa.api.annotations.versioning).previous_message_type =
+    option (udpa.annotations.versioning).previous_message_type =
         "envoy.config.filter.http.ip_tagging.v2.IPTagging.IPTag";
 
     // Specifies the IP tag name to apply.
