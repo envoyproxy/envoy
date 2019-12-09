@@ -10,7 +10,7 @@ import "envoy/api/v3alpha/core/address.proto";
 
 import "google/protobuf/timestamp.proto";
 
-import "udpa/api/annotations/versioning.proto";
+import "udpa/annotations/versioning.proto";
 
 import "validate/validate.proto";
 
@@ -32,7 +32,7 @@ enum HealthCheckerType {
 
 // [#next-free-field: 10]
 message HealthCheckEvent {
-  option (udpa.api.annotations.versioning).previous_message_type =
+  option (udpa.annotations.versioning).previous_message_type =
       "envoy.data.core.v2alpha.HealthCheckEvent";
 
   HealthCheckerType health_checker_type = 1 [(validate.rules).enum = {defined_only: true}];
@@ -65,7 +65,7 @@ message HealthCheckEvent {
 }
 
 message HealthCheckEjectUnhealthy {
-  option (udpa.api.annotations.versioning).previous_message_type =
+  option (udpa.annotations.versioning).previous_message_type =
       "envoy.data.core.v2alpha.HealthCheckEjectUnhealthy";
 
   // The type of failure that caused this ejection.
@@ -73,7 +73,7 @@ message HealthCheckEjectUnhealthy {
 }
 
 message HealthCheckAddHealthy {
-  option (udpa.api.annotations.versioning).previous_message_type =
+  option (udpa.annotations.versioning).previous_message_type =
       "envoy.data.core.v2alpha.HealthCheckAddHealthy";
 
   // Whether this addition is the result of the first ever health check on a host, in which case
@@ -84,7 +84,7 @@ message HealthCheckAddHealthy {
 }
 
 message HealthCheckFailure {
-  option (udpa.api.annotations.versioning).previous_message_type =
+  option (udpa.annotations.versioning).previous_message_type =
       "envoy.data.core.v2alpha.HealthCheckFailure";
 
   // The type of failure that caused this event.
@@ -95,11 +95,11 @@ message HealthCheckFailure {
 }
 
 message DegradedHealthyHost {
-  option (udpa.api.annotations.versioning).previous_message_type =
+  option (udpa.annotations.versioning).previous_message_type =
       "envoy.data.core.v2alpha.DegradedHealthyHost";
 }
 
 message NoLongerDegradedHost {
-  option (udpa.api.annotations.versioning).previous_message_type =
+  option (udpa.annotations.versioning).previous_message_type =
       "envoy.data.core.v2alpha.NoLongerDegradedHost";
 }

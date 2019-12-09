@@ -10,7 +10,7 @@ import "envoy/config/ratelimit/v3alpha/rls.proto";
 
 import "google/protobuf/duration.proto";
 
-import "udpa/api/annotations/versioning.proto";
+import "udpa/annotations/versioning.proto";
 
 import "validate/validate.proto";
 
@@ -20,7 +20,7 @@ import "validate/validate.proto";
 
 // [#next-free-field: 6]
 message RateLimit {
-  option (udpa.api.annotations.versioning).previous_message_type =
+  option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.thrift.rate_limit.v2alpha1.RateLimit";
 
   // The rate limit domain to use in the rate limit service request.

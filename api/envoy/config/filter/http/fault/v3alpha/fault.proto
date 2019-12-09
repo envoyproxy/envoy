@@ -12,7 +12,7 @@ import "envoy/type/v3alpha/percent.proto";
 
 import "google/protobuf/wrappers.proto";
 
-import "udpa/api/annotations/versioning.proto";
+import "udpa/annotations/versioning.proto";
 
 import "validate/validate.proto";
 
@@ -21,7 +21,7 @@ import "validate/validate.proto";
 // [#extension: envoy.filters.http.fault]
 
 message FaultAbort {
-  option (udpa.api.annotations.versioning).previous_message_type =
+  option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.http.fault.v2.FaultAbort";
 
   reserved 1;
@@ -40,7 +40,7 @@ message FaultAbort {
 
 // [#next-free-field: 14]
 message HTTPFault {
-  option (udpa.api.annotations.versioning).previous_message_type =
+  option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.http.fault.v2.HTTPFault";
 
   // If specified, the filter will inject delays based on the values in the

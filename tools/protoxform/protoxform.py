@@ -203,14 +203,14 @@ def FormatHeaderFromFile(source_code_info, file_proto):
       google_imports.append(d)
     elif d.startswith('validate/'):
       infra_imports.append(d)
-    elif d in ['udpa/api/annotations/versioning.proto']:
+    elif d in ['udpa/annotations/versioning.proto']:
       # Skip, we decide to add this based on requires_versioning_import
       pass
     else:
       misc_imports.append(d)
 
   if requires_versioning_import:
-    misc_imports.append('udpa/api/annotations/versioning.proto')
+    misc_imports.append('udpa/annotations/versioning.proto')
 
   def FormatImportBlock(xs):
     if not xs:

@@ -11,7 +11,7 @@ import "envoy/api/v3alpha/core/base.proto";
 import "google/protobuf/any.proto";
 import "google/rpc/status.proto";
 
-import "udpa/api/annotations/versioning.proto";
+import "udpa/annotations/versioning.proto";
 
 // [#protodoc-title: Common discovery API components]
 
@@ -19,7 +19,7 @@ import "udpa/api/annotations/versioning.proto";
 // a given Envoy node on some API.
 // [#next-free-field: 7]
 message DiscoveryRequest {
-  option (udpa.api.annotations.versioning).previous_message_type = "envoy.api.v2.DiscoveryRequest";
+  option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.DiscoveryRequest";
 
   // The version_info provided in the request messages will be the version_info
   // received with the most recent successfully processed response or empty on
@@ -64,7 +64,7 @@ message DiscoveryRequest {
 
 // [#next-free-field: 7]
 message DiscoveryResponse {
-  option (udpa.api.annotations.versioning).previous_message_type = "envoy.api.v2.DiscoveryResponse";
+  option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.DiscoveryResponse";
 
   // The version of the response data.
   string version_info = 1;
@@ -141,8 +141,7 @@ message DiscoveryResponse {
 // initial_resource_versions.
 // [#next-free-field: 8]
 message DeltaDiscoveryRequest {
-  option (udpa.api.annotations.versioning).previous_message_type =
-      "envoy.api.v2.DeltaDiscoveryRequest";
+  option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.DeltaDiscoveryRequest";
 
   // The node making the request.
   core.Node node = 1;
@@ -201,7 +200,7 @@ message DeltaDiscoveryRequest {
 
 // [#next-free-field: 7]
 message DeltaDiscoveryResponse {
-  option (udpa.api.annotations.versioning).previous_message_type =
+  option (udpa.annotations.versioning).previous_message_type =
       "envoy.api.v2.DeltaDiscoveryResponse";
 
   // The version of the response data (used for debugging).
@@ -227,7 +226,7 @@ message DeltaDiscoveryResponse {
 }
 
 message Resource {
-  option (udpa.api.annotations.versioning).previous_message_type = "envoy.api.v2.Resource";
+  option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.Resource";
 
   // The resource's name, to distinguish it from others of the same type of resource.
   string name = 3;

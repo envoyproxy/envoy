@@ -10,7 +10,7 @@ import "envoy/type/v3alpha/percent.proto";
 
 import "google/protobuf/duration.proto";
 
-import "udpa/api/annotations/versioning.proto";
+import "udpa/annotations/versioning.proto";
 
 import "validate/validate.proto";
 
@@ -20,7 +20,7 @@ import "validate/validate.proto";
 // HTTP/gRPC/Mongo/Redis operation or delay proxying of TCP connections.
 // [#next-free-field: 6]
 message FaultDelay {
-  option (udpa.api.annotations.versioning).previous_message_type =
+  option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.fault.v2.FaultDelay";
 
   enum FaultDelayType {
@@ -32,7 +32,7 @@ message FaultDelay {
   // :ref:`http fault filter <config_http_filters_fault_injection_http_header>` documentation for
   // more information.
   message HeaderDelay {
-    option (udpa.api.annotations.versioning).previous_message_type =
+    option (udpa.annotations.versioning).previous_message_type =
         "envoy.config.filter.fault.v2.FaultDelay.HeaderDelay";
   }
 
@@ -61,12 +61,12 @@ message FaultDelay {
 
 // Describes a rate limit to be applied.
 message FaultRateLimit {
-  option (udpa.api.annotations.versioning).previous_message_type =
+  option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.fault.v2.FaultRateLimit";
 
   // Describes a fixed/constant rate limit.
   message FixedLimit {
-    option (udpa.api.annotations.versioning).previous_message_type =
+    option (udpa.annotations.versioning).previous_message_type =
         "envoy.config.filter.fault.v2.FaultRateLimit.FixedLimit";
 
     // The limit supplied in KiB/s.
@@ -77,7 +77,7 @@ message FaultRateLimit {
   // :ref:`http fault filter <config_http_filters_fault_injection_http_header>` documentation for
   // more information.
   message HeaderLimit {
-    option (udpa.api.annotations.versioning).previous_message_type =
+    option (udpa.annotations.versioning).previous_message_type =
         "envoy.config.filter.fault.v2.FaultRateLimit.HeaderLimit";
   }
 

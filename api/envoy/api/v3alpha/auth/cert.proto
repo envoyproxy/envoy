@@ -13,15 +13,14 @@ import "google/protobuf/any.proto";
 import "google/protobuf/struct.proto";
 import "google/protobuf/wrappers.proto";
 
-import "udpa/api/annotations/versioning.proto";
+import "udpa/annotations/versioning.proto";
 
 import "validate/validate.proto";
 
 // [#protodoc-title: Common TLS configuration]
 
 message TlsParameters {
-  option (udpa.api.annotations.versioning).previous_message_type =
-      "envoy.api.v2.auth.TlsParameters";
+  option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.auth.TlsParameters";
 
   enum TlsProtocol {
     // Envoy will choose the optimal TLS version.
@@ -110,7 +109,7 @@ message TlsParameters {
 // (potentially asynchronous) signing and decryption operations. Some use cases for private key
 // methods would be TPM support and TLS acceleration.
 message PrivateKeyProvider {
-  option (udpa.api.annotations.versioning).previous_message_type =
+  option (udpa.annotations.versioning).previous_message_type =
       "envoy.api.v2.auth.PrivateKeyProvider";
 
   reserved 2;
@@ -129,8 +128,7 @@ message PrivateKeyProvider {
 
 // [#next-free-field: 7]
 message TlsCertificate {
-  option (udpa.api.annotations.versioning).previous_message_type =
-      "envoy.api.v2.auth.TlsCertificate";
+  option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.auth.TlsCertificate";
 
   // The TLS certificate chain.
   core.DataSource certificate_chain = 1;
@@ -159,7 +157,7 @@ message TlsCertificate {
 }
 
 message TlsSessionTicketKeys {
-  option (udpa.api.annotations.versioning).previous_message_type =
+  option (udpa.annotations.versioning).previous_message_type =
       "envoy.api.v2.auth.TlsSessionTicketKeys";
 
   // Keys for encrypting and decrypting TLS session tickets. The
@@ -191,7 +189,7 @@ message TlsSessionTicketKeys {
 
 // [#next-free-field: 9]
 message CertificateValidationContext {
-  option (udpa.api.annotations.versioning).previous_message_type =
+  option (udpa.annotations.versioning).previous_message_type =
       "envoy.api.v2.auth.CertificateValidationContext";
 
   // TLS certificate data containing certificate authority certificates to use in verifying
@@ -309,11 +307,10 @@ message CertificateValidationContext {
 // TLS context shared by both client and server TLS contexts.
 // [#next-free-field: 9]
 message CommonTlsContext {
-  option (udpa.api.annotations.versioning).previous_message_type =
-      "envoy.api.v2.auth.CommonTlsContext";
+  option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.auth.CommonTlsContext";
 
   message CombinedCertificateValidationContext {
-    option (udpa.api.annotations.versioning).previous_message_type =
+    option (udpa.annotations.versioning).previous_message_type =
         "envoy.api.v2.auth.CommonTlsContext.CombinedCertificateValidationContext";
 
     // How to validate peer certificates.
@@ -373,7 +370,7 @@ message CommonTlsContext {
 }
 
 message UpstreamTlsContext {
-  option (udpa.api.annotations.versioning).previous_message_type =
+  option (udpa.annotations.versioning).previous_message_type =
       "envoy.api.v2.auth.UpstreamTlsContext";
 
   // Common TLS context settings.
@@ -404,7 +401,7 @@ message UpstreamTlsContext {
 
 // [#next-free-field: 6]
 message DownstreamTlsContext {
-  option (udpa.api.annotations.versioning).previous_message_type =
+  option (udpa.annotations.versioning).previous_message_type =
       "envoy.api.v2.auth.DownstreamTlsContext";
 
   // Common TLS context settings.
@@ -428,8 +425,7 @@ message DownstreamTlsContext {
 }
 
 message SdsSecretConfig {
-  option (udpa.api.annotations.versioning).previous_message_type =
-      "envoy.api.v2.auth.SdsSecretConfig";
+  option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.auth.SdsSecretConfig";
 
   // Name (FQDN, UUID, SPKI, SHA256, etc.) by which the secret can be uniquely referred to.
   // When both name and config are specified, then secret can be fetched and/or reloaded via SDS.
@@ -441,7 +437,7 @@ message SdsSecretConfig {
 }
 
 message Secret {
-  option (udpa.api.annotations.versioning).previous_message_type = "envoy.api.v2.auth.Secret";
+  option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.auth.Secret";
 
   // Name (FQDN, UUID, SPKI, SHA256, etc.) by which the secret can be uniquely referred to.
   string name = 1;

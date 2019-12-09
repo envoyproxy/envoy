@@ -10,7 +10,7 @@ option java_generic_services = true;
 import "envoy/api/v3alpha/core/base.proto";
 import "envoy/api/v3alpha/ratelimit/ratelimit.proto";
 
-import "udpa/api/annotations/versioning.proto";
+import "udpa/annotations/versioning.proto";
 
 import "validate/validate.proto";
 
@@ -30,7 +30,7 @@ service RateLimitService {
 // of them are over limit. This enables more complex application level rate limiting scenarios
 // if desired.
 message RateLimitRequest {
-  option (udpa.api.annotations.versioning).previous_message_type =
+  option (udpa.annotations.versioning).previous_message_type =
       "envoy.service.ratelimit.v2.RateLimitRequest";
 
   // All rate limit requests must specify a domain. This enables the configuration to be per
@@ -49,7 +49,7 @@ message RateLimitRequest {
 
 // A response from a ShouldRateLimit call.
 message RateLimitResponse {
-  option (udpa.api.annotations.versioning).previous_message_type =
+  option (udpa.annotations.versioning).previous_message_type =
       "envoy.service.ratelimit.v2.RateLimitResponse";
 
   enum Code {
@@ -65,7 +65,7 @@ message RateLimitResponse {
 
   // Defines an actual rate limit in terms of requests per unit of time and the unit itself.
   message RateLimit {
-    option (udpa.api.annotations.versioning).previous_message_type =
+    option (udpa.annotations.versioning).previous_message_type =
         "envoy.service.ratelimit.v2.RateLimitResponse.RateLimit";
 
     enum Unit {
@@ -93,7 +93,7 @@ message RateLimitResponse {
   }
 
   message DescriptorStatus {
-    option (udpa.api.annotations.versioning).previous_message_type =
+    option (udpa.annotations.versioning).previous_message_type =
         "envoy.service.ratelimit.v2.RateLimitResponse.DescriptorStatus";
 
     // The response code for an individual descriptor.

@@ -14,7 +14,7 @@ import "envoy/type/v3alpha/hash_policy.proto";
 import "google/protobuf/duration.proto";
 import "google/protobuf/wrappers.proto";
 
-import "udpa/api/annotations/versioning.proto";
+import "udpa/annotations/versioning.proto";
 
 import "validate/validate.proto";
 
@@ -24,18 +24,18 @@ import "validate/validate.proto";
 
 // [#next-free-field: 12]
 message TcpProxy {
-  option (udpa.api.annotations.versioning).previous_message_type =
+  option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.network.tcp_proxy.v2.TcpProxy";
 
   // Allows for specification of multiple upstream clusters along with weights
   // that indicate the percentage of traffic to be forwarded to each cluster.
   // The router selects an upstream cluster based on these weights.
   message WeightedCluster {
-    option (udpa.api.annotations.versioning).previous_message_type =
+    option (udpa.annotations.versioning).previous_message_type =
         "envoy.config.filter.network.tcp_proxy.v2.TcpProxy.WeightedCluster";
 
     message ClusterWeight {
-      option (udpa.api.annotations.versioning).previous_message_type =
+      option (udpa.annotations.versioning).previous_message_type =
           "envoy.config.filter.network.tcp_proxy.v2.TcpProxy.WeightedCluster.ClusterWeight";
 
       // Name of the upstream cluster.

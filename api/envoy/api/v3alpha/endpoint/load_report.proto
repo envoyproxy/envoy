@@ -12,7 +12,7 @@ import "envoy/api/v3alpha/core/base.proto";
 import "google/protobuf/duration.proto";
 import "google/protobuf/struct.proto";
 
-import "udpa/api/annotations/versioning.proto";
+import "udpa/annotations/versioning.proto";
 
 import "validate/validate.proto";
 
@@ -23,7 +23,7 @@ import "validate/validate.proto";
 // [#not-implemented-hide:] Not configuration. TBD how to doc proto APIs.
 // [#next-free-field: 9]
 message UpstreamLocalityStats {
-  option (udpa.api.annotations.versioning).previous_message_type =
+  option (udpa.annotations.versioning).previous_message_type =
       "envoy.api.v2.endpoint.UpstreamLocalityStats";
 
   // Name of zone, region and optionally endpoint group these metrics were
@@ -62,7 +62,7 @@ message UpstreamLocalityStats {
 // [#not-implemented-hide:] Not configuration. TBD how to doc proto APIs.
 // [#next-free-field: 8]
 message UpstreamEndpointStats {
-  option (udpa.api.annotations.versioning).previous_message_type =
+  option (udpa.annotations.versioning).previous_message_type =
       "envoy.api.v2.endpoint.UpstreamEndpointStats";
 
   // Upstream host address.
@@ -104,7 +104,7 @@ message UpstreamEndpointStats {
 
 // [#not-implemented-hide:] Not configuration. TBD how to doc proto APIs.
 message EndpointLoadMetricStats {
-  option (udpa.api.annotations.versioning).previous_message_type =
+  option (udpa.annotations.versioning).previous_message_type =
       "envoy.api.v2.endpoint.EndpointLoadMetricStats";
 
   // Name of the metric; may be empty.
@@ -124,11 +124,10 @@ message EndpointLoadMetricStats {
 // Next ID: 7
 // [#next-free-field: 7]
 message ClusterStats {
-  option (udpa.api.annotations.versioning).previous_message_type =
-      "envoy.api.v2.endpoint.ClusterStats";
+  option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.endpoint.ClusterStats";
 
   message DroppedRequests {
-    option (udpa.api.annotations.versioning).previous_message_type =
+    option (udpa.annotations.versioning).previous_message_type =
         "envoy.api.v2.endpoint.ClusterStats.DroppedRequests";
 
     // Identifier for the policy specifying the drop.

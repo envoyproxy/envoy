@@ -13,7 +13,7 @@ import "google/protobuf/any.proto";
 import "google/protobuf/struct.proto";
 import "google/protobuf/wrappers.proto";
 
-import "udpa/api/annotations/versioning.proto";
+import "udpa/annotations/versioning.proto";
 
 import "validate/validate.proto";
 
@@ -21,7 +21,7 @@ import "validate/validate.proto";
 // Listener :ref:`configuration overview <config_listeners>`
 
 message Filter {
-  option (udpa.api.annotations.versioning).previous_message_type = "envoy.api.v2.listener.Filter";
+  option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.listener.Filter";
 
   reserved 3, 2;
 
@@ -68,7 +68,7 @@ message Filter {
 // [#comment:TODO(PiotrSikora): Add support for configurable precedence of the rules]
 // [#next-free-field: 13]
 message FilterChainMatch {
-  option (udpa.api.annotations.versioning).previous_message_type =
+  option (udpa.annotations.versioning).previous_message_type =
       "envoy.api.v2.listener.FilterChainMatch";
 
   enum ConnectionSourceType {
@@ -167,8 +167,7 @@ message FilterChainMatch {
 // various other parameters.
 // [#next-free-field: 8]
 message FilterChain {
-  option (udpa.api.annotations.versioning).previous_message_type =
-      "envoy.api.v2.listener.FilterChain";
+  option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.listener.FilterChain";
 
   reserved 2;
 
@@ -208,7 +207,7 @@ message FilterChain {
 }
 
 message ListenerFilter {
-  option (udpa.api.annotations.versioning).previous_message_type =
+  option (udpa.annotations.versioning).previous_message_type =
       "envoy.api.v2.listener.ListenerFilter";
 
   reserved 2;

@@ -10,7 +10,7 @@ option java_generic_services = true;
 import "envoy/api/v3alpha/core/base.proto";
 
 import "metrics.proto";
-import "udpa/api/annotations/versioning.proto";
+import "udpa/annotations/versioning.proto";
 
 import "validate/validate.proto";
 
@@ -24,16 +24,16 @@ service MetricsService {
 }
 
 message StreamMetricsResponse {
-  option (udpa.api.annotations.versioning).previous_message_type =
+  option (udpa.annotations.versioning).previous_message_type =
       "envoy.service.metrics.v2.StreamMetricsResponse";
 }
 
 message StreamMetricsMessage {
-  option (udpa.api.annotations.versioning).previous_message_type =
+  option (udpa.annotations.versioning).previous_message_type =
       "envoy.service.metrics.v2.StreamMetricsMessage";
 
   message Identifier {
-    option (udpa.api.annotations.versioning).previous_message_type =
+    option (udpa.annotations.versioning).previous_message_type =
         "envoy.service.metrics.v2.StreamMetricsMessage.Identifier";
 
     // The node sending metrics over the stream.

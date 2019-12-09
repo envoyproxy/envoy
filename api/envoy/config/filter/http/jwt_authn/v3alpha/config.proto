@@ -13,7 +13,7 @@ import "envoy/api/v3alpha/route/route.proto";
 import "google/protobuf/duration.proto";
 import "google/protobuf/empty.proto";
 
-import "udpa/api/annotations/versioning.proto";
+import "udpa/annotations/versioning.proto";
 
 import "validate/validate.proto";
 
@@ -52,7 +52,7 @@ import "validate/validate.proto";
 //
 // [#next-free-field: 10]
 message JwtProvider {
-  option (udpa.api.annotations.versioning).previous_message_type =
+  option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.http.jwt_authn.v2alpha.JwtProvider";
 
   // Specify the `principal <https://tools.ietf.org/html/rfc7519#section-4.1.1>`_ that issued
@@ -193,7 +193,7 @@ message JwtProvider {
 
 // This message specifies how to fetch JWKS from remote and how to cache it.
 message RemoteJwks {
-  option (udpa.api.annotations.versioning).previous_message_type =
+  option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.http.jwt_authn.v2alpha.RemoteJwks";
 
   // The HTTP URI to fetch the JWKS. For example:
@@ -213,7 +213,7 @@ message RemoteJwks {
 
 // This message specifies a header location to extract JWT token.
 message JwtHeader {
-  option (udpa.api.annotations.versioning).previous_message_type =
+  option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.http.jwt_authn.v2alpha.JwtHeader";
 
   // The HTTP header name.
@@ -227,7 +227,7 @@ message JwtHeader {
 
 // Specify a required provider with audiences.
 message ProviderWithAudiences {
-  option (udpa.api.annotations.versioning).previous_message_type =
+  option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.http.jwt_authn.v2alpha.ProviderWithAudiences";
 
   // Specify a required provider name.
@@ -279,7 +279,7 @@ message ProviderWithAudiences {
 //
 // [#next-free-field: 6]
 message JwtRequirement {
-  option (udpa.api.annotations.versioning).previous_message_type =
+  option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.http.jwt_authn.v2alpha.JwtRequirement";
 
   oneof requires_type {
@@ -308,7 +308,7 @@ message JwtRequirement {
 // This message specifies a list of RequiredProvider.
 // Their results are OR-ed; if any one of them passes, the result is passed
 message JwtRequirementOrList {
-  option (udpa.api.annotations.versioning).previous_message_type =
+  option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.http.jwt_authn.v2alpha.JwtRequirementOrList";
 
   // Specify a list of JwtRequirement.
@@ -318,7 +318,7 @@ message JwtRequirementOrList {
 // This message specifies a list of RequiredProvider.
 // Their results are AND-ed; all of them must pass, if one of them fails or missing, it fails.
 message JwtRequirementAndList {
-  option (udpa.api.annotations.versioning).previous_message_type =
+  option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.http.jwt_authn.v2alpha.JwtRequirementAndList";
 
   // Specify a list of JwtRequirement.
@@ -347,7 +347,7 @@ message JwtRequirementAndList {
 // In above example, all requests matched the path prefix require jwt authentication
 // from "provider-A".
 message RequirementRule {
-  option (udpa.api.annotations.versioning).previous_message_type =
+  option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.http.jwt_authn.v2alpha.RequirementRule";
 
   // The route matching parameter. Only when the match is satisfied, the "requires" field will
@@ -384,7 +384,7 @@ message RequirementRule {
 // If a filter set "jwt_selector" with "issuer_1" to FilterState for a request,
 // jwt_authn filter will use JwtRequirement{"provider_name": "issuer1"} to verify.
 message FilterStateRule {
-  option (udpa.api.annotations.versioning).previous_message_type =
+  option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.http.jwt_authn.v2alpha.FilterStateRule";
 
   // The filter state name to retrieve the `Router::StringAccessor` object.
@@ -437,7 +437,7 @@ message FilterStateRule {
 //              - provider_name: provider2
 //
 message JwtAuthentication {
-  option (udpa.api.annotations.versioning).previous_message_type =
+  option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.http.jwt_authn.v2alpha.JwtAuthentication";
 
   // Map of provider names to JwtProviders.

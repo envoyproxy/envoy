@@ -11,14 +11,14 @@ import "envoy/api/v3alpha/core/address.proto";
 import "envoy/api/v3alpha/core/health_check.proto";
 import "envoy/type/v3alpha/percent.proto";
 
-import "udpa/api/annotations/versioning.proto";
+import "udpa/annotations/versioning.proto";
 
 // [#protodoc-title: Clusters]
 
 // Admin endpoint uses this wrapper for `/clusters` to display cluster status information.
 // See :ref:`/clusters <operations_admin_interface_clusters>` for more information.
 message Clusters {
-  option (udpa.api.annotations.versioning).previous_message_type = "envoy.admin.v2alpha.Clusters";
+  option (udpa.annotations.versioning).previous_message_type = "envoy.admin.v2alpha.Clusters";
 
   // Mapping from cluster name to each cluster's status.
   repeated ClusterStatus cluster_statuses = 1;
@@ -27,8 +27,7 @@ message Clusters {
 // Details an individual cluster's current status.
 // [#next-free-field: 6]
 message ClusterStatus {
-  option (udpa.api.annotations.versioning).previous_message_type =
-      "envoy.admin.v2alpha.ClusterStatus";
+  option (udpa.annotations.versioning).previous_message_type = "envoy.admin.v2alpha.ClusterStatus";
 
   // Name of the cluster.
   string name = 1;
@@ -79,7 +78,7 @@ message ClusterStatus {
 // Current state of a particular host.
 // [#next-free-field: 9]
 message HostStatus {
-  option (udpa.api.annotations.versioning).previous_message_type = "envoy.admin.v2alpha.HostStatus";
+  option (udpa.annotations.versioning).previous_message_type = "envoy.admin.v2alpha.HostStatus";
 
   // Address of this host.
   api.v3alpha.core.Address address = 1;
@@ -132,7 +131,7 @@ message HostStatus {
 // Health status for a host.
 // [#next-free-field: 7]
 message HostHealthStatus {
-  option (udpa.api.annotations.versioning).previous_message_type =
+  option (udpa.annotations.versioning).previous_message_type =
       "envoy.admin.v2alpha.HostHealthStatus";
 
   // The host is currently failing active health checks.

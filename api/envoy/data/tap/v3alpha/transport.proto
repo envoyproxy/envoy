@@ -11,7 +11,7 @@ import "envoy/data/tap/v3alpha/common.proto";
 
 import "google/protobuf/timestamp.proto";
 
-import "udpa/api/annotations/versioning.proto";
+import "udpa/annotations/versioning.proto";
 
 // [#protodoc-title: Transport tap data]
 // Trace format for the tap transport socket extension. This dumps plain text read/write
@@ -19,8 +19,7 @@ import "udpa/api/annotations/versioning.proto";
 
 // Connection properties.
 message Connection {
-  option (udpa.api.annotations.versioning).previous_message_type =
-      "envoy.data.tap.v2alpha.Connection";
+  option (udpa.annotations.versioning).previous_message_type = "envoy.data.tap.v2alpha.Connection";
 
   // Local address.
   api.v3alpha.core.Address local_address = 2;
@@ -31,14 +30,13 @@ message Connection {
 
 // Event in a socket trace.
 message SocketEvent {
-  option (udpa.api.annotations.versioning).previous_message_type =
-      "envoy.data.tap.v2alpha.SocketEvent";
+  option (udpa.annotations.versioning).previous_message_type = "envoy.data.tap.v2alpha.SocketEvent";
 
   // Data read by Envoy from the transport socket.
   message Read {
     // TODO(htuch): Half-close for reads.
 
-    option (udpa.api.annotations.versioning).previous_message_type =
+    option (udpa.annotations.versioning).previous_message_type =
         "envoy.data.tap.v2alpha.SocketEvent.Read";
 
     // Binary data read.
@@ -47,7 +45,7 @@ message SocketEvent {
 
   // Data written by Envoy to the transport socket.
   message Write {
-    option (udpa.api.annotations.versioning).previous_message_type =
+    option (udpa.annotations.versioning).previous_message_type =
         "envoy.data.tap.v2alpha.SocketEvent.Write";
 
     // Binary data written.
@@ -61,7 +59,7 @@ message SocketEvent {
   message Closed {
     // TODO(mattklein123): Close event type.
 
-    option (udpa.api.annotations.versioning).previous_message_type =
+    option (udpa.annotations.versioning).previous_message_type =
         "envoy.data.tap.v2alpha.SocketEvent.Closed";
   }
 
@@ -81,7 +79,7 @@ message SocketEvent {
 // Sequence of read/write events that constitute a buffered trace on a socket.
 // [#next-free-field: 6]
 message SocketBufferedTrace {
-  option (udpa.api.annotations.versioning).previous_message_type =
+  option (udpa.annotations.versioning).previous_message_type =
       "envoy.data.tap.v2alpha.SocketBufferedTrace";
 
   // Trace ID unique to the originating Envoy only. Trace IDs can repeat and should not be used
@@ -105,7 +103,7 @@ message SocketBufferedTrace {
 
 // A streamed socket trace segment. Multiple segments make up a full trace.
 message SocketStreamedTraceSegment {
-  option (udpa.api.annotations.versioning).previous_message_type =
+  option (udpa.annotations.versioning).previous_message_type =
       "envoy.data.tap.v2alpha.SocketStreamedTraceSegment";
 
   // Trace ID unique to the originating Envoy only. Trace IDs can repeat and should not be used

@@ -13,7 +13,7 @@ import "google/protobuf/any.proto";
 import "google/protobuf/struct.proto";
 import "google/protobuf/wrappers.proto";
 
-import "udpa/api/annotations/versioning.proto";
+import "udpa/annotations/versioning.proto";
 
 import "validate/validate.proto";
 
@@ -59,7 +59,7 @@ enum TrafficDirection {
 
 // Identifies location of where either Envoy runs or where upstream hosts run.
 message Locality {
-  option (udpa.api.annotations.versioning).previous_message_type = "envoy.api.v2.core.Locality";
+  option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.core.Locality";
 
   // Region this :ref:`zone <envoy_api_field_api.v3alpha.core.Locality.zone>` belongs to.
   string region = 1;
@@ -86,7 +86,7 @@ message Locality {
 // configuration for serving.
 // [#next-free-field: 6]
 message Node {
-  option (udpa.api.annotations.versioning).previous_message_type = "envoy.api.v2.core.Node";
+  option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.core.Node";
 
   // An opaque node identifier for the Envoy node. This also provides the local
   // service node name. It should be set if any of the following features are
@@ -145,7 +145,7 @@ message Node {
 //   (x-envoy-upstream-canary) and for stats purposes.
 // [#next-major-version: move to type/metadata/v2]
 message Metadata {
-  option (udpa.api.annotations.versioning).previous_message_type = "envoy.api.v2.core.Metadata";
+  option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.core.Metadata";
 
   // Key is the reverse DNS filter name, e.g. com.acme.widget. The envoy.*
   // namespace is reserved for Envoy's built-in filters.
@@ -154,8 +154,7 @@ message Metadata {
 
 // Runtime derived uint32 with a default when not specified.
 message RuntimeUInt32 {
-  option (udpa.api.annotations.versioning).previous_message_type =
-      "envoy.api.v2.core.RuntimeUInt32";
+  option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.core.RuntimeUInt32";
 
   // Default value if runtime value is not available.
   uint32 default_value = 2;
@@ -166,7 +165,7 @@ message RuntimeUInt32 {
 
 // Runtime derived bool with a default when not specified.
 message RuntimeFeatureFlag {
-  option (udpa.api.annotations.versioning).previous_message_type =
+  option (udpa.annotations.versioning).previous_message_type =
       "envoy.api.v2.core.RuntimeFeatureFlag";
 
   // Default value if runtime value is not available.
@@ -180,7 +179,7 @@ message RuntimeFeatureFlag {
 
 // Header name/value pair.
 message HeaderValue {
-  option (udpa.api.annotations.versioning).previous_message_type = "envoy.api.v2.core.HeaderValue";
+  option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.core.HeaderValue";
 
   // Header name.
   string key = 1 [(validate.rules).string = {min_bytes: 1 max_bytes: 16384}];
@@ -195,7 +194,7 @@ message HeaderValue {
 
 // Header name/value pair plus option to control append behavior.
 message HeaderValueOption {
-  option (udpa.api.annotations.versioning).previous_message_type =
+  option (udpa.annotations.versioning).previous_message_type =
       "envoy.api.v2.core.HeaderValueOption";
 
   // Header name/value pair that this option applies to.
@@ -208,14 +207,14 @@ message HeaderValueOption {
 
 // Wrapper for a set of headers.
 message HeaderMap {
-  option (udpa.api.annotations.versioning).previous_message_type = "envoy.api.v2.core.HeaderMap";
+  option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.core.HeaderMap";
 
   repeated HeaderValue headers = 1;
 }
 
 // Data source consisting of either a file or an inline value.
 message DataSource {
-  option (udpa.api.annotations.versioning).previous_message_type = "envoy.api.v2.core.DataSource";
+  option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.core.DataSource";
 
   oneof specifier {
     option (validate.required) = true;
@@ -233,8 +232,7 @@ message DataSource {
 
 // The message specifies how to fetch data from remote and how to verify it.
 message RemoteDataSource {
-  option (udpa.api.annotations.versioning).previous_message_type =
-      "envoy.api.v2.core.RemoteDataSource";
+  option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.core.RemoteDataSource";
 
   // The HTTP URI to fetch the remote data.
   HttpUri http_uri = 1 [(validate.rules).message = {required: true}];
@@ -245,8 +243,7 @@ message RemoteDataSource {
 
 // Async data source which support async data fetch.
 message AsyncDataSource {
-  option (udpa.api.annotations.versioning).previous_message_type =
-      "envoy.api.v2.core.AsyncDataSource";
+  option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.core.AsyncDataSource";
 
   oneof specifier {
     option (validate.required) = true;
@@ -264,8 +261,7 @@ message AsyncDataSource {
 // empty, a default transport socket implementation and configuration will be
 // chosen based on the platform and existence of tls_context.
 message TransportSocket {
-  option (udpa.api.annotations.versioning).previous_message_type =
-      "envoy.api.v2.core.TransportSocket";
+  option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.core.TransportSocket";
 
   reserved 2;
 
@@ -286,7 +282,7 @@ message TransportSocket {
 // might not exist in upstream kernels or precompiled Envoy binaries.
 // [#next-free-field: 7]
 message SocketOption {
-  option (udpa.api.annotations.versioning).previous_message_type = "envoy.api.v2.core.SocketOption";
+  option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.core.SocketOption";
 
   enum SocketState {
     // Socket options are applied after socket creation but before binding the socket to a port
@@ -335,7 +331,7 @@ message SocketOption {
 //   integral percentage out of 100. For instance, a runtime key lookup returning the value "42"
 //   would parse as a `FractionalPercent` whose numerator is 42 and denominator is HUNDRED.
 message RuntimeFractionalPercent {
-  option (udpa.api.annotations.versioning).previous_message_type =
+  option (udpa.annotations.versioning).previous_message_type =
       "envoy.api.v2.core.RuntimeFractionalPercent";
 
   // Default value if the runtime value's for the numerator/denominator keys are not available.
@@ -347,7 +343,7 @@ message RuntimeFractionalPercent {
 
 // Identifies a specific ControlPlane instance that Envoy is connected to.
 message ControlPlane {
-  option (udpa.api.annotations.versioning).previous_message_type = "envoy.api.v2.core.ControlPlane";
+  option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.core.ControlPlane";
 
   // An opaque control plane identifier that uniquely identifies an instance
   // of control plane. This can be used to identify which control plane instance,
