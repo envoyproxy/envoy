@@ -5,7 +5,7 @@ import shutil
 import socket
 import subprocess
 import tempfile
-from threading import Thread
+from threading import Thread, Semaphore
 import time
 import unittest
 
@@ -43,12 +43,21 @@ class KafkaBrokerIntegrationTest(unittest.TestCase):
     # We want to check if our services are okay after running any test.
     KafkaBrokerIntegrationTest.services.check_state()
 
+  @classmethod
+  def kafka_address(cls):
+    return '127.0.0.1:%s' % KafkaBrokerIntegrationTest.services.kafka_envoy_port
+
+  @classmethod
+  def envoy_stats_address(cls):
+    return 'http://127.0.0.1:%s/stats' % KafkaBrokerIntegrationTest.services.envoy_monitoring_port
+
   def test_kafka_consumer_with_no_messages_received(self):
     """
     This test verifies that consumer sends fetches correctly, and receives nothing.
     """
 
-    consumer = KafkaConsumer(bootstrap_servers='127.0.0.1:19092', fetch_max_wait_ms=500)
+    consumer = KafkaConsumer(bootstrap_servers=KafkaBrokerIntegrationTest.kafka_address(),
+                             fetch_max_wait_ms=500)
     consumer.assign([TopicPartition('test_kafka_consumer_with_no_messages_received', 0)])
     for _ in range(10):
       records = consumer.poll(timeout_ms=1000)
@@ -71,7 +80,7 @@ class KafkaBrokerIntegrationTest(unittest.TestCase):
     messages_to_send = 100
     partition = TopicPartition('test_kafka_producer_and_consumer', 0)
 
-    producer = KafkaProducer(bootstrap_servers='127.0.0.1:19092')
+    producer = KafkaProducer(bootstrap_servers=KafkaBrokerIntegrationTest.kafka_address())
     for _ in range(messages_to_send):
       future = producer.send(value=b'some_message_bytes',
                              topic=partition.topic,
@@ -79,7 +88,7 @@ class KafkaBrokerIntegrationTest(unittest.TestCase):
       send_status = future.get()
       self.assertTrue(send_status.offset >= 0)
 
-    consumer = KafkaConsumer(bootstrap_servers='127.0.0.1:19092',
+    consumer = KafkaConsumer(bootstrap_servers=KafkaBrokerIntegrationTest.kafka_address(),
                              auto_offset_reset='earliest',
                              fetch_max_bytes=100)
     consumer.assign([partition])
@@ -106,7 +115,7 @@ class KafkaBrokerIntegrationTest(unittest.TestCase):
     consumer_count = 10
     consumers = []
     for id in range(consumer_count):
-      consumer = KafkaConsumer(bootstrap_servers='127.0.0.1:19092',
+      consumer = KafkaConsumer(bootstrap_servers=KafkaBrokerIntegrationTest.kafka_address(),
                                group_id='test',
                                client_id='test-%s' % id)
       consumer.subscribe(['test_consumer_with_consumer_groups'])
@@ -147,7 +156,7 @@ class KafkaBrokerIntegrationTest(unittest.TestCase):
     This test verifies that Kafka Admin Client can still be used to manage Kafka.
     """
 
-    admin_client = KafkaAdminClient(bootstrap_servers='127.0.0.1:19092')
+    admin_client = KafkaAdminClient(bootstrap_servers=KafkaBrokerIntegrationTest.kafka_address())
 
     # Create a topic with 3 partitions.
     new_topic_spec = NewTopic(name='test_admin_client', num_partitions=3, replication_factor=1)
@@ -218,7 +227,7 @@ class MetricsHolder:
     Grab request/response metrics from envoy's stats interface.
     """
 
-    stats_url = 'http://127.0.0.1:9901/stats'
+    stats_url = KafkaBrokerIntegrationTest.envoy_stats_address()
     requests = {}
     responses = {}
     with urllib.request.urlopen(stats_url) as remote_metrics_url:
@@ -244,9 +253,26 @@ class ServicesHolder:
 
   def __init__(self):
     self.kafka_tmp_dir = None
-    self.envoy_handle = None
-    self.zookeeper_handle = None
-    self.kafka_handle = None
+
+    self.envoy_worker = None
+    self.zookeeper_worker = None
+    self.kafka_worker = None
+
+  @staticmethod
+  def get_random_listener_port():
+    """
+    Here we count on OS to give us some random socket.
+    Obviously this method will need to be invoked in a try loop anyways, as in degenerate scenario
+    someone else might have bound to it after we had closed the socket and before the service
+    that's supposed to use it binds to it.
+    """
+
+    import socket
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as server_socket:
+      server_socket.bind(('0.0.0.0', 0))
+      socket_port = server_socket.getsockname()[1]
+      print('returning %s' % socket_port)
+      return socket_port
 
   def start(self):
     """
@@ -283,62 +309,106 @@ class ServicesHolder:
     kafka_store_dir = self.kafka_tmp_dir + '/kafka_data'
     os.mkdir(kafka_store_dir)
 
-    # Render config file for Envoy.
-    template = RenderingHelper.get_template('envoy_config_yaml.j2')
-    contents = template.render()
-    envoy_config_file = os.path.join(config_dir, 'envoy_config.yaml')
-    with open(envoy_config_file, 'w') as fd:
-      fd.write(contents)
-      print('Envoy config file rendered at: ' + envoy_config_file)
-
-    # Render config file for Zookeeper.
-    template = RenderingHelper.get_template('zookeeper_properties.j2')
-    contents = template.render(data={'data_dir': zookeeper_store_dir})
-    zookeeper_config_file = os.path.join(config_dir, 'zookeeper.properties')
-    with open(zookeeper_config_file, 'w') as fd:
-      fd.write(contents)
-      print('Zookeeper config file rendered at: ' + zookeeper_config_file)
-
-    # Render config file for Kafka.
-    template = RenderingHelper.get_template('kafka_server_properties.j2')
-    contents = template.render(data={'data_dir': kafka_store_dir})
-    kafka_config_file = os.path.join(config_dir, 'kafka_server.properties')
-    with open(kafka_config_file, 'w') as fd:
-      fd.write(contents)
-      print('Kafka config file rendered at: ' + kafka_config_file)
-
-    # Config files have been rendered, start the services now.
-
-    # Start Envoy in the background, pointing to rendered config file.
-    envoy_binary = ServicesHolder.find_envoy()
-    envoy_args = [os.path.abspath(envoy_binary), '-c', envoy_config_file]
-    self.envoy_handle = subprocess.Popen(envoy_args, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-    ServicesHolder.start_pipe_dumper(self.envoy_handle, 'Envoy')
-    print('Envoy started')
-
     # Find the Kafka server 'bin' directory.
     kafka_bin_dir = os.path.join('.', 'external', 'kafka_server_binary', 'bin')
 
-    # Start Zookeeper in background, pointing to rendered config file.
-    zk_binary = os.path.join(kafka_bin_dir, 'zookeeper-server-start.sh')
-    zk_args = [os.path.abspath(zk_binary), zookeeper_config_file]
-    self.zk_handle = subprocess.Popen(zk_args,
-                                      env=launcher_environment,
-                                      stdout=subprocess.PIPE,
-                                      stderr=subprocess.PIPE)
-    ServicesHolder.start_pipe_dumper(self.zk_handle, 'Zookeeper')
-    print('Zookeeper server started')
+    # Main initialization block:
+    # - generate random ports,
+    # - render configuration with these ports,
+    # - start services and check if they are running okay,
+    # - if anything is having problems, kill everything and start again.
+    while True:
 
-    # Start Kafka in background, pointing to rendered config file.
-    kafka_binary = os.path.join(kafka_bin_dir, 'kafka-server-start.sh')
-    kafka_args = [os.path.abspath(kafka_binary), kafka_config_file]
-    self.kafka_handle = subprocess.Popen(kafka_args,
-                                         env=launcher_environment,
-                                         stdout=subprocess.PIPE,
-                                         stderr=subprocess.PIPE)
-    ServicesHolder.start_pipe_dumper(self.kafka_handle, 'Kafka')
-    print('Kafka server started')
-    time.sleep(30)
+      # Generate random ports.
+      zk_port = ServicesHolder.get_random_listener_port()
+      kafka_real_port = ServicesHolder.get_random_listener_port()
+      kafka_envoy_port = ServicesHolder.get_random_listener_port()
+      envoy_monitoring_port = ServicesHolder.get_random_listener_port()
+
+      # These ports need to be exposed to tests.
+      self.kafka_envoy_port = kafka_envoy_port
+      self.envoy_monitoring_port = envoy_monitoring_port
+
+      # Render config file for Envoy.
+      template = RenderingHelper.get_template('envoy_config_yaml.j2')
+      contents = template.render(
+          data={
+              'kafka_real_port': kafka_real_port,
+              'kafka_envoy_port': kafka_envoy_port,
+              'envoy_monitoring_port': envoy_monitoring_port
+          })
+      envoy_config_file = os.path.join(config_dir, 'envoy_config.yaml')
+      with open(envoy_config_file, 'w') as fd:
+        fd.write(contents)
+        print('Envoy config file rendered at: ' + envoy_config_file)
+
+      # Render config file for Zookeeper.
+      template = RenderingHelper.get_template('zookeeper_properties.j2')
+      contents = template.render(data={'data_dir': zookeeper_store_dir, 'zk_port': zk_port})
+      zookeeper_config_file = os.path.join(config_dir, 'zookeeper.properties')
+      with open(zookeeper_config_file, 'w') as fd:
+        fd.write(contents)
+        print('Zookeeper config file rendered at: ' + zookeeper_config_file)
+
+      # Render config file for Kafka.
+      template = RenderingHelper.get_template('kafka_server_properties.j2')
+      contents = template.render(
+          data={
+              'data_dir': kafka_store_dir,
+              'zk_port': zk_port,
+              'kafka_real_port': kafka_real_port,
+              'kafka_envoy_port': kafka_envoy_port
+          })
+      kafka_config_file = os.path.join(config_dir, 'kafka_server.properties')
+      with open(kafka_config_file, 'w') as fd:
+        fd.write(contents)
+        print('Kafka config file rendered at: ' + kafka_config_file)
+
+      # Start the services now.
+      try:
+
+        # Start Envoy in the background, pointing to rendered config file.
+        envoy_binary = ServicesHolder.find_envoy()
+        envoy_args = [os.path.abspath(envoy_binary), '-c', envoy_config_file]
+        envoy_handle = subprocess.Popen(envoy_args, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        self.envoy_worker = ProcessWorker(envoy_handle, 'Envoy', 'starting main dispatch loop')
+        self.envoy_worker.await_startup()
+
+        # Start Zookeeper in background, pointing to rendered config file.
+        zk_binary = os.path.join(kafka_bin_dir, 'zookeeper-server-start.sh')
+        zk_args = [os.path.abspath(zk_binary), zookeeper_config_file]
+        zk_handle = subprocess.Popen(zk_args,
+                                     env=launcher_environment,
+                                     stdout=subprocess.PIPE,
+                                     stderr=subprocess.PIPE)
+        self.zk_worker = ProcessWorker(zk_handle, 'Zookeeper', 'binding to port')
+        self.zk_worker.await_startup()
+
+        # Start Kafka in background, pointing to rendered config file.
+        kafka_binary = os.path.join(kafka_bin_dir, 'kafka-server-start.sh')
+        kafka_args = [os.path.abspath(kafka_binary), kafka_config_file]
+        kafka_handle = subprocess.Popen(kafka_args,
+                                        env=launcher_environment,
+                                        stdout=subprocess.PIPE,
+                                        stderr=subprocess.PIPE)
+        self.kafka_worker = ProcessWorker(kafka_handle, 'Kafka', '[KafkaServer id=0] started')
+        self.kafka_worker.await_startup()
+
+        # All services have started without problems - now we can finally finish.
+        break
+
+      except Exception as e:
+        print('Could not start services, will try again', e)
+
+        if self.kafka_worker:
+          self.kafka_worker.kill()
+          self.kafka_worker = None
+        if self.zk_worker:
+          self.zk_worker.kill()
+          self.zk_worker = None
+        if self.envoy_worker:
+          self.envoy_worker.kill()
+          self.envoy_worker = None
 
   @staticmethod
   def find_java():
@@ -372,59 +442,160 @@ class ServicesHolder:
       return candidate
     raise Exception("Could not find Envoy")
 
-  @staticmethod
-  def start_pipe_dumper(process_handle, name):
-    """
-    Starts a parallel thread that's going to dump service's output to stdout (this might be useful
-    in case of build failure).
-    """
-
-    thread = Thread(target=ServicesHolder.pipe_dumper, args=(process_handle.stdout, name, 'out'))
-    thread.start()
-    thread = Thread(target=ServicesHolder.pipe_dumper, args=(process_handle.stderr, name, 'err'))
-    thread.start()
-
-  @staticmethod
-  def pipe_dumper(pipe, name, pipe_name):
-    try:
-      for line in pipe:
-        print('%s(%s):' % (name, pipe_name), line.decode().rstrip())
-    finally:
-      pipe.close()
-
   def shut_down(self):
     # Teardown - kill Kafka, Zookeeper, and Envoy. Then delete their data directory.
     print('Cleaning up')
 
-    if self.kafka_handle:
-      print('Killing Kafka')
-      self.kafka_handle.kill()
-      self.kafka_handle.wait()
+    if self.kafka_worker:
+      self.kafka_worker.kill()
 
-    if self.zk_handle:
-      print('Killing Zookeeper')
-      self.zk_handle.kill()
-      self.zk_handle.wait()
+    if self.zk_worker:
+      self.zk_worker.kill()
 
-    if self.envoy_handle:
-      print('Killing Envoy')
-      self.envoy_handle.kill()
-      self.envoy_handle.wait()
+    if self.envoy_worker:
+      self.envoy_worker.kill()
 
     if self.kafka_tmp_dir:
       print('Removing temporary directory: ' + self.kafka_tmp_dir)
       shutil.rmtree(self.kafka_tmp_dir)
 
   def check_state(self):
-    status = self.envoy_handle.poll()
+    self.envoy_worker.check_state()
+    self.zk_worker.check_state()
+    self.kafka_worker.check_state()
+
+
+class ProcessWorker:
+  """
+  Helper class that wraps the external service process.
+  Provides ability to wait until service is ready to use (this is done by tracing logs) and
+  printing service's output to stdout.
+  """
+
+  # Service is considered to be properly initialized after it has logged its startup message
+  # and has been alive for INITIALIZATION_WAIT_SECONDS after that message has been seen.
+  # This (clunky) design is needed because Zookeeper happens to log "binding to port" and then
+  # might fail to bind.
+  INITIALIZATION_WAIT_SECONDS = 3
+
+  def __init__(self, process_handle, name, startup_message):
+    # Handle to process and pretty name.
+    self.process_handle = process_handle
+    self.name = name
+
+    self.startup_message = startup_message
+    self.startup_message_ts = None
+
+    # Semaphore raised when startup has finished and information regarding startup's success.
+    self.initialization_semaphore = Semaphore(value=0)
+    self.initialization_ok = False
+
+    self.state_worker = Thread(target=ProcessWorker.initialization_worker, args=(self,))
+    self.state_worker.start()
+    self.out_worker = Thread(target=ProcessWorker.pipe_handler,
+                             args=(self, self.process_handle.stdout, 'out'))
+    self.out_worker.start()
+    self.err_worker = Thread(target=ProcessWorker.pipe_handler,
+                             args=(self, self.process_handle.stderr, 'err'))
+    self.err_worker.start()
+
+  @staticmethod
+  def initialization_worker(owner):
+    """
+    Worker thread.
+    Responsible for detecting if service died during initialization steps and ensuring if enough
+    time has passed since the startup message has been seen.
+    When either of these happens, we just raise the initialization semaphore.
+    """
+
+    while True:
+      status = owner.process_handle.poll()
+      if status:
+        # Service died.
+        print('%s did not initialize properly - finished with: %s' % (owner.name, status))
+        owner.initialization_ok = False
+        owner.initialization_semaphore.release()
+        break
+      else:
+        # Service is still running.
+        startup_message_ts = owner.startup_message_ts
+        if startup_message_ts:
+          # The log message has been registered (by pipe_handler thread), let's just ensure that
+          # some time has passed and mark the service as running.
+          current_time = int(round(time.time()))
+          if current_time - startup_message_ts >= ProcessWorker.INITIALIZATION_WAIT_SECONDS:
+            print('Startup message seen %s seconds ago, and service is still running' %
+                  (ProcessWorker.INITIALIZATION_WAIT_SECONDS),
+                  flush=True)
+            owner.initialization_ok = True
+            owner.initialization_semaphore.release()
+            break
+      time.sleep(1)
+    print('Initialization worker for %s has finished' % (owner.name))
+
+  @staticmethod
+  def pipe_handler(owner, pipe, pipe_name):
+    """
+    Worker thread.
+    If a service startup message is seen, then it just registers the timestamp of its appearance.
+    Also prints every received message.
+    """
+
+    try:
+      for raw_line in pipe:
+        line = raw_line.decode().rstrip()
+        print('%s(%s):' % (owner.name, pipe_name), line, flush=True)
+        if owner.startup_message in line:
+          print('%s initialization message [%s] has been logged' %
+                (owner.name, owner.startup_message))
+          owner.startup_message_ts = int(round(time.time()))
+    finally:
+      pipe.close()
+    print('Pipe handler for %s(%s) has finished' % (owner.name, pipe_name))
+
+  def await_startup(self):
+    """
+    Awaits on initialization semaphore, and then verifies the initialization state.
+    If everything is okay, we just continue (we can use the service), otherwise throw.
+    """
+
+    print('Waiting for %s to start...' % (self.name))
+    self.initialization_semaphore.acquire()
+    try:
+      if self.initialization_ok:
+        print('Service %s started successfully' % (self.name))
+      else:
+        raise Exception('%s could not start' % (self.name))
+    finally:
+      self.initialization_semaphore.release()
+
+  def check_state(self):
+    """
+    Verifies if the service is still running. Throws if it is not.
+    """
+
+    status = self.process_handle.poll()
     if status:
-      raise Exception('Envoy died with: ' + str(status))
-    status = self.zk_handle.poll()
-    if status:
-      raise Exception('Zookeeper died with: ' + str(status))
-    status = self.kafka_handle.poll()
-    if status:
-      raise Exception('Kafka died with: ' + str(status))
+      raise Exception('%s died with: %s' % (self.name, str(status)))
+
+  def kill(self):
+    """
+    Utility method to kill the main service thread and all related workers.
+    """
+
+    print('Stopping service %s' % self.name)
+
+    # Kill the real process.
+    self.process_handle.kill()
+    self.process_handle.wait()
+
+    # The sub-workers are going to finish on their own, as they will detect main thread dying
+    # (through pipes closing, or .poll() returning a non-null value).
+    self.state_worker.join()
+    self.out_worker.join()
+    self.err_worker.join()
+
+    print('Service %s has been stopped' % self.name)
 
 
 class RenderingHelper:

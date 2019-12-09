@@ -1,6 +1,6 @@
 broker.id=0
-listeners=PLAINTEXT://127.0.0.1:9092
-advertised.listeners=PLAINTEXT://127.0.0.1:19092
+listeners=PLAINTEXT://127.0.0.1:{{ data['kafka_real_port'] }}
+advertised.listeners=PLAINTEXT://127.0.0.1:{{ data['kafka_envoy_port'] }}
 
 num.network.threads=3
 num.io.threads=8
@@ -20,7 +20,7 @@ log.retention.hours=168
 log.segment.bytes=1073741824
 log.retention.check.interval.ms=300000
 
-zookeeper.connect=127.0.0.1:42181
+zookeeper.connect=127.0.0.1:{{ data['zk_port'] }}
 zookeeper.connection.timeout.ms=6000
 
 group.initial.rebalance.delay.ms=0
