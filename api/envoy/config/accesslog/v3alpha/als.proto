@@ -11,7 +11,7 @@ import "envoy/api/v3alpha/core/grpc_service.proto";
 import "google/protobuf/duration.proto";
 import "google/protobuf/wrappers.proto";
 
-import "udpa/api/annotations/versioning.proto";
+import "udpa/annotations/versioning.proto";
 
 import "validate/validate.proto";
 
@@ -23,7 +23,7 @@ import "validate/validate.proto";
 // <envoy_api_field_service.accesslog.v3alpha.StreamAccessLogsMessage.http_logs>`.
 // [#extension: envoy.access_loggers.http_grpc]
 message HttpGrpcAccessLogConfig {
-  option (udpa.api.annotations.versioning).previous_message_type =
+  option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.accesslog.v2.HttpGrpcAccessLogConfig";
 
   CommonGrpcAccessLogConfig common_config = 1 [(validate.rules).message = {required: true}];
@@ -45,7 +45,7 @@ message HttpGrpcAccessLogConfig {
 // populate *StreamAccessLogsMessage.tcp_logs*.
 // [#extension: envoy.access_loggers.tcp_grpc]
 message TcpGrpcAccessLogConfig {
-  option (udpa.api.annotations.versioning).previous_message_type =
+  option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.accesslog.v2.TcpGrpcAccessLogConfig";
 
   CommonGrpcAccessLogConfig common_config = 1 [(validate.rules).message = {required: true}];
@@ -54,7 +54,7 @@ message TcpGrpcAccessLogConfig {
 // Common configuration for gRPC access logs.
 // [#next-free-field: 6]
 message CommonGrpcAccessLogConfig {
-  option (udpa.api.annotations.versioning).previous_message_type =
+  option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.accesslog.v2.CommonGrpcAccessLogConfig";
 
   // The friendly name of the access log to be returned in :ref:`StreamAccessLogsMessage.Identifier

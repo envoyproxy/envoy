@@ -12,7 +12,7 @@ import "envoy/api/v3alpha/discovery.proto";
 import "google/api/annotations.proto";
 import "google/protobuf/struct.proto";
 
-import "udpa/api/annotations/versioning.proto";
+import "udpa/annotations/versioning.proto";
 
 import "validate/validate.proto";
 
@@ -40,14 +40,13 @@ service RuntimeDiscoveryService {
 // [#not-implemented-hide:] Not configuration. Workaround c++ protobuf issue with importing
 // services: https://github.com/google/protobuf/issues/4221
 message RtdsDummy {
-  option (udpa.api.annotations.versioning).previous_message_type =
+  option (udpa.annotations.versioning).previous_message_type =
       "envoy.service.discovery.v2.RtdsDummy";
 }
 
 // RTDS resource type. This describes a layer in the runtime virtual filesystem.
 message Runtime {
-  option (udpa.api.annotations.versioning).previous_message_type =
-      "envoy.service.discovery.v2.Runtime";
+  option (udpa.annotations.versioning).previous_message_type = "envoy.service.discovery.v2.Runtime";
 
   // Runtime resource name. This makes the Runtime a self-describing xDS
   // resource.

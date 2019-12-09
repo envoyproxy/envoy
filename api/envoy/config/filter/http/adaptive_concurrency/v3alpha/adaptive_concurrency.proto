@@ -13,7 +13,7 @@ import "google/api/annotations.proto";
 import "google/protobuf/duration.proto";
 import "google/protobuf/wrappers.proto";
 
-import "udpa/api/annotations/versioning.proto";
+import "udpa/annotations/versioning.proto";
 
 import "validate/validate.proto";
 
@@ -24,13 +24,13 @@ import "validate/validate.proto";
 
 // Configuration parameters for the gradient controller.
 message GradientControllerConfig {
-  option (udpa.api.annotations.versioning).previous_message_type =
+  option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.http.adaptive_concurrency.v2alpha.GradientControllerConfig";
 
   // Parameters controlling the periodic recalculation of the concurrency limit from sampled request
   // latencies.
   message ConcurrencyLimitCalculationParams {
-    option (udpa.api.annotations.versioning).previous_message_type =
+    option (udpa.annotations.versioning).previous_message_type =
         "envoy.config.filter.http.adaptive_concurrency.v2alpha.GradientControllerConfig."
         "ConcurrencyLimitCalculationParams";
 
@@ -47,7 +47,7 @@ message GradientControllerConfig {
   // Parameters controlling the periodic minRTT recalculation.
   // [#next-free-field: 6]
   message MinimumRTTCalculationParams {
-    option (udpa.api.annotations.versioning).previous_message_type =
+    option (udpa.annotations.versioning).previous_message_type =
         "envoy.config.filter.http.adaptive_concurrency.v2alpha.GradientControllerConfig."
         "MinimumRTTCalculationParams";
 
@@ -89,7 +89,7 @@ message GradientControllerConfig {
 }
 
 message AdaptiveConcurrency {
-  option (udpa.api.annotations.versioning).previous_message_type =
+  option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.http.adaptive_concurrency.v2alpha.AdaptiveConcurrency";
 
   oneof concurrency_controller_config {

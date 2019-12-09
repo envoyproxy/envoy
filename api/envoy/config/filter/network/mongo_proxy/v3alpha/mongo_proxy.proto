@@ -8,7 +8,7 @@ option java_package = "io.envoyproxy.envoy.config.filter.network.mongo_proxy.v3a
 
 import "envoy/config/filter/fault/v3alpha/fault.proto";
 
-import "udpa/api/annotations/versioning.proto";
+import "udpa/annotations/versioning.proto";
 
 import "validate/validate.proto";
 
@@ -17,7 +17,7 @@ import "validate/validate.proto";
 // [#extension: envoy.filters.network.mongo_proxy]
 
 message MongoProxy {
-  option (udpa.api.annotations.versioning).previous_message_type =
+  option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.network.mongo_proxy.v2.MongoProxy";
 
   // The human readable prefix to use when emitting :ref:`statistics

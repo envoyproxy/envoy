@@ -13,14 +13,14 @@ import "envoy/type/v3alpha/percent.proto";
 import "google/protobuf/any.proto";
 import "google/protobuf/struct.proto";
 
-import "udpa/api/annotations/versioning.proto";
+import "udpa/annotations/versioning.proto";
 
 import "validate/validate.proto";
 
 // [#protodoc-title: Common access log types]
 
 message AccessLog {
-  option (udpa.api.annotations.versioning).previous_message_type =
+  option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.accesslog.v2.AccessLog";
 
   reserved 3;
@@ -54,7 +54,7 @@ message AccessLog {
 
 // [#next-free-field: 12]
 message AccessLogFilter {
-  option (udpa.api.annotations.versioning).previous_message_type =
+  option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.accesslog.v2.AccessLogFilter";
 
   oneof filter_specifier {
@@ -97,7 +97,7 @@ message AccessLogFilter {
 
 // Filter on an integer comparison.
 message ComparisonFilter {
-  option (udpa.api.annotations.versioning).previous_message_type =
+  option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.accesslog.v2.ComparisonFilter";
 
   enum Op {
@@ -120,7 +120,7 @@ message ComparisonFilter {
 
 // Filters on HTTP response/status code.
 message StatusCodeFilter {
-  option (udpa.api.annotations.versioning).previous_message_type =
+  option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.accesslog.v2.StatusCodeFilter";
 
   // Comparison.
@@ -129,7 +129,7 @@ message StatusCodeFilter {
 
 // Filters on total request duration in milliseconds.
 message DurationFilter {
-  option (udpa.api.annotations.versioning).previous_message_type =
+  option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.accesslog.v2.DurationFilter";
 
   // Comparison.
@@ -139,20 +139,20 @@ message DurationFilter {
 // Filters for requests that are not health check requests. A health check
 // request is marked by the health check filter.
 message NotHealthCheckFilter {
-  option (udpa.api.annotations.versioning).previous_message_type =
+  option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.accesslog.v2.NotHealthCheckFilter";
 }
 
 // Filters for requests that are traceable. See the tracing overview for more
 // information on how a request becomes traceable.
 message TraceableFilter {
-  option (udpa.api.annotations.versioning).previous_message_type =
+  option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.accesslog.v2.TraceableFilter";
 }
 
 // Filters for random sampling of requests.
 message RuntimeFilter {
-  option (udpa.api.annotations.versioning).previous_message_type =
+  option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.accesslog.v2.RuntimeFilter";
 
   // Runtime key to get an optional overridden numerator for use in the *percent_sampled* field.
@@ -181,7 +181,7 @@ message RuntimeFilter {
 // Filters are evaluated sequentially and if one of them returns false, the
 // filter returns false immediately.
 message AndFilter {
-  option (udpa.api.annotations.versioning).previous_message_type =
+  option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.accesslog.v2.AndFilter";
 
   repeated AccessLogFilter filters = 1 [(validate.rules).repeated = {min_items: 2}];
@@ -191,7 +191,7 @@ message AndFilter {
 // Filters are evaluated sequentially and if one of them returns true, the
 // filter returns true immediately.
 message OrFilter {
-  option (udpa.api.annotations.versioning).previous_message_type =
+  option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.accesslog.v2.OrFilter";
 
   repeated AccessLogFilter filters = 2 [(validate.rules).repeated = {min_items: 2}];
@@ -199,7 +199,7 @@ message OrFilter {
 
 // Filters requests based on the presence or value of a request header.
 message HeaderFilter {
-  option (udpa.api.annotations.versioning).previous_message_type =
+  option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.accesslog.v2.HeaderFilter";
 
   // Only requests with a header which matches the specified HeaderMatcher will pass the filter
@@ -211,7 +211,7 @@ message HeaderFilter {
 // A list of the response flags can be found
 // in the access log formatter :ref:`documentation<config_access_log_format_response_flags>`.
 message ResponseFlagFilter {
-  option (udpa.api.annotations.versioning).previous_message_type =
+  option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.accesslog.v2.ResponseFlagFilter";
 
   // Only responses with the any of the flags listed in this field will be logged.
@@ -247,7 +247,7 @@ message ResponseFlagFilter {
 // Filters gRPC requests based on their response status. If a gRPC status is not provided, the
 // filter will infer the status from the HTTP status code.
 message GrpcStatusFilter {
-  option (udpa.api.annotations.versioning).previous_message_type =
+  option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.accesslog.v2.GrpcStatusFilter";
 
   enum Status {
@@ -280,7 +280,7 @@ message GrpcStatusFilter {
 
 // Extension filter is statically registered at runtime.
 message ExtensionFilter {
-  option (udpa.api.annotations.versioning).previous_message_type =
+  option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.accesslog.v2.ExtensionFilter";
 
   reserved 2;

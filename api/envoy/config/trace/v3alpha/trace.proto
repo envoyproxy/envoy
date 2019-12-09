@@ -14,7 +14,7 @@ import "google/protobuf/struct.proto";
 import "google/protobuf/wrappers.proto";
 
 import "opencensus/proto/trace/v1/trace_config.proto";
-import "udpa/api/annotations/versioning.proto";
+import "udpa/annotations/versioning.proto";
 
 import "validate/validate.proto";
 
@@ -27,10 +27,10 @@ import "validate/validate.proto";
 // <envoy_api_field_config.bootstrap.v3alpha.Bootstrap.tracing>` field. Envoy may support other
 // tracers in the future, but right now the HTTP tracer is the only one supported.
 message Tracing {
-  option (udpa.api.annotations.versioning).previous_message_type = "envoy.config.trace.v2.Tracing";
+  option (udpa.annotations.versioning).previous_message_type = "envoy.config.trace.v2.Tracing";
 
   message Http {
-    option (udpa.api.annotations.versioning).previous_message_type =
+    option (udpa.annotations.versioning).previous_message_type =
         "envoy.config.trace.v2.Tracing.Http";
 
     reserved 2;
@@ -70,7 +70,7 @@ message Tracing {
 // Configuration for the LightStep tracer.
 // [#extension: envoy.tracers.lightstep]
 message LightstepConfig {
-  option (udpa.api.annotations.versioning).previous_message_type =
+  option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.trace.v2.LightstepConfig";
 
   // The cluster manager cluster that hosts the LightStep collectors.
@@ -85,8 +85,7 @@ message LightstepConfig {
 // [#extension: envoy.tracers.zipkin]
 // [#next-free-field: 6]
 message ZipkinConfig {
-  option (udpa.api.annotations.versioning).previous_message_type =
-      "envoy.config.trace.v2.ZipkinConfig";
+  option (udpa.annotations.versioning).previous_message_type = "envoy.config.trace.v2.ZipkinConfig";
 
   // Available Zipkin collector endpoint versions.
   enum CollectorEndpointVersion {
@@ -137,7 +136,7 @@ message ZipkinConfig {
 // <https://github.com/opentracing/opentracing-cpp>`_.
 // [#extension: envoy.tracers.dynamic_ot]
 message DynamicOtConfig {
-  option (udpa.api.annotations.versioning).previous_message_type =
+  option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.trace.v2.DynamicOtConfig";
 
   // Dynamic library implementing the `OpenTracing API
@@ -152,7 +151,7 @@ message DynamicOtConfig {
 // Configuration for the Datadog tracer.
 // [#extension: envoy.tracers.datadog]
 message DatadogConfig {
-  option (udpa.api.annotations.versioning).previous_message_type =
+  option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.trace.v2.DatadogConfig";
 
   // The cluster to use for submitting traces to the Datadog agent.
@@ -166,7 +165,7 @@ message DatadogConfig {
 // [#next-free-field: 13]
 // [#extension: envoy.tracers.opencensus]
 message OpenCensusConfig {
-  option (udpa.api.annotations.versioning).previous_message_type =
+  option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.trace.v2.OpenCensusConfig";
 
   enum TraceContext {
@@ -234,8 +233,7 @@ message OpenCensusConfig {
 // [#not-implemented-hide:]
 // Configuration for AWS X-Ray tracer.
 message XRayConfig {
-  option (udpa.api.annotations.versioning).previous_message_type =
-      "envoy.config.trace.v2.XRayConfig";
+  option (udpa.annotations.versioning).previous_message_type = "envoy.config.trace.v2.XRayConfig";
 
   // The endpoint of the X-Ray Daemon where the spans will be sent. Since by default daemon
   // listens to localhost:2000, so the default value is 127.0.0.1:2000.
@@ -250,7 +248,7 @@ message XRayConfig {
 
 // Configuration structure.
 message TraceServiceConfig {
-  option (udpa.api.annotations.versioning).previous_message_type =
+  option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.trace.v2.TraceServiceConfig";
 
   // The upstream gRPC cluster that hosts the metrics service.

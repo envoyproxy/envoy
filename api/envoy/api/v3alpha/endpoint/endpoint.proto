@@ -12,7 +12,7 @@ import "envoy/api/v3alpha/core/health_check.proto";
 
 import "google/protobuf/wrappers.proto";
 
-import "udpa/api/annotations/versioning.proto";
+import "udpa/annotations/versioning.proto";
 
 import "validate/validate.proto";
 
@@ -20,11 +20,11 @@ import "validate/validate.proto";
 
 // Upstream host identifier.
 message Endpoint {
-  option (udpa.api.annotations.versioning).previous_message_type = "envoy.api.v2.endpoint.Endpoint";
+  option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.endpoint.Endpoint";
 
   // The optional health check configuration.
   message HealthCheckConfig {
-    option (udpa.api.annotations.versioning).previous_message_type =
+    option (udpa.annotations.versioning).previous_message_type =
         "envoy.api.v2.endpoint.Endpoint.HealthCheckConfig";
 
     // Optional alternative health check port value.
@@ -60,8 +60,7 @@ message Endpoint {
 // An Endpoint that Envoy can route traffic to.
 // [#next-free-field: 6]
 message LbEndpoint {
-  option (udpa.api.annotations.versioning).previous_message_type =
-      "envoy.api.v2.endpoint.LbEndpoint";
+  option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.endpoint.LbEndpoint";
 
   // Upstream host identifier or a named reference.
   oneof host_identifier {
@@ -100,7 +99,7 @@ message LbEndpoint {
 // balancing weights or different priorities.
 // [#next-free-field: 7]
 message LocalityLbEndpoints {
-  option (udpa.api.annotations.versioning).previous_message_type =
+  option (udpa.annotations.versioning).previous_message_type =
       "envoy.api.v2.endpoint.LocalityLbEndpoints";
 
   // Identifies location of where the upstream hosts run.
