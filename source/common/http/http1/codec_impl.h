@@ -61,6 +61,7 @@ public:
   void readDisable(bool disable) override;
   uint32_t bufferLimit() override;
   absl::string_view responseDetails() override { return details_; }
+  const Network::Address::InstanceConstSharedPtr& connectionLocalAddress() override;
 
   void isResponseToHeadRequest(bool value) { is_response_to_head_request_ = value; }
   void setDetails(absl::string_view details) { details_ = details; }

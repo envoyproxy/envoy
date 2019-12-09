@@ -743,6 +743,7 @@ TEST_P(IntegrationTest, TestBind) {
     address_string = "::1";
   }
   config_helper_.setSourceAddress(address_string);
+  useAccessLog("%UPSTREAM_LOCAL_ADDRESS%\n");
   initialize();
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
@@ -763,6 +764,7 @@ TEST_P(IntegrationTest, TestBind) {
   ASSERT_TRUE(upstream_request_->waitForEndStream(*dispatcher_));
 
   cleanupUpstreamAndDownstream();
+  EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr(address_string));
 }
 
 TEST_P(IntegrationTest, TestFailedBind) {
