@@ -8,7 +8,7 @@ option java_package = "io.envoyproxy.envoy.config.filter.http.dynamic_forward_pr
 
 import "envoy/config/common/dynamic_forward_proxy/v3alpha/dns_cache.proto";
 
-import "udpa/api/annotations/versioning.proto";
+import "udpa/annotations/versioning.proto";
 
 import "validate/validate.proto";
 
@@ -18,7 +18,7 @@ import "validate/validate.proto";
 // <arch_overview_http_dynamic_forward_proxy>` for more information.
 // [#extension: envoy.filters.http.dynamic_forward_proxy]
 message FilterConfig {
-  option (udpa.api.annotations.versioning).previous_message_type =
+  option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.http.dynamic_forward_proxy.v2alpha.FilterConfig";
 
   // The DNS cache configuration that the filter will attach to. Note this configuration must
@@ -30,7 +30,7 @@ message FilterConfig {
 
 // Per route Configuration for the dynamic forward proxy HTTP filter.
 message PerRouteConfig {
-  option (udpa.api.annotations.versioning).previous_message_type =
+  option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.http.dynamic_forward_proxy.v2alpha.PerRouteConfig";
 
   oneof host_rewrite_specifier {

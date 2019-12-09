@@ -8,7 +8,7 @@ option java_package = "io.envoyproxy.envoy.config.cluster.dynamic_forward_proxy.
 
 import "envoy/config/common/dynamic_forward_proxy/v3alpha/dns_cache.proto";
 
-import "udpa/api/annotations/versioning.proto";
+import "udpa/annotations/versioning.proto";
 
 import "validate/validate.proto";
 
@@ -18,7 +18,7 @@ import "validate/validate.proto";
 // <arch_overview_http_dynamic_forward_proxy>` for more information.
 // [#extension: envoy.clusters.dynamic_forward_proxy]
 message ClusterConfig {
-  option (udpa.api.annotations.versioning).previous_message_type =
+  option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.cluster.dynamic_forward_proxy.v2alpha.ClusterConfig";
 
   // The DNS cache configuration that the cluster will attach to. Note this configuration must

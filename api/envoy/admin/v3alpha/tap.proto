@@ -8,13 +8,13 @@ option java_package = "io.envoyproxy.envoy.admin.v3alpha";
 
 import "envoy/service/tap/v3alpha/common.proto";
 
-import "udpa/api/annotations/versioning.proto";
+import "udpa/annotations/versioning.proto";
 
 import "validate/validate.proto";
 
 // The /tap admin request body that is used to configure an active tap session.
 message TapRequest {
-  option (udpa.api.annotations.versioning).previous_message_type = "envoy.admin.v2alpha.TapRequest";
+  option (udpa.annotations.versioning).previous_message_type = "envoy.admin.v2alpha.TapRequest";
 
   // The opaque configuration ID used to match the configuration to a loaded extension.
   // A tap extension configures a similar opaque ID that is used to match.

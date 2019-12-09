@@ -18,7 +18,7 @@ import "google/protobuf/duration.proto";
 import "google/protobuf/struct.proto";
 import "google/protobuf/wrappers.proto";
 
-import "udpa/api/annotations/versioning.proto";
+import "udpa/annotations/versioning.proto";
 
 import "validate/validate.proto";
 
@@ -33,7 +33,7 @@ import "validate/validate.proto";
 // upstream cluster to route to or whether to perform a redirect.
 // [#next-free-field: 19]
 message VirtualHost {
-  option (udpa.api.annotations.versioning).previous_message_type = "envoy.api.v2.route.VirtualHost";
+  option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.route.VirtualHost";
 
   enum TlsRequirementType {
     // No TLS requirement for the virtual host.
@@ -154,8 +154,7 @@ message VirtualHost {
 
 // A filter-defined action type.
 message FilterAction {
-  option (udpa.api.annotations.versioning).previous_message_type =
-      "envoy.api.v2.route.FilterAction";
+  option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.route.FilterAction";
 
   google.protobuf.Any action = 1;
 }
@@ -169,7 +168,7 @@ message FilterAction {
 //   <envoy_api_msg_api.v3alpha.route.HeaderMatcher>`.
 // [#next-free-field: 18]
 message Route {
-  option (udpa.api.annotations.versioning).previous_message_type = "envoy.api.v2.route.Route";
+  option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.route.Route";
 
   reserved 6, 8;
 
@@ -259,12 +258,11 @@ message Route {
 // traffic to be forwarded to each cluster. The router selects an upstream cluster based on the
 // weights.
 message WeightedCluster {
-  option (udpa.api.annotations.versioning).previous_message_type =
-      "envoy.api.v2.route.WeightedCluster";
+  option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.route.WeightedCluster";
 
   // [#next-free-field: 11]
   message ClusterWeight {
-    option (udpa.api.annotations.versioning).previous_message_type =
+    option (udpa.annotations.versioning).previous_message_type =
         "envoy.api.v2.route.WeightedCluster.ClusterWeight";
 
     reserved 7, 8;
@@ -346,15 +344,15 @@ message WeightedCluster {
 
 // [#next-free-field: 12]
 message RouteMatch {
-  option (udpa.api.annotations.versioning).previous_message_type = "envoy.api.v2.route.RouteMatch";
+  option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.route.RouteMatch";
 
   message GrpcRouteMatchOptions {
-    option (udpa.api.annotations.versioning).previous_message_type =
+    option (udpa.annotations.versioning).previous_message_type =
         "envoy.api.v2.route.RouteMatch.GrpcRouteMatchOptions";
   }
 
   message TlsContextMatchOptions {
-    option (udpa.api.annotations.versioning).previous_message_type =
+    option (udpa.annotations.versioning).previous_message_type =
         "envoy.api.v2.route.RouteMatch.TlsContextMatchOptions";
 
     // If specified, the route will match against whether or not a certificate is presented.
@@ -441,7 +439,7 @@ message RouteMatch {
 
 // [#next-free-field: 12]
 message CorsPolicy {
-  option (udpa.api.annotations.versioning).previous_message_type = "envoy.api.v2.route.CorsPolicy";
+  option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.route.CorsPolicy";
 
   reserved 1, 8, 7;
 
@@ -491,7 +489,7 @@ message CorsPolicy {
 
 // [#next-free-field: 30]
 message RouteAction {
-  option (udpa.api.annotations.versioning).previous_message_type = "envoy.api.v2.route.RouteAction";
+  option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.route.RouteAction";
 
   enum ClusterNotFoundResponseCode {
     // HTTP status code - 503 Service Unavailable.
@@ -515,7 +513,7 @@ message RouteAction {
   // During shadowing, the host/authority header is altered such that *-shadow* is appended. This is
   // useful for logging. For example, *cluster1* becomes *cluster1-shadow*.
   message RequestMirrorPolicy {
-    option (udpa.api.annotations.versioning).previous_message_type =
+    option (udpa.annotations.versioning).previous_message_type =
         "envoy.api.v2.route.RouteAction.RequestMirrorPolicy";
 
     reserved 2;
@@ -543,11 +541,11 @@ message RouteAction {
   // <arch_overview_load_balancing_types>`.
   // [#next-free-field: 6]
   message HashPolicy {
-    option (udpa.api.annotations.versioning).previous_message_type =
+    option (udpa.annotations.versioning).previous_message_type =
         "envoy.api.v2.route.RouteAction.HashPolicy";
 
     message Header {
-      option (udpa.api.annotations.versioning).previous_message_type =
+      option (udpa.annotations.versioning).previous_message_type =
           "envoy.api.v2.route.RouteAction.HashPolicy.Header";
 
       // The name of the request header that will be used to obtain the hash
@@ -570,7 +568,7 @@ message RouteAction {
     //    streams on the same connection will independently receive the same
     //    cookie, even if they arrive at the Envoy simultaneously.
     message Cookie {
-      option (udpa.api.annotations.versioning).previous_message_type =
+      option (udpa.annotations.versioning).previous_message_type =
           "envoy.api.v2.route.RouteAction.HashPolicy.Cookie";
 
       // The name of the cookie that will be used to obtain the hash key. If the
@@ -589,7 +587,7 @@ message RouteAction {
     }
 
     message ConnectionProperties {
-      option (udpa.api.annotations.versioning).previous_message_type =
+      option (udpa.annotations.versioning).previous_message_type =
           "envoy.api.v2.route.RouteAction.HashPolicy.ConnectionProperties";
 
       // Hash on source IP address.
@@ -651,7 +649,7 @@ message RouteAction {
   // <envoy_api_field_config.filter.network.http_connection_manager.v3alpha.HttpConnectionManager.upgrade_configs>`
   // but does not affect any custom filter chain specified there.
   message UpgradeConfig {
-    option (udpa.api.annotations.versioning).previous_message_type =
+    option (udpa.annotations.versioning).previous_message_type =
         "envoy.api.v2.route.RouteAction.UpgradeConfig";
 
     // The case-insensitive name of this upgrade, e.g. "websocket".
@@ -865,10 +863,10 @@ message RouteAction {
 // HTTP retry :ref:`architecture overview <arch_overview_http_routing_retry>`.
 // [#next-free-field: 11]
 message RetryPolicy {
-  option (udpa.api.annotations.versioning).previous_message_type = "envoy.api.v2.route.RetryPolicy";
+  option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.route.RetryPolicy";
 
   message RetryPriority {
-    option (udpa.api.annotations.versioning).previous_message_type =
+    option (udpa.annotations.versioning).previous_message_type =
         "envoy.api.v2.route.RetryPolicy.RetryPriority";
 
     reserved 2;
@@ -883,7 +881,7 @@ message RetryPolicy {
   }
 
   message RetryHostPredicate {
-    option (udpa.api.annotations.versioning).previous_message_type =
+    option (udpa.annotations.versioning).previous_message_type =
         "envoy.api.v2.route.RetryPolicy.RetryHostPredicate";
 
     reserved 2;
@@ -898,7 +896,7 @@ message RetryPolicy {
   }
 
   message RetryBackOff {
-    option (udpa.api.annotations.versioning).previous_message_type =
+    option (udpa.annotations.versioning).previous_message_type =
         "envoy.api.v2.route.RetryPolicy.RetryBackOff";
 
     // Specifies the base interval between retries. This parameter is required and must be greater
@@ -977,7 +975,7 @@ message RetryPolicy {
 
 // HTTP request hedging :ref:`architecture overview <arch_overview_http_routing_hedging>`.
 message HedgePolicy {
-  option (udpa.api.annotations.versioning).previous_message_type = "envoy.api.v2.route.HedgePolicy";
+  option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.route.HedgePolicy";
 
   // Specifies the number of initial requests that should be sent upstream.
   // Must be at least 1.
@@ -1004,8 +1002,7 @@ message HedgePolicy {
 
 // [#next-free-field: 9]
 message RedirectAction {
-  option (udpa.api.annotations.versioning).previous_message_type =
-      "envoy.api.v2.route.RedirectAction";
+  option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.route.RedirectAction";
 
   enum RedirectResponseCode {
     // Moved Permanently HTTP Status Code - 301.
@@ -1069,7 +1066,7 @@ message RedirectAction {
 }
 
 message DirectResponseAction {
-  option (udpa.api.annotations.versioning).previous_message_type =
+  option (udpa.annotations.versioning).previous_message_type =
       "envoy.api.v2.route.DirectResponseAction";
 
   // Specifies the HTTP response status to be returned.
@@ -1087,7 +1084,7 @@ message DirectResponseAction {
 }
 
 message Decorator {
-  option (udpa.api.annotations.versioning).previous_message_type = "envoy.api.v2.route.Decorator";
+  option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.route.Decorator";
 
   // The operation name associated with the request matched to this route. If tracing is
   // enabled, this information will be used as the span name reported for this request.
@@ -1101,7 +1098,7 @@ message Decorator {
 }
 
 message Tracing {
-  option (udpa.api.annotations.versioning).previous_message_type = "envoy.api.v2.route.Tracing";
+  option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.route.Tracing";
 
   // Target percentage of requests managed by this HTTP connection manager that will be force
   // traced if the :ref:`x-client-trace-id <config_http_conn_man_headers_x-client-trace-id>`
@@ -1155,8 +1152,7 @@ message Tracing {
 //    every application endpoint. This is both not easily maintainable and as well the matching and
 //    statistics output are not free.
 message VirtualCluster {
-  option (udpa.api.annotations.versioning).previous_message_type =
-      "envoy.api.v2.route.VirtualCluster";
+  option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.route.VirtualCluster";
 
   reserved 1, 3;
 
@@ -1175,11 +1171,11 @@ message VirtualCluster {
 
 // Global rate limiting :ref:`architecture overview <arch_overview_rate_limit>`.
 message RateLimit {
-  option (udpa.api.annotations.versioning).previous_message_type = "envoy.api.v2.route.RateLimit";
+  option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.route.RateLimit";
 
   // [#next-free-field: 7]
   message Action {
-    option (udpa.api.annotations.versioning).previous_message_type =
+    option (udpa.annotations.versioning).previous_message_type =
         "envoy.api.v2.route.RateLimit.Action";
 
     // The following descriptor entry is appended to the descriptor:
@@ -1190,7 +1186,7 @@ message RateLimit {
     //
     // <local service cluster> is derived from the :option:`--service-cluster` option.
     message SourceCluster {
-      option (udpa.api.annotations.versioning).previous_message_type =
+      option (udpa.annotations.versioning).previous_message_type =
           "envoy.api.v2.route.RateLimit.Action.SourceCluster";
     }
 
@@ -1213,7 +1209,7 @@ message RateLimit {
     // indicates which
     //   header in the request contains the target cluster.
     message DestinationCluster {
-      option (udpa.api.annotations.versioning).previous_message_type =
+      option (udpa.annotations.versioning).previous_message_type =
           "envoy.api.v2.route.RateLimit.Action.DestinationCluster";
     }
 
@@ -1224,7 +1220,7 @@ message RateLimit {
     //
     //   ("<descriptor_key>", "<header_value_queried_from_header>")
     message RequestHeaders {
-      option (udpa.api.annotations.versioning).previous_message_type =
+      option (udpa.annotations.versioning).previous_message_type =
           "envoy.api.v2.route.RateLimit.Action.RequestHeaders";
 
       // The header name to be queried from the request headers. The header’s
@@ -1243,7 +1239,7 @@ message RateLimit {
     //
     //   ("remote_address", "<trusted address from x-forwarded-for>")
     message RemoteAddress {
-      option (udpa.api.annotations.versioning).previous_message_type =
+      option (udpa.annotations.versioning).previous_message_type =
           "envoy.api.v2.route.RateLimit.Action.RemoteAddress";
     }
 
@@ -1253,7 +1249,7 @@ message RateLimit {
     //
     //   ("generic_key", "<descriptor_value>")
     message GenericKey {
-      option (udpa.api.annotations.versioning).previous_message_type =
+      option (udpa.annotations.versioning).previous_message_type =
           "envoy.api.v2.route.RateLimit.Action.GenericKey";
 
       // The value to use in the descriptor entry.
@@ -1266,7 +1262,7 @@ message RateLimit {
     //
     //   ("header_match", "<descriptor_value>")
     message HeaderValueMatch {
-      option (udpa.api.annotations.versioning).previous_message_type =
+      option (udpa.annotations.versioning).previous_message_type =
           "envoy.api.v2.route.RateLimit.Action.HeaderValueMatch";
 
       // The value to use in the descriptor entry.
@@ -1356,8 +1352,7 @@ message RateLimit {
 //  [#next-major-version: HeaderMatcher should be refactored to use StringMatcher.]
 // [#next-free-field: 12]
 message HeaderMatcher {
-  option (udpa.api.annotations.versioning).previous_message_type =
-      "envoy.api.v2.route.HeaderMatcher";
+  option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.route.HeaderMatcher";
 
   reserved 2, 3, 5;
 
@@ -1423,7 +1418,7 @@ message HeaderMatcher {
 // as an ampersand-separated list of keys and/or key=value elements.
 // [#next-free-field: 7]
 message QueryParameterMatcher {
-  option (udpa.api.annotations.versioning).previous_message_type =
+  option (udpa.annotations.versioning).previous_message_type =
       "envoy.api.v2.route.QueryParameterMatcher";
 
   reserved 3, 4;
