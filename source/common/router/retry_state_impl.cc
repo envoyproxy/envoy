@@ -387,13 +387,7 @@ RetryStateImpl::RetryBudgetStatus RetryStateImpl::retryBudgetStatus(Upstream::Re
   const uint64_t current_active = cluster_.resourceManager(priority).requests().count() +
                                   cluster_.resourceManager(priority).pendingRequests().count();
 
-  // If the current number of active requests doesn't meet the concurrency minimum to begin
-  // enforcing the retry budget, we will simply enforce the budget as if the number of active
-  // requests is at the minimum. This does not honor the configured budget percentage accurately
-  // until the minimum concurrency is met, but allows for reasonable numbers of active retries when
-  // there are few outstanding requests.
-  const double budget = std::max<uint64_t>(current_active, retry_budget->min_concurrency) *
-    retry_budget->budget_percent / 100.0;
+  const double budget = std::max<uint64_t>(current_active * retry_budget->budget_percent / 100.0, retry_budget->min_retry_concurrency);
 
   if (cluster_.resourceManager(priority).retries().count() >= budget) {
     return RetryBudgetStatus::Exceeded;

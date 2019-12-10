@@ -35,25 +35,17 @@ message CircuitBreakers {
           "envoy.api.v2.cluster.CircuitBreakers.Thresholds.RetryBudget";
 
       // Specifies the limit on concurrent retries as a percentage of the sum of active requests and
-      // active pending requests.
+      // active pending requests. For example, if there are 100 active requests and the
+      // budget_percent is set to 25, there may be 25 active retries.
       //
       // This parameter is optional. Defaults to 20%.
       type.v3alpha.Percent budget_percent = 1;
 
-      // Specifies the minimum retry concurrency allowed for the retry budget. If the active request
-      // count is less than this value, there is no enforcement of the retry budget. However, once the
-      // request concurrency reaches or exceeds the configured value, the budget is enforced and the
-      // number of allowed retries is equal to a percentage of the request concurrency.
+      // Specifies the minimum retry concurrency allowed for the retry budget. The limit on the
+      // number of active retries may never go below this number.
       //
-      // .. note::
-      //
-      //    Consider a `percent_budget` of 20% and a `min_concurrency` of 15. If the number of
-      //    concurrent requests is 10, there is no limit to how many of those active requests may be
-      //    retries. If the number of concurrent requests is 25, the number of active retries is
-      //    limited to 20% of 25, so 5 active retries.
-      //
-      // This parameter is optional. Defaults to 15.
-      google.protobuf.UInt32Value min_concurrency = 2;
+      // This parameter is optional. Defaults to 3.
+      google.protobuf.UInt32Value min_retry_concurrency = 2;
     }
 
     // The :ref:`RoutingPriority<envoy_api_enum_api.v3alpha.core.RoutingPriority>`

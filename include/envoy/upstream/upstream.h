@@ -668,8 +668,8 @@ public:
     // The percentage of outstanding requests that are allowed to be retries.
     double budget_percent;
 
-    // The minimum request concurrency required before enforcing the retry budget.
-    uint32_t min_concurrency;
+    // The minimum retry concurrency allowed to be enforced by the retry budget.
+    uint32_t min_retry_concurrency;
   };
 
   virtual ~ClusterInfo() = default;

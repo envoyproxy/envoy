@@ -946,7 +946,7 @@ TEST_F(RouterRetryStateImplTest, BudgetAvailableRetries) {
   // Override the max_retries CB via retry budget. As configured, there are no allowed retries via
   // max_retries CB.
   const auto budget = Upstream::ClusterInfo::RetryBudget{
-    .min_concurrency = 15,
+    .min_retry_concurrency = 3,
     .budget_percent = 20,
   };
   EXPECT_CALL(cluster_, retryBudget(_)).WillRepeatedly(Return(budget));
@@ -969,10 +969,10 @@ TEST_F(RouterRetryStateImplTest, BudgetNoAvailableRetries) {
                                 5 /* rq_retry */,
                                 0 /* conn_pool */);
 
-  // Override the max_retries CB via retry budget. As configured, there are 5 allowed retries via
-  // max_retries CB.
+  // Override the max_retries CB via a retry budget that won't let any retries. As configured, there
+  // are 5 allowed retries via max_retries CB.
   const auto budget = Upstream::ClusterInfo::RetryBudget{
-    .min_concurrency = 15,
+    .min_retry_concurrency = 0,
     .budget_percent = 0,
   };
   EXPECT_CALL(cluster_, retryBudget(_)).WillRepeatedly(Return(budget));
@@ -1020,7 +1020,7 @@ TEST_F(RouterRetryStateImplTest, BudgetVerifyMinimumConcurrency) {
                                 0 /* conn_pool */);
 
   const auto budget = Upstream::ClusterInfo::RetryBudget{
-    .min_concurrency = 15,
+    .min_retry_concurrency = 3,
     .budget_percent = 20,
   };
   EXPECT_CALL(cluster_, retryBudget(_)).WillRepeatedly(Return(budget));

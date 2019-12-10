@@ -768,8 +768,8 @@ ClusterInfoImpl::ClusterInfoImpl(
         retry_budget_map_.emplace(priority, RetryBudget{
           .budget_percent =
             PROTOBUF_GET_WRAPPED_OR_DEFAULT(threshold.retry_budget(), budget_percent, 20.0),
-          .min_concurrency =
-            PROTOBUF_GET_WRAPPED_OR_DEFAULT(threshold.retry_budget(), min_concurrency, 15),
+          .min_retry_concurrency =
+            PROTOBUF_GET_WRAPPED_OR_DEFAULT(threshold.retry_budget(), min_retry_concurrency, 3),
             });
       }
     }
