@@ -1,10 +1,12 @@
 #include <memory>
 
 #include "common/buffer/buffer_impl.h"
+#include "common/config/datasource.h"
 #include "common/http/message_impl.h"
 #include "common/stream_info/stream_info_impl.h"
 
 #include "extensions/filters/http/lua/lua_filter.h"
+#include "extensions/filters/http/well_known_names.h"
 
 #include "test/mocks/api/mocks.h"
 #include "test/mocks/http/mocks.h"
@@ -33,9 +35,17 @@ namespace Lua {
 namespace {
 
 const envoy::config::filter::http::lua::v2::Lua
-buildConfigFromLuaCode(const std::string& lua_code) {
+buildConfigFromLuaCode(const std::string& lua_code, const std::string& per_route_lua_code) {
   envoy::config::filter::http::lua::v2::Lua config;
   config.set_inline_code(lua_code);
+  if (!per_route_lua_code.empty()) {
+    envoy::api::v2::core::DataSource code;
+    code.set_inline_string(per_route_lua_code);
+
+    auto* source_codes = config.mutable_source_codes();
+    (*source_codes)["per_route.lua"] = code;
+  }
+
   return config;
 }
 
@@ -77,7 +87,14 @@ public:
   ~LuaHttpFilterTest() override { filter_->onDestroy(); }
 
   void setup(const std::string& lua_code) {
-    config_.reset(new FilterConfig(buildConfigFromLuaCode(lua_code), tls_, cluster_manager_, api_));
+    config_.reset(
+        new FilterConfig(buildConfigFromLuaCode(lua_code, ""), tls_, cluster_manager_, api_));
+    setupFilter();
+  }
+
+  void setupWithPerRoute(const std::string& lua_code, const std::string& per_route_lua_code) {
+    config_.reset(new FilterConfig(buildConfigFromLuaCode(lua_code, per_route_lua_code), tls_,
+                                   cluster_manager_, api_));
     setupFilter();
   }
 
@@ -97,6 +114,15 @@ public:
     TestUtility::loadFromYaml(yaml, metadata_);
     EXPECT_CALL(decoder_callbacks_.route_->route_entry_, metadata())
         .WillOnce(testing::ReturnRef(metadata_));
+  }
+
+  void routeLocalConfig(const Router::RouteSpecificFilterConfig* route_settings,
+                        const Router::RouteSpecificFilterConfig* vhost_settings) {
+    ON_CALL(decoder_callbacks_.route_->route_entry_, perFilterConfig(HttpFilterNames::get().Lua))
+        .WillByDefault(Return(route_settings));
+    ON_CALL(decoder_callbacks_.route_->route_entry_.virtual_host_,
+            perFilterConfig(HttpFilterNames::get().Lua))
+        .WillByDefault(Return(vhost_settings));
   }
 
   NiceMock<ThreadLocal::MockInstance> tls_;
@@ -199,7 +225,7 @@ TEST(LuaHttpFilterConfigTest, BadCode) {
   NiceMock<Upstream::MockClusterManager> cluster_manager;
   NiceMock<Api::MockApi> api;
   EXPECT_THROW_WITH_MESSAGE(
-      FilterConfig(buildConfigFromLuaCode(SCRIPT), tls, cluster_manager, api),
+      FilterConfig(buildConfigFromLuaCode(SCRIPT, ""), tls, cluster_manager, api),
       Filters::Common::Lua::LuaException,
       "script GLOBAL load error: [string \"...\"]:3: '=' expected near '<eof>'");
 }
@@ -1741,6 +1767,76 @@ TEST_F(LuaHttpFilterTest, SignatureVerify) {
               scriptLog(spdlog::level::trace, StrEq("Failed to verify digest. Error code: 0")));
   EXPECT_CALL(*filter_,
               scriptLog(spdlog::level::trace, StrEq("Failed to verify digest. Error code: 0")));
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
+}
+
+TEST_F(LuaHttpFilterTest, RouteDisabledConfigOverride) {
+  const std::string SCRIPT{R"EOF(
+    function envoy_on_request(request_handle)
+      request_handle:logInfo("do not call")
+    end
+  )EOF"};
+
+  InSequence s;
+  setup(SCRIPT);
+
+  envoy::config::filter::http::lua::v2::LuaPerRoute vhost_cfg;
+  vhost_cfg.set_disabled(true);
+  FilterConfigPerRoute vhost_settings(vhost_cfg);
+  routeLocalConfig(nullptr, &vhost_settings);
+  Http::TestHeaderMapImpl request_headers{{":path", "/"}};
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
+}
+
+TEST_F(LuaHttpFilterTest, PerRouteConfigOverride) {
+  const std::string SCRIPT{R"EOF(
+    function envoy_on_request(request_handle)
+      request_handle:logInfo("do not call")
+    end
+  )EOF"};
+
+  const std::string PER_ROUTE_SCRIPT{R"EOF(
+    function envoy_on_request(request_handle)
+      request_handle:logInfo("call this instead")
+    end
+  )EOF"};
+
+  InSequence s;
+  setupWithPerRoute(SCRIPT, PER_ROUTE_SCRIPT);
+
+  envoy::config::filter::http::lua::v2::LuaPerRoute vhost_cfg;
+  // To use the per route Lua code.
+  vhost_cfg.set_name("per_route.lua");
+  FilterConfigPerRoute vhost_settings(vhost_cfg);
+  routeLocalConfig(nullptr, &vhost_settings);
+  Http::TestHeaderMapImpl request_headers{{":path", "/"}};
+  EXPECT_CALL(*filter_, scriptLog(spdlog::level::info, StrEq("call this instead")));
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
+}
+
+TEST_F(LuaHttpFilterTest, UseWrongPerRouteConfigOverride) {
+  const std::string SCRIPT{R"EOF(
+    function envoy_on_request(request_handle)
+      request_handle:logInfo("do not call")
+    end
+  )EOF"};
+
+  const std::string PER_ROUTE_SCRIPT{R"EOF(
+    function envoy_on_request(request_handle)
+      request_handle:logInfo("call this instead")
+    end
+  )EOF"};
+
+  InSequence s;
+  setupWithPerRoute(SCRIPT, PER_ROUTE_SCRIPT);
+
+  envoy::config::filter::http::lua::v2::LuaPerRoute vhost_cfg;
+  // This name does not exist in the listed source codes.
+  vhost_cfg.set_name("WRONG.lua");
+  FilterConfigPerRoute vhost_settings(vhost_cfg);
+  routeLocalConfig(nullptr, &vhost_settings);
+  Http::TestHeaderMapImpl request_headers{{":path", "/"}};
+  EXPECT_CALL(*filter_, scriptLog(spdlog::level::info, StrEq("do not call")));
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, true));
 }
 

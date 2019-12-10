@@ -17,6 +17,7 @@ Version history
 * lb_subset_config: new fallback policy for selectors: :ref:`KEYS_SUBSET<envoy_api_enum_value_Cluster.LbSubsetConfig.LbSubsetSelector.LbSubsetSelectorFallbackPolicy.KEYS_SUBSET>`
 * listeners: added :ref:`reuse_port<envoy_api_field_Listener.reuse_port>` option.
 * logger: added :ref:`--log-format-escaped <operations_cli>` command line option to escape newline characters in application logs.
+* lua: added support for providing per-route config and optionally disable the filter.
 * rbac: added support for matching all subject alt names instead of first in :ref:`principal_name <envoy_api_field_config.rbac.v2.Principal.Authenticated.principal_name>`.
 * redis: performance improvement for larger split commands by avoiding string copies.
 * redis: correctly follow MOVE/ASK redirection for mirrored clusters.
