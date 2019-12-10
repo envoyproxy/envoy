@@ -70,7 +70,7 @@ void SymbolTableImpl::Encoding::appendEncoding(uint64_t number,
   // high-order bit 0.
   do {
     if (number < (1 << 7)) {
-      mem_block.appendOne(number); // number <= 127 get encoded in one byte.
+      mem_block.appendOne(number); // number <= 127 gets encoded in one byte.
     } else {
       mem_block.appendOne((number & Low7Bits) | SpilloverMask); // >= 128 need spillover bytes.
     }
