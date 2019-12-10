@@ -2,12 +2,14 @@ syntax = "proto3";
 
 package envoy.api.v3alpha.cluster;
 
+option java_package = "io.envoyproxy.envoy.api.v3alpha.cluster";
 option java_outer_classname = "OutlierDetectionProto";
 option java_multiple_files = true;
-option java_package = "io.envoyproxy.envoy.api.v3alpha.cluster";
 
 import "google/protobuf/duration.proto";
 import "google/protobuf/wrappers.proto";
+
+import "udpa/annotations/versioning.proto";
 
 import "validate/validate.proto";
 
@@ -17,6 +19,9 @@ import "validate/validate.proto";
 // more information on outlier detection.
 // [#next-free-field: 21]
 message OutlierDetection {
+  option (udpa.annotations.versioning).previous_message_type =
+      "envoy.api.v2.cluster.OutlierDetection";
+
   // The number of consecutive 5xx responses or local origin errors that are mapped
   // to 5xx error codes before a consecutive 5xx ejection
   // occurs. Defaults to 5.

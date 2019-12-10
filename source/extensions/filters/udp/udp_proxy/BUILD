@@ -29,7 +29,7 @@ envoy_cc_extension(
     srcs = ["config.cc"],
     hdrs = ["config.h"],
     security_posture = "robust_to_untrusted_downstream",
-    status = "wip",
+    status = "alpha",
     deps = [
         ":udp_proxy_filter_lib",
         "//include/envoy/registry",

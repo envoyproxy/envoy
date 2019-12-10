@@ -52,6 +52,12 @@ absl::optional<CelValue> evaluate(const Expression& expr, Protobuf::Arena* arena
 bool matches(const Expression& expr, const StreamInfo::StreamInfo& info,
              const Http::HeaderMap& headers);
 
+// Thrown when there is an CEL library error.
+class CelException : public EnvoyException {
+public:
+  CelException(const std::string& what) : EnvoyException(what) {}
+};
+
 } // namespace Expr
 } // namespace Common
 } // namespace Filters

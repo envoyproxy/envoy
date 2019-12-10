@@ -2,9 +2,9 @@ syntax = "proto3";
 
 package envoy.config.filter.http.jwt_authn.v2alpha;
 
+option java_package = "io.envoyproxy.envoy.config.filter.http.jwt_authn.v2alpha";
 option java_outer_classname = "ConfigProto";
 option java_multiple_files = true;
-option java_package = "io.envoyproxy.envoy.config.filter.http.jwt_authn.v2alpha";
 
 import "envoy/api/v2/core/base.proto";
 import "envoy/api/v2/core/http_uri.proto";
