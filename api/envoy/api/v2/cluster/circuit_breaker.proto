@@ -24,7 +24,6 @@ message CircuitBreakers {
   // :ref:`RoutingPriority<envoy_api_enum_core.RoutingPriority>`.
   // [#next-free-field: 9]
   message Thresholds {
-
     message RetryBudget {
       // Specifies the limit on concurrent retries as a percentage of the sum of active requests and
       // active pending requests. For example, if there are 100 active requests and the

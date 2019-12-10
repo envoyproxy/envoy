@@ -861,7 +861,7 @@ message RouteAction {
 }
 
 // HTTP retry :ref:`architecture overview <arch_overview_http_routing_retry>`.
-// [#next-free-field: 12]
+// [#next-free-field: 11]
 message RetryPolicy {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.route.RetryPolicy";
 

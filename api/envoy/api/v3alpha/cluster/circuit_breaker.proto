@@ -31,6 +31,9 @@ message CircuitBreakers {
         "envoy.api.v2.cluster.CircuitBreakers.Thresholds";
 
     message RetryBudget {
+      option (udpa.annotations.versioning).previous_message_type =
+          "envoy.api.v2.cluster.CircuitBreakers.Thresholds.RetryBudget";
+
       // Specifies the limit on concurrent retries as a percentage of the sum of active requests and
       // active pending requests. For example, if there are 100 active requests and the
       // budget_percent is set to 25, there may be 25 active retries.

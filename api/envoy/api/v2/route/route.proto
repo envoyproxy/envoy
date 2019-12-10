@@ -876,7 +876,7 @@ message RouteAction {
 }
 
 // HTTP retry :ref:`architecture overview <arch_overview_http_routing_retry>`.
-// [#next-free-field: 12]
+// [#next-free-field: 11]
 message RetryPolicy {
   message RetryPriority {
     string name = 1 [(validate.rules).string = {min_bytes: 1}];
