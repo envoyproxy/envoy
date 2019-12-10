@@ -994,13 +994,9 @@ TEST_F(RouterRetryStateImplTest, BudgetUnconfiguredRetries) {
                                 5 /* rq_retry */,
                                 0 /* conn_pool */);
 
-  const auto budget = Upstream::ClusterInfo::RetryBudget{
-    .min_concurrency = 15,
-    .budget_percent = 20,
-  };
-  EXPECT_CALL(cluster_, retryBudget(_)).WillRepeatedly(Return(budget));
+  EXPECT_CALL(cluster_, retryBudget(_)).WillRepeatedly(Return(absl::nullopt));
 
-  Http::TestHeaderMapImpl request_headers{{"x-envoy-retry-on", "5xx"}};
+  Http::TestHeaderMapImpl request_headers{{"x-envoy-retry-on", "5xx"}, {"x-envoy-max-retries", "5"}};
 
   setup(request_headers);
   EXPECT_TRUE(state_->enabled());
@@ -1008,6 +1004,55 @@ TEST_F(RouterRetryStateImplTest, BudgetUnconfiguredRetries) {
   expectTimerCreateAndEnable();
   Http::TestHeaderMapImpl response_headers{{":status", "500"}};
   EXPECT_EQ(RetryStatus::Yes, state_->shouldRetryHeaders(response_headers, callback_));
+
+  incrOutstandingResource(TestResourceType::Retry, 5);
+
+  EXPECT_EQ(RetryStatus::NoOverflow, state_->shouldRetryHeaders(response_headers, callback_));
+
+}
+
+TEST_F(RouterRetryStateImplTest, BudgetVerifyMinimumConcurrency) {
+  // Expect no available retries from resource manager.
+  cluster_.resetResourceManager(0 /* cx */,
+                                0 /* rq_pending */,
+                                0 /* rq */,
+                                0 /* rq_retry */,
+                                0 /* conn_pool */);
+
+  const auto budget = Upstream::ClusterInfo::RetryBudget{
+    .min_concurrency = 15,
+    .budget_percent = 20,
+  };
+  EXPECT_CALL(cluster_, retryBudget(_)).WillRepeatedly(Return(budget));
+
+  Http::TestHeaderMapImpl request_headers{{"x-envoy-retry-on", "5xx"}, {"x-envoy-max-retries", "5"}};
+  Http::TestHeaderMapImpl response_headers{{":status", "500"}};
+
+  setup(request_headers);
+  EXPECT_TRUE(state_->enabled());
+
+  // Load up 2 outstanding retries and verify the 3rd one is allowed when there are no outstanding
+  // requests. This verifies the minimum allowed outstanding retries before the budget is scaled
+  // with the request concurrency.
+  incrOutstandingResource(TestResourceType::Retry, 2);
+
+  expectTimerCreateAndEnable();
+  EXPECT_EQ(RetryStatus::Yes, state_->shouldRetryHeaders(response_headers, callback_));
+
+  // 3 outstanding retries.
+  incrOutstandingResource(TestResourceType::Retry, 1);
+
+  EXPECT_EQ(RetryStatus::NoOverflow, state_->shouldRetryHeaders(response_headers, callback_));
+
+  incrOutstandingResource(TestResourceType::Request, 20);
+
+  EXPECT_CALL(*retry_timer_, enableTimer(_, _));
+  EXPECT_EQ(RetryStatus::Yes, state_->shouldRetryHeaders(response_headers, callback_));
+
+  // 4 outstanding retries.
+  incrOutstandingResource(TestResourceType::Retry, 1);
+
+  EXPECT_EQ(RetryStatus::NoOverflow, state_->shouldRetryHeaders(response_headers, callback_));
 }
 
 } // namespace
