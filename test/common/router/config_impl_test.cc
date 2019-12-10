@@ -648,6 +648,17 @@ virtual_hosts:
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
   TestConfigImpl config(parseRouteConfigurationFromV2Yaml(yaml), factory_context_, true);
 
+  // No host header, no x-forwarded-proto and no path header testing.
+  EXPECT_EQ(nullptr, config.route(Http::TestHeaderMapImpl{{":path", "/"}, {":method", "GET"}}, 0));
+  EXPECT_EQ(
+      nullptr,
+      config.route(
+          Http::TestHeaderMapImpl{{":authority", "foo"}, {":path", "/"}, {":method", "GET"}}, 0));
+  EXPECT_EQ(nullptr, config.route(Http::TestHeaderMapImpl{{":authority", "foo"},
+                                                          {":method", "CONNECT"},
+                                                          {"x-forwarded-proto", "http"}},
+                                  0));
+
   // Base routing testing.
   EXPECT_EQ("instant-server",
             config.route(genHeaders("api.lyft.com", "/", "GET"), 0)->routeEntry()->clusterName());
