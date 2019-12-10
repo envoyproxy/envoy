@@ -75,17 +75,14 @@ void Utility::appendXff(HeaderMap& headers, const Network::Address::Instance& re
     return;
   }
 
-  HeaderString& header = headers.insertForwardedFor().value();
-  const std::string& address_as_string = remote_address.ip()->addressAsString();
-  HeaderMapImpl::appendToHeader(header, address_as_string.c_str());
+  headers.appendForwardedFor(remote_address.ip()->addressAsString(), ",");
 }
 
 void Utility::appendVia(HeaderMap& headers, const std::string& via) {
-  HeaderString& header = headers.insertVia().value();
-  if (!header.empty()) {
-    header.append(", ", 2);
-  }
-  header.append(via.c_str(), via.size());
+  // TODO(asraa): Investigate whether it is necessary to append with whitespace here by:
+  //     (a) Validating we do not expect whitespace in via headers
+  //     (b) Add runtime guarding in case users have upstreams which expect it.
+  headers.appendVia(via, ", ");
 }
 
 std::string Utility::createSslRedirectPath(const HeaderMap& headers) {
@@ -431,7 +428,7 @@ bool Utility::sanitizeConnectionHeader(Http::HeaderMap& headers) {
     bool keep_header = false;
 
     // Determine whether the nominated header contains invalid values
-    HeaderEntry* nominated_header = NULL;
+    const HeaderEntry* nominated_header = NULL;
 
     if (lcs_header_to_remove == Http::Headers::get().Connection) {
       // Remove the connection header from the nominated tokens if it's self nominated
@@ -485,8 +482,7 @@ bool Utility::sanitizeConnectionHeader(Http::HeaderMap& headers) {
         }
 
         if (keep_header) {
-          nominated_header->value().setCopy(Http::Headers::get().TEValues.Trailers.data(),
-                                            Http::Headers::get().TEValues.Trailers.size());
+          headers.setTE(Http::Headers::get().TEValues.Trailers);
         }
       }
     }
@@ -506,7 +502,7 @@ bool Utility::sanitizeConnectionHeader(Http::HeaderMap& headers) {
     if (new_value.empty()) {
       headers.removeConnection();
     } else {
-      headers.Connection()->value(new_value);
+      headers.setConnection(new_value);
     }
   }
 

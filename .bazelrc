@@ -27,9 +27,10 @@ build:linux --copt=-fPIC
 # We already have absl in the build, define absl=1 to tell googletest to use absl for backtrace.
 build --define absl=1
 
-# Pass PATH, CC and CXX variables from the environment.
+# Pass PATH, CC, CXX and LLVM_CONFIG variables from the environment.
 build --action_env=CC
 build --action_env=CXX
+build --action_env=LLVM_CONFIG
 build --action_env=PATH
 
 # Common flags for sanitizers

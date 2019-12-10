@@ -61,6 +61,25 @@ public:
   void testRequestHeadersExceedLimit(std::string header_string);
   void testRequestHeadersAccepted(std::string header_string);
 
+  // Send the request, and validate the received request headers.
+  // Then send a response just to clean up.
+  void sendAndValidateRequestAndSendResponse(absl::string_view raw_request,
+                                             const TestHeaderMapImpl& expected_request_headers) {
+    NiceMock<Http::MockStreamDecoder> decoder;
+    Http::StreamEncoder* response_encoder = nullptr;
+    EXPECT_CALL(callbacks_, newStream(_, _))
+        .Times(1)
+        .WillOnce(Invoke([&](Http::StreamEncoder& encoder, bool) -> Http::StreamDecoder& {
+          response_encoder = &encoder;
+          return decoder;
+        }));
+    EXPECT_CALL(decoder, decodeHeaders_(HeaderMapEqual(&expected_request_headers), true)).Times(1);
+    Buffer::OwnedImpl buffer(raw_request);
+    codec_->dispatch(buffer);
+    EXPECT_EQ(0U, buffer.length());
+    response_encoder->encodeHeaders(TestHeaderMapImpl{{":status", "200"}}, true);
+  }
+
 protected:
   uint32_t max_request_headers_kb_{Http::DEFAULT_MAX_REQUEST_HEADERS_KB};
   uint32_t max_request_headers_count_{Http::DEFAULT_MAX_HEADERS_COUNT};
@@ -165,6 +184,23 @@ TEST_F(Http1ServerConnectionImplTest, EmptyHeader) {
   Buffer::OwnedImpl buffer("GET / HTTP/1.1\r\nTest:\r\nHello: World\r\n\r\n");
   codec_->dispatch(buffer);
   EXPECT_EQ(0U, buffer.length());
+}
+
+TEST_F(Http1ServerConnectionImplTest, HostWithLWS) {
+  initialize();
+
+  TestHeaderMapImpl expected_headers{{":authority", "host"}, {":path", "/"}, {":method", "GET"}};
+
+  // Regression test spaces before and after the host header value.
+  sendAndValidateRequestAndSendResponse("GET / HTTP/1.1\r\nHost: host \r\n\r\n", expected_headers);
+
+  // Regression test tabs before and after the host header value.
+  sendAndValidateRequestAndSendResponse("GET / HTTP/1.1\r\nHost:	host	\r\n\r\n",
+                                        expected_headers);
+
+  // Regression test mixed spaces and tabs before and after the host header value.
+  sendAndValidateRequestAndSendResponse(
+      "GET / HTTP/1.1\r\nHost: 	 	  host		  	 \r\n\r\n", expected_headers);
 }
 
 TEST_F(Http1ServerConnectionImplTest, Http10) {
@@ -354,6 +390,22 @@ TEST_F(Http1ServerConnectionImplTest, BadRequestNoStream) {
   ON_CALL(connection_, write(_, _)).WillByDefault(AddBufferToString(&output));
 
   Buffer::OwnedImpl buffer("bad");
+  EXPECT_THROW(codec_->dispatch(buffer), CodecProtocolException);
+  EXPECT_EQ("HTTP/1.1 400 Bad Request\r\ncontent-length: 0\r\nconnection: close\r\n\r\n", output);
+}
+
+// This behavior was observed during CVE-2019-18801 and helped to limit the
+// scope of affected Envoy configurations.
+TEST_F(Http1ServerConnectionImplTest, RejectInvalidMethod) {
+  initialize();
+
+  Http::MockStreamDecoder decoder;
+  EXPECT_CALL(callbacks_, newStream(_, _)).WillOnce(ReturnRef(decoder));
+
+  std::string output;
+  ON_CALL(connection_, write(_, _)).WillByDefault(AddBufferToString(&output));
+
+  Buffer::OwnedImpl buffer("BAD / HTTP/1.1\r\nHost: foo\r\n");
   EXPECT_THROW(codec_->dispatch(buffer), CodecProtocolException);
   EXPECT_EQ("HTTP/1.1 400 Bad Request\r\ncontent-length: 0\r\nconnection: close\r\n\r\n", output);
 }
@@ -557,6 +609,33 @@ TEST_F(Http1ServerConnectionImplTest, HeaderOnlyResponse) {
   TestHeaderMapImpl headers{{":status", "200"}};
   response_encoder->encodeHeaders(headers, true);
   EXPECT_EQ("HTTP/1.1 200 OK\r\ncontent-length: 0\r\n\r\n", output);
+}
+
+// As with Http1ClientConnectionImplTest.LargeHeaderRequestEncode but validate
+// the response encoder instead of request encoder.
+TEST_F(Http1ServerConnectionImplTest, LargeHeaderResponseEncode) {
+  initialize();
+
+  NiceMock<Http::MockStreamDecoder> decoder;
+  Http::StreamEncoder* response_encoder = nullptr;
+  EXPECT_CALL(callbacks_, newStream(_, _))
+      .WillOnce(Invoke([&](Http::StreamEncoder& encoder, bool) -> Http::StreamDecoder& {
+        response_encoder = &encoder;
+        return decoder;
+      }));
+
+  Buffer::OwnedImpl buffer("GET / HTTP/1.1\r\n\r\n");
+  codec_->dispatch(buffer);
+  EXPECT_EQ(0U, buffer.length());
+
+  std::string output;
+  ON_CALL(connection_, write(_, _)).WillByDefault(AddBufferToString(&output));
+
+  const std::string long_header_value = std::string(79 * 1024, 'a');
+  TestHeaderMapImpl headers{{":status", "200"}, {"foo", long_header_value}};
+  response_encoder->encodeHeaders(headers, true);
+  EXPECT_EQ("HTTP/1.1 200 OK\r\nfoo: " + long_header_value + "\r\ncontent-length: 0\r\n\r\n",
+            output);
 }
 
 TEST_F(Http1ServerConnectionImplTest, HeaderOnlyResponseTrainProperHeaders) {
@@ -1426,6 +1505,56 @@ TEST_F(Http1ClientConnectionImplTest, LargeResponseHeadersAccepted) {
   std::string long_header = "big: " + std::string(79 * 1024, 'q') + "\r\n";
   buffer = Buffer::OwnedImpl(long_header);
   codec_->dispatch(buffer);
+}
+
+// Regression test for CVE-2019-18801. Large method headers should not trigger
+// ASSERTs or ASAN, which they previously did.
+TEST_F(Http1ClientConnectionImplTest, LargeMethodRequestEncode) {
+  initialize();
+
+  NiceMock<Http::MockStreamDecoder> response_decoder;
+  const std::string long_method = std::string(79 * 1024, 'a');
+  Http::StreamEncoder& request_encoder = codec_->newStream(response_decoder);
+  TestHeaderMapImpl headers{{":method", long_method}, {":path", "/"}, {":authority", "host"}};
+  std::string output;
+  ON_CALL(connection_, write(_, _)).WillByDefault(AddBufferToString(&output));
+  request_encoder.encodeHeaders(headers, true);
+  EXPECT_EQ(long_method + " / HTTP/1.1\r\nhost: host\r\ncontent-length: 0\r\n\r\n", output);
+}
+
+// As with LargeMethodEncode, but for the path header. This was not an issue
+// in CVE-2019-18801, but the related code does explicit size calculations on
+// both path and method (these are the two distinguished headers). So,
+// belt-and-braces.
+TEST_F(Http1ClientConnectionImplTest, LargePathRequestEncode) {
+  initialize();
+
+  NiceMock<Http::MockStreamDecoder> response_decoder;
+  const std::string long_path = std::string(79 * 1024, '/');
+  Http::StreamEncoder& request_encoder = codec_->newStream(response_decoder);
+  TestHeaderMapImpl headers{{":method", "GET"}, {":path", long_path}, {":authority", "host"}};
+  std::string output;
+  ON_CALL(connection_, write(_, _)).WillByDefault(AddBufferToString(&output));
+  request_encoder.encodeHeaders(headers, true);
+  EXPECT_EQ("GET " + long_path + " HTTP/1.1\r\nhost: host\r\ncontent-length: 0\r\n\r\n", output);
+}
+
+// As with LargeMethodEncode, but for an arbitrary header. This was not an issue
+// in CVE-2019-18801.
+TEST_F(Http1ClientConnectionImplTest, LargeHeaderRequestEncode) {
+  initialize();
+
+  NiceMock<Http::MockStreamDecoder> response_decoder;
+  Http::StreamEncoder& request_encoder = codec_->newStream(response_decoder);
+  const std::string long_header_value = std::string(79 * 1024, 'a');
+  TestHeaderMapImpl headers{
+      {":method", "GET"}, {"foo", long_header_value}, {":path", "/"}, {":authority", "host"}};
+  std::string output;
+  ON_CALL(connection_, write(_, _)).WillByDefault(AddBufferToString(&output));
+  request_encoder.encodeHeaders(headers, true);
+  EXPECT_EQ("GET / HTTP/1.1\r\nhost: host\r\nfoo: " + long_header_value +
+                "\r\ncontent-length: 0\r\n\r\n",
+            output);
 }
 
 // Exception called when the number of response headers exceeds the default value of 100.

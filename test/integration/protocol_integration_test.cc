@@ -1012,8 +1012,10 @@ TEST_P(DownstreamProtocolIntegrationTest, ManyRequestTrailersAccepted) {
   EXPECT_EQ("200", response->headers().Status()->value().getStringView());
 }
 
+// This test uses an Http::HeaderMapImpl instead of an Http::TestHeaderMapImpl to avoid
+// time-consuming byte size validations that will cause this test to timeout.
 TEST_P(DownstreamProtocolIntegrationTest, ManyRequestHeadersTimeout) {
-  // Set timeout for 5 seconds, and ensure that a request with 20k+ headers can be sent.
+  // Set timeout for 5 seconds, and ensure that a request with 10k+ headers can be sent.
   testManyRequestHeaders(std::chrono::milliseconds(5000));
 }
 
@@ -1025,6 +1027,8 @@ TEST_P(DownstreamProtocolIntegrationTest, LargeRequestTrailersRejected) {
   testLargeRequestTrailers(66, 60);
 }
 
+// This test uses an Http::HeaderMapImpl instead of an Http::TestHeaderMapImpl to avoid
+// time-consuming byte size verification that will cause this test to timeout.
 TEST_P(DownstreamProtocolIntegrationTest, ManyTrailerHeaders) {
   max_request_headers_kb_ = 96;
   max_request_headers_count_ = 20005;
@@ -1037,9 +1041,9 @@ TEST_P(DownstreamProtocolIntegrationTest, ManyTrailerHeaders) {
             max_request_headers_count_);
       });
 
-  Http::TestHeaderMapImpl request_trailers{};
+  Http::HeaderMapImpl request_trailers{};
   for (int i = 0; i < 20000; i++) {
-    request_trailers.addCopy(std::to_string(i), "");
+    request_trailers.addCopy(Http::LowerCaseString(std::to_string(i)), "");
   }
 
   initialize();
@@ -1059,6 +1063,55 @@ TEST_P(DownstreamProtocolIntegrationTest, ManyTrailerHeaders) {
   EXPECT_TRUE(upstream_request_->complete());
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().Status()->value().getStringView());
+}
+
+// Regression tests for CVE-2019-18801. We only validate the behavior of large
+// :method request headers, since the case of other large headers is
+// covered in the various testLargeRequest-based integration tests here.
+//
+// The table below describes the expected behaviors (in addition we should never
+// see an ASSERT or ASAN failure trigger).
+//
+// Downstream    Upstream   Behavior expected
+// ------------------------------------------
+// H1            H1         Envoy will reject (HTTP/1 codec behavior)
+// H1            H2         Envoy will reject (HTTP/1 codec behavior)
+// H2            H1         Envoy will forward but backend will reject (HTTP/1
+//                          codec behavior)
+// H2            H2         Success
+TEST_P(ProtocolIntegrationTest, LargeRequestMethod) {
+  const std::string long_method = std::string(48 * 1024, 'a');
+  const Http::TestHeaderMapImpl request_headers{{":method", long_method},
+                                                {":path", "/test/long/url"},
+                                                {":scheme", "http"},
+                                                {":authority", "host"}};
+
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  if (downstreamProtocol() == Http::CodecClient::Type::HTTP1) {
+    auto encoder_decoder = codec_client_->startRequest(request_headers);
+    request_encoder_ = &encoder_decoder.first;
+    auto response = std::move(encoder_decoder.second);
+    codec_client_->waitForDisconnect();
+    EXPECT_TRUE(response->complete());
+    EXPECT_EQ("400", response->headers().Status()->value().getStringView());
+  } else {
+    ASSERT(downstreamProtocol() == Http::CodecClient::Type::HTTP2);
+    if (upstreamProtocol() == FakeHttpConnection::Type::HTTP1) {
+      auto response = codec_client_->makeHeaderOnlyRequest(request_headers);
+      ASSERT_TRUE(
+          fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+      response->waitForEndStream();
+      EXPECT_TRUE(response->complete());
+      EXPECT_EQ("400", response->headers().Status()->value().getStringView());
+    } else {
+      ASSERT(upstreamProtocol() == FakeHttpConnection::Type::HTTP2);
+      auto response =
+          sendRequestAndWaitForResponse(request_headers, 0, default_response_headers_, 0);
+      EXPECT_TRUE(response->complete());
+    }
+  }
 }
 
 // Tests StopAllIterationAndBuffer. Verifies decode-headers-return-stop-all-filter calls decodeData
@@ -1412,6 +1465,32 @@ TEST_P(ProtocolIntegrationTest, ConnDurationTimeoutNoHttpRequest) {
   codec_client_ = makeHttpConnection(lookupPort("http"));
   ASSERT_TRUE(codec_client_->waitForDisconnect(std::chrono::milliseconds(10000)));
   test_server_->waitForCounterGe("http.config_test.downstream_cx_max_duration_reached", 1);
+}
+
+// Make sure that invalid authority headers get blocked at or before the HCM.
+TEST_P(DownstreamProtocolIntegrationTest, InvalidAuth) {
+  initialize();
+  fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  Http::TestHeaderMapImpl request_headers{{":method", "POST"},
+                                          {":path", "/test/long/url"},
+                                          {":scheme", "http"},
+                                          {":authority", "ho|st|"}};
+
+  auto response = codec_client_->makeHeaderOnlyRequest(request_headers);
+  if (downstreamProtocol() == Http::CodecClient::Type::HTTP1) {
+    // For HTTP/1 this is handled by the HCM, which sends a full 400 response.
+    response->waitForEndStream();
+    ASSERT_TRUE(response->complete());
+    EXPECT_EQ("400", response->headers().Status()->value().getStringView());
+  } else {
+    // For HTTP/2 this is handled by nghttp2 which resets the connection without
+    // sending an HTTP response.
+    codec_client_->waitForDisconnect();
+    ASSERT_FALSE(response->complete());
+  }
 }
 
 // For tests which focus on downstream-to-Envoy behavior, and don't need to be

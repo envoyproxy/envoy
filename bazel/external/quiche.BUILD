@@ -2029,6 +2029,7 @@ envoy_cc_library(
     copts = quiche_copts,
     repository = "@envoy",
     tags = ["nofips"],
+    visibility = ["//visibility:public"],
     deps = [
         ":quic_core_alarm_interface_lib",
         ":quic_core_crypto_encryption_lib",
@@ -2368,9 +2369,9 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "quic_core_qpack_qpack_constants_lib",
-    srcs = ["quiche/quic/core/qpack/qpack_constants.cc"],
-    hdrs = ["quiche/quic/core/qpack/qpack_constants.h"],
+    name = "quic_core_qpack_qpack_instructions_lib",
+    srcs = ["quiche/quic/core/qpack/qpack_instructions.cc"],
+    hdrs = ["quiche/quic/core/qpack/qpack_instructions.h"],
     copts = quiche_copts,
     repository = "@envoy",
     tags = ["nofips"],
@@ -2403,12 +2404,12 @@ envoy_cc_library(
     tags = ["nofips"],
     deps = [
         ":quic_core_qpack_blocking_manager_lib",
-        ":quic_core_qpack_qpack_constants_lib",
         ":quic_core_qpack_qpack_decoder_stream_receiver_lib",
         ":quic_core_qpack_qpack_encoder_stream_sender_lib",
         ":quic_core_qpack_qpack_header_table_lib",
         ":quic_core_qpack_qpack_index_conversions_lib",
         ":quic_core_qpack_qpack_instruction_encoder_lib",
+        ":quic_core_qpack_qpack_instructions_lib",
         ":quic_core_qpack_qpack_required_insert_count_lib",
         ":quic_core_qpack_value_splitting_header_list_lib",
         ":quic_core_types_lib",
@@ -2440,7 +2441,7 @@ envoy_cc_library(
     deps = [
         ":http2_hpack_huffman_hpack_huffman_decoder_lib",
         ":http2_hpack_varint_hpack_varint_decoder_lib",
-        ":quic_core_qpack_qpack_constants_lib",
+        ":quic_core_qpack_qpack_instructions_lib",
         ":quic_platform_base",
     ],
 )
@@ -2455,7 +2456,7 @@ envoy_cc_library(
     deps = [
         ":http2_hpack_huffman_hpack_huffman_encoder_lib",
         ":http2_hpack_varint_hpack_varint_encoder_lib",
-        ":quic_core_qpack_qpack_constants_lib",
+        ":quic_core_qpack_qpack_instructions_lib",
         ":quic_platform",
     ],
 )
@@ -2468,12 +2469,12 @@ envoy_cc_library(
     repository = "@envoy",
     tags = ["nofips"],
     deps = [
-        ":quic_core_qpack_qpack_constants_lib",
         ":quic_core_qpack_qpack_decoder_stream_sender_lib",
         ":quic_core_qpack_qpack_encoder_stream_receiver_lib",
         ":quic_core_qpack_qpack_header_table_lib",
         ":quic_core_qpack_qpack_index_conversions_lib",
         ":quic_core_qpack_qpack_instruction_decoder_lib",
+        ":quic_core_qpack_qpack_instructions_lib",
         ":quic_core_qpack_qpack_required_insert_count_lib",
         ":quic_core_types_lib",
         ":quic_platform_base",
@@ -2498,8 +2499,8 @@ envoy_cc_library(
     repository = "@envoy",
     tags = ["nofips"],
     deps = [
-        ":quic_core_qpack_qpack_constants_lib",
         ":quic_core_qpack_qpack_instruction_encoder_lib",
+        ":quic_core_qpack_qpack_instructions_lib",
         ":quic_core_qpack_qpack_stream_sender_delegate_lib",
         ":quic_core_types_lib",
         ":quic_platform_base",
@@ -2516,8 +2517,8 @@ envoy_cc_library(
     deps = [
         ":http2_decoder_decode_buffer_lib",
         ":http2_decoder_decode_status_lib",
-        ":quic_core_qpack_qpack_constants_lib",
         ":quic_core_qpack_qpack_instruction_decoder_lib",
+        ":quic_core_qpack_qpack_instructions_lib",
         ":quic_core_qpack_qpack_stream_receiver_lib",
         ":quic_platform_base",
     ],
@@ -2531,8 +2532,8 @@ envoy_cc_library(
     repository = "@envoy",
     tags = ["nofips"],
     deps = [
-        ":quic_core_qpack_qpack_constants_lib",
         ":quic_core_qpack_qpack_instruction_encoder_lib",
+        ":quic_core_qpack_qpack_instructions_lib",
         ":quic_core_qpack_qpack_stream_sender_delegate_lib",
         ":quic_core_types_lib",
         ":quic_platform_base",
@@ -2549,8 +2550,8 @@ envoy_cc_library(
     deps = [
         ":http2_decoder_decode_buffer_lib",
         ":http2_decoder_decode_status_lib",
-        ":quic_core_qpack_qpack_constants_lib",
         ":quic_core_qpack_qpack_instruction_decoder_lib",
+        ":quic_core_qpack_qpack_instructions_lib",
         ":quic_core_qpack_qpack_stream_receiver_lib",
         ":quic_core_types_lib",
         ":quic_platform_base",
@@ -2762,6 +2763,7 @@ envoy_cc_library(
         "quiche/quic/core/uber_quic_stream_id_manager.cc",
     ],
     hdrs = [
+        "quiche/quic/core/handshaker_delegate_interface.h",
         "quiche/quic/core/legacy_quic_stream_id_manager.h",
         "quiche/quic/core/quic_control_frame_manager.h",
         "quiche/quic/core/quic_crypto_client_handshaker.h",

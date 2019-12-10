@@ -2,9 +2,9 @@ syntax = "proto3";
 
 package envoy.service.discovery.v2;
 
+option java_package = "io.envoyproxy.envoy.service.discovery.v2";
 option java_outer_classname = "HdsProto";
 option java_multiple_files = true;
-option java_package = "io.envoyproxy.envoy.service.discovery.v2";
 option java_generic_services = true;
 
 import "envoy/api/v2/core/base.proto";
@@ -62,10 +62,8 @@ service HealthDiscoveryService {
   // request/response. Should we add an identifier to the HealthCheckSpecifier
   // to bind with the response?
   rpc FetchHealthCheck(HealthCheckRequestOrEndpointHealthResponse) returns (HealthCheckSpecifier) {
-    option (google.api.http) = {
-      post: "/v2/discovery:health_check"
-      body: "*"
-    };
+    option (google.api.http).post = "/v2/discovery:health_check";
+    option (google.api.http).body = "*";
   }
 }
 

@@ -2,9 +2,9 @@ syntax = "proto3";
 
 package envoy.api.v2.cluster;
 
+option java_package = "io.envoyproxy.envoy.api.v2.cluster";
 option java_outer_classname = "CircuitBreakerProto";
 option java_multiple_files = true;
-option java_package = "io.envoyproxy.envoy.api.v2.cluster";
 option csharp_namespace = "Envoy.Api.V2.ClusterNS";
 option ruby_package = "Envoy.Api.V2.ClusterNS";
 

@@ -407,24 +407,22 @@ private:
   struct PendingUpdates {
     ~PendingUpdates() { disableTimer(); }
     void enableTimer(const uint64_t timeout) {
-      ASSERT(!timer_enabled_);
       if (timer_ != nullptr) {
+        ASSERT(!timer_->enabled());
         timer_->enableTimer(std::chrono::milliseconds(timeout));
-        timer_enabled_ = true;
       }
     }
     bool disableTimer() {
-      const bool was_enabled = timer_enabled_;
-      if (timer_ != nullptr) {
-        timer_->disableTimer();
-        timer_enabled_ = false;
+      if (timer_ == nullptr) {
+        return false;
       }
+
+      const bool was_enabled = timer_->enabled();
+      timer_->disableTimer();
       return was_enabled;
     }
 
     Event::TimerPtr timer_;
-    // TODO(rgs1): this should be part of Event::Timer's interface.
-    bool timer_enabled_{};
     // This is default constructed to the clock's epoch:
     // https://en.cppreference.com/w/cpp/chrono/time_point/time_point
     //
