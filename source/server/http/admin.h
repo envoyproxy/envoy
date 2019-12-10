@@ -174,8 +174,8 @@ private:
    * if an error while handling an admin request occurs.
    */
   struct AdminException {
-    Http::Code code;
-    std::string message;
+    const Http::Code code;
+    const std::string message;
   };
 
   /**
@@ -246,8 +246,8 @@ private:
   /**
    * Helper methods for the /config_dump url handler.
    */
-  void addAllToDump(envoy::admin::v2alpha::ConfigDump& dump,
-                    const absl::optional<std::string>& mask) const;
+  void addAllConfigToDump(envoy::admin::v2alpha::ConfigDump& dump,
+                          const absl::optional<std::string>& mask) const;
   void addResourceToDump(envoy::admin::v2alpha::ConfigDump& dump,
                          const absl::optional<std::string>& mask,
                          const std::string& resource) const;

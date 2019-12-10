@@ -176,25 +176,25 @@ bool filterParam(Http::Utility::QueryParams params, Buffer::Instance& response,
   return true;
 }
 
-// Helper method to get a query parameter
-absl::optional<std::string> queryParam(const Http::Utility::QueryParams params,
-                                       const std::string key) {
+// Helper method to get a query parameter.
+absl::optional<std::string> queryParam(const Http::Utility::QueryParams& params,
+                                       const std::string& key) {
   return (params.find(key) != params.end()) ? absl::optional<std::string>{params.at(key)}
                                             : absl::nullopt;
 }
 
-// Helper method to get the format parameter
-absl::optional<std::string> formatParam(const Http::Utility::QueryParams params) {
+// Helper method to get the format parameter.
+absl::optional<std::string> formatParam(const Http::Utility::QueryParams& params) {
   return queryParam(params, "format");
 }
 
-// Helper method to get the resource parameter
-absl::optional<std::string> resourceParam(const Http::Utility::QueryParams params) {
+// Helper method to get the resource parameter.
+absl::optional<std::string> resourceParam(const Http::Utility::QueryParams& params) {
   return queryParam(params, "resource");
 }
 
-// Helper method to get the mask parameter
-absl::optional<std::string> maskParam(const Http::Utility::QueryParams params) {
+// Helper method to get the mask parameter.
+absl::optional<std::string> maskParam(const Http::Utility::QueryParams& params) {
   return queryParam(params, "mask");
 }
 
@@ -545,8 +545,8 @@ Http::Code AdminImpl::handlerClusters(absl::string_view url, Http::HeaderMap& re
   return Http::Code::OK;
 }
 
-void AdminImpl::addAllToDump(envoy::admin::v2alpha::ConfigDump& dump,
-                             const absl::optional<std::string>& mask) const {
+void AdminImpl::addAllConfigToDump(envoy::admin::v2alpha::ConfigDump& dump,
+                                   const absl::optional<std::string>& mask) const {
   for (const auto& key_callback_pair : config_tracker_.getCallbacksMap()) {
     ProtobufTypes::MessagePtr message = key_callback_pair.second();
     RELEASE_ASSERT(message, "");
@@ -565,13 +565,12 @@ void AdminImpl::addAllToDump(envoy::admin::v2alpha::ConfigDump& dump,
 void AdminImpl::addResourceToDump(envoy::admin::v2alpha::ConfigDump& dump,
                                   const absl::optional<std::string>& mask,
                                   const std::string& resource) const {
-  bool resource_found = false;
   for (const auto& key_callback_pair : config_tracker_.getCallbacksMap()) {
     ProtobufTypes::MessagePtr message = key_callback_pair.second();
     RELEASE_ASSERT(message, "");
 
-    auto field_descriptor = message.get()->GetDescriptor()->FindFieldByName(resource);
-    const Protobuf::Reflection* reflection = message.get()->GetReflection();
+    auto field_descriptor = message->GetDescriptor()->FindFieldByName(resource);
+    const Protobuf::Reflection* reflection = message->GetReflection();
     if (!field_descriptor) {
       continue;
     } else if (!field_descriptor->is_repeated()) {
@@ -580,7 +579,6 @@ void AdminImpl::addResourceToDump(envoy::admin::v2alpha::ConfigDump& dump,
           fmt::format("{} is not a repeated field. Use ?mask={} to get only this field",
                       field_descriptor->name(), field_descriptor->name())};
     }
-    resource_found = true;
 
     auto repeated = reflection->GetRepeatedPtrField<Protobuf::Message>(*message, field_descriptor);
     for (Protobuf::Message& msg : repeated) {
@@ -595,12 +593,10 @@ void AdminImpl::addResourceToDump(envoy::admin::v2alpha::ConfigDump& dump,
 
     // We found the desired resource so there is no need to continue iterating over
     // the other keys.
-    break;
+    return;
   }
-  if (!resource_found) {
-    throw AdminException{Http::Code::NotFound,
-                         fmt::format("{} not found in config dump", resource)};
-  }
+
+  throw AdminException{Http::Code::NotFound, fmt::format("{} not found in config dump", resource)};
 }
 
 Http::Code AdminImpl::handlerConfigDump(absl::string_view url, Http::HeaderMap& response_headers,
@@ -619,7 +615,7 @@ Http::Code AdminImpl::handlerConfigDump(absl::string_view url, Http::HeaderMap& 
       return e.code;
     }
   } else {
-    addAllToDump(dump, mask);
+    addAllConfigToDump(dump, mask);
   }
 
   response_headers.setReferenceContentType(Http::Headers::get().ContentTypeValues.Json);

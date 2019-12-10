@@ -132,6 +132,7 @@ modify different aspects of the server:
 .. _operations_admin_interface_config_dump_by_mask:
 
 .. http:get:: /config_dump?mask={}
+
   Specify a subset of fields that you would like to be returned. The mask is parsed as a
   ``ProtobufWkt::FieldMask`` and applied to each top level dump such as
   :ref:`BootstrapConfigDump <envoy_api_msg_admin.v2alpha.BootstrapConfigDump>` and
@@ -142,16 +143,20 @@ modify different aspects of the server:
 .. _operations_admin_interface_config_dump_by_resource:
 
 .. http:get:: /config_dump?resource={}
+
   Dump only the currently loaded configuration that matches the specified resource. The resource must
-  be a repeated field in one of the top level config dumps such as static_listeners from
-  :ref:`ListenersConfigDump <envoy_api_msg_admin.v2alpha.ListenersConfigDump` or dynamic_active_clusters
-  from :ref:`ClustersConfigDump <envoy_api_msg_admin.v2alpha.ClustersConfigDump`. If you need a non-repeated
+  be a repeated field in one of the top level config dumps such as
+  :ref:`static_listeners <envoy_api_field_admin.v2alpha.ListenersConfigDump.static_listeners>` from
+  :ref:`ListenersConfigDump <envoy_api_msg_admin.v2alpha.ListenersConfigDump>` or
+  :ref:`dynamic_active_clusters <envoy_api_field_admin.v2alpha.ClustersConfigDump.dynamic_active_clusters>` from
+  :ref:`ClustersConfigDump <envoy_api_msg_admin.v2alpha.ClustersConfigDump>`. If you need a non-repeated
   field, use the mask query parameter documented above. If you want only a subset of fields from the repeated
   resource, use both as documented below.
 
 .. _operations_admin_interface_config_dump_by_resource_and_mask:
 
 .. http:get:: /config_dump?resource={},mask={}
+
   When both resource and mask query parameters are specified, the mask is applied to every element
   in the desired repeated field so that only a subset of fields are returned. The mask is parsed
   as a ``ProtobufWkt::FieldMask``.
