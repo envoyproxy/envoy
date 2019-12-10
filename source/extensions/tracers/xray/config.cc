@@ -2,6 +2,7 @@
 
 #include <string>
 
+#include "envoy/api/v2/core/address.pb.h"
 #include "envoy/registry/registry.h"
 
 #include "common/common/utility.h"
@@ -16,10 +17,14 @@ namespace Extensions {
 namespace Tracers {
 namespace XRay {
 
+namespace api = ::envoy::api::v2;
+namespace trace = envoy::config::trace::v2alpha;
+
 XRayTracerFactory::XRayTracerFactory() : FactoryBase(TracerNames::get().XRay) {}
 
-Tracing::HttpTracerPtr XRayTracerFactory::createHttpTracerTyped(
-    const envoy::config::trace::v2alpha::xray::Config& proto_config, Server::Instance& server) {
+Tracing::HttpTracerPtr
+XRayTracerFactory::createHttpTracerTyped(const trace::xray::Config& proto_config,
+                                         Server::Instance& server) {
   std::string sampling_rules_json;
   try {
     sampling_rules_json =
@@ -28,8 +33,18 @@ Tracing::HttpTracerPtr XRayTracerFactory::createHttpTracerTyped(
     ENVOY_LOG(error, "Failed to read sampling rules manifest because of {}.", e.what());
   }
 
-  XRayConfiguration xconfig{proto_config.daemon_endpoint(), proto_config.segment_name(),
-                            sampling_rules_json};
+  RELEASE_ASSERT(proto_config.daemon_endpoint().protocol() ==
+                     api::core::SocketAddress::Protocol::SocketAddress_Protocol_UDP,
+                 "X-Ray daemon endpoint must be a UDP socket address");
+
+  RELEASE_ASSERT(proto_config.daemon_endpoint().port_specifier_case() ==
+                     api::core::SocketAddress::PortSpecifierCase::kPortValue,
+                 "X-Ray daemon port must be specified as number. Not a named port.");
+
+  const std::string endpoint = fmt::format("{}:{}", proto_config.daemon_endpoint().address(),
+                                           proto_config.daemon_endpoint().port_value());
+
+  XRayConfiguration xconfig{endpoint, proto_config.segment_name(), sampling_rules_json};
   auto xray_driver = std::make_unique<XRay::Driver>(xconfig, server);
 
   return std::make_unique<Tracing::HttpTracerImpl>(std::move(xray_driver), server.localInfo());

@@ -25,9 +25,7 @@ std::string createHeader(const std::string& format, uint32_t version) {
   json_options.preserve_proto_field_names = true;
   std::string json;
   const auto status = Protobuf::util::MessageToJsonString(header, &json, json_options);
-  if (!status.ok()) {
-    throw new EnvoyException("Failed to serialize X-Ray header to JSON.");
-  }
+  ASSERT(status.ok());
   return json;
 }
 
@@ -36,9 +34,6 @@ std::string createHeader(const std::string& format, uint32_t version) {
 DaemonBrokerImpl::DaemonBrokerImpl(const std::string& daemon_endpoint) {
   address_ = Network::Utility::parseInternetAddressAndPort(daemon_endpoint, false /*v6only*/);
   io_handle_ = address_->socket(Network::Address::SocketType::Datagram);
-  RELEASE_ASSERT(
-      io_handle_->fd() != -1,
-      absl::StrCat("Failed to acquire UDP socket to X-Ray daemon at - ", daemon_endpoint));
 }
 
 void DaemonBrokerImpl::send(const std::string& data) const {
@@ -53,7 +48,8 @@ void DaemonBrokerImpl::send(const std::string& data) const {
                                                   nullptr /*local_ip*/, *address_);
 
   if (rc.rc_ != payload.length()) {
-    ENVOY_LOG_TO_LOGGER(logger, error, "Failed to send trace payload to the X-Ray daemon.");
+    // TODO(marcomagdy): report this in stats
+    ENVOY_LOG_TO_LOGGER(logger, debug, "Failed to send trace payload to the X-Ray daemon.");
   }
 }
 

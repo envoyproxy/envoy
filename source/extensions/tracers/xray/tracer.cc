@@ -99,12 +99,9 @@ void Span::finishSpan() {
   json_options.preserve_proto_field_names = true;
   std::string json;
   const auto status = Protobuf::util::MessageToJsonString(s, &json, json_options);
-  if (!status.ok()) {
-    throw new EnvoyException("Failed to serialize span to JSON.");
-  }
-
+  ASSERT(status.ok());
   broker_.send(json);
-}
+} // namespace XRay
 
 void Span::injectContext(Http::HeaderMap& request_headers) {
   const std::string xray_header_value =
@@ -147,8 +144,7 @@ Tracing::SpanPtr Tracer::startSpan(const std::string& span_name, const std::stri
       break;
     case SamplingDecision::NotSampled:
       // should never get here. If the header has Sampled=0 then we never call startSpan().
-      RELEASE_ASSERT(false, "X-Ray startSpan called despite HTTP header having sampled=0");
-      break;
+      NOT_REACHED_GCOVR_EXCL_LINE;
     default:
       break;
     }

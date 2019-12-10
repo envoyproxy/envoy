@@ -1,10 +1,11 @@
+
 syntax = "proto3";
 
-package envoy.config.trace.v2alpha.xray;
+package envoy.config.trace.v3alpha.xray;
 
 option java_outer_classname = "XRayTracer";
 option java_multiple_files = true;
-option java_package = "io.envoyproxy.envoy.config.trace.v2alpha.xray";
+option java_package = "io.envoyproxy.envoy.config.trace.v3alpha.xray";
 
 import "envoy/api/v2/core/address.proto";
 import "envoy/api/v2/core/base.proto";
@@ -12,8 +13,7 @@ import "envoy/api/v2/core/base.proto";
 import "validate/validate.proto";
 
 // [#protodoc-title: AWS X-Ray Tracer Configuration]
-// Configuration for AWS X-Ray tracer
-
+// Configuration for AWS X-Ray tracer.
 message Config {
   // The UDP endpoint of the X-Ray Daemon where the spans will be sent.
   // If this value is not set, the default value of 127.0.0.1:2000 will be used.
@@ -27,3 +27,4 @@ message Config {
   // https://docs.aws.amazon.com/xray/latest/devguide/xray-sdk-go-configuration.html#xray-sdk-go-configuration-sampling
   api.v2.core.DataSource sampling_rule_manifest = 3;
 }
+

@@ -24,7 +24,10 @@ TEST(XRayTracerConfigTest, XRayHttpTracerWithTypedConfig) {
     name: envoy.tracers.xray
     typed_config:
       "@type": type.googleapis.com/envoy.config.trace.v2alpha.xray.Config
-      daemon_endpoint: 127.0.0.1:2020
+      daemon_endpoint:
+        protocol: UDP
+        address: 127.0.0.1
+        port_value: 2000
       segment_name: AwsAppMesh
       sampling_rule_manifest:
         filename: "rules.json")EOF";
@@ -55,7 +58,10 @@ TEST(XRayTracerConfigTest, XRayHttpTracerWithInvalidFileName) {
     name: envoy.tracers.xray
     typed_config:
       "@type": type.googleapis.com/envoy.config.trace.v2alpha.xray.Config
-      daemon_endpoint: 127.0.0.1:2030
+      daemon_endpoint:
+        protocol: UDP
+        address: 127.0.0.1
+        port_value: 2000
       segment_name: AwsAppMesh
       sampling_rule_manifest:
         filename: "rules.json")EOF";
