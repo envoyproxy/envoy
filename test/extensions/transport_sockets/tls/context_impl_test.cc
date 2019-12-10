@@ -428,7 +428,7 @@ TEST_F(SslServerContextImplTicketTest, TicketKeySuccessWithCustomLifetimeHint) {
     keys:
       filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ticket_key_a"
       filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ticket_key_b"
-  session_timeout: 2307
+  session_timeout: 2307s
 )EOF";
   EXPECT_NO_THROW(loadConfigYaml(yaml));
 }
