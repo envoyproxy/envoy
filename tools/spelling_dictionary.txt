@@ -524,6 +524,7 @@ evwatch
 exe
 execlp
 expectable
+extrahelp
 faceplant
 facto
 failover
@@ -644,6 +645,7 @@ lexically
 libc
 libevent
 libstdc
+libtooling
 lifecycle
 lightstep
 linearization
@@ -651,6 +653,7 @@ linearize
 linearized
 linux
 livelock
+llvm
 localhost
 lockless
 login
