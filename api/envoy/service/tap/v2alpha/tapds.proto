@@ -2,9 +2,9 @@ syntax = "proto3";
 
 package envoy.service.tap.v2alpha;
 
+option java_package = "io.envoyproxy.envoy.service.tap.v2alpha";
 option java_outer_classname = "TapdsProto";
 option java_multiple_files = true;
-option java_package = "io.envoyproxy.envoy.service.tap.v2alpha";
 option java_generic_services = true;
 
 import "envoy/api/v2/discovery.proto";
@@ -26,10 +26,8 @@ service TapDiscoveryService {
   }
 
   rpc FetchTapConfigs(api.v2.DiscoveryRequest) returns (api.v2.DiscoveryResponse) {
-    option (google.api.http) = {
-      post: "/v2/discovery:tap_configs"
-      body: "*"
-    };
+    option (google.api.http).post = "/v2/discovery:tap_configs";
+    option (google.api.http).body = "*";
   }
 }
 

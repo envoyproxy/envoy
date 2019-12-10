@@ -2,9 +2,9 @@ syntax = "proto3";
 
 package envoy.api.v3alpha.listener;
 
+option java_package = "io.envoyproxy.envoy.api.v3alpha.listener";
 option java_outer_classname = "QuicConfigProto";
 option java_multiple_files = true;
-option java_package = "io.envoyproxy.envoy.api.v3alpha.listener";
 
 import "google/protobuf/duration.proto";
 import "google/protobuf/wrappers.proto";

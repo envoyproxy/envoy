@@ -2,9 +2,9 @@ syntax = "proto3";
 
 package envoy.type.metadata.v2;
 
+option java_package = "io.envoyproxy.envoy.type.metadata.v2";
 option java_outer_classname = "MetadataProto";
 option java_multiple_files = true;
-option java_package = "io.envoyproxy.envoy.type.metadata.v2";
 
 import "validate/validate.proto";
 

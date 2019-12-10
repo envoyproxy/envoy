@@ -2,9 +2,9 @@ syntax = "proto3";
 
 package envoy.api.v2.route;
 
+option java_package = "io.envoyproxy.envoy.api.v2.route";
 option java_outer_classname = "RouteProto";
 option java_multiple_files = true;
-option java_package = "io.envoyproxy.envoy.api.v2.route";
 
 import "envoy/api/v2/core/base.proto";
 import "envoy/type/matcher/regex.proto";
@@ -381,7 +381,7 @@ message RouteMatch {
     // .. attention::
     //   This field has been deprecated in favor of `safe_regex` as it is not safe for use with
     //   untrusted input in all cases.
-    string regex = 3 [(validate.rules).string = {max_bytes: 1024}, deprecated = true];
+    string regex = 3 [deprecated = true, (validate.rules).string = {max_bytes: 1024}];
 
     // If specified, the route is a regular expression rule meaning that the
     // regex must match the *:path* header once the query string is removed. The entire path
@@ -464,7 +464,7 @@ message CorsPolicy {
   //   This field has been deprecated in favor of `allow_origin_string_match` as it is not safe for
   //   use with untrusted input in all cases.
   repeated string allow_origin_regex = 8
-      [(validate.rules).repeated = {items {string {max_bytes: 1024}}}, deprecated = true];
+      [deprecated = true, (validate.rules).repeated = {items {string {max_bytes: 1024}}}];
 
   // Specifies string patterns that match allowed origins. An origin is allowed if any of the
   // string matchers match.
@@ -1153,7 +1153,7 @@ message VirtualCluster {
   // .. attention::
   //   This field has been deprecated in favor of `headers` as it is not safe for use with
   //   untrusted input in all cases.
-  string pattern = 1 [(validate.rules).string = {max_bytes: 1024}, deprecated = true];
+  string pattern = 1 [deprecated = true, (validate.rules).string = {max_bytes: 1024}];
 
   // Specifies a list of header matchers to use for matching requests. Each specified header must
   // match. The pseudo-headers `:path` and `:method` can be used to match the request path and
@@ -1358,7 +1358,7 @@ message HeaderMatcher {
     // .. attention::
     //   This field has been deprecated in favor of `safe_regex_match` as it is not safe for use
     //   with untrusted input in all cases.
-    string regex_match = 5 [(validate.rules).string = {max_bytes: 1024}, deprecated = true];
+    string regex_match = 5 [deprecated = true, (validate.rules).string = {max_bytes: 1024}];
 
     // If specified, this regex string is a regular expression rule which implies the entire request
     // header value must match the regex. The rule will not match if only a subsequence of the
