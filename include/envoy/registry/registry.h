@@ -5,6 +5,7 @@
 #include <string>
 #include <vector>
 
+#include "envoy/api/v2/core/base.pb.h"
 #include "envoy/common/exception.h"
 
 #include "common/common/assert.h"
@@ -30,6 +31,8 @@ class BaseFactoryCategoryNames {
 public:
   virtual ~BaseFactoryCategoryNames() = default;
   virtual std::vector<absl::string_view> registeredNames() const PURE;
+  virtual absl::optional<envoy::api::v2::core::SemanticVersion>
+  getFactoryVersion(absl::string_view name) const PURE;
 };
 
 template <class Base> class FactoryCategoryNames : public BaseFactoryCategoryNames {
@@ -38,6 +41,11 @@ public:
 
   std::vector<absl::string_view> registeredNames() const override {
     return FactoryRegistry::registeredNames();
+  }
+
+  absl::optional<envoy::api::v2::core::SemanticVersion>
+  getFactoryVersion(absl::string_view name) const override {
+    return FactoryRegistry::getFactoryVersion(name);
   }
 };
 
@@ -133,6 +141,16 @@ public:
     return *factories;
   }
 
+  /**
+   * Gets the current map of vendor specific factory versions.
+   */
+  static absl::flat_hash_map<std::string, envoy::api::v2::core::SemanticVersion>&
+  versioned_factories() {
+    static auto* factories =
+        new absl::flat_hash_map<std::string, envoy::api::v2::core::SemanticVersion>;
+    return *factories;
+  }
+
   static absl::flat_hash_map<std::string, std::string>& deprecatedFactoryNames() {
     static auto* deprecated_factory_names = new absl::flat_hash_map<std::string, std::string>;
     return *deprecated_factory_names;
@@ -153,6 +171,19 @@ public:
   }
 
   /**
+   * version is used for registering vendor specific factories that are versioned
+   * independently of Envoy.
+   */
+  static void registerFactory(Base& factory, absl::string_view name,
+                              const envoy::api::v2::core::SemanticVersion& version) {
+    auto result = factories().emplace(std::make_pair(name, &factory));
+    if (!result.second) {
+      throw EnvoyException(fmt::format("Double registration for name: '{}'", factory.name()));
+    }
+    versioned_factories().emplace(std::make_pair(name, version));
+  }
+
+  /**
    * Gets a factory by name. If the name isn't found in the registry, returns nullptr.
    */
   static Base* getFactory(absl::string_view name) {
@@ -170,6 +201,15 @@ public:
     if (status) {
       ENVOY_LOG(warn, "{} is deprecated, use {} instead.", it->first, it->second);
     }
+  }
+
+  static absl::optional<envoy::api::v2::core::SemanticVersion>
+  getFactoryVersion(absl::string_view name) {
+    auto it = versioned_factories().find(name);
+    if (it == versioned_factories().end()) {
+      return absl::nullopt;
+    }
+    return it->second;
   }
 
 private:
@@ -250,6 +290,20 @@ public:
     for (auto deprecated_name : deprecated_names) {
       ASSERT(!deprecated_name.empty());
       FactoryRegistry<Base>::registerFactory(instance_, deprecated_name, instance_.name());
+    }
+
+    if (!FactoryCategoryRegistry::isRegistered(Base::category())) {
+      FactoryCategoryRegistry::registerCategory(Base::category(), new FactoryCategoryNames<Base>());
+    }
+  }
+
+  /**
+   * Constructor that registers an instance of the factory with the FactoryRegistry along with
+   * vendor specific version.
+   */
+  explicit RegisterFactory(const envoy::api::v2::core::SemanticVersion& version) {
+    if (!instance_.name().empty()) {
+      FactoryRegistry<Base>::registerFactory(instance_, instance_.name(), version);
     }
 
     if (!FactoryCategoryRegistry::isRegistered(Base::category())) {

@@ -73,6 +73,11 @@ TEST(RegistryTest, DefaultFactoryPublished) {
   // Expect that the factory is present.
   EXPECT_NE(Registry::FactoryRegistry<PublishedFactory>::getFactory("testing.published.test"),
             nullptr);
+
+  // Expect no version
+  auto version =
+      factories.find("testing.published")->second->getFactoryVersion("testing.published.test");
+  EXPECT_FALSE(version.has_value());
 }
 
 class TestWithDeprecatedPublishedFactory : public PublishedFactory {
@@ -95,6 +100,42 @@ TEST(RegistryTest, WithDeprecatedFactoryPublished) {
                       Envoy::Registry::FactoryRegistry<PublishedFactory>::getFactory(
                           "testing.published.deprecated_name")
                           ->name());
+}
+
+class TestVersionedFactory : public PublishedFactory {
+public:
+  std::string name() override { return "testing.published.versioned"; }
+  static envoy::api::v2::core::SemanticVersion getVersion() {
+    envoy::api::v2::core::SemanticVersion version;
+    version.set_major(2);
+    version.set_minor(5);
+    version.set_patch(39);
+    return version;
+  }
+};
+
+REGISTER_FACTORY(TestVersionedFactory, PublishedFactory)(TestVersionedFactory::getVersion());
+
+TEST(RegistryTest, VersionedFactory) {
+  const auto& factories = Envoy::Registry::FactoryCategoryRegistry::registeredFactories();
+
+  // Expect that the category is present.
+  ASSERT_NE(factories.find("testing.published"), factories.end());
+
+  // Expect that the factory is listed in the right category.
+  const auto& names = factories.find("testing.published")->second->registeredNames();
+  EXPECT_NE(std::find(names.begin(), names.end(), "testing.published.versioned"), std::end(names));
+
+  // Expect that the factory is present.
+  EXPECT_NE(Registry::FactoryRegistry<PublishedFactory>::getFactory("testing.published.versioned"),
+            nullptr);
+
+  auto version =
+      factories.find("testing.published")->second->getFactoryVersion("testing.published.versioned");
+  EXPECT_TRUE(version.has_value());
+  EXPECT_EQ(2, version.value().major());
+  EXPECT_EQ(5, version.value().minor());
+  EXPECT_EQ(39, version.value().patch());
 }
 
 } // namespace

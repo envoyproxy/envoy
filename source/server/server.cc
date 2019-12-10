@@ -305,6 +305,19 @@ void InstanceImpl::initialize(const Options& options,
   server_stats_->version_.set(version_int);
 
   bootstrap_.mutable_node()->set_build_version(VersionInfo::version());
+  bootstrap_.mutable_node()->set_user_agent_name("envoy");
+  bootstrap_.mutable_node()->set_user_agent_version(VersionInfo::version());
+  for (const auto& ext : Envoy::Registry::FactoryCategoryRegistry::registeredFactories()) {
+    for (const auto& name : ext.second->registeredNames()) {
+      auto* extension = bootstrap_.mutable_node()->mutable_extension_versions()->add_extension();
+      extension->set_name(std::string(name));
+      extension->set_category(ext.first);
+      auto version = ext.second->getFactoryVersion(name);
+      if (version) {
+        *extension->mutable_version() = version.value();
+      }
+    }
+  }
 
   local_info_ = std::make_unique<LocalInfo::LocalInfoImpl>(
       bootstrap_.node(), local_address, options.serviceZone(), options.serviceClusterName(),

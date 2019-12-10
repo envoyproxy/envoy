@@ -561,6 +561,8 @@ TEST_P(ServerInstanceImplTest, BootstrapNode) {
   EXPECT_EQ("bootstrap_id", server_->localInfo().nodeName());
   EXPECT_EQ("bootstrap_sub_zone", server_->localInfo().node().locality().sub_zone());
   EXPECT_EQ(VersionInfo::version(), server_->localInfo().node().build_version());
+  EXPECT_EQ("envoy", server_->localInfo().node().user_agent_name());
+  EXPECT_EQ(VersionInfo::version(), server_->localInfo().node().user_agent_version());
 }
 
 TEST_P(ServerInstanceImplTest, LoadsBootstrapFromConfigProtoOptions) {

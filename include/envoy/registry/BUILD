@@ -13,5 +13,6 @@ envoy_cc_library(
     hdrs = ["registry.h"],
     deps = [
         "//source/common/common:assert_lib",
+        "@envoy_api//envoy/api/v2/core:pkg_cc_proto",
     ],
 )

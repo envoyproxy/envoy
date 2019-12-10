@@ -86,6 +86,10 @@ public:
     log_entry->mutable_common_properties()->clear_time_to_first_downstream_tx_byte();
     log_entry->mutable_common_properties()->clear_time_to_last_downstream_tx_byte();
     log_entry->mutable_request()->clear_request_id();
+    if (request_msg.has_identifier()) {
+      auto* node = request_msg.mutable_identifier()->mutable_node();
+      node->clear_extension_versions();
+    }
     EXPECT_EQ(request_msg.DebugString(), expected_request_msg.DebugString());
 
     return AssertionSuccess();
@@ -120,6 +124,8 @@ identifier:
     locality:
       zone: zone_name
     build_version: {}
+    user_agent_name: "envoy"
+    user_agent_version: {}
   log_name: foo
 http_logs:
   log_entry:
@@ -138,7 +144,7 @@ http_logs:
       response_code_details: "route_not_found"
       response_headers_bytes: 54
 )EOF",
-                                                  VersionInfo::version())));
+                                                  VersionInfo::version(), VersionInfo::version())));
 
   BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
       lookupPort("http"), "GET", "/notfound", "", downstream_protocol_, version_);
@@ -192,6 +198,8 @@ identifier:
     locality:
       zone: zone_name
     build_version: {}
+    user_agent_name: "envoy"
+    user_agent_version: {}
   log_name: foo
 http_logs:
   log_entry:
@@ -210,8 +218,7 @@ http_logs:
       response_code_details: "route_not_found"
       response_headers_bytes: 54
 )EOF",
-                                                  VersionInfo::version())));
-
+                                                  VersionInfo::version(), VersionInfo::version())));
   cleanup();
 }
 
