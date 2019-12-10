@@ -469,7 +469,9 @@ void ConnectionImpl::onHeaderValue(const char* data, size_t length) {
     return;
   }
 
-  const absl::string_view header_value = absl::string_view(data, length);
+  // Work around a bug in http_parser where trailing whitespace is not trimmed
+  // as the spec requires: https://tools.ietf.org/html/rfc7230#section-3.2.4
+  const absl::string_view header_value = StringUtil::trim(absl::string_view(data, length));
 
   if (strict_header_validation_) {
     if (!Http::HeaderUtility::headerIsValid(header_value)) {
@@ -487,7 +489,7 @@ void ConnectionImpl::onHeaderValue(const char* data, size_t length) {
   }
 
   header_parsing_state_ = HeaderParsingState::Value;
-  current_header_value_.append(data, length);
+  current_header_value_.append(header_value.data(), header_value.length());
 
   const uint32_t total =
       current_header_field_.size() + current_header_value_.size() + current_header_map_->byteSize();
