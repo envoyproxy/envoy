@@ -32,10 +32,6 @@ void DeltaSubscriptionImpl::start(const std::set<std::string>& resources) {
   stats_.update_attempt_.inc();
 }
 
-void DeltaSubscriptionImpl::requestAliasResolution(const std::set<std::string>& aliases) {
-  context_->requestAliasesResolution(type_url_, aliases);
-}
-
 void DeltaSubscriptionImpl::updateResourceInterest(
     const std::set<std::string>& update_to_these_names) {
   watch_ = context_->addOrUpdateWatch(type_url_, watch_, update_to_these_names, *this,

@@ -51,7 +51,7 @@ void VhdsSubscription::updateOnDemand(const std::set<std::string>& domains) {
     with_route_config_name_prefix.emplace(
         VhdsSubscription::domainNameToAlias(config_update_info_->routeConfigName(), domain));
   }
-  subscription_->requestAliasResolution(with_route_config_name_prefix);
+  subscription_->updateResourceInterest({with_route_config_name_prefix});
 }
 
 void VhdsSubscription::onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason reason,

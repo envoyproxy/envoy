@@ -42,9 +42,6 @@ public:
   void resume(const std::string& type_url) override;
   bool paused(const std::string& type_url) const override;
 
-  void requestAliasesResolution(const std::string&, const std::set<std::string>&) override {
-    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
-  }
   Watch* addOrUpdateWatch(const std::string&, Watch*, const std::set<std::string>&,
                           SubscriptionCallbacks&, std::chrono::milliseconds) override {
     NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
@@ -144,9 +141,6 @@ public:
   void resume(const std::string&) override {}
   bool paused(const std::string&) const override { return false; }
 
-  void requestAliasesResolution(const std::string&, const std::set<std::string>&) override {
-    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
-  }
   Watch* addOrUpdateWatch(const std::string&, Watch*, const std::set<std::string>&,
                           SubscriptionCallbacks&, std::chrono::milliseconds) override {
     throw EnvoyException("ADS must be configured to support an ADS config source");

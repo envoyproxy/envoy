@@ -40,6 +40,22 @@ AddedRemoved WatchMap::updateWatchInterest(Watch* watch,
                       findRemovals(newly_removed_from_watch, watch));
 }
 
+absl::flat_hash_set<Watch*>
+WatchMap::watchesInterestedIn(const std::string& resource_name,
+                              const Protobuf::RepeatedPtrField<std::string>& aliases) {
+  absl::flat_hash_set<Watch*> ret = watchesInterestedIn(resource_name);
+  if (ret != wildcard_watches_) {
+    return ret;
+  }
+  for (const auto& alias : aliases) {
+    ret = watchesInterestedIn(alias);
+    if (ret != wildcard_watches_) {
+      return ret;
+    }
+  }
+  return ret;
+}
+
 absl::flat_hash_set<Watch*> WatchMap::watchesInterestedIn(const std::string& resource_name) {
   absl::flat_hash_set<Watch*> ret = wildcard_watches_;
   const auto watches_interested = watch_interest_.find(resource_name);
@@ -93,16 +109,40 @@ void WatchMap::onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>
   }
 }
 
+// For responses to on-demand requests, replace the original watch for an alias
+// with one for the resource's name
+void WatchMap::convertAliasWatchToNameWatch(const envoy::api::v2::Resource& resource) {
+  absl::flat_hash_set<Watch*> watches_to_update;
+  for (const auto& alias : resource.aliases()) {
+    const auto interested_watches = watch_interest_.find(alias);
+    if (interested_watches != watch_interest_.end()) {
+      for (const auto& interested_watch : interested_watches->second) {
+        watches_to_update.insert(interested_watch);
+      }
+      break;
+    }
+  }
+  for (const auto& watch : watches_to_update) {
+    updateWatchInterest(watch, {resource.name()});
+  }
+}
+
 void WatchMap::onConfigUpdate(
     const Protobuf::RepeatedPtrField<envoy::api::v2::Resource>& added_resources,
     const Protobuf::RepeatedPtrField<std::string>& removed_resources,
     const std::string& system_version_info) {
+  for (const auto& r : added_resources) {
+    // a non-empty response to an on-demand request
+    if (r.has_resource() && r.aliases_size() > 0) {
+      convertAliasWatchToNameWatch(r);
+    }
+  }
   // Build a pair of maps: from watches, to the set of resources {added,removed} that each watch
   // cares about. Each entry in the map-pair is then a nice little bundle that can be fed directly
   // into the individual onConfigUpdate()s.
   absl::flat_hash_map<Watch*, Protobuf::RepeatedPtrField<envoy::api::v2::Resource>> per_watch_added;
   for (const auto& r : added_resources) {
-    const absl::flat_hash_set<Watch*>& interested_in_r = watchesInterestedIn(r.name());
+    const absl::flat_hash_set<Watch*>& interested_in_r = watchesInterestedIn(r.name(), r.aliases());
     for (const auto& interested_watch : interested_in_r) {
       per_watch_added[interested_watch].Add()->CopyFrom(r);
     }

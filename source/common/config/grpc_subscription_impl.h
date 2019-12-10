@@ -28,9 +28,6 @@ public:
                                init_fetch_timeout) {}
 
   // Config::Subscription
-  void requestAliasResolution(const std::set<std::string>&) override {
-    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
-  }
   void start(const std::set<std::string>& resource_names) override {
     // Subscribe first, so we get failure callbacks if grpc_mux_.start() fails.
     grpc_mux_subscription_.start(resource_names);

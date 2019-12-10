@@ -63,17 +63,8 @@ void NewGrpcMuxImpl::onDiscoveryResponse(
               message->system_version_info(), message->type_url());
     return;
   }
+
   kickOffAck(sub->second->sub_state_.handleResponse(*message));
-}
-
-void NewGrpcMuxImpl::requestAliasesResolution(const std::string& type_url,
-                                              const std::set<std::string>& aliases) {
-  auto sub = subscriptions_.find(type_url);
-  ASSERT(sub != subscriptions_.end(),
-         fmt::format("Tried to resolve aliases for non-existent subscription {}.", type_url));
-
-  sub->second->sub_state_.updateSubscriptionInterest(aliases, {});
-  trySendDiscoveryRequests();
 }
 
 void NewGrpcMuxImpl::onStreamEstablished() {

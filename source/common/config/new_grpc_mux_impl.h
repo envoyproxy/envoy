@@ -40,8 +40,6 @@ public:
   void pause(const std::string& type_url) override;
   void resume(const std::string& type_url) override;
   bool paused(const std::string& type_url) const override;
-  void requestAliasesResolution(const std::string& type_url,
-                                const std::set<std::string>& aliases) override;
   void
   onDiscoveryResponse(std::unique_ptr<envoy::api::v2::DeltaDiscoveryResponse>&& message) override;
 

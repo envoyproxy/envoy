@@ -134,16 +134,6 @@ public:
    * @return bool whether the API is paused.
    */
   virtual bool paused(const std::string& type_url) const PURE;
-
-  /**
-   * Initiates an on-demand xDS resource resolution. Currently supports
-   * resolution of VirtualHosts using their associated domain name(s).
-   * @param type_url type URL corresponding to xDS API, currently
-   * only type.googleapis.com/envoy.api.v2.VirtualHost is supported
-   * @param aliases domains or hostname to resolve
-   */
-  virtual void requestAliasesResolution(const std::string& type_url,
-                                        const std::set<std::string>& aliases) PURE;
 };
 
 using GrpcMuxPtr = std::unique_ptr<GrpcMux>;

@@ -42,7 +42,7 @@ public:
 
   // Config::Subscription
   void start(const std::set<std::string>& resource_names) override;
-  void requestAliasResolution(const std::set<std::string>& aliases) override;
+
   void updateResourceInterest(const std::set<std::string>& update_to_these_names) override;
 
   // Config::SubscriptionCallbacks (all pass through to callbacks_!)

@@ -91,14 +91,6 @@ public:
    * be passed to std::set_difference, which must be given sorted collections.
    */
   virtual void updateResourceInterest(const std::set<std::string>& update_to_these_names) PURE;
-
-  /**
-   * Add aliases for resources to fetch.
-   * @param resources set of aliases to fetch.
-   */
-  virtual void requestAliasResolution(const std::set<std::string>&) {
-    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
-  }
 };
 
 using SubscriptionPtr = std::unique_ptr<Subscription>;
