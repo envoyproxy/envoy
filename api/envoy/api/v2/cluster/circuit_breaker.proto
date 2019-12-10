@@ -68,7 +68,8 @@ message CircuitBreakers {
       //
       // .. note::
       //
-      //    If this field is set, the retry budget will override any configured retry circuit breaker.
+      //    If this field is set, the retry budget will override any configured retry circuit
+      //    breaker.
       RetryBudget retry_budget = 8;
     }
 

@@ -378,7 +378,8 @@ bool RetryStateImpl::wouldRetryFromReset(const Http::StreamResetReason reset_rea
   return false;
 }
 
-RetryStateImpl::RetryBudgetStatus RetryStateImpl::retryBudgetStatus(Upstream::ResourcePriority priority) const {
+RetryStateImpl::RetryBudgetStatus
+RetryStateImpl::retryBudgetStatus(Upstream::ResourcePriority priority) const {
   const auto retry_budget = cluster_.retryBudget(priority);
   if (!retry_budget) {
     return RetryBudgetStatus::Unconfigured;
@@ -387,14 +388,14 @@ RetryStateImpl::RetryBudgetStatus RetryStateImpl::retryBudgetStatus(Upstream::Re
   const uint64_t current_active = cluster_.resourceManager(priority).requests().count() +
                                   cluster_.resourceManager(priority).pendingRequests().count();
 
-  const double budget = std::max<uint64_t>(current_active * retry_budget->budget_percent / 100.0, retry_budget->min_retry_concurrency);
+  const double budget = std::max<uint64_t>(current_active * retry_budget->budget_percent / 100.0,
+                                           retry_budget->min_retry_concurrency);
 
   if (cluster_.resourceManager(priority).retries().count() >= budget) {
     return RetryBudgetStatus::Exceeded;
   }
   return RetryBudgetStatus::Available;
 }
-
 
 } // namespace Router
 } // namespace Envoy

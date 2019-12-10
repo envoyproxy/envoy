@@ -25,11 +25,11 @@
 #include "common/config/utility.h"
 #include "common/http/utility.h"
 #include "common/network/address_impl.h"
-#include "common/router/config_utility.h"
 #include "common/network/resolver_impl.h"
 #include "common/network/socket_option_factory.h"
 #include "common/protobuf/protobuf.h"
 #include "common/protobuf/utility.h"
+#include "common/router/config_utility.h"
 #include "common/runtime/runtime_impl.h"
 #include "common/upstream/eds.h"
 #include "common/upstream/health_checker_impl.h"
@@ -764,13 +764,15 @@ ClusterInfoImpl::ClusterInfoImpl(
   if (config.has_circuit_breakers()) {
     for (const auto& threshold : config.circuit_breakers().thresholds()) {
       if (threshold.has_retry_budget()) {
-        const ResourcePriority priority = Router::ConfigUtility::parsePriority(threshold.priority());
-        retry_budget_map_.emplace(priority, RetryBudget{
-          .budget_percent =
-            PROTOBUF_GET_WRAPPED_OR_DEFAULT(threshold.retry_budget(), budget_percent, 20.0),
-          .min_retry_concurrency =
-            PROTOBUF_GET_WRAPPED_OR_DEFAULT(threshold.retry_budget(), min_retry_concurrency, 3),
-            });
+        const ResourcePriority priority =
+            Router::ConfigUtility::parsePriority(threshold.priority());
+        retry_budget_map_.emplace(priority,
+                                  RetryBudget{
+                                      .budget_percent = PROTOBUF_GET_WRAPPED_OR_DEFAULT(
+                                          threshold.retry_budget(), budget_percent, 20.0),
+                                      .min_retry_concurrency = PROTOBUF_GET_WRAPPED_OR_DEFAULT(
+                                          threshold.retry_budget(), min_retry_concurrency, 3),
+                                  });
       }
     }
   }

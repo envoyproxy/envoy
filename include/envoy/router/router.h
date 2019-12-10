@@ -250,7 +250,11 @@ public:
    * RetryBudgetStatus whether the retry budget has been configured or allows for additional
    * retries.
    */
-  enum class RetryBudgetStatus { Unconfigured, Available, Exceeded, };
+  enum class RetryBudgetStatus {
+    Unconfigured,
+    Available,
+    Exceeded,
+  };
 
   virtual ~RetryState() = default;
 

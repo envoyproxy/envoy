@@ -937,17 +937,14 @@ TEST_F(RouterRetryStateImplTest, NoPreferredOverLimitExceeded) {
 
 TEST_F(RouterRetryStateImplTest, BudgetAvailableRetries) {
   // Expect no available retries from resource manager.
-  cluster_.resetResourceManager(0 /* cx */,
-                                0 /* rq_pending */,
-                                0 /* rq */,
-                                0 /* rq_retry */,
+  cluster_.resetResourceManager(0 /* cx */, 0 /* rq_pending */, 0 /* rq */, 0 /* rq_retry */,
                                 0 /* conn_pool */);
 
   // Override the max_retries CB via retry budget. As configured, there are no allowed retries via
   // max_retries CB.
   const auto budget = Upstream::ClusterInfo::RetryBudget{
-    .min_retry_concurrency = 3,
-    .budget_percent = 20,
+      .min_retry_concurrency = 3,
+      .budget_percent = 20,
   };
   EXPECT_CALL(cluster_, retryBudget(_)).WillRepeatedly(Return(budget));
 
@@ -963,17 +960,14 @@ TEST_F(RouterRetryStateImplTest, BudgetAvailableRetries) {
 
 TEST_F(RouterRetryStateImplTest, BudgetNoAvailableRetries) {
   // Expect no available retries from resource manager.
-  cluster_.resetResourceManager(0 /* cx */,
-                                0 /* rq_pending */,
-                                20 /* rq */,
-                                5 /* rq_retry */,
+  cluster_.resetResourceManager(0 /* cx */, 0 /* rq_pending */, 20 /* rq */, 5 /* rq_retry */,
                                 0 /* conn_pool */);
 
   // Override the max_retries CB via a retry budget that won't let any retries. As configured, there
   // are 5 allowed retries via max_retries CB.
   const auto budget = Upstream::ClusterInfo::RetryBudget{
-    .min_retry_concurrency = 0,
-    .budget_percent = 0,
+      .min_retry_concurrency = 0,
+      .budget_percent = 0,
   };
   EXPECT_CALL(cluster_, retryBudget(_)).WillRepeatedly(Return(budget));
 
@@ -988,15 +982,13 @@ TEST_F(RouterRetryStateImplTest, BudgetNoAvailableRetries) {
 
 TEST_F(RouterRetryStateImplTest, BudgetUnconfiguredRetries) {
   // Expect no available retries from resource manager.
-  cluster_.resetResourceManager(0 /* cx */,
-                                0 /* rq_pending */,
-                                0 /* rq */,
-                                5 /* rq_retry */,
+  cluster_.resetResourceManager(0 /* cx */, 0 /* rq_pending */, 0 /* rq */, 5 /* rq_retry */,
                                 0 /* conn_pool */);
 
   EXPECT_CALL(cluster_, retryBudget(_)).WillRepeatedly(Return(absl::nullopt));
 
-  Http::TestHeaderMapImpl request_headers{{"x-envoy-retry-on", "5xx"}, {"x-envoy-max-retries", "5"}};
+  Http::TestHeaderMapImpl request_headers{{"x-envoy-retry-on", "5xx"},
+                                          {"x-envoy-max-retries", "5"}};
 
   setup(request_headers);
   EXPECT_TRUE(state_->enabled());
@@ -1008,24 +1000,21 @@ TEST_F(RouterRetryStateImplTest, BudgetUnconfiguredRetries) {
   incrOutstandingResource(TestResourceType::Retry, 5);
 
   EXPECT_EQ(RetryStatus::NoOverflow, state_->shouldRetryHeaders(response_headers, callback_));
-
 }
 
 TEST_F(RouterRetryStateImplTest, BudgetVerifyMinimumConcurrency) {
   // Expect no available retries from resource manager.
-  cluster_.resetResourceManager(0 /* cx */,
-                                0 /* rq_pending */,
-                                0 /* rq */,
-                                0 /* rq_retry */,
+  cluster_.resetResourceManager(0 /* cx */, 0 /* rq_pending */, 0 /* rq */, 0 /* rq_retry */,
                                 0 /* conn_pool */);
 
   const auto budget = Upstream::ClusterInfo::RetryBudget{
-    .min_retry_concurrency = 3,
-    .budget_percent = 20,
+      .min_retry_concurrency = 3,
+      .budget_percent = 20,
   };
   EXPECT_CALL(cluster_, retryBudget(_)).WillRepeatedly(Return(budget));
 
-  Http::TestHeaderMapImpl request_headers{{"x-envoy-retry-on", "5xx"}, {"x-envoy-max-retries", "5"}};
+  Http::TestHeaderMapImpl request_headers{{"x-envoy-retry-on", "5xx"},
+                                          {"x-envoy-max-retries", "5"}};
   Http::TestHeaderMapImpl response_headers{{":status", "500"}};
 
   setup(request_headers);
