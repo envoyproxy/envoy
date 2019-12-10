@@ -2,17 +2,17 @@ syntax = "proto3";
 
 package envoy.v3alpha;
 
+option java_package = "io.envoyproxy.envoy.v3alpha";
 option java_outer_classname = "SampleProto";
 option java_multiple_files = true;
-option java_package = "io.envoyproxy.envoy.v3alpha";
 
-import "udpa/api/annotations/versioning.proto";
+import "udpa/annotations/versioning.proto";
 
 message Sample {
-  option (udpa.api.annotations.versioning).previous_message_type = "envoy.v2.Sample";
+  option (udpa.annotations.versioning).previous_message_type = "envoy.v2.Sample";
 
   message Entry {
-    option (udpa.api.annotations.versioning).previous_message_type = "envoy.v2.Sample.Entry";
+    option (udpa.annotations.versioning).previous_message_type = "envoy.v2.Sample.Entry";
 
     string key = 1;
 

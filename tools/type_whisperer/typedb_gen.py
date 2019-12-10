@@ -7,7 +7,6 @@ import sys
 
 from google.protobuf import text_format
 
-from tools.api_proto_plugin.utils import BazelBinPathForOutputArtifact, ExtractRepoName
 from tools.type_whisperer.api_type_db_pb2 import TypeDb
 from tools.type_whisperer.types_pb2 import Types, TypeDescription
 
@@ -65,8 +64,10 @@ def UpgradedPath(proto_path):
 
 def LoadTypes(path):
   """Load a tools.type_whisperer.Types proto from the filesystem.
+
   Args:
     path: filesystem path for a file in text proto format.
+
   Returns:
     tools.type_whisperer.Types proto loaded from path.
   """
@@ -78,13 +79,16 @@ def LoadTypes(path):
 
 def NextVersionUpgrade(type_name, type_map, next_version_upgrade_memo, visited=None):
   """Does a given type require upgrade between major version?
+
   Performs depth-first search through type dependency graph for any upgraded
   types that will force type_name to be upgraded.
+
   Args:
     type_name: fully qualified type name.
     type_map: map from type name to tools.type_whisperer.TypeDescription.
     next_version_upgrade_memo: a memo dictionary to avoid revisiting nodes across invocations.
     visited: a set of visited nodes in the current search, used to detect loops.
+
   Returns:
     A boolean indicating whether the type requires upgrade.
   """
@@ -114,21 +118,14 @@ def NextVersionUpgrade(type_name, type_map, next_version_upgrade_memo, visited=N
 
 
 if __name__ == '__main__':
-  # Root of source tree.
-  src_root = sys.argv[1]
   # Output path for type database.
-  out_path = sys.argv[2]
-  # Bazel labels for source .proto.
-  src_labels = sys.argv[3:]
+  out_path = sys.argv[1]
 
-  # Load type descriptors for each .proto.
-  type_desc_paths = [
-      BazelBinPathForOutputArtifact(label,
-                                    '.types.pb_text',
-                                    root=src_root,
-                                    repo_tag=ExtractRepoName(label)) for label in src_labels
-  ]
+  # Load type descriptors for each type whisper
+  type_desc_paths = sys.argv[2:]
+
   type_whispers = map(LoadTypes, type_desc_paths)
+
   # Aggregate type descriptors to a single type map.
   type_map = dict(sum([list(t.types.items()) for t in type_whispers], []))
   all_pkgs = set([type_desc.qualified_package for type_desc in type_map.values()])
@@ -140,6 +137,7 @@ if __name__ == '__main__':
       for type_name, type_desc in type_map.items()
       if NextVersionUpgrade(type_name, type_map, next_version_upgrade_memo)
   ])
+
   # Generate type map entries for upgraded types.
   upgraded_types = []
   for type_name, type_desc in type_map.items():

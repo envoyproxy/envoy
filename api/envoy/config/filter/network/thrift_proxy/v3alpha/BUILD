@@ -9,6 +9,6 @@ api_proto_package(
         "//envoy/api/v3alpha/core:pkg",
         "//envoy/api/v3alpha/route:pkg",
         "//envoy/config/filter/network/thrift_proxy/v2alpha1:pkg",
-        "@com_github_cncf_udpa//udpa/api/annotations:pkg",
+        "@com_github_cncf_udpa//udpa/annotations:pkg",
     ],
 )

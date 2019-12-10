@@ -38,15 +38,3 @@ def BazelBinPathForOutputArtifact(label, suffix, repo_tag, root=''):
   glob_pattern = os.path.join(
       root, 'bazel-bin/**/%s%s' % (ProtoFileCanonicalFromLabel(label, repo_tag), suffix))
   return glob.glob(glob_pattern, recursive=True)[0]
-
-
-def ExtractRepoName(label):
-  """Extract repository name from label"""
-  repo = ""
-  for i, ch in enumerate(label):
-    if label[i] == label[i + 1]:
-      repo += "//"
-      break
-    else:
-      repo += ch
-  return repo

@@ -7,6 +7,8 @@ namespace Common {
 namespace Redis {
 namespace Client {
 namespace {
+// null_pool_callbacks is used for requests that must be filtered and not redirected such as
+// "asking".
 Common::Redis::Client::DoNothingPoolCallbacks null_pool_callbacks;
 } // namespace
 
@@ -97,7 +99,7 @@ void ClientImpl::flushBufferAndResetTimer() {
   connection_->write(encoder_buffer_, false);
 }
 
-PoolRequest* ClientImpl::makeRequest(const RespValue& request, PoolCallbacks& callbacks) {
+PoolRequest* ClientImpl::makeRequest(const RespValue& request, ClientCallbacks& callbacks) {
   ASSERT(connection_->state() == Network::Connection::State::Open);
 
   const bool empty_buffer = encoder_buffer_.length() == 0;
@@ -212,7 +214,7 @@ void ClientImpl::onRespValue(RespValuePtr&& value) {
   }
   request.aggregate_request_timer_->complete();
 
-  PoolCallbacks& callbacks = request.callbacks_;
+  ClientCallbacks& callbacks = request.callbacks_;
 
   // We need to ensure the request is popped before calling the callback, since the callback might
   // result in closing the connection.
@@ -223,9 +225,13 @@ void ClientImpl::onRespValue(RespValuePtr&& value) {
     std::vector<absl::string_view> err = StringUtil::splitToken(value->asString(), " ", false);
     bool redirected = false;
     if (err.size() == 3) {
+      // MOVED and ASK redirection errors have the following substrings: MOVED or ASK (err[0]), hash
+      // key slot (err[1]), and IP address and TCP port separated by a colon (err[2])
       if (err[0] == RedirectionResponse::get().MOVED || err[0] == RedirectionResponse::get().ASK) {
-        redirected = callbacks.onRedirection(*value);
-        if (redirected) {
+        redirected = true;
+        bool redirect_succeeded = callbacks.onRedirection(std::move(value), std::string(err[2]),
+                                                          err[0] == RedirectionResponse::get().ASK);
+        if (redirect_succeeded) {
           host_->cluster().stats().upstream_internal_redirect_succeeded_total_.inc();
         } else {
           host_->cluster().stats().upstream_internal_redirect_failed_total_.inc();
@@ -251,7 +257,7 @@ void ClientImpl::onRespValue(RespValuePtr&& value) {
   putOutlierEvent(Upstream::Outlier::Result::ExtOriginRequestSuccess);
 }
 
-ClientImpl::PendingRequest::PendingRequest(ClientImpl& parent, PoolCallbacks& callbacks,
+ClientImpl::PendingRequest::PendingRequest(ClientImpl& parent, ClientCallbacks& callbacks,
                                            Stats::StatName command)
     : parent_(parent), callbacks_(callbacks), command_{command},
       aggregate_request_timer_(parent_.redis_command_stats_->createAggregateTimer(
