@@ -225,8 +225,7 @@ RetryStatus RetryStateImpl::shouldRetry(bool would_retry, DoRetryCallback callba
 
   // Only consider the max_retries circuit breaker if a retry budget is not configured. Otherwise,
   // only consider the retry budget.
-  using RetryBudgetStatus = Upstream::ClusterInfo::RetryBudgetStatus;
-  const RetryBudgetStatus budget_status = cluster_.retryBudgetStatus(priority_);
+  const RetryBudgetStatus budget_status = retryBudgetStatus(priority_);
   bool retry_overflow;
   switch (budget_status) {
   case RetryBudgetStatus::Exceeded:
@@ -378,6 +377,30 @@ bool RetryStateImpl::wouldRetryFromReset(const Http::StreamResetReason reset_rea
 
   return false;
 }
+
+RetryStateImpl::RetryBudgetStatus RetryStateImpl::retryBudgetStatus(Upstream::ResourcePriority priority) const {
+  const auto retry_budget = cluster_.retryBudget(priority);
+  if (!retry_budget) {
+    return RetryBudgetStatus::Unconfigured;
+  }
+
+  const uint64_t current_active = cluster_.resourceManager(priority).requests().count() +
+                                  cluster_.resourceManager(priority).pendingRequests().count();
+
+  // If the current number of active requests doesn't meet the concurrency minimum to begin
+  // enforcing the retry budget, we will simply enforce the budget as if the number of active
+  // requests is at the minimum. This does not honor the configured budget percentage accurately
+  // until the minimum concurrency is met, but allows for reasonable numbers of active retries when
+  // there are few outstanding requests.
+  const double budget = std::max<uint64_t>(current_active, retry_budget->min_concurrency) *
+    retry_budget->budget_percent / 100.0;
+
+  if (cluster_.resourceManager(priority).retries().count() >= budget) {
+    return RetryBudgetStatus::Exceeded;
+  }
+  return RetryBudgetStatus::Available;
+}
+
 
 } // namespace Router
 } // namespace Envoy

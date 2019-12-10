@@ -579,7 +579,12 @@ public:
   void createNetworkFilterChain(Network::Connection&) const override;
   Http::Protocol
   upstreamHttpProtocol(absl::optional<Http::Protocol> downstream_protocol) const override;
-  RetryBudgetStatus retryBudgetStatus(ResourcePriority priority) const override;
+  absl::optional<RetryBudget> retryBudget(ResourcePriority priority) const override {
+    if (!retry_budget_map_.contains(priority)) {
+      return absl::nullopt;
+    }
+    return retry_budget_map_.at(priority);
+  }
 
 private:
   struct ResourceManagers {
@@ -592,13 +597,6 @@ private:
     using Managers = std::array<ResourceManagerImplPtr, NumResourcePriorities>;
 
     Managers managers_;
-  };
-
-  // TODO (tonya11en): Rework the interface to ResourceManager/Resource to add support for budgets.
-  // and pull this logic out.
-  struct RetryBudget {
-    double budget_percent;
-    uint32_t min_concurrency;
   };
 
   Runtime::Loader& runtime_;

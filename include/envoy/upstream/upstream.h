@@ -664,15 +664,13 @@ public:
     static const uint64_t CLOSE_CONNECTIONS_ON_HOST_HEALTH_FAILURE = 0x4;
   };
 
-  enum class RetryBudgetStatus {
-    // A retry budget was not configured.
-    Unconfigured,
-    // The configured retry budget has not been exceeded.
-    Available,
-    // There is no available retry budget for this cluster.
-    Exceeded,
-  };
+  struct RetryBudget {
+    // The percentage of outstanding requests that are allowed to be retries.
+    double budget_percent;
 
+    // The minimum request concurrency required before enforcing the retry budget.
+    uint32_t min_concurrency;
+  };
 
   virtual ~ClusterInfo() = default;
 
@@ -880,9 +878,9 @@ public:
   upstreamHttpProtocol(absl::optional<Http::Protocol> downstream_protocol) const PURE;
 
   /**
-   *  The current state of the retry budget (if configured) for the cluster.
+   * @return the retry budget associated with a priority for the cluster if configured.
    */
-  virtual RetryBudgetStatus retryBudgetStatus(ResourcePriority priority) const PURE;
+  virtual absl::optional<RetryBudget> retryBudget(ResourcePriority priority) const PURE;
 
 protected:
   /**

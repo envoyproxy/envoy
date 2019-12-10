@@ -83,6 +83,7 @@ public:
   }
 
   uint32_t hostSelectionMaxAttempts() const override { return host_selection_max_attempts_; }
+  RetryBudgetStatus retryBudgetStatus(Upstream::ResourcePriority priority) const override;
 
 private:
   RetryStateImpl(const RetryPolicy& route_policy, Http::HeaderMap& request_headers,
