@@ -15,7 +15,7 @@ namespace StreamInfo {
 class FilterStateImpl : public FilterState {
 public:
   FilterStateImpl(FilterState::LifeSpan life_span) : life_span_(life_span) {
-    maybeCreateParent(/* read_only = */ true);
+    maybeCreateParent(ParentAccessMode::ReadOnly);
   }
 
   /**
@@ -24,7 +24,7 @@ public:
    */
   FilterStateImpl(std::shared_ptr<FilterState> ancestor, FilterState::LifeSpan life_span)
       : ancestor_(ancestor), life_span_(life_span) {
-    maybeCreateParent(/* read_only = */ true);
+    maybeCreateParent(ParentAccessMode::ReadOnly);
   }
 
   using LazyCreateAncestor = std::pair<std::shared_ptr<FilterState>&, FilterState::LifeSpan>;
@@ -36,7 +36,7 @@ public:
    */
   FilterStateImpl(LazyCreateAncestor lazy_create_ancestor, FilterState::LifeSpan life_span)
       : ancestor_(lazy_create_ancestor), life_span_(life_span) {
-    maybeCreateParent(/* read_only = */ true);
+    maybeCreateParent(ParentAccessMode::ReadOnly);
   }
 
   // FilterState
@@ -54,7 +54,8 @@ public:
 private:
   // This only checks the local data_storage_ for data_name existence.
   bool hasDataWithNameInternally(absl::string_view data_name) const;
-  void maybeCreateParent(bool read_only);
+  enum class ParentAccessMode { ReadOnly, ReadWrite };
+  void maybeCreateParent(ParentAccessMode parent_access_mode);
 
   struct FilterObject {
     std::shared_ptr<Object> data_;

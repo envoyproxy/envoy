@@ -22,21 +22,17 @@ struct StreamInfoImpl : public StreamInfo {
 
   StreamInfoImpl(Http::Protocol protocol, TimeSource& time_source)
       : time_source_(time_source), start_time_(time_source.systemTime()),
-        start_time_monotonic_(time_source.monotonicTime()),
-        filter_state_(std::make_shared<FilterStateImpl>(FilterState::LifeSpan::FilterChain)) {
-    protocol_ = protocol;
-  }
+        start_time_monotonic_(time_source.monotonicTime()), protocol_(protocol),
+        filter_state_(std::make_shared<FilterStateImpl>(FilterState::LifeSpan::FilterChain)) {}
 
   StreamInfoImpl(Http::Protocol protocol, TimeSource& time_source,
                  std::shared_ptr<FilterState>& parent_filter_state)
       : time_source_(time_source), start_time_(time_source.systemTime()),
-        start_time_monotonic_(time_source.monotonicTime()),
+        start_time_monotonic_(time_source.monotonicTime()), protocol_(protocol),
         filter_state_(std::make_shared<FilterStateImpl>(
             FilterStateImpl::LazyCreateAncestor(parent_filter_state,
                                                 FilterState::LifeSpan::DownstreamConnection),
-            FilterState::LifeSpan::FilterChain)) {
-    protocol_ = protocol;
-  }
+            FilterState::LifeSpan::FilterChain)) {}
 
   SystemTime startTime() const override { return start_time_; }
 

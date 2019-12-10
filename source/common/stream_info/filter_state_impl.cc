@@ -12,7 +12,7 @@ void FilterStateImpl::setData(absl::string_view data_name, std::shared_ptr<Objec
       throw EnvoyException(
           "FilterState::setData<T> called twice with conflicting life_span on the same data_name.");
     }
-    maybeCreateParent(/* read_only = */ false);
+    maybeCreateParent(ParentAccessMode::ReadWrite);
     parent_->setData(data_name, data, state_type, life_span);
     return;
   }
@@ -90,7 +90,7 @@ bool FilterStateImpl::hasDataWithNameInternally(absl::string_view data_name) con
   return data_storage_.count(data_name) > 0;
 }
 
-void FilterStateImpl::maybeCreateParent(bool read_only) {
+void FilterStateImpl::maybeCreateParent(ParentAccessMode parent_access_mode) {
   if (parent_ != nullptr) {
     return;
   }
@@ -108,9 +108,9 @@ void FilterStateImpl::maybeCreateParent(bool read_only) {
   }
 
   auto lazy_create_ancestor = absl::get<LazyCreateAncestor>(ancestor_);
-  // If we're only going to get data from our parent, we don't need to create
-  // lazy ancestor, because they're empty anyways.
-  if (read_only && lazy_create_ancestor.first == nullptr) {
+  // If we're only going to read data from our parent, we don't need to create lazy ancestor,
+  // because they're empty anyways.
+  if (parent_access_mode == ParentAccessMode::ReadOnly && lazy_create_ancestor.first == nullptr) {
     return;
   }
 

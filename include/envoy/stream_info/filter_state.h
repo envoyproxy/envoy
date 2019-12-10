@@ -28,11 +28,11 @@ public:
   // FilterStateImpl at the same life span. This interface is supposed to be accessed at the leaf
   // level (FilterChain) for objects with any desired longer life span.
   //
-  // - FilterChain has the shortest life span, which is as long as the http filter chain lives.
+  // - FilterChain has the shortest life span, which is as long as the filter chain lives.
   //
   // - DownstreamRequest is longer than FilterChain. When internal redirect is enabled, one
   //   downstream request may create multiple filter chains. DownstreamRequest allows an Object to
-  //   survived across filter chains for book needs.
+  //   survive across filter chains for bookkeeping needs.
   //
   // - DownstreamConnection makes an Object survive the entire duration of a downstream connection.
   //   Any stream within this connection can see the same object.
@@ -140,8 +140,8 @@ public:
   virtual LifeSpan lifeSpan() const PURE;
 
   /**
-   * @return the point of the parent FilterState that has longer life span. nullptr means this is
-   * at the top LifeSpan or the parent is not yet created.
+   * @return the pointer of the parent FilterState that has longer life span. nullptr means this is
+   * either the top LifeSpan or the parent is not yet created.
    */
   virtual std::shared_ptr<FilterState> parent() const PURE;
 

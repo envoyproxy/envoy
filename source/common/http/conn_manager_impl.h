@@ -90,6 +90,7 @@ public:
 
   TimeSource& timeSource() { return time_source_; }
 
+  // Return a reference to the shared_ptr so that it can be lazy created on demand.
   std::shared_ptr<StreamInfo::FilterState>& filterState() { return filter_state_; }
 
 private:
