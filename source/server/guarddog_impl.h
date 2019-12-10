@@ -72,7 +72,7 @@ public:
   /**
    * Exposed for testing purposes only (but harmless to call):
    */
-  int loopIntervalForTest() const { return loop_interval_.count(); }
+  int64_t loopIntervalForTest() const { return loop_interval_.count(); }
 
   /**
    * Test hook to force a step() to catch up with the current simulated

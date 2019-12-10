@@ -685,7 +685,7 @@ void ListenerManagerImpl::startWorkers(GuardDog& guard_dog) {
 
 void ListenerManagerImpl::stopListener(Network::ListenerConfig& listener,
                                        std::function<void()> callback) {
-  const auto workers_pending_stop = std::make_shared<std::atomic<uint32_t>>(workers_.size());
+  const auto workers_pending_stop = std::make_shared<std::atomic<uint64_t>>(workers_.size());
   for (const auto& worker : workers_) {
     worker->stopListener(listener, [this, callback, workers_pending_stop]() {
       if (--(*workers_pending_stop) == 0) {
