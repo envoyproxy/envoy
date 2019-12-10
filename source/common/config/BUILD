@@ -15,7 +15,7 @@ envoy_cc_library(
     deps = [
         "//source/common/protobuf",
         "//source/common/protobuf:utility_lib",
-        "@com_github_cncf_udpa//udpa/api/annotations:pkg_cc_proto",
+        "@com_github_cncf_udpa//udpa/annotations:pkg_cc_proto",
         "@com_github_cncf_udpa//udpa/type/v1:pkg_cc_proto",
     ],
 )
