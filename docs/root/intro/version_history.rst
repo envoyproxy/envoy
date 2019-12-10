@@ -1,6 +1,12 @@
 Version history
 ---------------
 
+1.12.2 (December 10, 2019)
+==========================
+* http: fixed CVE-2019-18801 by allocating sufficient memory for request headers.
+* http: fixed CVE-2019-18802 by implementing stricter validation of HTTP/1 headers.
+* route config: fixed CVE-2019-18838 by checking for presence of host/path headers.
+
 1.12.1 (November 8, 2019)
 =========================
 * listener: fixed CVE-2019-18836 by clearing accept filters before connection creation.
