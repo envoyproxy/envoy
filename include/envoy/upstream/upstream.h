@@ -873,7 +873,8 @@ public:
   /**
    * @return auto sni flag. if this is true, sni value will be set automatically
    */
-  virtual bool auto_sni() const PURE;
+  virtual const absl::optional<envoy::api::v2::core::HttpProtocolOptions>&
+  httpProtocolOptions() const PURE;
 
 protected:
   /**

@@ -280,7 +280,10 @@ public:
 
 TEST_F(RouterTest, UpdateFilterState) {
   NiceMock<StreamInfo::MockStreamInfo> stream_info;
-  ON_CALL(*cm_.thread_local_cluster_.cluster_.info_, auto_sni()).WillByDefault(Return(true));
+  auto dummy_option = absl::make_optional<envoy::api::v2::core::HttpProtocolOptions>();
+  dummy_option.value().set_auto_sni(true);
+  ON_CALL(*cm_.thread_local_cluster_.cluster_.info_, httpProtocolOptions())
+      .WillByDefault(ReturnRef(dummy_option));
   ON_CALL(callbacks_.stream_info_, filterState())
       .WillByDefault(ReturnRef(stream_info.filterState()));
   EXPECT_CALL(cm_.conn_pool_, newStream(_, _)).WillOnce(Return(&cancellable_));
@@ -290,6 +293,7 @@ TEST_F(RouterTest, UpdateFilterState) {
   expectResponseTimerCreate();
 
   Http::TestHeaderMapImpl headers;
+
   HttpTestUtility::addDefaultHeaders(headers);
   router_.decodeHeaders(headers, true);
   EXPECT_EQ("host", stream_info.filterState()

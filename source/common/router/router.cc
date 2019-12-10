@@ -421,7 +421,6 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
     };
   }
   Upstream::ThreadLocalCluster* cluster = config_.cm_.get(route_entry_->clusterName());
-
   if (!cluster) {
     config_.stats_.no_cluster_.inc();
     ENVOY_STREAM_LOG(debug, "unknown cluster '{}'", *callbacks_, route_entry_->clusterName());
@@ -490,7 +489,10 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
   Http::ConnectionPool::Instance* conn_pool;
   auto url_str = headers.Host()->value().getStringView();
   const auto parsed_authority = Http::Utility::parseAuthority(url_str.data());
-  if (cluster_->auto_sni() && !parsed_authority.is_ip_address_) {
+  const auto http_protocol_options = cluster_->httpProtocolOptions();
+
+  if (http_protocol_options != absl::nullopt && http_protocol_options->auto_sni() &&
+      !parsed_authority.is_ip_address_) {
     callbacks_->streamInfo().filterState().setData(
         Network::UpstreamServerName::key(), std::make_unique<Network::UpstreamServerName>(url_str),
         StreamInfo::FilterState::StateType::Mutable);

@@ -22,6 +22,7 @@ envoy_cc_mock(
         "//source/common/upstream:upstream_lib",
         "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/stats:stats_mocks",
+        "@envoy_api//envoy/api/v2/core:pkg_cc_proto",
     ],
 )
 

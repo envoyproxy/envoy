@@ -320,7 +320,8 @@ public:
                                                 MonotonicTime receive_time,
                                                 uint32_t* packets_dropped);
 
-  /* Read available packets from a given UDP socket and pass the packet to a given
+  /**
+   * Read available packets from a given UDP socket and pass the packet to a given
    * UdpPacketProcessor.
    * @param handle is the UDP socket to read from.
    * @param local_address is the socket's local address used to populate port.

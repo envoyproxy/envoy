@@ -12,6 +12,7 @@
 #include <vector>
 
 #include "envoy/api/v2/core/base.pb.h"
+#include "envoy/api/v2/core/protocol.pb.h"
 #include "envoy/api/v2/eds.pb.h"
 #include "envoy/api/v2/endpoint/endpoint.pb.h"
 #include "envoy/config/typed_metadata.h"
@@ -573,7 +574,10 @@ public:
 
   bool drainConnectionsOnHostRemoval() const override { return drain_connections_on_host_removal_; }
   bool warmHosts() const override { return warm_hosts_; }
-  bool auto_sni() const override { return auto_sni_; }
+  const absl::optional<envoy::api::v2::core::HttpProtocolOptions>&
+  httpProtocolOptions() const override {
+    return http_protocol_options_;
+  }
 
   absl::optional<std::string> eds_service_name() const override { return eds_service_name_; }
 
@@ -626,7 +630,7 @@ private:
   const Network::ConnectionSocket::OptionsSharedPtr cluster_socket_options_;
   const bool drain_connections_on_host_removal_;
   const bool warm_hosts_;
-  const bool auto_sni_;
+  absl::optional<envoy::api::v2::core::HttpProtocolOptions> http_protocol_options_;
   absl::optional<std::string> eds_service_name_;
   const absl::optional<envoy::api::v2::Cluster::CustomClusterType> cluster_type_;
   const std::unique_ptr<Server::Configuration::CommonFactoryContext> factory_context_;

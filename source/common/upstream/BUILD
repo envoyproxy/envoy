@@ -375,6 +375,7 @@ envoy_cc_library(
         ":strict_dns_cluster_lib",
         ":upstream_includes",
         ":transport_socket_match_lib",
+        "@envoy_api//envoy/api/v2/core:pkg_cc_proto",
         "//include/envoy/event:dispatcher_interface",
         "//include/envoy/event:timer_interface",
         "//include/envoy/network:dns_interface",
