@@ -13,6 +13,7 @@ Version history
 * health check: gRPC health checker sets the gRPC deadline to the configured timeout duration.
 * http: added the ability to sanitize headers nominated by the Connection header. This new behavior is guarded by envoy.reloadable_features.connection_header_sanitization which defaults to true.
 * http: support :ref:`auto_host_rewrite_header<envoy_api_field_config.filter.http.dynamic_forward_proxy.v2alpha.PerRouteConfig.auto_host_rewrite_header>` in the dynamic forward proxy.
+* jwt_authn: added :ref: `allow_missing<envoy_api_field_config.filter.http.jwt_authn.v2alpha.JwtRequirement.allow_missing>` option that accepts request without token but rejects bad request with bad tokens.
 * jwt_authn: added :ref:`bypass_cors_preflight<envoy_api_field_config.filter.http.jwt_authn.v2alpha.JwtAuthentication.bypass_cors_preflight>` to allow bypassing the CORS preflight request.
 * lb_subset_config: new fallback policy for selectors: :ref:`KEYS_SUBSET<envoy_api_enum_value_Cluster.LbSubsetConfig.LbSubsetSelector.LbSubsetSelectorFallbackPolicy.KEYS_SUBSET>`
 * listeners: added :ref:`reuse_port<envoy_api_field_Listener.reuse_port>` option.
@@ -31,8 +32,6 @@ Version history
 * tls: remove TLS 1.0 and 1.1 from client defaults
 * tracing: added the ability to set custom tags on both the :ref:`HTTP connection manager<envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.tracing>` and the :ref:`HTTP route <envoy_api_field_route.Route.tracing>`.
 * udp: added initial support for :ref:`UDP proxy <config_udp_listener_filters_udp_proxy>`
-* router: exposed DOWNSTREAM_REMOTE_ADDRESS as custom HTTP request/response headers.
-* jwt_authn filter: added `allow_missing` option
 
 1.12.0 (October 31, 2019)
 =========================
