@@ -23,7 +23,9 @@ public:
         new FakeUpstream(0, FakeHttpConnection::Type::HTTP1, version_, timeSystem()));
   }
 
-  void initializeFilter(const std::string& filter_config, const std::string& lua_per_route_yaml) {
+  void initializeFilter(const std::string& filter_config,
+                        const std::string& lua_per_route_yaml = "",
+                        const std::string& domain = "*") {
     config_helper_.addFilter(filter_config);
 
     config_helper_.addConfigModifier([](envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
@@ -37,7 +39,7 @@ public:
     });
 
     config_helper_.addConfigModifier(
-        [lua_per_route_yaml](
+        [domain, lua_per_route_yaml](
             envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager&
                 hcm) {
           hcm.mutable_route_config()
@@ -57,6 +59,7 @@ public:
             (*per_filter_config)["envoy.lua"].PackFrom(lua_per_route);
           }
 
+          hcm.mutable_route_config()->mutable_virtual_hosts(0)->set_domains(0, domain);
           auto* new_route = hcm.mutable_route_config()->mutable_virtual_hosts(0)->add_routes();
           new_route->mutable_match()->set_prefix("/alt/route");
           new_route->mutable_route()->set_cluster("alt_cluster");
@@ -110,6 +113,32 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, LuaIntegrationTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
 
+// Regression test for pulling route info during early local replies using the Lua filter
+// metadata() API. Covers both the upgrade required and no authority cases.
+TEST_P(LuaIntegrationTest, CallMetadataDuringLocalReply) {
+  const std::string FILTER_AND_CODE =
+      R"EOF(
+name: envoy.lua
+typed_config:
+  "@type": type.googleapis.com/envoy.config.filter.http.lua.v2.Lua
+  inline_code: |
+    function envoy_on_response(response_handle)
+      local metadata = response_handle:metadata():get("foo.bar")
+      if metadata == nil then
+      end
+    end
+)EOF";
+
+  initializeFilter(FILTER_AND_CODE, "", "foo");
+  std::string response;
+  sendRawHttpAndWaitForResponse(lookupPort("http"), "GET / HTTP/1.0\r\n\r\n", &response, true);
+  EXPECT_TRUE(response.find("HTTP/1.1 426 Upgrade Required\r\n") == 0);
+
+  response = "";
+  sendRawHttpAndWaitForResponse(lookupPort("http"), "GET / HTTP/1.1\r\n\r\n", &response, true);
+  EXPECT_TRUE(response.find("HTTP/1.1 400 Bad Request\r\n") == 0);
+}
+
 // Basic request and response.
 TEST_P(LuaIntegrationTest, RequestAndResponse) {
   const std::string FILTER_AND_CODE =
@@ -155,7 +184,7 @@ typed_config:
     end
 )EOF";
 
-  initializeFilter(FILTER_AND_CODE, "");
+  initializeFilter(FILTER_AND_CODE);
   codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
   Http::TestHeaderMapImpl request_headers{{":method", "POST"},
                                           {":path", "/test/long/url"},
@@ -254,7 +283,7 @@ typed_config:
     end
 )EOF";
 
-  initializeFilter(FILTER_AND_CODE, "");
+  initializeFilter(FILTER_AND_CODE);
 
   codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
   Http::TestHeaderMapImpl request_headers{{":method", "GET"},
@@ -314,7 +343,7 @@ typed_config:
     end
 )EOF";
 
-  initializeFilter(FILTER_AND_CODE, "");
+  initializeFilter(FILTER_AND_CODE);
 
   codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
   Http::TestHeaderMapImpl request_headers{{":method", "GET"},
@@ -352,7 +381,7 @@ typed_config:
     end
 )EOF";
 
-  initializeFilter(FILTER_AND_CODE, "");
+  initializeFilter(FILTER_AND_CODE);
 
   codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
   Http::TestHeaderMapImpl request_headers{{":method", "GET"},
@@ -469,7 +498,7 @@ typed_config:
     end
 )EOF";
 
-  initializeFilter(FILTER_AND_CODE, "");
+  initializeFilter(FILTER_AND_CODE);
 
   auto signature =
       "345ac3a167558f4f387a81c2d64234d901a7ceaa544db779d2f797b0ea4ef851b740905a63e2f4d5af42cee093a2"

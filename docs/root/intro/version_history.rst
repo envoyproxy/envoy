@@ -37,6 +37,18 @@ Version history
 * tracing: added upstream_address tag.
 * udp: added initial support for :ref:`UDP proxy <config_udp_listener_filters_udp_proxy>`
 
+1.12.2 (December 10, 2019)
+==========================
+* http: fixed CVE-2019-18801 by allocating sufficient memory for request headers.
+* http: fixed CVE-2019-18802 by implementing stricter validation of HTTP/1 headers.
+* http: trim LWS at the end of header keys, for correct HTTP/1.1 header parsing.
+* http: added strict authority checking. This can be reversed temporarily by setting the runtime feature `envoy.reloadable_features.strict_authority_validation` to false.
+* route config: fixed CVE-2019-18838 by checking for presence of host/path headers.
+
+1.12.1 (November 8, 2019)
+=========================
+* listener: fixed CVE-2019-18836 by clearing accept filters before connection creation.
+
 1.12.0 (October 31, 2019)
 =========================
 * access log: added a new flag for :ref:`downstream protocol error <envoy_api_field_data.accesslog.v2.ResponseFlags.downstream_protocol_error>`.
