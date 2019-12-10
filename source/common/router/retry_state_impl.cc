@@ -227,9 +227,18 @@ RetryStatus RetryStateImpl::shouldRetry(bool would_retry, DoRetryCallback callba
   // only consider the retry budget.
   using RetryBudgetStatus = Upstream::ClusterInfo::RetryBudgetStatus;
   const RetryBudgetStatus budget_status = cluster_.retryBudgetStatus(priority_);
-  const bool retry_overflow =
-    budget_status == RetryBudgetStatus::Exceeded ||
-    (budget_status == RetryBudgetStatus::Unconfigured && !cluster_.resourceManager(priority_).retries().canCreate());
+  bool retry_overflow;
+  switch (budget_status) {
+  case RetryBudgetStatus::Exceeded:
+    retry_overflow = true;
+  case RetryBudgetStatus::Unconfigured:
+    retry_overflow = !cluster_.resourceManager(priority_).retries().canCreate();
+  case RetryBudgetStatus::Available:
+    retry_overflow = false;
+  default:
+    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+  }
+
   if (retry_overflow) {
     return RetryStatus::NoOverflow;
   }

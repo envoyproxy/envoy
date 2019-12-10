@@ -935,6 +935,24 @@ TEST_F(RouterRetryStateImplTest, NoPreferredOverLimitExceeded) {
   EXPECT_EQ(RetryStatus::No, state_->shouldRetryHeaders(good_response_headers, callback_));
 }
 
+TEST_F(RouterRetryStateImplTest, BudgetAvailableRetries) {
+  // Expect no available retries from resource manager.
+  cluster_.resetResourceManager(0, 0, 0, 0, 0);
+
+  // Override the max_retries CB via retry budget.
+  const auto budget_status = Upstream::ClusterInfo::RetryBudgetStatus::Available;
+  EXPECT_CALL(cluster_, retryBudgetStatus(_)).WillRepeatedly(Return(budget_status));
+
+  Http::TestHeaderMapImpl request_headers{{"x-envoy-retry-on", "5xx"}};
+
+  setup(request_headers);
+  EXPECT_TRUE(state_->enabled());
+
+  expectTimerCreateAndEnable();
+  Http::TestHeaderMapImpl response_headers{{":status", "200"}};
+  EXPECT_EQ(RetryStatus::Yes, state_->shouldRetryHeaders(response_headers, callback_));
+}
+
 } // namespace
 } // namespace Router
 } // namespace Envoy

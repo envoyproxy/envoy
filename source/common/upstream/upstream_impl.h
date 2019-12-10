@@ -594,6 +594,8 @@ private:
     Managers managers_;
   };
 
+  // TODO (tonya11en): Rework the interface to ResourceManager/Resource to add support for budgets.
+  // and pull this logic out.
   struct RetryBudget {
     double budget_percent;
     uint32_t min_concurrency;
