@@ -31,9 +31,6 @@ message CircuitBreakers {
         "envoy.api.v2.cluster.CircuitBreakers.Thresholds";
 
     message RetryBudget {
-      option (udpa.api.annotations.versioning).previous_message_type =
-          "envoy.api.v2.cluster.CircuitBreakers.Thresholds.RetryBudget";
-
       // Specifies the limit on concurrent retries as a percentage of the sum of active requests and
       // active pending requests. For example, if there are 100 active requests and the
       // budget_percent is set to 25, there may be 25 active retries.
@@ -64,18 +61,22 @@ message CircuitBreakers {
     // upstream cluster. If not specified, the default is 1024.
     google.protobuf.UInt32Value max_requests = 4;
 
-    // The maximum number of parallel retries that Envoy will allow to the
-    // upstream cluster. If not specified, the default is 3.
-    google.protobuf.UInt32Value max_retries = 5;
+    // If neither max_retries or retry_budget is specified, a max_retries value
+    // of 3 is enforced.
+    oneof retry_threshold {
+      // The maximum number of parallel retries that Envoy will allow to the
+      // upstream cluster. If not specified, the default is 3.
+      google.protobuf.UInt32Value max_retries = 5;
 
-    // Specifies a limit on concurrent retries in relation to the number of active requests. This
-    // parameter is optional.
-    //
-    // .. note::
-    //
-    //    If this field is set, the retry budget will override any configured retry circuit
-    //    breaker.
-    RetryBudget retry_budget = 8;
+      // Specifies a limit on concurrent retries in relation to the number of active requests. This
+      // parameter is optional.
+      //
+      // .. note::
+      //
+      //    If this field is set, the retry budget will override any configured retry circuit
+      //    breaker.
+      RetryBudget retry_budget = 8;
+    }
 
     // If track_remaining is true, then stats will be published that expose
     // the number of resources remaining until the circuit breakers open. If
