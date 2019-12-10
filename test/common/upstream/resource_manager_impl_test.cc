@@ -79,7 +79,9 @@ TEST(ResourceManagerImplTest, RemainingResourceGauges) {
   // Test remaining_cx_ gauge
   EXPECT_EQ(1U, resource_manager.connections().max());
   EXPECT_EQ(1U, stats.remaining_cx_.value());
+  EXPECT_EQ(0U, resource_manager.connections().count());
   resource_manager.connections().inc();
+  EXPECT_EQ(1U, resource_manager.connections().count());
   EXPECT_EQ(0U, stats.remaining_cx_.value());
   resource_manager.connections().dec();
   EXPECT_EQ(1U, stats.remaining_cx_.value());
@@ -87,7 +89,9 @@ TEST(ResourceManagerImplTest, RemainingResourceGauges) {
   // Test remaining_pending_ gauge
   EXPECT_EQ(2U, resource_manager.pendingRequests().max());
   EXPECT_EQ(2U, stats.remaining_pending_.value());
+  EXPECT_EQ(0U, resource_manager.pendingRequests().count());
   resource_manager.pendingRequests().inc();
+  EXPECT_EQ(1U, resource_manager.pendingRequests().count());
   EXPECT_EQ(1U, stats.remaining_pending_.value());
   resource_manager.pendingRequests().inc();
   EXPECT_EQ(0U, stats.remaining_pending_.value());
@@ -95,11 +99,14 @@ TEST(ResourceManagerImplTest, RemainingResourceGauges) {
   EXPECT_EQ(1U, stats.remaining_pending_.value());
   resource_manager.pendingRequests().dec();
   EXPECT_EQ(2U, stats.remaining_pending_.value());
+  EXPECT_EQ(2U, stats.remaining_pending_.value());
 
   // Test remaining_rq_ gauge
   EXPECT_EQ(1U, resource_manager.requests().max());
   EXPECT_EQ(1U, stats.remaining_rq_.value());
+  EXPECT_EQ(0U, resource_manager.requests().count());
   resource_manager.requests().inc();
+  EXPECT_EQ(1U, resource_manager.requests().count());
   EXPECT_EQ(0U, stats.remaining_rq_.value());
   resource_manager.requests().dec();
   EXPECT_EQ(1U, stats.remaining_rq_.value());
@@ -108,14 +115,18 @@ TEST(ResourceManagerImplTest, RemainingResourceGauges) {
   // despite having more retries than the configured max
   EXPECT_EQ(0U, resource_manager.retries().max());
   EXPECT_EQ(0U, stats.remaining_retries_.value());
+  EXPECT_EQ(0U, resource_manager.retries().count());
   resource_manager.retries().inc();
+  EXPECT_EQ(1U, resource_manager.retries().count());
   EXPECT_EQ(0U, stats.remaining_retries_.value());
   resource_manager.retries().dec();
 
   // Test remaining_cx_pools gauge.
   EXPECT_EQ(3U, resource_manager.connectionPools().max());
   EXPECT_EQ(3U, stats.remaining_cx_pools_.value());
+  EXPECT_EQ(0U, resource_manager.connectionPools().count());
   resource_manager.connectionPools().inc();
+  EXPECT_EQ(1U, resource_manager.connectionPools().count());
   EXPECT_EQ(2U, stats.remaining_cx_pools_.value());
   resource_manager.connectionPools().dec();
   EXPECT_EQ(3U, stats.remaining_cx_pools_.value());
