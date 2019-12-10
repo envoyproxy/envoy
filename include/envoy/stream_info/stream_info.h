@@ -136,6 +136,8 @@ struct ResponseCodeDetailValues {
   // indicates that original "success" headers may have been sent downstream
   // despite the subsequent failure.
   const std::string LateUpstreamReset = "upstream_reset_after_response_started";
+  // The request was rejected due to invalid characters in the HOST/:authority header.
+  const std::string InvalidAuthority = "invalid_authority";
 };
 
 using ResponseCodeDetails = ConstSingleton<ResponseCodeDetailValues>;

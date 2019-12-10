@@ -446,13 +446,15 @@ TEST_P(IntegrationTest, TestInlineHeaders) {
 
 // Verify for HTTP/1.0 a keep-alive header results in no connection: close.
 // Also verify existing host headers are passed through for the HTTP/1.0 case.
-TEST_P(IntegrationTest, Http10WithHostandKeepAlive) {
+// This also regression tests proper handling of trailing whitespace after key
+// values, specifically the host header.
+TEST_P(IntegrationTest, Http10WithHostandKeepAliveAndLws) {
   autonomous_upstream_ = true;
   config_helper_.addConfigModifier(&setAllowHttp10WithDefaultHost);
   initialize();
   std::string response;
   sendRawHttpAndWaitForResponse(lookupPort("http"),
-                                "GET / HTTP/1.0\r\nHost: foo.com\r\nConnection:Keep-alive\r\n\r\n",
+                                "GET / HTTP/1.0\r\nHost: foo.com \r\nConnection:Keep-alive\r\n\r\n",
                                 &response, true);
   EXPECT_THAT(response, HasSubstr("HTTP/1.0 200 OK\r\n"));
   EXPECT_THAT(response, Not(HasSubstr("connection: close")));

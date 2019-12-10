@@ -1462,6 +1462,32 @@ TEST_P(ProtocolIntegrationTest, ConnDurationTimeoutNoHttpRequest) {
   test_server_->waitForCounterGe("http.config_test.downstream_cx_max_duration_reached", 1);
 }
 
+// Make sure that invalid authority headers get blocked at or before the HCM.
+TEST_P(DownstreamProtocolIntegrationTest, InvalidAuth) {
+  initialize();
+  fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  Http::TestHeaderMapImpl request_headers{{":method", "POST"},
+                                          {":path", "/test/long/url"},
+                                          {":scheme", "http"},
+                                          {":authority", "ho|st|"}};
+
+  auto response = codec_client_->makeHeaderOnlyRequest(request_headers);
+  if (downstreamProtocol() == Http::CodecClient::Type::HTTP1) {
+    // For HTTP/1 this is handled by the HCM, which sends a full 400 response.
+    response->waitForEndStream();
+    ASSERT_TRUE(response->complete());
+    EXPECT_EQ("400", response->headers().Status()->value().getStringView());
+  } else {
+    // For HTTP/2 this is handled by nghttp2 which resets the connection without
+    // sending an HTTP response.
+    codec_client_->waitForDisconnect();
+    ASSERT_FALSE(response->complete());
+  }
+}
+
 // For tests which focus on downstream-to-Envoy behavior, and don't need to be
 // run with both HTTP/1 and HTTP/2 upstreams.
 INSTANTIATE_TEST_SUITE_P(Protocols, DownstreamProtocolIntegrationTest,

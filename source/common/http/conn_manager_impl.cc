@@ -779,6 +779,15 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(HeaderMapPtr&& headers, 
     }
   }
 
+  // Make sure the host is valid.
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.strict_authority_validation") &&
+      !HeaderUtility::authorityIsValid(request_headers_->Host()->value().getStringView())) {
+    sendLocalReply(Grpc::Common::hasGrpcContentType(*request_headers_), Code::BadRequest, "",
+                   nullptr, is_head_request_, absl::nullopt,
+                   StreamInfo::ResponseCodeDetails::get().InvalidAuthority);
+    return;
+  }
+
   // Currently we only support relative paths at the application layer. We expect the codec to have
   // broken the path into pieces if applicable. NOTE: Currently the HTTP/1.1 codec only does this
   // when the allow_absolute_url flag is enabled on the HCM.

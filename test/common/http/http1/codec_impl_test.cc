@@ -61,6 +61,25 @@ public:
   void testRequestHeadersExceedLimit(std::string header_string);
   void testRequestHeadersAccepted(std::string header_string);
 
+  // Send the request, and validate the received request headers.
+  // Then send a response just to clean up.
+  void sendAndValidateRequestAndSendResponse(absl::string_view raw_request,
+                                             const TestHeaderMapImpl& expected_request_headers) {
+    NiceMock<Http::MockStreamDecoder> decoder;
+    Http::StreamEncoder* response_encoder = nullptr;
+    EXPECT_CALL(callbacks_, newStream(_, _))
+        .Times(1)
+        .WillOnce(Invoke([&](Http::StreamEncoder& encoder, bool) -> Http::StreamDecoder& {
+          response_encoder = &encoder;
+          return decoder;
+        }));
+    EXPECT_CALL(decoder, decodeHeaders_(HeaderMapEqual(&expected_request_headers), true)).Times(1);
+    Buffer::OwnedImpl buffer(raw_request);
+    codec_->dispatch(buffer);
+    EXPECT_EQ(0U, buffer.length());
+    response_encoder->encodeHeaders(TestHeaderMapImpl{{":status", "200"}}, true);
+  }
+
 protected:
   uint32_t max_request_headers_kb_{Http::DEFAULT_MAX_REQUEST_HEADERS_KB};
   uint32_t max_request_headers_count_{Http::DEFAULT_MAX_HEADERS_COUNT};
@@ -165,6 +184,23 @@ TEST_F(Http1ServerConnectionImplTest, EmptyHeader) {
   Buffer::OwnedImpl buffer("GET / HTTP/1.1\r\nTest:\r\nHello: World\r\n\r\n");
   codec_->dispatch(buffer);
   EXPECT_EQ(0U, buffer.length());
+}
+
+TEST_F(Http1ServerConnectionImplTest, HostWithLWS) {
+  initialize();
+
+  TestHeaderMapImpl expected_headers{{":authority", "host"}, {":path", "/"}, {":method", "GET"}};
+
+  // Regression test spaces before and after the host header value.
+  sendAndValidateRequestAndSendResponse("GET / HTTP/1.1\r\nHost: host \r\n\r\n", expected_headers);
+
+  // Regression test tabs before and after the host header value.
+  sendAndValidateRequestAndSendResponse("GET / HTTP/1.1\r\nHost:	host	\r\n\r\n",
+                                        expected_headers);
+
+  // Regression test mixed spaces and tabs before and after the host header value.
+  sendAndValidateRequestAndSendResponse(
+      "GET / HTTP/1.1\r\nHost: 	 	  host		  	 \r\n\r\n", expected_headers);
 }
 
 TEST_F(Http1ServerConnectionImplTest, Http10) {
@@ -449,6 +485,9 @@ TEST_F(Http1ServerConnectionImplTest, HeaderInvalidCharsRejection) {
 // Regression test for http-parser allowing embedded NULs in header values,
 // verify we reject them.
 TEST_F(Http1ServerConnectionImplTest, HeaderEmbeddedNulRejection) {
+  TestScopedRuntime scoped_runtime;
+  Runtime::LoaderSingleton::getExisting()->mergeValues(
+      {{"envoy.reloadable_features.strict_header_validation", "false"}});
   initialize();
 
   InSequence sequence;
