@@ -2,6 +2,10 @@
 
 #include "envoy/registry/registry.h"
 
+#include "common/common/fmt.h"
+
+#include "test/test_common/logging.h"
+
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
@@ -69,6 +73,28 @@ TEST(RegistryTest, DefaultFactoryPublished) {
   // Expect that the factory is present.
   EXPECT_NE(Registry::FactoryRegistry<PublishedFactory>::getFactory("testing.published.test"),
             nullptr);
+}
+
+class TestWithDeprecatedPublishedFactory : public PublishedFactory {
+public:
+  std::string name() override { return "testing.published.instead_name"; }
+};
+
+REGISTER_FACTORY(TestWithDeprecatedPublishedFactory,
+                 PublishedFactory){"testing.published.deprecated_name"};
+
+TEST(RegistryTest, WithDeprecatedFactoryPublished) {
+  EXPECT_EQ("testing.published.instead_name",
+            Envoy::Registry::FactoryRegistry<PublishedFactory>::getFactory(
+                "testing.published.deprecated_name")
+                ->name());
+  EXPECT_LOG_CONTAINS("warn",
+                      fmt::format("{} is deprecated, use {} instead.",
+                                  "testing.published.deprecated_name",
+                                  "testing.published.instead_name"),
+                      Envoy::Registry::FactoryRegistry<PublishedFactory>::getFactory(
+                          "testing.published.deprecated_name")
+                          ->name());
 }
 
 } // namespace

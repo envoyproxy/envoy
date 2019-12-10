@@ -2,9 +2,9 @@ syntax = "proto3";
 
 package envoy.service.discovery.v2;
 
+option java_package = "io.envoyproxy.envoy.service.discovery.v2";
 option java_outer_classname = "RtdsProto";
 option java_multiple_files = true;
-option java_package = "io.envoyproxy.envoy.service.discovery.v2";
 option java_generic_services = true;
 
 import "envoy/api/v2/discovery.proto";
@@ -27,10 +27,8 @@ service RuntimeDiscoveryService {
   }
 
   rpc FetchRuntime(api.v2.DiscoveryRequest) returns (api.v2.DiscoveryResponse) {
-    option (google.api.http) = {
-      post: "/v2/discovery:runtime"
-      body: "*"
-    };
+    option (google.api.http).post = "/v2/discovery:runtime";
+    option (google.api.http).body = "*";
   }
 }
 
