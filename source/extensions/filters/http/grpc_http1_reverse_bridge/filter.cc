@@ -191,7 +191,7 @@ Http::FilterDataStatus Filter::encodeData(Buffer::Instance& buffer, bool end_str
 }
 
 Http::FilterTrailersStatus Filter::encodeTrailers(Http::HeaderMap& trailers) {
-  trailers.insertGrpcStatus().value(grpc_status_);
+  trailers.setGrpcStatus(grpc_status_);
 
   if (withhold_grpc_frames_) {
     buildGrpcFrameHeader(buffer_);
