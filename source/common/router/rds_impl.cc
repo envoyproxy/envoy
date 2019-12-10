@@ -112,12 +112,13 @@ void RdsRouteConfigSubscription::onConfigUpdate(
   if (config_update_info_->onRdsUpdate(route_config, version_info)) {
     stats_.config_reload_.inc();
 
-    if (config_update_info_->routeConfiguration().has_vhds()) {
-      ENVOY_LOG(debug, "rds: vhds configuration present, starting vhds: config_name={} hash={}",
-                route_config_name_, config_update_info_->configHash());
+    if (config_update_info_->routeConfiguration().has_vhds() &&
+        config_update_info_->vhdsConfigurationChanged()) {
+      ENVOY_LOG(
+          debug,
+          "rds: vhds configuration present/changed, (re)starting vhds: config_name={} hash={}",
+          route_config_name_, config_update_info_->configHash());
       maybeCreateInitManager(version_info, noop_init_manager, resume_rds);
-      // TODO(dmitri-d): It's unsafe to depend directly on factory context here,
-      // the listener might have been torn down, need to remove this.
       vhds_subscription_ = std::make_unique<VhdsSubscription>(
           config_update_info_, factory_context_, stat_prefix_, route_config_providers_);
       vhds_subscription_->registerInitTargetWithInitManager(

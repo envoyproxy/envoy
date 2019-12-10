@@ -53,6 +53,11 @@ public:
   virtual const std::string& configVersion() PURE;
 
   /**
+   * @return bool return whether VHDS configuration has been changed in the last RDS update.
+   */
+  virtual bool vhdsConfigurationChanged() const PURE;
+
+  /**
    * @return uint64_t the hash value of RouteConfiguration.
    */
   virtual uint64_t configHash() const PURE;

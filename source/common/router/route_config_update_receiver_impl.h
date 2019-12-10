@@ -17,8 +17,8 @@ class RouteConfigUpdateReceiverImpl : public RouteConfigUpdateReceiver {
 public:
   RouteConfigUpdateReceiverImpl(TimeSource& time_source,
                                 ProtobufMessage::ValidationVisitor& validation_visitor)
-      : time_source_(time_source), last_config_hash_(0ull),
-        validation_visitor_(validation_visitor) {}
+      : time_source_(time_source), last_config_hash_(0ull), last_vhds_config_hash_(0ul),
+        validation_visitor_(validation_visitor), vhds_configuration_changed_(true) {}
 
   void initializeVhosts(const envoy::api::v2::RouteConfiguration& route_configuration);
   void collectAliasesInUpdate(
@@ -43,6 +43,7 @@ public:
   absl::optional<RouteConfigProvider::ConfigInfo> configInfo() const override {
     return config_info_;
   }
+  bool vhdsConfigurationChanged() const override { return vhds_configuration_changed_; }
   const envoy::api::v2::RouteConfiguration& routeConfiguration() override {
     return route_config_proto_;
   }
@@ -55,12 +56,14 @@ private:
   TimeSource& time_source_;
   envoy::api::v2::RouteConfiguration route_config_proto_;
   uint64_t last_config_hash_;
+  uint64_t last_vhds_config_hash_;
   std::string last_config_version_;
   SystemTime last_updated_;
   std::map<std::string, envoy::api::v2::route::VirtualHost> virtual_hosts_;
   absl::optional<RouteConfigProvider::ConfigInfo> config_info_;
   ProtobufMessage::ValidationVisitor& validation_visitor_;
   std::set<std::string> aliases_in_last_update_;
+  bool vhds_configuration_changed_;
 };
 
 } // namespace Router

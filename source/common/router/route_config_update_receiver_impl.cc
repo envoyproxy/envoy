@@ -21,6 +21,9 @@ bool RouteConfigUpdateReceiverImpl::onRdsUpdate(const envoy::api::v2::RouteConfi
 
   route_config_proto_ = rc;
   last_config_hash_ = new_hash;
+  const uint64_t new_vhds_config_hash = MessageUtil::hash(rc.vhds());
+  vhds_configuration_changed_ = new_vhds_config_hash != last_vhds_config_hash_;
+  last_vhds_config_hash_ = new_vhds_config_hash;
   last_config_version_ = version_info;
   last_updated_ = time_source_.systemTime();
   initializeVhosts(route_config_proto_);
