@@ -120,7 +120,10 @@ def SyncV3Alpha(cmd, src_labels):
       continue
     # Skip unversioned package namespaces. TODO(htuch): fix this to use the type
     # DB and proper upgrade paths.
-    if 'v2' in dst:
+    if 'v1' in dst:
+      dst = re.sub('v1alpha\d?|v1', 'v3alpha', dst)
+      SyncProtoFile(cmd, src, dst)
+    elif 'v2' in dst:
       dst = re.sub('v2alpha\d?|v2', 'v3alpha', dst)
       SyncProtoFile(cmd, src, dst)
     elif 'envoy/type/matcher' in dst:
