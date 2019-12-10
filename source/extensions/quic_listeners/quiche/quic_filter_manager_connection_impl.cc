@@ -128,7 +128,7 @@ void QuicFilterManagerConnectionImpl::adjustBytesToSend(int64_t delta) {
   write_buffer_watermark_simulation_.checkLowWatermark(bytes_to_send_);
 }
 
-void QuicFilterManagerConnectionImpl::maybeHandleDelayedClose() {
+void QuicFilterManagerConnectionImpl::maybeApplyDelayClosePolicy() {
   if (!inDelayedClose()) {
     return;
   }

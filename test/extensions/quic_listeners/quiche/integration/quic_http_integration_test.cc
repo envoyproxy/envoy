@@ -177,8 +177,8 @@ TEST_P(QuicHttpIntegrationTest, DownstreamReadDisabledOnGiantPost) {
   testRouterRequestAndResponseWithBody(/*request_size=*/1024 * 1024, /*response_size=*/1024, false);
 }
 
+// Tests that a connection idle times out after 1s and starts delayed close.
 TEST_P(QuicHttpIntegrationTest, TestDelayedConnectionTeardownTimeoutTrigger) {
-  quic::SetVerbosityLogThreshold(1);
   config_helper_.addFilter("{ name: envoy.http_dynamo_filter, typed_config: { \"@type\": "
                            "type.googleapis.com/google.protobuf.Empty } }");
   config_helper_.setBufferLimits(1024, 1024);

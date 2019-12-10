@@ -43,7 +43,7 @@ void EnvoyQuicClientSession::Initialize() {
 
 void EnvoyQuicClientSession::OnCanWrite() {
   quic::QuicSpdyClientSession::OnCanWrite();
-  maybeHandleDelayedClose();
+  maybeApplyDelayClosePolicy();
 }
 
 void EnvoyQuicClientSession::OnGoAway(const quic::QuicGoAwayFrame& frame) {

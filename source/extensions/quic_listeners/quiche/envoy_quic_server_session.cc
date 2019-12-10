@@ -95,9 +95,9 @@ void EnvoyQuicServerSession::SendGoAway(quic::QuicErrorCode error_code, const st
 
 void EnvoyQuicServerSession::OnCanWrite() {
   quic::QuicServerSessionBase::OnCanWrite();
-  // Do no update delay close state according to connection level packet egress because that is
+  // Do not update delay close state according to connection level packet egress because that is
   // equivalent to TCP transport layer egress. But only do so if the session gets chance to write.
-  maybeHandleDelayedClose();
+  maybeApplyDelayClosePolicy();
 }
 
 void EnvoyQuicServerSession::OnCryptoHandshakeEvent(CryptoHandshakeEvent event) {

@@ -98,7 +98,7 @@ public:
   void adjustBytesToSend(int64_t delta);
 
   // Called after each write when a previous connection close call is postponed.
-  void maybeHandleDelayedClose();
+  void maybeApplyDelayClosePolicy();
 
   uint32_t bytesToSend() { return bytes_to_send_; }
 
