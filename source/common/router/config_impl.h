@@ -17,9 +17,9 @@
 #include "envoy/server/filter_config.h"
 #include "envoy/upstream/cluster_manager.h"
 
+#include "common/common/to_lower_table.h"
 #include "common/config/metadata.h"
 #include "common/http/hash_policy.h"
-#include "common/http/header_utility.h"
 #include "common/router/config_utility.h"
 #include "common/router/header_formatter.h"
 #include "common/router/header_parser.h"
@@ -795,6 +795,7 @@ private:
   using WildcardVirtualHosts =
       std::map<int64_t, std::unordered_map<std::string, VirtualHostSharedPtr>, std::greater<>>;
   using SubstringFunction = std::function<std::string(const std::string&, int)>;
+  static const ToLowerTable& toLowerTable();
   const VirtualHostImpl* findWildcardVirtualHost(const std::string& host,
                                                  const WildcardVirtualHosts& wildcard_virtual_hosts,
                                                  SubstringFunction substring_function) const;

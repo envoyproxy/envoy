@@ -59,10 +59,14 @@ service VirtualHostDiscoveryService {
   }
 }
 
-// [#next-free-field: 11]
+// [#next-free-field: 14]
 message RouteConfiguration {
   option (udpa.api.annotations.versioning).previous_message_type =
       "envoy.api.v2.RouteConfiguration";
+
+  reserved 3;
+
+  reserved "internal_only_headers";
 
   // The name of the route configuration. For example, it might match
   // :ref:`route_config_name
@@ -82,12 +86,11 @@ message RouteConfiguration {
   // [#not-implemented-hide:]
   Vhds vhds = 9;
 
-  // Optionally specifies a list of HTTP headers that the connection manager
+  // Optionally specifies a list of valid HTTP headers that the connection manager
   // will consider to be internal only. If they are found on external requests they will be cleaned
   // prior to filter invocation. See :ref:`config_http_conn_man_headers_x-envoy-internal` for more
   // information.
-  repeated string internal_only_headers = 3
-      [(validate.rules).repeated = {items {string {pattern: "^[^\000\n\r]+$"}}}];
+  repeated core.ValidHeaderName valid_internal_only_headers = 11;
 
   // Specifies a list of HTTP headers that should be added to each response that
   // the connection manager encodes. Headers specified at this level are applied
@@ -100,8 +103,16 @@ message RouteConfiguration {
 
   // Specifies a list of HTTP headers that should be removed from each response
   // that the connection manager encodes.
+  //
+  // This field is deprecated. Use
+  // :ref:`valid_response_headers_to_remove<envoy_api_msg_RouteConfiguration.valid_response_headers_to_remove>`
+  // instead.
   repeated string response_headers_to_remove = 5
       [(validate.rules).repeated = {items {string {pattern: "^[^\000\n\r]+$"}}}];
+
+  // Specifies a list of valid HTTP headers that should be removed from each response
+  // that the connection manager encodes.
+  repeated core.ValidHeaderName valid_response_headers_to_remove = 12;
 
   // Specifies a list of HTTP headers that should be added to each request
   // routed by the HTTP connection manager. Headers specified at this level are
@@ -114,8 +125,16 @@ message RouteConfiguration {
 
   // Specifies a list of HTTP headers that should be removed from each request
   // routed by the HTTP connection manager.
+  //
+  // This field is deprecated. Use
+  // :ref:`valid_request_headers_to_remove<envoy_api_msg_route.RouteConfiguration.valid_request_headers_to_remove>`
+  // field instead.
   repeated string request_headers_to_remove = 8
       [(validate.rules).repeated = {items {string {pattern: "^[^\000\n\r]+$"}}}];
+
+  // Specifies a list of valid HTTP headers that should be removed from each request
+  // routed by the HTTP connection manager.
+  repeated core.ValidHeaderName valid_request_headers_to_remove = 13;
 
   // By default, headers that should be added/removed are evaluated from most to least specific:
   //

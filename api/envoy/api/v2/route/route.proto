@@ -29,7 +29,7 @@ import "validate/validate.proto";
 // host header. This allows a single listener to service multiple top level domain path trees. Once
 // a virtual host is selected based on the domain, the routes are processed in order to see which
 // upstream cluster to route to or whether to perform a redirect.
-// [#next-free-field: 19]
+// [#next-free-field: 21]
 message VirtualHost {
   enum TlsRequirementType {
     // No TLS requirement for the virtual host.
@@ -66,10 +66,7 @@ message VirtualHost {
   //   The longest wildcards match first.
   //   Only a single virtual host in the entire route configuration can match on ``*``. A domain
   //   must be unique across all virtual hosts or the config will fail to load.
-  repeated string domains = 2 [(validate.rules).repeated = {
-    min_items: 1
-    items {string {pattern: "^[^\000\n\r]*$"}}
-  }];
+  repeated string domains = 2 [(validate.rules).repeated = {min_items: 1}];
 
   // The list of routes that will be matched, in order, for incoming requests.
   // The first route that matches will be used.
@@ -98,8 +95,17 @@ message VirtualHost {
 
   // Specifies a list of HTTP headers that should be removed from each request
   // handled by this virtual host.
+  // .. attention::
+  //
+  //   **This field is deprecated**. Set the
+  //   :ref:`valid_request_headers_to_remove
+  //   <envoy_api_msg_route.VirtualHost.valid_request_headers_to_remove>` field instead.
   repeated string request_headers_to_remove = 13
-      [(validate.rules).repeated = {items {string {pattern: "^[^\000\n\r]+$"}}}];
+      [(validate.rules).repeated = {items {string {pattern: "^[^\000\n\r]+$"}}}, deprecated = true];
+
+  // Specifies a list of valid HTTP headers that should be removed from each request
+  // handled by this virtual host.
+  repeated core.ValidHeaderName valid_request_headers_to_remove = 19;
 
   // Specifies a list of HTTP headers that should be added to each response
   // handled by this virtual host. Headers specified at this level are applied
@@ -112,8 +118,17 @@ message VirtualHost {
 
   // Specifies a list of HTTP headers that should be removed from each response
   // handled by this virtual host.
+  // .. attention::
+  //
+  //   **This field is deprecated**. Set the
+  //   :ref:`valid_response_headers_to_remove
+  //   <envoy_api_msg_route.VirtualHost.valid_response_headers_to_remove>` field instead.
   repeated string response_headers_to_remove = 11
-      [(validate.rules).repeated = {items {string {pattern: "^[^\000\n\r]+$"}}}];
+      [(validate.rules).repeated = {items {string {pattern: "^[^\000\n\r]+$"}}}, deprecated = true];
+
+  // Specifies a list of valid HTTP headers that should be removed from each response
+  // handled by this virtual host.
+  repeated core.ValidHeaderName valid_response_headers_to_remove = 20;
 
   // Indicates that the virtual host has a CORS policy.
   CorsPolicy cors = 8;
@@ -521,7 +536,7 @@ message CorsPolicy {
   core.RuntimeFractionalPercent shadow_enabled = 10;
 }
 
-// [#next-free-field: 30]
+// [#next-free-field: 33]
 message RouteAction {
   enum ClusterNotFoundResponseCode {
     // HTTP status code - 503 Service Unavailable.
@@ -582,7 +597,11 @@ message RouteAction {
     message Header {
       // The name of the request header that will be used to obtain the hash
       // key. If the request header is not present, no hash will be produced.
-      string header_name = 1 [(validate.rules).string = {min_bytes: 1}];
+      //
+      string header_name = 1
+          [(validate.rules).string = {min_bytes: 1 pattern: "^[^\000\n\r]"}, deprecated = true];
+
+      core.ValidHeaderName valid_header_name = 2;
     }
 
     // Envoy supports two types of cookie affinity:
@@ -689,7 +708,13 @@ message RouteAction {
     //
     //   Internally, Envoy always uses the HTTP/2 *:authority* header to represent the HTTP/1
     //   *Host* header. Thus, if attempting to match on *Host*, match on *:authority* instead.
-    string cluster_header = 2 [(validate.rules).string = {min_bytes: 1 pattern: "^[^\000\r\n]+$"}];
+    //
+    // This field is deprecated. Use
+    // :ref:`valid_cluster_header<envoy_api_field_route.RouteAction.valid_cluster_header>` instead.
+    string cluster_header = 2
+        [(validate.rules).string = {min_bytes: 1 pattern: "^[^\000\r\n]+$"}, deprecated = true];
+
+    core.ValidHeaderValue valid_cluster_header = 30;
 
     // Multiple upstream clusters can be specified for a given route. The
     // request is routed to one of the upstream clusters based on weights
@@ -744,8 +769,17 @@ message RouteAction {
     // Indicates that during forwarding, the host header will be swapped with
     // this value.
     //
+    // This field is deprecated. Use :ref:`valid_auto_host_rewrite_header
+    // <envoy_api_field_route.RouteAction.valid_host_rewrite>` instead.
+    //
     // [#next-major-version: host_rewrite_literal]
-    string host_rewrite = 6;
+    string host_rewrite = 6 [deprecated = true];
+
+    // Indicates that during forwarding, the host header will be swapped with
+    // this value.
+    //
+    // [#next-major-version: valid_host_rewrite_literal]
+    core.ValidHeaderValue valid_host_rewrite = 31;
 
     // Indicates that during forwarding, the host header will be swapped with
     // the hostname of the upstream host chosen by the cluster manager. This
@@ -763,8 +797,23 @@ message RouteAction {
     //   Pay attention to the potential security implications of using this option. Provided header
     //   must come from trusted source.
     //
+    // This field is deprecated. Use :ref:`valid_auto_host_rewrite_header
+    // <envoy_api_field_route.RouteAction.valid_auto_host_rewrite_header>` instead.
+    //
     // [#next-major-version: host_rewrite_header]
-    string auto_host_rewrite_header = 29;
+    string auto_host_rewrite_header = 29 [deprecated = true];
+
+    // Indicates that during forwarding, the host header will be swapped with the content of given
+    // downstream or :ref:`custom <config_http_conn_man_headers_custom_request_headers>` header.
+    // If header value is empty, host header is left intact.
+    //
+    // .. attention::
+    //
+    //   Pay attention to the potential security implications of using this option. Provided header
+    //   must come from trusted source.
+    //
+    // [#next-major-version: valid_host_rewrite_header]
+    core.ValidHeaderValue valid_auto_host_rewrite_header = 32;
   }
 
   // Specifies the upstream timeout for the route. If not specified, the default is 15s. This
@@ -1210,7 +1259,7 @@ message RateLimit {
       // The header name to be queried from the request headers. The header’s
       // value is used to populate the value of the descriptor entry for the
       // descriptor_key.
-      string header_name = 1 [(validate.rules).string = {min_bytes: 1}];
+      string header_name = 1 [(validate.rules).string = {min_bytes: 1 pattern: "^[^\000\n\r]"}];
 
       // The key to use in the descriptor entry.
       string descriptor_key = 2 [(validate.rules).string = {min_bytes: 1}];
@@ -1326,12 +1375,18 @@ message RateLimit {
 //   value.
 //
 //  [#next-major-version: HeaderMatcher should be refactored to use StringMatcher.]
-// [#next-free-field: 12]
+// [#next-free-field: 13]
 message HeaderMatcher {
   reserved 2, 3;
 
   // Specifies the name of the header in the request.
-  string name = 1 [(validate.rules).string = {min_bytes: 1}];
+  //
+  // This field is deprecated. Use :ref:`valid_name<envoy_api_field_route.HeaderMatcher.valid_name>`
+  // instead.
+  string name = 1 [(validate.rules).string = {min_bytes: 1 pattern: "^[^\000\r\n]+$"}];
+
+  // Specifies the  name of the header in the request.
+  core.ValidHeaderName valid_name = 12;
 
   // Specifies how the header match will be performed to route the request.
   oneof header_match_specifier {

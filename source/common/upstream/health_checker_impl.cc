@@ -217,6 +217,11 @@ void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::onInterval() {
     client_->addConnectionCallbacks(connection_callback_impl_);
     expect_reset_ = false;
   }
+  // Check that hostname and path are valid header values before creating the health check request.
+  if (!Http::HeaderUtility::headerIsValid(hostname_) ||
+      !Http::HeaderUtility::headerIsValid(parent_.path_)) {
+    throw EnvoyException("Invalid header values in health check request");
+  }
 
   Http::StreamEncoder* request_encoder = &client_->newStream(*this);
   request_encoder->getStream().addCallbacks(*this);

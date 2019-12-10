@@ -45,6 +45,7 @@ envoy_cc_library(
         "//source/common/common:assert_lib",
         "//source/common/common:utility_lib",
         "//source/common/config:metadata_lib",
+        "//source/common/http:header_utility_lib",
         "//source/common/http:utility_lib",
         "//source/common/stream_info:utility_lib",
     ],

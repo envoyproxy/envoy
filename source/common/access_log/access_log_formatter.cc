@@ -9,6 +9,7 @@
 #include "common/common/fmt.h"
 #include "common/common/utility.h"
 #include "common/config/metadata.h"
+#include "common/http/header_utility.h"
 #include "common/http/utility.h"
 #include "common/stream_info/utility.h"
 
@@ -28,7 +29,6 @@ namespace {
 const std::regex& getStartTimeNewlinePattern() {
   CONSTRUCT_ON_FIRST_USE(std::regex, "%[-_0^#]*[1-9]*n");
 }
-const std::regex& getNewlinePattern() { CONSTRUCT_ON_FIRST_USE(std::regex, "\n"); }
 
 // Helper that handles the case when the ConnectionInfo is missing or if the desired value is
 // empty.
@@ -173,10 +173,13 @@ void AccessLogFormatParser::parseCommandHeader(const std::string& token, const s
   } else {
     alternative_header = "";
   }
-  // The main and alternative header should not contain invalid characters {NUL, LR, CF}.
-  if (std::regex_search(main_header, getNewlinePattern()) ||
-      std::regex_search(alternative_header, getNewlinePattern())) {
-    throw EnvoyException("Invalid header configuration. Format string contains newline.");
+  // The main and alternative header should not contain invalid characters {NUL, LR, CF}. This uses
+  // nghttp2's check for invalid header value characters (nghttp2's check for invalid header name
+  // characters will return false for uppercase characters as well).
+  if (!Http::HeaderUtility::headerIsValid(main_header) ||
+      !Http::HeaderUtility::headerIsValid(alternative_header)) {
+    throw EnvoyException(
+        "Invalid header configuration. Format string contains invalid characters.");
   }
 }
 

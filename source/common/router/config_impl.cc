@@ -18,6 +18,7 @@
 #include "common/common/empty_string.h"
 #include "common/common/fmt.h"
 #include "common/common/hash.h"
+#include "common/http/header_utility.h"
 #include "common/common/logger.h"
 #include "common/common/regex.h"
 #include "common/common/utility.h"
@@ -347,6 +348,9 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
   }
   for (const auto& upgrade_config : route.route().upgrade_configs()) {
     const bool enabled = upgrade_config.has_enabled() ? upgrade_config.enabled().value() : true;
+    if (!Http::HeaderUtility::headerIsValid(upgrade_config.upgrade_type())) {
+      throw EnvoyException(fmt::format("Invalid upgrade type {}", upgrade_config.upgrade_type()));
+    }
     const bool success =
         upgrade_map_
             .emplace(std::make_pair(
@@ -999,6 +1003,11 @@ const VirtualHostImpl* RouteMatcher::findWildcardVirtualHost(
   return nullptr;
 }
 
+const ToLowerTable& RouteMatcher::toLowerTable() {
+  static auto* table = new ToLowerTable();
+  return *table;
+}
+
 RouteMatcher::RouteMatcher(const envoy::api::v2::RouteConfiguration& route_config,
                            const ConfigImpl& global_route_config,
                            Server::Configuration::ServerFactoryContext& factory_context,
@@ -1007,7 +1016,8 @@ RouteMatcher::RouteMatcher(const envoy::api::v2::RouteConfiguration& route_confi
     VirtualHostSharedPtr virtual_host(new VirtualHostImpl(
         virtual_host_config, global_route_config, factory_context, validator, validate_clusters));
     for (const std::string& domain_name : virtual_host_config.domains()) {
-      const std::string domain = Http::LowerCaseString(domain_name).get();
+      std::string domain = domain_name;
+      toLowerTable().toLowerCase(domain);
       bool duplicate_found = false;
       if ("*" == domain) {
         if (default_virtual_host_) {

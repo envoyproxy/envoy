@@ -63,16 +63,32 @@ message HealthCheck {
     }
   }
 
-  // [#next-free-field: 11]
+  // [#next-free-field: 14]
   message HttpHealthCheck {
     // The value of the host header in the HTTP health check request. If
     // left empty (default value), the name of the cluster this health check is associated
     // with will be used.
-    string host = 1;
+    //
+    // This field is deprecated. Use
+    // :ref:`valid_host<envoy_api_field_core.HealthCheck.HttpHealthCheck.valid_host>`
+    // instead.
+    string host = 1 [deprecated = true];
+
+    // The value of the host header in the HTTP health check request. If
+    // left empty (default value), the name of the cluster this health check is associated
+    // with will be used.
+    ValidHeaderValue valid_host = 11;
 
     // Specifies the HTTP path that will be requested during health checking. For example
     // */healthcheck*.
-    string path = 2 [(validate.rules).string = {min_bytes: 1}];
+    //
+    // This field is deprecated. Use
+    // :ref:`valid_path<envoy_api_field_core.HealthCheck.HttpHealthCheck.valid_path>` instead.
+    string path = 2 [(validate.rules).string = {min_bytes: 1}, deprecated = true];
+
+    // Specifies the valid HTTP path that will be requested during health checking. For example
+    // */healthcheck*.
+    ValidHeaderValue valid_path = 12;
 
     // [#not-implemented-hide:] HTTP specific payload.
     Payload send = 3;
@@ -94,7 +110,15 @@ message HealthCheck {
 
     // Specifies a list of HTTP headers that should be removed from each request that is sent to the
     // health checked cluster.
-    repeated string request_headers_to_remove = 8;
+    //
+    // This field is deprecated. use
+    // :ref:`valid_request_headers_to_remove<envoy_api_field_core.HealthCheck.HttpHealthCheck.valid_request_headers_to_remove>`
+    // instead.
+    repeated string request_headers_to_remove = 8 [deprecated = true];
+
+    // Specifies a list of HTTP headers that should be removed from each request that is sent to the
+    // health checked cluster.
+    repeated ValidHeaderValue valid_request_headers_to_remove = 13;
 
     // If set, health checks will be made using http/2.
     // Deprecated, use :ref:`codec_client_type
@@ -146,7 +170,16 @@ message HealthCheck {
     // The value of the :authority header in the gRPC health check request. If
     // left empty (default value), the name of the cluster this health check is associated
     // with will be used.
-    string authority = 2 [(validate.rules).string = {pattern: "^[^\000\n\r]*$"}];
+    //
+    // This field is deprecated. Use
+    // :ref:`valid_authority<envoy_api_field_core.HealthCheck.GrpcHealthCheck.valid_authority>`
+    // instead.
+    string authority = 2 [(validate.rules).string = {pattern: "^[^\000\n\r]*$"}, deprecated = true];
+
+    // The value of the :authority header in the gRPC health check request. If
+    // left empty (default value), the name of the cluster this health check is associated
+    // with will be used.
+    ValidHeaderValue valid_authority = 3;
   }
 
   // Custom health check.

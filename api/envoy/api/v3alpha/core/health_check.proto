@@ -70,23 +70,23 @@ message HealthCheck {
     }
   }
 
-  // [#next-free-field: 11]
+  // [#next-free-field: 14]
   message HttpHealthCheck {
     option (udpa.api.annotations.versioning).previous_message_type =
         "envoy.api.v2.core.HealthCheck.HttpHealthCheck";
 
-    reserved 7;
+    reserved 1, 2, 8, 7;
 
-    reserved "use_http2";
+    reserved "host", "path", "request_headers_to_remove", "use_http2";
 
     // The value of the host header in the HTTP health check request. If
     // left empty (default value), the name of the cluster this health check is associated
     // with will be used.
-    string host = 1;
+    ValidHeaderValue valid_host = 11;
 
-    // Specifies the HTTP path that will be requested during health checking. For example
+    // Specifies the valid HTTP path that will be requested during health checking. For example
     // */healthcheck*.
-    string path = 2 [(validate.rules).string = {min_bytes: 1}];
+    ValidHeaderValue valid_path = 12;
 
     // [#not-implemented-hide:] HTTP specific payload.
     Payload send = 3;
@@ -108,7 +108,7 @@ message HealthCheck {
 
     // Specifies a list of HTTP headers that should be removed from each request that is sent to the
     // health checked cluster.
-    repeated string request_headers_to_remove = 8;
+    repeated ValidHeaderValue valid_request_headers_to_remove = 13;
 
     // Specifies a list of HTTP response statuses considered healthy. If provided, replaces default
     // 200-only policy - 200 must be included explicitly as needed. Ranges follow half-open
@@ -155,6 +155,10 @@ message HealthCheck {
     option (udpa.api.annotations.versioning).previous_message_type =
         "envoy.api.v2.core.HealthCheck.GrpcHealthCheck";
 
+    reserved 2;
+
+    reserved "authority";
+
     // An optional service name parameter which will be sent to gRPC service in
     // `grpc.health.v1.HealthCheckRequest
     // <https://github.com/grpc/grpc/blob/master/src/proto/grpc/health/v1/health.proto#L20>`_.
@@ -165,7 +169,7 @@ message HealthCheck {
     // The value of the :authority header in the gRPC health check request. If
     // left empty (default value), the name of the cluster this health check is associated
     // with will be used.
-    string authority = 2 [(validate.rules).string = {pattern: "^[^\000\n\r]*$"}];
+    ValidHeaderValue valid_authority = 3;
   }
 
   // Custom health check.

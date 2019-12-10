@@ -31,7 +31,7 @@ import "validate/validate.proto";
 // host header. This allows a single listener to service multiple top level domain path trees. Once
 // a virtual host is selected based on the domain, the routes are processed in order to see which
 // upstream cluster to route to or whether to perform a redirect.
-// [#next-free-field: 19]
+// [#next-free-field: 21]
 message VirtualHost {
   option (udpa.api.annotations.versioning).previous_message_type = "envoy.api.v2.route.VirtualHost";
 
@@ -48,9 +48,9 @@ message VirtualHost {
     ALL = 2;
   }
 
-  reserved 9, 12;
+  reserved 9, 13, 11, 12;
 
-  reserved "per_filter_config";
+  reserved "request_headers_to_remove", "response_headers_to_remove", "per_filter_config";
 
   // The logical name of the virtual host. This is used when emitting certain
   // statistics but is not relevant for routing.
@@ -72,10 +72,7 @@ message VirtualHost {
   //   The longest wildcards match first.
   //   Only a single virtual host in the entire route configuration can match on ``*``. A domain
   //   must be unique across all virtual hosts or the config will fail to load.
-  repeated string domains = 2 [(validate.rules).repeated = {
-    min_items: 1
-    items {string {pattern: "^[^\000\n\r]*$"}}
-  }];
+  repeated string domains = 2 [(validate.rules).repeated = {min_items: 1}];
 
   // The list of routes that will be matched, in order, for incoming requests.
   // The first route that matches will be used.
@@ -102,10 +99,9 @@ message VirtualHost {
   repeated core.HeaderValueOption request_headers_to_add = 7
       [(validate.rules).repeated = {max_items: 1000}];
 
-  // Specifies a list of HTTP headers that should be removed from each request
+  // Specifies a list of valid HTTP headers that should be removed from each request
   // handled by this virtual host.
-  repeated string request_headers_to_remove = 13
-      [(validate.rules).repeated = {items {string {pattern: "^[^\000\n\r]+$"}}}];
+  repeated core.ValidHeaderName valid_request_headers_to_remove = 19;
 
   // Specifies a list of HTTP headers that should be added to each response
   // handled by this virtual host. Headers specified at this level are applied
@@ -116,10 +112,9 @@ message VirtualHost {
   repeated core.HeaderValueOption response_headers_to_add = 10
       [(validate.rules).repeated = {max_items: 1000}];
 
-  // Specifies a list of HTTP headers that should be removed from each response
+  // Specifies a list of valid HTTP headers that should be removed from each response
   // handled by this virtual host.
-  repeated string response_headers_to_remove = 11
-      [(validate.rules).repeated = {items {string {pattern: "^[^\000\n\r]+$"}}}];
+  repeated core.ValidHeaderName valid_response_headers_to_remove = 20;
 
   // Indicates that the virtual host has a CORS policy.
   CorsPolicy cors = 8;
@@ -494,7 +489,7 @@ message CorsPolicy {
   core.RuntimeFractionalPercent shadow_enabled = 10;
 }
 
-// [#next-free-field: 30]
+// [#next-free-field: 33]
 message RouteAction {
   option (udpa.api.annotations.versioning).previous_message_type = "envoy.api.v2.route.RouteAction";
 
@@ -554,9 +549,11 @@ message RouteAction {
       option (udpa.api.annotations.versioning).previous_message_type =
           "envoy.api.v2.route.RouteAction.HashPolicy.Header";
 
-      // The name of the request header that will be used to obtain the hash
-      // key. If the request header is not present, no hash will be produced.
-      string header_name = 1 [(validate.rules).string = {min_bytes: 1}];
+      reserved 1;
+
+      reserved "header_name";
+
+      core.ValidHeaderName valid_header_name = 2;
     }
 
     // Envoy supports two types of cookie affinity:
@@ -654,7 +651,9 @@ message RouteAction {
     google.protobuf.BoolValue enabled = 2;
   }
 
-  reserved 12, 18, 19, 16, 22, 21;
+  reserved 12, 18, 19, 16, 22, 21, 2, 6, 29;
+
+  reserved "cluster_header", "host_rewrite", "auto_host_rewrite_header";
 
   oneof cluster_specifier {
     option (validate.required) = true;
@@ -663,16 +662,7 @@ message RouteAction {
     // to.
     string cluster = 1 [(validate.rules).string = {min_bytes: 1}];
 
-    // Envoy will determine the cluster to route to by reading the value of the
-    // HTTP header named by cluster_header from the request headers. If the
-    // header is not found or the referenced cluster does not exist, Envoy will
-    // return a 404 response.
-    //
-    // .. attention::
-    //
-    //   Internally, Envoy always uses the HTTP/2 *:authority* header to represent the HTTP/1
-    //   *Host* header. Thus, if attempting to match on *Host*, match on *:authority* instead.
-    string cluster_header = 2 [(validate.rules).string = {min_bytes: 1 pattern: "^[^\000\r\n]+$"}];
+    core.ValidHeaderValue valid_cluster_header = 30;
 
     // Multiple upstream clusters can be specified for a given route. The
     // request is routed to one of the upstream clusters based on weights
@@ -728,8 +718,8 @@ message RouteAction {
     // Indicates that during forwarding, the host header will be swapped with
     // this value.
     //
-    // [#next-major-version: host_rewrite_literal]
-    string host_rewrite = 6;
+    // [#next-major-version: valid_host_rewrite_literal]
+    core.ValidHeaderValue valid_host_rewrite = 31;
 
     // Indicates that during forwarding, the host header will be swapped with
     // the hostname of the upstream host chosen by the cluster manager. This
@@ -747,8 +737,8 @@ message RouteAction {
     //   Pay attention to the potential security implications of using this option. Provided header
     //   must come from trusted source.
     //
-    // [#next-major-version: host_rewrite_header]
-    string auto_host_rewrite_header = 29;
+    // [#next-major-version: valid_host_rewrite_header]
+    core.ValidHeaderValue valid_auto_host_rewrite_header = 32;
   }
 
   // Specifies the upstream timeout for the route. If not specified, the default is 15s. This
@@ -1221,7 +1211,7 @@ message RateLimit {
       // The header name to be queried from the request headers. The header’s
       // value is used to populate the value of the descriptor entry for the
       // descriptor_key.
-      string header_name = 1 [(validate.rules).string = {min_bytes: 1}];
+      string header_name = 1 [(validate.rules).string = {min_bytes: 1 pattern: "^[^\000\n\r]"}];
 
       // The key to use in the descriptor entry.
       string descriptor_key = 2 [(validate.rules).string = {min_bytes: 1}];
@@ -1355,7 +1345,7 @@ message HeaderMatcher {
   reserved "regex_match";
 
   // Specifies the name of the header in the request.
-  string name = 1 [(validate.rules).string = {min_bytes: 1}];
+  string name = 1 [(validate.rules).string = {min_bytes: 1 pattern: "^[^\000\r\n]+$"}];
 
   // Specifies how the header match will be performed to route the request.
   oneof header_match_specifier {
