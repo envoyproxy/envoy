@@ -507,7 +507,7 @@ private:
                                          Runtime::Loader& runtime, Runtime::RandomGenerator& random,
                                          Event::Dispatcher& dispatcher,
                                          Upstream::ResourcePriority priority) PURE;
-  Http::ConnectionPool::Instance* getConnPool(bool update_sni = false, absl::string_view url = "");
+  Http::ConnectionPool::Instance* getConnPool();
   void maybeDoShadowing();
   bool maybeRetryReset(Http::StreamResetReason reset_reason, UpstreamRequest& upstream_request);
   uint32_t numRequestsAwaitingHeaders();

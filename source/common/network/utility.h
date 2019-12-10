@@ -320,13 +320,6 @@ public:
                                                 MonotonicTime receive_time,
                                                 uint32_t* packets_dropped);
 
-  /**
-   * Check whether that is valid FQDN or IPv4/IPv6 address, if host is IPv4 or IPv6, that returns
-   * true
-   * @param host is hostname
-   */
-  static bool isIpAddress(const std::string& host);
-
   /* Read available packets from a given UDP socket and pass the packet to a given
    * UdpPacketProcessor.
    * @param handle is the UDP socket to read from.

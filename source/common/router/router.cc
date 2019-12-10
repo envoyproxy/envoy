@@ -491,7 +491,10 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
   auto url_str = headers.Host()->value().getStringView();
   const auto parsed_authority = Http::Utility::parseAuthority(url_str.data());
   if (cluster_->auto_sni() && !parsed_authority.is_ip_address_) {
-    conn_pool = getConnPool(true, url_str);
+    callbacks_->streamInfo().filterState().setData(
+        Network::UpstreamServerName::key(), std::make_unique<Network::UpstreamServerName>(url_str),
+        StreamInfo::FilterState::StateType::Mutable);
+    conn_pool = getConnPool();
   } else {
     conn_pool = getConnPool();
   }
@@ -575,15 +578,10 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
   return Http::FilterHeadersStatus::StopIteration;
 }
 
-Http::ConnectionPool::Instance* Filter::getConnPool(bool update_sni, absl::string_view url) {
+Http::ConnectionPool::Instance* Filter::getConnPool() {
   // Choose protocol based on cluster configuration and downstream connection
   // Note: Cluster may downgrade HTTP2 to HTTP1 based on runtime configuration.
   Http::Protocol protocol = cluster_->upstreamHttpProtocol(callbacks_->streamInfo().protocol());
-  if (update_sni) {
-    callbacks_->streamInfo().filterState().setData(
-        Network::UpstreamServerName::key(), std::make_unique<Network::UpstreamServerName>(url),
-        StreamInfo::FilterState::StateType::Mutable);
-  }
   transport_socket_options_ = Network::TransportSocketOptionsUtility::fromFilterState(
       callbacks_->streamInfo().filterState());
 
