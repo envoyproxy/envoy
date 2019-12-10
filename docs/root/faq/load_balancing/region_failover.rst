@@ -1,4 +1,4 @@
-How do I make Envoy fail over to another during service degradation?
+How do I make Envoy fail over to another region during service degradation?
 ====================================================================
 
 Envoy uses the concept of
