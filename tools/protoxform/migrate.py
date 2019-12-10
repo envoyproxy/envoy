@@ -153,7 +153,7 @@ def V3MigrationXform(file_proto):
     v3 FileDescriptorProto message.
   """
   # Load type database.
-  typedb = utils.LoadTypeDb()
+  typedb = utils.GetTypeDb()
   # If this isn't a proto in an upgraded package, return None.
   if file_proto.package not in typedb.next_version_packages or not typedb.next_version_packages[
       file_proto.package]:

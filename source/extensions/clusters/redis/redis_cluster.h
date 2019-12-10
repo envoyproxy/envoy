@@ -194,7 +194,7 @@ private:
 
   struct RedisDiscoverySession
       : public Extensions::NetworkFilters::Common::Redis::Client::Config,
-        public Extensions::NetworkFilters::Common::Redis::Client::PoolCallbacks {
+        public Extensions::NetworkFilters::Common::Redis::Client::ClientCallbacks {
     RedisDiscoverySession(RedisCluster& parent,
                           NetworkFilters::Common::Redis::Client::ClientFactory& client_factory);
 
@@ -225,11 +225,14 @@ private:
       return Extensions::NetworkFilters::Common::Redis::Client::ReadPolicy::Master;
     }
 
-    // Extensions::NetworkFilters::Common::Redis::Client::PoolCallbacks
+    // Extensions::NetworkFilters::Common::Redis::Client::ClientCallbacks
     void onResponse(NetworkFilters::Common::Redis::RespValuePtr&& value) override;
     void onFailure() override;
     // Note: Below callback isn't used in topology updates
-    bool onRedirection(const NetworkFilters::Common::Redis::RespValue&) override { return true; }
+    bool onRedirection(NetworkFilters::Common::Redis::RespValuePtr&&, const std::string&,
+                       bool) override {
+      return true;
+    }
     void onUnexpectedResponse(const NetworkFilters::Common::Redis::RespValuePtr&);
 
     Network::Address::InstanceConstSharedPtr
