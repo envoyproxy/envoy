@@ -340,13 +340,6 @@ public:
    * return how many times host selection should be reattempted during host selection.
    */
   virtual uint32_t hostSelectionMaxAttempts() const PURE;
-
-  /**
-   * Determine if the retry budget is configured, allows, or disallows retries.
-   * @param priority current priority set.
-   * @return the status of the retry budget.
-   */
-  virtual RetryBudgetStatus retryBudgetStatus(Upstream::ResourcePriority priority) const PURE;
 };
 
 using RetryStatePtr = std::unique_ptr<RetryState>;
