@@ -2546,7 +2546,7 @@ TEST_P(SslSocketTest, TicketSessionResumptionCustomTimeout) {
   session_ticket_keys:
     keys:
       filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ticket_key_a"
-  session_timeout: 2307
+  session_timeout: 2307s
 )EOF";
 
   const std::string client_ctx_yaml = R"EOF(
