@@ -35,7 +35,7 @@ wget -O fuzzit https://github.com/fuzzitdev/fuzzit/releases/latest/download/fuzz
 chmod a+x fuzzit
 
 PREFIX=$(realpath /build/tmp/_bazel_bazel/*/execroot/envoy/bazel-out/k8-fastbuild/bin)
-SLOW_TARGETS=("access-log-formatter" "h1-capture" "h1-capture-direct-response" "response-header" "request-header" "config")
+SLOW_TARGETS=("access-log-formatter" "h1-capture" "h1-capture-direct-response" "response-header" "request-header" "config" "server")
 for t in ${FILTERED_FUZZER_TARGETS}
 do
   TARGET_BASE="$(expr "$t" : '.*/\(.*\)_fuzz_test')"
