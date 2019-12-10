@@ -2,9 +2,9 @@ syntax = "proto3";
 
 package envoy.config.filter.http.lua.v3alpha;
 
+option java_package = "io.envoyproxy.envoy.config.filter.http.lua.v3alpha";
 option java_outer_classname = "LuaProto";
 option java_multiple_files = true;
-option java_package = "io.envoyproxy.envoy.config.filter.http.lua.v3alpha";
 
 import "envoy/api/v3alpha/core/base.proto";
 
@@ -26,8 +26,9 @@ message Lua {
   // strings so complex scripts can be easily expressed inline in the configuration.
   string inline_code = 1 [(validate.rules).string = {min_bytes: 1}];
 
-  // The Lua source codes that Envoy will execute based on name. Key is Lua code name, e.g. foo.lua,
-  // this name can be referenced by Lua per route configuration.
+  // The Lua source codes that Envoy will execute based on name. Key is Lua source code name, e.g.
+  // ``foo.lua``, this name can be referenced by
+  // :ref:`LuaPerRoute <envoy_api_msg_config.filter.http.lua.v3alpha.LuaPerRoute>`.
   map<string, api.v3alpha.core.DataSource> source_codes = 2;
 }
 
@@ -38,10 +39,12 @@ message LuaPerRoute {
   oneof override {
     option (validate.required) = true;
 
-    // Disable the Lua filter for this particular vhost or route.
+    // Disable the Lua filter for this particular vhost or route. If disabled is specified in
+    // multiple per-filter-configs, the most specific one will be used.
     bool disabled = 1 [(validate.rules).bool = {const: true}];
 
-    // The name of a Lua code defined in Lua source codes.
+    // The name of a Lua source code defined in
+    // :ref:`Lua.source_codes <envoy_api_field_config.filter.http.lua.v3alpha.Lua.source_codes>`.
     string name = 2 [(validate.rules).string = {min_bytes: 1}];
   }
 }
