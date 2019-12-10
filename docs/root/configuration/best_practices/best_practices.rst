@@ -5,3 +5,5 @@ Configuration best practices
   :maxdepth: 2
 
   edge
+  level_two
+
