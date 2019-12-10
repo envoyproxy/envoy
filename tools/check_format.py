@@ -894,7 +894,7 @@ if __name__ == "__main__":
                                     "    {}".format(line))
             maintainer = len(set(owners).intersection(set(maintainers))) > 0
             if not maintainer:
-              error_messages.append("Extensions require at least 1 maintainer OWNER:\n"
+              error_messages.append("Extensions require at least one maintainer OWNER:\n"
                                     "    {}".format(line))
 
       return owned
