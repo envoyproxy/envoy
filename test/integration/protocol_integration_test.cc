@@ -1060,6 +1060,55 @@ TEST_P(DownstreamProtocolIntegrationTest, ManyTrailerHeaders) {
   EXPECT_EQ("200", response->headers().Status()->value().getStringView());
 }
 
+// Regression tests for CVE-2019-18801. We only validate the behavior of large
+// :method request headers, since the case of other large headers is
+// covered in the various testLargeRequest-based integration tests here.
+//
+// The table below describes the expected behaviors (in addition we should never
+// see an ASSERT or ASAN failure trigger).
+//
+// Downstream    Upstream   Behavior expected
+// ------------------------------------------
+// H1            H1         Envoy will reject (HTTP/1 codec behavior)
+// H1            H2         Envoy will reject (HTTP/1 codec behavior)
+// H2            H1         Envoy will forward but backend will reject (HTTP/1
+//                          codec behavior)
+// H2            H2         Success
+TEST_P(ProtocolIntegrationTest, LargeRequestMethod) {
+  const std::string long_method = std::string(48 * 1024, 'a');
+  const Http::TestHeaderMapImpl request_headers{{":method", long_method},
+                                                {":path", "/test/long/url"},
+                                                {":scheme", "http"},
+                                                {":authority", "host"}};
+
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  if (downstreamProtocol() == Http::CodecClient::Type::HTTP1) {
+    auto encoder_decoder = codec_client_->startRequest(request_headers);
+    request_encoder_ = &encoder_decoder.first;
+    auto response = std::move(encoder_decoder.second);
+    codec_client_->waitForDisconnect();
+    EXPECT_TRUE(response->complete());
+    EXPECT_EQ("400", response->headers().Status()->value().getStringView());
+  } else {
+    ASSERT(downstreamProtocol() == Http::CodecClient::Type::HTTP2);
+    if (upstreamProtocol() == FakeHttpConnection::Type::HTTP1) {
+      auto response = codec_client_->makeHeaderOnlyRequest(request_headers);
+      ASSERT_TRUE(
+          fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+      response->waitForEndStream();
+      EXPECT_TRUE(response->complete());
+      EXPECT_EQ("400", response->headers().Status()->value().getStringView());
+    } else {
+      ASSERT(upstreamProtocol() == FakeHttpConnection::Type::HTTP2);
+      auto response =
+          sendRequestAndWaitForResponse(request_headers, 0, default_response_headers_, 0);
+      EXPECT_TRUE(response->complete());
+    }
+  }
+}
+
 // Tests StopAllIterationAndBuffer. Verifies decode-headers-return-stop-all-filter calls decodeData
 // once after iteration is resumed.
 TEST_P(DownstreamProtocolIntegrationTest, testDecodeHeadersReturnsStopAll) {

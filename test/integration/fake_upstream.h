@@ -24,6 +24,7 @@
 #include "common/common/thread.h"
 #include "common/grpc/codec.h"
 #include "common/grpc/common.h"
+#include "common/http/exception.h"
 #include "common/network/connection_balancer_impl.h"
 #include "common/network/filter_impl.h"
 #include "common/network/listen_socket_impl.h"
@@ -435,10 +436,24 @@ private:
 
     // Network::ReadFilter
     Network::FilterStatus onData(Buffer::Instance& data, bool) override {
-      parent_.codec_->dispatch(data);
+      try {
+        parent_.codec_->dispatch(data);
+      } catch (const Http::CodecProtocolException& e) {
+        ENVOY_LOG(debug, "FakeUpstream dispatch error: {}", e.what());
+        // We don't do a full stream shutdown like HCM, but just shutdown the
+        // connection for now.
+        read_filter_callbacks_->connection().close(
+            Network::ConnectionCloseType::FlushWriteAndDelay);
+      }
       return Network::FilterStatus::StopIteration;
     }
 
+    void
+    initializeReadFilterCallbacks(Network::ReadFilterCallbacks& read_filter_callbacks) override {
+      read_filter_callbacks_ = &read_filter_callbacks;
+    }
+
+    Network::ReadFilterCallbacks* read_filter_callbacks_{};
     FakeHttpConnection& parent_;
   };
 

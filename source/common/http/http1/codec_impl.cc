@@ -303,7 +303,7 @@ void RequestStreamEncoderImpl::encodeHeaders(const HeaderMap& headers, bool end_
     head_request_ = true;
   }
   connection_.onEncodeHeaders(headers);
-  connection_.reserveBuffer(std::max(4096U, path->value().size() + 4096));
+  connection_.reserveBuffer(path->value().size() + method->value().size() + 4096);
   connection_.copyToBuffer(method->value().getStringView().data(), method->value().size());
   connection_.addCharToBuffer(' ');
   connection_.copyToBuffer(path->value().getStringView().data(), path->value().size());

@@ -1090,6 +1090,25 @@ TEST_P(Http2CodecImplTest, LargeRequestHeadersAccepted) {
   request_encoder_->encodeHeaders(request_headers, false);
 }
 
+// This is the HTTP/2 variant of the HTTP/1 regression test for CVE-2019-18801.
+// Large method headers should not trigger ASSERTs or ASAN. The underlying issue
+// in CVE-2019-18801 only affected the HTTP/1 encoder, but we include a test
+// here for belt-and-braces. This also demonstrates that the HTTP/2 codec will
+// accept arbitrary :method headers, unlike the HTTP/1 codec (see
+// Http1ServerConnectionImplTest.RejectInvalidMethod for comparison).
+TEST_P(Http2CodecImplTest, LargeMethodRequestEncode) {
+  max_request_headers_kb_ = 80;
+  initialize();
+
+  const std::string long_method = std::string(79 * 1024, 'a');
+  TestHeaderMapImpl request_headers;
+  HttpTestUtility::addDefaultHeaders(request_headers);
+  request_headers.setReferenceKey(Headers::get().Method, long_method);
+  EXPECT_CALL(request_decoder_, decodeHeaders_(HeaderMapEqual(&request_headers), false));
+  EXPECT_CALL(server_stream_callbacks_, onResetStream(_, _)).Times(0);
+  request_encoder_->encodeHeaders(request_headers, false);
+}
+
 // Tests stream reset when the number of request headers exceeds the default maximum of 100.
 TEST_P(Http2CodecImplTest, ManyRequestHeadersInvokeResetStream) {
   initialize();
