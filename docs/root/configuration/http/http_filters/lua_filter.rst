@@ -57,6 +57,56 @@ Configuration
 * :ref:`v2 API reference <envoy_api_msg_config.filter.http.lua.v2.Lua>`
 * This filter should be configured with the name *envoy.lua*.
 
+Per-Route Configuration
+-----------------------
+
+The Lua HTTP filter configuration can be overridden or disabled on a per-route basis by providing a
+:ref:`LuaPerRoute <envoy_api_msg_config.filter.http.lua.v2.LuaPerRoute>` configuration on
+the virtual host, route, or weighted cluster.
+
+As an example, given the following Lua filter configuration,
+
+.. code-block:: yaml
+
+  name: envoy.lua
+  typed_config:
+    "@type": type.googleapis.com/envoy.config.filter.http.lua.v2.Lua
+    inline_code: |
+      function envoy_on_request(request_handle)
+      end
+      function envoy_on_response(response_handle)
+      end
+    source_codes:
+      removefoo.lua:
+        inline_string: |
+          function envoy_on_request(request_handle)
+          end
+          function envoy_on_response(response_handle)
+            response_handle:headers():remove("foo")
+          end
+
+we then can set reference to ``removefoo.lua`` code on the virtual host, and disabled the
+filter for ``/static`` prefixed routes.
+
+.. code-block:: yaml
+
+  route_config:
+    name: local_route
+    virtual_hosts:
+    - name: local_service
+      domains: ["*"]
+      per_filter_config:
+        envoy.lua:
+          name: removefoo.lua
+      routes:
+      - match: { prefix: "/static" }
+        route: { cluster: some_service }
+        per_filter_config:
+          envoy.envoy.lua:
+            disabled: true
+      - match: { prefix: "/" }
+        route: { cluster: some_service }
+
 Script examples
 ---------------
 
