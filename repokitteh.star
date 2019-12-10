@@ -8,7 +8,7 @@ use(
   "github.com/repokitteh/modules/ownerscheck.star",
   paths=[
     {
-      "owner": "envoyproxy/api-shepherds!",
+      "owner": "rktest2!",
       "path": "api/",
       "label": "api",
     },
