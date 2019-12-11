@@ -1,5 +1,6 @@
 #include "extensions/common/dynamic_forward_proxy/dns_cache_impl.h"
 
+#include "common/http/utility.h"
 #include "common/network/utility.h"
 
 // TODO(mattklein123): Move DNS family helpers to a smaller include.
@@ -16,7 +17,7 @@ DnsCacheImpl::DnsCacheImpl(
     const envoy::config::common::dynamic_forward_proxy::v2alpha::DnsCacheConfig& config)
     : main_thread_dispatcher_(main_thread_dispatcher),
       dns_lookup_family_(Upstream::getDnsLookupFamilyFromEnum(config.dns_lookup_family())),
-      resolver_(main_thread_dispatcher.createDnsResolver({})), tls_slot_(tls.allocateSlot()),
+      resolver_(main_thread_dispatcher.createDnsResolver({}, false)), tls_slot_(tls.allocateSlot()),
       scope_(root_scope.createScope(fmt::format("dns_cache.{}.", config.name()))),
       stats_{ALL_DNS_CACHE_STATS(POOL_COUNTER(*scope_), POOL_GAUGE(*scope_))},
       refresh_interval_(PROTOBUF_GET_MS_OR_DEFAULT(config, dns_refresh_rate, 60000)),
@@ -90,55 +91,19 @@ void DnsCacheImpl::startCacheLoad(const std::string& host, uint16_t default_port
     return;
   }
 
-  // First try to see if there is a port included. This also checks to see that there is not a ']'
-  // as the last character which is indicative of an IPv6 address without a port. This is a best
-  // effort attempt.
-  const auto colon_pos = host.rfind(':');
-  absl::string_view host_to_resolve = host;
-  if (colon_pos != absl::string_view::npos && host_to_resolve.back() != ']') {
-    const absl::string_view string_view_host = host;
-    host_to_resolve = string_view_host.substr(0, colon_pos);
-    const auto port_str = string_view_host.substr(colon_pos + 1);
-    uint64_t port64;
-    if (port_str.empty() || !absl::SimpleAtoi(port_str, &port64) || port64 > 65535) {
-      // Just attempt to resolve whatever we were given. This will very likely fail.
-      host_to_resolve = host;
-    } else {
-      default_port = port64;
-    }
-  }
-
-  // Now see if this is an IP address. We need to know this because some things (such as setting
-  // SNI) are special cased if this is an IP address. Either way, we still go through the normal
-  // resolver flow. We could short-circuit the DNS resolver in this case, but the extra code to do
-  // so is not worth it since the DNS resolver should handle it for us.
-  bool is_ip_address = false;
-  try {
-    absl::string_view potential_ip_address = host_to_resolve;
-    // TODO(mattklein123): Optimally we would support bracket parsing in parseInternetAddress(),
-    // but we still need to trim the brackets to send the IPv6 address into the DNS resolver. For
-    // now, just do all the trimming here, but in the future we should consider whether we can
-    // have unified [] handling as low as possible in the stack.
-    if (potential_ip_address.front() == '[' && potential_ip_address.back() == ']') {
-      potential_ip_address.remove_prefix(1);
-      potential_ip_address.remove_suffix(1);
-    }
-    Network::Utility::parseInternetAddress(std::string(potential_ip_address));
-    is_ip_address = true;
-    host_to_resolve = potential_ip_address;
-  } catch (const EnvoyException&) {
-  }
+  const auto host_attributes = Http::Utility::parseAuthority(host);
 
   // TODO(mattklein123): Right now, the same host with different ports will become two
   // independent primary hosts with independent DNS resolutions. I'm not sure how much this will
   // matter, but we could consider collapsing these down and sharing the underlying DNS resolution.
-  auto& primary_host =
-      *primary_hosts_
-           // try_emplace() is used here for direct argument forwarding.
-           .try_emplace(host, std::make_unique<PrimaryHostInfo>(
-                                  *this, host_to_resolve, default_port, is_ip_address,
-                                  [this, host]() { onReResolve(host); }))
-           .first->second;
+  auto& primary_host = *primary_hosts_
+                            // try_emplace() is used here for direct argument forwarding.
+                            .try_emplace(host, std::make_unique<PrimaryHostInfo>(
+                                                   *this, std::string(host_attributes.host_),
+                                                   host_attributes.port_.value_or(default_port),
+                                                   host_attributes.is_ip_address_,
+                                                   [this, host]() { onReResolve(host); }))
+                            .first->second;
   startResolve(host, primary_host);
 }
 

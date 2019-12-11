@@ -509,10 +509,6 @@ int ConnectionImpl::onFrameReceived(const nghttp2_frame* frame) {
 
   switch (frame->hd.type) {
   case NGHTTP2_HEADERS: {
-    // Verify that the final HeaderMap's byte size is under the limit before decoding headers.
-    // This assert iterates over the HeaderMap.
-    ASSERT(stream->headers_->byteSize().has_value() &&
-           stream->headers_->byteSize().value() == stream->headers_->byteSizeInternal());
     stream->remote_end_stream_ = frame->hd.flags & NGHTTP2_FLAG_END_STREAM;
     if (!stream->cookies_.empty()) {
       HeaderString key(Headers::get().Cookie);
@@ -624,12 +620,6 @@ int ConnectionImpl::onFrameSend(const nghttp2_frame* frame) {
   case NGHTTP2_HEADERS:
   case NGHTTP2_DATA: {
     StreamImpl* stream = getStream(frame->hd.stream_id);
-    if (stream->headers_) {
-      // Verify that the final HeaderMap's byte size is under the limit before sending frames.
-      // This assert iterates over the HeaderMap.
-      ASSERT(stream->headers_->byteSize().has_value() &&
-             stream->headers_->byteSize().value() == stream->headers_->byteSizeInternal());
-    }
     stream->local_end_stream_sent_ = frame->hd.flags & NGHTTP2_FLAG_END_STREAM;
     break;
   }
@@ -820,9 +810,7 @@ int ConnectionImpl::saveHeader(const nghttp2_frame* frame, HeaderString&& name,
   }
   stream->saveHeader(std::move(name), std::move(value));
 
-  // Verify that the cached value in byte size exists.
-  ASSERT(stream->headers_->byteSize().has_value());
-  if (stream->headers_->byteSize().value() > max_headers_kb_ * 1024 ||
+  if (stream->headers_->byteSize() > max_headers_kb_ * 1024 ||
       stream->headers_->size() > max_headers_count_) {
     // This will cause the library to reset/close the stream.
     stats_.header_overflow_.inc();
@@ -1066,6 +1054,13 @@ ConnectionImpl::Http2Options::Http2Options(const Http2Settings& http2_settings) 
   if (http2_settings.allow_metadata_) {
     nghttp2_option_set_user_recv_extension_type(options_, METADATA_FRAME_TYPE);
   }
+
+  // nghttp2 v1.39.2 lowered the internal flood protection limit from 10K to 1K of ACK frames. This
+  // new limit may cause the internal nghttp2 mitigation to trigger more often (as it requires just
+  // 9K of incoming bytes for smallest 9 byte SETTINGS frame), bypassing the same mitigation and its
+  // associated behavior in the envoy HTTP/2 codec. Since envoy does not rely on this mitigation,
+  // set back to the old 10K number to avoid any changes in the HTTP/2 codec behavior.
+  nghttp2_option_set_max_outbound_ack(options_, 10000);
 }
 
 ConnectionImpl::Http2Options::~Http2Options() { nghttp2_option_del(options_); }

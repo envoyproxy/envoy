@@ -7,6 +7,8 @@
 #include "envoy/http/header_map.h"
 #include "envoy/stream_info/stream_info.h"
 
+#include "common/protobuf/protobuf.h"
+
 namespace Envoy {
 namespace AccessLog {
 
@@ -78,10 +80,6 @@ public:
 
   /**
    * Log a completed request.
-   * Prior to logging, call refreshByteSize() on HeaderMaps to ensure that an accurate byte size
-   * count is logged.
-   * TODO(asraa): Remove refreshByteSize() requirement when entries in HeaderMap can no longer be
-   * modified by reference and headerMap holds an accurate internal byte size count.
    * @param request_headers supplies the incoming request headers after filtering.
    * @param response_headers supplies response headers.
    * @param response_trailers supplies response trailers.
@@ -139,6 +137,19 @@ public:
                              const Http::HeaderMap& response_headers,
                              const Http::HeaderMap& response_trailers,
                              const StreamInfo::StreamInfo& stream_info) const PURE;
+  /**
+   * Extract a value from the provided headers/trailers/stream, preserving the value's type.
+   * @param request_headers supplies the request headers.
+   * @param response_headers supplies the response headers.
+   * @param response_trailers supplies the response trailers.
+   * @param stream_info supplies the stream info.
+   * @return ProtobufWkt::Value containing a single value extracted from the given
+   *         headers/trailers/stream.
+   */
+  virtual ProtobufWkt::Value formatValue(const Http::HeaderMap& request_headers,
+                                         const Http::HeaderMap& response_headers,
+                                         const Http::HeaderMap& response_trailers,
+                                         const StreamInfo::StreamInfo& stream_info) const PURE;
 };
 
 using FormatterProviderPtr = std::unique_ptr<FormatterProvider>;

@@ -88,8 +88,6 @@ Network::Address::InstanceConstSharedPtr ConnectionManagerUtility::mutateRequest
   Network::Address::InstanceConstSharedPtr final_remote_address;
   bool single_xff_address;
   const uint32_t xff_num_trusted_hops = config.xffNumTrustedHops();
-  const bool trusted_forwarded_proto =
-      Runtime::runtimeFeatureEnabled("envoy.reloadable_features.trusted_forwarded_proto");
 
   if (config.useRemoteAddress()) {
     single_xff_address = request_headers.ForwardedFor() == nullptr;
@@ -113,18 +111,9 @@ Network::Address::InstanceConstSharedPtr ConnectionManagerUtility::mutateRequest
         Utility::appendXff(request_headers, *connection.remoteAddress());
       }
     }
-    if (trusted_forwarded_proto) {
-      // If the prior hop is not a trusted proxy, overwrite any x-forwarded-proto value it set as
-      // untrusted. Alternately if no x-forwarded-proto header exists, add one.
-      if (xff_num_trusted_hops == 0 || request_headers.ForwardedProto() == nullptr) {
-        request_headers.setReferenceForwardedProto(connection.ssl()
-                                                       ? Headers::get().SchemeValues.Https
-                                                       : Headers::get().SchemeValues.Http);
-      }
-    } else {
-      // Previously, before the trusted_forwarded_proto logic, Envoy would always overwrite the
-      // x-forwarded-proto header even if it was set by a trusted proxy. This code path is
-      // deprecated and will be removed.
+    // If the prior hop is not a trusted proxy, overwrite any x-forwarded-proto value it set as
+    // untrusted. Alternately if no x-forwarded-proto header exists, add one.
+    if (xff_num_trusted_hops == 0 || request_headers.ForwardedProto() == nullptr) {
       request_headers.setReferenceForwardedProto(
           connection.ssl() ? Headers::get().SchemeValues.Https : Headers::get().SchemeValues.Http);
     }
@@ -200,8 +189,8 @@ Network::Address::InstanceConstSharedPtr ConnectionManagerUtility::mutateRequest
 
   if (config.userAgent()) {
     request_headers.setEnvoyDownstreamServiceCluster(config.userAgent().value());
-    const HeaderEntry& user_agent_header = request_headers.insertUserAgent();
-    if (user_agent_header.value().empty()) {
+    const HeaderEntry* user_agent_header = request_headers.UserAgent();
+    if (!user_agent_header || user_agent_header->value().empty()) {
       // Following setReference() is safe because user agent is constant for the life of the
       // listener.
       request_headers.setReferenceUserAgent(config.userAgent().value());
@@ -283,7 +272,7 @@ void ConnectionManagerUtility::mutateTracingRequestHeader(HeaderMap& request_hea
     UuidUtils::setTraceableUuid(x_request_id, UuidTraceStatus::NoTrace);
   }
 
-  request_headers.RequestId()->value(x_request_id);
+  request_headers.setRequestId(x_request_id);
 }
 
 void ConnectionManagerUtility::mutateXfccRequestHeader(HeaderMap& request_headers,
@@ -364,8 +353,7 @@ void ConnectionManagerUtility::mutateXfccRequestHeader(HeaderMap& request_header
 
   const std::string client_cert_details_str = absl::StrJoin(client_cert_details, ";");
   if (config.forwardClientCert() == ForwardClientCertType::AppendForward) {
-    HeaderMapImpl::appendToHeader(request_headers.insertForwardedClientCert().value(),
-                                  client_cert_details_str);
+    request_headers.appendForwardedClientCert(client_cert_details_str, ",");
   } else if (config.forwardClientCert() == ForwardClientCertType::SanitizeSet) {
     request_headers.setForwardedClientCert(client_cert_details_str);
   } else {
@@ -411,11 +399,11 @@ bool ConnectionManagerUtility::maybeNormalizePath(HeaderMap& request_headers,
   ASSERT(request_headers.Path());
   bool is_valid_path = true;
   if (config.shouldNormalizePath()) {
-    is_valid_path = PathUtil::canonicalPath(*request_headers.Path());
+    is_valid_path = PathUtil::canonicalPath(request_headers);
   }
   // Merge slashes after path normalization to catch potential edge cases with percent encoding.
   if (is_valid_path && config.shouldMergeSlashes()) {
-    PathUtil::mergeSlashes(*request_headers.Path());
+    PathUtil::mergeSlashes(request_headers);
   }
   return is_valid_path;
 }

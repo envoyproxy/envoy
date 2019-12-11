@@ -2197,6 +2197,26 @@ TEST_F(RouterMatcherHashPolicyTest, HashIpv6DifferentAddresses) {
   }
 }
 
+TEST_F(RouterMatcherHashPolicyTest, HashQueryParameters) {
+  firstRouteHashPolicy()->mutable_query_parameter()->set_name("param");
+  {
+    Http::TestHeaderMapImpl headers = genHeaders("www.lyft.com", "/foo", "GET");
+    Router::RouteConstSharedPtr route = config().route(headers, 0);
+    EXPECT_FALSE(
+        route->routeEntry()->hashPolicy()->generateHash(nullptr, headers, add_cookie_nop_));
+  }
+  {
+    Http::TestHeaderMapImpl headers = genHeaders("www.lyft.com", "/foo?param=xyz", "GET");
+    Router::RouteConstSharedPtr route = config().route(headers, 0);
+    EXPECT_TRUE(route->routeEntry()->hashPolicy()->generateHash(nullptr, headers, add_cookie_nop_));
+  }
+  {
+    Http::TestHeaderMapImpl headers = genHeaders("www.lyft.com", "/bar?param=xyz", "GET");
+    Router::RouteConstSharedPtr route = config().route(headers, 0);
+    EXPECT_FALSE(route->routeEntry()->hashPolicy());
+  }
+}
+
 TEST_F(RouterMatcherHashPolicyTest, HashMultiple) {
   auto route = route_config_.mutable_virtual_hosts(0)->mutable_routes(0)->mutable_route();
   route->add_hash_policy()->mutable_header()->set_header_name("foo_header");
@@ -5444,6 +5464,22 @@ virtual_hosts:
             denominator: 1
           overall_sampling:
             numerator: 3
+          custom_tags:
+          - tag: ltag
+            literal:
+              value: lvalue
+          - tag: etag
+            environment:
+              name: E_TAG
+          - tag: rtag
+            request_header:
+              name: X-Tag
+          - tag: mtag
+            metadata:
+              kind: { route: {} }
+              metadata_key:
+                key: com.bar.foo
+                path: [ { key: xx }, { key: yy } ]
         route: { cluster: ww2 }
   )EOF";
   BazFactory baz_factory;
@@ -5470,6 +5506,12 @@ virtual_hosts:
   EXPECT_EQ(1, route3->tracingConfig()->getRandomSampling().denominator());
   EXPECT_EQ(3, route3->tracingConfig()->getOverallSampling().numerator());
   EXPECT_EQ(0, route3->tracingConfig()->getOverallSampling().denominator());
+
+  std::vector<std::string> custom_tags{"ltag", "etag", "rtag", "mtag"};
+  const Tracing::CustomTagMap& map = route3->tracingConfig()->getCustomTags();
+  for (const std::string& custom_tag : custom_tags) {
+    EXPECT_NE(map.find(custom_tag), map.end());
+  }
 }
 
 // Test to check Prefix Rewrite for redirects

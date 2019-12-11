@@ -19,6 +19,7 @@ BSON
 CAS
 CB
 CDS
+CEL
 CHACHA
 CHLO
 CHMOD
@@ -84,6 +85,7 @@ EXPECTs
 EXPR
 FAQ
 FASTOPEN
+FB
 FCDS
 FFFF
 FIN
@@ -284,6 +286,7 @@ UDP
 UDS
 URI
 URL
+USEVC
 UTC
 UTF
 UUID
@@ -967,6 +970,7 @@ superset
 symlink
 symlinked
 symlinks
+syncookie
 sys
 syscall
 syscalls
@@ -1059,6 +1063,7 @@ unreferenced
 unregister
 unregisters
 unresolvable
+unserializable
 unsetenv
 unsubscription
 unterminated
@@ -1124,3 +1129,4 @@ zag
 zig
 zipkin
 zlib
+OBQ

@@ -118,9 +118,11 @@ DispatcherImpl::createClientConnection(Network::Address::InstanceConstSharedPtr 
 }
 
 Network::DnsResolverSharedPtr DispatcherImpl::createDnsResolver(
-    const std::vector<Network::Address::InstanceConstSharedPtr>& resolvers) {
+    const std::vector<Network::Address::InstanceConstSharedPtr>& resolvers,
+    const bool use_tcp_for_dns_lookups) {
   ASSERT(isThreadSafe());
-  return Network::DnsResolverSharedPtr{new Network::DnsResolverImpl(*this, resolvers)};
+  return Network::DnsResolverSharedPtr{
+      new Network::DnsResolverImpl(*this, resolvers, use_tcp_for_dns_lookups)};
 }
 
 FileEventPtr DispatcherImpl::createFileEvent(int fd, FileReadyCb cb, FileTriggerType trigger,

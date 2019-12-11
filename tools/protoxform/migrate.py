@@ -88,6 +88,7 @@ class UpgradeVisitor(visitor.Visitor):
     upgraded_proto = copy.deepcopy(msg_proto)
     if upgraded_proto.options.deprecated:
       options.AddHideOption(upgraded_proto.options)
+    options.SetVersioningAnnotation(upgraded_proto.options, type_context.name)
     # Mark deprecated fields as ready for deletion by protoxform.
     for f in upgraded_proto.field:
       if f.options.deprecated:
@@ -152,7 +153,7 @@ def V3MigrationXform(file_proto):
     v3 FileDescriptorProto message.
   """
   # Load type database.
-  typedb = utils.LoadTypeDb()
+  typedb = utils.GetTypeDb()
   # If this isn't a proto in an upgraded package, return None.
   if file_proto.package not in typedb.next_version_packages or not typedb.next_version_packages[
       file_proto.package]:

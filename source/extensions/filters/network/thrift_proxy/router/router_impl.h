@@ -6,6 +6,8 @@
 
 #include "envoy/config/filter/network/thrift_proxy/v2alpha1/thrift_proxy.pb.h"
 #include "envoy/router/router.h"
+#include "envoy/stats/scope.h"
+#include "envoy/stats/stats_macros.h"
 #include "envoy/tcp/conn_pool.h"
 #include "envoy/upstream/load_balancer.h"
 
@@ -162,13 +164,25 @@ private:
   std::vector<RouteEntryImplBaseConstSharedPtr> routes_;
 };
 
+#define ALL_THRIFT_ROUTER_STATS(COUNTER, GAUGE, HISTOGRAM)                                         \
+  COUNTER(route_missing)                                                                           \
+  COUNTER(unknown_cluster)                                                                         \
+  COUNTER(upstream_rq_maintenance_mode)                                                            \
+  COUNTER(no_healthy_upstream)
+
+struct RouterStats {
+  ALL_THRIFT_ROUTER_STATS(GENERATE_COUNTER_STRUCT, GENERATE_GAUGE_STRUCT, GENERATE_HISTOGRAM_STRUCT)
+};
+
 class Router : public Tcp::ConnectionPool::UpstreamCallbacks,
                public Upstream::LoadBalancerContextBase,
                public ProtocolConverter,
                public ThriftFilters::DecoderFilter,
                Logger::Loggable<Logger::Id::thrift> {
 public:
-  Router(Upstream::ClusterManager& cluster_manager) : cluster_manager_(cluster_manager) {}
+  Router(Upstream::ClusterManager& cluster_manager, const std::string& stat_prefix,
+         Stats::Scope& scope)
+      : cluster_manager_(cluster_manager), stats_(generateStats(stat_prefix, scope)) {}
 
   ~Router() override = default;
 
@@ -239,8 +253,14 @@ private:
 
   void convertMessageBegin(MessageMetadataSharedPtr metadata);
   void cleanup();
+  RouterStats generateStats(const std::string& prefix, Stats::Scope& scope) {
+    return RouterStats{ALL_THRIFT_ROUTER_STATS(POOL_COUNTER_PREFIX(scope, prefix),
+                                               POOL_GAUGE_PREFIX(scope, prefix),
+                                               POOL_HISTOGRAM_PREFIX(scope, prefix))};
+  }
 
   Upstream::ClusterManager& cluster_manager_;
+  RouterStats stats_;
 
   ThriftFilters::DecoderFilterCallbacks* callbacks_{};
   RouteConstSharedPtr route_{};

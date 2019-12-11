@@ -2,9 +2,9 @@ syntax = "proto3";
 
 package envoy.api.v3alpha;
 
+option java_package = "io.envoyproxy.envoy.api.v3alpha";
 option java_outer_classname = "RdsProto";
 option java_multiple_files = true;
-option java_package = "io.envoyproxy.envoy.api.v3alpha";
 option java_generic_services = true;
 
 import "envoy/api/v3alpha/core/base.proto";
@@ -14,6 +14,8 @@ import "envoy/api/v3alpha/route/route.proto";
 
 import "google/api/annotations.proto";
 import "google/protobuf/wrappers.proto";
+
+import "udpa/annotations/versioning.proto";
 
 import "validate/validate.proto";
 
@@ -34,10 +36,8 @@ service RouteDiscoveryService {
   }
 
   rpc FetchRoutes(DiscoveryRequest) returns (DiscoveryResponse) {
-    option (google.api.http) = {
-      post: "/v3alpha/discovery:routes"
-      body: "*"
-    };
+    option (google.api.http).post = "/v3alpha/discovery:routes";
+    option (google.api.http).body = "*";
   }
 }
 
@@ -59,6 +59,8 @@ service VirtualHostDiscoveryService {
 
 // [#next-free-field: 11]
 message RouteConfiguration {
+  option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.RouteConfiguration";
+
   // The name of the route configuration. For example, it might match
   // :ref:`route_config_name
   // <envoy_api_field_config.filter.network.http_connection_manager.v3alpha.Rds.route_config_name>`
@@ -139,6 +141,8 @@ message RouteConfiguration {
 
 // [#not-implemented-hide:]
 message Vhds {
+  option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.Vhds";
+
   // Configuration source specifier for VHDS.
   core.ConfigSource config_source = 1 [(validate.rules).message = {required: true}];
 }

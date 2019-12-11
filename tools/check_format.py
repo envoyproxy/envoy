@@ -307,6 +307,12 @@ def whitelistedForGrpcInit(file_path):
   return file_path in GRPC_INIT_WHITELIST
 
 
+def whitelistedForUnpackTo(file_path):
+  return file_path.startswith("./test") or file_path in [
+      "./source/common/protobuf/utility.cc", "./source/common/protobuf/utility.h"
+  ]
+
+
 def findSubstringAndReturnError(pattern, file_path, error_message):
   text = readFile(file_path)
   if pattern in text:
@@ -499,6 +505,9 @@ def checkSourceLine(line, file_path, reportError):
        "std::chrono::system_clock::now" in line or "std::chrono::steady_clock::now" in line or \
        "std::this_thread::sleep_for" in line or hasCondVarWaitFor(line):
       reportError("Don't reference real-world time sources from production code; use injection")
+  if not whitelistedForUnpackTo(file_path):
+    if "UnpackTo" in line:
+      reportError("Don't use UnpackTo() directly, use MessageUtil::unpackTo() instead")
   # Check that we use the absl::Time library
   if "std::get_time" in line:
     if "test/" in file_path:
@@ -851,7 +860,10 @@ if __name__ == "__main__":
   namespace_check = args.namespace_check
   namespace_check_excluded_paths = args.namespace_check_excluded_paths
   build_fixer_check_excluded_paths = args.build_fixer_check_excluded_paths + [
-      "./bazel/external/", "./bazel/toolchains/", "./bazel/BUILD"
+      "./bazel/external/",
+      "./bazel/toolchains/",
+      "./bazel/BUILD",
+      "./tools/clang_tools",
   ]
   include_dir_order = args.include_dir_order
   if args.add_excluded_prefixes:

@@ -1012,8 +1012,10 @@ TEST_P(DownstreamProtocolIntegrationTest, ManyRequestTrailersAccepted) {
   EXPECT_EQ("200", response->headers().Status()->value().getStringView());
 }
 
+// This test uses an Http::HeaderMapImpl instead of an Http::TestHeaderMapImpl to avoid
+// time-consuming byte size validations that will cause this test to timeout.
 TEST_P(DownstreamProtocolIntegrationTest, ManyRequestHeadersTimeout) {
-  // Set timeout for 5 seconds, and ensure that a request with 20k+ headers can be sent.
+  // Set timeout for 5 seconds, and ensure that a request with 10k+ headers can be sent.
   testManyRequestHeaders(std::chrono::milliseconds(5000));
 }
 
@@ -1025,6 +1027,8 @@ TEST_P(DownstreamProtocolIntegrationTest, LargeRequestTrailersRejected) {
   testLargeRequestTrailers(66, 60);
 }
 
+// This test uses an Http::HeaderMapImpl instead of an Http::TestHeaderMapImpl to avoid
+// time-consuming byte size verification that will cause this test to timeout.
 TEST_P(DownstreamProtocolIntegrationTest, ManyTrailerHeaders) {
   max_request_headers_kb_ = 96;
   max_request_headers_count_ = 20005;
@@ -1037,9 +1041,9 @@ TEST_P(DownstreamProtocolIntegrationTest, ManyTrailerHeaders) {
             max_request_headers_count_);
       });
 
-  Http::TestHeaderMapImpl request_trailers{};
+  Http::HeaderMapImpl request_trailers{};
   for (int i = 0; i < 20000; i++) {
-    request_trailers.addCopy(std::to_string(i), "");
+    request_trailers.addCopy(Http::LowerCaseString(std::to_string(i)), "");
   }
 
   initialize();

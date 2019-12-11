@@ -73,7 +73,7 @@ public:
   virtual ~ResourceManager() = default;
 
   /**
-   * @return Resource& active TCP connections.
+   * @return Resource& active TCP connections and UDP sessions.
    */
   virtual Resource& connections() PURE;
 
