@@ -647,8 +647,10 @@ bool ContextImpl::verifySubjectAltName(X509* cert,
   for (const GENERAL_NAME* general_name : san_names.get()) {
     const std::string san = generalNameAsString(general_name);
     for (auto& config_san : subject_alt_names) {
-      if (general_name->type == GEN_DNS ? dnsNameMatch(config_san, san.c_str()) : config_san == san)
+      if (general_name->type == GEN_DNS ? dnsNameMatch(config_san, san.c_str())
+                                        : config_san == san) {
         return true;
+      }
     }
   }
   return false;
