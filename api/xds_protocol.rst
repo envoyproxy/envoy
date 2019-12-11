@@ -238,8 +238,9 @@ resources are available with a :ref:`DiscoveryResponse <envoy_api_msg_DiscoveryR
 
 After processing the :ref:`DiscoveryResponse <envoy_api_msg_DiscoveryResponse>`, Envoy will send a new
 request on the stream, specifying the last version successfully applied
-and the nonce provided by the management server. If the update was
-successfully applied, the :ref:`version_info <envoy_api_field_DiscoveryResponse.version_info>` will be **X**, as indicated
+and the nonce provided by the management server. This new request is either an ACK or a NACK.
+If the update was successfully applied, the new request is an ACK and the
+:ref:`version_info <envoy_api_field_DiscoveryResponse.version_info>` will be **X**, as indicated
 in the sequence diagram:
 
 .. figure:: diagrams/simple-ack.svg
@@ -253,7 +254,8 @@ In this sequence diagram, and below, the following format is used to abbreviate 
 The version provides Envoy and the management server a shared notion of
 the currently applied configuration, as well as a mechanism to ACK/NACK
 configuration updates. If Envoy had instead rejected configuration
-update **X**, it would reply with :ref:`error_detail <envoy_api_field_DiscoveryRequest.error_detail>`
+update **X**, it would reply with a NACK containing
+:ref:`error_detail <envoy_api_field_DiscoveryRequest.error_detail>`
 populated and its previous version, which in this case was the empty
 initial version. The :ref:`error_detail <envoy_api_field_DiscoveryRequest.error_detail>` has more details around the exact
 error message populated in the message field:
@@ -266,6 +268,14 @@ Later, an API update may succeed at a new version **Y**:
 
 .. figure:: diagrams/later-ack.svg
    :alt: ACK after NACK
+
+ACK and NACK semantics can be summarized as follows:
+
+- the xDS client should ACK or NACK every *DiscoveryResponse* received from the management server.
+- nonce from the *DiscoveryResponse* is included as response_nonce in the ACK or NACK.
+- ACK signifies successful configuration update and contains the version_info from the *DiscoveryResponse*.
+- NACK signifies unsuccessful configuration update and contains the previous (existing) version_info.
+- only the NACK should populate the :ref:`error_detail <envoy_api_field_DiscoveryRequest.error_detail>`.
 
 Each stream has its own notion of versioning, there is no shared
 versioning across resource types. When ADS is not used, even each
