@@ -14,14 +14,14 @@ namespace XRay {
 /**
  * Config registration for the XRay tracer. @see TracerFactory.
  */
-class XRayTracerFactory : public Common::FactoryBase<envoy::config::trace::v2alpha::xray::Config>,
+class XRayTracerFactory : public Common::FactoryBase<envoy::config::trace::v2alpha::XRayConfig>,
                           Logger::Loggable<Logger::Id::tracing> {
 public:
   XRayTracerFactory();
 
 private:
   Tracing::HttpTracerPtr
-  createHttpTracerTyped(const envoy::config::trace::v2alpha::xray::Config& proto_config,
+  createHttpTracerTyped(const envoy::config::trace::v2alpha::XRayConfig& proto_config,
                         Server::Instance& server) override;
 };
 

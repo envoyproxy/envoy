@@ -55,7 +55,7 @@ message Tracing {
     // - :ref:`DynamicOtConfig <envoy_api_msg_config.trace.v3alpha.DynamicOtConfig>`
     // - :ref:`DatadogConfig <envoy_api_msg_config.trace.v3alpha.DatadogConfig>`
     // - :ref:`OpenCensusConfig <envoy_api_msg_config.trace.v3alpha.OpenCensusConfig>`
-    // - :ref:`AWS X-Ray <envoy_api_msg_config.trace.v3alpha.xray.Config>`
+    // - :ref:`AWS X-Ray <envoy_api_msg_config.trace.v3alpha.XRayConfig>`
     oneof config_type {
       google.protobuf.Any typed_config = 3;
     }

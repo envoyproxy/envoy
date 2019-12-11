@@ -1,8 +1,8 @@
 syntax = "proto3";
 
-package envoy.config.trace.v3alpha.xray;
+package envoy.config.trace.v3alpha;
 
-option java_package = "io.envoyproxy.envoy.config.trace.v3alpha.xray";
+option java_package = "io.envoyproxy.envoy.config.trace.v3alpha";
 option java_outer_classname = "XrayProto";
 option java_multiple_files = true;
 
@@ -16,9 +16,9 @@ import "validate/validate.proto";
 // [#protodoc-title: AWS X-Ray Tracer Configuration]
 // Configuration for AWS X-Ray tracer
 
-message Config {
+message XRayConfig {
   option (udpa.annotations.versioning).previous_message_type =
-      "envoy.config.trace.v2alpha.xray.Config";
+      "envoy.config.trace.v2alpha.XRayConfig";
 
   // The UDP endpoint of the X-Ray Daemon where the spans will be sent.
   // If this value is not set, the default value of 127.0.0.1:2000 will be used.

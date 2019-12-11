@@ -23,7 +23,7 @@ namespace trace = envoy::config::trace::v2alpha;
 XRayTracerFactory::XRayTracerFactory() : FactoryBase(TracerNames::get().XRay) {}
 
 Tracing::HttpTracerPtr
-XRayTracerFactory::createHttpTracerTyped(const trace::xray::Config& proto_config,
+XRayTracerFactory::createHttpTracerTyped(const trace::XRayConfig& proto_config,
                                          Server::Instance& server) {
   std::string sampling_rules_json;
   try {
