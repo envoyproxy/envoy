@@ -6,6 +6,7 @@ Version history
 * access log: added FILTER_STATE :ref:`access log formatters <config_access_log_format>` and gRPC access logger.
 * access log: added a :ref:`typed JSON logging mode <config_access_log_format_dictionaries>` to output access logs in JSON format with non-string values
 * api: remove all support for v1
+* api: added ability to specify `mode` for :ref:`Pipe <envoy_api_field_core.Pipe.mode>`.
 * buffer: remove old implementation
 * build: official released binary is now built against libc++.
 * cluster: added :ref: `aggregate cluster <arch_overview_aggregate_cluster>` that allows load balancing between clusters.
@@ -33,7 +34,6 @@ Version history
 * thrift_proxy: added stats to the router filter.
 * tls: remove TLS 1.0 and 1.1 from client defaults
 * router: exposed DOWNSTREAM_REMOTE_ADDRESS as custom HTTP request/response headers.
-* api: added ability to specify `mode` for :ref:`Pipe <envoy_api_field_core.Pipe.mode>`.
 * tracing: added the ability to set custom tags on both the :ref:`HTTP connection manager<envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.tracing>` and the :ref:`HTTP route <envoy_api_field_route.Route.tracing>`.
 * tracing: added upstream_address tag.
 * udp: added initial support for :ref:`UDP proxy <config_udp_listener_filters_udp_proxy>`
