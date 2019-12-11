@@ -3,6 +3,7 @@
 #include <limits>
 #include <numeric>
 
+#include "envoy/protobuf/descriptor.pb.h"
 #include "envoy/protobuf/message_validator.h"
 
 #include "common/common/assert.h"
@@ -503,6 +504,77 @@ std::string MessageUtil::CodeEnumToString(ProtobufUtil::error::Code code) {
   default:
     return "";
   }
+}
+
+namespace {
+
+// Recursive helper method for MessageUtil::redact() below.
+void redactInPlace(Protobuf::Message* message) {
+  // If the message is an `Any`, we can't use any type-based introspection. Instead, we have to
+  // unpack it to its original type to redact it...
+  auto* any = dynamic_cast<ProtobufWkt::Any*>(message);
+  if (any != nullptr) {
+    // 1. Extract the type name from the URL. This is guaranteed to be the portion of the URL
+    // following the last '/' character.
+    const std::string& type_url = any->type_url();
+    const std::size_t last_slash = type_url.find_last_of('/');
+    const std::string type_name = type_url.substr(last_slash + 1);
+    const auto* descriptor =
+        Protobuf::DescriptorPool::generated_pool()->FindMessageTypeByName(type_name);
+
+    // 2. Instantiate a mutable message of the correct dynamic type, and unpack the `Any` into it.
+    Protobuf::DynamicMessageFactory dmf;
+    std::unique_ptr<Protobuf::Message> typed_message(dmf.GetPrototype(descriptor)->New());
+    any->UnpackTo(typed_message.get());
+
+    // 3. Redact the typed message and repack it into the original `Any`.
+    redactInPlace(typed_message.get());
+    any->PackFrom(*typed_message);
+
+    return;
+  }
+
+  // If the message isn't an `Any`, determine whether we need to redact it by looking for the
+  // `redacted` option on the message's descriptor.
+  const auto* descriptor = message->GetDescriptor();
+  if (descriptor->options().GetExtension(envoy::protobuf::redacted)) {
+    // If this message should be redacted, clear it and don't recurse any deeper.
+    message->Clear();
+  } else {
+    // Otherwise, use reflection to recurse into all message-typed fields of this message.
+    const auto* reflection = message->GetReflection();
+    std::vector<const Protobuf::FieldDescriptor*> field_descriptors;
+    reflection->ListFields(*message, &field_descriptors);
+    for (const auto* field_descriptor : field_descriptors) {
+      // Note for the future: if we ever need to support a "redacted" option at the field level,
+      // in addition to the existing message-level option, this is where we would check the field
+      // descriptor's options and clear out individual fields. Currently, we simply don't touch
+      // any fields that aren't of message type.
+      if (field_descriptor->type() == Protobuf::FieldDescriptor::TYPE_MESSAGE) {
+        // Repeated fields need slightly different handling from non-repeated...
+        if (field_descriptor->is_repeated()) {
+          const int field_size = reflection->FieldSize(*message, field_descriptor);
+          for (int i = 0; i < field_size; ++i) {
+            redactInPlace(reflection->MutableRepeatedMessage(message, field_descriptor, i));
+          }
+        } else {
+          redactInPlace(reflection->MutableMessage(message, field_descriptor));
+        }
+      }
+    }
+  }
+}
+
+} // namespace
+
+std::unique_ptr<Protobuf::Message> MessageUtil::redact(const Protobuf::Message& message) {
+  // 1. Clone the original message. New() will return an empty message of the correct dynamic type.
+  std::unique_ptr<Protobuf::Message> redacted(message.New());
+  redacted->MergeFrom(message);
+
+  // 2. Redact the cloned message.
+  redactInPlace(redacted.get());
+  return redacted;
 }
 
 ProtobufWkt::Value ValueUtil::loadFromYaml(const std::string& yaml) {

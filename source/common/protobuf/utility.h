@@ -361,6 +361,14 @@ public:
    * @param code the protobuf error code
    */
   static std::string CodeEnumToString(ProtobufUtil::error::Code code);
+
+  /**
+   * Makes a copy of a source message with all "redacted" data cleared. See envoy.protobuf.redacted.
+   * @param message original message to copy from.
+   * @return cloned message of the same dynamic type as the original, with all "redacted" data
+   * cleared.
+   */
+  static std::unique_ptr<Protobuf::Message> redact(const Protobuf::Message& message);
 };
 
 class ValueUtil {

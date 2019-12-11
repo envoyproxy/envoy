@@ -8,6 +8,7 @@ option java_multiple_files = true;
 
 import "envoy/api/v2/core/base.proto";
 import "envoy/api/v2/core/config_source.proto";
+import "envoy/protobuf/descriptor.proto";
 
 import "google/protobuf/any.proto";
 import "google/protobuf/struct.proto";
@@ -119,6 +120,8 @@ message PrivateKeyProvider {
 
 // [#next-free-field: 7]
 message TlsCertificate {
+  option (envoy.protobuf.redacted) = true;
+
   // The TLS certificate chain.
   core.DataSource certificate_chain = 1;
 

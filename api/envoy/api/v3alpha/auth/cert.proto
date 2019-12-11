@@ -129,6 +129,7 @@ message PrivateKeyProvider {
 // [#next-free-field: 7]
 message TlsCertificate {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.auth.TlsCertificate";
+  option (envoy.protobuf.redacted) = true;
 
   // The TLS certificate chain.
   core.DataSource certificate_chain = 1;
