@@ -1014,7 +1014,7 @@ TEST_F(RouterRetryStateImplTest, BudgetVerifyMinimumConcurrency) {
   EXPECT_CALL(cluster_, retryBudget(_)).WillRepeatedly(Return(budget));
 
   Http::TestHeaderMapImpl request_headers{{"x-envoy-retry-on", "5xx"},
-                                          {"x-envoy-max-retries", "5"}};
+                                          {"x-envoy-max-retries", "42"}};
   Http::TestHeaderMapImpl response_headers{{":status", "500"}};
 
   setup(request_headers);
@@ -1042,6 +1042,51 @@ TEST_F(RouterRetryStateImplTest, BudgetVerifyMinimumConcurrency) {
   incrOutstandingResource(TestResourceType::Retry, 1);
 
   EXPECT_EQ(RetryStatus::NoOverflow, state_->shouldRetryHeaders(response_headers, callback_));
+
+  // Override via runtime and expect successful retry.
+  EXPECT_CALL(runtime_.snapshot_, exists(_)).WillRepeatedly(Return(true));
+  EXPECT_CALL(runtime_.snapshot_,
+              getDouble("circuit_breakers.fake_cluster.default.retry_budget.budget_percent", _))
+      .WillRepeatedly(Return(100.0));
+
+  EXPECT_CALL(*retry_timer_, enableTimer(_, _));
+  EXPECT_EQ(RetryStatus::Yes, state_->shouldRetryHeaders(response_headers, callback_));
+}
+
+TEST_F(RouterRetryStateImplTest, BudgetRuntimeSetOnly) {
+  // Expect no available retries from resource manager, so no retries allowed according to
+  // max_retries CB.
+  cluster_.resetResourceManager(0 /* cx */, 0 /* rq_pending */, 0 /* rq */, 0 /* rq_retry */,
+                                0 /* conn_pool */);
+
+  EXPECT_CALL(runtime_.snapshot_, getInteger("upstream.base_retry_backoff_ms", _));
+
+  // Don't configure retry budgets. We'll rely on runtime config only.
+  EXPECT_CALL(cluster_, retryBudget(_)).WillRepeatedly(Return(absl::nullopt));
+  EXPECT_CALL(runtime_.snapshot_,
+              exists("circuit_breakers.fake_cluster.default.retry_budget.min_retry_concurrency"))
+      .WillRepeatedly(Return(true));
+  EXPECT_CALL(
+      runtime_.snapshot_,
+      getInteger("circuit_breakers.fake_cluster.default.retry_budget.min_retry_concurrency", _))
+      .WillRepeatedly(Return(5));
+  EXPECT_CALL(runtime_.snapshot_,
+              exists("circuit_breakers.fake_cluster.default.retry_budget.budget_percent"))
+      .WillRepeatedly(Return(true));
+  EXPECT_CALL(runtime_.snapshot_,
+              getDouble("circuit_breakers.fake_cluster.default.retry_budget.budget_percent", _))
+      .WillRepeatedly(Return(20.0));
+
+  Http::TestHeaderMapImpl request_headers{{"x-envoy-retry-on", "5xx"}};
+
+  setup(request_headers);
+  EXPECT_TRUE(state_->enabled());
+
+  incrOutstandingResource(TestResourceType::Retry, 4);
+
+  expectTimerCreateAndEnable();
+  Http::TestHeaderMapImpl response_headers{{":status", "500"}};
+  EXPECT_EQ(RetryStatus::Yes, state_->shouldRetryHeaders(response_headers, callback_));
 }
 
 } // namespace

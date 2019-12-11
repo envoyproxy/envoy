@@ -15,10 +15,7 @@ envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
     extension_name = "envoy.filters.http.original_src",
-    deps = [
-        "//source/extensions/filters/http/original_src:config_lib",
-        "@envoy_api//envoy/config/filter/http/original_src/v2alpha1:pkg_cc_proto",
-    ],
+    deps = ["//source/extensions/filters/http/original_src:config_lib"],
 )
 
 envoy_extension_cc_test(

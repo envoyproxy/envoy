@@ -576,12 +576,7 @@ public:
   void createNetworkFilterChain(Network::Connection&) const override;
   Http::Protocol
   upstreamHttpProtocol(absl::optional<Http::Protocol> downstream_protocol) const override;
-  absl::optional<RetryBudget> retryBudget(ResourcePriority priority) const override {
-    if (!retry_budget_map_.contains(priority)) {
-      return absl::nullopt;
-    }
-    return retry_budget_map_.at(priority);
-  }
+  absl::optional<RetryBudget> retryBudget(ResourcePriority priority) const override;
 
 private:
   struct ResourceManagers {

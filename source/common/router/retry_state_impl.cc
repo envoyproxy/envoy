@@ -380,9 +380,42 @@ bool RetryStateImpl::wouldRetryFromReset(const Http::StreamResetReason reset_rea
 
 RetryStateImpl::RetryBudgetStatus
 RetryStateImpl::retryBudgetStatus(Upstream::ResourcePriority priority) const {
-  const auto retry_budget = cluster_.retryBudget(priority);
-  if (!retry_budget) {
+  auto retry_budget = cluster_.retryBudget(priority);
+
+  // TODO (tonya11en): Extend the ResourceManager to accomodate the retry budget in addition to
+  // the static circuit breaker values and move the runtime logic there.
+  std::string priority_name;
+  switch (priority) {
+  case Upstream::ResourcePriority::Default:
+    priority_name = "default";
+    break;
+  case Upstream::ResourcePriority::High:
+    priority_name = "high";
+    break;
+  default:
+    NOT_REACHED_GCOVR_EXCL_LINE;
+  };
+
+  const auto fmt_budget_key = [this, priority_name](std::string&& tunable) -> std::string {
+    return fmt::format("circuit_breakers.{}.{}.retry_budget.{}", cluster_.name(), priority_name,
+                       tunable);
+  };
+  const std::string budget_percent_key = fmt_budget_key("budget_percent");
+  const std::string min_retry_concurrency_key = fmt_budget_key("min_retry_concurrency");
+  std::cout << "@tallen " << budget_percent_key << std::endl;
+  std::cout << "@tallen " << min_retry_concurrency_key << std::endl;
+
+  const bool runtime_budget_set = runtime_.snapshot().exists(budget_percent_key) &&
+                                  runtime_.snapshot().exists(min_retry_concurrency_key);
+  if (!retry_budget && !runtime_budget_set) {
+    // The retry budget is not configured and is not set via runtime.
     return RetryBudgetStatus::Unconfigured;
+  } else if (runtime_budget_set) {
+    retry_budget = Upstream::ClusterInfo::RetryBudget{
+        .budget_percent = std::min(100.0, runtime_.snapshot().getDouble(budget_percent_key, 20.0)),
+        .min_retry_concurrency =
+            static_cast<uint32_t>(runtime_.snapshot().getInteger(min_retry_concurrency_key, 3)),
+    };
   }
 
   const uint64_t current_active = cluster_.resourceManager(priority).requests().count() +

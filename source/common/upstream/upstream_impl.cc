@@ -766,13 +766,13 @@ ClusterInfoImpl::ClusterInfoImpl(
       if (threshold.has_retry_budget()) {
         const ResourcePriority priority =
             Router::ConfigUtility::parsePriority(threshold.priority());
-        retry_budget_map_.emplace(priority,
-                                  RetryBudget{
-                                      .budget_percent = PROTOBUF_GET_WRAPPED_OR_DEFAULT(
-                                          threshold.retry_budget(), budget_percent, 20.0),
-                                      .min_retry_concurrency = PROTOBUF_GET_WRAPPED_OR_DEFAULT(
-                                          threshold.retry_budget(), min_retry_concurrency, 3),
-                                  });
+        auto budget = RetryBudget{
+            .budget_percent =
+                PROTOBUF_GET_WRAPPED_OR_DEFAULT(threshold.retry_budget(), budget_percent, 20.0),
+            .min_retry_concurrency =
+                PROTOBUF_GET_WRAPPED_OR_DEFAULT(threshold.retry_budget(), min_retry_concurrency, 3),
+        };
+        retry_budget_map_.emplace(priority, std::move(budget));
       }
     }
   }
@@ -1114,6 +1114,14 @@ ClusterInfoImpl::ResourceManagers::load(const envoy::api::v2::Cluster& config,
       runtime, runtime_prefix, max_connections, max_pending_requests, max_requests, max_retries,
       max_connection_pools,
       ClusterInfoImpl::generateCircuitBreakersStats(stats_scope, priority_name, track_remaining));
+}
+
+absl::optional<ClusterInfoImpl::RetryBudget>
+ClusterInfoImpl::retryBudget(ResourcePriority priority) const {
+  if (!retry_budget_map_.contains(priority)) {
+    return absl::nullopt;
+  }
+  return retry_budget_map_.at(priority);
 }
 
 PriorityStateManager::PriorityStateManager(ClusterImplBase& cluster,
