@@ -129,34 +129,10 @@ def CreateIssues(access_token, runtime_and_pr):
           raise
 
 
-def GetRuntimeAlreadyTrue():
-  """Returns a list of runtime flags already defaulted to true
-  """
-  runtime_already_true = []
-  runtime_features = re.compile(r'.*"(envoy.reloadable_features..*)",.*')
-  with open('source/common/runtime/runtime_features.cc', 'r') as features:
-    for line in features.readlines():
-      match = runtime_features.match(line)
-      # hit the sentinel value: no more true flags.
-      if not match:
-        continue
-      guard = match.group(1)
-      if guard == 'envoy.reloadable_features.test_feature_false':
-        print("Found sentinel\n")
-        return runtime_already_true
-      if 'test_feature_true' not in guard:
-        print("Found existing runtime guard " + guard)
-        runtime_already_true.append(guard)
-
-  return runtime_already_true
-
-
 def GetRuntimeAndPr():
   """Returns a list of tuples of [runtime features to deprecate, PR the feature was added]
   """
   repo = Repo(os.getcwd())
-
-  runtime_already_true = GetRuntimeAlreadyTrue()
 
   # grep source code looking for reloadable features which are true to find the
   # PR they were added.
@@ -165,13 +141,25 @@ def GetRuntimeAndPr():
   runtime_features = re.compile(r'.*"(envoy.reloadable_features..*)",.*')
 
   removal_date = date.today() - datetime.timedelta(days=183)
+  found_test_feature_true = False
 
-  # Walk the blame of runtime_features and look for true flags older than 6 months.
+  # Walk the blame of runtime_features and look for true runtime features older than 6 months.
   for commit, lines in repo.blame('HEAD', 'source/common/runtime/runtime_features.cc'):
     for line in lines:
       match = runtime_features.match(line)
-      if match and match.group(1) in runtime_already_true:
+      if match:
         runtime_guard = match.group(1)
+        if runtime_guard == 'envoy.reloadable_features.test_feature_false':
+          print("Found end sentinel\n")
+          if not found_test_feature_true:
+            # The script depends on the cc file having the true runtime block
+            # before the false runtime block.  Fail if one isn't found.
+            print ('Failed to find test_feature_true.  Script needs fixing')
+            sys.exit(1)
+          return features_to_flip
+        if runtime_guard == 'envoy.reloadable_features.test_feature_true':
+          found_test_feature_true = True
+          continue
         pr = (int(re.search('\(#(\d+)\)', commit.message).group(1)))
         pr_date = date.fromtimestamp(commit.committed_date)
         removable = (pr_date < removal_date)
@@ -180,8 +168,8 @@ def GetRuntimeAndPr():
               (removable and 'and is safe to remove' or 'is not ready to remove'))
         if removable:
           features_to_flip.append((runtime_guard, pr))
-          runtime_already_true.remove(runtime_guard)
-  return features_to_flip
+  print ('Failed to find test_feature_false.  Script needs fixing')
+  sys.exit(1)
 
 
 if __name__ == '__main__':
