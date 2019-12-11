@@ -96,7 +96,6 @@ private:
   RetryStatus shouldRetry(bool would_retry, DoRetryCallback callback);
   RetryBudgetStatus retryBudgetStatus(Upstream::ResourcePriority priority) const;
 
-
   const Upstream::ClusterInfo& cluster_;
   Runtime::Loader& runtime_;
   Runtime::RandomGenerator& random_;
