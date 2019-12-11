@@ -1472,10 +1472,12 @@ TEST(AccessLogFormatterTest, CompositeFormatterSuccess) {
     EXPECT_CALL(Const(stream_info), filterState()).Times(testing::AtLeast(1));
     stream_info.filter_state_.setData("testing",
                                       std::make_unique<Router::StringAccessorImpl>("test_value"),
-                                      StreamInfo::FilterState::StateType::ReadOnly);
+                                      StreamInfo::FilterState::StateType::ReadOnly,
+                                      StreamInfo::FilterState::LifeSpan::FilterChain);
     stream_info.filter_state_.setData("serialized",
                                       std::make_unique<TestSerializedUnknownFilterState>(),
-                                      StreamInfo::FilterState::StateType::ReadOnly);
+                                      StreamInfo::FilterState::StateType::ReadOnly,
+                                      StreamInfo::FilterState::LifeSpan::FilterChain);
     const std::string format = "%FILTER_STATE(testing)%|%FILTER_STATE(serialized)%|"
                                "%FILTER_STATE(testing):8%|%FILTER_STATE(nonexisting)%";
     FormatterImpl formatter(format);

@@ -14,6 +14,7 @@
 #include "envoy/router/router.h"
 #include "envoy/ssl/connection.h"
 #include "envoy/stats/scope.h"
+#include "envoy/stream_info/filter_state.h"
 #include "envoy/tracing/http_tracer.h"
 
 #include "common/buffer/buffer_impl.h"
@@ -485,7 +486,8 @@ ConnectionManagerImpl::ActiveStream::ActiveStream(ConnectionManagerImpl& connect
       stream_id_(connection_manager.random_generator_.random()),
       request_response_timespan_(new Stats::HistogramCompletableTimespanImpl(
           connection_manager_.stats_.named_.downstream_rq_time_, connection_manager_.timeSource())),
-      stream_info_(connection_manager_.codec_->protocol(), connection_manager_.timeSource()),
+      stream_info_(connection_manager_.codec_->protocol(), connection_manager_.timeSource(),
+                   connection_manager.filterState()),
       upstream_options_(std::make_shared<Network::Socket::Options>()) {
   ASSERT(!connection_manager.config_.isRoutable() ||
              ((connection_manager.config_.routeConfigProvider() == nullptr &&
@@ -2244,6 +2246,17 @@ bool ConnectionManagerImpl::ActiveStreamDecoderFilter::recreateStream() {
   parent_.connection_manager_.doEndStream(this->parent_);
 
   StreamDecoder& new_stream = parent_.connection_manager_.newStream(*response_encoder, true);
+  // We don't need to copy over the old parent FilterState from the old StreamInfo if it did not
+  // store any objects with a LifeSpan at or above DownstreamRequest. This is to avoid unnecessary
+  // heap allocation.
+  if (parent_.stream_info_.filter_state_->hasDataAtOrAboveLifeSpan(
+          StreamInfo::FilterState::LifeSpan::DownstreamRequest)) {
+    (*parent_.connection_manager_.streams_.begin())->stream_info_.filter_state_ =
+        std::make_shared<StreamInfo::FilterStateImpl>(
+            parent_.stream_info_.filter_state_->parent(),
+            StreamInfo::FilterState::LifeSpan::FilterChain);
+  }
+
   new_stream.decodeHeaders(std::move(request_headers), true);
   return true;
 }
