@@ -604,9 +604,7 @@ MATCHER_P(HeaderMapEqual, rhs, "") {
   if (!equal) {
     *result_listener << "\n"
                      << TestUtility::addLeftAndRightPadding("header map:") << "\n"
-                     << *rhs
-                     << TestUtility::addLeftAndRightPadding("is not equal to:")
-                     << "\n"
+                     << *rhs << TestUtility::addLeftAndRightPadding("is not equal to:") << "\n"
                      << lhs << TestUtility::addLeftAndRightPadding("") // line full of padding
                      << "\n";
   }

@@ -200,8 +200,7 @@ TEST_F(Http1ServerConnectionImplTest, IdentityEncoding) {
       {"transfer-encoding", "identity"},
   };
   EXPECT_CALL(decoder, decodeHeaders_(HeaderMapEqual(&expected_headers), true)).Times(1);
-  Buffer::OwnedImpl buffer(
-      "GET / HTTP/1.1\r\ntransfer-encoding: identity\r\n\r\n");
+  Buffer::OwnedImpl buffer("GET / HTTP/1.1\r\ntransfer-encoding: identity\r\n\r\n");
   codec_->dispatch(buffer);
   EXPECT_EQ(0U, buffer.length());
 }
