@@ -65,7 +65,7 @@ protected:
     decompressor.init(window_bits);
   }
 
-  static void unitializedDecompressorTestHelper() {
+  static void uninitializedDecompressorTestHelper() {
     Buffer::OwnedImpl input_buffer;
     Buffer::OwnedImpl output_buffer;
     ZlibDecompressorImpl decompressor;
@@ -79,7 +79,7 @@ protected:
 // init.
 TEST_F(ZlibDecompressorImplFailureTest, DecompressorFailureTest) {
   EXPECT_DEATH_LOG_TO_STDERR(decompressorBadInitTestHelper(100), "assert failure: result >= 0");
-  unitializedDecompressorTestHelper();
+  uninitializedDecompressorTestHelper();
 }
 
 // Exercises decompressor's checksum by calling it before init or decompress.

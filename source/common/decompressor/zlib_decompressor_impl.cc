@@ -3,6 +3,7 @@
 #include <memory>
 
 #include "envoy/common/exception.h"
+#include "common/common/logger.h"
 
 #include "common/common/assert.h"
 #include "common/common/stack_array.h"
@@ -70,6 +71,10 @@ bool ZlibDecompressorImpl::inflateNext() {
 
   if (result < 0) {
     decompression_error_ = result;
+    ENVOY_LOG(
+        trace,
+        "zlib decompression error: {}. Error codes are defined in https://www.zlib.net/manual.html",
+        result);
     return false;
   }
 
