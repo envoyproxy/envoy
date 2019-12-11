@@ -687,6 +687,14 @@ names, which the server thought the client was already not subscribed
 to. The server must cleanly process such a request; it can simply ignore
 these phantom unsubscriptions.
 
+Knowing When a Requested Resource Does Not Exist
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+When a resource subscribed to by a client does not exist, the server will send a :ref:`Resource
+<envoy_api_msg_Resource>` whose :ref:`name <envoy_api_field_Resource.name>` field matches the
+name that the client subscribed to and whose :ref:`resource <envoy_api_field_Resource.resource>`
+field is unset.
+
 REST-JSON polling subscriptions
 -------------------------------
 
