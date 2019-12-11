@@ -44,13 +44,7 @@ VhdsSubscription::VhdsSubscription(RouteConfigUpdatePtr& config_update_info,
           *scope_, *this);
 }
 
-void VhdsSubscription::updateOnDemand(const std::set<std::string>& domains) {
-  std::set<std::string> with_route_config_name_prefix;
-  // Prefix each of the domain names with route_config_name, management server expects this.
-  for (auto& domain : domains) {
-    with_route_config_name_prefix.emplace(
-        VhdsSubscription::domainNameToAlias(config_update_info_->routeConfigName(), domain));
-  }
+void VhdsSubscription::updateOnDemand(const std::string& with_route_config_name_prefix) {
   subscription_->updateResourceInterest({with_route_config_name_prefix});
 }
 

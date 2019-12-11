@@ -130,7 +130,10 @@ void RdsRouteConfigSubscription::onConfigUpdate(
       for (auto* provider : route_config_providers_) {
         provider->onConfigUpdate();
       }
-      vhds_subscription_.release();
+      // RDS update removed VHDS configuration
+      if (!config_update_info_->routeConfiguration().has_vhds()) {
+        vhds_subscription_.release();
+      }
     }
     update_callback_manager_.runCallbacks();
   }
@@ -185,7 +188,7 @@ void RdsRouteConfigSubscription::onConfigUpdateFailed(
   init_target_.ready();
 }
 
-void RdsRouteConfigSubscription::updateOnDemand(const std::set<std::string>& aliases) {
+void RdsRouteConfigSubscription::updateOnDemand(const std::string& aliases) {
   if (vhds_subscription_.get() == nullptr) {
     return;
   }
@@ -291,10 +294,11 @@ void RdsRouteConfigProviderImpl::validateConfig(
 void RdsRouteConfigProviderImpl::requestVirtualHostsUpdate(
     const std::string& for_domain,
     Http::RouteConfigUpdatedCallbackSharedPtr route_config_updated_cb) {
+  auto alias = VhdsSubscription::domainNameToAlias(config_update_info_->routeConfigName(), for_domain);
   factory_context_.dispatcher().post(
-      [this, for_domain]() -> void { subscription_->updateOnDemand({for_domain}); });
+      [this, alias]() -> void { subscription_->updateOnDemand(alias); });
   config_update_callbacks_->getTyped<ThreadLocalCallbacks>().callbacks_.push_back(
-      {for_domain, route_config_updated_cb});
+      {alias, route_config_updated_cb});
 }
 
 RouteConfigProviderManagerImpl::RouteConfigProviderManagerImpl(Server::Admin& admin) {

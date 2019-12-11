@@ -117,7 +117,7 @@ public:
     return route_config_providers_;
   }
   RouteConfigUpdatePtr& routeConfigUpdate() { return config_update_info_; }
-  void updateOnDemand(const std::set<std::string>& aliases);
+  void updateOnDemand(const std::string& aliases);
   void maybeCreateInitManager(const std::string& version_info,
                               std::unique_ptr<Init::ManagerImpl>& init_manager,
                               std::unique_ptr<Cleanup>& resume_rds);

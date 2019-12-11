@@ -132,8 +132,7 @@ void WatchMap::onConfigUpdate(
     const Protobuf::RepeatedPtrField<std::string>& removed_resources,
     const std::string& system_version_info) {
   for (const auto& r : added_resources) {
-    // a non-empty response to an on-demand request
-    if (r.has_resource() && r.aliases_size() > 0) {
+    if (r.aliases_size() > 0) {
       convertAliasWatchToNameWatch(r);
     }
   }
@@ -142,7 +141,7 @@ void WatchMap::onConfigUpdate(
   // into the individual onConfigUpdate()s.
   absl::flat_hash_map<Watch*, Protobuf::RepeatedPtrField<envoy::api::v2::Resource>> per_watch_added;
   for (const auto& r : added_resources) {
-    const absl::flat_hash_set<Watch*>& interested_in_r = watchesInterestedIn(r.name(), r.aliases());
+    const absl::flat_hash_set<Watch*>& interested_in_r = watchesInterestedIn(r.name());
     for (const auto& interested_watch : interested_in_r) {
       per_watch_added[interested_watch].Add()->CopyFrom(r);
     }

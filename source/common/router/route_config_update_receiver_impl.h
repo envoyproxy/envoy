@@ -20,16 +20,18 @@ public:
       : time_source_(time_source), last_config_hash_(0ull), last_vhds_config_hash_(0ul),
         validation_visitor_(validation_visitor), vhds_configuration_changed_(true) {}
 
-  void initializeVhosts(const envoy::api::v2::RouteConfiguration& route_configuration);
+  void initializeRdsVhosts(const envoy::api::v2::RouteConfiguration& route_configuration);
   void collectAliasesInUpdate(
       const Protobuf::RepeatedPtrField<envoy::api::v2::Resource>& added_resources);
-  void removeVhosts(std::map<std::string, envoy::api::v2::route::VirtualHost>& vhosts,
+  bool removeVhosts(std::map<std::string, envoy::api::v2::route::VirtualHost>& vhosts,
                     const Protobuf::RepeatedPtrField<std::string>& removed_vhost_names);
-  void updateVhosts(std::map<std::string, envoy::api::v2::route::VirtualHost>& vhosts,
+  bool updateVhosts(std::map<std::string, envoy::api::v2::route::VirtualHost>& vhosts,
                     const Protobuf::RepeatedPtrField<envoy::api::v2::Resource>& added_resources);
-  void rebuildRouteConfig(const std::map<std::string, envoy::api::v2::route::VirtualHost>& vhosts,
-                          envoy::api::v2::RouteConfiguration& route_config);
+  void rebuildRouteConfig(const std::map<std::string, envoy::api::v2::route::VirtualHost>& rds_vhosts,
+                          const std::map<std::string, envoy::api::v2::route::VirtualHost>& vhds_vhosts,
+                              envoy::api::v2::RouteConfiguration& route_config);
   bool aliasResolutionFailed(const envoy::api::v2::Resource& resource) const;
+  void onUpdateCommon(const envoy::api::v2::RouteConfiguration& rc, const std::string& version_info);
 
   // Router::RouteConfigUpdateReceiver
   bool onRdsUpdate(const envoy::api::v2::RouteConfiguration& rc,
@@ -59,7 +61,8 @@ private:
   uint64_t last_vhds_config_hash_;
   std::string last_config_version_;
   SystemTime last_updated_;
-  std::map<std::string, envoy::api::v2::route::VirtualHost> virtual_hosts_;
+  std::map<std::string, envoy::api::v2::route::VirtualHost> rds_virtual_hosts_;
+  std::map<std::string, envoy::api::v2::route::VirtualHost> vhds_virtual_hosts_;
   absl::optional<RouteConfigProvider::ConfigInfo> config_info_;
   ProtobufMessage::ValidationVisitor& validation_visitor_;
   std::set<std::string> aliases_in_last_update_;

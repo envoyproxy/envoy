@@ -18,17 +18,21 @@ bool RouteConfigUpdateReceiverImpl::onRdsUpdate(const envoy::api::v2::RouteConfi
   if (new_hash == last_config_hash_) {
     return false;
   }
-
   route_config_proto_ = rc;
   last_config_hash_ = new_hash;
-  const uint64_t new_vhds_config_hash = MessageUtil::hash(rc.vhds());
+  const uint64_t new_vhds_config_hash = rc.has_vhds() ? MessageUtil::hash(rc.vhds()) : 0ul;
   vhds_configuration_changed_ = new_vhds_config_hash != last_vhds_config_hash_;
   last_vhds_config_hash_ = new_vhds_config_hash;
+  initializeRdsVhosts(route_config_proto_);
+  onUpdateCommon(route_config_proto_, version_info);
+  return true;
+}
+
+void RouteConfigUpdateReceiverImpl::onUpdateCommon(const envoy::api::v2::RouteConfiguration& rc, const std::string& version_info) {
   last_config_version_ = version_info;
   last_updated_ = time_source_.systemTime();
-  initializeVhosts(route_config_proto_);
-  config_info_.emplace(RouteConfigProvider::ConfigInfo{route_config_proto_, last_config_version_});
-  return true;
+  rebuildRouteConfig(rds_virtual_hosts_, vhds_virtual_hosts_, route_config_proto_);
+  config_info_.emplace(RouteConfigProvider::ConfigInfo{rc, last_config_version_});
 }
 
 bool RouteConfigUpdateReceiverImpl::onVhdsUpdate(
@@ -36,11 +40,10 @@ bool RouteConfigUpdateReceiverImpl::onVhdsUpdate(
     const Protobuf::RepeatedPtrField<std::string>& removed_resources,
     const std::string& version_info) {
   collectAliasesInUpdate(added_resources);
-  removeVhosts(virtual_hosts_, removed_resources);
-  updateVhosts(virtual_hosts_, added_resources);
-  rebuildRouteConfig(virtual_hosts_, route_config_proto_);
-
-  return onRdsUpdate(route_config_proto_, version_info) || !aliases_in_last_update_.empty();
+  bool removed = removeVhosts(vhds_virtual_hosts_, removed_resources);
+  bool updated = updateVhosts(vhds_virtual_hosts_, added_resources);
+  onUpdateCommon(route_config_proto_, version_info);
+  return removed || updated || !aliases_in_last_update_.empty();
 }
 
 void RouteConfigUpdateReceiverImpl::collectAliasesInUpdate(
@@ -52,25 +55,30 @@ void RouteConfigUpdateReceiverImpl::collectAliasesInUpdate(
   }
 }
 
-void RouteConfigUpdateReceiverImpl::initializeVhosts(
+void RouteConfigUpdateReceiverImpl::initializeRdsVhosts(
     const envoy::api::v2::RouteConfiguration& route_configuration) {
-  virtual_hosts_.clear();
+  rds_virtual_hosts_.clear();
   for (const auto& vhost : route_configuration.virtual_hosts()) {
-    virtual_hosts_.emplace(vhost.name(), vhost);
+    rds_virtual_hosts_.emplace(vhost.name(), vhost);
   }
 }
 
-void RouteConfigUpdateReceiverImpl::removeVhosts(
+bool RouteConfigUpdateReceiverImpl::removeVhosts(
     std::map<std::string, envoy::api::v2::route::VirtualHost>& vhosts,
     const Protobuf::RepeatedPtrField<std::string>& removed_vhost_names) {
+  bool vhosts_removed = false;
   for (const auto& vhost_name : removed_vhost_names) {
+    auto found = vhosts.find(vhost_name);
+    vhosts_removed = vhosts_removed || found != vhosts.end();
     vhosts.erase(vhost_name);
   }
+  return vhosts_removed;
 }
 
-void RouteConfigUpdateReceiverImpl::updateVhosts(
+bool RouteConfigUpdateReceiverImpl::updateVhosts(
     std::map<std::string, envoy::api::v2::route::VirtualHost>& vhosts,
     const Protobuf::RepeatedPtrField<envoy::api::v2::Resource>& added_resources) {
+  bool vhosts_added = false;
   for (const auto& resource : added_resources) {
     // the management server returns empty resources for aliases that it couldn't resolve.
     if (aliasResolutionFailed(resource)) {
@@ -84,14 +92,20 @@ void RouteConfigUpdateReceiverImpl::updateVhosts(
       vhosts.erase(found);
     }
     vhosts.emplace(vhost.name(), vhost);
+    vhosts_added = true;
   }
+  return vhosts_added;
 }
 
 void RouteConfigUpdateReceiverImpl::rebuildRouteConfig(
-    const std::map<std::string, envoy::api::v2::route::VirtualHost>& vhosts,
+    const std::map<std::string, envoy::api::v2::route::VirtualHost>& rds_vhosts,
+    const std::map<std::string, envoy::api::v2::route::VirtualHost>& vhds_vhosts,
     envoy::api::v2::RouteConfiguration& route_config) {
   route_config.clear_virtual_hosts();
-  for (const auto& vhost : vhosts) {
+  for (const auto& vhost : rds_vhosts) {
+    route_config.mutable_virtual_hosts()->Add()->CopyFrom(vhost.second);
+  }
+  for (const auto& vhost : vhds_vhosts) {
     route_config.mutable_virtual_hosts()->Add()->CopyFrom(vhost.second);
   }
 }
