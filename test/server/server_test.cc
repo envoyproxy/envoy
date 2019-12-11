@@ -957,6 +957,7 @@ TEST_P(StaticValidationTest, ClusterUnknownField) {
   EXPECT_TRUE(validate("cluster_unknown_field.yaml"));
 }
 
+// Custom StatsSink that registers both a Cluster update callback and Server lifecycle callback.
 class CallbacksStatsSink : public Stats::Sink, public Upstream::ClusterUpdateCallbacks {
 public:
   CallbacksStatsSink(Server::Instance& server)
