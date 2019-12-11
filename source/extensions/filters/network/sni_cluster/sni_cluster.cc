@@ -22,7 +22,7 @@ Network::FilterStatus SniClusterFilter::onNewConnection() {
         TcpProxy::PerConnectionCluster::key(),
         std::make_unique<TcpProxy::PerConnectionCluster>(sni),
         StreamInfo::FilterState::StateType::Mutable,
-        StreamInfo::FilterState::LifeSpan::FilterChain);
+        StreamInfo::FilterState::LifeSpan::DownstreamConnection);
   }
 
   return Network::FilterStatus::Continue;

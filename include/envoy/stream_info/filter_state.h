@@ -31,10 +31,10 @@ public:
   // - FilterChain has the shortest life span, which is as long as the filter chain lives.
   //
   // - DownstreamRequest is longer than FilterChain. When internal redirect is enabled, one
-  //   downstream request may create multiple filter chains. DownstreamRequest allows an Object to
+  //   downstream request may create multiple filter chains. DownstreamRequest allows an object to
   //   survive across filter chains for bookkeeping needs.
   //
-  // - DownstreamConnection makes an Object survive the entire duration of a downstream connection.
+  // - DownstreamConnection makes an object survive the entire duration of a downstream connection.
   //   Any stream within this connection can see the same object.
   //
   // Note that order matters in this enum because it's assumed that life span grows as enum number
