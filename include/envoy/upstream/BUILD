@@ -149,6 +149,7 @@ envoy_cc_library(
         "//include/envoy/ssl:context_interface",
         "//include/envoy/ssl:context_manager_interface",
         "//include/envoy/upstream:types_interface",
+        "@envoy_api//envoy/api/v2/core:pkg_cc_proto",
     ],
 )
 
