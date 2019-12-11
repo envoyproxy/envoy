@@ -15,7 +15,7 @@ jobs:
         Write-Host "##vso[task.prependpath]$env:TOOLS_BIN_DIR"
       displayName: "Install dependencies"
       env:
-        TOOLS_BIN_DIR: $(Pipeline.Workspace)\bin
+        TOOLS_BIN_DIR: C:\ProgramData\chocolatey\bin
 
     - bash: ci/windows_ci_steps.sh
       displayName: "Run Windows CI"
