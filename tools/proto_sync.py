@@ -120,7 +120,10 @@ def SyncV3Alpha(cmd, src_labels):
       continue
     # Skip unversioned package namespaces. TODO(htuch): fix this to use the type
     # DB and proper upgrade paths.
-    if 'v2' in dst:
+    if 'v1' in dst:
+      dst = re.sub('v1alpha\d?|v1', 'v3alpha', dst)
+      SyncProtoFile(cmd, src, dst)
+    elif 'v2' in dst:
       dst = re.sub('v2alpha\d?|v2', 'v3alpha', dst)
       SyncProtoFile(cmd, src, dst)
     elif 'envoy/type/matcher' in dst:
@@ -149,9 +152,9 @@ def GetImportDeps(proto_path):
         # We can ignore imports provided implicitly by api_proto_package().
         if any(import_path.startswith(p) for p in API_BUILD_SYSTEM_IMPORT_PREFIXES):
           continue
-        # Special case handling for in-built versioning annotations.
-        if import_path == 'udpa/api/annotations/versioning.proto':
-          imports.append('@com_github_cncf_udpa//udpa/api/annotations:pkg')
+        # Special case handling for UDPA annotations.
+        if import_path.startswith('udpa/annotations/'):
+          imports.append('@com_github_cncf_udpa//udpa/annotations:pkg')
           continue
         # Explicit remapping for external deps, compute paths for envoy/*.
         if import_path in external_proto_deps.EXTERNAL_PROTO_IMPORT_BAZEL_DEP_MAP:
