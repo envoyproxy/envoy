@@ -131,13 +131,13 @@ bool HeaderUtility::matchHeaders(const HeaderMap& request_headers, const HeaderD
 }
 
 bool HeaderUtility::headerIsValid(const absl::string_view header_value) {
-  return (nghttp2_check_header_value(reinterpret_cast<const uint8_t*>(header_value.data()),
-                                     header_value.size()) != 0);
+  return nghttp2_check_header_value(reinterpret_cast<const uint8_t*>(header_value.data()),
+                                    header_value.size()) != 0;
 }
 
 bool HeaderUtility::authorityIsValid(const absl::string_view header_value) {
-  return (nghttp2_check_authority(reinterpret_cast<const uint8_t*>(header_value.data()),
-                                  header_value.size()) != 0);
+  return nghttp2_check_authority(reinterpret_cast<const uint8_t*>(header_value.data()),
+                                 header_value.size()) != 0;
 }
 
 void HeaderUtility::addHeaders(HeaderMap& headers, const HeaderMap& headers_to_add) {
