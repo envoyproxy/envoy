@@ -363,10 +363,14 @@ public:
   static std::string CodeEnumToString(ProtobufUtil::error::Code code);
 
   /**
-   * Makes a copy of a source message with all "redacted" data cleared. See envoy.protobuf.redacted.
+   * Makes a copy of a source message with all `redacted` data sanitized. Specifically, any
+   * string-typed fields that are annotated as `redacted`, or that are contained directly or
+   * indirectly within a message-typed field that is annotated as `redacted`, will have their
+   * values replaced with the string "[redacted]" in the result.
+   * See also envoy.protobuf.redacted.
    * @param message original message to copy from.
-   * @return cloned message of the same dynamic type as the original, with all "redacted" data
-   * cleared.
+   * @return cloned message of the same dynamic type as the original, with all `redacted` data
+   * sanitized.
    */
   static std::unique_ptr<Protobuf::Message> redact(const Protobuf::Message& message);
 };

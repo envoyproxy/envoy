@@ -8,6 +8,11 @@ option java_package = "io.envoyproxy.envoy.protobuf";
 
 import "google/protobuf/descriptor.proto";
 
-extend google.protobuf.MessageOptions {
+extend google.protobuf.FieldOptions {
+  // This option indicates that a field contains personally-identifying or otherwise sensitive data,
+  // such as a private key or a password. It is used by `MessageUtil::redact` to determine which
+  // fields need to be sanitized. Please note that this has no effect on standard Protobuf functions
+  // such as `TextFormat::PrintToString`; you must explicitly call `MessageUtil::redact` wherever
+  // you need to sanitize sensitive data.
   bool redacted = 50000;
 }

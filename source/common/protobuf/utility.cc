@@ -509,7 +509,7 @@ std::string MessageUtil::CodeEnumToString(ProtobufUtil::error::Code code) {
 namespace {
 
 // Recursive helper method for MessageUtil::redact() below.
-void redactInPlace(Protobuf::Message* message) {
+void redactInPlace(Protobuf::Message* message, bool ancestor_is_redacted) {
   // If the message is an `Any`, we can't use any type-based introspection. Instead, we have to
   // unpack it to its original type to redact it...
   auto* any = dynamic_cast<ProtobufWkt::Any*>(message);
@@ -528,38 +528,40 @@ void redactInPlace(Protobuf::Message* message) {
     any->UnpackTo(typed_message.get());
 
     // 3. Redact the typed message and repack it into the original `Any`.
-    redactInPlace(typed_message.get());
+    redactInPlace(typed_message.get(), ancestor_is_redacted);
     any->PackFrom(*typed_message);
 
     return;
   }
 
-  // If the message isn't an `Any`, determine whether we need to redact it by looking for the
-  // `redacted` option on the message's descriptor.
-  const auto* descriptor = message->GetDescriptor();
-  if (descriptor->options().GetExtension(envoy::protobuf::redacted)) {
-    // If this message should be redacted, clear it and don't recurse any deeper.
-    message->Clear();
-  } else {
-    // Otherwise, use reflection to recurse into all message-typed fields of this message.
-    const auto* reflection = message->GetReflection();
-    std::vector<const Protobuf::FieldDescriptor*> field_descriptors;
-    reflection->ListFields(*message, &field_descriptors);
-    for (const auto* field_descriptor : field_descriptors) {
-      // Note for the future: if we ever need to support a "redacted" option at the field level,
-      // in addition to the existing message-level option, this is where we would check the field
-      // descriptor's options and clear out individual fields. Currently, we simply don't touch
-      // any fields that aren't of message type.
-      if (field_descriptor->type() == Protobuf::FieldDescriptor::TYPE_MESSAGE) {
-        // Repeated fields need slightly different handling from non-repeated...
-        if (field_descriptor->is_repeated()) {
-          const int field_size = reflection->FieldSize(*message, field_descriptor);
-          for (int i = 0; i < field_size; ++i) {
-            redactInPlace(reflection->MutableRepeatedMessage(message, field_descriptor, i));
-          }
-        } else {
-          redactInPlace(reflection->MutableMessage(message, field_descriptor));
+  // Otherwise, use reflection to traverse all populated fields of this message...
+  const auto* reflection = message->GetReflection();
+  std::vector<const Protobuf::FieldDescriptor*> field_descriptors;
+  reflection->ListFields(*message, &field_descriptors);
+  for (const auto* field_descriptor : field_descriptors) {
+    // Redact if this field or any of its ancestors have the `redacted` option set.
+    const bool redacted =
+        ancestor_is_redacted || field_descriptor->options().GetExtension(envoy::protobuf::redacted);
+
+    if (redacted && field_descriptor->type() == Protobuf::FieldDescriptor::TYPE_STRING) {
+      // Base case: replace strings with "[redacted]".
+      if (field_descriptor->is_repeated()) {
+        const int field_size = reflection->FieldSize(*message, field_descriptor);
+        for (int i = 0; i < field_size; ++i) {
+          reflection->SetRepeatedString(message, field_descriptor, i, "[redacted]");
         }
+      } else {
+        reflection->SetString(message, field_descriptor, "[redacted]");
+      }
+    } else if (field_descriptor->type() == Protobuf::FieldDescriptor::TYPE_MESSAGE) {
+      // Recursive case: traverse message fields.
+      if (field_descriptor->is_repeated()) {
+        const int field_size = reflection->FieldSize(*message, field_descriptor);
+        for (int i = 0; i < field_size; ++i) {
+          redactInPlace(reflection->MutableRepeatedMessage(message, field_descriptor, i), redacted);
+        }
+      } else {
+        redactInPlace(reflection->MutableMessage(message, field_descriptor), redacted);
       }
     }
   }
@@ -573,7 +575,7 @@ std::unique_ptr<Protobuf::Message> MessageUtil::redact(const Protobuf::Message& 
   redacted->MergeFrom(message);
 
   // 2. Redact the cloned message.
-  redactInPlace(redacted.get());
+  redactInPlace(redacted.get(), /* ancestor_is_redacted = */ false);
   return redacted;
 }
 
