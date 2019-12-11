@@ -2,9 +2,9 @@ syntax = "proto3";
 
 package envoy.api.v3alpha.route;
 
+option java_package = "io.envoyproxy.envoy.api.v3alpha.route";
 option java_outer_classname = "RouteProto";
 option java_multiple_files = true;
-option java_package = "io.envoyproxy.envoy.api.v3alpha.route";
 
 import "envoy/api/v3alpha/core/base.proto";
 import "envoy/type/matcher/v3alpha/regex.proto";
@@ -734,9 +734,7 @@ message RouteAction {
   oneof host_rewrite_specifier {
     // Indicates that during forwarding, the host header will be swapped with
     // this value.
-    //
-    // [#next-major-version: host_rewrite_literal]
-    string host_rewrite = 6;
+    string host_rewrite_literal = 6;
 
     // Indicates that during forwarding, the host header will be swapped with
     // the hostname of the upstream host chosen by the cluster manager. This
@@ -753,9 +751,7 @@ message RouteAction {
     //
     //   Pay attention to the potential security implications of using this option. Provided header
     //   must come from trusted source.
-    //
-    // [#next-major-version: host_rewrite_header]
-    string auto_host_rewrite_header = 29;
+    string host_rewrite_header = 29;
   }
 
   // Specifies the upstream timeout for the route. If not specified, the default is 15s. This

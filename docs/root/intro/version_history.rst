@@ -9,6 +9,7 @@ Version history
 * buffer: remove old implementation
 * build: official released binary is now built against libc++.
 * cluster: added :ref: `aggregate cluster <arch_overview_aggregate_cluster>` that allows load balancing between clusters.
+* decompressor: remove decompressor hard assert failure and replace with an error flag.
 * ext_authz: added :ref:`configurable ability<envoy_api_field_config.filter.http.ext_authz.v2.ExtAuthz.include_peer_certificate>` to send the :ref:`certificate<envoy_api_field_service.auth.v2.AttributeContext.Peer.certificate>` to the `ext_authz` service.
 * health check: gRPC health checker sets the gRPC deadline to the configured timeout duration.
 * http: added the ability to sanitize headers nominated by the Connection header. This new behavior is guarded by envoy.reloadable_features.connection_header_sanitization which defaults to true.
@@ -35,6 +36,18 @@ Version history
 * tracing: added the ability to set custom tags on both the :ref:`HTTP connection manager<envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.tracing>` and the :ref:`HTTP route <envoy_api_field_route.Route.tracing>`.
 * tracing: added upstream_address tag.
 * udp: added initial support for :ref:`UDP proxy <config_udp_listener_filters_udp_proxy>`
+
+1.12.2 (December 10, 2019)
+==========================
+* http: fixed CVE-2019-18801 by allocating sufficient memory for request headers.
+* http: fixed CVE-2019-18802 by implementing stricter validation of HTTP/1 headers.
+* http: trim LWS at the end of header keys, for correct HTTP/1.1 header parsing.
+* http: added strict authority checking. This can be reversed temporarily by setting the runtime feature `envoy.reloadable_features.strict_authority_validation` to false.
+* route config: fixed CVE-2019-18838 by checking for presence of host/path headers.
+
+1.12.1 (November 8, 2019)
+=========================
+* listener: fixed CVE-2019-18836 by clearing accept filters before connection creation.
 
 1.12.0 (October 31, 2019)
 =========================

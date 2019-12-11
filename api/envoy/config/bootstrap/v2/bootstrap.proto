@@ -2,9 +2,9 @@ syntax = "proto3";
 
 package envoy.config.bootstrap.v2;
 
+option java_package = "io.envoyproxy.envoy.config.bootstrap.v2";
 option java_outer_classname = "BootstrapProto";
 option java_multiple_files = true;
-option java_package = "io.envoyproxy.envoy.config.bootstrap.v2";
 
 import "envoy/api/v2/auth/cert.proto";
 import "envoy/api/v2/cds.proto";
