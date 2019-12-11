@@ -1,7 +1,8 @@
 #pragma once
 
-#include "common/common/logger.h"
 #include "envoy/decompressor/decompressor.h"
+
+#include "common/common/logger.h"
 
 #include "zlib.h"
 
@@ -11,8 +12,8 @@ namespace Decompressor {
 /**
  * Implementation of decompressor's interface.
  */
-class ZlibDecompressorImpl : public Decompressor,
-                             public Loggable<Logger::Id::decompression> {
+class ZlibDecompressorImpl : public Decompressor
+                             public Logger::Loggable<Logger::Id::decompression> {
 public:
   ZlibDecompressorImpl();
 
