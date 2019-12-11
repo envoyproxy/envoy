@@ -36,11 +36,12 @@ enum CacheEntryStatus {
 // Byte range from an HTTP request.
 class RawByteRange {
 public:
-  // - If first==UINT64_MAX, construct a RawByteRange requesting the final last
-  // body bytes.
-  // - Otherwise, construct a RawByteRange requesting the [first,last] body
-  // bytes. Prereq: first == UINT64_MAX || first <= last Invariant: isSuffix() ||
-  // firstBytePos() <= lastBytePos
+  // - If first==UINT64_MAX, construct a RawByteRange requesting the final last body bytes.
+  // - Otherwise, construct a RawByteRange requesting the [first,last] body bytes.
+  // Prereq: first == UINT64_MAX || first <= last
+  // Invariant: isSuffix() || firstBytePos() <= lastBytePos
+  // Examples: RawByteRange(0,4) requests the first 5 bytes.
+  //           RawByteRange(UINT64_MAX,4) requests the last 4 bytes.
   RawByteRange(uint64_t first, uint64_t last) : first_byte_pos_(first), last_byte_pos_(last) {
     RELEASE_ASSERT(isSuffix() || first <= last, "Illegal byte range.");
   }
@@ -63,27 +64,37 @@ private:
   uint64_t last_byte_pos_;
 };
 
-// Byte range from an HTTP request, adjusted for a known response body size.
+// Byte range from an HTTP request, adjusted for a known response body size, and converted from an
+// HTTP-style closed interval to a C++ style half-open interval.
 class AdjustedByteRange {
 public:
-  // Construct an AdjustedByteRange representing the [first,last] bytes in the
-  // response body. Prereq: first <= last Invariant: firstBytePos() <=
-  // lastBytePos()
-  AdjustedByteRange(uint64_t first, uint64_t last) : first_byte_pos_(first), last_byte_pos_(last) {
-    ASSERT(first <= last, "Illegal byte range.");
+  // Construct an AdjustedByteRange representing the [first,last) bytes in the
+  // response body. Prereq: first <= last Invariant: begin() <= end()
+  // Example: AdjustedByteRange(0,4) represents the first 4 bytes.
+  AdjustedByteRange(uint64_t first, uint64_t last) : first_(first), last_(last) {
+    ASSERT(first < last, "Illegal byte range.");
   }
-  uint64_t firstBytePos() const { return first_byte_pos_; }
-  uint64_t lastBytePos() const { return last_byte_pos_; }
-  uint64_t length() const { return last_byte_pos_ - first_byte_pos_ + 1; }
+  uint64_t begin() const { return first_; }
+  // Unlike RawByteRange, end() is one past the index of the last offset.
+  uint64_t end() const { return last_; }
+  uint64_t length() const { return last_ - first_; }
   void trimFront(uint64_t n) {
     RELEASE_ASSERT(n <= length(), "Attempt to trim too much from range.");
-    first_byte_pos_ += n;
+    first_ += n;
   }
 
 private:
-  uint64_t first_byte_pos_;
-  uint64_t last_byte_pos_;
+  uint64_t first_;
+  uint64_t last_;
 };
+
+// Adjusts request_range_spec to fit a cached response of size content_length, putting the results
+// in response_ranges. Returns true if response_ranges is satisfiable (empty is considered
+// satisfiable, as it denotes the entire body).
+// TODO(toddmgreer) Merge/reorder ranges where appropriate.
+bool adjustByteRangeSet(std::vector<AdjustedByteRange>& response_ranges,
+                        const std::vector<RawByteRange>& request_range_spec,
+                        uint64_t content_length);
 
 // Result of a lookup operation, including cached headers and information needed
 // to serve a response based on it, or to attempt to validate.
@@ -168,8 +179,6 @@ public:
 
 private:
   bool isFresh(const Http::HeaderMap& response_headers) const;
-  bool adjustByteRangeSet(std::vector<AdjustedByteRange>& response_ranges,
-                          uint64_t content_length) const;
 
   Key key_;
   std::vector<RawByteRange> request_range_spec_;
@@ -234,7 +243,7 @@ public:
   //
   // If a cache happens to load data in chunks of a set size, it may be
   // efficient to respond with fewer than the requested number of bytes. For
-  // example, assuming a 24 byte full-bodied response from a cache that reads in
+  // example, assuming a 23 byte full-bodied response from a cache that reads in
   // absurdly small 10 byte chunks:
   //
   // getBody requests bytes  0-23 .......... callback with bytes 0-9

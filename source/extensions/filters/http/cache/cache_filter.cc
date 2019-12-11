@@ -111,7 +111,7 @@ void CacheFilter::onOkHeaders(Http::HeaderMapPtr&& headers,
     // TODO(toddmgreer) handle multi-range requests.
     ASSERT(remaining_body_.size() <= 1);
     if (remaining_body_.empty()) {
-      remaining_body_.emplace_back(0, content_length - 1);
+      remaining_body_.emplace_back(0, content_length);
     }
     getBody();
   } else {

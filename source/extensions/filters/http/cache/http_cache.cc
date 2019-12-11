@@ -46,6 +46,9 @@ size_t localHashKey(const Key& key) { return stableHashKey(key); }
 
 // Returns true if response_headers is fresh.
 bool LookupRequest::isFresh(const Http::HeaderMap& response_headers) const {
+  if (!response_headers.Date()) {
+    return false;
+  }
   const Http::HeaderEntry* cache_control_header = response_headers.CacheControl();
   if (cache_control_header) {
     const SystemTime::duration effective_max_age =
@@ -62,28 +65,21 @@ LookupResult LookupRequest::makeLookupResult(Http::HeaderMapPtr&& response_heade
   // TODO(toddmgreer) Implement all HTTP caching semantics.
   ASSERT(response_headers);
   LookupResult result;
-  if (!isFresh(*response_headers)) {
-    result.cache_entry_status = CacheEntryStatus::RequiresValidation;
-    return result;
-  }
-
+  result.cache_entry_status =
+      isFresh(*response_headers) ? CacheEntryStatus::Ok : CacheEntryStatus::RequiresValidation;
   result.headers = std::move(response_headers);
   result.content_length = content_length;
-  if (adjustByteRangeSet(result.response_ranges, content_length)) {
-    result.cache_entry_status = CacheEntryStatus::Ok;
-  } else {
-    result.cache_entry_status = CacheEntryStatus::UnsatisfiableRange;
+  if (!adjustByteRangeSet(result.response_ranges, request_range_spec_, content_length)) {
+    result.headers->insertStatus().value(416); // Range Not Satisfiable
   }
+  result.has_trailers = false;
   return result;
 }
 
-// Adjusts response_ranges to fit a cached response of size content_length.
-// Returns true if response_ranges is satisfiable (empty is considered
-// satisfiable, as it denotes the entire body).
-// TODO(toddmgreer) Merge/reorder ranges where appropriate.
-bool LookupRequest::adjustByteRangeSet(std::vector<AdjustedByteRange>& response_ranges,
-                                       uint64_t content_length) const {
-  if (request_range_spec_.empty()) {
+bool adjustByteRangeSet(std::vector<AdjustedByteRange>& response_ranges,
+                        const std::vector<RawByteRange>& request_range_spec,
+                        uint64_t content_length) {
+  if (request_range_spec.empty()) {
     // No range header, so the request can proceed.
     return true;
   }
@@ -93,7 +89,7 @@ bool LookupRequest::adjustByteRangeSet(std::vector<AdjustedByteRange>& response_
     return false;
   }
 
-  for (const RawByteRange& spec : request_range_spec_) {
+  for (const RawByteRange& spec : request_range_spec) {
     if (spec.isSuffix()) {
       // spec is a suffix-byte-range-spec
       if (spec.suffixLength() >= content_length) {
@@ -102,15 +98,18 @@ bool LookupRequest::adjustByteRangeSet(std::vector<AdjustedByteRange>& response_
         response_ranges.clear();
         return true;
       }
-      response_ranges.emplace_back(content_length - spec.suffixLength(), content_length - 1);
+      response_ranges.emplace_back(content_length - spec.suffixLength(), content_length);
     } else {
       // spec is a byte-range-spec
       if (spec.firstBytePos() >= content_length) {
         // This range is unsatisfiable, so skip it.
         continue;
       }
-      response_ranges.emplace_back(spec.firstBytePos(),
-                                   std::min(spec.lastBytePos(), content_length - 1));
+      if (spec.lastBytePos() >= content_length - 1) {
+        response_ranges.emplace_back(spec.firstBytePos(), content_length);
+      } else {
+        response_ranges.emplace_back(spec.firstBytePos(), spec.lastBytePos());
+      }
     }
   }
   if (response_ranges.empty()) {

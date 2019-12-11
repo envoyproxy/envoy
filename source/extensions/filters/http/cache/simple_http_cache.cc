@@ -26,9 +26,8 @@ public:
   }
 
   void getBody(const AdjustedByteRange& range, LookupBodyCallback&& cb) override {
-    RELEASE_ASSERT(range.lastBytePos() < body_.length(), "Attempt to read past end of body.");
-    cb(std::make_unique<Buffer::OwnedImpl>(&body_[range.firstBytePos()],
-                                           range.lastBytePos() - range.firstBytePos() + 1));
+    RELEASE_ASSERT(range.end() <= body_.length(), "Attempt to read past end of body.");
+    cb(std::make_unique<Buffer::OwnedImpl>(&body_[range.begin()], range.length()));
   }
 
   void getTrailers(LookupTrailersCallback&& cb) override {

@@ -19,7 +19,7 @@ protected:
   Event::SimulatedTimeSystem time_source_;
   DateFormatter formatter_{"%a, %d %b %Y %H:%M:%S GMT"};
   Http::TestHeaderMapImpl request_headers_{
-      {":authority", "host"}, {":path", "/"}, {":method", "GET"}, {"x-forwarded-proto", "https"}};
+      {":path", "/"}, {":method", "GET"}, {"x-forwarded-proto", "https"}};
   Http::TestHeaderMapImpl response_headers_{{"date", formatter_.now(time_source_)},
                                             {"cache-control", "public,max-age=3600"}};
   NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks_;
@@ -36,7 +36,8 @@ protected:
   }
 };
 
-TEST_F(CacheFilterTest, ImmediateHit) {
+TEST_F(CacheFilterTest, ImmediateHitNoBody) {
+  request_headers_.insertHost().value(absl::string_view("ImmediateHitNoBody"));
   ON_CALL(decoder_callbacks_, dispatcher()).WillByDefault(ReturnRef(context_.dispatcher_));
   ON_CALL(context_.dispatcher_, post(_)).WillByDefault(::testing::InvokeArgument<0>());
 
@@ -64,6 +65,48 @@ TEST_F(CacheFilterTest, ImmediateHit) {
               encodeHeaders_(testing::AllOf(IsSupersetOfHeaders(response_headers_),
                                             HeaderHasValueRef("age", "0")),
                              true));
+  EXPECT_EQ(filter->decodeHeaders(request_headers_, true),
+            Http::FilterHeadersStatus::StopIteration);
+  ::testing::Mock::VerifyAndClearExpectations(&decoder_callbacks_);
+  filter->onDestroy();
+}
+
+TEST_F(CacheFilterTest, ImmediateHitBody) {
+  request_headers_.insertHost().value(absl::string_view("ImmediateHitBody"));
+  ON_CALL(decoder_callbacks_, dispatcher()).WillByDefault(ReturnRef(context_.dispatcher_));
+  ON_CALL(context_.dispatcher_, post(_)).WillByDefault(::testing::InvokeArgument<0>());
+
+  // Create filter for request 1
+  config_.set_name("SimpleHttpCache");
+  CacheFilterSharedPtr filter = makeFilter();
+  ASSERT_TRUE(filter);
+
+  // Decode request 1 header
+  EXPECT_CALL(decoder_callbacks_, continueDecoding);
+  EXPECT_EQ(filter->decodeHeaders(request_headers_, true),
+            Http::FilterHeadersStatus::StopIteration);
+  ::testing::Mock::VerifyAndClearExpectations(&decoder_callbacks_);
+
+  // Encode response header
+  const std::string body = "abc";
+  const uint64_t content_length = body.size();
+  Buffer::OwnedImpl buffer(body);
+  response_headers_.insertContentLength().value(content_length);
+  EXPECT_EQ(filter->encodeHeaders(response_headers_, false), Http::FilterHeadersStatus::Continue);
+  EXPECT_EQ(filter->encodeData(buffer, true), Http::FilterDataStatus::Continue);
+  filter->onDestroy();
+
+  // Create filter for request 2
+  filter = makeFilter();
+  ASSERT_TRUE(filter);
+
+  // Decode request 2 header
+  EXPECT_CALL(decoder_callbacks_,
+              encodeHeaders_(testing::AllOf(IsSupersetOfHeaders(response_headers_),
+                                            HeaderHasValueRef("age", "0")),
+                             false));
+  EXPECT_CALL(decoder_callbacks_,
+              encodeData(testing::Property(&Buffer::Instance::toString, testing::Eq(body)), true));
   EXPECT_EQ(filter->decodeHeaders(request_headers_, true),
             Http::FilterHeadersStatus::StopIteration);
   ::testing::Mock::VerifyAndClearExpectations(&decoder_callbacks_);

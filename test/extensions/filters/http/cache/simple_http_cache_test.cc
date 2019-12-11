@@ -23,7 +23,7 @@ protected:
   SimpleHttpCacheTest() {
     request_headers_.insertMethod().value(absl::string_view(("GET")));
     request_headers_.insertHost().value(absl::string_view(("example.com")));
-    request_headers_.insertScheme().value(absl::string_view(("https")));
+    request_headers_.insertForwardedProto().value(absl::string_view(("https")));
     request_headers_.insertCacheControl().value(absl::string_view(("max-age=3600")));
   }
 
@@ -78,7 +78,7 @@ protected:
     if (!lookup_context) {
       return AssertionFailure() << "Expected nonnull lookup_context";
     }
-    const std::string actual_body = getBody(*lookup_context, 0, body.size() - 1u);
+    const std::string actual_body = getBody(*lookup_context, 0, body.size());
     if (body != actual_body) {
       return AssertionFailure() << "Expected body == " << body << "\n  Actual:  " << actual_body;
     }
@@ -201,7 +201,7 @@ TEST_F(SimpleHttpCacheTest, StreamingPut) {
   EXPECT_EQ(CacheEntryStatus::Ok, lookup_result_.cache_entry_status);
   EXPECT_NE(nullptr, lookup_result_.headers);
   ASSERT_EQ(13, lookup_result_.content_length);
-  EXPECT_EQ("Hello, World!", getBody(*name_lookup_context, 0, 12));
+  EXPECT_EQ("Hello, World!", getBody(*name_lookup_context, 0, 13));
 }
 
 TEST(Registration, getFactory) {
