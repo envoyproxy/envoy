@@ -5,7 +5,6 @@
 #include "envoy/common/exception.h"
 
 #include "common/common/assert.h"
-#include "common/common/logger.h"
 #include "common/common/stack_array.h"
 
 namespace Envoy {
