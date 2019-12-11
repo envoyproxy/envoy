@@ -11,3 +11,4 @@ Bootstrap
   ../config/overload/v2alpha/overload.proto
   ../config/ratelimit/v2/rls.proto
   ../config/trace/v2/trace.proto
+  ../config/trace/v2alpha/xray.proto
