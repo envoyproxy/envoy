@@ -330,7 +330,8 @@ TEST_F(Http1ServerConnectionImplTest, Http11AbsolutePortTooLarge) {
 TEST_F(Http1ServerConnectionImplTest, SketchyConnectionHeader) {
   initialize();
 
-  Buffer::OwnedImpl buffer("GET / HTTP/1.1\r\nHost: bah\r\nConnection: a,b,c,d,e,f,g,h,i,j,k,l,m\r\n\r\n");
+  Buffer::OwnedImpl buffer(
+      "GET / HTTP/1.1\r\nHost: bah\r\nConnection: a,b,c,d,e,f,g,h,i,j,k,l,m\r\n\r\n");
   expect400(Protocol::Http11, true, buffer, "http1.connection_header_rejected");
 }
 
