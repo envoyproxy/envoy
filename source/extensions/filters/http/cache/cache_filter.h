@@ -19,6 +19,8 @@ namespace Cache {
 
 /**
  * A filter that caches responses and attempts to satisfy requests from cache.
+ * It also inherits from std::enable_shared_from_this so it can pass shared_ptrs to asynch methods,
+ * to ensure that it doesn't get destroyed before they complete.
  */
 class CacheFilter;
 using CacheFilterSharedPtr = std::shared_ptr<CacheFilter>;
