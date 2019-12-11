@@ -40,22 +40,6 @@ AddedRemoved WatchMap::updateWatchInterest(Watch* watch,
                       findRemovals(newly_removed_from_watch, watch));
 }
 
-absl::flat_hash_set<Watch*>
-WatchMap::watchesInterestedIn(const std::string& resource_name,
-                              const Protobuf::RepeatedPtrField<std::string>& aliases) {
-  absl::flat_hash_set<Watch*> ret = watchesInterestedIn(resource_name);
-  if (ret != wildcard_watches_) {
-    return ret;
-  }
-  for (const auto& alias : aliases) {
-    ret = watchesInterestedIn(alias);
-    if (ret != wildcard_watches_) {
-      return ret;
-    }
-  }
-  return ret;
-}
-
 absl::flat_hash_set<Watch*> WatchMap::watchesInterestedIn(const std::string& resource_name) {
   absl::flat_hash_set<Watch*> ret = wildcard_watches_;
   const auto watches_interested = watch_interest_.find(resource_name);

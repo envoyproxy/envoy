@@ -103,9 +103,6 @@ private:
 
   // Returns the union of watch_interest_[resource_name] and wildcard_watches_.
   absl::flat_hash_set<Watch*> watchesInterestedIn(const std::string& resource_name);
-  absl::flat_hash_set<Watch*>
-  watchesInterestedIn(const std::string& resource_name,
-                      const Protobuf::RepeatedPtrField<std::string>& aliases);
 
   // checks is a watch for an alias exists and replaces it with the resource's name
   void convertAliasWatchToNameWatch(const envoy::api::v2::Resource& resource);

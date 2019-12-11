@@ -137,7 +137,7 @@ TEST_F(VhdsTest, VhdsAddsVirtualHosts) {
       messageDifferencer_.Equals(vhost, config_update_info->routeConfiguration().virtual_hosts(0)));
 }
 
-// verify that an RDS update of vhosts leaves VHDS vhosts intact
+// verify that an RDS update of virtual hosts leaves VHDS virtual hosts intact
 TEST_F(VhdsTest, RdsUpdatesVirtualHosts) {
   const auto route_config = TestUtility::parseYaml<envoy::api::v2::RouteConfiguration>(R"EOF(
 name: my_route
