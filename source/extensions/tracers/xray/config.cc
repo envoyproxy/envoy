@@ -33,13 +33,15 @@ XRayTracerFactory::createHttpTracerTyped(const trace::XRayConfig& proto_config,
     ENVOY_LOG(error, "Failed to read sampling rules manifest because of {}.", e.what());
   }
 
-  RELEASE_ASSERT(proto_config.daemon_endpoint().protocol() ==
-                     api::core::SocketAddress::Protocol::SocketAddress_Protocol_UDP,
-                 "X-Ray daemon endpoint must be a UDP socket address");
+  if (proto_config.daemon_endpoint().protocol() !=
+      api::core::SocketAddress::Protocol::SocketAddress_Protocol_UDP) {
+    throw EnvoyException("X-Ray daemon endpoint must be a UDP socket address");
+  }
 
-  RELEASE_ASSERT(proto_config.daemon_endpoint().port_specifier_case() ==
-                     api::core::SocketAddress::PortSpecifierCase::kPortValue,
-                 "X-Ray daemon port must be specified as number. Not a named port.");
+  if (proto_config.daemon_endpoint().port_specifier_case() !=
+      api::core::SocketAddress::PortSpecifierCase::kPortValue) {
+    throw EnvoyException("X-Ray daemon port must be specified as number. Not a named port.");
+  }
 
   const std::string endpoint = fmt::format("{}:{}", proto_config.daemon_endpoint().address(),
                                            proto_config.daemon_endpoint().port_value());

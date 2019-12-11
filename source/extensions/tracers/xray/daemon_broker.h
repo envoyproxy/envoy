@@ -43,8 +43,8 @@ public:
   void send(const std::string& data) const final;
 
 private:
-  Network::IoHandlePtr io_handle_;
-  Network::Address::InstanceConstSharedPtr address_;
+  const Network::Address::InstanceConstSharedPtr address_;
+  const Network::IoHandlePtr io_handle_;
 };
 
 } // namespace XRay
