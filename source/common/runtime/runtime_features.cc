@@ -37,12 +37,12 @@ constexpr const char* runtime_features[] = {
 // high risk to be enabled by default. Examples where we have opted to land
 // features without enabling by default are swapping the underlying buffer
 // implementation or the HTTP/1.1 codec implementation. Most features should be
-// enabled by deafult.
+// enabled by default.
 //
 // When features are added here, there should be a tracking bug assigned to the
 // code owner to flip the default after sufficient testing.
 constexpr const char* disabled_runtime_features[] = {
-    // Sentinal and test flag.
+    // Sentinel and test flag.
     "envoy.reloadable_features.test_feature_false",
     // Should be removed as part of https://github.com/envoyproxy/envoy/issues/8993
     "envoy.reloadable_features.http2_protocol_options.stream_error_on_invalid_http_messaging",

@@ -137,12 +137,12 @@ def GetRuntimeAlreadyTrue():
   with open('source/common/runtime/runtime_features.cc', 'r') as features:
     for line in features.readlines():
       match = runtime_features.match(line)
-      # hit the sentinal value: no more true flags.
+      # hit the sentinel value: no more true flags.
       if not match:
         continue
       guard = match.group(1)
       if guard == 'envoy.reloadable_features.test_feature_false':
-        print("Found sentinal\n")
+        print("Found sentinel\n")
         return runtime_already_true
       if 'test_feature_true' not in guard:
         print("Found existing runtime guard " + guard)
@@ -176,8 +176,8 @@ def GetRuntimeAndPr():
         pr_date = date.fromtimestamp(commit.committed_date)
         removable = (pr_date < removal_date)
         # Add the runtime guard and PR to the list to file issues about.
-        print("Flag " + runtime_guard + " added at " + str(pr_date) + " " +
-              (removable and "and is safe to remove" or "is not ready to remove"))
+        print('Flag ' + runtime_guard + ' added at ' + str(pr_date) + ' ' +
+              (removable and 'and is safe to remove' or 'is not ready to remove'))
         if removable:
           features_to_flip.append((runtime_guard, pr))
           runtime_already_true.remove(runtime_guard)
@@ -188,7 +188,7 @@ if __name__ == '__main__':
   runtime_and_pr = GetRuntimeAndPr()
 
   if not runtime_and_pr:
-    print ('No code is deprecated.')
+    print('No code is deprecated.')
     sys.exit(0)
 
   access_token = os.getenv('GH_ACCESS_TOKEN')
