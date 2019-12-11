@@ -12,7 +12,7 @@ def envoy_copts(repository, test = False):
         "-Woverloaded-virtual",
         "-Wold-style-cast",
         "-Wvla",
-        "-std=c++14",
+        "-std=c++17",
     ]
 
     # Windows options for cleanest service compilation;
@@ -23,7 +23,7 @@ def envoy_copts(repository, test = False):
     msvc_options = [
         "-WX",
         "-Zc:__cplusplus",
-        "-std:c++14",
+        "-std:c++17",
         "-DWIN32",
         "-D_WIN32_WINNT=0x0602",
         "-DNTDDI_VERSION=0x06020000",

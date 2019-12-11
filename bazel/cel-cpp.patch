@@ -1,0 +1,1191 @@
+diff --git a/base/BUILD b/base/BUILD
+index 8b92d6f..dd6929e 100644
+--- a/base/BUILD
++++ b/base/BUILD
+@@ -17,7 +17,7 @@ cc_library(
+         "statusor.h",
+         "statusor_internals.h",
+     ],
+-    copts = ["-std=c++14"],
++    copts = ["-std=c++17"],
+     deps = [
+         "@com_google_absl//absl/base",
+         "@com_google_absl//absl/base:core_headers",
+diff --git a/common/BUILD b/common/BUILD
+index d561461..a08de81 100644
+--- a/common/BUILD
++++ b/common/BUILD
+@@ -12,7 +12,7 @@ cc_library(
+     hdrs = [
+         "macros.h",
+     ],
+-    copts = ["-std=c++14"],
++    copts = ["-std=c++17"],
+     deps = [],
+ )
+ 
+@@ -21,7 +21,7 @@ cc_library(
+     hdrs = [
+         "id.h",
+     ],
+-    copts = ["-std=c++14"],
++    copts = ["-std=c++17"],
+     deps = [
+         "//internal:cel_printer",
+         "//internal:handle",
+@@ -35,7 +35,7 @@ cc_library(
+     hdrs = [
+         "type.h",
+     ],
+-    copts = ["-std=c++14"],
++    copts = ["-std=c++17"],
+     deps = [
+         "//internal:handle",
+         "@com_google_absl//absl/memory",
+@@ -51,7 +51,7 @@ cc_library(
+     hdrs = [
+         "enum.h",
+     ],
+-    copts = ["-std=c++14"],
++    copts = ["-std=c++17"],
+     deps = [
+         ":type",
+         "//internal:cel_printer",
+@@ -66,7 +66,7 @@ cc_library(
+     hdrs = [
+         "error.h",
+     ],
+-    copts = ["-std=c++14"],
++    copts = ["-std=c++17"],
+     deps = [
+         "//internal:cel_printer",
+         "//internal:hash_util",
+@@ -84,7 +84,7 @@ cc_library(
+     hdrs = [
+         "unknown.h",
+     ],
+-    copts = ["-std=c++14"],
++    copts = ["-std=c++17"],
+     deps = [
+         ":id",
+         ":macros",
+@@ -100,7 +100,7 @@ cc_library(
+     hdrs = [
+         "parent_ref.h",
+     ],
+-    copts = ["-std=c++14"],
++    copts = ["-std=c++17"],
+     deps = [
+         "//internal:ref_countable",
+         "@com_google_absl//absl/types:optional",
+@@ -115,7 +115,7 @@ cc_library(
+     hdrs = [
+         "custom_object.h",
+     ],
+-    copts = ["-std=c++14"],
++    copts = ["-std=c++17"],
+     deps = [
+         ":value",
+     ],
+@@ -129,7 +129,7 @@ cc_library(
+     hdrs = [
+         "operators.h",
+     ],
+-    copts = ["-std=c++14"],
++    copts = ["-std=c++17"],
+     deps = [
+         "@com_google_absl//absl/strings",
+         "@com_google_absl//absl/types:optional",
+@@ -145,7 +145,7 @@ cc_library(
+     hdrs = [
+         "escaping.h",
+     ],
+-    copts = ["-std=c++14"],
++    copts = ["-std=c++17"],
+     deps = [
+         "@com_google_absl//absl/strings",
+         "@com_google_absl//absl/strings:str_format",
+@@ -156,7 +156,7 @@ cc_library(
+ cc_test(
+     name = "escaping_test",
+     srcs = ["escaping_test.cc"],
+-    copts = ["-std=c++14"],
++    copts = ["-std=c++17"],
+     deps = [
+         ":escaping",
+         "@com_github_google_googletest//:gtest_main",
+@@ -171,7 +171,7 @@ cc_library(
+     hdrs = [
+         "value.h",
+     ],
+-    copts = ["-std=c++14"],
++    copts = ["-std=c++17"],
+     deps = [
+         ":enum",
+         ":error",
+@@ -202,7 +202,7 @@ cc_library(
+ cc_test(
+     name = "value_test",
+     srcs = ["value_test.cc"],
+-    copts = ["-std=c++14"],
++    copts = ["-std=c++17"],
+     deps = [
+         ":custom_object",
+         ":value",
+@@ -226,7 +226,7 @@ cc_library(
+     hdrs = [
+         "converters.h",
+     ],
+-    copts = ["-std=c++14"],
++    copts = ["-std=c++17"],
+     deps = [
+         ":parent_ref",
+         ":value",
+@@ -239,7 +239,7 @@ cc_library(
+ cc_test(
+     name = "converters_test",
+     srcs = ["converters_test.cc"],
+-    copts = ["-std=c++14"],
++    copts = ["-std=c++17"],
+     deps = [
+         ":converters",
+         ":value",
+diff --git a/conformance/BUILD b/conformance/BUILD
+index 2a402ce..d2bf48e 100644
+--- a/conformance/BUILD
++++ b/conformance/BUILD
+@@ -31,7 +31,7 @@ cc_binary(
+     name = "server",
+     testonly = 1,
+     srcs = ["server.cc"],
+-    copts = ["-std=c++14"],
++    copts = ["-std=c++17"],
+     deps = [
+         "//base:status",
+         "//eval/eval:container_backed_list_impl",
+diff --git a/eval/compiler/BUILD b/eval/compiler/BUILD
+index d063692..6dda1ce 100644
+--- a/eval/compiler/BUILD
++++ b/eval/compiler/BUILD
+@@ -14,7 +14,7 @@ cc_library(
+     hdrs = [
+         "flat_expr_builder.h",
+     ],
+-    copts = ["-std=c++14"],
++    copts = ["-std=c++17"],
+     deps = [
+         ":constant_folding",
+         "//base:status",
+@@ -44,7 +44,7 @@ cc_test(
+     srcs = [
+         "flat_expr_builder_test.cc",
+     ],
+-    copts = ["-std=c++14"],
++    copts = ["-std=c++17"],
+     deps = [
+         ":flat_expr_builder",
+         "//eval/public:builtin_func_registrar",
+@@ -64,7 +64,7 @@ cc_library(
+     hdrs = [
+         "constant_folding.h",
+     ],
+-    copts = ["-std=c++14"],
++    copts = ["-std=c++17"],
+     deps = [
+         "//eval/eval:const_value_step",
+         "//eval/eval:container_backed_list_impl",
+@@ -83,7 +83,7 @@ cc_test(
+     srcs = [
+         "constant_folding_test.cc",
+     ],
+-    copts = ["-std=c++14"],
++    copts = ["-std=c++17"],
+     deps = [
+         ":constant_folding",
+         "//eval/public:builtin_func_registrar",
+diff --git a/eval/eval/BUILD b/eval/eval/BUILD
+index b66cd3c..fcc4629 100644
+--- a/eval/eval/BUILD
++++ b/eval/eval/BUILD
+@@ -14,7 +14,7 @@ cc_library(
+     hdrs = [
+         "evaluator_core.h",
+     ],
+-    copts = ["-std=c++14"],
++    copts = ["-std=c++17"],
+     deps = [
+         "//eval/public:activation",
+         "//eval/public:cel_expression",
+@@ -29,7 +29,7 @@ cc_library(
+     hdrs = [
+         "expression_step_base.h",
+     ],
+-    copts = ["-std=c++14"],
++    copts = ["-std=c++17"],
+     deps = [
+         ":evaluator_core",
+         "//eval/public:activation",
+@@ -49,7 +49,7 @@ cc_library(
+     hdrs = [
+         "const_value_step.h",
+     ],
+-    copts = ["-std=c++14"],
++    copts = ["-std=c++17"],
+     deps = [
+         ":evaluator_core",
+         ":expression_step_base",
+@@ -70,7 +70,7 @@ cc_library(
+     hdrs = [
+         "container_access_step.h",
+     ],
+-    copts = ["-std=c++14"],
++    copts = ["-std=c++17"],
+     deps = [
+         ":evaluator_core",
+         ":expression_step_base",
+@@ -90,7 +90,7 @@ cc_library(
+     hdrs = [
+         "ident_step.h",
+     ],
+-    copts = ["-std=c++14"],
++    copts = ["-std=c++17"],
+     deps = [
+         ":evaluator_core",
+         ":expression_step_base",
+@@ -109,7 +109,7 @@ cc_library(
+     hdrs = [
+         "function_step.h",
+     ],
+-    copts = ["-std=c++14"],
++    copts = ["-std=c++17"],
+     deps = [
+         ":evaluator_core",
+         ":expression_step_base",
+@@ -131,7 +131,7 @@ cc_library(
+     hdrs = [
+         "field_access.h",
+     ],
+-    copts = ["-std=c++14"],
++    copts = ["-std=c++17"],
+     deps = [
+         "//base:status",
+         "//eval/public:cel_value",
+@@ -148,7 +148,7 @@ cc_library(
+     hdrs = [
+         "container_backed_list_impl.h",
+     ],
+-    copts = ["-std=c++14"],
++    copts = ["-std=c++17"],
+     deps = [
+         "//eval/public:cel_value",
+         "@com_google_absl//absl/strings",
+@@ -164,7 +164,7 @@ cc_library(
+     hdrs = [
+         "container_backed_map_impl.h",
+     ],
+-    copts = ["-std=c++14"],
++    copts = ["-std=c++17"],
+     deps = [
+         "//eval/public:cel_value",
+         "@com_google_absl//absl/container:node_hash_map",
+@@ -180,7 +180,7 @@ cc_library(
+     hdrs = [
+         "field_backed_list_impl.h",
+     ],
+-    copts = ["-std=c++14"],
++    copts = ["-std=c++17"],
+     deps = [
+         ":field_access",
+         "//eval/public:cel_value",
+@@ -196,7 +196,7 @@ cc_library(
+     hdrs = [
+         "field_backed_map_impl.h",
+     ],
+-    copts = ["-std=c++14"],
++    copts = ["-std=c++17"],
+     deps = [
+         ":field_access",
+         "//eval/public:cel_value",
+@@ -213,7 +213,7 @@ cc_library(
+     hdrs = [
+         "select_step.h",
+     ],
+-    copts = ["-std=c++14"],
++    copts = ["-std=c++17"],
+     deps = [
+         ":evaluator_core",
+         ":expression_step_base",
+@@ -235,7 +235,7 @@ cc_library(
+     hdrs = [
+         "create_list_step.h",
+     ],
+-    copts = ["-std=c++14"],
++    copts = ["-std=c++17"],
+     deps = [
+         ":container_backed_list_impl",
+         ":evaluator_core",
+@@ -256,7 +256,7 @@ cc_library(
+     hdrs = [
+         "create_struct_step.h",
+     ],
+-    copts = ["-std=c++14"],
++    copts = ["-std=c++17"],
+     deps = [
+         ":container_backed_map_impl",
+         ":evaluator_core",
+@@ -277,7 +277,7 @@ cc_library(
+     hdrs = [
+         "jump_step.h",
+     ],
+-    copts = ["-std=c++14"],
++    copts = ["-std=c++17"],
+     deps = [
+         ":evaluator_core",
+         ":expression_step_base",
+@@ -296,7 +296,7 @@ cc_library(
+     hdrs = [
+         "logic_step.h",
+     ],
+-    copts = ["-std=c++14"],
++    copts = ["-std=c++17"],
+     deps = [
+         ":evaluator_core",
+         ":expression_step_base",
+@@ -316,7 +316,7 @@ cc_library(
+     hdrs = [
+         "comprehension_step.h",
+     ],
+-    copts = ["-std=c++14"],
++    copts = ["-std=c++17"],
+     deps = [
+         ":evaluator_core",
+         ":expression_step_base",
+@@ -334,7 +334,7 @@ cc_test(
+     srcs = [
+         "evaluator_core_test.cc",
+     ],
+-    copts = ["-std=c++14"],
++    copts = ["-std=c++17"],
+     deps = [
+         ":evaluator_core",
+         "//eval/compiler:flat_expr_builder",
+@@ -350,7 +350,7 @@ cc_test(
+     srcs = [
+         "const_value_step_test.cc",
+     ],
+-    copts = ["-std=c++14"],
++    copts = ["-std=c++17"],
+     deps = [
+         ":const_value_step",
+         ":evaluator_core",
+@@ -365,7 +365,7 @@ cc_test(
+     srcs = [
+         "container_access_step_test.cc",
+     ],
+-    copts = ["-std=c++14"],
++    copts = ["-std=c++17"],
+     deps = [
+         ":container_access_step",
+         ":container_backed_list_impl",
+@@ -384,7 +384,7 @@ cc_test(
+     srcs = [
+         "ident_step_test.cc",
+     ],
+-    copts = ["-std=c++14"],
++    copts = ["-std=c++17"],
+     deps = [
+         ":evaluator_core",
+         ":ident_step",
+@@ -399,7 +399,7 @@ cc_test(
+     srcs = [
+         "function_step_test.cc",
+     ],
+-    copts = ["-std=c++14"],
++    copts = ["-std=c++17"],
+     deps = [
+         ":evaluator_core",
+         ":function_step",
+@@ -418,7 +418,7 @@ cc_test(
+     srcs = [
+         "container_backed_map_impl_test.cc",
+     ],
+-    copts = ["-std=c++14"],
++    copts = ["-std=c++17"],
+     deps = [
+         ":container_backed_map_impl",
+         "//eval/public:cel_value",
+@@ -433,7 +433,7 @@ cc_test(
+     srcs = [
+         "field_backed_list_impl_test.cc",
+     ],
+-    copts = ["-std=c++14"],
++    copts = ["-std=c++17"],
+     deps = [
+         ":evaluator_core",
+         ":field_backed_list_impl",
+@@ -449,7 +449,7 @@ cc_test(
+     srcs = [
+         "field_backed_map_impl_test.cc",
+     ],
+-    copts = ["-std=c++14"],
++    copts = ["-std=c++17"],
+     deps = [
+         ":evaluator_core",
+         ":field_backed_map_impl",
+@@ -465,7 +465,7 @@ cc_test(
+     srcs = [
+         "select_step_test.cc",
+     ],
+-    copts = ["-std=c++14"],
++    copts = ["-std=c++17"],
+     deps = [
+         ":container_backed_map_impl",
+         ":evaluator_core",
+@@ -484,7 +484,7 @@ cc_test(
+     srcs = [
+         "create_list_step_test.cc",
+     ],
+-    copts = ["-std=c++14"],
++    copts = ["-std=c++17"],
+     deps = [
+         ":const_value_step",
+         ":create_list_step",
+@@ -501,7 +501,7 @@ cc_test(
+     srcs = [
+         "create_struct_step_test.cc",
+     ],
+-    copts = ["-std=c++14"],
++    copts = ["-std=c++17"],
+     deps = [
+         ":container_backed_list_impl",
+         ":container_backed_map_impl",
+diff --git a/eval/public/BUILD b/eval/public/BUILD
+index 878c271..6720c6b 100644
+--- a/eval/public/BUILD
++++ b/eval/public/BUILD
+@@ -9,7 +9,7 @@ cc_library(
+     hdrs = [
+         "cel_value_internal.h",
+     ],
+-    copts = ["-std=c++14"],
++    copts = ["-std=c++17"],
+     deps = [
+         "@com_google_absl//absl/types:variant",
+     ],
+@@ -23,7 +23,7 @@ cc_library(
+     hdrs = [
+         "cel_value.h",
+     ],
+-    copts = ["-std=c++14"],
++    copts = ["-std=c++17"],
+     deps = [
+         ":cel_value_internal",
+         "//base:status",
+@@ -43,7 +43,7 @@ cc_library(
+     hdrs = [
+         "cel_attribute.h",
+     ],
+-    copts = ["-std=c++14"],
++    copts = ["-std=c++17"],
+     deps = [
+         ":cel_value",
+         ":cel_value_internal",
+@@ -60,7 +60,7 @@ cc_library(
+     hdrs = [
+         "cel_value_producer.h",
+     ],
+-    copts = ["-std=c++14"],
++    copts = ["-std=c++17"],
+     deps = [
+         ":cel_value",
+         "@com_google_absl//absl/strings",
+@@ -74,7 +74,7 @@ cc_library(
+     hdrs = [
+         "unknown_attribute_set.h",
+     ],
+-    copts = ["-std=c++14"],
++    copts = ["-std=c++17"],
+     deps = [
+         ":cel_attribute",
+         "//base:status",
+@@ -91,7 +91,7 @@ cc_library(
+     hdrs = [
+         "activation.h",
+     ],
+-    copts = ["-std=c++14"],
++    copts = ["-std=c++17"],
+     deps = [
+         ":cel_function",
+         ":cel_value",
+@@ -111,7 +111,7 @@ cc_library(
+     hdrs = [
+         "activation_bind_helper.h",
+     ],
+-    copts = ["-std=c++14"],
++    copts = ["-std=c++17"],
+     deps = [
+         ":activation",
+         "//eval/eval:field_access",
+@@ -129,7 +129,7 @@ cc_library(
+     hdrs = [
+         "cel_function.h",
+     ],
+-    copts = ["-std=c++14"],
++    copts = ["-std=c++17"],
+     deps = [
+         ":cel_value",
+         "@com_google_absl//absl/types:span",
+@@ -144,7 +144,7 @@ cc_library(
+     hdrs = [
+         "cel_function_adapter.h",
+     ],
+-    copts = ["-std=c++14"],
++    copts = ["-std=c++17"],
+     deps = [
+         ":cel_function",
+         ":cel_function_registry",
+@@ -162,7 +162,7 @@ cc_library(
+     hdrs = [
+         "cel_function_provider.h",
+     ],
+-    copts = ["-std=c++14"],
++    copts = ["-std=c++17"],
+     deps = [
+         ":activation",
+         ":cel_function",
+@@ -174,7 +174,7 @@ cc_library(
+     hdrs = [
+         "cel_builtins.h",
+     ],
+-    copts = ["-std=c++14"],
++    copts = ["-std=c++17"],
+     deps = [
+     ],
+ )
+@@ -187,7 +187,7 @@ cc_library(
+     hdrs = [
+         "builtin_func_registrar.h",
+     ],
+-    copts = ["-std=c++14"],
++    copts = ["-std=c++17"],
+     deps = [
+         ":cel_builtins",
+         ":cel_function",
+@@ -210,7 +210,7 @@ cc_library(
+     hdrs = [
+         "extension_func_registrar.h",
+     ],
+-    copts = ["-std=c++14"],
++    copts = ["-std=c++17"],
+     deps = [
+         ":cel_function",
+         ":cel_function_adapter",
+@@ -226,7 +226,7 @@ cc_library(
+     hdrs = [
+         "cel_expression.h",
+     ],
+-    copts = ["-std=c++14"],
++    copts = ["-std=c++17"],
+     deps = [
+         ":activation",
+         ":cel_function",
+@@ -241,7 +241,7 @@ cc_library(
+     name = "source_position",
+     srcs = ["source_position.cc"],
+     hdrs = ["source_position.h"],
+-    copts = ["-std=c++14"],
++    copts = ["-std=c++17"],
+     deps = [
+         "@com_google_googleapis//google/api/expr/v1alpha1:syntax_cc_proto",
+         "@com_google_protobuf//:protobuf_lite",
+@@ -253,7 +253,7 @@ cc_library(
+     hdrs = [
+         "ast_visitor.h",
+     ],
+-    copts = ["-std=c++14"],
++    copts = ["-std=c++17"],
+     deps = [
+         ":source_position",
+         "@com_google_absl//absl/strings",
+@@ -266,7 +266,7 @@ cc_library(
+     hdrs = [
+         "ast_visitor_base.h",
+     ],
+-    copts = ["-std=c++14"],
++    copts = ["-std=c++17"],
+     deps = [
+         ":ast_visitor",
+         "@com_google_googleapis//google/api/expr/v1alpha1:syntax_cc_proto",
+@@ -281,7 +281,7 @@ cc_library(
+     hdrs = [
+         "ast_traverse.h",
+     ],
+-    copts = ["-std=c++14"],
++    copts = ["-std=c++17"],
+     deps = [
+         ":ast_visitor",
+         ":source_position",
+@@ -295,7 +295,7 @@ cc_library(
+     hdrs = [
+         "cel_options.h",
+     ],
+-    copts = ["-std=c++14"],
++    copts = ["-std=c++17"],
+     deps = [
+         "@com_google_protobuf//:protobuf",
+     ],
+@@ -309,7 +309,7 @@ cc_library(
+     hdrs = [
+         "cel_expr_builder_factory.h",
+     ],
+-    copts = ["-std=c++14"],
++    copts = ["-std=c++17"],
+     deps = [
+         ":cel_expression",
+         ":cel_options",
+@@ -325,7 +325,7 @@ cc_library(
+     hdrs = [
+         "value_export_util.h",
+     ],
+-    copts = ["-std=c++14"],
++    copts = ["-std=c++17"],
+     deps = [
+         ":cel_value",
+         "//base:status",
+@@ -338,7 +338,7 @@ cc_library(
+     name = "cel_function_registry",
+     srcs = ["cel_function_registry.cc"],
+     hdrs = ["cel_function_registry.h"],
+-    copts = ["-std=c++14"],
++    copts = ["-std=c++17"],
+     deps = [
+         ":cel_function",
+         ":cel_function_provider",
+@@ -355,7 +355,7 @@ cc_test(
+     srcs = [
+         "cel_value_test.cc",
+     ],
+-    copts = ["-std=c++14"],
++    copts = ["-std=c++17"],
+     deps = [
+         ":cel_value",
+         ":unknown_attribute_set",
+@@ -372,7 +372,7 @@ cc_test(
+     srcs = [
+         "cel_attribute_test.cc",
+     ],
+-    copts = ["-std=c++14"],
++    copts = ["-std=c++17"],
+     deps = [
+         ":cel_attribute",
+         ":cel_value",
+@@ -388,7 +388,7 @@ cc_test(
+     srcs = [
+         "activation_test.cc",
+     ],
+-    copts = ["-std=c++14"],
++    copts = ["-std=c++17"],
+     deps = [
+         ":activation",
+         ":cel_function",
+@@ -401,7 +401,7 @@ cc_test(
+     srcs = [
+         "ast_traverse_test.cc",
+     ],
+-    copts = ["-std=c++14"],
++    copts = ["-std=c++17"],
+     deps = [
+         ":ast_traverse",
+         "@com_github_google_googletest//:gtest_main",
+@@ -414,7 +414,7 @@ cc_test(
+     srcs = [
+         "activation_bind_helper_test.cc",
+     ],
+-    copts = ["-std=c++14"],
++    copts = ["-std=c++17"],
+     deps = [
+         ":activation",
+         ":activation_bind_helper",
+@@ -429,7 +429,7 @@ cc_test(
+     srcs = [
+         "cel_function_provider_test.cc",
+     ],
+-    copts = ["-std=c++14"],
++    copts = ["-std=c++17"],
+     deps = [
+         ":cel_function",
+         ":cel_function_provider",
+@@ -442,7 +442,7 @@ cc_test(
+     srcs = [
+         "cel_function_registry_test.cc",
+     ],
+-    copts = ["-std=c++14"],
++    copts = ["-std=c++17"],
+     deps = [
+         ":cel_function",
+         ":cel_function_provider",
+@@ -457,7 +457,7 @@ cc_test(
+     srcs = [
+         "cel_function_adapter_test.cc",
+     ],
+-    copts = ["-std=c++14"],
++    copts = ["-std=c++17"],
+     deps = [
+         ":cel_function",
+         ":cel_function_adapter",
+@@ -472,7 +472,7 @@ cc_test(
+     srcs = [
+         "builtin_func_test.cc",
+     ],
+-    copts = ["-std=c++14"],
++    copts = ["-std=c++17"],
+     deps = [
+         ":activation",
+         ":builtin_func_registrar",
+@@ -492,7 +492,7 @@ cc_test(
+     srcs = [
+         "extension_func_test.cc",
+     ],
+-    copts = ["-std=c++14"],
++    copts = ["-std=c++17"],
+     deps = [
+         ":builtin_func_registrar",
+         ":cel_function_registry",
+@@ -510,7 +510,7 @@ cc_test(
+     srcs = [
+         "source_position_test.cc",
+     ],
+-    copts = ["-std=c++14"],
++    copts = ["-std=c++17"],
+     deps = [
+         ":source_position",
+         "@com_github_google_googletest//:gtest_main",
+@@ -524,7 +524,7 @@ cc_test(
+     srcs = [
+         "unknown_attribute_set_test.cc",
+     ],
+-    copts = ["-std=c++14"],
++    copts = ["-std=c++17"],
+     deps = [
+         ":cel_attribute",
+         ":cel_value",
+@@ -541,7 +541,7 @@ cc_test(
+     srcs = [
+         "value_export_util_test.cc",
+     ],
+-    copts = ["-std=c++14"],
++    copts = ["-std=c++17"],
+     deps = [
+         ":cel_value",
+         ":value_export_util",
+diff --git a/eval/public/cel_value.h b/eval/public/cel_value.h
+index 173da9a..33cc51c 100644
+--- a/eval/public/cel_value.h
++++ b/eval/public/cel_value.h
+@@ -46,7 +46,7 @@ class CelValue {
+   template <int N>
+   class StringHolderBase {
+    public:
+-    StringHolderBase() : value_({}) {}
++    StringHolderBase() {}
+ 
+     StringHolderBase(const StringHolderBase &) = default;
+     StringHolderBase &operator=(const StringHolderBase &) = default;
+diff --git a/eval/tests/BUILD b/eval/tests/BUILD
+index 273f1a2..f8d5919 100644
+--- a/eval/tests/BUILD
++++ b/eval/tests/BUILD
+@@ -14,7 +14,7 @@ cc_test(
+     srcs = [
+         "benchmark_test.cc",
+     ],
+-    copts = ["-std=c++14"],
++    copts = ["-std=c++17"],
+     tags = ["manual"],
+     deps = [
+         ":request_context_cc_proto",
+@@ -39,7 +39,7 @@ cc_test(
+     srcs = [
+         "end_to_end_test.cc",
+     ],
+-    copts = ["-std=c++14"],
++    copts = ["-std=c++17"],
+     deps = [
+         "//eval/public:activation",
+         "//eval/public:builtin_func_registrar",
+diff --git a/internal/BUILD b/internal/BUILD
+index c6d2c7f..05e29f6 100644
+--- a/internal/BUILD
++++ b/internal/BUILD
+@@ -13,7 +13,7 @@ cc_library(
+     hdrs = [
+         "ref_countable.h",
+     ],
+-    copts = ["-std=c++14"],
++    copts = ["-std=c++17"],
+     deps = [
+         ":holder",
+         ":specialize",
+@@ -23,7 +23,7 @@ cc_library(
+ cc_test(
+     name = "ref_countable_test",
+     srcs = ["ref_countable_test.cc"],
+-    copts = ["-std=c++14"],
++    copts = ["-std=c++17"],
+     deps = [
+         ":ref_countable",
+         "//testutil:util",
+@@ -37,7 +37,7 @@ cc_library(
+     hdrs = [
+         "handle.h",
+     ],
+-    copts = ["-std=c++14"],
++    copts = ["-std=c++17"],
+     deps = [
+         ":hash_util",
+         ":specialize",
+@@ -47,7 +47,7 @@ cc_library(
+ cc_test(
+     name = "handle_test",
+     srcs = ["handle_test.cc"],
+-    copts = ["-std=c++14"],
++    copts = ["-std=c++17"],
+     deps = [
+         ":handle",
+         "@com_github_google_googletest//:gtest_main",
+@@ -60,7 +60,7 @@ cc_library(
+     hdrs = [
+         "holder.h",
+     ],
+-    copts = ["-std=c++14"],
++    copts = ["-std=c++17"],
+     deps = [
+         ":port",
+         ":specialize",
+@@ -72,7 +72,7 @@ cc_library(
+ cc_test(
+     name = "holder_test",
+     srcs = ["holder_test.cc"],
+-    copts = ["-std=c++14"],
++    copts = ["-std=c++17"],
+     deps = [
+         ":holder",
+         ":types",
+@@ -90,7 +90,7 @@ cc_library(
+     hdrs = [
+         "hash_util.h",
+     ],
+-    copts = ["-std=c++14"],
++    copts = ["-std=c++17"],
+     deps = [
+         ":port",
+         ":specialize",
+@@ -107,7 +107,7 @@ cc_library(
+     hdrs = [
+         "status_util.h",
+     ],
+-    copts = ["-std=c++14"],
++    copts = ["-std=c++17"],
+     deps = [
+         "@com_google_absl//absl/strings",
+         "@com_google_googleapis//google/rpc:code_cc_proto",
+@@ -120,7 +120,7 @@ cc_library(
+     hdrs = [
+         "visitor_util.h",
+     ],
+-    copts = ["-std=c++14"],
++    copts = ["-std=c++17"],
+     deps = [
+         ":specialize",
+         ":types",
+@@ -133,7 +133,7 @@ cc_library(
+ cc_test(
+     name = "visitor_util_test",
+     srcs = ["visitor_util_test.cc"],
+-    copts = ["-std=c++14"],
++    copts = ["-std=c++17"],
+     deps = [
+         ":adapter_util",
+         ":visitor_util",
+@@ -149,7 +149,7 @@ cc_library(
+     hdrs = [
+         "adapter_util.h",
+     ],
+-    copts = ["-std=c++14"],
++    copts = ["-std=c++17"],
+     deps = [
+         ":visitor_util",
+     ],
+@@ -161,7 +161,7 @@ cc_library(
+     hdrs = [
+         "cel_printer.h",
+     ],
+-    copts = ["-std=c++14"],
++    copts = ["-std=c++17"],
+     deps = [
+         ":specialize",
+         ":types",
+@@ -175,7 +175,7 @@ cc_library(
+ cc_test(
+     name = "cel_printer_test",
+     srcs = ["cel_printer_test.cc"],
+-    copts = ["-std=c++14"],
++    copts = ["-std=c++17"],
+     deps = [
+         ":cel_printer",
+         "@com_github_google_googletest//:gtest_main",
+@@ -186,7 +186,7 @@ cc_library(
+     name = "proto_util",
+     srcs = ["proto_util.cc"],
+     hdrs = ["proto_util.h"],
+-    copts = ["-std=c++14"],
++    copts = ["-std=c++17"],
+     deps = [
+         ":status_util",
+         "//common:macros",
+@@ -202,7 +202,7 @@ cc_library(
+     name = "map_impl",
+     srcs = ["map_impl.cc"],
+     hdrs = ["map_impl.h"],
+-    copts = ["-std=c++14"],
++    copts = ["-std=c++17"],
+     deps = [
+         ":status_util",
+         "//common:macros",
+@@ -214,7 +214,7 @@ cc_library(
+ cc_library(
+     name = "list_impl",
+     hdrs = ["list_impl.h"],
+-    copts = ["-std=c++14"],
++    copts = ["-std=c++17"],
+     deps = [
+         ":holder",
+         "//common:macros",
+@@ -225,7 +225,7 @@ cc_library(
+ cc_library(
+     name = "value_internal",
+     hdrs = ["value_internal.h"],
+-    copts = ["-std=c++14"],
++    copts = ["-std=c++17"],
+     deps = [
+         ":adapter_util",
+         ":cast",
+@@ -244,7 +244,7 @@ cc_library(
+ cc_test(
+     name = "value_internal_test",
+     srcs = ["value_internal_test.cc"],
+-    copts = ["-std=c++14"],
++    copts = ["-std=c++17"],
+     deps = [
+         ":value_internal",
+         "//testutil:util",
+@@ -257,19 +257,19 @@ cc_test(
+ cc_library(
+     name = "port",
+     hdrs = ["port.h"],
+-    copts = ["-std=c++14"],
++    copts = ["-std=c++17"],
+ )
+ 
+ cc_library(
+     name = "specialize",
+     hdrs = ["specialize.h"],
+-    copts = ["-std=c++14"],
++    copts = ["-std=c++17"],
+ )
+ 
+ cc_library(
+     name = "cast",
+     hdrs = ["cast.h"],
+-    copts = ["-std=c++14"],
++    copts = ["-std=c++17"],
+     deps = [
+         ":port",
+         ":specialize",
+@@ -282,7 +282,7 @@ cc_library(
+ cc_test(
+     name = "cast_test",
+     srcs = ["cast_test.cc"],
+-    copts = ["-std=c++14"],
++    copts = ["-std=c++17"],
+     deps = [
+         ":cast",
+         "@com_github_google_googletest//:gtest_main",
+@@ -294,7 +294,7 @@ cc_library(
+     hdrs = [
+         "types.h",
+     ],
+-    copts = ["-std=c++14"],
++    copts = ["-std=c++17"],
+     deps = [
+         ":port",
+         ":specialize",
+@@ -306,7 +306,7 @@ cc_library(
+ cc_test(
+     name = "types_test",
+     srcs = ["types_test.cc"],
+-    copts = ["-std=c++14"],
++    copts = ["-std=c++17"],
+     deps = [
+         ":types",
+         "@com_github_google_googletest//:gtest_main",
+diff --git a/parser/BUILD b/parser/BUILD
+index 3b634e5..90e7fc0 100644
+--- a/parser/BUILD
++++ b/parser/BUILD
+@@ -21,7 +21,7 @@ cc_library(
+     ],
+     copts = [
+         "-fexceptions",
+-        "-std=c++14",
++        "-std=c++17",
+     ],
+     deps = [
+         ":cel_cc_parser",
+@@ -44,7 +44,7 @@ cc_library(
+     ],
+     copts = [
+         "-fexceptions",
+-        "-std=c++14",
++        "-std=c++17",
+     ],
+     deps = [
+         ":source_factory",
+@@ -66,7 +66,7 @@ cc_library(
+     ],
+     copts = [
+         "-fexceptions",
+-        "-std=c++14",
++        "-std=c++17",
+     ],
+     deps = [
+         ":cel_cc_parser",
+@@ -94,7 +94,7 @@ cc_library(
+     ],
+     copts = [
+         "-fexceptions",
+-        "-std=c++14",
++        "-std=c++17",
+     ],
+     deps = [
+         ":cel_cc_parser",
+@@ -111,7 +111,7 @@ cc_library(
+ cc_test(
+     name = "parser_test",
+     srcs = ["parser_test.cc"],
+-    copts = ["-std=c++14"],
++    copts = ["-std=c++17"],
+     deps = [
+         ":parser",
+         "//common:escaping",
+diff --git a/protoutil/BUILD b/protoutil/BUILD
+index 0df1757..6993c8f 100644
+--- a/protoutil/BUILD
++++ b/protoutil/BUILD
+@@ -13,7 +13,7 @@ cc_library(
+     hdrs = [
+         "type_registry.h",
+     ],
+-    copts = ["-std=c++14"],
++    copts = ["-std=c++17"],
+     deps = [
+         "//common:macros",
+         "//common:parent_ref",
+@@ -30,7 +30,7 @@ cc_library(
+ cc_test(
+     name = "type_registry_test",
+     srcs = ["type_registry_test.cc"],
+-    copts = ["-std=c++14"],
++    copts = ["-std=c++17"],
+     deps = [
+         ":type_registry",
+         "//common:value",
+@@ -50,7 +50,7 @@ cc_library(
+     hdrs = [
+         "converters.h",
+     ],
+-    copts = ["-std=c++14"],
++    copts = ["-std=c++17"],
+     deps = [
+         ":type_registry",
+         "//common:macros",
+@@ -73,7 +73,7 @@ cc_library(
+ cc_test(
+     name = "converters_test",
+     srcs = ["converters_test.cc"],
+-    copts = ["-std=c++14"],
++    copts = ["-std=c++17"],
+     data = [
+         "@com_google_cel_spec//testdata",
+     ],
+diff --git a/testutil/BUILD b/testutil/BUILD
+index 0bf8e50..7305225 100644
+--- a/testutil/BUILD
++++ b/testutil/BUILD
+@@ -15,7 +15,7 @@ cc_library(
+     hdrs = [
+         "test_data_util.h",
+     ],
+-    copts = ["-std=c++14"],
++    copts = ["-std=c++17"],
+     deps = [
+         "//common:type",
+         "//common:value",
+@@ -44,7 +44,7 @@ cc_library(
+     hdrs = [
+         "test_data_io.h",
+     ],
+-    copts = ["-std=c++14"],
++    copts = ["-std=c++17"],
+     deps = [
+         "//internal:status_util",
+         "@com_github_google_googletest//:gtest_main",
+@@ -69,7 +69,7 @@ cc_binary(
+     srcs = [
+         "test_data_gen.cc",
+     ],
+-    copts = ["-std=c++14"],
++    copts = ["-std=c++17"],
+     deps = [
+         ":test_data_io",
+         ":test_data_util",
+@@ -87,7 +87,7 @@ cc_binary(
+ cc_test(
+     name = "test_data_test",
+     srcs = ["test_data_test.cc"],
+-    copts = ["-std=c++14"],
++    copts = ["-std=c++17"],
+     data = [
+         "@com_google_cel_spec//testdata",
+     ],
+@@ -105,7 +105,7 @@ cc_library(
+     hdrs = [
+         "util.h",
+     ],
+-    copts = ["-std=c++14"],
++    copts = ["-std=c++17"],
+     deps = [
+         "@com_github_google_googletest//:gtest_main",
+         "@com_google_protobuf//:protobuf",
+diff --git a/v1beta1/BUILD b/v1beta1/BUILD
+index 41c64d6..2480b94 100644
+--- a/v1beta1/BUILD
++++ b/v1beta1/BUILD
+@@ -15,7 +15,7 @@ cc_library(
+     hdrs = [
+         "converters.h",
+     ],
+-    copts = ["-std=c++14"],
++    copts = ["-std=c++17"],
+     deps = [
+         "//common:converters",
+         "//common:macros",
+@@ -37,7 +37,7 @@ cc_library(
+ cc_test(
+     name = "converters_test",
+     srcs = ["converters_test.cc"],
+-    copts = ["-std=c++14"],
++    copts = ["-std=c++17"],
+     data = [
+         "@com_google_cel_spec//testdata",
+     ],
