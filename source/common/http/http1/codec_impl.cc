@@ -25,12 +25,12 @@ namespace Http1 {
 namespace {
 
 struct Http1ResponseCodeDetailValues {
-  const std::string TooManyHeaders = "http1.too_many_headers";
-  const std::string HeadersTooLarge = "http1.headers_too_large";
-  const std::string HttpCodecError = "http1.codec_error";
-  const std::string InvalidCharacters = "http1.invalid_characters";
-  const std::string ConnectionHeaderSanitization = "http1.connection_header_bad";
-  const std::string InvalidUrl = "http1.invalid_url";
+  const absl::string_view TooManyHeaders = "http1.too_many_headers";
+  const absl::string_view HeadersTooLarge = "http1.headers_too_large";
+  const absl::string_view HttpCodecError = "http1.codec_error";
+  const absl::string_view InvalidCharacters = "http1.invalid_characters";
+  const absl::string_view ConnectionHeaderSanitization = "http1.connection_header_rejected";
+  const absl::string_view InvalidUrl = "http1.invalid_url";
 };
 
 using Http1ResponseCodeDetails = ConstSingleton<Http1ResponseCodeDetailValues>;
@@ -555,6 +555,7 @@ int ConnectionImpl::onHeadersCompleteBase() {
                      header_value);
       error_code_ = Http::Code::BadRequest;
       sendProtocolError(Http1ResponseCodeDetails::get().ConnectionHeaderSanitization);
+      throw CodecProtocolException("Invalid nominated headers in Connection.");
     }
   }
 
