@@ -271,10 +271,17 @@ Later, an API update may succeed at a new version **Y**:
 
 ACK and NACK semantics can be summarized as follows:
 
-- the xDS client should ACK or NACK every *DiscoveryResponse* received from the management server.
-- nonce from the *DiscoveryResponse* is included as response_nonce in the ACK or NACK.
-- ACK signifies successful configuration update and contains the version_info from the *DiscoveryResponse*.
-- NACK signifies unsuccessful configuration update and contains the previous (existing) version_info.
+- the xDS client should ACK or NACK every :ref:`DiscoveryResponse <envoy_api_msg_DiscoveryResponse>`
+  received from the management server.
+- Like all other requests, the nonce from the :ref:`DiscoveryResponse <envoy_api_msg_DiscoveryResponse>`
+  is sent as :ref:`response_nonce <envoy_api_field_DiscoveryRequest.response_nonce>`.
+  As described in :ref:`resource update <xds_protocol_resource_update>` the nonce is
+  used in certain race conditions to disambiguate between ACK and NACK.
+- ACK signifies successful configuration update and contains the
+  :ref:`version_info <envoy_api_field_DiscoveryResponse.version_info>` from the
+  :ref:`DiscoveryResponse <envoy_api_msg_DiscoveryResponse>`.
+- NACK signifies unsuccessful configuration update and contains the previous (existing)
+  :ref:`version_info <envoy_api_field_DiscoveryResponse.version_info>`.
 - only the NACK should populate the :ref:`error_detail <envoy_api_field_DiscoveryRequest.error_detail>`.
 
 Each stream has its own notion of versioning, there is no shared
