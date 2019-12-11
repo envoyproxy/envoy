@@ -46,6 +46,13 @@ bool cbsContainsU16(CBS& cbs, uint16_t n) {
   return false;
 }
 
+std::string lastCryptoError() {
+  char errbuf[256] = {0};
+
+  ERR_error_string_n(ERR_get_error(), errbuf, sizeof(errbuf));
+  return std::string(errbuf);
+}
+
 } // namespace
 
 ContextImpl::ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& config,
@@ -68,13 +75,13 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& c
     ctx.ssl_ctx_.reset(SSL_CTX_new(TLS_method()));
 
     int rc = SSL_CTX_set_app_data(ctx.ssl_ctx_.get(), this);
-    RELEASE_ASSERT(rc == 1, "");
+    RELEASE_ASSERT(rc == 1, lastCryptoError());
 
     rc = SSL_CTX_set_min_proto_version(ctx.ssl_ctx_.get(), config.minProtocolVersion());
-    RELEASE_ASSERT(rc == 1, "");
+    RELEASE_ASSERT(rc == 1, lastCryptoError());
 
     rc = SSL_CTX_set_max_proto_version(ctx.ssl_ctx_.get(), config.maxProtocolVersion());
-    RELEASE_ASSERT(rc == 1, "");
+    RELEASE_ASSERT(rc == 1, lastCryptoError());
 
     if (!SSL_CTX_set_strict_cipher_list(ctx.ssl_ctx_.get(), config.cipherSuites().c_str())) {
       std::vector<absl::string_view> ciphers =
@@ -758,17 +765,18 @@ ClientContextImpl::ClientContextImpl(Stats::Scope& scope,
     for (auto& ctx : tls_contexts_) {
       int rc = SSL_CTX_set_alpn_protos(ctx.ssl_ctx_.get(), &parsed_alpn_protocols_[0],
                                        parsed_alpn_protocols_.size());
-      RELEASE_ASSERT(rc == 0, "");
+      RELEASE_ASSERT(rc == 0, lastCryptoError());
     }
   }
 
   if (!config.signingAlgorithmsForTest().empty()) {
-    const uint16_t sigalgs = parseSigningAlgorithmsForTest(config.signingAlgorithmsForTest());
-    RELEASE_ASSERT(sigalgs != 0, "");
+    const auto sigalgs = parseSigningAlgorithmsForTest(config.signingAlgorithmsForTest());
+    RELEASE_ASSERT(sigalgs.has_value(), fmt::format("unsupported signing algorithm {}",
+                                                    config.signingAlgorithmsForTest()));
 
     for (auto& ctx : tls_contexts_) {
-      int rc = SSL_CTX_set_verify_algorithm_prefs(ctx.ssl_ctx_.get(), &sigalgs, 1);
-      RELEASE_ASSERT(rc == 1, "");
+      int rc = SSL_CTX_set_verify_algorithm_prefs(ctx.ssl_ctx_.get(), &sigalgs.value(), 1);
+      RELEASE_ASSERT(rc == 1, lastCryptoError());
     }
   }
 
@@ -794,7 +802,7 @@ bssl::UniquePtr<SSL> ClientContextImpl::newSsl(const Network::TransportSocketOpt
 
   if (!server_name_indication.empty()) {
     int rc = SSL_set_tlsext_host_name(ssl_con.get(), server_name_indication.c_str());
-    RELEASE_ASSERT(rc, "");
+    RELEASE_ASSERT(rc, lastCryptoError());
   }
 
   if (options && !options->verifySubjectAltNameListOverride().empty()) {
@@ -808,7 +816,7 @@ bssl::UniquePtr<SSL> ClientContextImpl::newSsl(const Network::TransportSocketOpt
     if (!parsed_override_alpn.empty()) {
       int rc = SSL_set_alpn_protos(ssl_con.get(), parsed_override_alpn.data(),
                                    parsed_override_alpn.size());
-      RELEASE_ASSERT(rc == 0, "");
+      RELEASE_ASSERT(rc == 0, lastCryptoError());
     }
   }
 
@@ -861,7 +869,8 @@ int ClientContextImpl::newSessionKey(SSL_SESSION* session) {
   return 1; // Tell BoringSSL that we took ownership of the session.
 }
 
-uint16_t ClientContextImpl::parseSigningAlgorithmsForTest(const std::string& sigalgs) {
+absl::optional<uint16_t>
+ClientContextImpl::parseSigningAlgorithmsForTest(const std::string& sigalgs) {
   // This is used only when testing RSA/ECDSA certificate selection, so only the signing algorithms
   // used in tests are supported here.
   if (sigalgs == "rsa_pss_rsae_sha256") {
@@ -869,7 +878,8 @@ uint16_t ClientContextImpl::parseSigningAlgorithmsForTest(const std::string& sig
   } else if (sigalgs == "ecdsa_secp256r1_sha256") {
     return SSL_SIGN_ECDSA_SECP256R1_SHA256;
   }
-  return 0;
+
+  return absl::optional<uint16_t>();
 }
 
 ServerContextImpl::ServerContextImpl(Stats::Scope& scope,
@@ -929,7 +939,7 @@ ServerContextImpl::ServerContextImpl(Stats::Scope& scope,
 
     int rc = SSL_CTX_set_session_id_context(ctx.ssl_ctx_.get(), session_context_buf,
                                             session_context_len);
-    RELEASE_ASSERT(rc == 1, "");
+    RELEASE_ASSERT(rc == 1, lastCryptoError());
   }
 }
 
@@ -938,7 +948,7 @@ void ServerContextImpl::generateHashForSessionContexId(const std::vector<std::st
                                                        unsigned& session_context_len) {
   EVP_MD_CTX md;
   int rc = EVP_DigestInit(&md, EVP_sha256());
-  RELEASE_ASSERT(rc == 1, "");
+  RELEASE_ASSERT(rc == 1, lastCryptoError());
 
   // Hash the CommonName/SANs of all the server certificates. This makes sure that sessions can only
   // be resumed to certificate(s) for the same name(s), but allows resuming to unique certs in the
@@ -947,18 +957,18 @@ void ServerContextImpl::generateHashForSessionContexId(const std::vector<std::st
   // chain for resumption purposes.
   for (const auto& ctx : tls_contexts_) {
     X509* cert = SSL_CTX_get0_certificate(ctx.ssl_ctx_.get());
-    RELEASE_ASSERT(cert != nullptr, "");
+    RELEASE_ASSERT(cert != nullptr, "TLS context should have an active certificate");
     X509_NAME* cert_subject = X509_get_subject_name(cert);
-    RELEASE_ASSERT(cert_subject != nullptr, "");
+    RELEASE_ASSERT(cert_subject != nullptr, "TLS certificate should have a subject");
     int cn_index = X509_NAME_get_index_by_NID(cert_subject, NID_commonName, -1);
     // It's possible that the certificate doesn't have CommonName, but has SANs.
     if (cn_index >= 0) {
       X509_NAME_ENTRY* cn_entry = X509_NAME_get_entry(cert_subject, cn_index);
-      RELEASE_ASSERT(cn_entry != nullptr, "");
+      RELEASE_ASSERT(cn_entry != nullptr, "certificate subject CN should be present");
       ASN1_STRING* cn_asn1 = X509_NAME_ENTRY_get_data(cn_entry);
       RELEASE_ASSERT(ASN1_STRING_length(cn_asn1) > 0, "");
       rc = EVP_DigestUpdate(&md, ASN1_STRING_data(cn_asn1), ASN1_STRING_length(cn_asn1));
-      RELEASE_ASSERT(rc == 1, "");
+      RELEASE_ASSERT(rc == 1, lastCryptoError());
     }
 
     bssl::UniquePtr<GENERAL_NAMES> san_names(static_cast<GENERAL_NAMES*>(
@@ -967,7 +977,7 @@ void ServerContextImpl::generateHashForSessionContexId(const std::vector<std::st
       for (const GENERAL_NAME* san : san_names.get()) {
         if (san->type == GEN_DNS || san->type == GEN_URI) {
           rc = EVP_DigestUpdate(&md, ASN1_STRING_data(san->d.ia5), ASN1_STRING_length(san->d.ia5));
-          RELEASE_ASSERT(rc == 1, "");
+          RELEASE_ASSERT(rc == 1, lastCryptoError());
         }
       }
     } else {
@@ -980,7 +990,7 @@ void ServerContextImpl::generateHashForSessionContexId(const std::vector<std::st
         X509_NAME_digest(cert_issuer_name, EVP_sha256(), session_context_buf, &session_context_len);
     RELEASE_ASSERT(rc == 1 && session_context_len == SHA256_DIGEST_LENGTH, "");
     rc = EVP_DigestUpdate(&md, session_context_buf, session_context_len);
-    RELEASE_ASSERT(rc == 1, "");
+    RELEASE_ASSERT(rc == 1, lastCryptoError());
   }
 
   // Hash all the settings that affect whether the server will allow/accept
@@ -991,12 +1001,12 @@ void ServerContextImpl::generateHashForSessionContexId(const std::vector<std::st
     rc = X509_digest(ca_cert_.get(), EVP_sha256(), session_context_buf, &session_context_len);
     RELEASE_ASSERT(rc == 1 && session_context_len == SHA256_DIGEST_LENGTH, "");
     rc = EVP_DigestUpdate(&md, session_context_buf, session_context_len);
-    RELEASE_ASSERT(rc == 1, "");
+    RELEASE_ASSERT(rc == 1, lastCryptoError());
 
     // verify_subject_alt_name_list_ can only be set with a ca_cert
     for (const std::string& name : verify_subject_alt_name_list_) {
       rc = EVP_DigestUpdate(&md, name.data(), name.size());
-      RELEASE_ASSERT(rc == 1, "");
+      RELEASE_ASSERT(rc == 1, lastCryptoError());
     }
   }
 
@@ -1004,25 +1014,25 @@ void ServerContextImpl::generateHashForSessionContexId(const std::vector<std::st
     rc = EVP_DigestUpdate(&md, hash.data(),
                           hash.size() *
                               sizeof(std::remove_reference<decltype(hash)>::type::value_type));
-    RELEASE_ASSERT(rc == 1, "");
+    RELEASE_ASSERT(rc == 1, lastCryptoError());
   }
 
   for (const auto& hash : verify_certificate_spki_list_) {
     rc = EVP_DigestUpdate(&md, hash.data(),
                           hash.size() *
                               sizeof(std::remove_reference<decltype(hash)>::type::value_type));
-    RELEASE_ASSERT(rc == 1, "");
+    RELEASE_ASSERT(rc == 1, lastCryptoError());
   }
 
   // Hash configured SNIs for this context, so that sessions cannot be resumed across different
   // filter chains, even when using the same server certificate.
   for (const auto& name : server_names) {
     rc = EVP_DigestUpdate(&md, name.data(), name.size());
-    RELEASE_ASSERT(rc == 1, "");
+    RELEASE_ASSERT(rc == 1, lastCryptoError());
   }
 
   rc = EVP_DigestFinal(&md, session_context_buf, &session_context_len);
-  RELEASE_ASSERT(rc == 1, "");
+  RELEASE_ASSERT(rc == 1, lastCryptoError());
 }
 
 int ServerContextImpl::sessionTicketProcess(SSL*, uint8_t* key_name, uint8_t* iv,
