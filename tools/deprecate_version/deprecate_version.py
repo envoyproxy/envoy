@@ -154,7 +154,7 @@ def GetRuntimeAndPr():
           if not found_test_feature_true:
             # The script depends on the cc file having the true runtime block
             # before the false runtime block.  Fail if one isn't found.
-            print ('Failed to find test_feature_true.  Script needs fixing')
+            print('Failed to find test_feature_true.  Script needs fixing')
             sys.exit(1)
           return features_to_flip
         if runtime_guard == 'envoy.reloadable_features.test_feature_true':
@@ -168,7 +168,7 @@ def GetRuntimeAndPr():
               (removable and 'and is safe to remove' or 'is not ready to remove'))
         if removable:
           features_to_flip.append((runtime_guard, pr))
-  print ('Failed to find test_feature_false.  Script needs fixing')
+  print('Failed to find test_feature_false.  Script needs fixing')
   sys.exit(1)
 
 
