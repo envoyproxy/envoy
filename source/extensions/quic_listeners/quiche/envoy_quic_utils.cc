@@ -1,6 +1,6 @@
 #include "extensions/quic_listeners/quiche/envoy_quic_utils.h"
 
-#include <sys/socket.h>
+#include "envoy/common/platform.h"
 
 #include "envoy/api/v2/core/base.pb.h"
 
