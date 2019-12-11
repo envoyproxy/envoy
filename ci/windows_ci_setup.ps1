@@ -6,7 +6,14 @@ mkdir "$env:TOOLS_BIN_DIR"
 
 $wc = New-Object System.Net.WebClient
 $wc.DownloadFile("https://github.com/bazelbuild/bazelisk/releases/download/v1.0/bazelisk-windows-amd64.exe", "$env:TOOLS_BIN_DIR\bazel.exe")
+$wc.DownloadFile("https://github.com/ninja-build/ninja/releases/download/v1.9.0/ninja-win.zip", "$env:TOOLS_BIN_DIR\ninja-win.zip")
 
-# Install ninja.
-$choco = "$Env:ProgramData/chocolatey/choco.exe"
-iex "$choco install -y -f --acceptlicense --no-progress ninja"
+Add-Type -AssemblyName System.IO.Compression.FileSystem
+function Unzip
+{
+    param([string]$zipfile, [string]$outpath)
+
+    [System.IO.Compression.ZipFile]::ExtractToDirectory($zipfile, $outpath)
+}
+
+Unzip "$env:TOOLS_BIN_DIR\ninja-win.zip" "$env:TOOLS_BIN_DIR"
