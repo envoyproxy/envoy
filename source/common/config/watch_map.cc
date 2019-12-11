@@ -131,6 +131,9 @@ void WatchMap::onConfigUpdate(
     const Protobuf::RepeatedPtrField<envoy::api::v2::Resource>& added_resources,
     const Protobuf::RepeatedPtrField<std::string>& removed_resources,
     const std::string& system_version_info) {
+  // When an on-demand request is made a Watch is created using an alias, as the resource name isn't
+  // known at that point. When an update containing aliases comes back, we update Watches with
+  // resource names.
   for (const auto& r : added_resources) {
     if (r.aliases_size() > 0) {
       convertAliasWatchToNameWatch(r);

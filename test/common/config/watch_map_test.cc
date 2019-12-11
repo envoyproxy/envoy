@@ -27,26 +27,11 @@ public:
   }
 };
 
-// expectDeltaAndSotwUpdate() EXPECTs two birds with one function call: we want to cover both SotW
-// and delta, which, while mechanically different, can behave identically for our testing purposes.
-// Specifically, as a simplification for these tests, every still-present resource is updated in
-// every update. Therefore, a resource can never show up in the SotW update but not the delta
-// update. We can therefore use the same expected_resources for both.
-void expectDeltaAndSotwUpdate(
-    NamedMockSubscriptionCallbacks& callbacks,
-    const std::vector<envoy::api::v2::ClusterLoadAssignment>& expected_resources,
-    const std::vector<std::string>& expected_removals, const std::string& version) {
-  EXPECT_CALL(callbacks, onConfigUpdate(_, version))
-      .WillOnce(Invoke(
-          [expected_resources](const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& gotten_resources,
-                               const std::string&) {
-            EXPECT_EQ(expected_resources.size(), gotten_resources.size());
-            for (size_t i = 0; i < expected_resources.size(); i++) {
-              envoy::api::v2::ClusterLoadAssignment cur_gotten_resource;
-              gotten_resources[i].UnpackTo(&cur_gotten_resource);
-              EXPECT_TRUE(TestUtility::protoEqual(cur_gotten_resource, expected_resources[i]));
-            }
-          }));
+template <class T>
+void expectDeltaUpdate(MockSubscriptionCallbacks<T>& callbacks,
+                       const std::vector<T>& expected_resources,
+                       const std::vector<std::string>& expected_removals,
+                       const std::string& version) {
   EXPECT_CALL(callbacks, onConfigUpdate(_, _, _))
       .WillOnce(
           Invoke([expected_resources, expected_removals, version](
@@ -56,7 +41,7 @@ void expectDeltaAndSotwUpdate(
             EXPECT_EQ(expected_resources.size(), gotten_resources.size());
             for (size_t i = 0; i < expected_resources.size(); i++) {
               EXPECT_EQ(gotten_resources[i].version(), version);
-              envoy::api::v2::ClusterLoadAssignment cur_gotten_resource;
+              T cur_gotten_resource;
               gotten_resources[i].resource().UnpackTo(&cur_gotten_resource);
               EXPECT_TRUE(TestUtility::protoEqual(cur_gotten_resource, expected_resources[i]));
             }
@@ -65,6 +50,30 @@ void expectDeltaAndSotwUpdate(
               EXPECT_EQ(expected_removals[i], removed_resources[i]);
             }
           }));
+}
+
+// expectDeltaAndSotwUpdate() EXPECTs two birds with one function call: we want to cover both SotW
+// and delta, which, while mechanically different, can behave identically for our testing purposes.
+// Specifically, as a simplification for these tests, every still-present resource is updated in
+// every update. Therefore, a resource can never show up in the SotW update but not the delta
+// update. We can therefore use the same expected_resources for both.
+template <class T>
+void expectDeltaAndSotwUpdate(MockSubscriptionCallbacks<T>& callbacks,
+                              const std::vector<T>& expected_resources,
+                              const std::vector<std::string>& expected_removals,
+                              const std::string& version) {
+  EXPECT_CALL(callbacks, onConfigUpdate(_, version))
+      .WillOnce(Invoke(
+          [expected_resources](const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& gotten_resources,
+                               const std::string&) {
+            EXPECT_EQ(expected_resources.size(), gotten_resources.size());
+            for (size_t i = 0; i < expected_resources.size(); i++) {
+              T cur_gotten_resource;
+              gotten_resources[i].UnpackTo(&cur_gotten_resource);
+              EXPECT_TRUE(TestUtility::protoEqual(cur_gotten_resource, expected_resources[i]));
+            }
+          }));
+  expectDeltaUpdate<T>(callbacks, expected_resources, expected_removals, version);
 }
 
 void expectNoUpdate(NamedMockSubscriptionCallbacks& callbacks, const std::string& version) {
@@ -140,7 +149,8 @@ TEST(WatchMapTest, Basic) {
     std::vector<envoy::api::v2::ClusterLoadAssignment> expected_resources;
     expected_resources.push_back(bob);
 
-    expectDeltaAndSotwUpdate(callbacks, expected_resources, {}, "version1");
+    expectDeltaAndSotwUpdate<envoy::api::v2::ClusterLoadAssignment>(callbacks, expected_resources,
+                                                                    {}, "version1");
     doDeltaAndSotwUpdate(watch_map, updated_resources, {}, "version1");
   }
   {
@@ -167,7 +177,8 @@ TEST(WatchMapTest, Basic) {
     expected_resources.push_back(carol);
     expected_resources.push_back(dave);
 
-    expectDeltaAndSotwUpdate(callbacks, expected_resources, {"bob"}, "version2");
+    expectDeltaAndSotwUpdate<envoy::api::v2::ClusterLoadAssignment>(callbacks, expected_resources,
+                                                                    {"bob"}, "version2");
     doDeltaAndSotwUpdate(watch_map, updated_resources, {"bob"}, "version2");
   }
 }
@@ -200,7 +211,8 @@ TEST(WatchMapTest, Overlap) {
     watch_map.updateWatchInterest(watch2, {"dummy"});
 
     // *Only* first watch receives update.
-    expectDeltaAndSotwUpdate(callbacks1, {alice}, {}, "version1");
+    expectDeltaAndSotwUpdate<envoy::api::v2::ClusterLoadAssignment>(callbacks1, {alice}, {},
+                                                                    "version1");
     expectNoUpdate(callbacks2, "version1");
     doDeltaAndSotwUpdate(watch_map, updated_resources, {}, "version1");
   }
@@ -212,8 +224,10 @@ TEST(WatchMapTest, Overlap) {
     EXPECT_TRUE(added_removed.removed_.empty());
 
     // Both watches receive update.
-    expectDeltaAndSotwUpdate(callbacks1, {alice}, {}, "version2");
-    expectDeltaAndSotwUpdate(callbacks2, {alice}, {}, "version2");
+    expectDeltaAndSotwUpdate<envoy::api::v2::ClusterLoadAssignment>(callbacks1, {alice}, {},
+                                                                    "version2");
+    expectDeltaAndSotwUpdate<envoy::api::v2::ClusterLoadAssignment>(callbacks2, {alice}, {},
+                                                                    "version2");
     doDeltaAndSotwUpdate(watch_map, updated_resources, {}, "version2");
   }
   // First watch loses interest.
@@ -223,7 +237,8 @@ TEST(WatchMapTest, Overlap) {
     EXPECT_TRUE(added_removed.removed_.empty());
 
     // Both watches receive the update. For watch2, this is obviously desired.
-    expectDeltaAndSotwUpdate(callbacks2, {alice}, {}, "version3");
+    expectDeltaAndSotwUpdate<envoy::api::v2::ClusterLoadAssignment>(callbacks2, {alice}, {},
+                                                                    "version3");
     // For watch1, it's more subtle: the WatchMap sees that this update has no
     // resources watch1 cares about, but also knows that watch1 previously had
     // some resources. So, it must inform watch1 that it now has no resources.
@@ -266,7 +281,8 @@ TEST(WatchMapTest, AddRemoveAdd) {
     watch_map.updateWatchInterest(watch2, {"dummy"});
 
     // *Only* first watch receives update.
-    expectDeltaAndSotwUpdate(callbacks1, {alice}, {}, "version1");
+    expectDeltaAndSotwUpdate<envoy::api::v2::ClusterLoadAssignment>(callbacks1, {alice}, {},
+                                                                    "version1");
     expectNoUpdate(callbacks2, "version1");
     doDeltaAndSotwUpdate(watch_map, updated_resources, {}, "version1");
   }
@@ -287,7 +303,8 @@ TEST(WatchMapTest, AddRemoveAdd) {
     EXPECT_TRUE(added_removed.removed_.empty());
 
     // Both watches receive the update. For watch2, this is obviously desired.
-    expectDeltaAndSotwUpdate(callbacks2, {alice}, {}, "version2");
+    expectDeltaAndSotwUpdate<envoy::api::v2::ClusterLoadAssignment>(callbacks2, {alice}, {},
+                                                                    "version2");
     // For watch1, it's more subtle: the WatchMap sees that this update has no
     // resources watch1 cares about, but also knows that watch1 previously had
     // some resources. So, it must inform watch1 that it now has no resources.
@@ -320,12 +337,14 @@ TEST(WatchMapTest, UninterestingUpdate) {
   ::testing::Mock::VerifyAndClearExpectations(&callbacks);
 
   // The server sends an update adding alice and removing bob. We pay attention only to alice.
-  expectDeltaAndSotwUpdate(callbacks, {alice}, {}, "version2");
+  expectDeltaAndSotwUpdate<envoy::api::v2::ClusterLoadAssignment>(callbacks, {alice}, {},
+                                                                  "version2");
   doDeltaAndSotwUpdate(watch_map, alice_update, {}, "version2");
   ::testing::Mock::VerifyAndClearExpectations(&callbacks);
 
   // The server sends an update removing alice and adding bob. We pay attention only to alice.
-  expectDeltaAndSotwUpdate(callbacks, {}, {"alice"}, "version3");
+  expectDeltaAndSotwUpdate<envoy::api::v2::ClusterLoadAssignment>(callbacks, {}, {"alice"},
+                                                                  "version3");
   doDeltaAndSotwUpdate(watch_map, bob_update, {"alice"}, "version3");
   ::testing::Mock::VerifyAndClearExpectations(&callbacks);
 
@@ -362,8 +381,10 @@ TEST(WatchMapTest, WatchingEverything) {
   std::vector<envoy::api::v2::ClusterLoadAssignment> expected_resources2;
   expected_resources2.push_back(alice);
 
-  expectDeltaAndSotwUpdate(callbacks1, expected_resources1, {}, "version1");
-  expectDeltaAndSotwUpdate(callbacks2, expected_resources2, {}, "version1");
+  expectDeltaAndSotwUpdate<envoy::api::v2::ClusterLoadAssignment>(callbacks1, expected_resources1,
+                                                                  {}, "version1");
+  expectDeltaAndSotwUpdate<envoy::api::v2::ClusterLoadAssignment>(callbacks2, expected_resources2,
+                                                                  {}, "version1");
   doDeltaAndSotwUpdate(watch_map, updated_resources, {}, "version1");
 }
 
@@ -392,8 +413,10 @@ TEST(WatchMapTest, DeltaOnConfigUpdate) {
     envoy::api::v2::ClusterLoadAssignment will_be_removed_later;
     will_be_removed_later.set_cluster_name("removed");
     prepare_removed.Add()->PackFrom(will_be_removed_later);
-    expectDeltaAndSotwUpdate(callbacks2, {will_be_removed_later}, {}, "version0");
-    expectDeltaAndSotwUpdate(callbacks3, {will_be_removed_later}, {}, "version0");
+    expectDeltaAndSotwUpdate<envoy::api::v2::ClusterLoadAssignment>(
+        callbacks2, {will_be_removed_later}, {}, "version0");
+    expectDeltaAndSotwUpdate<envoy::api::v2::ClusterLoadAssignment>(
+        callbacks3, {will_be_removed_later}, {}, "version0");
     doDeltaAndSotwUpdate(watch_map, prepare_removed, {}, "version0");
   }
 
@@ -402,9 +425,12 @@ TEST(WatchMapTest, DeltaOnConfigUpdate) {
   updated.set_cluster_name("updated");
   update.Add()->PackFrom(updated);
 
-  expectDeltaAndSotwUpdate(callbacks1, {updated}, {}, "version1");          // only update
-  expectDeltaAndSotwUpdate(callbacks2, {updated}, {"removed"}, "version1"); // update+remove
-  expectDeltaAndSotwUpdate(callbacks3, {}, {"removed"}, "version1");        // only remove
+  expectDeltaAndSotwUpdate<envoy::api::v2::ClusterLoadAssignment>(callbacks1, {updated}, {},
+                                                                  "version1"); // only update
+  expectDeltaAndSotwUpdate<envoy::api::v2::ClusterLoadAssignment>(
+      callbacks2, {updated}, {"removed"}, "version1"); // update+remove
+  expectDeltaAndSotwUpdate<envoy::api::v2::ClusterLoadAssignment>(callbacks3, {}, {"removed"},
+                                                                  "version1"); // only remove
   doDeltaAndSotwUpdate(watch_map, update, {"removed"}, "version1");
 }
 
@@ -421,6 +447,55 @@ TEST(WatchMapTest, OnConfigUpdateFailed) {
   EXPECT_CALL(callbacks1, onConfigUpdateFailed(ConfigUpdateFailureReason::UpdateRejected, nullptr));
   EXPECT_CALL(callbacks2, onConfigUpdateFailed(ConfigUpdateFailureReason::UpdateRejected, nullptr));
   watch_map.onConfigUpdateFailed(ConfigUpdateFailureReason::UpdateRejected, nullptr);
+}
+
+// Delta onConfigUpdate that comes in response to an on-demand request updates the watch that was
+// originally created with an alias with resource's name This test verifies this behaviour.
+TEST(WatchMapTest, DeltaOnConfigUpdateWithAliases) {
+  MockSubscriptionCallbacks<envoy::api::v2::route::VirtualHost> callbacks1;
+  WatchMap watch_map;
+  Watch* watch1 = watch_map.addWatch(callbacks1);
+  watch_map.updateWatchInterest(watch1, {"domain1.test"});
+
+  Protobuf::RepeatedPtrField<ProtobufWkt::Any> update;
+  envoy::api::v2::route::VirtualHost vhost;
+  vhost.set_name("vhost_1");
+  vhost.add_domains("domain1.test");
+  vhost.add_domains("domain2.test");
+  update.Add()->PackFrom(vhost);
+  auto resources = wrapInResource(update, "version1");
+  resources.at(0).add_aliases("domain1.test");
+  resources.at(0).add_aliases("domain2.test");
+
+  expectDeltaUpdate<envoy::api::v2::route::VirtualHost>(callbacks1, {vhost}, {}, "version1");
+  watch_map.onConfigUpdate(resources, {}, "version1");
+}
+
+// Delta onConfigUpdate that comes in response to an on-demand request that couldn't be resolved
+// will contain an empty Resource with the aliases field populated with the alias originally used in
+// the request. This test verifies handling of such replies
+TEST(WatchMapTest, DeltaOnConfigUpdateWithEmptyResourcesWithAliases) {
+  MockSubscriptionCallbacks<envoy::api::v2::route::VirtualHost> callbacks1;
+  WatchMap watch_map;
+  Watch* watch1 = watch_map.addWatch(callbacks1);
+  watch_map.updateWatchInterest(watch1, {"domain1.test"});
+
+  Protobuf::RepeatedPtrField<envoy::api::v2::Resource> resource_not_found;
+  auto* cur_resource = resource_not_found.Add();
+  cur_resource->set_name("not-found");
+  cur_resource->add_aliases("domain1.test");
+
+  EXPECT_CALL(callbacks1, onConfigUpdate(_, _, _))
+      .WillOnce(
+          Invoke([](const Protobuf::RepeatedPtrField<envoy::api::v2::Resource>& added_resources,
+                    const Protobuf::RepeatedPtrField<std::string>&, const std::string&) {
+            EXPECT_EQ(1, added_resources.size());
+            const auto& resource = added_resources.at(0);
+            EXPECT_EQ(1, resource.aliases_size());
+            EXPECT_EQ("domain1.test", resource.aliases(0));
+          }));
+
+  watch_map.onConfigUpdate(resource_not_found, {}, "version1");
 }
 
 } // namespace
