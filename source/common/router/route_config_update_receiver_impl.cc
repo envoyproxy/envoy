@@ -28,7 +28,8 @@ bool RouteConfigUpdateReceiverImpl::onRdsUpdate(const envoy::api::v2::RouteConfi
   return true;
 }
 
-void RouteConfigUpdateReceiverImpl::onUpdateCommon(const envoy::api::v2::RouteConfiguration& rc, const std::string& version_info) {
+void RouteConfigUpdateReceiverImpl::onUpdateCommon(const envoy::api::v2::RouteConfiguration& rc,
+                                                   const std::string& version_info) {
   last_config_version_ = version_info;
   last_updated_ = time_source_.systemTime();
   rebuildRouteConfig(rds_virtual_hosts_, vhds_virtual_hosts_, route_config_proto_);

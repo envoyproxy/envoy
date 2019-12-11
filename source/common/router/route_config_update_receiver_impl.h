@@ -27,11 +27,13 @@ public:
                     const Protobuf::RepeatedPtrField<std::string>& removed_vhost_names);
   bool updateVhosts(std::map<std::string, envoy::api::v2::route::VirtualHost>& vhosts,
                     const Protobuf::RepeatedPtrField<envoy::api::v2::Resource>& added_resources);
-  void rebuildRouteConfig(const std::map<std::string, envoy::api::v2::route::VirtualHost>& rds_vhosts,
-                          const std::map<std::string, envoy::api::v2::route::VirtualHost>& vhds_vhosts,
-                              envoy::api::v2::RouteConfiguration& route_config);
+  void
+  rebuildRouteConfig(const std::map<std::string, envoy::api::v2::route::VirtualHost>& rds_vhosts,
+                     const std::map<std::string, envoy::api::v2::route::VirtualHost>& vhds_vhosts,
+                     envoy::api::v2::RouteConfiguration& route_config);
   bool aliasResolutionFailed(const envoy::api::v2::Resource& resource) const;
-  void onUpdateCommon(const envoy::api::v2::RouteConfiguration& rc, const std::string& version_info);
+  void onUpdateCommon(const envoy::api::v2::RouteConfiguration& rc,
+                      const std::string& version_info);
 
   // Router::RouteConfigUpdateReceiver
   bool onRdsUpdate(const envoy::api::v2::RouteConfiguration& rc,

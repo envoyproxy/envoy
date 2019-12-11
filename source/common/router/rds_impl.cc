@@ -294,7 +294,8 @@ void RdsRouteConfigProviderImpl::validateConfig(
 void RdsRouteConfigProviderImpl::requestVirtualHostsUpdate(
     const std::string& for_domain,
     Http::RouteConfigUpdatedCallbackSharedPtr route_config_updated_cb) {
-  auto alias = VhdsSubscription::domainNameToAlias(config_update_info_->routeConfigName(), for_domain);
+  auto alias =
+      VhdsSubscription::domainNameToAlias(config_update_info_->routeConfigName(), for_domain);
   factory_context_.dispatcher().post(
       [this, alias]() -> void { subscription_->updateOnDemand(alias); });
   config_update_callbacks_->getTyped<ThreadLocalCallbacks>().callbacks_.push_back(

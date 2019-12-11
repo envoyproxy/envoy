@@ -353,8 +353,7 @@ public:
   bool use_rds_with_vhosts{false};
 };
 
-INSTANTIATE_TEST_SUITE_P(IpVersionsClientType, VhdsIntegrationTest,
-                         GRPC_CLIENT_INTEGRATION_PARAMS);
+INSTANTIATE_TEST_SUITE_P(IpVersionsClientType, VhdsIntegrationTest, GRPC_CLIENT_INTEGRATION_PARAMS);
 
 TEST_P(VhdsIntegrationTest, RdsUpdateWithoutVHDSChangesDoesNotRestartVHDS) {
   testRouterHeaderOnlyRequestAndResponse(nullptr, 1, "/", "host");
@@ -414,9 +413,9 @@ TEST_P(VhdsIntegrationTest, VhdsVirtualHostAddUpdateRemove) {
   EXPECT_TRUE(compareDeltaDiscoveryRequest(Config::TypeUrl::get().VirtualHost,
                                            {vhdsRequestResourceName("vhost.first")}, {},
                                            vhds_stream_));
-  sendDeltaDiscoveryResponse<envoy::api::v2::route::VirtualHost>(Config::TypeUrl::get().VirtualHost,
-                                                                 {buildVirtualHost2()}, {}, "4",
-                                                                 vhds_stream_, {"my_route/vhost.first"});
+  sendDeltaDiscoveryResponse<envoy::api::v2::route::VirtualHost>(
+      Config::TypeUrl::get().VirtualHost, {buildVirtualHost2()}, {}, "4", vhds_stream_,
+      {"my_route/vhost.first"});
 
   waitForNextUpstreamRequest(1);
   // Send response headers, and end_stream if there is no response body.
@@ -481,9 +480,9 @@ TEST_P(VhdsIntegrationTest, RdsWithVirtualHostsVhdsVirtualHostAddUpdateRemove) {
   EXPECT_TRUE(compareDeltaDiscoveryRequest(Config::TypeUrl::get().VirtualHost,
                                            {vhdsRequestResourceName("vhost.first")}, {},
                                            vhds_stream_));
-  sendDeltaDiscoveryResponse<envoy::api::v2::route::VirtualHost>(Config::TypeUrl::get().VirtualHost,
-                                                                 {buildVirtualHost2()}, {}, "4",
-                                                                 vhds_stream_, {"my_route/vhost.first"});
+  sendDeltaDiscoveryResponse<envoy::api::v2::route::VirtualHost>(
+      Config::TypeUrl::get().VirtualHost, {buildVirtualHost2()}, {}, "4", vhds_stream_,
+      {"my_route/vhost.first"});
 
   waitForNextUpstreamRequest(1);
   // Send response headers, and end_stream if there is no response body.
