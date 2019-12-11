@@ -182,7 +182,7 @@ public:
 
 class TestShadowPolicy : public ShadowPolicy {
 public:
-  TestShadowPolicy(const std::string& cluster = "", const std::string& runtime_key = "",
+  TestShadowPolicy(absl::string_view cluster = "", absl::string_view runtime_key = "",
                    envoy::type::FractionalPercent default_value = {})
       : cluster_(cluster), runtime_key_(runtime_key), default_value_(default_value) {}
   // Router::ShadowPolicy
