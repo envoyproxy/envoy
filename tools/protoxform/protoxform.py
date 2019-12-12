@@ -206,6 +206,8 @@ def FormatHeaderFromFile(source_code_info, file_proto):
     elif d in ['udpa/annotations/versioning.proto']:
       # Skip, we decide to add this based on requires_versioning_import
       pass
+    elif d in ['udpa/annotations/migrate.proto']:
+      infra_imports.append(d)
     else:
       misc_imports.append(d)
 
