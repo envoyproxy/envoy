@@ -2,9 +2,9 @@ syntax = "proto3";
 
 package envoy.api.v3alpha;
 
+option java_package = "io.envoyproxy.envoy.api.v3alpha";
 option java_outer_classname = "LdsProto";
 option java_multiple_files = true;
-option java_package = "io.envoyproxy.envoy.api.v3alpha";
 option java_generic_services = true;
 
 import "envoy/api/v3alpha/core/address.proto";
@@ -17,6 +17,8 @@ import "envoy/config/listener/v2/api_listener.proto";
 import "google/api/annotations.proto";
 import "google/protobuf/duration.proto";
 import "google/protobuf/wrappers.proto";
+
+import "udpa/annotations/versioning.proto";
 
 import "validate/validate.proto";
 
@@ -35,15 +37,15 @@ service ListenerDiscoveryService {
   }
 
   rpc FetchListeners(DiscoveryRequest) returns (DiscoveryResponse) {
-    option (google.api.http) = {
-      post: "/v3alpha/discovery:listeners"
-      body: "*"
-    };
+    option (google.api.http).post = "/v3alpha/discovery:listeners";
+    option (google.api.http).body = "*";
   }
 }
 
-// [#next-free-field: 21]
+// [#next-free-field: 22]
 message Listener {
+  option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.Listener";
+
   enum DrainType {
     // Drain in response to calling /healthcheck/fail admin endpoint (along with the health check
     // filter), listener removal/modification, and hot restart.
@@ -57,6 +59,9 @@ message Listener {
 
   // [#not-implemented-hide:]
   message DeprecatedV1 {
+    option (udpa.annotations.versioning).previous_message_type =
+        "envoy.api.v2.Listener.DeprecatedV1";
+
     // Whether the listener should bind to the port. A listener that doesn't
     // bind can only receive connections redirected from other listeners that
     // set use_original_dst parameter to true. Default is true.
@@ -72,6 +77,9 @@ message Listener {
 
   // Configuration for listener connection balancing.
   message ConnectionBalanceConfig {
+    option (udpa.annotations.versioning).previous_message_type =
+        "envoy.api.v2.Listener.ConnectionBalanceConfig";
+
     // A connection balancer implementation that does exact balancing. This means that a lock is
     // held during balancing so that connection counts are nearly exactly balanced between worker
     // threads. This is "nearly" exact in the sense that a connection might close in parallel thus
@@ -79,6 +87,8 @@ message Listener {
     // sacrifices accept throughput for accuracy and should be used when there are a small number of
     // connections that rarely cycle (e.g., service mesh gRPC egress).
     message ExactBalance {
+      option (udpa.annotations.versioning).previous_message_type =
+          "envoy.api.v2.Listener.ConnectionBalanceConfig.ExactBalance";
     }
 
     oneof balance_type {
@@ -223,4 +233,17 @@ message Listener {
   // If no configuration is specified, Envoy will not attempt to balance active connections between
   // worker threads.
   ConnectionBalanceConfig connection_balance_config = 20;
+
+  // When this flag is set to true, listeners set the *SO_REUSEPORT* socket option and
+  // create one socket for each worker thread. This makes inbound connections
+  // distribute among worker threads roughly evenly in cases where there are a high number
+  // of connections. When this flag is set to false, all worker threads share one socket.
+  // For UDP this flag is set to true forcibly.
+  //
+  // Before Linux v4.19-rc1, new TCP connections may be rejected during hot restart
+  // (see `3rd paragraph in 'soreuseport' commit message
+  // <https://github.com/torvalds/linux/commit/c617f398edd4db2b8567a28e89>`_).
+  // This issue was fixed by `tcp: Avoid TCP syncookie rejected by SO_REUSEPORT socket
+  // <https://github.com/torvalds/linux/commit/40a1227ea845a37ab197dd1caffb60b047fa36b1>`_.
+  bool reuse_port = 21;
 }

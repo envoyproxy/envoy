@@ -117,6 +117,11 @@ config_setting(
 )
 
 config_setting(
+    name = "msan_build",
+    values = {"define": "ENVOY_CONFIG_MSAN=1"},
+)
+
+config_setting(
     name = "coverage_build",
     values = {"define": "ENVOY_CONFIG_COVERAGE=1"},
 )

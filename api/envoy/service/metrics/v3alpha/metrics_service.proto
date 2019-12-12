@@ -2,14 +2,15 @@ syntax = "proto3";
 
 package envoy.service.metrics.v3alpha;
 
+option java_package = "io.envoyproxy.envoy.service.metrics.v3alpha";
 option java_outer_classname = "MetricsServiceProto";
 option java_multiple_files = true;
-option java_package = "io.envoyproxy.envoy.service.metrics.v3alpha";
 option java_generic_services = true;
 
 import "envoy/api/v3alpha/core/base.proto";
 
 import "metrics.proto";
+import "udpa/annotations/versioning.proto";
 
 import "validate/validate.proto";
 
@@ -23,10 +24,18 @@ service MetricsService {
 }
 
 message StreamMetricsResponse {
+  option (udpa.annotations.versioning).previous_message_type =
+      "envoy.service.metrics.v2.StreamMetricsResponse";
 }
 
 message StreamMetricsMessage {
+  option (udpa.annotations.versioning).previous_message_type =
+      "envoy.service.metrics.v2.StreamMetricsMessage";
+
   message Identifier {
+    option (udpa.annotations.versioning).previous_message_type =
+        "envoy.service.metrics.v2.StreamMetricsMessage.Identifier";
+
     // The node sending metrics over the stream.
     api.v3alpha.core.Node node = 1 [(validate.rules).message = {required: true}];
   }

@@ -61,6 +61,19 @@ public:
   std::unique_ptr<RoundRobinLoadBalancer> lb_;
 };
 
+class LeastRequestTester : public BaseTester {
+public:
+  LeastRequestTester(uint64_t num_hosts, uint32_t choice_count) : BaseTester(num_hosts) {
+    envoy::api::v2::Cluster::LeastRequestLbConfig lr_lb_config;
+    lr_lb_config.mutable_choice_count()->set_value(choice_count);
+    lb_ =
+        std::make_unique<LeastRequestLoadBalancer>(priority_set_, &local_priority_set_, stats_,
+                                                   runtime_, random_, common_config_, lr_lb_config);
+  }
+
+  std::unique_ptr<LeastRequestLoadBalancer> lb_;
+};
+
 void BM_RoundRobinLoadBalancerBuild(benchmark::State& state) {
   for (auto _ : state) {
     state.PauseTiming();
@@ -211,6 +224,36 @@ void computeHitStats(benchmark::State& state,
   state.counters["stddev_hits"] = stddev;
   state.counters["relative_stddev_hits"] = (stddev / mean);
 }
+
+void BM_LeastRequestLoadBalancerChooseHost(benchmark::State& state) {
+  for (auto _ : state) {
+    state.PauseTiming();
+    const uint64_t num_hosts = state.range(0);
+    const uint64_t choice_count = state.range(1);
+    const uint64_t keys_to_simulate = state.range(2);
+    LeastRequestTester tester(num_hosts, choice_count);
+    std::unordered_map<std::string, uint64_t> hit_counter;
+    TestLoadBalancerContext context;
+    state.ResumeTiming();
+
+    for (uint64_t i = 0; i < keys_to_simulate; ++i) {
+      hit_counter[tester.lb_->chooseHost(&context)->address()->asString()] += 1;
+    }
+
+    // Do not time computation of mean, standard deviation, and relative standard deviation.
+    state.PauseTiming();
+    computeHitStats(state, hit_counter);
+    state.ResumeTiming();
+  }
+}
+BENCHMARK(BM_LeastRequestLoadBalancerChooseHost)
+    ->Args({100, 1, 1000000})
+    ->Args({100, 2, 1000000})
+    ->Args({100, 3, 1000000})
+    ->Args({100, 10, 1000000})
+    ->Args({100, 50, 1000000})
+    ->Args({100, 100, 1000000})
+    ->Unit(benchmark::kMillisecond);
 
 void BM_RingHashLoadBalancerChooseHost(benchmark::State& state) {
   for (auto _ : state) {

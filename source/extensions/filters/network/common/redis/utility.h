@@ -16,6 +16,8 @@ public:
   AuthRequest(const std::string& password);
 };
 
+RespValuePtr makeError(const std::string& error);
+
 class ReadOnlyRequest : public Redis::RespValue {
 public:
   ReadOnlyRequest();

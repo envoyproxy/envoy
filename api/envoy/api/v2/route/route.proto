@@ -2,21 +2,23 @@ syntax = "proto3";
 
 package envoy.api.v2.route;
 
+option java_package = "io.envoyproxy.envoy.api.v2.route";
 option java_outer_classname = "RouteProto";
 option java_multiple_files = true;
-option java_package = "io.envoyproxy.envoy.api.v2.route";
 
 import "envoy/api/v2/core/base.proto";
 import "envoy/type/matcher/regex.proto";
 import "envoy/type/matcher/string.proto";
 import "envoy/type/percent.proto";
 import "envoy/type/range.proto";
+import "envoy/type/tracing/v2/custom_tag.proto";
 
 import "google/protobuf/any.proto";
 import "google/protobuf/duration.proto";
 import "google/protobuf/struct.proto";
 import "google/protobuf/wrappers.proto";
 
+import "udpa/annotations/migrate.proto";
 import "validate/validate.proto";
 
 // [#protodoc-title: HTTP route]
@@ -380,7 +382,7 @@ message RouteMatch {
     // .. attention::
     //   This field has been deprecated in favor of `safe_regex` as it is not safe for use with
     //   untrusted input in all cases.
-    string regex = 3 [(validate.rules).string = {max_bytes: 1024}, deprecated = true];
+    string regex = 3 [deprecated = true, (validate.rules).string = {max_bytes: 1024}];
 
     // If specified, the route is a regular expression rule meaning that the
     // regex must match the *:path* header once the query string is removed. The entire path
@@ -463,7 +465,7 @@ message CorsPolicy {
   //   This field has been deprecated in favor of `allow_origin_string_match` as it is not safe for
   //   use with untrusted input in all cases.
   repeated string allow_origin_regex = 8
-      [(validate.rules).repeated = {items {string {max_bytes: 1024}}}, deprecated = true];
+      [deprecated = true, (validate.rules).repeated = {items {string {max_bytes: 1024}}}];
 
   // Specifies string patterns that match allowed origins. An origin is allowed if any of the
   // string matchers match.
@@ -572,6 +574,7 @@ message RouteAction {
 
   // Specifies the route's hashing policy if the upstream cluster uses a hashing :ref:`load balancer
   // <arch_overview_load_balancing_types>`.
+  // [#next-free-field: 6]
   message HashPolicy {
     message Header {
       // The name of the request header that will be used to obtain the hash
@@ -614,6 +617,13 @@ message RouteAction {
       bool source_ip = 1;
     }
 
+    message QueryParameter {
+      // The name of the URL query parameter that will be used to obtain the hash
+      // key. If the parameter is not present, no hash will be produced. Query
+      // parameter names are case-sensitive.
+      string name = 1 [(validate.rules).string = {min_bytes: 1}];
+    }
+
     oneof policy_specifier {
       option (validate.required) = true;
 
@@ -625,6 +635,9 @@ message RouteAction {
 
       // Connection properties hash policy.
       ConnectionProperties connection_properties = 3;
+
+      // Query parameter hash policy.
+      QueryParameter query_parameter = 5;
     }
 
     // The flag that short-circuits the hash computing. This field provides a
@@ -737,9 +750,7 @@ message RouteAction {
   oneof host_rewrite_specifier {
     // Indicates that during forwarding, the host header will be swapped with
     // this value.
-    //
-    // [#next-major-version: host_rewrite_literal]
-    string host_rewrite = 6;
+    string host_rewrite = 6 [(udpa.annotations.field_migrate).rename = "host_rewrite_literal"];
 
     // Indicates that during forwarding, the host header will be swapped with
     // the hostname of the upstream host chosen by the cluster manager. This
@@ -756,9 +767,8 @@ message RouteAction {
     //
     //   Pay attention to the potential security implications of using this option. Provided header
     //   must come from trusted source.
-    //
-    // [#next-major-version: host_rewrite_header]
-    string auto_host_rewrite_header = 29;
+    string auto_host_rewrite_header = 29
+        [(udpa.annotations.field_migrate).rename = "host_rewrite_header"];
   }
 
   // Specifies the upstream timeout for the route. If not specified, the default is 15s. This
@@ -1100,6 +1110,14 @@ message Tracing {
   // :ref:`HTTP Connection Manager <config_http_conn_man_runtime>`.
   // Default: 100%
   type.FractionalPercent overall_sampling = 3;
+
+  // A list of custom tags with unique tag name to create tags for the active span.
+  // It will take effect after merging with the :ref:`corresponding configuration
+  // <envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.tracing.custom_tags>`
+  // configured in the HTTP connection manager. If two tags with the same name are configured
+  // each in the HTTP connection manager and the route level, the one configured here takes
+  // priority.
+  repeated type.tracing.v2.CustomTag custom_tags = 4;
 }
 
 // A virtual cluster is a way of specifying a regex matching rule against
@@ -1133,7 +1151,7 @@ message VirtualCluster {
   // .. attention::
   //   This field has been deprecated in favor of `headers` as it is not safe for use with
   //   untrusted input in all cases.
-  string pattern = 1 [(validate.rules).string = {max_bytes: 1024}, deprecated = true];
+  string pattern = 1 [deprecated = true, (validate.rules).string = {max_bytes: 1024}];
 
   // Specifies a list of header matchers to use for matching requests. Each specified header must
   // match. The pseudo-headers `:path` and `:method` can be used to match the request path and
@@ -1338,7 +1356,7 @@ message HeaderMatcher {
     // .. attention::
     //   This field has been deprecated in favor of `safe_regex_match` as it is not safe for use
     //   with untrusted input in all cases.
-    string regex_match = 5 [(validate.rules).string = {max_bytes: 1024}, deprecated = true];
+    string regex_match = 5 [deprecated = true, (validate.rules).string = {max_bytes: 1024}];
 
     // If specified, this regex string is a regular expression rule which implies the entire request
     // header value must match the regex. The rule will not match if only a subsequence of the

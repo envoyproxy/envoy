@@ -2,11 +2,13 @@ syntax = "proto3";
 
 package envoy.api.v3alpha.core;
 
+option java_package = "io.envoyproxy.envoy.api.v3alpha.core";
 option java_outer_classname = "HttpUriProto";
 option java_multiple_files = true;
-option java_package = "io.envoyproxy.envoy.api.v3alpha.core";
 
 import "google/protobuf/duration.proto";
+
+import "udpa/annotations/versioning.proto";
 
 import "validate/validate.proto";
 
@@ -14,6 +16,8 @@ import "validate/validate.proto";
 
 // Envoy external URI descriptor
 message HttpUri {
+  option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.core.HttpUri";
+
   // The HTTP server URI. It should be a full FQDN with protocol, host and path.
   //
   // Example:

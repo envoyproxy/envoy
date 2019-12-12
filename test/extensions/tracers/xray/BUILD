@@ -16,6 +16,7 @@ envoy_extension_cc_test(
     name = "xray_test",
     srcs = [
         "localized_sampling_test.cc",
+        "tracer_test.cc",
         "util_test.cc",
         "xray_tracer_impl_test.cc",
     ],

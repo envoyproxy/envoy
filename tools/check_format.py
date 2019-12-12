@@ -308,6 +308,12 @@ def whitelistedForGrpcInit(file_path):
   return file_path in GRPC_INIT_WHITELIST
 
 
+def whitelistedForUnpackTo(file_path):
+  return file_path.startswith("./test") or file_path in [
+      "./source/common/protobuf/utility.cc", "./source/common/protobuf/utility.h"
+  ]
+
+
 def findSubstringAndReturnError(pattern, file_path, error_message):
   text = readFile(file_path)
   if pattern in text:
@@ -500,6 +506,9 @@ def checkSourceLine(line, file_path, reportError):
        "std::chrono::system_clock::now" in line or "std::chrono::steady_clock::now" in line or \
        "std::this_thread::sleep_for" in line or hasCondVarWaitFor(line):
       reportError("Don't reference real-world time sources from production code; use injection")
+  if not whitelistedForUnpackTo(file_path):
+    if "UnpackTo" in line:
+      reportError("Don't use UnpackTo() directly, use MessageUtil::unpackTo() instead")
   # Check that we use the absl::Time library
   if "std::get_time" in line:
     if "test/" in file_path:
@@ -852,7 +861,10 @@ if __name__ == "__main__":
   namespace_check = args.namespace_check
   namespace_check_excluded_paths = args.namespace_check_excluded_paths
   build_fixer_check_excluded_paths = args.build_fixer_check_excluded_paths + [
-      "./bazel/external/", "./bazel/toolchains/", "./bazel/BUILD"
+      "./bazel/external/",
+      "./bazel/toolchains/",
+      "./bazel/BUILD",
+      "./tools/clang_tools",
   ]
   include_dir_order = args.include_dir_order
   if args.add_excluded_prefixes:
@@ -867,6 +879,11 @@ if __name__ == "__main__":
   # error_messages.
   def ownedDirectories(error_messages):
     owned = []
+    maintainers = [
+        '@mattklein123', '@htuch', '@alyssawilk', '@zuercher', '@lizan', '@snowp', '@junr03',
+        '@dnoe', '@dio', '@jmarantz'
+    ]
+
     try:
       with open('./CODEOWNERS') as f:
         for line in f:
@@ -879,6 +896,11 @@ if __name__ == "__main__":
             if len(owners) < 2:
               error_messages.append("Extensions require at least 2 owners in CODEOWNERS:\n"
                                     "    {}".format(line))
+            maintainer = len(set(owners).intersection(set(maintainers))) > 0
+            if not maintainer:
+              error_messages.append("Extensions require at least one maintainer OWNER:\n"
+                                    "    {}".format(line))
+
       return owned
     except IOError:
       return []  # for the check format tests.
