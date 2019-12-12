@@ -2,9 +2,9 @@ syntax = "proto3";
 
 package envoy.api.v2.endpoint;
 
+option java_package = "io.envoyproxy.envoy.api.v2.endpoint";
 option java_outer_classname = "EndpointProto";
 option java_multiple_files = true;
-option java_package = "io.envoyproxy.envoy.api.v2.endpoint";
 
 import "envoy/api/v2/core/address.proto";
 import "envoy/api/v2/core/base.proto";
@@ -57,6 +57,7 @@ message LbEndpoint {
   oneof host_identifier {
     Endpoint endpoint = 1;
 
+    // [#not-implemented-hide:]
     string endpoint_name = 5;
   }
 

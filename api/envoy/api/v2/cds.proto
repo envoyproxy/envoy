@@ -2,9 +2,9 @@ syntax = "proto3";
 
 package envoy.api.v2;
 
+option java_package = "io.envoyproxy.envoy.api.v2";
 option java_outer_classname = "CdsProto";
 option java_multiple_files = true;
-option java_package = "io.envoyproxy.envoy.api.v2";
 option java_generic_services = true;
 
 import "envoy/api/v2/auth/cert.proto";
@@ -39,15 +39,13 @@ service ClusterDiscoveryService {
   }
 
   rpc FetchClusters(DiscoveryRequest) returns (DiscoveryResponse) {
-    option (google.api.http) = {
-      post: "/v2/discovery:clusters"
-      body: "*"
-    };
+    option (google.api.http).post = "/v2/discovery:clusters";
+    option (google.api.http).body = "*";
   }
 }
 
 // Configuration for a single upstream cluster.
-// [#next-free-field: 45]
+// [#next-free-field: 46]
 message Cluster {
   // Refer to :ref:`service discovery type <arch_overview_service_discovery_types>`
   // for an explanation on each type.
@@ -222,6 +220,13 @@ message Cluster {
         // If DEFAULT_SUBSET is selected, load balancing is performed over the
         // endpoints matching the values from the default_subset field.
         DEFAULT_SUBSET = 3;
+
+        // If KEYS_SUBSET is selected, subset selector matching is performed again with metadata
+        // keys reduced to
+        // :ref:`fallback_keys_subset<envoy_api_field_Cluster.LbSubsetConfig.LbSubsetSelector.fallback_keys_subset>`.
+        // It allows for a fallback to a different, less specific selector if some of the keys of
+        // the selector are considered optional.
+        KEYS_SUBSET = 4;
       }
 
       // List of keys to match with the weighted cluster metadata.
@@ -231,6 +236,17 @@ message Cluster {
       // metadata.
       LbSubsetSelectorFallbackPolicy fallback_policy = 2
           [(validate.rules).enum = {defined_only: true}];
+
+      // Subset of
+      // :ref:`keys<envoy_api_field_Cluster.LbSubsetConfig.LbSubsetSelector.keys>` used by
+      // :ref:`KEYS_SUBSET<envoy_api_enum_value_Cluster.LbSubsetConfig.LbSubsetSelector.LbSubsetSelectorFallbackPolicy.KEYS_SUBSET>`
+      // fallback policy.
+      // It has to be a non empty list if KEYS_SUBSET fallback policy is selected.
+      // For any other fallback policy the parameter is not used and should not be set.
+      // Only values also present in
+      // :ref:`keys<envoy_api_field_Cluster.LbSubsetConfig.LbSubsetSelector.keys>` are allowed, but
+      // `fallback_keys_subset` cannot be equal to `keys`.
+      repeated string fallback_keys_subset = 3;
     }
 
     // The behavior used when no endpoint subset matches the selected route's
@@ -664,6 +680,10 @@ message Cluster {
   // and :ref:`LOGICAL_DNS<envoy_api_enum_value_Cluster.DiscoveryType.LOGICAL_DNS>`
   // this setting is ignored.
   repeated core.Address dns_resolvers = 18;
+
+  // [#next-major-version: Reconcile DNS options in a single message.]
+  // Always use TCP queries instead of UDP queries for DNS lookups.
+  bool use_tcp_for_dns_lookups = 45;
 
   // If specified, outlier detection will be enabled for this upstream cluster.
   // Each of the configuration values can be overridden via

@@ -2,9 +2,9 @@ syntax = "proto3";
 
 package envoy.api.v3alpha;
 
+option java_package = "io.envoyproxy.envoy.api.v3alpha";
 option java_outer_classname = "CdsProto";
 option java_multiple_files = true;
-option java_package = "io.envoyproxy.envoy.api.v3alpha";
 option java_generic_services = true;
 
 import "envoy/api/v3alpha/cluster/circuit_breaker.proto";
@@ -25,6 +25,8 @@ import "google/protobuf/duration.proto";
 import "google/protobuf/struct.proto";
 import "google/protobuf/wrappers.proto";
 
+import "udpa/annotations/versioning.proto";
+
 import "validate/validate.proto";
 
 // [#protodoc-title: Clusters]
@@ -38,16 +40,16 @@ service ClusterDiscoveryService {
   }
 
   rpc FetchClusters(DiscoveryRequest) returns (DiscoveryResponse) {
-    option (google.api.http) = {
-      post: "/v3alpha/discovery:clusters"
-      body: "*"
-    };
+    option (google.api.http).post = "/v3alpha/discovery:clusters";
+    option (google.api.http).body = "*";
   }
 }
 
 // Configuration for a single upstream cluster.
-// [#next-free-field: 45]
+// [#next-free-field: 46]
 message Cluster {
+  option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.Cluster";
+
   // Refer to :ref:`service discovery type <arch_overview_service_discovery_types>`
   // for an explanation on each type.
   enum DiscoveryType {
@@ -149,6 +151,9 @@ message Cluster {
   // TransportSocketMatch specifies what transport socket config will be used
   // when the match conditions are satisfied.
   message TransportSocketMatch {
+    option (udpa.annotations.versioning).previous_message_type =
+        "envoy.api.v2.Cluster.TransportSocketMatch";
+
     // The name of the match, used in stats generation.
     string name = 1 [(validate.rules).string = {min_len: 1}];
 
@@ -165,6 +170,9 @@ message Cluster {
 
   // Extended cluster type.
   message CustomClusterType {
+    option (udpa.annotations.versioning).previous_message_type =
+        "envoy.api.v2.Cluster.CustomClusterType";
+
     // The type of the cluster to instantiate. The name must match a supported cluster type.
     string name = 1 [(validate.rules).string = {min_bytes: 1}];
 
@@ -175,6 +183,9 @@ message Cluster {
 
   // Only valid when discovery type is EDS.
   message EdsClusterConfig {
+    option (udpa.annotations.versioning).previous_message_type =
+        "envoy.api.v2.Cluster.EdsClusterConfig";
+
     // Configuration for the source of EDS updates for this Cluster.
     core.ConfigSource eds_config = 1;
 
@@ -188,6 +199,9 @@ message Cluster {
   // endpoint metadata and selected by route and weighted cluster metadata.
   // [#next-free-field: 8]
   message LbSubsetConfig {
+    option (udpa.annotations.versioning).previous_message_type =
+        "envoy.api.v2.Cluster.LbSubsetConfig";
+
     // If NO_FALLBACK is selected, a result
     // equivalent to no healthy hosts is reported. If ANY_ENDPOINT is selected,
     // any cluster endpoint may be returned (subject to policy, health checks,
@@ -201,6 +215,9 @@ message Cluster {
 
     // Specifications for subsets.
     message LbSubsetSelector {
+      option (udpa.annotations.versioning).previous_message_type =
+          "envoy.api.v2.Cluster.LbSubsetConfig.LbSubsetSelector";
+
       // Allows to override top level fallback policy per selector.
       enum LbSubsetSelectorFallbackPolicy {
         // If NOT_DEFINED top level config fallback policy is used instead.
@@ -216,6 +233,13 @@ message Cluster {
         // If DEFAULT_SUBSET is selected, load balancing is performed over the
         // endpoints matching the values from the default_subset field.
         DEFAULT_SUBSET = 3;
+
+        // If KEYS_SUBSET is selected, subset selector matching is performed again with metadata
+        // keys reduced to
+        // :ref:`fallback_keys_subset<envoy_api_field_api.v3alpha.Cluster.LbSubsetConfig.LbSubsetSelector.fallback_keys_subset>`.
+        // It allows for a fallback to a different, less specific selector if some of the keys of
+        // the selector are considered optional.
+        KEYS_SUBSET = 4;
       }
 
       // List of keys to match with the weighted cluster metadata.
@@ -225,6 +249,18 @@ message Cluster {
       // metadata.
       LbSubsetSelectorFallbackPolicy fallback_policy = 2
           [(validate.rules).enum = {defined_only: true}];
+
+      // Subset of
+      // :ref:`keys<envoy_api_field_api.v3alpha.Cluster.LbSubsetConfig.LbSubsetSelector.keys>` used
+      // by
+      // :ref:`KEYS_SUBSET<envoy_api_enum_value_api.v3alpha.Cluster.LbSubsetConfig.LbSubsetSelector.LbSubsetSelectorFallbackPolicy.KEYS_SUBSET>`
+      // fallback policy.
+      // It has to be a non empty list if KEYS_SUBSET fallback policy is selected.
+      // For any other fallback policy the parameter is not used and should not be set.
+      // Only values also present in
+      // :ref:`keys<envoy_api_field_api.v3alpha.Cluster.LbSubsetConfig.LbSubsetSelector.keys>` are
+      // allowed, but `fallback_keys_subset` cannot be equal to `keys`.
+      repeated string fallback_keys_subset = 3;
     }
 
     // The behavior used when no endpoint subset matches the selected route's
@@ -292,6 +328,9 @@ message Cluster {
 
   // Specific configuration for the LeastRequest load balancing policy.
   message LeastRequestLbConfig {
+    option (udpa.annotations.versioning).previous_message_type =
+        "envoy.api.v2.Cluster.LeastRequestLbConfig";
+
     // The number of random healthy hosts from which the host with the fewest active requests will
     // be chosen. Defaults to 2 so that we perform two-choice selection if the field is not set.
     google.protobuf.UInt32Value choice_count = 1 [(validate.rules).uint32 = {gte: 2}];
@@ -300,6 +339,9 @@ message Cluster {
   // Specific configuration for the :ref:`RingHash<arch_overview_load_balancing_types_ring_hash>`
   // load balancing policy.
   message RingHashLbConfig {
+    option (udpa.annotations.versioning).previous_message_type =
+        "envoy.api.v2.Cluster.RingHashLbConfig";
+
     // The hash function used to hash hosts onto the ketama ring.
     enum HashFunction {
       // Use `xxHash <https://github.com/Cyan4973/xxHash>`_, this is the default hash function.
@@ -333,6 +375,9 @@ message Cluster {
   // :ref:`Original Destination <arch_overview_load_balancing_types_original_destination>`
   // load balancing policy.
   message OriginalDstLbConfig {
+    option (udpa.annotations.versioning).previous_message_type =
+        "envoy.api.v2.Cluster.OriginalDstLbConfig";
+
     // When true, :ref:`x-envoy-original-dst-host
     // <config_http_conn_man_headers_x-envoy-original-dst-host>` can be used to override destination
     // address.
@@ -348,9 +393,15 @@ message Cluster {
   // Common configuration for all load balancer implementations.
   // [#next-free-field: 7]
   message CommonLbConfig {
+    option (udpa.annotations.versioning).previous_message_type =
+        "envoy.api.v2.Cluster.CommonLbConfig";
+
     // Configuration for :ref:`zone aware routing
     // <arch_overview_load_balancing_zone_aware_routing>`.
     message ZoneAwareLbConfig {
+      option (udpa.annotations.versioning).previous_message_type =
+          "envoy.api.v2.Cluster.CommonLbConfig.ZoneAwareLbConfig";
+
       // Configures percentage of requests that will be considered for zone aware routing
       // if zone aware routing is configured. If not specified, the default is 100%.
       // * :ref:`runtime values <config_cluster_manager_cluster_runtime_zone_routing>`.
@@ -374,6 +425,8 @@ message Cluster {
     // Configuration for :ref:`locality weighted load balancing
     // <arch_overview_load_balancing_locality_weighted_lb>`
     message LocalityWeightedLbConfig {
+      option (udpa.annotations.versioning).previous_message_type =
+          "envoy.api.v2.Cluster.CommonLbConfig.LocalityWeightedLbConfig";
     }
 
     // Configures the :ref:`healthy panic threshold <arch_overview_load_balancing_panic_threshold>`.
@@ -433,6 +486,8 @@ message Cluster {
   }
 
   message RefreshRate {
+    option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.Cluster.RefreshRate";
+
     // Specifies the base interval between refreshes. This parameter is required and must be greater
     // than zero and less than
     // :ref:`max_interval <envoy_api_field_api.v3alpha.Cluster.RefreshRate.max_interval>`.
@@ -648,6 +703,10 @@ message Cluster {
   // this setting is ignored.
   repeated core.Address dns_resolvers = 18;
 
+  // [#next-major-version: Reconcile DNS options in a single message.]
+  // Always use TCP queries instead of UDP queries for DNS lookups.
+  bool use_tcp_for_dns_lookups = 45;
+
   // If specified, outlier detection will be enabled for this upstream cluster.
   // Each of the configuration values can be overridden via
   // :ref:`runtime values <config_cluster_manager_cluster_runtime_outlier_detection>`.
@@ -787,7 +846,12 @@ message Cluster {
 // To facilitate this, the config message for the top-level LB policy may include a field of
 // type LoadBalancingPolicy that specifies the child policy.
 message LoadBalancingPolicy {
+  option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.LoadBalancingPolicy";
+
   message Policy {
+    option (udpa.annotations.versioning).previous_message_type =
+        "envoy.api.v2.LoadBalancingPolicy.Policy";
+
     reserved 2;
 
     reserved "config";
@@ -807,11 +871,16 @@ message LoadBalancingPolicy {
 // An extensible structure containing the address Envoy should bind to when
 // establishing upstream connections.
 message UpstreamBindConfig {
+  option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.UpstreamBindConfig";
+
   // The address Envoy should bind to when establishing upstream connections.
   core.Address source_address = 1;
 }
 
 message UpstreamConnectionOptions {
+  option (udpa.annotations.versioning).previous_message_type =
+      "envoy.api.v2.UpstreamConnectionOptions";
+
   // If set then set SO_KEEPALIVE on the socket to enable TCP Keepalives.
   core.TcpKeepalive tcp_keepalive = 1;
 }

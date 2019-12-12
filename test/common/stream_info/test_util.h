@@ -11,7 +11,7 @@ namespace Envoy {
 
 class TestStreamInfo : public StreamInfo::StreamInfo {
 public:
-  TestStreamInfo() {
+  TestStreamInfo() : filter_state_(Envoy::StreamInfo::FilterState::LifeSpan::FilterChain) {
     tm fake_time;
     memset(&fake_time, 0, sizeof(fake_time));
     fake_time.tm_year = 99; // tm < 1901-12-13 20:45:52 is not valid on macOS
@@ -49,6 +49,7 @@ public:
   void setResponseFlag(Envoy::StreamInfo::ResponseFlag response_flag) override {
     response_flags_ |= response_flag;
   }
+  uint64_t responseFlags() const override { return response_flags_; }
   void onUpstreamHostSelected(Upstream::HostDescriptionConstSharedPtr host) override {
     upstream_host_ = host;
   }
@@ -191,6 +192,10 @@ public:
     return upstream_transport_failure_reason_;
   }
 
+  void setRequestHeaders(const Http::HeaderMap& headers) override { request_headers_ = &headers; }
+
+  const Http::HeaderMap* getRequestHeaders() const override { return request_headers_; }
+
   Event::TimeSystem& timeSystem() { return test_time_.timeSystem(); }
 
   SystemTime start_time_;
@@ -220,10 +225,11 @@ public:
   Ssl::ConnectionInfoConstSharedPtr upstream_connection_info_;
   const Router::RouteEntry* route_entry_{};
   envoy::api::v2::core::Metadata metadata_{};
-  Envoy::StreamInfo::FilterStateImpl filter_state_{};
+  Envoy::StreamInfo::FilterStateImpl filter_state_;
   Envoy::StreamInfo::UpstreamTiming upstream_timing_;
   std::string requested_server_name_;
   std::string upstream_transport_failure_reason_;
+  const Http::HeaderMap* request_headers_{};
   DangerousDeprecatedTestTime test_time_;
 };
 

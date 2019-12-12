@@ -6,6 +6,7 @@
 #include "envoy/network/filter.h"
 #include "envoy/server/drain_manager.h"
 #include "envoy/server/filter_config.h"
+#include "envoy/server/listener_manager.h"
 #include "envoy/stats/scope.h"
 
 #include "common/common/logger.h"
@@ -13,10 +14,59 @@
 
 #include "server/filter_chain_manager_impl.h"
 
+#include "absl/base/call_once.h"
+
 namespace Envoy {
 namespace Server {
 
 class ListenerManagerImpl;
+
+class ListenSocketFactoryImpl : public Network::ListenSocketFactory,
+                                protected Logger::Loggable<Logger::Id::config> {
+public:
+  ListenSocketFactoryImpl(ListenerComponentFactory& factory,
+                          Network::Address::InstanceConstSharedPtr address,
+                          Network::Address::SocketType socket_type,
+                          const Network::Socket::OptionsSharedPtr& options, bool bind_to_port,
+                          const std::string& listener_name, bool reuse_port);
+
+  // Network::ListenSocketFactory
+  Network::Address::SocketType socketType() const override { return socket_type_; }
+  const Network::Address::InstanceConstSharedPtr& localAddress() const override {
+    return local_address_;
+  }
+
+  Network::SocketSharedPtr getListenSocket() override;
+
+  /**
+   * @return the socket shared by worker threads; otherwise return null.
+   */
+  absl::optional<std::reference_wrapper<Network::Socket>> sharedSocket() const override {
+    if (!reuse_port_) {
+      ASSERT(socket_ != nullptr);
+      return *socket_;
+    }
+    // If reuse_port is true, always return null, even socket_ is created for reserving
+    // port number.
+    return absl::nullopt;
+  }
+
+protected:
+  Network::SocketSharedPtr createListenSocketAndApplyOptions();
+
+private:
+  ListenerComponentFactory& factory_;
+  // Initially, its port number might be 0. Once a socket is created, its port
+  // will be set to the binding port.
+  Network::Address::InstanceConstSharedPtr local_address_;
+  Network::Address::SocketType socket_type_;
+  const Network::Socket::OptionsSharedPtr options_;
+  bool bind_to_port_;
+  const std::string& listener_name_;
+  const bool reuse_port_;
+  Network::SocketSharedPtr socket_;
+  absl::once_flag steal_once_;
+};
 
 // TODO(mattklein123): Consider getting rid of pre-worker start and post-worker start code by
 //                     initializing all listeners after workers are started.
@@ -65,22 +115,20 @@ public:
   }
 
   Network::Address::InstanceConstSharedPtr address() const { return address_; }
-  Network::Address::SocketType socketType() const { return socket_type_; }
-  const envoy::api::v2::Listener& config() { return config_; }
-  const Network::SocketSharedPtr& getSocket() const { return socket_; }
+  const envoy::api::v2::Listener& config() const { return config_; }
+  const Network::ListenSocketFactorySharedPtr& getSocketFactory() const { return socket_factory_; }
   void debugLog(const std::string& message);
   void initialize();
   DrainManager& localDrainManager() const { return *local_drain_manager_; }
-  void setSocket(const Network::SocketSharedPtr& socket);
+  void setSocketFactory(const Network::ListenSocketFactorySharedPtr& socket_factory);
   void setSocketAndOptions(const Network::SocketSharedPtr& socket);
   const Network::Socket::OptionsSharedPtr& listenSocketOptions() { return listen_socket_options_; }
-  const std::string& versionInfo() { return version_info_; }
+  const std::string& versionInfo() const { return version_info_; }
 
   // Network::ListenerConfig
   Network::FilterChainManager& filterChainManager() override { return filter_chain_manager_; }
   Network::FilterChainFactory& filterChainFactory() override { return *this; }
-  Network::Socket& socket() override { return *socket_; }
-  const Network::Socket& socket() const override { return *socket_; }
+  Network::ListenSocketFactory& listenSocketFactory() override { return *socket_factory_; }
   bool bindToPort() override { return bind_to_port_; }
   bool handOffRestoredDestinationConnections() const override {
     return hand_off_restored_destination_connections_;
@@ -143,7 +191,7 @@ public:
   bool createNetworkFilterChain(Network::Connection& connection,
                                 const std::vector<Network::FilterFactoryCb>& factories) override;
   bool createListenerFilterChain(Network::ListenerFilterManager& manager) override;
-  bool createUdpListenerFilterChain(Network::UdpListenerFilterManager& udp_listener,
+  void createUdpListenerFilterChain(Network::UdpListenerFilterManager& udp_listener,
                                     Network::UdpReadFilterCallbacks& callbacks) override;
 
   SystemTime last_updated_;
@@ -162,8 +210,7 @@ private:
   Network::Address::InstanceConstSharedPtr address_;
   FilterChainManagerImpl filter_chain_manager_;
 
-  Network::Address::SocketType socket_type_;
-  Network::SocketSharedPtr socket_;
+  Network::ListenSocketFactorySharedPtr socket_factory_;
   Stats::ScopePtr global_scope_;   // Stats with global named scope, but needed for LDS cleanup.
   Stats::ScopePtr listener_scope_; // Stats with listener named scope.
   const bool bind_to_port_;

@@ -27,11 +27,6 @@ public:
 
   /**
    * Log a completed request if the underlying AccessLog `filter_` allows it.
-   *
-   * Prior to logging, call refreshByteSize() on HeaderMaps to ensure that an accurate byte size
-   * count is logged.
-   * TODO(asraa): Remove refreshByteSize() requirement when entries in HeaderMap can no longer be
-   * modified by reference and HeaderMap holds an accurate internal byte size count.
    */
   void log(const Http::HeaderMap* request_headers, const Http::HeaderMap* response_headers,
            const Http::HeaderMap* response_trailers,

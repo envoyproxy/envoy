@@ -1,10 +1,7 @@
 #pragma once
 
-#include <netinet/in.h>
-#include <netinet/tcp.h>
-#include <sys/socket.h>
-
 #include "envoy/api/os_sys_calls.h"
+#include "envoy/common/platform.h"
 #include "envoy/network/listen_socket.h"
 
 #include "common/common/assert.h"
@@ -47,6 +44,12 @@ namespace Network {
 #define ENVOY_SOCKET_SO_MARK ENVOY_MAKE_SOCKET_OPTION_NAME(SOL_SOCKET, SO_MARK)
 #else
 #define ENVOY_SOCKET_SO_MARK Network::SocketOptionName()
+#endif
+
+#ifdef SO_REUSEPORT
+#define ENVOY_SOCKET_SO_REUSEPORT ENVOY_MAKE_SOCKET_OPTION_NAME(SOL_SOCKET, SO_REUSEPORT)
+#else
+#define ENVOY_SOCKET_SO_REUSEPORT Network::SocketOptionName()
 #endif
 
 #ifdef TCP_KEEPCNT

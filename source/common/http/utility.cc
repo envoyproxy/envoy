@@ -23,7 +23,10 @@
 #include "common/protobuf/utility.h"
 
 #include "absl/strings/match.h"
+#include "absl/strings/numbers.h"
 #include "absl/strings/str_cat.h"
+#include "absl/strings/str_split.h"
+#include "absl/strings/string_view.h"
 
 namespace Envoy {
 namespace Http {
@@ -72,17 +75,14 @@ void Utility::appendXff(HeaderMap& headers, const Network::Address::Instance& re
     return;
   }
 
-  HeaderString& header = headers.insertForwardedFor().value();
-  const std::string& address_as_string = remote_address.ip()->addressAsString();
-  HeaderMapImpl::appendToHeader(header, address_as_string.c_str());
+  headers.appendForwardedFor(remote_address.ip()->addressAsString(), ",");
 }
 
 void Utility::appendVia(HeaderMap& headers, const std::string& via) {
-  HeaderString& header = headers.insertVia().value();
-  if (!header.empty()) {
-    header.append(", ", 2);
-  }
-  header.append(via.c_str(), via.size());
+  // TODO(asraa): Investigate whether it is necessary to append with whitespace here by:
+  //     (a) Validating we do not expect whitespace in via headers
+  //     (b) Add runtime guarding in case users have upstreams which expect it.
+  headers.appendVia(via, ", ");
 }
 
 std::string Utility::createSslRedirectPath(const HeaderMap& headers) {
@@ -320,7 +320,7 @@ void Utility::sendLocalReply(
     if (!body_text.empty() && !is_head_request) {
       // TODO(dio): Probably it is worth to consider caching the encoded message based on gRPC
       // status.
-      response_headers->insertGrpcMessage().value(PercentEncoding::encode(body_text));
+      response_headers->setGrpcMessage(PercentEncoding::encode(body_text));
     }
     encode_headers(std::move(response_headers), true); // Trailers only response
     return;
@@ -329,8 +329,8 @@ void Utility::sendLocalReply(
   HeaderMapPtr response_headers{
       new HeaderMapImpl{{Headers::get().Status, std::to_string(enumToInt(response_code))}}};
   if (!body_text.empty()) {
-    response_headers->insertContentLength().value(body_text.size());
-    response_headers->insertContentType().value(Headers::get().ContentTypeValues.Text);
+    response_headers->setContentLength(body_text.size());
+    response_headers->setReferenceContentType(Headers::get().ContentTypeValues.Text);
   }
 
   if (is_head_request) {
@@ -387,6 +387,128 @@ Utility::getLastAddressFromXFF(const Http::HeaderMap& request_headers, uint32_t 
   }
 }
 
+bool Utility::sanitizeConnectionHeader(Http::HeaderMap& headers) {
+  static const size_t MAX_ALLOWED_NOMINATED_HEADERS = 10;
+  static const size_t MAX_ALLOWED_TE_VALUE_SIZE = 256;
+
+  // Remove any headers nominated by the Connection header. The TE header
+  // is sanitized and removed only if it's empty after removing unsupported values
+  // See https://github.com/envoyproxy/envoy/issues/8623
+  const auto& cv = Http::Headers::get().ConnectionValues;
+  const auto& connection_header_value = headers.Connection()->value();
+
+  StringUtil::CaseUnorderedSet headers_to_remove{};
+  std::vector<absl::string_view> connection_header_tokens =
+      StringUtil::splitToken(connection_header_value.getStringView(), ",", false);
+
+  // If we have 10 or more nominated headers, fail this request
+  if (connection_header_tokens.size() >= MAX_ALLOWED_NOMINATED_HEADERS) {
+    ENVOY_LOG_MISC(trace, "Too many nominated headers in request");
+    return false;
+  }
+
+  // Split the connection header and evaluate each nominated header
+  for (const auto& token : connection_header_tokens) {
+
+    const auto token_sv = StringUtil::trim(token);
+
+    // Build the LowerCaseString for header lookup
+    const LowerCaseString lcs_header_to_remove{std::string(token_sv)};
+
+    // If the Connection token value is not a nominated header, ignore it here since
+    // the connection header is removed elsewhere when the H1 request is upgraded to H2
+    if ((lcs_header_to_remove.get() == cv.Close) ||
+        (lcs_header_to_remove.get() == cv.Http2Settings) ||
+        (lcs_header_to_remove.get() == cv.KeepAlive) ||
+        (lcs_header_to_remove.get() == cv.Upgrade)) {
+      continue;
+    }
+
+    // By default we will remove any nominated headers
+    bool keep_header = false;
+
+    // Determine whether the nominated header contains invalid values
+    const HeaderEntry* nominated_header = NULL;
+
+    if (lcs_header_to_remove == Http::Headers::get().Connection) {
+      // Remove the connection header from the nominated tokens if it's self nominated
+      // The connection header itself is *not removed*
+      ENVOY_LOG_MISC(trace, "Skipping self nominated header [{}]", token_sv);
+      keep_header = true;
+      headers_to_remove.emplace(token_sv);
+
+    } else if ((lcs_header_to_remove == Http::Headers::get().ForwardedFor) ||
+               (lcs_header_to_remove == Http::Headers::get().ForwardedHost) ||
+               (lcs_header_to_remove == Http::Headers::get().ForwardedProto) ||
+               !token_sv.find(':')) {
+
+      // An attacker could nominate an X-Forwarded* header, and its removal may mask
+      // the origin of the incoming request and potentially alter its handling.
+      // Additionally, pseudo headers should never be nominated. In both cases, we
+      // should fail the request.
+      // See: https://nathandavison.com/blog/abusing-http-hop-by-hop-request-headers
+
+      ENVOY_LOG_MISC(trace, "Invalid nomination of {} header", token_sv);
+      return false;
+    } else {
+      // Examine the value of all other nominated headers
+      nominated_header = headers.get(lcs_header_to_remove);
+    }
+
+    if (nominated_header) {
+      auto nominated_header_value_sv = nominated_header->value().getStringView();
+
+      const bool is_te_header = (lcs_header_to_remove == Http::Headers::get().TE);
+
+      // reject the request if the TE header is too large
+      if (is_te_header && (nominated_header_value_sv.size() >= MAX_ALLOWED_TE_VALUE_SIZE)) {
+        ENVOY_LOG_MISC(trace, "TE header contains a value that exceeds the allowable length");
+        return false;
+      }
+
+      if (is_te_header) {
+        for (const auto& header_value :
+             StringUtil::splitToken(nominated_header_value_sv, ",", false)) {
+
+          const absl::string_view header_sv = StringUtil::trim(header_value);
+
+          // If trailers exist in the TE value tokens, keep the header, removing any other values
+          // that may exist
+          if (StringUtil::CaseInsensitiveCompare()(header_sv,
+                                                   Http::Headers::get().TEValues.Trailers)) {
+            keep_header = true;
+            break;
+          }
+        }
+
+        if (keep_header) {
+          headers.setTE(Http::Headers::get().TEValues.Trailers);
+        }
+      }
+    }
+
+    if (!keep_header) {
+      ENVOY_LOG_MISC(trace, "Removing nominated header [{}]", token_sv);
+      headers.remove(lcs_header_to_remove);
+      headers_to_remove.emplace(token_sv);
+    }
+  }
+
+  // Lastly remove extra nominated headers from the Connection header
+  if (!headers_to_remove.empty()) {
+    const std::string new_value = StringUtil::removeTokens(connection_header_value.getStringView(),
+                                                           ",", headers_to_remove, ",");
+
+    if (new_value.empty()) {
+      headers.removeConnection();
+    } else {
+      headers.setConnection(new_value);
+    }
+  }
+
+  return true;
+}
+
 const std::string& Utility::getProtocolString(const Protocol protocol) {
   switch (protocol) {
   case Protocol::Http10:
@@ -435,8 +557,8 @@ MessagePtr Utility::prepareHeaders(const ::envoy::api::v2::core::HttpUri& http_u
   extractHostPathFromUri(http_uri.uri(), host, path);
 
   MessagePtr message(new RequestMessageImpl());
-  message->headers().insertPath().value(path.data(), path.size());
-  message->headers().insertHost().value(host.data(), host.size());
+  message->headers().setPath(path);
+  message->headers().setHost(host);
 
   return message;
 }
@@ -478,8 +600,8 @@ void Utility::transformUpgradeRequestFromH1toH2(HeaderMap& headers) {
   ASSERT(Utility::isUpgrade(headers));
 
   const HeaderString& upgrade = headers.Upgrade()->value();
-  headers.insertMethod().value().setReference(Http::Headers::get().MethodValues.Connect);
-  headers.insertProtocol().value().setCopy(upgrade.getStringView());
+  headers.setReferenceMethod(Http::Headers::get().MethodValues.Connect);
+  headers.setProtocol(upgrade.getStringView());
   headers.removeUpgrade();
   headers.removeConnection();
   // nghttp2 rejects upgrade requests/responses with content length, so strip
@@ -492,7 +614,7 @@ void Utility::transformUpgradeRequestFromH1toH2(HeaderMap& headers) {
 
 void Utility::transformUpgradeResponseFromH1toH2(HeaderMap& headers) {
   if (getResponseStatus(headers) == 101) {
-    headers.insertStatus().value().setInteger(200);
+    headers.setStatus(200);
   }
   headers.removeUpgrade();
   headers.removeConnection();
@@ -506,17 +628,17 @@ void Utility::transformUpgradeRequestFromH2toH1(HeaderMap& headers) {
   ASSERT(Utility::isH2UpgradeRequest(headers));
 
   const HeaderString& protocol = headers.Protocol()->value();
-  headers.insertMethod().value().setReference(Http::Headers::get().MethodValues.Get);
-  headers.insertUpgrade().value().setCopy(protocol.getStringView());
-  headers.insertConnection().value().setReference(Http::Headers::get().ConnectionValues.Upgrade);
+  headers.setReferenceMethod(Http::Headers::get().MethodValues.Get);
+  headers.setUpgrade(protocol.getStringView());
+  headers.setReferenceConnection(Http::Headers::get().ConnectionValues.Upgrade);
   headers.removeProtocol();
 }
 
 void Utility::transformUpgradeResponseFromH2toH1(HeaderMap& headers, absl::string_view upgrade) {
   if (getResponseStatus(headers) == 200) {
-    headers.insertUpgrade().value().setCopy(upgrade);
-    headers.insertConnection().value().setReference(Http::Headers::get().ConnectionValues.Upgrade);
-    headers.insertStatus().value().setInteger(101);
+    headers.setUpgrade(upgrade);
+    headers.setReferenceConnection(Http::Headers::get().ConnectionValues.Upgrade);
+    headers.setStatus(101);
   }
 }
 
@@ -568,8 +690,8 @@ std::string Utility::PercentEncoding::encode(absl::string_view value) {
     // https://github.com/grpc/grpc/blob/master/doc/PROTOCOL-HTTP2.md#responses.
     //
     // We do checking for each char in the string. If the current char is included in the defined
-    // escaping characters, we jump to "the slow path" (append the char [encoded or not encoded] to
-    // the returned string one by one) started from the current index.
+    // escaping characters, we jump to "the slow path" (append the char [encoded or not encoded]
+    // to the returned string one by one) started from the current index.
     if (ch < ' ' || ch >= '~' || ch == '%') {
       return PercentEncoding::encode(value, i);
     }
@@ -621,6 +743,50 @@ std::string Utility::PercentEncoding::decode(absl::string_view encoded) {
     decoded.push_back(ch);
   }
   return decoded;
+}
+
+Utility::AuthorityAttributes Utility::parseAuthority(absl::string_view host) {
+  // First try to see if there is a port included. This also checks to see that there is not a ']'
+  // as the last character which is indicative of an IPv6 address without a port. This is a best
+  // effort attempt.
+  const auto colon_pos = host.rfind(':');
+  absl::string_view host_to_resolve = host;
+  absl::optional<uint16_t> port;
+  if (colon_pos != absl::string_view::npos && host_to_resolve.back() != ']') {
+    const absl::string_view string_view_host = host;
+    host_to_resolve = string_view_host.substr(0, colon_pos);
+    const auto port_str = string_view_host.substr(colon_pos + 1);
+    uint64_t port64;
+    if (port_str.empty() || !absl::SimpleAtoi(port_str, &port64) || port64 > 65535) {
+      // Just attempt to resolve whatever we were given. This will very likely fail.
+      host_to_resolve = host;
+    } else {
+      port = static_cast<uint16_t>(port64);
+    }
+  }
+
+  // Now see if this is an IP address. We need to know this because some things (such as setting
+  // SNI) are special cased if this is an IP address. Either way, we still go through the normal
+  // resolver flow. We could short-circuit the DNS resolver in this case, but the extra code to do
+  // so is not worth it since the DNS resolver should handle it for us.
+  bool is_ip_address = false;
+  try {
+    absl::string_view potential_ip_address = host_to_resolve;
+    // TODO(mattklein123): Optimally we would support bracket parsing in parseInternetAddress(),
+    // but we still need to trim the brackets to send the IPv6 address into the DNS resolver. For
+    // now, just do all the trimming here, but in the future we should consider whether we can
+    // have unified [] handling as low as possible in the stack.
+    if (potential_ip_address.front() == '[' && potential_ip_address.back() == ']') {
+      potential_ip_address.remove_prefix(1);
+      potential_ip_address.remove_suffix(1);
+    }
+    Network::Utility::parseInternetAddress(std::string(potential_ip_address));
+    is_ip_address = true;
+    host_to_resolve = potential_ip_address;
+  } catch (const EnvoyException&) {
+  }
+
+  return {is_ip_address, host_to_resolve, port};
 }
 
 } // namespace Http

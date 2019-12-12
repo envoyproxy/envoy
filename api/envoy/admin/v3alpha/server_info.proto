@@ -2,11 +2,13 @@ syntax = "proto3";
 
 package envoy.admin.v3alpha;
 
+option java_package = "io.envoyproxy.envoy.admin.v3alpha";
 option java_outer_classname = "ServerInfoProto";
 option java_multiple_files = true;
-option java_package = "io.envoyproxy.envoy.admin.v3alpha";
 
 import "google/protobuf/duration.proto";
+
+import "udpa/annotations/versioning.proto";
 
 // [#protodoc-title: Server State]
 
@@ -14,6 +16,8 @@ import "google/protobuf/duration.proto";
 // server version/server status information.
 // [#next-free-field: 7]
 message ServerInfo {
+  option (udpa.annotations.versioning).previous_message_type = "envoy.admin.v2alpha.ServerInfo";
+
   enum State {
     // Server is live and serving traffic.
     LIVE = 0;
@@ -47,8 +51,11 @@ message ServerInfo {
   CommandLineOptions command_line_options = 6;
 }
 
-// [#next-free-field: 27]
+// [#next-free-field: 28]
 message CommandLineOptions {
+  option (udpa.annotations.versioning).previous_message_type =
+      "envoy.admin.v2alpha.CommandLineOptions";
+
   enum IpVersion {
     v4 = 0;
     v6 = 1;
@@ -101,6 +108,9 @@ message CommandLineOptions {
 
   // See :option:`--log-format` for details.
   string log_format = 10;
+
+  // See :option:`--log-format-escaped` for details.
+  bool log_format_escaped = 27;
 
   // See :option:`--log-path` for details.
   string log_path = 11;

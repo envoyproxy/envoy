@@ -2,14 +2,16 @@ syntax = "proto3";
 
 package envoy.config.filter.network.thrift_proxy.v3alpha;
 
+option java_package = "io.envoyproxy.envoy.config.filter.network.thrift_proxy.v3alpha";
 option java_outer_classname = "RouteProto";
 option java_multiple_files = true;
-option java_package = "io.envoyproxy.envoy.config.filter.network.thrift_proxy.v3alpha";
 
 import "envoy/api/v3alpha/core/base.proto";
 import "envoy/api/v3alpha/route/route.proto";
 
 import "google/protobuf/wrappers.proto";
+
+import "udpa/annotations/versioning.proto";
 
 import "validate/validate.proto";
 
@@ -17,6 +19,9 @@ import "validate/validate.proto";
 // Thrift Proxy :ref:`configuration overview <config_network_filters_thrift_proxy>`.
 
 message RouteConfiguration {
+  option (udpa.annotations.versioning).previous_message_type =
+      "envoy.config.filter.network.thrift_proxy.v2alpha1.RouteConfiguration";
+
   // The name of the route configuration. Reserved for future use in asynchronous route discovery.
   string name = 1;
 
@@ -26,6 +31,9 @@ message RouteConfiguration {
 }
 
 message Route {
+  option (udpa.annotations.versioning).previous_message_type =
+      "envoy.config.filter.network.thrift_proxy.v2alpha1.Route";
+
   // Route matching parameters.
   RouteMatch match = 1 [(validate.rules).message = {required: true}];
 
@@ -34,6 +42,9 @@ message Route {
 }
 
 message RouteMatch {
+  option (udpa.annotations.versioning).previous_message_type =
+      "envoy.config.filter.network.thrift_proxy.v2alpha1.RouteMatch";
+
   oneof match_specifier {
     option (validate.required) = true;
 
@@ -69,8 +80,11 @@ message RouteMatch {
   repeated api.v3alpha.route.HeaderMatcher headers = 4;
 }
 
-// [#next-free-field: 6]
+// [#next-free-field: 7]
 message RouteAction {
+  option (udpa.annotations.versioning).previous_message_type =
+      "envoy.config.filter.network.thrift_proxy.v2alpha1.RouteAction";
+
   oneof cluster_specifier {
     option (validate.required) = true;
 
@@ -82,11 +96,18 @@ message RouteAction {
     // request is routed to one of the upstream clusters based on weights
     // assigned to each cluster.
     WeightedCluster weighted_clusters = 2;
+
+    // Envoy will determine the cluster to route to by reading the value of the
+    // Thrift header named by cluster_header from the request headers. If the
+    // header is not found or the referenced cluster does not exist Envoy will
+    // respond with an unknown method exception or an internal error exception,
+    // respectively.
+    string cluster_header = 6 [(validate.rules).string = {min_bytes: 1}];
   }
 
   // Optional endpoint metadata match criteria used by the subset load balancer. Only endpoints in
   // the upstream cluster with metadata matching what is set in this field will be considered.
-  // Note that this will be merged with what's provided in :ref: `WeightedCluster.MetadataMatch
+  // Note that this will be merged with what's provided in :ref:`WeightedCluster.metadata_match
   // <envoy_api_field_config.filter.network.thrift_proxy.v3alpha.WeightedCluster.ClusterWeight.metadata_match>`,
   // with values there taking precedence. Keys and values should be provided under the "envoy.lb"
   // metadata key.
@@ -106,7 +127,13 @@ message RouteAction {
 // percentage of traffic to be forwarded to each cluster. The router selects an upstream cluster
 // based on these weights.
 message WeightedCluster {
+  option (udpa.annotations.versioning).previous_message_type =
+      "envoy.config.filter.network.thrift_proxy.v2alpha1.WeightedCluster";
+
   message ClusterWeight {
+    option (udpa.annotations.versioning).previous_message_type =
+        "envoy.config.filter.network.thrift_proxy.v2alpha1.WeightedCluster.ClusterWeight";
+
     // Name of the upstream cluster.
     string name = 1 [(validate.rules).string = {min_bytes: 1}];
 
@@ -117,7 +144,7 @@ message WeightedCluster {
 
     // Optional endpoint metadata match criteria used by the subset load balancer. Only endpoints in
     // the upstream cluster with metadata matching what is set in this field, combined with what's
-    // provided in :ref: `RouteAction's metadata_match
+    // provided in :ref:`RouteAction's metadata_match
     // <envoy_api_field_config.filter.network.thrift_proxy.v3alpha.RouteAction.metadata_match>`,
     // will be considered. Values here will take precedence. Keys and values should be provided
     // under the "envoy.lb" metadata key.

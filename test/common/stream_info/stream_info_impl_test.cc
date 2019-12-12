@@ -121,6 +121,7 @@ TEST_F(StreamInfoImplTest, ResponseFlagTest) {
         << fmt::format("Flag: {} was expected to be set", flag);
   }
   EXPECT_TRUE(stream_info.hasAnyResponseFlag());
+  EXPECT_EQ(0xFFF, stream_info.responseFlags());
 
   StreamInfoImpl stream_info2(Http::Protocol::Http2, test_time_.timeSystem());
   stream_info2.setResponseFlag(FailedLocalHealthCheck);
@@ -162,7 +163,8 @@ TEST_F(StreamInfoImplTest, MiscSettersAndGetters) {
     EXPECT_EQ(&route_entry, stream_info.routeEntry());
 
     stream_info.filterState().setData("test", std::make_unique<TestIntAccessor>(1),
-                                      FilterState::StateType::ReadOnly);
+                                      FilterState::StateType::ReadOnly,
+                                      FilterState::LifeSpan::FilterChain);
     EXPECT_EQ(1, stream_info.filterState().getDataReadOnly<TestIntAccessor>("test").access());
 
     EXPECT_EQ("", stream_info.requestedServerName());
@@ -213,6 +215,15 @@ TEST_F(StreamInfoImplTest, DumpStateTest) {
     EXPECT_THAT(state, testing::HasSubstr("protocol_: 2"));
     prefix = prefix + "  ";
   }
+}
+
+TEST_F(StreamInfoImplTest, RequestHeadersTest) {
+  StreamInfoImpl stream_info(Http::Protocol::Http2, test_time_.timeSystem());
+  EXPECT_FALSE(stream_info.getRequestHeaders());
+
+  Http::HeaderMapImpl headers;
+  stream_info.setRequestHeaders(headers);
+  EXPECT_EQ(&headers, stream_info.getRequestHeaders());
 }
 
 } // namespace

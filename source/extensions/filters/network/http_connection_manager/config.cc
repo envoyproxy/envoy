@@ -12,19 +12,20 @@
 
 #include "common/access_log/access_log_impl.h"
 #include "common/common/fmt.h"
-#include "common/config/filter_json.h"
 #include "common/config/utility.h"
 #include "common/http/conn_manager_utility.h"
 #include "common/http/date_provider_impl.h"
 #include "common/http/default_server_string.h"
 #include "common/http/http1/codec_impl.h"
 #include "common/http/http2/codec_impl.h"
+#include "common/http/http3/quic_codec_factory.h"
+#include "common/http/http3/well_known_names.h"
 #include "common/http/utility.h"
-#include "common/json/config_schemas.h"
 #include "common/protobuf/utility.h"
 #include "common/router/rds_impl.h"
 #include "common/router/scoped_rds.h"
 #include "common/runtime/runtime_impl.h"
+#include "common/tracing/http_tracer_impl.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -116,13 +117,6 @@ HttpConnectionManagerFilterConfigFactory::createFilterFactoryFromProtoTyped(
   };
 }
 
-Network::FilterFactoryCb HttpConnectionManagerFilterConfigFactory::createFilterFactory(
-    const Json::Object& json_config, Server::Configuration::FactoryContext& context) {
-  envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager proto_config;
-  Config::FilterJson::translateHttpConnectionManager(json_config, proto_config);
-  return createFilterFactoryFromProtoTyped(proto_config, context);
-}
-
 /**
  * Static registration for the HTTP connection manager filter.
  */
@@ -172,16 +166,19 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
                                                                          context_.listenerScope())),
       proxy_100_continue_(config.proxy_100_continue()),
       delayed_close_timeout_(PROTOBUF_GET_MS_OR_DEFAULT(config, delayed_close_timeout, 1000)),
+#ifdef ENVOY_NORMALIZE_PATH_BY_DEFAULT
       normalize_path_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
           config, normalize_path,
           // TODO(htuch): we should have a boolean variant of featureEnabled() here.
           context.runtime().snapshot().featureEnabled("http_connection_manager.normalize_path",
-#ifdef ENVOY_NORMALIZE_PATH_BY_DEFAULT
-                                                      100
+                                                      100))),
 #else
-                                                      0
+      normalize_path_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(
+          config, normalize_path,
+          // TODO(htuch): we should have a boolean variant of featureEnabled() here.
+          context.runtime().snapshot().featureEnabled("http_connection_manager.normalize_path",
+                                                      0))),
 #endif
-                                                      ))),
       merge_slashes_(config.merge_slashes()) {
   // If idle_timeout_ was not configured in common_http_protocol_options, use value in deprecated
   // idle_timeout field.
@@ -262,7 +259,6 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
     const auto& tracing_config = config.tracing();
 
     Tracing::OperationName tracing_operation_name;
-    std::vector<Http::LowerCaseString> request_headers_for_tags;
 
     // Listener level traffic direction overrides the operation name
     switch (context.direction()) {
@@ -291,8 +287,15 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
       NOT_REACHED_GCOVR_EXCL_LINE;
     }
 
+    Tracing::CustomTagMap custom_tags;
     for (const std::string& header : tracing_config.request_headers_for_tags()) {
-      request_headers_for_tags.push_back(Http::LowerCaseString(header));
+      envoy::type::tracing::v2::CustomTag::Header headerTag;
+      headerTag.set_name(header);
+      custom_tags.emplace(
+          header, std::make_shared<const Tracing::RequestHeaderCustomTag>(header, headerTag));
+    }
+    for (const auto& tag : tracing_config.custom_tags()) {
+      custom_tags.emplace(tag.tag(), Tracing::HttpTracerUtility::createCustomTag(tag));
     }
 
     envoy::type::FractionalPercent client_sampling;
@@ -314,8 +317,8 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
 
     tracing_config_ =
         std::make_unique<Http::TracingConnectionManagerConfig>(Http::TracingConnectionManagerConfig{
-            tracing_operation_name, request_headers_for_tags, client_sampling, random_sampling,
-            overall_sampling, tracing_config.verbose(), max_path_tag_length});
+            tracing_operation_name, custom_tags, client_sampling, random_sampling, overall_sampling,
+            tracing_config.verbose(), max_path_tag_length});
   }
 
   for (const auto& access_log : config.access_log()) {
@@ -392,24 +395,17 @@ void HttpConnectionManagerConfig::processFilter(
 
   ENVOY_LOG(debug, "    {} filter #{}", prefix, i);
   ENVOY_LOG(debug, "      name: {}", string_name);
-
-  const Json::ObjectSharedPtr filter_config =
-      MessageUtil::getJsonObjectFromMessage(proto_config.config());
-  ENVOY_LOG(debug, "    config: {}", filter_config->asJsonString());
+  ENVOY_LOG(debug, "    config: {}",
+            MessageUtil::getJsonStringFromMessage(proto_config.config(), true));
 
   // Now see if there is a factory that will accept the config.
   auto& factory =
       Config::Utility::getAndCheckFactory<Server::Configuration::NamedHttpFilterConfigFactory>(
           string_name);
-  Http::FilterFactoryCb callback;
-  if (Config::Utility::allowDeprecatedV1Config(context_.runtime(), *filter_config)) {
-    callback = factory.createFilterFactory(*filter_config->getObject("value", true), stats_prefix_,
-                                           context_);
-  } else {
-    ProtobufTypes::MessagePtr message = Config::Utility::translateToFactoryConfig(
-        proto_config, context_.messageValidationVisitor(), factory);
-    callback = factory.createFilterFactoryFromProto(*message, stats_prefix_, context_);
-  }
+  ProtobufTypes::MessagePtr message = Config::Utility::translateToFactoryConfig(
+      proto_config, context_.messageValidationVisitor(), factory);
+  Http::FilterFactoryCb callback =
+      factory.createFilterFactoryFromProto(*message, stats_prefix_, context_);
   is_terminal = factory.isTerminalFilter();
   filter_factories.push_back(callback);
 }
@@ -428,8 +424,14 @@ HttpConnectionManagerConfig::createCodec(Network::Connection& connection,
         connection, callbacks, context_.scope(), http2_settings_, maxRequestHeadersKb(),
         maxRequestHeadersCount());
   case CodecType::HTTP3:
-    // TODO(danzh) create QUIC specific codec.
-    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+    // Hard code Quiche factory name here to instantiate a QUIC codec implemented.
+    // TODO(danzh) Add support to get the factory name from config, possibly
+    // from HttpConnectionManager protobuf. This is not essential till there are multiple
+    // implementations of QUIC.
+    return std::unique_ptr<Http::ServerConnection>(
+        Config::Utility::getAndCheckFactory<Http::QuicHttpServerConnectionFactory>(
+            Http::QuicCodecNames::get().Quiche)
+            .createQuicServerConnection(connection, callbacks));
   case CodecType::AUTO:
     return Http::ConnectionManagerUtility::autoCreateCodec(
         connection, data, callbacks, context_.scope(), http1_settings_, http2_settings_,

@@ -180,7 +180,7 @@ public:
   uint32_t retryShadowBufferLimit() const override { return retry_shadow_buffer_limit_; }
 
 private:
-  enum class SslRequirements { NONE, EXTERNAL_ONLY, ALL };
+  enum class SslRequirements { None, ExternalOnly, All };
 
   struct VirtualClusterEntry : public VirtualCluster {
     VirtualClusterEntry(const envoy::api::v2::route::VirtualCluster& virtual_cluster,
@@ -349,10 +349,13 @@ public:
   // Tracing::getOverallSampling
   const envoy::type::FractionalPercent& getOverallSampling() const override;
 
+  const Tracing::CustomTagMap& getCustomTags() const override;
+
 private:
   envoy::type::FractionalPercent client_sampling_;
   envoy::type::FractionalPercent random_sampling_;
   envoy::type::FractionalPercent overall_sampling_;
+  Tracing::CustomTagMap custom_tags_;
 };
 
 /**

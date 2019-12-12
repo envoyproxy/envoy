@@ -2,16 +2,22 @@ syntax = "proto3";
 
 package envoy.config.grpc_credential.v3alpha;
 
+option java_package = "io.envoyproxy.envoy.config.grpc_credential.v3alpha";
 option java_outer_classname = "FileBasedMetadataProto";
 option java_multiple_files = true;
-option java_package = "io.envoyproxy.envoy.config.grpc_credential.v3alpha";
 
 import "envoy/api/v3alpha/core/base.proto";
 
+import "udpa/annotations/versioning.proto";
+
 // [#protodoc-title: Grpc Credentials File Based Metadata]
 // Configuration for File Based Metadata Grpc Credentials Plugin
+// [#extension: envoy.grpc_credentials.file_based_metadata]
 
 message FileBasedMetadataConfig {
+  option (udpa.annotations.versioning).previous_message_type =
+      "envoy.config.grpc_credential.v2alpha.FileBasedMetadataConfig";
+
   // Location or inline data of secret to use for authentication of the Google gRPC connection
   // this secret will be attached to a header of the gRPC connection
   api.v3alpha.core.DataSource secret_data = 1;

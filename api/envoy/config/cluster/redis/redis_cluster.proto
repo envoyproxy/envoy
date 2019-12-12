@@ -2,9 +2,9 @@ syntax = "proto3";
 
 package envoy.config.cluster.redis;
 
+option java_package = "io.envoyproxy.envoy.config.cluster.redis";
 option java_outer_classname = "RedisClusterProto";
 option java_multiple_files = true;
-option java_package = "io.envoyproxy.envoy.config.cluster.redis";
 
 import "google/protobuf/duration.proto";
 import "google/protobuf/wrappers.proto";
@@ -48,6 +48,7 @@ import "validate/validate.proto";
 //         cluster_refresh_timeout: 0.5s
 //         redirect_refresh_interval: 10s
 //         redirect_refresh_threshold: 10
+// [#extension: envoy.clusters.redis]
 
 message RedisClusterConfig {
   // Interval between successive topology refresh requests. If not set, this defaults to 5s.

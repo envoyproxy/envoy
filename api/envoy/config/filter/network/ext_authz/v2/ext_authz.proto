@@ -2,9 +2,9 @@ syntax = "proto3";
 
 package envoy.config.filter.network.ext_authz.v2;
 
+option java_package = "io.envoyproxy.envoy.config.filter.network.ext_authz.v2";
 option java_outer_classname = "ExtAuthzProto";
 option java_multiple_files = true;
-option java_package = "io.envoyproxy.envoy.config.filter.network.ext_authz.v2";
 
 import "envoy/api/v2/core/grpc_service.proto";
 
@@ -13,6 +13,7 @@ import "validate/validate.proto";
 // [#protodoc-title: Network External Authorization ]
 // The network layer external authorization service configuration
 // :ref:`configuration overview <config_network_filters_ext_authz>`.
+// [#extension: envoy.filters.network.ext_authz]
 
 // External Authorization filter calls out to an external service over the
 // gRPC Authorization API defined by
@@ -31,4 +32,10 @@ message ExtAuthz {
   // communication failure between authorization service and the proxy.
   // Defaults to false.
   bool failure_mode_allow = 3;
+
+  // Specifies if the peer certificate is sent to the external service.
+  //
+  // When this field is true, Envoy will include the peer X.509 certificate, if available, in the
+  // :ref:`certificate<envoy_api_field_service.auth.v2.AttributeContext.Peer.certificate>`.
+  bool include_peer_certificate = 4;
 }

@@ -85,7 +85,7 @@ public:
     route_ = new NiceMock<MockRoute>();
     route_ptr_.reset(route_);
 
-    router_ = std::make_unique<Router>(context_.clusterManager());
+    router_ = std::make_unique<Router>(context_.clusterManager(), "test", context_.scope());
 
     EXPECT_EQ(nullptr, router_->downstreamConnection());
 
@@ -437,6 +437,7 @@ TEST_F(ThriftRouterTest, NoRoute) {
         EXPECT_TRUE(end_stream);
       }));
   EXPECT_EQ(FilterStatus::StopIteration, router_->messageBegin(metadata_));
+  EXPECT_EQ(1U, context_.scope().counter("test.route_missing").value());
 }
 
 TEST_F(ThriftRouterTest, NoCluster) {
@@ -455,6 +456,7 @@ TEST_F(ThriftRouterTest, NoCluster) {
         EXPECT_TRUE(end_stream);
       }));
   EXPECT_EQ(FilterStatus::StopIteration, router_->messageBegin(metadata_));
+  EXPECT_EQ(1U, context_.scope().counter("test.unknown_cluster").value());
 }
 
 TEST_F(ThriftRouterTest, ClusterMaintenanceMode) {
@@ -475,6 +477,7 @@ TEST_F(ThriftRouterTest, ClusterMaintenanceMode) {
         EXPECT_TRUE(end_stream);
       }));
   EXPECT_EQ(FilterStatus::StopIteration, router_->messageBegin(metadata_));
+  EXPECT_EQ(1U, context_.scope().counter("test.upstream_rq_maintenance_mode").value());
 }
 
 TEST_F(ThriftRouterTest, NoHealthyHosts) {
@@ -496,6 +499,7 @@ TEST_F(ThriftRouterTest, NoHealthyHosts) {
       }));
 
   EXPECT_EQ(FilterStatus::StopIteration, router_->messageBegin(metadata_));
+  EXPECT_EQ(1U, context_.scope().counter("test.no_healthy_upstream").value());
 }
 
 TEST_F(ThriftRouterTest, TruncatedResponse) {
@@ -601,6 +605,27 @@ TEST_F(ThriftRouterTest, UnexpectedUpstreamLocalClose) {
         EXPECT_TRUE(end_stream);
       }));
   router_->onEvent(Network::ConnectionEvent::RemoteClose);
+}
+
+// Regression test for https://github.com/envoyproxy/envoy/issues/9037.
+TEST_F(ThriftRouterTest, DontCloseConnectionTwice) {
+  initializeRouter();
+  startRequest(MessageType::Call);
+  connectUpstream();
+  sendTrivialStruct(FieldType::String);
+
+  EXPECT_CALL(callbacks_, sendLocalReply(_, _))
+      .WillOnce(Invoke([&](const DirectResponse& response, bool end_stream) -> void {
+        auto& app_ex = dynamic_cast<const AppException&>(response);
+        EXPECT_EQ(AppExceptionType::InternalError, app_ex.type_);
+        EXPECT_THAT(app_ex.what(), ContainsRegex(".*connection failure.*"));
+        EXPECT_TRUE(end_stream);
+      }));
+  router_->onEvent(Network::ConnectionEvent::RemoteClose);
+
+  // Connection close shouldn't happen in onDestroy(), since it's been handled.
+  EXPECT_CALL(upstream_connection_, close(Network::ConnectionCloseType::NoFlush)).Times(0);
+  destroyRouter();
 }
 
 TEST_F(ThriftRouterTest, UnexpectedRouterDestroyBeforeUpstreamConnect) {

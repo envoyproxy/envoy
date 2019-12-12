@@ -3,6 +3,7 @@
 #include <queue>
 
 #include "envoy/api/api.h"
+#include "envoy/common/platform.h"
 #include "envoy/grpc/async_client.h"
 #include "envoy/stats/scope.h"
 #include "envoy/thread/thread.h"
@@ -117,7 +118,7 @@ struct GoogleAsyncClientStats {
   // .streams_total
   Stats::Counter* streams_total_;
   // .streams_closed_<gRPC status code>
-  std::array<Stats::Counter*, Status::GrpcStatus::MaximumValid + 1> streams_closed_;
+  std::array<Stats::Counter*, Status::WellKnownGrpcStatus::MaximumKnown + 1> streams_closed_;
 };
 
 // Interface to allow the gRPC stub to be mocked out by tests.

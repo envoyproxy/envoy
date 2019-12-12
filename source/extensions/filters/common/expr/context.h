@@ -5,6 +5,7 @@
 #include "common/http/headers.h"
 
 #include "eval/public/cel_value.h"
+#include "eval/public/cel_value_producer.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -29,11 +30,13 @@ constexpr absl::string_view UserAgent = "useragent";
 constexpr absl::string_view Size = "size";
 constexpr absl::string_view TotalSize = "total_size";
 constexpr absl::string_view Duration = "duration";
+constexpr absl::string_view Protocol = "protocol";
 
 // Symbols for traversing the response properties
 constexpr absl::string_view Response = "response";
 constexpr absl::string_view Code = "code";
 constexpr absl::string_view Trailers = "trailers";
+constexpr absl::string_view Flags = "flags";
 
 // Per-request or per-connection metadata
 constexpr absl::string_view Metadata = "metadata";
@@ -78,13 +81,15 @@ private:
   const Http::HeaderMap* value_;
 };
 
-class BaseWrapper : public google::api::expr::runtime::CelMap {
+class BaseWrapper : public google::api::expr::runtime::CelMap,
+                    public google::api::expr::runtime::CelValueProducer {
 public:
   int size() const override { return 0; }
   bool empty() const override { return false; }
   const google::api::expr::runtime::CelList* ListKeys() const override {
     NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
   }
+  CelValue Produce(ProtobufWkt::Arena*) override { return CelValue::CreateMap(this); }
 };
 
 class RequestWrapper : public BaseWrapper {
@@ -137,6 +142,17 @@ public:
 private:
   const StreamInfo::StreamInfo& info_;
   const bool local_;
+};
+
+class MetadataProducer : public google::api::expr::runtime::CelValueProducer {
+public:
+  MetadataProducer(const envoy::api::v2::core::Metadata& metadata) : metadata_(metadata) {}
+  CelValue Produce(ProtobufWkt::Arena* arena) override {
+    return CelValue::CreateMessage(&metadata_, arena);
+  }
+
+private:
+  const envoy::api::v2::core::Metadata& metadata_;
 };
 
 } // namespace Expr

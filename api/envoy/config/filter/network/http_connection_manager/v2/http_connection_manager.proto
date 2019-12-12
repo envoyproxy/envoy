@@ -2,9 +2,9 @@ syntax = "proto3";
 
 package envoy.config.filter.network.http_connection_manager.v2;
 
+option java_package = "io.envoyproxy.envoy.config.filter.network.http_connection_manager.v2";
 option java_outer_classname = "HttpConnectionManagerProto";
 option java_multiple_files = true;
-option java_package = "io.envoyproxy.envoy.config.filter.network.http_connection_manager.v2";
 
 import "envoy/api/v2/core/config_source.proto";
 import "envoy/api/v2/core/protocol.proto";
@@ -12,6 +12,7 @@ import "envoy/api/v2/rds.proto";
 import "envoy/api/v2/srds.proto";
 import "envoy/config/filter/accesslog/v2/accesslog.proto";
 import "envoy/type/percent.proto";
+import "envoy/type/tracing/v2/custom_tag.proto";
 
 import "google/protobuf/any.proto";
 import "google/protobuf/duration.proto";
@@ -22,6 +23,7 @@ import "validate/validate.proto";
 
 // [#protodoc-title: HTTP connection manager]
 // HTTP connection manager :ref:`configuration overview <config_http_conn_man>`.
+// [#extension: envoy.filters.network.http_connection_manager]
 
 // [#next-free-field: 36]
 message HttpConnectionManager {
@@ -83,7 +85,7 @@ message HttpConnectionManager {
     ALWAYS_FORWARD_ONLY = 4;
   }
 
-  // [#next-free-field: 8]
+  // [#next-free-field: 9]
   message Tracing {
     enum OperationName {
       // The HTTP listener is used for ingress/incoming requests.
@@ -100,12 +102,16 @@ message HttpConnectionManager {
     // .. attention::
     //  This field has been deprecated in favor of `traffic_direction`.
     OperationName operation_name = 1
-        [(validate.rules).enum = {defined_only: true}, deprecated = true];
+        [deprecated = true, (validate.rules).enum = {defined_only: true}];
 
     // A list of header names used to create tags for the active span. The header name is used to
     // populate the tag name, and the header value is used to populate the tag value. The tag is
     // created if the specified header name is present in the request's headers.
-    repeated string request_headers_for_tags = 2;
+    //
+    // .. attention::
+    //  This field has been deprecated in favor of :ref:`custom_tags
+    //  <envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.tracing.custom_tags>`.
+    repeated string request_headers_for_tags = 2 [deprecated = true];
 
     // Target percentage of requests managed by this HTTP connection manager that will be force
     // traced if the :ref:`x-client-trace-id <config_http_conn_man_headers_x-client-trace-id>`
@@ -140,6 +146,9 @@ message HttpConnectionManager {
     // truncate lengthy request paths to meet the needs of a tracing backend.
     // Default: 256
     google.protobuf.UInt32Value max_path_tag_length = 7;
+
+    // A list of custom tags with unique tag name to create tags for the active span.
+    repeated type.tracing.v2.CustomTag custom_tags = 8;
   }
 
   message InternalAddressConfig {

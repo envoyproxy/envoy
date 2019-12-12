@@ -32,15 +32,12 @@ namespace {
 class OptionsImplTest : public testing::Test {
 
 public:
-  // Do the ugly work of turning a std::string into a char** and create an OptionsImpl. Args are
+  // Do the ugly work of turning a std::string into a vector and create an OptionsImpl. Args are
   // separated by a single space: no fancy quoting or escaping.
   std::unique_ptr<OptionsImpl> createOptionsImpl(const std::string& args) {
     std::vector<std::string> words = TestUtility::split(args, ' ');
-    std::vector<const char*> argv;
-    std::transform(words.cbegin(), words.cend(), std::back_inserter(argv),
-                   [](const std::string& arg) { return arg.c_str(); });
     return std::make_unique<OptionsImpl>(
-        argv.size(), argv.data(), [](bool) { return "1"; }, spdlog::level::warn);
+        std::move(words), [](bool) { return "1"; }, spdlog::level::warn);
   }
 };
 
@@ -93,7 +90,6 @@ TEST_F(OptionsImplTest, All) {
   EXPECT_EQ(std::chrono::seconds(60), options->drainTime());
   EXPECT_EQ(std::chrono::seconds(90), options->parentShutdownTime());
   EXPECT_TRUE(options->hotRestartDisabled());
-  EXPECT_FALSE(options->libeventBufferEnabled());
   EXPECT_TRUE(options->cpusetThreadsEnabled());
   EXPECT_TRUE(options->allowUnknownStaticFields());
   EXPECT_TRUE(options->rejectUnknownDynamicFields());
@@ -247,11 +243,29 @@ TEST_F(OptionsImplTest, OptionsAreInSyncWithProto) {
   // 1. version        - default TCLAP argument.
   // 2. help           - default TCLAP argument.
   // 3. ignore_rest    - default TCLAP argument.
-  // 4. use-libevent-buffers  - short-term override for rollout of new buffer implementation.
-  // 5. allow-unknown-fields  - deprecated alias of allow-unknown-static-fields.
-  // 6. use-fake-symbol-table - short-term override for rollout of real symbol-table implementation.
-  // 7. hot restart version - print the hot restart version and exit.
-  EXPECT_EQ(options->count() - 7, command_line_options->GetDescriptor()->field_count());
+  // 4. allow-unknown-fields  - deprecated alias of allow-unknown-static-fields.
+  // 5. use-fake-symbol-table - short-term override for rollout of real symbol-table implementation.
+  // 6. hot restart version - print the hot restart version and exit.
+  EXPECT_EQ(options->count() - 6, command_line_options->GetDescriptor()->field_count());
+}
+
+TEST_F(OptionsImplTest, OptionsFromArgv) {
+  const std::array<const char*, 3> args{"envoy", "-c", "hello"};
+  std::unique_ptr<OptionsImpl> options = std::make_unique<OptionsImpl>(
+      args.size(), args.data(), [](bool) { return "1"; }, spdlog::level::warn);
+  // Spot check that the arguments were parsed.
+  EXPECT_EQ("hello", options->configPath());
+}
+
+TEST_F(OptionsImplTest, OptionsFromArgvPrefix) {
+  const std::array<const char*, 5> args{"envoy", "-c", "hello", "--admin-address-path", "goodbye"};
+  std::unique_ptr<OptionsImpl> options = std::make_unique<OptionsImpl>(
+      args.size() - 2, // Pass in only a prefix of the args
+      args.data(), [](bool) { return "1"; }, spdlog::level::warn);
+  EXPECT_EQ("hello", options->configPath());
+  // This should still have the default value since the extra arguments are
+  // ignored.
+  EXPECT_EQ("", options->adminAddressPath());
 }
 
 TEST_F(OptionsImplTest, BadCliOption) {

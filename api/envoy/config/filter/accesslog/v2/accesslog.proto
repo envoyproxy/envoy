@@ -2,9 +2,9 @@ syntax = "proto3";
 
 package envoy.config.filter.accesslog.v2;
 
+option java_package = "io.envoyproxy.envoy.config.filter.accesslog.v2";
 option java_outer_classname = "AccesslogProto";
 option java_multiple_files = true;
-option java_package = "io.envoyproxy.envoy.config.filter.accesslog.v2";
 
 import "envoy/api/v2/core/base.proto";
 import "envoy/api/v2/route/route.proto";
@@ -245,7 +245,7 @@ message ExtensionFilter {
 
   // Custom configuration that depends on the filter being instantiated.
   oneof config_type {
-    google.protobuf.Struct config = 2;
+    google.protobuf.Struct config = 2 [deprecated = true];
 
     google.protobuf.Any typed_config = 3;
   }

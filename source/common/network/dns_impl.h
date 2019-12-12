@@ -1,11 +1,10 @@
 #pragma once
 
-#include <netdb.h>
-
 #include <cstdint>
 #include <string>
 #include <unordered_map>
 
+#include "envoy/common/platform.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/event/file_event.h"
 #include "envoy/network/dns.h"
@@ -28,7 +27,8 @@ class DnsResolverImplPeer;
 class DnsResolverImpl : public DnsResolver, protected Logger::Loggable<Logger::Id::upstream> {
 public:
   DnsResolverImpl(Event::Dispatcher& dispatcher,
-                  const std::vector<Network::Address::InstanceConstSharedPtr>& resolvers);
+                  const std::vector<Network::Address::InstanceConstSharedPtr>& resolvers,
+                  const bool use_tcp_for_dns_lookups);
   ~DnsResolverImpl() override;
 
   // Network::DnsResolver

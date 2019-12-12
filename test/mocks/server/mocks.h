@@ -77,6 +77,7 @@ public:
   MOCK_CONST_METHOD0(componentLogLevels,
                      const std::vector<std::pair<std::string, spdlog::level::level_enum>>&());
   MOCK_CONST_METHOD0(logFormat, const std::string&());
+  MOCK_CONST_METHOD0(logFormatEscaped, bool());
   MOCK_CONST_METHOD0(logPath, const std::string&());
   MOCK_CONST_METHOD0(parentShutdownTime, std::chrono::seconds());
   MOCK_CONST_METHOD0(restartEpoch, uint64_t());
@@ -88,7 +89,6 @@ public:
   MOCK_CONST_METHOD0(hotRestartDisabled, bool());
   MOCK_CONST_METHOD0(signalHandlingEnabled, bool());
   MOCK_CONST_METHOD0(mutexTracingEnabled, bool());
-  MOCK_CONST_METHOD0(libeventBufferEnabled, bool());
   MOCK_CONST_METHOD0(fakeSymbolTableEnabled, bool());
   MOCK_CONST_METHOD0(cpusetThreadsEnabled, bool());
   MOCK_CONST_METHOD0(toCommandLineOptions, Server::CommandLineOptionsPtr());
@@ -259,7 +259,7 @@ public:
                Network::SocketSharedPtr(Network::Address::InstanceConstSharedPtr address,
                                         Network::Address::SocketType socket_type,
                                         const Network::Socket::OptionsSharedPtr& options,
-                                        bool bind_to_port));
+                                        const ListenSocketCreationParams& params));
   MOCK_METHOD1(createDrainManager_, DrainManager*(envoy::api::v2::Listener::DrainType drain_type));
   MOCK_METHOD0(nextListenerTag, uint64_t());
 
@@ -280,6 +280,8 @@ public:
   MOCK_METHOD1(startWorkers, void(GuardDog& guard_dog));
   MOCK_METHOD1(stopListeners, void(StopListenersType listeners_type));
   MOCK_METHOD0(stopWorkers, void());
+  MOCK_METHOD0(beginListenerUpdate, void());
+  MOCK_METHOD1(endListenerUpdate, void(ListenerManager::FailureStates&&));
 };
 
 class MockServerLifecycleNotifier : public ServerLifecycleNotifier {

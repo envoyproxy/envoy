@@ -84,7 +84,8 @@ ClusterFactoryImplBase::selectDnsResolver(const envoy::api::v2::Cluster& cluster
     for (const auto& resolver_addr : resolver_addrs) {
       resolvers.push_back(Network::Address::resolveProtoAddress(resolver_addr));
     }
-    return context.dispatcher().createDnsResolver(resolvers);
+    const bool use_tcp_for_dns_lookups = cluster.use_tcp_for_dns_lookups();
+    return context.dispatcher().createDnsResolver(resolvers, use_tcp_for_dns_lookups);
   }
 
   return context.dnsResolver();

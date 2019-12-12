@@ -357,6 +357,8 @@ TEST_P(ServerInstanceImplTest, LifecycleNotifications) {
   started.WaitForNotification();
   EXPECT_TRUE(startup);
   EXPECT_FALSE(shutdown);
+  EXPECT_TRUE(TestUtility::findGauge(stats_store_, "server.state")->used());
+  EXPECT_EQ(0L, TestUtility::findGauge(stats_store_, "server.state")->value());
 
   post_init_fired.WaitForNotification();
   EXPECT_TRUE(post_init);
@@ -601,6 +603,7 @@ TEST_P(ServerInstanceImplTest, BootstrapRuntime) {
   EXPECT_EQ("bar", server_->runtime().snapshot().get("foo"));
   // This should access via the override/some_service overlay.
   EXPECT_EQ("fozz", server_->runtime().snapshot().get("fizz"));
+  EXPECT_EQ("foobar", server_->runtime().snapshot().getLayers()[3]->name());
 }
 
 // Validate that a runtime absent an admin layer will fail mutating operations

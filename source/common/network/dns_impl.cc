@@ -1,20 +1,19 @@
 #include "common/network/dns_impl.h"
 
-#include <netdb.h>
-#include <netinet/in.h>
-#include <sys/socket.h>
-
 #include <chrono>
 #include <cstdint>
 #include <list>
 #include <memory>
 #include <string>
 
+#include "envoy/common/platform.h"
+
 #include "common/common/assert.h"
 #include "common/common/fmt.h"
 #include "common/network/address_impl.h"
 #include "common/network/utility.h"
 
+#include "absl/strings/str_join.h"
 #include "ares.h"
 
 namespace Envoy {
@@ -22,12 +21,19 @@ namespace Network {
 
 DnsResolverImpl::DnsResolverImpl(
     Event::Dispatcher& dispatcher,
-    const std::vector<Network::Address::InstanceConstSharedPtr>& resolvers)
+    const std::vector<Network::Address::InstanceConstSharedPtr>& resolvers,
+    const bool use_tcp_for_dns_lookups)
     : dispatcher_(dispatcher),
       timer_(dispatcher.createTimer([this] { onEventCallback(ARES_SOCKET_BAD, 0); })) {
-  ares_options options;
+  ares_options options{};
+  int optmask = 0;
 
-  initializeChannel(&options, 0);
+  if (use_tcp_for_dns_lookups) {
+    optmask |= ARES_OPT_FLAGS;
+    options.flags |= ARES_FLAG_USEVC;
+  }
+
+  initializeChannel(&options, optmask);
 
   if (!resolvers.empty()) {
     std::vector<std::string> resolver_addrs;
@@ -48,7 +54,7 @@ DnsResolverImpl::DnsResolverImpl(
                                            resolver->ip()->addressAsString(),
                                            resolver->ip()->port()));
     }
-    const std::string resolvers_csv = StringUtil::join(resolver_addrs, ",");
+    const std::string resolvers_csv = absl::StrJoin(resolver_addrs, ",");
     int result = ares_set_servers_ports_csv(channel_, resolvers_csv.c_str());
     RELEASE_ASSERT(result == ARES_SUCCESS, "");
   }

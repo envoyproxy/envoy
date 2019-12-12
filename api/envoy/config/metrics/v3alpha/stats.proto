@@ -2,9 +2,9 @@ syntax = "proto3";
 
 package envoy.config.metrics.v3alpha;
 
+option java_package = "io.envoyproxy.envoy.config.metrics.v3alpha";
 option java_outer_classname = "StatsProto";
 option java_multiple_files = true;
-option java_package = "io.envoyproxy.envoy.config.metrics.v3alpha";
 
 import "envoy/api/v3alpha/core/address.proto";
 import "envoy/type/matcher/v3alpha/string.proto";
@@ -13,6 +13,8 @@ import "google/protobuf/any.proto";
 import "google/protobuf/struct.proto";
 import "google/protobuf/wrappers.proto";
 
+import "udpa/annotations/versioning.proto";
+
 import "validate/validate.proto";
 
 // [#protodoc-title: Stats]
@@ -20,6 +22,8 @@ import "validate/validate.proto";
 
 // Configuration for pluggable stats sinks.
 message StatsSink {
+  option (udpa.annotations.versioning).previous_message_type = "envoy.config.metrics.v2.StatsSink";
+
   reserved 2;
 
   reserved "config";
@@ -44,6 +48,9 @@ message StatsSink {
 
 // Statistics configuration such as tagging.
 message StatsConfig {
+  option (udpa.annotations.versioning).previous_message_type =
+      "envoy.config.metrics.v2.StatsConfig";
+
   // Each stat name is iteratively processed through these tag specifiers.
   // When a tag is matched, the first capture group is removed from the name so
   // later :ref:`TagSpecifiers <envoy_api_msg_config.metrics.v3alpha.TagSpecifier>` cannot match
@@ -142,6 +149,9 @@ message StatsMatcher {
   //   }
   //
 
+  option (udpa.annotations.versioning).previous_message_type =
+      "envoy.config.metrics.v2.StatsMatcher";
+
   oneof stats_matcher {
     option (validate.required) = true;
 
@@ -164,6 +174,9 @@ message StatsMatcher {
 // unconditionally set if a fixed value, otherwise it will only be set if one
 // or more capture groups in the regex match.
 message TagSpecifier {
+  option (udpa.annotations.versioning).previous_message_type =
+      "envoy.config.metrics.v2.TagSpecifier";
+
   // Attaches an identifier to the tag values to identify the tag being in the
   // sink. Envoy has a set of default names and regexes to extract dynamic
   // portions of existing stats, which can be found in :repo:`well_known_names.h
@@ -243,7 +256,10 @@ message TagSpecifier {
 
 // Stats configuration proto schema for built-in *envoy.statsd* sink. This sink does not support
 // tagged metrics.
+// [#extension: envoy.stat_sinks.statsd]
 message StatsdSink {
+  option (udpa.annotations.versioning).previous_message_type = "envoy.config.metrics.v2.StatsdSink";
+
   oneof statsd_specifier {
     option (validate.required) = true;
 
@@ -291,7 +307,11 @@ message StatsdSink {
 // The sink emits stats with `DogStatsD <https://docs.datadoghq.com/guides/dogstatsd/>`_
 // compatible tags. Tags are configurable via :ref:`StatsConfig
 // <envoy_api_msg_config.metrics.v3alpha.StatsConfig>`.
+// [#extension: envoy.stat_sinks.dog_statsd]
 message DogStatsdSink {
+  option (udpa.annotations.versioning).previous_message_type =
+      "envoy.config.metrics.v2.DogStatsdSink";
+
   reserved 2;
 
   oneof dog_statsd_specifier {
@@ -316,7 +336,11 @@ message DogStatsdSink {
 // Note that only a single HystrixSink should be configured.
 //
 // Streaming is started through an admin endpoint :http:get:`/hystrix_event_stream`.
+// [#extension: envoy.stat_sinks.hystrix]
 message HystrixSink {
+  option (udpa.annotations.versioning).previous_message_type =
+      "envoy.config.metrics.v2.HystrixSink";
+
   // The number of buckets the rolling statistical window is divided into.
   //
   // Each time the sink is flushed, all relevant Envoy statistics are sampled and

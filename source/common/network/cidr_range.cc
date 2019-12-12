@@ -1,15 +1,12 @@
 #include "common/network/cidr_range.h"
 
-#include <arpa/inet.h>
-#include <netinet/in.h>
-#include <sys/socket.h>
-
 #include <array>
 #include <cstdint>
 #include <string>
 #include <vector>
 
 #include "envoy/common/exception.h"
+#include "envoy/common/platform.h"
 
 #include "common/common/assert.h"
 #include "common/common/fmt.h"
@@ -114,6 +111,10 @@ CidrRange CidrRange::create(const std::string& address, int length) {
 }
 
 CidrRange CidrRange::create(const envoy::api::v2::core::CidrRange& cidr) {
+  return create(Utility::parseInternetAddress(cidr.address_prefix()), cidr.prefix_len().value());
+}
+
+CidrRange CidrRange::create(const envoy::api::v3alpha::core::CidrRange& cidr) {
   return create(Utility::parseInternetAddress(cidr.address_prefix()), cidr.prefix_len().value());
 }
 

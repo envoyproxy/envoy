@@ -138,41 +138,6 @@ TEST(UtilityTest, ParseRateLimitSettings) {
   EXPECT_EQ(4, rate_limit_settings.fill_rate_);
 }
 
-TEST(UtilityTest, AllowDeprecatedV1Config) {
-  NiceMock<Runtime::MockLoader> runtime;
-  const Json::ObjectSharedPtr no_v1_config = Json::Factory::loadFromString("{}");
-  const Json::ObjectSharedPtr v1_config =
-      Json::Factory::loadFromString("{\"deprecated_v1\": true}");
-
-  // No v1 config.
-  EXPECT_FALSE(Utility::allowDeprecatedV1Config(runtime, *no_v1_config));
-
-  // v1 config, runtime not allowed.
-  EXPECT_CALL(runtime.snapshot_,
-              deprecatedFeatureEnabled("envoy.deprecated_features.v1_filter_json_config"))
-      .WillOnce(Return(false));
-  EXPECT_THROW_WITH_MESSAGE(
-      Utility::allowDeprecatedV1Config(runtime, *v1_config), EnvoyException,
-      "Using deprecated v1 JSON config load via 'deprecated_v1: true'. This configuration will be "
-      "removed from Envoy soon. Please see "
-      "https://www.envoyproxy.io/docs/envoy/latest/intro/deprecated for details. The "
-      "`envoy.deprecated_features.v1_filter_json_config` runtime key can be used to temporarily "
-      "enable this feature once the deprecation becomes fail by default.");
-
-  // v1 config, runtime allowed.
-  EXPECT_CALL(runtime.snapshot_,
-              deprecatedFeatureEnabled("envoy.deprecated_features.v1_filter_json_config"))
-      .WillOnce(Return(true));
-  EXPECT_LOG_CONTAINS(
-      "warning",
-      "Using deprecated v1 JSON config load via 'deprecated_v1: true'. This configuration will be "
-      "removed from Envoy soon. Please see "
-      "https://www.envoyproxy.io/docs/envoy/latest/intro/deprecated for details. The "
-      "`envoy.deprecated_features.v1_filter_json_config` runtime key can be used to temporarily "
-      "enable this feature once the deprecation becomes fail by default.",
-      Utility::allowDeprecatedV1Config(runtime, *v1_config));
-}
-
 // TEST(UtilityTest, FactoryForGrpcApiConfigSource) should catch misconfigured
 // API configs along the dimension of ApiConfigSource type.
 TEST(UtilityTest, FactoryForGrpcApiConfigSource) {
@@ -296,7 +261,21 @@ TEST(UtilityTest, PrepareDnsRefreshStrategy) {
   }
 }
 
-void packTypedStructIntoAny(ProtobufWkt::Any& typed_config, const ProtobufWkt::Message& inner) {
+// Validate that an opaque config of the wrong type throws during conversion.
+TEST(UtilityTest, AnyWrongType) {
+  ProtobufWkt::Duration source_duration;
+  source_duration.set_seconds(42);
+  ProtobufWkt::Any typed_config;
+  typed_config.PackFrom(source_duration);
+  ProtobufWkt::Timestamp out;
+  EXPECT_THROW_WITH_REGEX(
+      Utility::translateOpaqueConfig("", typed_config, ProtobufWkt::Struct(),
+                                     ProtobufMessage::getStrictValidationVisitor(), out),
+      EnvoyException,
+      R"(Unable to unpack as google.protobuf.Timestamp: \[type.googleapis.com/google.protobuf.Duration\] .*)");
+}
+
+void packTypedStructIntoAny(ProtobufWkt::Any& typed_config, const Protobuf::Message& inner) {
   udpa::type::v1::TypedStruct typed_struct;
   (*typed_struct.mutable_type_url()) =
       absl::StrCat("type.googleapis.com/", inner.GetDescriptor()->full_name());
@@ -312,7 +291,7 @@ TEST(UtilityTest, TypedStructToStruct) {
   packTypedStructIntoAny(typed_config, untyped_struct);
 
   ProtobufWkt::Struct out;
-  Utility::translateOpaqueConfig(typed_config, ProtobufWkt::Struct(),
+  Utility::translateOpaqueConfig("", typed_config, ProtobufWkt::Struct(),
                                  ProtobufMessage::getStrictValidationVisitor(), out);
 
   EXPECT_THAT(out, ProtoEq(untyped_struct));
@@ -333,7 +312,7 @@ TEST(UtilityTest, TypedStructToBootstrap) {
   packTypedStructIntoAny(typed_config, bootstrap);
 
   envoy::config::bootstrap::v2::Bootstrap out;
-  Utility::translateOpaqueConfig(typed_config, ProtobufWkt::Struct(),
+  Utility::translateOpaqueConfig("", typed_config, ProtobufWkt::Struct(),
                                  ProtobufMessage::getStrictValidationVisitor(), out);
   EXPECT_THAT(out, ProtoEq(bootstrap));
 }
@@ -354,7 +333,7 @@ TEST(UtilityTest, TypedStructToInvalidType) {
 
   ProtobufWkt::Any out;
   EXPECT_THROW_WITH_MESSAGE(
-      Utility::translateOpaqueConfig(typed_config, ProtobufWkt::Struct(),
+      Utility::translateOpaqueConfig("", typed_config, ProtobufWkt::Struct(),
                                      ProtobufMessage::getStrictValidationVisitor(), out),
       EnvoyException,
       "Invalid proto type.\nExpected google.protobuf.Any\nActual: "

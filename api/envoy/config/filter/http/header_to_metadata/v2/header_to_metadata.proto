@@ -2,9 +2,9 @@ syntax = "proto3";
 
 package envoy.config.filter.http.header_to_metadata.v2;
 
+option java_package = "io.envoyproxy.envoy.config.filter.http.header_to_metadata.v2";
 option java_outer_classname = "HeaderToMetadataProto";
 option java_multiple_files = true;
-option java_package = "io.envoyproxy.envoy.config.filter.http.header_to_metadata.v2";
 
 import "validate/validate.proto";
 
@@ -14,6 +14,7 @@ import "validate/validate.proto";
 // for matching load balancer subsets, logging, etc.
 //
 // Header to Metadata :ref:`configuration overview <config_http_filters_header_to_metadata>`.
+// [#extension: envoy.filters.http.header_to_metadata]
 
 message Config {
   enum ValueType {

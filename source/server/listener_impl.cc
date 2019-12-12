@@ -26,14 +26,106 @@
 namespace Envoy {
 namespace Server {
 
+ListenSocketFactoryImpl::ListenSocketFactoryImpl(ListenerComponentFactory& factory,
+                                                 Network::Address::InstanceConstSharedPtr address,
+                                                 Network::Address::SocketType socket_type,
+                                                 const Network::Socket::OptionsSharedPtr& options,
+                                                 bool bind_to_port,
+                                                 const std::string& listener_name, bool reuse_port)
+    : factory_(factory), local_address_(address), socket_type_(socket_type), options_(options),
+      bind_to_port_(bind_to_port), listener_name_(listener_name), reuse_port_(reuse_port) {
+
+  bool create_socket = false;
+  if (local_address_->type() == Network::Address::Type::Ip) {
+    if (socket_type_ == Network::Address::SocketType::Datagram) {
+      ASSERT(reuse_port_ == true);
+    }
+
+    if (reuse_port_ == false) {
+      // create a socket which will be used by all worker threads
+      create_socket = true;
+    } else if (local_address_->ip()->port() == 0) {
+      // port is 0, need to create a socket here for reserving a real port number,
+      // then all worker threads should use same port.
+      create_socket = true;
+    }
+  } else {
+    ASSERT(local_address_->type() == Network::Address::Type::Pipe);
+    // Listeners with Unix domain socket always use shared socket.
+    create_socket = true;
+  }
+
+  if (create_socket) {
+    socket_ = createListenSocketAndApplyOptions();
+  }
+
+  if (socket_ && local_address_->ip() && local_address_->ip()->port() == 0) {
+    local_address_ = socket_->localAddress();
+  }
+
+  ENVOY_LOG(debug, "Set listener {} socket factory local address to {}", listener_name_,
+            local_address_->asString());
+}
+
+Network::SocketSharedPtr ListenSocketFactoryImpl::createListenSocketAndApplyOptions() {
+  // socket might be nullptr depending on factory_ implementation.
+  Network::SocketSharedPtr socket = factory_.createListenSocket(
+      local_address_, socket_type_, options_, {bind_to_port_, !reuse_port_});
+
+  // Binding is done by now.
+  ENVOY_LOG(debug, "Create listen socket for listener {} on address {}", listener_name_,
+            local_address_->asString());
+  if (socket != nullptr && options_ != nullptr) {
+    const bool ok = Network::Socket::applyOptions(options_, *socket,
+                                                  envoy::api::v2::core::SocketOption::STATE_BOUND);
+    const std::string message =
+        fmt::format("{}: Setting socket options {}", listener_name_, ok ? "succeeded" : "failed");
+    if (!ok) {
+      ENVOY_LOG(warn, "{}", message);
+      throw EnvoyException(message);
+    } else {
+      ENVOY_LOG(debug, "{}", message);
+    }
+
+    // Add the options to the socket_ so that STATE_LISTENING options can be
+    // set in the worker after listen()/evconnlistener_new() is called.
+    socket->addOptions(options_);
+  }
+  return socket;
+}
+
+Network::SocketSharedPtr ListenSocketFactoryImpl::getListenSocket() {
+  if (!reuse_port_) {
+    return socket_;
+  }
+
+  Network::SocketSharedPtr socket;
+  absl::call_once(steal_once_, [this, &socket]() {
+    if (socket_) {
+      // If a listener's port is set to 0, socket_ should be created for reserving a port
+      // number, it is handed over to the first worker thread came here.
+      // There are several reasons for doing this:
+      // - for UDP, once a socket being bound, it begins to receive packets, it can't be
+      //   left unused, and closing it will lost packets received by it.
+      // - port number should be reserved before adding listener to active_listeners_ list,
+      //   otherwise admin API /listeners might return 0 as listener's port.
+      socket = std::move(socket_);
+    }
+  });
+
+  if (socket) {
+    return socket;
+  }
+
+  return createListenSocketAndApplyOptions();
+}
+
 ListenerImpl::ListenerImpl(const envoy::api::v2::Listener& config, const std::string& version_info,
                            ListenerManagerImpl& parent, const std::string& name, bool added_via_api,
                            bool workers_started, uint64_t hash,
                            ProtobufMessage::ValidationVisitor& validation_visitor)
     : parent_(parent), address_(Network::Address::resolveProtoAddress(config.address())),
-      filter_chain_manager_(address_),
-      socket_type_(Network::Utility::protobufAddressSocketType(config.address())),
-      global_scope_(parent_.server_.stats().createScope("")),
+      filter_chain_manager_(address_), global_scope_(parent_.server_.stats().createScope("")),
       listener_scope_(
           parent_.server_.stats().createScope(fmt::format("listener.{}.", address_->asString()))),
       bind_to_port_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config.deprecated_v1(), bind_to_port, true)),
@@ -51,17 +143,22 @@ ListenerImpl::ListenerImpl(const envoy::api::v2::Listener& config, const std::st
       listener_filters_timeout_(
           PROTOBUF_GET_MS_OR_DEFAULT(config, listener_filters_timeout, 15000)),
       continue_on_listener_filters_timeout_(config.continue_on_listener_filters_timeout()) {
-  if (config.has_transparent()) {
+  Network::Address::SocketType socket_type =
+      Network::Utility::protobufAddressSocketType(config.address());
+  if (PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, transparent, false)) {
     addListenSocketOptions(Network::SocketOptionFactory::buildIpTransparentOptions());
   }
-  if (config.has_freebind()) {
+  if (PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, freebind, false)) {
     addListenSocketOptions(Network::SocketOptionFactory::buildIpFreebindOptions());
+  }
+  if ((socket_type == Network::Address::SocketType::Datagram) || config.reuse_port()) {
+    addListenSocketOptions(Network::SocketOptionFactory::buildReusePortOptions());
   }
   if (!config.socket_options().empty()) {
     addListenSocketOptions(
         Network::SocketOptionFactory::buildLiteralOptions(config.socket_options()));
   }
-  if (socket_type_ == Network::Address::SocketType::Datagram) {
+  if (socket_type == Network::Address::SocketType::Datagram) {
     // Needed for recvmsg to return destination address in IP header.
     addListenSocketOptions(Network::SocketOptionFactory::buildIpPacketInfoOptions());
     // Needed to return receive buffer overflown indicator.
@@ -78,7 +175,7 @@ ListenerImpl::ListenerImpl(const envoy::api::v2::Listener& config, const std::st
   }
 
   if (!config.listener_filters().empty()) {
-    switch (socket_type_) {
+    switch (socket_type) {
     case Network::Address::SocketType::Datagram:
       if (config.listener_filters().size() > 1) {
         // Currently supports only 1 UDP listener
@@ -98,7 +195,7 @@ ListenerImpl::ListenerImpl(const envoy::api::v2::Listener& config, const std::st
     }
   }
 
-  if (config.filter_chains().empty() && (socket_type_ == Network::Address::SocketType::Stream ||
+  if (config.filter_chains().empty() && (socket_type == Network::Address::SocketType::Stream ||
                                          !udp_listener_factory_->isTransportConnectionless())) {
     // If we got here, this is a tcp listener or connection-oriented udp listener, so ensure there
     // is a filter chain specified
@@ -125,7 +222,7 @@ ListenerImpl::ListenerImpl(const envoy::api::v2::Listener& config, const std::st
   ListenerFilterChainFactoryBuilder builder(*this, factory_context);
   filter_chain_manager_.addFilterChain(config.filter_chains(), builder);
 
-  if (socket_type_ == Network::Address::SocketType::Datagram) {
+  if (socket_type == Network::Address::SocketType::Datagram) {
     return;
   }
 
@@ -172,11 +269,11 @@ ListenerImpl::ListenerImpl(const envoy::api::v2::Listener& config, const std::st
                    (matcher.transport_protocol().empty() &&
                     (!matcher.server_names().empty() || !matcher.application_protocols().empty()));
           }) &&
-      not std::any_of(config.listener_filters().begin(), config.listener_filters().end(),
-                      [](const auto& filter) {
-                        return filter.name() ==
-                               Extensions::ListenerFilters::ListenerFilterNames::get().TlsInspector;
-                      });
+      !std::any_of(config.listener_filters().begin(), config.listener_filters().end(),
+                   [](const auto& filter) {
+                     return filter.name() ==
+                            Extensions::ListenerFilters::ListenerFilterNames::get().TlsInspector;
+                   });
   // Automatically inject TLS Inspector if it wasn't configured explicitly and it's needed.
   if (need_tls_inspector) {
     const std::string message =
@@ -255,10 +352,10 @@ bool ListenerImpl::createListenerFilterChain(Network::ListenerFilterManager& man
   return Configuration::FilterChainUtility::buildFilterChain(manager, listener_filter_factories_);
 }
 
-bool ListenerImpl::createUdpListenerFilterChain(Network::UdpListenerFilterManager& manager,
+void ListenerImpl::createUdpListenerFilterChain(Network::UdpListenerFilterManager& manager,
                                                 Network::UdpReadFilterCallbacks& callbacks) {
-  return Configuration::FilterChainUtility::buildUdpFilterChain(manager, callbacks,
-                                                                udp_listener_filter_factories_);
+  Configuration::FilterChainUtility::buildUdpFilterChain(manager, callbacks,
+                                                         udp_listener_filter_factories_);
 }
 
 bool ListenerImpl::drainClose() const {
@@ -292,27 +389,9 @@ Init::Manager& ListenerImpl::initManager() {
   }
 }
 
-void ListenerImpl::setSocket(const Network::SocketSharedPtr& socket) {
-  ASSERT(!socket_);
-  socket_ = socket;
-  // Server config validation sets nullptr sockets.
-  if (socket_ && listen_socket_options_) {
-    // 'pre_bind = false' as bind() is never done after this.
-    bool ok = Network::Socket::applyOptions(listen_socket_options_, *socket_,
-                                            envoy::api::v2::core::SocketOption::STATE_BOUND);
-    const std::string message =
-        fmt::format("{}: Setting socket options {}", name_, ok ? "succeeded" : "failed");
-    if (!ok) {
-      ENVOY_LOG(warn, "{}", message);
-      throw EnvoyException(message);
-    } else {
-      ENVOY_LOG(debug, "{}", message);
-    }
-
-    // Add the options to the socket_ so that STATE_LISTENING options can be
-    // set in the worker after listen()/evconnlistener_new() is called.
-    socket_->addOptions(listen_socket_options_);
-  }
+void ListenerImpl::setSocketFactory(const Network::ListenSocketFactorySharedPtr& socket_factory) {
+  ASSERT(!socket_factory_);
+  socket_factory_ = socket_factory;
 }
 
 } // namespace Server

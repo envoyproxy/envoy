@@ -2,9 +2,9 @@ syntax = "proto3";
 
 package envoy.config.filter.network.thrift_proxy.v2alpha1;
 
+option java_package = "io.envoyproxy.envoy.config.filter.network.thrift_proxy.v2alpha1";
 option java_outer_classname = "RouteProto";
 option java_multiple_files = true;
-option java_package = "io.envoyproxy.envoy.config.filter.network.thrift_proxy.v2alpha1";
 
 import "envoy/api/v2/core/base.proto";
 import "envoy/api/v2/route/route.proto";
@@ -69,7 +69,7 @@ message RouteMatch {
   repeated api.v2.route.HeaderMatcher headers = 4;
 }
 
-// [#next-free-field: 6]
+// [#next-free-field: 7]
 message RouteAction {
   oneof cluster_specifier {
     option (validate.required) = true;
@@ -82,11 +82,18 @@ message RouteAction {
     // request is routed to one of the upstream clusters based on weights
     // assigned to each cluster.
     WeightedCluster weighted_clusters = 2;
+
+    // Envoy will determine the cluster to route to by reading the value of the
+    // Thrift header named by cluster_header from the request headers. If the
+    // header is not found or the referenced cluster does not exist Envoy will
+    // respond with an unknown method exception or an internal error exception,
+    // respectively.
+    string cluster_header = 6 [(validate.rules).string = {min_bytes: 1}];
   }
 
   // Optional endpoint metadata match criteria used by the subset load balancer. Only endpoints in
   // the upstream cluster with metadata matching what is set in this field will be considered.
-  // Note that this will be merged with what's provided in :ref: `WeightedCluster.MetadataMatch
+  // Note that this will be merged with what's provided in :ref:`WeightedCluster.metadata_match
   // <envoy_api_field_config.filter.network.thrift_proxy.v2alpha1.WeightedCluster.ClusterWeight.metadata_match>`,
   // with values there taking precedence. Keys and values should be provided under the "envoy.lb"
   // metadata key.
@@ -117,7 +124,7 @@ message WeightedCluster {
 
     // Optional endpoint metadata match criteria used by the subset load balancer. Only endpoints in
     // the upstream cluster with metadata matching what is set in this field, combined with what's
-    // provided in :ref: `RouteAction's metadata_match
+    // provided in :ref:`RouteAction's metadata_match
     // <envoy_api_field_config.filter.network.thrift_proxy.v2alpha1.RouteAction.metadata_match>`,
     // will be considered. Values here will take precedence. Keys and values should be provided
     // under the "envoy.lb" metadata key.

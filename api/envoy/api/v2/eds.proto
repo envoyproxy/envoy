@@ -2,9 +2,9 @@ syntax = "proto3";
 
 package envoy.api.v2;
 
+option java_package = "io.envoyproxy.envoy.api.v2";
 option java_outer_classname = "EdsProto";
 option java_multiple_files = true;
-option java_package = "io.envoyproxy.envoy.api.v2";
 option java_generic_services = true;
 
 import "envoy/api/v2/discovery.proto";
@@ -30,10 +30,8 @@ service EndpointDiscoveryService {
   }
 
   rpc FetchEndpoints(DiscoveryRequest) returns (DiscoveryResponse) {
-    option (google.api.http) = {
-      post: "/v2/discovery:endpoints"
-      body: "*"
-    };
+    option (google.api.http).post = "/v2/discovery:endpoints";
+    option (google.api.http).body = "*";
   }
 }
 
@@ -126,6 +124,7 @@ message ClusterLoadAssignment {
   repeated endpoint.LocalityLbEndpoints endpoints = 2;
 
   // Map of named endpoints that can be referenced in LocalityLbEndpoints.
+  // [#not-implemented-hide:]
   map<string, endpoint.Endpoint> named_endpoints = 5;
 
   // Load balancing policy settings.

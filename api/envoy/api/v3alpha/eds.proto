@@ -2,9 +2,9 @@ syntax = "proto3";
 
 package envoy.api.v3alpha;
 
+option java_package = "io.envoyproxy.envoy.api.v3alpha";
 option java_outer_classname = "EdsProto";
 option java_multiple_files = true;
-option java_package = "io.envoyproxy.envoy.api.v3alpha";
 option java_generic_services = true;
 
 import "envoy/api/v3alpha/discovery.proto";
@@ -14,6 +14,8 @@ import "envoy/type/v3alpha/percent.proto";
 import "google/api/annotations.proto";
 import "google/protobuf/duration.proto";
 import "google/protobuf/wrappers.proto";
+
+import "udpa/annotations/versioning.proto";
 
 import "validate/validate.proto";
 
@@ -30,10 +32,8 @@ service EndpointDiscoveryService {
   }
 
   rpc FetchEndpoints(DiscoveryRequest) returns (DiscoveryResponse) {
-    option (google.api.http) = {
-      post: "/v3alpha/discovery:endpoints"
-      body: "*"
-    };
+    option (google.api.http).post = "/v3alpha/discovery:endpoints";
+    option (google.api.http).body = "*";
   }
 }
 
@@ -48,10 +48,18 @@ service EndpointDiscoveryService {
 // then an endpoint within that locality will be chose based on its weight.
 // [#next-free-field: 6]
 message ClusterLoadAssignment {
+  option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.ClusterLoadAssignment";
+
   // Load balancing policy settings.
   // [#next-free-field: 6]
   message Policy {
+    option (udpa.annotations.versioning).previous_message_type =
+        "envoy.api.v2.ClusterLoadAssignment.Policy";
+
     message DropOverload {
+      option (udpa.annotations.versioning).previous_message_type =
+          "envoy.api.v2.ClusterLoadAssignment.Policy.DropOverload";
+
       // Identifier for the policy specifying the drop.
       string category = 1 [(validate.rules).string = {min_bytes: 1}];
 
@@ -126,6 +134,7 @@ message ClusterLoadAssignment {
   repeated endpoint.LocalityLbEndpoints endpoints = 2;
 
   // Map of named endpoints that can be referenced in LocalityLbEndpoints.
+  // [#not-implemented-hide:]
   map<string, endpoint.Endpoint> named_endpoints = 5;
 
   // Load balancing policy settings.

@@ -1,8 +1,7 @@
 #include "common/network/listener_impl.h"
 
-#include <sys/un.h>
-
 #include "envoy/common/exception.h"
+#include "envoy/common/platform.h"
 
 #include "common/common/assert.h"
 #include "common/common/empty_string.h"
@@ -65,11 +64,11 @@ void ListenerImpl::setupServerSocket(Event::DispatcherImpl& dispatcher, Socket& 
   evconnlistener_set_error_cb(listener_.get(), errorCallback);
 }
 
-ListenerImpl::ListenerImpl(Event::DispatcherImpl& dispatcher, Socket& socket, ListenerCallbacks& cb,
-                           bool bind_to_port)
-    : BaseListenerImpl(dispatcher, socket), cb_(cb), listener_(nullptr) {
+ListenerImpl::ListenerImpl(Event::DispatcherImpl& dispatcher, SocketSharedPtr socket,
+                           ListenerCallbacks& cb, bool bind_to_port)
+    : BaseListenerImpl(dispatcher, std::move(socket)), cb_(cb), listener_(nullptr) {
   if (bind_to_port) {
-    setupServerSocket(dispatcher, socket);
+    setupServerSocket(dispatcher, *socket_);
   }
 }
 

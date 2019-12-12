@@ -2,9 +2,9 @@ syntax = "proto3";
 
 package envoy.config.accesslog.v2;
 
+option java_package = "io.envoyproxy.envoy.config.accesslog.v2";
 option java_outer_classname = "AlsProto";
 option java_multiple_files = true;
-option java_package = "io.envoyproxy.envoy.config.accesslog.v2";
 
 import "envoy/api/v2/core/grpc_service.proto";
 
@@ -19,6 +19,7 @@ import "validate/validate.proto";
 // :ref:`AccessLog <envoy_api_msg_config.filter.accesslog.v2.AccessLog>`. This configuration will
 // populate :ref:`StreamAccessLogsMessage.http_logs
 // <envoy_api_field_service.accesslog.v2.StreamAccessLogsMessage.http_logs>`.
+// [#extension: envoy.access_loggers.http_grpc]
 message HttpGrpcAccessLogConfig {
   CommonGrpcAccessLogConfig common_config = 1 [(validate.rules).message = {required: true}];
 
@@ -37,11 +38,13 @@ message HttpGrpcAccessLogConfig {
 
 // Configuration for the built-in *envoy.tcp_grpc_access_log* type. This configuration will
 // populate *StreamAccessLogsMessage.tcp_logs*.
+// [#extension: envoy.access_loggers.tcp_grpc]
 message TcpGrpcAccessLogConfig {
   CommonGrpcAccessLogConfig common_config = 1 [(validate.rules).message = {required: true}];
 }
 
 // Common configuration for gRPC access logs.
+// [#next-free-field: 6]
 message CommonGrpcAccessLogConfig {
   // The friendly name of the access log to be returned in :ref:`StreamAccessLogsMessage.Identifier
   // <envoy_api_msg_service.accesslog.v2.StreamAccessLogsMessage.Identifier>`. This allows the
@@ -60,4 +63,9 @@ message CommonGrpcAccessLogConfig {
   // this limit it hit, or every time flush interval is elapsed, whichever comes first. Setting it
   // to zero effectively disables the batching. Defaults to 16384.
   google.protobuf.UInt32Value buffer_size_bytes = 4;
+
+  // Additional filter state objects to log in :ref:`filter_state_objects
+  // <envoy_api_field_data.accesslog.v2.AccessLogCommon.filter_state_objects>`.
+  // Logger will call `FilterState::Object::serializeAsProto` to serialize the filter state object.
+  repeated string filter_state_objects_to_log = 5;
 }

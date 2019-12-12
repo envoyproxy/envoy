@@ -6,6 +6,8 @@
 
 #include "envoy/config/filter/network/thrift_proxy/v2alpha1/thrift_proxy.pb.h"
 #include "envoy/router/router.h"
+#include "envoy/stats/scope.h"
+#include "envoy/stats/stats_macros.h"
 #include "envoy/tcp/conn_pool.h"
 #include "envoy/upstream/load_balancer.h"
 
@@ -40,6 +42,7 @@ public:
   }
   const RateLimitPolicy& rateLimitPolicy() const override { return rate_limit_policy_; }
   bool stripServiceName() const override { return strip_service_name_; };
+  const Http::LowerCaseString& clusterHeader() const override { return cluster_header_; }
 
   // Router::Route
   const RouteEntry* routeEntry() const override;
@@ -48,7 +51,7 @@ public:
                                       uint64_t random_value) const PURE;
 
 protected:
-  RouteConstSharedPtr clusterEntry(uint64_t random_value) const;
+  RouteConstSharedPtr clusterEntry(uint64_t random_value, const MessageMetadata& metadata) const;
   bool headersMatch(const Http::HeaderMap& headers) const;
 
 private:
@@ -72,6 +75,7 @@ private:
     }
     const RateLimitPolicy& rateLimitPolicy() const override { return parent_.rateLimitPolicy(); }
     bool stripServiceName() const override { return parent_.stripServiceName(); }
+    const Http::LowerCaseString& clusterHeader() const override { return parent_.clusterHeader(); }
 
     // Router::Route
     const RouteEntry* routeEntry() const override { return this; }
@@ -84,6 +88,28 @@ private:
   };
   using WeightedClusterEntrySharedPtr = std::shared_ptr<WeightedClusterEntry>;
 
+  class DynamicRouteEntry : public RouteEntry, public Route {
+  public:
+    DynamicRouteEntry(const RouteEntryImplBase& parent, absl::string_view cluster_name)
+        : parent_(parent), cluster_name_(std::string(cluster_name)) {}
+
+    // Router::RouteEntry
+    const std::string& clusterName() const override { return cluster_name_; }
+    const Envoy::Router::MetadataMatchCriteria* metadataMatchCriteria() const override {
+      return parent_.metadataMatchCriteria();
+    }
+    const RateLimitPolicy& rateLimitPolicy() const override { return parent_.rateLimitPolicy(); }
+    bool stripServiceName() const override { return parent_.stripServiceName(); }
+    const Http::LowerCaseString& clusterHeader() const override { return parent_.clusterHeader(); }
+
+    // Router::Route
+    const RouteEntry* routeEntry() const override { return this; }
+
+  private:
+    const RouteEntryImplBase& parent_;
+    const std::string cluster_name_;
+  };
+
   const std::string cluster_name_;
   const std::vector<Http::HeaderUtility::HeaderDataPtr> config_headers_;
   std::vector<WeightedClusterEntrySharedPtr> weighted_clusters_;
@@ -91,6 +117,7 @@ private:
   Envoy::Router::MetadataMatchCriteriaConstPtr metadata_match_criteria_;
   const RateLimitPolicyImpl rate_limit_policy_;
   const bool strip_service_name_;
+  const Http::LowerCaseString cluster_header_;
 };
 
 using RouteEntryImplBaseConstSharedPtr = std::shared_ptr<const RouteEntryImplBase>;
@@ -137,13 +164,25 @@ private:
   std::vector<RouteEntryImplBaseConstSharedPtr> routes_;
 };
 
+#define ALL_THRIFT_ROUTER_STATS(COUNTER, GAUGE, HISTOGRAM)                                         \
+  COUNTER(route_missing)                                                                           \
+  COUNTER(unknown_cluster)                                                                         \
+  COUNTER(upstream_rq_maintenance_mode)                                                            \
+  COUNTER(no_healthy_upstream)
+
+struct RouterStats {
+  ALL_THRIFT_ROUTER_STATS(GENERATE_COUNTER_STRUCT, GENERATE_GAUGE_STRUCT, GENERATE_HISTOGRAM_STRUCT)
+};
+
 class Router : public Tcp::ConnectionPool::UpstreamCallbacks,
                public Upstream::LoadBalancerContextBase,
                public ProtocolConverter,
                public ThriftFilters::DecoderFilter,
                Logger::Loggable<Logger::Id::thrift> {
 public:
-  Router(Upstream::ClusterManager& cluster_manager) : cluster_manager_(cluster_manager) {}
+  Router(Upstream::ClusterManager& cluster_manager, const std::string& stat_prefix,
+         Stats::Scope& scope)
+      : cluster_manager_(cluster_manager), stats_(generateStats(stat_prefix, scope)) {}
 
   ~Router() override = default;
 
@@ -181,6 +220,7 @@ private:
 
     FilterStatus start();
     void resetStream();
+    void releaseConnection(bool close);
 
     // Tcp::ConnectionPool::Callbacks
     void onPoolFailure(Tcp::ConnectionPool::PoolFailureReason reason,
@@ -213,8 +253,14 @@ private:
 
   void convertMessageBegin(MessageMetadataSharedPtr metadata);
   void cleanup();
+  RouterStats generateStats(const std::string& prefix, Stats::Scope& scope) {
+    return RouterStats{ALL_THRIFT_ROUTER_STATS(POOL_COUNTER_PREFIX(scope, prefix),
+                                               POOL_GAUGE_PREFIX(scope, prefix),
+                                               POOL_HISTOGRAM_PREFIX(scope, prefix))};
+  }
 
   Upstream::ClusterManager& cluster_manager_;
+  RouterStats stats_;
 
   ThriftFilters::DecoderFilterCallbacks* callbacks_{};
   RouteConstSharedPtr route_{};

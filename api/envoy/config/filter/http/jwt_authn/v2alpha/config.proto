@@ -2,9 +2,9 @@ syntax = "proto3";
 
 package envoy.config.filter.http.jwt_authn.v2alpha;
 
+option java_package = "io.envoyproxy.envoy.config.filter.http.jwt_authn.v2alpha";
 option java_outer_classname = "ConfigProto";
 option java_multiple_files = true;
-option java_package = "io.envoyproxy.envoy.config.filter.http.jwt_authn.v2alpha";
 
 import "envoy/api/v2/core/base.proto";
 import "envoy/api/v2/core/http_uri.proto";
@@ -17,6 +17,7 @@ import "validate/validate.proto";
 
 // [#protodoc-title: JWT Authentication]
 // JWT Authentication :ref:`configuration overview <config_http_filters_jwt_authn>`.
+// [#extension: envoy.filters.http.jwt_authn]
 
 // Please see following for JWT authentication flow:
 //
@@ -464,4 +465,9 @@ message JwtAuthentication {
   // The *rules* field above is checked first, if it could not find any matches,
   // check this one.
   FilterStateRule filter_state_rules = 3;
+
+  // When set to true, bypass the `CORS preflight request
+  // <http://www.w3.org/TR/cors/#cross-origin-request-with-preflight>`_ regardless of JWT
+  // requirements specified in the rules.
+  bool bypass_cors_preflight = 4;
 }

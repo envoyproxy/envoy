@@ -74,6 +74,7 @@ public:
         pool_(scope_.symbolTable()),
         metadata_context_namespaces_(config.metadata_context_namespaces().begin(),
                                      config.metadata_context_namespaces().end()),
+        include_peer_certificate_(config.include_peer_certificate()),
         stats_(generateStats(stats_prefix, scope)), ext_authz_ok_(pool_.add("ext_authz.ok")),
         ext_authz_denied_(pool_.add("ext_authz.denied")),
         ext_authz_error_(pool_.add("ext_authz.error")),
@@ -111,6 +112,8 @@ public:
     scope.counterFromStatName(name).inc();
   }
 
+  bool includePeerCertificate() const { return include_peer_certificate_; }
+
 private:
   static Http::Code toErrorCode(uint64_t status) {
     const auto code = static_cast<Http::Code>(status);
@@ -141,6 +144,8 @@ private:
   Stats::StatNamePool pool_;
 
   const std::vector<std::string> metadata_context_namespaces_;
+
+  const bool include_peer_certificate_;
 
   // The stats for the filter.
   ExtAuthzFilterStats stats_;

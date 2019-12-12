@@ -9,6 +9,7 @@
 #include "quiche/quic/core/quic_crypto_server_stream.h"
 #pragma GCC diagnostic pop
 
+#include "common/common/assert.h"
 #include "extensions/quic_listeners/quiche/envoy_quic_server_stream.h"
 
 namespace Envoy {
@@ -18,10 +19,17 @@ EnvoyQuicServerSession::EnvoyQuicServerSession(
     const quic::QuicConfig& config, const quic::ParsedQuicVersionVector& supported_versions,
     std::unique_ptr<EnvoyQuicConnection> connection, quic::QuicSession::Visitor* visitor,
     quic::QuicCryptoServerStream::Helper* helper, const quic::QuicCryptoServerConfig* crypto_config,
-    quic::QuicCompressedCertsCache* compressed_certs_cache, Event::Dispatcher& dispatcher)
+    quic::QuicCompressedCertsCache* compressed_certs_cache, Event::Dispatcher& dispatcher,
+    uint32_t send_buffer_limit)
     : quic::QuicServerSessionBase(config, supported_versions, connection.get(), visitor, helper,
                                   crypto_config, compressed_certs_cache),
-      QuicFilterManagerConnectionImpl(std::move(connection), dispatcher) {}
+      QuicFilterManagerConnectionImpl(*connection, dispatcher, send_buffer_limit),
+      quic_connection_(std::move(connection)) {}
+
+EnvoyQuicServerSession::~EnvoyQuicServerSession() {
+  ASSERT(!quic_connection_->connected());
+  QuicFilterManagerConnectionImpl::quic_connection_ = nullptr;
+}
 
 absl::string_view EnvoyQuicServerSession::requestedServerName() const {
   return {GetCryptoStream()->crypto_negotiated_params().sni};
@@ -41,6 +49,9 @@ quic::QuicSpdyStream* EnvoyQuicServerSession::CreateIncomingStream(quic::QuicStr
   auto stream = new EnvoyQuicServerStream(id, this, quic::BIDIRECTIONAL);
   ActivateStream(absl::WrapUnique(stream));
   setUpRequestDecoder(*stream);
+  if (aboveHighWatermark()) {
+    stream->runHighWatermarkCallbacks();
+  }
   return stream;
 }
 
@@ -82,12 +93,21 @@ void EnvoyQuicServerSession::SendGoAway(quic::QuicErrorCode error_code, const st
   }
 }
 
+void EnvoyQuicServerSession::OnCanWrite() {
+  quic::QuicServerSessionBase::OnCanWrite();
+  // Do not update delay close state according to connection level packet egress because that is
+  // equivalent to TCP transport layer egress. But only do so if the session gets chance to write.
+  maybeApplyDelayClosePolicy();
+}
+
 void EnvoyQuicServerSession::OnCryptoHandshakeEvent(CryptoHandshakeEvent event) {
   quic::QuicServerSessionBase::OnCryptoHandshakeEvent(event);
   if (event == HANDSHAKE_CONFIRMED) {
-    raiseEvent(Network::ConnectionEvent::Connected);
+    raiseConnectionEvent(Network::ConnectionEvent::Connected);
   }
 }
+
+bool EnvoyQuicServerSession::hasDataToWrite() { return HasDataToWrite(); }
 
 } // namespace Quic
 } // namespace Envoy

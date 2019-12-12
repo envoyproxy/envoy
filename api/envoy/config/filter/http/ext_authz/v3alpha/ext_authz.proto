@@ -2,9 +2,9 @@ syntax = "proto3";
 
 package envoy.config.filter.http.ext_authz.v3alpha;
 
+option java_package = "io.envoyproxy.envoy.config.filter.http.ext_authz.v3alpha";
 option java_outer_classname = "ExtAuthzProto";
 option java_multiple_files = true;
-option java_package = "io.envoyproxy.envoy.config.filter.http.ext_authz.v3alpha";
 
 import "envoy/api/v3alpha/core/base.proto";
 import "envoy/api/v3alpha/core/grpc_service.proto";
@@ -12,13 +12,19 @@ import "envoy/api/v3alpha/core/http_uri.proto";
 import "envoy/type/matcher/v3alpha/string.proto";
 import "envoy/type/v3alpha/http_status.proto";
 
+import "udpa/annotations/versioning.proto";
+
 import "validate/validate.proto";
 
 // [#protodoc-title: External Authorization]
 // External Authorization :ref:`configuration overview <config_http_filters_ext_authz>`.
+// [#extension: envoy.filters.http.ext_authz]
 
-// [#next-free-field: 10]
+// [#next-free-field: 11]
 message ExtAuthz {
+  option (udpa.annotations.versioning).previous_message_type =
+      "envoy.config.filter.http.ext_authz.v2.ExtAuthz";
+
   reserved 4;
 
   reserved "use_alpha";
@@ -88,10 +94,19 @@ message ExtAuthz {
   //
   // If this field is not specified, the filter will be enabled for all requests.
   api.v3alpha.core.RuntimeFractionalPercent filter_enabled = 9;
+
+  // Specifies if the peer certificate is sent to the external service.
+  //
+  // When this field is true, Envoy will include the peer X.509 certificate, if available, in the
+  // :ref:`certificate<envoy_api_field_service.auth.v3alpha.AttributeContext.Peer.certificate>`.
+  bool include_peer_certificate = 10;
 }
 
 // Configuration for buffering the request data.
 message BufferSettings {
+  option (udpa.annotations.versioning).previous_message_type =
+      "envoy.config.filter.http.ext_authz.v2.BufferSettings";
+
   // Sets the maximum size of a message body that the filter will hold in memory. Envoy will return
   // *HTTP 413* and will *not* initiate the authorization process when buffer reaches the number
   // set in this field. Note that this setting will have precedence over :ref:`failure_mode_allow
@@ -130,6 +145,9 @@ message BufferSettings {
 // for details.
 // [#next-free-field: 9]
 message HttpService {
+  option (udpa.annotations.versioning).previous_message_type =
+      "envoy.config.filter.http.ext_authz.v2.HttpService";
+
   reserved 3, 4, 5, 6;
 
   // Sets the HTTP server URI which the authorization requests must be sent to.
@@ -146,6 +164,9 @@ message HttpService {
 }
 
 message AuthorizationRequest {
+  option (udpa.annotations.versioning).previous_message_type =
+      "envoy.config.filter.http.ext_authz.v2.AuthorizationRequest";
+
   // Authorization request will include the client request headers that have a correspondent match
   // in the :ref:`list <envoy_api_msg_type.matcher.v3alpha.ListStringMatcher>`. Note that in
   // addition to the user's supplied matchers:
@@ -163,6 +184,9 @@ message AuthorizationRequest {
 }
 
 message AuthorizationResponse {
+  option (udpa.annotations.versioning).previous_message_type =
+      "envoy.config.filter.http.ext_authz.v2.AuthorizationResponse";
+
   // When this :ref:`list <envoy_api_msg_type.matcher.v3alpha.ListStringMatcher>` is set,
   // authorization response headers that have a correspondent match will be added to the original
   // client request. Note that coexistent headers will be overridden.
@@ -179,6 +203,9 @@ message AuthorizationResponse {
 
 // Extra settings on a per virtualhost/route/weighted-cluster level.
 message ExtAuthzPerRoute {
+  option (udpa.annotations.versioning).previous_message_type =
+      "envoy.config.filter.http.ext_authz.v2.ExtAuthzPerRoute";
+
   oneof override {
     option (validate.required) = true;
 
@@ -197,6 +224,9 @@ message ExtAuthzPerRoute {
 // host is used without needing to parse the host header. If CheckSettings is specified in multiple
 // per-filter-configs, they will be merged in order, and the result will be used.
 message CheckSettings {
+  option (udpa.annotations.versioning).previous_message_type =
+      "envoy.config.filter.http.ext_authz.v2.CheckSettings";
+
   // Context extensions to set on the CheckRequest's
   // :ref:`AttributeContext.context_extensions<envoy_api_field_service.auth.v3alpha.AttributeContext.context_extensions>`
   //
