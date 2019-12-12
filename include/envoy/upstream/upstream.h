@@ -871,7 +871,7 @@ public:
   upstreamHttpProtocol(absl::optional<Http::Protocol> downstream_protocol) const PURE;
 
   /**
-   * @return auto sni flag. if this is true, sni value will be set automatically
+   * @return http protocol options for upstream connection
    */
   virtual const absl::optional<envoy::api::v2::core::HttpProtocolOptions>&
   httpProtocolOptions() const PURE;

@@ -630,7 +630,7 @@ private:
   const Network::ConnectionSocket::OptionsSharedPtr cluster_socket_options_;
   const bool drain_connections_on_host_removal_;
   const bool warm_hosts_;
-  absl::optional<envoy::api::v2::core::HttpProtocolOptions> http_protocol_options_;
+  const absl::optional<envoy::api::v2::core::HttpProtocolOptions> http_protocol_options_;
   absl::optional<std::string> eds_service_name_;
   const absl::optional<envoy::api::v2::Cluster::CustomClusterType> cluster_type_;
   const std::unique_ptr<Server::Configuration::CommonFactoryContext> factory_context_;

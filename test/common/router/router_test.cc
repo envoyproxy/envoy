@@ -296,10 +296,10 @@ TEST_F(RouterTest, UpdateFilterState) {
 
   HttpTestUtility::addDefaultHeaders(headers);
   router_.decodeHeaders(headers, true);
-  EXPECT_EQ("host", stream_info.filterState()
-                        .template getDataReadOnly<Network::UpstreamServerName>(
-                            Network::UpstreamServerName::key())
-                        .value());
+  EXPECT_EQ("host",
+            stream_info.filterState()
+                .getDataReadOnly<Network::UpstreamServerName>(Network::UpstreamServerName::key())
+                .value());
   EXPECT_CALL(cancellable_, cancel());
   router_.onDestroy();
   EXPECT_TRUE(verifyHostUpstreamStats(0, 0));

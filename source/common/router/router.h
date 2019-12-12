@@ -30,8 +30,6 @@
 #include "common/stream_info/stream_info_impl.h"
 #include "common/upstream/load_balancer_impl.h"
 
-#include "absl/strings/string_view.h"
-
 namespace Envoy {
 namespace Router {
 
