@@ -34,3 +34,8 @@ def envoy_api_binding():
         name = "http_api_protos",
         actual = "@com_google_googleapis//google/api:annotations_cc_proto",
     )
+    native.bind(
+        name = "rpc_status_proto",
+        actual = "@com_google_googleapis//google/rpc:status_cc_proto",
+    )
+
