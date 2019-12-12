@@ -30,9 +30,9 @@ public:
 /**
  * Outbound request callbacks.
  */
-class PoolCallbacks {
+class ClientCallbacks {
 public:
-  virtual ~PoolCallbacks() = default;
+  virtual ~ClientCallbacks() = default;
 
   /**
    * Called when a pipelined response is received.
@@ -48,21 +48,26 @@ public:
   /**
    * Called when a MOVED or ASK redirection error is received, and the request must be retried.
    * @param value supplies the MOVED error response
+   * @param host_address supplies the redirection host address and port
+   * @param ask_redirection indicates if this is a ASK redirection
    * @return bool true if the request is successfully redirected, false otherwise
    */
-  virtual bool onRedirection(const Common::Redis::RespValue& value) PURE;
+  virtual bool onRedirection(RespValuePtr&& value, const std::string& host_address,
+                             bool ask_redirection) PURE;
 };
 
 /**
  * DoNothingPoolCallbacks is used for internally generated commands whose response is
  * transparently filtered, and redirection never occurs (e.g., "asking", "auth", etc.).
  */
-class DoNothingPoolCallbacks : public PoolCallbacks {
+class DoNothingPoolCallbacks : public ClientCallbacks {
 public:
-  // PoolCallbacks
+  // ClientCallbacks
   void onResponse(Common::Redis::RespValuePtr&&) override {}
   void onFailure() override {}
-  bool onRedirection(const Common::Redis::RespValue&) override { return false; }
+  bool onRedirection(Common::Redis::RespValuePtr&&, const std::string&, bool) override {
+    return false;
+  }
 };
 
 /**
@@ -95,7 +100,7 @@ public:
    * @return PoolRequest* a handle to the active request or nullptr if the request could not be made
    *         for some reason.
    */
-  virtual PoolRequest* makeRequest(const RespValue& request, PoolCallbacks& callbacks) PURE;
+  virtual PoolRequest* makeRequest(const RespValue& request, ClientCallbacks& callbacks) PURE;
 
   /**
    * Initialize the connection. Issue the auth command and readonly command as needed.

@@ -335,7 +335,7 @@ TEST_F(DnsImplConstructor, SupportsCustomResolvers) {
   auto addr4 = Network::Utility::parseInternetAddressAndPort("127.0.0.1:54");
   char addr6str[INET6_ADDRSTRLEN];
   auto addr6 = Network::Utility::parseInternetAddressAndPort("[::1]:54");
-  auto resolver = dispatcher_->createDnsResolver({addr4, addr6});
+  auto resolver = dispatcher_->createDnsResolver({addr4, addr6}, false);
   auto peer = std::make_unique<DnsResolverImplPeer>(dynamic_cast<DnsResolverImpl*>(resolver.get()));
   ares_addr_port_node* resolvers;
   int result = ares_get_servers_ports(peer->channel(), &resolvers);
@@ -380,7 +380,7 @@ private:
 TEST_F(DnsImplConstructor, SupportCustomAddressInstances) {
   auto test_instance(std::make_shared<CustomInstance>("127.0.0.1", 45));
   EXPECT_EQ(test_instance->asString(), "127.0.0.1:borked_port_45");
-  auto resolver = dispatcher_->createDnsResolver({test_instance});
+  auto resolver = dispatcher_->createDnsResolver({test_instance}, false);
   auto peer = std::make_unique<DnsResolverImplPeer>(dynamic_cast<DnsResolverImpl*>(resolver.get()));
   ares_addr_port_node* resolvers;
   int result = ares_get_servers_ports(peer->channel(), &resolvers);
@@ -396,7 +396,7 @@ TEST_F(DnsImplConstructor, BadCustomResolvers) {
   envoy::api::v2::core::Address pipe_address;
   pipe_address.mutable_pipe()->set_path("foo");
   auto pipe_instance = Network::Utility::protobufAddressToAddress(pipe_address);
-  EXPECT_THROW_WITH_MESSAGE(dispatcher_->createDnsResolver({pipe_instance}), EnvoyException,
+  EXPECT_THROW_WITH_MESSAGE(dispatcher_->createDnsResolver({pipe_instance}, false), EnvoyException,
                             "DNS resolver 'foo' is not an IP address");
 }
 
@@ -405,7 +405,7 @@ public:
   DnsImplTest() : api_(Api::createApiForTest()), dispatcher_(api_->allocateDispatcher()) {}
 
   void SetUp() override {
-    resolver_ = dispatcher_->createDnsResolver({});
+    resolver_ = dispatcher_->createDnsResolver({}, use_tcp_for_dns_lookups());
 
     // Instantiate TestDnsServer and listen on a random port on the loopback address.
     server_ = std::make_unique<TestDnsServer>(*dispatcher_);
@@ -415,7 +415,9 @@ public:
 
     // Point c-ares at the listener with no search domains and TCP-only.
     peer_ = std::make_unique<DnsResolverImplPeer>(dynamic_cast<DnsResolverImpl*>(resolver_.get()));
-    peer_->resetChannelTcpOnly(zero_timeout());
+    if (tcp_only()) {
+      peer_->resetChannelTcpOnly(zero_timeout());
+    }
     ares_set_servers_ports_csv(peer_->channel(), socket_->localAddress()->asString().c_str());
   }
 
@@ -437,6 +439,8 @@ public:
 protected:
   // Should the DnsResolverImpl use a zero timeout for c-ares queries?
   virtual bool zero_timeout() const { return false; }
+  virtual bool tcp_only() const { return true; }
+  virtual bool use_tcp_for_dns_lookups() const { return false; }
   std::unique_ptr<TestDnsServer> server_;
   std::unique_ptr<DnsResolverImplPeer> peer_;
   Network::MockConnectionHandler connection_handler_;
@@ -849,7 +853,7 @@ TEST(DnsImplUnitTest, PendingTimerEnable) {
   Event::MockDispatcher dispatcher;
   Event::MockTimer* timer = new NiceMock<Event::MockTimer>();
   EXPECT_CALL(dispatcher, createTimer_(_)).WillOnce(Return(timer));
-  DnsResolverImpl resolver(dispatcher, {});
+  DnsResolverImpl resolver(dispatcher, {}, false);
   Event::FileEvent* file_event = new NiceMock<Event::MockFileEvent>();
   EXPECT_CALL(dispatcher, createFileEvent_(_, _, _, _)).WillOnce(Return(file_event));
   EXPECT_CALL(*timer, enableTimer(_, _));
@@ -857,6 +861,63 @@ TEST(DnsImplUnitTest, PendingTimerEnable) {
                                       [&](std::list<DnsResponse>&& results) {
                                         UNREFERENCED_PARAMETER(results);
                                       }));
+}
+
+class DnsImplAresFlagsForTcpTest : public DnsImplTest {
+protected:
+  bool tcp_only() const override { return false; }
+  bool use_tcp_for_dns_lookups() const override { return true; }
+};
+
+// Parameterize the DNS test server socket address.
+INSTANTIATE_TEST_SUITE_P(IpVersions, DnsImplAresFlagsForTcpTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
+
+// Validate that c_ares flag `ARES_FLAG_USEVC` is set when boolean property
+// `use_tcp_for_dns_lookups` is enabled.
+TEST_P(DnsImplAresFlagsForTcpTest, TcpLookupsEnabled) {
+  server_->addCName("root.cnam.domain", "result.cname.domain");
+  server_->addHosts("result.cname.domain", {"201.134.56.7"}, RecordType::A);
+  std::list<Address::InstanceConstSharedPtr> address_list;
+  ares_options opts{};
+  int optmask = 0;
+  EXPECT_EQ(ARES_SUCCESS, ares_save_options(peer_->channel(), &opts, &optmask));
+  EXPECT_TRUE((opts.flags & ARES_FLAG_USEVC) == ARES_FLAG_USEVC);
+  EXPECT_NE(nullptr, resolver_->resolve("root.cnam.domain", DnsLookupFamily::Auto,
+                                        [&](std::list<DnsResponse>&& results) -> void {
+                                          address_list = getAddressList(results);
+                                          dispatcher_->exit();
+                                        }));
+  ares_destroy_options(&opts);
+}
+
+class DnsImplAresFlagsForUdpTest : public DnsImplTest {
+protected:
+  bool tcp_only() const override { return false; }
+};
+
+// Parameterize the DNS test server socket address.
+INSTANTIATE_TEST_SUITE_P(IpVersions, DnsImplAresFlagsForUdpTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
+
+// Validate that c_ares flag `ARES_FLAG_USEVC` is not set when boolean property
+// `use_tcp_for_dns_lookups` is disabled.
+TEST_P(DnsImplAresFlagsForUdpTest, UdpLookupsEnabled) {
+  server_->addCName("root.cnam.domain", "result.cname.domain");
+  server_->addHosts("result.cname.domain", {"201.134.56.7"}, RecordType::A);
+  std::list<Address::InstanceConstSharedPtr> address_list;
+  ares_options opts{};
+  int optmask = 0;
+  EXPECT_EQ(ARES_SUCCESS, ares_save_options(peer_->channel(), &opts, &optmask));
+  EXPECT_FALSE((opts.flags & ARES_FLAG_USEVC) == ARES_FLAG_USEVC);
+  EXPECT_NE(nullptr, resolver_->resolve("root.cnam.domain", DnsLookupFamily::Auto,
+                                        [&](std::list<DnsResponse>&& results) -> void {
+                                          address_list = getAddressList(results);
+                                          dispatcher_->exit();
+                                        }));
+  ares_destroy_options(&opts);
 }
 
 } // namespace Network

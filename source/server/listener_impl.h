@@ -14,19 +14,21 @@
 
 #include "server/filter_chain_manager_impl.h"
 
+#include "absl/base/call_once.h"
+
 namespace Envoy {
 namespace Server {
 
 class ListenerManagerImpl;
 
-class ListenSocketFactoryImplBase : public Network::ListenSocketFactory,
-                                    protected Logger::Loggable<Logger::Id::config> {
+class ListenSocketFactoryImpl : public Network::ListenSocketFactory,
+                                protected Logger::Loggable<Logger::Id::config> {
 public:
-  ListenSocketFactoryImplBase(ListenerComponentFactory& factory,
-                              Network::Address::InstanceConstSharedPtr local_address,
-                              Network::Address::SocketType socket_type,
-                              const Network::Socket::OptionsSharedPtr& options, bool bind_to_port,
-                              const std::string& listener_name);
+  ListenSocketFactoryImpl(ListenerComponentFactory& factory,
+                          Network::Address::InstanceConstSharedPtr address,
+                          Network::Address::SocketType socket_type,
+                          const Network::Socket::OptionsSharedPtr& options, bool bind_to_port,
+                          const std::string& listener_name, bool reuse_port);
 
   // Network::ListenSocketFactory
   Network::Address::SocketType socketType() const override { return socket_type_; }
@@ -34,9 +36,23 @@ public:
     return local_address_;
   }
 
+  Network::SocketSharedPtr getListenSocket() override;
+
+  /**
+   * @return the socket shared by worker threads; otherwise return null.
+   */
+  absl::optional<std::reference_wrapper<Network::Socket>> sharedSocket() const override {
+    if (!reuse_port_) {
+      ASSERT(socket_ != nullptr);
+      return *socket_;
+    }
+    // If reuse_port is true, always return null, even socket_ is created for reserving
+    // port number.
+    return absl::nullopt;
+  }
+
 protected:
   Network::SocketSharedPtr createListenSocketAndApplyOptions();
-  void setLocalAddress(Network::Address::InstanceConstSharedPtr local_address);
 
 private:
   ListenerComponentFactory& factory_;
@@ -47,41 +63,9 @@ private:
   const Network::Socket::OptionsSharedPtr options_;
   bool bind_to_port_;
   const std::string& listener_name_;
-};
-
-class TcpListenSocketFactory : public ListenSocketFactoryImplBase {
-public:
-  TcpListenSocketFactory(ListenerComponentFactory& factory,
-                         Network::Address::InstanceConstSharedPtr local_address,
-                         const Network::Socket::OptionsSharedPtr& options, bool bind_to_port,
-                         const std::string& listener_name);
-
-  // Network::ListenSocketFactory
-  // If |socket_| is nullptr, create a new socket for it. Otherwise, always return |socket_|.
-  Network::SocketSharedPtr getListenSocket() override;
-  absl::optional<std::reference_wrapper<Network::Socket>> sharedSocket() const override {
-    ASSERT(socket_ != nullptr);
-    return *socket_;
-  }
-
-private:
-  // This is currently always shared across all workers. In the future SO_REUSEPORT support will be
-  // added.
+  const bool reuse_port_;
   Network::SocketSharedPtr socket_;
-};
-
-class UdpListenSocketFactory : public ListenSocketFactoryImplBase {
-public:
-  UdpListenSocketFactory(ListenerComponentFactory& factory,
-                         Network::Address::InstanceConstSharedPtr local_address,
-                         const Network::Socket::OptionsSharedPtr& options, bool bind_to_port,
-                         const std::string& listener_name);
-
-  // Network::ListenSocketFactory
-  Network::SocketSharedPtr getListenSocket() override;
-  absl::optional<std::reference_wrapper<Network::Socket>> sharedSocket() const override {
-    return absl::nullopt;
-  }
+  absl::once_flag steal_once_;
 };
 
 // TODO(mattklein123): Consider getting rid of pre-worker start and post-worker start code by

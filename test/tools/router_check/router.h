@@ -110,6 +110,11 @@ private:
    * Set UUID as the name for each route for detecting missing tests during the coverage check.
    */
   static void assignUniqueRouteNames(envoy::api::v2::RouteConfiguration& route_config);
+  /**
+   * For each route with runtime fraction 0%, set the numerator to a nonzero value so the
+   * route can be tested as enabled or disabled.
+   */
+  static void assignRuntimeFraction(envoy::api::v2::RouteConfiguration& route_config);
 
   bool compareCluster(ToolConfig& tool_config, const std::string& expected);
   bool compareCluster(ToolConfig& tool_config,

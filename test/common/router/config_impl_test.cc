@@ -648,6 +648,17 @@ virtual_hosts:
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
   TestConfigImpl config(parseRouteConfigurationFromV2Yaml(yaml), factory_context_, true);
 
+  // No host header, no x-forwarded-proto and no path header testing.
+  EXPECT_EQ(nullptr, config.route(Http::TestHeaderMapImpl{{":path", "/"}, {":method", "GET"}}, 0));
+  EXPECT_EQ(
+      nullptr,
+      config.route(
+          Http::TestHeaderMapImpl{{":authority", "foo"}, {":path", "/"}, {":method", "GET"}}, 0));
+  EXPECT_EQ(nullptr, config.route(Http::TestHeaderMapImpl{{":authority", "foo"},
+                                                          {":method", "CONNECT"},
+                                                          {"x-forwarded-proto", "http"}},
+                                  0));
+
   // Base routing testing.
   EXPECT_EQ("instant-server",
             config.route(genHeaders("api.lyft.com", "/", "GET"), 0)->routeEntry()->clusterName());
@@ -2194,6 +2205,26 @@ TEST_F(RouterMatcherHashPolicyTest, HashIpv6DifferentAddresses) {
     const uint64_t hash_1 = hash_policy->generateHash(&first_ip, headers, add_cookie_nop_).value();
     const uint64_t hash_2 = hash_policy->generateHash(&second_ip, headers, add_cookie_nop_).value();
     EXPECT_EQ(hash_1, hash_2);
+  }
+}
+
+TEST_F(RouterMatcherHashPolicyTest, HashQueryParameters) {
+  firstRouteHashPolicy()->mutable_query_parameter()->set_name("param");
+  {
+    Http::TestHeaderMapImpl headers = genHeaders("www.lyft.com", "/foo", "GET");
+    Router::RouteConstSharedPtr route = config().route(headers, 0);
+    EXPECT_FALSE(
+        route->routeEntry()->hashPolicy()->generateHash(nullptr, headers, add_cookie_nop_));
+  }
+  {
+    Http::TestHeaderMapImpl headers = genHeaders("www.lyft.com", "/foo?param=xyz", "GET");
+    Router::RouteConstSharedPtr route = config().route(headers, 0);
+    EXPECT_TRUE(route->routeEntry()->hashPolicy()->generateHash(nullptr, headers, add_cookie_nop_));
+  }
+  {
+    Http::TestHeaderMapImpl headers = genHeaders("www.lyft.com", "/bar?param=xyz", "GET");
+    Router::RouteConstSharedPtr route = config().route(headers, 0);
+    EXPECT_FALSE(route->routeEntry()->hashPolicy());
   }
 }
 
@@ -5444,6 +5475,22 @@ virtual_hosts:
             denominator: 1
           overall_sampling:
             numerator: 3
+          custom_tags:
+          - tag: ltag
+            literal:
+              value: lvalue
+          - tag: etag
+            environment:
+              name: E_TAG
+          - tag: rtag
+            request_header:
+              name: X-Tag
+          - tag: mtag
+            metadata:
+              kind: { route: {} }
+              metadata_key:
+                key: com.bar.foo
+                path: [ { key: xx }, { key: yy } ]
         route: { cluster: ww2 }
   )EOF";
   BazFactory baz_factory;
@@ -5470,6 +5517,12 @@ virtual_hosts:
   EXPECT_EQ(1, route3->tracingConfig()->getRandomSampling().denominator());
   EXPECT_EQ(3, route3->tracingConfig()->getOverallSampling().numerator());
   EXPECT_EQ(0, route3->tracingConfig()->getOverallSampling().denominator());
+
+  std::vector<std::string> custom_tags{"ltag", "etag", "rtag", "mtag"};
+  const Tracing::CustomTagMap& map = route3->tracingConfig()->getCustomTags();
+  for (const std::string& custom_tag : custom_tags) {
+    EXPECT_NE(map.find(custom_tag), map.end());
+  }
 }
 
 // Test to check Prefix Rewrite for redirects
