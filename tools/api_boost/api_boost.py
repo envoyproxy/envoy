@@ -32,7 +32,8 @@ def ApiBoostFile(llvm_include_path, path):
   # Run the booster
   try:
     result = sp.run([
-        './bazel-bin/tools/clang_tools/api_booster/api_booster', '--extra-arg-before=-xc++',
+        './bazel-bin/external/envoy_dev/clang_tools/api_booster/api_booster',
+        '--extra-arg-before=-xc++',
         '--extra-arg=-isystem%s' % llvm_include_path, '--extra-arg=-Wno-undefined-internal', path
     ],
                     capture_output=True,
@@ -97,13 +98,18 @@ def ApiBoostTree(args):
     ]
     query = 'kind(cc_library, {})'.format(' union '.join(dep_build_targets))
     dep_lib_build_targets = sp.check_output(['bazel', 'query', query]).decode().splitlines()
+    # Slightly easier to debug when we build api_booster on its own.
     sp.run([
         'bazel',
         'build',
         '--strip=always',
-        '//tools/clang_tools/api_booster',
-    ] + dep_lib_build_targets,
-           check=True)
+        '@envoy_dev//clang_tools/api_booster',
+    ], check=True)
+    sp.run([
+        'bazel',
+        'build',
+        '--strip=always',
+    ] + dep_lib_build_targets, check=True)
 
   # Figure out where the LLVM include path is. We need to provide this
   # explicitly as the api_booster is built inside the Bazel cache and doesn't

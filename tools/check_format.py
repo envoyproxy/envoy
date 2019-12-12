@@ -341,7 +341,8 @@ def isBuildFile(file_path):
 
 
 def isExternalBuildFile(file_path):
-  return isBuildFile(file_path) and file_path.startswith("./bazel/external/")
+  return isBuildFile(file_path) and (file_path.startswith("./bazel/external/") or
+                                     file_path.startswith("./tools/clang_tools"))
 
 
 def isSkylarkFile(file_path):
