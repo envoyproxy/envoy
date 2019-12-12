@@ -13,8 +13,6 @@
 
 #include "extensions/common/redis/redirection_mgr.h"
 
-#include "../../../../../../../../Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/include/c++/v1/cstdint"
-
 namespace Envoy {
 namespace Extensions {
 namespace Common {
