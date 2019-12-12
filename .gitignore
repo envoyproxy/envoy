@@ -19,7 +19,6 @@ cscope.*
 *.pyc
 **/pyformat
 SOURCE_VERSION
-api_type_db.generated.pb_text
 .settings/
 *.sw*
 tags

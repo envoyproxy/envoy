@@ -234,5 +234,8 @@ envoy_cc_test_library(
     name = "test_utils_lib",
     hdrs = ["test_utils.h"],
     tags = ["nofips"],
-    deps = ["@com_googlesource_quiche//:quic_core_http_spdy_session_lib"],
+    deps = [
+        "//source/extensions/quic_listeners/quiche:quic_filter_manager_connection_lib",
+        "@com_googlesource_quiche//:quic_core_http_spdy_session_lib",
+    ],
 )

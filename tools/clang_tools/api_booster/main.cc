@@ -25,20 +25,26 @@
 #include "absl/strings/str_join.h"
 #include "absl/strings/str_split.h"
 
-using namespace clang;
-using namespace clang::ast_matchers;
-using namespace clang::tooling;
-using namespace llvm;
+// Enable to see debug log messages.
+#ifdef ENABLE_DEBUG_LOG
+#define DEBUG_LOG(s)                                                                               \
+  do {                                                                                             \
+    std::cerr << (s) << std::endl;                                                                 \
+  } while (0)
+#else
+#define DEBUG_LOG(s)
+#endif
 
-class ApiBooster : public MatchFinder::MatchCallback, public SourceFileCallbacks {
+class ApiBooster : public clang::ast_matchers::MatchFinder::MatchCallback,
+                   public clang::tooling::SourceFileCallbacks {
 public:
   // AST match callback.
-  void run(const MatchFinder::MatchResult& result) override {
+  void run(const clang::ast_matchers::MatchFinder::MatchResult& result) override {
     // If we have a match on type, we should track the corresponding .pb.h.
     if (const clang::TypeLoc* type = result.Nodes.getNodeAs<clang::TypeLoc>("type")) {
       const std::string type_name =
           type->getType().getCanonicalType().getUnqualifiedType().getAsString();
-      // std::cerr << "debug: " << type_name << std::endl;
+      DEBUG_LOG(absl::StrCat("Matched type ", type_name));
       const auto result = getProtoPathFromCType(type_name);
       if (result) {
         source_api_proto_paths_.insert(*result + ".pb.h");
@@ -101,7 +107,7 @@ public:
   }
 
   // Visitor callback for start of a compilation unit.
-  bool handleBeginSource(CompilerInstance& CI) override {
+  bool handleBeginSource(clang::CompilerInstance& CI) override {
     source_api_proto_paths_.clear();
     return true;
   }
@@ -170,24 +176,26 @@ int main(int argc, const char** argv) {
   // only ones displayed.
   llvm::cl::OptionCategory api_booster_tool_category("api-booster options");
 
-  CommonOptionsParser OptionsParser(argc, argv, api_booster_tool_category);
-  ClangTool Tool(OptionsParser.getCompilations(), OptionsParser.getSourcePathList());
+  clang::tooling::CommonOptionsParser OptionsParser(argc, argv, api_booster_tool_category);
+  clang::tooling::ClangTool Tool(OptionsParser.getCompilations(),
+                                 OptionsParser.getSourcePathList());
 
   ApiBooster api_booster;
-  MatchFinder finder;
+  clang::ast_matchers::MatchFinder finder;
 
   // Match on all mentions of types in the AST.
-  auto type_matcher = typeLoc(isExpansionInMainFile()).bind("type");
+  auto type_matcher =
+      clang::ast_matchers::typeLoc(clang::ast_matchers::isExpansionInMainFile()).bind("type");
   finder.addMatcher(type_matcher, &api_booster);
 
   // Match on all call expressions. We are interested in particular in calls
   // where validation on protos is performed.
-  auto call_matcher = callExpr().bind("call_expr");
+  auto call_matcher = clang::ast_matchers::callExpr().bind("call_expr");
   finder.addMatcher(call_matcher, &api_booster);
 
   // Match on all template instantiations.We are interested in particular in
   // instantiations of factories where validation on protos is performed.
-  auto tmpl_matcher = classTemplateSpecializationDecl().bind("tmpl");
+  auto tmpl_matcher = clang::ast_matchers::classTemplateSpecializationDecl().bind("tmpl");
   finder.addMatcher(tmpl_matcher, &api_booster);
 
   return Tool.run(newFrontendActionFactory(&finder, &api_booster).get());

@@ -10,6 +10,7 @@ package_group(
 # This is where you add protos that will participate in docs RST generation.
 proto_library(
     name = "protos",
+    visibility = ["//visibility:public"],
     deps = [
         "//envoy/admin/v2alpha:pkg",
         "//envoy/api/v2:pkg",

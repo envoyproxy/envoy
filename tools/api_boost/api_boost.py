@@ -27,7 +27,7 @@ API_INCLUDE_REGEX = re.compile('#include "(envoy/.*)/[^/]+\.pb\.(validate\.)?h"'
 
 
 # Update a C++ file to the latest API.
-def ApiBoostFile(llvm_include_path, path):
+def ApiBoostFile(llvm_include_path, debug_log, path):
   print('Processing %s' % path)
   # Run the booster
   try:
@@ -41,6 +41,8 @@ def ApiBoostFile(llvm_include_path, path):
   except sp.CalledProcessError as e:
     print('api_booster failure for %s: %s %s' % (path, e, e.stderr.decode('utf-8')))
     raise
+  if debug_log:
+    print(result.stderr.decode('utf-8'))
 
   # Consume stdout containing the list of inferred API headers. We don't have
   # rewrite capabilities yet in the API booster, so we rewrite here in Python
@@ -98,13 +100,18 @@ def ApiBoostTree(args):
     ]
     query = 'kind(cc_library, {})'.format(' union '.join(dep_build_targets))
     dep_lib_build_targets = sp.check_output(['bazel', 'query', query]).decode().splitlines()
+    extra_api_booster_args = []
+    if args.debug_log:
+      extra_api_booster_args.append('--copt=-DENABLE_DEBUG_LOG')
+
     # Slightly easier to debug when we build api_booster on its own.
     sp.run([
         'bazel',
         'build',
         '--strip=always',
         '@envoy_dev//clang_tools/api_booster',
-    ], check=True)
+    ] + extra_api_booster_args,
+           check=True)
     sp.run([
         'bazel',
         'build',
@@ -120,22 +127,13 @@ def ApiBoostTree(args):
       sp.check_output([os.getenv('LLVM_CONFIG'), '--libdir']).decode().rstrip(),
       'clang/9.0.0/include')
 
-  # Determine the files in the target dirs eligible for API boosting.
-  paths = []
-  for p in args.paths:
-    if os.path.isfile(p):
-      paths.append(p)
-      continue
-    for root, dirs, files in os.walk(p):
-      for f in files:
-        if f.endswith('.cc') or f.endswith('.h'):
-          paths.append(os.path.join(root, f))
-
-  # Filter files that aren't in the compilation database; we can't meaningfully
-  # run them under Clang libtooling (e.g. Windows plaform files on Linux).
-  known_files = set(
-      [entry['file'] for entry in json.loads(pathlib.Path('compile_commands.json').read_text())])
-  paths = [p for p in paths if p in known_files]
+  # Determine the files in the target dirs eligible for API boosting, based on
+  # known files in the compilation database.
+  paths = set([])
+  for entry in json.loads(pathlib.Path('compile_commands.json').read_text()):
+    file_path = entry['file']
+    if any(file_path.startswith(prefix) for prefix in args.paths):
+      paths.add(file_path)
 
   # The API boosting is file local, so this is trivially parallelizable, use
   # multiprocessing pool with default worker pool sized to cpu_count(), since
@@ -145,7 +143,7 @@ def ApiBoostTree(args):
     # in one thread on consumed transitive headers on the other thread isn't an
     # issue. This also ensures that we complete all analysis error free before
     # any mutation takes place.
-    p.map(functools.partial(ApiBoostFile, llvm_include_path), paths)
+    p.map(functools.partial(ApiBoostFile, llvm_include_path, args.debug_log), paths)
     p.map(SwapTmpFile, paths)
 
 
@@ -154,6 +152,7 @@ if __name__ == '__main__':
   parser.add_argument('--generate_api_type_database', action='store_true')
   parser.add_argument('--generate_compilation_database', action='store_true')
   parser.add_argument('--build_api_booster', action='store_true')
+  parser.add_argument('--debug_log', action='store_true')
   parser.add_argument('paths', nargs='*', default=['source', 'test', 'include'])
   args = parser.parse_args()
   ApiBoostTree(args)

@@ -1,6 +1,7 @@
 licenses(["notice"])  # Apache 2
 
 load("//bazel:envoy_build_system.bzl", "envoy_cc_library", "envoy_cc_test", "envoy_package", "envoy_proto_library")
+load("//tools/type_whisperer:type_database.bzl", "type_database")
 load("@com_google_protobuf//:protobuf.bzl", "py_proto_library")
 
 envoy_package()
@@ -35,11 +36,24 @@ py_binary(
     ],
 )
 
+label_flag(
+    name = "api_type_db_target",
+    # TODO(htuch): break dependence of API type DB on docs target.
+    build_setting_default = "@envoy_api//docs:protos",
+    visibility = ["//visibility:public"],
+)
+
+type_database(
+    name = "api_type_db",
+    targets = [":api_type_db_target"],
+    visibility = ["//visibility:public"],
+)
+
 # Pack API type database text file into a char* string that can be referenced
 # at the C++ level.
 genrule(
     name = "api_type_db_genrule",
-    srcs = ["api_type_db.generated.pb_text"],
+    srcs = [":api_type_db"],
     outs = ["api_type_db_def.generated.cc"],
     cmd = "(echo 'namespace Envoy { namespace Tools { namespace TypeWhisperer " +
           "{ const char* ApiTypeDbPbText = R\"EOF('; cat $(SRCS); echo ')EOF\";}}}') > $@",
