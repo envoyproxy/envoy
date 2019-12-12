@@ -28,6 +28,11 @@ R"(
             - {{ domain }}
       sni: {{ domain }}
     type: LOGICAL_DNS
+    upstream_connection_options: &upstream_opts
+      tcp_keepalive:
+        keepalive_interval: 10
+        keepalive_probes: 1
+        keepalive_time: 5
   - name: base_wlan # Note: the direct API depends on the existence of a cluster with this name.
     connect_timeout: {{ connect_timeout_seconds }}s
     dns_refresh_rate: {{ dns_refresh_rate_seconds }}s
@@ -38,6 +43,7 @@ R"(
       endpoints: *base_endpoints
     tls_context: *base_tls_context
     type: LOGICAL_DNS
+    upstream_connection_options: *upstream_opts
   - name: base_wwan # Note: the direct API depends on the existence of a cluster with this name.
     connect_timeout: {{ connect_timeout_seconds }}s
     dns_refresh_rate: {{ dns_refresh_rate_seconds }}s
@@ -48,6 +54,7 @@ R"(
       endpoints: *base_endpoints
     tls_context: *base_tls_context
     type: LOGICAL_DNS
+    upstream_connection_options: *upstream_opts
   - name: stats
     connect_timeout: {{ connect_timeout_seconds }}s
     dns_refresh_rate: {{ dns_refresh_rate_seconds }}s
