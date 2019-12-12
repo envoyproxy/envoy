@@ -389,11 +389,12 @@ The SotW protocol variants do not provide any explicit mechanism to determine wh
 resource does not exist.
 
 Responses for :ref:`Listener <envoy_api_msg_Listener>` and :ref:`Cluster <envoy_api_msg_Cluster>`
-resource types must include all resources requested by the client. However, there is still a
-race condition here: if the client initially sends a request for resource A, then sends a request
-for resources A and B, and then sees a response containing only resource A, the client cannot
-conclude that resource B does not exist, because the response may have been sent on the
-basis of the first request, before the server saw the second request.
+resource types must include all resources requested by the client. However, it may not be possible
+for the client to know that a resource does not exist based solely on its absence in a response,
+because there is a race condition here: if the client initially sends a request for resource A,
+then sends a request for resources A and B, and then sees a response containing only resource A,
+the client cannot conclude that resource B does not exist, because the response may have been
+t sent on the basis of the first request, before the server saw the second request.
 
 For other resource types, because each resource can be sent in its own response, there is no way
 to know from the next response whether the newly requested resource exists, because the next
