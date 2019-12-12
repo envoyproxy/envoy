@@ -382,7 +382,7 @@ RetryStateImpl::RetryBudgetStatus
 RetryStateImpl::retryBudgetStatus(Upstream::ResourcePriority priority) const {
   auto retry_budget = cluster_.retryBudget(priority);
 
-  // TODO (tonya11en): Extend the ResourceManager to accomodate the retry budget in addition to
+  // TODO (tonya11en): Extend the ResourceManager to accommodate the retry budget in addition to
   // the static circuit breaker values and move the runtime logic there.
   std::string priority_name;
   switch (priority) {
