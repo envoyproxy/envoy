@@ -21,6 +21,7 @@ envoy_cc_library(
         "grpc_transcoding",
         "http_api_protos",
         "api_httpbody_protos",
+        "rpc_status_proto",
     ],
     deps = [
         ":transcoder_input_stream_lib",
