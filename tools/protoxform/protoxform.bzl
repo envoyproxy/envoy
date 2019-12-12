@@ -9,4 +9,4 @@ def _protoxform_impl(target, ctx):
 #
 #   bazel build //api --aspects tools/protoxform/protoxform.bzl%protoxform_aspect \
 #       --output_groups=proto
-protoxform_aspect = api_proto_plugin_aspect("//tools/protoxform", _protoxform_impl)
+protoxform_aspect = api_proto_plugin_aspect("//tools/protoxform", _protoxform_impl, use_type_db = True)

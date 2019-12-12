@@ -26,7 +26,7 @@ Assuming that `CC` and `CXX` already point at Clang, you should be able to build
 with:
 
 ```console
-bazel build //tools/clang_tools/syntax_only
+bazel build @envoy_dev//clang_tools/syntax_only
 ```
 
 To run `libtooling` based tools against Envoy, you will need to first generate a
@@ -42,7 +42,7 @@ tools/gen_compilation_database.py --run_bazel_build --include_headers
 Finally, the tool can be run against source files in the Envoy tree:
 
 ```console
-bazel-bin/tools/clang_tools/syntax_only/syntax_only \
+bazel-bin/external/envoy_dev/clang_tools/syntax_only/syntax_only \
   source/common/common/logger.cc
 ```
 

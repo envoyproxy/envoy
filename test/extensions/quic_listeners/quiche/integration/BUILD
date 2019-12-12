@@ -14,6 +14,7 @@ envoy_cc_test(
     data = ["//test/config/integration/certs"],
     tags = ["nofips"],
     deps = [
+        "//source/extensions/filters/http/dynamo:config",
         "//source/extensions/quic_listeners/quiche:active_quic_listener_config_lib",
         "//source/extensions/quic_listeners/quiche:codec_lib",
         "//source/extensions/quic_listeners/quiche:envoy_quic_client_connection_lib",
