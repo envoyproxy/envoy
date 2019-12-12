@@ -19,7 +19,7 @@ public:
   size_t size() const;
   bool empty();
   const UpdateAck& front();
-  void pop();
+  UpdateAck popFront();
   void pause(const std::string& type_url);
   void resume(const std::string& type_url);
   bool paused(const std::string& type_url) const;

@@ -34,9 +34,13 @@ void GrpcMuxImpl::removeWatch(const std::string& type_url, Watch* watch) {
   watchMapFor(type_url).removeWatch(watch);
 }
 
-void GrpcMuxImpl::pause(const std::string& type_url) { pausable_ack_queue_.pause(type_url); }
+void GrpcMuxImpl::pause(const std::string& type_url) {
+  ENVOY_LOG(debug, "Pausing {}", type_url);
+  pausable_ack_queue_.pause(type_url);
+}
 
 void GrpcMuxImpl::resume(const std::string& type_url) {
+  ENVOY_LOG(debug, "Resuming {}", type_url);
   pausable_ack_queue_.resume(type_url);
   trySendDiscoveryRequests();
 }
@@ -174,8 +178,7 @@ void GrpcMuxImpl::trySendDiscoveryRequests() {
       // safe to assume it's of the type_url that we're wanting to send.
       //
       // getNextRequestWithAck() returns a raw unowned pointer, which sendGrpcMessage deletes.
-      sendGrpcMessage(sub.getNextRequestWithAck(pausable_ack_queue_.front()));
-      pausable_ack_queue_.pop();
+      sendGrpcMessage(sub.getNextRequestWithAck(pausable_ack_queue_.popFront()));
       ENVOY_LOG(debug, "GrpcMuxImpl sent ACK discovery request for {}", next_request_type_url);
     } else {
       // getNextRequestAckless() returns a raw unowned pointer, which sendGrpcMessage deletes.

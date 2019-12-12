@@ -76,8 +76,8 @@ void SotwSubscriptionState::handleGoodResponse(const envoy::api::v2::DiscoveryRe
   // Now that we're passed onConfigUpdate() without an exception thrown, we know we're good.
   last_good_version_info_ = message.version_info();
   last_good_nonce_ = message.nonce();
-  ENVOY_LOG(debug, "Config update for {} accepted with {} resources", type_url(),
-            message.resources().size());
+  ENVOY_LOG(debug, "Config update for {} (version {}) accepted with {} resources", type_url(),
+            message.version_info(), message.resources().size());
 }
 
 void SotwSubscriptionState::handleBadResponse(const EnvoyException& e, UpdateAck& ack) {
@@ -119,6 +119,7 @@ void* SotwSubscriptionState::getNextRequestAckless() { return getNextRequestInte
 void* SotwSubscriptionState::getNextRequestWithAck(const UpdateAck& ack) {
   envoy::api::v2::DiscoveryRequest* request = getNextRequestInternal();
   request->set_response_nonce(ack.nonce_);
+  ENVOY_LOG(debug, "ACK for {} will have nonce {}", type_url(), ack.nonce_);
   if (ack.error_detail_.code() != Grpc::Status::WellKnownGrpcStatus::Ok) {
     // Don't needlessly make the field present-but-empty if status is ok.
     request->mutable_error_detail()->CopyFrom(ack.error_detail_);
