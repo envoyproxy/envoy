@@ -21,8 +21,6 @@ envoy_extension_cc_test(
         "//test/mocks/buffer:buffer_mocks",
         "//test/mocks/http:http_mocks",
         "//test/mocks/upstream:upstream_mocks",
-        "@envoy_api//envoy/config/filter/http/csrf/v2:pkg_cc_proto",
-        "@envoy_api//envoy/type:pkg_cc_proto",
     ],
 )
 

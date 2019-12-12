@@ -1,7 +1,4 @@
 #include "envoy/admin/v2alpha/config_dump.pb.h"
-#include "envoy/api/v2/core/base.pb.h"
-#include "envoy/api/v2/lds.pb.h"
-#include "envoy/api/v2/listener/listener.pb.h"
 
 #include "common/network/listen_socket_impl.h"
 #include "common/network/socket_option_impl.h"

@@ -45,7 +45,6 @@ envoy_cc_library(
         "//source/common/buffer:buffer_lib",
         "//source/common/network:filter_lib",
         "//source/extensions/filters/network:well_known_names",
-        "@envoy_api//envoy/api/v2/core:pkg_cc_proto",
     ],
 )
 

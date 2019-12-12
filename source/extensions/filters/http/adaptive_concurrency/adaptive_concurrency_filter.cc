@@ -5,8 +5,6 @@
 #include <string>
 #include <vector>
 
-#include "envoy/config/filter/http/adaptive_concurrency/v2alpha/adaptive_concurrency.pb.h"
-
 #include "common/common/assert.h"
 #include "common/protobuf/utility.h"
 

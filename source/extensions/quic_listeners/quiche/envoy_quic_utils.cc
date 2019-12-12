@@ -2,8 +2,6 @@
 
 #include <sys/socket.h>
 
-#include "envoy/api/v2/core/base.pb.h"
-
 #include "common/network/socket_option_factory.h"
 
 namespace Envoy {

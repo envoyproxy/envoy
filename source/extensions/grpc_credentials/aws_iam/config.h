@@ -1,7 +1,6 @@
 #pragma once
 
-#include "envoy/api/v2/core/grpc_service.pb.h"
-#include "envoy/config/grpc_credential/v2alpha/aws_iam.pb.h"
+#include "envoy/config/grpc_credential/v2alpha/aws_iam.pb.validate.h"
 #include "envoy/grpc/google_grpc_creds.h"
 #include "envoy/http/header_map.h"
 

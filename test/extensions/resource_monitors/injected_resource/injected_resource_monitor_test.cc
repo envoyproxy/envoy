@@ -1,5 +1,3 @@
-#include "envoy/config/resource_monitor/injected_resource/v2alpha/injected_resource.pb.h"
-
 #include "common/event/dispatcher_impl.h"
 #include "common/stats/isolated_store_impl.h"
 

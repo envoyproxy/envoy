@@ -1,7 +1,5 @@
 #include <fstream>
 
-#include "envoy/config/bootstrap/v2/bootstrap.pb.h"
-
 #include "common/common/thread.h"
 #include "common/network/address_impl.h"
 

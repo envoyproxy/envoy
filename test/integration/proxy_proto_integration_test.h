@@ -1,7 +1,5 @@
 #pragma once
 
-#include "envoy/config/bootstrap/v2/bootstrap.pb.h"
-
 #include "common/http/codec_client.h"
 
 #include "test/integration/fake_upstream.h"

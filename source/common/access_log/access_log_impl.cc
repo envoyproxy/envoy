@@ -4,7 +4,6 @@
 #include <string>
 
 #include "envoy/common/time.h"
-#include "envoy/config/filter/accesslog/v2/accesslog.pb.h"
 #include "envoy/config/filter/accesslog/v2/accesslog.pb.validate.h"
 #include "envoy/filesystem/filesystem.h"
 #include "envoy/http/header_map.h"

@@ -1,5 +1,3 @@
-#include "envoy/config/bootstrap/v2/bootstrap.pb.h"
-
 #include "test/integration/http_protocol_integration.h"
 #include "test/integration/server.h"
 

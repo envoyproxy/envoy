@@ -1,7 +1,6 @@
 #include "common/common/regex.h"
 
 #include "envoy/common/exception.h"
-#include "envoy/type/matcher/regex.pb.h"
 
 #include "common/common/assert.h"
 #include "common/common/fmt.h"

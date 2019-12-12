@@ -1,7 +1,5 @@
 #pragma once
 
-#include "envoy/api/v2/core/health_check.pb.h"
-#include "envoy/config/filter/network/redis_proxy/v2/redis_proxy.pb.validate.h"
 #include "envoy/server/health_checker_config.h"
 
 #include "extensions/health_checkers/redis/redis.h"

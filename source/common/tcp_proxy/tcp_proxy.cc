@@ -4,8 +4,7 @@
 #include <string>
 
 #include "envoy/buffer/buffer.h"
-#include "envoy/config/filter/accesslog/v2/accesslog.pb.h"
-#include "envoy/config/filter/network/tcp_proxy/v2/tcp_proxy.pb.h"
+#include "envoy/config/filter/network/http_connection_manager/v2/http_connection_manager.pb.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/event/timer.h"
 #include "envoy/stats/scope.h"

@@ -1,5 +1,3 @@
-#include "envoy/config/resource_monitor/fixed_heap/v2alpha/fixed_heap.pb.h"
-
 #include "extensions/resource_monitors/fixed_heap/fixed_heap_monitor.h"
 
 #include "absl/types/optional.h"

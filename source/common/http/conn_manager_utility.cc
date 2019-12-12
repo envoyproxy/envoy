@@ -4,8 +4,6 @@
 #include <cstdint>
 #include <string>
 
-#include "envoy/type/percent.pb.h"
-
 #include "common/access_log/access_log_formatter.h"
 #include "common/common/empty_string.h"
 #include "common/common/utility.h"

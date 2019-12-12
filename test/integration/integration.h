@@ -5,8 +5,6 @@
 #include <string>
 #include <vector>
 
-#include "envoy/api/v2/discovery.pb.h"
-#include "envoy/api/v2/endpoint/endpoint.pb.h"
 #include "envoy/server/process_context.h"
 
 #include "common/http/codec_client.h"

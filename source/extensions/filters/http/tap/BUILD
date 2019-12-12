@@ -19,6 +19,7 @@ envoy_cc_library(
         "//include/envoy/buffer:buffer_interface",
         "//include/envoy/http:header_map_interface",
         "//source/extensions/common/tap:tap_interface",
+        "@envoy_api//envoy/service/tap/v2alpha:pkg_cc_proto",
     ],
 )
 
@@ -29,9 +30,7 @@ envoy_cc_library(
     deps = [
         ":tap_config_interface",
         "//source/extensions/common/tap:tap_config_base",
-        "@envoy_api//envoy/api/v2/core:pkg_cc_proto",
         "@envoy_api//envoy/data/tap/v2alpha:pkg_cc_proto",
-        "@envoy_api//envoy/service/tap/v2alpha:pkg_cc_proto",
     ],
 )
 
@@ -61,6 +60,5 @@ envoy_cc_extension(
         "//source/extensions/filters/http:well_known_names",
         "//source/extensions/filters/http/common:factory_base_lib",
         "@envoy_api//envoy/config/filter/http/tap/v2alpha:pkg_cc_proto",
-        "@envoy_api//envoy/service/tap/v2alpha:pkg_cc_proto",
     ],
 )

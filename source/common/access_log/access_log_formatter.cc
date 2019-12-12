@@ -5,8 +5,6 @@
 #include <string>
 #include <vector>
 
-#include "envoy/api/v2/core/base.pb.h"
-
 #include "common/common/assert.h"
 #include "common/common/fmt.h"
 #include "common/common/utility.h"

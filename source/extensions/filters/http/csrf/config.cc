@@ -1,6 +1,5 @@
 #include "extensions/filters/http/csrf/config.h"
 
-#include "envoy/config/filter/http/csrf/v2/csrf.pb.h"
 #include "envoy/config/filter/http/csrf/v2/csrf.pb.validate.h"
 #include "envoy/registry/registry.h"
 

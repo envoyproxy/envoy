@@ -3,7 +3,6 @@
 #include <chrono>
 #include <cstdint>
 
-#include "envoy/api/v2/core/base.pb.h"
 #include "envoy/common/time.h"
 #include "envoy/http/header_map.h"
 #include "envoy/stream_info/stream_info.h"

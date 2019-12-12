@@ -2,9 +2,6 @@
 #include <cstdint>
 #include <string>
 
-#include "envoy/api/v2/core/base.pb.h"
-#include "envoy/type/percent.pb.h"
-
 #include "common/buffer/buffer_impl.h"
 #include "common/common/empty_string.h"
 #include "common/config/metadata.h"

@@ -1,4 +1,3 @@
-#include "envoy/config/overload/v2alpha/overload.pb.h"
 #include "envoy/server/resource_monitor.h"
 #include "envoy/server/resource_monitor_config.h"
 

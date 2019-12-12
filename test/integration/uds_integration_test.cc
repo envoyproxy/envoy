@@ -1,7 +1,5 @@
 #include "uds_integration_test.h"
 
-#include "envoy/config/bootstrap/v2/bootstrap.pb.h"
-
 #include "common/event/dispatcher_impl.h"
 #include "common/network/utility.h"
 

@@ -1,5 +1,4 @@
-#include "envoy/config/filter/http/ext_authz/v2/ext_authz.pb.h"
-#include "envoy/service/auth/v2/external_auth.pb.h"
+#include "envoy/api/v2/core/base.pb.h"
 
 #include "common/http/headers.h"
 #include "common/http/message_impl.h"

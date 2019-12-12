@@ -5,7 +5,6 @@
 #include <vector>
 
 #include "envoy/api/api.h"
-#include "envoy/api/v2/cds.pb.h"
 #include "envoy/http/codec.h"
 #include "envoy/upstream/cluster_manager.h"
 

@@ -1,7 +1,5 @@
 #include "common/config/new_grpc_mux_impl.h"
 
-#include "envoy/api/v2/discovery.pb.h"
-
 #include "common/common/assert.h"
 #include "common/common/backoff_strategy.h"
 #include "common/common/token_bucket_impl.h"

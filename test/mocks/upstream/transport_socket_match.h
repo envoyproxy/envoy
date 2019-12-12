@@ -2,7 +2,6 @@
 
 #include <string>
 
-#include "envoy/api/v2/core/base.pb.h"
 #include "envoy/upstream/upstream.h"
 
 #include "common/stats/isolated_store_impl.h"

@@ -1,7 +1,5 @@
 #include "common/upstream/transport_socket_match_impl.h"
 
-#include "envoy/api/v2/cds.pb.h"
-#include "envoy/api/v2/core/base.pb.h"
 #include "envoy/server/transport_socket_config.h"
 
 #include "common/config/utility.h"

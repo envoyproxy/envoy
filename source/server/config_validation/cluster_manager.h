@@ -1,7 +1,5 @@
 #pragma once
 
-#include "envoy/api/v2/core/config_source.pb.h"
-#include "envoy/config/bootstrap/v2/bootstrap.pb.h"
 #include "envoy/secret/secret_manager.h"
 #include "envoy/upstream/cluster_manager.h"
 

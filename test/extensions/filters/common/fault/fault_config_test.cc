@@ -1,5 +1,3 @@
-#include "envoy/config/filter/fault/v2/fault.pb.h"
-
 #include "extensions/filters/common/fault/fault_config.h"
 
 #include "test/test_common/utility.h"

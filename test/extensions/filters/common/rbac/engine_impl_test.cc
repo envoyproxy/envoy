@@ -1,5 +1,3 @@
-#include "envoy/api/v2/core/base.pb.h"
-#include "envoy/config/rbac/v2/rbac.pb.h"
 #include "envoy/config/rbac/v2/rbac.pb.validate.h"
 
 #include "common/network/utility.h"

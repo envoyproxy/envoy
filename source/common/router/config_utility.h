@@ -4,7 +4,6 @@
 #include <string>
 #include <vector>
 
-#include "envoy/api/v2/core/base.pb.h"
 #include "envoy/api/v2/route/route.pb.h"
 #include "envoy/http/codes.h"
 #include "envoy/json/json_object.h"

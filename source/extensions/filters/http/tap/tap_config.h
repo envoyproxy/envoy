@@ -3,6 +3,7 @@
 #include "envoy/buffer/buffer.h"
 #include "envoy/common/pure.h"
 #include "envoy/http/header_map.h"
+#include "envoy/service/tap/v2alpha/common.pb.h"
 
 #include "extensions/common/tap/tap.h"
 

@@ -1,5 +1,3 @@
-#include "envoy/config/trace/v2/trace.pb.h"
-
 #include "common/network/utility.h"
 
 #include "extensions/tracers/zipkin/span_buffer.h"

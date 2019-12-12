@@ -2,8 +2,6 @@
 
 #include <unordered_set>
 
-#include "envoy/api/v2/discovery.pb.h"
-
 #include "common/config/utility.h"
 #include "common/protobuf/protobuf.h"
 

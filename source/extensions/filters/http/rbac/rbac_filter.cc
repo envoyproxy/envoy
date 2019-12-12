@@ -1,6 +1,5 @@
 #include "extensions/filters/http/rbac/rbac_filter.h"
 
-#include "envoy/config/filter/http/rbac/v2/rbac.pb.h"
 #include "envoy/stats/scope.h"
 
 #include "common/http/utility.h"

@@ -3,8 +3,6 @@
 #include <string>
 #include <vector>
 
-#include "envoy/api/v2/core/base.pb.h"
-
 #include "common/access_log/access_log_formatter.h"
 #include "common/common/utility.h"
 #include "common/http/header_map_impl.h"

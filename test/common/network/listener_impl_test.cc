@@ -1,5 +1,3 @@
-#include "envoy/api/v2/core/base.pb.h"
-
 #include "common/network/address_impl.h"
 #include "common/network/listener_impl.h"
 #include "common/network/utility.h"

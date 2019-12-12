@@ -1,7 +1,5 @@
 #include "extensions/filters/common/rbac/matchers.h"
 
-#include "envoy/config/rbac/v2/rbac.pb.h"
-
 #include "common/common/assert.h"
 
 namespace Envoy {

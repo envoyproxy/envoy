@@ -34,7 +34,6 @@ envoy_cc_test(
         "//test/mocks/upstream:host_mocks",
         "//test/mocks/upstream:upstream_mocks",
         "@envoy_api//envoy/config/accesslog/v2:pkg_cc_proto",
-        "@envoy_api//envoy/config/filter/accesslog/v2:pkg_cc_proto",
         "@envoy_api//envoy/config/filter/network/tcp_proxy/v2:pkg_cc_proto",
     ],
 )

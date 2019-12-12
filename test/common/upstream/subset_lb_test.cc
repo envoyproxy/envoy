@@ -6,7 +6,6 @@
 #include <vector>
 
 #include "envoy/api/v2/cds.pb.h"
-#include "envoy/api/v2/core/base.pb.h"
 
 #include "common/common/logger.h"
 #include "common/config/metadata.h"

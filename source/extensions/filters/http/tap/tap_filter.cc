@@ -1,7 +1,5 @@
 #include "extensions/filters/http/tap/tap_filter.h"
 
-#include "envoy/config/filter/http/tap/v2alpha/tap.pb.h"
-
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {

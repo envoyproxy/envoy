@@ -1,7 +1,6 @@
 #pragma once
 
-#include "envoy/api/v2/core/health_check.pb.h"
-#include "envoy/config/health_checker/redis/v2/redis.pb.h"
+#include "envoy/api/v2/core/health_check.pb.validate.h"
 #include "envoy/config/health_checker/redis/v2/redis.pb.validate.h"
 
 #include "common/protobuf/protobuf.h"

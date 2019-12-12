@@ -1,8 +1,6 @@
 #include <chrono>
 #include <memory>
 
-#include "envoy/api/v2/route/route.pb.h"
-
 #include "common/buffer/buffer_impl.h"
 #include "common/http/header_utility.h"
 #include "common/upstream/upstream_impl.h"

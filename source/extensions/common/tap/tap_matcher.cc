@@ -1,7 +1,5 @@
 #include "extensions/common/tap/tap_matcher.h"
 
-#include "envoy/service/tap/v2alpha/common.pb.h"
-
 #include "common/common/assert.h"
 
 namespace Envoy {

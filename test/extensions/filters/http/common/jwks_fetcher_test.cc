@@ -1,8 +1,6 @@
 #include <chrono>
 #include <thread>
 
-#include "envoy/api/v2/core/http_uri.pb.h"
-
 #include "common/http/message_impl.h"
 #include "common/protobuf/utility.h"
 

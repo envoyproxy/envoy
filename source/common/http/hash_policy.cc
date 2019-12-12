@@ -1,7 +1,5 @@
 #include "common/http/hash_policy.h"
 
-#include "envoy/api/v2/route/route.pb.h"
-
 #include "common/http/utility.h"
 
 namespace Envoy {

@@ -1,4 +1,5 @@
 #include "envoy/api/v2/cds.pb.h"
+#include "envoy/api/v2/discovery.pb.h"
 #include "envoy/grpc/status.h"
 #include "envoy/stats/scope.h"
 

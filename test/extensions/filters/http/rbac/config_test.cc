@@ -1,7 +1,3 @@
-#include "envoy/config/filter/http/rbac/v2/rbac.pb.h"
-#include "envoy/config/filter/http/rbac/v2/rbac.pb.validate.h"
-#include "envoy/config/rbac/v2/rbac.pb.h"
-
 #include "extensions/filters/common/rbac/engine.h"
 #include "extensions/filters/http/rbac/config.h"
 

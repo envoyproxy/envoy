@@ -1,7 +1,5 @@
 #include <memory>
 
-#include "envoy/api/v2/core/base.pb.h"
-
 #include "common/buffer/buffer_impl.h"
 #include "common/http/message_impl.h"
 #include "common/stream_info/stream_info_impl.h"

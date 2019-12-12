@@ -1,5 +1,3 @@
-#include "envoy/config/filter/http/jwt_authn/v2alpha/config.pb.h"
-
 #include "common/protobuf/utility.h"
 
 #include "extensions/filters/http/jwt_authn/matcher.h"

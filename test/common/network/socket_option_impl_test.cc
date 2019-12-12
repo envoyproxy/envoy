@@ -1,5 +1,3 @@
-#include "envoy/api/v2/core/base.pb.h"
-
 #include "test/common/network/socket_option_test.h"
 
 namespace Envoy {

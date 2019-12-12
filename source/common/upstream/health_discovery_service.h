@@ -1,8 +1,6 @@
 #pragma once
 
 #include "envoy/api/api.h"
-#include "envoy/api/v2/cds.pb.h"
-#include "envoy/api/v2/core/address.pb.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/server/transport_socket_config.h"
 #include "envoy/service/discovery/v2/hds.pb.h"

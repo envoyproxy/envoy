@@ -4,7 +4,6 @@
 #include <cstdint>
 #include <string>
 
-#include "envoy/config/filter/network/client_ssl_auth/v2/client_ssl_auth.pb.h"
 #include "envoy/network/connection.h"
 #include "envoy/stats/scope.h"
 

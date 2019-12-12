@@ -1,5 +1,4 @@
 #include "envoy/common/exception.h"
-#include "envoy/type/matcher/regex.pb.h"
 
 #include "common/common/regex.h"
 

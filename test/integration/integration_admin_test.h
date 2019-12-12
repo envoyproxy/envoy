@@ -1,8 +1,5 @@
 #pragma once
 
-#include "envoy/config/bootstrap/v2/bootstrap.pb.h"
-#include "envoy/config/metrics/v2/stats.pb.h"
-
 #include "common/json/json_loader.h"
 
 #include "test/integration/http_protocol_integration.h"

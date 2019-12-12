@@ -1,7 +1,5 @@
 #include "common/upstream/static_cluster.h"
 
-#include "envoy/api/v2/cds.pb.h"
-#include "envoy/api/v2/eds.pb.h"
 #include "envoy/common/exception.h"
 
 namespace Envoy {

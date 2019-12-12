@@ -1,7 +1,5 @@
 #include "common/http/header_utility.h"
 
-#include "envoy/api/v2/route/route.pb.h"
-
 #include "common/common/regex.h"
 #include "common/common/utility.h"
 #include "common/http/header_map_impl.h"

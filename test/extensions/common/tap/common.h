@@ -1,5 +1,3 @@
-#include "envoy/data/tap/v2alpha/wrapper.pb.h"
-
 #include "common/protobuf/utility.h"
 
 #include "extensions/common/tap/tap.h"

@@ -5,7 +5,6 @@
 #include <string>
 #include <vector>
 
-#include "envoy/config/filter/http/fault/v2/fault.pb.h"
 #include "envoy/event/timer.h"
 #include "envoy/http/codes.h"
 #include "envoy/http/header_map.h"

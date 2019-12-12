@@ -4,7 +4,6 @@
 #include <numeric>
 
 #include "envoy/protobuf/message_validator.h"
-#include "envoy/type/percent.pb.h"
 
 #include "common/common/assert.h"
 #include "common/common/fmt.h"

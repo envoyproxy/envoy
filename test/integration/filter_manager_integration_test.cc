@@ -2,8 +2,6 @@
 
 #include <regex>
 
-#include "envoy/config/bootstrap/v2/bootstrap.pb.h"
-
 #include "test/integration/http_integration.h"
 #include "test/integration/integration.h"
 #include "test/integration/utility.h"

@@ -1,6 +1,5 @@
 #pragma once
 
-#include "envoy/api/v2/rds.pb.h"
 #include "envoy/router/router.h"
 
 #include "test/mocks/server/mocks.h"

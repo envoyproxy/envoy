@@ -1,6 +1,5 @@
 #include "extensions/filters/http/squash/config.h"
 
-#include "envoy/config/filter/http/squash/v2/squash.pb.h"
 #include "envoy/config/filter/http/squash/v2/squash.pb.validate.h"
 #include "envoy/registry/registry.h"
 

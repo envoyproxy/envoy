@@ -2,9 +2,6 @@
 
 #include <iostream>
 
-#include "envoy/api/v2/core/config_source.pb.h"
-#include "envoy/api/v2/lds.pb.h"
-#include "envoy/api/v2/listener/listener.pb.h"
 #include "envoy/event/timer.h"
 #include "envoy/server/drain_manager.h"
 #include "envoy/server/instance.h"

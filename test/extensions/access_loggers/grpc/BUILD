@@ -23,10 +23,6 @@ envoy_extension_cc_test(
         "//test/mocks/ssl:ssl_mocks",
         "//test/mocks/stream_info:stream_info_mocks",
         "//test/mocks/thread_local:thread_local_mocks",
-        "@envoy_api//envoy/api/v2/core:pkg_cc_proto",
-        "@envoy_api//envoy/config/accesslog/v2:pkg_cc_proto",
-        "@envoy_api//envoy/data/accesslog/v2:pkg_cc_proto",
-        "@envoy_api//envoy/service/accesslog/v2:pkg_cc_proto",
     ],
 )
 
@@ -56,8 +52,6 @@ envoy_extension_cc_test(
         "//test/mocks/ssl:ssl_mocks",
         "//test/mocks/stream_info:stream_info_mocks",
         "//test/mocks/thread_local:thread_local_mocks",
-        "@envoy_api//envoy/config/accesslog/v2:pkg_cc_proto",
-        "@envoy_api//envoy/data/accesslog/v2:pkg_cc_proto",
     ],
 )
 
@@ -68,8 +62,6 @@ envoy_extension_cc_test(
     deps = [
         "//source/extensions/access_loggers/grpc:http_config",
         "//test/mocks/server:server_mocks",
-        "@envoy_api//envoy/api/v2/core:pkg_cc_proto",
-        "@envoy_api//envoy/config/accesslog/v2:pkg_cc_proto",
     ],
 )
 
@@ -86,8 +78,6 @@ envoy_extension_cc_test(
         "//test/integration:http_integration_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/accesslog/v2:pkg_cc_proto",
-        "@envoy_api//envoy/config/bootstrap/v2:pkg_cc_proto",
-        "@envoy_api//envoy/config/filter/network/http_connection_manager/v2:pkg_cc_proto",
         "@envoy_api//envoy/service/accesslog/v2:pkg_cc_proto",
     ],
 )
@@ -106,9 +96,7 @@ envoy_extension_cc_test(
         "//test/common/grpc:grpc_client_integration_lib",
         "//test/integration:http_integration_lib",
         "//test/test_common:utility_lib",
-        "@envoy_api//envoy/api/v2/core:pkg_cc_proto",
         "@envoy_api//envoy/config/accesslog/v2:pkg_cc_proto",
-        "@envoy_api//envoy/config/bootstrap/v2:pkg_cc_proto",
         "@envoy_api//envoy/config/filter/network/tcp_proxy/v2:pkg_cc_proto",
         "@envoy_api//envoy/service/accesslog/v2:pkg_cc_proto",
     ],

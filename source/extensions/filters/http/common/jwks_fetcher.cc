@@ -1,7 +1,5 @@
 #include "extensions/filters/http/common/jwks_fetcher.h"
 
-#include "envoy/api/v2/core/http_uri.pb.h"
-
 #include "common/common/enum_to_int.h"
 #include "common/http/headers.h"
 #include "common/http/utility.h"

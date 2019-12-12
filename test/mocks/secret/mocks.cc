@@ -1,7 +1,5 @@
 #include "test/mocks/secret/mocks.h"
 
-#include "envoy/api/v2/auth/cert.pb.h"
-
 #include "common/secret/secret_provider_impl.h"
 
 using testing::_;

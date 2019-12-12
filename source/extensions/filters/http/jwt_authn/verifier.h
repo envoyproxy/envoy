@@ -1,7 +1,5 @@
 #pragma once
 
-#include "envoy/config/filter/http/jwt_authn/v2alpha/config.pb.h"
-
 #include "extensions/filters/http/jwt_authn/authenticator.h"
 
 namespace Envoy {

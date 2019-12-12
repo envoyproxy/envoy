@@ -1,6 +1,5 @@
 #include <chrono>
 
-#include "envoy/api/v2/route/route.pb.h"
 #include "envoy/stats/stats.h"
 
 #include "common/http/header_map_impl.h"

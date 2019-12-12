@@ -1,6 +1,5 @@
 #include "common/network/listener_impl.h"
 
-#include "envoy/api/v2/core/base.pb.h"
 #include "envoy/common/exception.h"
 #include "envoy/common/platform.h"
 

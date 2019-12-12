@@ -1,7 +1,5 @@
 #include <cstdlib>
 
-#include "envoy/api/v2/core/grpc_service.pb.h"
-
 #include "common/grpc/google_grpc_creds_impl.h"
 
 #include "test/common/grpc/utility.h"

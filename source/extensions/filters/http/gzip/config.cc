@@ -1,6 +1,5 @@
 #include "extensions/filters/http/gzip/config.h"
 
-#include "envoy/config/filter/http/gzip/v2/gzip.pb.h"
 #include "envoy/config/filter/http/gzip/v2/gzip.pb.validate.h"
 #include "envoy/registry/registry.h"
 

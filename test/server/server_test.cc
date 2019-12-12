@@ -1,7 +1,5 @@
 #include <memory>
 
-#include "envoy/api/v2/core/base.pb.h"
-
 #include "common/common/assert.h"
 #include "common/common/version.h"
 #include "common/network/address_impl.h"

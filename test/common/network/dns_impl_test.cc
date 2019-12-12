@@ -8,7 +8,6 @@
 #include <unordered_map>
 #include <vector>
 
-#include "envoy/api/v2/core/address.pb.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/network/address.h"
 #include "envoy/network/dns.h"

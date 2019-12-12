@@ -14,6 +14,5 @@ envoy_cc_test(
     deps = [
         "//source/extensions/filters/common/fault:fault_config_lib",
         "//test/test_common:utility_lib",
-        "@envoy_api//envoy/config/filter/fault/v2:pkg_cc_proto",
     ],
 )

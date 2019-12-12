@@ -1,4 +1,3 @@
-#include "envoy/config/filter/udp/udp_proxy/v2alpha/udp_proxy.pb.h"
 #include "envoy/config/filter/udp/udp_proxy/v2alpha/udp_proxy.pb.validate.h"
 
 #include "extensions/filters/udp/udp_proxy/udp_proxy_filter.h"

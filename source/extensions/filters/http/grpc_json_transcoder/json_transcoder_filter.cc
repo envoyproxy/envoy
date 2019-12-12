@@ -4,7 +4,6 @@
 #include <unordered_set>
 
 #include "envoy/common/exception.h"
-#include "envoy/config/filter/http/transcoder/v2/transcoder.pb.h"
 #include "envoy/http/filter.h"
 
 #include "common/buffer/buffer_impl.h"

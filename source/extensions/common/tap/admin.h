@@ -1,7 +1,6 @@
 #pragma once
 
 #include "envoy/server/admin.h"
-#include "envoy/service/tap/v2alpha/common.pb.h"
 #include "envoy/singleton/manager.h"
 
 #include "extensions/common/tap/tap.h"

@@ -4,7 +4,6 @@
 #include <unordered_map>
 
 #include "envoy/common/time.h"
-#include "envoy/config/filter/http/jwt_authn/v2alpha/config.pb.h"
 
 #include "common/common/logger.h"
 #include "common/config/datasource.h"

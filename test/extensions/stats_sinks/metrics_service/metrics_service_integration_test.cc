@@ -1,4 +1,3 @@
-#include "envoy/config/bootstrap/v2/bootstrap.pb.h"
 #include "envoy/config/metrics/v2/metrics_service.pb.h"
 #include "envoy/service/metrics/v2/metrics_service.pb.h"
 

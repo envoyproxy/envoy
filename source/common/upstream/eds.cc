@@ -1,9 +1,5 @@
 #include "common/upstream/eds.h"
 
-#include "envoy/api/v2/cds.pb.h"
-#include "envoy/api/v2/core/config_source.pb.h"
-#include "envoy/api/v2/discovery.pb.h"
-#include "envoy/api/v2/eds.pb.h"
 #include "envoy/api/v2/eds.pb.validate.h"
 
 #include "common/common/utility.h"

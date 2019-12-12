@@ -1,5 +1,3 @@
-#include "envoy/api/v2/core/base.pb.h"
-
 #include "common/buffer/buffer_impl.h"
 
 #include "extensions/filters/common/lua/wrappers.h"

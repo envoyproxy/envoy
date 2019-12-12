@@ -1,7 +1,3 @@
-#include "envoy/api/v2/core/base.pb.h"
-#include "envoy/api/v2/route/route.pb.h"
-#include "envoy/type/percent.pb.h"
-
 #pragma once
 
 #include <chrono>

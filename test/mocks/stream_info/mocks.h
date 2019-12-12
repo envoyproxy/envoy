@@ -1,6 +1,5 @@
 #pragma once
 
-#include "envoy/api/v2/core/base.pb.h"
 #include "envoy/stream_info/stream_info.h"
 
 #include "common/stream_info/filter_state_impl.h"

@@ -2,10 +2,6 @@
 #include <list>
 #include <string>
 
-#include "envoy/api/v2/core/base.pb.h"
-#include "envoy/config/bootstrap/v2/bootstrap.pb.h"
-#include "envoy/config/metrics/v2/stats.pb.h"
-
 #include "common/api/api_impl.h"
 #include "common/config/well_known_names.h"
 #include "common/json/json_loader.h"

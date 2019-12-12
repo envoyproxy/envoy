@@ -1,5 +1,3 @@
-#include "envoy/config/filter/http/header_to_metadata/v2/header_to_metadata.pb.h"
-
 #include "common/common/base64.h"
 #include "common/http/header_map_impl.h"
 #include "common/protobuf/protobuf.h"

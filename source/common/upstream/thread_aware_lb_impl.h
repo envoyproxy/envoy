@@ -1,7 +1,5 @@
 #pragma once
 
-#include "envoy/api/v2/cds.pb.h"
-
 #include "common/upstream/load_balancer_impl.h"
 
 #include "absl/synchronization/mutex.h"

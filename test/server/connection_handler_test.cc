@@ -1,5 +1,3 @@
-#include "envoy/api/v2/core/base.pb.h"
-#include "envoy/api/v2/listener/udp_listener_config.pb.h"
 #include "envoy/server/active_udp_listener_config.h"
 #include "envoy/stats/scope.h"
 

@@ -30,7 +30,6 @@ envoy_cc_library(
         "//include/envoy/stats:stats_interface",
         "//include/envoy/thread_local:thread_local_interface",
         "//include/envoy/upstream:cluster_manager_interface",
-        "@envoy_api//envoy/api/v2:pkg_cc_proto",
         "@envoy_api//envoy/config/filter/network/http_connection_manager/v2:pkg_cc_proto",
     ],
 )
@@ -43,7 +42,6 @@ envoy_cc_library(
         ":rds_interface",
         "//include/envoy/common:time_interface",
         "//source/common/protobuf",
-        "@envoy_api//envoy/api/v2:pkg_cc_proto",
     ],
 )
 
@@ -65,7 +63,6 @@ envoy_cc_library(
         "//source/common/protobuf",
         "//source/common/protobuf:utility_lib",
         "@envoy_api//envoy/api/v2/core:pkg_cc_proto",
-        "@envoy_api//envoy/type:pkg_cc_proto",
     ],
 )
 

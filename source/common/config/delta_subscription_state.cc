@@ -1,7 +1,5 @@
 #include "common/config/delta_subscription_state.h"
 
-#include "envoy/api/v2/discovery.pb.h"
-
 #include "common/common/assert.h"
 #include "common/common/hash.h"
 

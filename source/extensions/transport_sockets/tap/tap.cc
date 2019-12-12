@@ -1,7 +1,5 @@
 #include "extensions/transport_sockets/tap/tap.h"
 
-#include "envoy/config/transport_socket/tap/v2alpha/tap.pb.h"
-
 #include "common/buffer/buffer_impl.h"
 
 namespace Envoy {

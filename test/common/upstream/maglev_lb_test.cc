@@ -1,7 +1,5 @@
 #include <memory>
 
-#include "envoy/api/v2/cds.pb.h"
-
 #include "common/upstream/maglev_lb.h"
 
 #include "test/common/upstream/utility.h"

@@ -1,5 +1,3 @@
-#include "envoy/config/bootstrap/v2/bootstrap.pb.h"
-
 #include "extensions/filters/network/thrift_proxy/buffer_helper.h"
 
 #include "test/extensions/filters/network/thrift_proxy/integration.h"

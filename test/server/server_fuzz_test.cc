@@ -1,7 +1,6 @@
 #include <fstream>
 
-#include "envoy/api/v2/core/address.pb.h"
-#include "envoy/config/bootstrap/v2/bootstrap.pb.h"
+#include "envoy/config/bootstrap/v2/bootstrap.pb.validate.h"
 
 #include "common/network/address_impl.h"
 #include "common/thread_local/thread_local_impl.h"

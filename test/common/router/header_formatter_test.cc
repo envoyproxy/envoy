@@ -1,9 +1,7 @@
 #include <string>
 
 #include "envoy/api/v2/core/base.pb.h"
-#include "envoy/api/v2/rds.pb.h"
 #include "envoy/api/v2/rds.pb.validate.h"
-#include "envoy/api/v2/route/route.pb.h"
 #include "envoy/http/protocol.h"
 
 #include "common/config/metadata.h"

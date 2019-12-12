@@ -5,8 +5,6 @@
 #include <string>
 #include <vector>
 
-#include "envoy/api/v2/route/route.pb.h"
-
 #include "common/common/assert.h"
 #include "common/common/empty_string.h"
 #include "common/protobuf/utility.h"

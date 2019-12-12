@@ -1,7 +1,5 @@
 #pragma once
 
-#include "envoy/api/v2/core/grpc_service.pb.h"
-
 #include "common/common/assert.h"
 
 #include "test/test_common/utility.h"

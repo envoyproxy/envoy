@@ -1,12 +1,11 @@
-#include "envoy/api/v2/core/http_uri.pb.h"
-#include "envoy/api/v2/core/protocol.pb.h"
-
 #pragma once
 
 #include <chrono>
 #include <cstdint>
 #include <string>
 
+#include "envoy/api/v2/core/http_uri.pb.h"
+#include "envoy/api/v2/core/protocol.pb.h"
 #include "envoy/grpc/status.h"
 #include "envoy/http/codes.h"
 #include "envoy/http/filter.h"

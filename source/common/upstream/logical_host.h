@@ -1,8 +1,5 @@
 #pragma once
 
-#include "envoy/api/v2/core/base.pb.h"
-#include "envoy/api/v2/endpoint/endpoint.pb.h"
-
 #include "common/upstream/upstream_impl.h"
 
 namespace Envoy {

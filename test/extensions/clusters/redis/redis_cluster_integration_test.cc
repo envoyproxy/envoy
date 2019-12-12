@@ -1,8 +1,6 @@
 #include <sstream>
 #include <vector>
 
-#include "envoy/config/bootstrap/v2/bootstrap.pb.h"
-
 #include "common/common/macros.h"
 
 #include "extensions/filters/network/redis_proxy/command_splitter_impl.h"

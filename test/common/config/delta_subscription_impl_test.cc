@@ -1,7 +1,3 @@
-#include "envoy/api/v2/core/base.pb.h"
-#include "envoy/api/v2/discovery.pb.h"
-#include "envoy/api/v2/eds.pb.h"
-
 #include "common/buffer/zero_copy_input_stream_impl.h"
 
 #include "test/common/config/delta_subscription_test_harness.h"

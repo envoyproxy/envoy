@@ -91,7 +91,6 @@ envoy_basic_cc_library(
         "fmtlib",
     ],
     include_prefix = envoy_include_prefix(package_name()),
-    deps = ["//include/envoy/common:base_includes"],
 )
 
 envoy_cc_library(

@@ -1,6 +1,5 @@
 #include "extensions/transport_sockets/tls/private_key/private_key_manager_impl.h"
 
-#include "envoy/api/v2/auth/cert.pb.h"
 #include "envoy/registry/registry.h"
 
 namespace Envoy {

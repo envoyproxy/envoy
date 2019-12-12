@@ -6,8 +6,6 @@
 #include <string>
 #include <vector>
 
-#include "envoy/config/bootstrap/v2/bootstrap.pb.h"
-#include "envoy/config/metrics/v2/stats.pb.h"
 #include "envoy/config/trace/v2/trace.pb.h"
 #include "envoy/network/connection.h"
 #include "envoy/runtime/runtime.h"

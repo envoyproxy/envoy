@@ -1,7 +1,5 @@
 #pragma once
 
-#include "envoy/api/v2/auth/cert.pb.h"
-#include "envoy/api/v2/core/config_source.pb.h"
 #include "envoy/secret/secret_callbacks.h"
 #include "envoy/secret/secret_manager.h"
 #include "envoy/server/transport_socket_config.h"

@@ -2,8 +2,9 @@
 
 #include <list>
 
+#include "envoy/api/v2/discovery.pb.h"
+
 #include "absl/container/flat_hash_map.h"
-#include "google/rpc/status.pb.h"
 
 namespace Envoy {
 namespace Config {

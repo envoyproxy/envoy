@@ -5,8 +5,6 @@
 #include <string>
 #include <vector>
 
-#include "envoy/api/v2/cds.pb.h"
-
 #include "common/common/assert.h"
 #include "common/upstream/load_balancer_impl.h"
 

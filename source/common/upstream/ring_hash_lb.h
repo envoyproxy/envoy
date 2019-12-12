@@ -2,7 +2,6 @@
 
 #include <vector>
 
-#include "envoy/api/v2/cds.pb.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats_macros.h"

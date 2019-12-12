@@ -2,7 +2,6 @@
 
 #include <limits>
 
-#include "envoy/api/v2/cds.pb.h"
 #include "envoy/upstream/host_description.h"
 #include "envoy/upstream/upstream.h"
 

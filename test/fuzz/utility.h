@@ -1,7 +1,5 @@
 #pragma once
 
-#include "envoy/api/v2/core/base.pb.h"
-
 #include "common/common/empty_string.h"
 #include "common/network/resolver_impl.h"
 #include "common/network/utility.h"

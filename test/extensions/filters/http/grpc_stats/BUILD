@@ -21,6 +21,5 @@ envoy_extension_cc_test(
         "//test/common/buffer:utility_lib",
         "//test/common/stream_info:test_util",
         "//test/mocks/server:server_mocks",
-        "@envoy_api//envoy/config/filter/http/grpc_stats/v2alpha:pkg_cc_proto",
     ],
 )

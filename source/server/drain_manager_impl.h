@@ -3,7 +3,6 @@
 #include <chrono>
 #include <functional>
 
-#include "envoy/api/v2/lds.pb.h"
 #include "envoy/server/drain_manager.h"
 #include "envoy/server/instance.h"
 

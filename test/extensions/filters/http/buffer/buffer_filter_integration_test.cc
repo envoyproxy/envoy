@@ -1,5 +1,4 @@
 #include "envoy/config/filter/http/buffer/v2/buffer.pb.h"
-#include "envoy/config/filter/network/http_connection_manager/v2/http_connection_manager.pb.h"
 
 #include "common/protobuf/utility.h"
 
