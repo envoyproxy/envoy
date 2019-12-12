@@ -1,6 +1,8 @@
 #include "envoy/api/v2/route/route.pb.validate.h"
 #include "envoy/config/filter/http/cors/v2/cors.pb.validate.h"
 
+#include <string>
+
 #include "common/router/config_impl.h"
 
 #include "test/mocks/runtime/mocks.h"
@@ -14,7 +16,7 @@ namespace Extensions {
 namespace HttpFilters {
 namespace Cors {
 namespace {
-// Helper utilities to convert a YAML string blob into a protobuf configuration.
+// Helper utility to convert a YAML string blob into a protobuf configuration.
 template <typename T>
 T createConfigFromYaml(const std::string& config_str) {
   T policy;

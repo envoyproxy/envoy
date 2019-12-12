@@ -1,5 +1,8 @@
 #pragma once
 
+#include <string>
+#include <vector>
+
 #include "envoy/config/filter/http/cors/v2/cors.pb.h"
 #include "envoy/http/filter.h"
 #include "envoy/stats/scope.h"
