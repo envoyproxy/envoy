@@ -21,7 +21,7 @@ message VmConfig {
   string vm_id = 1;
 
   // The Wasm runtime type (either "v8" or "null" for code comipled into Envoy).
-  string runtime = 2;
+  string runtime = 2 {validate.rules).string = {min_bytes: 2};
 
   // The Wasm code that Envoy will execute.
   api.v2.core.AsyncDataSource code = 3;
@@ -62,6 +62,6 @@ message WasmService {
   // not be used with filters.
   bool singleton = 2;
 
-  // If set add 'stat_prefix' as a prefix to all stats.
+  // If set add 'stat_prefix' as a prefix to all stats. May be left blank.
   string stat_prefix = 3;
 }
