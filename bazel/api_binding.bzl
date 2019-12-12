@@ -38,4 +38,3 @@ def envoy_api_binding():
         name = "rpc_status_proto",
         actual = "@com_google_googleapis//google/rpc:status_cc_proto",
     )
-
