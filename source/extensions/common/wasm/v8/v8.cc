@@ -20,7 +20,7 @@ namespace Common {
 namespace Wasm {
 namespace V8 {
 
-ThreadSafeSingleton<VmGlobalStats> global_stats_;
+std::atomic<int> active_vms_;
 
 wasm::Engine* engine() {
   static const auto engine = wasm::Engine::make();
@@ -39,8 +39,7 @@ using FuncDataPtr = std::unique_ptr<FuncData>;
 
 class V8 : public WasmVmBase {
 public:
-  V8(Stats::ScopeSharedPtr scope)
-      : WasmVmBase(scope, &global_stats_.get(), WasmRuntimeNames::get().V8) {}
+  V8(Stats::ScopeSharedPtr scope) : WasmVmBase(scope, &active_vms_, WasmRuntimeNames::get().V8) {}
 
   // Extensions::Common::Wasm::WasmVm
   absl::string_view runtime() override { return WasmRuntimeNames::get().V8; }

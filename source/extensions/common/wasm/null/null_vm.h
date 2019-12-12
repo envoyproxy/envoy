@@ -19,16 +19,16 @@ namespace Common {
 namespace Wasm {
 namespace Null {
 
-extern ThreadSafeSingleton<VmGlobalStats> global_stats_;
+extern std::atomic<int> active_vms_;
 
 // The NullVm wraps a C++ WASM plugin which has been compiled with the WASM API
 // and linked directly into the Envoy process. This is useful for development
 // in that it permits the debugger to set breakpoints in both Envoy and the plugin.
 struct NullVm : public WasmVmBase {
   NullVm(Stats::ScopeSharedPtr scope)
-      : WasmVmBase(scope, &global_stats_.get(), WasmRuntimeNames::get().Null) {}
+      : WasmVmBase(scope, &active_vms_, WasmRuntimeNames::get().Null) {}
   NullVm(const NullVm& other)
-      : WasmVmBase(other.scope_, &global_stats_.get(), WasmRuntimeNames::get().Null),
+      : WasmVmBase(other.scope_, &active_vms_, WasmRuntimeNames::get().Null),
         plugin_name_(other.plugin_name_) {}
 
   // WasmVm

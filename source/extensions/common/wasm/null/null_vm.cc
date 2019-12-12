@@ -18,7 +18,7 @@ namespace Common {
 namespace Wasm {
 namespace Null {
 
-ThreadSafeSingleton<VmGlobalStats> global_stats_;
+std::atomic<int> active_vms_;
 
 WasmVmPtr NullVm::clone() {
   auto cloned_null_vm = std::make_unique<NullVm>(*this);
