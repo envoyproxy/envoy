@@ -59,6 +59,17 @@ TEST(BufferFilterFactoryTest, BufferFilterEmptyProto) {
   cb(filter_callback);
 }
 
+TEST(BufferFilterFactoryTest, BufferFilterNoMaxRequestBytes) {
+  BufferFilterFactory factory;
+  envoy::config::filter::http::buffer::v2::Buffer config =
+      *dynamic_cast<envoy::config::filter::http::buffer::v2::Buffer*>(
+          factory.createEmptyConfigProto().get());
+
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+  EXPECT_THROW_WITH_REGEX(factory.createFilterFactoryFromProto(config, "stats", context),
+                          EnvoyException, "Proto constraint validation failed");
+}
+
 TEST(BufferFilterFactoryTest, BufferFilterEmptyRouteProto) {
   BufferFilterFactory factory;
   EXPECT_NO_THROW({

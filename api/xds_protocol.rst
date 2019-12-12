@@ -687,6 +687,17 @@ names, which the server thought the client was already not subscribed
 to. The server must cleanly process such a request; it can simply ignore
 these phantom unsubscriptions.
 
+Knowing When a Requested Resource Does Not Exist
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+When a resource subscribed to by a client does not exist, the server will send a :ref:`Resource
+<envoy_api_msg_Resource>` whose :ref:`name <envoy_api_field_Resource.name>` field matches the
+name that the client subscribed to and whose :ref:`resource <envoy_api_field_Resource.resource>`
+field is unset. This allows the client to quickly determine when a resource does not exist without
+waiting for a timeout, as would be done in the SotW protocol variants. However, clients are still
+encouraged to use a timeout to protect against the case where the management server fails to send
+a response in a timely manner.
+
 REST-JSON polling subscriptions
 -------------------------------
 
