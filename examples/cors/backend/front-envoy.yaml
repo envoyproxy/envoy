@@ -26,7 +26,7 @@ static_resources:
                 allow_origin_string_match:
                 - safe_regex:
                     google_re2: {}
-                    regex: .*
+                    regex: \*
                 allow_methods: "GET"
                 filter_enabled:
                   default_value:
