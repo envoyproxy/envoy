@@ -432,7 +432,7 @@ TEST_P(VhdsIntegrationTest, VhdsVirtualHostAddUpdateRemove) {
 //  - a spontaneous VHDS DiscoveryResponse adds two virtual hosts
 //  - the next spontaneous VHDS DiscoveryResponse removes newly added virtual hosts
 //  - Upstream makes a request to an (now) unknown domain
-//  - A VHDS DiscoveryReponse received containing update for the domain
+//  - A VHDS DiscoveryResponse received containing update for the domain
 //  - Upstream receives a 200 response
 TEST_P(VhdsIntegrationTest, RdsWithVirtualHostsVhdsVirtualHostAddUpdateRemove) {
   // RDS exchange with a non-empty virtual_hosts field
