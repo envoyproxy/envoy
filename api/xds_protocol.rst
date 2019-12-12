@@ -411,7 +411,7 @@ Note that this timeout is not strictly necessary when using wildcard mode for :r
 <envoy_api_msg_Listener>` and :ref:`Cluster <envoy_api_msg_Cluster>` resource types, because
 in that case every response will contain all existing resources that are relevant to the
 client, so the client can know that a resource does not exist by its absence in the next
-response it sees. However, using a timeout is still recommended inthis case, since it protects
+response it sees. However, using a timeout is still recommended in this case, since it protects
 against the case where the management server fails to send a response in a timely manner.
 
 Note that even if a requested resource does not exist at the moment when the client requests it,
