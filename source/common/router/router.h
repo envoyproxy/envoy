@@ -92,7 +92,7 @@ public:
     using ParseRetryFlagsFunc = std::function<std::pair<uint32_t, bool>(absl::string_view)>;
 
   private:
-    static HeaderCheckResult hasValidRetryFields(Http::HeaderEntry* header_entry,
+    static HeaderCheckResult hasValidRetryFields(const Http::HeaderEntry* header_entry,
                                                  const ParseRetryFlagsFunc& parse_fn) {
       HeaderCheckResult r;
       if (header_entry) {
@@ -103,7 +103,7 @@ public:
       return r;
     }
 
-    static HeaderCheckResult isInteger(Http::HeaderEntry* header_entry) {
+    static HeaderCheckResult isInteger(const Http::HeaderEntry* header_entry) {
       HeaderCheckResult r;
       if (header_entry) {
         uint64_t out;

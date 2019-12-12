@@ -17,7 +17,7 @@ Network::ClientConnectionPtr ValidationDispatcher::createClientConnection(
 }
 
 Network::DnsResolverSharedPtr ValidationDispatcher::createDnsResolver(
-    const std::vector<Network::Address::InstanceConstSharedPtr>&) {
+    const std::vector<Network::Address::InstanceConstSharedPtr>&, const bool) {
   return dns_resolver_;
 }
 

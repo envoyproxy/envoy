@@ -46,6 +46,12 @@ struct RedisClusterStats {
   REDIS_CLUSTER_STATS(GENERATE_COUNTER_STRUCT)
 };
 
+class DoNothingPoolCallbacks : public PoolCallbacks {
+public:
+  void onResponse(Common::Redis::RespValuePtr&&) override{};
+  void onFailure() override{};
+};
+
 class InstanceImpl : public Instance {
 public:
   InstanceImpl(
@@ -56,12 +62,22 @@ public:
       const Common::Redis::RedisCommandStatsSharedPtr& redis_command_stats,
       Extensions::Common::Redis::RedirectionManagerSharedPtr redirection_manager);
   // RedisProxy::ConnPool::Instance
-  Common::Redis::Client::PoolRequest*
-  makeRequest(const std::string& key, const Common::Redis::RespValue& request,
-              Common::Redis::Client::PoolCallbacks& callbacks) override;
+  Common::Redis::Client::PoolRequest* makeRequest(const std::string& key, RespVariant&& request,
+                                                  PoolCallbacks& callbacks) override;
+  /**
+   * Makes a redis request based on IP address and TCP port of the upstream host (e.g.,
+   * moved/ask cluster redirection). This is now only kept mostly for testing.
+   * @param host_address supplies the IP address and TCP port of the upstream host to receive
+   * the request.
+   * @param request supplies the Redis request to make.
+   * @param callbacks supplies the request completion callbacks.
+   * @return PoolRequest* a handle to the active request or nullptr if the request could not be
+   * made for some reason.
+   */
   Common::Redis::Client::PoolRequest*
   makeRequestToHost(const std::string& host_address, const Common::Redis::RespValue& request,
-                    Common::Redis::Client::PoolCallbacks& callbacks) override;
+                    Common::Redis::Client::ClientCallbacks& callbacks);
+
   bool onRedirection() override { return redirection_manager_->onRedirection(cluster_name_); }
 
   // Allow the unit test to have access to private members.
@@ -85,17 +101,38 @@ private:
 
   using ThreadLocalActiveClientPtr = std::unique_ptr<ThreadLocalActiveClient>;
 
+  struct PendingRequest : public Common::Redis::Client::ClientCallbacks,
+                          public Common::Redis::Client::PoolRequest {
+    PendingRequest(ThreadLocalPool& parent, RespVariant&& incoming_request,
+                   PoolCallbacks& pool_callbacks);
+    ~PendingRequest() override;
+
+    // Common::Redis::Client::ClientCallbacks
+    void onResponse(Common::Redis::RespValuePtr&& response) override;
+    void onFailure() override;
+    bool onRedirection(Common::Redis::RespValuePtr&& value, const std::string& host_address,
+                       bool ask_redirection) override;
+
+    // PoolRequest
+    void cancel() override;
+
+    ThreadLocalPool& parent_;
+    const RespVariant incoming_request_;
+    Common::Redis::Client::PoolRequest* request_handler_;
+    PoolCallbacks& pool_callbacks_;
+  };
+
   struct ThreadLocalPool : public ThreadLocal::ThreadLocalObject,
                            public Upstream::ClusterUpdateCallbacks {
     ThreadLocalPool(InstanceImpl& parent, Event::Dispatcher& dispatcher, std::string cluster_name);
     ~ThreadLocalPool() override;
     ThreadLocalActiveClientPtr& threadLocalActiveClient(Upstream::HostConstSharedPtr host);
-    Common::Redis::Client::PoolRequest*
-    makeRequest(const std::string& key, const Common::Redis::RespValue& request,
-                Common::Redis::Client::PoolCallbacks& callbacks);
+    Common::Redis::Client::PoolRequest* makeRequest(const std::string& key, RespVariant&& request,
+                                                    PoolCallbacks& callbacks);
     Common::Redis::Client::PoolRequest*
     makeRequestToHost(const std::string& host_address, const Common::Redis::RespValue& request,
-                      Common::Redis::Client::PoolCallbacks& callbacks);
+                      Common::Redis::Client::ClientCallbacks& callbacks);
+
     void onClusterAddOrUpdateNonVirtual(Upstream::ThreadLocalCluster& cluster);
     void onHostsAdded(const std::vector<Upstream::HostSharedPtr>& hosts_added);
     void onHostsRemoved(const std::vector<Upstream::HostSharedPtr>& hosts_removed);
@@ -106,6 +143,8 @@ private:
       onClusterAddOrUpdateNonVirtual(cluster);
     }
     void onClusterRemoval(const std::string& cluster_name) override;
+
+    void onRequestCompleted();
 
     InstanceImpl& parent_;
     Event::Dispatcher& dispatcher_;
@@ -118,6 +157,7 @@ private:
     std::string auth_password_;
     std::list<Upstream::HostSharedPtr> created_via_redirect_hosts_;
     std::list<ThreadLocalActiveClientPtr> clients_to_drain_;
+    std::list<PendingRequest> pending_requests_;
 
     /* This timer is used to poll the active clients in clients_to_drain_ to determine whether they
      * have been drained (have no active requests) or not. It is only enabled after a client has

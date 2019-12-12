@@ -113,7 +113,7 @@ void RedisHealthChecker::RedisActiveHealthCheckSession::onFailure() {
 }
 
 bool RedisHealthChecker::RedisActiveHealthCheckSession::onRedirection(
-    const NetworkFilters::Common::Redis::RespValue&) {
+    NetworkFilters::Common::Redis::RespValuePtr&&, const std::string&, bool) {
   // Treat any redirection error response from a Redis server as success.
   current_request_ = nullptr;
   handleSuccess();

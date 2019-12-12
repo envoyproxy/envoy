@@ -27,6 +27,27 @@ namespace Envoy {
 namespace AccessLog {
 namespace {
 
+const ProtobufWkt::Value& nullValue() {
+  static const auto* v = []() -> ProtobufWkt::Value* {
+    auto* vv = new ProtobufWkt::Value();
+    vv->set_null_value(ProtobufWkt::NULL_VALUE);
+    return vv;
+  }();
+  return *v;
+}
+
+ProtobufWkt::Value stringValue(const std::string& str) {
+  ProtobufWkt::Value val;
+  val.set_string_value(str);
+  return val;
+}
+
+ProtobufWkt::Value numberValue(double num) {
+  ProtobufWkt::Value val;
+  val.set_number_value(num);
+  return val;
+}
+
 class TestSerializedUnknownFilterState : public StreamInfo::FilterState::Object {
 public:
   ProtobufTypes::MessagePtr serializeAsProto() const override {
@@ -35,6 +56,38 @@ public:
     any->set_value("\xde\xad\xbe\xef");
     return any;
   }
+};
+
+class TestSerializedStructFilterState : public StreamInfo::FilterState::Object {
+public:
+  TestSerializedStructFilterState() : use_struct_(true) {
+    (*struct_.mutable_fields())["inner_key"] = stringValue("inner_value");
+  }
+
+  explicit TestSerializedStructFilterState(const ProtobufWkt::Struct& s) : use_struct_(true) {
+    struct_.CopyFrom(s);
+  }
+
+  explicit TestSerializedStructFilterState(std::chrono::seconds seconds) : use_struct_(false) {
+    duration_.set_seconds(seconds.count());
+  }
+
+  ProtobufTypes::MessagePtr serializeAsProto() const override {
+    if (use_struct_) {
+      auto s = std::make_unique<ProtobufWkt::Struct>();
+      s->CopyFrom(struct_);
+      return s;
+    }
+
+    auto d = std::make_unique<ProtobufWkt::Duration>();
+    d->CopyFrom(duration_);
+    return d;
+  }
+
+private:
+  const bool use_struct_;
+  ProtobufWkt::Struct struct_;
+  ProtobufWkt::Duration duration_;
 };
 
 TEST(AccessLogFormatUtilsTest, protocolToString) {
@@ -50,6 +103,8 @@ TEST(AccessLogFormatterTest, plainStringFormatter) {
   StreamInfo::MockStreamInfo stream_info;
 
   EXPECT_EQ("plain", formatter.format(header, header, header, stream_info));
+  EXPECT_THAT(formatter.formatValue(header, header, header, stream_info),
+              ProtoEq(stringValue("plain")));
 }
 
 TEST(AccessLogFormatterTest, streamInfoFormatter) {
@@ -61,15 +116,19 @@ TEST(AccessLogFormatterTest, streamInfoFormatter) {
   {
     StreamInfoFormatter request_duration_format("REQUEST_DURATION");
     absl::optional<std::chrono::nanoseconds> dur = std::chrono::nanoseconds(5000000);
-    EXPECT_CALL(stream_info, lastDownstreamRxByteReceived()).WillOnce(Return(dur));
+    EXPECT_CALL(stream_info, lastDownstreamRxByteReceived()).WillRepeatedly(Return(dur));
     EXPECT_EQ("5", request_duration_format.format(header, header, header, stream_info));
+    EXPECT_THAT(request_duration_format.formatValue(header, header, header, stream_info),
+                ProtoEq(numberValue(5.0)));
   }
 
   {
     StreamInfoFormatter request_duration_format("REQUEST_DURATION");
     absl::optional<std::chrono::nanoseconds> dur;
-    EXPECT_CALL(stream_info, lastDownstreamRxByteReceived()).WillOnce(Return(dur));
+    EXPECT_CALL(stream_info, lastDownstreamRxByteReceived()).WillRepeatedly(Return(dur));
     EXPECT_EQ("-", request_duration_format.format(header, header, header, stream_info));
+    EXPECT_THAT(request_duration_format.formatValue(header, header, header, stream_info),
+                ProtoEq(nullValue()));
   }
 
   {
@@ -77,6 +136,8 @@ TEST(AccessLogFormatterTest, streamInfoFormatter) {
     absl::optional<std::chrono::nanoseconds> dur = std::chrono::nanoseconds(10000000);
     EXPECT_CALL(stream_info, firstUpstreamRxByteReceived()).WillRepeatedly(Return(dur));
     EXPECT_EQ("10", response_duration_format.format(header, header, header, stream_info));
+    EXPECT_THAT(response_duration_format.formatValue(header, header, header, stream_info),
+                ProtoEq(numberValue(10.0)));
   }
 
   {
@@ -84,6 +145,8 @@ TEST(AccessLogFormatterTest, streamInfoFormatter) {
     absl::optional<std::chrono::nanoseconds> dur;
     EXPECT_CALL(stream_info, firstUpstreamRxByteReceived()).WillRepeatedly(Return(dur));
     EXPECT_EQ("-", response_duration_format.format(header, header, header, stream_info));
+    EXPECT_THAT(response_duration_format.formatValue(header, header, header, stream_info),
+                ProtoEq(nullValue()));
   }
 
   {
@@ -95,6 +158,8 @@ TEST(AccessLogFormatterTest, streamInfoFormatter) {
     EXPECT_CALL(stream_info, lastDownstreamTxByteSent()).WillRepeatedly(Return(dur_downstream));
 
     EXPECT_EQ("15", ttlb_duration_format.format(header, header, header, stream_info));
+    EXPECT_THAT(ttlb_duration_format.formatValue(header, header, header, stream_info),
+                ProtoEq(numberValue(15.0)));
   }
 
   {
@@ -106,19 +171,25 @@ TEST(AccessLogFormatterTest, streamInfoFormatter) {
     EXPECT_CALL(stream_info, lastDownstreamTxByteSent()).WillRepeatedly(Return(dur_downstream));
 
     EXPECT_EQ("-", ttlb_duration_format.format(header, header, header, stream_info));
+    EXPECT_THAT(ttlb_duration_format.formatValue(header, header, header, stream_info),
+                ProtoEq(nullValue()));
   }
 
   {
     StreamInfoFormatter bytes_received_format("BYTES_RECEIVED");
-    EXPECT_CALL(stream_info, bytesReceived()).WillOnce(Return(1));
+    EXPECT_CALL(stream_info, bytesReceived()).WillRepeatedly(Return(1));
     EXPECT_EQ("1", bytes_received_format.format(header, header, header, stream_info));
+    EXPECT_THAT(bytes_received_format.formatValue(header, header, header, stream_info),
+                ProtoEq(numberValue(1.0)));
   }
 
   {
     StreamInfoFormatter protocol_format("PROTOCOL");
     absl::optional<Http::Protocol> protocol = Http::Protocol::Http11;
-    EXPECT_CALL(stream_info, protocol()).WillOnce(Return(protocol));
+    EXPECT_CALL(stream_info, protocol()).WillRepeatedly(Return(protocol));
     EXPECT_EQ("HTTP/1.1", protocol_format.format(header, header, header, stream_info));
+    EXPECT_THAT(protocol_format.formatValue(header, header, header, stream_info),
+                ProtoEq(stringValue("HTTP/1.1")));
   }
 
   {
@@ -126,6 +197,8 @@ TEST(AccessLogFormatterTest, streamInfoFormatter) {
     absl::optional<uint32_t> response_code{200};
     EXPECT_CALL(stream_info, responseCode()).WillRepeatedly(Return(response_code));
     EXPECT_EQ("200", response_format.format(header, header, header, stream_info));
+    EXPECT_THAT(response_format.formatValue(header, header, header, stream_info),
+                ProtoEq(numberValue(200.0)));
   }
 
   {
@@ -133,6 +206,8 @@ TEST(AccessLogFormatterTest, streamInfoFormatter) {
     absl::optional<uint32_t> response_code;
     EXPECT_CALL(stream_info, responseCode()).WillRepeatedly(Return(response_code));
     EXPECT_EQ("0", response_code_format.format(header, header, header, stream_info));
+    EXPECT_THAT(response_code_format.formatValue(header, header, header, stream_info),
+                ProtoEq(numberValue(0.0)));
   }
 
   {
@@ -140,6 +215,8 @@ TEST(AccessLogFormatterTest, streamInfoFormatter) {
     absl::optional<std::string> rc_details;
     EXPECT_CALL(stream_info, responseCodeDetails()).WillRepeatedly(ReturnRef(rc_details));
     EXPECT_EQ("-", response_format.format(header, header, header, stream_info));
+    EXPECT_THAT(response_format.formatValue(header, header, header, stream_info),
+                ProtoEq(nullValue()));
   }
 
   {
@@ -147,12 +224,16 @@ TEST(AccessLogFormatterTest, streamInfoFormatter) {
     absl::optional<std::string> rc_details{"via_upstream"};
     EXPECT_CALL(stream_info, responseCodeDetails()).WillRepeatedly(ReturnRef(rc_details));
     EXPECT_EQ("via_upstream", response_code_format.format(header, header, header, stream_info));
+    EXPECT_THAT(response_code_format.formatValue(header, header, header, stream_info),
+                ProtoEq(stringValue("via_upstream")));
   }
 
   {
     StreamInfoFormatter bytes_sent_format("BYTES_SENT");
-    EXPECT_CALL(stream_info, bytesSent()).WillOnce(Return(1));
+    EXPECT_CALL(stream_info, bytesSent()).WillRepeatedly(Return(1));
     EXPECT_EQ("1", bytes_sent_format.format(header, header, header, stream_info));
+    EXPECT_THAT(bytes_sent_format.formatValue(header, header, header, stream_info),
+                ProtoEq(numberValue(1.0)));
   }
 
   {
@@ -160,6 +241,8 @@ TEST(AccessLogFormatterTest, streamInfoFormatter) {
     absl::optional<std::chrono::nanoseconds> dur = std::chrono::nanoseconds(15000000);
     EXPECT_CALL(stream_info, requestComplete()).WillRepeatedly(Return(dur));
     EXPECT_EQ("15", duration_format.format(header, header, header, stream_info));
+    EXPECT_THAT(duration_format.formatValue(header, header, header, stream_info),
+                ProtoEq(numberValue(15.0)));
   }
 
   {
@@ -167,60 +250,83 @@ TEST(AccessLogFormatterTest, streamInfoFormatter) {
     ON_CALL(stream_info, hasResponseFlag(StreamInfo::ResponseFlag::LocalReset))
         .WillByDefault(Return(true));
     EXPECT_EQ("LR", response_flags_format.format(header, header, header, stream_info));
+    EXPECT_THAT(response_flags_format.formatValue(header, header, header, stream_info),
+                ProtoEq(stringValue("LR")));
   }
 
   {
     StreamInfoFormatter upstream_format("UPSTREAM_HOST");
     EXPECT_EQ("10.0.0.1:443", upstream_format.format(header, header, header, stream_info));
+    EXPECT_THAT(upstream_format.formatValue(header, header, header, stream_info),
+                ProtoEq(stringValue("10.0.0.1:443")));
   }
 
   {
     StreamInfoFormatter upstream_format("UPSTREAM_CLUSTER");
     const std::string upstream_cluster_name = "cluster_name";
-    EXPECT_CALL(stream_info.host_->cluster_, name()).WillOnce(ReturnRef(upstream_cluster_name));
+    EXPECT_CALL(stream_info.host_->cluster_, name())
+        .WillRepeatedly(ReturnRef(upstream_cluster_name));
     EXPECT_EQ("cluster_name", upstream_format.format(header, header, header, stream_info));
+    EXPECT_THAT(upstream_format.formatValue(header, header, header, stream_info),
+                ProtoEq(stringValue("cluster_name")));
   }
 
   {
     StreamInfoFormatter upstream_format("UPSTREAM_HOST");
-    EXPECT_CALL(stream_info, upstreamHost()).WillOnce(Return(nullptr));
+    EXPECT_CALL(stream_info, upstreamHost()).WillRepeatedly(Return(nullptr));
     EXPECT_EQ("-", upstream_format.format(header, header, header, stream_info));
+    EXPECT_THAT(upstream_format.formatValue(header, header, header, stream_info),
+                ProtoEq(nullValue()));
   }
 
   {
     StreamInfoFormatter upstream_format("UPSTREAM_CLUSTER");
-    EXPECT_CALL(stream_info, upstreamHost()).WillOnce(Return(nullptr));
+    EXPECT_CALL(stream_info, upstreamHost()).WillRepeatedly(Return(nullptr));
     EXPECT_EQ("-", upstream_format.format(header, header, header, stream_info));
+    EXPECT_THAT(upstream_format.formatValue(header, header, header, stream_info),
+                ProtoEq(nullValue()));
   }
 
   {
     StreamInfoFormatter upstream_format("DOWNSTREAM_LOCAL_ADDRESS");
     EXPECT_EQ("127.0.0.2:0", upstream_format.format(header, header, header, stream_info));
+    EXPECT_THAT(upstream_format.formatValue(header, header, header, stream_info),
+                ProtoEq(stringValue("127.0.0.2:0")));
   }
 
   {
     StreamInfoFormatter upstream_format("DOWNSTREAM_LOCAL_ADDRESS_WITHOUT_PORT");
     EXPECT_EQ("127.0.0.2", upstream_format.format(header, header, header, stream_info));
+    EXPECT_THAT(upstream_format.formatValue(header, header, header, stream_info),
+                ProtoEq(stringValue("127.0.0.2")));
   }
 
   {
     StreamInfoFormatter upstream_format("DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT");
     EXPECT_EQ("127.0.0.1", upstream_format.format(header, header, header, stream_info));
+    EXPECT_THAT(upstream_format.formatValue(header, header, header, stream_info),
+                ProtoEq(stringValue("127.0.0.1")));
   }
 
   {
     StreamInfoFormatter upstream_format("DOWNSTREAM_REMOTE_ADDRESS");
     EXPECT_EQ("127.0.0.1:0", upstream_format.format(header, header, header, stream_info));
+    EXPECT_THAT(upstream_format.formatValue(header, header, header, stream_info),
+                ProtoEq(stringValue("127.0.0.1:0")));
   }
 
   {
     StreamInfoFormatter upstream_format("DOWNSTREAM_DIRECT_REMOTE_ADDRESS_WITHOUT_PORT");
     EXPECT_EQ("127.0.0.1", upstream_format.format(header, header, header, stream_info));
+    EXPECT_THAT(upstream_format.formatValue(header, header, header, stream_info),
+                ProtoEq(stringValue("127.0.0.1")));
   }
 
   {
     StreamInfoFormatter upstream_format("DOWNSTREAM_DIRECT_REMOTE_ADDRESS");
     EXPECT_EQ("127.0.0.1:0", upstream_format.format(header, header, header, stream_info));
+    EXPECT_THAT(upstream_format.formatValue(header, header, header, stream_info),
+                ProtoEq(stringValue("127.0.0.1:0")));
   }
 
   {
@@ -229,6 +335,8 @@ TEST(AccessLogFormatterTest, streamInfoFormatter) {
     EXPECT_CALL(stream_info, requestedServerName())
         .WillRepeatedly(ReturnRef(requested_server_name));
     EXPECT_EQ("stub_server", upstream_format.format(header, header, header, stream_info));
+    EXPECT_THAT(upstream_format.formatValue(header, header, header, stream_info),
+                ProtoEq(stringValue("stub_server")));
   }
 
   {
@@ -237,6 +345,8 @@ TEST(AccessLogFormatterTest, streamInfoFormatter) {
     EXPECT_CALL(stream_info, requestedServerName())
         .WillRepeatedly(ReturnRef(requested_server_name));
     EXPECT_EQ("-", upstream_format.format(header, header, header, stream_info));
+    EXPECT_THAT(upstream_format.formatValue(header, header, header, stream_info),
+                ProtoEq(nullValue()));
   }
   {
     StreamInfoFormatter upstream_format("DOWNSTREAM_PEER_URI_SAN");
@@ -245,6 +355,8 @@ TEST(AccessLogFormatterTest, streamInfoFormatter) {
     EXPECT_CALL(*connection_info, uriSanPeerCertificate()).WillRepeatedly(Return(sans));
     EXPECT_CALL(stream_info, downstreamSslConnection()).WillRepeatedly(Return(connection_info));
     EXPECT_EQ("san", upstream_format.format(header, header, header, stream_info));
+    EXPECT_THAT(upstream_format.formatValue(header, header, header, stream_info),
+                ProtoEq(stringValue("san")));
   }
 
   {
@@ -262,11 +374,15 @@ TEST(AccessLogFormatterTest, streamInfoFormatter) {
         .WillRepeatedly(Return(std::vector<std::string>()));
     EXPECT_CALL(stream_info, downstreamSslConnection()).WillRepeatedly(Return(connection_info));
     EXPECT_EQ("-", upstream_format.format(header, header, header, stream_info));
+    EXPECT_THAT(upstream_format.formatValue(header, header, header, stream_info),
+                ProtoEq(nullValue()));
   }
   {
     EXPECT_CALL(stream_info, downstreamSslConnection()).WillRepeatedly(Return(nullptr));
     StreamInfoFormatter upstream_format("DOWNSTREAM_PEER_URI_SAN");
     EXPECT_EQ("-", upstream_format.format(header, header, header, stream_info));
+    EXPECT_THAT(upstream_format.formatValue(header, header, header, stream_info),
+                ProtoEq(nullValue()));
   }
   {
     StreamInfoFormatter upstream_format("DOWNSTREAM_LOCAL_URI_SAN");
@@ -275,6 +391,8 @@ TEST(AccessLogFormatterTest, streamInfoFormatter) {
     EXPECT_CALL(*connection_info, uriSanLocalCertificate()).WillRepeatedly(Return(sans));
     EXPECT_CALL(stream_info, downstreamSslConnection()).WillRepeatedly(Return(connection_info));
     EXPECT_EQ("san", upstream_format.format(header, header, header, stream_info));
+    EXPECT_THAT(upstream_format.formatValue(header, header, header, stream_info),
+                ProtoEq(stringValue("san")));
   }
   {
     StreamInfoFormatter upstream_format("DOWNSTREAM_LOCAL_URI_SAN");
@@ -291,11 +409,15 @@ TEST(AccessLogFormatterTest, streamInfoFormatter) {
         .WillRepeatedly(Return(std::vector<std::string>()));
     EXPECT_CALL(stream_info, downstreamSslConnection()).WillRepeatedly(Return(connection_info));
     EXPECT_EQ("-", upstream_format.format(header, header, header, stream_info));
+    EXPECT_THAT(upstream_format.formatValue(header, header, header, stream_info),
+                ProtoEq(nullValue()));
   }
   {
     EXPECT_CALL(stream_info, downstreamSslConnection()).WillRepeatedly(Return(nullptr));
     StreamInfoFormatter upstream_format("DOWNSTREAM_LOCAL_URI_SAN");
     EXPECT_EQ("-", upstream_format.format(header, header, header, stream_info));
+    EXPECT_THAT(upstream_format.formatValue(header, header, header, stream_info),
+                ProtoEq(nullValue()));
   }
   {
     StreamInfoFormatter upstream_format("DOWNSTREAM_LOCAL_SUBJECT");
@@ -305,6 +427,8 @@ TEST(AccessLogFormatterTest, streamInfoFormatter) {
         .WillRepeatedly(ReturnRef(subject_local));
     EXPECT_CALL(stream_info, downstreamSslConnection()).WillRepeatedly(Return(connection_info));
     EXPECT_EQ("subject", upstream_format.format(header, header, header, stream_info));
+    EXPECT_THAT(upstream_format.formatValue(header, header, header, stream_info),
+                ProtoEq(stringValue("subject")));
   }
   {
     StreamInfoFormatter upstream_format("DOWNSTREAM_LOCAL_SUBJECT");
@@ -313,11 +437,15 @@ TEST(AccessLogFormatterTest, streamInfoFormatter) {
         .WillRepeatedly(ReturnRef(EMPTY_STRING));
     EXPECT_CALL(stream_info, downstreamSslConnection()).WillRepeatedly(Return(connection_info));
     EXPECT_EQ("-", upstream_format.format(header, header, header, stream_info));
+    EXPECT_THAT(upstream_format.formatValue(header, header, header, stream_info),
+                ProtoEq(nullValue()));
   }
   {
     EXPECT_CALL(stream_info, downstreamSslConnection()).WillRepeatedly(Return(nullptr));
     StreamInfoFormatter upstream_format("DOWNSTREAM_LOCAL_SUBJECT");
     EXPECT_EQ("-", upstream_format.format(header, header, header, stream_info));
+    EXPECT_THAT(upstream_format.formatValue(header, header, header, stream_info),
+                ProtoEq(nullValue()));
   }
   {
     StreamInfoFormatter upstream_format("DOWNSTREAM_PEER_SUBJECT");
@@ -326,6 +454,8 @@ TEST(AccessLogFormatterTest, streamInfoFormatter) {
     EXPECT_CALL(*connection_info, subjectPeerCertificate()).WillRepeatedly(ReturnRef(subject_peer));
     EXPECT_CALL(stream_info, downstreamSslConnection()).WillRepeatedly(Return(connection_info));
     EXPECT_EQ("subject", upstream_format.format(header, header, header, stream_info));
+    EXPECT_THAT(upstream_format.formatValue(header, header, header, stream_info),
+                ProtoEq(stringValue("subject")));
   }
   {
     StreamInfoFormatter upstream_format("DOWNSTREAM_PEER_SUBJECT");
@@ -333,11 +463,15 @@ TEST(AccessLogFormatterTest, streamInfoFormatter) {
     EXPECT_CALL(*connection_info, subjectPeerCertificate()).WillRepeatedly(ReturnRef(EMPTY_STRING));
     EXPECT_CALL(stream_info, downstreamSslConnection()).WillRepeatedly(Return(connection_info));
     EXPECT_EQ("-", upstream_format.format(header, header, header, stream_info));
+    EXPECT_THAT(upstream_format.formatValue(header, header, header, stream_info),
+                ProtoEq(nullValue()));
   }
   {
     EXPECT_CALL(stream_info, downstreamSslConnection()).WillRepeatedly(Return(nullptr));
     StreamInfoFormatter upstream_format("DOWNSTREAM_PEER_SUBJECT");
     EXPECT_EQ("-", upstream_format.format(header, header, header, stream_info));
+    EXPECT_THAT(upstream_format.formatValue(header, header, header, stream_info),
+                ProtoEq(nullValue()));
   }
   {
     StreamInfoFormatter upstream_format("DOWNSTREAM_TLS_SESSION_ID");
@@ -346,6 +480,8 @@ TEST(AccessLogFormatterTest, streamInfoFormatter) {
     EXPECT_CALL(*connection_info, sessionId()).WillRepeatedly(ReturnRef(session_id));
     EXPECT_CALL(stream_info, downstreamSslConnection()).WillRepeatedly(Return(connection_info));
     EXPECT_EQ("deadbeef", upstream_format.format(header, header, header, stream_info));
+    EXPECT_THAT(upstream_format.formatValue(header, header, header, stream_info),
+                ProtoEq(stringValue("deadbeef")));
   }
   {
     StreamInfoFormatter upstream_format("DOWNSTREAM_TLS_SESSION_ID");
@@ -353,11 +489,15 @@ TEST(AccessLogFormatterTest, streamInfoFormatter) {
     EXPECT_CALL(*connection_info, sessionId()).WillRepeatedly(ReturnRef(EMPTY_STRING));
     EXPECT_CALL(stream_info, downstreamSslConnection()).WillRepeatedly(Return(connection_info));
     EXPECT_EQ("-", upstream_format.format(header, header, header, stream_info));
+    EXPECT_THAT(upstream_format.formatValue(header, header, header, stream_info),
+                ProtoEq(nullValue()));
   }
   {
     EXPECT_CALL(stream_info, downstreamSslConnection()).WillRepeatedly(Return(nullptr));
     StreamInfoFormatter upstream_format("DOWNSTREAM_TLS_SESSION_ID");
     EXPECT_EQ("-", upstream_format.format(header, header, header, stream_info));
+    EXPECT_THAT(upstream_format.formatValue(header, header, header, stream_info),
+                ProtoEq(nullValue()));
   }
   {
     StreamInfoFormatter upstream_format("DOWNSTREAM_TLS_CIPHER");
@@ -374,11 +514,15 @@ TEST(AccessLogFormatterTest, streamInfoFormatter) {
     EXPECT_CALL(*connection_info, ciphersuiteString()).WillRepeatedly(Return(""));
     EXPECT_CALL(stream_info, downstreamSslConnection()).WillRepeatedly(Return(connection_info));
     EXPECT_EQ("-", upstream_format.format(header, header, header, stream_info));
+    EXPECT_THAT(upstream_format.formatValue(header, header, header, stream_info),
+                ProtoEq(nullValue()));
   }
   {
     EXPECT_CALL(stream_info, downstreamSslConnection()).WillRepeatedly(Return(nullptr));
     StreamInfoFormatter upstream_format("DOWNSTREAM_TLS_CIPHER");
     EXPECT_EQ("-", upstream_format.format(header, header, header, stream_info));
+    EXPECT_THAT(upstream_format.formatValue(header, header, header, stream_info),
+                ProtoEq(nullValue()));
   }
   {
     StreamInfoFormatter upstream_format("DOWNSTREAM_TLS_VERSION");
@@ -387,6 +531,8 @@ TEST(AccessLogFormatterTest, streamInfoFormatter) {
     EXPECT_CALL(*connection_info, tlsVersion()).WillRepeatedly(ReturnRef(tlsVersion));
     EXPECT_CALL(stream_info, downstreamSslConnection()).WillRepeatedly(Return(connection_info));
     EXPECT_EQ("TLSv1.2", upstream_format.format(header, header, header, stream_info));
+    EXPECT_THAT(upstream_format.formatValue(header, header, header, stream_info),
+                ProtoEq(stringValue("TLSv1.2")));
   }
   {
     StreamInfoFormatter upstream_format("DOWNSTREAM_TLS_VERSION");
@@ -394,11 +540,15 @@ TEST(AccessLogFormatterTest, streamInfoFormatter) {
     EXPECT_CALL(*connection_info, tlsVersion()).WillRepeatedly(ReturnRef(EMPTY_STRING));
     EXPECT_CALL(stream_info, downstreamSslConnection()).WillRepeatedly(Return(connection_info));
     EXPECT_EQ("-", upstream_format.format(header, header, header, stream_info));
+    EXPECT_THAT(upstream_format.formatValue(header, header, header, stream_info),
+                ProtoEq(nullValue()));
   }
   {
     EXPECT_CALL(stream_info, downstreamSslConnection()).WillRepeatedly(Return(nullptr));
     StreamInfoFormatter upstream_format("DOWNSTREAM_TLS_VERSION");
     EXPECT_EQ("-", upstream_format.format(header, header, header, stream_info));
+    EXPECT_THAT(upstream_format.formatValue(header, header, header, stream_info),
+                ProtoEq(nullValue()));
   }
   {
     StreamInfoFormatter upstream_format("DOWNSTREAM_PEER_FINGERPRINT_256");
@@ -408,6 +558,8 @@ TEST(AccessLogFormatterTest, streamInfoFormatter) {
         .WillRepeatedly(ReturnRef(expected_sha));
     EXPECT_CALL(stream_info, downstreamSslConnection()).WillRepeatedly(Return(connection_info));
     EXPECT_EQ(expected_sha, upstream_format.format(header, header, header, stream_info));
+    EXPECT_THAT(upstream_format.formatValue(header, header, header, stream_info),
+                ProtoEq(stringValue(expected_sha)));
   }
   {
     StreamInfoFormatter upstream_format("DOWNSTREAM_PEER_FINGERPRINT_256");
@@ -417,11 +569,15 @@ TEST(AccessLogFormatterTest, streamInfoFormatter) {
         .WillRepeatedly(ReturnRef(expected_sha));
     EXPECT_CALL(stream_info, downstreamSslConnection()).WillRepeatedly(Return(connection_info));
     EXPECT_EQ("-", upstream_format.format(header, header, header, stream_info));
+    EXPECT_THAT(upstream_format.formatValue(header, header, header, stream_info),
+                ProtoEq(nullValue()));
   }
   {
     EXPECT_CALL(stream_info, downstreamSslConnection()).WillRepeatedly(Return(nullptr));
     StreamInfoFormatter upstream_format("DOWNSTREAM_PEER_FINGERPRINT_256");
     EXPECT_EQ("-", upstream_format.format(header, header, header, stream_info));
+    EXPECT_THAT(upstream_format.formatValue(header, header, header, stream_info),
+                ProtoEq(nullValue()));
   }
   {
     StreamInfoFormatter upstream_format("DOWNSTREAM_PEER_SERIAL");
@@ -431,6 +587,8 @@ TEST(AccessLogFormatterTest, streamInfoFormatter) {
         .WillRepeatedly(ReturnRef(serial_number));
     EXPECT_CALL(stream_info, downstreamSslConnection()).WillRepeatedly(Return(connection_info));
     EXPECT_EQ("b8b5ecc898f2124a", upstream_format.format(header, header, header, stream_info));
+    EXPECT_THAT(upstream_format.formatValue(header, header, header, stream_info),
+                ProtoEq(stringValue("b8b5ecc898f2124a")));
   }
   {
     StreamInfoFormatter upstream_format("DOWNSTREAM_PEER_SERIAL");
@@ -439,11 +597,15 @@ TEST(AccessLogFormatterTest, streamInfoFormatter) {
         .WillRepeatedly(ReturnRef(EMPTY_STRING));
     EXPECT_CALL(stream_info, downstreamSslConnection()).WillRepeatedly(Return(connection_info));
     EXPECT_EQ("-", upstream_format.format(header, header, header, stream_info));
+    EXPECT_THAT(upstream_format.formatValue(header, header, header, stream_info),
+                ProtoEq(nullValue()));
   }
   {
     EXPECT_CALL(stream_info, downstreamSslConnection()).WillRepeatedly(Return(nullptr));
     StreamInfoFormatter upstream_format("DOWNSTREAM_PEER_SERIAL");
     EXPECT_EQ("-", upstream_format.format(header, header, header, stream_info));
+    EXPECT_THAT(upstream_format.formatValue(header, header, header, stream_info),
+                ProtoEq(nullValue()));
   }
   {
     StreamInfoFormatter upstream_format("DOWNSTREAM_PEER_ISSUER");
@@ -461,11 +623,15 @@ TEST(AccessLogFormatterTest, streamInfoFormatter) {
     EXPECT_CALL(*connection_info, issuerPeerCertificate()).WillRepeatedly(ReturnRef(EMPTY_STRING));
     EXPECT_CALL(stream_info, downstreamSslConnection()).WillRepeatedly(Return(connection_info));
     EXPECT_EQ("-", upstream_format.format(header, header, header, stream_info));
+    EXPECT_THAT(upstream_format.formatValue(header, header, header, stream_info),
+                ProtoEq(nullValue()));
   }
   {
     EXPECT_CALL(stream_info, downstreamSslConnection()).WillRepeatedly(Return(nullptr));
     StreamInfoFormatter upstream_format("DOWNSTREAM_PEER_ISSUER");
     EXPECT_EQ("-", upstream_format.format(header, header, header, stream_info));
+    EXPECT_THAT(upstream_format.formatValue(header, header, header, stream_info),
+                ProtoEq(nullValue()));
   }
   {
     StreamInfoFormatter upstream_format("DOWNSTREAM_PEER_SUBJECT");
@@ -483,11 +649,15 @@ TEST(AccessLogFormatterTest, streamInfoFormatter) {
     EXPECT_CALL(*connection_info, subjectPeerCertificate()).WillRepeatedly(ReturnRef(EMPTY_STRING));
     EXPECT_CALL(stream_info, downstreamSslConnection()).WillRepeatedly(Return(connection_info));
     EXPECT_EQ("-", upstream_format.format(header, header, header, stream_info));
+    EXPECT_THAT(upstream_format.formatValue(header, header, header, stream_info),
+                ProtoEq(nullValue()));
   }
   {
     EXPECT_CALL(stream_info, downstreamSslConnection()).WillRepeatedly(Return(nullptr));
     StreamInfoFormatter upstream_format("DOWNSTREAM_PEER_SUBJECT");
     EXPECT_EQ("-", upstream_format.format(header, header, header, stream_info));
+    EXPECT_THAT(upstream_format.formatValue(header, header, header, stream_info),
+                ProtoEq(nullValue()));
   }
   {
     StreamInfoFormatter upstream_format("DOWNSTREAM_PEER_CERT");
@@ -497,6 +667,8 @@ TEST(AccessLogFormatterTest, streamInfoFormatter) {
         .WillRepeatedly(ReturnRef(expected_cert));
     EXPECT_CALL(stream_info, downstreamSslConnection()).WillRepeatedly(Return(connection_info));
     EXPECT_EQ(expected_cert, upstream_format.format(header, header, header, stream_info));
+    EXPECT_THAT(upstream_format.formatValue(header, header, header, stream_info),
+                ProtoEq(stringValue(expected_cert)));
   }
   {
     StreamInfoFormatter upstream_format("DOWNSTREAM_PEER_CERT");
@@ -506,11 +678,15 @@ TEST(AccessLogFormatterTest, streamInfoFormatter) {
         .WillRepeatedly(ReturnRef(expected_cert));
     EXPECT_CALL(stream_info, downstreamSslConnection()).WillRepeatedly(Return(connection_info));
     EXPECT_EQ("-", upstream_format.format(header, header, header, stream_info));
+    EXPECT_THAT(upstream_format.formatValue(header, header, header, stream_info),
+                ProtoEq(nullValue()));
   }
   {
     EXPECT_CALL(stream_info, downstreamSslConnection()).WillRepeatedly(Return(nullptr));
     StreamInfoFormatter upstream_format("DOWNSTREAM_PEER_CERT");
     EXPECT_EQ("-", upstream_format.format(header, header, header, stream_info));
+    EXPECT_THAT(upstream_format.formatValue(header, header, header, stream_info),
+                ProtoEq(nullValue()));
   }
   {
     StreamInfoFormatter upstream_format("DOWNSTREAM_PEER_CERT_V_START");
@@ -529,11 +705,15 @@ TEST(AccessLogFormatterTest, streamInfoFormatter) {
     EXPECT_CALL(*connection_info, validFromPeerCertificate()).WillRepeatedly(Return(absl::nullopt));
     EXPECT_CALL(stream_info, downstreamSslConnection()).WillRepeatedly(Return(connection_info));
     EXPECT_EQ("-", upstream_format.format(header, header, header, stream_info));
+    EXPECT_THAT(upstream_format.formatValue(header, header, header, stream_info),
+                ProtoEq(nullValue()));
   }
   {
     EXPECT_CALL(stream_info, downstreamSslConnection()).WillRepeatedly(Return(nullptr));
     StreamInfoFormatter upstream_format("DOWNSTREAM_PEER_CERT_V_START");
     EXPECT_EQ("-", upstream_format.format(header, header, header, stream_info));
+    EXPECT_THAT(upstream_format.formatValue(header, header, header, stream_info),
+                ProtoEq(nullValue()));
   }
   {
     StreamInfoFormatter upstream_format("DOWNSTREAM_PEER_CERT_V_END");
@@ -553,11 +733,15 @@ TEST(AccessLogFormatterTest, streamInfoFormatter) {
         .WillRepeatedly(Return(absl::nullopt));
     EXPECT_CALL(stream_info, downstreamSslConnection()).WillRepeatedly(Return(connection_info));
     EXPECT_EQ("-", upstream_format.format(header, header, header, stream_info));
+    EXPECT_THAT(upstream_format.formatValue(header, header, header, stream_info),
+                ProtoEq(nullValue()));
   }
   {
     EXPECT_CALL(stream_info, downstreamSslConnection()).WillRepeatedly(Return(nullptr));
     StreamInfoFormatter upstream_format("DOWNSTREAM_PEER_CERT_V_END");
     EXPECT_EQ("-", upstream_format.format(header, header, header, stream_info));
+    EXPECT_THAT(upstream_format.formatValue(header, header, header, stream_info),
+                ProtoEq(nullValue()));
   }
   {
     StreamInfoFormatter upstream_format("UPSTREAM_TRANSPORT_FAILURE_REASON");
@@ -565,6 +749,8 @@ TEST(AccessLogFormatterTest, streamInfoFormatter) {
     EXPECT_CALL(stream_info, upstreamTransportFailureReason())
         .WillRepeatedly(ReturnRef(upstream_transport_failure_reason));
     EXPECT_EQ("SSL error", upstream_format.format(header, header, header, stream_info));
+    EXPECT_THAT(upstream_format.formatValue(header, header, header, stream_info),
+                ProtoEq(stringValue("SSL error")));
   }
 
   {
@@ -573,6 +759,8 @@ TEST(AccessLogFormatterTest, streamInfoFormatter) {
     EXPECT_CALL(stream_info, upstreamTransportFailureReason())
         .WillRepeatedly(ReturnRef(upstream_transport_failure_reason));
     EXPECT_EQ("-", upstream_format.format(header, header, header, stream_info));
+    EXPECT_THAT(upstream_format.formatValue(header, header, header, stream_info),
+                ProtoEq(nullValue()));
   }
 }
 
@@ -586,24 +774,45 @@ TEST(AccessLogFormatterTest, requestHeaderFormatter) {
     RequestHeaderFormatter formatter(":Method", "", absl::optional<size_t>());
     EXPECT_EQ("GET",
               formatter.format(request_header, response_header, response_trailer, stream_info));
+    EXPECT_THAT(
+        formatter.formatValue(request_header, response_header, response_trailer, stream_info),
+        ProtoEq(stringValue("GET")));
   }
 
   {
     RequestHeaderFormatter formatter(":path", ":method", absl::optional<size_t>());
     EXPECT_EQ("/",
               formatter.format(request_header, response_header, response_trailer, stream_info));
+    EXPECT_THAT(
+        formatter.formatValue(request_header, response_header, response_trailer, stream_info),
+        ProtoEq(stringValue("/")));
   }
 
   {
     RequestHeaderFormatter formatter(":TEST", ":METHOD", absl::optional<size_t>());
     EXPECT_EQ("GET",
               formatter.format(request_header, response_header, response_trailer, stream_info));
+    EXPECT_THAT(
+        formatter.formatValue(request_header, response_header, response_trailer, stream_info),
+        ProtoEq(stringValue("GET")));
   }
 
   {
     RequestHeaderFormatter formatter("does_not_exist", "", absl::optional<size_t>());
     EXPECT_EQ("-",
               formatter.format(request_header, response_header, response_trailer, stream_info));
+    EXPECT_THAT(
+        formatter.formatValue(request_header, response_header, response_trailer, stream_info),
+        ProtoEq(nullValue()));
+  }
+
+  {
+    RequestHeaderFormatter formatter(":Method", "", absl::optional<size_t>(2));
+    EXPECT_EQ("GE",
+              formatter.format(request_header, response_header, response_trailer, stream_info));
+    EXPECT_THAT(
+        formatter.formatValue(request_header, response_header, response_trailer, stream_info),
+        ProtoEq(stringValue("GE")));
   }
 }
 
@@ -617,24 +826,45 @@ TEST(AccessLogFormatterTest, responseHeaderFormatter) {
     ResponseHeaderFormatter formatter(":method", "", absl::optional<size_t>());
     EXPECT_EQ("PUT",
               formatter.format(request_header, response_header, response_trailer, stream_info));
+    EXPECT_THAT(
+        formatter.formatValue(request_header, response_header, response_trailer, stream_info),
+        ProtoEq(stringValue("PUT")));
   }
 
   {
     ResponseHeaderFormatter formatter("test", ":method", absl::optional<size_t>());
     EXPECT_EQ("test",
               formatter.format(request_header, response_header, response_trailer, stream_info));
+    EXPECT_THAT(
+        formatter.formatValue(request_header, response_header, response_trailer, stream_info),
+        ProtoEq(stringValue("test")));
   }
 
   {
     ResponseHeaderFormatter formatter(":path", ":method", absl::optional<size_t>());
     EXPECT_EQ("PUT",
               formatter.format(request_header, response_header, response_trailer, stream_info));
+    EXPECT_THAT(
+        formatter.formatValue(request_header, response_header, response_trailer, stream_info),
+        ProtoEq(stringValue("PUT")));
   }
 
   {
     ResponseHeaderFormatter formatter("does_not_exist", "", absl::optional<size_t>());
     EXPECT_EQ("-",
               formatter.format(request_header, response_header, response_trailer, stream_info));
+    EXPECT_THAT(
+        formatter.formatValue(request_header, response_header, response_trailer, stream_info),
+        ProtoEq(nullValue()));
+  }
+
+  {
+    ResponseHeaderFormatter formatter(":method", "", absl::optional<size_t>(2));
+    EXPECT_EQ("PU",
+              formatter.format(request_header, response_header, response_trailer, stream_info));
+    EXPECT_THAT(
+        formatter.formatValue(request_header, response_header, response_trailer, stream_info),
+        ProtoEq(stringValue("PU")));
   }
 }
 
@@ -648,24 +878,45 @@ TEST(AccessLogFormatterTest, responseTrailerFormatter) {
     ResponseTrailerFormatter formatter(":method", "", absl::optional<size_t>());
     EXPECT_EQ("POST",
               formatter.format(request_header, response_header, response_trailer, stream_info));
+    EXPECT_THAT(
+        formatter.formatValue(request_header, response_header, response_trailer, stream_info),
+        ProtoEq(stringValue("POST")));
   }
 
   {
     ResponseTrailerFormatter formatter("test-2", ":method", absl::optional<size_t>());
     EXPECT_EQ("test-2",
               formatter.format(request_header, response_header, response_trailer, stream_info));
+    EXPECT_THAT(
+        formatter.formatValue(request_header, response_header, response_trailer, stream_info),
+        ProtoEq(stringValue("test-2")));
   }
 
   {
     ResponseTrailerFormatter formatter(":path", ":method", absl::optional<size_t>());
     EXPECT_EQ("POST",
               formatter.format(request_header, response_header, response_trailer, stream_info));
+    EXPECT_THAT(
+        formatter.formatValue(request_header, response_header, response_trailer, stream_info),
+        ProtoEq(stringValue("POST")));
   }
 
   {
     ResponseTrailerFormatter formatter("does_not_exist", "", absl::optional<size_t>());
     EXPECT_EQ("-",
               formatter.format(request_header, response_header, response_trailer, stream_info));
+    EXPECT_THAT(
+        formatter.formatValue(request_header, response_header, response_trailer, stream_info),
+        ProtoEq(nullValue()));
+  }
+
+  {
+    ResponseTrailerFormatter formatter(":method", "", absl::optional<size_t>(2));
+    EXPECT_EQ("PO",
+              formatter.format(request_header, response_header, response_trailer, stream_info));
+    EXPECT_THAT(
+        formatter.formatValue(request_header, response_header, response_trailer, stream_info),
+        ProtoEq(stringValue("PO")));
   }
 }
 
@@ -675,66 +926,161 @@ TEST(AccessLogFormatterTest, responseTrailerFormatter) {
  */
 void populateMetadataTestData(envoy::api::v2::core::Metadata& metadata) {
   ProtobufWkt::Struct struct_obj;
-  ProtobufWkt::Value val;
   auto& fields_map = *struct_obj.mutable_fields();
-  val.set_string_value("test_value");
-  fields_map["test_key"] = val;
-  val.set_string_value("inner_value");
+  fields_map["test_key"] = stringValue("test_value");
   ProtobufWkt::Struct struct_inner;
-  (*struct_inner.mutable_fields())["inner_key"] = val;
-  val.clear_string_value();
+  (*struct_inner.mutable_fields())["inner_key"] = stringValue("inner_value");
+  ProtobufWkt::Value val;
   *val.mutable_struct_value() = struct_inner;
   fields_map["test_obj"] = val;
   (*metadata.mutable_filter_metadata())["com.test"] = struct_obj;
 }
 
-TEST(AccessLogFormatterTest, dynamicMetadataFormatter) {
+TEST(AccessLogFormatterTest, DynamicMetadataFormatter) {
   envoy::api::v2::core::Metadata metadata;
   populateMetadataTestData(metadata);
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+  EXPECT_CALL(stream_info, dynamicMetadata()).WillRepeatedly(ReturnRef(metadata));
+  EXPECT_CALL(Const(stream_info), dynamicMetadata()).WillRepeatedly(ReturnRef(metadata));
+  Http::TestHeaderMapImpl header;
 
   {
-    MetadataFormatter formatter("com.test", {}, absl::optional<size_t>());
-    std::string json = formatter.format(metadata);
-    EXPECT_TRUE(json.find("\"test_key\":\"test_value\"") != std::string::npos);
-    EXPECT_TRUE(json.find("\"test_obj\":{\"inner_key\":\"inner_value\"}") != std::string::npos);
+    DynamicMetadataFormatter formatter("com.test", {}, absl::optional<size_t>());
+    std::string val = formatter.format(header, header, header, stream_info);
+    EXPECT_TRUE(val.find("\"test_key\":\"test_value\"") != std::string::npos);
+    EXPECT_TRUE(val.find("\"test_obj\":{\"inner_key\":\"inner_value\"}") != std::string::npos);
+
+    ProtobufWkt::Value expected_val;
+    expected_val.mutable_struct_value()->CopyFrom(metadata.filter_metadata().at("com.test"));
+    EXPECT_THAT(formatter.formatValue(header, header, header, stream_info), ProtoEq(expected_val));
   }
   {
-    MetadataFormatter formatter("com.test", {"test_key"}, absl::optional<size_t>());
-    std::string json = formatter.format(metadata);
-    EXPECT_EQ("\"test_value\"", json);
+    DynamicMetadataFormatter formatter("com.test", {"test_key"}, absl::optional<size_t>());
+    EXPECT_EQ("\"test_value\"", formatter.format(header, header, header, stream_info));
+    EXPECT_THAT(formatter.formatValue(header, header, header, stream_info),
+                ProtoEq(stringValue("test_value")));
   }
   {
-    MetadataFormatter formatter("com.test", {"test_obj"}, absl::optional<size_t>());
-    std::string json = formatter.format(metadata);
-    EXPECT_EQ("{\"inner_key\":\"inner_value\"}", json);
+    DynamicMetadataFormatter formatter("com.test", {"test_obj"}, absl::optional<size_t>());
+    EXPECT_EQ("{\"inner_key\":\"inner_value\"}",
+              formatter.format(header, header, header, stream_info));
+
+    ProtobufWkt::Value expected_val;
+    (*expected_val.mutable_struct_value()->mutable_fields())["inner_key"] =
+        stringValue("inner_value");
+    EXPECT_THAT(formatter.formatValue(header, header, header, stream_info), ProtoEq(expected_val));
   }
   {
-    MetadataFormatter formatter("com.test", {"test_obj", "inner_key"}, absl::optional<size_t>());
-    std::string json = formatter.format(metadata);
-    EXPECT_EQ("\"inner_value\"", json);
+    DynamicMetadataFormatter formatter("com.test", {"test_obj", "inner_key"},
+                                       absl::optional<size_t>());
+    EXPECT_EQ("\"inner_value\"", formatter.format(header, header, header, stream_info));
+    EXPECT_THAT(formatter.formatValue(header, header, header, stream_info),
+                ProtoEq(stringValue("inner_value")));
   }
+
   // not found cases
   {
-    MetadataFormatter formatter("com.notfound", {}, absl::optional<size_t>());
-    EXPECT_EQ("-", formatter.format(metadata));
+    DynamicMetadataFormatter formatter("com.notfound", {}, absl::optional<size_t>());
+    EXPECT_EQ("-", formatter.format(header, header, header, stream_info));
+    EXPECT_THAT(formatter.formatValue(header, header, header, stream_info), ProtoEq(nullValue()));
   }
   {
-    MetadataFormatter formatter("com.test", {"notfound"}, absl::optional<size_t>());
-    EXPECT_EQ("-", formatter.format(metadata));
+    DynamicMetadataFormatter formatter("com.test", {"notfound"}, absl::optional<size_t>());
+    EXPECT_EQ("-", formatter.format(header, header, header, stream_info));
+    EXPECT_THAT(formatter.formatValue(header, header, header, stream_info), ProtoEq(nullValue()));
   }
   {
-    MetadataFormatter formatter("com.test", {"test_obj", "notfound"}, absl::optional<size_t>());
-    EXPECT_EQ("-", formatter.format(metadata));
+    DynamicMetadataFormatter formatter("com.test", {"test_obj", "notfound"},
+                                       absl::optional<size_t>());
+    EXPECT_EQ("-", formatter.format(header, header, header, stream_info));
+    EXPECT_THAT(formatter.formatValue(header, header, header, stream_info), ProtoEq(nullValue()));
   }
+
   // size limit
   {
-    MetadataFormatter formatter("com.test", {"test_key"}, absl::optional<size_t>(5));
-    std::string json = formatter.format(metadata);
-    EXPECT_EQ("\"test", json);
+    DynamicMetadataFormatter formatter("com.test", {"test_key"}, absl::optional<size_t>(5));
+    EXPECT_EQ("\"test", formatter.format(header, header, header, stream_info));
+
+    // N.B. Does not truncate.
+    EXPECT_THAT(formatter.formatValue(header, header, header, stream_info),
+                ProtoEq(stringValue("test_value")));
   }
 }
 
-TEST(AccessLogFormatterTest, startTimeFormatter) {
+TEST(AccessLogFormatterTest, FilterStateFormatter) {
+  Http::TestHeaderMapImpl header;
+  StreamInfo::MockStreamInfo stream_info;
+  stream_info.filter_state_.setData("key",
+                                    std::make_unique<Router::StringAccessorImpl>("test_value"),
+                                    StreamInfo::FilterState::StateType::ReadOnly);
+  stream_info.filter_state_.setData("key-struct",
+                                    std::make_unique<TestSerializedStructFilterState>(),
+                                    StreamInfo::FilterState::StateType::ReadOnly);
+  stream_info.filter_state_.setData("key-no-serialization",
+                                    std::make_unique<StreamInfo::FilterState::Object>(),
+                                    StreamInfo::FilterState::StateType::ReadOnly);
+  stream_info.filter_state_.setData(
+      "key-serialization-error",
+      std::make_unique<TestSerializedStructFilterState>(std::chrono::seconds(-281474976710656)),
+      StreamInfo::FilterState::StateType::ReadOnly);
+  EXPECT_CALL(Const(stream_info), filterState()).Times(testing::AtLeast(1));
+
+  {
+    FilterStateFormatter formatter("key", absl::optional<size_t>());
+
+    EXPECT_EQ("\"test_value\"", formatter.format(header, header, header, stream_info));
+    EXPECT_THAT(formatter.formatValue(header, header, header, stream_info),
+                ProtoEq(stringValue("test_value")));
+  }
+  {
+    FilterStateFormatter formatter("key-struct", absl::optional<size_t>());
+
+    EXPECT_EQ("{\"inner_key\":\"inner_value\"}",
+              formatter.format(header, header, header, stream_info));
+
+    ProtobufWkt::Value expected;
+    (*expected.mutable_struct_value()->mutable_fields())["inner_key"] = stringValue("inner_value");
+
+    EXPECT_THAT(formatter.formatValue(header, header, header, stream_info), ProtoEq(expected));
+  }
+
+  // not found case
+  {
+    FilterStateFormatter formatter("key-not-found", absl::optional<size_t>());
+
+    EXPECT_EQ("-", formatter.format(header, header, header, stream_info));
+    EXPECT_THAT(formatter.formatValue(header, header, header, stream_info), ProtoEq(nullValue()));
+  }
+
+  // no serialization case
+  {
+    FilterStateFormatter formatter("key-no-serialization", absl::optional<size_t>());
+
+    EXPECT_EQ("-", formatter.format(header, header, header, stream_info));
+    EXPECT_THAT(formatter.formatValue(header, header, header, stream_info), ProtoEq(nullValue()));
+  }
+
+  // serialization error case
+  {
+    FilterStateFormatter formatter("key-serialization-error", absl::optional<size_t>());
+
+    EXPECT_EQ("-", formatter.format(header, header, header, stream_info));
+    EXPECT_THAT(formatter.formatValue(header, header, header, stream_info), ProtoEq(nullValue()));
+  }
+
+  // size limit
+  {
+    FilterStateFormatter formatter("key", absl::optional<size_t>(5));
+
+    EXPECT_EQ("\"test", formatter.format(header, header, header, stream_info));
+
+    // N.B. Does not truncate.
+    EXPECT_THAT(formatter.formatValue(header, header, header, stream_info),
+                ProtoEq(stringValue("test_value")));
+  }
+}
+
+TEST(AccessLogFormatterTest, StartTimeFormatter) {
   NiceMock<StreamInfo::MockStreamInfo> stream_info;
   Http::TestHeaderMapImpl header{{":method", "GET"}, {":path", "/"}};
 
@@ -742,16 +1088,20 @@ TEST(AccessLogFormatterTest, startTimeFormatter) {
     StartTimeFormatter start_time_format("%Y/%m/%d");
     time_t test_epoch = 1522280158;
     SystemTime time = std::chrono::system_clock::from_time_t(test_epoch);
-    EXPECT_CALL(stream_info, startTime()).WillOnce(Return(time));
+    EXPECT_CALL(stream_info, startTime()).WillRepeatedly(Return(time));
     EXPECT_EQ("2018/03/28", start_time_format.format(header, header, header, stream_info));
+    EXPECT_THAT(start_time_format.formatValue(header, header, header, stream_info),
+                ProtoEq(stringValue("2018/03/28")));
   }
 
   {
     StartTimeFormatter start_time_format("");
     SystemTime time;
-    EXPECT_CALL(stream_info, startTime()).WillOnce(Return(time));
+    EXPECT_CALL(stream_info, startTime()).WillRepeatedly(Return(time));
     EXPECT_EQ(AccessLogDateTimeFormatter::fromTime(time),
               start_time_format.format(header, header, header, stream_info));
+    EXPECT_THAT(start_time_format.formatValue(header, header, header, stream_info),
+                ProtoEq(stringValue(AccessLogDateTimeFormatter::fromTime(time))));
   }
 }
 
@@ -786,7 +1136,7 @@ TEST(AccessLogFormatterTest, JsonFormatterPlainStringTest) {
 
   std::unordered_map<std::string, std::string> key_mapping = {
       {"plain_string", "plain_string_value"}};
-  JsonFormatterImpl formatter(key_mapping);
+  JsonFormatterImpl formatter(key_mapping, false);
 
   verifyJsonOutput(formatter.format(request_header, response_header, response_trailer, stream_info),
                    expected_json_map);
@@ -806,7 +1156,7 @@ TEST(AccessLogFormatterTest, JsonFormatterSingleOperatorTest) {
   std::unordered_map<std::string, std::string> expected_json_map = {{"protocol", "HTTP/1.1"}};
 
   std::unordered_map<std::string, std::string> key_mapping = {{"protocol", "%PROTOCOL%"}};
-  JsonFormatterImpl formatter(key_mapping);
+  JsonFormatterImpl formatter(key_mapping, false);
 
   verifyJsonOutput(formatter.format(request_header, response_header, response_trailer, stream_info),
                    expected_json_map);
@@ -829,7 +1179,7 @@ TEST(AccessLogFormatterTest, JsonFormatterNonExistentHeaderTest) {
       {"some_request_header", "%REQ(some_request_header)%"},
       {"nonexistent_response_header", "%RESP(nonexistent_response_header)%"},
       {"some_response_header", "%RESP(some_response_header)%"}};
-  JsonFormatterImpl formatter(key_mapping);
+  JsonFormatterImpl formatter(key_mapping, false);
 
   absl::optional<Http::Protocol> protocol = Http::Protocol::Http11;
   EXPECT_CALL(stream_info, protocol()).WillRepeatedly(Return(protocol));
@@ -859,7 +1209,7 @@ TEST(AccessLogFormatterTest, JsonFormatterAlternateHeaderTest) {
        "%RESP(response_absent_header?response_present_header)%"},
       {"response_present_header_or_response_absent_header",
        "%RESP(response_present_header?response_absent_header)%"}};
-  JsonFormatterImpl formatter(key_mapping);
+  JsonFormatterImpl formatter(key_mapping, false);
 
   absl::optional<Http::Protocol> protocol = Http::Protocol::Http11;
   EXPECT_CALL(stream_info, protocol()).WillRepeatedly(Return(protocol));
@@ -889,10 +1239,86 @@ TEST(AccessLogFormatterTest, JsonFormatterDynamicMetadataTest) {
       {"test_obj", "%DYNAMIC_METADATA(com.test:test_obj)%"},
       {"test_obj.inner_key", "%DYNAMIC_METADATA(com.test:test_obj:inner_key)%"}};
 
-  JsonFormatterImpl formatter(key_mapping);
+  JsonFormatterImpl formatter(key_mapping, false);
 
   verifyJsonOutput(formatter.format(request_header, response_header, response_trailer, stream_info),
                    expected_json_map);
+}
+
+TEST(AccessLogFormatterTest, JsonFormatterTypedDynamicMetadataTest) {
+  StreamInfo::MockStreamInfo stream_info;
+  Http::TestHeaderMapImpl request_header{{"first", "GET"}, {":path", "/"}};
+  Http::TestHeaderMapImpl response_header{{"second", "PUT"}, {"test", "test"}};
+  Http::TestHeaderMapImpl response_trailer{{"third", "POST"}, {"test-2", "test-2"}};
+
+  envoy::api::v2::core::Metadata metadata;
+  populateMetadataTestData(metadata);
+  EXPECT_CALL(stream_info, dynamicMetadata()).WillRepeatedly(ReturnRef(metadata));
+  EXPECT_CALL(Const(stream_info), dynamicMetadata()).WillRepeatedly(ReturnRef(metadata));
+
+  std::unordered_map<std::string, std::string> key_mapping = {
+      {"test_key", "%DYNAMIC_METADATA(com.test:test_key)%"},
+      {"test_obj", "%DYNAMIC_METADATA(com.test:test_obj)%"},
+      {"test_obj.inner_key", "%DYNAMIC_METADATA(com.test:test_obj:inner_key)%"}};
+
+  JsonFormatterImpl formatter(key_mapping, true);
+
+  const std::string json =
+      formatter.format(request_header, response_header, response_trailer, stream_info);
+  ProtobufWkt::Struct output;
+  MessageUtil::loadFromJson(json, output);
+
+  const auto& fields = output.fields();
+  EXPECT_EQ("test_value", fields.at("test_key").string_value());
+  EXPECT_EQ("inner_value", fields.at("test_obj.inner_key").string_value());
+  EXPECT_EQ("inner_value",
+            fields.at("test_obj").struct_value().fields().at("inner_key").string_value());
+}
+
+TEST(AccessLogFormatterTets, JsonFormatterFilterStateTest) {
+  Http::TestHeaderMapImpl header;
+  StreamInfo::MockStreamInfo stream_info;
+  stream_info.filter_state_.setData("test_key",
+                                    std::make_unique<Router::StringAccessorImpl>("test_value"),
+                                    StreamInfo::FilterState::StateType::ReadOnly);
+  stream_info.filter_state_.setData("test_obj", std::make_unique<TestSerializedStructFilterState>(),
+                                    StreamInfo::FilterState::StateType::ReadOnly);
+  EXPECT_CALL(Const(stream_info), filterState()).Times(testing::AtLeast(1));
+
+  std::unordered_map<std::string, std::string> expected_json_map = {
+      {"test_key", "\"test_value\""}, {"test_obj", "{\"inner_key\":\"inner_value\"}"}};
+
+  std::unordered_map<std::string, std::string> key_mapping = {
+      {"test_key", "%FILTER_STATE(test_key)%"}, {"test_obj", "%FILTER_STATE(test_obj)%"}};
+
+  JsonFormatterImpl formatter(key_mapping, false);
+
+  verifyJsonOutput(formatter.format(header, header, header, stream_info), expected_json_map);
+}
+
+TEST(AccessLogFormatterTets, JsonFormatterTypedFilterStateTest) {
+  Http::TestHeaderMapImpl header;
+  StreamInfo::MockStreamInfo stream_info;
+  stream_info.filter_state_.setData("test_key",
+                                    std::make_unique<Router::StringAccessorImpl>("test_value"),
+                                    StreamInfo::FilterState::StateType::ReadOnly);
+  stream_info.filter_state_.setData("test_obj", std::make_unique<TestSerializedStructFilterState>(),
+                                    StreamInfo::FilterState::StateType::ReadOnly);
+  EXPECT_CALL(Const(stream_info), filterState()).Times(testing::AtLeast(1));
+
+  std::unordered_map<std::string, std::string> key_mapping = {
+      {"test_key", "%FILTER_STATE(test_key)%"}, {"test_obj", "%FILTER_STATE(test_obj)%"}};
+
+  JsonFormatterImpl formatter(key_mapping, true);
+
+  std::string json = formatter.format(header, header, header, stream_info);
+  ProtobufWkt::Struct output;
+  MessageUtil::loadFromJson(json, output);
+
+  const auto& fields = output.fields();
+  EXPECT_EQ("test_value", fields.at("test_key").string_value());
+  EXPECT_EQ("inner_value",
+            fields.at("test_obj").struct_value().fields().at("inner_key").string_value());
 }
 
 TEST(AccessLogFormatterTest, JsonFormatterStartTimeTest) {
@@ -918,7 +1344,7 @@ TEST(AccessLogFormatterTest, JsonFormatterStartTimeTest) {
       {"bad_format", "%START_TIME(bad_format)%"},
       {"default", "%START_TIME%"},
       {"all_zeroes", "%START_TIME(%f.%1f.%2f.%3f)%"}};
-  JsonFormatterImpl formatter(key_mapping);
+  JsonFormatterImpl formatter(key_mapping, false);
 
   verifyJsonOutput(formatter.format(request_header, response_header, response_trailer, stream_info),
                    expected_json_map);
@@ -937,17 +1363,59 @@ TEST(AccessLogFormatterTest, JsonFormatterMultiTokenTest) {
     std::unordered_map<std::string, std::string> key_mapping = {
         {"multi_token_field",
          "%PROTOCOL% plainstring %REQ(some_request_header)% %RESP(some_response_header)%"}};
-    JsonFormatterImpl formatter(key_mapping);
 
-    absl::optional<Http::Protocol> protocol = Http::Protocol::Http11;
-    EXPECT_CALL(stream_info, protocol()).WillRepeatedly(Return(protocol));
+    for (const bool preserve_types : {false, true}) {
+      JsonFormatterImpl formatter(key_mapping, preserve_types);
 
-    const auto parsed = Json::Factory::loadFromString(
-        formatter.format(request_header, response_header, response_trailer, stream_info));
-    for (const auto& pair : expected_json_map) {
-      EXPECT_EQ(parsed->getString(pair.first), pair.second);
+      absl::optional<Http::Protocol> protocol = Http::Protocol::Http11;
+      EXPECT_CALL(stream_info, protocol()).WillRepeatedly(Return(protocol));
+
+      const auto parsed = Json::Factory::loadFromString(
+          formatter.format(request_header, response_header, response_trailer, stream_info));
+      for (const auto& pair : expected_json_map) {
+        EXPECT_EQ(parsed->getString(pair.first), pair.second);
+      }
     }
   }
+}
+
+TEST(AccessLogFormatterTest, JsonFormatterTypedTest) {
+  Http::TestHeaderMapImpl header;
+  StreamInfo::MockStreamInfo stream_info;
+  EXPECT_CALL(Const(stream_info), lastDownstreamRxByteReceived())
+      .WillRepeatedly(Return(std::chrono::nanoseconds(5000000)));
+
+  ProtobufWkt::Value list;
+  list.mutable_list_value()->add_values()->set_bool_value(true);
+  list.mutable_list_value()->add_values()->set_string_value("two");
+  list.mutable_list_value()->add_values()->set_number_value(3.14);
+
+  ProtobufWkt::Struct s;
+  (*s.mutable_fields())["list"] = list;
+
+  stream_info.filter_state_.setData("test_obj",
+                                    std::make_unique<TestSerializedStructFilterState>(s),
+                                    StreamInfo::FilterState::StateType::ReadOnly);
+  EXPECT_CALL(Const(stream_info), filterState()).Times(testing::AtLeast(1));
+
+  std::unordered_map<std::string, std::string> key_mapping = {
+      {"request_duration", "%REQUEST_DURATION%"},
+      {"request_duration_multi", "%REQUEST_DURATION%ms"},
+      {"filter_state", "%FILTER_STATE(test_obj)%"},
+  };
+
+  JsonFormatterImpl formatter(key_mapping, true);
+
+  const auto json = formatter.format(header, header, header, stream_info);
+  ProtobufWkt::Struct output;
+  MessageUtil::loadFromJson(json, output);
+
+  EXPECT_THAT(output.fields().at("request_duration"), ProtoEq(numberValue(5.0)));
+  EXPECT_THAT(output.fields().at("request_duration_multi"), ProtoEq(stringValue("5ms")));
+
+  ProtobufWkt::Value expected;
+  expected.mutable_struct_value()->CopyFrom(s);
+  EXPECT_THAT(output.fields().at("filter_state"), ProtoEq(expected));
 }
 
 TEST(AccessLogFormatterTest, CompositeFormatterSuccess) {
@@ -1004,10 +1472,12 @@ TEST(AccessLogFormatterTest, CompositeFormatterSuccess) {
     EXPECT_CALL(Const(stream_info), filterState()).Times(testing::AtLeast(1));
     stream_info.filter_state_.setData("testing",
                                       std::make_unique<Router::StringAccessorImpl>("test_value"),
-                                      StreamInfo::FilterState::StateType::ReadOnly);
+                                      StreamInfo::FilterState::StateType::ReadOnly,
+                                      StreamInfo::FilterState::LifeSpan::FilterChain);
     stream_info.filter_state_.setData("serialized",
                                       std::make_unique<TestSerializedUnknownFilterState>(),
-                                      StreamInfo::FilterState::StateType::ReadOnly);
+                                      StreamInfo::FilterState::StateType::ReadOnly,
+                                      StreamInfo::FilterState::LifeSpan::FilterChain);
     const std::string format = "%FILTER_STATE(testing)%|%FILTER_STATE(serialized)%|"
                                "%FILTER_STATE(testing):8%|%FILTER_STATE(nonexisting)%";
     FormatterImpl formatter(format);

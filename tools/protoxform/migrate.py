@@ -8,6 +8,7 @@ from tools.api_proto_plugin import visitor
 from tools.protoxform import options
 from tools.protoxform import utils
 
+from udpa.annotations import migrate_pb2
 from google.api import annotations_pb2
 
 ENVOY_COMMENT_WITH_TYPE_REGEX = re.compile('<envoy_api_(msg|enum_value|field|enum)_([\w\.]+)>')
@@ -72,6 +73,17 @@ class UpgradeVisitor(visitor.Visitor):
     proto.reserved_name.append(field_or_value.name)
     options.AddHideOption(field_or_value.options)
 
+  def _Rename(self, proto, migrate_annotation):
+    """Rename a field/enum/service/message
+
+    Args:
+      proto: DescriptorProto or corresponding proto message
+      migrate_annotation: udpa.annotations.MigrateAnnotation message
+    """
+    if migrate_annotation.rename:
+      proto.name = migrate_annotation.rename
+      migrate_annotation.rename = ""
+
   def VisitService(self, service_proto, type_context):
     upgraded_proto = copy.deepcopy(service_proto)
     for m in upgraded_proto.method:
@@ -88,6 +100,7 @@ class UpgradeVisitor(visitor.Visitor):
     upgraded_proto = copy.deepcopy(msg_proto)
     if upgraded_proto.options.deprecated:
       options.AddHideOption(upgraded_proto.options)
+    options.SetVersioningAnnotation(upgraded_proto.options, type_context.name)
     # Mark deprecated fields as ready for deletion by protoxform.
     for f in upgraded_proto.field:
       if f.options.deprecated:
@@ -97,6 +110,8 @@ class UpgradeVisitor(visitor.Visitor):
         f.type_name = ""
       else:
         f.type_name = self._UpgradedType(f.type_name)
+      if f.options.HasExtension(migrate_pb2.field_migrate):
+        self._Rename(f, f.options.Extensions[migrate_pb2.field_migrate])
     # Upgrade nested messages.
     del upgraded_proto.nested_type[:]
     upgraded_proto.nested_type.extend(nested_msgs)
@@ -120,6 +135,11 @@ class UpgradeVisitor(visitor.Visitor):
 
   def VisitFile(self, file_proto, type_context, services, msgs, enums):
     upgraded_proto = copy.deepcopy(file_proto)
+    # Upgrade imports.
+    upgraded_proto.dependency[:] = [
+        dependency for dependency in upgraded_proto.dependency
+        if dependency not in ("udpa/annotations/migrate.proto")
+    ]
     # Upgrade package.
     upgraded_proto.package = self._typedb.next_version_packages[upgraded_proto.package]
     upgraded_proto.name = self._typedb.next_version_proto_paths[upgraded_proto.name]
@@ -152,7 +172,7 @@ def V3MigrationXform(file_proto):
     v3 FileDescriptorProto message.
   """
   # Load type database.
-  typedb = utils.LoadTypeDb()
+  typedb = utils.GetTypeDb()
   # If this isn't a proto in an upgraded package, return None.
   if file_proto.package not in typedb.next_version_packages or not typedb.next_version_packages[
       file_proto.package]:

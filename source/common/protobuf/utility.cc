@@ -450,6 +450,10 @@ void MessageUtil::jsonConvert(const ProtobufWkt::Struct& source,
   jsonConvertInternal(source, validation_visitor, dest);
 }
 
+void MessageUtil::jsonConvertValue(const Protobuf::Message& source, ProtobufWkt::Value& dest) {
+  jsonConvertInternal(source, ProtobufMessage::getNullValidationVisitor(), dest);
+}
+
 ProtobufWkt::Struct MessageUtil::keyValueStruct(const std::string& key, const std::string& value) {
   ProtobufWkt::Struct struct_obj;
   ProtobufWkt::Value val;
@@ -611,6 +615,14 @@ void TimestampUtil::systemClockToTimestamp(const SystemTime system_clock_time,
       std::chrono::time_point_cast<std::chrono::milliseconds>(system_clock_time)
           .time_since_epoch()
           .count()));
+}
+
+absl::string_view TypeUtil::typeUrlToDescriptorFullName(absl::string_view type_url) {
+  const size_t pos = type_url.rfind('/');
+  if (pos != absl::string_view::npos) {
+    type_url = type_url.substr(pos + 1);
+  }
+  return type_url;
 }
 
 } // namespace Envoy

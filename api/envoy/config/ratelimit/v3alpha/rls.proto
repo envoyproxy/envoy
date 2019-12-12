@@ -2,11 +2,13 @@ syntax = "proto3";
 
 package envoy.config.ratelimit.v3alpha;
 
+option java_package = "io.envoyproxy.envoy.config.ratelimit.v3alpha";
 option java_outer_classname = "RlsProto";
 option java_multiple_files = true;
-option java_package = "io.envoyproxy.envoy.config.ratelimit.v3alpha";
 
 import "envoy/api/v3alpha/core/grpc_service.proto";
+
+import "udpa/annotations/versioning.proto";
 
 import "validate/validate.proto";
 
@@ -14,6 +16,9 @@ import "validate/validate.proto";
 
 // Rate limit :ref:`configuration overview <config_rate_limit_service>`.
 message RateLimitServiceConfig {
+  option (udpa.annotations.versioning).previous_message_type =
+      "envoy.config.ratelimit.v2.RateLimitServiceConfig";
+
   reserved 1, 3;
 
   // Specifies the gRPC service that hosts the rate limit service. The client

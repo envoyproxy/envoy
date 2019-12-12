@@ -446,13 +446,15 @@ TEST_P(IntegrationTest, TestInlineHeaders) {
 
 // Verify for HTTP/1.0 a keep-alive header results in no connection: close.
 // Also verify existing host headers are passed through for the HTTP/1.0 case.
-TEST_P(IntegrationTest, Http10WithHostandKeepAlive) {
+// This also regression tests proper handling of trailing whitespace after key
+// values, specifically the host header.
+TEST_P(IntegrationTest, Http10WithHostandKeepAliveAndLws) {
   autonomous_upstream_ = true;
   config_helper_.addConfigModifier(&setAllowHttp10WithDefaultHost);
   initialize();
   std::string response;
   sendRawHttpAndWaitForResponse(lookupPort("http"),
-                                "GET / HTTP/1.0\r\nHost: foo.com\r\nConnection:Keep-alive\r\n\r\n",
+                                "GET / HTTP/1.0\r\nHost: foo.com \r\nConnection:Keep-alive\r\n\r\n",
                                 &response, true);
   EXPECT_THAT(response, HasSubstr("HTTP/1.0 200 OK\r\n"));
   EXPECT_THAT(response, Not(HasSubstr("connection: close")));
@@ -487,6 +489,34 @@ TEST_P(IntegrationTest, Pipeline) {
     connection.run(Event::Dispatcher::RunType::NonBlock);
   }
   EXPECT_THAT(response, HasSubstr("HTTP/1.1 400 Bad Request\r\n"));
+  connection.close();
+}
+
+// Add a pipeline test where complete request headers in the first request merit
+// an inline sendLocalReply to make sure the "kick" works under the call stack
+// of dispatch as well as when a response is proxied from upstream.
+TEST_P(IntegrationTest, PipelineInline) {
+  autonomous_upstream_ = true;
+  initialize();
+  std::string response;
+
+  Buffer::OwnedImpl buffer("GET / HTTP/1.1\r\n\r\nGET / HTTP/1.0\r\n\r\n");
+  RawConnectionDriver connection(
+      lookupPort("http"), buffer,
+      [&](Network::ClientConnection&, const Buffer::Instance& data) -> void {
+        response.append(data.toString());
+      },
+      version_);
+
+  while (response.find("400") == std::string::npos) {
+    connection.run(Event::Dispatcher::RunType::NonBlock);
+  }
+  EXPECT_THAT(response, HasSubstr("HTTP/1.1 400 Bad Request\r\n"));
+
+  while (response.find("426") == std::string::npos) {
+    connection.run(Event::Dispatcher::RunType::NonBlock);
+  }
+  EXPECT_THAT(response, HasSubstr("HTTP/1.1 426 Upgrade Required\r\n"));
   connection.close();
 }
 

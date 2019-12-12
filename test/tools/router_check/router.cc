@@ -73,7 +73,7 @@ RouterCheckTool RouterCheckTool::create(const std::string& router_config_file,
   auto api = Api::createApiForTest(*stats);
   TestUtility::loadFromFile(router_config_file, route_config, *api);
   assignUniqueRouteNames(route_config);
-
+  assignRuntimeFraction(route_config);
   auto factory_context =
       std::make_unique<NiceMock<Server::Configuration::MockServerFactoryContext>>();
   auto config = std::make_unique<Router::ConfigImpl>(
@@ -93,6 +93,18 @@ void RouterCheckTool::assignUniqueRouteNames(envoy::api::v2::RouteConfiguration&
   for (auto& host : *route_config.mutable_virtual_hosts()) {
     for (auto& route : *host.mutable_routes()) {
       route.set_name(random.uuid());
+    }
+  }
+}
+
+void RouterCheckTool::assignRuntimeFraction(envoy::api::v2::RouteConfiguration& route_config) {
+  for (auto& host : *route_config.mutable_virtual_hosts()) {
+    for (auto& route : *host.mutable_routes()) {
+      if (route.match().has_runtime_fraction() &&
+          route.match().runtime_fraction().default_value().numerator() == 0) {
+        route.mutable_match()->mutable_runtime_fraction()->mutable_default_value()->set_numerator(
+            1);
+      }
     }
   }
 }
