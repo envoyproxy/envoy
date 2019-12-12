@@ -19,7 +19,7 @@ namespace Cache {
 
 /**
  * A filter that caches responses and attempts to satisfy requests from cache.
- * It also inherits from std::enable_shared_from_this so it can pass shared_ptrs to asynch methods,
+ * It also inherits from std::enable_shared_from_this so it can pass shared_ptrs to async methods,
  * to ensure that it doesn't get destroyed before they complete.
  */
 class CacheFilter;
@@ -66,7 +66,7 @@ private:
   InsertContextPtr insert_;
 
   // Tracks what body bytes still need to be read from the cache. This is
-  // currently only one Range, but will expand when full range support is added.
+  // currently only one Range, but will expand when full range support is added. Initialized by onOkHeaders.
   std::vector<AdjustedByteRange> remaining_body_;
 
   // True if the response has trailers.

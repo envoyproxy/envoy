@@ -20,7 +20,7 @@ protected:
   DateFormatter formatter_{"%a, %d %b %Y %H:%M:%S GMT"};
   Http::TestHeaderMapImpl request_headers_{
       {":path", "/"}, {":method", "GET"}, {"x-forwarded-proto", "https"}};
-  Http::TestHeaderMapImpl response_headers_{{"date", formatter_.now(time_source_)},
+  Http::TestHeaderMapImpl response_headers_{{":status", "200"},{"date", formatter_.now(time_source_)},
                                             {"cache-control", "public,max-age=3600"}};
   NiceMock<Http::MockStreamDecoderFilterCallbacks> decoder_callbacks_;
   NiceMock<Http::MockStreamEncoderFilterCallbacks> encoder_callbacks_;
