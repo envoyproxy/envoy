@@ -50,6 +50,7 @@ import "validate/validate.proto";
 //         redirect_refresh_threshold: 10
 // [#extension: envoy.clusters.redis]
 
+// [#next-free-field: 7]
 message RedisClusterConfig {
   // Interval between successive topology refresh requests. If not set, this defaults to 5s.
   google.protobuf.Duration cluster_refresh_rate = 1 [(validate.rules).duration = {gt {}}];
