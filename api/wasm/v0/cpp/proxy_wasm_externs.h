@@ -11,6 +11,10 @@
 //
 //  ABI calls from the host into the VM.
 //
+//  These will typically be implemented by a language specific SDK which will provide an API on top
+//  of this ABI e.g. the C++ SDK provides a proxy_wasm_api.h implemenation of the API on top of this
+//  ABI.
+//
 
 // Non-stream calls.
 
