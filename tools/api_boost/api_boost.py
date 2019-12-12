@@ -144,7 +144,7 @@ def ApiBoostTree(args):
 
 
 if __name__ == '__main__':
-  parser = argparse.ArgumentParser(description='Update Envoy treee to the latest API')
+  parser = argparse.ArgumentParser(description='Update Envoy tree to the latest API')
   parser.add_argument('--generate_api_type_database', action='store_true')
   parser.add_argument('--generate_compilation_database', action='store_true')
   parser.add_argument('--build_api_booster', action='store_true')
