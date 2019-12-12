@@ -17,17 +17,17 @@ import "validate/validate.proto";
 message VmConfig {
   // An ID which will be used along with a hash of the wasm code (or null_vm_id) to determine which
   // VM will be used for the plugin. All plugins which use the same vm_id and code will use the same
-  // VM. May be left blank.
+  // VM. May be left blank. Sharing a VM between plugins can reduce memory utilization and make sharing of data easier which may have security implications.  See ref: "TODO: add ref" for details.
   string vm_id = 1;
 
-  // The Wasm runtime type (see source/extensions/common/wasm/well_known_names.h).
+  // The Wasm runtime type (either "v8" or "null" for code comipled into Envoy).
   string runtime = 2;
 
   // The Wasm code that Envoy will execute.
   api.v2.core.AsyncDataSource code = 3;
 
-  // The Wasm configuration string used on initialization of a new VM (proxy_onStart).
-  string configuration = 4;
+  // The Wasm configuration used in initialization of a new VM (proxy_on_start).
+  google.protobuf.Any configuration = 4;
 
   // Allow the wasm file to include pre-compiled code on VMs which support it.
   bool allow_precompiled = 5;
@@ -47,9 +47,8 @@ message PluginConfig {
   // Configuration for finding or starting VM.
   VmConfig vm_config = 3;
 
-  // Filter/service configuration string e.g. a serialized protobuf which will be the
-  // argument to the proxy_onConfigure() call.
-  string configuration = 4;
+  // Filter/service configuration used to configurre or reconfigure a plugin (proxy_on_configuration).
+  google.protobuf.Any configuration = 4;
 }
 
 // WasmService is configured as a built-in *envoy.wasm_service* :ref:`ServiceConfig
