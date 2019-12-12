@@ -6,6 +6,8 @@ option java_package = "io.envoyproxy.envoy.v2";
 option java_outer_classname = "SampleProto";
 option java_multiple_files = true;
 
+import "udpa/annotations/migrate.proto";
+
 message Sample {
   message Entry {
     string key = 1;
@@ -14,4 +16,8 @@ message Sample {
   }
 
   repeated Entry entries = 1;
+
+  string will_deprecated = 2 [deprecated = true];
+
+  string will_rename_compoent = 3 [(udpa.annotations.field_migrate).rename = "renamed_component"];
 }

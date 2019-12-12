@@ -32,7 +32,8 @@ public:
     if (entry) {
       decoder_callbacks_->streamInfo().filterState().setData(
           state_, std::make_unique<Router::StringAccessorImpl>(entry->value().getStringView()),
-          StreamInfo::FilterState::StateType::ReadOnly);
+          StreamInfo::FilterState::StateType::ReadOnly,
+          StreamInfo::FilterState::LifeSpan::FilterChain);
     }
     return Http::FilterHeadersStatus::Continue;
   }

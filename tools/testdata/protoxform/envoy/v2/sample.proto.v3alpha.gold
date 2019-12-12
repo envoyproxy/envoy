@@ -19,5 +19,11 @@ message Sample {
     string value = 2;
   }
 
+  reserved 2;
+
+  reserved "will_deprecated";
+
   repeated Entry entries = 1;
+
+  string renamed_component = 3;
 }

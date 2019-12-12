@@ -9,8 +9,6 @@ def _type_database_impl(ctx):
     args = [ctx.outputs.pb_text.path]
     for dep in type_db_deps.to_list():
         ws_name = dep.owner.workspace_name
-
-        # allow empty workspace name for protoxform test protos
         if (not ws_name) or ws_name in ctx.attr.proto_repositories:
             args.append(dep.path)
 

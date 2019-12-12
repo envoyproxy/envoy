@@ -1,11 +1,11 @@
-BAZEL_SKYLIB_RELEASE = "0.8.0"
-BAZEL_SKYLIB_SHA256 = "2ef429f5d7ce7111263289644d233707dba35e39696377ebab8b0bc701f7818e"
+BAZEL_SKYLIB_RELEASE = "0.9.0"
+BAZEL_SKYLIB_SHA256 = "1dde365491125a3db70731e25658dfdd3bc5dbdfd11b840b3e987ecf043c7ca0"
 
 OPENCENSUS_PROTO_GIT_SHA = "5cec5ea58c3efa81fa808f2bd38ce182da9ee731"  # Jul 25, 2019
 OPENCENSUS_PROTO_SHA256 = "faeb93f293ff715b0cb530d273901c0e2e99277b9ed1c0a0326bca9ec5774ad2"
 
-PGV_GIT_SHA = "a18376249eb51cdd517f67fe8703897322812e6d"  # Nov 5, 2019
-PGV_SHA256 = "8e45a3582e7fa9d0005ad6ff1ed9208e793b847f1c455d2bbe5b1c580338ffaf"
+PGV_GIT_SHA = "de8fa833aeb04a6bf84c313e39898c22f381fb05"  # Nov 11,2019
+PGV_SHA256 = "c53d1a4af3c48313de174244a98b78aa05dd1f81f92bbf426c2417aea0060d1a"
 
 GOOGLEAPIS_GIT_SHA = "82944da21578a53b74e547774cf62ed31a05b841"  # Dec 2, 2019
 GOOGLEAPIS_SHA = "a45019af4d3290f02eaeb1ce10990166978c807cb33a9692141a076ba46d1405"
@@ -24,7 +24,7 @@ ZIPKINAPI_SHA256 = "688c4fe170821dd589f36ec45aaadc03a618a40283bc1f97da8fa11686fc
 REPOSITORY_LOCATIONS = dict(
     bazel_skylib = dict(
         sha256 = BAZEL_SKYLIB_SHA256,
-        urls = ["https://github.com/bazelbuild/bazel-skylib/releases/download/" + BAZEL_SKYLIB_RELEASE + "/bazel-skylib." + BAZEL_SKYLIB_RELEASE + ".tar.gz"],
+        urls = ["https://github.com/bazelbuild/bazel-skylib/releases/download/" + BAZEL_SKYLIB_RELEASE + "/bazel_skylib-" + BAZEL_SKYLIB_RELEASE + ".tar.gz"],
     ),
     com_envoyproxy_protoc_gen_validate = dict(
         sha256 = PGV_SHA256,

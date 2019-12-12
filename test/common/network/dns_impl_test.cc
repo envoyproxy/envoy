@@ -880,8 +880,7 @@ TEST_P(DnsImplAresFlagsForTcpTest, TcpLookupsEnabled) {
   server_->addCName("root.cnam.domain", "result.cname.domain");
   server_->addHosts("result.cname.domain", {"201.134.56.7"}, RecordType::A);
   std::list<Address::InstanceConstSharedPtr> address_list;
-  struct ares_options opts;
-  memset(&opts, 0, sizeof(opts));
+  ares_options opts{};
   int optmask = 0;
   EXPECT_EQ(ARES_SUCCESS, ares_save_options(peer_->channel(), &opts, &optmask));
   EXPECT_TRUE((opts.flags & ARES_FLAG_USEVC) == ARES_FLAG_USEVC);
@@ -909,8 +908,7 @@ TEST_P(DnsImplAresFlagsForUdpTest, UdpLookupsEnabled) {
   server_->addCName("root.cnam.domain", "result.cname.domain");
   server_->addHosts("result.cname.domain", {"201.134.56.7"}, RecordType::A);
   std::list<Address::InstanceConstSharedPtr> address_list;
-  struct ares_options opts;
-  memset(&opts, 0, sizeof(opts));
+  ares_options opts{};
   int optmask = 0;
   EXPECT_EQ(ARES_SUCCESS, ares_save_options(peer_->channel(), &opts, &optmask));
   EXPECT_FALSE((opts.flags & ARES_FLAG_USEVC) == ARES_FLAG_USEVC);

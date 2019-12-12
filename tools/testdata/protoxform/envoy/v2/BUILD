@@ -6,4 +6,7 @@ proto_library(
         "sample.proto",
     ],
     visibility = ["//visibility:public"],
+    deps = [
+        "@com_github_cncf_udpa//udpa/annotations:pkg",
+    ],
 )

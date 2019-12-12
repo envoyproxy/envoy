@@ -55,8 +55,10 @@ def ResultProtoFile(path, filename, version):
   Returns:
     actual result proto absolute path
   """
-  base = "./bazel-bin"
-  base += path + "/protos" + path + "/" + filename + "." + version + ".proto"
+  base = "./bazel-bin/"
+  delimited_path = path.split('/')
+  base += os.path.join(*delimited_path, "protos", *delimited_path)
+  base += "/{0}.{1}.proto".format(filename, version)
   return os.path.abspath(base)
 
 
