@@ -553,7 +553,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
   // runtime keys.
   for (const auto& shadow_policy : route_entry_->shadowPolicies()) {
     if (FilterUtility::shouldShadow(shadow_policy, config_.runtime_, callbacks_->streamId())) {
-      active_shadow_policies_.push_back(std::cref<ShadowPolicyPtr>(shadow_policy));
+      active_shadow_policies_.push_back(std::cref(*shadow_policy.get()));
     }
   }
 
@@ -680,10 +680,10 @@ void Filter::cleanup() {
 }
 
 void Filter::maybeDoShadowing() {
-  for (const auto& shadow_policy : active_shadow_policies_) {
-    const auto& ptr = shadow_policy.get();
+  for (const auto& shadow_policy_wrapper : active_shadow_policies_) {
+    const auto& shadow_policy = shadow_policy_wrapper.get();
 
-    ASSERT(!ptr->cluster().empty());
+    ASSERT(!shadow_policy.cluster().empty());
     Http::MessagePtr request(new Http::RequestMessageImpl(
         Http::HeaderMapPtr{new Http::HeaderMapImpl(*downstream_headers_)}));
     if (callbacks_->decodingBuffer()) {
@@ -693,7 +693,8 @@ void Filter::maybeDoShadowing() {
       request->trailers(Http::HeaderMapPtr{new Http::HeaderMapImpl(*downstream_trailers_)});
     }
 
-    config_.shadowWriter().shadow(ptr->cluster(), std::move(request), timeout_.global_timeout_);
+    config_.shadowWriter().shadow(shadow_policy.cluster(), std::move(request),
+                                  timeout_.global_timeout_);
   }
 }
 
