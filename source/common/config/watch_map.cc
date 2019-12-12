@@ -109,9 +109,11 @@ AddedRemoved WatchMap::convertAliasWatchesToNameWatches(const envoy::api::v2::Re
 
   auto ret = AddedRemoved({}, {});
   for (const auto& watch : watches_to_update) {
-    const auto& converted_watches =  updateWatchInterest(watch, {resource.name()});
-    std::copy(converted_watches.added_.begin(), converted_watches.added_.end(), std::inserter(ret.added_, ret.added_.end()));
-    std::copy(converted_watches.removed_.begin(), converted_watches.removed_.end(), std::inserter(ret.removed_, ret.removed_.end()));
+    const auto& converted_watches = updateWatchInterest(watch, {resource.name()});
+    std::copy(converted_watches.added_.begin(), converted_watches.added_.end(),
+              std::inserter(ret.added_, ret.added_.end()));
+    std::copy(converted_watches.removed_.begin(), converted_watches.removed_.end(),
+              std::inserter(ret.removed_, ret.removed_.end()));
   }
 
   return ret;

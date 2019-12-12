@@ -112,13 +112,14 @@ TEST_F(NewGrpcMuxImplTest, DiscoveryResponseNonexistentSub) {
   }
 }
 
-// DeltaDiscoveryResponse that comes in response to an on-demand request updates the watch with resource's name.
-// The watch is initially created with an alias used in the on-demand request.
+// DeltaDiscoveryResponse that comes in response to an on-demand request updates the watch with
+// resource's name. The watch is initially created with an alias used in the on-demand request.
 TEST_F(NewGrpcMuxImplTest, ConfigUpdateWithAliases) {
   setup();
 
   const std::string& type_url = Config::TypeUrl::get().VirtualHost;
-  auto* watch = grpc_mux_->addOrUpdateWatch(type_url, nullptr, {"domain1.test"}, callbacks_, std::chrono::milliseconds(0));
+  auto* watch = grpc_mux_->addOrUpdateWatch(type_url, nullptr, {"domain1.test"}, callbacks_,
+                                            std::chrono::milliseconds(0));
 
   EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
   grpc_mux_->start();
@@ -148,13 +149,14 @@ TEST_F(NewGrpcMuxImplTest, ConfigUpdateWithAliases) {
 }
 
 // DeltaDiscoveryResponse that comes in response to an on-demand request that couldn't be resolved
-// will contain an empty Resource. The Reource's aliases field will be populated with the alias originally used in
-// the request.
+// will contain an empty Resource. The Reource's aliases field will be populated with the alias
+// originally used in the request.
 TEST_F(NewGrpcMuxImplTest, ConfigUpdateWithNotFoundResponse) {
   setup();
 
   const std::string& type_url = Config::TypeUrl::get().VirtualHost;
-  auto* watch = grpc_mux_->addOrUpdateWatch(type_url, nullptr, {"domain1.test"}, callbacks_, std::chrono::milliseconds(0));
+  auto* watch = grpc_mux_->addOrUpdateWatch(type_url, nullptr, {"domain1.test"}, callbacks_,
+                                            std::chrono::milliseconds(0));
 
   EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
   grpc_mux_->start();
@@ -174,7 +176,8 @@ TEST_F(NewGrpcMuxImplTest, ConfigUpdateWithNotFoundResponse) {
 
   ASSERT_TRUE(sub != subscriptions.end());
   const auto found_resource_names = sub->second->watch_map_.updateWatchInterest(watch, {});
-  ASSERT_TRUE(found_resource_names.removed_.find("not-found") != found_resource_names.removed_.end());
+  ASSERT_TRUE(found_resource_names.removed_.find("not-found") !=
+              found_resource_names.removed_.end());
 }
 
 } // namespace
