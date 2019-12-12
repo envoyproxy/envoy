@@ -19,7 +19,19 @@ RedirectionManagerSharedPtr getRedirectionManager(Singleton::Manager& manager,
       });
 }
 
+bool RedirectionManagerImpl::onFailure(const std::string& cluster_name) {
+  return onEvent(cluster_name, EventType::Failure);
+}
+
+bool RedirectionManagerImpl::onHostDegraded(const std::string& cluster_name) {
+  return onEvent(cluster_name, EventType::DegradedHost);
+}
+
 bool RedirectionManagerImpl::onRedirection(const std::string& cluster_name) {
+  return onEvent(cluster_name, EventType::Redirection);
+}
+
+bool RedirectionManagerImpl::onEvent(const std::string& cluster_name, EventType event_type) {
   ClusterInfoSharedPtr info;
   {
     // Hold the map lock to avoid a race condition with calls to unregisterCluster
@@ -39,14 +51,36 @@ bool RedirectionManagerImpl::onRedirection(const std::string& cluster_name) {
     uint64_t last_callback_time_ms = info->last_callback_time_ms_.load();
     if (!last_callback_time_ms ||
         (now >= (last_callback_time_ms + info->min_time_between_triggering_.count()))) {
-      info->redirects_count_++; // ignore redirects during min time between triggering
-      if ((info->redirects_count_ >= info->redirects_threshold_) &&
+      std::atomic<uint32_t>* count;
+      uint32_t threshold;
+      switch (event_type) {
+      case EventType::Redirection: {
+        count = &(info->redirects_count_);
+        threshold = info->redirects_threshold_;
+        break;
+      }
+      case EventType::DegradedHost: {
+        count = &(info->host_degraded_count_);
+        threshold = info->host_degraded_threshold_;
+        break;
+      }
+      case EventType::Failure: {
+        count = &(info->failures_count_);
+        threshold = info->failure_threshold_;
+        break;
+      }
+      }
+      if (threshold <= 0) {
+        return false;
+      }
+      // ignore redirects during min time between triggering
+      if ((++(*count) >= threshold) &&
           (info->last_callback_time_ms_.compare_exchange_strong(last_callback_time_ms, now))) {
         // last_callback_time_ms_ successfully updated without any changes since it was
         // initially read. This thread is allowed to post a call to the registered callback
         // on the main thread. Otherwise, the thread would be ignored to prevent over-triggering
         // cluster callbacks.
-        info->redirects_count_ = 0;
+        *count = 0;
         main_thread_dispatcher_.post([this, cluster_name, info]() {
           // Ensure that cluster is still active before calling callback.
           auto map = cm_.clusters();
@@ -62,13 +96,14 @@ bool RedirectionManagerImpl::onRedirection(const std::string& cluster_name) {
   return false;
 }
 
-RedirectionManagerImpl::HandlePtr
-RedirectionManagerImpl::registerCluster(const std::string& cluster_name,
-                                        std::chrono::milliseconds min_time_between_triggering,
-                                        uint32_t redirects_threshold, const RedirectCB& cb) {
+RedirectionManagerImpl::HandlePtr RedirectionManagerImpl::registerCluster(
+    const std::string& cluster_name, std::chrono::milliseconds min_time_between_triggering,
+    const uint32_t redirects_threshold, const uint32_t failure_threshold,
+    const uint32_t host_degraded_threshold, const RedirectCB& cb) {
   Thread::LockGuard lock(map_mutex_);
-  ClusterInfoSharedPtr info = std::make_shared<ClusterInfo>(
-      cluster_name, min_time_between_triggering, redirects_threshold, cb);
+  ClusterInfoSharedPtr info =
+      std::make_shared<ClusterInfo>(cluster_name, min_time_between_triggering, redirects_threshold,
+                                    failure_threshold, host_degraded_threshold, cb);
   info_map_[cluster_name] = info;
 
   return std::make_unique<RedirectionManagerImpl::HandleImpl>(this, info);

@@ -40,6 +40,22 @@ public:
   virtual bool onRedirection(const std::string& cluster_name) PURE;
 
   /**
+   * Notifies the manager that a failure has been received for a given cluster.
+   * @param cluster_name is the name of the cluster.
+   * @return bool true is a cluster's registered callback with is scheduled
+   * to be called from the main thread dispatcher, false otherwise.
+   */
+  virtual bool onFailure(const std::string& cluster_name) PURE;
+
+  /**
+   * Notifies the manager that a degraded host has been used for a given cluster.
+   * @param cluster_name is the name of the cluster.
+   * @return bool true is a cluster's registered callback with is scheduled
+   * to be called from the main thread dispatcher, false otherwise.
+   */
+  virtual bool onHostDegraded(const std::string& cluster_name) PURE;
+
+  /**
    * Register a cluster to be tracked by the manager (called by main thread only).
    * @param cluster_name is the name of the cluster.
    * @param min_time_between_triggering is the minimum amount of time that must pass between
@@ -52,7 +68,10 @@ public:
    */
   virtual HandlePtr registerCluster(const std::string& cluster_name,
                                     std::chrono::milliseconds min_time_between_triggering,
-                                    uint32_t redirects_threshold, const RedirectCB& cb) PURE;
+                                    const uint32_t redirects_threshold,
+                                    const uint32_t failure_threshold,
+                                    const uint32_t host_degraded_threshold,
+                                    const RedirectCB& cb) PURE;
 };
 
 using RedirectionManagerSharedPtr = std::shared_ptr<RedirectionManager>;

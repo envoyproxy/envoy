@@ -373,6 +373,7 @@ void InstanceImpl::PendingRequest::onResponse(Common::Redis::RespValuePtr&& resp
 void InstanceImpl::PendingRequest::onFailure() {
   request_handler_ = nullptr;
   pool_callbacks_.onFailure();
+  parent_.parent_.onFailure();
   parent_.onRequestCompleted();
 }
 

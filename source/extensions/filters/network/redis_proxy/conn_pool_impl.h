@@ -79,6 +79,8 @@ public:
                     Common::Redis::Client::ClientCallbacks& callbacks);
 
   bool onRedirection() override { return redirection_manager_->onRedirection(cluster_name_); }
+  bool onFailure() { return redirection_manager_->onFailure(cluster_name_); }
+  bool onHostDegraded() { return redirection_manager_->onHostDegraded(cluster_name_); }
 
   // Allow the unit test to have access to private members.
   friend class RedisConnPoolImplTest;

@@ -13,6 +13,8 @@
 
 #include "extensions/common/redis/redirection_mgr.h"
 
+#include "../../../../../../../../Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/include/c++/v1/cstdint"
+
 namespace Envoy {
 namespace Extensions {
 namespace Common {
@@ -29,15 +31,21 @@ public:
    */
   struct ClusterInfo {
     ClusterInfo(std::string cluster_name, std::chrono::milliseconds min_time_between_triggering,
-                uint32_t redirects_threshold, RedirectCB cb)
+                const uint32_t redirects_threshold, const uint32_t failure_threshold,
+                const uint32_t host_degraded_threshold, RedirectCB cb)
         : cluster_name_(std::move(cluster_name)),
           min_time_between_triggering_(min_time_between_triggering),
-          redirects_threshold_(redirects_threshold), cb_(std::move(cb)) {}
+          redirects_threshold_(redirects_threshold), failure_threshold_(failure_threshold),
+          host_degraded_threshold_(host_degraded_threshold), cb_(std::move(cb)) {}
     std::string cluster_name_;
     std::atomic<uint64_t> last_callback_time_ms_{};
     std::atomic<uint32_t> redirects_count_{};
+    std::atomic<uint32_t> failures_count_{};
+    std::atomic<uint32_t> host_degraded_count_{};
     std::chrono::milliseconds min_time_between_triggering_;
-    uint32_t redirects_threshold_;
+    const uint32_t redirects_threshold_;
+    const uint32_t failure_threshold_;
+    const uint32_t host_degraded_threshold_;
     RedirectCB cb_;
   };
 
@@ -60,13 +68,29 @@ public:
       : main_thread_dispatcher_(main_thread_dispatcher), cm_(cm), time_source_(time_source) {}
 
   bool onRedirection(const std::string& cluster_name) override;
+  bool onFailure(const std::string& cluster_name) override;
+  bool onHostDegraded(const std::string& cluster_name) override;
 
   HandlePtr registerCluster(const std::string& cluster_name,
                             std::chrono::milliseconds min_time_between_triggering,
-                            uint32_t redirects_threshold, const RedirectCB& cb) override;
+                            const uint32_t redirects_threshold, const uint32_t failure_threshold,
+                            const uint32_t host_degraded_threshold, const RedirectCB& cb) override;
 
 private:
   void unregisterCluster(const ClusterInfoSharedPtr& cluster_info);
+  /**
+   * The type of events that can trigger discovery
+   */
+  enum EventType {
+    // MOVE or ASK redirection
+    Redirection,
+    // Failure
+    Failure,
+    // Sending request to degraded/unhealthy host
+    DegradedHost
+  };
+
+  bool onEvent(const std::string& cluster_name, EventType event_type);
 
   Event::Dispatcher& main_thread_dispatcher_;
   Upstream::ClusterManager& cm_;

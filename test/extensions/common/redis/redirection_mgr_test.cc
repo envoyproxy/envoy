@@ -122,7 +122,7 @@ public:
 // invalid unregistered cluster names.
 TEST_F(RedirectionMgrTest, Basic) {
   handle_ = redirection_manager_->registerCluster(cluster_name_, std::chrono::milliseconds(1000), 1,
-                                                  [&]() { callback_count_++; });
+                                                  1, 1, [&]() { callback_count_++; });
   RedirectionManagerImpl::ClusterInfoSharedPtr cluster_info = clusterInfo(cluster_name_);
 
   Thread::ThreadPtr thread_1 = platform_.threadFactory().createThread([&]() {
@@ -147,6 +147,8 @@ TEST_F(RedirectionMgrTest, Basic) {
   EXPECT_EQ(cluster_info->last_callback_time_ms_.load(), 2000);
   EXPECT_EQ(cluster_info->min_time_between_triggering_, std::chrono::milliseconds(1000));
   EXPECT_EQ(cluster_info->redirects_threshold_, 1);
+  EXPECT_EQ(cluster_info->failure_threshold_, 1);
+  EXPECT_EQ(cluster_info->host_degraded_threshold_, 1);
 
   callback_count_ = 0;
   advanceTime(MonotonicTime(std::chrono::seconds(5)));
@@ -157,12 +159,96 @@ TEST_F(RedirectionMgrTest, Basic) {
   EXPECT_FALSE(redirection_manager_->onRedirection(cluster_name_));
 }
 
+// This test exercises the redirection manager's basic functionality with failure events being
+// registered via 2 threads. The manager is notified of events on valid registered clusters and
+// invalid unregistered cluster names.
+TEST_F(RedirectionMgrTest, BasicFailureEvents) {
+  handle_ = redirection_manager_->registerCluster(cluster_name_, std::chrono::milliseconds(1000), 1,
+                                                  1, 1, [&]() { callback_count_++; });
+  RedirectionManagerImpl::ClusterInfoSharedPtr cluster_info = clusterInfo(cluster_name_);
+
+  Thread::ThreadPtr thread_1 = platform_.threadFactory().createThread([&]() {
+    waitForTime(MonotonicTime(std::chrono::seconds(1)));
+    EXPECT_TRUE(redirection_manager_->onFailure(cluster_name_));
+    waitForTime(MonotonicTime(std::chrono::seconds(2)));
+    redirection_manager_->onFailure(cluster_name_);
+    waitForTime(MonotonicTime(std::chrono::seconds(3)));
+  });
+  Thread::ThreadPtr thread_2 = platform_.threadFactory().createThread([&]() {
+    waitForTime(MonotonicTime(std::chrono::seconds(2)));
+    redirection_manager_->onFailure(cluster_name_);
+    waitForTime(MonotonicTime(std::chrono::seconds(3)));
+  });
+
+  advanceTime(MonotonicTime(std::chrono::seconds(3)), 2);
+  thread_1->join();
+  thread_2->join();
+
+  EXPECT_GE(callback_count_, 2);
+  EXPECT_EQ(cluster_info->failures_count_, 0);
+  EXPECT_EQ(cluster_info->last_callback_time_ms_.load(), 2000);
+  EXPECT_EQ(cluster_info->min_time_between_triggering_, std::chrono::milliseconds(1000));
+  EXPECT_EQ(cluster_info->redirects_threshold_, 1);
+  EXPECT_EQ(cluster_info->failure_threshold_, 1);
+  EXPECT_EQ(cluster_info->host_degraded_threshold_, 1);
+
+  callback_count_ = 0;
+  advanceTime(MonotonicTime(std::chrono::seconds(5)));
+  EXPECT_FALSE(redirection_manager_->onFailure("unregistered_cluster_name"));
+  EXPECT_EQ(callback_count_, 0);
+
+  handle_.reset();
+  EXPECT_FALSE(redirection_manager_->onFailure(cluster_name_));
+}
+
+// This test exercises the redirection manager's basic functionality with degraded events being
+// registered via 2 threads. The manager is notified of events on valid registered clusters and
+// invalid unregistered cluster names.
+TEST_F(RedirectionMgrTest, BasicDegradedEvents) {
+  handle_ = redirection_manager_->registerCluster(cluster_name_, std::chrono::milliseconds(1000), 1,
+                                                  1, 1, [&]() { callback_count_++; });
+  RedirectionManagerImpl::ClusterInfoSharedPtr cluster_info = clusterInfo(cluster_name_);
+
+  Thread::ThreadPtr thread_1 = platform_.threadFactory().createThread([&]() {
+    waitForTime(MonotonicTime(std::chrono::seconds(1)));
+    EXPECT_TRUE(redirection_manager_->onHostDegraded(cluster_name_));
+    waitForTime(MonotonicTime(std::chrono::seconds(2)));
+    redirection_manager_->onHostDegraded(cluster_name_);
+    waitForTime(MonotonicTime(std::chrono::seconds(3)));
+  });
+  Thread::ThreadPtr thread_2 = platform_.threadFactory().createThread([&]() {
+    waitForTime(MonotonicTime(std::chrono::seconds(2)));
+    redirection_manager_->onHostDegraded(cluster_name_);
+    waitForTime(MonotonicTime(std::chrono::seconds(3)));
+  });
+
+  advanceTime(MonotonicTime(std::chrono::seconds(3)), 2);
+  thread_1->join();
+  thread_2->join();
+
+  EXPECT_GE(callback_count_, 2);
+  EXPECT_EQ(cluster_info->host_degraded_count_, 0);
+  EXPECT_EQ(cluster_info->last_callback_time_ms_.load(), 2000);
+  EXPECT_EQ(cluster_info->min_time_between_triggering_, std::chrono::milliseconds(1000));
+  EXPECT_EQ(cluster_info->redirects_threshold_, 1);
+  EXPECT_EQ(cluster_info->failure_threshold_, 1);
+  EXPECT_EQ(cluster_info->host_degraded_threshold_, 1);
+
+  callback_count_ = 0;
+  advanceTime(MonotonicTime(std::chrono::seconds(5)));
+  EXPECT_FALSE(redirection_manager_->onHostDegraded("unregistered_cluster_name"));
+  EXPECT_EQ(callback_count_, 0);
+
+  handle_.reset();
+  EXPECT_FALSE(redirection_manager_->onHostDegraded(cluster_name_));
+}
+
 // This test records a high number of events for a cluster using 2 threads. Simulated time
 // is advanced without thread synchronization for up to 2 seconds during the threads' activity
 // to simulate possible thread timing issues.
 TEST_F(RedirectionMgrTest, HighVolume) {
   handle_ = redirection_manager_->registerCluster(cluster_name_, std::chrono::seconds(2), 1000,
-                                                  [&]() { callback_count_++; });
+                                                  1000, 1000, [&]() { callback_count_++; });
   RedirectionManagerImpl::ClusterInfoSharedPtr cluster_info = clusterInfo(cluster_name_);
   uint32_t thread1_callback_count = 0;
   uint32_t thread2_callback_count = 0;
@@ -171,7 +257,9 @@ TEST_F(RedirectionMgrTest, HighVolume) {
     for (uint32_t i = 1; i < 61; i += 2) {
       waitForTime(MonotonicTime(std::chrono::seconds(i)));
       for (uint32_t j = 0; j < 2000; j++) {
-        if (redirection_manager_->onRedirection(cluster_name_)) {
+        if (redirection_manager_->onRedirection(cluster_name_) ||
+            redirection_manager_->onFailure(cluster_name_) ||
+            redirection_manager_->onHostDegraded(cluster_name_)) {
           thread1_callback_count++;
         }
       }
@@ -181,7 +269,9 @@ TEST_F(RedirectionMgrTest, HighVolume) {
     for (uint32_t i = 1; i < 61; i += 2) {
       waitForTime(MonotonicTime(std::chrono::seconds(i)));
       for (uint32_t j = 0; j < 2000; j++) {
-        if (redirection_manager_->onRedirection(cluster_name_)) {
+        if (redirection_manager_->onRedirection(cluster_name_) ||
+            redirection_manager_->onFailure(cluster_name_) ||
+            redirection_manager_->onHostDegraded(cluster_name_)) {
           thread2_callback_count++;
         }
       }
@@ -197,6 +287,28 @@ TEST_F(RedirectionMgrTest, HighVolume) {
 
   EXPECT_EQ(callback_count_, thread1_callback_count + thread2_callback_count);
   EXPECT_EQ(callback_count_, 30);
+}
+
+// This test exercises the redirection manager's basic functionality with redirect/failure/host
+// degraded events are disabled by setting the threshold to 0
+TEST_F(RedirectionMgrTest, FeatureDisabled) {
+  handle_ = redirection_manager_->registerCluster(cluster_name_, std::chrono::milliseconds(1000), 0,
+                                                  0, 0, [&]() { callback_count_++; });
+  RedirectionManagerImpl::ClusterInfoSharedPtr cluster_info = clusterInfo(cluster_name_);
+
+  EXPECT_FALSE(redirection_manager_->onRedirection(cluster_name_));
+  EXPECT_FALSE(redirection_manager_->onFailure(cluster_name_));
+  EXPECT_FALSE(redirection_manager_->onHostDegraded(cluster_name_));
+
+  EXPECT_GE(callback_count_, 0);
+  EXPECT_EQ(cluster_info->redirects_count_, 0);
+  EXPECT_EQ(cluster_info->failures_count_, 0);
+  EXPECT_EQ(cluster_info->host_degraded_count_, 0);
+  EXPECT_EQ(cluster_info->last_callback_time_ms_.load(), 0);
+  EXPECT_EQ(cluster_info->min_time_between_triggering_, std::chrono::milliseconds(1000));
+  EXPECT_EQ(cluster_info->redirects_threshold_, 0);
+  EXPECT_EQ(cluster_info->failure_threshold_, 0);
+  EXPECT_EQ(cluster_info->host_degraded_threshold_, 0);
 }
 
 } // namespace Redis

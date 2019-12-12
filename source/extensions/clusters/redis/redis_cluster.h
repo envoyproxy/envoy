@@ -257,6 +257,8 @@ private:
   const std::chrono::milliseconds cluster_refresh_timeout_;
   const std::chrono::milliseconds redirect_refresh_interval_;
   const uint32_t redirect_refresh_threshold_;
+  const uint32_t failure_refresh_threshold_;
+  const uint32_t host_degraded_refresh_threshold_;
   std::list<DnsDiscoveryResolveTargetPtr> dns_discovery_resolve_targets_;
   Event::Dispatcher& dispatcher_;
   Network::DnsResolverSharedPtr dns_resolver_;
@@ -271,6 +273,7 @@ private:
   Upstream::HostMap all_hosts_;
 
   const std::string auth_password_;
+  const std::string cluster_name_;
   const Common::Redis::RedirectionManagerSharedPtr redirection_manager_;
   const Common::Redis::RedirectionManager::HandlePtr registration_handle_;
 };
