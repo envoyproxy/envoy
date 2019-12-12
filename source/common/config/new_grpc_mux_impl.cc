@@ -64,6 +64,16 @@ void NewGrpcMuxImpl::onDiscoveryResponse(
     return;
   }
 
+  // When an on-demand request is made a Watch is created using an alias, as the resource name isn't
+  // known at that point. When an update containing aliases comes back, we update Watches with
+  // resource names.
+  for (const auto& r : message->resources()) {
+    if (r.aliases_size() > 0) {
+      auto converted = sub->second->watch_map_.convertAliasWatchesToNameWatches(r);
+      sub->second->sub_state_.updateSubscriptionInterest(converted.added_, converted.removed_);
+    }
+  }
+
   kickOffAck(sub->second->sub_state_.handleResponse(*message));
 }
 

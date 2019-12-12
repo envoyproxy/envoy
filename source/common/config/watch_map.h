@@ -76,6 +76,9 @@ public:
   // updateWatchInterest().
   void removeWatch(Watch* watch);
 
+  // checks is a watch for an alias exists and replaces it with the resource's name
+  AddedRemoved convertAliasWatchesToNameWatches(const envoy::api::v2::Resource& resource);
+
   // SubscriptionCallbacks
   void onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
                       const std::string& version_info) override;
@@ -103,9 +106,6 @@ private:
 
   // Returns the union of watch_interest_[resource_name] and wildcard_watches_.
   absl::flat_hash_set<Watch*> watchesInterestedIn(const std::string& resource_name);
-
-  // checks is a watch for an alias exists and replaces it with the resource's name
-  void convertAliasWatchToNameWatch(const envoy::api::v2::Resource& resource);
 
   absl::flat_hash_set<std::unique_ptr<Watch>> watches_;
 

@@ -95,7 +95,7 @@ void WatchMap::onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>
 
 // For responses to on-demand requests, replace the original watch for an alias
 // with one for the resource's name
-void WatchMap::convertAliasWatchToNameWatch(const envoy::api::v2::Resource& resource) {
+AddedRemoved WatchMap::convertAliasWatchesToNameWatches(const envoy::api::v2::Resource& resource) {
   absl::flat_hash_set<Watch*> watches_to_update;
   for (const auto& alias : resource.aliases()) {
     const auto interested_watches = watch_interest_.find(alias);
@@ -106,23 +106,21 @@ void WatchMap::convertAliasWatchToNameWatch(const envoy::api::v2::Resource& reso
       break;
     }
   }
+
+  auto ret = AddedRemoved({}, {});
   for (const auto& watch : watches_to_update) {
-    updateWatchInterest(watch, {resource.name()});
+    const auto& converted_watches =  updateWatchInterest(watch, {resource.name()});
+    std::copy(converted_watches.added_.begin(), converted_watches.added_.end(), std::inserter(ret.added_, ret.added_.end()));
+    std::copy(converted_watches.removed_.begin(), converted_watches.removed_.end(), std::inserter(ret.removed_, ret.removed_.end()));
   }
+
+  return ret;
 }
 
 void WatchMap::onConfigUpdate(
     const Protobuf::RepeatedPtrField<envoy::api::v2::Resource>& added_resources,
     const Protobuf::RepeatedPtrField<std::string>& removed_resources,
     const std::string& system_version_info) {
-  // When an on-demand request is made a Watch is created using an alias, as the resource name isn't
-  // known at that point. When an update containing aliases comes back, we update Watches with
-  // resource names.
-  for (const auto& r : added_resources) {
-    if (r.aliases_size() > 0) {
-      convertAliasWatchToNameWatch(r);
-    }
-  }
   // Build a pair of maps: from watches, to the set of resources {added,removed} that each watch
   // cares about. Each entry in the map-pair is then a nice little bundle that can be fed directly
   // into the individual onConfigUpdate()s.
