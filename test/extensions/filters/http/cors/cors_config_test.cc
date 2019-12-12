@@ -1,7 +1,7 @@
+#include <string>
+
 #include "envoy/api/v2/route/route.pb.validate.h"
 #include "envoy/config/filter/http/cors/v2/cors.pb.validate.h"
-
-#include <string>
 
 #include "common/router/config_impl.h"
 
@@ -17,13 +17,12 @@ namespace HttpFilters {
 namespace Cors {
 namespace {
 // Helper utility to convert a YAML string blob into a protobuf configuration.
-template <typename T>
-T createConfigFromYaml(const std::string& config_str) {
+template <typename T> T createConfigFromYaml(const std::string& config_str) {
   T policy;
   TestUtility::loadFromYamlAndValidate(config_str, policy);
   return policy;
 }
-}
+} // namespace
 
 class CorsLegacyConfigTest : public testing::Test {
 public:

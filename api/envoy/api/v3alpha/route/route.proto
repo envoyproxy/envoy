@@ -48,9 +48,9 @@ message VirtualHost {
     ALL = 2;
   }
 
-  reserved 9, 12;
+  reserved 9, 8, 12;
 
-  reserved "per_filter_config";
+  reserved "cors", "per_filter_config";
 
   // The logical name of the virtual host. This is used when emitting certain
   // statistics but is not relevant for routing.
@@ -658,7 +658,9 @@ message RouteAction {
     google.protobuf.BoolValue enabled = 2;
   }
 
-  reserved 12, 18, 19, 16, 22, 21;
+  reserved 12, 18, 19, 16, 22, 21, 17;
+
+  reserved "cors";
 
   oneof cluster_specifier {
     option (validate.required) = true;

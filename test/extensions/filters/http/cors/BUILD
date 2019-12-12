@@ -32,9 +32,9 @@ envoy_extension_cc_test(
         "//source/extensions/filters/http/cors:cors_filter_lib",
         "//test/mocks/runtime:runtime_mocks",
         "//test/test_common:utility_lib",
-        "@envoy_api//envoy/config/filter/http/cors/v2:pkg_cc_proto",
         "@envoy_api//envoy/api/v2/route:pkg_cc_proto",
-    ]
+        "@envoy_api//envoy/config/filter/http/cors/v2:pkg_cc_proto",
+    ],
 )
 
 envoy_extension_cc_test(
