@@ -1001,7 +1001,6 @@ REGISTER_FACTORY(CallbacksStatsSinkFactory, Server::Configuration::StatsSinkFact
 // lifecycle callback is also used to ensure that the cluster update callback is freed during
 // Server::Instance's destruction. See issue #9292 for more details.
 TEST_P(ServerInstanceImplTest, CallbacksStatsSinkTest) {
-  ENVOY_LOG_MISC(warn, "starting server");
   initialize("test/server/callbacks_stats_sink_bootstrap.yaml");
   // Necessary to trigger server lifecycle callbacks, otherwise only terminate() is called.
   server_->shutdown();
