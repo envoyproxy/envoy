@@ -1,9 +1,6 @@
 #include "extensions/tracers/xray/tracer.h"
 
-#include <sys/socket.h>
-
 #include <algorithm>
-#include <array>
 #include <chrono>
 #include <string>
 
@@ -107,7 +104,7 @@ void Span::injectContext(Http::HeaderMap& request_headers) {
   const std::string xray_header_value =
       fmt::format("root={};parent={};sampled={}", traceId(), Id(), sampled() ? "1" : "0");
 
-  // Set the XRay header in to envoy header map.
+  // Set the XRay header into envoy header map for visibility to upstream
   request_headers.addCopy(Http::LowerCaseString(XRayTraceHeader), xray_header_value);
 }
 
