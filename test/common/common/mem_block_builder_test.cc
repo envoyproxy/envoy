@@ -61,4 +61,12 @@ TEST(MemBlockBuilderTest, AppendUint32) {
   EXPECT_EQ(0, mem_block.capacity());
 }
 
+TEST(MemBlockBuilderTest, AppendTooMuch) {
+  MemBlockBuilder<uint8_t> mem_block(1);
+  mem_block.appendOne(1);
+  EXPECT_DEATH({ mem_block.appendOne(2); }, "insufficient capacity");
+  const uint8_t foo[] = {3, 4};
+  EXPECT_DEATH({ mem_block.appendData(foo, ABSL_ARRAYSIZE(foo)); }, "insufficient capacity");
+}
+
 } // namespace Envoy

@@ -34,7 +34,7 @@ public:
    * capacity. This does not have resize semantics; when populate() is called any
    * previous contents are erased.
    *
-   * @param capcity The number of memory elements to allocate.
+   * @param capacity The number of memory elements to allocate.
    */
   void populate(uint64_t capacity) {
     data_ = std::make_unique<T[]>(capacity);
