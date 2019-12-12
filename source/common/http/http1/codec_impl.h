@@ -194,7 +194,7 @@ public:
 
   CodecStats& stats() { return stats_; }
 
-  bool enable_trailers() const { return enable_trailers_; }
+  bool enableTrailers() const { return enable_trailers_; }
 
 protected:
   ConnectionImpl(Network::Connection& connection, Stats::Scope& stats, http_parser_type type,

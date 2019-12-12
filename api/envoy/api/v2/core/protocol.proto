@@ -90,9 +90,9 @@ message Http1ProtocolOptions {
   // .. attention::
   //
   //   Note that this only happens when Envoy is chunk encoding which occurs when:
-  //   - The request is Http1.1
-  //   - Is neither a HEAD only request nor a HTTP Upgrade
-  //   - Not a HEAD request
+  //   - The request is HTTP1.1.
+  //   - Is neither a HEAD only request nor a HTTP Upgrade.
+  //   - Not a response to a HEAD request.
   //   - The content length header is not present.
   bool enable_trailers = 5;
 }

@@ -191,7 +191,7 @@ void StreamEncoderImpl::encodeData(Buffer::Instance& data, bool end_stream) {
 }
 
 void StreamEncoderImpl::encodeTrailers(const HeaderMap& trailers) {
-  if (!connection_.enable_trailers()) {
+  if (!connection_.enableTrailers()) {
     return endEncode();
   }
   // Trailers only matter if it is a chunk transfer encoding
@@ -412,7 +412,8 @@ void ConnectionImpl::completeLastHeader() {
   if (current_header_map_->size() > max_headers_count_) {
     error_code_ = Http::Code::RequestHeaderFieldsTooLarge;
     sendProtocolError();
-    throw CodecProtocolException("headers size exceeds limit");
+    const std::string header_type = processing_trailers_ ? "trailers" : "headers";
+    throw CodecProtocolException(absl::StrCat(header_type, " size exceeds limit"));
   }
 
   header_parsing_state_ = HeaderParsingState::Field;
@@ -482,7 +483,7 @@ size_t ConnectionImpl::dispatchSlice(const char* slice, size_t len) {
 
 void ConnectionImpl::onHeaderField(const char* data, size_t length) {
   // We previously already finished up the headers, these headers are
-  // now trailers
+  // now trailers.
   if (header_parsing_state_ == HeaderParsingState::Done) {
     if (!enable_trailers_) {
       // Ignore trailers.
@@ -532,10 +533,10 @@ void ConnectionImpl::onHeaderValue(const char* data, size_t length) {
   const uint32_t total =
       current_header_field_.size() + current_header_value_.size() + current_header_map_->byteSize();
   if (total > (max_headers_kb_ * 1024)) {
-
+    const std::string header_type = processing_trailers_ ? "trailers" : "headers";
     error_code_ = Http::Code::RequestHeaderFieldsTooLarge;
     sendProtocolError();
-    throw CodecProtocolException("headers size exceeds limit");
+    throw CodecProtocolException(absl::StrCat(header_type, " size exceeds limit"));
   }
 }
 

@@ -197,10 +197,8 @@ void Http1ServerConnectionImplTest::testTrailersExceedLimit(std::string trailer_
   codec_->dispatch(buffer);
   buffer = Buffer::OwnedImpl(trailer_string + "\r\n\r\n");
   if (enable_trailers) {
-    // TODO Expect exception to say if it is trailers or headers are over the
-    // limit
     EXPECT_THROW_WITH_MESSAGE(codec_->dispatch(buffer), EnvoyException,
-                              "headers size exceeds limit");
+                              "trailers size exceeds limit");
   } else {
     // If trailers are not enabled, we expect Envoy to simply skip over the large
     // trailers as if nothing has happened!
