@@ -145,7 +145,7 @@ public:
    * compilation. Then, if cloning is supported, we clone that VM for each worker, potentially
    * copying and sharing the initialized data structures for efficiency. Otherwise we create an new
    * VM from scratch for each worker.
-   * @return true if the VM is cloneable.
+   * @return one of enum Cloneable with the VMs cloneablity.
    */
   virtual Cloneable cloneable() PURE;
 
