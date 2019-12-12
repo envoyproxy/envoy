@@ -499,7 +499,7 @@ TEST_P(VhdsIntegrationTest, RdsWithVirtualHostsVhdsVirtualHostAddUpdateRemove) {
 //  - a spontaneous VHDS DiscoveryResponse adds two virtual hosts
 //  - the next spontaneous VHDS DiscoveryResponse removes newly added virtual hosts
 //  - Upstream makes a request to an (now) unknown domain
-//  - A VHDS DiscoveryReponse received but contains no update for the domain (the management server
+//  - A VHDS DiscoveryResponse received but contains no update for the domain (the management server
 //  couldn't resolve it)
 //  - Upstream receives a 404 response
 TEST_P(VhdsIntegrationTest, VhdsOnDemandUpdateFailToResolveTheAlias) {
@@ -540,7 +540,7 @@ TEST_P(VhdsIntegrationTest, VhdsOnDemandUpdateFailToResolveTheAlias) {
 //  - a spontaneous VHDS DiscoveryResponse adds two virtual hosts
 //  - the next spontaneous VHDS DiscoveryResponse removes newly added virtual hosts
 //  - Upstream makes a request to an (now) unknown domain
-//  - A VHDS DiscoveryReponse received that contains update for vhost.first host, but vhost.third
+//  - A VHDS DiscoveryResponse received that contains update for vhost.first host, but vhost.third
 //  couldn't be resolved
 //  - Upstream receives a 404 response
 TEST_P(VhdsIntegrationTest, VhdsOnDemandUpdateFailToResolveOneAliasOutOfSeveral) {
