@@ -20,17 +20,18 @@
 
 /**
  * Called when the VM starts for each plugin.
- * @param root_context_id is an identifier with the lifetime of the VM which will be used for
- * one or more related plugins and their corresponding proxy_on_configure(), proxy_on_done() and
- * proxy_on_delete() calls. It is also be provided during creation of stream context for those
- * plugins.
- * @param configuration_size is the size of any configuration available via proxy_get_configuration.
+ * @param root_context_id is an identifier for one or more related plugins and their corresponding
+ * proxy_on_configure(), proxy_on_done() and proxy_on_delete() calls. It is also be provided during
+ * creation of stream context for those plugins.
+ * @param vm_configuration_size is the size of any configuration available via
+ * proxy_get_configuration during the lifetime of this call.
  * @return non-zero on success and zero on failure (e.g. bad configuration).
  */
-extern "C" uint32_t proxy_on_start(uint32_t root_context_id, uint32_t configuration_size);
+extern "C" uint32_t proxy_on_start(uint32_t root_context_id, uint32_t vm_configuration_size);
 /**
- * Can be called to validate a configuration (e.g. by an xDS provider) both before proxy_on_start()
- * to verify the VM configuration or after proxy_on_start() to verify a plugin configuation.
+ * Can be called to validate a configuration (e.g. from bootstrap or xDS) both before
+ * proxy_on_start() to verify the VM configuration or after proxy_on_start() to verify a plugin
+ * configuation.
  * @param root_context_id is a unique identifier for the configuration verification context.
  * @param configuration_size is the size of any configuration available via
  * proxy_get_configuration().
@@ -41,11 +42,12 @@ extern "C" uint32_t proxy_validate_configuration(uint32_t root_context_id,
 /**
  * Called when a plugin loads or when plugin configuration changes dynamically.
  * @param root_context_id is an identifier for one or more related plugins.
- * @param configuration_size is the size of any configuration available via
+ * @param plugin_configuration_size is the size of any configuration available via
  * proxy_get_configuration().
  * @return non-zero on success and zero on failure (e.g. bad configuration).
  */
-extern "C" uint32_t proxy_on_configure(uint32_t root_context_id, uint32_t configuration_size);
+extern "C" uint32_t proxy_on_configure(uint32_t root_context_id,
+                                       uint32_t plugin_configuration_size);
 
 // Stream calls.
 
@@ -82,8 +84,10 @@ extern "C" void proxy_on_delete(uint32_t context_id);
 // Configuration and Status
 
 /**
- * Called from the VM to get any configuration. Valid only when in a proxy_on_start(),
- * proxy_validate_configuration() or proxy_on_configure() handler.
+ * Called from the VM to get any configuration. Valid only when in proxy_on_start() (where it will
+ * return a VM configuration), proxy_on_configure() (where it will return a plugin configuraiton) or
+ * in proxy_validate_configuration() (where it will return a VM configuration before
+ * proxy_on_start() has been called and a plugin configuration after).
  * @param configuration_ptr a pointer to a location which will be filled with either nullptr (if no
  * configuration is available) or a pointer to a malloc()ed block containing the configuration
  * bytes.
