@@ -64,7 +64,7 @@ envoy_cc_library(
         "//source/common/common:assert_lib",
         "//source/common/common:hash_lib",
         "//source/common/common:utility_lib",
-        "@envoy_api//envoy/protobuf:pkg_cc_proto",
+        "@com_github_cncf_udpa//udpa/annotations:pkg_cc_proto",
         "@envoy_api//envoy/type:pkg_cc_proto",
     ],
 )

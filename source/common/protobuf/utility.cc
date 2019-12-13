@@ -3,7 +3,6 @@
 #include <limits>
 #include <numeric>
 
-#include "envoy/protobuf/descriptor.pb.h"
 #include "envoy/protobuf/message_validator.h"
 
 #include "common/common/assert.h"
@@ -12,6 +11,7 @@
 #include "common/protobuf/protobuf.h"
 
 #include "absl/strings/match.h"
+#include "udpa/annotations/sensitive.pb.h"
 #include "yaml-cpp/yaml.h"
 
 namespace Envoy {
@@ -509,9 +509,8 @@ std::string MessageUtil::CodeEnumToString(ProtobufUtil::error::Code code) {
 namespace {
 
 // Recursive helper method for MessageUtil::redact() below.
-void redactInPlace(Protobuf::Message* message, bool ancestor_is_redacted) {
-  // If the message is an `Any`, we can't use any type-based introspection. Instead, we have to
-  // unpack it to its original type to redact it...
+void redactInPlace(Protobuf::Message* message, bool ancestor_is_sensitive) {
+  // If the message is an `Any`, we have to first unpack it to its original type to redact it...
   auto* any = dynamic_cast<ProtobufWkt::Any*>(message);
   if (any != nullptr) {
     // 1. Extract the type name from the URL. This is guaranteed to be the portion of the URL
@@ -528,7 +527,7 @@ void redactInPlace(Protobuf::Message* message, bool ancestor_is_redacted) {
     any->UnpackTo(typed_message.get());
 
     // 3. Redact the typed message and repack it into the original `Any`.
-    redactInPlace(typed_message.get(), ancestor_is_redacted);
+    redactInPlace(typed_message.get(), ancestor_is_sensitive);
     any->PackFrom(*typed_message);
 
     return;
@@ -539,29 +538,34 @@ void redactInPlace(Protobuf::Message* message, bool ancestor_is_redacted) {
   std::vector<const Protobuf::FieldDescriptor*> field_descriptors;
   reflection->ListFields(*message, &field_descriptors);
   for (const auto* field_descriptor : field_descriptors) {
-    // Redact if this field or any of its ancestors have the `redacted` option set.
-    const bool redacted =
-        ancestor_is_redacted || field_descriptor->options().GetExtension(envoy::protobuf::redacted);
+    // Redact if this field or any of its ancestors have the `sensitive` option set.
+    const bool sensitive = ancestor_is_sensitive ||
+                           field_descriptor->options().GetExtension(udpa::annotations::sensitive);
 
-    if (redacted && field_descriptor->type() == Protobuf::FieldDescriptor::TYPE_STRING) {
-      // Base case: replace strings with "[redacted]".
-      if (field_descriptor->is_repeated()) {
-        const int field_size = reflection->FieldSize(*message, field_descriptor);
-        for (int i = 0; i < field_size; ++i) {
-          reflection->SetRepeatedString(message, field_descriptor, i, "[redacted]");
-        }
-      } else {
-        reflection->SetString(message, field_descriptor, "[redacted]");
-      }
-    } else if (field_descriptor->type() == Protobuf::FieldDescriptor::TYPE_MESSAGE) {
+    if (field_descriptor->type() == Protobuf::FieldDescriptor::TYPE_MESSAGE) {
       // Recursive case: traverse message fields.
       if (field_descriptor->is_repeated()) {
         const int field_size = reflection->FieldSize(*message, field_descriptor);
         for (int i = 0; i < field_size; ++i) {
-          redactInPlace(reflection->MutableRepeatedMessage(message, field_descriptor, i), redacted);
+          redactInPlace(reflection->MutableRepeatedMessage(message, field_descriptor, i),
+                        sensitive);
         }
       } else {
-        redactInPlace(reflection->MutableMessage(message, field_descriptor), redacted);
+        redactInPlace(reflection->MutableMessage(message, field_descriptor), sensitive);
+      }
+    } else if (sensitive) {
+      // Base case: replace strings with "[redacted]" and clear all others.
+      if (field_descriptor->type() == Protobuf::FieldDescriptor::TYPE_STRING) {
+        if (field_descriptor->is_repeated()) {
+          const int field_size = reflection->FieldSize(*message, field_descriptor);
+          for (int i = 0; i < field_size; ++i) {
+            reflection->SetRepeatedString(message, field_descriptor, i, "[redacted]");
+          }
+        } else {
+          reflection->SetString(message, field_descriptor, "[redacted]");
+        }
+      } else {
+        reflection->ClearField(message, field_descriptor);
       }
     }
   }
@@ -575,7 +579,7 @@ std::unique_ptr<Protobuf::Message> MessageUtil::redact(const Protobuf::Message& 
   redacted->MergeFrom(message);
 
   // 2. Redact the cloned message.
-  redactInPlace(redacted.get(), /* ancestor_is_redacted = */ false);
+  redactInPlace(redacted.get(), /* ancestor_is_sensitive = */ false);
   return redacted;
 }
 

@@ -363,14 +363,24 @@ public:
   static std::string CodeEnumToString(ProtobufUtil::error::Code code);
 
   /**
-   * Makes a copy of a source message with all `redacted` data sanitized. Specifically, any
-   * string-typed fields that are annotated as `redacted`, or that are contained directly or
-   * indirectly within a message-typed field that is annotated as `redacted`, will have their
-   * values replaced with the string "[redacted]" in the result.
-   * See also envoy.protobuf.redacted.
+   * Makes a copy of a source message with all sensitive data (that is, fields annotated as
+   * `udpa.annotations.sensitive`) redacted for display. String-typed fields annotated as
+   * `sensitive` will be replaced with the string "[redacted]", primitive-typed fields (including
+   * enums) will be cleared, and message-typed fields will be traversed recursively to redact
+   * their contents.
+   *
+   * LIMITATION: This works properly for strongly-typed messages, as well as for messages packed in
+   * a `ProtobufWkt::Any` with a `type_url` corresponding to a proto that was compiled into the
+   * Envoy binary. However it does not work for messages encoded as `ProtobufWkt::Struct`, since
+   * structs are missing the "sensitive" annotations that this function expects. Similarly, it fails
+   * for messages encoded as `ProtobufWkt::Any` with a `type_url` that isn't registered with the
+   * binary. If you're working with struct-typed messages, including those that might be hiding
+   * within strongly-typed messages, please reify them to strongly-typed messages using
+   * `MessageUtil::jsonConvert()` before calling `MessageUtil::redact()`.
+   *
    * @param message original message to copy from.
-   * @return cloned message of the same dynamic type as the original, with all `redacted` data
-   * sanitized.
+   * @return cloned message of the same dynamic type as the original, with all sensitive data
+   * redacted.
    */
   static std::unique_ptr<Protobuf::Message> redact(const Protobuf::Message& message);
 };
