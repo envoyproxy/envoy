@@ -158,7 +158,7 @@ void CacheFilter::onHeadersAsync(const CacheFilterSharedPtr& self, LookupResult&
 }
 
 void CacheFilter::getBody() {
-  ASSERT(!remaining_body_.empty());
+  ASSERT(!remaining_body_.empty(), "No reason to call getBody when there's no body to get.");
   CacheFilterSharedPtr self = shared_from_this();
   lookup_->getBody(remaining_body_[0],
                    [self](Buffer::InstancePtr&& body) { self->onBody(std::move(body)); });
@@ -172,8 +172,15 @@ void CacheFilter::onBody(Buffer::InstancePtr&& body) {
   if (!lookup_) {
     return;
   }
-  ASSERT(!remaining_body_.empty());
+  if (remaining_body_.empty()) {
+    ASSERT(false, "CacheFilter doesn't call getBody unless there's more body to get, so this is a "
+                  "bogus callback.");
+    decoder_callbacks_->resetStream();
+    return;
+  }
+
   if (!body) {
+    ASSERT(false, "Cache said it had a body, but isn't giving it to us.");
     decoder_callbacks_->resetStream();
     return;
   }
