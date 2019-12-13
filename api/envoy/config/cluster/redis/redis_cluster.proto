@@ -70,10 +70,10 @@ message RedisClusterConfig {
 
   // The number of failures that must be received before triggering a topology refresh request.
   // If not set, this defaults to 0, which disables the topology refresh due to failure.
-  google.protobuf.UInt32Value failure_refresh_threshold = 5;
+  uint32 failure_refresh_threshold = 5;
 
   // The number of hosts became degraded or unhealthy before triggering a topology refresh request.
   // If not set, this defaults to 0, which disables the topology refresh due to degraded or
   // unhealthy host.
-  google.protobuf.UInt32Value host_degraded_refresh_threshold = 6;
+  uint32 host_degraded_refresh_threshold = 6;
 }

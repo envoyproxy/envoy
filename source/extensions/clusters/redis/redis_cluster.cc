@@ -31,10 +31,8 @@ RedisCluster::RedisCluster(
           PROTOBUF_GET_MS_OR_DEFAULT(redis_cluster, redirect_refresh_interval, 5000))),
       redirect_refresh_threshold_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(redis_cluster, redirect_refresh_threshold, 5)),
-      failure_refresh_threshold_(
-          PROTOBUF_GET_WRAPPED_OR_DEFAULT(redis_cluster, failure_refresh_threshold, 0)),
-      host_degraded_refresh_threshold_(
-          PROTOBUF_GET_WRAPPED_OR_DEFAULT(redis_cluster, host_degraded_refresh_threshold, 0)),
+      failure_refresh_threshold_(redis_cluster.failure_refresh_threshold()),
+      host_degraded_refresh_threshold_(redis_cluster.host_degraded_refresh_threshold()),
       dispatcher_(factory_context.dispatcher()), dns_resolver_(std::move(dns_resolver)),
       dns_lookup_family_(Upstream::getDnsLookupFamilyFromCluster(cluster)),
       load_assignment_(cluster.has_load_assignment()
