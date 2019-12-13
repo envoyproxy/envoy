@@ -32,6 +32,7 @@ from google.protobuf import text_format
 # Note: we have to include those proto definitions to make FormatOptions work,
 # this also serves as whitelist of extended options.
 from google.api import annotations_pb2 as _
+from udpa.annotations import sensitive_pb2 as _
 from validate import validate_pb2 as _
 
 CLANG_FORMAT_STYLE = ('{ColumnLimit: 100, SpacesInContainerLiterals: false, '
