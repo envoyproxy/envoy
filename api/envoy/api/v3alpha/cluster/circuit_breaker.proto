@@ -80,6 +80,11 @@ message CircuitBreakers {
     // If track_remaining is true, then stats will be published that expose
     // the number of resources remaining until the circuit breakers open. If
     // not specified, the default is false.
+    //
+    // .. note::
+    //
+    //    If a retry budget is used in lieu of the max_retries circuit breaker,
+    //    the remaining retry resources remaining will not be tracked.
     bool track_remaining = 6;
 
     // The maximum number of connection pools per cluster that Envoy will concurrently support at
