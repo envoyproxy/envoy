@@ -94,7 +94,6 @@ private:
   void resetRetry();
   bool wouldRetryFromReset(const Http::StreamResetReason reset_reason);
   RetryStatus shouldRetry(bool would_retry, DoRetryCallback callback);
-  RetryBudgetStatus retryBudgetStatus(Upstream::ResourcePriority priority) const;
 
   const Upstream::ClusterInfo& cluster_;
   Runtime::Loader& runtime_;

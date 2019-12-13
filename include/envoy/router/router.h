@@ -246,16 +246,6 @@ class RetryState {
 public:
   using DoRetryCallback = std::function<void()>;
 
-  /**
-   * RetryBudgetStatus whether the retry budget has been configured or allows for additional
-   * retries.
-   */
-  enum class RetryBudgetStatus {
-    Unconfigured,
-    Available,
-    Exceeded,
-  };
-
   virtual ~RetryState() = default;
 
   /**
