@@ -72,10 +72,9 @@ enum class ConnectionCloseType {
 /**
  * Run-time modifiable connection options to alter socket settings
  */
-class DynamicSocketOptions : public Logger::Loggable<Logger::Id::connection>{
+class DynamicSocketOptions : public Logger::Loggable<Logger::Id::connection> {
 public:
-
-  DynamicSocketOptions(uint64_t id):conn_id(id) {}
+  DynamicSocketOptions(uint64_t id) : conn_id(id) {}
 
   virtual ~DynamicSocketOptions() = default;
 
@@ -97,7 +96,7 @@ public:
 
   /**
    * Get the receive buffer low water-mark size to a value specified by 'low_watermark'
-   * @param low_watermark_val retuns the receive buffer 'low_watermark' configured
+   * @param low_watermark_val returns the receive buffer 'low_watermark' configured
    */
   void getSocketRecvLoWat(IoHandle& io_handle, uint32_t& low_watermark_val) const;
 

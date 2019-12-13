@@ -781,7 +781,7 @@ TEST_P(ConnectionImplTest, DynamicSocketOptions) {
     uint32_t get_recv_buf_size = 0;
     dynamic_socket_object.setSocketRecvBufferSize(socket_->ioHandle(), set_recv_buf_size);
     dynamic_socket_object.getSocketRecvBufferSize(socket_->ioHandle(), get_recv_buf_size);
-    EXPECT_EQ(get_recv_buf_size, 2*set_recv_buf_size);
+    EXPECT_EQ(get_recv_buf_size, 2 * set_recv_buf_size);
   }
 
   {
