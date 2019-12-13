@@ -127,7 +127,7 @@ public:
    *        should take place.
    * @return TRUE if shadowing should take place.
    */
-  static bool shouldShadow(const ShadowPolicyPtr& policy, Runtime::Loader& runtime,
+  static bool shouldShadow(const ShadowPolicy& policy, Runtime::Loader& runtime,
                            uint64_t stable_random);
 
   /**

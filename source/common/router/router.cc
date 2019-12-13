@@ -101,19 +101,19 @@ void FilterUtility::setUpstreamScheme(Http::HeaderMap& headers, bool use_secure_
   }
 }
 
-bool FilterUtility::shouldShadow(const ShadowPolicyPtr& policy, Runtime::Loader& runtime,
+bool FilterUtility::shouldShadow(const ShadowPolicy& policy, Runtime::Loader& runtime,
                                  uint64_t stable_random) {
-  if (policy->cluster().empty()) {
+  if (policy.cluster().empty()) {
     return false;
   }
 
-  if (policy->defaultValue().numerator() > 0) {
-    return runtime.snapshot().featureEnabled(policy->runtimeKey(), policy->defaultValue(),
+  if (policy.defaultValue().numerator() > 0) {
+    return runtime.snapshot().featureEnabled(policy.runtimeKey(), policy.defaultValue(),
                                              stable_random);
   }
 
-  if (!policy->runtimeKey().empty() &&
-      !runtime.snapshot().featureEnabled(policy->runtimeKey(), 0, stable_random, 10000UL)) {
+  if (!policy.runtimeKey().empty() &&
+      !runtime.snapshot().featureEnabled(policy.runtimeKey(), 0, stable_random, 10000UL)) {
     return false;
   }
 
@@ -554,8 +554,9 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
   // Determine which shadow policies to use. It's possible that we don't do any shadowing due to
   // runtime keys.
   for (const auto& shadow_policy : route_entry_->shadowPolicies()) {
-    if (FilterUtility::shouldShadow(shadow_policy, config_.runtime_, callbacks_->streamId())) {
-      active_shadow_policies_.push_back(std::cref(*shadow_policy));
+    const auto& policy_ref = *shadow_policy;
+    if (FilterUtility::shouldShadow(policy_ref, config_.runtime_, callbacks_->streamId())) {
+      active_shadow_policies_.push_back(std::cref(policy_ref));
     }
   }
 
