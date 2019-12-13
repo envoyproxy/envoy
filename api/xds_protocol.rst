@@ -394,7 +394,7 @@ for the client to know that a resource does not exist based solely on its absenc
 because the delivery of the updates is eventually consistent: if the client initially sends a
 request for resource A, then sends a request for resources A and B, and then sees a response
 containing only resource A, the client cannot conclude that resource B does not exist, because
-the response may have been t sent on the basis of the first request, before the server saw the
+the response may have been sent on the basis of the first request, before the server saw the
 second request.
 
 For other resource types, because each resource can be sent in its own response, there is no way
