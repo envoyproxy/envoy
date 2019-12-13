@@ -165,6 +165,7 @@ envoy_cc_test(
     deps = [
         "//source/common/common:regex_lib",
         "//test/test_common:utility_lib",
+        "@envoy_api//envoy/type/matcher:pkg_cc_proto",
     ],
 )
 

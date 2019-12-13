@@ -1,6 +1,9 @@
 #include <string>
 #include <vector>
 
+#include "envoy/config/filter/network/rate_limit/v2/rate_limit.pb.h"
+#include "envoy/config/filter/network/tcp_proxy/v2/tcp_proxy.pb.h"
+
 #include "common/buffer/buffer_impl.h"
 #include "common/network/filter_manager_impl.h"
 #include "common/tcp_proxy/tcp_proxy.h"

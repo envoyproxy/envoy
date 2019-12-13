@@ -98,6 +98,7 @@ envoy_cc_test(
         "//source/common/stats:stats_matcher_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/metrics/v2:pkg_cc_proto",
+        "@envoy_api//envoy/type/matcher:pkg_cc_proto",
     ],
 )
 
@@ -209,5 +210,6 @@ envoy_cc_test_binary(
         "//test/test_common:simulated_time_system_lib",
         "//test/test_common:test_time_lib",
         "//test/test_common:utility_lib",
+        "@envoy_api//envoy/config/metrics/v2:pkg_cc_proto",
     ],
 )

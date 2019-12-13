@@ -1,5 +1,8 @@
 #include <memory>
 
+#include "envoy/config/accesslog/v2/als.pb.h"
+#include "envoy/data/accesslog/v2/accesslog.pb.h"
+
 #include "common/buffer/zero_copy_input_stream_impl.h"
 #include "common/network/address_impl.h"
 #include "common/router/string_accessor_impl.h"

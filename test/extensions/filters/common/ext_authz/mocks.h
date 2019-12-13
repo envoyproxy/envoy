@@ -3,6 +3,8 @@
 #include <string>
 #include <vector>
 
+#include "envoy/service/auth/v2/external_auth.pb.h"
+
 #include "extensions/filters/common/ext_authz/ext_authz.h"
 
 #include "gmock/gmock.h"

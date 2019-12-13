@@ -4,6 +4,7 @@
 #include <memory>
 #include <string>
 
+#include "envoy/config/trace/v2/trace.pb.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/thread_local/thread_local.h"
 #include "envoy/tracing/http_tracer.h"

@@ -1,6 +1,9 @@
 #include "common/secret/secret_manager_impl.h"
 
 #include "envoy/admin/v2alpha/config_dump.pb.h"
+#include "envoy/api/v2/auth/cert.pb.h"
+#include "envoy/api/v2/core/base.pb.h"
+#include "envoy/api/v2/core/config_source.pb.h"
 #include "envoy/common/exception.h"
 
 #include "common/common/assert.h"

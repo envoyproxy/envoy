@@ -44,7 +44,9 @@ envoy_cc_library(
         "//source/common/protobuf:utility_lib",
         "//source/extensions/filters/network/dubbo_proxy:metadata_lib",
         "//source/extensions/filters/network/dubbo_proxy:serializer_interface",
+        "@envoy_api//envoy/api/v2/route:pkg_cc_proto",
         "@envoy_api//envoy/config/filter/network/dubbo_proxy/v2alpha1:pkg_cc_proto",
+        "@envoy_api//envoy/type:pkg_cc_proto",
     ],
 )
 
@@ -80,6 +82,5 @@ envoy_cc_library(
         "//source/extensions/filters/network/dubbo_proxy:protocol_interface",
         "//source/extensions/filters/network/dubbo_proxy:serializer_interface",
         "//source/extensions/filters/network/dubbo_proxy/filters:filter_interface",
-        "@envoy_api//envoy/config/filter/network/dubbo_proxy/v2alpha1:pkg_cc_proto",
     ],
 )
