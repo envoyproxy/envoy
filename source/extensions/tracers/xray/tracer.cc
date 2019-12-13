@@ -61,7 +61,7 @@ void Span::setId(uint64_t id) { id_ = Hex::uint64ToHex(id); }
 
 void Span::finishSpan() {
   using std::chrono::time_point_cast;
-  using namespace envoy::tracers::xray;
+  using namespace source::extensions::tracers::xray;
   // X-Ray expects timestamps to be in epoch seconds with milli/micro-second precision as a fraction
   using SecondsWithFraction = std::chrono::duration<double>;
   if (!sampled()) {
