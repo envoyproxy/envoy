@@ -508,7 +508,9 @@ std::string MessageUtil::CodeEnumToString(ProtobufUtil::error::Code code) {
 
 namespace {
 
-// Recursive helper method for MessageUtil::redact() below.
+// Recursive helper method for MessageUtil::redact() below. Note that we have to keep track of
+// whether an ancestor was marked as `sensitive`, not just the field, because of cases like
+// `TlsContext::private_key`, which is of type `core.DataSource` rather than `string`.
 void redactInPlace(Protobuf::Message* message, bool ancestor_is_sensitive) {
   // If the message is an `Any`, we have to first unpack it to its original type to redact it...
   auto* any = dynamic_cast<ProtobufWkt::Any*>(message);
@@ -520,6 +522,14 @@ void redactInPlace(Protobuf::Message* message, bool ancestor_is_sensitive) {
     const std::string type_name = type_url.substr(last_slash + 1);
     const auto* descriptor =
         Protobuf::DescriptorPool::generated_pool()->FindMessageTypeByName(type_name);
+
+    // If the type URL doesn't correspond to a known proto, give up redacting and treat this
+    // message the same as a `ProtobufWkt::Struct`. See the documented limitation on
+    // `MessageUtil::redact()` for more context.
+    if (descriptor == nullptr) {
+      ENVOY_LOG_MISC(warn, "Could not redact message with unknown type URL {}", type_url);
+      return;
+    }
 
     // 2. Instantiate a mutable message of the correct dynamic type, and unpack the `Any` into it.
     Protobuf::DynamicMessageFactory dmf;

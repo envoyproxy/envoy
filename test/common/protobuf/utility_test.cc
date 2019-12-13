@@ -259,6 +259,92 @@ TEST_F(ProtobufUtilityTest, LoadTextProtoFromFile_Failure) {
                                 "\" as a text protobuf (type envoy.config.bootstrap.v2.Bootstrap)");
 }
 
+TEST_F(ProtobufUtilityTest, RedactMessage) {
+  envoy::config::bootstrap::v2::Bootstrap original;
+  TestUtility::loadFromYaml(R"EOF(
+static_resources:
+  secrets:
+    - tls_certificate:
+        certificate_chain:
+          inline_string: This field is not sensitive.
+        private_key:
+          inline_string: This field should be redacted!
+        password:
+          inline_string: This field should also be redacted!
+)EOF",
+                            original);
+
+  envoy::config::bootstrap::v2::Bootstrap expected;
+  TestUtility::loadFromYaml(R"EOF(
+static_resources:
+  secrets:
+    - tls_certificate:
+        certificate_chain:
+          inline_string: This field is not sensitive.
+        private_key:
+          inline_string: '[redacted]'
+        password:
+          inline_string: '[redacted]'
+)EOF",
+                            expected);
+
+  EXPECT_TRUE(TestUtility::protoEqual(expected, *MessageUtil::redact(original)));
+}
+
+TEST_F(ProtobufUtilityTest, RedactAnyWithKnownTypeUrl) {
+  ProtobufWkt::Any original;
+  TestUtility::loadFromYaml(R"EOF(
+"@type": type.googleapis.com/envoy.config.bootstrap.v2.Bootstrap
+static_resources:
+  secrets:
+    - tls_certificate:
+        certificate_chain:
+          inline_string: This field is not sensitive.
+        private_key:
+          inline_string: This field should be redacted!
+        password:
+          inline_string: This field should also be redacted!
+)EOF",
+                            original);
+
+  ProtobufWkt::Any expected;
+  TestUtility::loadFromYaml(R"EOF(
+"@type": type.googleapis.com/envoy.config.bootstrap.v2.Bootstrap
+static_resources:
+  secrets:
+    - tls_certificate:
+        certificate_chain:
+          inline_string: This field is not sensitive.
+        private_key:
+          inline_string: '[redacted]'
+        password:
+          inline_string: '[redacted]'
+)EOF",
+                            expected);
+
+  EXPECT_TRUE(TestUtility::protoEqual(expected, *MessageUtil::redact(original)));
+}
+
+TEST_F(ProtobufUtilityTest, RedactAnyWithUnknownTypeUrl) {
+  ProtobufWkt::Any original;
+  TestUtility::loadFromYaml(R"EOF(
+"@type": type.googleapis.com/envoy.config.bootstrap.v2.Bootstrap
+static_resources:
+  secrets:
+    - tls_certificate:
+        certificate_chain:
+          inline_string: This field is not sensitive.
+        private_key:
+          inline_string: This field could be sensitive, but we have no way of knowing!
+        password:
+          inline_string: The point of this test is that redact shouldn't crash.
+)EOF",
+                            original);
+  original.set_type_url("type.googleapis.com/envoy.unknown.Message");
+
+  EXPECT_TRUE(TestUtility::protoEqual(original, *MessageUtil::redact(original)));
+}
+
 TEST_F(ProtobufUtilityTest, KeyValueStruct) {
   const ProtobufWkt::Struct obj = MessageUtil::keyValueStruct("test_key", "test_value");
   EXPECT_EQ(obj.fields_size(), 1);
