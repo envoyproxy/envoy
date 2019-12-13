@@ -255,7 +255,7 @@ class ServicesHolder:
     self.kafka_tmp_dir = None
 
     self.envoy_worker = None
-    self.zookeeper_worker = None
+    self.zk_worker = None
     self.kafka_worker = None
 
   @staticmethod
