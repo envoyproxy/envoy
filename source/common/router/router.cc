@@ -555,7 +555,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
   // runtime keys.
   for (const auto& shadow_policy : route_entry_->shadowPolicies()) {
     if (FilterUtility::shouldShadow(shadow_policy, config_.runtime_, callbacks_->streamId())) {
-      active_shadow_policies_.push_back(std::cref(*shadow_policy.get()));
+      active_shadow_policies_.push_back(std::cref(*shadow_policy));
     }
   }
 
