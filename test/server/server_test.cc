@@ -254,7 +254,7 @@ private:
   Stats::Counter& stats_flushed_;
 };
 
-// Custom StatsSinFactory that creates CustomStatsSink.
+// Custom StatsSinkFactory that creates CustomStatsSink.
 class CustomStatsSinkFactory : public Server::Configuration::StatsSinkFactory {
 public:
   // StatsSinkFactory
@@ -955,6 +955,55 @@ TEST_P(StaticValidationTest, NetworkFilterUnknownField) {
 
 TEST_P(StaticValidationTest, ClusterUnknownField) {
   EXPECT_TRUE(validate("cluster_unknown_field.yaml"));
+}
+
+// Custom StatsSink that registers both a Cluster update callback and Server lifecycle callback.
+class CallbacksStatsSink : public Stats::Sink, public Upstream::ClusterUpdateCallbacks {
+public:
+  CallbacksStatsSink(Server::Instance& server)
+      : cluster_removal_cb_handle_(
+            server.clusterManager().addThreadLocalClusterUpdateCallbacks(*this)),
+        lifecycle_cb_handle_(server.lifecycleNotifier().registerCallback(
+            ServerLifecycleNotifier::Stage::ShutdownExit,
+            [this]() { cluster_removal_cb_handle_.reset(); })) {}
+
+  // Stats::Sink
+  void flush(Stats::MetricSnapshot&) override {}
+  void onHistogramComplete(const Stats::Histogram&, uint64_t) override {}
+
+  // Upstream::ClusterUpdateCallbacks
+  void onClusterAddOrUpdate(Upstream::ThreadLocalCluster&) override {}
+  void onClusterRemoval(const std::string&) override {}
+
+private:
+  Upstream::ClusterUpdateCallbacksHandlePtr cluster_removal_cb_handle_;
+  ServerLifecycleNotifier::HandlePtr lifecycle_cb_handle_;
+};
+
+class CallbacksStatsSinkFactory : public Server::Configuration::StatsSinkFactory {
+public:
+  // StatsSinkFactory
+  Stats::SinkPtr createStatsSink(const Protobuf::Message&, Server::Instance& server) override {
+    return std::make_unique<CallbacksStatsSink>(server);
+  }
+
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return ProtobufTypes::MessagePtr{new Envoy::ProtobufWkt::Empty()};
+  }
+
+  std::string name() override { return "envoy.callbacks_stats_sink"; }
+};
+
+REGISTER_FACTORY(CallbacksStatsSinkFactory, Server::Configuration::StatsSinkFactory);
+
+// This test ensures that a stats sink can use cluster update callbacks properly. Using only a
+// cluster update callback is insufficient to protect against double-free bugs, so a server
+// lifecycle callback is also used to ensure that the cluster update callback is freed during
+// Server::Instance's destruction. See issue #9292 for more details.
+TEST_P(ServerInstanceImplTest, CallbacksStatsSinkTest) {
+  initialize("test/server/callbacks_stats_sink_bootstrap.yaml");
+  // Necessary to trigger server lifecycle callbacks, otherwise only terminate() is called.
+  server_->shutdown();
 }
 
 } // namespace

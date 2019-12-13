@@ -212,6 +212,7 @@ envoy_cc_library(
     external_deps = ["tclap"],
     deps = [
         "//include/envoy/network:address_interface",
+        "//include/envoy/registry",
         "//include/envoy/server:options_interface",
         "//include/envoy/stats:stats_interface",
         "//source/common/api:os_sys_calls_lib",

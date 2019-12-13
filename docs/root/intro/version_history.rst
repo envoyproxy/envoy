@@ -25,6 +25,7 @@ Version history
 * router: allow using a :ref:`query parameter
   <envoy_api_field_route.RouteAction.HashPolicy.query_parameter>` for HTTP consistent hashing.
 * router: skip the Location header when the response code is not a 201 or a 3xx.
+* server: added the :option:`--disable-extensions` CLI option, to disable extensions at startup.
 * router: exposed DOWNSTREAM_REMOTE_ADDRESS as custom HTTP request/response headers.
 * router check tool: added support for testing and marking coverage for routes of runtime fraction 0.
 * server: fixed a bug in config validation for configs with runtime layers
@@ -35,6 +36,7 @@ Version history
 * tls: remove TLS 1.0 and 1.1 from client defaults
 * tracing: added the ability to set custom tags on both the :ref:`HTTP connection manager<envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.tracing>` and the :ref:`HTTP route <envoy_api_field_route.Route.tracing>`.
 * tracing: added upstream_address tag.
+* tracing: added initial support for AWS X-Ray (local sampling rules only) :ref:`X-Ray Tracing <envoy_api_msg_config.trace.v2alpha.XRayConfig>`.
 * udp: added initial support for :ref:`UDP proxy <config_udp_listener_filters_udp_proxy>`
 
 1.12.2 (December 10, 2019)
