@@ -555,6 +555,20 @@ int ConnectionImpl::onHeadersCompleteBase() {
     }
   }
 
+  // Per https://tools.ietf.org/html/rfc7230#section-3.3.1 Envoy should reject
+  // transfer-codings it does not understand.
+  if (current_header_map_->TransferEncoding()) {
+    absl::string_view encoding = current_header_map_->TransferEncoding()->value().getStringView();
+    if (Runtime::runtimeFeatureEnabled(
+            "envoy.reloadable_features.reject_unsupported_transfer_encodings") &&
+        encoding != Headers::get().TransferEncodingValues.Identity &&
+        encoding != Headers::get().TransferEncodingValues.Chunked) {
+      error_code_ = Http::Code::NotImplemented;
+      sendProtocolError();
+      throw CodecProtocolException("http/1.1 protocol error: unsupported transfer encoding");
+    }
+  }
+
   int rc = onHeadersComplete(std::move(current_header_map_));
   current_header_map_.reset();
   header_parsing_state_ = HeaderParsingState::Done;

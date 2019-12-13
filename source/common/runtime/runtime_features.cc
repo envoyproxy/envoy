@@ -31,6 +31,7 @@ constexpr const char* runtime_features[] = {
     "envoy.reloadable_features.connection_header_sanitization",
     "envoy.reloadable_features.strict_header_validation",
     "envoy.reloadable_features.strict_authority_validation",
+    "envoy.reloadable_features.reject_unsupported_transfer_encodings",
 };
 
 // This is a section for officially sanctioned runtime features which are too
