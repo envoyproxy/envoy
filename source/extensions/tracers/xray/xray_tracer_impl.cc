@@ -12,8 +12,9 @@ namespace Extensions {
 namespace Tracers {
 namespace XRay {
 
-constexpr static char DefaultDaemonEndpoint[] = "127.0.0.1:2000";
-static XRayHeader parseXRayHeader(const Http::LowerCaseString& header) {
+namespace {
+constexpr auto DefaultDaemonEndpoint = "127.0.0.1:2000";
+XRayHeader parseXRayHeader(const Http::LowerCaseString& header) {
   const auto& lowered_header = header.get();
   XRayHeader result;
   for (const auto& token : StringUtil::splitToken(lowered_header, ";")) {
@@ -34,6 +35,7 @@ static XRayHeader parseXRayHeader(const Http::LowerCaseString& header) {
   }
   return result;
 }
+} // namespace
 
 Driver::Driver(const XRayConfiguration& config, Server::Instance& server)
     : xray_config_(config), tls_slot_ptr_(server.threadLocal().allocateSlot()) {
