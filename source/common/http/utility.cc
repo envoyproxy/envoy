@@ -2,11 +2,12 @@
 
 #include <http_parser.h>
 
-#include <cctype>
 #include <cstdint>
+#include <cstring>
 #include <string>
 #include <vector>
 
+#include "envoy/common/exception.h"
 #include "envoy/http/header_map.h"
 
 #include "common/buffer/buffer_impl.h"
@@ -751,36 +752,18 @@ std::string Utility::PercentEncoding::decode(absl::string_view encoded) {
   return decoded;
 }
 
-class MalformedAuthority {
-  static void throwException(absl::string_view authority) {
-    throw EnvoyException(fmt::format("malformed authority: {}", authority));
-  }
-
-  friend absl::string_view Utility::hostFromAuthority(absl::string_view authority);
-};
-
 absl::string_view Utility::hostFromAuthority(absl::string_view authority) {
-  bool ipv6_flag = false;
-
-  if (authority.find("[") != absl::string_view::npos) {
-    ipv6_flag = true;
-  }
-
-  auto bracket_close_pos = authority.rfind("]");
-  if (ipv6_flag) {
-    if (bracket_close_pos != absl::string_view::npos) {
-      return authority.substr(1, bracket_close_pos - 1);
+  if (authority[0] == '[') {
+    auto close_bracket_pos = authority.rfind("]");
+    if (close_bracket_pos) {
+      return authority.substr(1, close_bracket_pos - 1);
     } else {
-      MalformedAuthority::throwException(authority);
+      throw EnvoyException(fmt::format("malformed authority: {}", authority));
     }
   }
 
-  auto comma_pos = authority.rfind(":");
-  if (comma_pos != absl::string_view::npos) {
-    return authority.substr(0, comma_pos);
-  } else {
-    return authority;
-  }
+  auto port_flag_pos = authority.rfind(":");
+  return authority.substr(0, port_flag_pos);
 }
 
 absl::optional<absl::string_view> Utility::portFromAuthority(absl::string_view authority) {
@@ -788,18 +771,45 @@ absl::optional<absl::string_view> Utility::portFromAuthority(absl::string_view a
   if (pos == absl::string_view::npos) {
     return absl::nullopt;
   }
+
+  // port section may be not include more than 5 digits, so that should be treated as malformed
+  if (authority.substr(pos + 1).size() > 5) {
+    throw EnvoyException(fmt::format("malformed authority: {}", authority));
+  }
   return authority.substr(pos + 1);
 }
 
+void Utility::AttributeUpdater(AuthorityAttributes& auth_attr, absl::string_view authority,
+                               bool with_port) {
+  try {
+    if (with_port) {
+      const Network::Address::InstanceConstSharedPtr instance =
+          Network::Utility::parseInternetAddressAndPort(authority);
+      auth_attr.host = Http::Utility::hostFromAuthority(authority);
+      auth_attr.port = instance->ip()->port();
+      auth_attr.is_ip_address = true;
+    } else {
+      auto extracted_host = Http::Utility::hostFromAuthority(authority);
+      Network::Utility::parseInternetAddress(extracted_host);
+      auth_attr.host = extracted_host;
+    }
+    auth_attr.is_ip_address = true;
+  } catch (const EnvoyException&) {
+  }
+}
+
 const Utility::AuthorityAttributes Utility::parseAuthority(absl::string_view authority) {
+  // the number of length of DNS host name is restricted less than 255 octets, according to
+  // RFC1035(https://tools.ietf.org/html/rfc1035#section-2.3.4) if target authority has very
+  // long(more than 256) bytes, it may cause CPU burning because of string traversal so we should
+  // treat these authority as malformed
+  if (strlen(std::string(authority).c_str()) > 255) {
+    throw EnvoyException(fmt::format("malformed authority: {}", authority));
+  }
+
   Utility::AuthorityAttributes auth_attr;
   auth_attr.port = absl::nullopt;
   auth_attr.host = authority;
-
-  bool is_ipv4 = true;
-  bool is_ipv6 = false;
-  bool have_port_ipv4 = false;
-  bool have_port_ipv6 = false;
 
   // This section applies first-match-wins algorithm described from
   // RFC3986(https://tools.ietf.org/html/rfc3986#section-3.2.2). Host literal include IP-literal,
@@ -809,71 +819,22 @@ const Utility::AuthorityAttributes Utility::parseAuthority(absl::string_view aut
   // check if passed authority matches IP-literal. IP-literal is constructed from bracket symbols
   // and IPv6 address or future version of ip address. In this case, future version of ip address
   // should be ignored
-  if (authority.find("[") != absl::string_view::npos) {
-    is_ipv6 = true;
-  }
-
-  if (authority.rfind("]:") != absl::string_view::npos && is_ipv6) {
-    have_port_ipv6 = true;
-  }
-
-  // check if passed authority matches IPv4 Address. IPv4 address is separated four section by dot
-  // deliminator, and each section has characters which is constructed from only digits
-  int delim_count = 0;
-  for (auto&& ch : authority) {
-    if (ch == '.') {
-      ++delim_count;
-      continue;
+  if (authority[0] == '[') {
+    if (authority.rfind("]:") != absl::string_view::npos) {
+      AttributeUpdater(auth_attr, authority, true);
+    } else {
+      AttributeUpdater(auth_attr, authority, false);
     }
-    if (ch == ':') {
-      break;
-    }
-    if (!std::isdigit(static_cast<unsigned char>(ch))) {
-      is_ipv4 = false;
-      break;
-    }
-  }
-
-  if (delim_count != 3) {
-    is_ipv4 = false;
-  }
-
-  if (is_ipv4 && authority.find(":") != absl::string_view::npos) {
-    have_port_ipv4 = true;
-  }
-
-  if (have_port_ipv6 || have_port_ipv4) {
-    try {
-      const Network::Address::InstanceConstSharedPtr instance =
-          Network::Utility::parseInternetAddressAndPort(authority);
-      auth_attr.host = Http::Utility::hostFromAuthority(authority);
-      auth_attr.port = instance->ip()->port();
-      auth_attr.is_ip_address = true;
-    } catch (const EnvoyException&) {
-    }
-
     return auth_attr;
   }
 
-  if (is_ipv6) {
+  if (Network::Utility::isIpv4Address(authority)) {
     try {
-      auto extracted_host = Http::Utility::hostFromAuthority(authority);
-      const Network::Address::InstanceConstSharedPtr instance =
-          Network::Utility::parseInternetAddress(extracted_host);
-      auth_attr.host = extracted_host;
-      auth_attr.is_ip_address = true;
-    } catch (const EnvoyException&) {
-    }
-
-    return auth_attr;
-  }
-
-  if (is_ipv4) {
-    try {
-      const Network::Address::InstanceConstSharedPtr instance =
-          Network::Utility::parseInternetAddress(authority);
-      auth_attr.host = Http::Utility::hostFromAuthority(authority);
-      auth_attr.is_ip_address = true;
+      if (authority.find(":") != absl::string_view::npos) {
+        AttributeUpdater(auth_attr, authority, true);
+      } else {
+        AttributeUpdater(auth_attr, authority, false);
+      }
     } catch (const EnvoyException&) {
     }
 

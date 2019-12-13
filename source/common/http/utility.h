@@ -433,6 +433,14 @@ absl::string_view hostFromAuthority(absl::string_view authority);
 absl::optional<absl::string_view> portFromAuthority(absl::string_view authority);
 
 /**
+ * update attributes with authority status
+ * @param auth_attr authority attributes want to update
+ * @param authority target authority
+ * @param with_port whether target authority has port
+ */
+void AttributeUpdater(AuthorityAttributes& auth_attr, absl::string_view authority, bool with_port);
+
+/**
  * Parse passed authority, and get that is valid FQDN or IPv4/IPv6 address, hostname and port-name.
  * @param host host/authority
  * @param default_port If passed authority does not have port, this value is returned
