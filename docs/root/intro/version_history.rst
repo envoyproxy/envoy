@@ -25,6 +25,7 @@ Version history
 * router: allow using a :ref:`query parameter
   <envoy_api_field_route.RouteAction.HashPolicy.query_parameter>` for HTTP consistent hashing.
 * router: skip the Location header when the response code is not a 201 or a 3xx.
+* server: added the :option:`--disable-extensions` CLI option, to disable extensions at startup.
 * router: exposed DOWNSTREAM_REMOTE_ADDRESS as custom HTTP request/response headers.
 * router check tool: added support for testing and marking coverage for routes of runtime fraction 0.
 * server: fixed a bug in config validation for configs with runtime layers

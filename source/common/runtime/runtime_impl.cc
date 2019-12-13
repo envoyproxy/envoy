@@ -39,7 +39,8 @@ bool isLegacyFeature(absl::string_view feature) {
 }
 
 bool isRuntimeFeature(absl::string_view feature) {
-  return absl::StartsWith(feature, "envoy.reloadable_features.");
+  return RuntimeFeaturesDefaults::get().enabledByDefault(feature) ||
+         RuntimeFeaturesDefaults::get().existsButDisabled(feature);
 }
 
 } // namespace
