@@ -18,8 +18,6 @@ namespace Common {
 namespace Wasm {
 namespace Null {
 
-std::atomic<int> active_vms_;
-
 WasmVmPtr NullVm::clone() {
   auto cloned_null_vm = std::make_unique<NullVm>(*this);
   cloned_null_vm->load(plugin_name_, false /* unused */);
