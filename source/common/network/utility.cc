@@ -122,7 +122,7 @@ Address::InstanceConstSharedPtr Utility::parseInternetAddress(absl::string_view 
     return std::make_shared<Address::Ipv6Instance>(sa6, v6only);
   }
   sockaddr_in sa4;
-  if (inet_pton(AF_INET, ip_address.data(), &sa4.sin_addr) == 1) {
+  if (inet_pton(AF_INET, std::string(ip_address).c_str(), &sa4.sin_addr) == 1) {
     sa4.sin_family = AF_INET;
     sa4.sin_port = htons(port);
     return std::make_shared<Address::Ipv4Instance>(&sa4);
@@ -600,6 +600,33 @@ Api::IoErrorPtr Utility::readPacketsFromSocket(IoHandle& handle,
           debug, "Kernel dropped {} more packets. Consider increase receive buffer size.", delta);
     }
   } while (true);
+}
+
+bool Utility::isIpv4Address(absl::string_view address) {
+  int delim_count = 0;
+  std::string dec_octet;
+
+  for (auto&& ch : address) {
+    if (ch == '.') {
+      uint32_t num_octet;
+      if (!absl::SimpleAtoi(dec_octet, &num_octet) || num_octet > 255) {
+        return false;
+      }
+      dec_octet.clear();
+      ++delim_count;
+      continue;
+    }
+    if (ch == ':') {
+      break;
+    }
+    dec_octet += ch;
+  }
+
+  if (delim_count != 3) {
+    return false;
+  }
+
+  return true;
 }
 
 } // namespace Network

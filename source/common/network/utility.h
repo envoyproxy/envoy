@@ -341,6 +341,15 @@ public:
                                                UdpPacketProcessor& udp_packet_processor,
                                                TimeSource& time_source, uint32_t& packets_dropped);
 
+  /**
+   * check if passed authority matches IPv4 Address. IPv4 address is separated four sections by dot
+   * deliminator, and each section has characters which is constructed from only digits
+   * the range of these digits are 0~255
+   *
+   * @param address target address
+   */
+  static bool isIpv4Address(absl::string_view address);
+
 private:
   static void throwWithMalformedIp(absl::string_view ip_address);
 

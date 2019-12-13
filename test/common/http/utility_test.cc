@@ -777,7 +777,7 @@ TEST(HttpUtility, CheckIsIpAddress) {
     const auto& try_host = std::get<1>(pattern);
     const auto& expect_host = std::get<2>(pattern);
     const auto& expect_port = std::get<3>(pattern);
-
+    std::cout << try_host << std::endl;
     const auto host_attributes = Utility::parseAuthority(try_host);
 
     EXPECT_EQ(status_pattern, host_attributes.is_ip_address);
