@@ -21,7 +21,7 @@
 /**
  * Called when the VM starts for each plugin.
  * @param root_context_id is an identifier for one or more related plugins and their corresponding
- * proxy_on_configure(), proxy_on_done() and proxy_on_delete() calls. It is also be provided during
+ * proxy_on_configure(), proxy_on_done() and proxy_on_delete() calls. It is also provided during
  * creation of stream context for those plugins.
  * @param vm_configuration_size is the size of any configuration available via
  * proxy_get_configuration during the lifetime of this call.
