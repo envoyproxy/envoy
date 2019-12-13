@@ -237,8 +237,6 @@ envoy_cc_test(
         "//source/common/network:socket_option_lib",
         "//source/common/network:utility_lib",
         "//source/common/protobuf",
-        "//source/extensions/filters/listener/original_dst:config",
-        "//source/extensions/filters/listener/tls_inspector:config",
         "//source/extensions/filters/network/http_connection_manager:config",
         "//source/extensions/transport_sockets/raw_buffer:config",
         "//source/extensions/transport_sockets/tls:config",
