@@ -5,14 +5,16 @@ package envoy.config.filter.http.cache.v3alpha;
 option java_package = "io.envoyproxy.envoy.config.filter.http.cache.v3alpha";
 option java_outer_classname = "CacheProto";
 option java_multiple_files = true;
+
+import "validate/validate.proto";
+
 // [#protodoc-title: HTTP Cache Filter]
 // `Design<https://docs.google.com/document/d/1WPuim_GzhfdsnIj_tf-fIeutK0jO4aVQfVrLJFoLN3g/view>`_
 // [#proto-status: experimental]
 
 message Cache {
-
   // Name of cache implementation to use.
-  string name = 1;
+  string name = 1 [(validate.rules).string = {min_bytes: 1}];
 
   // List of allowed Vary headers. These headers will be provided to caches in lookups, and the
   // cache filter will only insert responses whose Vary headers (if any) are all in this list. For

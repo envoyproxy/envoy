@@ -31,9 +31,7 @@ TEST_F(CacheFilterFactoryTest, Basic) {
 }
 
 TEST_F(CacheFilterFactoryTest, NoName) {
-  Http::FilterFactoryCb cb = factory_.createFilterFactoryFromProto(config_, "stats", context_);
-  EXPECT_THROW(cb(filter_callback_), ProtoValidationException);
-  ;
+  EXPECT_THROW(factory_.createFilterFactoryFromProto(config_, "stats", context_), EnvoyException);
 }
 
 TEST_F(CacheFilterFactoryTest, UnregisteredName) {
