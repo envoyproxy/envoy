@@ -6,6 +6,7 @@
 
 #include "envoy/common/exception.h"
 #include "envoy/config/bootstrap/v2/bootstrap.pb.h"
+#include "envoy/registry/registry.h"
 #include "envoy/server/options.h"
 
 #include "common/common/logger.h"
@@ -134,7 +135,17 @@ public:
   Server::CommandLineOptionsPtr toCommandLineOptions() const override;
   void parseComponentLogLevels(const std::string& component_log_levels);
   bool cpusetThreadsEnabled() const override { return cpuset_threads_; }
+  const std::vector<std::string>& disabledExtensions() const override {
+    return disabled_extensions_;
+  }
   uint32_t count() const;
+
+  /**
+   * disableExtensions parses the given set of extension names of
+   * the form $CATEGORY/$NAME, and disables the corresponding extension
+   * factories.
+   */
+  static void disableExtensions(const std::vector<std::string>&);
 
 private:
   void logError(const std::string& error) const;
@@ -167,6 +178,7 @@ private:
   bool mutex_tracing_enabled_;
   bool cpuset_threads_;
   bool fake_symbol_table_enabled_;
+  std::vector<std::string> disabled_extensions_;
   uint32_t count_;
 };
 

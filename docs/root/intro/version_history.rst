@@ -13,6 +13,7 @@ Version history
 * ext_authz: added :ref:`configurable ability<envoy_api_field_config.filter.http.ext_authz.v2.ExtAuthz.include_peer_certificate>` to send the :ref:`certificate<envoy_api_field_service.auth.v2.AttributeContext.Peer.certificate>` to the `ext_authz` service.
 * health check: gRPC health checker sets the gRPC deadline to the configured timeout duration.
 * http: added the ability to sanitize headers nominated by the Connection header. This new behavior is guarded by envoy.reloadable_features.connection_header_sanitization which defaults to true.
+* http: blocks unsupported transfer-encodings. Can be reverted temporarily by setting runtime feature `envoy.reloadable_features.reject_unsupported_transfer_encodings` to false.
 * http: support :ref:`auto_host_rewrite_header<envoy_api_field_config.filter.http.dynamic_forward_proxy.v2alpha.PerRouteConfig.auto_host_rewrite_header>` in the dynamic forward proxy.
 * jwt_authn: added :ref:`bypass_cors_preflight<envoy_api_field_config.filter.http.jwt_authn.v2alpha.JwtAuthentication.bypass_cors_preflight>` to allow bypassing the CORS preflight request.
 * lb_subset_config: new fallback policy for selectors: :ref:`KEYS_SUBSET<envoy_api_enum_value_Cluster.LbSubsetConfig.LbSubsetSelector.LbSubsetSelectorFallbackPolicy.KEYS_SUBSET>`
@@ -25,6 +26,7 @@ Version history
 * router: allow using a :ref:`query parameter
   <envoy_api_field_route.RouteAction.HashPolicy.query_parameter>` for HTTP consistent hashing.
 * router: skip the Location header when the response code is not a 201 or a 3xx.
+* server: added the :option:`--disable-extensions` CLI option, to disable extensions at startup.
 * router: exposed DOWNSTREAM_REMOTE_ADDRESS as custom HTTP request/response headers.
 * router check tool: added support for testing and marking coverage for routes of runtime fraction 0.
 * server: fixed a bug in config validation for configs with runtime layers

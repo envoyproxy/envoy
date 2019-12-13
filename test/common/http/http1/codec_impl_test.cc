@@ -200,6 +200,64 @@ TEST_F(Http1ServerConnectionImplTest, EmptyHeader) {
   EXPECT_EQ(0U, buffer.length());
 }
 
+TEST_F(Http1ServerConnectionImplTest, IdentityEncoding) {
+  initialize();
+
+  InSequence sequence;
+
+  Http::MockStreamDecoder decoder;
+  EXPECT_CALL(callbacks_, newStream(_, _)).WillOnce(ReturnRef(decoder));
+
+  TestHeaderMapImpl expected_headers{
+      {":path", "/"},
+      {":method", "GET"},
+      {"transfer-encoding", "identity"},
+  };
+  EXPECT_CALL(decoder, decodeHeaders_(HeaderMapEqual(&expected_headers), true)).Times(1);
+  Buffer::OwnedImpl buffer("GET / HTTP/1.1\r\ntransfer-encoding: identity\r\n\r\n");
+  codec_->dispatch(buffer);
+  EXPECT_EQ(0U, buffer.length());
+}
+
+TEST_F(Http1ServerConnectionImplTest, ChunkedBody) {
+  initialize();
+
+  InSequence sequence;
+
+  Http::MockStreamDecoder decoder;
+  EXPECT_CALL(callbacks_, newStream(_, _)).WillOnce(ReturnRef(decoder));
+
+  TestHeaderMapImpl expected_headers{
+      {":path", "/"},
+      {":method", "POST"},
+      {"transfer-encoding", "chunked"},
+  };
+  EXPECT_CALL(decoder, decodeHeaders_(HeaderMapEqual(&expected_headers), false)).Times(1);
+  Buffer::OwnedImpl expected_data("Hello World");
+  EXPECT_CALL(decoder, decodeData(BufferEqual(&expected_data), false)).Times(1);
+  EXPECT_CALL(decoder, decodeData(_, true)).Times(1);
+
+  Buffer::OwnedImpl buffer(
+      "POST / HTTP/1.1\r\ntransfer-encoding: chunked\r\n\r\nb\r\nHello World\r\n0\r\n\r\n");
+  codec_->dispatch(buffer);
+  EXPECT_EQ(0U, buffer.length());
+}
+
+// Currently http_parser does not support chained transfer encodings.
+TEST_F(Http1ServerConnectionImplTest, IdentityAndChunkedBody) {
+  initialize();
+
+  InSequence sequence;
+
+  Http::MockStreamDecoder decoder;
+  EXPECT_CALL(callbacks_, newStream(_, _)).WillOnce(ReturnRef(decoder));
+
+  Buffer::OwnedImpl buffer("POST / HTTP/1.1\r\ntransfer-encoding: "
+                           "identity,chunked\r\n\r\nb\r\nHello World\r\n0\r\n\r\n");
+  EXPECT_THROW_WITH_MESSAGE(codec_->dispatch(buffer), CodecProtocolException,
+                            "http/1.1 protocol error: unsupported transfer encoding");
+}
+
 TEST_F(Http1ServerConnectionImplTest, HostWithLWS) {
   initialize();
 
