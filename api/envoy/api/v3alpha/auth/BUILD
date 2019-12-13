@@ -8,7 +8,6 @@ api_proto_package(
     deps = [
         "//envoy/api/v2/auth:pkg",
         "//envoy/api/v3alpha/core:pkg",
-        "//envoy/protobuf:pkg",
         "@com_github_cncf_udpa//udpa/annotations:pkg",
     ],
 )

@@ -8,7 +8,6 @@ option java_multiple_files = true;
 
 import "envoy/api/v3alpha/core/base.proto";
 import "envoy/api/v3alpha/core/config_source.proto";
-import "envoy/protobuf/descriptor.proto";
 
 import "google/protobuf/any.proto";
 import "google/protobuf/struct.proto";
