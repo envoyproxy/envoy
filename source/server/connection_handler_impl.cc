@@ -137,9 +137,9 @@ ConnectionHandlerImpl::ActiveTcpListener::~ActiveTcpListener() {
     parent_.dispatcher_.deferredDelete(std::move(removed));
   }
 
-  for (auto& tagAndConnections : connections_by_tag_) {
-    ASSERT(tagAndConnections.second != nullptr);
-    auto& connections = tagAndConnections.second->connections_;
+  for (auto& tag_and_connections : connections_by_tag_) {
+    ASSERT(tag_and_connections.second != nullptr);
+    auto& connections = tag_and_connections.second->connections_;
     while (!connections.empty()) {
       connections.front()->connection_->close(Network::ConnectionCloseType::NoFlush);
     }
@@ -332,7 +332,7 @@ void ConnectionHandlerImpl::ActiveTcpListener::newConnection(
   }
 
   auto transport_socket = filter_chain->transportSocketFactory().createTransportSocket(nullptr);
-  auto& active_connections = getOrCreateActiveConnections(filter_chain->getTag());
+  auto& active_connections = getOrCreateActiveConnections(filter_chain->filterChainTag());
   ActiveTcpConnectionPtr active_connection(new ActiveTcpConnection(
       active_connections,
       parent_.dispatcher_.createServerConnection(std::move(socket), std::move(transport_socket)),

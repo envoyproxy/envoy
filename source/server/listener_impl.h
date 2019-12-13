@@ -171,7 +171,6 @@ public:
   Upstream::ClusterManager& clusterManager() override;
   Event::Dispatcher& dispatcher() override;
   Network::DrainDecision& drainDecision() override;
-
   Grpc::Context& grpcContext() override;
   bool healthCheckFailed() override;
   Tracing::HttpTracer& httpTracer() override;

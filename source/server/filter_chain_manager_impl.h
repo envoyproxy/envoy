@@ -28,6 +28,10 @@ public:
   buildFilterChain(const ::envoy::api::v2::listener::FilterChain& filter_chain) const PURE;
 };
 
+// FilterChainFactoryContextImpl is supposed to used by network filter chain.
+// Its lifetime must cover the created network filter chain.
+// Its lifetime should be covered by the owned listeners so as to support replacing the active
+// filter chains in the listener.
 class FilterChainFactoryContextImpl : public Configuration::FilterChainFactoryContext,
                                       public Network::DrainDecision {
 public:
@@ -92,7 +96,6 @@ public:
  * Implementation of FilterChainManager.
  */
 class FilterChainManagerImpl : public Network::FilterChainManager,
-
                                Logger::Loggable<Logger::Id::config> {
 public:
   explicit FilterChainManagerImpl(const Network::Address::InstanceConstSharedPtr& address)
@@ -240,7 +243,7 @@ public:
     return filters_factory_;
   }
 
-  int64_t getTag() const override { return tag_; }
+  int64_t filterChainTag() const override { return tag_; }
 
 private:
   const Network::TransportSocketFactoryPtr transport_socket_factory_;

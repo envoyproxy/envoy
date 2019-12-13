@@ -141,6 +141,8 @@ public:
     return empty_network_filter_factory_;
   }
 
+  int64_t filterChainTag() const override { return 0; }
+
 private:
   const TransportSocketFactoryPtr transport_socket_factory_;
   const std::vector<FilterFactoryCb> empty_network_filter_factory_{};

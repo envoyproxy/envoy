@@ -333,11 +333,9 @@ public:
   virtual const std::vector<FilterFactoryCb>& networkFilterFactories() const PURE;
 
   /**
-   * @return int64_t The tag of the FilterChainFactoryContext which the FilterChain is built from.
-   * The default implementation is provided for those FilterChain not associated with
-   * FilterChainFactoryContext.
+   * @return int64_t the tag the filter chain should use for connection handler tracking.
    */
-  virtual int64_t getTag() const { return 0; }
+  virtual int64_t filterChainTag() const PURE;
 };
 
 using FilterChainSharedPtr = std::shared_ptr<FilterChain>;
@@ -357,8 +355,6 @@ public:
    */
   virtual const FilterChain* findFilterChain(const ConnectionSocket& socket) const PURE;
 };
-
-using FilterChainManagerSharedPtr = std::shared_ptr<FilterChainManager>;
 
 /**
  * Callbacks used by individual UDP listener read filter instances to communicate with the filter
