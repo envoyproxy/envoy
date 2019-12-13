@@ -242,7 +242,8 @@ and the nonce provided by the management server. The version provides Envoy and 
 management server a shared notion of the currently applied configuration,
 as well as a mechanism to ACK/NACK configuration updates.
 
-ACK:
+ACK
+^^^
 
 If the update was successfully applied, the
 :ref:`version_info <envoy_api_field_DiscoveryResponse.version_info>` will be **X**, as indicated
@@ -251,7 +252,8 @@ in the sequence diagram:
 .. figure:: diagrams/simple-ack.svg
    :alt: Version update after ACK
 
-NACK:
+NACK
+^^^^
 
 If Envoy had instead rejected configuration
 update **X**, it would reply with :ref:`error_detail <envoy_api_field_DiscoveryRequest.error_detail>`
