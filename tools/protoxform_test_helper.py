@@ -9,7 +9,7 @@ import sys
 
 
 def PathAndFilename(label):
-  """retrieve actual path and filename from bazel label
+  """Retrieve actual path and filename from bazel label
 
   Args:
     label: bazel label to specify target proto.
@@ -29,7 +29,7 @@ def PathAndFilename(label):
 
 
 def GoldenProtoFile(path, filename, version):
-  """retrieve golden proto file path. In general, those are placed in tools/testdata/protoxform.
+  """Retrieve golden proto file path. In general, those are placed in tools/testdata/protoxform.
 
   Args:
     path: target proto path
@@ -45,7 +45,7 @@ def GoldenProtoFile(path, filename, version):
 
 
 def ResultProtoFile(path, filename, version):
-  """retrieve result proto file path. In general, those are placed in bazel artifacts.
+  """Retrieve result proto file path. In general, those are placed in bazel artifacts.
 
   Args:
     path: target proto path
@@ -63,7 +63,7 @@ def ResultProtoFile(path, filename, version):
 
 
 def Diff(result_file, golden_file):
-  """execute diff command with unified form
+  """Execute diff command with unified form
 
   Args:
     result_file: result proto file
@@ -80,7 +80,7 @@ def Diff(result_file, golden_file):
 
 
 def Run(path, filename, version):
-  """run main execution for protoxform test
+  """Run main execution for protoxform test
 
   Args:
     path: target proto path
