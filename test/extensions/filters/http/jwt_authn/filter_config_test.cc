@@ -37,7 +37,7 @@ rules:
   NiceMock<Server::Configuration::MockFactoryContext> context;
   FilterConfig filter_conf(proto_config, "", context);
 
-  StreamInfo::FilterStateImpl filter_state;
+  StreamInfo::FilterStateImpl filter_state(StreamInfo::FilterState::LifeSpan::FilterChain);
   EXPECT_TRUE(filter_conf.findVerifier(
                   Http::TestHeaderMapImpl{
                       {":method", "GET"},
@@ -80,26 +80,28 @@ filter_state_rules:
   FilterConfig filter_conf(proto_config, "", context);
 
   // Empty filter_state
-  StreamInfo::FilterStateImpl filter_state1;
+  StreamInfo::FilterStateImpl filter_state1(StreamInfo::FilterState::LifeSpan::FilterChain);
   EXPECT_TRUE(filter_conf.findVerifier(Http::TestHeaderMapImpl(), filter_state1) == nullptr);
 
   // Wrong selector
-  StreamInfo::FilterStateImpl filter_state2;
-  filter_state2.setData("jwt_selector",
-                        std::make_unique<Router::StringAccessorImpl>("wrong_selector"),
-                        StreamInfo::FilterState::StateType::ReadOnly);
+  StreamInfo::FilterStateImpl filter_state2(StreamInfo::FilterState::LifeSpan::FilterChain);
+  filter_state2.setData(
+      "jwt_selector", std::make_unique<Router::StringAccessorImpl>("wrong_selector"),
+      StreamInfo::FilterState::StateType::ReadOnly, StreamInfo::FilterState::LifeSpan::FilterChain);
   EXPECT_TRUE(filter_conf.findVerifier(Http::TestHeaderMapImpl(), filter_state2) == nullptr);
 
   // correct selector
-  StreamInfo::FilterStateImpl filter_state3;
+  StreamInfo::FilterStateImpl filter_state3(StreamInfo::FilterState::LifeSpan::FilterChain);
   filter_state3.setData("jwt_selector", std::make_unique<Router::StringAccessorImpl>("selector1"),
-                        StreamInfo::FilterState::StateType::ReadOnly);
+                        StreamInfo::FilterState::StateType::ReadOnly,
+                        StreamInfo::FilterState::LifeSpan::FilterChain);
   EXPECT_TRUE(filter_conf.findVerifier(Http::TestHeaderMapImpl(), filter_state3) != nullptr);
 
   // correct selector
-  StreamInfo::FilterStateImpl filter_state4;
+  StreamInfo::FilterStateImpl filter_state4(StreamInfo::FilterState::LifeSpan::FilterChain);
   filter_state4.setData("jwt_selector", std::make_unique<Router::StringAccessorImpl>("selector2"),
-                        StreamInfo::FilterState::StateType::ReadOnly);
+                        StreamInfo::FilterState::StateType::ReadOnly,
+                        StreamInfo::FilterState::LifeSpan::FilterChain);
   EXPECT_TRUE(filter_conf.findVerifier(Http::TestHeaderMapImpl(), filter_state4) != nullptr);
 }
 

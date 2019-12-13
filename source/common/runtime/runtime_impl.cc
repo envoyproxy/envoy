@@ -24,9 +24,29 @@
 
 namespace Envoy {
 namespace Runtime {
+namespace {
+
+// Before ASSERTS were added to ensure runtime features were restricted to
+// booleans, several integer features were added. isLegacyFeatures exempts
+// existing integer features from the checks until they can be cleaned up.
+// This includes
+// envoy.reloadable_features.max_[request|response]_headers_count from
+// include/envoy/http/codec.h as well as the http2_protocol_options overrides in
+// source/common/http/http2/codec_impl.cc
+bool isLegacyFeature(absl::string_view feature) {
+  return absl::StartsWith(feature, "envoy.reloadable_features.http2_protocol_options.") ||
+         absl::StartsWith(feature, "envoy.reloadable_features.max_re");
+}
+
+bool isRuntimeFeature(absl::string_view feature) {
+  return RuntimeFeaturesDefaults::get().enabledByDefault(feature) ||
+         RuntimeFeaturesDefaults::get().existsButDisabled(feature);
+}
+
+} // namespace
 
 bool runtimeFeatureEnabled(absl::string_view feature) {
-  ASSERT(absl::StartsWith(feature, "envoy.reloadable_features"));
+  ASSERT(isRuntimeFeature(feature));
   if (Runtime::LoaderSingleton::getExisting()) {
     return Runtime::LoaderSingleton::getExisting()->threadsafeSnapshot()->runtimeFeatureEnabled(
         feature);
@@ -220,6 +240,7 @@ bool SnapshotImpl::featureEnabled(const std::string& key, uint64_t default_value
 }
 
 const std::string& SnapshotImpl::get(const std::string& key) const {
+  ASSERT(!isRuntimeFeature(key)); // Make sure runtime guarding is only used for getBoolean
   auto entry = values_.find(key);
   if (entry == values_.end()) {
     return EMPTY_STRING;
@@ -261,6 +282,7 @@ bool SnapshotImpl::featureEnabled(const std::string& key,
 }
 
 uint64_t SnapshotImpl::getInteger(const std::string& key, uint64_t default_value) const {
+  ASSERT(isLegacyFeature(key) || !isRuntimeFeature(key));
   auto entry = values_.find(key);
   if (entry == values_.end() || !entry->second.uint_value_) {
     return default_value;
@@ -270,6 +292,7 @@ uint64_t SnapshotImpl::getInteger(const std::string& key, uint64_t default_value
 }
 
 double SnapshotImpl::getDouble(const std::string& key, double default_value) const {
+  ASSERT(!isRuntimeFeature(key)); // Make sure runtime guarding is only used for getBoolean
   auto entry = values_.find(key);
   if (entry == values_.end() || !entry->second.double_value_) {
     return default_value;

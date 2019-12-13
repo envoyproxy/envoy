@@ -203,6 +203,15 @@ public:
    * @return uint32_t the stream's configured buffer limits.
    */
   virtual uint32_t bufferLimit() PURE;
+
+  /*
+   * @return string_view optionally return the reason behind codec level errors.
+   *
+   * This information is communicated via direct accessor rather than passed with the
+   * CodecProtocolException so that the error can be associated only with the problematic stream and
+   * not associated with every stream on the connection.
+   */
+  virtual absl::string_view responseDetails() { return ""; }
 };
 
 /**

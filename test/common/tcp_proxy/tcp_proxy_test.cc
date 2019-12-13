@@ -751,7 +751,8 @@ TEST(ConfigTest, PerConnectionClusterWithTopLevelMetadataMatchConfig) {
   NiceMock<Network::MockConnection> connection;
   connection.stream_info_.filterState().setData(
       "envoy.tcp_proxy.cluster", std::make_unique<PerConnectionCluster>("filter_state_cluster"),
-      StreamInfo::FilterState::StateType::Mutable);
+      StreamInfo::FilterState::StateType::Mutable,
+      StreamInfo::FilterState::LifeSpan::DownstreamConnection);
 
   const auto route = config_obj.getRouteFromEntries(connection);
   EXPECT_NE(nullptr, route);
@@ -1772,7 +1773,8 @@ TEST_F(TcpProxyRoutingTest, DEPRECATED_FEATURE_TEST(UseClusterFromPerConnectionC
   NiceMock<StreamInfo::MockStreamInfo> stream_info;
   stream_info.filterState().setData("envoy.tcp_proxy.cluster",
                                     std::make_unique<PerConnectionCluster>("filter_state_cluster"),
-                                    StreamInfo::FilterState::StateType::Mutable);
+                                    StreamInfo::FilterState::StateType::Mutable,
+                                    StreamInfo::FilterState::LifeSpan::DownstreamConnection);
   ON_CALL(connection_, streamInfo()).WillByDefault(ReturnRef(stream_info));
   EXPECT_CALL(Const(connection_), streamInfo()).WillRepeatedly(ReturnRef(stream_info));
 
@@ -1792,7 +1794,8 @@ TEST_F(TcpProxyRoutingTest, DEPRECATED_FEATURE_TEST(UpstreamServerName)) {
   NiceMock<StreamInfo::MockStreamInfo> stream_info;
   stream_info.filterState().setData("envoy.network.upstream_server_name",
                                     std::make_unique<UpstreamServerName>("www.example.com"),
-                                    StreamInfo::FilterState::StateType::ReadOnly);
+                                    StreamInfo::FilterState::StateType::ReadOnly,
+                                    StreamInfo::FilterState::LifeSpan::DownstreamConnection);
 
   ON_CALL(connection_, streamInfo()).WillByDefault(ReturnRef(stream_info));
   EXPECT_CALL(Const(connection_), streamInfo()).WillRepeatedly(ReturnRef(stream_info));
@@ -1827,7 +1830,8 @@ TEST_F(TcpProxyRoutingTest, DEPRECATED_FEATURE_TEST(ApplicationProtocols)) {
   stream_info.filterState().setData(
       Network::ApplicationProtocols::key(),
       std::make_unique<Network::ApplicationProtocols>(std::vector<std::string>{"foo", "bar"}),
-      StreamInfo::FilterState::StateType::ReadOnly);
+      StreamInfo::FilterState::StateType::ReadOnly,
+      StreamInfo::FilterState::LifeSpan::DownstreamConnection);
 
   ON_CALL(connection_, streamInfo()).WillByDefault(ReturnRef(stream_info));
   EXPECT_CALL(Const(connection_), streamInfo()).WillRepeatedly(ReturnRef(stream_info));

@@ -41,6 +41,11 @@ void EnvoyQuicClientSession::Initialize() {
   quic_connection_->setEnvoyConnection(*this);
 }
 
+void EnvoyQuicClientSession::OnCanWrite() {
+  quic::QuicSpdyClientSession::OnCanWrite();
+  maybeApplyDelayClosePolicy();
+}
+
 void EnvoyQuicClientSession::OnGoAway(const quic::QuicGoAwayFrame& frame) {
   ENVOY_CONN_LOG(debug, "GOAWAY received with error {}: {}", *this,
                  quic::QuicErrorCodeToString(frame.error_code), frame.reason_phrase);
@@ -72,6 +77,8 @@ EnvoyQuicClientSession::CreateIncomingStream(quic::PendingStream* /*pending*/) {
   // Disallow server initiated stream.
   NOT_REACHED_GCOVR_EXCL_LINE;
 }
+
+bool EnvoyQuicClientSession::hasDataToWrite() { return HasDataToWrite(); }
 
 } // namespace Quic
 } // namespace Envoy
