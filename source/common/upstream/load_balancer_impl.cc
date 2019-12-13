@@ -180,9 +180,9 @@ void LoadBalancerBase::recalculatePerPriorityState(uint32_t priority,
   const uint32_t normalized_total_availability =
       calculateNormalizedTotalAvailability(per_priority_health, per_priority_degraded);
   if (normalized_total_availability == 0) {
-    // Everything is terrible. Send all load to P=0.
-    // In this one case sumEntries(per_priority_load) != 100 since we sinkhole all traffic in P=0.
-    per_priority_load.healthy_priority_load_.get()[0] = 100;
+    // Everything is terrible. There is nothing to calculate here.
+    // Let recalculatePerPriorityPanic and recalculateLoadInTotalPanic deal with
+    // load calculation.
     return;
   }
 
@@ -236,14 +236,16 @@ void LoadBalancerBase::recalculatePerPriorityPanic() {
   const uint64_t panic_threshold = std::min<uint64_t>(
       100, runtime_.snapshot().getInteger(RuntimePanicThreshold, default_healthy_panic_percent_));
 
-  // Panic mode is disabled only when panic_threshold is 0%.
-  if (panic_threshold > 0 && normalized_total_availability == 0) {
-    // Everything is terrible. All load should be to P=0. Turn on panic mode.
-    ASSERT(per_priority_load_.healthy_priority_load_.get()[0] == 100);
-    per_priority_panic_[0] = true;
+  // This is corner case when panic is disabled and there is no hosts available.
+  // But the load must be distributed somewhere.
+  // This is just a placeholder, because no traffic will be directed to
+  // priority 0 anyways, because it is empty.
+  if (panic_threshold == 0 && normalized_total_availability == 0) {
+    per_priority_load_.healthy_priority_load_.get()[0] = 100;
     return;
   }
 
+  bool total_panic = true;
   for (size_t i = 0; i < per_priority_health_.get().size(); ++i) {
     // For each level check if it should run in panic mode. Never set panic mode if
     // normalized total health is 100%, even when individual priority level has very low # of
@@ -251,7 +253,50 @@ void LoadBalancerBase::recalculatePerPriorityPanic() {
     const HostSet& priority_host_set = *priority_set_.hostSetsPerPriority()[i];
     per_priority_panic_[i] =
         (normalized_total_availability == 100 ? false : isGlobalPanic(priority_host_set));
+    total_panic = total_panic && per_priority_panic_[i];
   }
+
+  // If all priority levels are in panic mode, load distribution
+  // is done differently.
+  if (total_panic) {
+    recalculateLoadInTotalPanic();
+  }
+}
+
+// recalculateLoadInTotalPanic method is called when all priority levels
+// are in panic mode. The load distribution is done NOT based on number
+// of healthy hosts in the priority, but based on number of hosts
+// in each priority regardless of its health.
+void LoadBalancerBase::recalculateLoadInTotalPanic() {
+  // first calculate total number of hosts across all priorities regardless
+  // whether they are healthy or not.
+  uint32_t total_hosts_num = 0;
+  for (size_t i = 0; i < per_priority_panic_.size(); i++) {
+    const HostSet& host_set = *priority_set_.hostSetsPerPriority()[i];
+    total_hosts_num += host_set.hosts().size() - host_set.excludedHosts().size();
+  }
+  if (0 == total_hosts_num) {
+    // Backend is empty, but load must be distributed somewhere.
+    per_priority_load_.healthy_priority_load_.get()[0] = 100;
+    return;
+  }
+
+  // Now iterate through all priority levels and calculate how much
+  // load is supposed to go to each priority. In panic mode the calculation
+  // is based n ot on the number of healthy hosts but based on the number of
+  // total hosts in the priority.
+  uint32_t total_load = 100;
+  for (size_t i = 0; i < per_priority_panic_.size(); i++) {
+    const HostSet& host_set = *priority_set_.hostSetsPerPriority()[i];
+    auto hosts_num = host_set.hosts().size() - host_set.excludedHosts().size();
+
+    uint32_t priority_load = 100 * hosts_num / total_hosts_num;
+    per_priority_load_.healthy_priority_load_.get()[i] = priority_load;
+    per_priority_load_.degraded_priority_load_.get()[i] = 0;
+    total_load -= priority_load;
+  }
+  // add to priority zero whatever if left
+  per_priority_load_.healthy_priority_load_.get()[0] += total_load;
 }
 
 std::pair<HostSet&, LoadBalancerBase::HostAvailability>

@@ -59,6 +59,7 @@ protected:
    * requests to hosts regardless of whether they are healthy or not.
    */
   bool isGlobalPanic(const HostSet& host_set);
+  void recalculateLoadInTotalPanic();
 
   LoadBalancerBase(const PrioritySet& priority_set, ClusterStats& stats, Runtime::Loader& runtime,
                    Runtime::RandomGenerator& random,
