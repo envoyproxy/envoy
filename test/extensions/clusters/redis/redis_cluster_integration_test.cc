@@ -575,7 +575,6 @@ TEST_P(RedisClusterWithRefreshIntegrationTest, ClusterSlotRequestAfterFailure) {
   EXPECT_TRUE(
       fake_upstream_connection_2->waitForData(cluster_slots_request.size(), &proxy_to_server));
   EXPECT_EQ(cluster_slots_request, proxy_to_server);
-  expectCallClusterSlot(random_index_, cluster_slot_response);
 
   EXPECT_TRUE(fake_upstream_connection_1->close());
   EXPECT_TRUE(fake_upstream_connection_2->close());
