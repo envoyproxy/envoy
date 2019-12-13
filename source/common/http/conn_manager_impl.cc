@@ -488,10 +488,6 @@ void ConnectionManagerImpl::RdsRouteConfigUpdateRequester::requestRouteConfigUpd
                                                     std::move(route_config_updated_cb));
 }
 
-bool ConnectionManagerImpl::RdsRouteConfigUpdateRequester::canRequestRouteConfigUpdate() {
-  return route_config_provider_->config()->usesVhds();
-}
-
 ConnectionManagerImpl::ActiveStream::ActiveStream(ConnectionManagerImpl& connection_manager)
     : connection_manager_(connection_manager),
       route_config_provider_(connection_manager.config_.routeConfigProvider()),
@@ -1388,8 +1384,11 @@ void ConnectionManagerImpl::ActiveStream::requestRouteConfigUpdate(
                                                            std::move(route_config_updated_cb));
 }
 
-bool ConnectionManagerImpl::ActiveStream::canRequestRouteConfigUpdate() {
-  return route_config_update_requester_->canRequestRouteConfigUpdate();
+absl::optional<Router::ConfigConstSharedPtr> ConnectionManagerImpl::ActiveStream::routeConfig() {
+  if (route_config_provider_ == nullptr) {
+    return {};
+  }
+  return absl::optional<Router::ConfigConstSharedPtr>(route_config_provider_->config());
 }
 
 void ConnectionManagerImpl::ActiveStream::sendLocalReply(
@@ -2283,8 +2282,9 @@ void ConnectionManagerImpl::ActiveStreamDecoderFilter::requestRouteConfigUpdate(
   parent_.requestRouteConfigUpdate(std::move(route_config_updated_cb));
 }
 
-bool ConnectionManagerImpl::ActiveStreamDecoderFilter::canRequestRouteConfigUpdate() {
-  return parent_.canRequestRouteConfigUpdate();
+absl::optional<Router::ConfigConstSharedPtr>
+ConnectionManagerImpl::ActiveStreamDecoderFilter::routeConfig() {
+  return parent_.routeConfig();
 }
 
 Buffer::WatermarkBufferPtr ConnectionManagerImpl::ActiveStreamEncoderFilter::createBuffer() {

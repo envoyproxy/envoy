@@ -10,7 +10,8 @@ namespace HttpFilters {
 namespace OnDemand {
 
 Http::FilterHeadersStatus OnDemandRouteUpdate::decodeHeaders(Http::HeaderMap&, bool) {
-  if (callbacks_->route() != nullptr || !callbacks_->canRequestRouteConfigUpdate()) {
+  if (callbacks_->route() != nullptr ||
+      !(callbacks_->routeConfig().has_value() && callbacks_->routeConfig().value()->usesVhds())) {
     filter_iteration_state_ = Http::FilterHeadersStatus::Continue;
     return filter_iteration_state_;
   }

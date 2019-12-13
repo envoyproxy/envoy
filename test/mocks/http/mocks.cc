@@ -68,7 +68,8 @@ MockStreamDecoderFilterCallbacks::MockStreamDecoderFilterCallbacks() {
                                    absl::string_view details) {
         sendLocalReply_(code, body, modify_headers, grpc_status, details);
       }));
-  ON_CALL(*this, canRequestRouteConfigUpdate()).WillByDefault(Return(false));
+  ON_CALL(*this, routeConfig())
+      .WillByDefault(Return(absl::optional<Router::ConfigConstSharedPtr>()));
 }
 
 MockStreamDecoderFilterCallbacks::~MockStreamDecoderFilterCallbacks() = default;

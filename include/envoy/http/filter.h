@@ -453,7 +453,7 @@ public:
    * @return true if a RouteConfiguration update can be scheduled. Returns false if
    * RouteConfigProvider doesn't support on-demand updates or VHDS hasn't been configured.
    */
-  virtual bool canRequestRouteConfigUpdate() PURE;
+  virtual absl::optional<Router::ConfigConstSharedPtr> routeConfig() PURE;
 };
 
 /**

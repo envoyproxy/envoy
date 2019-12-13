@@ -372,7 +372,7 @@ private:
 
     void requestRouteConfigUpdate(
         Http::RouteConfigUpdatedCallbackSharedPtr route_config_updated_cb) override;
-    bool canRequestRouteConfigUpdate() override;
+    absl::optional<Router::ConfigConstSharedPtr> routeConfig() override;
 
     StreamDecoderFilterSharedPtr handle_;
     bool is_grpc_request_{};
@@ -476,7 +476,6 @@ private:
                                           Http::RouteConfigUpdatedCallbackSharedPtr) {
       NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
     };
-    virtual bool canRequestRouteConfigUpdate() { return false; }
   };
 
   class RdsRouteConfigUpdateRequester : public RouteConfigUpdateRequester {
@@ -486,7 +485,6 @@ private:
     void requestRouteConfigUpdate(
         const HeaderString& host,
         Http::RouteConfigUpdatedCallbackSharedPtr route_config_updated_cb) override;
-    bool canRequestRouteConfigUpdate() override;
 
   private:
     Router::RouteConfigProvider* route_config_provider_;
@@ -618,7 +616,7 @@ private:
     void refreshCachedRoute();
     void
     requestRouteConfigUpdate(Http::RouteConfigUpdatedCallbackSharedPtr route_config_updated_cb);
-    bool canRequestRouteConfigUpdate();
+    absl::optional<Router::ConfigConstSharedPtr> routeConfig();
 
     void refreshCachedTracingCustomTags();
 
