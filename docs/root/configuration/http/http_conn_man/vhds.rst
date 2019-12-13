@@ -42,17 +42,11 @@ If a route for the contents of a host/authority header cannot be resolved, the a
 paused while a
 :ref:`DeltaDiscoveryRequest <envoy_api_msg_DeltaDiscoveryRequest>` is sent.
 When a :ref:`DeltaDiscoveryResponse <envoy_api_msg_DeltaDiscoveryResponse>` is received where one of
-the :ref:`aliases <envoy_api_field_resource.aliases>` in the response exactly matches the
+the :ref:`aliases <envoy_api_field_resource.aliases>` or the 
+:ref:`name <envoy_api_field_resource.name>` in the response exactly matches the
 :ref:`resource_names_subscribe <envoy_api_field_DeltaDiscoveryRequest.resource_names_subscribe>`
 entry from the :ref:`DeltaDiscoveryRequest <envoy_api_msg_DeltaDiscoveryRequest>`, the route
 configuration is updated, the stream is resumed, and processing of the filter chain continues.
-
-If a virtual host is requested and the management server does not know about it, then the management
-server should respond with a :ref:`DeltaDiscoveryResponse <envoy_api_msg_DeltaDiscoveryResponse>` in
-which the :ref:`resources <envoy_api_field_DeltaDiscoveryResponse.resources>` entry for that virtual
-host has the :ref:`name <envoy_api_field_resource.name>` and
-:ref:`aliases <envoy_api_field_resource.aliases>` set to the requested host entry and the resource
-unpopulated. This will allow Envoy to match the requested resource to the response.
 
 Updates to virtual hosts occur in two ways. If a virtual host was originally sent over RDS, then the
 virtual host should be updated over RDS. If a virtual host was subscribed to over VHDS, then updates
