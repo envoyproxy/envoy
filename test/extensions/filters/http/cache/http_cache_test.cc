@@ -10,7 +10,7 @@ namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace Cache {
-TEST(RawByteRangeTest, isSuffix) {
+TEST(RawByteRangeTest, IsSuffix) {
   auto r = RawByteRange(UINT64_MAX, 4);
   ASSERT_TRUE(r.isSuffix());
 }
@@ -30,7 +30,7 @@ TEST(RawByteRangeTest, LastBytePos) {
   ASSERT_EQ(4, r.lastBytePos());
 }
 
-TEST(RawByteRangeTest, suffixLength) {
+TEST(RawByteRangeTest, SuffixLength) {
   auto r = RawByteRange(UINT64_MAX, 4);
   ASSERT_EQ(4, r.suffixLength());
 }
@@ -73,7 +73,7 @@ LookupResult makeLookupResult(const LookupRequest& lookup_request,
       std::make_unique<Http::TestHeaderMapImpl>(response_headers), content_length);
 }
 
-TEST_F(LookupRequestTest, makeLookupResultNoBody) {
+TEST_F(LookupRequestTest, MakeLookupResultNoBody) {
   const LookupRequest lookup_request(request_headers_, current_time_);
   const Http::TestHeaderMapImpl response_headers(
       {{"date", formatter_.fromTime(current_time_)}, {"cache-control", "public, max-age=3600"}});
@@ -86,7 +86,7 @@ TEST_F(LookupRequestTest, makeLookupResultNoBody) {
   EXPECT_FALSE(lookup_response.has_trailers);
 }
 
-TEST_F(LookupRequestTest, makeLookupResultBody) {
+TEST_F(LookupRequestTest, MakeLookupResultBody) {
   const LookupRequest lookup_request(request_headers_, current_time_);
   const Http::TestHeaderMapImpl response_headers(
       {{"date", formatter_.fromTime(current_time_)}, {"cache-control", "public, max-age=3600"}});
@@ -101,7 +101,7 @@ TEST_F(LookupRequestTest, makeLookupResultBody) {
   EXPECT_FALSE(lookup_response.has_trailers);
 }
 
-TEST_F(LookupRequestTest, makeLookupResultNoDate) {
+TEST_F(LookupRequestTest, MakeLookupResultNoDate) {
   const LookupRequest lookup_request(request_headers_, current_time_);
   const Http::TestHeaderMapImpl response_headers({{"cache-control", "public, max-age=3600"}});
   const LookupResult lookup_response = makeLookupResult(lookup_request, response_headers);

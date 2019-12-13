@@ -1,5 +1,6 @@
 #pragma once
 
+#include <iosfwd>
 #include <string>
 #include <vector>
 
@@ -18,7 +19,7 @@ namespace Extensions {
 namespace HttpFilters {
 namespace Cache {
 // Whether a given cache entry is good for the current request.
-enum CacheEntryStatus {
+enum class CacheEntryStatus {
   // This entry is fresh, and an appropriate response to the request.
   Ok,
   // No usable entry was found. If this was generated for a cache entry, the
@@ -32,6 +33,8 @@ enum CacheEntryStatus {
   // This entry is fresh, but can't satisfy the requested range(s).
   UnsatisfiableRange,
 };
+
+std::ostream& operator<<(std::ostream& os, CacheEntryStatus status);
 
 // Byte range from an HTTP request.
 class RawByteRange {

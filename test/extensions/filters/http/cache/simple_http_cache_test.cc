@@ -204,7 +204,7 @@ TEST_F(SimpleHttpCacheTest, StreamingPut) {
   EXPECT_EQ("Hello, World!", getBody(*name_lookup_context, 0, 13));
 }
 
-TEST(Registration, getFactory) {
+TEST(Registration, GetFactory) {
   HttpCacheFactory* factory =
       Registry::FactoryRegistry<HttpCacheFactory>::getFactory("SimpleHttpCache");
   ASSERT_NE(factory, nullptr);

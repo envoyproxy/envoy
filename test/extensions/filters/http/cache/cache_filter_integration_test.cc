@@ -21,7 +21,7 @@ public:
   }
 
   const std::string default_config{R"EOF(
-    name: envoy.cache
+    name: envoy.filters.http.cache
     typed_config:
         "@type": type.googleapis.com/envoy.config.filter.http.cache.v3alpha.Cache
         name: SimpleHttpCache

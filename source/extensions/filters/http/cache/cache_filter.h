@@ -32,6 +32,7 @@ public:
   static CacheFilterSharedPtr make(const envoy::config::filter::http::cache::v3alpha::Cache& config,
                                    const std::string& stats_prefix, Stats::Scope& scope,
                                    TimeSource& time_source) {
+    // Can't use make_shared due to private constructor.
     return std::shared_ptr<CacheFilter>(new CacheFilter(config, stats_prefix, scope, time_source));
   }
   // Http::StreamFilterBase
@@ -66,7 +67,8 @@ private:
   InsertContextPtr insert_;
 
   // Tracks what body bytes still need to be read from the cache. This is
-  // currently only one Range, but will expand when full range support is added. Initialized by onOkHeaders.
+  // currently only one Range, but will expand when full range support is added. Initialized by
+  // onOkHeaders.
   std::vector<AdjustedByteRange> remaining_body_;
 
   // True if the response has trailers.

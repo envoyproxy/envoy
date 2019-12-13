@@ -1,6 +1,7 @@
 #include "extensions/filters/http/cache/http_cache.h"
 
 #include <algorithm>
+#include <ostream>
 
 #include "common/http/headers.h"
 #include "common/protobuf/utility.h"
@@ -13,6 +14,23 @@ namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace Cache {
+
+std::ostream& operator<<(std::ostream& os, CacheEntryStatus status) {
+  switch (status) {
+  case CacheEntryStatus::Ok:
+    return os << "Ok";
+  case CacheEntryStatus::Unusable:
+    return os << "Unusable";
+  case CacheEntryStatus::RequiresValidation:
+    return os << "RequiresValidation";
+  case CacheEntryStatus::FoundNotModified:
+    return os << "FoundNotModified";
+  case CacheEntryStatus::UnsatisfiableRange:
+    return os << "UnsatisfiableRange";
+  }
+  ASSERT(false, "Unreachable");
+  return os;
+}
 
 LookupRequest::LookupRequest(const Http::HeaderMap& request_headers, SystemTime timestamp)
     : timestamp_(timestamp),
