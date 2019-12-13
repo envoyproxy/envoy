@@ -45,20 +45,6 @@ void QuicFilterManagerConnectionImpl::setBufferLimits(uint32_t /*limit*/) {
   NOT_REACHED_GCOVR_EXCL_LINE;
 }
 
-void QuicFilterManagerConnectionImpl::setSocketRecvBufferSize(uint32_t buffer_size) const {
-  // Currently not implemented for QUIC
-  NOT_REACHED_GCOVR_EXCL_LINE;
-}
-
-uint32_t QuicFilterManagerConnectionImpl::getSocketRecvBufferSize() const {
-  // Currently not implemented for QUIC
-  NOT_REACHED_GCOVR_EXCL_LINE;
-}
-void QuicFilterManagerConnectionImpl::setSocketRecvLoWat(uint32_t low_watermark) const {
-  // Currently not implemented for QUIC
-  NOT_REACHED_GCOVR_EXCL_LINE;
-}
-
 bool QuicFilterManagerConnectionImpl::aboveHighWatermark() const {
   return write_buffer_watermark_simulation_.isAboveHighWatermark();
 }

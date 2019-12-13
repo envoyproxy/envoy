@@ -38,6 +38,62 @@ void ConnectionImplUtility::updateBufferStats(uint64_t delta, uint64_t new_total
   }
 }
 
+void DynamicSocketOptions::setSocketRecvBufferSize(IoHandle& io_handle, uint32_t buffer_size) const {
+  if (io_handle.fd() == -1) {
+         ENVOY_CONN_LOG(trace,
+             "Stale socket file handle, operation Set Receive Buffer aborted", *this);
+    return;
+  }
+  // Modify the receive buffer size to 'buffer_size'
+  if (setsockopt(io_handle.fd(), SOL_SOCKET, SO_RCVBUF, &buffer_size, sizeof(uint32_t)) == -1) {
+         ENVOY_CONN_LOG(trace,
+             "Failed to modify socket receive buffer to size: buffer_size={}", *this, buffer_size);
+  }
+}
+
+void DynamicSocketOptions::getSocketRecvBufferSize(IoHandle& io_handle, uint32_t& recv_buf_size) const {
+  uint32_t option_len;
+
+  if (io_handle.fd() == -1) {
+         ENVOY_CONN_LOG(trace,
+             "Stale socket file handle, operation Get Receive Buffer Size aborted", *this);
+  }
+
+  // Read the set receive buffer size as it is double the value configured through
+  // 'setSocketRecvBufferSize' on some machines this value can not be lower than '2304' bytes
+  if (getsockopt(io_handle.fd(), SOL_SOCKET, SO_RCVBUF, &recv_buf_size, &option_len) == -1) {
+         ENVOY_CONN_LOG(trace, "Failed to read socket receive buffer size", *this);
+  }
+}
+
+void DynamicSocketOptions::setSocketRecvLoWat(IoHandle& io_handle, uint32_t low_watermark) const {
+  if (io_handle.fd() == -1) {
+         ENVOY_CONN_LOG(trace,
+             "Stale socket file handle, operation Set Receive Buffer Low Watermark aborted", *this);
+    return;
+  }
+  // Modify the receive buffer low watermark to 'low_watermark' value
+  if (setsockopt(io_handle.fd(), SOL_SOCKET, SO_RCVLOWAT, &low_watermark, sizeof(uint32_t)) == -1) {
+         ENVOY_CONN_LOG(trace,
+             "Failed to set socket receive buffer low watermark size: buffer_size={}", *this, low_watermark);
+  }
+}
+
+void DynamicSocketOptions::getSocketRecvLoWat(IoHandle& io_handle, uint32_t& low_watermark_val) const {
+  uint32_t option_len;
+
+  if (io_handle.fd() == -1) {
+         ENVOY_CONN_LOG(trace,
+             "Stale socket file handle, operation Get Receive Buffer Low Watermark aborted", *this);
+    return;
+  }
+  // Read the receive buffer low watermark value into 'low_watermark_val' variable
+  if (getsockopt(io_handle.fd(), SOL_SOCKET, SO_RCVLOWAT, &low_watermark_val, &option_len) == -1) {
+         ENVOY_CONN_LOG(trace,
+             "Failed to get socket receive buffer low watermark size: buffer_size={}", *this, low_watermark_val);
+  }
+}
+
 std::atomic<uint64_t> ConnectionImpl::next_global_id_;
 
 ConnectionImpl::ConnectionImpl(Event::Dispatcher& dispatcher, ConnectionSocketPtr&& socket,
@@ -425,51 +481,6 @@ void ConnectionImpl::setBufferLimits(uint32_t limit) {
   // would result in respecting the exact buffer limit.
   if (limit > 0) {
     static_cast<Buffer::WatermarkBuffer*>(write_buffer_.get())->setWatermarks(limit + 1);
-  }
-}
-
-void ConnectionImpl::setSocketRecvBufferSize(uint32_t buffer_size) const {
-  if (ioHandle().fd() == -1) {
-         ENVOY_CONN_LOG(trace,
-             "Stale socket file handle, operation Set Receive Buffer aborted", *this);
-    return;
-  }
-  // Modify the receive buffer size to 'buffer_size'
-  if (setsockopt(ioHandle().fd(), SOL_SOCKET, SO_RCVBUF, &buffer_size, sizeof(uint32_t)) == -1) {
-         ENVOY_CONN_LOG(trace,
-             "Failed to modify socket receive buffer to size: buffer_size={}", *this, buffer_size);
-  }
-}
-
-uint32_t ConnectionImpl::getSocketRecvBufferSize() const {
-  uint32_t option_len;
-  uint32_t recv_buf_size = 0;
-
-  if (ioHandle().fd() == -1) {
-         ENVOY_CONN_LOG(trace,
-             "Stale socket file handle, operation Get Receive Buffer Size aborted", *this);
-    return 0;
-  }
-
-  // Read the set receive buffer size as it is double the value configured through
-  // 'setSocketRecvBufferSize' on some machines this value can not be lower than '2304' bytes
-  if (getsockopt(ioHandle().fd(), SOL_SOCKET, SO_RCVBUF, &recv_buf_size, &option_len) == -1) {
-         ENVOY_CONN_LOG(trace, "Failed to read socket receive buffer size", *this);
-  }
-
-  return recv_buf_size;
-}
-
-void ConnectionImpl::setSocketRecvLoWat(uint32_t low_watermark) const {
-  if (ioHandle().fd() == -1) {
-         ENVOY_CONN_LOG(trace,
-             "Stale socket file handle, operation Set Receive Buffer Low Watermark aborted", *this);
-    return;
-  }
-  // Modify the receive buffer low watermark to 'low_watermark' value
-  if (setsockopt(ioHandle().fd(), SOL_SOCKET, SO_RCVLOWAT, &low_watermark, sizeof(uint32_t)) == -1) {
-         ENVOY_CONN_LOG(trace,
-             "Failed to set socket receive buffer low watermark size: buffer_size={}", *this, low_watermark);
   }
 }
 

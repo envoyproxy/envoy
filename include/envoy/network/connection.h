@@ -70,6 +70,52 @@ enum class ConnectionCloseType {
 };
 
 /**
+ * Run-time modifiable connection options to alter socket settings
+ */
+class DynamicSocketOptions : public Logger::Loggable<Logger::Id::connection>{
+public:
+
+  DynamicSocketOptions(uint64_t id):conn_id(id) {}
+
+  virtual ~DynamicSocketOptions() = default;
+
+  /**
+   * Set the receive buffer size for the socket to a value specified by the 'buffer_size'
+   */
+  void setSocketRecvBufferSize(IoHandle& io_handle, uint32_t buffer_size) const;
+
+  /**
+   * Get the receive buffer size for the socket
+   * @param recv_buf_size returns the size of the receive buffer configured
+   */
+  void getSocketRecvBufferSize(IoHandle& io_handle, uint32_t& recv_buf_size) const;
+
+  /**
+   * Set the receive buffer low water-mark size to a value specified by 'low_watermark'
+   */
+  void setSocketRecvLoWat(IoHandle& io_handle, uint32_t low_watermark) const;
+
+  /**
+   * Get the receive buffer low water-mark size to a value specified by 'low_watermark'
+   * @param low_watermark_val retuns the receive buffer 'low_watermark' configured
+   */
+  void getSocketRecvLoWat(IoHandle& io_handle, uint32_t& low_watermark_val) const;
+
+  /**
+   * @return uint64_t the unique local ID of the invoking connection.
+   */
+  uint64_t id() const { return conn_id; }
+
+private:
+  /**
+   * Connection identifier for the connection performing operations on the socket.
+   * This 'id' is used for performing contextual logging, while performing operations.
+   */
+  uint64_t conn_id;
+};
+using DynamicSocketOptionsPtr = std::unique_ptr<DynamicSocketOptions>;
+
+/**
  * An abstract raw connection. Free the connection or call close() to disconnect.
  */
 class Connection : public Event::DeferredDeletable, public FilterManager {
@@ -250,21 +296,6 @@ public:
   virtual void setBufferLimits(uint32_t limit) PURE;
 
   /**
-   * Set the receive buffer size for the socket to a value specified by the 'buffer_size'
-   */
-  virtual void setSocketRecvBufferSize(uint32_t buffer_size) const PURE;
-
-  /**
-   * Return the receive buffer size for the socket
-   */
-  virtual uint32_t getSocketRecvBufferSize() const PURE;
-
-  /**
-   * Set the receive buffer low water-mark size to a value specified by 'low_watermark'
-   */
-  virtual void setSocketRecvLoWat(uint32_t low_watermark) const PURE;
-
-  /**
    * Get the value set with setBufferLimits.
    */
   virtual uint32_t bufferLimit() const PURE;
@@ -309,6 +340,13 @@ public:
    *         occurred an empty string is returned.
    */
   virtual absl::string_view transportFailureReason() const PURE;
+  DynamicSocketOptionsPtr dynamic_socket_options_ptr_;
+  DynamicSocketOptions& getDynamicSocketOptionsPtr() {
+    if (dynamic_socket_options_ptr_ == nullptr) {
+      dynamic_socket_options_ptr_ = std::make_unique<DynamicSocketOptions>(id());
+    }
+    return *dynamic_socket_options_ptr_.get();
+  }
 };
 
 using ConnectionPtr = std::unique_ptr<Connection>;

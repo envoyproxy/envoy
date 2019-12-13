@@ -76,9 +76,6 @@ public:
   MOCK_CONST_METHOD0(state, State());
   MOCK_METHOD2(write, void(Buffer::Instance& data, bool end_stream));
   MOCK_METHOD1(setBufferLimits, void(uint32_t limit));
-  MOCK_CONST_METHOD1(setSocketRecvBufferSize, void(uint32_t buffer_size));
-  MOCK_CONST_METHOD0(getSocketRecvBufferSize, uint32_t());
-  MOCK_CONST_METHOD1(setSocketRecvLoWat, void(uint32_t low_watermark));
   MOCK_CONST_METHOD0(bufferLimit, uint32_t());
   MOCK_CONST_METHOD0(localAddressRestored, bool());
   MOCK_CONST_METHOD0(aboveHighWatermark, bool());
@@ -124,9 +121,6 @@ public:
   MOCK_CONST_METHOD0(state, State());
   MOCK_METHOD2(write, void(Buffer::Instance& data, bool end_stream));
   MOCK_METHOD1(setBufferLimits, void(uint32_t limit));
-  MOCK_CONST_METHOD1(setSocketRecvBufferSize, void(uint32_t buffer_size));
-  MOCK_CONST_METHOD0(getSocketRecvBufferSize, uint32_t());
-  MOCK_CONST_METHOD1(setSocketRecvLoWat, void(uint32_t low_watermark));
   MOCK_CONST_METHOD0(bufferLimit, uint32_t());
   MOCK_CONST_METHOD0(localAddressRestored, bool());
   MOCK_CONST_METHOD0(aboveHighWatermark, bool());
@@ -175,9 +169,6 @@ public:
   MOCK_CONST_METHOD0(state, State());
   MOCK_METHOD2(write, void(Buffer::Instance& data, bool end_stream));
   MOCK_METHOD1(setBufferLimits, void(uint32_t limit));
-  MOCK_CONST_METHOD1(setSocketRecvBufferSize, void(uint32_t buffer_size));
-  MOCK_CONST_METHOD0(getSocketRecvBufferSize, uint32_t());
-  MOCK_CONST_METHOD1(setSocketRecvLoWat, void(uint32_t low_watermark));
   MOCK_CONST_METHOD0(bufferLimit, uint32_t());
   MOCK_CONST_METHOD0(localAddressRestored, bool());
   MOCK_CONST_METHOD0(aboveHighWatermark, bool());

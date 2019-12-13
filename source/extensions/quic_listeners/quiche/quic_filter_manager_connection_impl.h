@@ -67,9 +67,6 @@ public:
     NOT_REACHED_GCOVR_EXCL_LINE;
   }
   void setBufferLimits(uint32_t limit) override;
-  void setSocketRecvBufferSize(uint32_t buffer_size) const override;
-  uint32_t getSocketRecvBufferSize() const override;
-  void setSocketRecvLoWat(uint32_t low_watermark) const override;
   uint32_t bufferLimit() const override {
     // As quic connection is not HTTP1.1, this method shouldn't be called by HCM.
     NOT_REACHED_GCOVR_EXCL_LINE;

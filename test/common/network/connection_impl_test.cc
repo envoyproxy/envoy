@@ -768,6 +768,33 @@ TEST_P(ConnectionImplTest, BasicWrite) {
   disconnect(true);
 }
 
+// Validate dynamic socket options
+TEST_P(ConnectionImplTest, DynamicSocketOptions) {
+  setUpBasicConnection();
+  connect();
+
+  auto& dynamic_socket_object = client_connection_->getDynamicSocketOptionsPtr();
+  {
+    // Test set and get socket receive buffer size
+    // The value read from get is always double the value set on Linux
+    uint32_t set_recv_buf_size = 4096;
+    uint32_t get_recv_buf_size = 0;
+    dynamic_socket_object.setSocketRecvBufferSize(socket_->ioHandle(), set_recv_buf_size);
+    dynamic_socket_object.getSocketRecvBufferSize(socket_->ioHandle(), get_recv_buf_size);
+    EXPECT_EQ(get_recv_buf_size, 2*set_recv_buf_size);
+  }
+
+  {
+    // Test set and get socket receive low watermark size
+    uint32_t set_recv_lowat = 4096;
+    uint32_t get_recv_lowat = 0;
+    dynamic_socket_object.setSocketRecvLoWat(socket_->ioHandle(), set_recv_lowat);
+    dynamic_socket_object.getSocketRecvLoWat(socket_->ioHandle(), get_recv_lowat);
+    EXPECT_EQ(set_recv_lowat, get_recv_lowat);
+  }
+  disconnect(true);
+}
+
 // Similar to BasicWrite, only with watermarks set.
 TEST_P(ConnectionImplTest, WriteWithWatermarks) {
   useMockBuffer();
