@@ -76,7 +76,7 @@ TEST(MemBlockBuilderTest, AppendDataTooMuch) {
 #else
                ".*insufficient capacity.*"
 #endif
-               );
+  );
 }
 
 } // namespace Envoy
