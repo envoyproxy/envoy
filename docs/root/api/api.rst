@@ -9,3 +9,4 @@ API
 
   ../api-v2/api
   ../api-docs/xds_protocol
+  client_features

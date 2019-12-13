@@ -5,6 +5,7 @@
 #include "common/common/fmt.h"
 
 #include "test/test_common/logging.h"
+#include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -105,17 +106,11 @@ TEST(RegistryTest, WithDeprecatedFactoryPublished) {
 class TestVersionedFactory : public PublishedFactory {
 public:
   std::string name() override { return "testing.published.versioned"; }
-  static envoy::api::v2::core::SemanticVersion getVersion() {
-    envoy::api::v2::core::SemanticVersion version;
-    version.set_major(2);
-    version.set_minor(5);
-    version.set_patch(39);
-    return version;
-  }
 };
 
-REGISTER_FACTORY(TestVersionedFactory, PublishedFactory)(TestVersionedFactory::getVersion());
+REGISTER_FACTORY(TestVersionedFactory, PublishedFactory){FACTORY_VERSION(2, 5, 39, {"alpha"})};
 
+// Test registration of versioned factory
 TEST(RegistryTest, VersionedFactory) {
   const auto& factories = Envoy::Registry::FactoryCategoryRegistry::registeredFactories();
 
@@ -133,9 +128,50 @@ TEST(RegistryTest, VersionedFactory) {
   auto version =
       factories.find("testing.published")->second->getFactoryVersion("testing.published.versioned");
   EXPECT_TRUE(version.has_value());
-  EXPECT_EQ(2, version.value().major());
-  EXPECT_EQ(5, version.value().minor());
-  EXPECT_EQ(39, version.value().patch());
+  EXPECT_EQ(2, version.value().version().major());
+  EXPECT_EQ(5, version.value().version().minor());
+  EXPECT_EQ(39, version.value().version().patch());
+  EXPECT_EQ(1, version.value().build_info().size());
+  EXPECT_EQ("alpha", version.value().build_info()[0]);
+}
+
+class TestVersionedWithDeprecatedNamesFactory : public PublishedFactory {
+public:
+  std::string name() override { return "testing.published.versioned.instead_name"; }
+};
+
+REGISTER_FACTORY(TestVersionedWithDeprecatedNamesFactory, PublishedFactory){
+    FACTORY_VERSION(0, 0, 1, {"private"}), {"testing.published.versioned.deprecated_name"}};
+
+// Test registration of versioned factory that also uses deprecated names
+TEST(RegistryTest, VersionedWithDeprecatednamesFactory) {
+  EXPECT_EQ("testing.published.versioned.instead_name",
+            Envoy::Registry::FactoryRegistry<PublishedFactory>::getFactory(
+                "testing.published.versioned.deprecated_name")
+                ->name());
+  EXPECT_LOG_CONTAINS("warn",
+                      fmt::format("{} is deprecated, use {} instead.",
+                                  "testing.published.versioned.deprecated_name",
+                                  "testing.published.versioned.instead_name"),
+                      Envoy::Registry::FactoryRegistry<PublishedFactory>::getFactory(
+                          "testing.published.versioned.deprecated_name")
+                          ->name());
+  const auto& factories = Envoy::Registry::FactoryCategoryRegistry::registeredFactories();
+  auto version = factories.find("testing.published")
+                     ->second->getFactoryVersion("testing.published.versioned.instead_name");
+  EXPECT_TRUE(version.has_value());
+  EXPECT_EQ(0, version.value().version().major());
+  EXPECT_EQ(0, version.value().version().minor());
+  EXPECT_EQ(1, version.value().version().patch());
+  EXPECT_EQ(1, version.value().build_info().size());
+  EXPECT_EQ("private", version.value().build_info()[0]);
+  // Get the version using deprecated name and check that it matches the
+  // version obtained through the new name.
+  auto deprecated_version =
+      factories.find("testing.published")
+          ->second->getFactoryVersion("testing.published.versioned.deprecated_name");
+  EXPECT_TRUE(deprecated_version.has_value());
+  EXPECT_THAT(deprecated_version.value(), ProtoEq(version.value()));
 }
 
 } // namespace

@@ -31,7 +31,7 @@ class BaseFactoryCategoryNames {
 public:
   virtual ~BaseFactoryCategoryNames() = default;
   virtual std::vector<absl::string_view> registeredNames() const PURE;
-  virtual absl::optional<envoy::api::v2::core::SemanticVersion>
+  virtual absl::optional<envoy::api::v2::core::BuildVersion>
   getFactoryVersion(absl::string_view name) const PURE;
 };
 
@@ -43,7 +43,7 @@ public:
     return FactoryRegistry::registeredNames();
   }
 
-  absl::optional<envoy::api::v2::core::SemanticVersion>
+  absl::optional<envoy::api::v2::core::BuildVersion>
   getFactoryVersion(absl::string_view name) const override {
     return FactoryRegistry::getFactoryVersion(name);
   }
@@ -144,10 +144,10 @@ public:
   /**
    * Gets the current map of vendor specific factory versions.
    */
-  static absl::flat_hash_map<std::string, envoy::api::v2::core::SemanticVersion>&
+  static absl::flat_hash_map<std::string, envoy::api::v2::core::BuildVersion>&
   versioned_factories() {
     static auto* factories =
-        new absl::flat_hash_map<std::string, envoy::api::v2::core::SemanticVersion>;
+        new absl::flat_hash_map<std::string, envoy::api::v2::core::BuildVersion>;
     return *factories;
   }
 
@@ -175,12 +175,16 @@ public:
    * independently of Envoy.
    */
   static void registerFactory(Base& factory, absl::string_view name,
-                              const envoy::api::v2::core::SemanticVersion& version) {
+                              const envoy::api::v2::core::BuildVersion& version,
+                              absl::string_view instead_value = "") {
     auto result = factories().emplace(std::make_pair(name, &factory));
     if (!result.second) {
       throw EnvoyException(fmt::format("Double registration for name: '{}'", factory.name()));
     }
     versioned_factories().emplace(std::make_pair(name, version));
+    if (!instead_value.empty()) {
+      deprecatedFactoryNames().emplace(std::make_pair(name, instead_value));
+    }
   }
 
   /**
@@ -203,7 +207,7 @@ public:
     }
   }
 
-  static absl::optional<envoy::api::v2::core::SemanticVersion>
+  static absl::optional<envoy::api::v2::core::BuildVersion>
   getFactoryVersion(absl::string_view name) {
     auto it = versioned_factories().find(name);
     if (it == versioned_factories().end()) {
@@ -301,9 +305,35 @@ public:
    * Constructor that registers an instance of the factory with the FactoryRegistry along with
    * vendor specific version.
    */
-  explicit RegisterFactory(const envoy::api::v2::core::SemanticVersion& version) {
+  explicit RegisterFactory(uint32_t major, uint32_t minor, uint32_t patch,
+                           std::initializer_list<absl::string_view> build_info) {
+    if (!instance_.name().empty()) {
+      FactoryRegistry<Base>::registerFactory(instance_, instance_.name(),
+                                             MakeBuildVersion(major, minor, patch, build_info));
+    }
+
+    if (!FactoryCategoryRegistry::isRegistered(Base::category())) {
+      FactoryCategoryRegistry::registerCategory(Base::category(), new FactoryCategoryNames<Base>());
+    }
+  }
+
+  /**
+   * Constructor that registers an instance of the factory with the FactoryRegistry along with
+   * vendor specific version and deprecated names.
+   */
+  explicit RegisterFactory(uint32_t major, uint32_t minor, uint32_t patch,
+                           std::initializer_list<absl::string_view> build_info,
+                           std::initializer_list<absl::string_view> deprecated_names) {
+    auto version = MakeBuildVersion(major, minor, patch, build_info);
     if (!instance_.name().empty()) {
       FactoryRegistry<Base>::registerFactory(instance_, instance_.name(), version);
+    } else {
+      ASSERT(deprecated_names.size() != 0);
+    }
+
+    for (auto deprecated_name : deprecated_names) {
+      ASSERT(!deprecated_name.empty());
+      FactoryRegistry<Base>::registerFactory(instance_, deprecated_name, version, instance_.name());
     }
 
     if (!FactoryCategoryRegistry::isRegistered(Base::category())) {
@@ -312,6 +342,19 @@ public:
   }
 
 private:
+  static envoy::api::v2::core::BuildVersion
+  MakeBuildVersion(uint32_t major, uint32_t minor, uint32_t patch,
+                   std::initializer_list<absl::string_view> build_info) {
+    envoy::api::v2::core::BuildVersion version;
+    version.mutable_version()->set_major(major);
+    version.mutable_version()->set_minor(minor);
+    version.mutable_version()->set_patch(patch);
+    for (const auto& info : build_info) {
+      version.add_build_info(std::string(info));
+    }
+    return version;
+  }
+
   T instance_{};
 };
 
@@ -342,6 +385,8 @@ private:
   static Envoy::Registry::RegisterFactory</* NOLINT(fuchsia-statically-constructed-objects) */     \
                                           FACTORY, BASE>                                           \
       FACTORY##_registered
+
+#define FACTORY_VERSION(major, minor, patch, build_info) major, minor, patch, build_info
 
 /**
  * Macro used for static registration declaration.

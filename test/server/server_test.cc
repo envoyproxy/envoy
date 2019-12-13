@@ -554,13 +554,25 @@ TEST_P(ServerInstanceImplTest, ValidationAllowStaticRejectDynamic) {
 }
 
 // Validate server localInfo() from bootstrap Node.
-TEST_P(ServerInstanceImplTest, BootstrapNode) {
+// Deprecated testing of the envoy.api.v2.core.Node.build_version field
+TEST_P(ServerInstanceImplTest, DEPRECATED_FEATURE_TEST(BootstrapNodeDeprecated)) {
   initialize("test/server/node_bootstrap.yaml");
   EXPECT_EQ("bootstrap_zone", server_->localInfo().zoneName());
   EXPECT_EQ("bootstrap_cluster", server_->localInfo().clusterName());
   EXPECT_EQ("bootstrap_id", server_->localInfo().nodeName());
   EXPECT_EQ("bootstrap_sub_zone", server_->localInfo().node().locality().sub_zone());
   EXPECT_EQ(VersionInfo::version(), server_->localInfo().node().build_version());
+  EXPECT_EQ("envoy", server_->localInfo().node().user_agent_name());
+  EXPECT_EQ(VersionInfo::version(), server_->localInfo().node().user_agent_version());
+}
+
+// Validate server localInfo() from bootstrap Node.
+TEST_P(ServerInstanceImplTest, BootstrapNode) {
+  initialize("test/server/node_bootstrap.yaml");
+  EXPECT_EQ("bootstrap_zone", server_->localInfo().zoneName());
+  EXPECT_EQ("bootstrap_cluster", server_->localInfo().clusterName());
+  EXPECT_EQ("bootstrap_id", server_->localInfo().nodeName());
+  EXPECT_EQ("bootstrap_sub_zone", server_->localInfo().node().locality().sub_zone());
   EXPECT_EQ("envoy", server_->localInfo().node().user_agent_name());
   EXPECT_EQ(VersionInfo::version(), server_->localInfo().node().user_agent_version());
 }
