@@ -67,7 +67,13 @@ public:
   void resetResourceManager(uint64_t cx, uint64_t rq_pending, uint64_t rq, uint64_t rq_retry,
                             uint64_t conn_pool) {
     resource_manager_ = std::make_unique<ResourceManagerImpl>(
-        runtime_, name_, cx, rq_pending, rq, rq_retry, conn_pool, circuit_breakers_stats_);
+        runtime_, name_, cx, rq_pending, rq, rq_retry, conn_pool, circuit_breakers_stats_, absl::nullopt, absl::nullopt);
+  }
+
+  void resetResourceManagerWithRetryBudget(uint64_t cx, uint64_t rq_pending, uint64_t rq, uint64_t rq_retry,
+                            uint64_t conn_pool, double budget_percent, uint32_t min_retry_concurrency) {
+    resource_manager_ = std::make_unique<ResourceManagerImpl>(
+        runtime_, name_, cx, rq_pending, rq, rq_retry, conn_pool, circuit_breakers_stats_, budget_percent, min_retry_concurrency);
   }
 
   // Upstream::ClusterInfo
@@ -110,7 +116,6 @@ public:
   MOCK_CONST_METHOD0(eds_service_name, absl::optional<std::string>());
   MOCK_CONST_METHOD1(createNetworkFilterChain, void(Network::Connection&));
   MOCK_CONST_METHOD1(upstreamHttpProtocol, Http::Protocol(absl::optional<Http::Protocol>));
-  MOCK_CONST_METHOD1(retryBudget, absl::optional<RetryBudget>(ResourcePriority priority));
 
   std::string name_{"fake_cluster"};
   absl::optional<std::string> eds_service_name_;

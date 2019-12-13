@@ -664,14 +664,6 @@ public:
     static const uint64_t CLOSE_CONNECTIONS_ON_HOST_HEALTH_FAILURE = 0x4;
   };
 
-  struct RetryBudget {
-    // The percentage of outstanding requests that are allowed to be retries.
-    double budget_percent;
-
-    // The minimum retry concurrency allowed to be enforced by the retry budget.
-    uint32_t min_retry_concurrency;
-  };
-
   virtual ~ClusterInfo() = default;
 
   /**
@@ -876,11 +868,6 @@ public:
    */
   virtual Http::Protocol
   upstreamHttpProtocol(absl::optional<Http::Protocol> downstream_protocol) const PURE;
-
-  /**
-   * @return the retry budget associated with a priority for the cluster if configured.
-   */
-  virtual absl::optional<RetryBudget> retryBudget(ResourcePriority priority) const PURE;
 
 protected:
   /**

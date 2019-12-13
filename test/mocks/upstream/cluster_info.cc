@@ -42,7 +42,7 @@ MockClusterInfo::MockClusterInfo()
           ClusterInfoImpl::generateCircuitBreakersStats(stats_store_, "default", true)),
       resource_manager_(new Upstream::ResourceManagerImpl(runtime_, "fake_key", 1, 1024, 1024, 1,
                                                           std::numeric_limits<uint64_t>::max(),
-                                                          circuit_breakers_stats_)) {
+                                                          circuit_breakers_stats_, absl::nullopt, absl::nullopt)) {
   ON_CALL(*this, connectTimeout()).WillByDefault(Return(std::chrono::milliseconds(1)));
   ON_CALL(*this, idleTimeout()).WillByDefault(Return(absl::optional<std::chrono::milliseconds>()));
   ON_CALL(*this, name()).WillByDefault(ReturnRef(name_));

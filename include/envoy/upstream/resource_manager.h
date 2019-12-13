@@ -51,7 +51,7 @@ public:
   /**
    * @return the current resource count.
    */
-  virtual uint64_t count() PURE;
+  virtual uint64_t count() const PURE;
 };
 
 /**

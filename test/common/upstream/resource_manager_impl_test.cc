@@ -27,7 +27,7 @@ TEST(ResourceManagerImplTest, RuntimeResourceManager) {
   ResourceManagerImpl resource_manager(
       runtime, "circuit_breakers.runtime_resource_manager_test.default.", 0, 0, 0, 1, 0,
       ClusterCircuitBreakersStats{
-          ALL_CLUSTER_CIRCUIT_BREAKERS_STATS(POOL_GAUGE(store), POOL_GAUGE(store))});
+          ALL_CLUSTER_CIRCUIT_BREAKERS_STATS(POOL_GAUGE(store), POOL_GAUGE(store))}, absl::nullopt, absl::nullopt);
 
   EXPECT_CALL(
       runtime.snapshot_,
@@ -58,6 +58,7 @@ TEST(ResourceManagerImplTest, RuntimeResourceManager) {
       .WillRepeatedly(Return(0U));
   EXPECT_EQ(0U, resource_manager.retries().max());
   EXPECT_FALSE(resource_manager.retries().canCreate());
+
   EXPECT_CALL(
       runtime.snapshot_,
       getInteger("circuit_breakers.runtime_resource_manager_test.default.max_connection_pools", 0U))
@@ -65,6 +66,14 @@ TEST(ResourceManagerImplTest, RuntimeResourceManager) {
       .WillRepeatedly(Return(5U));
   EXPECT_EQ(5U, resource_manager.connectionPools().max());
   EXPECT_TRUE(resource_manager.connectionPools().canCreate());
+
+  // Verify retry budgets override max_retries.
+  EXPECT_CALL(runtime.snapshot_, exists(_)).WillRepeatedly(Return(true));
+  EXPECT_CALL(runtime.snapshot_,
+              getInteger("circuit_breakers.runtime_resource_manager_test.default.retry_budget.min_retry_concurrency", _))
+      .WillRepeatedly(Return(5U));
+  EXPECT_EQ(5U, resource_manager.retries().max());
+  EXPECT_TRUE(resource_manager.retries().canCreate());
 }
 
 TEST(ResourceManagerImplTest, RemainingResourceGauges) {
@@ -74,7 +83,7 @@ TEST(ResourceManagerImplTest, RemainingResourceGauges) {
   auto stats = ClusterCircuitBreakersStats{
       ALL_CLUSTER_CIRCUIT_BREAKERS_STATS(POOL_GAUGE(store), POOL_GAUGE(store))};
   ResourceManagerImpl resource_manager(
-      runtime, "circuit_breakers.runtime_resource_manager_test.default.", 1, 2, 1, 0, 3, stats);
+      runtime, "circuit_breakers.runtime_resource_manager_test.default.", 1, 2, 1, 0, 3, stats, absl::nullopt, absl::nullopt);
 
   // Test remaining_cx_ gauge
   EXPECT_EQ(1U, resource_manager.connections().max());
@@ -130,6 +139,26 @@ TEST(ResourceManagerImplTest, RemainingResourceGauges) {
   EXPECT_EQ(2U, stats.remaining_cx_pools_.value());
   resource_manager.connectionPools().dec();
   EXPECT_EQ(3U, stats.remaining_cx_pools_.value());
+}
+
+TEST(ResourceManagerImplTest, RetryBudgetOverrideGauge) {
+  NiceMock<Runtime::MockLoader> runtime;
+  Stats::IsolatedStoreImpl store;
+
+  auto stats = ClusterCircuitBreakersStats{
+      ALL_CLUSTER_CIRCUIT_BREAKERS_STATS(POOL_GAUGE(store), POOL_GAUGE(store))};
+
+  // Test retry budgets disable remaining_retries gauge (it should always be 0).
+  ResourceManagerImpl rm( 
+      runtime, "circuit_breakers.runtime_resource_manager_test.default.", 1, 2, 1, 0, 3, stats, 20.0, 5);
+
+  EXPECT_EQ(5U, rm.retries().max());
+  EXPECT_EQ(0U, stats.remaining_retries_.value());
+  EXPECT_EQ(0U, rm.retries().count());
+  rm.retries().inc();
+  EXPECT_EQ(1U, rm.retries().count());
+  EXPECT_EQ(0U, stats.remaining_retries_.value());
+  rm.retries().dec();
 }
 } // namespace
 } // namespace Upstream

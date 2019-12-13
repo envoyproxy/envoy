@@ -223,25 +223,7 @@ RetryStatus RetryStateImpl::shouldRetry(bool would_retry, DoRetryCallback callba
 
   retries_remaining_--;
 
-  // Only consider the max_retries circuit breaker if a retry budget is not configured. Otherwise,
-  // only consider the retry budget.
-  const RetryBudgetStatus budget_status = retryBudgetStatus(priority_);
-  bool retry_overflow;
-  switch (budget_status) {
-  case RetryBudgetStatus::Exceeded:
-    retry_overflow = true;
-    break;
-  case RetryBudgetStatus::Unconfigured:
-    retry_overflow = !cluster_.resourceManager(priority_).retries().canCreate();
-    break;
-  case RetryBudgetStatus::Available:
-    retry_overflow = false;
-    break;
-  default:
-    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
-  }
-
-  if (retry_overflow) {
+  if (!cluster_.resourceManager(priority_).retries().canCreate()) {
     cluster_.stats().upstream_rq_retry_overflow_.inc();
     return RetryStatus::NoOverflow;
   }
@@ -376,58 +358,6 @@ bool RetryStateImpl::wouldRetryFromReset(const Http::StreamResetReason reset_rea
   }
 
   return false;
-}
-
-RetryStateImpl::RetryBudgetStatus
-RetryStateImpl::retryBudgetStatus(Upstream::ResourcePriority priority) const {
-  auto retry_budget = cluster_.retryBudget(priority);
-
-  // TODO (tonya11en): Extend the ResourceManager to accommodate the retry budget in addition to
-  // the static circuit breaker values and move the runtime logic there.
-  std::string priority_name;
-  switch (priority) {
-  case Upstream::ResourcePriority::Default:
-    priority_name = "default";
-    break;
-  case Upstream::ResourcePriority::High:
-    priority_name = "high";
-    break;
-  default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
-  };
-
-  const auto fmt_budget_key = [this, priority_name](std::string&& tunable) -> std::string {
-    return fmt::format("circuit_breakers.{}.{}.retry_budget.{}", cluster_.name(), priority_name,
-                       tunable);
-  };
-  const std::string budget_percent_key = fmt_budget_key("budget_percent");
-  const std::string min_retry_concurrency_key = fmt_budget_key("min_retry_concurrency");
-  std::cout << "@tallen " << budget_percent_key << std::endl;
-  std::cout << "@tallen " << min_retry_concurrency_key << std::endl;
-
-  const bool runtime_budget_set = runtime_.snapshot().exists(budget_percent_key) &&
-                                  runtime_.snapshot().exists(min_retry_concurrency_key);
-  if (!retry_budget && !runtime_budget_set) {
-    // The retry budget is not configured and is not set via runtime.
-    return RetryBudgetStatus::Unconfigured;
-  } else if (runtime_budget_set) {
-    retry_budget = Upstream::ClusterInfo::RetryBudget{
-        .budget_percent = std::min(100.0, runtime_.snapshot().getDouble(budget_percent_key, 20.0)),
-        .min_retry_concurrency =
-            static_cast<uint32_t>(runtime_.snapshot().getInteger(min_retry_concurrency_key, 3)),
-    };
-  }
-
-  const uint64_t current_active = cluster_.resourceManager(priority).requests().count() +
-                                  cluster_.resourceManager(priority).pendingRequests().count();
-
-  const double budget = std::max<uint64_t>(current_active * retry_budget->budget_percent / 100.0,
-                                           retry_budget->min_retry_concurrency);
-
-  if (cluster_.resourceManager(priority).retries().count() >= budget) {
-    return RetryBudgetStatus::Exceeded;
-  }
-  return RetryBudgetStatus::Available;
 }
 
 } // namespace Router
