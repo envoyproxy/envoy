@@ -2,7 +2,7 @@ syntax = "proto3";
 
 // The structures in this file are merely for JSON serialization to communicate with the X-Ray
 // daemon. The X-Ray daemon does not speak protobuf.
-package envoy.tracers.xray.daemon;
+package source.extensions.tracers.xray.daemon;
 
 import "validate/validate.proto";
 
