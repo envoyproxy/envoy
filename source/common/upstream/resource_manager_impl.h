@@ -38,9 +38,10 @@ public:
                   cb_stats.remaining_rq_),
         connection_pools_(max_connection_pools, runtime, runtime_key + "max_connection_pools",
                           cb_stats.cx_pool_open_, cb_stats.remaining_cx_pools_),
-        retries_(budget_percent, min_retry_concurrency, max_retries, runtime, runtime_key + "retry_budget.",
-            runtime_key + "max_retries", cb_stats.rq_retry_open_, cb_stats.remaining_retries_, requests_, pending_requests_) {
-        }
+        retries_(budget_percent, min_retry_concurrency, max_retries, runtime,
+                 runtime_key + "retry_budget.", runtime_key + "max_retries",
+                 cb_stats.rq_retry_open_, cb_stats.remaining_retries_, requests_,
+                 pending_requests_) {}
 
   // Upstream::ResourceManager
   Resource& connections() override { return connections_; }
@@ -109,20 +110,19 @@ private:
 
   class RetryBudgetImpl : public Resource {
   public:
-    RetryBudgetImpl(absl::optional<double> budget_percent, absl::optional<uint32_t> min_retry_concurrency,
-        uint64_t max_retries, Runtime::Loader& runtime,
-                    const std::string& retry_budget_runtime_key,
-                    const std::string& max_retries_runtime_key,
-                    Stats::Gauge& open_gauge, Stats::Gauge& remaining,
-                    const Resource& requests, const Resource& pending_requests) :
-      runtime_(runtime), max_retry_resource_(max_retries, runtime, max_retries_runtime_key, open_gauge, remaining),
-      budget_percent_(budget_percent), min_retry_concurrency_(min_retry_concurrency),
-      budget_percent_key_(retry_budget_runtime_key + "budget_percent"),
-      min_retry_concurrency_key_(retry_budget_runtime_key + "min_retry_concurrency"), requests_(requests), 
-      pending_requests_(pending_requests), remaining_(remaining)
-    {
-    }
-    ~RetryBudgetImpl() override { }
+    RetryBudgetImpl(absl::optional<double> budget_percent,
+                    absl::optional<uint32_t> min_retry_concurrency, uint64_t max_retries,
+                    Runtime::Loader& runtime, const std::string& retry_budget_runtime_key,
+                    const std::string& max_retries_runtime_key, Stats::Gauge& open_gauge,
+                    Stats::Gauge& remaining, const Resource& requests,
+                    const Resource& pending_requests)
+        : runtime_(runtime),
+          max_retry_resource_(max_retries, runtime, max_retries_runtime_key, open_gauge, remaining),
+          budget_percent_(budget_percent), min_retry_concurrency_(min_retry_concurrency),
+          budget_percent_key_(retry_budget_runtime_key + "budget_percent"),
+          min_retry_concurrency_key_(retry_budget_runtime_key + "min_retry_concurrency"),
+          requests_(requests), pending_requests_(pending_requests), remaining_(remaining) {}
+    ~RetryBudgetImpl() override {}
 
     // Upstream::Resource
     bool canCreate() override {
@@ -136,7 +136,7 @@ private:
       max_retry_resource_.inc();
       clearRemainingGauge();
     }
-    void dec() override { 
+    void dec() override {
       max_retry_resource_.dec();
       clearRemainingGauge();
     }
@@ -150,24 +150,21 @@ private:
       }
 
       const uint64_t current_active = requests_.count() + pending_requests_.count();
-      const double budget_percent =
-        runtime_.snapshot().getDouble(budget_percent_key_, budget_percent_ ? *budget_percent_ : 20.0);
-      const uint32_t min_retry_concurrency =
-        runtime_.snapshot().getInteger(min_retry_concurrency_key_,
-            min_retry_concurrency_ ? *min_retry_concurrency_ : 3);
+      const double budget_percent = runtime_.snapshot().getDouble(
+          budget_percent_key_, budget_percent_ ? *budget_percent_ : 20.0);
+      const uint32_t min_retry_concurrency = runtime_.snapshot().getInteger(
+          min_retry_concurrency_key_, min_retry_concurrency_ ? *min_retry_concurrency_ : 3);
 
       clearRemainingGauge();
       return std::max<uint64_t>(budget_percent / 100.0 * current_active, min_retry_concurrency);
     }
-    uint64_t count() const override {
-      return max_retry_resource_.count();
-    }
+    uint64_t count() const override { return max_retry_resource_.count(); }
 
   private:
     bool useRetryBudget() const {
       return runtime_.snapshot().exists(budget_percent_key_) ||
-             runtime_.snapshot().exists(min_retry_concurrency_key_) ||
-             budget_percent_ || min_retry_concurrency_;
+             runtime_.snapshot().exists(min_retry_concurrency_key_) || budget_percent_ ||
+             min_retry_concurrency_;
     }
 
     // If the retry budget is in use, the stats tracking remaining retries do not make sense since
