@@ -106,7 +106,7 @@ message Extension {
 
 // Version of various extensions and filters grouped by category.
 message ExtensionVersions {
-  // Versions of all non-core extensions in binary.
+  // Versions of all extensions in binary.
   repeated Extension extension = 1;
 }
 
