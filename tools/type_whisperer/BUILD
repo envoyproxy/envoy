@@ -1,6 +1,6 @@
 licenses(["notice"])  # Apache 2
 
-load("//bazel:envoy_build_system.bzl", "envoy_cc_library", "envoy_cc_test", "envoy_package", "envoy_proto_library")
+load("//bazel:envoy_build_system.bzl", "envoy_cc_library", "envoy_package", "envoy_proto_library")
 load("//tools/type_whisperer:type_database.bzl", "type_database")
 load("@com_google_protobuf//:protobuf.bzl", "py_proto_library")
 
@@ -75,12 +75,4 @@ envoy_cc_library(
 envoy_proto_library(
     name = "api_type_db_proto",
     srcs = ["api_type_db.proto"],
-)
-
-envoy_cc_test(
-    name = "api_type_db_test",
-    srcs = ["api_type_db_test.cc"],
-    deps = [
-        ":api_type_db_lib",
-    ],
 )

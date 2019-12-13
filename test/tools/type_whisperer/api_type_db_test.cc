@@ -1,8 +1,5 @@
-#include "tools/type_whisperer/api_type_db.h"
-
-// TODO(htuch): make sure this runs under CI.
-
 #include "gtest/gtest.h"
+#include "tools/type_whisperer/api_type_db.h"
 
 namespace Envoy {
 namespace Tools {

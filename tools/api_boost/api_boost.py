@@ -7,7 +7,7 @@
 #
 # Usage (from a clean tree):
 #
-# api_boost.py --generate_api_type_database --generate_compilation_database \
+# api_boost.py --generate_compilation_database \
 #   --build_api_booster
 
 import argparse
@@ -81,11 +81,8 @@ def SwapTmpFile(path):
 
 # Update the Envoy source tree the latest API.
 def ApiBoostTree(args):
-  # Optional setup of state. We need the API type database, compilation database
-  # and api_booster tool in place before we can start boosting.
-  if args.generate_api_type_database:
-    sp.run(['./tools/gen_api_type_database.sh'], check=True)
-
+  # Optional setup of state. We need the compilation database and api_booster
+  # tool in place before we can start boosting.
   if args.generate_compilation_database:
     sp.run(['./tools/gen_compilation_database.py', '--run_bazel_build', '--include_headers'],
            check=True)
@@ -105,8 +102,7 @@ def ApiBoostTree(args):
     dep_lib_build_targets = sp.check_output(['bazel', 'query', query]).decode().splitlines()
     # We also need some misc. stuff such as test binaries for setup of benchmark
     # dep.
-    query = 'attr("tags", "compilation_db_dep", {})'.format(
-        ' union '.join(dep_build_targets))
+    query = 'attr("tags", "compilation_db_dep", {})'.format(' union '.join(dep_build_targets))
     dep_lib_build_targets.extend(sp.check_output(['bazel', 'query', query]).decode().splitlines())
     extra_api_booster_args = []
     if args.debug_log:
@@ -157,7 +153,6 @@ def ApiBoostTree(args):
 
 if __name__ == '__main__':
   parser = argparse.ArgumentParser(description='Update Envoy tree to the latest API')
-  parser.add_argument('--generate_api_type_database', action='store_true')
   parser.add_argument('--generate_compilation_database', action='store_true')
   parser.add_argument('--build_api_booster', action='store_true')
   parser.add_argument('--debug_log', action='store_true')

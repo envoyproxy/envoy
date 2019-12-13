@@ -11,8 +11,7 @@ We refer to the process of upgrading Envoy to the latest version of the API as
 major version at the API clock invokes:
 
 ```console
-/tools/api_boost/api_boost.py --build_api_booster --generate_api_type_database \
-  --generate_compilation_database
+/tools/api_boost/api_boost.py --build_api_booster --generate_compilation_database
 ```
 
 followed by `fix_format`. The full process is still WiP, but we expect that
