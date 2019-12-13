@@ -348,7 +348,7 @@ public:
 class RedisClusterWithRefreshIntegrationTest : public RedisClusterIntegrationTest {
 public:
   RedisClusterWithRefreshIntegrationTest(const std::string& config = testConfigWithRefresh(),
-                                            int num_upstreams = 3)
+                                         int num_upstreams = 3)
       : RedisClusterIntegrationTest(config, num_upstreams) {}
 };
 
@@ -529,10 +529,9 @@ TEST_P(RedisClusterWithAuthIntegrationTest, SingleSlotMasterReplica) {
   EXPECT_TRUE(fake_upstream_connection->close());
 }
 
-
 // This test show the test proxy's multi-stage response to an error from an upstream fake
-// redis server. The proxy will connect to the first fake upstream server to rediscover the cluster's
-// topology using a "cluster slots" command.
+// redis server. The proxy will connect to the first fake upstream server to rediscover the
+// cluster's topology using a "cluster slots" command.
 TEST_P(RedisClusterWithRefreshIntegrationTest, ClusterSlotRequestAfterFailure) {
   random_index_ = 0;
 
@@ -547,7 +546,7 @@ TEST_P(RedisClusterWithRefreshIntegrationTest, ClusterSlotRequestAfterFailure) {
   // foo hashes to slot 12182 which the proxy believes is at the server reachable via
   // fake_upstreams_[0], based on the singleSlotMasterReplica() response above.
   std::string request = makeBulkStringArray({"get", "foo"});
-  // The actual CLUSTERDOWN error.
+  // The actual error response.
   std::string error_response = "-CLUSTERDOWN The cluster is down\r\n";
   std::string cluster_slots_request = makeBulkStringArray({"CLUSTER", "SLOTS"});
   std::string proxy_to_server;
