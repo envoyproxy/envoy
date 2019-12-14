@@ -18,7 +18,7 @@ composed of one or more network level (L3/L4) :ref:`filters <arch_overview_netwo
 a new connection is received on a listener, the appropriate filter chain is selected, and the
 configured connection local filter stack is instantiated and begins processing subsequent events.
 The generic listener architecture is used to perform the vast majority of different proxy tasks that
-Envoy is used for (e.g., :ref:`rate limiting <arch_overview_rate_limit>`, :ref:`TLS client
+Envoy is used for (e.g., :ref:`rate limiting <arch_overview_global_rate_limit>`, :ref:`TLS client
 authentication <arch_overview_ssl_auth_filter>`, :ref:`HTTP connection management
 <arch_overview_http_conn_man>`, MongoDB :ref:`sniffing <arch_overview_mongo>`, raw :ref:`TCP proxy
 <arch_overview_tcp_proxy>`, etc.).

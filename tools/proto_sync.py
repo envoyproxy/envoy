@@ -86,6 +86,7 @@ def SyncProtoFile(cmd, src, dst):
     dst: destination path.
   """
   if cmd == 'fix':
+    os.makedirs(os.path.dirname(dst), exist_ok=True)
     shutil.copyfile(src, dst)
   else:
     try:
