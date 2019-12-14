@@ -2,9 +2,9 @@ syntax = "proto3";
 
 package envoy.type.tracing.v2;
 
+option java_package = "io.envoyproxy.envoy.type.tracing.v2";
 option java_outer_classname = "CustomTagProto";
 option java_multiple_files = true;
-option java_package = "io.envoyproxy.envoy.type.tracing.v2";
 
 import "envoy/type/metadata/v2/metadata.proto";
 

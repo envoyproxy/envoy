@@ -117,7 +117,7 @@ http_filters:
 
   NiceMock<Server::MockInstance> server_;
   std::unique_ptr<RouteConfigProviderManagerImpl> route_config_provider_manager_;
-  RouteConfigProviderPtr rds_;
+  RouteConfigProviderSharedPtr rds_;
 };
 
 TEST_F(RdsImplTest, RdsAndStatic) {
@@ -331,7 +331,7 @@ public:
 
   envoy::config::filter::network::http_connection_manager::v2::Rds rds_;
   std::unique_ptr<RouteConfigProviderManagerImpl> route_config_provider_manager_;
-  RouteConfigProviderPtr provider_;
+  RouteConfigProviderSharedPtr provider_;
 };
 
 envoy::api::v2::RouteConfiguration parseRouteConfigurationFromV2Yaml(const std::string& yaml) {
@@ -470,11 +470,14 @@ virtual_hosts:
   server_factory_context_.cluster_manager_.subscription_factory_.callbacks_->onConfigUpdate(
       route_configs, "1");
 
-  RouteConfigProviderPtr provider2 = route_config_provider_manager_->createRdsRouteConfigProvider(
-      rds_, mock_factory_context_, "foo_prefix", outer_init_manager_);
+  RouteConfigProviderSharedPtr provider2 =
+      route_config_provider_manager_->createRdsRouteConfigProvider(
+          rds_, mock_factory_context_, "foo_prefix", outer_init_manager_);
 
   // provider2 should have route config immediately after create
   EXPECT_TRUE(provider2->configInfo().has_value());
+
+  EXPECT_EQ(provider_, provider2) << "fail to obtain the same rds config provider object";
 
   // So this means that both provider have same subscription.
   EXPECT_EQ(&dynamic_cast<RdsRouteConfigProviderImpl&>(*provider_).subscription(),
@@ -484,8 +487,9 @@ virtual_hosts:
   envoy::config::filter::network::http_connection_manager::v2::Rds rds2;
   rds2.set_route_config_name("foo_route_config");
   rds2.mutable_config_source()->set_path("bar_path");
-  RouteConfigProviderPtr provider3 = route_config_provider_manager_->createRdsRouteConfigProvider(
-      rds2, mock_factory_context_, "foo_prefix", mock_factory_context_.initManager());
+  RouteConfigProviderSharedPtr provider3 =
+      route_config_provider_manager_->createRdsRouteConfigProvider(
+          rds2, mock_factory_context_, "foo_prefix", mock_factory_context_.initManager());
   EXPECT_NE(provider3, provider_);
   server_factory_context_.cluster_manager_.subscription_factory_.callbacks_->onConfigUpdate(
       route_configs, "provider3");
@@ -508,6 +512,49 @@ virtual_hosts:
 
   EXPECT_EQ(0UL,
             route_config_provider_manager_->dumpRouteConfigs()->dynamic_route_configs().size());
+}
+
+TEST_F(RouteConfigProviderManagerImplTest, SameProviderOnTwoInitManager) {
+  Buffer::OwnedImpl data;
+  // Get a RouteConfigProvider. This one should create an entry in the RouteConfigProviderManager.
+  setup();
+
+  EXPECT_FALSE(provider_->configInfo().has_value());
+
+  NiceMock<Server::Configuration::MockFactoryContext> mock_factory_context2;
+
+  Init::WatcherImpl real_watcher("real", []() {});
+  Init::ManagerImpl real_init_manager("real");
+
+  RouteConfigProviderSharedPtr provider2 =
+      route_config_provider_manager_->createRdsRouteConfigProvider(rds_, mock_factory_context2,
+                                                                   "foo_prefix", real_init_manager);
+
+  EXPECT_FALSE(provider2->configInfo().has_value());
+
+  EXPECT_EQ(provider_, provider2) << "fail to obtain the same rds config provider object";
+  real_init_manager.initialize(real_watcher);
+  EXPECT_EQ(Init::Manager::State::Initializing, real_init_manager.state());
+
+  {
+    Protobuf::RepeatedPtrField<ProtobufWkt::Any> route_configs;
+    route_configs.Add()->PackFrom(parseRouteConfigurationFromV2Yaml(R"EOF(
+name: foo_route_config
+virtual_hosts:
+  - name: bar
+    domains: ["*"]
+    routes:
+      - match: { prefix: "/" }
+        route: { cluster: baz }
+)EOF"));
+
+    server_factory_context_.cluster_manager_.subscription_factory_.callbacks_->onConfigUpdate(
+        route_configs, "1");
+
+    EXPECT_TRUE(provider_->configInfo().has_value());
+    EXPECT_TRUE(provider2->configInfo().has_value());
+    EXPECT_EQ(Init::Manager::State::Initialized, real_init_manager.state());
+  }
 }
 
 // Negative test for protoc-gen-validate constraints.

@@ -27,6 +27,7 @@ Configuration
   :maxdepth: 2
 
   configuration/edge
+  configuration/level_two
   configuration/sni
   configuration/zone_aware_routing
   configuration/zipkin_tracing

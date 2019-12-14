@@ -2,9 +2,9 @@ syntax = "proto3";
 
 package envoy.config.filter.http.transcoder.v2;
 
+option java_package = "io.envoyproxy.envoy.config.filter.http.transcoder.v2";
 option java_outer_classname = "TranscoderProto";
 option java_multiple_files = true;
-option java_package = "io.envoyproxy.envoy.config.filter.http.transcoder.v2";
 
 import "validate/validate.proto";
 

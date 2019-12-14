@@ -431,7 +431,7 @@ public:
   ~MockRouteConfigProviderManager() override;
 
   MOCK_METHOD4(createRdsRouteConfigProvider,
-               RouteConfigProviderPtr(
+               RouteConfigProviderSharedPtr(
                    const envoy::config::filter::network::http_connection_manager::v2::Rds& rds,
                    Server::Configuration::FactoryContext& factory_context,
                    const std::string& stat_prefix, Init::Manager& init_manager));

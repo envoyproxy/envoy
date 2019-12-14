@@ -2,9 +2,9 @@ syntax = "proto3";
 
 package envoy.config.metrics.v2;
 
+option java_package = "io.envoyproxy.envoy.config.metrics.v2";
 option java_outer_classname = "StatsProto";
 option java_multiple_files = true;
-option java_package = "io.envoyproxy.envoy.config.metrics.v2";
 
 import "envoy/api/v2/core/address.proto";
 import "envoy/type/matcher/string.proto";

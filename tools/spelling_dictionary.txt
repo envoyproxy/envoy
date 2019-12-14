@@ -995,6 +995,7 @@ thru
 timespan
 timestamp
 timestamps
+timeval
 tm
 tmp
 tmpfile

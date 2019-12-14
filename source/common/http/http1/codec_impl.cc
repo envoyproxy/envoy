@@ -24,6 +24,17 @@ namespace Http {
 namespace Http1 {
 namespace {
 
+struct Http1ResponseCodeDetailValues {
+  const absl::string_view TooManyHeaders = "http1.too_many_headers";
+  const absl::string_view HeadersTooLarge = "http1.headers_too_large";
+  const absl::string_view HttpCodecError = "http1.codec_error";
+  const absl::string_view InvalidCharacters = "http1.invalid_characters";
+  const absl::string_view ConnectionHeaderSanitization = "http1.connection_header_rejected";
+  const absl::string_view InvalidUrl = "http1.invalid_url";
+};
+
+using Http1ResponseCodeDetails = ConstSingleton<Http1ResponseCodeDetailValues>;
+
 const StringUtil::CaseUnorderedSet& caseUnorderdSetContainingUpgradeAndHttp2Settings() {
   CONSTRUCT_ON_FIRST_USE(StringUtil::CaseUnorderedSet,
                          Http::Headers::get().ConnectionValues.Upgrade,
@@ -305,7 +316,7 @@ void RequestStreamEncoderImpl::encodeHeaders(const HeaderMap& headers, bool end_
     head_request_ = true;
   }
   connection_.onEncodeHeaders(headers);
-  connection_.reserveBuffer(std::max(4096U, path->value().size() + 4096));
+  connection_.reserveBuffer(path->value().size() + method->value().size() + 4096);
   connection_.copyToBuffer(method->value().getStringView().data(), method->value().size());
   connection_.addCharToBuffer(' ');
   connection_.copyToBuffer(path->value().getStringView().data(), path->value().size());
@@ -381,7 +392,7 @@ void ConnectionImpl::completeLastHeader() {
   // Check if the number of headers exceeds the limit.
   if (current_header_map_->size() > max_headers_count_) {
     error_code_ = Http::Code::RequestHeaderFieldsTooLarge;
-    sendProtocolError();
+    sendProtocolError(Http1ResponseCodeDetails::get().TooManyHeaders);
     throw CodecProtocolException("headers size exceeds limit");
   }
 
@@ -442,7 +453,7 @@ void ConnectionImpl::dispatch(Buffer::Instance& data) {
 size_t ConnectionImpl::dispatchSlice(const char* slice, size_t len) {
   ssize_t rc = http_parser_execute(&parser_, &settings_, slice, len);
   if (HTTP_PARSER_ERRNO(&parser_) != HPE_OK && HTTP_PARSER_ERRNO(&parser_) != HPE_PAUSED) {
-    sendProtocolError();
+    sendProtocolError(Http1ResponseCodeDetails::get().HttpCodecError);
     throw CodecProtocolException("http/1.1 protocol error: " +
                                  std::string(http_errno_name(HTTP_PARSER_ERRNO(&parser_))));
   }
@@ -469,13 +480,15 @@ void ConnectionImpl::onHeaderValue(const char* data, size_t length) {
     return;
   }
 
-  const absl::string_view header_value = absl::string_view(data, length);
+  // Work around a bug in http_parser where trailing whitespace is not trimmed
+  // as the spec requires: https://tools.ietf.org/html/rfc7230#section-3.2.4
+  const absl::string_view header_value = StringUtil::trim(absl::string_view(data, length));
 
   if (strict_header_validation_) {
     if (!Http::HeaderUtility::headerIsValid(header_value)) {
       ENVOY_CONN_LOG(debug, "invalid header value: {}", connection_, header_value);
       error_code_ = Http::Code::BadRequest;
-      sendProtocolError();
+      sendProtocolError(Http1ResponseCodeDetails::get().InvalidCharacters);
       throw CodecProtocolException("http/1.1 protocol error: header value contains invalid chars");
     }
   } else if (header_value.find('\0') != absl::string_view::npos) {
@@ -487,16 +500,14 @@ void ConnectionImpl::onHeaderValue(const char* data, size_t length) {
   }
 
   header_parsing_state_ = HeaderParsingState::Value;
-  current_header_value_.append(data, length);
+  current_header_value_.append(header_value.data(), header_value.length());
 
-  // Verify that the cached value in byte size exists.
-  ASSERT(current_header_map_->byteSize().has_value());
-  const uint32_t total = current_header_field_.size() + current_header_value_.size() +
-                         current_header_map_->byteSize().value();
+  const uint32_t total =
+      current_header_field_.size() + current_header_value_.size() + current_header_map_->byteSize();
   if (total > (max_headers_kb_ * 1024)) {
 
     error_code_ = Http::Code::RequestHeaderFieldsTooLarge;
-    sendProtocolError();
+    sendProtocolError(Http1ResponseCodeDetails::get().HeadersTooLarge);
     throw CodecProtocolException("headers size exceeds limit");
   }
 }
@@ -504,10 +515,6 @@ void ConnectionImpl::onHeaderValue(const char* data, size_t length) {
 int ConnectionImpl::onHeadersCompleteBase() {
   ENVOY_CONN_LOG(trace, "headers complete", connection_);
   completeLastHeader();
-  // Validate that the completed HeaderMap's cached byte size exists and is correct.
-  // This assert iterates over the HeaderMap.
-  ASSERT(current_header_map_->byteSize().has_value() &&
-         current_header_map_->byteSize() == current_header_map_->byteSizeInternal());
   if (!(parser_.http_major == 1 && parser_.http_minor == 1)) {
     // This is not necessarily true, but it's good enough since higher layers only care if this is
     // HTTP/1.1 or not.
@@ -528,7 +535,7 @@ int ConnectionImpl::onHeadersCompleteBase() {
         if (new_value.empty()) {
           current_header_map_->removeConnection();
         } else {
-          current_header_map_->Connection()->value(new_value);
+          current_header_map_->setConnection(new_value);
         }
       }
       current_header_map_->remove(Headers::get().Http2Settings);
@@ -543,7 +550,22 @@ int ConnectionImpl::onHeadersCompleteBase() {
       ENVOY_CONN_LOG(debug, "Invalid nominated headers in Connection: {}", connection_,
                      header_value);
       error_code_ = Http::Code::BadRequest;
+      sendProtocolError(Http1ResponseCodeDetails::get().ConnectionHeaderSanitization);
+      throw CodecProtocolException("Invalid nominated headers in Connection.");
+    }
+  }
+
+  // Per https://tools.ietf.org/html/rfc7230#section-3.3.1 Envoy should reject
+  // transfer-codings it does not understand.
+  if (current_header_map_->TransferEncoding()) {
+    absl::string_view encoding = current_header_map_->TransferEncoding()->value().getStringView();
+    if (Runtime::runtimeFeatureEnabled(
+            "envoy.reloadable_features.reject_unsupported_transfer_encodings") &&
+        encoding != Headers::get().TransferEncodingValues.Identity &&
+        encoding != Headers::get().TransferEncodingValues.Chunked) {
+      error_code_ = Http::Code::NotImplemented;
       sendProtocolError();
+      throw CodecProtocolException("http/1.1 protocol error: unsupported transfer encoding");
     }
   }
 
@@ -631,7 +653,7 @@ void ServerConnectionImpl::handlePath(HeaderMapImpl& headers, unsigned int metho
 
   Utility::Url absolute_url;
   if (!absolute_url.initialize(active_request_->request_url_.getStringView())) {
-    sendProtocolError();
+    sendProtocolError(Http1ResponseCodeDetails::get().InvalidUrl);
     throw CodecProtocolException("http/1.1 protocol error: invalid url in request line");
   }
   // RFC7230#5.7
@@ -738,7 +760,10 @@ void ServerConnectionImpl::onResetStream(StreamResetReason reason) {
   active_request_.reset();
 }
 
-void ServerConnectionImpl::sendProtocolError() {
+void ServerConnectionImpl::sendProtocolError(absl::string_view details) {
+  if (active_request_) {
+    active_request_->response_encoder_.setDetails(details);
+  }
   // We do this here because we may get a protocol error before we have a logical stream. Higher
   // layers can only operate on streams, so there is no coherent way to allow them to send an error
   // "out of band." On one hand this is kind of a hack but on the other hand it normalizes HTTP/1.1
@@ -872,6 +897,12 @@ void ClientConnectionImpl::onResetStream(StreamResetReason reason) {
   if (!pending_responses_.empty()) {
     pending_responses_.clear();
     request_encoder_->runResetCallbacks(reason);
+  }
+}
+
+void ClientConnectionImpl::sendProtocolError(absl::string_view details) {
+  if (request_encoder_) {
+    request_encoder_->setDetails(details);
   }
 }
 

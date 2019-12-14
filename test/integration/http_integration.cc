@@ -913,6 +913,7 @@ void HttpIntegrationTest::testLargeRequestHeaders(uint32_t size, uint32_t count,
 
   Http::TestHeaderMapImpl big_headers{
       {":method", "GET"}, {":path", "/test/long/url"}, {":scheme", "http"}, {":authority", "host"}};
+
   // Already added four headers.
   for (unsigned int i = 0; i < count; i++) {
     big_headers.addCopy(std::to_string(i), std::string(size * 1024, 'a'));
@@ -979,6 +980,8 @@ void HttpIntegrationTest::testLargeRequestTrailers(uint32_t size, uint32_t max_s
 }
 
 void HttpIntegrationTest::testManyRequestHeaders(std::chrono::milliseconds time) {
+  // This test uses an Http::HeaderMapImpl instead of an Http::TestHeaderMapImpl to avoid
+  // time-consuming asserts when using a large number of headers.
   max_request_headers_kb_ = 96;
   max_request_headers_count_ = 20005;
 
@@ -990,11 +993,13 @@ void HttpIntegrationTest::testManyRequestHeaders(std::chrono::milliseconds time)
             max_request_headers_count_);
       });
 
-  Http::TestHeaderMapImpl big_headers{
-      {":method", "GET"}, {":path", "/test/long/url"}, {":scheme", "http"}, {":authority", "host"}};
+  Http::HeaderMapImpl big_headers{{Http::Headers::get().Method, "GET"},
+                                  {Http::Headers::get().Path, "/test/long/url"},
+                                  {Http::Headers::get().Scheme, "http"},
+                                  {Http::Headers::get().Host, "host"}};
 
   for (int i = 0; i < 20000; i++) {
-    big_headers.addCopy(std::to_string(i), std::string(0, 'a'));
+    big_headers.addCopy(Http::LowerCaseString(std::to_string(i)), std::string(0, 'a'));
   }
   initialize();
 

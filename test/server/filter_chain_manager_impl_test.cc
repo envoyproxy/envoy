@@ -21,7 +21,6 @@
 #include "server/filter_chain_manager_impl.h"
 #include "server/listener_manager_impl.h"
 
-#include "extensions/filters/listener/original_dst/original_dst.h"
 #include "extensions/transport_sockets/tls/ssl_socket.h"
 
 #include "test/mocks/network/mocks.h"

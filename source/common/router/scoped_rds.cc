@@ -114,11 +114,10 @@ ScopedRdsConfigSubscription::RdsRouteConfigProviderHelper::RdsRouteConfigProvide
     envoy::config::filter::network::http_connection_manager::v2::Rds& rds,
     Init::Manager& init_manager)
     : parent_(parent), scope_name_(scope_name),
-      route_provider_(static_cast<RdsRouteConfigProviderImpl*>(
-          parent_.route_config_provider_manager_
-              .createRdsRouteConfigProvider(rds, parent_.factory_context_, parent_.stat_prefix_,
-                                            init_manager)
-              .release())),
+      route_provider_(std::dynamic_pointer_cast<RdsRouteConfigProviderImpl>(
+          parent_.route_config_provider_manager_.createRdsRouteConfigProvider(
+              rds, parent_.factory_context_, parent_.stat_prefix_, init_manager))),
+
       rds_update_callback_handle_(route_provider_->subscription().addUpdateCallback([this]() {
         // Subscribe to RDS update.
         parent_.onRdsConfigUpdate(scope_name_, route_provider_->subscription());

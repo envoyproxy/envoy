@@ -60,8 +60,10 @@ public:
   void resetStream(StreamResetReason reason) override;
   void readDisable(bool disable) override;
   uint32_t bufferLimit() override;
+  absl::string_view responseDetails() override { return details_; }
 
   void isResponseToHeadRequest(bool value) { is_response_to_head_request_ = value; }
+  void setDetails(absl::string_view details) { details_ = details; }
 
 protected:
   StreamEncoderImpl(ConnectionImpl& connection, HeaderKeyFormatter* header_key_formatter);
@@ -101,6 +103,7 @@ private:
   bool processing_100_continue_ : 1;
   bool is_response_to_head_request_ : 1;
   bool is_content_length_allowed_ : 1;
+  absl::string_view details_;
 };
 
 /**
@@ -282,7 +285,7 @@ private:
   /**
    * Send a protocol error response to remote.
    */
-  virtual void sendProtocolError() PURE;
+  virtual void sendProtocolError(absl::string_view details = "") PURE;
 
   /**
    * Called when output_buffer_ or the underlying connection go from below a low watermark to over
@@ -355,7 +358,7 @@ private:
   void onBody(const char* data, size_t length) override;
   void onMessageComplete() override;
   void onResetStream(StreamResetReason reason) override;
-  void sendProtocolError() override;
+  void sendProtocolError(absl::string_view details) override;
   void onAboveHighWatermark() override;
   void onBelowLowWatermark() override;
 
@@ -395,7 +398,7 @@ private:
   void onBody(const char* data, size_t length) override;
   void onMessageComplete() override;
   void onResetStream(StreamResetReason reason) override;
-  void sendProtocolError() override {}
+  void sendProtocolError(absl::string_view details) override;
   void onAboveHighWatermark() override;
   void onBelowLowWatermark() override;
 
