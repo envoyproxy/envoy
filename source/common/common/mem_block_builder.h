@@ -1,9 +1,10 @@
 #pragma once
 
 #include <memory>
-#include <vector>
 
 #include "common/common/assert.h"
+
+#include "absl/types/span.h"
 
 namespace Envoy {
 
@@ -64,10 +65,11 @@ public:
    * @param data The block of objects to insert.
    * @param size The number of elements in the block.
    */
-  void appendData(const T* data, uint64_t size) {
+  void appendData(absl::Span<const T> data) {
+    uint64_t size = data.size();
     SECURITY_ASSERT(capacity_remaining_ >= size, "insufficient capacity");
     if (size != 0) {
-      memcpy(write_ptr_, data, size * sizeof(T));
+      memcpy(write_ptr_, data.data(), size * sizeof(T));
     }
     write_ptr_ += size;
     capacity_remaining_ -= size;
@@ -78,7 +80,7 @@ public:
    *
    * @param src the block to append.
    */
-  void appendBlock(const MemBlockBuilder& src) { appendData(src.data_.get(), src.size()); }
+  void appendBlock(const MemBlockBuilder& src) { appendData(src.span()); }
 
   /**
    * @return the number of elements remaining in the MemBlockBuilder.
@@ -102,11 +104,9 @@ public:
   }
 
   /**
-   * @return the populated data as a vector.
-   *
-   * This is exposed to help with unit testing.
+   * @return the populated data as an absl::Span.
    */
-  std::vector<T> toVector() const { return std::vector<T>(data_.get(), write_ptr_); }
+  absl::Span<T> span() const { return absl::MakeSpan(data_.get(), write_ptr_); }
 
   /**
    * @return The number of elements the have been added to the builder.
