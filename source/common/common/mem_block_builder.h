@@ -36,12 +36,7 @@ public:
    *
    * @param capacity The number of memory elements to allocate.
    */
-  void populate(uint64_t capacity) {
-    data_ = std::make_unique<T[]>(capacity);
-    capacity_ = capacity;
-    capacity_remaining_ = capacity;
-    write_ptr_ = data_.get();
-  }
+  void populate(uint64_t capacity) { populateHelper(capacity, std::make_unique<T[]>(capacity)); }
 
   /**
    * @return the capacity.
@@ -56,7 +51,7 @@ public:
    * @param object the object to append.
    */
   void appendOne(T object) {
-    RELEASE_ASSERT(capacity_remaining_ >= 1, "insufficient capacity");
+    SECURITY_ASSERT(capacity_remaining_ >= 1, "insufficient capacity");
     ASSERT(write_ptr_ < (data_.get() + capacity_));
     *write_ptr_++ = object;
     --capacity_remaining_;
@@ -71,7 +66,7 @@ public:
    * @param size The number of elements in the block.
    */
   void appendData(const T* data, uint64_t size) {
-    RELEASE_ASSERT(capacity_remaining_ >= size, "insufficient capacity");
+    SECURITY_ASSERT(capacity_remaining_ >= size, "insufficient capacity");
     ASSERT((write_ptr_ + size) <= (data_.get() + capacity_));
     if (size != 0) {
       memcpy(write_ptr_, data, size * sizeof(T));
@@ -95,12 +90,7 @@ public:
   /**
    * Empties the contents of this.
    */
-  void reset() {
-    data_.reset();
-    capacity_ = 0;
-    capacity_remaining_ = 0;
-    write_ptr_ = nullptr;
-  }
+  void reset() { populateHelper(0, std::unique_ptr<T[]>(nullptr)); }
 
   /**
    * Returns the underlying storage as a unique pointer, clearing this.
@@ -127,6 +117,13 @@ public:
   uint64_t size() const { return write_ptr_ - data_.get(); }
 
 private:
+  void populateHelper(uint64_t capacity, std::unique_ptr<T[]> data) {
+    data_ = std::move(data);
+    capacity_ = capacity;
+    capacity_remaining_ = capacity;
+    write_ptr_ = data_.get();
+  }
+
   std::unique_ptr<T[]> data_;
   uint64_t capacity_;
   uint64_t capacity_remaining_;
