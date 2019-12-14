@@ -25,9 +25,9 @@ template <class T> class MemBlockBuilder {
 public:
   // Constructs a MemBlockBuilder allowing for 'capacity' instances of T.
   explicit MemBlockBuilder(uint64_t capacity)
-      : data_(std::make_unique<T[]>(capacity)), capacity_(capacity), capacity_remaining_(capacity),
+      : data_(std::make_unique<T[]>(capacity)), capacity_remaining_(capacity),
         write_ptr_(data_.get()) {}
-  MemBlockBuilder() : capacity_(0), capacity_remaining_(0), write_ptr_(nullptr) {}
+  MemBlockBuilder() : capacity_remaining_(0), write_ptr_(nullptr) {}
 
   /**
    * Populates (or repopulates) the MemBlockBuilder to make it the specified
@@ -41,7 +41,7 @@ public:
   /**
    * @return the capacity.
    */
-  uint64_t capacity() const { return capacity_; }
+  uint64_t capacity() const { return capacity_remaining_ + write_ptr_ - data_.get(); }
 
   /**
    * Appends a single object of type T, moving an internal write-pointer
@@ -52,7 +52,6 @@ public:
    */
   void appendOne(T object) {
     SECURITY_ASSERT(capacity_remaining_ >= 1, "insufficient capacity");
-    ASSERT(write_ptr_ < (data_.get() + capacity_));
     *write_ptr_++ = object;
     --capacity_remaining_;
   }
@@ -67,7 +66,6 @@ public:
    */
   void appendData(const T* data, uint64_t size) {
     SECURITY_ASSERT(capacity_remaining_ >= size, "insufficient capacity");
-    ASSERT((write_ptr_ + size) <= (data_.get() + capacity_));
     if (size != 0) {
       memcpy(write_ptr_, data, size * sizeof(T));
     }
@@ -99,7 +97,6 @@ public:
    */
   std::unique_ptr<T[]> release() {
     write_ptr_ = nullptr;
-    capacity_ = 0;
     capacity_remaining_ = 0;
     return std::move(data_);
   }
@@ -119,13 +116,11 @@ public:
 private:
   void populateHelper(uint64_t capacity, std::unique_ptr<T[]> data) {
     data_ = std::move(data);
-    capacity_ = capacity;
     capacity_remaining_ = capacity;
     write_ptr_ = data_.get();
   }
 
   std::unique_ptr<T[]> data_;
-  uint64_t capacity_;
   uint64_t capacity_remaining_;
   T* write_ptr_;
 };
