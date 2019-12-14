@@ -51,9 +51,9 @@ public:
    * @param object the object to append.
    */
   void appendOne(T object) {
-    T* dest = write_span_.data();
-    write_span_.remove_prefix(1); // asserts there is enough space.
-    *dest = object;
+    SECURITY_ASSERT(write_span_.size() >= 1, "insufficient capacity");
+    *write_span_.data() = object;
+    write_span_.remove_prefix(1);
   }
 
   /**
@@ -66,12 +66,12 @@ public:
    */
   void appendData(absl::Span<const T> data) {
     uint64_t size = data.size();
+    SECURITY_ASSERT(write_span_.size() >= size, "insufficient capacity");
     if (size == 0) {
       return;
     }
-    T* dest = write_span_.data();
-    write_span_.remove_prefix(size); // asserts there is enough space.
-    memcpy(dest, data.data(), size * sizeof(T));
+    memcpy(write_span_.data(), data.data(), size * sizeof(T));
+    write_span_.remove_prefix(size);
   }
 
   /**
