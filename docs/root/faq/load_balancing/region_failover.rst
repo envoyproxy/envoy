@@ -1,5 +1,5 @@
 How do I make Envoy fail over to another region during service degradation?
-====================================================================
+===========================================================================
 
 Envoy uses the concept of
 `priorities <arch_overview_load_balancing_priority_levels>` to express
