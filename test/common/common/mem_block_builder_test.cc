@@ -70,7 +70,7 @@ TEST(MemBlockBuilderTest, AppendOneTooMuch) {
 #ifdef ENVOY_CONFIG_COVERAGE
                "" // For some reason, this test under coverage generates a list of testdata/*.
 #else
-               ".*insufficient capacity.*"
+               ".*size\\(\\) >= n.*"
 #endif
   );
 }
@@ -82,7 +82,7 @@ TEST(MemBlockBuilderTest, AppendDataTooMuch) {
 #ifdef ENVOY_CONFIG_COVERAGE
                "" // For some reason, this test under coverage generates a list of testdata/*.
 #else
-               ".*insufficient capacity.*"
+               ".*size\\(\\) >= n.*"
 #endif
   );
 }
