@@ -30,39 +30,23 @@ ConnPoolImpl::ConnPoolImpl(Event::Dispatcher& dispatcher, Upstream::HostConstSha
                            const Network::ConnectionSocket::OptionsSharedPtr& options,
                            const Http::Http1Settings& settings,
                            const Network::TransportSocketOptionsSharedPtr& transport_socket_options)
-    : ConnPoolImplBase(std::move(host), std::move(priority)), dispatcher_(dispatcher),
-      socket_options_(options), transport_socket_options_(transport_socket_options),
+    : ConnPoolImplBase(std::move(host), std::move(priority), dispatcher), socket_options_(options),
+      transport_socket_options_(transport_socket_options),
       upstream_ready_timer_(dispatcher_.createTimer([this]() { onUpstreamReady(); })),
       settings_(settings) {}
 
-ConnPoolImpl::~ConnPoolImpl() {
-  while (!ready_clients_.empty()) {
-    ready_clients_.front()->codec_client_->close();
-  }
-
-  while (!busy_clients_.empty()) {
-    busy_clients_.front()->codec_client_->close();
-  }
-
-  // Make sure all clients are destroyed before we are destroyed.
-  dispatcher_.clearDeferredDeleteList();
-}
+ConnPoolImpl::~ConnPoolImpl() {}
 
 void ConnPoolImpl::drainConnections() {
   while (!ready_clients_.empty()) {
-    ready_clients_.front()->codec_client_->close();
+    firstReady().codec_client_->close();
   }
 
   // We drain busy clients by manually setting remaining requests to 1. Thus, when the next
   // response completes the client will be destroyed.
   for (const auto& client : busy_clients_) {
-    client->remaining_requests_ = 1;
+    static_cast<ActiveClient&>(*client).remaining_requests_ = 1;
   }
-}
-
-void ConnPoolImpl::addDrainedCallback(DrainedCb cb) {
-  drained_callbacks_.push_back(cb);
-  checkForDrained();
 }
 
 bool ConnPoolImpl::hasActiveConnections() const {
@@ -82,7 +66,7 @@ void ConnPoolImpl::attachRequestToClient(ActiveClient& client, StreamDecoder& re
 void ConnPoolImpl::checkForDrained() {
   if (!drained_callbacks_.empty() && pending_requests_.empty() && busy_clients_.empty()) {
     while (!ready_clients_.empty()) {
-      ready_clients_.front()->codec_client_->close();
+      firstReady().codec_client_->close();
     }
 
     for (const DrainedCb& cb : drained_callbacks_) {
@@ -93,16 +77,16 @@ void ConnPoolImpl::checkForDrained() {
 
 void ConnPoolImpl::createNewConnection() {
   ENVOY_LOG(debug, "creating a new connection");
-  ActiveClientPtr client(new ActiveClient(*this));
+  auto client = std::make_unique<ConnPoolImpl::ActiveClient>(*this);
   client->moveIntoList(std::move(client), busy_clients_);
 }
 
 ConnectionPool::Cancellable* ConnPoolImpl::newStream(StreamDecoder& response_decoder,
                                                      ConnectionPool::Callbacks& callbacks) {
   if (!ready_clients_.empty()) {
-    ready_clients_.front()->moveBetweenLists(ready_clients_, busy_clients_);
-    ENVOY_CONN_LOG(debug, "using existing connection", *busy_clients_.front()->codec_client_);
-    attachRequestToClient(*busy_clients_.front(), response_decoder, callbacks);
+    firstReady().moveBetweenLists(ready_clients_, busy_clients_);
+    ENVOY_CONN_LOG(debug, "using existing connection", *firstBusy().codec_client_);
+    attachRequestToClient(firstBusy(), response_decoder, callbacks);
     return nullptr;
   }
 
@@ -225,7 +209,7 @@ void ConnPoolImpl::onResponseComplete(ActiveClient& client) {
 void ConnPoolImpl::onUpstreamReady() {
   upstream_ready_enabled_ = false;
   while (!pending_requests_.empty() && !ready_clients_.empty()) {
-    ActiveClient& client = *ready_clients_.front();
+    ActiveClient& client = firstReady();
     ENVOY_CONN_LOG(debug, "attaching to next request", *client.codec_client_);
     // There is work to do so bind a request to the client and move it to the busy list. Pending
     // requests are pushed onto the front, so pull from the back.

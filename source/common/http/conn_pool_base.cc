@@ -2,6 +2,31 @@
 
 namespace Envoy {
 namespace Http {
+
+ConnPoolImplBase::~ConnPoolImplBase() {
+  while (!ready_clients_.empty()) {
+    ready_clients_.front()->close();
+  }
+
+  while (!busy_clients_.empty()) {
+    busy_clients_.front()->close();
+  }
+
+  // Make sure all clients are destroyed before we are destroyed.
+  dispatcher_.clearDeferredDeleteList();
+}
+
+void ConnPoolImplBase::addDrainedCallback(DrainedCb cb) {
+  drained_callbacks_.push_back(cb);
+  checkForDrained();
+}
+
+void ConnPoolImplBase::onConnectTimeout(ConnPoolImplBase::ActiveClient& client) {
+  ENVOY_CONN_ID_LOG(debug, "connect timeout", client.connectionId());
+  host_->cluster().stats().upstream_cx_connect_timeout_.inc();
+  client.close();
+}
+
 ConnPoolImplBase::PendingRequest::PendingRequest(ConnPoolImplBase& parent, StreamDecoder& decoder,
                                                  ConnectionPool::Callbacks& callbacks)
     : parent_(parent), decoder_(decoder), callbacks_(callbacks) {

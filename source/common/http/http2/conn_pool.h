@@ -22,7 +22,7 @@ namespace Http2 {
  * shifting to a new connection if we reach max streams on the primary. This is a base class
  * used for both the prod implementation as well as the testing one.
  */
-class ConnPoolImpl : public ConnectionPool::Instance, public ConnPoolImplBase {
+class ConnPoolImpl : public ConnPoolImplBase {
 public:
   ConnPoolImpl(Event::Dispatcher& dispatcher, Upstream::HostConstSharedPtr host,
                Upstream::ResourcePriority priority,
@@ -32,7 +32,6 @@ public:
 
   // Http::ConnectionPool::Instance
   Http::Protocol protocol() const override { return Http::Protocol::Http2; }
-  void addDrainedCallback(DrainedCb cb) override;
   void drainConnections() override;
   bool hasActiveConnections() const override;
   ConnectionPool::Cancellable* newStream(Http::StreamDecoder& response_decoder,
@@ -42,12 +41,16 @@ public:
 protected:
   struct ActiveClient : public Network::ConnectionCallbacks,
                         public CodecClientCallbacks,
-                        public Event::DeferredDeletable,
-                        public Http::ConnectionCallbacks {
+                        public Http::ConnectionCallbacks,
+                        public ConnPoolImplBase::ActiveClient {
     ActiveClient(ConnPoolImpl& parent);
     ~ActiveClient() override;
 
     void onConnectTimeout() { parent_.onConnectTimeout(*this); }
+
+    // ConnPoolImpl::ActiveClient
+    void close() override { client_->close(); }
+    uint64_t connectionId() const override { return client_->id(); }
 
     // Network::ConnectionCallbacks
     void onEvent(Network::ConnectionEvent event) override {
@@ -84,7 +87,6 @@ protected:
   virtual uint32_t maxTotalStreams() PURE;
   void movePrimaryClientToDraining();
   void onConnectionEvent(ActiveClient& client, Network::ConnectionEvent event);
-  void onConnectTimeout(ActiveClient& client);
   void onGoAway(ActiveClient& client);
   void onStreamDestroy(ActiveClient& client);
   void onStreamReset(ActiveClient& client, Http::StreamResetReason reason);
@@ -92,10 +94,8 @@ protected:
   void onUpstreamReady();
 
   Stats::TimespanPtr conn_connect_ms_;
-  Event::Dispatcher& dispatcher_;
   ActiveClientPtr primary_client_;
   ActiveClientPtr draining_client_;
-  std::list<DrainedCb> drained_callbacks_;
   const Network::ConnectionSocket::OptionsSharedPtr socket_options_;
   const Network::TransportSocketOptionsSharedPtr transport_socket_options_;
 };

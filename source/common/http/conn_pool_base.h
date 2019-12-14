@@ -1,20 +1,29 @@
 #pragma once
 
+#include "envoy/event/dispatcher.h"
 #include "envoy/http/conn_pool.h"
 
 #include "common/common/linked_object.h"
 
 #include "absl/strings/string_view.h"
+#include "envoy/network/connection.h"
 
 namespace Envoy {
 namespace Http {
 
 // Base class that handles request queueing logic shared between connection pool implementations.
-class ConnPoolImplBase : protected Logger::Loggable<Logger::Id::pool> {
+class ConnPoolImplBase : public ConnectionPool::Instance,
+                         protected Logger::Loggable<Logger::Id::pool> {
+
+  // ConnectionPool::Instance
+  void addDrainedCallback(DrainedCb cb) override;
+
 protected:
-  ConnPoolImplBase(Upstream::HostConstSharedPtr host, Upstream::ResourcePriority priority)
-      : host_(host), priority_(priority) {}
-  virtual ~ConnPoolImplBase() = default;
+  ConnPoolImplBase(Upstream::HostConstSharedPtr host, Upstream::ResourcePriority priority,
+                   Event::Dispatcher& dispatcher)
+      : host_(host), priority_(priority), dispatcher_(dispatcher) {}
+  virtual ~ConnPoolImplBase();
+
 
   struct PendingRequest : LinkedObject<PendingRequest>, public ConnectionPool::Cancellable {
     PendingRequest(ConnPoolImplBase& parent, StreamDecoder& decoder,
@@ -31,6 +40,16 @@ protected:
 
   using PendingRequestPtr = std::unique_ptr<PendingRequest>;
 
+  struct ActiveClient : LinkedObject<ActiveClient>, public Event::DeferredDeletable {
+    virtual ~ActiveClient() = default;
+
+    virtual void close() PURE;
+
+    virtual uint64_t connectionId() const PURE;
+  };
+
+  using ActiveClientPtr = std::unique_ptr<ActiveClient>;
+
   // Creates a new PendingRequest and enqueues it into the request queue.
   ConnectionPool::Cancellable* newPendingRequest(StreamDecoder& decoder,
                                                  ConnectionPool::Callbacks& callbacks);
@@ -42,15 +61,22 @@ protected:
   void purgePendingRequests(const Upstream::HostDescriptionConstSharedPtr& host_description,
                             absl::string_view failure_reason);
 
+  void onConnectTimeout(ActiveClient& client);
+
   // Must be implemented by sub class. Attempts to drain inactive clients.
   virtual void checkForDrained() PURE;
 
   const Upstream::HostConstSharedPtr host_;
   const Upstream::ResourcePriority priority_;
+  Event::Dispatcher& dispatcher_;
+
+  std::list<DrainedCb> drained_callbacks_;
   std::list<PendingRequestPtr> pending_requests_;
   // When calling purgePendingRequests, this list will be used to hold the requests we are about
   // to purge. We need this if one cancelled requests cancels a different pending request
   std::list<PendingRequestPtr> pending_requests_to_purge_;
+  std::list<ActiveClientPtr> ready_clients_;
+  std::list<ActiveClientPtr> busy_clients_;
 };
 } // namespace Http
 } // namespace Envoy

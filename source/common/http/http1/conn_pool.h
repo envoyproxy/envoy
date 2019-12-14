@@ -41,7 +41,6 @@ public:
 
   // ConnectionPool::Instance
   Http::Protocol protocol() const override { return Http::Protocol::Http11; }
-  void addDrainedCallback(DrainedCb cb) override;
   void drainConnections() override;
   bool hasActiveConnections() const override;
   ConnectionPool::Cancellable* newStream(StreamDecoder& response_decoder,
@@ -83,11 +82,13 @@ protected:
 
   using StreamWrapperPtr = std::unique_ptr<StreamWrapper>;
 
-  struct ActiveClient : LinkedObject<ActiveClient>,
-                        public Network::ConnectionCallbacks,
-                        public Event::DeferredDeletable {
+  struct ActiveClient : public Network::ConnectionCallbacks, public ConnPoolImplBase::ActiveClient {
     ActiveClient(ConnPoolImpl& parent);
     ~ActiveClient() override;
+
+    // ConnPoolImplBase::ActiveClient
+    void close() override { codec_client_->close(); }
+    uint64_t connectionId() override { codec_client_->id(); }
 
     void onConnectTimeout();
 
@@ -108,8 +109,6 @@ protected:
     uint64_t remaining_requests_;
   };
 
-  using ActiveClientPtr = std::unique_ptr<ActiveClient>;
-
   void attachRequestToClient(ActiveClient& client, StreamDecoder& response_decoder,
                              ConnectionPool::Callbacks& callbacks);
   virtual CodecClientPtr createCodecClient(Upstream::Host::CreateConnectionData& data) PURE;
@@ -119,11 +118,9 @@ protected:
   void onResponseComplete(ActiveClient& client);
   void onUpstreamReady();
   void processIdleClient(ActiveClient& client, bool delay);
+  ActiveClient& firstReady() const { return static_cast<ActiveClient&>(*ready_clients_.front()); }
+  ActiveClient& firstBusy() const { return static_cast<ActiveClient&>(*busy_clients_.front()); }
 
-  Event::Dispatcher& dispatcher_;
-  std::list<ActiveClientPtr> ready_clients_;
-  std::list<ActiveClientPtr> busy_clients_;
-  std::list<DrainedCb> drained_callbacks_;
   const Network::ConnectionSocket::OptionsSharedPtr socket_options_;
   const Network::TransportSocketOptionsSharedPtr transport_socket_options_;
   Event::TimerPtr upstream_ready_timer_;

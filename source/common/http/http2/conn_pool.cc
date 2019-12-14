@@ -20,10 +20,14 @@ ConnPoolImpl::ConnPoolImpl(Event::Dispatcher& dispatcher, Upstream::HostConstSha
                            Upstream::ResourcePriority priority,
                            const Network::ConnectionSocket::OptionsSharedPtr& options,
                            const Network::TransportSocketOptionsSharedPtr& transport_socket_options)
-    : ConnPoolImplBase(std::move(host), std::move(priority)), dispatcher_(dispatcher),
-      socket_options_(options), transport_socket_options_(transport_socket_options) {}
+    : ConnPoolImplBase(std::move(host), std::move(priority), dispatcher), socket_options_(options),
+      transport_socket_options_(transport_socket_options) {}
 
 ConnPoolImpl::~ConnPoolImpl() {
+  // TODO(snowp): Change the HTTP/2 conn pool to use the ready_clients_ from the base
+  // implementation. We probably need a third list for HTTP/2 (draining_clients_) in anticipation
+  // for there to be a distinction between a client that is being shut down (draining) and one that
+  // has reached its capacity (busy).
   if (primary_client_) {
     primary_client_->client_->close();
   }
@@ -31,20 +35,12 @@ ConnPoolImpl::~ConnPoolImpl() {
   if (draining_client_) {
     draining_client_->client_->close();
   }
-
-  // Make sure all clients are destroyed before we are destroyed.
-  dispatcher_.clearDeferredDeleteList();
 }
 
 void ConnPoolImpl::ConnPoolImpl::drainConnections() {
   if (primary_client_ != nullptr) {
     movePrimaryClientToDraining();
   }
-}
-
-void ConnPoolImpl::addDrainedCallback(DrainedCb cb) {
-  drained_callbacks_.push_back(cb);
-  checkForDrained();
 }
 
 bool ConnPoolImpl::hasActiveConnections() const {
@@ -215,12 +211,6 @@ void ConnPoolImpl::movePrimaryClientToDraining() {
   }
 
   ASSERT(!primary_client_);
-}
-
-void ConnPoolImpl::onConnectTimeout(ActiveClient& client) {
-  ENVOY_CONN_LOG(debug, "connect timeout", *client.client_);
-  host_->cluster().stats().upstream_cx_connect_timeout_.inc();
-  client.client_->close();
 }
 
 void ConnPoolImpl::onGoAway(ActiveClient& client) {
