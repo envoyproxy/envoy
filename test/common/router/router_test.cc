@@ -795,7 +795,8 @@ void RouterTestBase::testAppendCluster(absl::optional<Http::LowerCaseString> clu
       /* do_not_forward */ false,
       /* not_forwarded_header */ absl::nullopt);
   callbacks_.streamInfo().filterState().setData(DebugConfig::key(), std::move(debug_config),
-                                                StreamInfo::FilterState::StateType::ReadOnly);
+                                                StreamInfo::FilterState::StateType::ReadOnly,
+                                                StreamInfo::FilterState::LifeSpan::FilterChain);
 
   NiceMock<Http::MockStreamEncoder> encoder;
   Http::StreamDecoder* response_decoder = nullptr;
@@ -846,7 +847,8 @@ void RouterTestBase::testAppendUpstreamHost(
       /* do_not_forward */ false,
       /* not_forwarded_header */ absl::nullopt);
   callbacks_.streamInfo().filterState().setData(DebugConfig::key(), std::move(debug_config),
-                                                StreamInfo::FilterState::StateType::ReadOnly);
+                                                StreamInfo::FilterState::StateType::ReadOnly,
+                                                StreamInfo::FilterState::LifeSpan::FilterChain);
   cm_.conn_pool_.host_->hostname_ = "scooby.doo";
 
   NiceMock<Http::MockStreamEncoder> encoder;
@@ -917,7 +919,8 @@ void RouterTestBase::testDoNotForward(
       /* do_not_forward */ true,
       /* not_forwarded_header */ not_forwarded_header_name);
   callbacks_.streamInfo().filterState().setData(DebugConfig::key(), std::move(debug_config),
-                                                StreamInfo::FilterState::StateType::ReadOnly);
+                                                StreamInfo::FilterState::StateType::ReadOnly,
+                                                StreamInfo::FilterState::LifeSpan::FilterChain);
 
   Http::TestHeaderMapImpl response_headers{
       {":status", "204"},
@@ -949,7 +952,8 @@ TEST_F(RouterTest, AllDebugConfig) {
       /* do_not_forward */ true,
       /* not_forwarded_header */ absl::nullopt);
   callbacks_.streamInfo().filterState().setData(DebugConfig::key(), std::move(debug_config),
-                                                StreamInfo::FilterState::StateType::ReadOnly);
+                                                StreamInfo::FilterState::StateType::ReadOnly,
+                                                StreamInfo::FilterState::LifeSpan::FilterChain);
   cm_.conn_pool_.host_->hostname_ = "scooby.doo";
 
   Http::TestHeaderMapImpl response_headers{{":status", "204"},
@@ -4327,7 +4331,7 @@ TEST_F(RouterTest, ApplicationProtocols) {
   callbacks_.streamInfo().filterState().setData(
       Network::ApplicationProtocols::key(),
       std::make_unique<Network::ApplicationProtocols>(std::vector<std::string>{"foo", "bar"}),
-      StreamInfo::FilterState::StateType::ReadOnly);
+      StreamInfo::FilterState::StateType::ReadOnly, StreamInfo::FilterState::LifeSpan::FilterChain);
 
   EXPECT_CALL(cm_, httpConnPoolForCluster(_, _, _, _))
       .WillOnce(

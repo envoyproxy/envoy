@@ -43,7 +43,7 @@ public:
     raw_fetcher_ = new MockJwksFetcher;
     fetcher_.reset(raw_fetcher_);
     auth_ = Authenticator::create(
-        check_audience, provider, !provider, filter_config_->getCache().getJwksCache(),
+        check_audience, provider, !provider, !provider, filter_config_->getCache().getJwksCache(),
         filter_config_->cm(), [this](Upstream::ClusterManager&) { return std::move(fetcher_); },
         filter_config_->timeSource());
     jwks_ = Jwks::createFrom(PublicKey, Jwks::JWKS);
@@ -58,12 +58,22 @@ public:
       out_name_ = name;
       out_payload_ = payload;
     };
-    auto tokens = filter_config_->getExtractor().extract(headers);
+    initTokenExtractor();
+    auto tokens = extractor_->extract(headers);
     auth_->verify(headers, parent_span_, std::move(tokens), std::move(set_payload_cb),
                   std::move(on_complete_cb));
   }
 
+  void initTokenExtractor() {
+    JwtProviderList providers;
+    for (const auto& it : proto_config_.providers()) {
+      providers.emplace_back(&it.second);
+    }
+    extractor_ = Extractor::create(providers);
+  }
+
   JwtAuthentication proto_config_;
+  ExtractorConstPtr extractor_;
   FilterConfigSharedPtr filter_config_;
   MockJwksFetcher* raw_fetcher_;
   JwksFetcherPtr fetcher_;
@@ -272,7 +282,8 @@ TEST_F(AuthenticatorTest, TestOnDestroy) {
   EXPECT_CALL(*raw_fetcher_, cancel()).Times(1);
 
   auto headers = Http::TestHeaderMapImpl{{"Authorization", "Bearer " + std::string(GoodToken)}};
-  auto tokens = filter_config_->getExtractor().extract(headers);
+  initTokenExtractor();
+  auto tokens = extractor_->extract(headers);
   // callback should not be called.
   std::function<void(const Status&)> on_complete_cb = [](const Status&) { FAIL(); };
   auth_->verify(headers, parent_span_, std::move(tokens), nullptr, std::move(on_complete_cb));

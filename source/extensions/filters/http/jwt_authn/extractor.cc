@@ -82,11 +82,13 @@ public:
  * The class implements Extractor interface
  *
  */
-class ExtractorImpl : public Extractor {
+class ExtractorImpl : public Logger::Loggable<Logger::Id::jwt>, public Extractor {
 public:
   ExtractorImpl(const JwtProvider& provider);
 
-  ExtractorImpl(const JwtAuthentication& config);
+  ExtractorImpl(
+      const std::vector<const ::envoy::config::filter::http::jwt_authn::v2alpha::JwtProvider*>&
+          providers);
 
   std::vector<JwtLocationConstPtr> extract(const Http::HeaderMap& headers) const override;
 
@@ -132,14 +134,14 @@ private:
   std::vector<LowerCaseString> forward_payload_headers_;
 };
 
-ExtractorImpl::ExtractorImpl(const JwtAuthentication& config) {
-  for (const auto& it : config.providers()) {
-    const auto& provider = it.second;
-    addProvider(provider);
+ExtractorImpl::ExtractorImpl(const JwtProvider& provider) { addProvider(provider); }
+
+ExtractorImpl::ExtractorImpl(const JwtProviderList& providers) {
+  for (const auto& provider : providers) {
+    ASSERT(provider);
+    addProvider(*provider);
   }
 }
-
-ExtractorImpl::ExtractorImpl(const JwtProvider& provider) { addProvider(provider); }
 
 void ExtractorImpl::addProvider(const JwtProvider& provider) {
   for (const auto& header : provider.from_headers()) {
@@ -161,6 +163,7 @@ void ExtractorImpl::addProvider(const JwtProvider& provider) {
 
 void ExtractorImpl::addHeaderConfig(const std::string& issuer, const LowerCaseString& header_name,
                                     const std::string& value_prefix) {
+  ENVOY_LOG(debug, "addHeaderConfig for issuer {} at {}", issuer, header_name.get());
   const std::string map_key = header_name.get() + value_prefix;
   auto& header_location_spec = header_locations_[map_key];
   if (!header_location_spec) {
@@ -180,6 +183,7 @@ std::vector<JwtLocationConstPtr> ExtractorImpl::extract(const Http::HeaderMap& h
   // Check header locations first
   for (const auto& location_it : header_locations_) {
     const auto& location_spec = location_it.second;
+    ENVOY_LOG(debug, "extract {}", location_it.first);
     const Http::HeaderEntry* entry = headers.get(location_spec->header_);
     if (entry) {
       auto value_str = entry->value().getStringView();
@@ -253,12 +257,12 @@ void ExtractorImpl::sanitizePayloadHeaders(Http::HeaderMap& headers) const {
 
 } // namespace
 
-ExtractorConstPtr Extractor::create(const JwtAuthentication& config) {
-  return std::make_unique<ExtractorImpl>(config);
-}
-
 ExtractorConstPtr Extractor::create(const JwtProvider& provider) {
   return std::make_unique<ExtractorImpl>(provider);
+}
+
+ExtractorConstPtr Extractor::create(const JwtProviderList& providers) {
+  return std::make_unique<ExtractorImpl>(providers);
 }
 
 } // namespace JwtAuthn

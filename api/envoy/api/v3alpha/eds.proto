@@ -2,9 +2,9 @@ syntax = "proto3";
 
 package envoy.api.v3alpha;
 
+option java_package = "io.envoyproxy.envoy.api.v3alpha";
 option java_outer_classname = "EdsProto";
 option java_multiple_files = true;
-option java_package = "io.envoyproxy.envoy.api.v3alpha";
 option java_generic_services = true;
 
 import "envoy/api/v3alpha/discovery.proto";
@@ -32,10 +32,8 @@ service EndpointDiscoveryService {
   }
 
   rpc FetchEndpoints(DiscoveryRequest) returns (DiscoveryResponse) {
-    option (google.api.http) = {
-      post: "/v3alpha/discovery:endpoints"
-      body: "*"
-    };
+    option (google.api.http).post = "/v3alpha/discovery:endpoints";
+    option (google.api.http).body = "*";
   }
 }
 

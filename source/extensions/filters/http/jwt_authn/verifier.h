@@ -82,7 +82,7 @@ public:
       const ::envoy::config::filter::http::jwt_authn::v2alpha::JwtRequirement& requirement,
       const Protobuf::Map<
           std::string, ::envoy::config::filter::http::jwt_authn::v2alpha::JwtProvider>& providers,
-      const AuthFactory& factory, const Extractor& extractor_for_allow_fail);
+      const AuthFactory& factory);
 
   // Factory method for creating verifier contexts.
   static ContextSharedPtr createContext(Http::HeaderMap& headers, Tracing::Span& parent_span,

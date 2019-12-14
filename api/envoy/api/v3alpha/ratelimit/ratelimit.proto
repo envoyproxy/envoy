@@ -2,9 +2,9 @@ syntax = "proto3";
 
 package envoy.api.v3alpha.ratelimit;
 
+option java_package = "io.envoyproxy.envoy.api.v3alpha.ratelimit";
 option java_outer_classname = "RatelimitProto";
 option java_multiple_files = true;
-option java_package = "io.envoyproxy.envoy.api.v3alpha.ratelimit";
 
 import "udpa/annotations/versioning.proto";
 

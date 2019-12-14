@@ -34,7 +34,7 @@ public:
   void createVerifier() {
     filter_config_ = ::std::make_shared<FilterConfig>(proto_config_, "", mock_factory_ctx_);
     verifier_ = Verifier::create(proto_config_.rules(0).requires(), proto_config_.providers(),
-                                 *filter_config_, filter_config_->getExtractor());
+                                 *filter_config_);
   }
 
   JwtAuthentication proto_config_;

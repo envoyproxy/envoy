@@ -226,6 +226,7 @@ envoy_cc_library(
     hdrs = ["pausable_ack_queue.h"],
     deps = [
         "//source/common/common:assert_lib",
+        "@com_google_googleapis//google/rpc:status_cc_proto",
         "@envoy_api//envoy/api/v2:pkg_cc_proto",
     ],
 )
