@@ -117,7 +117,7 @@ private:
 
     ScopedRdsConfigSubscription& parent_;
     std::string scope_name_;
-    std::unique_ptr<RdsRouteConfigProviderImpl> route_provider_;
+    std::shared_ptr<RdsRouteConfigProviderImpl> route_provider_;
     // This handle_ is owned by the route config provider's RDS subscription, when the helper
     // destructs, the handle is deleted as well.
     Common::CallbackHandle* rds_update_callback_handle_;

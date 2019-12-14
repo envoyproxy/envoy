@@ -136,35 +136,40 @@ public:
     }
   }
 
-  void setupFilterChain(int num_decoder_filters, int num_encoder_filters) {
+  void setupFilterChain(int num_decoder_filters, int num_encoder_filters, int num_requests = 1) {
     // NOTE: The length/repetition in this routine allows InSequence to work correctly in an outer
     // scope.
-    for (int i = 0; i < num_decoder_filters; i++) {
+    for (int i = 0; i < num_decoder_filters * num_requests; i++) {
       decoder_filters_.push_back(new MockStreamDecoderFilter());
     }
 
-    for (int i = 0; i < num_encoder_filters; i++) {
+    for (int i = 0; i < num_encoder_filters * num_requests; i++) {
       encoder_filters_.push_back(new MockStreamEncoderFilter());
     }
 
-    EXPECT_CALL(filter_factory_, createFilterChain(_))
-        .WillOnce(Invoke([num_decoder_filters, num_encoder_filters,
-                          this](FilterChainFactoryCallbacks& callbacks) -> void {
-          for (int i = 0; i < num_decoder_filters; i++) {
-            callbacks.addStreamDecoderFilter(StreamDecoderFilterSharedPtr{decoder_filters_[i]});
-          }
+    InSequence s;
+    for (int req = 0; req < num_requests; req++) {
+      EXPECT_CALL(filter_factory_, createFilterChain(_))
+          .WillOnce(Invoke([num_decoder_filters, num_encoder_filters, req,
+                            this](FilterChainFactoryCallbacks& callbacks) -> void {
+            for (int i = 0; i < num_decoder_filters; i++) {
+              callbacks.addStreamDecoderFilter(
+                  StreamDecoderFilterSharedPtr{decoder_filters_[req * num_decoder_filters + i]});
+            }
 
-          for (int i = 0; i < num_encoder_filters; i++) {
-            callbacks.addStreamEncoderFilter(StreamEncoderFilterSharedPtr{encoder_filters_[i]});
-          }
-        }));
+            for (int i = 0; i < num_encoder_filters; i++) {
+              callbacks.addStreamEncoderFilter(
+                  StreamEncoderFilterSharedPtr{encoder_filters_[req * num_encoder_filters + i]});
+            }
+          }));
 
-    for (int i = 0; i < num_decoder_filters; i++) {
-      EXPECT_CALL(*decoder_filters_[i], setDecoderFilterCallbacks(_));
-    }
+      for (int i = 0; i < num_decoder_filters; i++) {
+        EXPECT_CALL(*decoder_filters_[req * num_decoder_filters + i], setDecoderFilterCallbacks(_));
+      }
 
-    for (int i = 0; i < num_encoder_filters; i++) {
-      EXPECT_CALL(*encoder_filters_[i], setEncoderFilterCallbacks(_));
+      for (int i = 0; i < num_encoder_filters; i++) {
+        EXPECT_CALL(*encoder_filters_[req * num_encoder_filters + i], setEncoderFilterCallbacks(_));
+      }
     }
   }
 
@@ -5058,6 +5063,87 @@ TEST_F(HttpConnectionManagerImplTest, HeaderOnlyRequestAndResponseUsingHttp3) {
   filter_callbacks_.connection_.dispatcher_.clearDeferredDeleteList();
   conn_manager_.reset();
   EXPECT_EQ(0U, stats_.named_.downstream_cx_http3_active_.value());
+}
+
+namespace {
+
+class SimpleType : public StreamInfo::FilterState::Object {
+public:
+  SimpleType(int value) : value_(value) {}
+  int access() const { return value_; }
+
+private:
+  int value_;
+};
+
+} // namespace
+
+TEST_F(HttpConnectionManagerImplTest, ConnectionFilterState) {
+  setup(false, "envoy-custom-server", false);
+
+  setupFilterChain(1, 0, /* num_requests = */ 3);
+
+  EXPECT_CALL(*codec_, dispatch(_)).Times(2).WillRepeatedly(Invoke([&](Buffer::Instance&) -> void {
+    StreamDecoder* decoder = &conn_manager_->newStream(response_encoder_);
+    HeaderMapPtr headers{
+        new TestHeaderMapImpl{{":authority", "host"}, {":path", "/"}, {":method", "GET"}}};
+    decoder->decodeHeaders(std::move(headers), true);
+  }));
+  {
+    InSequence s;
+    EXPECT_CALL(*decoder_filters_[0], decodeHeaders(_, true))
+        .WillOnce(Invoke([this](HeaderMap&, bool) -> FilterHeadersStatus {
+          decoder_filters_[0]->callbacks_->streamInfo().filterState().setData(
+              "per_filter_chain", std::make_unique<SimpleType>(1),
+              StreamInfo::FilterState::StateType::ReadOnly,
+              StreamInfo::FilterState::LifeSpan::FilterChain);
+          decoder_filters_[0]->callbacks_->streamInfo().filterState().setData(
+              "per_downstream_request", std::make_unique<SimpleType>(2),
+              StreamInfo::FilterState::StateType::ReadOnly,
+              StreamInfo::FilterState::LifeSpan::DownstreamRequest);
+          decoder_filters_[0]->callbacks_->streamInfo().filterState().setData(
+              "per_downstream_connection", std::make_unique<SimpleType>(3),
+              StreamInfo::FilterState::StateType::ReadOnly,
+              StreamInfo::FilterState::LifeSpan::DownstreamConnection);
+          return FilterHeadersStatus::StopIteration;
+        }));
+    EXPECT_CALL(*decoder_filters_[1], decodeHeaders(_, true))
+        .WillOnce(Invoke([this](HeaderMap&, bool) -> FilterHeadersStatus {
+          EXPECT_FALSE(
+              decoder_filters_[1]->callbacks_->streamInfo().filterState().hasData<SimpleType>(
+                  "per_filter_chain"));
+          EXPECT_TRUE(
+              decoder_filters_[1]->callbacks_->streamInfo().filterState().hasData<SimpleType>(
+                  "per_downstream_request"));
+          EXPECT_TRUE(
+              decoder_filters_[1]->callbacks_->streamInfo().filterState().hasData<SimpleType>(
+                  "per_downstream_connection"));
+          return FilterHeadersStatus::StopIteration;
+        }));
+    EXPECT_CALL(*decoder_filters_[2], decodeHeaders(_, true))
+        .WillOnce(Invoke([this](HeaderMap&, bool) -> FilterHeadersStatus {
+          EXPECT_FALSE(
+              decoder_filters_[2]->callbacks_->streamInfo().filterState().hasData<SimpleType>(
+                  "per_filter_chain"));
+          EXPECT_FALSE(
+              decoder_filters_[2]->callbacks_->streamInfo().filterState().hasData<SimpleType>(
+                  "per_downstream_request"));
+          EXPECT_TRUE(
+              decoder_filters_[2]->callbacks_->streamInfo().filterState().hasData<SimpleType>(
+                  "per_downstream_connection"));
+          return FilterHeadersStatus::StopIteration;
+        }));
+  }
+
+  EXPECT_CALL(*decoder_filters_[0], decodeComplete());
+  EXPECT_CALL(*decoder_filters_[0], onDestroy());
+  EXPECT_CALL(*decoder_filters_[1], decodeComplete());
+  EXPECT_CALL(*decoder_filters_[2], decodeComplete());
+
+  Buffer::OwnedImpl fake_input;
+  conn_manager_->onData(fake_input, false);
+  decoder_filters_[0]->callbacks_->recreateStream();
+  conn_manager_->onData(fake_input, false);
 }
 
 class HttpConnectionManagerImplDeathTest : public HttpConnectionManagerImplTest {

@@ -106,6 +106,8 @@ or you can subscribe to the iCal feed [here](https://app.opsgenie.com/webcal/get
 * Run the deprecate_features.py script (e.g. `sh tools/deprecate_features/deprecate_features.sh`)
   to make the last release's deprecated features fatal-by-default. Submit the resultant PR and send
   an email to envoy-announce.
+* Check source/common/runtime/runtime_features.cc and see if any runtime guards in
+  disabled_runtime_features should be reassessed, and ping on the relevant issues.
 
 ## When does a maintainer lose maintainer status
 

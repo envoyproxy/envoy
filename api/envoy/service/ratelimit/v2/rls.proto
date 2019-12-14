@@ -10,6 +10,7 @@ option java_generic_services = true;
 import "envoy/api/v2/core/base.proto";
 import "envoy/api/v2/ratelimit/ratelimit.proto";
 
+import "udpa/annotations/migrate.proto";
 import "validate/validate.proto";
 
 // [#protodoc-title: Rate Limit Service (RLS)]
@@ -102,8 +103,8 @@ message RateLimitResponse {
   repeated DescriptorStatus statuses = 2;
 
   // A list of headers to add to the response
-  // [#next-major-version: rename to response_headers_to_add]
-  repeated api.v2.core.HeaderValue headers = 3;
+  repeated api.v2.core.HeaderValue headers = 3
+      [(udpa.annotations.field_migrate).rename = "response_headers_to_add"];
 
   // A list of headers to add to the request when forwarded
   repeated api.v2.core.HeaderValue request_headers_to_add = 4;

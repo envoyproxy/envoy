@@ -279,7 +279,7 @@ key:
   parseScopedRouteConfigurationFromYaml(*resources.Add(), config_yaml2);
   EXPECT_NO_THROW(srds_subscription_->onConfigUpdate(resources, "1"));
   context_init_manager_.initialize(init_watcher_);
-  init_watcher_.expectReady().Times(2); // SRDS and RDS "foo_routes"
+  init_watcher_.expectReady().Times(3); // SRDS x2 and RDS "foo_routes"
   EXPECT_EQ(
       1UL,
       factory_context_.scope_.counter("foo.scoped_rds.foo_scoped_routes.config_reload").value());
@@ -333,7 +333,7 @@ key:
 // Tests that multiple uniquely named non-conflict resources are allowed in config updates.
 TEST_F(ScopedRdsTest, MultipleResourcesDelta) {
   setup();
-  init_watcher_.expectReady().Times(2); // SRDS and RDS "foo_routes"
+  init_watcher_.expectReady().Times(3); // SRDS x2 and RDS "foo_routes"
 
   const std::string config_yaml = R"EOF(
 name: foo_scope
