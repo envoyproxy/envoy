@@ -57,12 +57,11 @@ public:
   }
 
   /**
-   * Appends raw data, moving an internal write-pointer forward. Asserts
-   * that there is room to write the block when compiled for debug. It is
-   * the caller's responsibility to ensure that the input data is valid.
+   * Appends raw data specified as a span, moving an internal write-pointer
+   * forward. Asserts that there is room to write the block. It is the caller's
+   * responsibility to ensure that the input data is valid.
    *
-   * @param data The block of objects to insert.
-   * @param size The number of elements in the block.
+   * @param data The span of objects to insert.
    */
   void appendData(absl::Span<const T> data) {
     uint64_t size = data.size();
