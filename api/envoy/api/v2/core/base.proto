@@ -84,7 +84,7 @@ message BuildVersion {
   type.SemanticVersion version = 1;
 
   // Free-form build information i.e. 'alpha'
-  repeated string build_info = 2;
+  repeated string labels = 2;
 }
 
 // Version and identification for an Envoy extension.
@@ -100,7 +100,7 @@ message Extension {
   // of other extensions and the Envoy API.
   BuildVersion version = 3;
 
-  // Indicates that the extension is present but was disabled during runtime.
+  // Indicates that the extension is present but was disabled via dynamic configuration.
   bool disabled = 4;
 }
 
@@ -161,7 +161,8 @@ message Node {
   ExtensionVersions extension_versions = 8;
 
   // Client feature support list. These are well known features described
-  // in the Envoy API repository for a given major version of an API.
+  // in the Envoy API repository for a given major version of an API. Client features
+  // use reverse DNS naming scheme, for example `com.acme.feature`.
   // See :ref:`the list of features <client_features>` that xDS client may
   // support.
   repeated string client_features = 9;

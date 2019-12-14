@@ -146,9 +146,9 @@ public:
    */
   static absl::flat_hash_map<std::string, envoy::api::v2::core::BuildVersion>&
   versioned_factories() {
-    static auto* factories =
-        new absl::flat_hash_map<std::string, envoy::api::v2::core::BuildVersion>;
-    return *factories;
+    using VersionedFactoryMap =
+        absl::flat_hash_map<std::string, envoy::api::v2::core::BuildVersion>;
+    MUTABLE_CONSTRUCT_ON_FIRST_USE(VersionedFactoryMap);
   }
 
   static absl::flat_hash_map<std::string, std::string>& deprecatedFactoryNames() {
@@ -306,10 +306,10 @@ public:
    * vendor specific version.
    */
   explicit RegisterFactory(uint32_t major, uint32_t minor, uint32_t patch,
-                           std::initializer_list<absl::string_view> build_info) {
+                           std::initializer_list<absl::string_view> labels) {
     if (!instance_.name().empty()) {
       FactoryRegistry<Base>::registerFactory(instance_, instance_.name(),
-                                             MakeBuildVersion(major, minor, patch, build_info));
+                                             MakeBuildVersion(major, minor, patch, labels));
     }
 
     if (!FactoryCategoryRegistry::isRegistered(Base::category())) {
@@ -322,9 +322,9 @@ public:
    * vendor specific version and deprecated names.
    */
   explicit RegisterFactory(uint32_t major, uint32_t minor, uint32_t patch,
-                           std::initializer_list<absl::string_view> build_info,
+                           std::initializer_list<absl::string_view> labels,
                            std::initializer_list<absl::string_view> deprecated_names) {
-    auto version = MakeBuildVersion(major, minor, patch, build_info);
+    auto version = MakeBuildVersion(major, minor, patch, labels);
     if (!instance_.name().empty()) {
       FactoryRegistry<Base>::registerFactory(instance_, instance_.name(), version);
     } else {
@@ -344,13 +344,13 @@ public:
 private:
   static envoy::api::v2::core::BuildVersion
   MakeBuildVersion(uint32_t major, uint32_t minor, uint32_t patch,
-                   std::initializer_list<absl::string_view> build_info) {
+                   std::initializer_list<absl::string_view> labels) {
     envoy::api::v2::core::BuildVersion version;
     version.mutable_version()->set_major(major);
     version.mutable_version()->set_minor(minor);
     version.mutable_version()->set_patch(patch);
-    for (const auto& info : build_info) {
-      version.add_build_info(std::string(info));
+    for (const auto& label : labels) {
+      version.add_labels(std::string(label));
     }
     return version;
   }

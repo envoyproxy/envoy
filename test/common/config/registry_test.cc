@@ -131,8 +131,8 @@ TEST(RegistryTest, VersionedFactory) {
   EXPECT_EQ(2, version.value().version().major());
   EXPECT_EQ(5, version.value().version().minor());
   EXPECT_EQ(39, version.value().version().patch());
-  EXPECT_EQ(1, version.value().build_info().size());
-  EXPECT_EQ("alpha", version.value().build_info()[0]);
+  EXPECT_EQ(1, version.value().labels().size());
+  EXPECT_EQ("alpha", version.value().labels()[0]);
 }
 
 class TestVersionedWithDeprecatedNamesFactory : public PublishedFactory {
@@ -163,8 +163,8 @@ TEST(RegistryTest, VersionedWithDeprecatednamesFactory) {
   EXPECT_EQ(0, version.value().version().major());
   EXPECT_EQ(0, version.value().version().minor());
   EXPECT_EQ(1, version.value().version().patch());
-  EXPECT_EQ(1, version.value().build_info().size());
-  EXPECT_EQ("private", version.value().build_info()[0]);
+  EXPECT_EQ(1, version.value().labels().size());
+  EXPECT_EQ("private", version.value().labels()[0]);
   // Get the version using deprecated name and check that it matches the
   // version obtained through the new name.
   auto deprecated_version =
