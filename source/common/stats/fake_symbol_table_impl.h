@@ -79,8 +79,8 @@ public:
       size_t sz = name.size();
       SymbolTableImpl::Encoding::appendEncoding(sz, mem_block);
       if (!name.empty()) {
-        mem_block.appendData(absl::MakeConstSpan(
-            reinterpret_cast<const uint8_t*>(name.data()), sz));
+        mem_block.appendData(
+            absl::MakeConstSpan(reinterpret_cast<const uint8_t*>(name.data()), sz));
       }
     }
 
@@ -141,8 +141,8 @@ private:
     name = StringUtil::removeTrailingCharacters(name, '.');
     MemBlockBuilder<uint8_t> mem_block(SymbolTableImpl::Encoding::totalSizeBytes(name.size()));
     SymbolTableImpl::Encoding::appendEncoding(name.size(), mem_block);
-    mem_block.appendData(absl::MakeConstSpan(
-        reinterpret_cast<const uint8_t*>(name.data()), name.size()));
+    mem_block.appendData(
+        absl::MakeConstSpan(reinterpret_cast<const uint8_t*>(name.data()), name.size()));
     return mem_block.release();
   }
 };
