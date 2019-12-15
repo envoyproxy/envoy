@@ -94,6 +94,9 @@ public:
      * Decodes a uint8_t array into a SymbolVec.
      */
     static SymbolVec decodeSymbols(const SymbolTable::Storage array, uint64_t size);
+    static void decodeTokens(const SymbolTable::Storage array, uint64_t size,
+                             const std::function<void(Symbol)>& symbolTokenFn,
+                             const std::function<void(absl::string_view)>& stringViewTokenFn);
 
     /**
      * Returns the number of bytes required to represent StatName as a uint8_t
@@ -210,7 +213,8 @@ private:
    * @param symbols the vector of symbols to decode.
    * @return std::string the retrieved stat name.
    */
-  std::string decodeSymbolVec(const SymbolVec& symbols) const;
+  //std::string decodeSymbolVec(const SymbolVec& symbols) const;
+  std::vector<absl::string_view> decodeStrings(const Storage array, uint64_t size) const;
 
   /**
    * Convenience function for encode(), symbolizing one string segment at a time.
@@ -320,7 +324,9 @@ public:
 
   uint8_t* bytes() { return bytes_.get(); }
 
-private:
+protected:
+  explicit StatNameStorage(SymbolTable::StoragePtr bytes) : bytes_(std::move(bytes)) {}
+
   SymbolTable::StoragePtr bytes_;
 };
 
@@ -376,13 +382,13 @@ public:
   bool operator!=(const StatName& rhs) const { return !(*this == rhs); }
 
   /**
-   * @return uint64_t the number of bytes in the symbol array, excluding the two-byte
+   * @return uint64_t the number of bytes in the symbol array, excluding the
    *                  overhead for the size itself.
    */
   uint64_t dataSize() const;
 
   /**
-   * @return uint64_t the number of bytes in the symbol array, including the two-byte
+   * @return uint64_t the number of bytes in the symbol array, including the
    *                  overhead for the size itself.
    */
   uint64_t size() const { return SymbolTableImpl::Encoding::totalSizeBytes(dataSize()); }
@@ -462,6 +468,20 @@ public:
 private:
   SymbolTable& symbol_table_;
 };
+
+class StatNameDynamicStorage : public StatNameStorage {
+public:
+  // Basic constructor for when you have a name and need to generate an
+  // inlined StatName representation for it. Note that this will not access
+  // the SymbolTable lock, but it will cost considerably more memory as
+  // there will be no symbol sharing.
+  StatNameDynamicStorage(absl::string_view name) : StatNameStorage(makeStorage(name)) {}
+  ~StatNameDynamicStorage() { bytes_.reset(); }
+
+ private:
+  static SymbolTable::StoragePtr makeStorage(absl::string_view name);
+};
+
 
 /**
  * Maintains storage for a collection of StatName objects. Like

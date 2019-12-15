@@ -14,8 +14,35 @@
 namespace Envoy {
 namespace Stats {
 
-static const uint32_t SpilloverMask = 0x80;
-static const uint32_t Low7Bits = 0x7f;
+static constexpr uint32_t SpilloverMask = 0x80;
+static constexpr uint32_t Low7Bits = 0x7f;
+
+// Symbols can be a mixture of shared tokens that are held by the SymbolTable
+// and inline dynamic strings, which are never shared, but are held inline in
+// the StatName array. When symbols have DynamicMask (high order bit) set, the
+// lower 31 bits of the symbol is interepreted as the length. The following
+// Ceiling(num_bytes / 4.0) are interpreted as literal characters. Note that
+// using join(), a StatName may be created with both managed symnbols and
+// dynamic tokens. In all cases, "." is used to join the dynamic and managed
+// tokens.
+//
+// Consider a dyanmic token "abcde". The length is 5, so it would begin Symbol
+// 0x80000005. The next two Symbols would be:
+//   { 'a' | ('b' << 8) | ('c' << 16) | ('d' << 24), 'e' }
+// So when considering sequences of Symbols we need to be examining the
+// DynamicMask to understand how to interpret the remaining bytes.
+//
+// This is a reasonably compact inline representation for the symbol array. But
+// the Symbol array is only a transient structure used during
+// SymbolTable::encode() and SymbolTable::toString(), and this pattern will not
+// be produced by SymbolTable::encode(). It can only arise by constructing a
+// dynamic token programatically. toString() must be able to decode this pattern.
+//
+// The representation in the uint8_t array that is used for StatNameStorage could
+// naively ...
+//static constexpr uint32_t DynamicTokenMask = 0x80000000;
+//static uint32_t dynamicTokenSize(Symbol symbol) { return symbol & ~DynamicTokenMask; }
+static uint8_t literalStringIndicator = 0;
 
 uint64_t StatName::dataSize() const {
   if (size_and_data_ == nullptr) {
@@ -100,17 +127,53 @@ std::pair<uint64_t, uint64_t> SymbolTableImpl::Encoding::decodeNumber(const uint
   return std::make_pair(number, encoding - start);
 }
 
-SymbolVec SymbolTableImpl::Encoding::decodeSymbols(const SymbolTable::Storage array,
-                                                   uint64_t size) {
+SymbolVec SymbolTableImpl::Encoding::decodeSymbols(
+    const SymbolTable::Storage array, uint64_t size) {
   SymbolVec symbol_vec;
   symbol_vec.reserve(size);
-  while (size > 0) {
-    std::pair<uint64_t, uint64_t> symbol_consumed = decodeNumber(array);
-    symbol_vec.push_back(symbol_consumed.first);
-    size -= symbol_consumed.second;
-    array += symbol_consumed.second;
-  }
+  decodeTokens(array, size, [&symbol_vec](Symbol symbol) { symbol_vec.push_back(symbol); },
+               [](absl::string_view) {});
   return symbol_vec;
+}
+
+void SymbolTableImpl::Encoding::decodeTokens(
+    const SymbolTable::Storage array, uint64_t size,
+    const std::function<void(Symbol)>& symbolTokenFn,
+    const std::function<void(absl::string_view)>& stringViewTokenFn) {
+  while (size > 0) {
+    if (*array == literalStringIndicator) {
+      // To avoid scanning memory during decode
+
+      ASSERT(size > 1);
+      ++array;
+      --size;
+      std::pair<uint64_t, uint64_t> length_consumed = decodeNumber(array);
+      uint64_t length = length_consumed.first;
+      array += length_consumed.second;
+      size -= length_consumed.second;
+      ASSERT(size >= length);
+      stringViewTokenFn(absl::string_view(reinterpret_cast<const char*>(array), length));
+      size -= length;
+      array += length;
+    } else {
+      std::pair<uint64_t, uint64_t> symbol_consumed = decodeNumber(array);
+      symbolTokenFn(symbol_consumed.first);
+      size -= symbol_consumed.second;
+      array += symbol_consumed.second;
+    }
+  }
+}
+
+std::vector<absl::string_view> SymbolTableImpl::decodeStrings(
+    const SymbolTable::Storage array, uint64_t size) const {
+  std::vector<absl::string_view> strings;
+  Thread::LockGuard lock(lock_);
+  Encoding::decodeTokens(array, size,
+               [this, &strings](Symbol symbol) NO_THREAD_SAFETY_ANALYSIS {
+                 strings.push_back(fromSymbol(symbol));
+               },
+               [&strings](absl::string_view str) { strings.push_back(str); });
+  return strings;
 }
 
 void SymbolTableImpl::Encoding::moveToMemBlock(MemBlockBuilder<uint8_t>& mem_block) {
@@ -121,7 +184,7 @@ void SymbolTableImpl::Encoding::moveToMemBlock(MemBlockBuilder<uint8_t>& mem_blo
 
 SymbolTableImpl::SymbolTableImpl()
     // Have to be explicitly initialized, if we want to use the GUARDED_BY macro.
-    : next_symbol_(0), monotonic_counter_(0) {}
+    : next_symbol_(1), monotonic_counter_(1) {}
 
 SymbolTableImpl::~SymbolTableImpl() {
   // To avoid leaks into the symbol table, we expect all StatNames to be freed.
@@ -166,7 +229,7 @@ uint64_t SymbolTableImpl::numSymbols() const {
 }
 
 std::string SymbolTableImpl::toString(const StatName& stat_name) const {
-  return decodeSymbolVec(Encoding::decodeSymbols(stat_name.data(), stat_name.dataSize()));
+  return absl::StrJoin(decodeStrings(stat_name.data(), stat_name.dataSize()), ".");
 }
 
 void SymbolTableImpl::callWithStringView(StatName stat_name,
@@ -174,6 +237,7 @@ void SymbolTableImpl::callWithStringView(StatName stat_name,
   fn(toString(stat_name));
 }
 
+/*
 std::string SymbolTableImpl::decodeSymbolVec(const SymbolVec& symbols) const {
   std::vector<absl::string_view> name_tokens;
   name_tokens.reserve(symbols.size());
@@ -185,7 +249,7 @@ std::string SymbolTableImpl::decodeSymbolVec(const SymbolVec& symbols) const {
     }
   }
   return absl::StrJoin(name_tokens, ".");
-}
+  }*/
 
 void SymbolTableImpl::incRefCount(const StatName& stat_name) {
   // Before taking the lock, decode the array of symbols from the SymbolTable::Storage.
@@ -418,6 +482,34 @@ StatNameStorage::StatNameStorage(StatName src, SymbolTable& table) {
   src.copyToMemBlock(storage);
   bytes_ = storage.release();
   table.incRefCount(statName());
+}
+
+SymbolTable::StoragePtr StatNameDynamicStorage::makeStorage(absl::string_view name) {
+  name = StringUtil::removeTrailingCharacters(name, '.');
+
+  // For all StatName objects, we first have the total number of bytes in the
+  // representation. But for inlined dynamic string StatName variants, we must
+  // store the lengthe of the payload separately, so that if this token gets
+  // joined with others, we'll know much space it consumes until the next token.
+  // So the layout is
+  //   [ length-of-whole-StatName, literalStringIndicastor, length-of-name, name ]
+  // So we need to figure out how many bytes we need to represent length-of-name and
+  // bytes
+
+  // payload_bytes is the total number of bytes needed to represent the characters
+  // in name, plus their encoded size, plus the literal indicator.
+  uint64_t payload_bytes = SymbolTableImpl::Encoding::totalSizeBytes(name.size()) + 1;
+
+  // total_bytes includes the payload_bytes, plus the literalStringIndicator, and
+  // the length of those.
+  uint64_t total_bytes = SymbolTableImpl::Encoding::totalSizeBytes(payload_bytes);
+  MemBlockBuilder<uint8_t> mem_block(total_bytes);
+
+  SymbolTableImpl::Encoding::appendEncoding(payload_bytes, mem_block);
+  mem_block.appendOne(literalStringIndicator);
+  SymbolTableImpl::Encoding::appendEncoding(name.size(), mem_block);
+  mem_block.appendData(reinterpret_cast<const uint8_t*>(name.data()), name.size());
+  return mem_block.release();
 }
 
 StatNameStorage::~StatNameStorage() {
