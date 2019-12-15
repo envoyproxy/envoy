@@ -101,6 +101,7 @@ public:
   void free(const StatName&) override {}
   void incRefCount(const StatName&) override {}
   StoragePtr encode(absl::string_view name) override { return encodeHelper(name); }
+  StoragePtr makeDynamicStorage(absl::string_view name) override { return encodeHelper(name); }
   SymbolTable::StoragePtr join(const std::vector<StatName>& names) const override {
     std::vector<absl::string_view> strings;
     for (StatName name : names) {

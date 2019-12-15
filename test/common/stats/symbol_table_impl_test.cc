@@ -137,13 +137,22 @@ TEST_P(StatNameTest, TestEmpty) {
   EXPECT_TRUE(StatName().empty());
 }
 
-TEST_P(StatNameTest, TestDynamic) {
-  if (GetParam() == SymbolTableType::Real) {
-    StatNameDynamicStorage storage("dynamic.stat");
+TEST_P(StatNameTest, TestDynamic100k) {
+  // Tests 100k different sizes of dynamic stat, covering all kinds of
+  // corner cases of spilling over into multi-byte lengths.
+
+  std::string stat_str("dynamic_stat.x");
+  for (int i = 0; i < 100 * 1000; ++i) {
+    char ch = i % 256;
+    if (ch == '.') {
+      ch = 'x';
+    }
+    stat_str += ch;
+    StatNameDynamicStorage storage(stat_str, *table_);
     StatName dynamic = storage.statName();
-    EXPECT_EQ("dynamic.stat", table_->toString(dynamic));
+    EXPECT_EQ(stat_str, table_->toString(dynamic));
     SymbolTable::StoragePtr joined = table_->join({makeStat("a.b"), dynamic, makeStat("c.d")});
-    EXPECT_EQ("a.b.dynamic.stat.c.d", table_->toString(StatName(joined.get())));
+    EXPECT_EQ(absl::StrCat("a.b.", stat_str, ".c.d"), table_->toString(StatName(joined.get())));
   }
 }
 

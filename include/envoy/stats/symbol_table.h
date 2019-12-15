@@ -182,6 +182,7 @@ public:
 
 private:
   friend struct HeapStatData;
+  friend class StatNameDynamicStorage;
   friend class StatNameStorage;
   friend class StatNameList;
   friend class StatNameSet;
@@ -221,6 +222,8 @@ private:
    *
    */
   virtual StoragePtr encode(absl::string_view name) PURE;
+
+  virtual StoragePtr makeDynamicStorage(absl::string_view name) PURE;
 
   /**
    * Called by StatNameSet's destructor.

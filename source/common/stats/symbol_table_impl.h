@@ -173,6 +173,7 @@ public:
   void populateList(const absl::string_view* names, uint32_t num_names,
                     StatNameList& list) override;
   StoragePtr encode(absl::string_view name) override;
+  StoragePtr makeDynamicStorage(absl::string_view name) override;
   void callWithStringView(StatName stat_name,
                           const std::function<void(absl::string_view)>& fn) const override;
 
@@ -213,7 +214,7 @@ private:
    * @param symbols the vector of symbols to decode.
    * @return std::string the retrieved stat name.
    */
-  //std::string decodeSymbolVec(const SymbolVec& symbols) const;
+  // std::string decodeSymbolVec(const SymbolVec& symbols) const;
   std::vector<absl::string_view> decodeStrings(const Storage array, uint64_t size) const;
 
   /**
@@ -475,13 +476,10 @@ public:
   // inlined StatName representation for it. Note that this will not access
   // the SymbolTable lock, but it will cost considerably more memory as
   // there will be no symbol sharing.
-  StatNameDynamicStorage(absl::string_view name) : StatNameStorage(makeStorage(name)) {}
+  StatNameDynamicStorage(absl::string_view name, SymbolTable& table)
+      : StatNameStorage(table.makeDynamicStorage(name)) {}
   ~StatNameDynamicStorage() { bytes_.reset(); }
-
- private:
-  static SymbolTable::StoragePtr makeStorage(absl::string_view name);
 };
-
 
 /**
  * Maintains storage for a collection of StatName objects. Like

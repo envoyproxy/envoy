@@ -20,13 +20,13 @@ static constexpr uint32_t Low7Bits = 0x7f;
 // Symbols can be a mixture of shared tokens that are held by the SymbolTable
 // and inline dynamic strings, which are never shared, but are held inline in
 // the StatName array. When symbols have DynamicMask (high order bit) set, the
-// lower 31 bits of the symbol is interepreted as the length. The following
+// lower 31 bits of the symbol is interpreted as the length. The following
 // Ceiling(num_bytes / 4.0) are interpreted as literal characters. Note that
-// using join(), a StatName may be created with both managed symnbols and
+// using join(), a StatName may be created with both managed symbols and
 // dynamic tokens. In all cases, "." is used to join the dynamic and managed
 // tokens.
 //
-// Consider a dyanmic token "abcde". The length is 5, so it would begin Symbol
+// Consider a dynamic token "abcde". The length is 5, so it would begin Symbol
 // 0x80000005. The next two Symbols would be:
 //   { 'a' | ('b' << 8) | ('c' << 16) | ('d' << 24), 'e' }
 // So when considering sequences of Symbols we need to be examining the
@@ -36,12 +36,12 @@ static constexpr uint32_t Low7Bits = 0x7f;
 // the Symbol array is only a transient structure used during
 // SymbolTable::encode() and SymbolTable::toString(), and this pattern will not
 // be produced by SymbolTable::encode(). It can only arise by constructing a
-// dynamic token programatically. toString() must be able to decode this pattern.
+// dynamic token programmatically. toString() must be able to decode this pattern.
 //
 // The representation in the uint8_t array that is used for StatNameStorage could
 // naively ...
-//static constexpr uint32_t DynamicTokenMask = 0x80000000;
-//static uint32_t dynamicTokenSize(Symbol symbol) { return symbol & ~DynamicTokenMask; }
+// static constexpr uint32_t DynamicTokenMask = 0x80000000;
+// static uint32_t dynamicTokenSize(Symbol symbol) { return symbol & ~DynamicTokenMask; }
 static uint8_t literalStringIndicator = 0;
 
 uint64_t StatName::dataSize() const {
@@ -127,12 +127,13 @@ std::pair<uint64_t, uint64_t> SymbolTableImpl::Encoding::decodeNumber(const uint
   return std::make_pair(number, encoding - start);
 }
 
-SymbolVec SymbolTableImpl::Encoding::decodeSymbols(
-    const SymbolTable::Storage array, uint64_t size) {
+SymbolVec SymbolTableImpl::Encoding::decodeSymbols(const SymbolTable::Storage array,
+                                                   uint64_t size) {
   SymbolVec symbol_vec;
   symbol_vec.reserve(size);
-  decodeTokens(array, size, [&symbol_vec](Symbol symbol) { symbol_vec.push_back(symbol); },
-               [](absl::string_view) {});
+  decodeTokens(
+      array, size, [&symbol_vec](Symbol symbol) { symbol_vec.push_back(symbol); },
+      [](absl::string_view) {});
   return symbol_vec;
 }
 
@@ -164,15 +165,15 @@ void SymbolTableImpl::Encoding::decodeTokens(
   }
 }
 
-std::vector<absl::string_view> SymbolTableImpl::decodeStrings(
-    const SymbolTable::Storage array, uint64_t size) const {
+std::vector<absl::string_view> SymbolTableImpl::decodeStrings(const SymbolTable::Storage array,
+                                                              uint64_t size) const {
   std::vector<absl::string_view> strings;
   Thread::LockGuard lock(lock_);
-  Encoding::decodeTokens(array, size,
-               [this, &strings](Symbol symbol) NO_THREAD_SAFETY_ANALYSIS {
-                 strings.push_back(fromSymbol(symbol));
-               },
-               [&strings](absl::string_view str) { strings.push_back(str); });
+  Encoding::decodeTokens(
+      array, size,
+      [this, &strings](Symbol symbol)
+          NO_THREAD_SAFETY_ANALYSIS { strings.push_back(fromSymbol(symbol)); },
+      [&strings](absl::string_view str) { strings.push_back(str); });
   return strings;
 }
 
@@ -484,15 +485,15 @@ StatNameStorage::StatNameStorage(StatName src, SymbolTable& table) {
   table.incRefCount(statName());
 }
 
-SymbolTable::StoragePtr StatNameDynamicStorage::makeStorage(absl::string_view name) {
+SymbolTable::StoragePtr SymbolTableImpl::makeDynamicStorage(absl::string_view name) {
   name = StringUtil::removeTrailingCharacters(name, '.');
 
   // For all StatName objects, we first have the total number of bytes in the
   // representation. But for inlined dynamic string StatName variants, we must
-  // store the lengthe of the payload separately, so that if this token gets
+  // store the length of the payload separately, so that if this token gets
   // joined with others, we'll know much space it consumes until the next token.
   // So the layout is
-  //   [ length-of-whole-StatName, literalStringIndicastor, length-of-name, name ]
+  //   [ length-of-whole-StatName, literalStringIndicator, length-of-name, name ]
   // So we need to figure out how many bytes we need to represent length-of-name and
   // bytes
 
