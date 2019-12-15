@@ -28,27 +28,38 @@ LocalRateLimitStats Config::generateStats(const std::string& prefix, Stats::Scop
 }
 
 void Config::onFillTimer() {
+  // Relaxed consistency is used for all operations because we don't care about ordering, just the
+  // final atomic correctness.
+  uint32_t expected_tokens = tokens_.load(std::memory_order_relaxed);
   uint32_t new_tokens_value;
-  {
-    // TODO(mattklein123): Consider replacing with an atomic CAS loop.
-    absl::MutexLock lock(&mutex_);
-    new_tokens_value = std::min(max_tokens_, tokens_ + tokens_per_fill_);
-    tokens_ = new_tokens_value;
-  }
+  do {
+    // expected_tokens is either initialized above or reloaded during the CAS failure below.
+    new_tokens_value = std::min(max_tokens_, expected_tokens + tokens_per_fill_);
+
+    // Loop while the weak CAS fails trying to update the tokens value.
+  } while (
+      !tokens_.compare_exchange_weak(expected_tokens, new_tokens_value, std::memory_order_relaxed));
 
   ENVOY_LOG(trace, "local_rate_limit: fill tokens={}", new_tokens_value);
   fill_timer_->enableTimer(fill_interval_);
 }
 
 bool Config::canCreateConnection() {
-  // TODO(mattklein123): Consider replacing with an atomic CAS loop.
-  absl::MutexLock lock(&mutex_);
-  if (tokens_ > 0) {
-    tokens_--;
-    return true;
-  } else {
-    return false;
-  }
+  // Relaxed consistency is used for all operations because we don't care about ordering, just the
+  // final atomic correctness.
+  uint32_t expected_tokens = tokens_.load(std::memory_order_relaxed);
+  do {
+    // expected_tokens is either initialized above or reloaded during the CAS failure below.
+    if (expected_tokens == 0) {
+      return false;
+    }
+
+    // Loop while the weak CAS fails trying to subtract 1 from expected.
+  } while (!tokens_.compare_exchange_weak(expected_tokens, expected_tokens - 1,
+                                          std::memory_order_relaxed));
+
+  // We successfully decremented the counter by 1.
+  return true;
 }
 
 Network::FilterStatus Filter::onNewConnection() {

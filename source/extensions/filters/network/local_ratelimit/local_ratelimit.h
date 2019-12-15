@@ -51,8 +51,7 @@ private:
   const std::chrono::milliseconds fill_interval_;
   Runtime::FeatureFlag enabled_;
   LocalRateLimitStats stats_;
-  absl::Mutex mutex_;
-  uint32_t tokens_ ABSL_GUARDED_BY(mutex_);
+  std::atomic<uint32_t> tokens_;
 };
 
 using ConfigSharedPtr = std::shared_ptr<Config>;
