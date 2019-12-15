@@ -545,10 +545,10 @@ private:
  * SymbolTable lock, but tokens are not shared across StatNames.
  *
  * The SymbolTable is required as a constructor argument to assist in encoding
- * the stat-names, which differs bween FakeSymbolTableImpl and SymbolTableImpl.
+ * the stat-names, which differs between FakeSymbolTableImpl and SymbolTableImpl.
  *
  * Example usage:
- *   StatNameDynamcPool pool(symbol_table);
+ *   StatNameDynamicPool pool(symbol_table);
  *   StatName name1 = pool.add("name1");
  *   StatName name2 = pool.add("name2");
  */

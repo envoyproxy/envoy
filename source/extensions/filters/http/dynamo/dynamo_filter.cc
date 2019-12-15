@@ -221,8 +221,9 @@ void DynamoFilter::chargeFailureSpecificStats(const Json::Object& json_body) {
     if (table_descriptor_.table_name.empty()) {
       stats_->counter({stats_->error_, stats_->no_table_, pool.add(error_type)}).inc();
     } else {
-      stats_->counter({stats_->error_, pool.add(table_descriptor_.table_name),
-                       pool.add(error_type)}).inc();
+      stats_
+          ->counter({stats_->error_, pool.add(table_descriptor_.table_name), pool.add(error_type)})
+          .inc();
     }
   } else {
     stats_->counter({stats_->empty_response_body_}).inc();
