@@ -286,7 +286,7 @@ protected:
 
   absl::string_view stripTrailingDot(absl::string_view prefix) {
     return CodeStatsImpl::stripTrailingDot(prefix);
-  }
+    }
 
   Stats::SymbolTablePtr symbol_table_;
   CodeStatsImpl code_stats_;
