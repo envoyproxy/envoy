@@ -1,3 +1,5 @@
+#include "envoy/api/v2/core/grpc_service.pb.h"
+
 #include "common/grpc/async_client_impl.h"
 
 #include "test/mocks/http/mocks.h"

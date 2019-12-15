@@ -1,5 +1,6 @@
 #pragma once
 
+#include "envoy/config/filter/network/tcp_proxy/v2/tcp_proxy.pb.h"
 #include "envoy/config/filter/network/tcp_proxy/v2/tcp_proxy.pb.validate.h"
 
 #include "extensions/filters/network/common/factory_base.h"

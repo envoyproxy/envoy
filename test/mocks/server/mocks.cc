@@ -2,6 +2,9 @@
 
 #include <string>
 
+#include "envoy/admin/v2alpha/server_info.pb.h"
+#include "envoy/api/v2/core/base.pb.h"
+
 #include "common/singleton/manager_impl.h"
 
 #include "gmock/gmock.h"

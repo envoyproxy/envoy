@@ -1,3 +1,6 @@
+#include "envoy/config/trace/v2/trace.pb.h"
+#include "envoy/config/trace/v2/trace.pb.validate.h"
+
 #include "extensions/tracers/datadog/config.h"
 
 #include "test/mocks/server/mocks.h"

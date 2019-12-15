@@ -8,6 +8,7 @@
 #include "envoy/runtime/runtime.h"
 #include "envoy/thread_local/thread_local.h"
 #include "envoy/tracing/http_tracer.h"
+#include "envoy/type/metadata/v2/metadata.pb.h"
 #include "envoy/type/tracing/v2/custom_tag.pb.h"
 #include "envoy/upstream/cluster_manager.h"
 

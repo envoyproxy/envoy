@@ -1,5 +1,6 @@
 #pragma once
 
+#include "envoy/api/v2/discovery.pb.h"
 #include "envoy/config/subscription.h"
 
 #include "common/config/new_grpc_mux_impl.h"

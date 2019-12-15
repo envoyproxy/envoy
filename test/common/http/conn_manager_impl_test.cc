@@ -6,8 +6,11 @@
 
 #include "envoy/access_log/access_log.h"
 #include "envoy/buffer/buffer.h"
+#include "envoy/config/filter/network/http_connection_manager/v2/http_connection_manager.pb.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/tracing/http_tracer.h"
+#include "envoy/type/percent.pb.h"
+#include "envoy/type/tracing/v2/custom_tag.pb.h"
 
 #include "common/access_log/access_log_formatter.h"
 #include "common/access_log/access_log_impl.h"

@@ -97,8 +97,7 @@ def ApiBoostTree(args):
     ]
     # Figure out some cc_libraries that cover most of our external deps. This is
     # the same logic as in gen_compilation_database.py.
-    query = 'attr(include_prefix, ".+", kind(cc_library, deps({})))'.format(
-        ' union '.join(dep_build_targets))
+    query = 'kind(cc_library, {})'.format(' union '.join(dep_build_targets))
     dep_lib_build_targets = sp.check_output(['bazel', 'query', query]).decode().splitlines()
     # We also need some misc. stuff such as test binaries for setup of benchmark
     # dep.

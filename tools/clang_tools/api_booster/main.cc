@@ -156,7 +156,8 @@ private:
       return result->substr(0, result->size() - 6);
     } else if (!absl::StartsWith(proto_type_name, "envoy.HotRestart") &&
                !absl::StartsWith(proto_type_name, "envoy.RouterCheckToolSchema") &&
-               !absl::StartsWith(proto_type_name, "envoy.test")) {
+               !absl::StartsWith(proto_type_name, "envoy.test") &&
+               !absl::StartsWith(proto_type_name, "envoy.tracers.xray.daemon")) {
       // Die hard if we don't have a useful proto type for something that looks
       // like an API type(modulo a short whitelist).
       std::cerr << "Unknown API type: " << proto_type_name << std::endl;

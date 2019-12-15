@@ -1,6 +1,6 @@
 #pragma once
 
-#include "envoy/config/filter/http/rbac/v2/rbac.pb.h"
+#include "envoy/config/rbac/v2/rbac.pb.h"
 
 #include "extensions/filters/common/rbac/engine.h"
 #include "extensions/filters/common/rbac/matchers.h"
