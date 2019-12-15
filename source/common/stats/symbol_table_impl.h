@@ -397,7 +397,7 @@ public:
    */
   void copyToMemBlock(MemBlockBuilder<uint8_t>& mem_block_builder) {
     ASSERT(mem_block_builder.size() == 0);
-    mem_block_builder.appendData(size_and_data_, size());
+    mem_block_builder.appendData(absl::MakeSpan(size_and_data_, size()));
   }
 
   /**
@@ -409,7 +409,7 @@ public:
    * @param mem_block_builder the builder to receive the storage.
    */
   void appendDataToMemBlock(MemBlockBuilder<uint8_t>& storage) {
-    storage.appendData(data(), dataSize());
+    storage.appendData(absl::MakeSpan(data(), dataSize()));
   }
 
 #ifndef ENVOY_CONFIG_COVERAGE
