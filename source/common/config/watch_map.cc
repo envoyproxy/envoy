@@ -1,5 +1,7 @@
 #include "common/config/watch_map.h"
 
+#include "envoy/api/v2/discovery.pb.h"
+
 namespace Envoy {
 namespace Config {
 

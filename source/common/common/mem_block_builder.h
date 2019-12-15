@@ -1,9 +1,10 @@
 #pragma once
 
 #include <memory>
-#include <vector>
 
 #include "common/common/assert.h"
+
+#include "absl/types/span.h"
 
 namespace Envoy {
 
@@ -25,28 +26,22 @@ template <class T> class MemBlockBuilder {
 public:
   // Constructs a MemBlockBuilder allowing for 'capacity' instances of T.
   explicit MemBlockBuilder(uint64_t capacity)
-      : data_(std::make_unique<T[]>(capacity)), capacity_(capacity), capacity_remaining_(capacity),
-        write_ptr_(data_.get()) {}
-  MemBlockBuilder() : capacity_(0), capacity_remaining_(0), write_ptr_(nullptr) {}
+      : data_(std::make_unique<T[]>(capacity)), write_span_(data_.get(), capacity) {}
+  MemBlockBuilder() {}
 
   /**
    * Populates (or repopulates) the MemBlockBuilder to make it the specified
    * capacity. This does not have resize semantics; when populate() is called any
    * previous contents are erased.
    *
-   * @param capcity The number of memory elements to allocate.
+   * @param capacity The number of memory elements to allocate.
    */
-  void populate(uint64_t capacity) {
-    data_ = std::make_unique<T[]>(capacity);
-    capacity_ = capacity;
-    capacity_remaining_ = capacity;
-    write_ptr_ = data_.get();
-  }
+  void populate(uint64_t capacity) { populateHelper(capacity, std::make_unique<T[]>(capacity)); }
 
   /**
    * @return the capacity.
    */
-  uint64_t capacity() const { return capacity_; }
+  uint64_t capacity() const { return write_span_.size() + write_span_.data() - data_.get(); }
 
   /**
    * Appends a single object of type T, moving an internal write-pointer
@@ -56,28 +51,26 @@ public:
    * @param object the object to append.
    */
   void appendOne(T object) {
-    RELEASE_ASSERT(capacity_remaining_ >= 1, "insufficient capacity");
-    ASSERT(write_ptr_ < (data_.get() + capacity_));
-    *write_ptr_++ = object;
-    --capacity_remaining_;
+    SECURITY_ASSERT(write_span_.size() >= 1, "insufficient capacity");
+    *write_span_.data() = object;
+    write_span_.remove_prefix(1);
   }
 
   /**
-   * Appends raw data, moving an internal write-pointer forward. Asserts
-   * that there is room to write the block when compiled for debug. It is
-   * the caller's responsibility to ensure that the input data is valid.
+   * Appends raw data specified as a span, moving an internal write-pointer
+   * forward. Asserts that there is room to write the block. It is the caller's
+   * responsibility to ensure that the input data is valid.
    *
-   * @param data The block of objects to insert.
-   * @param size The number of elements in the block.
+   * @param data The span of objects to insert.
    */
-  void appendData(const T* data, uint64_t size) {
-    RELEASE_ASSERT(capacity_remaining_ >= size, "insufficient capacity");
-    ASSERT((write_ptr_ + size) <= (data_.get() + capacity_));
-    if (size != 0) {
-      memcpy(write_ptr_, data, size * sizeof(T));
+  void appendData(absl::Span<const T> data) {
+    uint64_t size = data.size();
+    SECURITY_ASSERT(write_span_.size() >= size, "insufficient capacity");
+    if (size == 0) {
+      return;
     }
-    write_ptr_ += size;
-    capacity_remaining_ -= size;
+    memcpy(write_span_.data(), data.data(), size * sizeof(T));
+    write_span_.remove_prefix(size);
   }
 
   /**
@@ -85,22 +78,17 @@ public:
    *
    * @param src the block to append.
    */
-  void appendBlock(const MemBlockBuilder& src) { appendData(src.data_.get(), src.size()); }
+  void appendBlock(const MemBlockBuilder& src) { appendData(src.span()); }
 
   /**
    * @return the number of elements remaining in the MemBlockBuilder.
    */
-  uint64_t capacityRemaining() const { return capacity_remaining_; }
+  uint64_t capacityRemaining() const { return write_span_.size(); }
 
   /**
    * Empties the contents of this.
    */
-  void reset() {
-    data_.reset();
-    capacity_ = 0;
-    capacity_remaining_ = 0;
-    write_ptr_ = nullptr;
-  }
+  void reset() { populateHelper(0, std::unique_ptr<T[]>(nullptr)); }
 
   /**
    * Returns the underlying storage as a unique pointer, clearing this.
@@ -108,29 +96,28 @@ public:
    * @return the transferred storage.
    */
   std::unique_ptr<T[]> release() {
-    write_ptr_ = nullptr;
-    capacity_ = 0;
-    capacity_remaining_ = 0;
+    write_span_.reset();
     return std::move(data_);
   }
 
   /**
-   * @return the populated data as a vector.
-   *
-   * This is exposed to help with unit testing.
+   * @return the populated data as an absl::Span.
    */
-  std::vector<T> toVector() const { return std::vector<T>(data_.get(), write_ptr_); }
+  absl::Span<T> span() const { return absl::MakeSpan(data_.get(), write_span_.data()); }
 
   /**
    * @return The number of elements the have been added to the builder.
    */
-  uint64_t size() const { return write_ptr_ - data_.get(); }
+  uint64_t size() const { return write_span_.data() - data_.get(); }
 
 private:
+  void populateHelper(uint64_t capacity, std::unique_ptr<T[]> data) {
+    data_ = std::move(data);
+    write_span_ = absl::MakeSpan(data_.get(), capacity);
+  }
+
   std::unique_ptr<T[]> data_;
-  uint64_t capacity_;
-  uint64_t capacity_remaining_;
-  T* write_ptr_;
+  absl::Span<T> write_span_;
 };
 
 } // namespace Envoy

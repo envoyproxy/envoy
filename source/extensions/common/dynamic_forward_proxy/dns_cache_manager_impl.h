@@ -1,5 +1,7 @@
 #pragma once
 
+#include "envoy/config/common/dynamic_forward_proxy/v2alpha/dns_cache.pb.h"
+
 #include "extensions/common/dynamic_forward_proxy/dns_cache.h"
 
 #include "absl/container/flat_hash_map.h"

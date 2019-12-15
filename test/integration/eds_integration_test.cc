@@ -1,4 +1,9 @@
+#include "envoy/api/v2/cds.pb.h"
+#include "envoy/api/v2/core/health_check.pb.h"
 #include "envoy/api/v2/eds.pb.h"
+#include "envoy/config/bootstrap/v2/bootstrap.pb.h"
+#include "envoy/config/filter/network/http_connection_manager/v2/http_connection_manager.pb.h"
+#include "envoy/type/http.pb.h"
 
 #include "common/upstream/load_balancer_impl.h"
 

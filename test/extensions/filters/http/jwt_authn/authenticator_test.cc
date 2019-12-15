@@ -1,3 +1,6 @@
+#include "envoy/api/v2/core/http_uri.pb.h"
+#include "envoy/config/filter/http/jwt_authn/v2alpha/config.pb.h"
+
 #include "common/http/message_impl.h"
 #include "common/protobuf/utility.h"
 

@@ -4,8 +4,9 @@
 #include <string>
 #include <vector>
 
-#include "envoy/config/filter/network/dubbo_proxy/v2alpha1/dubbo_proxy.pb.h"
+#include "envoy/api/v2/route/route.pb.h"
 #include "envoy/config/filter/network/dubbo_proxy/v2alpha1/route.pb.h"
+#include "envoy/type/range.pb.h"
 
 #include "common/common/logger.h"
 #include "common/common/matchers.h"

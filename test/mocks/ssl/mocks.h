@@ -3,6 +3,7 @@
 #include <functional>
 #include <string>
 
+#include "envoy/api/v2/auth/cert.pb.h"
 #include "envoy/ssl/certificate_validation_context_config.h"
 #include "envoy/ssl/connection.h"
 #include "envoy/ssl/context.h"

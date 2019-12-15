@@ -10,6 +10,7 @@
 #include "envoy/config/filter/network/redis_proxy/v2/redis_proxy.pb.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/thread_local/thread_local.h"
+#include "envoy/type/percent.pb.h"
 #include "envoy/upstream/cluster_manager.h"
 
 #include "common/common/to_lower_table.h"

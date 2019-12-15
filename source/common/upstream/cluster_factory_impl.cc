@@ -1,5 +1,7 @@
 #include "common/upstream/cluster_factory_impl.h"
 
+#include "envoy/api/v2/cds.pb.h"
+
 #include "common/http/utility.h"
 #include "common/network/address_impl.h"
 #include "common/network/resolver_impl.h"
