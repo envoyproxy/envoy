@@ -125,7 +125,6 @@ public:
     // make_unique does not work with private ctor, even though FakeSymbolTableImpl is a friend.
     return StatNameSetPtr(new StatNameSet(*this, name));
   }
-  void forgetSet(StatNameSet&) override {}
   uint64_t getRecentLookups(const RecentLookupsFn&) const override { return 0; }
   void clearRecentLookups() override {}
   void setRecentLookupCapacity(uint64_t) override {}

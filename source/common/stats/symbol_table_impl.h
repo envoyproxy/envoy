@@ -182,7 +182,6 @@ public:
 #endif
 
   StatNameSetPtr makeSet(absl::string_view name) override;
-  void forgetSet(StatNameSet& stat_name_set) override;
   uint64_t getRecentLookups(const RecentLookupsFn&) const override;
   void clearRecentLookups() override;
   void setRecentLookupCapacity(uint64_t capacity) override;
@@ -201,9 +200,6 @@ private:
 
   // This must be held during both encode() and free().
   mutable Thread::MutexBasicLockable lock_;
-
-  // This must be held while updating stat_name_sets_.
-  mutable Thread::MutexBasicLockable stat_name_set_mutex_;
 
   /**
    * Decodes a vector of symbols back into its period-delimited stat name. If
@@ -272,8 +268,6 @@ private:
   // using an Envoy::IntervalSet.
   std::stack<Symbol> pool_ GUARDED_BY(lock_);
   RecentLookups recent_lookups_ GUARDED_BY(lock_);
-
-  absl::flat_hash_set<StatNameSet*> stat_name_sets_ GUARDED_BY(stat_name_set_mutex_);
 };
 
 /**
@@ -744,8 +738,6 @@ class StatNameSet {
 public:
   // This object must be instantiated via SymbolTable::makeSet(), thus constructor is private.
 
-  ~StatNameSet();
-
   /**
    * Adds a string to the builtin map, which is not mutex protected. This map is
    * always consulted first as a hit there means no lock is required.
@@ -783,24 +775,11 @@ public:
     return pool_.add(str);
   }
 
-  /**
-   * Clears recent lookups.
-   */
-  void clearRecentLookups();
-
-  /**
-   * Sets the number of names recorded in the recent-lookups set.
-   *
-   * @param capacity the capacity to configure.
-   */
-  void setRecentLookupCapacity(uint64_t capacity);
-
 private:
   friend class FakeSymbolTableImpl;
   friend class SymbolTableImpl;
 
   StatNameSet(SymbolTable& symbol_table, absl::string_view name);
-  uint64_t getRecentLookups(const RecentLookups::IterFn& iter) const;
 
   const std::string name_;
   Stats::SymbolTable& symbol_table_;
@@ -808,7 +787,6 @@ private:
   mutable absl::Mutex mutex_;
   using StringStatNameMap = absl::flat_hash_map<std::string, Stats::StatName>;
   StringStatNameMap builtin_stat_names_;
-  RecentLookups recent_lookups_ GUARDED_BY(mutex_);
 };
 
 } // namespace Stats

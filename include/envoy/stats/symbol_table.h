@@ -224,13 +224,6 @@ private:
   virtual StoragePtr encode(absl::string_view name) PURE;
 
   virtual StoragePtr makeDynamicStorage(absl::string_view name) PURE;
-
-  /**
-   * Called by StatNameSet's destructor.
-   *
-   * @param stat_name_set the set.
-   */
-  virtual void forgetSet(StatNameSet& stat_name_set) PURE;
 };
 
 using SymbolTablePtr = std::unique_ptr<SymbolTable>;
