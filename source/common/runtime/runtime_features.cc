@@ -33,6 +33,21 @@ constexpr const char* runtime_features[] = {
     "envoy.reloadable_features.strict_authority_validation",
 };
 
+// This is a section for officially sanctioned runtime features which are too
+// high risk to be enabled by default. Examples where we have opted to land
+// features without enabling by default are swapping the underlying buffer
+// implementation or the HTTP/1.1 codec implementation. Most features should be
+// enabled by default.
+//
+// When features are added here, there should be a tracking bug assigned to the
+// code owner to flip the default after sufficient testing.
+constexpr const char* disabled_runtime_features[] = {
+    // Sentinel and test flag.
+    "envoy.reloadable_features.test_feature_false",
+    // Should be removed as part of https://github.com/envoyproxy/envoy/issues/8993
+    "envoy.reloadable_features.http2_protocol_options.stream_error_on_invalid_http_messaging",
+};
+
 // This is a list of configuration fields which are disallowed by default in Envoy
 //
 // By default, use of proto fields marked as deprecated in their api/.../*.proto file will result
@@ -69,6 +84,9 @@ RuntimeFeatures::RuntimeFeatures() {
   }
   for (auto& feature : runtime_features) {
     enabled_features_.insert(feature);
+  }
+  for (auto& feature : disabled_runtime_features) {
+    disabled_features_.insert(feature);
   }
 }
 
