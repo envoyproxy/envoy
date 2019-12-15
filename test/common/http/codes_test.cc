@@ -279,7 +279,7 @@ TEST_F(CodeUtilityTest, ResponseTimingTest) {
   code_stats.chargeResponseTiming(info);
 }
 
-class CodeStatsTest : public testing::Test {
+/*class CodeStatsTest : public testing::Test {
 protected:
   CodeStatsTest()
       : symbol_table_(Stats::SymbolTableCreator::makeSymbolTable()), code_stats_(*symbol_table_) {}
@@ -297,7 +297,7 @@ TEST_F(CodeStatsTest, StripTrailingDot) {
   EXPECT_EQ("foo", stripTrailingDot("foo."));
   EXPECT_EQ(".foo", stripTrailingDot(".foo"));  // no change
   EXPECT_EQ("foo.", stripTrailingDot("foo..")); // only one dot gets stripped.
-}
+  }*/
 
 } // namespace Http
 } // namespace Envoy

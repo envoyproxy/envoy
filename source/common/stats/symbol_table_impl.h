@@ -478,6 +478,8 @@ public:
   // there will be no symbol sharing.
   StatNameDynamicStorage(absl::string_view name, SymbolTable& table)
       : StatNameStorage(table.makeDynamicStorage(name)) {}
+  StatNameDynamicStorage(StatNameDynamicStorage&& src) noexcept
+      : StatNameStorage(std::move(src.bytes_)) {}
   ~StatNameDynamicStorage() { bytes_.reset(); }
 };
 
@@ -534,6 +536,43 @@ private:
   // at the cost of having a destructor that calls clear().
   SymbolTable& symbol_table_;
   std::vector<StatNameStorage> storage_vector_;
+};
+
+/**
+ * Maintains storage for a collection of StatName objects constructed from
+ * dynamically discovered strings. Like StatNameDynamicStorage, this has an RAII
+ * usage model. Creating StatNames with this interface do not incur a
+ * SymbolTable lock, but tokens are not shared across StatNames.
+ *
+ * The SymbolTable is required as a constructor argument to assist in encoding
+ * the stat-names, which differs bween FakeSymbolTableImpl and SymbolTableImpl.
+ *
+ * Example usage:
+ *   StatNameDynamcPool pool(symbol_table);
+ *   StatName name1 = pool.add("name1");
+ *   StatName name2 = pool.add("name2");
+ */
+class StatNameDynamicPool {
+public:
+  explicit StatNameDynamicPool(SymbolTable& symbol_table) : symbol_table_(symbol_table) {}
+
+  /**
+   * Removes all StatNames from the pool.
+   */
+  void clear() { storage_vector_.clear(); }
+
+  /**
+   * @param name the name to add the container.
+   * @return the StatName held in the container for this name.
+   */
+  StatName add(absl::string_view name);
+
+private:
+  // We keep the stat names in a vector of StatNameStorage, storing the
+  // SymbolTable reference separately. This saves 8 bytes per StatName,
+  // at the cost of having a destructor that calls clear().
+  SymbolTable& symbol_table_;
+  std::vector<StatNameDynamicStorage> storage_vector_;
 };
 
 // Represents an ordered container of StatNames. The encoding for each StatName

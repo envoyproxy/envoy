@@ -176,19 +176,13 @@ void DynamoFilter::chargeStatsPerEntity(const std::string& entity, const std::st
       time_source_.monotonicTime() - start_decode_);
 
   size_t group_index = DynamoStats::groupIndex(status);
-  std::vector<std::unique_ptr<Stats::StatNameDynamicStorage>> dynamic_storage;
-  auto get_dynamic = [this, &dynamic_storage](absl::string_view name) -> const Stats::StatName {
-    auto storage = std::make_unique<Stats::StatNameDynamicStorage>(name, stats_->symbolTable());
-    const Stats::StatName stat_name = storage->statName();
-    dynamic_storage.push_back(std::move(storage));
-    return stat_name;
-  };
+  Stats::StatNameDynamicPool pool(stats_->symbolTable());
 
   const Stats::StatName entity_type_name =
       stats_->getBuiltin(entity_type, stats_->unknown_entity_type_);
-  const Stats::StatName entity_name = get_dynamic(entity);
-  const Stats::StatName total_name = get_dynamic(absl::StrCat("upstream_rq_total_", status));
-  const Stats::StatName time_name = get_dynamic(absl::StrCat("upstream_rq_time_", status));
+  const Stats::StatName entity_name = pool.add(entity);
+  const Stats::StatName total_name = pool.add(absl::StrCat("upstream_rq_total_", status));
+  const Stats::StatName time_name = pool.add(absl::StrCat("upstream_rq_time_", status));
 
   stats_->counter({entity_type_name, entity_name, stats_->upstream_rq_total_}).inc();
   const Stats::StatName total_group = stats_->upstream_rq_total_groups_[group_index];
@@ -223,13 +217,12 @@ void DynamoFilter::chargeFailureSpecificStats(const Json::Object& json_body) {
   std::string error_type = RequestParser::parseErrorType(json_body);
 
   if (!error_type.empty()) {
-    Stats::StatNameDynamicStorage error_type_storage(error_type, stats_->symbolTable());
-    const Stats::StatName error_type_stat_name = error_type_storage.statName();
+    Stats::StatNameDynamicPool pool(stats_->symbolTable());
     if (table_descriptor_.table_name.empty()) {
-      stats_->counter({stats_->error_, stats_->no_table_, error_type_stat_name}).inc();
+      stats_->counter({stats_->error_, stats_->no_table_, pool.add(error_type)}).inc();
     } else {
-      Stats::StatNameDynamicStorage table_name(table_descriptor_.table_name, stats_->symbolTable());
-      stats_->counter({stats_->error_, table_name.statName(), error_type_stat_name}).inc();
+      stats_->counter({stats_->error_, pool.add(table_descriptor_.table_name),
+                       pool.add(error_type)}).inc();
     }
   } else {
     stats_->counter({stats_->empty_response_body_}).inc();

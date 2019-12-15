@@ -158,12 +158,12 @@ void CodeStatsImpl::chargeResponseTiming(const ResponseTimingInfo& info) const {
   }
 }
 
-absl::string_view CodeStatsImpl::stripTrailingDot(absl::string_view str) {
+/*absl::string_view CodeStatsImpl::stripTrailingDot(absl::string_view str) {
   if (absl::EndsWith(str, ".")) {
     str.remove_suffix(1);
   }
   return str;
-}
+  }*/
 
 Stats::StatName CodeStatsImpl::upstreamRqGroup(Code response_code) const {
   switch (enumToInt(response_code) / 100) {
