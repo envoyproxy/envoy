@@ -31,9 +31,12 @@ class FactoryRegistryProxy {
 public:
   virtual ~FactoryRegistryProxy() = default;
   virtual std::vector<absl::string_view> registeredNames() const PURE;
+  // Return all registered factory names, including disabled factories.
+  virtual std::vector<absl::string_view> allRegisteredNames() const PURE;
   virtual absl::optional<envoy::api::v2::core::BuildVersion>
   getFactoryVersion(absl::string_view name) const PURE;
   virtual bool disableFactory(absl::string_view) PURE;
+  virtual bool isFactoryDisabled(absl::string_view) const PURE;
 };
 
 template <class Base> class FactoryRegistryProxyImpl : public FactoryRegistryProxy {
@@ -44,6 +47,10 @@ public:
     return FactoryRegistry::registeredNames();
   }
 
+  std::vector<absl::string_view> allRegisteredNames() const override {
+    return FactoryRegistry::registeredNames(true);
+  }
+
   absl::optional<envoy::api::v2::core::BuildVersion>
   getFactoryVersion(absl::string_view name) const override {
     return FactoryRegistry::getFactoryVersion(name);
@@ -51,6 +58,10 @@ public:
 
   bool disableFactory(absl::string_view name) override {
     return FactoryRegistry::disableFactory(name);
+  }
+
+  bool isFactoryDisabled(absl::string_view name) const override {
+    return FactoryRegistry::isFactoryDisabled(name);
   }
 };
 
@@ -136,14 +147,13 @@ public:
   /**
    * Return a sorted vector of registered factory names.
    */
-  static std::vector<absl::string_view> registeredNames() {
+  static std::vector<absl::string_view> registeredNames(bool include_disabled = false) {
     std::vector<absl::string_view> ret;
 
     ret.reserve(factories().size());
 
     for (const auto& factory : factories()) {
-      // Only publish the name of factories that have not been disabled.
-      if (factory.second) {
+      if (factory.second || include_disabled) {
         ret.push_back(factory.first);
       }
     }
@@ -266,6 +276,17 @@ public:
     }
   }
 
+  /**
+   * @return vendor specific version of a factory.
+   */
+  static bool isFactoryDisabled(absl::string_view name) {
+    auto it = factories().find(name);
+    return it == factories().end() || it->second == nullptr;
+  }
+
+  /**
+   * @return vendor specific version of a factory.
+   */
   static absl::optional<envoy::api::v2::core::BuildVersion>
   getFactoryVersion(absl::string_view name) {
     auto it = versioned_factories().find(name);

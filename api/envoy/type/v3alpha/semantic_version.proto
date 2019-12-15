@@ -1,10 +1,12 @@
 syntax = "proto3";
 
-package envoy.type;
+package envoy.type.v3alpha;
 
-option java_package = "io.envoyproxy.envoy.type";
+option java_package = "io.envoyproxy.envoy.type.v3alpha";
 option java_outer_classname = "SemanticVersionProto";
 option java_multiple_files = true;
+
+import "udpa/annotations/versioning.proto";
 
 // [#protodoc-title: Semantic Version]
 
@@ -12,6 +14,8 @@ option java_multiple_files = true;
 // expected behaviors and APIs, the patch version field is used only
 // for security fixes and can be generally ignored.
 message SemanticVersion {
+  option (udpa.annotations.versioning).previous_message_type = "envoy.type.SemanticVersion";
+
   uint32 major = 1;
 
   uint32 minor = 2;
