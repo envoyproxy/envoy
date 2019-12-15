@@ -59,7 +59,6 @@ private:
   void recordHistogram(Stats::Scope& scope, const Stats::StatNameVec& names,
                        Stats::Histogram::Unit unit, uint64_t count) const;
 
-  // static absl::string_view stripTrailingDot(absl::string_view prefix);
   Stats::StatName upstreamRqGroup(Code response_code) const;
   Stats::StatName upstreamRqStatName(Code response_code) const;
 

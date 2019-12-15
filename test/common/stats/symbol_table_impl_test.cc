@@ -60,11 +60,6 @@ protected:
   SymbolVec getSymbols(StatName stat_name) {
     return SymbolTableImpl::Encoding::decodeSymbols(stat_name.data(), stat_name.dataSize());
   }
-#if 0
-  std::string decodeSymbolVec(const SymbolVec& symbol_vec) {
-    return real_symbol_table_->decodeSymbolVec(symbol_vec);
-  }
-#endif
   Symbol monotonicCounter() { return real_symbol_table_->monotonicCounter(); }
   std::string encodeDecode(absl::string_view stat_name) {
     return table_->toString(makeStat(stat_name));
