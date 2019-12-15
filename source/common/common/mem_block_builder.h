@@ -96,7 +96,8 @@ public:
    * @return the transferred storage.
    */
   std::unique_ptr<T[]> release() {
-    write_span_.reset();
+    uint8_t* empty = nullptr;
+    write_span_ = absl::MakeSpan(empty, 0);
     return std::move(data_);
   }
 
