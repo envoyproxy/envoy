@@ -27,12 +27,17 @@ const tools::type_whisperer::TypeDb& getApiTypeDb() {
 
 } // namespace
 
-absl::optional<std::string> ApiTypeDb::getProtoPathForType(const std::string& type_name) {
-  auto it = getApiTypeDb().types().find(type_name);
-  if (it == getApiTypeDb().types().end()) {
-    return absl::nullopt;
+absl::optional<TypeInformation> ApiTypeDb::getLatestTypeInformation(const std::string& type_name) {
+  absl::optional<TypeInformation> result;
+  std::string current_type_name = type_name;
+  while (true) {
+    auto it = getApiTypeDb().types().find(current_type_name);
+    if (it == getApiTypeDb().types().end()) {
+      return result;
+    }
+    result.emplace(current_type_name, it->second.proto_path());
+    current_type_name = it->second.next_version_type_name();
   }
-  return it->second.proto_path();
 }
 
 } // namespace TypeWhisperer
