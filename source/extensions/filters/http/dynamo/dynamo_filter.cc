@@ -176,13 +176,13 @@ void DynamoFilter::chargeStatsPerEntity(const std::string& entity, const std::st
       time_source_.monotonicTime() - start_decode_);
 
   size_t group_index = DynamoStats::groupIndex(status);
-  Stats::StatNameDynamicPool pool(stats_->symbolTable());
+  Stats::StatNameDynamicPool dynamic(stats_->symbolTable());
 
   const Stats::StatName entity_type_name =
       stats_->getBuiltin(entity_type, stats_->unknown_entity_type_);
-  const Stats::StatName entity_name = pool.add(entity);
-  const Stats::StatName total_name = pool.add(absl::StrCat("upstream_rq_total_", status));
-  const Stats::StatName time_name = pool.add(absl::StrCat("upstream_rq_time_", status));
+  const Stats::StatName entity_name = dynamic.add(entity);
+  const Stats::StatName total_name = dynamic.add(absl::StrCat("upstream_rq_total_", status));
+  const Stats::StatName time_name = dynamic.add(absl::StrCat("upstream_rq_time_", status));
 
   stats_->counter({entity_type_name, entity_name, stats_->upstream_rq_total_}).inc();
   const Stats::StatName total_group = stats_->upstream_rq_total_groups_[group_index];
@@ -217,12 +217,13 @@ void DynamoFilter::chargeFailureSpecificStats(const Json::Object& json_body) {
   std::string error_type = RequestParser::parseErrorType(json_body);
 
   if (!error_type.empty()) {
-    Stats::StatNameDynamicPool pool(stats_->symbolTable());
+    Stats::StatNameDynamicPool dynamic(stats_->symbolTable());
     if (table_descriptor_.table_name.empty()) {
-      stats_->counter({stats_->error_, stats_->no_table_, pool.add(error_type)}).inc();
+      stats_->counter({stats_->error_, stats_->no_table_, dynamic.add(error_type)}).inc();
     } else {
       stats_
-          ->counter({stats_->error_, pool.add(table_descriptor_.table_name), pool.add(error_type)})
+          ->counter({stats_->error_, dynamic.add(table_descriptor_.table_name),
+                     dynamic.add(error_type)})
           .inc();
     }
   } else {

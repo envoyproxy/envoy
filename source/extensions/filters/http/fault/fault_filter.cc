@@ -84,10 +84,9 @@ FaultFilterConfig::FaultFilterConfig(const envoy::config::filter::http::fault::v
       delays_injected_(stat_name_set_->add("delays_injected")),
       stats_prefix_(stat_name_set_->add(absl::StrCat(stats_prefix, "fault"))) {}
 
-void FaultFilterConfig::incCounter(absl::string_view downstream_cluster,
-                                   Stats::StatName stat_name) {
+void FaultFilterConfig::incCounter(Stats::StatName downstream_cluster, Stats::StatName stat_name) {
   Stats::SymbolTable::StoragePtr storage = scope_.symbolTable().join(
-      {stats_prefix_, stat_name_set_->getDynamic(downstream_cluster), stat_name});
+      {stats_prefix_, downstream_cluster, stat_name});
   scope_.counterFromStatName(Stats::StatName(storage.get())).inc();
 }
 
@@ -137,6 +136,12 @@ Http::FilterHeadersStatus FaultFilter::decodeHeaders(Http::HeaderMap& headers, b
   if (headers.EnvoyDownstreamServiceCluster()) {
     downstream_cluster_ =
         std::string(headers.EnvoyDownstreamServiceCluster()->value().getStringView());
+    if (downstream_cluster_.empty()) {
+      downstream_cluster_storage_.reset();
+    } else {
+      downstream_cluster_storage_ = std::make_unique<Stats::StatNameDynamicStorage>(
+          downstream_cluster_, config_->scope().symbolTable());
+    }
 
     downstream_cluster_delay_percent_key_ =
         fmt::format("fault.http.{}.delay.fixed_delay_percent", downstream_cluster_);
@@ -289,7 +294,7 @@ uint64_t FaultFilter::abortHttpStatus() {
 void FaultFilter::recordDelaysInjectedStats() {
   // Downstream specific stats.
   if (!downstream_cluster_.empty()) {
-    config_->incDelays(downstream_cluster_);
+    config_->incDelays(downstream_cluster_storage_->statName());
   }
 
   // General stats. All injected faults are considered a single aggregate active fault.
@@ -300,7 +305,7 @@ void FaultFilter::recordDelaysInjectedStats() {
 void FaultFilter::recordAbortsInjectedStats() {
   // Downstream specific stats.
   if (!downstream_cluster_.empty()) {
-    config_->incAborts(downstream_cluster_);
+    config_->incAborts(downstream_cluster_storage_->statName());
   }
 
   // General stats. All injected faults are considered a single aggregate active fault.
