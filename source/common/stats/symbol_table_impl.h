@@ -768,23 +768,6 @@ public:
   }
 
   /**
-   * Finds a StatName by name. If 'token' has been remembered as a built-in,
-   * then no lock is required. Otherwise we must consult dynamic_stat_names_
-   * under a lock that's private to the StatNameSet. If that's empty, we need to
-   * create the StatName in the pool, which requires taking a global lock, and
-   * then remember the new StatName in the dynamic_stat_names_. This allows
-   * subsequent lookups of the same string to take only the set's lock, and not
-   * the whole symbol-table lock.
-   *
-   * @return a StatName corresponding to the passed-in token, owned by the set.
-   *
-   * TODO(jmarantz): Potential perf issue here with contention, both on this
-   * set's mutex and also the SymbolTable mutex which must be taken during
-   * StatNamePool::add().
-   */
-  StatName getDynamic(absl::string_view token);
-
-  /**
    * Finds a builtin StatName by name. If the builtin has not been registered,
    * then the fallback is returned.
    *
@@ -825,7 +808,6 @@ private:
   mutable absl::Mutex mutex_;
   using StringStatNameMap = absl::flat_hash_map<std::string, Stats::StatName>;
   StringStatNameMap builtin_stat_names_;
-  StringStatNameMap dynamic_stat_names_ GUARDED_BY(mutex_);
   RecentLookups recent_lookups_ GUARDED_BY(mutex_);
 };
 

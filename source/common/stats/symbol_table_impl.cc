@@ -650,26 +650,6 @@ StatName StatNameSet::getBuiltin(absl::string_view token, StatName fallback) {
   return fallback;
 }
 
-StatName StatNameSet::getDynamic(absl::string_view token) {
-  // We duplicate most of the getBuiltin implementation so that we can detect
-  // the difference between "not found" and "found empty stat name".
-  const auto iter = builtin_stat_names_.find(token);
-  if (iter != builtin_stat_names_.end()) {
-    return iter->second;
-  }
-
-  {
-    // Other tokens require holding a lock for our local cache.
-    absl::MutexLock lock(&mutex_);
-    Stats::StatName& stat_name_ref = dynamic_stat_names_[token];
-    if (stat_name_ref.empty()) { // Note that builtin_stat_names_ already has one for "".
-      stat_name_ref = pool_.add(token);
-      recent_lookups_.lookup(token);
-    }
-    return stat_name_ref;
-  }
-}
-
 uint64_t StatNameSet::getRecentLookups(const RecentLookups::IterFn& iter) const {
   absl::MutexLock lock(&mutex_);
   recent_lookups_.forEach(iter);
