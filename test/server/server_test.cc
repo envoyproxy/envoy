@@ -1020,7 +1020,7 @@ TEST_P(ServerInstanceImplTest, CallbacksStatsSinkTest) {
   server_->shutdown();
 }
 
-// Validate that disabled extension is reflected in the Node extension.
+// Validate that disabled extension is reflected in the list of Node extensions.
 TEST_P(ServerInstanceImplTest, DisabledExtension) {
   OptionsImpl::disableExtensions({"filters.http/envoy.buffer"});
   initialize("test/server/node_bootstrap.yaml");

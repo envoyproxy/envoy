@@ -277,7 +277,7 @@ public:
   }
 
   /**
-   * @return vendor specific version of a factory.
+   * @return true if the named factory was disabled.
    */
   static bool isFactoryDisabled(absl::string_view name) {
     auto it = factories().find(name);
@@ -388,17 +388,8 @@ public:
    * vendor specific version.
    */
   RegisterFactory(uint32_t major, uint32_t minor, uint32_t patch,
-                  std::initializer_list<absl::string_view> labels) {
-    if (!instance_.name().empty()) {
-      FactoryRegistry<Base>::registerFactory(instance_, instance_.name(),
-                                             MakeBuildVersion(major, minor, patch, labels));
-    }
-
-    if (!FactoryCategoryRegistry::isRegistered(Base::category())) {
-      FactoryCategoryRegistry::registerCategory(Base::category(),
-                                                new FactoryRegistryProxyImpl<Base>());
-    }
-  }
+                  std::initializer_list<absl::string_view> labels)
+      : RegisterFactory(major, minor, patch, labels, {}) {}
 
   /**
    * Constructor that registers an instance of the factory with the FactoryRegistry along with
