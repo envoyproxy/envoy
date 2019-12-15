@@ -454,6 +454,7 @@ SymbolTable::StoragePtr SymbolTableImpl::makeDynamicStorage(absl::string_view na
   mem_block.appendOne(LiteralStringIndicator);
   SymbolTableImpl::Encoding::appendEncoding(name.size(), mem_block);
   mem_block.appendData(reinterpret_cast<const uint8_t*>(name.data()), name.size());
+  ASSERT(mem_block.capacityRemaining() == 0);
   return mem_block.release();
 }
 
@@ -529,6 +530,7 @@ SymbolTable::StoragePtr SymbolTableImpl::join(const StatNameVec& stat_names) con
   for (StatName stat_name : stat_names) {
     stat_name.appendDataToMemBlock(mem_block);
   }
+  ASSERT(mem_block.capacityRemaining() == 0);
   return mem_block.release();
 }
 
