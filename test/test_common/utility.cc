@@ -11,6 +11,7 @@
 #include <vector>
 
 #include "envoy/api/v2/cds.pb.h"
+#include "envoy/api/v2/eds.pb.h"
 #include "envoy/api/v2/lds.pb.h"
 #include "envoy/api/v2/rds.pb.h"
 #include "envoy/api/v2/route/route.pb.h"

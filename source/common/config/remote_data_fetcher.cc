@@ -1,5 +1,7 @@
 #include "common/config/remote_data_fetcher.h"
 
+#include "envoy/api/v2/core/http_uri.pb.h"
+
 #include "common/common/enum_to_int.h"
 #include "common/common/hex.h"
 #include "common/crypto/utility.h"

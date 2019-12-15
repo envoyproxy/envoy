@@ -1,5 +1,7 @@
 #include "extensions/filters/common/rbac/engine_impl.h"
 
+#include "envoy/config/rbac/v2/rbac.pb.h"
+
 #include "common/http/header_map_impl.h"
 
 namespace Envoy {

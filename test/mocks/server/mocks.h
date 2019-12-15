@@ -5,6 +5,10 @@
 #include <list>
 #include <string>
 
+#include "envoy/api/v2/core/base.pb.h"
+#include "envoy/api/v2/core/config_source.pb.h"
+#include "envoy/api/v2/lds.pb.h"
+#include "envoy/api/v2/listener/listener.pb.h"
 #include "envoy/common/mutex_tracer.h"
 #include "envoy/config/bootstrap/v2/bootstrap.pb.h"
 #include "envoy/protobuf/message_validator.h"

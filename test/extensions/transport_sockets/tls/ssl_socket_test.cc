@@ -2,6 +2,9 @@
 #include <memory>
 #include <string>
 
+#include "envoy/api/v2/auth/cert.pb.h"
+#include "envoy/api/v2/lds.pb.h"
+#include "envoy/api/v2/listener/listener.pb.h"
 #include "envoy/network/transport_socket.h"
 
 #include "common/buffer/buffer_impl.h"

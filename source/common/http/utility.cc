@@ -6,6 +6,8 @@
 #include <string>
 #include <vector>
 
+#include "envoy/api/v2/core/http_uri.pb.h"
+#include "envoy/api/v2/core/protocol.pb.h"
 #include "envoy/http/header_map.h"
 
 #include "common/buffer/buffer_impl.h"

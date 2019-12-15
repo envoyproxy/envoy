@@ -3,6 +3,7 @@
 #include <memory>
 #include <string>
 
+#include "envoy/service/ratelimit/v2/rls.pb.h"
 #include "envoy/stats/scope.h"
 
 #include "common/http/header_map_impl.h"

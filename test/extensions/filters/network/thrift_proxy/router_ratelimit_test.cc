@@ -1,6 +1,8 @@
 #include <memory>
 
+#include "envoy/api/v2/route/route.pb.h"
 #include "envoy/common/exception.h"
+#include "envoy/config/filter/network/thrift_proxy/v2alpha1/thrift_proxy.pb.h"
 #include "envoy/config/filter/network/thrift_proxy/v2alpha1/thrift_proxy.pb.validate.h"
 #include "envoy/ratelimit/ratelimit.h"
 

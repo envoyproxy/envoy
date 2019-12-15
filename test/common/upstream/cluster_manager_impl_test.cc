@@ -1,3 +1,8 @@
+#include "envoy/admin/v2alpha/config_dump.pb.h"
+#include "envoy/api/v2/cds.pb.h"
+#include "envoy/api/v2/core/base.pb.h"
+#include "envoy/config/bootstrap/v2/bootstrap.pb.h"
+
 #include "test/common/upstream/test_cluster_manager.h"
 
 using testing::_;
