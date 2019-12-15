@@ -2,6 +2,7 @@
 
 # Diff or copy protoxform artifacts from Bazel cache back to the source tree.
 
+import argparse
 import os
 import pathlib
 import re
@@ -44,6 +45,7 @@ api_proto_package($fields)
 
 IMPORT_REGEX = re.compile('import "(.*)";')
 SERVICE_REGEX = re.compile('service \w+ {')
+PACKAGE_REGEX = re.compile('\npackage ([^="]*);')
 PREVIOUS_MESSAGE_TYPE_REGEX = re.compile(r'previous_message_type\s+=\s+"([^"]*)";')
 
 
@@ -59,79 +61,50 @@ class RequiresReformatError(ProtoSyncError):
         message)
 
 
-def LabelPaths(label, src_suffix):
-  """Compute single proto file source/destination paths from a Bazel proto label.
+def GetDirectoryFromPackage(package):
+  """Get directory path from package name or full qualified message name
 
   Args:
-    label: Bazel source proto label string.
-    src_suffix: suffix string to append to source path.
-
-  Returns:
-    source, destination path tuple. The source indicates where in the Bazel
-      cache the protoxform.py artifact with src_suffix can be found. The
-      destination is a provisional path in the Envoy source tree for copying the
-      contents of source when run in fix mode.
+    package: the full qualified name of package or message.
   """
-  src = utils.BazelBinPathForOutputArtifact(label, src_suffix)
-  dst = 'api/%s' % utils.ProtoFileCanonicalFromLabel(label)
-  return src, dst
+  return '/'.join(s for s in package.split('.') if s and s[0].islower())
 
 
-def SyncProtoFile(cmd, src, dst):
+def GetDestinationPath(src):
+  """Obtain destination path from a proto file path by reading its package statement.
+
+  Args:
+    src: source path
+  """
+  src_path = pathlib.Path(src)
+  contents = src_path.read_text(encoding='utf8')
+  matches = re.findall(PACKAGE_REGEX, contents)
+  if len(matches) != 1:
+    raise RequiresReformatError("Expect {} has only one package delcaration but has {}".format(
+        src, len(matches)))
+  return pathlib.Path(GetDirectoryFromPackage(
+      matches[0])).joinpath(src_path.name.split('.')[0] + ".proto")
+
+
+def SyncProtoFile(cmd, src):
   """Diff or in-place update a single proto file from protoxform.py Bazel cache artifacts."
 
   Args:
     cmd: 'check' or 'fix'.
     src: source path.
-    dst: destination path.
   """
+  # Skip empty files, this indicates this file isn't modified in this version.
+  if os.stat(src).st_size == 0:
+    return
+  dst = pathlib.Path('api').joinpath(GetDestinationPath(src))
   if cmd == 'fix':
-    shutil.copyfile(src, dst)
+    dst.parent.mkdir(0o755, True, True)
+    shutil.copyfile(src, str(dst))
   else:
     try:
       subprocess.check_call(['diff', src, dst])
     except subprocess.CalledProcessError:
       raise RequiresReformatError('%s and %s do not match' % (src, dst))
-
-
-def SyncV2(cmd, src_labels):
-  """Diff or in-place update v2 protos from protoxform.py Bazel cache artifacts."
-
-  Args:
-    cmd: 'check' or 'fix'.
-    src_labels: Bazel label for source protos.
-  """
-  for s in src_labels:
-    src, dst = LabelPaths(s, '.v2.proto')
-    SyncProtoFile(cmd, src, dst)
-
-
-def SyncV3Alpha(cmd, src_labels):
-  """Diff or in-place update v3alpha protos from protoxform.py Bazel cache artifacts."
-
-  Args:
-    cmd: 'check' or 'fix'.
-    src_labels: Bazel label for source protos.
-  """
-  for s in src_labels:
-    src, dst = LabelPaths(s, '.v3alpha.proto')
-    # Skip empty files, this indicates this file isn't modified in next version.
-    if os.stat(src).st_size == 0:
-      continue
-    # Skip unversioned package namespaces. TODO(htuch): fix this to use the type
-    # DB and proper upgrade paths.
-    if 'v1' in dst:
-      dst = re.sub('v1alpha\d?|v1', 'v3alpha', dst)
-      SyncProtoFile(cmd, src, dst)
-    elif 'v2' in dst:
-      dst = re.sub('v2alpha\d?|v2', 'v3alpha', dst)
-      SyncProtoFile(cmd, src, dst)
-    elif 'envoy/type/matcher' in dst:
-      dst = re.sub('/type/matcher/', '/type/matcher/v3alpha/', dst)
-      SyncProtoFile(cmd, src, dst)
-    elif 'envoy/type' in dst:
-      dst = re.sub('/type/', '/type/v3alpha/', dst)
-      SyncProtoFile(cmd, src, dst)
 
 
 def GetImportDeps(proto_path):
@@ -187,7 +160,7 @@ def GetPreviousMessageTypeDeps(proto_path):
   matches = re.findall(PREVIOUS_MESSAGE_TYPE_REGEX, contents)
   deps = []
   for m in matches:
-    target = '//%s:pkg' % '/'.join(s for s in m.split('.') if s and s[0].islower())
+    target = '//%s:pkg' % GetDirectoryFromPackage(m)
     deps.append(target)
   return deps
 
@@ -259,12 +232,15 @@ def SyncBuildFiles(cmd):
 
 
 if __name__ == '__main__':
-  cmd = sys.argv[1]
-  src_labels = sys.argv[2:]
+  parser = argparse.ArgumentParser()
+  parser.add_argument('--mode', choices=['check', 'fix'])
+  parser.add_argument('labels', nargs='*')
+  args = parser.parse_args()
   try:
-    SyncV2(cmd, src_labels)
-    SyncV3Alpha(cmd, src_labels)
-    SyncBuildFiles(cmd)
+    for label in args.labels:
+      SyncProtoFile(args.mode, utils.BazelBinPathForOutputArtifact(label, '.v2.proto'))
+      SyncProtoFile(args.mode, utils.BazelBinPathForOutputArtifact(label, '.v3alpha.proto'))
+    SyncBuildFiles(args.mode)
   except ProtoSyncError as e:
     sys.stderr.write('%s\n' % e)
     sys.exit(1)
