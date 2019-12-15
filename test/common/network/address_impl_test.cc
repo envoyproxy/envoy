@@ -363,6 +363,15 @@ TEST(PipeInstanceTest, AbstractNamespacePermission) {
   const mode_t mode = 0777;
   EXPECT_THROW_WITH_REGEX(PipeInstance address("@/foo", mode), EnvoyException,
                           "Cannot set mode for Abstract AF_UNIX sockets");
+
+  sockaddr_un sun;
+  sun.sun_family = AF_UNIX;
+  StringUtil::strlcpy(&sun.sun_path[1], "@/foo", sizeof sun.sun_path);
+  sun.sun_path[0] = '\0';
+  socklen_t ss_len = offsetof(struct sockaddr_un, sun_path) + 1 + strlen(sun.sun_path);
+
+  EXPECT_THROW_WITH_REGEX(PipeInstance address(&sun, ss_len, mode), EnvoyException,
+                          "Cannot set mode for Abstract AF_UNIX sockets");
 #endif
 }
 
