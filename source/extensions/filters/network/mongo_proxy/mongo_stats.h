@@ -31,8 +31,6 @@ public:
     return stat_name_set_->getBuiltin(str, fallback);
   }
 
-  //Stats::StatName getDynamic(const std::string& str) { return stat_name_set_->getDynamic(str); }
-
   Stats::SymbolTable& symbolTable() { return scope_.symbolTable(); }
 
 private:
