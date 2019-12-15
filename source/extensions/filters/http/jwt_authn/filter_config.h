@@ -1,6 +1,7 @@
 #pragma once
 
 #include "envoy/api/api.h"
+#include "envoy/config/filter/http/jwt_authn/v2alpha/config.pb.h"
 #include "envoy/router/string_accessor.h"
 #include "envoy/server/filter_config.h"
 #include "envoy/stats/scope.h"

@@ -5,8 +5,13 @@
 #include <string>
 #include <unordered_map>
 
+#include "envoy/api/v2/discovery.pb.h"
+#include "envoy/config/bootstrap/v2/bootstrap.pb.h"
 #include "envoy/event/dispatcher.h"
+#include "envoy/service/discovery/v2/rtds.pb.h"
+#include "envoy/service/discovery/v2/rtds.pb.validate.h"
 #include "envoy/thread_local/thread_local.h"
+#include "envoy/type/percent.pb.h"
 #include "envoy/type/percent.pb.validate.h"
 
 #include "common/common/assert.h"

@@ -1,3 +1,5 @@
+#include "envoy/config/filter/http/jwt_authn/v2alpha/config.pb.h"
+
 #include "extensions/filters/http/jwt_authn/verifier.h"
 
 #include "test/extensions/filters/http/jwt_authn/mock.h"

@@ -1,3 +1,5 @@
+#include "envoy/service/tap/v2alpha/common.pb.h"
+
 #include "extensions/common/tap/admin.h"
 
 #include "test/mocks/server/mocks.h"

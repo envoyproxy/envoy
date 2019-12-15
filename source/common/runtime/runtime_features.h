@@ -4,6 +4,7 @@
 
 #include "envoy/api/v2/core/base.pb.h"
 #include "envoy/runtime/runtime.h"
+#include "envoy/type/percent.pb.h"
 
 #include "common/protobuf/utility.h"
 #include "common/singleton/const_singleton.h"

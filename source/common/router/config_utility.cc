@@ -3,6 +3,10 @@
 #include <string>
 #include <vector>
 
+#include "envoy/api/v2/core/base.pb.h"
+#include "envoy/api/v2/route/route.pb.h"
+#include "envoy/type/matcher/string.pb.h"
+
 #include "common/common/assert.h"
 #include "common/common/regex.h"
 

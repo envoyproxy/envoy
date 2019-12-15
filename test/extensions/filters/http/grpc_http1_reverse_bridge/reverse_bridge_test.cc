@@ -1,6 +1,8 @@
 #include <memory>
 #include <string>
 
+#include "envoy/config/filter/http/grpc_http1_reverse_bridge/v2alpha1/config.pb.h"
+
 #include "common/buffer/buffer_impl.h"
 #include "common/grpc/codec.h"
 #include "common/http/header_map_impl.h"

@@ -1,3 +1,5 @@
+#include "envoy/config/filter/http/jwt_authn/v2alpha/config.pb.h"
+
 #include "common/router/string_accessor_impl.h"
 #include "common/stream_info/filter_state_impl.h"
 

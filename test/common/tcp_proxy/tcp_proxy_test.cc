@@ -6,6 +6,7 @@
 #include <vector>
 
 #include "envoy/config/accesslog/v2/file.pb.h"
+#include "envoy/config/filter/accesslog/v2/accesslog.pb.h"
 #include "envoy/config/filter/network/tcp_proxy/v2/tcp_proxy.pb.h"
 #include "envoy/config/filter/network/tcp_proxy/v2/tcp_proxy.pb.validate.h"
 

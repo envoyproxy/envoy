@@ -3,7 +3,11 @@
 #include <string>
 #include <vector>
 
+#include "envoy/api/v2/core/base.pb.h"
+#include "envoy/api/v2/core/health_check.pb.h"
 #include "envoy/api/v2/core/health_check.pb.validate.h"
+#include "envoy/api/v2/endpoint/endpoint.pb.h"
+#include "envoy/data/core/v2alpha/health_check_event.pb.h"
 
 #include "common/buffer/buffer_impl.h"
 #include "common/buffer/zero_copy_input_stream_impl.h"

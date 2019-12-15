@@ -34,7 +34,10 @@ envoy_extension_cc_test(
         "//test/mocks/tracing:tracing_mocks",
         "//test/mocks/upstream:upstream_mocks",
         "//test/test_common:utility_lib",
+        "@envoy_api//envoy/api/v2/core:pkg_cc_proto",
         "@envoy_api//envoy/config/filter/http/ext_authz/v2:pkg_cc_proto",
+        "@envoy_api//envoy/service/auth/v2:pkg_cc_proto",
+        "@envoy_api//envoy/type:pkg_cc_proto",
     ],
 )
 
@@ -45,6 +48,7 @@ envoy_extension_cc_test(
     deps = [
         "//source/extensions/filters/http/ext_authz:config",
         "//test/mocks/server:server_mocks",
+        "@envoy_api//envoy/api/v2/core:pkg_cc_proto",
         "@envoy_api//envoy/config/filter/http/ext_authz/v2:pkg_cc_proto",
     ],
 )
@@ -57,6 +61,8 @@ envoy_extension_cc_test(
         "//source/extensions/filters/http/ext_authz:config",
         "//test/integration:http_integration_lib",
         "//test/test_common:utility_lib",
+        "@envoy_api//envoy/api/v2/listener:pkg_cc_proto",
+        "@envoy_api//envoy/config/bootstrap/v2:pkg_cc_proto",
         "@envoy_api//envoy/config/filter/http/ext_authz/v2:pkg_cc_proto",
         "@envoy_api//envoy/service/auth/v2:pkg_cc_proto",
     ],

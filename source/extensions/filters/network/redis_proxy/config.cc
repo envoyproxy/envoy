@@ -1,5 +1,8 @@
 #include "extensions/filters/network/redis_proxy/config.h"
 
+#include "envoy/config/filter/network/redis_proxy/v2/redis_proxy.pb.h"
+#include "envoy/config/filter/network/redis_proxy/v2/redis_proxy.pb.validate.h"
+
 #include "extensions/common/redis/redirection_mgr_impl.h"
 #include "extensions/filters/network/common/redis/client_impl.h"
 #include "extensions/filters/network/redis_proxy/command_splitter_impl.h"
