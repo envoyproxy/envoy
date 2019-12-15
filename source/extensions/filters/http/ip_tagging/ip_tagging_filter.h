@@ -69,7 +69,6 @@ private:
   const Stats::StatName hit_;
   const Stats::StatName no_hit_;
   const Stats::StatName total_;
-  std::vector<const Stats::StatName> tags_;
   std::unique_ptr<Network::LcTrie::LcTrie<std::string>> trie_;
 };
 
