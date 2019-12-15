@@ -176,11 +176,19 @@ void DynamoFilter::chargeStatsPerEntity(const std::string& entity, const std::st
       time_source_.monotonicTime() - start_decode_);
 
   size_t group_index = DynamoStats::groupIndex(status);
+  std::vector<std::unique_ptr<Stats::StatNameDynamicStorage>> dynamic_storage;
+  auto get_dynamic = [this, &dynamic_storage](absl::string_view name) -> const Stats::StatName {
+    auto storage = std::make_unique<Stats::StatNameDynamicStorage>(name, stats_->symbolTable());
+    const Stats::StatName stat_name = storage->statName();
+    dynamic_storage.push_back(std::move(storage));
+    return stat_name;
+  };
+
   const Stats::StatName entity_type_name =
       stats_->getBuiltin(entity_type, stats_->unknown_entity_type_);
-  const Stats::StatName entity_name = stats_->getDynamic(entity);
-  const Stats::StatName total_name = stats_->getDynamic(absl::StrCat("upstream_rq_total_", status));
-  const Stats::StatName time_name = stats_->getDynamic(absl::StrCat("upstream_rq_time_", status));
+  const Stats::StatName entity_name = get_dynamic(entity);
+  const Stats::StatName total_name = get_dynamic(absl::StrCat("upstream_rq_total_", status));
+  const Stats::StatName time_name = get_dynamic(absl::StrCat("upstream_rq_time_", status));
 
   stats_->counter({entity_type_name, entity_name, stats_->upstream_rq_total_}).inc();
   const Stats::StatName total_group = stats_->upstream_rq_total_groups_[group_index];
@@ -205,9 +213,8 @@ void DynamoFilter::chargeUnProcessedKeysStats(const Json::Object& json_body) {
   // complete apart of the batch operation. Only the table names will be logged for errors.
   std::vector<std::string> unprocessed_tables = RequestParser::parseBatchUnProcessedKeys(json_body);
   for (const std::string& unprocessed_table : unprocessed_tables) {
-    stats_
-        ->counter({stats_->error_, stats_->getDynamic(unprocessed_table),
-                   stats_->batch_failure_unprocessed_keys_})
+    Stats::StatNameDynamicStorage storage(unprocessed_table, stats_->symbolTable());
+    stats_->counter({stats_->error_, storage.statName(), stats_->batch_failure_unprocessed_keys_})
         .inc();
   }
 }
@@ -216,13 +223,13 @@ void DynamoFilter::chargeFailureSpecificStats(const Json::Object& json_body) {
   std::string error_type = RequestParser::parseErrorType(json_body);
 
   if (!error_type.empty()) {
+    Stats::StatNameDynamicStorage error_type_storage(error_type, stats_->symbolTable());
+    const Stats::StatName error_type_stat_name = error_type_storage.statName();
     if (table_descriptor_.table_name.empty()) {
-      stats_->counter({stats_->error_, stats_->no_table_, stats_->getDynamic(error_type)}).inc();
+      stats_->counter({stats_->error_, stats_->no_table_, error_type_stat_name}).inc();
     } else {
-      stats_
-          ->counter({stats_->error_, stats_->getDynamic(table_descriptor_.table_name),
-                     stats_->getDynamic(error_type)})
-          .inc();
+      Stats::StatNameDynamicStorage table_name(table_descriptor_.table_name, stats_->symbolTable());
+      stats_->counter({stats_->error_, table_name.statName(), error_type_stat_name}).inc();
     }
   } else {
     stats_->counter({stats_->empty_response_body_}).inc();

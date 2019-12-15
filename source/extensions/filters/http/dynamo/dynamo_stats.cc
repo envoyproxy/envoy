@@ -70,9 +70,12 @@ Stats::Counter& DynamoStats::buildPartitionStatCounter(const std::string& table_
                                                        const std::string& partition_id) {
   // Use the last 7 characters of the partition id.
   absl::string_view id_last_7 = absl::string_view(partition_id).substr(partition_id.size() - 7);
-  const Stats::SymbolTable::StoragePtr stat_name_storage = addPrefix(
-      {table_, getDynamic(table_name), capacity_, getBuiltin(operation, unknown_operation_),
-       getDynamic(absl::StrCat("__partition_id=", id_last_7))});
+  Stats::StatNameDynamicStorage id_last_7_stat_name(absl::StrCat("__partition_id=", id_last_7),
+                                                    scope_.symbolTable());
+  Stats::StatNameDynamicStorage table_stat_name(table_name, scope_.symbolTable());
+  const Stats::SymbolTable::StoragePtr stat_name_storage =
+      addPrefix({table_, table_stat_name.statName(), capacity_,
+                 getBuiltin(operation, unknown_operation_), id_last_7_stat_name.statName()});
   return scope_.counterFromStatName(Stats::StatName(stat_name_storage.get()));
 }
 
