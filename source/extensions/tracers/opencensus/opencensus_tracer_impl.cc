@@ -2,6 +2,7 @@
 
 #include <grpcpp/grpcpp.h>
 
+#include "envoy/config/trace/v2/trace.pb.h"
 #include "envoy/http/header_map.h"
 
 #include "common/common/base64.h"

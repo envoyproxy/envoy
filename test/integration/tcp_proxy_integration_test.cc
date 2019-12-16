@@ -2,8 +2,11 @@
 
 #include <memory>
 
+#include "envoy/api/v2/cds.pb.h"
+#include "envoy/api/v2/core/base.pb.h"
 #include "envoy/config/accesslog/v2/file.pb.h"
-#include "envoy/config/filter/network/tcp_proxy/v2/tcp_proxy.pb.validate.h"
+#include "envoy/config/bootstrap/v2/bootstrap.pb.h"
+#include "envoy/config/filter/network/tcp_proxy/v2/tcp_proxy.pb.h"
 
 #include "common/network/utility.h"
 

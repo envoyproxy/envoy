@@ -1,3 +1,4 @@
+#include "envoy/config/filter/dubbo/router/v2alpha1/router.pb.h"
 #include "envoy/config/filter/dubbo/router/v2alpha1/router.pb.validate.h"
 
 #include "extensions/filters/network/dubbo_proxy/filters/well_known_names.h"

@@ -5,6 +5,10 @@
 #include <string>
 #include <unordered_map>
 
+#include "envoy/api/v2/core/base.pb.h"
+#include "envoy/api/v2/rds.pb.h"
+#include "envoy/type/percent.pb.h"
+
 #include "common/network/utility.h"
 #include "common/protobuf/message_validator_impl.h"
 #include "common/protobuf/utility.h"

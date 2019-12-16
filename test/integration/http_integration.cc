@@ -8,6 +8,7 @@
 #include <vector>
 
 #include "envoy/buffer/buffer.h"
+#include "envoy/config/filter/network/http_connection_manager/v2/http_connection_manager.pb.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/http/header_map.h"
 #include "envoy/network/address.h"

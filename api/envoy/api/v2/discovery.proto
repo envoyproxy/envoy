@@ -2,9 +2,9 @@ syntax = "proto3";
 
 package envoy.api.v2;
 
+option java_package = "io.envoyproxy.envoy.api.v2";
 option java_outer_classname = "DiscoveryProto";
 option java_multiple_files = true;
-option java_package = "io.envoyproxy.envoy.api.v2";
 
 import "envoy/api/v2/core/base.proto";
 
@@ -217,7 +217,6 @@ message Resource {
   // The resource's name, to distinguish it from others of the same type of resource.
   string name = 3;
 
-  // [#not-implemented-hide:]
   // The aliases are a list of other names that this resource can go by.
   repeated string aliases = 4;
 

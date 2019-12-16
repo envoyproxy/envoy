@@ -1,3 +1,4 @@
+#include "envoy/config/bootstrap/v2/bootstrap.pb.h"
 #include "envoy/network/filter.h"
 #include "envoy/registry/registry.h"
 

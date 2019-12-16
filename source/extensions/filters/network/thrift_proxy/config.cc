@@ -3,6 +3,8 @@
 #include <map>
 #include <string>
 
+#include "envoy/config/filter/network/thrift_proxy/v2alpha1/thrift_proxy.pb.h"
+#include "envoy/config/filter/network/thrift_proxy/v2alpha1/thrift_proxy.pb.validate.h"
 #include "envoy/network/connection.h"
 #include "envoy/registry/registry.h"
 

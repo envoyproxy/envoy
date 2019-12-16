@@ -1,7 +1,10 @@
 #pragma once
 
+#include "envoy/api/v2/core/base.pb.h"
 #include "envoy/config/filter/http/ext_authz/v2/ext_authz.pb.h"
+#include "envoy/service/auth/v2/external_auth.pb.h"
 #include "envoy/tracing/http_tracer.h"
+#include "envoy/type/matcher/string.pb.h"
 #include "envoy/upstream/cluster_manager.h"
 
 #include "common/common/logger.h"

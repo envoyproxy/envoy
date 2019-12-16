@@ -1,5 +1,8 @@
 #include "extensions/filters/network/rbac/config.h"
 
+#include "envoy/config/filter/network/rbac/v2/rbac.pb.h"
+#include "envoy/config/filter/network/rbac/v2/rbac.pb.validate.h"
+#include "envoy/config/rbac/v2/rbac.pb.h"
 #include "envoy/network/connection.h"
 #include "envoy/registry/registry.h"
 

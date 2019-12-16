@@ -1,5 +1,10 @@
 #include "extensions/health_checkers/redis/redis.h"
 
+#include "envoy/api/v2/core/health_check.pb.h"
+#include "envoy/config/filter/network/redis_proxy/v2/redis_proxy.pb.validate.h"
+#include "envoy/config/health_checker/redis/v2/redis.pb.h"
+#include "envoy/data/core/v2alpha/health_check_event.pb.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace HealthCheckers {

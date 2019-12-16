@@ -2,6 +2,11 @@
 
 #include <err.h>
 
+#include "envoy/api/v2/cds.pb.h"
+#include "envoy/config/cluster/redis/redis_cluster.pb.h"
+#include "envoy/config/cluster/redis/redis_cluster.pb.validate.h"
+#include "envoy/config/filter/network/redis_proxy/v2/redis_proxy.pb.validate.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace Clusters {

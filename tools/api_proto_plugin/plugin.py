@@ -17,8 +17,8 @@ OutputDescriptor = namedtuple(
         # Output files are generated alongside their corresponding input .proto,
         # with the output_suffix appended.
         'output_suffix',
-        # The visitor is a function to create a visitor.Visitor defining the business
-        # logic of the plugin for the specific output descriptor.
+        # The visitor factory is a function to create a visitor.Visitor defining
+        # the business logic of the plugin for the specific output descriptor.
         'visitor_factory',
         # FileDescriptorProto transformer; this is applied to the input
         # before any output generation.
