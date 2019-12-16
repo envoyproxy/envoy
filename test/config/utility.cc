@@ -396,10 +396,9 @@ void ConfigHelper::finalize(const std::vector<uint32_t>& ports) {
       if (tap_path) {
         auto* filter_chain = listener->mutable_filter_chains(j);
         const bool has_tls = filter_chain->has_tls_context();
-        absl::optional<ProtobufWkt::Struct> tls_config;
+        const Protobuf::Message* tls_config = nullptr;
         if (has_tls) {
-          tls_config = ProtobufWkt::Struct();
-          TestUtility::jsonConvert(filter_chain->tls_context(), tls_config.value());
+          tls_config = &filter_chain->tls_context();
           filter_chain->clear_tls_context();
         }
         setTapTransportSocket(tap_path.value(), fmt::format("listener_{}_{}", i, j),
@@ -442,10 +441,9 @@ void ConfigHelper::finalize(const std::vector<uint32_t>& ports) {
 
     if (tap_path) {
       const bool has_tls = cluster->has_tls_context();
-      absl::optional<ProtobufWkt::Struct> tls_config;
+      const Protobuf::Message* tls_config = nullptr;
       if (has_tls) {
-        tls_config = ProtobufWkt::Struct();
-        TestUtility::jsonConvert(cluster->tls_context(), tls_config.value());
+        tls_config = &cluster->tls_context();
         cluster->clear_tls_context();
       }
       setTapTransportSocket(tap_path.value(), fmt::format("cluster_{}", i),
@@ -471,15 +469,15 @@ void ConfigHelper::finalize(const std::vector<uint32_t>& ports) {
 
 void ConfigHelper::setTapTransportSocket(const std::string& tap_path, const std::string& type,
                                          envoy::api::v2::core::TransportSocket& transport_socket,
-                                         const absl::optional<ProtobufWkt::Struct>& tls_config) {
+                                         const Protobuf::Message* tls_config) {
   // Determine inner transport socket.
   envoy::api::v2::core::TransportSocket inner_transport_socket;
   if (!transport_socket.name().empty()) {
     RELEASE_ASSERT(!tls_config, "");
     inner_transport_socket.MergeFrom(transport_socket);
-  } else if (tls_config.has_value()) {
+  } else if (tls_config) {
     inner_transport_socket.set_name("envoy.transport_sockets.tls");
-    inner_transport_socket.mutable_config()->MergeFrom(tls_config.value());
+    inner_transport_socket.mutable_typed_config()->PackFrom(*tls_config);
   } else {
     inner_transport_socket.set_name("envoy.transport_sockets.raw_buffer");
   }

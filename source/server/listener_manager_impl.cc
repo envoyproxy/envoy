@@ -91,7 +91,7 @@ std::vector<Network::FilterFactoryCb> ProdListenerComponentFactory::createNetwor
     ENVOY_LOG(debug, "  filter #{}:", i);
     ENVOY_LOG(debug, "    name: {}", string_name);
     ENVOY_LOG(debug, "  config: {}",
-              MessageUtil::getJsonStringFromMessage(proto_config.config(), true));
+              MessageUtil::getJsonStringFromMessage(proto_config.typed_config(), true));
 
     // Now see if there is a factory that will accept the config.
     auto& factory =
@@ -120,7 +120,7 @@ ProdListenerComponentFactory::createListenerFilterFactoryList_(
     ENVOY_LOG(debug, "  filter #{}:", i);
     ENVOY_LOG(debug, "    name: {}", string_name);
     ENVOY_LOG(debug, "  config: {}",
-              MessageUtil::getJsonStringFromMessage(proto_config.config(), true));
+              MessageUtil::getJsonStringFromMessage(proto_config.typed_config(), true));
 
     // Now see if there is a factory that will accept the config.
     auto& factory =
@@ -144,7 +144,7 @@ ProdListenerComponentFactory::createUdpListenerFilterFactoryList_(
     ENVOY_LOG(debug, "  filter #{}:", i);
     ENVOY_LOG(debug, "    name: {}", string_name);
     ENVOY_LOG(debug, "  config: {}",
-              MessageUtil::getJsonStringFromMessage(proto_config.config(), true));
+              MessageUtil::getJsonStringFromMessage(proto_config.typed_config(), true));
 
     // Now see if there is a factory that will accept the config.
     auto& factory =
@@ -751,7 +751,7 @@ std::unique_ptr<Network::FilterChain> ListenerFilterChainFactoryBuilder::buildFi
   if (!filter_chain.has_transport_socket()) {
     if (filter_chain.has_tls_context()) {
       transport_socket.set_name(Extensions::TransportSockets::TransportSocketNames::get().Tls);
-      MessageUtil::jsonConvert(filter_chain.tls_context(), *transport_socket.mutable_config());
+      transport_socket.mutable_typed_config()->PackFrom(filter_chain.tls_context());
     } else {
       transport_socket.set_name(
           Extensions::TransportSockets::TransportSocketNames::get().RawBuffer);

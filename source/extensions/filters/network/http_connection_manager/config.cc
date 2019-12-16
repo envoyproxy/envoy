@@ -400,7 +400,7 @@ void HttpConnectionManagerConfig::processFilter(
   ENVOY_LOG(debug, "    {} filter #{}", prefix, i);
   ENVOY_LOG(debug, "      name: {}", string_name);
   ENVOY_LOG(debug, "    config: {}",
-            MessageUtil::getJsonStringFromMessage(proto_config.config(), true));
+            MessageUtil::getJsonStringFromMessage(proto_config.typed_config(), true));
 
   // Now see if there is a factory that will accept the config.
   auto& factory =

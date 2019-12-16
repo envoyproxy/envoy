@@ -41,6 +41,7 @@ public:
         TestEnvironment::runfilesPath("test/config/integration/certs/upstreamcacert.pem"));
     if (!header_value_1_.empty()) {
       const std::string yaml1 = fmt::format(R"EOF(
+"@type": type.googleapis.com/envoy.config.grpc_credential.v2alpha.FileBasedMetadataConfig        
 secret_data:
   inline_string: {}
 header_key: {}
@@ -50,11 +51,12 @@ header_prefix: {}
       auto* plugin_config = google_grpc->add_call_credentials()->mutable_from_plugin();
       plugin_config->set_name(credentials_factory_name_);
       envoy::config::grpc_credential::v2alpha::FileBasedMetadataConfig metadata_config;
-      Envoy::TestUtility::loadFromYaml(yaml1, *plugin_config->mutable_config());
+      Envoy::TestUtility::loadFromYaml(yaml1, *plugin_config->mutable_typed_config());
     }
     if (!header_value_2_.empty()) {
       // uses default key/prefix
       const std::string yaml2 = fmt::format(R"EOF(
+"@type": type.googleapis.com/envoy.config.grpc_credential.v2alpha.FileBasedMetadataConfig        
 secret_data:
   inline_string: {}
 )EOF",
@@ -62,7 +64,7 @@ secret_data:
       envoy::config::grpc_credential::v2alpha::FileBasedMetadataConfig metadata_config2;
       auto* plugin_config2 = google_grpc->add_call_credentials()->mutable_from_plugin();
       plugin_config2->set_name(credentials_factory_name_);
-      Envoy::TestUtility::loadFromYaml(yaml2, *plugin_config2->mutable_config());
+      Envoy::TestUtility::loadFromYaml(yaml2, *plugin_config2->mutable_typed_config());
     }
     if (!access_token_value_.empty()) {
       google_grpc->add_call_credentials()->set_access_token(access_token_value_);
