@@ -12,6 +12,7 @@
 
 #include "absl/strings/match.h"
 #include "udpa/annotations/sensitive.pb.h"
+#include "udpa/type/v1/typed_struct.pb.h"
 #include "yaml-cpp/yaml.h"
 
 namespace Envoy {
@@ -508,6 +509,16 @@ std::string MessageUtil::CodeEnumToString(ProtobufUtil::error::Code code) {
 
 namespace {
 
+std::unique_ptr<Protobuf::Message> typeUrlToNewMessage(Protobuf::MessageFactory& message_factory,
+                                                       absl::string_view type_url) {
+  const absl::string_view type_name = TypeUtil::typeUrlToDescriptorFullName(type_url);
+  const Protobuf::Descriptor* descriptor =
+      Protobuf::DescriptorPool::generated_pool()->FindMessageTypeByName(
+          static_cast<std::string>(type_name));
+  return std::unique_ptr<Protobuf::Message>(
+      descriptor == nullptr ? nullptr : message_factory.GetPrototype(descriptor)->New());
+}
+
 // Recursive helper method for MessageUtil::redact() below. Note that we have to keep track of
 // whether an ancestor was marked as `sensitive`, not just the field, because of cases like
 // `TlsContext::private_key`, which is of type `core.DataSource` rather than `string`.
@@ -515,31 +526,42 @@ void redactInPlace(Protobuf::Message* message, bool ancestor_is_sensitive) {
   // If the message is an `Any`, we have to first unpack it to its original type to redact it...
   auto* any = dynamic_cast<ProtobufWkt::Any*>(message);
   if (any != nullptr) {
-    // 1. Extract the type name from the URL. This is guaranteed to be the portion of the URL
-    // following the last '/' character.
-    const std::string& type_url = any->type_url();
-    const std::size_t last_slash = type_url.find_last_of('/');
-    const std::string type_name = type_url.substr(last_slash + 1);
-    const auto* descriptor =
-        Protobuf::DescriptorPool::generated_pool()->FindMessageTypeByName(type_name);
-
-    // If the type URL doesn't correspond to a known proto, give up redacting and treat this
-    // message the same as a `ProtobufWkt::Struct`. See the documented limitation on
-    // `MessageUtil::redact()` for more context.
-    if (descriptor == nullptr) {
-      ENVOY_LOG_MISC(warn, "Could not redact message with unknown type URL {}", type_url);
+    Protobuf::DynamicMessageFactory message_factory;
+    auto typed_message = typeUrlToNewMessage(message_factory, any->type_url());
+    if (typed_message == nullptr) {
+      // If the type URL doesn't correspond to a known proto, give up redacting and treat this
+      // message the same as a `ProtobufWkt::Struct`. See the documented limitation on
+      // `MessageUtil::redact()` for more context.
+      ENVOY_LOG_MISC(warn, "Could not redact ProtobufWkt::Any with unknown type URL {}",
+                     any->type_url());
       return;
     }
 
-    // 2. Instantiate a mutable message of the correct dynamic type, and unpack the `Any` into it.
-    Protobuf::DynamicMessageFactory dmf;
-    std::unique_ptr<Protobuf::Message> typed_message(dmf.GetPrototype(descriptor)->New());
     any->UnpackTo(typed_message.get());
-
-    // 3. Redact the typed message and repack it into the original `Any`.
     redactInPlace(typed_message.get(), ancestor_is_sensitive);
     any->PackFrom(*typed_message);
+    return;
+  }
 
+  // If the message is a `TypedStruct`, it also contains a `type_url` and can be handled the same
+  // way as `Any` above.
+  auto* typed_struct = dynamic_cast<udpa::type::v1::TypedStruct*>(message);
+  if (typed_struct != nullptr) {
+    Protobuf::DynamicMessageFactory message_factory;
+    auto typed_message = typeUrlToNewMessage(message_factory, typed_struct->type_url());
+    if (typed_message == nullptr) {
+      // If the type URL doesn't correspond to a known proto, give up redacting and treat this
+      // message the same as a `ProtobufWkt::Struct`. See the documented limitation on
+      // `MessageUtil::redact()` for more context.
+      ENVOY_LOG_MISC(warn, "Could not redact udpa::type::v1::TypedStruct with unknown type URL {}",
+                     typed_struct->type_url());
+      return;
+    }
+
+    MessageUtil::jsonConvert(typed_struct->value(), ProtobufMessage::getNullValidationVisitor(),
+                             *typed_message);
+    redactInPlace(typed_message.get(), ancestor_is_sensitive);
+    MessageUtil::jsonConvert(*typed_message, *(typed_struct->mutable_value()));
     return;
   }
 

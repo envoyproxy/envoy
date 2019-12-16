@@ -21,6 +21,7 @@
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
+#include "udpa/type/v1/typed_struct.pb.h"
 
 namespace Envoy {
 
@@ -340,7 +341,64 @@ static_resources:
           inline_string: The point of this test is that redact shouldn't crash.
 )EOF",
                             original);
+  // Note, `loadFromYaml` validates the type, so we have to swap this unknown url in afterwards.
   original.set_type_url("type.googleapis.com/envoy.unknown.Message");
+
+  EXPECT_TRUE(TestUtility::protoEqual(original, *MessageUtil::redact(original)));
+}
+
+TEST_F(ProtobufUtilityTest, RedactTypedStructWithKnownTypeUrl) {
+  udpa::type::v1::TypedStruct original;
+  TestUtility::loadFromYaml(R"EOF(
+type_url: type.googleapis.com/envoy.config.bootstrap.v2.Bootstrap
+value:
+  static_resources:
+    secrets:
+      - tls_certificate:
+          certificate_chain:
+            inline_string: This field is not sensitive.
+          private_key:
+            inline_string: This field should be redacted!
+          password:
+            inline_string: This field should also be redacted!
+)EOF",
+                            original);
+
+  udpa::type::v1::TypedStruct expected;
+  TestUtility::loadFromYaml(R"EOF(
+type_url: type.googleapis.com/envoy.config.bootstrap.v2.Bootstrap
+value:
+  static_resources:
+    secrets:
+      - tls_certificate:
+          certificate_chain:
+            inline_string: This field is not sensitive.
+          private_key:
+            inline_string: '[redacted]'
+          password:
+            inline_string: '[redacted]'
+)EOF",
+                            expected);
+
+  EXPECT_TRUE(TestUtility::protoEqual(expected, *MessageUtil::redact(original)));
+}
+
+TEST_F(ProtobufUtilityTest, RedactTypedStructWithUnknownTypeUrl) {
+  udpa::type::v1::TypedStruct original;
+  TestUtility::loadFromYaml(R"EOF(
+type_url: type.googleapis.com/envoy.unknown.Message
+value:
+  static_resources:
+    secrets:
+      - tls_certificate:
+          certificate_chain:
+            inline_string: This field is not sensitive.
+          private_key:
+            inline_string: This field could be sensitive, but we have no way of knowing!
+          password:
+            inline_string: The point of this test is that redact shouldn't crash.
+)EOF",
+                            original);
 
   EXPECT_TRUE(TestUtility::protoEqual(original, *MessageUtil::redact(original)));
 }
