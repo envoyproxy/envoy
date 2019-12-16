@@ -360,13 +360,14 @@ TEST(PipeInstanceTest, PermissionFail) {
 
 TEST(PipeInstanceTest, AbstractNamespacePermission) {
 #if defined(__linux__)
+  std::string path = "@/foo";
   const mode_t mode = 0777;
-  EXPECT_THROW_WITH_REGEX(PipeInstance address("@/foo", mode), EnvoyException,
+  EXPECT_THROW_WITH_REGEX(PipeInstance address(path, mode), EnvoyException,
                           "Cannot set mode for Abstract AF_UNIX sockets");
 
   sockaddr_un sun;
   sun.sun_family = AF_UNIX;
-  StringUtil::strlcpy(&sun.sun_path[1], "@/foo", sizeof sun.sun_path);
+  StringUtil::strlcpy(&sun.sun_path[1], path.data(), path.size());
   sun.sun_path[0] = '\0';
   socklen_t ss_len = offsetof(struct sockaddr_un, sun_path) + 1 + strlen(sun.sun_path);
 
