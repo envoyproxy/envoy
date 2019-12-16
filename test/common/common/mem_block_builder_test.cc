@@ -28,7 +28,10 @@ TEST(MemBlockBuilderTest, AppendUint8) {
 
   append.appendBlock(mem_block);
   EXPECT_EQ(0, append.capacityRemaining());
-  EXPECT_EQ((std::vector<uint8_t>{8, 9, 5, 6, 7, 8, 9}), append.span());
+  uint64_t size = append.size();
+  std::unique_ptr<uint8_t[]> data = append.release();
+  EXPECT_EQ((std::vector<uint8_t>{8, 9, 5, 6, 7, 8, 9}),
+            std::vector<uint8_t>(data.get(), data.get() + size));
 
   mem_block.reset();
   EXPECT_EQ(0, mem_block.capacity());
