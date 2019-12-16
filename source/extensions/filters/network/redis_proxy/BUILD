@@ -88,7 +88,7 @@ envoy_cc_library(
         "//source/common/upstream:load_balancer_lib",
         "//source/common/upstream:upstream_lib",
         "//source/extensions/clusters/redis:redis_cluster_lb",
-        "//source/extensions/common/redis:redirection_mgr_interface",
+        "//source/extensions/common/redis:cluster_refresh_manager_interface",
         "//source/extensions/filters/network/common/redis:client_lib",
         "//source/extensions/filters/network/common/redis:utility_lib",
         "@envoy_api//envoy/api/v2/core:pkg_cc_proto",
@@ -122,7 +122,7 @@ envoy_cc_extension(
     security_posture = "requires_trusted_downstream_and_upstream",
     deps = [
         "//include/envoy/upstream:upstream_interface",
-        "//source/extensions/common/redis:redirection_mgr_lib",
+        "//source/extensions/common/redis:cluster_refresh_manager_lib",
         "//source/extensions/filters/network:well_known_names",
         "//source/extensions/filters/network/common:factory_base_lib",
         "//source/extensions/filters/network/common/redis:codec_lib",
