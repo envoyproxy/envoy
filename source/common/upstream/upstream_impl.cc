@@ -1276,12 +1276,14 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(const HostVector& new_hosts,
     }
 
     // Check if in-place host update should be skipped, i.e. when the following criteria are met
-    // (currently there is only one criterion, but we might add more in the future):
     // - The cluster health checker is activated and a new host is matched with the existing one,
     //   but the health check address is different.
+    // - The cluster health checker is activated and a new host is matched with the existing on,
+    //   but the priority is different.
     const bool skip_inplace_host_update =
         health_checker_ != nullptr && existing_host_found &&
-        *existing_host->second->healthCheckAddress() != *host->healthCheckAddress();
+        ((*existing_host->second->healthCheckAddress() != *host->healthCheckAddress()) ||
+         (existing_host->second->priority() != host->priority()));
 
     // When there is a match and we decided to do in-place update, we potentially update the host's
     // health check flag and metadata. Afterwards, the host is pushed back into the final_hosts,
