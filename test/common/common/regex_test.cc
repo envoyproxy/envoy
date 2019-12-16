@@ -52,7 +52,7 @@ TEST(Utility, ParseRegex) {
     matcher.mutable_google_re2()->mutable_max_program_size()->set_value(1);
     matcher.set_regex("/asdf/.*");
     EXPECT_THROW_WITH_REGEX(Utility::parseRegex(matcher), EnvoyException,
-                            "RE2 program size of [0-9]+ > max program size of 1\\.");
+                            "RE2 program size of \\d+ > max program size of 1\\.");
   }
 }
 
