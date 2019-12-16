@@ -275,7 +275,8 @@ After a NACK, an API update may succeed at a new version **Y**:
 .. figure:: diagrams/later-ack.svg
    :alt: ACK after NACK
 
-ACK and NACK semantics can be summarized as follows:
+ACK and NACK semantics summary
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 - The xDS client should ACK or NACK every :ref:`DiscoveryResponse <envoy_api_msg_DiscoveryResponse>`
   received from the management server.
@@ -289,6 +290,9 @@ ACK and NACK semantics can be summarized as follows:
 - NACK signifies unsuccessful configuration update and contains the previous (existing)
   :ref:`version_info <envoy_api_field_DiscoveryResponse.version_info>`.
 - Only the NACK should populate the :ref:`error_detail <envoy_api_field_DiscoveryRequest.error_detail>`.
+
+Versioning and Node Identifier
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 Each stream has its own notion of versioning, there is no shared
 versioning across resource types. When ADS is not used, even each
