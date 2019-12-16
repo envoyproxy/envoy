@@ -30,13 +30,15 @@ public:
   MemBlockBuilder() {}
 
   /**
-   * Populates (or repopulates) the MemBlockBuilder to make it the specified
-   * capacity. This does not have resize semantics; when populate() is called any
-   * previous contents are erased.
+   * Allocates (or reallocates) memory for the MemBlockBuilder to make it the
+   * specified capacity. This does not have resize semantics; when setCapacity()
+   * is called any previous contents are erased.
    *
    * @param capacity The number of memory elements to allocate.
    */
-  void populate(uint64_t capacity) { populateHelper(capacity, std::make_unique<T[]>(capacity)); }
+  void setCapacity(uint64_t capacity) {
+    setCapacityHelper(capacity, std::make_unique<T[]>(capacity));
+  }
 
   /**
    * @return the capacity.
@@ -88,7 +90,7 @@ public:
   /**
    * Empties the contents of this.
    */
-  void reset() { populateHelper(0, std::unique_ptr<T[]>(nullptr)); }
+  void reset() { setCapacityHelper(0, std::unique_ptr<T[]>(nullptr)); }
 
   /**
    * Returns the underlying storage as a unique pointer, clearing this.
@@ -96,7 +98,7 @@ public:
    * @return the transferred storage.
    */
   std::unique_ptr<T[]> release() {
-    write_span_.reset();
+    write_span_ = absl::MakeSpan(static_cast<T*>(nullptr), 0);
     return std::move(data_);
   }
 
@@ -111,7 +113,7 @@ public:
   uint64_t size() const { return write_span_.data() - data_.get(); }
 
 private:
-  void populateHelper(uint64_t capacity, std::unique_ptr<T[]> data) {
+  void setCapacityHelper(uint64_t capacity, std::unique_ptr<T[]> data) {
     data_ = std::move(data);
     write_span_ = absl::MakeSpan(data_.get(), capacity);
   }
