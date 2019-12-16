@@ -31,8 +31,8 @@ public:
 
   /**
    * Populates (or repopulates) the MemBlockBuilder to make it the specified
-   * capacity. This does not have resize semantics; when populate() is called any
-   * previous contents are erased.
+   * capacity. This does not have resize semantics; when populate() is called
+   * any previous contents are erased.
    *
    * @param capacity The number of memory elements to allocate.
    */
@@ -96,8 +96,7 @@ public:
    * @return the transferred storage.
    */
   std::unique_ptr<T[]> release() {
-    uint8_t* empty = nullptr;
-    write_span_ = absl::MakeSpan(empty, 0);
+    write_span_ = absl::MakeSpan(static_cast<T*>(nullptr), 0);
     return std::move(data_);
   }
 
