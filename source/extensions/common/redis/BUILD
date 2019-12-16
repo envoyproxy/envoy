@@ -13,18 +13,18 @@ load(
 envoy_package()
 
 envoy_cc_library(
-    name = "redirection_mgr_interface",
-    hdrs = ["redirection_mgr.h"],
+    name = "cluster_refresh_manager_interface",
+    hdrs = ["cluster_refresh_manager.h"],
     deps = [
     ],
 )
 
 envoy_cc_library(
-    name = "redirection_mgr_lib",
-    srcs = ["redirection_mgr_impl.cc"],
-    hdrs = ["redirection_mgr_impl.h"],
+    name = "cluster_refresh_manager_lib",
+    srcs = ["cluster_refresh_manager_impl.cc"],
+    hdrs = ["cluster_refresh_manager_impl.h"],
     deps = [
-        ":redirection_mgr_interface",
+        ":cluster_refresh_manager_interface",
         "//include/envoy/event:dispatcher_interface",
         "//include/envoy/singleton:manager_interface",
         "//include/envoy/upstream:cluster_manager_interface",

@@ -144,7 +144,8 @@ const std::string ConfigHelper::QUIC_HTTP_PROXY_CONFIG = BASE_UDP_LISTENER_CONFI
             name: envoy.file_access_log
             filter:
               not_health_check_filter:  {}
-            config:
+            typed_config:
+              "@type": type.googleapis.com/envoy.config.accesslog.v2.FileAccessLog
               path: /dev/null
           route_config:
             virtual_hosts:
