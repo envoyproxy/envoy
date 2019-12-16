@@ -949,11 +949,10 @@ VirtualHostImpl::VirtualHostImpl(const envoy::api::v2::route::VirtualHost& virtu
     if (validate_clusters) {
       routes_.back()->validateClusters(factory_context.clusterManager());
       for (const auto& shadow_policy : routes_.back()->shadowPolicies()) {
-        if (!shadow_policy->cluster().empty()) {
-          if (!factory_context.clusterManager().get(shadow_policy->cluster())) {
-            throw EnvoyException(
-                fmt::format("route: unknown shadow cluster '{}'", shadow_policy->cluster()));
-          }
+        ASSERT(!shadow_policy->cluster().empty());
+        if (!factory_context.clusterManager().get(shadow_policy->cluster())) {
+          throw EnvoyException(
+              fmt::format("route: unknown shadow cluster '{}'", shadow_policy->cluster()));
         }
       }
     }
