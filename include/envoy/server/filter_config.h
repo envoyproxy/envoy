@@ -209,7 +209,7 @@ public:
    * @return uint64_t The tag assigned with this context at runtime. It will be used for connection
    * handler tracking.
    */
-  virtual uint64_t getTag() const PURE;
+  virtual uint64_t filterChainTag() const PURE;
 };
 
 /**

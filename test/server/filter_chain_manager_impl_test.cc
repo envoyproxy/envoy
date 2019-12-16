@@ -124,6 +124,7 @@ public:
   )EOF";
   envoy::api::v2::listener::FilterChain filter_chain_template_;
   MockFilterChainFactoryBuilder filter_chain_factory_builder_;
+  NiceMock<Server::Configuration::MockFactoryContext> parent_context_;
 
   // Test target.
   FilterChainManagerImpl filter_chain_manager_{
@@ -140,5 +141,44 @@ TEST_F(FilterChainManagerImplTest, AddSingleFilterChain) {
   auto* filter_chain = findFilterChainHelper(10000, "127.0.0.1", "", "tls", {}, "8.8.8.8", 111);
   EXPECT_NE(filter_chain, nullptr);
 }
+
+TEST_F(FilterChainManagerImplTest, AddZeroFilterChain) {
+  {
+    auto callback = filter_chain_manager_.createFilterChainFactoryContextCallback(parent_context_);
+    callback->prepareFilterChainFactoryContexts();
+  }
+  // Successfully reach here.
+}
+
+// The commit filter chain contexts are co-owned by filter chain manager.
+TEST_F(FilterChainManagerImplTest, CommittedFilterChainContext) {
+  std::vector<std::shared_ptr<Configuration::FilterChainFactoryContext>> contexts;
+  {
+    auto callback = filter_chain_manager_.createFilterChainFactoryContextCallback(parent_context_);
+    callback->prepareFilterChainFactoryContexts();
+    contexts.push_back(callback->createFilterChainFactoryContext(&filter_chain_template_));
+  }
+  for (const auto& shared_ptr : contexts) {
+    EXPECT_GT(shared_ptr.use_count(), 1);
+  }
+}
+
+// The current implementation generated unique tag for the same context.
+TEST_F(FilterChainManagerImplTest, FilterChainContextsHaveUniqueFilterChainTag) {
+  std::vector<std::shared_ptr<Configuration::FilterChainFactoryContext>> contexts;
+  {
+    auto callback = filter_chain_manager_.createFilterChainFactoryContextCallback(parent_context_);
+    callback->prepareFilterChainFactoryContexts();
+    for (int i = 0; i < 100; i++) {
+      contexts.push_back(callback->createFilterChainFactoryContext(&filter_chain_template_));
+    }
+  }
+  std::set<uint64_t> tag_set;
+  for (const auto& context : contexts) {
+    tag_set.emplace(context->filterChainTag());
+  }
+  EXPECT_EQ(tag_set.size(), contexts.size());
+}
+
 } // namespace Server
 } // namespace Envoy

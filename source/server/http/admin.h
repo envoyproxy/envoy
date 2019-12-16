@@ -402,7 +402,7 @@ private:
       return empty_network_filter_factory_;
     }
 
-    int64_t filterChainTag() const override { return 0; }
+    uint64_t filterChainTag() const override { return 0; }
 
   private:
     const Network::RawBufferSocketFactory transport_socket_factory_;

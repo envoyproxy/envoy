@@ -724,7 +724,17 @@ ListenerFilterChainFactoryBuilder::ListenerFilterChainFactoryBuilder(
     ListenerImpl& listener,
     Server::Configuration::TransportSocketFactoryContextImpl& factory_context,
     std::unique_ptr<FilterChainFactoryContextCallback>&& filter_chain_factory_context_callback)
-    : parent_(listener), factory_context_(factory_context),
+    : ListenerFilterChainFactoryBuilder(listener.messageValidationVisitor(),
+                                        listener.parent_.factory_, factory_context,
+                                        std::move(filter_chain_factory_context_callback)) {}
+
+ListenerFilterChainFactoryBuilder::ListenerFilterChainFactoryBuilder(
+    ProtobufMessage::ValidationVisitor& validator,
+    ListenerComponentFactory& listener_component_factory,
+    Server::Configuration::TransportSocketFactoryContextImpl& factory_context,
+    std::unique_ptr<FilterChainFactoryContextCallback>&& filter_chain_factory_context_callback)
+    : validator_(validator), listener_component_factory_(listener_component_factory),
+      factory_context_(factory_context),
       filter_chain_factory_context_callback_(std::move(filter_chain_factory_context_callback)) {
   filter_chain_factory_context_callback_->prepareFilterChainFactoryContexts();
 }
@@ -755,17 +765,17 @@ std::unique_ptr<Network::FilterChain> ListenerFilterChainFactoryBuilder::buildFi
 
   auto& config_factory = Config::Utility::getAndCheckFactory<
       Server::Configuration::DownstreamTransportSocketConfigFactory>(transport_socket.name());
-  ProtobufTypes::MessagePtr message = Config::Utility::translateToFactoryConfig(
-      transport_socket, parent_.messageValidationVisitor(), config_factory);
+  ProtobufTypes::MessagePtr message =
+      Config::Utility::translateToFactoryConfig(transport_socket, validator_, config_factory);
 
   std::vector<std::string> server_names(filter_chain.filter_chain_match().server_names().begin(),
                                         filter_chain.filter_chain_match().server_names().end());
   return std::make_unique<FilterChainImpl>(
       config_factory.createTransportSocketFactory(*message, factory_context_,
                                                   std::move(server_names)),
-      parent_.parent_.factory_.createNetworkFilterFactoryList(filter_chain.filters(),
-                                                              *filter_chain_factory_context),
-      filter_chain_factory_context->getTag());
+      listener_component_factory_.createNetworkFilterFactoryList(filter_chain.filters(),
+                                                                 *filter_chain_factory_context),
+      filter_chain_factory_context->filterChainTag());
 }
 
 Network::ListenSocketFactorySharedPtr

@@ -24,11 +24,11 @@ Network::Address::InstanceConstSharedPtr fakeAddress() {
 } // namespace
 
 FilterChainFactoryContextImpl::FilterChainFactoryContextImpl(
-    Configuration::FactoryContext& parent_context, uint64_t tag)
-    : parent_context_(parent_context), tag_(tag) {}
+    Configuration::FactoryContext& parent_context, uint64_t filter_chain_tag)
+    : parent_context_(parent_context), filter_chain_tag_(filter_chain_tag) {}
 
 // FilterChainFactoryContext
-uint64_t FilterChainFactoryContextImpl::getTag() const { return tag_; }
+uint64_t FilterChainFactoryContextImpl::filterChainTag() const { return filter_chain_tag_; }
 
 // DrainDecision
 bool FilterChainFactoryContextImpl::drainClose() const {
@@ -582,7 +582,7 @@ void FilterChainManagerImpl::FilterChainContextCallbackImpl::prepareFilterChainF
 std::shared_ptr<Configuration::FilterChainFactoryContext>
 FilterChainManagerImpl::FilterChainContextCallbackImpl::createFilterChainFactoryContext(
     const ::envoy::api::v2::listener::FilterChain* const filter_chain) {
-  // TODO: drain close should be saved in per filter chain context
+  // TODO(lambdai): drain close should be saved in per filter chain context
   UNREFERENCED_PARAMETER(filter_chain);
   auto res = std::make_shared<FilterChainFactoryContextImpl>(parent_context_, ++parent_.next_tag_);
   parent_.factory_contexts_.push_back(res);

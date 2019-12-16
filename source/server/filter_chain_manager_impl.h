@@ -35,10 +35,11 @@ public:
 class FilterChainFactoryContextImpl : public Configuration::FilterChainFactoryContext,
                                       public Network::DrainDecision {
 public:
-  FilterChainFactoryContextImpl(Configuration::FactoryContext& parent_context, uint64_t tag);
+  FilterChainFactoryContextImpl(Configuration::FactoryContext& parent_context,
+                                uint64_t filter_chain_tag);
 
   // FilterChainFactoryContext
-  uint64_t getTag() const override;
+  uint64_t filterChainTag() const override;
 
   // DrainDecision
   bool drainClose() const override;
@@ -75,7 +76,7 @@ public:
 
 private:
   Configuration::FactoryContext& parent_context_;
-  uint64_t tag_;
+  uint64_t filter_chain_tag_;
 };
 
 class FilterChainManagerImpl;
@@ -230,9 +231,10 @@ private:
 class FilterChainImpl : public Network::FilterChain {
 public:
   FilterChainImpl(Network::TransportSocketFactoryPtr&& transport_socket_factory,
-                  std::vector<Network::FilterFactoryCb>&& filters_factory, int64_t tag = 0)
+                  std::vector<Network::FilterFactoryCb>&& filters_factory,
+                  int64_t filter_chain_tag = 0)
       : transport_socket_factory_(std::move(transport_socket_factory)),
-        filters_factory_(std::move(filters_factory)), tag_(tag) {}
+        filters_factory_(std::move(filters_factory)), filter_chain_tag_(filter_chain_tag) {}
 
   // Network::FilterChain
   const Network::TransportSocketFactory& transportSocketFactory() const override {
@@ -243,12 +245,12 @@ public:
     return filters_factory_;
   }
 
-  int64_t filterChainTag() const override { return tag_; }
+  uint64_t filterChainTag() const override { return filter_chain_tag_; }
 
 private:
   const Network::TransportSocketFactoryPtr transport_socket_factory_;
   const std::vector<Network::FilterFactoryCb> filters_factory_;
-  const int64_t tag_{0};
+  const int64_t filter_chain_tag_{0};
 };
 
 } // namespace Server
