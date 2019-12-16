@@ -82,10 +82,9 @@ public:
     ENVOY_LOG(debug, "Failed to fetch remote data. Failure reason: {}", enumToInt(failure));
     if (allow_empty_) {
       callback_(EMPTY_STRING);
+      // Only raise ready when caller allows empty.
+      init_target_.ready();
     }
-
-    // We need to allow server startup to continue, even if we have a bad config.
-    init_target_.ready();
   }
 
 private:
