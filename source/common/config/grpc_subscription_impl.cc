@@ -1,4 +1,4 @@
-#include "common/config/grpc_mux_subscription_impl.h"
+#include "common/config/grpc_subscription_impl.h"
 
 #include "common/common/assert.h"
 #include "common/common/logger.h"
@@ -9,17 +9,18 @@
 namespace Envoy {
 namespace Config {
 
-GrpcMuxSubscriptionImpl::GrpcMuxSubscriptionImpl(GrpcMuxSharedPtr grpc_mux,
-                                                 SubscriptionCallbacks& callbacks,
-                                                 SubscriptionStats stats,
-                                                 absl::string_view type_url,
-                                                 Event::Dispatcher& dispatcher,
-                                                 std::chrono::milliseconds init_fetch_timeout)
+GrpcSubscriptionImpl::GrpcSubscriptionImpl(GrpcMuxSharedPtr grpc_mux,
+                                           SubscriptionCallbacks& callbacks,
+                                           SubscriptionStats stats, absl::string_view type_url,
+                                           Event::Dispatcher& dispatcher,
+                                           std::chrono::milliseconds init_fetch_timeout,
+                                           bool is_aggregated)
     : grpc_mux_(grpc_mux), callbacks_(callbacks), stats_(stats), type_url_(type_url),
-      dispatcher_(dispatcher), init_fetch_timeout_(init_fetch_timeout) {}
+      dispatcher_(dispatcher), init_fetch_timeout_(init_fetch_timeout),
+      is_aggregated_(is_aggregated) {}
 
 // Config::Subscription
-void GrpcMuxSubscriptionImpl::start(const std::set<std::string>& resources) {
+void GrpcSubscriptionImpl::start(const std::set<std::string>& resources) {
   if (init_fetch_timeout_.count() > 0) {
     init_fetch_timeout_timer_ = dispatcher_.createTimer([this]() -> void {
       callbacks_.onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason::FetchTimedout,
@@ -33,9 +34,13 @@ void GrpcMuxSubscriptionImpl::start(const std::set<std::string>& resources) {
   // gRPC/filesystem/REST Subscriptions. Since ADS is push based and muxed, the notion of an
   // "attempt" for a given xDS API combined by ADS is not really that meaningful.
   stats_.update_attempt_.inc();
+
+  if (!is_aggregated_) {
+    grpc_mux_->start();
+  }
 }
 
-void GrpcMuxSubscriptionImpl::updateResourceInterest(
+void GrpcSubscriptionImpl::updateResourceInterest(
     const std::set<std::string>& update_to_these_names) {
   // First destroy the watch, so that this subscribe doesn't send a request for both the
   // previously watched resources and the new ones (we may have lost interest in some of the
@@ -46,7 +51,7 @@ void GrpcMuxSubscriptionImpl::updateResourceInterest(
 }
 
 // Config::GrpcMuxCallbacks
-void GrpcMuxSubscriptionImpl::onConfigUpdate(
+void GrpcSubscriptionImpl::onConfigUpdate(
     const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
     const std::string& version_info) {
   disableInitFetchTimeoutTimer();
@@ -62,8 +67,8 @@ void GrpcMuxSubscriptionImpl::onConfigUpdate(
             resources.size(), version_info);
 }
 
-void GrpcMuxSubscriptionImpl::onConfigUpdateFailed(ConfigUpdateFailureReason reason,
-                                                   const EnvoyException* e) {
+void GrpcSubscriptionImpl::onConfigUpdateFailed(ConfigUpdateFailureReason reason,
+                                                const EnvoyException* e) {
   switch (reason) {
   case Envoy::Config::ConfigUpdateFailureReason::ConnectionFailure:
     stats_.update_failure_.inc();
@@ -93,11 +98,11 @@ void GrpcMuxSubscriptionImpl::onConfigUpdateFailed(ConfigUpdateFailureReason rea
   callbacks_.onConfigUpdateFailed(reason, e);
 }
 
-std::string GrpcMuxSubscriptionImpl::resourceName(const ProtobufWkt::Any& resource) {
+std::string GrpcSubscriptionImpl::resourceName(const ProtobufWkt::Any& resource) {
   return callbacks_.resourceName(resource);
 }
 
-void GrpcMuxSubscriptionImpl::disableInitFetchTimeoutTimer() {
+void GrpcSubscriptionImpl::disableInitFetchTimeoutTimer() {
   if (init_fetch_timeout_timer_) {
     init_fetch_timeout_timer_->disableTimer();
     init_fetch_timeout_timer_.reset();
