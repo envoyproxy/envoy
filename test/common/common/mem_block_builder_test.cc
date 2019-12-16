@@ -17,7 +17,7 @@ TEST(MemBlockBuilderTest, AppendUint8) {
 
   MemBlockBuilder<uint8_t> append;
   EXPECT_EQ(0, append.capacity());
-  append.populate(7);
+  append.setCapacity(7);
   EXPECT_EQ(7, append.capacity());
   append.appendOne(8);
   append.appendOne(9);
@@ -48,7 +48,7 @@ TEST(MemBlockBuilderTest, AppendUint32) {
 
   MemBlockBuilder<uint32_t> append;
   EXPECT_EQ(0, append.capacity());
-  append.populate(7);
+  append.setCapacity(7);
   EXPECT_EQ(7, append.capacity());
   append.appendOne(100008);
   append.appendOne(100009);
