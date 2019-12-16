@@ -230,8 +230,8 @@ envoy_cc_library(
     srcs = ["pausable_ack_queue.cc"],
     hdrs = ["pausable_ack_queue.h"],
     deps = [
+        ":update_ack_lib",
         "//source/common/common:assert_lib",
-        "@com_google_googleapis//google/rpc:status_cc_proto",
     ],
 )
 
@@ -301,6 +301,12 @@ envoy_cc_library(
         "//source/common/protobuf",
         "@envoy_api//envoy/annotations:pkg_cc_proto",
     ],
+)
+
+envoy_cc_library(
+    name = "update_ack_lib",
+    hdrs = ["update_ack.h"],
+    deps = ["@com_google_googleapis//google/rpc:status_cc_proto"],
 )
 
 envoy_cc_library(
