@@ -2,7 +2,9 @@
 
 #include <string>
 
-#include "envoy/config/accesslog/v2/file.pb.h"
+#include "envoy/api/v2/route/route.pb.h"
+#include "envoy/config/bootstrap/v2/bootstrap.pb.h"
+#include "envoy/config/filter/network/http_connection_manager/v2/http_connection_manager.pb.h"
 
 #include "common/http/header_map_impl.h"
 #include "common/http/headers.h"
@@ -326,6 +328,42 @@ TEST_P(IntegrationTest, HittingGrpcFilterLimitBufferingHeaders) {
   EXPECT_THAT(response->headers(), HttpStatusIs("200"));
   EXPECT_THAT(response->headers(),
               HeaderValueOf(Headers::get().GrpcStatus, "2")); // Unknown gRPC error
+}
+
+TEST_P(IntegrationTest, TestSmuggling) {
+  initialize();
+  const std::string smuggled_request = "GET / HTTP/1.1\r\nHost: disallowed\r\n\r\n";
+  ASSERT_EQ(smuggled_request.length(), 36);
+  // Make sure the http parser rejects having content-length and transfer-encoding: chunked
+  // on the same request, regardless of order and spacing.
+  {
+    std::string response;
+    const std::string full_request =
+        "GET / HTTP/1.1\r\nHost: host\r\ncontent-length: 36\r\ntransfer-encoding: chunked\r\n\r\n" +
+        smuggled_request;
+    sendRawHttpAndWaitForResponse(lookupPort("http"), full_request.c_str(), &response, false);
+    EXPECT_EQ("HTTP/1.1 400 Bad Request\r\ncontent-length: 0\r\nconnection: close\r\n\r\n",
+              response);
+  }
+  {
+    std::string response;
+    const std::string request = "GET / HTTP/1.1\r\nHost: host\r\ntransfer-encoding: chunked "
+                                "\r\ncontent-length: 36\r\n\r\n" +
+                                smuggled_request;
+    sendRawHttpAndWaitForResponse(lookupPort("http"), request.c_str(), &response, false);
+    EXPECT_EQ("HTTP/1.1 400 Bad Request\r\ncontent-length: 0\r\nconnection: close\r\n\r\n",
+              response);
+  }
+  // Make sure unsupported transfer encodings are rejected, lest they be abused.
+  {
+    std::string response;
+    const std::string request = "GET / HTTP/1.1\r\nHost: host\r\ntransfer-encoding: "
+                                "identity,chunked \r\ncontent-length: 36\r\n\r\n" +
+                                smuggled_request;
+    sendRawHttpAndWaitForResponse(lookupPort("http"), request.c_str(), &response, false);
+    EXPECT_EQ("HTTP/1.1 501 Not Implemented\r\ncontent-length: 0\r\nconnection: close\r\n\r\n",
+              response);
+  }
 }
 
 TEST_P(IntegrationTest, BadFirstline) {

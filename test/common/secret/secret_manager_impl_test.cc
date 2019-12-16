@@ -2,6 +2,7 @@
 
 #include "envoy/admin/v2alpha/config_dump.pb.h"
 #include "envoy/api/v2/auth/cert.pb.h"
+#include "envoy/api/v2/core/config_source.pb.h"
 #include "envoy/common/exception.h"
 #include "envoy/config/grpc_credential/v2alpha/file_based_metadata.pb.h"
 

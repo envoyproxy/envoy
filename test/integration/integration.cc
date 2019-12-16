@@ -8,7 +8,12 @@
 #include <string>
 #include <vector>
 
+#include "envoy/admin/v2alpha/config_dump.pb.h"
+#include "envoy/api/v2/auth/cert.pb.h"
+#include "envoy/api/v2/discovery.pb.h"
+#include "envoy/api/v2/endpoint/endpoint.pb.h"
 #include "envoy/buffer/buffer.h"
+#include "envoy/config/bootstrap/v2/bootstrap.pb.h"
 #include "envoy/http/header_map.h"
 
 #include "common/api/api_impl.h"

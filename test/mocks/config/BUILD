@@ -21,5 +21,6 @@ envoy_cc_mock(
         "//source/common/protobuf:utility_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/api/v2:pkg_cc_proto",
+        "@envoy_api//envoy/api/v2/core:pkg_cc_proto",
     ],
 )

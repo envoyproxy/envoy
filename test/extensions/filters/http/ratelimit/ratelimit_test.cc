@@ -2,6 +2,8 @@
 #include <string>
 #include <vector>
 
+#include "envoy/config/filter/http/rate_limit/v2/rate_limit.pb.h"
+
 #include "common/buffer/buffer_impl.h"
 #include "common/common/empty_string.h"
 #include "common/http/context_impl.h"

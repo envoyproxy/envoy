@@ -5,6 +5,8 @@
 #include <iostream>
 #include <string>
 
+#include "envoy/admin/v2alpha/server_info.pb.h"
+
 #include "common/common/fmt.h"
 #include "common/common/logger.h"
 #include "common/common/macros.h"

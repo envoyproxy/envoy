@@ -1,5 +1,8 @@
 #pragma once
 
+#include "envoy/api/v2/cds.pb.h"
+#include "envoy/api/v2/endpoint/endpoint.pb.h"
+
 #include "common/upstream/cluster_factory_impl.h"
 #include "common/upstream/upstream_impl.h"
 

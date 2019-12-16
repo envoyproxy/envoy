@@ -76,7 +76,6 @@ message RouteConfiguration {
   // on-demand discovery of virtual hosts. The contents of these two fields will be merged to
   // generate a routing table for a given RouteConfiguration, with *vhds* derived configuration
   // taking precedence.
-  // [#not-implemented-hide:]
   Vhds vhds = 9;
 
   // Optionally specifies a list of HTTP headers that the connection manager
@@ -139,7 +138,6 @@ message RouteConfiguration {
   google.protobuf.BoolValue validate_clusters = 7;
 }
 
-// [#not-implemented-hide:]
 message Vhds {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.Vhds";
 

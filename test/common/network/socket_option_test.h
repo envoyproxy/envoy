@@ -1,5 +1,7 @@
 #pragma once
 
+#include "envoy/api/v2/core/base.pb.h"
+
 #include "common/network/address_impl.h"
 #include "common/network/socket_option_impl.h"
 
