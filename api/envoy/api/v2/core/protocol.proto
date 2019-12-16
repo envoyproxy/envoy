@@ -85,12 +85,12 @@ message Http1ProtocolOptions {
   // are lower cased.
   HeaderKeyFormat header_key_format = 4;
 
-  // Enables trailers for HTTP1. By default the HTTP/1 codec drops proxied trailers.
+  // Enables trailers for HTTP/1. By default the HTTP/1 codec drops proxied trailers.
   //
   // .. attention::
   //
   //   Note that this only happens when Envoy is chunk encoding which occurs when:
-  //   - The request is HTTP1.1.
+  //   - The request is HTTP/1.1.
   //   - Is neither a HEAD only request nor a HTTP Upgrade.
   //   - Not a response to a HEAD request.
   //   - The content length header is not present.

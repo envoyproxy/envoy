@@ -240,7 +240,7 @@ struct Http1Settings {
   std::string default_host_for_http_10_;
   // Encode trailers in Http. By default the HTTP/1 codec drops proxied trailers.
   // Note that this only happens when Envoy is chunk encoding which occurs when:
-  //  - The request is Http1.1
+  //  - The request is HTTP/1.1
   //  - Is neither a HEAD only request nor a HTTP Upgrade
   //  - Not a HEAD request
   bool enable_trailers_{false};

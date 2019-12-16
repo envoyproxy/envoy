@@ -33,7 +33,13 @@ struct Http1ResponseCodeDetailValues {
   const absl::string_view InvalidUrl = "http1.invalid_url";
 };
 
+struct Http1HeaderTypesValues {
+  const absl::string_view Headers = "headers";
+  const absl::string_view Trailers = "trailers";
+};
+
 using Http1ResponseCodeDetails = ConstSingleton<Http1ResponseCodeDetailValues>;
+using Http1HeaderTypes = ConstSingleton<Http1HeaderTypesValues>;
 
 const StringUtil::CaseUnorderedSet& caseUnorderdSetContainingUpgradeAndHttp2Settings() {
   CONSTRUCT_ON_FIRST_USE(StringUtil::CaseUnorderedSet,
@@ -423,7 +429,8 @@ void ConnectionImpl::completeLastHeader() {
   if (current_header_map_->size() > max_headers_count_) {
     error_code_ = Http::Code::RequestHeaderFieldsTooLarge;
     sendProtocolError(Http1ResponseCodeDetails::get().TooManyHeaders);
-    const std::string header_type = processing_trailers_ ? "trailers" : "headers";
+    const absl::string_view header_type =
+        processing_trailers_ ? Http1HeaderTypes::get().Trailers : Http1HeaderTypes::get().Headers;
     throw CodecProtocolException(absl::StrCat(header_type, " size exceeds limit"));
   }
 
@@ -544,7 +551,8 @@ void ConnectionImpl::onHeaderValue(const char* data, size_t length) {
   const uint32_t total =
       current_header_field_.size() + current_header_value_.size() + current_header_map_->byteSize();
   if (total > (max_headers_kb_ * 1024)) {
-    const std::string header_type = processing_trailers_ ? "trailers" : "headers";
+    const absl::string_view header_type =
+        processing_trailers_ ? Http1HeaderTypes::get().Trailers : Http1HeaderTypes::get().Headers;
     error_code_ = Http::Code::RequestHeaderFieldsTooLarge;
     sendProtocolError(Http1ResponseCodeDetails::get().HeadersTooLarge);
     throw CodecProtocolException(absl::StrCat(header_type, " size exceeds limit"));
@@ -552,7 +560,8 @@ void ConnectionImpl::onHeaderValue(const char* data, size_t length) {
 }
 
 int ConnectionImpl::onHeadersCompleteBase() {
-  const std::string header_type = processing_trailers_ ? "trailers" : "headers";
+  const absl::string_view header_type =
+      processing_trailers_ ? Http1HeaderTypes::get().Trailers : Http1HeaderTypes::get().Headers;
   ENVOY_CONN_LOG(trace, "onHeadersCompleteBase complete for {}", connection_, header_type);
   completeLastHeader();
 
