@@ -57,7 +57,7 @@
 #include "server/transport_socket_config_impl.h"
 
 #include "extensions/clusters/well_known_names.h"
-#include "extensions/common/redis/redirection_mgr_impl.h"
+#include "extensions/common/redis/cluster_refresh_manager_impl.h"
 #include "extensions/filters/network/common/redis/client.h"
 #include "extensions/filters/network/common/redis/client_impl.h"
 #include "extensions/filters/network/common/redis/codec.h"
@@ -274,8 +274,8 @@ private:
 
   const std::string auth_password_;
   const std::string cluster_name_;
-  const Common::Redis::RedirectionManagerSharedPtr redirection_manager_;
-  const Common::Redis::RedirectionManager::HandlePtr registration_handle_;
+  const Common::Redis::ClusterRefreshManagerSharedPtr refresh_manager_;
+  const Common::Redis::ClusterRefreshManager::HandlePtr registration_handle_;
 };
 
 class RedisClusterFactory : public Upstream::ConfigurableClusterFactoryBase<

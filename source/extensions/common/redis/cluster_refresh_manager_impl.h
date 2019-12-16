@@ -11,18 +11,18 @@
 #include "common/common/lock_guard.h"
 #include "common/common/thread.h"
 
-#include "extensions/common/redis/redirection_mgr.h"
+#include "extensions/common/redis/cluster_refresh_manager.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace Common {
 namespace Redis {
 
-class RedirectionManagerImpl : public RedirectionManager,
-                               public Envoy::Singleton::Instance,
-                               public std::enable_shared_from_this<RedirectionManagerImpl> {
+class ClusterRefreshManagerImpl : public ClusterRefreshManager,
+                                  public Envoy::Singleton::Instance,
+                                  public std::enable_shared_from_this<ClusterRefreshManagerImpl> {
 public:
-  friend class RedirectionMgrTest;
+  friend class ClusterRefreshManagerTest;
 
   /**
    * The information that the manager keeps for each cluster upon registration.
@@ -30,7 +30,7 @@ public:
   struct ClusterInfo {
     ClusterInfo(std::string cluster_name, std::chrono::milliseconds min_time_between_triggering,
                 const uint32_t redirects_threshold, const uint32_t failure_threshold,
-                const uint32_t host_degraded_threshold, RedirectCB cb)
+                const uint32_t host_degraded_threshold, RefreshCB cb)
         : cluster_name_(std::move(cluster_name)),
           min_time_between_triggering_(min_time_between_triggering),
           redirects_threshold_(redirects_threshold), failure_threshold_(failure_threshold),
@@ -44,25 +44,25 @@ public:
     const uint32_t redirects_threshold_;
     const uint32_t failure_threshold_;
     const uint32_t host_degraded_threshold_;
-    RedirectCB cb_;
+    RefreshCB cb_;
   };
 
   using ClusterInfoSharedPtr = std::shared_ptr<ClusterInfo>;
 
   class HandleImpl : public Handle {
   public:
-    HandleImpl(RedirectionManagerImpl* mgr, ClusterInfoSharedPtr& cluster_info)
+    HandleImpl(ClusterRefreshManagerImpl* mgr, ClusterInfoSharedPtr& cluster_info)
         : manager_(mgr->shared_from_this()), cluster_info_(cluster_info) {}
 
     ~HandleImpl() override { manager_->unregisterCluster(cluster_info_); }
 
   private:
-    const std::shared_ptr<RedirectionManagerImpl> manager_;
+    const std::shared_ptr<ClusterRefreshManagerImpl> manager_;
     const std::shared_ptr<ClusterInfo> cluster_info_;
   };
 
-  RedirectionManagerImpl(Event::Dispatcher& main_thread_dispatcher, Upstream::ClusterManager& cm,
-                         TimeSource& time_source)
+  ClusterRefreshManagerImpl(Event::Dispatcher& main_thread_dispatcher, Upstream::ClusterManager& cm,
+                            TimeSource& time_source)
       : main_thread_dispatcher_(main_thread_dispatcher), cm_(cm), time_source_(time_source) {}
 
   bool onRedirection(const std::string& cluster_name) override;
@@ -72,7 +72,7 @@ public:
   HandlePtr registerCluster(const std::string& cluster_name,
                             std::chrono::milliseconds min_time_between_triggering,
                             const uint32_t redirects_threshold, const uint32_t failure_threshold,
-                            const uint32_t host_degraded_threshold, const RedirectCB& cb) override;
+                            const uint32_t host_degraded_threshold, const RefreshCB& cb) override;
 
 private:
   void unregisterCluster(const ClusterInfoSharedPtr& cluster_info);
@@ -97,10 +97,10 @@ private:
   Thread::MutexBasicLockable map_mutex_;
 };
 
-RedirectionManagerSharedPtr getRedirectionManager(Singleton::Manager& manager,
-                                                  Event::Dispatcher& main_thread_dispatcher,
-                                                  Upstream::ClusterManager& cm,
-                                                  TimeSource& time_source);
+ClusterRefreshManagerSharedPtr getClusterRefreshManager(Singleton::Manager& manager,
+                                                        Event::Dispatcher& main_thread_dispatcher,
+                                                        Upstream::ClusterManager& cm,
+                                                        TimeSource& time_source);
 } // namespace Redis
 } // namespace Common
 } // namespace Extensions

@@ -43,10 +43,10 @@ RedisCluster::RedisCluster(
       auth_password_(
           NetworkFilters::RedisProxy::ProtocolOptionsConfigImpl::auth_password(info(), api)),
       cluster_name_(cluster.name()),
-      redirection_manager_(Common::Redis::getRedirectionManager(
+      refresh_manager_(Common::Redis::getClusterRefreshManager(
           factory_context.singletonManager(), factory_context.dispatcher(),
           factory_context.clusterManager(), factory_context.api().timeSource())),
-      registration_handle_(redirection_manager_->registerCluster(
+      registration_handle_(refresh_manager_->registerCluster(
           cluster_name_, redirect_refresh_interval_, redirect_refresh_threshold_,
           failure_refresh_threshold_, host_degraded_refresh_threshold_, [&]() {
             redis_discovery_session_.resolve_timer_->enableTimer(std::chrono::milliseconds(0));
@@ -129,7 +129,7 @@ void RedisCluster::reloadHealthyHostsHelper(const Upstream::HostSharedPtr& host)
   }
   if (host && (host->health() == Upstream::Host::Health::Degraded ||
                host->health() == Upstream::Host::Health::Unhealthy)) {
-    redirection_manager_->onHostDegraded(cluster_name_);
+    refresh_manager_->onHostDegraded(cluster_name_);
   }
   ClusterImplBase::reloadHealthyHostsHelper(host);
 }

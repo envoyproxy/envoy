@@ -1,4 +1,4 @@
-#include "extensions/common/redis/redirection_mgr_impl.h"
+#include "extensions/common/redis/cluster_refresh_manager_impl.h"
 
 #include "envoy/singleton/manager.h"
 
@@ -7,31 +7,31 @@ namespace Extensions {
 namespace Common {
 namespace Redis {
 
-SINGLETON_MANAGER_REGISTRATION(redis_redirection_manager);
+SINGLETON_MANAGER_REGISTRATION(redis_refresh_manager);
 
-RedirectionManagerSharedPtr getRedirectionManager(Singleton::Manager& manager,
-                                                  Event::Dispatcher& main_thread_dispatcher,
-                                                  Upstream::ClusterManager& cm,
-                                                  TimeSource& time_source) {
-  return manager.getTyped<RedirectionManager>(
-      SINGLETON_MANAGER_REGISTERED_NAME(redis_redirection_manager), [&] {
-        return std::make_shared<RedirectionManagerImpl>(main_thread_dispatcher, cm, time_source);
+ClusterRefreshManagerSharedPtr getClusterRefreshManager(Singleton::Manager& manager,
+                                                        Event::Dispatcher& main_thread_dispatcher,
+                                                        Upstream::ClusterManager& cm,
+                                                        TimeSource& time_source) {
+  return manager.getTyped<ClusterRefreshManager>(
+      SINGLETON_MANAGER_REGISTERED_NAME(redis_refresh_manager), [&] {
+        return std::make_shared<ClusterRefreshManagerImpl>(main_thread_dispatcher, cm, time_source);
       });
 }
 
-bool RedirectionManagerImpl::onFailure(const std::string& cluster_name) {
+bool ClusterRefreshManagerImpl::onFailure(const std::string& cluster_name) {
   return onEvent(cluster_name, EventType::Failure);
 }
 
-bool RedirectionManagerImpl::onHostDegraded(const std::string& cluster_name) {
+bool ClusterRefreshManagerImpl::onHostDegraded(const std::string& cluster_name) {
   return onEvent(cluster_name, EventType::DegradedHost);
 }
 
-bool RedirectionManagerImpl::onRedirection(const std::string& cluster_name) {
+bool ClusterRefreshManagerImpl::onRedirection(const std::string& cluster_name) {
   return onEvent(cluster_name, EventType::Redirection);
 }
 
-bool RedirectionManagerImpl::onEvent(const std::string& cluster_name, EventType event_type) {
+bool ClusterRefreshManagerImpl::onEvent(const std::string& cluster_name, EventType event_type) {
   ClusterInfoSharedPtr info;
   {
     // Hold the map lock to avoid a race condition with calls to unregisterCluster
@@ -96,20 +96,20 @@ bool RedirectionManagerImpl::onEvent(const std::string& cluster_name, EventType 
   return false;
 }
 
-RedirectionManagerImpl::HandlePtr RedirectionManagerImpl::registerCluster(
+ClusterRefreshManagerImpl::HandlePtr ClusterRefreshManagerImpl::registerCluster(
     const std::string& cluster_name, std::chrono::milliseconds min_time_between_triggering,
     const uint32_t redirects_threshold, const uint32_t failure_threshold,
-    const uint32_t host_degraded_threshold, const RedirectCB& cb) {
+    const uint32_t host_degraded_threshold, const RefreshCB& cb) {
   Thread::LockGuard lock(map_mutex_);
   ClusterInfoSharedPtr info =
       std::make_shared<ClusterInfo>(cluster_name, min_time_between_triggering, redirects_threshold,
                                     failure_threshold, host_degraded_threshold, cb);
   info_map_[cluster_name] = info;
 
-  return std::make_unique<RedirectionManagerImpl::HandleImpl>(this, info);
+  return std::make_unique<ClusterRefreshManagerImpl::HandleImpl>(this, info);
 }
 
-void RedirectionManagerImpl::unregisterCluster(const ClusterInfoSharedPtr& cluster_info) {
+void ClusterRefreshManagerImpl::unregisterCluster(const ClusterInfoSharedPtr& cluster_info) {
   Thread::LockGuard lock(map_mutex_);
   info_map_.erase(cluster_info->cluster_name_);
 }
