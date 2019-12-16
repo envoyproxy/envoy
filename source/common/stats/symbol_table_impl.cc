@@ -97,7 +97,7 @@ void SymbolTableImpl::Encoding::addSymbols(const std::vector<Symbol>& symbols) {
   for (Symbol symbol : symbols) {
     data_bytes_required_ += encodingSizeBytes(symbol);
   }
-  mem_block_.populate(data_bytes_required_);
+  mem_block_.setCapacity(data_bytes_required_);
   for (Symbol symbol : symbols) {
     appendEncoding(symbol, mem_block_);
   }
