@@ -5,6 +5,7 @@
 #include <string>
 #include <vector>
 
+#include "envoy/admin/v2alpha/server_info.pb.h"
 #include "envoy/common/exception.h"
 #include "envoy/config/bootstrap/v2/bootstrap.pb.h"
 
@@ -252,7 +253,7 @@ TEST_F(OptionsImplTest, OptionsAreInSyncWithProto) {
 TEST_F(OptionsImplTest, OptionsFromArgv) {
   const std::array<const char*, 3> args{"envoy", "-c", "hello"};
   std::unique_ptr<OptionsImpl> options = std::make_unique<OptionsImpl>(
-      args.size(), args.data(), [](bool) { return "1"; }, spdlog::level::warn);
+      static_cast<int>(args.size()), args.data(), [](bool) { return "1"; }, spdlog::level::warn);
   // Spot check that the arguments were parsed.
   EXPECT_EQ("hello", options->configPath());
 }
@@ -260,7 +261,7 @@ TEST_F(OptionsImplTest, OptionsFromArgv) {
 TEST_F(OptionsImplTest, OptionsFromArgvPrefix) {
   const std::array<const char*, 5> args{"envoy", "-c", "hello", "--admin-address-path", "goodbye"};
   std::unique_ptr<OptionsImpl> options = std::make_unique<OptionsImpl>(
-      args.size() - 2, // Pass in only a prefix of the args
+      static_cast<int>(args.size()) - 2, // Pass in only a prefix of the args
       args.data(), [](bool) { return "1"; }, spdlog::level::warn);
   EXPECT_EQ("hello", options->configPath());
   // This should still have the default value since the extra arguments are

@@ -1,3 +1,5 @@
+#include "envoy/config/trace/v2/trace.pb.h"
+#include "envoy/config/trace/v2alpha/xray.pb.validate.h"
 #include "envoy/registry/registry.h"
 
 #include "extensions/tracers/xray/config.h"

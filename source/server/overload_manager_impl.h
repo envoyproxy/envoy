@@ -6,7 +6,7 @@
 #include <vector>
 
 #include "envoy/api/api.h"
-#include "envoy/config/overload/v2alpha/overload.pb.validate.h"
+#include "envoy/config/overload/v2alpha/overload.pb.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/protobuf/message_validator.h"
 #include "envoy/server/overload_manager.h"

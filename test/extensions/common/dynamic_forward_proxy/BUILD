@@ -19,6 +19,8 @@ envoy_cc_test(
         "//test/mocks/network:network_mocks",
         "//test/mocks/thread_local:thread_local_mocks",
         "//test/test_common:simulated_time_system_lib",
+        "@envoy_api//envoy/api/v2:pkg_cc_proto",
+        "@envoy_api//envoy/config/common/dynamic_forward_proxy/v2alpha:pkg_cc_proto",
     ],
 )
 
@@ -28,5 +30,6 @@ envoy_cc_mock(
     hdrs = ["mocks.h"],
     deps = [
         "//source/extensions/common/dynamic_forward_proxy:dns_cache_interface",
+        "@envoy_api//envoy/config/common/dynamic_forward_proxy/v2alpha:pkg_cc_proto",
     ],
 )

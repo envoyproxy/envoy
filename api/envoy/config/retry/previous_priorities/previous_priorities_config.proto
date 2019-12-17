@@ -6,6 +6,8 @@ option java_package = "io.envoyproxy.envoy.config.retry.previous_priorities";
 option java_outer_classname = "PreviousPrioritiesConfigProto";
 option java_multiple_files = true;
 
+import "validate/validate.proto";
+
 // A retry host selector that attempts to spread retries between priorities, even if certain
 // priorities would not normally be attempted due to higher priorities being available.
 //
@@ -41,5 +43,7 @@ message PreviousPrioritiesConfig {
   // load which excludes the priorities routed to with the first two attempts, and the fifth and
   // sixth attempt will use the priority load excluding the priorities used for the first four
   // attempts.
-  int32 update_frequency = 1;
+  //
+  // Must be greater than 0.
+  int32 update_frequency = 1 [(validate.rules).int32 = {gt: 0}];
 }

@@ -1,3 +1,6 @@
+#include "envoy/api/v2/route/route.pb.h"
+#include "envoy/config/filter/network/http_connection_manager/v2/http_connection_manager.pb.h"
+
 #include "test/integration/http_protocol_integration.h"
 
 namespace Envoy {

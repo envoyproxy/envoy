@@ -1,6 +1,9 @@
 #pragma once
 
+#include "envoy/data/tap/v2alpha/common.pb.h"
+#include "envoy/data/tap/v2alpha/http.pb.h"
 #include "envoy/http/header_map.h"
+#include "envoy/service/tap/v2alpha/common.pb.h"
 
 #include "common/common/logger.h"
 

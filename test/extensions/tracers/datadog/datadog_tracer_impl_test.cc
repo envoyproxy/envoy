@@ -3,6 +3,8 @@
 #include <sstream>
 #include <string>
 
+#include "envoy/config/trace/v2/trace.pb.h"
+
 #include "common/common/base64.h"
 #include "common/http/header_map_impl.h"
 #include "common/http/headers.h"

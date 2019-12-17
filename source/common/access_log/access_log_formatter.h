@@ -6,6 +6,7 @@
 #include <vector>
 
 #include "envoy/access_log/access_log.h"
+#include "envoy/api/v2/core/base.pb.h"
 #include "envoy/common/time.h"
 #include "envoy/stream_info/stream_info.h"
 

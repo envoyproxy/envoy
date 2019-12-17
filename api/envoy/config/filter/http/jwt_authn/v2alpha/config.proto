@@ -263,7 +263,23 @@ message ProviderWithAudiences {
 //          - provider_name: provider-B
 //          - provider_name: provider-C
 //
-// [#next-free-field: 6]
+//  # Example 7: A is optional (if token from A is provided, it must be valid, but also allows
+//  missing token.)
+//  requires_any:
+//    requirements:
+//    - provider_name: provider-A
+//    - allow_missing: {}
+//
+//  # Example 8: A is optional and B is required.
+//  requires_all:
+//    requirements:
+//    - requires_any:
+//        requirements:
+//        - provider_name: provider-A
+//        - allow_missing: {}
+//    - provider_name: provider-B
+//
+// [#next-free-field: 7]
 message JwtRequirement {
   oneof requires_type {
     // Specify a required provider name.
@@ -285,6 +301,12 @@ message JwtRequirement {
     // JWTs and pass the verified JWT payloads to another filter, the other filter
     // will make decision. In this mode, all JWT tokens will be verified.
     google.protobuf.Empty allow_missing_or_failed = 5;
+
+    // The requirement is satisfied if JWT is missing, but failed if JWT is
+    // presented but invalid. Similar to allow_missing_or_failed, this is used
+    // to only verify JWTs and pass the verified payload to another filter. The
+    // different is this mode will reject requests with invalid tokens.
+    google.protobuf.Empty allow_missing = 6;
   }
 }
 

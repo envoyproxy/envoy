@@ -2,6 +2,7 @@
 #include <string>
 #include <vector>
 
+#include "envoy/config/filter/network/rate_limit/v2/rate_limit.pb.h"
 #include "envoy/stats/stats.h"
 
 #include "common/buffer/buffer_impl.h"
