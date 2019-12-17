@@ -70,6 +70,6 @@ message ClientConfig {
 }
 
 message ClientStatusResponse {
-  // Client configs for the clients in the ClientStatusRequest.
+  // Client configs for the clients specified in the ClientStatusRequest.
   repeated ClientConfig config = 1;
 }
