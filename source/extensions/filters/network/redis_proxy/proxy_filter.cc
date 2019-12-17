@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <string>
 
+#include "envoy/config/filter/network/redis_proxy/v2/redis_proxy.pb.h"
 #include "envoy/stats/scope.h"
 
 #include "common/common/assert.h"

@@ -2,9 +2,9 @@ syntax = "proto3";
 
 package envoy.data.tap.v3alpha;
 
+option java_package = "io.envoyproxy.envoy.data.tap.v3alpha";
 option java_outer_classname = "CommonProto";
 option java_multiple_files = true;
-option java_package = "io.envoyproxy.envoy.data.tap.v3alpha";
 
 import "udpa/annotations/versioning.proto";
 

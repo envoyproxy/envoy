@@ -1,3 +1,5 @@
+#include "envoy/config/filter/http/jwt_authn/v2alpha/config.pb.h"
+
 #include "common/protobuf/utility.h"
 
 #include "extensions/filters/http/jwt_authn/extractor.h"
@@ -59,7 +61,11 @@ class ExtractorTest : public testing::Test {
 public:
   void SetUp() override {
     TestUtility::loadFromYaml(ExampleConfig, config_);
-    extractor_ = Extractor::create(config_);
+    JwtProviderList providers;
+    for (const auto& it : config_.providers()) {
+      providers.emplace_back(&it.second);
+    }
+    extractor_ = Extractor::create(providers);
   }
 
   JwtAuthentication config_;

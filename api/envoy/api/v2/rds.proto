@@ -2,9 +2,9 @@ syntax = "proto3";
 
 package envoy.api.v2;
 
+option java_package = "io.envoyproxy.envoy.api.v2";
 option java_outer_classname = "RdsProto";
 option java_multiple_files = true;
-option java_package = "io.envoyproxy.envoy.api.v2";
 option java_generic_services = true;
 
 import "envoy/api/v2/core/base.proto";
@@ -34,10 +34,8 @@ service RouteDiscoveryService {
   }
 
   rpc FetchRoutes(DiscoveryRequest) returns (DiscoveryResponse) {
-    option (google.api.http) = {
-      post: "/v2/discovery:routes"
-      body: "*"
-    };
+    option (google.api.http).post = "/v2/discovery:routes";
+    option (google.api.http).body = "*";
   }
 }
 
@@ -73,7 +71,6 @@ message RouteConfiguration {
   // on-demand discovery of virtual hosts. The contents of these two fields will be merged to
   // generate a routing table for a given RouteConfiguration, with *vhds* derived configuration
   // taking precedence.
-  // [#not-implemented-hide:]
   Vhds vhds = 9;
 
   // Optionally specifies a list of HTTP headers that the connection manager
@@ -136,7 +133,6 @@ message RouteConfiguration {
   google.protobuf.BoolValue validate_clusters = 7;
 }
 
-// [#not-implemented-hide:]
 message Vhds {
   // Configuration source specifier for VHDS.
   core.ConfigSource config_source = 1 [(validate.rules).message = {required: true}];

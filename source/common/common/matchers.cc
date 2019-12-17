@@ -1,6 +1,10 @@
 #include "common/common/matchers.h"
 
 #include "envoy/api/v2/core/base.pb.h"
+#include "envoy/type/matcher/metadata.pb.h"
+#include "envoy/type/matcher/number.pb.h"
+#include "envoy/type/matcher/string.pb.h"
+#include "envoy/type/matcher/value.pb.h"
 
 #include "common/common/regex.h"
 #include "common/config/metadata.h"

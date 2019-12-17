@@ -1,3 +1,6 @@
+#include "envoy/config/filter/http/rbac/v2/rbac.pb.h"
+#include "envoy/config/rbac/v2/rbac.pb.h"
+
 #include "common/config/metadata.h"
 #include "common/network/utility.h"
 

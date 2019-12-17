@@ -10,6 +10,7 @@ package_group(
 # This is where you add protos that will participate in docs RST generation.
 proto_library(
     name = "protos",
+    visibility = ["//visibility:public"],
     deps = [
         "//envoy/admin/v2alpha:pkg",
         "//envoy/api/v2:pkg",
@@ -78,6 +79,7 @@ proto_library(
         "//envoy/config/resource_monitor/injected_resource/v2alpha:pkg",
         "//envoy/config/retry/previous_priorities:pkg",
         "//envoy/config/trace/v2:pkg",
+        "//envoy/config/trace/v2alpha:pkg",
         "//envoy/config/transport_socket/alts/v2alpha:pkg",
         "//envoy/config/transport_socket/tap/v2alpha:pkg",
         "//envoy/data/accesslog/v2:pkg",

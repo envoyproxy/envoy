@@ -3,6 +3,9 @@
 #include <algorithm>
 #include <string>
 
+#include "envoy/config/bootstrap/v2/bootstrap.pb.h"
+#include "envoy/config/filter/network/http_connection_manager/v2/http_connection_manager.pb.h"
+
 #include "common/buffer/buffer_impl.h"
 #include "common/http/header_map_impl.h"
 
@@ -837,9 +840,11 @@ TEST_P(Http2IntegrationTest, GoAway) {
   EXPECT_EQ("200", response->headers().Status()->value().getStringView());
 }
 
-TEST_P(Http2IntegrationTest, Trailers) { testTrailers(1024, 2048); }
+TEST_P(Http2IntegrationTest, Trailers) { testTrailers(1024, 2048, false, false); }
 
-TEST_P(Http2IntegrationTest, TrailersGiantBody) { testTrailers(1024 * 1024, 1024 * 1024); }
+TEST_P(Http2IntegrationTest, TrailersGiantBody) {
+  testTrailers(1024 * 1024, 1024 * 1024, false, false);
+}
 
 TEST_P(Http2IntegrationTest, GrpcRequestTimeout) {
   config_helper_.addConfigModifier(

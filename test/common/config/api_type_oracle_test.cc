@@ -1,8 +1,9 @@
+#include "envoy/config/filter/http/ip_tagging/v2/ip_tagging.pb.h"
+#include "envoy/config/filter/http/ip_tagging/v3alpha/ip_tagging.pb.h"
+
 #include "common/config/api_type_oracle.h"
 
 // For proto descriptors only
-#include "envoy/config/filter/http/ip_tagging/v2/ip_tagging.pb.h"
-#include "envoy/config/filter/http/ip_tagging/v3alpha/ip_tagging.pb.h"
 
 #include "gtest/gtest.h"
 #include "udpa/type/v1/typed_struct.pb.h"
@@ -12,6 +13,10 @@ namespace Config {
 namespace {
 
 TEST(ApiTypeOracleTest, All) {
+  // For proto descriptors only
+  static_cast<void>(envoy::config::filter::http::ip_tagging::v2::IPTagging::RequestType());
+  static_cast<void>(envoy::config::filter::http::ip_tagging::v3alpha::IPTagging::RequestType());
+
   EXPECT_EQ(nullptr, ApiTypeOracle::inferEarlierVersionDescriptor("foo", {}, ""));
   EXPECT_EQ(nullptr, ApiTypeOracle::inferEarlierVersionDescriptor("envoy.ip_tagging", {}, ""));
 
