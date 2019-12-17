@@ -107,7 +107,7 @@ public:
   const ScopedRouteMap& scopedRouteMap() const { return scoped_route_map_; }
 
 private:
-  // A helper class that takes care the life cycle management of a RDS route provider and the
+  // A helper class that takes care of the life cycle management of a RDS route provider and the
   // update callback handle.
   struct RdsRouteConfigProviderHelper {
     RdsRouteConfigProviderHelper(
@@ -133,8 +133,9 @@ private:
                          std::vector<std::string>& exception_msgs);
   // Removes given scopes from the managed set of scopes.
   // Returns true if any scope updated, false otherwise.
-  bool removeScopes(const Protobuf::RepeatedPtrField<std::string>& scope_names,
-                    const std::string& version_info);
+  std::list<std::unique_ptr<RdsRouteConfigProviderHelper>>
+  removeScopes(const Protobuf::RepeatedPtrField<std::string>& scope_names,
+               const std::string& version_info);
 
   // Envoy::Config::DeltaConfigSubscriptionInstance
   void start() override { subscription_->start({}); }
