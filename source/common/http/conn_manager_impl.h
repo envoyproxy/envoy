@@ -474,7 +474,8 @@ private:
 
   // Used to abstract making of RouteConfig update request.
   // RdsRouteConfigUpdateRequester is used when an RdsRouteConfigProvider is configured,
-  // NullRouteConfigUpdateRequester is used in all other cases (specifically when ScopedRdsConfigProvider/InlineScopedRoutesConfigProvider is configured)
+  // NullRouteConfigUpdateRequester is used in all other cases (specifically when
+  // ScopedRdsConfigProvider/InlineScopedRoutesConfigProvider is configured)
   class RouteConfigUpdateRequester {
   public:
     virtual ~RouteConfigUpdateRequester() = default;

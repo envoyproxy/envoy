@@ -258,7 +258,7 @@ void RdsRouteConfigProviderImpl::onConfigUpdate() {
     return previous;
   });
 
-  const auto aliases = config_update_info_->aliasesInLastVhdsUpdate();
+  const auto aliases = config_update_info_->resourceIdsInLastVhdsUpdate();
   // Regular (non-VHDS) RDS updates don't populate aliases fields in resources.
   if (aliases.empty()) {
     return;

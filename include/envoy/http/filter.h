@@ -450,7 +450,8 @@ public:
 
   /**
    *
-   * @return absl::optional<Router::ConfigConstSharedPtr>. Contains a value if a non-scoped RDS route config provider is used.
+   * @return absl::optional<Router::ConfigConstSharedPtr>. Contains a value if a non-scoped RDS
+   * route config provider is used.
    */
   virtual absl::optional<Router::ConfigConstSharedPtr> routeConfig() PURE;
 };

@@ -23,7 +23,7 @@ public:
         validation_visitor_(validation_visitor), vhds_configuration_changed_(true) {}
 
   void initializeRdsVhosts(const envoy::api::v2::RouteConfiguration& route_configuration);
-  void collectAliasesInUpdate(
+  void collectResourceIdsInUpdate(
       const Protobuf::RepeatedPtrField<envoy::api::v2::Resource>& added_resources);
   bool removeVhosts(std::map<std::string, envoy::api::v2::route::VirtualHost>& vhosts,
                     const Protobuf::RepeatedPtrField<std::string>& removed_vhost_names);
@@ -54,8 +54,8 @@ public:
     return route_config_proto_;
   }
   SystemTime lastUpdated() const override { return last_updated_; }
-  const std::set<std::string>& aliasesInLastVhdsUpdate() override {
-    return aliases_in_last_update_;
+  const std::set<std::string>& resourceIdsInLastVhdsUpdate() override {
+    return resource_ids_in_last_update_;
   }
 
 private:
@@ -69,7 +69,7 @@ private:
   std::map<std::string, envoy::api::v2::route::VirtualHost> vhds_virtual_hosts_;
   absl::optional<RouteConfigProvider::ConfigInfo> config_info_;
   ProtobufMessage::ValidationVisitor& validation_visitor_;
-  std::set<std::string> aliases_in_last_update_;
+  std::set<std::string> resource_ids_in_last_update_;
   bool vhds_configuration_changed_;
 };
 

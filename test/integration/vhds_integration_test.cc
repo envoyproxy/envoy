@@ -349,6 +349,26 @@ public:
     stream->sendGrpcMessage(response);
   }
 
+  // used in VhdsOnDemandUpdateWithResourceNameAsAlias test
+  // to create a DeltaDiscoveryResponse with a resource name matching the value used to create an
+  // on-demand request
+  envoy::api::v2::DeltaDiscoveryResponse createDeltaDiscoveryResponseWithResourceNameUsedAsAlias() {
+    envoy::api::v2::DeltaDiscoveryResponse ret;
+    ret.set_system_version_info("system_version_info_this_is_a_test");
+    ret.set_type_url(Config::TypeUrl::get().VirtualHost);
+
+    auto* resource = ret.add_resources();
+    resource->set_name("my_route/vhost_1");
+    resource->set_version("4");
+    resource->mutable_resource()->PackFrom(
+        TestUtility::parseYaml<envoy::api::v2::route::VirtualHost>(
+            virtualHostYaml("vhost_1", "vhost_1, vhost.first")));
+    resource->add_aliases("my_route/vhost.first");
+    ret.set_nonce("test-nonce-0");
+
+    return ret;
+  }
+
   FakeStreamPtr vhds_stream_;
   bool use_rds_with_vhosts{false};
 };
@@ -483,6 +503,47 @@ TEST_P(VhdsIntegrationTest, RdsWithVirtualHostsVhdsVirtualHostAddUpdateRemove) {
   sendDeltaDiscoveryResponse<envoy::api::v2::route::VirtualHost>(
       Config::TypeUrl::get().VirtualHost, {buildVirtualHost2()}, {}, "4", vhds_stream_,
       {"my_route/vhost.first"});
+
+  waitForNextUpstreamRequest(1);
+  // Send response headers, and end_stream if there is no response body.
+  upstream_request_->encodeHeaders(default_response_headers_, true);
+
+  response->waitForHeaders();
+  EXPECT_EQ("200", response->headers().Status()->value().getStringView());
+
+  cleanupUpstreamAndDownstream();
+}
+
+// tests a scenario where:
+//  a Resource received in a DeltaDiscoveryResponse has name that matches the value used in the
+//  on-demand request
+TEST_P(VhdsIntegrationTest, VhdsOnDemandUpdateWithResourceNameAsAlias) {
+  // RDS exchange with a non-empty virtual_hosts field
+  useRdsWithVhosts();
+
+  testRouterHeaderOnlyRequestAndResponse(nullptr, 1);
+  cleanupUpstreamAndDownstream();
+  codec_client_->waitForDisconnect();
+
+  // verify that rds-based virtual host can be resolved
+  testRouterHeaderOnlyRequestAndResponse(nullptr, 1, "/rdsone", "vhost.rds.first");
+  cleanupUpstreamAndDownstream();
+  codec_client_->waitForDisconnect();
+
+  // Attempt to make a request to an unknown host
+  codec_client_ = makeHttpConnection(makeClientConnection((lookupPort("http"))));
+  Http::TestHeaderMapImpl request_headers{{":method", "GET"},
+                                          {":path", "/"},
+                                          {":scheme", "http"},
+                                          {":authority", "vhost_1"},
+                                          {"x-lyft-user-id", "123"}};
+  IntegrationStreamDecoderPtr response = codec_client_->makeHeaderOnlyRequest(request_headers);
+  EXPECT_TRUE(compareDeltaDiscoveryRequest(Config::TypeUrl::get().VirtualHost,
+                                           {vhdsRequestResourceName("vhost_1")}, {}, vhds_stream_));
+
+  envoy::api::v2::DeltaDiscoveryResponse vhds_update =
+      createDeltaDiscoveryResponseWithResourceNameUsedAsAlias();
+  vhds_stream_->sendGrpcMessage(vhds_update);
 
   waitForNextUpstreamRequest(1);
   // Send response headers, and end_stream if there is no response body.

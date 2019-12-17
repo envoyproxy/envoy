@@ -1395,7 +1395,8 @@ absl::optional<Router::ConfigConstSharedPtr> ConnectionManagerImpl::ActiveStream
   if (connection_manager_.config_.routeConfigProvider() == nullptr) {
     return {};
   }
-  return absl::optional<Router::ConfigConstSharedPtr>(connection_manager_.config_.routeConfigProvider()->config());
+  return absl::optional<Router::ConfigConstSharedPtr>(
+      connection_manager_.config_.routeConfigProvider()->config());
 }
 
 void ConnectionManagerImpl::ActiveStream::sendLocalReply(

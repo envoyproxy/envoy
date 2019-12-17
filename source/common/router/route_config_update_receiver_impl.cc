@@ -43,19 +43,20 @@ bool RouteConfigUpdateReceiverImpl::onVhdsUpdate(
     const Protobuf::RepeatedPtrField<envoy::api::v2::Resource>& added_resources,
     const Protobuf::RepeatedPtrField<std::string>& removed_resources,
     const std::string& version_info) {
-  collectAliasesInUpdate(added_resources);
+  collectResourceIdsInUpdate(added_resources);
   bool removed = removeVhosts(vhds_virtual_hosts_, removed_resources);
   bool updated = updateVhosts(vhds_virtual_hosts_, added_resources);
   onUpdateCommon(route_config_proto_, version_info);
-  return removed || updated || !aliases_in_last_update_.empty();
+  return removed || updated || !resource_ids_in_last_update_.empty();
 }
 
-void RouteConfigUpdateReceiverImpl::collectAliasesInUpdate(
+void RouteConfigUpdateReceiverImpl::collectResourceIdsInUpdate(
     const Protobuf::RepeatedPtrField<envoy::api::v2::Resource>& added_resources) {
-  aliases_in_last_update_.clear();
+  resource_ids_in_last_update_.clear();
   for (const auto& resource : added_resources) {
+    resource_ids_in_last_update_.emplace(resource.name());
     std::copy(resource.aliases().begin(), resource.aliases().end(),
-              std::inserter(aliases_in_last_update_, aliases_in_last_update_.end()));
+              std::inserter(resource_ids_in_last_update_, resource_ids_in_last_update_.end()));
   }
 }
 
