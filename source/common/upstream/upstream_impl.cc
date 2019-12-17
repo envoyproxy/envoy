@@ -1401,6 +1401,24 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(const HostVector& new_hosts,
   if (!hosts_added_to_current_priority.empty() || !current_priority_hosts.empty()) {
     hosts_removed_from_current_priority = std::move(current_priority_hosts);
     hosts_changed = true;
+
+    // Don't remove hosts that will be added back to another priority. If the host would be removed,
+    // but it exists in all_hosts but not in new_hosts.
+    for (auto i = hosts_removed_from_current_priority.begin();
+         i != hosts_removed_from_current_priority.end();) {
+      bool new_host = false;
+      for (const HostSharedPtr& host : new_hosts) {
+        if ((*i)->address()->asString() == host->address()->asString()) {
+          new_host = true;
+          break;
+        }
+      }
+      if (!new_host && all_hosts.find((*i)->address()->asString()) != all_hosts.end()) {
+        i = hosts_removed_from_current_priority.erase(i);
+      } else {
+        i++;
+      }
+    }
   }
 
   // During the update we populated final_hosts with all the hosts that should remain
