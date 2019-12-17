@@ -163,7 +163,8 @@ def ApiBoostTree(target_paths,
   finally:
     # Cleanup any stray **/*.clang-replacements.yaml.
     for prefix in target_paths:
-      clang_replacements = pathlib.Path(PrefixDirectory(prefix)).glob('**/*.yaml')
+      clang_replacements = pathlib.Path(
+          PrefixDirectory(prefix)).glob('**/*.clang-replacements.yaml')
       for path in clang_replacements:
         path.unlink()
 
