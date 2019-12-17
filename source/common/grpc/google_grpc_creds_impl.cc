@@ -73,6 +73,21 @@ CredsUtility::callCredentials(const envoy::api::v2::core::GrpcService::GoogleGrp
                                                   credential.google_iam().authority_selector());
       break;
     }
+    case envoy::api::v2::core::GrpcService::GoogleGrpc::CallCredentials::kStsService: {
+      grpc::experimental::StsCredentialsOptions options = {
+          credential.sts_service().token_exchange_service_uri(),
+          credential.sts_service().resource(),
+          credential.sts_service().audience(),
+          credential.sts_service().scope(),
+          credential.sts_service().requested_token_type(),
+          credential.sts_service().subject_token_path(),
+          credential.sts_service().subject_token_type(),
+          credential.sts_service().actor_token_path(),
+          credential.sts_service().actor_token_type(),
+      };
+      new_call_creds = grpc::experimental::StsCredentials(options);
+      break;
+    }
     default:
       // We don't handle plugin credentials here, callers can do so instead if they want.
       continue;

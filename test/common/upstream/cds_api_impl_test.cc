@@ -3,7 +3,9 @@
 #include <string>
 #include <vector>
 
-#include "envoy/api/v2/core/config_source.pb.validate.h"
+#include "envoy/api/v2/cds.pb.h"
+#include "envoy/api/v2/core/config_source.pb.h"
+#include "envoy/api/v2/discovery.pb.h"
 
 #include "common/config/utility.h"
 #include "common/protobuf/utility.h"

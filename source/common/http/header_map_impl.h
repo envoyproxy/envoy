@@ -16,38 +16,34 @@ namespace Http {
 
 /**
  * These are definitions of all of the inline header access functions described inside header_map.h
- *
- * When a non-const reference or pointer to a HeaderEntry is returned, the internal byte size count
- * will be cleared, since HeaderMap will no longer be able to accurately update the size of that
- * HeaderEntry.
- * TODO(asraa): Remove functions with a non-const HeaderEntry return value.
+ * TODO(asraa): Simplify code here so macros expand into single virtual calls.
  */
 #define DEFINE_INLINE_HEADER_FUNCS(name)                                                           \
 public:                                                                                            \
   const HeaderEntry* name() const override { return inline_headers_.name##_; }                     \
-  HeaderEntry* name() override {                                                                   \
-    cached_byte_size_.reset();                                                                     \
-    return inline_headers_.name##_;                                                                \
-  }                                                                                                \
-  HeaderEntry& insert##name() override {                                                           \
-    cached_byte_size_.reset();                                                                     \
-    return maybeCreateInline(&inline_headers_.name##_, Headers::get().name);                       \
+  void append##name(absl::string_view data, absl::string_view delimiter) override {                \
+    HeaderEntry& entry = maybeCreateInline(&inline_headers_.name##_, Headers::get().name);         \
+    addSize(HeaderMapImpl::appendToHeader(entry.value(), data, delimiter));                        \
+    verifyByteSize();                                                                              \
   }                                                                                                \
   void setReference##name(absl::string_view value) override {                                      \
     HeaderEntry& entry = maybeCreateInline(&inline_headers_.name##_, Headers::get().name);         \
     updateSize(entry.value().size(), value.size());                                                \
     entry.value().setReference(value);                                                             \
+    verifyByteSize();                                                                              \
   }                                                                                                \
   void set##name(absl::string_view value) override {                                               \
     HeaderEntry& entry = maybeCreateInline(&inline_headers_.name##_, Headers::get().name);         \
     updateSize(entry.value().size(), value.size());                                                \
     entry.value().setCopy(value);                                                                  \
+    verifyByteSize();                                                                              \
   }                                                                                                \
   void set##name(uint64_t value) override {                                                        \
     HeaderEntry& entry = maybeCreateInline(&inline_headers_.name##_, Headers::get().name);         \
     subtractSize(inline_headers_.name##_->value().size());                                         \
     entry.value().setInteger(value);                                                               \
     addSize(inline_headers_.name##_->value().size());                                              \
+    verifyByteSize();                                                                              \
   }                                                                                                \
   void remove##name() override { removeInline(&inline_headers_.name##_); }
 
@@ -62,14 +58,6 @@ public:                                                                         
  */
 class HeaderMapImpl : public HeaderMap, NonCopyable {
 public:
-  /**
-   * Appends data to header. If header already has a value, the string ',' is added between the
-   * existing value and data.
-   * @param header the header to append to.
-   * @param data to append to the header.
-   */
-  static uint64_t appendToHeader(HeaderString& header, absl::string_view data);
-
   HeaderMapImpl();
   explicit HeaderMapImpl(
       const std::initializer_list<std::pair<LowerCaseString, std::string>>& values);
@@ -89,21 +77,21 @@ public:
   bool operator!=(const HeaderMapImpl& rhs) const;
 
   // Http::HeaderMap
-  void addReference(const LowerCaseString& key, const std::string& value) override;
+  void addReference(const LowerCaseString& key, absl::string_view value) override;
   void addReferenceKey(const LowerCaseString& key, uint64_t value) override;
-  void addReferenceKey(const LowerCaseString& key, const std::string& value) override;
+  void addReferenceKey(const LowerCaseString& key, absl::string_view value) override;
   void addCopy(const LowerCaseString& key, uint64_t value) override;
-  void addCopy(const LowerCaseString& key, const std::string& value) override;
-  void setReference(const LowerCaseString& key, const std::string& value) override;
-  void setReferenceKey(const LowerCaseString& key, const std::string& value) override;
-  absl::optional<uint64_t> byteSize() const override;
-  uint64_t refreshByteSize() override;
-  uint64_t byteSizeInternal() const override;
+  void addCopy(const LowerCaseString& key, absl::string_view value) override;
+  void appendCopy(const LowerCaseString& key, absl::string_view value) override;
+  void setReference(const LowerCaseString& key, absl::string_view value) override;
+  void setReferenceKey(const LowerCaseString& key, absl::string_view value) override;
+  void setCopy(const LowerCaseString& key, absl::string_view value) override;
+  uint64_t byteSize() const override;
   const HeaderEntry* get(const LowerCaseString& key) const override;
-  HeaderEntry* get(const LowerCaseString& key) override;
   void iterate(ConstIterateCb cb, void* context) const override;
   void iterateReverse(ConstIterateCb cb, void* context) const override;
   Lookup lookup(const LowerCaseString& key, const HeaderEntry** entry) const override;
+  void clear() override;
   void remove(const LowerCaseString& key) override;
   void removePrefix(const LowerCaseString& key) override;
   size_t size() const override { return headers_.size(); }
@@ -113,7 +101,6 @@ public:
 protected:
   // For tests only, unoptimized, they aren't intended for regular HeaderMapImpl users.
   void copyFrom(const HeaderMap& rhs);
-  void clear() { removePrefix(LowerCaseString("")); }
 
   struct HeaderEntryImpl : public HeaderEntry, NonCopyable {
     HeaderEntryImpl(const LowerCaseString& key);
@@ -122,7 +109,6 @@ protected:
 
     // HeaderEntry
     const HeaderString& key() const override { return key_; }
-    void value(const char* value, uint32_t size) override;
     void value(absl::string_view value) override;
     void value(uint64_t value) override;
     void value(const HeaderEntry& header) override;
@@ -148,6 +134,8 @@ protected:
   struct StaticLookupTable; // Defined in header_map_impl.cc.
 
   struct AllInlineHeaders {
+    void clear() { memset(this, 0, sizeof(*this)); }
+
     ALL_INLINE_HEADERS(DEFINE_INLINE_HEADER_STRUCT)
   };
 
@@ -209,6 +197,10 @@ protected:
     std::list<HeaderEntryImpl>::const_reverse_iterator rend() const { return headers_.rend(); }
     size_t size() const { return headers_.size(); }
     bool empty() const { return headers_.empty(); }
+    void clear() {
+      headers_.clear();
+      pseudo_headers_end_ = headers_.end();
+    }
 
   private:
     std::list<HeaderEntryImpl> headers_;
@@ -216,9 +208,12 @@ protected:
   };
 
   void insertByKey(HeaderString&& key, HeaderString&& value);
+  static uint64_t appendToHeader(HeaderString& header, absl::string_view data,
+                                 absl::string_view delimiter = ",");
   HeaderEntryImpl& maybeCreateInline(HeaderEntryImpl** entry, const LowerCaseString& key);
   HeaderEntryImpl& maybeCreateInline(HeaderEntryImpl** entry, const LowerCaseString& key,
                                      HeaderString&& value);
+  HeaderEntry* getExisting(const LowerCaseString& key);
   HeaderEntryImpl* getExistingInline(absl::string_view key);
 
   void removeInline(HeaderEntryImpl** entry);
@@ -229,9 +224,16 @@ protected:
   AllInlineHeaders inline_headers_;
   HeaderList headers_;
 
-  // When present, this holds the internal byte size of the HeaderMap. The value is removed once an
-  // inline header entry is accessed and updated when refreshByteSize() is called.
-  absl::optional<uint64_t> cached_byte_size_ = 0;
+  // This holds the internal byte size of the HeaderMap.
+  uint64_t cached_byte_size_ = 0;
+  // Performs a manual byte size count.
+  uint64_t byteSizeInternal() const;
+  // In TestHeaderMapImpl and VerifiedHeaderMapImpl, this method is overridden to performs a
+  // time-consuming manual byte size count on each operation to verify the byte size. For prod
+  // HeaderMaps, this verification is skipped.
+  // TODO(asraa): Move this verification out of prod code and wrap virtual Http::HeaderMap methods
+  // in Http::TestHeaderMapImpl with the verification.
+  virtual void verifyByteSize() {}
 
   ALL_INLINE_HEADERS(DEFINE_INLINE_HEADER_FUNCS)
 };

@@ -2,9 +2,9 @@ syntax = "proto3";
 
 package envoy.admin.v2alpha;
 
+option java_package = "io.envoyproxy.envoy.admin.v2alpha";
 option java_outer_classname = "ServerInfoProto";
 option java_multiple_files = true;
-option java_package = "io.envoyproxy.envoy.admin.v2alpha";
 
 import "google/protobuf/duration.proto";
 
@@ -47,7 +47,7 @@ message ServerInfo {
   CommandLineOptions command_line_options = 6;
 }
 
-// [#next-free-field: 28]
+// [#next-free-field: 29]
 message CommandLineOptions {
   enum IpVersion {
     v4 = 0;
@@ -143,4 +143,7 @@ message CommandLineOptions {
 
   // See :option:`--cpuset-threads` for details.
   bool cpuset_threads = 25;
+
+  // See :option:`--disable-extensions` for details.
+  repeated string disabled_extensions = 28;
 }

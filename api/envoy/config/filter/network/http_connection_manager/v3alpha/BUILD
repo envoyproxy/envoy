@@ -12,6 +12,6 @@ api_proto_package(
         "//envoy/config/filter/network/http_connection_manager/v2:pkg",
         "//envoy/type/tracing/v2:pkg",
         "//envoy/type/v3alpha:pkg",
-        "@com_github_cncf_udpa//udpa/api/annotations:pkg",
+        "@com_github_cncf_udpa//udpa/annotations:pkg",
     ],
 )

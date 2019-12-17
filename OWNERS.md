@@ -10,7 +10,7 @@ routing PRs, questions, etc. to the right place.
   * Catch-all, "all the things", and generally trying to make himself obsolete as fast as
     possible.
 * Harvey Tuch ([htuch](https://github.com/htuch)) (htuch@google.com)
-  * APIs, xDS, gRPC, configuration, Bazel/build, base server (startup, etc.), Python, and Bash.
+  * APIs, xDS, UDPA, gRPC, configuration, security, Python, and Bash.
 * Alyssa Wilk ([alyssawilk](https://github.com/alyssawilk)) (alyssar@google.com)
   * HTTP, flow control, cluster manager, load balancing, and core networking (listeners,
     connections, etc.).
@@ -25,6 +25,8 @@ routing PRs, questions, etc. to the right place.
 
 # Maintainers
 
+* Asra Ali ([asraa](https://github.com/asraa)) (asraa@google.com)
+  * Fuzzing, security, headers, HTTP/gRPC, router, access log, tests.
 * Jose Nino ([junr03](https://github.com/junr03)) (jnino@lyft.com)
   * Outlier detection, HTTP routing, xDS, configuration/operational questions.
 * Dan Noé ([dnoe](https://github.com/dnoe)) (dpn@google.com)
@@ -39,7 +41,6 @@ routing PRs, questions, etc. to the right place.
 * All maintainers
 * Piotr Sikora ([PiotrSikora](https://github.com/PiotrSikora)) (piotrsikora@google.com)
 * Yan Avlasov ([yanavlasov](https://github.com/yanavlasov)) (yavlasov@google.com)
-* Asra Ali ([asraa](https://github.com/asraa)) (asraa@google.com)
 
 # Emeritus maintainers
 

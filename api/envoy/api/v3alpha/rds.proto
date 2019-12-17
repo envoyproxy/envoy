@@ -2,9 +2,9 @@ syntax = "proto3";
 
 package envoy.api.v3alpha;
 
+option java_package = "io.envoyproxy.envoy.api.v3alpha";
 option java_outer_classname = "RdsProto";
 option java_multiple_files = true;
-option java_package = "io.envoyproxy.envoy.api.v3alpha";
 option java_generic_services = true;
 
 import "envoy/api/v3alpha/core/base.proto";
@@ -15,7 +15,7 @@ import "envoy/api/v3alpha/route/route.proto";
 import "google/api/annotations.proto";
 import "google/protobuf/wrappers.proto";
 
-import "udpa/api/annotations/versioning.proto";
+import "udpa/annotations/versioning.proto";
 
 import "validate/validate.proto";
 
@@ -36,10 +36,8 @@ service RouteDiscoveryService {
   }
 
   rpc FetchRoutes(DiscoveryRequest) returns (DiscoveryResponse) {
-    option (google.api.http) = {
-      post: "/v3alpha/discovery:routes"
-      body: "*"
-    };
+    option (google.api.http).post = "/v3alpha/discovery:routes";
+    option (google.api.http).body = "*";
   }
 }
 
@@ -61,8 +59,7 @@ service VirtualHostDiscoveryService {
 
 // [#next-free-field: 11]
 message RouteConfiguration {
-  option (udpa.api.annotations.versioning).previous_message_type =
-      "envoy.api.v2.RouteConfiguration";
+  option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.RouteConfiguration";
 
   // The name of the route configuration. For example, it might match
   // :ref:`route_config_name
@@ -79,7 +76,6 @@ message RouteConfiguration {
   // on-demand discovery of virtual hosts. The contents of these two fields will be merged to
   // generate a routing table for a given RouteConfiguration, with *vhds* derived configuration
   // taking precedence.
-  // [#not-implemented-hide:]
   Vhds vhds = 9;
 
   // Optionally specifies a list of HTTP headers that the connection manager
@@ -142,9 +138,8 @@ message RouteConfiguration {
   google.protobuf.BoolValue validate_clusters = 7;
 }
 
-// [#not-implemented-hide:]
 message Vhds {
-  option (udpa.api.annotations.versioning).previous_message_type = "envoy.api.v2.Vhds";
+  option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.Vhds";
 
   // Configuration source specifier for VHDS.
   core.ConfigSource config_source = 1 [(validate.rules).message = {required: true}];

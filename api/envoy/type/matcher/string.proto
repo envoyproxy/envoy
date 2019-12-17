@@ -2,9 +2,9 @@ syntax = "proto3";
 
 package envoy.type.matcher;
 
+option java_package = "io.envoyproxy.envoy.type.matcher";
 option java_outer_classname = "StringProto";
 option java_multiple_files = true;
-option java_package = "io.envoyproxy.envoy.type.matcher";
 
 import "envoy/type/matcher/regex.proto";
 
@@ -54,7 +54,7 @@ message StringMatcher {
     // .. attention::
     //   This field has been deprecated in favor of `safe_regex` as it is not safe for use with
     //   untrusted input in all cases.
-    string regex = 4 [(validate.rules).string = {max_bytes: 1024}, deprecated = true];
+    string regex = 4 [deprecated = true, (validate.rules).string = {max_bytes: 1024}];
 
     // The input string must match the regular expression specified here.
     RegexMatcher safe_regex = 5 [(validate.rules).message = {required: true}];

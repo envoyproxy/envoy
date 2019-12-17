@@ -1,3 +1,6 @@
+#include "envoy/config/bootstrap/v2/bootstrap.pb.h"
+#include "envoy/config/overload/v2alpha/overload.pb.h"
+
 #include "test/integration/http_protocol_integration.h"
 
 #include "absl/strings/str_cat.h"

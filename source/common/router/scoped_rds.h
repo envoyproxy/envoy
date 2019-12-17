@@ -2,6 +2,8 @@
 
 #include <string>
 
+#include "envoy/api/v2/core/config_source.pb.h"
+#include "envoy/api/v2/discovery.pb.h"
 #include "envoy/api/v2/srds.pb.h"
 #include "envoy/common/callback.h"
 #include "envoy/config/filter/network/http_connection_manager/v2/http_connection_manager.pb.h"
@@ -117,7 +119,7 @@ private:
 
     ScopedRdsConfigSubscription& parent_;
     std::string scope_name_;
-    std::unique_ptr<RdsRouteConfigProviderImpl> route_provider_;
+    std::shared_ptr<RdsRouteConfigProviderImpl> route_provider_;
     // This handle_ is owned by the route config provider's RDS subscription, when the helper
     // destructs, the handle is deleted as well.
     Common::CallbackHandle* rds_update_callback_handle_;
