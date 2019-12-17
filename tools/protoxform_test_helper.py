@@ -111,7 +111,7 @@ if __name__ == "__main__":
 
   if len(messages) == 0:
     logging.warning("PASS")
+    sys.exit(0)
   else:
     logging.error("FAILED:\n{}".format(messages))
-
-  sys.exit()
+    sys.exit(1)
