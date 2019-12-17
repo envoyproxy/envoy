@@ -1399,26 +1399,21 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(const HostVector& new_hosts,
 
   // Whatever remains in current_priority_hosts should be removed.
   if (!hosts_added_to_current_priority.empty() || !current_priority_hosts.empty()) {
-    hosts_removed_from_current_priority = std::move(current_priority_hosts);
-    hosts_changed = true;
 
     // Don't remove hosts that will be added back to another priority. If the host would be removed,
-    // but it exists in all_hosts but not in new_hosts.
-    for (auto i = hosts_removed_from_current_priority.begin();
-         i != hosts_removed_from_current_priority.end();) {
-      bool new_host = false;
-      for (const HostSharedPtr& host : new_hosts) {
-        if ((*i)->address()->asString() == host->address()->asString()) {
-          new_host = true;
-          break;
-        }
-      }
-      if (!new_host && all_hosts.find((*i)->address()->asString()) != all_hosts.end()) {
-        i = hosts_removed_from_current_priority.erase(i);
+    // but it exists in all_hosts and has a different priority.
+    for (auto i = current_priority_hosts.begin(); i != current_priority_hosts.end();) {
+      auto lookup_existing_host = all_hosts.find((*i)->address()->asString());
+      if (lookup_existing_host != all_hosts.end() &&
+          lookup_existing_host->second->priority() != (*i)->priority()) {
+        i = current_priority_hosts.erase(i);
       } else {
         i++;
       }
     }
+
+    hosts_removed_from_current_priority = std::move(current_priority_hosts);
+    hosts_changed = true;
   }
 
   // During the update we populated final_hosts with all the hosts that should remain
