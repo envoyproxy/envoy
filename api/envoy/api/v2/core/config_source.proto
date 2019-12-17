@@ -73,7 +73,7 @@ message ApiConfigSource {
 
   // For gRPC APIs, the back off settings for re-establishing connections. If not set, a default
   // jittered exponential back off with an initial interval of 5s and a max of 30s will be used.
-  BackOffSettings back_off_settings = 8;
+  BackOffStrategy back_off_strategy = 8;
 }
 
 // Aggregated Discovery Service (ADS) options. This is currently empty, but when
@@ -100,33 +100,20 @@ message RateLimitSettings {
   google.protobuf.DoubleValue fill_rate = 2 [(validate.rules).double = {gt: 0.0}];
 }
 
-// Retry back off settings for discovery requests made by Envoy.
-message BackOffSettings {
-  // Jittered exponential back off algorithm.
-  message JitteredBackOff {
-    // The base interval to be used for the next back off computation. It should be greater than
-    // zero and less than or equal to :ref:`max_interval <max_interval>`.
-    google.protobuf.Duration base_interval = 1 [(validate.rules).message.required = true];
+// Configuration defining a jittered exponential back off strategy.
+message BackOffStrategy {
+  // The base interval to be used for the next back off computation. It should be greater than
+  // zero and less than or equal to :ref:`max_interval <max_interval>`.
+  google.protobuf.Duration base_interval = 1 [(validate.rules).duration = {
+    required: true
+    gt {}
+   }];
 
-    // The cap on the next back off value.
-    google.protobuf.Duration max_interval = 2 [(validate.rules).message.required = true];
-  }
-
-  // Fixed back off algorithm.
-  message FixedBackOff {
-    // The fixed back off duration. It should be greater than zero.
-    google.protobuf.Duration interval = 1 [(validate.rules).message.required = true];
-  }
-
-  oneof back_off_type {
-    option (validate.required) = true;
-
-    // Use a jittered exponential back off.
-    JitteredBackOff jittered_back_off = 1;
-
-    // Use a constant duration for back off.
-    FixedBackOff fixed_back_off = 2;
-  }
+  // The cap on the next back off value.
+  google.protobuf.Duration max_interval = 2 [(validate.rules).duration = {
+    required: true
+    gt {}
+  }];
 }
 
 // Configuration for :ref:`listeners <config_listeners>`, :ref:`clusters
