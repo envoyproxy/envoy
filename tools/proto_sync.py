@@ -80,7 +80,7 @@ def GetDestinationPath(src):
   contents = src_path.read_text(encoding='utf8')
   matches = re.findall(PACKAGE_REGEX, contents)
   if len(matches) != 1:
-    raise RequiresReformatError("Expect {} has only one package delcaration but has {}".format(
+    raise RequiresReformatError("Expect {} has only one package declaration but has {}".format(
         src, len(matches)))
   return pathlib.Path(GetDirectoryFromPackage(
       matches[0])).joinpath(src_path.name.split('.')[0] + ".proto")
