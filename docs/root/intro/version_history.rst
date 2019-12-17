@@ -6,6 +6,7 @@ Version history
 * access log: added FILTER_STATE :ref:`access log formatters <config_access_log_format>` and gRPC access logger.
 * access log: added a :ref:`typed JSON logging mode <config_access_log_format_dictionaries>` to output access logs in JSON format with non-string values
 * api: remove all support for v1
+* api: added ability to specify `mode` for :ref:`Pipe <envoy_api_field_core.Pipe.mode>`.
 * buffer: remove old implementation
 * build: official released binary is now built against libc++.
 * cluster: added :ref: `aggregate cluster <arch_overview_aggregate_cluster>` that allows load balancing between clusters.
