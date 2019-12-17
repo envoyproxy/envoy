@@ -777,12 +777,17 @@ TEST_P(ConnectionImplTest, DynamicSocketOptions) {
   auto& dynamic_socket_object = client_connection_->getDynamicSocketOptionsPtr();
   {
     // Test set and get socket receive buffer size
-    // The value read from get is always double the value set on Linux
     uint32_t set_recv_buf_size = 4096;
     uint32_t get_recv_buf_size = 0;
     dynamic_socket_object.setSocketRecvBufferSize(socket_->ioHandle(), set_recv_buf_size);
     dynamic_socket_object.getSocketRecvBufferSize(socket_->ioHandle(), get_recv_buf_size);
+#ifdef __APPLE__
+    // 'set_recv_buf_size' is equal to 'get_recv_buf_size' on macOS
+    EXPECT_EQ(get_recv_buf_size, set_recv_buf_size);
+#else
+    // 'get_recv_buf_size' is double the value of 'set_recv_buf_size' of Linux
     EXPECT_EQ(get_recv_buf_size, 2 * set_recv_buf_size);
+#endif
   }
 
   {

@@ -339,13 +339,14 @@ public:
    *         occurred an empty string is returned.
    */
   virtual absl::string_view transportFailureReason() const PURE;
-  DynamicSocketOptionsPtr dynamic_socket_options_ptr_;
   DynamicSocketOptions& getDynamicSocketOptionsPtr() {
     if (dynamic_socket_options_ptr_ == nullptr) {
       dynamic_socket_options_ptr_ = std::make_unique<DynamicSocketOptions>(id());
     }
     return *dynamic_socket_options_ptr_.get();
   }
+private:
+  DynamicSocketOptionsPtr dynamic_socket_options_ptr_;
 };
 
 using ConnectionPtr = std::unique_ptr<Connection>;
