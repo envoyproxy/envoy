@@ -1,5 +1,6 @@
 #include "extensions/filters/http/gzip/gzip_filter.h"
 
+#include "envoy/config/filter/http/gzip/v2/gzip.pb.h"
 #include "envoy/stats/scope.h"
 
 #include "common/common/macros.h"

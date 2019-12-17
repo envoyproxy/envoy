@@ -1,8 +1,9 @@
+#include "envoy/config/filter/http/ip_tagging/v2/ip_tagging.pb.h"
+#include "envoy/config/filter/http/ip_tagging/v3alpha/ip_tagging.pb.h"
+
 #include "common/config/api_type_oracle.h"
 
 // For proto descriptors only
-#include "envoy/config/filter/http/ip_tagging/v2/ip_tagging.pb.h"
-#include "envoy/config/filter/http/ip_tagging/v3alpha/ip_tagging.pb.h"
 
 #include "gtest/gtest.h"
 #include "udpa/type/v1/typed_struct.pb.h"

@@ -238,34 +238,61 @@ resources are available with a :ref:`DiscoveryResponse <envoy_api_msg_DiscoveryR
 
 After processing the :ref:`DiscoveryResponse <envoy_api_msg_DiscoveryResponse>`, Envoy will send a new
 request on the stream, specifying the last version successfully applied
-and the nonce provided by the management server. If the update was
-successfully applied, the :ref:`version_info <envoy_api_field_DiscoveryResponse.version_info>` will be **X**, as indicated
+and the nonce provided by the management server. The version provides Envoy and the
+management server a shared notion of the currently applied configuration,
+as well as a mechanism to ACK/NACK configuration updates.
+
+ACK
+^^^
+
+If the update was successfully applied, the
+:ref:`version_info <envoy_api_field_DiscoveryResponse.version_info>` will be **X**, as indicated
 in the sequence diagram:
 
 .. figure:: diagrams/simple-ack.svg
    :alt: Version update after ACK
 
-In this sequence diagram, and below, the following format is used to abbreviate messages:
+NACK
+^^^^
 
-- *DiscoveryRequest*: (V=version_info,R=resource_names,N=response_nonce,T=type_url)
-- *DiscoveryResponse*: (V=version_info,R=resources,N=nonce,T=type_url)
-
-The version provides Envoy and the management server a shared notion of
-the currently applied configuration, as well as a mechanism to ACK/NACK
-configuration updates. If Envoy had instead rejected configuration
+If Envoy had instead rejected configuration
 update **X**, it would reply with :ref:`error_detail <envoy_api_field_DiscoveryRequest.error_detail>`
 populated and its previous version, which in this case was the empty
-initial version. The :ref:`error_detail <envoy_api_field_DiscoveryRequest.error_detail>` has more details around the exact
-error message populated in the message field:
+initial version. The :ref:`error_detail <envoy_api_field_DiscoveryRequest.error_detail>` has
+more details around the exact error message populated in the message field:
 
 .. figure:: diagrams/simple-nack.svg
    :alt: No version update after NACK
 
-Later, an API update may succeed at a new version **Y**:
+In the sequence diagrams, the following format is used to abbreviate messages:
+
+- *DiscoveryRequest*: (V=version_info,R=resource_names,N=response_nonce,T=type_url)
+- *DiscoveryResponse*: (V=version_info,R=resources,N=nonce,T=type_url)
+
+After a NACK, an API update may succeed at a new version **Y**:
 
 
 .. figure:: diagrams/later-ack.svg
    :alt: ACK after NACK
+
+ACK and NACK semantics summary
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+- The xDS client should ACK or NACK every :ref:`DiscoveryResponse <envoy_api_msg_DiscoveryResponse>`
+  received from the management server.
+- Like all other requests, the nonce from the :ref:`DiscoveryResponse <envoy_api_msg_DiscoveryResponse>`
+  is sent as :ref:`response_nonce <envoy_api_field_DiscoveryRequest.response_nonce>`.
+  As described in :ref:`resource update <xds_protocol_resource_update>` the nonce is
+  used in certain race conditions to disambiguate between ACK and NACK.
+- ACK signifies successful configuration update and contains the
+  :ref:`version_info <envoy_api_field_DiscoveryResponse.version_info>` from the
+  :ref:`DiscoveryResponse <envoy_api_msg_DiscoveryResponse>`.
+- NACK signifies unsuccessful configuration update and contains the previous (existing)
+  :ref:`version_info <envoy_api_field_DiscoveryResponse.version_info>`.
+- Only the NACK should populate the :ref:`error_detail <envoy_api_field_DiscoveryRequest.error_detail>`.
+
+Versioning and Node Identifier
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 Each stream has its own notion of versioning, there is no shared
 versioning across resource types. When ADS is not used, even each

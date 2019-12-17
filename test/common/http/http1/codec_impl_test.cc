@@ -22,11 +22,13 @@
 #include "gtest/gtest.h"
 
 using testing::_;
+using testing::AtLeast;
 using testing::InSequence;
 using testing::Invoke;
 using testing::NiceMock;
 using testing::Return;
 using testing::ReturnRef;
+using testing::StrictMock;
 
 namespace Envoy {
 namespace Http {
@@ -60,7 +62,10 @@ public:
   void expect400(Protocol p, bool allow_absolute_url, Buffer::OwnedImpl& buffer,
                  absl::string_view details = "");
   void testRequestHeadersExceedLimit(std::string header_string, absl::string_view details = "");
+  void testTrailersExceedLimit(std::string trailer_string, bool enable_trailers);
   void testRequestHeadersAccepted(std::string header_string);
+  // Used to test if trailers are decoded/encoded
+  void expectTrailersTest(bool enable_trailers);
 
   // Send the request, and validate the received request headers.
   // Then send a response just to clean up.
@@ -140,6 +145,76 @@ void Http1ServerConnectionImplTest::expectHeadersTest(Protocol p, bool allow_abs
   EXPECT_EQ(p, codec_->protocol());
 }
 
+void Http1ServerConnectionImplTest::expectTrailersTest(bool enable_trailers) {
+  initialize();
+
+  // Make a new 'codec' with the right settings
+  if (enable_trailers) {
+    codec_settings_.enable_trailers_ = enable_trailers;
+    codec_ =
+        std::make_unique<ServerConnectionImpl>(connection_, store_, callbacks_, codec_settings_,
+                                               max_request_headers_kb_, max_request_headers_count_);
+  }
+
+  StrictMock<Http::MockStreamDecoder> decoder;
+  EXPECT_CALL(callbacks_, newStream(_, _))
+      .WillOnce(
+          Invoke([&](Http::StreamEncoder&, bool) -> Http::StreamDecoder& { return decoder; }));
+
+  EXPECT_CALL(decoder, decodeHeaders_(_, false));
+
+  if (enable_trailers) {
+    EXPECT_CALL(decoder, decodeData(_, false)).Times(AtLeast(1));
+    EXPECT_CALL(decoder, decodeTrailers_).Times(1);
+  } else {
+    EXPECT_CALL(decoder, decodeData(_, false)).Times(AtLeast(1));
+    EXPECT_CALL(decoder, decodeData(_, true));
+  }
+
+  Buffer::OwnedImpl buffer("POST / HTTP/1.1\r\ntransfer-encoding: chunked\r\n\r\nb\r\nHello "
+                           "World\r\n0\r\nhello: world\r\nsecond: header\r\n\r\n");
+  codec_->dispatch(buffer);
+  EXPECT_EQ(0U, buffer.length());
+}
+
+void Http1ServerConnectionImplTest::testTrailersExceedLimit(std::string trailer_string,
+                                                            bool enable_trailers) {
+  initialize();
+  // Make a new 'codec' with the right settings
+  codec_settings_.enable_trailers_ = enable_trailers;
+  codec_ =
+      std::make_unique<ServerConnectionImpl>(connection_, store_, callbacks_, codec_settings_,
+                                             max_request_headers_kb_, max_request_headers_count_);
+  std::string exception_reason;
+  NiceMock<Http::MockStreamDecoder> decoder;
+  EXPECT_CALL(callbacks_, newStream(_, _))
+      .WillOnce(
+          Invoke([&](Http::StreamEncoder&, bool) -> Http::StreamDecoder& { return decoder; }));
+
+  if (enable_trailers) {
+    EXPECT_CALL(decoder, decodeHeaders_(_, false));
+    EXPECT_CALL(decoder, decodeData(_, false)).Times(AtLeast(1));
+  } else {
+    EXPECT_CALL(decoder, decodeData(_, false)).Times(AtLeast(1));
+    EXPECT_CALL(decoder, decodeData(_, true));
+  }
+
+  Buffer::OwnedImpl buffer("POST / HTTP/1.1\r\n"
+                           "Host: host\r\n"
+                           "Transfer-Encoding: chunked\r\n\r\n"
+                           "4\r\n"
+                           "body\r\n0\r\n");
+  codec_->dispatch(buffer);
+  buffer = Buffer::OwnedImpl(trailer_string + "\r\n\r\n");
+  if (enable_trailers) {
+    EXPECT_THROW_WITH_MESSAGE(codec_->dispatch(buffer), EnvoyException,
+                              "trailers size exceeds limit");
+  } else {
+    // If trailers are not enabled, we expect Envoy to simply skip over the large
+    // trailers as if nothing has happened!
+    codec_->dispatch(buffer);
+  }
+}
 void Http1ServerConnectionImplTest::testRequestHeadersExceedLimit(std::string header_string,
                                                                   absl::string_view details) {
   initialize();
@@ -396,6 +471,30 @@ TEST_F(Http1ServerConnectionImplTest, Http11InvalidRequest) {
   // Invalid because www.somewhere.com is not an absolute path nor an absolute url
   Buffer::OwnedImpl buffer("GET www.somewhere.com HTTP/1.1\r\nHost: bah\r\n\r\n");
   expect400(Protocol::Http11, true, buffer, "http1.codec_error");
+}
+
+TEST_F(Http1ServerConnectionImplTest, Http11InvalidTrailerPost) {
+  initialize();
+
+  std::string output;
+  ON_CALL(connection_, write(_, _)).WillByDefault(AddBufferToString(&output));
+
+  StrictMock<Http::MockStreamDecoder> decoder;
+  EXPECT_CALL(callbacks_, newStream(_, _))
+      .WillOnce(
+          Invoke([&](Http::StreamEncoder&, bool) -> Http::StreamDecoder& { return decoder; }));
+
+  EXPECT_CALL(decoder, decodeHeaders_(_, false));
+  EXPECT_CALL(decoder, decodeData(_, false)).Times(AtLeast(1));
+
+  Buffer::OwnedImpl buffer("POST / HTTP/1.1\r\n"
+                           "Host: host\r\n"
+                           "Transfer-Encoding: chunked\r\n\r\n"
+                           "4\r\n"
+                           "body\r\n0\r\n"
+                           "badtrailer\r\n\r\n");
+  EXPECT_THROW(codec_->dispatch(buffer), CodecProtocolException);
+  EXPECT_EQ("HTTP/1.1 400 Bad Request\r\ncontent-length: 0\r\nconnection: close\r\n\r\n", output);
 }
 
 TEST_F(Http1ServerConnectionImplTest, Http11AbsolutePathNoSlash) {
@@ -846,7 +945,41 @@ TEST_F(Http1ServerConnectionImplTest, ChunkedResponse) {
 
   Buffer::OwnedImpl data("Hello World");
   response_encoder->encodeData(data, true);
-  EXPECT_EQ("HTTP/1.1 200 OK\r\ntransfer-encoding: chunked\r\n\r\nb\r\nHello World\r\n0\r\n\r\n",
+
+  EXPECT_EQ("HTTP/1.1 200 OK\r\ntransfer-encoding: chunked\r\n\r\nb\r\nHello "
+            "World\r\n0\r\n\r\n",
+            output);
+}
+
+TEST_F(Http1ServerConnectionImplTest, ChunkedResponseWithTrailers) {
+  codec_settings_.enable_trailers_ = true;
+  initialize();
+  NiceMock<Http::MockStreamDecoder> decoder;
+  Http::StreamEncoder* response_encoder = nullptr;
+  EXPECT_CALL(callbacks_, newStream(_, _))
+      .WillOnce(Invoke([&](Http::StreamEncoder& encoder, bool) -> Http::StreamDecoder& {
+        response_encoder = &encoder;
+        return decoder;
+      }));
+
+  Buffer::OwnedImpl buffer("GET / HTTP/1.1\r\n\r\n");
+  codec_->dispatch(buffer);
+  EXPECT_EQ(0U, buffer.length());
+
+  std::string output;
+  ON_CALL(connection_, write(_, _)).WillByDefault(AddBufferToString(&output));
+
+  TestHeaderMapImpl headers{{":status", "200"}};
+  response_encoder->encodeHeaders(headers, false);
+
+  Buffer::OwnedImpl data("Hello World");
+  response_encoder->encodeData(data, false);
+
+  TestHeaderMapImpl trailers{{"foo", "bar"}, {"foo", "baz"}};
+  response_encoder->encodeTrailers(trailers);
+
+  EXPECT_EQ("HTTP/1.1 200 OK\r\ntransfer-encoding: chunked\r\n\r\nb\r\nHello "
+            "World\r\n0\r\nfoo: bar\r\nfoo: baz\r\n\r\n",
             output);
 }
 
@@ -947,22 +1080,9 @@ TEST_F(Http1ServerConnectionImplTest, DoubleRequest) {
   EXPECT_EQ(0U, buffer.length());
 }
 
-TEST_F(Http1ServerConnectionImplTest, RequestWithTrailers) {
-  initialize();
+TEST_F(Http1ServerConnectionImplTest, RequestWithTrailersDropped) { expectTrailersTest(false); }
 
-  NiceMock<Http::MockStreamDecoder> decoder;
-  Http::StreamEncoder* response_encoder = nullptr;
-  EXPECT_CALL(callbacks_, newStream(_, _))
-      .WillOnce(Invoke([&](Http::StreamEncoder& encoder, bool) -> Http::StreamDecoder& {
-        response_encoder = &encoder;
-        return decoder;
-      }));
-
-  Buffer::OwnedImpl buffer("POST / HTTP/1.1\r\ntransfer-encoding: chunked\r\n\r\nb\r\nHello "
-                           "World\r\n0\r\nhello: world\r\nsecond: header\r\n\r\n");
-  codec_->dispatch(buffer);
-  EXPECT_EQ(0U, buffer.length());
-}
+TEST_F(Http1ServerConnectionImplTest, RequestWithTrailersKept) { expectTrailersTest(true); }
 
 TEST_F(Http1ServerConnectionImplTest, IgnoreUpgradeH2c) {
   initialize();
@@ -1478,6 +1598,31 @@ TEST_F(Http1ClientConnectionImplTest, HighwatermarkMultipleResponses) {
   static_cast<ClientConnection*>(codec_.get())
       ->onUnderlyingConnectionBelowWriteBufferLowWatermark();
 }
+
+TEST_F(Http1ServerConnectionImplTest, LargeTrailersRejected) {
+  // Default limit of 60 KiB
+  std::string long_string = "big: " + std::string(60 * 1024, 'q') + "\r\n";
+  testTrailersExceedLimit(long_string, true);
+}
+
+// Tests that the default limit for the number of request headers is 100.
+TEST_F(Http1ServerConnectionImplTest, ManyTrailersRejected) {
+  // Send a request with 101 headers.
+  testTrailersExceedLimit(createHeaderFragment(101), true);
+}
+
+TEST_F(Http1ServerConnectionImplTest, LargeTrailersRejectedIgnored) {
+  // Default limit of 60 KiB
+  std::string long_string = "big: " + std::string(60 * 1024, 'q') + "\r\n";
+  testTrailersExceedLimit(long_string, false);
+}
+
+// Tests that the default limit for the number of request headers is 100.
+TEST_F(Http1ServerConnectionImplTest, ManyTrailersIgnored) {
+  // Send a request with 101 headers.
+  testTrailersExceedLimit(createHeaderFragment(101), false);
+}
+
 TEST_F(Http1ServerConnectionImplTest, LargeRequestHeadersRejected) {
   // Default limit of 60 KiB
   std::string long_string = "big: " + std::string(60 * 1024, 'q') + "\r\n";

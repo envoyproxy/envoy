@@ -1,5 +1,7 @@
+#include "envoy/api/v2/core/address.pb.h"
 #include "envoy/config/accesslog/v2/als.pb.h"
-#include "envoy/config/filter/network/tcp_proxy/v2/tcp_proxy.pb.validate.h"
+#include "envoy/config/bootstrap/v2/bootstrap.pb.h"
+#include "envoy/config/filter/network/tcp_proxy/v2/tcp_proxy.pb.h"
 #include "envoy/service/accesslog/v2/als.pb.h"
 
 #include "common/buffer/zero_copy_input_stream_impl.h"

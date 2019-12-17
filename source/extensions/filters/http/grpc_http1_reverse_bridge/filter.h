@@ -28,8 +28,12 @@ public:
   // Http::StreamEncoderFilter
   Http::FilterHeadersStatus encodeHeaders(Http::HeaderMap& headers, bool end_stream) override;
   Http::FilterDataStatus encodeData(Buffer::Instance& buffer, bool end_stream) override;
+  Http::FilterTrailersStatus encodeTrailers(Http::HeaderMap& trailers) override;
 
 private:
+  // Prepend the grpc frame into the buffer
+  void buildGrpcFrameHeader(Buffer::Instance& buffer);
+
   const std::string upstream_content_type_;
   const bool withhold_grpc_frames_;
 

@@ -1,5 +1,7 @@
 #include "extensions/filters/http/ext_authz/ext_authz.h"
 
+#include "envoy/api/v2/core/base.pb.h"
+
 #include "common/common/assert.h"
 #include "common/common/enum_to_int.h"
 #include "common/http/utility.h"

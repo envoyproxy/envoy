@@ -332,7 +332,7 @@ IoHandlePtr Ipv6Instance::socket(SocketType type) const {
   return io_handle;
 }
 
-PipeInstance::PipeInstance(const sockaddr_un* address, socklen_t ss_len)
+PipeInstance::PipeInstance(const sockaddr_un* address, socklen_t ss_len, mode_t mode)
     : InstanceBase(Type::Pipe) {
   if (address->sun_path[0] == '\0') {
 #if !defined(__linux__)
@@ -345,15 +345,19 @@ PipeInstance::PipeInstance(const sockaddr_un* address, socklen_t ss_len)
   }
   address_ = *address;
   if (abstract_namespace_) {
+    if (mode != 0) {
+      throw EnvoyException("Cannot set mode for Abstract AF_UNIX sockets");
+    }
     // Replace all null characters with '@' in friendly_name_.
     friendly_name_ =
         friendlyNameFromAbstractPath(absl::string_view(address_.sun_path, address_length_));
   } else {
     friendly_name_ = address->sun_path;
   }
+  this->mode = mode;
 }
 
-PipeInstance::PipeInstance(const std::string& pipe_path) : InstanceBase(Type::Pipe) {
+PipeInstance::PipeInstance(const std::string& pipe_path, mode_t mode) : InstanceBase(Type::Pipe) {
   if (pipe_path.size() >= sizeof(address_.sun_path)) {
     throw EnvoyException(
         fmt::format("Path \"{}\" exceeds maximum UNIX domain socket path size of {}.", pipe_path,
@@ -370,6 +374,9 @@ PipeInstance::PipeInstance(const std::string& pipe_path) : InstanceBase(Type::Pi
 #if !defined(__linux__)
     throw EnvoyException("Abstract AF_UNIX sockets are only supported on linux.");
 #endif
+    if (mode != 0) {
+      throw EnvoyException("Cannot set mode for Abstract AF_UNIX sockets");
+    }
     abstract_namespace_ = true;
     address_length_ = pipe_path.size();
     memcpy(&address_.sun_path[0], pipe_path.data(), pipe_path.size());
@@ -385,6 +392,7 @@ PipeInstance::PipeInstance(const std::string& pipe_path) : InstanceBase(Type::Pi
     StringUtil::strlcpy(&address_.sun_path[0], pipe_path.c_str(), sizeof(address_.sun_path));
     friendly_name_ = address_.sun_path;
   }
+  this->mode = mode;
 }
 
 bool PipeInstance::operator==(const Instance& rhs) const { return asString() == rhs.asString(); }
@@ -397,7 +405,14 @@ Api::SysCallIntResult PipeInstance::bind(int fd) const {
     unlink(address_.sun_path);
   }
   auto& os_syscalls = Api::OsSysCallsSingleton::get();
-  return os_syscalls.bind(fd, sockAddr(), sockAddrLen());
+  auto bind_result = os_syscalls.bind(fd, sockAddr(), sockAddrLen());
+  if (mode != 0 && !abstract_namespace_ && bind_result.rc_ == 0) {
+    auto set_permissions = os_syscalls.chmod(address_.sun_path, mode);
+    if (set_permissions.rc_ != 0) {
+      throw EnvoyException(fmt::format("Failed to create socket with mode {}", mode));
+    }
+  }
+  return bind_result;
 }
 
 Api::SysCallIntResult PipeInstance::connect(int fd) const {
