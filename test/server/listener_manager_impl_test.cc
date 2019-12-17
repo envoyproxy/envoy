@@ -151,7 +151,7 @@ filter_chains:
         validation_context:
           trusted_ca:
             filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"
-          match_subject_alt_name:
+          match_subject_alt_names:
             exact: localhost
             exact: 127.0.0.1
   )EOF",
@@ -3528,7 +3528,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, VerifySanWithNoCA) {
               - certificate_chain: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_cert.pem" }
                 private_key: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_key.pem" }
             validation_context:
-              match_subject_alt_name: 
+              match_subject_alt_names: 
                  exact: "spiffe://lyft.com/testclient"
   )EOF",
                                                        Network::Address::IpVersion::v4);

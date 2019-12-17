@@ -271,7 +271,7 @@ TEST_F(SdsApiTest, DefaultCertificateValidationContextTest) {
   dynamic_cvc->set_allow_expired_certificate(false);
   dynamic_cvc->mutable_trusted_ca()->set_filename(TestEnvironment::substitute(
       "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"));
-  dynamic_cvc->add_match_subject_alt_name()->set_exact("second san");
+  dynamic_cvc->add_match_subject_alt_names()->set_exact("second san");
   const std::string dynamic_verify_certificate_spki =
       "QGJRPdmx/r5EGOFLb2MTiZp2isyC0Whht7iazhzXaCM=";
   dynamic_cvc->add_verify_certificate_spki(dynamic_verify_certificate_spki);
@@ -288,7 +288,7 @@ TEST_F(SdsApiTest, DefaultCertificateValidationContextTest) {
   envoy::api::v2::auth::CertificateValidationContext default_cvc;
   default_cvc.set_allow_expired_certificate(true);
   default_cvc.mutable_trusted_ca()->set_inline_bytes("fake trusted ca");
-  default_cvc.add_match_subject_alt_name()->set_exact("first san");
+  default_cvc.add_match_subject_alt_names()->set_exact("first san");
   default_cvc.add_verify_certificate_hash(default_verify_certificate_hash);
   envoy::api::v2::auth::CertificateValidationContext merged_cvc = default_cvc;
   merged_cvc.MergeFrom(*sds_api.secret());

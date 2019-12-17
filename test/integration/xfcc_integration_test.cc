@@ -44,7 +44,7 @@ common_tls_context:
   validation_context:
     trusted_ca:
       filename: {{ test_rundir }}/test/config/integration/certs/cacert.pem
-    match_subject_alt_name: 
+    match_subject_alt_names: 
       exact: "spiffe://lyft.com/backend-team"
       exact: "lyft.com"
       exact: "www.lyft.com"
@@ -55,7 +55,7 @@ common_tls_context:
   validation_context:
     trusted_ca:
       filename: {{ test_rundir }}/test/config/integration/certs/cacert.pem
-    match_subject_alt_name: 
+    match_subject_alt_names: 
       exact: "spiffe://lyft.com/backend-team"
       exact: "lyft.com"
       exact: "www.lyft.com"
@@ -135,7 +135,7 @@ void XfccIntegrationTest::initialize() {
     auto* validation_context = context.mutable_common_tls_context()->mutable_validation_context();
     validation_context->mutable_trusted_ca()->set_filename(
         TestEnvironment::runfilesPath("test/config/integration/certs/upstreamcacert.pem"));
-    validation_context->add_match_subject_alt_name()->set_suffix("lyft.com");
+    validation_context->add_match_subject_alt_names()->set_suffix("lyft.com");
     transport_socket->set_name("envoy.transport_sockets.tls");
     transport_socket->mutable_typed_config()->PackFrom(context);
   });

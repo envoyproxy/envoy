@@ -290,7 +290,7 @@ message CertificateValidationContext {
   //   Subject Alternative Names are easily spoofable and verifying only them is insecure,
   //   therefore this option must be used together with :ref:`trusted_ca
   //   <envoy_api_field_api.v3alpha.auth.CertificateValidationContext.trusted_ca>`.
-  repeated type.matcher.v3alpha.StringMatcher match_subject_alt_name = 9;
+  repeated type.matcher.v3alpha.StringMatcher match_subject_alt_names = 9;
 
   // [#not-implemented-hide:] Must present a signed time-stamped OCSP response.
   google.protobuf.BoolValue require_ocsp_staple = 5;
