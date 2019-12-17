@@ -7,9 +7,9 @@
 #include <string>
 #include <vector>
 
-#include "envoy/common/exception.h"
 #include "envoy/api/v2/core/http_uri.pb.h"
 #include "envoy/api/v2/core/protocol.pb.h"
+#include "envoy/common/exception.h"
 #include "envoy/http/header_map.h"
 
 #include "common/buffer/buffer_impl.h"
@@ -751,40 +751,88 @@ std::string Utility::PercentEncoding::decode(absl::string_view encoded) {
   return decoded;
 }
 
-absl::string_view Utility::hostFromAuthority(absl::string_view authority) {
+absl::optional<int> rightLimitedFind(absl::string_view authority, char symbol, int limit) {
+  const auto authority_size = static_cast<int>(authority.size());
+  const auto end_pos = authority_size - limit >= 0 ? authority_size - limit : 0;
+
+  for (int i = authority_size - 1; i >= end_pos; --i) {
+    if (symbol == authority[i]) {
+      return i;
+    }
+  }
+  return absl::nullopt;
+}
+
+absl::optional<int> rightLimitedFind(absl::string_view authority, const std::string& symbols,
+                                     int limit) {
+  const auto authority_size = static_cast<int>(authority.size());
+  const auto symbols_size = static_cast<int>(symbols.size());
+  const auto end_pos = authority_size - limit + symbols_size - 1 >= 0
+                           ? authority_size - limit + symbols_size - 1
+                           : symbols_size - 1;
+
+  for (int i = authority_size - 1; i >= end_pos; --i) {
+    for (int j = 0; j < symbols_size; ++j) {
+      if (authority[i - j] != symbols[symbols_size - 1 - j]) {
+        break;
+      }
+      if (j == symbols_size - 1) {
+        return i;
+      }
+    }
+  }
+  return absl::nullopt;
+}
+
+absl::string_view Utility::hostFromAuthority(absl::string_view authority, int port_pos) {
   if (authority[0] == '[') {
-    auto close_bracket_pos = authority.rfind("]");
-    if (close_bracket_pos) {
-      return authority.substr(1, close_bracket_pos - 1);
+    // index number of close bracket is less than 7
+    const auto close_bracket_pos = rightLimitedFind(authority, ']', 7);
+    if (close_bracket_pos != absl::nullopt) {
+      return authority.substr(1, close_bracket_pos.value() - 1);
     } else {
       throw EnvoyException(fmt::format("malformed authority: {}", authority));
     }
   }
 
-  auto port_flag_pos = authority.rfind(":");
-  return authority.substr(0, port_flag_pos);
+  // index number of colon is less than 6
+  if (port_pos != -1) {
+    return authority.substr(0, port_pos);
+  }
+
+  const auto port_flag_pos = rightLimitedFind(authority, ':', 6);
+  if (port_flag_pos != absl::nullopt) {
+    return authority.substr(0, port_flag_pos.value());
+  }
+
+  return authority;
 }
 
-absl::optional<absl::string_view> Utility::portFromAuthority(absl::string_view authority) {
-  const auto pos = authority.rfind(":");
-  if (pos == absl::string_view::npos) {
+absl::optional<absl::string_view> Utility::portFromAuthority(absl::string_view authority,
+                                                             int port_pos) {
+  if (port_pos != -1) {
+    return authority.substr(port_pos + 1);
+  }
+
+  const auto pos = rightLimitedFind(authority, ':', 6);
+  if (pos == absl::nullopt) {
     return absl::nullopt;
   }
 
   // port section may be not include more than 5 digits, so that should be treated as malformed
-  if (authority.substr(pos + 1).size() > 5) {
+  if (authority.substr(pos.value() + 1).size() > 5) {
     throw EnvoyException(fmt::format("malformed authority: {}", authority));
   }
-  return authority.substr(pos + 1);
+  return authority.substr(pos.value() + 1);
 }
 
 void Utility::AttributeUpdater(AuthorityAttributes& auth_attr, absl::string_view authority,
-                               bool with_port) {
+                               int port_pos) {
   try {
-    if (with_port) {
+    if (port_pos != -1) {
       const Network::Address::InstanceConstSharedPtr instance =
           Network::Utility::parseInternetAddressAndPort(authority);
-      auth_attr.host = Http::Utility::hostFromAuthority(authority);
+      auth_attr.host = Http::Utility::hostFromAuthority(authority, port_pos);
       auth_attr.port = instance->ip()->port();
       auth_attr.is_ip_address = true;
     } else {
@@ -798,14 +846,6 @@ void Utility::AttributeUpdater(AuthorityAttributes& auth_attr, absl::string_view
 }
 
 const Utility::AuthorityAttributes Utility::parseAuthority(absl::string_view authority) {
-  // the number of length of DNS host name is restricted less than 255 octets, according to
-  // RFC1035(https://tools.ietf.org/html/rfc1035#section-2.3.4) if target authority has very
-  // long(more than 256) bytes, it may cause CPU burning because of string traversal so we should
-  // treat these authority as malformed
-  if (strlen(std::string(authority).c_str()) > 255) {
-    throw EnvoyException(fmt::format("malformed authority: {}", authority));
-  }
-
   Utility::AuthorityAttributes auth_attr;
   auth_attr.port = absl::nullopt;
   auth_attr.host = authority;
@@ -819,20 +859,22 @@ const Utility::AuthorityAttributes Utility::parseAuthority(absl::string_view aut
   // and IPv6 address or future version of ip address. In this case, future version of ip address
   // should be ignored
   if (authority[0] == '[') {
-    if (authority.rfind("]:") != absl::string_view::npos) {
-      AttributeUpdater(auth_attr, authority, true);
+    const auto port_pos = rightLimitedFind(authority, "]:", 7);
+    if (port_pos != absl::nullopt) {
+      AttributeUpdater(auth_attr, authority, port_pos.value());
     } else {
-      AttributeUpdater(auth_attr, authority, false);
+      AttributeUpdater(auth_attr, authority);
     }
     return auth_attr;
   }
 
   if (Network::Utility::isIpv4Address(authority)) {
     try {
-      if (authority.find(":") != absl::string_view::npos) {
-        AttributeUpdater(auth_attr, authority, true);
+      const auto port_pos = rightLimitedFind(authority, ':', 6);
+      if (port_pos != absl::nullopt) {
+        AttributeUpdater(auth_attr, authority, port_pos.value());
       } else {
-        AttributeUpdater(auth_attr, authority, false);
+        AttributeUpdater(auth_attr, authority);
       }
     } catch (const EnvoyException&) {
     }
@@ -842,15 +884,13 @@ const Utility::AuthorityAttributes Utility::parseAuthority(absl::string_view aut
 
   // check if passed authority matches reg-name. Basically, authorities which is not matched IPv6 or
   // IPv4, should be treated as reg-name
-  const auto colon_lpos = authority.find(":");
-  const auto colon_rpos = authority.rfind(":");
+  const auto port_str = Http::Utility::portFromAuthority(authority);
 
-  // If the number of colon is upper than 1, authority can't separate host and port correctly.
-  if (colon_lpos != absl::string_view::npos && colon_lpos == colon_rpos) {
-    absl::string_view port_str = Http::Utility::portFromAuthority(authority).value();
+  // If failed to find colon, that is treated as simple reg-name
+  if (port_str != absl::nullopt) {
     uint64_t port64 = 0;
-    if (port_str.empty() || !absl::SimpleAtoi(std::string(port_str).c_str(), &port64) ||
-        port64 > 65535) {
+    if (port_str.value().empty() ||
+        !absl::SimpleAtoi(std::string(port_str.value()).c_str(), &port64) || port64 > 65535) {
       return auth_attr;
     }
     auth_attr.host = Http::Utility::hostFromAuthority(authority);

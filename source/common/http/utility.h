@@ -420,25 +420,27 @@ struct AuthorityAttributes {
 /**
  * retrieve host part from authority.
  * @param authority authority
- * @return std::string retrieved host
+ * @param port_pos port position
+ * @return retrieved host
  */
-absl::string_view hostFromAuthority(absl::string_view authority);
+absl::string_view hostFromAuthority(absl::string_view authority, int port_pos = -1);
 
 /**
  * retrieve port part from authority.
  * @param authority authority
- * @param default_port default port
- * @return std::string retrieved port
+ * @param port_pos port position
+ * @return retrieved port
  */
-absl::optional<absl::string_view> portFromAuthority(absl::string_view authority);
+absl::optional<absl::string_view> portFromAuthority(absl::string_view authority, int port_pos = -1);
 
 /**
  * update attributes with authority status
  * @param auth_attr authority attributes want to update
  * @param authority target authority
- * @param with_port whether target authority has port
+ * @param port_pos port position
  */
-void AttributeUpdater(AuthorityAttributes& auth_attr, absl::string_view authority, bool with_port);
+void AttributeUpdater(AuthorityAttributes& auth_attr, absl::string_view authority,
+                      int port_pos = -1);
 
 /**
  * Parse passed authority, and get that is valid FQDN or IPv4/IPv6 address, hostname and port-name.
