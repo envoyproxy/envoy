@@ -477,7 +477,7 @@ key:
             "foo_routes");
 }
 
-// Tests that scope-key conflict resources in differnt pushes are handled correctly.
+// Tests that scope-key conflict resources in different pushes are handled correctly.
 TEST_F(ScopedRdsTest, ScopeKeyReuseInDifferentPushes) {
   setup();
 
