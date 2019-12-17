@@ -959,6 +959,12 @@ TEST_F(HttpHealthCheckerImplTest, ZeroRetryInterval) {
   EXPECT_EQ(Host::Health::Healthy, cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->health());
 }
 
+MATCHER_P(TransportOptionsEq, expected, "") {
+  const Network::TransportSocketOptionsSharedPtr& options = arg;
+  EXPECT_EQ(options->applicationProtocolListOverride(), std::vector<std::string>{expected});
+  return true;
+}
+
 TEST_F(HttpHealthCheckerImplTest, SetALPNProtocol) {
   const std::string host = "fake_cluster";
   const std::string path = "/healthcheck";
@@ -981,6 +987,8 @@ TEST_F(HttpHealthCheckerImplTest, SetALPNProtocol) {
       Network::TransportSocketFactoryPtr(socket_factory));
   cluster_->info_->transport_socket_matcher_.reset(transport_socket_match);
 
+  EXPECT_CALL(*socket_factory, createTransportSocket(TransportOptionsEq("http1")));
+
   health_checker_.reset(new TestHttpHealthCheckerImpl(*cluster_, parseHealthCheckFromV2Yaml(yaml),
                                                       dispatcher_, runtime_, random_,
                                                       HealthCheckEventLoggerPtr(event_logger_)));
@@ -988,27 +996,10 @@ TEST_F(HttpHealthCheckerImplTest, SetALPNProtocol) {
   cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
       makeTestHost(cluster_->info_, "tcp://127.0.0.1:80")};
   cluster_->info_->stats().upstream_cx_total_.inc();
-  EXPECT_CALL(*socket_factory, createTransportSocket(_))
-      .WillOnce(Invoke([&](Network::TransportSocketOptionsSharedPtr&& transport_socket_options)
-                           -> Network::TransportSocketPtr {
-        EXPECT_EQ(transport_socket_options->applicationProtocolListOverride(),
-                  std::vector<std::string>{"http1"});
-        // Doesn't matter, this is ignored by one of the mocks above.
-        return nullptr;
-      }));
   expectSessionCreate();
   expectStreamCreate(0);
   EXPECT_CALL(*test_sessions_[0]->timeout_timer_, enableTimer(_, _));
   health_checker_->start();
-
-  EXPECT_CALL(runtime_.snapshot_, getInteger("health_check.max_interval", _));
-  EXPECT_CALL(runtime_.snapshot_, getInteger("health_check.min_interval", _))
-      .WillOnce(Return(45000));
-  EXPECT_CALL(*test_sessions_[0]->interval_timer_,
-              enableTimer(std::chrono::milliseconds(45000), _));
-  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, disableTimer());
-  respond(0, "200", false, false, true);
-  EXPECT_EQ(Host::Health::Healthy, cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->health());
 }
 
 TEST_F(HttpHealthCheckerImplTest, SuccessServiceCheck) {
