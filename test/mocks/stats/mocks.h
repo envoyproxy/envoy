@@ -287,7 +287,6 @@ public:
   MOCK_METHOD1(nullGauge, NullGaugeImpl&(const std::string&));
   MOCK_CONST_METHOD0(gauges, std::vector<GaugeSharedPtr>());
   MOCK_METHOD2(histogram, Histogram&(const std::string&, Histogram::Unit));
-  MOCK_METHOD2(nullHistogram, NullHistogramImpl&(const std::string&, Histogram::Unit));
   MOCK_CONST_METHOD0(histograms, std::vector<ParentHistogramSharedPtr>());
 
   MOCK_CONST_METHOD1(findCounter, OptionalCounter(StatName));

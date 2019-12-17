@@ -35,8 +35,7 @@ IsolatedStoreImpl::IsolatedStoreImpl(SymbolTable& symbol_table)
             name, unit, *this, alloc_.symbolTable().toString(name), std::vector<Tag>()));
       }),
       null_counter_(new NullCounterImpl(symbol_table)),
-      null_gauge_(new NullGaugeImpl(symbol_table)),
-      null_histogram_(new NullHistogramImpl(symbol_table)) {}
+      null_gauge_(new NullGaugeImpl(symbol_table)) {}
 
 ScopePtr IsolatedStoreImpl::createScope(const std::string& name) {
   return std::make_unique<ScopePrefixer>(name, *this);

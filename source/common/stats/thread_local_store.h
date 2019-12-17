@@ -176,9 +176,6 @@ public:
     return default_scope_->histogram(name, unit);
   }
   NullGaugeImpl& nullGauge(const std::string&) override { return null_gauge_; }
-  NullHistogramImpl& nullHistogram(const std::string&, Histogram::Unit) override {
-    return null_histogram_;
-  };
   const SymbolTable& constSymbolTable() const override { return alloc_.constSymbolTable(); }
   SymbolTable& symbolTable() override { return alloc_.symbolTable(); }
   const TagProducer& tagProducer() const { return *tag_producer_; }
@@ -286,9 +283,6 @@ private:
     }
 
     NullGaugeImpl& nullGauge(const std::string&) override { return parent_.null_gauge_; }
-    NullHistogramImpl& nullHistogram(const std::string&, Histogram::Unit) override {
-      return parent_.null_histogram_;
-    };
 
     // NOTE: The find methods assume that `name` is fully-qualified.
     // Implementations will not add the scope prefix.

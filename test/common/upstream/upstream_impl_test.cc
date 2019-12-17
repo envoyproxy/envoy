@@ -2102,9 +2102,8 @@ TEST_F(ClusterInfoImplTest, TestTrackTimeoutBudgets) {
   )EOF";
 
   auto cluster = makeCluster(yaml_disabled);
-  // Null unit points to a rejected/null histogram.
-  EXPECT_EQ(Stats::Histogram::Unit::Null,
-            cluster->info()->timeoutBudgetStats().upstream_rq_timeout_budget_percent_used_.unit());
+  // The stats will be null if they have not been explicitly turned on.
+  EXPECT_FALSE(cluster->info()->timeoutBudgetStats().has_value());
 
   // Check that with the flag, the histogram is created.
   const std::string yaml = R"EOF(
@@ -2116,9 +2115,10 @@ TEST_F(ClusterInfoImplTest, TestTrackTimeoutBudgets) {
   )EOF";
 
   cluster = makeCluster(yaml);
-  // The correct unit means that the histogram was created.
+  // The stats should be created.
+  EXPECT_TRUE(cluster->info()->timeoutBudgetStats().has_value());
   EXPECT_EQ(Stats::Histogram::Unit::Unspecified,
-            cluster->info()->timeoutBudgetStats().upstream_rq_timeout_budget_percent_used_.unit());
+            cluster->info()->timeoutBudgetStats()->upstream_rq_timeout_budget_percent_used_.unit());
 }
 
 class TestFilterConfigFactoryBase {

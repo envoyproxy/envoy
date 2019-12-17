@@ -66,5 +66,4 @@ static inline std::string statPrefixJoin(absl::string_view prefix, absl::string_
 #define NULL_STAT_DECL_IGNORE_MODE_(X, MODE) std::string(#X)),
 
 #define NULL_POOL_GAUGE(POOL) (POOL).nullGauge(NULL_STAT_DECL_IGNORE_MODE_
-#define NULL_POOL_HISTOGRAM(POOL) (POOL).nullHistogram(Envoy::statPrefixJoin("", FINISH_STAT_DECL_UNIT_
 } // namespace Envoy

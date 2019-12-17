@@ -43,9 +43,6 @@ public:
   SymbolTable& symbolTable() override { return scope_.symbolTable(); }
 
   NullGaugeImpl& nullGauge(const std::string& str) override { return scope_.nullGauge(str); }
-  NullHistogramImpl& nullHistogram(const std::string& str, Histogram::Unit unit) override {
-    return scope_.nullHistogram(str, unit);
-  }
 
 private:
   Scope& scope_;

@@ -827,9 +827,9 @@ public:
   virtual ClusterLoadReportStats& loadReportStats() const PURE;
 
   /**
-   * @return ClusterTimeoutBudgetStats& stats on timeout budgets for this cluster.
+   * @return absl::optional<ClusterTimeoutBudgetStats>& stats on timeout budgets for this cluster.
    */
-  virtual ClusterTimeoutBudgetStats& timeoutBudgetStats() const PURE;
+  virtual absl::optional<ClusterTimeoutBudgetStats>& timeoutBudgetStats() const PURE;
 
   /**
    * Returns an optional source address for upstream connections to bind to.

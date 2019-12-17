@@ -9,7 +9,6 @@
 
 #include "common/common/utility.h"
 #include "common/stats/allocator_impl.h"
-#include "common/stats/histogram_impl.h"
 #include "common/stats/null_counter.h"
 #include "common/stats/null_gauge.h"
 #include "common/stats/store_impl.h"
@@ -110,9 +109,6 @@ public:
   }
   NullCounterImpl& nullCounter() { return *null_counter_; }
   NullGaugeImpl& nullGauge(const std::string&) override { return *null_gauge_; }
-  NullHistogramImpl& nullHistogram(const std::string&, Histogram::Unit) override {
-    return *null_histogram_;
-  }
   Histogram& histogramFromStatName(StatName name, Histogram::Unit unit) override {
     Histogram& histogram = histograms_.get(name, unit);
     return histogram;
@@ -158,7 +154,6 @@ private:
   IsolatedStatsCache<Histogram> histograms_;
   RefcountPtr<NullCounterImpl> null_counter_;
   RefcountPtr<NullGaugeImpl> null_gauge_;
-  RefcountPtr<NullHistogramImpl> null_histogram_;
 };
 
 } // namespace Stats

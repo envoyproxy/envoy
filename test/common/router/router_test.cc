@@ -1190,6 +1190,89 @@ TEST_F(RouterTest, TimeoutBudgetHistogramStatOnlyGlobal) {
   response_decoder->decodeData(data, true);
 }
 
+// Verify the timeout budget histograms are filled out correctly when the global timeout occurs
+// during a retry.
+TEST_F(RouterTest, TimeoutBudgetHistogramStatDuringRetry) {
+  NiceMock<Http::MockStreamEncoder> encoder1;
+  Http::StreamDecoder* response_decoder1 = nullptr;
+  EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
+      .WillOnce(Invoke([&](Http::StreamDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks)
+                           -> Http::ConnectionPool::Cancellable* {
+        response_decoder1 = &decoder;
+        callbacks.onPoolReady(encoder1, cm_.conn_pool_.host_, upstream_stream_info_);
+        return nullptr;
+      }));
+  expectPerTryTimerCreate();
+  expectResponseTimerCreate();
+
+  Http::TestHeaderMapImpl headers{{"x-envoy-retry-on", "5xx"},
+                                  {"x-envoy-upstream-rq-timeout-ms", "400"},
+                                  {"x-envoy-upstream-rq-per-try-timeout-ms", "320"}};
+  HttpTestUtility::addDefaultHeaders(headers);
+  router_.decodeHeaders(headers, false);
+  Buffer::OwnedImpl data;
+  router_.decodeData(data, true);
+
+  // Per-try budget used on the first request.
+  EXPECT_CALL(cm_.thread_local_cluster_.cluster_.info_->timeout_budget_stats_store_,
+              deliverHistogramToSinks(
+                  Property(&Stats::Metric::name, "upstream_rq_timeout_budget_per_try_percent_used"),
+                  50ull));
+
+  // 5xx response.
+  router_.retry_state_->expectHeadersRetry();
+  Http::HeaderMapPtr response_headers1(new Http::TestHeaderMapImpl{{":status", "503"}});
+  EXPECT_CALL(cm_.conn_pool_.host_->outlier_detector_, putHttpResponseCode(503));
+  test_time_.sleep(std::chrono::milliseconds(160));
+  response_decoder1->decodeHeaders(std::move(response_headers1), true);
+  EXPECT_TRUE(verifyHostUpstreamStats(0, 1));
+
+  // We expect the 5xx response to kick off a new request.
+  EXPECT_CALL(encoder1.stream_, resetStream(_)).Times(0);
+  NiceMock<Http::MockStreamEncoder> encoder2;
+  Http::StreamDecoder* response_decoder2 = nullptr;
+  EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
+      .WillOnce(Invoke([&](Http::StreamDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks)
+                           -> Http::ConnectionPool::Cancellable* {
+        response_decoder2 = &decoder;
+        callbacks.onPoolReady(encoder2, cm_.conn_pool_.host_, upstream_stream_info_);
+        return nullptr;
+      }));
+  expectPerTryTimerCreate();
+  router_.retry_state_->callback_();
+
+  // Global timeout used overall.
+  EXPECT_CALL(
+      cm_.thread_local_cluster_.cluster_.info_->timeout_budget_stats_store_,
+      deliverHistogramToSinks(
+          Property(&Stats::Metric::name, "upstream_rq_timeout_budget_percent_used"), 100ull));
+  // Per-try budget used on the second request before the global timeout hit.
+  EXPECT_CALL(cm_.thread_local_cluster_.cluster_.info_->timeout_budget_stats_store_,
+              deliverHistogramToSinks(
+                  Property(&Stats::Metric::name, "upstream_rq_timeout_budget_per_try_percent_used"),
+                  75ull));
+
+  // Trigger global timeout.
+  EXPECT_CALL(callbacks_.stream_info_,
+              setResponseFlag(StreamInfo::ResponseFlag::UpstreamRequestTimeout));
+  EXPECT_CALL(encoder2.stream_, resetStream(Http::StreamResetReason::LocalReset));
+  Http::TestHeaderMapImpl response_headers{
+      {":status", "504"}, {"content-length", "24"}, {"content-type", "text/plain"}};
+  test_time_.sleep(std::chrono::milliseconds(240));
+  EXPECT_CALL(callbacks_, encodeHeaders_(HeaderMapEqualRef(&response_headers), false));
+  EXPECT_CALL(callbacks_, encodeData(_, true));
+  EXPECT_CALL(*router_.retry_state_, shouldRetryReset(_, _)).Times(0);
+  EXPECT_CALL(cm_.conn_pool_.host_->outlier_detector_,
+              putResult(Upstream::Outlier::Result::LocalOriginTimeout, _));
+  response_timeout_->invokeCallback();
+
+  EXPECT_EQ(1U,
+            cm_.thread_local_cluster_.cluster_.info_->stats_store_.counter("upstream_rq_timeout")
+                .value());
+  EXPECT_EQ(1UL, cm_.conn_pool_.host_->stats().rq_timeout_.value());
+  EXPECT_TRUE(verifyHostUpstreamStats(0, 2));
+}
+
 // Validate gRPC OK response stats are sane when response is trailers only.
 TEST_F(RouterTest, GrpcOkTrailersOnly) {
   NiceMock<Http::MockStreamEncoder> encoder1;

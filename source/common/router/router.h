@@ -486,6 +486,8 @@ private:
     // Tracks whether we deferred a per try timeout because the downstream request
     // had not been completed yet.
     bool create_per_try_timeout_on_request_complete_ : 1;
+
+    MonotonicTime start_time_;
   };
 
   using UpstreamRequestPtr = std::unique_ptr<UpstreamRequest>;
@@ -509,7 +511,6 @@ private:
   void maybeDoShadowing();
   bool maybeRetryReset(Http::StreamResetReason reset_reason, UpstreamRequest& upstream_request);
   uint32_t numRequestsAwaitingHeaders();
-  void onGlobalTimeout();
   void onPerTryTimeout(UpstreamRequest& upstream_request);
   void onRequestComplete();
   void onResponseTimeout();
