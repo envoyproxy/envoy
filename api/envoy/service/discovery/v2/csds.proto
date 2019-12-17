@@ -54,22 +54,22 @@ enum ConfigStatus {
 
 // Detailed config (per xDS) with status.
 message PerXdsConfig {
-  ConfigStatus status = 0;
+  ConfigStatus status = 1;
   oneof per_xds_config {
-    admin.v2alpha.ListenersConfigDump listener_config;
-    admin.v2alpha.ClustersConfigDump cluster_config;
-    admin.v2alpha.RoutesConfigDump route_config;
-    admin.v2alpha.ScopedRoutesConfigDump scoped_route_config;
+    admin.v2alpha.ListenersConfigDump listener_config = 2;
+    admin.v2alpha.ClustersConfigDump cluster_config = 3;
+    admin.v2alpha.RoutesConfigDump route_config = 4;
+    admin.v2alpha.ScopedRoutesConfigDump scoped_route_config = 5;
   }
 }
 
 // All xds configs for a particular client.
 message ClientConfig {
   api.v2.core.Node node = 1;
-  repeated PerXdsConfig xds_config;
+  repeated PerXdsConfig xds_config = 2;
 }
 
 message ClientStatusResponse {
   // Client configs for the clients in the ClientStatusRequest.
-  repeated ClientConfig config;
+  repeated ClientConfig config = 1;
 }
