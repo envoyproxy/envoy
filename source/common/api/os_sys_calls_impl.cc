@@ -5,12 +5,18 @@
 #include <unistd.h>
 
 #include <cerrno>
+#include <string>
 
 namespace Envoy {
 namespace Api {
 
 SysCallIntResult OsSysCallsImpl::bind(int sockfd, const sockaddr* addr, socklen_t addrlen) {
   const int rc = ::bind(sockfd, addr, addrlen);
+  return {rc, errno};
+}
+
+SysCallIntResult OsSysCallsImpl::chmod(const std::string& path, mode_t mode) {
+  const int rc = ::chmod(path.c_str(), mode);
   return {rc, errno};
 }
 
