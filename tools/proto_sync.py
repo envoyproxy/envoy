@@ -10,6 +10,7 @@ import shutil
 import string
 import subprocess
 import sys
+import tempfile
 
 from api_proto_plugin import utils
 
@@ -86,7 +87,7 @@ def GetDestinationPath(src):
       matches[0])).joinpath(src_path.name.split('.')[0] + ".proto")
 
 
-def SyncProtoFile(cmd, src):
+def SyncProtoFile(cmd, src, dst_root):
   """Diff or in-place update a single proto file from protoxform.py Bazel cache artifacts."
 
   Args:
@@ -96,15 +97,9 @@ def SyncProtoFile(cmd, src):
   # Skip empty files, this indicates this file isn't modified in this version.
   if os.stat(src).st_size == 0:
     return
-  dst = str(pathlib.Path('api').joinpath(GetDestinationPath(src)))
-  if cmd == 'fix':
-    dst.parent.mkdir(0o755, True, True)
-    shutil.copyfile(src, dst)
-  else:
-    try:
-      subprocess.check_call(['diff', src, dst])
-    except subprocess.CalledProcessError:
-      raise RequiresReformatError('%s and %s do not match' % (src, dst))
+  dst = dst_root.joinpath(GetDestinationPath(src))
+  dst.parent.mkdir(0o755, True, True)
+  shutil.copyfile(src, str(dst))
 
 
 def GetImportDeps(proto_path):
@@ -135,7 +130,7 @@ def GetImportDeps(proto_path):
           continue
         if import_path.startswith('envoy/'):
           # Ignore package internal imports.
-          if os.path.dirname(os.path.join('api', import_path)) == os.path.dirname(proto_path):
+          if os.path.dirname(proto_path).endswith(os.path.dirname(import_path)):
             continue
           imports.append('//%s:pkg' % os.path.dirname(import_path))
           continue
@@ -210,37 +205,68 @@ def BuildFileContents(root, files):
   return BUILD_FILE_TEMPLATE.substitute(fields=formatted_fields)
 
 
-def SyncBuildFiles(cmd):
+def SyncBuildFiles(cmd, dst_root):
   """Diff or in-place update api/ BUILD files.
 
   Args:
     cmd: 'check' or 'fix'.
   """
-  for root, dirs, files in os.walk('api/'):
+  for root, dirs, files in os.walk(str(dst_root)):
     is_proto_dir = any(f.endswith('.proto') for f in files)
     if not is_proto_dir:
       continue
     build_contents = BuildFileContents(root, files)
     build_path = os.path.join(root, 'BUILD')
-    if cmd == 'fix':
-      with open(build_path, 'w') as f:
-        f.write(build_contents)
-    else:
-      with open(build_path, 'r') as f:
-        if build_contents != f.read():
-          raise RequiresReformatError('%s is not canonically formatted' % build_path)
+    with open(build_path, 'w') as f:
+      f.write(build_contents)
+
+
+def GenerateCurrentApiDir(api_dir, dst_dir):
+  """Helper function to generate original API repository to be compared with diff.
+  This copies the original API repository and deletes file we don't want to compare.
+
+  Args:
+    api_dir: the original api directory
+    dst_dir: the api directory to be compared in temporary directory
+  """
+  dst = dst_dir.joinpath("envoy")
+  shutil.copytree(str(api_dir.joinpath("envoy")), str(dst))
+
+  for p in dst.glob('**/*.md'):
+    p.unlink()
+  # envoy.service.auth.v2alpha exist for compatibility while we don't run in protoxform
+  # so we ignore it here.
+  shutil.rmtree(str(dst.joinpath("service", "auth", "v2alpha")))
 
 
 if __name__ == '__main__':
   parser = argparse.ArgumentParser()
   parser.add_argument('--mode', choices=['check', 'fix'])
+  parser.add_argument('--api_repo', default='envoy_api')
+  parser.add_argument('--api_root', default='api')
   parser.add_argument('labels', nargs='*')
   args = parser.parse_args()
-  try:
+
+  with tempfile.TemporaryDirectory() as tmp:
+    dst_dir = pathlib.Path(tmp).joinpath("b")
     for label in args.labels:
-      SyncProtoFile(args.mode, utils.BazelBinPathForOutputArtifact(label, '.v2.proto'))
-      SyncProtoFile(args.mode, utils.BazelBinPathForOutputArtifact(label, '.v3alpha.proto'))
-    SyncBuildFiles(args.mode)
-  except ProtoSyncError as e:
-    sys.stderr.write('%s\n' % e)
-    sys.exit(1)
+      SyncProtoFile(args.mode, utils.BazelBinPathForOutputArtifact(label, '.v2.proto'), dst_dir)
+      SyncProtoFile(args.mode, utils.BazelBinPathForOutputArtifact(label, '.v3alpha.proto'),
+                    dst_dir)
+    SyncBuildFiles(args.mode, dst_dir)
+
+    current_api_dir = pathlib.Path(tmp).joinpath("a")
+    current_api_dir.mkdir(0o755, True, True)
+    api_root = pathlib.Path(args.api_root)
+    GenerateCurrentApiDir(api_root, current_api_dir)
+
+    diff = subprocess.run(['diff', '-Npur', "a", "b"], cwd=tmp, stdout=subprocess.PIPE).stdout
+
+    if diff.strip():
+      if args.mode == "check":
+        print("Please apply following patch to directory '{}'".format(args.api_root),
+              file=sys.stderr)
+        print(diff.decode(), file=sys.stderr)
+        sys.exit(1)
+      if args.mode == "fix":
+        subprocess.run(['patch', '-p1'], input=diff, cwd=str(api_root.resolve()))
