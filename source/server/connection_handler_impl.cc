@@ -87,7 +87,7 @@ void ConnectionHandlerImpl::ActiveTcpListener::removeConnection(ActiveTcpConnect
   ActiveConnections& active_connections = connection.active_connections_;
   ActiveTcpConnectionPtr removed = connection.removeFromList(active_connections.connections_);
   parent_.dispatcher_.deferredDelete(std::move(removed));
-  // Only lookup if defer delete is needed
+  // Delete map entry only iff connections becomes empty.
   if (active_connections.connections_.empty()) {
     auto iter = connections_by_tag_.find(active_connections.tag_);
     ASSERT(iter != connections_by_tag_.end());

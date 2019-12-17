@@ -65,6 +65,7 @@ void fillState(envoy::admin::v2alpha::ListenersConfigDump_DynamicListenerState& 
   state.mutable_listener()->MergeFrom(listener.config());
   TimestampUtil::systemClockToTimestamp(listener.last_updated_, *(state.mutable_last_updated()));
 }
+
 } // namespace
 
 std::vector<Network::FilterFactoryCb> ProdListenerComponentFactory::createNetworkFilterFactoryList_(

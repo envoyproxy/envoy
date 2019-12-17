@@ -27,10 +27,8 @@ FilterChainFactoryContextImpl::FilterChainFactoryContextImpl(
     Configuration::FactoryContext& parent_context, uint64_t filter_chain_tag)
     : parent_context_(parent_context), filter_chain_tag_(filter_chain_tag) {}
 
-// FilterChainFactoryContext
 uint64_t FilterChainFactoryContextImpl::filterChainTag() const { return filter_chain_tag_; }
 
-// DrainDecision
 bool FilterChainFactoryContextImpl::drainClose() const {
   // TODO(lambdai): will provide individual value for each filter chain context.
   return parent_context_.drainDecision().drainClose();
@@ -43,17 +41,17 @@ Init::Manager& FilterChainFactoryContextImpl::initManager() {
   return parent_context_.initManager();
 }
 
-// Delegate to parent context
 ThreadLocal::SlotAllocator& FilterChainFactoryContextImpl::threadLocal() {
   return parent_context_.threadLocal();
 }
 
 const envoy::api::v2::core::Metadata& FilterChainFactoryContextImpl::listenerMetadata() const {
   return parent_context_.listenerMetadata();
-};
+}
+
 envoy::api::v2::core::TrafficDirection FilterChainFactoryContextImpl::direction() const {
   return parent_context_.direction();
-};
+}
 
 ProtobufMessage::ValidationVisitor& FilterChainFactoryContextImpl::messageValidationVisitor() {
   return parent_context_.messageValidationVisitor();
@@ -62,6 +60,7 @@ ProtobufMessage::ValidationVisitor& FilterChainFactoryContextImpl::messageValida
 AccessLog::AccessLogManager& FilterChainFactoryContextImpl::accessLogManager() {
   return parent_context_.accessLogManager();
 }
+
 Upstream::ClusterManager& FilterChainFactoryContextImpl::clusterManager() {
   return parent_context_.clusterManager();
 }
@@ -87,16 +86,21 @@ Http::Context& FilterChainFactoryContextImpl::httpContext() {
 const LocalInfo::LocalInfo& FilterChainFactoryContextImpl::localInfo() const {
   return parent_context_.localInfo();
 }
+
 Envoy::Runtime::RandomGenerator& FilterChainFactoryContextImpl::random() {
   return parent_context_.random();
 }
+
 Envoy::Runtime::Loader& FilterChainFactoryContextImpl::runtime() {
   return parent_context_.runtime();
 }
+
 Stats::Scope& FilterChainFactoryContextImpl::scope() { return parent_context_.scope(); }
+
 Singleton::Manager& FilterChainFactoryContextImpl::singletonManager() {
   return parent_context_.singletonManager();
 }
+
 OverloadManager& FilterChainFactoryContextImpl::overloadManager() {
   return parent_context_.overloadManager();
 }
@@ -106,12 +110,15 @@ Admin& FilterChainFactoryContextImpl::admin() { return parent_context_.admin(); 
 TimeSource& FilterChainFactoryContextImpl::timeSource() { return api().timeSource(); }
 
 Api::Api& FilterChainFactoryContextImpl::api() { return parent_context_.api(); }
+
 ServerLifecycleNotifier& FilterChainFactoryContextImpl::lifecycleNotifier() {
   return parent_context_.lifecycleNotifier();
 }
+
 OptProcessContextRef FilterChainFactoryContextImpl::processContext() {
   return parent_context_.processContext();
 }
+
 Configuration::ServerFactoryContext&
 FilterChainFactoryContextImpl::getServerFactoryContext() const {
   return parent_context_.getServerFactoryContext();

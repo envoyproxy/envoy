@@ -153,6 +153,9 @@ private:
     bool is_deleting_{false};
   };
 
+  /**
+   * Wrapper for a group of active connections which are attached to the same filter chain context.
+   */
   class ActiveConnections : public Event::DeferredDeletable {
   public:
     ActiveConnections(ActiveTcpListener& listener, uint64_t tag);
@@ -162,6 +165,7 @@ private:
     uint64_t tag_;
     std::list<ActiveTcpConnectionPtr> connections_;
   };
+
   /**
    * Wrapper for an active TCP connection owned by this handler.
    */

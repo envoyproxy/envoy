@@ -49,7 +49,6 @@ public:
   Upstream::ClusterManager& clusterManager() override;
   Event::Dispatcher& dispatcher() override;
   Network::DrainDecision& drainDecision() override;
-
   Grpc::Context& grpcContext() override;
   bool healthCheckFailed() override;
   Tracing::HttpTracer& httpTracer() override;
@@ -71,7 +70,6 @@ public:
   ServerLifecycleNotifier& lifecycleNotifier() override;
   OptProcessContextRef processContext() override;
   Configuration::ServerFactoryContext& getServerFactoryContext() const override;
-
   Stats::Scope& listenerScope() override;
 
 private:
@@ -81,18 +79,6 @@ private:
 
 class FilterChainManagerImpl;
 
-class ThreadLocalFilterChainManagerHelper : public ThreadLocal::ThreadLocalObject {
-public:
-  // The FCM which can be snapped by worker.
-  std::shared_ptr<FilterChainManagerImpl> filter_chain_manager_;
-  // The per worker listener which owns the thread local filter chain manager
-  Network::ListenerCallbacks* listener_;
-
-  // Below could be mutated by main thread. Worker thread should access with caution.
-  std::unique_ptr<Init::ManagerImpl> fcm_init_manager_;
-  std::unique_ptr<Init::WatcherImpl> fcm_init_watcher_;
-  std::unique_ptr<std::unordered_set<uint64_t>> filter_chains_trait_;
-};
 /**
  * Implementation of FilterChainManager.
  */
