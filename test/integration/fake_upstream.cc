@@ -222,9 +222,12 @@ FakeHttpConnection::FakeHttpConnection(SharedConnectionWrapper& shared_connectio
                                        uint32_t max_request_headers_count)
     : FakeConnectionBase(shared_connection, time_system) {
   if (type == Type::HTTP1) {
+    Http::Http1Settings http1_settings;
+    // For the purpose of testing, we always have the upstream encode the trailers if any
+    http1_settings.enable_trailers_ = true;
     codec_ = std::make_unique<Http::Http1::ServerConnectionImpl>(
-        shared_connection_.connection(), store, *this, Http::Http1Settings(),
-        max_request_headers_kb, max_request_headers_count);
+        shared_connection_.connection(), store, *this, http1_settings, max_request_headers_kb,
+        max_request_headers_count);
   } else {
     auto settings = Http::Http2Settings();
     settings.allow_connect_ = true;
