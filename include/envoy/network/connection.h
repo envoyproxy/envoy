@@ -345,7 +345,11 @@ public:
     }
     return *dynamic_socket_options_ptr_.get();
   }
+
 private:
+  /**
+   * Instance to perform run-time configurable operations on the socket
+   */
   DynamicSocketOptionsPtr dynamic_socket_options_ptr_;
 };
 
