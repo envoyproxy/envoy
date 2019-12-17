@@ -1,5 +1,7 @@
 #include "extensions/filters/http/health_check/config.h"
 
+#include "envoy/config/filter/http/health_check/v2/health_check.pb.h"
+#include "envoy/config/filter/http/health_check/v2/health_check.pb.validate.h"
 #include "envoy/registry/registry.h"
 
 #include "common/http/header_utility.h"

@@ -1,5 +1,8 @@
 #include "test/integration/proxy_proto_integration_test.h"
 
+#include "envoy/api/v2/cds.pb.h"
+#include "envoy/config/bootstrap/v2/bootstrap.pb.h"
+
 #include "common/buffer/buffer_impl.h"
 
 #include "test/test_common/network_utility.h"

@@ -231,11 +231,13 @@ def envoy_cc_test_library(
 # Envoy test binaries should be specified with this function.
 def envoy_cc_test_binary(
         name,
+        tags = [],
         **kargs):
     envoy_cc_binary(
         name,
         testonly = 1,
         linkopts = _envoy_test_linkopts(),
+        tags = tags + ["compilation_db_implied"],
         **kargs
     )
 

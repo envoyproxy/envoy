@@ -3,6 +3,7 @@
 #include <string>
 
 #include "envoy/api/api.h"
+#include "envoy/api/v2/core/base.pb.h"
 #include "envoy/config/filter/network/redis_proxy/v2/redis_proxy.pb.h"
 #include "envoy/config/filter/network/redis_proxy/v2/redis_proxy.pb.validate.h"
 #include "envoy/upstream/upstream.h"

@@ -6,6 +6,8 @@
 #include <string>
 #include <vector>
 
+#include "envoy/api/v2/core/http_uri.pb.h"
+#include "envoy/api/v2/core/protocol.pb.h"
 #include "envoy/http/header_map.h"
 
 #include "common/buffer/buffer_impl.h"
@@ -276,6 +278,7 @@ Utility::parseHttp1Settings(const envoy::api::v2::core::Http1ProtocolOptions& co
   ret.allow_absolute_url_ = PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, allow_absolute_url, true);
   ret.accept_http_10_ = config.accept_http_10();
   ret.default_host_for_http_10_ = config.default_host_for_http_10();
+  ret.enable_trailers_ = config.enable_trailers();
 
   if (config.header_key_format().has_proper_case_words()) {
     ret.header_key_format_ = Http1Settings::HeaderKeyFormat::ProperCase;

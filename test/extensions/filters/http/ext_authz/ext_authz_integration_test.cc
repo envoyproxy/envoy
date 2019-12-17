@@ -1,3 +1,5 @@
+#include "envoy/api/v2/listener/listener.pb.h"
+#include "envoy/config/bootstrap/v2/bootstrap.pb.h"
 #include "envoy/config/filter/http/ext_authz/v2/ext_authz.pb.h"
 #include "envoy/service/auth/v2/external_auth.pb.h"
 

@@ -1,5 +1,6 @@
 #include "extensions/filters/http/ip_tagging/config.h"
 
+#include "envoy/config/filter/http/ip_tagging/v3alpha/ip_tagging.pb.h"
 #include "envoy/config/filter/http/ip_tagging/v3alpha/ip_tagging.pb.validate.h"
 #include "envoy/registry/registry.h"
 

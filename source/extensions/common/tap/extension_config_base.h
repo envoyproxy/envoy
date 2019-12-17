@@ -1,6 +1,7 @@
 #pragma once
 
 #include "envoy/config/common/tap/v2alpha/common.pb.h"
+#include "envoy/service/tap/v2alpha/common.pb.h"
 #include "envoy/thread_local/thread_local.h"
 
 #include "extensions/common/tap/admin.h"

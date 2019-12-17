@@ -3,6 +3,8 @@
 #include <chrono>
 #include <string>
 
+#include "envoy/api/v2/core/grpc_service.pb.h"
+#include "envoy/config/filter/network/ext_authz/v2/ext_authz.pb.h"
 #include "envoy/config/filter/network/ext_authz/v2/ext_authz.pb.validate.h"
 #include "envoy/network/connection.h"
 #include "envoy/registry/registry.h"

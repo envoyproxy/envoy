@@ -2,6 +2,11 @@
 
 #include "envoy/admin/v2alpha/config_dump.pb.h"
 #include "envoy/admin/v2alpha/config_dump.pb.validate.h"
+#include "envoy/api/v2/core/config_source.pb.h"
+#include "envoy/api/v2/discovery.pb.h"
+#include "envoy/api/v2/rds.pb.h"
+#include "envoy/api/v2/srds.pb.h"
+#include "envoy/config/filter/network/http_connection_manager/v2/http_connection_manager.pb.h"
 #include "envoy/config/subscription.h"
 #include "envoy/init/manager.h"
 #include "envoy/stats/scope.h"
@@ -279,7 +284,7 @@ key:
   parseScopedRouteConfigurationFromYaml(*resources.Add(), config_yaml2);
   EXPECT_NO_THROW(srds_subscription_->onConfigUpdate(resources, "1"));
   context_init_manager_.initialize(init_watcher_);
-  init_watcher_.expectReady().Times(2); // SRDS and RDS "foo_routes"
+  init_watcher_.expectReady().Times(3); // SRDS x2 and RDS "foo_routes"
   EXPECT_EQ(
       1UL,
       factory_context_.scope_.counter("foo.scoped_rds.foo_scoped_routes.config_reload").value());
@@ -333,7 +338,7 @@ key:
 // Tests that multiple uniquely named non-conflict resources are allowed in config updates.
 TEST_F(ScopedRdsTest, MultipleResourcesDelta) {
   setup();
-  init_watcher_.expectReady().Times(2); // SRDS and RDS "foo_routes"
+  init_watcher_.expectReady().Times(3); // SRDS x2 and RDS "foo_routes"
 
   const std::string config_yaml = R"EOF(
 name: foo_scope

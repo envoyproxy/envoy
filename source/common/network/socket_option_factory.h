@@ -1,6 +1,6 @@
 #pragma once
 
-#include "envoy/api/v2/core/address.pb.h"
+#include "envoy/api/v2/core/base.pb.h"
 #include "envoy/common/platform.h"
 #include "envoy/network/listen_socket.h"
 
