@@ -96,10 +96,10 @@ def SyncProtoFile(cmd, src):
   # Skip empty files, this indicates this file isn't modified in this version.
   if os.stat(src).st_size == 0:
     return
-  dst = pathlib.Path('api').joinpath(GetDestinationPath(src))
+  dst = str(pathlib.Path('api').joinpath(GetDestinationPath(src)))
   if cmd == 'fix':
     dst.parent.mkdir(0o755, True, True)
-    shutil.copyfile(src, str(dst))
+    shutil.copyfile(src, dst)
   else:
     try:
       subprocess.check_call(['diff', src, dst])
