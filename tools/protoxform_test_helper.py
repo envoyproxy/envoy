@@ -113,3 +113,5 @@ if __name__ == "__main__":
     logging.warning("PASS")
   else:
     logging.error("FAILED:\n{}".format(messages))
+
+  sys.exit()
