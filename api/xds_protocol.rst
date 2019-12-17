@@ -238,34 +238,61 @@ resources are available with a :ref:`DiscoveryResponse <envoy_api_msg_DiscoveryR
 
 After processing the :ref:`DiscoveryResponse <envoy_api_msg_DiscoveryResponse>`, Envoy will send a new
 request on the stream, specifying the last version successfully applied
-and the nonce provided by the management server. If the update was
-successfully applied, the :ref:`version_info <envoy_api_field_DiscoveryResponse.version_info>` will be **X**, as indicated
+and the nonce provided by the management server. The version provides Envoy and the
+management server a shared notion of the currently applied configuration,
+as well as a mechanism to ACK/NACK configuration updates.
+
+ACK
+^^^
+
+If the update was successfully applied, the
+:ref:`version_info <envoy_api_field_DiscoveryResponse.version_info>` will be **X**, as indicated
 in the sequence diagram:
 
 .. figure:: diagrams/simple-ack.svg
    :alt: Version update after ACK
 
-In this sequence diagram, and below, the following format is used to abbreviate messages:
+NACK
+^^^^
 
-- *DiscoveryRequest*: (V=version_info,R=resource_names,N=response_nonce,T=type_url)
-- *DiscoveryResponse*: (V=version_info,R=resources,N=nonce,T=type_url)
-
-The version provides Envoy and the management server a shared notion of
-the currently applied configuration, as well as a mechanism to ACK/NACK
-configuration updates. If Envoy had instead rejected configuration
+If Envoy had instead rejected configuration
 update **X**, it would reply with :ref:`error_detail <envoy_api_field_DiscoveryRequest.error_detail>`
 populated and its previous version, which in this case was the empty
-initial version. The :ref:`error_detail <envoy_api_field_DiscoveryRequest.error_detail>` has more details around the exact
-error message populated in the message field:
+initial version. The :ref:`error_detail <envoy_api_field_DiscoveryRequest.error_detail>` has
+more details around the exact error message populated in the message field:
 
 .. figure:: diagrams/simple-nack.svg
    :alt: No version update after NACK
 
-Later, an API update may succeed at a new version **Y**:
+In the sequence diagrams, the following format is used to abbreviate messages:
+
+- *DiscoveryRequest*: (V=version_info,R=resource_names,N=response_nonce,T=type_url)
+- *DiscoveryResponse*: (V=version_info,R=resources,N=nonce,T=type_url)
+
+After a NACK, an API update may succeed at a new version **Y**:
 
 
 .. figure:: diagrams/later-ack.svg
    :alt: ACK after NACK
+
+ACK and NACK semantics summary
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+- The xDS client should ACK or NACK every :ref:`DiscoveryResponse <envoy_api_msg_DiscoveryResponse>`
+  received from the management server.
+- Like all other requests, the nonce from the :ref:`DiscoveryResponse <envoy_api_msg_DiscoveryResponse>`
+  is sent as :ref:`response_nonce <envoy_api_field_DiscoveryRequest.response_nonce>`.
+  As described in :ref:`resource update <xds_protocol_resource_update>` the nonce is
+  used in certain race conditions to disambiguate between ACK and NACK.
+- ACK signifies successful configuration update and contains the
+  :ref:`version_info <envoy_api_field_DiscoveryResponse.version_info>` from the
+  :ref:`DiscoveryResponse <envoy_api_msg_DiscoveryResponse>`.
+- NACK signifies unsuccessful configuration update and contains the previous (existing)
+  :ref:`version_info <envoy_api_field_DiscoveryResponse.version_info>`.
+- Only the NACK should populate the :ref:`error_detail <envoy_api_field_DiscoveryRequest.error_detail>`.
+
+Versioning and Node Identifier
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 Each stream has its own notion of versioning, there is no shared
 versioning across resource types. When ADS is not used, even each
@@ -385,23 +412,35 @@ from the client's perspective.
 Knowing When a Requested Resource Does Not Exist
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-In the SotW protocol variants, responses for :ref:`Listener <envoy_api_msg_Listener>` and
-:ref:`Cluster <envoy_api_msg_Cluster>` resource types must include all resources requested by the
-client. Therefore, if a client requests a resource that does not exist, it can immediately
-tell this from the response.
+The SotW protocol variants do not provide any explicit mechanism to determine when a requested
+resource does not exist.
 
-However, for other resource types, because each resource can be sent in its own response, there is
-no way to know from the next response whether the newly requested resource exists, because the next
+Responses for :ref:`Listener <envoy_api_msg_Listener>` and :ref:`Cluster <envoy_api_msg_Cluster>`
+resource types must include all resources requested by the client. However, it may not be possible
+for the client to know that a resource does not exist based solely on its absence in a response,
+because the delivery of the updates is eventually consistent: if the client initially sends a
+request for resource A, then sends a request for resources A and B, and then sees a response
+containing only resource A, the client cannot conclude that resource B does not exist, because
+the response may have been sent on the basis of the first request, before the server saw the
+second request.
+
+For other resource types, because each resource can be sent in its own response, there is no way
+to know from the next response whether the newly requested resource exists, because the next
 response could be an unrelated update for another resource that had already been subscribed to
-previously. As a result, clients are expected to use a timeout (recommended duration is 15
-seconds) after sending a request for a new resource, after which they will consider the requested
-resource to not exist if they have not received the resource. In Envoy, this is done for
+previously.
+
+As a result, clients are expected to use a timeout (recommended duration is 15 seconds) after
+sending a request for a new resource, after which they will consider the requested resource to
+not exist if they have not received the resource. In Envoy, this is done for
 :ref:`RouteConfiguration <envoy_api_msg_RouteConfiguration>` and :ref:`ClusterLoadAssignment
 <envoy_api_msg_ClusterLoadAssignment>` resources during :ref:`resource warming
 <xds_protocol_resource_warming>`.
 
-Note that clients may want to use the same timeout even for :ref:`Listener
-<envoy_api_msg_Listener>` and :ref:`Cluster <envoy_api_msg_Cluster>` resources, to protect
+Note that this timeout is not strictly necessary when using wildcard mode for :ref:`Listener
+<envoy_api_msg_Listener>` and :ref:`Cluster <envoy_api_msg_Cluster>` resource types, because
+in that case every response will contain all existing resources that are relevant to the
+client, so the client can know that a resource does not exist by its absence in the next
+response it sees. However, using a timeout is still recommended in this case, since it protects
 against the case where the management server fails to send a response in a timely manner.
 
 Note that even if a requested resource does not exist at the moment when the client requests it,
@@ -656,6 +695,8 @@ resource of a :ref:`DeltaDiscoveryResponse <envoy_api_msg_DeltaDiscoveryResponse
 returned in the name field in the resource of a
 :ref:`DeltaDiscoveryResponse <envoy_api_msg_DeltaDiscoveryResponse>`.
 
+.. _xds_protocol_delta_subscribe:
+
 Subscribing to Resources
 ^^^^^^^^^^^^^^^^^^^^^^^^
 
@@ -686,6 +727,17 @@ A :ref:`resource_names_unsubscribe <envoy_api_field_DeltaDiscoveryRequest.resour
 names, which the server thought the client was already not subscribed
 to. The server must cleanly process such a request; it can simply ignore
 these phantom unsubscriptions.
+
+Knowing When a Requested Resource Does Not Exist
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+When a resource subscribed to by a client does not exist, the server will send a :ref:`Resource
+<envoy_api_msg_Resource>` whose :ref:`name <envoy_api_field_Resource.name>` field matches the
+name that the client subscribed to and whose :ref:`resource <envoy_api_field_Resource.resource>`
+field is unset. This allows the client to quickly determine when a resource does not exist without
+waiting for a timeout, as would be done in the SotW protocol variants. However, clients are still
+encouraged to use a timeout to protect against the case where the management server fails to send
+a response in a timely manner.
 
 REST-JSON polling subscriptions
 -------------------------------

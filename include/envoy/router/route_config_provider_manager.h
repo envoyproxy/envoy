@@ -2,6 +2,7 @@
 
 #include <string>
 
+#include "envoy/api/v2/rds.pb.h"
 #include "envoy/config/filter/network/http_connection_manager/v2/http_connection_manager.pb.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/json/json_object.h"
@@ -36,7 +37,7 @@ public:
    * @param init_manager the Init::Manager used to coordinate initialization of a the underlying RDS
    * subscription.
    */
-  virtual RouteConfigProviderPtr createRdsRouteConfigProvider(
+  virtual RouteConfigProviderSharedPtr createRdsRouteConfigProvider(
       const envoy::config::filter::network::http_connection_manager::v2::Rds& rds,
       Server::Configuration::FactoryContext& factory_context, const std::string& stat_prefix,
       Init::Manager& init_manager) PURE;

@@ -3,6 +3,8 @@
 #include <string>
 #include <unordered_map>
 
+#include "envoy/api/v2/discovery.pb.h"
+#include "envoy/api/v2/rds.pb.h"
 #include "envoy/api/v2/route/route.pb.h"
 #include "envoy/router/rds.h"
 #include "envoy/router/route_config_update_receiver.h"

@@ -3,8 +3,8 @@
 #include <string>
 #include <vector>
 
+#include "envoy/api/v2/cds.pb.h"
 #include "envoy/api/v2/core/base.pb.h"
-#include "envoy/api/v2/endpoint/endpoint.pb.h"
 #include "envoy/config/typed_metadata.h"
 #include "envoy/server/transport_socket_config.h"
 #include "envoy/stats/scope.h"

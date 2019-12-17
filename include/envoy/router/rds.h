@@ -67,6 +67,7 @@ public:
 };
 
 using RouteConfigProviderPtr = std::unique_ptr<RouteConfigProvider>;
+using RouteConfigProviderSharedPtr = std::shared_ptr<RouteConfigProvider>;
 
 } // namespace Router
 } // namespace Envoy

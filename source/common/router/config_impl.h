@@ -10,11 +10,13 @@
 #include <unordered_map>
 #include <vector>
 
+#include "envoy/api/v2/core/base.pb.h"
 #include "envoy/api/v2/rds.pb.h"
 #include "envoy/api/v2/route/route.pb.h"
 #include "envoy/router/router.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/server/filter_config.h"
+#include "envoy/type/percent.pb.h"
 #include "envoy/upstream/cluster_manager.h"
 
 #include "common/config/metadata.h"

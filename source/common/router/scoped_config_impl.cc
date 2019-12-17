@@ -1,5 +1,8 @@
 #include "common/router/scoped_config_impl.h"
 
+#include "envoy/api/v2/srds.pb.h"
+#include "envoy/config/filter/network/http_connection_manager/v2/http_connection_manager.pb.h"
+
 namespace Envoy {
 namespace Router {
 

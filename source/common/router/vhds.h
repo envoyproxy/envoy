@@ -6,9 +6,8 @@
 #include <unordered_map>
 #include <unordered_set>
 
-#include "envoy/api/v2/rds.pb.h"
+#include "envoy/api/v2/discovery.pb.h"
 #include "envoy/api/v2/route/route.pb.h"
-#include "envoy/config/filter/network/http_connection_manager/v2/http_connection_manager.pb.h"
 #include "envoy/config/subscription.h"
 #include "envoy/http/codes.h"
 #include "envoy/local_info/local_info.h"

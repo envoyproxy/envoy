@@ -1,6 +1,8 @@
 #include <memory>
 
 #include "envoy/api/v2/auth/cert.pb.h"
+#include "envoy/api/v2/core/config_source.pb.h"
+#include "envoy/api/v2/discovery.pb.h"
 #include "envoy/common/exception.h"
 #include "envoy/service/discovery/v2/sds.pb.h"
 

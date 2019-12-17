@@ -172,21 +172,8 @@ Http::FilterDataStatus Filter::encodeData(Buffer::Instance& buffer, bool end_str
     trailers.setGrpcStatus(grpc_status_);
 
     if (withhold_grpc_frames_) {
-      // Compute the size of the payload and construct the length prefix.
-      //
-      // We do this even if the upstream failed: If the response returned non-200,
-      // we'll respond with a grpc-status with an error, so clients will know that the request
-      // was unsuccessful. Since we're guaranteed at this point to have a valid response
-      // (unless upstream lied in content-type) we attempt to return a well-formed gRPC
-      // response body.
-      const auto length = buffer.length() + buffer_.length();
-
-      std::array<uint8_t, Grpc::GRPC_FRAME_HEADER_SIZE> frame;
-      Grpc::Encoder().newFrame(Grpc::GRPC_FH_DEFAULT, length, frame);
-
       buffer.prepend(buffer_);
-      Buffer::OwnedImpl frame_buffer(frame.data(), frame.size());
-      buffer.prepend(frame_buffer);
+      buildGrpcFrameHeader(buffer);
     }
 
     return Http::FilterDataStatus::Continue;
@@ -201,6 +188,32 @@ Http::FilterDataStatus Filter::encodeData(Buffer::Instance& buffer, bool end_str
   } else {
     return Http::FilterDataStatus::Continue;
   }
+}
+
+Http::FilterTrailersStatus Filter::encodeTrailers(Http::HeaderMap& trailers) {
+  trailers.setGrpcStatus(grpc_status_);
+
+  if (withhold_grpc_frames_) {
+    buildGrpcFrameHeader(buffer_);
+    encoder_callbacks_->addEncodedData(buffer_, false);
+  }
+
+  return Http::FilterTrailersStatus::Continue;
+}
+
+void Filter::buildGrpcFrameHeader(Buffer::Instance& buffer) {
+  // Compute the size of the payload and construct the length prefix.
+  //
+  // We do this even if the upstream failed: If the response returned non-200,
+  // we'll respond with a grpc-status with an error, so clients will know that the request
+  // was unsuccessful. Since we're guaranteed at this point to have a valid response
+  // (unless upstream lied in content-type) we attempt to return a well-formed gRPC
+  // response body.
+  const auto length = buffer.length();
+  std::array<uint8_t, Grpc::GRPC_FRAME_HEADER_SIZE> frame;
+  Grpc::Encoder().newFrame(Grpc::GRPC_FH_DEFAULT, length, frame);
+  Buffer::OwnedImpl frame_buffer(frame.data(), frame.size());
+  buffer.prepend(frame_buffer);
 }
 
 } // namespace GrpcHttp1ReverseBridge

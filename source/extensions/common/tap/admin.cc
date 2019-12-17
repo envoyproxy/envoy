@@ -2,6 +2,8 @@
 
 #include "envoy/admin/v2alpha/tap.pb.h"
 #include "envoy/admin/v2alpha/tap.pb.validate.h"
+#include "envoy/data/tap/v2alpha/wrapper.pb.h"
+#include "envoy/service/tap/v2alpha/common.pb.h"
 
 #include "common/buffer/buffer_impl.h"
 #include "common/protobuf/message_validator_impl.h"

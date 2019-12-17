@@ -5,6 +5,10 @@
 #include <list>
 #include <string>
 
+#include "envoy/api/v2/core/base.pb.h"
+#include "envoy/api/v2/core/config_source.pb.h"
+#include "envoy/api/v2/lds.pb.h"
+#include "envoy/api/v2/listener/listener.pb.h"
 #include "envoy/common/mutex_tracer.h"
 #include "envoy/config/bootstrap/v2/bootstrap.pb.h"
 #include "envoy/protobuf/message_validator.h"
@@ -91,6 +95,7 @@ public:
   MOCK_CONST_METHOD0(mutexTracingEnabled, bool());
   MOCK_CONST_METHOD0(fakeSymbolTableEnabled, bool());
   MOCK_CONST_METHOD0(cpusetThreadsEnabled, bool());
+  MOCK_CONST_METHOD0(disabledExtensions, const std::vector<std::string>&());
   MOCK_CONST_METHOD0(toCommandLineOptions, Server::CommandLineOptionsPtr());
 
   std::string config_path_;
@@ -110,6 +115,7 @@ public:
   bool signal_handling_enabled_{true};
   bool mutex_tracing_enabled_{};
   bool cpuset_threads_enabled_{};
+  std::vector<std::string> disabled_extensions_;
 };
 
 class MockConfigTracker : public ConfigTracker {

@@ -1,3 +1,6 @@
+#include "envoy/api/v2/core/base.pb.h"
+#include "envoy/service/auth/v2/external_auth.pb.h"
+
 #include "common/network/address_impl.h"
 #include "common/protobuf/protobuf.h"
 

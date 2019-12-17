@@ -3,6 +3,7 @@
 #include <chrono>
 #include <string>
 
+#include "envoy/config/filter/thrift/rate_limit/v2alpha1/rate_limit.pb.h"
 #include "envoy/config/filter/thrift/rate_limit/v2alpha1/rate_limit.pb.validate.h"
 #include "envoy/registry/registry.h"
 
