@@ -111,7 +111,8 @@ message VirtualHost {
   // handled by this virtual host.
   repeated string response_headers_to_remove = 11;
 
-  // Indicates that the virtual host has a CORS policy.
+  // Indicates that the virtual host has a CORS policy. This field is ignored if a
+  // `typed_per_filter_config` for the CORS filter is found.
   //
   // .. attention::
   //
@@ -844,7 +845,8 @@ message RouteAction {
   // ignoring the rest of the hash policy list.
   repeated HashPolicy hash_policy = 15;
 
-  // Indicates that the route has a CORS policy.
+  // Indicates that the route has a CORS policy. This field is ignored if a
+  // `typed_per_filter_config` for the CORS filter is found.
   //
   // .. attention::
   //

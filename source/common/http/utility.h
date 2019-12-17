@@ -312,7 +312,7 @@ resolveMostSpecificPerFilterConfigGeneric(const std::string& filter_name,
                                           const Router::RouteConstSharedPtr& route);
 
 /**
- * Retrieves the route specific config. Route specific config can be in a few
+ * Retrieves the route specific config. Route specific configs can be in a few
  * places, that are checked in order. The first config found is returned. The
  * order is:
  * - the routeEntry() (for config that's applied on weighted clusters)
@@ -345,10 +345,39 @@ const ConfigType* resolveMostSpecificPerFilterConfig(const std::string& filter_n
   return dynamic_cast<const ConfigType*>(generic_config);
 }
 
+/**
+ * The non template implementation of resolveAllPerFilterConfigGeneric. see
+ * resolveAllPerFilterConfigGeneric for docs.
+ */
 std::vector<const Router::RouteSpecificFilterConfig*>
 resolveAllPerFilterConfigGeneric(const std::string& filter_name,
                                  const Router::RouteConstSharedPtr& route);
 
+/**
+ * Retrieves all route specific configs. Route specific configs can be in a few
+ * places, that are checked in order. All configs that are found are returned. The
+ * order is:
+ * - the routeEntry() (for config that's applied on weighted clusters)
+ * - the route
+ * - and finally from the virtual host object (routeEntry()->virtualhost()).
+ *
+ * To use, simply:
+ *
+ *     const auto* configs =
+ *         Utility::resolveAllPerFilterConfigGeneric<ConcreteType>(FILTER_NAME,
+ * stream_callbacks_.route());
+ *
+ * See notes about config's lifetime below.
+ *
+ * @param filter_name The name of the filter who's route config should be
+ * fetched.
+ * @param route The route to check for route configs. nullptr routes will
+ * result in an empty vector being returned.
+ *
+ * @return A vector of pointers of route configs that were found. An empty vector if no configs were
+ * found. The lifetime of the pointers in the vector is the same as the corresponding route
+ * parameter.
+ */
 template <class ConfigType>
 std::vector<const ConfigType*>
 resolveAllPerFilterConfigGeneric(const std::string& filter_name,
