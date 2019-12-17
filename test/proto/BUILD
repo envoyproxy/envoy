@@ -42,3 +42,12 @@ envoy_proto_descriptor(
         "well_known_protos",
     ],
 )
+
+envoy_proto_library(
+    name = "sensitive_proto",
+    srcs = [":sensitive.proto"],
+    deps = [
+        "@com_github_cncf_udpa//udpa/annotations:pkg",
+        "@com_github_cncf_udpa//udpa/type/v1:pkg",
+    ],
+)
