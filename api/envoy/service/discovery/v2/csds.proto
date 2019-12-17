@@ -1,0 +1,74 @@
+syntax = "proto3";
+
+package envoy.service.discovery.v2;
+
+option java_package = "io.envoyproxy.envoy.service.discovery.v2";
+option java_outer_classname = "CsdsProto";
+option java_multiple_files = true;
+option java_generic_services = true;
+
+import "envoy/admin/v2alpha/config_dump.proto";
+import "envoy/api/v2/core/base.proto";
+import "envoy/api/v2/discovery.proto";
+
+import "google/protobuf/struct.proto";
+
+// CSDS is Client Status Discovery Service. It can be used to get the status of
+// xDS-compliant client from the management servier's point of view.
+service ClientStatusService {
+  rpc StreamClientStatus(stream ClientStatusRequest) returns (stream ClientStatusResponse) {
+  }
+  rpc FetchClientStatus(ClientStatusRequest) returns (ClientStatusResponse) {
+    option (google.api.http) = {
+      post: "/v2/discovery:client_status"
+      body: "*"
+     };
+  }
+}
+
+// Request for client status for a list of clients identified by Node identifier.
+message ClientStatusRequest {
+  // Node identifier for a list of clients.
+  repeated api.v2.core.Node nodes = 1;
+  // Metadata is used to give extra information to the management server.
+  // For example, management server can choose to only send config status if
+  // there is a metadata CONFIG_STATUS_ONLY: ture.
+  google.protobuf.Struct metadata = 2;
+}
+
+// Status of a config.
+enum ConfigStatus {
+     // Status info is not available/unkonwn.
+    UNKNOWN = 0;
+    // Management server has sent the config to client and received ACK.
+    SYNCED = 1;
+    // Config is not sent.
+    NOT_SENT = 2;
+    // Management server has sent the config to client but hasn’t received
+    // ACK/NACK.
+    STALE = 3;
+    // Management server has sent the config to client but received NACK.
+    ERROR = 4;
+}
+
+// Detailed config (per xDS) with status.
+message PerXdsConfig {
+   ConfigStatus status = 0;
+   oneof per_xds_config {
+      admin.v2alpha.ListenersConfigDump listener_config;
+      admin.v2alpha.ClustersConfigDump cluster_config;
+      admin.v2alpha.RoutesConfigDump route_config;
+      admin.v2alpha.ScopedRoutesConfigDump scoped_route_config;
+   }
+}
+
+// All xds configs for a particular client.
+message ClientConfig {
+  api.v2.core.Node node = 1;
+ repeated PerXdsConfig xds_config;
+}
+
+message ClientStatusResponse {
+  // Client configs for the clients in the ClientStatusRequest.
+  repeated ClientConfig config;
+}
