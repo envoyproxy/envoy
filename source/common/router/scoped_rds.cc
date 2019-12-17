@@ -192,8 +192,12 @@ ScopedRdsConfigSubscription::removeScopes(
   for (const auto& scope_name : scope_names) {
     auto iter = scoped_route_map_.find(scope_name);
     if (iter != scoped_route_map_.end()) {
-      to_be_removed_rds_providers.emplace_back(std::move(route_provider_by_scope_[scope_name]));
-      route_provider_by_scope_.erase(scope_name);
+      auto rds_config_provider_helper_iter = route_provider_by_scope_.find(scope_name);
+      if (rds_config_provider_helper_iter != route_provider_by_scope_.end()) {
+        to_be_removed_rds_providers.emplace_back(
+            std::move(rds_config_provider_helper_iter->second));
+        route_provider_by_scope_.erase(rds_config_provider_helper_iter);
+      }
       scope_name_by_hash_.erase(iter->second->scopeKey().hash());
       scoped_route_map_.erase(iter);
       applyConfigUpdate([scope_name](ConfigProvider::ConfigConstSharedPtr config)

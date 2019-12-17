@@ -132,7 +132,8 @@ private:
                          Init::Manager& init_manager, const std::string& version_info,
                          std::vector<std::string>& exception_msgs);
   // Removes given scopes from the managed set of scopes.
-  // Returns true if any scope updated, false otherwise.
+  // Returns a list of to be removed helpers which is temporally held in the onConfigUpdate method,
+  // to make sure new scopes sharing the same RDS source configs could reuse the subscriptions.
   std::list<std::unique_ptr<RdsRouteConfigProviderHelper>>
   removeScopes(const Protobuf::RepeatedPtrField<std::string>& scope_names,
                const std::string& version_info);
