@@ -1,8 +1,7 @@
 #include "extensions/quic_listeners/quiche/envoy_quic_utils.h"
 
-#include "envoy/common/platform.h"
-
 #include "envoy/api/v2/core/base.pb.h"
+#include "envoy/common/platform.h"
 
 #include "common/network/socket_option_factory.h"
 
