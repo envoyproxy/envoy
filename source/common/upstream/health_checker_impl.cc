@@ -15,6 +15,7 @@
 #include "common/grpc/common.h"
 #include "common/http/header_map_impl.h"
 #include "common/network/address_impl.h"
+#include "common/network/transport_socket_options_impl.h"
 #include "common/router/router.h"
 #include "common/runtime/runtime_impl.h"
 #include "common/upstream/host_utility.h"
@@ -110,6 +111,7 @@ HttpHealthCheckerImpl::HttpHealthCheckerImpl(const Cluster& cluster,
                                           config.http_health_check().request_headers_to_remove())),
       http_status_checker_(config.http_health_check().expected_statuses(),
                            static_cast<uint64_t>(Http::Code::OK)),
+      alpn_protocol_(config.alpn_protocol()),
       codec_client_type_(codecClientType(config.http_health_check().use_http2()
                                              ? envoy::type::HTTP2
                                              : config.http_health_check().codec_client_type())) {
@@ -215,8 +217,15 @@ void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::onEvent(Network::Conne
 // TODO(lilika) : Support connection pooling
 void HttpHealthCheckerImpl::HttpActiveHealthCheckSession::onInterval() {
   if (!client_) {
+    const auto& proto = parent_.alpnProtocol();
+    std::vector<std::string> alpn_protocols{};
+    if (!proto.empty()) {
+      alpn_protocols.push_back(proto);
+    }
+    auto options = std::make_shared<Network::TransportSocketOptionsImpl>(
+        "", std::vector<std::string>{}, std::move(alpn_protocols));
     Upstream::Host::CreateConnectionData conn =
-        host_->createHealthCheckConnection(parent_.dispatcher_);
+        host_->createHealthCheckConnection(parent_.dispatcher_, std::move(options));
     client_.reset(parent_.createCodecClient(conn));
     client_->addConnectionCallbacks(connection_callback_impl_);
     expect_reset_ = false;
@@ -471,7 +480,7 @@ void TcpHealthCheckerImpl::TcpActiveHealthCheckSession::onEvent(Network::Connect
 // TODO(lilika) : Support connection pooling
 void TcpHealthCheckerImpl::TcpActiveHealthCheckSession::onInterval() {
   if (!client_) {
-    client_ = host_->createHealthCheckConnection(parent_.dispatcher_).connection_;
+    client_ = host_->createHealthCheckConnection(parent_.dispatcher_, nullptr).connection_;
     session_callbacks_.reset(new TcpSessionCallbacks(*this));
     client_->addConnectionCallbacks(*session_callbacks_);
     client_->addReadFilter(session_callbacks_);
@@ -624,7 +633,7 @@ void GrpcHealthCheckerImpl::GrpcActiveHealthCheckSession::onEvent(Network::Conne
 void GrpcHealthCheckerImpl::GrpcActiveHealthCheckSession::onInterval() {
   if (!client_) {
     Upstream::Host::CreateConnectionData conn =
-        host_->createHealthCheckConnection(parent_.dispatcher_);
+        host_->createHealthCheckConnection(parent_.dispatcher_, nullptr);
     client_ = parent_.createCodecClient(conn);
     client_->addConnectionCallbacks(connection_callback_impl_);
     client_->setCodecConnectionCallbacks(http_connection_callback_impl_);

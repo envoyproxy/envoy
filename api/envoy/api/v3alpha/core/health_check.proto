@@ -50,7 +50,7 @@ enum HealthStatus {
   DEGRADED = 5;
 }
 
-// [#next-free-field: 21]
+// [#next-free-field: 22]
 message HealthCheck {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.core.HealthCheck";
 
@@ -291,4 +291,10 @@ message HealthCheck {
   // initial health check failure event will be logged.
   // The default value is false.
   bool always_log_health_check_failures = 19;
+
+  // Specifies the ALPN protocol for health check connections. This is useful if the corresponding
+  // upstream is using ALPN-based :ref:`FilterChainMatch <envoy_api_msg_listener.FilterChainMatch>`
+  // along with different protocols for health checks versus data connections.
+  // If empty, no ALPN protocol will be set on HC connections.
+  string alpn_protocol = 21;
 }
