@@ -450,8 +450,7 @@ public:
 
   /**
    *
-   * @return true if a RouteConfiguration update can be scheduled. Returns false if
-   * RouteConfigProvider doesn't support on-demand updates or VHDS hasn't been configured.
+   * @return absl::optional<Router::ConfigConstSharedPtr>. Contains a value if a non-scoped RDS route config provider is used.
    */
   virtual absl::optional<Router::ConfigConstSharedPtr> routeConfig() PURE;
 };

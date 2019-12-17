@@ -73,8 +73,10 @@ bool RouteConfigUpdateReceiverImpl::removeVhosts(
   bool vhosts_removed = false;
   for (const auto& vhost_name : removed_vhost_names) {
     auto found = vhosts.find(vhost_name);
-    vhosts_removed = vhosts_removed || found != vhosts.end();
-    vhosts.erase(vhost_name);
+    if (found != vhosts.end()) {
+      vhosts_removed = true;
+      vhosts.erase(vhost_name);
+    }
   }
   return vhosts_removed;
 }

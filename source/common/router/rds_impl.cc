@@ -276,6 +276,7 @@ void RdsRouteConfigProviderImpl::onConfigUpdate() {
           auto found = aliases.find(it->alias_);
           if (found != aliases.end()) {
             if (auto cb = it->cb_.lock()) {
+              // TODO(dmitri-d) HeaderMapImpl is expensive, need to profile this
               Http::HeaderMapImpl hostHeader;
               hostHeader.setHost(VhdsSubscription::aliasToDomainName(it->alias_));
               (*cb)(config->virtualHostExists(hostHeader));

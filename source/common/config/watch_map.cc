@@ -105,7 +105,6 @@ AddedRemoved WatchMap::convertAliasWatchesToNameWatches(const envoy::api::v2::Re
       for (const auto& interested_watch : interested_watches->second) {
         watches_to_update.insert(interested_watch);
       }
-      break;
     }
   }
 

@@ -472,6 +472,9 @@ private:
 
   using ActiveStreamEncoderFilterPtr = std::unique_ptr<ActiveStreamEncoderFilter>;
 
+  // Used to abstract making of RouteConfig update request.
+  // RdsRouteConfigUpdateRequester is used when an RdsRouteConfigProvider is configured,
+  // NullRouteConfigUpdateRequester is used in all other cases (specifically when ScopedRdsConfigProvider/InlineScopedRoutesConfigProvider is configured)
   class RouteConfigUpdateRequester {
   public:
     virtual ~RouteConfigUpdateRequester() = default;
@@ -716,7 +719,6 @@ private:
     }
 
     ConnectionManagerImpl& connection_manager_;
-    Router::RouteConfigProvider* route_config_provider_;
     Router::ConfigConstSharedPtr snapped_route_config_;
     Router::ScopedConfigConstSharedPtr snapped_scoped_routes_config_;
     Tracing::SpanPtr active_span_;

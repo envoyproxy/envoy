@@ -490,14 +490,13 @@ void ConnectionManagerImpl::chargeTracingStats(const Tracing::Reason& tracing_re
 void ConnectionManagerImpl::RdsRouteConfigUpdateRequester::requestRouteConfigUpdate(
     const HeaderString& host, Http::RouteConfigUpdatedCallbackSharedPtr route_config_updated_cb) {
   ASSERT(!host.empty());
-  auto& host_header = Http::LowerCaseString(std::string(host.getStringView())).get();
+  const auto& host_header = absl::AsciiStrToLower(host.getStringView());
   route_config_provider_->requestVirtualHostsUpdate(host_header,
                                                     std::move(route_config_updated_cb));
 }
 
 ConnectionManagerImpl::ActiveStream::ActiveStream(ConnectionManagerImpl& connection_manager)
     : connection_manager_(connection_manager),
-      route_config_provider_(connection_manager.config_.routeConfigProvider()),
       stream_id_(connection_manager.random_generator_.random()),
       request_response_timespan_(new Stats::HistogramCompletableTimespanImpl(
           connection_manager_.stats_.named_.downstream_rq_time_, connection_manager_.timeSource())),
@@ -1393,10 +1392,10 @@ void ConnectionManagerImpl::ActiveStream::requestRouteConfigUpdate(
 }
 
 absl::optional<Router::ConfigConstSharedPtr> ConnectionManagerImpl::ActiveStream::routeConfig() {
-  if (route_config_provider_ == nullptr) {
+  if (connection_manager_.config_.routeConfigProvider() == nullptr) {
     return {};
   }
-  return absl::optional<Router::ConfigConstSharedPtr>(route_config_provider_->config());
+  return absl::optional<Router::ConfigConstSharedPtr>(connection_manager_.config_.routeConfigProvider()->config());
 }
 
 void ConnectionManagerImpl::ActiveStream::sendLocalReply(
