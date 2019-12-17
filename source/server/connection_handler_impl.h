@@ -138,14 +138,14 @@ private:
      */
     void newConnection(Network::ConnectionSocketPtr&& socket);
 
-    ActiveConnections& getOrCreateActiveConnections(uint64_t tag);
+    ActiveConnections& getOrCreateActiveConnections(const Network::FilterChain& filter_chain);
 
     ConnectionHandlerImpl& parent_;
     Network::ListenerPtr listener_;
     const std::chrono::milliseconds listener_filters_timeout_;
     const bool continue_on_listener_filters_timeout_;
     std::list<ActiveTcpSocketPtr> sockets_;
-    std::unordered_map<uint64_t, ActiveConnectionsPtr> connections_by_tag_;
+    std::unordered_map<const Network::FilterChain*, ActiveConnectionsPtr> connections_by_context_;
 
     // The number of connections currently active on this listener. This is typically used for
     // connection balancing across per-handler listeners.
@@ -158,11 +158,13 @@ private:
    */
   class ActiveConnections : public Event::DeferredDeletable {
   public:
-    ActiveConnections(ActiveTcpListener& listener, uint64_t tag);
+    ActiveConnections(ActiveTcpListener& listener, const Network::FilterChain& filter_chain);
     ~ActiveConnections();
 
+    // listener filterchain pair is the owner of the connections
     ActiveTcpListener& listener_;
-    uint64_t tag_;
+    const Network::FilterChain& filter_chain_;
+    // Owned connections
     std::list<ActiveTcpConnectionPtr> connections_;
   };
 

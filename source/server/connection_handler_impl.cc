@@ -89,12 +89,12 @@ void ConnectionHandlerImpl::ActiveTcpListener::removeConnection(ActiveTcpConnect
   parent_.dispatcher_.deferredDelete(std::move(removed));
   // Delete map entry only iff connections becomes empty.
   if (active_connections.connections_.empty()) {
-    auto iter = connections_by_tag_.find(active_connections.tag_);
-    ASSERT(iter != connections_by_tag_.end());
+    auto iter = connections_by_context_.find(&active_connections.filter_chain_);
+    ASSERT(iter != connections_by_context_.end());
     parent_.dispatcher_.deferredDelete(std::move(iter->second));
-    // The erase will break the iteration over the connections_by_tag_ during the deletion.
+    // The erase will break the iteration over the connections_by_context_ during the deletion.
     if (!is_deleting_) {
-      connections_by_tag_.erase(iter);
+      connections_by_context_.erase(iter);
     }
   }
 }
@@ -137,9 +137,9 @@ ConnectionHandlerImpl::ActiveTcpListener::~ActiveTcpListener() {
     parent_.dispatcher_.deferredDelete(std::move(removed));
   }
 
-  for (auto& tag_and_connections : connections_by_tag_) {
-    ASSERT(tag_and_connections.second != nullptr);
-    auto& connections = tag_and_connections.second->connections_;
+  for (auto& chain_and_connections : connections_by_context_) {
+    ASSERT(chain_and_connections.second != nullptr);
+    auto& connections = chain_and_connections.second->connections_;
     while (!connections.empty()) {
       connections.front()->connection_->close(Network::ConnectionCloseType::NoFlush);
     }
@@ -332,7 +332,7 @@ void ConnectionHandlerImpl::ActiveTcpListener::newConnection(
   }
 
   auto transport_socket = filter_chain->transportSocketFactory().createTransportSocket(nullptr);
-  auto& active_connections = getOrCreateActiveConnections(filter_chain->filterChainTag());
+  auto& active_connections = getOrCreateActiveConnections(*filter_chain);
   ActiveTcpConnectionPtr active_connection(new ActiveTcpConnection(
       active_connections,
       parent_.dispatcher_.createServerConnection(std::move(socket), std::move(transport_socket)),
@@ -356,10 +356,11 @@ void ConnectionHandlerImpl::ActiveTcpListener::newConnection(
 }
 
 ConnectionHandlerImpl::ActiveConnections&
-ConnectionHandlerImpl::ActiveTcpListener::getOrCreateActiveConnections(uint64_t tag) {
-  ActiveConnectionsPtr& connections = connections_by_tag_[tag];
+ConnectionHandlerImpl::ActiveTcpListener::getOrCreateActiveConnections(
+    const Network::FilterChain& filter_chain) {
+  ActiveConnectionsPtr& connections = connections_by_context_[&filter_chain];
   if (connections == nullptr) {
-    connections = std::make_unique<ConnectionHandlerImpl::ActiveConnections>(*this, tag);
+    connections = std::make_unique<ConnectionHandlerImpl::ActiveConnections>(*this, filter_chain);
   }
   return *connections;
 }
@@ -401,8 +402,8 @@ void ConnectionHandlerImpl::ActiveTcpListener::post(Network::ConnectionSocketPtr
 }
 
 ConnectionHandlerImpl::ActiveConnections::ActiveConnections(
-    ConnectionHandlerImpl::ActiveTcpListener& listener, uint64_t tag)
-    : listener_(listener), tag_(tag) {}
+    ConnectionHandlerImpl::ActiveTcpListener& listener, const Network::FilterChain& filter_chain)
+    : listener_(listener), filter_chain_(filter_chain) {}
 
 ConnectionHandlerImpl::ActiveConnections::~ActiveConnections() {
   // connections should be defer deleted already.
