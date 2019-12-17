@@ -21,13 +21,21 @@ namespace AdaptiveConcurrency {
 AdaptiveConcurrencyFilterConfig::AdaptiveConcurrencyFilterConfig(
     const envoy::config::filter::http::adaptive_concurrency::v2alpha::AdaptiveConcurrency&
         proto_config,
-    Runtime::Loader& runtime, std::string stats_prefix, Stats::Scope&, TimeSource& time_source)
+    Runtime::Loader& runtime, std::string stats_prefix, Stats::Scope& scope,
+    TimeSource& time_source)
     : stats_prefix_(std::move(stats_prefix)), time_source_(time_source),
-      adaptive_concurrency_feature_(proto_config.enabled(), runtime) {}
+      adaptive_concurrency_feature_(proto_config.enabled(), runtime), scope_(scope),
+      stats_(generateStats(scope_, stats_prefix_)) {}
 
 AdaptiveConcurrencyFilter::AdaptiveConcurrencyFilter(
     AdaptiveConcurrencyFilterConfigSharedPtr config, ConcurrencyControllerSharedPtr controller)
     : config_(std::move(config)), controller_(std::move(controller)) {}
+
+AdaptiveConcurrencyStats AdaptiveConcurrencyFilterConfig::generateStats(Stats::Scope& scope,
+                                                                        const std::string& prefix) {
+  return AdaptiveConcurrencyStats{ALL_ADAPTIVE_CONCURRENCY_STATS(POOL_GAUGE_PREFIX(scope, prefix))};
+  ;
+}
 
 Http::FilterHeadersStatus AdaptiveConcurrencyFilter::decodeHeaders(Http::HeaderMap&, bool) {
   // In addition to not sampling if the filter is disabled, health checks should also not be sampled

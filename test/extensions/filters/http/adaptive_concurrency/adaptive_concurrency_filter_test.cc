@@ -113,6 +113,7 @@ enabled:
   Http::TestHeaderMapImpl response_headers;
   EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->encodeHeaders(response_headers, true));
   filter_->encodeComplete();
+  EXPECT_EQ(0, stats_.gauge("testprefix.enabled", Stats::Gauge::ImportMode::NeverImport).value());
 }
 
 TEST_F(AdaptiveConcurrencyFilterTest, TestEnableConfiguredInProto) {
@@ -199,6 +200,7 @@ TEST_F(AdaptiveConcurrencyFilterTest, RecordSampleOmission) {
   EXPECT_CALL(*controller_, forwardingDecision()).WillOnce(Return(RequestForwardingAction::Block));
   Http::TestHeaderMapImpl request_headers;
   filter_->decodeHeaders(request_headers, true);
+  EXPECT_EQ(1, stats_.gauge("testprefix.enabled", Stats::Gauge::ImportMode::NeverImport).value());
 
   filter_.reset();
 }

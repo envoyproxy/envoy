@@ -192,10 +192,21 @@ The adaptive concurrency filter outputs statistics in the
 comes from the owning HTTP connection manager. Statistics are specific to the concurrency
 controllers.
 
+Adaptive Concurrency Statistics
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The adaptive concurrency filter uses the namespace
+*http.<stat_prefix>.adaptive_concurrency.*.
+
+.. csv-table::
+  :header: Name, Type, Description
+  :widths: auto
+
+  enabled, Gauge, Set to 1 if the filter is enabled and 0 otherwise.
+
 Gradient Controller Statistics
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 The gradient controller uses the namespace
-*http.<stat_prefix>.adaptive_concurrency.gradient_controller*.
+*http.<stat_prefix>.adaptive_concurrency.gradient_controller.*.
 
 .. csv-table::
   :header: Name, Type, Description
@@ -204,7 +215,5 @@ The gradient controller uses the namespace
   rq_blocked, Counter, Total requests that were blocked by the filter.
   min_rtt_calculation_active, Gauge, Set to 1 if the controller is in the process of a minRTT calculation. 0 otherwise.
   concurrency_limit, Gauge, The current concurrency limit.
-  gradient, Gauge, The current gradient value.
-  burst_queue_size, Gauge, The current headroom value in the concurrency limit calculation.
   min_rtt_msecs, Gauge, The current measured minRTT value.
   sample_rtt_msecs, Gauge, The current measured sampleRTT aggregate.

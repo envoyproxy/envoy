@@ -155,11 +155,9 @@ uint32_t GradientController::calculateNewLimit() {
   const auto buffered_min_rtt = min_rtt_.count() + min_rtt_.count() * config_.minRTTBufferPercent();
   const double raw_gradient = static_cast<double>(buffered_min_rtt) / sample_rtt_.count();
   const double gradient = std::max<double>(0.5, std::min<double>(2.0, raw_gradient));
-  stats_.gradient_.set(gradient);
 
   const double limit = concurrencyLimit() * gradient;
   const double burst_headroom = sqrt(limit);
-  stats_.burst_queue_size_.set(burst_headroom);
 
   // The final concurrency value factors in the burst headroom and must be clamped to keep the value
   // in the range [1, configured_max].

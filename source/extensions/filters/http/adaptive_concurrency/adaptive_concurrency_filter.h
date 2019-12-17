@@ -23,6 +23,18 @@ namespace HttpFilters {
 namespace AdaptiveConcurrency {
 
 /**
+ * All stats for the adaptive concurrency filter.
+ */
+#define ALL_ADAPTIVE_CONCURRENCY_STATS(GAUGE) GAUGE(enabled, NeverImport)
+
+/**
+ * Wrapper struct for the adaptive concurrency stats. @see stats_macros.h
+ */
+struct AdaptiveConcurrencyStats {
+  ALL_ADAPTIVE_CONCURRENCY_STATS(GENERATE_GAUGE_STRUCT)
+};
+
+/**
  * Configuration for the adaptive concurrency limit filter.
  */
 class AdaptiveConcurrencyFilterConfig {
@@ -33,13 +45,23 @@ public:
       Runtime::Loader& runtime, std::string stats_prefix, Stats::Scope& scope,
       TimeSource& time_source);
 
-  bool filterEnabled() const { return adaptive_concurrency_feature_.enabled(); }
+  bool filterEnabled() const {
+    const bool enabled = adaptive_concurrency_feature_.enabled();
+    stats_.enabled_.set(enabled);
+    return enabled;
+  }
+
   TimeSource& timeSource() const { return time_source_; }
 
 private:
+  static AdaptiveConcurrencyStats generateStats(Stats::Scope& scope,
+                                                const std::string& stats_prefix);
+
   const std::string stats_prefix_;
   TimeSource& time_source_;
   Runtime::FeatureFlag adaptive_concurrency_feature_;
+  Stats::Scope& scope_;
+  AdaptiveConcurrencyStats stats_;
 };
 
 using AdaptiveConcurrencyFilterConfigSharedPtr =
