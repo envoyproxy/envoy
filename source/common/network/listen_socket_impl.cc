@@ -1,7 +1,5 @@
 #include "common/network/listen_socket_impl.h"
 
-#include <sys/types.h>
-
 #include <string>
 
 #include "envoy/api/v2/core/base.pb.h"

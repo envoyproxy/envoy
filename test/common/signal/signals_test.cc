@@ -1,6 +1,6 @@
-#include <sys/mman.h>
-
 #include <csignal>
+
+#include "envoy/common/platform.h"
 
 #include "common/signal/signal_action.h"
 

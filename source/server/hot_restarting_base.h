@@ -1,7 +1,6 @@
 #pragma once
 
 #include <fcntl.h>
-#include <sys/un.h>
 
 #include <array>
 #include <atomic>

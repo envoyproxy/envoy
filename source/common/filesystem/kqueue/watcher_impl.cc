@@ -1,7 +1,3 @@
-#include <sys/event.h>
-#include <sys/fcntl.h>
-#include <sys/types.h>
-
 #include "envoy/common/exception.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/event/file_event.h"

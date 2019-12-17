@@ -5,6 +5,7 @@
 #include <string>
 #include <unordered_map>
 
+#include "envoy/common/platform.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/filesystem/watcher.h"
 

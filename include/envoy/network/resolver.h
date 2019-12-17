@@ -1,11 +1,10 @@
 #pragma once
 
-#include <sys/types.h>
-
 #include <cstdint>
 #include <string>
 
 #include "envoy/api/v2/core/address.pb.h"
+#include "envoy/common/platform.h"
 #include "envoy/common/pure.h"
 #include "envoy/network/address.h"
 

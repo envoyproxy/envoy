@@ -4,6 +4,7 @@
 
 #include <functional>
 
+#include "envoy/common/platform.h"
 #include "envoy/thread/thread.h"
 
 namespace Envoy {

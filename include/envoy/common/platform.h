@@ -43,13 +43,20 @@ typedef unsigned int sa_family_t;
 #include <netdb.h>
 #include <netinet/in.h>
 #include <netinet/tcp.h>
+#include <sys/fcntl.h>
+#include <sys/inotify.h>
 #include <sys/ioctl.h>
 #include <sys/mman.h> // for mode_t
+#include <sys/prctl.h>
 #include <sys/socket.h>
+#include <sys/stat.h>
+#if defined(__linux__)
+#include <sys/syscall.h>
+#endif
+#include <sys/types.h>
 #include <sys/uio.h> // for iovec
 #include <sys/un.h>
-#include <sys/stat.h>
-#include <fcntl.h>
+#include <sys/wait.h>
 #include <unistd.h>
 
 #if defined(__linux__)

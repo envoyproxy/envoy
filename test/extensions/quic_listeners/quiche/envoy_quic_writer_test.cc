@@ -1,7 +1,7 @@
-#include <sys/types.h>
-
 #include <memory>
 #include <string>
+
+#include "envoy/common/platform.h"
 
 #include "common/network/address_impl.h"
 #include "common/network/io_socket_error_impl.h"

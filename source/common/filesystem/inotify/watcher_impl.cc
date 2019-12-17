@@ -1,5 +1,3 @@
-#include <sys/inotify.h>
-
 #include <cstdint>
 #include <string>
 

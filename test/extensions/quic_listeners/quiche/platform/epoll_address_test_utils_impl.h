@@ -6,10 +6,9 @@
 // consumed or referenced directly by other Envoy code. It serves purely as a
 // porting layer for QUICHE.
 
-#include <sys/socket.h>
-
 #include <algorithm>
 
+#include "envoy/common/platform.h"
 #include "envoy/network/address.h"
 
 #include "test/test_common/environment.h"

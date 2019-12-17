@@ -1,7 +1,5 @@
 #pragma once
 
-#include <sys/stat.h>
-
 #include <memory>
 #include <string>
 

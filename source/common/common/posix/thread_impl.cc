@@ -1,10 +1,6 @@
 #include "common/common/assert.h"
 #include "common/common/thread_impl.h"
 
-#if defined(__linux__)
-#include <sys/syscall.h>
-#endif
-
 namespace Envoy {
 namespace Thread {
 

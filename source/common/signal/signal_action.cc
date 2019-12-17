@@ -1,7 +1,5 @@
 #include "common/signal/signal_action.h"
 
-#include <sys/mman.h>
-
 #include <csignal>
 
 #include "common/common/assert.h"
