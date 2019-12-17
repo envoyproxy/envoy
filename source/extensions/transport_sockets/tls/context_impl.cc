@@ -184,9 +184,9 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& c
       verify_mode = SSL_VERIFY_PEER | SSL_VERIFY_FAIL_IF_NO_PEER_CERT;
     }
 
-    if (!cert_validation_config->matchSubjectAltNameList().empty()) {
+    if (!cert_validation_config->subjectAltNameMatchers().empty()) {
       for (const ::envoy::type::matcher::StringMatcher& matcher :
-           cert_validation_config->matchSubjectAltNameList()) {
+           cert_validation_config->subjectAltNameMatchers()) {
         match_subject_alt_name_list_.push_back(Matchers::StringMatcherImpl(matcher));
       }
       verify_mode = SSL_VERIFY_PEER | SSL_VERIFY_FAIL_IF_NO_PEER_CERT;
@@ -933,13 +933,13 @@ ServerContextImpl::ServerContextImpl(Stats::Scope& scope,
     }
 
     if (!parsed_alpn_protocols_.empty()) {
-      SSL_CTX_set_alpn_select_cb(
-          ctx.ssl_ctx_.get(),
-          [](SSL*, const unsigned char** out, unsigned char* outlen, const unsigned char* in,
-             unsigned int inlen, void* arg) -> int {
-            return static_cast<ServerContextImpl*>(arg)->alpnSelectCallback(out, outlen, in, inlen);
-          },
-          this);
+      SSL_CTX_set_alpn_select_cb(ctx.ssl_ctx_.get(),
+                                 [](SSL*, const unsigned char** out, unsigned char* outlen,
+                                    const unsigned char* in, unsigned int inlen, void* arg) -> int {
+                                   return static_cast<ServerContextImpl*>(arg)->alpnSelectCallback(
+                                       out, outlen, in, inlen);
+                                 },
+                                 this);
     }
 
     if (!session_ticket_keys_.empty()) {
