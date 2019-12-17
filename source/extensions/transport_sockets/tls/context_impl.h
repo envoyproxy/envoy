@@ -69,12 +69,12 @@ public:
   /**
    * Performs subjectAltName matching with the provided matchers.
    * @param ssl the certificate to verify
-   * @param match_subject_alt_name_list the configured matchers to match
+   * @param subject_alt_name_matchers the configured matchers to match
    * @return true if the verification succeeds
    */
   static bool
   matchSubjectAltName(X509* cert,
-                      const std::vector<Matchers::StringMatcherImpl>& match_subject_alt_name_list);
+                      const std::vector<Matchers::StringMatcherImpl>& subject_alt_name_matchers);
 
   /**
    * Determines whether the given name matches 'pattern' which may optionally begin with a wildcard.
@@ -110,9 +110,8 @@ protected:
   // A SSL_CTX_set_cert_verify_callback for custom cert validation.
   static int verifyCallback(X509_STORE_CTX* store_ctx, void* arg);
 
-  int verifyCertificate(
-      X509* cert, const std::vector<std::string>& verify_san_list,
-      const std::vector<Matchers::StringMatcherImpl>& match_subject_alt_name_list);
+  int verifyCertificate(X509* cert, const std::vector<std::string>& verify_san_list,
+                        const std::vector<Matchers::StringMatcherImpl>& subject_alt_name_matchers);
 
   /**
    * Verifies certificate hash for pinning. The hash is a hex-encoded SHA-256 of the DER-encoded
@@ -173,7 +172,7 @@ protected:
   std::vector<TlsContext> tls_contexts_;
   bool verify_trusted_ca_{false};
   std::vector<std::string> verify_subject_alt_name_list_;
-  std::vector<Matchers::StringMatcherImpl> match_subject_alt_name_list_;
+  std::vector<Matchers::StringMatcherImpl> subject_alt_name_matchers_;
   std::vector<std::vector<uint8_t>> verify_certificate_hash_list_;
   std::vector<std::vector<uint8_t>> verify_certificate_spki_list_;
   Stats::Scope& scope_;

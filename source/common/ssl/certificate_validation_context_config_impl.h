@@ -27,7 +27,7 @@ public:
   }
   const std::vector<::envoy::type::matcher::StringMatcher>&
   subjectAltNameMatchers() const override {
-    return match_subject_alt_name_list_;
+    return subject_alt_name_matchers_;
   }
   const std::vector<std::string>& verifyCertificateHashList() const override {
     return verify_certificate_hash_list_;
@@ -43,7 +43,7 @@ private:
   const std::string certificate_revocation_list_;
   const std::string certificate_revocation_list_path_;
   const std::vector<std::string> verify_subject_alt_name_list_;
-  const std::vector<::envoy::type::matcher::StringMatcher> match_subject_alt_name_list_;
+  const std::vector<::envoy::type::matcher::StringMatcher> subject_alt_name_matchers_;
   const std::vector<std::string> verify_certificate_hash_list_;
   const std::vector<std::string> verify_certificate_spki_list_;
   const bool allow_expired_certificate_;

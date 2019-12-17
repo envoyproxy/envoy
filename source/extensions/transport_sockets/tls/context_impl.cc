@@ -187,7 +187,7 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& c
     if (!cert_validation_config->subjectAltNameMatchers().empty()) {
       for (const ::envoy::type::matcher::StringMatcher& matcher :
            cert_validation_config->subjectAltNameMatchers()) {
-        match_subject_alt_name_list_.push_back(Matchers::StringMatcherImpl(matcher));
+        subject_alt_name_matchers_.push_back(Matchers::StringMatcherImpl(matcher));
       }
       verify_mode = SSL_VERIFY_PEER | SSL_VERIFY_FAIL_IF_NO_PEER_CERT;
     }
@@ -497,19 +497,18 @@ int ContextImpl::verifyCallback(X509_STORE_CTX* store_ctx, void* arg) {
               !transport_socket_options->verifySubjectAltNameListOverride().empty()
           ? transport_socket_options->verifySubjectAltNameListOverride()
           : impl->verify_subject_alt_name_list_,
-      impl->match_subject_alt_name_list_);
+      impl->subject_alt_name_matchers_);
 }
 
 int ContextImpl::verifyCertificate(
     X509* cert, const std::vector<std::string>& verify_san_list,
-    const std::vector<Matchers::StringMatcherImpl>& match_subject_alt_name_list) {
+    const std::vector<Matchers::StringMatcherImpl>& subject_alt_name_matchers) {
   if (!verify_san_list.empty() && !verifySubjectAltName(cert, verify_san_list)) {
     stats_.fail_verify_san_.inc();
     return 0;
   }
 
-  if (!match_subject_alt_name_list.empty() &&
-      !matchSubjectAltName(cert, match_subject_alt_name_list)) {
+  if (!subject_alt_name_matchers.empty() && !matchSubjectAltName(cert, subject_alt_name_matchers)) {
     stats_.fail_verify_san_.inc();
     return 0;
   }
@@ -620,7 +619,7 @@ std::vector<Ssl::PrivateKeyMethodProviderSharedPtr> ContextImpl::getPrivateKeyMe
 }
 
 bool ContextImpl::matchSubjectAltName(
-    X509* cert, const std::vector<Matchers::StringMatcherImpl>& match_subject_alt_name_list) {
+    X509* cert, const std::vector<Matchers::StringMatcherImpl>& subject_alt_name_matchers) {
   bssl::UniquePtr<GENERAL_NAMES> san_names(
       static_cast<GENERAL_NAMES*>(X509_get_ext_d2i(cert, NID_subject_alt_name, nullptr, nullptr)));
   if (san_names == nullptr) {
@@ -628,7 +627,7 @@ bool ContextImpl::matchSubjectAltName(
   }
   for (const GENERAL_NAME* general_name : san_names.get()) {
     const std::string san = generalNameAsString(general_name);
-    for (auto& config_san_matcher : match_subject_alt_name_list) {
+    for (auto& config_san_matcher : subject_alt_name_matchers) {
       if (config_san_matcher.match(san)) {
         return true;
       }
