@@ -3,6 +3,8 @@
 #include <string>
 
 #include "envoy/api/v2/auth/cert.pb.h"
+#include "envoy/api/v2/core/base.pb.h"
+#include "envoy/type/percent.pb.h"
 
 #include "common/buffer/buffer_impl.h"
 #include "common/common/empty_string.h"
@@ -824,7 +826,8 @@ void RouterTestBase::testAppendCluster(absl::optional<Http::LowerCaseString> clu
       /* do_not_forward */ false,
       /* not_forwarded_header */ absl::nullopt);
   callbacks_.streamInfo().filterState().setData(DebugConfig::key(), std::move(debug_config),
-                                                StreamInfo::FilterState::StateType::ReadOnly);
+                                                StreamInfo::FilterState::StateType::ReadOnly,
+                                                StreamInfo::FilterState::LifeSpan::FilterChain);
 
   NiceMock<Http::MockStreamEncoder> encoder;
   Http::StreamDecoder* response_decoder = nullptr;
@@ -875,7 +878,8 @@ void RouterTestBase::testAppendUpstreamHost(
       /* do_not_forward */ false,
       /* not_forwarded_header */ absl::nullopt);
   callbacks_.streamInfo().filterState().setData(DebugConfig::key(), std::move(debug_config),
-                                                StreamInfo::FilterState::StateType::ReadOnly);
+                                                StreamInfo::FilterState::StateType::ReadOnly,
+                                                StreamInfo::FilterState::LifeSpan::FilterChain);
   cm_.conn_pool_.host_->hostname_ = "scooby.doo";
 
   NiceMock<Http::MockStreamEncoder> encoder;
@@ -946,7 +950,8 @@ void RouterTestBase::testDoNotForward(
       /* do_not_forward */ true,
       /* not_forwarded_header */ not_forwarded_header_name);
   callbacks_.streamInfo().filterState().setData(DebugConfig::key(), std::move(debug_config),
-                                                StreamInfo::FilterState::StateType::ReadOnly);
+                                                StreamInfo::FilterState::StateType::ReadOnly,
+                                                StreamInfo::FilterState::LifeSpan::FilterChain);
 
   Http::TestHeaderMapImpl response_headers{
       {":status", "204"},
@@ -978,7 +983,8 @@ TEST_F(RouterTest, AllDebugConfig) {
       /* do_not_forward */ true,
       /* not_forwarded_header */ absl::nullopt);
   callbacks_.streamInfo().filterState().setData(DebugConfig::key(), std::move(debug_config),
-                                                StreamInfo::FilterState::StateType::ReadOnly);
+                                                StreamInfo::FilterState::StateType::ReadOnly,
+                                                StreamInfo::FilterState::LifeSpan::FilterChain);
   cm_.conn_pool_.host_->hostname_ = "scooby.doo";
 
   Http::TestHeaderMapImpl response_headers{{":status", "204"},
@@ -4266,12 +4272,12 @@ TEST_F(RouterTest, AutoHostRewriteEnabled) {
 
   Http::TestHeaderMapImpl incoming_headers;
   HttpTestUtility::addDefaultHeaders(incoming_headers);
-  incoming_headers.Host()->value(req_host);
+  incoming_headers.setHost(req_host);
 
   cm_.conn_pool_.host_->hostname_ = "scooby.doo";
   Http::TestHeaderMapImpl outgoing_headers;
   HttpTestUtility::addDefaultHeaders(outgoing_headers);
-  outgoing_headers.Host()->value(cm_.conn_pool_.host_->hostname_);
+  outgoing_headers.setHost(cm_.conn_pool_.host_->hostname_);
 
   EXPECT_CALL(callbacks_.route_->route_entry_, timeout())
       .WillOnce(Return(std::chrono::milliseconds(0)));
@@ -4304,7 +4310,7 @@ TEST_F(RouterTest, AutoHostRewriteDisabled) {
 
   Http::TestHeaderMapImpl incoming_headers;
   HttpTestUtility::addDefaultHeaders(incoming_headers);
-  incoming_headers.Host()->value(req_host);
+  incoming_headers.setHost(req_host);
 
   cm_.conn_pool_.host_->hostname_ = "scooby.doo";
 
@@ -4356,7 +4362,7 @@ TEST_F(RouterTest, ApplicationProtocols) {
   callbacks_.streamInfo().filterState().setData(
       Network::ApplicationProtocols::key(),
       std::make_unique<Network::ApplicationProtocols>(std::vector<std::string>{"foo", "bar"}),
-      StreamInfo::FilterState::StateType::ReadOnly);
+      StreamInfo::FilterState::StateType::ReadOnly, StreamInfo::FilterState::LifeSpan::FilterChain);
 
   EXPECT_CALL(cm_, httpConnPoolForCluster(_, _, _, _))
       .WillOnce(
@@ -4577,6 +4583,7 @@ TEST_F(RouterTestChildSpan, BasicFlow) {
   EXPECT_CALL(*child_span,
               setTag(Eq(Tracing::Tags::get().Component), Eq(Tracing::Tags::get().Proxy)));
   EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().HttpProtocol), Eq("HTTP/1.0")));
+  EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().UpstreamAddress), Eq("10.0.0.5:9211")));
   EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().UpstreamCluster), Eq("fake_cluster")));
   EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().HttpStatusCode), Eq("200")));
   EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().ResponseFlags), Eq("-")));
@@ -4620,6 +4627,7 @@ TEST_F(RouterTestChildSpan, ResetFlow) {
   EXPECT_CALL(*child_span,
               setTag(Eq(Tracing::Tags::get().Component), Eq(Tracing::Tags::get().Proxy)));
   EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().HttpProtocol), Eq("HTTP/1.0")));
+  EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().UpstreamAddress), Eq("10.0.0.5:9211")));
   EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().UpstreamCluster), Eq("fake_cluster")));
   EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().HttpStatusCode), Eq("200")));
   EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().ResponseFlags), Eq("UR")));
@@ -4659,6 +4667,7 @@ TEST_F(RouterTestChildSpan, CancelFlow) {
   EXPECT_CALL(*child_span,
               setTag(Eq(Tracing::Tags::get().Component), Eq(Tracing::Tags::get().Proxy)));
   EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().HttpProtocol), Eq("HTTP/1.0")));
+  EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().UpstreamAddress), Eq("10.0.0.5:9211")));
   EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().UpstreamCluster), Eq("fake_cluster")));
   EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().HttpStatusCode), Eq("0")));
   EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().ResponseFlags), Eq("-")));
@@ -4698,6 +4707,7 @@ TEST_F(RouterTestChildSpan, ResetRetryFlow) {
   EXPECT_CALL(*child_span_1,
               setTag(Eq(Tracing::Tags::get().Component), Eq(Tracing::Tags::get().Proxy)));
   EXPECT_CALL(*child_span_1, setTag(Eq(Tracing::Tags::get().HttpProtocol), Eq("HTTP/1.0")));
+  EXPECT_CALL(*child_span_1, setTag(Eq(Tracing::Tags::get().UpstreamAddress), Eq("10.0.0.5:9211")));
   EXPECT_CALL(*child_span_1, setTag(Eq(Tracing::Tags::get().UpstreamCluster), Eq("fake_cluster")));
   EXPECT_CALL(*child_span_1, setTag(Eq(Tracing::Tags::get().HttpStatusCode), Eq("0")));
   EXPECT_CALL(*child_span_1, setTag(Eq(Tracing::Tags::get().ResponseFlags), Eq("UR")));
@@ -4734,6 +4744,7 @@ TEST_F(RouterTestChildSpan, ResetRetryFlow) {
   EXPECT_CALL(*child_span_2,
               setTag(Eq(Tracing::Tags::get().Component), Eq(Tracing::Tags::get().Proxy)));
   EXPECT_CALL(*child_span_2, setTag(Eq(Tracing::Tags::get().HttpProtocol), Eq("HTTP/1.0")));
+  EXPECT_CALL(*child_span_2, setTag(Eq(Tracing::Tags::get().UpstreamAddress), Eq("10.0.0.5:9211")));
   EXPECT_CALL(*child_span_2, setTag(Eq(Tracing::Tags::get().UpstreamCluster), Eq("fake_cluster")));
   EXPECT_CALL(*child_span_2, setTag(Eq(Tracing::Tags::get().HttpStatusCode), Eq("200")));
   EXPECT_CALL(*child_span_2, setTag(Eq(Tracing::Tags::get().ResponseFlags), Eq("-")));

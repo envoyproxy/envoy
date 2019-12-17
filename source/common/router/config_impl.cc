@@ -8,9 +8,13 @@
 #include <string>
 #include <vector>
 
+#include "envoy/api/v2/core/base.pb.h"
+#include "envoy/api/v2/rds.pb.h"
+#include "envoy/api/v2/route/route.pb.h"
 #include "envoy/http/header_map.h"
 #include "envoy/runtime/runtime.h"
-#include "envoy/type/percent.pb.validate.h"
+#include "envoy/type/matcher/string.pb.h"
+#include "envoy/type/percent.pb.h"
 #include "envoy/upstream/cluster_manager.h"
 #include "envoy/upstream/upstream.h"
 
@@ -388,6 +392,12 @@ bool RouteEntryImplBase::matchRoute(const Http::HeaderMap& headers,
                                     uint64_t random_value) const {
   bool matches = true;
 
+  // TODO(mattklein123): Currently all match types require a path header. When we support CONNECT
+  // we will need to figure out how to safely relax this.
+  if (headers.Path() == nullptr) {
+    return false;
+  }
+
   matches &= evaluateRuntimeMatch(random_value);
   if (!matches) {
     // No need to waste further cycles calculating a route match.
@@ -429,13 +439,13 @@ void RouteEntryImplBase::finalizeRequestHeaders(Http::HeaderMap& headers,
   }
 
   if (!host_rewrite_.empty()) {
-    headers.Host()->value(host_rewrite_);
+    headers.setHost(host_rewrite_);
   } else if (auto_host_rewrite_header_) {
-    Http::HeaderEntry* header = headers.get(*auto_host_rewrite_header_);
+    const Http::HeaderEntry* header = headers.get(*auto_host_rewrite_header_);
     if (header != nullptr) {
       absl::string_view header_value = header->value().getStringView();
       if (!header_value.empty()) {
-        headers.Host()->value(header_value);
+        headers.setHost(header_value);
       }
     }
   }
@@ -1068,6 +1078,11 @@ const VirtualHostImpl* RouteMatcher::findVirtualHost(const Http::HeaderMap& head
   if (virtual_hosts_.empty() && wildcard_virtual_host_suffixes_.empty() &&
       wildcard_virtual_host_prefixes_.empty()) {
     return default_virtual_host_.get();
+  }
+
+  // There may be no authority in early reply paths in the HTTP connection manager.
+  if (headers.Host() == nullptr) {
+    return nullptr;
   }
 
   // TODO (@rshriram) Match Origin header in WebSocket

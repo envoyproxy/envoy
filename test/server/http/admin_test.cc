@@ -3,8 +3,12 @@
 #include <regex>
 #include <unordered_map>
 
+#include "envoy/admin/v2alpha/clusters.pb.h"
 #include "envoy/admin/v2alpha/memory.pb.h"
 #include "envoy/admin/v2alpha/server_info.pb.h"
+#include "envoy/api/v2/auth/cert.pb.h"
+#include "envoy/api/v2/core/base.pb.h"
+#include "envoy/config/filter/network/http_connection_manager/v2/http_connection_manager.pb.h"
 #include "envoy/json/json_object.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/stats/stats.h"
@@ -839,7 +843,7 @@ TEST_P(AdminInstanceTest, EscapeHelpTextWithPunctuation) {
   Http::HeaderMapImpl header_map;
   Buffer::OwnedImpl response;
   EXPECT_EQ(Http::Code::OK, getCallback("/", header_map, response));
-  Http::HeaderString& content_type = header_map.ContentType()->value();
+  const Http::HeaderString& content_type = header_map.ContentType()->value();
   EXPECT_THAT(std::string(content_type.getStringView()), testing::HasSubstr("text/html"));
   EXPECT_EQ(-1, response.search(planets.data(), planets.size(), 0));
   const std::string escaped_planets = "jupiter&gt;saturn&gt;mars";

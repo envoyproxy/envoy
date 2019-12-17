@@ -1,5 +1,6 @@
 #pragma once
 
+#include "envoy/config/filter/network/rbac/v2/rbac.pb.h"
 #include "envoy/network/connection.h"
 #include "envoy/network/filter.h"
 #include "envoy/stats/stats_macros.h"

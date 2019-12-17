@@ -2,9 +2,9 @@ syntax = "proto3";
 
 package envoy.config.filter.http.adaptive_concurrency.v2alpha;
 
+option java_package = "io.envoyproxy.envoy.config.filter.http.adaptive_concurrency.v2alpha";
 option java_outer_classname = "AdaptiveConcurrencyProto";
 option java_multiple_files = true;
-option java_package = "io.envoyproxy.envoy.config.filter.http.adaptive_concurrency.v2alpha";
 
 import "envoy/api/v2/core/base.proto";
 import "envoy/type/percent.proto";

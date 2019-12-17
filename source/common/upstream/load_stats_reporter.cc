@@ -1,5 +1,6 @@
 #include "common/upstream/load_stats_reporter.h"
 
+#include "envoy/service/load_stats/v2/lrs.pb.h"
 #include "envoy/stats/scope.h"
 
 #include "common/protobuf/protobuf.h"

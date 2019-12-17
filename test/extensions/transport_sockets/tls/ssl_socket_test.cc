@@ -2,6 +2,9 @@
 #include <memory>
 #include <string>
 
+#include "envoy/api/v2/auth/cert.pb.h"
+#include "envoy/api/v2/lds.pb.h"
+#include "envoy/api/v2/listener/listener.pb.h"
 #include "envoy/network/transport_socket.h"
 
 #include "common/buffer/buffer_impl.h"
@@ -13,7 +16,6 @@
 #include "common/network/transport_socket_options_impl.h"
 #include "common/network/utility.h"
 
-#include "extensions/filters/listener/tls_inspector/tls_inspector.h"
 #include "extensions/transport_sockets/tls/context_config_impl.h"
 #include "extensions/transport_sockets/tls/context_impl.h"
 #include "extensions/transport_sockets/tls/private_key/private_key_manager_impl.h"

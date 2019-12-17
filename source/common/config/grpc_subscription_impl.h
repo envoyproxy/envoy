@@ -1,6 +1,5 @@
 #pragma once
 
-#include "envoy/api/v2/core/base.pb.h"
 #include "envoy/config/subscription.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/grpc/async_client.h"

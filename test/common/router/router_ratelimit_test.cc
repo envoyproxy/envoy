@@ -2,6 +2,8 @@
 #include <string>
 #include <vector>
 
+#include "envoy/api/v2/rds.pb.h"
+#include "envoy/api/v2/route/route.pb.h"
 #include "envoy/api/v2/route/route.pb.validate.h"
 
 #include "common/http/header_map_impl.h"

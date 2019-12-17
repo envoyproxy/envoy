@@ -1,5 +1,6 @@
 #pragma once
 
+#include "envoy/config/common/dynamic_forward_proxy/v2alpha/dns_cache.pb.h"
 #include "envoy/network/dns.h"
 #include "envoy/thread_local/thread_local.h"
 

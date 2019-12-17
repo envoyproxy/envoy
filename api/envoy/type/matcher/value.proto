@@ -2,9 +2,9 @@ syntax = "proto3";
 
 package envoy.type.matcher;
 
+option java_package = "io.envoyproxy.envoy.type.matcher";
 option java_outer_classname = "ValueProto";
 option java_multiple_files = true;
-option java_package = "io.envoyproxy.envoy.type.matcher";
 
 import "envoy/type/matcher/number.proto";
 import "envoy/type/matcher/string.proto";

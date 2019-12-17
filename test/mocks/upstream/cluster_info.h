@@ -5,6 +5,8 @@
 #include <memory>
 #include <string>
 
+#include "envoy/api/v2/cds.pb.h"
+#include "envoy/api/v2/core/base.pb.h"
 #include "envoy/api/v2/core/protocol.pb.h"
 #include "envoy/config/typed_metadata.h"
 #include "envoy/stats/scope.h"

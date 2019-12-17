@@ -1,5 +1,6 @@
 #include "extensions/filters/http/csrf/csrf_filter.h"
 
+#include "envoy/config/filter/http/csrf/v2/csrf.pb.h"
 #include "envoy/stats/scope.h"
 
 #include "common/common/empty_string.h"
