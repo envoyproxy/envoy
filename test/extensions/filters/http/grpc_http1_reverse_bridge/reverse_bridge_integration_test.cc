@@ -110,6 +110,7 @@ TEST_P(ReverseBridgeIntegrationTest, EnabledRoute) {
       std::equal(response->body().begin(), response->body().begin() + 4, expected_prefix.begin()));
   EXPECT_THAT(response->headers(),
               HeaderValueOf(Http::Headers::get().ContentType, "application/grpc"));
+  EXPECT_THAT(*response->trailers(), HeaderValueOf(Http::Headers::get().GrpcStatus, "0"));
 
   codec_client_->close();
   ASSERT_TRUE(fake_upstream_connection_->close());
