@@ -123,7 +123,7 @@ public:
   const std::string& maxAge() const override { return max_age_; };
   const absl::optional<bool>& allowCredentials() const override { return allow_credentials_; };
   bool enabled() const override {
-    if (has_shadow_enabled_) {
+    if (has_filter_enabled_) {
       return loader_.snapshot().featureEnabled(filter_enabled_.runtime_key(),
                                                filter_enabled_.default_value());
     }
