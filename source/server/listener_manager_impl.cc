@@ -775,8 +775,7 @@ std::unique_ptr<Network::FilterChain> ListenerFilterChainFactoryBuilder::buildFi
       config_factory.createTransportSocketFactory(*message, factory_context_,
                                                   std::move(server_names)),
       listener_component_factory_.createNetworkFilterFactoryList(filter_chain.filters(),
-                                                                 *filter_chain_factory_context),
-      filter_chain_factory_context->filterChainTag());
+                                                                 *filter_chain_factory_context));
 }
 
 Network::ListenSocketFactorySharedPtr

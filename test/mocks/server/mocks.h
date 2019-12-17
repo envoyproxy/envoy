@@ -610,7 +610,6 @@ class MockFilterChainFactoryContext : public MockFactoryContext, public FilterCh
 public:
   MockFilterChainFactoryContext();
   ~MockFilterChainFactoryContext() override;
-  MOCK_CONST_METHOD0(filterChainTag, uint64_t());
 };
 
 } // namespace Configuration

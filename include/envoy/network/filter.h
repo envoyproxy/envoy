@@ -331,11 +331,6 @@ public:
    * const std::vector<FilterFactoryCb>& a list of filters to be used by the new connection.
    */
   virtual const std::vector<FilterFactoryCb>& networkFilterFactories() const PURE;
-
-  /**
-   * @return uint64_t the tag the filter chain should use for connection handler tracking.
-   */
-  virtual uint64_t filterChainTag() const PURE;
 };
 
 using FilterChainSharedPtr = std::shared_ptr<FilterChain>;

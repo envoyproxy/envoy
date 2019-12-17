@@ -24,10 +24,8 @@ Network::Address::InstanceConstSharedPtr fakeAddress() {
 } // namespace
 
 FilterChainFactoryContextImpl::FilterChainFactoryContextImpl(
-    Configuration::FactoryContext& parent_context, uint64_t filter_chain_tag)
-    : parent_context_(parent_context), filter_chain_tag_(filter_chain_tag) {}
-
-uint64_t FilterChainFactoryContextImpl::filterChainTag() const { return filter_chain_tag_; }
+    Configuration::FactoryContext& parent_context)
+    : parent_context_(parent_context) {}
 
 bool FilterChainFactoryContextImpl::drainClose() const {
   // TODO(lambdai): will provide individual value for each filter chain context.
@@ -591,7 +589,7 @@ FilterChainManagerImpl::FilterChainContextCallbackImpl::createFilterChainFactory
     const ::envoy::api::v2::listener::FilterChain* const filter_chain) {
   // TODO(lambdai): drain close should be saved in per filter chain context
   UNREFERENCED_PARAMETER(filter_chain);
-  auto res = std::make_shared<FilterChainFactoryContextImpl>(parent_context_, ++parent_.next_tag_);
+  auto res = std::make_shared<FilterChainFactoryContextImpl>(parent_context_);
   parent_.factory_contexts_.push_back(res);
   return res;
 }

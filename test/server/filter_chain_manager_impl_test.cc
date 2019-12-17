@@ -163,21 +163,17 @@ TEST_F(FilterChainManagerImplTest, CommittedFilterChainContext) {
   }
 }
 
-// The current implementation generated unique tag for the same context.
-TEST_F(FilterChainManagerImplTest, FilterChainContextsHaveUniqueFilterChainTag) {
-  std::vector<std::shared_ptr<Configuration::FilterChainFactoryContext>> contexts;
+// The current implementation generated independent contexts for the same filter_chain
+TEST_F(FilterChainManagerImplTest, FilterChainContextsAreUnique) {
+  std::set<std::shared_ptr<Configuration::FilterChainFactoryContext>> contexts;
   {
     auto callback = filter_chain_manager_.createFilterChainFactoryContextCallback(parent_context_);
     callback->prepareFilterChainFactoryContexts();
-    for (int i = 0; i < 100; i++) {
+    for (int i = 0; i < 2; i++) {
       contexts.push_back(callback->createFilterChainFactoryContext(&filter_chain_template_));
     }
   }
-  std::set<uint64_t> tag_set;
-  for (const auto& context : contexts) {
-    tag_set.emplace(context->filterChainTag());
-  }
-  EXPECT_EQ(tag_set.size(), contexts.size());
+  EXPECT_EQ(contexts.size(), 2);
 }
 
 } // namespace Server

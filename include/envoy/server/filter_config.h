@@ -203,14 +203,7 @@ public:
 /**
  * An implementation of FactoryContext. It should be used to create NetworkFilterChain.
  */
-class FilterChainFactoryContext : public virtual FactoryContext {
-public:
-  /**
-   * @return uint64_t The tag assigned with this context at runtime. It will be used for connection
-   * handler tracking.
-   */
-  virtual uint64_t filterChainTag() const PURE;
-};
+class FilterChainFactoryContext : public virtual FactoryContext {};
 
 /**
  * An implementation of FactoryContext. It can be used to create ListenerFilterChain.

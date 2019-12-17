@@ -176,7 +176,6 @@ public:
   // Network::FilterChain
   MOCK_CONST_METHOD0(transportSocketFactory, const TransportSocketFactory&());
   MOCK_CONST_METHOD0(networkFilterFactories, const std::vector<FilterFactoryCb>&());
-  MOCK_CONST_METHOD0(filterChainTag, uint64_t());
 };
 
 class MockFilterChainManager : public FilterChainManager {
