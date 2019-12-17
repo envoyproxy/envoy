@@ -1027,7 +1027,7 @@ TEST_P(ServerInstanceImplTest, DisabledExtension) {
   OptionsImpl::disableExtensions({"filters.http/envoy.buffer"});
   initialize("test/server/node_bootstrap.yaml");
   bool disabled_filter_found = false;
-  for (const auto& extension : server_->localInfo().node().extension_versions().extension()) {
+  for (const auto& extension : server_->localInfo().node().extensions()) {
     if (extension.category() == "filters.http" && extension.name() == "envoy.buffer") {
       ASSERT_TRUE(extension.disabled());
       disabled_filter_found = true;

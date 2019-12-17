@@ -309,7 +309,7 @@ void InstanceImpl::initialize(const Options& options,
   bootstrap_.mutable_node()->set_user_agent_version(VersionInfo::version());
   for (const auto& ext : Envoy::Registry::FactoryCategoryRegistry::registeredFactories()) {
     for (const auto& name : ext.second->allRegisteredNames()) {
-      auto* extension = bootstrap_.mutable_node()->mutable_extension_versions()->add_extension();
+      auto* extension = bootstrap_.mutable_node()->add_extensions();
       extension->set_name(std::string(name));
       extension->set_category(ext.first);
       auto version = ext.second->getFactoryVersion(name);

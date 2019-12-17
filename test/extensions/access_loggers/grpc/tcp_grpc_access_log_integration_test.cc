@@ -110,7 +110,7 @@ public:
     log_entry->mutable_common_properties()->clear_time_to_last_downstream_tx_byte();
     if (request_msg.has_identifier()) {
       auto* node = request_msg.mutable_identifier()->mutable_node();
-      node->clear_extension_versions();
+      node->clear_extensions();
     }
     EXPECT_EQ(request_msg.DebugString(), expected_request_msg.DebugString());
 
