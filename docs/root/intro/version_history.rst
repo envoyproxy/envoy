@@ -5,6 +5,7 @@ Version history
 ================
 * access log: added FILTER_STATE :ref:`access log formatters <config_access_log_format>` and gRPC access logger.
 * access log: added a :ref:`typed JSON logging mode <config_access_log_format_dictionaries>` to output access logs in JSON format with non-string values
+* adaptive concurrency: removed gradient and burst queue stats and added enabled stat.
 * api: remove all support for v1
 * buffer: remove old implementation
 * build: official released binary is now built against libc++.
