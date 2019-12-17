@@ -293,8 +293,9 @@ message HealthCheck {
   bool always_log_health_check_failures = 19;
 
   // Specifies the ALPN protocol for health check connections. This is useful if the corresponding
-  // upstream is using ALPN-based :ref:`FilterChainMatch <envoy_api_msg_listener.FilterChainMatch>`
-  // along with different protocols for health checks versus data connections.
-  // If empty, no ALPN protocol will be set on HC connections.
+  // upstream is using ALPN-based :ref:`FilterChainMatch
+  // <envoy_api_msg_api.v3alpha.listener.FilterChainMatch>` along with different protocols for
+  // health checks versus data connections. If empty, no ALPN protocol will be set on HC
+  // connections.
   string alpn_protocol = 21;
 }
