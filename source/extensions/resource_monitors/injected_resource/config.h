@@ -1,5 +1,6 @@
 #pragma once
 
+#include "envoy/config/resource_monitor/injected_resource/v2alpha/injected_resource.pb.h"
 #include "envoy/config/resource_monitor/injected_resource/v2alpha/injected_resource.pb.validate.h"
 #include "envoy/server/resource_monitor_config.h"
 

@@ -260,6 +260,14 @@ following are the command line options that Envoy supports.
   and these occurrences are counted in the :ref:`server.dynamic_unknown_fields <server_statistics>`
   statistic.
 
+.. option:: --disable-extensions <extension list>
+
+  *(optional)* This flag disabled the provided list of comma-separated extension names. Disabled
+  extensions cannot be used by static or dynamic configuration, though they are still linked into
+  Envoy and may run start-up code or have other runtime effects. Extension names are created by
+  joining the extension category and name with a forward slash,
+  e.g. ``grpc_credentials/envoy.grpc_credentials.file_based_metadata``.
+
 .. option:: --version
 
   *(optional)* This flag is used to display Envoy version and build information, e.g.

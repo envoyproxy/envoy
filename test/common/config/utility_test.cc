@@ -1,5 +1,8 @@
-#include "envoy/api/v2/eds.pb.h"
+#include "envoy/api/v2/cds.pb.h"
+#include "envoy/api/v2/core/config_source.pb.h"
+#include "envoy/api/v2/core/grpc_service.pb.h"
 #include "envoy/common/exception.h"
+#include "envoy/config/bootstrap/v2/bootstrap.pb.h"
 
 #include "common/common/fmt.h"
 #include "common/config/utility.h"

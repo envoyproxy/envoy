@@ -19,5 +19,6 @@ envoy_extension_cc_test(
         "//source/extensions/filters/network/tcp_proxy:config",
         "//test/mocks/server:server_mocks",
         "//test/test_common:utility_lib",
+        "@envoy_api//envoy/config/filter/network/tcp_proxy/v2:pkg_cc_proto",
     ],
 )

@@ -1,8 +1,10 @@
 #include <unordered_set>
 
+#include "envoy/api/v2/cds.pb.h"
 #include "envoy/api/v2/cds.pb.validate.h"
 #include "envoy/config/bootstrap/v2/bootstrap.pb.h"
 #include "envoy/config/bootstrap/v2/bootstrap.pb.validate.h"
+#include "envoy/type/percent.pb.h"
 
 #include "common/common/base64.h"
 #include "common/protobuf/message_validator_impl.h"

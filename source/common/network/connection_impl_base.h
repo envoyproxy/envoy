@@ -12,7 +12,6 @@ class ConnectionImplBase : public FilterManagerConnection,
                            protected Logger::Loggable<Logger::Id::connection> {
 public:
   ConnectionImplBase(Event::Dispatcher& dispatcher, uint64_t id);
-  ~ConnectionImplBase() override {}
 
   // Network::Connection
   void addConnectionCallbacks(ConnectionCallbacks& cb) override;

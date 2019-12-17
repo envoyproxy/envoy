@@ -2,6 +2,7 @@
 
 #include "envoy/access_log/access_log.h"
 #include "envoy/api/v2/core/health_check.pb.h"
+#include "envoy/data/core/v2alpha/health_check_event.pb.h"
 #include "envoy/event/timer.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/stats/scope.h"
