@@ -2,15 +2,14 @@ syntax = "proto3";
 
 package tools.type_whisperer;
 
-message TypeDbDescription {
-  // Fully qualified package name.
-  string qualified_package = 2;
+import "tools/type_whisperer/types.proto";
 
-  // Path to .proto from API root.
-  string proto_path = 3;
+message TypeDbDescription {
+  // Type details.
+  TypeDetails type_details = 1;
 
   // Type's name in the next major version of the API.
-  string next_version_type_name = 4;
+  string next_version_type_name = 2;
 }
 
 // API type database. This describes the types in the API and the upgrade path

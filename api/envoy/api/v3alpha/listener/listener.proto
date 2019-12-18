@@ -2,6 +2,7 @@ syntax = "proto3";
 
 package envoy.api.v3alpha.listener;
 
+import "envoy/api/v3alpha/auth/cert.proto";
 import "envoy/api/v3alpha/core/address.proto";
 import "envoy/api/v3alpha/core/base.proto";
 
@@ -23,9 +24,7 @@ option java_multiple_files = true;
 message Filter {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.listener.Filter";
 
-  reserved 3, 2;
-
-  reserved "config";
+  reserved 3;
 
   // The name of the filter to instantiate. The name must match a
   // :ref:`supported filter <config_network_filters>`.
@@ -34,6 +33,8 @@ message Filter {
   // Filter specific configuration which depends on the filter being
   // instantiated. See the supported filters for further documentation.
   oneof config_type {
+    google.protobuf.Struct hidden_envoy_deprecated_config = 2 [deprecated = true];
+
     google.protobuf.Any typed_config = 4;
   }
 }
@@ -169,12 +170,16 @@ message FilterChainMatch {
 message FilterChain {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.listener.FilterChain";
 
-  reserved 2;
-
-  reserved "tls_context";
-
   // The criteria to use when matching a connection to this filter chain.
   FilterChainMatch filter_chain_match = 1;
+
+  // The TLS context for this filter chain.
+  //
+  // .. attention::
+  //
+  //   **This field is deprecated**. Use `transport_socket` with name `tls` instead. If both are
+  //   set, `transport_socket` takes priority.
+  auth.DownstreamTlsContext hidden_envoy_deprecated_tls_context = 2 [deprecated = true];
 
   // A list of individual network filters that make up the filter chain for
   // connections established with the listener. Order matters as the filters are
@@ -210,10 +215,6 @@ message ListenerFilter {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.api.v2.listener.ListenerFilter";
 
-  reserved 2;
-
-  reserved "config";
-
   // The name of the filter to instantiate. The name must match a
   // :ref:`supported filter <config_listener_filters>`.
   string name = 1 [(validate.rules).string = {min_bytes: 1}];
@@ -221,6 +222,8 @@ message ListenerFilter {
   // Filter specific configuration which depends on the filter being instantiated.
   // See the supported filters for further documentation.
   oneof config_type {
+    google.protobuf.Struct hidden_envoy_deprecated_config = 2 [deprecated = true];
+
     google.protobuf.Any typed_config = 3;
   }
 }

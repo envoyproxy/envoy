@@ -109,7 +109,7 @@ def NextVersionUpgrade(type_name, type_map, next_version_upgrade_memo, visited=N
     return next_version_upgrade_memo[type_name]
   type_desc = type_map[type_name]
   # Force upgrade packages that we enumerate.
-  if type_desc.qualified_package in PKG_FORCE_UPGRADE:
+  if type_desc.type_details.qualified_package in PKG_FORCE_UPGRADE:
     return True
   # Recurse and memoize.
   should_upgrade = type_desc.next_version_upgrade or any(
@@ -129,12 +129,12 @@ if __name__ == '__main__':
 
   # Aggregate type descriptors to a single type map.
   type_map = dict(sum([list(t.types.items()) for t in type_whispers], []))
-  all_pkgs = set([type_desc.qualified_package for type_desc in type_map.values()])
+  all_pkgs = set([type_desc.type_details.qualified_package for type_desc in type_map.values()])
 
   # Determine via DFS on each type descriptor and its deps which packages require upgrade.
   next_version_upgrade_memo = {}
   next_versions_pkgs = set([
-      type_desc.qualified_package
+      type_desc.type_details.qualified_package
       for type_name, type_desc in type_map.items()
       if NextVersionUpgrade(type_name, type_map, next_version_upgrade_memo)
   ])
@@ -142,10 +142,12 @@ if __name__ == '__main__':
   # Generate type map entries for upgraded types.
   upgraded_types = []
   for type_name, type_desc in type_map.items():
-    if type_desc.qualified_package in next_versions_pkgs:
+    if type_desc.type_details.qualified_package in next_versions_pkgs:
       upgrade_type_desc = TypeDescription()
-      upgrade_type_desc.qualified_package = UpgradedType(type_desc.qualified_package)
-      upgrade_type_desc.proto_path = UpgradedPath(type_desc.proto_path)
+      upgrade_type_desc.type_details.MergeFrom(type_desc.type_details)
+      upgrade_type_desc.type_details.qualified_package = UpgradedType(
+          type_desc.type_details.qualified_package)
+      upgrade_type_desc.type_details.proto_path = UpgradedPath(type_desc.type_details.proto_path)
       upgraded_types.append((UpgradedType(type_name), upgrade_type_desc))
   for n, t in upgraded_types:
     type_map[n] = t
@@ -158,13 +160,12 @@ if __name__ == '__main__':
   next_proto_path = {}
   for t in sorted(type_map):
     type_desc = type_db.types[t]
-    type_desc.qualified_package = type_map[t].qualified_package
-    type_desc.proto_path = type_map[t].proto_path
-    if type_desc.qualified_package in next_versions_pkgs:
+    type_desc.type_details.MergeFrom(type_map[t].type_details)
+    if type_desc.type_details.qualified_package in next_versions_pkgs:
       type_desc.next_version_type_name = UpgradedType(t)
       assert (type_desc.next_version_type_name != t)
-      next_proto_path[type_map[t].proto_path] = type_map[
-          type_desc.next_version_type_name].proto_path
+      next_proto_path[type_map[t].type_details.proto_path] = type_map[
+          type_desc.next_version_type_name].type_details.proto_path
   for pkg in sorted(all_pkgs):
     if pkg in next_versions_pkgs:
       type_db.next_version_packages[pkg] = UpgradedType(pkg)

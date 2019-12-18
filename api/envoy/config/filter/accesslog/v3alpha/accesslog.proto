@@ -23,10 +23,6 @@ message AccessLog {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.accesslog.v2.AccessLog";
 
-  reserved 3;
-
-  reserved "config";
-
   // The name of the access log implementation to instantiate. The name must
   // match a statically registered access log. Current built-in loggers include:
   //
@@ -48,6 +44,8 @@ message AccessLog {
   // #. "envoy.tcp_grpc_access_log": :ref:`TcpGrpcAccessLogConfig
   //    <envoy_api_msg_config.accesslog.v3alpha.TcpGrpcAccessLogConfig>`
   oneof config_type {
+    google.protobuf.Struct hidden_envoy_deprecated_config = 3 [deprecated = true];
+
     google.protobuf.Any typed_config = 4;
   }
 }
@@ -283,16 +281,14 @@ message ExtensionFilter {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.accesslog.v2.ExtensionFilter";
 
-  reserved 2;
-
-  reserved "config";
-
   // The name of the filter implementation to instantiate. The name must
   // match a statically registered filter.
   string name = 1;
 
   // Custom configuration that depends on the filter being instantiated.
   oneof config_type {
+    google.protobuf.Struct hidden_envoy_deprecated_config = 2 [deprecated = true];
+
     google.protobuf.Any typed_config = 3;
   }
 }

@@ -8,6 +8,7 @@ api_proto_package(
     has_services = True,
     deps = [
         "//envoy/api/v2:pkg",
+        "//envoy/api/v3alpha/auth:pkg",
         "//envoy/api/v3alpha/cluster:pkg",
         "//envoy/api/v3alpha/core:pkg",
         "//envoy/api/v3alpha/endpoint:pkg",

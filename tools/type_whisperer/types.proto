@@ -2,20 +2,41 @@ syntax = "proto3";
 
 package tools.type_whisperer;
 
-// Description for a single type.
-message TypeDescription {
+// Field or enum entry level type information.
+message NamedEntityDescription {
+  // Field or enum value has a deprecated option set.
+  bool deprecate = 1;
+
+  // Field or enum value has (udpa.annotations.*_migrate).rename set.
+  string rename = 2;
+}
+
+// Type details for a single type.
+message TypeDetails {
   // Fully qualified package name.
-  string qualified_package = 2;
+  string qualified_package = 1;
 
   // Path to .proto from API root.
-  string proto_path = 3;
+  string proto_path = 2;
 
-  // Fully qualified type names for type dependencies.
-  repeated string type_dependencies = 4;
+  // Is this type an enum? There is special treatment required during API
+  // boosting and name mangling.
+  bool enum_type = 4;
+
+  map<string, NamedEntityDescription> names = 6;
+}
+
+// Description for a single type.
+message TypeDescription {
+  // Type details.
+  TypeDetails type_details = 1;
 
   // Does this type have a breaking change? If so, it needs to be upgraded at
   // the next major version.
-  bool next_version_upgrade = 5;
+  bool next_version_upgrade = 2;
+
+  // Fully qualified type names for type dependencies.
+  repeated string type_dependencies = 3;
 }
 
 message Types {

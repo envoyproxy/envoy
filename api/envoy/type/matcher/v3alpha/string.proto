@@ -19,10 +19,6 @@ option java_multiple_files = true;
 message StringMatcher {
   option (udpa.annotations.versioning).previous_message_type = "envoy.type.matcher.StringMatcher";
 
-  reserved 4;
-
-  reserved "regex";
-
   oneof match_pattern {
     option (validate.required) = true;
 
@@ -48,6 +44,22 @@ message StringMatcher {
     //
     // * *abc* matches the value *xyz.abc*
     string suffix = 3 [(validate.rules).string = {min_bytes: 1}];
+
+    // The input string must match the regular expression specified here.
+    // The regex grammar is defined `here
+    // <https://en.cppreference.com/w/cpp/regex/ecmascript>`_.
+    //
+    // Examples:
+    //
+    // * The regex ``\d{3}`` matches the value *123*
+    // * The regex ``\d{3}`` does not match the value *1234*
+    // * The regex ``\d{3}`` does not match the value *123.456*
+    //
+    // .. attention::
+    //   This field has been deprecated in favor of `safe_regex` as it is not safe for use with
+    //   untrusted input in all cases.
+    string hidden_envoy_deprecated_regex = 4
+        [deprecated = true, (validate.rules).string = {max_bytes: 1024}];
 
     // The input string must match the regular expression specified here.
     RegexMatcher safe_regex = 5 [(validate.rules).message = {required: true}];

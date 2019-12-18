@@ -276,7 +276,7 @@ public:
   NiceMock<Api::MockApi> api_;
   envoy::config::filter::network::redis_proxy::v2::RedisProxy::ConnPoolSettings::ReadPolicy
       read_policy_ = envoy::config::filter::network::redis_proxy::v2::
-          RedisProxy_ConnPoolSettings_ReadPolicy_MASTER;
+          RedisProxy::ConnPoolSettings::MASTER;
   NiceMock<Stats::MockCounter> upstream_cx_drained_;
   NiceMock<Stats::MockCounter> max_upstream_unknown_connections_reached_;
   std::shared_ptr<NiceMock<Extensions::Common::Redis::MockClusterRefreshManager>>
@@ -376,16 +376,16 @@ TEST_F(RedisConnPoolImplTest, ClientRequestFailed) {
 
 TEST_F(RedisConnPoolImplTest, BasicWithReadPolicy) {
   testReadPolicy(envoy::config::filter::network::redis_proxy::v2::
-                     RedisProxy_ConnPoolSettings_ReadPolicy_PREFER_MASTER,
+                     RedisProxy::ConnPoolSettings::PREFER_MASTER,
                  NetworkFilters::Common::Redis::Client::ReadPolicy::PreferMaster);
   testReadPolicy(envoy::config::filter::network::redis_proxy::v2::
-                     RedisProxy_ConnPoolSettings_ReadPolicy_REPLICA,
+                     RedisProxy::ConnPoolSettings::REPLICA,
                  NetworkFilters::Common::Redis::Client::ReadPolicy::Replica);
   testReadPolicy(envoy::config::filter::network::redis_proxy::v2::
-                     RedisProxy_ConnPoolSettings_ReadPolicy_PREFER_REPLICA,
+                     RedisProxy::ConnPoolSettings::PREFER_REPLICA,
                  NetworkFilters::Common::Redis::Client::ReadPolicy::PreferReplica);
   testReadPolicy(
-      envoy::config::filter::network::redis_proxy::v2::RedisProxy_ConnPoolSettings_ReadPolicy_ANY,
+      envoy::config::filter::network::redis_proxy::v2::RedisProxy::ConnPoolSettings::ANY,
       NetworkFilters::Common::Redis::Client::ReadPolicy::Any);
 };
 

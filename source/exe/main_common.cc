@@ -30,7 +30,7 @@ Server::DrainManagerPtr ProdComponentFactory::createDrainManager(Server::Instanc
   // hot restart at the global level. The per-listener drain managers decide whether to
   // to include /healthcheck/fail status.
   return std::make_unique<Server::DrainManagerImpl>(server,
-                                                    envoy::api::v2::Listener_DrainType_MODIFY_ONLY);
+                                                    envoy::api::v2::Listener::MODIFY_ONLY);
 }
 
 Runtime::LoaderPtr ProdComponentFactory::createRuntime(Server::Instance& server,

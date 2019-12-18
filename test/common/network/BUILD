@@ -2,7 +2,6 @@ licenses(["notice"])  # Apache 2
 
 load(
     "//bazel:envoy_build_system.bzl",
-    "envoy_cc_binary",
     "envoy_cc_test",
     "envoy_cc_test_binary",
     "envoy_cc_test_library",
@@ -285,9 +284,8 @@ envoy_cc_test(
     ],
 )
 
-envoy_cc_binary(
+envoy_cc_test_binary(
     name = "lc_trie_speed_test",
-    testonly = 1,
     srcs = ["lc_trie_speed_test.cc"],
     external_deps = [
         "benchmark",

@@ -52,6 +52,13 @@ public:
   // AST match callback dispatcher.
   void run(const clang::ast_matchers::MatchFinder::MatchResult& match_result) override {
     clang::SourceManager& source_manager = match_result.Context->getSourceManager();
+    DEBUG_LOG("AST match callback dispatcher");
+    for (const auto it : match_result.Nodes.getMap()) {
+      const std::string match_text = getSourceText(it.second.getSourceRange(), source_manager);
+      DEBUG_LOG(absl::StrCat("  Result for ", it.first, " [",
+                             match_text.size() > 250 ? match_text.substr(0, 250) + "..." : match_text,
+                             "]"));
+    }
     if (const auto* type_loc = match_result.Nodes.getNodeAs<clang::TypeLoc>("type")) {
       onTypeLocMatch(*type_loc, source_manager);
       return;
@@ -62,11 +69,16 @@ public:
     }
     if (const auto* decl_ref_expr =
             match_result.Nodes.getNodeAs<clang::DeclRefExpr>("decl_ref_expr")) {
-      onDeclRefExprMatch(*decl_ref_expr, source_manager);
+      onDeclRefExprMatch(*decl_ref_expr, *match_result.Context, source_manager);
       return;
     }
     if (const auto* call_expr = match_result.Nodes.getNodeAs<clang::CallExpr>("call_expr")) {
-      onCallExprMatch(*call_expr, source_manager);
+      onCallExprMatch(*call_expr, *match_result.Context, source_manager);
+      return;
+    }
+    if (const auto* member_call_expr =
+            match_result.Nodes.getNodeAs<clang::CXXMemberCallExpr>("member_call_expr")) {
+      onMemberCallExprMatch(*member_call_expr, source_manager);
       return;
     }
     if (const auto* tmpl =
@@ -92,24 +104,39 @@ public:
   }
 
 private:
+  static bool isEnvoyNamespace(absl::string_view s) {
+    return absl::StartsWith(s, "envoy::") || absl::StartsWith(s, "::envoy::");
+  }
+
   // Match callback for TypeLoc. These are explicit mentions of the type in the
   // source. If we have a match on type, we should track the corresponding .pb.h
   // and attempt to upgrade.
   void onTypeLocMatch(const clang::TypeLoc& type_loc, const clang::SourceManager& source_manager) {
-    const std::string type_name =
+    absl::optional<clang::SourceRange> source_range;
+    std::string type_name =
         type_loc.getType().getCanonicalType().getUnqualifiedType().getAsString();
     // Remove qualifiers, e.g. const.
     const clang::UnqualTypeLoc unqual_type_loc = type_loc.getUnqualifiedLoc();
-
+    DEBUG_LOG(absl::StrCat("Type class ", type_loc.getType()->getTypeClassName()));
     // Today we are only smart enought to rewrite ElaborateTypeLoc, which are
     // full namespace prefixed types. We probably will need to support more, in
     // particular if we want message-level type renaming. TODO(htuch): add more
     // supported AST TypeLoc classes as needed.
-    const bool rewrite = unqual_type_loc.getTypeLocClass() == clang::TypeLoc::Elaborated;
-    tryBoostType(unqual_type_loc.getType().getCanonicalType().getAsString(),
-                 rewrite ? absl::make_optional<clang::SourceRange>(unqual_type_loc.getSourceRange())
-                         : absl::nullopt,
-                 source_manager, type_loc.getType()->getTypeClassName());
+    if (unqual_type_loc.getTypeLocClass() == clang::TypeLoc::Elaborated &&
+        isEnvoyNamespace(getSourceText(unqual_type_loc.getSourceRange(), source_manager))) {
+      source_range = absl::make_optional<clang::SourceRange>(unqual_type_loc.getSourceRange());
+    } else if (unqual_type_loc.getTypeLocClass() == clang::TypeLoc::MemberPointer) {
+      // This doesn't handle namespace qualification, WiP.
+#if 0
+      auto member_pointer_type_loc = type_loc.getAs<clang::MemberPointerTypeLoc>();
+      type_name = member_pointer_type_loc.getClassTInfo()->getType().getAsString();
+      DEBUG_LOG(type_name);
+      source_range =
+          absl::make_optional<clang::SourceRange>(member_pointer_type_loc.getSigilLoc());
+#endif
+    }
+    tryBoostType(type_name, source_range, source_manager, type_loc.getType()->getTypeClassName(),
+                 false);
   }
 
   // Match callback for clang::UsingDecl. These are 'using' aliases for API type
@@ -120,55 +147,165 @@ private:
     // is such an API type database match.
     const clang::SourceRange source_range = clang::SourceRange(
         using_decl.getQualifierLoc().getBeginLoc(), using_decl.getNameInfo().getEndLoc());
-    const std::string type_name = clang::Lexer::getSourceText(
-        clang::CharSourceRange::getTokenRange(source_range), source_manager, lexer_lopt_, 0);
-    tryBoostType(type_name, source_range, source_manager, "UsingDecl");
+    const std::string type_name = getSourceText(source_range, source_manager);
+    tryBoostType(type_name, source_range, source_manager, "UsingDecl", true);
   }
 
   // Match callback for clang::DeclRefExpr. These occur when enums constants,
   // e.g. foo::bar::kBaz, appear in the source.
-  void onDeclRefExprMatch(const clang::DeclRefExpr& decl_ref_expr,
+  void onDeclRefExprMatch(const clang::DeclRefExpr& decl_ref_expr, const clang::ASTContext& context,
                           const clang::SourceManager& source_manager) {
     // We don't need to consider non-namespace qualified DeclRefExprfor now (no
     // renaming support yet).
     if (!decl_ref_expr.hasQualifier()) {
       return;
     }
+    const std::string decl_name = decl_ref_expr.getNameInfo().getAsString();
+    DEBUG_LOG("decl_name " + decl_name);
+    // There are generated methods to stringify/parse/validate enum values,
+    // these need special treatment as they look like types with special
+    // suffices.
+    for (const std::string& enum_generated_method_suffix : {"_Name", "_Parse", "_IsValid"}) {
+      if (absl::EndsWith(decl_name, enum_generated_method_suffix)) {
+        // Remove trailing suffix from reference for replacement range and type
+        // name purposes.
+        const clang::SourceLocation begin_loc = source_manager.getSpellingLoc(decl_ref_expr.getBeginLoc());
+        const std::string type_name_with_suffix =
+            getSourceText(decl_ref_expr.getSourceRange(), source_manager);
+        const std::string type_name = type_name_with_suffix.substr(
+            0, type_name_with_suffix.size() - enum_generated_method_suffix.size());
+        tryBoostType(type_name, begin_loc, type_name.size(), source_manager,
+                     "DeclRefExpr suffixed " + enum_generated_method_suffix, false);
+        return;
+      }
+    }
     // Remove trailing : from namespace qualifier.
     const clang::SourceRange source_range =
         clang::SourceRange(decl_ref_expr.getQualifierLoc().getBeginLoc(),
                            decl_ref_expr.getQualifierLoc().getEndLoc().getLocWithOffset(-1));
-    const std::string type_name = clang::Lexer::getSourceText(
-        clang::CharSourceRange::getTokenRange(source_range), source_manager, lexer_lopt_, 0);
-    tryBoostType(type_name, source_range, source_manager, "DeclRefExpr");
+    // Only try to boost type if it's explicitly an Envoy qualified type.
+    const std::string source_type_name = getSourceText(source_range, source_manager);
+    const clang::QualType ast_type =
+        decl_ref_expr.getDecl()->getType().getCanonicalType().getUnqualifiedType();
+    const std::string ast_type_name = ast_type.getAsString();
+    if (isEnvoyNamespace(source_type_name)) {
+      // Generally we pull the type from the named entity's declaration type,
+      // since this allows us to map from things like envoy::type::HTTP2 to the
+      // underlying fully qualified envoy::type::CodecClientType::HTTP2 prior to
+      // API type database lookup. However, for the generated static methods or
+      // field accessors, we don't want to deal with lookup via the function
+      // type, so we use the source text directly.
+      const std::string type_name = ast_type.isPODType(context) ? ast_type_name : source_type_name;
+      tryBoostType(type_name, source_range, source_manager, "DeclRefExpr", true);
+    }
+    const auto latest_type_info = getLatestTypeInformationFromCType(ast_type_name);
+    // In some cases we need to upgrade the name the DeclRefExpr points at. If
+    // this isn't a known API type, our work here is done.
+    if (!latest_type_info) {
+      return;
+    }
+    const clang::SourceRange decl_source_range = decl_ref_expr.getNameInfo().getSourceRange();
+    // Deprecated enum constants need to be upgraded.
+    if (latest_type_info->enum_type_) {
+      const auto enum_value_rename =
+          ProtoCxxUtils::renameEnumValue(decl_name, latest_type_info->renames_);
+      if (enum_value_rename) {
+        const clang::SourceRange decl_source_range = decl_ref_expr.getNameInfo().getSourceRange();
+        const clang::tooling::Replacement enum_value_replacement(
+            source_manager, source_manager.getSpellingLoc(decl_source_range.getBegin()),
+            sourceRangeLength(decl_source_range, source_manager), *enum_value_rename);
+        insertReplacement(enum_value_replacement);
+      }
+      return;
+    }
+    // If we see something like Foo::mutable_bar (i.e. a function pointer), we
+    // need to consider this for upgrade renaming.
+#if 0
+    if (tryRenameMethod(*latest_type_info, decl_source_range, source_manager)) {
+      return;
+    }
+#endif
+    // We need to map from envoy::type::matcher::StringMatcher::kRegex to
+    // envoy::type::matcher::v3alpha::StringMatcher::kHiddenEnvoyDeprecatedRegex.
+    const auto constant_rename =
+        ProtoCxxUtils::renameConstant(decl_name, latest_type_info->renames_);
+    if (constant_rename) {
+      const clang::tooling::Replacement constant_replacement(
+          source_manager, decl_source_range.getBegin(),
+          sourceRangeLength(decl_source_range, source_manager), *constant_rename);
+      insertReplacement(constant_replacement);
+    }
   }
 
   // Match callback clang::CallExpr. We don't need to rewrite, but if it's something like
   // loadFromYamlAndValidate, we might need to look at the argument type to
   // figure out any corresponding .pb.validate.h we require.
-  void onCallExprMatch(const clang::CallExpr& call_expr,
+  void onCallExprMatch(const clang::CallExpr& call_expr, const clang::ASTContext& context,
                        const clang::SourceManager& source_manager) {
     auto* direct_callee = call_expr.getDirectCallee();
     if (direct_callee != nullptr) {
       const std::unordered_map<std::string, int> ValidateNameToArg = {
           {"loadFromYamlAndValidate", 1},
           {"loadFromFileAndValidate", 1},
-          {"downcastAndValidate", 0},
+          {"downcastAndValidate", -1},
           {"validate", 0},
       };
       const std::string& callee_name = direct_callee->getNameInfo().getName().getAsString();
+      DEBUG_LOG(absl::StrCat("callee_name ", callee_name));
       const auto arg = ValidateNameToArg.find(callee_name);
       // Sometimes we hit false positives because we aren't qualifying above.
       // TODO(htuch): fix this.
-      if (arg != ValidateNameToArg.end() && arg->second < call_expr.getNumArgs()) {
-        const std::string type_name = call_expr.getArg(arg->second)
-                                          ->getType()
-                                          .getCanonicalType()
-                                          .getUnqualifiedType()
-                                          .getAsString();
-        tryBoostType(type_name, {}, source_manager, "validation invocation", true);
+      if (arg != ValidateNameToArg.end() &&
+          arg->second < static_cast<int>(call_expr.getNumArgs())) {
+        const std::string type_name = arg->second >= 0 ? call_expr.getArg(arg->second)
+                                                             ->getType()
+                                                             .getCanonicalType()
+                                                             .getUnqualifiedType()
+                                                             .getAsString()
+                                                       : call_expr.getCallReturnType(context)
+                                                             .getNonReferenceType()
+                                                             .getCanonicalType()
+                                                             .getUnqualifiedType()
+                                                             .getAsString();
+        DEBUG_LOG(absl::StrCat("Validation header boosting ", type_name));
+        tryBoostType(type_name, {}, source_manager, "validation invocation", true, true);
       }
     }
+  }
+
+  // Match callback clang::CallMemberExpr. We rewrite things like
+  // ->mutable_foo() to ->mutable_foo_new_name() during renames.
+  void onMemberCallExprMatch(const clang::CXXMemberCallExpr& member_call_expr,
+                             const clang::SourceManager& source_manager) {
+    const std::string type_name =
+        member_call_expr.getObjectType().getCanonicalType().getUnqualifiedType().getAsString();
+    const auto latest_type_info = getLatestTypeInformationFromCType(type_name);
+    // If this isn't a known API type, our work here is done.
+    if (!latest_type_info) {
+      return;
+    }
+    const clang::SourceRange source_range = {
+        source_manager.getSpellingLoc(member_call_expr.getExprLoc()),
+        source_manager.getSpellingLoc(member_call_expr.getExprLoc())};
+    const std::string method_name = getSourceText(source_range, source_manager);
+    DEBUG_LOG(
+        absl::StrCat("Matched member call expr on ", type_name, " with method ", method_name));
+    tryRenameMethod(*latest_type_info, source_range, source_manager);
+  }
+
+  bool tryRenameMethod(const TypeInformation& type_info, clang::SourceRange source_range,
+                       const clang::SourceManager& source_manager) {
+    const std::string method_name = getSourceText(source_range, source_manager);
+    DEBUG_LOG(absl::StrCat("Checking for rename of ", method_name));
+    const auto method_rename = ProtoCxxUtils::renameMethod(method_name, type_info.renames_);
+    if (method_rename) {
+      const clang::tooling::Replacement method_replacement(
+          source_manager, source_range.getBegin(), sourceRangeLength(source_range, source_manager),
+          *method_rename);
+      insertReplacement(method_replacement);
+      return true;
+    }
+    return false;
   }
 
   // Match callback for clang::ClassTemplateSpecializationDecl. An additional
@@ -180,27 +317,59 @@ private:
                                            ->getInjectedClassNameSpecialization()
                                            .getCanonicalType()
                                            .getAsString();
-    if (tmpl_type_name == "FactoryBase<type-parameter-0-0>") {
+    DEBUG_LOG(absl::StrCat("Template name ", tmpl_type_name));
+    if (absl::EndsWith(tmpl_type_name, "FactoryBase<type-parameter-0-0>")) {
       const std::string type_name = tmpl.getTemplateArgs()
                                         .get(0)
                                         .getAsType()
                                         .getCanonicalType()
                                         .getUnqualifiedType()
                                         .getAsString();
-      tryBoostType(type_name, {}, source_manager, "FactoryBase template", true);
+      tryBoostType(type_name, {}, source_manager, "FactoryBase template", true, true);
+    }
+    if (tmpl_type_name == "FactoryBase<type-parameter-0-0, type-parameter-0-1>") {
+      const std::string type_name_0 = tmpl.getTemplateArgs()
+                                          .get(0)
+                                          .getAsType()
+                                          .getCanonicalType()
+                                          .getUnqualifiedType()
+                                          .getAsString();
+      tryBoostType(type_name_0, {}, source_manager, "FactoryBase template", true, true);
+      const std::string type_name_1 = tmpl.getTemplateArgs()
+                                          .get(1)
+                                          .getAsType()
+                                          .getCanonicalType()
+                                          .getUnqualifiedType()
+                                          .getAsString();
+      tryBoostType(type_name_1, {}, source_manager, "FactoryBase template", true, true);
     }
   }
 
   // Attempt to boost a given type and rewrite the given source range.
   void tryBoostType(const std::string& type_name, absl::optional<clang::SourceRange> source_range,
                     const clang::SourceManager& source_manager, absl::string_view debug_description,
-                    bool validation_required = false) {
-    const auto latest_type_info = getLatestTypeInformationFromCType(type_name);
+                    bool requires_enum_truncation, bool validation_required = false) {
+    if (source_range) {
+      tryBoostType(type_name, source_manager.getSpellingLoc(source_range->getBegin()),
+                   sourceRangeLength(*source_range, source_manager), source_manager,
+                   debug_description, requires_enum_truncation, validation_required);
+    } else {
+      tryBoostType(type_name, {}, -1, source_manager, debug_description, requires_enum_truncation,
+                   validation_required);
+    }
+  }
+
+  void tryBoostType(const std::string& type_name, clang::SourceLocation begin_loc, int length,
+                    const clang::SourceManager& source_manager, absl::string_view debug_description,
+                    bool requires_enum_truncation, bool validation_required = false) {
+    const auto latest_type_info = getLatestTypeInformationFromCType(
+        absl::StartsWith(type_name, "::") ? type_name.substr(2) : type_name);
     // If this isn't a known API type, our work here is done.
     if (!latest_type_info) {
       return;
     }
-    DEBUG_LOG(absl::StrCat("Matched type '", type_name, "' (", debug_description, ")"));
+    DEBUG_LOG(absl::StrCat("Matched type '", type_name, "' (", debug_description, ") length ",
+                           length, " at ", begin_loc.printToString(source_manager)));
     // Track corresponding imports.
     source_api_proto_paths_.insert(adjustProtoSuffix(latest_type_info->proto_path_, ".pb.h"));
     if (validation_required) {
@@ -208,23 +377,64 @@ private:
           adjustProtoSuffix(latest_type_info->proto_path_, ".pb.validate.h"));
     }
     // Not all AST matchers know how to do replacements (yet?).
-    if (!source_range) {
+    if (length == -1) {
       return;
     }
+    // We need to look at the text we're replacing to decide whether we should
+    // use the qualified C++'ified proto name.
+    const bool qualified =
+        getSourceText(begin_loc, length, source_manager).find("::") != std::string::npos;
+    std::string case_residual;
+    if (absl::EndsWith(type_name, "Case")) {
+      case_residual = type_name.substr(type_name.rfind(':') - 1);
+    }
     // Add corresponding replacement.
-    const clang::SourceLocation start = source_range->getBegin();
-    const clang::SourceLocation end =
-        clang::Lexer::getLocForEndOfToken(source_range->getEnd(), 0, source_manager, lexer_lopt_);
-    const size_t length = source_manager.getFileOffset(end) - source_manager.getFileOffset(start);
-    clang::tooling::Replacement type_replacement(
-        source_manager, start, length, ProtoCxxUtils::protoToCxxType(latest_type_info->type_name_));
-    llvm::Error error = replacements_[type_replacement.getFilePath()].add(type_replacement);
+    const clang::tooling::Replacement type_replacement(
+        source_manager, begin_loc, length,
+        ProtoCxxUtils::protoToCxxType(latest_type_info->type_name_, qualified,
+                                      latest_type_info->enum_type_ && requires_enum_truncation) +
+            case_residual);
+    insertReplacement(type_replacement);
+  }
+
+  void insertReplacement(const clang::tooling::Replacement& replacement) {
+    llvm::Error error = replacements_[replacement.getFilePath()].add(replacement);
     if (error) {
       std::cerr << "  Replacement insertion error: " << llvm::toString(std::move(error))
                 << std::endl;
     } else {
-      std::cerr << "  Replacement added: " << type_replacement.toString() << std::endl;
+      std::cerr << "  Replacement added: " << replacement.toString() << std::endl;
     }
+  }
+
+  // Modeled after getRangeSize() in Clang's Replacements.cpp. Turns out it's
+  // non-trivial to get the actual length of a SourceRange, as the end location
+  // point to the start of the last token.
+  int sourceRangeLength(clang::SourceRange source_range,
+                        const clang::SourceManager& source_manager) {
+    const clang::SourceLocation spelling_begin =
+        source_manager.getSpellingLoc(source_range.getBegin());
+    const clang::SourceLocation spelling_end = source_manager.getSpellingLoc(source_range.getEnd());
+    std::pair<clang::FileID, unsigned> start = source_manager.getDecomposedLoc(spelling_begin);
+    std::pair<clang::FileID, unsigned> end = source_manager.getDecomposedLoc(spelling_end);
+    if (start.first != end.first) {
+      return -1;
+    }
+    end.second += clang::Lexer::MeasureTokenLength(spelling_end, source_manager, lexer_lopt_);
+    return end.second - start.second;
+  }
+
+  std::string getSourceText(clang::SourceLocation begin_loc, int size,
+                            const clang::SourceManager& source_manager) {
+    return clang::Lexer::getSourceText(
+        {clang::SourceRange(begin_loc, begin_loc.getLocWithOffset(size)), false}, source_manager,
+        lexer_lopt_, 0);
+  }
+
+  std::string getSourceText(clang::SourceRange source_range,
+                            const clang::SourceManager& source_manager) {
+    return clang::Lexer::getSourceText(clang::CharSourceRange::getTokenRange(source_range),
+                                       source_manager, lexer_lopt_, 0);
   }
 
   void addNamedspaceQualifiedTypeReplacement() {}
@@ -238,11 +448,12 @@ private:
   // from the API type database.
   absl::optional<TypeInformation>
   getLatestTypeInformationFromCType(const std::string& c_type_name) {
+    DEBUG_LOG("getLatestTypeInformation " + c_type_name);
     // Ignore compound or non-API types.
     // TODO(htuch): this is all super hacky and not really right, we should be
     // removing qualifiers etc. to get to the underlying type name.
     const std::string type_name = std::regex_replace(c_type_name, std::regex("^(class|enum) "), "");
-    if (!absl::StartsWith(type_name, "envoy::") || absl::StrContains(type_name, " ")) {
+    if (!isEnvoyNamespace(type_name) || absl::StrContains(type_name, " ")) {
       return {};
     }
     const std::string proto_type_name = ProtoCxxUtils::cxxToProtoType(type_name);
@@ -263,6 +474,7 @@ private:
       ::exit(1);
     }
 
+    DEBUG_LOG("No type information found");
     return {};
   }
 
@@ -307,12 +519,22 @@ int main(int argc, const char** argv) {
 
   // Match on all call expressions. We are interested in particular in calls
   // where validation on protos is performed.
-  auto call_matcher = clang::ast_matchers::callExpr().bind("call_expr");
+  auto call_matcher =
+      clang::ast_matchers::callExpr(clang::ast_matchers::isExpansionInMainFile()).bind("call_expr");
   finder.addMatcher(call_matcher, &api_booster);
 
-  // Match on all template instantiations.We are interested in particular in
+  // Match on all .foo() or ->foo() expressions. We are interested in these for renames
+  // and deprecations.
+  auto member_call_expr =
+      clang::ast_matchers::cxxMemberCallExpr(clang::ast_matchers::isExpansionInMainFile())
+          .bind("member_call_expr");
+  finder.addMatcher(member_call_expr, &api_booster);
+
+  // Match on all template instantiations. We are interested in particular in
   // instantiations of factories where validation on protos is performed.
-  auto tmpl_matcher = clang::ast_matchers::classTemplateSpecializationDecl().bind("tmpl");
+  auto tmpl_matcher = clang::ast_matchers::classTemplateSpecializationDecl(
+                          clang::ast_matchers::matchesName(".*FactoryBase.*"))
+                          .bind("tmpl");
   finder.addMatcher(tmpl_matcher, &api_booster);
 
   // Apply ApiBooster to AST matches. This will generate a set of replacements in

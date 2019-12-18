@@ -19,13 +19,10 @@ namespace Extensions {
 namespace Tracers {
 namespace XRay {
 
-namespace api = ::envoy::api::v2;
-namespace trace = envoy::config::trace::v2alpha;
-
 XRayTracerFactory::XRayTracerFactory() : FactoryBase(TracerNames::get().XRay) {}
 
 Tracing::HttpTracerPtr
-XRayTracerFactory::createHttpTracerTyped(const trace::XRayConfig& proto_config,
+XRayTracerFactory::createHttpTracerTyped(const envoy::config::trace::v2alpha::XRayConfig& proto_config,
                                          Server::Instance& server) {
   std::string sampling_rules_json;
   try {
@@ -36,12 +33,12 @@ XRayTracerFactory::createHttpTracerTyped(const trace::XRayConfig& proto_config,
   }
 
   if (proto_config.daemon_endpoint().protocol() !=
-      api::core::SocketAddress::Protocol::SocketAddress_Protocol_UDP) {
+      envoy::api::v2::core::SocketAddress::UDP) {
     throw EnvoyException("X-Ray daemon endpoint must be a UDP socket address");
   }
 
   if (proto_config.daemon_endpoint().port_specifier_case() !=
-      api::core::SocketAddress::PortSpecifierCase::kPortValue) {
+      envoy::api::v2::core::SocketAddress::PortSpecifierCase::kPortValue) {
     throw EnvoyException("X-Ray daemon port must be specified as number. Not a named port.");
   }
 

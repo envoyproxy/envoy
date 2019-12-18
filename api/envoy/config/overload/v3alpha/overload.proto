@@ -25,10 +25,6 @@ message ResourceMonitor {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.overload.v2alpha.ResourceMonitor";
 
-  reserved 2;
-
-  reserved "config";
-
   // The name of the resource monitor to instantiate. Must match a registered
   // resource monitor type. The built-in resource monitors are:
   //
@@ -40,6 +36,8 @@ message ResourceMonitor {
 
   // Configuration for the resource monitor being instantiated.
   oneof config_type {
+    google.protobuf.Struct hidden_envoy_deprecated_config = 2 [deprecated = true];
+
     google.protobuf.Any typed_config = 3;
   }
 }

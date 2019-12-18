@@ -83,8 +83,10 @@ def GetDestinationPath(src):
   if len(matches) != 1:
     raise RequiresReformatError("Expect {} has only one package declaration but has {}".format(
         src, len(matches)))
+  #shadow_fixup = ".envoy_internal" if "envoy_internal" in src else ""
+  shadow_fixup = ""
   return pathlib.Path(GetDirectoryFromPackage(
-      matches[0])).joinpath(src_path.name.split('.')[0] + ".proto")
+      matches[0])).joinpath(src_path.name.split('.')[0] + shadow_fixup + ".proto")
 
 
 def SyncProtoFile(cmd, src, dst_root):
@@ -251,8 +253,11 @@ if __name__ == '__main__':
     dst_dir = pathlib.Path(tmp).joinpath("b")
     for label in args.labels:
       SyncProtoFile(args.mode, utils.BazelBinPathForOutputArtifact(label, '.v2.proto'), dst_dir)
-      SyncProtoFile(args.mode, utils.BazelBinPathForOutputArtifact(label, '.v3alpha.proto'),
+      SyncProtoFile(args.mode,
+                    utils.BazelBinPathForOutputArtifact(label, '.v3alpha.envoy_internal.proto'),
                     dst_dir)
+      #SyncProtoFile(args.mode, utils.BazelBinPathForOutputArtifact(label, '.v3alpha.proto'),
+      #              dst_dir)
     SyncBuildFiles(args.mode, dst_dir)
 
     current_api_dir = pathlib.Path(tmp).joinpath("a")

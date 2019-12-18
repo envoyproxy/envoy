@@ -2,12 +2,11 @@ licenses(["notice"])  # Apache 2
 
 load("//bazel:envoy_build_system.bzl", "envoy_cc_library", "envoy_package", "envoy_proto_library")
 load("//tools/type_whisperer:type_database.bzl", "type_database")
-load("@com_google_protobuf//:protobuf.bzl", "py_proto_library")
 
 envoy_package()
 
-py_proto_library(
-    name = "types_py_proto",
+envoy_proto_library(
+    name = "types",
     srcs = ["types.proto"],
 )
 
@@ -19,6 +18,7 @@ py_binary(
     deps = [
         ":types_py_proto",
         "//tools/api_proto_plugin",
+        "@com_github_cncf_udpa//udpa/annotations:pkg_py_proto",
         "@com_google_protobuf//:protobuf_python",
     ],
 )
@@ -75,4 +75,5 @@ envoy_cc_library(
 envoy_proto_library(
     name = "api_type_db_proto",
     srcs = ["api_type_db.proto"],
+    deps = ["//tools/type_whisperer:types"],
 )

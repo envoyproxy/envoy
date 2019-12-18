@@ -36,9 +36,10 @@ message FaultDelay {
         "envoy.config.filter.fault.v2.FaultDelay.HeaderDelay";
   }
 
-  reserved 2, 1;
+  reserved 2;
 
-  reserved "type";
+  // Unused and deprecated. Will be removed in the next release.
+  FaultDelayType hidden_envoy_deprecated_type = 1 [deprecated = true];
 
   oneof fault_delay_secifier {
     option (validate.required) = true;

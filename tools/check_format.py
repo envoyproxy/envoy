@@ -72,7 +72,7 @@ STD_REGEX_WHITELIST = ("./source/common/common/utility.cc", "./source/common/com
                        "./source/extensions/filters/http/squash/squash_filter.cc",
                        "./source/server/http/admin.h", "./source/server/http/admin.cc",
                        "./tools/clang_tools/api_booster/main.cc",
-                       "./tools/clang_tools/api_booster/proto_cxx_utils.h")
+                       "./tools/clang_tools/api_booster/proto_cxx_utils.cc")
 
 # Only one C++ file should instantiate grpc_init
 GRPC_INIT_WHITELIST = ("./source/common/grpc/google_grpc_context.cc")

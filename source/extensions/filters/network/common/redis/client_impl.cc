@@ -30,22 +30,22 @@ ConfigImpl::ConfigImpl(
       enable_command_stats_(config.enable_command_stats()) {
   switch (config.read_policy()) {
   case envoy::config::filter::network::redis_proxy::v2::
-      RedisProxy_ConnPoolSettings_ReadPolicy_MASTER:
+      RedisProxy::ConnPoolSettings::MASTER:
     read_policy_ = ReadPolicy::Master;
     break;
   case envoy::config::filter::network::redis_proxy::v2::
-      RedisProxy_ConnPoolSettings_ReadPolicy_PREFER_MASTER:
+      RedisProxy::ConnPoolSettings::PREFER_MASTER:
     read_policy_ = ReadPolicy::PreferMaster;
     break;
   case envoy::config::filter::network::redis_proxy::v2::
-      RedisProxy_ConnPoolSettings_ReadPolicy_REPLICA:
+      RedisProxy::ConnPoolSettings::REPLICA:
     read_policy_ = ReadPolicy::Replica;
     break;
   case envoy::config::filter::network::redis_proxy::v2::
-      RedisProxy_ConnPoolSettings_ReadPolicy_PREFER_REPLICA:
+      RedisProxy::ConnPoolSettings::PREFER_REPLICA:
     read_policy_ = ReadPolicy::PreferReplica;
     break;
-  case envoy::config::filter::network::redis_proxy::v2::RedisProxy_ConnPoolSettings_ReadPolicy_ANY:
+  case envoy::config::filter::network::redis_proxy::v2::RedisProxy::ConnPoolSettings::ANY:
     read_policy_ = ReadPolicy::Any;
     break;
   default:

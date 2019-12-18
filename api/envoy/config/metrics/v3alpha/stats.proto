@@ -24,10 +24,6 @@ option java_multiple_files = true;
 message StatsSink {
   option (udpa.annotations.versioning).previous_message_type = "envoy.config.metrics.v2.StatsSink";
 
-  reserved 2;
-
-  reserved "config";
-
   // The name of the stats sink to instantiate. The name must match a supported
   // stats sink. The built-in stats sinks are:
   //
@@ -42,6 +38,8 @@ message StatsSink {
   // Stats sink specific configuration which depends on the sink being instantiated. See
   // :ref:`StatsdSink <envoy_api_msg_config.metrics.v3alpha.StatsdSink>` for an example.
   oneof config_type {
+    google.protobuf.Struct hidden_envoy_deprecated_config = 2 [deprecated = true];
+
     google.protobuf.Any typed_config = 3;
   }
 }

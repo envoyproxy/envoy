@@ -109,13 +109,11 @@ message GrpcService {
             "envoy.api.v2.core.GrpcService.GoogleGrpc.CallCredentials."
             "MetadataCredentialsFromPlugin";
 
-        reserved 2;
-
-        reserved "config";
-
         string name = 1;
 
         oneof config_type {
+          google.protobuf.Struct hidden_envoy_deprecated_config = 2 [deprecated = true];
+
           google.protobuf.Any typed_config = 3;
         }
       }

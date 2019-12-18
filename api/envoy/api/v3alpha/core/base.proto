@@ -263,10 +263,6 @@ message AsyncDataSource {
 message TransportSocket {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.core.TransportSocket";
 
-  reserved 2;
-
-  reserved "config";
-
   // The name of the transport socket to instantiate. The name must match a supported transport
   // socket implementation.
   string name = 1 [(validate.rules).string = {min_bytes: 1}];
@@ -274,6 +270,8 @@ message TransportSocket {
   // Implementation specific configuration which depends on the implementation being instantiated.
   // See the supported transport socket implementations for further documentation.
   oneof config_type {
+    google.protobuf.Struct hidden_envoy_deprecated_config = 2 [deprecated = true];
+
     google.protobuf.Any typed_config = 3;
   }
 }

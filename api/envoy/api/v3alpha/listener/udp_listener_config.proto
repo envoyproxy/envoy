@@ -18,10 +18,6 @@ message UdpListenerConfig {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.api.v2.listener.UdpListenerConfig";
 
-  reserved 2;
-
-  reserved "config";
-
   // Used to look up UDP listener factory, matches "raw_udp_listener" or
   // "quic_listener" to create a specific udp listener.
   // If not specified, treat as "raw_udp_listener".
@@ -30,6 +26,8 @@ message UdpListenerConfig {
   // Used to create a specific listener factory. To some factory, e.g.
   // "raw_udp_listener", config is not needed.
   oneof config_type {
+    google.protobuf.Struct hidden_envoy_deprecated_config = 2 [deprecated = true];
+
     google.protobuf.Any typed_config = 3;
   }
 }

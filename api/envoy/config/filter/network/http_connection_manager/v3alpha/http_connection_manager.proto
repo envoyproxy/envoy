@@ -103,9 +103,23 @@ message HttpConnectionManager {
       EGRESS = 1;
     }
 
-    reserved 1, 2;
+    // The span name will be derived from this field. If
+    // :ref:`traffic_direction <envoy_api_field_api.v3alpha.Listener.traffic_direction>` is
+    // specified on the parent listener, then it is used instead of this field.
+    //
+    // .. attention::
+    //  This field has been deprecated in favor of `traffic_direction`.
+    OperationName hidden_envoy_deprecated_operation_name = 1
+        [deprecated = true, (validate.rules).enum = {defined_only: true}];
 
-    reserved "operation_name", "request_headers_for_tags";
+    // A list of header names used to create tags for the active span. The header name is used to
+    // populate the tag name, and the header value is used to populate the tag value. The tag is
+    // created if the specified header name is present in the request's headers.
+    //
+    // .. attention::
+    //  This field has been deprecated in favor of :ref:`custom_tags
+    //  <envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.tracing.custom_tags>`.
+    repeated string hidden_envoy_deprecated_request_headers_for_tags = 2 [deprecated = true];
 
     // Target percentage of requests managed by this HTTP connection manager that will be force
     // traced if the :ref:`x-client-trace-id <config_http_conn_man_headers_x-client-trace-id>`
@@ -220,9 +234,7 @@ message HttpConnectionManager {
     google.protobuf.BoolValue enabled = 3;
   }
 
-  reserved 27, 11;
-
-  reserved "idle_timeout";
+  reserved 27;
 
   // Supplies the type of codec that the connection manager should use.
   CodecType codec_type = 1 [(validate.rules).enum = {defined_only: true}];
@@ -289,6 +301,16 @@ message HttpConnectionManager {
   // constraints.
   google.protobuf.UInt32Value max_request_headers_kb = 29
       [(validate.rules).uint32 = {lte: 96 gt: 0}];
+
+  // The idle timeout for connections managed by the connection manager. The
+  // idle timeout is defined as the period in which there are no active
+  // requests. If not set, there is no idle timeout. When the idle timeout is
+  // reached the connection will be closed. If the connection is an HTTP/2
+  // connection a drain sequence will occur prior to closing the connection.
+  // This field is deprecated. Use :ref:`idle_timeout
+  // <envoy_api_field_config.filter.network.http_connection_manager.v3alpha.HttpConnectionManager.common_http_protocol_options>`
+  // instead.
+  google.protobuf.Duration hidden_envoy_deprecated_idle_timeout = 11 [deprecated = true];
 
   // The stream idle timeout for connections managed by the connection manager.
   // If not specified, this defaults to 5 minutes. The default value was selected
@@ -639,9 +661,7 @@ message HttpFilter {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.network.http_connection_manager.v2.HttpFilter";
 
-  reserved 3, 2;
-
-  reserved "config";
+  reserved 3;
 
   // The name of the filter to instantiate. The name must match a
   // :ref:`supported filter <config_http_filters>`.
@@ -650,6 +670,8 @@ message HttpFilter {
   // Filter specific configuration which depends on the filter being instantiated. See the supported
   // filters for further documentation.
   oneof config_type {
+    google.protobuf.Struct hidden_envoy_deprecated_config = 2 [deprecated = true];
+
     google.protobuf.Any typed_config = 4;
   }
 }
