@@ -371,6 +371,10 @@ protected:
   // If true, use AutonomousUpstream for fake upstreams.
   bool autonomous_upstream_{false};
 
+  // If true, allow incomplete streams in AutonomousUpstream
+  // This does nothing if autonomous_upstream_ is false
+  bool autonomous_allow_incomplete_streams_{false};
+
   bool enable_half_close_{false};
 
   // Whether the default created fake upstreams are UDP listeners.
