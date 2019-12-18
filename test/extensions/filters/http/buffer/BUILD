@@ -2,7 +2,9 @@ licenses(["notice"])  # Apache 2
 
 load(
     "//bazel:envoy_build_system.bzl",
+    "envoy_cc_fuzz_test",
     "envoy_package",
+    "envoy_proto_library",
 )
 load(
     "//test/extensions:extensions_build_system.bzl",
@@ -53,6 +55,29 @@ envoy_extension_cc_test(
         "//source/extensions/filters/http/buffer:config",
         "//test/mocks/server:server_mocks",
         "//test/test_common:utility_lib",
+        "@envoy_api//envoy/config/filter/http/buffer/v2:pkg_cc_proto",
+    ],
+)
+
+envoy_proto_library(
+    name = "buffer_filter_fuzz_proto",
+    srcs = ["buffer_filter_fuzz.proto"],
+    deps = [
+        "//test/fuzz:common_proto",
+        "@envoy_api//envoy/config/filter/http/buffer/v2:pkg",
+    ],
+)
+
+envoy_cc_fuzz_test(
+    name = "buffer_filter_fuzz_test",
+    srcs = ["buffer_filter_fuzz_test.cc"],
+    corpus = "buffer_filter_corpus",
+    deps = [
+        ":buffer_filter_fuzz_proto_cc_proto",
+        "//source/extensions/filters/http/buffer:config",
+        "//test/extensions/filters/http/common/fuzz:decoder_filter_fuzz_lib",
+        "//test/mocks/buffer:buffer_mocks",
+        "//test/mocks/http:http_mocks",
         "@envoy_api//envoy/config/filter/http/buffer/v2:pkg_cc_proto",
     ],
 )
