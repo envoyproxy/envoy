@@ -7,6 +7,7 @@
 
 #include "envoy/access_log/access_log.h"
 #include "envoy/config/filter/accesslog/v2/accesslog.pb.h"
+#include "envoy/config/typed_config.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/server/access_log_config.h"
 #include "envoy/type/percent.pb.h"
@@ -230,7 +231,7 @@ private:
 /**
  * Extension filter factory that reads from ExtensionFilter proto.
  */
-class ExtensionFilterFactory {
+class ExtensionFilterFactory : public Config::TypedConfig {
 public:
   virtual ~ExtensionFilterFactory() = default;
 
@@ -246,13 +247,6 @@ public:
   virtual FilterPtr
   createFilter(const envoy::config::filter::accesslog::v2::ExtensionFilter& config,
                Runtime::Loader& runtime, Runtime::RandomGenerator& random) PURE;
-
-  /**
-   * @return ProtobufTypes::MessagePtr create empty config proto message for v2. The config, which
-   * arrives in an opaque google.protobuf.Struct message, will be converted to JSON and then parsed
-   * into this empty proto.
-   */
-  virtual ProtobufTypes::MessagePtr createEmptyConfigProto() PURE;
 
   /**
    * @return std::string the identifying name for a particular Filter implementation

@@ -90,6 +90,7 @@ public:
    * FactoryCategoryRegistry.
    */
   static std::string category() { return "dubbo_proxy.route_matchers"; }
+  static std::string type() { return ""; }
 
   /**
    * Convenience method to lookup a factory by type.
@@ -98,7 +99,7 @@ public:
    */
   static NamedRouteMatcherConfigFactory& getFactory(RouteMatcherType type) {
     const std::string& name = RouteMatcherNames::get().fromType(type);
-    return Envoy::Config::Utility::getAndCheckFactory<NamedRouteMatcherConfigFactory>(name);
+    return Envoy::Config::Utility::getAndCheckFactoryByName<NamedRouteMatcherConfigFactory>(name);
   }
 };
 

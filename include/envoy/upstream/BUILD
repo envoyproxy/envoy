@@ -105,6 +105,7 @@ envoy_cc_library(
     name = "retry_interface",
     hdrs = ["retry.h"],
     deps = [
+        "//include/envoy/config:typed_config_interface",
         "//include/envoy/upstream:types_interface",
         "//include/envoy/upstream:upstream_interface",
     ],

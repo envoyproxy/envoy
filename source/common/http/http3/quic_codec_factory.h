@@ -19,6 +19,7 @@ public:
   createQuicServerConnection(Network::Connection& connection, ConnectionCallbacks& callbacks) PURE;
 
   static std::string category() { return "quic_client_codec"; }
+  static std::string type() { return ""; }
 };
 
 // A factory to create Http::ClientConnection instance for QUIC.
@@ -32,6 +33,7 @@ public:
   createQuicClientConnection(Network::Connection& connection, ConnectionCallbacks& callbacks) PURE;
 
   static std::string category() { return "quic_server_codec"; }
+  static std::string type() { return ""; }
 };
 
 } // namespace Http

@@ -158,6 +158,11 @@ public:
     return *deprecated_factory_names;
   }
 
+  static absl::flat_hash_map<std::string, Base*>& typeNames() {
+    static auto* type_names = new absl::flat_hash_map<std::string, Base*>;
+    return *type_names;
+  }
+
   /**
    * instead_value are used when passed name was deprecated.
    */
@@ -167,8 +172,18 @@ public:
     if (!result.second) {
       throw EnvoyException(fmt::format("Double registration for name: '{}'", factory.name()));
     }
+
     if (!instead_value.empty()) {
       deprecatedFactoryNames().emplace(std::make_pair(name, instead_value));
+    } else {
+      auto type = factory.type();
+      if (!type.empty() && type != "google.protobuf.Empty") {
+        auto result = typeNames().emplace(std::make_pair(type, &factory));
+        if (!result.second) {
+          throw EnvoyException(fmt::format("Double registration for type '{}' by '{}' in '{}'",
+                                           type, factory.name(), factory.category()));
+        }
+      }
     }
   }
 
@@ -211,6 +226,17 @@ public:
     }
 
     checkDeprecated(name);
+    return it->second;
+  }
+
+  /**
+   * Gets a factory by type URL. If not found, returns nullptr.
+   */
+  static Base* getFactoryByType(absl::string_view type) {
+    auto it = typeNames().find(type);
+    if (it == factories().end()) {
+      return nullptr;
+    }
     return it->second;
   }
 

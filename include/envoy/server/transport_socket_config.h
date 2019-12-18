@@ -2,6 +2,7 @@
 
 #include <string>
 
+#include "envoy/config/typed_config.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/init/manager.h"
 #include "envoy/local_info/local_info.h"
@@ -106,16 +107,9 @@ public:
   virtual Api::Api& api() PURE;
 };
 
-class TransportSocketConfigFactory {
+class TransportSocketConfigFactory : public Config::TypedConfig {
 public:
   virtual ~TransportSocketConfigFactory() = default;
-
-  /**
-   * @return ProtobufTypes::MessagePtr create empty config proto message. The transport socket
-   *         config, which arrives in an opaque google.protobuf.Struct message, will be converted
-   *         to JSON and then parsed into this empty proto.
-   */
-  virtual ProtobufTypes::MessagePtr createEmptyConfigProto() PURE;
 
   /**
    * @return std::string the identifying name for a particular TransportSocketFactoryPtr

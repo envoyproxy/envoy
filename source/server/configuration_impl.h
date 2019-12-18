@@ -11,6 +11,7 @@
 
 #include "envoy/config/bootstrap/v2/bootstrap.pb.h"
 #include "envoy/config/trace/v2/trace.pb.h"
+#include "envoy/config/typed_config.h"
 #include "envoy/http/filter.h"
 #include "envoy/network/filter.h"
 #include "envoy/server/configuration.h"
@@ -30,7 +31,7 @@ namespace Configuration {
  * Implemented for each Stats::Sink and registered via Registry::registerFactory() or
  * the convenience class RegisterFactory.
  */
-class StatsSinkFactory {
+class StatsSinkFactory : public Config::TypedConfig {
 public:
   virtual ~StatsSinkFactory() = default;
 
@@ -42,13 +43,6 @@ public:
    * @param server supplies the server instance
    */
   virtual Stats::SinkPtr createStatsSink(const Protobuf::Message& config, Instance& server) PURE;
-
-  /**
-   * @return ProtobufTypes::MessagePtr create empty config proto message for v2. The filter
-   *         config, which arrives in an opaque google.protobuf.Struct message, will be converted to
-   *         JSON and then parsed into this empty proto.
-   */
-  virtual ProtobufTypes::MessagePtr createEmptyConfigProto() PURE;
 
   /**
    * Returns the identifying name for a particular implementation of Stats::Sink produced by the

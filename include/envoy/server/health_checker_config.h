@@ -84,6 +84,7 @@ public:
    * FactoryCategoryRegistry.
    */
   static std::string category() { return "health_checkers"; }
+  static std::string type() { return ""; }
 };
 
 } // namespace Configuration

@@ -26,6 +26,8 @@
 #include "common/protobuf/utility.h"
 #include "common/singleton/const_singleton.h"
 
+#include "udpa/type/v1/typed_struct.pb.h"
+
 namespace Envoy {
 namespace Config {
 
@@ -193,7 +195,7 @@ public:
    * @param name string identifier for the particular implementation. Note: this is a proto string
    * because it is assumed that this value will be pulled directly from the configuration proto.
    */
-  template <class Factory> static Factory& getAndCheckFactory(const std::string& name) {
+  template <class Factory> static Factory& getAndCheckFactoryByName(const std::string& name) {
     if (name.empty()) {
       throw EnvoyException("Provided name for static registration lookup was empty.");
     }
@@ -206,6 +208,46 @@ public:
     }
 
     return *factory;
+  }
+
+  /**
+   * Get a Factory from the registry with error checking to ensure the name and the factory are
+   * valid. If the typed config references a proto that is neither Struct nor Empty, then the proto
+   * type is used to select a factory.
+   * @param message proto that contains fields 'name' and 'typed_config'.
+   */
+  template <class Factory, class ProtoMessage>
+  static Factory& getAndCheckFactory(const ProtoMessage& message) {
+    const auto& name = message.name();
+
+    static const std::string struct_type =
+        ProtobufWkt::Struct::default_instance().GetDescriptor()->full_name();
+    static const std::string empty_type =
+        ProtobufWkt::Empty::default_instance().GetDescriptor()->full_name();
+    static const std::string typed_struct_type =
+        udpa::type::v1::TypedStruct::default_instance().GetDescriptor()->full_name();
+
+    if (message.has_typed_config()) {
+      absl::string_view type =
+          TypeUtil::typeUrlToDescriptorFullName(message.typed_config().type_url());
+
+      if (type == typed_struct_type) {
+        udpa::type::v1::TypedStruct typed_struct;
+        MessageUtil::unpackTo(message.typed_config(), typed_struct);
+        type = TypeUtil::typeUrlToDescriptorFullName(typed_struct.type_url());
+      }
+
+      if (!type.empty() && type != struct_type && type != empty_type) {
+        Factory* factory = Registry::FactoryRegistry<Factory>::getFactoryByType(type);
+
+        if (factory == nullptr) {
+          throw EnvoyException(
+              fmt::format("Didn't find a registered implementation for type: '{}'", type));
+        }
+        return *factory;
+      }
+    }
+    return Utility::getAndCheckFactoryByName<Factory>(name);
   }
 
   /**

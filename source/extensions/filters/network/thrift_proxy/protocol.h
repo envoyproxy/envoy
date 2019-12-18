@@ -520,6 +520,7 @@ public:
    * FactoryCategoryRegistry.
    */
   static std::string category() { return "thrift_proxy.protocols"; }
+  static std::string type() { return ""; }
 
   /**
    * Convenience method to lookup a factory by type.
@@ -528,7 +529,7 @@ public:
    */
   static NamedProtocolConfigFactory& getFactory(ProtocolType type) {
     const std::string& name = ProtocolNames::get().fromType(type);
-    return Envoy::Config::Utility::getAndCheckFactory<NamedProtocolConfigFactory>(name);
+    return Envoy::Config::Utility::getAndCheckFactoryByName<NamedProtocolConfigFactory>(name);
   }
 };
 

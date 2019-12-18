@@ -20,7 +20,8 @@ public:
 TEST(ActiveQuicListenerConfigTest, CreateActiveQuicListenerFactory) {
   std::string listener_name = QuicListenerName;
   auto& config_factory =
-      Config::Utility::getAndCheckFactory<Server::ActiveUdpListenerConfigFactory>(listener_name);
+      Config::Utility::getAndCheckFactoryByName<Server::ActiveUdpListenerConfigFactory>(
+          listener_name);
   ProtobufTypes::MessagePtr config = config_factory.createEmptyConfigProto();
 
   std::string yaml = R"EOF(

@@ -42,6 +42,8 @@ public:
    */
   static std::string category() { return "wasm.null_vms"; }
 
+  static std::string type() { return ""; }
+
   /**
    * Create an instance of the plugin.
    */

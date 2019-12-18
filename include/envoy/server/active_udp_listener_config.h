@@ -34,6 +34,8 @@ public:
    * FactoryCategoryRegistry.
    */
   static std::string category() { return "udp_listeners"; }
+
+  static std::string type() { return ""; }
 };
 
 } // namespace Server

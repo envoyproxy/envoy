@@ -18,6 +18,8 @@ class Registration {
 public:
   virtual ~Registration() = default;
   virtual std::string name() PURE;
+  static std::string category() { return "singleton"; }
+  static std::string type() { return ""; }
 };
 
 /**

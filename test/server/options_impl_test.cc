@@ -455,6 +455,7 @@ public:
   virtual ~TestFactory() = default;
   virtual std::string name() PURE;
   static std::string category() { return "test"; }
+  static std::string type() { return ""; }
 };
 
 class TestTestFactory : public TestFactory {
@@ -467,6 +468,7 @@ public:
   virtual ~TestingFactory() = default;
   virtual std::string name() PURE;
   static std::string category() { return "testing"; }
+  static std::string type() { return ""; }
 };
 
 class TestTestingFactory : public TestingFactory {

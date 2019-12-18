@@ -40,6 +40,7 @@ public:
    * FactoryCategoryRegistry.
    */
   static std::string category() { return "resolvers"; }
+  static std::string type() { return ""; }
 };
 
 } // namespace Address

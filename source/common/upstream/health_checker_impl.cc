@@ -85,7 +85,7 @@ HealthCheckerSharedPtr HealthCheckerFactory::create(
   case envoy::api::v2::core::HealthCheck::HealthCheckerCase::kCustomHealthCheck: {
     auto& factory =
         Config::Utility::getAndCheckFactory<Server::Configuration::CustomHealthCheckerFactory>(
-            health_check_config.custom_health_check().name());
+            health_check_config.custom_health_check());
     std::unique_ptr<Server::Configuration::HealthCheckerFactoryContext> context(
         new HealthCheckerFactoryContextImpl(cluster, runtime, random, dispatcher,
                                             std::move(event_logger), validation_visitor, api));

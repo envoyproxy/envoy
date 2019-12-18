@@ -100,6 +100,7 @@ public:
    * FactoryCategoryRegistry.
    */
   static std::string category() { return "dubbo_proxy.serializers"; }
+  static std::string type() { return ""; }
 
   /**
    * Convenience method to lookup a factory by type.
@@ -109,7 +110,7 @@ public:
   static NamedSerializerConfigFactory& getFactory(ProtocolType protocol_type,
                                                   SerializationType type) {
     const std::string& name = ProtocolSerializerNames::get().fromType(protocol_type, type);
-    return Envoy::Config::Utility::getAndCheckFactory<NamedSerializerConfigFactory>(name);
+    return Envoy::Config::Utility::getAndCheckFactoryByName<NamedSerializerConfigFactory>(name);
   }
 };
 

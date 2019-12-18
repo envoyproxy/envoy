@@ -3,6 +3,7 @@
 #include <string>
 
 #include "envoy/access_log/access_log.h"
+#include "envoy/config/typed_config.h"
 #include "envoy/server/filter_config.h"
 
 #include "common/protobuf/protobuf.h"
@@ -15,7 +16,7 @@ namespace Configuration {
  * Implemented for each AccessLog::Instance and registered via Registry::registerFactory or the
  * convenience class RegisterFactory.
  */
-class AccessLogInstanceFactory {
+class AccessLogInstanceFactory : public Config::TypedConfig {
 public:
   virtual ~AccessLogInstanceFactory() = default;
 
@@ -31,13 +32,6 @@ public:
   virtual AccessLog::InstanceSharedPtr createAccessLogInstance(const Protobuf::Message& config,
                                                                AccessLog::FilterPtr&& filter,
                                                                FactoryContext& context) PURE;
-
-  /**
-   * @return ProtobufTypes::MessagePtr create empty config proto message for v2. The config, which
-   * arrives in an opaque google.protobuf.Struct message, will be converted to JSON and then parsed
-   * into this empty proto.
-   */
-  virtual ProtobufTypes::MessagePtr createEmptyConfigProto() PURE;
 
   /**
    * @return std::string the identifying name for a particular AccessLog::Instance implementation

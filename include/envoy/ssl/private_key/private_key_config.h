@@ -35,6 +35,8 @@ public:
    * Used for automatic registration with FactoryCategoryRegistry.
    */
   static std::string category() { return "tls.key_providers"; };
+
+  static std::string type() { return ""; };
 };
 
 } // namespace Ssl

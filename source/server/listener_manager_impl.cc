@@ -87,16 +87,15 @@ std::vector<Network::FilterFactoryCb> ProdListenerComponentFactory::createNetwor
   std::vector<Network::FilterFactoryCb> ret;
   for (ssize_t i = 0; i < filters.size(); i++) {
     const auto& proto_config = filters[i];
-    const std::string& string_name = proto_config.name();
     ENVOY_LOG(debug, "  filter #{}:", i);
-    ENVOY_LOG(debug, "    name: {}", string_name);
+    ENVOY_LOG(debug, "    name: {}", proto_config.name());
     ENVOY_LOG(debug, "  config: {}",
               MessageUtil::getJsonStringFromMessage(proto_config.config(), true));
 
     // Now see if there is a factory that will accept the config.
     auto& factory =
         Config::Utility::getAndCheckFactory<Configuration::NamedNetworkFilterConfigFactory>(
-            string_name);
+            proto_config);
 
     Config::Utility::validateTerminalFilters(filters[i].name(), "network",
                                              factory.isTerminalFilter(), i == filters.size() - 1);
@@ -116,16 +115,15 @@ ProdListenerComponentFactory::createListenerFilterFactoryList_(
   std::vector<Network::ListenerFilterFactoryCb> ret;
   for (ssize_t i = 0; i < filters.size(); i++) {
     const auto& proto_config = filters[i];
-    const std::string& string_name = proto_config.name();
     ENVOY_LOG(debug, "  filter #{}:", i);
-    ENVOY_LOG(debug, "    name: {}", string_name);
+    ENVOY_LOG(debug, "    name: {}", proto_config.name());
     ENVOY_LOG(debug, "  config: {}",
               MessageUtil::getJsonStringFromMessage(proto_config.config(), true));
 
     // Now see if there is a factory that will accept the config.
     auto& factory =
         Config::Utility::getAndCheckFactory<Configuration::NamedListenerFilterConfigFactory>(
-            string_name);
+            proto_config);
     auto message = Config::Utility::translateToFactoryConfig(
         proto_config, context.messageValidationVisitor(), factory);
     ret.push_back(factory.createFilterFactoryFromProto(*message, context));
@@ -140,16 +138,15 @@ ProdListenerComponentFactory::createUdpListenerFilterFactoryList_(
   std::vector<Network::UdpListenerFilterFactoryCb> ret;
   for (ssize_t i = 0; i < filters.size(); i++) {
     const auto& proto_config = filters[i];
-    const std::string& string_name = proto_config.name();
     ENVOY_LOG(debug, "  filter #{}:", i);
-    ENVOY_LOG(debug, "    name: {}", string_name);
+    ENVOY_LOG(debug, "    name: {}", proto_config.name());
     ENVOY_LOG(debug, "  config: {}",
               MessageUtil::getJsonStringFromMessage(proto_config.config(), true));
 
     // Now see if there is a factory that will accept the config.
     auto& factory =
         Config::Utility::getAndCheckFactory<Configuration::NamedUdpListenerFilterConfigFactory>(
-            string_name);
+            proto_config);
 
     auto message = Config::Utility::translateToFactoryConfig(
         proto_config, context.messageValidationVisitor(), factory);
@@ -759,7 +756,7 @@ std::unique_ptr<Network::FilterChain> ListenerFilterChainFactoryBuilder::buildFi
   }
 
   auto& config_factory = Config::Utility::getAndCheckFactory<
-      Server::Configuration::DownstreamTransportSocketConfigFactory>(transport_socket.name());
+      Server::Configuration::DownstreamTransportSocketConfigFactory>(transport_socket);
   ProtobufTypes::MessagePtr message = Config::Utility::translateToFactoryConfig(
       transport_socket, parent_.messageValidationVisitor(), config_factory);
 

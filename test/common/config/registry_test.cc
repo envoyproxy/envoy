@@ -17,6 +17,8 @@ class InternalFactory {
 public:
   virtual ~InternalFactory() = default;
   virtual std::string name() PURE;
+  static std::string category() { return ""; }
+  static std::string type() { return ""; }
 };
 
 class TestInternalFactory : public InternalFactory {
@@ -51,6 +53,7 @@ public:
   virtual ~PublishedFactory() = default;
   virtual std::string name() PURE;
   static std::string category() { return "testing.published"; }
+  static std::string type() { return ""; }
 };
 
 class TestPublishedFactory : public PublishedFactory {

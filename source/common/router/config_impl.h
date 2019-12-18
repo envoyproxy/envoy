@@ -264,11 +264,12 @@ private:
   uint32_t retry_on_{};
   // Each pair contains the name and config proto to be used to create the RetryHostPredicates
   // that should be used when with this policy.
-  std::vector<std::pair<std::string, ProtobufTypes::MessagePtr>> retry_host_predicate_configs_;
+  std::vector<std::pair<Upstream::RetryHostPredicateFactory&, ProtobufTypes::MessagePtr>>
+      retry_host_predicate_configs_;
   Upstream::RetryPrioritySharedPtr retry_priority_;
   // Name and config proto to use to create the RetryPriority to use with this policy. Default
   // initialized when no RetryPriority should be used.
-  std::pair<std::string, ProtobufTypes::MessagePtr> retry_priority_config_;
+  std::pair<Upstream::RetryPriorityFactory*, ProtobufTypes::MessagePtr> retry_priority_config_;
   uint32_t host_selection_attempts_{1};
   std::vector<uint32_t> retriable_status_codes_;
   std::vector<Http::HeaderMatcherSharedPtr> retriable_headers_;

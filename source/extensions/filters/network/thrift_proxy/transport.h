@@ -104,6 +104,7 @@ public:
    * FactoryCategoryRegistry.
    */
   static std::string category() { return "thrift_proxy.transports"; }
+  static std::string type() { return ""; }
 
   /**
    * Convenience method to lookup a factory by type.
@@ -112,7 +113,7 @@ public:
    */
   static NamedTransportConfigFactory& getFactory(TransportType type) {
     const std::string& name = TransportNames::get().fromType(type);
-    return Envoy::Config::Utility::getAndCheckFactory<NamedTransportConfigFactory>(name);
+    return Envoy::Config::Utility::getAndCheckFactoryByName<NamedTransportConfigFactory>(name);
   }
 };
 

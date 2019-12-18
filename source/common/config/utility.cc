@@ -24,8 +24,6 @@
 #include "common/stats/stats_matcher_impl.h"
 #include "common/stats/tag_producer_impl.h"
 
-#include "udpa/type/v1/typed_struct.pb.h"
-
 namespace Envoy {
 namespace Config {
 

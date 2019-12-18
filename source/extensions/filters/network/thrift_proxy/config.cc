@@ -157,15 +157,13 @@ ProtocolPtr ConfigImpl::createProtocol() {
 
 void ConfigImpl::processFilter(
     const envoy::config::filter::network::thrift_proxy::v2alpha1::ThriftFilter& proto_config) {
-  const std::string& string_name = proto_config.name();
-
   ENVOY_LOG(debug, "    thrift filter #{}", filter_factories_.size());
-  ENVOY_LOG(debug, "      name: {}", string_name);
+  ENVOY_LOG(debug, "      name: {}", proto_config.name());
   ENVOY_LOG(debug, "    config: {}",
             MessageUtil::getJsonStringFromMessage(proto_config.config(), true));
   auto& factory =
       Envoy::Config::Utility::getAndCheckFactory<ThriftFilters::NamedThriftFilterConfigFactory>(
-          string_name);
+          proto_config);
 
   ProtobufTypes::MessagePtr message = Envoy::Config::Utility::translateToFactoryConfig(
       proto_config, context_.messageValidationVisitor(), factory);

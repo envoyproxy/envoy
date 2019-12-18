@@ -149,6 +149,8 @@ public:
    * FactoryCategoryRegistry.
    */
   static std::string category() { return "clusters"; }
+
+  virtual std::string type() const { return ""; }
 };
 
 } // namespace Upstream

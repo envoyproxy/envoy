@@ -74,6 +74,7 @@ public:
   parse(const ProtobufWkt::Struct& data) const PURE;
 
   static std::string category() { return "typed_metadata"; }
+  static std::string type() { return ""; }
 };
 
 } // namespace Config

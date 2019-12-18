@@ -4,6 +4,7 @@
 
 #include "envoy/access_log/access_log.h"
 #include "envoy/api/v2/core/base.pb.h"
+#include "envoy/config/typed_config.h"
 #include "envoy/grpc/context.h"
 #include "envoy/http/codes.h"
 #include "envoy/http/context.h"
@@ -211,15 +212,9 @@ public:
 /**
  * Common interface for listener filters and UDP listener filters
  */
-class ListenerFilterConfigFactoryBase {
+class ListenerFilterConfigFactoryBase : public Config::TypedConfig {
 public:
   virtual ~ListenerFilterConfigFactoryBase() = default;
-
-  /**
-   * @return ProtobufTypes::MessagePtr create empty config proto message. The filter
-   *         config, which arrives in an opaque message, will be parsed into this empty proto.
-   */
-  virtual ProtobufTypes::MessagePtr createEmptyConfigProto() PURE;
 
   /**
    * @return std::string the identifying name for a particular implementation of a listener filter
@@ -320,7 +315,7 @@ public:
  * Implemented by each network filter and registered via Registry::registerFactory()
  * or the convenience class RegisterFactory.
  */
-class NamedNetworkFilterConfigFactory : public ProtocolOptionsFactory {
+class NamedNetworkFilterConfigFactory : public ProtocolOptionsFactory, public Config::TypedConfig {
 public:
   ~NamedNetworkFilterConfigFactory() override = default;
 
@@ -334,13 +329,6 @@ public:
    */
   virtual Network::FilterFactoryCb createFilterFactoryFromProto(const Protobuf::Message& config,
                                                                 FactoryContext& context) PURE;
-
-  /**
-   * @return ProtobufTypes::MessagePtr create empty config proto message for v2. The filter
-   *         config, which arrives in an opaque google.protobuf.Struct message, will be converted to
-   *         JSON and then parsed into this empty proto.
-   */
-  virtual ProtobufTypes::MessagePtr createEmptyConfigProto() PURE;
 
   /**
    * @return std::string the identifying name for a particular implementation of a network filter
@@ -365,7 +353,8 @@ public:
  * Implemented by each upstream cluster network filter and registered via
  * Registry::registerFactory() or the convenience class RegisterFactory.
  */
-class NamedUpstreamNetworkFilterConfigFactory : public ProtocolOptionsFactory {
+class NamedUpstreamNetworkFilterConfigFactory : public ProtocolOptionsFactory,
+                                                public Config::TypedConfig {
 public:
   ~NamedUpstreamNetworkFilterConfigFactory() override = default;
 
@@ -376,11 +365,6 @@ public:
    */
   virtual Network::FilterFactoryCb createFilterFactoryFromProto(const Protobuf::Message& config,
                                                                 CommonFactoryContext& context) PURE;
-
-  /**
-   * @return ProtobufTypes::MessagePtr create empty config proto message for v2.
-   */
-  virtual ProtobufTypes::MessagePtr createEmptyConfigProto() PURE;
 
   /**
    * @return std::string the identifying name for a particular implementation of a network filter
@@ -400,7 +384,7 @@ public:
  * Implemented by each HTTP filter and registered via Registry::registerFactory or the
  * convenience class RegisterFactory.
  */
-class NamedHttpFilterConfigFactory : public ProtocolOptionsFactory {
+class NamedHttpFilterConfigFactory : public ProtocolOptionsFactory, public Config::TypedConfig {
 public:
   ~NamedHttpFilterConfigFactory() override = default;
 
@@ -417,13 +401,6 @@ public:
   virtual Http::FilterFactoryCb createFilterFactoryFromProto(const Protobuf::Message& config,
                                                              const std::string& stat_prefix,
                                                              FactoryContext& context) PURE;
-
-  /**
-   * @return ProtobufTypes::MessagePtr create empty config proto message for v2. The filter
-   *         config, which arrives in an opaque google.protobuf.Struct message, will be converted to
-   *         JSON and then parsed into this empty proto.
-   */
-  virtual ProtobufTypes::MessagePtr createEmptyConfigProto() PURE;
 
   /**
    * @return ProtobufTypes::MessagePtr create an empty virtual host, route, or weighted

@@ -1,5 +1,6 @@
 #pragma once
 
+#include "envoy/config/typed_config.h"
 #include "envoy/upstream/types.h"
 #include "envoy/upstream/upstream.h"
 
@@ -75,7 +76,7 @@ using RetryHostPredicateSharedPtr = std::shared_ptr<RetryHostPredicate>;
 /**
  * Factory for RetryPriority.
  */
-class RetryPriorityFactory {
+class RetryPriorityFactory : public Config::TypedConfig {
 public:
   virtual ~RetryPriorityFactory() = default;
 
@@ -93,13 +94,13 @@ public:
    */
   static std::string category() { return "retry_priorities"; }
 
-  virtual ProtobufTypes::MessagePtr createEmptyConfigProto() PURE;
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override { return nullptr; }
 };
 
 /**
  * Factory for RetryHostPredicate.
  */
-class RetryHostPredicateFactory {
+class RetryHostPredicateFactory : public Config::TypedConfig {
 public:
   virtual ~RetryHostPredicateFactory() = default;
 
@@ -113,7 +114,7 @@ public:
 
   static std::string category() { return "retry_host_predicates"; }
 
-  virtual ProtobufTypes::MessagePtr createEmptyConfigProto() PURE;
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override { return nullptr; }
 };
 
 } // namespace Upstream

@@ -57,6 +57,8 @@ public:
 
   // There could be only one factory thus the name is static.
   static std::string name() { return "ssl_context_manager"; }
+  static std::string category() { return "ssl_context_manager"; }
+  static std::string type() { return ""; }
 };
 
 } // namespace Ssl

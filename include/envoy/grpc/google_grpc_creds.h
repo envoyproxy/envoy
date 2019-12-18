@@ -46,6 +46,7 @@ public:
    * FactoryCategoryRegistry.
    */
   static std::string category() { return "grpc_credentials"; }
+  static std::string type() { return ""; }
 };
 
 } // namespace Grpc
