@@ -28,16 +28,28 @@ const tools::type_whisperer::TypeDb& getApiTypeDb() {
 } // namespace
 
 absl::optional<TypeInformation> ApiTypeDb::getLatestTypeInformation(const std::string& type_name) {
-  absl::optional<TypeInformation> result;
+  absl::string_view latest_type_name;
+  const tools::type_whisperer::TypeDbDescription* latest_type_desc{};
   std::string current_type_name = type_name;
   while (true) {
     auto it = getApiTypeDb().types().find(current_type_name);
     if (it == getApiTypeDb().types().end()) {
-      return result;
+      break;
     }
-    result.emplace(current_type_name, it->second.proto_path());
+    latest_type_name = it->first;
+    latest_type_desc = &it->second;
     current_type_name = it->second.next_version_type_name();
   }
+  if (latest_type_desc == nullptr) {
+    return {};
+  }
+  auto result = absl::make_optional<TypeInformation>(latest_type_name,
+                                                     latest_type_desc->type_details().proto_path(),
+                                                     latest_type_desc->type_details().enum_type());
+  for (const auto it : latest_type_desc->type_details().fields()) {
+    result->field_renames_[it.first] = it.second.rename();
+  }
+  return result;
 }
 
 } // namespace TypeWhisperer
