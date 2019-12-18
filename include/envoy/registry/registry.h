@@ -234,7 +234,7 @@ public:
    */
   static Base* getFactoryByType(absl::string_view type) {
     auto it = typeNames().find(type);
-    if (it == factories().end()) {
+    if (it == typeNames().end()) {
       return nullptr;
     }
     return it->second;
@@ -276,6 +276,11 @@ private:
 
     factories().emplace(factory.name(), &factory);
     RELEASE_ASSERT(getFactory(factory.name()) == &factory, "");
+
+    if (!factory.type().empty()) {
+      typeNames().emplace(factory.type(), &factory);
+    }
+
     return displaced;
   }
 

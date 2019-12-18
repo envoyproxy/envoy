@@ -71,6 +71,8 @@ public:
 
   // Server::Configuration::TransportSocketConfigFactory
   ProtobufTypes::MessagePtr createEmptyConfigProto() override;
+
+  std::string type() override { return ""; }
 };
 
 DECLARE_FACTORY(QuicServerTransportSocketConfigFactory);
@@ -86,6 +88,8 @@ public:
 
   // Server::Configuration::TransportSocketConfigFactory
   ProtobufTypes::MessagePtr createEmptyConfigProto() override;
+
+  std::string type() override { return ""; }
 };
 
 DECLARE_FACTORY(QuicClientTransportSocketConfigFactory);

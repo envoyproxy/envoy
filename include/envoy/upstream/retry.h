@@ -93,8 +93,6 @@ public:
    * FactoryCategoryRegistry.
    */
   static std::string category() { return "retry_priorities"; }
-
-  ProtobufTypes::MessagePtr createEmptyConfigProto() override { return nullptr; }
 };
 
 /**
@@ -113,8 +111,6 @@ public:
   virtual std::string name() PURE;
 
   static std::string category() { return "retry_host_predicates"; }
-
-  ProtobufTypes::MessagePtr createEmptyConfigProto() override { return nullptr; }
 };
 
 } // namespace Upstream
