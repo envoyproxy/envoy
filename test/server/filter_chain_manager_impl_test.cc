@@ -170,7 +170,7 @@ TEST_F(FilterChainManagerImplTest, FilterChainContextsAreUnique) {
     auto callback = filter_chain_manager_.createFilterChainFactoryContextCallback(parent_context_);
     callback->prepareFilterChainFactoryContexts();
     for (int i = 0; i < 2; i++) {
-      contexts.push_back(callback->createFilterChainFactoryContext(&filter_chain_template_));
+      contexts.insert(callback->createFilterChainFactoryContext(&filter_chain_template_));
     }
   }
   EXPECT_EQ(contexts.size(), 2);
