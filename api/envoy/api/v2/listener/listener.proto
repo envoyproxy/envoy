@@ -212,7 +212,10 @@ message ListenerFilterMatch {
       [(validate.rules).repeated = {items {uint32 {lte: 65535 gte: 1}}}];
 }
 
+// [#next-free-field: 6]
 message ListenerFilter {
+  reserved 5;
+
   // The name of the filter to instantiate. The name must match a
   // :ref:`supported filter <config_listener_filters>`.
   string name = 1 [(validate.rules).string = {min_bytes: 1}];
@@ -229,7 +232,4 @@ message ListenerFilter {
   oneof switches {
     ListenerFilterMatch disabled = 4;
   }
-
-  // ListenerFilterMatch enabled = 5;
-  reserved 5;
 }
