@@ -19,9 +19,6 @@ import pathlib
 import re
 import subprocess as sp
 
-# Temporary location of modified files.
-TMP_SWP_SUFFIX = '.tmp.swp'
-
 # Detect API #includes.
 API_INCLUDE_REGEX = re.compile('#include "(envoy/.*)/[^/]+\.pb\.(validate\.)?h"')
 

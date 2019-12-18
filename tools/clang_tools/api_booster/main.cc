@@ -214,9 +214,9 @@ int main(int argc, const char** argv) {
   // only ones displayed.
   llvm::cl::OptionCategory api_booster_tool_category("api-booster options");
 
-  clang::tooling::CommonOptionsParser optionsParser(argc, argv, api_booster_tool_category);
-  clang::tooling::RefactoringTool tool(optionsParser.getCompilations(),
-                                       optionsParser.getSourcePathList());
+  clang::tooling::CommonOptionsParser options_parser(argc, argv, api_booster_tool_category);
+  clang::tooling::RefactoringTool tool(options_parser.getCompilations(),
+                                       options_parser.getSourcePathList());
 
   ApiBooster::ApiBooster api_booster(tool.getReplacements());
   clang::ast_matchers::MatchFinder finder;
