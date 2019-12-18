@@ -6,6 +6,7 @@
 #include <string>
 #include <vector>
 
+#include "envoy/api/v2/core/address.pb.h"
 #include "envoy/common/exception.h"
 #include "envoy/common/platform.h"
 #include "envoy/network/connection.h"
@@ -454,7 +455,8 @@ Utility::protobufAddressToAddress(const envoy::api::v2::core::Address& proto_add
                                          proto_address.socket_address().port_value(),
                                          !proto_address.socket_address().ipv4_compat());
   case envoy::api::v2::core::Address::kPipe:
-    return std::make_shared<Address::PipeInstance>(proto_address.pipe().path());
+    return std::make_shared<Address::PipeInstance>(proto_address.pipe().path(),
+                                                   proto_address.pipe().mode());
   default:
     NOT_REACHED_GCOVR_EXCL_LINE;
   }

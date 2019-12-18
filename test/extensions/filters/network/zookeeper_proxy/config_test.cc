@@ -1,3 +1,4 @@
+#include "envoy/config/filter/network/zookeeper_proxy/v1alpha1/zookeeper_proxy.pb.h"
 #include "envoy/config/filter/network/zookeeper_proxy/v1alpha1/zookeeper_proxy.pb.validate.h"
 
 #include "extensions/filters/network/zookeeper_proxy/config.h"

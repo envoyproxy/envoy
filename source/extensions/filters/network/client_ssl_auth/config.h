@@ -1,5 +1,6 @@
 #pragma once
 
+#include "envoy/config/filter/network/client_ssl_auth/v2/client_ssl_auth.pb.h"
 #include "envoy/config/filter/network/client_ssl_auth/v2/client_ssl_auth.pb.validate.h"
 
 #include "extensions/filters/network/common/factory_base.h"

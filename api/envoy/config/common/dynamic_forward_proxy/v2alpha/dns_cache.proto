@@ -2,9 +2,9 @@ syntax = "proto3";
 
 package envoy.config.common.dynamic_forward_proxy.v2alpha;
 
+option java_package = "io.envoyproxy.envoy.config.common.dynamic_forward_proxy.v2alpha";
 option java_outer_classname = "DnsCacheProto";
 option java_multiple_files = true;
-option java_package = "io.envoyproxy.envoy.config.common.dynamic_forward_proxy.v2alpha";
 
 import "envoy/api/v2/cds.proto";
 

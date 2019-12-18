@@ -29,6 +29,7 @@ namespace Logger {
   FUNCTION(config)                                                                                 \
   FUNCTION(connection)                                                                             \
   FUNCTION(conn_handler)                                                                           \
+  FUNCTION(decompression)                                                                          \
   FUNCTION(dubbo)                                                                                  \
   FUNCTION(file)                                                                                   \
   FUNCTION(filter)                                                                                 \

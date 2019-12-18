@@ -2,13 +2,13 @@ syntax = "proto3";
 
 package envoy.config.filter.http.dynamic_forward_proxy.v3alpha;
 
+option java_package = "io.envoyproxy.envoy.config.filter.http.dynamic_forward_proxy.v3alpha";
 option java_outer_classname = "DynamicForwardProxyProto";
 option java_multiple_files = true;
-option java_package = "io.envoyproxy.envoy.config.filter.http.dynamic_forward_proxy.v3alpha";
 
 import "envoy/config/common/dynamic_forward_proxy/v3alpha/dns_cache.proto";
 
-import "udpa/api/annotations/versioning.proto";
+import "udpa/annotations/versioning.proto";
 
 import "validate/validate.proto";
 
@@ -18,7 +18,7 @@ import "validate/validate.proto";
 // <arch_overview_http_dynamic_forward_proxy>` for more information.
 // [#extension: envoy.filters.http.dynamic_forward_proxy]
 message FilterConfig {
-  option (udpa.api.annotations.versioning).previous_message_type =
+  option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.http.dynamic_forward_proxy.v2alpha.FilterConfig";
 
   // The DNS cache configuration that the filter will attach to. Note this configuration must
@@ -30,7 +30,7 @@ message FilterConfig {
 
 // Per route Configuration for the dynamic forward proxy HTTP filter.
 message PerRouteConfig {
-  option (udpa.api.annotations.versioning).previous_message_type =
+  option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.http.dynamic_forward_proxy.v2alpha.PerRouteConfig";
 
   oneof host_rewrite_specifier {
@@ -43,9 +43,7 @@ message PerRouteConfig {
     // :ref:`HCM host rewrite <envoy_api_field_api.v3alpha.route.RouteAction.host_rewrite>` given
     // that the value set here would be used for DNS lookups whereas the value set in the HCM would
     // be used for host header forwarding which is not the desired outcome.
-    //
-    // [#next-major-version: host_rewrite_literal]
-    string host_rewrite = 1;
+    string host_rewrite_literal = 1;
 
     // Indicates that before DNS lookup, the host header will be swapped with
     // the value of this header. If not set or empty, the original host header
@@ -57,8 +55,6 @@ message PerRouteConfig {
     // <envoy_api_field_api.v3alpha.route.RouteAction.auto_host_rewrite_header>` given that the
     // value set here would be used for DNS lookups whereas the value set in the HCM would be used
     // for host header forwarding which is not the desired outcome.
-    //
-    // [#next-major-version: host_rewrite_header]
-    string auto_host_rewrite_header = 2;
+    string host_rewrite_header = 2;
   }
 }

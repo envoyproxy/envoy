@@ -1,6 +1,10 @@
 #include <ctime>
 #include <regex>
 
+#include "envoy/api/v2/core/base.pb.h"
+#include "envoy/config/filter/accesslog/v2/accesslog.pb.h"
+#include "envoy/config/filter/http/router/v2/router.pb.h"
+
 #include "common/network/utility.h"
 #include "common/router/router.h"
 #include "common/upstream/upstream_impl.h"

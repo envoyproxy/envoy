@@ -3,7 +3,10 @@
 #include <chrono>
 
 #include "envoy/api/api.h"
-#include "envoy/config/health_checker/redis/v2/redis.pb.validate.h"
+#include "envoy/api/v2/core/health_check.pb.h"
+#include "envoy/config/filter/network/redis_proxy/v2/redis_proxy.pb.validate.h"
+#include "envoy/config/health_checker/redis/v2/redis.pb.h"
+#include "envoy/data/core/v2alpha/health_check_event.pb.h"
 
 #include "common/upstream/health_checker_base_impl.h"
 
@@ -50,7 +53,7 @@ private:
   struct RedisActiveHealthCheckSession
       : public ActiveHealthCheckSession,
         public Extensions::NetworkFilters::Common::Redis::Client::Config,
-        public Extensions::NetworkFilters::Common::Redis::Client::PoolCallbacks,
+        public Extensions::NetworkFilters::Common::Redis::Client::ClientCallbacks,
         public Network::ConnectionCallbacks {
     RedisActiveHealthCheckSession(RedisHealthChecker& parent, const Upstream::HostSharedPtr& host);
     ~RedisActiveHealthCheckSession() override;
@@ -85,10 +88,11 @@ private:
     uint32_t maxUpstreamUnknownConnections() const override { return 0; }
     bool enableCommandStats() const override { return false; }
 
-    // Extensions::NetworkFilters::Common::Redis::Client::PoolCallbacks
+    // Extensions::NetworkFilters::Common::Redis::Client::ClientCallbacks
     void onResponse(NetworkFilters::Common::Redis::RespValuePtr&& value) override;
     void onFailure() override;
-    bool onRedirection(const NetworkFilters::Common::Redis::RespValue& value) override;
+    bool onRedirection(NetworkFilters::Common::Redis::RespValuePtr&&, const std::string&,
+                       bool) override;
 
     // Network::ConnectionCallbacks
     void onEvent(Network::ConnectionEvent event) override;

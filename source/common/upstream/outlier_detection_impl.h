@@ -10,8 +10,10 @@
 #include <vector>
 
 #include "envoy/access_log/access_log.h"
+#include "envoy/api/v2/cds.pb.h"
 #include "envoy/api/v2/cluster/outlier_detection.pb.h"
 #include "envoy/common/time.h"
+#include "envoy/data/cluster/v2alpha/outlier_detection_event.pb.h"
 #include "envoy/event/timer.h"
 #include "envoy/http/codes.h"
 #include "envoy/runtime/runtime.h"

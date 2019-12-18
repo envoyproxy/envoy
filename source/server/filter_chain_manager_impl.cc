@@ -1,5 +1,7 @@
 #include "server/filter_chain_manager_impl.h"
 
+#include "envoy/api/v2/listener/listener.pb.h"
+
 #include "common/common/empty_string.h"
 #include "common/common/fmt.h"
 #include "common/config/utility.h"

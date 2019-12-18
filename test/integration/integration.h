@@ -5,6 +5,8 @@
 #include <string>
 #include <vector>
 
+#include "envoy/api/v2/discovery.pb.h"
+#include "envoy/api/v2/endpoint/endpoint.pb.h"
 #include "envoy/server/process_context.h"
 
 #include "common/http/codec_client.h"
@@ -368,6 +370,10 @@ protected:
 
   // If true, use AutonomousUpstream for fake upstreams.
   bool autonomous_upstream_{false};
+
+  // If true, allow incomplete streams in AutonomousUpstream
+  // This does nothing if autonomous_upstream_ is false
+  bool autonomous_allow_incomplete_streams_{false};
 
   bool enable_half_close_{false};
 

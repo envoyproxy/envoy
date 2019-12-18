@@ -41,6 +41,12 @@ if [[ "${COVERAGE_OUTPUT}" != *"Current route coverage: 100%"* ]] ; then
   exit 1
 fi
 
+RUNTIME_COVERAGE_OUTPUT=$("${PATH_BIN}" "-c" "${PATH_CONFIG}/Runtime.yaml" "-t" "${PATH_CONFIG}/Runtime.golden.proto.json" "--details" "--useproto" "--covall" 2>&1) ||
+  echo "${RUNTIME_COVERAGE_OUTPUT:-no-output}"
+if [[ "${RUNTIME_COVERAGE_OUTPUT}" != *"Current route coverage: 100%"* ]] ; then
+  exit 1
+fi
+
 # Testing coverage flag fails
 COVERAGE_OUTPUT=$($COVERAGE_CMD "100" 2>&1) || echo "${COVERAGE_OUTPUT:-no-output}"
 if [[ "${COVERAGE_OUTPUT}" != *"Failed to meet coverage requirement: 100%"* ]] ; then

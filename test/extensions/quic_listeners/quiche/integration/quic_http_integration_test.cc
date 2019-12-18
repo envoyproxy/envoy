@@ -1,3 +1,7 @@
+#include "envoy/api/v2/auth/cert.pb.h"
+#include "envoy/config/bootstrap/v2/bootstrap.pb.h"
+#include "envoy/config/filter/network/http_connection_manager/v2/http_connection_manager.pb.h"
+
 #include "test/config/utility.h"
 #include "test/integration/http_integration.h"
 #include "test/test_common/utility.h"
@@ -97,12 +101,11 @@ public:
       auto* filter_chain =
           bootstrap.mutable_static_resources()->mutable_listeners(0)->mutable_filter_chains(0);
       auto* transport_socket = filter_chain->mutable_transport_socket();
-      TestUtility::jsonConvert(tls_context, *transport_socket->mutable_config());
+      transport_socket->mutable_typed_config()->PackFrom(tls_context);
     });
     config_helper_.addConfigModifier(
         [](envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager&
                hcm) {
-          hcm.mutable_delayed_close_timeout()->set_nanos(0);
           EXPECT_EQ(hcm.codec_type(), envoy::config::filter::network::http_connection_manager::v2::
                                           HttpConnectionManager::HTTP3);
         });
@@ -176,6 +179,43 @@ TEST_P(QuicHttpIntegrationTest, UpstreamReadDisabledOnGiantResponseBody) {
 TEST_P(QuicHttpIntegrationTest, DownstreamReadDisabledOnGiantPost) {
   config_helper_.setBufferLimits(/*upstream_buffer_limit=*/1024, /*downstream_buffer_limit=*/1024);
   testRouterRequestAndResponseWithBody(/*request_size=*/1024 * 1024, /*response_size=*/1024, false);
+}
+
+// Tests that a connection idle times out after 1s and starts delayed close.
+TEST_P(QuicHttpIntegrationTest, TestDelayedConnectionTeardownTimeoutTrigger) {
+  config_helper_.addFilter("{ name: envoy.http_dynamo_filter, typed_config: { \"@type\": "
+                           "type.googleapis.com/google.protobuf.Empty } }");
+  config_helper_.setBufferLimits(1024, 1024);
+  config_helper_.addConfigModifier(
+      [](envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager& hcm) {
+        // 200ms.
+        hcm.mutable_delayed_close_timeout()->set_nanos(200000000);
+        hcm.mutable_drain_timeout()->set_seconds(1);
+        hcm.mutable_common_http_protocol_options()->mutable_idle_timeout()->set_seconds(1);
+      });
+
+  initialize();
+
+  fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  auto encoder_decoder =
+      codec_client_->startRequest(Http::TestHeaderMapImpl{{":method", "POST"},
+                                                          {":path", "/test/long/url"},
+                                                          {":scheme", "http"},
+                                                          {":authority", "host"}});
+  request_encoder_ = &encoder_decoder.first;
+  auto response = std::move(encoder_decoder.second);
+
+  codec_client_->sendData(*request_encoder_, 1024 * 65, false);
+
+  response->waitForEndStream();
+  // The delayed close timeout should trigger since client is not closing the connection.
+  EXPECT_TRUE(codec_client_->waitForDisconnect(std::chrono::milliseconds(5000)));
+  EXPECT_EQ(codec_client_->last_connection_event(), Network::ConnectionEvent::RemoteClose);
+  EXPECT_EQ(test_server_->counter("http.config_test.downstream_cx_delayed_close_timeout")->value(),
+            1);
 }
 
 } // namespace Quic
