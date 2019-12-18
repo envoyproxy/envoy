@@ -7,6 +7,7 @@
 #include "envoy/api/v2/eds.pb.h"
 
 #include "common/common/hash.h"
+#include "common/config/grpc_mux_impl.h"
 #include "common/config/grpc_subscription_impl.h"
 #include "common/config/resources.h"
 
@@ -44,10 +45,13 @@ public:
       timer_cb_ = timer_cb;
       return timer_;
     }));
+
+    mux_ = std::make_shared<Config::GrpcMuxImpl>(
+        local_info_, std::unique_ptr<Grpc::MockAsyncClient>(async_client_), dispatcher_,
+        *method_descriptor_, random_, rate_limit_settings_, true);
     subscription_ = std::make_unique<GrpcSubscriptionImpl>(
-        local_info_, std::unique_ptr<Grpc::MockAsyncClient>(async_client_), dispatcher_, random_,
-        *method_descriptor_, Config::TypeUrl::get().ClusterLoadAssignment, callbacks_, stats_,
-        stats_store_, rate_limit_settings_, init_fetch_timeout, true);
+        mux_, callbacks_, stats_, Config::TypeUrl::get().ClusterLoadAssignment, dispatcher_,
+        init_fetch_timeout, false);
   }
 
   ~GrpcSubscriptionTestHarness() override { EXPECT_CALL(async_stream_, sendMessageRaw_(_, false)); }
@@ -117,7 +121,7 @@ public:
       expectSendMessage(last_cluster_names_, version_, false,
                         Grpc::Status::WellKnownGrpcStatus::Internal, "bad config");
     }
-    subscription_->grpcMux()->onDiscoveryResponse(std::move(response));
+    mux_->onDiscoveryResponse(std::move(response));
     Mock::VerifyAndClearExpectations(&async_stream_);
   }
 
@@ -170,6 +174,7 @@ public:
   envoy::api::v2::core::Node node_;
   NiceMock<Config::MockSubscriptionCallbacks<envoy::api::v2::ClusterLoadAssignment>> callbacks_;
   NiceMock<Grpc::MockAsyncStream> async_stream_;
+  std::shared_ptr<GrpcMuxImpl> mux_;
   std::unique_ptr<GrpcSubscriptionImpl> subscription_;
   std::string last_response_nonce_;
   std::set<std::string> last_cluster_names_;
