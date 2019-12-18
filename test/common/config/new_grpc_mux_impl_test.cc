@@ -149,7 +149,7 @@ TEST_F(NewGrpcMuxImplTest, ConfigUpdateWithAliases) {
 }
 
 // DeltaDiscoveryResponse that comes in response to an on-demand request that couldn't be resolved
-// will contain an empty Resource. The Reource's aliases field will be populated with the alias
+// will contain an empty Resource. The Resource's aliases field will be populated with the alias
 // originally used in the request.
 TEST_F(NewGrpcMuxImplTest, ConfigUpdateWithNotFoundResponse) {
   setup();
