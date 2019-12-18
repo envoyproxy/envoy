@@ -23,11 +23,9 @@ namespace Null {
 // and linked directly into the Envoy process. This is useful for development
 // in that it permits the debugger to set breakpoints in both Envoy and the plugin.
 struct NullVm : public WasmVmBase {
-  NullVm(Stats::ScopeSharedPtr scope)
-      : WasmVmBase(scope, globalStats(), WasmRuntimeNames::get().Null) {}
+  NullVm(Stats::ScopeSharedPtr scope) : WasmVmBase(scope, WasmRuntimeNames::get().Null) {}
   NullVm(const NullVm& other)
-      : WasmVmBase(other.scope_, globalStats(), WasmRuntimeNames::get().Null),
-        plugin_name_(other.plugin_name_) {}
+      : WasmVmBase(other.scope_, WasmRuntimeNames::get().Null), plugin_name_(other.plugin_name_) {}
 
   // WasmVm
   absl::string_view runtime() override { return WasmRuntimeNames::get().Null; }
@@ -41,7 +39,6 @@ struct NullVm : public WasmVmBase {
   bool setWord(uint64_t pointer, Word data) override;
   bool getWord(uint64_t pointer, Word* data) override;
   absl::string_view getCustomSection(absl::string_view name) override;
-  VmGlobalStats& globalStats() { MUTABLE_CONSTRUCT_ON_FIRST_USE(VmGlobalStats); }
 
 #define _FORWARD_GET_FUNCTION(_T)                                                                  \
   void getFunction(absl::string_view function_name, _T* f) override {                              \

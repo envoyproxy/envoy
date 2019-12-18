@@ -37,7 +37,7 @@ using FuncDataPtr = std::unique_ptr<FuncData>;
 
 class V8 : public WasmVmBase {
 public:
-  V8(Stats::ScopeSharedPtr scope) : WasmVmBase(scope, globalStats(), WasmRuntimeNames::get().V8) {}
+  V8(Stats::ScopeSharedPtr scope) : WasmVmBase(scope, WasmRuntimeNames::get().V8) {}
 
   // Extensions::Common::Wasm::WasmVm
   absl::string_view runtime() override { return WasmRuntimeNames::get().V8; }
@@ -86,8 +86,6 @@ private:
   template <typename R, typename... Args>
   void getModuleFunctionImpl(absl::string_view function_name,
                              std::function<R(Context*, Args...)>* function);
-
-  VmGlobalStats& globalStats() { MUTABLE_CONSTRUCT_ON_FIRST_USE(VmGlobalStats); }
 
   wasm::vec<byte_t> source_ = wasm::vec<byte_t>::invalid();
   wasm::own<wasm::Store> store_;
