@@ -1,6 +1,8 @@
 #include <fstream>
 #include <functional>
 
+#include "envoy/config/filter/http/transcoder/v2/transcoder.pb.h"
+
 #include "common/buffer/buffer_impl.h"
 #include "common/grpc/codec.h"
 #include "common/grpc/common.h"

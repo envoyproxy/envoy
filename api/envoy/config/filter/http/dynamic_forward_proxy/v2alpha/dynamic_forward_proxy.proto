@@ -8,6 +8,7 @@ option java_multiple_files = true;
 
 import "envoy/config/common/dynamic_forward_proxy/v2alpha/dns_cache.proto";
 
+import "udpa/annotations/migrate.proto";
 import "validate/validate.proto";
 
 // [#protodoc-title: Dynamic forward proxy]
@@ -35,9 +36,7 @@ message PerRouteConfig {
     // :ref:`HCM host rewrite <envoy_api_field_route.RouteAction.host_rewrite>` given that the
     // value set here would be used for DNS lookups whereas the value set in the HCM would be used
     // for host header forwarding which is not the desired outcome.
-    //
-    // [#next-major-version: host_rewrite_literal]
-    string host_rewrite = 1;
+    string host_rewrite = 1 [(udpa.annotations.field_migrate).rename = "host_rewrite_literal"];
 
     // Indicates that before DNS lookup, the host header will be swapped with
     // the value of this header. If not set or empty, the original host header
@@ -48,8 +47,7 @@ message PerRouteConfig {
     // :ref:`HCM host rewrite header <envoy_api_field_route.RouteAction.auto_host_rewrite_header>`
     // given that the value set here would be used for DNS lookups whereas the value set in the HCM
     // would be used for host header forwarding which is not the desired outcome.
-    //
-    // [#next-major-version: host_rewrite_header]
-    string auto_host_rewrite_header = 2;
+    string auto_host_rewrite_header = 2
+        [(udpa.annotations.field_migrate).rename = "host_rewrite_header"];
   }
 }

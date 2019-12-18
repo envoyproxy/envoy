@@ -1,3 +1,5 @@
+#include "envoy/config/filter/network/http_connection_manager/v2/http_connection_manager.pb.h"
+
 #include "test/integration/http_integration.h"
 #include "test/mocks/http/mocks.h"
 #include "test/test_common/utility.h"

@@ -4,7 +4,7 @@
 #include <list>
 #include <string>
 
-#include "extensions/common/redis/redirection_mgr.h"
+#include "extensions/common/redis/cluster_refresh_manager.h"
 #include "extensions/filters/network/common/redis/client.h"
 #include "extensions/filters/network/common/redis/codec_impl.h"
 #include "extensions/filters/network/redis_proxy/command_splitter.h"

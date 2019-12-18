@@ -5,9 +5,11 @@
 #include <memory>
 #include <string>
 
+#include "envoy/api/v2/rds.pb.h"
 #include "envoy/api/v2/rds.pb.validate.h"
-#include "envoy/api/v2/route/route.pb.validate.h"
+#include "envoy/api/v2/route/route.pb.h"
 #include "envoy/server/filter_config.h"
+#include "envoy/type/percent.pb.h"
 
 #include "common/config/metadata.h"
 #include "common/config/well_known_names.h"

@@ -8,7 +8,12 @@
 #include <string>
 #include <vector>
 
+#include "envoy/admin/v2alpha/config_dump.pb.h"
+#include "envoy/api/v2/auth/cert.pb.h"
+#include "envoy/api/v2/discovery.pb.h"
+#include "envoy/api/v2/endpoint/endpoint.pb.h"
 #include "envoy/buffer/buffer.h"
+#include "envoy/config/bootstrap/v2/bootstrap.pb.h"
 #include "envoy/http/header_map.h"
 
 #include "common/api/api_impl.h"
@@ -294,8 +299,8 @@ void BaseIntegrationTest::createUpstreams() {
   for (uint32_t i = 0; i < fake_upstreams_count_; ++i) {
     auto endpoint = upstream_address_fn_(i);
     if (autonomous_upstream_) {
-      fake_upstreams_.emplace_back(
-          new AutonomousUpstream(endpoint, upstream_protocol_, *time_system_));
+      fake_upstreams_.emplace_back(new AutonomousUpstream(
+          endpoint, upstream_protocol_, *time_system_, autonomous_allow_incomplete_streams_));
     } else {
       fake_upstreams_.emplace_back(new FakeUpstream(endpoint, upstream_protocol_, *time_system_,
                                                     enable_half_close_, udp_fake_upstream_));

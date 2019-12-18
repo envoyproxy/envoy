@@ -1,5 +1,7 @@
 #include "common/grpc/async_client_impl.h"
 
+#include "envoy/api/v2/core/grpc_service.pb.h"
+
 #include "common/buffer/zero_copy_input_stream_impl.h"
 #include "common/common/enum_to_int.h"
 #include "common/common/utility.h"

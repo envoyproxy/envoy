@@ -1,5 +1,7 @@
 #pragma once
 
+#include "envoy/api/v2/core/http_uri.pb.h"
+
 #include "extensions/filters/http/common/jwks_fetcher.h"
 
 #include "test/mocks/server/mocks.h"

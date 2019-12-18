@@ -22,6 +22,7 @@ CDS
 CEL
 CHACHA
 CHLO
+CHMOD
 CHLOS
 CIDR
 CLA
@@ -988,6 +989,7 @@ templatizing
 testability
 testcase
 testcases
+testdata
 testee
 th
 threadsafe
@@ -995,6 +997,7 @@ thru
 timespan
 timestamp
 timestamps
+timeval
 tm
 tmp
 tmpfile

@@ -8,6 +8,7 @@
 #include <string>
 
 #include "envoy/config/config_provider_manager.h"
+#include "envoy/config/filter/network/http_connection_manager/v2/http_connection_manager.pb.h"
 #include "envoy/config/filter/network/http_connection_manager/v2/http_connection_manager.pb.validate.h"
 #include "envoy/http/filter.h"
 #include "envoy/router/route_config_provider_manager.h"
@@ -180,7 +181,7 @@ private:
   absl::optional<std::chrono::milliseconds> max_connection_duration_;
   std::chrono::milliseconds stream_idle_timeout_;
   std::chrono::milliseconds request_timeout_;
-  Router::RouteConfigProviderPtr route_config_provider_;
+  Router::RouteConfigProviderSharedPtr route_config_provider_;
   Config::ConfigProviderPtr scoped_routes_config_provider_;
   std::chrono::milliseconds drain_timeout_;
   bool generate_request_id_;

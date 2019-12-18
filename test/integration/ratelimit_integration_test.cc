@@ -1,3 +1,8 @@
+#include "envoy/api/v2/listener/listener.pb.h"
+#include "envoy/config/bootstrap/v2/bootstrap.pb.h"
+#include "envoy/config/filter/http/rate_limit/v2/rate_limit.pb.h"
+#include "envoy/config/filter/http/rate_limit/v2/rate_limit.pb.validate.h"
+#include "envoy/config/filter/network/http_connection_manager/v2/http_connection_manager.pb.h"
 #include "envoy/service/ratelimit/v2/rls.pb.h"
 
 #include "common/buffer/zero_copy_input_stream_impl.h"
