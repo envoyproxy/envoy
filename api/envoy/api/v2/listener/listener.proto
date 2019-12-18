@@ -204,6 +204,14 @@ message FilterChain {
   string name = 7;
 }
 
+// Specifies the match criteria. All of the criteria needs to be satisfied.
+message ListenerFilterMatch {
+  // If it is not empty, the criteria is satisfied if the destination port of the connection is
+  // contained.
+  repeated uint32 destination_ports = 1
+      [(validate.rules).repeated = {items {uint32 {lte: 65535 gte: 1}}}];
+}
+
 message ListenerFilter {
   // The name of the filter to instantiate. The name must match a
   // :ref:`supported filter <config_listener_filters>`.
@@ -216,4 +224,12 @@ message ListenerFilter {
 
     google.protobuf.Any typed_config = 3;
   }
+
+  // Decide when to enable/disable this listener filter on incoming traffic.
+  oneof switches {
+    ListenerFilterMatch disabled = 4;
+  }
+
+  // ListenerFilterMatch enabled = 5;
+  reserved 5;
 }
