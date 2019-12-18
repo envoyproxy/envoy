@@ -71,25 +71,24 @@ TEST(MemBlockBuilderTest, AppendUint32) {
 TEST(MemBlockBuilderTest, AppendOneTooMuch) {
   MemBlockBuilder<uint8_t> mem_block(1);
   mem_block.appendOne(1);
-  EXPECT_DEATH({ mem_block.appendOne(2); },
 #ifdef ENVOY_CONFIG_COVERAGE
-               "" // For some reason, this test under coverage generates a list of testdata/*.
+  // For some reason, this test under coverage generates a list of testdata/*.
+  EXPECT_DEATH({ mem_block.appendOne(2); }, "");
 #else
-               ".*insufficient capacity.*"
+  EXPECT_DEATH({ mem_block.appendOne(2); }, ".*insufficient capacity.*");
 #endif
-  );
 }
 
 TEST(MemBlockBuilderTest, AppendDataTooMuch) {
   MemBlockBuilder<uint8_t> mem_block(1);
   const uint8_t foo[] = {1, 2};
-  EXPECT_DEATH({ mem_block.appendData(absl::MakeConstSpan(foo, ABSL_ARRAYSIZE(foo))); },
 #ifdef ENVOY_CONFIG_COVERAGE
-               "" // For some reason, this test under coverage generates a list of testdata/*.
+  // For some reason, this test under coverage generates a list of testdata/*.
+  EXPECT_DEATH({ mem_block.appendData(absl::MakeConstSpan(foo, ABSL_ARRAYSIZE(foo))); }, "");
 #else
-               ".*insufficient capacity.*"
+  EXPECT_DEATH({ mem_block.appendData(absl::MakeConstSpan(foo, ABSL_ARRAYSIZE(foo))); },
+               ".*insufficient capacity.*");
 #endif
-  );
 }
 
 } // namespace Envoy
