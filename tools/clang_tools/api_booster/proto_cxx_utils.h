@@ -10,6 +10,8 @@ namespace ApiBooster {
 // Protobuf C++ code generation hackery. This is where the utilities that map
 // between C++ and protobuf types, enum constants and identifiers live. Most of
 // this is heuristic and needs to match whatever the protobuf compiler does.
+// TODO(htuch): investigate what can be done to make use of embedded proto
+// descriptors in generated stubs to make these utils more robust.
 class ProtoCxxUtils {
 public:
   // Convert from a C++ type, e.g. foo::bar::v2, to a protobuf type, e.g.

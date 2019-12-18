@@ -152,6 +152,8 @@ def ApiBoostTree(target_paths,
       # in one thread on consumed transitive headers on the other thread isn't an
       # issue. This also ensures that we complete all analysis error free before
       # any mutation takes place.
+      # TODO(htuch): we should move to run-clang-tidy.py once the headers fixups
+      # are Clang-based.
       api_includes = p.map(functools.partial(ApiBoostFile, llvm_include_path, debug_log),
                            file_paths)
       # Apply Clang replacements before header fixups, since the replacements
