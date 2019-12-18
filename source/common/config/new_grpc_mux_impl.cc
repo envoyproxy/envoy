@@ -71,7 +71,7 @@ void NewGrpcMuxImpl::onDiscoveryResponse(
   // resource names.
   for (const auto& r : message->resources()) {
     if (r.aliases_size() > 0) {
-      auto converted = sub->second->watch_map_.convertAliasWatchesToNameWatches(r);
+      AddedRemoved converted = sub->second->watch_map_.convertAliasWatchesToNameWatches(r);
       sub->second->sub_state_.updateSubscriptionInterest(converted.added_, converted.removed_);
     }
   }

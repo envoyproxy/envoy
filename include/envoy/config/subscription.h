@@ -8,7 +8,6 @@
 #include "envoy/common/pure.h"
 #include "envoy/stats/stats_macros.h"
 
-#include "common/common/assert.h"
 #include "common/protobuf/protobuf.h"
 
 namespace Envoy {

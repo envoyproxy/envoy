@@ -510,11 +510,13 @@ ConnectionManagerImpl::ActiveStream::ActiveStream(ConnectionManagerImpl& connect
                connection_manager.config_.scopedRouteConfigProvider() == nullptr)),
          "Either routeConfigProvider or scopedRouteConfigProvider should be set in "
          "ConnectionManagerImpl.");
-  if (connection_manager.config_.routeConfigProvider() != nullptr) {
+  if (connection_manager_.config_.isRoutable() &&
+      connection_manager.config_.routeConfigProvider() != nullptr) {
     route_config_update_requester_ =
         std::make_unique<ConnectionManagerImpl::RdsRouteConfigUpdateRequester>(
             connection_manager.config_.routeConfigProvider());
-  } else if (connection_manager.config_.scopedRouteConfigProvider() != nullptr) {
+  } else if (connection_manager_.config_.isRoutable() &&
+             connection_manager.config_.scopedRouteConfigProvider() != nullptr) {
     route_config_update_requester_ =
         std::make_unique<ConnectionManagerImpl::NullRouteConfigUpdateRequester>();
   }
