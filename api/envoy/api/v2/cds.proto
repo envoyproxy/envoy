@@ -2,11 +2,6 @@ syntax = "proto3";
 
 package envoy.api.v2;
 
-option java_package = "io.envoyproxy.envoy.api.v2";
-option java_outer_classname = "CdsProto";
-option java_multiple_files = true;
-option java_generic_services = true;
-
 import "envoy/api/v2/auth/cert.proto";
 import "envoy/api/v2/cluster/circuit_breaker.proto";
 import "envoy/api/v2/cluster/filter.proto";
@@ -28,6 +23,11 @@ import "google/protobuf/wrappers.proto";
 
 import "udpa/annotations/migrate.proto";
 import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.api.v2";
+option java_outer_classname = "CdsProto";
+option java_multiple_files = true;
+option java_generic_services = true;
 
 // [#protodoc-title: Clusters]
 
