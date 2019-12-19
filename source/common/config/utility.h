@@ -21,6 +21,7 @@
 #include "common/common/backoff_strategy.h"
 #include "common/common/hash.h"
 #include "common/common/hex.h"
+#include "common/config/api_type_oracle.h"
 #include "common/grpc/common.h"
 #include "common/protobuf/protobuf.h"
 #include "common/protobuf/utility.h"
@@ -240,11 +241,19 @@ public:
       if (!type.empty() && type != struct_type && type != empty_type) {
         Factory* factory = Registry::FactoryRegistry<Factory>::getFactoryByType(type);
 
-        if (factory == nullptr) {
-          throw EnvoyException(
-              fmt::format("Didn't find a registered implementation for type: '{}'", type));
+        if (factory != nullptr) {
+          return *factory;
         }
-        return *factory;
+
+        // try to look up a deprecated type
+        auto earlier_version = ApiTypeOracle::inferEarlierExtension(type);
+        if (earlier_version) {
+          // return Utility::getAndCheckFactoryByName<Factory>(earlier_version.value());
+          return Utility::getAndCheckFactoryByName<Factory>(name);
+        }
+
+        throw EnvoyException(
+            fmt::format("Didn't find a registered implementation for type: '{}'", type));
       }
     }
     return Utility::getAndCheckFactoryByName<Factory>(name);

@@ -69,5 +69,14 @@ ApiTypeOracle::inferEarlierVersionDescriptor(absl::string_view extension_name,
   return nullptr;
 }
 
+absl::optional<std::string> ApiTypeOracle::inferEarlierExtension(absl::string_view config_type) {
+  for (const auto& it : v2ApiTypeMap()) {
+    if (config_type == it.second) {
+      return it.first;
+    }
+  }
+  return {};
+}
+
 } // namespace Config
 } // namespace Envoy

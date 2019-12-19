@@ -3,6 +3,7 @@
 #include "common/protobuf/protobuf.h"
 
 #include "absl/strings/string_view.h"
+#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Config {
@@ -25,6 +26,11 @@ public:
   inferEarlierVersionDescriptor(absl::string_view extension_name,
                                 const ProtobufWkt::Any& typed_config,
                                 absl::string_view target_type);
+
+  /**
+   * Infers an extension name for an earlier version of the configuration proto.
+   */
+  static absl::optional<std::string> inferEarlierExtension(absl::string_view config_type);
 };
 
 } // namespace Config
