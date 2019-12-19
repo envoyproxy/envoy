@@ -34,7 +34,7 @@ grep --quiet --fixed-strings "$VERSION_NUM" docs/root/intro/version_history.rst 
   || (echo "Git tag $VERSION_NUM not found in version_history.rst" && exit 1)
 
 # Check that the CLI options are always sorted.
-diff --quiet \
+diff --brief \
   <(grep '^.. option::' docs/root/operations/cli.rst) \
   <(grep '^.. option::' docs/root/operations/cli.rst | sort) \
   || (echo "CLI options in docs/root/operations/cli.rst are not sorted" && exit 1)
