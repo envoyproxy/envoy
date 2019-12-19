@@ -1572,6 +1572,7 @@ TEST_F(TcpProxyTest, DEPRECATED_FEATURE_TEST(AccessLogBytesRxTxDuration)) {
   EXPECT_THAT(access_log_data_,
               MatchesRegex("bytesreceived=1 bytessent=2 "
                            "datetime=\\d+-\\d+-\\d+T\\d+:\\d+:\\d+\\.\\d+Z nonzeronum=\\d+"));
+  EXPECT_THAT(access_log_data_, Not(MatchesRegex("nonzeronum=0")));
 #endif
 }
 
