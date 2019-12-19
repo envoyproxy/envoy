@@ -20,11 +20,12 @@ import api_boost
 TestCase = namedtuple('TestCase', ['name', 'description'])
 
 # List of test in the form [(file_name, explanation)]
-TESTS = list(map(lambda x: TestCase(*x), [
-    ('elaborated_type', 'ElaboratedTypeLoc type upgrades'),
-    ('using_decl', 'UsingDecl upgrades for named types'),
-    ('decl_ref_expr', 'DeclRefExpr upgrades for named constants'),
-]))
+TESTS = list(
+    map(lambda x: TestCase(*x), [
+        ('elaborated_type', 'ElaboratedTypeLoc type upgrades'),
+        ('using_decl', 'UsingDecl upgrades for named types'),
+        ('decl_ref_expr', 'DeclRefExpr upgrades for named constants'),
+    ]))
 
 TESTDATA_PATH = 'tools/api_boost/testdata'
 
