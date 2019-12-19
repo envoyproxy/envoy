@@ -2,11 +2,6 @@ syntax = "proto3";
 
 package envoy.service.discovery.v3alpha;
 
-option java_package = "io.envoyproxy.envoy.service.discovery.v3alpha";
-option java_outer_classname = "HdsProto";
-option java_multiple_files = true;
-option java_generic_services = true;
-
 import "envoy/api/v3alpha/core/base.proto";
 import "envoy/api/v3alpha/core/health_check.proto";
 import "envoy/api/v3alpha/endpoint/endpoint.proto";
@@ -15,6 +10,11 @@ import "google/api/annotations.proto";
 import "google/protobuf/duration.proto";
 
 import "udpa/annotations/versioning.proto";
+
+option java_package = "io.envoyproxy.envoy.service.discovery.v3alpha";
+option java_outer_classname = "HdsProto";
+option java_multiple_files = true;
+option java_generic_services = true;
 
 // HDS is Health Discovery Service. It compliments Envoy’s health checking
 // service by designating this Envoy to be a healthchecker for a subset of hosts

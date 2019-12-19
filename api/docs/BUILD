@@ -1,3 +1,5 @@
+load("@rules_proto//proto:defs.bzl", "proto_library")
+
 licenses(["notice"])  # Apache 2
 
 package_group(

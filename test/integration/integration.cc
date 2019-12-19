@@ -299,8 +299,8 @@ void BaseIntegrationTest::createUpstreams() {
   for (uint32_t i = 0; i < fake_upstreams_count_; ++i) {
     auto endpoint = upstream_address_fn_(i);
     if (autonomous_upstream_) {
-      fake_upstreams_.emplace_back(
-          new AutonomousUpstream(endpoint, upstream_protocol_, *time_system_));
+      fake_upstreams_.emplace_back(new AutonomousUpstream(
+          endpoint, upstream_protocol_, *time_system_, autonomous_allow_incomplete_streams_));
     } else {
       fake_upstreams_.emplace_back(new FakeUpstream(endpoint, upstream_protocol_, *time_system_,
                                                     enable_half_close_, udp_fake_upstream_));

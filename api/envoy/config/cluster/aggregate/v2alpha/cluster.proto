@@ -2,11 +2,11 @@ syntax = "proto3";
 
 package envoy.config.cluster.aggregate.v2alpha;
 
+import "validate/validate.proto";
+
 option java_package = "io.envoyproxy.envoy.config.cluster.aggregate.v2alpha";
 option java_outer_classname = "ClusterProto";
 option java_multiple_files = true;
-
-import "validate/validate.proto";
 
 // [#protodoc-title: Aggregate cluster configuration]
 
