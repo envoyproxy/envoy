@@ -70,7 +70,9 @@ STD_REGEX_WHITELIST = ("./source/common/common/utility.cc", "./source/common/com
                        "./source/common/access_log/access_log_formatter.cc",
                        "./source/extensions/filters/http/squash/squash_filter.h",
                        "./source/extensions/filters/http/squash/squash_filter.cc",
-                       "./source/server/http/admin.h", "./source/server/http/admin.cc")
+                       "./source/server/http/admin.h", "./source/server/http/admin.cc",
+                       "./tools/clang_tools/api_booster/main.cc",
+                       "./tools/clang_tools/api_booster/proto_cxx_utils.h")
 
 # Only one C++ file should instantiate grpc_init
 GRPC_INIT_WHITELIST = ("./source/common/grpc/google_grpc_context.cc")
@@ -340,7 +342,8 @@ def isBuildFile(file_path):
 
 
 def isExternalBuildFile(file_path):
-  return isBuildFile(file_path) and file_path.startswith("./bazel/external/")
+  return isBuildFile(file_path) and (file_path.startswith("./bazel/external/") or
+                                     file_path.startswith("./tools/clang_tools"))
 
 
 def isSkylarkFile(file_path):
@@ -858,7 +861,10 @@ if __name__ == "__main__":
   target_path = args.target_path
   envoy_build_rule_check = not args.skip_envoy_build_rule_check
   namespace_check = args.namespace_check
-  namespace_check_excluded_paths = args.namespace_check_excluded_paths
+  namespace_check_excluded_paths = args.namespace_check_excluded_paths + [
+      "./tools/api_boost/testdata/",
+      "./tools/clang_tools/",
+  ]
   build_fixer_check_excluded_paths = args.build_fixer_check_excluded_paths + [
       "./bazel/external/",
       "./bazel/toolchains/",
@@ -878,6 +884,11 @@ if __name__ == "__main__":
   # error_messages.
   def ownedDirectories(error_messages):
     owned = []
+    maintainers = [
+        '@mattklein123', '@htuch', '@alyssawilk', '@zuercher', '@lizan', '@snowp', '@junr03',
+        '@dnoe', '@dio', '@jmarantz'
+    ]
+
     try:
       with open('./CODEOWNERS') as f:
         for line in f:
@@ -890,6 +901,11 @@ if __name__ == "__main__":
             if len(owners) < 2:
               error_messages.append("Extensions require at least 2 owners in CODEOWNERS:\n"
                                     "    {}".format(line))
+            maintainer = len(set(owners).intersection(set(maintainers))) > 0
+            if not maintainer:
+              error_messages.append("Extensions require at least one maintainer OWNER:\n"
+                                    "    {}".format(line))
+
       return owned
     except IOError:
       return []  # for the check format tests.

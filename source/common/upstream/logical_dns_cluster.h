@@ -5,6 +5,9 @@
 #include <functional>
 #include <string>
 
+#include "envoy/api/v2/cds.pb.h"
+#include "envoy/api/v2/eds.pb.h"
+#include "envoy/api/v2/endpoint/endpoint.pb.h"
 #include "envoy/stats/scope.h"
 
 #include "common/common/empty_string.h"

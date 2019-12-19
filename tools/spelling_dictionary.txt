@@ -13,6 +13,7 @@ API
 ASAN
 ASCII
 ASSERTs
+AST
 AWS
 BACKTRACE
 BSON
@@ -22,6 +23,7 @@ CDS
 CEL
 CHACHA
 CHLO
+CHMOD
 CHLOS
 CIDR
 CLA
@@ -301,6 +303,7 @@ WKT
 WRR
 WS
 Welford's
+Wi
 XDS
 XFCC
 XFF
@@ -418,6 +421,7 @@ codings
 combinatorial
 comparator
 compat
+compiation
 completable
 cond
 condvar
@@ -524,6 +528,7 @@ evwatch
 exe
 execlp
 expectable
+extrahelp
 faceplant
 facto
 failover
@@ -644,6 +649,7 @@ lexically
 libc
 libevent
 libstdc
+libtooling
 lifecycle
 lightstep
 linearization
@@ -651,6 +657,7 @@ linearize
 linearized
 linux
 livelock
+llvm
 localhost
 lockless
 login
@@ -664,6 +671,7 @@ lowp
 ltrim
 lua
 lyft
+mabye
 maglev
 malloc
 matchable
@@ -988,6 +996,7 @@ templatizing
 testability
 testcase
 testcases
+testdata
 testee
 th
 threadsafe
@@ -995,6 +1004,7 @@ thru
 timespan
 timestamp
 timestamps
+timeval
 tm
 tmp
 tmpfile

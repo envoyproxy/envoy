@@ -1,4 +1,6 @@
+#include "envoy/api/v2/rds.pb.h"
 #include "envoy/api/v2/rds.pb.validate.h"
+#include "envoy/api/v2/route/route.pb.h"
 
 #include "common/router/config_impl.h"
 
@@ -84,17 +86,6 @@ DEFINE_PROTO_FUZZER(const test::common::router::RouteTestCase& input) {
     ConfigImpl config(cleanRouteConfig(input.config()), factory_context,
                       ProtobufMessage::getNullValidationVisitor(), true);
     Http::TestHeaderMapImpl headers = Fuzz::fromHeaders(input.headers());
-    // It's a precondition of routing that {:authority, :path, x-forwarded-proto} headers exists,
-    // HCM enforces this.
-    if (headers.Host() == nullptr) {
-      headers.setHost("example.com");
-    }
-    if (headers.Path() == nullptr) {
-      headers.setPath("/");
-    }
-    if (headers.ForwardedProto() == nullptr) {
-      headers.setForwardedProto("http");
-    }
     auto route = config.route(headers, stream_info, input.random_value());
     if (route != nullptr && route->routeEntry() != nullptr) {
       route->routeEntry()->finalizeRequestHeaders(headers, stream_info, true);

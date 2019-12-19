@@ -25,8 +25,7 @@ DnsResolverImpl::DnsResolverImpl(
     const bool use_tcp_for_dns_lookups)
     : dispatcher_(dispatcher),
       timer_(dispatcher.createTimer([this] { onEventCallback(ARES_SOCKET_BAD, 0); })) {
-  ares_options options;
-  memset(&options, 0, sizeof(options));
+  ares_options options{};
   int optmask = 0;
 
   if (use_tcp_for_dns_lookups) {

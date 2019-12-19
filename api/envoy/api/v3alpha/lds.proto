@@ -2,11 +2,6 @@ syntax = "proto3";
 
 package envoy.api.v3alpha;
 
-option java_outer_classname = "LdsProto";
-option java_multiple_files = true;
-option java_package = "io.envoyproxy.envoy.api.v3alpha";
-option java_generic_services = true;
-
 import "envoy/api/v3alpha/core/address.proto";
 import "envoy/api/v3alpha/core/base.proto";
 import "envoy/api/v3alpha/discovery.proto";
@@ -18,9 +13,14 @@ import "google/api/annotations.proto";
 import "google/protobuf/duration.proto";
 import "google/protobuf/wrappers.proto";
 
-import "udpa/api/annotations/versioning.proto";
+import "udpa/annotations/versioning.proto";
 
 import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.api.v3alpha";
+option java_outer_classname = "LdsProto";
+option java_multiple_files = true;
+option java_generic_services = true;
 
 // [#protodoc-title: Listener]
 // Listener :ref:`configuration overview <config_listeners>`
@@ -37,16 +37,14 @@ service ListenerDiscoveryService {
   }
 
   rpc FetchListeners(DiscoveryRequest) returns (DiscoveryResponse) {
-    option (google.api.http) = {
-      post: "/v3alpha/discovery:listeners"
-      body: "*"
-    };
+    option (google.api.http).post = "/v3alpha/discovery:listeners";
+    option (google.api.http).body = "*";
   }
 }
 
 // [#next-free-field: 22]
 message Listener {
-  option (udpa.api.annotations.versioning).previous_message_type = "envoy.api.v2.Listener";
+  option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.Listener";
 
   enum DrainType {
     // Drain in response to calling /healthcheck/fail admin endpoint (along with the health check
@@ -61,7 +59,7 @@ message Listener {
 
   // [#not-implemented-hide:]
   message DeprecatedV1 {
-    option (udpa.api.annotations.versioning).previous_message_type =
+    option (udpa.annotations.versioning).previous_message_type =
         "envoy.api.v2.Listener.DeprecatedV1";
 
     // Whether the listener should bind to the port. A listener that doesn't
@@ -79,7 +77,7 @@ message Listener {
 
   // Configuration for listener connection balancing.
   message ConnectionBalanceConfig {
-    option (udpa.api.annotations.versioning).previous_message_type =
+    option (udpa.annotations.versioning).previous_message_type =
         "envoy.api.v2.Listener.ConnectionBalanceConfig";
 
     // A connection balancer implementation that does exact balancing. This means that a lock is
@@ -89,7 +87,7 @@ message Listener {
     // sacrifices accept throughput for accuracy and should be used when there are a small number of
     // connections that rarely cycle (e.g., service mesh gRPC egress).
     message ExactBalance {
-      option (udpa.api.annotations.versioning).previous_message_type =
+      option (udpa.annotations.versioning).previous_message_type =
           "envoy.api.v2.Listener.ConnectionBalanceConfig.ExactBalance";
     }
 

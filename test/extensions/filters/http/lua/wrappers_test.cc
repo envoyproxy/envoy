@@ -1,3 +1,5 @@
+#include "envoy/api/v2/core/base.pb.h"
+
 #include "common/http/utility.h"
 #include "common/stream_info/stream_info_impl.h"
 
