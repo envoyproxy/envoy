@@ -31,9 +31,9 @@ Terminal 1
   $ docker-compose -f docker-compose-dev.yaml up --build -d
   $ docker-compose -f docker-compose-dev.yaml ps
 
-    Name                        Command               State                            Ports
-  ---------------------------------------------------------------------------------------------------------------------------
-  templating_front-envoy_1   /docker-entrypoint.sh /bin ...   Up      10000/tcp, 0.0.0.0:8000->80/tcp, 0.0.0.0:8001->8001/tcp
+            Name                          Command              State                            Ports
+  ----------------------------------------------------------------------------------------------------------------------------
+  templating_front-envoy_1        /docker-entrypoint.sh /bin ... Up      10000/tcp, 0.0.0.0:8000->80/tcp, 0.0.0.0:8001->8001/tcp
 
 **Step 3: Send a request to get context specific "robots.txt" file**
 
@@ -77,9 +77,9 @@ Terminal 1
   $ docker-compose -f docker-compose-prod.yaml up --build -d
   $ docker-compose -f docker-compose-prod.yaml ps
 
-    Name                        Command               State                            Ports
-  ---------------------------------------------------------------------------------------------------------------------------
-  templating_front-envoy_1   /docker-entrypoint.sh /bin ...   Up      10000/tcp, 0.0.0.0:8000->80/tcp, 0.0.0.0:8001->8001/tcp
+            Name                          Command              State                            Ports
+  ----------------------------------------------------------------------------------------------------------------------------
+  templating_front-envoy_1        /docker-entrypoint.sh /bin ... Up      10000/tcp, 0.0.0.0:8000->80/tcp, 0.0.0.0:8001->8001/tcp
 
 **Step 5: Send a request to get context specific "robots.txt" file**
 
