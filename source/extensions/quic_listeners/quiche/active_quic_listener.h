@@ -94,13 +94,21 @@ public:
         std::make_unique<Network::Socket::Options>();
 #ifdef SO_ATTACH_REUSEPORT_CBPF
     std::vector<sock_filter> filter = {
-        {0x80, 0, 0, 0000000000},   {0x35, 0, 9, 0x00000009},
-        {0x30, 0, 0, 0000000000},   {0x54, 0, 0, 0x00000080},
-        {0x15, 0, 2, 0000000000},   {0x20, 0, 0, 0x00000001},
-        {0x05, 0, 0, 0x00000005},   {0x80, 0, 0, 0000000000},
-        {0x35, 0, 2, 0x0000000e},   {0x20, 0, 0, 0x00000006},
-        {0x05, 0, 0, 0x00000001},   {0x20, 0, 0, static_cast<uint32_t>(SKF_AD_OFF + SKF_AD_RXHASH)},
-        {0x94, 0, 0, concurrency_}, {0x16, 0, 0, 0000000000},
+        {0x80, 0, 0, 0000000000}, //                   ld len
+        {0x35, 0, 9, 0x00000009}, //                   jlt #0x9, packet_too_short
+        {0x30, 0, 0, 0000000000}, //                   ldb [0]
+        {0x54, 0, 0, 0x00000080}, //                   and #0x80
+        {0x15, 0, 2, 0000000000}, //                   jne #0, ietf_long_header
+        {0x20, 0, 0, 0x00000001}, //                   ld [1]
+        {0x05, 0, 0, 0x00000005}, //                   ja return
+        {0x80, 0, 0, 0000000000}, //                   ietf_long_header: ld len
+        {0x35, 0, 2, 0x0000000e}, //                   jlt #0xe, packet_too_short
+        {0x20, 0, 0, 0x00000006}, //                   ld [6]
+        {0x05, 0, 0, 0x00000001}, //                   ja return
+        {0x20, 0, 0,              // packet_too_short: ld rxhash
+         static_cast<uint32_t>(SKF_AD_OFF + SKF_AD_RXHASH)},
+        {0x94, 0, 0, concurrency_}, // return:         mod #socket_count
+        {0x16, 0, 0, 0000000000},   //                 ret a
     };
     sock_fprog prog;
     absl::call_once(install_bpf_once_, [&]() {
