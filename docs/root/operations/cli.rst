@@ -218,7 +218,7 @@ following are the command line options that Envoy supports.
   the parent shutdown time set via the :option:`--parent-shutdown-time-s` option. How the two 
   settings are configured depends on the specific deployment. In edge scenarios, it might be
   desirable to have a very long drain time. In service to service scenarios, it might be possible
-  to make the drain and shutdown ime much shorter (e.g., 60s/90s).
+  to make the drain and shutdown time much shorter (e.g., 60s/90s).
 
 .. option:: --parent-shutdown-time-s <integer>
 
