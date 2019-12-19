@@ -80,6 +80,7 @@ cleanup
 trap cleanup EXIT
 
 bazel/setup_clang.sh /opt/llvm
+export LLVM_CONFIG=/opt/llvm/bin/llvm-config
 
 [[ "${BUILD_REASON}" != "PullRequest" ]] && BAZEL_EXTRA_TEST_OPTIONS+=" --nocache_test_results --test_output=all"
 
