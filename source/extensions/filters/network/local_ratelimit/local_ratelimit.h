@@ -16,7 +16,7 @@ namespace LocalRateLimitFilter {
 /**
  * All local rate limit stats. @see stats_macros.h
  */
-#define ALL_LOCAL_RATE_LIMIT_STATS(COUNTER) COUNTER(rate_limit)
+#define ALL_LOCAL_RATE_LIMIT_STATS(COUNTER) COUNTER(rate_limited)
 
 /**
  * Struct definition for all local rate limit stats. @see stats_macros.h

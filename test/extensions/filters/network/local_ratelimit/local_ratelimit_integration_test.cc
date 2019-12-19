@@ -48,7 +48,7 @@ typed_config:
   ASSERT_TRUE(fake_upstream_connection->waitForDisconnect(true));
 
   EXPECT_EQ(0,
-            test_server_->counter("local_rate_limit.local_rate_limit_stats.rate_limit")->value());
+            test_server_->counter("local_rate_limit.local_rate_limit_stats.rate_limited")->value());
 }
 
 // TODO(mattklein123): Create an integration test that tests rate limiting. Right now this is

@@ -24,7 +24,7 @@ namespace {
 
 class LocalRateLimitTestBase : public testing::Test {
 public:
-  void setup(const std::string& filter_yaml) {
+  void initialize(const std::string& filter_yaml) {
     envoy::config::filter::network::local_rate_limit::v2alpha::LocalRateLimit proto_config;
     TestUtility::loadFromYamlAndValidate(filter_yaml, proto_config);
     EXPECT_CALL(*fill_timer_, enableTimer(_, nullptr));
@@ -40,7 +40,7 @@ public:
 
 // Verify token bucket functionality.
 TEST_F(LocalRateLimitTestBase, TokenBucket) {
-  setup(R"EOF(
+  initialize(R"EOF(
 stat_prefix: local_rate_limit_stats
 token_bucket:
   max_tokens: 1
@@ -75,7 +75,7 @@ token_bucket:
 
 // Verify token bucket functionality.
 TEST_F(LocalRateLimitTestBase, TokenBucketMultipleTokensPerFill) {
-  setup(R"EOF(
+  initialize(R"EOF(
 stat_prefix: local_rate_limit_stats
 token_bucket:
   max_tokens: 2
@@ -119,7 +119,7 @@ public:
 
 // Basic no rate limit case.
 TEST_F(LocalRateLimitFilterTest, NoRateLimit) {
-  setup(R"EOF(
+  initialize(R"EOF(
 stat_prefix: local_rate_limit_stats
 token_bucket:
   max_tokens: 1
@@ -130,13 +130,13 @@ token_bucket:
   ActiveFilter active_filter(config_);
   EXPECT_EQ(Network::FilterStatus::Continue, active_filter.filter_.onNewConnection());
   EXPECT_EQ(0, TestUtility::findCounter(stats_store_,
-                                        "local_rate_limit.local_rate_limit_stats.rate_limit")
+                                        "local_rate_limit.local_rate_limit_stats.rate_limited")
                    ->value());
 }
 
 // Basic rate limit case.
 TEST_F(LocalRateLimitFilterTest, RateLimit) {
-  setup(R"EOF(
+  initialize(R"EOF(
 stat_prefix: local_rate_limit_stats
 token_bucket:
   max_tokens: 1
@@ -153,7 +153,7 @@ token_bucket:
   EXPECT_CALL(active_filter2.read_filter_callbacks_.connection_, close(_));
   EXPECT_EQ(Network::FilterStatus::StopIteration, active_filter2.filter_.onNewConnection());
   EXPECT_EQ(1, TestUtility::findCounter(stats_store_,
-                                        "local_rate_limit.local_rate_limit_stats.rate_limit")
+                                        "local_rate_limit.local_rate_limit_stats.rate_limited")
                    ->value());
 
   // Refill the bucket.
@@ -167,7 +167,7 @@ token_bucket:
 
 // Verify the runtime disable functionality.
 TEST_F(LocalRateLimitFilterTest, RuntimeDisabled) {
-  setup(R"EOF(
+  initialize(R"EOF(
 stat_prefix: local_rate_limit_stats
 token_bucket:
   max_tokens: 1
@@ -188,7 +188,7 @@ enabled:
   EXPECT_CALL(runtime_.snapshot_, getBoolean("foo_key", true)).WillOnce(Return(false));
   EXPECT_EQ(Network::FilterStatus::Continue, active_filter2.filter_.onNewConnection());
   EXPECT_EQ(0, TestUtility::findCounter(stats_store_,
-                                        "local_rate_limit.local_rate_limit_stats.rate_limit")
+                                        "local_rate_limit.local_rate_limit_stats.rate_limited")
                    ->value());
 }
 

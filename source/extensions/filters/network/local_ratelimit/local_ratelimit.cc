@@ -69,7 +69,7 @@ Network::FilterStatus Filter::onNewConnection() {
   }
 
   if (!config_->canCreateConnection()) {
-    config_->stats().rate_limit_.inc();
+    config_->stats().rate_limited_.inc();
     ENVOY_CONN_LOG(trace, "local_rate_limit: rate limiting connection",
                    read_callbacks_->connection());
     read_callbacks_->connection().close(Network::ConnectionCloseType::NoFlush);

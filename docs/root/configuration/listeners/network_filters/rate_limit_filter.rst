@@ -7,6 +7,10 @@ Rate limit
 * :ref:`v2 API reference <envoy_api_msg_config.filter.network.rate_limit.v2.RateLimit>`
 * This filter should be configured with the name *envoy.ratelimit*.
 
+.. note::
+  Local rate limiting is also supported via the :ref:`local rate limit filter
+  <config_network_filters_local_rate_limit>`.
+
 .. _config_network_filters_rate_limit_stats:
 
 Statistics

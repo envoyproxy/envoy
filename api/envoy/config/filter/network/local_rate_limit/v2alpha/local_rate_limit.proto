@@ -20,9 +20,13 @@ message LocalRateLimit {
   // <config_network_filters_local_rate_limit_stats>`.
   string stat_prefix = 1 [(validate.rules).string = {min_bytes: 1}];
 
-  // The token bucket configuration to use for rate limiting connections. Each incoming connection
-  // consumes a single token. If the token is available, the connection will be allowed. If no
-  // tokens are available, the connection will be immediately closed.
+  // The token bucket configuration to use for rate limiting connections that are processed by the
+  // filter's filter chain. Each incoming connection processed by the filter consumes a single
+  // token. If the token is available, the connection will be allowed. If no tokens are available,
+  // the connection will be immediately closed.
+  //
+  // .. note::
+  //   In the current implementation each filter and filter chain has an independent rate limit.
   type.TokenBucket token_bucket = 2 [(validate.rules).message = {required: true}];
 
   // Runtime flag that controls whether the filter is enabled or not. If not specified, defaults
