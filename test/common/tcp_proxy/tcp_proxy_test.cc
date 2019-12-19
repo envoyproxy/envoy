@@ -1564,7 +1564,7 @@ TEST_F(TcpProxyTest, DEPRECATED_FEATURE_TEST(AccessLogBytesRxTxDuration)) {
   upstream_callbacks_->onEvent(Network::ConnectionEvent::RemoteClose);
   filter_.reset();
 
-#if !defined(WIN32)
+#ifndef GTEST_USES_SIMPLE_RE
   EXPECT_THAT(access_log_data_,
               MatchesRegex(
                   "bytesreceived=1 bytessent=2 datetime=[0-9-]+T[0-9:.]+Z nonzeronum=[1-9][0-9]*"));
