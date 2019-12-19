@@ -170,6 +170,7 @@ features. The following sandboxes are available:
     sandboxes/lua
     sandboxes/mysql
     sandboxes/redis
+    sandboxes/templating
     sandboxes/zipkin_tracing
 
 Other use cases
