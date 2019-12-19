@@ -959,13 +959,13 @@ TEST_F(HttpHealthCheckerImplTest, ZeroRetryInterval) {
   EXPECT_EQ(Host::Health::Healthy, cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->health());
 }
 
-MATCHER_P(TransportOptionsEq, expected, "") {
+MATCHER_P(ApplicationProtocolListEq, expected, "") {
   const Network::TransportSocketOptionsSharedPtr& options = arg;
   EXPECT_EQ(options->applicationProtocolListOverride(), std::vector<std::string>{expected});
   return true;
 }
 
-TEST_F(HttpHealthCheckerImplTest, SetALPNProtocol) {
+TEST_F(HttpHealthCheckerImplTest, SetALPNProtocols) {
   const std::string host = "fake_cluster";
   const std::string path = "/healthcheck";
   const std::string yaml = R"EOF(
@@ -978,7 +978,8 @@ TEST_F(HttpHealthCheckerImplTest, SetALPNProtocol) {
     http_health_check:
       service_name: locations
       path: /healthcheck
-    alpn_protocol: http1
+    alpn_protocols:
+    - http1
     )EOF";
 
   auto socket_factory = new Network::MockTransportSocketFactory();
@@ -987,7 +988,7 @@ TEST_F(HttpHealthCheckerImplTest, SetALPNProtocol) {
       Network::TransportSocketFactoryPtr(socket_factory));
   cluster_->info_->transport_socket_matcher_.reset(transport_socket_match);
 
-  EXPECT_CALL(*socket_factory, createTransportSocket(TransportOptionsEq("http1")));
+  EXPECT_CALL(*socket_factory, createTransportSocket(ApplicationProtocolListEq("http1")));
 
   health_checker_.reset(new TestHttpHealthCheckerImpl(*cluster_, parseHealthCheckFromV2Yaml(yaml),
                                                       dispatcher_, runtime_, random_,
