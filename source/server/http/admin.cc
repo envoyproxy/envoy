@@ -541,10 +541,10 @@ Http::Code AdminImpl::handlerConfigDump(absl::string_view, Http::HeaderMap& resp
     auto& any_message = *(dump.add_configs());
     any_message.PackFrom(*message);
   }
-  const auto redacted = MessageUtil::redact(dump);
+  MessageUtil::redact(dump);
 
   response_headers.setReferenceContentType(Http::Headers::get().ContentTypeValues.Json);
-  response.add(MessageUtil::getJsonStringFromMessage(*redacted, true)); // pretty-print
+  response.add(MessageUtil::getJsonStringFromMessage(dump, true)); // pretty-print
   return Http::Code::OK;
 }
 

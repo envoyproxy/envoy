@@ -523,7 +523,7 @@ std::unique_ptr<Protobuf::Message> typeUrlToNewMessage(Protobuf::MessageFactory&
 // Recursive helper method for MessageUtil::redact() below. Note that we have to keep track of
 // whether an ancestor was marked as `sensitive`, not just the field, because of cases like
 // `TlsContext::private_key`, which is of type `core.DataSource` rather than `string`.
-void redactInPlace(Protobuf::Message* message, bool ancestor_is_sensitive) {
+void redact(Protobuf::Message* message, bool ancestor_is_sensitive) {
   // If the message is an `Any`, we have to first unpack it to its original type to redact it...
   auto* any = dynamic_cast<ProtobufWkt::Any*>(message);
   if (any != nullptr) {
@@ -539,7 +539,7 @@ void redactInPlace(Protobuf::Message* message, bool ancestor_is_sensitive) {
     }
 
     any->UnpackTo(typed_message.get());
-    redactInPlace(typed_message.get(), ancestor_is_sensitive);
+    redact(typed_message.get(), ancestor_is_sensitive);
     any->PackFrom(*typed_message);
     return;
   }
@@ -561,7 +561,7 @@ void redactInPlace(Protobuf::Message* message, bool ancestor_is_sensitive) {
 
     MessageUtil::jsonConvert(typed_struct->value(), ProtobufMessage::getNullValidationVisitor(),
                              *typed_message);
-    redactInPlace(typed_message.get(), ancestor_is_sensitive);
+    redact(typed_message.get(), ancestor_is_sensitive);
     MessageUtil::jsonConvert(*typed_message, *(typed_struct->mutable_value()));
     return;
   }
@@ -580,11 +580,10 @@ void redactInPlace(Protobuf::Message* message, bool ancestor_is_sensitive) {
       if (field_descriptor->is_repeated()) {
         const int field_size = reflection->FieldSize(*message, field_descriptor);
         for (int i = 0; i < field_size; ++i) {
-          redactInPlace(reflection->MutableRepeatedMessage(message, field_descriptor, i),
-                        sensitive);
+          redact(reflection->MutableRepeatedMessage(message, field_descriptor, i), sensitive);
         }
       } else {
-        redactInPlace(reflection->MutableMessage(message, field_descriptor), sensitive);
+        redact(reflection->MutableMessage(message, field_descriptor), sensitive);
       }
     } else if (sensitive) {
       // Base case: replace strings with "[redacted]" and clear all others.
@@ -606,14 +605,8 @@ void redactInPlace(Protobuf::Message* message, bool ancestor_is_sensitive) {
 
 } // namespace
 
-std::unique_ptr<Protobuf::Message> MessageUtil::redact(const Protobuf::Message& message) {
-  // 1. Clone the original message. New() will return an empty message of the correct dynamic type.
-  std::unique_ptr<Protobuf::Message> redacted(message.New());
-  redacted->MergeFrom(message);
-
-  // 2. Redact the cloned message.
-  redactInPlace(redacted.get(), /* ancestor_is_sensitive = */ false);
-  return redacted;
+void MessageUtil::redact(Protobuf::Message& message) {
+  ::Envoy::redact(&message, /* ancestor_is_sensitive = */ false);
 }
 
 ProtobufWkt::Value ValueUtil::loadFromYaml(const std::string& yaml) {

@@ -363,8 +363,8 @@ public:
   static std::string CodeEnumToString(ProtobufUtil::error::Code code);
 
   /**
-   * Makes a copy of a source message with all sensitive data (that is, fields annotated as
-   * `udpa.annotations.sensitive`) redacted for display. String-typed fields annotated as
+   * Modifies a message such that all sensitive data (that is, fields annotated as
+   * `udpa.annotations.sensitive`) is redacted for display. String-typed fields annotated as
    * `sensitive` will be replaced with the string "[redacted]", primitive-typed fields (including
    * enums) will be cleared, and message-typed fields will be traversed recursively to redact
    * their contents.
@@ -378,11 +378,9 @@ public:
    * within strongly-typed messages, please reify them to strongly-typed messages using
    * `MessageUtil::jsonConvert()` before calling `MessageUtil::redact()`.
    *
-   * @param message original message to copy from.
-   * @return cloned message of the same dynamic type as the original, with all sensitive data
-   * redacted.
+   * @param message message to redact.
    */
-  static std::unique_ptr<Protobuf::Message> redact(const Protobuf::Message& message);
+  static void redact(Protobuf::Message& message);
 };
 
 class ValueUtil {

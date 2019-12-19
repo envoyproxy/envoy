@@ -264,8 +264,8 @@ TEST_F(ProtobufUtilityTest, LoadTextProtoFromFile_Failure) {
 }
 
 TEST_F(ProtobufUtilityTest, Redact) {
-  // Original message: contains a bunch of sensitive data.
-  envoy::test::Sensitive original;
+  // Message to redact: contains a bunch of sensitive data.
+  envoy::test::Sensitive actual;
   TestUtility::loadFromYaml(R"EOF(
 sensitive_string: This field should be redacted.
 sensitive_repeated_string:
@@ -424,7 +424,7 @@ insensitive_repeated_typed_struct:
         - '3'
         - '4'
 )EOF",
-                            original);
+                            actual);
 
   // Expected result: all sensitive data is redacted.
   envoy::test::Sensitive expected;
@@ -564,36 +564,41 @@ insensitive_repeated_message:
       - 4
 )EOF",
                             insensitive);
-  original.MergeFrom(insensitive);
+  actual.MergeFrom(insensitive);
   expected.MergeFrom(insensitive);
 
-  EXPECT_TRUE(TestUtility::protoEqual(expected, *MessageUtil::redact(original)));
+  MessageUtil::redact(actual);
+  EXPECT_TRUE(TestUtility::protoEqual(expected, actual));
 }
 
 TEST_F(ProtobufUtilityTest, RedactAnyWithUnknownTypeUrl) {
-  ProtobufWkt::Any original;
+  ProtobufWkt::Any actual;
   // Note, `loadFromYaml` validates the type when populating `Any`, so we have to pass the real type
   // first and substitute an unknown message type after loading.
   TestUtility::loadFromYaml(R"EOF(
 '@type': type.googleapis.com/envoy.test.Sensitive
 sensitive_string: This field is sensitive, but we have no way of knowing.
 )EOF",
-                            original);
-  original.set_type_url("type.googleapis.com/envoy.unknown.Message");
+                            actual);
+  actual.set_type_url("type.googleapis.com/envoy.unknown.Message");
 
-  EXPECT_TRUE(TestUtility::protoEqual(original, *MessageUtil::redact(original)));
+  ProtobufWkt::Any expected = actual;
+  MessageUtil::redact(actual);
+  EXPECT_TRUE(TestUtility::protoEqual(expected, actual));
 }
 
 TEST_F(ProtobufUtilityTest, RedactTypedStructWithUnknownTypeUrl) {
-  udpa::type::v1::TypedStruct original;
+  udpa::type::v1::TypedStruct actual;
   TestUtility::loadFromYaml(R"EOF(
 type_url: type.googleapis.com/envoy.unknown.Message
 value:
   sensitive_string: This field is sensitive, but we have no way of knowing.
 )EOF",
-                            original);
+                            actual);
 
-  EXPECT_TRUE(TestUtility::protoEqual(original, *MessageUtil::redact(original)));
+  udpa::type::v1::TypedStruct expected = actual;
+  MessageUtil::redact(actual);
+  EXPECT_TRUE(TestUtility::protoEqual(expected, actual));
 }
 
 TEST_F(ProtobufUtilityTest, KeyValueStruct) {
