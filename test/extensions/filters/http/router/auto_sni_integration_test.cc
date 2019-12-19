@@ -12,11 +12,11 @@
 
 namespace Envoy {
 namespace {
-class TLSIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
+class TlsIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
                            public Event::TestUsingSimulatedTime,
                            public HttpIntegrationTest {
 public:
-  TLSIntegrationTest() : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam()) {}
+  TlsIntegrationTest() : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam()) {}
 
   void setup() {
     setUpstreamProtocol(FakeHttpConnection::Type::HTTP1);
@@ -66,11 +66,11 @@ public:
   std::string upstream_cert_name_{"upstreamlocalhost"};
 };
 
-INSTANTIATE_TEST_SUITE_P(IpVersions, TLSIntegrationTest,
+INSTANTIATE_TEST_SUITE_P(IpVersions, TlsIntegrationTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
 
-TEST_P(TLSIntegrationTest, Test) {
+TEST_P(TlsIntegrationTest, Test) {
   setup();
   codec_client_ = makeHttpConnection(lookupPort("http"));
   Http::TestHeaderMapImpl request_headers{
