@@ -522,12 +522,12 @@ message Cluster {
   //    match:
   //      acceptMTLS: true
   //    transport_socket:
-  //      name: tls
+  //      name: envoy.transport_sockets.tls
   //      config: { ... } # tls socket configuration
   //  - name: "defaultToPlaintext"
   //    match: {}
   //    transport_socket:
-  //      name: "rawbuffer"
+  //      name: envoy.transport_sockets.raw_buffer
   //
   // Connections to the endpoints whose metadata value under *envoy.transport_socket*
   // having "acceptMTLS"/"true" key/value pair use the "enableMTLS" socket configuration.
