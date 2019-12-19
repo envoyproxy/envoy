@@ -4,20 +4,19 @@
 
 set -e
 
+VERSION_NUM=$(cat VERSION)
+VERSION_NUM=${VERSION_NUM%%-*} # Strip the suffix from versions like 1.3.0-dev.
+
 # We need to set ENVOY_DOCS_VERSION_STRING and ENVOY_DOCS_RELEASE_LEVEL for Sphinx.
 # We also validate that the tag and version match at this point if needed.
 if [ -n "$CIRCLE_TAG" ]
 then
   # Check the git tag matches the version number in the VERSION file.
-  VERSION_NUMBER=$(cat VERSION)
-  if [ "v${VERSION_NUMBER}" != "${CIRCLE_TAG}" ]; then
+  if [ "v${VERSION_NUM}" != "${CIRCLE_TAG}" ]; then
     echo "Given git tag does not match the VERSION file content:"
-    echo "${CIRCLE_TAG} vs $(cat VERSION)"
+    echo "${CIRCLE_TAG} vs ${VERSION_NUM}"
     exit 1
   fi
-  # Check the version_history.rst contains current release version.
-  grep --fixed-strings "$VERSION_NUMBER" docs/root/intro/version_history.rst \
-    || (echo "Git tag not found in version_history.rst" && exit 1)
 
   # Now that we now there is a match, we can use the tag.
   export ENVOY_DOCS_VERSION_STRING="tag-$CIRCLE_TAG"
@@ -25,11 +24,20 @@ then
   export ENVOY_BLOB_SHA="$CIRCLE_TAG"
 else
   BUILD_SHA=$(git rev-parse HEAD)
-  VERSION_NUM=$(cat VERSION)
   export ENVOY_DOCS_VERSION_STRING="${VERSION_NUM}"-"${BUILD_SHA:0:6}"
   export ENVOY_DOCS_RELEASE_LEVEL=pre-release
   export ENVOY_BLOB_SHA="$BUILD_SHA"
 fi
+
+# Check the version_history.rst contains current release version.
+grep --quiet --fixed-strings "$VERSION_NUM" docs/root/intro/version_history.rst \
+  || (echo "Git tag $VERSION_NUM not found in version_history.rst" && exit 1)
+
+# Check that the CLI options are always sorted.
+diff --quiet \
+  <(grep '^.. option::' docs/root/operations/cli.rst) \
+  <(grep '^.. option::' docs/root/operations/cli.rst | sort) \
+  || (echo "CLI options in docs/root/operations/cli.rst are not sorted" && exit 1)
 
 SCRIPT_DIR=$(dirname "$0")
 API_DIR=$(dirname "$dir")/api
