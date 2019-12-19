@@ -787,6 +787,14 @@ void HttpIntegrationTest::testEnvoyHandling100Continue(bool additional_continue_
 
 void HttpIntegrationTest::testEnvoyProxying100Continue(bool continue_before_upstream_complete,
                                                        bool with_encoder_filter) {
+  envoy::config::filter::http::cors::v2::PerRouteCorsPolicy policy;
+  const std::string yaml = R"(
+  allow_origin_string_match:
+    - exact: "*"
+  allow_headers: "content-type,x-grpc-web"
+  allow_methods: "GET,POST"
+  )";
+  TestUtility::loadFromYaml(yaml, policy);
   if (with_encoder_filter) {
     // Because 100-continue only affects encoder filters, make sure it plays well with one.
     config_helper_.addFilter("name: envoy.cors");
@@ -795,12 +803,8 @@ void HttpIntegrationTest::testEnvoyProxying100Continue(bool continue_before_upst
             -> void {
           auto* route_config = hcm.mutable_route_config();
           auto* virtual_host = route_config->mutable_virtual_hosts(0);
-          {
-            auto* cors = virtual_host->mutable_cors();
-            cors->mutable_allow_origin_string_match()->Add()->set_exact("*");
-            cors->set_allow_headers("content-type,x-grpc-web");
-            cors->set_allow_methods("GET,POST");
-          }
+          auto* config = virtual_host->mutable_typed_per_filter_config();
+          (*config)["envoy.cors"].PackFrom(policy);
         });
   }
   config_helper_.addConfigModifier(
