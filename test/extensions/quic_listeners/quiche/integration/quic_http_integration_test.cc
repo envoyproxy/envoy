@@ -215,7 +215,7 @@ TEST_P(QuicHttpIntegrationTest, TestDelayedConnectionTeardownTimeoutTrigger) {
   request_encoder_ = &encoder_decoder.first;
   auto response = std::move(encoder_decoder.second);
 
-  codec_client_->sendData(*request_encoder_, 1024 * 65, true);
+  codec_client_->sendData(*request_encoder_, 1024 * 65, false);
 
   response->waitForEndStream();
   // The delayed close timeout should trigger since client is not closing the connection.
