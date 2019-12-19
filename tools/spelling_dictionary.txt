@@ -408,6 +408,7 @@ ciphersuites
 circllhist
 CITT
 cloneable
+cloneability
 cmd
 cmsghdr
 codebase
