@@ -51,7 +51,7 @@ message ServerInfo {
   CommandLineOptions command_line_options = 6;
 }
 
-// [#next-free-field: 28]
+// [#next-free-field: 29]
 message CommandLineOptions {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.admin.v2alpha.CommandLineOptions";
@@ -147,4 +147,7 @@ message CommandLineOptions {
 
   // See :option:`--cpuset-threads` for details.
   bool cpuset_threads = 25;
+
+  // See :option:`--disable-extensions` for details.
+  repeated string disabled_extensions = 28;
 }

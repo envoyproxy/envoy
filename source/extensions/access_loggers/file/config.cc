@@ -3,6 +3,7 @@
 #include <memory>
 #include <unordered_map>
 
+#include "envoy/config/accesslog/v2/file.pb.h"
 #include "envoy/config/accesslog/v2/file.pb.validate.h"
 #include "envoy/registry/registry.h"
 #include "envoy/server/filter_config.h"

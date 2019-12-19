@@ -2,7 +2,9 @@
 
 #include <string>
 
-#include "envoy/config/accesslog/v2/file.pb.h"
+#include "envoy/api/v2/route/route.pb.h"
+#include "envoy/config/bootstrap/v2/bootstrap.pb.h"
+#include "envoy/config/filter/network/http_connection_manager/v2/http_connection_manager.pb.h"
 
 #include "common/http/header_map_impl.h"
 #include "common/http/headers.h"
@@ -328,6 +330,42 @@ TEST_P(IntegrationTest, HittingGrpcFilterLimitBufferingHeaders) {
               HeaderValueOf(Headers::get().GrpcStatus, "2")); // Unknown gRPC error
 }
 
+TEST_P(IntegrationTest, TestSmuggling) {
+  initialize();
+  const std::string smuggled_request = "GET / HTTP/1.1\r\nHost: disallowed\r\n\r\n";
+  ASSERT_EQ(smuggled_request.length(), 36);
+  // Make sure the http parser rejects having content-length and transfer-encoding: chunked
+  // on the same request, regardless of order and spacing.
+  {
+    std::string response;
+    const std::string full_request =
+        "GET / HTTP/1.1\r\nHost: host\r\ncontent-length: 36\r\ntransfer-encoding: chunked\r\n\r\n" +
+        smuggled_request;
+    sendRawHttpAndWaitForResponse(lookupPort("http"), full_request.c_str(), &response, false);
+    EXPECT_EQ("HTTP/1.1 400 Bad Request\r\ncontent-length: 0\r\nconnection: close\r\n\r\n",
+              response);
+  }
+  {
+    std::string response;
+    const std::string request = "GET / HTTP/1.1\r\nHost: host\r\ntransfer-encoding: chunked "
+                                "\r\ncontent-length: 36\r\n\r\n" +
+                                smuggled_request;
+    sendRawHttpAndWaitForResponse(lookupPort("http"), request.c_str(), &response, false);
+    EXPECT_EQ("HTTP/1.1 400 Bad Request\r\ncontent-length: 0\r\nconnection: close\r\n\r\n",
+              response);
+  }
+  // Make sure unsupported transfer encodings are rejected, lest they be abused.
+  {
+    std::string response;
+    const std::string request = "GET / HTTP/1.1\r\nHost: host\r\ntransfer-encoding: "
+                                "identity,chunked \r\ncontent-length: 36\r\n\r\n" +
+                                smuggled_request;
+    sendRawHttpAndWaitForResponse(lookupPort("http"), request.c_str(), &response, false);
+    EXPECT_EQ("HTTP/1.1 501 Not Implemented\r\ncontent-length: 0\r\nconnection: close\r\n\r\n",
+              response);
+  }
+}
+
 TEST_P(IntegrationTest, BadFirstline) {
   initialize();
   std::string response;
@@ -336,11 +374,13 @@ TEST_P(IntegrationTest, BadFirstline) {
 }
 
 TEST_P(IntegrationTest, MissingDelimiter) {
+  useAccessLog("%RESPONSE_CODE_DETAILS%");
   initialize();
   std::string response;
   sendRawHttpAndWaitForResponse(lookupPort("http"),
                                 "GET / HTTP/1.1\r\nHost: host\r\nfoo bar\r\n\r\n", &response);
   EXPECT_EQ("HTTP/1.1 400 Bad Request\r\ncontent-length: 0\r\nconnection: close\r\n\r\n", response);
+  EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("http1.codec_error"));
 }
 
 TEST_P(IntegrationTest, InvalidCharacterInFirstline) {
@@ -356,6 +396,40 @@ TEST_P(IntegrationTest, InvalidVersion) {
   std::string response;
   sendRawHttpAndWaitForResponse(lookupPort("http"), "GET / HTTP/1.01\r\nHost: host\r\n\r\n",
                                 &response);
+  EXPECT_EQ("HTTP/1.1 400 Bad Request\r\ncontent-length: 0\r\nconnection: close\r\n\r\n", response);
+}
+
+// Expect that malformed trailers to break the connection
+TEST_P(IntegrationTest, BadTrailer) {
+  initialize();
+  fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
+  std::string response;
+  sendRawHttpAndWaitForResponse(lookupPort("http"),
+                                "POST / HTTP/1.1\r\n"
+                                "Host: host\r\n"
+                                "Transfer-Encoding: chunked\r\n\r\n"
+                                "4\r\n"
+                                "body\r\n0\r\n"
+                                "badtrailer\r\n\r\n",
+                                &response);
+
+  EXPECT_EQ("HTTP/1.1 400 Bad Request\r\ncontent-length: 0\r\nconnection: close\r\n\r\n", response);
+}
+
+// Expect malformed headers to break the connection
+TEST_P(IntegrationTest, BadHeader) {
+  initialize();
+  fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
+  std::string response;
+  sendRawHttpAndWaitForResponse(lookupPort("http"),
+                                "POST / HTTP/1.1\r\n"
+                                "Host: host\r\n"
+                                "badHeader\r\n"
+                                "Transfer-Encoding: chunked\r\n\r\n"
+                                "4\r\n"
+                                "body\r\n0\r\n\r\n",
+                                &response);
+
   EXPECT_EQ("HTTP/1.1 400 Bad Request\r\ncontent-length: 0\r\nconnection: close\r\n\r\n", response);
 }
 
@@ -488,6 +562,60 @@ TEST_P(IntegrationTest, Pipeline) {
   while (response.find("400") == std::string::npos) {
     connection.run(Event::Dispatcher::RunType::NonBlock);
   }
+  EXPECT_THAT(response, HasSubstr("HTTP/1.1 400 Bad Request\r\n"));
+  connection.close();
+}
+
+// Checks to ensure that we reject the third request that is pipelined in the
+// same request
+TEST_P(IntegrationTest, PipelineWithTrailers) {
+  config_helper_.addConfigModifier(setEnableDownstreamTrailersHttp1());
+  config_helper_.addConfigModifier(setEnableUpstreamTrailersHttp1());
+  autonomous_upstream_ = true;
+  autonomous_allow_incomplete_streams_ = true;
+  initialize();
+  std::string response;
+
+  std::string good_request("POST / HTTP/1.1\r\n"
+                           "Host: host\r\n"
+                           "Transfer-Encoding: chunked\r\n\r\n"
+                           "4\r\n"
+                           "body\r\n0\r\n"
+                           "trailer1:t2\r\n"
+                           "trailer2:t3\r\n"
+                           "\r\n");
+
+  std::string bad_request("POST / HTTP/1.1\r\n"
+                          "Host: host\r\n"
+                          "Transfer-Encoding: chunked\r\n\r\n"
+                          "4\r\n"
+                          "body\r\n0\r\n"
+                          "trailer1\r\n"
+                          "trailer2:t3\r\n"
+                          "\r\n");
+
+  Buffer::OwnedImpl buffer(absl::StrCat(good_request, good_request, bad_request));
+
+  RawConnectionDriver connection(
+      lookupPort("http"), buffer,
+      [&](Network::ClientConnection&, const Buffer::Instance& data) -> void {
+        response.append(data.toString());
+      },
+      version_);
+
+  // First response should be success.
+  size_t pos;
+  while ((pos = response.find("200")) == std::string::npos) {
+    connection.run(Event::Dispatcher::RunType::NonBlock);
+  }
+  EXPECT_THAT(response, HasSubstr("HTTP/1.1 200 OK\r\n"));
+  while (response.find("200", pos + 1) == std::string::npos) {
+    connection.run(Event::Dispatcher::RunType::NonBlock);
+  }
+  while (response.find("400") == std::string::npos) {
+    connection.run(Event::Dispatcher::RunType::NonBlock);
+  }
+
   EXPECT_THAT(response, HasSubstr("HTTP/1.1 400 Bad Request\r\n"));
   connection.close();
 }
@@ -975,6 +1103,18 @@ TEST_P(IntegrationTest, ProcessObjectUnealthy) {
 
   EXPECT_TRUE(response->complete());
   EXPECT_THAT(response->headers(), HttpStatusIs("500"));
+}
+
+TEST_P(IntegrationTest, TrailersDroppedDuringEncoding) { testTrailers(10, 10, false, false); }
+
+TEST_P(IntegrationTest, TrailersDroppedUpstream) {
+  config_helper_.addConfigModifier(setEnableDownstreamTrailersHttp1());
+  testTrailers(10, 10, false, false);
+}
+
+TEST_P(IntegrationTest, TrailersDroppedDownstream) {
+  config_helper_.addConfigModifier(setEnableUpstreamTrailersHttp1());
+  testTrailers(10, 10, false, false);
 }
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, UpstreamEndpointIntegrationTest,

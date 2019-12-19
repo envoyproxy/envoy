@@ -1,5 +1,7 @@
 #include "extensions/filters/network/dubbo_proxy/router/config.h"
 
+#include "envoy/config/filter/dubbo/router/v2alpha1/router.pb.h"
+#include "envoy/config/filter/dubbo/router/v2alpha1/router.pb.validate.h"
 #include "envoy/registry/registry.h"
 
 #include "extensions/filters/network/dubbo_proxy/router/router_impl.h"

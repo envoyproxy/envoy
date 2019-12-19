@@ -1,5 +1,6 @@
 #include "common/ssl/tls_certificate_config_impl.h"
 
+#include "envoy/api/v2/auth/cert.pb.h"
 #include "envoy/common/exception.h"
 #include "envoy/server/transport_socket_config.h"
 

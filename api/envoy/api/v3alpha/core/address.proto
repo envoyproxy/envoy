@@ -24,6 +24,9 @@ message Pipe {
   // Paths starting with '@' will result in an error in environments other than
   // Linux.
   string path = 1 [(validate.rules).string = {min_bytes: 1}];
+
+  // The mode for the Pipe. Not applicable for abstract sockets.
+  uint32 mode = 2 [(validate.rules).uint32 = {lte: 511}];
 }
 
 // [#next-free-field: 7]

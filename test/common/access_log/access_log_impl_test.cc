@@ -3,6 +3,7 @@
 #include <memory>
 #include <string>
 
+#include "envoy/config/filter/accesslog/v2/accesslog.pb.h"
 #include "envoy/config/filter/accesslog/v2/accesslog.pb.validate.h"
 #include "envoy/upstream/cluster_manager.h"
 #include "envoy/upstream/upstream.h"

@@ -31,6 +31,8 @@ envoy_cc_test(
         "//test/mocks/stats:stats_mocks",
         "//test/mocks/upstream:upstream_mocks",
         "//test/test_common:test_time_lib",
+        "@envoy_api//envoy/api/v2/core:pkg_cc_proto",
+        "@envoy_api//envoy/api/v2/route:pkg_cc_proto",
     ],
 )
 
@@ -162,6 +164,7 @@ envoy_cc_fuzz_test(
         "//test/mocks/tracing:tracing_mocks",
         "//test/mocks/upstream:upstream_mocks",
         "//test/test_common:simulated_time_system_lib",
+        "@envoy_api//envoy/config/filter/network/http_connection_manager/v2:pkg_cc_proto",
     ],
 )
 
@@ -203,6 +206,9 @@ envoy_cc_test(
         "//test/mocks/upstream:upstream_mocks",
         "//test/test_common:logging_lib",
         "//test/test_common:test_time_lib",
+        "@envoy_api//envoy/config/filter/network/http_connection_manager/v2:pkg_cc_proto",
+        "@envoy_api//envoy/type:pkg_cc_proto",
+        "@envoy_api//envoy/type/tracing/v2:pkg_cc_proto",
     ],
 )
 
@@ -225,6 +231,8 @@ envoy_cc_test(
         "//test/mocks/upstream:upstream_mocks",
         "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",
+        "@envoy_api//envoy/config/filter/network/http_connection_manager/v2:pkg_cc_proto",
+        "@envoy_api//envoy/type:pkg_cc_proto",
     ],
 )
 

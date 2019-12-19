@@ -6,7 +6,6 @@ option java_package = "io.envoyproxy.envoy.config.trace.v3alpha";
 option java_outer_classname = "TraceProto";
 option java_multiple_files = true;
 
-import "envoy/api/v3alpha/core/base.proto";
 import "envoy/api/v3alpha/core/grpc_service.proto";
 
 import "google/protobuf/any.proto";
@@ -56,8 +55,7 @@ message Tracing {
     // - :ref:`DynamicOtConfig <envoy_api_msg_config.trace.v3alpha.DynamicOtConfig>`
     // - :ref:`DatadogConfig <envoy_api_msg_config.trace.v3alpha.DatadogConfig>`
     // - :ref:`OpenCensusConfig <envoy_api_msg_config.trace.v3alpha.OpenCensusConfig>`
-    // [#comment: TODO(marco) when XRay is implemented, uncomment the following; - :ref:`XRayConfig
-    // <envoy_api_msg_config.trace.v3alpha.XRayConfig>`]
+    // - :ref:`AWS X-Ray <envoy_api_msg_config.trace.v3alpha.XRayConfig>`
     oneof config_type {
       google.protobuf.Any typed_config = 3;
     }
@@ -228,22 +226,6 @@ message OpenCensusConfig {
 
   // List of outgoing trace context headers we will produce.
   repeated TraceContext outgoing_trace_context = 9;
-}
-
-// [#not-implemented-hide:]
-// Configuration for AWS X-Ray tracer.
-message XRayConfig {
-  option (udpa.annotations.versioning).previous_message_type = "envoy.config.trace.v2.XRayConfig";
-
-  // The endpoint of the X-Ray Daemon where the spans will be sent. Since by default daemon
-  // listens to localhost:2000, so the default value is 127.0.0.1:2000.
-  string daemon_endpoint = 1 [(validate.rules).string = {min_bytes: 1}];
-
-  // The custom name to name a X-Ray segment. By default will use cluster name.
-  string segment_name = 2;
-
-  // The location of custom sampling rule json file.
-  api.v3alpha.core.DataSource sampling_rule_manifest = 3;
 }
 
 // Configuration structure.
