@@ -549,7 +549,6 @@ void AdminImpl::addAllConfigToDump(envoy::admin::v2alpha::ConfigDump& dump,
                                    const absl::optional<std::string>& mask) const {
   for (const auto& key_callback_pair : config_tracker_.getCallbacksMap()) {
     ProtobufTypes::MessagePtr message = key_callback_pair.second();
-    RELEASE_ASSERT(message, "");
 
     if (mask.has_value()) {
       Protobuf::FieldMask field_mask;
@@ -562,22 +561,22 @@ void AdminImpl::addAllConfigToDump(envoy::admin::v2alpha::ConfigDump& dump,
   }
 }
 
-void AdminImpl::addResourceToDump(envoy::admin::v2alpha::ConfigDump& dump,
-                                  const absl::optional<std::string>& mask,
-                                  const std::string& resource) const {
+absl::optional<std::pair<Http::Code, std::string>>
+AdminImpl::addResourceToDump(envoy::admin::v2alpha::ConfigDump& dump,
+                             const absl::optional<std::string>& mask,
+                             const std::string& resource) const {
   for (const auto& key_callback_pair : config_tracker_.getCallbacksMap()) {
     ProtobufTypes::MessagePtr message = key_callback_pair.second();
-    RELEASE_ASSERT(message, "");
 
     auto field_descriptor = message->GetDescriptor()->FindFieldByName(resource);
     const Protobuf::Reflection* reflection = message->GetReflection();
     if (!field_descriptor) {
       continue;
     } else if (!field_descriptor->is_repeated()) {
-      throw AdminException{
+      return absl::optional<std::pair<Http::Code, std::string>>{std::make_pair(
           Http::Code::BadRequest,
           fmt::format("{} is not a repeated field. Use ?mask={} to get only this field",
-                      field_descriptor->name(), field_descriptor->name())};
+                      field_descriptor->name(), field_descriptor->name()))};
     }
 
     auto repeated = reflection->GetRepeatedPtrField<Protobuf::Message>(*message, field_descriptor);
@@ -593,10 +592,11 @@ void AdminImpl::addResourceToDump(envoy::admin::v2alpha::ConfigDump& dump,
 
     // We found the desired resource so there is no need to continue iterating over
     // the other keys.
-    return;
+    return absl::nullopt;
   }
 
-  throw AdminException{Http::Code::NotFound, fmt::format("{} not found in config dump", resource)};
+  return absl::optional<std::pair<Http::Code, std::string>>{
+      std::make_pair(Http::Code::NotFound, fmt::format("{} not found in config dump", resource))};
 }
 
 Http::Code AdminImpl::handlerConfigDump(absl::string_view url, Http::HeaderMap& response_headers,
@@ -608,11 +608,10 @@ Http::Code AdminImpl::handlerConfigDump(absl::string_view url, Http::HeaderMap& 
   envoy::admin::v2alpha::ConfigDump dump;
 
   if (resource.has_value()) {
-    try {
-      addResourceToDump(dump, mask, resource.value());
-    } catch (AdminException e) {
-      response.add(e.message);
-      return e.code;
+    auto err = addResourceToDump(dump, mask, resource.value());
+    if (err.has_value()) {
+      response.add(err.value().second);
+      return err.value().first;
     }
   } else {
     addAllConfigToDump(dump, mask);

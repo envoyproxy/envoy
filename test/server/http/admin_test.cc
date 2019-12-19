@@ -931,6 +931,9 @@ TEST_P(AdminInstanceTest, ConfigDumpMaintainsOrder) {
   }
 }
 
+// Test that using the resource query parameter filters the config dump.
+// We add both static and dynamic listener config to the dump, but expect only
+// dynamic in the JSON with ?resource=dynamic_listeners.
 TEST_P(AdminInstanceTest, ConfigDumpFiltersByResource) {
   Buffer::OwnedImpl response;
   Http::HeaderMapImpl header_map;
@@ -958,6 +961,9 @@ TEST_P(AdminInstanceTest, ConfigDumpFiltersByResource) {
   EXPECT_EQ(expected_json, output);
 }
 
+// Test that using the mask query parameter filters the config dump.
+// We add both static and dynamic listener config to the dump, but expect only
+// dynamic in the JSON with ?mask=dynamic_listeners.
 TEST_P(AdminInstanceTest, ConfigDumpFiltersByMask) {
   Buffer::OwnedImpl response;
   Http::HeaderMapImpl header_map;
@@ -1002,6 +1008,8 @@ ProtobufTypes::MessagePtr testDumpClustersConfig() {
   return msg;
 }
 
+// Test that when using both resource and mask query parameters the JSON output contains
+// only the desired resource and the fields specified in the mask.
 TEST_P(AdminInstanceTest, ConfigDumpFiltersByResourceAndMask) {
   Buffer::OwnedImpl response;
   Http::HeaderMapImpl header_map;
@@ -1023,6 +1031,8 @@ TEST_P(AdminInstanceTest, ConfigDumpFiltersByResourceAndMask) {
   EXPECT_EQ(expected_json, output);
 }
 
+// Test that no fields are present in the JSON output if there is no intersection between the fields
+// of the config dump and the fields present in the mask query parameter.
 TEST_P(AdminInstanceTest, ConfigDumpNonExistentMask) {
   Buffer::OwnedImpl response;
   Http::HeaderMapImpl header_map;
@@ -1041,6 +1051,8 @@ TEST_P(AdminInstanceTest, ConfigDumpNonExistentMask) {
   EXPECT_EQ(expected_json, output);
 }
 
+// Test that a 404 Not found is returned if a non-existent resource is passed in as the
+// resource query parameter.
 TEST_P(AdminInstanceTest, ConfigDumpNonExistentResource) {
   Buffer::OwnedImpl response;
   Http::HeaderMapImpl header_map;
@@ -1052,6 +1064,8 @@ TEST_P(AdminInstanceTest, ConfigDumpNonExistentResource) {
   EXPECT_EQ(Http::Code::NotFound, getCallback("/config_dump?resource=foo", header_map, response));
 }
 
+// Test that a 400 Bad Request is returned if the passed resource query parameter is not a
+// repeated field.
 TEST_P(AdminInstanceTest, ConfigDumpResourceNotRepeated) {
   Buffer::OwnedImpl response;
   Http::HeaderMapImpl header_map;
