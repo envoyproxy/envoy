@@ -47,7 +47,6 @@ DEFINE_PROTO_FUZZER(const test::extensions::filters::common::expr::EvaluatorTest
   } catch (const CelException& e) {
     ENVOY_LOG_MISC(debug, "CelException: {}", e.what());
   }
-
 }
 
 } // namespace
