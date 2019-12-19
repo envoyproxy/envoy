@@ -488,24 +488,23 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
   }
 
   // Fetch a connection pool for the upstream cluster.
-  Http::ConnectionPool::Instance* conn_pool;
   const auto http_protocol_options = cluster_->httpProtocolOptions();
 
-  if (http_protocol_options != absl::nullopt && http_protocol_options.value().auto_sni()) {
-    auto url_str = headers.Host()->value().getStringView();
-    const auto parsed_authority = Http::Utility::parseAuthority(url_str.data());
+  if (http_protocol_options.has_value() && http_protocol_options.value().auto_sni()) {
+    auto host_str = headers.Host()->value().getStringView();
+    const auto parsed_authority = Http::Utility::parseAuthority(host_str.data());
 
     if (!parsed_authority.is_ip_address_) {
       // update filter state of upstream server name with reached host name and to enable referring
       // that as transport_socket_options
       callbacks_->streamInfo().filterState().setData(
           Network::UpstreamServerName::key(),
-          std::make_unique<Network::UpstreamServerName>(url_str),
+          std::make_unique<Network::UpstreamServerName>(host_str),
           StreamInfo::FilterState::StateType::Mutable);
     }
   }
 
-  conn_pool = getConnPool();
+  auto conn_pool = getConnPool();
 
   if (!conn_pool) {
     sendNoHealthyUpstreamResponse();
