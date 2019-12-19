@@ -100,7 +100,7 @@ TEST_F(LocalRateLimitTestBase, CasEdgeCases) {
   }
 }
 
-// Verify token bucket functionality.
+// Verify token bucket functionality with a single token.
 TEST_F(LocalRateLimitTestBase, TokenBucket) {
   initialize(R"EOF(
 stat_prefix: local_rate_limit_stats
@@ -135,7 +135,7 @@ token_bucket:
   EXPECT_FALSE(config_->canCreateConnection());
 }
 
-// Verify token bucket functionality.
+// Verify token bucket functionality with max tokens and tokens per fill > 1.
 TEST_F(LocalRateLimitTestBase, TokenBucketMultipleTokensPerFill) {
   initialize(R"EOF(
 stat_prefix: local_rate_limit_stats
@@ -163,6 +163,30 @@ token_bucket:
 
   // 2 -> 0 tokens
   EXPECT_TRUE(config_->canCreateConnection());
+  EXPECT_TRUE(config_->canCreateConnection());
+  EXPECT_FALSE(config_->canCreateConnection());
+}
+
+// Verify token bucket functionality with max tokens > tokens per fill.
+TEST_F(LocalRateLimitTestBase, TokenBucketMaxTokensGreaterThanTokensPerFill) {
+  initialize(R"EOF(
+stat_prefix: local_rate_limit_stats
+token_bucket:
+  max_tokens: 2
+  tokens_per_fill: 1
+  fill_interval: 0.2s
+)EOF");
+
+  // 2 -> 0 tokens
+  EXPECT_TRUE(config_->canCreateConnection());
+  EXPECT_TRUE(config_->canCreateConnection());
+  EXPECT_FALSE(config_->canCreateConnection());
+
+  // 0 -> 1 tokens
+  EXPECT_CALL(*fill_timer_, enableTimer(std::chrono::milliseconds(200), nullptr));
+  fill_timer_->invokeCallback();
+
+  // 1 -> 0 tokens
   EXPECT_TRUE(config_->canCreateConnection());
   EXPECT_FALSE(config_->canCreateConnection());
 }
