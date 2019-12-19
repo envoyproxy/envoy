@@ -40,6 +40,8 @@ public:
   // Register file event and apply socket options.
   void setUpConnectionSocket();
 
+  void switchConnectionSocket(Network::ConnectionSocketPtr&& connection_socket);
+
 private:
   EnvoyQuicClientConnection(const quic::QuicConnectionId& server_connection_id,
                             quic::QuicConnectionHelperInterface& helper,

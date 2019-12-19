@@ -12,9 +12,10 @@ ProtobufTypes::MessagePtr ActiveQuicListenerConfigFactory::createEmptyConfigProt
 }
 
 Network::ActiveUdpListenerFactoryPtr
-ActiveQuicListenerConfigFactory::createActiveUdpListenerFactory(const Protobuf::Message& message) {
+ActiveQuicListenerConfigFactory::createActiveUdpListenerFactory(const Protobuf::Message& message,
+                                                                uint32_t concurrency) {
   auto& config = dynamic_cast<const envoy::api::v2::listener::QuicProtocolOptions&>(message);
-  return std::make_unique<ActiveQuicListenerFactory>(config);
+  return std::make_unique<ActiveQuicListenerFactory>(config, concurrency);
 }
 
 std::string ActiveQuicListenerConfigFactory::name() { return QuicListenerName; }

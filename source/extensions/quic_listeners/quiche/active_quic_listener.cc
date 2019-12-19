@@ -13,19 +13,32 @@ namespace Quic {
 ActiveQuicListener::ActiveQuicListener(Event::Dispatcher& dispatcher,
                                        Network::ConnectionHandler& parent,
                                        Network::ListenerConfig& listener_config,
-                                       const quic::QuicConfig& quic_config)
+                                       const quic::QuicConfig& quic_config,
+                                       Network::Socket::OptionsSharedPtr options)
     : ActiveQuicListener(dispatcher, parent,
                          listener_config.listenSocketFactory().getListenSocket(), listener_config,
-                         quic_config) {}
+                         quic_config, std::move(options)) {}
 
 ActiveQuicListener::ActiveQuicListener(Event::Dispatcher& dispatcher,
                                        Network::ConnectionHandler& parent,
                                        Network::SocketSharedPtr listen_socket,
                                        Network::ListenerConfig& listener_config,
-                                       const quic::QuicConfig& quic_config)
+                                       const quic::QuicConfig& quic_config,
+                                       Network::Socket::OptionsSharedPtr options)
     : Server::ConnectionHandlerImpl::ActiveListenerImplBase(parent, listener_config),
       dispatcher_(dispatcher), version_manager_(quic::CurrentSupportedVersions()),
       listen_socket_(*listen_socket) {
+  if (options != nullptr) {
+    const bool ok = Network::Socket::applyOptions(options, listen_socket_,
+                                                  envoy::api::v2::core::SocketOption::STATE_BOUND);
+    if (!ok) {
+      ENVOY_LOG(warn, "Fail to apply socket options to socket {} on listener {} after binding",
+                listen_socket_.ioHandle().fd(), listener_config.name());
+      throw EnvoyException("Fail to apply socket options.");
+    }
+    listen_socket_.addOptions(options);
+  }
+
   udp_listener_ = dispatcher_.createUdpListener(std::move(listen_socket), *this);
   quic::QuicRandom* const random = quic::QuicRandom::GetInstance();
   random->RandBytes(random_seed_, sizeof(random_seed_));
@@ -41,7 +54,7 @@ ActiveQuicListener::ActiveQuicListener(Event::Dispatcher& dispatcher,
   quic_dispatcher_ = std::make_unique<EnvoyQuicDispatcher>(
       crypto_config_.get(), quic_config, &version_manager_, std::move(connection_helper),
       std::move(alarm_factory), quic::kQuicDefaultConnectionIdLength, parent, config_, stats_,
-      dispatcher, listen_socket_);
+      per_worker_stats_, dispatcher, listen_socket_);
   quic_dispatcher_->InitializeWithWriter(new EnvoyQuicPacketWriter(listen_socket_));
 }
 

@@ -96,7 +96,7 @@ public:
   ListenerImpl(const envoy::api::v2::Listener& config, const std::string& version_info,
                ListenerManagerImpl& parent, const std::string& name, bool added_via_api,
                bool workers_started, uint64_t hash,
-               ProtobufMessage::ValidationVisitor& validation_visitor);
+               ProtobufMessage::ValidationVisitor& validation_visitor, uint32_t concurrency);
   ~ListenerImpl() override;
 
   /**
@@ -146,7 +146,7 @@ public:
   Stats::Scope& listenerScope() override { return *listener_scope_; }
   uint64_t listenerTag() const override { return listener_tag_; }
   const std::string& name() const override { return name_; }
-  const Network::ActiveUdpListenerFactory* udpListenerFactory() override {
+  Network::ActiveUdpListenerFactory* udpListenerFactory() override {
     return udp_listener_factory_.get();
   }
   Network::ConnectionBalancer& connectionBalancer() override { return *connection_balancer_; }

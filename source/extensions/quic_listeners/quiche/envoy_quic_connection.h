@@ -54,6 +54,10 @@ protected:
     return *envoy_connection_;
   }
 
+  void setConnectionSocket(Network::ConnectionSocketPtr&& connection_socket) {
+    connection_socket_ = std::move(connection_socket);
+  }
+
 private:
   // TODO(danzh): populate stats.
   std::unique_ptr<Network::Connection::ConnectionStats> connection_stats_;

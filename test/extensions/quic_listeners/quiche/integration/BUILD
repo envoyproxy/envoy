@@ -22,6 +22,7 @@ envoy_cc_test(
         "//source/extensions/quic_listeners/quiche:envoy_quic_connection_helper_lib",
         "//source/extensions/quic_listeners/quiche:envoy_quic_proof_verifier_lib",
         "//source/extensions/quic_listeners/quiche:quic_transport_socket_factory_lib",
+        "//test/extensions/quic_listeners/quiche:quic_test_utils_for_envoy_lib",
         "//test/integration:http_integration_lib",
         "@envoy_api//envoy/api/v2/auth:pkg_cc_proto",
         "@envoy_api//envoy/config/bootstrap/v2:pkg_cc_proto",

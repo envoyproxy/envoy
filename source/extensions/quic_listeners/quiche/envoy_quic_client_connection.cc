@@ -92,6 +92,14 @@ void EnvoyQuicClientConnection::setUpConnectionSocket() {
   }
 }
 
+void EnvoyQuicClientConnection::switchConnectionSocket(
+    Network::ConnectionSocketPtr&& connection_socket) {
+  auto writer = new EnvoyQuicPacketWriter(*connection_socket);
+  setConnectionSocket(std::move(connection_socket));
+  setUpConnectionSocket();
+  SetQuicPacketWriter(writer, true);
+}
+
 void EnvoyQuicClientConnection::onFileEvent(uint32_t events) {
   ENVOY_CONN_LOG(trace, "socket event: {}", *this, events);
   ASSERT(events & (Event::FileReadyType::Read | Event::FileReadyType::Write));

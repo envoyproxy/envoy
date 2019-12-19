@@ -57,13 +57,16 @@ public:
         listener_stats_({ALL_LISTENER_STATS(POOL_COUNTER(listener_config_.listenerScope()),
                                             POOL_GAUGE(listener_config_.listenerScope()),
                                             POOL_HISTOGRAM(listener_config_.listenerScope()))}),
+        per_worker_stats_({ALL_PER_HANDLER_LISTENER_STATS(
+            POOL_COUNTER_PREFIX(listener_config_.listenerScope(), "worker."),
+            POOL_GAUGE_PREFIX(listener_config_.listenerScope(), "worker."))}),
         connection_handler_(*dispatcher_, "test_thread"),
         envoy_quic_dispatcher_(
             &crypto_config_, quic_config_, &version_manager_,
             std::make_unique<EnvoyQuicConnectionHelper>(*dispatcher_),
             std::make_unique<EnvoyQuicAlarmFactory>(*dispatcher_, *connection_helper_.GetClock()),
             quic::kQuicDefaultConnectionIdLength, connection_handler_, listener_config_,
-            listener_stats_, *dispatcher_, *listen_socket_) {
+            listener_stats_, per_worker_stats_, *dispatcher_, *listen_socket_) {
     auto writer = new testing::NiceMock<quic::test::MockPacketWriter>();
     envoy_quic_dispatcher_.InitializeWithWriter(writer);
     EXPECT_CALL(*writer, WritePacket(_, _, _, _, _))
@@ -128,6 +131,7 @@ protected:
 
   testing::NiceMock<Network::MockListenerConfig> listener_config_;
   Server::ListenerStats listener_stats_;
+  Server::PerHandlerListenerStats per_worker_stats_;
   Server::ConnectionHandlerImpl connection_handler_;
   EnvoyQuicDispatcher envoy_quic_dispatcher_;
 };
@@ -224,6 +228,8 @@ TEST_P(EnvoyQuicDispatcherTest, CloseConnectionDueToMissingFilterChain) {
   EXPECT_EQ(0u, connection_handler_.numConnections());
   EXPECT_TRUE(quic::test::QuicDispatcherPeer::GetTimeWaitListManager(&envoy_quic_dispatcher_)
                   ->IsConnectionIdInTimeWait(connection_id));
+  EXPECT_EQ(1u, listener_stats_.downstream_cx_total_.value());
+  EXPECT_EQ(0u, listener_stats_.downstream_cx_active_.value());
   EXPECT_EQ(1u, listener_stats_.no_filter_chain_match_.value());
 }
 

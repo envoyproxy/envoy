@@ -312,7 +312,7 @@ public:
   MOCK_METHOD0(listenerScope, Stats::Scope&());
   MOCK_CONST_METHOD0(listenerTag, uint64_t());
   MOCK_CONST_METHOD0(name, const std::string&());
-  MOCK_METHOD0(udpListenerFactory, const Network::ActiveUdpListenerFactory*());
+  MOCK_METHOD0(udpListenerFactory, Network::ActiveUdpListenerFactory*());
   MOCK_METHOD0(connectionBalancer, ConnectionBalancer&());
 
   envoy::api::v2::core::TrafficDirection direction() const override {

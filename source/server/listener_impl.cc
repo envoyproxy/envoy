@@ -126,7 +126,8 @@ Network::SocketSharedPtr ListenSocketFactoryImpl::getListenSocket() {
 ListenerImpl::ListenerImpl(const envoy::api::v2::Listener& config, const std::string& version_info,
                            ListenerManagerImpl& parent, const std::string& name, bool added_via_api,
                            bool workers_started, uint64_t hash,
-                           ProtobufMessage::ValidationVisitor& validation_visitor)
+                           ProtobufMessage::ValidationVisitor& validation_visitor,
+                           uint32_t concurrency)
     : parent_(parent), address_(Network::Address::resolveProtoAddress(config.address())),
       filter_chain_manager_(address_), global_scope_(parent_.server_.stats().createScope("")),
       listener_scope_(
@@ -174,7 +175,7 @@ ListenerImpl::ListenerImpl(const envoy::api::v2::Listener& config, const std::st
         udp_config.udp_listener_name());
     ProtobufTypes::MessagePtr message =
         Config::Utility::translateToFactoryConfig(udp_config, validation_visitor_, config_factory);
-    udp_listener_factory_ = config_factory.createActiveUdpListenerFactory(*message);
+    udp_listener_factory_ = config_factory.createActiveUdpListenerFactory(*message, concurrency);
   }
 
   if (!config.listener_filters().empty()) {

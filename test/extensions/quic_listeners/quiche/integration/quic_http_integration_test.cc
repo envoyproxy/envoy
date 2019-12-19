@@ -1,3 +1,5 @@
+#include <cstddef>
+
 #include "envoy/api/v2/auth/cert.pb.h"
 #include "envoy/config/bootstrap/v2/bootstrap.pb.h"
 #include "envoy/config/filter/network/http_connection_manager/v2/http_connection_manager.pb.h"
@@ -14,6 +16,7 @@
 
 #include "quiche/quic/core/http/quic_client_push_promise_index.h"
 #include "quiche/quic/core/quic_utils.h"
+#include "quiche/quic/test_tools/quic_test_utils.h"
 
 #pragma GCC diagnostic pop
 
@@ -23,6 +26,7 @@
 #include "extensions/quic_listeners/quiche/envoy_quic_connection_helper.h"
 #include "extensions/quic_listeners/quiche/envoy_quic_alarm_factory.h"
 #include "extensions/quic_listeners/quiche/envoy_quic_packet_writer.h"
+#include "extensions/quic_listeners/quiche/envoy_quic_utils.h"
 
 namespace Envoy {
 namespace Quic {
@@ -49,7 +53,7 @@ public:
         alarm_factory_(*dispatcher_, *conn_helper_.GetClock()) {}
 
   Network::ClientConnectionPtr makeClientConnection(uint32_t port) override {
-    Network::Address::InstanceConstSharedPtr server_addr = Network::Utility::resolveUrl(
+    server_addr_ = Network::Utility::resolveUrl(
         fmt::format("udp://{}:{}", Network::Test::getLoopbackAddressUrlString(version_), port));
     Network::Address::InstanceConstSharedPtr local_addr =
         Network::Test::getCanonicalLoopbackAddress(version_);
@@ -58,8 +62,9 @@ public:
     // TODO(danzh) Implement retry upon version mismatch and modify test frame work to specify a
     // different version set on server side to test that.
     auto connection = std::make_unique<EnvoyQuicClientConnection>(
-        getNextServerDesignatedConnectionId(), server_addr, conn_helper_, alarm_factory_,
+        getNextServerDesignatedConnectionId(), server_addr_, conn_helper_, alarm_factory_,
         quic::ParsedQuicVersionVector{supported_versions_[0]}, local_addr, *dispatcher_, nullptr);
+    quic_connection_ = connection.get();
     auto session = std::make_unique<EnvoyQuicClientSession>(
         quic_config_, supported_versions_, std::move(connection), server_id_, &crypto_config_,
         &push_promise_index_, *dispatcher_, 0);
@@ -123,6 +128,8 @@ protected:
   EnvoyQuicConnectionHelper conn_helper_;
   EnvoyQuicAlarmFactory alarm_factory_;
   CodecClientCallbacksForTest client_codec_callback_;
+  Network::Address::InstanceConstSharedPtr server_addr_;
+  EnvoyQuicClientConnection* quic_connection_{nullptr};
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, QuicHttpIntegrationTest,
@@ -208,7 +215,7 @@ TEST_P(QuicHttpIntegrationTest, TestDelayedConnectionTeardownTimeoutTrigger) {
   request_encoder_ = &encoder_decoder.first;
   auto response = std::move(encoder_decoder.second);
 
-  codec_client_->sendData(*request_encoder_, 1024 * 65, false);
+  codec_client_->sendData(*request_encoder_, 1024 * 65, true);
 
   response->waitForEndStream();
   // The delayed close timeout should trigger since client is not closing the connection.
@@ -218,5 +225,103 @@ TEST_P(QuicHttpIntegrationTest, TestDelayedConnectionTeardownTimeoutTrigger) {
             1);
 }
 
+TEST_P(QuicHttpIntegrationTest, MultipleQuicListeners) {
+  concurrency_ = 8;
+  initialize();
+  std::vector<IntegrationCodecClientPtr> codec_clients;
+  quic::QuicCryptoClientConfig::CachedState* cached = crypto_config_.LookupOrCreate(server_id_);
+  for (size_t i = 1; i <= concurrency_; ++i) {
+    // The BPF filter looks at the 1st byte of connection id in the packet
+    // header. And currently all QUIC versions support 8 bytes connection id. So
+    // create connections with the first 4 bytes of connection id different from each
+    // other so they should be evenly distributed.
+    cached->add_server_designated_connection_id(quic::test::TestConnectionId(i << 32));
+    codec_clients.push_back(makeHttpConnection(lookupPort("http")));
+  }
+  if (GetParam() == Network::Address::IpVersion::v4) {
+    test_server_->waitForCounterEq("listener.0.0.0.0_0.downstream_cx_total", 8u);
+  } else {
+    test_server_->waitForCounterEq("listener.[__]_0.downstream_cx_total", 8u);
+  }
+#ifdef SO_ATTACH_REUSEPORT_CBPF
+  for (size_t i = 0; i < concurrency_; ++i) {
+    if (GetParam() == Network::Address::IpVersion::v4) {
+      test_server_->waitForGaugeEq(
+          fmt::format("listener.0.0.0.0_0.worker_{}.downstream_cx_active", i), 1u);
+      test_server_->waitForCounterEq(
+          fmt::format("listener.0.0.0.0_0.worker_{}.downstream_cx_total", i), 1u);
+    } else {
+      test_server_->waitForGaugeEq(fmt::format("listener.[__]_0.worker_{}.downstream_cx_active", i),
+                                   1u);
+      test_server_->waitForCounterEq(
+          fmt::format("listener.[__]_0.worker_{}.downstream_cx_total", i), 1u);
+    }
+  }
+#else
+  // Even without BPF support, these connections should more or less distributed
+  // across different workers.
+  for (size_t i = 0; i < concurrency_; ++i) {
+    if (GetParam() == Network::Address::IpVersion::v4) {
+      EXPECT_LT(
+          test_server_->gauge(fmt::format("listener.0.0.0.0_0.worker_{}.downstream_cx_active", i))
+              ->value(),
+          8u);
+      EXPECT_LT(
+          test_server_->counter(fmt::format("listener.0.0.0.0_0.worker_{}.downstream_cx_total", i))
+              ->value(),
+          8u);
+    } else {
+      EXPECT_LT(
+          test_server_->gauge(fmt::format("listener.[__]_0.worker_{}.downstream_cx_active", i))
+              ->value(),
+          8u);
+      EXPECT_LT(
+          test_server_->counter(fmt::format("listener.[__]_0.worker_{}.downstream_cx_total", i))
+              ->value(),
+          8u);
+    }
+  }
+#endif
+  for (size_t i = 0; i < concurrency_; ++i) {
+    codec_clients[i]->close();
+  }
+}
+
+TEST_P(QuicHttpIntegrationTest, ConnectionMigration) {
+#ifdef SO_ATTACH_REUSEPORT_CBPF
+  concurrency_ = 2;
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto encoder_decoder =
+      codec_client_->startRequest(Http::TestHeaderMapImpl{{":method", "POST"},
+                                                          {":path", "/test/long/url"},
+                                                          {":scheme", "http"},
+                                                          {":authority", "host"}});
+  request_encoder_ = &encoder_decoder.first;
+  auto response = std::move(encoder_decoder.second);
+
+  codec_client_->sendData(*request_encoder_, 1024u, false);
+
+  // Change to a new port, and connection should still continue.
+  Network::Address::InstanceConstSharedPtr local_addr =
+      Network::Test::getCanonicalLoopbackAddress(version_);
+  std::cerr << "Switch socket and send the rest data\n";
+  quic_connection_->switchConnectionSocket(
+      createConnectionSocket(server_addr_, local_addr, nullptr));
+  codec_client_->sendData(*request_encoder_, 1024u, true);
+  waitForNextUpstreamRequest(0, TestUtility::DefaultTimeout);
+  // Send response headers, and end_stream if there is no response body.
+  const Http::TestHeaderMapImpl response_headers{{":status", "200"}};
+  size_t response_size{5u};
+  upstream_request_->encodeHeaders(response_headers, false);
+  upstream_request_->encodeData(response_size, true);
+  response->waitForEndStream();
+  verifyResponse(std::move(response), "200", response_headers, std::string(response_size, 'a'));
+
+  EXPECT_TRUE(upstream_request_->complete());
+  EXPECT_EQ(1024u * 2, upstream_request_->bodyLength());
+  cleanupUpstreamAndDownstream();
+#endif
+}
 } // namespace Quic
 } // namespace Envoy

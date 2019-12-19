@@ -74,7 +74,7 @@ public:
         }));
 
     quic_listener_ = std::make_unique<ActiveQuicListener>(
-        *dispatcher_, connection_handler_, listen_socket_, listener_config_, quic_config_);
+        *dispatcher_, connection_handler_, listen_socket_, listener_config_, quic_config_, nullptr);
     simulated_time_system_.sleep(std::chrono::milliseconds(100));
   }
 

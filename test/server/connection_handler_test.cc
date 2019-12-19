@@ -62,7 +62,7 @@ public:
       dummy.set_udp_listener_name(listener_name);
       udp_listener_factory_ =
           Config::Utility::getAndCheckFactory<ActiveUdpListenerConfigFactory>(listener_name)
-              .createActiveUdpListenerFactory(dummy);
+              .createActiveUdpListenerFactory(dummy, /*concurrency=*/1);
       ON_CALL(*socket_, socketType()).WillByDefault(Return(socket_type));
     }
 

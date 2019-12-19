@@ -21,7 +21,7 @@ public:
    * Create an ActiveUdpListenerFactory object according to given message.
    */
   virtual Network::ActiveUdpListenerFactoryPtr
-  createActiveUdpListenerFactory(const Protobuf::Message& message) PURE;
+  createActiveUdpListenerFactory(const Protobuf::Message& message, uint32_t concurrency) PURE;
 
   /**
    * Used to identify which udp listener to create: quic or raw udp.
