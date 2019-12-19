@@ -13,6 +13,7 @@ envoy_cc_library(
     hdrs = ["filter_config.h"],
     deps = [
         ":filter_interface",
+        "//include/envoy/factory",
         "//include/envoy/server:filter_config_interface",
         "//source/common/common:macros",
         "//source/common/protobuf:cc_wkt_protos",

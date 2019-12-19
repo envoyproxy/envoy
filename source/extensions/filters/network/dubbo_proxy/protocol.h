@@ -4,6 +4,7 @@
 #include <unordered_map>
 
 #include "envoy/buffer/buffer.h"
+#include "envoy/factory/factory.h"
 
 #include "common/common/assert.h"
 #include "common/common/fmt.h"
@@ -119,7 +120,7 @@ public:
    * created by this factory. Used for automatic registration with
    * FactoryCategoryRegistry.
    */
-  static std::string category() { return "dubbo_proxy.protocols"; }
+  static std::string category() { return Factory::Categories::get().DubboProxyProtocols; }
 
   /**
    * Convenience method to lookup a factory by type.

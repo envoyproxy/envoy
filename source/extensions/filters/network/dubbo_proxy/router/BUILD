@@ -22,6 +22,7 @@ envoy_cc_library(
     hdrs = ["route.h"],
     deps = [
         ":router_interface",
+        "//include/envoy/factory",
         "//include/envoy/server:filter_config_interface",
         "//source/common/config:utility_lib",
         "//source/common/singleton:const_singleton",

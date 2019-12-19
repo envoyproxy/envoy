@@ -3,6 +3,7 @@
 #include <string>
 
 #include "envoy/event/dispatcher.h"
+#include "envoy/factory/factory.h"
 #include "envoy/init/manager.h"
 #include "envoy/local_info/local_info.h"
 #include "envoy/network/transport_socket.h"
@@ -150,7 +151,7 @@ public:
    * created by this factory. Used for automatic registration with
    * FactoryCategoryRegistry.
    */
-  static std::string category() { return "transport_sockets.upstream"; }
+  static std::string category() { return Factory::Categories::get().TransportSocketsUpstream; }
 };
 
 /**
@@ -182,7 +183,7 @@ public:
    * created by this factory. Used for automatic registration with
    * FactoryCategoryRegistry.
    */
-  static std::string category() { return "transport_sockets.downstream"; }
+  static std::string category() { return Factory::Categories::get().TransportSocketsDownstream; }
 };
 
 } // namespace Configuration

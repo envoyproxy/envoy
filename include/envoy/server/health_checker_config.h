@@ -1,6 +1,7 @@
 #pragma once
 
 #include "envoy/api/v2/core/health_check.pb.h"
+#include "envoy/factory/factory.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/upstream/health_checker.h"
 
@@ -83,7 +84,7 @@ public:
    * created by this factory. Used for automatic registration with
    * FactoryCategoryRegistry.
    */
-  static std::string category() { return "health_checkers"; }
+  static std::string category() { return Factory::Categories::get().HealthCheckers; }
 };
 
 } // namespace Configuration

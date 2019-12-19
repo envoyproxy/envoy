@@ -7,6 +7,7 @@
 
 #include "envoy/access_log/access_log.h"
 #include "envoy/config/filter/accesslog/v2/accesslog.pb.h"
+#include "envoy/factory/factory.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/server/access_log_config.h"
 #include "envoy/type/percent.pb.h"
@@ -265,7 +266,7 @@ public:
    * created by this factory. Used for automatic registration with
    * FactoryCategoryRegistry.
    */
-  static std::string category() { return "access_logger.extension_filters"; }
+  static std::string category() { return Factory::Categories::get().AccessLoggerExtensionFilters; }
 };
 
 /**

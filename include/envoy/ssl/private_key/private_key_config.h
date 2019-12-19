@@ -1,6 +1,7 @@
 #pragma once
 
 #include "envoy/api/v2/auth/cert.pb.h"
+#include "envoy/factory/factory.h"
 #include "envoy/registry/registry.h"
 #include "envoy/ssl/private_key/private_key.h"
 
@@ -34,7 +35,7 @@ public:
    * @return std::string the identifying category name for objects created by this factory.
    * Used for automatic registration with FactoryCategoryRegistry.
    */
-  static std::string category() { return "tls.key_providers"; };
+  static std::string category() { return Factory::Categories::get().TlsKeyProviders; };
 };
 
 } // namespace Ssl

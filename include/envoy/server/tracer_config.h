@@ -1,6 +1,7 @@
 #pragma once
 
 #include "envoy/common/pure.h"
+#include "envoy/factory/factory.h"
 #include "envoy/server/instance.h"
 #include "envoy/tracing/http_tracer.h"
 
@@ -46,7 +47,7 @@ public:
    * created by this factory. Used for automatic registration with
    * FactoryCategoryRegistry.
    */
-  static std::string category() { return "tracers"; }
+  static std::string category() { return Factory::Categories::get().Tracers; }
 };
 
 } // namespace Configuration

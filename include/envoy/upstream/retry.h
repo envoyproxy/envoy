@@ -1,5 +1,6 @@
 #pragma once
 
+#include "envoy/factory/factory.h"
 #include "envoy/upstream/types.h"
 #include "envoy/upstream/upstream.h"
 
@@ -91,7 +92,7 @@ public:
    * created by this factory. Used for automatic registration with
    * FactoryCategoryRegistry.
    */
-  static std::string category() { return "retry_priorities"; }
+  static std::string category() { return Factory::Categories::get().RetryPriorities; }
 
   virtual ProtobufTypes::MessagePtr createEmptyConfigProto() PURE;
 };
@@ -111,7 +112,7 @@ public:
    */
   virtual std::string name() PURE;
 
-  static std::string category() { return "retry_host_predicates"; }
+  static std::string category() { return Factory::Categories::get().RetryHostPredicates; }
 
   virtual ProtobufTypes::MessagePtr createEmptyConfigProto() PURE;
 };

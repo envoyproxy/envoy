@@ -12,6 +12,7 @@
 #include "envoy/api/api.h"
 #include "envoy/api/v2/cds.pb.h"
 #include "envoy/event/dispatcher.h"
+#include "envoy/factory/factory.h"
 #include "envoy/local_info/local_info.h"
 #include "envoy/network/dns.h"
 #include "envoy/runtime/runtime.h"
@@ -148,7 +149,7 @@ public:
    * created by this factory. Used for automatic registration with
    * FactoryCategoryRegistry.
    */
-  static std::string category() { return "clusters"; }
+  static std::string category() { return Factory::Categories::get().Clusters; }
 };
 
 } // namespace Upstream

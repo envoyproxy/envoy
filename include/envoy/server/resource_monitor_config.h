@@ -3,6 +3,7 @@
 #include "envoy/api/api.h"
 #include "envoy/common/pure.h"
 #include "envoy/event/dispatcher.h"
+#include "envoy/factory/factory.h"
 #include "envoy/protobuf/message_validator.h"
 #include "envoy/server/resource_monitor.h"
 
@@ -72,7 +73,7 @@ public:
    * created by this factory. Used for automatic registration with
    * FactoryCategoryRegistry.
    */
-  static std::string category() { return "resource_monitors"; }
+  static std::string category() { return Factory::Categories::get().ResourceMonitors; }
 };
 
 } // namespace Configuration

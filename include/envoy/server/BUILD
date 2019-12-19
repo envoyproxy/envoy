@@ -14,6 +14,7 @@ envoy_cc_library(
     deps = [
         ":filter_config_interface",
         "//include/envoy/access_log:access_log_interface",
+        "//include/envoy/factory",
         "//source/common/protobuf",
     ],
 )
@@ -73,6 +74,7 @@ envoy_cc_library(
     name = "health_checker_config_interface",
     hdrs = ["health_checker_config.h"],
     deps = [
+        "//include/envoy/factory",
         "//include/envoy/upstream:health_checker_interface",
         "@envoy_api//envoy/api/v2/core:pkg_cc_proto",
     ],
@@ -155,6 +157,7 @@ envoy_cc_library(
         ":process_context_interface",
         "//include/envoy/access_log:access_log_interface",
         "//include/envoy/api:api_interface",
+        "//include/envoy/factory",
         "//include/envoy/grpc:context_interface",
         "//include/envoy/http:codes_interface",
         "//include/envoy/http:context_interface",
@@ -211,6 +214,7 @@ envoy_cc_library(
     hdrs = ["transport_socket_config.h"],
     deps = [
         "//include/envoy/event:dispatcher_interface",
+        "//include/envoy/factory",
         "//include/envoy/init:manager_interface",
         "//include/envoy/local_info:local_info_interface",
         "//include/envoy/network:transport_socket_interface",
@@ -240,6 +244,7 @@ envoy_cc_library(
         ":resource_monitor_interface",
         "//include/envoy/api:api_interface",
         "//include/envoy/event:dispatcher_interface",
+        "//include/envoy/factory",
         "//include/envoy/protobuf:message_validator_interface",
     ],
 )
@@ -258,6 +263,7 @@ envoy_cc_library(
     hdrs = ["tracer_config.h"],
     deps = [
         ":instance_interface",
+        "//include/envoy/factory",
         "//source/common/protobuf",
     ],
 )
@@ -265,5 +271,8 @@ envoy_cc_library(
 envoy_cc_library(
     name = "active_udp_listener_config_interface",
     hdrs = ["active_udp_listener_config.h"],
-    deps = ["//include/envoy/network:connection_handler_interface"],
+    deps = [
+        "//include/envoy/factory",
+        "//include/envoy/network:connection_handler_interface",
+    ],
 )

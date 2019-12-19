@@ -105,6 +105,7 @@ envoy_cc_library(
     name = "retry_interface",
     hdrs = ["retry.h"],
     deps = [
+        "//include/envoy/factory",
         "//include/envoy/upstream:types_interface",
         "//include/envoy/upstream:upstream_interface",
     ],
@@ -167,6 +168,7 @@ envoy_cc_library(
         ":upstream_interface",
         "//include/envoy/common:callback",
         "//include/envoy/config:typed_metadata_interface",
+        "//include/envoy/factory",
         "//include/envoy/http:codec_interface",
         "//include/envoy/network:connection_interface",
         "//include/envoy/network:transport_socket_interface",
