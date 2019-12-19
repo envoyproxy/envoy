@@ -27,7 +27,7 @@ REPOSITORY_LOCATIONS = dict(
         urls = ["https://github.com/envoyproxy/envoy-build-tools/archive/07314d549e27e9a4033af6236888d2a9ee0ad443.tar.gz"],
     ),
     boringssl = dict(
-        sha256 = "2529b7071a71e447dcc8eb4ac01838b12acad75ecd0dafa73ddac38168e5d857",
+        sha256 = "3eea198c8e3f587ffc8ea6acf87d7575f571bbe6dd88ec90405e236303f3dc01",
         strip_prefix = "boringssl-65e0aad1b721a5aa67f2a8041cf48f691139bb9f",
         # To update BoringSSL, which tracks Chromium releases:
         # 1. Open https://omahaproxy.appspot.com/ and note <current_version> of linux/beta release.
@@ -43,7 +43,7 @@ REPOSITORY_LOCATIONS = dict(
         urls = ["https://commondatastorage.googleapis.com/chromium-boringssl-docs/fips/boringssl-66005f41fbc3529ffe8d007708756720529da20d.tar.xz"],
     ),
     com_google_absl = dict(
-        sha256 = "3df5970908ed9a09ba51388d04661803a6af18c373866f442cede7f381e0b94a",
+        sha256 = "2529b7071a71e447dcc8eb4ac01838b12acad75ecd0dafa73ddac38168e5d857",
         strip_prefix = "abseil-cpp-77f87009a34c745255bd84d8f2647040d831a2b3",
         # 2019-12-06
         urls = ["https://github.com/abseil/abseil-cpp/archive/77f87009a34c745255bd84d8f2647040d831a2b3.tar.gz"],

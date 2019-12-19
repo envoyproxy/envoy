@@ -20,7 +20,7 @@ namespace {
 constexpr size_t MinDynamicCapacity{32};
 // This includes the NULL (StringUtil::itoa technically only needs 21).
 constexpr size_t MaxIntegerLength{32};
-constexpr size_t MapSizeThreshold{8};
+constexpr size_t MapSizeThreshold{0};
 
 uint64_t newCapacity(uint32_t existing_capacity, uint32_t size_to_append) {
   return (static_cast<uint64_t>(existing_capacity) + size_to_append) * 2;
@@ -537,9 +537,14 @@ const HeaderEntry* HeaderMapImpl::get(const LowerCaseString& key) const {
     HeaderLazyMap::iterator iter = headers_.find(key.get());
     if (iter != headers_.findEnd()) {
 #if HEADER_MAP_USE_FLAT_HASH_MAP
+# if HEADER_MAP_USE_SLIST
+      const HeaderMapCell& cell = iter->second;
+      HeaderEntryImpl& header_entry = *cell.node;
+# else
       const HeaderNodeVector& v = iter->second;
       ASSERT(!v.empty()); // It's impossible to have a map entry with an empty vector as its value.
       HeaderEntryImpl& header_entry = *v[0];
+ endif
 #endif
 #if HEADER_MAP_USE_MULTI_MAP
       HeaderEntryImpl& header_entry = *(iter->second);
@@ -655,12 +660,23 @@ void HeaderMapImpl::HeaderList::remove(absl::string_view key) {
     auto iter = find(key);
     if (iter != lazy_map_.end()) {
 #if HEADER_MAP_USE_FLAT_HASH_MAP
+# if HEADER_MAP_USE_SLIST
+      HeaderCell* cell = &iter->second;
+      do {
+        const HeaderNode& node = cell->node;
+        ASSERT(node->key() == key);
+        erase(node, false /* clear_from_map */);
+        cell = cell->next;
+      } while (cell != nullptr);
+      lazy_map_.erase(iter);
+# else
       HeaderNodeVector header_nodes = std::move(iter->second);
       lazy_map_.erase(iter);
       for (const HeaderNode& node : header_nodes) {
         ASSERT(node->key() == key);
         erase(node, false /* clear_from_map */);
       }
+# endif
 #endif
 #if HEADER_MAP_USE_MULTI_MAP
       ASSERT(iter->second->key() == key);

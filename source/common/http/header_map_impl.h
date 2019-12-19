@@ -1,8 +1,9 @@
 #pragma once
 
-#define HEADER_MAP_USE_MULTI_MAP true
-#define HEADER_MAP_USE_FLAT_HASH_MAP false
-#define HEADER_MAP_USE_BTREE true
+#define HEADER_MAP_USE_MULTI_MAP false
+#define HEADER_MAP_USE_FLAT_HASH_MAP true
+#define HEADER_MAP_USE_BTREE false
+#define HEADER_MAP_USE_SLIST true
 
 #include <array>
 #include <cstdint>
@@ -24,7 +25,10 @@
 #include "common/http/headers.h"
 
 #if HEADER_MAP_USE_FLAT_HASH_MAP
-#include "absl/container/flat_hash_map.h"
+# include "absl/container/flat_hash_map.h"
+# if !HEADER_MAP_USE_SLIST
+#  include "absl/container/inlined_vector.h"
+# endif
 #endif
 
 namespace Envoy {
@@ -118,8 +122,13 @@ protected:
   struct HeaderEntryImpl;
   using HeaderNode = std::list<HeaderEntryImpl>::iterator;
 #if HEADER_MAP_USE_FLAT_HASH_MAP
-  using HeaderNodeVector = std::vector<HeaderNode>;
+# if HEADER_MAP_USE_SLIST
+  struct HeaderCell { HeaderNode node; HeaderCell* next; };
+  using HeaderLazyMap = absl::flat_hash_map<absl::string_view, HeaderCell>;
+# else
+  using HeaderNodeVector = absl::InlinedVector<HeaderNode, 1>;
   using HeaderLazyMap = absl::flat_hash_map<absl::string_view, HeaderNodeVector>;
+# endif
 #endif
 #if HEADER_MAP_USE_MULTI_MAP
 # if HEADER_MAP_USE_BTREE
@@ -195,7 +204,12 @@ protected:
       addSize(i->key().size() + i->value().size());
       if (!lazy_map_.empty()) {
 #if HEADER_MAP_USE_FLAT_HASH_MAP
+# if HEADER_MAP_USE_SLIST
         lazy_map_[i->key().getStringView()].push_back(i);
+# else
+        HeaderCell& cell = lazy_map_[i->key().getStringView()];
+        cell.node = i;
+# endif
 #endif
 #if HEADER_MAP_USE_MULTI_MAP
         lazy_map_.insert(std::make_pair(i->key().getStringView(), i));

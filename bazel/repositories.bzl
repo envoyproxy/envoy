@@ -439,8 +439,8 @@ def _com_google_absl():
         actual = "@com_google_absl//absl/base",
     )
     native.bind(
-        name = "abseil_btree_map",
-        actual = "@com_google_absl//absl/container:btree_map",
+        name = "abseil_btree",
+        actual = "@com_google_absl//absl/container:btree",
     )
     native.bind(
         name = "abseil_flat_hash_map",
