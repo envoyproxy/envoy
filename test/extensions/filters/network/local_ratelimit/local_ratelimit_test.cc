@@ -20,23 +20,85 @@ namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
 namespace LocalRateLimitFilter {
-namespace {
 
 class LocalRateLimitTestBase : public testing::Test {
 public:
   void initialize(const std::string& filter_yaml) {
     envoy::config::filter::network::local_rate_limit::v2alpha::LocalRateLimit proto_config;
     TestUtility::loadFromYamlAndValidate(filter_yaml, proto_config);
+    fill_timer_ = new Event::MockTimer(&dispatcher_);
     EXPECT_CALL(*fill_timer_, enableTimer(_, nullptr));
     config_ = std::make_shared<Config>(proto_config, dispatcher_, stats_store_, runtime_);
   }
 
+  Thread::ThreadSynchronizer& synchronizer() { return config_->synchronizer_; }
+
   NiceMock<Event::MockDispatcher> dispatcher_;
   Stats::IsolatedStoreImpl stats_store_;
   NiceMock<Runtime::MockLoader> runtime_;
-  Event::MockTimer* fill_timer_ = new Event::MockTimer(&dispatcher_);
+  Event::MockTimer* fill_timer_{};
   ConfigSharedPtr config_;
 };
+
+// Verify various token bucket CAS edge cases.
+TEST_F(LocalRateLimitTestBase, CasEdgeCases) {
+  // This tests the case in which a connection creation races with the fill timer.
+  {
+    initialize(R"EOF(
+  stat_prefix: local_rate_limit_stats
+  token_bucket:
+    max_tokens: 1
+    fill_interval: 0.2s
+  )EOF");
+
+    synchronizer().enable();
+
+    // Start a thread and start the fill callback. This will wait pre-CAS.
+    std::thread t1([&] {
+      EXPECT_CALL(*fill_timer_, enableTimer(std::chrono::milliseconds(200), nullptr));
+      fill_timer_->invokeCallback();
+    });
+    // Wait until the thread is actually waiting.
+    synchronizer().barrier("on_fill_timer_pre_cas");
+
+    // Pre-signal the other wait, and create a connection. This should succeed.
+    synchronizer().signal("can_create_connection_pre_cas");
+    EXPECT_TRUE(config_->canCreateConnection());
+
+    // Now signal the thread to continue which should cause a CAS failure and the loop to repeat.
+    // We need to ignore further waits so we don't wait again.
+    synchronizer().ignoreWait("on_fill_timer_pre_cas", true);
+    synchronizer().signal("on_fill_timer_pre_cas");
+    t1.join();
+
+    // 1 -> 0 tokens
+    synchronizer().signal("can_create_connection_pre_cas");
+    EXPECT_TRUE(config_->canCreateConnection());
+    EXPECT_FALSE(config_->canCreateConnection());
+  }
+
+  // This tests the case in which two connection creations race.
+  {
+    initialize(R"EOF(
+  stat_prefix: local_rate_limit_stats
+  token_bucket:
+    max_tokens: 1
+    fill_interval: 0.2s
+  )EOF");
+
+    synchronizer().enable();
+    // Start a thread and see if we can create a connection. This will wait pre-CAS.
+    std::thread t1([&] { EXPECT_FALSE(config_->canCreateConnection()); });
+    // Wait until the thread is actually waiting.
+    synchronizer().barrier("can_create_connection_pre_cas");
+
+    // Create the connection on this thread, which should cause the CAS to fail on the other thread.
+    synchronizer().ignoreWait("can_create_connection_pre_cas", true);
+    EXPECT_TRUE(config_->canCreateConnection());
+    synchronizer().signal("can_create_connection_pre_cas");
+    t1.join();
+  }
+}
 
 // Verify token bucket functionality.
 TEST_F(LocalRateLimitTestBase, TokenBucket) {
@@ -192,7 +254,6 @@ enabled:
                    ->value());
 }
 
-} // namespace
 } // namespace LocalRateLimitFilter
 } // namespace NetworkFilters
 } // namespace Extensions

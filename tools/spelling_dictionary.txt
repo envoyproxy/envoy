@@ -977,6 +977,7 @@ superset
 symlink
 symlinked
 symlinks
+synchronizer
 syncookie
 sys
 syscall

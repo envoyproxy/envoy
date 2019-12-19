@@ -6,6 +6,7 @@
 #include "envoy/runtime/runtime.h"
 #include "envoy/stats/stats_macros.h"
 
+#include "common/common/thread_synchronizer.h"
 #include "common/runtime/runtime_features.h"
 
 namespace Envoy {
@@ -52,6 +53,9 @@ private:
   Runtime::FeatureFlag enabled_;
   LocalRateLimitStats stats_;
   std::atomic<uint32_t> tokens_;
+  Thread::ThreadSynchronizer synchronizer_; // Used for testing only.
+
+  friend class LocalRateLimitTestBase;
 };
 
 using ConfigSharedPtr = std::shared_ptr<Config>;
