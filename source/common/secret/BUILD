@@ -19,6 +19,7 @@ envoy_cc_library(
         "//include/envoy/server:transport_socket_config_interface",
         "//source/common/common:assert_lib",
         "//source/common/common:minimal_logger_lib",
+        "//source/common/protobuf:utility_lib",
         "@envoy_api//envoy/admin/v2alpha:pkg_cc_proto",
         "@envoy_api//envoy/api/v2/auth:pkg_cc_proto",
         "@envoy_api//envoy/api/v2/core:pkg_cc_proto",

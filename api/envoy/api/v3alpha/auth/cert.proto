@@ -185,7 +185,8 @@ message TlsSessionTicketKeys {
   //   * Keep the session ticket keys at least as secure as your TLS certificate private keys
   //   * Rotate session ticket keys at least daily, and preferably hourly
   //   * Always generate keys using a cryptographically-secure random data source
-  repeated core.DataSource keys = 1 [(validate.rules).repeated = {min_items: 1}];
+  repeated core.DataSource keys = 1
+      [(validate.rules).repeated = {min_items: 1}, (udpa.annotations.sensitive) = true];
 }
 
 // [#next-free-field: 9]
