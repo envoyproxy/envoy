@@ -26,13 +26,13 @@ Version history
 * redis: performance improvement for larger split commands by avoiding string copies.
 * redis: correctly follow MOVE/ASK redirection for mirrored clusters.
 * redis: add :ref:`host_degraded_refresh_threshold <envoy_api_field_config.cluster.redis.RedisClusterConfig.host_degraded_refresh_threshold>` and :ref:`failure_refresh_threshold <envoy_api_field_config.cluster.redis.RedisClusterConfig.failure_refresh_threshold>` to refresh topology when nodes are degraded or when requests fails.
+* router: added histograms to show timeout budget usage to the :ref:`cluster stats <config_cluster_manager_cluster_stats>`.
 * router: added support for REQ(header-name) :ref:`header formatter <config_http_conn_man_headers_custom_request_headers>`.
 * router: allow using a :ref:`query parameter
   <envoy_api_field_route.RouteAction.HashPolicy.query_parameter>` for HTTP consistent hashing.
-* router: skip the Location header when the response code is not a 201 or a 3xx.
-* router: added histograms to show timeout budget usage to the :ref:`cluster stats <config_cluster_manager_cluster_stats>`.
-* server: added the :option:`--disable-extensions` CLI option, to disable extensions at startup.
 * router: exposed DOWNSTREAM_REMOTE_ADDRESS as custom HTTP request/response headers.
+* router: skip the Location header when the response code is not a 201 or a 3xx.
+* server: added the :option:`--disable-extensions` CLI option, to disable extensions at startup.
 * router check tool: added support for testing and marking coverage for routes of runtime fraction 0.
 * server: fixed a bug in config validation for configs with runtime layers
 * tcp_proxy: added :ref:`ClusterWeight.metadata_match<envoy_api_field_config.filter.network.tcp_proxy.v2.TcpProxy.WeightedCluster.ClusterWeight.metadata_match>`

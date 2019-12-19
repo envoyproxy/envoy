@@ -759,8 +759,16 @@ void Filter::onResponseTimeout() {
       cluster_->stats().upstream_rq_timeout_.inc();
 
       if (cluster_->timeoutBudgetStats().has_value()) {
+        // Cancel firing per-try timeout information, because the per-try timeout did not come into
+        // play when the global timeout was hit.
+        upstream_request->timeout_budget_stats_->cancel();
+
+        Event::Dispatcher& dispatcher = callbacks_->dispatcher();
+        std::chrono::milliseconds response_time =
+            std::chrono::duration_cast<std::chrono::milliseconds>(
+                dispatcher.timeSource().monotonicTime() - downstream_request_complete_time_);
         cluster_->timeoutBudgetStats()->upstream_rq_timeout_budget_percent_used_.recordValue(
-            TimeoutPrecisionFactor);
+            percentageOfTimeout(response_time, timeout_.global_timeout_));
       }
 
       if (upstream_request->upstream_host_) {
@@ -822,6 +830,15 @@ void Filter::onPerTryTimeout(UpstreamRequest& upstream_request) {
   cluster_->stats().upstream_rq_per_try_timeout_.inc();
   if (upstream_request.upstream_host_) {
     upstream_request.upstream_host_->stats().rq_timeout_.inc();
+  }
+
+  if (cluster_->timeoutBudgetStats().has_value()) {
+    Event::Dispatcher& dispatcher = callbacks_->dispatcher();
+    std::chrono::milliseconds response_time = std::chrono::duration_cast<std::chrono::milliseconds>(
+        dispatcher.timeSource().monotonicTime() - downstream_request_complete_time_);
+
+    cluster_->timeoutBudgetStats()->upstream_rq_timeout_budget_percent_used_.recordValue(
+        percentageOfTimeout(response_time, timeout_.global_timeout_));
   }
 
   upstream_request.resetStream();
@@ -1388,8 +1405,7 @@ Filter::UpstreamRequest::UpstreamRequest(Filter& parent, Http::ConnectionPool::I
       calling_encode_headers_(false), upstream_canary_(false), decode_complete_(false),
       encode_complete_(false), encode_trailers_(false), retried_(false), awaiting_headers_(true),
       outlier_detection_timeout_recorded_(false),
-      create_per_try_timeout_on_request_complete_(false),
-      start_time_(parent_.callbacks_->dispatcher().timeSource().monotonicTime()) {
+      create_per_try_timeout_on_request_complete_(false) {
   if (parent_.config_.start_child_span_) {
     span_ = parent_.callbacks_->activeSpan().spawnChild(
         parent_.callbacks_->tracingConfig(), "router " + parent.cluster_->name() + " egress",
@@ -1398,6 +1414,19 @@ Filter::UpstreamRequest::UpstreamRequest(Filter& parent, Http::ConnectionPool::I
       // This is a retry request, add this metadata to span.
       span_->setTag(Tracing::Tags::get().RetryCount, std::to_string(parent.attempt_count_ - 1));
     }
+  }
+
+  if (parent_.cluster_->timeoutBudgetStats().has_value()) {
+    const auto start_time = parent_.callbacks_->dispatcher().timeSource().monotonicTime();
+    timeout_budget_stats_ = std::make_unique<Cleanup>([this, start_time]() {
+      Event::Dispatcher& dispatcher = parent_.callbacks_->dispatcher();
+      std::chrono::milliseconds response_time =
+          std::chrono::duration_cast<std::chrono::milliseconds>(
+              dispatcher.timeSource().monotonicTime() - start_time);
+      parent_.cluster_->timeoutBudgetStats()
+          ->upstream_rq_timeout_budget_per_try_percent_used_.recordValue(
+              percentageOfTimeout(response_time, parent_.timeout_.per_try_timeout_));
+    });
   }
 
   stream_info_.healthCheck(parent_.callbacks_->streamInfo().healthCheck());
@@ -1415,15 +1444,6 @@ Filter::UpstreamRequest::~UpstreamRequest() {
     per_try_timeout_->disableTimer();
   }
   clearRequestEncoder();
-
-  if (parent_.cluster_->timeoutBudgetStats().has_value()) {
-    Event::Dispatcher& dispatcher = parent_.callbacks_->dispatcher();
-    std::chrono::milliseconds response_time = std::chrono::duration_cast<std::chrono::milliseconds>(
-        dispatcher.timeSource().monotonicTime() - start_time_);
-    parent_.cluster_->timeoutBudgetStats()
-        ->upstream_rq_timeout_budget_per_try_percent_used_.recordValue(
-            percentageOfTimeout(response_time, parent_.timeout_.per_try_timeout_));
-  }
 
   stream_info_.setUpstreamTiming(upstream_timing_);
   stream_info_.onRequestComplete();

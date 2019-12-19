@@ -19,6 +19,7 @@
 
 #include "common/access_log/access_log_impl.h"
 #include "common/buffer/watermark_buffer.h"
+#include "common/common/cleanup.h"
 #include "common/common/hash.h"
 #include "common/common/hex.h"
 #include "common/common/linked_object.h"
@@ -487,7 +488,7 @@ private:
     // had not been completed yet.
     bool create_per_try_timeout_on_request_complete_ : 1;
 
-    MonotonicTime start_time_;
+    std::unique_ptr<Cleanup> timeout_budget_stats_;
   };
 
   using UpstreamRequestPtr = std::unique_ptr<UpstreamRequest>;
