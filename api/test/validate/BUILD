@@ -11,6 +11,7 @@ api_cc_test(
         "//envoy/config/bootstrap/v2:pkg_cc_proto",
         "//envoy/config/filter/accesslog/v2:pkg_cc_proto",
         "//envoy/config/filter/http/buffer/v2:pkg_cc_proto",
+        "//envoy/config/filter/http/cors/v2:pkg_cc_proto",
         "//envoy/config/filter/http/fault/v2:pkg_cc_proto",
         "//envoy/config/filter/http/gzip/v2:pkg_cc_proto",
         "//envoy/config/filter/http/header_to_metadata/v2:pkg_cc_proto",

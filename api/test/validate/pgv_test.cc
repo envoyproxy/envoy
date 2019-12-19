@@ -12,6 +12,7 @@
 #include "envoy/config/health_checker/redis/v2/redis.pb.validate.h"
 #include "envoy/config/filter/accesslog/v2/accesslog.pb.validate.h"
 #include "envoy/config/filter/http/buffer/v2/buffer.pb.validate.h"
+#include "envoy/config/filter/http/cors/v2/cors.pb.validate.h"
 #include "envoy/config/filter/http/fault/v2/fault.pb.validate.h"
 #include "envoy/config/filter/http/gzip/v2/gzip.pb.validate.h"
 #include "envoy/config/filter/http/health_check/v2/health_check.pb.validate.h"
