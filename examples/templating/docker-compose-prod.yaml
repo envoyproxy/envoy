@@ -1,0 +1,22 @@
+version: "3.7"
+services:
+
+  front-envoy:
+    build:
+      context: .
+      dockerfile: Dockerfile-frontenvoy
+    command: ["/bin/bash", "-c", "./start_front.sh"]
+    environment:
+      - ROBOTS_TXT_ADDRESS=/var/www/robots-prod.txt
+      - SERVICE_NAME=front-proxy
+    networks:
+      - envoymesh
+    expose:
+      - "80"
+      - "8001"
+    ports:
+      - "8000:80"
+      - "8001:8001"
+
+networks:
+  envoymesh: {}

@@ -1,0 +1,15 @@
+FROM envoyproxy/envoy-dev:latest
+
+RUN apt-get update \
+	&& apt-get install -y \
+		curl \
+		gettext-base \
+		net-tools
+
+COPY ./robots-dev.txt /var/www/robots-dev.txt
+COPY ./robots-prod.txt /var/www/robots-prod.txt
+
+COPY ./front-envoy.yaml /tpl/envoy.yaml
+COPY ./start_front.sh /start_front.sh
+
+RUN chmod 500 /start_front.sh
