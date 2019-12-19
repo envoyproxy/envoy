@@ -6,14 +6,14 @@ Degraded endpoints
 Envoy supports marking certain endpoints as degraded, meaning that they are able to receive
 traffic, but should only receive traffic once there are not sufficient healthy hosts available.
 
-Routing to degraded hosts can be thought of as similar routing to hosts in a
+Routing to degraded hosts can be thought of as similar to routing to hosts in a
 lower :ref:`priority <arch_overview_load_balancing_priority_levels>`, although
-degraded hosts will count against their priority's health percentage when
-computing traffic spillover. As the amount of healthy hosts available is no
-longer sufficient to handle 100% of the load, traffic will spill over to
-degraded hosts using the same mechanism as priority spillover for healthy
-hosts. This ensures that traffic is gradually shifted to degraded hosts as it
-becomes necessary.
+degraded hosts will count against their original priority's health percentage
+for the purposes of computing traffic spillover. As the amount of healthy hosts
+available is no longer sufficient to handle 100% of the load, traffic will
+spill over to degraded hosts using the same mechanism as priority spillover for
+healthy hosts. This ensures that traffic is gradually shifted to degraded hosts
+as it becomes necessary.
 
 
 +--------------------------------+------------------------------+-------------------------------+
