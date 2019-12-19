@@ -112,6 +112,11 @@ public:
             absl::string_view(reinterpret_cast<char*>(&prog), sizeof(prog))));
       }
     });
+#else
+    if (concurrency_ > 1) {
+      ENVOY_LOG(warn, "BPF filter is not supported on this platform. QUIC won't support connection "
+                      "migration and NET rebinding.");
+    }
 #endif
     return std::make_unique<ActiveQuicListener>(disptacher, parent, config, quic_config_,
                                                 std::move(options));
