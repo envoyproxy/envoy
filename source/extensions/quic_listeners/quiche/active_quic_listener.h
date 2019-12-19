@@ -1,6 +1,8 @@
 #pragma once
 
+#if defined(__linux__)
 #include <linux/filter.h>
+#endif
 
 #include <vector>
 
