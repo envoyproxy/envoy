@@ -27,7 +27,10 @@ unhealthy, successes required before marking a host healthy, etc.):
   :ref:`redis_key <envoy_api_msg_config.health_checker.redis.v2.Redis>`.
 
 Health checks occur over the transport socket specified for the cluster. This implies that if a cluster is
-using a TLS-enabled transport socket, the health check will also occur over TLS.
+using a TLS-enabled transport socket, the health check will also occur over TLS. The
+:ref:`ALPN protocols <envoy_api_field_core.HealthCheck.alpn_protocols>` used for health check connections
+can be specified, which is useful if the corresponding upstream is using ALPN-based
+:ref:`FilterChainMatch <envoy_api_msg_api.v3alpha.listener.FilterChainMatch>` with different protocols for                                                                       health checks versus data connections.
 
 .. _arch_overview_per_cluster_health_check_config:
 
