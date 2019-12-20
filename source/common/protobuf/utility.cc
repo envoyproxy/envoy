@@ -10,6 +10,7 @@
 
 #include "common/common/assert.h"
 #include "common/common/fmt.h"
+#include "common/common/macros.h"
 #include "common/protobuf/message_validator_impl.h"
 #include "common/protobuf/protobuf.h"
 
@@ -589,6 +590,7 @@ bool redactDataSource(Protobuf::Message* message, bool ancestor_is_sensitive) {
       case DataSource::kInlineBytes:
         // Clear inline bytes and treat it as a string (fall through).
         data_source->clear_inline_bytes();
+        FALLTHRU;
       case DataSource::kInlineString:
         // Redact strings the usual way.
         data_source->set_inline_string("[redacted]");

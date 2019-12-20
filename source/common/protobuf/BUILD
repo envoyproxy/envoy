@@ -64,6 +64,7 @@ envoy_cc_library(
         "//include/envoy/runtime:runtime_interface",
         "//source/common/common:assert_lib",
         "//source/common/common:hash_lib",
+        "//source/common/common:macros",
         "//source/common/common:utility_lib",
         "@com_github_cncf_udpa//udpa/annotations:pkg_cc_proto",
         "@com_github_cncf_udpa//udpa/type/v1:pkg_cc_proto",
