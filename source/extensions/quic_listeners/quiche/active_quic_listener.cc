@@ -1,5 +1,12 @@
 #include "extensions/quic_listeners/quiche/active_quic_listener.h"
 
+#if defined(__linux__)
+#include <linux/filter.h>
+
+#endif
+
+#include <vector>
+
 #include "extensions/quic_listeners/quiche/envoy_quic_alarm_factory.h"
 #include "extensions/quic_listeners/quiche/envoy_quic_connection_helper.h"
 #include "extensions/quic_listeners/quiche/envoy_quic_dispatcher.h"
@@ -89,6 +96,69 @@ void ActiveQuicListener::onData(Network::UdpRecvData& data) {
 
 void ActiveQuicListener::onWriteReady(const Network::Socket& /*socket*/) {
   quic_dispatcher_->OnCanWrite();
+}
+
+ActiveQuicListenerFactory::ActiveQuicListenerFactory(
+    const envoy::api::v2::listener::QuicProtocolOptions& config, uint32_t concurrency)
+    : concurrency_(concurrency) {
+  uint64_t idle_network_timeout_ms =
+      config.has_idle_timeout() ? DurationUtil::durationToMilliseconds(config.idle_timeout())
+                                : 300000;
+  quic_config_.SetIdleNetworkTimeout(
+      quic::QuicTime::Delta::FromMilliseconds(idle_network_timeout_ms),
+      quic::QuicTime::Delta::FromMilliseconds(idle_network_timeout_ms));
+  int32_t max_time_before_crypto_handshake_ms =
+      config.has_crypto_handshake_timeout()
+          ? DurationUtil::durationToMilliseconds(config.crypto_handshake_timeout())
+          : 20000;
+  quic_config_.set_max_time_before_crypto_handshake(
+      quic::QuicTime::Delta::FromMilliseconds(max_time_before_crypto_handshake_ms));
+  int32_t max_streams = PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, max_concurrent_streams, 100);
+  quic_config_.SetMaxIncomingBidirectionalStreamsToSend(max_streams);
+  quic_config_.SetMaxIncomingUnidirectionalStreamsToSend(max_streams);
+}
+
+Network::ConnectionHandler::ActiveListenerPtr
+ActiveQuicListenerFactory::createActiveUdpListener(Network::ConnectionHandler& parent,
+                                                   Event::Dispatcher& disptacher,
+                                                   Network::ListenerConfig& config) {
+  std::unique_ptr<Network::Socket::Options> options = std::make_unique<Network::Socket::Options>();
+#ifdef SO_ATTACH_REUSEPORT_CBPF
+  std::vector<sock_filter> filter = {
+      {0x80, 0, 0, 0000000000}, //                   ld len
+      {0x35, 0, 9, 0x00000009}, //                   jlt #0x9, packet_too_short
+      {0x30, 0, 0, 0000000000}, //                   ldb [0]
+      {0x54, 0, 0, 0x00000080}, //                   and #0x80
+      {0x15, 0, 2, 0000000000}, //                   jne #0, ietf_long_header
+      {0x20, 0, 0, 0x00000001}, //                   ld [1]
+      {0x05, 0, 0, 0x00000005}, //                   ja return
+      {0x80, 0, 0, 0000000000}, //                   ietf_long_header: ld len
+      {0x35, 0, 2, 0x0000000e}, //                   jlt #0xe, packet_too_short
+      {0x20, 0, 0, 0x00000006}, //                   ld [6]
+      {0x05, 0, 0, 0x00000001}, //                   ja return
+      {0x20, 0, 0,              // packet_too_short: ld rxhash
+       static_cast<uint32_t>(SKF_AD_OFF + SKF_AD_RXHASH)},
+      {0x94, 0, 0, concurrency_}, // return:         mod #socket_count
+      {0x16, 0, 0, 0000000000},   //                 ret a
+  };
+  sock_fprog prog;
+  absl::call_once(install_bpf_once_, [&]() {
+    if (concurrency_ > 1) {
+      prog.len = filter.size();
+      prog.filter = filter.data();
+      options->push_back(std::make_shared<Network::SocketOptionImpl>(
+          envoy::api::v2::core::SocketOption::STATE_BOUND, ENVOY_ATTACH_REUSEPORT_CBPF,
+          absl::string_view(reinterpret_cast<char*>(&prog), sizeof(prog))));
+    }
+  });
+#else
+  if (concurrency_ > 1) {
+    ENVOY_LOG(warn, "BPF filter is not supported on this platform. QUIC won't support connection "
+                    "migration and NET rebinding.");
+  }
+#endif
+  return std::make_unique<ActiveQuicListener>(disptacher, parent, config, quic_config_,
+                                              std::move(options));
 }
 
 } // namespace Quic
