@@ -149,11 +149,15 @@ def api_go_test(name, **kwargs):
         **kwargs
     )
 
-def api_proto_package(srcs = [], deps = [], has_services = False, visibility = ["//visibility:public"]):
+def api_proto_package(
+        name = "pkg",
+        srcs = [],
+        deps = [],
+        has_services = False,
+        visibility = ["//visibility:public"]):
     if srcs == []:
         srcs = native.glob(["*.proto"])
 
-    name = "pkg"
     api_cc_py_proto_library(
         name = name,
         visibility = visibility,

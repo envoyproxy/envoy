@@ -5,6 +5,18 @@ load("@envoy_api//bazel:api_build_system.bzl", "api_proto_package")
 licenses(["notice"])  # Apache 2
 
 api_proto_package(
+    name = "pkg",
+    srcs = [
+        "certs.proto",
+        "clusters.proto",
+        "config_dump.proto",
+        "listeners.proto",
+        "memory.proto",
+        "metrics.proto",
+        "mutex_stats.proto",
+        "server_info.proto",
+        "tap.proto",
+    ],
     deps = [
         "//envoy/api/v2:pkg",
         "//envoy/api/v2/auth:pkg",

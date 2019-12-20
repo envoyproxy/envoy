@@ -8,6 +8,15 @@ option java_package = "io.envoyproxy.envoy.v3alpha";
 option java_outer_classname = "SampleProto";
 option java_multiple_files = true;
 
+enum SomeEnum {
+  reserved 2;
+
+  reserved "BAR";
+
+  DEPRECATED_AND_UNAVAILABLE_DO_NOT_USE = 0 [deprecated = true];
+  FOO = 1;
+}
+
 message Sample {
   option (udpa.annotations.versioning).previous_message_type = "envoy.v2.Sample";
 

@@ -108,6 +108,8 @@ if __name__ == "__main__":
   path, filename = PathAndFilename(sys.argv[1])
   messages += Run(path, filename, 'v2')
   messages += Run(path, filename, 'v3alpha')
+  messages += Run(path, filename, 'v3alpha')
+  messages += Run(path, filename, 'v3alpha.envoy_internal')
 
   if len(messages) == 0:
     logging.warning("PASS")

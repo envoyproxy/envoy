@@ -5,9 +5,33 @@ load("@envoy_api//bazel:api_build_system.bzl", "api_proto_package")
 licenses(["notice"])  # Apache 2
 
 api_proto_package(
+    name = "pkg",
+    srcs = [
+        "metadata.proto",
+        "number.proto",
+        "regex.proto",
+        "string.proto",
+        "value.proto",
+    ],
     deps = [
         "//envoy/type/matcher:pkg",
         "//envoy/type/v3alpha:pkg",
+        "@com_github_cncf_udpa//udpa/annotations:pkg",
+    ],
+)
+
+api_proto_package(
+    name = "shadow_pkg",
+    srcs = [
+        "metadata_envoy_internal.proto",
+        "number_envoy_internal.proto",
+        "regex_envoy_internal.proto",
+        "string_envoy_internal.proto",
+        "value_envoy_internal.proto",
+    ],
+    deps = [
+        "//envoy/type/matcher:pkg",
+        "//envoy/type/v3alpha:shadow_pkg",
         "@com_github_cncf_udpa//udpa/annotations:pkg",
     ],
 )

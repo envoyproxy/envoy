@@ -5,9 +5,29 @@ load("@envoy_api//bazel:api_build_system.bzl", "api_proto_package")
 licenses(["notice"])  # Apache 2
 
 api_proto_package(
+    name = "pkg",
+    srcs = [
+        "circuit_breaker.proto",
+        "filter.proto",
+        "outlier_detection.proto",
+    ],
     deps = [
         "//envoy/api/v2/cluster:pkg",
         "//envoy/api/v3alpha/core:pkg",
+        "@com_github_cncf_udpa//udpa/annotations:pkg",
+    ],
+)
+
+api_proto_package(
+    name = "shadow_pkg",
+    srcs = [
+        "circuit_breaker_envoy_internal.proto",
+        "filter_envoy_internal.proto",
+        "outlier_detection_envoy_internal.proto",
+    ],
+    deps = [
+        "//envoy/api/v2/cluster:pkg",
+        "//envoy/api/v3alpha/core:shadow_pkg",
         "@com_github_cncf_udpa//udpa/annotations:pkg",
     ],
 )

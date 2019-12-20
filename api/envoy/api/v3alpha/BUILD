@@ -5,6 +5,14 @@ load("@envoy_api//bazel:api_build_system.bzl", "api_proto_package")
 licenses(["notice"])  # Apache 2
 
 api_proto_package(
+    name = "pkg",
+    srcs = [
+        "cds.proto",
+        "discovery.proto",
+        "eds.proto",
+        "lds.proto",
+        "rds.proto",
+    ],
     has_services = True,
     deps = [
         "//envoy/api/v2:pkg",
@@ -15,6 +23,30 @@ api_proto_package(
         "//envoy/api/v3alpha/route:pkg",
         "//envoy/config/listener/v2:pkg",
         "//envoy/type/v3alpha:pkg",
+        "@com_github_cncf_udpa//udpa/annotations:pkg",
+    ],
+)
+
+api_proto_package(
+    name = "shadow_pkg",
+    srcs = [
+        "cds_envoy_internal.proto",
+        "discovery_envoy_internal.proto",
+        "eds_envoy_internal.proto",
+        "lds_envoy_internal.proto",
+        "rds_envoy_internal.proto",
+    ],
+    has_services = True,
+    deps = [
+        "//envoy/api/v2:pkg",
+        "//envoy/api/v3alpha/auth:shadow_pkg",
+        "//envoy/api/v3alpha/cluster:shadow_pkg",
+        "//envoy/api/v3alpha/core:shadow_pkg",
+        "//envoy/api/v3alpha/endpoint:shadow_pkg",
+        "//envoy/api/v3alpha/listener:shadow_pkg",
+        "//envoy/api/v3alpha/route:shadow_pkg",
+        "//envoy/config/listener/v2:pkg",
+        "//envoy/type/v3alpha:shadow_pkg",
         "@com_github_cncf_udpa//udpa/annotations:pkg",
     ],
 )

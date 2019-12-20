@@ -5,6 +5,11 @@ load("@envoy_api//bazel:api_build_system.bzl", "api_proto_package")
 licenses(["notice"])  # Apache 2
 
 api_proto_package(
+    name = "pkg",
+    srcs = [
+        "dubbo_proxy.proto",
+        "route.proto",
+    ],
     deps = [
         "//envoy/api/v2/route:pkg",
         "//envoy/type:pkg",

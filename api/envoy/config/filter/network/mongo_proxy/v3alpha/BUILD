@@ -5,8 +5,20 @@ load("@envoy_api//bazel:api_build_system.bzl", "api_proto_package")
 licenses(["notice"])  # Apache 2
 
 api_proto_package(
+    name = "pkg",
+    srcs = ["mongo_proxy.proto"],
     deps = [
         "//envoy/config/filter/fault/v3alpha:pkg",
+        "//envoy/config/filter/network/mongo_proxy/v2:pkg",
+        "@com_github_cncf_udpa//udpa/annotations:pkg",
+    ],
+)
+
+api_proto_package(
+    name = "shadow_pkg",
+    srcs = ["mongo_proxy_envoy_internal.proto"],
+    deps = [
+        "//envoy/config/filter/fault/v3alpha:shadow_pkg",
         "//envoy/config/filter/network/mongo_proxy/v2:pkg",
         "@com_github_cncf_udpa//udpa/annotations:pkg",
     ],

@@ -5,6 +5,18 @@ load("@envoy_api//bazel:api_build_system.bzl", "api_proto_package")
 licenses(["notice"])  # Apache 2
 
 api_proto_package(
+    name = "pkg",
+    srcs = [
+        "certs.proto",
+        "clusters.proto",
+        "config_dump.proto",
+        "listeners.proto",
+        "memory.proto",
+        "metrics.proto",
+        "mutex_stats.proto",
+        "server_info.proto",
+        "tap.proto",
+    ],
     deps = [
         "//envoy/admin/v2alpha:pkg",
         "//envoy/api/v3alpha:pkg",
@@ -14,6 +26,32 @@ api_proto_package(
         "//envoy/service/route/v3alpha:pkg",
         "//envoy/service/tap/v3alpha:pkg",
         "//envoy/type/v3alpha:pkg",
+        "@com_github_cncf_udpa//udpa/annotations:pkg",
+    ],
+)
+
+api_proto_package(
+    name = "shadow_pkg",
+    srcs = [
+        "certs_envoy_internal.proto",
+        "clusters_envoy_internal.proto",
+        "config_dump_envoy_internal.proto",
+        "listeners_envoy_internal.proto",
+        "memory_envoy_internal.proto",
+        "metrics_envoy_internal.proto",
+        "mutex_stats_envoy_internal.proto",
+        "server_info_envoy_internal.proto",
+        "tap_envoy_internal.proto",
+    ],
+    deps = [
+        "//envoy/admin/v2alpha:pkg",
+        "//envoy/api/v3alpha:shadow_pkg",
+        "//envoy/api/v3alpha/auth:shadow_pkg",
+        "//envoy/api/v3alpha/core:shadow_pkg",
+        "//envoy/config/bootstrap/v3alpha:shadow_pkg",
+        "//envoy/service/route/v3alpha:shadow_pkg",
+        "//envoy/service/tap/v3alpha:shadow_pkg",
+        "//envoy/type/v3alpha:shadow_pkg",
         "@com_github_cncf_udpa//udpa/annotations:pkg",
     ],
 )

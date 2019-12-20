@@ -15,6 +15,12 @@ api_cc_test(
     ],
 )
 
+api_cc_test(
+    name = "shadow_test",
+    srcs = ["shadow_test.cc"],
+    deps = ["//envoy/api/v3alpha:shadow_pkg_cc_proto"],
+)
+
 api_go_test(
     name = "go_build_test",
     size = "small",

@@ -41,7 +41,7 @@ load("@envoy_api//bazel:api_build_system.bzl", "api_proto_package")
 
 licenses(["notice"])  # Apache 2
 
-api_proto_package($fields)
+$api_proto_packages
 """)
 
 IMPORT_REGEX = re.compile('import "(.*)";')
@@ -83,8 +83,9 @@ def GetDestinationPath(src):
   if len(matches) != 1:
     raise RequiresReformatError("Expect {} has only one package declaration but has {}".format(
         src, len(matches)))
+  shadow_fixup = "_envoy_internal" if "envoy_internal" in src else ""
   return pathlib.Path(GetDirectoryFromPackage(
-      matches[0])).joinpath(src_path.name.split('.')[0] + ".proto")
+      matches[0])).joinpath(src_path.name.split('.')[0] + shadow_fixup + ".proto")
 
 
 def SyncProtoFile(cmd, src, dst_root):
@@ -102,11 +103,12 @@ def SyncProtoFile(cmd, src, dst_root):
   shutil.copyfile(src, str(dst))
 
 
-def GetImportDeps(proto_path):
+def GetImportDeps(proto_path, shadow):
   """Obtain the Bazel dependencies for the import paths from a .proto file.
 
   Args:
     proto_path: path to .proto.
+    shadow: is this a shadow package?
 
   Returns:
     A list of Bazel targets reflecting the imports in the .proto at proto_path.
@@ -132,7 +134,8 @@ def GetImportDeps(proto_path):
           # Ignore package internal imports.
           if os.path.dirname(proto_path).endswith(os.path.dirname(import_path)):
             continue
-          imports.append('//%s:pkg' % os.path.dirname(import_path))
+          pkg = 'shadow_pkg' if shadow and 'v3alpha' in import_path else 'pkg'
+          imports.append('//%s:%s' % (os.path.dirname(import_path), pkg))
           continue
         raise ProtoSyncError(
             'Unknown import path mapping for %s, please update the mappings in tools/proto_sync.py.\n'
@@ -176,33 +179,37 @@ def HasServices(proto_path):
   return False
 
 
-def BuildFileContents(root, files):
-  """Compute the canonical BUILD contents for an api/ proto directory.
+def ApiProtoPackageContents(root, files, shadow):
+  """Compute the ApiProtoPackage contents for an api/ proto directory.
 
   Args:
     root: base path to directory.
     files: a list of files in the directory.
+    shadow: is this a shadow package?
 
   Returns:
-    A string containing the canonical BUILD file content for root.
+    A string containing the api_proto_package target.
   """
-  import_deps = set(sum([GetImportDeps(os.path.join(root, f)) for f in files], []))
+  import_deps = set(sum([GetImportDeps(os.path.join(root, f), shadow) for f in files], []))
   history_deps = set(sum([GetPreviousMessageTypeDeps(os.path.join(root, f)) for f in files], []))
   deps = import_deps.union(history_deps)
   has_services = any(HasServices(os.path.join(root, f)) for f in files)
-  fields = []
+  fields = ['    name = "%s",' % ('shadow_pkg' if shadow else 'pkg')]
+
+  def FormatList(xs):
+    if len(xs) == 1:
+      return '"%s"' % xs[0]
+    else:
+      return '\n' + '\n'.join(
+          '        "%s",' % f for f in sorted(xs, key=lambda s: s.replace(':', '!'))) + '\n    '
+
+  fields.append('    srcs = [%s],' % FormatList(files))
   if has_services:
     fields.append('    has_services = True,')
   if deps:
-    if len(deps) == 1:
-      formatted_deps = '"%s"' % list(deps)[0]
-    else:
-      formatted_deps = '\n' + '\n'.join(
-          '        "%s",' % dep
-          for dep in sorted(deps, key=lambda s: s.replace(':', '!'))) + '\n    '
-    fields.append('    deps = [%s],' % formatted_deps)
+    fields.append('    deps = [%s],' % FormatList(list(deps)))
   formatted_fields = '\n' + '\n'.join(fields) + '\n' if fields else ''
-  return BUILD_FILE_TEMPLATE.substitute(fields=formatted_fields)
+  return 'api_proto_package(%s)' % formatted_fields
 
 
 def SyncBuildFiles(cmd, dst_root):
@@ -212,10 +219,17 @@ def SyncBuildFiles(cmd, dst_root):
     cmd: 'check' or 'fix'.
   """
   for root, dirs, files in os.walk(str(dst_root)):
-    is_proto_dir = any(f.endswith('.proto') for f in files)
-    if not is_proto_dir:
+    shadow_proto_files = [f for f in files if f.endswith('_envoy_internal.proto')]
+    canonical_proto_files = [
+        f for f in files if f.endswith('.proto') and not f.endswith('_envoy_internal.proto')
+    ]
+    if not canonical_proto_files:
       continue
-    build_contents = BuildFileContents(root, files)
+    api_proto_packages = [ApiProtoPackageContents(root, canonical_proto_files, False)]
+    if shadow_proto_files:
+      api_proto_packages.append(ApiProtoPackageContents(root, shadow_proto_files, True))
+    build_contents = BUILD_FILE_TEMPLATE.substitute(
+        api_proto_packages='\n\n'.join(api_proto_packages))
     build_path = os.path.join(root, 'BUILD')
     with open(build_path, 'w') as f:
       f.write(build_contents)
@@ -251,6 +265,9 @@ if __name__ == '__main__':
     dst_dir = pathlib.Path(tmp).joinpath("b")
     for label in args.labels:
       SyncProtoFile(args.mode, utils.BazelBinPathForOutputArtifact(label, '.v2.proto'), dst_dir)
+      SyncProtoFile(args.mode,
+                    utils.BazelBinPathForOutputArtifact(label, '.v3alpha.envoy_internal.proto'),
+                    dst_dir)
       SyncProtoFile(args.mode, utils.BazelBinPathForOutputArtifact(label, '.v3alpha.proto'),
                     dst_dir)
     SyncBuildFiles(args.mode, dst_dir)

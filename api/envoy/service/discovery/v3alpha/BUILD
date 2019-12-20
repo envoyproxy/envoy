@@ -5,11 +5,36 @@ load("@envoy_api//bazel:api_build_system.bzl", "api_proto_package")
 licenses(["notice"])  # Apache 2
 
 api_proto_package(
+    name = "pkg",
+    srcs = [
+        "ads.proto",
+        "hds.proto",
+        "rtds.proto",
+        "sds.proto",
+    ],
     has_services = True,
     deps = [
         "//envoy/api/v3alpha:pkg",
         "//envoy/api/v3alpha/core:pkg",
         "//envoy/api/v3alpha/endpoint:pkg",
+        "//envoy/service/discovery/v2:pkg",
+        "@com_github_cncf_udpa//udpa/annotations:pkg",
+    ],
+)
+
+api_proto_package(
+    name = "shadow_pkg",
+    srcs = [
+        "ads_envoy_internal.proto",
+        "hds_envoy_internal.proto",
+        "rtds_envoy_internal.proto",
+        "sds_envoy_internal.proto",
+    ],
+    has_services = True,
+    deps = [
+        "//envoy/api/v3alpha:shadow_pkg",
+        "//envoy/api/v3alpha/core:shadow_pkg",
+        "//envoy/api/v3alpha/endpoint:shadow_pkg",
         "//envoy/service/discovery/v2:pkg",
         "@com_github_cncf_udpa//udpa/annotations:pkg",
     ],
