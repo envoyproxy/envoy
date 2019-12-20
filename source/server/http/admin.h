@@ -7,8 +7,10 @@
 #include <utility>
 #include <vector>
 
-#include "envoy/admin/v2alpha/clusters.pb.h"
-#include "envoy/admin/v2alpha/listeners.pb.h"
+#include "envoy/admin/v2alpha/server_info.pb.h"
+#include "envoy/api/v2/core/base.pb.h"
+#include "envoy/api/v2/rds.pb.h"
+#include "envoy/config/filter/network/http_connection_manager/v2/http_connection_manager.pb.h"
 #include "envoy/http/filter.h"
 #include "envoy/network/filter.h"
 #include "envoy/network/listen_socket.h"

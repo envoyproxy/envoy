@@ -1,8 +1,10 @@
 #include <unordered_set>
 
+#include "envoy/api/v2/cds.pb.h"
 #include "envoy/api/v2/cds.pb.validate.h"
 #include "envoy/config/bootstrap/v2/bootstrap.pb.h"
 #include "envoy/config/bootstrap/v2/bootstrap.pb.validate.h"
+#include "envoy/type/percent.pb.h"
 
 #include "common/common/base64.h"
 #include "common/protobuf/message_validator_impl.h"
@@ -428,13 +430,27 @@ TEST_F(ProtobufUtilityTest, HashedValueStdHash) {
   EXPECT_NE(set.find(hv3), set.end());
 }
 
+// MessageUtility::anyConvert() with the wrong type throws.
 TEST_F(ProtobufUtilityTest, AnyConvertWrongType) {
   ProtobufWkt::Duration source_duration;
   source_duration.set_seconds(42);
   ProtobufWkt::Any source_any;
   source_any.PackFrom(source_duration);
-  EXPECT_THROW_WITH_REGEX(TestUtility::anyConvert<ProtobufWkt::Timestamp>(source_any),
-                          EnvoyException, "Unable to unpack .*");
+  EXPECT_THROW_WITH_REGEX(
+      TestUtility::anyConvert<ProtobufWkt::Timestamp>(source_any), EnvoyException,
+      R"(Unable to unpack as google.protobuf.Timestamp: \[type.googleapis.com/google.protobuf.Duration\] .*)");
+}
+
+// MessageUtility::unpackTo() with the wrong type throws.
+TEST_F(ProtobufUtilityTest, UnpackToWrongType) {
+  ProtobufWkt::Duration source_duration;
+  source_duration.set_seconds(42);
+  ProtobufWkt::Any source_any;
+  source_any.PackFrom(source_duration);
+  ProtobufWkt::Timestamp dst;
+  EXPECT_THROW_WITH_REGEX(
+      MessageUtil::unpackTo(source_any, dst), EnvoyException,
+      R"(Unable to unpack as google.protobuf.Timestamp: \[type.googleapis.com/google.protobuf.Duration\] .*)");
 }
 
 TEST_F(ProtobufUtilityTest, JsonConvertSuccess) {
@@ -479,6 +495,30 @@ TEST_F(ProtobufUtilityTest, JsonConvertCamelSnake) {
                        .fields()
                        .at("local_cluster_name")
                        .string_value());
+}
+
+// Test the jsonConvertValue happy path. Failure modes are converted by jsonConvert tests.
+TEST_F(ProtobufUtilityTest, JsonConvertValueSuccess) {
+  {
+    envoy::config::bootstrap::v2::Bootstrap source;
+    source.set_flags_path("foo");
+    ProtobufWkt::Value tmp;
+    envoy::config::bootstrap::v2::Bootstrap dest;
+    MessageUtil::jsonConvertValue(source, tmp);
+    TestUtility::jsonConvert(tmp, dest);
+    EXPECT_EQ("foo", dest.flags_path());
+  }
+
+  {
+    ProtobufWkt::StringValue source;
+    source.set_value("foo");
+    ProtobufWkt::Value dest;
+    MessageUtil::jsonConvertValue(source, dest);
+
+    ProtobufWkt::Value expected;
+    expected.set_string_value("foo");
+    EXPECT_THAT(dest, ProtoEq(expected));
+  }
 }
 
 TEST_F(ProtobufUtilityTest, YamlLoadFromStringFail) {
@@ -807,6 +847,12 @@ TEST(StatusCode, Strings) {
   }
   ASSERT_EQ("",
             MessageUtil::CodeEnumToString(static_cast<ProtobufUtil::error::Code>(last_code + 1)));
+}
+
+TEST(TypeUtilTest, TypeUrlToDescriptorFullName) {
+  EXPECT_EQ("envoy.config.filter.http.ip_tagging.v2.IPTagging",
+            TypeUtil::typeUrlToDescriptorFullName(
+                "type.googleapis.com/envoy.config.filter.http.ip_tagging.v2.IPTagging"));
 }
 
 } // namespace Envoy

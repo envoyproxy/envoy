@@ -2,6 +2,7 @@
 # Envoy test targets. This includes both test library and test binary targets.
 load("@bazel_tools//tools/build_defs/pkg:pkg.bzl", "pkg_tar")
 load(":envoy_binary.bzl", "envoy_cc_binary")
+load(":envoy_library.bzl", "tcmalloc_external_deps")
 load(
     ":envoy_internal.bzl",
     "envoy_copts",
@@ -26,6 +27,9 @@ def _envoy_cc_test_infrastructure_library(
         include_prefix = None,
         copts = [],
         **kargs):
+    # Add implicit tcmalloc external dependency(if available) in order to enable CPU and heap profiling in tests.
+    deps += tcmalloc_external_deps(repository)
+
     native.cc_library(
         name = name,
         srcs = srcs,
@@ -227,11 +231,13 @@ def envoy_cc_test_library(
 # Envoy test binaries should be specified with this function.
 def envoy_cc_test_binary(
         name,
+        tags = [],
         **kargs):
     envoy_cc_binary(
         name,
         testonly = 1,
         linkopts = _envoy_test_linkopts(),
+        tags = tags + ["compilation_db_implied"],
         **kargs
     )
 

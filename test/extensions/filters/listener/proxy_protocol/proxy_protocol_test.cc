@@ -2,6 +2,7 @@
 #include <memory>
 #include <string>
 
+#include "envoy/api/v2/core/base.pb.h"
 #include "envoy/stats/scope.h"
 
 #include "common/buffer/buffer_impl.h"
@@ -93,10 +94,19 @@ public:
   }
 
   void connect(bool read = true) {
+    int expected_callbacks = 2;
+    auto maybeExitDispatcher = [&]() -> void {
+      expected_callbacks--;
+      if (expected_callbacks == 0) {
+        dispatcher_->exit();
+      }
+    };
+
     EXPECT_CALL(factory_, createListenerFilterChain(_))
         .WillOnce(Invoke([&](Network::ListenerFilterManager& filter_manager) -> bool {
           filter_manager.addAcceptFilter(
               std::make_unique<Filter>(std::make_shared<Config>(listenerScope())));
+          maybeExitDispatcher();
           return true;
         }));
     conn_->connect();
@@ -112,7 +122,7 @@ public:
           }));
     }
     EXPECT_CALL(connection_callbacks_, onEvent(Network::ConnectionEvent::Connected))
-        .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { dispatcher_->exit(); }));
+        .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { maybeExitDispatcher(); }));
     dispatcher_->run(Event::Dispatcher::RunType::Block);
   }
 

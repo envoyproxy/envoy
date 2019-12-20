@@ -7,6 +7,7 @@
 #include <string>
 #include <vector>
 
+#include "envoy/config/bootstrap/v2/bootstrap.pb.h"
 #include "envoy/stats/sink.h"
 #include "envoy/tracing/http_tracer.h"
 #include "envoy/upstream/cluster_manager.h"

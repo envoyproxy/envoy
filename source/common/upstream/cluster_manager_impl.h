@@ -10,6 +10,9 @@
 #include <vector>
 
 #include "envoy/api/api.h"
+#include "envoy/api/v2/cds.pb.h"
+#include "envoy/api/v2/core/address.pb.h"
+#include "envoy/api/v2/core/config_source.pb.h"
 #include "envoy/config/bootstrap/v2/bootstrap.pb.h"
 #include "envoy/http/codes.h"
 #include "envoy/local_info/local_info.h"
@@ -229,7 +232,9 @@ public:
   Config::GrpcMuxSharedPtr adsMux() override { return ads_mux_; }
   Grpc::AsyncClientManager& grpcAsyncClientManager() override { return *async_client_manager_; }
 
-  const std::string& localClusterName() const override { return local_cluster_name_; }
+  const absl::optional<std::string>& localClusterName() const override {
+    return local_cluster_name_;
+  }
 
   ClusterUpdateCallbacksHandlePtr
   addThreadLocalClusterUpdateCallbacks(ClusterUpdateCallbacks&) override;
@@ -405,24 +410,22 @@ private:
   struct PendingUpdates {
     ~PendingUpdates() { disableTimer(); }
     void enableTimer(const uint64_t timeout) {
-      ASSERT(!timer_enabled_);
       if (timer_ != nullptr) {
+        ASSERT(!timer_->enabled());
         timer_->enableTimer(std::chrono::milliseconds(timeout));
-        timer_enabled_ = true;
       }
     }
     bool disableTimer() {
-      const bool was_enabled = timer_enabled_;
-      if (timer_ != nullptr) {
-        timer_->disableTimer();
-        timer_enabled_ = false;
+      if (timer_ == nullptr) {
+        return false;
       }
+
+      const bool was_enabled = timer_->enabled();
+      timer_->disableTimer();
       return was_enabled;
     }
 
     Event::TimerPtr timer_;
-    // TODO(rgs1): this should be part of Event::Timer's interface.
-    bool timer_enabled_{};
     // This is default constructed to the clock's epoch:
     // https://en.cppreference.com/w/cpp/chrono/time_point/time_point
     //
@@ -472,8 +475,8 @@ private:
   ClusterManagerInitHelper init_helper_;
   Config::GrpcMuxSharedPtr ads_mux_;
   LoadStatsReporterPtr load_stats_reporter_;
-  // The name of the local cluster of this Envoy instance if defined, else the empty string.
-  std::string local_cluster_name_;
+  // The name of the local cluster of this Envoy instance if defined.
+  absl::optional<std::string> local_cluster_name_;
   Grpc::AsyncClientManagerPtr async_client_manager_;
   Server::ConfigTracker::EntryOwnerPtr config_tracker_entry_;
   TimeSource& time_source_;

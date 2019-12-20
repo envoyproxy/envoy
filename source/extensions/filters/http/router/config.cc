@@ -1,5 +1,6 @@
 #include "extensions/filters/http/router/config.h"
 
+#include "envoy/config/filter/http/router/v2/router.pb.h"
 #include "envoy/config/filter/http/router/v2/router.pb.validate.h"
 
 #include "common/router/router.h"

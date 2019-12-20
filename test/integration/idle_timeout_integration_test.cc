@@ -1,5 +1,10 @@
+#include "envoy/config/bootstrap/v2/bootstrap.pb.h"
+#include "envoy/config/filter/network/http_connection_manager/v2/http_connection_manager.pb.h"
+
 #include "test/integration/http_protocol_integration.h"
 #include "test/test_common/test_time.h"
+
+using testing::HasSubstr;
 
 namespace Envoy {
 namespace {
@@ -7,6 +12,7 @@ namespace {
 class IdleTimeoutIntegrationTest : public HttpProtocolIntegrationTest {
 public:
   void initialize() override {
+    useAccessLog("%RESPONSE_CODE_DETAILS%");
     config_helper_.addConfigModifier(
         [&](envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager& hcm)
             -> void {
@@ -172,6 +178,8 @@ TEST_P(IdleTimeoutIntegrationTest, PerStreamIdleTimeoutAfterDownstreamHeaders) {
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("408", response->headers().Status()->value().getStringView());
   EXPECT_EQ("stream timeout", response->body());
+
+  EXPECT_THAT(waitForAccessLog(access_log_name_), HasSubstr("stream_idle_timeout"));
 }
 
 // Per-stream idle timeout after having sent downstream head request.

@@ -1,9 +1,11 @@
 #pragma once
 
 #include "envoy/api/api.h"
-#include "envoy/api/v2/core/base.pb.h"
+#include "envoy/api/v2/cds.pb.h"
+#include "envoy/api/v2/core/address.pb.h"
+#include "envoy/api/v2/core/config_source.pb.h"
+#include "envoy/api/v2/eds.pb.h"
 #include "envoy/config/bootstrap/v2/bootstrap.pb.h"
-#include "envoy/config/filter/network/http_connection_manager/v2/http_connection_manager.pb.h"
 #include "envoy/config/grpc_mux.h"
 #include "envoy/config/subscription.h"
 #include "envoy/json/json_object.h"
@@ -208,6 +210,7 @@ public:
 
   /**
    * Translate a nested config into a proto message provided by the implementation factory.
+   * @param extension_name name of extension corresponding to config.
    * @param enclosing_message proto that contains a field 'config'. Note: the enclosing proto is
    * provided because for statically registered implementations, a custom config is generally
    * optional, which means the conversion must be done conditionally.
@@ -225,8 +228,8 @@ public:
     // Fail in an obvious way if a plugin does not return a proto.
     RELEASE_ASSERT(config != nullptr, "");
 
-    translateOpaqueConfig(enclosing_message.typed_config(), enclosing_message.config(),
-                          validation_visitor, *config);
+    translateOpaqueConfig(factory.name(), enclosing_message.typed_config(),
+                          enclosing_message.config(), validation_visitor, *config);
 
     return config;
   }
@@ -268,12 +271,14 @@ public:
   /**
    * Translate opaque config from google.protobuf.Any or google.protobuf.Struct to defined proto
    * message.
+   * @param extension_name name of extension corresponding to config.
    * @param typed_config opaque config packed in google.protobuf.Any
    * @param config the deprecated google.protobuf.Struct config, empty struct if doesn't exist.
    * @param validation_visitor message validation visitor instance.
    * @param out_proto the proto message instantiated by extensions
    */
-  static void translateOpaqueConfig(const ProtobufWkt::Any& typed_config,
+  static void translateOpaqueConfig(absl::string_view extension_name,
+                                    const ProtobufWkt::Any& typed_config,
                                     const ProtobufWkt::Struct& config,
                                     ProtobufMessage::ValidationVisitor& validation_visitor,
                                     Protobuf::Message& out_proto);

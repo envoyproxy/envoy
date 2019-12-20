@@ -1,5 +1,8 @@
 #include <string>
 
+#include "envoy/config/filter/network/http_connection_manager/v2/http_connection_manager.pb.h"
+#include "envoy/type/percent.pb.h"
+
 #include "common/http/conn_manager_utility.h"
 #include "common/http/header_utility.h"
 #include "common/http/headers.h"
@@ -241,26 +244,8 @@ TEST_F(ConnectionManagerUtilityTest, SkipXffAppendPassThruUseRemoteAddress) {
   EXPECT_EQ("198.51.100.1", headers.ForwardedFor()->value().getStringView());
 }
 
-TEST_F(ConnectionManagerUtilityTest, ForwardedProtoLegacyBehavior) {
-  TestScopedRuntime scoped_runtime;
-  Runtime::LoaderSingleton::getExisting()->mergeValues(
-      {{"envoy.reloadable_features.trusted_forwarded_proto", "false"}});
-
-  ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(true));
-  ON_CALL(config_, xffNumTrustedHops()).WillByDefault(Return(1));
-  EXPECT_CALL(config_, skipXffAppend()).WillOnce(Return(true));
-  connection_.remote_address_ = std::make_shared<Network::Address::Ipv4Instance>("12.12.12.12");
-  ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(true));
-  TestHeaderMapImpl headers{{"x-forwarded-proto", "https"}};
-
-  callMutateRequestHeaders(headers, Protocol::Http2);
-  EXPECT_EQ("http", headers.ForwardedProto()->value().getStringView());
-}
-
 TEST_F(ConnectionManagerUtilityTest, PreserveForwardedProtoWhenInternal) {
   TestScopedRuntime scoped_runtime;
-  Runtime::LoaderSingleton::getExisting()->mergeValues(
-      {{"envoy.reloadable_features.trusted_forwarded_proto", "true"}});
 
   ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(true));
   ON_CALL(config_, xffNumTrustedHops()).WillByDefault(Return(1));

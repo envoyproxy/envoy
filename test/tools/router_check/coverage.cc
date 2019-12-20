@@ -2,8 +2,6 @@
 
 #include <algorithm>
 
-#include "envoy/api/v2/core/base.pb.h"
-
 namespace Envoy {
 double RouteCoverage::report() {
   uint64_t route_weight = 0;

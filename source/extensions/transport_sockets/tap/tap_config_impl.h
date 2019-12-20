@@ -1,6 +1,8 @@
 #pragma once
 
+#include "envoy/data/tap/v2alpha/transport.pb.h"
 #include "envoy/event/timer.h"
+#include "envoy/service/tap/v2alpha/common.pb.h"
 
 #include "extensions/common/tap/tap_config_base.h"
 #include "extensions/transport_sockets/tap/tap_config.h"

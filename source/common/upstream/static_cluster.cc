@@ -1,5 +1,9 @@
 #include "common/upstream/static_cluster.h"
 
+#include "envoy/api/v2/cds.pb.h"
+#include "envoy/api/v2/eds.pb.h"
+#include "envoy/common/exception.h"
+
 namespace Envoy {
 namespace Upstream {
 
@@ -19,6 +23,7 @@ StaticClusterImpl::StaticClusterImpl(
       cluster_load_assignment.policy(), overprovisioning_factor, kDefaultOverProvisioningFactor);
 
   for (const auto& locality_lb_endpoint : cluster_load_assignment.endpoints()) {
+    validateEndpointsForZoneAwareRouting(locality_lb_endpoint);
     priority_state_manager_->initializePriorityFor(locality_lb_endpoint);
     for (const auto& lb_endpoint : locality_lb_endpoint.lb_endpoints()) {
       priority_state_manager_->registerHostForPriority(

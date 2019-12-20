@@ -141,8 +141,7 @@ guided by annotations in protobuf.
   field or enum value. No field may be marked as deprecated unless a replacement for this
   functionality exists and the corresponding Envoy implementation is production ready.
 
-* Renames are specified with a `[#rename-at-next-major-version: <new name>]` protobuf comment
-  annotation.
+* Renames are specified with a `[(udpa.annotations.field_migrate).rename = "<new name>"]` annotation.
 
 * We anticipate that `protoxform` will also support `oneof` promotion, package movement, etc. via
   similar annotations.

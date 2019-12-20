@@ -1,9 +1,24 @@
 #include "common/config/metadata.h"
 
+#include "envoy/api/v2/core/base.pb.h"
+#include "envoy/type/metadata/v2/metadata.pb.h"
+
 #include "common/protobuf/utility.h"
 
 namespace Envoy {
 namespace Config {
+
+MetadataKey::MetadataKey(const envoy::type::metadata::v2::MetadataKey& metadata_key)
+    : key_(metadata_key.key()) {
+  for (const auto& seg : metadata_key.path()) {
+    path_.push_back(seg.key());
+  }
+}
+
+const ProtobufWkt::Value& Metadata::metadataValue(const envoy::api::v2::core::Metadata& metadata,
+                                                  const MetadataKey& metadata_key) {
+  return metadataValue(metadata, metadata_key.key_, metadata_key.path_);
+}
 
 const ProtobufWkt::Value& Metadata::metadataValue(const envoy::api::v2::core::Metadata& metadata,
                                                   const std::string& filter,

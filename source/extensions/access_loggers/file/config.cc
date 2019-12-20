@@ -3,6 +3,7 @@
 #include <memory>
 #include <unordered_map>
 
+#include "envoy/config/accesslog/v2/file.pb.h"
 #include "envoy/config/accesslog/v2/file.pb.validate.h"
 #include "envoy/registry/registry.h"
 #include "envoy/server/filter_config.h"
@@ -39,10 +40,15 @@ FileAccessLogFactory::createAccessLogInstance(const Protobuf::Message& config,
   } else if (fal_config.access_log_format_case() ==
              envoy::config::accesslog::v2::FileAccessLog::kJsonFormat) {
     auto json_format_map = this->convertJsonFormatToMap(fal_config.json_format());
-    formatter = std::make_unique<AccessLog::JsonFormatterImpl>(json_format_map);
+    formatter = std::make_unique<AccessLog::JsonFormatterImpl>(json_format_map, false);
+  } else if (fal_config.access_log_format_case() ==
+             envoy::config::accesslog::v2::FileAccessLog::kTypedJsonFormat) {
+    auto json_format_map = this->convertJsonFormatToMap(fal_config.typed_json_format());
+    formatter = std::make_unique<AccessLog::JsonFormatterImpl>(json_format_map, true);
   } else {
     throw EnvoyException(
-        "Invalid access_log format provided. Only 'format' and 'json_format' are supported.");
+        "Invalid access_log format provided. Only 'format', 'json_format', or 'typed_json_format' "
+        "are supported.");
   }
 
   return std::make_shared<FileAccessLog>(fal_config.path(), std::move(filter), std::move(formatter),

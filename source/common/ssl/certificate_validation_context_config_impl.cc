@@ -1,5 +1,6 @@
 #include "common/ssl/certificate_validation_context_config_impl.h"
 
+#include "envoy/api/v2/auth/cert.pb.h"
 #include "envoy/common/exception.h"
 
 #include "common/common/empty_string.h"

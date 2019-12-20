@@ -2,7 +2,8 @@
 
 #include <string>
 
-#include "envoy/config/accesslog/v2/file.pb.h"
+#include "envoy/config/bootstrap/v2/bootstrap.pb.h"
+#include "envoy/config/filter/network/http_connection_manager/v2/http_connection_manager.pb.h"
 
 #include "common/http/header_map_impl.h"
 #include "common/protobuf/utility.h"
@@ -100,7 +101,7 @@ void WebsocketIntegrationTest::commonValidate(Http::HeaderMap& proxied_headers,
       original_headers.Connection()->value() == "keep-alive, upgrade") {
     // The keep-alive is implicit for HTTP/1.1, so Envoy only sets the upgrade
     // header when converting from HTTP/1.1 to H2
-    proxied_headers.Connection()->value().setCopy("keep-alive, upgrade", 19);
+    proxied_headers.setConnection("keep-alive, upgrade");
   }
 }
 

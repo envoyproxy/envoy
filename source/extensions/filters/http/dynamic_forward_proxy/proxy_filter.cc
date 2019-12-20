@@ -1,5 +1,8 @@
 #include "extensions/filters/http/dynamic_forward_proxy/proxy_filter.h"
 
+#include "envoy/api/v2/core/base.pb.h"
+#include "envoy/config/filter/http/dynamic_forward_proxy/v2alpha/dynamic_forward_proxy.pb.h"
+
 #include "extensions/common/dynamic_forward_proxy/dns_cache.h"
 #include "extensions/filters/http/well_known_names.h"
 
@@ -74,7 +77,7 @@ Http::FilterHeadersStatus ProxyFilter::decodeHeaders(Http::HeaderMap& headers, b
   if (config != nullptr) {
     const auto& host_rewrite = config->hostRewrite();
     if (!host_rewrite.empty()) {
-      headers.Host()->value(host_rewrite);
+      headers.setHost(host_rewrite);
     }
 
     const auto& host_rewrite_header = config->hostRewriteHeader();
@@ -82,7 +85,7 @@ Http::FilterHeadersStatus ProxyFilter::decodeHeaders(Http::HeaderMap& headers, b
       const auto* header = headers.get(host_rewrite_header);
       if (header != nullptr) {
         const auto& header_value = header->value().getStringView();
-        headers.Host()->value(header_value);
+        headers.setHost(header_value);
       }
     }
   }

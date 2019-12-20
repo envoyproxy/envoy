@@ -6,6 +6,7 @@
 #include <vector>
 
 #include "envoy/api/v2/core/address.pb.h"
+#include "envoy/api/v2/core/base.pb.h"
 #include "envoy/network/connection.h"
 #include "envoy/network/drain_decision.h"
 #include "envoy/network/filter.h"
@@ -136,19 +137,9 @@ public:
   MockUdpListenerCallbacks();
   ~MockUdpListenerCallbacks() override;
 
-  void onData(UdpRecvData& data) override { onData_(data); }
-
-  void onWriteReady(const Socket& socket) override { onWriteReady_(socket); }
-
-  void onReceiveError(const ErrorCode& err_code, Api::IoError::IoErrorCode err) override {
-    onReceiveError_(err_code, err);
-  }
-
-  MOCK_METHOD1(onData_, void(UdpRecvData& data));
-
-  MOCK_METHOD1(onWriteReady_, void(const Socket& socket));
-
-  MOCK_METHOD2(onReceiveError_, void(const ErrorCode& err_code, Api::IoError::IoErrorCode err));
+  MOCK_METHOD1(onData, void(UdpRecvData& data));
+  MOCK_METHOD1(onWriteReady, void(const Socket& socket));
+  MOCK_METHOD1(onReceiveError, void(Api::IoError::IoErrorCode err));
 };
 
 class MockDrainDecision : public DrainDecision {
@@ -428,6 +419,8 @@ public:
   MOCK_METHOD0(dispatcher, Event::Dispatcher&());
   MOCK_CONST_METHOD0(localAddress, Address::InstanceConstSharedPtr&());
   MOCK_METHOD1(send, Api::IoCallUint64Result(const UdpSendData&));
+
+  Event::MockDispatcher dispatcher_;
 };
 
 class MockUdpReadFilterCallbacks : public UdpReadFilterCallbacks {

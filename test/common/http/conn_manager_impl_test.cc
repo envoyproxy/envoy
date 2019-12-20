@@ -6,8 +6,11 @@
 
 #include "envoy/access_log/access_log.h"
 #include "envoy/buffer/buffer.h"
+#include "envoy/config/filter/network/http_connection_manager/v2/http_connection_manager.pb.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/tracing/http_tracer.h"
+#include "envoy/type/percent.pb.h"
+#include "envoy/type/tracing/v2/custom_tag.pb.h"
 
 #include "common/access_log/access_log_formatter.h"
 #include "common/access_log/access_log_impl.h"
@@ -95,6 +98,12 @@ public:
     filter_callbacks_.connection_.dispatcher_.clearDeferredDeleteList();
   }
 
+  Tracing::CustomTagConstSharedPtr requestHeaderCustomTag(const std::string& header) {
+    envoy::type::tracing::v2::CustomTag::Header headerTag;
+    headerTag.set_name(header);
+    return std::make_shared<Tracing::RequestHeaderCustomTag>(header, headerTag);
+  }
+
   void setup(bool ssl, const std::string& server_name, bool tracing = true, bool use_srds = false) {
     use_srds_ = use_srds;
     if (ssl) {
@@ -121,7 +130,7 @@ public:
       percent2.set_denominator(envoy::type::FractionalPercent::TEN_THOUSAND);
       tracing_config_ = std::make_unique<TracingConnectionManagerConfig>(
           TracingConnectionManagerConfig{Tracing::OperationName::Ingress,
-                                         {LowerCaseString(":method")},
+                                         {{":method", requestHeaderCustomTag(":method")}},
                                          percent1,
                                          percent2,
                                          percent1,
@@ -130,35 +139,40 @@ public:
     }
   }
 
-  void setupFilterChain(int num_decoder_filters, int num_encoder_filters) {
+  void setupFilterChain(int num_decoder_filters, int num_encoder_filters, int num_requests = 1) {
     // NOTE: The length/repetition in this routine allows InSequence to work correctly in an outer
     // scope.
-    for (int i = 0; i < num_decoder_filters; i++) {
+    for (int i = 0; i < num_decoder_filters * num_requests; i++) {
       decoder_filters_.push_back(new MockStreamDecoderFilter());
     }
 
-    for (int i = 0; i < num_encoder_filters; i++) {
+    for (int i = 0; i < num_encoder_filters * num_requests; i++) {
       encoder_filters_.push_back(new MockStreamEncoderFilter());
     }
 
-    EXPECT_CALL(filter_factory_, createFilterChain(_))
-        .WillOnce(Invoke([num_decoder_filters, num_encoder_filters,
-                          this](FilterChainFactoryCallbacks& callbacks) -> void {
-          for (int i = 0; i < num_decoder_filters; i++) {
-            callbacks.addStreamDecoderFilter(StreamDecoderFilterSharedPtr{decoder_filters_[i]});
-          }
+    InSequence s;
+    for (int req = 0; req < num_requests; req++) {
+      EXPECT_CALL(filter_factory_, createFilterChain(_))
+          .WillOnce(Invoke([num_decoder_filters, num_encoder_filters, req,
+                            this](FilterChainFactoryCallbacks& callbacks) -> void {
+            for (int i = 0; i < num_decoder_filters; i++) {
+              callbacks.addStreamDecoderFilter(
+                  StreamDecoderFilterSharedPtr{decoder_filters_[req * num_decoder_filters + i]});
+            }
 
-          for (int i = 0; i < num_encoder_filters; i++) {
-            callbacks.addStreamEncoderFilter(StreamEncoderFilterSharedPtr{encoder_filters_[i]});
-          }
-        }));
+            for (int i = 0; i < num_encoder_filters; i++) {
+              callbacks.addStreamEncoderFilter(
+                  StreamEncoderFilterSharedPtr{encoder_filters_[req * num_encoder_filters + i]});
+            }
+          }));
 
-    for (int i = 0; i < num_decoder_filters; i++) {
-      EXPECT_CALL(*decoder_filters_[i], setDecoderFilterCallbacks(_));
-    }
+      for (int i = 0; i < num_decoder_filters; i++) {
+        EXPECT_CALL(*decoder_filters_[req * num_decoder_filters + i], setDecoderFilterCallbacks(_));
+      }
 
-    for (int i = 0; i < num_encoder_filters; i++) {
-      EXPECT_CALL(*encoder_filters_[i], setEncoderFilterCallbacks(_));
+      for (int i = 0; i < num_encoder_filters; i++) {
+        EXPECT_CALL(*encoder_filters_[req * num_encoder_filters + i], setEncoderFilterCallbacks(_));
+      }
     }
   }
 
@@ -795,10 +809,98 @@ TEST_F(HttpConnectionManagerImplTest, StartAndFinishSpanNormalFlow) {
   // No decorator.
   EXPECT_CALL(*route_config_provider_.route_config_->route_, decorator())
       .WillRepeatedly(Return(nullptr));
+  envoy::type::FractionalPercent percent1;
+  percent1.set_numerator(100);
+  envoy::type::FractionalPercent percent2;
+  percent2.set_numerator(10000);
+  percent2.set_denominator(envoy::type::FractionalPercent::TEN_THOUSAND);
+
+  struct TracingTagMetaSuite {
+    using Factory =
+        std::function<Tracing::CustomTagConstSharedPtr(const std::string&, const std::string&)>;
+    std::string prefix;
+    Factory factory;
+  };
+  struct TracingTagSuite {
+    bool has_conn;
+    bool has_route;
+    std::list<Tracing::CustomTagConstSharedPtr> custom_tags;
+    std::string tag;
+    std::string tag_value;
+  };
+  std::vector<TracingTagMetaSuite> tracing_tag_meta_cases = {
+      {"l-tag",
+       [](const std::string& t, const std::string& v) {
+         envoy::type::tracing::v2::CustomTag::Literal literal;
+         literal.set_value(v);
+         return std::make_shared<Tracing::LiteralCustomTag>(t, literal);
+       }},
+      {"e-tag",
+       [](const std::string& t, const std::string& v) {
+         envoy::type::tracing::v2::CustomTag::Environment e;
+         e.set_default_value(v);
+         return std::make_shared<Tracing::EnvironmentCustomTag>(t, e);
+       }},
+      {"x-tag",
+       [](const std::string& t, const std::string& v) {
+         envoy::type::tracing::v2::CustomTag::Header h;
+         h.set_default_value(v);
+         return std::make_shared<Tracing::RequestHeaderCustomTag>(t, h);
+       }},
+      {"m-tag", [](const std::string& t, const std::string& v) {
+         envoy::type::tracing::v2::CustomTag::Metadata m;
+         m.mutable_kind()->mutable_host();
+         m.set_default_value(v);
+         return std::make_shared<Tracing::MetadataCustomTag>(t, m);
+       }}};
+  std::vector<TracingTagSuite> tracing_tag_cases;
+  for (const TracingTagMetaSuite& ms : tracing_tag_meta_cases) {
+    const std::string& t1 = ms.prefix + "-1";
+    const std::string& v1 = ms.prefix + "-v1";
+    tracing_tag_cases.push_back({true, false, {ms.factory(t1, v1)}, t1, v1});
+
+    const std::string& t2 = ms.prefix + "-2";
+    const std::string& v2 = ms.prefix + "-v2";
+    const std::string& rv2 = ms.prefix + "-r2";
+    tracing_tag_cases.push_back({true, true, {ms.factory(t2, v2), ms.factory(t2, rv2)}, t2, rv2});
+
+    const std::string& t3 = ms.prefix + "-3";
+    const std::string& rv3 = ms.prefix + "-r3";
+    tracing_tag_cases.push_back({false, true, {ms.factory(t3, rv3)}, t3, rv3});
+  }
+  Tracing::CustomTagMap conn_tracing_tags = {
+      {":method", requestHeaderCustomTag(":method")}}; // legacy test case
+  Tracing::CustomTagMap route_tracing_tags;
+  for (TracingTagSuite& s : tracing_tag_cases) {
+    if (s.has_conn) {
+      const Tracing::CustomTagConstSharedPtr& ptr = s.custom_tags.front();
+      conn_tracing_tags.emplace(ptr->tag(), ptr);
+      s.custom_tags.pop_front();
+    }
+    if (s.has_route) {
+      const Tracing::CustomTagConstSharedPtr& ptr = s.custom_tags.front();
+      route_tracing_tags.emplace(ptr->tag(), ptr);
+      s.custom_tags.pop_front();
+    }
+  }
+  tracing_config_ = std::make_unique<TracingConnectionManagerConfig>(
+      TracingConnectionManagerConfig{Tracing::OperationName::Ingress, conn_tracing_tags, percent1,
+                                     percent2, percent1, false, 256});
+  NiceMock<Router::MockRouteTracing> route_tracing;
+  ON_CALL(route_tracing, getClientSampling()).WillByDefault(ReturnRef(percent1));
+  ON_CALL(route_tracing, getRandomSampling()).WillByDefault(ReturnRef(percent2));
+  ON_CALL(route_tracing, getOverallSampling()).WillByDefault(ReturnRef(percent1));
+  ON_CALL(route_tracing, getCustomTags()).WillByDefault(ReturnRef(route_tracing_tags));
+  ON_CALL(*route_config_provider_.route_config_->route_, tracingConfig())
+      .WillByDefault(Return(&route_tracing));
+
   EXPECT_CALL(*span, finishSpan());
   EXPECT_CALL(*span, setTag(_, _)).Times(testing::AnyNumber());
   // Verify tag is set based on the request headers.
   EXPECT_CALL(*span, setTag(Eq(":method"), Eq("GET")));
+  for (const TracingTagSuite& s : tracing_tag_cases) {
+    EXPECT_CALL(*span, setTag(Eq(s.tag), Eq(s.tag_value)));
+  }
   // Verify if the activeSpan interface returns reference to the current span.
   EXPECT_CALL(*span, setTag(Eq("service-cluster"), Eq("scoobydoo")));
   EXPECT_CALL(runtime_.snapshot_, featureEnabled("tracing.global_enabled",
@@ -986,7 +1088,7 @@ TEST_F(HttpConnectionManagerImplTest, StartAndFinishSpanNormalFlowEgressDecorato
   percent2.set_denominator(envoy::type::FractionalPercent::TEN_THOUSAND);
   tracing_config_ = std::make_unique<TracingConnectionManagerConfig>(
       TracingConnectionManagerConfig{Tracing::OperationName::Egress,
-                                     {LowerCaseString(":method")},
+                                     {{":method", requestHeaderCustomTag(":method")}},
                                      percent1,
                                      percent2,
                                      percent1,
@@ -1065,7 +1167,7 @@ TEST_F(HttpConnectionManagerImplTest, StartAndFinishSpanNormalFlowEgressDecorato
   percent2.set_denominator(envoy::type::FractionalPercent::TEN_THOUSAND);
   tracing_config_ = std::make_unique<TracingConnectionManagerConfig>(
       TracingConnectionManagerConfig{Tracing::OperationName::Egress,
-                                     {LowerCaseString(":method")},
+                                     {{":method", requestHeaderCustomTag(":method")}},
                                      percent1,
                                      percent2,
                                      percent1,
@@ -1139,7 +1241,7 @@ TEST_F(HttpConnectionManagerImplTest,
   percent2.set_denominator(envoy::type::FractionalPercent::TEN_THOUSAND);
   tracing_config_ = std::make_unique<TracingConnectionManagerConfig>(
       TracingConnectionManagerConfig{Tracing::OperationName::Egress,
-                                     {LowerCaseString(":method")},
+                                     {{":method", requestHeaderCustomTag(":method")}},
                                      percent1,
                                      percent2,
                                      percent1,
@@ -4964,6 +5066,87 @@ TEST_F(HttpConnectionManagerImplTest, HeaderOnlyRequestAndResponseUsingHttp3) {
   filter_callbacks_.connection_.dispatcher_.clearDeferredDeleteList();
   conn_manager_.reset();
   EXPECT_EQ(0U, stats_.named_.downstream_cx_http3_active_.value());
+}
+
+namespace {
+
+class SimpleType : public StreamInfo::FilterState::Object {
+public:
+  SimpleType(int value) : value_(value) {}
+  int access() const { return value_; }
+
+private:
+  int value_;
+};
+
+} // namespace
+
+TEST_F(HttpConnectionManagerImplTest, ConnectionFilterState) {
+  setup(false, "envoy-custom-server", false);
+
+  setupFilterChain(1, 0, /* num_requests = */ 3);
+
+  EXPECT_CALL(*codec_, dispatch(_)).Times(2).WillRepeatedly(Invoke([&](Buffer::Instance&) -> void {
+    StreamDecoder* decoder = &conn_manager_->newStream(response_encoder_);
+    HeaderMapPtr headers{
+        new TestHeaderMapImpl{{":authority", "host"}, {":path", "/"}, {":method", "GET"}}};
+    decoder->decodeHeaders(std::move(headers), true);
+  }));
+  {
+    InSequence s;
+    EXPECT_CALL(*decoder_filters_[0], decodeHeaders(_, true))
+        .WillOnce(Invoke([this](HeaderMap&, bool) -> FilterHeadersStatus {
+          decoder_filters_[0]->callbacks_->streamInfo().filterState().setData(
+              "per_filter_chain", std::make_unique<SimpleType>(1),
+              StreamInfo::FilterState::StateType::ReadOnly,
+              StreamInfo::FilterState::LifeSpan::FilterChain);
+          decoder_filters_[0]->callbacks_->streamInfo().filterState().setData(
+              "per_downstream_request", std::make_unique<SimpleType>(2),
+              StreamInfo::FilterState::StateType::ReadOnly,
+              StreamInfo::FilterState::LifeSpan::DownstreamRequest);
+          decoder_filters_[0]->callbacks_->streamInfo().filterState().setData(
+              "per_downstream_connection", std::make_unique<SimpleType>(3),
+              StreamInfo::FilterState::StateType::ReadOnly,
+              StreamInfo::FilterState::LifeSpan::DownstreamConnection);
+          return FilterHeadersStatus::StopIteration;
+        }));
+    EXPECT_CALL(*decoder_filters_[1], decodeHeaders(_, true))
+        .WillOnce(Invoke([this](HeaderMap&, bool) -> FilterHeadersStatus {
+          EXPECT_FALSE(
+              decoder_filters_[1]->callbacks_->streamInfo().filterState().hasData<SimpleType>(
+                  "per_filter_chain"));
+          EXPECT_TRUE(
+              decoder_filters_[1]->callbacks_->streamInfo().filterState().hasData<SimpleType>(
+                  "per_downstream_request"));
+          EXPECT_TRUE(
+              decoder_filters_[1]->callbacks_->streamInfo().filterState().hasData<SimpleType>(
+                  "per_downstream_connection"));
+          return FilterHeadersStatus::StopIteration;
+        }));
+    EXPECT_CALL(*decoder_filters_[2], decodeHeaders(_, true))
+        .WillOnce(Invoke([this](HeaderMap&, bool) -> FilterHeadersStatus {
+          EXPECT_FALSE(
+              decoder_filters_[2]->callbacks_->streamInfo().filterState().hasData<SimpleType>(
+                  "per_filter_chain"));
+          EXPECT_FALSE(
+              decoder_filters_[2]->callbacks_->streamInfo().filterState().hasData<SimpleType>(
+                  "per_downstream_request"));
+          EXPECT_TRUE(
+              decoder_filters_[2]->callbacks_->streamInfo().filterState().hasData<SimpleType>(
+                  "per_downstream_connection"));
+          return FilterHeadersStatus::StopIteration;
+        }));
+  }
+
+  EXPECT_CALL(*decoder_filters_[0], decodeComplete());
+  EXPECT_CALL(*decoder_filters_[0], onDestroy());
+  EXPECT_CALL(*decoder_filters_[1], decodeComplete());
+  EXPECT_CALL(*decoder_filters_[2], decodeComplete());
+
+  Buffer::OwnedImpl fake_input;
+  conn_manager_->onData(fake_input, false);
+  decoder_filters_[0]->callbacks_->recreateStream();
+  conn_manager_->onData(fake_input, false);
 }
 
 class HttpConnectionManagerImplDeathTest : public HttpConnectionManagerImplTest {

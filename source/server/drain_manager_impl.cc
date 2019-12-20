@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <functional>
 
+#include "envoy/api/v2/lds.pb.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/event/timer.h"
 #include "envoy/runtime/runtime.h"
