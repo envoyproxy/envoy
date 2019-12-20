@@ -201,12 +201,15 @@ public:
 };
 
 /**
- * An implementation of FactoryContext. It should be used to create NetworkFilterChain.
+ * An implementation of FactoryContext. The life time is no shorter than the created filter chains.
+ * The life time is no longer than the belonged listener. It should be used to create
+ * NetworkFilterChain.
  */
 class FilterChainFactoryContext : public virtual FactoryContext {};
 
 /**
- * An implementation of FactoryContext. It can be used to create ListenerFilterChain.
+ * An implementation of FactoryContext. The life time should cover the lifetime of the filter chains
+ * and connections. It can be used to create ListenerFilterChain.
  */
 class ListenerFactoryContext : public virtual FactoryContext {
 public:
