@@ -2,13 +2,13 @@ syntax = "proto3";
 
 package envoy.config.filter.http.buffer.v2;
 
-option java_package = "io.envoyproxy.envoy.config.filter.http.buffer.v2";
-option java_outer_classname = "BufferProto";
-option java_multiple_files = true;
-
 import "google/protobuf/wrappers.proto";
 
 import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.config.filter.http.buffer.v2";
+option java_outer_classname = "BufferProto";
+option java_multiple_files = true;
 
 // [#protodoc-title: Buffer]
 // Buffer :ref:`configuration overview <config_http_filters_buffer>`.

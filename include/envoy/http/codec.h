@@ -9,6 +9,7 @@
 #include "envoy/http/header_map.h"
 #include "envoy/http/metadata_interface.h"
 #include "envoy/http/protocol.h"
+#include "envoy/network/address.h"
 
 namespace Envoy {
 namespace Http {
@@ -212,6 +213,12 @@ public:
    * not associated with every stream on the connection.
    */
   virtual absl::string_view responseDetails() { return ""; }
+
+  /*
+   * @return const Address::InstanceConstSharedPtr& the local address of the connection associated
+   * with the stream.
+   */
+  virtual const Network::Address::InstanceConstSharedPtr& connectionLocalAddress() PURE;
 };
 
 /**
@@ -238,6 +245,12 @@ struct Http1Settings {
   bool accept_http_10_{false};
   // Set a default host if no Host: header is present for HTTP/1.0 requests.`
   std::string default_host_for_http_10_;
+  // Encode trailers in Http. By default the HTTP/1 codec drops proxied trailers.
+  // Note that this only happens when Envoy is chunk encoding which occurs when:
+  //  - The request is HTTP/1.1
+  //  - Is neither a HEAD only request nor a HTTP Upgrade
+  //  - Not a HEAD request
+  bool enable_trailers_{false};
 
   enum class HeaderKeyFormat {
     // By default no formatting is performed, presenting all headers in lowercase (as Envoy

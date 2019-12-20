@@ -205,6 +205,7 @@ HttpIntegrationTest::makeRawHttpConnection(Network::ClientConnectionPtr&& conn) 
   cluster->max_response_headers_count_ = 200;
   cluster->http2_settings_.allow_connect_ = true;
   cluster->http2_settings_.allow_metadata_ = true;
+  cluster->http1_settings_.enable_trailers_ = true;
   Upstream::HostDescriptionConstSharedPtr host_description{Upstream::makeTestHostDescription(
       cluster, fmt::format("tcp://{}:80", Network::Test::getLoopbackAddressUrlString(version_)))};
   return std::make_unique<IntegrationCodecClient>(*dispatcher_, std::move(conn), host_description,
@@ -268,6 +269,23 @@ std::string HttpIntegrationTest::waitForAccessLog(const std::string& filename) {
 void HttpIntegrationTest::setDownstreamProtocol(Http::CodecClient::Type downstream_protocol) {
   downstream_protocol_ = downstream_protocol;
   config_helper_.setClientCodec(typeToCodecType(downstream_protocol_));
+}
+
+ConfigHelper::HttpModifierFunction HttpIntegrationTest::setEnableDownstreamTrailersHttp1() {
+  return
+      [](envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager& hcm) {
+        hcm.mutable_http_protocol_options()->set_enable_trailers(true);
+      };
+}
+
+ConfigHelper::ConfigModifierFunction HttpIntegrationTest::setEnableUpstreamTrailersHttp1() {
+  return [&](envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
+    RELEASE_ASSERT(bootstrap.mutable_static_resources()->clusters_size() == 1, "");
+    if (fake_upstreams_[0]->httpType() == FakeHttpConnection::Type::HTTP1) {
+      auto* cluster = bootstrap.mutable_static_resources()->mutable_clusters(0);
+      cluster->mutable_http_protocol_options()->set_enable_trailers(true);
+    }
+  };
 }
 
 IntegrationStreamDecoderPtr HttpIntegrationTest::sendRequestAndWaitForResponse(
@@ -965,13 +983,18 @@ void HttpIntegrationTest::testLargeRequestTrailers(uint32_t size, uint32_t max_s
   codec_client_->sendData(*request_encoder_, 10, false);
   codec_client_->sendTrailers(*request_encoder_, request_trailers);
 
-  if (size >= max_size && downstream_protocol_ == Http::CodecClient::Type::HTTP2) {
-    // For HTTP/2, expect a stream reset when the size of the trailers is larger than the maximum
-    // limit.
-    response->waitForReset();
-    codec_client_->close();
-    EXPECT_FALSE(response->complete());
-
+  if (size >= max_size) {
+    if (downstream_protocol_ == Http::CodecClient::Type::HTTP1) {
+      codec_client_->waitForDisconnect();
+      EXPECT_TRUE(response->complete());
+      EXPECT_EQ("431", response->headers().Status()->value().getStringView());
+    } else {
+      // Expect a stream reset when the size of the trailers is larger than the maximum
+      // limit.
+      response->waitForReset();
+      codec_client_->close();
+      EXPECT_FALSE(response->complete());
+    }
   } else {
     waitForNextUpstreamRequest();
     upstream_request_->encodeHeaders(default_response_headers_, true);
@@ -1055,7 +1078,8 @@ void HttpIntegrationTest::testDownstreamResetBeforeResponseComplete() {
   EXPECT_EQ(512U, response->body().size());
 }
 
-void HttpIntegrationTest::testTrailers(uint64_t request_size, uint64_t response_size) {
+void HttpIntegrationTest::testTrailers(uint64_t request_size, uint64_t response_size,
+                                       bool check_request, bool check_response) {
   Http::TestHeaderMapImpl request_trailers{{"request1", "trailer1"}, {"request2", "trailer2"}};
   Http::TestHeaderMapImpl response_trailers{{"response1", "trailer1"}, {"response2", "trailer2"}};
 
@@ -1078,15 +1102,19 @@ void HttpIntegrationTest::testTrailers(uint64_t request_size, uint64_t response_
 
   EXPECT_TRUE(upstream_request_->complete());
   EXPECT_EQ(request_size, upstream_request_->bodyLength());
-  if (fake_upstreams_[0]->httpType() == FakeHttpConnection::Type::HTTP2) {
+  if (check_request) {
     EXPECT_THAT(*upstream_request_->trailers(), HeaderMapEqualRef(&request_trailers));
+  } else {
+    EXPECT_EQ(upstream_request_->trailers(), nullptr);
   }
 
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().Status()->value().getStringView());
   EXPECT_EQ(response_size, response->body().size());
-  if (fake_upstreams_[0]->httpType() == FakeHttpConnection::Type::HTTP2) {
+  if (check_response) {
     EXPECT_THAT(*response->trailers(), HeaderMapEqualRef(&response_trailers));
+  } else {
+    EXPECT_EQ(response->trailers(), nullptr);
   }
 }
 

@@ -68,14 +68,7 @@ protected:
   StatName makeStat(absl::string_view name) { return pool_->add(name); }
 
   std::vector<uint8_t> serializeDeserialize(uint64_t number) {
-    const uint64_t num_bytes = SymbolTableImpl::Encoding::encodingSizeBytes(number);
-    const uint64_t block_size = 10;
-    MemBlockBuilder<uint8_t> mem_block(block_size);
-    SymbolTableImpl::Encoding::appendEncoding(number, mem_block);
-    EXPECT_EQ(block_size, num_bytes + mem_block.capacityRemaining());
-    absl::Span<uint8_t> span = mem_block.span();
-    EXPECT_EQ(number, SymbolTableImpl::Encoding::decodeNumber(span.data()).first) << number;
-    return std::vector<uint8_t>(span.data(), span.data() + span.size());
+    return TestUtil::serializeDeserializeNumber(number);
   }
 
   FakeSymbolTableImpl* fake_symbol_table_{nullptr};
@@ -115,6 +108,18 @@ TEST_P(StatNameTest, SerializeBytes) {
   for (uint32_t i = 0; i < 17000; ++i) {
     serializeDeserialize(i);
   }
+}
+
+TEST_P(StatNameTest, SerializeStrings) {
+  TestUtil::serializeDeserializeString("");
+  TestUtil::serializeDeserializeString("Hello, world!");
+  TestUtil::serializeDeserializeString("embedded\0\nul");
+  TestUtil::serializeDeserializeString(std::string(200, 'a'));
+  TestUtil::serializeDeserializeString(std::string(2000, 'a'));
+  TestUtil::serializeDeserializeString(std::string(20000, 'a'));
+  TestUtil::serializeDeserializeString(std::string(200000, 'a'));
+  TestUtil::serializeDeserializeString(std::string(2000000, 'a'));
+  TestUtil::serializeDeserializeString(std::string(20000000, 'a'));
 }
 
 TEST_P(StatNameTest, AllocFree) { encodeDecode("hello.world"); }

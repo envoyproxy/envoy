@@ -2,10 +2,6 @@ syntax = "proto3";
 
 package envoy.config.filter.http.router.v3alpha;
 
-option java_package = "io.envoyproxy.envoy.config.filter.http.router.v3alpha";
-option java_outer_classname = "RouterProto";
-option java_multiple_files = true;
-
 import "envoy/config/filter/accesslog/v3alpha/accesslog.proto";
 
 import "google/protobuf/wrappers.proto";
@@ -13,6 +9,10 @@ import "google/protobuf/wrappers.proto";
 import "udpa/annotations/versioning.proto";
 
 import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.config.filter.http.router.v3alpha";
+option java_outer_classname = "RouterProto";
+option java_multiple_files = true;
 
 // [#protodoc-title: Router]
 // Router :ref:`configuration overview <config_http_filters_router>`.

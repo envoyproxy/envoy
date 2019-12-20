@@ -117,7 +117,7 @@ public:
      *
      * @param mem_block_builder memory block to receive the encoded bytes.
      */
-    void moveToMemBlock(MemBlockBuilder<uint8_t>& array);
+    void moveToMemBlock(MemBlockBuilder<uint8_t>& mem_block_builder);
 
     /**
      * @param number A number to encode in a variable length byte-array.
