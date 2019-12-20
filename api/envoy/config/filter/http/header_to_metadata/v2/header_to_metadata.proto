@@ -2,11 +2,11 @@ syntax = "proto3";
 
 package envoy.config.filter.http.header_to_metadata.v2;
 
+import "validate/validate.proto";
+
 option java_package = "io.envoyproxy.envoy.config.filter.http.header_to_metadata.v2";
 option java_outer_classname = "HeaderToMetadataProto";
 option java_multiple_files = true;
-
-import "validate/validate.proto";
 
 // [#protodoc-title: Header-To-Metadata Filter]
 //

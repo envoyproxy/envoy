@@ -6,6 +6,7 @@
 //
 // NOLINT(namespace-envoy)
 
+#include <fstream>
 #include <iostream>
 #include <regex>
 #include <set>
@@ -15,15 +16,18 @@
 #include "clang/ASTMatchers/ASTMatchFinder.h"
 #include "clang/Frontend/FrontendActions.h"
 #include "clang/Tooling/CommonOptionsParser.h"
-#include "clang/Tooling/Tooling.h"
+#include "clang/Tooling/Core/Replacement.h"
+#include "clang/Tooling/Refactoring.h"
+#include "clang/Tooling/ReplacementsYaml.h"
 
 // Declares llvm::cl::extrahelp.
 #include "llvm/Support/CommandLine.h"
 
+#include "proto_cxx_utils.h"
+
 #include "tools/type_whisperer/api_type_db.h"
 
-#include "absl/strings/str_join.h"
-#include "absl/strings/str_split.h"
+#include "absl/strings/str_cat.h"
 
 // Enable to see debug log messages.
 #ifdef ENABLE_DEBUG_LOG
@@ -35,19 +39,30 @@
 #define DEBUG_LOG(s)
 #endif
 
+using namespace Envoy::Tools::TypeWhisperer;
+
+namespace ApiBooster {
+
 class ApiBooster : public clang::ast_matchers::MatchFinder::MatchCallback,
                    public clang::tooling::SourceFileCallbacks {
 public:
+  ApiBooster(std::map<std::string, clang::tooling::Replacements>& replacements)
+      : replacements_(replacements) {}
+
   // AST match callback.
-  void run(const clang::ast_matchers::MatchFinder::MatchResult& result) override {
-    // If we have a match on type, we should track the corresponding .pb.h.
-    if (const clang::TypeLoc* type = result.Nodes.getNodeAs<clang::TypeLoc>("type")) {
+  void run(const clang::ast_matchers::MatchFinder::MatchResult& match_result) override {
+    clang::SourceManager& source_manager = match_result.Context->getSourceManager();
+    // If we have a match on type, we should track the corresponding .pb.h and
+    // attempt to upgrade.
+    if (const clang::TypeLoc* type_loc = match_result.Nodes.getNodeAs<clang::TypeLoc>("type")) {
       const std::string type_name =
-          type->getType().getCanonicalType().getUnqualifiedType().getAsString();
-      DEBUG_LOG(absl::StrCat("Matched type ", type_name));
-      const auto result = getProtoPathFromCType(type_name);
+          type_loc->getType().getCanonicalType().getUnqualifiedType().getAsString();
+      const auto result = getLatestTypeInformationFromCType(type_name);
       if (result) {
-        source_api_proto_paths_.insert(*result + ".pb.h");
+        source_api_proto_paths_.insert(adjustProtoSuffix(result->proto_path_, ".pb.h"));
+        DEBUG_LOG(absl::StrCat("Matched type ", type_name, " ", type_loc->getTypeLocClass(), " ",
+                               type_loc->getType()->getTypeClassName()));
+        addTypeLocReplacements(*type_loc, result->type_name_, source_manager);
       }
       return;
     }
@@ -55,7 +70,8 @@ public:
     // If we have a match on a call expression, check to see if it's something
     // like loadFromYamlAndValidate; if so, we might need to look at the
     // argument type to figure out any corresponding .pb.validate.h we require.
-    if (const clang::CallExpr* call_expr = result.Nodes.getNodeAs<clang::CallExpr>("call_expr")) {
+    if (const clang::CallExpr* call_expr =
+            match_result.Nodes.getNodeAs<clang::CallExpr>("call_expr")) {
       auto* direct_callee = call_expr->getDirectCallee();
       if (direct_callee != nullptr) {
         const std::unordered_map<std::string, int> ValidateNameToArg = {
@@ -74,9 +90,10 @@ public:
                                             .getCanonicalType()
                                             .getUnqualifiedType()
                                             .getAsString();
-          const auto result = getProtoPathFromCType(type_name);
+          const auto result = getLatestTypeInformationFromCType(type_name);
           if (result) {
-            source_api_proto_paths_.insert(*result + ".pb.validate.h");
+            source_api_proto_paths_.insert(
+                adjustProtoSuffix(result->proto_path_, ".pb.validate.h"));
           }
         }
       }
@@ -86,7 +103,7 @@ public:
     // The last place we need to look for .pb.validate.h reference is
     // instantiation of FactoryBase.
     if (const clang::ClassTemplateSpecializationDecl* tmpl =
-            result.Nodes.getNodeAs<clang::ClassTemplateSpecializationDecl>("tmpl")) {
+            match_result.Nodes.getNodeAs<clang::ClassTemplateSpecializationDecl>("tmpl")) {
       const std::string tmpl_type_name = tmpl->getSpecializedTemplate()
                                              ->getInjectedClassNameSpecialization()
                                              .getCanonicalType()
@@ -98,9 +115,9 @@ public:
                                           .getCanonicalType()
                                           .getUnqualifiedType()
                                           .getAsString();
-        const auto result = getProtoPathFromCType(type_name);
+        const auto result = getLatestTypeInformationFromCType(type_name);
         if (result) {
-          source_api_proto_paths_.insert(*result + ".pb.validate.h");
+          source_api_proto_paths_.insert(adjustProtoSuffix(result->proto_path_, ".pb.validate.h"));
         }
       }
     }
@@ -122,38 +139,54 @@ public:
   }
 
 private:
-  // Convert from C++ type, e.g. envoy:config::v2::Cluster, to a proto path
-  // (minus the .proto suffix), e.g. envoy/config/v2/cluster.
-  absl::optional<std::string> getProtoPathFromCType(const std::string& c_type_name) {
+  // Attempt to add type replacements as applicable for Envoy API types.
+  void addTypeLocReplacements(const clang::TypeLoc& type_loc,
+                              const std::string& latest_proto_type_name,
+                              const clang::SourceManager& source_manager) {
+    // We only support upgrading ElaboratedTypes so far. TODO(htuch): extend
+    // this to other AST type matches.
+    const clang::UnqualTypeLoc unqual_type_loc = type_loc.getUnqualifiedLoc();
+    if (unqual_type_loc.getTypeLocClass() == clang::TypeLoc::Elaborated) {
+      clang::LangOptions lopt;
+      const clang::SourceLocation start = unqual_type_loc.getSourceRange().getBegin();
+      const clang::SourceLocation end = clang::Lexer::getLocForEndOfToken(
+          unqual_type_loc.getSourceRange().getEnd(), 0, source_manager, lopt);
+      const size_t length = source_manager.getFileOffset(end) - source_manager.getFileOffset(start);
+      clang::tooling::Replacement type_replacement(
+          source_manager, start, length, ProtoCxxUtils::protoToCxxType(latest_proto_type_name));
+      llvm::Error error = replacements_[type_replacement.getFilePath()].add(type_replacement);
+      if (error) {
+        std::cerr << "  Replacement insertion error: " << llvm::toString(std::move(error))
+                  << std::endl;
+      } else {
+        std::cerr << "  Replacement added: " << type_replacement.toString() << std::endl;
+      }
+    }
+  }
+
+  // Remove .proto from a path, apply specified suffix instead.
+  std::string adjustProtoSuffix(absl::string_view proto_path, absl::string_view suffix) {
+    return absl::StrCat(proto_path.substr(0, proto_path.size() - 6), suffix);
+  }
+
+  // Obtain the latest type information for a given from C++ type, e.g. envoy:config::v2::Cluster,
+  // from the API type database.
+  absl::optional<TypeInformation>
+  getLatestTypeInformationFromCType(const std::string& c_type_name) {
     // Ignore compound or non-API types.
-    // TODO(htuch): without compound types, this is only an under-approximation
-    // of the types. Add proper logic to destructor compound types.
+    // TODO(htuch): this is all super hacky and not really right, we should be
+    // removing qualifiers etc. to get to the underlying type name.
     const std::string type_name = std::regex_replace(c_type_name, std::regex("^(class|enum) "), "");
     if (!absl::StartsWith(type_name, "envoy::") || absl::StrContains(type_name, " ")) {
       return {};
     }
-
-    // Convert from C++ to a qualified proto type. This is fairly hacky stuff,
-    // we're essentially reversing the conventions that the protobuf C++
-    // compiler is using, e.g. replacing _ and :: with . as needed, guessing
-    // that a Case suffix implies some enum switching.
-    const std::string dotted_path = std::regex_replace(type_name, std::regex("::"), ".");
-    std::vector<std::string> frags = absl::StrSplit(dotted_path, '.');
-    for (std::string& frag : frags) {
-      if (!frag.empty() && isupper(frag[0])) {
-        frag = std::regex_replace(frag, std::regex("_"), ".");
-      }
-    }
-    if (absl::EndsWith(frags.back(), "Case")) {
-      frags.pop_back();
-    }
-    const std::string proto_type_name = absl::StrJoin(frags, ".");
+    const std::string proto_type_name = ProtoCxxUtils::cxxToProtoType(type_name);
 
     // Use API type database to map from proto type to path.
-    auto result = Envoy::Tools::TypeWhisperer::ApiTypeDb::getProtoPathForType(proto_type_name);
+    auto result = ApiTypeDb::getLatestTypeInformation(proto_type_name);
     if (result) {
       // Remove the .proto extension.
-      return result->substr(0, result->size() - 6);
+      return result;
     } else if (!absl::StartsWith(proto_type_name, "envoy.HotRestart") &&
                !absl::StartsWith(proto_type_name, "envoy.RouterCheckToolSchema") &&
                !absl::StartsWith(proto_type_name, "envoy.test") &&
@@ -170,18 +203,22 @@ private:
 
   // Set of inferred .pb[.validate].h, updated as the AST matcher callbacks above fire.
   std::set<std::string> source_api_proto_paths_;
+  // Map from source file to replacements.
+  std::map<std::string, clang::tooling::Replacements>& replacements_;
 };
+
+} // namespace ApiBooster
 
 int main(int argc, const char** argv) {
   // Apply a custom category to all command-line options so that they are the
   // only ones displayed.
   llvm::cl::OptionCategory api_booster_tool_category("api-booster options");
 
-  clang::tooling::CommonOptionsParser OptionsParser(argc, argv, api_booster_tool_category);
-  clang::tooling::ClangTool Tool(OptionsParser.getCompilations(),
-                                 OptionsParser.getSourcePathList());
+  clang::tooling::CommonOptionsParser options_parser(argc, argv, api_booster_tool_category);
+  clang::tooling::RefactoringTool tool(options_parser.getCompilations(),
+                                       options_parser.getSourcePathList());
 
-  ApiBooster api_booster;
+  ApiBooster::ApiBooster api_booster(tool.getReplacements());
   clang::ast_matchers::MatchFinder finder;
 
   // Match on all mentions of types in the AST.
@@ -199,5 +236,35 @@ int main(int argc, const char** argv) {
   auto tmpl_matcher = clang::ast_matchers::classTemplateSpecializationDecl().bind("tmpl");
   finder.addMatcher(tmpl_matcher, &api_booster);
 
-  return Tool.run(newFrontendActionFactory(&finder, &api_booster).get());
+  // Apply ApiBooster to AST matches. This will generate a set of replacements in
+  // tool.getReplacements().
+  const int run_result = tool.run(newFrontendActionFactory(&finder, &api_booster).get());
+  if (run_result != 0) {
+    std::cerr << "Exiting with non-zero result " << run_result << std::endl;
+    return run_result;
+  }
+
+  // Serialize replacements to <main source file path>.clang-replacements.yaml.
+  // These are suitable for consuming by clang-apply-replacements.
+  for (const auto& file_replacement : tool.getReplacements()) {
+    // Populate TranslationUnitReplacements from file replacements (this is what
+    // there exists llvm::yaml serialization support for).
+    clang::tooling::TranslationUnitReplacements tu_replacements;
+    tu_replacements.MainSourceFile = file_replacement.first;
+    for (const auto& r : file_replacement.second) {
+      tu_replacements.Replacements.push_back(r);
+      DEBUG_LOG(r.toString());
+    }
+    // Serialize TranslationUnitReplacements to YAML.
+    std::string yaml_content;
+    llvm::raw_string_ostream yaml_content_stream(yaml_content);
+    llvm::yaml::Output yaml(yaml_content_stream);
+    yaml << tu_replacements;
+    // Write to <main source file path>.clang-replacements.yaml.
+    std::ofstream serialized_replacement_file(tu_replacements.MainSourceFile +
+                                              ".clang-replacements.yaml");
+    serialized_replacement_file << yaml_content_stream.str();
+  }
+
+  return 0;
 }

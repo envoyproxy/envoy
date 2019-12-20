@@ -2,11 +2,11 @@ syntax = "proto3";
 
 package envoy.type;
 
+import "validate/validate.proto";
+
 option java_package = "io.envoyproxy.envoy.type";
 option java_outer_classname = "HttpStatusProto";
 option java_multiple_files = true;
-
-import "validate/validate.proto";
 
 // HTTP response codes supported in Envoy.
 // For more details: https://www.iana.org/assignments/http-status-codes/http-status-codes.xhtml

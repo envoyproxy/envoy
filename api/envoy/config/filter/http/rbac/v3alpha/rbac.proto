@@ -2,15 +2,15 @@ syntax = "proto3";
 
 package envoy.config.filter.http.rbac.v3alpha;
 
-option java_package = "io.envoyproxy.envoy.config.filter.http.rbac.v3alpha";
-option java_outer_classname = "RbacProto";
-option java_multiple_files = true;
-
 import "envoy/config/rbac/v3alpha/rbac.proto";
 
 import "udpa/annotations/versioning.proto";
 
 import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.config.filter.http.rbac.v3alpha";
+option java_outer_classname = "RbacProto";
+option java_multiple_files = true;
 
 // [#protodoc-title: RBAC]
 // Role-Based Access Control :ref:`configuration overview <config_http_filters_rbac>`.

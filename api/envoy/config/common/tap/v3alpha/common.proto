@@ -2,16 +2,16 @@ syntax = "proto3";
 
 package envoy.config.common.tap.v3alpha;
 
-option java_package = "io.envoyproxy.envoy.config.common.tap.v3alpha";
-option java_outer_classname = "CommonProto";
-option java_multiple_files = true;
-
 import "envoy/api/v3alpha/core/config_source.proto";
 import "envoy/service/tap/v3alpha/common.proto";
 
 import "udpa/annotations/versioning.proto";
 
 import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.config.common.tap.v3alpha";
+option java_outer_classname = "CommonProto";
+option java_multiple_files = true;
 
 // [#protodoc-title: Common tap extension configuration]
 

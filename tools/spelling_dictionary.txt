@@ -310,6 +310,7 @@ WKT
 WRR
 WS
 Welford's
+Wi
 XDS
 XFCC
 XFF
@@ -427,6 +428,7 @@ codings
 combinatorial
 comparator
 compat
+compiation
 completable
 cond
 condvar
@@ -655,6 +657,7 @@ libc
 libevent
 libtool
 libstdc
+libtooling
 lifecycle
 lightstep
 linearization
@@ -662,6 +665,7 @@ linearize
 linearized
 linux
 livelock
+llvm
 localhost
 lockless
 login
@@ -675,6 +679,7 @@ lowp
 ltrim
 lua
 lyft
+mabye
 maglev
 malloc
 matchable

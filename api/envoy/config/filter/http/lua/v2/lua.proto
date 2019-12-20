@@ -2,11 +2,11 @@ syntax = "proto3";
 
 package envoy.config.filter.http.lua.v2;
 
+import "validate/validate.proto";
+
 option java_package = "io.envoyproxy.envoy.config.filter.http.lua.v2";
 option java_outer_classname = "LuaProto";
 option java_multiple_files = true;
-
-import "validate/validate.proto";
 
 // [#protodoc-title: Lua]
 // Lua :ref:`configuration overview <config_http_filters_lua>`.
