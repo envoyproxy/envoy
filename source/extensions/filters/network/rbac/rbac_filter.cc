@@ -1,6 +1,7 @@
 #include "extensions/filters/network/rbac/rbac_filter.h"
 
 #include "envoy/buffer/buffer.h"
+#include "envoy/config/filter/network/rbac/v2/rbac.pb.h"
 #include "envoy/network/connection.h"
 
 #include "extensions/filters/network/well_known_names.h"

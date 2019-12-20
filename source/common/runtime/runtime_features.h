@@ -4,6 +4,7 @@
 
 #include "envoy/api/v2/core/base.pb.h"
 #include "envoy/runtime/runtime.h"
+#include "envoy/type/percent.pb.h"
 
 #include "common/protobuf/utility.h"
 #include "common/singleton/const_singleton.h"
@@ -29,12 +30,16 @@ public:
   bool enabledByDefault(absl::string_view feature) const {
     return enabled_features_.find(feature) != enabled_features_.end();
   }
+  bool existsButDisabled(absl::string_view feature) const {
+    return disabled_features_.find(feature) != disabled_features_.end();
+  }
 
 private:
   friend class RuntimeFeaturesPeer;
 
   absl::flat_hash_set<std::string> disallowed_features_;
   absl::flat_hash_set<std::string> enabled_features_;
+  absl::flat_hash_set<std::string> disabled_features_;
 };
 
 using RuntimeFeaturesDefaults = ConstSingleton<RuntimeFeatures>;

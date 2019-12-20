@@ -34,3 +34,17 @@ envoy_extension_cc_test(
         "//test/mocks/server:server_mocks",
     ],
 )
+
+envoy_extension_cc_test(
+    name = "grpc_web_integration_test",
+    srcs = ["grpc_web_filter_integration_test.cc"],
+    extension_name = "envoy.filters.http.grpc_web",
+    deps = [
+        "//source/common/buffer:buffer_lib",
+        "//source/common/http:header_map_lib",
+        "//source/extensions/filters/http/grpc_web:grpc_web_filter_lib",
+        "//test/integration:http_integration_lib",
+        "//test/mocks/upstream:upstream_mocks",
+        "//test/test_common:utility_lib",
+    ],
+)

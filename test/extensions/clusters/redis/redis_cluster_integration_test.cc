@@ -1,6 +1,8 @@
 #include <sstream>
 #include <vector>
 
+#include "envoy/config/bootstrap/v2/bootstrap.pb.h"
+
 #include "common/common/macros.h"
 
 #include "extensions/filters/network/redis_proxy/command_splitter_impl.h"
@@ -62,12 +64,34 @@ const std::string& clusterConfig() {
             cluster_refresh_rate: 60s
             cluster_refresh_timeout: 4s
             redirect_refresh_interval: 0s
-            redirect_refresh_threshold: 0
+            redirect_refresh_threshold: 1
 )EOF");
 }
 
 const std::string& testConfig() {
   CONSTRUCT_ON_FIRST_USE(std::string, listenerConfig() + clusterConfig());
+}
+
+const std::string& testConfigWithRefresh() {
+  CONSTRUCT_ON_FIRST_USE(std::string, listenerConfig() + R"EOF(
+  clusters:
+    - name: cluster_0
+      lb_policy: CLUSTER_PROVIDED
+      hosts:
+      - socket_address:
+          address: 127.0.0.1
+          port_value: 0
+      cluster_type:
+        name: envoy.clusters.redis
+        typed_config:
+          "@type": type.googleapis.com/google.protobuf.Struct
+          value:
+            cluster_refresh_rate: 3600s
+            cluster_refresh_timeout: 4s
+            redirect_refresh_interval: 100s
+            redirect_refresh_threshold: 1
+            failure_refresh_threshold: 1
+)EOF");
 }
 
 const std::string& testConfigWithReadPolicy() {
@@ -323,6 +347,13 @@ public:
       : RedisClusterIntegrationTest(config, num_upstreams) {}
 };
 
+class RedisClusterWithRefreshIntegrationTest : public RedisClusterIntegrationTest {
+public:
+  RedisClusterWithRefreshIntegrationTest(const std::string& config = testConfigWithRefresh(),
+                                         int num_upstreams = 3)
+      : RedisClusterIntegrationTest(config, num_upstreams) {}
+};
+
 INSTANTIATE_TEST_SUITE_P(IpVersions, RedisClusterIntegrationTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
@@ -500,5 +531,56 @@ TEST_P(RedisClusterWithAuthIntegrationTest, SingleSlotMasterReplica) {
   EXPECT_TRUE(fake_upstream_connection->close());
 }
 
+// This test show the test proxy's multi-stage response to an error from an upstream fake
+// redis server. The proxy will connect to the first fake upstream server to rediscover the
+// cluster's topology using a "cluster slots" command.
+TEST_P(RedisClusterWithRefreshIntegrationTest, ClusterSlotRequestAfterFailure) {
+  random_index_ = 0;
+
+  on_server_init_function_ = [this]() {
+    std::string cluster_slot_response = singleSlotMasterReplica(
+        fake_upstreams_[0]->localAddress()->ip(), fake_upstreams_[1]->localAddress()->ip());
+    expectCallClusterSlot(random_index_, cluster_slot_response);
+  };
+
+  initialize();
+
+  // foo hashes to slot 12182 which the proxy believes is at the server reachable via
+  // fake_upstreams_[0], based on the singleSlotMasterReplica() response above.
+  std::string request = makeBulkStringArray({"get", "foo"});
+  // The actual error response.
+  std::string error_response = "-CLUSTERDOWN The cluster is down\r\n";
+  std::string cluster_slots_request = makeBulkStringArray({"CLUSTER", "SLOTS"});
+  std::string proxy_to_server;
+
+  IntegrationTcpClientPtr redis_client = makeTcpConnection(lookupPort("redis_proxy"));
+  redis_client->write(request);
+
+  FakeRawConnectionPtr fake_upstream_connection_1, fake_upstream_connection_2;
+
+  // Data from the client should always be routed to fake_upstreams_[0] by the load balancer.
+  EXPECT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection_1));
+  EXPECT_TRUE(fake_upstream_connection_1->waitForData(request.size(), &proxy_to_server));
+  // The data in request should be received by the first server, fake_upstreams_[0].
+  EXPECT_EQ(request, proxy_to_server);
+  proxy_to_server.clear();
+
+  // Send the server down error response from the first fake Redis server back to the proxy.
+  EXPECT_TRUE(fake_upstream_connection_1->write(error_response));
+  redis_client->waitForData(error_response);
+  // The client should receive response unchanged.
+  EXPECT_EQ(error_response, redis_client->data());
+
+  // A new connection should be created to fake_upstreams_[0] for topology discovery.
+  proxy_to_server.clear();
+  EXPECT_TRUE(fake_upstreams_[0]->waitForRawConnection(fake_upstream_connection_2));
+  EXPECT_TRUE(
+      fake_upstream_connection_2->waitForData(cluster_slots_request.size(), &proxy_to_server));
+  EXPECT_EQ(cluster_slots_request, proxy_to_server);
+
+  EXPECT_TRUE(fake_upstream_connection_1->close());
+  EXPECT_TRUE(fake_upstream_connection_2->close());
+  redis_client->close();
+}
 } // namespace
 } // namespace Envoy

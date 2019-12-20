@@ -70,6 +70,15 @@ if [[ -f "/etc/redhat-release" ]]; then
   export BAZEL_BUILD_EXTRA_OPTIONS+="--copt=-DENVOY_IGNORE_GLIBCXX_USE_CXX11_ABI_ERROR=1"
 fi
 
+function cleanup() {
+  # Remove build artifacts. This doesn't mess with incremental builds as these
+  # are just symlinks.
+  rm -rf "${ENVOY_SRCDIR}"/bazel-* clang.bazelrc
+}
+
+cleanup
+trap cleanup EXIT
+
 bazel/setup_clang.sh /opt/llvm
 
 [[ "${BUILD_REASON}" != "PullRequest" ]] && BAZEL_EXTRA_TEST_OPTIONS+=" --nocache_test_results --test_output=all"
@@ -115,15 +124,6 @@ mkdir -p "${ENVOY_FAILED_TEST_LOGS}"
 # This is where we copy the build profile to.
 export ENVOY_BUILD_PROFILE="${ENVOY_BUILD_DIR}"/generated/build-profile
 mkdir -p "${ENVOY_BUILD_PROFILE}"
-
-function cleanup() {
-  # Remove build artifacts. This doesn't mess with incremental builds as these
-  # are just symlinks.
-  rm -rf "${ENVOY_SRCDIR}"/bazel-*
-}
-
-cleanup
-trap cleanup EXIT
 
 mkdir -p "${ENVOY_FILTER_EXAMPLE_SRCDIR}"/bazel
 ln -sf "${ENVOY_SRCDIR}"/bazel/get_workspace_status "${ENVOY_FILTER_EXAMPLE_SRCDIR}"/bazel/

@@ -1,5 +1,7 @@
 #include "extensions/tracers/lightstep/config.h"
 
+#include "envoy/config/trace/v2/trace.pb.h"
+#include "envoy/config/trace/v2/trace.pb.validate.h"
 #include "envoy/registry/registry.h"
 
 #include "common/common/utility.h"

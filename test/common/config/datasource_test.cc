@@ -1,5 +1,4 @@
 #include "envoy/api/v2/core/base.pb.h"
-#include "envoy/api/v2/core/base.pb.validate.h"
 
 #include "common/common/empty_string.h"
 #include "common/config/datasource.h"

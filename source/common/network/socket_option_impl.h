@@ -1,6 +1,7 @@
 #pragma once
 
 #include "envoy/api/os_sys_calls.h"
+#include "envoy/api/v2/core/base.pb.h"
 #include "envoy/common/platform.h"
 #include "envoy/network/listen_socket.h"
 

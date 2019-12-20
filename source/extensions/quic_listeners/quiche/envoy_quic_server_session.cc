@@ -93,12 +93,21 @@ void EnvoyQuicServerSession::SendGoAway(quic::QuicErrorCode error_code, const st
   }
 }
 
+void EnvoyQuicServerSession::OnCanWrite() {
+  quic::QuicServerSessionBase::OnCanWrite();
+  // Do not update delay close state according to connection level packet egress because that is
+  // equivalent to TCP transport layer egress. But only do so if the session gets chance to write.
+  maybeApplyDelayClosePolicy();
+}
+
 void EnvoyQuicServerSession::OnCryptoHandshakeEvent(CryptoHandshakeEvent event) {
   quic::QuicServerSessionBase::OnCryptoHandshakeEvent(event);
   if (event == HANDSHAKE_CONFIRMED) {
     raiseConnectionEvent(Network::ConnectionEvent::Connected);
   }
 }
+
+bool EnvoyQuicServerSession::hasDataToWrite() { return HasDataToWrite(); }
 
 } // namespace Quic
 } // namespace Envoy

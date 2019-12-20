@@ -60,8 +60,10 @@ public:
   void resetStream(StreamResetReason reason) override;
   void readDisable(bool disable) override;
   uint32_t bufferLimit() override;
+  absl::string_view responseDetails() override { return details_; }
 
   void isResponseToHeadRequest(bool value) { is_response_to_head_request_ = value; }
+  void setDetails(absl::string_view details) { details_ = details; }
 
 protected:
   StreamEncoderImpl(ConnectionImpl& connection, HeaderKeyFormatter* header_key_formatter);
@@ -101,6 +103,7 @@ private:
   bool processing_100_continue_ : 1;
   bool is_response_to_head_request_ : 1;
   bool is_content_length_allowed_ : 1;
+  absl::string_view details_;
 };
 
 /**
@@ -138,6 +141,8 @@ private:
 
 /**
  * Base class for HTTP/1.1 client and server connections.
+ * Handles the callbacks of http_parser with its own base routine and then
+ * virtual dispatches to its subclasses.
  */
 class ConnectionImpl : public virtual Connection, protected Logger::Loggable<Logger::Id::http> {
 public:
@@ -192,10 +197,12 @@ public:
 
   CodecStats& stats() { return stats_; }
 
+  bool enableTrailers() const { return enable_trailers_; }
+
 protected:
   ConnectionImpl(Network::Connection& connection, Stats::Scope& stats, http_parser_type type,
                  uint32_t max_headers_kb, const uint32_t max_headers_count,
-                 HeaderKeyFormatterPtr&& header_key_formatter);
+                 HeaderKeyFormatterPtr&& header_key_formatter, bool enable_trailers);
 
   bool resetStreamCalled() { return reset_stream_called_; }
 
@@ -205,10 +212,12 @@ protected:
   HeaderMapPtr deferred_end_stream_headers_;
   Http::Code error_code_{Http::Code::BadRequest};
   const HeaderKeyFormatterPtr header_key_formatter_;
+  bool processing_trailers_ : 1;
   bool handling_upgrade_ : 1;
   bool reset_stream_called_ : 1;
   const bool strict_header_validation_ : 1;
   const bool connection_header_sanitization_ : 1;
+  const bool enable_trailers_ : 1;
 
 private:
   enum class HeaderParsingState { Field, Value, Done };
@@ -255,7 +264,8 @@ private:
 
   /**
    * Called when headers are complete. A base routine happens first then a virtual dispatch is
-   * invoked.
+   * invoked. Note that this only applies to headers and NOT trailers. End of
+   * trailers are signaled via onMessageCompleteBase().
    * @return 0 if no error, 1 if there should be no body.
    */
   int onHeadersCompleteBase();
@@ -272,7 +282,7 @@ private:
    * Called when the request/response is complete.
    */
   void onMessageCompleteBase();
-  virtual void onMessageComplete() PURE;
+  virtual void onMessageComplete(HeaderMapImplPtr&& trailers) PURE;
 
   /**
    * @see onResetStreamBase().
@@ -282,7 +292,7 @@ private:
   /**
    * Send a protocol error response to remote.
    */
-  virtual void sendProtocolError() PURE;
+  virtual void sendProtocolError(absl::string_view details = "") PURE;
 
   /**
    * Called when output_buffer_ or the underlying connection go from below a low watermark to over
@@ -317,7 +327,7 @@ private:
 class ServerConnectionImpl : public ServerConnection, public ConnectionImpl {
 public:
   ServerConnectionImpl(Network::Connection& connection, Stats::Scope& stats,
-                       ServerConnectionCallbacks& callbacks, Http1Settings settings,
+                       ServerConnectionCallbacks& callbacks, const Http1Settings& settings,
                        uint32_t max_request_headers_kb, const uint32_t max_request_headers_count);
 
   bool supports_http_10() override { return codec_settings_.accept_http_10_; }
@@ -353,9 +363,9 @@ private:
   void onUrl(const char* data, size_t length) override;
   int onHeadersComplete(HeaderMapImplPtr&& headers) override;
   void onBody(const char* data, size_t length) override;
-  void onMessageComplete() override;
+  void onMessageComplete(HeaderMapImplPtr&& trailers) override;
   void onResetStream(StreamResetReason reason) override;
-  void sendProtocolError() override;
+  void sendProtocolError(absl::string_view details) override;
   void onAboveHighWatermark() override;
   void onBelowLowWatermark() override;
 
@@ -393,9 +403,9 @@ private:
   void onUrl(const char*, size_t) override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
   int onHeadersComplete(HeaderMapImplPtr&& headers) override;
   void onBody(const char* data, size_t length) override;
-  void onMessageComplete() override;
+  void onMessageComplete(HeaderMapImplPtr&& trailers) override;
   void onResetStream(StreamResetReason reason) override;
-  void sendProtocolError() override {}
+  void sendProtocolError(absl::string_view details) override;
   void onAboveHighWatermark() override;
   void onBelowLowWatermark() override;
 

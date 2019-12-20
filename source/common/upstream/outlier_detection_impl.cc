@@ -6,6 +6,8 @@
 #include <string>
 #include <vector>
 
+#include "envoy/api/v2/cds.pb.h"
+#include "envoy/api/v2/cluster/outlier_detection.pb.h"
 #include "envoy/data/cluster/v2alpha/outlier_detection_event.pb.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/stats/scope.h"

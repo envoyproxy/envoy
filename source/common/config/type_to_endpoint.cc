@@ -1,9 +1,11 @@
 #include "common/config/type_to_endpoint.h"
 
+#include "envoy/api/v2/auth/cert.pb.h"
 #include "envoy/api/v2/cds.pb.h"
 #include "envoy/api/v2/eds.pb.h"
 #include "envoy/api/v2/lds.pb.h"
 #include "envoy/api/v2/rds.pb.h"
+#include "envoy/api/v2/route/route.pb.h"
 #include "envoy/api/v2/srds.pb.h"
 #include "envoy/service/discovery/v2/rtds.pb.h"
 
