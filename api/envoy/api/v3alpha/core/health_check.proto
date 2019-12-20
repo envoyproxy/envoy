@@ -298,7 +298,7 @@ message HealthCheck {
   // This allows overriding the cluster TLS settings, just for health check connections.
   message TLSOptions {
     // Specifies the ALPN protocols for health check connections. This is useful if
-    // the correspondingupstream is using ALPN-based :ref:`FilterChainMatch
+    // the corresponding upstream is using ALPN-based :ref:`FilterChainMatch
     // <envoy_api_msg_api.v3alpha.listener.FilterChainMatch>` along with different protocols for
     // health checks versus data connections. If empty, no ALPN protocols will be set on health
     // check connections.
