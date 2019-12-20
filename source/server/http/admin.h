@@ -171,11 +171,6 @@ private:
     const bool mutates_server_state_;
   };
 
-  struct AdminException {
-    const Http::Code code;
-    const std::string message;
-  };
-
   /**
    * Implementation of RouteConfigProvider that returns a static null route config.
    */
