@@ -28,6 +28,7 @@ public:
       ClusterStats& stats, Stats::Scope& scope, Runtime::Loader& runtime,
       Runtime::RandomGenerator& random, const LoadBalancerSubsetInfo& subsets,
       const absl::optional<envoy::api::v2::Cluster::RingHashLbConfig>& lb_ring_hash_config,
+      const absl::optional<envoy::api::v2::Cluster::MaglevLbConfig>& lb_maglev_config,
       const absl::optional<envoy::api::v2::Cluster::LeastRequestLbConfig>& least_request_config,
       const envoy::api::v2::Cluster::CommonLbConfig& common_config);
   ~SubsetLoadBalancer() override;
@@ -226,6 +227,7 @@ private:
 
   const LoadBalancerType lb_type_;
   const absl::optional<envoy::api::v2::Cluster::RingHashLbConfig> lb_ring_hash_config_;
+  const absl::optional<envoy::api::v2::Cluster::MaglevLbConfig> lb_maglev_config_;
   const absl::optional<envoy::api::v2::Cluster::LeastRequestLbConfig> least_request_config_;
   const envoy::api::v2::Cluster::CommonLbConfig common_config_;
   ClusterStats& stats_;

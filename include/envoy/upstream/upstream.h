@@ -752,6 +752,12 @@ public:
   lbRingHashConfig() const PURE;
 
   /**
+   * @return configuration for maglev load balancing, only used if type is set to maglev_lb.
+   */
+  virtual const absl::optional<envoy::api::v2::Cluster::MaglevLbConfig>&
+  lbMaglevConfig() const PURE;
+
+  /**
    * @return const absl::optional<envoy::api::v2::Cluster::OriginalDstLbConfig>& the configuration
    *         for the Original Destination load balancing policy, only used if type is set to
    *         ORIGINAL_DST_LB.

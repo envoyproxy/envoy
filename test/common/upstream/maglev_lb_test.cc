@@ -29,7 +29,7 @@ public:
 
   void init(uint32_t table_size) {
     lb_ = std::make_unique<MaglevLoadBalancer>(priority_set_, stats_, stats_store_, runtime_,
-                                               random_, common_config_, table_size);
+                                               random_, config_, common_config_, table_size);
     lb_->initialize();
   }
 
@@ -38,6 +38,7 @@ public:
   std::shared_ptr<MockClusterInfo> info_{new NiceMock<MockClusterInfo>()};
   Stats::IsolatedStoreImpl stats_store_;
   ClusterStats stats_;
+  absl::optional<envoy::api::v2::Cluster::MaglevLbConfig> config_;
   envoy::api::v2::Cluster::CommonLbConfig common_config_;
   NiceMock<Runtime::MockLoader> runtime_;
   NiceMock<Runtime::MockRandomGenerator> random_;
@@ -58,6 +59,39 @@ TEST_F(MaglevLoadBalancerTest, Basic) {
       makeTestHost(info_, "tcp://127.0.0.1:94"), makeTestHost(info_, "tcp://127.0.0.1:95")};
   host_set_.healthy_hosts_ = host_set_.hosts_;
   host_set_.runCallbacks({}, {});
+  init(7);
+
+  EXPECT_EQ("maglev_lb.min_entries_per_host", lb_->stats().min_entries_per_host_.name());
+  EXPECT_EQ("maglev_lb.max_entries_per_host", lb_->stats().max_entries_per_host_.name());
+  EXPECT_EQ(1, lb_->stats().min_entries_per_host_.value());
+  EXPECT_EQ(2, lb_->stats().max_entries_per_host_.value());
+
+  // maglev: i=0 host=127.0.0.1:92
+  // maglev: i=1 host=127.0.0.1:94
+  // maglev: i=2 host=127.0.0.1:90
+  // maglev: i=3 host=127.0.0.1:91
+  // maglev: i=4 host=127.0.0.1:95
+  // maglev: i=5 host=127.0.0.1:90
+  // maglev: i=6 host=127.0.0.1:93
+  LoadBalancerPtr lb = lb_->factory()->create();
+  const std::vector<uint32_t> expected_assignments{2, 4, 0, 1, 5, 0, 3};
+  for (uint32_t i = 0; i < 3 * expected_assignments.size(); ++i) {
+    TestLoadBalancerContext context(i);
+    EXPECT_EQ(host_set_.hosts_[expected_assignments[i % expected_assignments.size()]],
+              lb->chooseHost(&context));
+  }
+}
+
+// Basic with logical name.
+TEST_F(MaglevLoadBalancerTest, BasicWithLogicalName) {
+  host_set_.hosts_ = {
+      makeTestHost(info_, "tcp://127.0.0.1:90"), makeTestHost(info_, "tcp://127.0.0.1:91"),
+      makeTestHost(info_, "tcp://127.0.0.1:92"), makeTestHost(info_, "tcp://127.0.0.1:93"),
+      makeTestHost(info_, "tcp://127.0.0.1:94"), makeTestHost(info_, "tcp://127.0.0.1:95")};
+  host_set_.healthy_hosts_ = host_set_.hosts_;
+  host_set_.runCallbacks({}, {});
+  config_ = envoy::api::v2::Cluster::MaglevLbConfig();
+  config_.value().set_use_logical_name(true);
   init(7);
 
   EXPECT_EQ("maglev_lb.min_entries_per_host", lb_->stats().min_entries_per_host_.name());

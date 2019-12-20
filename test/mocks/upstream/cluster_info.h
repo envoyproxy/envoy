@@ -89,6 +89,8 @@ public:
                      const absl::optional<envoy::api::v2::Cluster::CustomClusterType>&());
   MOCK_CONST_METHOD0(lbRingHashConfig,
                      const absl::optional<envoy::api::v2::Cluster::RingHashLbConfig>&());
+  MOCK_CONST_METHOD0(lbMaglevConfig,
+                     const absl::optional<envoy::api::v2::Cluster::MaglevLbConfig>&());
   MOCK_CONST_METHOD0(lbLeastRequestConfig,
                      const absl::optional<envoy::api::v2::Cluster::LeastRequestLbConfig>&());
   MOCK_CONST_METHOD0(lbOriginalDstConfig,
@@ -134,6 +136,7 @@ public:
   absl::optional<envoy::api::v2::Cluster::CustomClusterType> cluster_type_;
   NiceMock<MockLoadBalancerSubsetInfo> lb_subset_;
   absl::optional<envoy::api::v2::Cluster::RingHashLbConfig> lb_ring_hash_config_;
+  absl::optional<envoy::api::v2::Cluster::MaglevLbConfig> lb_maglev_config_;
   absl::optional<envoy::api::v2::Cluster::OriginalDstLbConfig> lb_original_dst_config_;
   Network::ConnectionSocket::OptionsSharedPtr cluster_socket_options_;
   envoy::api::v2::Cluster::CommonLbConfig lb_config_;

@@ -652,6 +652,7 @@ ClusterInfoImpl::ClusterInfoImpl(
       source_address_(getSourceAddress(config, bind_config)),
       lb_least_request_config_(config.least_request_lb_config()),
       lb_ring_hash_config_(config.ring_hash_lb_config()),
+      lb_maglev_config_(config.maglev_lb_config()),
       lb_original_dst_config_(config.original_dst_lb_config()), added_via_api_(added_via_api),
       lb_subset_(LoadBalancerSubsetInfoImpl(config.lb_subset_config())),
       metadata_(config.metadata()), typed_metadata_(config.metadata()),

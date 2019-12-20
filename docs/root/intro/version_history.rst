@@ -24,10 +24,12 @@ Version history
 * lb_subset_config: new fallback policy for selectors: :ref:`KEYS_SUBSET<envoy_api_enum_value_Cluster.LbSubsetConfig.LbSubsetSelector.LbSubsetSelectorFallbackPolicy.KEYS_SUBSET>`
 * listeners: added :ref:`reuse_port<envoy_api_field_Listener.reuse_port>` option.
 * logger: added :ref:`--log-format-escaped <operations_cli>` command line option to escape newline characters in application logs.
+* maglev_lb_config: added support for using logical address names while hashing a host onto the maglev table :ref:`use_logical_name <envoy_api_msg_Cluster.MaglevLbConfig.use_logical_name>`.
 * rbac: added support for matching all subject alt names instead of first in :ref:`principal_name <envoy_api_field_config.rbac.v2.Principal.Authenticated.principal_name>`.
 * redis: performance improvement for larger split commands by avoiding string copies.
 * redis: correctly follow MOVE/ASK redirection for mirrored clusters.
 * redis: add :ref:`host_degraded_refresh_threshold <envoy_api_field_config.cluster.redis.RedisClusterConfig.host_degraded_refresh_threshold>` and :ref:`failure_refresh_threshold <envoy_api_field_config.cluster.redis.RedisClusterConfig.failure_refresh_threshold>` to refresh topology when nodes are degraded or when requests fails.
+* ring_hash_lb_config: added support for using logical address names while hashing a host onto the ring :ref:`use_logical_name <envoy_api_msg_Cluster.RingHashLbConfig.use_logical_name>`.
 * router: added support for REQ(header-name) :ref:`header formatter <config_http_conn_man_headers_custom_request_headers>`.
 * router: allow using a :ref:`query parameter
   <envoy_api_field_route.RouteAction.HashPolicy.query_parameter>` for HTTP consistent hashing.

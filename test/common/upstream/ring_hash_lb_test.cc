@@ -252,6 +252,82 @@ TEST_P(RingHashLoadBalancerTest, BasicWithMurmur2) {
   EXPECT_EQ(0UL, stats_.lb_healthy_panic_.value());
 }
 
+// Expect reasonable results with logical name.
+TEST_P(RingHashLoadBalancerTest, BasicWithLogicalName) {
+  hostSet().hosts_ = {
+      makeTestHost(info_, "tcp://127.0.0.1:90"), makeTestHost(info_, "tcp://127.0.0.1:91"),
+      makeTestHost(info_, "tcp://127.0.0.1:92"), makeTestHost(info_, "tcp://127.0.0.1:93"),
+      makeTestHost(info_, "tcp://127.0.0.1:94"), makeTestHost(info_, "tcp://127.0.0.1:95")};
+  hostSet().healthy_hosts_ = hostSet().hosts_;
+  hostSet().runCallbacks({}, {});
+
+  config_ = envoy::api::v2::Cluster::RingHashLbConfig();
+  config_.value().set_use_logical_name(true);
+  config_.value().mutable_minimum_ring_size()->set_value(12);
+
+  init();
+  EXPECT_EQ("ring_hash_lb.size", lb_->stats().size_.name());
+  EXPECT_EQ("ring_hash_lb.min_hashes_per_host", lb_->stats().min_hashes_per_host_.name());
+  EXPECT_EQ("ring_hash_lb.max_hashes_per_host", lb_->stats().max_hashes_per_host_.name());
+  EXPECT_EQ(12, lb_->stats().size_.value());
+  EXPECT_EQ(2, lb_->stats().min_hashes_per_host_.value());
+  EXPECT_EQ(2, lb_->stats().max_hashes_per_host_.value());
+
+  // hash ring:
+  // port | position
+  // ---------------------------
+  // :94  | 833437586790550860
+  // :92  | 928266305478181108
+  // :90  | 1033482794131418490
+  // :95  | 3551244743356806947
+  // :93  | 3851675632748031481
+  // :91  | 5583722120771150861
+  // :91  | 6311230543546372928
+  // :93  | 7700377290971790572
+  // :95  | 13144177310400110813
+  // :92  | 13444792449719432967
+  // :94  | 15516499411664133160
+  // :90  | 16117243373044804889
+
+  LoadBalancerPtr lb = lb_->factory()->create();
+  {
+    TestLoadBalancerContext context(0);
+    EXPECT_EQ(hostSet().hosts_[4], lb->chooseHost(&context));
+  }
+  {
+    TestLoadBalancerContext context(std::numeric_limits<uint64_t>::max());
+    EXPECT_EQ(hostSet().hosts_[4], lb->chooseHost(&context));
+  }
+  {
+    TestLoadBalancerContext context(3551244743356806947);
+    EXPECT_EQ(hostSet().hosts_[5], lb->chooseHost(&context));
+  }
+  {
+    TestLoadBalancerContext context(3551244743356806948);
+    EXPECT_EQ(hostSet().hosts_[3], lb->chooseHost(&context));
+  }
+  {
+    EXPECT_CALL(random_, random()).WillOnce(Return(16117243373044804880UL));
+    EXPECT_EQ(hostSet().hosts_[0], lb->chooseHost(nullptr));
+  }
+  EXPECT_EQ(0UL, stats_.lb_healthy_panic_.value());
+
+  hostSet().healthy_hosts_.clear();
+  hostSet().runCallbacks({}, {});
+  lb = lb_->factory()->create();
+  {
+    TestLoadBalancerContext context(0);
+    if (GetParam() == 1) {
+      EXPECT_EQ(hostSet().hosts_[4], lb->chooseHost(&context));
+    } else {
+      // When all hosts are unhealthy, the default behavior of the load balancer is to send
+      // traffic to P=0. In this case, P=0 has no backends so it returns nullptr.
+      EXPECT_EQ(nullptr, lb->chooseHost(&context));
+    }
+  }
+  EXPECT_EQ(1UL, stats_.lb_healthy_panic_.value());
+}
+
 // Given 2 hosts and a minimum ring size of 3, expect 2 hashes per host and a ring size of 4.
 TEST_P(RingHashLoadBalancerTest, UnevenHosts) {
   hostSet().hosts_ = {makeTestHost(info_, "tcp://127.0.0.1:80"),

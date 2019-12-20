@@ -46,7 +46,7 @@ service ClusterDiscoveryService {
 }
 
 // Configuration for a single upstream cluster.
-// [#next-free-field: 46]
+// [#next-free-field: 47]
 message Cluster {
   // Refer to :ref:`service discovery type <arch_overview_service_discovery_types>`
   // for an explanation on each type.
@@ -322,6 +322,7 @@ message Cluster {
 
   // Specific configuration for the :ref:`RingHash<arch_overview_load_balancing_types_ring_hash>`
   // load balancing policy.
+  // [#next-free-field: 6]
   message RingHashLbConfig {
     // The hash function used to hash hosts onto the ketama ring.
     enum HashFunction {
@@ -350,6 +351,18 @@ message Cluster {
     // to further constrain resource use. See also
     // :ref:`minimum_ring_size<envoy_api_field_Cluster.RingHashLbConfig.minimum_ring_size>`.
     google.protobuf.UInt64Value maximum_ring_size = 4 [(validate.rules).uint64 = {lte: 8388608}];
+
+    // When true, the host's logical name is used to place it in the hash ring.
+    // Otherwise it will use the resolved address.
+    bool use_logical_name = 5;
+  }
+
+  // Specific configuration for the :ref:`Maglev<arch_overview_load_balancing_types_maglev>`
+  // load balancing policy.
+  message MaglevLbConfig {
+    // When true, the host's logical name is used to place it in the maglev table.
+    // Otherwise it will use the resolved address.
+    bool use_logical_name = 1;
   }
 
   // Specific configuration for the
@@ -724,6 +737,9 @@ message Cluster {
   oneof lb_config {
     // Optional configuration for the Ring Hash load balancing policy.
     RingHashLbConfig ring_hash_lb_config = 23;
+
+    // Optional configuration for the Maglev load balancing policy.
+    MaglevLbConfig maglev_lb_config = 46;
 
     // Optional configuration for the Original Destination load balancing policy.
     OriginalDstLbConfig original_dst_lb_config = 34;

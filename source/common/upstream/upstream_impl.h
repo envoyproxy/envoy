@@ -546,6 +546,9 @@ public:
   lbRingHashConfig() const override {
     return lb_ring_hash_config_;
   }
+  const absl::optional<envoy::api::v2::Cluster::MaglevLbConfig>& lbMaglevConfig() const override {
+    return lb_maglev_config_;
+  }
   const absl::optional<envoy::api::v2::Cluster::OriginalDstLbConfig>&
   lbOriginalDstConfig() const override {
     return lb_original_dst_config_;
@@ -615,6 +618,7 @@ private:
   LoadBalancerType lb_type_;
   absl::optional<envoy::api::v2::Cluster::LeastRequestLbConfig> lb_least_request_config_;
   absl::optional<envoy::api::v2::Cluster::RingHashLbConfig> lb_ring_hash_config_;
+  absl::optional<envoy::api::v2::Cluster::MaglevLbConfig> lb_maglev_config_;
   absl::optional<envoy::api::v2::Cluster::OriginalDstLbConfig> lb_original_dst_config_;
   const bool added_via_api_;
   LoadBalancerSubsetInfoImpl lb_subset_;

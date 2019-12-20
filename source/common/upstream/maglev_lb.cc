@@ -6,7 +6,7 @@ namespace Envoy {
 namespace Upstream {
 
 MaglevTable::MaglevTable(const NormalizedHostWeightVector& normalized_host_weights,
-                         double max_normalized_weight, uint64_t table_size,
+                         double max_normalized_weight, uint64_t table_size, bool use_logical_name,
                          MaglevLoadBalancerStats& stats)
     : table_size_(table_size), stats_(stats) {
   // TODO(mattklein123): The Maglev table must have a size that is a prime number for the algorithm
@@ -26,7 +26,8 @@ MaglevTable::MaglevTable(const NormalizedHostWeightVector& normalized_host_weigh
   table_build_entries.reserve(normalized_host_weights.size());
   for (const auto& host_weight : normalized_host_weights) {
     const auto& host = host_weight.first;
-    const std::string& address = host->address()->asString();
+    const std::string& address =
+        use_logical_name ? host->address()->logicalName() : host->address()->asString();
     table_build_entries.emplace_back(host, HashUtil::xxHash64(address) % table_size_,
                                      (HashUtil::xxHash64(address, 1) % (table_size_ - 1)) + 1,
                                      host_weight.second);
@@ -71,7 +72,9 @@ MaglevTable::MaglevTable(const NormalizedHostWeightVector& normalized_host_weigh
 
   if (ENVOY_LOG_CHECK_LEVEL(trace)) {
     for (uint64_t i = 0; i < table_.size(); i++) {
-      ENVOY_LOG(trace, "maglev: i={} host={}", i, table_[i]->address()->asString());
+      ENVOY_LOG(trace, "maglev: i={} host={}", i,
+                use_logical_name ? table_[i]->address()->logicalName()
+                                 : table_[i]->address()->asString());
     }
   }
 }
@@ -88,14 +91,15 @@ uint64_t MaglevTable::permutation(const TableBuildEntry& entry) {
   return (entry.offset_ + (entry.skip_ * entry.next_)) % table_size_;
 }
 
-MaglevLoadBalancer::MaglevLoadBalancer(const PrioritySet& priority_set, ClusterStats& stats,
-                                       Stats::Scope& scope, Runtime::Loader& runtime,
-                                       Runtime::RandomGenerator& random,
-                                       const envoy::api::v2::Cluster::CommonLbConfig& common_config,
-                                       uint64_t table_size)
+MaglevLoadBalancer::MaglevLoadBalancer(
+    const PrioritySet& priority_set, ClusterStats& stats, Stats::Scope& scope,
+    Runtime::Loader& runtime, Runtime::RandomGenerator& random,
+    const absl::optional<envoy::api::v2::Cluster::MaglevLbConfig>& config,
+    const envoy::api::v2::Cluster::CommonLbConfig& common_config, uint64_t table_size)
     : ThreadAwareLoadBalancerBase(priority_set, stats, runtime, random, common_config),
       scope_(scope.createScope("maglev_lb.")), stats_(generateStats(*scope_)),
-      table_size_(table_size) {}
+      table_size_(table_size),
+      use_logical_name_(config ? config.value().use_logical_name() : false) {}
 
 MaglevLoadBalancerStats MaglevLoadBalancer::generateStats(Stats::Scope& scope) {
   return {ALL_MAGLEV_LOAD_BALANCER_STATS(POOL_GAUGE(scope))};
