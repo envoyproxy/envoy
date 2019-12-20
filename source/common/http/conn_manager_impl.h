@@ -479,7 +479,7 @@ private:
   class RouteConfigUpdateRequester {
   public:
     virtual ~RouteConfigUpdateRequester() = default;
-    virtual void requestRouteConfigUpdate(const std::string&, Event::Dispatcher&,
+    virtual void requestRouteConfigUpdate(const std::string, Event::Dispatcher&,
                                           Http::RouteConfigUpdatedCallbackSharedPtr) {
       NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
     };
@@ -490,7 +490,7 @@ private:
     RdsRouteConfigUpdateRequester(Router::RouteConfigProvider* route_config_provider)
         : route_config_provider_(route_config_provider) {}
     void requestRouteConfigUpdate(
-        const std::string& host_header, Event::Dispatcher& thread_local_dispatcher,
+        const std::string host_header, Event::Dispatcher& thread_local_dispatcher,
         Http::RouteConfigUpdatedCallbackSharedPtr route_config_updated_cb) override;
 
   private:

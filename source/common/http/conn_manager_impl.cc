@@ -488,7 +488,7 @@ void ConnectionManagerImpl::chargeTracingStats(const Tracing::Reason& tracing_re
 }
 
 void ConnectionManagerImpl::RdsRouteConfigUpdateRequester::requestRouteConfigUpdate(
-    const std::string& host_header, Event::Dispatcher& thread_local_dispatcher,
+    const std::string host_header, Event::Dispatcher& thread_local_dispatcher,
     Http::RouteConfigUpdatedCallbackSharedPtr route_config_updated_cb) {
   route_config_provider_->requestVirtualHostsUpdate(host_header, thread_local_dispatcher,
                                                     std::move(route_config_updated_cb));
