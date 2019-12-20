@@ -965,7 +965,7 @@ MATCHER_P(ApplicationProtocolListEq, expected, "") {
   return true;
 }
 
-TEST_F(HttpHealthCheckerImplTest, SetALPNProtocols) {
+TEST_F(HttpHealthCheckerImplTest, TLSOptions) {
   const std::string host = "fake_cluster";
   const std::string path = "/healthcheck";
   const std::string yaml = R"EOF(
@@ -978,8 +978,9 @@ TEST_F(HttpHealthCheckerImplTest, SetALPNProtocols) {
     http_health_check:
       service_name: locations
       path: /healthcheck
-    alpn_protocols:
-    - http1
+    tls_options:
+      alpn_protocols:
+      - http1
     )EOF";
 
   auto socket_factory = new Network::MockTransportSocketFactory();

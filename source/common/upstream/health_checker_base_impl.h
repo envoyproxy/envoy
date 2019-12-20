@@ -9,6 +9,7 @@
 #include "envoy/upstream/health_checker.h"
 
 #include "common/common/logger.h"
+#include "common/network/transport_socket_options_impl.h"
 
 namespace Envoy {
 namespace Upstream {
@@ -43,6 +44,11 @@ public:
   // Upstream::HealthChecker
   void addHostCheckCompleteCb(HostStatusCb callback) override { callbacks_.push_back(callback); }
   void start() override;
+  std::shared_ptr<Network::TransportSocketOptionsImpl> transportSocketOptions() const {
+    auto protocols = alpn_protocols_;
+    return std::make_shared<Network::TransportSocketOptionsImpl>("", std::vector<std::string>{},
+                                                                 std::move(protocols));
+  }
 
 protected:
   class ActiveHealthCheckSession : public Event::DeferredDeletable {
@@ -129,6 +135,7 @@ private:
   void refreshHealthyStat();
   void runCallbacks(HostSharedPtr host, HealthTransition changed_state);
   void setUnhealthyCrossThread(const HostSharedPtr& host);
+  std::vector<std::string> alpnProtocols(const envoy::api::v2::core::HealthCheck& config) const;
 
   static const std::chrono::milliseconds NO_TRAFFIC_INTERVAL;
 
@@ -144,6 +151,7 @@ private:
   std::unordered_map<HostSharedPtr, ActiveHealthCheckSessionPtr> active_sessions_;
   uint64_t local_process_healthy_{};
   uint64_t local_process_degraded_{};
+  const std::vector<std::string> alpn_protocols_;
 };
 
 class HealthCheckEventLoggerImpl : public HealthCheckEventLogger {

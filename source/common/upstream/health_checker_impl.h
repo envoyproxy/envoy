@@ -52,8 +52,6 @@ public:
                         Event::Dispatcher& dispatcher, Runtime::Loader& runtime,
                         Runtime::RandomGenerator& random, HealthCheckEventLoggerPtr&& event_logger);
 
-  const std::vector<std::string>& alpnProtocols() const { return alpn_protocols_; }
-
   /**
    * Utility class checking if given http status matches configured expectations.
    */
@@ -145,7 +143,6 @@ private:
   absl::optional<std::string> service_name_;
   Router::HeaderParserPtr request_headers_parser_;
   const HttpStatusChecker http_status_checker_;
-  const std::vector<std::string> alpn_protocols_;
 
 protected:
   const Http::CodecClient::Type codec_client_type_;
