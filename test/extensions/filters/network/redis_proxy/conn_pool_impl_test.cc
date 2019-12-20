@@ -73,15 +73,15 @@ public:
       max_upstream_unknown_connections_reached_.value_++;
     }));
 
-    redirection_mgr_ =
-        std::make_shared<NiceMock<Extensions::Common::Redis::MockRedirectionManager>>();
+    cluster_refresh_manager_ =
+        std::make_shared<NiceMock<Extensions::Common::Redis::MockClusterRefreshManager>>();
     auto redis_command_stats =
         Common::Redis::RedisCommandStats::createRedisCommandStats(store->symbolTable());
     std::unique_ptr<InstanceImpl> conn_pool_impl = std::make_unique<InstanceImpl>(
         cluster_name_, cm_, *this, tls_,
         Common::Redis::Client::createConnPoolSettings(20, hashtagging, true, max_unknown_conns,
                                                       read_policy_),
-        api_, std::move(store), redis_command_stats, redirection_mgr_);
+        api_, std::move(store), redis_command_stats, cluster_refresh_manager_);
     // Set the authentication password for this connection pool.
     conn_pool_impl->tls_->getTyped<InstanceImpl::ThreadLocalPool>().auth_password_ = auth_password_;
     conn_pool_ = std::move(conn_pool_impl);
@@ -279,7 +279,8 @@ public:
           RedisProxy_ConnPoolSettings_ReadPolicy_MASTER;
   NiceMock<Stats::MockCounter> upstream_cx_drained_;
   NiceMock<Stats::MockCounter> max_upstream_unknown_connections_reached_;
-  std::shared_ptr<NiceMock<Extensions::Common::Redis::MockRedirectionManager>> redirection_mgr_;
+  std::shared_ptr<NiceMock<Extensions::Common::Redis::MockClusterRefreshManager>>
+      cluster_refresh_manager_;
 };
 
 TEST_F(RedisConnPoolImplTest, Basic) {

@@ -2,10 +2,6 @@ syntax = "proto3";
 
 package envoy.api.v3alpha.listener;
 
-option java_package = "io.envoyproxy.envoy.api.v3alpha.listener";
-option java_outer_classname = "ListenerProto";
-option java_multiple_files = true;
-
 import "envoy/api/v3alpha/core/address.proto";
 import "envoy/api/v3alpha/core/base.proto";
 
@@ -16,6 +12,10 @@ import "google/protobuf/wrappers.proto";
 import "udpa/annotations/versioning.proto";
 
 import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.api.v3alpha.listener";
+option java_outer_classname = "ListenerProto";
+option java_multiple_files = true;
 
 // [#protodoc-title: Listener components]
 // Listener :ref:`configuration overview <config_listeners>`

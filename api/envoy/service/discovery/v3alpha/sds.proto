@@ -2,16 +2,16 @@ syntax = "proto3";
 
 package envoy.service.discovery.v3alpha;
 
-option java_package = "io.envoyproxy.envoy.service.discovery.v3alpha";
-option java_outer_classname = "SdsProto";
-option java_multiple_files = true;
-option java_generic_services = true;
-
 import "envoy/api/v3alpha/discovery.proto";
 
 import "google/api/annotations.proto";
 
 import "udpa/annotations/versioning.proto";
+
+option java_package = "io.envoyproxy.envoy.service.discovery.v3alpha";
+option java_outer_classname = "SdsProto";
+option java_multiple_files = true;
+option java_generic_services = true;
 
 service SecretDiscoveryService {
   rpc DeltaSecrets(stream api.v3alpha.DeltaDiscoveryRequest)

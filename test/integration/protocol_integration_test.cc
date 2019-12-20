@@ -84,6 +84,13 @@ protected:
 // downstream and H1/H2 upstreams.
 using ProtocolIntegrationTest = HttpProtocolIntegrationTest;
 
+TEST_P(ProtocolIntegrationTest, TrailerSupportHttp1) {
+  config_helper_.addConfigModifier(setEnableDownstreamTrailersHttp1());
+  config_helper_.addConfigModifier(setEnableUpstreamTrailersHttp1());
+
+  testTrailers(10, 20, true, true);
+}
+
 TEST_P(ProtocolIntegrationTest, ShutdownWithActiveConnPoolConnections) {
   auto response = makeHeaderOnlyRequest(nullptr, 0);
   // Shut down the server with active connection pool connections.
@@ -952,6 +959,7 @@ TEST_P(DownstreamProtocolIntegrationTest, ManyRequestHeadersAccepted) {
 
 TEST_P(DownstreamProtocolIntegrationTest, ManyRequestTrailersRejected) {
   // Default header (and trailer) count limit is 100.
+  config_helper_.addConfigModifier(setEnableDownstreamTrailersHttp1());
   Http::TestHeaderMapImpl request_trailers;
   for (int i = 0; i < 150; i++) {
     request_trailers.addCopy("trailer", std::string(1, 'a'));
@@ -965,25 +973,15 @@ TEST_P(DownstreamProtocolIntegrationTest, ManyRequestTrailersRejected) {
   codec_client_->sendData(*request_encoder_, 1, false);
   codec_client_->sendTrailers(*request_encoder_, request_trailers);
 
-  // Only relevant to Http2Downstream.
-  if (downstream_protocol_ == Http::CodecClient::Type::HTTP1) {
-    // Http1 Downstream ignores trailers.
-    waitForNextUpstreamRequest();
-    upstream_request_->encodeHeaders(default_response_headers_, true);
-    response->waitForEndStream();
-    EXPECT_TRUE(response->complete());
-    EXPECT_EQ("200", response->headers().Status()->value().getStringView());
-  } else {
-    // Expect rejection.
-    // TODO(asraa): we shouldn't need this unexpected disconnect, but some tests hit unparented
-    // connections without it. Likely need to reconsider whether the waits/closes should be on
-    // client or upstream.
-    fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
-    ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
-    response->waitForReset();
-    ASSERT_TRUE(fake_upstream_connection_->close());
-    ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
-  }
+  // Expect rejection.
+  // TODO(asraa): we shouldn't need this unexpected disconnect, but some tests hit unparented
+  // connections without it. Likely need to reconsider whether the waits/closes should be on
+  // client or upstream.
+  fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+  response->waitForReset();
+  ASSERT_TRUE(fake_upstream_connection_->close());
+  ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
 }
 
 TEST_P(DownstreamProtocolIntegrationTest, ManyRequestTrailersAccepted) {
@@ -995,6 +993,7 @@ TEST_P(DownstreamProtocolIntegrationTest, ManyRequestTrailersAccepted) {
         hcm.mutable_common_http_protocol_options()->mutable_max_headers_count()->set_value(
             max_count);
       });
+  config_helper_.addConfigModifier(setEnableUpstreamTrailersHttp1());
   max_request_headers_count_ = max_count;
   Http::TestHeaderMapImpl request_trailers;
   for (int i = 0; i < 150; i++) {
@@ -1023,10 +1022,12 @@ TEST_P(DownstreamProtocolIntegrationTest, ManyRequestHeadersTimeout) {
 }
 
 TEST_P(DownstreamProtocolIntegrationTest, LargeRequestTrailersAccepted) {
+  config_helper_.addConfigModifier(setEnableDownstreamTrailersHttp1());
   testLargeRequestTrailers(60, 96);
 }
 
 TEST_P(DownstreamProtocolIntegrationTest, LargeRequestTrailersRejected) {
+  config_helper_.addConfigModifier(setEnableDownstreamTrailersHttp1());
   testLargeRequestTrailers(66, 60);
 }
 
@@ -1036,6 +1037,7 @@ TEST_P(DownstreamProtocolIntegrationTest, ManyTrailerHeaders) {
   max_request_headers_kb_ = 96;
   max_request_headers_count_ = 20005;
 
+  config_helper_.addConfigModifier(setEnableDownstreamTrailersHttp1());
   config_helper_.addConfigModifier(
       [&](envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager& hcm)
           -> void {
