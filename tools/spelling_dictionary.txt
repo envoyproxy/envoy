@@ -428,7 +428,6 @@ codings
 combinatorial
 comparator
 compat
-compiation
 completable
 cond
 condvar
@@ -579,6 +578,7 @@ goog
 google
 goto
 gzip
+hackery
 hacky
 handshaker
 hardcoded
@@ -679,7 +679,6 @@ lowp
 ltrim
 lua
 lyft
-mabye
 maglev
 malloc
 matchable
