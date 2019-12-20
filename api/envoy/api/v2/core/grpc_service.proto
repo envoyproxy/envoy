@@ -2,10 +2,6 @@ syntax = "proto3";
 
 package envoy.api.v2.core;
 
-option java_package = "io.envoyproxy.envoy.api.v2.core";
-option java_outer_classname = "GrpcServiceProto";
-option java_multiple_files = true;
-
 import "envoy/api/v2/core/base.proto";
 
 import "google/protobuf/any.proto";
@@ -14,6 +10,10 @@ import "google/protobuf/empty.proto";
 import "google/protobuf/struct.proto";
 
 import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.api.v2.core";
+option java_outer_classname = "GrpcServiceProto";
+option java_multiple_files = true;
 
 // [#protodoc-title: gRPC services]
 

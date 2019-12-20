@@ -2,14 +2,14 @@ syntax = "proto3";
 
 package envoy.data.cluster.v2alpha;
 
-option java_package = "io.envoyproxy.envoy.data.cluster.v2alpha";
-option java_outer_classname = "OutlierDetectionEventProto";
-option java_multiple_files = true;
-
 import "google/protobuf/timestamp.proto";
 import "google/protobuf/wrappers.proto";
 
 import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.data.cluster.v2alpha";
+option java_outer_classname = "OutlierDetectionEventProto";
+option java_multiple_files = true;
 
 // [#protodoc-title: Outlier detection logging events]
 // :ref:`Outlier detection logging <arch_overview_outlier_detection_logging>`.
