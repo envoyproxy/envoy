@@ -76,7 +76,7 @@ public:
   SystemTime lastUpdated() const override { return last_updated_; }
   void onConfigUpdate() override {}
   void validateConfig(const envoy::api::v2::RouteConfiguration&) const override {}
-  void requestVirtualHostsUpdate(const std::string&,
+  void requestVirtualHostsUpdate(const std::string&, Event::Dispatcher&,
                                  Http::RouteConfigUpdatedCallbackSharedPtr) override {
     NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
   }
@@ -178,11 +178,8 @@ using RdsRouteConfigSubscriptionSharedPtr = std::shared_ptr<RdsRouteConfigSubscr
 
 struct UpdateOnDemandCallback {
   const std::string alias_;
+  Event::Dispatcher& thread_local_dispatcher_;
   std::weak_ptr<Http::RouteConfigUpdatedCallback> cb_;
-};
-
-struct ThreadLocalCallbacks : public ThreadLocal::ThreadLocalObject {
-  std::list<UpdateOnDemandCallback> callbacks_;
 };
 
 /**
@@ -204,7 +201,7 @@ public:
   SystemTime lastUpdated() const override { return config_update_info_->lastUpdated(); }
   void onConfigUpdate() override;
   void requestVirtualHostsUpdate(
-      const std::string& for_domain,
+      const std::string& for_domain, Event::Dispatcher& thread_local_dispatcher,
       Http::RouteConfigUpdatedCallbackSharedPtr route_config_updated_cb) override;
   void validateConfig(const envoy::api::v2::RouteConfiguration& config) const override;
 
@@ -222,7 +219,7 @@ private:
   Server::Configuration::ServerFactoryContext& factory_context_;
   ProtobufMessage::ValidationVisitor& validator_;
   ThreadLocal::SlotPtr tls_;
-  ThreadLocal::SlotPtr config_update_callbacks_;
+  std::list<UpdateOnDemandCallback> config_update_callbacks_;
 
   friend class RouteConfigProviderManagerImpl;
 };

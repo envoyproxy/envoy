@@ -218,8 +218,7 @@ RdsRouteConfigProviderImpl::RdsRouteConfigProviderImpl(
       config_update_info_(subscription_->routeConfigUpdate()),
       factory_context_(factory_context.getServerFactoryContext()),
       validator_(factory_context.messageValidationVisitor()),
-      tls_(factory_context.threadLocal().allocateSlot()),
-      config_update_callbacks_(factory_context.threadLocal().allocateSlot()) {
+      tls_(factory_context.threadLocal().allocateSlot()) {
   ConfigConstSharedPtr initial_config;
   if (config_update_info_->configInfo().has_value()) {
     initial_config = std::make_shared<ConfigImpl>(config_update_info_->routeConfiguration(),
@@ -229,9 +228,6 @@ RdsRouteConfigProviderImpl::RdsRouteConfigProviderImpl(
   }
   tls_->set([initial_config](Event::Dispatcher&) -> ThreadLocal::ThreadLocalObjectSharedPtr {
     return std::make_shared<ThreadLocalConfig>(initial_config);
-  });
-  config_update_callbacks_->set([](Event::Dispatcher&) -> ThreadLocal::ThreadLocalObjectSharedPtr {
-    return std::make_shared<ThreadLocalCallbacks>();
   });
   // It should be 1:1 mapping due to shared rds config.
   ASSERT(subscription_->routeConfigProviders().empty());
@@ -264,30 +260,25 @@ void RdsRouteConfigProviderImpl::onConfigUpdate() {
     return;
   }
 
+  const auto config = std::static_pointer_cast<const ConfigImpl>(new_config);
   // Notifies connections that RouteConfiguration update has been propagated.
   // Callbacks processing is performed in FIFO order. The callback is skipped if alias used in
   // the VHDS update request do not match the aliases in the update response
-  config_update_callbacks_->runOnAllThreads(
-      [aliases, new_config](ThreadLocal::ThreadLocalObjectSharedPtr previous)
-          -> ThreadLocal::ThreadLocalObjectSharedPtr {
-        const auto config = std::static_pointer_cast<const ConfigImpl>(new_config);
-        auto callbacks = std::dynamic_pointer_cast<ThreadLocalCallbacks>(previous)->callbacks_;
-        for (auto it = callbacks.begin(); it != callbacks.end();) {
-          auto found = aliases.find(it->alias_);
-          if (found != aliases.end()) {
-            if (auto cb = it->cb_.lock()) {
-              // TODO(dmitri-d) HeaderMapImpl is expensive, need to profile this
-              Http::HeaderMapImpl hostHeader;
-              hostHeader.setHost(VhdsSubscription::aliasToDomainName(it->alias_));
-              (*cb)(config->virtualHostExists(hostHeader));
-            }
-            it = callbacks.erase(it);
-          } else {
-            it++;
-          }
-        }
-        return previous;
-      });
+  for (auto it = config_update_callbacks_.begin(); it != config_update_callbacks_.end();) {
+    auto found = aliases.find(it->alias_);
+    if (found != aliases.end()) {
+      if (auto cb = it->cb_.lock()) {
+        // TODO(dmitri-d) HeaderMapImpl is expensive, need to profile this
+        Http::HeaderMapImpl host_header;
+        host_header.setHost(VhdsSubscription::aliasToDomainName(it->alias_));
+        const bool host_exists = config->virtualHostExists(host_header);
+        it->thread_local_dispatcher_.post([cb, host_exists] { (*cb)(host_exists); });
+      }
+      it = config_update_callbacks_.erase(it);
+    } else {
+      it++;
+    }
+  }
 }
 
 void RdsRouteConfigProviderImpl::validateConfig(
@@ -299,14 +290,15 @@ void RdsRouteConfigProviderImpl::validateConfig(
 // Schedules a VHDS request on the main thread and queues up the callback to use when the VHDS
 // response has been propagated to the worker thread that was the request origin.
 void RdsRouteConfigProviderImpl::requestVirtualHostsUpdate(
-    const std::string& for_domain,
+    const std::string& for_domain, Event::Dispatcher& thread_local_dispatcher,
     Http::RouteConfigUpdatedCallbackSharedPtr route_config_updated_cb) {
   auto alias =
       VhdsSubscription::domainNameToAlias(config_update_info_->routeConfigName(), for_domain);
-  factory_context_.dispatcher().post(
-      [this, alias]() -> void { subscription_->updateOnDemand(alias); });
-  config_update_callbacks_->getTyped<ThreadLocalCallbacks>().callbacks_.push_back(
-      {alias, route_config_updated_cb});
+  factory_context_.dispatcher().post([this, alias, &thread_local_dispatcher,
+                                      route_config_updated_cb]() -> void {
+    subscription_->updateOnDemand(alias);
+    config_update_callbacks_.push_back({alias, thread_local_dispatcher, route_config_updated_cb});
+  });
 }
 
 RouteConfigProviderManagerImpl::RouteConfigProviderManagerImpl(Server::Admin& admin) {

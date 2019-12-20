@@ -57,6 +57,9 @@ public:
   /**
    * @return bool return whether VHDS configuration has been changed in the last RDS update.
    */
+  // TODO(dmitri-d): Consider splitting RouteConfigUpdateReceiver into a RouteConfig state and a
+  // last update state. The latter could be passed to callbacks as a parameter, which would make the
+  // intent and the lifecycle of the "last update state" less muddled.
   virtual bool vhdsConfigurationChanged() const PURE;
 
   /**

@@ -63,6 +63,7 @@ public:
    */
   virtual void
   requestVirtualHostsUpdate(const std::string& for_domain,
+                            Event::Dispatcher& thread_local_dispatcher,
                             Http::RouteConfigUpdatedCallbackSharedPtr route_config_updated_cb) PURE;
 };
 

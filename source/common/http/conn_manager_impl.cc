@@ -488,10 +488,9 @@ void ConnectionManagerImpl::chargeTracingStats(const Tracing::Reason& tracing_re
 }
 
 void ConnectionManagerImpl::RdsRouteConfigUpdateRequester::requestRouteConfigUpdate(
-    const HeaderString& host, Http::RouteConfigUpdatedCallbackSharedPtr route_config_updated_cb) {
-  ASSERT(!host.empty());
-  const auto& host_header = absl::AsciiStrToLower(host.getStringView());
-  route_config_provider_->requestVirtualHostsUpdate(host_header,
+    const std::string& host_header, Event::Dispatcher& thread_local_dispatcher,
+    Http::RouteConfigUpdatedCallbackSharedPtr route_config_updated_cb) {
+  route_config_provider_->requestVirtualHostsUpdate(host_header, thread_local_dispatcher,
                                                     std::move(route_config_updated_cb));
 }
 
@@ -1388,8 +1387,12 @@ void ConnectionManagerImpl::ActiveStream::refreshCachedTracingCustomTags() {
 }
 
 void ConnectionManagerImpl::ActiveStream::requestRouteConfigUpdate(
+    Event::Dispatcher& thread_local_dispatcher,
     Http::RouteConfigUpdatedCallbackSharedPtr route_config_updated_cb) {
-  route_config_update_requester_->requestRouteConfigUpdate(request_headers_->Host()->value(),
+  ASSERT(!request_headers_->Host()->value().empty());
+  const auto& host_header =
+      absl::AsciiStrToLower(request_headers_->Host()->value().getStringView());
+  route_config_update_requester_->requestRouteConfigUpdate(host_header, thread_local_dispatcher,
                                                            std::move(route_config_updated_cb));
 }
 
@@ -2300,7 +2303,7 @@ bool ConnectionManagerImpl::ActiveStreamDecoderFilter::recreateStream() {
 
 void ConnectionManagerImpl::ActiveStreamDecoderFilter::requestRouteConfigUpdate(
     Http::RouteConfigUpdatedCallbackSharedPtr route_config_updated_cb) {
-  parent_.requestRouteConfigUpdate(std::move(route_config_updated_cb));
+  parent_.requestRouteConfigUpdate(dispatcher(), std::move(route_config_updated_cb));
 }
 
 absl::optional<Router::ConfigConstSharedPtr>
