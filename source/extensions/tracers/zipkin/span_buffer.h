@@ -7,7 +7,6 @@
 #include "extensions/tracers/zipkin/tracer_interface.h"
 #include "extensions/tracers/zipkin/zipkin_core_types.h"
 
-#include "zipkin-jsonv2.pb.h"
 #include "zipkin.pb.h"
 
 namespace Envoy {
