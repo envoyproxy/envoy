@@ -2,11 +2,6 @@ syntax = "proto3";
 
 package envoy.api.v2;
 
-option java_package = "io.envoyproxy.envoy.api.v2";
-option java_outer_classname = "RdsProto";
-option java_multiple_files = true;
-option java_generic_services = true;
-
 import "envoy/api/v2/core/base.proto";
 import "envoy/api/v2/core/config_source.proto";
 import "envoy/api/v2/discovery.proto";
@@ -16,6 +11,11 @@ import "google/api/annotations.proto";
 import "google/protobuf/wrappers.proto";
 
 import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.api.v2";
+option java_outer_classname = "RdsProto";
+option java_multiple_files = true;
+option java_generic_services = true;
 
 // [#protodoc-title: HTTP route configuration]
 // * Routing :ref:`architecture overview <arch_overview_http_routing>`

@@ -2,10 +2,6 @@ syntax = "proto3";
 
 package envoy.config.filter.network.http_connection_manager.v2;
 
-option java_package = "io.envoyproxy.envoy.config.filter.network.http_connection_manager.v2";
-option java_outer_classname = "HttpConnectionManagerProto";
-option java_multiple_files = true;
-
 import "envoy/api/v2/core/config_source.proto";
 import "envoy/api/v2/core/protocol.proto";
 import "envoy/api/v2/rds.proto";
@@ -20,6 +16,10 @@ import "google/protobuf/struct.proto";
 import "google/protobuf/wrappers.proto";
 
 import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.config.filter.network.http_connection_manager.v2";
+option java_outer_classname = "HttpConnectionManagerProto";
+option java_multiple_files = true;
 
 // [#protodoc-title: HTTP connection manager]
 // HTTP connection manager :ref:`configuration overview <config_http_conn_man>`.

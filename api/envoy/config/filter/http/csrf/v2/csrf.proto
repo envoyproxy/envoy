@@ -2,14 +2,14 @@ syntax = "proto3";
 
 package envoy.config.filter.http.csrf.v2;
 
-option java_package = "io.envoyproxy.envoy.config.filter.http.csrf.v2";
-option java_outer_classname = "CsrfProto";
-option java_multiple_files = true;
-
 import "envoy/api/v2/core/base.proto";
 import "envoy/type/matcher/string.proto";
 
 import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.config.filter.http.csrf.v2";
+option java_outer_classname = "CsrfProto";
+option java_multiple_files = true;
 
 // [#protodoc-title: CSRF]
 // Cross-Site Request Forgery :ref:`configuration overview <config_http_filters_csrf>`.

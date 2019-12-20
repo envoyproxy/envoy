@@ -2,14 +2,14 @@ syntax = "proto3";
 
 package envoy.config.filter.http.dynamic_forward_proxy.v2alpha;
 
-option java_package = "io.envoyproxy.envoy.config.filter.http.dynamic_forward_proxy.v2alpha";
-option java_outer_classname = "DynamicForwardProxyProto";
-option java_multiple_files = true;
-
 import "envoy/config/common/dynamic_forward_proxy/v2alpha/dns_cache.proto";
 
 import "udpa/annotations/migrate.proto";
 import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.config.filter.http.dynamic_forward_proxy.v2alpha";
+option java_outer_classname = "DynamicForwardProxyProto";
+option java_multiple_files = true;
 
 // [#protodoc-title: Dynamic forward proxy]
 

@@ -2,14 +2,14 @@ syntax = "proto3";
 
 package envoy.config.filter.http.squash.v2;
 
-option java_package = "io.envoyproxy.envoy.config.filter.http.squash.v2";
-option java_outer_classname = "SquashProto";
-option java_multiple_files = true;
-
 import "google/protobuf/duration.proto";
 import "google/protobuf/struct.proto";
 
 import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.config.filter.http.squash.v2";
+option java_outer_classname = "SquashProto";
+option java_multiple_files = true;
 
 // [#protodoc-title: Squash]
 // Squash :ref:`configuration overview <config_http_filters_squash>`.
