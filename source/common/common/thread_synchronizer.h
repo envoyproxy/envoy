@@ -26,37 +26,42 @@ public:
   void enable();
 
   /**
-   * Wait for a specified event to occur via signal(). Before blocking to wait, any callers of
-   * barrier() waiting on this event will be released.
+   * This is the only API that should generally be called from production code. It introduces
+   * a "sync point" that test code can then use to force blocking, thread barriers, etc. Even
+   * when the synchronizer is enabled(), the syncPoint() will do nothing unless it has been
+   * registered to block via waitOn().
    */
-  void wait(absl::string_view event_name) {
+  void syncPoint(absl::string_view event_name) {
     if (data_ != nullptr) {
-      waitWorker(event_name);
+      syncPointWorker(event_name);
     }
   }
 
   /**
-   * Tell the synchronizer to either ignore (or not) wait events. If ignore is true, any code
-   * calling wait() will immediately proceed.
+   * The next time the sync point registered with event_name is invoked via syncPoint(), the calling
+   * code will block until signaled. Note that this is a one-shot operation and the sync point's
+   * wait status will be cleared.
    */
-  void ignoreWait(absl::string_view event_name, bool ignore) {
+  void waitOn(absl::string_view event_name) {
     if (data_ != nullptr) {
-      ignoreWaitWorker(event_name, ignore);
+      waitOnWorker(event_name);
     }
   }
 
   /**
-   * Wait until another thread is itself waiting on an event. This can be used to force a
-   * specific interleaving between two threads.
+   * This call will block until the next time the sync point registered with event_name is invoked.
+   * The event_name must have been previously registered for blocking via waitOn(). The typical
+   * test pattern is to have a thread arrive at a sync point, block, and then release a test
+   * thread which continues test execution, eventually calling signal() to release the other thread.
    */
-  void barrier(absl::string_view event_name) {
+  void barrierOn(absl::string_view event_name) {
     if (data_ != nullptr) {
-      barrierWorker(event_name);
+      barrierOnWorker(event_name);
     }
   }
 
   /**
-   * Signal an event such that a thread that has called wait() will now proceed.
+   * Signal an event such that a thread that is blocked within syncPoint() will now proceed.
    */
   void signal(absl::string_view event_name) {
     if (data_ != nullptr) {
@@ -67,9 +72,9 @@ public:
 private:
   struct SynchronizerEntry {
     absl::Mutex mutex_;
+    bool wait_on_ ABSL_GUARDED_BY(mutex_){};
     bool signaled_ ABSL_GUARDED_BY(mutex_){};
     bool at_barrier_ ABSL_GUARDED_BY(mutex_){};
-    bool ignore_wait_ ABSL_GUARDED_BY(mutex_){};
   };
 
   struct SynchronizerData {
@@ -79,9 +84,9 @@ private:
   };
 
   SynchronizerEntry& getOrCreateEntry(absl::string_view event_name);
-  void waitWorker(absl::string_view event_name);
-  void ignoreWaitWorker(absl::string_view event_name, bool ignore);
-  void barrierWorker(absl::string_view event_name);
+  void syncPointWorker(absl::string_view event_name);
+  void waitOnWorker(absl::string_view event_name);
+  void barrierOnWorker(absl::string_view event_name);
   void signalWorker(absl::string_view event_name);
 
   std::unique_ptr<SynchronizerData> data_;

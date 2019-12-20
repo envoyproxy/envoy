@@ -30,19 +30,28 @@ ThreadSynchronizer::getOrCreateEntry(absl::string_view event_name) {
   return *existing_entry;
 }
 
-void ThreadSynchronizer::waitWorker(absl::string_view event_name) {
+void ThreadSynchronizer::waitOnWorker(absl::string_view event_name) {
+  SynchronizerEntry& entry = getOrCreateEntry(event_name);
+  absl::MutexLock lock(&entry.mutex_);
+  ENVOY_LOG(debug, "thread synchronizer: waiting on next {}", event_name);
+  ASSERT(!entry.wait_on_);
+  entry.wait_on_ = true;
+}
+
+void ThreadSynchronizer::syncPointWorker(absl::string_view event_name) {
   SynchronizerEntry& entry = getOrCreateEntry(event_name);
   absl::MutexLock lock(&entry.mutex_);
 
   // See if we are ignoring waits. If so, just return.
-  if (entry.ignore_wait_) {
-    ENVOY_LOG(debug, "thread synchronizer: waiting for {}: ignoring", event_name);
+  if (!entry.wait_on_) {
+    ENVOY_LOG(debug, "thread synchronizer: sync point {}: ignoring", event_name);
     return;
   }
+  entry.wait_on_ = false;
 
   // See if we are already signaled. If so, just clear signaled and return.
   if (entry.signaled_) {
-    ENVOY_LOG(debug, "thread synchronizer: waiting for {}: already signaled", event_name);
+    ENVOY_LOG(debug, "thread synchronizer: sync point {}: already signaled", event_name);
     entry.signaled_ = false;
     return;
   }
@@ -51,9 +60,9 @@ void ThreadSynchronizer::waitWorker(absl::string_view event_name) {
   entry.at_barrier_ = true;
 
   // Now wait to be signaled.
-  ENVOY_LOG(debug, "thread synchronizer: waiting for {}", event_name);
+  ENVOY_LOG(debug, "thread synchronizer: blocking on sync point {}", event_name);
   entry.mutex_.Await(absl::Condition(&entry.signaled_));
-  ENVOY_LOG(debug, "thread synchronizer: done waiting for {}", event_name);
+  ENVOY_LOG(debug, "thread synchronizer: done blocking for sync point {}", event_name);
 
   // Clear the barrier and signaled before unlocking and returning.
   ASSERT(entry.at_barrier_);
@@ -62,17 +71,11 @@ void ThreadSynchronizer::waitWorker(absl::string_view event_name) {
   entry.signaled_ = false;
 }
 
-void ThreadSynchronizer::ignoreWaitWorker(absl::string_view event_name, bool ignore) {
+void ThreadSynchronizer::barrierOnWorker(absl::string_view event_name) {
   SynchronizerEntry& entry = getOrCreateEntry(event_name);
   absl::MutexLock lock(&entry.mutex_);
-  ENVOY_LOG(debug, "thread synchronizer: update ignore wait for {}: {}", event_name, ignore);
-  entry.ignore_wait_ = ignore;
-}
-
-void ThreadSynchronizer::barrierWorker(absl::string_view event_name) {
-  SynchronizerEntry& entry = getOrCreateEntry(event_name);
-  absl::MutexLock lock(&entry.mutex_);
-  ENVOY_LOG(debug, "thread synchronizer: barrier at {}", event_name);
+  ASSERT(!entry.at_barrier_ && entry.wait_on_);
+  ENVOY_LOG(debug, "thread synchronizer: barrier on {}", event_name);
   entry.mutex_.Await(absl::Condition(&entry.at_barrier_));
   ENVOY_LOG(debug, "thread synchronizer: barrier complete {}", event_name);
 }
@@ -80,8 +83,8 @@ void ThreadSynchronizer::barrierWorker(absl::string_view event_name) {
 void ThreadSynchronizer::signalWorker(absl::string_view event_name) {
   SynchronizerEntry& entry = getOrCreateEntry(event_name);
   absl::MutexLock lock(&entry.mutex_);
-  ENVOY_LOG(debug, "thread synchronizer: signaling {}", event_name);
   ASSERT(!entry.signaled_);
+  ENVOY_LOG(debug, "thread synchronizer: signaling {}", event_name);
   entry.signaled_ = true;
 }
 

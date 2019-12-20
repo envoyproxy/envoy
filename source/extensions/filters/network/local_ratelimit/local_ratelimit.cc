@@ -17,8 +17,11 @@ Config::Config(
       tokens_per_fill_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(proto_config.token_bucket(), tokens_per_fill, 1)),
       fill_interval_(PROTOBUF_GET_MS_REQUIRED(proto_config.token_bucket(), fill_interval)),
-      enabled_(proto_config.enabled(), runtime),
+      enabled_(proto_config.runtime_enabled(), runtime),
       stats_(generateStats(proto_config.stat_prefix(), scope)), tokens_(max_tokens_) {
+  if (fill_interval_ < std::chrono::milliseconds(50)) {
+    throw EnvoyException("local rate limit token bucket fill timer must be >= 50ms");
+  }
   fill_timer_->enableTimer(fill_interval_);
 }
 
@@ -37,7 +40,7 @@ void Config::onFillTimer() {
     new_tokens_value = std::min(max_tokens_, expected_tokens + tokens_per_fill_);
 
     // Testing hook.
-    synchronizer_.wait("on_fill_timer_pre_cas");
+    synchronizer_.syncPoint("on_fill_timer_pre_cas");
 
     // Loop while the weak CAS fails trying to update the tokens value.
   } while (
@@ -58,7 +61,7 @@ bool Config::canCreateConnection() {
     }
 
     // Testing hook.
-    synchronizer_.wait("can_create_connection_pre_cas");
+    synchronizer_.syncPoint("can_create_connection_pre_cas");
 
     // Loop while the weak CAS fails trying to subtract 1 from expected.
   } while (!tokens_.compare_exchange_weak(expected_tokens, expected_tokens - 1,

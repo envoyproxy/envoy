@@ -23,11 +23,13 @@ namespace LocalRateLimitFilter {
 
 class LocalRateLimitTestBase : public testing::Test {
 public:
-  void initialize(const std::string& filter_yaml) {
+  void initialize(const std::string& filter_yaml, bool expect_timer_create = true) {
     envoy::config::filter::network::local_rate_limit::v2alpha::LocalRateLimit proto_config;
     TestUtility::loadFromYamlAndValidate(filter_yaml, proto_config);
     fill_timer_ = new Event::MockTimer(&dispatcher_);
-    EXPECT_CALL(*fill_timer_, enableTimer(_, nullptr));
+    if (expect_timer_create) {
+      EXPECT_CALL(*fill_timer_, enableTimer(_, nullptr));
+    }
     config_ = std::make_shared<Config>(proto_config, dispatcher_, stats_store_, runtime_);
   }
 
@@ -40,6 +42,19 @@ public:
   ConfigSharedPtr config_;
 };
 
+// Make sure we fail with a fill rate this is too fast.
+TEST_F(LocalRateLimitTestBase, TooFastFillRate) {
+  EXPECT_THROW_WITH_MESSAGE(initialize(R"EOF(
+stat_prefix: local_rate_limit_stats
+token_bucket:
+  max_tokens: 1
+  fill_interval: 0.049s
+)EOF",
+                                       false),
+                            EnvoyException,
+                            "local rate limit token bucket fill timer must be >= 50ms");
+}
+
 // Verify various token bucket CAS edge cases.
 TEST_F(LocalRateLimitTestBase, CasEdgeCases) {
   // This tests the case in which a connection creation races with the fill timer.
@@ -48,31 +63,28 @@ TEST_F(LocalRateLimitTestBase, CasEdgeCases) {
   stat_prefix: local_rate_limit_stats
   token_bucket:
     max_tokens: 1
-    fill_interval: 0.2s
+    fill_interval: 0.05s
   )EOF");
 
     synchronizer().enable();
 
     // Start a thread and start the fill callback. This will wait pre-CAS.
+    synchronizer().waitOn("on_fill_timer_pre_cas");
     std::thread t1([&] {
-      EXPECT_CALL(*fill_timer_, enableTimer(std::chrono::milliseconds(200), nullptr));
+      EXPECT_CALL(*fill_timer_, enableTimer(std::chrono::milliseconds(50), nullptr));
       fill_timer_->invokeCallback();
     });
     // Wait until the thread is actually waiting.
-    synchronizer().barrier("on_fill_timer_pre_cas");
+    synchronizer().barrierOn("on_fill_timer_pre_cas");
 
-    // Pre-signal the other wait, and create a connection. This should succeed.
-    synchronizer().signal("can_create_connection_pre_cas");
+    // Create a connection. This should succeed.
     EXPECT_TRUE(config_->canCreateConnection());
 
     // Now signal the thread to continue which should cause a CAS failure and the loop to repeat.
-    // We need to ignore further waits so we don't wait again.
-    synchronizer().ignoreWait("on_fill_timer_pre_cas", true);
     synchronizer().signal("on_fill_timer_pre_cas");
     t1.join();
 
     // 1 -> 0 tokens
-    synchronizer().signal("can_create_connection_pre_cas");
     EXPECT_TRUE(config_->canCreateConnection());
     EXPECT_FALSE(config_->canCreateConnection());
   }
@@ -87,13 +99,14 @@ TEST_F(LocalRateLimitTestBase, CasEdgeCases) {
   )EOF");
 
     synchronizer().enable();
+
     // Start a thread and see if we can create a connection. This will wait pre-CAS.
+    synchronizer().waitOn("can_create_connection_pre_cas");
     std::thread t1([&] { EXPECT_FALSE(config_->canCreateConnection()); });
     // Wait until the thread is actually waiting.
-    synchronizer().barrier("can_create_connection_pre_cas");
+    synchronizer().barrierOn("can_create_connection_pre_cas");
 
     // Create the connection on this thread, which should cause the CAS to fail on the other thread.
-    synchronizer().ignoreWait("can_create_connection_pre_cas", true);
     EXPECT_TRUE(config_->canCreateConnection());
     synchronizer().signal("can_create_connection_pre_cas");
     t1.join();
@@ -258,7 +271,7 @@ stat_prefix: local_rate_limit_stats
 token_bucket:
   max_tokens: 1
   fill_interval: 0.2s
-enabled:
+runtime_enabled:
   default_value: true
   runtime_key: foo_key
 )EOF");
