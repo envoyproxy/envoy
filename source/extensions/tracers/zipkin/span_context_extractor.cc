@@ -68,7 +68,7 @@ bool SpanContextExtractor::extractSampled(const Tracing::Decision tracing_decisi
   // Checking if sampled flag has been specified. Also checking for 'true' value, as some old
   // zipkin tracers may still use that value, although should be 0 or 1.
   absl::string_view xb3_sampled = x_b3_sampled_entry->value().getStringView();
-  sampled = xb3_sampled == ZipkinCoreConstants::get().SAMPLED || xb3_sampled == "true";
+  sampled = xb3_sampled == SAMPLED || xb3_sampled == "true";
   return sampled;
 }
 

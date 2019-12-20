@@ -582,6 +582,32 @@ bool ValueUtil::equal(const ProtobufWkt::Value& v1, const ProtobufWkt::Value& v2
   }
 }
 
+ProtobufWkt::Value ValueUtil::stringValue(const std::string& str) {
+  ProtobufWkt::Value val;
+  val.set_string_value(str);
+  return val;
+}
+
+ProtobufWkt::Value ValueUtil::boolValue(bool b) {
+  ProtobufWkt::Value val;
+  val.set_bool_value(b);
+  return val;
+}
+
+ProtobufWkt::Value ValueUtil::structValue(const ProtobufWkt::Struct& obj) {
+  ProtobufWkt::Value val;
+  (*val.mutable_struct_value()) = obj;
+  return val;
+}
+
+ProtobufWkt::Value ValueUtil::listValue(const std::vector<ProtobufWkt::Value>& values) {
+  ProtobufWkt::Value val;
+  for (const auto& value : values) {
+    (*val.mutable_list_value()->add_values()) = value;
+  }
+  return val;
+}
+
 namespace {
 
 void validateDuration(const ProtobufWkt::Duration& duration) {

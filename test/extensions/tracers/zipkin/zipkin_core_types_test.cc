@@ -6,6 +6,7 @@
 #include "extensions/tracers/zipkin/zipkin_core_types.h"
 
 #include "test/test_common/test_time.h"
+#include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
 
@@ -19,23 +20,31 @@ TEST(ZipkinCoreTypesEndpointTest, defaultConstructor) {
   Endpoint ep;
 
   EXPECT_EQ("", ep.serviceName());
-  EXPECT_EQ(R"({"ipv4":"","port":0,"serviceName":""})", ep.toJson());
+  EXPECT_TRUE(TestUtility::protoEqual(
+      TestUtility::jsonToStruct(R"({"ipv4":"","port":0,"serviceName":""})"), ep.toStruct()));
 
   Network::Address::InstanceConstSharedPtr addr =
       Network::Utility::parseInternetAddress("127.0.0.1");
   ep.setAddress(addr);
-  EXPECT_EQ(R"({"ipv4":"127.0.0.1","port":0,"serviceName":""})", ep.toJson());
+  EXPECT_TRUE(TestUtility::protoEqual(
+      TestUtility::jsonToStruct(R"({"ipv4":"127.0.0.1","port":0,"serviceName":""})"),
+      ep.toStruct()));
 
   addr = Network::Utility::parseInternetAddressAndPort(
       "[2001:0db8:85a3:0000:0000:8a2e:0370:4444]:7334");
   ep.setAddress(addr);
-  EXPECT_EQ(R"({"ipv6":"2001:db8:85a3::8a2e:370:4444","port":7334,"serviceName":""})", ep.toJson());
+  EXPECT_TRUE(TestUtility::protoEqual(
+      TestUtility::jsonToStruct(
+          R"({"ipv6":"2001:db8:85a3::8a2e:370:4444","port":7334,"serviceName":""})"),
+      ep.toStruct()));
 
   ep.setServiceName("my_service");
   EXPECT_EQ("my_service", ep.serviceName());
 
-  EXPECT_EQ(R"({"ipv6":"2001:db8:85a3::8a2e:370:4444","port":7334,"serviceName":"my_service"})",
-            ep.toJson());
+  EXPECT_TRUE(TestUtility::protoEqual(
+      TestUtility::jsonToStruct(
+          R"({"ipv6":"2001:db8:85a3::8a2e:370:4444","port":7334,"serviceName":"my_service"})"),
+      ep.toStruct()));
 }
 
 TEST(ZipkinCoreTypesEndpointTest, customConstructor) {
@@ -44,14 +53,18 @@ TEST(ZipkinCoreTypesEndpointTest, customConstructor) {
   Endpoint ep(std::string("my_service"), addr);
 
   EXPECT_EQ("my_service", ep.serviceName());
-  EXPECT_EQ(R"({"ipv4":"127.0.0.1","port":3306,"serviceName":"my_service"})", ep.toJson());
+  EXPECT_TRUE(TestUtility::protoEqual(
+      TestUtility::jsonToStruct(R"({"ipv4":"127.0.0.1","port":3306,"serviceName":"my_service"})"),
+      ep.toStruct()));
 
   addr = Network::Utility::parseInternetAddressAndPort(
       "[2001:0db8:85a3:0000:0000:8a2e:0370:4444]:7334");
   ep.setAddress(addr);
 
-  EXPECT_EQ(R"({"ipv6":"2001:db8:85a3::8a2e:370:4444","port":7334,"serviceName":"my_service"})",
-            ep.toJson());
+  EXPECT_TRUE(TestUtility::protoEqual(
+      TestUtility::jsonToStruct(
+          R"({"ipv6":"2001:db8:85a3::8a2e:370:4444","port":7334,"serviceName":"my_service"})"),
+      ep.toStruct()));
 }
 
 TEST(ZipkinCoreTypesEndpointTest, copyOperator) {
@@ -61,10 +74,12 @@ TEST(ZipkinCoreTypesEndpointTest, copyOperator) {
   Endpoint ep2(ep1);
 
   EXPECT_EQ("my_service", ep1.serviceName());
-  EXPECT_EQ(R"({"ipv4":"127.0.0.1","port":3306,"serviceName":"my_service"})", ep1.toJson());
+  EXPECT_TRUE(TestUtility::protoEqual(
+      TestUtility::jsonToStruct(R"({"ipv4":"127.0.0.1","port":3306,"serviceName":"my_service"})"),
+      ep1.toStruct()));
 
   EXPECT_EQ(ep1.serviceName(), ep2.serviceName());
-  EXPECT_EQ(ep1.toJson(), ep2.toJson());
+  EXPECT_TRUE(TestUtility::protoEqual(ep1.toStruct(), ep2.toStruct()));
 }
 
 TEST(ZipkinCoreTypesEndpointTest, assignmentOperator) {
@@ -74,10 +89,12 @@ TEST(ZipkinCoreTypesEndpointTest, assignmentOperator) {
   Endpoint ep2 = ep1;
 
   EXPECT_EQ("my_service", ep1.serviceName());
-  EXPECT_EQ(R"({"ipv4":"127.0.0.1","port":3306,"serviceName":"my_service"})", ep1.toJson());
+  EXPECT_TRUE(TestUtility::protoEqual(
+      TestUtility::jsonToStruct(R"({"ipv4":"127.0.0.1","port":3306,"serviceName":"my_service"})"),
+      ep1.toStruct()));
 
   EXPECT_EQ(ep1.serviceName(), ep2.serviceName());
-  EXPECT_EQ(ep1.toJson(), ep2.toJson());
+  EXPECT_TRUE(TestUtility::protoEqual(ep1.toStruct(), ep2.toStruct()));
 }
 
 TEST(ZipkinCoreTypesAnnotationTest, defaultConstructor) {
@@ -94,12 +111,12 @@ TEST(ZipkinCoreTypesAnnotationTest, defaultConstructor) {
   ann.setTimestamp(timestamp);
   EXPECT_EQ(timestamp, ann.timestamp());
 
-  ann.setValue(ZipkinCoreConstants::get().CLIENT_SEND);
-  EXPECT_EQ(ZipkinCoreConstants::get().CLIENT_SEND, ann.value());
+  ann.setValue(CLIENT_SEND);
+  EXPECT_EQ(CLIENT_SEND, ann.value());
 
-  std::string expected_json = R"({"timestamp":)" + std::to_string(timestamp) + R"(,"value":")" +
-                              ZipkinCoreConstants::get().CLIENT_SEND + R"("})";
-  EXPECT_EQ(expected_json, ann.toJson());
+  std::string expected_json =
+      R"({"timestamp":)" + std::to_string(timestamp) + R"(,"value":")" + CLIENT_SEND + R"("})";
+  EXPECT_TRUE(TestUtility::protoEqual(TestUtility::jsonToStruct(expected_json), ann.toStruct()));
 
   // Test the copy-semantics flavor of setEndpoint
   Network::Address::InstanceConstSharedPtr addr =
@@ -108,14 +125,14 @@ TEST(ZipkinCoreTypesAnnotationTest, defaultConstructor) {
   ann.setEndpoint(ep);
   EXPECT_TRUE(ann.isSetEndpoint());
   EXPECT_EQ("my_service", ann.endpoint().serviceName());
-  EXPECT_EQ(R"({"ipv4":"127.0.0.1","port":3306,"serviceName":"my_service"})",
-            (const_cast<Endpoint&>(ann.endpoint())).toJson());
+  EXPECT_TRUE(TestUtility::protoEqual(
+      TestUtility::jsonToStruct(R"({"ipv4":"127.0.0.1","port":3306,"serviceName":"my_service"})"),
+      (const_cast<Endpoint&>(ann.endpoint())).toStruct()));
 
-  expected_json = R"({"timestamp":)" + std::to_string(timestamp) + R"(,"value":")" +
-                  ZipkinCoreConstants::get().CLIENT_SEND +
+  expected_json = R"({"timestamp":)" + std::to_string(timestamp) + R"(,"value":")" + CLIENT_SEND +
                   R"(","endpoint":{"ipv4":)"
                   R"("127.0.0.1","port":3306,"serviceName":"my_service"}})";
-  EXPECT_EQ(expected_json, ann.toJson());
+  EXPECT_TRUE(TestUtility::protoEqual(TestUtility::jsonToStruct(expected_json), ann.toStruct()));
 
   // Test the move-semantics flavor of setEndpoint
   addr = Network::Utility::parseInternetAddressAndPort("192.168.1.1:5555");
@@ -123,23 +140,23 @@ TEST(ZipkinCoreTypesAnnotationTest, defaultConstructor) {
   ann.setEndpoint(std::move(ep2));
   EXPECT_TRUE(ann.isSetEndpoint());
   EXPECT_EQ("my_service_2", ann.endpoint().serviceName());
-  EXPECT_EQ(R"({"ipv4":"192.168.1.1","port":5555,"serviceName":"my_service_2"})",
-            (const_cast<Endpoint&>(ann.endpoint())).toJson());
+  EXPECT_TRUE(TestUtility::protoEqual(
+      TestUtility::jsonToStruct(
+          R"({"ipv4":"192.168.1.1","port":5555,"serviceName":"my_service_2"})"),
+      (const_cast<Endpoint&>(ann.endpoint())).toStruct()));
 
-  expected_json = R"({"timestamp":)" + std::to_string(timestamp) + R"(,"value":")" +
-                  ZipkinCoreConstants::get().CLIENT_SEND +
+  expected_json = R"({"timestamp":)" + std::to_string(timestamp) + R"(,"value":")" + CLIENT_SEND +
                   R"(","endpoint":{"ipv4":"192.168.1.1",)"
                   R"("port":5555,"serviceName":"my_service_2"}})";
-  EXPECT_EQ(expected_json, ann.toJson());
+  EXPECT_TRUE(TestUtility::protoEqual(TestUtility::jsonToStruct(expected_json), ann.toStruct()));
 
-  // Test changeEndpointServiceName
+  // Test change endpoint service name.
   ann.changeEndpointServiceName("NEW_SERVICE_NAME");
   EXPECT_EQ("NEW_SERVICE_NAME", ann.endpoint().serviceName());
-  expected_json = R"({"timestamp":)" + std::to_string(timestamp) + R"(,"value":")" +
-                  ZipkinCoreConstants::get().CLIENT_SEND +
+  expected_json = R"({"timestamp":)" + std::to_string(timestamp) + R"(,"value":")" + CLIENT_SEND +
                   R"(","endpoint":{"ipv4":"192.168.1.1",)"
                   R"("port":5555,"serviceName":"NEW_SERVICE_NAME"}})";
-  EXPECT_EQ(expected_json, ann.toJson());
+  EXPECT_TRUE(TestUtility::protoEqual(TestUtility::jsonToStruct(expected_json), ann.toStruct()));
 }
 
 TEST(ZipkinCoreTypesAnnotationTest, customConstructor) {
@@ -150,21 +167,22 @@ TEST(ZipkinCoreTypesAnnotationTest, customConstructor) {
   uint64_t timestamp = std::chrono::duration_cast<std::chrono::microseconds>(
                            test_time.timeSystem().systemTime().time_since_epoch())
                            .count();
-  Annotation ann(timestamp, ZipkinCoreConstants::get().CLIENT_SEND, ep);
+  Annotation ann(timestamp, CLIENT_SEND, ep);
 
   EXPECT_EQ(timestamp, ann.timestamp());
-  EXPECT_EQ(ZipkinCoreConstants::get().CLIENT_SEND, ann.value());
+  EXPECT_EQ(CLIENT_SEND, ann.value());
   EXPECT_TRUE(ann.isSetEndpoint());
 
   EXPECT_EQ("my_service", ann.endpoint().serviceName());
-  EXPECT_EQ(R"({"ipv4":"127.0.0.1","port":3306,"serviceName":"my_service"})",
-            (const_cast<Endpoint&>(ann.endpoint())).toJson());
+  EXPECT_TRUE(TestUtility::protoEqual(
+      TestUtility::jsonToStruct(R"({"ipv4":"127.0.0.1","port":3306,"serviceName":"my_service"})"),
+      (const_cast<Endpoint&>(ann.endpoint())).toStruct()));
 
   std::string expected_json = R"({"timestamp":)" + std::to_string(timestamp) + R"(,"value":")" +
-                              ZipkinCoreConstants::get().CLIENT_SEND +
+                              CLIENT_SEND +
                               R"(","endpoint":{"ipv4":"127.0.0.1",)"
                               R"("port":3306,"serviceName":"my_service"}})";
-  EXPECT_EQ(expected_json, ann.toJson());
+  EXPECT_TRUE(TestUtility::protoEqual(TestUtility::jsonToStruct(expected_json), ann.toStruct()));
 }
 
 TEST(ZipkinCoreTypesAnnotationTest, copyConstructor) {
@@ -175,13 +193,13 @@ TEST(ZipkinCoreTypesAnnotationTest, copyConstructor) {
   uint64_t timestamp = std::chrono::duration_cast<std::chrono::microseconds>(
                            test_time.timeSystem().systemTime().time_since_epoch())
                            .count();
-  Annotation ann(timestamp, ZipkinCoreConstants::get().CLIENT_SEND, ep);
+  Annotation ann(timestamp, CLIENT_SEND, ep);
   Annotation ann2(ann);
 
   EXPECT_EQ(ann.value(), ann2.value());
   EXPECT_EQ(ann.timestamp(), ann2.timestamp());
   EXPECT_EQ(ann.isSetEndpoint(), ann2.isSetEndpoint());
-  EXPECT_EQ(ann.toJson(), ann2.toJson());
+  EXPECT_TRUE(TestUtility::protoEqual(ann.toStruct(), ann2.toStruct()));
   EXPECT_EQ(ann.endpoint().serviceName(), ann2.endpoint().serviceName());
 }
 
@@ -193,13 +211,13 @@ TEST(ZipkinCoreTypesAnnotationTest, assignmentOperator) {
   uint64_t timestamp = std::chrono::duration_cast<std::chrono::microseconds>(
                            test_time.timeSystem().systemTime().time_since_epoch())
                            .count();
-  Annotation ann(timestamp, ZipkinCoreConstants::get().CLIENT_SEND, ep);
+  Annotation ann(timestamp, CLIENT_SEND, ep);
   Annotation ann2 = ann;
 
   EXPECT_EQ(ann.value(), ann2.value());
   EXPECT_EQ(ann.timestamp(), ann2.timestamp());
   EXPECT_EQ(ann.isSetEndpoint(), ann2.isSetEndpoint());
-  EXPECT_EQ(ann.toJson(), ann2.toJson());
+  EXPECT_TRUE(TestUtility::protoEqual(ann.toStruct(), ann2.toStruct()));
   EXPECT_EQ(ann.endpoint().serviceName(), ann2.endpoint().serviceName());
 }
 
@@ -218,7 +236,7 @@ TEST(ZipkinCoreTypesBinaryAnnotationTest, defaultConstructor) {
   EXPECT_EQ("value", ann.value());
 
   std::string expected_json = R"({"key":"key","value":"value"})";
-  EXPECT_EQ(expected_json, ann.toJson());
+  EXPECT_TRUE(TestUtility::protoEqual(TestUtility::jsonToStruct(expected_json), ann.toStruct()));
 
   // Test the copy-semantics flavor of setEndpoint
 
@@ -228,30 +246,33 @@ TEST(ZipkinCoreTypesBinaryAnnotationTest, defaultConstructor) {
   ann.setEndpoint(ep);
   EXPECT_TRUE(ann.isSetEndpoint());
   EXPECT_EQ("my_service", ann.endpoint().serviceName());
-  EXPECT_EQ(R"({"ipv4":"127.0.0.1","port":3306,"serviceName":"my_service"})",
-            (const_cast<Endpoint&>(ann.endpoint())).toJson());
+  EXPECT_TRUE(TestUtility::protoEqual(
+      TestUtility::jsonToStruct(R"({"ipv4":"127.0.0.1","port":3306,"serviceName":"my_service"})"),
+      (const_cast<Endpoint&>(ann.endpoint())).toStruct()));
 
   expected_json = "{"
                   R"("key":"key","value":"value",)"
                   R"("endpoint":)"
                   R"({"ipv4":"127.0.0.1","port":3306,"serviceName":"my_service"})"
                   "}";
-  EXPECT_EQ(expected_json, ann.toJson());
+  EXPECT_TRUE(TestUtility::protoEqual(TestUtility::jsonToStruct(expected_json), ann.toStruct()));
 
   // Test the move-semantics flavor of setEndpoint
   addr = Network::Utility::parseInternetAddressAndPort("192.168.1.1:5555");
   Endpoint ep2(std::string("my_service_2"), addr);
-  ann.setEndpoint(std::move(ep2));
+  ann.setEndpoint(ep2);
   EXPECT_TRUE(ann.isSetEndpoint());
   EXPECT_EQ("my_service_2", ann.endpoint().serviceName());
-  EXPECT_EQ(R"({"ipv4":"192.168.1.1","port":5555,"serviceName":"my_service_2"})",
-            (const_cast<Endpoint&>(ann.endpoint())).toJson());
+  EXPECT_TRUE(TestUtility::protoEqual(
+      TestUtility::jsonToStruct(
+          R"({"ipv4":"192.168.1.1","port":5555,"serviceName":"my_service_2"})"),
+      (const_cast<Endpoint&>(ann.endpoint())).toStruct()));
   expected_json = "{"
                   R"("key":"key","value":"value",)"
                   R"("endpoint":)"
                   R"({"ipv4":"192.168.1.1","port":5555,"serviceName":"my_service_2"})"
                   "}";
-  EXPECT_EQ(expected_json, ann.toJson());
+  EXPECT_TRUE(TestUtility::protoEqual(TestUtility::jsonToStruct(expected_json), ann.toStruct()));
 }
 
 TEST(ZipkinCoreTypesBinaryAnnotationTest, customConstructor) {
@@ -262,7 +283,7 @@ TEST(ZipkinCoreTypesBinaryAnnotationTest, customConstructor) {
   EXPECT_FALSE(ann.isSetEndpoint());
   EXPECT_EQ(AnnotationType::STRING, ann.annotationType());
   std::string expected_json = R"({"key":"key","value":"value"})";
-  EXPECT_EQ(expected_json, ann.toJson());
+  EXPECT_TRUE(TestUtility::protoEqual(TestUtility::jsonToStruct(expected_json), ann.toStruct()));
 }
 
 TEST(ZipkinCoreTypesBinaryAnnotationTest, copyConstructor) {
@@ -272,7 +293,7 @@ TEST(ZipkinCoreTypesBinaryAnnotationTest, copyConstructor) {
   EXPECT_EQ(ann.value(), ann2.value());
   EXPECT_EQ(ann.key(), ann2.key());
   EXPECT_EQ(ann.isSetEndpoint(), ann2.isSetEndpoint());
-  EXPECT_EQ(ann.toJson(), ann2.toJson());
+  EXPECT_TRUE(TestUtility::protoEqual(ann.toStruct(), ann2.toStruct()));
   EXPECT_EQ(ann.annotationType(), ann2.annotationType());
 }
 
@@ -283,7 +304,7 @@ TEST(ZipkinCoreTypesBinaryAnnotationTest, assignmentOperator) {
   EXPECT_EQ(ann.value(), ann2.value());
   EXPECT_EQ(ann.key(), ann2.key());
   EXPECT_EQ(ann.isSetEndpoint(), ann2.isSetEndpoint());
-  EXPECT_EQ(ann.toJson(), ann2.toJson());
+  EXPECT_TRUE(TestUtility::protoEqual(ann.toStruct(), ann2.toStruct()));
   EXPECT_EQ(ann.annotationType(), ann2.annotationType());
 }
 
@@ -305,9 +326,10 @@ TEST(ZipkinCoreTypesSpanTest, defaultConstructor) {
   EXPECT_FALSE(span.isSetParentId());
   EXPECT_FALSE(span.isSetTimestamp());
   EXPECT_FALSE(span.isSetTraceIdHigh());
-  EXPECT_EQ(R"({"traceId":"0000000000000000","name":"","id":"0000000000000000",)"
-            R"("annotations":[],"binaryAnnotations":[]})",
-            span.toJson());
+  EXPECT_TRUE(TestUtility::protoEqual(
+      TestUtility::jsonToStruct(
+          R"({"traceId":"0000000000000000","name":"","id":"0000000000000000"})"),
+      span.toStruct()));
 
   uint64_t id = Util::generateRandom64(test_time.timeSystem());
   std::string id_hex = Hex::uint64ToHex(id);
@@ -360,15 +382,15 @@ TEST(ZipkinCoreTypesSpanTest, defaultConstructor) {
   Endpoint endpoint;
   Annotation ann;
   BinaryAnnotation bann;
-  std::vector<Zipkin::Annotation> annotations;
-  std::vector<Zipkin::BinaryAnnotation> binary_annotations;
+  std::vector<Annotation> annotations;
+  std::vector<BinaryAnnotation> binary_annotations;
 
   endpoint.setServiceName("my_service_name");
   Network::Address::InstanceConstSharedPtr addr =
       Network::Utility::parseInternetAddressAndPort("192.168.1.2:3306");
   endpoint.setAddress(addr);
 
-  ann.setValue(Zipkin::ZipkinCoreConstants::get().CLIENT_SEND);
+  ann.setValue(CLIENT_SEND);
   ann.setTimestamp(timestamp);
   ann.setEndpoint(endpoint);
 
@@ -376,7 +398,7 @@ TEST(ZipkinCoreTypesSpanTest, defaultConstructor) {
   span.setAnnotations(annotations);
   EXPECT_EQ(1ULL, span.annotations().size());
 
-  bann.setKey(Zipkin::ZipkinCoreConstants::get().LOCAL_COMPONENT);
+  bann.setKey(LOCAL_COMPONENT);
   bann.setValue("my_component_name");
   bann.setEndpoint(endpoint);
 
@@ -384,22 +406,24 @@ TEST(ZipkinCoreTypesSpanTest, defaultConstructor) {
   span.setBinaryAnnotations(binary_annotations);
   EXPECT_EQ(1ULL, span.binaryAnnotations().size());
 
-  EXPECT_EQ(R"({"traceId":")" + span.traceIdAsHexString() + R"(","name":"span_name","id":")" +
-                span.idAsHexString() + R"(","parentId":")" + span.parentIdAsHexString() +
-                R"(","timestamp":)" + std::to_string(span.timestamp()) +
-                R"(,"duration":3000,)"
-                R"("annotations":[)"
-                R"({"timestamp":)" +
-                std::to_string(span.timestamp()) +
-                R"(,"value":"cs","endpoint":)"
-                R"({"ipv4":"192.168.1.2","port":3306,"serviceName":"my_service_name"}}],)"
-                R"("binaryAnnotations":[{"key":"lc","value":"my_component_name","endpoint":)"
-                R"({"ipv4":"192.168.1.2","port":3306,"serviceName":"my_service_name"}}]})",
-            span.toJson());
+  EXPECT_TRUE(TestUtility::protoEqual(
+      TestUtility::jsonToStruct(
+          R"({"traceId":")" + span.traceIdAsHexString() + R"(","name":"span_name","id":")" +
+          span.idAsHexString() + R"(","parentId":")" + span.parentIdAsHexString() +
+          R"(","timestamp":)" + std::to_string(span.timestamp()) +
+          R"(,"duration":3000,)"
+          R"("annotations":[)"
+          R"({"timestamp":)" +
+          std::to_string(span.timestamp()) +
+          R"(,"value":"cs","endpoint":)"
+          R"({"ipv4":"192.168.1.2","port":3306,"serviceName":"my_service_name"}}],)"
+          R"("binaryAnnotations":[{"key":"lc","value":"my_component_name","endpoint":)"
+          R"({"ipv4":"192.168.1.2","port":3306,"serviceName":"my_service_name"}}]})"),
+      span.toStruct()));
 
   // Test the copy-semantics flavor of addAnnotation and addBinaryAnnotation
 
-  ann.setValue(Zipkin::ZipkinCoreConstants::get().SERVER_SEND);
+  ann.setValue(SERVER_SEND);
   span.addAnnotation(ann);
   bann.setKey("http.return_code");
   bann.setValue("200");
@@ -410,7 +434,8 @@ TEST(ZipkinCoreTypesSpanTest, defaultConstructor) {
 
   // Test the move-semantics flavor of addAnnotation and addBinaryAnnotation
 
-  ann.setValue(Zipkin::ZipkinCoreConstants::get().SERVER_RECV);
+  ann.setValue(SERVER_RECV);
+  Annotation ann_copy(ann);
   span.addAnnotation(std::move(ann));
   bann.setKey("http.return_code");
   bann.setValue("400");
@@ -419,72 +444,76 @@ TEST(ZipkinCoreTypesSpanTest, defaultConstructor) {
   EXPECT_EQ(3ULL, span.annotations().size());
   EXPECT_EQ(3ULL, span.binaryAnnotations().size());
 
-  EXPECT_EQ(R"({"traceId":")" + span.traceIdAsHexString() + R"(","name":"span_name","id":")" +
-                span.idAsHexString() + R"(","parentId":")" + span.parentIdAsHexString() +
-                R"(","timestamp":)" + std::to_string(span.timestamp()) +
-                R"(,"duration":3000,)"
-                R"("annotations":[)"
-                R"({"timestamp":)" +
-                std::to_string(timestamp) +
-                R"(,"value":"cs","endpoint":)"
-                R"({"ipv4":"192.168.1.2","port":3306,"serviceName":"my_service_name"}},)"
-                R"({"timestamp":)" +
-                std::to_string(timestamp) +
-                R"(,"value":"ss",)"
-                R"("endpoint":{"ipv4":"192.168.1.2","port":3306,)"
-                R"("serviceName":"my_service_name"}},)"
-                R"({"timestamp":)" +
-                std::to_string(timestamp) +
-                R"(,"value":"sr","endpoint":{"ipv4":"192.168.1.2","port":3306,)"
-                R"("serviceName":"my_service_name"}}],)"
-                R"("binaryAnnotations":[{"key":"lc","value":"my_component_name",)"
-                R"("endpoint":{"ipv4":"192.168.1.2","port":3306,)"
-                R"("serviceName":"my_service_name"}},)"
-                R"({"key":"http.return_code","value":"200",)"
-                R"("endpoint":{"ipv4":"192.168.1.2","port":3306,)"
-                R"("serviceName":"my_service_name"}},)"
-                R"({"key":"http.return_code","value":"400",)"
-                R"("endpoint":{"ipv4":"192.168.1.2","port":3306,)"
-                R"("serviceName":"my_service_name"}}]})",
-            span.toJson());
+  EXPECT_TRUE(TestUtility::protoEqual(
+      TestUtility::jsonToStruct(
+          R"({"traceId":")" + span.traceIdAsHexString() + R"(","name":"span_name","id":")" +
+          span.idAsHexString() + R"(","parentId":")" + span.parentIdAsHexString() +
+          R"(","timestamp":)" + std::to_string(span.timestamp()) +
+          R"(,"duration":3000,)"
+          R"("annotations":[)"
+          R"({"timestamp":)" +
+          std::to_string(timestamp) +
+          R"(,"value":"cs","endpoint":)"
+          R"({"ipv4":"192.168.1.2","port":3306,"serviceName":"my_service_name"}},)"
+          R"({"timestamp":)" +
+          std::to_string(timestamp) +
+          R"(,"value":"ss",)"
+          R"("endpoint":{"ipv4":"192.168.1.2","port":3306,)"
+          R"("serviceName":"my_service_name"}},)"
+          R"({"timestamp":)" +
+          std::to_string(timestamp) +
+          R"(,"value":"sr","endpoint":{"ipv4":"192.168.1.2","port":3306,)"
+          R"("serviceName":"my_service_name"}}],)"
+          R"("binaryAnnotations":[{"key":"lc","value":"my_component_name",)"
+          R"("endpoint":{"ipv4":"192.168.1.2","port":3306,)"
+          R"("serviceName":"my_service_name"}},)"
+          R"({"key":"http.return_code","value":"200",)"
+          R"("endpoint":{"ipv4":"192.168.1.2","port":3306,)"
+          R"("serviceName":"my_service_name"}},)"
+          R"({"key":"http.return_code","value":"400",)"
+          R"("endpoint":{"ipv4":"192.168.1.2","port":3306,)"
+          R"("serviceName":"my_service_name"}}]})"),
+      span.toStruct()));
 
   // Test setSourceServiceName and setDestinationServiceName
 
-  ann.setValue(Zipkin::ZipkinCoreConstants::get().CLIENT_RECV); // NOLINT(bugprone-use-after-move)
-  span.addAnnotation(ann);
+  ann_copy.setValue(CLIENT_RECV);
+  span.addAnnotation(ann_copy);
   span.setServiceName("NEW_SERVICE_NAME");
-  EXPECT_EQ(R"({"traceId":")" + span.traceIdAsHexString() + R"(","name":"span_name","id":")" +
-                span.idAsHexString() + R"(","parentId":")" + span.parentIdAsHexString() +
-                R"(","timestamp":)" + std::to_string(span.timestamp()) +
-                R"(,"duration":3000,)"
-                R"("annotations":[)"
-                R"({"timestamp":)" +
-                std::to_string(timestamp) +
-                R"(,"value":"cs","endpoint":)"
-                R"({"ipv4":"192.168.1.2","port":3306,"serviceName":"NEW_SERVICE_NAME"}},)"
-                R"({"timestamp":)" +
-                std::to_string(timestamp) +
-                R"(,"value":"ss",)"
-                R"("endpoint":{"ipv4":"192.168.1.2","port":3306,)"
-                R"("serviceName":"NEW_SERVICE_NAME"}},)"
-                R"({"timestamp":)" +
-                std::to_string(timestamp) +
-                R"(,"value":"sr","endpoint":{"ipv4":"192.168.1.2","port":3306,)"
-                R"("serviceName":"NEW_SERVICE_NAME"}},)"
-                R"({"timestamp":)" +
-                std::to_string(timestamp) +
-                R"(,"value":"cr","endpoint":)"
-                R"({"ipv4":"192.168.1.2","port":3306,"serviceName":"NEW_SERVICE_NAME"}}],)"
-                R"("binaryAnnotations":[{"key":"lc","value":"my_component_name",)"
-                R"("endpoint":{"ipv4":"192.168.1.2","port":3306,)"
-                R"("serviceName":"my_service_name"}},)"
-                R"({"key":"http.return_code","value":"200",)"
-                R"("endpoint":{"ipv4":"192.168.1.2","port":3306,)"
-                R"("serviceName":"my_service_name"}},)"
-                R"({"key":"http.return_code","value":"400",)"
-                R"("endpoint":{"ipv4":"192.168.1.2","port":3306,)"
-                R"("serviceName":"my_service_name"}}]})",
-            span.toJson());
+  EXPECT_TRUE(TestUtility::protoEqual(
+      TestUtility::jsonToStruct(
+          R"({"traceId":")" + span.traceIdAsHexString() + R"(","name":"span_name","id":")" +
+          span.idAsHexString() + R"(","parentId":")" + span.parentIdAsHexString() +
+          R"(","timestamp":)" + std::to_string(span.timestamp()) +
+          R"(,"duration":3000,)"
+          R"("annotations":[)"
+          R"({"timestamp":)" +
+          std::to_string(timestamp) +
+          R"(,"value":"cs","endpoint":)"
+          R"({"ipv4":"192.168.1.2","port":3306,"serviceName":"NEW_SERVICE_NAME"}},)"
+          R"({"timestamp":)" +
+          std::to_string(timestamp) +
+          R"(,"value":"ss",)"
+          R"("endpoint":{"ipv4":"192.168.1.2","port":3306,)"
+          R"("serviceName":"NEW_SERVICE_NAME"}},)"
+          R"({"timestamp":)" +
+          std::to_string(timestamp) +
+          R"(,"value":"sr","endpoint":{"ipv4":"192.168.1.2","port":3306,)"
+          R"("serviceName":"NEW_SERVICE_NAME"}},)"
+          R"({"timestamp":)" +
+          std::to_string(timestamp) +
+          R"(,"value":"cr","endpoint":)"
+          R"({"ipv4":"192.168.1.2","port":3306,"serviceName":"NEW_SERVICE_NAME"}}],)"
+          R"("binaryAnnotations":[{"key":"lc","value":"my_component_name",)"
+          R"("endpoint":{"ipv4":"192.168.1.2","port":3306,)"
+          R"("serviceName":"my_service_name"}},)"
+          R"({"key":"http.return_code","value":"200",)"
+          R"("endpoint":{"ipv4":"192.168.1.2","port":3306,)"
+          R"("serviceName":"my_service_name"}},)"
+          R"({"key":"http.return_code","value":"400",)"
+          R"("endpoint":{"ipv4":"192.168.1.2","port":3306,)"
+          R"("serviceName":"my_service_name"}}]})"),
+      span.toStruct()));
 }
 
 TEST(ZipkinCoreTypesSpanTest, copyConstructor) {

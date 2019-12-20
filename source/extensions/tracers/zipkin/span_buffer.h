@@ -2,6 +2,8 @@
 
 #include "envoy/config/trace/v2/trace.pb.h"
 
+#include "common/protobuf/protobuf.h"
+
 #include "extensions/tracers/zipkin/tracer_interface.h"
 #include "extensions/tracers/zipkin/zipkin_core_types.h"
 
@@ -122,8 +124,8 @@ public:
   std::string serialize(const std::vector<Span>& pending_spans) override;
 
 private:
-  const std::vector<zipkin::jsonv2::Span> toListOfSpans(const Span& zipkin_span) const;
-  const zipkin::jsonv2::Endpoint toProtoEndpoint(const Endpoint& zipkin_endpoint) const;
+  const std::vector<ProtobufWkt::Struct> toListOfSpans(const Span& zipkin_span) const;
+  const ProtobufWkt::Struct toProtoEndpoint(const Endpoint& zipkin_endpoint) const;
 
   const bool shared_span_context_;
 };

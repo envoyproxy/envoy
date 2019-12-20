@@ -5,7 +5,9 @@
 #include "extensions/tracers/zipkin/span_buffer.h"
 
 #include "test/test_common/test_time.h"
+#include "test/test_common/utility.h"
 
+#include "absl/strings/str_format.h"
 #include "gtest/gtest.h"
 
 namespace Envoy {
@@ -57,6 +59,13 @@ Span createSpan(const std::vector<absl::string_view>& annotation_values, const I
   return span;
 }
 
+void expectEqualSerializedBuffer(const std::string& str1, const std::string& str2) {
+  EXPECT_EQ(str1.size(), str2.size());
+  EXPECT_TRUE(
+      TestUtility::protoEqual(TestUtility::jsonToStruct(absl::StrFormat(R"({"root":%s})", str1)),
+                              TestUtility::jsonToStruct(absl::StrFormat(R"({"root":%s})", str2))));
+}
+
 void expectSerializedBuffer(SpanBuffer& buffer, const bool delay_allocation,
                             const std::vector<std::string>& expected_list) {
   DangerousDeprecatedTestTime test_time;
@@ -76,7 +85,7 @@ void expectSerializedBuffer(SpanBuffer& buffer, const bool delay_allocation,
   for (uint64_t i = 0; i < expected_list.size(); i++) {
     buffer.addSpan(createSpan({"cs", "sr"}, IpType::V4));
     EXPECT_EQ(i + 1, buffer.pendingSpans());
-    EXPECT_EQ(expected_list.at(i), buffer.serialize());
+    expectEqualSerializedBuffer(expected_list.at(i), buffer.serialize());
   }
 
   // Add a valid span. Valid means can be serialized to v2.
@@ -162,96 +171,96 @@ TEST(ZipkinSpanBufferTest, SerializeSpan) {
   const bool shared = true;
   SpanBuffer buffer1(envoy::config::trace::v2::ZipkinConfig::HTTP_JSON, shared, 2);
   buffer1.addSpan(createSpan({"cs"}, IpType::V4));
-  EXPECT_EQ("[{"
-            R"("traceId":"0000000000000001",)"
-            R"("id":"0000000000000001",)"
-            R"("kind":"CLIENT",)"
-            R"("timestamp":"1566058071601051",)"
-            R"("duration":"100",)"
-            R"("localEndpoint":{)"
-            R"("serviceName":"service1",)"
-            R"("ipv4":"1.2.3.4",)"
-            R"("port":8080},)"
-            R"("tags":{)"
-            R"("component":"proxy"})"
-            "}]",
-            buffer1.serialize());
+  expectEqualSerializedBuffer("[{"
+                              R"("traceId":"0000000000000001",)"
+                              R"("id":"0000000000000001",)"
+                              R"("kind":"CLIENT",)"
+                              R"("timestamp":1566058071601051,)"
+                              R"("duration":100,)"
+                              R"("localEndpoint":{)"
+                              R"("serviceName":"service1",)"
+                              R"("ipv4":"1.2.3.4",)"
+                              R"("port":8080},)"
+                              R"("tags":{)"
+                              R"("component":"proxy"})"
+                              "}]",
+                              buffer1.serialize());
 
   SpanBuffer buffer1_v6(envoy::config::trace::v2::ZipkinConfig::HTTP_JSON, shared, 2);
   buffer1_v6.addSpan(createSpan({"cs"}, IpType::V6));
-  EXPECT_EQ("[{"
-            R"("traceId":"0000000000000001",)"
-            R"("id":"0000000000000001",)"
-            R"("kind":"CLIENT",)"
-            R"("timestamp":"1566058071601051",)"
-            R"("duration":"100",)"
-            R"("localEndpoint":{)"
-            R"("serviceName":"service1",)"
-            R"("ipv6":"2001:db8:85a3::8a2e:370:4444",)"
-            R"("port":7334},)"
-            R"("tags":{)"
-            R"("component":"proxy"})"
-            "}]",
-            buffer1_v6.serialize());
+  expectEqualSerializedBuffer("[{"
+                              R"("traceId":"0000000000000001",)"
+                              R"("id":"0000000000000001",)"
+                              R"("kind":"CLIENT",)"
+                              R"("timestamp":1566058071601051,)"
+                              R"("duration":100,)"
+                              R"("localEndpoint":{)"
+                              R"("serviceName":"service1",)"
+                              R"("ipv6":"2001:db8:85a3::8a2e:370:4444",)"
+                              R"("port":7334},)"
+                              R"("tags":{)"
+                              R"("component":"proxy"})"
+                              "}]",
+                              buffer1_v6.serialize());
 
   SpanBuffer buffer2(envoy::config::trace::v2::ZipkinConfig::HTTP_JSON, shared, 2);
   buffer2.addSpan(createSpan({"cs", "sr"}, IpType::V4));
-  EXPECT_EQ("[{"
-            R"("traceId":"0000000000000001",)"
-            R"("id":"0000000000000001",)"
-            R"("kind":"CLIENT",)"
-            R"("timestamp":"1566058071601051",)"
-            R"("duration":"100",)"
-            R"("localEndpoint":{)"
-            R"("serviceName":"service1",)"
-            R"("ipv4":"1.2.3.4",)"
-            R"("port":8080},)"
-            R"("tags":{)"
-            R"("component":"proxy"}},)"
-            R"({)"
-            R"("traceId":"0000000000000001",)"
-            R"("id":"0000000000000001",)"
-            R"("kind":"SERVER",)"
-            R"("timestamp":"1566058071601051",)"
-            R"("duration":"100",)"
-            R"("localEndpoint":{)"
-            R"("serviceName":"service1",)"
-            R"("ipv4":"1.2.3.4",)"
-            R"("port":8080},)"
-            R"("tags":{)"
-            R"("component":"proxy"},)"
-            R"("shared":true)"
-            "}]",
-            buffer2.serialize());
+  expectEqualSerializedBuffer("[{"
+                              R"("traceId":"0000000000000001",)"
+                              R"("id":"0000000000000001",)"
+                              R"("kind":"CLIENT",)"
+                              R"("timestamp":1566058071601051,)"
+                              R"("duration":100,)"
+                              R"("localEndpoint":{)"
+                              R"("serviceName":"service1",)"
+                              R"("ipv4":"1.2.3.4",)"
+                              R"("port":8080},)"
+                              R"("tags":{)"
+                              R"("component":"proxy"}},)"
+                              R"({)"
+                              R"("traceId":"0000000000000001",)"
+                              R"("id":"0000000000000001",)"
+                              R"("kind":"SERVER",)"
+                              R"("timestamp":1566058071601051,)"
+                              R"("duration":100,)"
+                              R"("localEndpoint":{)"
+                              R"("serviceName":"service1",)"
+                              R"("ipv4":"1.2.3.4",)"
+                              R"("port":8080},)"
+                              R"("tags":{)"
+                              R"("component":"proxy"},)"
+                              R"("shared":true)"
+                              "}]",
+                              buffer2.serialize());
 
   SpanBuffer buffer3(envoy::config::trace::v2::ZipkinConfig::HTTP_JSON, !shared, 2);
   buffer3.addSpan(createSpan({"cs", "sr"}, IpType::V4));
-  EXPECT_EQ("[{"
-            R"("traceId":"0000000000000001",)"
-            R"("id":"0000000000000001",)"
-            R"("kind":"CLIENT",)"
-            R"("timestamp":"1566058071601051",)"
-            R"("duration":"100",)"
-            R"("localEndpoint":{)"
-            R"("serviceName":"service1",)"
-            R"("ipv4":"1.2.3.4",)"
-            R"("port":8080},)"
-            R"("tags":{)"
-            R"("component":"proxy"}},)"
-            R"({)"
-            R"("traceId":"0000000000000001",)"
-            R"("id":"0000000000000001",)"
-            R"("kind":"SERVER",)"
-            R"("timestamp":"1566058071601051",)"
-            R"("duration":"100",)"
-            R"("localEndpoint":{)"
-            R"("serviceName":"service1",)"
-            R"("ipv4":"1.2.3.4",)"
-            R"("port":8080},)"
-            R"("tags":{)"
-            R"("component":"proxy"})"
-            "}]",
-            buffer3.serialize());
+  expectEqualSerializedBuffer("[{"
+                              R"("traceId":"0000000000000001",)"
+                              R"("id":"0000000000000001",)"
+                              R"("kind":"CLIENT",)"
+                              R"("timestamp":1566058071601051,)"
+                              R"("duration":100,)"
+                              R"("localEndpoint":{)"
+                              R"("serviceName":"service1",)"
+                              R"("ipv4":"1.2.3.4",)"
+                              R"("port":8080},)"
+                              R"("tags":{)"
+                              R"("component":"proxy"}},)"
+                              R"({)"
+                              R"("traceId":"0000000000000001",)"
+                              R"("id":"0000000000000001",)"
+                              R"("kind":"SERVER",)"
+                              R"("timestamp":1566058071601051,)"
+                              R"("duration":100,)"
+                              R"("localEndpoint":{)"
+                              R"("serviceName":"service1",)"
+                              R"("ipv4":"1.2.3.4",)"
+                              R"("port":8080},)"
+                              R"("tags":{)"
+                              R"("component":"proxy"})"
+                              "}]",
+                              buffer3.serialize());
 
   SpanBuffer buffer4(envoy::config::trace::v2::ZipkinConfig::HTTP_PROTO, shared, 2);
   buffer4.addSpan(createSpan({"cs"}, IpType::V4));
