@@ -14,5 +14,6 @@ envoy_cc_test_library(
     deps = [
         "//include/envoy/http:filter_interface",
         "//test/fuzz:utility_lib",
+        "//test/mocks/http:http_mocks",
     ],
 )

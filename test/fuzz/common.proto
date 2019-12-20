@@ -17,7 +17,7 @@ message Headers {
 
 message HttpData {
   Headers headers = 1;
-  string data = 2;
+  repeated string data = 2;
   Headers trailers = 3;
 }
 

@@ -17,22 +17,12 @@ namespace Extensions {
 namespace HttpFilters {
 namespace BufferFilter {
 
-class BufferFilterFuzz : public DecoderFuzzFilter {
-public:
-  BufferFilterFuzz(envoy::config::filter::http::buffer::v2::Buffer proto_config)
-      : config_(std::make_shared<BufferFilterConfig>(proto_config)) {
-    // Initialize filter and setup callbacks.
-    filter_ = std::make_unique<BufferFilter>(config_);
-    filter_->setDecoderFilterCallbacks(callbacks_);
-  }
-
-  BufferFilterConfigSharedPtr config_;
-};
-
 DEFINE_PROTO_FUZZER(
     const test::extensions::filters::http::buffer::BufferFilterFuzzTestCase& input) {
-  BufferFilterFuzz filter(input.config());
-  filter.fuzz(input.data());
+  BufferFilterConfigSharedPtr config(std::make_shared<BufferFilterConfig>(input.config()));
+  BufferFilter filter(config);
+  DecoderFuzzFilter decoder_filter(&filter);
+  // decoder_filter.fuzz(input.data());
 }
 
 } // namespace BufferFilter
