@@ -1615,9 +1615,12 @@ void Filter::UpstreamRequest::onPoolReady(Http::StreamEncoder& request_encoder,
 
   host->outlierDetector().putResult(Upstream::Outlier::Result::LocalOriginConnectSuccess);
 
-  // TODO(ggreenway): set upstream local address in the StreamInfo.
   onUpstreamHostSelected(host);
   request_encoder.getStream().addCallbacks(*this);
+
+  stream_info_.setUpstreamLocalAddress(request_encoder.getStream().connectionLocalAddress());
+  parent_.callbacks_->streamInfo().setUpstreamLocalAddress(
+      request_encoder.getStream().connectionLocalAddress());
 
   stream_info_.setUpstreamSslConnection(info.downstreamSslConnection());
   parent_.callbacks_->streamInfo().setUpstreamSslConnection(info.downstreamSslConnection());
