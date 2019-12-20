@@ -1,5 +1,6 @@
 #!/usr/bin/python
 
+import random
 import os
 import shutil
 import socket
@@ -369,7 +370,11 @@ class ServicesHolder:
 
         # Start Envoy in the background, pointing to rendered config file.
         envoy_binary = ServicesHolder.find_envoy()
-        envoy_args = [os.path.abspath(envoy_binary), '-c', envoy_config_file]
+        # --base-id is added to allow multiple Envoy instances to run at the same time.
+        envoy_args = [
+            os.path.abspath(envoy_binary), '-c', envoy_config_file, '--base-id',
+            str(random.randint(1, 999999))
+        ]
         envoy_handle = subprocess.Popen(envoy_args, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         self.envoy_worker = ProcessWorker(envoy_handle, 'Envoy', 'starting main dispatch loop')
         self.envoy_worker.await_startup()
