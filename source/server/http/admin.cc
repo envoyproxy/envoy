@@ -549,6 +549,7 @@ void AdminImpl::addAllConfigToDump(envoy::admin::v2alpha::ConfigDump& dump,
                                    const absl::optional<std::string>& mask) const {
   for (const auto& key_callback_pair : config_tracker_.getCallbacksMap()) {
     ProtobufTypes::MessagePtr message = key_callback_pair.second();
+    ASSERT(message);
 
     if (mask.has_value()) {
       Protobuf::FieldMask field_mask;
@@ -567,6 +568,7 @@ AdminImpl::addResourceToDump(envoy::admin::v2alpha::ConfigDump& dump,
                              const std::string& resource) const {
   for (const auto& key_callback_pair : config_tracker_.getCallbacksMap()) {
     ProtobufTypes::MessagePtr message = key_callback_pair.second();
+    ASSERT(message);
 
     auto field_descriptor = message->GetDescriptor()->FindFieldByName(resource);
     const Protobuf::Reflection* reflection = message->GetReflection();
