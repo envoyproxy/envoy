@@ -61,7 +61,7 @@ using ActiveQuicListenerPtr = std::unique_ptr<ActiveQuicListener>;
 
 // A factory to create ActiveQuicListener based on given config.
 class ActiveQuicListenerFactory : public Network::ActiveUdpListenerFactory,
-                                         Logger::Loggable<Logger::Id::quic> {
+                                  Logger::Loggable<Logger::Id::quic> {
 public:
   ActiveQuicListenerFactory(const envoy::api::v2::listener::QuicProtocolOptions& config,
                             uint32_t concurrency);
