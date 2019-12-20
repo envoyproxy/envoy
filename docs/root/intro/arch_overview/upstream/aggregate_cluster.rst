@@ -9,7 +9,7 @@ policy to cluster using MAGLEV, from cluster with 0.1s connection timeout to clu
 connection timeout, etc. Aggregate cluster loosely couples multiple clusters by referencing their 
 name in the :ref:`configuration <envoy_api_msg_config.cluster.aggregate.v2alpha.ClusterConfig>`. The
 fallback priority is defined implicitly by the ordering in the :ref:`clusters list <envoy_api_field_config.cluster.aggregate.v2alpha.ClusterConfig.clusters>`.
-Aggregate cluster uses tiered load balancing. The load balancer chooses cluster and piority first 
+Aggregate cluster uses tiered load balancing. The load balancer chooses cluster and priority first 
 and then delegates the load balancing to the load balancer of the selected cluster. The top level 
 load balancer reuses the existing load balancing algorithm by linearizing the priority set of 
 multiple clusters into one. 

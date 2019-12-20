@@ -2,14 +2,14 @@ syntax = "proto3";
 
 package envoy.service.auth.v2;
 
-option java_package = "io.envoyproxy.envoy.service.auth.v2";
-option java_outer_classname = "AttributeContextProto";
-option java_multiple_files = true;
-
 import "envoy/api/v2/core/address.proto";
 import "envoy/api/v2/core/base.proto";
 
 import "google/protobuf/timestamp.proto";
+
+option java_package = "io.envoyproxy.envoy.service.auth.v2";
+option java_outer_classname = "AttributeContextProto";
+option java_multiple_files = true;
 
 // [#protodoc-title: Attribute Context ]
 

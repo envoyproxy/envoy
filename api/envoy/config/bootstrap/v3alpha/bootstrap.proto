@@ -2,10 +2,6 @@ syntax = "proto3";
 
 package envoy.config.bootstrap.v3alpha;
 
-option java_package = "io.envoyproxy.envoy.config.bootstrap.v3alpha";
-option java_outer_classname = "BootstrapProto";
-option java_multiple_files = true;
-
 import "envoy/api/v3alpha/auth/cert.proto";
 import "envoy/api/v3alpha/cds.proto";
 import "envoy/api/v3alpha/core/address.proto";
@@ -23,6 +19,10 @@ import "google/protobuf/wrappers.proto";
 import "udpa/annotations/versioning.proto";
 
 import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.config.bootstrap.v3alpha";
+option java_outer_classname = "BootstrapProto";
+option java_multiple_files = true;
 
 // [#protodoc-title: Bootstrap]
 // This proto is supplied via the :option:`-c` CLI flag and acts as the root
