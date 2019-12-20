@@ -840,6 +840,28 @@ TEST_F(EdsTest, EndpointMovedToNewPriority) {
     // around should preserve that.
     EXPECT_FALSE(hosts[0]->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC));
   }
+
+  // Moves the endpoints back to original priorities
+  cluster_load_assignment.clear_endpoints();
+  add_endpoint(80, 0);
+  add_endpoint(81, 0);
+
+  doOnConfigUpdateVerifyNoThrow(cluster_load_assignment);
+
+  {
+    auto& hosts = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts();
+    EXPECT_EQ(hosts.size(), 2);
+
+    // The endpoints were healthy, so moving them around should preserve that.
+    EXPECT_FALSE(hosts[0]->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC));
+    EXPECT_FALSE(hosts[1]->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC));
+  }
+
+  {
+    // priority 1 should now be empty
+    auto& hosts = cluster_->prioritySet().hostSetsPerPriority()[1]->hosts();
+    EXPECT_TRUE(hosts.empty());
+  }
 }
 
 // Verifies that if an endpoint is moved between priorities, the health check value
