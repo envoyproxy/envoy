@@ -96,8 +96,8 @@ DEFINE_PROTO_FUZZER(const test::common::http::HeaderMapImplFuzzTestCase& input) 
     }
     case test::common::http::Action::kMutateAndMove: {
       const auto& mutate_and_move = action.mutate_and_move();
-      lower_case_strings.emplace_back(std::make_unique<Http::LowerCaseString>(
-          replaceInvalidCharacters(mutate_and_move.key())));
+      lower_case_strings.emplace_back(
+          std::make_unique<Http::LowerCaseString>(replaceInvalidCharacters(mutate_and_move.key())));
       Http::HeaderString header_field(*lower_case_strings.back());
       Http::HeaderString header_value;
       // Do some mutation or parameterized action.
