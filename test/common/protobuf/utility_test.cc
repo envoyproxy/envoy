@@ -362,6 +362,16 @@ sensitive_repeated_typed_struct:
       insensitive_repeated_int:
         - '3'
         - '4'
+sensitive_v2_data_source:
+  - {}
+  - filename: This filename should not be redacted despite its parent.
+  - inline_bytes: 8EDAC7ED
+  - inline_string: This inline string should be redacted because of its parent.
+sensitive_v3alpha_data_source:
+  - {}
+  - filename: This filename should not be redacted despite its parent.
+  - inline_bytes: 8EDAC7ED
+  - inline_string: This inline string should be redacted because of its parent.
 insensitive_any:
   '@type': type.googleapis.com/envoy.test.Sensitive
   sensitive_string: This field should be redacted.
@@ -484,6 +494,16 @@ sensitive_repeated_typed_struct:
       insensitive_repeated_string:
         - '[redacted]'
         - '[redacted]'
+sensitive_v2_data_source:
+  - {}
+  - filename: This filename should not be redacted despite its parent.
+  - inline_string: '[redacted]'
+  - inline_string: '[redacted]'
+sensitive_v3alpha_data_source:
+  - {}
+  - filename: This filename should not be redacted despite its parent.
+  - inline_string: '[redacted]'
+  - inline_string: '[redacted]'
 insensitive_any:
   '@type': type.googleapis.com/envoy.test.Sensitive
   sensitive_string: '[redacted]'

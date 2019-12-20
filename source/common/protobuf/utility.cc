@@ -3,6 +3,8 @@
 #include <limits>
 #include <numeric>
 
+#include "envoy/api/v2/core/base.pb.h"
+#include "envoy/api/v3alpha/core/base.pb.h"
 #include "envoy/protobuf/message_validator.h"
 #include "envoy/type/percent.pb.h"
 
@@ -520,11 +522,11 @@ std::unique_ptr<Protobuf::Message> typeUrlToNewMessage(Protobuf::MessageFactory&
       descriptor == nullptr ? nullptr : message_factory.GetPrototype(descriptor)->New());
 }
 
-// Recursive helper method for MessageUtil::redact() below. Note that we have to keep track of
-// whether an ancestor was marked as `sensitive`, not just the field, because of cases like
-// `TlsContext::private_key`, which is of type `core.DataSource` rather than `string`.
-void redact(Protobuf::Message* message, bool ancestor_is_sensitive) {
-  // If the message is an `Any`, we have to first unpack it to its original type to redact it...
+// Forward declaration for mutually-recursive helper functions.
+void redact(Protobuf::Message* message, bool ancestor_is_sensitive);
+
+// To redact an `Any`, we have to unpack it to its original type to redact it.
+bool redactAny(Protobuf::Message* message, bool ancestor_is_sensitive) {
   auto* any = dynamic_cast<ProtobufWkt::Any*>(message);
   if (any != nullptr) {
     Protobuf::DynamicMessageFactory message_factory;
@@ -535,17 +537,19 @@ void redact(Protobuf::Message* message, bool ancestor_is_sensitive) {
       // `MessageUtil::redact()` for more context.
       ENVOY_LOG_MISC(warn, "Could not redact ProtobufWkt::Any with unknown type URL {}",
                      any->type_url());
-      return;
+      return false;
     }
 
     any->UnpackTo(typed_message.get());
     redact(typed_message.get(), ancestor_is_sensitive);
     any->PackFrom(*typed_message);
-    return;
+    return true;
   }
+  return false;
+}
 
-  // If the message is a `TypedStruct`, it also contains a `type_url` and can be handled the same
-  // way as `Any` above.
+// To redact a `TypedStruct`, we have to reify it based on its `type_url` to redact it.
+bool redactTypedStruct(Protobuf::Message* message, bool ancestor_is_sensitive) {
   auto* typed_struct = dynamic_cast<udpa::type::v1::TypedStruct*>(message);
   if (typed_struct != nullptr) {
     Protobuf::DynamicMessageFactory message_factory;
@@ -556,17 +560,57 @@ void redact(Protobuf::Message* message, bool ancestor_is_sensitive) {
       // `MessageUtil::redact()` for more context.
       ENVOY_LOG_MISC(warn, "Could not redact udpa::type::v1::TypedStruct with unknown type URL {}",
                      typed_struct->type_url());
-      return;
+      return false;
     }
 
     MessageUtil::jsonConvert(typed_struct->value(), ProtobufMessage::getNullValidationVisitor(),
                              *typed_message);
     redact(typed_message.get(), ancestor_is_sensitive);
     MessageUtil::jsonConvert(*typed_message, *(typed_struct->mutable_value()));
+    return true;
+  }
+  return false;
+}
+
+// `DataSource`, which is annotated as `sensitive` in `TlsCertificate` and `TlsSessionTicketKeys`
+// requires special handling.
+template <typename DataSource>
+bool redactDataSource(Protobuf::Message* message, bool ancestor_is_sensitive) {
+  auto* data_source = dynamic_cast<DataSource*>(message);
+  if (data_source != nullptr) {
+    if (ancestor_is_sensitive) {
+      switch (data_source->specifier_case()) {
+      case DataSource::SPECIFIER_NOT_SET:
+        // If the data source is empty, no work is needed.
+        break;
+      case DataSource::kFilename:
+        // Don't redact filenames (SecretManagerImplTest::ConfigDumpNotRedactFilenamePrivateKey).
+        break;
+      case DataSource::kInlineBytes:
+        // Clear inline bytes and treat it as a string (fall through).
+        data_source->clear_inline_bytes();
+      case DataSource::kInlineString:
+        // Redact strings the usual way.
+        data_source->set_inline_string("[redacted]");
+        break;
+      }
+    }
+    return true;
+  }
+  return false;
+}
+
+// Recursive helper method for MessageUtil::redact() below. Note that we have to keep track of
+// whether an ancestor was marked as `sensitive`, not just the field, to handle cases similar to
+// `DataSource` in a more general way.
+void redact(Protobuf::Message* message, bool ancestor_is_sensitive) {
+  if (redactAny(message, ancestor_is_sensitive) ||
+      redactTypedStruct(message, ancestor_is_sensitive) ||
+      redactDataSource<envoy::api::v2::core::DataSource>(message, ancestor_is_sensitive) ||
+      redactDataSource<envoy::api::v3alpha::core::DataSource>(message, ancestor_is_sensitive)) {
     return;
   }
 
-  // Otherwise, use reflection to traverse all populated fields of this message...
   const auto* reflection = message->GetReflection();
   std::vector<const Protobuf::FieldDescriptor*> field_descriptors;
   reflection->ListFields(*message, &field_descriptors);

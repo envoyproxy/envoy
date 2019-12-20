@@ -9,6 +9,8 @@ option java_multiple_files = true;
 import "google/protobuf/any.proto";
 import "google/protobuf/struct.proto";
 
+import "envoy/api/v2/core/base.proto";
+import "envoy/api/v3alpha/core/base.proto";
 import "udpa/annotations/sensitive.proto";
 import "udpa/type/v1/typed_struct.proto";
 
@@ -24,6 +26,10 @@ message Sensitive {
   udpa.type.v1.TypedStruct sensitive_typed_struct = 9 [(udpa.annotations.sensitive) = true];
   repeated udpa.type.v1.TypedStruct sensitive_repeated_typed_struct = 10
       [(udpa.annotations.sensitive) = true];
+  repeated envoy.api.v2.core.DataSource sensitive_v2_data_source = 11
+      [(udpa.annotations.sensitive) = true];
+  repeated envoy.api.v3alpha.core.DataSource sensitive_v3alpha_data_source = 12
+      [(udpa.annotations.sensitive) = true];
 
   string insensitive_string = 101;
   repeated string insensitive_repeated_string = 102;
@@ -35,4 +41,6 @@ message Sensitive {
   repeated google.protobuf.Any insensitive_repeated_any = 108;
   udpa.type.v1.TypedStruct insensitive_typed_struct = 109;
   repeated udpa.type.v1.TypedStruct insensitive_repeated_typed_struct = 110;
+  repeated envoy.api.v2.core.DataSource insensitive_v2_data_source = 111;
+  repeated envoy.api.v3alpha.core.DataSource insensitive_v3alpha_data_source = 112;
 }
