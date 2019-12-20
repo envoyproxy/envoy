@@ -48,6 +48,7 @@ CTXs
 CVC
 CVE
 CX
+CYGWIN
 DER
 DESC
 DFATAL
@@ -57,7 +58,9 @@ DNS
 DRYs
 DS
 DST
+DW
 EADDRINUSE
+EADDRNOTAVAIL
 EAGAIN
 ECDH
 ECDHE
@@ -91,6 +94,7 @@ FCDS
 FFFF
 FIN
 FIPS
+FIRSTHDR
 FQDN
 FREEBIND
 FUZZER
@@ -150,6 +154,7 @@ LDS
 LEV
 LF
 LHS
+LLVM
 LRS
 MB
 MD
@@ -165,6 +170,7 @@ NACKs
 NBF
 NBSP
 NDEBUG
+NEXTHDR
 NGHTTP
 NOAUTH
 NODELAY
@@ -299,6 +305,7 @@ VLOG
 VM
 WASM
 WAVM
+WIP
 WKT
 WRR
 WS
@@ -421,7 +428,6 @@ codings
 combinatorial
 comparator
 compat
-compiation
 completable
 cond
 condvar
@@ -572,6 +578,7 @@ goog
 google
 goto
 gzip
+hackery
 hacky
 handshaker
 hardcoded
@@ -648,6 +655,7 @@ lenenc
 lexically
 libc
 libevent
+libtool
 libstdc
 libtooling
 lifecycle
@@ -671,7 +679,6 @@ lowp
 ltrim
 lua
 lyft
-mabye
 maglev
 malloc
 matchable
