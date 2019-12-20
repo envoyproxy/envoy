@@ -84,6 +84,7 @@ message ClientConfig {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.service.discovery.v2.ClientConfig";
 
+  // Node identifier for a particular client.
   api.v3alpha.core.Node node = 1;
 
   repeated PerXdsConfig xds_config = 2;

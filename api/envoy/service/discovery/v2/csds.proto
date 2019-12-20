@@ -73,6 +73,7 @@ message PerXdsConfig {
 
 // All xds configs for a particular client.
 message ClientConfig {
+  // Node identifier for a particular client.
   api.v2.core.Node node = 1;
 
   repeated PerXdsConfig xds_config = 2;
