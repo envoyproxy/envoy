@@ -6,10 +6,11 @@
 #include <vector>
 
 #include "envoy/api/api.h"
+#include "envoy/api/v2/auth/cert.pb.h"
 #include "envoy/api/v2/cds.pb.h"
 #include "envoy/api/v2/core/base.pb.h"
-#include "envoy/api/v2/core/protocol.pb.h"
 #include "envoy/api/v2/eds.pb.h"
+#include "envoy/api/v2/listener/listener.pb.h"
 #include "envoy/api/v2/route/route.pb.h"
 #include "envoy/config/bootstrap/v2/bootstrap.pb.h"
 #include "envoy/config/filter/network/http_connection_manager/v2/http_connection_manager.pb.h"
@@ -78,7 +79,8 @@ public:
   static const std::string TCP_PROXY_CONFIG;
   // A basic configuration for L7 proxying.
   static const std::string HTTP_PROXY_CONFIG;
-
+  // A basic configuration for L7 proxying with QUIC transport.
+  static const std::string QUIC_HTTP_PROXY_CONFIG;
   // A string for a basic buffer filter, which can be used with addFilter()
   static const std::string DEFAULT_BUFFER_FILTER;
   // A string for a small buffer filter, which can be used with addFilter()
@@ -139,7 +141,7 @@ public:
 
   // Set the HTTP access log for the first HCM (if present) to a given file. The default is
   // /dev/null.
-  bool setAccessLog(const std::string& filename);
+  bool setAccessLog(const std::string& filename, absl::string_view format = "");
 
   // Renames the first listener to the name specified.
   void renameListener(const std::string& name);

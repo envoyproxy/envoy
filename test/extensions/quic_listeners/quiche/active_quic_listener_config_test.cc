@@ -1,5 +1,3 @@
-#include "envoy/api/v2/listener/quic_config.pb.h"
-
 #include "common/config/utility.h"
 
 #include "extensions/quic_listeners/quiche/active_quic_listener.h"

@@ -48,6 +48,8 @@ typedef unsigned int sa_family_t;
 #include <sys/socket.h>
 #include <sys/uio.h> // for iovec
 #include <sys/un.h>
+#include <sys/stat.h>
+#include <fcntl.h>
 #include <unistd.h>
 
 #if defined(__linux__)

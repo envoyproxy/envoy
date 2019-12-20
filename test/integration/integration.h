@@ -5,6 +5,8 @@
 #include <string>
 #include <vector>
 
+#include "envoy/api/v2/discovery.pb.h"
+#include "envoy/api/v2/endpoint/endpoint.pb.h"
 #include "envoy/server/process_context.h"
 
 #include "common/http/codec_client.h"
@@ -138,7 +140,7 @@ struct ApiFilesystemConfig {
 /**
  * Test fixture for all integration tests.
  */
-class BaseIntegrationTest : Logger::Loggable<Logger::Id::testing> {
+class BaseIntegrationTest : protected Logger::Loggable<Logger::Id::testing> {
 public:
   using TestTimeSystemPtr = std::unique_ptr<Event::TestTimeSystem>;
   using InstanceConstSharedPtrFn = std::function<Network::Address::InstanceConstSharedPtr(int)>;
@@ -191,7 +193,7 @@ public:
   void setUpstreamAddress(uint32_t upstream_index,
                           envoy::api::v2::endpoint::LbEndpoint& endpoint) const;
 
-  Network::ClientConnectionPtr makeClientConnection(uint32_t port);
+  virtual Network::ClientConnectionPtr makeClientConnection(uint32_t port);
 
   void registerTestServerPorts(const std::vector<std::string>& port_names);
   void createTestServer(const std::string& json_path, const std::vector<std::string>& port_names);
@@ -368,6 +370,10 @@ protected:
 
   // If true, use AutonomousUpstream for fake upstreams.
   bool autonomous_upstream_{false};
+
+  // If true, allow incomplete streams in AutonomousUpstream
+  // This does nothing if autonomous_upstream_ is false
+  bool autonomous_allow_incomplete_streams_{false};
 
   bool enable_half_close_{false};
 

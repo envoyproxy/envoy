@@ -159,6 +159,7 @@ envoy_cc_library(
         "//include/envoy/stats:symbol_table_interface",
         "//source/common/common:assert_lib",
         "//source/common/common:logger_lib",
+        "//source/common/common:mem_block_builder_lib",
         "//source/common/common:stack_array",
         "//source/common/common:thread_lib",
         "//source/common/common:utility_lib",

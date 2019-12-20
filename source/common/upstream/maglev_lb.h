@@ -1,5 +1,6 @@
 #pragma once
 
+#include "envoy/api/v2/cds.pb.h"
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats_macros.h"
 
@@ -26,8 +27,8 @@ struct MaglevLoadBalancerStats {
 /**
  * This is an implementation of Maglev consistent hashing as described in:
  * https://static.googleusercontent.com/media/research.google.com/en//pubs/archive/44824.pdf
- * section 3.4. Specifically, the algorithm shown in pseudocode listening 1 is implemented
- * with a fixed table size of 65537. This is the recommended table size in section 5.3.
+ * section 3.4. Specifically, the algorithm shown in pseudocode listing 1 is implemented with a
+ * fixed table size of 65537. This is the recommended table size in section 5.3.
  */
 class MaglevTable : public ThreadAwareLoadBalancerBase::HashingLoadBalancer,
                     Logger::Loggable<Logger::Id::upstream> {

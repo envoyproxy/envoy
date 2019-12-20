@@ -4,6 +4,7 @@
 #include <unordered_set>
 
 #include "envoy/common/exception.h"
+#include "envoy/config/filter/http/transcoder/v2/transcoder.pb.h"
 #include "envoy/http/filter.h"
 
 #include "common/buffer/buffer_impl.h"
@@ -487,9 +488,9 @@ Http::FilterTrailersStatus JsonTranscoderFilter::encodeTrailers(Http::HeaderMap&
   bool is_trailers_only_response = response_headers_ == &trailers;
 
   if (!grpc_status || grpc_status.value() == Grpc::Status::WellKnownGrpcStatus::InvalidCode) {
-    response_headers_->Status()->value(enumToInt(Http::Code::ServiceUnavailable));
+    response_headers_->setStatus(enumToInt(Http::Code::ServiceUnavailable));
   } else {
-    response_headers_->Status()->value(Grpc::Utility::grpcToHttpStatus(grpc_status.value()));
+    response_headers_->setStatus(Grpc::Utility::grpcToHttpStatus(grpc_status.value()));
     if (!is_trailers_only_response) {
       response_headers_->setGrpcStatus(grpc_status.value());
     }
@@ -594,7 +595,7 @@ bool JsonTranscoderFilter::maybeConvertGrpcStatus(Grpc::Status::GrpcStatus grpc_
     return false;
   }
 
-  response_headers_->Status()->value(Grpc::Utility::grpcToHttpStatus(grpc_status));
+  response_headers_->setStatus(Grpc::Utility::grpcToHttpStatus(grpc_status));
 
   bool is_trailers_only_response = response_headers_ == &trailers;
   if (is_trailers_only_response) {

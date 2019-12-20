@@ -2,18 +2,19 @@ syntax = "proto3";
 
 package envoy.service.trace.v3alpha;
 
-option java_outer_classname = "TraceServiceProto";
-option java_multiple_files = true;
-option java_package = "io.envoyproxy.envoy.service.trace.v3alpha";
-option java_generic_services = true;
-
 import "envoy/api/v3alpha/core/base.proto";
 
 import "google/api/annotations.proto";
 
 import "opencensus/proto/trace/v1/trace.proto";
+import "udpa/annotations/versioning.proto";
 
 import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.service.trace.v3alpha";
+option java_outer_classname = "TraceServiceProto";
+option java_multiple_files = true;
+option java_generic_services = true;
 
 // Service for streaming traces to server that consumes the trace data. It
 // uses OpenCensus data model as a standard to represent trace information.
@@ -26,10 +27,18 @@ service TraceService {
 }
 
 message StreamTracesResponse {
+  option (udpa.annotations.versioning).previous_message_type =
+      "envoy.service.trace.v2.StreamTracesResponse";
 }
 
 message StreamTracesMessage {
+  option (udpa.annotations.versioning).previous_message_type =
+      "envoy.service.trace.v2.StreamTracesMessage";
+
   message Identifier {
+    option (udpa.annotations.versioning).previous_message_type =
+        "envoy.service.trace.v2.StreamTracesMessage.Identifier";
+
     // The node sending the access log messages over the stream.
     api.v3alpha.core.Node node = 1 [(validate.rules).message = {required: true}];
   }

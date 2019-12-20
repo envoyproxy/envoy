@@ -4,6 +4,8 @@
 #include <tuple>
 #include <vector>
 
+#include "envoy/api/v2/cds.pb.h"
+#include "envoy/api/v2/core/base.pb.h"
 #include "envoy/stats/scope.h"
 
 #include "common/network/utility.h"

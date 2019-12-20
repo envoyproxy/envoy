@@ -5,6 +5,8 @@
 #include <iostream>
 #include <string>
 
+#include "envoy/admin/v2alpha/server_info.pb.h"
+
 #include "common/common/fmt.h"
 #include "common/common/logger.h"
 #include "common/common/macros.h"
@@ -18,7 +20,22 @@
 #include "tclap/CmdLine.h"
 
 namespace Envoy {
+namespace {
+std::vector<std::string> toArgsVector(int argc, const char* const* argv) {
+  std::vector<std::string> args;
+  for (int i = 0; i < argc; ++i) {
+    args.emplace_back(argv[i]);
+  }
+  return args;
+}
+} // namespace
+
 OptionsImpl::OptionsImpl(int argc, const char* const* argv,
+                         const HotRestartVersionCb& hot_restart_version_cb,
+                         spdlog::level::level_enum default_log_level)
+    : OptionsImpl(toArgsVector(argc, argv), hot_restart_version_cb, default_log_level) {}
+
+OptionsImpl::OptionsImpl(std::vector<std::string> args,
                          const HotRestartVersionCb& hot_restart_version_cb,
                          spdlog::level::level_enum default_log_level)
     : signal_handling_enabled_(true) {
@@ -116,9 +133,14 @@ OptionsImpl::OptionsImpl(int argc, const char* const* argv,
   TCLAP::ValueArg<bool> use_fake_symbol_table("", "use-fake-symbol-table",
                                               "Use fake symbol table implementation", false, true,
                                               "bool", cmd);
+
+  TCLAP::ValueArg<std::string> disable_extensions("", "disable-extensions",
+                                                  "Comma-separated list of extensions to disable",
+                                                  false, "", "string", cmd);
+
   cmd.setExceptionHandling(false);
   try {
-    cmd.parse(argc, argv);
+    cmd.parse(args);
     count_ = cmd.getArgList().size();
   } catch (TCLAP::ArgException& e) {
     try {
@@ -213,6 +235,10 @@ OptionsImpl::OptionsImpl(int argc, const char* const* argv,
     std::cerr << hot_restart_version_cb(!hot_restart_disabled_);
     throw NoServingException();
   }
+
+  if (!disable_extensions.getValue().empty()) {
+    disabled_extensions_ = absl::StrSplit(disable_extensions.getValue(), ",");
+  }
 }
 
 void OptionsImpl::parseComponentLogLevels(const std::string& component_log_levels) {
@@ -294,6 +320,9 @@ Server::CommandLineOptionsPtr OptionsImpl::toCommandLineOptions() const {
   command_line_options->set_enable_mutex_tracing(mutexTracingEnabled());
   command_line_options->set_cpuset_threads(cpusetThreadsEnabled());
   command_line_options->set_restart_epoch(restartEpoch());
+  for (const auto& e : disabledExtensions()) {
+    command_line_options->add_disabled_extensions(e);
+  }
   return command_line_options;
 }
 
@@ -307,5 +336,22 @@ OptionsImpl::OptionsImpl(const std::string& service_cluster, const std::string& 
       parent_shutdown_time_(900), mode_(Server::Mode::Serve), hot_restart_disabled_(false),
       signal_handling_enabled_(true), mutex_tracing_enabled_(false), cpuset_threads_(false),
       fake_symbol_table_enabled_(false) {}
+
+void OptionsImpl::disableExtensions(const std::vector<std::string>& names) {
+  for (const auto& name : names) {
+    const std::vector<absl::string_view> parts = absl::StrSplit(name, absl::MaxSplits("/", 1));
+
+    if (parts.size() != 2) {
+      ENVOY_LOG_MISC(warn, "failed to disable invalid extension name '{}'", name);
+      continue;
+    }
+
+    if (Registry::FactoryCategoryRegistry::disableFactory(parts[0], parts[1])) {
+      ENVOY_LOG_MISC(info, "disabled extension '{}'", name);
+    } else {
+      ENVOY_LOG_MISC(warn, "failed to disable unknown extension '{}'", name);
+    }
+  }
+}
 
 } // namespace Envoy

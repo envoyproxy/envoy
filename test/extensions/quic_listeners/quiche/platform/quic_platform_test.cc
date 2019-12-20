@@ -27,6 +27,7 @@
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
+#include "quiche/common/platform/api/quiche_endian.h"
 #include "quiche/epoll_server/fake_simple_epoll_server.h"
 #include "quiche/quic/platform/api/quic_aligned.h"
 #include "quiche/quic/platform/api/quic_arraysize.h"
@@ -34,7 +35,6 @@
 #include "quiche/quic/platform/api/quic_cert_utils.h"
 #include "quiche/quic/platform/api/quic_client_stats.h"
 #include "quiche/quic/platform/api/quic_containers.h"
-#include "quiche/quic/platform/api/quic_endian.h"
 #include "quiche/quic/platform/api/quic_estimate_memory_usage.h"
 #include "quiche/quic/platform/api/quic_expect_bug.h"
 #include "quiche/quic/platform/api/quic_exported_stats.h"
@@ -188,9 +188,10 @@ TEST_F(QuicPlatformTest, QuicInlinedVector) {
   EXPECT_EQ(3, vec[0]);
 }
 
-TEST_F(QuicPlatformTest, QuicEndian) {
-  EXPECT_EQ(0x1234, QuicEndian::NetToHost16(QuicEndian::HostToNet16(0x1234)));
-  EXPECT_EQ(0x12345678, QuicEndian::NetToHost32(QuicEndian::HostToNet32(0x12345678)));
+TEST_F(QuicPlatformTest, QuicheEndian) {
+  EXPECT_EQ(0x1234, quiche::QuicheEndian::NetToHost16(quiche::QuicheEndian::HostToNet16(0x1234)));
+  EXPECT_EQ(0x12345678,
+            quiche::QuicheEndian::NetToHost32(quiche::QuicheEndian::HostToNet32(0x12345678)));
 }
 
 TEST_F(QuicPlatformTest, QuicEstimateMemoryUsage) {

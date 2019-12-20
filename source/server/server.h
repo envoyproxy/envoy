@@ -8,6 +8,7 @@
 #include <memory>
 #include <string>
 
+#include "envoy/config/bootstrap/v2/bootstrap.pb.h"
 #include "envoy/event/timer.h"
 #include "envoy/server/drain_manager.h"
 #include "envoy/server/guarddog.h"
@@ -251,6 +252,9 @@ private:
   void notifyCallbacksForStage(
       Stage stage, Event::PostCb completion_cb = [] {});
 
+  using LifecycleNotifierCallbacks = std::list<StageCallback>;
+  using LifecycleNotifierCompletionCallbacks = std::list<StageCallbackWithCompletion>;
+
   // init_manager_ must come before any member that participates in initialization, and destructed
   // only after referencing members are gone, since initialization continuation can potentially
   // occur at any point during member lifetime. This init manager is populated with LdsApi targets.
@@ -285,6 +289,8 @@ private:
   ProdListenerComponentFactory listener_component_factory_;
   ProdWorkerFactory worker_factory_;
   std::unique_ptr<ListenerManager> listener_manager_;
+  absl::node_hash_map<Stage, LifecycleNotifierCallbacks> stage_callbacks_;
+  absl::node_hash_map<Stage, LifecycleNotifierCompletionCallbacks> stage_completable_callbacks_;
   Configuration::MainImpl config_;
   Network::DnsResolverSharedPtr dns_resolver_;
   Event::TimerPtr stat_flush_timer_;
@@ -314,18 +320,12 @@ private:
 
   ServerFactoryContextImpl server_context_;
 
-  using LifecycleNotifierCallbacks = std::list<StageCallback>;
-  using LifecycleNotifierCompletionCallbacks = std::list<StageCallbackWithCompletion>;
-
   template <class T>
   class LifecycleCallbackHandle : public ServerLifecycleNotifier::Handle, RaiiListElement<T> {
   public:
     LifecycleCallbackHandle(std::list<T>& callbacks, T& callback)
         : RaiiListElement<T>(callbacks, callback) {}
   };
-
-  absl::node_hash_map<Stage, LifecycleNotifierCallbacks> stage_callbacks_;
-  absl::node_hash_map<Stage, LifecycleNotifierCompletionCallbacks> stage_completable_callbacks_;
 };
 
 // Local implementation of Stats::MetricSnapshot used to flush metrics to sinks. We could

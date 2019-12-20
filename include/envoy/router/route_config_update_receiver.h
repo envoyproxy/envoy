@@ -2,6 +2,8 @@
 
 #include <memory>
 
+#include "envoy/api/v2/discovery.pb.h"
+#include "envoy/api/v2/rds.pb.h"
 #include "envoy/common/pure.h"
 #include "envoy/common/time.h"
 #include "envoy/router/rds.h"

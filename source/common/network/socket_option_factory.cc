@@ -1,5 +1,7 @@
 #include "common/network/socket_option_factory.h"
 
+#include "envoy/api/v2/core/base.pb.h"
+
 #include "common/common/fmt.h"
 #include "common/network/addr_family_aware_socket_option_impl.h"
 #include "common/network/socket_option_impl.h"
@@ -112,6 +114,13 @@ std::unique_ptr<Socket::Options> SocketOptionFactory::buildRxQueueOverFlowOption
       envoy::api::v2::core::SocketOption::STATE_BOUND,
       ENVOY_MAKE_SOCKET_OPTION_NAME(SOL_SOCKET, SO_RXQ_OVFL), 1));
 #endif
+  return options;
+}
+
+std::unique_ptr<Socket::Options> SocketOptionFactory::buildReusePortOptions() {
+  std::unique_ptr<Socket::Options> options = std::make_unique<Socket::Options>();
+  options->push_back(std::make_shared<Network::SocketOptionImpl>(
+      envoy::api::v2::core::SocketOption::STATE_PREBIND, ENVOY_SOCKET_SO_REUSEPORT, 1));
   return options;
 }
 

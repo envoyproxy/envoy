@@ -68,7 +68,7 @@ public:
 
 private:
   Upstream::ClusterManager& cm_;
-  const envoy::api::v2::core::HttpUri& uri_;
+  const envoy::api::v2::core::HttpUri uri_;
   const std::string content_hash_;
   RemoteDataFetcherCallback& callback_;
 

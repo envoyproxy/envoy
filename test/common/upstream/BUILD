@@ -21,6 +21,7 @@ envoy_cc_test(
         "//test/mocks/protobuf:protobuf_mocks",
         "//test/mocks/upstream:upstream_mocks",
         "//test/test_common:utility_lib",
+        "@envoy_api//envoy/api/v2:pkg_cc_proto",
         "@envoy_api//envoy/api/v2/core:pkg_cc_proto",
     ],
 )
@@ -32,42 +33,11 @@ envoy_cc_test(
         "abseil_optional",
     ],
     deps = [
-        ":utility_lib",
-        "//include/envoy/stats:stats_interface",
-        "//include/envoy/upstream:upstream_interface",
-        "//source/common/api:api_lib",
-        "//source/common/config:utility_lib",
-        "//source/common/event:dispatcher_lib",
-        "//source/common/network:socket_option_lib",
-        "//source/common/network:transport_socket_options_lib",
-        "//source/common/network:utility_lib",
-        "//source/common/protobuf:utility_lib",
-        "//source/common/stats:stats_lib",
-        "//source/common/upstream:cluster_factory_lib",
-        "//source/common/upstream:cluster_manager_lib",
-        "//source/common/upstream:subset_lb_lib",
-        "//source/extensions/transport_sockets/raw_buffer:config",
-        "//source/extensions/transport_sockets/tls:context_lib",
-        "//test/integration/clusters:custom_static_cluster",
-        "//test/mocks/access_log:access_log_mocks",
-        "//test/mocks/api:api_mocks",
-        "//test/mocks/http:http_mocks",
-        "//test/mocks/local_info:local_info_mocks",
-        "//test/mocks/network:network_mocks",
-        "//test/mocks/protobuf:protobuf_mocks",
-        "//test/mocks/runtime:runtime_mocks",
-        "//test/mocks/secret:secret_mocks",
-        "//test/mocks/server:server_mocks",
-        "//test/mocks/tcp:tcp_mocks",
-        "//test/mocks/thread_local:thread_local_mocks",
-        "//test/mocks/upstream:upstream_mocks",
-        "//test/test_common:registry_lib",
-        "//test/test_common:simulated_time_system_lib",
-        "//test/test_common:threadsafe_singleton_injector_lib",
-        "//test/test_common:utility_lib",
+        ":test_cluster_manager",
         "@envoy_api//envoy/admin/v2alpha:pkg_cc_proto",
         "@envoy_api//envoy/api/v2:pkg_cc_proto",
         "@envoy_api//envoy/api/v2/core:pkg_cc_proto",
+        "@envoy_api//envoy/config/bootstrap/v2:pkg_cc_proto",
     ],
 )
 
@@ -108,6 +78,8 @@ envoy_cc_test(
         "//test/mocks/upstream:upstream_mocks",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/api/v2:pkg_cc_proto",
+        "@envoy_api//envoy/api/v2/core:pkg_cc_proto",
+        "@envoy_api//envoy/api/v2/endpoint:pkg_cc_proto",
     ],
 )
 
@@ -134,6 +106,8 @@ envoy_cc_test(
         "//test/test_common:simulated_time_system_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/api/v2/core:pkg_cc_proto",
+        "@envoy_api//envoy/api/v2/endpoint:pkg_cc_proto",
+        "@envoy_api//envoy/data/core/v2alpha:pkg_cc_proto",
     ],
 )
 
@@ -169,6 +143,7 @@ envoy_cc_test(
         "//source/common/upstream:upstream_lib",
         "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/upstream:upstream_mocks",
+        "@envoy_api//envoy/api/v2:pkg_cc_proto",
     ],
 )
 
@@ -184,6 +159,9 @@ envoy_cc_test(
         "//source/common/upstream:upstream_lib",
         "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/upstream:upstream_mocks",
+        "@envoy_api//envoy/api/v2:pkg_cc_proto",
+        "@envoy_api//envoy/api/v2/core:pkg_cc_proto",
+        "@envoy_api//envoy/api/v2/endpoint:pkg_cc_proto",
     ],
 )
 
@@ -199,8 +177,8 @@ envoy_cc_test(
         "//test/mocks/upstream:upstream_mocks",
         "//test/test_common:simulated_time_system_lib",
         "//test/test_common:utility_lib",
-        "@envoy_api//envoy/api/v2:pkg_cc_proto",
         "@envoy_api//envoy/api/v2/endpoint:pkg_cc_proto",
+        "@envoy_api//envoy/service/load_stats/v2:pkg_cc_proto",
     ],
 )
 
@@ -220,6 +198,7 @@ envoy_cc_test(
         "//test/mocks/upstream:upstream_mocks",
         "//test/test_common:simulated_time_system_lib",
         "//test/test_common:utility_lib",
+        "@envoy_api//envoy/api/v2/core:pkg_cc_proto",
         "@envoy_api//envoy/service/discovery/v2:pkg_cc_proto",
     ],
 )
@@ -245,6 +224,8 @@ envoy_cc_test(
         "//test/mocks/thread_local:thread_local_mocks",
         "//test/mocks/upstream:upstream_mocks",
         "//test/test_common:utility_lib",
+        "@envoy_api//envoy/api/v2:pkg_cc_proto",
+        "@envoy_api//envoy/api/v2/core:pkg_cc_proto",
     ],
 )
 
@@ -267,6 +248,7 @@ envoy_cc_test(
         "//test/mocks/ssl:ssl_mocks",
         "//test/mocks/upstream:upstream_mocks",
         "//test/test_common:utility_lib",
+        "@envoy_api//envoy/api/v2:pkg_cc_proto",
     ],
 )
 
@@ -287,6 +269,8 @@ envoy_cc_test(
         "//test/mocks/upstream:upstream_mocks",
         "//test/test_common:simulated_time_system_lib",
         "//test/test_common:utility_lib",
+        "@envoy_api//envoy/api/v2/cluster:pkg_cc_proto",
+        "@envoy_api//envoy/data/cluster/v2alpha:pkg_cc_proto",
     ],
 )
 
@@ -327,6 +311,7 @@ envoy_cc_test(
         "//source/common/upstream:upstream_lib",
         "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/upstream:upstream_mocks",
+        "@envoy_api//envoy/api/v2:pkg_cc_proto",
     ],
 )
 
@@ -337,6 +322,7 @@ envoy_cc_test(
         ":utility_lib",
         "//source/common/upstream:maglev_lb_lib",
         "//test/mocks/upstream:upstream_mocks",
+        "@envoy_api//envoy/api/v2:pkg_cc_proto",
     ],
 )
 
@@ -355,6 +341,7 @@ envoy_cc_binary(
         "//test/common/upstream:utility_lib",
         "//test/mocks/upstream:upstream_mocks",
         "//test/test_common:printers_lib",
+        "@envoy_api//envoy/api/v2:pkg_cc_proto",
     ],
 )
 
@@ -374,6 +361,7 @@ envoy_cc_test(
         "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/upstream:upstream_mocks",
         "@envoy_api//envoy/api/v2:pkg_cc_proto",
+        "@envoy_api//envoy/api/v2/core:pkg_cc_proto",
     ],
 )
 
@@ -391,6 +379,8 @@ envoy_cc_test(
         "//test/mocks/server:server_mocks",
         "//test/test_common:registry_lib",
         "//test/test_common:utility_lib",
+        "@envoy_api//envoy/api/v2:pkg_cc_proto",
+        "@envoy_api//envoy/api/v2/core:pkg_cc_proto",
     ],
 )
 
@@ -399,6 +389,9 @@ envoy_cc_test(
     srcs = ["upstream_impl_test.cc"],
     deps = [
         ":utility_lib",
+        "@envoy_api//envoy/api/v2/core:pkg_cc_proto",
+        "@envoy_api//envoy/api/v2/endpoint:pkg_cc_proto",
+        "@envoy_api//envoy/api/v2:pkg_cc_proto",
         "//include/envoy/api:api_interface",
         "//include/envoy/http:codec_interface",
         "//include/envoy/upstream:cluster_manager_interface",
@@ -434,6 +427,53 @@ envoy_cc_test_library(
         "//source/common/upstream:upstream_includes",
         "//source/common/upstream:upstream_lib",
         "//test/test_common:utility_lib",
+        "@envoy_api//envoy/api/v2:pkg_cc_proto",
+        "@envoy_api//envoy/api/v2/core:pkg_cc_proto",
+        "@envoy_api//envoy/api/v2/endpoint:pkg_cc_proto",
+        "@envoy_api//envoy/config/bootstrap/v2:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_test_library(
+    name = "test_cluster_manager",
+    hdrs = ["test_cluster_manager.h"],
+    deps = [
+        ":utility_lib",
+        "//include/envoy/stats:stats_interface",
+        "//include/envoy/upstream:upstream_interface",
+        "//source/common/api:api_lib",
+        "//source/common/config:utility_lib",
+        "//source/common/event:dispatcher_lib",
+        "//source/common/network:socket_option_lib",
+        "//source/common/network:transport_socket_options_lib",
+        "//source/common/network:utility_lib",
+        "//source/common/protobuf:utility_lib",
+        "//source/common/stats:stats_lib",
+        "//source/common/upstream:cluster_factory_lib",
+        "//source/common/upstream:cluster_manager_lib",
+        "//source/common/upstream:subset_lb_lib",
+        "//source/extensions/transport_sockets/raw_buffer:config",
+        "//source/extensions/transport_sockets/tls:context_lib",
+        "//test/integration/clusters:custom_static_cluster",
+        "//test/mocks/access_log:access_log_mocks",
+        "//test/mocks/api:api_mocks",
+        "//test/mocks/http:http_mocks",
+        "//test/mocks/local_info:local_info_mocks",
+        "//test/mocks/network:network_mocks",
+        "//test/mocks/protobuf:protobuf_mocks",
+        "//test/mocks/runtime:runtime_mocks",
+        "//test/mocks/secret:secret_mocks",
+        "//test/mocks/server:server_mocks",
+        "//test/mocks/tcp:tcp_mocks",
+        "//test/mocks/thread_local:thread_local_mocks",
+        "//test/mocks/upstream:upstream_mocks",
+        "//test/test_common:registry_lib",
+        "//test/test_common:simulated_time_system_lib",
+        "//test/test_common:threadsafe_singleton_injector_lib",
+        "//test/test_common:utility_lib",
+        "@envoy_api//envoy/api/v2:pkg_cc_proto",
+        "@envoy_api//envoy/api/v2/core:pkg_cc_proto",
+        "@envoy_api//envoy/config/bootstrap/v2:pkg_cc_proto",
     ],
 )
 
@@ -466,5 +506,6 @@ envoy_cc_test(
         "//test/mocks/upstream:upstream_mocks",
         "//test/test_common:registry_lib",
         "//test/test_common:utility_lib",
+        "@envoy_api//envoy/api/v2:pkg_cc_proto",
     ],
 )

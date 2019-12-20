@@ -9,6 +9,9 @@
 #include <vector>
 
 #include "envoy/admin/v2alpha/config_dump.pb.h"
+#include "envoy/api/v2/cds.pb.h"
+#include "envoy/api/v2/core/config_source.pb.h"
+#include "envoy/config/bootstrap/v2/bootstrap.pb.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/network/dns.h"
 #include "envoy/runtime/runtime.h"
@@ -119,18 +122,23 @@ void ClusterManagerInitHelper::initializeSecondaryClusters() {
 void ClusterManagerInitHelper::maybeFinishInitialize() {
   // Do not do anything if we are still doing the initial static load or if we are waiting for
   // CDS initialize.
+  ENVOY_LOG(debug, "maybe finish initialize state: {}", enumToInt(state_));
   if (state_ == State::Loading || state_ == State::WaitingForCdsInitialize) {
     return;
   }
 
   // If we are still waiting for primary clusters to initialize, do nothing.
   ASSERT(state_ == State::WaitingForStaticInitialize || state_ == State::CdsInitialized);
+  ENVOY_LOG(debug, "maybe finish initialize primary init clusters empty: {}",
+            primary_init_clusters_.empty());
   if (!primary_init_clusters_.empty()) {
     return;
   }
 
   // If we are still waiting for secondary clusters to initialize, see if we need to first call
   // initialize on them. This is only done once.
+  ENVOY_LOG(debug, "maybe finish initialize secondary init clusters empty: {}",
+            secondary_init_clusters_.empty());
   if (!secondary_init_clusters_.empty()) {
     if (!started_secondary_initialize_) {
       ENVOY_LOG(info, "cm init: initializing secondary clusters");
@@ -153,6 +161,7 @@ void ClusterManagerInitHelper::maybeFinishInitialize() {
   // At this point, if we are doing static init, and we have CDS, start CDS init. Otherwise, move
   // directly to initialized.
   started_secondary_initialize_ = false;
+  ENVOY_LOG(debug, "maybe finish initialize cds api ready: {}", cds_ != nullptr);
   if (state_ == State::WaitingForStaticInitialize && cds_) {
     ENVOY_LOG(info, "cm init: initializing cds");
     state_ = State::WaitingForCdsInitialize;
@@ -474,7 +483,7 @@ bool ClusterManagerImpl::scheduleUpdate(const Cluster& cluster, uint32_t priorit
   }
 
   // Ensure there's a timer set to deliver these updates.
-  if (!updates->timer_enabled_) {
+  if (!updates->timer_->enabled()) {
     updates->enableTimer(timeout);
   }
 
@@ -494,7 +503,6 @@ void ClusterManagerImpl::applyUpdates(const Cluster& cluster, uint32_t priority,
   postThreadLocalClusterUpdate(cluster, priority, hosts_added, hosts_removed);
 
   cm_stats_.cluster_updated_via_merge_.inc();
-  updates.timer_enabled_ = false;
   updates.last_updated_ = time_source_.monotonicTime();
 }
 

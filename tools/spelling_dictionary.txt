@@ -13,14 +13,17 @@ API
 ASAN
 ASCII
 ASSERTs
+AST
 AWS
 BACKTRACE
 BSON
 CAS
 CB
 CDS
+CEL
 CHACHA
 CHLO
+CHMOD
 CHLOS
 CIDR
 CLA
@@ -45,6 +48,7 @@ CTXs
 CVC
 CVE
 CX
+CYGWIN
 DER
 DESC
 DFATAL
@@ -54,7 +58,9 @@ DNS
 DRYs
 DS
 DST
+DW
 EADDRINUSE
+EADDRNOTAVAIL
 EAGAIN
 ECDH
 ECDHE
@@ -83,10 +89,12 @@ EXPECTs
 EXPR
 FAQ
 FASTOPEN
+FB
 FCDS
 FFFF
 FIN
 FIPS
+FIRSTHDR
 FQDN
 FREEBIND
 FUZZER
@@ -146,6 +154,7 @@ LDS
 LEV
 LF
 LHS
+LLVM
 LRS
 MB
 MD
@@ -161,6 +170,7 @@ NACKs
 NBF
 NBSP
 NDEBUG
+NEXTHDR
 NGHTTP
 NOAUTH
 NODELAY
@@ -283,6 +293,7 @@ UDP
 UDS
 URI
 URL
+USEVC
 UTC
 UTF
 UUID
@@ -294,10 +305,12 @@ VLOG
 VM
 WASM
 WAVM
+WIP
 WKT
 WRR
 WS
 Welford's
+Wi
 XDS
 XFCC
 XFF
@@ -521,6 +534,7 @@ evwatch
 exe
 execlp
 expectable
+extrahelp
 faceplant
 facto
 failover
@@ -564,6 +578,7 @@ goog
 google
 goto
 gzip
+hackery
 hacky
 handshaker
 hardcoded
@@ -640,7 +655,9 @@ lenenc
 lexically
 libc
 libevent
+libtool
 libstdc
+libtooling
 lifecycle
 lightstep
 linearization
@@ -648,6 +665,7 @@ linearize
 linearized
 linux
 livelock
+llvm
 localhost
 lockless
 login
@@ -966,6 +984,7 @@ superset
 symlink
 symlinked
 symlinks
+syncookie
 sys
 syscall
 syscalls
@@ -984,6 +1003,7 @@ templatizing
 testability
 testcase
 testcases
+testdata
 testee
 th
 threadsafe
@@ -991,6 +1011,7 @@ thru
 timespan
 timestamp
 timestamps
+timeval
 tm
 tmp
 tmpfile
@@ -1058,6 +1079,7 @@ unreferenced
 unregister
 unregisters
 unresolvable
+unserializable
 unsetenv
 unsubscription
 unterminated
@@ -1123,3 +1145,4 @@ zag
 zig
 zipkin
 zlib
+OBQ

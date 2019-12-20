@@ -1,5 +1,6 @@
 #include "extensions/filters/http/buffer/buffer_filter.h"
 
+#include "envoy/config/filter/http/buffer/v2/buffer.pb.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/http/codes.h"
 

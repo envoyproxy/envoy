@@ -5,6 +5,7 @@
 #include <string>
 
 #include "envoy/api/io_error.h"
+#include "envoy/api/v2/core/base.pb.h"
 #include "envoy/common/exception.h"
 #include "envoy/network/connection.h"
 #include "envoy/network/connection_balancer.h"
@@ -44,8 +45,7 @@ public:
   virtual const Address::InstanceConstSharedPtr& localAddress() const PURE;
 
   /**
-   * @return the socket if getListenSocket() returns a shared socket among each call,
-   * nullopt otherwise.
+   * @return the socket shared by worker threads if any; otherwise return null.
    */
   virtual absl::optional<std::reference_wrapper<Socket>> sharedSocket() const PURE;
 };

@@ -1,3 +1,6 @@
+#include "envoy/api/v2/cds.pb.h"
+#include "envoy/config/common/dynamic_forward_proxy/v2alpha/dns_cache.pb.h"
+
 #include "extensions/common/dynamic_forward_proxy/dns_cache_impl.h"
 #include "extensions/common/dynamic_forward_proxy/dns_cache_manager_impl.h"
 
@@ -23,7 +26,7 @@ public:
     config_.set_name("foo");
     config_.set_dns_lookup_family(envoy::api::v2::Cluster::V4_ONLY);
 
-    EXPECT_CALL(dispatcher_, createDnsResolver(_)).WillOnce(Return(resolver_));
+    EXPECT_CALL(dispatcher_, createDnsResolver(_, _)).WillOnce(Return(resolver_));
     dns_cache_ = std::make_unique<DnsCacheImpl>(dispatcher_, tls_, store_, config_);
     update_callbacks_handle_ = dns_cache_->addUpdateCallbacks(update_callbacks_);
   }

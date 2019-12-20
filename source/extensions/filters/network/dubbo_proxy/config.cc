@@ -1,5 +1,7 @@
 #include "extensions/filters/network/dubbo_proxy/config.h"
 
+#include "envoy/config/filter/network/dubbo_proxy/v2alpha1/dubbo_proxy.pb.h"
+#include "envoy/config/filter/network/dubbo_proxy/v2alpha1/dubbo_proxy.pb.validate.h"
 #include "envoy/registry/registry.h"
 
 #include "common/config/utility.h"
@@ -144,7 +146,7 @@ void ConfigImpl::registerFilter(const DubboFilterConfig& proto_config) {
       Envoy::Config::Utility::getAndCheckFactory<DubboFilters::NamedDubboFilterConfigFactory>(
           string_name);
   ProtobufTypes::MessagePtr message = factory.createEmptyConfigProto();
-  Envoy::Config::Utility::translateOpaqueConfig(proto_config.config(),
+  Envoy::Config::Utility::translateOpaqueConfig(string_name, proto_config.config(),
                                                 ProtobufWkt::Struct::default_instance(),
                                                 context_.messageValidationVisitor(), *message);
   DubboFilters::FilterFactoryCb callback =

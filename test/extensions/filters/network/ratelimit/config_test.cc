@@ -1,3 +1,4 @@
+#include "envoy/api/v2/core/grpc_service.pb.h"
 #include "envoy/config/filter/network/rate_limit/v2/rate_limit.pb.h"
 #include "envoy/config/filter/network/rate_limit/v2/rate_limit.pb.validate.h"
 
