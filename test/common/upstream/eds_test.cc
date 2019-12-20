@@ -808,6 +808,13 @@ TEST_F(EdsTest, EndpointMovedToNewPriority) {
   cluster_load_assignment.clear_endpoints();
   add_endpoint(81, 0);
   add_endpoint(80, 1);
+
+  // Verify that no hosts gets added or removed to/from the PrioritySet.
+  cluster_->prioritySet().addMemberUpdateCb([&](const auto& added, const auto& removed) {
+    EXPECT_TRUE(added.empty());
+    EXPECT_TRUE(removed.empty());
+  });
+
   doOnConfigUpdateVerifyNoThrow(cluster_load_assignment);
 
   {
@@ -892,8 +899,7 @@ TEST_F(EdsTest, EndpointMoved) {
   // Verify that no hosts gets added or removed to/from the PrioritySet.
   cluster_->prioritySet().addMemberUpdateCb([&](const auto& added, const auto& removed) {
     EXPECT_TRUE(added.empty());
-    // EXPECT_TRUE(removed.empty());
-    EXPECT_EQ(2, removed.size());
+    EXPECT_TRUE(removed.empty());
   });
   doOnConfigUpdateVerifyNoThrow(cluster_load_assignment);
 
