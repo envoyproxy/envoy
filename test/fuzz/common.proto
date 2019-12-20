@@ -22,4 +22,5 @@ message StreamInfo {
   envoy.api.v2.core.Metadata upstream_metadata = 4;
   string requested_server_name = 5;
   envoy.api.v2.core.Address address = 6;
+  envoy.api.v2.core.Address upstream_local_address = 7;
 }

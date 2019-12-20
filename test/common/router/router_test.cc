@@ -4374,7 +4374,7 @@ public:
     EXPECT_CALL(stream_, addCallbacks(_)).WillOnce(Invoke([&](Http::StreamCallbacks& callbacks) {
       stream_callbacks_ = &callbacks;
     }));
-    EXPECT_CALL(encoder_, getStream()).WillOnce(ReturnRef(stream_));
+    EXPECT_CALL(encoder_, getStream()).WillRepeatedly(ReturnRef(stream_));
     EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
         .WillOnce(Invoke(
             [&](Http::StreamDecoder& decoder,

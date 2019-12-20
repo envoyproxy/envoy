@@ -82,7 +82,8 @@ def RewriteIncludes(args):
 def ApiBoostTree(target_paths,
                  generate_compilation_database=False,
                  build_api_booster=False,
-                 debug_log=False):
+                 debug_log=False,
+                 sequential=False):
   dep_build_targets = ['//%s/...' % PrefixDirectory(prefix) for prefix in target_paths]
 
   # Optional setup of state. We need the compilation database and api_booster
@@ -139,12 +140,15 @@ def ApiBoostTree(target_paths,
     file_path = entry['file']
     if any(file_path.startswith(prefix) for prefix in target_paths):
       file_paths.add(file_path)
+  # Ensure a determinstic ordering if we are going to process sequentially.
+  if sequential:
+    file_paths = sorted(file_paths)
 
   # The API boosting is file local, so this is trivially parallelizable, use
   # multiprocessing pool with default worker pool sized to cpu_count(), since
   # this is CPU bound.
   try:
-    with mp.Pool() as p:
+    with mp.Pool(processes=1 if sequential else None) as p:
       # We need multiple phases, to ensure that any dependency on files being modified
       # in one thread on consumed transitive headers on the other thread isn't an
       # issue. This also ensures that we complete all analysis error free before
@@ -173,7 +177,11 @@ if __name__ == '__main__':
   parser.add_argument('--generate_compilation_database', action='store_true')
   parser.add_argument('--build_api_booster', action='store_true')
   parser.add_argument('--debug_log', action='store_true')
+  parser.add_argument('--sequential', action='store_true')
   parser.add_argument('paths', nargs='*', default=['source', 'test', 'include'])
   args = parser.parse_args()
-  ApiBoostTree(args.paths, args.generate_compilation_database, args.build_api_booster,
-               args.debug_log)
+  ApiBoostTree(args.paths,
+               generate_compilation_database=args.generate_compilation_database,
+               build_api_booster=args.build_api_booster,
+               debug_log=args.debug_log,
+               sequential=args.sequential)
