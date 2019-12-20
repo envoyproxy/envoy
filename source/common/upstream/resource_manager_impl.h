@@ -122,7 +122,6 @@ private:
           budget_percent_key_(retry_budget_runtime_key + "budget_percent"),
           min_retry_concurrency_key_(retry_budget_runtime_key + "min_retry_concurrency"),
           requests_(requests), pending_requests_(pending_requests), remaining_(remaining) {}
-    ~RetryBudgetImpl() override {}
 
     // Upstream::Resource
     bool canCreate() override {
@@ -156,6 +155,10 @@ private:
           min_retry_concurrency_key_, min_retry_concurrency_ ? *min_retry_concurrency_ : 3);
 
       clearRemainingGauge();
+
+      // We enforce that the retry concurrency is never allowed to go below the
+      // min_retry_concurrency, even if the configured percent of the current active requests
+      // yields a value that is smaller.
       return std::max<uint64_t>(budget_percent / 100.0 * current_active, min_retry_concurrency);
     }
     uint64_t count() const override { return max_retry_resource_.count(); }
