@@ -28,7 +28,7 @@ unhealthy, successes required before marking a host healthy, etc.):
 
 Health checks occur over the transport socket specified for the cluster. This implies that if a cluster is
 using a TLS-enabled transport socket, the health check will also occur over TLS. The
-:ref:`ALPN protocols <envoy_api_field_core.HealthCheck.alpn_protocols>` used for health check connections
+:ref:`TLS options <envoy_api_msg_core.HealthCheck.TLSOptions>` used for health check connections
 can be specified, which is useful if the corresponding upstream is using ALPN-based
 :ref:`FilterChainMatch <envoy_api_msg_listener.FilterChainMatch>` with different protocols for
 health checks versus data connections.
