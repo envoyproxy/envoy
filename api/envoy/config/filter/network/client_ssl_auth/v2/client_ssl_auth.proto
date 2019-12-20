@@ -2,15 +2,15 @@ syntax = "proto3";
 
 package envoy.config.filter.network.client_ssl_auth.v2;
 
-option java_package = "io.envoyproxy.envoy.config.filter.network.client_ssl_auth.v2";
-option java_outer_classname = "ClientSslAuthProto";
-option java_multiple_files = true;
-
 import "envoy/api/v2/core/address.proto";
 
 import "google/protobuf/duration.proto";
 
 import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.config.filter.network.client_ssl_auth.v2";
+option java_outer_classname = "ClientSslAuthProto";
+option java_multiple_files = true;
 
 // [#protodoc-title: Client TLS authentication]
 // Client TLS authentication

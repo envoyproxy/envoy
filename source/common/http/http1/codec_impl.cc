@@ -301,6 +301,10 @@ void StreamEncoderImpl::readDisable(bool disable) { connection_.readDisable(disa
 
 uint32_t StreamEncoderImpl::bufferLimit() { return connection_.bufferLimit(); }
 
+const Network::Address::InstanceConstSharedPtr& StreamEncoderImpl::connectionLocalAddress() {
+  return connection_.connection().localAddress();
+}
+
 static const char RESPONSE_PREFIX[] = "HTTP/1.1 ";
 static const char HTTP_10_RESPONSE_PREFIX[] = "HTTP/1.0 ";
 

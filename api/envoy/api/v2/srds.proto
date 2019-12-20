@@ -2,16 +2,16 @@ syntax = "proto3";
 
 package envoy.api.v2;
 
-option java_package = "io.envoyproxy.envoy.api.v2";
-option java_outer_classname = "SrdsProto";
-option java_multiple_files = true;
-option java_generic_services = true;
-
 import "envoy/api/v2/discovery.proto";
 
 import "google/api/annotations.proto";
 
 import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.api.v2";
+option java_outer_classname = "SrdsProto";
+option java_multiple_files = true;
+option java_generic_services = true;
 
 // [#protodoc-title: HTTP scoped routing configuration]
 // * Routing :ref:`architecture overview <arch_overview_http_routing>`
