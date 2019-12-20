@@ -42,5 +42,5 @@ Runtime
 -------
 
 The local rate limit filter can be runtime feature flagged via the :ref:`enabled
-<envoy_api_field_config.filter.network.local_rate_limit.v2alpha.LocalRateLimit.enabled>`
+<envoy_api_field_config.filter.network.local_rate_limit.v2alpha.LocalRateLimit.runtime_enabled>`
 configuration field.
