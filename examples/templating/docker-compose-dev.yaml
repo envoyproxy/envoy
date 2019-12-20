@@ -7,7 +7,7 @@ services:
       dockerfile: Dockerfile-frontenvoy
     command: ["/bin/bash", "-c", "./start_front.sh"]
     environment:
-      - ROBOTS_TXT_ADDRESS=/var/www/robots-dev.txt
+      - ROBOTS_TXT_FILEPATH=/var/www/robots-dev.txt
       - SERVICE_NAME=front-proxy
     networks:
       - envoymesh

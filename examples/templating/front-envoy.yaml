@@ -23,7 +23,7 @@ static_resources:
                 direct_response:
                   status: 200
                   body:
-                    filename: ${ROBOTS_TXT_ADDRESS}
+                    filename: ${ROBOTS_TXT_FILEPATH}
               - match:
                   prefix: "/"
                 direct_response:
