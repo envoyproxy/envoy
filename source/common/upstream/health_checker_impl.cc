@@ -15,7 +15,6 @@
 #include "common/grpc/common.h"
 #include "common/http/header_map_impl.h"
 #include "common/network/address_impl.h"
-#include "common/network/transport_socket_options_impl.h"
 #include "common/router/router.h"
 #include "common/runtime/runtime_impl.h"
 #include "common/upstream/host_utility.h"
