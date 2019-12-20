@@ -965,7 +965,7 @@ MATCHER_P(ApplicationProtocolListEq, expected, "") {
   return true;
 }
 
-TEST_F(HttpHealthCheckerImplTest, TLSOptions) {
+TEST_F(HttpHealthCheckerImplTest, TlsOptions) {
   const std::string host = "fake_cluster";
   const std::string path = "/healthcheck";
   const std::string yaml = R"EOF(

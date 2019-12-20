@@ -191,9 +191,9 @@ message HealthCheck {
   // cluster is using a TLS-enabled transport socket, the health check will also occur over TLS.
   //
   // This allows overriding the cluster TLS settings, just for health check connections.
-  message TLSOptions {
+  message TlsOptions {
     option (udpa.annotations.versioning).previous_message_type =
-        "envoy.api.v2.core.HealthCheck.TLSOptions";
+        "envoy.api.v2.core.HealthCheck.TlsOptions";
 
     // Specifies the ALPN protocols for health check connections. This is useful if the
     // corresponding upstream is using ALPN-based :ref:`FilterChainMatch
@@ -308,5 +308,6 @@ message HealthCheck {
   // The default value is false.
   bool always_log_health_check_failures = 19;
 
-  TLSOptions tls_options = 21;
+  // This allows overriding the cluster TLS settings, just for health check connections.
+  TlsOptions tls_options = 21;
 }
