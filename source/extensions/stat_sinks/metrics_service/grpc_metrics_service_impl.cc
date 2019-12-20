@@ -2,6 +2,7 @@
 
 #include "envoy/common/exception.h"
 #include "envoy/event/dispatcher.h"
+#include "envoy/service/metrics/v2/metrics_service.pb.h"
 #include "envoy/stats/histogram.h"
 #include "envoy/stats/stats.h"
 #include "envoy/upstream/cluster_manager.h"

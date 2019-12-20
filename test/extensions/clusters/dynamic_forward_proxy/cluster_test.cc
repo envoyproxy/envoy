@@ -1,3 +1,7 @@
+#include "envoy/api/v2/cds.pb.h"
+#include "envoy/config/cluster/dynamic_forward_proxy/v2alpha/cluster.pb.h"
+#include "envoy/config/cluster/dynamic_forward_proxy/v2alpha/cluster.pb.validate.h"
+
 #include "common/singleton/manager_impl.h"
 
 #include "extensions/clusters/dynamic_forward_proxy/cluster.h"

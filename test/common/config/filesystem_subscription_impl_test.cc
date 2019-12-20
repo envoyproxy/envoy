@@ -1,3 +1,5 @@
+#include "envoy/api/v2/eds.pb.h"
+
 #include "test/common/config/filesystem_subscription_test_harness.h"
 #include "test/mocks/event/mocks.h"
 #include "test/mocks/filesystem/mocks.h"

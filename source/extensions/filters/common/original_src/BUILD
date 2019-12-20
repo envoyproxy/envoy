@@ -20,6 +20,7 @@ envoy_cc_library(
         "//source/common/common:minimal_logger_lib",
         "//source/common/network:address_lib",
         "//source/common/network:utility_lib",
+        "@envoy_api//envoy/api/v2/core:pkg_cc_proto",
     ],
 )
 

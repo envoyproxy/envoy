@@ -1,3 +1,4 @@
+#include "envoy/config/bootstrap/v2/bootstrap.pb.h"
 #include "envoy/upstream/resource_manager.h"
 #include "envoy/upstream/upstream.h"
 

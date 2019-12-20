@@ -206,6 +206,8 @@ def FormatHeaderFromFile(source_code_info, file_proto):
     elif d in ['udpa/annotations/versioning.proto']:
       # Skip, we decide to add this based on requires_versioning_import
       pass
+    elif d in ['udpa/annotations/migrate.proto']:
+      infra_imports.append(d)
     else:
       misc_imports.append(d)
 
@@ -221,7 +223,7 @@ def FormatHeaderFromFile(source_code_info, file_proto):
       map(FormatImportBlock, [envoy_imports, google_imports, misc_imports, infra_imports]))
   comment_block = FormatComments(source_code_info.file_level_comments)
 
-  return ''.join(map(FormatBlock, [file_block, options_block, import_block, comment_block]))
+  return ''.join(map(FormatBlock, [file_block, import_block, options_block, comment_block]))
 
 
 def NormalizeFieldTypeName(type_context, field_fqn):

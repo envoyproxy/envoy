@@ -2,12 +2,6 @@ syntax = "proto3";
 
 package envoy.api.v2.listener;
 
-option java_package = "io.envoyproxy.envoy.api.v2.listener";
-option java_outer_classname = "ListenerProto";
-option java_multiple_files = true;
-option csharp_namespace = "Envoy.Api.V2.ListenerNS";
-option ruby_package = "Envoy.Api.V2.ListenerNS";
-
 import "envoy/api/v2/auth/cert.proto";
 import "envoy/api/v2/core/address.proto";
 import "envoy/api/v2/core/base.proto";
@@ -17,6 +11,12 @@ import "google/protobuf/struct.proto";
 import "google/protobuf/wrappers.proto";
 
 import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.api.v2.listener";
+option java_outer_classname = "ListenerProto";
+option java_multiple_files = true;
+option csharp_namespace = "Envoy.Api.V2.ListenerNS";
+option ruby_package = "Envoy.Api.V2.ListenerNS";
 
 // [#protodoc-title: Listener components]
 // Listener :ref:`configuration overview <config_listeners>`

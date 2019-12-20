@@ -1,5 +1,7 @@
 #include "common/config/filesystem_subscription_impl.h"
 
+#include "envoy/api/v2/discovery.pb.h"
+
 #include "common/common/macros.h"
 #include "common/config/utility.h"
 #include "common/protobuf/protobuf.h"

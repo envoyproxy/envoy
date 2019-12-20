@@ -9,6 +9,12 @@
 #include <unordered_set>
 #include <vector>
 
+#include "envoy/api/v2/cds.pb.h"
+#include "envoy/api/v2/cluster/circuit_breaker.pb.h"
+#include "envoy/api/v2/core/address.pb.h"
+#include "envoy/api/v2/core/base.pb.h"
+#include "envoy/api/v2/core/health_check.pb.h"
+#include "envoy/api/v2/endpoint/endpoint.pb.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/event/timer.h"
 #include "envoy/network/dns.h"
@@ -912,7 +918,9 @@ void ClusterImplBase::onPreInitComplete() {
   }
   initialization_started_ = true;
 
-  ENVOY_LOG(debug, "initializing secondary cluster {} completed", info()->name());
+  ENVOY_LOG(debug, "initializing {} cluster {} completed",
+            initializePhase() == InitializePhase::Primary ? "Primary" : "Secondary",
+            info()->name());
   init_manager_.initialize(init_watcher_);
 }
 

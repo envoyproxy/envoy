@@ -2,17 +2,17 @@ syntax = "proto3";
 
 package envoy.service.ratelimit.v3alpha;
 
-option java_package = "io.envoyproxy.envoy.service.ratelimit.v3alpha";
-option java_outer_classname = "RlsProto";
-option java_multiple_files = true;
-option java_generic_services = true;
-
 import "envoy/api/v3alpha/core/base.proto";
 import "envoy/api/v3alpha/ratelimit/ratelimit.proto";
 
 import "udpa/annotations/versioning.proto";
 
 import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.service.ratelimit.v3alpha";
+option java_outer_classname = "RlsProto";
+option java_multiple_files = true;
+option java_generic_services = true;
 
 // [#protodoc-title: Rate Limit Service (RLS)]
 
@@ -116,8 +116,7 @@ message RateLimitResponse {
   repeated DescriptorStatus statuses = 2;
 
   // A list of headers to add to the response
-  // [#next-major-version: rename to response_headers_to_add]
-  repeated api.v3alpha.core.HeaderValue headers = 3;
+  repeated api.v3alpha.core.HeaderValue response_headers_to_add = 3;
 
   // A list of headers to add to the request when forwarded
   repeated api.v3alpha.core.HeaderValue request_headers_to_add = 4;

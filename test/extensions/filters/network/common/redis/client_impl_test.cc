@@ -1,5 +1,7 @@
 #include <vector>
 
+#include "envoy/config/filter/network/redis_proxy/v2/redis_proxy.pb.h"
+
 #include "common/buffer/buffer_impl.h"
 #include "common/network/utility.h"
 #include "common/upstream/upstream_impl.h"
