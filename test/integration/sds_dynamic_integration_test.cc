@@ -117,10 +117,12 @@ protected:
   }
 
   void sendSdsResponse(const envoy::api::v3alpha::auth::Secret& secret) {
-    envoy::api::v3alpha::DiscoveryResponse discovery_response;
+    envoy::api::v2::DiscoveryResponse discovery_response;
     discovery_response.set_version_info("1");
     discovery_response.set_type_url(Config::TypeUrl::get().Secret);
-    discovery_response.add_resources()->PackFrom(secret);
+    Protobuf::DynamicMessageFactory dmf;
+    auto downgraded = Config::VersionConverter::downgrade(dmf, secret);
+    discovery_response.add_resources()->PackFrom(*downgraded);
 
     xds_stream_->sendGrpcMessage(discovery_response);
   }

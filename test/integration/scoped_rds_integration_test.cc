@@ -162,12 +162,14 @@ fragments:
   }
 
   void sendRdsResponse(const std::string& route_config, const std::string& version) {
-    envoy::api::v3alpha::DiscoveryResponse response;
+    envoy::api::v2::DiscoveryResponse response;
     response.set_version_info(version);
     response.set_type_url(Config::TypeUrl::get().RouteConfiguration);
     auto route_configuration =
         TestUtility::parseYaml<envoy::api::v3alpha::RouteConfiguration>(route_config);
-    response.add_resources()->PackFrom(route_configuration);
+    Protobuf::DynamicMessageFactory dmf;
+    auto downgraded = Config::VersionConverter::downgrade(dmf, route_configuration);
+    response.add_resources()->PackFrom(*downgraded);
     ASSERT(rds_upstream_info_.stream_by_resource_name_[route_configuration.name()] != nullptr);
     rds_upstream_info_.stream_by_resource_name_[route_configuration.name()]->sendGrpcMessage(
         response);
@@ -189,7 +191,7 @@ fragments:
                                   const std::string& version) {
     ASSERT(scoped_rds_upstream_info_.stream_by_resource_name_[srds_config_name_] != nullptr);
 
-    envoy::api::v3alpha::DeltaDiscoveryResponse response;
+    envoy::api::v2::DeltaDiscoveryResponse response;
     response.set_system_version_info(version);
     response.set_type_url(Config::TypeUrl::get().ScopedRouteConfiguration);
 
@@ -202,7 +204,9 @@ fragments:
       auto resource = response.add_resources();
       resource->set_name(scoped_route_proto.name());
       resource->set_version(version);
-      resource->mutable_resource()->PackFrom(scoped_route_proto);
+      Protobuf::DynamicMessageFactory dmf;
+      auto downgraded = Config::VersionConverter::downgrade(dmf, scoped_route_proto);
+      resource->mutable_resource()->PackFrom(*downgraded);
     }
     scoped_rds_upstream_info_.stream_by_resource_name_[srds_config_name_]->sendGrpcMessage(
         response);
@@ -212,14 +216,16 @@ fragments:
                                  const std::string& version) {
     ASSERT(scoped_rds_upstream_info_.stream_by_resource_name_[srds_config_name_] != nullptr);
 
-    envoy::api::v3alpha::DiscoveryResponse response;
+    envoy::api::v2::DiscoveryResponse response;
     response.set_version_info(version);
     response.set_type_url(Config::TypeUrl::get().ScopedRouteConfiguration);
 
     for (const auto& resource_proto : resource_protos) {
       envoy::api::v3alpha::ScopedRouteConfiguration scoped_route_proto;
       TestUtility::loadFromYaml(resource_proto, scoped_route_proto);
-      response.add_resources()->PackFrom(scoped_route_proto);
+      Protobuf::DynamicMessageFactory dmf;
+      auto downgraded = Config::VersionConverter::downgrade(dmf, scoped_route_proto);
+      response.add_resources()->PackFrom(*downgraded);
     }
     scoped_rds_upstream_info_.stream_by_resource_name_[srds_config_name_]->sendGrpcMessage(
         response);

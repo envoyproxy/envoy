@@ -1,6 +1,8 @@
 #include "envoy/api/v3alpha/cds.pb.h"
 #include "envoy/api/v3alpha/core/base.pb.h"
+#include "envoy/api/v2/discovery.pb.h"
 #include "envoy/api/v3alpha/discovery.pb.h"
+#include "envoy/api/v2/eds.pb.h"
 #include "envoy/api/v3alpha/eds.pb.h"
 #include "envoy/config/bootstrap/v3alpha/bootstrap.pb.h"
 #include "envoy/config/filter/http/router/v3alpha/router.pb.h"
@@ -369,16 +371,16 @@ public:
         RELEASE_ASSERT(result, result.message());
         eds_stream_->startGrpcStream();
 
-        envoy::api::v3alpha::DiscoveryRequest discovery_request;
+        envoy::api::v2::DiscoveryRequest discovery_request;
         result = eds_stream_->waitForGrpcMessage(*dispatcher_, discovery_request);
         RELEASE_ASSERT(result, result.message());
 
-        envoy::api::v3alpha::DiscoveryResponse discovery_response;
+        envoy::api::v2::DiscoveryResponse discovery_response;
         discovery_response.set_version_info("1");
         discovery_response.set_type_url(Config::TypeUrl::get().ClusterLoadAssignment);
 
-        envoy::api::v3alpha::ClusterLoadAssignment cluster_load_assignment =
-            TestUtility::parseYaml<envoy::api::v3alpha::ClusterLoadAssignment>(fmt::format(
+        auto cluster_load_assignment =
+            TestUtility::parseYaml<envoy::api::v2::ClusterLoadAssignment>(fmt::format(
                 R"EOF(
                 cluster_name: cluster_0
                 endpoints:

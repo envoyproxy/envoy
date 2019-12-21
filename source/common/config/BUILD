@@ -13,8 +13,9 @@ envoy_cc_library(
     srcs = ["api_type_oracle.cc"],
     hdrs = ["api_type_oracle.h"],
     deps = [
+        "//source/common/common:assert_lib",
+        "//source/common/common:logger_lib",
         "//source/common/protobuf",
-        "//source/common/protobuf:utility_lib",
         "@com_github_cncf_udpa//udpa/annotations:pkg_cc_proto",
         "@com_github_cncf_udpa//udpa/type/v1:pkg_cc_proto",
     ],
@@ -292,10 +293,10 @@ envoy_cc_library(
     deps = [
         "//source/common/grpc:common_lib",
         "//source/common/protobuf",
-        "@envoy_api//envoy/api/v3alpha:pkg_cc_proto",
-        "@envoy_api//envoy/api/v3alpha/auth:pkg_cc_proto",
-        "@envoy_api//envoy/api/v3alpha/route:pkg_cc_proto",
-        "@envoy_api//envoy/service/discovery/v3alpha:pkg_cc_proto",
+        "@envoy_api//envoy/api/v2:pkg_cc_proto",
+        "@envoy_api//envoy/api/v2/auth:pkg_cc_proto",
+        "@envoy_api//envoy/api/v2/route:pkg_cc_proto",
+        "@envoy_api//envoy/service/discovery/v2:pkg_cc_proto",
     ],
 )
 
@@ -339,6 +340,7 @@ envoy_cc_library(
     deps = [
         "//source/common/common:assert_lib",
         "//source/common/protobuf",
+        "@com_github_cncf_udpa//udpa/annotations:pkg_cc_proto",
     ],
 )
 

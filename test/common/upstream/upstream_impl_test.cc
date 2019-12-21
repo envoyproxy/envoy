@@ -405,6 +405,7 @@ TEST_F(StrictDnsClusterImplTest, HostRemovalActiveHealthSkipped) {
 
   ResolverData resolver(*dns_resolver_, dispatcher_);
   envoy::api::v3alpha::Cluster cluster_config = parseClusterFromV2Yaml(yaml);
+  ENVOY_LOG_MISC(debug, "HTD config is {}", cluster_config.DebugString());
   Envoy::Stats::ScopePtr scope = stats_.createScope(fmt::format(
       "cluster.{}.", cluster_config.alt_stat_name().empty() ? cluster_config.name()
                                                             : cluster_config.alt_stat_name()));

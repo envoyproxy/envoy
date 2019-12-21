@@ -1,6 +1,7 @@
 #!/bin/bash
 
 set -e
+set -x
 
 # Router_check_tool binary path
 PATH_BIN="${TEST_SRCDIR}/envoy"/test/tools/router_check/router_check_tool

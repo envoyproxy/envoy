@@ -1129,7 +1129,7 @@ dynamic_listeners:
   - name: foo
     error_state:
       failed_configuration:
-        "@type": type.googleapis.com/envoy.api.v2.Listener
+        "@type": type.googleapis.com/envoy.api.v3alpha.Listener
         name: foo
         address:
           socket_address:

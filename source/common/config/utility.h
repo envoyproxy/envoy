@@ -230,7 +230,7 @@ public:
     RELEASE_ASSERT(config != nullptr, "");
 
     translateOpaqueConfig(factory.name(), enclosing_message.typed_config(),
-                          enclosing_message.config(), validation_visitor, *config);
+                          enclosing_message.hidden_envoy_deprecated_config(), validation_visitor, *config);
 
     return config;
   }

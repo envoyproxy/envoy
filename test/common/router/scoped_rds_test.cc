@@ -4,6 +4,7 @@
 #include "envoy/admin/v3alpha/config_dump.pb.validate.h"
 #include "envoy/api/v3alpha/core/config_source.pb.h"
 #include "envoy/api/v3alpha/discovery.pb.h"
+#include "envoy/api/v2/rds.pb.h"
 #include "envoy/api/v3alpha/rds.pb.h"
 #include "envoy/api/v3alpha/srds.pb.h"
 #include "envoy/config/filter/network/http_connection_manager/v3alpha/http_connection_manager.pb.h"
@@ -127,7 +128,7 @@ protected:
                 subscriptionFromConfigSource(
                     _,
                     Eq(Grpc::Common::typeUrl(
-                        envoy::api::v3alpha::RouteConfiguration().GetDescriptor()->full_name())),
+                        envoy::api::v2::RouteConfiguration().GetDescriptor()->full_name())),
                     _, _))
         .Times(AnyNumber())
         .WillRepeatedly(Invoke([this](const envoy::api::v3alpha::core::ConfigSource&,

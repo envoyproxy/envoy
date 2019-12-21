@@ -5,6 +5,7 @@
 #include "envoy/admin/v3alpha/config_dump.pb.h"
 #include "envoy/api/v3alpha/core/config_source.pb.h"
 #include "envoy/api/v3alpha/discovery.pb.h"
+#include "envoy/api/v2/srds.pb.h"
 #include "envoy/api/v3alpha/srds.pb.h"
 #include "envoy/api/v3alpha/srds.pb.validate.h"
 #include "envoy/config/filter/network/http_connection_manager/v3alpha/http_connection_manager.pb.h"
@@ -105,7 +106,7 @@ ScopedRdsConfigSubscription::ScopedRdsConfigSubscription(
       factory_context.clusterManager().subscriptionFactory().subscriptionFromConfigSource(
           scoped_rds.scoped_rds_config_source(),
           Grpc::Common::typeUrl(
-              envoy::api::v3alpha::ScopedRouteConfiguration().GetDescriptor()->full_name()),
+              envoy::api::v2::ScopedRouteConfiguration().GetDescriptor()->full_name()),
           *scope_, *this);
 
   initialize([scope_key_builder]() -> Envoy::Config::ConfigProvider::ConfigConstSharedPtr {

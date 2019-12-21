@@ -1,5 +1,6 @@
 #include <memory>
 
+#include "envoy/api/v2/discovery.pb.h"
 #include "envoy/api/v3alpha/discovery.pb.h"
 #include "envoy/api/v3alpha/eds.pb.h"
 
@@ -8,6 +9,7 @@
 #include "common/config/protobuf_link_hacks.h"
 #include "common/config/resources.h"
 #include "common/config/utility.h"
+#include "common/config/version_converter.h"
 #include "common/protobuf/protobuf.h"
 #include "common/stats/isolated_store_impl.h"
 
@@ -68,9 +70,11 @@ public:
                          bool first = false, const std::string& nonce = "",
                          const Protobuf::int32 error_code = Grpc::Status::WellKnownGrpcStatus::Ok,
                          const std::string& error_message = "") {
-    envoy::api::v3alpha::DiscoveryRequest expected_request;
+    envoy::api::v2::DiscoveryRequest expected_request;
     if (first) {
-      expected_request.mutable_node()->CopyFrom(local_info_.node());
+      Protobuf::DynamicMessageFactory dmf;
+      auto downgraded = Config::VersionConverter::downgrade(dmf, local_info_.node());
+      expected_request.mutable_node()->CopyFrom(*downgraded);
     }
     for (const auto& resource : resource_names) {
       expected_request.add_resource_names(resource);
@@ -253,17 +257,22 @@ TEST_F(GrpcMuxImplTest, WildcardWatch) {
     response->set_version_info("1");
     envoy::api::v3alpha::ClusterLoadAssignment load_assignment;
     load_assignment.set_cluster_name("x");
-    response->add_resources()->PackFrom(load_assignment);
+    Protobuf::DynamicMessageFactory dmf;
+    auto downgraded = Config::VersionConverter::downgrade(dmf, load_assignment);
+    response->add_resources()->PackFrom(*downgraded);
     EXPECT_CALL(callbacks_, onConfigUpdate(_, "1"))
         .WillOnce(
             Invoke([&load_assignment](const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
                                       const std::string&) {
               EXPECT_EQ(1, resources.size());
-              envoy::api::v3alpha::ClusterLoadAssignment expected_assignment;
-              resources[0].UnpackTo(&expected_assignment);
+              envoy::api::v3alpha::ClusterLoadAssignment expected_assignment =
+                  MessageUtil::anyConvert<envoy::api::v3alpha::ClusterLoadAssignment>(resources[0]);
+              ENVOY_LOG_MISC(debug, "HTD expected {}", expected_assignment.DebugString());
+              ENVOY_LOG_MISC(debug, "HTD original {}", load_assignment.DebugString());
               EXPECT_TRUE(TestUtility::protoEqual(expected_assignment, load_assignment));
             }));
     expectSendMessage(type_url, {}, "1");
+    ENVOY_LOG_MISC(debug, "HTD onReceiveMessage");
     grpc_mux_->grpcStreamForTest().onReceiveMessage(std::move(response));
   }
 }
@@ -282,6 +291,8 @@ TEST_F(GrpcMuxImplTest, WatchDemux) {
   expectSendMessage(type_url, {"y", "z", "x"}, "", true);
   grpc_mux_->start();
 
+  Protobuf::DynamicMessageFactory dmf;
+
   {
     std::unique_ptr<envoy::api::v3alpha::DiscoveryResponse> response(
         new envoy::api::v3alpha::DiscoveryResponse());
@@ -289,15 +300,16 @@ TEST_F(GrpcMuxImplTest, WatchDemux) {
     response->set_version_info("1");
     envoy::api::v3alpha::ClusterLoadAssignment load_assignment;
     load_assignment.set_cluster_name("x");
-    response->add_resources()->PackFrom(load_assignment);
+    auto downgraded = Config::VersionConverter::downgrade(dmf, load_assignment);
+    response->add_resources()->PackFrom(*downgraded);
     EXPECT_CALL(bar_callbacks, onConfigUpdate(_, "1")).Times(0);
     EXPECT_CALL(foo_callbacks, onConfigUpdate(_, "1"))
         .WillOnce(
             Invoke([&load_assignment](const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
                                       const std::string&) {
               EXPECT_EQ(1, resources.size());
-              envoy::api::v3alpha::ClusterLoadAssignment expected_assignment;
-              resources[0].UnpackTo(&expected_assignment);
+              envoy::api::v3alpha::ClusterLoadAssignment expected_assignment =
+                  MessageUtil::anyConvert<envoy::api::v3alpha::ClusterLoadAssignment>(resources[0]);
               EXPECT_TRUE(TestUtility::protoEqual(expected_assignment, load_assignment));
             }));
     expectSendMessage(type_url, {"y", "z", "x"}, "1");
@@ -311,22 +323,26 @@ TEST_F(GrpcMuxImplTest, WatchDemux) {
     response->set_version_info("2");
     envoy::api::v3alpha::ClusterLoadAssignment load_assignment_x;
     load_assignment_x.set_cluster_name("x");
-    response->add_resources()->PackFrom(load_assignment_x);
+    auto downgraded_x = Config::VersionConverter::downgrade(dmf, load_assignment_x);
+    response->add_resources()->PackFrom(*downgraded_x);
     envoy::api::v3alpha::ClusterLoadAssignment load_assignment_y;
     load_assignment_y.set_cluster_name("y");
-    response->add_resources()->PackFrom(load_assignment_y);
+    auto downgraded_y = Config::VersionConverter::downgrade(dmf, load_assignment_y);
+    response->add_resources()->PackFrom(*downgraded_y);
     envoy::api::v3alpha::ClusterLoadAssignment load_assignment_z;
     load_assignment_z.set_cluster_name("z");
-    response->add_resources()->PackFrom(load_assignment_z);
+    auto downgraded_z = Config::VersionConverter::downgrade(dmf, load_assignment_z);
+    response->add_resources()->PackFrom(*downgraded_z);
     EXPECT_CALL(bar_callbacks, onConfigUpdate(_, "2"))
         .WillOnce(Invoke(
             [&load_assignment_y, &load_assignment_z](
                 const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources, const std::string&) {
               EXPECT_EQ(2, resources.size());
-              envoy::api::v3alpha::ClusterLoadAssignment expected_assignment;
-              resources[0].UnpackTo(&expected_assignment);
+              envoy::api::v3alpha::ClusterLoadAssignment expected_assignment =
+                  MessageUtil::anyConvert<envoy::api::v3alpha::ClusterLoadAssignment>(resources[0]);
               EXPECT_TRUE(TestUtility::protoEqual(expected_assignment, load_assignment_y));
-              resources[1].UnpackTo(&expected_assignment);
+              expected_assignment =
+                  MessageUtil::anyConvert<envoy::api::v3alpha::ClusterLoadAssignment>(resources[1]);
               EXPECT_TRUE(TestUtility::protoEqual(expected_assignment, load_assignment_z));
             }));
     EXPECT_CALL(foo_callbacks, onConfigUpdate(_, "2"))
@@ -334,10 +350,11 @@ TEST_F(GrpcMuxImplTest, WatchDemux) {
             [&load_assignment_x, &load_assignment_y](
                 const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources, const std::string&) {
               EXPECT_EQ(2, resources.size());
-              envoy::api::v3alpha::ClusterLoadAssignment expected_assignment;
-              resources[0].UnpackTo(&expected_assignment);
+              envoy::api::v3alpha::ClusterLoadAssignment expected_assignment =
+                  MessageUtil::anyConvert<envoy::api::v3alpha::ClusterLoadAssignment>(resources[0]);
               EXPECT_TRUE(TestUtility::protoEqual(expected_assignment, load_assignment_x));
-              resources[1].UnpackTo(&expected_assignment);
+              expected_assignment =
+                  MessageUtil::anyConvert<envoy::api::v3alpha::ClusterLoadAssignment>(resources[1]);
               EXPECT_TRUE(TestUtility::protoEqual(expected_assignment, load_assignment_y));
             }));
     expectSendMessage(type_url, {"y", "z", "x"}, "2");

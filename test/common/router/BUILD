@@ -44,7 +44,7 @@ envoy_proto_library(
     srcs = ["header_parser_fuzz.proto"],
     deps = [
         "//test/fuzz:common_proto",
-        "@envoy_api//envoy/api/v2/core:pkg",
+        "@envoy_api//envoy/api/v3alpha/core:pkg",
     ],
 )
 
@@ -116,6 +116,7 @@ envoy_cc_test(
         "//test/test_common:simulated_time_system_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/admin/v3alpha:pkg_cc_proto",
+        "@envoy_api//envoy/api/v2:pkg_cc_proto",
         "@envoy_api//envoy/api/v3alpha:pkg_cc_proto",
         "@envoy_api//envoy/api/v3alpha/core:pkg_cc_proto",
         "@envoy_api//envoy/config/filter/network/http_connection_manager/v3alpha:pkg_cc_proto",
@@ -163,7 +164,7 @@ envoy_proto_library(
     srcs = ["route_fuzz.proto"],
     deps = [
         "//test/fuzz:common_proto",
-        "@envoy_api//envoy/api/v2:pkg",
+        "@envoy_api//envoy/api/v3alpha:pkg",
     ],
 )
 

@@ -5,6 +5,7 @@
 #include "envoy/admin/v3alpha/config_dump.pb.h"
 #include "envoy/api/v3alpha/core/config_source.pb.h"
 #include "envoy/api/v3alpha/discovery.pb.h"
+#include "envoy/api/v2/lds.pb.h"
 #include "envoy/api/v3alpha/lds.pb.h"
 #include "envoy/api/v3alpha/lds.pb.validate.h"
 #include "envoy/stats/scope.h"
@@ -28,7 +29,7 @@ LdsApiImpl::LdsApiImpl(const envoy::api::v3alpha::core::ConfigSource& lds_config
       validation_visitor_(validation_visitor) {
   subscription_ = cm.subscriptionFactory().subscriptionFromConfigSource(
       lds_config,
-      Grpc::Common::typeUrl(envoy::api::v3alpha::Listener().GetDescriptor()->full_name()), *scope_,
+      Grpc::Common::typeUrl(envoy::api::v2::Listener().GetDescriptor()->full_name()), *scope_,
       *this);
   init_manager.add(init_target_);
 }

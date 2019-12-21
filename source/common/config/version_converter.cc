@@ -1,5 +1,7 @@
 #include "common/config/version_converter.h"
 
+#include "udpa/annotations/versioning.pb.h"
+
 #include "common/common/assert.h"
 
 // Protobuf reflection is on a per-scalar type basis, i.e. there are method to
@@ -28,8 +30,41 @@ namespace Config {
 // field, and don't reject if present.
 constexpr uint32_t DeprecatedMessageFieldNumber = 100000;
 
+std::unique_ptr<Protobuf::Message> VersionConverter::downgrade(
+    Protobuf::DynamicMessageFactory& dmf,
+    const Protobuf::Message& next_message) {
+  const Protobuf::Descriptor* desc = next_message.GetDescriptor();
+  if (desc->options().HasExtension(udpa::annotations::versioning)) {
+    const std::string& previous_target_type =
+        desc->options().GetExtension(udpa::annotations::versioning).previous_message_type();
+    ENVOY_LOG_MISC(debug, "HTD previous_target_type {}", previous_target_type);
+    const Protobuf::Descriptor* prev_desc =
+        Protobuf::DescriptorPool::generated_pool()->FindMessageTypeByName(previous_target_type);
+    ENVOY_LOG_MISC(debug, "HTD previous desc found");
+    std::unique_ptr<Protobuf::Message> prev_message;
+    prev_message.reset(dmf.GetPrototype(prev_desc)->New());
+    ENVOY_LOG_MISC(debug, "HTD previous message allocated");
+    std::string s;
+    next_message.SerializeToString(&s);
+    ENVOY_LOG_MISC(debug, "HTD next messsage serialized");
+    // TODO: should clear unknown fields
+    prev_message->ParseFromString(s);
+    ENVOY_LOG_MISC(debug, "HTD prev messsage deserialized");
+    return prev_message;
+  }
+  // Unnecessary copy..
+  std::unique_ptr<Protobuf::Message> same_message;
+  same_message.reset(dmf.GetPrototype(desc)->New());
+  same_message->MergeFrom(next_message);
+  return same_message;
+}
+
 void VersionConverter::upgrade(const Protobuf::Message& prev_message,
                                Protobuf::Message& next_message) {
+  std::string s;
+  prev_message.SerializeToString(&s);
+  next_message.ParseFromString(s);
+#if 0
   // Wow, why so complicated? Could we just do this conversion with:
   //
   //   next_message.MergeFromString(prev_message.SerializeAsString())
@@ -61,11 +96,16 @@ void VersionConverter::upgrade(const Protobuf::Message& prev_message,
     Protobuf::Message* target_message = &next_message;
 
     // Does the field exist in the new version message?
-    const std::string& prev_name = prev_field_descriptor->name();
-    const auto* target_field_descriptor = next_descriptor->FindFieldByName(prev_name);
+    //const std::string& prev_name = prev_field_descriptor->name();
+    //const auto* target_field_descriptor = next_descriptor->FindFieldByName(prev_name);
+    const auto* target_field_descriptor = next_descriptor->FindFieldByNumber(prev_field_descriptor->number());
+    //if (target_field_descriptor == nullptr) {
+    //  target_field_descriptor = next_descriptor->FindFieldByName("hidden_envoy_deprecated_" + prev_name);
+    //}
     // If we can't find this field in the next version, it must be deprecated.
     // So, use deprecated_message and its reflection instead.
     if (target_field_descriptor == nullptr) {
+      ASSERT(false);
       ASSERT(prev_field_descriptor->options().deprecated());
       if (!deprecated_message) {
         deprecated_message.reset(dmf.GetPrototype(prev_message.GetDescriptor())->New());
@@ -77,6 +117,7 @@ void VersionConverter::upgrade(const Protobuf::Message& prev_message,
     ASSERT(target_field_descriptor != nullptr);
 
     // These properties are guaranteed by protoxform.
+    //ENVOY_LOG_MISC(debug, "HTD prev_field_descriptor {} vs {}", prev_field_descriptor->DebugString(), target_field_descriptor->DebugString());
     ASSERT(prev_field_descriptor->type() == target_field_descriptor->type());
     ASSERT(prev_field_descriptor->number() == target_field_descriptor->number());
     ASSERT(prev_field_descriptor->type_name() == target_field_descriptor->type_name());
@@ -126,6 +167,7 @@ void VersionConverter::upgrade(const Protobuf::Message& prev_message,
     std::string* s = unknown_field_set->AddLengthDelimited(DeprecatedMessageFieldNumber);
     deprecated_message->SerializeToString(s);
   }
+#endif
 }
 
 void VersionConverter::unpackDeprecated(const Protobuf::Message& upgraded_message,

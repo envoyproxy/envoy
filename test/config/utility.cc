@@ -9,6 +9,7 @@
 #include "envoy/api/v3alpha/route/route.pb.h"
 #include "envoy/config/accesslog/v3alpha/file.pb.h"
 #include "envoy/config/bootstrap/v3alpha/bootstrap.pb.h"
+#include "envoy/config/filter/network/http_connection_manager/v2/http_connection_manager.pb.h"
 #include "envoy/config/filter/network/http_connection_manager/v3alpha/http_connection_manager.pb.h"
 #include "envoy/config/transport_socket/tap/v3alpha/tap.pb.h"
 #include "envoy/http/codec.h"
@@ -740,8 +741,7 @@ bool ConfigHelper::loadHttpConnectionManager(
   auto* hcm_filter = getFilterFromListener("envoy.http_connection_manager");
   if (hcm_filter) {
     auto* config = hcm_filter->mutable_typed_config();
-    ASSERT(config->Is<envoy::config::filter::network::http_connection_manager::v3alpha::
-                          HttpConnectionManager>());
+    //ASSERT(config->Is<envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager>());
     hcm = MessageUtil::anyConvert<
         envoy::config::filter::network::http_connection_manager::v3alpha::HttpConnectionManager>(
         *config);

@@ -12,7 +12,7 @@ envoy_package()
 envoy_proto_library(
     name = "common_proto",
     srcs = ["common.proto"],
-    deps = ["@envoy_api//envoy/api/v2/core:pkg"],
+    deps = ["@envoy_api//envoy/api/v3alpha/core:pkg"],
 )
 
 envoy_cc_test_library(

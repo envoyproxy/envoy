@@ -58,7 +58,6 @@ public:
       auto* filter_chain = listener->mutable_filter_chains(0);
       auto* config_blob = filter_chain->mutable_filters(0)->mutable_typed_config();
 
-      ASSERT_TRUE(config_blob->Is<envoy::config::filter::network::tcp_proxy::v3alpha::TcpProxy>());
       auto tcp_proxy_config =
           MessageUtil::anyConvert<envoy::config::filter::network::tcp_proxy::v3alpha::TcpProxy>(
               *config_blob);

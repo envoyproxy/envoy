@@ -233,7 +233,7 @@ api_config_source:
       - from_plugin:
           name: envoy.grpc_credentials.file_based_metadata
           typed_config:
-            "@type": type.googleapis.com/envoy.config.grpc_credential.v2alpha.FileBasedMetadataConfig
+            "@type": type.googleapis.com/envoy.config.grpc_credential.v3alpha.FileBasedMetadataConfig
       stat_prefix: sdsstat
       credentials_factory_name: envoy.grpc_credentials.file_based_metadata
   )",

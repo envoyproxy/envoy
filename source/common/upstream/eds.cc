@@ -1,5 +1,6 @@
 #include "common/upstream/eds.h"
 
+#include "envoy/api/v2/cds.pb.h"
 #include "envoy/api/v3alpha/cds.pb.h"
 #include "envoy/api/v3alpha/core/config_source.pb.h"
 #include "envoy/api/v3alpha/discovery.pb.h"
@@ -35,7 +36,7 @@ EdsClusterImpl::EdsClusterImpl(
       factory_context.clusterManager().subscriptionFactory().subscriptionFromConfigSource(
           eds_config,
           Grpc::Common::typeUrl(
-              envoy::api::v3alpha::ClusterLoadAssignment().GetDescriptor()->full_name()),
+              envoy::api::v2::ClusterLoadAssignment().GetDescriptor()->full_name()),
           info_->statsScope(), *this);
 }
 

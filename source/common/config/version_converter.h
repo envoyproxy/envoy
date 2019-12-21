@@ -23,6 +23,10 @@ public:
    */
   static void upgrade(const Protobuf::Message& prev_message, Protobuf::Message& next_message);
 
+  // Downgrade as far back as we can go.
+  static std::unique_ptr<Protobuf::Message> downgrade(Protobuf::DynamicMessageFactory& dmf,
+                                                      const Protobuf::Message& next_message);
+
   /**
    * Access the deprecated fields stored in the UnknownFieldSet of a message
    * generated via VersionConverter::upgrade().

@@ -341,7 +341,7 @@ TEST(UtilityTest, TypedStructToInvalidType) {
                                      ProtobufMessage::getStrictValidationVisitor(), out),
       EnvoyException,
       "Invalid proto type.\nExpected google.protobuf.Any\nActual: "
-      "envoy.config.bootstrap.v2.Bootstrap");
+      "envoy.config.bootstrap.v3alpha.Bootstrap");
 }
 
 TEST(CheckApiConfigSourceSubscriptionBackingClusterTest, GrpcClusterTestAcrossTypes) {

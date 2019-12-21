@@ -258,6 +258,7 @@ envoy_cc_library(
         "//source/common/init:target_lib",
         "//source/common/protobuf:utility_lib",
         "@envoy_api//envoy/admin/v3alpha:pkg_cc_proto",
+        "@envoy_api//envoy/api/v2:pkg_cc_proto",
         "@envoy_api//envoy/api/v3alpha:pkg_cc_proto",
         "@envoy_api//envoy/api/v3alpha/core:pkg_cc_proto",
     ],

@@ -7,6 +7,7 @@
 #include "envoy/api/v3alpha/eds.pb.h"
 
 #include "common/config/delta_subscription_impl.h"
+#include "common/config/version_converter.h"
 #include "common/grpc/common.h"
 
 #include "test/common/config/subscription_test_harness.h"
@@ -140,7 +141,9 @@ public:
         auto* resource = response->add_resources();
         resource->set_name(cluster);
         resource->set_version(version);
-        resource->mutable_resource()->PackFrom(*load_assignment);
+        Protobuf::DynamicMessageFactory dmf;
+        auto downgraded = Config::VersionConverter::downgrade(dmf, *load_assignment);
+        resource->mutable_resource()->PackFrom(*downgraded);
       }
     }
     Protobuf::RepeatedPtrField<std::string> removed_resources;

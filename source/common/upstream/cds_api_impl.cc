@@ -2,6 +2,7 @@
 
 #include <string>
 
+#include "envoy/api/v2/cds.pb.h"
 #include "envoy/api/v3alpha/cds.pb.h"
 #include "envoy/api/v3alpha/cds.pb.validate.h"
 #include "envoy/api/v3alpha/core/config_source.pb.h"
@@ -32,7 +33,7 @@ CdsApiImpl::CdsApiImpl(const envoy::api::v3alpha::core::ConfigSource& cds_config
       validation_visitor_(validation_visitor) {
   subscription_ = cm_.subscriptionFactory().subscriptionFromConfigSource(
       cds_config,
-      Grpc::Common::typeUrl(envoy::api::v3alpha::Cluster().GetDescriptor()->full_name()), *scope_,
+      Grpc::Common::typeUrl(envoy::api::v2::Cluster().GetDescriptor()->full_name()), *scope_,
       *this);
 }
 

@@ -7,6 +7,7 @@
 
 #include "envoy/api/v3alpha/core/config_source.pb.h"
 #include "envoy/api/v3alpha/discovery.pb.h"
+#include "envoy/api/v2/route/route.pb.h"
 #include "envoy/api/v3alpha/route/route.pb.h"
 
 #include "common/common/assert.h"
@@ -43,7 +44,7 @@ VhdsSubscription::VhdsSubscription(RouteConfigUpdatePtr& config_update_info,
       factory_context.clusterManager().subscriptionFactory().subscriptionFromConfigSource(
           config_update_info_->routeConfiguration().vhds().config_source(),
           Grpc::Common::typeUrl(
-              envoy::api::v3alpha::route::VirtualHost().GetDescriptor()->full_name()),
+              envoy::api::v2::route::VirtualHost().GetDescriptor()->full_name()),
           *scope_, *this);
 }
 

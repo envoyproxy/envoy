@@ -8,6 +8,8 @@
 
 #include "common/common/assert.h"
 #include "common/common/fmt.h"
+#include "common/config/api_type_oracle.h"
+#include "common/config/version_converter.h"
 #include "common/protobuf/message_validator_impl.h"
 #include "common/protobuf/protobuf.h"
 
@@ -106,6 +108,7 @@ void jsonConvertInternal(const Protobuf::Message& source,
     throw EnvoyException(fmt::format("Unable to convert protobuf message to JSON string: {} {}",
                                      status.ToString(), source.DebugString()));
   }
+  std::cerr << "HTD jCI 2\n";
   MessageUtil::loadFromJson(json, dest, validation_visitor);
 }
 
@@ -173,40 +176,79 @@ size_t MessageUtil::hash(const Protobuf::Message& message) {
   return HashUtil::xxHash64(text_format);
 }
 
-void MessageUtil::loadFromJson(const std::string& json, Protobuf::Message& message,
-                               ProtobufMessage::ValidationVisitor& validation_visitor) {
-  Protobuf::util::JsonParseOptions options;
-  options.case_insensitive_enum_parsing = true;
-  // Let's first try and get a clean parse when checking for unknown fields;
-  // this should be the common case.
-  options.ignore_unknown_fields = false;
-  const auto strict_status = Protobuf::util::JsonStringToMessage(json, &message, options);
-  if (strict_status.ok()) {
-    // Success, no need to do any extra work.
+namespace {
+void tryWithApiBoosting(std::function<void(Protobuf::Message&)> f, Protobuf::Message& message) {
+  std::cerr << "HTD oetap a\n";
+  const Protobuf::Descriptor* earlier_version_desc =
+      Config::ApiTypeOracle::inferEarlierVersionDescriptor("", {},
+                                                           message.GetDescriptor()->full_name());
+  if (earlier_version_desc == nullptr) {
+    std::cerr << "HTD oetap b\n";
+    f(message);
     return;
   }
-  // If we fail, we see if we get a clean parse when allowing unknown fields.
-  // This is essentially a workaround
-  // for https://github.com/protocolbuffers/protobuf/issues/5967.
-  // TODO(htuch): clean this up when protobuf supports JSON/YAML unknown field
-  // detection directly.
-  options.ignore_unknown_fields = true;
-  const auto relaxed_status = Protobuf::util::JsonStringToMessage(json, &message, options);
-  // If we still fail with relaxed unknown field checking, the error has nothing
-  // to do with unknown fields.
-  if (!relaxed_status.ok()) {
-    throw EnvoyException("Unable to parse JSON as proto (" + relaxed_status.ToString() +
-                         "): " + json);
+  Protobuf::DynamicMessageFactory dmf;
+  auto earlier_message = ProtobufTypes::MessagePtr(dmf.GetPrototype(earlier_version_desc)->New());
+  ASSERT(earlier_message != nullptr);
+  std::cerr << "HTD oetap try with " << earlier_message->GetDescriptor()->full_name() << "\n";
+  try {
+    f(*earlier_message);
+    Config::VersionConverter::upgrade(*earlier_message, message);
+  } catch (EnvoyException&) {
+    std::cerr << "HTD oetap try with " << message.GetDescriptor()->full_name() << "\n";
+    bool newer_error = false;
+    try {
+      f(message);
+    } catch (EnvoyException&) {
+      newer_error = true;
+    }
+    if (newer_error) {
+      throw;
+    }
   }
-  // We know it's an unknown field at this point.
-  validation_visitor.onUnknownField("type " + message.GetTypeName() + " reason " +
-                                    strict_status.ToString());
+}
+
+} // namespace
+
+void MessageUtil::loadFromJson(const std::string& json, Protobuf::Message& message,
+                               ProtobufMessage::ValidationVisitor& validation_visitor) {
+  std::cerr << "HTD lfj\n";
+  tryWithApiBoosting(
+      [&json, &validation_visitor](Protobuf::Message& message) {
+        Protobuf::util::JsonParseOptions options;
+        options.case_insensitive_enum_parsing = true;
+        // Let's first try and get a clean parse when checking for unknown fields;
+        // this should be the common case.
+        options.ignore_unknown_fields = false;
+        const auto strict_status = Protobuf::util::JsonStringToMessage(json, &message, options);
+        if (strict_status.ok()) {
+          // Success, no need to do any extra work.
+          return;
+        }
+        // If we fail, we see if we get a clean parse when allowing unknown fields.
+        // This is essentially a workaround
+        // for https://github.com/protocolbuffers/protobuf/issues/5967.
+        // TODO(htuch): clean this up when protobuf supports JSON/YAML unknown field
+        // detection directly.
+        options.ignore_unknown_fields = true;
+        const auto relaxed_status = Protobuf::util::JsonStringToMessage(json, &message, options);
+        // If we still fail with relaxed unknown field checking, the error has nothing
+        // to do with unknown fields.
+        if (!relaxed_status.ok()) {
+          throw EnvoyException("Unable to parse JSON as proto (" + relaxed_status.ToString() +
+                               "): " + json);
+        }
+        // We know it's an unknown field at this point.
+        validation_visitor.onUnknownField("type " + message.GetTypeName() + " reason " +
+                                          strict_status.ToString());
+      },
+      message);
 }
 
 void MessageUtil::loadFromJson(const std::string& json, ProtobufWkt::Struct& message) {
   // No need to validate if converting to a Struct, since there are no unknown
   // fields possible.
-  return loadFromJson(json, message, ProtobufMessage::getNullValidationVisitor());
+  loadFromJson(json, message, ProtobufMessage::getNullValidationVisitor());
 }
 
 void MessageUtil::loadFromYaml(const std::string& yaml, Protobuf::Message& message,
@@ -230,6 +272,7 @@ void MessageUtil::loadFromFile(const std::string& path, Protobuf::Message& messa
                                ProtobufMessage::ValidationVisitor& validation_visitor,
                                Api::Api& api) {
   const std::string contents = api.fileSystem().fileReadToEnd(path);
+  //std::cerr << "HTD lff: " << contents << "\n";
   // If the filename ends with .pb, attempt to parse it as a binary proto.
   if (absl::EndsWith(path, FileExtensions::get().ProtoBinary)) {
     // Attempt to parse the binary format.
@@ -249,6 +292,7 @@ void MessageUtil::loadFromFile(const std::string& path, Protobuf::Message& messa
                          message.GetTypeName() + ")");
   }
   if (absl::EndsWith(path, FileExtensions::get().Yaml)) {
+    std::cerr << "HTD lfy call\n";
     loadFromYaml(contents, message, validation_visitor);
   } else {
     loadFromJson(contents, message, validation_visitor);
@@ -432,11 +476,15 @@ std::string MessageUtil::getJsonStringFromMessage(const Protobuf::Message& messa
 }
 
 void MessageUtil::unpackTo(const ProtobufWkt::Any& any_message, Protobuf::Message& message) {
-  if (!any_message.UnpackTo(&message)) {
-    throw EnvoyException(fmt::format("Unable to unpack as {}: {}",
-                                     message.GetDescriptor()->full_name(),
-                                     any_message.DebugString()));
-  }
+  tryWithApiBoosting(
+      [&any_message](Protobuf::Message& message) {
+        if (!any_message.UnpackTo(&message)) {
+          throw EnvoyException(fmt::format("Unable to unpack as {}: {}",
+                                           message.GetDescriptor()->full_name(),
+                                           any_message.DebugString()));
+        }
+      },
+      message);
 }
 
 void MessageUtil::jsonConvert(const Protobuf::Message& source, ProtobufWkt::Struct& dest) {

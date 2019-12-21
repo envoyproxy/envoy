@@ -60,6 +60,7 @@ envoy_cc_library(
         "//source/common/ssl:certificate_validation_context_config_impl_lib",
         "//source/common/ssl:tls_certificate_config_impl_lib",
         "@envoy_api//envoy/api/v3alpha:pkg_cc_proto",
+        "@envoy_api//envoy/api/v2/auth:pkg_cc_proto",
         "@envoy_api//envoy/api/v3alpha/auth:pkg_cc_proto",
         "@envoy_api//envoy/api/v3alpha/core:pkg_cc_proto",
     ],

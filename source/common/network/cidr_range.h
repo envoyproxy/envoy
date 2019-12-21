@@ -99,9 +99,6 @@ public:
    * TODO(ccaraman): Update CidrRange::create to support only constructing valid ranges.
    */
   static CidrRange create(const envoy::api::v3alpha::core::CidrRange& cidr);
-  // The ::v2 and ::v3alpha variants will merge once we land API boosting
-  // automation. TODO(htuch): make sure this happens.
-  static CidrRange create(const envoy::api::v3alpha::core::CidrRange& cidr);
 
   /**
    * Given an IP address and a length of high order bits to keep, returns an address

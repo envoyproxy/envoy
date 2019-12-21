@@ -341,12 +341,12 @@ TEST_P(IntegrationAdminTest, Admin) {
   json = Json::Factory::loadFromString(response->body());
   size_t index = 0;
   const std::string expected_types[] = {
-      "type.googleapis.com/envoy.admin.v2alpha.BootstrapConfigDump",
-      "type.googleapis.com/envoy.admin.v2alpha.ClustersConfigDump",
-      "type.googleapis.com/envoy.admin.v2alpha.ListenersConfigDump",
-      "type.googleapis.com/envoy.admin.v2alpha.ScopedRoutesConfigDump",
-      "type.googleapis.com/envoy.admin.v2alpha.RoutesConfigDump",
-      "type.googleapis.com/envoy.admin.v2alpha.SecretsConfigDump"};
+      "type.googleapis.com/envoy.admin.v3alpha.BootstrapConfigDump",
+      "type.googleapis.com/envoy.admin.v3alpha.ClustersConfigDump",
+      "type.googleapis.com/envoy.admin.v3alpha.ListenersConfigDump",
+      "type.googleapis.com/envoy.admin.v3alpha.ScopedRoutesConfigDump",
+      "type.googleapis.com/envoy.admin.v3alpha.RoutesConfigDump",
+      "type.googleapis.com/envoy.admin.v3alpha.SecretsConfigDump"};
 
   for (const Json::ObjectSharedPtr& obj_ptr : json->getObjectArray("configs")) {
     EXPECT_TRUE(expected_types[index].compare(obj_ptr->getString("@type")) == 0);

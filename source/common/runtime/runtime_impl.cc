@@ -8,6 +8,7 @@
 #include "envoy/api/v3alpha/discovery.pb.h"
 #include "envoy/config/bootstrap/v3alpha/bootstrap.pb.h"
 #include "envoy/event/dispatcher.h"
+#include "envoy/service/discovery/v2/rtds.pb.h"
 #include "envoy/service/discovery/v3alpha/rtds.pb.h"
 #include "envoy/service/discovery/v3alpha/rtds.pb.validate.h"
 #include "envoy/thread_local/thread_local.h"
@@ -592,7 +593,7 @@ void RtdsSubscription::start() {
   subscription_ = parent_.cm_->subscriptionFactory().subscriptionFromConfigSource(
       config_source_,
       Grpc::Common::typeUrl(
-          envoy::service::discovery::v3alpha::Runtime().GetDescriptor()->full_name()),
+          envoy::service::discovery::v2::Runtime().GetDescriptor()->full_name()),
       store_, *this);
   subscription_->start({resource_name_});
 }

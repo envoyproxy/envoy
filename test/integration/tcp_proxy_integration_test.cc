@@ -6,6 +6,7 @@
 #include "envoy/api/v3alpha/core/base.pb.h"
 #include "envoy/config/accesslog/v3alpha/file.pb.h"
 #include "envoy/config/bootstrap/v3alpha/bootstrap.pb.h"
+#include "envoy/config/filter/network/tcp_proxy/v2/tcp_proxy.pb.h"
 #include "envoy/config/filter/network/tcp_proxy/v3alpha/tcp_proxy.pb.h"
 
 #include "common/network/utility.h"
@@ -242,9 +243,9 @@ TEST_P(TcpProxyIntegrationTest, AccessLog) {
         auto* config_blob = filter_chain->mutable_filters(0)->mutable_typed_config();
 
         ASSERT_TRUE(
-            config_blob->Is<envoy::config::filter::network::tcp_proxy::v3alpha::TcpProxy>());
+            config_blob->Is<envoy::config::filter::network::tcp_proxy::v2::TcpProxy>());
         auto tcp_proxy_config =
-            MessageUtil::anyConvert<envoy::config::filter::network::tcp_proxy::v3alpha::TcpProxy>(
+            MessageUtil::anyConvert<envoy::config::filter::network::tcp_proxy::v2::TcpProxy>(
                 *config_blob);
 
         auto* access_log = tcp_proxy_config.add_access_log();
@@ -334,7 +335,7 @@ TEST_P(TcpProxyIntegrationTest, TestIdletimeoutWithNoData) {
         auto* config_blob = filter_chain->mutable_filters(0)->mutable_typed_config();
 
         ASSERT_TRUE(
-            config_blob->Is<envoy::config::filter::network::tcp_proxy::v3alpha::TcpProxy>());
+            config_blob->Is<envoy::config::filter::network::tcp_proxy::v2::TcpProxy>());
         auto tcp_proxy_config =
             MessageUtil::anyConvert<envoy::config::filter::network::tcp_proxy::v3alpha::TcpProxy>(
                 *config_blob);
@@ -359,9 +360,9 @@ TEST_P(TcpProxyIntegrationTest, TestIdletimeoutWithLargeOutstandingData) {
         auto* config_blob = filter_chain->mutable_filters(0)->mutable_typed_config();
 
         ASSERT_TRUE(
-            config_blob->Is<envoy::config::filter::network::tcp_proxy::v3alpha::TcpProxy>());
+            config_blob->Is<envoy::config::filter::network::tcp_proxy::v2::TcpProxy>());
         auto tcp_proxy_config =
-            MessageUtil::anyConvert<envoy::config::filter::network::tcp_proxy::v3alpha::TcpProxy>(
+            MessageUtil::anyConvert<envoy::config::filter::network::tcp_proxy::v2::TcpProxy>(
                 *config_blob);
         tcp_proxy_config.mutable_idle_timeout()->set_nanos(
             std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::milliseconds(500))

@@ -383,7 +383,7 @@ TEST_F(ClusterManagerImplTest, OriginalDstLbRestriction2) {
 
   EXPECT_THROW_WITH_MESSAGE(
       create(parseBootstrapFromV2Yaml(yaml)), EnvoyException,
-      "cluster: LB policy ORIGINAL_DST_LB is not valid for Cluster type STATIC. "
+      "cluster: LB policy hidden_envoy_deprecated_ORIGINAL_DST_LB is not valid for Cluster type STATIC. "
       "'ORIGINAL_DST_LB' is allowed only with cluster type 'ORIGINAL_DST'");
 }
 
@@ -499,7 +499,7 @@ TEST_F(ClusterManagerImplTest, SubsetLoadBalancerOriginalDstRestriction) {
 
   EXPECT_THROW_WITH_MESSAGE(
       create(parseBootstrapFromV2Yaml(yaml)), EnvoyException,
-      "cluster: LB policy ORIGINAL_DST_LB cannot be combined with lb_subset_config");
+      "cluster: LB policy hidden_envoy_deprecated_ORIGINAL_DST_LB cannot be combined with lb_subset_config");
 }
 
 TEST_F(ClusterManagerImplTest, SubsetLoadBalancerClusterProvidedLbRestriction) {
@@ -849,7 +849,7 @@ TEST_F(ClusterManagerImplTest, InitializeOrder) {
     "dynamic_resources": {
       "cds_config": {
         "api_config_source": {
-          "api_type": "UNSUPPORTED_REST_LEGACY",
+          "api_type": "hidden_envoy_deprecated_UNSUPPORTED_REST_LEGACY",
           "refresh_delay": "30s",
           "cluster_names": ["cds_cluster"]
         }

@@ -11,7 +11,7 @@
 namespace envoy {
 namespace data {
 namespace tap {
-namespace v2alpha {
+namespace v3alpha {
 
 // TODO(mattklein123): AFAICT gtest has built in printing for proto messages but it doesn't seem
 // to work unless this is here.

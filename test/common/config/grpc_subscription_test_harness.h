@@ -3,12 +3,14 @@
 #include <memory>
 
 #include "envoy/api/v3alpha/core/base.pb.h"
+#include "envoy/api/v2/discovery.pb.h"
 #include "envoy/api/v3alpha/discovery.pb.h"
 #include "envoy/api/v3alpha/eds.pb.h"
 
 #include "common/common/hash.h"
 #include "common/config/grpc_subscription_impl.h"
 #include "common/config/resources.h"
+#include "common/config/version_converter.h"
 
 #include "test/common/config/subscription_test_harness.h"
 #include "test/mocks/config/mocks.h"
@@ -62,9 +64,11 @@ public:
                          bool expect_node, const Protobuf::int32 error_code,
                          const std::string& error_message) {
     UNREFERENCED_PARAMETER(expect_node);
-    envoy::api::v3alpha::DiscoveryRequest expected_request;
+    envoy::api::v2::DiscoveryRequest expected_request;
     if (expect_node) {
-      expected_request.mutable_node()->CopyFrom(node_);
+      Protobuf::DynamicMessageFactory dmf;
+      auto downgraded = Config::VersionConverter::downgrade(dmf, node_);
+      expected_request.mutable_node()->CopyFrom(*downgraded);
     }
     for (const auto& cluster : cluster_names) {
       expected_request.add_resource_names(cluster);
@@ -103,7 +107,9 @@ public:
           last_cluster_names_.end()) {
         envoy::api::v3alpha::ClusterLoadAssignment* load_assignment = typed_resources.Add();
         load_assignment->set_cluster_name(cluster);
-        response->add_resources()->PackFrom(*load_assignment);
+        Protobuf::DynamicMessageFactory dmf;
+        auto downgraded = Config::VersionConverter::downgrade(dmf, *load_assignment);
+        response->add_resources()->PackFrom(*downgraded);
       }
     }
     EXPECT_CALL(callbacks_, onConfigUpdate(RepeatedProtoEq(response->resources()), version))

@@ -7,6 +7,7 @@
 
 #include "envoy/admin/v3alpha/config_dump.pb.h"
 #include "envoy/api/v3alpha/discovery.pb.h"
+#include "envoy/api/v2/rds.pb.h"
 #include "envoy/api/v3alpha/rds.pb.h"
 #include "envoy/api/v3alpha/rds.pb.validate.h"
 #include "envoy/config/filter/network/http_connection_manager/v3alpha/http_connection_manager.pb.h"
@@ -75,7 +76,7 @@ RdsRouteConfigSubscription::RdsRouteConfigSubscription(
       factory_context.clusterManager().subscriptionFactory().subscriptionFromConfigSource(
           rds.config_source(),
           Grpc::Common::typeUrl(
-              envoy::api::v3alpha::RouteConfiguration().GetDescriptor()->full_name()),
+              envoy::api::v2::RouteConfiguration().GetDescriptor()->full_name()),
           *scope_, *this);
   config_update_info_ =
       std::make_unique<RouteConfigUpdateReceiverImpl>(factory_context.timeSource(), validator);
