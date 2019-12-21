@@ -30,6 +30,10 @@ def api_dependencies():
         locations = REPOSITORY_LOCATIONS,
     )
     envoy_http_archive(
+        name = "rules_proto",
+        locations = REPOSITORY_LOCATIONS,
+    )
+    envoy_http_archive(
         name = "kafka_source",
         locations = REPOSITORY_LOCATIONS,
         build_file_content = KAFKASOURCE_BUILD_CONTENT,

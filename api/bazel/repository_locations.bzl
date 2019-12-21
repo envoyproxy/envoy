@@ -1,11 +1,11 @@
 BAZEL_SKYLIB_RELEASE = "0.9.0"
 BAZEL_SKYLIB_SHA256 = "1dde365491125a3db70731e25658dfdd3bc5dbdfd11b840b3e987ecf043c7ca0"
 
-OPENCENSUS_PROTO_GIT_SHA = "5cec5ea58c3efa81fa808f2bd38ce182da9ee731"  # Jul 25, 2019
-OPENCENSUS_PROTO_SHA256 = "faeb93f293ff715b0cb530d273901c0e2e99277b9ed1c0a0326bca9ec5774ad2"
+OPENCENSUS_PROTO_GIT_SHA = "be218fb6bd674af7519b1850cdf8410d8cbd48e8"  # Dec 20, 2019
+OPENCENSUS_PROTO_SHA256 = "e3bbdc94375e86c0edfb2fc5851507e08a3f26ee725ffff7c5c0e73264bdfcde"
 
-PGV_GIT_SHA = "de8fa833aeb04a6bf84c313e39898c22f381fb05"  # Nov 11,2019
-PGV_SHA256 = "c53d1a4af3c48313de174244a98b78aa05dd1f81f92bbf426c2417aea0060d1a"
+PGV_GIT_SHA = "6d6fa03f9dc67580afdf6f43d6b20e8ebc4fdf6c"  # Dec 18,2019
+PGV_SHA256 = "ca549bd1dcde8a3a8f009d0b064bfe124769a110fbe15c32c4276d4b4a08b5ae"
 
 GOOGLEAPIS_GIT_SHA = "82944da21578a53b74e547774cf62ed31a05b841"  # Dec 2, 2019
 GOOGLEAPIS_SHA = "a45019af4d3290f02eaeb1ce10990166978c807cb33a9692141a076ba46d1405"
@@ -20,6 +20,9 @@ UDPA_SHA256 = "0271fb8ad2ec9ade21e4c7737dd128d2a8d8edebe911b777e2fc2585414aa045"
 
 ZIPKINAPI_RELEASE = "0.2.2"  # Aug 23, 2019
 ZIPKINAPI_SHA256 = "688c4fe170821dd589f36ec45aaadc03a618a40283bc1f97da8fa11686fc816b"
+
+RULES_PROTO_GIT_SHA = "2c0468366367d7ed97a1f702f9cd7155ab3f73c5"  # Nov 19, 2019
+RULES_PROTO_SHA256 = "73ebe9d15ba42401c785f9d0aeebccd73bd80bf6b8ac78f74996d31f2c0ad7a6"
 
 REPOSITORY_LOCATIONS = dict(
     bazel_skylib = dict(
@@ -51,6 +54,11 @@ REPOSITORY_LOCATIONS = dict(
         sha256 = OPENCENSUS_PROTO_SHA256,
         strip_prefix = "opencensus-proto-" + OPENCENSUS_PROTO_GIT_SHA + "/src",
         urls = ["https://github.com/census-instrumentation/opencensus-proto/archive/" + OPENCENSUS_PROTO_GIT_SHA + ".tar.gz"],
+    ),
+    rules_proto = dict(
+        sha256 = RULES_PROTO_SHA256,
+        strip_prefix = "rules_proto-" + RULES_PROTO_GIT_SHA + "",
+        urls = ["https://github.com/bazelbuild/rules_proto/archive/" + RULES_PROTO_GIT_SHA + ".tar.gz"],
     ),
     kafka_source = dict(
         sha256 = KAFKA_SOURCE_SHA,
