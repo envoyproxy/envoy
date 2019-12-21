@@ -5,13 +5,13 @@
 namespace envoy {
 namespace data {
 namespace tap {
-namespace v2alpha {
+namespace v3alpha {
 
 std::ostream& operator<<(std::ostream& os, const TraceWrapper& trace) {
   return os << Envoy::MessageUtil::getJsonStringFromMessage(trace, true, false);
 }
 
-} // namespace v2alpha
+} // namespace v3alpha
 } // namespace tap
 } // namespace data
 } // namespace envoy

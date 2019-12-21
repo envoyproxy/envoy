@@ -11,13 +11,13 @@
 namespace envoy {
 namespace data {
 namespace tap {
-namespace v2alpha {
+namespace v3alpha {
 
 // TODO(mattklein123): AFAICT gtest has built in printing for proto messages but it doesn't seem
 // to work unless this is here.
 std::ostream& operator<<(std::ostream& os, const TraceWrapper& trace);
 
-} // namespace v2alpha
+} // namespace v3alpha
 } // namespace tap
 } // namespace data
 } // namespace envoy

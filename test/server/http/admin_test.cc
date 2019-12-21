@@ -954,7 +954,7 @@ TEST_P(AdminInstanceTest, ConfigDumpFiltersByResource) {
   const std::string expected_json = R"EOF({
  "configs": [
   {
-   "@type": "type.googleapis.com/envoy.admin.v2alpha.ListenersConfigDump.DynamicListener",
+   "@type": "type.googleapis.com/envoy.admin.v3alpha.ListenersConfigDump.DynamicListener",
    "name": "foo"
   }
  ]
@@ -984,7 +984,7 @@ TEST_P(AdminInstanceTest, ConfigDumpFiltersByMask) {
   const std::string expected_json = R"EOF({
  "configs": [
   {
-   "@type": "type.googleapis.com/envoy.admin.v2alpha.ListenersConfigDump",
+   "@type": "type.googleapis.com/envoy.admin.v3alpha.ListenersConfigDump",
    "dynamic_listeners": [
     {
      "name": "foo"
@@ -1022,7 +1022,7 @@ TEST_P(AdminInstanceTest, ConfigDumpFiltersByResourceAndMask) {
   const std::string expected_json = R"EOF({
  "configs": [
   {
-   "@type": "type.googleapis.com/envoy.admin.v2alpha.ClustersConfigDump.StaticCluster",
+   "@type": "type.googleapis.com/envoy.admin.v3alpha.ClustersConfigDump.StaticCluster",
    "cluster": {
     "name": "foo"
    }
@@ -1045,7 +1045,7 @@ TEST_P(AdminInstanceTest, ConfigDumpNonExistentMask) {
   const std::string expected_json = R"EOF({
  "configs": [
   {
-   "@type": "type.googleapis.com/envoy.admin.v2alpha.ClustersConfigDump.StaticCluster"
+   "@type": "type.googleapis.com/envoy.admin.v3alpha.ClustersConfigDump.StaticCluster"
   }
  ]
 }

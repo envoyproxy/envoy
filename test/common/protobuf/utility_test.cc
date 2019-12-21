@@ -174,10 +174,10 @@ TEST_F(ProtobufUtilityTest, DowncastAndValidateUnknownFields) {
   envoy::config::bootstrap::v3alpha::Bootstrap bootstrap;
   bootstrap.GetReflection()->MutableUnknownFields(&bootstrap)->AddVarint(1, 0);
   EXPECT_THROW_WITH_MESSAGE(TestUtility::validate(bootstrap), EnvoyException,
-                            "Protobuf message (type envoy.config.bootstrap.v2.Bootstrap with "
+                            "Protobuf message (type envoy.config.bootstrap.v3alpha.Bootstrap with "
                             "unknown field set {1}) has unknown fields");
   EXPECT_THROW_WITH_MESSAGE(TestUtility::validate(bootstrap), EnvoyException,
-                            "Protobuf message (type envoy.config.bootstrap.v2.Bootstrap with "
+                            "Protobuf message (type envoy.config.bootstrap.v3alpha.Bootstrap with "
                             "unknown field set {1}) has unknown fields");
 }
 
@@ -187,10 +187,10 @@ TEST_F(ProtobufUtilityTest, DowncastAndValidateUnknownFieldsNested) {
   auto* cluster = bootstrap.mutable_static_resources()->add_clusters();
   cluster->GetReflection()->MutableUnknownFields(cluster)->AddVarint(1, 0);
   EXPECT_THROW_WITH_MESSAGE(TestUtility::validate(*cluster), EnvoyException,
-                            "Protobuf message (type envoy.api.v2.Cluster with "
+                            "Protobuf message (type envoy.config.cluster.v3alpha.Cluster with "
                             "unknown field set {1}) has unknown fields");
   EXPECT_THROW_WITH_MESSAGE(TestUtility::validate(bootstrap), EnvoyException,
-                            "Protobuf message (type envoy.api.v2.Cluster with "
+                            "Protobuf message (type envoy.config.cluster.v3alpha.Cluster with "
                             "unknown field set {1}) has unknown fields");
 }
 
@@ -218,7 +218,7 @@ TEST_F(ProtobufUtilityTest, LoadBinaryProtoUnknownFieldFromFile) {
   envoy::config::bootstrap::v3alpha::Bootstrap proto_from_file;
   EXPECT_THROW_WITH_MESSAGE(TestUtility::loadFromFile(filename, proto_from_file, *api_),
                             EnvoyException,
-                            "Protobuf message (type envoy.config.bootstrap.v2.Bootstrap with "
+                            "Protobuf message (type envoy.config.bootstrap.v3alpha.Bootstrap with "
                             "unknown field set {1}) has unknown fields");
 }
 
@@ -232,7 +232,7 @@ TEST_F(ProtobufUtilityTest, LoadBinaryProtoUnknownMultipleFieldsFromFile) {
   envoy::config::bootstrap::v3alpha::Bootstrap proto_from_file;
   EXPECT_THROW_WITH_MESSAGE(TestUtility::loadFromFile(filename, proto_from_file, *api_),
                             EnvoyException,
-                            "Protobuf message (type envoy.config.bootstrap.v2.Bootstrap with "
+                            "Protobuf message (type envoy.config.bootstrap.v3alpha.Bootstrap with "
                             "unknown field set {1, 2}) has unknown fields");
 }
 
@@ -258,10 +258,10 @@ TEST_F(ProtobufUtilityTest, LoadTextProtoFromFile_Failure) {
       TestEnvironment::writeStringToFileForTest("proto.pb_text", "invalid {");
 
   envoy::config::bootstrap::v3alpha::Bootstrap proto_from_file;
-  EXPECT_THROW_WITH_MESSAGE(TestUtility::loadFromFile(filename, proto_from_file, *api_),
-                            EnvoyException,
-                            "Unable to parse file \"" + filename +
-                                "\" as a text protobuf (type envoy.config.bootstrap.v2.Bootstrap)");
+  EXPECT_THROW_WITH_MESSAGE(
+      TestUtility::loadFromFile(filename, proto_from_file, *api_), EnvoyException,
+      "Unable to parse file \"" + filename +
+          "\" as a text protobuf (type envoy.config.bootstrap.v3alpha.Bootstrap)");
 }
 
 TEST_F(ProtobufUtilityTest, KeyValueStruct) {

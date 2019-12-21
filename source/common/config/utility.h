@@ -225,13 +225,11 @@ public:
                            ProtobufMessage::ValidationVisitor& validation_visitor,
                            Factory& factory) {
     ProtobufTypes::MessagePtr config = factory.createEmptyConfigProto();
-
     // Fail in an obvious way if a plugin does not return a proto.
     RELEASE_ASSERT(config != nullptr, "");
-
-    translateOpaqueConfig(enclosing_message.typed_config(), enclosing_message.config(),
-                          validation_visitor, *config);
-
+    translateOpaqueConfig(enclosing_message.typed_config(),
+                          enclosing_message.hidden_envoy_deprecated_config(), validation_visitor,
+                          *config);
     return config;
   }
 

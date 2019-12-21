@@ -381,10 +381,10 @@ TEST_F(ClusterManagerImplTest, OriginalDstLbRestriction2) {
                   port_value: 11001
   )EOF";
 
-  EXPECT_THROW_WITH_MESSAGE(
-      create(parseBootstrapFromV2Yaml(yaml)), EnvoyException,
-      "cluster: LB policy ORIGINAL_DST_LB is not valid for Cluster type STATIC. "
-      "'ORIGINAL_DST_LB' is allowed only with cluster type 'ORIGINAL_DST'");
+  EXPECT_THROW_WITH_MESSAGE(create(parseBootstrapFromV2Yaml(yaml)), EnvoyException,
+                            "cluster: LB policy hidden_envoy_deprecated_ORIGINAL_DST_LB is not "
+                            "valid for Cluster type STATIC. "
+                            "'ORIGINAL_DST_LB' is allowed only with cluster type 'ORIGINAL_DST'");
 }
 
 class ClusterManagerSubsetInitializationTest
@@ -500,9 +500,9 @@ TEST_F(ClusterManagerImplTest, SubsetLoadBalancerOriginalDstRestriction) {
         - keys: [ "x" ]
   )EOF";
 
-  EXPECT_THROW_WITH_MESSAGE(
-      create(parseBootstrapFromV2Yaml(yaml)), EnvoyException,
-      "cluster: LB policy ORIGINAL_DST_LB cannot be combined with lb_subset_config");
+  EXPECT_THROW_WITH_MESSAGE(create(parseBootstrapFromV2Yaml(yaml)), EnvoyException,
+                            "cluster: LB policy hidden_envoy_deprecated_ORIGINAL_DST_LB cannot be "
+                            "combined with lb_subset_config");
 }
 
 TEST_F(ClusterManagerImplTest, SubsetLoadBalancerClusterProvidedLbRestriction) {

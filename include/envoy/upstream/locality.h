@@ -46,16 +46,16 @@ Locality(const std::string& region, const std::string& zone, const std::string s
 
 // Something heinous this way comes. Required to allow == for LocalityWeightsMap.h in eds.h.
 namespace envoy {
-namespace api {
-namespace v2 {
+namespace config {
 namespace core {
+namespace v3alpha {
 
 inline bool operator==(const envoy::config::core::v3alpha::Locality& x,
                        const envoy::config::core::v3alpha::Locality& y) {
   return Envoy::Upstream::LocalityEqualTo()(x, y);
 }
 
+} // namespace v3alpha
 } // namespace core
-} // namespace v2
-} // namespace api
+} // namespace config
 } // namespace envoy

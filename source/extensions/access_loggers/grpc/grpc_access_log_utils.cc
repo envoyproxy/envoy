@@ -13,7 +13,7 @@ namespace GrpcCommon {
 
 namespace {
 
-using namespace envoy::data::accesslog::v2;
+using namespace envoy::data::accesslog::v3alpha;
 
 // Helper function to convert from a BoringSSL textual representation of the
 // TLS version to the corresponding enum value used in gRPC access logs.

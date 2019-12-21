@@ -322,7 +322,7 @@ filter_chains:
 - filters:
   - foo: type
     name: name
-    config: {}
+    typed_config: {}
   )EOF";
 
   EXPECT_THROW_WITH_REGEX(manager_->addOrUpdateListener(parseListenerFromV2Yaml(yaml), "", true),
@@ -1167,7 +1167,7 @@ dynamic_listeners:
   - name: foo
     error_state:
       failed_configuration:
-        "@type": type.googleapis.com/envoy.api.v2.Listener
+        "@type": type.googleapis.com/envoy.config.listener.v3alpha.Listener
         name: foo
         address:
           socket_address:

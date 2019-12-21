@@ -904,7 +904,7 @@ route_config:
         cluster: fake_cluster
 http_filters:
 - name: envoy.http_dynamo_filter
-  config: {}
+  typed_config: {}
 access_log:
 - name: envoy.file_access_log
   typed_config:
@@ -934,7 +934,7 @@ route_config:
         cluster: fake_cluster
 http_filters:
 - name: envoy.http_dynamo_filter
-  config: {}
+  typed_config: {}
 access_log:
 - name: envoy.file_access_log
   typed_config:

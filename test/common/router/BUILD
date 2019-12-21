@@ -43,7 +43,7 @@ envoy_proto_library(
     srcs = ["header_parser_fuzz.proto"],
     deps = [
         "//test/fuzz:common_proto",
-        "@envoy_api//envoy/api/v2/core:pkg",
+        "@envoy_api//envoy/config/core/v3alpha:pkg",
     ],
 )
 
@@ -166,7 +166,7 @@ envoy_proto_library(
     srcs = ["route_fuzz.proto"],
     deps = [
         "//test/fuzz:common_proto",
-        "@envoy_api//envoy/api/v2:pkg",
+        "@envoy_api//envoy/config/route/v3alpha:pkg",
     ],
 )
 
