@@ -29,7 +29,7 @@ namespace Http1 {
  *       address. Higher layer code should handle resolving DNS on error and creating a new pool
  *       bound to a different IP address.
  */
-class ConnPoolImpl : public ConnectionPool::Instance, public ConnPoolImplBase {
+class ConnPoolImpl : public ConnPoolImplBase {
 public:
   ConnPoolImpl(Event::Dispatcher& dispatcher, Upstream::HostConstSharedPtr host,
                Upstream::ResourcePriority priority,
@@ -88,7 +88,7 @@ protected:
 
     // ConnPoolImplBase::ActiveClient
     void close() override { codec_client_->close(); }
-    uint64_t connectionId() override { codec_client_->id(); }
+    uint64_t connectionId() const override { return codec_client_->id(); }
 
     void onConnectTimeout();
 
