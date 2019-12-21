@@ -1,10 +1,6 @@
 #include "common/upstream/health_checker_impl.h"
 
-#include "envoy/api/v2/core/health_check.pb.h"
-#include "envoy/data/core/v2alpha/health_check_event.pb.h"
 #include "envoy/server/health_checker_config.h"
-#include "envoy/type/http.pb.h"
-#include "envoy/type/range.pb.h"
 
 #include "common/buffer/zero_copy_input_stream_impl.h"
 #include "common/common/empty_string.h"
@@ -105,6 +101,11 @@ HttpHealthCheckerImpl::HttpHealthCheckerImpl(const Cluster& cluster,
                                              HealthCheckEventLoggerPtr&& event_logger)
     : HealthCheckerImplBase(cluster, config, dispatcher, runtime, random, std::move(event_logger)),
       path_(config.http_health_check().path()), host_value_(config.http_health_check().host()),
+      service_name_matcher_(
+          Matchers::StringMatcherImpl(config.http_health_check().service_name_matcher())),
+      has_service_name_matcher_(config.http_health_check().has_service_name_matcher()),
+      service_name_matcher_feature_(config.http_health_check().service_name_matcher_enabled(),
+                                    runtime),
       request_headers_parser_(
           Router::HeaderParser::configure(config.http_health_check().request_headers_to_add(),
                                           config.http_health_check().request_headers_to_remove())),
@@ -262,6 +263,19 @@ HttpHealthCheckerImpl::HttpActiveHealthCheckSession::healthCheckResult() {
   }
 
   const auto degraded = response_headers_->EnvoyDegraded() != nullptr;
+
+  if (parent_.service_name_matcher_feature_.enabled() && parent_.has_service_name_matcher_) {
+    std::string service_cluster_healthchecked =
+        response_headers_->EnvoyUpstreamHealthCheckedCluster()
+            ? std::string(
+                  response_headers_->EnvoyUpstreamHealthCheckedCluster()->value().getStringView())
+            : EMPTY_STRING;
+    if (parent_.service_name_matcher_.value().match(service_cluster_healthchecked)) {
+      return degraded ? HealthCheckResult::Degraded : HealthCheckResult::Succeeded;
+    } else {
+      return HealthCheckResult::Failed;
+    }
+  }
 
   if (parent_.service_name_ &&
       parent_.runtime_.snapshot().featureEnabled("health_check.verify_cluster", 100UL)) {

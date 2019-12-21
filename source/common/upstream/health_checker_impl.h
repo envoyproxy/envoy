@@ -12,6 +12,7 @@
 #include "common/grpc/codec.h"
 #include "common/http/codec_client.h"
 #include "common/router/header_parser.h"
+#include "common/runtime/runtime_features.h"
 #include "common/stream_info/stream_info_impl.h"
 #include "common/upstream/health_checker_base_impl.h"
 
@@ -141,6 +142,9 @@ private:
   const std::string path_;
   const std::string host_value_;
   absl::optional<std::string> service_name_;
+  absl::optional<Matchers::StringMatcherImpl> service_name_matcher_;
+  const bool has_service_name_matcher_;
+  Runtime::FeatureFlag service_name_matcher_feature_;
   Router::HeaderParserPtr request_headers_parser_;
   const HttpStatusChecker http_status_checker_;
 

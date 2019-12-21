@@ -48,6 +48,7 @@ Version history
 * tracing: added upstream_address tag.
 * tracing: added initial support for AWS X-Ray (local sampling rules only) :ref:`X-Ray Tracing <envoy_api_msg_config.trace.v2alpha.XRayConfig>`.
 * udp: added initial support for :ref:`UDP proxy <config_udp_listener_filters_udp_proxy>`
+* health check: added :ref:`service_name_matcher <envoy_api_msg_core.HealthCheck.HttpHealthCheck.service_name_matcher>` to better compare the service name patterns for health check identity.
 
 1.12.2 (December 10, 2019)
 ==========================
