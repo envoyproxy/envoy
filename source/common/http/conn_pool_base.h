@@ -14,7 +14,7 @@ namespace Http {
 // Base class that handles request queueing logic shared between connection pool implementations.
 class ConnPoolImplBase : public ConnectionPool::Instance,
                          protected Logger::Loggable<Logger::Id::pool> {
-
+public:
   // ConnectionPool::Instance
   void addDrainedCallback(DrainedCb cb) override;
 
@@ -23,7 +23,6 @@ protected:
                    Event::Dispatcher& dispatcher)
       : host_(host), priority_(priority), dispatcher_(dispatcher) {}
   virtual ~ConnPoolImplBase();
-
 
   struct PendingRequest : LinkedObject<PendingRequest>, public ConnectionPool::Cancellable {
     PendingRequest(ConnPoolImplBase& parent, StreamDecoder& decoder,
