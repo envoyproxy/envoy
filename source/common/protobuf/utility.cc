@@ -582,6 +582,15 @@ bool ValueUtil::equal(const ProtobufWkt::Value& v1, const ProtobufWkt::Value& v2
   }
 }
 
+const ProtobufWkt::Value& ValueUtil::nullValue() {
+  static const auto* v = []() -> ProtobufWkt::Value* {
+    auto* vv = new ProtobufWkt::Value();
+    vv->set_null_value(ProtobufWkt::NULL_VALUE);
+    return vv;
+  }();
+  return *v;
+}
+
 ProtobufWkt::Value ValueUtil::stringValue(const std::string& str) {
   ProtobufWkt::Value val;
   val.set_string_value(str);

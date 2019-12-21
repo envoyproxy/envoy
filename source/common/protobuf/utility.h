@@ -381,6 +381,11 @@ public:
   static bool equal(const ProtobufWkt::Value& v1, const ProtobufWkt::Value& v2);
 
   /**
+   * @return wrapped ProtobufWkt::NULL_VALUE.
+   */
+  static const ProtobufWkt::Value& nullValue();
+
+  /**
    * Wrap std::string into ProtobufWkt::Value string value.
    * @param str string to be wrapped.
    * @return wrapped string.
