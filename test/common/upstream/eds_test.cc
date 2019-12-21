@@ -843,13 +843,13 @@ TEST_F(EdsTest, EndpointMovedToNewPriority) {
 
   // Moves the endpoints back to original priorities
   cluster_load_assignment.clear_endpoints();
-  add_endpoint(80, 0);
-  add_endpoint(81, 0);
+  add_endpoint(80, 1);
+  add_endpoint(81, 1);
 
   doOnConfigUpdateVerifyNoThrow(cluster_load_assignment);
 
   {
-    auto& hosts = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts();
+    auto& hosts = cluster_->prioritySet().hostSetsPerPriority()[1]->hosts();
     EXPECT_EQ(hosts.size(), 2);
 
     // The endpoints were healthy, so moving them around should preserve that.
@@ -859,8 +859,8 @@ TEST_F(EdsTest, EndpointMovedToNewPriority) {
 
   {
     // priority 1 should now be empty
-    auto& hosts = cluster_->prioritySet().hostSetsPerPriority()[1]->hosts();
-    EXPECT_TRUE(hosts.empty());
+    auto& hosts = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts();
+    EXPECT_EQ(hosts.size(), 0);
   }
 }
 
@@ -1390,14 +1390,14 @@ TEST_F(EdsTest, EndpointHostsPerPriority) {
   EXPECT_EQ(0, cluster_->prioritySet().hostSetsPerPriority()[2]->hosts().size());
   EXPECT_EQ(5, cluster_->prioritySet().hostSetsPerPriority()[3]->hosts().size());
 
-  // Update the number of hosts in priority #4. Make sure no other priority
-  // levels are affected.
+  // Update the number of hosts in priority #4. Make sure other priority
+  // levels are removed
   cluster_load_assignment.clear_endpoints();
   add_hosts_to_priority(3, 4);
   doOnConfigUpdateVerifyNoThrow(cluster_load_assignment);
   ASSERT_EQ(4, cluster_->prioritySet().hostSetsPerPriority().size());
-  EXPECT_EQ(4, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().size());
-  EXPECT_EQ(1, cluster_->prioritySet().hostSetsPerPriority()[1]->hosts().size());
+  EXPECT_EQ(0, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().size());
+  EXPECT_EQ(0, cluster_->prioritySet().hostSetsPerPriority()[1]->hosts().size());
   EXPECT_EQ(0, cluster_->prioritySet().hostSetsPerPriority()[2]->hosts().size());
   EXPECT_EQ(4, cluster_->prioritySet().hostSetsPerPriority()[3]->hosts().size());
 }

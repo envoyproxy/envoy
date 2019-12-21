@@ -1259,21 +1259,9 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(const HostVector& new_hosts,
   // Keep track of hosts we see in new_hosts that we are able to match up with an existing host.
   std::unordered_set<std::string> existing_hosts_for_current_priority(
       current_priority_hosts.size());
-  std::unordered_set<std::string> previously_updated_hosts(all_hosts.size());
-  // Add any hosts that have been updated in previous priorities to existing host list
-  for (auto host = all_hosts.begin(); host != all_hosts.end();) {
-    if (updated_hosts.count(host->first)) {
-      previously_updated_hosts.emplace(host->first);
-    }
-    host++;
-  }
-
   HostVector final_hosts;
   for (const HostSharedPtr& host : new_hosts) {
-    if (previously_updated_hosts.find(host->address()->asString()) !=
-        previously_updated_hosts.end()) {
-      // pass
-    } else if (updated_hosts.count(host->address()->asString())) {
+    if (updated_hosts.count(host->address()->asString())) {
       continue;
     }
 
@@ -1331,11 +1319,7 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(const HostVector& new_hosts,
       // Did the priority change?
       if (host->priority() != existing_host->second->priority()) {
         existing_host->second->priority(host->priority());
-        hosts_changed = true;
-        if (previously_updated_hosts.find(host->address()->asString()) !=
-            previously_updated_hosts.end()) {
-          hosts_added_to_current_priority.emplace_back(existing_host->second);
-        }
+        hosts_added_to_current_priority.emplace_back(existing_host->second);
       }
 
       existing_host->second->weight(host->weight());
@@ -1366,18 +1350,20 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(const HostVector& new_hosts,
   // Remove hosts from current_priority_hosts that were matched to an existing host in the previous
   // loop.
   for (auto itr = current_priority_hosts.begin(); itr != current_priority_hosts.end();) {
-    if (previously_updated_hosts.find((*itr)->address()->asString()) !=
-        previously_updated_hosts.end()) {
-      itr++;
-      continue;
-    }
     auto existing_itr = existing_hosts_for_current_priority.find((*itr)->address()->asString());
 
     if (existing_itr != existing_hosts_for_current_priority.end()) {
+      existing_hosts_for_current_priority.erase(existing_itr);
       itr = current_priority_hosts.erase(itr);
     } else {
       itr++;
     }
+  }
+
+  // If we saw existing hosts during this iteration from a different priority, then we've moved
+  // a host from another priority into this one, so we should mark the priority as having changed.
+  if (!existing_hosts_for_current_priority.empty()) {
+    hosts_changed = true;
   }
 
   // The remaining hosts are hosts that are not referenced in the config update. We remove them from
@@ -1415,27 +1401,6 @@ bool BaseDynamicClusterImpl::updateDynamicHostList(const HostVector& new_hosts,
   if (!hosts_added_to_current_priority.empty() || !current_priority_hosts.empty()) {
     hosts_removed_from_current_priority = std::move(current_priority_hosts);
     hosts_changed = true;
-  }
-
-  for (auto i = hosts_removed_from_current_priority.begin();
-       i != hosts_removed_from_current_priority.end();) {
-    bool in_new_hosts = false;
-    for (const HostSharedPtr& host : new_hosts) {
-      if (host->address()->asString() == (*i)->address()->asString()) {
-        in_new_hosts = true;
-        break;
-      }
-    }
-    const bool host_updated =
-        updated_hosts.find((*i)->address()->asString()) != updated_hosts.end();
-
-    if (!in_new_hosts && host_updated) {
-      hosts_removed_from_current_priority.erase(i);
-      continue;
-    } else if (!in_new_hosts) {
-      updated_hosts[(*i)->address()->asString()] = *i;
-    }
-    i++;
   }
 
   // During the update we populated final_hosts with all the hosts that should remain
