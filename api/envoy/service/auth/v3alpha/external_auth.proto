@@ -2,11 +2,6 @@ syntax = "proto3";
 
 package envoy.service.auth.v3alpha;
 
-option java_package = "io.envoyproxy.envoy.service.auth.v3alpha";
-option java_outer_classname = "ExternalAuthProto";
-option java_multiple_files = true;
-option java_generic_services = true;
-
 import "envoy/api/v3alpha/core/base.proto";
 import "envoy/service/auth/v3alpha/attribute_context.proto";
 import "envoy/type/v3alpha/http_status.proto";
@@ -16,6 +11,11 @@ import "google/rpc/status.proto";
 import "udpa/annotations/versioning.proto";
 
 import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.service.auth.v3alpha";
+option java_outer_classname = "ExternalAuthProto";
+option java_multiple_files = true;
+option java_generic_services = true;
 
 // [#protodoc-title: Authorization Service ]
 

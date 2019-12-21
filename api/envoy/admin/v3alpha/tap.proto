@@ -2,15 +2,15 @@ syntax = "proto3";
 
 package envoy.admin.v3alpha;
 
-option java_package = "io.envoyproxy.envoy.admin.v3alpha";
-option java_outer_classname = "TapProto";
-option java_multiple_files = true;
-
 import "envoy/service/tap/v3alpha/common.proto";
 
 import "udpa/annotations/versioning.proto";
 
 import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.admin.v3alpha";
+option java_outer_classname = "TapProto";
+option java_multiple_files = true;
 
 // The /tap admin request body that is used to configure an active tap session.
 message TapRequest {

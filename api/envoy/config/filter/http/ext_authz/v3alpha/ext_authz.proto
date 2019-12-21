@@ -2,10 +2,6 @@ syntax = "proto3";
 
 package envoy.config.filter.http.ext_authz.v3alpha;
 
-option java_package = "io.envoyproxy.envoy.config.filter.http.ext_authz.v3alpha";
-option java_outer_classname = "ExtAuthzProto";
-option java_multiple_files = true;
-
 import "envoy/api/v3alpha/core/base.proto";
 import "envoy/api/v3alpha/core/grpc_service.proto";
 import "envoy/api/v3alpha/core/http_uri.proto";
@@ -15,6 +11,10 @@ import "envoy/type/v3alpha/http_status.proto";
 import "udpa/annotations/versioning.proto";
 
 import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.config.filter.http.ext_authz.v3alpha";
+option java_outer_classname = "ExtAuthzProto";
+option java_multiple_files = true;
 
 // [#protodoc-title: External Authorization]
 // External Authorization :ref:`configuration overview <config_http_filters_ext_authz>`.

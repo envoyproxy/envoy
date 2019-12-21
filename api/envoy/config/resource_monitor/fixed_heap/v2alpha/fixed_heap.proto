@@ -2,11 +2,11 @@ syntax = "proto3";
 
 package envoy.config.resource_monitor.fixed_heap.v2alpha;
 
+import "validate/validate.proto";
+
 option java_package = "io.envoyproxy.envoy.config.resource_monitor.fixed_heap.v2alpha";
 option java_outer_classname = "FixedHeapProto";
 option java_multiple_files = true;
-
-import "validate/validate.proto";
 
 // [#protodoc-title: Fixed heap]
 // [#extension: envoy.resource_monitors.fixed_heap]

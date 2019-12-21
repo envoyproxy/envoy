@@ -1,0 +1,15 @@
+syntax = "proto3";
+
+package envoy.v2;
+
+import "udpa/annotations/migrate.proto";
+
+message Sample {
+  message Entry {
+    string key = 1;
+    string value = 2;
+  }
+  repeated Entry entries = 1;
+  string will_deprecated = 2 [deprecated = true];
+  string will_rename_compoent = 3 [(udpa.annotations.field_migrate).rename = "renamed_component"];
+}

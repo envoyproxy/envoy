@@ -2,14 +2,14 @@ syntax = "proto3";
 
 package envoy.config.cluster.redis;
 
-option java_package = "io.envoyproxy.envoy.config.cluster.redis";
-option java_outer_classname = "RedisClusterProto";
-option java_multiple_files = true;
-
 import "google/protobuf/duration.proto";
 import "google/protobuf/wrappers.proto";
 
 import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.config.cluster.redis";
+option java_outer_classname = "RedisClusterProto";
+option java_multiple_files = true;
 
 // [#protodoc-title: Redis Cluster Configuration]
 // This cluster adds support for `Redis Cluster <https://redis.io/topics/cluster-spec>`_, as part

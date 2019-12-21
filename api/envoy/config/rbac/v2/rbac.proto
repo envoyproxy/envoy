@@ -2,10 +2,6 @@ syntax = "proto3";
 
 package envoy.config.rbac.v2;
 
-option java_package = "io.envoyproxy.envoy.config.rbac.v2";
-option java_outer_classname = "RbacProto";
-option java_multiple_files = true;
-
 import "envoy/api/v2/core/address.proto";
 import "envoy/api/v2/route/route.proto";
 import "envoy/type/matcher/metadata.proto";
@@ -14,6 +10,10 @@ import "envoy/type/matcher/string.proto";
 import "google/api/expr/v1alpha1/syntax.proto";
 
 import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.config.rbac.v2";
+option java_outer_classname = "RbacProto";
+option java_multiple_files = true;
 
 // [#protodoc-title: Role Based Access Control (RBAC)]
 

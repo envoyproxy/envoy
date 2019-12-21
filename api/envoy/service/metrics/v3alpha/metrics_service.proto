@@ -2,17 +2,17 @@ syntax = "proto3";
 
 package envoy.service.metrics.v3alpha;
 
-option java_package = "io.envoyproxy.envoy.service.metrics.v3alpha";
-option java_outer_classname = "MetricsServiceProto";
-option java_multiple_files = true;
-option java_generic_services = true;
-
 import "envoy/api/v3alpha/core/base.proto";
 
 import "metrics.proto";
 import "udpa/annotations/versioning.proto";
 
 import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.service.metrics.v3alpha";
+option java_outer_classname = "MetricsServiceProto";
+option java_multiple_files = true;
+option java_generic_services = true;
 
 // Service for streaming metrics to server that consumes the metrics data. It uses Prometheus metric
 // data model as a standard to represent metrics information.

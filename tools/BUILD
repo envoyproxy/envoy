@@ -25,6 +25,15 @@ envoy_py_test_binary(
     ],
 )
 
+py_library(
+    name = "run_command",
+    srcs = [
+        "run_command.py",
+    ],
+    srcs_version = "PY3",
+    visibility = ["//visibility:public"],
+)
+
 envoy_cc_binary(
     name = "bootstrap2pb",
     srcs = ["bootstrap2pb.cc"],
