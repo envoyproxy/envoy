@@ -782,8 +782,8 @@ Http::Code AdminImpl::handlerReady(absl::string_view, Http::HeaderMap&, Buffer::
   const envoy::admin::v2alpha::ServerInfo::State state =
       Utility::serverState(server_.initManager().state(), server_.healthCheckFailed());
 
-  response.add(envoy::admin::v2alpha::ServerInfo_State_Name(state) + "\n");
-  Http::Code code = state == envoy::admin::v2alpha::ServerInfo_State_LIVE
+  response.add(envoy::admin::v2alpha::ServerInfo::State_Name(state) + "\n");
+  Http::Code code = state == envoy::admin::v2alpha::ServerInfo::LIVE
                         ? Http::Code::OK
                         : Http::Code::ServiceUnavailable;
   return code;
