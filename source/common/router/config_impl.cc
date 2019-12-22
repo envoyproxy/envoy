@@ -158,7 +158,7 @@ CorsPolicyImpl::CorsPolicyImpl(const envoy::api::v2::route::CorsPolicy& config,
     : config_(config), loader_(loader), allow_methods_(config.allow_methods()),
       allow_headers_(config.allow_headers()), expose_headers_(config.expose_headers()),
       max_age_(config.max_age()),
-      legacy_enabled_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, enabled, true)) {
+      legacy_enabled_(config.has_enabled() ? config.enabled().value() : true) {
   for (const auto& origin : config.allow_origin()) {
     envoy::type::matcher::StringMatcher matcher_config;
     matcher_config.set_exact(origin);
