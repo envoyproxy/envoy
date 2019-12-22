@@ -2,11 +2,11 @@
 
 #include <string>
 
-#include "envoy/api/v2/core/config_source.pb.h"
-#include "envoy/api/v2/discovery.pb.h"
-#include "envoy/api/v2/srds.pb.h"
+#include "envoy/api/v3alpha/core/config_source.pb.h"
+#include "envoy/api/v3alpha/discovery.pb.h"
+#include "envoy/api/v3alpha/srds.pb.h"
 #include "envoy/common/callback.h"
-#include "envoy/config/filter/network/http_connection_manager/v2/http_connection_manager.pb.h"
+#include "envoy/config/filter/network/http_connection_manager/v3alpha/http_connection_manager.pb.h"
 #include "envoy/config/subscription.h"
 #include "envoy/router/route_config_provider_manager.h"
 #include "envoy/stats/scope.h"
@@ -24,11 +24,11 @@ namespace ScopedRoutesConfigProviderUtil {
 
 // If enabled in the HttpConnectionManager config, returns a ConfigProvider for scoped routing
 // configuration.
-Envoy::Config::ConfigProviderPtr
-create(const envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager&
-           config,
-       Server::Configuration::FactoryContext& factory_context, const std::string& stat_prefix,
-       Envoy::Config::ConfigProviderManager& scoped_routes_config_provider_manager);
+Envoy::Config::ConfigProviderPtr create(
+    const envoy::config::filter::network::http_connection_manager::v3alpha::HttpConnectionManager&
+        config,
+    Server::Configuration::FactoryContext& factory_context, const std::string& stat_prefix,
+    Envoy::Config::ConfigProviderManager& scoped_routes_config_provider_manager);
 
 } // namespace ScopedRoutesConfigProviderUtil
 
@@ -37,13 +37,13 @@ class ScopedRoutesConfigProviderManager;
 // A ConfigProvider for inline scoped routing configuration.
 class InlineScopedRoutesConfigProvider : public Envoy::Config::ImmutableConfigProviderBase {
 public:
-  InlineScopedRoutesConfigProvider(
-      ProtobufTypes::ConstMessagePtrVector&& config_protos, std::string name,
-      Server::Configuration::FactoryContext& factory_context,
-      ScopedRoutesConfigProviderManager& config_provider_manager,
-      envoy::api::v2::core::ConfigSource rds_config_source,
-      envoy::config::filter::network::http_connection_manager::v2::ScopedRoutes::ScopeKeyBuilder
-          scope_key_builder);
+  InlineScopedRoutesConfigProvider(ProtobufTypes::ConstMessagePtrVector&& config_protos,
+                                   std::string name,
+                                   Server::Configuration::FactoryContext& factory_context,
+                                   ScopedRoutesConfigProviderManager& config_provider_manager,
+                                   envoy::api::v3alpha::core::ConfigSource rds_config_source,
+                                   envoy::config::filter::network::http_connection_manager::
+                                       v3alpha::ScopedRoutes::ScopeKeyBuilder scope_key_builder);
 
   ~InlineScopedRoutesConfigProvider() override = default;
 
@@ -66,7 +66,7 @@ private:
   const std::string name_;
   ConfigConstSharedPtr config_;
   const std::vector<std::unique_ptr<const Protobuf::Message>> config_protos_;
-  const envoy::api::v2::core::ConfigSource rds_config_source_;
+  const envoy::api::v3alpha::core::ConfigSource rds_config_source_;
 };
 
 /**
@@ -88,15 +88,15 @@ class ScopedRdsConfigSubscription : public Envoy::Config::DeltaConfigSubscriptio
                                     Envoy::Config::SubscriptionCallbacks {
 public:
   using ScopedRouteConfigurationMap =
-      std::map<std::string, envoy::api::v2::ScopedRouteConfiguration>;
+      std::map<std::string, envoy::api::v3alpha::ScopedRouteConfiguration>;
 
   ScopedRdsConfigSubscription(
-      const envoy::config::filter::network::http_connection_manager::v2::ScopedRds& scoped_rds,
+      const envoy::config::filter::network::http_connection_manager::v3alpha::ScopedRds& scoped_rds,
       const uint64_t manager_identifier, const std::string& name,
-      const envoy::config::filter::network::http_connection_manager::v2::ScopedRoutes::
+      const envoy::config::filter::network::http_connection_manager::v3alpha::ScopedRoutes::
           ScopeKeyBuilder& scope_key_builder,
       Server::Configuration::FactoryContext& factory_context, const std::string& stat_prefix,
-      envoy::api::v2::core::ConfigSource rds_config_source,
+      envoy::api::v3alpha::core::ConfigSource rds_config_source,
       RouteConfigProviderManager& route_config_provider_manager,
       ScopedRoutesConfigProviderManager& config_provider_manager);
 
@@ -112,7 +112,7 @@ private:
   struct RdsRouteConfigProviderHelper {
     RdsRouteConfigProviderHelper(
         ScopedRdsConfigSubscription& parent, std::string scope_name,
-        envoy::config::filter::network::http_connection_manager::v2::Rds& rds,
+        envoy::config::filter::network::http_connection_manager::v3alpha::Rds& rds,
         Init::Manager& init_manager);
     ~RdsRouteConfigProviderHelper() { rds_update_callback_handle_->remove(); }
     ConfigConstSharedPtr routeConfig() { return route_provider_->config(); }
@@ -128,7 +128,7 @@ private:
   // Adds or updates scopes, create a new RDS provider for each resource, if an exception is thrown
   // during updating, the exception message is collected via the exception messages vector.
   // Returns true if any scope updated, false otherwise.
-  bool addOrUpdateScopes(const Protobuf::RepeatedPtrField<envoy::api::v2::Resource>& resources,
+  bool addOrUpdateScopes(const Protobuf::RepeatedPtrField<envoy::api::v3alpha::Resource>& resources,
                          Init::Manager& init_manager, const std::string& version_info,
                          std::vector<std::string>& exception_msgs);
   // Removes given scopes from the managed set of scopes.
@@ -149,16 +149,17 @@ private:
   // accept correct RouteConfiguration from management server.
   void onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
                       const std::string& version_info) override;
-  void onConfigUpdate(const Protobuf::RepeatedPtrField<envoy::api::v2::Resource>& added_resources,
-                      const Protobuf::RepeatedPtrField<std::string>& removed_resources,
-                      const std::string& version_info) override;
+  void
+  onConfigUpdate(const Protobuf::RepeatedPtrField<envoy::api::v3alpha::Resource>& added_resources,
+                 const Protobuf::RepeatedPtrField<std::string>& removed_resources,
+                 const std::string& version_info) override;
   void onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason reason,
                             const EnvoyException*) override {
     ASSERT(Envoy::Config::ConfigUpdateFailureReason::ConnectionFailure != reason);
     DeltaConfigSubscriptionInstance::onConfigUpdateFailed();
   }
   std::string resourceName(const ProtobufWkt::Any& resource) override {
-    return MessageUtil::anyConvert<envoy::api::v2::ScopedRouteConfiguration>(resource).name();
+    return MessageUtil::anyConvert<envoy::api::v3alpha::ScopedRouteConfiguration>(resource).name();
   }
   // Propagate RDS updates to ScopeConfigImpl in workers.
   void onRdsConfigUpdate(const std::string& scope_name,
@@ -175,11 +176,11 @@ private:
   Server::Configuration::FactoryContext& factory_context_;
   const std::string name_;
   std::unique_ptr<Envoy::Config::Subscription> subscription_;
-  const envoy::config::filter::network::http_connection_manager::v2::ScopedRoutes::ScopeKeyBuilder
-      scope_key_builder_;
+  const envoy::config::filter::network::http_connection_manager::v3alpha::ScopedRoutes::
+      ScopeKeyBuilder scope_key_builder_;
   Stats::ScopePtr scope_;
   ScopedRdsStats stats_;
-  const envoy::api::v2::core::ConfigSource rds_config_source_;
+  const envoy::api::v3alpha::core::ConfigSource rds_config_source_;
   ProtobufMessage::ValidationVisitor& validation_visitor_;
   const std::string stat_prefix_;
   RouteConfigProviderManager& route_config_provider_manager_;
@@ -244,16 +245,17 @@ class ScopedRoutesConfigProviderManagerOptArg
     : public Envoy::Config::ConfigProviderManager::OptionalArg {
 public:
   ScopedRoutesConfigProviderManagerOptArg(
-      std::string scoped_routes_name, const envoy::api::v2::core::ConfigSource& rds_config_source,
-      const envoy::config::filter::network::http_connection_manager::v2::ScopedRoutes::
+      std::string scoped_routes_name,
+      const envoy::api::v3alpha::core::ConfigSource& rds_config_source,
+      const envoy::config::filter::network::http_connection_manager::v3alpha::ScopedRoutes::
           ScopeKeyBuilder& scope_key_builder)
       : scoped_routes_name_(std::move(scoped_routes_name)), rds_config_source_(rds_config_source),
         scope_key_builder_(scope_key_builder) {}
 
   const std::string scoped_routes_name_;
-  const envoy::api::v2::core::ConfigSource& rds_config_source_;
-  const envoy::config::filter::network::http_connection_manager::v2::ScopedRoutes::ScopeKeyBuilder&
-      scope_key_builder_;
+  const envoy::api::v3alpha::core::ConfigSource& rds_config_source_;
+  const envoy::config::filter::network::http_connection_manager::v3alpha::ScopedRoutes::
+      ScopeKeyBuilder& scope_key_builder_;
 };
 
 } // namespace Router

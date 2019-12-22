@@ -1,6 +1,6 @@
 #pragma once
 
-#include "envoy/api/v2/core/http_uri.pb.h"
+#include "envoy/api/v3alpha/core/http_uri.pb.h"
 #include "envoy/common/pure.h"
 #include "envoy/upstream/cluster_manager.h"
 
@@ -44,7 +44,7 @@ public:
 class RemoteDataFetcher : public Logger::Loggable<Logger::Id::config>,
                           public Http::AsyncClient::Callbacks {
 public:
-  RemoteDataFetcher(Upstream::ClusterManager& cm, const ::envoy::api::v2::core::HttpUri& uri,
+  RemoteDataFetcher(Upstream::ClusterManager& cm, const envoy::api::v3alpha::core::HttpUri& uri,
                     const std::string& content_hash, RemoteDataFetcherCallback& callback);
 
   ~RemoteDataFetcher() override;
@@ -68,7 +68,7 @@ public:
 
 private:
   Upstream::ClusterManager& cm_;
-  const envoy::api::v2::core::HttpUri uri_;
+  const envoy::api::v3alpha::core::HttpUri uri_;
   const std::string content_hash_;
   RemoteDataFetcherCallback& callback_;
 

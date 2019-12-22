@@ -1,6 +1,6 @@
 #pragma once
 
-#include "envoy/api/v2/discovery.pb.h"
+#include "envoy/api/v3alpha/discovery.pb.h"
 #include "envoy/common/token_bucket.h"
 #include "envoy/config/grpc_mux.h"
 #include "envoy/config/subscription.h"
@@ -21,7 +21,7 @@ namespace Config {
 // logic to properly order the subscription(s)' various messages, and allows
 // starting/stopping/pausing of the subscriptions.
 class NewGrpcMuxImpl : public GrpcMux,
-                       public GrpcStreamCallbacks<envoy::api::v2::DeltaDiscoveryResponse>,
+                       public GrpcStreamCallbacks<envoy::api::v3alpha::DeltaDiscoveryResponse>,
                        Logger::Loggable<Logger::Id::config> {
 public:
   NewGrpcMuxImpl(Grpc::RawAsyncClientPtr&& async_client, Event::Dispatcher& dispatcher,
@@ -40,8 +40,8 @@ public:
   void pause(const std::string& type_url) override;
   void resume(const std::string& type_url) override;
   bool paused(const std::string& type_url) const override;
-  void
-  onDiscoveryResponse(std::unique_ptr<envoy::api::v2::DeltaDiscoveryResponse>&& message) override;
+  void onDiscoveryResponse(
+      std::unique_ptr<envoy::api::v3alpha::DeltaDiscoveryResponse>&& message) override;
 
   void onStreamEstablished() override;
 
@@ -110,7 +110,8 @@ private:
   // the order of Envoy's dependency ordering).
   std::list<std::string> subscription_ordering_;
 
-  GrpcStream<envoy::api::v2::DeltaDiscoveryRequest, envoy::api::v2::DeltaDiscoveryResponse>
+  GrpcStream<envoy::api::v3alpha::DeltaDiscoveryRequest,
+             envoy::api::v3alpha::DeltaDiscoveryResponse>
       grpc_stream_;
 };
 

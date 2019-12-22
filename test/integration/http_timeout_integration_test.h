@@ -1,7 +1,7 @@
 #pragma once
 
-#include "envoy/config/filter/http/router/v2/router.pb.h"
-#include "envoy/config/filter/network/http_connection_manager/v2/http_connection_manager.pb.h"
+#include "envoy/config/filter/http/router/v3alpha/router.pb.h"
+#include "envoy/config/filter/network/http_connection_manager/v3alpha/http_connection_manager.pb.h"
 
 #include "test/integration/http_integration.h"
 
@@ -27,15 +27,14 @@ public:
 
   void initialize() override {
     if (respect_expected_rq_timeout) {
-      config_helper_.addConfigModifier(
-          [&](envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager&
-                  hcm) {
-            envoy::config::filter::http::router::v2::Router router_config;
-            router_config.set_respect_expected_rq_timeout(respect_expected_rq_timeout);
-            // TestUtility::jsonConvert(router_config,
-            // *hcm.mutable_http_filters(0)->mutable_config());
-            hcm.mutable_http_filters(0)->mutable_typed_config()->PackFrom(router_config);
-          });
+      config_helper_.addConfigModifier([&](envoy::config::filter::network::http_connection_manager::
+                                               v3alpha::HttpConnectionManager& hcm) {
+        envoy::config::filter::http::router::v3alpha::Router router_config;
+        router_config.set_respect_expected_rq_timeout(respect_expected_rq_timeout);
+        // TestUtility::jsonConvert(router_config,
+        // *hcm.mutable_http_filters(0)->mutable_config());
+        hcm.mutable_http_filters(0)->mutable_typed_config()->PackFrom(router_config);
+      });
     }
 
     HttpIntegrationTest::initialize();

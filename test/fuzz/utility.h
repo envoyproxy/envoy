@@ -1,6 +1,6 @@
 #pragma once
 
-#include "envoy/api/v2/core/base.pb.h"
+#include "envoy/api/v3alpha/core/base.pb.h"
 
 #include "common/common/empty_string.h"
 #include "common/network/resolver_impl.h"
@@ -46,9 +46,11 @@ inline std::string replaceInvalidCharacters(absl::string_view string) {
 }
 
 // Return a new RepeatedPtrField of HeaderValueOptions with invalid characters removed.
-inline Protobuf::RepeatedPtrField<envoy::api::v2::core::HeaderValueOption> replaceInvalidHeaders(
-    const Protobuf::RepeatedPtrField<envoy::api::v2::core::HeaderValueOption>& headers_to_add) {
-  Protobuf::RepeatedPtrField<envoy::api::v2::core::HeaderValueOption> processed;
+inline Protobuf::RepeatedPtrField<envoy::api::v3alpha::core::HeaderValueOption>
+replaceInvalidHeaders(
+    const Protobuf::RepeatedPtrField<envoy::api::v3alpha::core::HeaderValueOption>&
+        headers_to_add) {
+  Protobuf::RepeatedPtrField<envoy::api::v3alpha::core::HeaderValueOption> processed;
   for (const auto& header : headers_to_add) {
     auto* header_value_option = processed.Add();
     auto* mutable_header = header_value_option->mutable_header();
@@ -59,9 +61,9 @@ inline Protobuf::RepeatedPtrField<envoy::api::v2::core::HeaderValueOption> repla
   return processed;
 }
 
-inline envoy::api::v2::core::Metadata
-replaceInvalidStringValues(const envoy::api::v2::core::Metadata& upstream_metadata) {
-  envoy::api::v2::core::Metadata processed = upstream_metadata;
+inline envoy::api::v3alpha::core::Metadata
+replaceInvalidStringValues(const envoy::api::v3alpha::core::Metadata& upstream_metadata) {
+  envoy::api::v3alpha::core::Metadata processed = upstream_metadata;
   for (auto& metadata_struct : *processed.mutable_filter_metadata()) {
     // Metadata fields consist of keyed Structs, which is a map of dynamically typed values. These
     // values can be null, a number, a string, a boolean, a list of values, or a recursive struct.
@@ -131,7 +133,7 @@ inline TestStreamInfo fromStreamInfo(const test::fuzz::StreamInfo& stream_info) 
   }
   test_stream_info.setRequestedServerName(stream_info.requested_server_name());
   auto upstream_host = std::make_shared<NiceMock<Upstream::MockHostDescription>>();
-  auto upstream_metadata = std::make_shared<envoy::api::v2::core::Metadata>(
+  auto upstream_metadata = std::make_shared<envoy::api::v3alpha::core::Metadata>(
       replaceInvalidStringValues(stream_info.upstream_metadata()));
   ON_CALL(*upstream_host, metadata()).WillByDefault(testing::Return(upstream_metadata));
   test_stream_info.upstream_host_ = upstream_host;

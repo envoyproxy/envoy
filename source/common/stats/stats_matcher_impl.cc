@@ -3,7 +3,7 @@
 #include <regex>
 #include <string>
 
-#include "envoy/config/metrics/v2/stats.pb.h"
+#include "envoy/config/metrics/v3alpha/stats.pb.h"
 
 #include "common/common/utility.h"
 
@@ -12,20 +12,20 @@ namespace Stats {
 
 // TODO(ambuc): Refactor this into common/matchers.cc, since StatsMatcher is really just a thin
 // wrapper around what might be called a StringMatcherList.
-StatsMatcherImpl::StatsMatcherImpl(const envoy::config::metrics::v2::StatsConfig& config) {
+StatsMatcherImpl::StatsMatcherImpl(const envoy::config::metrics::v3alpha::StatsConfig& config) {
   switch (config.stats_matcher().stats_matcher_case()) {
-  case envoy::config::metrics::v2::StatsMatcher::kRejectAll:
+  case envoy::config::metrics::v3alpha::StatsMatcher::StatsMatcherCase::kRejectAll:
     // In this scenario, there are no matchers to store.
     is_inclusive_ = !config.stats_matcher().reject_all();
     break;
-  case envoy::config::metrics::v2::StatsMatcher::kInclusionList:
+  case envoy::config::metrics::v3alpha::StatsMatcher::StatsMatcherCase::kInclusionList:
     // If we have an inclusion list, we are being default-exclusive.
     for (const auto& stats_matcher : config.stats_matcher().inclusion_list().patterns()) {
       matchers_.push_back(Matchers::StringMatcherImpl(stats_matcher));
     }
     is_inclusive_ = false;
     break;
-  case envoy::config::metrics::v2::StatsMatcher::kExclusionList:
+  case envoy::config::metrics::v3alpha::StatsMatcher::StatsMatcherCase::kExclusionList:
     // If we have an exclusion list, we are being default-inclusive.
     for (const auto& stats_matcher : config.stats_matcher().exclusion_list().patterns()) {
       matchers_.push_back(Matchers::StringMatcherImpl(stats_matcher));

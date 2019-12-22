@@ -7,10 +7,10 @@
 #include <utility>
 #include <vector>
 
-#include "envoy/admin/v2alpha/server_info.pb.h"
-#include "envoy/api/v2/core/base.pb.h"
-#include "envoy/api/v2/rds.pb.h"
-#include "envoy/config/filter/network/http_connection_manager/v2/http_connection_manager.pb.h"
+#include "envoy/admin/v3alpha/server_info.pb.h"
+#include "envoy/api/v3alpha/core/base.pb.h"
+#include "envoy/api/v3alpha/rds.pb.h"
+#include "envoy/config/filter/network/http_connection_manager/v3alpha/http_connection_manager.pb.h"
 #include "envoy/http/filter.h"
 #include "envoy/network/filter.h"
 #include "envoy/network/listen_socket.h"
@@ -42,7 +42,7 @@ namespace Envoy {
 namespace Server {
 
 namespace Utility {
-envoy::admin::v2alpha::ServerInfo::State serverState(Init::Manager::State state,
+envoy::admin::v3alpha::ServerInfo::State serverState(Init::Manager::State state,
                                                      bool health_check_failed);
 } // namespace Utility
 
@@ -182,7 +182,7 @@ private:
     absl::optional<ConfigInfo> configInfo() const override { return {}; }
     SystemTime lastUpdated() const override { return time_source_.systemTime(); }
     void onConfigUpdate() override {}
-    void validateConfig(const envoy::api::v2::RouteConfiguration&) const override {}
+    void validateConfig(const envoy::api::v3alpha::RouteConfiguration&) const override {}
 
     Router::ConfigConstSharedPtr config_;
     TimeSource& time_source_;
@@ -249,7 +249,7 @@ private:
                                  bool pretty_print = false);
 
   std::vector<const UrlHandler*> sortedHandlers() const;
-  envoy::admin::v2alpha::ServerInfo::State serverState();
+  envoy::admin::v3alpha::ServerInfo::State serverState();
   /**
    * URL handlers.
    */
@@ -376,8 +376,8 @@ private:
     const Network::ActiveUdpListenerFactory* udpListenerFactory() override {
       NOT_REACHED_GCOVR_EXCL_LINE;
     }
-    envoy::api::v2::core::TrafficDirection direction() const override {
-      return envoy::api::v2::core::TrafficDirection::UNSPECIFIED;
+    envoy::api::v3alpha::core::TrafficDirection direction() const override {
+      return envoy::api::v3alpha::core::UNSPECIFIED;
     }
     Network::ConnectionBalancer& connectionBalancer() override { return connection_balancer_; }
 

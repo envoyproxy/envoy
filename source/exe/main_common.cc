@@ -4,6 +4,8 @@
 #include <memory>
 #include <new>
 
+#include "envoy/api/v3alpha/lds.pb.h"
+
 #include "common/common/compiler_requirements.h"
 #include "common/common/perf_annotation.h"
 #include "common/network/utility.h"
@@ -30,7 +32,7 @@ Server::DrainManagerPtr ProdComponentFactory::createDrainManager(Server::Instanc
   // hot restart at the global level. The per-listener drain managers decide whether to
   // to include /healthcheck/fail status.
   return std::make_unique<Server::DrainManagerImpl>(server,
-                                                    envoy::api::v2::Listener::MODIFY_ONLY);
+                                                    envoy::api::v3alpha::Listener::MODIFY_ONLY);
 }
 
 Runtime::LoaderPtr ProdComponentFactory::createRuntime(Server::Instance& server,

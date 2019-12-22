@@ -1,7 +1,7 @@
 #include <string>
 
 #include "envoy/common/exception.h"
-#include "envoy/config/metrics/v2/stats.pb.h"
+#include "envoy/config/metrics/v3alpha/stats.pb.h"
 
 #include "common/config/well_known_names.h"
 #include "common/stats/tag_extractor_impl.h"
@@ -65,7 +65,7 @@ TEST(TagExtractorTest, BadRegex) {
 
 class DefaultTagRegexTester {
 public:
-  DefaultTagRegexTester() : tag_extractors_(envoy::config::metrics::v2::StatsConfig()) {}
+  DefaultTagRegexTester() : tag_extractors_(envoy::config::metrics::v3alpha::StatsConfig()) {}
 
   void testRegex(const std::string& stat_name, const std::string& expected_tag_extracted_name,
                  const std::vector<Tag>& expected_tags) {

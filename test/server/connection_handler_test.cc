@@ -1,5 +1,5 @@
-#include "envoy/api/v2/core/base.pb.h"
-#include "envoy/api/v2/listener/udp_listener_config.pb.h"
+#include "envoy/api/v3alpha/core/base.pb.h"
+#include "envoy/api/v3alpha/listener/udp_listener_config.pb.h"
 #include "envoy/server/active_udp_listener_config.h"
 #include "envoy/stats/scope.h"
 
@@ -57,7 +57,7 @@ public:
           name_(name), listener_filters_timeout_(listener_filters_timeout),
           continue_on_listener_filters_timeout_(continue_on_listener_filters_timeout),
           connection_balancer_(std::make_unique<Network::NopConnectionBalancerImpl>()) {
-      envoy::api::v2::listener::UdpListenerConfig dummy;
+      envoy::api::v3alpha::listener::UdpListenerConfig dummy;
       std::string listener_name("raw_udp_listener");
       dummy.set_udp_listener_name(listener_name);
       udp_listener_factory_ =
@@ -87,8 +87,8 @@ public:
     const Network::ActiveUdpListenerFactory* udpListenerFactory() override {
       return udp_listener_factory_.get();
     }
-    envoy::api::v2::core::TrafficDirection direction() const override {
-      return envoy::api::v2::core::TrafficDirection::UNSPECIFIED;
+    envoy::api::v3alpha::core::TrafficDirection direction() const override {
+      return envoy::api::v3alpha::core::UNSPECIFIED;
     }
     Network::ConnectionBalancer& connectionBalancer() override { return *connection_balancer_; }
 

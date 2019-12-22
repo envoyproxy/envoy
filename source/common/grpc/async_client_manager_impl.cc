@@ -1,6 +1,6 @@
 #include "common/grpc/async_client_manager_impl.h"
 
-#include "envoy/api/v2/core/grpc_service.pb.h"
+#include "envoy/api/v3alpha/core/grpc_service.pb.h"
 #include "envoy/stats/scope.h"
 
 #include "common/grpc/async_client_impl.h"
@@ -13,7 +13,7 @@ namespace Envoy {
 namespace Grpc {
 
 AsyncClientFactoryImpl::AsyncClientFactoryImpl(Upstream::ClusterManager& cm,
-                                               const envoy::api::v2::core::GrpcService& config,
+                                               const envoy::api::v3alpha::core::GrpcService& config,
                                                bool skip_cluster_check, TimeSource& time_source)
     : cm_(cm), config_(config), time_source_(time_source) {
   if (skip_cluster_check) {
@@ -50,7 +50,7 @@ RawAsyncClientPtr AsyncClientFactoryImpl::create() {
 
 GoogleAsyncClientFactoryImpl::GoogleAsyncClientFactoryImpl(
     ThreadLocal::Instance& tls, ThreadLocal::Slot* google_tls_slot, Stats::Scope& scope,
-    const envoy::api::v2::core::GrpcService& config, Api::Api& api)
+    const envoy::api::v3alpha::core::GrpcService& config, Api::Api& api)
     : tls_(tls), google_tls_slot_(google_tls_slot),
       scope_(scope.createScope(fmt::format("grpc.{}.", config.google_grpc().stat_prefix()))),
       config_(config), api_(api) {
@@ -79,12 +79,12 @@ RawAsyncClientPtr GoogleAsyncClientFactoryImpl::create() {
 }
 
 AsyncClientFactoryPtr
-AsyncClientManagerImpl::factoryForGrpcService(const envoy::api::v2::core::GrpcService& config,
+AsyncClientManagerImpl::factoryForGrpcService(const envoy::api::v3alpha::core::GrpcService& config,
                                               Stats::Scope& scope, bool skip_cluster_check) {
   switch (config.target_specifier_case()) {
-  case envoy::api::v2::core::GrpcService::kEnvoyGrpc:
+  case envoy::api::v3alpha::core::GrpcService::TargetSpecifierCase::kEnvoyGrpc:
     return std::make_unique<AsyncClientFactoryImpl>(cm_, config, skip_cluster_check, time_source_);
-  case envoy::api::v2::core::GrpcService::kGoogleGrpc:
+  case envoy::api::v3alpha::core::GrpcService::TargetSpecifierCase::kGoogleGrpc:
     return std::make_unique<GoogleAsyncClientFactoryImpl>(tls_, google_tls_slot_.get(), scope,
                                                           config, api_);
   default:

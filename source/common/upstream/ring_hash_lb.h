@@ -2,7 +2,7 @@
 
 #include <vector>
 
-#include "envoy/api/v2/cds.pb.h"
+#include "envoy/api/v3alpha/cds.pb.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats_macros.h"
@@ -42,13 +42,13 @@ class RingHashLoadBalancer : public ThreadAwareLoadBalancerBase,
 public:
   RingHashLoadBalancer(const PrioritySet& priority_set, ClusterStats& stats, Stats::Scope& scope,
                        Runtime::Loader& runtime, Runtime::RandomGenerator& random,
-                       const absl::optional<envoy::api::v2::Cluster::RingHashLbConfig>& config,
-                       const envoy::api::v2::Cluster::CommonLbConfig& common_config);
+                       const absl::optional<envoy::api::v3alpha::Cluster::RingHashLbConfig>& config,
+                       const envoy::api::v3alpha::Cluster::CommonLbConfig& common_config);
 
   const RingHashLoadBalancerStats& stats() const { return stats_; }
 
 private:
-  using HashFunction = envoy::api::v2::Cluster_RingHashLbConfig_HashFunction;
+  using HashFunction = envoy::api::v3alpha::Cluster::RingHashLbConfig::HashFunction;
 
   struct RingEntry {
     uint64_t hash_;

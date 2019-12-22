@@ -8,7 +8,7 @@
 #include <unordered_set>
 #include <vector>
 
-#include "envoy/config/metrics/v2/stats.pb.h"
+#include "envoy/config/metrics/v3alpha/stats.pb.h"
 #include "envoy/stats/tag_extractor.h"
 #include "envoy/stats/tag_producer.h"
 
@@ -29,7 +29,7 @@ namespace Stats {
  */
 class TagProducerImpl : public TagProducer {
 public:
-  TagProducerImpl(const envoy::config::metrics::v2::StatsConfig& config);
+  TagProducerImpl(const envoy::config::metrics::v3alpha::StatsConfig& config);
   TagProducerImpl() = default;
 
   /**
@@ -63,7 +63,7 @@ private:
    * Roughly estimate the size of the vectors.
    * @param config const envoy::config::metrics::v2::StatsConfig& the config.
    */
-  void reserveResources(const envoy::config::metrics::v2::StatsConfig& config);
+  void reserveResources(const envoy::config::metrics::v3alpha::StatsConfig& config);
 
   /**
    * Adds all default extractors from well_known_names.cc into the
@@ -74,7 +74,7 @@ private:
    * @return names std::unordered_set<std::string> the set of names to populate
    */
   std::unordered_set<std::string>
-  addDefaultExtractors(const envoy::config::metrics::v2::StatsConfig& config);
+  addDefaultExtractors(const envoy::config::metrics::v3alpha::StatsConfig& config);
 
   /**
    * Iterates over every tag extractor that might possibly match stat_name, calling

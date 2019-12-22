@@ -2,9 +2,9 @@
 #include <cstdint>
 #include <string>
 
-#include "envoy/api/v2/core/http_uri.pb.h"
-#include "envoy/api/v2/core/protocol.pb.h"
-#include "envoy/api/v2/core/protocol.pb.validate.h"
+#include "envoy/api/v3alpha/core/http_uri.pb.h"
+#include "envoy/api/v3alpha/core/protocol.pb.h"
+#include "envoy/api/v3alpha/core/protocol.pb.validate.h"
 
 #include "common/common/fmt.h"
 #include "common/http/exception.h"
@@ -249,7 +249,7 @@ TEST(HttpUtility, createSslRedirectPath) {
 namespace {
 
 Http2Settings parseHttp2SettingsFromV2Yaml(const std::string& yaml) {
-  envoy::api::v2::core::Http2ProtocolOptions http2_protocol_options;
+  envoy::api::v3alpha::core::Http2ProtocolOptions http2_protocol_options;
   TestUtility::loadFromYamlAndValidate(yaml, http2_protocol_options);
   return Utility::parseHttp2Settings(http2_protocol_options);
 }
@@ -580,7 +580,7 @@ TEST(HttpUtility, TestExtractHostPathFromUri) {
 }
 
 TEST(HttpUtility, TestPrepareHeaders) {
-  envoy::api::v2::core::HttpUri http_uri;
+  envoy::api::v3alpha::core::HttpUri http_uri;
   http_uri.set_uri("scheme://dns.name/x/y/z");
 
   Http::MessagePtr message = Utility::prepareHeaders(http_uri);

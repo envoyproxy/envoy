@@ -3,11 +3,11 @@
 #include <memory>
 #include <string>
 
-#include "envoy/admin/v2alpha/config_dump.pb.h"
-#include "envoy/api/v2/cds.pb.h"
-#include "envoy/api/v2/eds.pb.h"
-#include "envoy/api/v2/lds.pb.h"
-#include "envoy/api/v2/rds.pb.h"
+#include "envoy/admin/v3alpha/config_dump.pb.h"
+#include "envoy/api/v3alpha/cds.pb.h"
+#include "envoy/api/v3alpha/eds.pb.h"
+#include "envoy/api/v3alpha/lds.pb.h"
+#include "envoy/api/v3alpha/rds.pb.h"
 
 #include "test/common/grpc/grpc_client_integration.h"
 #include "test/integration/http_integration.h"
@@ -54,19 +54,21 @@ public:
 
   void TearDown() override;
 
-  envoy::api::v2::Cluster buildCluster(const std::string& name);
+  envoy::api::v3alpha::Cluster buildCluster(const std::string& name);
 
-  envoy::api::v2::Cluster buildRedisCluster(const std::string& name);
+  envoy::api::v3alpha::Cluster buildRedisCluster(const std::string& name);
 
-  envoy::api::v2::ClusterLoadAssignment buildClusterLoadAssignment(const std::string& name);
+  envoy::api::v3alpha::ClusterLoadAssignment buildClusterLoadAssignment(const std::string& name);
 
-  envoy::api::v2::Listener buildListener(const std::string& name, const std::string& route_config,
-                                         const std::string& stat_prefix = "ads_test");
+  envoy::api::v3alpha::Listener buildListener(const std::string& name,
+                                              const std::string& route_config,
+                                              const std::string& stat_prefix = "ads_test");
 
-  envoy::api::v2::Listener buildRedisListener(const std::string& name, const std::string& cluster);
+  envoy::api::v3alpha::Listener buildRedisListener(const std::string& name,
+                                                   const std::string& cluster);
 
-  envoy::api::v2::RouteConfiguration buildRouteConfig(const std::string& name,
-                                                      const std::string& cluster);
+  envoy::api::v3alpha::RouteConfiguration buildRouteConfig(const std::string& name,
+                                                           const std::string& cluster);
 
   void makeSingleRequest();
 
@@ -75,9 +77,9 @@ public:
 
   void testBasicFlow();
 
-  envoy::admin::v2alpha::ClustersConfigDump getClustersConfigDump();
-  envoy::admin::v2alpha::ListenersConfigDump getListenersConfigDump();
-  envoy::admin::v2alpha::RoutesConfigDump getRoutesConfigDump();
+  envoy::admin::v3alpha::ClustersConfigDump getClustersConfigDump();
+  envoy::admin::v3alpha::ListenersConfigDump getListenersConfigDump();
+  envoy::admin::v3alpha::RoutesConfigDump getRoutesConfigDump();
 };
 
 } // namespace Envoy

@@ -1,4 +1,3 @@
-#include "envoy/config/filter/http/ip_tagging/v2/ip_tagging.pb.h"
 #include "envoy/config/filter/http/ip_tagging/v3alpha/ip_tagging.pb.h"
 
 #include "common/config/api_type_oracle.h"
@@ -14,7 +13,7 @@ namespace {
 
 TEST(ApiTypeOracleTest, All) {
   // For proto descriptors only
-  static_cast<void>(envoy::config::filter::http::ip_tagging::v2::IPTagging::RequestType());
+  static_cast<void>(envoy::config::filter::http::ip_tagging::v3alpha::IPTagging::RequestType());
   static_cast<void>(envoy::config::filter::http::ip_tagging::v3alpha::IPTagging::RequestType());
 
   EXPECT_EQ(nullptr, ApiTypeOracle::inferEarlierVersionDescriptor("foo", {}, ""));

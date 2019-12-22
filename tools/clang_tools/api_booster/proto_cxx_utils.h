@@ -36,7 +36,7 @@ public:
   // Given an enum value, e.g. FOO_BAR determine if it needs upgrading.
   static absl::optional<std::string>
   renameEnumValue(absl::string_view enum_value_name,
-                 const std::unordered_map<std::string, std::string> renames);
+                  const std::unordered_map<std::string, std::string> renames);
 
   // Convert from a protobuf type, e.g. foo.bar.v2, to a C++ type, e.g.
   // foo::bar::v2.

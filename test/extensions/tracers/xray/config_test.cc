@@ -1,5 +1,6 @@
-#include "envoy/config/trace/v2/trace.pb.h"
-#include "envoy/config/trace/v2alpha/xray.pb.validate.h"
+#include "envoy/config/trace/v3alpha/trace.pb.h"
+#include "envoy/config/trace/v3alpha/xray.pb.h"
+#include "envoy/config/trace/v3alpha/xray.pb.validate.h"
 #include "envoy/registry/registry.h"
 
 #include "extensions/tracers/xray/config.h"
@@ -34,7 +35,7 @@ TEST(XRayTracerConfigTest, XRayHttpTracerWithTypedConfig) {
       sampling_rule_manifest:
         filename: "rules.json")EOF";
 
-  envoy::config::trace::v2::Tracing configuration;
+  envoy::config::trace::v3alpha::Tracing configuration;
   TestUtility::loadFromYaml(yaml_string, configuration);
 
   XRayTracerFactory factory;
@@ -68,7 +69,7 @@ TEST(XRayTracerConfigTest, XRayHttpTracerWithInvalidFileName) {
       sampling_rule_manifest:
         filename: "rules.json")EOF";
 
-  envoy::config::trace::v2::Tracing configuration;
+  envoy::config::trace::v3alpha::Tracing configuration;
   TestUtility::loadFromYaml(yaml_string, configuration);
 
   XRayTracerFactory factory;
@@ -94,7 +95,7 @@ TEST(XRayTracerConfigTest, ProtocolNotUDPThrows) {
       sampling_rule_manifest:
         filename: "rules.json")EOF";
 
-  envoy::config::trace::v2::Tracing configuration;
+  envoy::config::trace::v3alpha::Tracing configuration;
   TestUtility::loadFromYaml(yaml_string, configuration);
 
   XRayTracerFactory factory;
@@ -119,7 +120,7 @@ TEST(XRayTracerConfigTest, UsingNamedPortThrows) {
       sampling_rule_manifest:
         filename: "rules.json")EOF";
 
-  envoy::config::trace::v2::Tracing configuration;
+  envoy::config::trace::v3alpha::Tracing configuration;
   TestUtility::loadFromYaml(yaml_string, configuration);
 
   XRayTracerFactory factory;

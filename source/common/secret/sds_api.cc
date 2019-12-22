@@ -2,10 +2,10 @@
 
 #include <unordered_map>
 
-#include "envoy/api/v2/auth/cert.pb.h"
-#include "envoy/api/v2/auth/cert.pb.validate.h"
-#include "envoy/api/v2/core/config_source.pb.h"
-#include "envoy/api/v2/discovery.pb.h"
+#include "envoy/api/v3alpha/auth/cert.pb.h"
+#include "envoy/api/v3alpha/auth/cert.pb.validate.h"
+#include "envoy/api/v3alpha/core/config_source.pb.h"
+#include "envoy/api/v3alpha/discovery.pb.h"
 
 #include "common/config/resources.h"
 #include "common/protobuf/utility.h"
@@ -13,10 +13,11 @@
 namespace Envoy {
 namespace Secret {
 
-SdsApi::SdsApi(envoy::api::v2::core::ConfigSource sds_config, absl::string_view sds_config_name,
-               Config::SubscriptionFactory& subscription_factory, TimeSource& time_source,
-               ProtobufMessage::ValidationVisitor& validation_visitor, Stats::Store& stats,
-               Init::Manager& init_manager, std::function<void()> destructor_cb)
+SdsApi::SdsApi(envoy::api::v3alpha::core::ConfigSource sds_config,
+               absl::string_view sds_config_name, Config::SubscriptionFactory& subscription_factory,
+               TimeSource& time_source, ProtobufMessage::ValidationVisitor& validation_visitor,
+               Stats::Store& stats, Init::Manager& init_manager,
+               std::function<void()> destructor_cb)
     : init_target_(fmt::format("SdsApi {}", sds_config_name), [this] { initialize(); }),
       stats_(stats), sds_config_(std::move(sds_config)), sds_config_name_(sds_config_name),
       secret_hash_(0), clean_up_(std::move(destructor_cb)), validation_visitor_(validation_visitor),
@@ -33,7 +34,7 @@ SdsApi::SdsApi(envoy::api::v2::core::ConfigSource sds_config, absl::string_view 
 void SdsApi::onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
                             const std::string& version_info) {
   validateUpdateSize(resources.size());
-  auto secret = MessageUtil::anyConvert<envoy::api::v2::auth::Secret>(resources[0]);
+  auto secret = MessageUtil::anyConvert<envoy::api::v3alpha::auth::Secret>(resources[0]);
   MessageUtil::validate(secret, validation_visitor_);
 
   if (secret.name() != sds_config_name_) {
@@ -53,8 +54,9 @@ void SdsApi::onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& 
   init_target_.ready();
 }
 
-void SdsApi::onConfigUpdate(const Protobuf::RepeatedPtrField<envoy::api::v2::Resource>& resources,
-                            const Protobuf::RepeatedPtrField<std::string>&, const std::string&) {
+void SdsApi::onConfigUpdate(
+    const Protobuf::RepeatedPtrField<envoy::api::v3alpha::Resource>& resources,
+    const Protobuf::RepeatedPtrField<std::string>&, const std::string&) {
   validateUpdateSize(resources.size());
   Protobuf::RepeatedPtrField<ProtobufWkt::Any> unwrapped_resource;
   *unwrapped_resource.Add() = resources[0].resource();
@@ -81,8 +83,8 @@ void SdsApi::validateUpdateSize(int num_resources) {
 void SdsApi::initialize() {
   subscription_ = subscription_factory_.subscriptionFromConfigSource(
       sds_config_,
-      Grpc::Common::typeUrl(envoy::api::v2::auth::Secret().GetDescriptor()->full_name()), stats_,
-      *this);
+      Grpc::Common::typeUrl(envoy::api::v3alpha::auth::Secret().GetDescriptor()->full_name()),
+      stats_, *this);
   subscription_->start({sds_config_name_});
 }
 

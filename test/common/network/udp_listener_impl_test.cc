@@ -2,7 +2,7 @@
 #include <string>
 #include <vector>
 
-#include "envoy/api/v2/core/base.pb.h"
+#include "envoy/api/v3alpha/core/base.pb.h"
 
 #include "common/network/address_impl.h"
 #include "common/network/socket_option_factory.h"
@@ -108,7 +108,7 @@ TEST_P(UdpListenerImplTest, UdpSetListeningSocketOptionsSuccess) {
                                                            nullptr, true);
   std::shared_ptr<MockSocketOption> option = std::make_shared<MockSocketOption>();
   socket->addOption(option);
-  EXPECT_CALL(*option, setOption(_, envoy::api::v2::core::SocketOption::STATE_BOUND))
+  EXPECT_CALL(*option, setOption(_, envoy::api::v3alpha::core::SocketOption::STATE_BOUND))
       .WillOnce(Return(true));
   UdpListenerImpl listener(dispatcherImpl(), socket, listener_callbacks,
                            dispatcherImpl().timeSource());

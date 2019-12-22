@@ -5,8 +5,8 @@
 #include <string>
 #include <vector>
 
-#include "envoy/api/v2/discovery.pb.h"
-#include "envoy/api/v2/endpoint/endpoint.pb.h"
+#include "envoy/api/v3alpha/discovery.pb.h"
+#include "envoy/api/v3alpha/endpoint/endpoint.pb.h"
 #include "envoy/server/process_context.h"
 
 #include "common/http/codec_client.h"
@@ -191,7 +191,7 @@ public:
 
   // Set the endpoint's socket address to point at upstream at given index.
   void setUpstreamAddress(uint32_t upstream_index,
-                          envoy::api::v2::endpoint::LbEndpoint& endpoint) const;
+                          envoy::api::v3alpha::endpoint::LbEndpoint& endpoint) const;
 
   virtual Network::ClientConnectionPtr makeClientConnection(uint32_t port);
 
@@ -271,7 +271,7 @@ public:
   template <class T>
   void sendSotwDiscoveryResponse(const std::string& type_url, const std::vector<T>& messages,
                                  const std::string& version) {
-    envoy::api::v2::DiscoveryResponse discovery_response;
+    envoy::api::v3alpha::DiscoveryResponse discovery_response;
     discovery_response.set_version_info(version);
     discovery_response.set_type_url(type_url);
     for (const auto& message : messages) {
@@ -293,7 +293,7 @@ public:
                                   const std::vector<T>& added_or_updated,
                                   const std::vector<std::string>& removed,
                                   const std::string& version, FakeStreamPtr& stream) {
-    envoy::api::v2::DeltaDiscoveryResponse response;
+    envoy::api::v3alpha::DeltaDiscoveryResponse response;
     response.set_system_version_info("system_version_info_this_is_a_test");
     response.set_type_url(type_url);
     for (const auto& message : added_or_updated) {

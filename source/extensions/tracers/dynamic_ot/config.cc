@@ -1,7 +1,7 @@
 #include "extensions/tracers/dynamic_ot/config.h"
 
-#include "envoy/config/trace/v2/trace.pb.h"
-#include "envoy/config/trace/v2/trace.pb.validate.h"
+#include "envoy/config/trace/v3alpha/trace.pb.h"
+#include "envoy/config/trace/v3alpha/trace.pb.validate.h"
 #include "envoy/registry/registry.h"
 
 #include "common/common/utility.h"
@@ -19,7 +19,7 @@ DynamicOpenTracingTracerFactory::DynamicOpenTracingTracerFactory()
     : FactoryBase(TracerNames::get().DynamicOt) {}
 
 Tracing::HttpTracerPtr DynamicOpenTracingTracerFactory::createHttpTracerTyped(
-    const envoy::config::trace::v2::DynamicOtConfig& proto_config, Server::Instance& server) {
+    const envoy::config::trace::v3alpha::DynamicOtConfig& proto_config, Server::Instance& server) {
   const std::string& library = proto_config.library();
   const std::string config = MessageUtil::getJsonStringFromMessage(proto_config.config());
   Tracing::DriverPtr dynamic_driver =

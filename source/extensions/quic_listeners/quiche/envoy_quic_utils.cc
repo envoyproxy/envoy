@@ -2,7 +2,7 @@
 
 #include <sys/socket.h>
 
-#include "envoy/api/v2/core/base.pb.h"
+#include "envoy/api/v3alpha/core/base.pb.h"
 
 #include "common/network/socket_option_factory.h"
 
@@ -124,7 +124,7 @@ createConnectionSocket(Network::Address::InstanceConstSharedPtr& peer_addr,
     connection_socket->addOptions(options);
   }
   if (!Network::Socket::applyOptions(connection_socket->options(), *connection_socket,
-                                     envoy::api::v2::core::SocketOption::STATE_PREBIND)) {
+                                     envoy::api::v3alpha::core::SocketOption::STATE_PREBIND)) {
     connection_socket->close();
     ENVOY_LOG_MISC(error, "Fail to apply pre-bind options");
     return connection_socket;
@@ -136,7 +136,7 @@ createConnectionSocket(Network::Address::InstanceConstSharedPtr& peer_addr,
     local_addr = Network::Address::addressFromFd(connection_socket->ioHandle().fd());
   }
   if (!Network::Socket::applyOptions(connection_socket->options(), *connection_socket,
-                                     envoy::api::v2::core::SocketOption::STATE_BOUND)) {
+                                     envoy::api::v3alpha::core::SocketOption::STATE_BOUND)) {
     ENVOY_LOG_MISC(error, "Fail to apply post-bind options");
     connection_socket->close();
   }

@@ -1,5 +1,5 @@
 #include "envoy/config/filter/http/buffer/v2/buffer.pb.h"
-#include "envoy/config/filter/network/http_connection_manager/v2/http_connection_manager.pb.h"
+#include "envoy/config/filter/network/http_connection_manager/v3alpha/http_connection_manager.pb.h"
 
 #include "common/protobuf/utility.h"
 
@@ -121,7 +121,8 @@ ConfigHelper::HttpModifierFunction overrideConfig(const std::string& json_config
 
   return
       [buffer_per_route](
-          envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager& cfg) {
+          envoy::config::filter::network::http_connection_manager::v3alpha::HttpConnectionManager&
+              cfg) {
         auto* config = cfg.mutable_route_config()
                            ->mutable_virtual_hosts()
                            ->Mutable(0)

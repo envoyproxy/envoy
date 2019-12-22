@@ -2,8 +2,8 @@
 
 #include <string>
 
-#include "envoy/api/v2/auth/cert.pb.h"
-#include "envoy/api/v2/core/config_source.pb.h"
+#include "envoy/api/v3alpha/auth/cert.pb.h"
+#include "envoy/api/v3alpha/core/config_source.pb.h"
 #include "envoy/secret/secret_provider.h"
 
 namespace Envoy {
@@ -27,7 +27,7 @@ public:
    * @param add a static secret from envoy::api::v2::auth::Secret.
    * @throw an EnvoyException if the secret is invalid or not supported, or there is duplicate.
    */
-  virtual void addStaticSecret(const envoy::api::v2::auth::Secret& secret) PURE;
+  virtual void addStaticSecret(const envoy::api::v3alpha::auth::Secret& secret) PURE;
 
   /**
    * @param name a name of the static TlsCertificateConfigProvider.
@@ -58,7 +58,7 @@ public:
    * @return a TlsCertificateConfigProviderSharedPtr created from tls_certificate.
    */
   virtual TlsCertificateConfigProviderSharedPtr createInlineTlsCertificateProvider(
-      const envoy::api::v2::auth::TlsCertificate& tls_certificate) PURE;
+      const envoy::api::v3alpha::auth::TlsCertificate& tls_certificate) PURE;
 
   /**
    * @param certificate_validation_context the protobuf config of the certificate validation
@@ -68,7 +68,7 @@ public:
    */
   virtual CertificateValidationContextConfigProviderSharedPtr
   createInlineCertificateValidationContextProvider(
-      const envoy::api::v2::auth::CertificateValidationContext& certificate_validation_context)
+      const envoy::api::v3alpha::auth::CertificateValidationContext& certificate_validation_context)
       PURE;
 
   /**
@@ -76,7 +76,7 @@ public:
    * @return a TlsSessionTicketKeysConfigProviderSharedPtr created from session_ticket_keys.
    */
   virtual TlsSessionTicketKeysConfigProviderSharedPtr createInlineTlsSessionTicketKeysProvider(
-      const envoy::api::v2::auth::TlsSessionTicketKeys& tls_certificate) PURE;
+      const envoy::api::v3alpha::auth::TlsSessionTicketKeys& tls_certificate) PURE;
 
   /**
    * Finds and returns a dynamic secret provider associated to SDS config. Create
@@ -89,7 +89,7 @@ public:
    * @return TlsCertificateConfigProviderSharedPtr the dynamic TLS secret provider.
    */
   virtual TlsCertificateConfigProviderSharedPtr findOrCreateTlsCertificateProvider(
-      const envoy::api::v2::core::ConfigSource& config_source, const std::string& config_name,
+      const envoy::api::v3alpha::core::ConfigSource& config_source, const std::string& config_name,
       Server::Configuration::TransportSocketFactoryContext& secret_provider_context) PURE;
 
   /**
@@ -105,7 +105,7 @@ public:
    */
   virtual CertificateValidationContextConfigProviderSharedPtr
   findOrCreateCertificateValidationContextProvider(
-      const envoy::api::v2::core::ConfigSource& config_source, const std::string& config_name,
+      const envoy::api::v3alpha::core::ConfigSource& config_source, const std::string& config_name,
       Server::Configuration::TransportSocketFactoryContext& secret_provider_context) PURE;
 
   /**
@@ -121,7 +121,7 @@ public:
    */
   virtual TlsSessionTicketKeysConfigProviderSharedPtr
   findOrCreateTlsSessionTicketKeysContextProvider(
-      const envoy::api::v2::core::ConfigSource& config_source, const std::string& config_name,
+      const envoy::api::v3alpha::core::ConfigSource& config_source, const std::string& config_name,
       Server::Configuration::TransportSocketFactoryContext& secret_provider_context) PURE;
 };
 

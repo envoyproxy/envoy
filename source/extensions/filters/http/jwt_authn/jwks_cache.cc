@@ -4,7 +4,7 @@
 #include <unordered_map>
 
 #include "envoy/common/time.h"
-#include "envoy/config/filter/http/jwt_authn/v2alpha/config.pb.h"
+#include "envoy/config/filter/http/jwt_authn/v3alpha/config.pb.h"
 
 #include "common/common/logger.h"
 #include "common/config/datasource.h"
@@ -12,8 +12,8 @@
 
 #include "jwt_verify_lib/check_audience.h"
 
-using ::envoy::config::filter::http::jwt_authn::v2alpha::JwtAuthentication;
-using ::envoy::config::filter::http::jwt_authn::v2alpha::JwtProvider;
+using envoy::config::filter::http::jwt_authn::v3alpha::JwtAuthentication;
+using envoy::config::filter::http::jwt_authn::v3alpha::JwtProvider;
 using ::google::jwt_verify::Jwks;
 using ::google::jwt_verify::Status;
 
@@ -132,9 +132,9 @@ private:
 
 } // namespace
 
-JwksCachePtr JwksCache::create(
-    const ::envoy::config::filter::http::jwt_authn::v2alpha::JwtAuthentication& config,
-    TimeSource& time_source, Api::Api& api) {
+JwksCachePtr
+JwksCache::create(const envoy::config::filter::http::jwt_authn::v3alpha::JwtAuthentication& config,
+                  TimeSource& time_source, Api::Api& api) {
   return JwksCachePtr(new JwksCacheImpl(config, time_source, api));
 }
 

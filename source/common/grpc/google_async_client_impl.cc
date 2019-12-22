@@ -1,6 +1,6 @@
 #include "common/grpc/google_async_client_impl.h"
 
-#include "envoy/api/v2/core/grpc_service.pb.h"
+#include "envoy/api/v3alpha/core/grpc_service.pb.h"
 #include "envoy/stats/scope.h"
 
 #include "common/common/base64.h"
@@ -72,7 +72,7 @@ GoogleAsyncClientImpl::GoogleAsyncClientImpl(Event::Dispatcher& dispatcher,
                                              GoogleAsyncClientThreadLocal& tls,
                                              GoogleStubFactory& stub_factory,
                                              Stats::ScopeSharedPtr scope,
-                                             const envoy::api::v2::core::GrpcService& config,
+                                             const envoy::api::v3alpha::core::GrpcService& config,
                                              Api::Api& api)
     : dispatcher_(dispatcher), tls_(tls), stat_prefix_(config.google_grpc().stat_prefix()),
       initial_metadata_(config.initial_metadata()), scope_(scope) {

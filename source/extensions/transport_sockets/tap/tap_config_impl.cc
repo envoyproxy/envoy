@@ -1,6 +1,6 @@
 #include "extensions/transport_sockets/tap/tap_config_impl.h"
 
-#include "envoy/data/tap/v2alpha/transport.pb.h"
+#include "envoy/data/tap/v3alpha/transport.pb.h"
 
 #include "common/common/assert.h"
 #include "common/network/utility.h"
@@ -25,7 +25,7 @@ PerSocketTapperImpl::PerSocketTapperImpl(SocketTapConfigSharedPtr config,
   }
 }
 
-void PerSocketTapperImpl::fillConnectionInfo(envoy::data::tap::v2alpha::Connection& connection) {
+void PerSocketTapperImpl::fillConnectionInfo(envoy::data::tap::v3alpha::Connection& connection) {
   Network::Utility::addressToProtobufAddress(*connection_.localAddress(),
                                              *connection.mutable_local_address());
   Network::Utility::addressToProtobufAddress(*connection_.remoteAddress(),
@@ -56,7 +56,7 @@ void PerSocketTapperImpl::closeSocket(Network::ConnectionEvent) {
   sink_handle_.reset();
 }
 
-void PerSocketTapperImpl::initEvent(envoy::data::tap::v2alpha::SocketEvent& event) {
+void PerSocketTapperImpl::initEvent(envoy::data::tap::v3alpha::SocketEvent& event) {
   event.mutable_timestamp()->MergeFrom(Protobuf::util::TimeUtil::NanosecondsToTimestamp(
       std::chrono::duration_cast<std::chrono::nanoseconds>(
           config_->timeSource().systemTime().time_since_epoch())

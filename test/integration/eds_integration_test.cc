@@ -1,9 +1,9 @@
-#include "envoy/api/v2/cds.pb.h"
-#include "envoy/api/v2/core/health_check.pb.h"
-#include "envoy/api/v2/eds.pb.h"
-#include "envoy/config/bootstrap/v2/bootstrap.pb.h"
-#include "envoy/config/filter/network/http_connection_manager/v2/http_connection_manager.pb.h"
-#include "envoy/type/http.pb.h"
+#include "envoy/api/v3alpha/cds.pb.h"
+#include "envoy/api/v3alpha/core/health_check.pb.h"
+#include "envoy/api/v3alpha/eds.pb.h"
+#include "envoy/config/bootstrap/v3alpha/bootstrap.pb.h"
+#include "envoy/config/filter/network/http_connection_manager/v3alpha/http_connection_manager.pb.h"
+#include "envoy/type/v3alpha/http.pb.h"
 
 #include "common/upstream/load_balancer_impl.h"
 
@@ -23,7 +23,7 @@ class EdsIntegrationTest : public testing::TestWithParam<Network::Address::IpVer
 public:
   EdsIntegrationTest()
       : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam()),
-        codec_client_type_(envoy::type::HTTP1) {}
+        codec_client_type_(envoy::type::v3alpha::HTTP1) {}
 
   // We need to supply the endpoints via EDS to provide health status. Use a
   // filesystem delivery to simplify test mechanics.
@@ -32,7 +32,7 @@ public:
                     absl::optional<uint32_t> overprovisioning_factor = absl::nullopt,
                     bool await_update = true) {
     ASSERT(total_endpoints >= healthy_endpoints + degraded_endpoints);
-    envoy::api::v2::ClusterLoadAssignment cluster_load_assignment;
+    envoy::api::v3alpha::ClusterLoadAssignment cluster_load_assignment;
     cluster_load_assignment.set_cluster_name("cluster_0");
     if (overprovisioning_factor.has_value()) {
       cluster_load_assignment.mutable_policy()->mutable_overprovisioning_factor()->set_value(
@@ -46,11 +46,10 @@ public:
       // First N endpoints are degraded, next M are healthy and the remaining endpoints are
       // unhealthy or unknown depending on remaining_unhealthy.
       if (i < degraded_endpoints) {
-        endpoint->set_health_status(envoy::api::v2::core::HealthStatus::DEGRADED);
+        endpoint->set_health_status(envoy::api::v3alpha::core::DEGRADED);
       } else if (i >= healthy_endpoints + degraded_endpoints) {
-        endpoint->set_health_status(remaining_unhealthy
-                                        ? envoy::api::v2::core::HealthStatus::UNHEALTHY
-                                        : envoy::api::v2::core::HealthStatus::UNKNOWN);
+        endpoint->set_health_status(remaining_unhealthy ? envoy::api::v3alpha::core::UNHEALTHY
+                                                        : envoy::api::v3alpha::core::UNKNOWN);
       }
     }
 
@@ -63,10 +62,11 @@ public:
 
   void initializeTest(bool http_active_hc) {
     setUpstreamCount(4);
-    if (codec_client_type_ == envoy::type::HTTP2) {
+    if (codec_client_type_ == envoy::type::v3alpha::HTTP2) {
       setUpstreamProtocol(FakeHttpConnection::Type::HTTP2);
     }
-    config_helper_.addConfigModifier([this](envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
+    config_helper_.addConfigModifier([this](
+                                         envoy::config::bootstrap::v3alpha::Bootstrap& bootstrap) {
       // Switch predefined cluster_0 to CDS filesystem sourcing.
       bootstrap.mutable_dynamic_resources()->mutable_cds_config()->set_path(cds_helper_.cds_path());
       bootstrap.mutable_static_resources()->clear_clusters();
@@ -74,14 +74,14 @@ public:
 
     // Set validate_clusters to false to allow us to reference a CDS cluster.
     config_helper_.addConfigModifier(
-        [](envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager&
+        [](envoy::config::filter::network::http_connection_manager::v3alpha::HttpConnectionManager&
                hcm) { hcm.mutable_route_config()->mutable_validate_clusters()->set_value(false); });
 
     cluster_.mutable_connect_timeout()->CopyFrom(
         Protobuf::util::TimeUtil::MillisecondsToDuration(100));
     cluster_.set_name("cluster_0");
     cluster_.mutable_hosts()->Clear();
-    cluster_.set_type(envoy::api::v2::Cluster::EDS);
+    cluster_.set_type(envoy::api::v3alpha::Cluster::EDS);
     auto* eds_cluster_config = cluster_.mutable_eds_cluster_config();
     eds_cluster_config->mutable_eds_config()->set_path(eds_helper_.eds_path());
     if (http_active_hc) {
@@ -103,10 +103,10 @@ public:
     test_server_->waitForGaugeEq("cluster_manager.warming_clusters", 0);
   }
 
-  envoy::type::CodecClientType codec_client_type_{};
+  envoy::type::v3alpha::CodecClientType codec_client_type_{};
   EdsHelper eds_helper_;
   CdsHelper cds_helper_;
-  envoy::api::v2::Cluster cluster_;
+  envoy::api::v3alpha::Cluster cluster_;
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, EdsIntegrationTest,
@@ -115,7 +115,7 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, EdsIntegrationTest,
 // Verifies that a new cluster can we warmed when using HTTP/2 health checking. Regression test
 // of the issue detailed in issue #6951.
 TEST_P(EdsIntegrationTest, Http2HcClusterRewarming) {
-  codec_client_type_ = envoy::type::HTTP2;
+  codec_client_type_ = envoy::type::v3alpha::HTTP2;
   initializeTest(true);
   fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
   setEndpoints(1, 0, 0, false);
@@ -313,7 +313,7 @@ TEST_P(EdsIntegrationTest, BatchMemberUpdateCb) {
     member_update_count++;
   });
 
-  envoy::api::v2::ClusterLoadAssignment cluster_load_assignment;
+  envoy::api::v3alpha::ClusterLoadAssignment cluster_load_assignment;
   cluster_load_assignment.set_cluster_name("cluster_0");
 
   {

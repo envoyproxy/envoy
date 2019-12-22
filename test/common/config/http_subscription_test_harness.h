@@ -2,9 +2,9 @@
 
 #include <memory>
 
-#include "envoy/api/v2/core/base.pb.h"
-#include "envoy/api/v2/discovery.pb.h"
-#include "envoy/api/v2/eds.pb.h"
+#include "envoy/api/v3alpha/core/base.pb.h"
+#include "envoy/api/v3alpha/discovery.pb.h"
+#include "envoy/api/v3alpha/eds.pb.h"
 #include "envoy/http/async_client.h"
 
 #include "common/common/utility.h"
@@ -131,7 +131,7 @@ public:
     }
     response_json.pop_back();
     response_json += "]}";
-    envoy::api::v2::DiscoveryResponse response_pb;
+    envoy::api::v3alpha::DiscoveryResponse response_pb;
     TestUtility::loadFromJson(response_json, response_pb);
     Http::HeaderMapPtr response_headers{new Http::TestHeaderMapImpl{{":status", response_code}}};
     Http::MessagePtr message{new Http::ResponseMessageImpl(std::move(response_headers))};
@@ -183,11 +183,11 @@ public:
   Event::MockDispatcher dispatcher_;
   Event::MockTimer* timer_;
   Event::TimerCb timer_cb_;
-  envoy::api::v2::core::Node node_;
+  envoy::api::v3alpha::core::Node node_;
   Runtime::MockRandomGenerator random_gen_;
   Http::MockAsyncClientRequest http_request_;
   Http::AsyncClient::Callbacks* http_callbacks_;
-  Config::MockSubscriptionCallbacks<envoy::api::v2::ClusterLoadAssignment> callbacks_;
+  Config::MockSubscriptionCallbacks<envoy::api::v3alpha::ClusterLoadAssignment> callbacks_;
   std::unique_ptr<HttpSubscriptionImpl> subscription_;
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
   Event::MockTimer* init_timeout_timer_;

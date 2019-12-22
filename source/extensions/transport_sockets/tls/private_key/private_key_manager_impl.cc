@@ -1,6 +1,6 @@
 #include "extensions/transport_sockets/tls/private_key/private_key_manager_impl.h"
 
-#include "envoy/api/v2/auth/cert.pb.h"
+#include "envoy/api/v3alpha/auth/cert.pb.h"
 #include "envoy/registry/registry.h"
 
 namespace Envoy {
@@ -10,7 +10,7 @@ namespace Tls {
 
 Envoy::Ssl::PrivateKeyMethodProviderSharedPtr
 PrivateKeyMethodManagerImpl::createPrivateKeyMethodProvider(
-    const envoy::api::v2::auth::PrivateKeyProvider& config,
+    const envoy::api::v3alpha::auth::PrivateKeyProvider& config,
     Server::Configuration::TransportSocketFactoryContext& factory_context) {
 
   Ssl::PrivateKeyMethodProviderInstanceFactory* factory =

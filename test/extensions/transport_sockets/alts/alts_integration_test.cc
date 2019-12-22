@@ -1,4 +1,4 @@
-#include "envoy/config/bootstrap/v2/bootstrap.pb.h"
+#include "envoy/config/bootstrap/v3alpha/bootstrap.pb.h"
 #include "envoy/config/transport_socket/alts/v2alpha/alts.pb.h"
 
 #include "common/common/thread.h"
@@ -41,7 +41,8 @@ public:
         client_connect_handshaker_(client_connect_handshaker) {}
 
   void initialize() override {
-    config_helper_.addConfigModifier([this](envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
+    config_helper_.addConfigModifier([this](
+                                         envoy::config::bootstrap::v3alpha::Bootstrap& bootstrap) {
       auto* transport_socket = bootstrap.mutable_static_resources()
                                    ->mutable_listeners(0)
                                    ->mutable_filter_chains(0)

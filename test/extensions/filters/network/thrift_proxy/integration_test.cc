@@ -1,4 +1,4 @@
-#include "envoy/config/bootstrap/v2/bootstrap.pb.h"
+#include "envoy/config/bootstrap/v3alpha/bootstrap.pb.h"
 
 #include "extensions/filters/network/thrift_proxy/buffer_helper.h"
 
@@ -111,7 +111,7 @@ public:
   void initializeCommon() {
     setUpstreamCount(4);
 
-    config_helper_.addConfigModifier([](envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
+    config_helper_.addConfigModifier([](envoy::config::bootstrap::v3alpha::Bootstrap& bootstrap) {
       for (int i = 1; i < 4; i++) {
         auto* c = bootstrap.mutable_static_resources()->add_clusters();
         c->MergeFrom(bootstrap.static_resources().clusters()[0]);

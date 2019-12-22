@@ -1,6 +1,6 @@
 #pragma once
 
-#include "envoy/api/v2/cds.pb.h"
+#include "envoy/api/v3alpha/cds.pb.h"
 
 #include "common/upstream/load_balancer_impl.h"
 
@@ -40,7 +40,7 @@ public:
 protected:
   ThreadAwareLoadBalancerBase(const PrioritySet& priority_set, ClusterStats& stats,
                               Runtime::Loader& runtime, Runtime::RandomGenerator& random,
-                              const envoy::api::v2::Cluster::CommonLbConfig& common_config)
+                              const envoy::api::v3alpha::Cluster::CommonLbConfig& common_config)
       : LoadBalancerBase(priority_set, stats, runtime, random, common_config),
         factory_(new LoadBalancerFactoryImpl(stats, random)) {}
 

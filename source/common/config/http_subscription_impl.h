@@ -1,6 +1,6 @@
 #pragma once
 
-#include "envoy/api/v2/discovery.pb.h"
+#include "envoy/api/v3alpha/discovery.pb.h"
 #include "envoy/config/subscription.h"
 #include "envoy/event/dispatcher.h"
 
@@ -45,7 +45,7 @@ private:
 
   std::string path_;
   Protobuf::RepeatedPtrField<std::string> resources_;
-  envoy::api::v2::DiscoveryRequest request_;
+  envoy::api::v3alpha::DiscoveryRequest request_;
   Config::SubscriptionCallbacks& callbacks_;
   SubscriptionStats stats_;
   Event::Dispatcher& dispatcher_;

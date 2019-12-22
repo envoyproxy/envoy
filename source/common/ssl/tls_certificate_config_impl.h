@@ -3,7 +3,7 @@
 #include <string>
 
 #include "envoy/api/api.h"
-#include "envoy/api/v2/auth/cert.pb.h"
+#include "envoy/api/v3alpha/auth/cert.pb.h"
 #include "envoy/ssl/private_key/private_key.h"
 #include "envoy/ssl/tls_certificate_config.h"
 
@@ -12,7 +12,7 @@ namespace Ssl {
 
 class TlsCertificateConfigImpl : public TlsCertificateConfig {
 public:
-  TlsCertificateConfigImpl(const envoy::api::v2::auth::TlsCertificate& config,
+  TlsCertificateConfigImpl(const envoy::api::v3alpha::auth::TlsCertificate& config,
                            Server::Configuration::TransportSocketFactoryContext* factory_context,
                            Api::Api& api);
 

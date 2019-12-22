@@ -5,9 +5,9 @@
 #include <string>
 #include <vector>
 
-#include "envoy/api/v2/cds.pb.h"
-#include "envoy/api/v2/core/address.pb.h"
-#include "envoy/api/v2/eds.pb.h"
+#include "envoy/api/v3alpha/cds.pb.h"
+#include "envoy/api/v3alpha/core/address.pb.h"
+#include "envoy/api/v3alpha/eds.pb.h"
 #include "envoy/common/exception.h"
 #include "envoy/stats/scope.h"
 
@@ -22,9 +22,9 @@ namespace Envoy {
 namespace Upstream {
 
 namespace {
-envoy::api::v2::ClusterLoadAssignment
-convertPriority(const envoy::api::v2::ClusterLoadAssignment& load_assignment) {
-  envoy::api::v2::ClusterLoadAssignment converted;
+envoy::api::v3alpha::ClusterLoadAssignment
+convertPriority(const envoy::api::v3alpha::ClusterLoadAssignment& load_assignment) {
+  envoy::api::v3alpha::ClusterLoadAssignment converted;
   converted.MergeFrom(load_assignment);
 
   // We convert the priority set by the configuration back to zero. This helps
@@ -43,7 +43,7 @@ convertPriority(const envoy::api::v2::ClusterLoadAssignment& load_assignment) {
 } // namespace
 
 LogicalDnsCluster::LogicalDnsCluster(
-    const envoy::api::v2::Cluster& cluster, Runtime::Loader& runtime,
+    const envoy::api::v3alpha::Cluster& cluster, Runtime::Loader& runtime,
     Network::DnsResolverSharedPtr dns_resolver,
     Server::Configuration::TransportSocketFactoryContext& factory_context,
     Stats::ScopePtr&& stats_scope, bool added_via_api)
@@ -71,7 +71,7 @@ LogicalDnsCluster::LogicalDnsCluster(
     }
   }
 
-  const envoy::api::v2::core::SocketAddress& socket_address =
+  const envoy::api::v3alpha::core::SocketAddress& socket_address =
       lbEndpoint().endpoint().address().socket_address();
 
   if (!socket_address.resolver_name().empty()) {
@@ -151,7 +151,7 @@ void LogicalDnsCluster::startResolve() {
 
 std::pair<ClusterImplBaseSharedPtr, ThreadAwareLoadBalancerPtr>
 LogicalDnsClusterFactory::createClusterImpl(
-    const envoy::api::v2::Cluster& cluster, ClusterFactoryContext& context,
+    const envoy::api::v3alpha::Cluster& cluster, ClusterFactoryContext& context,
     Server::Configuration::TransportSocketFactoryContext& socket_factory_context,
     Stats::ScopePtr&& stats_scope) {
   auto selected_dns_resolver = selectDnsResolver(cluster, context);

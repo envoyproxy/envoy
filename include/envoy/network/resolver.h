@@ -5,7 +5,7 @@
 #include <cstdint>
 #include <string>
 
-#include "envoy/api/v2/core/address.pb.h"
+#include "envoy/api/v3alpha/core/address.pb.h"
 #include "envoy/common/pure.h"
 #include "envoy/network/address.h"
 
@@ -26,7 +26,7 @@ public:
    * @return InstanceConstSharedPtr appropriate Address::Instance.
    */
   virtual InstanceConstSharedPtr
-  resolve(const envoy::api::v2::core::SocketAddress& socket_address) PURE;
+  resolve(const envoy::api::v3alpha::core::SocketAddress& socket_address) PURE;
 
   /**
    * @return std::string the identifying name for a particular implementation of

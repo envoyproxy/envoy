@@ -1,4 +1,4 @@
-#include "envoy/api/v2/core/base.pb.h"
+#include "envoy/api/v3alpha/core/base.pb.h"
 #include "envoy/config/filter/listener/original_src/v2alpha1/original_src.pb.h"
 
 #include "common/network/socket_option_impl.h"
@@ -48,7 +48,7 @@ protected:
 
   absl::optional<Network::Socket::Option::Details>
   findOptionDetails(const Network::Socket::Options& options, Network::SocketOptionName name,
-                    envoy::api::v2::core::SocketOption::SocketState state) {
+                    envoy::api::v3alpha::core::SocketOption::SocketState state) {
     for (const auto& option : options) {
       auto details = option->getOptionDetails(callbacks_.socket_, state);
       if (details.has_value() && details->name_ == name) {
@@ -82,7 +82,7 @@ TEST_F(OriginalSrcTest, onNewConnectionIpv4AddressAddsOption) {
 
   NiceMock<Network::MockConnectionSocket> socket;
   EXPECT_CALL(socket, setLocalAddress(PointeesEq(callbacks_.socket_.remote_address_)));
-  options->at(0)->setOption(socket, envoy::api::v2::core::SocketOption::STATE_PREBIND);
+  options->at(0)->setOption(socket, envoy::api::v3alpha::core::SocketOption::STATE_PREBIND);
 }
 
 TEST_F(OriginalSrcTest, onNewConnectionIpv4AddressUsesCorrectAddress) {
@@ -115,7 +115,7 @@ TEST_F(OriginalSrcTest, onNewConnectionIpv4AddressBleachesPort) {
 
   // not ideal -- we're assuming that the original_src option is first, but it's a fair assumption
   // for now.
-  options->at(0)->setOption(socket, envoy::api::v2::core::SocketOption::STATE_PREBIND);
+  options->at(0)->setOption(socket, envoy::api::v3alpha::core::SocketOption::STATE_PREBIND);
 }
 
 TEST_F(OriginalSrcTest, filterAddsTransparentOption) {
@@ -131,8 +131,9 @@ TEST_F(OriginalSrcTest, filterAddsTransparentOption) {
 
   filter->onAccept(callbacks_);
 
-  auto transparent_option = findOptionDetails(*options, ENVOY_SOCKET_IP_TRANSPARENT,
-                                              envoy::api::v2::core::SocketOption::STATE_PREBIND);
+  auto transparent_option =
+      findOptionDetails(*options, ENVOY_SOCKET_IP_TRANSPARENT,
+                        envoy::api::v3alpha::core::SocketOption::STATE_PREBIND);
 
   EXPECT_TRUE(transparent_option.has_value());
 }
@@ -151,7 +152,7 @@ TEST_F(OriginalSrcTest, filterAddsMarkOption) {
   filter->onAccept(callbacks_);
 
   auto mark_option = findOptionDetails(*options, ENVOY_SOCKET_SO_MARK,
-                                       envoy::api::v2::core::SocketOption::STATE_PREBIND);
+                                       envoy::api::v3alpha::core::SocketOption::STATE_PREBIND);
 
   ASSERT_TRUE(mark_option.has_value());
   uint32_t value = 1234;
@@ -173,7 +174,7 @@ TEST_F(OriginalSrcTest, Mark0NotAdded) {
   filter->onAccept(callbacks_);
 
   auto mark_option = findOptionDetails(*options, ENVOY_SOCKET_SO_MARK,
-                                       envoy::api::v2::core::SocketOption::STATE_PREBIND);
+                                       envoy::api::v3alpha::core::SocketOption::STATE_PREBIND);
 
   ASSERT_FALSE(mark_option.has_value());
 }

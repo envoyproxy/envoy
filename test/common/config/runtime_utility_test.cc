@@ -1,4 +1,4 @@
-#include "envoy/config/bootstrap/v2/bootstrap.pb.h"
+#include "envoy/config/bootstrap/v3alpha/bootstrap.pb.h"
 
 #include "common/config/runtime_utility.h"
 
@@ -12,9 +12,9 @@ namespace Config {
 namespace {
 
 TEST(RuntimeUtility, TranslateEmpty) {
-  envoy::config::bootstrap::v2::LayeredRuntime layered_runtime_config;
+  envoy::config::bootstrap::v3alpha::LayeredRuntime layered_runtime_config;
   translateRuntime({}, layered_runtime_config);
-  envoy::config::bootstrap::v2::LayeredRuntime expected_runtime_config;
+  envoy::config::bootstrap::v3alpha::LayeredRuntime expected_runtime_config;
   {
     auto* layer = expected_runtime_config.add_layers();
     layer->set_name("base");
@@ -29,12 +29,12 @@ TEST(RuntimeUtility, TranslateEmpty) {
 }
 
 TEST(RuntimeUtility, TranslateSubdirOnly) {
-  envoy::config::bootstrap::v2::Runtime runtime_config;
+  envoy::config::bootstrap::v3alpha::Runtime runtime_config;
   runtime_config.set_symlink_root("foo");
   runtime_config.set_subdirectory("bar");
-  envoy::config::bootstrap::v2::LayeredRuntime layered_runtime_config;
+  envoy::config::bootstrap::v3alpha::LayeredRuntime layered_runtime_config;
   translateRuntime(runtime_config, layered_runtime_config);
-  envoy::config::bootstrap::v2::LayeredRuntime expected_runtime_config;
+  envoy::config::bootstrap::v3alpha::LayeredRuntime expected_runtime_config;
   {
     auto* layer = expected_runtime_config.add_layers();
     layer->set_name("base");
@@ -55,13 +55,13 @@ TEST(RuntimeUtility, TranslateSubdirOnly) {
 }
 
 TEST(RuntimeUtility, TranslateSubdirOverride) {
-  envoy::config::bootstrap::v2::Runtime runtime_config;
+  envoy::config::bootstrap::v3alpha::Runtime runtime_config;
   runtime_config.set_symlink_root("foo");
   runtime_config.set_subdirectory("bar");
   runtime_config.set_override_subdirectory("baz");
-  envoy::config::bootstrap::v2::LayeredRuntime layered_runtime_config;
+  envoy::config::bootstrap::v3alpha::LayeredRuntime layered_runtime_config;
   translateRuntime(runtime_config, layered_runtime_config);
-  envoy::config::bootstrap::v2::LayeredRuntime expected_runtime_config;
+  envoy::config::bootstrap::v3alpha::LayeredRuntime expected_runtime_config;
   {
     auto* layer = expected_runtime_config.add_layers();
     layer->set_name("base");

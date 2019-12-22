@@ -1,6 +1,6 @@
 #pragma once
 
-#include "envoy/config/trace/v2/trace.pb.h"
+#include "envoy/config/trace/v3alpha/trace.pb.h"
 #include "envoy/local_info/local_info.h"
 #include "envoy/tracing/http_tracer.h"
 
@@ -16,7 +16,7 @@ namespace OpenCensus {
  */
 class Driver : public Tracing::Driver, Logger::Loggable<Logger::Id::tracing> {
 public:
-  Driver(const envoy::config::trace::v2::OpenCensusConfig& oc_config,
+  Driver(const envoy::config::trace::v3alpha::OpenCensusConfig& oc_config,
          const LocalInfo::LocalInfo& localinfo);
 
   /**
@@ -29,7 +29,7 @@ public:
 private:
   void applyTraceConfig(const opencensus::proto::trace::v1::TraceConfig& config);
 
-  const envoy::config::trace::v2::OpenCensusConfig oc_config_;
+  const envoy::config::trace::v3alpha::OpenCensusConfig oc_config_;
   const LocalInfo::LocalInfo& local_info_;
 };
 

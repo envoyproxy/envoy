@@ -6,11 +6,11 @@
 #include <utility>
 #include <vector>
 
-#include "envoy/admin/v2alpha/config_dump.pb.h"
-#include "envoy/api/v2/core/address.pb.h"
-#include "envoy/api/v2/core/base.pb.h"
-#include "envoy/api/v2/core/config_source.pb.h"
-#include "envoy/api/v2/lds.pb.h"
+#include "envoy/admin/v3alpha/config_dump.pb.h"
+#include "envoy/api/v3alpha/core/address.pb.h"
+#include "envoy/api/v3alpha/core/base.pb.h"
+#include "envoy/api/v3alpha/core/config_source.pb.h"
+#include "envoy/api/v3alpha/lds.pb.h"
 #include "envoy/registry/registry.h"
 #include "envoy/server/filter_config.h"
 #include "envoy/server/listener_manager.h"
@@ -46,8 +46,8 @@ public:
   /**
    * Create an IPv4 listener with a given name.
    */
-  envoy::api::v2::Listener createIPv4Listener(const std::string& name) {
-    envoy::api::v2::Listener listener = parseListenerFromV2Yaml(R"EOF(
+  envoy::api::v3alpha::Listener createIPv4Listener(const std::string& name) {
+    envoy::api::v3alpha::Listener listener = parseListenerFromV2Yaml(R"EOF(
       address:
         socket_address: { address: 127.0.0.1, port_value: 1111 }
       filter_chains:
@@ -62,8 +62,8 @@ public:
    * and set in the Listener, it should result in a call to setsockopt() with the appropriate
    * values.
    */
-  void testSocketOption(const envoy::api::v2::Listener& listener,
-                        const envoy::api::v2::core::SocketOption::SocketState& expected_state,
+  void testSocketOption(const envoy::api::v3alpha::Listener& listener,
+                        const envoy::api::v3alpha::core::SocketOption::SocketState& expected_state,
                         const Network::SocketOptionName& expected_option, int expected_value,
                         uint32_t expected_num_options = 1,
                         ListenSocketCreationParams expected_creation_params = {true, true}) {
@@ -218,7 +218,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, UdpAddress) {
     }
     filter_chains: {}
   )EOF";
-  envoy::api::v2::Listener listener_proto;
+  envoy::api::v3alpha::Listener listener_proto;
   EXPECT_TRUE(Protobuf::TextFormat::ParseFromString(proto_text, &listener_proto));
 
   EXPECT_CALL(server_.random_, uuid());
@@ -440,7 +440,7 @@ TEST_F(ListenerManagerImplTest, ModifyOnlyDrainType) {
   )EOF";
 
   ListenerHandle* listener_foo =
-      expectListenerCreate(false, true, envoy::api::v2::Listener::MODIFY_ONLY);
+      expectListenerCreate(false, true, envoy::api::v3alpha::Listener::MODIFY_ONLY);
   EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, {true}));
   EXPECT_TRUE(manager_->addOrUpdateListener(parseListenerFromV2Yaml(listener_foo_yaml), "", true));
   checkStats(1, 0, 0, 0, 1, 0);
@@ -482,7 +482,7 @@ drain_type: modify_only
   )EOF";
 
   ListenerHandle* listener_foo_different_address =
-      expectListenerCreate(false, true, envoy::api::v2::Listener::MODIFY_ONLY);
+      expectListenerCreate(false, true, envoy::api::v3alpha::Listener::MODIFY_ONLY);
   EXPECT_CALL(*listener_foo_different_address, onDestroy());
   EXPECT_THROW_WITH_MESSAGE(
       manager_->addOrUpdateListener(parseListenerFromV2Yaml(listener_foo_different_address_yaml),
@@ -626,7 +626,7 @@ TEST_F(ListenerManagerImplTest, AddOrUpdateListener) {
 
   auto* lds_api = new MockLdsApi();
   EXPECT_CALL(listener_factory_, createLdsApi_(_)).WillOnce(Return(lds_api));
-  envoy::api::v2::core::ConfigSource lds_config;
+  envoy::api::v3alpha::core::ConfigSource lds_config;
   manager_->createLdsApi(lds_config);
 
   EXPECT_CALL(*lds_api, versionInfo()).WillOnce(Return(""));
@@ -1171,7 +1171,7 @@ dynamic_listeners:
 
   // Now have an external update with errors and make sure it gets dumped.
   ListenerManager::FailureStates non_empty_failure_state;
-  non_empty_failure_state.push_back(std::make_unique<envoy::admin::v2alpha::UpdateFailureState>());
+  non_empty_failure_state.push_back(std::make_unique<envoy::admin::v3alpha::UpdateFailureState>());
   auto& state = non_empty_failure_state.back();
   state->set_details("foo");
   manager_->beginListenerUpdate();
@@ -3054,7 +3054,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, Metadata) {
   EXPECT_EQ("test_value",
             Config::Metadata::metadataValue(context->listenerMetadata(), "com.bar.foo", "baz")
                 .string_value());
-  EXPECT_EQ(envoy::api::v2::core::TrafficDirection::INBOUND, context->direction());
+  EXPECT_EQ(envoy::api::v3alpha::core::INBOUND, context->direction());
 }
 
 TEST_F(ListenerManagerImplWithRealFiltersTest, OriginalDstFilter) {
@@ -3277,7 +3277,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, TransparentFreebindListenerDisabl
 TEST_F(ListenerManagerImplWithRealFiltersTest, TransparentListenerEnabled) {
   auto listener = createIPv4Listener("TransparentListener");
   listener.mutable_transparent()->set_value(true);
-  testSocketOption(listener, envoy::api::v2::core::SocketOption::STATE_PREBIND,
+  testSocketOption(listener, envoy::api::v3alpha::core::SocketOption::STATE_PREBIND,
                    ENVOY_SOCKET_IP_TRANSPARENT, /* expected_value */ 1,
                    /* expected_num_options */ 2);
 }
@@ -3292,7 +3292,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, FreebindListenerEnabled) {
   auto listener = createIPv4Listener("FreebindListener");
   listener.mutable_freebind()->set_value(true);
 
-  testSocketOption(listener, envoy::api::v2::core::SocketOption::STATE_PREBIND,
+  testSocketOption(listener, envoy::api::v3alpha::core::SocketOption::STATE_PREBIND,
                    ENVOY_SOCKET_IP_FREEBIND, /* expected_value */ 1);
 }
 
@@ -3306,7 +3306,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, FastOpenListenerEnabled) {
   auto listener = createIPv4Listener("FastOpenListener");
   listener.mutable_tcp_fast_open_queue_length()->set_value(1);
 
-  testSocketOption(listener, envoy::api::v2::core::SocketOption::STATE_LISTENING,
+  testSocketOption(listener, envoy::api::v3alpha::core::SocketOption::STATE_LISTENING,
                    ENVOY_SOCKET_TCP_FASTOPEN, /* expected_value */ 1);
 }
 
@@ -3318,7 +3318,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, ReusePortListenerEnabledForTcp) {
   // when reuse_port is true, port should be 0 for creating the shared socket,
   // otherwise socket creation will be done on worker thread.
   listener.mutable_address()->mutable_socket_address()->set_port_value(0);
-  testSocketOption(listener, envoy::api::v2::core::SocketOption::STATE_PREBIND,
+  testSocketOption(listener, envoy::api::v3alpha::core::SocketOption::STATE_PREBIND,
                    ENVOY_SOCKET_SO_REUSEPORT, /* expected_value */ 1,
                    /* expected_num_options */ 1,
                    /* expected_creation_params */ {true, false});
@@ -3328,7 +3328,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, ReusePortListenerEnabledForUdp) {
 
   auto listener = createIPv4Listener("UdpListener");
   listener.mutable_address()->mutable_socket_address()->set_protocol(
-      envoy::api::v2::core::SocketAddress::UDP);
+      envoy::api::v3alpha::core::SocketAddress::UDP);
   // For UDP, reuse_port is set to true forcibly, even it's set to false explicitly in config
   listener.set_reuse_port(false);
 
@@ -3337,7 +3337,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, ReusePortListenerEnabledForUdp) {
   listener.mutable_address()->mutable_socket_address()->set_port_value(0);
 
   // IpPacketInfo and RxQueueOverFlow are always set if supported
-  expectCreateListenSocket(envoy::api::v2::core::SocketOption::STATE_PREBIND,
+  expectCreateListenSocket(envoy::api::v3alpha::core::SocketOption::STATE_PREBIND,
 #ifdef SO_RXQ_OVFL
                            /* expected_num_options */ 3,
 #else
@@ -3369,7 +3369,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, ReusePortListenerEnabledForUdp) {
 }
 
 TEST_F(ListenerManagerImplWithRealFiltersTest, LiteralSockoptListenerEnabled) {
-  const envoy::api::v2::Listener listener = parseListenerFromV2Yaml(R"EOF(
+  const envoy::api::v3alpha::Listener listener = parseListenerFromV2Yaml(R"EOF(
     name: SockoptsListener
     address:
       socket_address: { address: 127.0.0.1, port_value: 1111 }
@@ -3384,7 +3384,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, LiteralSockoptListenerEnabled) {
     ]
   )EOF");
 
-  expectCreateListenSocket(envoy::api::v2::core::SocketOption::STATE_PREBIND,
+  expectCreateListenSocket(envoy::api::v3alpha::core::SocketOption::STATE_PREBIND,
                            /* expected_num_options */ 3);
   expectSetsockopt(os_sys_calls_,
                    /* expected_sockopt_level */ 1,

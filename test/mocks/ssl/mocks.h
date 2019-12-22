@@ -3,7 +3,7 @@
 #include <functional>
 #include <string>
 
-#include "envoy/api/v2/auth/cert.pb.h"
+#include "envoy/api/v3alpha/auth/cert.pb.h"
 #include "envoy/ssl/certificate_validation_context_config.h"
 #include "envoy/ssl/connection.h"
 #include "envoy/ssl/context.h"
@@ -117,7 +117,7 @@ public:
 
   MOCK_METHOD2(createPrivateKeyMethodProvider,
                PrivateKeyMethodProviderSharedPtr(
-                   const envoy::api::v2::auth::PrivateKeyProvider& config,
+                   const envoy::api::v3alpha::auth::PrivateKeyProvider& config,
                    Envoy::Server::Configuration::TransportSocketFactoryContext& factory_context));
 };
 

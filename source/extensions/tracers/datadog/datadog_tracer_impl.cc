@@ -1,6 +1,6 @@
 #include "extensions/tracers/datadog/datadog_tracer_impl.h"
 
-#include "envoy/config/trace/v2/trace.pb.h"
+#include "envoy/config/trace/v3alpha/trace.pb.h"
 
 #include "common/common/enum_to_int.h"
 #include "common/common/fmt.h"
@@ -21,7 +21,7 @@ Driver::TlsTracer::TlsTracer(const std::shared_ptr<opentracing::Tracer>& tracer,
                              TraceReporterPtr&& reporter, Driver& driver)
     : tracer_(tracer), reporter_(std::move(reporter)), driver_(driver) {}
 
-Driver::Driver(const envoy::config::trace::v2::DatadogConfig& datadog_config,
+Driver::Driver(const envoy::config::trace::v3alpha::DatadogConfig& datadog_config,
                Upstream::ClusterManager& cluster_manager, Stats::Store& stats,
                ThreadLocal::SlotAllocator& tls, Runtime::Loader& runtime)
     : OpenTracingDriver{stats},

@@ -1,11 +1,11 @@
 #pragma once
 
 #include "envoy/api/api.h"
-#include "envoy/api/v2/cds.pb.h"
-#include "envoy/api/v2/core/address.pb.h"
-#include "envoy/api/v2/core/config_source.pb.h"
-#include "envoy/api/v2/eds.pb.h"
-#include "envoy/config/bootstrap/v2/bootstrap.pb.h"
+#include "envoy/api/v3alpha/cds.pb.h"
+#include "envoy/api/v3alpha/core/address.pb.h"
+#include "envoy/api/v3alpha/core/config_source.pb.h"
+#include "envoy/api/v3alpha/eds.pb.h"
+#include "envoy/config/bootstrap/v3alpha/bootstrap.pb.h"
 #include "envoy/config/grpc_mux.h"
 #include "envoy/config/subscription.h"
 #include "envoy/json/json_object.h"
@@ -77,15 +77,15 @@ public:
    * envoy::api::v2::core::ApiConfigSource.
    */
   static std::chrono::milliseconds
-  apiConfigSourceRefreshDelay(const envoy::api::v2::core::ApiConfigSource& api_config_source);
+  apiConfigSourceRefreshDelay(const envoy::api::v3alpha::core::ApiConfigSource& api_config_source);
 
   /**
    * Extract request_timeout as a std::chrono::milliseconds from
    * envoy::api::v2::core::ApiConfigSource. If request_timeout isn't set in the config source, a
    * default value of 1s will be returned.
    */
-  static std::chrono::milliseconds
-  apiConfigSourceRequestTimeout(const envoy::api::v2::core::ApiConfigSource& api_config_source);
+  static std::chrono::milliseconds apiConfigSourceRequestTimeout(
+      const envoy::api::v3alpha::core::ApiConfigSource& api_config_source);
 
   /**
    * Extract initial_fetch_timeout as a std::chrono::milliseconds from
@@ -93,7 +93,7 @@ public:
    * default value of 0s will be returned.
    */
   static std::chrono::milliseconds
-  configSourceInitialFetchTimeout(const envoy::api::v2::core::ConfigSource& config_source);
+  configSourceInitialFetchTimeout(const envoy::api::v3alpha::core::ConfigSource& config_source);
 
   /**
    * Populate an envoy::api::v2::core::ApiConfigSource.
@@ -103,9 +103,10 @@ public:
    * @param api_config_source a reference to the envoy::api::v2::core::ApiConfigSource object to
    * populate.
    */
-  static void translateApiConfigSource(const std::string& cluster, uint32_t refresh_delay_ms,
-                                       const std::string& api_type,
-                                       envoy::api::v2::core::ApiConfigSource& api_config_source);
+  static void
+  translateApiConfigSource(const std::string& cluster, uint32_t refresh_delay_ms,
+                           const std::string& api_type,
+                           envoy::api::v3alpha::core::ApiConfigSource& api_config_source);
 
   /**
    * Check cluster info for API config sanity. Throws on error.
@@ -149,7 +150,7 @@ public:
    * services or cluster names, depending on expectations set by its API type.
    */
   static void
-  checkApiConfigSourceNames(const envoy::api::v2::core::ApiConfigSource& api_config_source);
+  checkApiConfigSourceNames(const envoy::api::v3alpha::core::ApiConfigSource& api_config_source);
 
   /**
    * Check the validity of a cluster backing an api config source. Throws on error.
@@ -168,7 +169,7 @@ public:
    */
   static void checkApiConfigSourceSubscriptionBackingCluster(
       const Upstream::ClusterManager::ClusterInfoMap& clusters,
-      const envoy::api::v2::core::ApiConfigSource& api_config_source);
+      const envoy::api::v3alpha::core::ApiConfigSource& api_config_source);
 
   /**
    * Parses RateLimit configuration from envoy::api::v2::core::ApiConfigSource to RateLimitSettings.
@@ -176,7 +177,7 @@ public:
    * @return RateLimitSettings.
    */
   static RateLimitSettings
-  parseRateLimitSettings(const envoy::api::v2::core::ApiConfigSource& api_config_source);
+  parseRateLimitSettings(const envoy::api::v3alpha::core::ApiConfigSource& api_config_source);
 
   /**
    * Generate a SubscriptionStats object from stats scope.
@@ -241,13 +242,13 @@ public:
    * @throws EnvoyException when the conflict of tag names is found.
    */
   static Stats::TagProducerPtr
-  createTagProducer(const envoy::config::bootstrap::v2::Bootstrap& bootstrap);
+  createTagProducer(const envoy::config::bootstrap::v3alpha::Bootstrap& bootstrap);
 
   /**
    * Create StatsMatcher instance.
    */
   static Stats::StatsMatcherPtr
-  createStatsMatcher(const envoy::config::bootstrap::v2::Bootstrap& bootstrap);
+  createStatsMatcher(const envoy::config::bootstrap::v3alpha::Bootstrap& bootstrap);
 
   /**
    * Obtain gRPC async client factory from a envoy::api::v2::core::ApiConfigSource.
@@ -257,7 +258,7 @@ public:
    */
   static Grpc::AsyncClientFactoryPtr
   factoryForGrpcApiConfigSource(Grpc::AsyncClientManager& async_client_manager,
-                                const envoy::api::v2::core::ApiConfigSource& api_config_source,
+                                const envoy::api::v3alpha::core::ApiConfigSource& api_config_source,
                                 Stats::Scope& scope);
 
   /**
@@ -265,8 +266,8 @@ public:
    * @param hosts cluster's list of hosts.
    * @return envoy::api::v2::ClusterLoadAssignment a load assignment configuration.
    */
-  static envoy::api::v2::ClusterLoadAssignment
-  translateClusterHosts(const Protobuf::RepeatedPtrField<envoy::api::v2::core::Address>& hosts);
+  static envoy::api::v3alpha::ClusterLoadAssignment translateClusterHosts(
+      const Protobuf::RepeatedPtrField<envoy::api::v3alpha::core::Address>& hosts);
 
   /**
    * Translate opaque config from google.protobuf.Any or google.protobuf.Struct to defined proto
@@ -310,7 +311,7 @@ public:
    * @param random the random generator.
    * @return BackOffStrategyPtr for scheduling refreshes.
    */
-  static BackOffStrategyPtr prepareDnsRefreshStrategy(const envoy::api::v2::Cluster& cluster,
+  static BackOffStrategyPtr prepareDnsRefreshStrategy(const envoy::api::v3alpha::Cluster& cluster,
                                                       uint64_t dns_refresh_rate_ms,
                                                       Runtime::RandomGenerator& random);
 };

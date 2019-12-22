@@ -2,7 +2,7 @@
 #include <memory>
 #include <string>
 
-#include "envoy/api/v2/core/base.pb.h"
+#include "envoy/api/v3alpha/core/base.pb.h"
 #include "envoy/common/platform.h"
 
 #include "common/buffer/buffer_impl.h"
@@ -313,7 +313,7 @@ TEST_P(ConnectionImplTest, SocketOptions) {
 
   auto option = std::make_shared<MockSocketOption>();
 
-  EXPECT_CALL(*option, setOption(_, envoy::api::v2::core::SocketOption::STATE_PREBIND))
+  EXPECT_CALL(*option, setOption(_, envoy::api::v3alpha::core::SocketOption::STATE_PREBIND))
       .WillOnce(Return(true));
   EXPECT_CALL(listener_callbacks_, onAccept_(_))
       .WillOnce(Invoke([&](Network::ConnectionSocketPtr& socket) -> void {
@@ -362,7 +362,7 @@ TEST_P(ConnectionImplTest, SocketOptionsFailureTest) {
 
   auto option = std::make_shared<MockSocketOption>();
 
-  EXPECT_CALL(*option, setOption(_, envoy::api::v2::core::SocketOption::STATE_PREBIND))
+  EXPECT_CALL(*option, setOption(_, envoy::api::v3alpha::core::SocketOption::STATE_PREBIND))
       .WillOnce(Return(false));
   EXPECT_CALL(listener_callbacks_, onAccept_(_))
       .WillOnce(Invoke([&](Network::ConnectionSocketPtr& socket) -> void {
@@ -933,8 +933,8 @@ TEST_P(ConnectionImplTest, BindFromSocketTest) {
         new Network::Address::Ipv6Instance(address_string, 0)};
   }
   auto option = std::make_shared<NiceMock<MockSocketOption>>();
-  EXPECT_CALL(*option, setOption(_, Eq(envoy::api::v2::core::SocketOption::STATE_PREBIND)))
-      .WillOnce(Invoke([&](Socket& socket, envoy::api::v2::core::SocketOption::SocketState) {
+  EXPECT_CALL(*option, setOption(_, Eq(envoy::api::v3alpha::core::SocketOption::STATE_PREBIND)))
+      .WillOnce(Invoke([&](Socket& socket, envoy::api::v3alpha::core::SocketOption::SocketState) {
         socket.setLocalAddress(new_source_address);
         return true;
       }));

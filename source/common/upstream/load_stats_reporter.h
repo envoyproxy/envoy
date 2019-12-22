@@ -1,5 +1,5 @@
 #include "envoy/event/dispatcher.h"
-#include "envoy/service/load_stats/v2/lrs.pb.h"
+#include "envoy/service/load_stats/v3alpha/lrs.pb.h"
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats_macros.h"
 #include "envoy/upstream/cluster_manager.h"
@@ -26,7 +26,7 @@ struct LoadReporterStats {
 };
 
 class LoadStatsReporter
-    : Grpc::AsyncStreamCallbacks<envoy::service::load_stats::v2::LoadStatsResponse>,
+    : Grpc::AsyncStreamCallbacks<envoy::service::load_stats::v3alpha::LoadStatsResponse>,
       Logger::Loggable<Logger::Id::upstream> {
 public:
   LoadStatsReporter(const LocalInfo::LocalInfo& local_info, ClusterManager& cluster_manager,
@@ -37,7 +37,7 @@ public:
   void onCreateInitialMetadata(Http::HeaderMap& metadata) override;
   void onReceiveInitialMetadata(Http::HeaderMapPtr&& metadata) override;
   void onReceiveMessage(
-      std::unique_ptr<envoy::service::load_stats::v2::LoadStatsResponse>&& message) override;
+      std::unique_ptr<envoy::service::load_stats::v3alpha::LoadStatsResponse>&& message) override;
   void onReceiveTrailingMetadata(Http::HeaderMapPtr&& metadata) override;
   void onRemoteClose(Grpc::Status::GrpcStatus status, const std::string& message) override;
 
@@ -53,15 +53,15 @@ private:
 
   ClusterManager& cm_;
   LoadReporterStats stats_;
-  Grpc::AsyncClient<envoy::service::load_stats::v2::LoadStatsRequest,
-                    envoy::service::load_stats::v2::LoadStatsResponse>
+  Grpc::AsyncClient<envoy::service::load_stats::v3alpha::LoadStatsRequest,
+                    envoy::service::load_stats::v3alpha::LoadStatsResponse>
       async_client_;
-  Grpc::AsyncStream<envoy::service::load_stats::v2::LoadStatsRequest> stream_{};
+  Grpc::AsyncStream<envoy::service::load_stats::v3alpha::LoadStatsRequest> stream_{};
   const Protobuf::MethodDescriptor& service_method_;
   Event::TimerPtr retry_timer_;
   Event::TimerPtr response_timer_;
-  envoy::service::load_stats::v2::LoadStatsRequest request_;
-  std::unique_ptr<envoy::service::load_stats::v2::LoadStatsResponse> message_;
+  envoy::service::load_stats::v3alpha::LoadStatsRequest request_;
+  std::unique_ptr<envoy::service::load_stats::v3alpha::LoadStatsResponse> message_;
   // Map from cluster name to start of measurement interval.
   std::unordered_map<std::string, std::chrono::steady_clock::duration> clusters_;
   TimeSource& time_source_;

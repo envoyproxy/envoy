@@ -4,7 +4,7 @@
 #include <string>
 #include <vector>
 
-#include "envoy/api/v2/cds.pb.h"
+#include "envoy/api/v3alpha/cds.pb.h"
 #include "envoy/common/pure.h"
 
 #include "common/protobuf/protobuf.h"
@@ -40,8 +40,9 @@ public:
   /**
    * @return fallback policy defined for this selector, or NOT_DEFINED
    */
-  virtual envoy::api::v2::Cluster::LbSubsetConfig::LbSubsetSelector::LbSubsetSelectorFallbackPolicy
-  fallbackPolicy() const PURE;
+  virtual envoy::api::v3alpha::Cluster::LbSubsetConfig::LbSubsetSelector::
+      LbSubsetSelectorFallbackPolicy
+      fallbackPolicy() const PURE;
 
   /**
    * @return fallback keys subset defined for this selector, or empty set
@@ -67,7 +68,7 @@ public:
    * @return LbSubsetFallbackPolicy the fallback policy used when
    * route metadata does not match any subset.
    */
-  virtual envoy::api::v2::Cluster::LbSubsetConfig::LbSubsetFallbackPolicy
+  virtual envoy::api::v3alpha::Cluster::LbSubsetConfig::LbSubsetFallbackPolicy
   fallbackPolicy() const PURE;
 
   /**

@@ -4,7 +4,7 @@
 #include <csetjmp>
 #include <cstring>
 
-#include "envoy/api/v2/core/base.pb.h"
+#include "envoy/api/v3alpha/core/base.pb.h"
 #include "envoy/buffer/buffer.h"
 #include "envoy/common/exception.h"
 #include "envoy/common/platform.h"
@@ -37,7 +37,7 @@ UdpListenerImpl::UdpListenerImpl(Event::DispatcherImpl& dispatcher, SocketShared
   ASSERT(file_event_);
 
   if (!Network::Socket::applyOptions(socket_->options(), *socket_,
-                                     envoy::api::v2::core::SocketOption::STATE_BOUND)) {
+                                     envoy::api::v3alpha::core::SocketOption::STATE_BOUND)) {
     throw CreateListenerException(fmt::format("cannot set post-bound socket option on socket: {}",
                                               socket_->localAddress()->asString()));
   }

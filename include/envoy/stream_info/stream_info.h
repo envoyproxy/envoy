@@ -4,7 +4,7 @@
 #include <cstdint>
 #include <string>
 
-#include "envoy/api/v2/core/base.pb.h"
+#include "envoy/api/v3alpha/core/base.pb.h"
 #include "envoy/common/pure.h"
 #include "envoy/common/time.h"
 #include "envoy/http/header_map.h"
@@ -464,8 +464,8 @@ public:
   /**
    * @return const envoy::api::v2::core::Metadata& the dynamic metadata associated with this request
    */
-  virtual envoy::api::v2::core::Metadata& dynamicMetadata() PURE;
-  virtual const envoy::api::v2::core::Metadata& dynamicMetadata() const PURE;
+  virtual envoy::api::v3alpha::core::Metadata& dynamicMetadata() PURE;
+  virtual const envoy::api::v3alpha::core::Metadata& dynamicMetadata() const PURE;
 
   /**
    * @param name the namespace used in the metadata in reverse DNS format, for example:

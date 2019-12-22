@@ -1,5 +1,6 @@
 #include <memory>
 
+#include "envoy/config/filter/thrift/router/v2alpha1/router.pb.h"
 #include "envoy/config/filter/thrift/router/v2alpha1/router.pb.validate.h"
 #include "envoy/tcp/conn_pool.h"
 

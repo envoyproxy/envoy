@@ -5,7 +5,7 @@
 #include <memory>
 #include <string>
 
-#include "envoy/config/trace/v2/trace.pb.h"
+#include "envoy/config/trace/v3alpha/trace.pb.h"
 
 #include "common/buffer/zero_copy_input_stream_impl.h"
 #include "common/common/base64.h"
@@ -132,11 +132,11 @@ void LightStepDriver::TlsLightStepTracer::enableTimer() {
   flush_timer_->enableTimer(std::chrono::milliseconds(flush_interval));
 }
 
-LightStepDriver::LightStepDriver(const envoy::config::trace::v2::LightstepConfig& lightstep_config,
-                                 Upstream::ClusterManager& cluster_manager, Stats::Store& stats,
-                                 ThreadLocal::SlotAllocator& tls, Runtime::Loader& runtime,
-                                 std::unique_ptr<lightstep::LightStepTracerOptions>&& options,
-                                 PropagationMode propagation_mode, Grpc::Context& grpc_context)
+LightStepDriver::LightStepDriver(
+    const envoy::config::trace::v3alpha::LightstepConfig& lightstep_config,
+    Upstream::ClusterManager& cluster_manager, Stats::Store& stats, ThreadLocal::SlotAllocator& tls,
+    Runtime::Loader& runtime, std::unique_ptr<lightstep::LightStepTracerOptions>&& options,
+    PropagationMode propagation_mode, Grpc::Context& grpc_context)
     : OpenTracingDriver{stats}, cm_{cluster_manager},
       tracer_stats_{LIGHTSTEP_TRACER_STATS(POOL_COUNTER_PREFIX(stats, "tracing.lightstep."))},
       tls_{tls.allocateSlot()}, runtime_{runtime}, options_{std::move(options)},

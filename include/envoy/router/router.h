@@ -9,7 +9,7 @@
 #include <string>
 
 #include "envoy/access_log/access_log.h"
-#include "envoy/api/v2/core/base.pb.h"
+#include "envoy/api/v3alpha/core/base.pb.h"
 #include "envoy/common/matchers.h"
 #include "envoy/config/typed_metadata.h"
 #include "envoy/http/codec.h"
@@ -17,7 +17,7 @@
 #include "envoy/http/hash_policy.h"
 #include "envoy/http/header_map.h"
 #include "envoy/tracing/http_tracer.h"
-#include "envoy/type/percent.pb.h"
+#include "envoy/type/v3alpha/percent.pb.h"
 #include "envoy/upstream/resource_manager.h"
 #include "envoy/upstream/retry.h"
 
@@ -360,7 +360,7 @@ public:
    * @return the default fraction of traffic the should be shadowed, if the runtime key is not
    *         present.
    */
-  virtual const envoy::type::FractionalPercent& defaultValue() const PURE;
+  virtual const envoy::type::v3alpha::FractionalPercent& defaultValue() const PURE;
 };
 
 /**
@@ -465,7 +465,7 @@ public:
    * @return percent chance that an additional upstream request should be sent
    * on top of the value from initialRequests().
    */
-  virtual const envoy::type::FractionalPercent& additionalRequestChance() const PURE;
+  virtual const envoy::type::v3alpha::FractionalPercent& additionalRequestChance() const PURE;
 
   /**
    * @return bool indicating whether request hedging should occur when a request
@@ -716,7 +716,7 @@ public:
    * @return const envoy::api::v2::core::Metadata& return the metadata provided in the config for
    * this route.
    */
-  virtual const envoy::api::v2::core::Metadata& metadata() const PURE;
+  virtual const envoy::api::v3alpha::core::Metadata& metadata() const PURE;
 
   /**
    * @return TlsContextMatchCriteria* the tls context match criterion for this route. If there is no
@@ -811,19 +811,19 @@ public:
    * This method returns the client sampling percentage.
    * @return the client sampling percentage
    */
-  virtual const envoy::type::FractionalPercent& getClientSampling() const PURE;
+  virtual const envoy::type::v3alpha::FractionalPercent& getClientSampling() const PURE;
 
   /**
    * This method returns the random sampling percentage.
    * @return the random sampling percentage
    */
-  virtual const envoy::type::FractionalPercent& getRandomSampling() const PURE;
+  virtual const envoy::type::v3alpha::FractionalPercent& getRandomSampling() const PURE;
 
   /**
    * This method returns the overall sampling percentage.
    * @return the overall sampling percentage
    */
-  virtual const envoy::type::FractionalPercent& getOverallSampling() const PURE;
+  virtual const envoy::type::v3alpha::FractionalPercent& getOverallSampling() const PURE;
 
   /**
    * This method returns the route level tracing custom tags.

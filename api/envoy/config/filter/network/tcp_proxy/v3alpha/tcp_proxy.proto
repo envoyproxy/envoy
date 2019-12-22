@@ -27,6 +27,68 @@ message TcpProxy {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.network.tcp_proxy.v2.TcpProxy";
 
+  // [#not-implemented-hide:] Deprecated.
+  // TCP Proxy filter configuration using V1 format.
+  message DeprecatedV1 {
+    option deprecated = true;
+    option (udpa.annotations.versioning).previous_message_type =
+        "envoy.config.filter.network.tcp_proxy.v2.TcpProxy.DeprecatedV1";
+
+    // A TCP proxy route consists of a set of optional L4 criteria and the
+    // name of a cluster. If a downstream connection matches all the
+    // specified criteria, the cluster in the route is used for the
+    // corresponding upstream connection. Routes are tried in the order
+    // specified until a match is found. If no match is found, the connection
+    // is closed. A route with no criteria is valid and always produces a
+    // match.
+    // [#next-free-field: 6]
+    message TCPRoute {
+      option (udpa.annotations.versioning).previous_message_type =
+          "envoy.config.filter.network.tcp_proxy.v2.TcpProxy.DeprecatedV1.TCPRoute";
+
+      // The cluster to connect to when a the downstream network connection
+      // matches the specified criteria.
+      string cluster = 1 [(validate.rules).string = {min_bytes: 1}];
+
+      // An optional list of IP address subnets in the form
+      // “ip_address/xx”. The criteria is satisfied if the destination IP
+      // address of the downstream connection is contained in at least one of
+      // the specified subnets. If the parameter is not specified or the list
+      // is empty, the destination IP address is ignored. The destination IP
+      // address of the downstream connection might be different from the
+      // addresses on which the proxy is listening if the connection has been
+      // redirected.
+      repeated api.v3alpha.core.CidrRange destination_ip_list = 2;
+
+      // An optional string containing a comma-separated list of port numbers
+      // or ranges. The criteria is satisfied if the destination port of the
+      // downstream connection is contained in at least one of the specified
+      // ranges. If the parameter is not specified, the destination port is
+      // ignored. The destination port address of the downstream connection
+      // might be different from the port on which the proxy is listening if
+      // the connection has been redirected.
+      string destination_ports = 3;
+
+      // An optional list of IP address subnets in the form
+      // “ip_address/xx”. The criteria is satisfied if the source IP address
+      // of the downstream connection is contained in at least one of the
+      // specified subnets. If the parameter is not specified or the list is
+      // empty, the source IP address is ignored.
+      repeated api.v3alpha.core.CidrRange source_ip_list = 4;
+
+      // An optional string containing a comma-separated list of port numbers
+      // or ranges. The criteria is satisfied if the source port of the
+      // downstream connection is contained in at least one of the specified
+      // ranges. If the parameter is not specified, the source port is
+      // ignored.
+      string source_ports = 5;
+    }
+
+    // The route table for the filter. All filter instances must have a route
+    // table, even if it is empty.
+    repeated TCPRoute routes = 1 [(validate.rules).repeated = {min_items: 1}];
+  }
+
   // Allows for specification of multiple upstream clusters along with weights
   // that indicate the percentage of traffic to be forwarded to each cluster.
   // The router selects an upstream cluster based on these weights.

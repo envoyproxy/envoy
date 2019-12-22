@@ -123,7 +123,8 @@ def ApiBoostTree(target_paths,
         'build',
         '--config=libc++',
         '--strip=always',
-    ] + dep_lib_build_targets, check=True)
+    ] + dep_lib_build_targets,
+           check=True)
 
   # Figure out where the LLVM include path is. We need to provide this
   # explicitly as the api_booster is built inside the Bazel cache and doesn't

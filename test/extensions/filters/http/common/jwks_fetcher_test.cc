@@ -1,7 +1,7 @@
 #include <chrono>
 #include <thread>
 
-#include "envoy/api/v2/core/http_uri.pb.h"
+#include "envoy/api/v3alpha/core/http_uri.pb.h"
 
 #include "common/http/message_impl.h"
 #include "common/protobuf/utility.h"
@@ -12,7 +12,7 @@
 #include "test/mocks/http/mocks.h"
 #include "test/test_common/utility.h"
 
-using ::envoy::api::v2::core::HttpUri;
+using envoy::api::v3alpha::core::HttpUri;
 
 namespace Envoy {
 namespace Extensions {

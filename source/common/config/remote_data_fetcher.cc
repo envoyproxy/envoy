@@ -1,6 +1,6 @@
 #include "common/config/remote_data_fetcher.h"
 
-#include "envoy/api/v2/core/http_uri.pb.h"
+#include "envoy/api/v3alpha/core/http_uri.pb.h"
 
 #include "common/common/enum_to_int.h"
 #include "common/common/hex.h"
@@ -13,7 +13,7 @@ namespace Config {
 namespace DataFetcher {
 
 RemoteDataFetcher::RemoteDataFetcher(Upstream::ClusterManager& cm,
-                                     const ::envoy::api::v2::core::HttpUri& uri,
+                                     const envoy::api::v3alpha::core::HttpUri& uri,
                                      const std::string& content_hash,
                                      RemoteDataFetcherCallback& callback)
     : cm_(cm), uri_(uri), content_hash_(content_hash), callback_(callback) {}

@@ -6,7 +6,7 @@
 #include <vector>
 
 #include "envoy/access_log/access_log.h"
-#include "envoy/api/v2/core/base.pb.h"
+#include "envoy/api/v3alpha/core/base.pb.h"
 #include "envoy/common/time.h"
 #include "envoy/stream_info/stream_info.h"
 
@@ -243,8 +243,8 @@ public:
                     absl::optional<size_t> max_length);
 
 protected:
-  std::string formatMetadata(const envoy::api::v2::core::Metadata& metadata) const;
-  ProtobufWkt::Value formatMetadataValue(const envoy::api::v2::core::Metadata& metadata) const;
+  std::string formatMetadata(const envoy::api::v3alpha::core::Metadata& metadata) const;
+  ProtobufWkt::Value formatMetadataValue(const envoy::api::v3alpha::core::Metadata& metadata) const;
 
 private:
   std::string filter_namespace_;

@@ -6,8 +6,8 @@
 #include <unordered_map>
 #include <unordered_set>
 
-#include "envoy/api/v2/discovery.pb.h"
-#include "envoy/api/v2/route/route.pb.h"
+#include "envoy/api/v3alpha/discovery.pb.h"
+#include "envoy/api/v3alpha/route/route.pb.h"
 #include "envoy/config/subscription.h"
 #include "envoy/http/codes.h"
 #include "envoy/local_info/local_info.h"
@@ -50,12 +50,12 @@ private:
                       const std::string&) override {
     NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
   }
-  void onConfigUpdate(const Protobuf::RepeatedPtrField<envoy::api::v2::Resource>&,
+  void onConfigUpdate(const Protobuf::RepeatedPtrField<envoy::api::v3alpha::Resource>&,
                       const Protobuf::RepeatedPtrField<std::string>&, const std::string&) override;
   void onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason reason,
                             const EnvoyException* e) override;
   std::string resourceName(const ProtobufWkt::Any& resource) override {
-    return MessageUtil::anyConvert<envoy::api::v2::route::VirtualHost>(resource).name();
+    return MessageUtil::anyConvert<envoy::api::v3alpha::route::VirtualHost>(resource).name();
   }
 
   RouteConfigUpdatePtr& config_update_info_;

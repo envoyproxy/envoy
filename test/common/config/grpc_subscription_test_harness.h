@@ -2,9 +2,9 @@
 
 #include <memory>
 
-#include "envoy/api/v2/core/base.pb.h"
-#include "envoy/api/v2/discovery.pb.h"
-#include "envoy/api/v2/eds.pb.h"
+#include "envoy/api/v3alpha/core/base.pb.h"
+#include "envoy/api/v3alpha/discovery.pb.h"
+#include "envoy/api/v3alpha/eds.pb.h"
 
 #include "common/common/hash.h"
 #include "common/config/grpc_subscription_impl.h"
@@ -62,7 +62,7 @@ public:
                          bool expect_node, const Protobuf::int32 error_code,
                          const std::string& error_message) {
     UNREFERENCED_PARAMETER(expect_node);
-    envoy::api::v2::DiscoveryRequest expected_request;
+    envoy::api::v3alpha::DiscoveryRequest expected_request;
     if (expect_node) {
       expected_request.mutable_node()->CopyFrom(node_);
     }
@@ -91,17 +91,17 @@ public:
 
   void deliverConfigUpdate(const std::vector<std::string>& cluster_names,
                            const std::string& version, bool accept) override {
-    std::unique_ptr<envoy::api::v2::DiscoveryResponse> response(
-        new envoy::api::v2::DiscoveryResponse());
+    std::unique_ptr<envoy::api::v3alpha::DiscoveryResponse> response(
+        new envoy::api::v3alpha::DiscoveryResponse());
     response->set_version_info(version);
     last_response_nonce_ = std::to_string(HashUtil::xxHash64(version));
     response->set_nonce(last_response_nonce_);
     response->set_type_url(Config::TypeUrl::get().ClusterLoadAssignment);
-    Protobuf::RepeatedPtrField<envoy::api::v2::ClusterLoadAssignment> typed_resources;
+    Protobuf::RepeatedPtrField<envoy::api::v3alpha::ClusterLoadAssignment> typed_resources;
     for (const auto& cluster : cluster_names) {
       if (std::find(last_cluster_names_.begin(), last_cluster_names_.end(), cluster) !=
           last_cluster_names_.end()) {
-        envoy::api::v2::ClusterLoadAssignment* load_assignment = typed_resources.Add();
+        envoy::api::v3alpha::ClusterLoadAssignment* load_assignment = typed_resources.Add();
         load_assignment->set_cluster_name(cluster);
         response->add_resources()->PackFrom(*load_assignment);
       }
@@ -167,8 +167,9 @@ public:
   Runtime::MockRandomGenerator random_;
   Event::MockTimer* timer_;
   Event::TimerCb timer_cb_;
-  envoy::api::v2::core::Node node_;
-  NiceMock<Config::MockSubscriptionCallbacks<envoy::api::v2::ClusterLoadAssignment>> callbacks_;
+  envoy::api::v3alpha::core::Node node_;
+  NiceMock<Config::MockSubscriptionCallbacks<envoy::api::v3alpha::ClusterLoadAssignment>>
+      callbacks_;
   NiceMock<Grpc::MockAsyncStream> async_stream_;
   std::unique_ptr<GrpcSubscriptionImpl> subscription_;
   std::string last_response_nonce_;

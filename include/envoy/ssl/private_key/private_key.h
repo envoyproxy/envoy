@@ -3,7 +3,7 @@
 #include <functional>
 #include <string>
 
-#include "envoy/api/v2/auth/cert.pb.h"
+#include "envoy/api/v3alpha/auth/cert.pb.h"
 #include "envoy/common/pure.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/ssl/private_key/private_key_callbacks.h"
@@ -81,7 +81,7 @@ public:
    * no provider can be used with the context configuration.
    */
   virtual PrivateKeyMethodProviderSharedPtr createPrivateKeyMethodProvider(
-      const envoy::api::v2::auth::PrivateKeyProvider& config,
+      const envoy::api::v3alpha::auth::PrivateKeyProvider& config,
       Envoy::Server::Configuration::TransportSocketFactoryContext& factory_context) PURE;
 };
 

@@ -1,6 +1,6 @@
-#include "envoy/api/v2/auth/cert.pb.h"
-#include "envoy/config/bootstrap/v2/bootstrap.pb.h"
-#include "envoy/config/filter/network/http_connection_manager/v2/http_connection_manager.pb.h"
+#include "envoy/api/v3alpha/auth/cert.pb.h"
+#include "envoy/config/bootstrap/v3alpha/bootstrap.pb.h"
+#include "envoy/config/filter/network/http_connection_manager/v3alpha/http_connection_manager.pb.h"
 
 #include "test/config/utility.h"
 #include "test/integration/http_integration.h"
@@ -95,8 +95,8 @@ public:
   }
 
   void initialize() override {
-    config_helper_.addConfigModifier([](envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
-      envoy::api::v2::auth::DownstreamTlsContext tls_context;
+    config_helper_.addConfigModifier([](envoy::config::bootstrap::v3alpha::Bootstrap& bootstrap) {
+      envoy::api::v3alpha::auth::DownstreamTlsContext tls_context;
       ConfigHelper::initializeTls({}, *tls_context.mutable_common_tls_context());
       auto* filter_chain =
           bootstrap.mutable_static_resources()->mutable_listeners(0)->mutable_filter_chains(0);
@@ -104,10 +104,10 @@ public:
       transport_socket->mutable_typed_config()->PackFrom(tls_context);
     });
     config_helper_.addConfigModifier(
-        [](envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager&
+        [](envoy::config::filter::network::http_connection_manager::v3alpha::HttpConnectionManager&
                hcm) {
-          EXPECT_EQ(hcm.codec_type(), envoy::config::filter::network::http_connection_manager::v2::
-                                          HttpConnectionManager::HTTP3);
+          EXPECT_EQ(hcm.codec_type(), envoy::config::filter::network::http_connection_manager::
+                                          v3alpha::HttpConnectionManager::HTTP3);
         });
 
     HttpIntegrationTest::initialize();
@@ -187,7 +187,8 @@ TEST_P(QuicHttpIntegrationTest, TestDelayedConnectionTeardownTimeoutTrigger) {
                            "type.googleapis.com/google.protobuf.Empty } }");
   config_helper_.setBufferLimits(1024, 1024);
   config_helper_.addConfigModifier(
-      [](envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager& hcm) {
+      [](envoy::config::filter::network::http_connection_manager::v3alpha::HttpConnectionManager&
+             hcm) {
         // 200ms.
         hcm.mutable_delayed_close_timeout()->set_nanos(200000000);
         hcm.mutable_drain_timeout()->set_seconds(1);

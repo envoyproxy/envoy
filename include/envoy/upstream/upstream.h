@@ -8,8 +8,8 @@
 #include <string>
 #include <vector>
 
-#include "envoy/api/v2/cds.pb.h"
-#include "envoy/api/v2/core/base.pb.h"
+#include "envoy/api/v3alpha/cds.pb.h"
+#include "envoy/api/v3alpha/core/base.pb.h"
 #include "envoy/common/callback.h"
 #include "envoy/config/typed_metadata.h"
 #include "envoy/http/codec.h"
@@ -213,8 +213,8 @@ using DegradedHostVectorConstSharedPtr = std::shared_ptr<const DegradedHostVecto
 using ExcludedHostVectorConstSharedPtr = std::shared_ptr<const ExcludedHostVector>;
 
 using HostListPtr = std::unique_ptr<HostVector>;
-using LocalityWeightsMap =
-    std::unordered_map<envoy::api::v2::core::Locality, uint32_t, LocalityHash, LocalityEqualTo>;
+using LocalityWeightsMap = std::unordered_map<envoy::api::v3alpha::core::Locality, uint32_t,
+                                              LocalityHash, LocalityEqualTo>;
 using PriorityState = std::vector<std::pair<HostListPtr, LocalityWeightsMap>>;
 
 /**
@@ -721,7 +721,7 @@ public:
    * @return const envoy::api::v2::Cluster::CommonLbConfig& the common configuration for all
    *         load balancers for this cluster.
    */
-  virtual const envoy::api::v2::Cluster::CommonLbConfig& lbConfig() const PURE;
+  virtual const envoy::api::v3alpha::Cluster::CommonLbConfig& lbConfig() const PURE;
 
   /**
    * @return the type of load balancing that the cluster should use.
@@ -731,24 +731,24 @@ public:
   /**
    * @return the service discovery type to use for resolving the cluster.
    */
-  virtual envoy::api::v2::Cluster::DiscoveryType type() const PURE;
+  virtual envoy::api::v3alpha::Cluster::DiscoveryType type() const PURE;
 
   /**
    * @return the type of cluster, only used for custom discovery types.
    */
-  virtual const absl::optional<envoy::api::v2::Cluster::CustomClusterType>&
+  virtual const absl::optional<envoy::api::v3alpha::Cluster::CustomClusterType>&
   clusterType() const PURE;
 
   /**
    * @return configuration for least request load balancing, only used if LB type is least request.
    */
-  virtual const absl::optional<envoy::api::v2::Cluster::LeastRequestLbConfig>&
+  virtual const absl::optional<envoy::api::v3alpha::Cluster::LeastRequestLbConfig>&
   lbLeastRequestConfig() const PURE;
 
   /**
    * @return configuration for ring hash load balancing, only used if type is set to ring_hash_lb.
    */
-  virtual const absl::optional<envoy::api::v2::Cluster::RingHashLbConfig>&
+  virtual const absl::optional<envoy::api::v3alpha::Cluster::RingHashLbConfig>&
   lbRingHashConfig() const PURE;
 
   /**
@@ -756,7 +756,7 @@ public:
    *         for the Original Destination load balancing policy, only used if type is set to
    *         ORIGINAL_DST_LB.
    */
-  virtual const absl::optional<envoy::api::v2::Cluster::OriginalDstLbConfig>&
+  virtual const absl::optional<envoy::api::v3alpha::Cluster::OriginalDstLbConfig>&
   lbOriginalDstConfig() const PURE;
 
   /**
@@ -828,7 +828,7 @@ public:
   /**
    * @return const envoy::api::v2::core::Metadata& the configuration metadata for this cluster.
    */
-  virtual const envoy::api::v2::core::Metadata& metadata() const PURE;
+  virtual const envoy::api::v3alpha::core::Metadata& metadata() const PURE;
 
   /**
    * @return const Envoy::Config::TypedMetadata&& the typed metadata for this cluster.

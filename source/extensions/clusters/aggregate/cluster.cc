@@ -1,6 +1,6 @@
 #include "extensions/clusters/aggregate/cluster.h"
 
-#include "envoy/api/v2/cds.pb.h"
+#include "envoy/api/v3alpha/cds.pb.h"
 #include "envoy/config/cluster/aggregate/v2alpha/cluster.pb.h"
 #include "envoy/config/cluster/aggregate/v2alpha/cluster.pb.validate.h"
 
@@ -9,7 +9,7 @@ namespace Extensions {
 namespace Clusters {
 namespace Aggregate {
 
-Cluster::Cluster(const envoy::api::v2::Cluster& cluster,
+Cluster::Cluster(const envoy::api::v3alpha::Cluster& cluster,
                  const envoy::config::cluster::aggregate::v2alpha::ClusterConfig& config,
                  Upstream::ClusterManager& cluster_manager, Runtime::Loader& runtime,
                  Runtime::RandomGenerator& random,
@@ -134,7 +134,7 @@ AggregateClusterLoadBalancer::chooseHost(Upstream::LoadBalancerContext* context)
 
 std::pair<Upstream::ClusterImplBaseSharedPtr, Upstream::ThreadAwareLoadBalancerPtr>
 ClusterFactory::createClusterWithConfig(
-    const envoy::api::v2::Cluster& cluster,
+    const envoy::api::v3alpha::Cluster& cluster,
     const envoy::config::cluster::aggregate::v2alpha::ClusterConfig& proto_config,
     Upstream::ClusterFactoryContext& context,
     Server::Configuration::TransportSocketFactoryContext& socket_factory_context,

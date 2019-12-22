@@ -1,6 +1,6 @@
 #pragma once
 
-#include "envoy/api/v2/route/route.pb.h"
+#include "envoy/api/v3alpha/route/route.pb.h"
 #include "envoy/http/hash_policy.h"
 
 namespace Envoy {
@@ -13,7 +13,7 @@ namespace Http {
 class HashPolicyImpl : public HashPolicy {
 public:
   explicit HashPolicyImpl(
-      absl::Span<const envoy::api::v2::route::RouteAction::HashPolicy* const> hash_policy);
+      absl::Span<const envoy::api::v3alpha::route::RouteAction::HashPolicy* const> hash_policy);
 
   // Http::HashPolicy
   absl::optional<uint64_t> generateHash(const Network::Address::Instance* downstream_addr,

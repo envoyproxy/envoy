@@ -8,7 +8,8 @@
 #include <vector>
 
 #include "envoy/buffer/buffer.h"
-#include "envoy/config/filter/network/http_connection_manager/v2/http_connection_manager.pb.h"
+#include "envoy/config/bootstrap/v3alpha/bootstrap.pb.h"
+#include "envoy/config/filter/network/http_connection_manager/v3alpha/http_connection_manager.pb.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/http/header_map.h"
 #include "envoy/network/address.h"
@@ -38,17 +39,17 @@
 namespace Envoy {
 namespace {
 
-envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager::CodecType
+envoy::config::filter::network::http_connection_manager::v3alpha::HttpConnectionManager::CodecType
 typeToCodecType(Http::CodecClient::Type type) {
   switch (type) {
   case Http::CodecClient::Type::HTTP1:
-    return envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager::
+    return envoy::config::filter::network::http_connection_manager::v3alpha::HttpConnectionManager::
         HTTP1;
   case Http::CodecClient::Type::HTTP2:
-    return envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager::
+    return envoy::config::filter::network::http_connection_manager::v3alpha::HttpConnectionManager::
         HTTP2;
   case Http::CodecClient::Type::HTTP3:
-    return envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager::
+    return envoy::config::filter::network::http_connection_manager::v3alpha::HttpConnectionManager::
         HTTP3;
   default:
     RELEASE_ASSERT(0, "");
@@ -272,14 +273,12 @@ void HttpIntegrationTest::setDownstreamProtocol(Http::CodecClient::Type downstre
 }
 
 ConfigHelper::HttpModifierFunction HttpIntegrationTest::setEnableDownstreamTrailersHttp1() {
-  return
-      [](envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager& hcm) {
-        hcm.mutable_http_protocol_options()->set_enable_trailers(true);
-      };
+  return [](envoy::config::filter::network::http_connection_manager::v3alpha::HttpConnectionManager&
+                hcm) { hcm.mutable_http_protocol_options()->set_enable_trailers(true); };
 }
 
 ConfigHelper::ConfigModifierFunction HttpIntegrationTest::setEnableUpstreamTrailersHttp1() {
-  return [&](envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
+  return [&](envoy::config::bootstrap::v3alpha::Bootstrap& bootstrap) {
     RELEASE_ASSERT(bootstrap.mutable_static_resources()->clusters_size() == 1, "");
     if (fake_upstreams_[0]->httpType() == FakeHttpConnection::Type::HTTP1) {
       auto* cluster = bootstrap.mutable_static_resources()->mutable_clusters(0);
@@ -810,8 +809,8 @@ void HttpIntegrationTest::testEnvoyProxying100Continue(bool continue_before_upst
     // Because 100-continue only affects encoder filters, make sure it plays well with one.
     config_helper_.addFilter("name: envoy.cors");
     config_helper_.addConfigModifier(
-        [&](envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager& hcm)
-            -> void {
+        [&](envoy::config::filter::network::http_connection_manager::v3alpha::HttpConnectionManager&
+                hcm) -> void {
           auto* route_config = hcm.mutable_route_config();
           auto* virtual_host = route_config->mutable_virtual_hosts(0);
           {
@@ -823,8 +822,8 @@ void HttpIntegrationTest::testEnvoyProxying100Continue(bool continue_before_upst
         });
   }
   config_helper_.addConfigModifier(
-      [&](envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager& hcm)
-          -> void { hcm.set_proxy_100_continue(true); });
+      [&](envoy::config::filter::network::http_connection_manager::v3alpha::HttpConnectionManager&
+              hcm) -> void { hcm.set_proxy_100_continue(true); });
   initialize();
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
@@ -921,8 +920,8 @@ void HttpIntegrationTest::testLargeRequestHeaders(uint32_t size, uint32_t count,
   // due to default headers.
 
   config_helper_.addConfigModifier(
-      [&](envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager& hcm)
-          -> void {
+      [&](envoy::config::filter::network::http_connection_manager::v3alpha::HttpConnectionManager&
+              hcm) -> void {
         hcm.mutable_max_request_headers_kb()->set_value(max_size);
         hcm.mutable_common_http_protocol_options()->mutable_max_headers_count()->set_value(
             max_count);
@@ -966,8 +965,8 @@ void HttpIntegrationTest::testLargeRequestTrailers(uint32_t size, uint32_t max_s
   // and other headers.
 
   config_helper_.addConfigModifier(
-      [&](envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager& hcm)
-          -> void { hcm.mutable_max_request_headers_kb()->set_value(max_size); });
+      [&](envoy::config::filter::network::http_connection_manager::v3alpha::HttpConnectionManager&
+              hcm) -> void { hcm.mutable_max_request_headers_kb()->set_value(max_size); });
   max_request_headers_kb_ = max_size;
   Http::TestHeaderMapImpl request_trailers{{"trailer", "trailer"}};
   request_trailers.addCopy("big", std::string(size * 1024, 'a'));
@@ -1010,8 +1009,8 @@ void HttpIntegrationTest::testManyRequestHeaders(std::chrono::milliseconds time)
   max_request_headers_count_ = 20005;
 
   config_helper_.addConfigModifier(
-      [&](envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager& hcm)
-          -> void {
+      [&](envoy::config::filter::network::http_connection_manager::v3alpha::HttpConnectionManager&
+              hcm) -> void {
         hcm.mutable_max_request_headers_kb()->set_value(max_request_headers_kb_);
         hcm.mutable_common_http_protocol_options()->mutable_max_headers_count()->set_value(
             max_request_headers_count_);

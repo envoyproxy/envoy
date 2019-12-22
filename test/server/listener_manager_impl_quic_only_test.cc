@@ -1,5 +1,5 @@
-#include "envoy/api/v2/core/base.pb.h"
-#include "envoy/api/v2/lds.pb.h"
+#include "envoy/api/v3alpha/core/base.pb.h"
+#include "envoy/api/v3alpha/lds.pb.h"
 
 #include "extensions/quic_listeners/quiche/quic_transport_socket_factory.h"
 
@@ -44,9 +44,9 @@ udp_listener_config:
   )EOF",
                                                        Network::Address::IpVersion::v4);
 
-  envoy::api::v2::Listener listener_proto = parseListenerFromV2Yaml(yaml);
+  envoy::api::v3alpha::Listener listener_proto = parseListenerFromV2Yaml(yaml);
   EXPECT_CALL(server_.random_, uuid());
-  expectCreateListenSocket(envoy::api::v2::core::SocketOption::STATE_PREBIND,
+  expectCreateListenSocket(envoy::api::v3alpha::core::SocketOption::STATE_PREBIND,
 #ifdef SO_RXQ_OVFL
                            /* expected_num_options */ 3, // SO_REUSEPORT is on forcibly for UDP
 #else

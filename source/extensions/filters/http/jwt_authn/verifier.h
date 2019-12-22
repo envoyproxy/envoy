@@ -1,6 +1,6 @@
 #pragma once
 
-#include "envoy/config/filter/http/jwt_authn/v2alpha/config.pb.h"
+#include "envoy/config/filter/http/jwt_authn/v3alpha/config.pb.h"
 
 #include "extensions/filters/http/jwt_authn/authenticator.h"
 
@@ -81,9 +81,9 @@ public:
 
   // Factory method for creating verifiers.
   static VerifierConstPtr create(
-      const ::envoy::config::filter::http::jwt_authn::v2alpha::JwtRequirement& requirement,
-      const Protobuf::Map<
-          std::string, ::envoy::config::filter::http::jwt_authn::v2alpha::JwtProvider>& providers,
+      const envoy::config::filter::http::jwt_authn::v3alpha::JwtRequirement& requirement,
+      const Protobuf::Map<std::string,
+                          envoy::config::filter::http::jwt_authn::v3alpha::JwtProvider>& providers,
       const AuthFactory& factory);
 
   // Factory method for creating verifier contexts.

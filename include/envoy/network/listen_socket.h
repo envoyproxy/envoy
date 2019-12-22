@@ -4,7 +4,7 @@
 #include <tuple>
 #include <vector>
 
-#include "envoy/api/v2/core/base.pb.h"
+#include "envoy/api/v3alpha/core/base.pb.h"
 #include "envoy/common/exception.h"
 #include "envoy/common/pure.h"
 #include "envoy/network/address.h"
@@ -102,7 +102,7 @@ public:
      * @return true if succeeded, false otherwise.
      */
     virtual bool setOption(Socket& socket,
-                           envoy::api::v2::core::SocketOption::SocketState state) const PURE;
+                           envoy::api::v3alpha::core::SocketOption::SocketState state) const PURE;
 
     /**
      * @param vector of bytes to which the option should append hash key data that will be used
@@ -130,7 +130,7 @@ public:
      */
     virtual absl::optional<Details>
     getOptionDetails(const Socket& socket,
-                     envoy::api::v2::core::SocketOption::SocketState state) const PURE;
+                     envoy::api::v3alpha::core::SocketOption::SocketState state) const PURE;
   };
 
   using OptionConstSharedPtr = std::shared_ptr<const Option>;
@@ -143,7 +143,7 @@ public:
   }
 
   static bool applyOptions(const OptionsSharedPtr& options, Socket& socket,
-                           envoy::api::v2::core::SocketOption::SocketState state) {
+                           envoy::api::v3alpha::core::SocketOption::SocketState state) {
     if (options == nullptr) {
       return true;
     }

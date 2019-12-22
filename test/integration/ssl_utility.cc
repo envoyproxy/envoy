@@ -1,6 +1,6 @@
 #include "test/integration/ssl_utility.h"
 
-#include "envoy/api/v2/auth/cert.pb.h"
+#include "envoy/api/v3alpha/auth/cert.pb.h"
 
 #include "common/json/json_loader.h"
 #include "common/network/utility.h"
@@ -49,7 +49,7 @@ createClientSslTransportSocketFactory(const ClientSslTransportOptions& options,
 )EOF";
   }
 
-  envoy::api::v2::auth::UpstreamTlsContext tls_context;
+  envoy::api::v3alpha::auth::UpstreamTlsContext tls_context;
   TestUtility::loadFromYaml(TestEnvironment::substitute(yaml_plain), tls_context);
   auto* common_context = tls_context.mutable_common_tls_context();
 
@@ -80,7 +80,7 @@ createClientSslTransportSocketFactory(const ClientSslTransportOptions& options,
 
 Network::TransportSocketFactoryPtr createUpstreamSslContext(ContextManager& context_manager,
                                                             Api::Api& api) {
-  envoy::api::v2::auth::DownstreamTlsContext tls_context;
+  envoy::api::v3alpha::auth::DownstreamTlsContext tls_context;
   ConfigHelper::initializeTls({}, *tls_context.mutable_common_tls_context());
 
   NiceMock<Server::Configuration::MockTransportSocketFactoryContext> mock_factory_ctx;

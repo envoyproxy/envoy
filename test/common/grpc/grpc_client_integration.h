@@ -1,6 +1,6 @@
 #pragma once
 
-#include "envoy/api/v2/core/grpc_service.pb.h"
+#include "envoy/api/v3alpha/core/grpc_service.pb.h"
 
 #include "common/common/assert.h"
 
@@ -22,7 +22,7 @@ public:
   virtual Network::Address::IpVersion ipVersion() const PURE;
   virtual ClientType clientType() const PURE;
 
-  void setGrpcService(envoy::api::v2::core::GrpcService& grpc_service,
+  void setGrpcService(envoy::api::v3alpha::core::GrpcService& grpc_service,
                       const std::string& cluster_name,
                       Network::Address::InstanceConstSharedPtr address) {
     switch (clientType()) {

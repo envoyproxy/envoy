@@ -2,7 +2,7 @@
 
 #include <string>
 
-#include "envoy/api/v2/core/base.pb.h"
+#include "envoy/api/v3alpha/core/base.pb.h"
 #include "envoy/local_info/local_info.h"
 
 #include "gmock/gmock.h"
@@ -19,12 +19,12 @@ public:
   MOCK_CONST_METHOD0(zoneName, const std::string&());
   MOCK_CONST_METHOD0(clusterName, const std::string&());
   MOCK_CONST_METHOD0(nodeName, const std::string&());
-  MOCK_CONST_METHOD0(node, envoy::api::v2::core::Node&());
+  MOCK_CONST_METHOD0(node, envoy::api::v3alpha::core::Node&());
 
   Network::Address::InstanceConstSharedPtr address_;
   // TODO(htuch): Make this behave closer to the real implementation, with the various property
   // methods using node_ as the source of truth.
-  envoy::api::v2::core::Node node_;
+  envoy::api::v3alpha::core::Node node_;
 };
 
 } // namespace LocalInfo

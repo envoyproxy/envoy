@@ -55,9 +55,9 @@ public:
     DEBUG_LOG("AST match callback dispatcher");
     for (const auto it : match_result.Nodes.getMap()) {
       const std::string match_text = getSourceText(it.second.getSourceRange(), source_manager);
-      DEBUG_LOG(absl::StrCat("  Result for ", it.first, " [",
-                             match_text.size() > 250 ? match_text.substr(0, 250) + "..." : match_text,
-                             "]"));
+      DEBUG_LOG(absl::StrCat(
+          "  Result for ", it.first, " [",
+          match_text.size() > 250 ? match_text.substr(0, 250) + "..." : match_text, "]"));
     }
     if (const auto* type_loc = match_result.Nodes.getNodeAs<clang::TypeLoc>("type")) {
       onTypeLocMatch(*type_loc, source_manager);
@@ -169,7 +169,8 @@ private:
       if (absl::EndsWith(decl_name, enum_generated_method_suffix)) {
         // Remove trailing suffix from reference for replacement range and type
         // name purposes.
-        const clang::SourceLocation begin_loc = source_manager.getSpellingLoc(decl_ref_expr.getBeginLoc());
+        const clang::SourceLocation begin_loc =
+            source_manager.getSpellingLoc(decl_ref_expr.getBeginLoc());
         const std::string type_name_with_suffix =
             getSourceText(decl_ref_expr.getSourceRange(), source_manager);
         const std::string type_name = type_name_with_suffix.substr(

@@ -1,6 +1,6 @@
 #include <vector>
 
-#include "envoy/config/filter/network/redis_proxy/v2/redis_proxy.pb.h"
+#include "envoy/config/filter/network/redis_proxy/v3alpha/redis_proxy.pb.h"
 
 #include "common/buffer/buffer_impl.h"
 #include "common/network/utility.h"
@@ -103,7 +103,7 @@ public:
   }
 
   void testInitializeReadPolicy(
-      envoy::config::filter::network::redis_proxy::v2::RedisProxy::ConnPoolSettings::ReadPolicy
+      envoy::config::filter::network::redis_proxy::v3alpha::RedisProxy::ConnPoolSettings::ReadPolicy
           read_policy) {
     InSequence s;
 
@@ -355,23 +355,23 @@ TEST_F(RedisClientImplTest, InitializedWithAuthPassword) {
 }
 
 TEST_F(RedisClientImplTest, InitializedWithPreferMasterReadPolicy) {
-  testInitializeReadPolicy(envoy::config::filter::network::redis_proxy::v2::
-                               RedisProxy::ConnPoolSettings::PREFER_MASTER);
+  testInitializeReadPolicy(envoy::config::filter::network::redis_proxy::v3alpha::RedisProxy::
+                               ConnPoolSettings::PREFER_MASTER);
 }
 
 TEST_F(RedisClientImplTest, InitializedWithReplicaReadPolicy) {
-  testInitializeReadPolicy(envoy::config::filter::network::redis_proxy::v2::
-                               RedisProxy::ConnPoolSettings::REPLICA);
+  testInitializeReadPolicy(
+      envoy::config::filter::network::redis_proxy::v3alpha::RedisProxy::ConnPoolSettings::REPLICA);
 }
 
 TEST_F(RedisClientImplTest, InitializedWithPreferReplicaReadPolicy) {
-  testInitializeReadPolicy(envoy::config::filter::network::redis_proxy::v2::
-                               RedisProxy::ConnPoolSettings::PREFER_REPLICA);
+  testInitializeReadPolicy(envoy::config::filter::network::redis_proxy::v3alpha::RedisProxy::
+                               ConnPoolSettings::PREFER_REPLICA);
 }
 
 TEST_F(RedisClientImplTest, InitializedWithAnyReadPolicy) {
   testInitializeReadPolicy(
-      envoy::config::filter::network::redis_proxy::v2::RedisProxy::ConnPoolSettings::ANY);
+      envoy::config::filter::network::redis_proxy::v3alpha::RedisProxy::ConnPoolSettings::ANY);
 }
 
 TEST_F(RedisClientImplTest, Cancel) {

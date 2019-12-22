@@ -19,7 +19,7 @@ envoy_cc_test(
         "//test/mocks/grpc:grpc_mocks",
         "//test/mocks/upstream:upstream_mocks",
         "//test/test_common:utility_lib",
-        "@envoy_api//envoy/service/ratelimit/v2:pkg_cc_proto",
+        "@envoy_api//envoy/service/ratelimit/v3alpha:pkg_cc_proto",
     ],
 )
 

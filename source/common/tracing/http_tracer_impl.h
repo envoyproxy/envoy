@@ -2,7 +2,7 @@
 
 #include <string>
 
-#include "envoy/api/v2/core/base.pb.h"
+#include "envoy/api/v3alpha/core/base.pb.h"
 #include "envoy/common/platform.h"
 #include "envoy/local_info/local_info.h"
 #include "envoy/runtime/runtime.h"
@@ -245,7 +245,7 @@ public:
                     const envoy::type::tracing::v2::CustomTag::Metadata& metadata);
   void apply(Span& span, const CustomTagContext& ctx) const override;
   absl::string_view value(const CustomTagContext&) const override { return default_value_; }
-  const envoy::api::v2::core::Metadata* metadata(const CustomTagContext& ctx) const;
+  const envoy::api::v3alpha::core::Metadata* metadata(const CustomTagContext& ctx) const;
 
 protected:
   const envoy::type::metadata::v2::MetadataKind::KindCase kind_;

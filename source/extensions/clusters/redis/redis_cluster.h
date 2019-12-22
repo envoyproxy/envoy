@@ -13,12 +13,13 @@
 #include <vector>
 
 #include "envoy/api/api.h"
-#include "envoy/api/v2/cds.pb.h"
-#include "envoy/api/v2/eds.pb.h"
-#include "envoy/api/v2/endpoint/endpoint.pb.h"
+#include "envoy/api/v3alpha/cds.pb.h"
+#include "envoy/api/v3alpha/eds.pb.h"
+#include "envoy/api/v3alpha/endpoint/endpoint.pb.h"
 #include "envoy/config/cluster/redis/redis_cluster.pb.h"
 #include "envoy/config/cluster/redis/redis_cluster.pb.validate.h"
-#include "envoy/config/filter/network/redis_proxy/v2/redis_proxy.pb.validate.h"
+#include "envoy/config/filter/network/redis_proxy/v3alpha/redis_proxy.pb.h"
+#include "envoy/config/filter/network/redis_proxy/v3alpha/redis_proxy.pb.validate.h"
 #include "envoy/config/typed_metadata.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/event/timer.h"
@@ -92,7 +93,7 @@ namespace Redis {
 
 class RedisCluster : public Upstream::BaseDynamicClusterImpl {
 public:
-  RedisCluster(const envoy::api::v2::Cluster& cluster,
+  RedisCluster(const envoy::api::v3alpha::Cluster& cluster,
                const envoy::config::cluster::redis::RedisClusterConfig& redis_cluster,
                NetworkFilters::Common::Redis::Client::ClientFactory& client_factory,
                Upstream::ClusterManager& cluster_manager, Runtime::Loader& runtime, Api::Api& api,
@@ -129,12 +130,12 @@ private:
 
   void reloadHealthyHostsHelper(const Upstream::HostSharedPtr& host) override;
 
-  const envoy::api::v2::endpoint::LocalityLbEndpoints& localityLbEndpoint() const {
+  const envoy::api::v3alpha::endpoint::LocalityLbEndpoints& localityLbEndpoint() const {
     // Always use the first endpoint.
     return load_assignment_.endpoints()[0];
   }
 
-  const envoy::api::v2::endpoint::LbEndpoint& lbEndpoint() const {
+  const envoy::api::v3alpha::endpoint::LbEndpoint& lbEndpoint() const {
     // Always use the first endpoint.
     return localityLbEndpoint().lb_endpoints()[0];
   }
@@ -264,7 +265,7 @@ private:
   Event::Dispatcher& dispatcher_;
   Network::DnsResolverSharedPtr dns_resolver_;
   Network::DnsLookupFamily dns_lookup_family_;
-  const envoy::api::v2::ClusterLoadAssignment load_assignment_;
+  const envoy::api::v3alpha::ClusterLoadAssignment load_assignment_;
   const LocalInfo::LocalInfo& local_info_;
   Runtime::RandomGenerator& random_;
   RedisDiscoverySession redis_discovery_session_;
@@ -290,7 +291,7 @@ private:
 
   std::pair<Upstream::ClusterImplBaseSharedPtr, Upstream::ThreadAwareLoadBalancerPtr>
   createClusterWithConfig(
-      const envoy::api::v2::Cluster& cluster,
+      const envoy::api::v3alpha::Cluster& cluster,
       const envoy::config::cluster::redis::RedisClusterConfig& proto_config,
       Upstream::ClusterFactoryContext& context,
       Server::Configuration::TransportSocketFactoryContext& socket_factory_context,

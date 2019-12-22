@@ -1,6 +1,6 @@
 #include "common/config/subscription_factory_impl.h"
 
-#include "envoy/api/v2/core/config_source.pb.h"
+#include "envoy/api/v3alpha/core/config_source.pb.h"
 
 #include "common/config/delta_subscription_impl.h"
 #include "common/config/filesystem_subscription_impl.h"
@@ -23,35 +23,37 @@ SubscriptionFactoryImpl::SubscriptionFactoryImpl(
       validation_visitor_(validation_visitor), api_(api) {}
 
 SubscriptionPtr SubscriptionFactoryImpl::subscriptionFromConfigSource(
-    const envoy::api::v2::core::ConfigSource& config, absl::string_view type_url,
+    const envoy::api::v3alpha::core::ConfigSource& config, absl::string_view type_url,
     Stats::Scope& scope, SubscriptionCallbacks& callbacks) {
   Config::Utility::checkLocalInfo(type_url, local_info_);
   std::unique_ptr<Subscription> result;
   SubscriptionStats stats = Utility::generateStats(scope);
   switch (config.config_source_specifier_case()) {
-  case envoy::api::v2::core::ConfigSource::kPath: {
+  case envoy::api::v3alpha::core::ConfigSource::ConfigSourceSpecifierCase::kPath: {
     Utility::checkFilesystemSubscriptionBackingPath(config.path(), api_);
     result = std::make_unique<Config::FilesystemSubscriptionImpl>(
         dispatcher_, config.path(), callbacks, stats, validation_visitor_, api_);
     break;
   }
-  case envoy::api::v2::core::ConfigSource::kApiConfigSource: {
-    const envoy::api::v2::core::ApiConfigSource& api_config_source = config.api_config_source();
+  case envoy::api::v3alpha::core::ConfigSource::ConfigSourceSpecifierCase::kApiConfigSource: {
+    const envoy::api::v3alpha::core::ApiConfigSource& api_config_source =
+        config.api_config_source();
     Utility::checkApiConfigSourceSubscriptionBackingCluster(cm_.clusters(), api_config_source);
     switch (api_config_source.api_type()) {
-    case envoy::api::v2::core::ApiConfigSource::UNSUPPORTED_REST_LEGACY:
+    case envoy::api::v3alpha::core::ApiConfigSource::
+        hidden_envoy_deprecated_UNSUPPORTED_REST_LEGACY:
       throw EnvoyException(
           "REST_LEGACY no longer a supported ApiConfigSource. "
           "Please specify an explicit supported api_type in the following config:\n" +
           config.DebugString());
-    case envoy::api::v2::core::ApiConfigSource::REST:
+    case envoy::api::v3alpha::core::ApiConfigSource::REST:
       result = std::make_unique<HttpSubscriptionImpl>(
           local_info_, cm_, api_config_source.cluster_names()[0], dispatcher_, random_,
           Utility::apiConfigSourceRefreshDelay(api_config_source),
           Utility::apiConfigSourceRequestTimeout(api_config_source), restMethod(type_url),
           callbacks, stats, Utility::configSourceInitialFetchTimeout(config), validation_visitor_);
       break;
-    case envoy::api::v2::core::ApiConfigSource::GRPC:
+    case envoy::api::v3alpha::core::ApiConfigSource::GRPC:
       result = std::make_unique<GrpcSubscriptionImpl>(
           local_info_,
           Config::Utility::factoryForGrpcApiConfigSource(cm_.grpcAsyncClientManager(),
@@ -62,7 +64,7 @@ SubscriptionPtr SubscriptionFactoryImpl::subscriptionFromConfigSource(
           Utility::configSourceInitialFetchTimeout(config),
           api_config_source.set_node_on_first_message_only());
       break;
-    case envoy::api::v2::core::ApiConfigSource::DELTA_GRPC: {
+    case envoy::api::v3alpha::core::ApiConfigSource::DELTA_GRPC: {
       Utility::checkApiConfigSourceSubscriptionBackingCluster(cm_.clusters(), api_config_source);
       result = std::make_unique<DeltaSubscriptionImpl>(
           std::make_shared<Config::NewGrpcMuxImpl>(
@@ -79,7 +81,7 @@ SubscriptionPtr SubscriptionFactoryImpl::subscriptionFromConfigSource(
     }
     break;
   }
-  case envoy::api::v2::core::ConfigSource::kAds: {
+  case envoy::api::v3alpha::core::ConfigSource::ConfigSourceSpecifierCase::kAds: {
     if (cm_.adsMux()->isDelta()) {
       result = std::make_unique<DeltaSubscriptionImpl>(
           cm_.adsMux(), type_url, callbacks, stats,

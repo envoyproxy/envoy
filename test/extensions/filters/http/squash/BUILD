@@ -35,7 +35,7 @@ envoy_extension_cc_test(
     deps = [
         "//source/extensions/filters/http/squash:config",
         "//test/integration:http_integration_lib",
-        "@envoy_api//envoy/config/bootstrap/v2:pkg_cc_proto",
+        "@envoy_api//envoy/config/bootstrap/v3alpha:pkg_cc_proto",
     ],
 )
 

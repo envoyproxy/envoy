@@ -3,9 +3,9 @@
 #include <string>
 
 #include "envoy/api/api.h"
-#include "envoy/api/v2/core/base.pb.h"
-#include "envoy/config/filter/network/redis_proxy/v2/redis_proxy.pb.h"
-#include "envoy/config/filter/network/redis_proxy/v2/redis_proxy.pb.validate.h"
+#include "envoy/api/v3alpha/core/base.pb.h"
+#include "envoy/config/filter/network/redis_proxy/v3alpha/redis_proxy.pb.h"
+#include "envoy/config/filter/network/redis_proxy/v3alpha/redis_proxy.pb.validate.h"
 #include "envoy/upstream/upstream.h"
 
 #include "common/common/empty_string.h"
@@ -22,14 +22,15 @@ namespace RedisProxy {
 class ProtocolOptionsConfigImpl : public Upstream::ProtocolOptionsConfig {
 public:
   ProtocolOptionsConfigImpl(
-      const envoy::config::filter::network::redis_proxy::v2::RedisProtocolOptions& proto_config)
+      const envoy::config::filter::network::redis_proxy::v3alpha::RedisProtocolOptions&
+          proto_config)
       : auth_password_(proto_config.auth_password()) {}
 
   std::string auth_password(Api::Api& api) const {
     return Config::DataSource::read(auth_password_, true, api);
   }
 
-  const envoy::api::v2::core::DataSource& auth_password_datasource() const {
+  const envoy::api::v3alpha::core::DataSource& auth_password_datasource() const {
     return auth_password_;
   }
 
@@ -44,7 +45,7 @@ public:
   }
 
 private:
-  envoy::api::v2::core::DataSource auth_password_;
+  envoy::api::v3alpha::core::DataSource auth_password_;
 };
 
 /**
@@ -52,19 +53,19 @@ private:
  */
 class RedisProxyFilterConfigFactory
     : public Common::FactoryBase<
-          envoy::config::filter::network::redis_proxy::v2::RedisProxy,
-          envoy::config::filter::network::redis_proxy::v2::RedisProtocolOptions> {
+          envoy::config::filter::network::redis_proxy::v3alpha::RedisProxy,
+          envoy::config::filter::network::redis_proxy::v3alpha::RedisProtocolOptions> {
 public:
   RedisProxyFilterConfigFactory() : FactoryBase(NetworkFilterNames::get().RedisProxy, true) {}
 
 private:
   Network::FilterFactoryCb createFilterFactoryFromProtoTyped(
-      const envoy::config::filter::network::redis_proxy::v2::RedisProxy& proto_config,
+      const envoy::config::filter::network::redis_proxy::v3alpha::RedisProxy& proto_config,
       Server::Configuration::FactoryContext& context) override;
 
   Upstream::ProtocolOptionsConfigConstSharedPtr createProtocolOptionsTyped(
-      const envoy::config::filter::network::redis_proxy::v2::RedisProtocolOptions& proto_config)
-      override {
+      const envoy::config::filter::network::redis_proxy::v3alpha::RedisProtocolOptions&
+          proto_config) override {
     return std::make_shared<ProtocolOptionsConfigImpl>(proto_config);
   }
 };

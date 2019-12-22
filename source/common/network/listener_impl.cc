@@ -1,6 +1,6 @@
 #include "common/network/listener_impl.h"
 
-#include "envoy/api/v2/core/base.pb.h"
+#include "envoy/api/v3alpha/core/base.pb.h"
 #include "envoy/common/exception.h"
 #include "envoy/common/platform.h"
 
@@ -57,7 +57,7 @@ void ListenerImpl::setupServerSocket(Event::DispatcherImpl& dispatcher, Socket& 
   }
 
   if (!Network::Socket::applyOptions(socket.options(), socket,
-                                     envoy::api::v2::core::SocketOption::STATE_LISTENING)) {
+                                     envoy::api::v3alpha::core::SocketOption::STATE_LISTENING)) {
     throw CreateListenerException(fmt::format("cannot set post-listen socket option on socket: {}",
                                               socket.localAddress()->asString()));
   }

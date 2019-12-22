@@ -5,9 +5,9 @@
 #include <memory>
 #include <string>
 
-#include "envoy/api/v2/core/config_source.pb.h"
-#include "envoy/api/v2/discovery.pb.h"
-#include "envoy/api/v2/route/route.pb.h"
+#include "envoy/api/v3alpha/core/config_source.pb.h"
+#include "envoy/api/v3alpha/discovery.pb.h"
+#include "envoy/api/v3alpha/route/route.pb.h"
 
 #include "common/common/assert.h"
 #include "common/common/fmt.h"
@@ -35,14 +35,15 @@ VhdsSubscription::VhdsSubscription(RouteConfigUpdatePtr& config_update_info,
                                   .config_source()
                                   .api_config_source()
                                   .api_type();
-  if (config_source != envoy::api::v2::core::ApiConfigSource::DELTA_GRPC) {
+  if (config_source != envoy::api::v3alpha::core::ApiConfigSource::DELTA_GRPC) {
     throw EnvoyException("vhds: only 'DELTA_GRPC' is supported as an api_type.");
   }
 
   subscription_ =
       factory_context.clusterManager().subscriptionFactory().subscriptionFromConfigSource(
           config_update_info_->routeConfiguration().vhds().config_source(),
-          Grpc::Common::typeUrl(envoy::api::v2::route::VirtualHost().GetDescriptor()->full_name()),
+          Grpc::Common::typeUrl(
+              envoy::api::v3alpha::route::VirtualHost().GetDescriptor()->full_name()),
           *scope_, *this);
 }
 
@@ -55,7 +56,7 @@ void VhdsSubscription::onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureRe
 }
 
 void VhdsSubscription::onConfigUpdate(
-    const Protobuf::RepeatedPtrField<envoy::api::v2::Resource>& added_resources,
+    const Protobuf::RepeatedPtrField<envoy::api::v3alpha::Resource>& added_resources,
     const Protobuf::RepeatedPtrField<std::string>& removed_resources,
     const std::string& version_info) {
   if (config_update_info_->onVhdsUpdate(added_resources, removed_resources, version_info)) {

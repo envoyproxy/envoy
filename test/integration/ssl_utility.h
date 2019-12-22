@@ -1,7 +1,7 @@
 #pragma once
 
 #include "envoy/api/api.h"
-#include "envoy/api/v2/auth/cert.pb.h"
+#include "envoy/api/v3alpha/auth/cert.pb.h"
 #include "envoy/network/address.h"
 #include "envoy/network/transport_socket.h"
 #include "envoy/secret/secret_manager.h"
@@ -37,7 +37,7 @@ struct ClientSslTransportOptions {
   }
 
   ClientSslTransportOptions&
-  setTlsVersion(envoy::api::v2::auth::TlsParameters_TlsProtocol tls_version) {
+  setTlsVersion(envoy::api::v3alpha::auth::TlsParameters::TlsProtocol tls_version) {
     tls_version_ = tls_version;
     return *this;
   }
@@ -47,8 +47,8 @@ struct ClientSslTransportOptions {
   bool client_ecdsa_cert_{};
   std::vector<std::string> cipher_suites_{};
   std::string sigalgs_;
-  envoy::api::v2::auth::TlsParameters_TlsProtocol tls_version_{
-      envoy::api::v2::auth::TlsParameters::TLS_AUTO};
+  envoy::api::v3alpha::auth::TlsParameters::TlsProtocol tls_version_{
+      envoy::api::v3alpha::auth::TlsParameters::TLS_AUTO};
 };
 
 Network::TransportSocketFactoryPtr

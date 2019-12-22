@@ -1,8 +1,8 @@
 #include "server/listener_impl.h"
 
-#include "envoy/api/v2/core/base.pb.h"
-#include "envoy/api/v2/lds.pb.h"
-#include "envoy/api/v2/listener/listener.pb.h"
+#include "envoy/api/v3alpha/core/base.pb.h"
+#include "envoy/api/v3alpha/lds.pb.h"
+#include "envoy/api/v3alpha/listener/listener.pb.h"
 #include "envoy/registry/registry.h"
 #include "envoy/server/active_udp_listener_config.h"
 #include "envoy/server/transport_socket_config.h"
@@ -79,8 +79,8 @@ Network::SocketSharedPtr ListenSocketFactoryImpl::createListenSocketAndApplyOpti
   ENVOY_LOG(debug, "Create listen socket for listener {} on address {}", listener_name_,
             local_address_->asString());
   if (socket != nullptr && options_ != nullptr) {
-    const bool ok = Network::Socket::applyOptions(options_, *socket,
-                                                  envoy::api::v2::core::SocketOption::STATE_BOUND);
+    const bool ok = Network::Socket::applyOptions(
+        options_, *socket, envoy::api::v3alpha::core::SocketOption::STATE_BOUND);
     const std::string message =
         fmt::format("{}: Setting socket options {}", listener_name_, ok ? "succeeded" : "failed");
     if (!ok) {
@@ -123,17 +123,17 @@ Network::SocketSharedPtr ListenSocketFactoryImpl::getListenSocket() {
   return createListenSocketAndApplyOptions();
 }
 
-ListenerImpl::ListenerImpl(const envoy::api::v2::Listener& config, const std::string& version_info,
-                           ListenerManagerImpl& parent, const std::string& name, bool added_via_api,
-                           bool workers_started, uint64_t hash,
-                           ProtobufMessage::ValidationVisitor& validation_visitor)
+ListenerImpl::ListenerImpl(const envoy::api::v3alpha::Listener& config,
+                           const std::string& version_info, ListenerManagerImpl& parent,
+                           const std::string& name, bool added_via_api, bool workers_started,
+                           uint64_t hash, ProtobufMessage::ValidationVisitor& validation_visitor)
     : parent_(parent), address_(Network::Address::resolveProtoAddress(config.address())),
       filter_chain_manager_(address_), global_scope_(parent_.server_.stats().createScope("")),
       listener_scope_(
           parent_.server_.stats().createScope(fmt::format("listener.{}.", address_->asString()))),
       bind_to_port_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config.deprecated_v1(), bind_to_port, true)),
       hand_off_restored_destination_connections_(
-          PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, use_original_dst, false)),
+          PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, hidden_envoy_deprecated_use_original_dst, false)),
       per_connection_buffer_limit_bytes_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, per_connection_buffer_limit_bytes, 1024 * 1024)),
       listener_tag_(parent_.factory_.nextListenerTag()), name_(name), added_via_api_(added_via_api),
@@ -244,7 +244,7 @@ ListenerImpl::ListenerImpl(const envoy::api::v2::Listener& config, const std::st
   }
 
   // Add original dst listener filter if 'use_original_dst' flag is set.
-  if (PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, use_original_dst, false)) {
+  if (PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, hidden_envoy_deprecated_use_original_dst, false)) {
     auto& factory =
         Config::Utility::getAndCheckFactory<Configuration::NamedListenerFilterConfigFactory>(
             Extensions::ListenerFilters::ListenerFilterNames::get().OriginalDst);
@@ -324,10 +324,10 @@ Singleton::Manager& ListenerImpl::singletonManager() { return parent_.server_.si
 OverloadManager& ListenerImpl::overloadManager() { return parent_.server_.overloadManager(); }
 ThreadLocal::Instance& ListenerImpl::threadLocal() { return parent_.server_.threadLocal(); }
 Admin& ListenerImpl::admin() { return parent_.server_.admin(); }
-const envoy::api::v2::core::Metadata& ListenerImpl::listenerMetadata() const {
+const envoy::api::v3alpha::core::Metadata& ListenerImpl::listenerMetadata() const {
   return config_.metadata();
 };
-envoy::api::v2::core::TrafficDirection ListenerImpl::direction() const {
+envoy::api::v3alpha::core::TrafficDirection ListenerImpl::direction() const {
   return config_.traffic_direction();
 };
 TimeSource& ListenerImpl::timeSource() { return api().timeSource(); }

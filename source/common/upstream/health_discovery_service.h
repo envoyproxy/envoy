@@ -1,11 +1,11 @@
 #pragma once
 
 #include "envoy/api/api.h"
-#include "envoy/api/v2/cds.pb.h"
-#include "envoy/api/v2/core/address.pb.h"
+#include "envoy/api/v3alpha/cds.pb.h"
+#include "envoy/api/v3alpha/core/address.pb.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/server/transport_socket_config.h"
-#include "envoy/service/discovery/v2/hds.pb.h"
+#include "envoy/service/discovery/v3alpha/hds.pb.h"
 #include "envoy/ssl/context_manager.h"
 #include "envoy/stats/stats_macros.h"
 #include "envoy/upstream/upstream.h"
@@ -39,8 +39,9 @@ public:
 class HdsCluster : public Cluster, Logger::Loggable<Logger::Id::upstream> {
 public:
   static ClusterSharedPtr create();
-  HdsCluster(Server::Admin& admin, Runtime::Loader& runtime, const envoy::api::v2::Cluster& cluster,
-             const envoy::api::v2::core::BindConfig& bind_config, Stats::Store& stats,
+  HdsCluster(Server::Admin& admin, Runtime::Loader& runtime,
+             const envoy::api::v3alpha::Cluster& cluster,
+             const envoy::api::v3alpha::core::BindConfig& bind_config, Stats::Store& stats,
              Ssl::ContextManager& ssl_context_manager, bool added_via_api,
              ClusterInfoFactory& info_factory, ClusterManager& cm,
              const LocalInfo::LocalInfo& local_info, Event::Dispatcher& dispatcher,
@@ -75,8 +76,8 @@ private:
   std::function<void()> initialization_complete_callback_;
 
   Runtime::Loader& runtime_;
-  const envoy::api::v2::Cluster& cluster_;
-  const envoy::api::v2::core::BindConfig& bind_config_;
+  const envoy::api::v3alpha::Cluster& cluster_;
+  const envoy::api::v3alpha::core::BindConfig& bind_config_;
   Stats::Store& stats_;
   Ssl::ContextManager& ssl_context_manager_;
   bool added_via_api_;
@@ -111,8 +112,9 @@ struct HdsDelegateStats {
  * server with a set of hosts to healthcheck, healthchecking them, and reporting
  * back the results.
  */
-class HdsDelegate : Grpc::AsyncStreamCallbacks<envoy::service::discovery::v2::HealthCheckSpecifier>,
-                    Logger::Loggable<Logger::Id::upstream> {
+class HdsDelegate
+    : Grpc::AsyncStreamCallbacks<envoy::service::discovery::v3alpha::HealthCheckSpecifier>,
+      Logger::Loggable<Logger::Id::upstream> {
 public:
   HdsDelegate(Stats::Scope& scope, Grpc::RawAsyncClientPtr async_client,
               Event::Dispatcher& dispatcher, Runtime::Loader& runtime, Envoy::Stats::Store& stats,
@@ -126,10 +128,10 @@ public:
   void onCreateInitialMetadata(Http::HeaderMap& metadata) override;
   void onReceiveInitialMetadata(Http::HeaderMapPtr&& metadata) override;
   void onReceiveMessage(
-      std::unique_ptr<envoy::service::discovery::v2::HealthCheckSpecifier>&& message) override;
+      std::unique_ptr<envoy::service::discovery::v3alpha::HealthCheckSpecifier>&& message) override;
   void onReceiveTrailingMetadata(Http::HeaderMapPtr&& metadata) override;
   void onRemoteClose(Grpc::Status::GrpcStatus status, const std::string& message) override;
-  envoy::service::discovery::v2::HealthCheckRequestOrEndpointHealthResponse sendResponse();
+  envoy::service::discovery::v3alpha::HealthCheckRequestOrEndpointHealthResponse sendResponse();
 
   std::vector<HdsClusterPtr> hdsClusters() { return hds_clusters_; };
 
@@ -141,16 +143,16 @@ private:
   void handleFailure();
   // Establishes a connection with the management server
   void establishNewStream();
-  void
-  processMessage(std::unique_ptr<envoy::service::discovery::v2::HealthCheckSpecifier>&& message);
+  void processMessage(
+      std::unique_ptr<envoy::service::discovery::v3alpha::HealthCheckSpecifier>&& message);
 
   HdsDelegateStats stats_;
   const Protobuf::MethodDescriptor& service_method_;
 
-  Grpc::AsyncClient<envoy::service::discovery::v2::HealthCheckRequestOrEndpointHealthResponse,
-                    envoy::service::discovery::v2::HealthCheckSpecifier>
+  Grpc::AsyncClient<envoy::service::discovery::v3alpha::HealthCheckRequestOrEndpointHealthResponse,
+                    envoy::service::discovery::v3alpha::HealthCheckSpecifier>
       async_client_;
-  Grpc::AsyncStream<envoy::service::discovery::v2::HealthCheckRequestOrEndpointHealthResponse>
+  Grpc::AsyncStream<envoy::service::discovery::v3alpha::HealthCheckRequestOrEndpointHealthResponse>
       stream_{};
   Event::Dispatcher& dispatcher_;
   Runtime::Loader& runtime_;
@@ -165,8 +167,9 @@ private:
   Singleton::Manager& singleton_manager_;
   ThreadLocal::SlotAllocator& tls_;
 
-  envoy::service::discovery::v2::HealthCheckRequestOrEndpointHealthResponse health_check_request_;
-  std::unique_ptr<envoy::service::discovery::v2::HealthCheckSpecifier> health_check_message_;
+  envoy::service::discovery::v3alpha::HealthCheckRequestOrEndpointHealthResponse
+      health_check_request_;
+  std::unique_ptr<envoy::service::discovery::v3alpha::HealthCheckSpecifier> health_check_message_;
 
   std::vector<std::string> clusters_;
   std::vector<HdsClusterPtr> hds_clusters_;

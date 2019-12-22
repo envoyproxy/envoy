@@ -3,7 +3,7 @@
 #include <functional>
 
 #include "envoy/access_log/access_log.h"
-#include "envoy/api/v2/core/base.pb.h"
+#include "envoy/api/v3alpha/core/base.pb.h"
 #include "envoy/grpc/context.h"
 #include "envoy/http/codes.h"
 #include "envoy/http/context.h"
@@ -128,7 +128,7 @@ public:
    * @return envoy::api::v2::core::TrafficDirection the direction of the traffic relative to the
    * local proxy.
    */
-  virtual envoy::api::v2::core::TrafficDirection direction() const PURE;
+  virtual envoy::api::v3alpha::core::TrafficDirection direction() const PURE;
 
   /**
    * @return const Network::DrainDecision& a drain decision that filters can use to determine if
@@ -170,7 +170,7 @@ public:
    * @return const envoy::api::v2::core::Metadata& the config metadata associated with this
    * listener.
    */
-  virtual const envoy::api::v2::core::Metadata& listenerMetadata() const PURE;
+  virtual const envoy::api::v3alpha::core::Metadata& listenerMetadata() const PURE;
 
   /**
    * @return OverloadManager& the overload manager for the server.

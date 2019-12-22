@@ -1,7 +1,7 @@
 #include "common/router/scoped_config_impl.h"
 
-#include "envoy/api/v2/srds.pb.h"
-#include "envoy/config/filter/network/http_connection_manager/v2/http_connection_manager.pb.h"
+#include "envoy/api/v3alpha/srds.pb.h"
+#include "envoy/config/filter/network/http_connection_manager/v3alpha/http_connection_manager.pb.h"
 
 namespace Envoy {
 namespace Router {
@@ -73,14 +73,14 @@ HeaderValueExtractorImpl::computeFragment(const Http::HeaderMap& headers) const 
   return nullptr;
 }
 
-ScopedRouteInfo::ScopedRouteInfo(envoy::api::v2::ScopedRouteConfiguration&& config_proto,
+ScopedRouteInfo::ScopedRouteInfo(envoy::api::v3alpha::ScopedRouteConfiguration&& config_proto,
                                  ConfigConstSharedPtr&& route_config)
     : config_proto_(std::move(config_proto)), route_config_(std::move(route_config)) {
   // TODO(stevenzzzz): Maybe worth a KeyBuilder abstraction when there are more than one type of
   // Fragment.
   for (const auto& fragment : config_proto_.key().fragments()) {
     switch (fragment.type_case()) {
-    case envoy::api::v2::ScopedRouteConfiguration::Key::Fragment::kStringKey:
+    case envoy::api::v3alpha::ScopedRouteConfiguration::Key::Fragment::TypeCase::kStringKey:
       scope_key_.addFragment(std::make_unique<StringKeyFragment>(fragment.string_key()));
       break;
     default:

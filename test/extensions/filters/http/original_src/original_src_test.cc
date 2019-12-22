@@ -1,4 +1,4 @@
-#include "envoy/api/v2/core/base.pb.h"
+#include "envoy/api/v3alpha/core/base.pb.h"
 #include "envoy/config/filter/http/original_src/v2alpha1/original_src.pb.h"
 
 #include "common/network/socket_option_impl.h"
@@ -62,7 +62,7 @@ protected:
 
   absl::optional<Network::Socket::Option::Details>
   findOptionDetails(const Network::Socket::Options& options, Network::SocketOptionName name,
-                    envoy::api::v2::core::SocketOption::SocketState state) {
+                    envoy::api::v3alpha::core::SocketOption::SocketState state) {
     for (const auto& option : options) {
       const auto details = option->getOptionDetails(socket_, state);
       if (details.has_value() && details->name_ == name) {
@@ -94,7 +94,7 @@ TEST_F(OriginalSrcHttpTest, DecodeHeadersIpv4AddressAddsOption) {
   EXPECT_CALL(socket,
               setLocalAddress(PointeesEq(callbacks_.stream_info_.downstream_remote_address_)));
   for (const auto& option : *options) {
-    option->setOption(socket, envoy::api::v2::core::SocketOption::STATE_PREBIND);
+    option->setOption(socket, envoy::api::v3alpha::core::SocketOption::STATE_PREBIND);
   }
 }
 
@@ -128,7 +128,7 @@ TEST_F(OriginalSrcHttpTest, DecodeHeadersIpv4AddressBleachesPort) {
 
   EXPECT_CALL(socket, setLocalAddress(PointeesEq(expected_address)));
   for (const auto& option : *options) {
-    option->setOption(socket, envoy::api::v2::core::SocketOption::STATE_PREBIND);
+    option->setOption(socket, envoy::api::v3alpha::core::SocketOption::STATE_PREBIND);
   }
 }
 
@@ -145,8 +145,9 @@ TEST_F(OriginalSrcHttpTest, FilterAddsTransparentOption) {
 
   filter->decodeHeaders(headers_, false);
 
-  const auto transparent_option = findOptionDetails(
-      *options, ENVOY_SOCKET_IP_TRANSPARENT, envoy::api::v2::core::SocketOption::STATE_PREBIND);
+  const auto transparent_option =
+      findOptionDetails(*options, ENVOY_SOCKET_IP_TRANSPARENT,
+                        envoy::api::v3alpha::core::SocketOption::STATE_PREBIND);
 
   EXPECT_TRUE(transparent_option.has_value());
 }
@@ -164,8 +165,8 @@ TEST_F(OriginalSrcHttpTest, FilterAddsMarkOption) {
 
   filter->decodeHeaders(headers_, false);
 
-  const auto mark_option = findOptionDetails(*options, ENVOY_SOCKET_SO_MARK,
-                                             envoy::api::v2::core::SocketOption::STATE_PREBIND);
+  const auto mark_option = findOptionDetails(
+      *options, ENVOY_SOCKET_SO_MARK, envoy::api::v3alpha::core::SocketOption::STATE_PREBIND);
 
   ASSERT_TRUE(mark_option.has_value());
   uint32_t value = 1234;
@@ -186,8 +187,8 @@ TEST_F(OriginalSrcHttpTest, Mark0NotAdded) {
 
   filter->decodeHeaders(headers_, false);
 
-  const auto mark_option = findOptionDetails(*options, ENVOY_SOCKET_SO_MARK,
-                                             envoy::api::v2::core::SocketOption::STATE_PREBIND);
+  const auto mark_option = findOptionDetails(
+      *options, ENVOY_SOCKET_SO_MARK, envoy::api::v3alpha::core::SocketOption::STATE_PREBIND);
 
   ASSERT_FALSE(mark_option.has_value());
 }

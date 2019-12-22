@@ -1,7 +1,7 @@
 #pragma once
 
-#include "envoy/api/v2/auth/cert.pb.h"
-#include "envoy/api/v2/core/config_source.pb.h"
+#include "envoy/api/v3alpha/auth/cert.pb.h"
+#include "envoy/api/v3alpha/core/config_source.pb.h"
 #include "envoy/secret/secret_callbacks.h"
 #include "envoy/secret/secret_manager.h"
 #include "envoy/server/transport_socket_config.h"
@@ -18,7 +18,7 @@ public:
   MockSecretManager();
   ~MockSecretManager() override;
 
-  MOCK_METHOD1(addStaticSecret, void(const envoy::api::v2::auth::Secret& secret));
+  MOCK_METHOD1(addStaticSecret, void(const envoy::api::v3alpha::auth::Secret& secret));
   MOCK_CONST_METHOD1(findStaticTlsCertificateProvider,
                      TlsCertificateConfigProviderSharedPtr(const std::string& name));
   MOCK_CONST_METHOD1(findStaticCertificateValidationContextProvider,
@@ -27,26 +27,26 @@ public:
                      TlsSessionTicketKeysConfigProviderSharedPtr(const std::string& name));
   MOCK_METHOD1(createInlineTlsCertificateProvider,
                TlsCertificateConfigProviderSharedPtr(
-                   const envoy::api::v2::auth::TlsCertificate& tls_certificate));
+                   const envoy::api::v3alpha::auth::TlsCertificate& tls_certificate));
   MOCK_METHOD1(createInlineCertificateValidationContextProvider,
                CertificateValidationContextConfigProviderSharedPtr(
-                   const envoy::api::v2::auth::CertificateValidationContext&
+                   const envoy::api::v3alpha::auth::CertificateValidationContext&
                        certificate_validation_context));
   MOCK_METHOD1(createInlineTlsSessionTicketKeysProvider,
                TlsSessionTicketKeysConfigProviderSharedPtr(
-                   const envoy::api::v2::auth::TlsSessionTicketKeys& tls_session_ticket_keys));
+                   const envoy::api::v3alpha::auth::TlsSessionTicketKeys& tls_session_ticket_keys));
   MOCK_METHOD3(findOrCreateTlsCertificateProvider,
                TlsCertificateConfigProviderSharedPtr(
-                   const envoy::api::v2::core::ConfigSource&, const std::string&,
+                   const envoy::api::v3alpha::core::ConfigSource&, const std::string&,
                    Server::Configuration::TransportSocketFactoryContext&));
   MOCK_METHOD3(findOrCreateCertificateValidationContextProvider,
                CertificateValidationContextConfigProviderSharedPtr(
-                   const envoy::api::v2::core::ConfigSource& config_source,
+                   const envoy::api::v3alpha::core::ConfigSource& config_source,
                    const std::string& config_name,
                    Server::Configuration::TransportSocketFactoryContext& secret_provider_context));
   MOCK_METHOD3(findOrCreateTlsSessionTicketKeysContextProvider,
                TlsSessionTicketKeysConfigProviderSharedPtr(
-                   const envoy::api::v2::core::ConfigSource&, const std::string&,
+                   const envoy::api::v3alpha::core::ConfigSource&, const std::string&,
                    Server::Configuration::TransportSocketFactoryContext&));
 };
 

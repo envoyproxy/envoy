@@ -1,6 +1,6 @@
-#include "envoy/api/v2/core/grpc_service.pb.h"
-#include "envoy/config/filter/http/rate_limit/v2/rate_limit.pb.h"
-#include "envoy/config/filter/http/rate_limit/v2/rate_limit.pb.validate.h"
+#include "envoy/api/v3alpha/core/grpc_service.pb.h"
+#include "envoy/config/filter/http/rate_limit/v3alpha/rate_limit.pb.h"
+#include "envoy/config/filter/http/rate_limit/v3alpha/rate_limit.pb.validate.h"
 
 #include "extensions/filters/http/ratelimit/config.h"
 
@@ -20,7 +20,7 @@ namespace {
 TEST(RateLimitFilterConfigTest, ValidateFail) {
   NiceMock<Server::Configuration::MockFactoryContext> context;
   EXPECT_THROW(RateLimitFilterConfig().createFilterFactoryFromProto(
-                   envoy::config::filter::http::rate_limit::v2::RateLimit(), "stats", context),
+                   envoy::config::filter::http::rate_limit::v3alpha::RateLimit(), "stats", context),
                ProtoValidationException);
 }
 
@@ -34,13 +34,13 @@ TEST(RateLimitFilterConfigTest, RatelimitCorrectProto) {
         cluster_name: ratelimit_cluster
   )EOF";
 
-  envoy::config::filter::http::rate_limit::v2::RateLimit proto_config{};
+  envoy::config::filter::http::rate_limit::v3alpha::RateLimit proto_config{};
   TestUtility::loadFromYamlAndValidate(yaml, proto_config);
 
   NiceMock<Server::Configuration::MockFactoryContext> context;
 
   EXPECT_CALL(context.cluster_manager_.async_client_manager_, factoryForGrpcService(_, _, _))
-      .WillOnce(Invoke([](const envoy::api::v2::core::GrpcService&, Stats::Scope&, bool) {
+      .WillOnce(Invoke([](const envoy::api::v3alpha::core::GrpcService&, Stats::Scope&, bool) {
         return std::make_unique<NiceMock<Grpc::MockAsyncClientFactory>>();
       }));
 
@@ -57,8 +57,8 @@ TEST(RateLimitFilterConfigTest, RateLimitFilterEmptyProto) {
 
   RateLimitFilterConfig factory;
 
-  envoy::config::filter::http::rate_limit::v2::RateLimit empty_proto_config =
-      *dynamic_cast<envoy::config::filter::http::rate_limit::v2::RateLimit*>(
+  envoy::config::filter::http::rate_limit::v3alpha::RateLimit empty_proto_config =
+      *dynamic_cast<envoy::config::filter::http::rate_limit::v3alpha::RateLimit*>(
           factory.createEmptyConfigProto().get());
 
   EXPECT_THROW(factory.createFilterFactoryFromProto(empty_proto_config, "stats", context),
@@ -71,7 +71,7 @@ TEST(RateLimitFilterConfigTest, BadRateLimitFilterConfig) {
   route_key: my_route
   )EOF";
 
-  envoy::config::filter::http::rate_limit::v2::RateLimit proto_config{};
+  envoy::config::filter::http::rate_limit::v3alpha::RateLimit proto_config{};
   EXPECT_THROW_WITH_REGEX(TestUtility::loadFromYamlAndValidate(yaml, proto_config), EnvoyException,
                           "route_key: Cannot find field");
 }

@@ -5,7 +5,7 @@
 #include <vector>
 
 #include "envoy/api/api.h"
-#include "envoy/api/v2/cds.pb.h"
+#include "envoy/api/v3alpha/cds.pb.h"
 #include "envoy/http/codec.h"
 #include "envoy/upstream/cluster_manager.h"
 
@@ -23,7 +23,7 @@ namespace Envoy {
 
 class CustomStaticCluster : public Upstream::ClusterImplBase {
 public:
-  CustomStaticCluster(const envoy::api::v2::Cluster& cluster, Runtime::Loader& runtime,
+  CustomStaticCluster(const envoy::api::v3alpha::Cluster& cluster, Runtime::Loader& runtime,
                       Server::Configuration::TransportSocketFactoryContext& factory_context,
                       Stats::ScopePtr&& stats_scope, bool added_via_api, uint32_t priority,
                       std::string address, uint32_t port)
@@ -86,7 +86,7 @@ protected:
 private:
   std::pair<Upstream::ClusterImplBaseSharedPtr, Upstream::ThreadAwareLoadBalancerPtr>
   createClusterWithConfig(
-      const envoy::api::v2::Cluster& cluster,
+      const envoy::api::v3alpha::Cluster& cluster,
       const test::integration::clusters::CustomStaticConfig& proto_config,
       Upstream::ClusterFactoryContext& context,
       Server::Configuration::TransportSocketFactoryContext& socket_factory_context,

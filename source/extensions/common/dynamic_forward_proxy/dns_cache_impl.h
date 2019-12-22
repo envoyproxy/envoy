@@ -1,6 +1,6 @@
 #pragma once
 
-#include "envoy/config/common/dynamic_forward_proxy/v2alpha/dns_cache.pb.h"
+#include "envoy/config/common/dynamic_forward_proxy/v3alpha/dns_cache.pb.h"
 #include "envoy/network/dns.h"
 #include "envoy/thread_local/thread_local.h"
 
@@ -39,7 +39,7 @@ class DnsCacheImpl : public DnsCache, Logger::Loggable<Logger::Id::forward_proxy
 public:
   DnsCacheImpl(Event::Dispatcher& main_thread_dispatcher, ThreadLocal::SlotAllocator& tls,
                Stats::Scope& root_scope,
-               const envoy::config::common::dynamic_forward_proxy::v2alpha::DnsCacheConfig& config);
+               const envoy::config::common::dynamic_forward_proxy::v3alpha::DnsCacheConfig& config);
   ~DnsCacheImpl() override;
 
   // DnsCache

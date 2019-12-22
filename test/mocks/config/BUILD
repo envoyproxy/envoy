@@ -20,7 +20,7 @@ envoy_cc_mock(
         "//source/common/config:resources_lib",
         "//source/common/protobuf:utility_lib",
         "//test/test_common:utility_lib",
-        "@envoy_api//envoy/api/v2:pkg_cc_proto",
-        "@envoy_api//envoy/api/v2/core:pkg_cc_proto",
+        "@envoy_api//envoy/api/v3alpha:pkg_cc_proto",
+        "@envoy_api//envoy/api/v3alpha/core:pkg_cc_proto",
     ],
 )

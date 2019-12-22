@@ -1,7 +1,7 @@
 #include "common/upstream/transport_socket_match_impl.h"
 
-#include "envoy/api/v2/cds.pb.h"
-#include "envoy/api/v2/core/base.pb.h"
+#include "envoy/api/v3alpha/cds.pb.h"
+#include "envoy/api/v3alpha/core/base.pb.h"
 #include "envoy/server/transport_socket_config.h"
 
 #include "common/config/utility.h"
@@ -10,7 +10,8 @@ namespace Envoy {
 namespace Upstream {
 
 TransportSocketMatcherImpl::TransportSocketMatcherImpl(
-    const Protobuf::RepeatedPtrField<envoy::api::v2::Cluster_TransportSocketMatch>& socket_matches,
+    const Protobuf::RepeatedPtrField<envoy::api::v3alpha::Cluster::TransportSocketMatch>&
+        socket_matches,
     Server::Configuration::TransportSocketFactoryContext& factory_context,
     Network::TransportSocketFactoryPtr& default_factory, Stats::Scope& stats_scope)
     : stats_scope_(stats_scope),
@@ -36,7 +37,7 @@ TransportSocketMatchStats TransportSocketMatcherImpl::generateStats(const std::s
 }
 
 TransportSocketMatcher::MatchData
-TransportSocketMatcherImpl::resolve(const envoy::api::v2::core::Metadata& metadata) const {
+TransportSocketMatcherImpl::resolve(const envoy::api::v3alpha::core::Metadata& metadata) const {
   for (const auto& match : matches_) {
     if (Config::Metadata::metadataLabelMatch(
             match.label_set, metadata,

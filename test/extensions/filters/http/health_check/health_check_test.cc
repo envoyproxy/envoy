@@ -1,7 +1,7 @@
 #include <chrono>
 #include <memory>
 
-#include "envoy/api/v2/route/route.pb.h"
+#include "envoy/api/v3alpha/route/route.pb.h"
 
 #include "common/buffer/buffer_impl.h"
 #include "common/http/header_utility.h"
@@ -47,7 +47,7 @@ public:
       bool pass_through,
       ClusterMinHealthyPercentagesConstSharedPtr cluster_min_healthy_percentages = nullptr) {
     header_data_ = std::make_shared<std::vector<Http::HeaderUtility::HeaderDataPtr>>();
-    envoy::api::v2::route::HeaderMatcher matcher;
+    envoy::api::v3alpha::route::HeaderMatcher matcher;
     matcher.set_name(":path");
     matcher.set_exact_match("/healthcheck");
     header_data_->emplace_back(std::make_unique<Http::HeaderUtility::HeaderData>(matcher));

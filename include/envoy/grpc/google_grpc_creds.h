@@ -3,7 +3,7 @@
 #include <memory>
 
 #include "envoy/api/api.h"
-#include "envoy/api/v2/core/grpc_service.pb.h"
+#include "envoy/api/v3alpha/core/grpc_service.pb.h"
 #include "envoy/common/pure.h"
 
 #include "grpcpp/grpcpp.h"
@@ -31,7 +31,7 @@ public:
    * channel.
    */
   virtual std::shared_ptr<grpc::ChannelCredentials>
-  getChannelCredentials(const envoy::api::v2::core::GrpcService& grpc_service_config,
+  getChannelCredentials(const envoy::api::v3alpha::core::GrpcService& grpc_service_config,
                         Api::Api& api) PURE;
 
   /**

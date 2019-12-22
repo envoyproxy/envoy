@@ -2,7 +2,7 @@
 
 #include <functional>
 
-#include "envoy/api/v2/auth/cert.pb.h"
+#include "envoy/api/v3alpha/auth/cert.pb.h"
 #include "envoy/common/callback.h"
 #include "envoy/common/pure.h"
 #include "envoy/ssl/certificate_validation_context_config.h"
@@ -43,21 +43,21 @@ public:
   virtual Common::CallbackHandle* addUpdateCallback(std::function<void()> callback) PURE;
 };
 
-using TlsCertificatePtr = std::unique_ptr<envoy::api::v2::auth::TlsCertificate>;
+using TlsCertificatePtr = std::unique_ptr<envoy::api::v3alpha::auth::TlsCertificate>;
 using CertificateValidationContextPtr =
-    std::unique_ptr<envoy::api::v2::auth::CertificateValidationContext>;
-using TlsSessionTicketKeysPtr = std::unique_ptr<envoy::api::v2::auth::TlsSessionTicketKeys>;
+    std::unique_ptr<envoy::api::v3alpha::auth::CertificateValidationContext>;
+using TlsSessionTicketKeysPtr = std::unique_ptr<envoy::api::v3alpha::auth::TlsSessionTicketKeys>;
 
-using TlsCertificateConfigProvider = SecretProvider<envoy::api::v2::auth::TlsCertificate>;
+using TlsCertificateConfigProvider = SecretProvider<envoy::api::v3alpha::auth::TlsCertificate>;
 using TlsCertificateConfigProviderSharedPtr = std::shared_ptr<TlsCertificateConfigProvider>;
 
 using CertificateValidationContextConfigProvider =
-    SecretProvider<envoy::api::v2::auth::CertificateValidationContext>;
+    SecretProvider<envoy::api::v3alpha::auth::CertificateValidationContext>;
 using CertificateValidationContextConfigProviderSharedPtr =
     std::shared_ptr<CertificateValidationContextConfigProvider>;
 
 using TlsSessionTicketKeysConfigProvider =
-    SecretProvider<envoy::api::v2::auth::TlsSessionTicketKeys>;
+    SecretProvider<envoy::api::v3alpha::auth::TlsSessionTicketKeys>;
 using TlsSessionTicketKeysConfigProviderSharedPtr =
     std::shared_ptr<TlsSessionTicketKeysConfigProvider>;
 

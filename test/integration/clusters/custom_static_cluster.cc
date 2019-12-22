@@ -1,8 +1,8 @@
 #include "custom_static_cluster.h"
 
-#include "envoy/api/v2/core/base.pb.h"
-#include "envoy/api/v2/core/health_check.pb.h"
-#include "envoy/api/v2/endpoint/endpoint.pb.h"
+#include "envoy/api/v3alpha/core/base.pb.h"
+#include "envoy/api/v3alpha/core/health_check.pb.h"
+#include "envoy/api/v3alpha/endpoint/endpoint.pb.h"
 
 namespace Envoy {
 
@@ -24,9 +24,9 @@ Upstream::HostSharedPtr CustomStaticCluster::makeHost() {
       Network::Utility::parseInternetAddress(address_, port_, true);
   return Upstream::HostSharedPtr{new Upstream::HostImpl(
       info(), "", address, info()->metadata(), 1,
-      envoy::api::v2::core::Locality::default_instance(),
-      envoy::api::v2::endpoint::Endpoint::HealthCheckConfig::default_instance(), priority_,
-      envoy::api::v2::core::HealthStatus::UNKNOWN)};
+      envoy::api::v3alpha::core::Locality::default_instance(),
+      envoy::api::v3alpha::endpoint::Endpoint::HealthCheckConfig::default_instance(), priority_,
+      envoy::api::v3alpha::core::UNKNOWN)};
 }
 
 Upstream::ThreadAwareLoadBalancerPtr CustomStaticCluster::threadAwareLb() {

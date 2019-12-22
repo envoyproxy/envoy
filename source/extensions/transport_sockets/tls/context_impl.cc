@@ -5,7 +5,7 @@
 #include <string>
 #include <vector>
 
-#include "envoy/admin/v2alpha/certs.pb.h"
+#include "envoy/admin/v3alpha/certs.pb.h"
 #include "envoy/common/exception.h"
 #include "envoy/common/platform.h"
 #include "envoy/stats/scope.h"
@@ -723,7 +723,7 @@ std::vector<Envoy::Ssl::CertificateDetailsPtr> ContextImpl::getCertChainInformat
 Envoy::Ssl::CertificateDetailsPtr ContextImpl::certificateDetails(X509* cert,
                                                                   const std::string& path) const {
   Envoy::Ssl::CertificateDetailsPtr certificate_details =
-      std::make_unique<envoy::admin::v2alpha::CertificateDetails>();
+      std::make_unique<envoy::admin::v3alpha::CertificateDetails>();
   certificate_details->set_path(path);
   certificate_details->set_serial_number(Utility::getSerialNumberFromCertificate(*cert));
   certificate_details->set_days_until_expiration(
@@ -734,12 +734,12 @@ Envoy::Ssl::CertificateDetailsPtr ContextImpl::certificateDetails(X509* cert,
   TimestampUtil::systemClockToTimestamp(Utility::getExpirationTime(*cert), *expiration_time);
 
   for (auto& dns_san : Utility::getSubjectAltNames(*cert, GEN_DNS)) {
-    envoy::admin::v2alpha::SubjectAlternateName& subject_alt_name =
+    envoy::admin::v3alpha::SubjectAlternateName& subject_alt_name =
         *certificate_details->add_subject_alt_names();
     subject_alt_name.set_dns(dns_san);
   }
   for (auto& uri_san : Utility::getSubjectAltNames(*cert, GEN_URI)) {
-    envoy::admin::v2alpha::SubjectAlternateName& subject_alt_name =
+    envoy::admin::v3alpha::SubjectAlternateName& subject_alt_name =
         *certificate_details->add_subject_alt_names();
     subject_alt_name.set_uri(uri_san);
   }

@@ -1,6 +1,6 @@
 #pragma once
 
-#include "envoy/api/v2/core/http_uri.pb.h"
+#include "envoy/api/v3alpha/core/http_uri.pb.h"
 #include "envoy/common/pure.h"
 #include "envoy/upstream/cluster_manager.h"
 
@@ -61,7 +61,7 @@ public:
    * @param parent_span the active span to create children under
    * @param receiver the receiver of the fetched JWKS or error.
    */
-  virtual void fetch(const ::envoy::api::v2::core::HttpUri& uri, Tracing::Span& parent_span,
+  virtual void fetch(const envoy::api::v3alpha::core::HttpUri& uri, Tracing::Span& parent_span,
                      JwksReceiver& receiver) PURE;
 
   /*

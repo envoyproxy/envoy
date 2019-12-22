@@ -1,7 +1,7 @@
 #pragma once
 
-#include "envoy/config/filter/http/dynamic_forward_proxy/v2alpha/dynamic_forward_proxy.pb.h"
-#include "envoy/config/filter/http/dynamic_forward_proxy/v2alpha/dynamic_forward_proxy.pb.validate.h"
+#include "envoy/config/filter/http/dynamic_forward_proxy/v3alpha/dynamic_forward_proxy.pb.h"
+#include "envoy/config/filter/http/dynamic_forward_proxy/v3alpha/dynamic_forward_proxy.pb.validate.h"
 
 #include "extensions/filters/http/common/factory_base.h"
 #include "extensions/filters/http/well_known_names.h"
@@ -16,17 +16,17 @@ namespace DynamicForwardProxy {
  */
 class DynamicForwardProxyFilterFactory
     : public Common::FactoryBase<
-          envoy::config::filter::http::dynamic_forward_proxy::v2alpha::FilterConfig,
-          envoy::config::filter::http::dynamic_forward_proxy::v2alpha::PerRouteConfig> {
+          envoy::config::filter::http::dynamic_forward_proxy::v3alpha::FilterConfig,
+          envoy::config::filter::http::dynamic_forward_proxy::v3alpha::PerRouteConfig> {
 public:
   DynamicForwardProxyFilterFactory() : FactoryBase(HttpFilterNames::get().DynamicForwardProxy) {}
 
 private:
   Http::FilterFactoryCb createFilterFactoryFromProtoTyped(
-      const envoy::config::filter::http::dynamic_forward_proxy::v2alpha::FilterConfig& proto_config,
+      const envoy::config::filter::http::dynamic_forward_proxy::v3alpha::FilterConfig& proto_config,
       const std::string& stats_prefix, Server::Configuration::FactoryContext& context) override;
   Router::RouteSpecificFilterConfigConstSharedPtr createRouteSpecificFilterConfigTyped(
-      const envoy::config::filter::http::dynamic_forward_proxy::v2alpha::PerRouteConfig& config,
+      const envoy::config::filter::http::dynamic_forward_proxy::v3alpha::PerRouteConfig& config,
       Server::Configuration::ServerFactoryContext&, ProtobufMessage::ValidationVisitor&) override;
 };
 

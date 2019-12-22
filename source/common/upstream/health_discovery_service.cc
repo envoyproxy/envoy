@@ -1,11 +1,11 @@
 #include "common/upstream/health_discovery_service.h"
 
-#include "envoy/api/v2/cds.pb.h"
-#include "envoy/api/v2/core/address.pb.h"
-#include "envoy/api/v2/core/base.pb.h"
-#include "envoy/api/v2/core/health_check.pb.h"
-#include "envoy/api/v2/endpoint/endpoint.pb.h"
-#include "envoy/service/discovery/v2/hds.pb.h"
+#include "envoy/api/v3alpha/cds.pb.h"
+#include "envoy/api/v3alpha/core/address.pb.h"
+#include "envoy/api/v3alpha/core/base.pb.h"
+#include "envoy/api/v3alpha/core/health_check.pb.h"
+#include "envoy/api/v3alpha/endpoint/endpoint.pb.h"
+#include "envoy/service/discovery/v3alpha/hds.pb.h"
 #include "envoy/stats/scope.h"
 
 #include "common/protobuf/protobuf.h"
@@ -49,10 +49,10 @@ HdsDelegate::HdsDelegate(Stats::Scope& scope, Grpc::RawAsyncClientPtr async_clie
   // TODO(lilika): Add support for other types of healthchecks
   health_check_request_.mutable_health_check_request()
       ->mutable_capability()
-      ->add_health_check_protocols(envoy::service::discovery::v2::Capability::HTTP);
+      ->add_health_check_protocols(envoy::service::discovery::v3alpha::Capability::HTTP);
   health_check_request_.mutable_health_check_request()
       ->mutable_capability()
-      ->add_health_check_protocols(envoy::service::discovery::v2::Capability::TCP);
+      ->add_health_check_protocols(envoy::service::discovery::v3alpha::Capability::TCP);
 
   establishNewStream();
 }
@@ -89,9 +89,9 @@ void HdsDelegate::handleFailure() {
 }
 
 // TODO(lilika): Add support for the same endpoint in different clusters/ports
-envoy::service::discovery::v2::HealthCheckRequestOrEndpointHealthResponse
+envoy::service::discovery::v3alpha::HealthCheckRequestOrEndpointHealthResponse
 HdsDelegate::sendResponse() {
-  envoy::service::discovery::v2::HealthCheckRequestOrEndpointHealthResponse response;
+  envoy::service::discovery::v3alpha::HealthCheckRequestOrEndpointHealthResponse response;
   for (const auto& cluster : hds_clusters_) {
     for (const auto& hosts : cluster->prioritySet().hostSetsPerPriority()) {
       for (const auto& host : hosts->hosts()) {
@@ -100,15 +100,15 @@ HdsDelegate::sendResponse() {
             *host->address(), *endpoint->mutable_endpoint()->mutable_address());
         // TODO(lilika): Add support for more granular options of envoy::api::v2::core::HealthStatus
         if (host->health() == Host::Health::Healthy) {
-          endpoint->set_health_status(envoy::api::v2::core::HealthStatus::HEALTHY);
+          endpoint->set_health_status(envoy::api::v3alpha::core::HEALTHY);
         } else {
           if (host->getActiveHealthFailureType() == Host::ActiveHealthFailureType::TIMEOUT) {
-            endpoint->set_health_status(envoy::api::v2::core::HealthStatus::TIMEOUT);
+            endpoint->set_health_status(envoy::api::v3alpha::core::TIMEOUT);
           } else if (host->getActiveHealthFailureType() ==
                      Host::ActiveHealthFailureType::UNHEALTHY) {
-            endpoint->set_health_status(envoy::api::v2::core::HealthStatus::UNHEALTHY);
+            endpoint->set_health_status(envoy::api::v3alpha::core::UNHEALTHY);
           } else if (host->getActiveHealthFailureType() == Host::ActiveHealthFailureType::UNKNOWN) {
-            endpoint->set_health_status(envoy::api::v2::core::HealthStatus::UNHEALTHY);
+            endpoint->set_health_status(envoy::api::v3alpha::core::UNHEALTHY);
           } else {
             NOT_REACHED_GCOVR_EXCL_LINE;
           }
@@ -132,14 +132,14 @@ void HdsDelegate::onReceiveInitialMetadata(Http::HeaderMapPtr&& metadata) {
 }
 
 void HdsDelegate::processMessage(
-    std::unique_ptr<envoy::service::discovery::v2::HealthCheckSpecifier>&& message) {
+    std::unique_ptr<envoy::service::discovery::v3alpha::HealthCheckSpecifier>&& message) {
   ENVOY_LOG(debug, "New health check response message {} ", message->DebugString());
   ASSERT(message);
 
   for (const auto& cluster_health_check : message->cluster_health_checks()) {
     // Create HdsCluster config
-    static const envoy::api::v2::core::BindConfig bind_config;
-    envoy::api::v2::Cluster cluster_config;
+    static const envoy::api::v3alpha::core::BindConfig bind_config;
+    envoy::api::v3alpha::Cluster cluster_config;
 
     cluster_config.set_name(cluster_health_check.cluster_name());
     cluster_config.mutable_connect_timeout()->set_seconds(ClusterTimeoutSeconds);
@@ -176,7 +176,7 @@ void HdsDelegate::processMessage(
 // TODO(lilika): Add support for subsequent HealthCheckSpecifier messages that
 // might modify the HdsClusters
 void HdsDelegate::onReceiveMessage(
-    std::unique_ptr<envoy::service::discovery::v2::HealthCheckSpecifier>&& message) {
+    std::unique_ptr<envoy::service::discovery::v3alpha::HealthCheckSpecifier>&& message) {
   stats_.requests_.inc();
   ENVOY_LOG(debug, "New health check response message {} ", message->DebugString());
 
@@ -208,10 +208,10 @@ void HdsDelegate::onRemoteClose(Grpc::Status::GrpcStatus status, const std::stri
 }
 
 HdsCluster::HdsCluster(Server::Admin& admin, Runtime::Loader& runtime,
-                       const envoy::api::v2::Cluster& cluster,
-                       const envoy::api::v2::core::BindConfig& bind_config, Stats::Store& stats,
-                       Ssl::ContextManager& ssl_context_manager, bool added_via_api,
-                       ClusterInfoFactory& info_factory, ClusterManager& cm,
+                       const envoy::api::v3alpha::Cluster& cluster,
+                       const envoy::api::v3alpha::core::BindConfig& bind_config,
+                       Stats::Store& stats, Ssl::ContextManager& ssl_context_manager,
+                       bool added_via_api, ClusterInfoFactory& info_factory, ClusterManager& cm,
                        const LocalInfo::LocalInfo& local_info, Event::Dispatcher& dispatcher,
                        Runtime::RandomGenerator& random, Singleton::Manager& singleton_manager,
                        ThreadLocal::SlotAllocator& tls,
@@ -227,12 +227,12 @@ HdsCluster::HdsCluster(Server::Admin& admin, Runtime::Loader& runtime,
        local_info, dispatcher, random, singleton_manager, tls, validation_visitor, api});
 
   for (const auto& host : cluster.hosts()) {
-    initial_hosts_->emplace_back(
-        new HostImpl(info_, "", Network::Address::resolveProtoAddress(host),
-                     envoy::api::v2::core::Metadata::default_instance(), 1,
-                     envoy::api::v2::core::Locality().default_instance(),
-                     envoy::api::v2::endpoint::Endpoint::HealthCheckConfig().default_instance(), 0,
-                     envoy::api::v2::core::HealthStatus::UNKNOWN));
+    initial_hosts_->emplace_back(new HostImpl(
+        info_, "", Network::Address::resolveProtoAddress(host),
+        envoy::api::v3alpha::core::Metadata::default_instance(), 1,
+        envoy::api::v3alpha::core::Locality().default_instance(),
+        envoy::api::v3alpha::endpoint::Endpoint::HealthCheckConfig().default_instance(), 0,
+        envoy::api::v3alpha::core::UNKNOWN));
   }
   initialize([] {});
 }
