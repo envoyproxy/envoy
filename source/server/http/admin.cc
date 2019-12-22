@@ -956,6 +956,35 @@ uint64_t PrometheusStatsFormatter::statsAsPrometheus(
     response.add(fmt::format("{0}_count{{{1}}} {2}\n", metric_name, tags, stats.sampleCount()));
   }
 
+  for (const auto& histogram : histograms) {
+    if (!shouldShowMetric(*histogram, used_only, regex)) {
+      continue;
+    }
+
+    const std::string tags = formattedTags(histogram->tags());
+    const std::string hist_tags = histogram->tags().empty() ? EMPTY_STRING : (tags + ",");
+
+    const std::string metric_name =
+        fmt::format("{0}_summary", metricName(histogram->tagExtractedName()));
+    if (metric_type_tracker.find(metric_name) == metric_type_tracker.end()) {
+      metric_type_tracker.insert(metric_name);
+      response.add(fmt::format("# TYPE {0} summary\n", metric_name));
+    }
+
+    const Stats::HistogramStatistics& stats = histogram->cumulativeStatistics();
+
+    const std::vector<double>& supported_quantiles = stats.supportedQuantiles();
+    const std::vector<double>& computed_quantiles = stats.computedQuantiles();
+    for (size_t i = 0; i < supported_quantiles.size(); ++i) {
+      double quantile = supported_quantiles[i];
+      double value = computed_quantiles[i];
+      response.add(
+          fmt::format("{0}{{{1}quantile=\"{2}\"}} {3}\n", metric_name, hist_tags, quantile, value))
+    }
+    response.add(fmt::format("{0}_sum{{{1}}} {2:.32g}\n", metric_name, tags, stats.sampleSum()));
+    response.add(fmt::format("{0}_count{{{1}}} {2}\n", metric_name, tags, stats.sampleCount()));
+  }
+
   return metric_type_tracker.size();
 }
 
