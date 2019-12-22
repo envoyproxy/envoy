@@ -35,8 +35,7 @@ XRayTracerFactory::createHttpTracerTyped(const trace::XRayConfig& proto_config,
     ENVOY_LOG(error, "Failed to read sampling rules manifest because of {}.", e.what());
   }
 
-  if (proto_config.daemon_endpoint().protocol() !=
-      api::core::SocketAddress::Protocol::SocketAddress_Protocol_UDP) {
+  if (proto_config.daemon_endpoint().protocol() != api::core::SocketAddress::UDP) {
     throw EnvoyException("X-Ray daemon endpoint must be a UDP socket address");
   }
 
