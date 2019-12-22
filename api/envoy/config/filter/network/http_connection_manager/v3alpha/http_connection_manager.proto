@@ -5,8 +5,8 @@ package envoy.config.filter.network.http_connection_manager.v3alpha;
 import "envoy/api/v3alpha/core/config_source.proto";
 import "envoy/api/v3alpha/core/protocol.proto";
 import "envoy/api/v3alpha/rds.proto";
-import "envoy/api/v3alpha/srds.proto";
 import "envoy/config/filter/accesslog/v3alpha/accesslog.proto";
+import "envoy/service/route/v3alpha/srds.proto";
 import "envoy/type/tracing/v2/custom_tag.proto";
 import "envoy/type/v3alpha/percent.proto";
 
@@ -495,7 +495,7 @@ message ScopedRouteConfigurationsList {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.network.http_connection_manager.v2.ScopedRouteConfigurationsList";
 
-  repeated api.v3alpha.ScopedRouteConfiguration scoped_route_configurations = 1
+  repeated service.route.v3alpha.ScopedRouteConfiguration scoped_route_configurations = 1
       [(validate.rules).repeated = {min_items: 1}];
 }
 
@@ -506,9 +506,10 @@ message ScopedRoutes {
 
   // Specifies the mechanism for constructing "scope keys" based on HTTP request attributes. These
   // keys are matched against a set of
-  // :ref:`Key<envoy_api_msg_api.v3alpha.ScopedRouteConfiguration.Key>` objects assembled from
-  // :ref:`ScopedRouteConfiguration<envoy_api_msg_api.v3alpha.ScopedRouteConfiguration>` messages
-  // distributed via SRDS (the Scoped Route Discovery Service) or assigned statically via
+  // :ref:`Key<envoy_api_msg_service.route.v3alpha.ScopedRouteConfiguration.Key>` objects assembled
+  // from
+  // :ref:`ScopedRouteConfiguration<envoy_api_msg_service.route.v3alpha.ScopedRouteConfiguration>`
+  // messages distributed via SRDS (the Scoped Route Discovery Service) or assigned statically via
   // :ref:`scoped_route_configurations_list<envoy_api_field_config.filter.network.http_connection_manager.v3alpha.ScopedRoutes.scoped_route_configurations_list>`.
   //
   // Upon receiving a request's headers, the Router will build a key using the algorithm specified
