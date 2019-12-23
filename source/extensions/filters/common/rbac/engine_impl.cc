@@ -12,8 +12,7 @@ namespace RBAC {
 
 RoleBasedAccessControlEngineImpl::RoleBasedAccessControlEngineImpl(
     const envoy::config::rbac::v2::RBAC& rules)
-    : allowed_if_matched_(rules.action() ==
-                          envoy::config::rbac::v2::RBAC_Action::RBAC_Action_ALLOW) {
+    : allowed_if_matched_(rules.action() == envoy::config::rbac::v2::RBAC::ALLOW) {
   // guard expression builder by presence of a condition in policies
   for (const auto& policy : rules.policies()) {
     if (policy.second.has_condition()) {

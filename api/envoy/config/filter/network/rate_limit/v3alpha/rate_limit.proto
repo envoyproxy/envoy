@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package envoy.config.filter.network.rate_limit.v3alpha;
 
-import "envoy/api/v3alpha/ratelimit/ratelimit.proto";
+import "envoy/config/ratelimit/v3alpha/ratelimit.proto";
 import "envoy/config/ratelimit/v3alpha/rls.proto";
 
 import "google/protobuf/duration.proto";
@@ -31,7 +31,7 @@ message RateLimit {
   string domain = 2 [(validate.rules).string = {min_bytes: 1}];
 
   // The rate limit descriptor list to use in the rate limit service request.
-  repeated api.v3alpha.ratelimit.RateLimitDescriptor descriptors = 3
+  repeated ratelimit.v3alpha.RateLimitDescriptor descriptors = 3
       [(validate.rules).repeated = {min_items: 1}];
 
   // The timeout in milliseconds for the rate limit service RPC. If not

@@ -19,6 +19,7 @@ py_binary(
     deps = [
         ":types_py_proto",
         "//tools/api_proto_plugin",
+        "@com_github_cncf_udpa//udpa/annotations:pkg_py_proto",
         "@com_google_protobuf//:protobuf_python",
     ],
 )
