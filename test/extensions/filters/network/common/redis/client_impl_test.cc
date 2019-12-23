@@ -281,10 +281,24 @@ TEST_F(RedisClientImplTest, BatchWithTimerCancelledByBufferFlush) {
   client_->close();
 }
 
+class ConfigEnableCommandStats : public Config {
+  bool disableOutlierEvents() const override { return false; }
+  std::chrono::milliseconds opTimeout() const override { return std::chrono::milliseconds(25); }
+  bool enableHashtagging() const override { return false; }
+  bool enableRedirection() const override { return false; }
+  unsigned int maxBufferSizeBeforeFlush() const override { return 0; }
+  std::chrono::milliseconds bufferFlushTimeoutInMs() const override {
+    return std::chrono::milliseconds(0);
+  }
+  ReadPolicy readPolicy() const override { return ReadPolicy::Master; }
+  uint32_t maxUpstreamUnknownConnections() const override { return 0; }
+  bool enableCommandStats() const override { return true; }
+};
+
 TEST_F(RedisClientImplTest, Basic) {
   InSequence s;
 
-  setup();
+  setup(std::make_unique<ConfigEnableCommandStats>());
 
   client_->initialize(auth_password_);
 
