@@ -112,6 +112,14 @@ public:
   }
 };
 
+// Serializes a number into a uint8_t array, and check that it de-serializes to
+// the same number. The serialized number is also returned, which can be
+// checked in unit tests, but ignored in fuzz tests.
+std::vector<uint8_t> serializeDeserializeNumber(uint64_t number);
+
+// Serializes a string into a MemBlock and then decodes it.
+void serializeDeserializeString(absl::string_view in);
+
 } // namespace TestUtil
 } // namespace Stats
 } // namespace Envoy

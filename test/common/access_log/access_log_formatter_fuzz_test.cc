@@ -12,10 +12,12 @@ DEFINE_PROTO_FUZZER(const test::common::access_log::TestCase& input) {
   try {
     std::vector<AccessLog::FormatterProviderPtr> formatters =
         AccessLog::AccessLogFormatParser::parse(input.format());
+    const auto& request_headers = Fuzz::fromHeaders(input.request_headers());
+    const auto& response_headers = Fuzz::fromHeaders(input.response_headers());
+    const auto& response_trailers = Fuzz::fromHeaders(input.response_trailers());
+    const auto& stream_info = Fuzz::fromStreamInfo(input.stream_info());
     for (const auto& it : formatters) {
-      it->format(
-          Fuzz::fromHeaders(input.request_headers()), Fuzz::fromHeaders(input.response_headers()),
-          Fuzz::fromHeaders(input.response_trailers()), Fuzz::fromStreamInfo(input.stream_info()));
+      it->format(request_headers, response_headers, response_trailers, stream_info);
     }
     ENVOY_LOG_MISC(trace, "Success");
   } catch (const EnvoyException& e) {

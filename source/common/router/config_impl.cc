@@ -159,7 +159,7 @@ CorsPolicyImpl::CorsPolicyImpl(const envoy::api::v2::route::CorsPolicy& config,
       loader_(loader), allow_methods_(config.allow_methods()),
       allow_headers_(config.allow_headers()), expose_headers_(config.expose_headers()),
       max_age_(config.max_age()),
-      legacy_enabled_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, enabled, true)),
+      legacy_enabled_(config.has_enabled() ? config.enabled().value() : true),
       has_filter_enabled_(config.has_filter_enabled()),
       has_shadow_enabled_(config.has_shadow_enabled()) {
   for (const auto& origin : config.allow_origin()) {

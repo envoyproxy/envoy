@@ -129,6 +129,7 @@ envoy_cc_fuzz_test(
     srcs = ["symbol_table_fuzz_test.cc"],
     corpus = "symbol_table_corpus",
     deps = [
+        ":stat_test_utility_lib",
         "//source/common/buffer:buffer_lib",
         "//source/common/common:assert_lib",
         "//source/common/decompressor:decompressor_lib",
