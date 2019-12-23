@@ -16,6 +16,8 @@ Version 1.13.0 (pending)
   <envoy_api_msg_config.filter.network.http_connection_manager.v2.HttpConnectionManager.Tracing>`
   has been deprecated in favor of the :ref:`custom_tags
   <envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.tracing.custom_tags>` field.
+* The `request_mirror_policy` field in :ref:`RouteMatch <envoy_api_msg_route.RouteAction>` has been deprecated in
+  favor of the `request_mirror_policies` field.
 
 
 Version 1.12.0 (October 31, 2019)
