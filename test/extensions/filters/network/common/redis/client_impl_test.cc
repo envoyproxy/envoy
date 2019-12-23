@@ -355,23 +355,23 @@ TEST_F(RedisClientImplTest, InitializedWithAuthPassword) {
 }
 
 TEST_F(RedisClientImplTest, InitializedWithPreferMasterReadPolicy) {
-  testInitializeReadPolicy(envoy::config::filter::network::redis_proxy::v2::
-                               RedisProxy_ConnPoolSettings_ReadPolicy_PREFER_MASTER);
+  testInitializeReadPolicy(
+      envoy::config::filter::network::redis_proxy::v2::RedisProxy::ConnPoolSettings::PREFER_MASTER);
 }
 
 TEST_F(RedisClientImplTest, InitializedWithReplicaReadPolicy) {
-  testInitializeReadPolicy(envoy::config::filter::network::redis_proxy::v2::
-                               RedisProxy_ConnPoolSettings_ReadPolicy_REPLICA);
+  testInitializeReadPolicy(
+      envoy::config::filter::network::redis_proxy::v2::RedisProxy::ConnPoolSettings::REPLICA);
 }
 
 TEST_F(RedisClientImplTest, InitializedWithPreferReplicaReadPolicy) {
-  testInitializeReadPolicy(envoy::config::filter::network::redis_proxy::v2::
-                               RedisProxy_ConnPoolSettings_ReadPolicy_PREFER_REPLICA);
+  testInitializeReadPolicy(envoy::config::filter::network::redis_proxy::v2::RedisProxy::
+                               ConnPoolSettings::PREFER_REPLICA);
 }
 
 TEST_F(RedisClientImplTest, InitializedWithAnyReadPolicy) {
   testInitializeReadPolicy(
-      envoy::config::filter::network::redis_proxy::v2::RedisProxy_ConnPoolSettings_ReadPolicy_ANY);
+      envoy::config::filter::network::redis_proxy::v2::RedisProxy::ConnPoolSettings::ANY);
 }
 
 TEST_F(RedisClientImplTest, Cancel) {
