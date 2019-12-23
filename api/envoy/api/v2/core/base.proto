@@ -213,7 +213,10 @@ message RetryPolicy {
   message RetryBackOff {
     // Specifies the base interval between retries. This parameter is required and must be greater
     // than zero. Values less than 1 ms are rounded up to 1 ms.
-    google.protobuf.Duration base_interval = 1 [(validate.rules).duration = {required: true gt {}}];
+    google.protobuf.Duration base_interval = 1 [(validate.rules).duration = {
+      required: true
+      gt {}
+    }];
 
     // Specifies the maximum interval between retries. This parameter is optional, but must be
     // greater than or equal to the `base_interval` if set. The default is 10 times the
