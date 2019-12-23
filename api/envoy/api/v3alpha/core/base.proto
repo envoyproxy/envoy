@@ -233,7 +233,12 @@ message DataSource {
 
 // The message specifies the retry policy of remote data source when fetching fails.
 message RetryPolicy {
+  option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.core.RetryPolicy";
+
   message RetryBackOff {
+    option (udpa.annotations.versioning).previous_message_type =
+        "envoy.api.v2.core.RetryPolicy.RetryBackOff";
+
     // Specifies the base interval between retries. This parameter is required and must be greater
     // than zero. Values less than 1 ms are rounded up to 1 ms.
     google.protobuf.Duration base_interval = 1 [(validate.rules).duration = {
