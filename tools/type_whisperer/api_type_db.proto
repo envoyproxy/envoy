@@ -27,15 +27,7 @@ message TypeDb {
   // Map from fully qualified type name to description.
   map<string, TypeDbDescription> types = 1;
 
-  // Map from fully qualified package to the package's name in the next major
-  // version of the API.
-  // map<string, string> next_version_packages = 2;
-
   // Map from .proto path to the proto's path in the next major version of the
   // API.
-  // map<string, string> next_version_proto_paths = 3;
-
-  // Map from .proto path to the proto's path in the next major version of the
-  // API.
-  map<string, NextVersionFileDescription> next_version_protos = 4;
+  map<string, NextVersionFileDescription> next_version_protos = 2;
 }
