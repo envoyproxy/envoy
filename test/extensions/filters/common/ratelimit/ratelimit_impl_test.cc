@@ -82,7 +82,7 @@ TEST_F(RateLimitGrpcClientTest, Basic) {
     EXPECT_EQ(nullptr, headers.RequestId());
 
     response = std::make_unique<envoy::service::ratelimit::v2::RateLimitResponse>();
-    response->set_overall_code(envoy::service::ratelimit::v2::RateLimitResponse_Code_OVER_LIMIT);
+    response->set_overall_code(envoy::service::ratelimit::v2::RateLimitResponse::OVER_LIMIT);
     EXPECT_CALL(span_, setTag(Eq("ratelimit_status"), Eq("over_limit")));
     EXPECT_CALL(request_callbacks_, complete_(LimitStatus::OverLimit, _, _));
     client_.onSuccess(std::move(response), span_);
@@ -101,7 +101,7 @@ TEST_F(RateLimitGrpcClientTest, Basic) {
     client_.onCreateInitialMetadata(headers);
 
     response = std::make_unique<envoy::service::ratelimit::v2::RateLimitResponse>();
-    response->set_overall_code(envoy::service::ratelimit::v2::RateLimitResponse_Code_OK);
+    response->set_overall_code(envoy::service::ratelimit::v2::RateLimitResponse::OK);
     EXPECT_CALL(span_, setTag(Eq("ratelimit_status"), Eq("ok")));
     EXPECT_CALL(request_callbacks_, complete_(LimitStatus::OK, _, _));
     client_.onSuccess(std::move(response), span_);

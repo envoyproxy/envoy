@@ -291,6 +291,8 @@ elif [[ "$CI_TARGET" == "bazel.fuzzit" ]]; then
 elif [[ "$CI_TARGET" == "fix_format" ]]; then
   # proto_format.sh needs to build protobuf.
   setup_clang_toolchain
+  echo "protoxform_test..."
+  ./tools/protoxform_test.sh
   echo "fix_format..."
   ./tools/check_format.py fix
   ./tools/format_python_tools.sh fix

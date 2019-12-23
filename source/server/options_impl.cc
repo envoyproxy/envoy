@@ -236,7 +236,9 @@ OptionsImpl::OptionsImpl(std::vector<std::string> args,
     throw NoServingException();
   }
 
-  disabled_extensions_ = absl::StrSplit(disable_extensions.getValue(), ",");
+  if (!disable_extensions.getValue().empty()) {
+    disabled_extensions_ = absl::StrSplit(disable_extensions.getValue(), ",");
+  }
 }
 
 void OptionsImpl::parseComponentLogLevels(const std::string& component_log_levels) {
