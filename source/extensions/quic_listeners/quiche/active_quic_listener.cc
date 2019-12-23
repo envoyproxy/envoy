@@ -124,6 +124,17 @@ ActiveQuicListenerFactory::createActiveUdpListener(Network::ConnectionHandler& p
                                                    Network::ListenerConfig& config) {
   std::unique_ptr<Network::Socket::Options> options = std::make_unique<Network::Socket::Options>();
 #ifdef SO_ATTACH_REUSEPORT_CBPF
+  // This BPF filter reads the 1st word of QUIC connection id in the UDP payload and mod it by the
+  // number of workers to get the socket index in the SO_REUSEPORT socket groups. QUIC packets
+  // should be at least 9 bytes, with the 1st byte indicates one of the below QUIC packet headers:
+  // 1) IETF QUIC long header: most significant bit is 1. The connection id starts from the 7th
+  // byte.
+  // 2) IETF QUIC short header: most significant bit is 0. The connection id starts from 2nd
+  // bytes.
+  // 3) Google QUIC header: most significant bit is 0. The connection id starts from 2nd
+  // bytes.
+  // Any packet that doesn't belong to any of the three packet header types are dispatched
+  // based on 5-tuple source/destination addresses.
   std::vector<sock_filter> filter = {
       {0x80, 0, 0, 0000000000}, //                   ld len
       {0x35, 0, 9, 0x00000009}, //                   jlt #0x9, packet_too_short
@@ -132,7 +143,7 @@ ActiveQuicListenerFactory::createActiveUdpListener(Network::ConnectionHandler& p
       {0x15, 0, 2, 0000000000}, //                   jne #0, ietf_long_header
       {0x20, 0, 0, 0x00000001}, //                   ld [1]
       {0x05, 0, 0, 0x00000005}, //                   ja return
-      {0x80, 0, 0, 0000000000}, //                   ietf_long_header: ld len
+      {0x80, 0, 0, 0000000000}, // ietf_long_header: ld len
       {0x35, 0, 2, 0x0000000e}, //                   jlt #0xe, packet_too_short
       {0x20, 0, 0, 0x00000006}, //                   ld [6]
       {0x05, 0, 0, 0x00000001}, //                   ja return
@@ -142,6 +153,8 @@ ActiveQuicListenerFactory::createActiveUdpListener(Network::ConnectionHandler& p
       {0x16, 0, 0, 0000000000},   //                 ret a
   };
   sock_fprog prog;
+  // This option only needs to be applied once to any one of the sockets in SO_REUSEPORT socket
+  // group. One of the listener will be created with this socket option.
   absl::call_once(install_bpf_once_, [&]() {
     if (concurrency_ > 1) {
       prog.len = filter.size();

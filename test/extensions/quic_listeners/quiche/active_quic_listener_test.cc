@@ -46,13 +46,7 @@ class ActiveQuicListenerTest : public testing::TestWithParam<Network::Address::I
 public:
   ActiveQuicListenerTest()
       : version_(GetParam()), api_(Api::createApiForTest(simulated_time_system_)),
-        dispatcher_(api_->allocateDispatcher()), read_filter_(new Network::MockReadFilter()),
-        filter_factory_({[this](Network::FilterManager& filter_manager) {
-          filter_manager.addReadFilter(read_filter_);
-          read_filter_->callbacks_->connection().addConnectionCallbacks(
-              network_connection_callbacks_);
-        }}),
-        connection_handler_(*dispatcher_, "test_thread") {}
+        dispatcher_(api_->allocateDispatcher()), connection_handler_(*dispatcher_, "test_thread") {}
 
   void SetUp() override {
     listen_socket_ = std::make_shared<Network::UdpListenSocket>(
@@ -64,7 +58,6 @@ public:
         Network::Test::getCanonicalLoopbackAddress(version_), nullptr, /*bind*/ false);
     ON_CALL(listener_config_, filterChainManager()).WillByDefault(ReturnRef(filter_chain_manager_));
     ON_CALL(filter_chain_manager_, findFilterChain(_)).WillByDefault(Return(&filter_chain_));
-    ON_CALL(filter_chain_, networkFilterFactories()).WillByDefault(ReturnRef(filter_factory_));
     ON_CALL(listener_config_.filter_chain_factory_, createNetworkFilterChain(_, _))
         .WillByDefault(Invoke([](Network::Connection& connection,
                                  const std::vector<Network::FilterFactoryCb>& filter_factories) {
@@ -91,9 +84,7 @@ protected:
   Event::DispatcherPtr dispatcher_;
   Network::SocketSharedPtr listen_socket_;
   Network::SocketPtr client_socket_;
-  std::shared_ptr<Network::MockReadFilter> read_filter_;
   Network::MockConnectionCallbacks network_connection_callbacks_;
-  std::vector<Network::FilterFactoryCb> filter_factory_;
   Network::MockFilterChain filter_chain_;
   Network::MockFilterChainManager filter_chain_manager_;
   NiceMock<Network::MockListenerConfig> listener_config_;
@@ -106,7 +97,26 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, ActiveQuicListenerTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
 
+TEST_P(ActiveQuicListenerTest, FailSocketOptionUponCreation) {
+  auto option = std::make_unique<Network::MockSocketOption>();
+  EXPECT_CALL(*option, setOption(_, envoy::api::v2::core::SocketOption::STATE_BOUND))
+      .WillOnce(Return(false));
+  auto options = std::make_shared<std::vector<Network::Socket::OptionConstSharedPtr>>();
+  options->emplace_back(std::move(option));
+  EXPECT_THROW_WITH_REGEX(std::make_unique<ActiveQuicListener>(*dispatcher_, connection_handler_,
+                                                               listen_socket_, listener_config_,
+                                                               quic_config_, options),
+                          EnvoyException, "Fail to apply socket options.");
+}
+
 TEST_P(ActiveQuicListenerTest, ReceiveFullQuicCHLO) {
+  auto read_filter = std::make_shared<Network::MockReadFilter>();
+  std::vector<Network::FilterFactoryCb> filter_factory{
+      [this, &read_filter](Network::FilterManager& filter_manager) {
+        filter_manager.addReadFilter(read_filter);
+        read_filter->callbacks_->connection().addConnectionCallbacks(network_connection_callbacks_);
+      }};
+
   quic::QuicConnectionId connection_id = quic::test::TestConnectionId(1);
   EnvoyQuicClock clock(*dispatcher_);
   quic::CryptoHandshakeMessage chlo = quic::test::crypto_test_utils::GenerateDefaultInchoateCHLO(
@@ -143,10 +153,10 @@ TEST_P(ActiveQuicListenerTest, ReceiveFullQuicCHLO) {
 
   EXPECT_CALL(listener_config_, filterChainManager());
   EXPECT_CALL(filter_chain_manager_, findFilterChain(_));
-  EXPECT_CALL(filter_chain_, networkFilterFactories());
+  EXPECT_CALL(filter_chain_, networkFilterFactories()).WillOnce(ReturnRef(filter_factory));
   EXPECT_CALL(listener_config_, filterChainFactory());
   EXPECT_CALL(listener_config_.filter_chain_factory_, createNetworkFilterChain(_, _));
-  EXPECT_CALL(*read_filter_, onNewConnection())
+  EXPECT_CALL(*read_filter, onNewConnection())
       // Stop iteration to avoid calling getRead/WriteBuffer().
       .WillOnce(Invoke([this]() {
         dispatcher_->exit();

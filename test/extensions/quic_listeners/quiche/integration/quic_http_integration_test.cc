@@ -302,12 +302,12 @@ TEST_P(QuicHttpIntegrationTest, ConnectionMigration) {
 
   codec_client_->sendData(*request_encoder_, 1024u, false);
 
-  // Change to a new port, and connection should still continue.
+  // Change to a new port by switching socket, and connection should still continue.
   Network::Address::InstanceConstSharedPtr local_addr =
       Network::Test::getCanonicalLoopbackAddress(version_);
-  std::cerr << "Switch socket and send the rest data\n";
   quic_connection_->switchConnectionSocket(
       createConnectionSocket(server_addr_, local_addr, nullptr));
+  // Send the rest data.
   codec_client_->sendData(*request_encoder_, 1024u, true);
   waitForNextUpstreamRequest(0, TestUtility::DefaultTimeout);
   // Send response headers, and end_stream if there is no response body.
