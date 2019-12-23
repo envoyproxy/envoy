@@ -8,6 +8,8 @@ option java_package = "io.envoyproxy.envoy.config.wasm.v3alpha";
 
 import "envoy/api/v3alpha/core/base.proto";
 
+import "google/protobuf/any.proto";
+
 import "validate/validate.proto";
 
 // [#protodoc-title: Wasm service]
@@ -21,7 +23,7 @@ message VmConfig {
   string vm_id = 1;
 
   // The Wasm runtime type (either "v8" or "null" for code compiled into Envoy).
-  string runtime = 2 {validate.rules).string = {min_bytes: 1}};
+  string runtime = 2 [(validate.rules).string = {min_bytes: 1}];
 
   // The Wasm code that Envoy will execute.
   api.v3alpha.core.AsyncDataSource code = 3;
