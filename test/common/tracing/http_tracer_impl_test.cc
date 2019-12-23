@@ -2,6 +2,9 @@
 #include <memory>
 #include <string>
 
+#include "envoy/api/v2/core/base.pb.h"
+#include "envoy/type/tracing/v2/custom_tag.pb.h"
+
 #include "common/common/base64.h"
 #include "common/http/header_map_impl.h"
 #include "common/http/headers.h"

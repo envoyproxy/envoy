@@ -2,6 +2,9 @@
 #include <cstdint>
 #include <string>
 
+#include "envoy/api/v2/core/base.pb.h"
+#include "envoy/type/percent.pb.h"
+
 #include "common/buffer/buffer_impl.h"
 #include "common/common/empty_string.h"
 #include "common/config/metadata.h"
@@ -4372,7 +4375,7 @@ public:
     EXPECT_CALL(stream_, addCallbacks(_)).WillOnce(Invoke([&](Http::StreamCallbacks& callbacks) {
       stream_callbacks_ = &callbacks;
     }));
-    EXPECT_CALL(encoder_, getStream()).WillOnce(ReturnRef(stream_));
+    EXPECT_CALL(encoder_, getStream()).WillRepeatedly(ReturnRef(stream_));
     EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
         .WillOnce(Invoke(
             [&](Http::StreamDecoder& decoder,

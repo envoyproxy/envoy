@@ -5,7 +5,9 @@
 #include <string>
 #include <vector>
 
+#include "envoy/api/v2/core/grpc_service.pb.h"
 #include "envoy/api/v2/ratelimit/ratelimit.pb.h"
+#include "envoy/service/ratelimit/v2/rls.pb.h"
 #include "envoy/stats/scope.h"
 
 #include "common/common/assert.h"
@@ -64,9 +66,8 @@ void GrpcClientImpl::onSuccess(
     std::unique_ptr<envoy::service::ratelimit::v2::RateLimitResponse>&& response,
     Tracing::Span& span) {
   LimitStatus status = LimitStatus::OK;
-  ASSERT(response->overall_code() != envoy::service::ratelimit::v2::RateLimitResponse_Code_UNKNOWN);
-  if (response->overall_code() ==
-      envoy::service::ratelimit::v2::RateLimitResponse_Code_OVER_LIMIT) {
+  ASSERT(response->overall_code() != envoy::service::ratelimit::v2::RateLimitResponse::UNKNOWN);
+  if (response->overall_code() == envoy::service::ratelimit::v2::RateLimitResponse::OVER_LIMIT) {
     status = LimitStatus::OverLimit;
     span.setTag(Constants::get().TraceStatus, Constants::get().TraceOverLimit);
   } else {

@@ -1,3 +1,5 @@
+#include "envoy/config/cluster/redis/redis_cluster.pb.validate.h"
+#include "envoy/config/filter/network/redis_proxy/v2/redis_proxy.pb.validate.h"
 #include "envoy/upstream/upstream.h"
 
 #include "source/extensions/clusters/redis/redis_cluster.h"

@@ -1,3 +1,5 @@
+#include "envoy/api/v2/core/base.pb.h"
+#include "envoy/config/rbac/v2/rbac.pb.h"
 #include "envoy/config/rbac/v2/rbac.pb.validate.h"
 
 #include "common/network/utility.h"
@@ -34,10 +36,10 @@ void checkEngine(const RBAC::RoleBasedAccessControlEngineImpl& engine, bool expe
 
 TEST(RoleBasedAccessControlEngineImpl, Disabled) {
   envoy::config::rbac::v2::RBAC rbac;
-  rbac.set_action(envoy::config::rbac::v2::RBAC_Action::RBAC_Action_ALLOW);
+  rbac.set_action(envoy::config::rbac::v2::RBAC::ALLOW);
   checkEngine(RBAC::RoleBasedAccessControlEngineImpl(rbac), false);
 
-  rbac.set_action(envoy::config::rbac::v2::RBAC_Action::RBAC_Action_DENY);
+  rbac.set_action(envoy::config::rbac::v2::RBAC::DENY);
   checkEngine(RBAC::RoleBasedAccessControlEngineImpl(rbac), true);
 }
 
@@ -46,7 +48,7 @@ TEST(RoleBasedAccessControlEngineImpl, Disabled) {
 TEST(RoleBasedAccessControlEngineImpl, InvalidConfig) {
   {
     envoy::config::rbac::v2::RBAC rbac;
-    rbac.set_action(envoy::config::rbac::v2::RBAC_Action::RBAC_Action_ALLOW);
+    rbac.set_action(envoy::config::rbac::v2::RBAC::ALLOW);
     envoy::config::rbac::v2::Policy policy;
     (*rbac.mutable_policies())["foo"] = policy;
 
@@ -57,7 +59,7 @@ TEST(RoleBasedAccessControlEngineImpl, InvalidConfig) {
 
   {
     envoy::config::rbac::v2::RBAC rbac;
-    rbac.set_action(envoy::config::rbac::v2::RBAC_Action::RBAC_Action_ALLOW);
+    rbac.set_action(envoy::config::rbac::v2::RBAC::ALLOW);
     envoy::config::rbac::v2::Policy policy;
     policy.add_permissions();
     (*rbac.mutable_policies())["foo"] = policy;
@@ -69,7 +71,7 @@ TEST(RoleBasedAccessControlEngineImpl, InvalidConfig) {
 
   {
     envoy::config::rbac::v2::RBAC rbac;
-    rbac.set_action(envoy::config::rbac::v2::RBAC_Action::RBAC_Action_ALLOW);
+    rbac.set_action(envoy::config::rbac::v2::RBAC::ALLOW);
     envoy::config::rbac::v2::Policy policy;
     auto* permission = policy.add_permissions();
     auto* and_rules = permission->mutable_and_rules();
@@ -84,7 +86,7 @@ TEST(RoleBasedAccessControlEngineImpl, InvalidConfig) {
 
   {
     envoy::config::rbac::v2::RBAC rbac;
-    rbac.set_action(envoy::config::rbac::v2::RBAC_Action::RBAC_Action_ALLOW);
+    rbac.set_action(envoy::config::rbac::v2::RBAC::ALLOW);
     envoy::config::rbac::v2::Policy policy;
     auto* permission = policy.add_permissions();
     permission->set_any(true);
@@ -97,7 +99,7 @@ TEST(RoleBasedAccessControlEngineImpl, InvalidConfig) {
 
   {
     envoy::config::rbac::v2::RBAC rbac;
-    rbac.set_action(envoy::config::rbac::v2::RBAC_Action::RBAC_Action_ALLOW);
+    rbac.set_action(envoy::config::rbac::v2::RBAC::ALLOW);
     envoy::config::rbac::v2::Policy policy;
     auto* permission = policy.add_permissions();
     permission->set_any(true);
@@ -111,7 +113,7 @@ TEST(RoleBasedAccessControlEngineImpl, InvalidConfig) {
 
   {
     envoy::config::rbac::v2::RBAC rbac;
-    rbac.set_action(envoy::config::rbac::v2::RBAC_Action::RBAC_Action_ALLOW);
+    rbac.set_action(envoy::config::rbac::v2::RBAC::ALLOW);
     envoy::config::rbac::v2::Policy policy;
     auto* permission = policy.add_permissions();
     permission->set_any(true);
@@ -133,7 +135,7 @@ TEST(RoleBasedAccessControlEngineImpl, AllowedWhitelist) {
   policy.add_principals()->set_any(true);
 
   envoy::config::rbac::v2::RBAC rbac;
-  rbac.set_action(envoy::config::rbac::v2::RBAC_Action::RBAC_Action_ALLOW);
+  rbac.set_action(envoy::config::rbac::v2::RBAC::ALLOW);
   (*rbac.mutable_policies())["foo"] = policy;
   RBAC::RoleBasedAccessControlEngineImpl engine(rbac);
 
@@ -154,7 +156,7 @@ TEST(RoleBasedAccessControlEngineImpl, DeniedBlacklist) {
   policy.add_principals()->set_any(true);
 
   envoy::config::rbac::v2::RBAC rbac;
-  rbac.set_action(envoy::config::rbac::v2::RBAC_Action::RBAC_Action_DENY);
+  rbac.set_action(envoy::config::rbac::v2::RBAC::DENY);
   (*rbac.mutable_policies())["foo"] = policy;
   RBAC::RoleBasedAccessControlEngineImpl engine(rbac);
 
@@ -180,7 +182,7 @@ TEST(RoleBasedAccessControlEngineImpl, BasicCondition) {
   )EOF"));
 
   envoy::config::rbac::v2::RBAC rbac;
-  rbac.set_action(envoy::config::rbac::v2::RBAC_Action::RBAC_Action_ALLOW);
+  rbac.set_action(envoy::config::rbac::v2::RBAC::ALLOW);
   (*rbac.mutable_policies())["foo"] = policy;
   RBAC::RoleBasedAccessControlEngineImpl engine(rbac);
   checkEngine(engine, false);
@@ -200,7 +202,7 @@ TEST(RoleBasedAccessControlEngineImpl, MalformedCondition) {
   )EOF"));
 
   envoy::config::rbac::v2::RBAC rbac;
-  rbac.set_action(envoy::config::rbac::v2::RBAC_Action::RBAC_Action_ALLOW);
+  rbac.set_action(envoy::config::rbac::v2::RBAC::ALLOW);
   (*rbac.mutable_policies())["foo"] = policy;
 
   EXPECT_THROW_WITH_REGEX(RBAC::RoleBasedAccessControlEngineImpl engine(rbac), EnvoyException,
@@ -218,7 +220,7 @@ TEST(RoleBasedAccessControlEngineImpl, MistypedCondition) {
   )EOF"));
 
   envoy::config::rbac::v2::RBAC rbac;
-  rbac.set_action(envoy::config::rbac::v2::RBAC_Action::RBAC_Action_ALLOW);
+  rbac.set_action(envoy::config::rbac::v2::RBAC::ALLOW);
   (*rbac.mutable_policies())["foo"] = policy;
   RBAC::RoleBasedAccessControlEngineImpl engine(rbac);
   checkEngine(engine, false);
@@ -243,7 +245,7 @@ TEST(RoleBasedAccessControlEngineImpl, ErrorCondition) {
   )EOF"));
 
   envoy::config::rbac::v2::RBAC rbac;
-  rbac.set_action(envoy::config::rbac::v2::RBAC_Action::RBAC_Action_ALLOW);
+  rbac.set_action(envoy::config::rbac::v2::RBAC::ALLOW);
   (*rbac.mutable_policies())["foo"] = policy;
   RBAC::RoleBasedAccessControlEngineImpl engine(rbac);
   checkEngine(engine, false, Envoy::Network::MockConnection());
@@ -273,7 +275,7 @@ TEST(RoleBasedAccessControlEngineImpl, HeaderCondition) {
   )EOF"));
 
   envoy::config::rbac::v2::RBAC rbac;
-  rbac.set_action(envoy::config::rbac::v2::RBAC_Action::RBAC_Action_ALLOW);
+  rbac.set_action(envoy::config::rbac::v2::RBAC::ALLOW);
   (*rbac.mutable_policies())["foo"] = policy;
   RBAC::RoleBasedAccessControlEngineImpl engine(rbac);
 
@@ -314,7 +316,7 @@ TEST(RoleBasedAccessControlEngineImpl, MetadataCondition) {
   )EOF"));
 
   envoy::config::rbac::v2::RBAC rbac;
-  rbac.set_action(envoy::config::rbac::v2::RBAC_Action::RBAC_Action_ALLOW);
+  rbac.set_action(envoy::config::rbac::v2::RBAC::ALLOW);
   (*rbac.mutable_policies())["foo"] = policy;
   RBAC::RoleBasedAccessControlEngineImpl engine(rbac);
 
@@ -339,7 +341,7 @@ TEST(RoleBasedAccessControlEngineImpl, ConjunctiveCondition) {
   )EOF"));
 
   envoy::config::rbac::v2::RBAC rbac;
-  rbac.set_action(envoy::config::rbac::v2::RBAC_Action::RBAC_Action_ALLOW);
+  rbac.set_action(envoy::config::rbac::v2::RBAC::ALLOW);
   (*rbac.mutable_policies())["foo"] = policy;
   RBAC::RoleBasedAccessControlEngineImpl engine(rbac);
 

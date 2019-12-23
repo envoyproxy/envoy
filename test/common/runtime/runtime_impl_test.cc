@@ -1,6 +1,12 @@
 #include <memory>
 #include <string>
 
+#include "envoy/api/v2/core/config_source.pb.h"
+#include "envoy/api/v2/discovery.pb.h"
+#include "envoy/config/bootstrap/v2/bootstrap.pb.h"
+#include "envoy/service/discovery/v2/rtds.pb.h"
+#include "envoy/type/percent.pb.h"
+
 #include "common/config/runtime_utility.h"
 #include "common/runtime/runtime_impl.h"
 #include "common/stats/isolated_store_impl.h"

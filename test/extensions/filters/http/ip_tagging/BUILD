@@ -25,5 +25,6 @@ envoy_extension_cc_test(
         "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/stats:stats_mocks",
         "//test/test_common:utility_lib",
+        "@envoy_api//envoy/config/filter/http/ip_tagging/v3alpha:pkg_cc_proto",
     ],
 )

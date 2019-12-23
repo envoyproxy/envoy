@@ -1,6 +1,8 @@
 #include <memory>
 
 #include "envoy/api/v2/auth/cert.pb.h"
+#include "envoy/api/v2/core/config_source.pb.h"
+#include "envoy/api/v2/discovery.pb.h"
 #include "envoy/common/exception.h"
 #include "envoy/service/discovery/v2/sds.pb.h"
 
@@ -271,7 +273,7 @@ TEST_F(SdsApiTest, DefaultCertificateValidationContextTest) {
   dynamic_cvc->set_allow_expired_certificate(false);
   dynamic_cvc->mutable_trusted_ca()->set_filename(TestEnvironment::substitute(
       "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"));
-  dynamic_cvc->add_verify_subject_alt_name("second san");
+  dynamic_cvc->add_match_subject_alt_names()->set_exact("second san");
   const std::string dynamic_verify_certificate_spki =
       "QGJRPdmx/r5EGOFLb2MTiZp2isyC0Whht7iazhzXaCM=";
   dynamic_cvc->add_verify_certificate_spki(dynamic_verify_certificate_spki);
@@ -288,7 +290,7 @@ TEST_F(SdsApiTest, DefaultCertificateValidationContextTest) {
   envoy::api::v2::auth::CertificateValidationContext default_cvc;
   default_cvc.set_allow_expired_certificate(true);
   default_cvc.mutable_trusted_ca()->set_inline_bytes("fake trusted ca");
-  default_cvc.add_verify_subject_alt_name("first san");
+  default_cvc.add_match_subject_alt_names()->set_exact("first san");
   default_cvc.add_verify_certificate_hash(default_verify_certificate_hash);
   envoy::api::v2::auth::CertificateValidationContext merged_cvc = default_cvc;
   merged_cvc.MergeFrom(*sds_api.secret());
@@ -302,9 +304,9 @@ TEST_F(SdsApiTest, DefaultCertificateValidationContextTest) {
   EXPECT_EQ(TestEnvironment::readFileToStringForTest(TestEnvironment::substitute(ca_cert)),
             cvc_config.caCert());
   // Verify that repeated fields are concatenated.
-  EXPECT_EQ(2, cvc_config.verifySubjectAltNameList().size());
-  EXPECT_EQ("first san", cvc_config.verifySubjectAltNameList()[0]);
-  EXPECT_EQ("second san", cvc_config.verifySubjectAltNameList()[1]);
+  EXPECT_EQ(2, cvc_config.subjectAltNameMatchers().size());
+  EXPECT_EQ("first san", cvc_config.subjectAltNameMatchers()[0].exact());
+  EXPECT_EQ("second san", cvc_config.subjectAltNameMatchers()[1].exact());
   // Verify that if dynamic CertificateValidationContext does not set certificate hash list, the new
   // secret contains hash list from default CertificateValidationContext.
   EXPECT_EQ(1, cvc_config.verifyCertificateHashList().size());

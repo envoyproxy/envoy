@@ -1,4 +1,7 @@
 #include "envoy/admin/v2alpha/config_dump.pb.h"
+#include "envoy/api/v2/core/base.pb.h"
+#include "envoy/api/v2/lds.pb.h"
+#include "envoy/api/v2/listener/listener.pb.h"
 
 #include "common/network/listen_socket_impl.h"
 #include "common/network/socket_option_impl.h"
@@ -86,7 +89,7 @@ protected:
    */
   ListenerHandle* expectListenerCreate(
       bool need_init, bool added_via_api,
-      envoy::api::v2::Listener::DrainType drain_type = envoy::api::v2::Listener_DrainType_DEFAULT) {
+      envoy::api::v2::Listener::DrainType drain_type = envoy::api::v2::Listener::DEFAULT) {
     if (added_via_api) {
       EXPECT_CALL(server_.validation_context_, staticValidationVisitor()).Times(0);
       EXPECT_CALL(server_.validation_context_, dynamicValidationVisitor());

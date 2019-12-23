@@ -1,3 +1,8 @@
+#include "envoy/api/v2/cds.pb.h"
+#include "envoy/api/v2/route/route.pb.h"
+#include "envoy/config/bootstrap/v2/bootstrap.pb.h"
+#include "envoy/config/filter/network/http_connection_manager/v2/http_connection_manager.pb.h"
+
 #include "test/integration/http_integration.h"
 
 #include "absl/strings/str_replace.h"
@@ -10,21 +15,21 @@ class HttpSubsetLbIntegrationTest : public testing::TestWithParam<envoy::api::v2
 public:
   // Returns all load balancer types except ORIGINAL_DST_LB and CLUSTER_PROVIDED.
   static std::vector<envoy::api::v2::Cluster_LbPolicy> getSubsetLbTestParams() {
-    int first = static_cast<int>(envoy::api::v2::Cluster_LbPolicy_LbPolicy_MIN);
-    int last = static_cast<int>(envoy::api::v2::Cluster_LbPolicy_LbPolicy_MAX);
+    int first = static_cast<int>(envoy::api::v2::Cluster::LbPolicy_MIN);
+    int last = static_cast<int>(envoy::api::v2::Cluster::LbPolicy_MAX);
     ASSERT(first < last);
 
     std::vector<envoy::api::v2::Cluster_LbPolicy> ret;
     for (int i = first; i <= last; i++) {
-      if (!envoy::api::v2::Cluster_LbPolicy_IsValid(i)) {
+      if (!envoy::api::v2::Cluster::LbPolicy_IsValid(i)) {
         continue;
       }
 
       auto policy = static_cast<envoy::api::v2::Cluster_LbPolicy>(i);
 
-      if (policy == envoy::api::v2::Cluster_LbPolicy_ORIGINAL_DST_LB ||
-          policy == envoy::api::v2::Cluster_LbPolicy_CLUSTER_PROVIDED ||
-          policy == envoy::api::v2::Cluster_LbPolicy_LOAD_BALANCING_POLICY_CONFIG) {
+      if (policy == envoy::api::v2::Cluster::ORIGINAL_DST_LB ||
+          policy == envoy::api::v2::Cluster::CLUSTER_PROVIDED ||
+          policy == envoy::api::v2::Cluster::LOAD_BALANCING_POLICY_CONFIG) {
         continue;
       }
 
@@ -37,7 +42,7 @@ public:
   // Converts an LbPolicy to strings suitable for test names.
   static std::string
   subsetLbTestParamsToString(const testing::TestParamInfo<envoy::api::v2::Cluster_LbPolicy>& p) {
-    const std::string& policy_name = envoy::api::v2::Cluster_LbPolicy_Name(p.param);
+    const std::string& policy_name = envoy::api::v2::Cluster::LbPolicy_Name(p.param);
     return absl::StrReplaceAll(policy_name, {{"_", ""}});
   }
 
@@ -45,8 +50,8 @@ public:
       : HttpIntegrationTest(Http::CodecClient::Type::HTTP1,
                             TestEnvironment::getIpVersionsForTest().front(),
                             ConfigHelper::HTTP_PROXY_CONFIG),
-        num_hosts_{4}, is_hash_lb_(GetParam() == envoy::api::v2::Cluster_LbPolicy_RING_HASH ||
-                                   GetParam() == envoy::api::v2::Cluster_LbPolicy_MAGLEV) {
+        num_hosts_{4}, is_hash_lb_(GetParam() == envoy::api::v2::Cluster::RING_HASH ||
+                                   GetParam() == envoy::api::v2::Cluster::MAGLEV) {
     autonomous_upstream_ = true;
     setUpstreamCount(num_hosts_);
 
@@ -172,10 +177,10 @@ public:
 
     if (is_hash_lb_) {
       EXPECT_EQ(hosts.size(), 1) << "Expected a single unique host to be selected for "
-                                 << envoy::api::v2::Cluster_LbPolicy_Name(GetParam());
+                                 << envoy::api::v2::Cluster::LbPolicy_Name(GetParam());
     } else {
       EXPECT_GT(hosts.size(), 1) << "Expected multiple hosts to be selected for "
-                                 << envoy::api::v2::Cluster_LbPolicy_Name(GetParam());
+                                 << envoy::api::v2::Cluster::LbPolicy_Name(GetParam());
     }
   }
 

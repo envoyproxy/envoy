@@ -1,6 +1,8 @@
 #include <fstream>
 #include <functional>
 
+#include "envoy/config/filter/http/transcoder/v2/transcoder.pb.h"
+
 #include "common/buffer/buffer_impl.h"
 #include "common/grpc/codec.h"
 #include "common/grpc/common.h"
@@ -72,7 +74,7 @@ protected:
 
     TestUtility::createDirectory(TestEnvironment::temporaryPath("envoy_test"));
     std::string path = TestEnvironment::temporaryPath("envoy_test/proto.descriptor");
-    std::ofstream file(path);
+    std::ofstream file(path, std::ios::binary);
     descriptor_set.SerializeToOstream(&file);
 
     return path;

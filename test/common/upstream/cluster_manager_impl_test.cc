@@ -1,3 +1,8 @@
+#include "envoy/admin/v2alpha/config_dump.pb.h"
+#include "envoy/api/v2/cds.pb.h"
+#include "envoy/api/v2/core/base.pb.h"
+#include "envoy/config/bootstrap/v2/bootstrap.pb.h"
+
 #include "test/common/upstream/test_cluster_manager.h"
 
 using testing::_;
@@ -388,15 +393,15 @@ public:
   ClusterManagerSubsetInitializationTest() = default;
 
   static std::vector<envoy::api::v2::Cluster_LbPolicy> lbPolicies() {
-    int first = static_cast<int>(envoy::api::v2::Cluster_LbPolicy_LbPolicy_MIN);
-    int last = static_cast<int>(envoy::api::v2::Cluster_LbPolicy_LbPolicy_MAX);
+    int first = static_cast<int>(envoy::api::v2::Cluster::LbPolicy_MIN);
+    int last = static_cast<int>(envoy::api::v2::Cluster::LbPolicy_MAX);
     ASSERT(first < last);
 
     std::vector<envoy::api::v2::Cluster_LbPolicy> policies;
     for (int i = first; i <= last; i++) {
-      if (envoy::api::v2::Cluster_LbPolicy_IsValid(i)) {
+      if (envoy::api::v2::Cluster::LbPolicy_IsValid(i)) {
         auto policy = static_cast<envoy::api::v2::Cluster_LbPolicy>(i);
-        if (policy != envoy::api::v2::Cluster_LbPolicy_LOAD_BALANCING_POLICY_CONFIG) {
+        if (policy != envoy::api::v2::Cluster::LOAD_BALANCING_POLICY_CONFIG) {
           policies.push_back(policy);
         }
       }
@@ -405,7 +410,7 @@ public:
   }
 
   static std::string paramName(const testing::TestParamInfo<ParamType>& info) {
-    const std::string& name = envoy::api::v2::Cluster_LbPolicy_Name(info.param);
+    const std::string& name = envoy::api::v2::Cluster::LbPolicy_Name(info.param);
     return absl::StrReplaceAll(name, {{"_", ""}});
   }
 };
@@ -438,23 +443,23 @@ TEST_P(ClusterManagerSubsetInitializationTest, SubsetLoadBalancerInitialization)
                   port_value: 8001
   )EOF";
 
-  const std::string& policy_name = envoy::api::v2::Cluster_LbPolicy_Name(GetParam());
+  const std::string& policy_name = envoy::api::v2::Cluster::LbPolicy_Name(GetParam());
 
   std::string cluster_type = "type: STATIC";
-  if (GetParam() == envoy::api::v2::Cluster_LbPolicy_ORIGINAL_DST_LB) {
+  if (GetParam() == envoy::api::v2::Cluster::ORIGINAL_DST_LB) {
     cluster_type = "type: ORIGINAL_DST";
-  } else if (GetParam() == envoy::api::v2::Cluster_LbPolicy_CLUSTER_PROVIDED) {
+  } else if (GetParam() == envoy::api::v2::Cluster::CLUSTER_PROVIDED) {
     // This custom cluster type is registered by linking test/integration/custom/static_cluster.cc.
     cluster_type = "cluster_type: { name: envoy.clusters.custom_static_with_lb }";
   }
   const std::string yaml = fmt::format(yamlPattern, cluster_type, policy_name);
 
-  if (GetParam() == envoy::api::v2::Cluster_LbPolicy_ORIGINAL_DST_LB ||
-      GetParam() == envoy::api::v2::Cluster_LbPolicy_CLUSTER_PROVIDED) {
+  if (GetParam() == envoy::api::v2::Cluster::ORIGINAL_DST_LB ||
+      GetParam() == envoy::api::v2::Cluster::CLUSTER_PROVIDED) {
     EXPECT_THROW_WITH_MESSAGE(
         create(parseBootstrapFromV2Yaml(yaml)), EnvoyException,
         fmt::format("cluster: LB policy {} cannot be combined with lb_subset_config",
-                    envoy::api::v2::Cluster_LbPolicy_Name(GetParam())));
+                    envoy::api::v2::Cluster::LbPolicy_Name(GetParam())));
 
   } else {
     create(parseBootstrapFromV2Yaml(yaml));

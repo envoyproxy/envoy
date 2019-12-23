@@ -2,16 +2,16 @@ syntax = "proto3";
 
 package envoy.config.transport_socket.tap.v3alpha;
 
-option java_package = "io.envoyproxy.envoy.config.transport_socket.tap.v3alpha";
-option java_outer_classname = "TapProto";
-option java_multiple_files = true;
-
 import "envoy/api/v3alpha/core/base.proto";
 import "envoy/config/common/tap/v3alpha/common.proto";
 
 import "udpa/annotations/versioning.proto";
 
 import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.config.transport_socket.tap.v3alpha";
+option java_outer_classname = "TapProto";
+option java_multiple_files = true;
 
 // [#protodoc-title: Tap]
 // [#extension: envoy.transport_sockets.tap]

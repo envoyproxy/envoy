@@ -5,6 +5,7 @@
 #include <unordered_map>
 
 #include "envoy/runtime/runtime.h"
+#include "envoy/type/percent.pb.h"
 #include "envoy/upstream/cluster_manager.h"
 
 #include "gmock/gmock.h"

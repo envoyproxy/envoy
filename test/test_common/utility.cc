@@ -11,6 +11,7 @@
 #include <vector>
 
 #include "envoy/api/v2/cds.pb.h"
+#include "envoy/api/v2/eds.pb.h"
 #include "envoy/api/v2/lds.pb.h"
 #include "envoy/api/v2/rds.pb.h"
 #include "envoy/api/v2/route/route.pb.h"
@@ -373,7 +374,7 @@ void AtomicFileUpdater::update(const std::string& contents) {
   const std::string target = use_target1_ ? target1_ : target2_;
   use_target1_ = !use_target1_;
   {
-    std::ofstream file(target);
+    std::ofstream file(target, std::ios_base::binary);
     file << contents;
   }
   TestUtility::createSymlink(target, new_link_);

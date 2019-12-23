@@ -4,6 +4,8 @@
 #include <regex>
 #include <unordered_map>
 
+#include "envoy/api/v2/auth/cert.pb.h"
+#include "envoy/config/bootstrap/v2/bootstrap.pb.h"
 #include "envoy/config/filter/network/http_connection_manager/v2/http_connection_manager.pb.h"
 #include "envoy/stats/scope.h"
 
@@ -44,7 +46,10 @@ common_tls_context:
   validation_context:
     trusted_ca:
       filename: {{ test_rundir }}/test/config/integration/certs/cacert.pem
-    verify_subject_alt_name: [ spiffe://lyft.com/backend-team, lyft.com, www.lyft.com ]
+    match_subject_alt_names: 
+      exact: "spiffe://lyft.com/backend-team"
+      exact: "lyft.com"
+      exact: "www.lyft.com"
 )EOF";
 
   const std::string yaml_mtls = R"EOF(
@@ -52,7 +57,10 @@ common_tls_context:
   validation_context:
     trusted_ca:
       filename: {{ test_rundir }}/test/config/integration/certs/cacert.pem
-    verify_subject_alt_name: [ spiffe://lyft.com/backend-team, lyft.com, www.lyft.com ]
+    match_subject_alt_names: 
+      exact: "spiffe://lyft.com/backend-team"
+      exact: "lyft.com"
+      exact: "www.lyft.com"
   tls_certificates:
     certificate_chain:
       filename: {{ test_rundir }}/test/config/integration/certs/clientcert.pem
@@ -129,7 +137,7 @@ void XfccIntegrationTest::initialize() {
     auto* validation_context = context.mutable_common_tls_context()->mutable_validation_context();
     validation_context->mutable_trusted_ca()->set_filename(
         TestEnvironment::runfilesPath("test/config/integration/certs/upstreamcacert.pem"));
-    validation_context->add_verify_subject_alt_name("foo.lyft.com");
+    validation_context->add_match_subject_alt_names()->set_suffix("lyft.com");
     transport_socket->set_name("envoy.transport_sockets.tls");
     transport_socket->mutable_typed_config()->PackFrom(context);
   });

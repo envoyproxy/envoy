@@ -1,5 +1,7 @@
 #pragma once
 
+#include "envoy/api/v2/core/config_source.pb.h"
+#include "envoy/api/v2/discovery.pb.h"
 #include "envoy/api/v2/eds.pb.h"
 #include "envoy/config/config_provider_manager.h"
 #include "envoy/config/grpc_mux.h"

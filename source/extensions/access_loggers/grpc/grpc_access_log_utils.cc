@@ -1,5 +1,7 @@
 #include "extensions/access_loggers/grpc/grpc_access_log_utils.h"
 
+#include "envoy/config/accesslog/v2/als.pb.h"
+#include "envoy/data/accesslog/v2/accesslog.pb.h"
 #include "envoy/upstream/upstream.h"
 
 #include "common/network/utility.h"
@@ -17,16 +19,16 @@ using namespace envoy::data::accesslog::v2;
 // TLS version to the corresponding enum value used in gRPC access logs.
 TLSProperties_TLSVersion tlsVersionStringToEnum(const std::string& tls_version) {
   if (tls_version == "TLSv1") {
-    return TLSProperties_TLSVersion_TLSv1;
+    return TLSProperties::TLSv1;
   } else if (tls_version == "TLSv1.1") {
-    return TLSProperties_TLSVersion_TLSv1_1;
+    return TLSProperties::TLSv1_1;
   } else if (tls_version == "TLSv1.2") {
-    return TLSProperties_TLSVersion_TLSv1_2;
+    return TLSProperties::TLSv1_2;
   } else if (tls_version == "TLSv1.3") {
-    return TLSProperties_TLSVersion_TLSv1_3;
+    return TLSProperties::TLSv1_3;
   }
 
-  return TLSProperties_TLSVersion_VERSION_UNSPECIFIED;
+  return TLSProperties::VERSION_UNSPECIFIED;
 }
 
 } // namespace
@@ -88,8 +90,7 @@ void Utility::responseFlagsToAccessLogResponseFlags(
 
   if (stream_info.hasResponseFlag(StreamInfo::ResponseFlag::UnauthorizedExternalService)) {
     common_access_log.mutable_response_flags()->mutable_unauthorized_details()->set_reason(
-        envoy::data::accesslog::v2::ResponseFlags_Unauthorized_Reason::
-            ResponseFlags_Unauthorized_Reason_EXTERNAL_SERVICE);
+        envoy::data::accesslog::v2::ResponseFlags::Unauthorized::EXTERNAL_SERVICE);
   }
 
   if (stream_info.hasResponseFlag(StreamInfo::ResponseFlag::RateLimitServiceError)) {

@@ -9,6 +9,7 @@
 
 #include "envoy/buffer/buffer.h"
 #include "envoy/common/time.h"
+#include "envoy/config/filter/network/http_connection_manager/v2/http_connection_manager.pb.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/network/drain_decision.h"
 #include "envoy/router/router.h"
@@ -16,6 +17,7 @@
 #include "envoy/stats/scope.h"
 #include "envoy/stream_info/filter_state.h"
 #include "envoy/tracing/http_tracer.h"
+#include "envoy/type/percent.pb.h"
 
 #include "common/buffer/buffer_impl.h"
 #include "common/common/assert.h"
@@ -380,6 +382,10 @@ void ConnectionManagerImpl::resetAllStreams(
     stream.onResetStream(StreamResetReason::ConnectionTermination, absl::string_view());
     if (response_flag.has_value()) {
       stream.stream_info_.setResponseFlag(response_flag.value());
+      if (*response_flag == StreamInfo::ResponseFlag::DownstreamProtocolError) {
+        stream.stream_info_.setResponseCodeDetails(
+            stream.response_encoder_->getStream().responseDetails());
+      }
     }
   }
 }

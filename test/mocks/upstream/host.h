@@ -5,7 +5,8 @@
 #include <list>
 #include <string>
 
-#include "envoy/api/v2/cluster/outlier_detection.pb.h"
+#include "envoy/api/v2/core/base.pb.h"
+#include "envoy/data/cluster/v2alpha/outlier_detection_event.pb.h"
 #include "envoy/upstream/upstream.h"
 
 #include "common/stats/fake_symbol_table_impl.h"

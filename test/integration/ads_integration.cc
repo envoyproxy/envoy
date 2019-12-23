@@ -1,10 +1,12 @@
 #include "test/integration/ads_integration.h"
 
+#include "envoy/admin/v2alpha/config_dump.pb.h"
+#include "envoy/api/v2/auth/cert.pb.h"
 #include "envoy/api/v2/cds.pb.h"
-#include "envoy/api/v2/discovery.pb.h"
 #include "envoy/api/v2/eds.pb.h"
 #include "envoy/api/v2/lds.pb.h"
 #include "envoy/api/v2/rds.pb.h"
+#include "envoy/config/bootstrap/v2/bootstrap.pb.h"
 
 #include "common/config/protobuf_link_hacks.h"
 #include "common/config/resources.h"
@@ -161,7 +163,7 @@ void AdsIntegrationTest::initializeAds(const bool rate_limiting) {
     auto* validation_context = context.mutable_common_tls_context()->mutable_validation_context();
     validation_context->mutable_trusted_ca()->set_filename(
         TestEnvironment::runfilesPath("test/config/integration/certs/upstreamcacert.pem"));
-    validation_context->add_verify_subject_alt_name("foo.lyft.com");
+    validation_context->add_match_subject_alt_names()->set_suffix("lyft.com");
     if (clientType() == Grpc::ClientType::GoogleGrpc) {
       auto* google_grpc = grpc_service->mutable_google_grpc();
       auto* ssl_creds = google_grpc->mutable_channel_credentials()->mutable_ssl_credentials();

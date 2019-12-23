@@ -1,5 +1,7 @@
 #pragma once
 
+#include "envoy/api/v2/core/base.pb.h"
+
 #include "common/common/empty_string.h"
 #include "common/network/resolver_impl.h"
 #include "common/network/utility.h"
@@ -117,6 +119,13 @@ inline TestStreamInfo fromStreamInfo(const test::fuzz::StreamInfo& stream_info) 
   testing::DefaultValue<const std::string&>::Set(EMPTY_STRING);
   TestStreamInfo test_stream_info;
   test_stream_info.metadata_ = stream_info.dynamic_metadata();
+  // Truncate recursive filter metadata fields.
+  // TODO(asraa): Resolve MessageToJsonString failure on recursive filter metadata.
+  for (auto& pair : *test_stream_info.metadata_.mutable_filter_metadata()) {
+    std::string value;
+    pair.second.SerializeToString(&value);
+    pair.second.ParseFromString(value.substr(0, 128));
+  }
   // libc++ clocks don't track at nanosecond on macOS.
   const auto start_time =
       static_cast<uint64_t>(std::numeric_limits<std::chrono::nanoseconds::rep>::max()) <
@@ -136,7 +145,11 @@ inline TestStreamInfo fromStreamInfo(const test::fuzz::StreamInfo& stream_info) 
   auto address = stream_info.has_address()
                      ? Envoy::Network::Address::resolveProtoAddress(stream_info.address())
                      : Network::Utility::resolveUrl("tcp://10.0.0.1:443");
-  test_stream_info.upstream_local_address_ = address;
+  auto upstream_local_address =
+      stream_info.has_upstream_local_address()
+          ? Envoy::Network::Address::resolveProtoAddress(stream_info.upstream_local_address())
+          : Network::Utility::resolveUrl("tcp://10.0.0.1:10000");
+  test_stream_info.upstream_local_address_ = upstream_local_address;
   test_stream_info.downstream_local_address_ = address;
   test_stream_info.downstream_direct_remote_address_ = address;
   test_stream_info.downstream_remote_address_ = address;

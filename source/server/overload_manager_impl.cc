@@ -1,5 +1,6 @@
 #include "server/overload_manager_impl.h"
 
+#include "envoy/config/overload/v2alpha/overload.pb.h"
 #include "envoy/stats/scope.h"
 
 #include "common/common/fmt.h"

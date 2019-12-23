@@ -2,6 +2,8 @@
 #include <string>
 #include <vector>
 
+#include "envoy/api/v2/core/base.pb.h"
+
 #include "common/network/address_impl.h"
 #include "common/network/socket_option_factory.h"
 #include "common/network/socket_option_impl.h"
@@ -17,6 +19,7 @@
 #include "test/test_common/threadsafe_singleton_injector.h"
 #include "test/test_common/utility.h"
 
+#include "absl/time/time.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
@@ -412,7 +415,7 @@ TEST_P(UdpListenerImplTest, SendData) {
     }
 
     retry++;
-    ::usleep(10000);
+    absl::SleepFor(absl::Milliseconds(10));
     ASSERT(bytes_read == 0);
   } while (true);
   EXPECT_EQ(bytes_to_read, bytes_read);

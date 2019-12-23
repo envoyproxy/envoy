@@ -6,6 +6,8 @@
 #include <string>
 #include <vector>
 
+#include "envoy/api/v2/core/base.pb.h"
+
 #include "common/grpc/common.h"
 #include "common/http/utility.h"
 #include "common/tracing/http_tracer_impl.h"

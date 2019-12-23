@@ -1,6 +1,7 @@
 #include <chrono>
 #include <iostream>
 
+#include "envoy/config/filter/http/adaptive_concurrency/v2alpha/adaptive_concurrency.pb.h"
 #include "envoy/config/filter/http/adaptive_concurrency/v2alpha/adaptive_concurrency.pb.validate.h"
 
 #include "common/stats/isolated_store_impl.h"

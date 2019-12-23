@@ -1,6 +1,6 @@
 #pragma once
 
-#include "envoy/config/trace/v2/trace.pb.validate.h"
+#include "envoy/config/trace/v2/trace.pb.h"
 #include "envoy/local_info/local_info.h"
 #include "envoy/tracing/http_tracer.h"
 

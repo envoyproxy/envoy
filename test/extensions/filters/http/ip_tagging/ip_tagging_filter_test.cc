@@ -1,5 +1,7 @@
 #include <memory>
 
+#include "envoy/config/filter/http/ip_tagging/v3alpha/ip_tagging.pb.h"
+
 #include "common/buffer/buffer_impl.h"
 #include "common/http/header_map_impl.h"
 #include "common/network/address_impl.h"
