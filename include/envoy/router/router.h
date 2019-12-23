@@ -643,8 +643,8 @@ public:
   virtual uint32_t retryShadowBufferLimit() const PURE;
 
   /**
-   * @return const ShadowPolicy& the shadow policy for the route. All routes have a shadow policy
-   *         even if no shadowing takes place.
+   * @return const std::vector<ShadowPolicy>& the shadow policies for the route. The vector is empty
+   *         if no shadowing takes place.
    */
   virtual const std::vector<ShadowPolicyPtr>& shadowPolicies() const PURE;
 
