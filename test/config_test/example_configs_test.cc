@@ -10,9 +10,13 @@ TEST(ExampleConfigsTest, DEPRECATED_FEATURE_TEST(All)) {
       {TestEnvironment::runfilesPath("test/config_test/example_configs_test_setup.sh")});
 
   // Change working directory, otherwise we won't be able to read files using relative paths.
+#ifdef PATH_MAX
   char cwd[PATH_MAX];
+#else
+  char cwd[1024];
+#endif
   const std::string& directory = TestEnvironment::temporaryDirectory() + "/test/config_test";
-  RELEASE_ASSERT(::getcwd(cwd, PATH_MAX) != nullptr, "");
+  RELEASE_ASSERT(::getcwd(cwd, sizeof(cwd)) != nullptr, "");
   RELEASE_ASSERT(::chdir(directory.c_str()) == 0, "");
 
 #ifdef __APPLE__
