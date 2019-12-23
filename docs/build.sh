@@ -110,4 +110,6 @@ rsync -rav  $API_DIR/diagrams "${GENERATED_RST_DIR}/api-docs"
 
 rsync -av "${SCRIPT_DIR}"/root/ "${SCRIPT_DIR}"/conf.py "${GENERATED_RST_DIR}"
 
+./docs/generate_extension_categories.sh "${GENERATED_RST_DIR}"
+
 sphinx-build -W --keep-going -b html "${GENERATED_RST_DIR}" "${DOCS_OUTPUT_DIR}"
