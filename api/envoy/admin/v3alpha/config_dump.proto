@@ -2,10 +2,6 @@ syntax = "proto3";
 
 package envoy.admin.v3alpha;
 
-option java_package = "io.envoyproxy.envoy.admin.v3alpha";
-option java_outer_classname = "ConfigDumpProto";
-option java_multiple_files = true;
-
 import "envoy/api/v3alpha/auth/cert.proto";
 import "envoy/api/v3alpha/cds.proto";
 import "envoy/api/v3alpha/lds.proto";
@@ -17,6 +13,10 @@ import "google/protobuf/any.proto";
 import "google/protobuf/timestamp.proto";
 
 import "udpa/annotations/versioning.proto";
+
+option java_package = "io.envoyproxy.envoy.admin.v3alpha";
+option java_outer_classname = "ConfigDumpProto";
+option java_multiple_files = true;
 
 // [#protodoc-title: ConfigDump]
 
@@ -35,6 +35,12 @@ message ConfigDump {
   // * *clusters*: :ref:`ClustersConfigDump <envoy_api_msg_admin.v3alpha.ClustersConfigDump>`
   // * *listeners*: :ref:`ListenersConfigDump <envoy_api_msg_admin.v3alpha.ListenersConfigDump>`
   // * *routes*:  :ref:`RoutesConfigDump <envoy_api_msg_admin.v3alpha.RoutesConfigDump>`
+  //
+  // You can filter output with the resource and mask query parameters.
+  // See :ref:`/config_dump?resource={} <operations_admin_interface_config_dump_by_resource>`,
+  // :ref:`/config_dump?mask={} <operations_admin_interface_config_dump_by_mask>`,
+  // or :ref:`/config_dump?resource={},mask={}
+  // <operations_admin_interface_config_dump_by_resource_and_mask>` for more information.
   repeated google.protobuf.Any configs = 1;
 }
 

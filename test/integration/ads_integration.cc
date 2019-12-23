@@ -163,7 +163,7 @@ void AdsIntegrationTest::initializeAds(const bool rate_limiting) {
     auto* validation_context = context.mutable_common_tls_context()->mutable_validation_context();
     validation_context->mutable_trusted_ca()->set_filename(
         TestEnvironment::runfilesPath("test/config/integration/certs/upstreamcacert.pem"));
-    validation_context->add_verify_subject_alt_name("foo.lyft.com");
+    validation_context->add_match_subject_alt_names()->set_suffix("lyft.com");
     if (clientType() == Grpc::ClientType::GoogleGrpc) {
       auto* google_grpc = grpc_service->mutable_google_grpc();
       auto* ssl_creds = google_grpc->mutable_channel_credentials()->mutable_ssl_credentials();

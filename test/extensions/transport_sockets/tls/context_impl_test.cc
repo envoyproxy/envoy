@@ -64,6 +64,16 @@ TEST_F(SslContextImplTest, TestVerifySubjectAltNameDNSMatched) {
   EXPECT_TRUE(ContextImpl::verifySubjectAltName(cert.get(), verify_subject_alt_name_list));
 }
 
+TEST_F(SslContextImplTest, TestMatchSubjectAltNameDNSMatched) {
+  bssl::UniquePtr<X509> cert = readCertFromFile(TestEnvironment::substitute(
+      "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_cert.pem"));
+  envoy::type::matcher::StringMatcher matcher;
+  matcher.set_regex(".*.example.com");
+  std::vector<Matchers::StringMatcherImpl> subject_alt_name_matchers;
+  subject_alt_name_matchers.push_back(Matchers::StringMatcherImpl(matcher));
+  EXPECT_TRUE(ContextImpl::matchSubjectAltName(cert.get(), subject_alt_name_matchers));
+}
+
 TEST_F(SslContextImplTest, TestVerifySubjectAltNameURIMatched) {
   bssl::UniquePtr<X509> cert = readCertFromFile(TestEnvironment::substitute(
       "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_uri_cert.pem"));
@@ -72,11 +82,31 @@ TEST_F(SslContextImplTest, TestVerifySubjectAltNameURIMatched) {
   EXPECT_TRUE(ContextImpl::verifySubjectAltName(cert.get(), verify_subject_alt_name_list));
 }
 
+TEST_F(SslContextImplTest, TestMatchSubjectAltNameURIMatched) {
+  bssl::UniquePtr<X509> cert = readCertFromFile(TestEnvironment::substitute(
+      "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_uri_cert.pem"));
+  envoy::type::matcher::StringMatcher matcher;
+  matcher.set_regex("spiffe://lyft.com/.*-team");
+  std::vector<Matchers::StringMatcherImpl> subject_alt_name_matchers;
+  subject_alt_name_matchers.push_back(Matchers::StringMatcherImpl(matcher));
+  EXPECT_TRUE(ContextImpl::matchSubjectAltName(cert.get(), subject_alt_name_matchers));
+}
+
 TEST_F(SslContextImplTest, TestVerifySubjectAltNameNotMatched) {
   bssl::UniquePtr<X509> cert = readCertFromFile(TestEnvironment::substitute(
       "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_cert.pem"));
   std::vector<std::string> verify_subject_alt_name_list = {"foo", "bar"};
   EXPECT_FALSE(ContextImpl::verifySubjectAltName(cert.get(), verify_subject_alt_name_list));
+}
+
+TEST_F(SslContextImplTest, TestMatchSubjectAltNameNotMatched) {
+  bssl::UniquePtr<X509> cert = readCertFromFile(TestEnvironment::substitute(
+      "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_cert.pem"));
+  envoy::type::matcher::StringMatcher matcher;
+  matcher.set_regex(".*.foo.com");
+  std::vector<Matchers::StringMatcherImpl> subject_alt_name_matchers;
+  subject_alt_name_matchers.push_back(Matchers::StringMatcherImpl(matcher));
+  EXPECT_FALSE(ContextImpl::matchSubjectAltName(cert.get(), subject_alt_name_matchers));
 }
 
 TEST_F(SslContextImplTest, TestCipherSuites) {
