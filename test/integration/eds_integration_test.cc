@@ -145,6 +145,8 @@ public:
 INSTANTIATE_TEST_SUITE_P(IpVersions, EdsIntegrationTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()));
 
+// Validates that endpoints can be added and then moved to other priorities without causing crashes.
+// Primarily as a regression test for https://github.com/envoyproxy/envoy/issues/8764
 TEST_P(EdsIntegrationTest, Http2UpdatePriorities) {
   codec_client_type_ = envoy::type::HTTP2;
   initializeTest(true);
