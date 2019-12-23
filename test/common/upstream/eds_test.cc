@@ -841,7 +841,7 @@ TEST_F(EdsTest, EndpointMovedToNewPriority) {
     EXPECT_FALSE(hosts[0]->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC));
   }
 
-  // Moves the endpoints all to priority 1
+  // Moves the endpoints all to priority 1.
   cluster_load_assignment.clear_endpoints();
   add_endpoint(80, 1);
   add_endpoint(81, 1);
@@ -849,7 +849,7 @@ TEST_F(EdsTest, EndpointMovedToNewPriority) {
   doOnConfigUpdateVerifyNoThrow(cluster_load_assignment);
 
   {
-    // Priority 0 shuld now be empty.
+    // Priority 0 should now be empty.
     auto& hosts = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts();
     EXPECT_EQ(hosts.size(), 0);
   }
