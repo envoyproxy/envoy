@@ -660,7 +660,7 @@ Utility::resolveMostSpecificPerFilterConfigGeneric(const std::string& filter_nam
 std::vector<const Router::RouteSpecificFilterConfig*>
 Utility::resolveAllPerFilterConfigGeneric(const std::string& filter_name,
                                           const Router::RouteConstSharedPtr& route) {
-  std::vector<const Router::RouteSpecificFilterConfig*> configs{};
+  std::vector<const Router::RouteSpecificFilterConfig*> configs;
   traversePerFilterConfigGeneric(
       filter_name, route,
       [&configs](const Router::RouteSpecificFilterConfig& cfg) { configs.push_back(&cfg); });
