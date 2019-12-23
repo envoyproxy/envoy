@@ -35,7 +35,6 @@ public:
     {
       for (uint32_t i = 0; i < first_priority; ++i) {
         auto* locality_lb_endpoints = cluster_load_assignment.add_endpoints();
-        locality_lb_endpoints->mutable_locality()->set_zone(&"1234"[i]);
         auto* endpoint = locality_lb_endpoints->add_lb_endpoints();
         setUpstreamAddress(i, *endpoint);
       }
@@ -44,7 +43,6 @@ public:
     {
       for (uint32_t i = first_priority; i < first_priority + second_priority; ++i) {
         auto* locality_lb_endpoints = cluster_load_assignment.add_endpoints();
-        locality_lb_endpoints->mutable_locality()->set_zone(&"1234"[i - first_priority]);
         locality_lb_endpoints->set_priority(1);
         auto* endpoint = locality_lb_endpoints->add_lb_endpoints();
         setUpstreamAddress(i, *endpoint);
