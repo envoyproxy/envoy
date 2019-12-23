@@ -20,15 +20,6 @@ TYPE_UPGRADE_REGEXES = [
     ('envoy\.type', 'envoy.type.v3alpha'),
 ]
 
-# As with TYPE_UPGRADE_REGEXES but for API .proto paths.
-PATH_UPGRADE_REGEXES = [
-    (r'(envoy/([\w/]*/|))(v1alpha\d?|v1)', r'\1v3alpha'),
-    (r'(envoy/([\w/]*/|))(v2alpha\d?|v2)', r'\1v3alpha'),
-    # These are special cases, e.g. upgrading versionless packages.
-    ('envoy/type/matcher', 'envoy/type/matcher/v3alpha'),
-    ('envoy/type', 'envoy/type/v3alpha'),
-]
-
 # These packages must be upgraded to v3alpha, even if there are no protos
 # modified. This is largely for situations where we know we want to be doing
 # structural change to have the APIs follow the x/y//vN/z.proto structure of
