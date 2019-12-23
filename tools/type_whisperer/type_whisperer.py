@@ -8,6 +8,7 @@ from tools.api_proto_plugin import visitor
 from tools.type_whisperer.types_pb2 import Types
 from udpa.annotations import migrate_pb2
 
+
 class TypeWhispererVisitor(visitor.Visitor):
   """Visitor to compute type information from a FileDescriptor proto.
 

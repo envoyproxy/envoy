@@ -70,10 +70,12 @@ def UpgradedPath(proto_path, upgraded_package):
   """Determine upgraded API .proto path."""
   return '/'.join([upgraded_package.replace('.', '/'), proto_path.split('/')[-1]])
 
+
 def UpgradedTypeWithDescription(type_name, type_desc):
   upgrade_type_desc = TypeDescription()
   upgrade_type_desc.qualified_package = UpgradedPackage(type_desc)
-  upgrade_type_desc.proto_path = UpgradedPath(type_desc.proto_path, upgrade_type_desc.qualified_package)
+  upgrade_type_desc.proto_path = UpgradedPath(type_desc.proto_path,
+                                              upgrade_type_desc.qualified_package)
   return (UpgradedType(type_name, type_desc), upgrade_type_desc)
 
 
@@ -154,9 +156,9 @@ if __name__ == '__main__':
 
   # Generate type map entries for upgraded types.
   type_map.update([
-    UpgradedTypeWithDescription(type_name, type_desc)
-    for type_name, type_desc in type_map.items()
-    if type_desc.qualified_package in next_versions_pkgs
+      UpgradedTypeWithDescription(type_name, type_desc)
+      for type_name, type_desc in type_map.items()
+      if type_desc.qualified_package in next_versions_pkgs
   ])
 
   # Generate the type database proto. To provide some stability across runs, in
@@ -172,9 +174,9 @@ if __name__ == '__main__':
     if type_desc.qualified_package in next_versions_pkgs:
       type_desc.next_version_type_name = UpgradedType(t, type_map[t])
       assert (type_desc.next_version_type_name != t)
-      next_proto_info[type_map[t].proto_path] = (type_map[
-          type_desc.next_version_type_name].proto_path, type_map[
-          type_desc.next_version_type_name].qualified_package)
+      next_proto_info[type_map[t].proto_path] = (
+          type_map[type_desc.next_version_type_name].proto_path,
+          type_map[type_desc.next_version_type_name].qualified_package)
   for proto_path, (next_proto_path, next_package) in sorted(next_proto_info.items()):
     type_db.next_version_protos[proto_path].proto_path = next_proto_path
     type_db.next_version_protos[proto_path].qualified_package = next_package
