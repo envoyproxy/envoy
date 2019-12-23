@@ -16,28 +16,31 @@ namespace Config {
 
 const char UnknownMethod[] = "could_not_lookup_method_due_to_unknown_type_url";
 
-#define API_TYPE_URL_IS(x)                                                                         \
-  (type_url == Grpc::Common::typeUrl(envoy::api::v2::x().GetDescriptor()->full_name()))
-#define DISCOVERY_TYPE_URL_IS(x)                                                                   \
-  (type_url ==                                                                                     \
-   Grpc::Common::typeUrl(envoy::service::discovery::v2::x().GetDescriptor()->full_name()))
+namespace {
+
+bool typeUrlIs(absl::string_view type_url, const Protobuf::Message& msg) {
+  return Grpc::Common::typeUrl(msg.GetDescriptor()->full_name()) == type_url;
+}
+
+} // namespace
+
 const Protobuf::MethodDescriptor& deltaGrpcMethod(absl::string_view type_url) {
   std::string method_name = UnknownMethod;
-  if (API_TYPE_URL_IS(RouteConfiguration)) {
+  if (typeUrlIs(type_url, envoy::api::v2::RouteConfiguration())) {
     method_name = "envoy.api.v2.RouteDiscoveryService.DeltaRoutes";
-  } else if (API_TYPE_URL_IS(ScopedRouteConfiguration)) {
+  } else if (typeUrlIs(type_url, envoy::api::v2::ScopedRouteConfiguration())) {
     method_name = "envoy.api.v2.ScopedRoutesDiscoveryService.DeltaScopedRoutes";
-  } else if (API_TYPE_URL_IS(route::VirtualHost)) {
+  } else if (typeUrlIs(type_url, envoy::api::v2::route::VirtualHost())) {
     method_name = "envoy.api.v2.VirtualHostDiscoveryService.DeltaVirtualHosts";
-  } else if (API_TYPE_URL_IS(auth::Secret)) {
+  } else if (typeUrlIs(type_url, envoy::api::v2::auth::Secret())) {
     method_name = "envoy.service.discovery.v2.SecretDiscoveryService.DeltaSecrets";
-  } else if (API_TYPE_URL_IS(Cluster)) {
+  } else if (typeUrlIs(type_url, envoy::api::v2::Cluster())) {
     method_name = "envoy.api.v2.ClusterDiscoveryService.DeltaClusters";
-  } else if (API_TYPE_URL_IS(ClusterLoadAssignment)) {
+  } else if (typeUrlIs(type_url, envoy::api::v2::ClusterLoadAssignment())) {
     method_name = "envoy.api.v2.EndpointDiscoveryService.DeltaEndpoints";
-  } else if (API_TYPE_URL_IS(Listener)) {
+  } else if (typeUrlIs(type_url, envoy::api::v2::Listener())) {
     method_name = "envoy.api.v2.ListenerDiscoveryService.DeltaListeners";
-  } else if (DISCOVERY_TYPE_URL_IS(Runtime)) {
+  } else if (typeUrlIs(type_url, envoy::service::discovery::v2::Runtime())) {
     method_name = "envoy.service.discovery.v2.RuntimeDiscoveryService.DeltaRuntime";
   }
   ASSERT(method_name != UnknownMethod);
@@ -46,19 +49,19 @@ const Protobuf::MethodDescriptor& deltaGrpcMethod(absl::string_view type_url) {
 
 const Protobuf::MethodDescriptor& sotwGrpcMethod(absl::string_view type_url) {
   std::string method_name = UnknownMethod;
-  if (API_TYPE_URL_IS(RouteConfiguration)) {
+  if (typeUrlIs(type_url, envoy::api::v2::RouteConfiguration())) {
     method_name = "envoy.api.v2.RouteDiscoveryService.StreamRoutes";
-  } else if (API_TYPE_URL_IS(ScopedRouteConfiguration)) {
+  } else if (typeUrlIs(type_url, envoy::api::v2::ScopedRouteConfiguration())) {
     method_name = "envoy.api.v2.ScopedRoutesDiscoveryService.StreamScopedRoutes";
-  } else if (API_TYPE_URL_IS(auth::Secret)) {
+  } else if (typeUrlIs(type_url, envoy::api::v2::auth::Secret())) {
     method_name = "envoy.service.discovery.v2.SecretDiscoveryService.StreamSecrets";
-  } else if (API_TYPE_URL_IS(Cluster)) {
+  } else if (typeUrlIs(type_url, envoy::api::v2::Cluster())) {
     method_name = "envoy.api.v2.ClusterDiscoveryService.StreamClusters";
-  } else if (API_TYPE_URL_IS(ClusterLoadAssignment)) {
+  } else if (typeUrlIs(type_url, envoy::api::v2::ClusterLoadAssignment())) {
     method_name = "envoy.api.v2.EndpointDiscoveryService.StreamEndpoints";
-  } else if (API_TYPE_URL_IS(Listener)) {
+  } else if (typeUrlIs(type_url, envoy::api::v2::Listener())) {
     method_name = "envoy.api.v2.ListenerDiscoveryService.StreamListeners";
-  } else if (DISCOVERY_TYPE_URL_IS(Runtime)) {
+  } else if (typeUrlIs(type_url, envoy::service::discovery::v2::Runtime())) {
     method_name = "envoy.service.discovery.v2.RuntimeDiscoveryService.StreamRuntime";
   }
   ASSERT(method_name != UnknownMethod);
@@ -67,25 +70,24 @@ const Protobuf::MethodDescriptor& sotwGrpcMethod(absl::string_view type_url) {
 
 const Protobuf::MethodDescriptor& restMethod(absl::string_view type_url) {
   std::string method_name = UnknownMethod;
-  if (API_TYPE_URL_IS(RouteConfiguration)) {
+  if (typeUrlIs(type_url, envoy::api::v2::RouteConfiguration())) {
     method_name = "envoy.api.v2.RouteDiscoveryService.FetchRoutes";
-  } else if (API_TYPE_URL_IS(ScopedRouteConfiguration)) {
+  } else if (typeUrlIs(type_url, envoy::api::v2::ScopedRouteConfiguration())) {
     method_name = "envoy.api.v2.ScopedRoutesDiscoveryService.FetchScopedRoutes";
-  } else if (API_TYPE_URL_IS(auth::Secret)) {
+  } else if (typeUrlIs(type_url, envoy::api::v2::auth::Secret())) {
     method_name = "envoy.service.discovery.v2.SecretDiscoveryService.FetchSecrets";
-  } else if (API_TYPE_URL_IS(Cluster)) {
+  } else if (typeUrlIs(type_url, envoy::api::v2::Cluster())) {
     method_name = "envoy.api.v2.ClusterDiscoveryService.FetchClusters";
-  } else if (API_TYPE_URL_IS(ClusterLoadAssignment)) {
+  } else if (typeUrlIs(type_url, envoy::api::v2::ClusterLoadAssignment())) {
     method_name = "envoy.api.v2.EndpointDiscoveryService.FetchEndpoints";
-  } else if (API_TYPE_URL_IS(Listener)) {
+  } else if (typeUrlIs(type_url, envoy::api::v2::Listener())) {
     method_name = "envoy.api.v2.ListenerDiscoveryService.FetchListeners";
-  } else if (DISCOVERY_TYPE_URL_IS(Runtime)) {
+  } else if (typeUrlIs(type_url, envoy::service::discovery::v2::Runtime())) {
     method_name = "envoy.service.discovery.v2.RuntimeDiscoveryService.FetchRuntime";
   }
   ASSERT(method_name != UnknownMethod);
   return *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(method_name);
 }
-#undef API_TYPE_URL_IS
 
 } // namespace Config
 } // namespace Envoy

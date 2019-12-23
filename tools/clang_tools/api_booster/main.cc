@@ -1,6 +1,6 @@
 // Upgrade a single Envoy C++ file to the latest API version.
 //
-// Currently this tool is a WiP and only does inference of .pb[.validate].h
+// Currently this tool is a WIP and only does inference of .pb[.validate].h
 // #include locations. This already exercises some of the muscles we need, such
 // as AST matching, rudimentary type inference and API type database lookup.
 //
@@ -82,7 +82,7 @@ public:
     return true;
   }
 
-  // Visitor callback for end of a compiation unit.
+  // Visitor callback for end of a compilation unit.
   void handleEndSource() override {
     // Dump known API header paths to stdout for api_boost.py to rewrite with
     // (no rewriting support in this tool yet).
@@ -259,7 +259,7 @@ private:
       // Die hard if we don't have a useful proto type for something that looks
       // like an API type(modulo a short whitelist).
       std::cerr << "Unknown API type: " << proto_type_name << std::endl;
-      // TODO(htuch): mabye there is a nicer way to terminate AST traversal?
+      // TODO(htuch): maybe there is a nicer way to terminate AST traversal?
       ::exit(1);
     }
 

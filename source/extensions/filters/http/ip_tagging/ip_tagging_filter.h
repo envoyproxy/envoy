@@ -48,11 +48,11 @@ private:
   static FilterRequestType requestTypeEnum(
       envoy::config::filter::http::ip_tagging::v3alpha::IPTagging::RequestType request_type) {
     switch (request_type) {
-    case envoy::config::filter::http::ip_tagging::v3alpha::IPTagging_RequestType_BOTH:
+    case envoy::config::filter::http::ip_tagging::v3alpha::IPTagging::BOTH:
       return FilterRequestType::BOTH;
-    case envoy::config::filter::http::ip_tagging::v3alpha::IPTagging_RequestType_INTERNAL:
+    case envoy::config::filter::http::ip_tagging::v3alpha::IPTagging::INTERNAL:
       return FilterRequestType::INTERNAL;
-    case envoy::config::filter::http::ip_tagging::v3alpha::IPTagging_RequestType_EXTERNAL:
+    case envoy::config::filter::http::ip_tagging::v3alpha::IPTagging::EXTERNAL:
       return FilterRequestType::EXTERNAL;
     default:
       NOT_REACHED_GCOVR_EXCL_LINE;

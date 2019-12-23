@@ -56,7 +56,8 @@ private:
 
 using LocalAsyncDataProviderPtr = std::unique_ptr<LocalAsyncDataProvider>;
 
-class RemoteAsyncDataProvider : public Config::DataFetcher::RemoteDataFetcherCallback {
+class RemoteAsyncDataProvider : public Config::DataFetcher::RemoteDataFetcherCallback,
+                                public Logger::Loggable<Logger::Id::config> {
 public:
   RemoteAsyncDataProvider(Upstream::ClusterManager& cm, Init::Manager& manager,
                           const envoy::api::v2::core::RemoteDataSource& source, bool allow_empty,
@@ -78,13 +79,12 @@ public:
 
   // Config::DataFetcher::RemoteDataFetcherCallback
   void onFailure(Config::DataFetcher::FailureReason failure) override {
+    ENVOY_LOG(debug, "Failed to fetch remote data. Failure reason: {}", enumToInt(failure));
     if (allow_empty_) {
       callback_(EMPTY_STRING);
-      init_target_.ready();
-    } else {
-      throw EnvoyException(
-          fmt::format("Failed to fetch remote data. Failure reason: {}", enumToInt(failure)));
     }
+    // We need to allow server startup to continue.
+    init_target_.ready();
   }
 
 private:

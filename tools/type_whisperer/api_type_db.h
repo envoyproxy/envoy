@@ -21,7 +21,7 @@ struct TypeInformation {
 
 // We don't expose the raw API type database to consumers, as this requires RTTI
 // and this may be linked in environments where this is not available (e.g.
-// libtooling binaries).
+// libtool binaries).
 class ApiTypeDb {
 public:
   static absl::optional<TypeInformation> getLatestTypeInformation(const std::string& type_name);
