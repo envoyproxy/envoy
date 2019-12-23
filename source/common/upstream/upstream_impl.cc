@@ -647,13 +647,9 @@ ClusterInfoImpl::ClusterInfoImpl(
       socket_matcher_(std::move(socket_matcher)), stats_scope_(std::move(stats_scope)),
       stats_(generateStats(*stats_scope_)), load_report_stats_store_(stats_scope_->symbolTable()),
       load_report_stats_(generateLoadReportStats(load_report_stats_store_)),
-      timeout_budget_stats_store_(
-          config.track_timeout_budgets()
-              ? std::make_unique<Stats::IsolatedStoreImpl>(stats_scope_->symbolTable())
-              : nullptr),
-      timeout_budget_stats_(timeout_budget_stats_store_
+      timeout_budget_stats_(config.track_timeout_budgets()
                                 ? absl::make_optional<ClusterTimeoutBudgetStats>(
-                                      generateTimeoutBudgetStats(*timeout_budget_stats_store_))
+                                      generateTimeoutBudgetStats(*stats_scope_))
                                 : absl::nullopt),
       features_(parseFeatures(config)),
       http1_settings_(Http::Utility::parseHttp1Settings(config.http_protocol_options())),

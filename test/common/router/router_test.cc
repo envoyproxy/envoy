@@ -1212,7 +1212,7 @@ TEST_F(RouterTest, TimeoutBudgetHistogramStatDuringRetries) {
   expectResponseTimerCreate();
 
   Http::TestHeaderMapImpl headers{{"x-envoy-retry-on", "5xx"},
-                                  {"x-envoy-upstream-rq-timeout-ms", "300"},
+                                  {"x-envoy-upstream-rq-timeout-ms", "400"},
                                   {"x-envoy-upstream-rq-per-try-timeout-ms", "100"}};
   HttpTestUtility::addDefaultHeaders(headers);
   router_.decodeHeaders(headers, false);
@@ -1223,13 +1223,18 @@ TEST_F(RouterTest, TimeoutBudgetHistogramStatDuringRetries) {
   EXPECT_CALL(cm_.thread_local_cluster_.cluster_.info_->timeout_budget_stats_store_,
               deliverHistogramToSinks(
                   Property(&Stats::Metric::name, "upstream_rq_timeout_budget_per_try_percent_used"),
-                  50ull));
+                  100ull));
+  // Global timeout histogram does not fire on the first request.
+  EXPECT_CALL(cm_.thread_local_cluster_.cluster_.info_->timeout_budget_stats_store_,
+              deliverHistogramToSinks(
+                  Property(&Stats::Metric::name, "upstream_rq_timeout_budget_percent_used"), _))
+      .Times(0);
 
-  // 5xx response.
+  // Per-try timeout.
+  test_time_.sleep(std::chrono::milliseconds(100));
   router_.retry_state_->expectHeadersRetry();
-  Http::HeaderMapPtr response_headers1(new Http::TestHeaderMapImpl{{":status", "503"}});
-  EXPECT_CALL(cm_.conn_pool_.host_->outlier_detector_, putHttpResponseCode(503));
-  test_time_.sleep(std::chrono::milliseconds(50));
+  Http::HeaderMapPtr response_headers1(new Http::TestHeaderMapImpl{{":status", "504"}});
+  EXPECT_CALL(cm_.conn_pool_.host_->outlier_detector_, putHttpResponseCode(504));
   response_decoder1->decodeHeaders(std::move(response_headers1), true);
   EXPECT_TRUE(verifyHostUpstreamStats(0, 1));
 
@@ -1247,7 +1252,7 @@ TEST_F(RouterTest, TimeoutBudgetHistogramStatDuringRetries) {
   expectPerTryTimerCreate();
   router_.retry_state_->callback_();
 
-  // Per-try budget used on the second request is 100.
+  // Per-try budget exhausted on the second try.
   EXPECT_CALL(cm_.thread_local_cluster_.cluster_.info_->timeout_budget_stats_store_,
               deliverHistogramToSinks(
                   Property(&Stats::Metric::name, "upstream_rq_timeout_budget_per_try_percent_used"),
@@ -1258,7 +1263,7 @@ TEST_F(RouterTest, TimeoutBudgetHistogramStatDuringRetries) {
       deliverHistogramToSinks(
           Property(&Stats::Metric::name, "upstream_rq_timeout_budget_percent_used"), 50ull));
 
-  // Trigger second per-try timeout.
+  // Trigger second request failure.
   EXPECT_CALL(callbacks_.stream_info_,
               setResponseFlag(StreamInfo::ResponseFlag::UpstreamRequestTimeout));
   EXPECT_CALL(encoder2.stream_, resetStream(Http::StreamResetReason::LocalReset));
@@ -1307,6 +1312,11 @@ TEST_F(RouterTest, TimeoutBudgetHistogramStatDuringGlobalTimeout) {
               deliverHistogramToSinks(
                   Property(&Stats::Metric::name, "upstream_rq_timeout_budget_per_try_percent_used"),
                   50ull));
+  // Global timeout histogram does not fire on the first request.
+  EXPECT_CALL(cm_.thread_local_cluster_.cluster_.info_->timeout_budget_stats_store_,
+              deliverHistogramToSinks(
+                  Property(&Stats::Metric::name, "upstream_rq_timeout_budget_percent_used"), _))
+      .Times(0);
 
   // 5xx response.
   router_.retry_state_->expectHeadersRetry();

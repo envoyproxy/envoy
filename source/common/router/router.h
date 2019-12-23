@@ -488,6 +488,9 @@ private:
     // had not been completed yet.
     bool create_per_try_timeout_on_request_complete_ : 1;
 
+    // If configured for the cluster, this will fire a histogram to indicate what
+    // percentage of the per-try timeout was used whenever the UpstreamRequest
+    // finishes.
     std::unique_ptr<Cleanup> timeout_budget_stats_;
   };
 
@@ -512,6 +515,7 @@ private:
   void maybeDoShadowing();
   bool maybeRetryReset(Http::StreamResetReason reset_reason, UpstreamRequest& upstream_request);
   uint32_t numRequestsAwaitingHeaders();
+  void onGlobalTimeout();
   void onPerTryTimeout(UpstreamRequest& upstream_request);
   void onRequestComplete();
   void onResponseTimeout();

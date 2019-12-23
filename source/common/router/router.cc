@@ -762,13 +762,6 @@ void Filter::onResponseTimeout() {
         // Cancel firing per-try timeout information, because the per-try timeout did not come into
         // play when the global timeout was hit.
         upstream_request->timeout_budget_stats_->cancel();
-
-        Event::Dispatcher& dispatcher = callbacks_->dispatcher();
-        std::chrono::milliseconds response_time =
-            std::chrono::duration_cast<std::chrono::milliseconds>(
-                dispatcher.timeSource().monotonicTime() - downstream_request_complete_time_);
-        cluster_->timeoutBudgetStats()->upstream_rq_timeout_budget_percent_used_.recordValue(
-            percentageOfTimeout(response_time, timeout_.global_timeout_));
       }
 
       if (upstream_request->upstream_host_) {
@@ -832,15 +825,6 @@ void Filter::onPerTryTimeout(UpstreamRequest& upstream_request) {
     upstream_request.upstream_host_->stats().rq_timeout_.inc();
   }
 
-  if (cluster_->timeoutBudgetStats().has_value()) {
-    Event::Dispatcher& dispatcher = callbacks_->dispatcher();
-    std::chrono::milliseconds response_time = std::chrono::duration_cast<std::chrono::milliseconds>(
-        dispatcher.timeSource().monotonicTime() - downstream_request_complete_time_);
-
-    cluster_->timeoutBudgetStats()->upstream_rq_timeout_budget_percent_used_.recordValue(
-        percentageOfTimeout(response_time, timeout_.global_timeout_));
-  }
-
   upstream_request.resetStream();
 
   updateOutlierDetection(Upstream::Outlier::Result::LocalOriginTimeout, upstream_request,
@@ -888,6 +872,15 @@ void Filter::chargeUpstreamAbort(Http::Code code, bool dropped, UpstreamRequest&
 
 void Filter::onUpstreamTimeoutAbort(StreamInfo::ResponseFlag response_flags,
                                     absl::string_view details) {
+  if (cluster_->timeoutBudgetStats().has_value()) {
+    Event::Dispatcher& dispatcher = callbacks_->dispatcher();
+    std::chrono::milliseconds response_time = std::chrono::duration_cast<std::chrono::milliseconds>(
+        dispatcher.timeSource().monotonicTime() - downstream_request_complete_time_);
+
+    cluster_->timeoutBudgetStats()->upstream_rq_timeout_budget_percent_used_.recordValue(
+        percentageOfTimeout(response_time, timeout_.global_timeout_));
+  }
+
   const absl::string_view body =
       timeout_response_code_ == Http::Code::GatewayTimeout ? "upstream request timeout" : "";
   onUpstreamAbort(timeout_response_code_, response_flags, body, false, details);
@@ -1416,13 +1409,17 @@ Filter::UpstreamRequest::UpstreamRequest(Filter& parent, Http::ConnectionPool::I
     }
   }
 
+  // If configured, set up the per-try histogram to fire when the UpstreamRequest
+  // completes. This is done via a Cleanup so that it can be cancelled if the global
+  // timeout is what cancels the request instead of the per-try timeout, and then avoid
+  // writing a misleading value into the histogram.
   if (parent_.cluster_->timeoutBudgetStats().has_value()) {
     const auto start_time = parent_.callbacks_->dispatcher().timeSource().monotonicTime();
     timeout_budget_stats_ = std::make_unique<Cleanup>([this, start_time]() {
       Event::Dispatcher& dispatcher = parent_.callbacks_->dispatcher();
-      std::chrono::milliseconds response_time =
-          std::chrono::duration_cast<std::chrono::milliseconds>(
-              dispatcher.timeSource().monotonicTime() - start_time);
+      const MonotonicTime end_time = dispatcher.timeSource().monotonicTime();
+      const std::chrono::milliseconds response_time =
+          std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time);
       parent_.cluster_->timeoutBudgetStats()
           ->upstream_rq_timeout_budget_per_try_percent_used_.recordValue(
               percentageOfTimeout(response_time, parent_.timeout_.per_try_timeout_));

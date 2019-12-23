@@ -560,7 +560,7 @@ public:
   ClusterStats& stats() const override { return stats_; }
   Stats::Scope& statsScope() const override { return *stats_scope_; }
   ClusterLoadReportStats& loadReportStats() const override { return load_report_stats_; }
-  absl::optional<ClusterTimeoutBudgetStats>& timeoutBudgetStats() const override {
+  const absl::optional<ClusterTimeoutBudgetStats>& timeoutBudgetStats() const override {
     return timeout_budget_stats_;
   }
   const Network::Address::InstanceConstSharedPtr& sourceAddress() const override {
@@ -609,8 +609,7 @@ private:
   mutable ClusterStats stats_;
   Stats::IsolatedStoreImpl load_report_stats_store_;
   mutable ClusterLoadReportStats load_report_stats_;
-  const std::unique_ptr<Stats::IsolatedStoreImpl> timeout_budget_stats_store_;
-  mutable absl::optional<ClusterTimeoutBudgetStats> timeout_budget_stats_;
+  const absl::optional<ClusterTimeoutBudgetStats> timeout_budget_stats_;
   const uint64_t features_;
   const Http::Http1Settings http1_settings_;
   const Http::Http2Settings http2_settings_;
