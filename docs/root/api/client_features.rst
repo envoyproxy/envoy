@@ -16,5 +16,5 @@ Currently Defined Client Features
 | envoy.config.require-any-fields-contain-struct | This feature indicates that xDS client requires |
 |                                                | that the configuration entries of type          |
 |                                                | *google.protobuf.Any* contain messages of type  |
-|                                                | *google.protobuf.Struct* only.                  |
+|                                                | *google.protobuf.Struct* only                   |
 +------------------------------------------------+-------------------------------------------------+
