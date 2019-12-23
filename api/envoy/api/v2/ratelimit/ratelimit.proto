@@ -2,11 +2,13 @@ syntax = "proto3";
 
 package envoy.api.v2.ratelimit;
 
+import "udpa/annotations/migrate.proto";
 import "validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.api.v2.ratelimit";
 option java_outer_classname = "RatelimitProto";
 option java_multiple_files = true;
+option (udpa.annotations.file_migrate).move_to_package = "envoy.config.ratelimit.v3alpha";
 
 // [#protodoc-title: Common rate limit components]
 

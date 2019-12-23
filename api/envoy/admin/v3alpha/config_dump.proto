@@ -6,8 +6,8 @@ import "envoy/api/v3alpha/auth/cert.proto";
 import "envoy/api/v3alpha/cds.proto";
 import "envoy/api/v3alpha/lds.proto";
 import "envoy/api/v3alpha/rds.proto";
-import "envoy/api/v3alpha/srds.proto";
 import "envoy/config/bootstrap/v3alpha/bootstrap.proto";
+import "envoy/service/route/v3alpha/srds.proto";
 
 import "google/protobuf/any.proto";
 import "google/protobuf/timestamp.proto";
@@ -264,7 +264,7 @@ message ScopedRoutesConfigDump {
     string name = 1;
 
     // The scoped route configurations.
-    repeated api.v3alpha.ScopedRouteConfiguration scoped_route_configs = 2;
+    repeated service.route.v3alpha.ScopedRouteConfiguration scoped_route_configs = 2;
 
     // The timestamp when the scoped route config set was last updated.
     google.protobuf.Timestamp last_updated = 3;
@@ -283,7 +283,7 @@ message ScopedRoutesConfigDump {
     string version_info = 2;
 
     // The scoped route configurations.
-    repeated api.v3alpha.ScopedRouteConfiguration scoped_route_configs = 3;
+    repeated service.route.v3alpha.ScopedRouteConfiguration scoped_route_configs = 3;
 
     // The timestamp when the scoped route config set was last updated.
     google.protobuf.Timestamp last_updated = 4;

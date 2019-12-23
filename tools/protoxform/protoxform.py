@@ -33,6 +33,7 @@ from google.protobuf import text_format
 # this also serves as whitelist of extended options.
 from google.api import annotations_pb2 as _
 from validate import validate_pb2 as _
+from udpa.annotations import migrate_pb2
 
 CLANG_FORMAT_STYLE = ('{ColumnLimit: 100, SpacesInContainerLiterals: false, '
                       'AllowShortFunctionsOnASingleLine: false}')
@@ -184,6 +185,11 @@ def FormatHeaderFromFile(source_code_info, file_proto):
 
   if file_proto.service:
     options.java_generic_services = True
+
+  if file_proto.options.HasExtension(migrate_pb2.file_migrate):
+    options.Extensions[migrate_pb2.file_migrate].CopyFrom(
+        file_proto.options.Extensions[migrate_pb2.file_migrate])
+
   options_block = FormatOptions(options)
 
   requires_versioning_import = any(
