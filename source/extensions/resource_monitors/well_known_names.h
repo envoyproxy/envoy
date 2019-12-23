@@ -18,6 +18,9 @@ public:
 
   // File-based injected resource monitor.
   const std::string InjectedResource = "envoy.resource_monitors.injected_resource";
+
+  // Monitoring the difference and percentage of allocated and reserved memory
+  const std::string UnusedHeap = "envoy.resource_monitors.unused_heap";
 };
 
 using ResourceMonitorNames = ConstSingleton<ResourceMonitorNameValues>;

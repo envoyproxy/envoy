@@ -106,6 +106,7 @@ EXTENSIONS = {
 
     "envoy.resource_monitors.fixed_heap":               "//source/extensions/resource_monitors/fixed_heap:config",
     "envoy.resource_monitors.injected_resource":        "//source/extensions/resource_monitors/injected_resource:config",
+    "envoy.resource_monitors.unused_heap":              "//source/extensions/resource_monitors/unused_heap:config",
 
     #
     # Stat sinks

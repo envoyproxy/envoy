@@ -16,3 +16,12 @@ envoy_cc_library(
         "//source/common/protobuf:utility_lib",
     ],
 )
+
+envoy_cc_library(
+    name = "memory_stats_reader_lib",
+    srcs = ["memory_stats_reader.cc"],
+    hdrs = ["memory_stats_reader.h"],
+    deps = [
+        "//source/common/memory:stats_lib",
+    ],
+)
