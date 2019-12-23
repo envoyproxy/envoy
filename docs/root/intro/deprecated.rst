@@ -20,6 +20,10 @@ Version 1.13.0 (pending)
   <envoy_api_field_auth.CertificateValidationContext.verify_subject_alt_name>`
   has been deprecated in favor of the :ref:`match_subject_alt_names
   <envoy_api_field_auth.CertificateValidationContext.match_subject_alt_names>` field.
+* The `cors` field in :ref:`VirtualHost <envoy_api_msg_route.VirtualHost>` has been deprecated in favor of
+  :ref:`typed_per_filter_config <envoy_api_field_route.VirtualHost.typed_per_filter_config>` for the CORS HTTP filter.
+* The `cors` field in :ref:`RouteAction <envoy_api_msg_route.RouteAction>` has been deprecated in favor of
+  :ref:`typed_per_filter_config <envoy_api_field_route.Route.typed_per_filter_config>` for the CORS HTTP filter.
 
 Version 1.12.0 (October 31, 2019)
 =================================
