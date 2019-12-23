@@ -764,12 +764,12 @@ ClientContextImpl::ClientContextImpl(Stats::Scope& scope,
   }
 
   if (!config.signingAlgorithmsForTest().empty()) {
-    const auto sigalgs = parseSigningAlgorithmsForTest(config.signingAlgorithmsForTest());
-    RELEASE_ASSERT(sigalgs.has_value(), fmt::format("unsupported signing algorithm {}",
-                                                    config.signingAlgorithmsForTest()));
+    const uint16_t sigalgs = parseSigningAlgorithmsForTest(config.signingAlgorithmsForTest());
+    RELEASE_ASSERT(sigalgs != 0, fmt::format("unsupported signing algorithm {}",
+                                             config.signingAlgorithmsForTest()));
 
     for (auto& ctx : tls_contexts_) {
-      int rc = SSL_CTX_set_verify_algorithm_prefs(ctx.ssl_ctx_.get(), &sigalgs.value(), 1);
+      int rc = SSL_CTX_set_verify_algorithm_prefs(ctx.ssl_ctx_.get(), &sigalgs, 1);
       RELEASE_ASSERT(rc == 1, Utility::getLastCryptoError().value_or(""));
     }
   }
@@ -863,8 +863,7 @@ int ClientContextImpl::newSessionKey(SSL_SESSION* session) {
   return 1; // Tell BoringSSL that we took ownership of the session.
 }
 
-absl::optional<uint16_t>
-ClientContextImpl::parseSigningAlgorithmsForTest(const std::string& sigalgs) {
+uint16_t ClientContextImpl::parseSigningAlgorithmsForTest(const std::string& sigalgs) {
   // This is used only when testing RSA/ECDSA certificate selection, so only the signing algorithms
   // used in tests are supported here.
   if (sigalgs == "rsa_pss_rsae_sha256") {
@@ -872,8 +871,7 @@ ClientContextImpl::parseSigningAlgorithmsForTest(const std::string& sigalgs) {
   } else if (sigalgs == "ecdsa_secp256r1_sha256") {
     return SSL_SIGN_ECDSA_SECP256R1_SHA256;
   }
-
-  return absl::optional<uint16_t>();
+  return 0;
 }
 
 ServerContextImpl::ServerContextImpl(Stats::Scope& scope,

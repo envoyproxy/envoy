@@ -17,7 +17,6 @@
 #include "extensions/transport_sockets/tls/context_manager_impl.h"
 
 #include "absl/synchronization/mutex.h"
-#include "absl/types/optional.h"
 #include "openssl/ssl.h"
 
 namespace Envoy {
@@ -191,7 +190,7 @@ public:
 
 private:
   int newSessionKey(SSL_SESSION* session);
-  absl::optional<uint16_t> parseSigningAlgorithmsForTest(const std::string& sigalgs);
+  uint16_t parseSigningAlgorithmsForTest(const std::string& sigalgs);
 
   const std::string server_name_indication_;
   const bool allow_renegotiation_;
