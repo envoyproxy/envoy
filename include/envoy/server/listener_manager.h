@@ -211,6 +211,8 @@ public:
    */
   using FailureStates = std::vector<std::unique_ptr<envoy::admin::v2alpha::UpdateFailureState>>;
   virtual void endListenerUpdate(FailureStates&& failure_states) PURE;
+
+  virtual Http::ServerConnectionCallbacks* apiListener() PURE;
 };
 
 } // namespace Server

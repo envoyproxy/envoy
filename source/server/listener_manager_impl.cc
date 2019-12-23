@@ -29,6 +29,7 @@
 
 #include "extensions/filters/listener/well_known_names.h"
 #include "extensions/transport_sockets/well_known_names.h"
+#include "extensions/filters/network/http_connection_manager/config.h"
 
 namespace Envoy {
 namespace Server {
@@ -300,6 +301,16 @@ ListenerManagerStats ListenerManagerImpl::generateStats(Stats::Scope& scope) {
 
 bool ListenerManagerImpl::addOrUpdateListener(const envoy::api::v2::Listener& config,
                                               const std::string& version_info, bool added_via_api) {
+
+  // FIXME initial experimentation where we only allow one API listener to exist and to come from
+  // bootstrap
+  if (!api_listener_ && config.has_api_listener()) {
+    ENVOY_LOG(error, "initializing API listener");
+    api_listener_ = std::make_unique<ApiListenerImpl>(
+        config, *this, config.name(), server_.messageValidationContext().staticValidationVisitor());
+    return true;
+  }
+
   std::string name;
   if (!config.name().empty()) {
     name = config.name();

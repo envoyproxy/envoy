@@ -420,6 +420,8 @@ public:
                                    bool is_internally_created = false) PURE;
 };
 
+using ServerConnectionCallbacksPtr = std::unique_ptr<ServerConnectionCallbacks>;
+
 /**
  * A server side HTTP connection.
  */

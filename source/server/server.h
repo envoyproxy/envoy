@@ -223,6 +223,9 @@ public:
   ThreadLocal::Instance& threadLocal() override { return thread_local_; }
   const LocalInfo::LocalInfo& localInfo() const override { return *local_info_; }
   TimeSource& timeSource() override { return time_source_; }
+  Http::ServerConnectionCallbacks* apiListener() override {
+    return listenerManager().apiListener();
+  }
 
   Configuration::ServerFactoryContext& serverFactoryContext() override { return server_context_; }
 

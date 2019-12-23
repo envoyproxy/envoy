@@ -11,6 +11,7 @@
 #include "envoy/config/filter/network/http_connection_manager/v2/http_connection_manager.pb.h"
 #include "envoy/config/filter/network/http_connection_manager/v2/http_connection_manager.pb.validate.h"
 #include "envoy/http/filter.h"
+#include "envoy/http/codec.h"
 #include "envoy/router/route_config_provider_manager.h"
 
 #include "common/common/logger.h"
@@ -197,6 +198,13 @@ private:
   static const uint64_t StreamIdleTimeoutMs = 5 * 60 * 1000;
   // request timeout is disabled by default
   static const uint64_t RequestTimeoutMs = 0;
+};
+
+class HttpConnectionManagerFactory {
+public:
+  static std::function<Http::ServerConnectionCallbacksPtr(Network::ReadFilterCallbacks&)>
+  createHttpConnectionManagerFactoryFromProto(const ProtobufWkt::Any& proto_config,
+                                              Server::Configuration::FactoryContext& context);
 };
 
 } // namespace HttpConnectionManager

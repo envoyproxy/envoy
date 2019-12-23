@@ -6,8 +6,6 @@
 #include <vector>
 
 #include "envoy/api/v2/core/base.pb.h"
-#include "envoy/config/filter/network/http_connection_manager/v2/http_connection_manager.pb.h"
-#include "envoy/config/filter/network/http_connection_manager/v2/http_connection_manager.pb.validate.h"
 #include "envoy/filesystem/filesystem.h"
 #include "envoy/server/admin.h"
 #include "envoy/tracing/http_tracer.h"
@@ -487,6 +485,73 @@ bool HttpConnectionManagerConfig::createUpgradeFilterChain(
 
 const Network::Address::Instance& HttpConnectionManagerConfig::localAddress() {
   return *context_.localInfo().address();
+}
+
+// Singleton registration via macro defined in envoy/singleton/manager.h
+SINGLETON_MANAGER_REGISTRATION(hcm_date_provider);
+SINGLETON_MANAGER_REGISTRATION(hcm_route_config_provider_manager);
+SINGLETON_MANAGER_REGISTRATION(hcm_scoped_routes_config_provider_manager);
+
+std::function<Http::ServerConnectionCallbacksPtr(Network::ReadFilterCallbacks&)>
+HttpConnectionManagerFactory::createHttpConnectionManagerFactoryFromProto(
+    const ProtobufWkt::Any& proto_config, Server::Configuration::FactoryContext& context) {
+  ENVOY_LOG_MISC(error, "In factory");
+  auto typed_config = MessageUtil::anyConvert<
+      envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager>(
+      proto_config);
+  ENVOY_LOG_MISC(error, "Downcasted proto successfully");
+
+  std::shared_ptr<Http::TlsCachingDateProviderImpl> hcm_date_provider =
+      context.singletonManager().getTyped<Http::TlsCachingDateProviderImpl>(
+          SINGLETON_MANAGER_REGISTERED_NAME(hcm_date_provider), [&context] {
+            return std::make_shared<Http::TlsCachingDateProviderImpl>(context.dispatcher(),
+                                                                      context.threadLocal());
+          });
+  ENVOY_LOG_MISC(error, "Built date provider");
+
+  std::shared_ptr<Router::RouteConfigProviderManager> hcm_route_config_provider_manager =
+      context.singletonManager().getTyped<Router::RouteConfigProviderManager>(
+          SINGLETON_MANAGER_REGISTERED_NAME(hcm_route_config_provider_manager), [&context] {
+            return std::make_shared<Router::RouteConfigProviderManagerImpl>(context.admin());
+          });
+
+  ENVOY_LOG_MISC(error, "Built route config provider");
+
+  std::shared_ptr<Router::ScopedRoutesConfigProviderManager>
+      hcm_scoped_routes_config_provider_manager =
+          context.singletonManager().getTyped<Router::ScopedRoutesConfigProviderManager>(
+              SINGLETON_MANAGER_REGISTERED_NAME(hcm_scoped_routes_config_provider_manager),
+              [&context, hcm_route_config_provider_manager] {
+                return std::make_shared<Router::ScopedRoutesConfigProviderManager>(
+                    context.admin(), *hcm_route_config_provider_manager);
+              });
+  ENVOY_LOG_MISC(error, "built scoped route provider");
+
+  std::shared_ptr<HttpConnectionManagerConfig> filter_config(new HttpConnectionManagerConfig(
+      typed_config, context, *hcm_date_provider, *hcm_route_config_provider_manager,
+      *hcm_scoped_routes_config_provider_manager));
+  ENVOY_LOG_MISC(error, "built config");
+
+  // This lambda captures the shared_ptrs created above, thus preserving the
+  // reference count.
+  // Keep in mind the lambda capture list **doesn't** determine the destruction order, but it's fine
+  // as these captured objects are also global singletons.
+  ENVOY_LOG_MISC(error, "about to return lambda");
+
+  return [hcm_scoped_routes_config_provider_manager, hcm_route_config_provider_manager,
+          hcm_date_provider, filter_config, &context](
+             Network::ReadFilterCallbacks& read_callbacks) -> Http::ServerConnectionCallbacksPtr {
+    ENVOY_LOG_MISC(error, "Inside of factory lambda");
+
+    auto conn_manager = std::make_unique<Http::ConnectionManagerImpl>(
+        *filter_config, context.drainDecision(), context.random(), context.httpContext(),
+        context.runtime(), context.localInfo(), context.clusterManager(),
+        &context.overloadManager(), context.dispatcher().timeSource());
+
+    conn_manager->initializeReadFilterCallbacks(read_callbacks);
+
+    return conn_manager;
+  };
 }
 
 } // namespace HttpConnectionManager

@@ -145,6 +145,9 @@ public:
   void beginListenerUpdate() override { error_state_tracker_.clear(); }
   void endListenerUpdate(FailureStates&& failure_state) override;
   Http::Context& httpContext() { return server_.httpContext(); }
+  Http::ServerConnectionCallbacks* apiListener() override {
+    return api_listener_ ? api_listener_->apiHandle() : nullptr;
+  }
 
   Instance& server_;
   ListenerComponentFactory& factory_;
@@ -214,6 +217,7 @@ private:
   createListenSocketFactory(const envoy::api::v2::core::Address& proto_address,
                             ListenerImpl& listener, bool reuse_port);
 
+  std::unique_ptr<ApiListenerImpl> api_listener_;
   // Active listeners are listeners that are currently accepting new connections on the workers.
   ListenerList active_listeners_;
   // Warming listeners are listeners that may need further initialization via the listener's init

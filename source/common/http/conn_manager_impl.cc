@@ -118,7 +118,9 @@ ConnectionManagerImpl::ConnectionManagerImpl(ConnectionManagerConfig& config,
           overload_manager ? overload_manager->getThreadLocalOverloadState().getState(
                                  Server::OverloadActionNames::get().DisableHttpKeepAlive)
                            : Server::OverloadManager::getInactiveState()),
-      time_source_(time_source) {}
+      time_source_(time_source) {
+  ENVOY_LOG(error, "HCM constructor");
+}
 
 const HeaderMapImpl& ConnectionManagerImpl::continueHeader() {
   CONSTRUCT_ON_FIRST_USE(HeaderMapImpl,
@@ -258,7 +260,8 @@ StreamDecoder& ConnectionManagerImpl::newStream(StreamEncoder& response_encoder,
   if (connection_idle_timer_) {
     connection_idle_timer_->disableTimer();
   }
-
+  ENVOY_LOG(error, "we should crash here");
+  ENVOY_CONN_LOG(error, "new stream", read_callbacks_->connection());
   ENVOY_CONN_LOG(debug, "new stream", read_callbacks_->connection());
   ActiveStreamPtr new_stream(new ActiveStream(*this));
   new_stream->state_.is_internally_created_ = is_internally_created;
@@ -1382,23 +1385,23 @@ void ConnectionManagerImpl::ActiveStream::sendLocalReply(
     createFilterChain();
   }
   stream_info_.setResponseCodeDetails(details);
-  Utility::sendLocalReply(
-      is_grpc_request,
-      [this, modify_headers](HeaderMapPtr&& headers, bool end_stream) -> void {
-        if (modify_headers != nullptr) {
-          modify_headers(*headers);
-        }
-        response_headers_ = std::move(headers);
-        // TODO: Start encoding from the last decoder filter that saw the
-        // request instead.
-        encodeHeaders(nullptr, *response_headers_, end_stream);
-      },
-      [this](Buffer::Instance& data, bool end_stream) -> void {
-        // TODO: Start encoding from the last decoder filter that saw the
-        // request instead.
-        encodeData(nullptr, data, end_stream, FilterIterationStartState::CanStartFromCurrent);
-      },
-      state_.destroyed_, code, body, grpc_status, is_head_request);
+  Utility::sendLocalReply(is_grpc_request,
+                          [this, modify_headers](HeaderMapPtr&& headers, bool end_stream) -> void {
+                            if (modify_headers != nullptr) {
+                              modify_headers(*headers);
+                            }
+                            response_headers_ = std::move(headers);
+                            // TODO: Start encoding from the last decoder filter that saw the
+                            // request instead.
+                            encodeHeaders(nullptr, *response_headers_, end_stream);
+                          },
+                          [this](Buffer::Instance& data, bool end_stream) -> void {
+                            // TODO: Start encoding from the last decoder filter that saw the
+                            // request instead.
+                            encodeData(nullptr, data, end_stream,
+                                       FilterIterationStartState::CanStartFromCurrent);
+                          },
+                          state_.destroyed_, code, body, grpc_status, is_head_request);
 }
 
 void ConnectionManagerImpl::ActiveStream::encode100ContinueHeaders(
