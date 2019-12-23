@@ -11,9 +11,9 @@
 #include "envoy/server/listener_manager.h"
 #include "envoy/stats/scope.h"
 
+#include "common/common/empty_string.h"
 #include "common/common/logger.h"
 #include "common/init/manager_impl.h"
-#include "common/common/empty_string.h"
 #include "common/stream_info/stream_info_impl.h"
 
 #include "server/filter_chain_manager_impl.h"
@@ -381,7 +381,7 @@ private:
   std::function<Http::ServerConnectionCallbacksPtr(Network::ReadFilterCallbacks&)>
       http_connection_manager_factory_;
   Http::ServerConnectionCallbacksPtr http_connection_manager_;
-}; // namespace Server
-}; // namespace Server
+};
 
-    ;
+} // namespace Server
+} // namespace Envoy

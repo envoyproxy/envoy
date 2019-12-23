@@ -260,19 +260,38 @@ StreamDecoder& ConnectionManagerImpl::newStream(StreamEncoder& response_encoder,
   if (connection_idle_timer_) {
     connection_idle_timer_->disableTimer();
   }
-  ENVOY_LOG(error, "we should crash here");
+
   ENVOY_CONN_LOG(error, "new stream", read_callbacks_->connection());
-  ENVOY_CONN_LOG(debug, "new stream", read_callbacks_->connection());
+  ENVOY_CONN_LOG(error, "new stream2", read_callbacks_->connection());
+
+  if (!read_callbacks_) {
+    ENVOY_LOG_MISC(error, "read_callbacks is null");
+  }
+  ENVOY_CONN_LOG(debug, "new stream3", read_callbacks_->connection());
   ActiveStreamPtr new_stream(new ActiveStream(*this));
+  ENVOY_CONN_LOG(error, "new stream4", read_callbacks_->connection());
+
   new_stream->state_.is_internally_created_ = is_internally_created;
+  ENVOY_CONN_LOG(error, "new stream5", read_callbacks_->connection());
+
   new_stream->response_encoder_ = &response_encoder;
+  ENVOY_CONN_LOG(error, "new stream6", read_callbacks_->connection());
+
   new_stream->response_encoder_->getStream().addCallbacks(*new_stream);
+  ENVOY_CONN_LOG(error, "new stream7", read_callbacks_->connection());
+
   new_stream->buffer_limit_ = new_stream->response_encoder_->getStream().bufferLimit();
+  ENVOY_CONN_LOG(error, "new stream8", read_callbacks_->connection());
+
   // If the network connection is backed up, the stream should be made aware of it on creation.
   // Both HTTP/1.x and HTTP/2 codecs handle this in StreamCallbackHelper::addCallbacks_.
   ASSERT(read_callbacks_->connection().aboveHighWatermark() == false ||
          new_stream->high_watermark_count_ > 0);
+  ENVOY_CONN_LOG(error, "new stream9", read_callbacks_->connection());
+
   new_stream->moveIntoList(std::move(new_stream), streams_);
+  ENVOY_CONN_LOG(error, "new stream10", read_callbacks_->connection());
+
   return **streams_.begin();
 }
 
