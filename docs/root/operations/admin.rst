@@ -155,14 +155,14 @@ modify different aspects of the server:
 
 .. _operations_admin_interface_config_dump_by_resource_and_mask:
 
-.. http:get:: /config_dump?resource={},mask={}
+.. http:get:: /config_dump?resource={}&mask={}
 
   When both resource and mask query parameters are specified, the mask is applied to every element
   in the desired repeated field so that only a subset of fields are returned. The mask is parsed
   as a ``ProtobufWkt::FieldMask``.
 
   For example, get the names of all active dynamic clusters with
-  ``/config_dump?resource=dynamic_active_clusters,mask=cluster.name``
+  ``/config_dump?resource=dynamic_active_clusters&mask=cluster.name``
 
 .. http:get:: /contention
 
