@@ -242,11 +242,10 @@ void ThreadLocalStoreImpl::releaseScopeCrossThread(ScopeImpl* scope) {
   }
 }
 
-void ThreadLocalStoreImpl::TlsCache::eraseScope(uint64_t scope_id) {
-  scope_cache_.erase(scope_id);
-}
+void ThreadLocalStoreImpl::TlsCache::eraseScope(uint64_t scope_id) { scope_cache_.erase(scope_id); }
 
-ThreadLocalStoreImpl::TlsCacheEntry& ThreadLocalStoreImpl::TlsCache::insertScope(uint64_t scope_id) {
+ThreadLocalStoreImpl::TlsCacheEntry&
+ThreadLocalStoreImpl::TlsCache::insertScope(uint64_t scope_id) {
   return scope_cache_[scope_id];
 }
 

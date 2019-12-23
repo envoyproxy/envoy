@@ -1196,53 +1196,54 @@ TEST_F(HistogramTest, ParentHistogramBucketSummary) {
 }
 
 class ClusterShutdownRaceTest : public ThreadLocalStoreNoMocksTestBase {
- public:
+public:
   static constexpr uint32_t NumThreads = 10;
   static constexpr uint32_t NumWorkerThreads = NumThreads - 1;
   static constexpr uint32_t NumScopes = 100;
   static constexpr uint32_t MainThreadIndex = 0;
 
   class BlockingScope {
-   public:
+  public:
     explicit BlockingScope(uint32_t count) : blocking_counter_(count) {}
     ~BlockingScope() { blocking_counter_.Wait(); }
 
     std::function<void()> run(std::function<void()> f) {
-      return [this, f]() { f(); decrementCount(); };
+      return [this, f]() {
+        f();
+        decrementCount();
+      };
     }
 
     void decrementCount() { blocking_counter_.DecrementCount(); }
 
-   private:
+  private:
     absl::BlockingCounter blocking_counter_;
   };
 
-  ClusterShutdownRaceTest() : api_(Api::createApiForTest()),
-                              thread_factory_(api_->threadFactory()),
-                              pool_(store_->symbolTable()),
-                              my_counter_name_(pool_.add("my_counter")) {
+  ClusterShutdownRaceTest()
+      : api_(Api::createApiForTest()), thread_factory_(api_->threadFactory()),
+        pool_(store_->symbolTable()), my_counter_name_(pool_.add("my_counter")) {
     // This is the same order as InstanceImpl::initialize in source/server/server.cc.
     thread_dispatchers_.resize(NumThreads);
     {
       BlockingScope blocking_scope(NumThreads);
       for (uint32_t i = 0; i < NumThreads; ++i) {
-        threads_.emplace_back(thread_factory_.createThread([this, i, &blocking_scope]() {
-                                                             threadFn(i, blocking_scope);
-                                                           }));
+        threads_.emplace_back(thread_factory_.createThread(
+            [this, i, &blocking_scope]() { threadFn(i, blocking_scope); }));
       }
     }
 
     {
       BlockingScope blocking_scope(1);
       thread_dispatchers_[MainThreadIndex]->post(blocking_scope.run([this]() {
-          tls_ = std::make_unique<ThreadLocal::InstanceImpl>();
-          bool is_main = true;
-          for (Event::DispatcherPtr& dispatcher : thread_dispatchers_) {
-            // Worker threads must be registered from the main thread, per assert in registerThread().
-            tls_->registerThread(*dispatcher, is_main);
-            is_main = false;
-          }
-          store_->initializeThreading(*thread_dispatchers_[0], *tls_);
+        tls_ = std::make_unique<ThreadLocal::InstanceImpl>();
+        bool is_main = true;
+        for (Event::DispatcherPtr& dispatcher : thread_dispatchers_) {
+          // Worker threads must be registered from the main thread, per assert in registerThread().
+          tls_->registerThread(*dispatcher, is_main);
+          is_main = false;
+        }
+        store_->initializeThreading(*thread_dispatchers_[0], *tls_);
       }));
     }
 
@@ -1253,13 +1254,13 @@ class ClusterShutdownRaceTest : public ThreadLocalStoreNoMocksTestBase {
 
   ~ClusterShutdownRaceTest() {
     thread_dispatchers_[MainThreadIndex]->post([this]() {
-                                                 scopes_.clear();
-                                                 store_->shutdownThreading();
-                                                 tls_->shutdownGlobalThreading();
-                                                 tls_->shutdownThread();
-                                                 store_.reset();
-                                                 tls_.reset();
-                                               });
+      scopes_.clear();
+      store_->shutdownThreading();
+      tls_->shutdownGlobalThreading();
+      tls_->shutdownThread();
+      store_.reset();
+      tls_.reset();
+    });
 
     for (Event::DispatcherPtr& dispatcher : thread_dispatchers_) {
       dispatcher->post([&dispatcher]() { dispatcher->exit(); });
@@ -1280,7 +1281,7 @@ class ClusterShutdownRaceTest : public ThreadLocalStoreNoMocksTestBase {
 
   void reconstructScopes(int thread_index) {
     for (uint32_t i = thread_index - 1; i < NumScopes; i += (NumThreads - 1)) {
-      scopes_[i] = store_->createScope("scope."); //absl::StrCat("scope", i, "."));
+      scopes_[i] = store_->createScope("scope."); // absl::StrCat("scope", i, "."));
       scopes_[i]->counterFromStatName(my_counter_name_).inc();
     }
   }
@@ -1311,7 +1312,7 @@ class ClusterShutdownRaceTest : public ThreadLocalStoreNoMocksTestBase {
 };
 
 TEST_F(ClusterShutdownRaceTest, TenThreads) {
-  //make_counters_done_.Notify();
+  // make_counters_done_.Notify();
 
   {
     BlockingScope blocking_scope(NumWorkerThreads);

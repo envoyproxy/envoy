@@ -114,9 +114,9 @@ TEST(RefcountPtr, Threads2) {
     absl::Notification go;
     for (uint32_t i = 0; i < num_threads; ++i) {
       threads[i] = thread_factory.createThread([&strings, i, &go]() {
-                                                 go.WaitForNotification();
-                                                 strings[i].reset();
-                                               });
+        go.WaitForNotification();
+        strings[i].reset();
+      });
     }
     go.Notify();
     for (uint32_t i = 0; i < num_threads; ++i) {
