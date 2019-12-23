@@ -52,8 +52,7 @@ HealthCheckerImplBase::initTransportSocketOptions(
                                                                  std::move(protocols));
   }
 
-  return std::make_shared<Network::TransportSocketOptionsImpl>("", std::vector<std::string>{},
-                                                               std::vector<std::string>{});
+  return std::make_shared<Network::TransportSocketOptionsImpl>();
 }
 
 HealthCheckerImplBase::~HealthCheckerImplBase() {
