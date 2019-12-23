@@ -11,6 +11,7 @@
 #include "common/stats/stats_matcher_impl.h"
 #include "common/stats/tag_producer_impl.h"
 #include "common/stats/thread_local_store.h"
+#include "common/thread_local/thread_local_impl.h"
 
 #include "test/common/stats/stat_test_utility.h"
 #include "test/mocks/event/mocks.h"
@@ -21,6 +22,8 @@
 #include "test/test_common/utility.h"
 
 #include "absl/strings/str_split.h"
+#include "absl/synchronization/blocking_counter.h"
+#include "absl/synchronization/notification.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
@@ -453,24 +456,30 @@ TEST_F(StatsThreadLocalStoreTest, OverlappingScopes) {
   tls_.shutdownThread();
 }
 
-class LookupWithStatNameTest : public testing::Test {
+class ThreadLocalStoreNoMocksTestBase : public testing::Test {
 public:
-  LookupWithStatNameTest()
+  ThreadLocalStoreNoMocksTestBase()
       : symbol_table_(SymbolTableCreator::makeSymbolTable()), alloc_(*symbol_table_),
-        store_(alloc_), pool_(*symbol_table_) {}
-  ~LookupWithStatNameTest() override { store_.shutdownThreading(); }
+        store_(std::make_unique<ThreadLocalStoreImpl>(alloc_)), pool_(*symbol_table_) {}
+  ~ThreadLocalStoreNoMocksTestBase() override {
+    if (store_ != nullptr) {
+      store_->shutdownThreading();
+    }
+  }
 
   StatName makeStatName(absl::string_view name) { return pool_.add(name); }
 
   SymbolTablePtr symbol_table_;
   AllocatorImpl alloc_;
-  ThreadLocalStoreImpl store_;
+  std::unique_ptr<ThreadLocalStoreImpl> store_;
   StatNamePool pool_;
 };
 
+class LookupWithStatNameTest : public ThreadLocalStoreNoMocksTestBase {};
+
 TEST_F(LookupWithStatNameTest, All) {
-  ScopePtr scope1 = store_.createScope("scope1.");
-  Counter& c1 = store_.counterFromStatName(makeStatName("c1"));
+  ScopePtr scope1 = store_->createScope("scope1.");
+  Counter& c1 = store_->counterFromStatName(makeStatName("c1"));
   Counter& c2 = scope1->counterFromStatName(makeStatName("c2"));
   EXPECT_EQ("c1", c1.name());
   EXPECT_EQ("scope1.c2", c2.name());
@@ -479,7 +488,7 @@ TEST_F(LookupWithStatNameTest, All) {
   EXPECT_EQ(0, c1.tags().size());
   EXPECT_EQ(0, c1.tags().size());
 
-  Gauge& g1 = store_.gaugeFromStatName(makeStatName("g1"), Gauge::ImportMode::Accumulate);
+  Gauge& g1 = store_->gaugeFromStatName(makeStatName("g1"), Gauge::ImportMode::Accumulate);
   Gauge& g2 = scope1->gaugeFromStatName(makeStatName("g2"), Gauge::ImportMode::Accumulate);
   EXPECT_EQ("g1", g1.name());
   EXPECT_EQ("scope1.g2", g2.name());
@@ -489,7 +498,7 @@ TEST_F(LookupWithStatNameTest, All) {
   EXPECT_EQ(0, g1.tags().size());
 
   Histogram& h1 =
-      store_.histogramFromStatName(makeStatName("h1"), Stats::Histogram::Unit::Unspecified);
+      store_->histogramFromStatName(makeStatName("h1"), Stats::Histogram::Unit::Unspecified);
   Histogram& h2 =
       scope1->histogramFromStatName(makeStatName("h2"), Stats::Histogram::Unit::Unspecified);
   scope1->deliverHistogramToSinks(h2, 0);
@@ -509,15 +518,15 @@ TEST_F(LookupWithStatNameTest, All) {
   ScopePtr scope3 = scope1->createScope(std::string("foo:\0:.", 7));
   EXPECT_EQ("scope1.foo___.bar", scope3->counter("bar").name());
 
-  EXPECT_EQ(4UL, store_.counters().size());
-  EXPECT_EQ(2UL, store_.gauges().size());
+  EXPECT_EQ(4UL, store_->counters().size());
+  EXPECT_EQ(2UL, store_->gauges().size());
 }
 
 TEST_F(LookupWithStatNameTest, NotFound) {
   StatName not_found(makeStatName("not_found"));
-  EXPECT_FALSE(store_.findCounter(not_found));
-  EXPECT_FALSE(store_.findGauge(not_found));
-  EXPECT_FALSE(store_.findHistogram(not_found));
+  EXPECT_FALSE(store_->findCounter(not_found));
+  EXPECT_FALSE(store_->findGauge(not_found));
+  EXPECT_FALSE(store_->findHistogram(not_found));
 }
 
 class StatsMatcherTLSTest : public StatsThreadLocalStoreTest {
@@ -1184,6 +1193,146 @@ TEST_F(HistogramTest, ParentHistogramBucketSummary) {
             "B30000(1,1) B60000(1,1) B300000(1,1) B600000(1,1) B1.8e+06(1,1) "
             "B3.6e+06(1,1)",
             parent_histogram->bucketSummary());
+}
+
+class ClusterShutdownRaceTest : public ThreadLocalStoreNoMocksTestBase {
+ public:
+  static constexpr uint32_t NumThreads = 10;
+  static constexpr uint32_t NumWorkerThreads = NumThreads - 1;
+  static constexpr uint32_t NumScopes = 100;
+  static constexpr uint32_t MainThreadIndex = 0;
+
+  class BlockingScope {
+   public:
+    explicit BlockingScope(uint32_t count) : blocking_counter_(count) {}
+    ~BlockingScope() { blocking_counter_.Wait(); }
+
+    std::function<void()> run(std::function<void()> f) {
+      return [this, f]() { f(); decrementCount(); };
+    }
+
+    void decrementCount() { blocking_counter_.DecrementCount(); }
+
+   private:
+    absl::BlockingCounter blocking_counter_;
+  };
+
+  ClusterShutdownRaceTest() : api_(Api::createApiForTest()),
+                              thread_factory_(api_->threadFactory()),
+                              pool_(store_->symbolTable()),
+                              my_counter_name_(pool_.add("my_counter")) {
+    // This is the same order as InstanceImpl::initialize in source/server/server.cc.
+    thread_dispatchers_.resize(NumThreads);
+    {
+      BlockingScope blocking_scope(NumThreads);
+      for (uint32_t i = 0; i < NumThreads; ++i) {
+        threads_.emplace_back(thread_factory_.createThread([this, i, &blocking_scope]() {
+                                                             threadFn(i, blocking_scope);
+                                                           }));
+      }
+    }
+
+    {
+      BlockingScope blocking_scope(1);
+      thread_dispatchers_[MainThreadIndex]->post(blocking_scope.run([this]() {
+          tls_ = std::make_unique<ThreadLocal::InstanceImpl>();
+          bool is_main = true;
+          for (Event::DispatcherPtr& dispatcher : thread_dispatchers_) {
+            // Worker threads must be registered from the main thread, per assert in registerThread().
+            tls_->registerThread(*dispatcher, is_main);
+            is_main = false;
+          }
+          store_->initializeThreading(*thread_dispatchers_[0], *tls_);
+      }));
+    }
+
+    for (uint32_t i = 0; i < NumScopes; ++i) {
+      scopes_.emplace_back(store_->createScope("scope")); // absl::StrCat("scope", i, ".")));
+    }
+  }
+
+  ~ClusterShutdownRaceTest() {
+    thread_dispatchers_[MainThreadIndex]->post([this]() {
+                                                 scopes_.clear();
+                                                 store_->shutdownThreading();
+                                                 tls_->shutdownGlobalThreading();
+                                                 tls_->shutdownThread();
+                                                 store_.reset();
+                                                 tls_.reset();
+                                               });
+
+    for (Event::DispatcherPtr& dispatcher : thread_dispatchers_) {
+      dispatcher->post([&dispatcher]() { dispatcher->exit(); });
+    }
+
+    for (Thread::ThreadPtr& thread : threads_) {
+      thread->join();
+    }
+  }
+
+  void incCounters() {
+    for (int i = 0; i < 1000; ++i) {
+      for (ScopePtr& scope : scopes_) {
+        scope->counterFromStatName(my_counter_name_).inc();
+      }
+    }
+  }
+
+  void reconstructScopes(int thread_index) {
+    for (uint32_t i = thread_index - 1; i < NumScopes; i += (NumThreads - 1)) {
+      scopes_[i] = store_->createScope("scope."); //absl::StrCat("scope", i, "."));
+      scopes_[i]->counterFromStatName(my_counter_name_).inc();
+    }
+  }
+
+  /*void clearSomeScopes(uint32_t thread_index) {
+    for (uint32_t i = thread_index; i < NumScopes; i += NumThreads) {
+      //scopes_[i] = nullptr;
+      scopes_[i] = store_->createScope(absl::StrCat("scope", i, "."));
+      //scopes_.emplace_back(store_->createScope(absl::StrCat("scope", i, ".")));
+    }
+    }*/
+
+  void threadFn(uint32_t thread_index, BlockingScope& blocking_scope) {
+    thread_dispatchers_[thread_index] = api_->allocateDispatcher();
+    blocking_scope.decrementCount();
+    thread_dispatchers_[thread_index]->run(Event::Dispatcher::RunType::RunUntilExit);
+  }
+
+  Api::ApiPtr api_;
+  std::vector<Event::DispatcherPtr> thread_dispatchers_;
+  Thread::ThreadFactory& thread_factory_;
+  std::unique_ptr<ThreadLocal::InstanceImpl> tls_;
+  std::vector<ScopePtr> scopes_;
+  std::vector<Thread::ThreadPtr> threads_;
+  absl::Notification make_counters_done_;
+  StatNamePool pool_;
+  StatName my_counter_name_;
+};
+
+TEST_F(ClusterShutdownRaceTest, TenThreads) {
+  //make_counters_done_.Notify();
+
+  {
+    BlockingScope blocking_scope(NumWorkerThreads);
+    for (uint32_t i = 1; i < thread_dispatchers_.size(); ++i) {
+      thread_dispatchers_[i]->post(blocking_scope.run([this]() { incCounters(); }));
+    }
+  }
+
+  {
+    BlockingScope blocking_scope(NumWorkerThreads);
+    for (uint32_t i = 1; i < thread_dispatchers_.size(); ++i) {
+      thread_dispatchers_[i]->post(blocking_scope.run([this, i]() { reconstructScopes(i); }));
+    }
+  }
+
+  {
+    BlockingScope blocking_scope(NumWorkerThreads);
+    for (uint32_t i = 1; i < thread_dispatchers_.size(); ++i) {
+      thread_dispatchers_[i]->post(blocking_scope.run([this]() { incCounters(); }));
+    }
+  }
 }
 
 } // namespace Stats

@@ -242,6 +242,14 @@ void ThreadLocalStoreImpl::releaseScopeCrossThread(ScopeImpl* scope) {
   }
 }
 
+void ThreadLocalStoreImpl::TlsCache::eraseScope(uint64_t scope_id) {
+  scope_cache_.erase(scope_id);
+}
+
+ThreadLocalStoreImpl::TlsCacheEntry& ThreadLocalStoreImpl::TlsCache::insertScope(uint64_t scope_id) {
+  return scope_cache_[scope_id];
+}
+
 void ThreadLocalStoreImpl::clearScopeFromCaches(uint64_t scope_id,
                                                 const Event::PostCb& clean_central_cache) {
   // If we are shutting down we no longer perform cache flushes as workers may be shutting down
@@ -249,7 +257,7 @@ void ThreadLocalStoreImpl::clearScopeFromCaches(uint64_t scope_id,
   if (!shutting_down_) {
     // Perform a cache flush on all threads.
     tls_->runOnAllThreads(
-        [this, scope_id]() -> void { tls_->getTyped<TlsCache>().scope_cache_.erase(scope_id); },
+        [this, scope_id]() -> void { tls_->getTyped<TlsCache>().eraseScope(scope_id); },
         clean_central_cache);
   }
 }
@@ -393,7 +401,7 @@ Counter& ThreadLocalStoreImpl::ScopeImpl::counterFromStatName(StatName name) {
   StatMap<CounterSharedPtr>* tls_cache = nullptr;
   StatNameHashSet* tls_rejected_stats = nullptr;
   if (!parent_.shutting_down_ && parent_.tls_) {
-    TlsCacheEntry& entry = parent_.tls_->getTyped<TlsCache>().scope_cache_[this->scope_id_];
+    TlsCacheEntry& entry = parent_.tls_->getTyped<TlsCache>().insertScope(this->scope_id_);
     tls_cache = &entry.counters_;
     tls_rejected_stats = &entry.rejected_stats_;
   }

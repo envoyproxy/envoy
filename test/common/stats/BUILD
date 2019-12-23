@@ -105,7 +105,10 @@ envoy_cc_test(
 envoy_cc_test(
     name = "refcount_ptr_test",
     srcs = ["refcount_ptr_test.cc"],
-    deps = ["//include/envoy/stats:refcount_ptr_interface"],
+    deps = [
+        "//include/envoy/stats:refcount_ptr_interface",
+        "//test/test_common:thread_factory_for_test_lib",
+    ],
 )
 
 envoy_cc_test(
@@ -184,6 +187,7 @@ envoy_cc_test(
         "//source/common/stats:stats_matcher_lib",
         "//source/common/stats:symbol_table_lib",
         "//source/common/stats:thread_local_store_lib",
+        "//source/common/thread_local:thread_local_lib",
         "//test/mocks/event:event_mocks",
         "//test/mocks/server:server_mocks",
         "//test/mocks/stats:stats_mocks",
