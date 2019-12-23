@@ -8,6 +8,7 @@
 #include "envoy/api/v2/core/base.pb.h"
 
 #include "common/common/assert.h"
+#include "common/common/empty_string.h"
 #include "common/common/fmt.h"
 #include "common/common/utility.h"
 #include "common/config/metadata.h"
@@ -25,7 +26,6 @@ namespace Envoy {
 namespace AccessLog {
 
 static const std::string UnspecifiedValueString = "-";
-static const std::string EmptyString;
 
 namespace {
 
@@ -674,7 +674,7 @@ StreamInfoFormatter::StreamInfoFormatter(const std::string& field_name) {
         [](const Ssl::ConnectionInfo& connection_info) {
           absl::optional<SystemTime> time = connection_info.validFromPeerCertificate();
           if (!time.has_value()) {
-            return EmptyString;
+            return EMPTY_STRING;
           }
           return AccessLogDateTimeFormatter::fromTime(time.value());
         });
@@ -683,7 +683,7 @@ StreamInfoFormatter::StreamInfoFormatter(const std::string& field_name) {
         [](const Ssl::ConnectionInfo& connection_info) {
           absl::optional<SystemTime> time = connection_info.expirationPeerCertificate();
           if (!time.has_value()) {
-            return EmptyString;
+            return EMPTY_STRING;
           }
           return AccessLogDateTimeFormatter::fromTime(time.value());
         });
