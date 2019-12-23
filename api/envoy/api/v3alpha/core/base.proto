@@ -6,6 +6,7 @@ import "envoy/api/v3alpha/core/http_uri.proto";
 import "envoy/type/v3alpha/percent.proto";
 
 import "google/protobuf/any.proto";
+import "google/protobuf/duration.proto";
 import "google/protobuf/struct.proto";
 import "google/protobuf/wrappers.proto";
 
@@ -230,6 +231,29 @@ message DataSource {
   }
 }
 
+// The message specifies the retry policy of remote data source when fetching fails.
+message RetryPolicy {
+  message RetryBackOff {
+    // Specifies the base interval between retries. This parameter is required and must be greater
+    // than zero. Values less than 1 ms are rounded up to 1 ms.
+    google.protobuf.Duration base_interval = 1 [(validate.rules).duration = {required: true gt {}}];
+
+    // Specifies the maximum interval between retries. This parameter is optional, but must be
+    // greater than or equal to the `base_interval` if set. The default is 10 times the
+    // `base_interval`.
+    google.protobuf.Duration max_interval = 2 [(validate.rules).duration = {gt {}}];
+  }
+
+  // Specifies parameters that control retry back off. This parameter is optional, in which case the
+  // default base interval is 1000 milliseconds. The default maximum interval is 10 times
+  // the base interval.
+  RetryBackOff retry_back_off = 1;
+
+  // Specifies the allowed number of retries. This parameter is optional and
+  // defaults to 1.
+  google.protobuf.UInt32Value num_retries = 2;
+}
+
 // The message specifies how to fetch data from remote and how to verify it.
 message RemoteDataSource {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.core.RemoteDataSource";
@@ -239,6 +263,9 @@ message RemoteDataSource {
 
   // SHA256 string for verifying data.
   string sha256 = 2 [(validate.rules).string = {min_bytes: 1}];
+
+  // Retry policy for fetching remote data.
+  RetryPolicy retry_policy = 3;
 }
 
 // Async data source which support async data fetch.
