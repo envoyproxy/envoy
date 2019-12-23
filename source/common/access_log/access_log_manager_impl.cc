@@ -26,8 +26,10 @@ AccessLogFileSharedPtr AccessLogManagerImpl::createAccessLog(const std::string& 
   }
 #endif
 
-  if (access_logs_.count(*file_name)) {
-    return access_logs_[*file_name];
+  std::unordered_map<std::string, AccessLogFileSharedPtr>::const_iterator access_log =
+      access_logs_.find(*file_name);
+  if (access_log != access_logs_.end()) {
+    return access_log->second;
   }
 
   access_logs_[*file_name] = std::make_shared<AccessLogFileImpl>(

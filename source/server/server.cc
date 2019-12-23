@@ -468,7 +468,8 @@ RunHelper::RunHelper(Instance& instance, const Options& options, Event::Dispatch
       }) {
   // Setup signals.
   if (options.signalHandlingEnabled()) {
-// None of these signals exist on Windows
+// TODO(Pivotal): Figure out solution to graceful shutdown on Windows. None of these signals exist
+// on Windows.
 #ifndef WIN32
     sigterm_ = dispatcher.listenForSignal(SIGTERM, [&instance]() {
       ENVOY_LOG(warn, "caught SIGTERM");
