@@ -14,6 +14,7 @@
 #include "common/common/assert.h"
 #include "common/common/hash.h"
 #include "common/common/lock_guard.h"
+#include "common/common/mem_block_builder.h"
 #include "common/common/non_copyable.h"
 #include "common/common/stack_array.h"
 #include "common/common/thread.h"
@@ -29,12 +30,6 @@ namespace Stats {
 
 /** A Symbol represents a string-token with a small index. */
 using Symbol = uint32_t;
-
-/**
- * We encode the byte-size of a StatName as its first two bytes.
- */
-constexpr uint64_t StatNameSizeEncodingBytes = 2;
-constexpr uint64_t StatNameMaxSize = 1 << (8 * StatNameSizeEncodingBytes); // 65536
 
 /** Transient representations of a vector of 32-bit symbols */
 using SymbolVec = std::vector<Symbol>;
@@ -80,11 +75,11 @@ public:
   class Encoding {
   public:
     /**
-     * Before destructing SymbolEncoding, you must call moveToStorage. This
+     * Before destructing SymbolEncoding, you must call moveToMemBlock. This
      * transfers ownership, and in particular, the responsibility to call
-     * SymbolTable::clear() on all referenced symbols. If we ever wanted
-     * to be able to destruct a SymbolEncoding without transferring it
-     * we could add a clear(SymbolTable&) method.
+     * SymbolTable::clear() on all referenced symbols. If we ever wanted to be
+     * able to destruct a SymbolEncoding without transferring it we could add a
+     * clear(SymbolTable&) method.
      */
     ~Encoding();
 
@@ -93,7 +88,7 @@ public:
      *
      * @param symbol the symbol to encode.
      */
-    void addSymbol(Symbol symbol);
+    void addSymbols(const std::vector<Symbol>& symbols);
 
     /**
      * Decodes a uint8_t array into a SymbolVec.
@@ -104,24 +99,62 @@ public:
      * Returns the number of bytes required to represent StatName as a uint8_t
      * array, including the encoded size.
      */
-    uint64_t bytesRequired() const { return dataBytesRequired() + StatNameSizeEncodingBytes; }
+    uint64_t bytesRequired() const {
+      return data_bytes_required_ + encodingSizeBytes(data_bytes_required_);
+    }
 
     /**
      * @return the number of uint8_t entries we collected while adding symbols.
      */
-    uint64_t dataBytesRequired() const { return vec_.size(); }
+    uint64_t dataBytesRequired() const { return data_bytes_required_; }
 
     /**
      * Moves the contents of the vector into an allocated array. The array
      * must have been allocated with bytesRequired() bytes.
      *
-     * @param array destination memory to receive the encoded bytes.
-     * @return uint64_t the number of bytes transferred.
+     * @param mem_block_builder memory block to receive the encoded bytes.
      */
-    uint64_t moveToStorage(SymbolTable::Storage array);
+    void moveToMemBlock(MemBlockBuilder<uint8_t>& array);
+
+    /**
+     * @param number A number to encode in a variable length byte-array.
+     * @return The number of bytes it would take to encode the number.
+     */
+    static uint64_t encodingSizeBytes(uint64_t number);
+
+    /**
+     * @param num_data_bytes The number of bytes in a data-block.
+     * @return The total number of bytes required for the data-block and its encoded size.
+     */
+    static uint64_t totalSizeBytes(uint64_t num_data_bytes) {
+      return encodingSizeBytes(num_data_bytes) + num_data_bytes;
+    }
+
+    /**
+     * Saves the specified number into the byte array, returning the next byte.
+     * There is no guarantee that bytes will be aligned, so we can't cast to a
+     * uint16_t* and assign, but must individually copy the bytes.
+     *
+     * Requires that the buffer be sized to accommodate encodingSizeBytes(number).
+     *
+     * @param number the number to write.
+     * @param mem_block the memory into which to append the number.
+     */
+    static void appendEncoding(uint64_t number, MemBlockBuilder<uint8_t>& mem_block);
+
+    /**
+     * Decodes a byte-array containing a variable-length number.
+     *
+     * @param The encoded byte array, written previously by appendEncoding.
+     * @return A pair containing the decoded number, and the number of bytes consumed from encoding.
+     */
+    static std::pair<uint64_t, uint64_t> decodeNumber(const uint8_t* encoding);
+
+    StoragePtr release() { return mem_block_.release(); }
 
   private:
-    std::vector<uint8_t> vec_;
+    uint64_t data_bytes_required_{0};
+    MemBlockBuilder<uint8_t> mem_block_;
   };
 
   SymbolTableImpl();
@@ -143,22 +176,6 @@ public:
 #ifndef ENVOY_CONFIG_COVERAGE
   void debugPrint() const override;
 #endif
-
-  /**
-   * Saves the specified length into the byte array, returning the next byte.
-   * There is no guarantee that bytes will be aligned, so we can't cast to a
-   * uint16_t* and assign, but must individually copy the bytes.
-   *
-   * @param length the length in bytes to write. Must be < StatNameMaxSize.
-   * @param bytes the pointer into which to write the length.
-   * @return the pointer to the next byte for writing the data.
-   */
-  static inline uint8_t* writeLengthReturningNext(uint64_t length, uint8_t* bytes) {
-    ASSERT(length < StatNameMaxSize);
-    *bytes++ = length & 0xff;
-    *bytes++ = length >> 8;
-    return bytes;
-  }
 
   StatNameSetPtr makeSet(absl::string_view name) override;
   void forgetSet(StatNameSet& stat_name_set) override;
@@ -362,20 +379,37 @@ public:
    * @return uint64_t the number of bytes in the symbol array, excluding the two-byte
    *                  overhead for the size itself.
    */
-  uint64_t dataSize() const {
-    if (size_and_data_ == nullptr) {
-      return 0;
-    }
-    return size_and_data_[0] | (static_cast<uint64_t>(size_and_data_[1]) << 8);
-  }
+  uint64_t dataSize() const;
 
   /**
    * @return uint64_t the number of bytes in the symbol array, including the two-byte
    *                  overhead for the size itself.
    */
-  uint64_t size() const { return dataSize() + StatNameSizeEncodingBytes; }
+  uint64_t size() const { return SymbolTableImpl::Encoding::totalSizeBytes(dataSize()); }
 
-  void copyToStorage(SymbolTable::Storage storage) { memcpy(storage, size_and_data_, size()); }
+  /**
+   * Copies the entire StatName representation into a MemBlockBuilder, including
+   * the length metadata at the beginning. The MemBlockBuilder must not have
+   * any other data in it.
+   *
+   * @param mem_block_builder the builder to receive the storage.
+   */
+  void copyToMemBlock(MemBlockBuilder<uint8_t>& mem_block_builder) {
+    ASSERT(mem_block_builder.size() == 0);
+    mem_block_builder.appendData(absl::MakeConstSpan(size_and_data_, size()));
+  }
+
+  /**
+   * Appends the data portion of the StatName representation into a
+   * MemBlockBuilder, excluding the length metadata. This is appropriate for
+   * join(), where several stat-names are combined, and we only need the
+   * aggregated length metadata.
+   *
+   * @param mem_block_builder the builder to receive the storage.
+   */
+  void appendDataToMemBlock(MemBlockBuilder<uint8_t>& storage) {
+    storage.appendData(absl::MakeConstSpan(data(), dataSize()));
+  }
 
 #ifndef ENVOY_CONFIG_COVERAGE
   void debugPrint();
@@ -384,7 +418,9 @@ public:
   /**
    * @return A pointer to the first byte of data (skipping over size bytes).
    */
-  const uint8_t* data() const { return size_and_data_ + StatNameSizeEncodingBytes; }
+  const uint8_t* data() const {
+    return size_and_data_ + SymbolTableImpl::Encoding::encodingSizeBytes(dataSize());
+  }
 
   /**
    * @return whether this is empty.

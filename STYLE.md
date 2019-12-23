@@ -88,6 +88,8 @@
   [Google C++ style guide](https://google.github.io/styleguide/cppguide.html#Unnamed_Namespaces_and_Static_Variables)
    allows either, but in Envoy we prefer anonymous namespaces.
 * Braces are required for all control statements include single line if, while, etc. statements.
+* Don't use [mangled Protobuf enum
+  names](https://developers.google.com/protocol-buffers/docs/reference/cpp-generated#enum).
 
 # Error handling
 

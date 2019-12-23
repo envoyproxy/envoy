@@ -2,10 +2,6 @@ syntax = "proto3";
 
 package envoy.config.filter.accesslog.v3alpha;
 
-option java_package = "io.envoyproxy.envoy.config.filter.accesslog.v3alpha";
-option java_outer_classname = "AccesslogProto";
-option java_multiple_files = true;
-
 import "envoy/api/v3alpha/core/base.proto";
 import "envoy/api/v3alpha/route/route.proto";
 import "envoy/type/v3alpha/percent.proto";
@@ -16,6 +12,10 @@ import "google/protobuf/struct.proto";
 import "udpa/annotations/versioning.proto";
 
 import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.config.filter.accesslog.v3alpha";
+option java_outer_classname = "AccesslogProto";
+option java_multiple_files = true;
 
 // [#protodoc-title: Common access log types]
 
