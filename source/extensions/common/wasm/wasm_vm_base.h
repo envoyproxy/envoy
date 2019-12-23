@@ -28,7 +28,7 @@ struct VmStats {
 // Wasm VM base instance. Provides common behavior (e.g. Stats).
 class WasmVmBase : public WasmVm {
 public:
-  WasmVmBase(Stats::ScopeSharedPtr scope, absl::string_view runtime)
+  WasmVmBase(const Stats::ScopeSharedPtr& scope, absl::string_view runtime)
       : scope_(scope), runtime_prefix_(absl::StrCat("wasm_vm.", runtime, ".")),
         stats_(VmStats{ALL_VM_STATS(POOL_COUNTER_PREFIX(*scope_, runtime_prefix_),
                                     POOL_GAUGE_PREFIX(*scope_, runtime_prefix_))}),

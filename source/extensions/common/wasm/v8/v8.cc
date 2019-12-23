@@ -37,7 +37,7 @@ using FuncDataPtr = std::unique_ptr<FuncData>;
 
 class V8 : public WasmVmBase {
 public:
-  V8(Stats::ScopeSharedPtr scope) : WasmVmBase(scope, WasmRuntimeNames::get().V8) {}
+  V8(const Stats::ScopeSharedPtr& scope) : WasmVmBase(scope, WasmRuntimeNames::get().V8) {}
 
   // Extensions::Common::Wasm::WasmVm
   absl::string_view runtime() override { return WasmRuntimeNames::get().V8; }
@@ -583,7 +583,7 @@ void V8::getModuleFunctionImpl(absl::string_view function_name,
   };
 }
 
-WasmVmPtr createVm(Stats::ScopeSharedPtr scope) { return std::make_unique<V8>(scope); }
+WasmVmPtr createVm(const Stats::ScopeSharedPtr& scope) { return std::make_unique<V8>(scope); }
 
 } // namespace V8
 } // namespace Wasm

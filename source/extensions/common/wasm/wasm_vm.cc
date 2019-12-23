@@ -14,7 +14,7 @@ namespace Wasm {
 thread_local Envoy::Extensions::Common::Wasm::Context* current_context_ = nullptr;
 thread_local uint32_t effective_context_id_ = 0;
 
-WasmVmPtr createWasmVm(absl::string_view runtime, Stats::ScopeSharedPtr scope) {
+WasmVmPtr createWasmVm(absl::string_view runtime, const Stats::ScopeSharedPtr& scope) {
   if (runtime.empty()) {
     throw WasmVmException("Failed to create WASM VM with unspecified runtime.");
   } else if (runtime == WasmRuntimeNames::get().Null) {
