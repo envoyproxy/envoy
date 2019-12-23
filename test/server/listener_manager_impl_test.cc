@@ -440,7 +440,7 @@ TEST_F(ListenerManagerImplTest, ModifyOnlyDrainType) {
   )EOF";
 
   ListenerHandle* listener_foo =
-      expectListenerCreate(false, true, envoy::api::v2::Listener_DrainType_MODIFY_ONLY);
+      expectListenerCreate(false, true, envoy::api::v2::Listener::MODIFY_ONLY);
   EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, {true}));
   EXPECT_TRUE(manager_->addOrUpdateListener(parseListenerFromV2Yaml(listener_foo_yaml), "", true));
   checkStats(1, 0, 0, 0, 1, 0);
@@ -482,7 +482,7 @@ drain_type: modify_only
   )EOF";
 
   ListenerHandle* listener_foo_different_address =
-      expectListenerCreate(false, true, envoy::api::v2::Listener_DrainType_MODIFY_ONLY);
+      expectListenerCreate(false, true, envoy::api::v2::Listener::MODIFY_ONLY);
   EXPECT_CALL(*listener_foo_different_address, onDestroy());
   EXPECT_THROW_WITH_MESSAGE(
       manager_->addOrUpdateListener(parseListenerFromV2Yaml(listener_foo_different_address_yaml),

@@ -5,6 +5,8 @@
 # tools/clang_tools/api_booster, as well as the type whisperer and API type
 # database.
 
+import argparse
+from collections import namedtuple
 import logging
 import os
 import pathlib
@@ -15,10 +17,15 @@ import tempfile
 
 import api_boost
 
+TestCase = namedtuple('TestCase', ['name', 'description'])
+
 # List of test in the form [(file_name, explanation)]
-TESTS = [
-    ('elaborated_type.cc', 'ElaboratedTypeLoc type upgrades'),
-]
+TESTS = list(
+    map(lambda x: TestCase(*x), [
+        ('elaborated_type', 'ElaboratedTypeLoc type upgrades'),
+        ('using_decl', 'UsingDecl upgrades for named types'),
+        ('decl_ref_expr', 'DeclRefExpr upgrades for named constants'),
+    ]))
 
 TESTDATA_PATH = 'tools/api_boost/testdata'
 
@@ -31,29 +38,45 @@ def Diff(some_path, other_path):
 
 
 if __name__ == '__main__':
+  parser = argparse.ArgumentParser(description='Golden C++ source tests for api_boost.py')
+  parser.add_argument('tests', nargs='*')
+  args = parser.parse_args()
+
   # Accumulated error messages.
   logging.basicConfig(format='%(message)s')
   messages = []
+
+  def ShouldRunTest(test_name):
+    return len(args.tests) == 0 or test_name in args.tests
 
   # Run API booster against test artifacts in a directory relative to workspace.
   # We use a temporary copy as the API booster does in-place rewriting.
   with tempfile.TemporaryDirectory(dir=pathlib.Path.cwd()) as path:
     # Setup temporary tree.
     shutil.copy(os.path.join(TESTDATA_PATH, 'BUILD'), path)
-    for filename, _ in TESTS:
-      shutil.copy(os.path.join(TESTDATA_PATH, filename), path)
+    for test in TESTS:
+      if ShouldRunTest(test.name):
+        shutil.copy(os.path.join(TESTDATA_PATH, test.name + '.cc'), path)
+      else:
+        # Place an empty file to make Bazel happy.
+        pathlib.Path(path, test.name + '.cc').write_text('')
 
     # Run API booster.
-    api_boost.ApiBoostTree([str(pathlib.Path(path).relative_to(pathlib.Path.cwd()))],
+    relpath_to_testdata = str(pathlib.Path(path).relative_to(pathlib.Path.cwd()))
+    api_boost.ApiBoostTree([relpath_to_testdata],
                            generate_compilation_database=True,
                            build_api_booster=True,
-                           debug_log=True)
+                           debug_log=True,
+                           sequential=True)
 
     # Validate output against golden files.
-    for filename, description in TESTS:
-      delta = Diff(os.path.join(TESTDATA_PATH, filename + '.gold'), os.path.join(path, filename))
-      if delta is not None:
-        messages.append('Non-empty diff for %s (%s):\n%s\n' % (filename, description, delta))
+    for test in TESTS:
+      if ShouldRunTest(test.name):
+        delta = Diff(os.path.join(TESTDATA_PATH, test.name + '.cc.gold'),
+                     os.path.join(path, test.name + '.cc'))
+        if delta is not None:
+          messages.append('Non-empty diff for %s (%s):\n%s\n' %
+                          (test.name, test.description, delta))
 
   if len(messages) > 0:
     logging.error('FAILED:\n{}'.format('\n'.join(messages)))

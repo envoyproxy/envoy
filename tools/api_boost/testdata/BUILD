@@ -9,7 +9,19 @@ load(
 envoy_package()
 
 envoy_cc_library(
+    name = "decl_ref_expr",
+    srcs = ["decl_ref_expr.cc"],
+    deps = ["@envoy_api//envoy/config/overload/v2alpha:pkg_cc_proto"],
+)
+
+envoy_cc_library(
     name = "elaborated_type",
     srcs = ["elaborated_type.cc"],
+    deps = ["@envoy_api//envoy/config/overload/v2alpha:pkg_cc_proto"],
+)
+
+envoy_cc_library(
+    name = "using_decl",
+    srcs = ["using_decl.cc"],
     deps = ["@envoy_api//envoy/config/overload/v2alpha:pkg_cc_proto"],
 )

@@ -206,10 +206,11 @@ def runChecks():
       "grpc_shutdown.cc",
       "Don't call grpc_init() or grpc_shutdown() directly, instantiate Grpc::GoogleGrpcContext. " +
       "See #8282")
-
   errors += fixFileExpectingFailure(
       "api/missing_package.proto",
       "Unable to find package name for proto file: ./api/missing_package.proto")
+  errors += checkUnfixableError("proto_enum_mangling.cc",
+                                "Don't use mangled Protobuf names for enum constants")
 
   # The following files have errors that can be automatically fixed.
   errors += checkAndFixError("over_enthusiastic_spaces.cc",
