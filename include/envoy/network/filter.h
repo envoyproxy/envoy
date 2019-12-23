@@ -378,6 +378,13 @@ public:
    */
   virtual void onData(UdpRecvData& data) PURE;
 
+  /**
+   * Called when there is an error event in the receive data path.
+   *
+   * @param error_code supplies the received error on the listener.
+   */
+  virtual void onReceiveError(Api::IoError::IoErrorCode error_code) PURE;
+
 protected:
   /**
    * @param callbacks supplies the read filter callbacks used to interact with the filter manager.
@@ -436,9 +443,8 @@ public:
    *
    * @param udp_listener supplies the listener to create the chain on.
    * @param callbacks supplies the callbacks needed to create a filter.
-   * @return true if filter chain was created successfully. Otherwise false.
    */
-  virtual bool createUdpListenerFilterChain(UdpListenerFilterManager& udp_listener,
+  virtual void createUdpListenerFilterChain(UdpListenerFilterManager& udp_listener,
                                             UdpReadFilterCallbacks& callbacks) PURE;
 };
 

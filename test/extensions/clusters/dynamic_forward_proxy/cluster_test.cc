@@ -1,3 +1,7 @@
+#include "envoy/api/v2/cds.pb.h"
+#include "envoy/config/cluster/dynamic_forward_proxy/v2alpha/cluster.pb.h"
+#include "envoy/config/cluster/dynamic_forward_proxy/v2alpha/cluster.pb.validate.h"
+
 #include "common/singleton/manager_impl.h"
 
 #include "extensions/clusters/dynamic_forward_proxy/cluster.h"
@@ -26,7 +30,8 @@ public:
   void initialize(const std::string& yaml_config, bool uses_tls) {
     envoy::api::v2::Cluster cluster_config = Upstream::parseClusterFromV2Yaml(yaml_config);
     envoy::config::cluster::dynamic_forward_proxy::v2alpha::ClusterConfig config;
-    Config::Utility::translateOpaqueConfig(cluster_config.cluster_type().typed_config(),
+    Config::Utility::translateOpaqueConfig(cluster_config.cluster_type().name(),
+                                           cluster_config.cluster_type().typed_config(),
                                            ProtobufWkt::Struct::default_instance(),
                                            ProtobufMessage::getStrictValidationVisitor(), config);
     Stats::ScopePtr scope = stats_store_.createScope("cluster.name.");
@@ -54,6 +59,17 @@ public:
                const Upstream::HostVector& hosts_removed) -> void {
           onMemberUpdateCb(hosts_added, hosts_removed);
         });
+
+    absl::flat_hash_map<std::string, Extensions::Common::DynamicForwardProxy::DnsHostInfoSharedPtr>
+        existing_hosts;
+    for (const auto& host : host_map_) {
+      existing_hosts.emplace(host.first, host.second);
+    }
+    EXPECT_CALL(*dns_cache_manager_->dns_cache_, hosts()).WillOnce(Return(existing_hosts));
+    if (!existing_hosts.empty()) {
+      EXPECT_CALL(*this, onMemberUpdateCb(SizeIs(existing_hosts.size()), SizeIs(0)));
+    }
+    cluster_->initialize([] {});
   }
 
   Extensions::Common::DynamicForwardProxy::DnsCacheManagerSharedPtr get() override {
@@ -172,8 +188,16 @@ TEST_F(ClusterTest, InvalidLbContext) {
   EXPECT_EQ(nullptr, lb_->chooseHost(nullptr));
 }
 
+// Verify cluster attaches to a populated cache.
+TEST_F(ClusterTest, PopulatedCache) {
+  makeTestHost("host1", "1.2.3.4");
+  makeTestHost("host2", "1.2.3.5");
+  initialize(default_yaml_config_, false);
+  EXPECT_EQ(2UL, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().size());
+}
+
 // Verify that using 'sni' causes a failure.
-TEST_F(ClusterTest, InvalidSNI) {
+TEST_F(ClusterTest, DEPRECATED_FEATURE_TEST(InvalidSNI)) {
   const std::string yaml_config = TestEnvironment::substitute(R"EOF(
 name: name
 connect_timeout: 0.25s
@@ -197,7 +221,7 @@ tls_context:
 }
 
 // Verify that using 'verify_subject_alt_name' causes a failure.
-TEST_F(ClusterTest, InvalidVerifySubjectAltName) {
+TEST_F(ClusterTest, DEPRECATED_FEATURE_TEST(InvalidVerifySubjectAltName)) {
   const std::string yaml_config = TestEnvironment::substitute(R"EOF(
 name: name
 connect_timeout: 0.25s

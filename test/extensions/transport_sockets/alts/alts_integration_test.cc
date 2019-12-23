@@ -1,3 +1,4 @@
+#include "envoy/config/bootstrap/v2/bootstrap.pb.h"
 #include "envoy/config/transport_socket/alts/v2alpha/alts.pb.h"
 
 #include "common/common/thread.h"
@@ -51,7 +52,7 @@ public:
         alts_config.add_peer_service_accounts(server_peer_identity_);
       }
       alts_config.set_handshaker_service(fakeHandshakerServerAddress(server_connect_handshaker_));
-      TestUtility::jsonConvert(alts_config, *transport_socket->mutable_config());
+      transport_socket->mutable_typed_config()->PackFrom(alts_config);
     });
     HttpIntegrationTest::initialize();
     registerTestServerPorts({"http"});

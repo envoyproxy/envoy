@@ -10,7 +10,7 @@
 
 #include "envoy/access_log/access_log.h"
 #include "envoy/api/api.h"
-#include "envoy/api/v2/core/base.pb.h"
+#include "envoy/api/v2/cds.pb.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/local_info/local_info.h"
 #include "envoy/network/dns.h"
@@ -142,6 +142,13 @@ public:
    * @return std::string the identifying name for a particular implementation of a cluster factory.
    */
   virtual std::string name() PURE;
+
+  /**
+   * @return std::string the identifying category name for objects
+   * created by this factory. Used for automatic registration with
+   * FactoryCategoryRegistry.
+   */
+  static std::string category() { return "clusters"; }
 };
 
 } // namespace Upstream

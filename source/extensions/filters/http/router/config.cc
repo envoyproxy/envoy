@@ -1,9 +1,8 @@
 #include "extensions/filters/http/router/config.h"
 
+#include "envoy/config/filter/http/router/v2/router.pb.h"
 #include "envoy/config/filter/http/router/v2/router.pb.validate.h"
 
-#include "common/config/filter_json.h"
-#include "common/json/config_schemas.h"
 #include "common/router/router.h"
 #include "common/router/shadow_writer_impl.h"
 
@@ -22,15 +21,6 @@ Http::FilterFactoryCb RouterFilterConfig::createFilterFactoryFromProtoTyped(
   return [filter_config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
     callbacks.addStreamDecoderFilter(std::make_shared<Router::ProdFilter>(*filter_config));
   };
-}
-
-Http::FilterFactoryCb
-RouterFilterConfig::createFilterFactory(const Json::Object& json_config,
-                                        const std::string& stat_prefix,
-                                        Server::Configuration::FactoryContext& context) {
-  envoy::config::filter::http::router::v2::Router proto_config;
-  Config::FilterJson::translateRouter(json_config, proto_config);
-  return createFilterFactoryFromProtoTyped(proto_config, stat_prefix, context);
 }
 
 /**

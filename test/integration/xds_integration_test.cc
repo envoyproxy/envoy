@@ -1,3 +1,6 @@
+#include "envoy/config/bootstrap/v2/bootstrap.pb.h"
+#include "envoy/config/filter/network/http_connection_manager/v2/http_connection_manager.pb.h"
+
 #include "test/integration/http_integration.h"
 #include "test/integration/http_protocol_integration.h"
 #include "test/test_common/environment.h"
@@ -108,6 +111,17 @@ TEST_P(LdsIntegrationTest, ReloadConfig) {
   std::string response2;
   sendRawHttpAndWaitForResponse(lookupPort("http"), "GET / HTTP/1.0\r\n\r\n", &response2, false);
   EXPECT_THAT(response2, HasSubstr("HTTP/1.0 200 OK\r\n"));
+}
+
+// Sample test making sure our config framework informs on listener failure.
+TEST_P(LdsIntegrationTest, FailConfigLoad) {
+  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v2::Bootstrap& bootstrap) -> void {
+    auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
+    auto* filter_chain = listener->mutable_filter_chains(0);
+    filter_chain->mutable_filters(0)->set_name("grewgragra");
+  });
+  EXPECT_DEATH_LOG_TO_STDERR(initialize(),
+                             "Didn't find a registered implementation for name: 'grewgragra'");
 }
 
 } // namespace

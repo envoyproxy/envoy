@@ -34,6 +34,7 @@ envoy_cc_library(
         "//include/envoy/grpc:async_client_interface",
         "//source/common/buffer:zero_copy_input_stream_lib",
         "//source/common/http:async_client_lib",
+        "@envoy_api//envoy/api/v2/core:pkg_cc_proto",
     ],
 )
 
@@ -152,10 +153,12 @@ envoy_cc_library(
         "//include/envoy/grpc:google_grpc_creds_interface",
         "//include/envoy/thread:thread_interface",
         "//include/envoy/thread_local:thread_local_interface",
+        "//source/common/common:base64_lib",
         "//source/common/common:empty_string",
         "//source/common/common:linked_object",
         "//source/common/common:thread_annotations",
         "//source/common/tracing:http_tracer_lib",
+        "@envoy_api//envoy/api/v2/core:pkg_cc_proto",
     ],
 )
 
@@ -181,5 +184,6 @@ envoy_cc_library(
         "//include/envoy/grpc:google_grpc_creds_interface",
         "//include/envoy/registry",
         "//source/common/config:datasource_lib",
+        "@envoy_api//envoy/api/v2/core:pkg_cc_proto",
     ],
 )

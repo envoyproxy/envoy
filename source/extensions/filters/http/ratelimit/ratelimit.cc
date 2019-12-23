@@ -26,9 +26,7 @@ struct RcDetailsValues {
 using RcDetails = ConstSingleton<RcDetailsValues>;
 
 void Filter::initiateCall(const Http::HeaderMap& headers) {
-  bool is_internal_request =
-      headers.EnvoyInternalRequest() && (headers.EnvoyInternalRequest()->value() == "true");
-
+  const bool is_internal_request = Http::HeaderUtility::isEnvoyInternalRequest(headers);
   if ((is_internal_request && config_->requestType() == FilterRequestType::External) ||
       (!is_internal_request && config_->requestType() == FilterRequestType::Internal)) {
     return;
@@ -155,7 +153,10 @@ void Filter::complete(Filters::Common::RateLimit::LimitStatus status,
                                            empty_stat_name,
                                            false};
     httpContext().codeStats().chargeResponseStat(info);
-    response_headers_to_add_->insertEnvoyRateLimited().value(
+    if (response_headers_to_add_ == nullptr) {
+      response_headers_to_add_ = std::make_unique<Http::HeaderMapImpl>();
+    }
+    response_headers_to_add_->setReferenceEnvoyRateLimited(
         Http::Headers::get().EnvoyRateLimitedValues.True);
     break;
   }

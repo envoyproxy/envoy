@@ -1,5 +1,7 @@
 #include "extensions/filters/http/header_to_metadata/header_to_metadata_filter.h"
 
+#include "envoy/config/filter/http/header_to_metadata/v2/header_to_metadata.pb.h"
+
 #include "common/common/base64.h"
 #include "common/config/well_known_names.h"
 #include "common/protobuf/protobuf.h"
@@ -95,7 +97,7 @@ bool HeaderToMetadataFilter::addMetadata(StructMap& map, const std::string& meta
   }
 
   std::string decodedValue = std::string(value);
-  if (encode == envoy::config::filter::http::header_to_metadata::v2::Config_ValueEncode_BASE64) {
+  if (encode == envoy::config::filter::http::header_to_metadata::v2::Config::BASE64) {
     decodedValue = Base64::decodeWithoutPadding(value);
     if (decodedValue.empty()) {
       ENVOY_LOG(debug, "Base64 decode failed");
@@ -105,10 +107,10 @@ bool HeaderToMetadataFilter::addMetadata(StructMap& map, const std::string& meta
 
   // Sane enough, add the key/value.
   switch (type) {
-  case envoy::config::filter::http::header_to_metadata::v2::Config_ValueType_STRING:
+  case envoy::config::filter::http::header_to_metadata::v2::Config::STRING:
     val.set_string_value(std::move(decodedValue));
     break;
-  case envoy::config::filter::http::header_to_metadata::v2::Config_ValueType_NUMBER: {
+  case envoy::config::filter::http::header_to_metadata::v2::Config::NUMBER: {
     double dval;
     if (absl::SimpleAtod(StringUtil::trim(decodedValue), &dval)) {
       val.set_number_value(dval);
@@ -118,7 +120,7 @@ bool HeaderToMetadataFilter::addMetadata(StructMap& map, const std::string& meta
     }
     break;
   }
-  case envoy::config::filter::http::header_to_metadata::v2::Config_ValueType_PROTOBUF_VALUE: {
+  case envoy::config::filter::http::header_to_metadata::v2::Config::PROTOBUF_VALUE: {
     if (!val.ParseFromString(decodedValue)) {
       ENVOY_LOG(debug, "parse from decoded string failed");
       return false;

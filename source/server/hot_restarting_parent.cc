@@ -5,6 +5,8 @@
 #include "common/memory/stats.h"
 #include "common/network/utility.h"
 
+#include "server/listener_impl.h"
+
 namespace Envoy {
 namespace Server {
 
@@ -95,9 +97,13 @@ HotRestartingParent::Internal::getListenSocketsForChild(const HotRestartMessage:
   Network::Address::InstanceConstSharedPtr addr =
       Network::Utility::resolveUrl(request.pass_listen_socket().address());
   for (const auto& listener : server_->listenerManager().listeners()) {
-    if (*listener.get().socket().localAddress() == *addr && listener.get().bindToPort()) {
-      wrapped_reply.mutable_reply()->mutable_pass_listen_socket()->set_fd(
-          listener.get().socket().ioHandle().fd());
+    Network::ListenSocketFactory& socket_factory = listener.get().listenSocketFactory();
+    if (*socket_factory.localAddress() == *addr && listener.get().bindToPort()) {
+      if (socket_factory.sharedSocket().has_value()) {
+        // Pass the socket to the new process iff it is already shared across workers.
+        wrapped_reply.mutable_reply()->mutable_pass_listen_socket()->set_fd(
+            socket_factory.sharedSocket()->get().ioHandle().fd());
+      }
       break;
     }
   }
@@ -110,14 +116,19 @@ HotRestartingParent::Internal::getListenSocketsForChild(const HotRestartMessage:
 // names. The problem can be solved by splitting the export up over many chunks.
 void HotRestartingParent::Internal::exportStatsToChild(HotRestartMessage::Reply::Stats* stats) {
   for (const auto& gauge : server_->stats().gauges()) {
-    (*stats->mutable_gauges())[gauge->name()] = gauge->value();
+    if (gauge->used()) {
+      (*stats->mutable_gauges())[gauge->name()] = gauge->value();
+    }
   }
+
   for (const auto& counter : server_->stats().counters()) {
-    // The hot restart parent is expected to have stopped its normal stat exporting (and so
-    // latching) by the time it begins exporting to the hot restart child.
-    uint64_t latched_value = counter->latch();
-    if (latched_value > 0) {
-      (*stats->mutable_counter_deltas())[counter->name()] = latched_value;
+    if (counter->used()) {
+      // The hot restart parent is expected to have stopped its normal stat exporting (and so
+      // latching) by the time it begins exporting to the hot restart child.
+      uint64_t latched_value = counter->latch();
+      if (latched_value > 0) {
+        (*stats->mutable_counter_deltas())[counter->name()] = latched_value;
+      }
     }
   }
   stats->set_memory_allocated(Memory::Stats::totalCurrentlyAllocated());

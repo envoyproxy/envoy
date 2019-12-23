@@ -18,5 +18,7 @@ envoy_cc_mock(
         "//include/envoy/server:transport_socket_config_interface",
         "//include/envoy/ssl:tls_certificate_config_interface",
         "//source/common/secret:secret_provider_impl_lib",
+        "@envoy_api//envoy/api/v2/auth:pkg_cc_proto",
+        "@envoy_api//envoy/api/v2/core:pkg_cc_proto",
     ],
 )

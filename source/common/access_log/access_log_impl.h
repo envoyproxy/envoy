@@ -9,6 +9,7 @@
 #include "envoy/config/filter/accesslog/v2/accesslog.pb.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/server/access_log_config.h"
+#include "envoy/type/percent.pb.h"
 
 #include "common/grpc/status.h"
 #include "common/http/header_utility.h"
@@ -258,6 +259,13 @@ public:
    * produced by the factory.
    */
   virtual std::string name() const PURE;
+
+  /**
+   * @return std::string the identifying category name for objects
+   * created by this factory. Used for automatic registration with
+   * FactoryCategoryRegistry.
+   */
+  static std::string category() { return "access_logger.extension_filters"; }
 };
 
 /**

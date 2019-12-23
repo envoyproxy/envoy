@@ -1,6 +1,10 @@
 #include <string>
 
+#include "envoy/config/filter/network/http_connection_manager/v2/http_connection_manager.pb.h"
+#include "envoy/type/percent.pb.h"
+
 #include "common/http/conn_manager_utility.h"
+#include "common/http/header_utility.h"
 #include "common/http/headers.h"
 #include "common/network/address_impl.h"
 #include "common/network/utility.h"
@@ -38,6 +42,7 @@ class MockConnectionManagerConfig : public ConnectionManagerConfig {
 public:
   MockConnectionManagerConfig() {
     ON_CALL(*this, generateRequestId()).WillByDefault(Return(true));
+    ON_CALL(*this, isRoutable()).WillByDefault(Return(true));
     ON_CALL(*this, preserveExternalRequestId()).WillByDefault(Return(false));
   }
 
@@ -58,6 +63,8 @@ public:
   MOCK_CONST_METHOD0(maxRequestHeadersKb, uint32_t());
   MOCK_CONST_METHOD0(maxRequestHeadersCount, uint32_t());
   MOCK_CONST_METHOD0(idleTimeout, absl::optional<std::chrono::milliseconds>());
+  MOCK_CONST_METHOD0(isRoutable, bool());
+  MOCK_CONST_METHOD0(maxConnectionDuration, absl::optional<std::chrono::milliseconds>());
   MOCK_CONST_METHOD0(streamIdleTimeout, std::chrono::milliseconds());
   MOCK_CONST_METHOD0(requestTimeout, std::chrono::milliseconds());
   MOCK_CONST_METHOD0(delayedCloseTimeout, std::chrono::milliseconds());
@@ -128,7 +135,7 @@ public:
                                                        random_, local_info_)
             ->asString();
     ConnectionManagerUtility::mutateTracingRequestHeader(headers, runtime_, config_, &route_);
-    ret.internal_ = headers.EnvoyInternalRequest() != nullptr;
+    ret.internal_ = HeaderUtility::isEnvoyInternalRequest(headers);
     return ret;
   }
 
@@ -237,26 +244,8 @@ TEST_F(ConnectionManagerUtilityTest, SkipXffAppendPassThruUseRemoteAddress) {
   EXPECT_EQ("198.51.100.1", headers.ForwardedFor()->value().getStringView());
 }
 
-TEST_F(ConnectionManagerUtilityTest, ForwardedProtoLegacyBehavior) {
-  TestScopedRuntime scoped_runtime;
-  Runtime::LoaderSingleton::getExisting()->mergeValues(
-      {{"envoy.reloadable_features.trusted_forwarded_proto", "false"}});
-
-  ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(true));
-  ON_CALL(config_, xffNumTrustedHops()).WillByDefault(Return(1));
-  EXPECT_CALL(config_, skipXffAppend()).WillOnce(Return(true));
-  connection_.remote_address_ = std::make_shared<Network::Address::Ipv4Instance>("12.12.12.12");
-  ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(true));
-  TestHeaderMapImpl headers{{"x-forwarded-proto", "https"}};
-
-  callMutateRequestHeaders(headers, Protocol::Http2);
-  EXPECT_EQ("http", headers.ForwardedProto()->value().getStringView());
-}
-
 TEST_F(ConnectionManagerUtilityTest, PreserveForwardedProtoWhenInternal) {
   TestScopedRuntime scoped_runtime;
-  Runtime::LoaderSingleton::getExisting()->mergeValues(
-      {{"envoy.reloadable_features.trusted_forwarded_proto", "true"}});
 
   ON_CALL(config_, useRemoteAddress()).WillByDefault(Return(true));
   ON_CALL(config_, xffNumTrustedHops()).WillByDefault(Return(1));
@@ -1251,7 +1240,7 @@ TEST_F(ConnectionManagerUtilityTest, RemovesProxyResponseHeaders) {
 TEST_F(ConnectionManagerUtilityTest, SanitizePathDefaultOff) {
   ON_CALL(config_, shouldNormalizePath()).WillByDefault(Return(false));
   HeaderMapImpl original_headers;
-  original_headers.insertPath().value(std::string("/xyz/../a"));
+  original_headers.setPath("/xyz/../a");
 
   HeaderMapImpl header_map(static_cast<HeaderMap&>(original_headers));
   ConnectionManagerUtility::maybeNormalizePath(header_map, config_);
@@ -1262,7 +1251,7 @@ TEST_F(ConnectionManagerUtilityTest, SanitizePathDefaultOff) {
 TEST_F(ConnectionManagerUtilityTest, SanitizePathNormalPath) {
   ON_CALL(config_, shouldNormalizePath()).WillByDefault(Return(true));
   HeaderMapImpl original_headers;
-  original_headers.insertPath().value(std::string("/xyz"));
+  original_headers.setPath("/xyz");
 
   HeaderMapImpl header_map(static_cast<HeaderMap&>(original_headers));
   ConnectionManagerUtility::maybeNormalizePath(header_map, config_);
@@ -1273,7 +1262,7 @@ TEST_F(ConnectionManagerUtilityTest, SanitizePathNormalPath) {
 TEST_F(ConnectionManagerUtilityTest, SanitizePathRelativePAth) {
   ON_CALL(config_, shouldNormalizePath()).WillByDefault(Return(true));
   HeaderMapImpl original_headers;
-  original_headers.insertPath().value(std::string("/xyz/../abc"));
+  original_headers.setPath("/xyz/../abc");
 
   HeaderMapImpl header_map(static_cast<HeaderMap&>(original_headers));
   ConnectionManagerUtility::maybeNormalizePath(header_map, config_);
@@ -1285,7 +1274,7 @@ TEST_F(ConnectionManagerUtilityTest, MergeSlashesDefaultOff) {
   ON_CALL(config_, shouldNormalizePath()).WillByDefault(Return(true));
   ON_CALL(config_, shouldMergeSlashes()).WillByDefault(Return(false));
   HeaderMapImpl original_headers;
-  original_headers.insertPath().value(std::string("/xyz///abc"));
+  original_headers.setPath("/xyz///abc");
 
   HeaderMapImpl header_map(static_cast<HeaderMap&>(original_headers));
   ConnectionManagerUtility::maybeNormalizePath(header_map, config_);
@@ -1297,7 +1286,7 @@ TEST_F(ConnectionManagerUtilityTest, MergeSlashes) {
   ON_CALL(config_, shouldNormalizePath()).WillByDefault(Return(true));
   ON_CALL(config_, shouldMergeSlashes()).WillByDefault(Return(true));
   HeaderMapImpl original_headers;
-  original_headers.insertPath().value(std::string("/xyz///abc"));
+  original_headers.setPath("/xyz///abc");
 
   HeaderMapImpl header_map(static_cast<HeaderMap&>(original_headers));
   ConnectionManagerUtility::maybeNormalizePath(header_map, config_);
@@ -1309,7 +1298,7 @@ TEST_F(ConnectionManagerUtilityTest, MergeSlashesWithoutNormalization) {
   ON_CALL(config_, shouldNormalizePath()).WillByDefault(Return(false));
   ON_CALL(config_, shouldMergeSlashes()).WillByDefault(Return(true));
   HeaderMapImpl original_headers;
-  original_headers.insertPath().value(std::string("/xyz/..//abc"));
+  original_headers.setPath("/xyz/..//abc");
 
   HeaderMapImpl header_map(static_cast<HeaderMap&>(original_headers));
   ConnectionManagerUtility::maybeNormalizePath(header_map, config_);

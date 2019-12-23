@@ -8,9 +8,13 @@
 #include <string>
 #include <vector>
 
+#include "envoy/api/v2/core/base.pb.h"
+#include "envoy/api/v2/rds.pb.h"
+#include "envoy/api/v2/route/route.pb.h"
 #include "envoy/http/header_map.h"
 #include "envoy/runtime/runtime.h"
-#include "envoy/type/percent.pb.validate.h"
+#include "envoy/type/matcher/string.pb.h"
+#include "envoy/type/percent.pb.h"
 #include "envoy/upstream/cluster_manager.h"
 #include "envoy/upstream/upstream.h"
 
@@ -22,7 +26,6 @@
 #include "common/common/regex.h"
 #include "common/common/utility.h"
 #include "common/config/metadata.h"
-#include "common/config/rds_json.h"
 #include "common/config/utility.h"
 #include "common/config/well_known_names.h"
 #include "common/http/headers.h"
@@ -30,6 +33,7 @@
 #include "common/protobuf/protobuf.h"
 #include "common/protobuf/utility.h"
 #include "common/router/retry_state_impl.h"
+#include "common/tracing/http_tracer_impl.h"
 
 #include "extensions/filters/http/well_known_names.h"
 
@@ -62,8 +66,7 @@ HedgePolicyImpl::HedgePolicyImpl(const envoy::api::v2::route::HedgePolicy& hedge
       additional_request_chance_(hedge_policy.additional_request_chance()),
       hedge_on_per_try_timeout_(hedge_policy.hedge_on_per_try_timeout()) {}
 
-HedgePolicyImpl::HedgePolicyImpl()
-    : initial_requests_(1), additional_request_chance_({}), hedge_on_per_try_timeout_(false) {}
+HedgePolicyImpl::HedgePolicyImpl() : initial_requests_(1), hedge_on_per_try_timeout_(false) {}
 
 RetryPolicyImpl::RetryPolicyImpl(const envoy::api::v2::route::RetryPolicy& retry_policy,
                                  ProtobufMessage::ValidationVisitor& validation_visitor)
@@ -155,7 +158,7 @@ CorsPolicyImpl::CorsPolicyImpl(const envoy::api::v2::route::CorsPolicy& config,
     : config_(config), loader_(loader), allow_methods_(config.allow_methods()),
       allow_headers_(config.allow_headers()), expose_headers_(config.expose_headers()),
       max_age_(config.max_age()),
-      legacy_enabled_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, enabled, true)) {
+      legacy_enabled_(config.has_enabled() ? config.enabled().value() : true) {
   for (const auto& origin : config.allow_origin()) {
     envoy::type::matcher::StringMatcher matcher_config;
     matcher_config.set_exact(origin);
@@ -220,6 +223,9 @@ RouteTracingImpl::RouteTracingImpl(const envoy::api::v2::route::Tracing& tracing
   } else {
     overall_sampling_ = tracing.overall_sampling();
   }
+  for (const auto& tag : tracing.custom_tags()) {
+    custom_tags_.emplace(tag.tag(), Tracing::HttpTracerUtility::createCustomTag(tag));
+  }
 }
 
 const envoy::type::FractionalPercent& RouteTracingImpl::getClientSampling() const {
@@ -233,6 +239,7 @@ const envoy::type::FractionalPercent& RouteTracingImpl::getRandomSampling() cons
 const envoy::type::FractionalPercent& RouteTracingImpl::getOverallSampling() const {
   return overall_sampling_;
 }
+const Tracing::CustomTagMap& RouteTracingImpl::getCustomTags() const { return custom_tags_; }
 
 RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
                                        const envoy::api::v2::route::Route& route,
@@ -385,6 +392,12 @@ bool RouteEntryImplBase::matchRoute(const Http::HeaderMap& headers,
                                     uint64_t random_value) const {
   bool matches = true;
 
+  // TODO(mattklein123): Currently all match types require a path header. When we support CONNECT
+  // we will need to figure out how to safely relax this.
+  if (headers.Path() == nullptr) {
+    return false;
+  }
+
   matches &= evaluateRuntimeMatch(random_value);
   if (!matches) {
     // No need to waste further cycles calculating a route match.
@@ -426,13 +439,13 @@ void RouteEntryImplBase::finalizeRequestHeaders(Http::HeaderMap& headers,
   }
 
   if (!host_rewrite_.empty()) {
-    headers.Host()->value(host_rewrite_);
+    headers.setHost(host_rewrite_);
   } else if (auto_host_rewrite_header_) {
-    Http::HeaderEntry* header = headers.get(*auto_host_rewrite_header_);
+    const Http::HeaderEntry* header = headers.get(*auto_host_rewrite_header_);
     if (header != nullptr) {
       absl::string_view header_value = header->value().getStringView();
       if (!header_value.empty()) {
-        headers.Host()->value(header_value);
+        headers.setHost(header_value);
       }
     }
   }
@@ -483,11 +496,11 @@ void RouteEntryImplBase::finalizePathHeader(Http::HeaderMap& headers,
 
   std::string path(headers.Path()->value().getStringView());
   if (insert_envoy_original_path) {
-    headers.insertEnvoyOriginalPath().value(*headers.Path());
+    headers.setEnvoyOriginalPath(path);
   }
   ASSERT(case_sensitive_ ? absl::StartsWith(path, matched_path)
                          : absl::StartsWithIgnoreCase(path, matched_path));
-  headers.Path()->value(path.replace(0, matched_path.size(), rewrite));
+  headers.setPath(path.replace(0, matched_path.size(), rewrite));
 }
 
 absl::string_view RouteEntryImplBase::processRequestHost(const Http::HeaderMap& headers,
@@ -883,13 +896,13 @@ VirtualHostImpl::VirtualHostImpl(const envoy::api::v2::route::VirtualHost& virtu
 
   switch (virtual_host.require_tls()) {
   case envoy::api::v2::route::VirtualHost::NONE:
-    ssl_requirements_ = SslRequirements::NONE;
+    ssl_requirements_ = SslRequirements::None;
     break;
   case envoy::api::v2::route::VirtualHost::EXTERNAL_ONLY:
-    ssl_requirements_ = SslRequirements::EXTERNAL_ONLY;
+    ssl_requirements_ = SslRequirements::ExternalOnly;
     break;
   case envoy::api::v2::route::VirtualHost::ALL:
-    ssl_requirements_ = SslRequirements::ALL;
+    ssl_requirements_ = SslRequirements::All;
     break;
   default:
     NOT_REACHED_GCOVR_EXCL_LINE;
@@ -1041,10 +1054,11 @@ RouteConstSharedPtr VirtualHostImpl::getRouteFromEntries(const Http::HeaderMap& 
   }
 
   // First check for ssl redirect.
-  if (ssl_requirements_ == SslRequirements::ALL && forwarded_proto_header->value() != "https") {
+  if (ssl_requirements_ == SslRequirements::All && forwarded_proto_header->value() != "https") {
     return SSL_REDIRECT_ROUTE;
-  } else if (ssl_requirements_ == SslRequirements::EXTERNAL_ONLY &&
-             forwarded_proto_header->value() != "https" && !headers.EnvoyInternalRequest()) {
+  } else if (ssl_requirements_ == SslRequirements::ExternalOnly &&
+             forwarded_proto_header->value() != "https" &&
+             !Http::HeaderUtility::isEnvoyInternalRequest(headers)) {
     return SSL_REDIRECT_ROUTE;
   }
 
@@ -1064,6 +1078,11 @@ const VirtualHostImpl* RouteMatcher::findVirtualHost(const Http::HeaderMap& head
   if (virtual_hosts_.empty() && wildcard_virtual_host_suffixes_.empty() &&
       wildcard_virtual_host_prefixes_.empty()) {
     return default_virtual_host_.get();
+  }
+
+  // There may be no authority in early reply paths in the HTTP connection manager.
+  if (headers.Host() == nullptr) {
+    return nullptr;
   }
 
   // TODO (@rshriram) Match Origin header in WebSocket
@@ -1154,7 +1173,8 @@ createRouteSpecificFilterConfig(const std::string& name, const ProtobufWkt::Any&
   auto& factory = Envoy::Config::Utility::getAndCheckFactory<
       Server::Configuration::NamedHttpFilterConfigFactory>(name);
   ProtobufTypes::MessagePtr proto_config = factory.createEmptyRouteConfigProto();
-  Envoy::Config::Utility::translateOpaqueConfig(typed_config, config, validator, *proto_config);
+  Envoy::Config::Utility::translateOpaqueConfig(name, typed_config, config, validator,
+                                                *proto_config);
   return factory.createRouteSpecificFilterConfig(*proto_config, factory_context, validator);
 }
 

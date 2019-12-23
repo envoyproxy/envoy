@@ -6,6 +6,7 @@
 #include "envoy/config/filter/http/fault/v2/fault.pb.h"
 #include "envoy/config/filter/http/fault/v2/fault.pb.validate.h"
 #include "envoy/event/dispatcher.h"
+#include "envoy/type/percent.pb.h"
 
 #include "common/buffer/buffer_impl.h"
 #include "common/common/empty_string.h"
@@ -16,6 +17,7 @@
 #include "extensions/filters/http/well_known_names.h"
 
 #include "test/common/http/common.h"
+#include "test/extensions/filters/http/fault/utility.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/runtime/mocks.h"
 #include "test/test_common/printers.h"
@@ -116,13 +118,6 @@ public:
   )EOF";
 
   const std::string v2_empty_fault_config_yaml = "{}";
-
-  envoy::config::filter::http::fault::v2::HTTPFault
-  convertYamlStrToProtoConfig(const std::string& yaml) {
-    envoy::config::filter::http::fault::v2::HTTPFault fault;
-    TestUtility::loadFromYaml(yaml, fault);
-    return fault;
-  }
 
   void SetUpTest(const envoy::config::filter::http::fault::v2::HTTPFault fault) {
     config_.reset(new FaultFilterConfig(fault, runtime_, "prefix.", stats_, time_system_));

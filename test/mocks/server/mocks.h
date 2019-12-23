@@ -5,6 +5,10 @@
 #include <list>
 #include <string>
 
+#include "envoy/api/v2/core/base.pb.h"
+#include "envoy/api/v2/core/config_source.pb.h"
+#include "envoy/api/v2/lds.pb.h"
+#include "envoy/api/v2/listener/listener.pb.h"
 #include "envoy/common/mutex_tracer.h"
 #include "envoy/config/bootstrap/v2/bootstrap.pb.h"
 #include "envoy/protobuf/message_validator.h"
@@ -77,6 +81,7 @@ public:
   MOCK_CONST_METHOD0(componentLogLevels,
                      const std::vector<std::pair<std::string, spdlog::level::level_enum>>&());
   MOCK_CONST_METHOD0(logFormat, const std::string&());
+  MOCK_CONST_METHOD0(logFormatEscaped, bool());
   MOCK_CONST_METHOD0(logPath, const std::string&());
   MOCK_CONST_METHOD0(parentShutdownTime, std::chrono::seconds());
   MOCK_CONST_METHOD0(restartEpoch, uint64_t());
@@ -88,9 +93,9 @@ public:
   MOCK_CONST_METHOD0(hotRestartDisabled, bool());
   MOCK_CONST_METHOD0(signalHandlingEnabled, bool());
   MOCK_CONST_METHOD0(mutexTracingEnabled, bool());
-  MOCK_CONST_METHOD0(libeventBufferEnabled, bool());
   MOCK_CONST_METHOD0(fakeSymbolTableEnabled, bool());
   MOCK_CONST_METHOD0(cpusetThreadsEnabled, bool());
+  MOCK_CONST_METHOD0(disabledExtensions, const std::vector<std::string>&());
   MOCK_CONST_METHOD0(toCommandLineOptions, Server::CommandLineOptionsPtr());
 
   std::string config_path_;
@@ -110,6 +115,7 @@ public:
   bool signal_handling_enabled_{true};
   bool mutex_tracing_enabled_{};
   bool cpuset_threads_enabled_{};
+  std::vector<std::string> disabled_extensions_;
 };
 
 class MockConfigTracker : public ConfigTracker {
@@ -259,7 +265,7 @@ public:
                Network::SocketSharedPtr(Network::Address::InstanceConstSharedPtr address,
                                         Network::Address::SocketType socket_type,
                                         const Network::Socket::OptionsSharedPtr& options,
-                                        bool bind_to_port));
+                                        const ListenSocketCreationParams& params));
   MOCK_METHOD1(createDrainManager_, DrainManager*(envoy::api::v2::Listener::DrainType drain_type));
   MOCK_METHOD0(nextListenerTag, uint64_t());
 
@@ -280,6 +286,8 @@ public:
   MOCK_METHOD1(startWorkers, void(GuardDog& guard_dog));
   MOCK_METHOD1(stopListeners, void(StopListenersType listeners_type));
   MOCK_METHOD0(stopWorkers, void());
+  MOCK_METHOD0(beginListenerUpdate, void());
+  MOCK_METHOD1(endListenerUpdate, void(ListenerManager::FailureStates&&));
 };
 
 class MockServerLifecycleNotifier : public ServerLifecycleNotifier {
@@ -331,8 +339,8 @@ public:
   MOCK_METHOD1(start, void(GuardDog& guard_dog));
   MOCK_METHOD2(initializeStats, void(Stats::Scope& scope, const std::string& prefix));
   MOCK_METHOD0(stop, void());
-  MOCK_METHOD1(stopListener, void(Network::ListenerConfig& listener));
-  MOCK_METHOD0(stopListeners, void());
+  MOCK_METHOD2(stopListener,
+               void(Network::ListenerConfig& listener, std::function<void()> completion));
 
   AddListenerCompletion add_listener_completion_;
   std::function<void()> remove_listener_completion_;

@@ -7,6 +7,7 @@
 #include "envoy/api/v2/core/base.pb.h"
 #include "envoy/common/pure.h"
 #include "envoy/common/time.h"
+#include "envoy/http/header_map.h"
 #include "envoy/http/protocol.h"
 #include "envoy/ssl/connection.h"
 #include "envoy/stream_info/filter_state.h"
@@ -63,8 +64,10 @@ enum ResponseFlag {
   StreamIdleTimeout = 0x10000,
   // Request specified x-envoy-* header values that failed strict header checks.
   InvalidEnvoyRequestHeaders = 0x20000,
+  // Downstream request had an HTTP protocol error
+  DownstreamProtocolError = 0x40000,
   // ATTENTION: MAKE SURE THIS REMAINS EQUAL TO THE LAST FLAG.
-  LastFlag = InvalidEnvoyRequestHeaders
+  LastFlag = DownstreamProtocolError
 };
 
 /**
@@ -134,6 +137,8 @@ struct ResponseCodeDetailValues {
   // indicates that original "success" headers may have been sent downstream
   // despite the subsequent failure.
   const std::string LateUpstreamReset = "upstream_reset_after_response_started";
+  // The request was rejected due to invalid characters in the HOST/:authority header.
+  const std::string InvalidAuthority = "invalid_authority";
 };
 
 using ResponseCodeDetails = ConstSingleton<ResponseCodeDetailValues>;
@@ -356,6 +361,11 @@ public:
   virtual bool hasAnyResponseFlag() const PURE;
 
   /**
+   * @return response flags encoded as an integer.
+   */
+  virtual uint64_t responseFlags() const PURE;
+
+  /**
    * @return upstream host description.
    */
   virtual Upstream::HostDescriptionConstSharedPtr upstreamHost() const PURE;
@@ -494,6 +504,16 @@ public:
    *         failed.
    */
   virtual const std::string& upstreamTransportFailureReason() const PURE;
+
+  /**
+   * @param headers request headers.
+   */
+  virtual void setRequestHeaders(const Http::HeaderMap& headers) PURE;
+
+  /**
+   * @return request headers.
+   */
+  virtual const Http::HeaderMap* getRequestHeaders() const PURE;
 };
 
 } // namespace StreamInfo

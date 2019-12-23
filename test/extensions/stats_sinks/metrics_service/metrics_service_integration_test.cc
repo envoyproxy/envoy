@@ -1,3 +1,4 @@
+#include "envoy/config/bootstrap/v2/bootstrap.pb.h"
 #include "envoy/config/metrics/v2/metrics_service.pb.h"
 #include "envoy/service/metrics/v2/metrics_service.pb.h"
 
@@ -43,7 +44,7 @@ public:
       envoy::config::metrics::v2::MetricsServiceConfig config;
       setGrpcService(*config.mutable_grpc_service(), "metrics_service",
                      fake_upstreams_.back()->localAddress());
-      TestUtility::jsonConvert(config, *metrics_sink->mutable_config());
+      metrics_sink->mutable_typed_config()->PackFrom(config);
       // Shrink reporting period down to 1s to make test not take forever.
       bootstrap.mutable_stats_flush_interval()->CopyFrom(
           Protobuf::util::TimeUtil::MillisecondsToDuration(100));

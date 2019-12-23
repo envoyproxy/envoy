@@ -11,6 +11,7 @@
 #include "test/test_common/utility.h"
 
 #include "absl/hash/hash_testing.h"
+#include "absl/strings/str_join.h"
 #include "absl/synchronization/blocking_counter.h"
 #include "gtest/gtest.h"
 
@@ -69,6 +70,10 @@ protected:
 
   StatName makeStat(absl::string_view name) { return pool_->add(name); }
 
+  std::vector<uint8_t> serializeDeserialize(uint64_t number) {
+    return TestUtil::serializeDeserializeNumber(number);
+  }
+
   FakeSymbolTableImpl* fake_symbol_table_{nullptr};
   SymbolTableImpl* real_symbol_table_{nullptr};
   std::unique_ptr<SymbolTable> table_;
@@ -77,6 +82,48 @@ protected:
 
 INSTANTIATE_TEST_SUITE_P(StatNameTest, StatNameTest,
                          testing::ValuesIn({SymbolTableType::Real, SymbolTableType::Fake}));
+
+TEST_P(StatNameTest, SerializeBytes) {
+  EXPECT_EQ(std::vector<uint8_t>{1}, serializeDeserialize(1));
+  EXPECT_EQ(std::vector<uint8_t>{127}, serializeDeserialize(127));
+  EXPECT_EQ((std::vector<uint8_t>{128, 1}), serializeDeserialize(128));
+  EXPECT_EQ((std::vector<uint8_t>{129, 1}), serializeDeserialize(129));
+  EXPECT_EQ((std::vector<uint8_t>{255, 1}), serializeDeserialize(255));
+  EXPECT_EQ((std::vector<uint8_t>{255, 127}), serializeDeserialize(16383));
+  EXPECT_EQ((std::vector<uint8_t>{128, 128, 1}), serializeDeserialize(16384));
+  EXPECT_EQ((std::vector<uint8_t>{129, 128, 1}), serializeDeserialize(16385));
+
+  auto power2 = [](uint32_t exp) -> uint64_t {
+    uint64_t one = 1;
+    return one << exp;
+  };
+  EXPECT_EQ((std::vector<uint8_t>{255, 255, 127}), serializeDeserialize(power2(21) - 1));
+  EXPECT_EQ((std::vector<uint8_t>{128, 128, 128, 1}), serializeDeserialize(power2(21)));
+  EXPECT_EQ((std::vector<uint8_t>{129, 128, 128, 1}), serializeDeserialize(power2(21) + 1));
+  EXPECT_EQ((std::vector<uint8_t>{255, 255, 255, 127}), serializeDeserialize(power2(28) - 1));
+  EXPECT_EQ((std::vector<uint8_t>{128, 128, 128, 128, 1}), serializeDeserialize(power2(28)));
+  EXPECT_EQ((std::vector<uint8_t>{129, 128, 128, 128, 1}), serializeDeserialize(power2(28) + 1));
+  EXPECT_EQ((std::vector<uint8_t>{255, 255, 255, 255, 127}), serializeDeserialize(power2(35) - 1));
+  EXPECT_EQ((std::vector<uint8_t>{128, 128, 128, 128, 128, 1}), serializeDeserialize(power2(35)));
+  EXPECT_EQ((std::vector<uint8_t>{129, 128, 128, 128, 128, 1}),
+            serializeDeserialize(power2(35) + 1));
+
+  for (uint32_t i = 0; i < 17000; ++i) {
+    serializeDeserialize(i);
+  }
+}
+
+TEST_P(StatNameTest, SerializeStrings) {
+  TestUtil::serializeDeserializeString("");
+  TestUtil::serializeDeserializeString("Hello, world!");
+  TestUtil::serializeDeserializeString("embedded\0\nul");
+  TestUtil::serializeDeserializeString(std::string(200, 'a'));
+  TestUtil::serializeDeserializeString(std::string(2000, 'a'));
+  TestUtil::serializeDeserializeString(std::string(20000, 'a'));
+  TestUtil::serializeDeserializeString(std::string(200000, 'a'));
+  TestUtil::serializeDeserializeString(std::string(2000000, 'a'));
+  TestUtil::serializeDeserializeString(std::string(20000000, 'a'));
+}
 
 TEST_P(StatNameTest, AllocFree) { encodeDecode("hello.world"); }
 
@@ -98,6 +145,28 @@ TEST_P(StatNameTest, Test100KSymbolsRoundtrip) {
     const std::string stat_name = absl::StrCat("symbol_", i);
     EXPECT_EQ(stat_name, encodeDecode(stat_name));
   }
+}
+
+TEST_P(StatNameTest, TwoHundredTwoLevel) {
+  for (int i = 0; i < 200; ++i) {
+    const std::string stat_name = absl::StrCat("symbol_", i);
+    EXPECT_EQ(stat_name, encodeDecode(stat_name));
+  }
+  EXPECT_EQ("http.foo", encodeDecode("http.foo"));
+}
+
+TEST_P(StatNameTest, TestLongSymbolName) {
+  std::string long_name(100000, 'a');
+  EXPECT_EQ(long_name, encodeDecode(long_name));
+}
+
+TEST_P(StatNameTest, TestLongSequence) {
+  std::string long_name("a");
+  for (int i = 0; i < 100000; ++i) {
+    absl::StrAppend(&long_name, ".a");
+  }
+
+  EXPECT_EQ(long_name, encodeDecode(long_name));
 }
 
 TEST_P(StatNameTest, TestUnusualDelimitersRoundtrip) {
@@ -164,6 +233,13 @@ TEST_P(StatNameTest, TestSymbolConsistency) {
   SymbolVec vec_2 = getSymbols(stat_name_2);
   EXPECT_EQ(vec_1[0], vec_2[1]);
   EXPECT_EQ(vec_2[0], vec_1[1]);
+}
+
+TEST_P(StatNameTest, TestIgnoreTrailingDots) {
+  EXPECT_EQ("foo.bar", encodeDecode("foo.bar."));
+  EXPECT_EQ("foo.bar", encodeDecode("foo.bar..."));
+  EXPECT_EQ("", encodeDecode("."));
+  EXPECT_EQ("", encodeDecode(".."));
 }
 
 TEST_P(StatNameTest, TestSameValueOnPartialFree) {
@@ -575,8 +651,20 @@ TEST_P(StatNameTest, StatNameSet) {
   EXPECT_NE(dynamic2.data(), dynamic.data());
 }
 
+TEST_P(StatNameTest, StorageCopy) {
+  StatName a = pool_->add("stat.name");
+  StatNameStorage b_storage(a, *table_);
+  StatName b = b_storage.statName();
+  EXPECT_EQ(a, b);
+  EXPECT_NE(a.data(), b.data());
+  b_storage.free(*table_);
+}
+
 TEST_P(StatNameTest, RecentLookups) {
   if (GetParam() == SymbolTableType::Fake) {
+    // touch these cover coverage for fake symbol tables, but they'll have no effect.
+    table_->clearRecentLookups();
+    table_->setRecentLookupCapacity(0);
     return;
   }
 
@@ -592,7 +680,7 @@ TEST_P(StatNameTest, RecentLookups) {
     accum.emplace_back(absl::StrCat(count, ": ", name));
   });
   EXPECT_EQ(5, total);
-  std::string recent_lookups_str = StringUtil::join(accum, " ");
+  std::string recent_lookups_str = absl::StrJoin(accum, " ");
 
   EXPECT_EQ("1: direct.stat "
             "2: dynamic.stat1 " // Combines entries from set and symbol-table.

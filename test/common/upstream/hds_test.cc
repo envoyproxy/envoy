@@ -1,5 +1,7 @@
 #include <memory>
 
+#include "envoy/api/v2/core/base.pb.h"
+#include "envoy/api/v2/core/health_check.pb.h"
 #include "envoy/service/discovery/v2/hds.pb.h"
 
 #include "common/singleton/manager_impl.h"
@@ -234,6 +236,22 @@ TEST_F(HdsTest, TestMinimalOnReceiveMessage) {
 
   // Process message
   EXPECT_CALL(*server_response_timer_, enableTimer(_, _)).Times(AtLeast(1));
+  hds_delegate_->onReceiveMessage(std::move(message));
+}
+
+// Tests OnReceiveMessage given a HealthCheckSpecifier message without interval field
+TEST_F(HdsTest, TestDefaultIntervalOnReceiveMessage) {
+  EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
+  EXPECT_CALL(async_stream_, sendMessageRaw_(_, _));
+  createHdsDelegate();
+
+  // Create Message
+  message = std::make_unique<envoy::service::discovery::v2::HealthCheckSpecifier>();
+  // notice that interval field is intentionally left undefined
+
+  // Process message
+  EXPECT_CALL(*server_response_timer_, enableTimer(std::chrono::milliseconds(1000), _))
+      .Times(AtLeast(1));
   hds_delegate_->onReceiveMessage(std::move(message));
 }
 

@@ -19,7 +19,6 @@ envoy_extension_cc_test(
         "//include/envoy/http:codes_interface",
         "//source/common/buffer:buffer_lib",
         "//source/common/common:empty_string",
-        "//source/common/config:filter_json_lib",
         "//source/common/http:context_lib",
         "//source/common/http:headers_lib",
         "//source/common/json:json_loader_lib",
@@ -35,6 +34,10 @@ envoy_extension_cc_test(
         "//test/mocks/tracing:tracing_mocks",
         "//test/mocks/upstream:upstream_mocks",
         "//test/test_common:utility_lib",
+        "@envoy_api//envoy/api/v2/core:pkg_cc_proto",
+        "@envoy_api//envoy/config/filter/http/ext_authz/v2:pkg_cc_proto",
+        "@envoy_api//envoy/service/auth/v2:pkg_cc_proto",
+        "@envoy_api//envoy/type:pkg_cc_proto",
     ],
 )
 
@@ -45,5 +48,22 @@ envoy_extension_cc_test(
     deps = [
         "//source/extensions/filters/http/ext_authz:config",
         "//test/mocks/server:server_mocks",
+        "@envoy_api//envoy/api/v2/core:pkg_cc_proto",
+        "@envoy_api//envoy/config/filter/http/ext_authz/v2:pkg_cc_proto",
+    ],
+)
+
+envoy_extension_cc_test(
+    name = "ext_authz_integration_test",
+    srcs = ["ext_authz_integration_test.cc"],
+    extension_name = "envoy.filters.http.ext_authz",
+    deps = [
+        "//source/extensions/filters/http/ext_authz:config",
+        "//test/integration:http_integration_lib",
+        "//test/test_common:utility_lib",
+        "@envoy_api//envoy/api/v2/listener:pkg_cc_proto",
+        "@envoy_api//envoy/config/bootstrap/v2:pkg_cc_proto",
+        "@envoy_api//envoy/config/filter/http/ext_authz/v2:pkg_cc_proto",
+        "@envoy_api//envoy/service/auth/v2:pkg_cc_proto",
     ],
 )

@@ -6,6 +6,7 @@
 
 #include "envoy/common/exception.h"
 #include "envoy/config/bootstrap/v2/bootstrap.pb.h"
+#include "envoy/registry/registry.h"
 #include "envoy/server/options.h"
 
 #include "common/common/logger.h"
@@ -24,13 +25,23 @@ public:
   using HotRestartVersionCb = std::function<std::string(bool)>;
 
   /**
-   * @throw NoServingException if Envoy has already done everything specified by the argv (e.g.
+   * @throw NoServingException if Envoy has already done everything specified by the args (e.g.
    *        print the hot restart version) and it's time to exit without serving HTTP traffic. The
    *        caller should exit(0) after any necessary cleanup.
    * @throw MalformedArgvException if something is wrong with the arguments (invalid flag or flag
    *        value). The caller should call exit(1) after any necessary cleanup.
    */
   OptionsImpl(int argc, const char* const* argv, const HotRestartVersionCb& hot_restart_version_cb,
+              spdlog::level::level_enum default_log_level);
+
+  /**
+   * @throw NoServingException if Envoy has already done everything specified by the args (e.g.
+   *        print the hot restart version) and it's time to exit without serving HTTP traffic. The
+   *        caller should exit(0) after any necessary cleanup.
+   * @throw MalformedArgvException if something is wrong with the arguments (invalid flag or flag
+   *        value). The caller should call exit(1) after any necessary cleanup.
+   */
+  OptionsImpl(std::vector<std::string> args, const HotRestartVersionCb& hot_restart_version_cb,
               spdlog::level::level_enum default_log_level);
 
   // Test constructor; creates "reasonable" defaults, but desired values should be set explicitly.
@@ -106,6 +117,7 @@ public:
     return component_log_levels_;
   }
   const std::string& logFormat() const override { return log_format_; }
+  bool logFormatEscaped() const override { return log_format_escaped_; }
   const std::string& logPath() const override { return log_path_; }
   std::chrono::seconds parentShutdownTime() const override { return parent_shutdown_time_; }
   uint64_t restartEpoch() const override { return restart_epoch_; }
@@ -119,12 +131,21 @@ public:
   bool hotRestartDisabled() const override { return hot_restart_disabled_; }
   bool signalHandlingEnabled() const override { return signal_handling_enabled_; }
   bool mutexTracingEnabled() const override { return mutex_tracing_enabled_; }
-  bool libeventBufferEnabled() const override { return libevent_buffer_enabled_; }
   bool fakeSymbolTableEnabled() const override { return fake_symbol_table_enabled_; }
   Server::CommandLineOptionsPtr toCommandLineOptions() const override;
   void parseComponentLogLevels(const std::string& component_log_levels);
   bool cpusetThreadsEnabled() const override { return cpuset_threads_; }
+  const std::vector<std::string>& disabledExtensions() const override {
+    return disabled_extensions_;
+  }
   uint32_t count() const;
+
+  /**
+   * disableExtensions parses the given set of extension names of
+   * the form $CATEGORY/$NAME, and disables the corresponding extension
+   * factories.
+   */
+  static void disableExtensions(const std::vector<std::string>&);
 
 private:
   void logError(const std::string& error) const;
@@ -142,6 +163,7 @@ private:
   std::vector<std::pair<std::string, spdlog::level::level_enum>> component_log_levels_;
   std::string component_log_level_str_;
   std::string log_format_;
+  bool log_format_escaped_;
   std::string log_path_;
   uint64_t restart_epoch_;
   std::string service_cluster_;
@@ -155,8 +177,8 @@ private:
   bool signal_handling_enabled_;
   bool mutex_tracing_enabled_;
   bool cpuset_threads_;
-  bool libevent_buffer_enabled_;
   bool fake_symbol_table_enabled_;
+  std::vector<std::string> disabled_extensions_;
   uint32_t count_;
 };
 

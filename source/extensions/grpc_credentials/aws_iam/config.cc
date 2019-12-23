@@ -2,6 +2,7 @@
 
 #include "envoy/api/v2/core/grpc_service.pb.h"
 #include "envoy/common/exception.h"
+#include "envoy/config/grpc_credential/v2alpha/aws_iam.pb.h"
 #include "envoy/config/grpc_credential/v2alpha/aws_iam.pb.validate.h"
 #include "envoy/grpc/google_grpc_creds.h"
 #include "envoy/registry/registry.h"
@@ -119,9 +120,9 @@ AwsIamHeaderAuthenticator::buildMessageToSign(absl::string_view service_url,
   Http::Utility::extractHostPathFromUri(uri, host, path);
 
   Http::RequestMessageImpl message;
-  message.headers().insertMethod().value().setReference(Http::Headers::get().MethodValues.Post);
-  message.headers().insertHost().value(host);
-  message.headers().insertPath().value(path);
+  message.headers().setReferenceMethod(Http::Headers::get().MethodValues.Post);
+  message.headers().setHost(host);
+  message.headers().setPath(path);
 
   return message;
 }

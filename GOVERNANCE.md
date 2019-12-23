@@ -83,7 +83,7 @@ or you can subscribe to the iCal feed [here](https://app.opsgenie.com/webcal/get
 * Do a final check of the [release notes](docs/root/intro/version_history.rst) and make any needed
   corrections.
 * Switch the [VERSION](VERSION) from a "dev" variant to a final variant. E.g., "1.6.0-dev" to
-  "1.6.0". Also remove the "Pending" tag from the top of the [release notes](docs/root/intro/version_history.rst)
+  "1.6.0". Also remove the "Pending" tags and add dates to the top of the [release notes](docs/root/intro/version_history.rst)
   and [deprecated log](docs/root/intro/deprecated.rst). Get a review and merge.
 * **Wait for tests to pass on
   [master](https://circleci.com/gh/envoyproxy/envoy/tree/master).**
@@ -106,6 +106,8 @@ or you can subscribe to the iCal feed [here](https://app.opsgenie.com/webcal/get
 * Run the deprecate_features.py script (e.g. `sh tools/deprecate_features/deprecate_features.sh`)
   to make the last release's deprecated features fatal-by-default. Submit the resultant PR and send
   an email to envoy-announce.
+* Check source/common/runtime/runtime_features.cc and see if any runtime guards in
+  disabled_runtime_features should be reassessed, and ping on the relevant issues.
 
 ## When does a maintainer lose maintainer status
 

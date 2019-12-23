@@ -3,8 +3,8 @@
 TLS
 ===
 
-Envoy supports both :ref:`TLS termination <envoy_api_field_listener.FilterChain.tls_context>` in listeners as well as
-:ref:`TLS origination <envoy_api_field_Cluster.tls_context>` when making connections to upstream
+Envoy supports both :ref:`TLS termination <envoy_api_field_listener.FilterChain.transport_socket>` in listeners as well as
+:ref:`TLS origination <envoy_api_field_Cluster.transport_socket>` when making connections to upstream
 clusters. Support is sufficient for Envoy to perform standard edge proxy duties for modern web
 services as well as to initiate connections with external services that have advanced TLS
 requirements (TLS1.2, SNI, etc.). Envoy supports the following TLS features:
@@ -80,11 +80,14 @@ Example configuration
       - filters:
         - name: envoy.http_connection_manager
           # ...
-        tls_context:
-          common_tls_context:
-            validation_context:
-              trusted_ca:
-                filename: /usr/local/my-client-ca.crt
+        transport_socket:
+          name: envoy.transport_sockets.tls
+          typed_config:
+            "@type": type.googleapis.com/envoy.api.v2.auth.DownstreamTlsContext
+            common_tls_context:
+              validation_context:
+                trusted_ca:
+                  filename: /usr/local/my-client-ca.crt
     clusters:
     - name: some_service
       connect_timeout: 0.25s
@@ -99,15 +102,18 @@ Example configuration
                 socket_address:
                   address: 127.0.0.2
                   port_value: 1234
-      tls_context:
-        common_tls_context:
-          tls_certificates:
-            certificate_chain: { "filename": "/cert.crt" }
-            private_key: { "filename": "/cert.key" }
-          validation_context:
-            verify_subject_alt_name: [ foo ]
-            trusted_ca:
-              filename: /etc/ssl/certs/ca-certificates.crt
+      transport_socket:
+        name: envoy.transport_sockets.tls
+        typed_config:
+          "@type": type.googleapis.com/envoy.api.v2.auth.UpstreamTlsContext
+          common_tls_context:
+            tls_certificates:
+              certificate_chain: { "filename": "/cert.crt" }
+              private_key: { "filename": "/cert.key" }
+            validation_context:
+              verify_subject_alt_name: [ foo ]
+              trusted_ca:
+                filename: /etc/ssl/certs/ca-certificates.crt
 
 */etc/ssl/certs/ca-certificates.crt* is the default path for the system CA bundle on Debian systems.
 :ref:`trusted_ca <envoy_api_field_auth.CertificateValidationContext.trusted_ca>` along with

@@ -3,6 +3,7 @@
 #include <chrono>
 #include <functional>
 
+#include "envoy/api/v2/lds.pb.h"
 #include "envoy/server/drain_manager.h"
 #include "envoy/server/instance.h"
 
@@ -27,12 +28,12 @@ public:
   void startParentShutdownSequence() override;
 
 private:
-  bool draining() const { return drain_tick_timer_ != nullptr; }
   void drainSequenceTick();
 
   Instance& server_;
   const envoy::api::v2::Listener::DrainType drain_type_;
   Event::TimerPtr drain_tick_timer_;
+  std::atomic<bool> draining_{false};
   std::atomic<uint32_t> drain_time_completed_{};
   Event::TimerPtr parent_shutdown_timer_;
   std::function<void()> drain_sequence_completion_;

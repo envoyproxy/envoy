@@ -546,7 +546,9 @@ TEST_F(StatsMatcherTLSTest, TestNoOpStatImpls) {
   EXPECT_EQ(noop_counter.value(), 0);
   Counter& noop_counter_2 = store_->counter("noop_counter_2");
   EXPECT_EQ(&noop_counter, &noop_counter_2);
-  EXPECT_FALSE(noop_counter.used()); // hardcoded to return false in NullMetricImpl.
+  EXPECT_FALSE(noop_counter.used());      // hardcoded to return false in NullMetricImpl.
+  EXPECT_EQ(0, noop_counter.latch());     // hardcoded to 0.
+  EXPECT_EQ(0, noop_counter.use_count()); // null counter is contained in ThreadLocalStoreImpl.
 
   // Gauge
   Gauge& noop_gauge = store_->gauge("noop_gauge", Gauge::ImportMode::Accumulate);
@@ -562,6 +564,10 @@ TEST_F(StatsMatcherTLSTest, TestNoOpStatImpls) {
   EXPECT_EQ(noop_gauge.value(), 0);
   noop_gauge.sub(2);
   EXPECT_EQ(noop_gauge.value(), 0);
+  EXPECT_EQ(Gauge::ImportMode::NeverImport, noop_gauge.importMode());
+  EXPECT_FALSE(noop_gauge.used());      // null gauge is contained in ThreadLocalStoreImpl.
+  EXPECT_EQ(0, noop_gauge.use_count()); // null gauge is contained in ThreadLocalStoreImpl.
+
   Gauge& noop_gauge_2 = store_->gauge("noop_gauge_2", Gauge::ImportMode::Accumulate);
   EXPECT_EQ(&noop_gauge, &noop_gauge_2);
 
@@ -569,6 +575,7 @@ TEST_F(StatsMatcherTLSTest, TestNoOpStatImpls) {
   Histogram& noop_histogram =
       store_->histogram("noop_histogram", Stats::Histogram::Unit::Unspecified);
   EXPECT_EQ(noop_histogram.name(), "");
+  EXPECT_FALSE(noop_histogram.used());
   Histogram& noop_histogram_2 =
       store_->histogram("noop_histogram_2", Stats::Histogram::Unit::Unspecified);
   EXPECT_EQ(&noop_histogram, &noop_histogram_2);
@@ -904,8 +911,8 @@ TEST_F(StatsThreadLocalStoreTestNoFixture, MemoryWithoutTlsFakeSymbolTable) {
   TestUtil::MemoryTest memory_test;
   TestUtil::forEachSampleStat(
       1000, [this](absl::string_view name) { store_->counter(std::string(name)); });
-  EXPECT_MEMORY_EQ(memory_test.consumedBytes(), 15268336); // June 30, 2019
-  EXPECT_MEMORY_LE(memory_test.consumedBytes(), 16 * million_);
+  EXPECT_MEMORY_EQ(memory_test.consumedBytes(), 14892880); // Oct 28, 2019
+  EXPECT_MEMORY_LE(memory_test.consumedBytes(), 15 * million_);
 }
 
 TEST_F(StatsThreadLocalStoreTestNoFixture, MemoryWithTlsFakeSymbolTable) {
@@ -914,7 +921,7 @@ TEST_F(StatsThreadLocalStoreTestNoFixture, MemoryWithTlsFakeSymbolTable) {
   TestUtil::MemoryTest memory_test;
   TestUtil::forEachSampleStat(
       1000, [this](absl::string_view name) { store_->counter(std::string(name)); });
-  EXPECT_MEMORY_EQ(memory_test.consumedBytes(), 17496848); // June 30, 2019
+  EXPECT_MEMORY_EQ(memory_test.consumedBytes(), 17121392); // Oct 28, 2019
   EXPECT_MEMORY_LE(memory_test.consumedBytes(), 18 * million_);
 }
 
@@ -924,8 +931,8 @@ TEST_F(StatsThreadLocalStoreTestNoFixture, MemoryWithoutTlsRealSymbolTable) {
   TestUtil::MemoryTest memory_test;
   TestUtil::forEachSampleStat(
       1000, [this](absl::string_view name) { store_->counter(std::string(name)); });
-  EXPECT_MEMORY_EQ(memory_test.consumedBytes(), 9139120); // Aug 9, 2019
-  EXPECT_MEMORY_LE(memory_test.consumedBytes(), 10 * million_);
+  EXPECT_MEMORY_EQ(memory_test.consumedBytes(), 8017968); // Oct 28, 2019
+  EXPECT_MEMORY_LE(memory_test.consumedBytes(), 9 * million_);
 }
 
 TEST_F(StatsThreadLocalStoreTestNoFixture, MemoryWithTlsRealSymbolTable) {
@@ -934,8 +941,8 @@ TEST_F(StatsThreadLocalStoreTestNoFixture, MemoryWithTlsRealSymbolTable) {
   TestUtil::MemoryTest memory_test;
   TestUtil::forEachSampleStat(
       1000, [this](absl::string_view name) { store_->counter(std::string(name)); });
-  EXPECT_MEMORY_EQ(memory_test.consumedBytes(), 11367632); // Aug 9, 2019
-  EXPECT_MEMORY_LE(memory_test.consumedBytes(), 12 * million_);
+  EXPECT_MEMORY_EQ(memory_test.consumedBytes(), 10246480); // Oct 28, 2019
+  EXPECT_MEMORY_LE(memory_test.consumedBytes(), 11 * million_);
 }
 
 TEST_F(StatsThreadLocalStoreTest, ShuttingDown) {
@@ -1159,6 +1166,24 @@ TEST_F(HistogramTest, BasicHistogramUsed) {
   for (const ParentHistogramSharedPtr& histogram : store_->histograms()) {
     EXPECT_TRUE(histogram->used());
   }
+}
+
+TEST_F(HistogramTest, ParentHistogramBucketSummary) {
+  ScopePtr scope1 = store_->createScope("scope1.");
+  Histogram& histogram = store_->histogram("histogram", Stats::Histogram::Unit::Unspecified);
+  store_->mergeHistograms([]() -> void {});
+  ASSERT_EQ(1, store_->histograms().size());
+  ParentHistogramSharedPtr parent_histogram = store_->histograms()[0];
+  EXPECT_EQ("No recorded values", parent_histogram->bucketSummary());
+
+  EXPECT_CALL(sink_, onHistogramComplete(Ref(histogram), 10));
+  histogram.recordValue(10);
+  store_->mergeHistograms([]() -> void {});
+  EXPECT_EQ("B0.5(0,0) B1(0,0) B5(0,0) B10(0,0) B25(1,1) B50(1,1) B100(1,1) "
+            "B250(1,1) B500(1,1) B1000(1,1) B2500(1,1) B5000(1,1) B10000(1,1) "
+            "B30000(1,1) B60000(1,1) B300000(1,1) B600000(1,1) B1.8e+06(1,1) "
+            "B3.6e+06(1,1)",
+            parent_histogram->bucketSummary());
 }
 
 } // namespace Stats

@@ -1,4 +1,7 @@
 #include "envoy/admin/v2alpha/config_dump.pb.h"
+#include "envoy/api/v2/core/base.pb.h"
+#include "envoy/api/v2/lds.pb.h"
+#include "envoy/api/v2/listener/listener.pb.h"
 
 #include "common/network/listen_socket_impl.h"
 #include "common/network/socket_option_impl.h"
@@ -67,6 +70,9 @@ protected:
               return ProdListenerComponentFactory::createUdpListenerFilterFactoryList_(filters,
                                                                                        context);
             }));
+    ON_CALL(listener_factory_, nextListenerTag()).WillByDefault(Invoke([this]() {
+      return listener_tag_++;
+    }));
 
     local_address_.reset(new Network::Address::Ipv4Instance("127.0.0.1", 1234));
     remote_address_.reset(new Network::Address::Ipv4Instance("127.0.0.1", 1234));
@@ -83,7 +89,7 @@ protected:
    */
   ListenerHandle* expectListenerCreate(
       bool need_init, bool added_via_api,
-      envoy::api::v2::Listener::DrainType drain_type = envoy::api::v2::Listener_DrainType_DEFAULT) {
+      envoy::api::v2::Listener::DrainType drain_type = envoy::api::v2::Listener::DEFAULT) {
     if (added_via_api) {
       EXPECT_CALL(server_.validation_context_, staticValidationVisitor()).Times(0);
       EXPECT_CALL(server_.validation_context_, dynamicValidationVisitor());
@@ -144,13 +150,14 @@ protected:
    */
   void
   expectCreateListenSocket(const envoy::api::v2::core::SocketOption::SocketState& expected_state,
-                           Network::Socket::Options::size_type expected_num_options) {
-    EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, true))
-        .WillOnce(Invoke([this, expected_num_options,
-                          &expected_state](const Network::Address::InstanceConstSharedPtr&,
-                                           Network::Address::SocketType,
-                                           const Network::Socket::OptionsSharedPtr& options,
-                                           bool) -> Network::SocketSharedPtr {
+                           Network::Socket::Options::size_type expected_num_options,
+                           ListenSocketCreationParams expected_creation_params = {true, true}) {
+    EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, expected_creation_params))
+        .WillOnce(Invoke([this, expected_num_options, &expected_state](
+                             const Network::Address::InstanceConstSharedPtr&,
+                             Network::Address::SocketType,
+                             const Network::Socket::OptionsSharedPtr& options,
+                             const ListenSocketCreationParams&) -> Network::SocketSharedPtr {
           EXPECT_NE(options.get(), nullptr);
           EXPECT_EQ(options->size(), expected_num_options);
           EXPECT_TRUE(
@@ -217,6 +224,7 @@ protected:
   Network::Address::InstanceConstSharedPtr local_address_;
   Network::Address::InstanceConstSharedPtr remote_address_;
   std::unique_ptr<Network::MockConnectionSocket> socket_;
+  uint64_t listener_tag_{1};
 };
 
 } // namespace Server

@@ -1,6 +1,8 @@
 #pragma once
 
 #include "envoy/api/v2/core/base.pb.h"
+#include "envoy/service/auth/v2/external_auth.pb.h"
+#include "envoy/type/http_status.pb.h"
 
 #include "common/http/headers.h"
 
@@ -29,11 +31,11 @@ public:
   static Http::MessagePtr makeMessageResponse(const HeaderValueOptionVector& headers,
                                               const std::string& body = std::string{});
 
-  static CheckResponsePtr
-  makeCheckResponse(Grpc::Status::GrpcStatus response_status = Grpc::Status::GrpcStatus::Ok,
-                    envoy::type::StatusCode http_status_code = envoy::type::StatusCode::OK,
-                    const std::string& body = std::string{},
-                    const HeaderValueOptionVector& headers = HeaderValueOptionVector{});
+  static CheckResponsePtr makeCheckResponse(
+      Grpc::Status::GrpcStatus response_status = Grpc::Status::WellKnownGrpcStatus::Ok,
+      envoy::type::StatusCode http_status_code = envoy::type::StatusCode::OK,
+      const std::string& body = std::string{},
+      const HeaderValueOptionVector& headers = HeaderValueOptionVector{});
 
   static Response
   makeAuthzResponse(CheckStatus status, Http::Code status_code = Http::Code::OK,

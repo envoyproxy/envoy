@@ -123,6 +123,11 @@ public:
   virtual const std::string& logFormat() const PURE;
 
   /**
+   * @return const bool indicating whether to escape c-style escape sequences in logs.
+   */
+  virtual bool logFormatEscaped() const PURE;
+
+  /**
    * @return const std::string& the log file path.
    */
   virtual const std::string& logPath() const PURE;
@@ -180,11 +185,6 @@ public:
   virtual bool mutexTracingEnabled() const PURE;
 
   /**
-   * @return whether to use the old libevent evbuffer-based Buffer implementation.
-   */
-  virtual bool libeventBufferEnabled() const PURE;
-
-  /**
    * @return whether to use the fake symbol table implementation.
    */
   virtual bool fakeSymbolTableEnabled() const PURE;
@@ -193,6 +193,11 @@ public:
    * @return bool indicating whether cpuset size should determine the number of worker threads.
    */
   virtual bool cpusetThreadsEnabled() const PURE;
+
+  /**
+   * @return the names of extensions to disable.
+   */
+  virtual const std::vector<std::string>& disabledExtensions() const PURE;
 
   /**
    * Converts the Options in to CommandLineOptions proto message defined in server_info.proto.

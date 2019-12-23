@@ -4,6 +4,8 @@
 #include <regex>
 #include <unordered_map>
 
+#include "envoy/api/v2/auth/cert.pb.h"
+#include "envoy/config/bootstrap/v2/bootstrap.pb.h"
 #include "envoy/config/filter/network/http_connection_manager/v2/http_connection_manager.pb.h"
 #include "envoy/stats/scope.h"
 
@@ -92,7 +94,7 @@ Network::TransportSocketFactoryPtr XfccIntegrationTest::createUpstreamSslContext
       std::move(cfg), *context_manager_, *upstream_stats_store, std::vector<std::string>{});
 }
 
-Network::ClientConnectionPtr XfccIntegrationTest::makeClientConnection() {
+Network::ClientConnectionPtr XfccIntegrationTest::makeTcpClientConnection() {
   Network::Address::InstanceConstSharedPtr address =
       Network::Utility::resolveUrl("tcp://" + Network::Test::getLoopbackAddressUrlString(version_) +
                                    ":" + std::to_string(lookupPort("http")));
@@ -123,11 +125,15 @@ void XfccIntegrationTest::initialize() {
       });
 
   config_helper_.addConfigModifier([&](envoy::config::bootstrap::v2::Bootstrap& bootstrap) -> void {
-    auto context = bootstrap.mutable_static_resources()->mutable_clusters(0)->mutable_tls_context();
-    auto* validation_context = context->mutable_common_tls_context()->mutable_validation_context();
+    auto transport_socket =
+        bootstrap.mutable_static_resources()->mutable_clusters(0)->mutable_transport_socket();
+    envoy::api::v2::auth::UpstreamTlsContext context;
+    auto* validation_context = context.mutable_common_tls_context()->mutable_validation_context();
     validation_context->mutable_trusted_ca()->set_filename(
         TestEnvironment::runfilesPath("test/config/integration/certs/upstreamcacert.pem"));
     validation_context->add_verify_subject_alt_name("foo.lyft.com");
+    transport_socket->set_name("envoy.transport_sockets.tls");
+    transport_socket->mutable_typed_config()->PackFrom(context);
   });
 
   if (tls_) {
@@ -143,7 +149,7 @@ void XfccIntegrationTest::initialize() {
 
 void XfccIntegrationTest::testRequestAndResponseWithXfccHeader(std::string previous_xfcc,
                                                                std::string expected_xfcc) {
-  Network::ClientConnectionPtr conn = tls_ ? makeMtlsClientConnection() : makeClientConnection();
+  Network::ClientConnectionPtr conn = tls_ ? makeMtlsClientConnection() : makeTcpClientConnection();
   Http::TestHeaderMapImpl header_map;
   if (previous_xfcc.empty()) {
     header_map = Http::TestHeaderMapImpl{{":method", "GET"},

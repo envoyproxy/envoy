@@ -3,6 +3,8 @@
 #include <regex>
 #include <string>
 
+#include "envoy/config/metrics/v2/stats.pb.h"
+
 #include "common/common/utility.h"
 
 namespace Envoy {

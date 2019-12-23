@@ -2,8 +2,10 @@
 
 #include <string>
 
+#include "envoy/api/v2/cds.pb.h"
 #include "envoy/api/v2/cds.pb.validate.h"
-#include "envoy/api/v2/cluster/outlier_detection.pb.validate.h"
+#include "envoy/api/v2/core/config_source.pb.h"
+#include "envoy/api/v2/discovery.pb.h"
 #include "envoy/stats/scope.h"
 
 #include "common/common/cleanup.h"
@@ -11,6 +13,8 @@
 #include "common/config/resources.h"
 #include "common/config/utility.h"
 #include "common/protobuf/utility.h"
+
+#include "absl/strings/str_join.h"
 
 namespace Envoy {
 namespace Upstream {
@@ -101,7 +105,7 @@ void CdsApiImpl::onConfigUpdate(
   runInitializeCallbackIfAny();
   if (!exception_msgs.empty()) {
     throw EnvoyException(
-        fmt::format("Error adding/updating cluster(s) {}", StringUtil::join(exception_msgs, ", ")));
+        fmt::format("Error adding/updating cluster(s) {}", absl::StrJoin(exception_msgs, ", ")));
   }
 }
 

@@ -1,5 +1,8 @@
 #include "extensions/filters/http/dynamic_forward_proxy/proxy_filter.h"
 
+#include "envoy/api/v2/core/base.pb.h"
+#include "envoy/config/filter/http/dynamic_forward_proxy/v2alpha/dynamic_forward_proxy.pb.h"
+
 #include "extensions/common/dynamic_forward_proxy/dns_cache.h"
 #include "extensions/filters/http/well_known_names.h"
 
@@ -27,7 +30,8 @@ ProxyFilterConfig::ProxyFilterConfig(
 
 ProxyPerRouteConfig::ProxyPerRouteConfig(
     const envoy::config::filter::http::dynamic_forward_proxy::v2alpha::PerRouteConfig& config)
-    : host_rewrite_(config.host_rewrite()) {}
+    : host_rewrite_(config.host_rewrite()),
+      host_rewrite_header_(Http::LowerCaseString(config.auto_host_rewrite_header())) {}
 
 void ProxyFilter::onDestroy() {
   // Make sure we destroy any active cache load handle in case we are getting reset and deferred
@@ -73,7 +77,16 @@ Http::FilterHeadersStatus ProxyFilter::decodeHeaders(Http::HeaderMap& headers, b
   if (config != nullptr) {
     const auto& host_rewrite = config->hostRewrite();
     if (!host_rewrite.empty()) {
-      headers.Host()->value(host_rewrite);
+      headers.setHost(host_rewrite);
+    }
+
+    const auto& host_rewrite_header = config->hostRewriteHeader();
+    if (!host_rewrite_header.get().empty()) {
+      const auto* header = headers.get(host_rewrite_header);
+      if (header != nullptr) {
+        const auto& header_value = header->value().getStringView();
+        headers.setHost(header_value);
+      }
     }
   }
 

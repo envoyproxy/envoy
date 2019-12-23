@@ -1,4 +1,6 @@
 #include "envoy/config/accesslog/v2/als.pb.h"
+#include "envoy/config/bootstrap/v2/bootstrap.pb.h"
+#include "envoy/config/filter/network/http_connection_manager/v2/http_connection_manager.pb.h"
 #include "envoy/service/accesslog/v2/als.pb.h"
 
 #include "common/buffer/zero_copy_input_stream_impl.h"
@@ -47,7 +49,7 @@ public:
           common_config->set_log_name("foo");
           setGrpcService(*common_config->mutable_grpc_service(), "accesslog",
                          fake_upstreams_.back()->localAddress());
-          TestUtility::jsonConvert(config, *access_log->mutable_config());
+          access_log->mutable_typed_config()->PackFrom(config);
         });
 
     HttpIntegrationTest::initialize();

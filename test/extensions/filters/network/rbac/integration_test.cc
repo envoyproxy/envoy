@@ -1,3 +1,7 @@
+#include "envoy/api/v2/listener/listener.pb.h"
+#include "envoy/config/bootstrap/v2/bootstrap.pb.h"
+#include "envoy/config/filter/network/rbac/v2/rbac.pb.validate.h"
+
 #include "extensions/filters/network/rbac/config.h"
 
 #include "test/integration/integration.h"
@@ -27,7 +31,8 @@ public:
     filter_chains:
       filters:
        -  name: envoy.filters.network.rbac
-          config:
+          typed_config:
+            "@type": type.googleapis.com/envoy.config.filter.network.rbac.v2.RBAC
             stat_prefix: tcp.
             rules:
               policies:
@@ -69,7 +74,8 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, RoleBasedAccessControlNetworkFilterIntegrat
 TEST_P(RoleBasedAccessControlNetworkFilterIntegrationTest, Allowed) {
   initializeFilter(R"EOF(
 name: envoy.filters.network.rbac
-config:
+typed_config:
+  "@type": type.googleapis.com/envoy.config.filter.network.rbac.v2.RBAC
   stat_prefix: tcp.
   rules:
     policies:
@@ -101,7 +107,8 @@ config:
 TEST_P(RoleBasedAccessControlNetworkFilterIntegrationTest, Denied) {
   initializeFilter(R"EOF(
 name: envoy.filters.network.rbac
-config:
+typed_config:
+  "@type": type.googleapis.com/envoy.config.filter.network.rbac.v2.RBAC
   stat_prefix: tcp.
   rules:
     policies:

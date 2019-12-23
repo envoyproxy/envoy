@@ -232,6 +232,15 @@ GetLastAddressFromXffInfo getLastAddressFromXFF(const Http::HeaderMap& request_h
                                                 uint32_t num_to_skip = 0);
 
 /**
+ * Remove any headers nominated by the Connection header
+ * Sanitize the TE header if it contains unsupported values
+ *
+ * @param headers the client request headers
+ * @return whether the headers were sanitized successfully
+ */
+bool sanitizeConnectionHeader(Http::HeaderMap& headers);
+
+/**
  * Get the string for the given http protocol.
  * @param protocol for which to return the string representation.
  * @return string representation of the protocol.
@@ -395,6 +404,25 @@ getMergedPerFilterConfig(const std::string& filter_name, const Router::RouteCons
   return merged;
 }
 
+struct AuthorityAttributes {
+  // whether parsed authority is pure ip address(IPv4/IPv6), if it is true
+  // passed that are not FQDN
+  bool is_ip_address_{};
+
+  // If parsed authority has host, that is stored here.
+  absl::string_view host_;
+
+  // If parsed authority has port, that is stored here.
+  absl::optional<uint16_t> port_;
+};
+
+/**
+ * Parse passed authority, and get that is valid FQDN or IPv4/IPv6 address, hostname and port-name.
+ * @param host host/authority
+ * @param default_port If passed authority does not have port, this value is returned
+ * @return hostname parse result. that includes whether host is IP Address, hostname and port-name
+ */
+AuthorityAttributes parseAuthority(absl::string_view host);
 } // namespace Utility
 } // namespace Http
 } // namespace Envoy

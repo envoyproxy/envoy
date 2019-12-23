@@ -3,6 +3,10 @@
 #include <string>
 #include <vector>
 
+#include "envoy/api/v2/core/base.pb.h"
+#include "envoy/api/v2/route/route.pb.h"
+#include "envoy/type/matcher/string.pb.h"
+
 #include "common/common/assert.h"
 #include "common/common/regex.h"
 
@@ -26,7 +30,7 @@ maybeCreateStringMatcher(const envoy::api::v2::route::QueryParameterMatcher& con
     }
 
     envoy::type::matcher::StringMatcher matcher_config;
-    if (PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, regex, false)) {
+    if (config.has_regex() ? config.regex().value() : false) {
       matcher_config.set_regex(config.value());
     } else {
       matcher_config.set_exact(config.value());

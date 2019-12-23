@@ -30,7 +30,8 @@ public:
     const std::string filter =
         R"EOF(
 name: envoy.filters.http.grpc_http1_reverse_bridge
-config:
+typed_config:
+  "@type": type.googleapis.com/envoy.config.filter.http.grpc_http1_reverse_bridge.v2alpha1.FilterConfig
   content_type: application/x-protobuf
   withhold_grpc_frames: true
             )EOF";
@@ -82,15 +83,15 @@ TEST_P(ReverseBridgeIntegrationTest, EnabledRoute) {
 
   // Respond to the request.
   Http::TestHeaderMapImpl response_headers;
-  response_headers.insertStatus().value(200);
-  response_headers.insertContentType().value(std::string("application/x-protobuf"));
+  response_headers.setStatus(200);
+  response_headers.setContentType("application/x-protobuf");
   upstream_request_->encodeHeaders(response_headers, false);
 
   Buffer::OwnedImpl response_data{"defgh"};
   upstream_request_->encodeData(response_data, false);
 
   Http::TestHeaderMapImpl response_trailers;
-  response_trailers.insertGrpcStatus().value(std::string("0"));
+  response_trailers.setGrpcStatus(std::string("0"));
   upstream_request_->encodeTrailers(response_trailers);
 
   response->waitForEndStream();
@@ -109,6 +110,7 @@ TEST_P(ReverseBridgeIntegrationTest, EnabledRoute) {
       std::equal(response->body().begin(), response->body().begin() + 4, expected_prefix.begin()));
   EXPECT_THAT(response->headers(),
               HeaderValueOf(Http::Headers::get().ContentType, "application/grpc"));
+  EXPECT_THAT(*response->trailers(), HeaderValueOf(Http::Headers::get().GrpcStatus, "0"));
 
   codec_client_->close();
   ASSERT_TRUE(fake_upstream_connection_->close());

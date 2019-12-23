@@ -2,6 +2,9 @@
 
 #include <string>
 
+#include "envoy/admin/v2alpha/server_info.pb.h"
+#include "envoy/api/v2/core/base.pb.h"
+
 #include "common/singleton/manager_impl.h"
 
 #include "gmock/gmock.h"
@@ -39,6 +42,7 @@ MockOptions::MockOptions(const std::string& config_path) : config_path_(config_p
   ON_CALL(*this, signalHandlingEnabled()).WillByDefault(ReturnPointee(&signal_handling_enabled_));
   ON_CALL(*this, mutexTracingEnabled()).WillByDefault(ReturnPointee(&mutex_tracing_enabled_));
   ON_CALL(*this, cpusetThreadsEnabled()).WillByDefault(ReturnPointee(&cpuset_threads_enabled_));
+  ON_CALL(*this, disabledExtensions()).WillByDefault(ReturnRef(disabled_extensions_));
   ON_CALL(*this, toCommandLineOptions()).WillByDefault(Invoke([] {
     return std::make_unique<envoy::admin::v2alpha::CommandLineOptions>();
   }));
@@ -91,9 +95,10 @@ MockOverloadManager::~MockOverloadManager() = default;
 MockListenerComponentFactory::MockListenerComponentFactory()
     : socket_(std::make_shared<NiceMock<Network::MockListenSocket>>()) {
   ON_CALL(*this, createListenSocket(_, _, _, _))
-      .WillByDefault(Invoke(
-          [&](Network::Address::InstanceConstSharedPtr, Network::Address::SocketType,
-              const Network::Socket::OptionsSharedPtr& options, bool) -> Network::SocketSharedPtr {
+      .WillByDefault(
+          Invoke([&](Network::Address::InstanceConstSharedPtr, Network::Address::SocketType,
+                     const Network::Socket::OptionsSharedPtr& options,
+                     const ListenSocketCreationParams&) -> Network::SocketSharedPtr {
             if (!Network::Socket::applyOptions(options, *socket_,
                                                envoy::api::v2::core::SocketOption::STATE_PREBIND)) {
               throw EnvoyException("MockListenerComponentFactory: Setting socket options failed");
@@ -115,7 +120,8 @@ MockWorkerFactory::~MockWorkerFactory() = default;
 MockWorker::MockWorker() {
   ON_CALL(*this, addListener(_, _))
       .WillByDefault(
-          Invoke([this](Network::ListenerConfig&, AddListenerCompletion completion) -> void {
+          Invoke([this](Network::ListenerConfig& config, AddListenerCompletion completion) -> void {
+            config.listenSocketFactory().getListenSocket();
             EXPECT_EQ(nullptr, add_listener_completion_);
             add_listener_completion_ = completion;
           }));
@@ -126,6 +132,13 @@ MockWorker::MockWorker() {
             EXPECT_EQ(nullptr, remove_listener_completion_);
             remove_listener_completion_ = completion;
           }));
+
+  ON_CALL(*this, stopListener(_, _))
+      .WillByDefault(Invoke([](Network::ListenerConfig&, std::function<void()> completion) -> void {
+        if (completion != nullptr) {
+          completion();
+        }
+      }));
 }
 MockWorker::~MockWorker() = default;
 

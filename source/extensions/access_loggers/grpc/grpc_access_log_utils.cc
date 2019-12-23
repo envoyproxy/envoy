@@ -1,5 +1,7 @@
 #include "extensions/access_loggers/grpc/grpc_access_log_utils.h"
 
+#include "envoy/config/accesslog/v2/als.pb.h"
+#include "envoy/data/accesslog/v2/accesslog.pb.h"
 #include "envoy/upstream/upstream.h"
 
 #include "common/network/utility.h"
@@ -17,16 +19,16 @@ using namespace envoy::data::accesslog::v2;
 // TLS version to the corresponding enum value used in gRPC access logs.
 TLSProperties_TLSVersion tlsVersionStringToEnum(const std::string& tls_version) {
   if (tls_version == "TLSv1") {
-    return TLSProperties_TLSVersion_TLSv1;
+    return TLSProperties::TLSv1;
   } else if (tls_version == "TLSv1.1") {
-    return TLSProperties_TLSVersion_TLSv1_1;
+    return TLSProperties::TLSv1_1;
   } else if (tls_version == "TLSv1.2") {
-    return TLSProperties_TLSVersion_TLSv1_2;
+    return TLSProperties::TLSv1_2;
   } else if (tls_version == "TLSv1.3") {
-    return TLSProperties_TLSVersion_TLSv1_3;
+    return TLSProperties::TLSv1_3;
   }
 
-  return TLSProperties_TLSVersion_VERSION_UNSPECIFIED;
+  return TLSProperties::VERSION_UNSPECIFIED;
 }
 
 } // namespace
@@ -35,7 +37,7 @@ void Utility::responseFlagsToAccessLogResponseFlags(
     envoy::data::accesslog::v2::AccessLogCommon& common_access_log,
     const StreamInfo::StreamInfo& stream_info) {
 
-  static_assert(StreamInfo::ResponseFlag::LastFlag == 0x20000,
+  static_assert(StreamInfo::ResponseFlag::LastFlag == 0x40000,
                 "A flag has been added. Fix this code.");
 
   if (stream_info.hasResponseFlag(StreamInfo::ResponseFlag::FailedLocalHealthCheck)) {
@@ -88,8 +90,7 @@ void Utility::responseFlagsToAccessLogResponseFlags(
 
   if (stream_info.hasResponseFlag(StreamInfo::ResponseFlag::UnauthorizedExternalService)) {
     common_access_log.mutable_response_flags()->mutable_unauthorized_details()->set_reason(
-        envoy::data::accesslog::v2::ResponseFlags_Unauthorized_Reason::
-            ResponseFlags_Unauthorized_Reason_EXTERNAL_SERVICE);
+        envoy::data::accesslog::v2::ResponseFlags::Unauthorized::EXTERNAL_SERVICE);
   }
 
   if (stream_info.hasResponseFlag(StreamInfo::ResponseFlag::RateLimitServiceError)) {
@@ -111,11 +112,16 @@ void Utility::responseFlagsToAccessLogResponseFlags(
   if (stream_info.hasResponseFlag(StreamInfo::ResponseFlag::InvalidEnvoyRequestHeaders)) {
     common_access_log.mutable_response_flags()->set_invalid_envoy_request_headers(true);
   }
+
+  if (stream_info.hasResponseFlag(StreamInfo::ResponseFlag::DownstreamProtocolError)) {
+    common_access_log.mutable_response_flags()->set_downstream_protocol_error(true);
+  }
 }
 
 void Utility::extractCommonAccessLogProperties(
     envoy::data::accesslog::v2::AccessLogCommon& common_access_log,
-    const StreamInfo::StreamInfo& stream_info) {
+    const StreamInfo::StreamInfo& stream_info,
+    const envoy::config::accesslog::v2::CommonGrpcAccessLogConfig& config) {
   // TODO(mattklein123): Populate sample_rate field.
   if (stream_info.downstreamRemoteAddress() != nullptr) {
     Network::Utility::addressToProtobufAddress(
@@ -230,6 +236,23 @@ void Utility::extractCommonAccessLogProperties(
   }
   if (stream_info.dynamicMetadata().filter_metadata_size() > 0) {
     common_access_log.mutable_metadata()->MergeFrom(stream_info.dynamicMetadata());
+  }
+
+  for (const auto& key : config.filter_state_objects_to_log()) {
+    if (stream_info.filterState().hasDataWithName(key)) {
+      const auto& obj =
+          stream_info.filterState().getDataReadOnly<StreamInfo::FilterState::Object>(key);
+      ProtobufTypes::MessagePtr serialized_proto = obj.serializeAsProto();
+      if (serialized_proto != nullptr) {
+        auto& filter_state_objects = *common_access_log.mutable_filter_state_objects();
+        ProtobufWkt::Any& any = filter_state_objects[key];
+        if (dynamic_cast<ProtobufWkt::Any*>(serialized_proto.get()) != nullptr) {
+          any.Swap(dynamic_cast<ProtobufWkt::Any*>(serialized_proto.get()));
+        } else {
+          any.PackFrom(*serialized_proto);
+        }
+      }
+    }
   }
 }
 

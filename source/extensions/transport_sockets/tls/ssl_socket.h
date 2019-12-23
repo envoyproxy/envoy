@@ -24,12 +24,10 @@ namespace Extensions {
 namespace TransportSockets {
 namespace Tls {
 
-// clang-format off
-#define ALL_SSL_SOCKET_FACTORY_STATS(COUNTER)                                 \
-  COUNTER(ssl_context_update_by_sds)                                          \
-  COUNTER(upstream_context_secrets_not_ready)                                 \
+#define ALL_SSL_SOCKET_FACTORY_STATS(COUNTER)                                                      \
+  COUNTER(ssl_context_update_by_sds)                                                               \
+  COUNTER(upstream_context_secrets_not_ready)                                                      \
   COUNTER(downstream_context_secrets_not_ready)
-// clang-format on
 
 /**
  * Wrapper struct for SSL socket factory stats. @see stats_macros.h
@@ -47,17 +45,17 @@ public:
 
   // Ssl::ConnectionInfo
   bool peerCertificatePresented() const override;
-  std::vector<std::string> uriSanLocalCertificate() const override;
+  absl::Span<const std::string> uriSanLocalCertificate() const override;
   const std::string& sha256PeerCertificateDigest() const override;
   const std::string& serialNumberPeerCertificate() const override;
   const std::string& issuerPeerCertificate() const override;
   const std::string& subjectPeerCertificate() const override;
   const std::string& subjectLocalCertificate() const override;
-  std::vector<std::string> uriSanPeerCertificate() const override;
+  absl::Span<const std::string> uriSanPeerCertificate() const override;
   const std::string& urlEncodedPemEncodedPeerCertificate() const override;
   const std::string& urlEncodedPemEncodedPeerCertificateChain() const override;
-  std::vector<std::string> dnsSansPeerCertificate() const override;
-  std::vector<std::string> dnsSansLocalCertificate() const override;
+  absl::Span<const std::string> dnsSansPeerCertificate() const override;
+  absl::Span<const std::string> dnsSansLocalCertificate() const override;
   absl::optional<SystemTime> validFromPeerCertificate() const override;
   absl::optional<SystemTime> expirationPeerCertificate() const override;
   const std::string& sessionId() const override;

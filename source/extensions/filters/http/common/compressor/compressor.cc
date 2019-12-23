@@ -95,7 +95,7 @@ Http::FilterHeadersStatus CompressorFilter::encodeHeaders(Http::HeaderMap& heade
     sanitizeEtagHeader(headers);
     insertVaryHeader(headers);
     headers.removeContentLength();
-    headers.insertContentEncoding().value(config_->contentEncoding());
+    headers.setContentEncoding(config_->contentEncoding());
     config_->stats().compressed_.inc();
     compressor_ = config_->makeCompressor();
   } else if (!skip_compression_) {
@@ -362,10 +362,10 @@ void CompressorFilter::insertVaryHeader(Http::HeaderMap& headers) {
       std::string new_header;
       absl::StrAppend(&new_header, vary->value().getStringView(), ", ",
                       Http::Headers::get().VaryValues.AcceptEncoding);
-      headers.insertVary().value(new_header);
+      headers.setVary(new_header);
     }
   } else {
-    headers.insertVary().value(Http::Headers::get().VaryValues.AcceptEncoding);
+    headers.setReferenceVary(Http::Headers::get().VaryValues.AcceptEncoding);
   }
 }
 

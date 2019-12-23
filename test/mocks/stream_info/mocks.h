@@ -1,5 +1,6 @@
 #pragma once
 
+#include "envoy/api/v2/core/base.pb.h"
 #include "envoy/stream_info/stream_info.h"
 
 #include "common/stream_info/filter_state_impl.h"
@@ -52,6 +53,7 @@ public:
   MOCK_CONST_METHOD0(bytesSent, uint64_t());
   MOCK_CONST_METHOD1(hasResponseFlag, bool(ResponseFlag));
   MOCK_CONST_METHOD0(hasAnyResponseFlag, bool());
+  MOCK_CONST_METHOD0(responseFlags, uint64_t());
   MOCK_CONST_METHOD0(upstreamHost, Upstream::HostDescriptionConstSharedPtr());
   MOCK_METHOD1(setUpstreamLocalAddress, void(const Network::Address::InstanceConstSharedPtr&));
   MOCK_CONST_METHOD0(upstreamLocalAddress, const Network::Address::InstanceConstSharedPtr&());
@@ -81,6 +83,8 @@ public:
   MOCK_CONST_METHOD0(requestedServerName, const std::string&());
   MOCK_METHOD1(setUpstreamTransportFailureReason, void(absl::string_view));
   MOCK_CONST_METHOD0(upstreamTransportFailureReason, const std::string&());
+  MOCK_METHOD1(setRequestHeaders, void(const Http::HeaderMap&));
+  MOCK_CONST_METHOD0(getRequestHeaders, const Http::HeaderMap*());
 
   std::shared_ptr<testing::NiceMock<Upstream::MockHostDescription>> host_{
       new testing::NiceMock<Upstream::MockHostDescription>()};

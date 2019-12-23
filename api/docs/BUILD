@@ -1,3 +1,5 @@
+load("@rules_proto//proto:defs.bzl", "proto_library")
+
 licenses(["notice"])  # Apache 2
 
 package_group(
@@ -10,6 +12,7 @@ package_group(
 # This is where you add protos that will participate in docs RST generation.
 proto_library(
     name = "protos",
+    visibility = ["//visibility:public"],
     deps = [
         "//envoy/admin/v2alpha:pkg",
         "//envoy/api/v2:pkg",
@@ -22,6 +25,7 @@ proto_library(
         "//envoy/api/v2/route:pkg",
         "//envoy/config/accesslog/v2:pkg",
         "//envoy/config/bootstrap/v2:pkg",
+        "//envoy/config/cluster/aggregate/v2alpha:pkg",
         "//envoy/config/cluster/dynamic_forward_proxy/v2alpha:pkg",
         "//envoy/config/cluster/redis:pkg",
         "//envoy/config/common/dynamic_forward_proxy/v2alpha:pkg",
@@ -37,6 +41,7 @@ proto_library(
         "//envoy/config/filter/http/ext_authz/v2:pkg",
         "//envoy/config/filter/http/fault/v2:pkg",
         "//envoy/config/filter/http/grpc_http1_reverse_bridge/v2alpha1:pkg",
+        "//envoy/config/filter/http/grpc_stats/v2alpha:pkg",
         "//envoy/config/filter/http/gzip/v2:pkg",
         "//envoy/config/filter/http/header_to_metadata/v2:pkg",
         "//envoy/config/filter/http/health_check/v2:pkg",
@@ -56,13 +61,16 @@ proto_library(
         "//envoy/config/filter/network/ext_authz/v2:pkg",
         "//envoy/config/filter/network/http_connection_manager/v2:pkg",
         "//envoy/config/filter/network/mongo_proxy/v2:pkg",
+        "//envoy/config/filter/network/mysql_proxy/v1alpha1:pkg",
         "//envoy/config/filter/network/rate_limit/v2:pkg",
         "//envoy/config/filter/network/rbac/v2:pkg",
         "//envoy/config/filter/network/redis_proxy/v2:pkg",
         "//envoy/config/filter/network/tcp_proxy/v2:pkg",
         "//envoy/config/filter/network/thrift_proxy/v2alpha1:pkg",
+        "//envoy/config/filter/network/zookeeper_proxy/v1alpha1:pkg",
         "//envoy/config/filter/thrift/rate_limit/v2alpha1:pkg",
         "//envoy/config/filter/thrift/router/v2alpha1:pkg",
+        "//envoy/config/filter/udp/udp_proxy/v2alpha:pkg",
         "//envoy/config/grpc_credential/v2alpha:pkg",
         "//envoy/config/health_checker/redis/v2:pkg",
         "//envoy/config/listener/v2:pkg",
@@ -72,7 +80,9 @@ proto_library(
         "//envoy/config/rbac/v2:pkg",
         "//envoy/config/resource_monitor/fixed_heap/v2alpha:pkg",
         "//envoy/config/resource_monitor/injected_resource/v2alpha:pkg",
+        "//envoy/config/retry/previous_priorities:pkg",
         "//envoy/config/trace/v2:pkg",
+        "//envoy/config/trace/v2alpha:pkg",
         "//envoy/config/transport_socket/alts/v2alpha:pkg",
         "//envoy/config/transport_socket/tap/v2alpha:pkg",
         "//envoy/data/accesslog/v2:pkg",
@@ -89,5 +99,7 @@ proto_library(
         "//envoy/service/trace/v2:pkg",
         "//envoy/type:pkg",
         "//envoy/type/matcher:pkg",
+        "//envoy/type/metadata/v2:pkg",
+        "//envoy/type/tracing/v2:pkg",
     ],
 )

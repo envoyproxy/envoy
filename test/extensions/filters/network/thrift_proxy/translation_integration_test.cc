@@ -1,3 +1,4 @@
+#include "envoy/config/bootstrap/v2/bootstrap.pb.h"
 #include "envoy/config/filter/network/thrift_proxy/v2alpha1/thrift_proxy.pb.h"
 
 #include "extensions/filters/network/well_known_names.h"
@@ -27,7 +28,8 @@ public:
     filter_chains:
       filters:
         - name: envoy.filters.network.thrift_proxy
-          config:
+          typed_config:
+            "@type": type.googleapis.com/envoy.config.filter.network.thrift_proxy.v2alpha1.ThriftProxy
             stat_prefix: thrift_stats
             route_config:
               name: "routes"
@@ -52,14 +54,11 @@ public:
     proto_opts.set_transport(upstream_transport_proto);
     proto_opts.set_protocol(upstream_protocol_proto);
 
-    ProtobufWkt::Struct struct_opts;
-    TestUtility::jsonConvert(proto_opts, struct_opts);
-
     config_helper_.addConfigModifier([&](envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
       auto* opts = bootstrap.mutable_static_resources()
                        ->mutable_clusters(0)
-                       ->mutable_extension_protocol_options();
-      (*opts)[NetworkFilterNames::get().ThriftProxy] = struct_opts;
+                       ->mutable_typed_extension_protocol_options();
+      (*opts)[NetworkFilterNames::get().ThriftProxy].PackFrom(proto_opts);
     });
 
     // Invent some varying, but deterministic, values to add. We use the add method instead of

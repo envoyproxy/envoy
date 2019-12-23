@@ -1,5 +1,7 @@
 #pragma once
 
+#include "envoy/api/v2/cds.pb.h"
+#include "envoy/api/v2/endpoint/endpoint.pb.h"
 #include "envoy/config/cluster/dynamic_forward_proxy/v2alpha/cluster.pb.h"
 #include "envoy/config/cluster/dynamic_forward_proxy/v2alpha/cluster.pb.validate.h"
 
@@ -31,10 +33,7 @@ public:
   }
 
   // Upstream::ClusterImplBase
-  void startPreInit() override {
-    // Nothing to do during initialization.
-    onPreInitComplete();
-  }
+  void startPreInit() override;
 
   // Extensions::Common::DynamicForwardProxy::DnsCache::UpdateCallbacks
   void onDnsHostAddOrUpdate(
@@ -92,6 +91,11 @@ private:
     return host_map_;
   }
 
+  void
+  addOrUpdateWorker(const std::string& host,
+                    const Extensions::Common::DynamicForwardProxy::DnsHostInfoSharedPtr& host_info,
+                    std::shared_ptr<HostInfoMap>& new_host_map,
+                    std::unique_ptr<Upstream::HostVector>& hosts_added);
   void swapAndUpdateMap(const HostInfoMapSharedPtr& new_hosts_map,
                         const Upstream::HostVector& hosts_added,
                         const Upstream::HostVector& hosts_removed);

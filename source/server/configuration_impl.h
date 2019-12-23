@@ -10,6 +10,7 @@
 #include <utility>
 
 #include "envoy/config/bootstrap/v2/bootstrap.pb.h"
+#include "envoy/config/trace/v2/trace.pb.h"
 #include "envoy/http/filter.h"
 #include "envoy/network/filter.h"
 #include "envoy/server/configuration.h"
@@ -54,6 +55,13 @@ public:
    * factory.
    */
   virtual std::string name() PURE;
+
+  /**
+   * @return std::string the identifying category name for objects
+   * created by this factory. Used for automatic registration with
+   * FactoryCategoryRegistry.
+   */
+  static std::string category() { return "stats_sinks"; }
 };
 
 /**
@@ -81,7 +89,7 @@ public:
    * Given a UdpListenerFilterManager and a list of factories, create a new filter chain. Chain
    * creation will exit early if any filters immediately close the connection.
    */
-  static bool
+  static void
   buildUdpFilterChain(Network::UdpListenerFilterManager& filter_manager,
                       Network::UdpReadFilterCallbacks& callbacks,
                       const std::vector<Network::UdpListenerFilterFactoryCb>& factories);

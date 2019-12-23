@@ -5,6 +5,7 @@ licenses(["notice"])  # Apache 2
 
 load(
     "//bazel:envoy_build_system.bzl",
+    "envoy_cc_extension",
     "envoy_cc_library",
     "envoy_package",
 )
@@ -17,19 +18,22 @@ envoy_cc_library(
     hdrs = ["gzip_filter.h"],
     deps = [
         "//source/common/compressor:compressor_lib",
+        "//source/common/http:headers_lib",
         "//source/common/protobuf",
         "//source/extensions/filters/http/common/compressor:compressor_lib",
         "@envoy_api//envoy/config/filter/http/gzip/v2:pkg_cc_proto",
     ],
 )
 
-envoy_cc_library(
+envoy_cc_extension(
     name = "config",
     srcs = ["config.cc"],
     hdrs = ["config.h"],
+    security_posture = "robust_to_untrusted_downstream",
     deps = [
         "//source/extensions/filters/http:well_known_names",
         "//source/extensions/filters/http/common:factory_base_lib",
         "//source/extensions/filters/http/gzip:gzip_filter_lib",
+        "@envoy_api//envoy/config/filter/http/gzip/v2:pkg_cc_proto",
     ],
 )

@@ -1,5 +1,6 @@
 #pragma once
 
+#include "envoy/config/common/dynamic_forward_proxy/v2alpha/dns_cache.pb.h"
 #include "envoy/network/dns.h"
 #include "envoy/thread_local/thread_local.h"
 
@@ -45,6 +46,7 @@ public:
   LoadDnsCacheEntryResult loadDnsCacheEntry(absl::string_view host, uint16_t default_port,
                                             LoadDnsCacheEntryCallbacks& callbacks) override;
   AddUpdateCallbacksHandlePtr addUpdateCallbacks(UpdateCallbacks& callbacks) override;
+  absl::flat_hash_map<std::string, DnsHostInfoSharedPtr> hosts() override;
 
 private:
   using TlsHostMap = absl::flat_hash_map<std::string, DnsHostInfoSharedPtr>;

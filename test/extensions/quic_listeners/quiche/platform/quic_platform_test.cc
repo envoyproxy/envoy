@@ -27,6 +27,7 @@
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
+#include "quiche/common/platform/api/quiche_endian.h"
 #include "quiche/epoll_server/fake_simple_epoll_server.h"
 #include "quiche/quic/platform/api/quic_aligned.h"
 #include "quiche/quic/platform/api/quic_arraysize.h"
@@ -34,7 +35,6 @@
 #include "quiche/quic/platform/api/quic_cert_utils.h"
 #include "quiche/quic/platform/api/quic_client_stats.h"
 #include "quiche/quic/platform/api/quic_containers.h"
-#include "quiche/quic/platform/api/quic_endian.h"
 #include "quiche/quic/platform/api/quic_estimate_memory_usage.h"
 #include "quiche/quic/platform/api/quic_expect_bug.h"
 #include "quiche/quic/platform/api/quic_exported_stats.h"
@@ -188,9 +188,10 @@ TEST_F(QuicPlatformTest, QuicInlinedVector) {
   EXPECT_EQ(3, vec[0]);
 }
 
-TEST_F(QuicPlatformTest, QuicEndian) {
-  EXPECT_EQ(0x1234, QuicEndian::NetToHost16(QuicEndian::HostToNet16(0x1234)));
-  EXPECT_EQ(0x12345678, QuicEndian::NetToHost32(QuicEndian::HostToNet32(0x12345678)));
+TEST_F(QuicPlatformTest, QuicheEndian) {
+  EXPECT_EQ(0x1234, quiche::QuicheEndian::NetToHost16(quiche::QuicheEndian::HostToNet16(0x1234)));
+  EXPECT_EQ(0x12345678,
+            quiche::QuicheEndian::NetToHost32(quiche::QuicheEndian::HostToNet32(0x12345678)));
 }
 
 TEST_F(QuicPlatformTest, QuicEstimateMemoryUsage) {
@@ -668,7 +669,7 @@ TEST_F(FileUtilsTest, ReadFileContents) {
 }
 
 TEST_F(QuicPlatformTest, PickUnsedPort) {
-  int port = QuicPickUnusedPortOrDie();
+  int port = QuicPickServerPortForTestsOrDie();
   std::vector<Envoy::Network::Address::IpVersion> supported_versions =
       Envoy::TestEnvironment::getIpVersionsForTest();
   for (auto ip_version : supported_versions) {
@@ -694,7 +695,7 @@ TEST_F(QuicPlatformTest, FailToPickUnsedPort) {
   // Fail bind call's to mimic port exhaustion.
   EXPECT_CALL(os_sys_calls, bind(_, _, _))
       .WillRepeatedly(Return(Envoy::Api::SysCallIntResult{-1, EADDRINUSE}));
-  EXPECT_DEATH_LOG_TO_STDERR(QuicPickUnusedPortOrDie(), "Failed to pick a port for test.");
+  EXPECT_DEATH_LOG_TO_STDERR(QuicPickServerPortForTestsOrDie(), "Failed to pick a port for test.");
 }
 
 TEST_F(QuicPlatformTest, TestEnvoyQuicBufferAllocator) {
@@ -733,16 +734,7 @@ TEST_F(QuicPlatformTest, TestQuicOptional) {
   EXPECT_EQ(1, *maybe_a);
 }
 
-class QuicMemSliceTest : public Envoy::Buffer::BufferImplementationParamTest {
-public:
-  ~QuicMemSliceTest() override = default;
-};
-
-INSTANTIATE_TEST_SUITE_P(QuicMemSliceTests, QuicMemSliceTest,
-                         testing::ValuesIn({Envoy::Buffer::BufferImplementation::Old,
-                                            Envoy::Buffer::BufferImplementation::New}));
-
-TEST_P(QuicMemSliceTest, ConstructMemSliceFromBuffer) {
+TEST(EnvoyQuicMemSliceTest, ConstructMemSliceFromBuffer) {
   std::string str(512, 'b');
   // Fragment needs to out-live buffer.
   bool fragment_releaser_called = false;
@@ -753,7 +745,6 @@ TEST_P(QuicMemSliceTest, ConstructMemSliceFromBuffer) {
         fragment_releaser_called = true;
       });
   Envoy::Buffer::OwnedImpl buffer;
-  Envoy::Buffer::BufferImplementationParamTest::verifyImplementation(buffer);
   EXPECT_DEBUG_DEATH(quic::QuicMemSlice slice0{quic::QuicMemSliceImpl(buffer, 0)}, "");
   std::string str2(1024, 'a');
   // str2 is copied.
@@ -781,9 +772,8 @@ TEST_P(QuicMemSliceTest, ConstructMemSliceFromBuffer) {
   EXPECT_TRUE(fragment_releaser_called);
 }
 
-TEST_P(QuicMemSliceTest, ConstructQuicMemSliceSpan) {
+TEST(EnvoyQuicMemSliceTest, ConstructQuicMemSliceSpan) {
   Envoy::Buffer::OwnedImpl buffer;
-  Envoy::Buffer::BufferImplementationParamTest::verifyImplementation(buffer);
   std::string str(1024, 'a');
   buffer.add(str);
   quic::QuicMemSlice slice{quic::QuicMemSliceImpl(buffer, str.length())};
@@ -793,7 +783,7 @@ TEST_P(QuicMemSliceTest, ConstructQuicMemSliceSpan) {
   EXPECT_EQ(str, span.GetData(0));
 }
 
-TEST_P(QuicMemSliceTest, QuicMemSliceStorage) {
+TEST(EnvoyQuicMemSliceTest, QuicMemSliceStorage) {
   std::string str(512, 'a');
   struct iovec iov = {const_cast<char*>(str.data()), str.length()};
   SimpleBufferAllocator allocator;

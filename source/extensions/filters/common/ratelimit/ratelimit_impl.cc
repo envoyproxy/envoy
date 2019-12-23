@@ -5,7 +5,9 @@
 #include <string>
 #include <vector>
 
+#include "envoy/api/v2/core/grpc_service.pb.h"
 #include "envoy/api/v2/ratelimit/ratelimit.pb.h"
+#include "envoy/service/ratelimit/v2/rls.pb.h"
 #include "envoy/stats/scope.h"
 
 #include "common/common/assert.h"
@@ -64,24 +66,24 @@ void GrpcClientImpl::onSuccess(
     std::unique_ptr<envoy::service::ratelimit::v2::RateLimitResponse>&& response,
     Tracing::Span& span) {
   LimitStatus status = LimitStatus::OK;
-  ASSERT(response->overall_code() != envoy::service::ratelimit::v2::RateLimitResponse_Code_UNKNOWN);
-  if (response->overall_code() ==
-      envoy::service::ratelimit::v2::RateLimitResponse_Code_OVER_LIMIT) {
+  ASSERT(response->overall_code() != envoy::service::ratelimit::v2::RateLimitResponse::UNKNOWN);
+  if (response->overall_code() == envoy::service::ratelimit::v2::RateLimitResponse::OVER_LIMIT) {
     status = LimitStatus::OverLimit;
     span.setTag(Constants::get().TraceStatus, Constants::get().TraceOverLimit);
   } else {
     span.setTag(Constants::get().TraceStatus, Constants::get().TraceOk);
   }
 
-  Http::HeaderMapPtr response_headers_to_add = std::make_unique<Http::HeaderMapImpl>();
+  Http::HeaderMapPtr response_headers_to_add, request_headers_to_add;
   if (!response->headers().empty()) {
+    response_headers_to_add = std::make_unique<Http::HeaderMapImpl>();
     for (const auto& h : response->headers()) {
       response_headers_to_add->addCopy(Http::LowerCaseString(h.key()), h.value());
     }
   }
 
-  Http::HeaderMapPtr request_headers_to_add = std::make_unique<Http::HeaderMapImpl>();
   if (!response->request_headers_to_add().empty()) {
+    request_headers_to_add = std::make_unique<Http::HeaderMapImpl>();
     for (const auto& h : response->request_headers_to_add()) {
       request_headers_to_add->addCopy(Http::LowerCaseString(h.key()), h.value());
     }
@@ -93,7 +95,7 @@ void GrpcClientImpl::onSuccess(
 
 void GrpcClientImpl::onFailure(Grpc::Status::GrpcStatus status, const std::string&,
                                Tracing::Span&) {
-  ASSERT(status != Grpc::Status::GrpcStatus::Ok);
+  ASSERT(status != Grpc::Status::WellKnownGrpcStatus::Ok);
   callbacks_->complete(LimitStatus::Error, nullptr, nullptr);
   callbacks_ = nullptr;
 }

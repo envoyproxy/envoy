@@ -1,6 +1,8 @@
 #include "common/network/addr_family_aware_socket_option_impl.h"
 
+#include "envoy/api/v2/core/base.pb.h"
 #include "envoy/common/exception.h"
+#include "envoy/common/platform.h"
 
 #include "common/api/os_sys_calls_impl.h"
 #include "common/common/assert.h"

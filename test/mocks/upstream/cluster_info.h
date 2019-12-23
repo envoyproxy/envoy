@@ -5,6 +5,8 @@
 #include <memory>
 #include <string>
 
+#include "envoy/api/v2/cds.pb.h"
+#include "envoy/api/v2/core/base.pb.h"
 #include "envoy/config/typed_metadata.h"
 #include "envoy/stats/scope.h"
 #include "envoy/upstream/cluster_manager.h"
@@ -76,6 +78,7 @@ public:
   MOCK_CONST_METHOD0(idleTimeout, const absl::optional<std::chrono::milliseconds>());
   MOCK_CONST_METHOD0(perConnectionBufferLimitBytes, uint32_t());
   MOCK_CONST_METHOD0(features, uint64_t());
+  MOCK_CONST_METHOD0(http1Settings, const Http::Http1Settings&());
   MOCK_CONST_METHOD0(http2Settings, const Http::Http2Settings&());
   MOCK_CONST_METHOD1(extensionProtocolOptions,
                      ProtocolOptionsConfigConstSharedPtr(const std::string&));
@@ -112,7 +115,8 @@ public:
 
   std::string name_{"fake_cluster"};
   absl::optional<std::string> eds_service_name_;
-  Http::Http2Settings http2_settings_{};
+  Http::Http1Settings http1_settings_;
+  Http::Http2Settings http2_settings_;
   ProtocolOptionsConfigConstSharedPtr extension_protocol_options_;
   uint64_t max_requests_per_connection_{};
   uint32_t max_response_headers_count_{Http::DEFAULT_MAX_HEADERS_COUNT};

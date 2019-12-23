@@ -5,7 +5,10 @@
 #include <string>
 #include <vector>
 
+#include "envoy/api/v2/route/route.pb.h"
 #include "envoy/buffer/buffer.h"
+#include "envoy/config/bootstrap/v2/bootstrap.pb.h"
+#include "envoy/config/filter/network/http_connection_manager/v2/http_connection_manager.pb.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/http/header_map.h"
 #include "envoy/registry/registry.h"
@@ -81,6 +84,13 @@ protected:
 // downstream and H1/H2 upstreams.
 using ProtocolIntegrationTest = HttpProtocolIntegrationTest;
 
+TEST_P(ProtocolIntegrationTest, TrailerSupportHttp1) {
+  config_helper_.addConfigModifier(setEnableDownstreamTrailersHttp1());
+  config_helper_.addConfigModifier(setEnableUpstreamTrailersHttp1());
+
+  testTrailers(10, 20, true, true);
+}
+
 TEST_P(ProtocolIntegrationTest, ShutdownWithActiveConnPoolConnections) {
   auto response = makeHeaderOnlyRequest(nullptr, 0);
   // Shut down the server with active connection pool connections.
@@ -146,7 +156,8 @@ TEST_P(ProtocolIntegrationTest, RouterRedirect) {
 TEST_P(ProtocolIntegrationTest, ComputedHealthCheck) {
   config_helper_.addFilter(R"EOF(
 name: envoy.health_check
-config:
+typed_config:
+    "@type": type.googleapis.com/envoy.config.filter.http.health_check.v2.HealthCheck
     pass_through_mode: false
     cluster_min_healthy_percentages:
         example_cluster_name: { value: 75 }
@@ -166,7 +177,8 @@ config:
 TEST_P(ProtocolIntegrationTest, ModifyBuffer) {
   config_helper_.addFilter(R"EOF(
 name: envoy.health_check
-config:
+typed_config:
+    "@type": type.googleapis.com/envoy.config.filter.http.health_check.v2.HealthCheck
     pass_through_mode: false
     cluster_min_healthy_percentages:
         example_cluster_name: { value: 75 }
@@ -185,7 +197,8 @@ config:
 TEST_P(ProtocolIntegrationTest, AddEncodedTrailers) {
   config_helper_.addFilter(R"EOF(
 name: add-trailers-filter
-config: {}
+typed_config:
+  "@type": type.googleapis.com/google.protobuf.Empty
 )EOF");
   initialize();
 
@@ -419,17 +432,18 @@ TEST_P(DownstreamProtocolIntegrationTest, RetryHostPredicateFilter) {
 
   // Note how we're expecting each upstream request to hit the same upstream.
   auto upstream_idx = waitForNextUpstreamRequest({0, 1});
+  ASSERT_TRUE(upstream_idx.has_value());
   upstream_request_->encodeHeaders(Http::TestHeaderMapImpl{{":status", "503"}}, false);
 
-  if (fake_upstreams_[upstream_idx]->httpType() == FakeHttpConnection::Type::HTTP1) {
+  if (fake_upstreams_[*upstream_idx]->httpType() == FakeHttpConnection::Type::HTTP1) {
     ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
-    ASSERT_TRUE(fake_upstreams_[upstream_idx]->waitForHttpConnection(*dispatcher_,
-                                                                     fake_upstream_connection_));
+    ASSERT_TRUE(fake_upstreams_[*upstream_idx]->waitForHttpConnection(*dispatcher_,
+                                                                      fake_upstream_connection_));
   } else {
     ASSERT_TRUE(upstream_request_->waitForReset());
   }
 
-  waitForNextUpstreamRequest(upstream_idx);
+  waitForNextUpstreamRequest(*upstream_idx);
   upstream_request_->encodeHeaders(default_response_headers_, false);
   upstream_request_->encodeData(512, true);
 
@@ -500,7 +514,8 @@ TEST_P(ProtocolIntegrationTest, RetryHittingRouteLimits) {
 // Test hitting the dynamo filter with too many request bytes to buffer. Ensure the connection
 // manager sends a 413.
 TEST_P(DownstreamProtocolIntegrationTest, HittingDecoderFilterLimit) {
-  config_helper_.addFilter("{ name: envoy.http_dynamo_filter, config: {} }");
+  config_helper_.addFilter("{ name: envoy.http_dynamo_filter, typed_config: { \"@type\": "
+                           "type.googleapis.com/google.protobuf.Empty } }");
   config_helper_.setBufferLimits(1024, 1024);
   initialize();
 
@@ -535,7 +550,8 @@ TEST_P(DownstreamProtocolIntegrationTest, HittingDecoderFilterLimit) {
 // are sent on early, the stream/connection will be reset.
 TEST_P(ProtocolIntegrationTest, HittingEncoderFilterLimit) {
   useAccessLog();
-  config_helper_.addFilter("{ name: envoy.http_dynamo_filter, config: {} }");
+  config_helper_.addFilter("{ name: envoy.http_dynamo_filter, typed_config: { \"@type\": "
+                           "type.googleapis.com/google.protobuf.Empty } }");
   config_helper_.setBufferLimits(1024, 1024);
   initialize();
 
@@ -943,6 +959,7 @@ TEST_P(DownstreamProtocolIntegrationTest, ManyRequestHeadersAccepted) {
 
 TEST_P(DownstreamProtocolIntegrationTest, ManyRequestTrailersRejected) {
   // Default header (and trailer) count limit is 100.
+  config_helper_.addConfigModifier(setEnableDownstreamTrailersHttp1());
   Http::TestHeaderMapImpl request_trailers;
   for (int i = 0; i < 150; i++) {
     request_trailers.addCopy("trailer", std::string(1, 'a'));
@@ -956,25 +973,15 @@ TEST_P(DownstreamProtocolIntegrationTest, ManyRequestTrailersRejected) {
   codec_client_->sendData(*request_encoder_, 1, false);
   codec_client_->sendTrailers(*request_encoder_, request_trailers);
 
-  // Only relevant to Http2Downstream.
-  if (downstream_protocol_ == Http::CodecClient::Type::HTTP1) {
-    // Http1 Downstream ignores trailers.
-    waitForNextUpstreamRequest();
-    upstream_request_->encodeHeaders(default_response_headers_, true);
-    response->waitForEndStream();
-    EXPECT_TRUE(response->complete());
-    EXPECT_EQ("200", response->headers().Status()->value().getStringView());
-  } else {
-    // Expect rejection.
-    // TODO(asraa): we shouldn't need this unexpected disconnect, but some tests hit unparented
-    // connections without it. Likely need to reconsider whether the waits/closes should be on
-    // client or upstream.
-    fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
-    ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
-    response->waitForReset();
-    ASSERT_TRUE(fake_upstream_connection_->close());
-    ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
-  }
+  // Expect rejection.
+  // TODO(asraa): we shouldn't need this unexpected disconnect, but some tests hit unparented
+  // connections without it. Likely need to reconsider whether the waits/closes should be on
+  // client or upstream.
+  fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
+  ASSERT_TRUE(fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+  response->waitForReset();
+  ASSERT_TRUE(fake_upstream_connection_->close());
+  ASSERT_TRUE(fake_upstream_connection_->waitForDisconnect());
 }
 
 TEST_P(DownstreamProtocolIntegrationTest, ManyRequestTrailersAccepted) {
@@ -986,6 +993,7 @@ TEST_P(DownstreamProtocolIntegrationTest, ManyRequestTrailersAccepted) {
         hcm.mutable_common_http_protocol_options()->mutable_max_headers_count()->set_value(
             max_count);
       });
+  config_helper_.addConfigModifier(setEnableUpstreamTrailersHttp1());
   max_request_headers_count_ = max_count;
   Http::TestHeaderMapImpl request_trailers;
   for (int i = 0; i < 150; i++) {
@@ -1006,23 +1014,30 @@ TEST_P(DownstreamProtocolIntegrationTest, ManyRequestTrailersAccepted) {
   EXPECT_EQ("200", response->headers().Status()->value().getStringView());
 }
 
+// This test uses an Http::HeaderMapImpl instead of an Http::TestHeaderMapImpl to avoid
+// time-consuming byte size validations that will cause this test to timeout.
 TEST_P(DownstreamProtocolIntegrationTest, ManyRequestHeadersTimeout) {
-  // Set timeout for 5 seconds, and ensure that a request with 20k+ headers can be sent.
+  // Set timeout for 5 seconds, and ensure that a request with 10k+ headers can be sent.
   testManyRequestHeaders(std::chrono::milliseconds(5000));
 }
 
 TEST_P(DownstreamProtocolIntegrationTest, LargeRequestTrailersAccepted) {
+  config_helper_.addConfigModifier(setEnableDownstreamTrailersHttp1());
   testLargeRequestTrailers(60, 96);
 }
 
 TEST_P(DownstreamProtocolIntegrationTest, LargeRequestTrailersRejected) {
+  config_helper_.addConfigModifier(setEnableDownstreamTrailersHttp1());
   testLargeRequestTrailers(66, 60);
 }
 
+// This test uses an Http::HeaderMapImpl instead of an Http::TestHeaderMapImpl to avoid
+// time-consuming byte size verification that will cause this test to timeout.
 TEST_P(DownstreamProtocolIntegrationTest, ManyTrailerHeaders) {
   max_request_headers_kb_ = 96;
   max_request_headers_count_ = 20005;
 
+  config_helper_.addConfigModifier(setEnableDownstreamTrailersHttp1());
   config_helper_.addConfigModifier(
       [&](envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager& hcm)
           -> void {
@@ -1031,9 +1046,9 @@ TEST_P(DownstreamProtocolIntegrationTest, ManyTrailerHeaders) {
             max_request_headers_count_);
       });
 
-  Http::TestHeaderMapImpl request_trailers{};
+  Http::HeaderMapImpl request_trailers{};
   for (int i = 0; i < 20000; i++) {
-    request_trailers.addCopy(std::to_string(i), "");
+    request_trailers.addCopy(Http::LowerCaseString(std::to_string(i)), "");
   }
 
   initialize();
@@ -1053,6 +1068,55 @@ TEST_P(DownstreamProtocolIntegrationTest, ManyTrailerHeaders) {
   EXPECT_TRUE(upstream_request_->complete());
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().Status()->value().getStringView());
+}
+
+// Regression tests for CVE-2019-18801. We only validate the behavior of large
+// :method request headers, since the case of other large headers is
+// covered in the various testLargeRequest-based integration tests here.
+//
+// The table below describes the expected behaviors (in addition we should never
+// see an ASSERT or ASAN failure trigger).
+//
+// Downstream    Upstream   Behavior expected
+// ------------------------------------------
+// H1            H1         Envoy will reject (HTTP/1 codec behavior)
+// H1            H2         Envoy will reject (HTTP/1 codec behavior)
+// H2            H1         Envoy will forward but backend will reject (HTTP/1
+//                          codec behavior)
+// H2            H2         Success
+TEST_P(ProtocolIntegrationTest, LargeRequestMethod) {
+  const std::string long_method = std::string(48 * 1024, 'a');
+  const Http::TestHeaderMapImpl request_headers{{":method", long_method},
+                                                {":path", "/test/long/url"},
+                                                {":scheme", "http"},
+                                                {":authority", "host"}};
+
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  if (downstreamProtocol() == Http::CodecClient::Type::HTTP1) {
+    auto encoder_decoder = codec_client_->startRequest(request_headers);
+    request_encoder_ = &encoder_decoder.first;
+    auto response = std::move(encoder_decoder.second);
+    codec_client_->waitForDisconnect();
+    EXPECT_TRUE(response->complete());
+    EXPECT_EQ("400", response->headers().Status()->value().getStringView());
+  } else {
+    ASSERT(downstreamProtocol() == Http::CodecClient::Type::HTTP2);
+    if (upstreamProtocol() == FakeHttpConnection::Type::HTTP1) {
+      auto response = codec_client_->makeHeaderOnlyRequest(request_headers);
+      ASSERT_TRUE(
+          fake_upstreams_[0]->waitForHttpConnection(*dispatcher_, fake_upstream_connection_));
+      response->waitForEndStream();
+      EXPECT_TRUE(response->complete());
+      EXPECT_EQ("400", response->headers().Status()->value().getStringView());
+    } else {
+      ASSERT(upstreamProtocol() == FakeHttpConnection::Type::HTTP2);
+      auto response =
+          sendRequestAndWaitForResponse(request_headers, 0, default_response_headers_, 0);
+      EXPECT_TRUE(response->complete());
+    }
+  }
 }
 
 // Tests StopAllIterationAndBuffer. Verifies decode-headers-return-stop-all-filter calls decodeData
@@ -1337,6 +1401,101 @@ TEST_P(ProtocolIntegrationTest, TestDownstreamResetIdleTimeout) {
   }
 
   codec_client_->waitForDisconnect();
+}
+
+// Test connection is closed after single request processed.
+TEST_P(ProtocolIntegrationTest, ConnDurationTimeoutBasic) {
+  config_helper_.setDownstreamMaxConnectionDuration(std::chrono::milliseconds(500));
+  config_helper_.addConfigModifier(
+      [](envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager& hcm) {
+        hcm.mutable_drain_timeout()->set_seconds(1);
+      });
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response = codec_client_->makeRequestWithBody(default_request_headers_, 1024);
+  waitForNextUpstreamRequest();
+
+  upstream_request_->encodeHeaders(default_response_headers_, false);
+  upstream_request_->encodeData(512, true);
+  response->waitForEndStream();
+
+  EXPECT_TRUE(upstream_request_->complete());
+  EXPECT_TRUE(response->complete());
+  test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_total", 1);
+  test_server_->waitForCounterGe("cluster.cluster_0.upstream_rq_200", 1);
+
+  ASSERT_TRUE(codec_client_->waitForDisconnect(std::chrono::milliseconds(10000)));
+  test_server_->waitForCounterGe("http.config_test.downstream_cx_max_duration_reached", 1);
+}
+
+// Test inflight request is processed correctly when timeout fires during request processing.
+TEST_P(ProtocolIntegrationTest, ConnDurationInflightRequest) {
+  config_helper_.setDownstreamMaxConnectionDuration(std::chrono::milliseconds(500));
+  config_helper_.addConfigModifier(
+      [](envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager& hcm) {
+        hcm.mutable_drain_timeout()->set_seconds(1);
+      });
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response = codec_client_->makeRequestWithBody(default_request_headers_, 1024);
+  waitForNextUpstreamRequest();
+
+  // block and wait for counter to increase
+  test_server_->waitForCounterGe("http.config_test.downstream_cx_max_duration_reached", 1);
+
+  // ensure request processed correctly
+  upstream_request_->encodeHeaders(default_response_headers_, false);
+  upstream_request_->encodeData(512, true);
+  response->waitForEndStream();
+
+  EXPECT_TRUE(upstream_request_->complete());
+  EXPECT_TRUE(response->complete());
+  test_server_->waitForCounterGe("cluster.cluster_0.upstream_cx_total", 1);
+  test_server_->waitForCounterGe("cluster.cluster_0.upstream_rq_200", 1);
+
+  ASSERT_TRUE(codec_client_->waitForDisconnect(std::chrono::milliseconds(10000)));
+}
+
+// Test connection is closed if no http requests were processed
+TEST_P(ProtocolIntegrationTest, ConnDurationTimeoutNoHttpRequest) {
+  config_helper_.setDownstreamMaxConnectionDuration(std::chrono::milliseconds(500));
+  config_helper_.addConfigModifier(
+      [](envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager& hcm) {
+        hcm.mutable_drain_timeout()->set_seconds(1);
+      });
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  ASSERT_TRUE(codec_client_->waitForDisconnect(std::chrono::milliseconds(10000)));
+  test_server_->waitForCounterGe("http.config_test.downstream_cx_max_duration_reached", 1);
+}
+
+// Make sure that invalid authority headers get blocked at or before the HCM.
+TEST_P(DownstreamProtocolIntegrationTest, InvalidAuth) {
+  initialize();
+  fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  Http::TestHeaderMapImpl request_headers{{":method", "POST"},
+                                          {":path", "/test/long/url"},
+                                          {":scheme", "http"},
+                                          {":authority", "ho|st|"}};
+
+  auto response = codec_client_->makeHeaderOnlyRequest(request_headers);
+  if (downstreamProtocol() == Http::CodecClient::Type::HTTP1) {
+    // For HTTP/1 this is handled by the HCM, which sends a full 400 response.
+    response->waitForEndStream();
+    ASSERT_TRUE(response->complete());
+    EXPECT_EQ("400", response->headers().Status()->value().getStringView());
+  } else {
+    // For HTTP/2 this is handled by nghttp2 which resets the connection without
+    // sending an HTTP response.
+    codec_client_->waitForDisconnect();
+    ASSERT_FALSE(response->complete());
+  }
 }
 
 // For tests which focus on downstream-to-Envoy behavior, and don't need to be

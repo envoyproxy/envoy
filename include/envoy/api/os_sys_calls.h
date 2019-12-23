@@ -1,20 +1,13 @@
 #pragma once
 
-#ifndef WIN32
-#include <sys/ioctl.h>
-#include <sys/mman.h>   // for mode_t
-#include <sys/socket.h> // for sockaddr
 #include <sys/stat.h>
-#include <sys/uio.h> // for iovec
-
-#endif
 
 #include <memory>
 #include <string>
 
 #include "envoy/api/os_sys_calls_common.h"
-#include "envoy/common/pure.h"
 #include "envoy/common/platform.h"
+#include "envoy/common/pure.h"
 
 namespace Envoy {
 namespace Api {
@@ -27,6 +20,11 @@ public:
    * @see bind (man 2 bind)
    */
   virtual SysCallIntResult bind(int sockfd, const sockaddr* addr, socklen_t addrlen) PURE;
+
+  /**
+   * @see chmod (man 2 chmod)
+   */
+  virtual SysCallIntResult chmod(const std::string& path, mode_t mode) PURE;
 
   /**
    * @see ioctl (man 2 ioctl)
@@ -47,12 +45,6 @@ public:
    * @see recv (man 2 recv)
    */
   virtual SysCallSizeResult recv(int socket, void* buffer, size_t length, int flags) PURE;
-
-  /**
-   * @see recv (man 2 recvfrom)
-   */
-  virtual SysCallSizeResult recvfrom(int sockfd, void* buffer, size_t length, int flags,
-                                     struct sockaddr* addr, socklen_t* addrlen) PURE;
 
   /**
    * @see recvmsg (man 2 recvmsg)
@@ -97,12 +89,6 @@ public:
    * @see man 2 socket
    */
   virtual SysCallIntResult socket(int domain, int type, int protocol) PURE;
-
-  /**
-   * @see man 2 sendto
-   */
-  virtual SysCallSizeResult sendto(int fd, const void* buffer, size_t size, int flags,
-                                   const sockaddr* addr, socklen_t addrlen) PURE;
 
   /**
    * @see man 2 sendmsg

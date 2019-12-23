@@ -1,7 +1,7 @@
 #include <memory>
 
-#include "envoy/api/v2/eds.pb.h"
 #include "envoy/api/v2/endpoint/load_report.pb.h"
+#include "envoy/service/load_stats/v2/lrs.pb.h"
 
 #include "common/upstream/load_stats_reporter.h"
 
@@ -223,7 +223,7 @@ TEST_F(LoadStatsReporterTest, RemoteStreamClose) {
   createLoadStatsReporter();
   EXPECT_CALL(*response_timer_, disableTimer());
   EXPECT_CALL(*retry_timer_, enableTimer(_, _));
-  load_stats_reporter_->onRemoteClose(Grpc::Status::GrpcStatus::Canceled, "");
+  load_stats_reporter_->onRemoteClose(Grpc::Status::WellKnownGrpcStatus::Canceled, "");
   EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
   expectSendMessage({});
   retry_timer_cb_();

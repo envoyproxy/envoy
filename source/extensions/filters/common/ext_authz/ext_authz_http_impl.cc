@@ -1,5 +1,10 @@
 #include "extensions/filters/common/ext_authz/ext_authz_http_impl.h"
 
+#include "envoy/api/v2/core/base.pb.h"
+#include "envoy/config/filter/http/ext_authz/v2/ext_authz.pb.h"
+#include "envoy/service/auth/v2/external_auth.pb.h"
+#include "envoy/type/matcher/string.pb.h"
+
 #include "common/common/enum_to_int.h"
 #include "common/common/fmt.h"
 #include "common/http/async_client_impl.h"
@@ -229,6 +234,7 @@ void RawHttpClientImpl::check(RequestCallbacks& callbacks,
     callbacks_ = nullptr;
     span_ = nullptr;
   } else {
+    span_->injectContext(message->headers());
     request_ = cm_.httpAsyncClientForCluster(cluster).send(
         std::move(message), *this,
         Http::AsyncClient::RequestOptions().setTimeout(config_->timeout()));

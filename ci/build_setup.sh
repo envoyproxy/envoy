@@ -11,39 +11,36 @@ export PPROF_PATH=/thirdparty_build/bin/pprof
 echo "ENVOY_SRCDIR=${ENVOY_SRCDIR}"
 
 function setup_gcc_toolchain() {
+  if [[ ! -z "${ENVOY_STDLIB}" && "${ENVOY_STDLIB}" != "libstdc++" ]]; then
+    echo "gcc toolchain doesn't support ${ENVOY_STDLIB}."
+    exit 1
+  fi
   if [[ -z "${ENVOY_RBE}" ]]; then
     export CC=gcc
     export CXX=g++
     export BAZEL_COMPILER=gcc
     echo "$CC/$CXX toolchain configured"
   else
-    export BAZEL_BUILD_OPTIONS="--config=rbe-toolchain-gcc ${BAZEL_BUILD_OPTIONS}"
+    export BAZEL_BUILD_OPTIONS="--config=remote-gcc ${BAZEL_BUILD_OPTIONS}"
   fi
 }
 
 function setup_clang_toolchain() {
+  ENVOY_STDLIB="${ENVOY_STDLIB:-libc++}"
   if [[ -z "${ENVOY_RBE}" ]]; then
-    export CC=clang
-    export CXX=clang++
-    export BAZEL_COMPILER=clang
-    export ASAN_SYMBOLIZER_PATH=/opt/llvm/bin/llvm-symbolizer
-    echo "$CC/$CXX toolchain configured"
+    if [[ "${ENVOY_STDLIB}" == "libc++" ]]; then
+      export BAZEL_BUILD_OPTIONS="--config=libc++ ${BAZEL_BUILD_OPTIONS}"
+    else
+      export BAZEL_BUILD_OPTIONS="--config=clang ${BAZEL_BUILD_OPTIONS}"
+    fi
   else
-    export BAZEL_BUILD_OPTIONS="--config=rbe-toolchain-clang ${BAZEL_BUILD_OPTIONS}"
+    if [[ "${ENVOY_STDLIB}" == "libc++" ]]; then
+      export BAZEL_BUILD_OPTIONS="--config=remote-clang-libc++ ${BAZEL_BUILD_OPTIONS}"
+    else
+      export BAZEL_BUILD_OPTIONS="--config=remote-clang ${BAZEL_BUILD_OPTIONS}"
+    fi
   fi
-}
-
-function setup_clang_libcxx_toolchain() {
-  if [[ -z "${ENVOY_RBE}" ]]; then
-    export CC=clang
-    export CXX=clang++
-    export BAZEL_COMPILER=clang
-    export ASAN_SYMBOLIZER_PATH=/opt/llvm/bin/llvm-symbolizer
-    export BAZEL_BUILD_OPTIONS="--config=libc++ ${BAZEL_BUILD_OPTIONS}"
-    echo "$CC/$CXX toolchain with libc++ configured"
-  else
-    export BAZEL_BUILD_OPTIONS="--config=rbe-toolchain-clang-libc++ ${BAZEL_BUILD_OPTIONS}"
-  fi
+  echo "clang toolchain with ${ENVOY_STDLIB} configured"
 }
 
 # Create a fake home. Python site libs tries to do getpwuid(3) if we don't and the CI
@@ -70,29 +67,40 @@ export PATH=/opt/llvm/bin:$PATH
 export CLANG_FORMAT=clang-format
 
 if [[ -f "/etc/redhat-release" ]]; then
-  export BAZEL_BUILD_EXTRA_OPTIONS="--copt=-DENVOY_IGNORE_GLIBCXX_USE_CXX11_ABI_ERROR=1 ${BAZEL_BUILD_EXTRA_OPTIONS}"
-else
-  export BAZEL_BUILD_EXTRA_OPTIONS="--linkopt=-fuse-ld=lld ${BAZEL_BUILD_EXTRA_OPTIONS}"
+  export BAZEL_BUILD_EXTRA_OPTIONS+="--copt=-DENVOY_IGNORE_GLIBCXX_USE_CXX11_ABI_ERROR=1"
 fi
 
-# Not sandboxing, since non-privileged Docker can't do nested namespaces.
+function cleanup() {
+  # Remove build artifacts. This doesn't mess with incremental builds as these
+  # are just symlinks.
+  rm -rf "${ENVOY_SRCDIR}"/bazel-* clang.bazelrc
+}
+
+cleanup
+trap cleanup EXIT
+
+bazel/setup_clang.sh /opt/llvm
+
+[[ "${BUILD_REASON}" != "PullRequest" ]] && BAZEL_EXTRA_TEST_OPTIONS+=" --nocache_test_results --test_output=all"
+
 export BAZEL_QUERY_OPTIONS="${BAZEL_OPTIONS}"
 export BAZEL_BUILD_OPTIONS="--verbose_failures ${BAZEL_OPTIONS} --action_env=HOME --action_env=PYTHONUSERBASE \
   --local_cpu_resources=${NUM_CPUS} --show_task_finish --experimental_generate_json_trace_profile \
-  --test_env=HOME --test_env=PYTHONUSERBASE --cache_test_results=no --test_output=all \
+  --test_env=HOME --test_env=PYTHONUSERBASE --test_output=errors \
+  --repository_cache=${BUILD_DIR}/repository_cache --experimental_repository_cache_hardlinks \
   ${BAZEL_BUILD_EXTRA_OPTIONS} ${BAZEL_EXTRA_TEST_OPTIONS}"
 
 [[ "${BAZEL_EXPUNGE}" == "1" ]] && "${BAZEL}" clean --expunge
 
 if [ "$1" != "-nofetch" ]; then
   # Setup Envoy consuming project.
-  if [[ ! -a "${ENVOY_FILTER_EXAMPLE_SRCDIR}" ]]
-  then
+  if [[ ! -d "${ENVOY_FILTER_EXAMPLE_SRCDIR}/.git" ]]; then
+    rm -rf "${ENVOY_FILTER_EXAMPLE_SRCDIR}"
     git clone https://github.com/envoyproxy/envoy-filter-example.git "${ENVOY_FILTER_EXAMPLE_SRCDIR}"
   fi
 
   # This is the hash on https://github.com/envoyproxy/envoy-filter-example.git we pin to.
-  (cd "${ENVOY_FILTER_EXAMPLE_SRCDIR}" && git fetch origin && git checkout -f 616ec56fb7a673e285aed278cb0a44f23789806f)
+  (cd "${ENVOY_FILTER_EXAMPLE_SRCDIR}" && git fetch origin && git checkout -f 03b45933284b332fd1df42cfb3270751fe543842)
   sed -e "s|{ENVOY_SRCDIR}|${ENVOY_SRCDIR}|" "${ENVOY_SRCDIR}"/ci/WORKSPACE.filter.example > "${ENVOY_FILTER_EXAMPLE_SRCDIR}"/WORKSPACE
   cp -f "${ENVOY_SRCDIR}"/.bazelversion "${ENVOY_FILTER_EXAMPLE_SRCDIR}"/.bazelversion
 fi
@@ -117,17 +125,10 @@ mkdir -p "${ENVOY_FAILED_TEST_LOGS}"
 export ENVOY_BUILD_PROFILE="${ENVOY_BUILD_DIR}"/generated/build-profile
 mkdir -p "${ENVOY_BUILD_PROFILE}"
 
-function cleanup() {
-  # Remove build artifacts. This doesn't mess with incremental builds as these
-  # are just symlinks.
-  rm -rf "${ENVOY_SRCDIR}"/bazel-*
-}
-
-cleanup
-trap cleanup EXIT
-
 mkdir -p "${ENVOY_FILTER_EXAMPLE_SRCDIR}"/bazel
 ln -sf "${ENVOY_SRCDIR}"/bazel/get_workspace_status "${ENVOY_FILTER_EXAMPLE_SRCDIR}"/bazel/
 cp -f "${ENVOY_SRCDIR}"/.bazelrc "${ENVOY_FILTER_EXAMPLE_SRCDIR}"/
+cp -f "${ENVOY_SRCDIR}"/*.bazelrc "${ENVOY_FILTER_EXAMPLE_SRCDIR}"/
 
 export BUILDIFIER_BIN="/usr/local/bin/buildifier"
+export BUILDOZER_BIN="/usr/local/bin/buildozer"

@@ -15,7 +15,8 @@ static_resources:
     filter_chains:
     - filters:
       - name: envoy.http_connection_manager
-        config:
+        typed_config:
+          "@type": type.googleapis.com/envoy.config.filter.network.http_connection_manager.v2.HttpConnectionManager
           stat_prefix: ingress_http
           codec_type: AUTO
           route_config:

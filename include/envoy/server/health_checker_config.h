@@ -1,5 +1,6 @@
 #pragma once
 
+#include "envoy/api/v2/core/health_check.pb.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/upstream/health_checker.h"
 
@@ -76,6 +77,13 @@ public:
    * checker produced by the factory.
    */
   virtual std::string name() PURE;
+
+  /**
+   * @return std::string the identifying category name for objects
+   * created by this factory. Used for automatic registration with
+   * FactoryCategoryRegistry.
+   */
+  static std::string category() { return "health_checkers"; }
 };
 
 } // namespace Configuration

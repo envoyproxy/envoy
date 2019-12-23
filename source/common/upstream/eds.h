@@ -1,6 +1,8 @@
 #pragma once
 
+#include "envoy/api/v2/cds.pb.h"
 #include "envoy/api/v2/core/base.pb.h"
+#include "envoy/api/v2/discovery.pb.h"
 #include "envoy/api/v2/eds.pb.h"
 #include "envoy/config/subscription.h"
 #include "envoy/config/subscription_factory.h"
@@ -27,7 +29,7 @@ public:
                  Stats::ScopePtr&& stats_scope, bool added_via_api);
 
   // Upstream::Cluster
-  InitializePhase initializePhase() const override { return InitializePhase::Secondary; }
+  InitializePhase initializePhase() const override { return initialize_phase_; }
 
 private:
   // Config::SubscriptionCallbacks
@@ -69,7 +71,6 @@ private:
     const envoy::api::v2::ClusterLoadAssignment& cluster_load_assignment_;
   };
 
-  const ClusterManager& cm_;
   std::unique_ptr<Config::Subscription> subscription_;
   const LocalInfo::LocalInfo& local_info_;
   const std::string cluster_name_;
@@ -77,6 +78,7 @@ private:
   HostMap all_hosts_;
   Event::TimerPtr assignment_timeout_;
   ProtobufMessage::ValidationVisitor& validation_visitor_;
+  InitializePhase initialize_phase_;
 };
 
 class EdsClusterFactory : public ClusterFactoryImplBase {

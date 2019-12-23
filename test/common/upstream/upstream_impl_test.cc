@@ -6,13 +6,15 @@
 #include <vector>
 
 #include "envoy/api/api.h"
+#include "envoy/api/v2/cds.pb.h"
+#include "envoy/api/v2/core/base.pb.h"
+#include "envoy/api/v2/core/health_check.pb.h"
+#include "envoy/api/v2/endpoint/endpoint.pb.h"
 #include "envoy/http/codec.h"
 #include "envoy/stats/scope.h"
 #include "envoy/upstream/cluster_manager.h"
 
 #include "common/config/metadata.h"
-#include "common/json/config_schemas.h"
-#include "common/json/json_loader.h"
 #include "common/network/utility.h"
 #include "common/singleton/manager_impl.h"
 #include "common/upstream/static_cluster.h"
@@ -253,8 +255,12 @@ TEST_F(StrictDnsClusterImplTest, Basic) {
         max_requests: 3
         max_retries: 4
     max_requests_per_connection: 3
+    protocol_selection: USE_DOWNSTREAM_PROTOCOL
     http2_protocol_options:
       hpack_table_size: 0
+    http_protocol_options:
+      header_key_format:
+        proper_case_words: {}
     hosts:
     - { socket_address: { address: localhost1, port_value: 11001 }}
     - { socket_address: { address: localhost2, port_value: 11002 }}
@@ -289,6 +295,8 @@ TEST_F(StrictDnsClusterImplTest, Basic) {
   EXPECT_EQ(4U, cluster.info()->resourceManager(ResourcePriority::High).retries().max());
   EXPECT_EQ(3U, cluster.info()->maxRequestsPerConnection());
   EXPECT_EQ(0U, cluster.info()->http2Settings().hpack_table_size_);
+  EXPECT_EQ(Http::Http1Settings::HeaderKeyFormat::ProperCase,
+            cluster.info()->http1Settings().header_key_format_);
 
   cluster.info()->stats().upstream_rq_total_.inc();
   EXPECT_EQ(1UL, stats_.counter("cluster.name.upstream_rq_total").value());
@@ -1629,38 +1637,6 @@ TEST_F(StaticClusterImplTest, NoHostsTest) {
   EXPECT_EQ(0UL, cluster.prioritySet().hostSetsPerPriority()[0]->healthyHosts().size());
 }
 
-TEST(ClusterDefinitionTest, BadClusterConfig) {
-  const std::string json = R"EOF(
-  {
-    "name": "cluster_1",
-    "connect_timeout_ms": 250,
-    "type": "static",
-    "lb_type": "round_robin",
-    "fake_type" : "expected_failure",
-    "hosts": [{"url": "tcp://127.0.0.1:11001"}]
-  }
-  )EOF";
-
-  Json::ObjectSharedPtr loader = Json::Factory::loadFromString(json);
-  EXPECT_THROW(loader->validateSchema(Json::Schema::CLUSTER_SCHEMA), Json::Exception);
-}
-
-TEST(ClusterDefinitionTest, BadDnsClusterConfig) {
-  const std::string json = R"EOF(
-  {
-    "name": "cluster_1",
-    "connect_timeout_ms": 250,
-    "type": "static",
-    "lb_type": "round_robin",
-    "hosts": [{"url": "tcp://127.0.0.1:11001"}],
-    "dns_lookup_family" : "foo"
-  }
-  )EOF";
-
-  Json::ObjectSharedPtr loader = Json::Factory::loadFromString(json);
-  EXPECT_THROW(loader->validateSchema(Json::Schema::CLUSTER_SCHEMA), Json::Exception);
-}
-
 TEST_F(StaticClusterImplTest, SourceAddressPriority) {
   envoy::api::v2::Cluster config;
   config.set_name("staticcluster");
@@ -2143,10 +2119,6 @@ public:
   TestNetworkFilterConfigFactory(TestFilterConfigFactoryBase& parent) : parent_(parent) {}
 
   // NamedNetworkFilterConfigFactory
-  Network::FilterFactoryCb createFilterFactory(const Json::Object&,
-                                               Server::Configuration::FactoryContext&) override {
-    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
-  }
   Network::FilterFactoryCb
   createFilterFactoryFromProto(const Protobuf::Message&,
                                Server::Configuration::FactoryContext&) override {
@@ -2171,10 +2143,6 @@ public:
   TestHttpFilterConfigFactory(TestFilterConfigFactoryBase& parent) : parent_(parent) {}
 
   // NamedNetworkFilterConfigFactory
-  Http::FilterFactoryCb createFilterFactory(const Json::Object&, const std::string&,
-                                            Server::Configuration::FactoryContext&) override {
-    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
-  }
   Http::FilterFactoryCb
   createFilterFactoryFromProto(const Protobuf::Message&, const std::string&,
                                Server::Configuration::FactoryContext&) override {

@@ -40,6 +40,7 @@ envoy_cc_library(
         "//include/envoy/ratelimit:ratelimit_interface",
         "//include/envoy/tracing:http_tracer_interface",
         "//include/envoy/upstream:cluster_manager_interface",
+        "@envoy_api//envoy/config/bootstrap/v2:pkg_cc_proto",
     ],
 )
 
@@ -71,7 +72,10 @@ envoy_cc_library(
 envoy_cc_library(
     name = "health_checker_config_interface",
     hdrs = ["health_checker_config.h"],
-    deps = ["//include/envoy/upstream:health_checker_interface"],
+    deps = [
+        "//include/envoy/upstream:health_checker_interface",
+        "@envoy_api//envoy/api/v2/core:pkg_cc_proto",
+    ],
 )
 
 envoy_cc_library(
@@ -156,7 +160,6 @@ envoy_cc_library(
         "//include/envoy/http:context_interface",
         "//include/envoy/http:filter_interface",
         "//include/envoy/init:manager_interface",
-        "//include/envoy/json:json_object_interface",
         "//include/envoy/local_info:local_info_interface",
         "//include/envoy/network:drain_decision_interface",
         "//include/envoy/runtime:runtime_interface",
@@ -191,6 +194,9 @@ envoy_cc_library(
         "//include/envoy/network:listen_socket_interface",
         "//include/envoy/ssl:context_interface",
         "//source/common/protobuf",
+        "@envoy_api//envoy/admin/v2alpha:pkg_cc_proto",
+        "@envoy_api//envoy/api/v2:pkg_cc_proto",
+        "@envoy_api//envoy/api/v2/core:pkg_cc_proto",
         "@envoy_api//envoy/api/v2/listener:pkg_cc_proto",
     ],
 )
@@ -253,7 +259,6 @@ envoy_cc_library(
     deps = [
         ":instance_interface",
         "//source/common/protobuf",
-        "@envoy_api//envoy/config/trace/v2:pkg_cc_proto",
     ],
 )
 

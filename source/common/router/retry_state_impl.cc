@@ -5,6 +5,8 @@
 #include <string>
 #include <vector>
 
+#include "envoy/api/v2/route/route.pb.h"
+
 #include "common/common/assert.h"
 #include "common/common/utility.h"
 #include "common/grpc/common.h"
@@ -92,10 +94,10 @@ RetryStateImpl::RetryStateImpl(const RetryPolicy& route_policy, Http::HeaderMap&
 
   if (!retriable_request_headers_.empty()) {
     // If this route limits retries by request headers, make sure there is a match.
-    bool request_header_match = false;
+    uint32_t request_header_match = 0;
     for (const auto& retriable_header : retriable_request_headers_) {
       if (retriable_header->matchesHeaders(request_headers)) {
-        request_header_match = true;
+        request_header_match = 1;
         break;
       }
     }
@@ -112,7 +114,7 @@ RetryStateImpl::RetryStateImpl(const RetryPolicy& route_policy, Http::HeaderMap&
   if (request_headers.EnvoyRetriableStatusCodes()) {
     for (const auto code : StringUtil::splitToken(
              request_headers.EnvoyRetriableStatusCodes()->value().getStringView(), ",")) {
-      uint64_t out;
+      unsigned int out;
       if (absl::SimpleAtoi(code, &out)) {
         retriable_status_codes_.emplace_back(out);
       }

@@ -6,6 +6,8 @@
 #include <string>
 #include <vector>
 
+#include "envoy/api/v2/core/base.pb.h"
+
 #include "common/grpc/common.h"
 #include "common/http/utility.h"
 #include "common/tracing/http_tracer_impl.h"
@@ -131,8 +133,7 @@ void AsyncStreamImpl::sendHeaders(HeaderMap& headers, bool end_stream) {
   }
 
   is_grpc_request_ = Grpc::Common::hasGrpcContentType(headers);
-  headers.insertEnvoyInternalRequest().value().setReference(
-      Headers::get().EnvoyInternalRequestValues.True);
+  headers.setReferenceEnvoyInternalRequest(Headers::get().EnvoyInternalRequestValues.True);
   if (send_xff_) {
     Utility::appendXff(headers, *parent_.config_.local_info_.address());
   }
@@ -237,8 +238,11 @@ AsyncRequestImpl::AsyncRequestImpl(MessagePtr&& request, AsyncClientImpl& parent
     : AsyncStreamImpl(parent, *this, options), request_(std::move(request)), callbacks_(callbacks) {
 
   if (nullptr != options.parent_span_) {
-    child_span_ = options.parent_span_->spawnChild(Tracing::EgressConfig::get(),
-                                                   "async " + parent.cluster_->name() + " egress",
+    const std::string child_span_name =
+        options.child_span_name_.empty()
+            ? absl::StrCat("async ", parent.cluster_->name(), " egress")
+            : options.child_span_name_;
+    child_span_ = options.parent_span_->spawnChild(Tracing::EgressConfig::get(), child_span_name,
                                                    parent.dispatcher().timeSource().systemTime());
   } else {
     child_span_ = std::make_unique<Tracing::NullSpan>();

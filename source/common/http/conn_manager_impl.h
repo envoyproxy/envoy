@@ -90,6 +90,9 @@ public:
 
   TimeSource& timeSource() { return time_source_; }
 
+  // Return a reference to the shared_ptr so that it can be lazy created on demand.
+  std::shared_ptr<StreamInfo::FilterState>& filterState() { return filter_state_; }
+
 private:
   struct ActiveStream;
 
@@ -477,7 +480,7 @@ private:
 
     // Tracing::TracingConfig
     Tracing::OperationName operationName() const override;
-    const std::vector<Http::LowerCaseString>& requestHeadersForTags() const override;
+    const Tracing::CustomTagMap* customTags() const override;
     bool verbose() const override;
     uint32_t maxPathTagLength() const override;
 
@@ -502,6 +505,8 @@ private:
     void snapScopedRouteConfig();
 
     void refreshCachedRoute();
+
+    void refreshCachedTracingCustomTags();
 
     // Pass on watermark callbacks to watermark subscribers. This boils down to passing watermark
     // events for this stream and the downstream connection to the router filter.
@@ -588,6 +593,13 @@ private:
       return request_metadata_map_vector_.get();
     }
 
+    Tracing::CustomTagMap& getOrMakeTracingCustomTagMap() {
+      if (tracing_custom_tags_ == nullptr) {
+        tracing_custom_tags_ = std::make_unique<Tracing::CustomTagMap>();
+      }
+      return *tracing_custom_tags_;
+    }
+
     ConnectionManagerImpl& connection_manager_;
     Router::ConfigConstSharedPtr snapped_route_config_;
     Router::ScopedConfigConstSharedPtr snapped_scoped_routes_config_;
@@ -632,6 +644,7 @@ private:
     // response.
     bool encoding_headers_only_{};
     Network::Socket::OptionsSharedPtr upstream_options_;
+    std::unique_ptr<Tracing::CustomTagMap> tracing_custom_tags_{nullptr};
   };
 
   using ActiveStreamPtr = std::unique_ptr<ActiveStream>;
@@ -653,8 +666,9 @@ private:
    */
   void doEndStream(ActiveStream& stream);
 
-  void resetAllStreams();
+  void resetAllStreams(absl::optional<StreamInfo::ResponseFlag> response_flag);
   void onIdleTimeout();
+  void onConnectionDurationTimeout();
   void onDrainTimeout();
   void startDrainSequence();
   Tracing::HttpTracer& tracer() { return http_context_.tracer(); }
@@ -675,6 +689,8 @@ private:
   // connection. When there are active streams it is disarmed in favor of each stream's
   // stream_idle_timer_.
   Event::TimerPtr connection_idle_timer_;
+  // A connection duration timer. Armed during handling new connection if enabled in config.
+  Event::TimerPtr connection_duration_timer_;
   Event::TimerPtr drain_timer_;
   Runtime::RandomGenerator& random_generator_;
   Http::Context& http_context_;
@@ -688,6 +704,7 @@ private:
   const Server::OverloadActionState& overload_stop_accepting_requests_ref_;
   const Server::OverloadActionState& overload_disable_keepalive_ref_;
   TimeSource& time_source_;
+  std::shared_ptr<StreamInfo::FilterState> filter_state_;
 };
 
 } // namespace Http

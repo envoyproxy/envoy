@@ -2,10 +2,6 @@ syntax = "proto3";
 
 package envoy.config.metrics.v2;
 
-option java_outer_classname = "StatsProto";
-option java_multiple_files = true;
-option java_package = "io.envoyproxy.envoy.config.metrics.v2";
-
 import "envoy/api/v2/core/address.proto";
 import "envoy/type/matcher/string.proto";
 
@@ -14,6 +10,10 @@ import "google/protobuf/struct.proto";
 import "google/protobuf/wrappers.proto";
 
 import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.config.metrics.v2";
+option java_outer_classname = "StatsProto";
+option java_multiple_files = true;
 
 // [#protodoc-title: Stats]
 // Statistics :ref:`architecture overview <arch_overview_statistics>`.
@@ -34,7 +34,7 @@ message StatsSink {
   // Stats sink specific configuration which depends on the sink being instantiated. See
   // :ref:`StatsdSink <envoy_api_msg_config.metrics.v2.StatsdSink>` for an example.
   oneof config_type {
-    google.protobuf.Struct config = 2;
+    google.protobuf.Struct config = 2 [deprecated = true];
 
     google.protobuf.Any typed_config = 3;
   }
@@ -240,6 +240,7 @@ message TagSpecifier {
 
 // Stats configuration proto schema for built-in *envoy.statsd* sink. This sink does not support
 // tagged metrics.
+// [#extension: envoy.stat_sinks.statsd]
 message StatsdSink {
   oneof statsd_specifier {
     option (validate.required) = true;
@@ -288,6 +289,7 @@ message StatsdSink {
 // The sink emits stats with `DogStatsD <https://docs.datadoghq.com/guides/dogstatsd/>`_
 // compatible tags. Tags are configurable via :ref:`StatsConfig
 // <envoy_api_msg_config.metrics.v2.StatsConfig>`.
+// [#extension: envoy.stat_sinks.dog_statsd]
 message DogStatsdSink {
   reserved 2;
 
@@ -313,6 +315,7 @@ message DogStatsdSink {
 // Note that only a single HystrixSink should be configured.
 //
 // Streaming is started through an admin endpoint :http:get:`/hystrix_event_stream`.
+// [#extension: envoy.stat_sinks.hystrix]
 message HystrixSink {
   // The number of buckets the rolling statistical window is divided into.
   //

@@ -8,6 +8,7 @@
 #include <string>
 
 #include "envoy/config/config_provider_manager.h"
+#include "envoy/config/filter/network/http_connection_manager/v2/http_connection_manager.pb.h"
 #include "envoy/config/filter/network/http_connection_manager/v2/http_connection_manager.pb.validate.h"
 #include "envoy/http/filter.h"
 #include "envoy/router/route_config_provider_manager.h"
@@ -34,11 +35,6 @@ class HttpConnectionManagerFilterConfigFactory
 public:
   HttpConnectionManagerFilterConfigFactory()
       : FactoryBase(NetworkFilterNames::get().HttpConnectionManager, true) {}
-
-  // NamedNetworkFilterConfigFactory
-  Network::FilterFactoryCb
-  createFilterFactory(const Json::Object& json_config,
-                      Server::Configuration::FactoryContext& context) override;
 
 private:
   Network::FilterFactoryCb createFilterFactoryFromProtoTyped(
@@ -108,6 +104,10 @@ public:
   uint32_t maxRequestHeadersKb() const override { return max_request_headers_kb_; }
   uint32_t maxRequestHeadersCount() const override { return max_request_headers_count_; }
   absl::optional<std::chrono::milliseconds> idleTimeout() const override { return idle_timeout_; }
+  bool isRoutable() const override { return true; }
+  absl::optional<std::chrono::milliseconds> maxConnectionDuration() const override {
+    return max_connection_duration_;
+  }
   std::chrono::milliseconds streamIdleTimeout() const override { return stream_idle_timeout_; }
   std::chrono::milliseconds requestTimeout() const override { return request_timeout_; }
   Router::RouteConfigProvider* routeConfigProvider() override {
@@ -178,9 +178,10 @@ private:
   const uint32_t max_request_headers_kb_;
   const uint32_t max_request_headers_count_;
   absl::optional<std::chrono::milliseconds> idle_timeout_;
+  absl::optional<std::chrono::milliseconds> max_connection_duration_;
   std::chrono::milliseconds stream_idle_timeout_;
   std::chrono::milliseconds request_timeout_;
-  Router::RouteConfigProviderPtr route_config_provider_;
+  Router::RouteConfigProviderSharedPtr route_config_provider_;
   Config::ConfigProviderPtr scoped_routes_config_provider_;
   std::chrono::milliseconds drain_timeout_;
   bool generate_request_id_;

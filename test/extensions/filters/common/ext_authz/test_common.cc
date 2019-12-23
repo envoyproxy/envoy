@@ -2,6 +2,10 @@
 
 #include <memory>
 
+#include "envoy/api/v2/core/base.pb.h"
+#include "envoy/service/auth/v2/external_auth.pb.h"
+#include "envoy/type/http_status.pb.h"
+
 #include "test/mocks/upstream/mocks.h"
 
 namespace Envoy {
@@ -18,7 +22,7 @@ CheckResponsePtr TestCommon::makeCheckResponse(Grpc::Status::GrpcStatus response
   auto status = response->mutable_status();
   status->set_code(response_status);
 
-  if (response_status != Grpc::Status::GrpcStatus::Ok) {
+  if (response_status != Grpc::Status::WellKnownGrpcStatus::Ok) {
     const auto denied_response = response->mutable_denied_response();
     if (!body.empty()) {
       denied_response->set_body(body);

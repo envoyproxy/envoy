@@ -3,10 +3,10 @@
 #include <chrono>
 #include <string>
 
+#include "envoy/config/filter/http/rate_limit/v2/rate_limit.pb.h"
 #include "envoy/config/filter/http/rate_limit/v2/rate_limit.pb.validate.h"
 #include "envoy/registry/registry.h"
 
-#include "common/config/filter_json.h"
 #include "common/protobuf/utility.h"
 
 #include "extensions/filters/common/ratelimit/ratelimit_impl.h"
@@ -33,15 +33,6 @@ Http::FilterFactoryCb RateLimitFilterConfig::createFilterFactoryFromProtoTyped(
         filter_config, Filters::Common::RateLimit::rateLimitClient(
                            context, proto_config.rate_limit_service().grpc_service(), timeout)));
   };
-}
-
-Http::FilterFactoryCb
-RateLimitFilterConfig::createFilterFactory(const Json::Object& json_config,
-                                           const std::string& stats_prefix,
-                                           Server::Configuration::FactoryContext& context) {
-  envoy::config::filter::http::rate_limit::v2::RateLimit proto_config;
-  Config::FilterJson::translateHttpRateLimitFilter(json_config, proto_config);
-  return createFilterFactoryFromProtoTyped(proto_config, stats_prefix, context);
 }
 
 /**

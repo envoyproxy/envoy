@@ -1,5 +1,7 @@
 #include <memory>
 
+#include "envoy/config/filter/http/gzip/v2/gzip.pb.h"
+
 #include "common/common/hex.h"
 #include "common/common/stack_array.h"
 #include "common/compressor/zlib_compressor_impl.h"

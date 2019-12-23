@@ -9,8 +9,10 @@ HTTP connection manager
   overview
   route_matching
   traffic_splitting
+  header_casing
   headers
   header_sanitizing
   stats
   runtime
   rds
+  vhds

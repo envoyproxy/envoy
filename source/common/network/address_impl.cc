@@ -1,15 +1,11 @@
 #include "common/network/address_impl.h"
 
-#include <arpa/inet.h>
-#include <netinet/in.h>
-#include <sys/socket.h>
-#include <sys/un.h>
-
 #include <array>
 #include <cstdint>
 #include <string>
 
 #include "envoy/common/exception.h"
+#include "envoy/common/platform.h"
 
 #include "common/api/os_sys_calls_impl.h"
 #include "common/common/assert.h"
@@ -41,6 +37,13 @@ void validateIpv6Supported(const std::string& address) {
     throw EnvoyException(
         fmt::format("IPv6 addresses are not supported on this machine: {}", address));
   }
+}
+
+// Constructs a readable string with the embedded nulls in the abstract path replaced with '@'.
+std::string friendlyNameFromAbstractPath(absl::string_view path) {
+  std::string friendly_name(path.data(), path.size());
+  std::replace(friendly_name.begin(), friendly_name.end(), '\0', '@');
+  return friendly_name;
 }
 
 } // namespace
@@ -329,7 +332,7 @@ IoHandlePtr Ipv6Instance::socket(SocketType type) const {
   return io_handle;
 }
 
-PipeInstance::PipeInstance(const sockaddr_un* address, socklen_t ss_len)
+PipeInstance::PipeInstance(const sockaddr_un* address, socklen_t ss_len, mode_t mode)
     : InstanceBase(Type::Pipe) {
   if (address->sun_path[0] == '\0') {
 #if !defined(__linux__)
@@ -341,13 +344,20 @@ PipeInstance::PipeInstance(const sockaddr_un* address, socklen_t ss_len)
     address_length_ = ss_len - offsetof(struct sockaddr_un, sun_path);
   }
   address_ = *address;
-  friendly_name_ =
-      abstract_namespace_
-          ? fmt::format("@{}", absl::string_view(address_.sun_path + 1, address_length_ - 1))
-          : address_.sun_path;
+  if (abstract_namespace_) {
+    if (mode != 0) {
+      throw EnvoyException("Cannot set mode for Abstract AF_UNIX sockets");
+    }
+    // Replace all null characters with '@' in friendly_name_.
+    friendly_name_ =
+        friendlyNameFromAbstractPath(absl::string_view(address_.sun_path, address_length_));
+  } else {
+    friendly_name_ = address->sun_path;
+  }
+  this->mode = mode;
 }
 
-PipeInstance::PipeInstance(const std::string& pipe_path) : InstanceBase(Type::Pipe) {
+PipeInstance::PipeInstance(const std::string& pipe_path, mode_t mode) : InstanceBase(Type::Pipe) {
   if (pipe_path.size() >= sizeof(address_.sun_path)) {
     throw EnvoyException(
         fmt::format("Path \"{}\" exceeds maximum UNIX domain socket path size of {}.", pipe_path,
@@ -355,16 +365,34 @@ PipeInstance::PipeInstance(const std::string& pipe_path) : InstanceBase(Type::Pi
   }
   memset(&address_, 0, sizeof(address_));
   address_.sun_family = AF_UNIX;
-  StringUtil::strlcpy(&address_.sun_path[0], pipe_path.c_str(), sizeof(address_.sun_path));
-  friendly_name_ = address_.sun_path;
-  if (address_.sun_path[0] == '@') {
+  if (pipe_path[0] == '@') {
+    // This indicates an abstract namespace.
+    // In this case, null bytes in the name have no special significance, and so we copy all
+    // characters of pipe_path to sun_path, including null bytes in the name. The pathname must also
+    // be null terminated. The friendly name is the address path with embedded nulls replaced with
+    // '@' for consistency with the first character.
 #if !defined(__linux__)
     throw EnvoyException("Abstract AF_UNIX sockets are only supported on linux.");
 #endif
+    if (mode != 0) {
+      throw EnvoyException("Cannot set mode for Abstract AF_UNIX sockets");
+    }
     abstract_namespace_ = true;
-    address_length_ = strlen(address_.sun_path);
+    address_length_ = pipe_path.size();
+    memcpy(&address_.sun_path[0], pipe_path.data(), pipe_path.size());
     address_.sun_path[0] = '\0';
+    address_.sun_path[pipe_path.size()] = '\0';
+    friendly_name_ =
+        friendlyNameFromAbstractPath(absl::string_view(address_.sun_path, address_length_));
+  } else {
+    // Throw an error if the pipe path has an embedded null character.
+    if (pipe_path.size() != strlen(pipe_path.c_str())) {
+      throw EnvoyException("UNIX domain socket pathname contains embedded null characters");
+    }
+    StringUtil::strlcpy(&address_.sun_path[0], pipe_path.c_str(), sizeof(address_.sun_path));
+    friendly_name_ = address_.sun_path;
   }
+  this->mode = mode;
 }
 
 bool PipeInstance::operator==(const Instance& rhs) const { return asString() == rhs.asString(); }
@@ -377,7 +405,14 @@ Api::SysCallIntResult PipeInstance::bind(int fd) const {
     unlink(address_.sun_path);
   }
   auto& os_syscalls = Api::OsSysCallsSingleton::get();
-  return os_syscalls.bind(fd, sockAddr(), sockAddrLen());
+  auto bind_result = os_syscalls.bind(fd, sockAddr(), sockAddrLen());
+  if (mode != 0 && !abstract_namespace_ && bind_result.rc_ == 0) {
+    auto set_permissions = os_syscalls.chmod(address_.sun_path, mode);
+    if (set_permissions.rc_ != 0) {
+      throw EnvoyException(fmt::format("Failed to create socket with mode {}", mode));
+    }
+  }
+  return bind_result;
 }
 
 Api::SysCallIntResult PipeInstance::connect(int fd) const {

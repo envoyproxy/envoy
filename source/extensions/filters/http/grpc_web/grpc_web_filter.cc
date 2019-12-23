@@ -1,6 +1,8 @@
 #include "extensions/filters/http/grpc_web/grpc_web_filter.h"
 
+#ifndef WIN32
 #include <arpa/inet.h>
+#endif
 
 #include "common/common/assert.h"
 #include "common/common/base64.h"
@@ -66,7 +68,7 @@ Http::FilterHeadersStatus GrpcWebFilter::decodeHeaders(Http::HeaderMap& headers,
     // Checks whether gRPC-Web client is sending base64 encoded request.
     is_text_request_ = true;
   }
-  headers.insertContentType().value().setReference(Http::Headers::get().ContentTypeValues.Grpc);
+  headers.setReferenceContentType(Http::Headers::get().ContentTypeValues.Grpc);
 
   const Http::HeaderEntry* accept = headers.Accept();
   if (accept != nullptr &&
@@ -78,10 +80,9 @@ Http::FilterHeadersStatus GrpcWebFilter::decodeHeaders(Http::HeaderMap& headers,
   }
 
   // Adds te:trailers to upstream HTTP2 request. It's required for gRPC.
-  headers.insertTE().value().setReference(Http::Headers::get().TEValues.Trailers);
+  headers.setReferenceTE(Http::Headers::get().TEValues.Trailers);
   // Adds grpc-accept-encoding:identity,deflate,gzip. It's required for gRPC.
-  headers.insertGrpcAcceptEncoding().value().setReference(
-      Http::Headers::get().GrpcAcceptEncodingValues.Default);
+  headers.setReferenceGrpcAcceptEncoding(Http::Headers::get().GrpcAcceptEncodingValues.Default);
   return Http::FilterHeadersStatus::Continue;
 }
 
@@ -144,11 +145,9 @@ Http::FilterHeadersStatus GrpcWebFilter::encodeHeaders(Http::HeaderMap& headers,
     chargeStat(headers);
   }
   if (is_text_response_) {
-    headers.insertContentType().value().setReference(
-        Http::Headers::get().ContentTypeValues.GrpcWebTextProto);
+    headers.setReferenceContentType(Http::Headers::get().ContentTypeValues.GrpcWebTextProto);
   } else {
-    headers.insertContentType().value().setReference(
-        Http::Headers::get().ContentTypeValues.GrpcWebProto);
+    headers.setReferenceContentType(Http::Headers::get().ContentTypeValues.GrpcWebProto);
   }
   return Http::FilterHeadersStatus::Continue;
 }
@@ -209,6 +208,9 @@ Http::FilterTrailersStatus GrpcWebFilter::encodeTrailers(Http::HeaderMap& traile
         return Http::HeaderMap::Iterate::Continue;
       },
       &temp);
+
+  // Clear out the trailers so they don't get added since it is now in the body
+  trailers.clear();
   Buffer::OwnedImpl buffer;
   // Adds the trailers frame head.
   buffer.add(&GRPC_WEB_TRAILER, 1);

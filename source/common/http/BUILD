@@ -29,6 +29,9 @@ envoy_cc_library(
         "//source/common/router:router_lib",
         "//source/common/stream_info:stream_info_lib",
         "//source/common/tracing:http_tracer_lib",
+        "@envoy_api//envoy/api/v2/core:pkg_cc_proto",
+        "@envoy_api//envoy/api/v2/route:pkg_cc_proto",
+        "@envoy_api//envoy/type:pkg_cc_proto",
     ],
 )
 
@@ -48,8 +51,11 @@ envoy_cc_library(
         "//source/common/common:enum_to_int",
         "//source/common/common:linked_object",
         "//source/common/common:minimal_logger_lib",
+        "//source/common/config:utility_lib",
         "//source/common/http/http1:codec_lib",
         "//source/common/http/http2:codec_lib",
+        "//source/common/http/http3:quic_codec_factory_lib",
+        "//source/common/http/http3:well_known_names",
         "//source/common/network:filter_lib",
     ],
 )
@@ -90,7 +96,6 @@ envoy_cc_library(
         "//source/common/common:enum_to_int",
         "//source/common/common:utility_lib",
         "//source/common/stats:symbol_table_lib",
-        "@envoy_api//envoy/type:pkg_cc_proto",
     ],
 )
 
@@ -124,6 +129,8 @@ envoy_cc_library(
         "//include/envoy/http:filter_interface",
         "//include/envoy/router:rds_interface",
         "//source/common/network:utility_lib",
+        "@envoy_api//envoy/config/filter/network/http_connection_manager/v2:pkg_cc_proto",
+        "@envoy_api//envoy/type:pkg_cc_proto",
     ],
 )
 
@@ -164,7 +171,6 @@ envoy_cc_library(
         "//include/envoy/router:rds_interface",
         "//include/envoy/router:scopes_interface",
         "//include/envoy/runtime:runtime_interface",
-        "//include/envoy/server:admin_interface",
         "//include/envoy/server:overload_manager_interface",
         "//include/envoy/ssl:connection_interface",
         "//include/envoy/stats:stats_interface",
@@ -181,14 +187,19 @@ envoy_cc_library(
         "//source/common/common:regex_lib",
         "//source/common/common:scope_tracker",
         "//source/common/common:utility_lib",
+        "//source/common/config:utility_lib",
         "//source/common/http/http1:codec_lib",
         "//source/common/http/http2:codec_lib",
+        "//source/common/http/http3:quic_codec_factory_lib",
+        "//source/common/http/http3:well_known_names",
         "//source/common/network:utility_lib",
         "//source/common/router:config_lib",
         "//source/common/runtime:uuid_util_lib",
         "//source/common/stats:timespan_lib",
         "//source/common/stream_info:stream_info_lib",
         "//source/common/tracing:http_tracer_lib",
+        "@envoy_api//envoy/config/filter/network/http_connection_manager/v2:pkg_cc_proto",
+        "@envoy_api//envoy/type:pkg_cc_proto",
     ],
 )
 
@@ -332,10 +343,12 @@ envoy_cc_library(
         "nghttp2",
     ],
     deps = [
+        ":header_map_lib",
+        "//include/envoy/common:regex_interface",
         "//include/envoy/http:header_map_interface",
         "//include/envoy/json:json_object_interface",
+        "//source/common/common:regex_lib",
         "//source/common/common:utility_lib",
-        "//source/common/config:rds_json_lib",
         "//source/common/protobuf:utility_lib",
         "@envoy_api//envoy/api/v2/route:pkg_cc_proto",
         "@envoy_api//envoy/type:pkg_cc_proto",

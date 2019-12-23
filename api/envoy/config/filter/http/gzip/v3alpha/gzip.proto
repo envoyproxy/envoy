@@ -2,15 +2,17 @@ syntax = "proto3";
 
 package envoy.config.filter.http.gzip.v3alpha;
 
-option java_outer_classname = "GzipProto";
-option java_multiple_files = true;
-option java_package = "io.envoyproxy.envoy.config.filter.http.gzip.v3alpha";
-
 import "envoy/config/filter/http/compressor/v2/compressor.proto";
 
 import "google/protobuf/wrappers.proto";
 
+import "udpa/annotations/versioning.proto";
+
 import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.config.filter.http.gzip.v3alpha";
+option java_outer_classname = "GzipProto";
+option java_multiple_files = true;
 
 // [#protodoc-title: Gzip]
 // Gzip :ref:`configuration overview <config_http_filters_gzip>`.
@@ -18,6 +20,9 @@ import "validate/validate.proto";
 
 // [#next-free-field: 11]
 message Gzip {
+  option (udpa.annotations.versioning).previous_message_type =
+      "envoy.config.filter.http.gzip.v2.Gzip";
+
   enum CompressionStrategy {
     DEFAULT = 0;
     FILTERED = 1;
@@ -26,6 +31,9 @@ message Gzip {
   }
 
   message CompressionLevel {
+    option (udpa.annotations.versioning).previous_message_type =
+        "envoy.config.filter.http.gzip.v2.Gzip.CompressionLevel";
+
     enum Enum {
       DEFAULT = 0;
       BEST = 1;

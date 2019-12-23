@@ -1,22 +1,15 @@
 #include "extensions/filters/network/tcp_proxy/config.h"
 
+#include "envoy/config/filter/network/tcp_proxy/v2/tcp_proxy.pb.h"
+#include "envoy/config/filter/network/tcp_proxy/v2/tcp_proxy.pb.validate.h"
 #include "envoy/registry/registry.h"
 
-#include "common/config/filter_json.h"
 #include "common/tcp_proxy/tcp_proxy.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
 namespace TcpProxy {
-
-Network::FilterFactoryCb
-ConfigFactory::createFilterFactory(const Json::Object& json_config,
-                                   Server::Configuration::FactoryContext& context) {
-  envoy::config::filter::network::tcp_proxy::v2::TcpProxy proto_config;
-  Config::FilterJson::translateTcpProxy(json_config, proto_config);
-  return createFilterFactoryFromProtoTyped(proto_config, context);
-}
 
 Network::FilterFactoryCb ConfigFactory::createFilterFactoryFromProtoTyped(
     const envoy::config::filter::network::tcp_proxy::v2::TcpProxy& proto_config,

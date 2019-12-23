@@ -7,8 +7,10 @@
 #include <utility>
 #include <vector>
 
-#include "envoy/admin/v2alpha/clusters.pb.h"
-#include "envoy/admin/v2alpha/listeners.pb.h"
+#include "envoy/admin/v2alpha/server_info.pb.h"
+#include "envoy/api/v2/core/base.pb.h"
+#include "envoy/api/v2/rds.pb.h"
+#include "envoy/config/filter/network/http_connection_manager/v2/http_connection_manager.pb.h"
 #include "envoy/http/filter.h"
 #include "envoy/network/filter.h"
 #include "envoy/network/listen_socket.h"
@@ -90,10 +92,8 @@ public:
   createNetworkFilterChain(Network::Connection& connection,
                            const std::vector<Network::FilterFactoryCb>& filter_factories) override;
   bool createListenerFilterChain(Network::ListenerFilterManager&) override { return true; }
-  bool createUdpListenerFilterChain(Network::UdpListenerFilterManager&,
-                                    Network::UdpReadFilterCallbacks&) override {
-    return true;
-  }
+  void createUdpListenerFilterChain(Network::UdpListenerFilterManager&,
+                                    Network::UdpReadFilterCallbacks&) override {}
 
   // Http::FilterChainFactory
   void createFilterChain(Http::FilterChainFactoryCallbacks& callbacks) override;
@@ -113,6 +113,10 @@ public:
   bool generateRequestId() override { return false; }
   bool preserveExternalRequestId() const override { return false; }
   absl::optional<std::chrono::milliseconds> idleTimeout() const override { return idle_timeout_; }
+  bool isRoutable() const override { return false; }
+  absl::optional<std::chrono::milliseconds> maxConnectionDuration() const override {
+    return max_connection_duration_;
+  }
   uint32_t maxRequestHeadersKb() const override { return max_request_headers_kb_; }
   uint32_t maxRequestHeadersCount() const override { return max_request_headers_count_; }
   std::chrono::milliseconds streamIdleTimeout() const override { return {}; }
@@ -232,6 +236,20 @@ private:
   void writeListenersAsJson(Buffer::Instance& response);
   void writeListenersAsText(Buffer::Instance& response);
 
+  /**
+   * Helper methods for the /config_dump url handler.
+   */
+  void addAllConfigToDump(envoy::admin::v2alpha::ConfigDump& dump,
+                          const absl::optional<std::string>& mask) const;
+  /**
+   * Add the config matching the passed resource to the passed config dump.
+   * @return absl::nullopt on success, else the Http::Code and an error message that should be added
+   * to the admin response.
+   */
+  absl::optional<std::pair<Http::Code, std::string>>
+  addResourceToDump(envoy::admin::v2alpha::ConfigDump& dump,
+                    const absl::optional<std::string>& mask, const std::string& resource) const;
+
   template <class StatType>
   static bool shouldShowMetric(const StatType& metric, const bool used_only,
                                const absl::optional<std::regex>& regex) {
@@ -320,6 +338,33 @@ private:
                                   AdminStream&);
   bool isFormUrlEncoded(const Http::HeaderEntry* content_type) const;
 
+  class AdminListenSocketFactory : public Network::ListenSocketFactory {
+  public:
+    AdminListenSocketFactory(Network::SocketSharedPtr socket) : socket_(socket) {}
+
+    // Network::ListenSocketFactory
+    Network::Address::SocketType socketType() const override { return socket_->socketType(); }
+
+    const Network::Address::InstanceConstSharedPtr& localAddress() const override {
+      return socket_->localAddress();
+    }
+
+    Network::SocketSharedPtr getListenSocket() override {
+      // This is only supposed to be called once.
+      RELEASE_ASSERT(!socket_create_, "AdminListener's socket shouldn't be shared.");
+      socket_create_ = true;
+      return socket_;
+    }
+
+    absl::optional<std::reference_wrapper<Network::Socket>> sharedSocket() const override {
+      return absl::nullopt;
+    }
+
+  private:
+    Network::SocketSharedPtr socket_;
+    bool socket_create_{false};
+  };
+
   class AdminListener : public Network::ListenerConfig {
   public:
     AdminListener(AdminImpl& parent, Stats::ScopePtr&& listener_scope)
@@ -329,8 +374,9 @@ private:
     // Network::ListenerConfig
     Network::FilterChainManager& filterChainManager() override { return parent_; }
     Network::FilterChainFactory& filterChainFactory() override { return parent_; }
-    Network::Socket& socket() override { return parent_.mutable_socket(); }
-    const Network::Socket& socket() const override { return parent_.mutable_socket(); }
+    Network::ListenSocketFactory& listenSocketFactory() override {
+      return *parent_.socket_factory_;
+    }
     bool bindToPort() override { return true; }
     bool handOffRestoredDestinationConnections() const override { return false; }
     uint32_t perConnectionBufferLimitBytes() const override { return 0; }
@@ -391,13 +437,15 @@ private:
   const uint32_t max_request_headers_kb_{Http::DEFAULT_MAX_REQUEST_HEADERS_KB};
   const uint32_t max_request_headers_count_{Http::DEFAULT_MAX_HEADERS_COUNT};
   absl::optional<std::chrono::milliseconds> idle_timeout_;
+  absl::optional<std::chrono::milliseconds> max_connection_duration_;
   absl::optional<std::string> user_agent_;
   Http::SlowDateProviderImpl date_provider_;
   std::vector<Http::ClientCertDetailsType> set_current_client_cert_details_;
   Http::Http1Settings http1_settings_;
   ConfigTrackerImpl config_tracker_;
   const Network::FilterChainSharedPtr admin_filter_chain_;
-  Network::SocketPtr socket_;
+  Network::SocketSharedPtr socket_;
+  Network::ListenSocketFactorySharedPtr socket_factory_;
   AdminListenerPtr listener_;
   const AdminInternalAddressConfig internal_address_config_;
 };

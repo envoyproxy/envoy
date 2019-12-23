@@ -2,10 +2,6 @@ syntax = "proto3";
 
 package envoy.config.filter.accesslog.v2;
 
-option java_outer_classname = "AccesslogProto";
-option java_multiple_files = true;
-option java_package = "io.envoyproxy.envoy.config.filter.accesslog.v2";
-
 import "envoy/api/v2/core/base.proto";
 import "envoy/api/v2/route/route.proto";
 import "envoy/type/percent.proto";
@@ -14,6 +10,10 @@ import "google/protobuf/any.proto";
 import "google/protobuf/struct.proto";
 
 import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.config.filter.accesslog.v2";
+option java_outer_classname = "AccesslogProto";
+option java_multiple_files = true;
 
 // [#protodoc-title: Common access log types]
 
@@ -39,7 +39,7 @@ message AccessLog {
   // #. "envoy.tcp_grpc_access_log": :ref:`TcpGrpcAccessLogConfig
   //    <envoy_api_msg_config.accesslog.v2.TcpGrpcAccessLogConfig>`
   oneof config_type {
-    google.protobuf.Struct config = 3;
+    google.protobuf.Struct config = 3 [deprecated = true];
 
     google.protobuf.Any typed_config = 4;
   }
@@ -200,6 +200,7 @@ message ResponseFlagFilter {
         in: "URX"
         in: "SI"
         in: "IH"
+        in: "DPE"
       }
     }
   }];
@@ -244,7 +245,7 @@ message ExtensionFilter {
 
   // Custom configuration that depends on the filter being instantiated.
   oneof config_type {
-    google.protobuf.Struct config = 2;
+    google.protobuf.Struct config = 2 [deprecated = true];
 
     google.protobuf.Any typed_config = 3;
   }

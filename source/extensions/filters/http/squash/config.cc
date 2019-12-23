@@ -1,11 +1,9 @@
 #include "extensions/filters/http/squash/config.h"
 
+#include "envoy/config/filter/http/squash/v2/squash.pb.h"
 #include "envoy/config/filter/http/squash/v2/squash.pb.validate.h"
 #include "envoy/registry/registry.h"
 
-#include "common/config/filter_json.h"
-#include "common/config/json_utility.h"
-#include "common/json/config_schemas.h"
 #include "common/protobuf/protobuf.h"
 #include "common/protobuf/utility.h"
 
@@ -15,15 +13,6 @@ namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace Squash {
-
-Http::FilterFactoryCb
-SquashFilterConfigFactory::createFilterFactory(const Envoy::Json::Object& json_config,
-                                               const std::string& stat_prefix,
-                                               Server::Configuration::FactoryContext& context) {
-  envoy::config::filter::http::squash::v2::Squash proto_config;
-  Config::FilterJson::translateSquashConfig(json_config, proto_config);
-  return createFilterFactoryFromProtoTyped(proto_config, stat_prefix, context);
-}
 
 Http::FilterFactoryCb SquashFilterConfigFactory::createFilterFactoryFromProtoTyped(
     const envoy::config::filter::http::squash::v2::Squash& proto_config, const std::string&,

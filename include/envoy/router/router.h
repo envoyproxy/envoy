@@ -17,6 +17,7 @@
 #include "envoy/http/hash_policy.h"
 #include "envoy/http/header_map.h"
 #include "envoy/tracing/http_tracer.h"
+#include "envoy/type/percent.pb.h"
 #include "envoy/upstream/resource_manager.h"
 #include "envoy/upstream/retry.h"
 
@@ -516,6 +517,15 @@ public:
    */
   virtual MetadataMatchCriteriaConstPtr
   mergeMatchCriteria(const ProtobufWkt::Struct& metadata_matches) const PURE;
+
+  /**
+   * Creates a new MetadataMatchCriteria with criteria vector reduced to given names
+   * @param names names of metadata keys to preserve
+   * @return MetadataMatchCriteriaConstPtr the result criteria. Returns nullptr if the result
+   * criteria are empty.
+   */
+  virtual MetadataMatchCriteriaConstPtr
+  filterMatchCriteria(const std::set<std::string>& names) const PURE;
 };
 
 class TlsContextMatchCriteria {
@@ -814,6 +824,12 @@ public:
    * @return the overall sampling percentage
    */
   virtual const envoy::type::FractionalPercent& getOverallSampling() const PURE;
+
+  /**
+   * This method returns the route level tracing custom tags.
+   * @return the tracing custom tags.
+   */
+  virtual const Tracing::CustomTagMap& getCustomTags() const PURE;
 };
 
 using RouteTracingConstPtr = std::unique_ptr<const RouteTracing>;

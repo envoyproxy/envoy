@@ -18,6 +18,8 @@ public:
   // Null sandbox: modules must be compiled into envoy and registered name is given in the
   // DataSource.inline_string.
   const std::string Null = "envoy.wasm.runtime.null";
+  // V8-based (https://v8.dev) WebAssembly runtime.
+  const std::string V8 = "envoy.wasm.runtime.v8";
 };
 
 using WasmRuntimeNames = ConstSingleton<WasmRuntimeValues>;

@@ -1,3 +1,9 @@
+#include <string>
+
+#include "envoy/api/v2/route/route.pb.h"
+#include "envoy/config/filter/http/health_check/v2/health_check.pb.h"
+#include "envoy/config/filter/http/health_check/v2/health_check.pb.validate.h"
+
 #include "extensions/filters/http/health_check/config.h"
 
 #include "test/mocks/server/mocks.h"
@@ -16,54 +22,73 @@ namespace HealthCheck {
 namespace {
 
 TEST(HealthCheckFilterConfig, HealthCheckFilter) {
-  std::string json_string = R"EOF(
-  {
-    "pass_through_mode" : true,
-    "endpoint" : "/hc"
-  }
+  const std::string yaml_string = R"EOF(
+  pass_through_mode: true
+  headers:
+    - name: ":path"
+      exact_match: "/hc"
   )EOF";
 
-  Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(json_string);
+  envoy::config::filter::http::health_check::v2::HealthCheck proto_config;
+  TestUtility::loadFromYaml(yaml_string, proto_config);
   NiceMock<Server::Configuration::MockFactoryContext> context;
   HealthCheckFilterConfig factory;
-  Http::FilterFactoryCb cb = factory.createFilterFactory(*json_config, "stats", context);
+  Http::FilterFactoryCb cb = factory.createFilterFactoryFromProto(proto_config, "stats", context);
   Http::MockFilterChainFactoryCallbacks filter_callback;
   EXPECT_CALL(filter_callback, addStreamFilter(_));
   cb(filter_callback);
 }
 
 TEST(HealthCheckFilterConfig, BadHealthCheckFilterConfig) {
-  std::string json_string = R"EOF(
-  {
-    "pass_through_mode" : true,
-    "endpoint" : "/hc",
-    "status" : 500
-  }
+  const std::string yaml_string = R"EOF(
+  pass_through_mode: true
+  headers:
+    - name: ":path"
+      exact_match: "/hc"
+  status: 500
   )EOF";
 
-  Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(json_string);
-  NiceMock<Server::Configuration::MockFactoryContext> context;
-  HealthCheckFilterConfig factory;
-  EXPECT_THROW(factory.createFilterFactory(*json_config, "stats", context), Json::Exception);
+  envoy::config::filter::http::health_check::v2::HealthCheck proto_config;
+  EXPECT_THROW_WITH_REGEX(TestUtility::loadFromYaml(yaml_string, proto_config), EnvoyException,
+                          "status: Cannot find field");
 }
 
-TEST(HealthCheckFilterConfig, FailsWhenNotPassThroughButTimeoutSetJson) {
-  HealthCheckFilterConfig healthCheckFilterConfig;
-  Json::ObjectSharedPtr config = Json::Factory::loadFromString(
-      "{\"pass_through_mode\":false, \"cache_time_ms\":234, \"endpoint\":\"foo\"}");
+TEST(HealthCheckFilterConfig, FailsWhenNotPassThroughButTimeoutSetYaml) {
+  const std::string yaml_string = R"EOF(
+  pass_through_mode: false
+  cache_time: 0.234s
+  headers:
+    - name: ":path"
+      exact_match: "/foo"
+  )EOF";
+
+  envoy::config::filter::http::health_check::v2::HealthCheck proto_config;
+  TestUtility::loadFromYaml(yaml_string, proto_config);
+
+  HealthCheckFilterConfig factory;
   NiceMock<Server::Configuration::MockFactoryContext> context;
 
-  EXPECT_THROW(healthCheckFilterConfig.createFilterFactory(*config, "dummy_stats_prefix", context),
+  EXPECT_THROW(factory.createFilterFactoryFromProto(proto_config, "dummy_stats_prefix", context),
                EnvoyException);
 }
 
-TEST(HealthCheckFilterConfig, NotFailingWhenNotPassThroughAndTimeoutNotSetJson) {
-  HealthCheckFilterConfig healthCheckFilterConfig;
-  Json::ObjectSharedPtr config =
-      Json::Factory::loadFromString("{\"pass_through_mode\":false, \"endpoint\":\"foo\"}");
+TEST(HealthCheckFilterConfig, NotFailingWhenNotPassThroughAndTimeoutNotSetYaml) {
+  const std::string yaml_string = R"EOF(
+  pass_through_mode: true
+  cache_time: 0.234s
+  headers:
+    - name: ":path"
+      exact_match: "/foo"
+  )EOF";
+
+  envoy::config::filter::http::health_check::v2::HealthCheck proto_config;
+  TestUtility::loadFromYaml(yaml_string, proto_config);
+
+  HealthCheckFilterConfig factory;
   NiceMock<Server::Configuration::MockFactoryContext> context;
 
-  healthCheckFilterConfig.createFilterFactory(*config, "dummy_stats_prefix", context);
+  EXPECT_NO_THROW(
+      factory.createFilterFactoryFromProto(proto_config, "dummy_stats_prefix", context));
 }
 
 TEST(HealthCheckFilterConfig, FailsWhenNotPassThroughButTimeoutSetProto) {

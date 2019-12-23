@@ -3,7 +3,11 @@
 #include <memory>
 
 #include "envoy/admin/v2alpha/config_dump.pb.h"
+#include "envoy/api/v2/core/config_source.pb.h"
+#include "envoy/api/v2/discovery.pb.h"
+#include "envoy/api/v2/srds.pb.h"
 #include "envoy/api/v2/srds.pb.validate.h"
+#include "envoy/config/filter/network/http_connection_manager/v2/http_connection_manager.pb.h"
 
 #include "common/common/assert.h"
 #include "common/common/cleanup.h"
@@ -12,6 +16,8 @@
 #include "common/config/resources.h"
 #include "common/init/manager_impl.h"
 #include "common/init/watcher_impl.h"
+
+#include "absl/strings/str_join.h"
 
 // Types are deeply nested under Envoy::Config::ConfigProvider; use 'using-directives' across all
 // ConfigProvider related types for consistency.
@@ -112,11 +118,10 @@ ScopedRdsConfigSubscription::RdsRouteConfigProviderHelper::RdsRouteConfigProvide
     envoy::config::filter::network::http_connection_manager::v2::Rds& rds,
     Init::Manager& init_manager)
     : parent_(parent), scope_name_(scope_name),
-      route_provider_(static_cast<RdsRouteConfigProviderImpl*>(
-          parent_.route_config_provider_manager_
-              .createRdsRouteConfigProvider(rds, parent_.factory_context_, parent_.stat_prefix_,
-                                            init_manager)
-              .release())),
+      route_provider_(std::dynamic_pointer_cast<RdsRouteConfigProviderImpl>(
+          parent_.route_config_provider_manager_.createRdsRouteConfigProvider(
+              rds, parent_.factory_context_, parent_.stat_prefix_, init_manager))),
+
       rds_update_callback_handle_(route_provider_->subscription().addUpdateCallback([this]() {
         // Subscribe to RDS update.
         parent_.onRdsConfigUpdate(scope_name_, route_provider_->subscription());
@@ -179,13 +184,20 @@ bool ScopedRdsConfigSubscription::addOrUpdateScopes(
   return any_applied;
 }
 
-bool ScopedRdsConfigSubscription::removeScopes(
+std::list<std::unique_ptr<ScopedRdsConfigSubscription::RdsRouteConfigProviderHelper>>
+ScopedRdsConfigSubscription::removeScopes(
     const Protobuf::RepeatedPtrField<std::string>& scope_names, const std::string& version_info) {
-  bool any_applied = false;
+  std::list<std::unique_ptr<ScopedRdsConfigSubscription::RdsRouteConfigProviderHelper>>
+      to_be_removed_rds_providers;
   for (const auto& scope_name : scope_names) {
     auto iter = scoped_route_map_.find(scope_name);
     if (iter != scoped_route_map_.end()) {
-      route_provider_by_scope_.erase(scope_name);
+      auto rds_config_provider_helper_iter = route_provider_by_scope_.find(scope_name);
+      if (rds_config_provider_helper_iter != route_provider_by_scope_.end()) {
+        to_be_removed_rds_providers.emplace_back(
+            std::move(rds_config_provider_helper_iter->second));
+        route_provider_by_scope_.erase(rds_config_provider_helper_iter);
+      }
       scope_name_by_hash_.erase(iter->second->scopeKey().hash());
       scoped_route_map_.erase(iter);
       applyConfigUpdate([scope_name](ConfigProvider::ConfigConstSharedPtr config)
@@ -195,17 +207,19 @@ bool ScopedRdsConfigSubscription::removeScopes(
         thread_local_scoped_config->removeRoutingScope(scope_name);
         return config;
       });
-      any_applied = true;
       ENVOY_LOG(debug, "srds: remove scoped route '{}', version: {}", scope_name, version_info);
     }
   }
-  return any_applied;
+  return to_be_removed_rds_providers;
 }
 
 void ScopedRdsConfigSubscription::onConfigUpdate(
     const Protobuf::RepeatedPtrField<envoy::api::v2::Resource>& added_resources,
     const Protobuf::RepeatedPtrField<std::string>& removed_resources,
     const std::string& version_info) {
+  // NOTE: deletes are done before adds/updates.
+
+  absl::flat_hash_map<std::string, ScopedRouteInfoConstSharedPtr> to_be_removed_scopes;
   // If new route config sources come after the factory_context_.initManager()'s initialize() been
   // called, that initManager can't accept new targets. Instead we use a local override which will
   // start new subscriptions but not wait on them to be ready.
@@ -242,12 +256,18 @@ void ScopedRdsConfigSubscription::onConfigUpdate(
       }
     });
   }
+
   std::vector<std::string> exception_msgs;
-  bool any_applied = addOrUpdateScopes(
-      added_resources,
-      (noop_init_manager == nullptr ? factory_context_.initManager() : *noop_init_manager),
-      version_info, exception_msgs);
-  any_applied = removeScopes(removed_resources, version_info) || any_applied;
+  // Do not delete RDS config providers just yet, in case the to be deleted RDS subscriptions could
+  // be reused by some to be added scopes.
+  std::list<std::unique_ptr<ScopedRdsConfigSubscription::RdsRouteConfigProviderHelper>>
+      to_be_removed_rds_providers = removeScopes(removed_resources, version_info);
+  bool any_applied =
+      addOrUpdateScopes(
+          added_resources,
+          (noop_init_manager == nullptr ? factory_context_.initManager() : *noop_init_manager),
+          version_info, exception_msgs) ||
+      !to_be_removed_rds_providers.empty();
   ConfigSubscriptionCommonBase::onConfigUpdate();
   if (any_applied) {
     setLastConfigInfo(absl::optional<LastConfigInfo>({absl::nullopt, version_info}));
@@ -255,7 +275,7 @@ void ScopedRdsConfigSubscription::onConfigUpdate(
   stats_.config_reload_.inc();
   if (!exception_msgs.empty()) {
     throw EnvoyException(fmt::format("Error adding/updating scoped route(s): {}",
-                                     StringUtil::join(exception_msgs, ", ")));
+                                     absl::StrJoin(exception_msgs, ", ")));
   }
 }
 

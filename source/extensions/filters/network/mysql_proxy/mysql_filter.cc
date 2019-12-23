@@ -1,5 +1,7 @@
 #include "extensions/filters/network/mysql_proxy/mysql_filter.h"
 
+#include "envoy/api/v2/core/base.pb.h"
+
 #include "common/buffer/buffer_impl.h"
 #include "common/common/assert.h"
 #include "common/common/logger.h"
@@ -72,7 +74,7 @@ DecoderPtr MySQLFilter::createDecoder(DecoderCallbacks& callbacks) {
 void MySQLFilter::onProtocolError() { config_->stats_.protocol_errors_.inc(); }
 
 void MySQLFilter::onNewMessage(MySQLSession::State state) {
-  if (state == MySQLSession::State::MYSQL_CHALLENGE_REQ) {
+  if (state == MySQLSession::State::ChallengeReq) {
     config_->stats_.login_attempts_.inc();
   }
 }

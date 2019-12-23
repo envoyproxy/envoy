@@ -1,7 +1,6 @@
 #pragma once
 
 #include "envoy/api/api.h"
-#include "envoy/api/v2/core/base.pb.h"
 #include "envoy/config/subscription.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/filesystem/filesystem.h"
@@ -32,6 +31,7 @@ public:
 
 private:
   void refresh();
+  void configRejected(const EnvoyException& e, const std::string& message);
 
   bool started_{};
   const std::string path_;

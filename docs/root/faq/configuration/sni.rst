@@ -23,11 +23,14 @@ The following is a YAML example of the above requirement.
   filter_chains:
   - filter_chain_match:
       server_names: ["example.com", "www.example.com"]
-    tls_context:
-      common_tls_context:
-        tls_certificates:
-        - certificate_chain: { filename: "example_com_cert.pem" }
-          private_key: { filename: "example_com_key.pem" }
+    transport_socket:
+      name: envoy.transport_sockets.tls
+      typed_config:
+        "@type": type.googleapis.com/envoy.api.v2.auth.DownstreamTlsContext
+        common_tls_context:
+          tls_certificates:
+          - certificate_chain: { filename: "example_com_cert.pem" }
+            private_key: { filename: "example_com_key.pem" }
     filters:
     - name: envoy.http_connection_manager
       typed_config:
@@ -42,11 +45,14 @@ The following is a YAML example of the above requirement.
               route: { cluster: service_foo }
   - filter_chain_match:
       server_names: "api.example.com"
-    tls_context:
-      common_tls_context:
-        tls_certificates:
-        - certificate_chain: { filename: "api_example_com_cert.pem" }
-          private_key: { filename: "api_example_com_key.pem" }
+    transport_socket:
+      name: envoy.transport_sockets.tls
+      typed_config:
+        "@type": type.googleapis.com/envoy.api.v2.auth.DownstreamTlsContext
+        common_tls_context:
+          tls_certificates:
+          - certificate_chain: { filename: "api_example_com_cert.pem" }
+            private_key: { filename: "api_example_com_key.pem" }
     filters:
     - name: envoy.http_connection_manager
       typed_config:

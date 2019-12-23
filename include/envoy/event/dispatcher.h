@@ -28,11 +28,9 @@ namespace Event {
 /**
  * All dispatcher stats. @see stats_macros.h
  */
-// clang-format off
 #define ALL_DISPATCHER_STATS(HISTOGRAM)                                                            \
   HISTOGRAM(loop_duration_us, Microseconds)                                                        \
   HISTOGRAM(poll_delay_us, Microseconds)
-// clang-format on
 
 /**
  * Struct definition for all dispatcher stats. @see stats_macros.h
@@ -104,10 +102,13 @@ public:
    * dispatcher.
    * @param resolvers supplies the addresses of DNS resolvers that this resolver should use. If left
    * empty, it will not use any specific resolvers, but use defaults (/etc/resolv.conf)
+   * @param use_tcp_for_dns_lookups if set to true, tcp will be used to perform dns lookups.
+   * Otherwise, udp is used.
    * @return Network::DnsResolverSharedPtr that is owned by the caller.
    */
   virtual Network::DnsResolverSharedPtr
-  createDnsResolver(const std::vector<Network::Address::InstanceConstSharedPtr>& resolvers) PURE;
+  createDnsResolver(const std::vector<Network::Address::InstanceConstSharedPtr>& resolvers,
+                    bool use_tcp_for_dns_lookups) PURE;
 
   /**
    * Creates a file event that will signal when a file is readable or writable. On UNIX systems this
@@ -133,8 +134,9 @@ public:
    * @param bind_to_port controls whether the listener binds to a transport port or not.
    * @return Network::ListenerPtr a new listener that is owned by the caller.
    */
-  virtual Network::ListenerPtr
-  createListener(Network::Socket& socket, Network::ListenerCallbacks& cb, bool bind_to_port) PURE;
+  virtual Network::ListenerPtr createListener(Network::SocketSharedPtr&& socket,
+                                              Network::ListenerCallbacks& cb,
+                                              bool bind_to_port) PURE;
 
   /**
    * Creates a logical udp listener on a specific port.
@@ -142,7 +144,7 @@ public:
    * @param cb supplies the udp listener callbacks to invoke for listener events.
    * @return Network::ListenerPtr a new listener that is owned by the caller.
    */
-  virtual Network::UdpListenerPtr createUdpListener(Network::Socket& socket,
+  virtual Network::UdpListenerPtr createUdpListener(Network::SocketSharedPtr&& socket,
                                                     Network::UdpListenerCallbacks& cb) PURE;
   /**
    * Allocates a timer. @see Timer for docs on how to use the timer.
@@ -215,6 +217,16 @@ public:
    * current thread of execution is on the same thread upon which the dispatcher loop is running.
    */
   virtual bool isThreadSafe() const PURE;
+
+  /**
+   * Returns a recently cached MonotonicTime value.
+   */
+  virtual MonotonicTime approximateMonotonicTime() const PURE;
+
+  /**
+   * Updates approximate monotonic time to current value.
+   */
+  virtual void updateApproximateMonotonicTime() PURE;
 };
 
 using DispatcherPtr = std::unique_ptr<Dispatcher>;

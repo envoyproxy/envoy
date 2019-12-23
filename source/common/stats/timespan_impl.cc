@@ -1,5 +1,6 @@
 #include "common/stats/timespan_impl.h"
 
+#include "common/common/assert.h"
 #include "common/common/fmt.h"
 
 namespace Envoy {

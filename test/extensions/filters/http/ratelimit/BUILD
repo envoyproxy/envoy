@@ -30,6 +30,7 @@ envoy_extension_cc_test(
         "//test/mocks/tracing:tracing_mocks",
         "//test/mocks/upstream:upstream_mocks",
         "//test/test_common:utility_lib",
+        "@envoy_api//envoy/config/filter/http/rate_limit/v2:pkg_cc_proto",
     ],
 )
 
@@ -40,5 +41,7 @@ envoy_extension_cc_test(
     deps = [
         "//source/extensions/filters/http/ratelimit:config",
         "//test/mocks/server:server_mocks",
+        "@envoy_api//envoy/api/v2/core:pkg_cc_proto",
+        "@envoy_api//envoy/config/filter/http/rate_limit/v2:pkg_cc_proto",
     ],
 )

@@ -5,6 +5,8 @@
 #include <string>
 #include <vector>
 
+#include "envoy/api/v2/discovery.pb.h"
+#include "envoy/api/v2/endpoint/endpoint.pb.h"
 #include "envoy/server/process_context.h"
 
 #include "common/http/codec_client.h"
@@ -138,7 +140,7 @@ struct ApiFilesystemConfig {
 /**
  * Test fixture for all integration tests.
  */
-class BaseIntegrationTest : Logger::Loggable<Logger::Id::testing> {
+class BaseIntegrationTest : protected Logger::Loggable<Logger::Id::testing> {
 public:
   using TestTimeSystemPtr = std::unique_ptr<Event::TestTimeSystem>;
   using InstanceConstSharedPtrFn = std::function<Network::Address::InstanceConstSharedPtr(int)>;
@@ -191,7 +193,7 @@ public:
   void setUpstreamAddress(uint32_t upstream_index,
                           envoy::api::v2::endpoint::LbEndpoint& endpoint) const;
 
-  Network::ClientConnectionPtr makeClientConnection(uint32_t port);
+  virtual Network::ClientConnectionPtr makeClientConnection(uint32_t port);
 
   void registerTestServerPorts(const std::vector<std::string>& port_names);
   void createTestServer(const std::string& json_path, const std::vector<std::string>& port_names);
@@ -222,14 +224,13 @@ public:
   // available if you're writing a SotW/delta-specific test.
   // TODO(fredlas) expect_node was defaulting false here; the delta+SotW unification work restores
   // it.
-  AssertionResult
-  compareDiscoveryRequest(const std::string& expected_type_url, const std::string& expected_version,
-                          const std::vector<std::string>& expected_resource_names,
-                          const std::vector<std::string>& expected_resource_names_added,
-                          const std::vector<std::string>& expected_resource_names_removed,
-                          bool expect_node = true,
-                          const Protobuf::int32 expected_error_code = Grpc::Status::GrpcStatus::Ok,
-                          const std::string& expected_error_message = "");
+  AssertionResult compareDiscoveryRequest(
+      const std::string& expected_type_url, const std::string& expected_version,
+      const std::vector<std::string>& expected_resource_names,
+      const std::vector<std::string>& expected_resource_names_added,
+      const std::vector<std::string>& expected_resource_names_removed, bool expect_node = true,
+      const Protobuf::int32 expected_error_code = Grpc::Status::WellKnownGrpcStatus::Ok,
+      const std::string& expected_error_message = "");
   template <class T>
   void sendDiscoveryResponse(const std::string& type_url, const std::vector<T>& state_of_the_world,
                              const std::vector<T>& added_or_updated,
@@ -245,7 +246,7 @@ public:
       const std::string& expected_type_url,
       const std::vector<std::string>& expected_resource_subscriptions,
       const std::vector<std::string>& expected_resource_unsubscriptions,
-      const Protobuf::int32 expected_error_code = Grpc::Status::GrpcStatus::Ok,
+      const Protobuf::int32 expected_error_code = Grpc::Status::WellKnownGrpcStatus::Ok,
       const std::string& expected_error_message = "") {
     return compareDeltaDiscoveryRequest(expected_type_url, expected_resource_subscriptions,
                                         expected_resource_unsubscriptions, xds_stream_,
@@ -256,7 +257,7 @@ public:
       const std::string& expected_type_url,
       const std::vector<std::string>& expected_resource_subscriptions,
       const std::vector<std::string>& expected_resource_unsubscriptions, FakeStreamPtr& stream,
-      const Protobuf::int32 expected_error_code = Grpc::Status::GrpcStatus::Ok,
+      const Protobuf::int32 expected_error_code = Grpc::Status::WellKnownGrpcStatus::Ok,
       const std::string& expected_error_message = "");
 
   // TODO(fredlas) expect_node was defaulting false here; the delta+SotW unification work restores
@@ -264,7 +265,7 @@ public:
   AssertionResult compareSotwDiscoveryRequest(
       const std::string& expected_type_url, const std::string& expected_version,
       const std::vector<std::string>& expected_resource_names, bool expect_node = true,
-      const Protobuf::int32 expected_error_code = Grpc::Status::GrpcStatus::Ok,
+      const Protobuf::int32 expected_error_code = Grpc::Status::WellKnownGrpcStatus::Ok,
       const std::string& expected_error_message = "");
 
   template <class T>
@@ -334,6 +335,7 @@ protected:
   // Will not return until that server is listening.
   virtual IntegrationTestServerPtr
   createIntegrationTestServer(const std::string& bootstrap_path,
+                              std::function<void(IntegrationTestServer&)> on_server_ready_function,
                               std::function<void()> on_server_init_function,
                               Event::TestTimeSystem& time_system);
 
@@ -349,6 +351,9 @@ protected:
   ConfigHelper config_helper_;
   // The ProcessObject to use when constructing the envoy server.
   absl::optional<std::reference_wrapper<ProcessObject>> process_object_{absl::nullopt};
+
+  // Steps that should be done before the envoy server starting.
+  std::function<void(IntegrationTestServer&)> on_server_ready_function_;
 
   // Steps that should be done in parallel with the envoy server starting. E.g., xDS
   // pre-init, control plane synchronization needed for server start.
@@ -366,7 +371,14 @@ protected:
   // If true, use AutonomousUpstream for fake upstreams.
   bool autonomous_upstream_{false};
 
+  // If true, allow incomplete streams in AutonomousUpstream
+  // This does nothing if autonomous_upstream_ is false
+  bool autonomous_allow_incomplete_streams_{false};
+
   bool enable_half_close_{false};
+
+  // Whether the default created fake upstreams are UDP listeners.
+  bool udp_fake_upstream_{false};
 
   // True if test will use a fixed RNG value.
   bool deterministic_{};

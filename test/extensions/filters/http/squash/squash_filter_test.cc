@@ -2,8 +2,8 @@
 #include <memory>
 #include <string>
 
-#include "common/config/filter_json.h"
-#include "common/config/json_utility.h"
+#include "envoy/config/filter/http/squash/v2/squash.pb.h"
+
 #include "common/http/message_impl.h"
 #include "common/protobuf/protobuf.h"
 

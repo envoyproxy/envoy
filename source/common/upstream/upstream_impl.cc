@@ -9,6 +9,12 @@
 #include <unordered_set>
 #include <vector>
 
+#include "envoy/api/v2/cds.pb.h"
+#include "envoy/api/v2/cluster/circuit_breaker.pb.h"
+#include "envoy/api/v2/core/address.pb.h"
+#include "envoy/api/v2/core/base.pb.h"
+#include "envoy/api/v2/core/health_check.pb.h"
+#include "envoy/api/v2/endpoint/endpoint.pb.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/event/timer.h"
 #include "envoy/network/dns.h"
@@ -22,7 +28,6 @@
 #include "common/common/enum_to_int.h"
 #include "common/common/fmt.h"
 #include "common/common/utility.h"
-#include "common/config/protocol_json.h"
 #include "common/config/utility.h"
 #include "common/http/utility.h"
 #include "common/network/address_impl.h"
@@ -138,7 +143,7 @@ createProtocolOptionsConfig(const std::string& name, const ProtobufWkt::Any& typ
     throw EnvoyException(fmt::format("filter {} does not support protocol options", name));
   }
 
-  Envoy::Config::Utility::translateOpaqueConfig(typed_config, config, validation_visitor,
+  Envoy::Config::Utility::translateOpaqueConfig(name, typed_config, config, validation_visitor,
                                                 *proto_config);
 
   return factory->createProtocolOptionsConfig(*proto_config, validation_visitor);
@@ -639,6 +644,7 @@ ClusterInfoImpl::ClusterInfoImpl(
       stats_(generateStats(*stats_scope_)), load_report_stats_store_(stats_scope_->symbolTable()),
       load_report_stats_(generateLoadReportStats(load_report_stats_store_)),
       features_(parseFeatures(config)),
+      http1_settings_(Http::Utility::parseHttp1Settings(config.http_protocol_options())),
       http2_settings_(Http::Utility::parseHttp2Settings(config.http2_protocol_options())),
       extension_protocol_options_(parseExtensionProtocolOptions(config, validation_visitor)),
       resource_managers_(config, runtime, name_, *stats_scope_),
@@ -678,13 +684,13 @@ ClusterInfoImpl::ClusterInfoImpl(
       throw EnvoyException(
           fmt::format("cluster: LB policy {} is not valid for Cluster type {}. 'ORIGINAL_DST_LB' "
                       "is allowed only with cluster type 'ORIGINAL_DST'",
-                      envoy::api::v2::Cluster_LbPolicy_Name(config.lb_policy()),
+                      envoy::api::v2::Cluster::LbPolicy_Name(config.lb_policy()),
                       envoy::api::v2::Cluster_DiscoveryType_Name(config.type())));
     }
     if (config.has_lb_subset_config()) {
       throw EnvoyException(
           fmt::format("cluster: LB policy {} cannot be combined with lb_subset_config",
-                      envoy::api::v2::Cluster_LbPolicy_Name(config.lb_policy())));
+                      envoy::api::v2::Cluster::LbPolicy_Name(config.lb_policy())));
     }
 
     lb_type_ = LoadBalancerType::ClusterProvided;
@@ -696,7 +702,7 @@ ClusterInfoImpl::ClusterInfoImpl(
     if (config.has_lb_subset_config()) {
       throw EnvoyException(
           fmt::format("cluster: LB policy {} cannot be combined with lb_subset_config",
-                      envoy::api::v2::Cluster_LbPolicy_Name(config.lb_policy())));
+                      envoy::api::v2::Cluster::LbPolicy_Name(config.lb_policy())));
     }
 
     lb_type_ = LoadBalancerType::ClusterProvided;
@@ -753,7 +759,7 @@ ClusterInfoImpl::ClusterInfoImpl(
         Server::Configuration::NamedUpstreamNetworkFilterConfigFactory>(string_name);
     auto message = factory.createEmptyConfigProto();
     if (!proto_config.typed_config().value().empty()) {
-      proto_config.typed_config().UnpackTo(message.get());
+      MessageUtil::unpackTo(proto_config.typed_config(), *message);
     }
     Network::FilterFactoryCb callback =
         factory.createFilterFactoryFromProto(*message, *factory_context_);
@@ -817,6 +823,8 @@ ClusterImplBase::ClusterImplBase(
     Stats::ScopePtr&& stats_scope, bool added_via_api)
     : init_manager_(fmt::format("Cluster {}", cluster.name())),
       init_watcher_("ClusterImplBase", [this]() { onInitDone(); }), runtime_(runtime),
+      local_cluster_(factory_context.clusterManager().localClusterName().value_or("") ==
+                     cluster.name()),
       symbol_table_(stats_scope->symbolTable()) {
   factory_context.setInitManager(init_manager_);
   auto socket_factory = createTransportSocketFactory(cluster, factory_context);
@@ -909,7 +917,9 @@ void ClusterImplBase::onPreInitComplete() {
   }
   initialization_started_ = true;
 
-  ENVOY_LOG(debug, "initializing secondary cluster {} completed", info()->name());
+  ENVOY_LOG(debug, "initializing {} cluster {} completed",
+            initializePhase() == InitializePhase::Primary ? "Primary" : "Secondary",
+            info()->name());
   init_manager_.initialize(init_watcher_);
 }
 
@@ -1013,6 +1023,14 @@ ClusterImplBase::resolveProtoAddress(const envoy::api::v2::core::Address& addres
                                        e.what()));
     }
     throw e;
+  }
+}
+
+void ClusterImplBase::validateEndpointsForZoneAwareRouting(
+    const envoy::api::v2::endpoint::LocalityLbEndpoints& endpoints) const {
+  if (local_cluster_ && endpoints.priority() > 0) {
+    throw EnvoyException(
+        fmt::format("Unexpected non-zero priority for local cluster '{}'.", info()->name()));
   }
 }
 

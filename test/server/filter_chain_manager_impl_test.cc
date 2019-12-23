@@ -4,7 +4,7 @@
 #include <utility>
 #include <vector>
 
-#include "envoy/admin/v2alpha/config_dump.pb.h"
+#include "envoy/api/v2/listener/listener.pb.h"
 #include "envoy/registry/registry.h"
 #include "envoy/server/filter_config.h"
 
@@ -21,7 +21,6 @@
 #include "server/filter_chain_manager_impl.h"
 #include "server/listener_manager_impl.h"
 
-#include "extensions/filters/listener/original_dst/original_dst.h"
 #include "extensions/transport_sockets/tls/ssl_socket.h"
 
 #include "test/mocks/network/mocks.h"
@@ -110,14 +109,17 @@ public:
   const std::string filter_chain_yaml = R"EOF(
       filter_chain_match:
         destination_port: 10000
-      tls_context:
-        common_tls_context:
-          tls_certificates:
-            - certificate_chain: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_multiple_dns_cert.pem" }
-              private_key: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_multiple_dns_key.pem" }
-        session_ticket_keys:
-          keys:
-          - filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ticket_key_a"
+      transport_socket:
+        name: envoy.transport_sockets.tls
+        typed_config:
+          "@type": type.googleapis.com/envoy.api.v2.auth.DownstreamTlsContext
+          common_tls_context:
+            tls_certificates:
+              - certificate_chain: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_multiple_dns_cert.pem" }
+                private_key: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_multiple_dns_key.pem" }
+          session_ticket_keys:
+            keys:
+            - filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ticket_key_a"
   )EOF";
   envoy::api::v2::listener::FilterChain filter_chain_template_;
   MockFilterChainFactoryBuilder filter_chain_factory_builder_;

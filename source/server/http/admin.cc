@@ -15,8 +15,10 @@
 #include "envoy/admin/v2alpha/config_dump.pb.h"
 #include "envoy/admin/v2alpha/listeners.pb.h"
 #include "envoy/admin/v2alpha/memory.pb.h"
+#include "envoy/admin/v2alpha/metrics.pb.h"
 #include "envoy/admin/v2alpha/mutex_stats.pb.h"
 #include "envoy/admin/v2alpha/server_info.pb.h"
+#include "envoy/api/v2/core/health_check.pb.h"
 #include "envoy/filesystem/filesystem.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/server/hot_restart.h"
@@ -143,15 +145,15 @@ const std::regex PromRegex("[^a-zA-Z0-9_]");
 const uint64_t RecentLookupsCapacity = 100;
 
 void populateFallbackResponseHeaders(Http::Code code, Http::HeaderMap& header_map) {
-  header_map.insertStatus().value(std::to_string(enumToInt(code)));
+  header_map.setStatus(std::to_string(enumToInt(code)));
   const auto& headers = Http::Headers::get();
   if (header_map.ContentType() == nullptr) {
     // Default to text-plain if unset.
-    header_map.insertContentType().value().setReference(headers.ContentTypeValues.TextUtf8);
+    header_map.setReferenceContentType(headers.ContentTypeValues.TextUtf8);
   }
   // Default to 'no-cache' if unset, but not 'no-store' which may break the back button.
   if (header_map.CacheControl() == nullptr) {
-    header_map.insertCacheControl().value().setReference(headers.CacheControlValues.NoCacheMaxAge0);
+    header_map.setReferenceCacheControl(headers.CacheControlValues.NoCacheMaxAge0);
   }
 
   // Under no circumstance should browsers sniff content-type.
@@ -176,10 +178,26 @@ bool filterParam(Http::Utility::QueryParams params, Buffer::Instance& response,
   return true;
 }
 
-// Helper method to get the format parameter
-absl::optional<std::string> formatParam(Http::Utility::QueryParams params) {
-  return (params.find("format") != params.end()) ? absl::optional<std::string>{params.at("format")}
-                                                 : absl::nullopt;
+// Helper method to get a query parameter.
+absl::optional<std::string> queryParam(const Http::Utility::QueryParams& params,
+                                       const std::string& key) {
+  return (params.find(key) != params.end()) ? absl::optional<std::string>{params.at(key)}
+                                            : absl::nullopt;
+}
+
+// Helper method to get the format parameter.
+absl::optional<std::string> formatParam(const Http::Utility::QueryParams& params) {
+  return queryParam(params, "format");
+}
+
+// Helper method to get the resource parameter.
+absl::optional<std::string> resourceParam(const Http::Utility::QueryParams& params) {
+  return queryParam(params, "resource");
+}
+
+// Helper method to get the mask parameter.
+absl::optional<std::string> maskParam(const Http::Utility::QueryParams& params) {
+  return queryParam(params, "mask");
 }
 
 // Helper method that ensures that we've setting flags based on all the health flag values on the
@@ -501,7 +519,7 @@ void AdminImpl::writeListenersAsJson(Buffer::Instance& response) {
   for (const auto& listener : server_.listenerManager().listeners()) {
     envoy::admin::v2alpha::ListenerStatus& listener_status = *listeners.add_listener_statuses();
     listener_status.set_name(listener.get().name());
-    Network::Utility::addressToProtobufAddress(*listener.get().socket().localAddress(),
+    Network::Utility::addressToProtobufAddress(*listener.get().listenSocketFactory().localAddress(),
                                                *listener_status.mutable_local_address());
   }
   response.add(MessageUtil::getJsonStringFromMessage(listeners, true)); // pretty-print
@@ -510,7 +528,7 @@ void AdminImpl::writeListenersAsJson(Buffer::Instance& response) {
 void AdminImpl::writeListenersAsText(Buffer::Instance& response) {
   for (const auto& listener : server_.listenerManager().listeners()) {
     response.add(fmt::format("{}::{}\n", listener.get().name(),
-                             listener.get().socket().localAddress()->asString()));
+                             listener.get().listenSocketFactory().localAddress()->asString()));
   }
 }
 
@@ -521,8 +539,7 @@ Http::Code AdminImpl::handlerClusters(absl::string_view url, Http::HeaderMap& re
 
   if (format_value.has_value() && format_value.value() == "json") {
     writeClustersAsJson(response);
-    response_headers.insertContentType().value().setReference(
-        Http::Headers::get().ContentTypeValues.Json);
+    response_headers.setReferenceContentType(Http::Headers::get().ContentTypeValues.Json);
   } else {
     writeClustersAsText(response);
   }
@@ -530,19 +547,81 @@ Http::Code AdminImpl::handlerClusters(absl::string_view url, Http::HeaderMap& re
   return Http::Code::OK;
 }
 
-// TODO(jsedgwick) Use query params to list available dumps, selectively dump, etc
-Http::Code AdminImpl::handlerConfigDump(absl::string_view, Http::HeaderMap& response_headers,
-                                        Buffer::Instance& response, AdminStream&) const {
-  envoy::admin::v2alpha::ConfigDump dump;
+void AdminImpl::addAllConfigToDump(envoy::admin::v2alpha::ConfigDump& dump,
+                                   const absl::optional<std::string>& mask) const {
   for (const auto& key_callback_pair : config_tracker_.getCallbacksMap()) {
     ProtobufTypes::MessagePtr message = key_callback_pair.second();
-    RELEASE_ASSERT(message, "");
-    auto& any_message = *(dump.add_configs());
-    any_message.PackFrom(*message);
+    ASSERT(message);
+
+    if (mask.has_value()) {
+      Protobuf::FieldMask field_mask;
+      ProtobufUtil::FieldMaskUtil::FromString(mask.value(), &field_mask);
+      ProtobufUtil::FieldMaskUtil::TrimMessage(field_mask, message.get());
+    }
+
+    auto* config = dump.add_configs();
+    config->PackFrom(*message);
+  }
+}
+
+absl::optional<std::pair<Http::Code, std::string>>
+AdminImpl::addResourceToDump(envoy::admin::v2alpha::ConfigDump& dump,
+                             const absl::optional<std::string>& mask,
+                             const std::string& resource) const {
+  for (const auto& key_callback_pair : config_tracker_.getCallbacksMap()) {
+    ProtobufTypes::MessagePtr message = key_callback_pair.second();
+    ASSERT(message);
+
+    auto field_descriptor = message->GetDescriptor()->FindFieldByName(resource);
+    const Protobuf::Reflection* reflection = message->GetReflection();
+    if (!field_descriptor) {
+      continue;
+    } else if (!field_descriptor->is_repeated()) {
+      return absl::optional<std::pair<Http::Code, std::string>>{std::make_pair(
+          Http::Code::BadRequest,
+          fmt::format("{} is not a repeated field. Use ?mask={} to get only this field",
+                      field_descriptor->name(), field_descriptor->name()))};
+    }
+
+    auto repeated = reflection->GetRepeatedPtrField<Protobuf::Message>(*message, field_descriptor);
+    for (Protobuf::Message& msg : repeated) {
+      if (mask.has_value()) {
+        Protobuf::FieldMask field_mask;
+        ProtobufUtil::FieldMaskUtil::FromString(mask.value(), &field_mask);
+        ProtobufUtil::FieldMaskUtil::TrimMessage(field_mask, &msg);
+      }
+      auto* config = dump.add_configs();
+      config->PackFrom(msg);
+    }
+
+    // We found the desired resource so there is no need to continue iterating over
+    // the other keys.
+    return absl::nullopt;
   }
 
-  response_headers.insertContentType().value().setReference(
-      Http::Headers::get().ContentTypeValues.Json);
+  return absl::optional<std::pair<Http::Code, std::string>>{
+      std::make_pair(Http::Code::NotFound, fmt::format("{} not found in config dump", resource))};
+}
+
+Http::Code AdminImpl::handlerConfigDump(absl::string_view url, Http::HeaderMap& response_headers,
+                                        Buffer::Instance& response, AdminStream&) const {
+  Http::Utility::QueryParams query_params = Http::Utility::parseQueryString(url);
+  const auto resource = resourceParam(query_params);
+  const auto mask = maskParam(query_params);
+
+  envoy::admin::v2alpha::ConfigDump dump;
+
+  if (resource.has_value()) {
+    auto err = addResourceToDump(dump, mask, resource.value());
+    if (err.has_value()) {
+      response.add(err.value().second);
+      return err.value().first;
+    }
+  } else {
+    addAllConfigToDump(dump, mask);
+  }
+
+  response_headers.setReferenceContentType(Http::Headers::get().ContentTypeValues.Json);
   response.add(MessageUtil::getJsonStringFromMessage(dump, true)); // pretty-print
   return Http::Code::OK;
 }
@@ -552,8 +631,7 @@ Http::Code AdminImpl::handlerContention(absl::string_view, Http::HeaderMap& resp
                                         Buffer::Instance& response, AdminStream&) {
 
   if (server_.options().mutexTracingEnabled() && server_.mutexTracer() != nullptr) {
-    response_headers.insertContentType().value().setReference(
-        Http::Headers::get().ContentTypeValues.Json);
+    response_headers.setReferenceContentType(Http::Headers::get().ContentTypeValues.Json);
 
     envoy::admin::v2alpha::MutexStats mutex_stats;
     mutex_stats.set_num_contentions(server_.mutexTracer()->numContentions());
@@ -687,8 +765,7 @@ Http::Code AdminImpl::handlerLogging(absl::string_view url, Http::HeaderMap&,
 // TODO(ambuc): Add more tcmalloc stats, export proto details based on allocator.
 Http::Code AdminImpl::handlerMemory(absl::string_view, Http::HeaderMap& response_headers,
                                     Buffer::Instance& response, AdminStream&) {
-  response_headers.insertContentType().value().setReference(
-      Http::Headers::get().ContentTypeValues.Json);
+  response_headers.setReferenceContentType(Http::Headers::get().ContentTypeValues.Json);
   envoy::admin::v2alpha::Memory memory;
   memory.set_allocated(Memory::Stats::totalCurrentlyAllocated());
   memory.set_heap_size(Memory::Stats::totalCurrentlyReserved());
@@ -775,7 +852,7 @@ Http::Code AdminImpl::handlerServerInfo(absl::string_view, Http::HeaderMap& head
       server_info.mutable_command_line_options();
   *command_line_options = *server_.options().toCommandLineOptions();
   response.add(MessageUtil::getJsonStringFromMessage(server_info, true, true));
-  headers.insertContentType().value().setReference(Http::Headers::get().ContentTypeValues.Json);
+  headers.setReferenceContentType(Http::Headers::get().ContentTypeValues.Json);
   return Http::Code::OK;
 }
 
@@ -784,8 +861,8 @@ Http::Code AdminImpl::handlerReady(absl::string_view, Http::HeaderMap&, Buffer::
   const envoy::admin::v2alpha::ServerInfo::State state =
       Utility::serverState(server_.initManager().state(), server_.healthCheckFailed());
 
-  response.add(envoy::admin::v2alpha::ServerInfo_State_Name(state) + "\n");
-  Http::Code code = state == envoy::admin::v2alpha::ServerInfo_State_LIVE
+  response.add(envoy::admin::v2alpha::ServerInfo::State_Name(state) + "\n");
+  Http::Code code = state == envoy::admin::v2alpha::ServerInfo::LIVE
                         ? Http::Code::OK
                         : Http::Code::ServiceUnavailable;
   return code;
@@ -818,8 +895,7 @@ Http::Code AdminImpl::handlerStats(absl::string_view url, Http::HeaderMap& respo
 
   if (const auto format_value = formatParam(params)) {
     if (format_value.value() == "json") {
-      response_headers.insertContentType().value().setReference(
-          Http::Headers::get().ContentTypeValues.Json);
+      response_headers.setReferenceContentType(Http::Headers::get().ContentTypeValues.Json);
       response.add(
           AdminImpl::statsAsJson(all_stats, server_.stats().histograms(), used_only, regex));
     } else if (format_value.value() == "prometheus") {
@@ -880,7 +956,7 @@ std::string PrometheusStatsFormatter::formattedTags(const std::vector<Stats::Tag
   for (const Stats::Tag& tag : tags) {
     buf.push_back(fmt::format("{}=\"{}\"", sanitizeName(tag.name_), tag.value_));
   }
-  return StringUtil::join(buf, ",");
+  return absl::StrJoin(buf, ",");
 }
 
 std::string PrometheusStatsFormatter::metricName(const std::string& extracted_name) {
@@ -1066,8 +1142,7 @@ Http::Code AdminImpl::handlerListenerInfo(absl::string_view url, Http::HeaderMap
 
   if (format_value.has_value() && format_value.value() == "json") {
     writeListenersAsJson(response);
-    response_headers.insertContentType().value().setReference(
-        Http::Headers::get().ContentTypeValues.Json);
+    response_headers.setReferenceContentType(Http::Headers::get().ContentTypeValues.Json);
   } else {
     writeListenersAsText(response);
   }
@@ -1078,8 +1153,7 @@ Http::Code AdminImpl::handlerCerts(absl::string_view, Http::HeaderMap& response_
                                    Buffer::Instance& response, AdminStream&) {
   // This set is used to track distinct certificates. We may have multiple listeners, upstreams, etc
   // using the same cert.
-  response_headers.insertContentType().value().setReference(
-      Http::Headers::get().ContentTypeValues.Json);
+  response_headers.setReferenceContentType(Http::Headers::get().ContentTypeValues.Json);
   envoy::admin::v2alpha::Certificates certificates;
   server_.sslContextManager().iterateContexts([&](const Ssl::Context& context) -> void {
     envoy::admin::v2alpha::Certificate& certificate = *certificates.add_certificates();
@@ -1099,8 +1173,7 @@ Http::Code AdminImpl::handlerCerts(absl::string_view, Http::HeaderMap& response_
 Http::Code AdminImpl::handlerRuntime(absl::string_view url, Http::HeaderMap& response_headers,
                                      Buffer::Instance& response, AdminStream&) {
   const Http::Utility::QueryParams params = Http::Utility::parseQueryString(url);
-  response_headers.insertContentType().value().setReference(
-      Http::Headers::get().ContentTypeValues.Json);
+  response_headers.setReferenceContentType(Http::Headers::get().ContentTypeValues.Json);
 
   // TODO(jsedgwick) Use proto to structure this output instead of arbitrary JSON
   rapidjson::Document document;
@@ -1225,7 +1298,8 @@ void AdminImpl::startHttpListener(const std::string& access_log_path,
   access_logs_.emplace_back(new Extensions::AccessLoggers::File::FileAccessLog(
       access_log_path, {}, AccessLog::AccessLogFormatUtils::defaultAccessLogFormatter(),
       server_.accessLogManager()));
-  socket_ = std::make_unique<Network::TcpListenSocket>(address, socket_options, true);
+  socket_ = std::make_shared<Network::TcpListenSocket>(address, socket_options, true);
+  socket_factory_ = std::make_shared<AdminListenSocketFactory>(socket_);
   listener_ = std::make_unique<AdminListener>(*this, std::move(listener_scope));
   if (!address_out_path.empty()) {
     std::ofstream address_out_file(address_out_path);
@@ -1388,8 +1462,7 @@ Http::Code AdminImpl::handlerHelp(absl::string_view, Http::HeaderMap&, Buffer::I
 
 Http::Code AdminImpl::handlerAdminHome(absl::string_view, Http::HeaderMap& response_headers,
                                        Buffer::Instance& response, AdminStream&) {
-  response_headers.insertContentType().value().setReference(
-      Http::Headers::get().ContentTypeValues.Html);
+  response_headers.setReferenceContentType(Http::Headers::get().ContentTypeValues.Html);
 
   response.add(absl::StrReplaceAll(AdminHtmlStart, {{"@FAVICON@", EnvoyFavicon}}));
 
@@ -1476,7 +1549,7 @@ Http::Code AdminImpl::request(absl::string_view path_and_query, absl::string_vie
                               Http::HeaderMap& response_headers, std::string& body) {
   AdminFilter filter(*this);
   Http::HeaderMapImpl request_headers;
-  request_headers.insertMethod().value(method.data(), method.size());
+  request_headers.setMethod(method);
   filter.decodeHeaders(request_headers, false);
   Buffer::OwnedImpl response;
 

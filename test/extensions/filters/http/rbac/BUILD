@@ -19,6 +19,8 @@ envoy_extension_cc_test(
     deps = [
         "//source/extensions/filters/http/rbac:config",
         "//test/mocks/server:server_mocks",
+        "@envoy_api//envoy/config/filter/http/rbac/v2:pkg_cc_proto",
+        "@envoy_api//envoy/config/rbac/v2:pkg_cc_proto",
     ],
 )
 
@@ -33,6 +35,8 @@ envoy_extension_cc_test(
         "//test/extensions/filters/http/rbac:route_config_mocks",
         "//test/mocks/http:http_mocks",
         "//test/mocks/network:network_mocks",
+        "@envoy_api//envoy/config/filter/http/rbac/v2:pkg_cc_proto",
+        "@envoy_api//envoy/config/rbac/v2:pkg_cc_proto",
     ],
 )
 
@@ -44,6 +48,8 @@ envoy_extension_cc_test(
         "//source/extensions/filters/http/rbac:config",
         "//test/config:utility_lib",
         "//test/integration:http_protocol_integration_lib",
+        "@envoy_api//envoy/config/filter/http/rbac/v2:pkg_cc_proto",
+        "@envoy_api//envoy/config/filter/network/http_connection_manager/v2:pkg_cc_proto",
     ],
 )
 
@@ -54,5 +60,6 @@ envoy_extension_cc_mock(
     deps = [
         "//source/extensions/filters/common/rbac:utility_lib",
         "//source/extensions/filters/http/rbac:rbac_filter_lib",
+        "@envoy_api//envoy/config/filter/http/rbac/v2:pkg_cc_proto",
     ],
 )

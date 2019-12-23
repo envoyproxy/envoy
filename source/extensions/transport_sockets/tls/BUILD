@@ -4,22 +4,25 @@ licenses(["notice"])  # Apache 2
 
 load(
     "//bazel:envoy_build_system.bzl",
+    "envoy_cc_extension",
     "envoy_cc_library",
     "envoy_package",
 )
 
 envoy_package()
 
-envoy_cc_library(
+envoy_cc_extension(
     name = "config",
     srcs = ["config.cc"],
     hdrs = ["config.h"],
+    security_posture = "robust_to_untrusted_downstream_and_upstream",
     deps = [
         ":ssl_socket_lib",
         "//include/envoy/network:transport_socket_interface",
         "//include/envoy/registry",
         "//include/envoy/server:transport_socket_config_interface",
         "//source/extensions/transport_sockets:well_known_names",
+        "@envoy_api//envoy/api/v2/auth:pkg_cc_proto",
     ],
 )
 

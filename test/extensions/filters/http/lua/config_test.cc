@@ -1,8 +1,12 @@
+#include <string>
+
+#include "envoy/config/filter/http/lua/v2/lua.pb.h"
 #include "envoy/config/filter/http/lua/v2/lua.pb.validate.h"
 
 #include "extensions/filters/http/lua/config.h"
 
 #include "test/mocks/server/mocks.h"
+#include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -23,16 +27,15 @@ TEST(LuaFilterConfigTest, ValidateFail) {
 }
 
 TEST(LuaFilterConfigTest, LuaFilterInJson) {
-  std::string json_string = R"EOF(
-  {
-    "inline_code" : "print(5)"
-  }
+  const std::string yaml_string = R"EOF(
+  inline_code : "print(5)"
   )EOF";
 
-  Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(json_string);
+  envoy::config::filter::http::lua::v2::Lua proto_config;
+  TestUtility::loadFromYaml(yaml_string, proto_config);
   NiceMock<Server::Configuration::MockFactoryContext> context;
   LuaFilterConfig factory;
-  Http::FilterFactoryCb cb = factory.createFilterFactory(*json_config, "stats", context);
+  Http::FilterFactoryCb cb = factory.createFilterFactoryFromProto(proto_config, "stats", context);
   Http::MockFilterChainFactoryCallbacks filter_callback;
   EXPECT_CALL(filter_callback, addStreamFilter(_));
   cb(filter_callback);

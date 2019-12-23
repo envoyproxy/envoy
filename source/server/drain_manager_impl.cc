@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <functional>
 
+#include "envoy/api/v2/lds.pb.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/event/timer.h"
 #include "envoy/runtime/runtime.h"
@@ -24,11 +25,11 @@ bool DrainManagerImpl::drainClose() const {
   // if even in the case of server health check failure we had some period of drain ramp up. This
   // would allow the other side to fail health check for the host which will require some thread
   // jumps versus immediately start GOAWAY/connection thrashing.
-  if (drain_type_ == envoy::api::v2::Listener_DrainType_DEFAULT && server_.healthCheckFailed()) {
+  if (drain_type_ == envoy::api::v2::Listener::DEFAULT && server_.healthCheckFailed()) {
     return true;
   }
 
-  if (!draining()) {
+  if (!draining_) {
     return false;
   }
 
@@ -51,7 +52,9 @@ void DrainManagerImpl::drainSequenceTick() {
 
 void DrainManagerImpl::startDrainSequence(std::function<void()> completion) {
   drain_sequence_completion_ = completion;
+  ASSERT(!draining_);
   ASSERT(!drain_tick_timer_);
+  draining_ = true;
   drain_tick_timer_ = server_.dispatcher().createTimer([this]() -> void { drainSequenceTick(); });
   drainSequenceTick();
 }

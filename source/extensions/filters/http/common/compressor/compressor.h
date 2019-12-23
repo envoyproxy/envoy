@@ -29,22 +29,20 @@ namespace Compressors {
  * "header_gzip" is specific to the gzip filter and is deprecated since it duplicates
  * "header_compressor_used".
  */
-// clang-format off
-#define ALL_COMPRESSOR_STATS(COUNTER)    \
-  COUNTER(compressed)                    \
-  COUNTER(not_compressed)                \
-  COUNTER(no_accept_header)              \
-  COUNTER(header_identity)               \
-  COUNTER(header_gzip)                   \
-  COUNTER(header_compressor_used)        \
-  COUNTER(header_compressor_overshadowed)\
-  COUNTER(header_wildcard)               \
-  COUNTER(header_not_valid)              \
-  COUNTER(total_uncompressed_bytes)      \
-  COUNTER(total_compressed_bytes)        \
-  COUNTER(content_length_too_small)      \
-  COUNTER(not_compressed_etag)           \
-// clang-format on
+#define ALL_COMPRESSOR_STATS(COUNTER)                                                              \
+  COUNTER(compressed)                                                                              \
+  COUNTER(not_compressed)                                                                          \
+  COUNTER(no_accept_header)                                                                        \
+  COUNTER(header_identity)                                                                         \
+  COUNTER(header_gzip)                                                                             \
+  COUNTER(header_compressor_used)                                                                  \
+  COUNTER(header_compressor_overshadowed)                                                          \
+  COUNTER(header_wildcard)                                                                         \
+  COUNTER(header_not_valid)                                                                        \
+  COUNTER(total_uncompressed_bytes)                                                                \
+  COUNTER(total_compressed_bytes)                                                                  \
+  COUNTER(content_length_too_small)                                                                \
+  COUNTER(not_compressed_etag)
 
 /**
  * Struct definition for compressor stats. @see stats_macros.h
@@ -73,8 +71,8 @@ public:
 
 protected:
   CompressorFilterConfig(const envoy::config::filter::http::compressor::v2::Compressor& compressor,
-                         const std::string& stats_prefix, Stats::Scope& scope, Runtime::Loader& runtime,
-                         const std::string& content_encoding);
+                         const std::string& stats_prefix, Stats::Scope& scope,
+                         Runtime::Loader& runtime, const std::string& content_encoding);
 
 private:
   static StringUtil::CaseUnorderedSet
@@ -148,13 +146,7 @@ private:
 
   class EncodingDecision : public StreamInfo::FilterState::Object {
   public:
-    enum class HeaderStat {
-      NotValid,
-      Identity,
-      Wildcard,
-      Overshadowed,
-      Used
-    };
+    enum class HeaderStat { NotValid, Identity, Wildcard, Overshadowed, Used };
     EncodingDecision(const std::string& encoding, const HeaderStat stat)
         : encoding_(encoding), stat_(stat) {}
     const std::string& encoding() const { return encoding_; }

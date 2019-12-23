@@ -4,6 +4,7 @@ licenses(["notice"])  # Apache 2
 
 load(
     "//bazel:envoy_build_system.bzl",
+    "envoy_cc_extension",
     "envoy_cc_library",
     "envoy_package",
 )
@@ -28,6 +29,7 @@ envoy_cc_library(
         "//source/common/network:utility_lib",
         "//source/extensions/common/tap:tap_config_base",
         "@envoy_api//envoy/data/tap/v2alpha:pkg_cc_proto",
+        "@envoy_api//envoy/service/tap/v2alpha:pkg_cc_proto",
     ],
 )
 
@@ -44,10 +46,12 @@ envoy_cc_library(
     ],
 )
 
-envoy_cc_library(
+envoy_cc_extension(
     name = "config",
     srcs = ["config.cc"],
     hdrs = ["config.h"],
+    security_posture = "requires_trusted_downstream_and_upstream",
+    status = "alpha",
     deps = [
         ":tap_config_impl",
         ":tap_lib",
@@ -58,5 +62,6 @@ envoy_cc_library(
         "//source/common/protobuf:utility_lib",
         "//source/extensions/transport_sockets:well_known_names",
         "@envoy_api//envoy/config/transport_socket/tap/v2alpha:pkg_cc_proto",
+        "@envoy_api//envoy/service/tap/v2alpha:pkg_cc_proto",
     ],
 )

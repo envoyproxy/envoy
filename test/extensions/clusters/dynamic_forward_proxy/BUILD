@@ -2,8 +2,6 @@ licenses(["notice"])  # Apache 2
 
 load(
     "//bazel:envoy_build_system.bzl",
-    "envoy_cc_mock",
-    "envoy_cc_test",
     "envoy_package",
 )
 load(
@@ -28,5 +26,7 @@ envoy_extension_cc_test(
         "//test/mocks/server:server_mocks",
         "//test/mocks/ssl:ssl_mocks",
         "//test/test_common:environment_lib",
+        "@envoy_api//envoy/api/v2:pkg_cc_proto",
+        "@envoy_api//envoy/config/cluster/dynamic_forward_proxy/v2alpha:pkg_cc_proto",
     ],
 )

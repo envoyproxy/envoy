@@ -1,4 +1,6 @@
+#include "envoy/config/bootstrap/v2/bootstrap.pb.h"
 #include "envoy/config/filter/http/jwt_authn/v2alpha/config.pb.h"
+#include "envoy/config/filter/network/http_connection_manager/v2/http_connection_manager.pb.h"
 
 #include "common/router/string_accessor_impl.h"
 
@@ -32,7 +34,8 @@ public:
     if (entry) {
       decoder_callbacks_->streamInfo().filterState().setData(
           state_, std::make_unique<Router::StringAccessorImpl>(entry->value().getStringView()),
-          StreamInfo::FilterState::StateType::ReadOnly);
+          StreamInfo::FilterState::StateType::ReadOnly,
+          StreamInfo::FilterState::LifeSpan::FilterChain);
     }
     return Http::FilterHeadersStatus::Continue;
   }
@@ -73,7 +76,7 @@ std::string getAuthFilterConfig(const std::string& config_str, bool use_local_jw
 
   HttpFilter filter;
   filter.set_name(HttpFilterNames::get().JwtAuthn);
-  TestUtility::jsonConvert(proto_config, *filter.mutable_config());
+  filter.mutable_typed_config()->PackFrom(proto_config);
   return MessageUtil::getJsonStringFromMessage(filter);
 }
 
@@ -191,6 +194,29 @@ TEST_P(LocalJwksIntegrationTest, NoRequiresPath) {
   waitForNextUpstreamRequest();
   upstream_request_->encodeHeaders(Http::TestHeaderMapImpl{{":status", "200"}}, true);
 
+  response->waitForEndStream();
+  ASSERT_TRUE(response->complete());
+  EXPECT_EQ("200", response->headers().Status()->value().getStringView());
+}
+
+// This test verifies a CORS preflight request without JWT token is allowed.
+TEST_P(LocalJwksIntegrationTest, CorsPreflight) {
+  config_helper_.addFilter(getFilterConfig(true));
+  initialize();
+
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+
+  auto response = codec_client_->makeHeaderOnlyRequest(Http::TestHeaderMapImpl{
+      {":method", "OPTIONS"},
+      {":path", "/"},
+      {":scheme", "http"},
+      {":authority", "host"},
+      {"access-control-request-method", "GET"},
+      {"origin", "test-origin"},
+  });
+
+  waitForNextUpstreamRequest();
+  upstream_request_->encodeHeaders(Http::TestHeaderMapImpl{{":status", "200"}}, true);
   response->waitForEndStream();
   ASSERT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().Status()->value().getStringView());

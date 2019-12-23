@@ -5,6 +5,10 @@
 #include <string>
 #include <unordered_map>
 
+#include "envoy/api/v2/core/base.pb.h"
+#include "envoy/api/v2/rds.pb.h"
+#include "envoy/type/percent.pb.h"
+
 #include "common/network/utility.h"
 #include "common/protobuf/message_validator_impl.h"
 #include "common/protobuf/utility.h"
@@ -73,7 +77,7 @@ RouterCheckTool RouterCheckTool::create(const std::string& router_config_file,
   auto api = Api::createApiForTest(*stats);
   TestUtility::loadFromFile(router_config_file, route_config, *api);
   assignUniqueRouteNames(route_config);
-
+  assignRuntimeFraction(route_config);
   auto factory_context =
       std::make_unique<NiceMock<Server::Configuration::MockServerFactoryContext>>();
   auto config = std::make_unique<Router::ConfigImpl>(
@@ -97,6 +101,18 @@ void RouterCheckTool::assignUniqueRouteNames(envoy::api::v2::RouteConfiguration&
   }
 }
 
+void RouterCheckTool::assignRuntimeFraction(envoy::api::v2::RouteConfiguration& route_config) {
+  for (auto& host : *route_config.mutable_virtual_hosts()) {
+    for (auto& route : *host.mutable_routes()) {
+      if (route.match().has_runtime_fraction() &&
+          route.match().runtime_fraction().default_value().numerator() == 0) {
+        route.mutable_match()->mutable_runtime_fraction()->mutable_default_value()->set_numerator(
+            1);
+      }
+    }
+  }
+}
+
 RouterCheckTool::RouterCheckTool(
     std::unique_ptr<NiceMock<Server::Configuration::MockServerFactoryContext>> factory_context,
     std::unique_ptr<Router::ConfigImpl> config, std::unique_ptr<Stats::IsolatedStoreImpl> stats,
@@ -109,9 +125,17 @@ RouterCheckTool::RouterCheckTool(
       .WillByDefault(testing::Invoke(this, &RouterCheckTool::runtimeMock));
 }
 
+Json::ObjectSharedPtr loadFromFile(const std::string& file_path, Api::Api& api) {
+  std::string contents = api.fileSystem().fileReadToEnd(file_path);
+  if (absl::EndsWith(file_path, ".yaml")) {
+    contents = MessageUtil::getJsonStringFromMessage(ValueUtil::loadFromYaml(contents));
+  }
+  return Json::Factory::loadFromString(contents);
+}
+
 // TODO(jyotima): Remove this code path once the json schema code path is deprecated.
 bool RouterCheckTool::compareEntriesInJson(const std::string& expected_route_json) {
-  Json::ObjectSharedPtr loader = Json::Factory::loadFromFile(expected_route_json, *api_);
+  Json::ObjectSharedPtr loader = loadFromFile(expected_route_json, *api_);
   loader->validateSchema(Json::ToolSchema::routerCheckSchema());
   bool no_failures = true;
   for (const Json::ObjectSharedPtr& check_config : loader->asObjectArray()) {
@@ -230,7 +254,7 @@ bool RouterCheckTool::compareCluster(ToolConfig& tool_config, const std::string&
   }
   const bool matches = compareResults(actual, expected, "cluster_name");
   if (matches && tool_config.route_->routeEntry() != nullptr) {
-    coverage_.markClusterCovered(*tool_config.route_->routeEntry());
+    coverage_.markClusterCovered(*tool_config.route_);
   }
   return matches;
 }
@@ -257,7 +281,7 @@ bool RouterCheckTool::compareVirtualCluster(ToolConfig& tool_config, const std::
   }
   const bool matches = compareResults(actual, expected, "virtual_cluster_name");
   if (matches && tool_config.route_->routeEntry() != nullptr) {
-    coverage_.markVirtualClusterCovered(*tool_config.route_->routeEntry());
+    coverage_.markVirtualClusterCovered(*tool_config.route_);
   }
   return matches;
 }
@@ -281,7 +305,7 @@ bool RouterCheckTool::compareVirtualHost(ToolConfig& tool_config, const std::str
   }
   const bool matches = compareResults(actual, expected, "virtual_host_name");
   if (matches && tool_config.route_->routeEntry() != nullptr) {
-    coverage_.markVirtualHostCovered(*tool_config.route_->routeEntry());
+    coverage_.markVirtualHostCovered(*tool_config.route_);
   }
   return matches;
 }
@@ -312,7 +336,7 @@ bool RouterCheckTool::compareRewritePath(ToolConfig& tool_config, const std::str
   }
   const bool matches = compareResults(actual, expected, "path_rewrite");
   if (matches && tool_config.route_->routeEntry() != nullptr) {
-    coverage_.markPathRewriteCovered(*tool_config.route_->routeEntry());
+    coverage_.markPathRewriteCovered(*tool_config.route_);
   }
   return matches;
 }
@@ -343,7 +367,7 @@ bool RouterCheckTool::compareRewriteHost(ToolConfig& tool_config, const std::str
   }
   const bool matches = compareResults(actual, expected, "host_rewrite");
   if (matches && tool_config.route_->routeEntry() != nullptr) {
-    coverage_.markHostRewriteCovered(*tool_config.route_->routeEntry());
+    coverage_.markHostRewriteCovered(*tool_config.route_);
   }
   return matches;
 }
@@ -366,8 +390,8 @@ bool RouterCheckTool::compareRedirectPath(ToolConfig& tool_config, const std::st
   }
 
   const bool matches = compareResults(actual, expected, "path_redirect");
-  if (matches && tool_config.route_->routeEntry() != nullptr) {
-    coverage_.markRedirectPathCovered(*tool_config.route_->routeEntry());
+  if (matches && tool_config.route_->directResponseEntry() != nullptr) {
+    coverage_.markRedirectPathCovered(*tool_config.route_);
   }
   return matches;
 }

@@ -1,5 +1,11 @@
 #include "common/upstream/health_discovery_service.h"
 
+#include "envoy/api/v2/cds.pb.h"
+#include "envoy/api/v2/core/address.pb.h"
+#include "envoy/api/v2/core/base.pb.h"
+#include "envoy/api/v2/core/health_check.pb.h"
+#include "envoy/api/v2/endpoint/endpoint.pb.h"
+#include "envoy/service/discovery/v2/hds.pb.h"
 #include "envoy/stats/scope.h"
 
 #include "common/protobuf/protobuf.h"
@@ -178,7 +184,7 @@ void HdsDelegate::onReceiveMessage(
   hds_clusters_.clear();
 
   // Set response
-  auto server_response_ms = PROTOBUF_GET_MS_REQUIRED(*message, interval);
+  auto server_response_ms = PROTOBUF_GET_MS_OR_DEFAULT(*message, interval, 1000);
 
   // Process the HealthCheckSpecifier message
   processMessage(std::move(message));

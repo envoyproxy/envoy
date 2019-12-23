@@ -2,9 +2,10 @@
 #include <string>
 #include <vector>
 
+#include "envoy/config/filter/thrift/rate_limit/v2alpha1/rate_limit.pb.h"
+
 #include "common/buffer/buffer_impl.h"
 #include "common/common/empty_string.h"
-#include "common/config/filter_json.h"
 #include "common/http/headers.h"
 
 #include "extensions/filters/network/thrift_proxy/app_exception_impl.h"

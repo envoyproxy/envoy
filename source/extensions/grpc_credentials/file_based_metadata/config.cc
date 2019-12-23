@@ -1,6 +1,7 @@
 #include "extensions/grpc_credentials/file_based_metadata/config.h"
 
 #include "envoy/api/v2/core/grpc_service.pb.h"
+#include "envoy/config/grpc_credential/v2alpha/file_based_metadata.pb.h"
 #include "envoy/config/grpc_credential/v2alpha/file_based_metadata.pb.validate.h"
 #include "envoy/grpc/google_grpc_creds.h"
 #include "envoy/registry/registry.h"
@@ -62,13 +63,17 @@ grpc::Status
 FileBasedMetadataAuthenticator::GetMetadata(grpc::string_ref, grpc::string_ref,
                                             const grpc::AuthContext&,
                                             std::multimap<grpc::string, grpc::string>* metadata) {
-  std::string header_value = Envoy::Config::DataSource::read(config_.secret_data(), true, api_);
   std::string header_key = "authorization";
   std::string header_prefix = config_.header_prefix();
   if (!config_.header_key().empty()) {
     header_key = config_.header_key();
   }
-  metadata->insert(std::make_pair(header_key, header_prefix + header_value));
+  try {
+    std::string header_value = Envoy::Config::DataSource::read(config_.secret_data(), true, api_);
+    metadata->insert(std::make_pair(header_key, header_prefix + header_value));
+  } catch (const EnvoyException& e) {
+    return grpc::Status(grpc::StatusCode::NOT_FOUND, e.what());
+  }
   return grpc::Status::OK;
 }
 

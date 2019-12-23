@@ -104,17 +104,23 @@ public:
   std::string waitForAccessLog(const std::string& filename);
 
 protected:
-  void useAccessLog();
+  void useAccessLog(absl::string_view format = "");
 
   IntegrationCodecClientPtr makeHttpConnection(uint32_t port);
   // Makes a http connection object without checking its connected state.
-  IntegrationCodecClientPtr makeRawHttpConnection(Network::ClientConnectionPtr&& conn);
+  virtual IntegrationCodecClientPtr makeRawHttpConnection(Network::ClientConnectionPtr&& conn);
   // Makes a http connection object with asserting a connected state.
   IntegrationCodecClientPtr makeHttpConnection(Network::ClientConnectionPtr&& conn);
 
   // Sets downstream_protocol_ and alters the HTTP connection manager codec type in the
   // config_helper_.
   void setDownstreamProtocol(Http::CodecClient::Type type);
+
+  // Enable the encoding/decoding of Http1 trailers downstream
+  ConfigHelper::HttpModifierFunction setEnableDownstreamTrailersHttp1();
+
+  // Enable the encoding/decoding of Http1 trailers upstream
+  ConfigHelper::ConfigModifierFunction setEnableUpstreamTrailersHttp1();
 
   // Sends |request_headers| and |request_body_size| bytes of body upstream.
   // Configured upstream to send |response_headers| and |response_body_size|
@@ -131,7 +137,7 @@ protected:
   // Sets fake_upstream_connection_ to the connection and upstream_request_ to stream.
   // In cases where the upstream that will receive the request is not deterministic, a second
   // upstream index may be provided, in which case both upstreams will be checked for requests.
-  uint64_t waitForNextUpstreamRequest(
+  absl::optional<uint64_t> waitForNextUpstreamRequest(
       const std::vector<uint64_t>& upstream_indices,
       std::chrono::milliseconds connection_wait_timeout = TestUtility::DefaultTimeout);
   void waitForNextUpstreamRequest(
@@ -208,7 +214,11 @@ protected:
 
   // HTTP/2 client tests.
   void testDownstreamResetBeforeResponseComplete();
-  void testTrailers(uint64_t request_size, uint64_t response_size);
+  // Test that trailers are sent. request_trailers_present and
+  // response_trailers_present will check if the trailers are present, otherwise
+  // makes sure they were dropped.
+  void testTrailers(uint64_t request_size, uint64_t response_size, bool request_trailers_present,
+                    bool response_trailers_present);
 
   Http::CodecClient::Type downstreamProtocol() const { return downstream_protocol_; }
   // Prefix listener stat with IP:port, including IP version dependent loopback address.

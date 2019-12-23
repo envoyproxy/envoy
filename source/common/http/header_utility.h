@@ -37,7 +37,6 @@ public:
   // It is the runtime equivalent of the HeaderMatchSpecifier proto in RDS API.
   struct HeaderData : public HeaderMatcher {
     HeaderData(const envoy::api::v2::route::HeaderMatcher& config);
-    HeaderData(const Json::Object& config);
 
     const LowerCaseString name_;
     HeaderMatchType header_match_type_;
@@ -98,11 +97,22 @@ public:
   static bool headerIsValid(const absl::string_view header_value);
 
   /**
+   * Validates that the characters in the authority are valid.
+   * @return bool true if the header values are valid, false otherwise.
+   */
+  static bool authorityIsValid(const absl::string_view authority_value);
+
+  /**
    * Add headers from one HeaderMap to another
    * @param headers target where headers will be added
    * @param headers_to_add supplies the headers to be added
    */
   static void addHeaders(HeaderMap& headers, const HeaderMap& headers_to_add);
+
+  /**
+   * @brief a helper function to determine if the headers represent an envoy internal request
+   */
+  static bool isEnvoyInternalRequest(const HeaderMap& headers);
 };
 } // namespace Http
 } // namespace Envoy

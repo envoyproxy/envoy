@@ -1,6 +1,5 @@
 #include <list>
 
-#include "envoy/config/bootstrap/v2/bootstrap.pb.h"
 #include "envoy/server/filter_config.h"
 
 #include "test/integration/integration.h"
@@ -86,14 +85,6 @@ private:
 class TestFilterConfigFactory : public Server::Configuration::NamedNetworkFilterConfigFactory {
 public:
   // NamedNetworkFilterConfigFactory
-  Network::FilterFactoryCb
-  createFilterFactory(const Json::Object&,
-                      Server::Configuration::FactoryContext& context) override {
-    return [&context](Network::FilterManager& filter_manager) -> void {
-      filter_manager.addReadFilter(std::make_shared<TestFilter>(context.clusterManager()));
-    };
-  }
-
   Network::FilterFactoryCb
   createFilterFactoryFromProto(const Protobuf::Message&,
                                Server::Configuration::FactoryContext& context) override {

@@ -57,7 +57,7 @@ void RestApiFetcher::onFailure(Http::AsyncClient::FailureReason reason) {
 void RestApiFetcher::refresh() {
   MessagePtr message(new RequestMessageImpl());
   createRequest(*message);
-  message->headers().insertHost().value(remote_cluster_name_);
+  message->headers().setHost(remote_cluster_name_);
   active_request_ = cm_.httpAsyncClientForCluster(remote_cluster_name_)
                         .send(std::move(message), *this,
                               AsyncClient::RequestOptions().setTimeout(request_timeout_));

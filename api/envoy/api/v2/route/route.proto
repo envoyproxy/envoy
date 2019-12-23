@@ -2,22 +2,24 @@ syntax = "proto3";
 
 package envoy.api.v2.route;
 
-option java_outer_classname = "RouteProto";
-option java_multiple_files = true;
-option java_package = "io.envoyproxy.envoy.api.v2.route";
-
 import "envoy/api/v2/core/base.proto";
 import "envoy/type/matcher/regex.proto";
 import "envoy/type/matcher/string.proto";
 import "envoy/type/percent.proto";
 import "envoy/type/range.proto";
+import "envoy/type/tracing/v2/custom_tag.proto";
 
 import "google/protobuf/any.proto";
 import "google/protobuf/duration.proto";
 import "google/protobuf/struct.proto";
 import "google/protobuf/wrappers.proto";
 
+import "udpa/annotations/migrate.proto";
 import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.api.v2.route";
+option java_outer_classname = "RouteProto";
+option java_multiple_files = true;
 
 // [#protodoc-title: HTTP route]
 // * Routing :ref:`architecture overview <arch_overview_http_routing>`
@@ -117,7 +119,7 @@ message VirtualHost {
   // *envoy.buffer* for the HTTP buffer filter. Use of this field is filter
   // specific; see the :ref:`HTTP filter documentation <config_http_filters>`
   // for if and how it is utilized.
-  map<string, google.protobuf.Struct> per_filter_config = 12;
+  map<string, google.protobuf.Struct> per_filter_config = 12 [deprecated = true];
 
   // The per_filter_config field can be used to provide virtual host-specific
   // configurations for filters. The key should match the filter name, such as
@@ -152,6 +154,11 @@ message VirtualHost {
   google.protobuf.UInt32Value per_request_buffer_limit_bytes = 18;
 }
 
+// A filter-defined action type.
+message FilterAction {
+  google.protobuf.Any action = 1;
+}
+
 // A route is both a specification of how to match a request as well as an indication of what to do
 // next (e.g., redirect, forward, rewrite, etc.).
 //
@@ -159,7 +166,7 @@ message VirtualHost {
 //
 //   Envoy supports routing on HTTP method via :ref:`header matching
 //   <envoy_api_msg_route.HeaderMatcher>`.
-// [#next-free-field: 17]
+// [#next-free-field: 18]
 message Route {
   reserved 6;
 
@@ -180,6 +187,11 @@ message Route {
 
     // Return an arbitrary HTTP response directly, without proxying.
     DirectResponseAction direct_response = 7;
+
+    // [#not-implemented-hide:]
+    // If true, a filter will define the action (e.g., it could dynamically generate the
+    // RouteAction).
+    FilterAction filter_action = 17;
   }
 
   // The Metadata field can be used to provide additional information
@@ -197,7 +209,7 @@ message Route {
   // *envoy.buffer* for the HTTP buffer filter. Use of this field is filter
   // specific; see the :ref:`HTTP filter documentation <config_http_filters>` for
   // if and how it is utilized.
-  map<string, google.protobuf.Struct> per_filter_config = 8;
+  map<string, google.protobuf.Struct> per_filter_config = 8 [deprecated = true];
 
   // The per_filter_config field can be used to provide route-specific
   // configurations for filters. The key should match the filter name, such as
@@ -265,9 +277,9 @@ message WeightedCluster {
 
     // Optional endpoint metadata match criteria used by the subset load balancer. Only endpoints in
     // the upstream cluster with metadata matching what is set in this field will be considered for
-    // load balancing. Note that this will be merged with what's provided in :ref:
-    // `RouteAction.MetadataMatch <envoy_api_field_route.RouteAction.metadata_match>`, with values
-    // here taking precedence. The filter name should be specified as *envoy.lb*.
+    // load balancing. Note that this will be merged with what's provided in
+    // :ref:`RouteAction.metadata_match <envoy_api_field_route.RouteAction.metadata_match>`, with
+    // values here taking precedence. The filter name should be specified as *envoy.lb*.
     core.Metadata metadata_match = 3;
 
     // Specifies a list of headers to be added to requests when this cluster is selected
@@ -303,7 +315,7 @@ message WeightedCluster {
     // *envoy.buffer* for the HTTP buffer filter. Use of this field is filter
     // specific; see the :ref:`HTTP filter documentation <config_http_filters>`
     // for if and how it is utilized.
-    map<string, google.protobuf.Struct> per_filter_config = 8;
+    map<string, google.protobuf.Struct> per_filter_config = 8 [deprecated = true];
 
     // The per_filter_config field can be used to provide weighted cluster-specific
     // configurations for filters. The key should match the filter name, such as
@@ -370,7 +382,7 @@ message RouteMatch {
     // .. attention::
     //   This field has been deprecated in favor of `safe_regex` as it is not safe for use with
     //   untrusted input in all cases.
-    string regex = 3 [(validate.rules).string = {max_bytes: 1024}, deprecated = true];
+    string regex = 3 [deprecated = true, (validate.rules).string = {max_bytes: 1024}];
 
     // If specified, the route is a regular expression rule meaning that the
     // regex must match the *:path* header once the query string is removed. The entire path
@@ -453,7 +465,7 @@ message CorsPolicy {
   //   This field has been deprecated in favor of `allow_origin_string_match` as it is not safe for
   //   use with untrusted input in all cases.
   repeated string allow_origin_regex = 8
-      [(validate.rules).repeated = {items {string {max_bytes: 1024}}}, deprecated = true];
+      [deprecated = true, (validate.rules).repeated = {items {string {max_bytes: 1024}}}];
 
   // Specifies string patterns that match allowed origins. An origin is allowed if any of the
   // string matchers match.
@@ -475,7 +487,7 @@ message CorsPolicy {
   google.protobuf.BoolValue allow_credentials = 6;
 
   oneof enabled_specifier {
-    // Specifies if CORS is enabled. Defaults to true. Only effective on route.
+    // Specifies if the CORS filter is enabled. Defaults to true. Only effective on route.
     //
     // .. attention::
     //
@@ -483,28 +495,25 @@ message CorsPolicy {
     //   :ref:`filter_enabled<envoy_api_field_route.CorsPolicy.filter_enabled>` field instead.
     google.protobuf.BoolValue enabled = 7 [deprecated = true];
 
-    // Specifies if CORS is enabled.
+    // Specifies the % of requests for which the CORS filter is enabled.
     //
-    // More information on how this can be controlled via runtime can be found
-    // :ref:`here <cors-runtime>`.
+    // If neither ``enabled``, ``filter_enabled``, nor ``shadow_enabled`` are specified, the CORS
+    // filter will be enabled for 100% of the requests.
     //
-    // .. note::
-    //
-    //   This field defaults to 100/:ref:`HUNDRED
-    //   <envoy_api_enum_type.FractionalPercent.DenominatorType>`.
+    // If :ref:`runtime_key <envoy_api_field_core.runtimefractionalpercent.runtime_key>` is
+    // specified, Envoy will lookup the runtime key to get the percentage of requests to filter.
     core.RuntimeFractionalPercent filter_enabled = 9;
   }
 
-  // Specifies if CORS policies are evaluated and tracked when filter is off but
-  // does not enforce any policies.
+  // Specifies the % of requests for which the CORS policies will be evaluated and tracked, but not
+  // enforced.
   //
-  // More information on how this can be controlled via runtime can be found
-  // :ref:`here <cors-runtime>`.
+  // This field is intended to be used when ``filter_enabled`` and ``enabled`` are off. One of those
+  // fields have to explicitly disable the filter in order for this setting to take effect.
   //
-  // .. note::
-  //
-  //   This field defaults to 100/:ref:`HUNDRED
-  //   <envoy_api_enum_type.FractionalPercent.DenominatorType>`.
+  // If :ref:`runtime_key <envoy_api_field_core.runtimefractionalpercent.runtime_key>` is specified,
+  // Envoy will lookup the runtime key to get the percentage of requests for which it will evaluate
+  // and track the request's *Origin* to determine if it's valid but will not enforce any policies.
   core.RuntimeFractionalPercent shadow_enabled = 10;
 }
 
@@ -560,21 +569,12 @@ message RouteAction {
     // For some fraction N/D, a random number in the range [0,D) is selected. If the
     // number is <= the value of the numerator N, or if the key is not present, the default
     // value, the request will be mirrored.
-    //
-    // .. note::
-    //
-    //   Parsing this field is implemented such that the runtime key's data may be represented
-    //   as a :ref:`FractionalPercent <envoy_api_msg_type.FractionalPercent>` proto represented
-    //   as JSON/YAML and may also be represented as an integer with the assumption that the value
-    //   is an integral percentage out of 100. For instance, a runtime key lookup returning the
-    //   value "42" would parse as a `FractionalPercent` whose numerator is 42 and denominator is
-    //   HUNDRED. This is behaviour is different to that of the deprecated `runtime_key` field,
-    //   where the implicit denominator is 10000.
     core.RuntimeFractionalPercent runtime_fraction = 3;
   }
 
   // Specifies the route's hashing policy if the upstream cluster uses a hashing :ref:`load balancer
   // <arch_overview_load_balancing_types>`.
+  // [#next-free-field: 6]
   message HashPolicy {
     message Header {
       // The name of the request header that will be used to obtain the hash
@@ -617,6 +617,13 @@ message RouteAction {
       bool source_ip = 1;
     }
 
+    message QueryParameter {
+      // The name of the URL query parameter that will be used to obtain the hash
+      // key. If the parameter is not present, no hash will be produced. Query
+      // parameter names are case-sensitive.
+      string name = 1 [(validate.rules).string = {min_bytes: 1}];
+    }
+
     oneof policy_specifier {
       option (validate.required) = true;
 
@@ -628,6 +635,9 @@ message RouteAction {
 
       // Connection properties hash policy.
       ConnectionProperties connection_properties = 3;
+
+      // Query parameter hash policy.
+      QueryParameter query_parameter = 5;
     }
 
     // The flag that short-circuits the hash computing. This field provides a
@@ -655,7 +665,7 @@ message RouteAction {
   // Allows enabling and disabling upgrades on a per-route basis.
   // This overrides any enabled/disabled upgrade filter chain specified in the
   // HttpConnectionManager
-  // :ref:upgrade_configs`
+  // :ref:`upgrade_configs
   // <envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.upgrade_configs>`
   // but does not affect any custom filter chain specified there.
   message UpgradeConfig {
@@ -740,7 +750,7 @@ message RouteAction {
   oneof host_rewrite_specifier {
     // Indicates that during forwarding, the host header will be swapped with
     // this value.
-    string host_rewrite = 6;
+    string host_rewrite = 6 [(udpa.annotations.field_migrate).rename = "host_rewrite_literal"];
 
     // Indicates that during forwarding, the host header will be swapped with
     // the hostname of the upstream host chosen by the cluster manager. This
@@ -757,7 +767,8 @@ message RouteAction {
     //
     //   Pay attention to the potential security implications of using this option. Provided header
     //   must come from trusted source.
-    string auto_host_rewrite_header = 29;
+    string auto_host_rewrite_header = 29
+        [(udpa.annotations.field_migrate).rename = "host_rewrite_header"];
   }
 
   // Specifies the upstream timeout for the route. If not specified, the default is 15s. This
@@ -869,7 +880,7 @@ message RetryPolicy {
     string name = 1 [(validate.rules).string = {min_bytes: 1}];
 
     oneof config_type {
-      google.protobuf.Struct config = 2;
+      google.protobuf.Struct config = 2 [deprecated = true];
 
       google.protobuf.Any typed_config = 3;
     }
@@ -879,7 +890,7 @@ message RetryPolicy {
     string name = 1 [(validate.rules).string = {min_bytes: 1}];
 
     oneof config_type {
-      google.protobuf.Struct config = 2;
+      google.protobuf.Struct config = 2 [deprecated = true];
 
       google.protobuf.Any typed_config = 3;
     }
@@ -1099,6 +1110,14 @@ message Tracing {
   // :ref:`HTTP Connection Manager <config_http_conn_man_runtime>`.
   // Default: 100%
   type.FractionalPercent overall_sampling = 3;
+
+  // A list of custom tags with unique tag name to create tags for the active span.
+  // It will take effect after merging with the :ref:`corresponding configuration
+  // <envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.tracing.custom_tags>`
+  // configured in the HTTP connection manager. If two tags with the same name are configured
+  // each in the HTTP connection manager and the route level, the one configured here takes
+  // priority.
+  repeated type.tracing.v2.CustomTag custom_tags = 4;
 }
 
 // A virtual cluster is a way of specifying a regex matching rule against
@@ -1132,7 +1151,7 @@ message VirtualCluster {
   // .. attention::
   //   This field has been deprecated in favor of `headers` as it is not safe for use with
   //   untrusted input in all cases.
-  string pattern = 1 [(validate.rules).string = {max_bytes: 1024}, deprecated = true];
+  string pattern = 1 [deprecated = true, (validate.rules).string = {max_bytes: 1024}];
 
   // Specifies a list of header matchers to use for matching requests. Each specified header must
   // match. The pseudo-headers `:path` and `:method` can be used to match the request path and
@@ -1337,7 +1356,7 @@ message HeaderMatcher {
     // .. attention::
     //   This field has been deprecated in favor of `safe_regex_match` as it is not safe for use
     //   with untrusted input in all cases.
-    string regex_match = 5 [(validate.rules).string = {max_bytes: 1024}, deprecated = true];
+    string regex_match = 5 [deprecated = true, (validate.rules).string = {max_bytes: 1024}];
 
     // If specified, this regex string is a regular expression rule which implies the entire request
     // header value must match the regex. The rule will not match if only a subsequence of the

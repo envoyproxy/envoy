@@ -2,11 +2,6 @@ syntax = "proto3";
 
 package envoy.config.trace.v3alpha;
 
-option java_outer_classname = "TraceProto";
-option java_multiple_files = true;
-option java_package = "io.envoyproxy.envoy.config.trace.v3alpha";
-
-import "envoy/api/v3alpha/core/base.proto";
 import "envoy/api/v3alpha/core/grpc_service.proto";
 
 import "google/protobuf/any.proto";
@@ -14,8 +9,13 @@ import "google/protobuf/struct.proto";
 import "google/protobuf/wrappers.proto";
 
 import "opencensus/proto/trace/v1/trace_config.proto";
+import "udpa/annotations/versioning.proto";
 
 import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.config.trace.v3alpha";
+option java_outer_classname = "TraceProto";
+option java_multiple_files = true;
 
 // [#protodoc-title: Tracing]
 // Tracing :ref:`architecture overview <arch_overview_tracing>`.
@@ -26,7 +26,16 @@ import "validate/validate.proto";
 // <envoy_api_field_config.bootstrap.v3alpha.Bootstrap.tracing>` field. Envoy may support other
 // tracers in the future, but right now the HTTP tracer is the only one supported.
 message Tracing {
+  option (udpa.annotations.versioning).previous_message_type = "envoy.config.trace.v2.Tracing";
+
   message Http {
+    option (udpa.annotations.versioning).previous_message_type =
+        "envoy.config.trace.v2.Tracing.Http";
+
+    reserved 2;
+
+    reserved "config";
+
     // The name of the HTTP trace driver to instantiate. The name must match a
     // supported HTTP trace driver. Built-in trace drivers:
     //
@@ -46,11 +55,8 @@ message Tracing {
     // - :ref:`DynamicOtConfig <envoy_api_msg_config.trace.v3alpha.DynamicOtConfig>`
     // - :ref:`DatadogConfig <envoy_api_msg_config.trace.v3alpha.DatadogConfig>`
     // - :ref:`OpenCensusConfig <envoy_api_msg_config.trace.v3alpha.OpenCensusConfig>`
-    // [#comment: TODO(marco) when XRay is implemented, uncomment the following; - :ref:`XRayConfig
-    // <envoy_api_msg_config.trace.v3alpha.XRayConfig>`]
+    // - :ref:`AWS X-Ray <envoy_api_msg_config.trace.v3alpha.XRayConfig>`
     oneof config_type {
-      google.protobuf.Struct config = 2;
-
       google.protobuf.Any typed_config = 3;
     }
   }
@@ -60,7 +66,11 @@ message Tracing {
 }
 
 // Configuration for the LightStep tracer.
+// [#extension: envoy.tracers.lightstep]
 message LightstepConfig {
+  option (udpa.annotations.versioning).previous_message_type =
+      "envoy.config.trace.v2.LightstepConfig";
+
   // The cluster manager cluster that hosts the LightStep collectors.
   string collector_cluster = 1 [(validate.rules).string = {min_bytes: 1}];
 
@@ -70,8 +80,11 @@ message LightstepConfig {
 }
 
 // Configuration for the Zipkin tracer.
+// [#extension: envoy.tracers.zipkin]
 // [#next-free-field: 6]
 message ZipkinConfig {
+  option (udpa.annotations.versioning).previous_message_type = "envoy.config.trace.v2.ZipkinConfig";
+
   // Available Zipkin collector endpoint versions.
   enum CollectorEndpointVersion {
     // Zipkin API v1, JSON over HTTP.
@@ -119,7 +132,11 @@ message ZipkinConfig {
 // DynamicOtConfig is used to dynamically load a tracer from a shared library
 // that implements the `OpenTracing dynamic loading API
 // <https://github.com/opentracing/opentracing-cpp>`_.
+// [#extension: envoy.tracers.dynamic_ot]
 message DynamicOtConfig {
+  option (udpa.annotations.versioning).previous_message_type =
+      "envoy.config.trace.v2.DynamicOtConfig";
+
   // Dynamic library implementing the `OpenTracing API
   // <https://github.com/opentracing/opentracing-cpp>`_.
   string library = 1 [(validate.rules).string = {min_bytes: 1}];
@@ -130,7 +147,11 @@ message DynamicOtConfig {
 }
 
 // Configuration for the Datadog tracer.
+// [#extension: envoy.tracers.datadog]
 message DatadogConfig {
+  option (udpa.annotations.versioning).previous_message_type =
+      "envoy.config.trace.v2.DatadogConfig";
+
   // The cluster to use for submitting traces to the Datadog agent.
   string collector_cluster = 1 [(validate.rules).string = {min_bytes: 1}];
 
@@ -140,7 +161,11 @@ message DatadogConfig {
 
 // Configuration for the OpenCensus tracer.
 // [#next-free-field: 13]
+// [#extension: envoy.tracers.opencensus]
 message OpenCensusConfig {
+  option (udpa.annotations.versioning).previous_message_type =
+      "envoy.config.trace.v2.OpenCensusConfig";
+
   enum TraceContext {
     // No-op default, no trace context is utilized.
     NONE = 0;
@@ -203,22 +228,11 @@ message OpenCensusConfig {
   repeated TraceContext outgoing_trace_context = 9;
 }
 
-// [#not-implemented-hide:]
-// Configuration for AWS X-Ray tracer.
-message XRayConfig {
-  // The endpoint of the X-Ray Daemon where the spans will be sent. Since by default daemon
-  // listens to localhost:2000, so the default value is 127.0.0.1:2000.
-  string daemon_endpoint = 1 [(validate.rules).string = {min_bytes: 1}];
-
-  // The custom name to name a X-Ray segment. By default will use cluster name.
-  string segment_name = 2;
-
-  // The location of custom sampling rule json file.
-  api.v3alpha.core.DataSource sampling_rule_manifest = 3;
-}
-
 // Configuration structure.
 message TraceServiceConfig {
+  option (udpa.annotations.versioning).previous_message_type =
+      "envoy.config.trace.v2.TraceServiceConfig";
+
   // The upstream gRPC cluster that hosts the metrics service.
   api.v3alpha.core.GrpcService grpc_service = 1 [(validate.rules).message = {required: true}];
 }

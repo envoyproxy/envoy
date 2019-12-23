@@ -2,6 +2,8 @@
 
 #include <memory>
 
+#include "envoy/api/v2/core/base.pb.h"
+#include "envoy/api/v2/discovery.pb.h"
 #include "envoy/api/v2/eds.pb.h"
 
 #include "common/common/hash.h"
@@ -52,7 +54,8 @@ public:
 
   void expectSendMessage(const std::set<std::string>& cluster_names, const std::string& version,
                          bool expect_node = false) override {
-    expectSendMessage(cluster_names, version, expect_node, Grpc::Status::GrpcStatus::Ok, "");
+    expectSendMessage(cluster_names, version, expect_node, Grpc::Status::WellKnownGrpcStatus::Ok,
+                      "");
   }
 
   void expectSendMessage(const std::set<std::string>& cluster_names, const std::string& version,
@@ -71,7 +74,7 @@ public:
     }
     expected_request.set_response_nonce(last_response_nonce_);
     expected_request.set_type_url(Config::TypeUrl::get().ClusterLoadAssignment);
-    if (error_code != Grpc::Status::GrpcStatus::Ok) {
+    if (error_code != Grpc::Status::WellKnownGrpcStatus::Ok) {
       ::google::rpc::Status* error_detail = expected_request.mutable_error_detail();
       error_detail->set_code(error_code);
       error_detail->set_message(error_message);
@@ -111,8 +114,8 @@ public:
     } else {
       EXPECT_CALL(callbacks_, onConfigUpdateFailed(
                                   Envoy::Config::ConfigUpdateFailureReason::UpdateRejected, _));
-      expectSendMessage(last_cluster_names_, version_, false, Grpc::Status::GrpcStatus::Internal,
-                        "bad config");
+      expectSendMessage(last_cluster_names_, version_, false,
+                        Grpc::Status::WellKnownGrpcStatus::Internal, "bad config");
     }
     subscription_->grpcMux()->onDiscoveryResponse(std::move(response));
     Mock::VerifyAndClearExpectations(&async_stream_);

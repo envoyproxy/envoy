@@ -3,6 +3,7 @@
 #include <queue>
 #include <unordered_map>
 
+#include "envoy/api/v2/discovery.pb.h"
 #include "envoy/common/time.h"
 #include "envoy/config/grpc_mux.h"
 #include "envoy/config/subscription.h"

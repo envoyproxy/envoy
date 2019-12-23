@@ -1,6 +1,8 @@
 #include <chrono>
 #include <thread>
 
+#include "envoy/config/filter/http/jwt_authn/v2alpha/config.pb.h"
+
 #include "common/protobuf/utility.h"
 #include "common/stats/isolated_store_impl.h"
 

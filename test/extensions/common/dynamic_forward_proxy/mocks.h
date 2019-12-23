@@ -1,5 +1,7 @@
 #pragma once
 
+#include "envoy/config/common/dynamic_forward_proxy/v2alpha/dns_cache.pb.h"
+
 #include "extensions/common/dynamic_forward_proxy/dns_cache.h"
 
 #include "gmock/gmock.h"
@@ -33,6 +35,8 @@ public:
   }
   MOCK_METHOD1(addUpdateCallbacks_,
                DnsCache::AddUpdateCallbacksHandle*(UpdateCallbacks& callbacks));
+
+  MOCK_METHOD0(hosts, absl::flat_hash_map<std::string, DnsHostInfoSharedPtr>());
 };
 
 class MockLoadDnsCacheEntryHandle : public DnsCache::LoadDnsCacheEntryHandle {

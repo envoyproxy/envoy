@@ -1,36 +1,41 @@
 REPOSITORY_LOCATIONS = dict(
     bazel_compdb = dict(
-        sha256 = "bb1b812396e2ee36a50a13b03ae6833173ce643e8a4bd50731067d0b4e5c6e86",
-        strip_prefix = "bazel-compilation-database-0.3.5",
-        urls = ["https://github.com/grailbio/bazel-compilation-database/archive/0.3.5.tar.gz"],
+        sha256 = "87e376a685eacfb27bcc0d0cdf5ded1d0b99d868390ac50f452ba6ed781caffe",
+        strip_prefix = "bazel-compilation-database-0.4.2",
+        urls = ["https://github.com/grailbio/bazel-compilation-database/archive/0.4.2.tar.gz"],
     ),
     bazel_gazelle = dict(
-        sha256 = "be9296bfd64882e3c08e3283c58fcb461fa6dd3c171764fcc4cf322f60615a9b",
-        urls = ["https://github.com/bazelbuild/bazel-gazelle/releases/download/0.18.1/bazel-gazelle-0.18.1.tar.gz"],
+        sha256 = "86c6d481b3f7aedc1d60c1c211c6f76da282ae197c3b3160f54bd3a8f847896f",
+        urls = ["https://github.com/bazelbuild/bazel-gazelle/releases/download/v0.19.1/bazel-gazelle-v0.19.1.tar.gz"],
     ),
     bazel_toolchains = dict(
-        sha256 = "a1e273b6159ae858f53046f5bab9678cffa82a72f0bf0c0a9e4af8fddb91209c",
-        strip_prefix = "bazel-toolchains-0.29.6",
+        sha256 = "ca8aa49ceb47e9bee04dd67f0bec0b010032b37ebbe67147b535237e801d9a87",
+        strip_prefix = "bazel-toolchains-1.2.2",
         urls = [
-            "https://github.com/bazelbuild/bazel-toolchains/releases/download/0.29.6/bazel-toolchains-0.29.6.tar.gz",
-            "https://mirror.bazel.build/github.com/bazelbuild/bazel-toolchains/archive/0.29.6.tar.gz",
+            "https://github.com/bazelbuild/bazel-toolchains/releases/download/1.2.2/bazel-toolchains-1.2.2.tar.gz",
+            "https://mirror.bazel.build/github.com/bazelbuild/bazel-toolchains/archive/1.2.2.tar.gz",
         ],
     ),
+    build_bazel_rules_apple = dict(
+        sha256 = "7a7afdd4869bb201c9352eed2daf37294d42b093579b70423490c1b4d4f6ce42",
+        urls = ["https://github.com/bazelbuild/rules_apple/releases/download/0.19.0/rules_apple.0.19.0.tar.gz"],
+    ),
     envoy_build_tools = dict(
-        sha256 = "92ccfd1fa27ffa74a86258d8c82719cdc0e13fa919eebe3bceaa0496c83d8e2b",
-        strip_prefix = "envoy-build-tools-cbd8d02d9d1521e4c01fc3f58ad4a22cf5636f30",
-        urls = ["https://github.com/envoyproxy/envoy-build-tools/archive/cbd8d02d9d1521e4c01fc3f58ad4a22cf5636f30.tar.gz"],
+        sha256 = "a81ff3a12adedfc4641a926c9b167c53bea62784a81ac9ced7893436c709b60b",
+        strip_prefix = "envoy-build-tools-07314d549e27e9a4033af6236888d2a9ee0ad443",
+        # 2019-11-22
+        urls = ["https://github.com/envoyproxy/envoy-build-tools/archive/07314d549e27e9a4033af6236888d2a9ee0ad443.tar.gz"],
     ),
     boringssl = dict(
-        sha256 = "891352824e0f7977bc0c291b8c65076e3ed23630334841b93f346f12d4484b06",
-        strip_prefix = "boringssl-5565939d4203234ddc742c02241ce4523e7b3beb",
+        sha256 = "3eea198c8e3f587ffc8ea6acf87d7575f571bbe6dd88ec90405e236303f3dc01",
+        strip_prefix = "boringssl-65e0aad1b721a5aa67f2a8041cf48f691139bb9f",
         # To update BoringSSL, which tracks Chromium releases:
         # 1. Open https://omahaproxy.appspot.com/ and note <current_version> of linux/beta release.
         # 2. Open https://chromium.googlesource.com/chromium/src/+/refs/tags/<current_version>/DEPS and note <boringssl_revision>.
         # 3. Find a commit in BoringSSL's "master-with-bazel" branch that merges <boringssl_revision>.
         #
-        # chromium-78.0.3904.21 (BETA)
-        urls = ["https://github.com/google/boringssl/archive/5565939d4203234ddc742c02241ce4523e7b3beb.tar.gz"],
+        # chromium-79.0.3945.16 (BETA)
+        urls = ["https://github.com/google/boringssl/archive/65e0aad1b721a5aa67f2a8041cf48f691139bb9f.tar.gz"],
     ),
     boringssl_fips = dict(
         sha256 = "b12ad676ee533824f698741bd127f6fbc82c46344398a6d78d25e62c6c418c73",
@@ -64,19 +69,19 @@ REPOSITORY_LOCATIONS = dict(
         urls = ["https://github.com/circonus-labs/libcircllhist/archive/63a16dd6f2fc7bc841bb17ff92be8318df60e2e1.tar.gz"],
     ),
     com_github_cyan4973_xxhash = dict(
-        sha256 = "afa29766cfc0448ff4a1fd9f2c47e02c48d50be5b79749925d15d545008c3f81",
-        strip_prefix = "xxHash-0.7.1",
-        urls = ["https://github.com/Cyan4973/xxHash/archive/v0.7.1.tar.gz"],
+        sha256 = "7e93d28e81c3e95ff07674a400001d0cdf23b7842d49b211e5582d00d8e3ac3e",
+        strip_prefix = "xxHash-0.7.2",
+        urls = ["https://github.com/Cyan4973/xxHash/archive/v0.7.2.tar.gz"],
     ),
     com_github_envoyproxy_sqlparser = dict(
         sha256 = "425dfee0c4fe9aff8acf2365cde3dd2ba7fb878d2ba37562d33920e34c40c05e",
         strip_prefix = "sql-parser-5f50c68bdf5f107692bb027d1c568f67597f4d7f",
         urls = ["https://github.com/envoyproxy/sql-parser/archive/5f50c68bdf5f107692bb027d1c568f67597f4d7f.tar.gz"],
     ),
-    com_github_eile_tclap = dict(
+    com_github_mirror_tclap = dict(
         sha256 = "f0ede0721dddbb5eba3a47385a6e8681b14f155e1129dd39d1a959411935098f",
         strip_prefix = "tclap-tclap-1-2-1-release-final",
-        urls = ["https://github.com/eile/tclap/archive/tclap-1-2-1-release-final.tar.gz"],
+        urls = ["https://github.com/mirror/tclap/archive/tclap-1-2-1-release-final.tar.gz"],
     ),
     com_github_fmtlib_fmt = dict(
         sha256 = "4c0741e10183f75d7d6f730b8708a99b329b2f942dad5a9da3385ab92bb4a15c",
@@ -89,10 +94,10 @@ REPOSITORY_LOCATIONS = dict(
         urls = ["https://github.com/gabime/spdlog/archive/v1.3.1.tar.gz"],
     ),
     com_github_google_libprotobuf_mutator = dict(
-        sha256 = "f45c3ad82376d891cd0bcaa7165e83efd90e0014b00aebf0cbaf07eb05a1d3f9",
-        strip_prefix = "libprotobuf-mutator-d1fe8a7d8ae18f3d454f055eba5213c291986f21",
-        # 2019-07-10
-        urls = ["https://github.com/google/libprotobuf-mutator/archive/d1fe8a7d8ae18f3d454f055eba5213c291986f21.tar.gz"],
+        sha256 = "54597f640c0ab5e5d783d2f3d3cfe8ad6da999ef1a194d89c2c5ab89a1fd8e13",
+        strip_prefix = "libprotobuf-mutator-dd89da92b59b1714bab6e2a135093948a1cf1c6a",
+        # 2019-10-08
+        urls = ["https://github.com/google/libprotobuf-mutator/archive/dd89da92b59b1714bab6e2a135093948a1cf1c6a.tar.gz"],
     ),
     com_github_gperftools_gperftools = dict(
         # TODO(cmluciano): Bump to release 2.8
@@ -103,24 +108,19 @@ REPOSITORY_LOCATIONS = dict(
         urls = ["https://github.com/gperftools/gperftools/archive/fc00474ddc21fff618fc3f009b46590e241e425e.tar.gz"],
     ),
     com_github_grpc_grpc = dict(
-        sha256 = "cce1d4585dd017980d4a407d8c5e9f8fc8c1dbb03f249b99e88a387ebb45a035",
-        strip_prefix = "grpc-1.22.1",
-        urls = ["https://github.com/grpc/grpc/archive/v1.22.1.tar.gz"],
+        sha256 = "ffbe61269160ea745e487f79b0fd06b6edd3d50c6d9123f053b5634737cf2f69",
+        strip_prefix = "grpc-1.25.0",
+        urls = ["https://github.com/grpc/grpc/archive/v1.25.0.tar.gz"],
     ),
     com_github_luajit_luajit = dict(
         sha256 = "409f7fe570d3c16558e594421c47bdd130238323c9d6fd6c83dedd2aaeb082a8",
         strip_prefix = "LuaJIT-2.1.0-beta3",
         urls = ["https://github.com/LuaJIT/LuaJIT/archive/v2.1.0-beta3.tar.gz"],
     ),
-    com_github_nanopb_nanopb = dict(
-        sha256 = "5fb4dab0b7f6a239908407fe07c9d03877cd0502abb637e38c41091cb9c1d438",
-        strip_prefix = "nanopb-0.3.9.3",
-        urls = ["https://github.com/nanopb/nanopb/archive/0.3.9.3.tar.gz"],
-    ),
     com_github_nghttp2_nghttp2 = dict(
-        sha256 = "25b623cd04dc6a863ca3b34ed6247844effe1aa5458229590b3f56a6d53cd692",
-        strip_prefix = "nghttp2-1.39.1",
-        urls = ["https://github.com/nghttp2/nghttp2/releases/download/v1.39.1/nghttp2-1.39.1.tar.gz"],
+        sha256 = "eb9d9046495a49dd40c7ef5d6c9907b51e5a6b320ea6e2add11eb8b52c982c47",
+        strip_prefix = "nghttp2-1.40.0",
+        urls = ["https://github.com/nghttp2/nghttp2/releases/download/v1.40.0/nghttp2-1.40.0.tar.gz"],
     ),
     io_opentracing_cpp = dict(
         sha256 = "015c4187f7a6426a2b5196f0ccd982aa87f010cf61f507ae3ce5c90523f92301",
@@ -155,14 +155,18 @@ REPOSITORY_LOCATIONS = dict(
         urls = ["https://github.com/libevent/libevent/archive/0d7d85c2083f7a4c9efe01c061486f332b576d28.tar.gz"],
     ),
     net_zlib = dict(
-        sha256 = "629380c90a77b964d896ed37163f5c3a34f6e6d897311f1df2a7016355c45eff",
-        strip_prefix = "zlib-1.2.11",
-        urls = ["https://github.com/madler/zlib/archive/v1.2.11.tar.gz"],
+        # Use the dev branch of zlib to resolve fuzz bugs and out of bound
+        # errors resulting in crashes in zlib 1.2.11.
+        # TODO(asraa): Remove when zlib > 1.2.11 is released.
+        sha256 = "155a8f8c1a753fb05b16a1b0cc0a0a9f61a78e245f9e0da483d13043b3bcbf2e",
+        strip_prefix = "zlib-79baebe50e4d6b73ae1f8b603f0ef41300110aa3",
+        # 2019-04-14 development branch
+        urls = ["https://github.com/madler/zlib/archive/79baebe50e4d6b73ae1f8b603f0ef41300110aa3.tar.gz"],
     ),
     com_github_jbeder_yaml_cpp = dict(
-        sha256 = "53dcffd55f3433b379fcc694f45c54898711c0e29159a7bd02e82a3e0253bac3",
-        strip_prefix = "yaml-cpp-0f9a586ca1dc29c2ecb8dd715a315b93e3f40f79",
-        urls = ["https://github.com/jbeder/yaml-cpp/archive/0f9a586ca1dc29c2ecb8dd715a315b93e3f40f79.tar.gz"],
+        sha256 = "77ea1b90b3718aa0c324207cb29418f5bced2354c2e483a9523d98c3460af1ed",
+        strip_prefix = "yaml-cpp-yaml-cpp-0.6.3",
+        urls = ["https://github.com/jbeder/yaml-cpp/archive/yaml-cpp-0.6.3.tar.gz"],
     ),
     com_github_msgpack_msgpack_c = dict(
         sha256 = "fbaa28c363a316fd7523f31d1745cf03eab0d1e1ea5a1c60aa0dffd4ce551afe",
@@ -170,10 +174,10 @@ REPOSITORY_LOCATIONS = dict(
         urls = ["https://github.com/msgpack/msgpack-c/releases/download/cpp-3.2.0/msgpack-3.2.0.tar.gz"],
     ),
     com_github_google_jwt_verify = dict(
-        sha256 = "b42ad9d286e267b265080e97bacb99c27bce39db93a6c34be9575ddd9a3edd7a",
-        strip_prefix = "jwt_verify_lib-945805866007edb9d2760915abaa672ed8b7da86",
-        # 2019-10-07
-        urls = ["https://github.com/google/jwt_verify_lib/archive/945805866007edb9d2760915abaa672ed8b7da86.tar.gz"],
+        sha256 = "7c937f61b4dbe7881bc3a03327150ec44b30b310c65a21ee621f083e665056f3",
+        strip_prefix = "jwt_verify_lib-14fbfce0ba1b05b6aeb2908b3ce825a52ccb6450",
+        # 2019-12-20
+        urls = ["https://github.com/google/jwt_verify_lib/archive/14fbfce0ba1b05b6aeb2908b3ce825a52ccb6450.tar.gz"],
     ),
     com_github_nodejs_http_parser = dict(
         sha256 = "ef26268c54c8084d17654ba2ed5140bffeffd2a040a895ffb22a6cca3f6c613f",
@@ -181,9 +185,9 @@ REPOSITORY_LOCATIONS = dict(
         urls = ["https://github.com/nodejs/http-parser/archive/v2.9.0.tar.gz"],
     ),
     com_github_pallets_jinja = dict(
-        sha256 = "e9baab084b8d84b511c75aca98bba8585041dbe971d5476ee53d9c6eea1b58b3",
-        strip_prefix = "jinja-2.10.1",
-        urls = ["https://github.com/pallets/jinja/archive/2.10.1.tar.gz"],
+        sha256 = "db49236731373e4f3118af880eb91bb0aa6978bc0cf8b35760f6a026f1a9ffc4",
+        strip_prefix = "jinja-2.10.3",
+        urls = ["https://github.com/pallets/jinja/archive/2.10.3.tar.gz"],
     ),
     com_github_pallets_markupsafe = dict(
         sha256 = "222a10e3237d92a9cd45ed5ea882626bc72bc5e0264d3ed0f2c9129fa69fc167",
@@ -219,9 +223,9 @@ REPOSITORY_LOCATIONS = dict(
         urls = ["https://github.com/google/googletest/archive/d7003576dd133856432e2e07340f45926242cc3a.tar.gz"],
     ),
     com_google_protobuf = dict(
-        sha256 = "3040a5b946d9df7aa89c0bf6981330bf92b7844fd90e71b61da0c721e421a421",
-        strip_prefix = "protobuf-3.9.1",
-        urls = ["https://github.com/protocolbuffers/protobuf/releases/download/v3.9.1/protobuf-all-3.9.1.tar.gz"],
+        sha256 = "d7cfd31620a352b2ee8c1ed883222a0d77e44346643458e062e86b1d069ace3e",
+        strip_prefix = "protobuf-3.10.1",
+        urls = ["https://github.com/protocolbuffers/protobuf/releases/download/v3.10.1/protobuf-all-3.10.1.tar.gz"],
     ),
     grpc_httpjson_transcoding = dict(
         sha256 = "a447458b47ea4dc1d31499f555769af437c5d129d988ec1e13d5fdd0a6a36b4e",
@@ -230,8 +234,8 @@ REPOSITORY_LOCATIONS = dict(
         urls = ["https://github.com/grpc-ecosystem/grpc-httpjson-transcoding/archive/2feabd5d64436e670084091a937855972ee35161.tar.gz"],
     ),
     io_bazel_rules_go = dict(
-        sha256 = "96b1f81de5acc7658e1f5a86d7dc9e1b89bc935d83799b711363a748652c471a",
-        urls = ["https://github.com/bazelbuild/rules_go/releases/download/0.19.2/rules_go-0.19.2.tar.gz"],
+        sha256 = "e88471aea3a3a4f19ec1310a55ba94772d087e9ce46e41ae38ecebe17935de7b",
+        urls = ["https://github.com/bazelbuild/rules_go/releases/download/v0.20.3/rules_go-v0.20.3.tar.gz"],
     ),
     rules_foreign_cc = dict(
         sha256 = "3184c244b32e65637a74213fc448964b687390eeeca42a36286f874c046bba15",
@@ -240,43 +244,54 @@ REPOSITORY_LOCATIONS = dict(
         urls = ["https://github.com/bazelbuild/rules_foreign_cc/archive/7bc4be735b0560289f6b86ab6136ee25d20b65b7.tar.gz"],
     ),
     rules_proto = dict(
-        sha256 = "602e7161d9195e50246177e7c55b2f39950a9cf7366f74ed5f22fd45750cd208",
-        strip_prefix = "rules_proto-97d8af4dc474595af3900dd85cb3a29ad28cc313",
-        # 2019-08-02
+        sha256 = "296ffd3e7992bd83fa75151255f7c7f27d22d6e52e2fd3c3d3d10c292317fbed",
+        strip_prefix = "rules_proto-f6c112fa4eb2b8f934feb938a6fce41425e41587",
+        # 2019-11-07
         urls = [
-            "https://mirror.bazel.build/github.com/bazelbuild/rules_proto/archive/97d8af4dc474595af3900dd85cb3a29ad28cc313.tar.gz",
-            "https://github.com/bazelbuild/rules_proto/archive/97d8af4dc474595af3900dd85cb3a29ad28cc313.tar.gz",
+            "https://mirror.bazel.build/github.com/bazelbuild/rules_proto/archive/f6c112fa4eb2b8f934feb938a6fce41425e41587.tar.gz",
+            "https://github.com/bazelbuild/rules_proto/archive/f6c112fa4eb2b8f934feb938a6fce41425e41587.tar.gz",
         ],
     ),
-    six_archive = dict(
-        sha256 = "105f8d68616f8248e24bf0e9372ef04d3cc10104f1980f54d57b2ce73a5ad56a",
-        urls = ["https://files.pythonhosted.org/packages/b3/b2/238e2590826bfdd113244a40d9d3eb26918bd798fc187e2360a8367068db/six-1.10.0.tar.gz"],
+    rules_python = dict(
+        sha256 = "aa96a691d3a8177f3215b14b0edc9641787abaaa30363a080165d06ab65e1161",
+        urls = ["https://github.com/bazelbuild/rules_python/releases/download/0.0.1/rules_python-0.0.1.tar.gz"],
+    ),
+    six = dict(
+        sha256 = "d16a0141ec1a18405cd4ce8b4613101da75da0e9a7aec5bdd4fa804d0e0eba73",
+        urls = ["https://files.pythonhosted.org/packages/dd/bf/4138e7bfb757de47d1f4b6994648ec67a51efe58fa907c1e11e350cddfca/six-1.12.0.tar.gz"],
     ),
     io_opencensus_cpp = dict(
-        sha256 = "c95ab57835182b8b4b17cf5bbfc2406805bc78c5022c17399f3e5c643f22826a",
-        strip_prefix = "opencensus-cpp-98970f78091ae65b4a029bcf512696ba6d665cf4",
-        # 2019-09-24
-        urls = ["https://github.com/census-instrumentation/opencensus-cpp/archive/98970f78091ae65b4a029bcf512696ba6d665cf4.tar.gz"],
+        sha256 = "a9ba6027436cfa1264860c6be602da7633d9a1f9abcb8838f2ae6bda8c2c14f6",
+        strip_prefix = "opencensus-cpp-13b1a2f29f541b6b2c4cb8bc3f6fbf3589d44227",
+        # 2019-12-01
+        urls = ["https://github.com/census-instrumentation/opencensus-cpp/archive/13b1a2f29f541b6b2c4cb8bc3f6fbf3589d44227.tar.gz"],
     ),
     com_github_curl = dict(
-        sha256 = "4376ac72b95572fb6c4fbffefb97c7ea0dd083e1974c0e44cd7e49396f454839",
-        strip_prefix = "curl-7.65.3",
-        urls = ["https://github.com/curl/curl/releases/download/curl-7_65_3/curl-7.65.3.tar.gz"],
+        sha256 = "52af3361cf806330b88b4fe6f483b6844209d47ae196ac46da4de59bb361ab02",
+        strip_prefix = "curl-7.67.0",
+        urls = ["https://github.com/curl/curl/releases/download/curl-7_67_0/curl-7.67.0.tar.gz"],
+    ),
+    com_googlesource_chromium_v8 = dict(
+        # This archive was created using https://storage.googleapis.com/envoyproxy-wee8/wee8-archive.sh
+        # and contains complete checkout of V8 with all dependencies necessary to build wee8.
+        sha256 = "7c897863d31569b4a4e16277d94415f1c42f3e130c1ff3573b048b76b15b635f",
+        urls = ["https://storage.googleapis.com/envoyproxy-wee8/wee8-7.9.317.14.tar.gz"],
     ),
     com_googlesource_quiche = dict(
-        # Static snapshot of https://quiche.googlesource.com/quiche/+archive/4abb566fbbc63df8fe7c1ac30b21632b9eb18d0c.tar.gz
-        sha256 = "c60bca3cf7f58b91394a89da96080657ff0fbe4d5675be9b21e90da8f68bc06f",
-        urls = ["https://storage.googleapis.com/quiche-envoy-integration/4abb566fbbc63df8fe7c1ac30b21632b9eb18d0c.tar.gz"],
+        # Static snapshot of https://quiche.googlesource.com/quiche/+archive/0ce303d8f1a774c821f4370d4b84d02e488ce332.tar.gz
+        sha256 = "7648f75631623bd98859b9be068cb857b3e83ce67ebcdf8123ad5667eb00da02",
+        urls = ["https://storage.googleapis.com/quiche-envoy-integration/0ce303d8f1a774c821f4370d4b84d02e488ce332.tar.gz"],
     ),
     com_google_cel_cpp = dict(
-        sha256 = "f027c551d57d38fb9f0b5e4f21a2b0b8663987119e23b1fd8dfcc7588e9a2350",
-        strip_prefix = "cel-cpp-d9d02b20ab85da2444dbdd03410bac6822141364",
-        urls = ["https://github.com/google/cel-cpp/archive/d9d02b20ab85da2444dbdd03410bac6822141364.tar.gz"],
+        sha256 = "b4eaf871d4910c599bb70eaef2eec852747989f15f26885353b7c5188a940ca8",
+        strip_prefix = "cel-cpp-4767e5de36c5701fa8ea46d7de3765161ef98353",
+        # 2019-11-28
+        urls = ["https://github.com/google/cel-cpp/archive/4767e5de36c5701fa8ea46d7de3765161ef98353.tar.gz"],
     ),
     com_googlesource_code_re2 = dict(
-        sha256 = "38bc0426ee15b5ed67957017fd18201965df0721327be13f60496f2b356e3e01",
-        strip_prefix = "re2-2019-08-01",
-        urls = ["https://github.com/google/re2/archive/2019-08-01.tar.gz"],
+        sha256 = "7268e1b4254d9ffa5ccf010fee954150dbb788fd9705234442e7d9f0ee5a42d3",
+        strip_prefix = "re2-2019-12-01",
+        urls = ["https://github.com/google/re2/archive/2019-12-01.tar.gz"],
     ),
     # Included to access FuzzedDataProvider.h. This is compiler agnostic but
     # provided as part of the compiler-rt source distribution. We can't use the
@@ -286,5 +301,15 @@ REPOSITORY_LOCATIONS = dict(
         # Only allow peeking at fuzzer related files for now.
         strip_prefix = "compiler-rt-9.0.0.src/lib/fuzzer",
         urls = ["http://releases.llvm.org/9.0.0/compiler-rt-9.0.0.src.tar.xz"],
+    ),
+    fuzzit_linux = dict(
+        sha256 = "9ca76ac1c22d9360936006efddf992977ebf8e4788ded8e5f9d511285c9ac774",
+        urls = ["https://github.com/fuzzitdev/fuzzit/releases/download/v2.4.76/fuzzit_Linux_x86_64.zip"],
+    ),
+    upb = dict(
+        sha256 = "e9f281c56ab1eb1f97a80ca8a83bb7ef73d230eabb8591f83876f4e7b85d9b47",
+        strip_prefix = "upb-8a3ae1ef3e3e3f26b45dec735c5776737fc7247f",
+        # 2019-11-19
+        urls = ["https://github.com/protocolbuffers/upb/archive/8a3ae1ef3e3e3f26b45dec735c5776737fc7247f.tar.gz"],
     ),
 )

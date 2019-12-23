@@ -3,7 +3,11 @@
 #include <string>
 #include <vector>
 
+#include "envoy/api/v2/core/base.pb.h"
+#include "envoy/api/v2/core/health_check.pb.h"
 #include "envoy/api/v2/core/health_check.pb.validate.h"
+#include "envoy/api/v2/endpoint/endpoint.pb.h"
+#include "envoy/data/core/v2alpha/health_check_event.pb.h"
 
 #include "common/buffer/buffer_impl.h"
 #include "common/buffer/zero_copy_input_stream_impl.h"
@@ -399,6 +403,9 @@ public:
             key: x-upstream-metadata
             value: "%UPSTREAM_METADATA([\"namespace\", \"key\"])%"
         - header:
+            key: x-downstream-remote-address
+            value: "%DOWNSTREAM_REMOTE_ADDRESS%"
+        - header:
             key: x-downstream-remote-address-without-port
             value: "%DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT%"
         - header:
@@ -507,7 +514,7 @@ public:
         new Http::TestHeaderMapImpl{{":status", code}});
 
     if (degraded) {
-      response_headers->insertEnvoyDegraded().value(1);
+      response_headers->setEnvoyDegraded(1);
     }
 
     if (service_cluster) {
@@ -1027,6 +1034,7 @@ TEST_F(HttpHealthCheckerImplTest, SuccessServiceCheckWithAdditionalHeaders) {
   const Http::LowerCaseString header_awesome("x-envoy-awesome");
   const Http::LowerCaseString upstream_metadata("x-upstream-metadata");
   const Http::LowerCaseString protocol("x-protocol");
+  const Http::LowerCaseString downstream_remote_address("x-downstream-remote-address");
   const Http::LowerCaseString downstream_remote_address_without_port(
       "x-downstream-remote-address-without-port");
   const Http::LowerCaseString downstream_local_address("x-downstream-local-address");
@@ -1041,6 +1049,7 @@ TEST_F(HttpHealthCheckerImplTest, SuccessServiceCheckWithAdditionalHeaders) {
   const std::string value_user_agent = "CoolEnvoy/HC";
   const std::string value_upstream_metadata = "value";
   const std::string value_protocol = "HTTP/1.1";
+  const std::string value_downstream_remote_address = "127.0.0.1:0";
   const std::string value_downstream_remote_address_without_port = "127.0.0.1";
   const std::string value_downstream_local_address = "127.0.0.1:0";
   const std::string value_downstream_local_address_without_port = "127.0.0.1";
@@ -1075,6 +1084,8 @@ TEST_F(HttpHealthCheckerImplTest, SuccessServiceCheckWithAdditionalHeaders) {
         EXPECT_EQ(headers.get(upstream_metadata)->value().getStringView(), value_upstream_metadata);
 
         EXPECT_EQ(headers.get(protocol)->value().getStringView(), value_protocol);
+        EXPECT_EQ(headers.get(downstream_remote_address)->value().getStringView(),
+                  value_downstream_remote_address);
         EXPECT_EQ(headers.get(downstream_remote_address_without_port)->value().getStringView(),
                   value_downstream_remote_address_without_port);
         EXPECT_EQ(headers.get(downstream_local_address)->value().getStringView(),
@@ -3247,6 +3258,8 @@ public:
                     headers.Scheme()->value().getStringView());
           EXPECT_NE(nullptr, headers.Method());
           EXPECT_EQ(expected_host, headers.Host()->value().getStringView());
+          EXPECT_EQ(std::chrono::milliseconds(1000).count(),
+                    Envoy::Grpc::Common::getGrpcTimeout(headers).count());
         }));
     EXPECT_CALL(test_sessions_[0]->request_encoder_, encodeData(_, true))
         .WillOnce(Invoke([&](Buffer::Instance& data, bool) {

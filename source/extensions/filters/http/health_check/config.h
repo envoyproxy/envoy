@@ -1,5 +1,6 @@
 #pragma once
 
+#include "envoy/config/filter/http/health_check/v2/health_check.pb.h"
 #include "envoy/config/filter/http/health_check/v2/health_check.pb.validate.h"
 
 #include "extensions/filters/http/common/factory_base.h"
@@ -14,10 +15,6 @@ class HealthCheckFilterConfig
     : public Common::FactoryBase<envoy::config::filter::http::health_check::v2::HealthCheck> {
 public:
   HealthCheckFilterConfig() : FactoryBase(HttpFilterNames::get().HealthCheck) {}
-
-  Http::FilterFactoryCb
-  createFilterFactory(const Json::Object& json_config, const std::string&,
-                      Server::Configuration::FactoryContext& context) override;
 
 private:
   Http::FilterFactoryCb createFilterFactoryFromProtoTyped(

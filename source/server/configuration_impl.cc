@@ -6,6 +6,8 @@
 #include <string>
 #include <vector>
 
+#include "envoy/config/bootstrap/v2/bootstrap.pb.h"
+#include "envoy/config/metrics/v2/stats.pb.h"
 #include "envoy/config/trace/v2/trace.pb.h"
 #include "envoy/network/connection.h"
 #include "envoy/runtime/runtime.h"
@@ -45,14 +47,12 @@ bool FilterChainUtility::buildFilterChain(
   return true;
 }
 
-bool FilterChainUtility::buildUdpFilterChain(
+void FilterChainUtility::buildUdpFilterChain(
     Network::UdpListenerFilterManager& filter_manager, Network::UdpReadFilterCallbacks& callbacks,
     const std::vector<Network::UdpListenerFilterFactoryCb>& factories) {
   for (const Network::UdpListenerFilterFactoryCb& factory : factories) {
     factory(filter_manager, callbacks);
   }
-
-  return true;
 }
 
 void MainImpl::initialize(const envoy::config::bootstrap::v2::Bootstrap& bootstrap,

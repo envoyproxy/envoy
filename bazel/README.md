@@ -44,7 +44,6 @@ for how to update or override dependencies.
     sudo apt-get install \
        libtool \
        cmake \
-       clang-format-9 \
        automake \
        autoconf \
        make \
@@ -59,19 +58,30 @@ for how to update or override dependencies.
     dnf install cmake libtool libstdc++ libstdc++-static libatomic ninja-build lld patch aspell-en
     ```
 
+    On Linux, we recommend using the prebuilt Clang+LLVM package from [LLVM official site](http://releases.llvm.org/download.html).
+    Extract the tar.xz and run the following:
+    ```
+    bazel/setup_clang.sh <PATH_TO_EXTRACTED_CLANG_LLVM>
+    ```
+
+    This will setup a `clang.bazelrc` file in Envoy source root. If you want to make clang as default, run the following:
+    ```
+    echo "build --config=clang" >> user.bazelrc
+    ```
+
     On macOS, you'll need to install several dependencies. This can be accomplished via [Homebrew](https://brew.sh/):
     ```
     brew install coreutils wget cmake libtool go bazel automake ninja clang-format autoconf aspell
     ```
     _notes_: `coreutils` is used for `realpath`, `gmd5sum` and `gsha256sum`
 
-    XCode is also required to build Envoy on macOS.
-    Envoy compiles and passes tests with the version of clang installed by XCode 9.3.0:
-    Apple LLVM version 9.1.0 (clang-902.0.30).
+    Xcode is also required to build Envoy on macOS.
+    Envoy compiles and passes tests with the version of clang installed by Xcode 11.1:
+    Apple clang version 11.0.0 (clang-1100.0.33.8).
 
     In order for bazel to be aware of the tools installed by brew, the PATH
     variable must be set for bazel builds. This can be accomplished by setting
-    this in your `$HOME/.bazelrc` file:
+    this in your `user.bazelrc` file:
 
     ```
     build --action_env=PATH="/usr/local/bin:/opt/local/bin:/usr/bin:/bin"
@@ -88,6 +98,8 @@ for how to update or override dependencies.
    and also for [Buildifer](https://github.com/bazelbuild/buildtools) which is used for formatting bazel BUILD files.
 1. `go get -u github.com/bazelbuild/buildtools/buildifier` to install buildifier. You may need to set `BUILDIFIER_BIN` to `$GOPATH/bin/buildifier`
    in your shell for buildifier to work.
+1. `go get -u github.com/bazelbuild/buildtools/buildozer` to install buildozer. You may need to set `BUILDOZER_BIN` to `$GOPATH/bin/buildozer`
+   in your shell for buildozer to work.
 1. `bazel build //source/exe:envoy-static` from the Envoy source directory.
 
 ## Building Envoy with the CI Docker image
@@ -137,20 +149,15 @@ set different options. See below to configure test IP versions.
 
 ## Linking against libc++ on Linux
 
-To link Envoy against libc++, use the following commands:
+To link Envoy against libc++, follow the [quick start](#quick-start-bazel-build-for-developers) to setup Clang+LLVM and run:
 ```
-export CC=clang
-export CXX=clang++
 bazel build --config=libc++ //source/exe:envoy-static
 ```
-Note: this assumes that both: clang compiler and libc++ library are installed in the system,
-and that `clang` and `clang++` are available in `$PATH`. On some systems, you might need to
-include them in the search path, e.g. `export PATH=/usr/lib/llvm-9/bin:$PATH`.
 
-You might also need to ensure libc++ is installed correctly on your system, e.g. on Ubuntu this
-might look like `sudo apt-get install libc++abi-9-dev libc++-9-dev`.
+Or use our configuration with Remote Execution or Docker sandbox, pass `--config=remote-clang-libc++` or
+`--config=docker-clang-libc++` respectively.
 
-Note: this configuration currently doesn't work with Remote Execution or Docker sandbox.
+If you want to make libc++ as default, add a line `build --config=libc++` to the `user.bazelrc` file in Envoy source root.
 
 ## Using a compiler toolchain in a non-standard location
 
@@ -166,7 +173,7 @@ for more details.
 ## Supported compiler versions
 
 We now require Clang >= 5.0 due to known issues with std::string thread safety and C++14 support. GCC >= 7 is also
-known to work. Currently the CI is running with Clang 8.
+known to work. Currently the CI is running with Clang 9.
 
 ## Clang STL debug symbols
 
@@ -388,6 +395,13 @@ Similarly, for [thread sanitizer (TSAN)](https://github.com/google/sanitizers/wi
 
 ```
 bazel test -c dbg --config=clang-tsan //test/...
+```
+
+For [memory sanitizer (MSAN)](https://github.com/google/sanitizers/wiki/MemorySanitizer) testing,
+it has to be run under the docker sandbox which comes with MSAN instrumented libc++:
+
+```
+bazel test -c dbg --config=docker-msan //test/...
 ```
 
 To run the sanitizers on OS X, prefix `macos-` to the config option, e.g.:

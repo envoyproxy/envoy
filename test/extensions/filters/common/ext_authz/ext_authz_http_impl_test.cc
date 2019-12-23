@@ -1,4 +1,5 @@
-#include "envoy/api/v2/core/base.pb.h"
+#include "envoy/config/filter/http/ext_authz/v2/ext_authz.pb.h"
+#include "envoy/service/auth/v2/external_auth.pb.h"
 
 #include "common/http/headers.h"
 #include "common/http/message_impl.h"
@@ -232,6 +233,7 @@ TEST_F(ExtAuthzHttpClientTest, AuthorizationOk) {
   EXPECT_CALL(active_span_, spawnChild_(_, config_->tracingName(), _)).WillOnce(Return(child_span));
   EXPECT_CALL(*child_span,
               setTag(Eq(Tracing::Tags::get().UpstreamCluster), Eq(config_->cluster())));
+  EXPECT_CALL(*child_span, injectContext(_));
 
   client_.check(request_callbacks_, request, active_span_);
 
@@ -257,6 +259,7 @@ TEST_F(ExtAuthzHttpClientTest, AuthorizationOkWithAddedAuthzHeaders) {
   EXPECT_CALL(active_span_, spawnChild_(_, config_->tracingName(), _)).WillOnce(Return(child_span));
   EXPECT_CALL(*child_span,
               setTag(Eq(Tracing::Tags::get().UpstreamCluster), Eq(config_->cluster())));
+  EXPECT_CALL(*child_span, injectContext(_));
   // Expect that header1 will be added and header2 correctly overwritten.
   EXPECT_CALL(async_client_, send_(AllOf(ContainsPairAsHeader(config_->headersToAdd().front()),
                                          ContainsPairAsHeader(config_->headersToAdd().back())),
@@ -286,6 +289,7 @@ TEST_F(ExtAuthzHttpClientTest, AuthorizationOkWithAllowHeader) {
   EXPECT_CALL(active_span_, spawnChild_(_, config_->tracingName(), _)).WillOnce(Return(child_span));
   EXPECT_CALL(*child_span,
               setTag(Eq(Tracing::Tags::get().UpstreamCluster), Eq(config_->cluster())));
+  EXPECT_CALL(*child_span, injectContext(_));
   client_.check(request_callbacks_, request, active_span_);
 
   const auto check_response_headers =
@@ -315,6 +319,7 @@ TEST_F(ExtAuthzHttpClientTest, AuthorizationDenied) {
   EXPECT_CALL(active_span_, spawnChild_(_, config_->tracingName(), _)).WillOnce(Return(child_span));
   EXPECT_CALL(*child_span,
               setTag(Eq(Tracing::Tags::get().UpstreamCluster), Eq(config_->cluster())));
+  EXPECT_CALL(*child_span, injectContext(_));
   client_.check(request_callbacks_, request, active_span_);
 
   EXPECT_CALL(*child_span, setTag(Eq("ext_authz_status"), Eq("ext_authz_unauthorized")));
@@ -337,6 +342,7 @@ TEST_F(ExtAuthzHttpClientTest, AuthorizationDeniedWithAllAttributes) {
   EXPECT_CALL(active_span_, spawnChild_(_, config_->tracingName(), _)).WillOnce(Return(child_span));
   EXPECT_CALL(*child_span,
               setTag(Eq(Tracing::Tags::get().UpstreamCluster), Eq(config_->cluster())));
+  EXPECT_CALL(*child_span, injectContext(_));
 
   envoy::service::auth::v2::CheckRequest request;
   client_.check(request_callbacks_, request, active_span_);
@@ -362,6 +368,7 @@ TEST_F(ExtAuthzHttpClientTest, AuthorizationDeniedAndAllowedClientHeaders) {
   EXPECT_CALL(active_span_, spawnChild_(_, config_->tracingName(), _)).WillOnce(Return(child_span));
   EXPECT_CALL(*child_span,
               setTag(Eq(Tracing::Tags::get().UpstreamCluster), Eq(config_->cluster())));
+  EXPECT_CALL(*child_span, injectContext(_));
 
   envoy::service::auth::v2::CheckRequest request;
   client_.check(request_callbacks_, request, active_span_);
@@ -385,6 +392,7 @@ TEST_F(ExtAuthzHttpClientTest, AuthorizationRequestError) {
   EXPECT_CALL(active_span_, spawnChild_(_, config_->tracingName(), _)).WillOnce(Return(child_span));
   EXPECT_CALL(*child_span,
               setTag(Eq(Tracing::Tags::get().UpstreamCluster), Eq(config_->cluster())));
+  EXPECT_CALL(*child_span, injectContext(_));
 
   client_.check(request_callbacks_, request, active_span_);
 
@@ -405,6 +413,8 @@ TEST_F(ExtAuthzHttpClientTest, AuthorizationRequest5xxError) {
   EXPECT_CALL(active_span_, spawnChild_(_, config_->tracingName(), _)).WillOnce(Return(child_span));
   EXPECT_CALL(*child_span,
               setTag(Eq(Tracing::Tags::get().UpstreamCluster), Eq(config_->cluster())));
+  EXPECT_CALL(*child_span, injectContext(_));
+
   client_.check(request_callbacks_, request, active_span_);
 
   EXPECT_CALL(request_callbacks_,
@@ -425,6 +435,7 @@ TEST_F(ExtAuthzHttpClientTest, AuthorizationRequestErrorParsingStatusCode) {
   EXPECT_CALL(active_span_, spawnChild_(_, config_->tracingName(), _)).WillOnce(Return(child_span));
   EXPECT_CALL(*child_span,
               setTag(Eq(Tracing::Tags::get().UpstreamCluster), Eq(config_->cluster())));
+  EXPECT_CALL(*child_span, injectContext(_));
 
   client_.check(request_callbacks_, request, active_span_);
 
@@ -443,6 +454,7 @@ TEST_F(ExtAuthzHttpClientTest, CancelledAuthorizationRequest) {
   EXPECT_CALL(active_span_, spawnChild_(_, config_->tracingName(), _)).WillOnce(Return(child_span));
   EXPECT_CALL(*child_span,
               setTag(Eq(Tracing::Tags::get().UpstreamCluster), Eq(config_->cluster())));
+  EXPECT_CALL(*child_span, injectContext(_));
   EXPECT_CALL(async_client_, send_(_, _, _)).WillOnce(Return(&async_request_));
   client_.check(request_callbacks_, request, active_span_);
 

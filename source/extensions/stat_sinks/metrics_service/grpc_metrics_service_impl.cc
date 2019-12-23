@@ -2,6 +2,7 @@
 
 #include "envoy/common/exception.h"
 #include "envoy/event/dispatcher.h"
+#include "envoy/service/metrics/v2/metrics_service.pb.h"
 #include "envoy/stats/histogram.h"
 #include "envoy/stats/stats.h"
 #include "envoy/upstream/cluster_manager.h"
@@ -56,8 +57,8 @@ void MetricsServiceSink::flushGauge(const Stats::Gauge& gauge) {
   metric->set_timestamp_ms(std::chrono::duration_cast<std::chrono::milliseconds>(
                                time_source_.systemTime().time_since_epoch())
                                .count());
-  auto* gauage_metric = metric->mutable_gauge();
-  gauage_metric->set_value(gauge.value());
+  auto* gauge_metric = metric->mutable_gauge();
+  gauge_metric->set_value(gauge.value());
 }
 
 void MetricsServiceSink::flushHistogram(const Stats::ParentHistogram& envoy_histogram) {

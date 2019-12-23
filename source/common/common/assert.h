@@ -68,6 +68,12 @@ void invokeDebugAssertionFailureRecordAction_ForAssertMacroUseOnly();
  */
 #define RELEASE_ASSERT(X, DETAILS) _ASSERT_IMPL(X, #X, abort(), DETAILS)
 
+/**
+ * Assert macro intended for security guarantees. It has the same functionality
+ * as RELEASE_ASSERT, but is intended for memory bounds-checking.
+ */
+#define SECURITY_ASSERT(X, DETAILS) _ASSERT_IMPL(X, #X, abort(), DETAILS)
+
 #if !defined(NDEBUG) || defined(ENVOY_LOG_DEBUG_ASSERT_IN_RELEASE)
 
 #if !defined(NDEBUG) // If this is a debug build.
@@ -105,9 +111,11 @@ void invokeDebugAssertionFailureRecordAction_ForAssertMacroUseOnly();
  * Indicate a panic situation and exit.
  */
 #define PANIC(X)                                                                                   \
-  ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::assert), critical,        \
-                      "panic: {}", X);                                                             \
-  abort();
+  do {                                                                                             \
+    ENVOY_LOG_TO_LOGGER(Envoy::Logger::Registry::getLog(Envoy::Logger::Id::assert), critical,      \
+                        "panic: {}", X);                                                           \
+    abort();                                                                                       \
+  } while (false)
 
 // NOT_IMPLEMENTED_GCOVR_EXCL_LINE is for overridden functions that are expressly not implemented.
 // The macro name includes "GCOVR_EXCL_LINE" to exclude the macro's usage from code coverage

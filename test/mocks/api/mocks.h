@@ -65,15 +65,12 @@ public:
   MOCK_METHOD3(sendmsg, SysCallSizeResult(int fd, const msghdr* message, int flags));
   MOCK_METHOD3(readv, SysCallSizeResult(int, const iovec*, int));
   MOCK_METHOD4(recv, SysCallSizeResult(int socket, void* buffer, size_t length, int flags));
-  MOCK_METHOD6(recvfrom, SysCallSizeResult(int sockfd, void* buffer, size_t length, int flags,
-                                           struct sockaddr* addr, socklen_t* addrlen));
-  MOCK_METHOD6(sendto, SysCallSizeResult(int sockfd, const void* buffer, size_t length, int flags,
-                                         const struct sockaddr* addr, socklen_t addrlen));
   MOCK_METHOD3(recvmsg, SysCallSizeResult(int socket, struct msghdr* msg, int flags));
   MOCK_METHOD2(ftruncate, SysCallIntResult(int fd, off_t length));
   MOCK_METHOD6(mmap, SysCallPtrResult(void* addr, size_t length, int prot, int flags, int fd,
                                       off_t offset));
   MOCK_METHOD2(stat, SysCallIntResult(const char* name, struct stat* stat));
+  MOCK_METHOD2(chmod, SysCallIntResult(const std::string& name, mode_t mode));
   MOCK_METHOD5(setsockopt_,
                int(int sockfd, int level, int optname, const void* optval, socklen_t optlen));
   MOCK_METHOD5(getsockopt_,
