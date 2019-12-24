@@ -10,6 +10,5 @@ api_proto_package(
         "//envoy/type:pkg",
         "//envoy/type/matcher:pkg",
         "//envoy/type/tracing/v2:pkg",
-        "@com_github_cncf_udpa//udpa/annotations:pkg",
     ],
 )

@@ -122,7 +122,6 @@ def GetImportDeps(proto_path):
           continue
         # Special case handling for UDPA annotations.
         if import_path.startswith('udpa/annotations/'):
-          imports.append('@com_github_cncf_udpa//udpa/annotations:pkg')
           continue
         # Explicit remapping for external deps, compute paths for envoy/*.
         if import_path in external_proto_deps.EXTERNAL_PROTO_IMPORT_BAZEL_DEP_MAP:

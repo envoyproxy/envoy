@@ -10,6 +10,5 @@ api_proto_package(
         "//envoy/config/filter/http/ext_authz/v2:pkg",
         "//envoy/type/matcher/v3alpha:pkg",
         "//envoy/type/v3alpha:pkg",
-        "@com_github_cncf_udpa//udpa/annotations:pkg",
     ],
 )

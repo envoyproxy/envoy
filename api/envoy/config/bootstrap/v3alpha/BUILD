@@ -13,6 +13,5 @@ api_proto_package(
         "//envoy/config/metrics/v3alpha:pkg",
         "//envoy/config/overload/v3alpha:pkg",
         "//envoy/config/trace/v3alpha:pkg",
-        "@com_github_cncf_udpa//udpa/annotations:pkg",
     ],
 )

@@ -14,6 +14,5 @@ api_proto_package(
         "//envoy/service/route/v3alpha:pkg",
         "//envoy/service/tap/v3alpha:pkg",
         "//envoy/type/v3alpha:pkg",
-        "@com_github_cncf_udpa//udpa/annotations:pkg",
     ],
 )
