@@ -159,9 +159,9 @@ def FormatHeaderFromFile(source_code_info, file_proto):
       type_dependencies.extend([m.input_type[1:], m.output_type[1:]])
   # Determine the envoy/ import paths from type deps.
   envoy_proto_paths = set(
-      typedb.types[t].type_details.proto_path
+      typedb.types[t].proto_path
       for t in type_dependencies
-      if t.startswith('envoy.') and typedb.types[t].type_details.proto_path != file_proto.name)
+      if t.startswith('envoy.') and typedb.types[t].proto_path != file_proto.name)
 
   def CamelCase(s):
     return ''.join(t.capitalize() for t in re.split('[\._]', s))
