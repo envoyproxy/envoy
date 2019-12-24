@@ -127,8 +127,8 @@ JsonV2Serializer::toListOfSpans(const Span& zipkin_span) const {
     const auto& binary_annotations = zipkin_span.binaryAnnotations();
     if (!binary_annotations.empty()) {
       ProtobufWkt::Struct tags;
+      auto* tag_fields = tags.mutable_fields();
       for (const auto& binary_annotation : binary_annotations) {
-        auto* tag_fields = tags.mutable_fields();
         (*tag_fields)[binary_annotation.key()] = ValueUtil::stringValue(binary_annotation.value());
       }
       (*fields)[SPAN_TAGS] = ValueUtil::structValue(tags);

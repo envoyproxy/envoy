@@ -30,27 +30,6 @@ namespace Envoy {
 namespace AccessLog {
 namespace {
 
-const ProtobufWkt::Value& nullValue() {
-  static const auto* v = []() -> ProtobufWkt::Value* {
-    auto* vv = new ProtobufWkt::Value();
-    vv->set_null_value(ProtobufWkt::NULL_VALUE);
-    return vv;
-  }();
-  return *v;
-}
-
-ProtobufWkt::Value stringValue(const std::string& str) {
-  ProtobufWkt::Value val;
-  val.set_string_value(str);
-  return val;
-}
-
-ProtobufWkt::Value numberValue(double num) {
-  ProtobufWkt::Value val;
-  val.set_number_value(num);
-  return val;
-}
-
 class TestSerializedUnknownFilterState : public StreamInfo::FilterState::Object {
 public:
   ProtobufTypes::MessagePtr serializeAsProto() const override {
@@ -64,14 +43,14 @@ public:
 class TestSerializedStructFilterState : public StreamInfo::FilterState::Object {
 public:
   TestSerializedStructFilterState() : use_struct_(true) {
-    (*struct_.mutable_fields())["inner_key"] = stringValue("inner_value");
+    (*struct_.mutable_fields())["inner_key"] = ValueUtil::stringValue("inner_value");
   }
 
   explicit TestSerializedStructFilterState(const ProtobufWkt::Struct& s) : use_struct_(true) {
     struct_.CopyFrom(s);
   }
 
-  explicit TestSerializedStructFilterState(std::chrono::seconds seconds) : use_struct_(false) {
+  explicit TestSerializedStructFilterState(std::chrono::seconds seconds) {
     duration_.set_seconds(seconds.count());
   }
 
@@ -88,7 +67,7 @@ public:
   }
 
 private:
-  const bool use_struct_;
+  const bool use_struct_{false};
   ProtobufWkt::Struct struct_;
   ProtobufWkt::Duration duration_;
 };
@@ -779,7 +758,7 @@ TEST(AccessLogFormatterTest, requestHeaderFormatter) {
               formatter.format(request_header, response_header, response_trailer, stream_info));
     EXPECT_THAT(
         formatter.formatValue(request_header, response_header, response_trailer, stream_info),
-        ProtoEq(stringValue("GET")));
+        ProtoEq(ValueUtil::stringValue("GET")));
   }
 
   {
@@ -788,7 +767,7 @@ TEST(AccessLogFormatterTest, requestHeaderFormatter) {
               formatter.format(request_header, response_header, response_trailer, stream_info));
     EXPECT_THAT(
         formatter.formatValue(request_header, response_header, response_trailer, stream_info),
-        ProtoEq(stringValue("/")));
+        ProtoEq(ValueUtil::stringValue("/")));
   }
 
   {
@@ -932,7 +911,7 @@ void populateMetadataTestData(envoy::api::v2::core::Metadata& metadata) {
   auto& fields_map = *struct_obj.mutable_fields();
   fields_map["test_key"] = ValueUtil::stringValue("test_value");
   ProtobufWkt::Struct struct_inner;
-  (*struct_inner.mutable_fields())["inner_key"] = stringValue("inner_value");
+  (*struct_inner.mutable_fields())["inner_key"] = ValueUtil::stringValue("inner_value");
   ProtobufWkt::Value val;
   *val.mutable_struct_value() = struct_inner;
   fields_map["test_obj"] = val;
@@ -961,7 +940,7 @@ TEST(AccessLogFormatterTest, DynamicMetadataFormatter) {
     DynamicMetadataFormatter formatter("com.test", {"test_key"}, absl::optional<size_t>());
     EXPECT_EQ("\"test_value\"", formatter.format(header, header, header, stream_info));
     EXPECT_THAT(formatter.formatValue(header, header, header, stream_info),
-                ProtoEq(stringValue("test_value")));
+                ProtoEq(ValueUtil::stringValue("test_value")));
   }
   {
     DynamicMetadataFormatter formatter("com.test", {"test_obj"}, absl::optional<size_t>());
@@ -970,7 +949,7 @@ TEST(AccessLogFormatterTest, DynamicMetadataFormatter) {
 
     ProtobufWkt::Value expected_val;
     (*expected_val.mutable_struct_value()->mutable_fields())["inner_key"] =
-        stringValue("inner_value");
+        ValueUtil::stringValue("inner_value");
     EXPECT_THAT(formatter.formatValue(header, header, header, stream_info), ProtoEq(expected_val));
   }
   {
@@ -978,25 +957,28 @@ TEST(AccessLogFormatterTest, DynamicMetadataFormatter) {
                                        absl::optional<size_t>());
     EXPECT_EQ("\"inner_value\"", formatter.format(header, header, header, stream_info));
     EXPECT_THAT(formatter.formatValue(header, header, header, stream_info),
-                ProtoEq(stringValue("inner_value")));
+                ProtoEq(ValueUtil::stringValue("inner_value")));
   }
 
   // not found cases
   {
     DynamicMetadataFormatter formatter("com.notfound", {}, absl::optional<size_t>());
     EXPECT_EQ("-", formatter.format(header, header, header, stream_info));
-    EXPECT_THAT(formatter.formatValue(header, header, header, stream_info), ProtoEq(nullValue()));
+    EXPECT_THAT(formatter.formatValue(header, header, header, stream_info),
+                ProtoEq(ValueUtil::nullValue()));
   }
   {
     DynamicMetadataFormatter formatter("com.test", {"notfound"}, absl::optional<size_t>());
     EXPECT_EQ("-", formatter.format(header, header, header, stream_info));
-    EXPECT_THAT(formatter.formatValue(header, header, header, stream_info), ProtoEq(nullValue()));
+    EXPECT_THAT(formatter.formatValue(header, header, header, stream_info),
+                ProtoEq(ValueUtil::nullValue()));
   }
   {
     DynamicMetadataFormatter formatter("com.test", {"test_obj", "notfound"},
                                        absl::optional<size_t>());
     EXPECT_EQ("-", formatter.format(header, header, header, stream_info));
-    EXPECT_THAT(formatter.formatValue(header, header, header, stream_info), ProtoEq(nullValue()));
+    EXPECT_THAT(formatter.formatValue(header, header, header, stream_info),
+                ProtoEq(ValueUtil::nullValue()));
   }
 
   // size limit
@@ -1006,7 +988,7 @@ TEST(AccessLogFormatterTest, DynamicMetadataFormatter) {
 
     // N.B. Does not truncate.
     EXPECT_THAT(formatter.formatValue(header, header, header, stream_info),
-                ProtoEq(stringValue("test_value")));
+                ProtoEq(ValueUtil::stringValue("test_value")));
   }
 }
 
@@ -1033,7 +1015,7 @@ TEST(AccessLogFormatterTest, FilterStateFormatter) {
 
     EXPECT_EQ("\"test_value\"", formatter.format(header, header, header, stream_info));
     EXPECT_THAT(formatter.formatValue(header, header, header, stream_info),
-                ProtoEq(stringValue("test_value")));
+                ProtoEq(ValueUtil::stringValue("test_value")));
   }
   {
     FilterStateFormatter formatter("key-struct", absl::optional<size_t>());
@@ -1042,7 +1024,8 @@ TEST(AccessLogFormatterTest, FilterStateFormatter) {
               formatter.format(header, header, header, stream_info));
 
     ProtobufWkt::Value expected;
-    (*expected.mutable_struct_value()->mutable_fields())["inner_key"] = stringValue("inner_value");
+    (*expected.mutable_struct_value()->mutable_fields())["inner_key"] =
+        ValueUtil::stringValue("inner_value");
 
     EXPECT_THAT(formatter.formatValue(header, header, header, stream_info), ProtoEq(expected));
   }
@@ -1052,7 +1035,8 @@ TEST(AccessLogFormatterTest, FilterStateFormatter) {
     FilterStateFormatter formatter("key-not-found", absl::optional<size_t>());
 
     EXPECT_EQ("-", formatter.format(header, header, header, stream_info));
-    EXPECT_THAT(formatter.formatValue(header, header, header, stream_info), ProtoEq(nullValue()));
+    EXPECT_THAT(formatter.formatValue(header, header, header, stream_info),
+                ProtoEq(ValueUtil::nullValue()));
   }
 
   // no serialization case
@@ -1060,7 +1044,8 @@ TEST(AccessLogFormatterTest, FilterStateFormatter) {
     FilterStateFormatter formatter("key-no-serialization", absl::optional<size_t>());
 
     EXPECT_EQ("-", formatter.format(header, header, header, stream_info));
-    EXPECT_THAT(formatter.formatValue(header, header, header, stream_info), ProtoEq(nullValue()));
+    EXPECT_THAT(formatter.formatValue(header, header, header, stream_info),
+                ProtoEq(ValueUtil::nullValue()));
   }
 
   // serialization error case
@@ -1068,7 +1053,8 @@ TEST(AccessLogFormatterTest, FilterStateFormatter) {
     FilterStateFormatter formatter("key-serialization-error", absl::optional<size_t>());
 
     EXPECT_EQ("-", formatter.format(header, header, header, stream_info));
-    EXPECT_THAT(formatter.formatValue(header, header, header, stream_info), ProtoEq(nullValue()));
+    EXPECT_THAT(formatter.formatValue(header, header, header, stream_info),
+                ProtoEq(ValueUtil::nullValue()));
   }
 
   // size limit
@@ -1079,7 +1065,7 @@ TEST(AccessLogFormatterTest, FilterStateFormatter) {
 
     // N.B. Does not truncate.
     EXPECT_THAT(formatter.formatValue(header, header, header, stream_info),
-                ProtoEq(stringValue("test_value")));
+                ProtoEq(ValueUtil::stringValue("test_value")));
   }
 }
 
@@ -1094,7 +1080,7 @@ TEST(AccessLogFormatterTest, StartTimeFormatter) {
     EXPECT_CALL(stream_info, startTime()).WillRepeatedly(Return(time));
     EXPECT_EQ("2018/03/28", start_time_format.format(header, header, header, stream_info));
     EXPECT_THAT(start_time_format.formatValue(header, header, header, stream_info),
-                ProtoEq(stringValue("2018/03/28")));
+                ProtoEq(ValueUtil::stringValue("2018/03/28")));
   }
 
   {
@@ -1104,7 +1090,7 @@ TEST(AccessLogFormatterTest, StartTimeFormatter) {
     EXPECT_EQ(AccessLogDateTimeFormatter::fromTime(time),
               start_time_format.format(header, header, header, stream_info));
     EXPECT_THAT(start_time_format.formatValue(header, header, header, stream_info),
-                ProtoEq(stringValue(AccessLogDateTimeFormatter::fromTime(time))));
+                ProtoEq(ValueUtil::stringValue(AccessLogDateTimeFormatter::fromTime(time))));
   }
 }
 
@@ -1413,8 +1399,8 @@ TEST(AccessLogFormatterTest, JsonFormatterTypedTest) {
   ProtobufWkt::Struct output;
   MessageUtil::loadFromJson(json, output);
 
-  EXPECT_THAT(output.fields().at("request_duration"), ProtoEq(numberValue(5.0)));
-  EXPECT_THAT(output.fields().at("request_duration_multi"), ProtoEq(stringValue("5ms")));
+  EXPECT_THAT(output.fields().at("request_duration"), ProtoEq(ValueUtil::numberValue(5.0)));
+  EXPECT_THAT(output.fields().at("request_duration_multi"), ProtoEq(ValueUtil::stringValue("5ms")));
 
   ProtobufWkt::Value expected;
   expected.mutable_struct_value()->CopyFrom(s);
