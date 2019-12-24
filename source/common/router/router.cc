@@ -491,12 +491,12 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
   const auto http_protocol_options = cluster_->httpProtocolOptions();
 
   if (http_protocol_options.has_value() && http_protocol_options.value().auto_sni()) {
-    auto host_str = headers.Host()->value().getStringView();
+    const auto host_str = headers.Host()->value().getStringView();
     const auto parsed_authority = Http::Utility::parseAuthority(host_str.data());
 
     if (!parsed_authority.is_ip_address_) {
-      // update filter state of upstream server name with reached host name and to enable referring
-      // that as transport_socket_options
+      // Update filter state with the host/authority to use for setting SNI in the transport socket
+      // options. This is referenced during the getConnPool() call below.
       callbacks_->streamInfo().filterState().setData(
           Network::UpstreamServerName::key(),
           std::make_unique<Network::UpstreamServerName>(host_str),

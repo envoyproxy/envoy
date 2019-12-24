@@ -525,7 +525,6 @@ evwatch
 exe
 execlp
 expectable
-extrahelp
 faceplant
 facto
 failover
