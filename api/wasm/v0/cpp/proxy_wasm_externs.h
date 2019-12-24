@@ -27,7 +27,8 @@
  * proxy_get_configuration during the lifetime of this call.
  * @return non-zero on success and zero on failure (e.g. bad configuration).
  */
-extern "C" uint32_t proxy_on_start(uint32_t root_context_id, uint32_t vm_configuration_size);
+extern "C" uint32_t proxy_on_vm_start(uint32_t root_context_id, uint32_t vm_configuration_size);
+
 /**
  * Can be called to validate a configuration (e.g. from bootstrap or xDS) both before
  * proxy_on_start() to verify the VM configuration or after proxy_on_start() to verify a plugin
@@ -57,7 +58,7 @@ extern "C" uint32_t proxy_on_configure(uint32_t root_context_id,
  * @param configuration_size is the size of any configuration available via
  * proxy_get_configuration().
  */
-extern "C" void proxy_on_create(uint32_t context_id, uint32_t root_context_id);
+extern "C" void proxy_on_context_create(uint32_t context_id, uint32_t root_context_id);
 
 // Stream and Non-stream calls.
 
