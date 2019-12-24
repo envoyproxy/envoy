@@ -212,15 +212,9 @@ public:
 /**
  * Common interface for listener filters and UDP listener filters
  */
-class ListenerFilterConfigFactoryBase : public Config::TypedConfig {
+class ListenerFilterConfigFactoryBase : public Config::TypedFactory {
 public:
   virtual ~ListenerFilterConfigFactoryBase() = default;
-
-  /**
-   * @return std::string the identifying name for a particular implementation of a listener filter
-   * produced by the factory.
-   */
-  virtual std::string name() PURE;
 };
 
 /**
@@ -244,12 +238,7 @@ public:
   createFilterFactoryFromProto(const Protobuf::Message& config,
                                ListenerFactoryContext& context) PURE;
 
-  /**
-   * @return std::string the identifying category name for objects
-   * created by this factory. Used for automatic registration with
-   * FactoryCategoryRegistry.
-   */
-  static std::string category() { return "filters.listener"; }
+  const std::string category() const override { return "filters.listener"; }
 };
 
 /**
@@ -272,19 +261,14 @@ public:
   createFilterFactoryFromProto(const Protobuf::Message& config,
                                ListenerFactoryContext& context) PURE;
 
-  /**
-   * @return std::string the identifying category name for objects
-   * created by this factory. Used for automatic registration with
-   * FactoryCategoryRegistry.
-   */
-  static std::string category() { return "filters.udp_listener"; }
+  const std::string category() const override { return "filters.udp_listener"; }
 };
 
 /**
  * Implemented by filter factories that require more options to process the protocol used by the
  * upstream cluster.
  */
-class ProtocolOptionsFactory {
+class ProtocolOptionsFactory : public Config::TypedFactory {
 public:
   virtual ~ProtocolOptionsFactory() = default;
 
@@ -315,7 +299,7 @@ public:
  * Implemented by each network filter and registered via Registry::registerFactory()
  * or the convenience class RegisterFactory.
  */
-class NamedNetworkFilterConfigFactory : public ProtocolOptionsFactory, public Config::TypedConfig {
+class NamedNetworkFilterConfigFactory : public ProtocolOptionsFactory {
 public:
   ~NamedNetworkFilterConfigFactory() override = default;
 
@@ -330,18 +314,7 @@ public:
   virtual Network::FilterFactoryCb createFilterFactoryFromProto(const Protobuf::Message& config,
                                                                 FactoryContext& context) PURE;
 
-  /**
-   * @return std::string the identifying name for a particular implementation of a network filter
-   * produced by the factory.
-   */
-  virtual std::string name() PURE;
-
-  /**
-   * @return std::string the identifying category name for objects
-   * created by this factory. Used for automatic registration with
-   * FactoryCategoryRegistry.
-   */
-  static std::string category() { return "filters.network"; }
+  const std::string category() const override { return "filters.network"; }
 
   /**
    * @return bool true if this filter must be the last filter in a filter chain, false otherwise.
@@ -353,8 +326,7 @@ public:
  * Implemented by each upstream cluster network filter and registered via
  * Registry::registerFactory() or the convenience class RegisterFactory.
  */
-class NamedUpstreamNetworkFilterConfigFactory : public ProtocolOptionsFactory,
-                                                public Config::TypedConfig {
+class NamedUpstreamNetworkFilterConfigFactory : public ProtocolOptionsFactory {
 public:
   ~NamedUpstreamNetworkFilterConfigFactory() override = default;
 
@@ -366,25 +338,14 @@ public:
   virtual Network::FilterFactoryCb createFilterFactoryFromProto(const Protobuf::Message& config,
                                                                 CommonFactoryContext& context) PURE;
 
-  /**
-   * @return std::string the identifying name for a particular implementation of a network filter
-   * produced by the factory.
-   */
-  virtual std::string name() PURE;
-
-  /**
-   * @return std::string the identifying category name for objects
-   * created by this factory. Used for automatic registration with
-   * FactoryCategoryRegistry.
-   */
-  static std::string category() { return "filters.upstream_network"; }
+  const std::string category() const override { return "filters.upstream_network"; }
 };
 
 /**
  * Implemented by each HTTP filter and registered via Registry::registerFactory or the
  * convenience class RegisterFactory.
  */
-class NamedHttpFilterConfigFactory : public ProtocolOptionsFactory, public Config::TypedConfig {
+class NamedHttpFilterConfigFactory : public ProtocolOptionsFactory {
 public:
   ~NamedHttpFilterConfigFactory() override = default;
 
@@ -423,18 +384,7 @@ public:
     return nullptr;
   }
 
-  /**
-   * @return std::string the identifying name for a particular implementation of an http filter
-   * produced by the factory.
-   */
-  virtual std::string name() PURE;
-
-  /**
-   * @return std::string the identifying category name for objects
-   * created by this factory. Used for automatic registration with
-   * FactoryCategoryRegistry.
-   */
-  static std::string category() { return "filters.http"; }
+  const std::string category() const override { return "filters.http"; }
 
   /**
    * @return bool true if this filter must be the last filter in a filter chain, false otherwise.

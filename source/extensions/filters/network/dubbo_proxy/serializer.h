@@ -4,6 +4,7 @@
 #include <unordered_map>
 
 #include "envoy/buffer/buffer.h"
+#include "envoy/config/typed_config.h"
 
 #include "common/common/assert.h"
 #include "common/config/utility.h"
@@ -78,7 +79,7 @@ using SerializerPtr = std::unique_ptr<Serializer>;
  * Implemented by each Dubbo serialize and registered via Registry::registerFactory or the
  * convenience class RegisterFactory.
  */
-class NamedSerializerConfigFactory {
+class NamedSerializerConfigFactory : public Config::UntypedFactory {
 public:
   virtual ~NamedSerializerConfigFactory() = default;
 
@@ -88,19 +89,7 @@ public:
    */
   virtual SerializerPtr createSerializer() PURE;
 
-  /**
-   * @return std::string the identifying name for a particular implementation of Dubbo serializer
-   * produced by the factory.
-   */
-  virtual std::string name() PURE;
-
-  /**
-   * @return std::string the identifying category name for objects
-   * created by this factory. Used for automatic registration with
-   * FactoryCategoryRegistry.
-   */
-  static std::string category() { return "dubbo_proxy.serializers"; }
-  static std::string type() { return ""; }
+  const std::string category() const override { return "dubbo_proxy.serializers"; }
 
   /**
    * Convenience method to lookup a factory by type.
@@ -121,7 +110,7 @@ template <class SerializerImpl> class SerializerFactoryBase : public NamedSerial
 public:
   SerializerPtr createSerializer() override { return std::make_unique<SerializerImpl>(); }
 
-  std::string name() override { return name_; }
+  const std::string name() const override { return name_; }
 
 protected:
   SerializerFactoryBase(ProtocolType protocol_type, SerializationType type)

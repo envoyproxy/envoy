@@ -55,7 +55,7 @@ public:
 
   MOCK_METHOD1(resolve,
                Address::InstanceConstSharedPtr(const envoy::api::v2::core::SocketAddress&));
-  MOCK_CONST_METHOD0(name, std::string());
+  MOCK_CONST_METHOD0(name, const std::string());
 };
 
 class MockReadFilterCallbacks : public ReadFilterCallbacks {

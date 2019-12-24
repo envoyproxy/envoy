@@ -39,7 +39,7 @@ public:
  * Implemented by each resource monitor and registered via Registry::registerFactory()
  * or the convenience class RegistryFactory.
  */
-class ResourceMonitorFactory : public Config::TypedConfig {
+class ResourceMonitorFactory : public Config::TypedFactory {
 public:
   virtual ~ResourceMonitorFactory() = default;
 
@@ -55,18 +55,7 @@ public:
   virtual ResourceMonitorPtr createResourceMonitor(const Protobuf::Message& config,
                                                    ResourceMonitorFactoryContext& context) PURE;
 
-  /**
-   * @return std::string the identifying name for a particular implementation of a resource
-   * monitor produced by the factory.
-   */
-  virtual std::string name() PURE;
-
-  /**
-   * @return std::string the identifying category name for objects
-   * created by this factory. Used for automatic registration with
-   * FactoryCategoryRegistry.
-   */
-  static std::string category() { return "resource_monitors"; }
+  const std::string category() const override { return "resource_monitors"; }
 };
 
 } // namespace Configuration

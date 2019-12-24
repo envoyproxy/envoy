@@ -125,7 +125,7 @@ public:
   MockNamedSerializerConfigFactory(std::function<MockSerializer*()> f) : f_(f) {}
 
   SerializerPtr createSerializer() override { return SerializerPtr{f_()}; }
-  std::string name() override {
+  const std::string name() const override {
     return SerializerNames::get().fromType(SerializationType::Hessian2);
   }
 
@@ -141,7 +141,9 @@ public:
     protocol->initSerializer(serialization_type);
     return protocol;
   }
-  std::string name() override { return ProtocolNames::get().fromType(ProtocolType::Dubbo); }
+  const std::string name() const override {
+    return ProtocolNames::get().fromType(ProtocolType::Dubbo);
+  }
 
   std::function<MockProtocol*()> f_;
 };
@@ -287,7 +289,7 @@ public:
     return std::make_unique<ConfigProto>();
   }
 
-  std::string name() override { return name_; }
+  const std::string name() const override { return name_; }
 
 protected:
   MockFactoryBase(const std::string& name) : name_(name) {}

@@ -5,6 +5,7 @@
 
 #include "envoy/buffer/buffer.h"
 #include "envoy/common/pure.h"
+#include "envoy/config/typed_config.h"
 #include "envoy/registry/registry.h"
 
 #include "common/common/assert.h"
@@ -498,7 +499,7 @@ public:
  * Implemented by each Thrift protocol and registered via Registry::registerFactory or the
  * convenience class RegisterFactory.
  */
-class NamedProtocolConfigFactory {
+class NamedProtocolConfigFactory : public Config::UntypedFactory {
 public:
   virtual ~NamedProtocolConfigFactory() = default;
 
@@ -508,19 +509,7 @@ public:
    */
   virtual ProtocolPtr createProtocol() PURE;
 
-  /**
-   * @return std::string the identifying name for a particular implementation of thrift protocol
-   * produced by the factory.
-   */
-  virtual std::string name() PURE;
-
-  /**
-   * @return std::string the identifying category name for objects
-   * created by this factory. Used for automatic registration with
-   * FactoryCategoryRegistry.
-   */
-  static std::string category() { return "thrift_proxy.protocols"; }
-  static std::string type() { return ""; }
+  const std::string category() const override { return "thrift_proxy.protocols"; }
 
   /**
    * Convenience method to lookup a factory by type.
@@ -540,7 +529,7 @@ template <class ProtocolImpl> class ProtocolFactoryBase : public NamedProtocolCo
 public:
   ProtocolPtr createProtocol() override { return std::move(std::make_unique<ProtocolImpl>()); }
 
-  std::string name() override { return name_; }
+  const std::string name() const override { return name_; }
 
 protected:
   ProtocolFactoryBase(const std::string& name) : name_(name) {}

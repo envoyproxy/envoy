@@ -18,7 +18,7 @@ namespace ThriftFilters {
  * Implemented by each Thrift filter and registered via Registry::registerFactory or the
  * convenience class RegisterFactory.
  */
-class NamedThriftFilterConfigFactory : public Envoy::Config::TypedConfig {
+class NamedThriftFilterConfigFactory : public Envoy::Config::TypedFactory {
 public:
   virtual ~NamedThriftFilterConfigFactory() = default;
 
@@ -35,18 +35,7 @@ public:
   createFilterFactoryFromProto(const Protobuf::Message& config, const std::string& stat_prefix,
                                Server::Configuration::FactoryContext& context) PURE;
 
-  /**
-   * @return std::string the identifying name for a particular implementation of a thrift filter
-   * produced by the factory.
-   */
-  virtual std::string name() PURE;
-
-  /**
-   * @return std::string the identifying category name for objects
-   * created by this factory. Used for automatic registration with
-   * FactoryCategoryRegistry.
-   */
-  static std::string category() { return "thrift_proxy.filters"; }
+  const std::string category() const override { return "thrift_proxy.filters"; }
 };
 
 } // namespace ThriftFilters

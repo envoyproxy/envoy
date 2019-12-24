@@ -1243,7 +1243,7 @@ public:
     return std::make_unique<envoy::config::filter::accesslog::v2::HeaderFilter>();
   }
 
-  std::string name() const override { return "test_header_filter"; }
+  const std::string name() const override { return "test_header_filter"; }
 };
 
 TEST_F(AccessLogImplTest, TestHeaderFilterPresence) {
@@ -1319,7 +1319,7 @@ public:
     return std::make_unique<ProtobufWkt::Struct>();
   }
 
-  std::string name() const override { return "sample_extension_filter"; }
+  const std::string name() const override { return "sample_extension_filter"; }
 };
 
 TEST_F(AccessLogImplTest, SampleExtensionFilter) {

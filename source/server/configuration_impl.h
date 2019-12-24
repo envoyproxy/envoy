@@ -31,7 +31,7 @@ namespace Configuration {
  * Implemented for each Stats::Sink and registered via Registry::registerFactory() or
  * the convenience class RegisterFactory.
  */
-class StatsSinkFactory : public Config::TypedConfig {
+class StatsSinkFactory : public Config::TypedFactory {
 public:
   virtual ~StatsSinkFactory() = default;
 
@@ -44,18 +44,7 @@ public:
    */
   virtual Stats::SinkPtr createStatsSink(const Protobuf::Message& config, Instance& server) PURE;
 
-  /**
-   * Returns the identifying name for a particular implementation of Stats::Sink produced by the
-   * factory.
-   */
-  virtual std::string name() PURE;
-
-  /**
-   * @return std::string the identifying category name for objects
-   * created by this factory. Used for automatic registration with
-   * FactoryCategoryRegistry.
-   */
-  static std::string category() { return "stats_sinks"; }
+  const std::string category() const override { return "stats_sinks"; }
 };
 
 /**

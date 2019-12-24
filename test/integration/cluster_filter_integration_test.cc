@@ -70,7 +70,7 @@ public:
     return std::make_unique<ProtobufWkt::StringValue>();
   }
 
-  std::string name() override { return "envoy.upstream.polite"; }
+  const std::string name() const override { return "envoy.upstream.polite"; }
 };
 
 // perform static registration

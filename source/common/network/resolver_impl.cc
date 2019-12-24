@@ -35,7 +35,7 @@ public:
     }
   }
 
-  std::string name() const override { return Config::AddressResolverNames::get().IP; }
+  const std::string name() const override { return Config::AddressResolverNames::get().IP; }
 };
 
 /**

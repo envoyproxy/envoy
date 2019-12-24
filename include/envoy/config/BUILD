@@ -70,6 +70,7 @@ envoy_cc_library(
     name = "typed_metadata_interface",
     hdrs = ["typed_metadata.h"],
     deps = [
+        ":typed_config_interface",
         "//source/common/protobuf",
     ],
 )

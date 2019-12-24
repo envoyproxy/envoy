@@ -28,7 +28,7 @@ public:
     return std::make_unique<envoy::config::grpc_credential::v2alpha::AwsIamConfig>();
   }
 
-  std::string name() const override { return GrpcCredentialsNames::get().AwsIam; }
+  const std::string name() const override { return GrpcCredentialsNames::get().AwsIam; }
 
 private:
   static std::string getRegion(const envoy::config::grpc_credential::v2alpha::AwsIamConfig& config);

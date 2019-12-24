@@ -231,7 +231,7 @@ private:
 /**
  * Extension filter factory that reads from ExtensionFilter proto.
  */
-class ExtensionFilterFactory : public Config::TypedConfig {
+class ExtensionFilterFactory : public Config::TypedFactory {
 public:
   virtual ~ExtensionFilterFactory() = default;
 
@@ -248,18 +248,7 @@ public:
   createFilter(const envoy::config::filter::accesslog::v2::ExtensionFilter& config,
                Runtime::Loader& runtime, Runtime::RandomGenerator& random) PURE;
 
-  /**
-   * @return std::string the identifying name for a particular Filter implementation
-   * produced by the factory.
-   */
-  virtual std::string name() const PURE;
-
-  /**
-   * @return std::string the identifying category name for objects
-   * created by this factory. Used for automatic registration with
-   * FactoryCategoryRegistry.
-   */
-  static std::string category() { return "access_logger.extension_filters"; }
+  const std::string category() const override { return "access_logger.extension_filters"; }
 };
 
 /**

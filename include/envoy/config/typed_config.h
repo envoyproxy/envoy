@@ -8,10 +8,38 @@ namespace Envoy {
 namespace Config {
 
 /**
- * Base class for config defined by a typed proto message.
+ * Base class for an extension factory.
  */
-class TypedConfig {
+class UntypedFactory {
 public:
+  virtual ~UntypedFactory() = default;
+
+  /**
+   * Name of the factory, a reversed DNS name is encouraged to avoid cross-org conflict.
+   * It's used as key in the metadata map, as well as key in the factory registry.
+   */
+  virtual const std::string name() const PURE;
+
+  /**
+   * @return std::string the identifying category name for objects
+   * created by this factory. Used for automatic registration with
+   * FactoryCategoryRegistry.
+   */
+  virtual const std::string category() const PURE;
+
+  /**
+   * @return configuration proto full name, or empty for untyped factories.
+   */
+  virtual const std::string configType() { return ""; }
+};
+
+/**
+ * Base class for an extension factory configured by a typed proto message.
+ */
+class TypedFactory : public UntypedFactory {
+public:
+  virtual ~TypedFactory() = default;
+
   /**
    * @return ProtobufTypes::MessagePtr create empty config proto message for v2. The config, which
    * arrives in an opaque google.protobuf.Struct message, will be converted to JSON and then parsed
@@ -19,18 +47,13 @@ public:
    */
   virtual ProtobufTypes::MessagePtr createEmptyConfigProto() PURE;
 
-  /**
-   * @return config proto full name
-   */
-  virtual std::string type() {
+  const std::string configType() override {
     auto ptr = createEmptyConfigProto();
     if (ptr == nullptr) {
       return "";
     }
     return ptr->GetDescriptor()->full_name();
   }
-
-  virtual ~TypedConfig() = default;
 };
 
 } // namespace Config

@@ -32,7 +32,7 @@ public:
   getChannelCredentials(const envoy::api::v2::core::GrpcService& grpc_service_config,
                         Api::Api& api) override;
 
-  std::string name() const override { return GrpcCredentialsNames::get().AccessTokenExample; }
+  const std::string name() const override { return GrpcCredentialsNames::get().AccessTokenExample; }
 };
 
 /*

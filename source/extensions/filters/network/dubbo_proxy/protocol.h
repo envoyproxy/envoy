@@ -4,6 +4,7 @@
 #include <unordered_map>
 
 #include "envoy/buffer/buffer.h"
+#include "envoy/config/typed_config.h"
 
 #include "common/common/assert.h"
 #include "common/common/fmt.h"
@@ -97,7 +98,7 @@ using ProtocolPtr = std::unique_ptr<Protocol>;
  * Implemented by each Dubbo protocol and registered via Registry::registerFactory or the
  * convenience class RegisterFactory.
  */
-class NamedProtocolConfigFactory {
+class NamedProtocolConfigFactory : public Config::UntypedFactory {
 public:
   virtual ~NamedProtocolConfigFactory() = default;
 
@@ -108,19 +109,7 @@ public:
    */
   virtual ProtocolPtr createProtocol(SerializationType serialization_type) PURE;
 
-  /**
-   * @return std::string the identifying name for a particular implementation of Dubbo protocol
-   * produced by the factory.
-   */
-  virtual std::string name() PURE;
-
-  /**
-   * @return std::string the identifying category name for objects
-   * created by this factory. Used for automatic registration with
-   * FactoryCategoryRegistry.
-   */
-  static std::string category() { return "dubbo_proxy.protocols"; }
-  static std::string type() { return ""; }
+  const std::string category() const override { return "dubbo_proxy.protocols"; }
 
   /**
    * Convenience method to lookup a factory by type.
@@ -144,7 +133,7 @@ public:
     return protocol;
   }
 
-  std::string name() override { return name_; }
+  const std::string name() const override { return name_; }
 
 protected:
   ProtocolFactoryBase(ProtocolType type) : name_(ProtocolNames::get().fromType(type)) {}

@@ -16,7 +16,7 @@ namespace Configuration {
  * Implemented for each AccessLog::Instance and registered via Registry::registerFactory or the
  * convenience class RegisterFactory.
  */
-class AccessLogInstanceFactory : public Config::TypedConfig {
+class AccessLogInstanceFactory : public Config::TypedFactory {
 public:
   virtual ~AccessLogInstanceFactory() = default;
 
@@ -33,18 +33,7 @@ public:
                                                                AccessLog::FilterPtr&& filter,
                                                                FactoryContext& context) PURE;
 
-  /**
-   * @return std::string the identifying name for a particular AccessLog::Instance implementation
-   * produced by the factory.
-   */
-  virtual std::string name() const PURE;
-
-  /**
-   * @return std::string the identifying category name for objects
-   * created by this factory. Used for automatic registration with
-   * FactoryCategoryRegistry.
-   */
-  static std::string category() { return "access_loggers"; }
+  const std::string category() const override { return "access_loggers"; }
 };
 
 } // namespace Configuration

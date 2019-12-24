@@ -1,5 +1,6 @@
 #include <algorithm>
 
+#include "envoy/config/typed_config.h"
 #include "envoy/registry/registry.h"
 
 #include "common/common/fmt.h"
@@ -13,17 +14,15 @@ namespace Envoy {
 namespace Config {
 namespace {
 
-class InternalFactory {
+class InternalFactory : public Config::UntypedFactory {
 public:
   virtual ~InternalFactory() = default;
-  virtual std::string name() PURE;
-  static std::string category() { return ""; }
-  static std::string type() { return ""; }
+  const std::string category() const override { return ""; }
 };
 
 class TestInternalFactory : public InternalFactory {
 public:
-  std::string name() override { return "testing.internal.test"; }
+  const std::string name() const override { return "testing.internal.test"; }
 };
 
 static Registry::RegisterInternalFactory<TestInternalFactory, InternalFactory>
@@ -48,17 +47,15 @@ TEST(RegistryTest, InternalFactoryNotPublished) {
             nullptr);
 }
 
-class PublishedFactory {
+class PublishedFactory : public Config::UntypedFactory {
 public:
   virtual ~PublishedFactory() = default;
-  virtual std::string name() PURE;
-  static std::string category() { return "testing.published"; }
-  static std::string type() { return ""; }
+  const std::string category() const override { return "testing.published"; }
 };
 
 class TestPublishedFactory : public PublishedFactory {
 public:
-  std::string name() override { return "testing.published.test"; }
+  const std::string name() const override { return "testing.published.test"; }
 };
 
 REGISTER_FACTORY(TestPublishedFactory, PublishedFactory);
@@ -80,7 +77,7 @@ TEST(RegistryTest, DefaultFactoryPublished) {
 
 class TestWithDeprecatedPublishedFactory : public PublishedFactory {
 public:
-  std::string name() override { return "testing.published.instead_name"; }
+  const std::string name() const override { return "testing.published.instead_name"; }
 };
 
 REGISTER_FACTORY(TestWithDeprecatedPublishedFactory,

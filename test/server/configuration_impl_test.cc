@@ -271,9 +271,9 @@ TEST_F(ConfigurationImplTest, ConfigurationFailsWhenInvalidTracerSpecified) {
 
   auto bootstrap = Upstream::parseBootstrapFromV2Json(json);
   MainImpl config;
-  EXPECT_THROW_WITH_MESSAGE(
-      config.initialize(bootstrap, server_, cluster_manager_factory_), EnvoyException,
-      "Didn't find a registered implementation for type: 'envoy.config.trace.v2.LightstepConfig'");
+  EXPECT_THROW_WITH_MESSAGE(config.initialize(bootstrap, server_, cluster_manager_factory_),
+                            EnvoyException,
+                            "Didn't find a registered implementation for name: 'invalid'");
 }
 
 TEST_F(ConfigurationImplTest, ProtoSpecifiedStatsSink) {

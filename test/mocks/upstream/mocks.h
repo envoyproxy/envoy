@@ -153,7 +153,7 @@ public:
     return std::make_shared<NiceMock<MockRetryPriority>>(retry_priority_);
   }
 
-  std::string name() const override { return "envoy.test_retry_priority"; }
+  const std::string name() const override { return "envoy.test_retry_priority"; }
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
     return ProtobufTypes::MessagePtr{new Envoy::ProtobufWkt::Empty()};
   }
@@ -423,7 +423,7 @@ public:
     return std::make_shared<NiceMock<MockRetryHostPredicate>>();
   }
 
-  std::string name() override { return "envoy.test_host_predicate"; }
+  const std::string name() const override { return "envoy.test_host_predicate"; }
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
     return ProtobufTypes::MessagePtr{new Envoy::ProtobufWkt::Empty()};
   }

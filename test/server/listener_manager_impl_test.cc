@@ -339,7 +339,7 @@ public:
     return std::make_unique<Envoy::ProtobufWkt::Empty>();
   }
 
-  std::string name() override { return "non_terminal"; }
+  const std::string name() const override { return "non_terminal"; }
 };
 
 TEST_F(ListenerManagerImplWithRealFiltersTest, TerminalNotLast) {
@@ -412,7 +412,7 @@ public:
     return std::make_unique<Envoy::ProtobufWkt::Empty>();
   }
 
-  std::string name() override { return "stats_test"; }
+  const std::string name() const override { return "stats_test"; }
   bool isTerminalFilter() override { return true; }
 
 private:
@@ -3157,7 +3157,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, OriginalDstTestFilter) {
       return std::make_unique<Envoy::ProtobufWkt::Empty>();
     }
 
-    std::string name() override { return "test.listener.original_dst"; }
+    const std::string name() const override { return "test.listener.original_dst"; }
   };
 
   /**
@@ -3231,7 +3231,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, OriginalDstTestFilterIPv6) {
       return std::make_unique<Envoy::ProtobufWkt::Empty>();
     }
 
-    std::string name() override { return "test.listener.original_dstipv6"; }
+    const std::string name() const override { return "test.listener.original_dstipv6"; }
   };
 
   /**

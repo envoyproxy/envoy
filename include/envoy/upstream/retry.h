@@ -76,7 +76,7 @@ using RetryHostPredicateSharedPtr = std::shared_ptr<RetryHostPredicate>;
 /**
  * Factory for RetryPriority.
  */
-class RetryPriorityFactory : public Config::TypedConfig {
+class RetryPriorityFactory : public Config::TypedFactory {
 public:
   virtual ~RetryPriorityFactory() = default;
 
@@ -85,32 +85,20 @@ public:
                       ProtobufMessage::ValidationVisitor& validation_visitor,
                       uint32_t retry_count) PURE;
 
-  virtual std::string name() const PURE;
-
-  /**
-   * @return std::string the identifying category name for objects
-   * created by this factory. Used for automatic registration with
-   * FactoryCategoryRegistry.
-   */
-  static std::string category() { return "retry_priorities"; }
+  const std::string category() const override { return "retry_priorities"; }
 };
 
 /**
  * Factory for RetryHostPredicate.
  */
-class RetryHostPredicateFactory : public Config::TypedConfig {
+class RetryHostPredicateFactory : public Config::TypedFactory {
 public:
   virtual ~RetryHostPredicateFactory() = default;
 
   virtual RetryHostPredicateSharedPtr createHostPredicate(const Protobuf::Message& config,
                                                           uint32_t retry_count) PURE;
 
-  /**
-   * @return name name of this factory.
-   */
-  virtual std::string name() PURE;
-
-  static std::string category() { return "retry_host_predicates"; }
+  const std::string category() const override { return "retry_host_predicates"; }
 };
 
 } // namespace Upstream

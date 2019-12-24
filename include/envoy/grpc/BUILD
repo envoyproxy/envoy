@@ -50,6 +50,7 @@ envoy_cc_library(
     ],
     deps = [
         "//include/envoy/api:api_interface",
+        "//include/envoy/config:typed_config_interface",
         "@envoy_api//envoy/api/v2/core:pkg_cc_proto",
     ],
 )

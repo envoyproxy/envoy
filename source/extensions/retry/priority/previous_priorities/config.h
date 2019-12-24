@@ -20,7 +20,7 @@ public:
                       ProtobufMessage::ValidationVisitor& validation_visitor,
                       uint32_t max_retries) override;
 
-  std::string name() const override {
+  const std::string name() const override {
     return RetryPriorityValues::get().PreviousPrioritiesRetryPriority;
   }
 

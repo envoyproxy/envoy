@@ -64,7 +64,7 @@ public:
     return std::make_unique<envoy::api::v2::core::Node>();
   }
 
-  std::string name() const override { return "foo"; }
+  const std::string name() const override { return "foo"; }
 };
 
 class TransportSocketMatcherTest : public testing::Test {

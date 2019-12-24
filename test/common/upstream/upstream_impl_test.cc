@@ -2133,8 +2133,10 @@ public:
                               ProtobufMessage::ValidationVisitor&) override {
     return parent_.createProtocolOptionsConfig(msg);
   }
-  std::string name() override { CONSTRUCT_ON_FIRST_USE(std::string, "envoy.test.filter"); }
-  std::string type() override { return name(); }
+  const std::string name() const override {
+    CONSTRUCT_ON_FIRST_USE(std::string, "envoy.test.filter");
+  }
+  const std::string configType() override { return ""; };
 
   TestFilterConfigFactoryBase& parent_;
 };
@@ -2168,8 +2170,10 @@ public:
                               ProtobufMessage::ValidationVisitor&) override {
     return parent_.createProtocolOptionsConfig(msg);
   }
-  std::string name() override { CONSTRUCT_ON_FIRST_USE(std::string, "envoy.test.filter"); }
-  std::string type() override { return name(); }
+  const std::string name() const override {
+    CONSTRUCT_ON_FIRST_USE(std::string, "envoy.test.filter");
+  }
+  const std::string configType() override { return ""; };
 
   TestFilterConfigFactoryBase& parent_;
 };

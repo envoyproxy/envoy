@@ -15,6 +15,7 @@
 #include "common/common/fmt.h"
 #include "common/common/hex.h"
 #include "common/common/utility.h"
+#include "common/config/api_type_oracle.h"
 #include "common/config/resources.h"
 #include "common/config/version_converter.h"
 #include "common/config/well_known_names.h"
@@ -22,6 +23,8 @@
 #include "common/protobuf/utility.h"
 #include "common/stats/stats_matcher_impl.h"
 #include "common/stats/tag_producer_impl.h"
+
+#include "udpa/type/v1/typed_struct.pb.h"
 
 namespace Envoy {
 namespace Config {

@@ -38,7 +38,7 @@ ProtobufTypes::MessagePtr TcpGrpcAccessLogFactory::createEmptyConfigProto() {
   return std::make_unique<envoy::config::accesslog::v2::TcpGrpcAccessLogConfig>();
 }
 
-std::string TcpGrpcAccessLogFactory::name() const { return AccessLogNames::get().TcpGrpc; }
+const std::string TcpGrpcAccessLogFactory::name() const { return AccessLogNames::get().TcpGrpc; }
 
 /**
  * Static registration for the TCP gRPC access log. @see RegisterFactory.

@@ -59,7 +59,7 @@ ProtobufTypes::MessagePtr FileAccessLogFactory::createEmptyConfigProto() {
   return ProtobufTypes::MessagePtr{new envoy::config::accesslog::v2::FileAccessLog()};
 }
 
-std::string FileAccessLogFactory::name() const { return AccessLogNames::get().File; }
+const std::string FileAccessLogFactory::name() const { return AccessLogNames::get().File; }
 
 std::unordered_map<std::string, std::string>
 FileAccessLogFactory::convertJsonFormatToMap(ProtobufWkt::Struct json_format) {

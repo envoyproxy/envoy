@@ -135,7 +135,7 @@ public:
     return CredsUtility::defaultChannelCredentials(grpc_service_config, api);
   }
 
-  std::string name() const override { return "envoy.grpc_credentials.default"; }
+  const std::string name() const override { return "envoy.grpc_credentials.default"; }
 };
 
 /**

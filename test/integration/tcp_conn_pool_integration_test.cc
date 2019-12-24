@@ -97,7 +97,9 @@ public:
     return ProtobufTypes::MessagePtr{new Envoy::ProtobufWkt::Empty()};
   }
 
-  std::string name() override { CONSTRUCT_ON_FIRST_USE(std::string, "envoy.test.router"); }
+  const std::string name() const override {
+    CONSTRUCT_ON_FIRST_USE(std::string, "envoy.test.router");
+  }
   bool isTerminalFilter() override { return true; }
 };
 

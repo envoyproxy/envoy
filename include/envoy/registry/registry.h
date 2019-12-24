@@ -176,7 +176,7 @@ public:
     if (!instead_value.empty()) {
       deprecatedFactoryNames().emplace(std::make_pair(name, instead_value));
     } else {
-      auto type = factory.type();
+      auto type = factory.configType();
       if (!type.empty() && type != "google.protobuf.Empty") {
         auto result = typeNames().emplace(std::make_pair(type, &factory));
         if (!result.second) {
@@ -277,10 +277,6 @@ private:
     factories().emplace(factory.name(), &factory);
     RELEASE_ASSERT(getFactory(factory.name()) == &factory, "");
 
-    if (!factory.type().empty()) {
-      typeNames().emplace(factory.type(), &factory);
-    }
-
     return displaced;
   }
 
@@ -321,8 +317,8 @@ public:
     // register its category here. This means that we have to ignore
     // multiple attempts to register the same category and can't detect
     // duplicate categories.
-    if (!FactoryCategoryRegistry::isRegistered(Base::category())) {
-      FactoryCategoryRegistry::registerCategory(Base::category(),
+    if (!FactoryCategoryRegistry::isRegistered(instance_.category())) {
+      FactoryCategoryRegistry::registerCategory(instance_.category(),
                                                 new FactoryRegistryProxyImpl<Base>());
     }
   }
@@ -343,8 +339,8 @@ public:
       FactoryRegistry<Base>::registerFactory(instance_, deprecated_name, instance_.name());
     }
 
-    if (!FactoryCategoryRegistry::isRegistered(Base::category())) {
-      FactoryCategoryRegistry::registerCategory(Base::category(),
+    if (!FactoryCategoryRegistry::isRegistered(instance_.category())) {
+      FactoryCategoryRegistry::registerCategory(instance_.category(),
                                                 new FactoryRegistryProxyImpl<Base>());
     }
   }

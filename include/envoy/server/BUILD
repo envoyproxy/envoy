@@ -73,6 +73,7 @@ envoy_cc_library(
     name = "health_checker_config_interface",
     hdrs = ["health_checker_config.h"],
     deps = [
+        "//include/envoy/config:typed_config_interface",
         "//include/envoy/upstream:health_checker_interface",
         "@envoy_api//envoy/api/v2/core:pkg_cc_proto",
     ],
@@ -269,5 +270,8 @@ envoy_cc_library(
 envoy_cc_library(
     name = "active_udp_listener_config_interface",
     hdrs = ["active_udp_listener_config.h"],
-    deps = ["//include/envoy/network:connection_handler_interface"],
+    deps = [
+        "//include/envoy/config:typed_config_interface",
+        "//include/envoy/network:connection_handler_interface",
+    ],
 )

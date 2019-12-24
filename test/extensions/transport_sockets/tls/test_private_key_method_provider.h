@@ -89,7 +89,7 @@ public:
     return std::make_shared<TestPrivateKeyMethodProvider>(config.typed_config(), factory_context);
   }
 
-  std::string name() const override { return std::string("test"); };
+  const std::string name() const override { return std::string("test"); };
 };
 
 } // namespace PrivateKeyMethodProvider

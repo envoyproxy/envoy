@@ -14,7 +14,7 @@ class AltsTransportSocketConfigFactory
     : public virtual Server::Configuration::TransportSocketConfigFactory {
 public:
   ProtobufTypes::MessagePtr createEmptyConfigProto() override;
-  std::string name() const override { return TransportSocketNames::get().Alts; }
+  const std::string name() const override { return TransportSocketNames::get().Alts; }
 };
 
 class UpstreamAltsTransportSocketConfigFactory

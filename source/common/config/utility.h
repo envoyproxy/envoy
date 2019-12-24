@@ -21,13 +21,10 @@
 #include "common/common/backoff_strategy.h"
 #include "common/common/hash.h"
 #include "common/common/hex.h"
-#include "common/config/api_type_oracle.h"
 #include "common/grpc/common.h"
 #include "common/protobuf/protobuf.h"
 #include "common/protobuf/utility.h"
 #include "common/singleton/const_singleton.h"
-
-#include "udpa/type/v1/typed_struct.pb.h"
 
 namespace Envoy {
 namespace Config {
@@ -213,50 +210,12 @@ public:
 
   /**
    * Get a Factory from the registry with error checking to ensure the name and the factory are
-   * valid. If the typed config references a proto that is neither Struct nor Empty, then the proto
-   * type is used to select a factory.
+   * valid.
    * @param message proto that contains fields 'name' and 'typed_config'.
    */
   template <class Factory, class ProtoMessage>
   static Factory& getAndCheckFactory(const ProtoMessage& message) {
-    const auto& name = message.name();
-
-    static const std::string struct_type =
-        ProtobufWkt::Struct::default_instance().GetDescriptor()->full_name();
-    static const std::string empty_type =
-        ProtobufWkt::Empty::default_instance().GetDescriptor()->full_name();
-    static const std::string typed_struct_type =
-        udpa::type::v1::TypedStruct::default_instance().GetDescriptor()->full_name();
-
-    if (message.has_typed_config()) {
-      absl::string_view type =
-          TypeUtil::typeUrlToDescriptorFullName(message.typed_config().type_url());
-
-      if (type == typed_struct_type) {
-        udpa::type::v1::TypedStruct typed_struct;
-        MessageUtil::unpackTo(message.typed_config(), typed_struct);
-        type = TypeUtil::typeUrlToDescriptorFullName(typed_struct.type_url());
-      }
-
-      if (!type.empty() && type != struct_type && type != empty_type) {
-        Factory* factory = Registry::FactoryRegistry<Factory>::getFactoryByType(type);
-
-        if (factory != nullptr) {
-          return *factory;
-        }
-
-        // try to look up a deprecated type
-        auto earlier_version = ApiTypeOracle::inferEarlierExtension(type);
-        if (earlier_version) {
-          // return Utility::getAndCheckFactoryByName<Factory>(earlier_version.value());
-          return Utility::getAndCheckFactoryByName<Factory>(name);
-        }
-
-        throw EnvoyException(
-            fmt::format("Didn't find a registered implementation for type: '{}'", type));
-      }
-    }
-    return Utility::getAndCheckFactoryByName<Factory>(name);
+    return Utility::getAndCheckFactoryByName<Factory>(message.name());
   }
 
   /**
