@@ -40,14 +40,15 @@ public:
   Upstream::HostDescriptionConstSharedPtr host() const override { return host_; };
 
 protected:
-  struct ActiveClient : public Network::ConnectionCallbacks,
+  struct ActiveClient : ConnPoolImplBase::ActiveClient,
+                        public Network::ConnectionCallbacks,
                         public CodecClientCallbacks,
                         public Event::DeferredDeletable,
                         public Http::ConnectionCallbacks {
     ActiveClient(ConnPoolImpl& parent);
     ~ActiveClient() override;
 
-    void onConnectTimeout() { parent_.onConnectTimeout(*this); }
+    void onConnectTimeout() override { parent_.onConnectTimeout(*this); }
 
     // Network::ConnectionCallbacks
     void onEvent(Network::ConnectionEvent event) override {
@@ -69,9 +70,7 @@ protected:
     CodecClientPtr client_;
     Upstream::HostDescriptionConstSharedPtr real_host_description_;
     uint64_t total_streams_{};
-    Event::TimerPtr connect_timer_;
     bool upstream_ready_{};
-    Stats::TimespanPtr conn_length_;
     bool closed_with_active_rq_{};
   };
 
@@ -91,7 +90,6 @@ protected:
   void newClientStream(Http::StreamDecoder& response_decoder, ConnectionPool::Callbacks& callbacks);
   void onUpstreamReady();
 
-  Stats::TimespanPtr conn_connect_ms_;
   Event::Dispatcher& dispatcher_;
   ActiveClientPtr primary_client_;
   ActiveClientPtr draining_client_;

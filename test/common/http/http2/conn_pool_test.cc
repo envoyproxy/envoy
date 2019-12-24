@@ -79,6 +79,7 @@ public:
     test_client.codec_ = new NiceMock<Http::MockClientConnection>();
     test_client.connect_timer_ = new NiceMock<Event::MockTimer>(&dispatcher_);
     test_client.client_dispatcher_ = api_->allocateDispatcher();
+    EXPECT_CALL(*test_client.connect_timer_, enableTimer(_, _));
     EXPECT_CALL(dispatcher_, createClientConnection_(_, _, _, _))
         .WillOnce(Return(test_client.connection_));
     auto cluster = std::make_shared<NiceMock<Upstream::MockClusterInfo>>();
@@ -95,7 +96,6 @@ public:
         .WillOnce(Invoke([this](Upstream::Host::CreateConnectionData&) -> CodecClient* {
           return test_clients_.back().codec_client_;
         }));
-    EXPECT_CALL(*test_client.connect_timer_, enableTimer(_, _));
   }
 
   // Connects a pending connection for client with the given index, asserting
@@ -395,9 +395,9 @@ TEST_F(Http2ConnPoolImplTest, VerifyConnectionTimingStats) {
   r1.inner_decoder_->decodeHeaders(HeaderMapPtr{new HeaderMapImpl{}}, true);
 
   test_clients_[0].connection_->raiseEvent(Network::ConnectionEvent::RemoteClose);
+  EXPECT_CALL(*this, onClientDestroy());
   EXPECT_CALL(cluster_->stats_store_,
               deliverHistogramToSinks(Property(&Stats::Metric::name, "upstream_cx_length_ms"), _));
-  EXPECT_CALL(*this, onClientDestroy());
   dispatcher_.clearDeferredDeleteList();
 
   EXPECT_EQ(1U, cluster_->stats_.upstream_cx_destroy_.value());

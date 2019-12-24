@@ -9,7 +9,6 @@
 
 #include "common/http/http2/codec_impl.h"
 #include "common/network/utility.h"
-#include "common/stats/timespan_impl.h"
 #include "common/upstream/upstream_impl.h"
 
 namespace Envoy {
@@ -156,7 +155,7 @@ void ConnPoolImpl::onConnectionEvent(ActiveClient& client, Network::ConnectionEv
       Envoy::Upstream::reportUpstreamCxDestroyActiveRequest(host_, event);
     }
 
-    if (client.connect_timer_) {
+    if (client.connectionState() == ConnPoolImplBase::ActiveClient::ConnectionState::Connecting) {
       host_->cluster().stats().upstream_cx_connect_fail_.inc();
       host_->stats().cx_connect_fail_.inc();
 
@@ -184,16 +183,13 @@ void ConnPoolImpl::onConnectionEvent(ActiveClient& client, Network::ConnectionEv
   }
 
   if (event == Network::ConnectionEvent::Connected) {
-    conn_connect_ms_->complete();
+    client.recordConnectionSetup();
 
     client.upstream_ready_ = true;
     onUpstreamReady();
   }
 
-  if (client.connect_timer_) {
-    client.connect_timer_->disableTimer();
-    client.connect_timer_.reset();
-  }
+  client.disarmConnectTimeout();
 }
 
 void ConnPoolImpl::movePrimaryClientToDraining() {
@@ -271,10 +267,7 @@ void ConnPoolImpl::onUpstreamReady() {
 }
 
 ConnPoolImpl::ActiveClient::ActiveClient(ConnPoolImpl& parent)
-    : parent_(parent),
-      connect_timer_(parent_.dispatcher_.createTimer([this]() -> void { onConnectTimeout(); })) {
-  parent_.conn_connect_ms_ = std::make_unique<Stats::HistogramCompletableTimespanImpl>(
-      parent_.host_->cluster().stats().upstream_cx_connect_ms_, parent_.dispatcher_.timeSource());
+    : ConnPoolImplBase::ActiveClient(parent.dispatcher_, parent.host_->cluster()), parent_(parent) {
   Upstream::Host::CreateConnectionData data = parent_.host_->createConnection(
       parent_.dispatcher_, parent_.socket_options_, parent_.transport_socket_options_);
   real_host_description_ = data.host_description_;
@@ -282,15 +275,12 @@ ConnPoolImpl::ActiveClient::ActiveClient(ConnPoolImpl& parent)
   client_->addConnectionCallbacks(*this);
   client_->setCodecClientCallbacks(*this);
   client_->setCodecConnectionCallbacks(*this);
-  connect_timer_->enableTimer(parent_.host_->cluster().connectTimeout());
 
   parent_.host_->stats().cx_total_.inc();
   parent_.host_->stats().cx_active_.inc();
   parent_.host_->cluster().stats().upstream_cx_total_.inc();
   parent_.host_->cluster().stats().upstream_cx_active_.inc();
   parent_.host_->cluster().stats().upstream_cx_http2_total_.inc();
-  conn_length_ = std::make_unique<Stats::HistogramCompletableTimespanImpl>(
-      parent_.host_->cluster().stats().upstream_cx_length_ms_, parent_.dispatcher_.timeSource());
 
   client_->setConnectionStats({parent_.host_->cluster().stats().upstream_cx_rx_bytes_total_,
                                parent_.host_->cluster().stats().upstream_cx_rx_bytes_buffered_,
@@ -302,7 +292,6 @@ ConnPoolImpl::ActiveClient::ActiveClient(ConnPoolImpl& parent)
 ConnPoolImpl::ActiveClient::~ActiveClient() {
   parent_.host_->stats().cx_active_.dec();
   parent_.host_->cluster().stats().upstream_cx_active_.dec();
-  conn_length_->complete();
 }
 
 CodecClientPtr ProdConnPoolImpl::createCodecClient(Upstream::Host::CreateConnectionData& data) {

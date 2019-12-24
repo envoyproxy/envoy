@@ -1,7 +1,42 @@
 #include "common/http/conn_pool_base.h"
 
+#include "common/stats/timespan_impl.h"
+
 namespace Envoy {
 namespace Http {
+ConnPoolImplBase::ActiveClient::ActiveClient(Event::Dispatcher& dispatcher,
+                                             const Upstream::ClusterInfo& cluster)
+    : connect_timer_(dispatcher.createTimer([this]() -> void { onConnectTimeout(); })) {
+
+  conn_connect_ms_ = std::make_unique<Stats::HistogramCompletableTimespanImpl>(
+      cluster.stats().upstream_cx_connect_ms_, dispatcher.timeSource());
+  conn_length_ = std::make_unique<Stats::HistogramCompletableTimespanImpl>(
+      cluster.stats().upstream_cx_length_ms_, dispatcher.timeSource());
+  connect_timer_->enableTimer(cluster.connectTimeout());
+}
+
+void ConnPoolImplBase::ActiveClient::recordConnectionSetup() {
+  conn_connect_ms_->complete();
+  conn_connect_ms_.reset();
+}
+
+void ConnPoolImplBase::ActiveClient::disarmConnectTimeout() {
+  if (connect_timer_) {
+    connect_timer_->disableTimer();
+    connect_timer_.reset();
+  }
+}
+
+ConnPoolImplBase::ActiveClient::ConnectionState ConnPoolImplBase::ActiveClient::connectionState() {
+  // We don't track any failure state, as the client should be deferred destroyed once a failure
+  // event is handled.
+  if (connect_timer_) {
+    return Connecting;
+  }
+
+  return Connected;
+}
+
 ConnPoolImplBase::PendingRequest::PendingRequest(ConnPoolImplBase& parent, StreamDecoder& decoder,
                                                  ConnectionPool::Callbacks& callbacks)
     : parent_(parent), decoder_(decoder), callbacks_(callbacks) {
