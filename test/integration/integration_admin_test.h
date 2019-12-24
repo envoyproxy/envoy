@@ -8,6 +8,7 @@
 #include "test/integration/http_protocol_integration.h"
 
 #include "gtest/gtest.h"
+#include "test/test_common/utility.h"
 
 namespace Envoy {
 
@@ -45,7 +46,7 @@ public:
   /**
    * Validates that the passed in string conforms to output of stats in JSON format.
    */
-  void validateStatsJson(const std::string stats_json, const uint64_t expected_hist_count) {
+  void validateStatsJson(const std::string& stats_json, const uint64_t expected_hist_count) {
     Json::ObjectSharedPtr statsjson = Json::Factory::loadFromString(stats_json);
     EXPECT_TRUE(statsjson->hasObject("stats"));
     uint64_t histogram_count = 0;
@@ -73,6 +74,11 @@ public:
 
     // Validate that the stats JSON has expected histograms element.
     EXPECT_EQ(expected_hist_count, histogram_count);
+  }
+
+  void expectEqualSerialized(const std::string& str1, const std::string& str2) {
+    EXPECT_TRUE(
+        TestUtility::protoEqual(TestUtility::jsonToStruct(str1), TestUtility::jsonToStruct(str2)));
   }
 };
 
