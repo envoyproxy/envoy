@@ -12,7 +12,7 @@ option java_multiple_files = true;
 // [#protodoc-title: Unused heap]
 // [#extension: envoy.resource_monitors.unused_heap]
 
-// The unused heap resource monitor reports the amount of memory reserved by Tcmalloc, but not used
+// The unused heap resource monitor reports the amount of memory reserved by TCMalloc, but not used
 // by Envoy, computed as a fraction of currently unused heap memory divided by a statically
 // configured maximum specified in the UnusedHeapConfig.
 message UnusedHeapConfig {
