@@ -1,8 +1,10 @@
 #include "test/test_common/environment.h"
 
 // TODO(asraa): Remove <experimental/filesystem> and rely only on <filesystem> when Envoy requires
-// Clang >= 9.
+// stdc++17
 #if defined(_LIBCPP_VERSION) && !defined(__APPLE__)
+#include <filesystem>
+#elif defined(_MSVC_LANG) && _MSVC_LANG >= 201703L
 #include <filesystem>
 #elif defined __has_include
 #if __has_include(<experimental/filesystem>) && !defined(__APPLE__)
