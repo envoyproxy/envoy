@@ -2,42 +2,23 @@ syntax = "proto3";
 
 package tools.type_whisperer;
 
-// Field level type information.
-message FieldDescription {
-  // Field has a deprecated option set.
-  bool deprecate = 1;
-
-  // Field has (udpa.annotations.field_migrate).rename set.
-  string rename = 2;
-}
-
-// Type details for a single type.
-message TypeDetails {
-  // Fully qualified package name.
-  string qualified_package = 1;
-
-  // Path to .proto from API root.
-  string proto_path = 2;
-
-  // Is this type an enum? There is special treatment required during API
-  // boosting and name mangling.
-  bool enum_type = 4;
-
-  // The fields in the message.
-  map<string, FieldDescription> fields = 6;
-}
-
 // Description for a single type.
 message TypeDescription {
-  // Type details.
-  TypeDetails type_details = 1;
+  // Fully qualified package name.
+  string qualified_package = 2;
+
+  // Path to .proto from API root.
+  string proto_path = 3;
+
+  // Fully qualified type names for type dependencies.
+  repeated string type_dependencies = 4;
 
   // Does this type have a breaking change? If so, it needs to be upgraded at
   // the next major version.
-  bool next_version_upgrade = 2;
+  bool next_version_upgrade = 5;
 
-  // Fully qualified type names for type dependencies.
-  repeated string type_dependencies = 3;
+  // The package of the type in next version
+  string next_version_package = 6;
 }
 
 message Types {
