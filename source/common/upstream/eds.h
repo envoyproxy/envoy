@@ -2,6 +2,7 @@
 
 #include "envoy/api/v2/cds.pb.h"
 #include "envoy/api/v2/core/base.pb.h"
+#include "envoy/api/v2/core/config_source.pb.h"
 #include "envoy/api/v2/discovery.pb.h"
 #include "envoy/api/v2/eds.pb.h"
 #include "envoy/config/subscription.h"
@@ -26,7 +27,9 @@ class EdsClusterImpl : public BaseDynamicClusterImpl, Config::SubscriptionCallba
 public:
   EdsClusterImpl(const envoy::api::v2::Cluster& cluster, Runtime::Loader& runtime,
                  Server::Configuration::TransportSocketFactoryContext& factory_context,
-                 Stats::ScopePtr&& stats_scope, bool added_via_api);
+                 Stats::ScopePtr&& stats_scope, bool added_via_api,
+                 const envoy::api::v2::core::ConfigSource::XdsApiVersion xds_api_version =
+                     envoy::api::v2::core::ConfigSource::AUTO);
 
   // Upstream::Cluster
   InitializePhase initializePhase() const override { return initialize_phase_; }
@@ -42,7 +45,7 @@ private:
   std::string resourceName(const ProtobufWkt::Any& resource) override {
     return MessageUtil::anyConvert<envoy::api::v2::ClusterLoadAssignment>(resource).cluster_name();
   }
-
+  std::string loadTypeUrl();
   using LocalityWeightsMap =
       std::unordered_map<envoy::api::v2::core::Locality, uint32_t, LocalityHash, LocalityEqualTo>;
   bool updateHostsPerLocality(const uint32_t priority, const uint32_t overprovisioning_factor,
@@ -79,6 +82,7 @@ private:
   Event::TimerPtr assignment_timeout_;
   ProtobufMessage::ValidationVisitor& validation_visitor_;
   InitializePhase initialize_phase_;
+  const envoy::api::v2::core::ConfigSource::XdsApiVersion xds_api_version_;
 };
 
 class EdsClusterFactory : public ClusterFactoryImplBase {

@@ -16,13 +16,15 @@ namespace Secret {
 SdsApi::SdsApi(envoy::api::v2::core::ConfigSource sds_config, absl::string_view sds_config_name,
                Config::SubscriptionFactory& subscription_factory, TimeSource& time_source,
                ProtobufMessage::ValidationVisitor& validation_visitor, Stats::Store& stats,
-               Init::Manager& init_manager, std::function<void()> destructor_cb)
+               Init::Manager& init_manager, std::function<void()> destructor_cb,
+               const envoy::api::v2::core::ConfigSource::XdsApiVersion xds_api_version)
     : init_target_(fmt::format("SdsApi {}", sds_config_name), [this] { initialize(); }),
       stats_(stats), sds_config_(std::move(sds_config)), sds_config_name_(sds_config_name),
       secret_hash_(0), clean_up_(std::move(destructor_cb)), validation_visitor_(validation_visitor),
       subscription_factory_(subscription_factory),
       time_source_(time_source), secret_data_{sds_config_name_, "uninitialized",
-                                              time_source_.systemTime()} {
+                                              time_source_.systemTime()},
+      xds_api_version_(xds_api_version) {
   // TODO(JimmyCYJ): Implement chained_init_manager, so that multiple init_manager
   // can be chained together to behave as one init_manager. In that way, we let
   // two listeners which share same SdsApi to register at separate init managers, and
@@ -79,11 +81,22 @@ void SdsApi::validateUpdateSize(int num_resources) {
 }
 
 void SdsApi::initialize() {
-  subscription_ = subscription_factory_.subscriptionFromConfigSource(
-      sds_config_,
-      Grpc::Common::typeUrl(envoy::api::v2::auth::Secret().GetDescriptor()->full_name()), stats_,
-      *this);
+  subscription_ =
+      subscription_factory_.subscriptionFromConfigSource(sds_config_, loadTypeUrl(), stats_, *this);
   subscription_->start({sds_config_name_});
+}
+
+std::string SdsApi::loadTypeUrl() {
+  switch (xds_api_version_) {
+  // automatically set api version as V2
+  case envoy::api::v2::core::ConfigSource::AUTO:
+  case envoy::api::v2::core::ConfigSource::V2:
+    return Grpc::Common::typeUrl(envoy::api::v2::auth::Secret().GetDescriptor()->full_name());
+  case envoy::api::v2::core::ConfigSource::V3ALPHA:
+    return Grpc::Common::typeUrl(envoy::api::v2::auth::Secret().GetDescriptor()->full_name());
+  default:
+    throw EnvoyException(fmt::format("type {} is not supported", xds_api_version_));
+  }
 }
 
 SdsApi::SecretData SdsApi::secretData() { return secret_data_; }

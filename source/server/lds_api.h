@@ -5,6 +5,7 @@
 #include "envoy/api/v2/core/config_source.pb.h"
 #include "envoy/api/v2/discovery.pb.h"
 #include "envoy/api/v2/lds.pb.h"
+#include "envoy/api/v3alpha/lds.pb.h"
 #include "envoy/config/subscription.h"
 #include "envoy/config/subscription_factory.h"
 #include "envoy/init/manager.h"
@@ -26,7 +27,9 @@ class LdsApiImpl : public LdsApi,
 public:
   LdsApiImpl(const envoy::api::v2::core::ConfigSource& lds_config, Upstream::ClusterManager& cm,
              Init::Manager& init_manager, Stats::Scope& scope, ListenerManager& lm,
-             ProtobufMessage::ValidationVisitor& validation_visitor);
+             ProtobufMessage::ValidationVisitor& validation_visitor,
+             const envoy::api::v2::core::ConfigSource::XdsApiVersion xds_api_version =
+                 envoy::api::v2::core::ConfigSource::AUTO);
 
   // Server::LdsApi
   std::string versionInfo() const override { return system_version_info_; }
@@ -43,6 +46,7 @@ private:
   std::string resourceName(const ProtobufWkt::Any& resource) override {
     return MessageUtil::anyConvert<envoy::api::v2::Listener>(resource).name();
   }
+  std::string loadTypeUrl();
 
   std::unique_ptr<Config::Subscription> subscription_;
   std::string system_version_info_;
@@ -51,6 +55,7 @@ private:
   Upstream::ClusterManager& cm_;
   Init::TargetImpl init_target_;
   ProtobufMessage::ValidationVisitor& validation_visitor_;
+  const envoy::api::v2::core::ConfigSource::XdsApiVersion xds_api_version_;
 };
 
 } // namespace Server

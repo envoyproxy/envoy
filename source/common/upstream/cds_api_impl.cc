@@ -6,6 +6,7 @@
 #include "envoy/api/v2/cds.pb.validate.h"
 #include "envoy/api/v2/core/config_source.pb.h"
 #include "envoy/api/v2/discovery.pb.h"
+#include "envoy/api/v3alpha/cds.pb.h"
 #include "envoy/stats/scope.h"
 
 #include "common/common/cleanup.h"
@@ -19,19 +20,20 @@
 namespace Envoy {
 namespace Upstream {
 
-CdsApiPtr CdsApiImpl::create(const envoy::api::v2::core::ConfigSource& cds_config,
-                             ClusterManager& cm, Stats::Scope& scope,
-                             ProtobufMessage::ValidationVisitor& validation_visitor) {
-  return CdsApiPtr{new CdsApiImpl(cds_config, cm, scope, validation_visitor)};
+CdsApiPtr
+CdsApiImpl::create(const envoy::api::v2::core::ConfigSource& cds_config, ClusterManager& cm,
+                   Stats::Scope& scope, ProtobufMessage::ValidationVisitor& validation_visitor,
+                   const envoy::api::v2::core::ConfigSource::XdsApiVersion xds_api_version) {
+  return CdsApiPtr{new CdsApiImpl(cds_config, cm, scope, validation_visitor, xds_api_version)};
 }
 
 CdsApiImpl::CdsApiImpl(const envoy::api::v2::core::ConfigSource& cds_config, ClusterManager& cm,
-                       Stats::Scope& scope, ProtobufMessage::ValidationVisitor& validation_visitor)
+                       Stats::Scope& scope, ProtobufMessage::ValidationVisitor& validation_visitor,
+                       const envoy::api::v2::core::ConfigSource::XdsApiVersion xds_api_version)
     : cm_(cm), scope_(scope.createScope("cluster_manager.cds.")),
-      validation_visitor_(validation_visitor) {
-  subscription_ = cm_.subscriptionFactory().subscriptionFromConfigSource(
-      cds_config, Grpc::Common::typeUrl(envoy::api::v2::Cluster().GetDescriptor()->full_name()),
-      *scope_, *this);
+      validation_visitor_(validation_visitor), xds_api_version_(xds_api_version) {
+  subscription_ = cm_.subscriptionFactory().subscriptionFromConfigSource(cds_config, loadTypeUrl(),
+                                                                         *scope_, *this);
 }
 
 void CdsApiImpl::onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
@@ -121,6 +123,19 @@ void CdsApiImpl::runInitializeCallbackIfAny() {
   if (initialize_callback_) {
     initialize_callback_();
     initialize_callback_ = nullptr;
+  }
+}
+
+std::string CdsApiImpl::loadTypeUrl() {
+  switch (xds_api_version_) {
+  // automatically set api version as V2
+  case envoy::api::v2::core::ConfigSource::AUTO:
+  case envoy::api::v2::core::ConfigSource::V2:
+    return Grpc::Common::typeUrl(envoy::api::v2::Cluster().GetDescriptor()->full_name());
+  case envoy::api::v2::core::ConfigSource::V3ALPHA:
+    return Grpc::Common::typeUrl(envoy::api::v3alpha::Cluster().GetDescriptor()->full_name());
+  default:
+    throw EnvoyException(fmt::format("type {} is not supported", xds_api_version_));
   }
 }
 

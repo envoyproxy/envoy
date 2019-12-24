@@ -26,7 +26,9 @@ class CdsApiImpl : public CdsApi,
 public:
   static CdsApiPtr create(const envoy::api::v2::core::ConfigSource& cds_config, ClusterManager& cm,
                           Stats::Scope& scope,
-                          ProtobufMessage::ValidationVisitor& validation_visitor);
+                          ProtobufMessage::ValidationVisitor& validation_visitor,
+                          const envoy::api::v2::core::ConfigSource::XdsApiVersion xds_api_version =
+                              envoy::api::v2::core::ConfigSource::AUTO);
 
   // Upstream::CdsApi
   void initialize() override { subscription_->start({}); }
@@ -47,9 +49,10 @@ private:
   std::string resourceName(const ProtobufWkt::Any& resource) override {
     return MessageUtil::anyConvert<envoy::api::v2::Cluster>(resource).name();
   }
-
+  std::string loadTypeUrl();
   CdsApiImpl(const envoy::api::v2::core::ConfigSource& cds_config, ClusterManager& cm,
-             Stats::Scope& scope, ProtobufMessage::ValidationVisitor& validation_visitor);
+             Stats::Scope& scope, ProtobufMessage::ValidationVisitor& validation_visitor,
+             const envoy::api::v2::core::ConfigSource::XdsApiVersion xds_api_version);
   void runInitializeCallbackIfAny();
 
   ClusterManager& cm_;
@@ -58,6 +61,7 @@ private:
   std::function<void()> initialize_callback_;
   Stats::ScopePtr scope_;
   ProtobufMessage::ValidationVisitor& validation_visitor_;
+  const envoy::api::v2::core::ConfigSource::XdsApiVersion xds_api_version_;
 };
 
 } // namespace Upstream

@@ -9,6 +9,7 @@
 #include "envoy/api/v2/discovery.pb.h"
 #include "envoy/api/v2/rds.pb.h"
 #include "envoy/api/v2/rds.pb.validate.h"
+#include "envoy/api/v3alpha/rds.pb.h"
 #include "envoy/config/filter/network/http_connection_manager/v2/http_connection_manager.pb.h"
 
 #include "common/common/assert.h"
@@ -60,7 +61,8 @@ RdsRouteConfigSubscription::RdsRouteConfigSubscription(
     const uint64_t manager_identifier, Server::Configuration::ServerFactoryContext& factory_context,
     ProtobufMessage::ValidationVisitor& validator, Init::Manager& init_manager,
     const std::string& stat_prefix,
-    Envoy::Router::RouteConfigProviderManagerImpl& route_config_provider_manager)
+    Envoy::Router::RouteConfigProviderManagerImpl& route_config_provider_manager,
+    const envoy::api::v2::core::ConfigSource::XdsApiVersion xds_api_version)
     : route_config_name_(rds.route_config_name()), factory_context_(factory_context),
       validator_(validator), init_manager_(init_manager),
       init_target_(fmt::format("RdsRouteConfigSubscription {}", route_config_name_),
@@ -68,13 +70,11 @@ RdsRouteConfigSubscription::RdsRouteConfigSubscription(
       scope_(factory_context.scope().createScope(stat_prefix + "rds." + route_config_name_ + ".")),
       stat_prefix_(stat_prefix), stats_({ALL_RDS_STATS(POOL_COUNTER(*scope_))}),
       route_config_provider_manager_(route_config_provider_manager),
-      manager_identifier_(manager_identifier) {
+      manager_identifier_(manager_identifier), xds_api_version_(xds_api_version) {
 
   subscription_ =
       factory_context.clusterManager().subscriptionFactory().subscriptionFromConfigSource(
-          rds.config_source(),
-          Grpc::Common::typeUrl(envoy::api::v2::RouteConfiguration().GetDescriptor()->full_name()),
-          *scope_, *this);
+          rds.config_source(), loadTypeUrl(), *scope_, *this);
   config_update_info_ =
       std::make_unique<RouteConfigUpdateReceiverImpl>(factory_context.timeSource(), validator);
 }
@@ -197,6 +197,20 @@ bool RdsRouteConfigSubscription::validateUpdateSize(int num_resources) {
     // (would be a return false here)
   }
   return true;
+}
+
+std::string RdsRouteConfigSubscription::loadTypeUrl() {
+  switch (xds_api_version_) {
+  // automatically set api version as V2
+  case envoy::api::v2::core::ConfigSource::AUTO:
+  case envoy::api::v2::core::ConfigSource::V2:
+    return Grpc::Common::typeUrl(envoy::api::v2::RouteConfiguration().GetDescriptor()->full_name());
+  case envoy::api::v2::core::ConfigSource::V3ALPHA:
+    return Grpc::Common::typeUrl(
+        envoy::api::v3alpha::RouteConfiguration().GetDescriptor()->full_name());
+  default:
+    throw EnvoyException(fmt::format("type {} is not supported", xds_api_version_));
+  }
 }
 
 RdsRouteConfigProviderImpl::RdsRouteConfigProviderImpl(
