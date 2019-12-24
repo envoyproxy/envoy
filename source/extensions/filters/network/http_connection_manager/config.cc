@@ -548,7 +548,12 @@ HttpConnectionManagerFactory::createHttpConnectionManagerFactoryFromProto(
         context.runtime(), context.localInfo(), context.clusterManager(),
         &context.overloadManager(), context.dispatcher().timeSource());
 
+    // Additional actions taken in the normal path.
+    // When a new connection is creating its filter chain it hydrates the factory with a filter
+    // manager which provides the hcm with the "read_callbacks".
     conn_manager->initializeReadFilterCallbacks(read_callbacks);
+    // When the connection first sends data through the hcm, the hcm creates a codec.
+    conn_manager->forceCodecCreation();
 
     return conn_manager;
   };

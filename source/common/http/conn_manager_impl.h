@@ -66,6 +66,11 @@ public:
                                                               Stats::Scope& scope);
   static const HeaderMapImpl& continueHeader();
 
+  void forceCodecCreation() {
+    ASSERT(!codec_);
+    codec_ = config_.createCodec(read_callbacks_->connection(), Buffer::OwnedImpl(), *this);
+  }
+
   // Network::ReadFilter
   Network::FilterStatus onData(Buffer::Instance& data, bool end_stream) override;
   Network::FilterStatus onNewConnection() override;
