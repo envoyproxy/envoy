@@ -305,6 +305,7 @@ private:
 
     struct ClusterEntry : public ThreadLocalCluster {
       ClusterEntry(ThreadLocalClusterManagerImpl& parent, ClusterInfoConstSharedPtr cluster,
+                   Outlier::DetectorSharedPtr outlier_detector,
                    const LoadBalancerFactorySharedPtr& lb_factory);
       ~ClusterEntry() override;
 
@@ -329,6 +330,7 @@ private:
       LoadBalancerPtr lb_;
       ClusterInfoConstSharedPtr cluster_info_;
       Http::AsyncClientImpl http_async_client_;
+      Outlier::DetectorSharedPtr outlier_detector_;
     };
 
     using ClusterEntryPtr = std::unique_ptr<ClusterEntry>;

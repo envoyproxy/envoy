@@ -101,6 +101,7 @@ protected:
     ConnPoolImpl& parent_;
     CodecClientPtr codec_client_;
     Upstream::HostDescriptionConstSharedPtr real_host_description_;
+    Network::Connection* connection_;
     StreamWrapperPtr stream_wrapper_;
     Event::TimerPtr connect_timer_;
     Stats::TimespanPtr conn_connect_ms_;

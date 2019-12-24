@@ -903,7 +903,8 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ThreadLocalClusterManagerImpl
     ENVOY_LOG(debug, "adding TLS local cluster {}", local_cluster_name.value());
     auto& local_cluster = parent.active_clusters_.at(local_cluster_name.value());
     thread_local_clusters_[local_cluster_name.value()] = std::make_unique<ClusterEntry>(
-        *this, local_cluster->cluster_->info(), local_cluster->loadBalancerFactory());
+        *this, local_cluster->cluster_->info(), local_cluster->cluster_->outlierDetector(),
+        local_cluster->loadBalancerFactory());
   }
 
   local_priority_set_ = local_cluster_name
@@ -919,7 +920,8 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ThreadLocalClusterManagerImpl
     ENVOY_LOG(debug, "adding TLS initial cluster {}", cluster.first);
     ASSERT(thread_local_clusters_.count(cluster.first) == 0);
     thread_local_clusters_[cluster.first] = std::make_unique<ClusterEntry>(
-        *this, cluster.second->cluster_->info(), cluster.second->loadBalancerFactory());
+        *this, cluster.second->cluster_->info(), cluster.second->outlierDetector(),
+        cluster.second->loadBalancerFactory());
   }
 }
 
@@ -1152,13 +1154,14 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::getHttpConnPoolsContainer(
 
 ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::ClusterEntry(
     ThreadLocalClusterManagerImpl& parent, ClusterInfoConstSharedPtr cluster,
-    const LoadBalancerFactorySharedPtr& lb_factory)
+    Outlier::DetectorSharedPtr outlier_detector, const LoadBalancerFactorySharedPtr& lb_factory)
     : parent_(parent), lb_factory_(lb_factory), cluster_info_(cluster),
       http_async_client_(cluster, parent.parent_.stats_, parent.thread_local_dispatcher_,
                          parent.parent_.local_info_, parent.parent_, parent.parent_.runtime_,
                          parent.parent_.random_,
                          Router::ShadowWriterPtr{new Router::ShadowWriterImpl(parent.parent_)},
-                         parent_.parent_.http_context_) {
+                         parent_.parent_.http_context_),
+      outlier_detector_(std::move(outlier_detector)) {
   priority_set_.getOrCreateHostSet(0);
 
   // TODO(mattklein123): Consider converting other LBs over to thread local. All of them could

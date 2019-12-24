@@ -27,7 +27,8 @@ public:
   ConnPoolImpl(Event::Dispatcher& dispatcher, Upstream::HostConstSharedPtr host,
                Upstream::ResourcePriority priority,
                const Network::ConnectionSocket::OptionsSharedPtr& options,
-               const Network::TransportSocketOptionsSharedPtr& transport_socket_options);
+               const Network::TransportSocketOptionsSharedPtr& transport_socket_options,
+               Upstream::Outlier::DetectorSharedPtr outlier_detector);
   ~ConnPoolImpl() override;
 
   // Http::ConnectionPool::Instance
@@ -73,6 +74,7 @@ protected:
     bool upstream_ready_{};
     Stats::TimespanPtr conn_length_;
     bool closed_with_active_rq_{};
+    Upstream::Outlier::EjectableMonitor* outlier_detector_;
   };
 
   using ActiveClientPtr = std::unique_ptr<ActiveClient>;
@@ -98,6 +100,7 @@ protected:
   std::list<DrainedCb> drained_callbacks_;
   const Network::ConnectionSocket::OptionsSharedPtr socket_options_;
   const Network::TransportSocketOptionsSharedPtr transport_socket_options_;
+  const Upstream::Outlier::DetectorSharedPtr outlier_detector_;
 };
 
 /**

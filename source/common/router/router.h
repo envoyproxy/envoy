@@ -381,9 +381,12 @@ private:
     void onPerTryTimeout();
     void maybeEndDecode(bool end_stream);
 
-    void onUpstreamHostSelected(Upstream::HostDescriptionConstSharedPtr host) {
+    void onUpstreamHostSelected(Upstream::HostDescriptionConstSharedPtr host, Network::Connection const* connection) {
       stream_info_.onUpstreamHostSelected(host);
       upstream_host_ = host;
+      if (connection != nullptr) {
+        connection_monitor_ = &connection->outlierDetection();
+      }
       parent_.callbacks_->streamInfo().onUpstreamHostSelected(host);
       if (parent_.retry_state_ && host) {
         parent_.retry_state_->onHostAttempted(host);
@@ -439,6 +442,7 @@ private:
                        Upstream::HostDescriptionConstSharedPtr host) override;
     void onPoolReady(Http::StreamEncoder& request_encoder,
                      Upstream::HostDescriptionConstSharedPtr host,
+                     const Network::Connection& connection,
                      const StreamInfo::StreamInfo& info) override;
 
     void setRequestEncoder(Http::StreamEncoder& request_encoder);
@@ -465,6 +469,7 @@ private:
     absl::optional<Http::StreamResetReason> deferred_reset_reason_;
     Buffer::WatermarkBufferPtr buffered_request_body_;
     Upstream::HostDescriptionConstSharedPtr upstream_host_;
+    Upstream::Outlier::DetectorHostMonitor* connection_monitor_;
     DownstreamWatermarkManager downstream_watermark_manager_{*this};
     Tracing::SpanPtr span_;
     StreamInfo::StreamInfoImpl stream_info_;

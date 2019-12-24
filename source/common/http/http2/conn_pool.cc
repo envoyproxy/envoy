@@ -19,9 +19,11 @@ namespace Http2 {
 ConnPoolImpl::ConnPoolImpl(Event::Dispatcher& dispatcher, Upstream::HostConstSharedPtr host,
                            Upstream::ResourcePriority priority,
                            const Network::ConnectionSocket::OptionsSharedPtr& options,
-                           const Network::TransportSocketOptionsSharedPtr& transport_socket_options)
+                           const Network::TransportSocketOptionsSharedPtr& transport_socket_options,
+                           Upstream::Outlier::DetectorSharedPtr outlier_detector)
     : ConnPoolImplBase(std::move(host), std::move(priority)), dispatcher_(dispatcher),
-      socket_options_(options), transport_socket_options_(transport_socket_options) {}
+      socket_options_(options), transport_socket_options_(transport_socket_options),
+      outlier_detector_(outlier_detector) {}
 
 ConnPoolImpl::~ConnPoolImpl() {
   if (primary_client_) {
@@ -118,8 +120,11 @@ ConnectionPool::Cancellable* ConnPoolImpl::newStream(Http::StreamDecoder& respon
     max_streams = maxTotalStreams();
   }
 
-  if (primary_client_ && primary_client_->total_streams_ >= max_streams) {
-    movePrimaryClientToDraining();
+  if (primary_client_) {
+    if (primary_client_->total_streams_ >= max_streams ||
+        primary_client_->outlier_detector_->ejected()) {
+      movePrimaryClientToDraining();
+    }
   }
 
   if (!primary_client_) {
@@ -277,6 +282,9 @@ ConnPoolImpl::ActiveClient::ActiveClient(ConnPoolImpl& parent)
       parent_.host_->cluster().stats().upstream_cx_connect_ms_, parent_.dispatcher_.timeSource());
   Upstream::Host::CreateConnectionData data = parent_.host_->createConnection(
       parent_.dispatcher_, parent_.socket_options_, parent_.transport_socket_options_);
+  parent_.outlier_detector_->addConnectionMonitor(*data.connection_);
+  outlier_detector_ = &data.connection_->outlierDetection();
+
   real_host_description_ = data.host_description_;
   client_ = parent_.createCodecClient(data);
   client_->addConnectionCallbacks(*this);

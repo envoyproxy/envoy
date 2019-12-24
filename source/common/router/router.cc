@@ -827,6 +827,9 @@ void Filter::updateOutlierDetection(Upstream::Outlier::Result result,
   if (upstream_request.upstream_host_) {
     upstream_request.upstream_host_->outlierDetector().putResult(result, code);
   }
+  if (upstream_request.connection_monitor_) {
+    upstream_request.connection_monitor_->putResult(result, code);
+  }
 }
 
 void Filter::chargeUpstreamAbort(Http::Code code, bool dropped, UpstreamRequest& upstream_request) {
@@ -1057,8 +1060,10 @@ void Filter::onUpstreamHeaders(uint64_t response_code, Http::HeaderMapPtr&& head
       Runtime::runtimeFeatureEnabled(
           "envoy.reloadable_features.outlier_detection_support_for_grpc_status")) {
     upstream_request.upstream_host_->outlierDetector().putHttpResponseCode(grpc_to_http_status);
+    upstream_request.connection_monitor_->putHttpResponseCode(grpc_to_http_status);
   } else {
     upstream_request.upstream_host_->outlierDetector().putHttpResponseCode(response_code);
+    upstream_request.connection_monitor_->putHttpResponseCode(response_code);
   }
 
   if (headers->EnvoyImmediateHealthCheckFail() != nullptr) {
@@ -1225,6 +1230,8 @@ void Filter::onUpstreamComplete(UpstreamRequest& upstream_request) {
     std::chrono::milliseconds response_time = std::chrono::duration_cast<std::chrono::milliseconds>(
         dispatcher.timeSource().monotonicTime() - downstream_request_complete_time_);
     upstream_request.upstream_host_->outlierDetector().putResponseTime(response_time);
+    upstream_request.connection_monitor_->putResult(
+        Upstream::Outlier::Result::LocalOriginConnectSuccess);
     const bool internal_request = Http::HeaderUtility::isEnvoyInternalRequest(*downstream_headers_);
 
     Http::CodeStats& code_stats = httpContext().codeStats();
@@ -1602,20 +1609,23 @@ void Filter::UpstreamRequest::onPoolFailure(Http::ConnectionPool::PoolFailureRea
   }
 
   // Mimic an upstream reset.
-  onUpstreamHostSelected(host);
+  onUpstreamHostSelected(host, nullptr);
   onResetStream(reset_reason, transport_failure_reason);
 }
 
 void Filter::UpstreamRequest::onPoolReady(Http::StreamEncoder& request_encoder,
                                           Upstream::HostDescriptionConstSharedPtr host,
+                                          const Network::Connection& connection,
                                           const StreamInfo::StreamInfo& info) {
   // This may be called under an existing ScopeTrackerScopeState but it will unwind correctly.
   ScopeTrackerScopeState scope(&parent_.callbacks_->scope(), parent_.callbacks_->dispatcher());
   ENVOY_STREAM_LOG(debug, "pool ready", *parent_.callbacks_);
 
+  // TODO maybe make an aggregate monitor?
   host->outlierDetector().putResult(Upstream::Outlier::Result::LocalOriginConnectSuccess);
+  connection.outlierDetection().putResult(Upstream::Outlier::Result::LocalOriginConnectSuccess);
 
-  onUpstreamHostSelected(host);
+  onUpstreamHostSelected(host, &connection);
   request_encoder.getStream().addCallbacks(*this);
 
   stream_info_.setUpstreamLocalAddress(request_encoder.getStream().connectionLocalAddress());

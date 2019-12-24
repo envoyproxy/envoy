@@ -18,6 +18,7 @@
 #include "envoy/http/codes.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/stats/scope.h"
+#include "envoy/thread_local/thread_local.h"
 #include "envoy/upstream/outlier_detection.h"
 #include "envoy/upstream/upstream.h"
 
@@ -38,6 +39,7 @@ public:
   const absl::optional<MonotonicTime>& lastEjectionTime() override { return time_; }
   const absl::optional<MonotonicTime>& lastUnejectionTime() override { return time_; }
   double successRate(SuccessRateMonitorType) const override { return -1; }
+  bool ejected() const override { return false; }
 
 private:
   const absl::optional<MonotonicTime> time_;
@@ -132,15 +134,19 @@ private:
 
 class DetectorImpl;
 
-/**
- * Implementation of DetectorHostMonitor for the generic detector.
- */
-class DetectorHostMonitorImpl : public DetectorHostMonitor {
+class MonitorImplBase : public virtual DetectorHostMonitor {
 public:
-  DetectorHostMonitorImpl(std::shared_ptr<DetectorImpl> detector, HostSharedPtr host);
+  MonitorImplBase(std::shared_ptr<DetectorImpl> detector);
 
-  void eject(MonotonicTime ejection_time);
-  void uneject(MonotonicTime ejection_time);
+  virtual void eject(MonotonicTime ejection_time) {
+    num_ejections_++;
+    last_ejection_time_ = ejection_time;
+  }
+  void uneject(MonotonicTime unejection_time) { last_unejection_time_ = (unejection_time); }
+
+  virtual void onConsecutiveGatewayFailure(const std::shared_ptr<DetectorImpl>& detector) PURE;
+  virtual void onConsecutive5xx(const std::shared_ptr<DetectorImpl>& detector) PURE;
+  virtual void onConsecutiveLocalOriginFailure(const std::shared_ptr<DetectorImpl>& detector) PURE;
 
   void resetConsecutive5xx() { consecutive_5xx_ = 0; }
   void resetConsecutiveGatewayFailure() { consecutive_gateway_failure_ = 0; }
@@ -165,7 +171,7 @@ public:
   SuccessRateMonitor& getSRMonitor(SuccessRateMonitorType type) {
     // Call const version of the same method
     return const_cast<SuccessRateMonitor&>(
-        const_cast<const DetectorHostMonitorImpl*>(this)->getSRMonitor(type));
+        const_cast<const MonitorImplBase*>(this)->getSRMonitor(type));
   }
 
   double successRate(SuccessRateMonitorType type) const override {
@@ -180,9 +186,10 @@ public:
   void localOriginFailure();
   void localOriginNoFailure();
 
-private:
+protected:
   std::weak_ptr<DetectorImpl> detector_;
-  std::weak_ptr<Host> host_;
+
+private:
   absl::optional<MonotonicTime> last_ejection_time_;
   absl::optional<MonotonicTime> last_unejection_time_;
   uint32_t num_ejections_{};
@@ -204,9 +211,64 @@ private:
 
   void putResultNoLocalExternalSplit(Result result, absl::optional<uint64_t> code);
   void putResultWithLocalExternalSplit(Result result, absl::optional<uint64_t> code);
-  std::function<void(DetectorHostMonitorImpl*, Result, absl::optional<uint64_t> code)>
-      put_result_func_;
+  std::function<void(MonitorImplBase*, Result, absl::optional<uint64_t> code)> put_result_func_;
 };
+
+/**
+ * Implementation of DetectorHostMonitor for the generic detector.
+ */
+class DetectorHostMonitorImpl : public MonitorImplBase {
+public:
+  DetectorHostMonitorImpl(std::shared_ptr<DetectorImpl> detector, HostSharedPtr host);
+
+  void eject(MonotonicTime ejection_time) override;
+
+  void onConsecutiveGatewayFailure(const std::shared_ptr<DetectorImpl>& detector) override;
+  void onConsecutive5xx(const std::shared_ptr<DetectorImpl>& detector) override;
+  void onConsecutiveLocalOriginFailure(const std::shared_ptr<DetectorImpl>& detector) override;
+
+  bool ejected() const override { return false; }
+
+private:
+  std::weak_ptr<Host> host_;
+};
+
+class DetectorConnectionMonitor : public MonitorImplBase {
+public:
+  DetectorConnectionMonitor(std::shared_ptr<DetectorImpl> detector, Network::Connection* connection)
+      : MonitorImplBase(std::move(detector)), connection_(connection) {}
+
+  ~DetectorConnectionMonitor();
+
+  // MonitorImplBase
+  void eject(MonotonicTime ejection_time) override {
+    MonitorImplBase::eject(ejection_time);
+    ejected_ = true;
+  }
+
+  void uneject(MonotonicTime) {
+    // Do nothing: unejecting doesn't make sense for connection monitors as we close the connections
+    // during ejection. This might get hit during draining, but we just ignore it.
+  }
+
+  void onConsecutiveGatewayFailure(const std::shared_ptr<DetectorImpl>&) override {
+    ejected_ = true;
+  }
+  void onConsecutive5xx(const std::shared_ptr<DetectorImpl>&) override { ejected_ = true; }
+  void onConsecutiveLocalOriginFailure(const std::shared_ptr<DetectorImpl>&) override {
+    ejected_ = true;
+  }
+
+  bool ejected() const override {
+    return ejected_;
+  }
+
+private:
+  std::atomic<bool> ejected_{};
+  Network::Connection* connection_;
+};
+
+using DetectorConnectionMonitorPtr = std::unique_ptr<DetectorConnectionMonitor>;
 
 /**
  * All outlier detection stats. @see stats_macros.h
@@ -365,6 +427,19 @@ public:
                                const std::vector<HostSuccessRatePair>& valid_success_rate_hosts,
                                double success_rate_stdev_factor);
 
+  void addConnectionMonitor(Network::Connection& connection) override {
+    auto monitor = std::make_unique<DetectorConnectionMonitor>(shared_from_this(), &connection);
+    connection_monitors_slot_->getTyped<ThreadLocalConnectionMonitors>()
+        .connection_monitors_[&connection] = monitor.get();
+
+    connection.setOutlierDetection(std::move(monitor));
+  }
+
+  void removeConnectionMonitor(Network::Connection* connection) {
+    connection_monitors_slot_->getTyped<ThreadLocalConnectionMonitors>().connection_monitors_.erase(
+        connection);
+  }
+
 private:
   DetectorImpl(const Cluster& cluster, const envoy::api::v2::cluster::OutlierDetection& config,
                Event::Dispatcher& dispatcher, Runtime::Loader& runtime, TimeSource& time_source,
@@ -396,6 +471,16 @@ private:
   std::list<ChangeStateCb> callbacks_;
   std::unordered_map<HostSharedPtr, DetectorHostMonitorImpl*> host_monitors_;
   EventLoggerSharedPtr event_logger_;
+
+  // We track connection state in a thread local map: this allows connections created on individual
+  // threads to add/remove themselves from the map without coordinating with the main thread.
+  //
+  // If connections eventually become thread aware, some work will have to be done here in order
+  // to ensure that we handle connections moving threads.
+  struct ThreadLocalConnectionMonitors : ThreadLocal::ThreadLocalObject {
+    std::unordered_map<Network::Connection*, DetectorConnectionMonitor*> connection_monitors_;
+  };
+  ThreadLocal::SlotPtr connection_monitors_slot_;
 
   // EjectionPair for external and local origin events.
   // When external/local origin events are not split, external_origin_sr_num_ are used for

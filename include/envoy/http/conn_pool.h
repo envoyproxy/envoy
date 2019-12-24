@@ -62,6 +62,7 @@ public:
    */
   virtual void onPoolReady(Http::StreamEncoder& encoder,
                            Upstream::HostDescriptionConstSharedPtr host,
+                           const Network::Connection& connection,
                            const StreamInfo::StreamInfo& info) PURE;
 };
 

@@ -75,7 +75,7 @@ void ConnPoolImpl::attachRequestToClient(ActiveClient& client, StreamDecoder& re
   host_->cluster().stats().upstream_rq_total_.inc();
   host_->stats().rq_total_.inc();
   client.stream_wrapper_ = std::make_unique<StreamWrapper>(response_decoder, client);
-  callbacks.onPoolReady(*client.stream_wrapper_, client.real_host_description_,
+  callbacks.onPoolReady(*client.stream_wrapper_, client.real_host_description_, *client.connection_,
                         client.codec_client_->streamInfo());
 }
 
@@ -312,6 +312,7 @@ ConnPoolImpl::ActiveClient::ActiveClient(ConnPoolImpl& parent)
   Upstream::Host::CreateConnectionData data = parent_.host_->createConnection(
       parent_.dispatcher_, parent_.socket_options_, parent_.transport_socket_options_);
   real_host_description_ = data.host_description_;
+  connection_ = data.connection_.get();
   codec_client_ = parent_.createCodecClient(data);
   codec_client_->addConnectionCallbacks(*this);
 

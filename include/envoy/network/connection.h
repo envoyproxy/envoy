@@ -294,6 +294,16 @@ public:
    *         occurred an empty string is returned.
    */
   virtual absl::string_view transportFailureReason() const PURE;
+
+  /**
+   * Sets the outlier detection monitor to use for this connection.
+   */
+  virtual void setOutlierDetection(Upstream::Outlier::DetectorHostMonitorPtr&& monitor) PURE;
+
+  /**
+   * Retrieves the outlier detection monitor used for this connection.
+   */
+  virtual Upstream::Outlier::DetectorHostMonitor& outlierDetection() const PURE;
 };
 
 using ConnectionPtr = std::unique_ptr<Connection>;

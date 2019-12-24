@@ -279,6 +279,7 @@ envoy_cc_library(
         "//include/envoy/runtime:runtime_interface",
         "//include/envoy/upstream:outlier_detection_interface",
         "//include/envoy/upstream:upstream_interface",
+        "//include/envoy/thread_local:thread_local_interface",
         "//source/common/common:assert_lib",
         "//source/common/common:utility_lib",
         "//source/common/http:codes_lib",

@@ -110,6 +110,8 @@ public:
    * and LocalOrigin type returns success rate for local origin errors.
    */
   virtual double successRate(SuccessRateMonitorType type) const PURE;
+
+  virtual bool ejected() const PURE;
 };
 
 using DetectorHostMonitorPtr = std::unique_ptr<DetectorHostMonitor>;
@@ -150,6 +152,11 @@ public:
    */
   virtual double
       successRateEjectionThreshold(DetectorHostMonitor::SuccessRateMonitorType) const PURE;
+
+  /**
+   * Adds a monitor for the provided connection.
+   */
+  virtual void addConnectionMonitor(Network::Connection& connection) PURE;
 };
 
 using DetectorSharedPtr = std::shared_ptr<Detector>;

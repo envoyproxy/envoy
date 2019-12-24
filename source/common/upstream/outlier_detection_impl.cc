@@ -35,9 +35,8 @@ DetectorSharedPtr DetectorImplFactory::createForCluster(
   }
 }
 
-DetectorHostMonitorImpl::DetectorHostMonitorImpl(std::shared_ptr<DetectorImpl> detector,
-                                                 HostSharedPtr host)
-    : detector_(detector), host_(host),
+MonitorImplBase::MonitorImplBase(std::shared_ptr<DetectorImpl> detector)
+    : detector_(detector),
       // add Success Rate monitors
       external_origin_sr_monitor_(envoy::data::cluster::v2alpha::OutlierEjectionType::SUCCESS_RATE),
       local_origin_sr_monitor_(
@@ -49,23 +48,12 @@ DetectorHostMonitorImpl::DetectorHostMonitorImpl(std::shared_ptr<DetectorImpl> d
                          : &DetectorHostMonitorImpl::putResultNoLocalExternalSplit;
 }
 
-void DetectorHostMonitorImpl::eject(MonotonicTime ejection_time) {
-  ASSERT(!host_.lock()->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK));
-  host_.lock()->healthFlagSet(Host::HealthFlag::FAILED_OUTLIER_CHECK);
-  num_ejections_++;
-  last_ejection_time_ = ejection_time;
-}
-
-void DetectorHostMonitorImpl::uneject(MonotonicTime unejection_time) {
-  last_unejection_time_ = (unejection_time);
-}
-
-void DetectorHostMonitorImpl::updateCurrentSuccessRateBucket() {
+void MonitorImplBase::updateCurrentSuccessRateBucket() {
   external_origin_sr_monitor_.updateCurrentSuccessRateBucket();
   local_origin_sr_monitor_.updateCurrentSuccessRateBucket();
 }
 
-void DetectorHostMonitorImpl::putHttpResponseCode(uint64_t response_code) {
+void MonitorImplBase::putHttpResponseCode(uint64_t response_code) {
   external_origin_sr_monitor_.incTotalReqCounter();
   if (Http::CodeUtility::is5xx(response_code)) {
     std::shared_ptr<DetectorImpl> detector = detector_.lock();
@@ -77,7 +65,7 @@ void DetectorHostMonitorImpl::putHttpResponseCode(uint64_t response_code) {
       if (++consecutive_gateway_failure_ == detector->runtime().snapshot().getInteger(
                                                 "outlier_detection.consecutive_gateway_failure",
                                                 detector->config().consecutiveGatewayFailure())) {
-        detector->onConsecutiveGatewayFailure(host_.lock());
+        onConsecutiveGatewayFailure(detector);
       }
     } else {
       consecutive_gateway_failure_ = 0;
@@ -86,7 +74,7 @@ void DetectorHostMonitorImpl::putHttpResponseCode(uint64_t response_code) {
     if (++consecutive_5xx_ ==
         detector->runtime().snapshot().getInteger("outlier_detection.consecutive_5xx",
                                                   detector->config().consecutive5xx())) {
-      detector->onConsecutive5xx(host_.lock());
+      onConsecutive5xx(detector);
     }
   } else {
     external_origin_sr_monitor_.incSuccessReqCounter();
@@ -95,7 +83,7 @@ void DetectorHostMonitorImpl::putHttpResponseCode(uint64_t response_code) {
   }
 }
 
-absl::optional<Http::Code> DetectorHostMonitorImpl::resultToHttpCode(Result result) {
+absl::optional<Http::Code> MonitorImplBase::resultToHttpCode(Result result) {
   Http::Code http_code = Http::Code::InternalServerError;
 
   switch (result) {
@@ -129,8 +117,7 @@ absl::optional<Http::Code> DetectorHostMonitorImpl::resultToHttpCode(Result resu
 // Depending on the value of the parameter *code* the function behaves differently:
 // - if the *code* is not defined, mapping uses resultToHttpCode method to do mapping.
 // - if *code* is defined, it is taken as HTTP code and reported as such to outlier detector.
-void DetectorHostMonitorImpl::putResultNoLocalExternalSplit(Result result,
-                                                            absl::optional<uint64_t> code) {
+void MonitorImplBase::putResultNoLocalExternalSplit(Result result, absl::optional<uint64_t> code) {
   if (code) {
     putHttpResponseCode(code.value());
   } else {
@@ -144,8 +131,7 @@ void DetectorHostMonitorImpl::putResultNoLocalExternalSplit(Result result,
 // Method is called by putResult when external and local origin errors
 // are treated separately. Local origin errors have separate counters and
 // separate success rate monitor.
-void DetectorHostMonitorImpl::putResultWithLocalExternalSplit(Result result,
-                                                              absl::optional<uint64_t>) {
+void MonitorImplBase::putResultWithLocalExternalSplit(Result result, absl::optional<uint64_t>) {
   switch (result) {
   // SUCCESS is used to report success for connection level. Server may still respond with
   // error, but connection to server was OK.
@@ -176,11 +162,11 @@ void DetectorHostMonitorImpl::putResultWithLocalExternalSplit(Result result,
 // It calls putResultWithLocalExternalSplit or put putResultNoLocalExternalSplit via
 // std::function. The setting happens in constructor based on split_external_local_origin_errors
 // config parameter.
-void DetectorHostMonitorImpl::putResult(Result result, absl::optional<uint64_t> code) {
+void MonitorImplBase::putResult(Result result, absl::optional<uint64_t> code) {
   put_result_func_(this, result, code);
 }
 
-void DetectorHostMonitorImpl::localOriginFailure() {
+void MonitorImplBase::localOriginFailure() {
   std::shared_ptr<DetectorImpl> detector = detector_.lock();
   if (!detector) {
     // It's possible for the cluster/detector to go away while we still have a host in use.
@@ -191,11 +177,11 @@ void DetectorHostMonitorImpl::localOriginFailure() {
       detector->runtime().snapshot().getInteger(
           "outlier_detection.consecutive_local_origin_failure",
           detector->config().consecutiveLocalOriginFailure())) {
-    detector->onConsecutiveLocalOriginFailure(host_.lock());
+    onConsecutiveLocalOriginFailure(detector);
   }
 }
 
-void DetectorHostMonitorImpl::localOriginNoFailure() {
+void MonitorImplBase::localOriginNoFailure() {
   std::shared_ptr<DetectorImpl> detector = detector_.lock();
   if (!detector) {
     // It's possible for the cluster/detector to go away while we still have a host in use.
@@ -206,6 +192,37 @@ void DetectorHostMonitorImpl::localOriginNoFailure() {
   local_origin_sr_monitor_.incSuccessReqCounter();
 
   resetConsecutiveLocalOriginFailure();
+}
+
+DetectorConnectionMonitor::~DetectorConnectionMonitor() {
+  auto shared_detector = detector_.lock();
+  if (shared_detector != nullptr) {
+    shared_detector->removeConnectionMonitor(connection_);
+  }
+}
+
+DetectorHostMonitorImpl::DetectorHostMonitorImpl(std::shared_ptr<DetectorImpl> detector,
+                                                 HostSharedPtr host)
+    : MonitorImplBase(detector), host_(host) {}
+
+void DetectorHostMonitorImpl::eject(MonotonicTime ejection_time) {
+  ASSERT(!host_.lock()->healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK));
+  host_.lock()->healthFlagSet(Host::HealthFlag::FAILED_OUTLIER_CHECK);
+  MonitorImplBase::eject(ejection_time);
+}
+
+void DetectorHostMonitorImpl::onConsecutiveGatewayFailure(
+    const std::shared_ptr<DetectorImpl>& detector) {
+  detector->onConsecutiveGatewayFailure(host_.lock());
+}
+
+void DetectorHostMonitorImpl::onConsecutive5xx(const std::shared_ptr<DetectorImpl>& detector) {
+  detector->onConsecutive5xx(host_.lock());
+}
+
+void DetectorHostMonitorImpl::onConsecutiveLocalOriginFailure(
+    const std::shared_ptr<DetectorImpl>& detector) {
+  detector->onConsecutiveLocalOriginFailure(host_.lock());
 }
 
 DetectorConfig::DetectorConfig(const envoy::api::v2::cluster::OutlierDetection& config)
