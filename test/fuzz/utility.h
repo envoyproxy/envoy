@@ -119,6 +119,13 @@ inline TestStreamInfo fromStreamInfo(const test::fuzz::StreamInfo& stream_info) 
   testing::DefaultValue<const std::string&>::Set(EMPTY_STRING);
   TestStreamInfo test_stream_info;
   test_stream_info.metadata_ = stream_info.dynamic_metadata();
+  // Truncate recursive filter metadata fields.
+  // TODO(asraa): Resolve MessageToJsonString failure on recursive filter metadata.
+  for (auto& pair : *test_stream_info.metadata_.mutable_filter_metadata()) {
+    std::string value;
+    pair.second.SerializeToString(&value);
+    pair.second.ParseFromString(value.substr(0, 128));
+  }
   // libc++ clocks don't track at nanosecond on macOS.
   const auto start_time =
       static_cast<uint64_t>(std::numeric_limits<std::chrono::nanoseconds::rep>::max()) <

@@ -8,7 +8,7 @@ set -e
 
 # Clean up any stale files in the API tree output. Bazel remembers valid cached
 # files still.
-rm -rf bazel-bin/external/envoy_api
+# rm -rf bazel-bin/external/envoy_api
 
 # Find all source protos.
 declare -r PROTO_TARGETS=$(bazel query "labels(srcs, labels(deps, @envoy_api//docs:protos))")

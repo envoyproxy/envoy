@@ -31,6 +31,12 @@ message ConfigDump {
   // * *clusters*: :ref:`ClustersConfigDump <envoy_api_msg_admin.v2alpha.ClustersConfigDump>`
   // * *listeners*: :ref:`ListenersConfigDump <envoy_api_msg_admin.v2alpha.ListenersConfigDump>`
   // * *routes*:  :ref:`RoutesConfigDump <envoy_api_msg_admin.v2alpha.RoutesConfigDump>`
+  //
+  // You can filter output with the resource and mask query parameters.
+  // See :ref:`/config_dump?resource={} <operations_admin_interface_config_dump_by_resource>`,
+  // :ref:`/config_dump?mask={} <operations_admin_interface_config_dump_by_mask>`,
+  // or :ref:`/config_dump?resource={},mask={}
+  // <operations_admin_interface_config_dump_by_resource_and_mask>` for more information.
   repeated google.protobuf.Any configs = 1;
 }
 

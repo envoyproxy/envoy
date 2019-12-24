@@ -17,6 +17,7 @@ DEFINE_PROTO_FUZZER(const test::common::http::HeaderMapImplFuzzTestCase& input) 
   Http::HeaderMapImplPtr header_map = std::make_unique<Http::HeaderMapImpl>();
   std::vector<std::unique_ptr<Http::LowerCaseString>> lower_case_strings;
   std::vector<std::unique_ptr<std::string>> strings;
+  uint64_t set_integer;
   constexpr auto max_actions = 128;
   for (int i = 0; i < std::min(max_actions, input.actions().size()); ++i) {
     const auto& action = input.actions(i);
@@ -95,8 +96,9 @@ DEFINE_PROTO_FUZZER(const test::common::http::HeaderMapImplFuzzTestCase& input) 
     }
     case test::common::http::Action::kMutateAndMove: {
       const auto& mutate_and_move = action.mutate_and_move();
-      Http::HeaderString header_field(
-          Http::LowerCaseString(replaceInvalidCharacters(mutate_and_move.key())));
+      lower_case_strings.emplace_back(
+          std::make_unique<Http::LowerCaseString>(replaceInvalidCharacters(mutate_and_move.key())));
+      Http::HeaderString header_field(*lower_case_strings.back());
       Http::HeaderString header_value;
       // Do some mutation or parameterized action.
       switch (mutate_and_move.mutate_selector_case()) {
@@ -108,7 +110,8 @@ DEFINE_PROTO_FUZZER(const test::common::http::HeaderMapImplFuzzTestCase& input) 
         header_value.setCopy(replaceInvalidCharacters(mutate_and_move.set_copy()));
         break;
       case test::common::http::MutateAndMove::kSetInteger:
-        header_value.setInteger(mutate_and_move.set_integer());
+        set_integer = mutate_and_move.set_integer();
+        header_value.setInteger(set_integer);
         break;
       case test::common::http::MutateAndMove::kSetReference:
         strings.emplace_back(std::make_unique<std::string>(

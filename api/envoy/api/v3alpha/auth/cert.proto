@@ -4,6 +4,7 @@ package envoy.api.v3alpha.auth;
 
 import "envoy/api/v3alpha/core/base.proto";
 import "envoy/api/v3alpha/core/config_source.proto";
+import "envoy/type/matcher/v3alpha/string.proto";
 
 import "google/protobuf/any.proto";
 import "google/protobuf/struct.proto";
@@ -187,10 +188,14 @@ message TlsSessionTicketKeys {
   repeated core.DataSource keys = 1 [(validate.rules).repeated = {min_items: 1}];
 }
 
-// [#next-free-field: 9]
+// [#next-free-field: 10]
 message CertificateValidationContext {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.api.v2.auth.CertificateValidationContext";
+
+  reserved 4;
+
+  reserved "verify_subject_alt_name";
 
   // TLS certificate data containing certificate authority certificates to use in verifying
   // a presented peer certificate (e.g. server certificate for clusters or client certificate
@@ -277,15 +282,15 @@ message CertificateValidationContext {
   repeated string verify_certificate_hash = 2
       [(validate.rules).repeated = {items {string {min_bytes: 64 max_bytes: 95}}}];
 
-  // An optional list of Subject Alternative Names. If specified, Envoy will verify that the
-  // Subject Alternative Name of the presented certificate matches one of the specified values.
+  // An optional list of Subject Alternative name matchers. Envoy will verify that the
+  // Subject Alternative Name of the presented certificate matches one of the specified matches.
   //
   // .. attention::
   //
   //   Subject Alternative Names are easily spoofable and verifying only them is insecure,
   //   therefore this option must be used together with :ref:`trusted_ca
   //   <envoy_api_field_api.v3alpha.auth.CertificateValidationContext.trusted_ca>`.
-  repeated string verify_subject_alt_name = 4;
+  repeated type.matcher.v3alpha.StringMatcher match_subject_alt_names = 9;
 
   // [#not-implemented-hide:] Must present a signed time-stamped OCSP response.
   google.protobuf.BoolValue require_ocsp_staple = 5;
