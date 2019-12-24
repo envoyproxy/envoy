@@ -18,9 +18,6 @@ public:
   createQuicServerConnection(Network::Connection& connection, ConnectionCallbacks& callbacks) PURE;
 
   const std::string category() const override { return "quic_client_codec"; }
-
-  // Prevents double registration for the same config proto
-  // const std::string configType() override { return ""; }
 };
 
 // A factory to create Http::ClientConnection instance for QUIC.
@@ -32,9 +29,6 @@ public:
   createQuicClientConnection(Network::Connection& connection, ConnectionCallbacks& callbacks) PURE;
 
   const std::string category() const override { return "quic_server_codec"; }
-
-  // Prevents double registration for the same config proto
-  // const std::string configType() override { return ""; }
 };
 
 } // namespace Http
