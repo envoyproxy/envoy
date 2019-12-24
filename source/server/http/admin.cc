@@ -49,6 +49,7 @@
 #include "common/network/listen_socket_impl.h"
 #include "common/network/utility.h"
 #include "common/profiler/profiler.h"
+#include "common/protobuf/utility.h"
 #include "common/router/config_impl.h"
 #include "common/stats/histogram_impl.h"
 #include "common/upstream/host_utility.h"
@@ -58,18 +59,7 @@
 #include "absl/strings/str_join.h"
 #include "absl/strings/str_replace.h"
 #include "absl/strings/string_view.h"
-
-// TODO(mattklein123): Switch to JSON interface methods and remove rapidjson dependency.
-#include "rapidjson/document.h"
-#include "rapidjson/error/en.h"
-#include "rapidjson/prettywriter.h"
-#include "rapidjson/reader.h"
-#include "rapidjson/schema.h"
-#include "rapidjson/stream.h"
-#include "rapidjson/stringbuffer.h"
 #include "spdlog/spdlog.h"
-
-using namespace rapidjson;
 
 namespace Envoy {
 namespace Server {
@@ -1043,89 +1033,72 @@ AdminImpl::statsAsJson(const std::map<std::string, uint64_t>& all_stats,
                        const std::vector<Stats::ParentHistogramSharedPtr>& all_histograms,
                        const bool used_only, const absl::optional<std::regex> regex,
                        const bool pretty_print) {
-  rapidjson::Document document;
-  document.SetObject();
-  rapidjson::Value stats_array(rapidjson::kArrayType);
-  rapidjson::Document::AllocatorType& allocator = document.GetAllocator();
+
+  ProtobufWkt::Struct document;
+  std::vector<ProtobufWkt::Value> stats_array;
   for (const auto& stat : all_stats) {
-    Value stat_obj;
-    stat_obj.SetObject();
-    Value stat_name;
-    stat_name.SetString(stat.first.c_str(), allocator);
-    stat_obj.AddMember("name", stat_name, allocator);
-    Value stat_value;
-    stat_value.SetInt(stat.second);
-    stat_obj.AddMember("value", stat_value, allocator);
-    stats_array.PushBack(stat_obj, allocator);
+    ProtobufWkt::Struct stat_obj;
+    auto* stat_obj_fields = stat_obj.mutable_fields();
+    (*stat_obj_fields)["name"] = ValueUtil::stringValue(stat.first);
+    (*stat_obj_fields)["value"] = ValueUtil::numberValue(stat.second);
+    stats_array.push_back(ValueUtil::structValue(stat_obj));
   }
 
-  Value histograms_container_obj;
-  histograms_container_obj.SetObject();
+  ProtobufWkt::Struct histograms_obj;
+  auto* histograms_obj_fields = histograms_obj.mutable_fields();
 
-  Value histograms_obj;
-  histograms_obj.SetObject();
+  ProtobufWkt::Struct histograms_obj_container;
+  auto* histograms_obj_container_fields = histograms_obj_container.mutable_fields();
+  std::vector<ProtobufWkt::Value> computed_quantile_array;
 
   bool found_used_histogram = false;
-  rapidjson::Value histogram_array(rapidjson::kArrayType);
-
   for (const Stats::ParentHistogramSharedPtr& histogram : all_histograms) {
     if (shouldShowMetric(*histogram, used_only, regex)) {
       if (!found_used_histogram) {
         // It is not possible for the supported quantiles to differ across histograms, so it is ok
         // to send them once.
         Stats::HistogramStatisticsImpl empty_statistics;
-        rapidjson::Value supported_quantile_array(rapidjson::kArrayType);
+        std::vector<ProtobufWkt::Value> supported_quantile_array;
         for (double quantile : empty_statistics.supportedQuantiles()) {
-          Value quantile_type;
-          quantile_type.SetDouble(quantile * 100);
-          supported_quantile_array.PushBack(quantile_type, allocator);
+          supported_quantile_array.push_back(ValueUtil::numberValue(quantile * 100));
         }
-        histograms_obj.AddMember("supported_quantiles", supported_quantile_array, allocator);
+        (*histograms_obj_fields)["supported_quantiles"] =
+            ValueUtil::listValue(supported_quantile_array);
         found_used_histogram = true;
       }
-      Value histogram_obj;
-      histogram_obj.SetObject();
-      Value histogram_name;
-      histogram_name.SetString(histogram->name().c_str(), allocator);
-      histogram_obj.AddMember("name", histogram_name, allocator);
 
-      rapidjson::Value computed_quantile_array(rapidjson::kArrayType);
+      ProtobufWkt::Struct computed_quantile;
+      auto* computed_quantile_fields = computed_quantile.mutable_fields();
+      (*computed_quantile_fields)["name"] = ValueUtil::stringValue(histogram->name());
 
+      std::vector<ProtobufWkt::Value> computed_quantile_value_array;
       for (size_t i = 0; i < histogram->intervalStatistics().supportedQuantiles().size(); ++i) {
-        Value quantile_obj;
-        quantile_obj.SetObject();
-        Value interval_value;
-        if (!std::isnan(histogram->intervalStatistics().computedQuantiles()[i])) {
-          interval_value.SetDouble(histogram->intervalStatistics().computedQuantiles()[i]);
-        }
-        quantile_obj.AddMember("interval", interval_value, allocator);
-        Value cumulative_value;
-        // We skip nan entries to put in the {null, null} entry to keep other data aligned.
-        if (!std::isnan(histogram->cumulativeStatistics().computedQuantiles()[i])) {
-          cumulative_value.SetDouble(histogram->cumulativeStatistics().computedQuantiles()[i]);
-        }
-        quantile_obj.AddMember("cumulative", cumulative_value, allocator);
-        computed_quantile_array.PushBack(quantile_obj, allocator);
+        ProtobufWkt::Struct computed_quantile_value;
+        auto* computed_quantile_value_fields = computed_quantile_value.mutable_fields();
+        const auto& interval = histogram->intervalStatistics().computedQuantiles()[i];
+        const auto& cumulative = histogram->cumulativeStatistics().computedQuantiles()[i];
+        (*computed_quantile_value_fields)["interval"] =
+            std::isnan(interval) ? ValueUtil::nullValue() : ValueUtil::numberValue(interval);
+        (*computed_quantile_value_fields)["cumulative"] =
+            std::isnan(cumulative) ? ValueUtil::nullValue() : ValueUtil::numberValue(cumulative);
+
+        computed_quantile_value_array.push_back(ValueUtil::structValue(computed_quantile_value));
       }
-      histogram_obj.AddMember("values", computed_quantile_array, allocator);
-      histogram_array.PushBack(histogram_obj, allocator);
+      (*computed_quantile_fields)["values"] = ValueUtil::listValue(computed_quantile_value_array);
+      computed_quantile_array.push_back(ValueUtil::structValue(computed_quantile));
     }
   }
+
   if (found_used_histogram) {
-    histograms_obj.AddMember("computed_quantiles", histogram_array, allocator);
-    histograms_container_obj.AddMember("histograms", histograms_obj, allocator);
-    stats_array.PushBack(histograms_container_obj, allocator);
+    (*histograms_obj_fields)["computed_quantiles"] = ValueUtil::listValue(computed_quantile_array);
+    (*histograms_obj_container_fields)["histograms"] = ValueUtil::structValue(histograms_obj);
+    stats_array.push_back(ValueUtil::structValue(histograms_obj_container));
   }
-  document.AddMember("stats", stats_array, allocator);
-  rapidjson::StringBuffer strbuf;
-  if (pretty_print) {
-    rapidjson::PrettyWriter<StringBuffer> writer(strbuf);
-    document.Accept(writer);
-  } else {
-    rapidjson::Writer<StringBuffer> writer(strbuf);
-    document.Accept(writer);
-  }
-  return strbuf.GetString();
+
+  auto* document_fields = document.mutable_fields();
+  (*document_fields)["stats"] = ValueUtil::listValue(stats_array);
+
+  return MessageUtil::getJsonStringFromMessage(document, pretty_print, true);
 }
 
 Http::Code AdminImpl::handlerQuitQuitQuit(absl::string_view, Http::HeaderMap&,
@@ -1175,56 +1148,59 @@ Http::Code AdminImpl::handlerRuntime(absl::string_view url, Http::HeaderMap& res
   const Http::Utility::QueryParams params = Http::Utility::parseQueryString(url);
   response_headers.setReferenceContentType(Http::Headers::get().ContentTypeValues.Json);
 
-  // TODO(jsedgwick) Use proto to structure this output instead of arbitrary JSON
-  rapidjson::Document document;
-  document.SetObject();
-  auto& allocator = document.GetAllocator();
-  std::map<std::string, rapidjson::Value> entry_objects;
-  rapidjson::Value layer_names{rapidjson::kArrayType};
+  // TODO(jsedgwick): Use proto to structure this output instead of arbitrary JSON.
   const auto& layers = server_.runtime().snapshot().getLayers();
 
+  std::vector<ProtobufWkt::Value> layer_names;
+  layer_names.reserve(layers.size());
+  std::map<std::string, std::vector<std::string>> entries;
   for (const auto& layer : layers) {
-    rapidjson::Value layer_name;
-    layer_name.SetString(layer->name().c_str(), allocator);
-    layer_names.PushBack(std::move(layer_name), allocator);
-    for (const auto& kv : layer->values()) {
-      rapidjson::Value entry_object{rapidjson::kObjectType};
-      const auto it = entry_objects.find(kv.first);
-      if (it == entry_objects.end()) {
-        rapidjson::Value entry_object{rapidjson::kObjectType};
-        entry_object.AddMember("layer_values", rapidjson::Value{kArrayType}, allocator);
-        entry_object.AddMember("final_value", "", allocator);
-        entry_objects.emplace(kv.first, std::move(entry_object));
+    layer_names.push_back(ValueUtil::stringValue(layer->name()));
+    for (const auto& value : layer->values()) {
+      const auto found = entries.find(value.first);
+      if (found == entries.end()) {
+        entries.emplace(value.first, std::vector<std::string>{});
       }
     }
   }
-  document.AddMember("layers", std::move(layer_names), allocator);
 
   for (const auto& layer : layers) {
-    for (auto& kv : entry_objects) {
-      const auto it = layer->values().find(kv.first);
-      const auto& entry_value = it == layer->values().end() ? "" : it->second.raw_string_value_;
-      rapidjson::Value entry_value_object;
-      entry_value_object.SetString(entry_value.c_str(), allocator);
-      if (!entry_value.empty()) {
-        kv.second["final_value"] = rapidjson::Value{entry_value_object, allocator};
-      }
-      kv.second["layer_values"].PushBack(entry_value_object, allocator);
+    for (auto& entry : entries) {
+      const auto found = layer->values().find(entry.first);
+      const auto& entry_value =
+          found == layer->values().end() ? EMPTY_STRING : found->second.raw_string_value_;
+      entry.second.push_back(entry_value);
     }
   }
 
-  rapidjson::Value value_arrays_obj{rapidjson::kObjectType};
-  for (auto& kv : entry_objects) {
-    value_arrays_obj.AddMember(rapidjson::StringRef(kv.first.c_str()), std::move(kv.second),
-                               allocator);
+  ProtobufWkt::Struct layer_entries;
+  auto* layer_entry_fields = layer_entries.mutable_fields();
+  for (const auto& entry : entries) {
+    std::vector<ProtobufWkt::Value> layer_entry_values;
+    layer_entry_values.reserve(entry.second.size());
+    std::string final_value;
+    for (const auto& value : entry.second) {
+      if (!value.empty()) {
+        final_value = value;
+      }
+      layer_entry_values.push_back(ValueUtil::stringValue(value));
+    }
+
+    ProtobufWkt::Struct layer_entry_value;
+    auto* layer_entry_value_fields = layer_entry_value.mutable_fields();
+
+    (*layer_entry_value_fields)["final_value"] = ValueUtil::stringValue(final_value);
+    (*layer_entry_value_fields)["layer_values"] = ValueUtil::listValue(layer_entry_values);
+    (*layer_entry_fields)[entry.first] = ValueUtil::structValue(layer_entry_value);
   }
 
-  document.AddMember("entries", std::move(value_arrays_obj), allocator);
+  ProtobufWkt::Struct runtime;
+  auto* fields = runtime.mutable_fields();
 
-  rapidjson::StringBuffer strbuf;
-  rapidjson::PrettyWriter<StringBuffer> writer(strbuf);
-  document.Accept(writer);
-  response.add(strbuf.GetString());
+  (*fields)["layers"] = ValueUtil::listValue(layer_names);
+  (*fields)["entries"] = ValueUtil::structValue(layer_entries);
+
+  response.add(MessageUtil::getJsonStringFromMessage(runtime, true, true));
   return Http::Code::OK;
 }
 
