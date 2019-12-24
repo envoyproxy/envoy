@@ -1198,9 +1198,7 @@ TEST_F(HistogramTest, ParentHistogramBucketSummary) {
 class ClusterShutdownRaceTest : public ThreadLocalStoreNoMocksTestBase {
 public:
   static constexpr uint32_t NumThreads = 10;
-  static constexpr uint32_t NumWorkerThreads = NumThreads - 1;
   static constexpr uint32_t NumScopes = 100;
-  static constexpr uint32_t MainThreadIndex = 0;
 
   class BlockingScope {
   public:
@@ -1226,7 +1224,9 @@ public:
     // This is the same order as InstanceImpl::initialize in source/server/server.cc.
     thread_dispatchers_.resize(NumThreads);
     {
-      BlockingScope blocking_scope(NumThreads);
+      BlockingScope blocking_scope(NumThreads + 1);
+      main_thread_ =
+          thread_factory_.createThread([this, &blocking_scope]() { mainThreadFn(blocking_scope); });
       for (uint32_t i = 0; i < NumThreads; ++i) {
         threads_.emplace_back(thread_factory_.createThread(
             [this, i, &blocking_scope]() { threadFn(i, blocking_scope); }));
@@ -1235,32 +1235,34 @@ public:
 
     {
       BlockingScope blocking_scope(1);
-      thread_dispatchers_[MainThreadIndex]->post(blocking_scope.run([this]() {
+      main_dispatcher_->post(blocking_scope.run([this]() {
         tls_ = std::make_unique<ThreadLocal::InstanceImpl>();
-        bool is_main = true;
+        tls_->registerThread(*main_dispatcher_, true);
         for (Event::DispatcherPtr& dispatcher : thread_dispatchers_) {
           // Worker threads must be registered from the main thread, per assert in registerThread().
-          tls_->registerThread(*dispatcher, is_main);
-          is_main = false;
+          tls_->registerThread(*dispatcher, false);
         }
-        store_->initializeThreading(*thread_dispatchers_[0], *tls_);
+        store_->initializeThreading(*main_dispatcher_, *tls_);
       }));
     }
 
+    /*
     for (uint32_t i = 0; i < NumScopes; ++i) {
       scopes_.emplace_back(store_->createScope("scope")); // absl::StrCat("scope", i, ".")));
     }
+    */
   }
 
   ~ClusterShutdownRaceTest() {
-    thread_dispatchers_[MainThreadIndex]->post([this]() {
-      scopes_.clear();
-      store_->shutdownThreading();
-      tls_->shutdownGlobalThreading();
-      tls_->shutdownThread();
-      store_.reset();
-      tls_.reset();
-    });
+    {
+      BlockingScope blocking_scope(1);
+      main_dispatcher_->post(blocking_scope.run([this]() {
+        // scopes_.clear();
+        store_->shutdownThreading();
+        tls_->shutdownGlobalThreading();
+        tls_->shutdownThread();
+      }));
+    }
 
     for (Event::DispatcherPtr& dispatcher : thread_dispatchers_) {
       dispatcher->post([&dispatcher]() { dispatcher->exit(); });
@@ -1269,24 +1271,30 @@ public:
     for (Thread::ThreadPtr& thread : threads_) {
       thread->join();
     }
+
+    main_dispatcher_->post([this]() {
+      store_.reset();
+      tls_.reset();
+      main_dispatcher_->exit();
+    });
+    main_thread_->join();
   }
 
   void incCounters() {
-    for (int i = 0; i < 1000; ++i) {
-      for (ScopePtr& scope : scopes_) {
-        scope->counterFromStatName(my_counter_name_).inc();
-      }
+    for (int i = 0; i < 10000; ++i) {
+      ScopePtr scope = store_->createScope("scope."); // absl::StrCat("scope", i, "."));
+      scope->counterFromStatName(my_counter_name_).inc();
     }
   }
 
-  void reconstructScopes(int thread_index) {
+  /*void reconstructScopes(int thread_index) {
     for (uint32_t i = thread_index - 1; i < NumScopes; i += (NumThreads - 1)) {
       scopes_[i] = store_->createScope("scope."); // absl::StrCat("scope", i, "."));
       scopes_[i]->counterFromStatName(my_counter_name_).inc();
     }
   }
 
-  /*void clearSomeScopes(uint32_t thread_index) {
+  void clearSomeScopes(uint32_t thread_index) {
     for (uint32_t i = thread_index; i < NumScopes; i += NumThreads) {
       //scopes_[i] = nullptr;
       scopes_[i] = store_->createScope(absl::StrCat("scope", i, "."));
@@ -1300,11 +1308,19 @@ public:
     thread_dispatchers_[thread_index]->run(Event::Dispatcher::RunType::RunUntilExit);
   }
 
+  void mainThreadFn(BlockingScope& blocking_scope) {
+    main_dispatcher_ = api_->allocateDispatcher();
+    blocking_scope.decrementCount();
+    main_dispatcher_->run(Event::Dispatcher::RunType::RunUntilExit);
+  }
+
   Api::ApiPtr api_;
+  Event::DispatcherPtr main_dispatcher_;
   std::vector<Event::DispatcherPtr> thread_dispatchers_;
   Thread::ThreadFactory& thread_factory_;
   std::unique_ptr<ThreadLocal::InstanceImpl> tls_;
-  std::vector<ScopePtr> scopes_;
+  // std::vector<ScopePtr> scopes_;
+  Thread::ThreadPtr main_thread_;
   std::vector<Thread::ThreadPtr> threads_;
   absl::Notification make_counters_done_;
   StatNamePool pool_;
@@ -1315,25 +1331,27 @@ TEST_F(ClusterShutdownRaceTest, TenThreads) {
   // make_counters_done_.Notify();
 
   {
-    BlockingScope blocking_scope(NumWorkerThreads);
-    for (uint32_t i = 1; i < thread_dispatchers_.size(); ++i) {
+    BlockingScope blocking_scope(NumThreads);
+    for (uint32_t i = 0; i < thread_dispatchers_.size(); ++i) {
       thread_dispatchers_[i]->post(blocking_scope.run([this]() { incCounters(); }));
     }
   }
 
+  /*
   {
-    BlockingScope blocking_scope(NumWorkerThreads);
-    for (uint32_t i = 1; i < thread_dispatchers_.size(); ++i) {
+    BlockingScope blocking_scope(NumThreads);
+    for (uint32_t i = 0; i < thread_dispatchers_.size(); ++i) {
       thread_dispatchers_[i]->post(blocking_scope.run([this, i]() { reconstructScopes(i); }));
     }
   }
 
   {
-    BlockingScope blocking_scope(NumWorkerThreads);
-    for (uint32_t i = 1; i < thread_dispatchers_.size(); ++i) {
+    BlockingScope blocking_scope(NumThreads);
+    for (uint32_t i = 0; i < thread_dispatchers_.size(); ++i) {
       thread_dispatchers_[i]->post(blocking_scope.run([this]() { incCounters(); }));
     }
   }
+  */
 }
 
 } // namespace Stats
