@@ -191,13 +191,15 @@ TEST_P(IntegrationAdminTest, Admin) {
             request("admin", "GET", "/stats?format=json&filter=^server\\.version$", response));
   EXPECT_EQ("application/json", ContentType(response));
   validateStatsJson(response->body(), 0);
-  expectEqualSerialized(response->body(), "{\"stats\":[{\"name\":\"server.version\",\"value\":0}]}");
+  expectEqualSerialized(response->body(),
+                        "{\"stats\":[{\"name\":\"server.version\",\"value\":0}]}");
 
   // Filtering stats by a non-full-string regex should also return just that match.
   EXPECT_EQ("200", request("admin", "GET", "/stats?format=json&filter=server\\.version", response));
   EXPECT_EQ("application/json", ContentType(response));
   validateStatsJson(response->body(), 0);
-  expectEqualSerialized(response->body(), "{\"stats\":[{\"name\":\"server.version\",\"value\":0}]}");
+  expectEqualSerialized(response->body(),
+                        "{\"stats\":[{\"name\":\"server.version\",\"value\":0}]}");
 
   // Filtering stats by a regex with no matches (".*not_intended_to_appear.*") should return a
   // valid, empty, stats array.
