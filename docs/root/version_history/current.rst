@@ -17,6 +17,7 @@ Changes
   Can be reverted temporarily by setting runtime feature `envoy.reloadable_features.fix_upgrade_response` to false.
 * logger: added :ref:`--log-format-prefix-with-location <operations_cli>` command line option to prefix '%v' with file path and line number.
 * network filters: added a :ref:`postgres proxy filter <config_network_filters_postgres_proxy>`.
+* network filters: added a :ref:`rocketmq proxy filter <config_network_filters_rocketmq_proxy>`.
 * request_id: added to :ref:`always_set_request_id_in_response setting <envoy_v3_api_field_extensions.filters.network.http_connection_manager.v3.HttpConnectionManager.always_set_request_id_in_response>`
   to set :ref:`x-request-id <config_http_conn_man_headers_x-request-id>` header in response even if
   tracing is not forced.
