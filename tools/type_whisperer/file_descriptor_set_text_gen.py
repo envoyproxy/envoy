@@ -1,4 +1,6 @@
 # Generate a text proto from a given list of FileDescriptorSets.
+# TODO(htuch): switch to base64 encoded binary output in the future,
+# this will avoid needing to deal with option preserving imports below.
 
 import sys
 
