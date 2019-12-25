@@ -99,6 +99,9 @@ public:
   MOCK_METHOD(Watch*, addOrUpdateWatch,
               (const std::string& type_url, Watch* watch, const std::set<std::string>& resources,
                SubscriptionCallbacks& callbacks, std::chrono::milliseconds init_fetch_timeout));
+  MOCK_METHOD(Watch*, addToWatch,
+              (const std::string& type_url, Watch* watch, const std::set<std::string>& resources,
+               SubscriptionCallbacks& callbacks, std::chrono::milliseconds init_fetch_timeout));
   MOCK_METHOD(void, removeWatch, (const std::string& type_url, Watch* watch));
 };
 

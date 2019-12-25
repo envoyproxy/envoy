@@ -50,6 +50,11 @@ public:
                           SubscriptionCallbacks&, std::chrono::milliseconds) override {
     NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
   }
+
+  Watch* addToWatch(const std::string&, Watch*, const std::set<std::string>&,
+                    SubscriptionCallbacks&, std::chrono::milliseconds) override {
+    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+  }
   void removeWatch(const std::string&, Watch*) override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
 
   void handleDiscoveryResponse(
@@ -154,6 +159,10 @@ public:
 
   Watch* addOrUpdateWatch(const std::string&, Watch*, const std::set<std::string>&,
                           SubscriptionCallbacks&, std::chrono::milliseconds) override {
+    throw EnvoyException("ADS must be configured to support an ADS config source");
+  }
+  Watch* addToWatch(const std::string&, Watch*, const std::set<std::string>&,
+                    SubscriptionCallbacks&, std::chrono::milliseconds) override {
     throw EnvoyException("ADS must be configured to support an ADS config source");
   }
   void removeWatch(const std::string&, Watch*) override {

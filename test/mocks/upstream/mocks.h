@@ -330,6 +330,7 @@ public:
   MOCK_METHOD(ClusterUpdateCallbacksHandle*, addThreadLocalClusterUpdateCallbacks_,
               (ClusterUpdateCallbacks & callbacks));
   MOCK_METHOD(Config::SubscriptionFactory&, subscriptionFactory, ());
+  MOCK_METHOD(void, addToClusterInterest, (const std::set<std::string>&));
 
   NiceMock<Http::ConnectionPool::MockInstance> conn_pool_;
   NiceMock<Http::MockAsyncClient> async_client_;
@@ -385,6 +386,7 @@ public:
   MOCK_METHOD(void, initialize, ());
   MOCK_METHOD(void, setInitializedCb, (std::function<void()> callback));
   MOCK_METHOD(const std::string, versionInfo, (), (const));
+  MOCK_METHOD(void, addToClusterInterest, (const std::set<std::string>&));
 
   std::function<void()> initialized_callback_;
 };

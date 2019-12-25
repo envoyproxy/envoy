@@ -90,6 +90,12 @@ public:
    * be passed to std::set_difference, which must be given sorted collections.
    */
   virtual void updateResourceInterest(const std::set<std::string>& update_to_these_names) PURE;
+
+  /**
+   * Add the resources to fetch.
+   * @param resources vector of resource names to fetch.
+   */
+  virtual void addToResourceInterest(const std::set<std::string>&){};
 };
 
 using SubscriptionPtr = std::unique_ptr<Subscription>;

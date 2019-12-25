@@ -45,6 +45,7 @@ public:
   void start(const std::set<std::string>& resource_names) override;
 
   void updateResourceInterest(const std::set<std::string>& update_to_these_names) override;
+  void addToResourceInterest(const std::set<std::string>& add_these_names) override;
 
   // Config::SubscriptionCallbacks (all pass through to callbacks_!)
   void onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,

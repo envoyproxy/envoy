@@ -37,6 +37,11 @@ public:
   Watch* addOrUpdateWatch(const std::string& type_url, Watch* watch,
                           const std::set<std::string>& resources, SubscriptionCallbacks& callbacks,
                           std::chrono::milliseconds init_fetch_timeout) override;
+
+  Watch* addToWatch(const std::string& type_url, Watch* watch,
+                    const std::set<std::string>& resources, SubscriptionCallbacks& callbacks,
+                    std::chrono::milliseconds init_fetch_timeout) override;
+
   void removeWatch(const std::string& type_url, Watch* watch) override;
 
   // TODO(fredlas) PR #8478 will remove this.
@@ -81,8 +86,11 @@ public:
   }
 
 private:
-  Watch* addWatch(const std::string& type_url, const std::set<std::string>& resources,
-                  SubscriptionCallbacks& callbacks, std::chrono::milliseconds init_fetch_timeout);
+  Watch* addWatch(const std::string& type_url, SubscriptionCallbacks& callbacks,
+                  std::chrono::milliseconds init_fetch_timeout);
+
+  void addToWatch(const std::string& type_url, Watch* watch,
+                  const std::set<std::string>& resources);
 
   // Updates the list of resource names watched by the given watch. If an added name is new across
   // the whole subscription, or if a removed name has no other watch interested in it, then the
