@@ -194,6 +194,11 @@ def HasServices(proto_path):
   return False
 
 
+# Key sort function to achieve consistent results with buildifier.
+def BuildOrderKey(key):
+  return key.replace(':', '!')
+
+
 def BuildFileContents(root, files):
   """Compute the canonical BUILD contents for an api/ proto directory.
 
@@ -216,8 +221,7 @@ def BuildFileContents(root, files):
       formatted_deps = '"%s"' % list(deps)[0]
     else:
       formatted_deps = '\n' + '\n'.join(
-          '        "%s",' % dep
-          for dep in sorted(deps, key=lambda s: s.replace(':', '!'))) + '\n    '
+          '        "%s",' % dep for dep in sorted(deps, key=BuildOrderKey)) + '\n    '
     fields.append('    deps = [%s],' % formatted_deps)
   formatted_fields = '\n' + '\n'.join(fields) + '\n' if fields else ''
   return BUILD_FILE_TEMPLATE.substitute(fields=formatted_fields)
@@ -293,5 +297,6 @@ if __name__ == '__main__':
         subprocess.run(['patch', '-p1'], input=diff, cwd=str(api_root.resolve()))
 
   with open('./api/BUILD', 'w') as f:
-    formatted_deps = '\n'.join('        "%s",' % d for d in sorted(set(pkg_deps)))
+    formatted_deps = '\n'.join(
+        '        "%s",' % d for d in sorted(set(pkg_deps), key=BuildOrderKey))
     f.write(TOP_LEVEL_API_BUILD_FILE_TEMPLATE.substitute(deps=formatted_deps))
