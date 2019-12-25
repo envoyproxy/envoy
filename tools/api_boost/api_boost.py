@@ -120,7 +120,7 @@ def ApiBoostTree(target_paths,
         'build',
         '--strip=always',
         '@envoy_dev//clang_tools/api_booster',
-    ] + extra_api_booster_args,
+    ] + BAZEL_BUILD_OPTIONS + extra_api_booster_args,
            check=True)
     sp.run([
         'bazel',

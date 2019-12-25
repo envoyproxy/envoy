@@ -18,6 +18,7 @@ build:clang --action_env=PATH=${PATH}
 build:clang --action_env=CC=clang
 build:clang --action_env=CXX=clang++
 build:clang --action_env=LLVM_CONFIG=${LLVM_PREFIX}/bin/llvm-config
+build:clang --repo_env=LLVM_CONFIG=${LLVM_PREFIX}/bin/llvm-config
 build:clang --linkopt=-L$(llvm-config --libdir)
 build:clang --linkopt=-Wl,-rpath,$(llvm-config --libdir)
 

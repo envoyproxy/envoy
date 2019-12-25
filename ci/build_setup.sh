@@ -79,8 +79,8 @@ function cleanup() {
 cleanup
 trap cleanup EXIT
 
-bazel/setup_clang.sh /opt/llvm
-export LLVM_CONFIG=/opt/llvm/bin/llvm-config
+export LLVM_ROOT=/opt/llvm
+bazel/setup_clang.sh "${LLVM_ROOT}"
 
 [[ "${BUILD_REASON}" != "PullRequest" ]] && BAZEL_EXTRA_TEST_OPTIONS+=" --nocache_test_results --test_output=all"
 
