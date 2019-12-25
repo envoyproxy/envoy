@@ -232,6 +232,12 @@ private:
   template <class Stat> using StatMap = StatNameHashMap<Stat>;
 
   struct TlsCacheEntry {
+    ~TlsCacheEntry() {
+      if (!counters_.empty()) {
+        counters_.clear();
+      }
+    }
+
     StatMap<CounterSharedPtr> counters_;
     StatMap<GaugeSharedPtr> gauges_;
     StatMap<TlsHistogramSharedPtr> histograms_;
@@ -247,6 +253,13 @@ private:
   };
 
   struct CentralCacheEntry {
+    void clear() {
+      counters_.clear();
+      gauges_.clear();
+      histograms_.clear();
+      // Note: leaves rejected_stats_ as that will be cleared from releaseScopeCrossThread().
+    }
+
     StatMap<CounterSharedPtr> counters_;
     StatMap<GaugeSharedPtr> gauges_;
     StatMap<ParentHistogramImplSharedPtr> histograms_;
@@ -336,6 +349,7 @@ private:
     ThreadLocalStoreImpl& parent_;
     StatNameStorage prefix_;
     mutable CentralCacheEntry central_cache_;
+    std::atomic<uint32_t> make_stat_depth_{0};
   };
 
   struct TlsCache : public ThreadLocal::ThreadLocalObject {

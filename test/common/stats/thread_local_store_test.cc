@@ -1197,8 +1197,8 @@ TEST_F(HistogramTest, ParentHistogramBucketSummary) {
 
 class ClusterShutdownRaceTest : public ThreadLocalStoreNoMocksTestBase {
 public:
-  static constexpr uint32_t NumThreads = 10;
-  static constexpr uint32_t NumScopes = 100;
+  static constexpr uint32_t NumThreads = 8;
+  // static constexpr uint32_t NumScopes = 100;
 
   class BlockingScope {
   public:
@@ -1281,7 +1281,7 @@ public:
   }
 
   void incCounters() {
-    for (int i = 0; i < 10000; ++i) {
+    for (int i = 0; i < 100; ++i) {
       ScopePtr scope = store_->createScope("scope."); // absl::StrCat("scope", i, "."));
       scope->counterFromStatName(my_counter_name_).inc();
     }
@@ -1330,10 +1330,22 @@ public:
 TEST_F(ClusterShutdownRaceTest, TenThreads) {
   // make_counters_done_.Notify();
 
-  {
-    BlockingScope blocking_scope(NumThreads);
-    for (uint32_t i = 0; i < thread_dispatchers_.size(); ++i) {
-      thread_dispatchers_[i]->post(blocking_scope.run([this]() { incCounters(); }));
+  for (uint32_t j = 0; j < 100; ++j) {
+    {
+      BlockingScope blocking_scope(NumThreads);
+      for (uint32_t i = 0; i < thread_dispatchers_.size(); ++i) {
+        thread_dispatchers_[i]->post(blocking_scope.run([this]() { incCounters(); }));
+      }
+    }
+
+    // With this blockade, use_counts for the counter get into the hundreds.
+    // Without it, they go deep into the tens of thousands, blowing through
+    // a 16-bit ref-count. So depending on the dynamics of an xDS update as
+    // described in #9448, the behavior could be due to ref-count overrun,
+    // and will be easily fixed.
+    {
+      BlockingScope blocking_scope(1);
+      main_dispatcher_->post(blocking_scope.run([]() {}));
     }
   }
 

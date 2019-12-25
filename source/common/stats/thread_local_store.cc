@@ -199,6 +199,8 @@ void ThreadLocalStoreImpl::releaseScopeCrossThread(ScopeImpl* scope) {
   ASSERT(scopes_.count(scope) == 1);
   scopes_.erase(scope);
 
+  scope->central_cache_.clear();
+
   // This is called directly from the ScopeImpl destructor, but we can't delay
   // the destruction of scope->central_cache_.central_cache_.rejected_stats_
   // to wait for all the TLS rejected_stats_ caches to be destructed, as those
@@ -224,13 +226,14 @@ void ThreadLocalStoreImpl::releaseScopeCrossThread(ScopeImpl* scope) {
     // to release the memory immediately, however, in which case we remove
     // the rejected stats set from purgatory.
     rejected_stats_purgatory_.insert(rejected_stats);
-    auto clean_central_cache = [this, rejected_stats]() {
+    auto clean_central_cache = [this, rejected_stats, scope_id]() {
       {
         Thread::LockGuard lock(lock_);
         rejected_stats_purgatory_.erase(rejected_stats);
       }
       rejected_stats->free(symbolTable());
       delete rejected_stats;
+      ENVOY_LOG_MISC(error, "x-scope cleanining done for scope {}", scope_id);
     };
     lock.release();
     main_thread_dispatcher_->post([this, clean_central_cache, scope_id]() {
@@ -268,6 +271,7 @@ ThreadLocalStoreImpl::ScopeImpl::ScopeImpl(ThreadLocalStoreImpl& parent, const s
       prefix_(Utility::sanitizeStatsName(prefix), parent.symbolTable()) {}
 
 ThreadLocalStoreImpl::ScopeImpl::~ScopeImpl() {
+  ASSERT(make_stat_depth_ == 0);
   parent_.releaseScopeCrossThread(this);
   prefix_.free(symbolTable());
 }
@@ -343,27 +347,50 @@ StatType& ThreadLocalStoreImpl::ScopeImpl::safeMakeStat(
   Thread::LockGuard lock(parent_.lock_);
   auto iter = central_cache_map.find(name);
   RefcountPtr<StatType>* central_ref = nullptr;
+  RefcountPtr<StatType> stat;
   if (iter != central_cache_map.end()) {
     central_ref = &(iter->second);
+    stat = *central_ref;
+    ASSERT(stat->use_count() >= 2);
   } else if (parent_.checkAndRememberRejection(name, central_rejected_stats, tls_rejected_stats)) {
     // Note that again we do the name-rejection lookup on the untruncated name.
     return null_stat;
   } else {
     TagExtraction extraction(parent_, name);
-    RefcountPtr<StatType> stat =
-        make_stat(parent_.alloc_, name, extraction.tagExtractedName(), extraction.tags());
+    stat = make_stat(parent_.alloc_, name, extraction.tagExtractedName(), extraction.tags());
     ASSERT(stat != nullptr);
+    ASSERT(stat->use_count() >= 1);
     central_ref = &central_cache_map[stat->statName()];
+    ASSERT(central_ref->get() == nullptr);
+    ASSERT(stat->use_count() >= 1);
+    uint32_t before = stat->use_count();
     *central_ref = stat;
+    uint32_t after = stat->use_count();
+    if (after < (before + 1)) {
+      // ENVOY_LOG_MISC(error, "central use_count before={} after={}", before, after);
+      ASSERT(stat->use_count() >= 2);
+    }
+    ASSERT(stat->use_count() >= 2);
   }
 
   // If we have a TLS cache, insert the stat.
   if (tls_cache) {
-    tls_cache->insert(std::make_pair((*central_ref)->statName(), *central_ref));
+    ASSERT(stat->use_count() >= 2);
+    uint32_t before = stat->use_count();
+    tls_cache->insert(std::make_pair((*central_ref)->statName(), stat));
+    uint32_t after = stat->use_count();
+    if (after < (before + 1)) {
+      // ENVOY_LOG_MISC(error, "tls use_count before={} after={}", before, after);
+      ASSERT(stat->use_count() >= 2);
+    }
+    ASSERT(stat->use_count() >= 2);
   }
 
   // Finally we return the reference.
-  return **central_ref;
+  ASSERT(stat->use_count() >= 2);
+  ENVOY_LOG_MISC(error, "use_count= {}", stat->use_count());
+
+  return *stat;
 }
 
 template <class StatType>
@@ -378,7 +405,18 @@ ThreadLocalStoreImpl::ScopeImpl::findStatLockHeld(
   return std::cref(*iter->second);
 }
 
+class MakeStatScope {
+public:
+  MakeStatScope(std::atomic<uint32_t>& depth) : depth_(depth) { ++depth_; }
+  ~MakeStatScope() { --depth_; }
+
+private:
+  std::atomic<uint32_t>& depth_;
+};
+
 Counter& ThreadLocalStoreImpl::ScopeImpl::counterFromStatName(StatName name) {
+  MakeStatScope make_stat_scope(make_stat_depth_);
+
   if (parent_.rejectsAll()) {
     return parent_.null_counter_;
   }
@@ -432,6 +470,8 @@ void ThreadLocalStoreImpl::ScopeImpl::deliverHistogramToSinks(const Histogram& h
 
 Gauge& ThreadLocalStoreImpl::ScopeImpl::gaugeFromStatName(StatName name,
                                                           Gauge::ImportMode import_mode) {
+  MakeStatScope make_stat_scope(make_stat_depth_);
+
   if (parent_.rejectsAll()) {
     return parent_.null_gauge_;
   }
@@ -468,6 +508,8 @@ Gauge& ThreadLocalStoreImpl::ScopeImpl::gaugeFromStatName(StatName name,
 
 Histogram& ThreadLocalStoreImpl::ScopeImpl::histogramFromStatName(StatName name,
                                                                   Histogram::Unit unit) {
+  MakeStatScope make_stat_scope(make_stat_depth_);
+
   if (parent_.rejectsAll()) {
     return parent_.null_histogram_;
   }

@@ -89,8 +89,8 @@ protected:
   // Holds backing store shared by both CounterImpl and GaugeImpl. CounterImpl
   // adds another field, pending_increment_, that is not used in Gauge.
   std::atomic<uint64_t> value_{0};
+  std::atomic<uint32_t> ref_count_{0};
   std::atomic<uint16_t> flags_{0};
-  std::atomic<uint16_t> ref_count_{0};
 };
 
 class CounterImpl : public StatsSharedImpl<Counter> {
@@ -202,7 +202,7 @@ CounterSharedPtr AllocatorImpl::makeCounter(StatName name, absl::string_view tag
   if (iter != counters_.end()) {
     return CounterSharedPtr(*iter);
   }
-  auto counter = CounterSharedPtr(new CounterImpl(name, *this, tag_extracted_name, tags));
+  CounterSharedPtr counter(new CounterImpl(name, *this, tag_extracted_name, tags));
   counters_.insert(counter.get());
   return counter;
 }
@@ -216,7 +216,7 @@ GaugeSharedPtr AllocatorImpl::makeGauge(StatName name, absl::string_view tag_ext
   if (iter != gauges_.end()) {
     return GaugeSharedPtr(*iter);
   }
-  auto gauge = GaugeSharedPtr(new GaugeImpl(name, *this, tag_extracted_name, tags, import_mode));
+  GaugeSharedPtr gauge(new GaugeImpl(name, *this, tag_extracted_name, tags, import_mode));
   gauges_.insert(gauge.get());
   return gauge;
 }
