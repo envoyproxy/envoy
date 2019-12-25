@@ -26,9 +26,7 @@ class CdsApiImpl : public CdsApi,
 public:
   static CdsApiPtr create(const envoy::api::v2::core::ConfigSource& cds_config, ClusterManager& cm,
                           Stats::Scope& scope,
-                          ProtobufMessage::ValidationVisitor& validation_visitor,
-                          const envoy::api::v2::core::ConfigSource::XdsApiVersion xds_api_version =
-                              envoy::api::v2::core::ConfigSource::AUTO);
+                          ProtobufMessage::ValidationVisitor& validation_visitor);
 
   // Upstream::CdsApi
   void initialize() override { subscription_->start({}); }
@@ -51,8 +49,7 @@ private:
   }
   std::string loadTypeUrl();
   CdsApiImpl(const envoy::api::v2::core::ConfigSource& cds_config, ClusterManager& cm,
-             Stats::Scope& scope, ProtobufMessage::ValidationVisitor& validation_visitor,
-             const envoy::api::v2::core::ConfigSource::XdsApiVersion xds_api_version);
+             Stats::Scope& scope, ProtobufMessage::ValidationVisitor& validation_visitor);
   void runInitializeCallbackIfAny();
 
   ClusterManager& cm_;

@@ -202,9 +202,7 @@ class LoaderImpl;
 struct RtdsSubscription : Config::SubscriptionCallbacks, Logger::Loggable<Logger::Id::runtime> {
   RtdsSubscription(LoaderImpl& parent,
                    const envoy::config::bootstrap::v2::RuntimeLayer::RtdsLayer& rtds_layer,
-                   Stats::Store& store, ProtobufMessage::ValidationVisitor& validation_visitor,
-                   const envoy::api::v2::core::ConfigSource::XdsApiVersion xds_api_version =
-                       envoy::api::v2::core::ConfigSource::AUTO);
+                   Stats::Store& store, ProtobufMessage::ValidationVisitor& validation_visitor);
 
   // Config::SubscriptionCallbacks
   void onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,

@@ -20,18 +20,16 @@
 namespace Envoy {
 namespace Upstream {
 
-CdsApiPtr
-CdsApiImpl::create(const envoy::api::v2::core::ConfigSource& cds_config, ClusterManager& cm,
-                   Stats::Scope& scope, ProtobufMessage::ValidationVisitor& validation_visitor,
-                   const envoy::api::v2::core::ConfigSource::XdsApiVersion xds_api_version) {
-  return CdsApiPtr{new CdsApiImpl(cds_config, cm, scope, validation_visitor, xds_api_version)};
+CdsApiPtr CdsApiImpl::create(const envoy::api::v2::core::ConfigSource& cds_config,
+                             ClusterManager& cm, Stats::Scope& scope,
+                             ProtobufMessage::ValidationVisitor& validation_visitor) {
+  return CdsApiPtr{new CdsApiImpl(cds_config, cm, scope, validation_visitor)};
 }
 
 CdsApiImpl::CdsApiImpl(const envoy::api::v2::core::ConfigSource& cds_config, ClusterManager& cm,
-                       Stats::Scope& scope, ProtobufMessage::ValidationVisitor& validation_visitor,
-                       const envoy::api::v2::core::ConfigSource::XdsApiVersion xds_api_version)
+                       Stats::Scope& scope, ProtobufMessage::ValidationVisitor& validation_visitor)
     : cm_(cm), scope_(scope.createScope("cluster_manager.cds.")),
-      validation_visitor_(validation_visitor), xds_api_version_(xds_api_version) {
+      validation_visitor_(validation_visitor), xds_api_version_(cds_config.xds_api_version()) {
   subscription_ = cm_.subscriptionFactory().subscriptionFromConfigSource(cds_config, loadTypeUrl(),
                                                                          *scope_, *this);
 }

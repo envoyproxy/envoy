@@ -16,8 +16,7 @@ namespace Upstream {
 EdsClusterImpl::EdsClusterImpl(
     const envoy::api::v2::Cluster& cluster, Runtime::Loader& runtime,
     Server::Configuration::TransportSocketFactoryContext& factory_context,
-    Stats::ScopePtr&& stats_scope, bool added_via_api,
-    const envoy::api::v2::core::ConfigSource::XdsApiVersion xds_api_version)
+    Stats::ScopePtr&& stats_scope, bool added_via_api)
     : BaseDynamicClusterImpl(cluster, runtime, factory_context, std::move(stats_scope),
                              added_via_api),
       local_info_(factory_context.localInfo()),
@@ -25,7 +24,7 @@ EdsClusterImpl::EdsClusterImpl(
                         ? cluster.name()
                         : cluster.eds_cluster_config().service_name()),
       validation_visitor_(factory_context.messageValidationVisitor()),
-      xds_api_version_(xds_api_version) {
+      xds_api_version_(cluster.eds_cluster_config().eds_config().xds_api_version()) {
   Event::Dispatcher& dispatcher = factory_context.dispatcher();
   assignment_timeout_ = dispatcher.createTimer([this]() -> void { onAssignmentTimeout(); });
   const auto& eds_config = cluster.eds_cluster_config().eds_config();

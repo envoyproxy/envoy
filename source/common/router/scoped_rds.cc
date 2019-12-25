@@ -100,7 +100,7 @@ ScopedRdsConfigSubscription::ScopedRdsConfigSubscription(
       rds_config_source_(std::move(rds_config_source)),
       validation_visitor_(factory_context.messageValidationVisitor()), stat_prefix_(stat_prefix),
       route_config_provider_manager_(route_config_provider_manager),
-      xds_api_version_(rds_config_source.version()) {
+      xds_api_version_(rds_config_source_.xds_api_version()) {
   subscription_ =
       factory_context.clusterManager().subscriptionFactory().subscriptionFromConfigSource(
           scoped_rds.scoped_rds_config_source(), loadTypeUrl(), *scope_, *this);

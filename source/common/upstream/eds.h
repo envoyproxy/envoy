@@ -27,9 +27,7 @@ class EdsClusterImpl : public BaseDynamicClusterImpl, Config::SubscriptionCallba
 public:
   EdsClusterImpl(const envoy::api::v2::Cluster& cluster, Runtime::Loader& runtime,
                  Server::Configuration::TransportSocketFactoryContext& factory_context,
-                 Stats::ScopePtr&& stats_scope, bool added_via_api,
-                 const envoy::api::v2::core::ConfigSource::XdsApiVersion xds_api_version =
-                     envoy::api::v2::core::ConfigSource::AUTO);
+                 Stats::ScopePtr&& stats_scope, bool added_via_api);
 
   // Upstream::Cluster
   InitializePhase initializePhase() const override { return initialize_phase_; }

@@ -162,5 +162,5 @@ message ConfigSource {
   google.protobuf.Duration initial_fetch_timeout = 4;
 
   // API version for xDS endpoint
-  XdsApiVersion version = 6;
+  XdsApiVersion xds_api_version = 6;
 }

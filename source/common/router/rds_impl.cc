@@ -120,7 +120,8 @@ void RdsRouteConfigSubscription::onConfigUpdate(
       // TODO(dmitri-d): It's unsafe to depend directly on factory context here,
       // the listener might have been torn down, need to remove this.
       vhds_subscription_ = std::make_unique<VhdsSubscription>(
-          config_update_info_, factory_context_, stat_prefix_, route_config_providers_);
+          config_update_info_, factory_context_, stat_prefix_, route_config_providers_,
+          config_update_info_->routeConfiguration().vhds().config_source().xds_api_version());
       vhds_subscription_->registerInitTargetWithInitManager(
           noop_init_manager == nullptr ? getRdsConfigInitManager() : *noop_init_manager);
     } else {
@@ -286,7 +287,7 @@ Router::RouteConfigProviderSharedPtr RouteConfigProviderManagerImpl::createRdsRo
     RdsRouteConfigSubscriptionSharedPtr subscription(new RdsRouteConfigSubscription(
         rds, manager_identifier, factory_context.getServerFactoryContext(),
         factory_context.messageValidationVisitor(), factory_context.initManager(), stat_prefix,
-        *this));
+        *this, rds.config_source().xds_api_version()));
     init_manager.add(subscription->init_target_);
     std::shared_ptr<RdsRouteConfigProviderImpl> new_provider{
         new RdsRouteConfigProviderImpl(std::move(subscription), factory_context)};

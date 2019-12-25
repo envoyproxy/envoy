@@ -42,9 +42,7 @@ public:
   SdsApi(envoy::api::v2::core::ConfigSource sds_config, absl::string_view sds_config_name,
          Config::SubscriptionFactory& subscription_factory, TimeSource& time_source,
          ProtobufMessage::ValidationVisitor& validation_visitor, Stats::Store& stats,
-         Init::Manager& init_manager, std::function<void()> destructor_cb,
-         const envoy::api::v2::core::ConfigSource::XdsApiVersion xds_api_version =
-             envoy::api::v2::core::ConfigSource::AUTO);
+         Init::Manager& init_manager, std::function<void()> destructor_cb);
 
   SecretData secretData();
 

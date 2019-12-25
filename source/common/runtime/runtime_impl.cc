@@ -547,12 +547,11 @@ void LoaderImpl::initialize(Upstream::ClusterManager& cm) { cm_ = &cm; }
 
 RtdsSubscription::RtdsSubscription(
     LoaderImpl& parent, const envoy::config::bootstrap::v2::RuntimeLayer::RtdsLayer& rtds_layer,
-    Stats::Store& store, ProtobufMessage::ValidationVisitor& validation_visitor,
-    const envoy::api::v2::core::ConfigSource::XdsApiVersion xds_api_version)
+    Stats::Store& store, ProtobufMessage::ValidationVisitor& validation_visitor)
     : parent_(parent), config_source_(rtds_layer.rtds_config()), store_(store),
       resource_name_(rtds_layer.name()),
       init_target_("RTDS " + resource_name_, [this]() { start(); }),
-      validation_visitor_(validation_visitor), xds_api_version_(xds_api_version) {}
+      validation_visitor_(validation_visitor), xds_api_version_(config_source_.xds_api_version()) {}
 
 void RtdsSubscription::onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
                                       const std::string&) {
