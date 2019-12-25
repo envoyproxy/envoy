@@ -25,6 +25,7 @@ TESTS = list(
         ('elaborated_type', 'ElaboratedTypeLoc type upgrades'),
         ('using_decl', 'UsingDecl upgrades for named types'),
         ('decl_ref_expr', 'DeclRefExpr upgrades for named constants'),
+        ('no_boost_file', 'API_NO_BOOST_FILE annotations'),
     ]))
 
 TESTDATA_PATH = 'tools/api_boost/testdata'

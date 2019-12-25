@@ -212,9 +212,19 @@ private:
       return;
     }
     // Add corresponding replacement.
-    const clang::SourceLocation start = source_range->getBegin();
-    const clang::SourceLocation end =
-        clang::Lexer::getLocForEndOfToken(source_range->getEnd(), 0, source_manager, lexer_lopt_);
+    const clang::SourceLocation non_spelling_start = source_range->getBegin();
+    if (non_spelling_start.isMacroID()) {
+      DEBUG_LOG("macro");
+      auto macro_name =
+          clang::Lexer::getImmediateMacroName(non_spelling_start, source_manager, lexer_lopt_);
+      if (macro_name.str() == "API_NO_BOOST") {
+        DEBUG_LOG("Skipping replacement due to API_NO_BOOST");
+        return;
+      }
+    }
+    const clang::SourceLocation start = source_manager.getSpellingLoc(source_range->getBegin());
+    const clang::SourceLocation end = clang::Lexer::getLocForEndOfToken(
+        source_manager.getSpellingLoc(source_range->getEnd()), 0, source_manager, lexer_lopt_);
     const size_t length = source_manager.getFileOffset(end) - source_manager.getFileOffset(start);
     clang::tooling::Replacement type_replacement(
         source_manager, start, length, ProtoCxxUtils::protoToCxxType(latest_type_info->type_name_));
