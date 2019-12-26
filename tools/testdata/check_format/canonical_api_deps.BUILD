@@ -9,5 +9,5 @@ envoy_cc_library(
     name = "foo",
     srcs = ["canonical_api_deps.cc", "canonical_api_deps.other.cc"],
     hdrs = ["canonical_api_deps.h"],
-    deps = ["@envoy_api//envoy/types:pkg_cc_proto"],
+    deps = ["@envoy_api_shadow//envoy/types:pkg_cc_proto"],
 )
