@@ -225,7 +225,7 @@ TEST_P(QuicHttpIntegrationTest, TestDelayedConnectionTeardownTimeoutTrigger) {
             1);
 }
 
-TEST_P(QuicHttpIntegrationTest, MultipleQuicListeners) {
+TEST_P(QuicHttpIntegrationTest, MultipleQuicListenersWithBPF) {
   concurrency_ = 8;
   initialize();
   std::vector<IntegrationCodecClientPtr> codec_clients;
@@ -257,7 +257,34 @@ TEST_P(QuicHttpIntegrationTest, MultipleQuicListeners) {
           fmt::format("listener.[__]_0.worker_{}.downstream_cx_total", i), 1u);
     }
   }
-#else
+#endif
+  for (size_t i = 0; i < concurrency_; ++i) {
+    codec_clients[i]->close();
+  }
+}
+
+TEST_P(QuicHttpIntegrationTest, MultipleQuicListenersNoBPF) {
+  concurrency_ = 8;
+  initialize();
+#ifdef SO_ATTACH_REUSEPORT_CBPF
+#define SO_ATTACH_REUSEPORT_CBPF_TMP SO_ATTACH_REUSEPORT_CBPF
+#undef SO_ATTACH_REUSEPORT_CBPF
+#endif
+  std::vector<IntegrationCodecClientPtr> codec_clients;
+  quic::QuicCryptoClientConfig::CachedState* cached = crypto_config_.LookupOrCreate(server_id_);
+  for (size_t i = 1; i <= concurrency_; ++i) {
+    // The BPF filter looks at the 1st byte of connection id in the packet
+    // header. And currently all QUIC versions support 8 bytes connection id. So
+    // create connections with the first 4 bytes of connection id different from each
+    // other so they should be evenly distributed.
+    cached->add_server_designated_connection_id(quic::test::TestConnectionId(i << 32));
+    codec_clients.push_back(makeHttpConnection(lookupPort("http")));
+  }
+  if (GetParam() == Network::Address::IpVersion::v4) {
+    test_server_->waitForCounterEq("listener.0.0.0.0_0.downstream_cx_total", 8u);
+  } else {
+    test_server_->waitForCounterEq("listener.[__]_0.downstream_cx_total", 8u);
+  }
   // Even without BPF support, these connections should more or less distributed
   // across different workers.
   for (size_t i = 0; i < concurrency_; ++i) {
@@ -281,10 +308,12 @@ TEST_P(QuicHttpIntegrationTest, MultipleQuicListeners) {
           8u);
     }
   }
-#endif
   for (size_t i = 0; i < concurrency_; ++i) {
     codec_clients[i]->close();
   }
+#ifdef SO_ATTACH_REUSEPORT_CBPF_TMP
+#define SO_ATTACH_REUSEPORT_CBPF SO_ATTACH_REUSEPORT_CBPF_TMP
+#endif
 }
 
 TEST_P(QuicHttpIntegrationTest, ConnectionMigration) {
