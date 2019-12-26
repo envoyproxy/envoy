@@ -32,6 +32,10 @@ def PrefixDirectory(path_prefix):
 # Update a C++ file to the latest API.
 def ApiBoostFile(llvm_include_path, debug_log, path):
   print('Processing %s' % path)
+  if 'API_NO_BOOST_FILE' in pathlib.Path(path).read_text():
+    if debug_log:
+      print('Not boosting %s due to API_NO_BOOST_FILE\n' % path)
+    return None
   # Run the booster
   try:
     result = sp.run([
@@ -57,6 +61,9 @@ def ApiBoostFile(llvm_include_path, debug_log, path):
 # below, we have more control over special casing as well, so ¯\_(ツ)_/¯.
 def RewriteIncludes(args):
   path, api_includes = args
+  # Files with API_NO_BOOST_FILE will have None returned by ApiBoostFile.
+  if api_includes is None:
+    return
   # We just dump the inferred API header includes at the start of the #includes
   # in the file and remove all the present API header includes. This does not
   # match Envoy style; we rely on later invocations of fix_format.sh to take
@@ -159,8 +166,8 @@ def ApiBoostTree(target_paths,
                            file_paths)
       # Apply Clang replacements before header fixups, since the replacements
       # are all relative to the original file.
-      for prefix in target_paths:
-        sp.run(['clang-apply-replacements', PrefixDirectory(prefix)], check=True)
+      for prefix_dir in set(map(PrefixDirectory, target_paths)):
+        sp.run(['clang-apply-replacements', prefix_dir], check=True)
       # Fixup headers.
       p.map(RewriteIncludes, zip(file_paths, api_includes))
   finally:

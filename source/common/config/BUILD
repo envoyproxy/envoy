@@ -21,6 +21,11 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "api_version_lib",
+    hdrs = ["api_version.h"],
+)
+
+envoy_cc_library(
     name = "config_provider_lib",
     srcs = ["config_provider_impl.cc"],
     hdrs = ["config_provider_impl.h"],
