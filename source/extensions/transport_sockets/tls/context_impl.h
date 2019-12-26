@@ -18,7 +18,6 @@
 #include "extensions/transport_sockets/tls/context_manager_impl.h"
 
 #include "absl/synchronization/mutex.h"
-#include "absl/types/optional.h"
 #include "openssl/ssl.h"
 #include "openssl/x509v3.h"
 
