@@ -253,6 +253,7 @@ envoy_cc_library(
         "//include/envoy/init:manager_interface",
         "//include/envoy/server:listener_manager_interface",
         "//source/common/common:cleanup_lib",
+        "//source/common/config:api_version_lib",
         "//source/common/config:resources_lib",
         "//source/common/config:utility_lib",
         "//source/common/init:target_lib",

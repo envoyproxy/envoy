@@ -1,6 +1,6 @@
 syntax = "proto3";
 
-package envoy.api.v3alpha;
+package envoy.service.route.v3alpha;
 
 import "envoy/api/v3alpha/discovery.proto";
 
@@ -10,7 +10,7 @@ import "udpa/annotations/versioning.proto";
 
 import "validate/validate.proto";
 
-option java_package = "io.envoyproxy.envoy.api.v3alpha";
+option java_package = "io.envoyproxy.envoy.service.route.v3alpha";
 option java_outer_classname = "SrdsProto";
 option java_multiple_files = true;
 option java_generic_services = true;
@@ -26,20 +26,22 @@ option java_generic_services = true;
 // :ref:`RouteConfiguration<envoy_api_msg_api.v3alpha.RouteConfiguration>` message) to each
 // HTTP request.
 service ScopedRoutesDiscoveryService {
-  rpc StreamScopedRoutes(stream DiscoveryRequest) returns (stream DiscoveryResponse) {
+  rpc StreamScopedRoutes(stream api.v3alpha.DiscoveryRequest)
+      returns (stream api.v3alpha.DiscoveryResponse) {
   }
 
-  rpc DeltaScopedRoutes(stream DeltaDiscoveryRequest) returns (stream DeltaDiscoveryResponse) {
+  rpc DeltaScopedRoutes(stream api.v3alpha.DeltaDiscoveryRequest)
+      returns (stream api.v3alpha.DeltaDiscoveryResponse) {
   }
 
-  rpc FetchScopedRoutes(DiscoveryRequest) returns (DiscoveryResponse) {
+  rpc FetchScopedRoutes(api.v3alpha.DiscoveryRequest) returns (api.v3alpha.DiscoveryResponse) {
     option (google.api.http).post = "/v3alpha/discovery:scoped-routes";
     option (google.api.http).body = "*";
   }
 }
 
 // Specifies a routing scope, which associates a
-// :ref:`Key<envoy_api_msg_api.v3alpha.ScopedRouteConfiguration.Key>` to a
+// :ref:`Key<envoy_api_msg_service.route.v3alpha.ScopedRouteConfiguration.Key>` to a
 // :ref:`envoy_api_msg_RouteConfiguration` (identified by its resource name).
 //
 // The HTTP connection manager builds up a table consisting of these Key to

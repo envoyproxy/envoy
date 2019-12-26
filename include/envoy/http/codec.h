@@ -9,6 +9,7 @@
 #include "envoy/http/header_map.h"
 #include "envoy/http/metadata_interface.h"
 #include "envoy/http/protocol.h"
+#include "envoy/network/address.h"
 
 namespace Envoy {
 namespace Http {
@@ -212,6 +213,12 @@ public:
    * not associated with every stream on the connection.
    */
   virtual absl::string_view responseDetails() { return ""; }
+
+  /*
+   * @return const Address::InstanceConstSharedPtr& the local address of the connection associated
+   * with the stream.
+   */
+  virtual const Network::Address::InstanceConstSharedPtr& connectionLocalAddress() PURE;
 };
 
 /**

@@ -1,7 +1,7 @@
 def _default_envoy_api_impl(ctx):
     ctx.file("WORKSPACE", "")
-    ctx.file("BUILD.bazel", "")
     api_dirs = [
+        "BUILD",
         "bazel",
         "docs",
         "envoy",

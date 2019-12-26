@@ -17,10 +17,14 @@ import os
 import multiprocessing as mp
 import pathlib
 import re
+import shlex
 import subprocess as sp
 
 # Detect API #includes.
 API_INCLUDE_REGEX = re.compile('#include "(envoy/.*)/[^/]+\.pb\.(validate\.)?h"')
+
+# Needed for CI to pass down bazel options.
+BAZEL_BUILD_OPTIONS = shlex.split(os.environ.get('BAZEL_BUILD_OPTIONS', ''))
 
 
 # Obtain the directory containing a path prefix, e.g. ./foo/bar.txt is ./foo,
@@ -32,6 +36,10 @@ def PrefixDirectory(path_prefix):
 # Update a C++ file to the latest API.
 def ApiBoostFile(llvm_include_path, debug_log, path):
   print('Processing %s' % path)
+  if 'API_NO_BOOST_FILE' in pathlib.Path(path).read_text():
+    if debug_log:
+      print('Not boosting %s due to API_NO_BOOST_FILE\n' % path)
+    return None
   # Run the booster
   try:
     result = sp.run([
@@ -57,6 +65,9 @@ def ApiBoostFile(llvm_include_path, debug_log, path):
 # below, we have more control over special casing as well, so ¯\_(ツ)_/¯.
 def RewriteIncludes(args):
   path, api_includes = args
+  # Files with API_NO_BOOST_FILE will have None returned by ApiBoostFile.
+  if api_includes is None:
+    return
   # We just dump the inferred API header includes at the start of the #includes
   # in the file and remove all the present API header includes. This does not
   # match Envoy style; we rely on later invocations of fix_format.sh to take
@@ -82,7 +93,8 @@ def RewriteIncludes(args):
 def ApiBoostTree(target_paths,
                  generate_compilation_database=False,
                  build_api_booster=False,
-                 debug_log=False):
+                 debug_log=False,
+                 sequential=False):
   dep_build_targets = ['//%s/...' % PrefixDirectory(prefix) for prefix in target_paths]
 
   # Optional setup of state. We need the compilation database and api_booster
@@ -115,13 +127,14 @@ def ApiBoostTree(target_paths,
         'build',
         '--strip=always',
         '@envoy_dev//clang_tools/api_booster',
-    ] + extra_api_booster_args,
+    ] + BAZEL_BUILD_OPTIONS + extra_api_booster_args,
            check=True)
     sp.run([
         'bazel',
         'build',
         '--strip=always',
-    ] + dep_lib_build_targets, check=True)
+    ] + BAZEL_BUILD_OPTIONS + dep_lib_build_targets,
+           check=True)
 
   # Figure out where the LLVM include path is. We need to provide this
   # explicitly as the api_booster is built inside the Bazel cache and doesn't
@@ -139,12 +152,15 @@ def ApiBoostTree(target_paths,
     file_path = entry['file']
     if any(file_path.startswith(prefix) for prefix in target_paths):
       file_paths.add(file_path)
+  # Ensure a determinstic ordering if we are going to process sequentially.
+  if sequential:
+    file_paths = sorted(file_paths)
 
   # The API boosting is file local, so this is trivially parallelizable, use
   # multiprocessing pool with default worker pool sized to cpu_count(), since
   # this is CPU bound.
   try:
-    with mp.Pool() as p:
+    with mp.Pool(processes=1 if sequential else None) as p:
       # We need multiple phases, to ensure that any dependency on files being modified
       # in one thread on consumed transitive headers on the other thread isn't an
       # issue. This also ensures that we complete all analysis error free before
@@ -155,8 +171,8 @@ def ApiBoostTree(target_paths,
                            file_paths)
       # Apply Clang replacements before header fixups, since the replacements
       # are all relative to the original file.
-      for prefix in target_paths:
-        sp.run(['clang-apply-replacements', PrefixDirectory(prefix)], check=True)
+      for prefix_dir in set(map(PrefixDirectory, target_paths)):
+        sp.run(['clang-apply-replacements', prefix_dir], check=True)
       # Fixup headers.
       p.map(RewriteIncludes, zip(file_paths, api_includes))
   finally:
@@ -173,7 +189,11 @@ if __name__ == '__main__':
   parser.add_argument('--generate_compilation_database', action='store_true')
   parser.add_argument('--build_api_booster', action='store_true')
   parser.add_argument('--debug_log', action='store_true')
+  parser.add_argument('--sequential', action='store_true')
   parser.add_argument('paths', nargs='*', default=['source', 'test', 'include'])
   args = parser.parse_args()
-  ApiBoostTree(args.paths, args.generate_compilation_database, args.build_api_booster,
-               args.debug_log)
+  ApiBoostTree(args.paths,
+               generate_compilation_database=args.generate_compilation_database,
+               build_api_booster=args.build_api_booster,
+               debug_log=args.debug_log,
+               sequential=args.sequential)
