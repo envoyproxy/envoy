@@ -110,7 +110,6 @@ public:
     return validation_context_;
   }
   Configuration::ServerFactoryContext& serverFactoryContext() override { return server_context_; }
-  Http::ServerConnectionCallbacks* apiListener() override { return nullptr; }
 
   // Server::ListenerComponentFactory
   LdsApiPtr createLdsApi(const envoy::api::v2::core::ConfigSource& lds_config) override {

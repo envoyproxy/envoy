@@ -28,7 +28,6 @@
 #include "server/well_known_names.h"
 
 #include "extensions/filters/listener/well_known_names.h"
-#include "extensions/filters/network/http_connection_manager/config.h"
 #include "extensions/transport_sockets/well_known_names.h"
 
 namespace Envoy {
@@ -302,12 +301,35 @@ ListenerManagerStats ListenerManagerImpl::generateStats(Stats::Scope& scope) {
 bool ListenerManagerImpl::addOrUpdateListener(const envoy::api::v2::Listener& config,
                                               const std::string& version_info, bool added_via_api) {
 
-  // FIXME initial experimentation where we only allow one API listener to exist and to come from
-  // bootstrap
-  if (!api_listener_ && config.has_api_listener()) {
-    ENVOY_LOG(error, "initializing API listener");
-    api_listener_ = std::make_unique<ApiListenerImpl>(
-        config, *this, config.name(), server_.messageValidationContext().staticValidationVisitor());
+  // FIXME HttpApiListener is very prescriptive about "what" and API Listener is.
+  // Whereas the config is very non-prescriptive -- through the use of an Any.
+  // Perhaps this path should similar to several parts in the codebase that have registered
+  // factories for all the different types. The problem is that I can't quite see what the abstract
+  // type that we store is; it entirely depends on what the API surface of the API listener is.
+  if (config.has_api_listener()) {
+    ENVOY_LOG(error, "has api listener");
+    // FIXME I propose that name should be required and unique for API listeners. Much like how
+    // address is required for a socket based listener. This is how Envoy can find different API
+    // listeners.
+    if (config.name().empty()) {
+      ENVOY_LOG(error, "the listener name is empty");
+      // FIXME throwing exception is ok here? Yes for bootstrap. What happens to the exception on an
+      // LDS update?
+    } else {
+      // FIXME if the name is already there and the listener was added via API, then update.
+      auto it = api_listeners_.find(config.name());
+      if (it != api_listeners_.end()) {
+        ENVOY_LOG(error, "this listener name already exists {}", config.name());
+        // Update if updatable
+      } else {
+        // Add!
+        ENVOY_LOG(error, "Adding brand new listener {}", config.name());
+        api_listeners_.emplace(config.name(),
+                               std::make_unique<HttpApiListener>(
+                                   config, *this, config.name(),
+                                   server_.messageValidationContext().staticValidationVisitor()));
+      }
+    }
     return true;
   }
 
@@ -791,6 +813,17 @@ ListenerManagerImpl::createListenSocketFactory(const envoy::api::v2::core::Addre
   return std::make_shared<ListenSocketFactoryImpl>(
       factory_, listener.address(), socket_type, listener.listenSocketOptions(),
       listener.bindToPort(), listener.name(), reuse_port);
+}
+
+Http::ServerConnectionCallbacks* ListenerManagerImpl::apiListener(const std::string& name) {
+  auto it = api_listeners_.find(name);
+  if (it != api_listeners_.end()) {
+    ENVOY_LOG(error, "returning non-null");
+    return it->second->apiHandle();
+  } else {
+    ENVOY_LOG(error, "returning null");
+    return nullptr;
+  }
 }
 
 } // namespace Server

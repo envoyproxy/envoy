@@ -10,7 +10,6 @@
 
 #include "common/common/assert.h"
 #include "common/config/utility.h"
-#include "common/http/conn_manager_impl.h"
 #include "common/network/connection_balancer_impl.h"
 #include "common/network/resolver_impl.h"
 #include "common/network/socket_option_factory.h"
@@ -25,7 +24,6 @@
 #include "server/well_known_names.h"
 
 #include "extensions/filters/listener/well_known_names.h"
-#include "extensions/filters/network/http_connection_manager/config.h"
 #include "extensions/transport_sockets/well_known_names.h"
 
 namespace Envoy {
@@ -398,72 +396,6 @@ void ListenerImpl::setSocketFactory(const Network::ListenSocketFactorySharedPtr&
   ASSERT(!socket_factory_);
   socket_factory_ = socket_factory;
 }
-
-////////////////// API Listener //////////////////////////
-ApiListenerImpl::ApiListenerImpl(const envoy::api::v2::Listener& config,
-                                 ListenerManagerImpl& parent, const std::string& name,
-                                 ProtobufMessage::ValidationVisitor& validation_visitor)
-    : config_(config), parent_(parent), name_(name),
-      address_(Network::Address::resolveProtoAddress(config.address())),
-      validation_visitor_(validation_visitor),
-      global_scope_(parent_.server_.stats().createScope("")),
-      listener_scope_(parent_.server_.stats().createScope(fmt::format("listener.api.{}.", name_))),
-      read_callbacks_(SyntheticReadCallbacks(*this)) {
-  ENVOY_LOG(error, "In API listener constructor");
-  http_connection_manager_factory_ =
-      Envoy::Extensions::NetworkFilters::HttpConnectionManager::HttpConnectionManagerFactory::
-          createHttpConnectionManagerFactoryFromProto(config.api_listener().api_listener(), *this);
-  ENVOY_LOG(error, "Created lambda");
-}
-
-AccessLog::AccessLogManager& ApiListenerImpl::accessLogManager() {
-  return parent_.server_.accessLogManager();
-}
-Upstream::ClusterManager& ApiListenerImpl::clusterManager() {
-  return parent_.server_.clusterManager();
-}
-Event::Dispatcher& ApiListenerImpl::dispatcher() { return parent_.server_.dispatcher(); }
-Network::DrainDecision& ApiListenerImpl::drainDecision() { return *this; }
-Grpc::Context& ApiListenerImpl::grpcContext() { return parent_.server_.grpcContext(); }
-bool ApiListenerImpl::healthCheckFailed() { return parent_.server_.healthCheckFailed(); }
-Tracing::HttpTracer& ApiListenerImpl::httpTracer() { return httpContext().tracer(); }
-Http::Context& ApiListenerImpl::httpContext() { return parent_.server_.httpContext(); }
-Init::Manager& ApiListenerImpl::initManager() { return parent_.server_.initManager(); }
-const LocalInfo::LocalInfo& ApiListenerImpl::localInfo() const {
-  return parent_.server_.localInfo();
-}
-Envoy::Runtime::RandomGenerator& ApiListenerImpl::random() { return parent_.server_.random(); }
-Envoy::Runtime::Loader& ApiListenerImpl::runtime() { return parent_.server_.runtime(); }
-Stats::Scope& ApiListenerImpl::scope() { return *global_scope_; }
-Singleton::Manager& ApiListenerImpl::singletonManager() {
-  return parent_.server_.singletonManager();
-}
-OverloadManager& ApiListenerImpl::overloadManager() { return parent_.server_.overloadManager(); }
-ThreadLocal::Instance& ApiListenerImpl::threadLocal() { return parent_.server_.threadLocal(); }
-Admin& ApiListenerImpl::admin() { return parent_.server_.admin(); }
-const envoy::api::v2::core::Metadata& ApiListenerImpl::listenerMetadata() const {
-  return config_.metadata();
-};
-envoy::api::v2::core::TrafficDirection ApiListenerImpl::direction() const {
-  return config_.traffic_direction();
-};
-TimeSource& ApiListenerImpl::timeSource() { return api().timeSource(); }
-
-ProtobufMessage::ValidationVisitor& ApiListenerImpl::messageValidationVisitor() {
-  return validation_visitor_;
-}
-Api::Api& ApiListenerImpl::api() { return parent_.server_.api(); }
-ServerLifecycleNotifier& ApiListenerImpl::lifecycleNotifier() {
-  return parent_.server_.lifecycleNotifier();
-}
-OptProcessContextRef ApiListenerImpl::processContext() { return parent_.server_.processContext(); }
-Configuration::ServerFactoryContext& ApiListenerImpl::getServerFactoryContext() const {
-  return parent_.server_.serverFactoryContext();
-}
-Stats::Scope& ApiListenerImpl::listenerScope() { return *listener_scope_; }
-
-// FIXME hook the api listener into listener draining in the manager.
-bool ApiListenerImpl::drainClose() const { return false; }
 
 } // namespace Server
 } // namespace Envoy

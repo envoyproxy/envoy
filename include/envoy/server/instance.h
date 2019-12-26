@@ -9,7 +9,6 @@
 #include "envoy/common/mutex_tracer.h"
 #include "envoy/event/timer.h"
 #include "envoy/grpc/context.h"
-#include "envoy/http/codec.h"
 #include "envoy/http/context.h"
 #include "envoy/init/manager.h"
 #include "envoy/local_info/local_info.h"
@@ -230,8 +229,6 @@ public:
    * @return Configuration::ServerFactoryContext& factory context for filters.
    */
   virtual Configuration::ServerFactoryContext& serverFactoryContext() PURE;
-
-  virtual Http::ServerConnectionCallbacks* apiListener() PURE;
 };
 
 } // namespace Server

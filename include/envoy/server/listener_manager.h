@@ -212,7 +212,19 @@ public:
   using FailureStates = std::vector<std::unique_ptr<envoy::admin::v2alpha::UpdateFailureState>>;
   virtual void endListenerUpdate(FailureStates&& failure_states) PURE;
 
-  virtual Http::ServerConnectionCallbacks* apiListener() PURE;
+  // FIXME figure out what type to return here. An idea I had is to provide a handle that connects
+  // to Envoy's owned listener via a weak ptr -- similar to the init manager handles. This way API
+  // calls can be safe without owning the underlying listener. Moreover, it might be the case that
+  // while this function returns a handle, the caller needs prior knowledge about the API surface
+  // that the handle provides so they can downcast to the actual "API listener" surface. This could
+  // also help with the type that the listener manager stores, i.e it stores "ApiListener" and the
+  // only thing that that interface knows how to do is to return a safe handle.
+  /**
+   * @name name of the API Listener to search for.
+   * @return Http::ServerConnectionCallbacks* a handle to the API Listener if it exists, nullptr if
+   * it does not.
+   */
+  virtual Http::ServerConnectionCallbacks* apiListener(const std::string& name) PURE;
 };
 
 } // namespace Server

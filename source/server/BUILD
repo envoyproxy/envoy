@@ -264,6 +264,31 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "api_listener_lib",
+    srcs = [
+        "api_listener.cc",
+    ],
+    hdrs = [
+        "api_listener.h",
+    ],
+    deps = [
+        ":drain_manager_lib",
+        ":listener_manager_impl",
+        "//include/envoy/network:connection_interface",
+        "//include/envoy/server:filter_config_interface",
+        "//include/envoy/server:listener_manager_interface",
+        "//source/common/common:empty_string",
+        "//source/common/http:conn_manager_lib",
+        "//source/common/init:manager_lib",
+        "//source/common/network:resolver_lib",
+        "//source/common/stream_info:stream_info_lib",
+        "//source/extensions/filters/network/http_connection_manager:config",
+        "@envoy_api//envoy/api/v2:pkg_cc_proto",
+        "@envoy_api//envoy/api/v2/listener:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
     name = "listener_lib",
     srcs = [
         "listener_impl.cc",
@@ -278,12 +303,10 @@ envoy_cc_library(
         ":listener_manager_impl",
         ":transport_socket_config_lib",
         ":well_known_names_lib",
-        "//include/envoy/network:connection_interface",
         "//include/envoy/server:active_udp_listener_config_interface",
         "//include/envoy/server:filter_config_interface",
         "//include/envoy/server:listener_manager_interface",
         "//include/envoy/server:transport_socket_config_interface",
-        "//source/common/common:empty_string",
         "//source/common/config:utility_lib",
         "//source/common/init:manager_lib",
         "//source/common/network:connection_balancer_lib",
@@ -291,9 +314,7 @@ envoy_cc_library(
         "//source/common/network:socket_option_factory_lib",
         "//source/common/network:utility_lib",
         "//source/common/protobuf:utility_lib",
-        "//source/common/stream_info:stream_info_lib",
         "//source/extensions/filters/listener:well_known_names",
-        "//source/extensions/filters/network/http_connection_manager:config",
         "//source/extensions/transport_sockets:well_known_names",
         "@envoy_api//envoy/api/v2:pkg_cc_proto",
         "@envoy_api//envoy/api/v2/core:pkg_cc_proto",
@@ -301,12 +322,16 @@ envoy_cc_library(
     ],
 )
 
+# TODO(junr03): actually separate this lib from the listener and api listener lib.
+# this can be done if the parent_ in the listener and the api listener becomes the ListenerManager interface.
+# the issue right now is that the listener's reach into the listener manager's server_ instance variable.
 envoy_cc_library(
     name = "listener_manager_impl",
     srcs = [
         "listener_manager_impl.cc",
     ],
     hdrs = [
+        "api_listener.h",
         "listener_impl.h",
         "listener_manager_impl.h",
     ],
@@ -390,6 +415,7 @@ envoy_cc_library(
     ],
     deps = [
         ":active_raw_udp_listener_config",
+        ":api_listener_lib",
         ":configuration_lib",
         ":connection_handler_lib",
         ":guarddog_lib",
