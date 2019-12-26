@@ -126,7 +126,8 @@ Network::SocketSharedPtr ListenSocketFactoryImpl::getListenSocket() {
 ListenerImpl::ListenerImpl(const envoy::api::v2::Listener& config, const std::string& version_info,
                            ListenerManagerImpl& parent, const std::string& name, bool added_via_api,
                            bool workers_started, uint64_t hash,
-                           ProtobufMessage::ValidationVisitor& validation_visitor)
+                           ProtobufMessage::ValidationVisitor& validation_visitor,
+                           uint32_t concurrency)
     : parent_(parent), address_(Network::Address::resolveProtoAddress(config.address())),
       filter_chain_manager_(address_), global_scope_(parent_.server_.stats().createScope("")),
       listener_scope_(
@@ -154,7 +155,8 @@ ListenerImpl::ListenerImpl(const envoy::api::v2::Listener& config, const std::st
   if (PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, freebind, false)) {
     addListenSocketOptions(Network::SocketOptionFactory::buildIpFreebindOptions());
   }
-  if ((socket_type == Network::Address::SocketType::Datagram) || config.reuse_port()) {
+  if ((socket_type == Network::Address::SocketType::Datagram && concurrency > 1) ||
+      config.reuse_port()) {
     addListenSocketOptions(Network::SocketOptionFactory::buildReusePortOptions());
   }
   if (!config.socket_options().empty()) {
