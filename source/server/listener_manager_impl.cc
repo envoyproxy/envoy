@@ -568,11 +568,12 @@ std::vector<std::reference_wrapper<Network::ListenerConfig>> ListenerManagerImpl
   return ret;
 }
 
-void ListenerManagerImpl::addListenerToWorker(Worker& worker, ListenerImpl& listener) {
-  worker.addListener(listener, [this, &listener](bool success) -> void {
+void ListenerManagerImpl::addListenerToWorker(Worker& worker, ListenerImpl& listener,
+                                              ListenerCompletionCallback completion_callback) {
+  worker.addListener(listener, [this, &listener, completion_callback](bool success) -> void {
     // The add listener completion runs on the worker thread. Post back to the main thread to
     // avoid locking.
-    server_.dispatcher().post([this, success, &listener]() -> void {
+    server_.dispatcher().post([this, success, &listener, completion_callback]() -> void {
       // It is theoretically possible for a listener to get added on 1 worker but not the others.
       // The below check with onListenerCreateFailure() is there to ensure we execute the
       // removal/logging/stats at most once on failure. Note also that drain/removal can race
@@ -590,6 +591,9 @@ void ListenerManagerImpl::addListenerToWorker(Worker& worker, ListenerImpl& list
       if (success) {
         stats_.listener_create_success_.inc();
       }
+      if (completion_callback) {
+        completion_callback();
+      }
     });
   });
 }
@@ -598,7 +602,7 @@ void ListenerManagerImpl::onListenerWarmed(ListenerImpl& listener) {
   // The warmed listener should be added first so that the worker will accept new connections
   // when it stops listening on the old listener.
   for (const auto& worker : workers_) {
-    addListenerToWorker(*worker, listener);
+    addListenerToWorker(*worker, listener, nullptr);
   }
 
   auto existing_active_listener = getListenerByName(active_listeners_, listener.name());
@@ -669,17 +673,27 @@ bool ListenerManagerImpl::removeListener(const std::string& name) {
 void ListenerManagerImpl::startWorkers(GuardDog& guard_dog) {
   ENVOY_LOG(info, "all dependencies initialized. starting workers");
   ASSERT(!workers_started_);
-  workers_started_ = true;
   uint32_t i = 0;
+  const auto listeners_pending_init =
+      std::make_shared<std::atomic<uint64_t>>(workers_.size() * active_listeners_.size());
   for (const auto& worker : workers_) {
     ASSERT(warming_listeners_.empty());
     for (const auto& listener : active_listeners_) {
-      addListenerToWorker(*worker, *listener);
+      addListenerToWorker(*worker, *listener, [this, listeners_pending_init]() {
+        if (--(*listeners_pending_init) == 0) {
+          workers_started_ = true;
+          stats_.workers_started_.set(1);
+        }
+      });
     }
     worker->start(guard_dog);
     if (enable_dispatcher_stats_) {
       worker->initializeStats(*scope_, fmt::format("worker_{}.", i++));
     }
+  }
+  if (active_listeners_.size() == 0) {
+    workers_started_ = true;
+    stats_.workers_started_.set(1);
   }
 }
 
