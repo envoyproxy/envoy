@@ -111,7 +111,7 @@ private:
     // Remove qualifiers, e.g. const.
     const clang::UnqualTypeLoc unqual_type_loc = type_loc.getUnqualifiedLoc();
 
-    // Today we are only smart enought to rewrite ElaborateTypeLoc, which are
+    // Today we are only smart enough to rewrite ElaborateTypeLoc, which are
     // full namespace prefixed types. We probably will need to support more, in
     // particular if we want message-level type renaming. TODO(htuch): add more
     // supported AST TypeLoc classes as needed.
