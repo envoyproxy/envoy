@@ -345,11 +345,14 @@ const ConfigType* resolveMostSpecificPerFilterConfig(const std::string& filter_n
   return dynamic_cast<const ConfigType*>(generic_config);
 }
 
+// We can have at most 3 route-specific filter configs.
+static constexpr int MaxRouteSpecificFilterConfigs = 3;
+
 /**
  * The non template implementation of resolveAllPerFilterConfigGeneric. see
  * resolveAllPerFilterConfigGeneric for docs.
  */
-std::vector<const Router::RouteSpecificFilterConfig*>
+std::array<const Router::RouteSpecificFilterConfig*, MaxRouteSpecificFilterConfigs>
 resolveAllPerFilterConfigGeneric(const std::string& filter_name,
                                  const Router::RouteConstSharedPtr& route);
 
@@ -379,18 +382,17 @@ resolveAllPerFilterConfigGeneric(const std::string& filter_name,
  * parameter.
  */
 template <class ConfigType>
-std::vector<const ConfigType*>
+std::array<const ConfigType*, MaxRouteSpecificFilterConfigs>
 resolveAllPerFilterConfigGeneric(const std::string& filter_name,
                                  const Router::RouteConstSharedPtr& route) {
   static_assert(std::is_base_of<Router::RouteSpecificFilterConfig, ConfigType>::value,
                 "ConfigType must be a subclass of Router::RouteSpecificFilterConfig");
-  std::vector<const Router::RouteSpecificFilterConfig*> generic_configs =
+  std::array<const Router::RouteSpecificFilterConfig*, MaxRouteSpecificFilterConfigs> generic_configs =
       resolveAllPerFilterConfigGeneric(filter_name, route);
 
-  std::vector<const ConfigType*> typed_configs;
-  typed_configs.reserve(generic_configs.size());
-  for (const auto& generic_config : generic_configs) {
-    typed_configs.push_back(dynamic_cast<const ConfigType*>(generic_config));
+  std::array<const ConfigType*, MaxRouteSpecificFilterConfigs> typed_configs;
+  for (size_t i = 0; i < generic_configs.size(); i++) {
+    typed_configs[i] = dynamic_cast<const ConfigType*>(generic_configs[i]);
   }
   return typed_configs;
 }

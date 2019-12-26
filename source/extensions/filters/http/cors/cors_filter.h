@@ -9,6 +9,7 @@
 #include "envoy/stats/stats_macros.h"
 
 #include "common/buffer/buffer_impl.h"
+#include "common/http/utility.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -96,7 +97,7 @@ private:
 
   Http::StreamDecoderFilterCallbacks* decoder_callbacks_{};
   Http::StreamEncoderFilterCallbacks* encoder_callbacks_{};
-  std::vector<const Envoy::Router::CorsPolicy*> policies_;
+  std::array<const Envoy::Router::CorsPolicy*, Http::Utility::MaxRouteSpecificFilterConfigs> policies_;
   bool is_cors_request_{};
   const Http::HeaderEntry* origin_{};
 
