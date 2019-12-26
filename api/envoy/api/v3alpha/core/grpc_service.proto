@@ -130,7 +130,8 @@ message GrpcService {
             "envoy.api.v2.core.GrpcService.GoogleGrpc.CallCredentials.StsService";
 
         // URI of the token exchange service that handles token exchange requests.
-        string token_exchange_service_uri = 1 [(validate.rules).string = {uri: true}];
+        // TODO(asraa): Add URI validation when implemented.
+        string token_exchange_service_uri = 1;
 
         // Location of the target service or resource where the client
         // intends to use the requested security token.

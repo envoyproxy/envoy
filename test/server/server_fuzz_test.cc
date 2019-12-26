@@ -52,6 +52,10 @@ makeHermeticPathsAndPorts(Fuzz::PerTestEnvironment& test_env,
     }
   }
   for (auto& cluster : *output.mutable_static_resources()->mutable_clusters()) {
+    for (auto& health_check : *cluster.mutable_health_checks()) {
+      // QUIC is not enabled in production code yet, so remove references for HTTP3.
+      health_check.mutable_http_health_check()->clear_codec_client_type();
+    }
     for (auto& host : *cluster.mutable_hosts()) {
       makePortHermetic(test_env, host);
     }

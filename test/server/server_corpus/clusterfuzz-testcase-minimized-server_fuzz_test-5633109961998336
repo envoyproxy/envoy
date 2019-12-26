@@ -1,0 +1,47 @@
+static_resources {
+  clusters {
+    name: "B"
+    connect_timeout {
+      nanos: 4
+    }
+    hosts {
+      pipe {
+        path: "l"
+      }
+    }
+    hosts {
+      pipe {
+        path: "\334\254"
+      }
+    }
+    health_checks {
+      timeout {
+        seconds: 512
+      }
+      interval {
+        nanos: 91
+      }
+      unhealthy_threshold {
+      }
+      healthy_threshold {
+      }
+      http_health_check {
+        host: "#"
+        path: "="
+        codec_client_type: HTTP3
+      }
+      interval_jitter_percent: 1
+      always_log_health_check_failures: true
+    }
+  }
+}
+cluster_manager {
+  load_stats_config {
+    rate_limit_settings {
+      fill_rate {
+        value: 2.36453327863576e-312
+      }
+    }
+  }
+}
+flags_path: "\000\000\000\000\000\010NK"
