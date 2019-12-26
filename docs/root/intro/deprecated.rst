@@ -20,6 +20,8 @@ Version 1.13.0 (pending)
   <envoy_api_field_auth.CertificateValidationContext.verify_subject_alt_name>`
   has been deprecated in favor of the :ref:`match_subject_alt_names
   <envoy_api_field_auth.CertificateValidationContext.match_subject_alt_names>` field.
+* The `request_mirror_policy` field in :ref:`RouteMatch <envoy_api_msg_route.RouteAction>` has been deprecated in
+  favor of the `request_mirror_policies` field.
 
 Version 1.12.0 (October 31, 2019)
 =================================

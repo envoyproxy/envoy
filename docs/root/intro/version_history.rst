@@ -29,6 +29,7 @@ Version history
 * redis: correctly follow MOVE/ASK redirection for mirrored clusters.
 * redis: add :ref:`host_degraded_refresh_threshold <envoy_api_field_config.cluster.redis.RedisClusterConfig.host_degraded_refresh_threshold>` and :ref:`failure_refresh_threshold <envoy_api_field_config.cluster.redis.RedisClusterConfig.failure_refresh_threshold>` to refresh topology when nodes are degraded or when requests fails.
 * router: added support for REQ(header-name) :ref:`header formatter <config_http_conn_man_headers_custom_request_headers>`.
+* router: added :ref:`request_mirror_policies<envoy_api_field_route.RouteAction.request_mirror_policies>` to support sending multiple mirrored requests in one route.
 * router: allow using a :ref:`query parameter
   <envoy_api_field_route.RouteAction.HashPolicy.query_parameter>` for HTTP consistent hashing.
 * router: skip the Location header when the response code is not a 201 or a 3xx.
