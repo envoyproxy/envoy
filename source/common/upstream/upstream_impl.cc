@@ -686,13 +686,13 @@ ClusterInfoImpl::ClusterInfoImpl(
       throw EnvoyException(
           fmt::format("cluster: LB policy {} is not valid for Cluster type {}. 'ORIGINAL_DST_LB' "
                       "is allowed only with cluster type 'ORIGINAL_DST'",
-                      envoy::api::v2::Cluster_LbPolicy_Name(config.lb_policy()),
+                      envoy::api::v2::Cluster::LbPolicy_Name(config.lb_policy()),
                       envoy::api::v2::Cluster_DiscoveryType_Name(config.type())));
     }
     if (config.has_lb_subset_config()) {
       throw EnvoyException(
           fmt::format("cluster: LB policy {} cannot be combined with lb_subset_config",
-                      envoy::api::v2::Cluster_LbPolicy_Name(config.lb_policy())));
+                      envoy::api::v2::Cluster::LbPolicy_Name(config.lb_policy())));
     }
 
     lb_type_ = LoadBalancerType::ClusterProvided;
@@ -704,7 +704,7 @@ ClusterInfoImpl::ClusterInfoImpl(
     if (config.has_lb_subset_config()) {
       throw EnvoyException(
           fmt::format("cluster: LB policy {} cannot be combined with lb_subset_config",
-                      envoy::api::v2::Cluster_LbPolicy_Name(config.lb_policy())));
+                      envoy::api::v2::Cluster::LbPolicy_Name(config.lb_policy())));
     }
 
     lb_type_ = LoadBalancerType::ClusterProvided;
@@ -919,7 +919,9 @@ void ClusterImplBase::onPreInitComplete() {
   }
   initialization_started_ = true;
 
-  ENVOY_LOG(debug, "initializing secondary cluster {} completed", info()->name());
+  ENVOY_LOG(debug, "initializing {} cluster {} completed",
+            initializePhase() == InitializePhase::Primary ? "Primary" : "Secondary",
+            info()->name());
   init_manager_.initialize(init_watcher_);
 }
 

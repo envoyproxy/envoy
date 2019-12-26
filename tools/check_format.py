@@ -71,7 +71,8 @@ STD_REGEX_WHITELIST = ("./source/common/common/utility.cc", "./source/common/com
                        "./source/extensions/filters/http/squash/squash_filter.h",
                        "./source/extensions/filters/http/squash/squash_filter.cc",
                        "./source/server/http/admin.h", "./source/server/http/admin.cc",
-                       "./tools/clang_tools/api_booster/main.cc")
+                       "./tools/clang_tools/api_booster/main.cc",
+                       "./tools/clang_tools/api_booster/proto_cxx_utils.cc")
 
 # Only one C++ file should instantiate grpc_init
 GRPC_INIT_WHITELIST = ("./source/common/grpc/google_grpc_context.cc")
@@ -564,6 +565,9 @@ def checkSourceLine(line, file_path, reportError):
      ('.counter(' in line or '.gauge(' in line or '.histogram(' in line):
     reportError("Don't lookup stats by name at runtime; use StatName saved during construction")
 
+  if re.search("envoy::[a-z0-9_:]+::[A-Z]\w*_\w*_[A-Z]{2}", line):
+    reportError("Don't use mangled Protobuf names for enum constants")
+
   hist_m = re.search("(?<=HISTOGRAM\()[a-zA-Z0-9_]+_(b|kb|mb|ns|us|ms|s)(?=,)", line)
   if hist_m and not whitelistedForHistogramSiSuffix(hist_m.group(0)):
     reportError(
@@ -860,7 +864,10 @@ if __name__ == "__main__":
   target_path = args.target_path
   envoy_build_rule_check = not args.skip_envoy_build_rule_check
   namespace_check = args.namespace_check
-  namespace_check_excluded_paths = args.namespace_check_excluded_paths
+  namespace_check_excluded_paths = args.namespace_check_excluded_paths + [
+      "./tools/api_boost/testdata/",
+      "./tools/clang_tools/",
+  ]
   build_fixer_check_excluded_paths = args.build_fixer_check_excluded_paths + [
       "./bazel/external/",
       "./bazel/toolchains/",

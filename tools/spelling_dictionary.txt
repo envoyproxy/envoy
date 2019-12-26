@@ -13,6 +13,7 @@ API
 ASAN
 ASCII
 ASSERTs
+AST
 AWS
 BACKTRACE
 BSON
@@ -47,6 +48,7 @@ CTXs
 CVC
 CVE
 CX
+CYGWIN
 DER
 DESC
 DFATAL
@@ -56,7 +58,9 @@ DNS
 DRYs
 DS
 DST
+DW
 EADDRINUSE
+EADDRNOTAVAIL
 EAGAIN
 ECDH
 ECDHE
@@ -90,6 +94,7 @@ FCDS
 FFFF
 FIN
 FIPS
+FIRSTHDR
 FQDN
 FREEBIND
 FUZZER
@@ -149,6 +154,7 @@ LDS
 LEV
 LF
 LHS
+LLVM
 LRS
 MB
 MD
@@ -164,6 +170,7 @@ NACKs
 NBF
 NBSP
 NDEBUG
+NEXTHDR
 NGHTTP
 NOAUTH
 NODELAY
@@ -298,10 +305,12 @@ VLOG
 VM
 WASM
 WAVM
+WIP
 WKT
 WRR
 WS
 Welford's
+Wi
 XDS
 XFCC
 XFF
@@ -457,6 +466,7 @@ deallocating
 deallocation
 dec
 dechunking
+decl
 decls
 decompressor
 decrement
@@ -524,7 +534,9 @@ evented
 evwatch
 exe
 execlp
+exprfor
 expectable
+extrahelp
 faceplant
 facto
 failover
@@ -568,6 +580,7 @@ goog
 google
 goto
 gzip
+hackery
 hacky
 handshaker
 hardcoded
@@ -644,6 +657,7 @@ lenenc
 lexically
 libc
 libevent
+libtool
 libstdc
 libtooling
 lifecycle
@@ -654,6 +668,7 @@ linearized
 linux
 livelock
 llvm
+loc
 localhost
 lockless
 login

@@ -20,6 +20,7 @@
 #include "test/mocks/network/mocks.h"
 #include "test/test_common/utility.h"
 #include "test/test_common/network_utility.h"
+#include "absl/time/time.h"
 #include "gtest/gtest.h"
 #include "gmock/gmock.h"
 #include "extensions/quic_listeners/quiche/platform/envoy_quic_clock.h"
@@ -176,7 +177,7 @@ TEST_P(ActiveQuicListenerTest, ReceiveFullQuicCHLO) {
     }
 
     retry++;
-    ::usleep(10000);
+    absl::SleepFor(absl::Milliseconds(10));
   } while (true);
   // TearDown() will close the connection.
   EXPECT_CALL(network_connection_callbacks_, onEvent(Network::ConnectionEvent::LocalClose));

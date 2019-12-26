@@ -1,8 +1,9 @@
-load("@com_google_protobuf//:protobuf.bzl", _py_proto_library = "py_proto_library")
 load("@com_envoyproxy_protoc_gen_validate//bazel:pgv_proto_library.bzl", "pgv_cc_proto_library")
+load("@com_github_grpc_grpc//bazel:cc_grpc_library.bzl", "cc_grpc_library")
+load("@com_google_protobuf//:protobuf.bzl", _py_proto_library = "py_proto_library")
 load("@io_bazel_rules_go//proto:def.bzl", "go_grpc_library", "go_proto_library")
 load("@io_bazel_rules_go//go:def.bzl", "go_test")
-load("@com_github_grpc_grpc//bazel:cc_grpc_library.bzl", "cc_grpc_library")
+load("@rules_proto//proto:defs.bzl", "proto_library")
 load(
     "//bazel:external_proto_deps.bzl",
     "EXTERNAL_PROTO_CC_BAZEL_DEP_MAP",
@@ -108,7 +109,7 @@ def api_cc_py_proto_library(
         linkstatic = 0,
         has_services = 0):
     relative_name = ":" + name
-    native.proto_library(
+    proto_library(
         name = name,
         srcs = srcs,
         deps = deps + _COMMON_PROTO_DEPS,

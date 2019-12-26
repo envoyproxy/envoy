@@ -33,8 +33,7 @@ TEST(UtilityResponseFlagsToAccessLogResponseFlagsTest, All) {
   common_access_log_expected.mutable_response_flags()->set_fault_injected(true);
   common_access_log_expected.mutable_response_flags()->set_rate_limited(true);
   common_access_log_expected.mutable_response_flags()->mutable_unauthorized_details()->set_reason(
-      envoy::data::accesslog::v2::ResponseFlags_Unauthorized_Reason::
-          ResponseFlags_Unauthorized_Reason_EXTERNAL_SERVICE);
+      envoy::data::accesslog::v2::ResponseFlags::Unauthorized::EXTERNAL_SERVICE);
   common_access_log_expected.mutable_response_flags()->set_rate_limit_service_error(true);
   common_access_log_expected.mutable_response_flags()->set_downstream_connection_termination(true);
   common_access_log_expected.mutable_response_flags()->set_upstream_retry_limit_exceeded(true);

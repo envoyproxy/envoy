@@ -10,6 +10,7 @@
 
 #include "common/common/cleanup.h"
 #include "common/common/utility.h"
+#include "common/config/api_version.h"
 #include "common/config/resources.h"
 #include "common/config/utility.h"
 #include "common/protobuf/utility.h"
@@ -30,7 +31,8 @@ CdsApiImpl::CdsApiImpl(const envoy::api::v2::core::ConfigSource& cds_config, Clu
     : cm_(cm), scope_(scope.createScope("cluster_manager.cds.")),
       validation_visitor_(validation_visitor) {
   subscription_ = cm_.subscriptionFactory().subscriptionFromConfigSource(
-      cds_config, Grpc::Common::typeUrl(envoy::api::v2::Cluster().GetDescriptor()->full_name()),
+      cds_config,
+      Grpc::Common::typeUrl(API_NO_BOOST(envoy::api::v2::Cluster)().GetDescriptor()->full_name()),
       *scope_, *this);
 }
 

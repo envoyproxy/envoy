@@ -8,7 +8,7 @@ set -e
 
 # Clean up any stale files in the API tree output. Bazel remembers valid cached
 # files still.
-rm -rf bazel-bin/external/envoy_api
+# rm -rf bazel-bin/external/envoy_api
 
 # Find all source protos.
 declare -r PROTO_TARGETS=$(bazel query "labels(srcs, labels(deps, @envoy_api//docs:protos))")
@@ -25,4 +25,4 @@ bazel build ${BAZEL_BUILD_OPTIONS} --//tools/api_proto_plugin:default_type_db_ta
   @envoy_api//docs:protos --aspects //tools/protoxform:protoxform.bzl%protoxform_aspect --output_groups=proto \
   --action_env=CPROFILE_ENABLED=1 --host_force_python=PY3
 
-./tools/proto_sync.py "$1" ${PROTO_TARGETS}
+./tools/proto_sync.py "--mode=$1" ${PROTO_TARGETS}
