@@ -239,6 +239,11 @@ elif [[ "$CI_TARGET" == "bazel.api" ]]; then
   echo "Testing API..."
   bazel_with_collection test ${BAZEL_BUILD_OPTIONS} -c fastbuild @envoy_api//test/... @envoy_api//tools/... \
     @envoy_api//tools:tap2pcap_test
+  echo "Testing API boosting (unit tests)..."
+  bazel_with_collection test ${BAZEL_BUILD_OPTIONS} -c fastbuild @envoy_dev//clang_tools/api_booster/...
+  echo "Testing API boosting (golden C++ tests)..."
+  # We use custom BAZEL_BUILD_OPTIONS here; the API booster isn't capable of working with libc++ yet.
+  LLVM_CONFIG="${LLVM_ROOT}"/bin/llvm-config BAZEL_BUILD_OPTIONS="--config=clang" python3.8 ./tools/api_boost/api_boost_test.py
   exit 0
 elif [[ "$CI_TARGET" == "bazel.coverage" ]]; then
   setup_clang_toolchain

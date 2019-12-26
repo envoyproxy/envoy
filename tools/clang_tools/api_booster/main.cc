@@ -111,7 +111,7 @@ private:
     // Remove qualifiers, e.g. const.
     const clang::UnqualTypeLoc unqual_type_loc = type_loc.getUnqualifiedLoc();
 
-    // Today we are only smart enought to rewrite ElaborateTypeLoc, which are
+    // Today we are only smart enough to rewrite ElaborateTypeLoc, which are
     // full namespace prefixed types. We probably will need to support more, in
     // particular if we want message-level type renaming. TODO(htuch): add more
     // supported AST TypeLoc classes as needed.
@@ -193,7 +193,7 @@ private:
                        const clang::SourceManager& source_manager) {
     auto* direct_callee = call_expr.getDirectCallee();
     if (direct_callee != nullptr) {
-      const std::unordered_map<std::string, int> ValidateNameToArg = {
+      const std::unordered_map<std::string, uint32_t> ValidateNameToArg = {
           {"loadFromYamlAndValidate", 1},
           {"loadFromFileAndValidate", 1},
           {"downcastAndValidate", 0},
