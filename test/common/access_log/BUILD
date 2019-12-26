@@ -41,7 +41,7 @@ envoy_cc_test(
         "//test/mocks/stream_info:stream_info_mocks",
         "//test/mocks/upstream:upstream_mocks",
         "//test/test_common:utility_lib",
-        "@envoy_api//envoy/api/v2/core:pkg_cc_proto",
+        "@envoy_api_shadow//envoy/api/v2/core:pkg_cc_proto",
     ],
 )
 
@@ -60,7 +60,7 @@ envoy_cc_test(
         "//test/mocks/server:server_mocks",
         "//test/mocks/upstream:upstream_mocks",
         "//test/test_common:utility_lib",
-        "@envoy_api//envoy/config/filter/accesslog/v2:pkg_cc_proto",
+        "@envoy_api_shadow//envoy/config/filter/accesslog/v2:pkg_cc_proto",
     ],
 )
 

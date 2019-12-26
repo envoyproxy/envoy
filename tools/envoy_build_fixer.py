@@ -109,8 +109,9 @@ def FindApiHeaders(source_path):
   return api_hdrs
 
 
-# Infer and adjust rule dependencies in BUILD files for @envoy_api proto files.
-# This is very cheap to do purely via a grep+buildozer syntax level step.
+# Infer and adjust rule dependencies in BUILD files for @envoy_api_shadow proto
+# files. This is very cheap to do purely via a grep+buildozer syntax level
+# step.
 #
 # This could actually be done much more generally, for all symbols and headers
 # if we made use of Clang libtooling semantic analysis. However, this requires a
@@ -147,11 +148,11 @@ def FixApiDeps(path, contents):
       # We're not smart enough to infer on generated files.
       if os.path.exists(p):
         api_hdrs = api_hdrs.union(FindApiHeaders(p))
-    actual_api_deps = set(['@envoy_api//%s:pkg_cc_proto' % h for h in api_hdrs])
+    actual_api_deps = set(['@envoy_api_shadow//%s:pkg_cc_proto' % h for h in api_hdrs])
     existing_api_deps = set([])
     if deps != 'missing':
       existing_api_deps = set([
-          d for d in deps.split() if d.startswith('@envoy_api//') and d.endswith('pkg_cc_proto') and
+          d for d in deps.split() if d.startswith('@envoy_api') and d.endswith('pkg_cc_proto') and
           d != '@com_github_cncf_udpa//udpa/annotations:pkg_cc_proto'
       ])
     deps_to_remove = existing_api_deps.difference(actual_api_deps)

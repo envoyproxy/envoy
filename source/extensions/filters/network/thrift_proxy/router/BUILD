@@ -21,7 +21,7 @@ envoy_cc_extension(
         "//source/extensions/filters/network/thrift_proxy/filters:factory_base_lib",
         "//source/extensions/filters/network/thrift_proxy/filters:filter_config_interface",
         "//source/extensions/filters/network/thrift_proxy/filters:well_known_names",
-        "@envoy_api//envoy/config/filter/thrift/router/v2alpha1:pkg_cc_proto",
+        "@envoy_api_shadow//envoy/config/filter/thrift/router/v2alpha1:pkg_cc_proto",
     ],
 )
 
@@ -68,7 +68,7 @@ envoy_cc_library(
         "//source/extensions/filters/network/thrift_proxy:thrift_object_interface",
         "//source/extensions/filters/network/thrift_proxy:transport_interface",
         "//source/extensions/filters/network/thrift_proxy/filters:filter_interface",
-        "@envoy_api//envoy/config/filter/network/thrift_proxy/v2alpha1:pkg_cc_proto",
+        "@envoy_api_shadow//envoy/config/filter/network/thrift_proxy/v2alpha1:pkg_cc_proto",
     ],
 )
 
@@ -81,6 +81,6 @@ envoy_cc_library(
         ":router_ratelimit_interface",
         "//source/common/http:header_utility_lib",
         "//source/extensions/filters/network/thrift_proxy:metadata_lib",
-        "@envoy_api//envoy/api/v2/route:pkg_cc_proto",
+        "@envoy_api_shadow//envoy/api/v2/route:pkg_cc_proto",
     ],
 )

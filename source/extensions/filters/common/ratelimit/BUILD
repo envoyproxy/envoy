@@ -24,9 +24,9 @@ envoy_cc_library(
         "//source/common/grpc:typed_async_client_lib",
         "//source/common/http:headers_lib",
         "//source/common/tracing:http_tracer_lib",
-        "@envoy_api//envoy/api/v2/core:pkg_cc_proto",
-        "@envoy_api//envoy/api/v2/ratelimit:pkg_cc_proto",
-        "@envoy_api//envoy/service/ratelimit/v2:pkg_cc_proto",
+        "@envoy_api_shadow//envoy/api/v2/core:pkg_cc_proto",
+        "@envoy_api_shadow//envoy/api/v2/ratelimit:pkg_cc_proto",
+        "@envoy_api_shadow//envoy/service/ratelimit/v2:pkg_cc_proto",
     ],
 )
 

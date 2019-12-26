@@ -138,13 +138,12 @@ def FormatTypeContextComments(type_context, annotation_xforms=None):
   return leading, trailing
 
 
-def FormatHeaderFromFile(source_code_info, file_proto, shadow):
+def FormatHeaderFromFile(source_code_info, file_proto):
   """Format proto header.
 
   Args:
     source_code_info: SourceCodeInfo object.
     file_proto: FileDescriptorProto for file.
-    shadow: Is this a shadow proto?
 
   Returns:
     Formatted proto header as a string.
@@ -196,12 +195,7 @@ def FormatHeaderFromFile(source_code_info, file_proto, shadow):
   requires_versioning_import = any(
       protoxform_options.GetVersioningAnnotation(m.options) for m in file_proto.message_type)
 
-  def FixupShadowPath(p):
-    if shadow and 'v3alpha' in p:
-      return p[:-len('.proto')] + '_envoy_internal.proto'
-    return p
-
-  envoy_imports = list(FixupShadowPath(p) for p in envoy_proto_paths)
+  envoy_imports = list(envoy_proto_paths)
   google_imports = []
   infra_imports = []
   misc_imports = []
@@ -466,9 +460,6 @@ class ProtoFormatVisitor(visitor.Visitor):
   See visitor.Visitor for visitor method docs comments.
   """
 
-  def __init__(self, shadow):
-    self._shadow = shadow
-
   def VisitService(self, service_proto, type_context):
     leading_comment, trailing_comment = FormatTypeContextComments(type_context)
     methods = '\n'.join(
@@ -529,7 +520,7 @@ class ProtoFormatVisitor(visitor.Visitor):
                                                   formatted_msgs, reserved_fields, fields)
 
   def VisitFile(self, file_proto, type_context, services, msgs, enums):
-    header = FormatHeaderFromFile(type_context.source_code_info, file_proto, self._shadow)
+    header = FormatHeaderFromFile(type_context.source_code_info, file_proto)
     formatted_services = FormatBlock('\n'.join(services))
     formatted_enums = FormatBlock('\n'.join(enums))
     formatted_msgs = FormatBlock('\n'.join(msgs))
@@ -544,11 +535,10 @@ def ParameterCallback(parameter):
 
 def Main():
   plugin.Plugin([
-      plugin.DirectOutputDescriptor('.v2.proto', functools.partial(ProtoFormatVisitor, False)),
-      plugin.OutputDescriptor('.v3alpha.proto', functools.partial(ProtoFormatVisitor, False),
+      plugin.DirectOutputDescriptor('.v2.proto', ProtoFormatVisitor),
+      plugin.OutputDescriptor('.v3alpha.proto', ProtoFormatVisitor,
                               functools.partial(migrate.V3MigrationXform, False)),
-      plugin.OutputDescriptor('.v3alpha.envoy_internal.proto',
-                              functools.partial(ProtoFormatVisitor, True),
+      plugin.OutputDescriptor('.v3alpha.envoy_internal.proto', ProtoFormatVisitor,
                               functools.partial(migrate.V3MigrationXform, True))
   ], ParameterCallback)
 

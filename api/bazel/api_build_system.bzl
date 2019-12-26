@@ -166,9 +166,9 @@ def api_proto_package(
         has_services = has_services,
     )
 
-    compilers = ["@io_bazel_rules_go//proto:go_proto", "//bazel:pgv_plugin_go"]
+    compilers = ["@io_bazel_rules_go//proto:go_proto", "@envoy_api//bazel:pgv_plugin_go"]
     if has_services:
-        compilers = ["@io_bazel_rules_go//proto:go_grpc", "//bazel:pgv_plugin_go"]
+        compilers = ["@io_bazel_rules_go//proto:go_grpc", "@envoy_api//bazel:pgv_plugin_go"]
 
     go_proto_library(
         name = name + _GO_PROTO_SUFFIX,

@@ -29,6 +29,6 @@ envoy_cc_test_library(
         "//source/common/protobuf:utility_lib",
         "//source/common/stats:isolated_store_lib",
         "//test/test_common:utility_lib",
-        "@envoy_api//envoy/api/v2:pkg_cc_proto",
+        "@envoy_api_shadow//envoy/api/v2:pkg_cc_proto",
     ],
 )

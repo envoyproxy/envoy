@@ -19,6 +19,6 @@ envoy_extension_cc_test(
         "//source/extensions/retry/priority:well_known_names",
         "//source/extensions/retry/priority/previous_priorities:config",
         "//test/mocks/upstream:upstream_mocks",
-        "@envoy_api//envoy/config/retry/previous_priorities:pkg_cc_proto",
+        "@envoy_api_shadow//envoy/config/retry/previous_priorities:pkg_cc_proto",
     ],
 )

@@ -20,7 +20,7 @@ envoy_cc_library(
         "//include/envoy/network:listener_interface",
         "//include/envoy/upstream:cluster_manager_interface",
         "//source/common/network:utility_lib",
-        "@envoy_api//envoy/config/filter/udp/udp_proxy/v2alpha:pkg_cc_proto",
+        "@envoy_api_shadow//envoy/config/filter/udp/udp_proxy/v2alpha:pkg_cc_proto",
     ],
 )
 
@@ -34,6 +34,6 @@ envoy_cc_extension(
         ":udp_proxy_filter_lib",
         "//include/envoy/registry",
         "//include/envoy/server:filter_config_interface",
-        "@envoy_api//envoy/config/filter/udp/udp_proxy/v2alpha:pkg_cc_proto",
+        "@envoy_api_shadow//envoy/config/filter/udp/udp_proxy/v2alpha:pkg_cc_proto",
     ],
 )

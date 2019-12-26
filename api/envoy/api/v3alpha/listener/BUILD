@@ -5,30 +5,9 @@ load("@envoy_api//bazel:api_build_system.bzl", "api_proto_package")
 licenses(["notice"])  # Apache 2
 
 api_proto_package(
-    name = "pkg",
-    srcs = [
-        "listener.proto",
-        "quic_config.proto",
-        "udp_listener_config.proto",
-    ],
     deps = [
         "//envoy/api/v2/listener:pkg",
         "//envoy/api/v3alpha/core:pkg",
-        "@com_github_cncf_udpa//udpa/annotations:pkg",
-    ],
-)
-
-api_proto_package(
-    name = "shadow_pkg",
-    srcs = [
-        "listener_envoy_internal.proto",
-        "quic_config_envoy_internal.proto",
-        "udp_listener_config_envoy_internal.proto",
-    ],
-    deps = [
-        "//envoy/api/v2/listener:pkg",
-        "//envoy/api/v3alpha/auth:shadow_pkg",
-        "//envoy/api/v3alpha/core:shadow_pkg",
         "@com_github_cncf_udpa//udpa/annotations:pkg",
     ],
 )

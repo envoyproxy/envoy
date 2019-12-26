@@ -38,11 +38,11 @@ envoy_cc_library(
         "//source/common/init:target_lib",
         "//source/common/protobuf:message_validator_lib",
         "//source/common/protobuf:utility_lib",
-        "@envoy_api//envoy/api/v2:pkg_cc_proto",
-        "@envoy_api//envoy/api/v2/core:pkg_cc_proto",
-        "@envoy_api//envoy/config/bootstrap/v2:pkg_cc_proto",
-        "@envoy_api//envoy/service/discovery/v2:pkg_cc_proto",
-        "@envoy_api//envoy/type:pkg_cc_proto",
+        "@envoy_api_shadow//envoy/api/v2:pkg_cc_proto",
+        "@envoy_api_shadow//envoy/api/v2/core:pkg_cc_proto",
+        "@envoy_api_shadow//envoy/config/bootstrap/v2:pkg_cc_proto",
+        "@envoy_api_shadow//envoy/service/discovery/v2:pkg_cc_proto",
+        "@envoy_api_shadow//envoy/type:pkg_cc_proto",
     ],
 )
 

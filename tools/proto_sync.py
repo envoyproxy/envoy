@@ -41,7 +41,7 @@ load("@envoy_api//bazel:api_build_system.bzl", "api_proto_package")
 
 licenses(["notice"])  # Apache 2
 
-$api_proto_packages
+api_proto_package($fields)
 """)
 
 TOP_LEVEL_API_BUILD_FILE_TEMPLATE = string.Template(
@@ -99,9 +99,8 @@ def GetDestinationPath(src):
   if len(matches) != 1:
     raise RequiresReformatError("Expect {} has only one package declaration but has {}".format(
         src, len(matches)))
-  shadow_fixup = "_envoy_internal" if "envoy_internal" in src else ""
   return pathlib.Path(GetDirectoryFromPackage(
-      matches[0])).joinpath(src_path.name.split('.')[0] + shadow_fixup + ".proto")
+      matches[0])).joinpath(src_path.name.split('.')[0] + ".proto")
 
 
 def SyncProtoFile(cmd, src, dst_root):
@@ -121,12 +120,11 @@ def SyncProtoFile(cmd, src, dst_root):
   return ['//%s:pkg' % str(rel_dst_path.parent)]
 
 
-def GetImportDeps(proto_path, shadow):
+def GetImportDeps(proto_path):
   """Obtain the Bazel dependencies for the import paths from a .proto file.
 
   Args:
     proto_path: path to .proto.
-    shadow: is this a shadow package?
 
   Returns:
     A list of Bazel targets reflecting the imports in the .proto at proto_path.
@@ -152,8 +150,7 @@ def GetImportDeps(proto_path, shadow):
           # Ignore package internal imports.
           if os.path.dirname(proto_path).endswith(os.path.dirname(import_path)):
             continue
-          pkg = 'shadow_pkg' if shadow and 'v3alpha' in import_path else 'pkg'
-          imports.append('//%s:%s' % (os.path.dirname(import_path), pkg))
+          imports.append('//%s:pkg' % os.path.dirname(import_path))
           continue
         raise ProtoSyncError(
             'Unknown import path mapping for %s, please update the mappings in tools/proto_sync.py.\n'
@@ -202,36 +199,32 @@ def BuildOrderKey(key):
   return key.replace(':', '!')
 
 
-def ApiProtoPackageContents(root, files, shadow):
-  """Compute the ApiProtoPackage contents for an api/ proto directory.
+def BuildFileContents(root, files):
+  """Compute the canonical BUILD contents for an api/ proto directory.
 
   Args:
     root: base path to directory.
     files: a list of files in the directory.
-    shadow: is this a shadow package?
 
   Returns:
-    A string containing the api_proto_package target.
+    A string containing the canonical BUILD file content for root.
   """
-  import_deps = set(sum([GetImportDeps(os.path.join(root, f), shadow) for f in files], []))
+  import_deps = set(sum([GetImportDeps(os.path.join(root, f)) for f in files], []))
   history_deps = set(sum([GetPreviousMessageTypeDeps(os.path.join(root, f)) for f in files], []))
   deps = import_deps.union(history_deps)
   has_services = any(HasServices(os.path.join(root, f)) for f in files)
-  fields = ['    name = "%s",' % ('shadow_pkg' if shadow else 'pkg')]
-
-  def FormatList(xs):
-    if len(xs) == 1:
-      return '"%s"' % xs[0]
-    else:
-      return '\n' + '\n'.join('        "%s",' % f for f in sorted(xs, key=BuildOrderKey)) + '\n    '
-
-  fields.append('    srcs = [%s],' % FormatList(files))
+  fields = []
   if has_services:
     fields.append('    has_services = True,')
   if deps:
-    fields.append('    deps = [%s],' % FormatList(list(deps)))
+    if len(deps) == 1:
+      formatted_deps = '"%s"' % list(deps)[0]
+    else:
+      formatted_deps = '\n' + '\n'.join(
+          '        "%s",' % dep for dep in sorted(deps, key=BuildOrderKey)) + '\n    '
+    fields.append('    deps = [%s],' % formatted_deps)
   formatted_fields = '\n' + '\n'.join(fields) + '\n' if fields else ''
-  return 'api_proto_package(%s)' % formatted_fields
+  return BUILD_FILE_TEMPLATE.substitute(fields=formatted_fields)
 
 
 def SyncBuildFiles(cmd, dst_root):
@@ -241,17 +234,10 @@ def SyncBuildFiles(cmd, dst_root):
     cmd: 'check' or 'fix'.
   """
   for root, dirs, files in os.walk(str(dst_root)):
-    shadow_proto_files = [f for f in files if f.endswith('_envoy_internal.proto')]
-    canonical_proto_files = [
-        f for f in files if f.endswith('.proto') and not f.endswith('_envoy_internal.proto')
-    ]
-    if not canonical_proto_files:
+    is_proto_dir = any(f.endswith('.proto') for f in files)
+    if not is_proto_dir:
       continue
-    api_proto_packages = [ApiProtoPackageContents(root, canonical_proto_files, False)]
-    if shadow_proto_files:
-      api_proto_packages.append(ApiProtoPackageContents(root, shadow_proto_files, True))
-    build_contents = BUILD_FILE_TEMPLATE.substitute(
-        api_proto_packages='\n\n'.join(api_proto_packages))
+    build_contents = BuildFileContents(root, files)
     build_path = os.path.join(root, 'BUILD')
     with open(build_path, 'w') as f:
       f.write(build_contents)
@@ -275,45 +261,47 @@ def GenerateCurrentApiDir(api_dir, dst_dir):
   shutil.rmtree(str(dst.joinpath("service", "auth", "v2alpha")))
 
 
-if __name__ == '__main__':
-  parser = argparse.ArgumentParser()
-  parser.add_argument('--mode', choices=['check', 'fix'])
-  parser.add_argument('--api_repo', default='envoy_api')
-  parser.add_argument('--api_root', default='api')
-  parser.add_argument('labels', nargs='*')
-  args = parser.parse_args()
+def Sync(api_root, mode, labels, shadow):
   pkg_deps = []
-
   with tempfile.TemporaryDirectory() as tmp:
     dst_dir = pathlib.Path(tmp).joinpath("b")
-    for label in args.labels:
-      pkg_deps += SyncProtoFile(args.mode, utils.BazelBinPathForOutputArtifact(label, '.v2.proto'),
+    for label in labels:
+      pkg_deps += SyncProtoFile(mode, utils.BazelBinPathForOutputArtifact(label, '.v2.proto'),
                                 dst_dir)
       pkg_deps += SyncProtoFile(
-          args.mode, utils.BazelBinPathForOutputArtifact(label, '.v3alpha.envoy_internal.proto'),
-          dst_dir)
-      pkg_deps += SyncProtoFile(args.mode,
-                                utils.BazelBinPathForOutputArtifact(label, '.v3alpha.proto'),
-                                dst_dir)
-    SyncBuildFiles(args.mode, dst_dir)
+          mode,
+          utils.BazelBinPathForOutputArtifact(
+              label, '.v3alpha.envoy_internal.proto' if shadow else '.v3alpha.proto'), dst_dir)
+    SyncBuildFiles(mode, dst_dir)
 
     current_api_dir = pathlib.Path(tmp).joinpath("a")
     current_api_dir.mkdir(0o755, True, True)
-    api_root = pathlib.Path(args.api_root)
-    GenerateCurrentApiDir(api_root, current_api_dir)
+    api_root_path = pathlib.Path(api_root)
+    GenerateCurrentApiDir(api_root_path, current_api_dir)
 
     diff = subprocess.run(['diff', '-Npur', "a", "b"], cwd=tmp, stdout=subprocess.PIPE).stdout
 
     if diff.strip():
-      if args.mode == "check":
-        print("Please apply following patch to directory '{}'".format(args.api_root),
-              file=sys.stderr)
+      if mode == "check":
+        print("Please apply following patch to directory '{}'".format(api_root), file=sys.stderr)
         print(diff.decode(), file=sys.stderr)
         sys.exit(1)
-      if args.mode == "fix":
-        subprocess.run(['patch', '-p1'], input=diff, cwd=str(api_root.resolve()))
+      if mode == "fix":
+        subprocess.run(['patch', '-p1'], input=diff, cwd=str(api_root_path.resolve()))
 
-  with open('./api/BUILD', 'w') as f:
+  with open(os.path.join(api_root, 'BUILD'), 'w') as f:
     formatted_deps = '\n'.join(
         '        "%s",' % d for d in sorted(set(pkg_deps), key=BuildOrderKey))
     f.write(TOP_LEVEL_API_BUILD_FILE_TEMPLATE.substitute(deps=formatted_deps))
+
+
+if __name__ == '__main__':
+  parser = argparse.ArgumentParser()
+  parser.add_argument('--mode', choices=['check', 'fix'])
+  parser.add_argument('--api_root', default='./api')
+  parser.add_argument('--api_shadow_root', default='./api_shadow')
+  parser.add_argument('labels', nargs='*')
+  args = parser.parse_args()
+
+  Sync(args.api_root, args.mode, args.labels, False)
+  Sync(args.api_shadow_root, args.mode, args.labels, True)
