@@ -17,10 +17,14 @@ import os
 import multiprocessing as mp
 import pathlib
 import re
+import shlex
 import subprocess as sp
 
 # Detect API #includes.
 API_INCLUDE_REGEX = re.compile('#include "(envoy/.*)/[^/]+\.pb\.(validate\.)?h"')
+
+# Needed for CI to pass down bazel options.
+BAZEL_BUILD_OPTIONS = shlex.split(os.environ.get('BAZEL_BUILD_OPTIONS', ''))
 
 
 # Obtain the directory containing a path prefix, e.g. ./foo/bar.txt is ./foo,
@@ -123,13 +127,14 @@ def ApiBoostTree(target_paths,
         'build',
         '--strip=always',
         '@envoy_dev//clang_tools/api_booster',
-    ] + extra_api_booster_args,
+    ] + BAZEL_BUILD_OPTIONS + extra_api_booster_args,
            check=True)
     sp.run([
         'bazel',
         'build',
         '--strip=always',
-    ] + dep_lib_build_targets, check=True)
+    ] + BAZEL_BUILD_OPTIONS + dep_lib_build_targets,
+           check=True)
 
   # Figure out where the LLVM include path is. We need to provide this
   # explicitly as the api_booster is built inside the Bazel cache and doesn't
