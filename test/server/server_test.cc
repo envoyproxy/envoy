@@ -217,6 +217,16 @@ protected:
     return server_thread;
   }
 
+  void expectCorrectBuildVersion(const envoy::api::v2::core::BuildVersion& build_version) {
+    std::string version_string =
+        absl::StrCat(build_version.version().major(), ".", build_version.version().minor(), ".",
+                     build_version.version().patch());
+    for (const auto& label : build_version.labels()) {
+      absl::StrAppend(&version_string, "-", label);
+    }
+    EXPECT_TRUE(absl::StartsWith(version_string, BUILD_VERSION_NUMBER));
+  }
+
   // Returns the server's tracer as a pointer, for use in dynamic_cast tests.
   Tracing::HttpTracer* tracer() { return &server_->httpContext().tracer(); };
 
@@ -565,7 +575,8 @@ TEST_P(ServerInstanceImplTest, DEPRECATED_FEATURE_TEST(BootstrapNodeDeprecated))
   EXPECT_EQ("bootstrap_sub_zone", server_->localInfo().node().locality().sub_zone());
   EXPECT_EQ(VersionInfo::version(), server_->localInfo().node().build_version());
   EXPECT_EQ("envoy", server_->localInfo().node().user_agent_name());
-  EXPECT_EQ(VersionInfo::version(), server_->localInfo().node().user_agent_version());
+  EXPECT_TRUE(server_->localInfo().node().has_user_agent_build_version());
+  expectCorrectBuildVersion(server_->localInfo().node().user_agent_build_version());
 }
 
 // Validate server localInfo() from bootstrap Node.
@@ -576,7 +587,8 @@ TEST_P(ServerInstanceImplTest, BootstrapNode) {
   EXPECT_EQ("bootstrap_id", server_->localInfo().nodeName());
   EXPECT_EQ("bootstrap_sub_zone", server_->localInfo().node().locality().sub_zone());
   EXPECT_EQ("envoy", server_->localInfo().node().user_agent_name());
-  EXPECT_EQ(VersionInfo::version(), server_->localInfo().node().user_agent_version());
+  EXPECT_TRUE(server_->localInfo().node().has_user_agent_build_version());
+  expectCorrectBuildVersion(server_->localInfo().node().user_agent_build_version());
 }
 
 TEST_P(ServerInstanceImplTest, LoadsBootstrapFromConfigProtoOptions) {

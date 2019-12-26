@@ -76,7 +76,7 @@ TEST(RegistryTest, DefaultFactoryPublished) {
             nullptr);
 
   // Expect no version
-  auto version =
+  auto const version =
       factories.find("testing.published")->second->getFactoryVersion("testing.published.test");
   EXPECT_FALSE(version.has_value());
 }

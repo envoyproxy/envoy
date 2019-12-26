@@ -318,6 +318,9 @@ envoy_cc_library(
         "version.h",
         ":generate_version_number",
     ],
+    deps = [
+        "@envoy_api//envoy/api/v2/core:pkg_cc_proto",
+    ],
 )
 
 envoy_cc_library(
