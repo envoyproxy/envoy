@@ -94,6 +94,7 @@ envoy_cc_test(
         "//source/common/config:grpc_mux_lib",
         "//source/common/config:protobuf_link_hacks",
         "//source/common/config:resources_lib",
+        "//source/common/config:version_converter_lib",
         "//source/common/protobuf",
         "//source/common/stats:isolated_store_lib",
         "//test/mocks:common_lib",
@@ -116,6 +117,7 @@ envoy_cc_test(
         "//source/common/config:new_grpc_mux_lib",
         "//source/common/config:protobuf_link_hacks",
         "//source/common/config:resources_lib",
+        "//source/common/config:version_converter_lib",
         "//source/common/protobuf",
         "//source/common/stats:isolated_store_lib",
         "//test/mocks:common_lib",
@@ -162,6 +164,7 @@ envoy_cc_test_library(
         "//source/common/config:api_version_lib",
         "//source/common/config:grpc_subscription_lib",
         "//source/common/config:resources_lib",
+        "//source/common/config:version_converter_lib",
         "//test/mocks/config:config_mocks",
         "//test/mocks/event:event_mocks",
         "//test/mocks/grpc:grpc_mocks",
@@ -179,6 +182,7 @@ envoy_cc_test_library(
     deps = [
         ":subscription_test_harness",
         "//source/common/config:delta_subscription_lib",
+        "//source/common/config:version_converter_lib",
         "//source/common/grpc:common_lib",
         "//test/mocks/config:config_mocks",
         "//test/mocks/event:event_mocks",
@@ -289,6 +293,7 @@ envoy_cc_test(
     name = "utility_test",
     srcs = ["utility_test.cc"],
     deps = [
+        "//source/common/config:api_version_lib",
         "//source/common/config:utility_lib",
         "//source/common/config:well_known_names",
         "//source/common/stats:stats_lib",
@@ -302,6 +307,7 @@ envoy_cc_test(
         "@com_github_cncf_udpa//udpa/type/v1:pkg_cc_proto",
         "@envoy_api//envoy/api/v2:pkg_cc_proto",
         "@envoy_api//envoy/api/v2/core:pkg_cc_proto",
+        "@envoy_api//envoy/api/v3alpha:pkg_cc_proto",
         "@envoy_api//envoy/config/bootstrap/v2:pkg_cc_proto",
     ],
 )

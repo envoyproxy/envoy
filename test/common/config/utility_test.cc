@@ -1,10 +1,12 @@
 #include "envoy/api/v2/cds.pb.h"
 #include "envoy/api/v2/core/config_source.pb.h"
 #include "envoy/api/v2/core/grpc_service.pb.h"
+#include "envoy/api/v3alpha/cds.pb.h"
 #include "envoy/common/exception.h"
 #include "envoy/config/bootstrap/v2/bootstrap.pb.h"
 
 #include "common/common/fmt.h"
+#include "common/config/api_version.h"
 #include "common/config/utility.h"
 #include "common/config/well_known_names.h"
 #include "common/protobuf/protobuf.h"
@@ -272,7 +274,7 @@ TEST(UtilityTest, AnyWrongType) {
   typed_config.PackFrom(source_duration);
   ProtobufWkt::Timestamp out;
   EXPECT_THROW_WITH_REGEX(
-      Utility::translateOpaqueConfig("", typed_config, ProtobufWkt::Struct(),
+      Utility::translateOpaqueConfig(typed_config, ProtobufWkt::Struct(),
                                      ProtobufMessage::getStrictValidationVisitor(), out),
       EnvoyException,
       R"(Unable to unpack as google.protobuf.Timestamp: \[type.googleapis.com/google.protobuf.Duration\] .*)");
@@ -294,7 +296,7 @@ TEST(UtilityTest, TypedStructToStruct) {
   packTypedStructIntoAny(typed_config, untyped_struct);
 
   ProtobufWkt::Struct out;
-  Utility::translateOpaqueConfig("", typed_config, ProtobufWkt::Struct(),
+  Utility::translateOpaqueConfig(typed_config, ProtobufWkt::Struct(),
                                  ProtobufMessage::getStrictValidationVisitor(), out);
 
   EXPECT_THAT(out, ProtoEq(untyped_struct));
@@ -315,7 +317,7 @@ TEST(UtilityTest, TypedStructToBootstrap) {
   packTypedStructIntoAny(typed_config, bootstrap);
 
   envoy::config::bootstrap::v2::Bootstrap out;
-  Utility::translateOpaqueConfig("", typed_config, ProtobufWkt::Struct(),
+  Utility::translateOpaqueConfig(typed_config, ProtobufWkt::Struct(),
                                  ProtobufMessage::getStrictValidationVisitor(), out);
   EXPECT_THAT(out, ProtoEq(bootstrap));
 }
@@ -335,14 +337,68 @@ TEST(UtilityTest, TypedStructToInvalidType) {
   packTypedStructIntoAny(typed_config, bootstrap);
 
   ProtobufWkt::Any out;
-  EXPECT_THROW_WITH_MESSAGE(
-      Utility::translateOpaqueConfig("", typed_config, ProtobufWkt::Struct(),
+  EXPECT_THROW_WITH_REGEX(
+      Utility::translateOpaqueConfig(typed_config, ProtobufWkt::Struct(),
                                      ProtobufMessage::getStrictValidationVisitor(), out),
-      EnvoyException,
-      "Invalid proto type.\nExpected google.protobuf.Any\nActual: "
-      "envoy.config.bootstrap.v2.Bootstrap");
+      EnvoyException, "Unable to parse JSON as proto");
 }
 
+// TODO(htuch): write a bunch of tests for translateOpaqueConfig that reflect
+// the tests we used to have for ApiTypeOracle.
+#if 0
+  // Struct upgrade to v3alpha.
+  {
+    const auto* desc = ApiTypeOracle::inferEarlierVersionDescriptor(
+        "envoy.ip_tagging", {}, "envoy.config.filter.http.ip_tagging.v3alpha.IPTagging");
+    EXPECT_EQ("envoy.config.filter.http.ip_tagging.v2.IPTagging", desc->full_name());
+  }
+
+  // Any upgrade from v2 to v3alpha.
+  {
+    ProtobufWkt::Any typed_config;
+    typed_config.set_type_url("envoy.config.filter.http.ip_tagging.v2.IPTagging");
+    const auto* desc = ApiTypeOracle::inferEarlierVersionDescriptor(
+        "envoy.ip_tagging", typed_config, "envoy.config.filter.http.ip_tagging.v3alpha.IPTagging");
+    EXPECT_EQ("envoy.config.filter.http.ip_tagging.v2.IPTagging", desc->full_name());
+  }
+
+  // There is no upgrade for same Any and target type URL.
+  {
+    ProtobufWkt::Any typed_config;
+    typed_config.set_type_url("envoy.config.filter.http.ip_tagging.v3alpha.IPTagging");
+    EXPECT_EQ(nullptr, ApiTypeOracle::inferEarlierVersionDescriptor(
+                           "envoy.ip_tagging", typed_config,
+                           "envoy.config.filter.http.ip_tagging.v3alpha.IPTagging"));
+  }
+
+  // TypedStruct upgrade from v2 to v3alpha.
+  {
+    ProtobufWkt::Any typed_config;
+    udpa::type::v1::TypedStruct typed_struct;
+    typed_struct.set_type_url("envoy.config.filter.http.ip_tagging.v2.IPTagging");
+    typed_config.PackFrom(typed_struct);
+    const auto* desc = ApiTypeOracle::inferEarlierVersionDescriptor(
+        "envoy.ip_tagging", typed_config, "envoy.config.filter.http.ip_tagging.v3alpha.IPTagging");
+    EXPECT_EQ("envoy.config.filter.http.ip_tagging.v2.IPTagging", desc->full_name());
+  }
+
+  // There is no upgrade for same TypedStruct and target type URL.
+  {
+    ProtobufWkt::Any typed_config;
+    udpa::type::v1::TypedStruct typed_struct;
+    typed_struct.set_type_url(
+        "type.googleapis.com/envoy.config.filter.http.ip_tagging.v3alpha.IPTagging");
+    typed_config.PackFrom(typed_struct);
+    EXPECT_EQ(nullptr, ApiTypeOracle::inferEarlierVersionDescriptor(
+                           "envoy.ip_tagging", typed_config,
+                           "envoy.config.filter.http.ip_tagging.v3alpha.IPTagging"));
+  }
+
+  // There is no upgrade for v2.
+  EXPECT_EQ(nullptr,
+            ApiTypeOracle::inferEarlierVersionDescriptor(
+                "envoy.ip_tagging", {}, "envoy.config.filter.http.ip_tagging.v2.IPTagging"));
+#endif
 TEST(CheckApiConfigSourceSubscriptionBackingClusterTest, GrpcClusterTestAcrossTypes) {
   envoy::api::v2::core::ConfigSource config;
   auto* api_config_source = config.mutable_api_config_source();

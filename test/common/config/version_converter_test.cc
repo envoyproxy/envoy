@@ -9,6 +9,7 @@ namespace Envoy {
 namespace Config {
 namespace {
 
+#if 0
 TEST(VersionConverterTest, All) {
   test::common::config::PreviousVersion previous_version;
   const std::string previous_version_yaml = R"EOF(
@@ -85,6 +86,7 @@ TEST(VersionConverterTest, All) {
           next_version.enum_field_with_deprecated_value());
   EXPECT_EQ(enum_with_deprecated_value, test::common::config::PREV_DEPRECATED_VALUE);
 }
+#endif
 
 } // namespace
 } // namespace Config
