@@ -773,7 +773,7 @@ dynamic_listeners:
                    .value());
   worker_->callAddCompletion(true);
 
-  // Validate taht workers_stat stat is set to 1 after workers have responded with initialization
+  // Validate that workers_started stat is set to 1 after workers have responded with initialization
   // status.
   EXPECT_EQ(1, server_.stats_store_
                    .gauge("listener_manager.workers_started", Stats::Gauge::ImportMode::NeverImport)
