@@ -195,39 +195,38 @@ private:
   void tryBoostType(const std::string& type_name, absl::optional<clang::SourceRange> source_range,
                     const clang::SourceManager& source_manager, absl::string_view debug_description,
                     bool validation_required = false) {
-    const auto latest_type_info = getLatestTypeInformationFromCType(type_name);
+    bool is_skip_macro = false;
+    if (source_range && source_range->getBegin().isMacroID()) {
+      DEBUG_LOG("macro");
+      auto macro_name = clang::Lexer::getImmediateMacroName(source_range->getBegin(),
+                                                            source_manager, lexer_lopt_);
+      if (macro_name.str() == "API_NO_BOOST") {
+        DEBUG_LOG("Skipping replacement due to API_NO_BOOST");
+        is_skip_macro = true;
+      }
+    }
+    const auto type_info = getTypeInformationFromCType(type_name, !is_skip_macro);
     // If this isn't a known API type, our work here is done.
-    if (!latest_type_info) {
+    if (!type_info) {
       return;
     }
     DEBUG_LOG(absl::StrCat("Matched type '", type_name, "' (", debug_description, ")"));
     // Track corresponding imports.
-    source_api_proto_paths_.insert(adjustProtoSuffix(latest_type_info->proto_path_, ".pb.h"));
+    source_api_proto_paths_.insert(adjustProtoSuffix(type_info->proto_path_, ".pb.h"));
     if (validation_required) {
-      source_api_proto_paths_.insert(
-          adjustProtoSuffix(latest_type_info->proto_path_, ".pb.validate.h"));
+      source_api_proto_paths_.insert(adjustProtoSuffix(type_info->proto_path_, ".pb.validate.h"));
     }
     // Not all AST matchers know how to do replacements (yet?).
-    if (!source_range) {
+    if (!source_range || is_skip_macro) {
       return;
     }
     // Add corresponding replacement.
-    const clang::SourceLocation non_spelling_start = source_range->getBegin();
-    if (non_spelling_start.isMacroID()) {
-      DEBUG_LOG("macro");
-      auto macro_name =
-          clang::Lexer::getImmediateMacroName(non_spelling_start, source_manager, lexer_lopt_);
-      if (macro_name.str() == "API_NO_BOOST") {
-        DEBUG_LOG("Skipping replacement due to API_NO_BOOST");
-        return;
-      }
-    }
     const clang::SourceLocation start = source_manager.getSpellingLoc(source_range->getBegin());
     const clang::SourceLocation end = clang::Lexer::getLocForEndOfToken(
         source_manager.getSpellingLoc(source_range->getEnd()), 0, source_manager, lexer_lopt_);
     const size_t length = source_manager.getFileOffset(end) - source_manager.getFileOffset(start);
     clang::tooling::Replacement type_replacement(
-        source_manager, start, length, ProtoCxxUtils::protoToCxxType(latest_type_info->type_name_));
+        source_manager, start, length, ProtoCxxUtils::protoToCxxType(type_info->type_name_));
     llvm::Error error = replacements_[type_replacement.getFilePath()].add(type_replacement);
     if (error) {
       std::cerr << "  Replacement insertion error: " << llvm::toString(std::move(error))
@@ -246,8 +245,8 @@ private:
 
   // Obtain the latest type information for a given from C++ type, e.g. envoy:config::v2::Cluster,
   // from the API type database.
-  absl::optional<TypeInformation>
-  getLatestTypeInformationFromCType(const std::string& c_type_name) {
+  absl::optional<TypeInformation> getTypeInformationFromCType(const std::string& c_type_name,
+                                                              bool latest) {
     // Ignore compound or non-API types.
     // TODO(htuch): this is all super hacky and not really right, we should be
     // removing qualifiers etc. to get to the underlying type name.
@@ -258,7 +257,8 @@ private:
     const std::string proto_type_name = ProtoCxxUtils::cxxToProtoType(type_name);
 
     // Use API type database to map from proto type to path.
-    auto result = ApiTypeDb::getLatestTypeInformation(proto_type_name);
+    auto result = latest ? ApiTypeDb::getLatestTypeInformation(proto_type_name)
+                         : ApiTypeDb::getExistingTypeInformation(proto_type_name);
     if (result) {
       // Remove the .proto extension.
       return result;
