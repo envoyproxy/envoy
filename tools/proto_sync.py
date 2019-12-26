@@ -196,9 +196,11 @@ def HasServices(proto_path):
         return True
   return False
 
+
 # Key sort function to achieve consistent results with buildifier.
 def BuildOrderKey(key):
   return key.replace(':', '!')
+
 
 def ApiProtoPackageContents(root, files, shadow):
   """Compute the ApiProtoPackage contents for an api/ proto directory.
@@ -221,8 +223,7 @@ def ApiProtoPackageContents(root, files, shadow):
     if len(xs) == 1:
       return '"%s"' % xs[0]
     else:
-      return '\n' + '\n'.join(
-          '        "%s",' % f for f in sorted(xs, key=BuildOrderKey)) + '\n    '
+      return '\n' + '\n'.join('        "%s",' % f for f in sorted(xs, key=BuildOrderKey)) + '\n    '
 
   fields.append('    srcs = [%s],' % FormatList(files))
   if has_services:
@@ -286,12 +287,14 @@ if __name__ == '__main__':
   with tempfile.TemporaryDirectory() as tmp:
     dst_dir = pathlib.Path(tmp).joinpath("b")
     for label in args.labels:
-      pkg_deps += SyncProtoFile(args.mode, utils.BazelBinPathForOutputArtifact(label, '.v2.proto'), dst_dir)
+      pkg_deps += SyncProtoFile(args.mode, utils.BazelBinPathForOutputArtifact(label, '.v2.proto'),
+                                dst_dir)
+      pkg_deps += SyncProtoFile(
+          args.mode, utils.BazelBinPathForOutputArtifact(label, '.v3alpha.envoy_internal.proto'),
+          dst_dir)
       pkg_deps += SyncProtoFile(args.mode,
-                    utils.BazelBinPathForOutputArtifact(label, '.v3alpha.envoy_internal.proto'),
-                    dst_dir)
-      pkg_deps += SyncProtoFile(args.mode, utils.BazelBinPathForOutputArtifact(label, '.v3alpha.proto'),
-                    dst_dir)
+                                utils.BazelBinPathForOutputArtifact(label, '.v3alpha.proto'),
+                                dst_dir)
     SyncBuildFiles(args.mode, dst_dir)
 
     current_api_dir = pathlib.Path(tmp).joinpath("a")
