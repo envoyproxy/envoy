@@ -66,7 +66,7 @@ py_binary(
     visibility = ["//visibility:public"],
     deps = [
         ":capture_fuzz_proto_py_proto",
-        "@envoy_api//envoy/data/tap/v2alpha:pkg_py_proto",
+        "@envoy_api_shadow//envoy/data/tap/v2alpha:pkg_py_proto",
     ],
 )
 
