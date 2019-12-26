@@ -134,8 +134,8 @@ TEST_F(WatermarkBufferTest, Drain) {
 
   // Go above the high watermark then drain down to just at the low watermark.
   buffer_.add(TEN_BYTES, 11);
-  buffer_.drain(6);
-  EXPECT_EQ(5, buffer_.length());
+  buffer_.drain(5);
+  EXPECT_EQ(6, buffer_.length());
   EXPECT_EQ(0, times_low_watermark_called_);
 
   // Now drain below.
@@ -144,6 +144,33 @@ TEST_F(WatermarkBufferTest, Drain) {
 
   // Going back above should trigger the high again
   buffer_.add(TEN_BYTES, 10);
+  EXPECT_EQ(2, times_high_watermark_called_);
+}
+
+// Verify that low watermark callback is called on drain in the case where the
+// high watermark is non-zero and low watermark is 0.
+TEST_F(WatermarkBufferTest, DrainWithLowWatermarkOfZero) {
+  buffer_.setWatermarks(0, 10);
+
+  // Draining from above to below the low watermark does nothing if the high
+  // watermark never got hit.
+  buffer_.add(TEN_BYTES, 10);
+  buffer_.drain(10);
+  EXPECT_EQ(0, times_high_watermark_called_);
+  EXPECT_EQ(0, times_low_watermark_called_);
+
+  // Go above the high watermark then drain down to just above the low watermark.
+  buffer_.add(TEN_BYTES, 11);
+  buffer_.drain(10);
+  EXPECT_EQ(1, buffer_.length());
+  EXPECT_EQ(0, times_low_watermark_called_);
+
+  // Now drain below.
+  buffer_.drain(1);
+  EXPECT_EQ(1, times_low_watermark_called_);
+
+  // Going back above should trigger the high again
+  buffer_.add(TEN_BYTES, 11);
   EXPECT_EQ(2, times_high_watermark_called_);
 }
 
@@ -211,12 +238,13 @@ TEST_F(WatermarkBufferTest, MoveWatermarks) {
   buffer_.setWatermarks(1, 8);
   EXPECT_EQ(1, times_high_watermark_called_);
 
-  buffer_.setWatermarks(9, 20);
-  EXPECT_EQ(0, times_low_watermark_called_);
-  buffer_.setWatermarks(10, 20);
-  EXPECT_EQ(1, times_low_watermark_called_);
   buffer_.setWatermarks(8, 20);
-  buffer_.setWatermarks(10, 20);
+  EXPECT_EQ(0, times_low_watermark_called_);
+  buffer_.setWatermarks(9, 20);
+  EXPECT_EQ(1, times_low_watermark_called_);
+  buffer_.setWatermarks(7, 20);
+  EXPECT_EQ(1, times_low_watermark_called_);
+  buffer_.setWatermarks(9, 20);
   EXPECT_EQ(1, times_low_watermark_called_);
 
   EXPECT_EQ(1, times_high_watermark_called_);
@@ -224,7 +252,16 @@ TEST_F(WatermarkBufferTest, MoveWatermarks) {
   EXPECT_EQ(2, times_high_watermark_called_);
   EXPECT_EQ(1, times_low_watermark_called_);
   buffer_.setWatermarks(0);
+  EXPECT_EQ(2, times_high_watermark_called_);
   EXPECT_EQ(2, times_low_watermark_called_);
+  buffer_.setWatermarks(1);
+  EXPECT_EQ(3, times_high_watermark_called_);
+  EXPECT_EQ(2, times_low_watermark_called_);
+
+  // Fully drain the buffer.
+  buffer_.drain(9);
+  EXPECT_EQ(3, times_low_watermark_called_);
+  EXPECT_EQ(0, buffer_.length());
 }
 
 TEST_F(WatermarkBufferTest, GetRawSlices) {

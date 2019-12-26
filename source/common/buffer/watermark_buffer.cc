@@ -78,7 +78,7 @@ void WatermarkBuffer::setWatermarks(uint32_t low_watermark, uint32_t high_waterm
 
 void WatermarkBuffer::checkLowWatermark() {
   if (!above_high_watermark_called_ ||
-      (high_watermark_ != 0 && OwnedImpl::length() >= low_watermark_)) {
+      (high_watermark_ != 0 && OwnedImpl::length() > low_watermark_)) {
     return;
   }
 
