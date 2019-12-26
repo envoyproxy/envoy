@@ -33,6 +33,12 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "no_boost_file",
+    srcs = ["no_boost_file.cc"],
+    deps = ["@envoy_api//envoy/config/overload/v2alpha:pkg_cc_proto"],
+)
+
+envoy_cc_library(
     name = "using_decl",
     srcs = ["using_decl.cc"],
     deps = ["@envoy_api//envoy/config/overload/v2alpha:pkg_cc_proto"],

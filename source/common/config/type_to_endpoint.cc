@@ -11,6 +11,8 @@
 
 #include "common/grpc/common.h"
 
+// API_NO_BOOST_FILE
+
 namespace Envoy {
 namespace Config {
 

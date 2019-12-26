@@ -26,6 +26,7 @@ TESTS = list(
         ('using_decl', 'UsingDecl upgrades for named types'),
         ('rename', 'Annotation-based renaming'),
         ('decl_ref_expr', 'DeclRefExpr upgrades for named constants'),
+        ('no_boost_file', 'API_NO_BOOST_FILE annotations'),
     ]))
 
 TESTDATA_PATH = 'tools/api_boost/testdata'

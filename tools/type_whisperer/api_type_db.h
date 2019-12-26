@@ -31,6 +31,7 @@ struct TypeInformation {
 // libtool binaries).
 class ApiTypeDb {
 public:
+  static absl::optional<TypeInformation> getExistingTypeInformation(const std::string& type_name);
   static absl::optional<TypeInformation> getLatestTypeInformation(const std::string& type_name);
 };
 

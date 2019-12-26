@@ -220,7 +220,7 @@ private:
                              const clang::SourceManager& source_manager) {
     const std::string type_name =
         member_call_expr.getObjectType().getCanonicalType().getUnqualifiedType().getAsString();
-    const auto latest_type_info = getLatestTypeInformationFromCType(type_name);
+    const auto latest_type_info = getTypeInformationFromCType(type_name, true);
     // If this isn't a known API type, our work here is done.
     if (!latest_type_info) {
       return;
@@ -265,7 +265,7 @@ private:
                     const clang::SourceManager& source_manager, absl::string_view debug_description,
                     bool requires_enum_truncation, bool validation_required = false) {
     if (source_range) {
-      tryBoostType(type_name, source_manager.getSpellingLoc(source_range->getBegin()),
+      tryBoostType(type_name, source_range->getBegin(),
                    sourceRangeLength(*source_range, source_manager), source_manager,
                    debug_description, requires_enum_truncation, validation_required);
     } else {
@@ -277,32 +277,41 @@ private:
   void tryBoostType(const std::string& type_name, clang::SourceLocation begin_loc, int length,
                     const clang::SourceManager& source_manager, absl::string_view debug_description,
                     bool requires_enum_truncation, bool validation_required = false) {
-    const auto latest_type_info = getLatestTypeInformationFromCType(type_name);
+    bool is_skip_macro = false;
+    if (begin_loc.isMacroID()) {
+      DEBUG_LOG("macro");
+      auto macro_name = clang::Lexer::getImmediateMacroName(begin_loc, source_manager, lexer_lopt_);
+      if (macro_name.str() == "API_NO_BOOST") {
+        DEBUG_LOG("Skipping replacement due to API_NO_BOOST");
+        is_skip_macro = true;
+      }
+    }
+    const auto type_info = getTypeInformationFromCType(type_name, !is_skip_macro);
     // If this isn't a known API type, our work here is done.
-    if (!latest_type_info) {
+    if (!type_info) {
       return;
     }
     DEBUG_LOG(absl::StrCat("Matched type '", type_name, "' (", debug_description, ") length ",
                            length, " at ", begin_loc.printToString(source_manager)));
     // Track corresponding imports.
-    source_api_proto_paths_.insert(adjustProtoSuffix(latest_type_info->proto_path_, ".pb.h"));
+    source_api_proto_paths_.insert(adjustProtoSuffix(type_info->proto_path_, ".pb.h"));
     if (validation_required) {
-      source_api_proto_paths_.insert(
-          adjustProtoSuffix(latest_type_info->proto_path_, ".pb.validate.h"));
+      source_api_proto_paths_.insert(adjustProtoSuffix(type_info->proto_path_, ".pb.validate.h"));
     }
     // Not all AST matchers know how to do replacements (yet?).
-    if (length == -1) {
+    if (length == -1 || is_skip_macro) {
       return;
     }
+    const clang::SourceLocation spelling_begin = source_manager.getSpellingLoc(begin_loc);
     // We need to look at the text we're replacing to decide whether we should
     // use the qualified C++'ified proto name.
     const bool qualified =
-        getSourceText(begin_loc, length, source_manager).find("::") != std::string::npos;
+        getSourceText(spelling_begin, length, source_manager).find("::") != std::string::npos;
     // Add corresponding replacement.
     const clang::tooling::Replacement type_replacement(
-        source_manager, begin_loc, length,
-        ProtoCxxUtils::protoToCxxType(latest_type_info->type_name_, qualified,
-                                      latest_type_info->enum_type_ && requires_enum_truncation));
+        source_manager, spelling_begin, length,
+        ProtoCxxUtils::protoToCxxType(type_info->type_name_, qualified,
+                                      type_info->enum_type_ && requires_enum_truncation));
     insertReplacement(type_replacement);
   }
 
@@ -355,8 +364,8 @@ private:
 
   // Obtain the latest type information for a given from C++ type, e.g. envoy:config::v2::Cluster,
   // from the API type database.
-  absl::optional<TypeInformation>
-  getLatestTypeInformationFromCType(const std::string& c_type_name) {
+  absl::optional<TypeInformation> getTypeInformationFromCType(const std::string& c_type_name,
+                                                              bool latest) {
     // Ignore compound or non-API types.
     // TODO(htuch): this is all super hacky and not really right, we should be
     // removing qualifiers etc. to get to the underlying type name.
@@ -367,7 +376,8 @@ private:
     const std::string proto_type_name = ProtoCxxUtils::cxxToProtoType(type_name);
 
     // Use API type database to map from proto type to path.
-    auto result = ApiTypeDb::getLatestTypeInformation(proto_type_name);
+    auto result = latest ? ApiTypeDb::getLatestTypeInformation(proto_type_name)
+                         : ApiTypeDb::getExistingTypeInformation(proto_type_name);
     if (result) {
       // Remove the .proto extension.
       return result;

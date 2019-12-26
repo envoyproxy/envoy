@@ -49,6 +49,15 @@ const tools::type_whisperer::TypeDb& getApiTypeDb() {
 
 } // namespace
 
+absl::optional<TypeInformation>
+ApiTypeDb::getExistingTypeInformation(const std::string& type_name) {
+  auto it = getApiTypeDb().types().find(type_name);
+  if (it == getApiTypeDb().types().end()) {
+    return {};
+  }
+  return absl::make_optional<TypeInformation>(type_name, it->second.proto_path(), false);
+}
+
 absl::optional<TypeInformation> ApiTypeDb::getLatestTypeInformation(const std::string& type_name) {
   std::string latest_type_name;
   const tools::type_whisperer::TypeDbDescription* latest_type_desc{};
