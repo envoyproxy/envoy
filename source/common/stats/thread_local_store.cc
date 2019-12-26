@@ -388,7 +388,6 @@ StatType& ThreadLocalStoreImpl::ScopeImpl::safeMakeStat(
 
   // Finally we return the reference.
   ASSERT(stat->use_count() >= 2);
-  ENVOY_LOG_MISC(error, "use_count= {}", stat->use_count());
 
   return *stat;
 }
