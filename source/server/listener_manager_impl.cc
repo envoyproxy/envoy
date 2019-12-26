@@ -756,7 +756,7 @@ std::unique_ptr<Network::FilterChain> ListenerFilterChainFactoryBuilder::buildFi
   if (!filter_chain.has_transport_socket()) {
     if (filter_chain.has_tls_context()) {
       transport_socket.set_name(Extensions::TransportSockets::TransportSocketNames::get().Tls);
-      MessageUtil::jsonConvert(filter_chain.tls_context(), *transport_socket.mutable_config());
+      transport_socket.mutable_typed_config()->PackFrom(filter_chain.tls_context());
     } else {
       transport_socket.set_name(
           Extensions::TransportSockets::TransportSocketNames::get().RawBuffer);
