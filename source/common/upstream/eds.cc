@@ -9,9 +9,12 @@
 #include "envoy/service/discovery/v3/discovery.pb.h"
 
 #include "common/common/assert.h"
+#include "common/common/cleanup.h"
 #include "common/common/utility.h"
 #include "common/config/api_version.h"
+#include "common/config/resources.h"
 #include "common/config/version_converter.h"
+#include "common/upstream/endpoint_groups_manager_impl.h"
 
 namespace Envoy {
 namespace Upstream {
@@ -26,7 +29,9 @@ EdsClusterImpl::EdsClusterImpl(
       cluster_name_(cluster.eds_cluster_config().service_name().empty()
                         ? cluster.name()
                         : cluster.eds_cluster_config().service_name()),
-      validation_visitor_(factory_context.messageValidationVisitor()) {
+      validation_visitor_(factory_context.messageValidationVisitor()),
+      subscription_factory_(factory_context.clusterManager().subscriptionFactory()),
+      cm_(factory_context.clusterManager()) {
   Event::Dispatcher& dispatcher = factory_context.dispatcher();
   assignment_timeout_ = dispatcher.createTimer([this]() -> void { onAssignmentTimeout(); });
   const auto& eds_config = cluster.eds_cluster_config().eds_config();
@@ -114,6 +119,14 @@ void EdsClusterImpl::onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt
   if (!validateUpdateSize(resources.size())) {
     return;
   }
+
+  std::unique_ptr<Cleanup> maybe_egds_resume;
+  if (cm_.adsMux()) {
+    cm_.adsMux()->pause(Config::TypeUrl::get().EndpointGroup);
+    maybe_egds_resume = std::make_unique<Cleanup>(
+        [this] { cm_.adsMux()->resume(Config::TypeUrl::get().EndpointGroup); });
+  }
+
   auto cluster_load_assignment =
       MessageUtil::anyConvertAndValidate<envoy::config::endpoint::v3::ClusterLoadAssignment>(
           resources[0], validation_visitor_);
@@ -138,6 +151,23 @@ void EdsClusterImpl::onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt
     assignment_timeout_->enableTimer(std::chrono::milliseconds(stale_after_ms));
   }
 
+  // Check if EGDS resource is included.
+  if (!cluster_load_assignment.endpoint_groups().empty()) {
+    endpoint_group_manager_ = std::make_unique<EndpointGroupsManagerImpl>();
+    egds_cluster_mapper_ = std::make_unique<EgdsClusterMapper>(
+        dynamic_cast<EndpointGroupMonitorManager&>(*endpoint_group_manager_),
+        dynamic_cast<EgdsClusterMapper::Delegate&>(*this), *this, cluster_load_assignment,
+        local_info_);
+    egds_api_ = std::make_unique<EgdsApiImpl>(*endpoint_group_manager_, validation_visitor_,
+                                              subscription_factory_, info_->statsScope(),
+                                              cluster_load_assignment.endpoint_groups());
+    egds_api_->initialize([&] {
+      // We need to allow server startup to continue, even if we have a bad config.
+      this->onPreInitComplete();
+    });
+    return;
+  }
+
   BatchUpdateHelper helper(*this, cluster_load_assignment);
   priority_set_.batchHostUpdate(helper);
 }
@@ -151,6 +181,71 @@ void EdsClusterImpl::onConfigUpdate(
   Protobuf::RepeatedPtrField<ProtobufWkt::Any> unwrapped_resource;
   *unwrapped_resource.Add() = resources[0].resource();
   onConfigUpdate(unwrapped_resource, resources[0].version());
+}
+
+void EdsClusterImpl::initializeCluster(
+    const envoy::config::endpoint::v3::ClusterLoadAssignment& cluster_load_assignment) {
+  BatchUpdateHelper helper(*this, cluster_load_assignment);
+  priority_set_.batchHostUpdate(helper);
+}
+
+void EdsClusterImpl::updateHosts(uint32_t priority, const HostVector& hosts_added,
+                                 const HostVector& hosts_removed,
+                                 PriorityStateManager& priority_state_manager,
+                                 LocalityWeightsMap& new_locality_weights_map,
+                                 absl::optional<uint32_t> overprovisioning_factor) {
+  ENVOY_LOG(debug, "EG update hosts, add {}, removed {}", hosts_added.size(), hosts_removed.size());
+
+  // Start update the hosts changes in the Endpoint Group to the cluster store.
+  const auto& host_set = priority_set_.getOrCreateHostSet(priority, overprovisioning_factor);
+  HostVectorSharedPtr current_hosts_copy(new HostVector(host_set.hosts()));
+
+  // Update the removed host.
+  for (auto it = hosts_removed.begin(); it != hosts_removed.end(); ++it) {
+    const auto& address = (*it)->address()->asString();
+
+    ENVOY_LOG(debug, "EG removed host {}", address);
+
+    const auto existing_itr = std::find_if(current_hosts_copy->begin(), current_hosts_copy->end(),
+                                           [address](const HostSharedPtr current) {
+                                             return current->address()->asString() == address;
+                                           });
+    ASSERT(existing_itr != current_hosts_copy->end());
+    current_hosts_copy->erase(existing_itr);
+
+    ASSERT(all_hosts_.find(address) != all_hosts_.end());
+    all_hosts_.erase(address);
+  }
+
+  // Update the added host.
+  current_hosts_copy->insert(current_hosts_copy->end(), hosts_added.begin(), hosts_added.end());
+  for (auto it = hosts_added.begin(); it != hosts_added.end(); ++it) {
+    const auto& address = (*it)->address()->asString();
+    ENVOY_LOG(debug, "EG added host {}", address);
+
+    ASSERT(all_hosts_.find(address) == all_hosts_.end());
+    all_hosts_[address] = *it;
+  }
+
+  // Update the added locality weights.
+  for (const auto& pair : new_locality_weights_map) {
+    if (!locality_weights_map_[priority].count(pair.first)) {
+      locality_weights_map_[priority].insert({pair.first, pair.second});
+    }
+  }
+
+  ASSERT(std::all_of(current_hosts_copy->begin(), current_hosts_copy->end(),
+                     [&](const auto& host) { return host->priority() == priority; }));
+  ENVOY_LOG(debug,
+            "EDS hosts or locality weights changed for cluster: {} current hosts {} priority {}",
+            info_->name(), host_set.hosts().size(), host_set.priority());
+  priority_state_manager.updateClusterPrioritySet(priority, std::move(current_hosts_copy),
+                                                  hosts_added, hosts_removed, absl::nullopt,
+                                                  overprovisioning_factor);
+}
+
+void EdsClusterImpl::batchHostUpdateForEndpointGroup(PrioritySet::BatchUpdateCb& callback) {
+  priority_set_.batchHostUpdate(callback);
 }
 
 bool EdsClusterImpl::validateUpdateSize(int num_resources) {

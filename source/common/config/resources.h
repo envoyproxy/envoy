@@ -21,6 +21,7 @@ public:
   const std::string ScopedRouteConfiguration{
       "type.googleapis.com/envoy.api.v2.ScopedRouteConfiguration"};
   const std::string Runtime{"type.googleapis.com/envoy.service.discovery.v2.Runtime"};
+  const std::string EndpointGroup{"type.googleapis.com/envoy.api.v2.EndpointGroup"};
 };
 
 using TypeUrl = ConstSingleton<TypeUrlValues>;

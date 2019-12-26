@@ -342,6 +342,9 @@ envoy_cc_library(
     hdrs = ["eds.h"],
     deps = [
         ":cluster_factory_lib",
+        ":egds_api_impl_lib",
+        ":egds_cluster_mapper_lib",
+        ":endpoint_groups_manager_lib",
         ":upstream_includes",
         "//include/envoy/config:grpc_mux_interface",
         "//include/envoy/config:subscription_factory_interface",
@@ -566,5 +569,91 @@ envoy_cc_library(
         "//source/extensions/clusters:well_known_names",
         "//source/server:transport_socket_config_lib",
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
+    name = "endpoint_group_monitor_interface",
+    hdrs = ["endpoint_group_monitor.h"],
+    deps = [
+        "//include/envoy/upstream:upstream_interface",
+        "@envoy_api//envoy/config/endpoint/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
+    name = "egds_cluster_mapper_lib",
+    srcs = ["egds_cluster_mapper.cc"],
+    hdrs = ["egds_cluster_mapper.h"],
+    deps = [
+        ":endpoint_group_monitor_interface",
+        ":upstream_includes",
+        "//include/envoy/local_info:local_info_interface",
+        "//include/envoy/upstream:upstream_interface",
+        "//source/common/common:minimal_logger_lib",
+        "//source/common/network:resolver_lib",
+        "@envoy_api//envoy/config/endpoint/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
+    name = "endpoint_groups_manager_interface",
+    hdrs = ["endpoint_groups_manager.h"],
+    deps = [
+        "//include/envoy/upstream:upstream_interface",
+        "@envoy_api//envoy/config/endpoint/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
+    name = "endpoint_groups_manager_lib",
+    srcs = ["endpoint_groups_manager_impl.cc"],
+    hdrs = ["endpoint_groups_manager_impl.h"],
+    deps = [
+        ":endpoint_group_lib",
+        ":endpoint_group_monitor_interface",
+        ":endpoint_groups_manager_interface",
+        "//include/envoy/upstream:upstream_interface",
+        "@envoy_api//envoy/config/endpoint/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
+    name = "endpoint_group_lib",
+    srcs = ["endpoint_group.cc"],
+    hdrs = ["endpoint_group.h"],
+    deps = [
+        ":endpoint_group_monitor_interface",
+        "//include/envoy/upstream:upstream_interface",
+        "@envoy_api//envoy/config/endpoint/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
+    name = "egds_api_impl_lib",
+    srcs = ["egds_api_impl.cc"],
+    hdrs = ["egds_api_impl.h"],
+    deps = [
+        ":egds_cluster_mapper_lib",
+        ":endpoint_group_monitor_interface",
+        ":endpoint_groups_manager_lib",
+        ":upstream_includes",
+        "//include/envoy/config:grpc_mux_interface",
+        "//include/envoy/config:subscription_factory_interface",
+        "//include/envoy/config:subscription_interface",
+        "//include/envoy/stats:stats_interface",
+        "//include/envoy/upstream:locality_lib",
+        "//include/envoy/upstream:upstream_interface",
+        "//source/common/common:minimal_logger_lib",
+        "//source/common/config:metadata_lib",
+        "//source/common/config:subscription_factory_lib",
+        "//source/common/config:utility_lib",
+        "//source/common/grpc:common_lib",
+        "//source/common/network:address_lib",
+        "//source/common/network:utility_lib",
+        "//source/common/protobuf:utility_lib",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/endpoint/v3:pkg_cc_proto",
+        "@envoy_api//envoy/service/discovery/v3:pkg_cc_proto",
     ],
 )

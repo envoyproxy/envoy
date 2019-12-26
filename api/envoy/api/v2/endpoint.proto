@@ -2,6 +2,7 @@ syntax = "proto3";
 
 package envoy.api.v2;
 
+import "envoy/api/v2/core/config_source.proto";
 import "envoy/api/v2/endpoint/endpoint_components.proto";
 import "envoy/type/percent.proto";
 
@@ -114,4 +115,30 @@ message ClusterLoadAssignment {
 
   // Load balancing policy settings.
   Policy policy = 4;
+
+  // References endpoint groups by name.
+  // Both endpoints and EGDS references will be used when present
+  repeated Egds endpoint_groups = 6;
+}
+
+// New xDS payload. The size of endpoints is fully arbitrary.
+// Also the EGDS requests to Pilot can be merged into one to boost efficiency
+message EndpointGroup {
+  string name = 1 [(validate.rules).string = {min_bytes: 1}];
+
+  // List of endpoints to load balance to.
+  repeated endpoint.LocalityLbEndpoints endpoints = 2;
+
+  // Map of named endpoints that can be referenced in LocalityLbEndpoints.
+  // [#not-implemented-hide:]
+  map<string, endpoint.Endpoint> named_endpoints = 3;
+}
+
+// The EGDS request configuration.
+message Egds {
+  // Configuration for the source of EGDS updates for this Cluster.
+  core.ConfigSource config_source = 1;
+
+  // the endpoint group resource name.
+  string endpoint_group_name = 2;
 }

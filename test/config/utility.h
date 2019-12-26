@@ -249,4 +249,22 @@ private:
   uint32_t update_successes_{};
 };
 
+// Common code for tests that deliver EGDS update via the filesystem.
+class EgdsHelper {
+public:
+  EgdsHelper();
+
+  // Set EDS contents on filesystem and wait for Envoy to pick this up.
+  void setEgds(const std::vector<envoy::config::endpoint::v3::EndpointGroup>& endpoint_groups);
+  void
+  setEgdsAndWait(const std::vector<envoy::config::endpoint::v3::EndpointGroup>& endpoint_groups,
+                 IntegrationTestServerStats& server_stats);
+  const std::string& egds_path() const { return egds_path_; }
+
+private:
+  const std::string egds_path_;
+  uint32_t egds_version_{};
+  uint32_t update_successes_{};
+};
+
 } // namespace Envoy

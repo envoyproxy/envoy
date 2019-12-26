@@ -122,4 +122,35 @@ message ClusterLoadAssignment {
 
   // Load balancing policy settings.
   Policy policy = 4;
+
+  // References endpoint groups by name.
+  // Both endpoints and EGDS references will be used when present
+  repeated Egds endpoint_groups = 6;
+}
+
+// New xDS payload. The size of endpoints is fully arbitrary.
+// Also the EGDS requests to Pilot can be merged into one to boost efficiency
+message EndpointGroup {
+  option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.EndpointGroup";
+
+  string name = 1 [(validate.rules).string = {min_bytes: 1}];
+
+  // List of endpoints to load balance to.
+  repeated LocalityLbEndpoints endpoints = 2;
+
+  // Map of named endpoints that can be referenced in LocalityLbEndpoints.
+  // [#not-implemented-hide:]
+  map<string, Endpoint> named_endpoints = 3;
+}
+
+// The EGDS request configuration.
+message Egds {
+  option (udpa.annotations.versioning).previous_message_type =
+      "envoy.api.v2.ClusterLoadAssignment.EgdsConfig";
+
+  // Configuration for the source of EGDS updates for this Cluster.
+  core.v3.ConfigSource config_source = 1;
+
+  // the endpoint group resource name.
+  string endpoint_group_name = 2;
 }

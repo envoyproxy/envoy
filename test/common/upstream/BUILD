@@ -511,3 +511,54 @@ envoy_cc_test(
         "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
     ],
 )
+
+envoy_cc_test(
+    name = "egds_api_impl_test",
+    srcs = ["egds_api_impl_test.cc"],
+    deps = [
+        ":utility_lib",
+        "//source/common/config:utility_lib",
+        "//source/common/protobuf:utility_lib",
+        "//source/common/upstream:cds_api_lib",
+        "//test/mocks/protobuf:protobuf_mocks",
+        "//test/mocks/upstream:upstream_mocks",
+        "//test/test_common:utility_lib",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/endpoint/v3:pkg_cc_proto",
+        "@envoy_api//envoy/service/discovery/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_test(
+    name = "endpoint_groups_manager_impl_test",
+    srcs = ["endpoint_groups_manager_impl_test.cc"],
+    deps = [
+        "//source/common/upstream:endpoint_groups_manager_lib",
+        "//source/common/upstream:upstream_lib",
+        "//test/mocks/upstream:upstream_mocks",
+        "//test/test_common:utility_lib",
+        "@envoy_api//envoy/config/endpoint/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_test(
+    name = "egds_cluster_mapper_test",
+    srcs = ["egds_cluster_mapper_test.cc"],
+    deps = [
+        ":utility_lib",
+        "//source/common/upstream:egds_cluster_mapper_lib",
+        "//source/common/upstream:endpoint_group_monitor_interface",
+        "//source/common/upstream:endpoint_groups_manager_lib",
+        "//source/common/upstream:upstream_lib",
+        "//source/extensions/transport_sockets/raw_buffer:config",
+        "//source/server:transport_socket_config_lib",
+        "//test/mocks/local_info:local_info_mocks",
+        "//test/mocks/protobuf:protobuf_mocks",
+        "//test/mocks/runtime:runtime_mocks",
+        "//test/mocks/server:server_mocks",
+        "//test/mocks/ssl:ssl_mocks",
+        "//test/mocks/upstream:upstream_mocks",
+        "//test/test_common:utility_lib",
+        "@envoy_api//envoy/api/v2:pkg_cc_proto",
+    ],
+)

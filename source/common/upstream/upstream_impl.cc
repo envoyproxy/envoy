@@ -537,6 +537,22 @@ PrioritySetImpl::getOrCreateHostSet(uint32_t priority,
   return *host_sets_[priority];
 }
 
+HostSetImpl&
+PrioritySetImpl::getOrCreateMutableHostSet(uint32_t priority,
+                                           absl::optional<uint32_t> overprovisioning_factor) {
+  if (host_sets_.size() < priority + 1) {
+    for (size_t i = host_sets_.size(); i <= priority; ++i) {
+      HostSetImplPtr host_set = createHostSet(i, overprovisioning_factor);
+      host_set->addPriorityUpdateCb([this](uint32_t priority, const HostVector& hosts_added,
+                                           const HostVector& hosts_removed) {
+        runReferenceUpdateCallbacks(priority, hosts_added, hosts_removed);
+      });
+      host_sets_.push_back(std::move(host_set));
+    }
+  }
+  return dynamic_cast<HostSetImpl&>(*host_sets_[priority]);
+}
+
 void PrioritySetImpl::updateHosts(uint32_t priority, UpdateHostsParams&& update_hosts_params,
                                   LocalityWeightsConstSharedPtr locality_weights,
                                   const HostVector& hosts_added, const HostVector& hosts_removed,

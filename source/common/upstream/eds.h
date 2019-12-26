@@ -13,6 +13,9 @@
 #include "envoy/upstream/locality.h"
 
 #include "common/upstream/cluster_factory_impl.h"
+#include "common/upstream/egds_api_impl.h"
+#include "common/upstream/egds_cluster_mapper.h"
+#include "common/upstream/endpoint_groups_manager.h"
 #include "common/upstream/upstream_impl.h"
 
 #include "extensions/clusters/well_known_names.h"
@@ -23,7 +26,9 @@ namespace Upstream {
 /**
  * Cluster implementation that reads host information from the Endpoint Discovery Service.
  */
-class EdsClusterImpl : public BaseDynamicClusterImpl, Config::SubscriptionCallbacks {
+class EdsClusterImpl : public BaseDynamicClusterImpl,
+                       Config::SubscriptionCallbacks,
+                       EgdsClusterMapper::Delegate {
 public:
   EdsClusterImpl(const envoy::config::cluster::v3::Cluster& cluster, Runtime::Loader& runtime,
                  Server::Configuration::TransportSocketFactoryContextImpl& factory_context,
@@ -54,6 +59,15 @@ private:
                               std::unordered_map<std::string, HostSharedPtr>& updated_hosts);
   bool validateUpdateSize(int num_resources);
 
+  // EgdsClusterMapper::Delegate
+  void initializeCluster(
+      const envoy::config::endpoint::v3::ClusterLoadAssignment& cluster_load_assignment) override;
+  void updateHosts(uint32_t priority, const HostVector& hosts_added,
+                   const HostVector& hosts_removed, PriorityStateManager& priority_state_manager,
+                   LocalityWeightsMap& new_locality_weights_map,
+                   absl::optional<uint32_t> overprovisioning_factor = absl::nullopt) override;
+  void batchHostUpdateForEndpointGroup(PrioritySet::BatchUpdateCb& callback) override;
+
   // ClusterImplBase
   void reloadHealthyHostsHelper(const HostSharedPtr& host) override;
   void startPreInit() override;
@@ -82,6 +96,12 @@ private:
   Event::TimerPtr assignment_timeout_;
   ProtobufMessage::ValidationVisitor& validation_visitor_;
   InitializePhase initialize_phase_;
+
+  Config::SubscriptionFactory& subscription_factory_;
+  Upstream::ClusterManager& cm_;
+  EgdsApiPtr egds_api_;
+  EgdsClusterMapperPtr egds_cluster_mapper_;
+  EndpointGroupsManagerPtr endpoint_group_manager_;
 };
 
 class EdsClusterFactory : public ClusterFactoryImplBase {

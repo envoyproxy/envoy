@@ -1,0 +1,46 @@
+syntax = "proto3";
+
+package envoy.api.v2;
+
+import "envoy/api/v2/discovery.proto";
+import "envoy/api/v2/endpoint/endpoint_components.proto";
+import "envoy/api/v2/core/config_source.proto";
+
+import "google/api/annotations.proto";
+import "google/protobuf/duration.proto";
+import "google/protobuf/wrappers.proto";
+
+import "envoy/annotations/resource.proto";
+import "udpa/annotations/migrate.proto";
+import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.api.v2";
+option java_outer_classname = "EgdsProto";
+option java_multiple_files = true;
+option java_generic_services = true;
+option (udpa.annotations.file_migrate).move_to_package = "envoy.service.endpoint.v3";
+
+// [#protodoc-title: EGDS]
+// Endpoint discovery :ref:`architecture overview <arch_overview_service_discovery_types_egds>`
+
+service EndpointGroupDiscoveryService {
+  option (envoy.annotations.resource).type = "envoy.api.v2.EndpointGroup";
+
+  // The resource_names field in DiscoveryRequest specifies a list of clusters
+  // to subscribe to updates for.
+  rpc StreamEndpointGroups(stream DiscoveryRequest) returns (stream DiscoveryResponse) {
+  }
+
+  rpc DeltaEndpointGroups(stream DeltaDiscoveryRequest) returns (stream DeltaDiscoveryResponse) {
+  }
+
+  rpc FetchEndpointGroups(DiscoveryRequest) returns (DiscoveryResponse) {
+    option (google.api.http).post = "/v2/discovery:endpoint_groups";
+    option (google.api.http).body = "*";
+  }
+}
+
+// [#not-implemented-hide:] Not configuration. Workaround c++ protobuf issue with importing
+// services: https://github.com/google/protobuf/issues/4221 and protoxform to upgrade the file.
+message EgdsDummy {
+}

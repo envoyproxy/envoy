@@ -100,6 +100,10 @@ public:
     metadata_ = std::make_shared<envoy::config::core::v3::Metadata>(new_metadata);
   }
 
+#if defined(ALIMESH)
+  void resetCluster(lusterInfoConstSharedPtr cluster) { cluster_ = cluster; }
+#endif
+
   const ClusterInfo& cluster() const override { return *cluster_; }
   HealthCheckHostMonitor& healthChecker() const override {
     if (health_checker_) {
@@ -355,6 +359,8 @@ public:
                    const HostVector& hosts_removed,
                    absl::optional<uint32_t> overprovisioning_factor = absl::nullopt);
 
+  HostVector& mutableHosts() { return *const_cast<HostVector*>(hosts_.get()); }
+
 protected:
   virtual void runUpdateCallbacks(const HostVector& hosts_added, const HostVector& hosts_removed) {
     member_update_cb_helper_.runCallbacks(priority_, hosts_added, hosts_removed);
@@ -444,6 +450,11 @@ public:
   const HostSet&
   getOrCreateHostSet(uint32_t priority,
                      absl::optional<uint32_t> overprovisioning_factor = absl::nullopt);
+
+  // Get the host set for this priority level, creating it if necessary.
+  HostSetImpl&
+  getOrCreateMutableHostSet(uint32_t priority,
+                            absl::optional<uint32_t> overprovisioning_factor = absl::nullopt);
 
   void updateHosts(uint32_t priority, UpdateHostsParams&& update_hosts_params,
                    LocalityWeightsConstSharedPtr locality_weights, const HostVector& hosts_added,
@@ -825,7 +836,7 @@ using PriorityStateManagerPtr = std::unique_ptr<PriorityStateManager>;
  * Base for all dynamic cluster types.
  */
 class BaseDynamicClusterImpl : public ClusterImplBase {
-protected:
+public:
   using ClusterImplBase::ClusterImplBase;
 
   /**

@@ -17,6 +17,9 @@
 #include "envoy/upstream/upstream.h"
 
 #include "common/common/callback_impl.h"
+#include "common/upstream/egds_cluster_mapper.h"
+#include "common/upstream/endpoint_group_monitor.h"
+#include "common/upstream/endpoint_groups_manager.h"
 #include "common/upstream/health_discovery_service.h"
 #include "common/upstream/load_balancer_impl.h"
 #include "common/upstream/upstream_impl.h"
@@ -428,5 +431,44 @@ public:
     return ProtobufTypes::MessagePtr{new Envoy::ProtobufWkt::Struct()};
   }
 };
+
+class MockEndpointGroupMonitor : public EndpointGroupMonitor {
+public:
+  MockEndpointGroupMonitor();
+  ~MockEndpointGroupMonitor() override;
+
+  MOCK_METHOD2(update, void(const envoy::config::endpoint::v3::EndpointGroup&, absl::string_view));
+};
+
+class MockEndpointGroupsManager : public EndpointGroupsManager {
+public:
+  MockEndpointGroupsManager();
+  ~MockEndpointGroupsManager() override;
+
+  MOCK_METHOD2(addOrUpdateEndpointGroup,
+               bool(const envoy::config::endpoint::v3::EndpointGroup&, absl::string_view));
+  MOCK_METHOD2(clearEndpointGroup, bool(absl::string_view, absl::string_view));
+  MOCK_METHOD1(removeEndpointGroup, bool(absl::string_view));
+};
+
+class MockEgdsClusterMapperDelegate : public EgdsClusterMapper::Delegate {
+public:
+  ~MockEgdsClusterMapperDelegate() override = default;
+
+  MOCK_METHOD1(initializeCluster, void(const envoy::config::endpoint::v3::ClusterLoadAssignment&));
+  MOCK_METHOD1(batchHostUpdateForEndpointGroup, void(PrioritySet::BatchUpdateCb&));
+  MOCK_METHOD6(updateHosts,
+               void(uint32_t priority, const HostVector&, const HostVector&, PriorityStateManager&,
+                    LocalityWeightsMap&, absl::optional<uint32_t>));
+};
+
+class MockEndpointGroupMonitorManager : public EndpointGroupMonitorManager {
+public:
+  ~MockEndpointGroupMonitorManager() override = default;
+
+  MOCK_METHOD2(addMonitor, void(EndpointGroupMonitorSharedPtr, absl::string_view));
+  MOCK_METHOD2(removeMonitor, void(EndpointGroupMonitorSharedPtr, absl::string_view));
+};
+
 } // namespace Upstream
 } // namespace Envoy

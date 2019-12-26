@@ -893,4 +893,39 @@ void EdsHelper::setEdsAndWait(
       update_successes_ == server_stats.counter("cluster.cluster_0.update_success")->value(), "");
 }
 
+EgdsHelper::EgdsHelper()
+    : egds_path_(TestEnvironment::writeStringToFileForTest("egds.pb_text", "")) {
+  // cluster.cluster_0.update_success will be incremented on the initial
+  // load when Envoy comes up.
+  ++update_successes_;
+}
+
+void EgdsHelper::setEgds(
+    const std::vector<envoy::config::endpoint::v3::EndpointGroup>& endpoint_groups) {
+  // Write to file the DiscoveryResponse and trigger inotify watch.
+  envoy::service::discovery::v3::DiscoveryResponse egds_response;
+  egds_response.set_version_info(std::to_string(egds_version_++));
+  egds_response.set_type_url(Config::TypeUrl::get().EndpointGroup);
+  for (const auto& group : endpoint_groups) {
+    egds_response.add_resources()->PackFrom(group);
+  }
+  // Past the initial write, need move semantics to trigger inotify move event that the
+  // FilesystemSubscriptionImpl is subscribed to.
+  std::string path =
+      TestEnvironment::writeStringToFileForTest("egds.update.pb_text", egds_response.DebugString());
+  TestEnvironment::renameFile(path, egds_path_);
+}
+
+void EgdsHelper::setEgdsAndWait(
+    const std::vector<envoy::config::endpoint::v3::EndpointGroup>& endpoint_groups,
+    IntegrationTestServerStats& server_stats) {
+  setEgds(endpoint_groups);
+  // Make sure Envoy has consumed the update now that it is running.
+  ++update_successes_;
+  server_stats.waitForCounterGe("cluster.cluster_0.egds.update_success", update_successes_);
+  RELEASE_ASSERT(update_successes_ ==
+                     server_stats.counter("cluster.cluster_0.egds.update_success")->value(),
+                 "");
+}
+
 } // namespace Envoy

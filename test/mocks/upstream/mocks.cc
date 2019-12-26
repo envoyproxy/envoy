@@ -177,5 +177,11 @@ MockRetryHostPredicate::~MockRetryHostPredicate() = default;
 MockClusterManagerFactory::MockClusterManagerFactory() = default;
 MockClusterManagerFactory::~MockClusterManagerFactory() = default;
 
+MockEndpointGroupsManager::MockEndpointGroupsManager() = default;
+MockEndpointGroupsManager::~MockEndpointGroupsManager() = default;
+
+MockEndpointGroupMonitor::MockEndpointGroupMonitor() = default;
+MockEndpointGroupMonitor::~MockEndpointGroupMonitor() = default;
+
 } // namespace Upstream
 } // namespace Envoy
