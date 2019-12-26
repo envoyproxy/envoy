@@ -404,6 +404,7 @@ def FormatFieldAsDefinitionListItem(outer_type_context, type_context, field):
   if field.options.HasExtension(validate_pb2.rules):
     rule = field.options.Extensions[validate_pb2.rules]
     if ((rule.HasField('message') and rule.message.required) or
+        (rule.HasField('duration') and rule.duration.required) or
         (rule.HasField('string') and rule.string.min_bytes > 0) or
         (rule.HasField('repeated') and rule.repeated.min_items > 0)):
       field_annotations = ['*REQUIRED*']

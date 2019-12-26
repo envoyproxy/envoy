@@ -5,6 +5,7 @@
 
 #include "common/common/utility.h"
 
+#include "absl/types/optional.h"
 #include "openssl/ssl.h"
 
 namespace Envoy {
@@ -64,6 +65,13 @@ SystemTime getValidFrom(const X509& cert);
  * @return time after which the certificate expires.
  */
 SystemTime getExpirationTime(const X509& cert);
+
+/**
+ * Returns the last crypto error from ERR_get_error(), or `absl::nullopt`
+ * if the error stack is empty.
+ * @return std::string error message
+ */
+absl::optional<std::string> getLastCryptoError();
 
 } // namespace Utility
 } // namespace Tls

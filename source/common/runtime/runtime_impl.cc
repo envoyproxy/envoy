@@ -17,6 +17,7 @@
 #include "common/common/assert.h"
 #include "common/common/fmt.h"
 #include "common/common/utility.h"
+#include "common/config/api_version.h"
 #include "common/filesystem/directory.h"
 #include "common/grpc/common.h"
 #include "common/protobuf/message_validator_impl.h"
@@ -590,7 +591,8 @@ void RtdsSubscription::start() {
   // instantiated in the server instance.
   subscription_ = parent_.cm_->subscriptionFactory().subscriptionFromConfigSource(
       config_source_,
-      Grpc::Common::typeUrl(envoy::service::discovery::v2::Runtime().GetDescriptor()->full_name()),
+      Grpc::Common::typeUrl(
+          API_NO_BOOST(envoy::service::discovery::v2::Runtime)().GetDescriptor()->full_name()),
       store_, *this);
   subscription_->start({resource_name_});
 }

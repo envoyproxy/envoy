@@ -114,6 +114,19 @@ TEST(UtilityTest, TestLongExpirationTime) {
   EXPECT_EQ(TEST_LONG_VALIDITY_CERT_NOT_AFTER, formatted);
 }
 
+TEST(UtilityTest, GetLastCryptoError) {
+  // Clearing the error stack leaves us with no error to get.
+  ERR_clear_error();
+  EXPECT_FALSE(Utility::getLastCryptoError().has_value());
+
+  ERR_put_error(ERR_LIB_SSL, 0, ERR_R_MALLOC_FAILURE, __FILE__, __LINE__);
+  EXPECT_EQ(Utility::getLastCryptoError().value(),
+            "error:10000041:SSL routines:OPENSSL_internal:malloc failure");
+
+  // We consumed the last error, so back to not having an error to get.
+  EXPECT_FALSE(Utility::getLastCryptoError().has_value());
+}
+
 } // namespace
 } // namespace Tls
 } // namespace TransportSockets

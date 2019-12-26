@@ -4,6 +4,7 @@
 #include "envoy/api/v2/eds.pb.h"
 
 #include "common/common/empty_string.h"
+#include "common/config/api_version.h"
 #include "common/config/grpc_mux_impl.h"
 #include "common/config/protobuf_link_hacks.h"
 #include "common/config/resources.h"
@@ -68,7 +69,7 @@ public:
                          bool first = false, const std::string& nonce = "",
                          const Protobuf::int32 error_code = Grpc::Status::WellKnownGrpcStatus::Ok,
                          const std::string& error_message = "") {
-    envoy::api::v2::DiscoveryRequest expected_request;
+    API_NO_BOOST(envoy::api::v2::DiscoveryRequest) expected_request;
     if (first) {
       expected_request.mutable_node()->CopyFrom(local_info_.node());
     }
