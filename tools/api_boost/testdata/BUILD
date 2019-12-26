@@ -11,13 +11,25 @@ envoy_package()
 envoy_cc_library(
     name = "decl_ref_expr",
     srcs = ["decl_ref_expr.cc"],
-    deps = ["@envoy_api//envoy/config/overload/v2alpha:pkg_cc_proto"],
+    deps = [
+        "@envoy_api//envoy/api/v2:pkg_cc_proto",
+        "@envoy_api//envoy/config/overload/v2alpha:pkg_cc_proto",
+    ],
 )
 
 envoy_cc_library(
     name = "elaborated_type",
     srcs = ["elaborated_type.cc"],
-    deps = ["@envoy_api//envoy/config/overload/v2alpha:pkg_cc_proto"],
+    deps = [
+        "@envoy_api//envoy/api/v2:pkg_cc_proto",
+        "@envoy_api//envoy/config/overload/v2alpha:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
+    name = "rename",
+    srcs = ["rename.cc"],
+    deps = ["@envoy_api//envoy/api/v2/route:pkg_cc_proto"],
 )
 
 envoy_cc_library(
