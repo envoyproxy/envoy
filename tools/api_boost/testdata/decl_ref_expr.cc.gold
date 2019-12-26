@@ -1,4 +1,7 @@
+#include "envoy/api/v3alpha/cds.pb.h"
 #include "envoy/config/overload/v3alpha/overload.pb.h"
+
+#define ASSERT(x) static_cast<void>(x)
 
 using envoy::config::overload::v3alpha::Trigger;
 
@@ -17,5 +20,9 @@ public:
     default:
       break;
     }
+    envoy::config::overload::v3alpha::ThresholdTrigger::default_instance();
+    ASSERT(envoy::config::overload::v3alpha::Trigger::kThreshold == Trigger::kThreshold);
+    envoy::api::v3alpha::Cluster_LbPolicy_Name(0);
+    static_cast<void>(envoy::api::v3alpha::Cluster::ORIGINAL_DST_LB);
   }
 };
