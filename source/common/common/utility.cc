@@ -5,6 +5,7 @@
 #include <cmath>
 #include <cstdint>
 #include <iterator>
+#include <regex>
 #include <string>
 
 #include "envoy/common/exception.h"
@@ -18,6 +19,7 @@
 #include "absl/strings/match.h"
 #include "absl/strings/str_join.h"
 #include "absl/strings/str_split.h"
+#include "absl/time/time.h"
 #include "spdlog/spdlog.h"
 
 namespace Envoy {
@@ -31,7 +33,7 @@ public:
   const std::regex PATTERN{"(%([1-9])?f)|(%s)", std::regex::optimize};
 };
 
-typedef ConstSingleton<SpecifierConstantValues> SpecifierConstants;
+using SpecifierConstants = ConstSingleton<SpecifierConstantValues>;
 
 } // namespace
 
@@ -41,10 +43,11 @@ std::string DateFormatter::fromTime(const SystemTime& time) const {
     // is 10.
     size_t seconds_length;
 
-    // A container object to hold a strftime'd string, its timestamp (in seconds) and a list of
-    // position offsets for each specifier found in a format string.
+    // A container object to hold a absl::FormatTime string, its timestamp (in seconds) and a list
+    // of position offsets for each specifier found in a format string.
     struct Formatted {
-      // The resulted string after format string is passed to strftime at a given point in time.
+      // The resulted string after format string is passed to absl::FormatTime at a given point in
+      // time.
       std::string str;
 
       // A timestamp (in seconds) when this object is created.
@@ -52,7 +55,7 @@ std::string DateFormatter::fromTime(const SystemTime& time) const {
 
       // List of offsets for each specifier found in a format string. This is needed to compensate
       // the position of each recorded specifier due to the possible size change of the previous
-      // segment (after strftime'd).
+      // segment (after being formatted).
       SpecifierOffsets specifier_offsets;
     };
     // A map is used to keep different formatted format strings at a given second.
@@ -163,31 +166,28 @@ void DateFormatter::parse(const std::string& format_string) {
 std::string
 DateFormatter::fromTimeAndPrepareSpecifierOffsets(time_t time, SpecifierOffsets& specifier_offsets,
                                                   const std::string& seconds_str) const {
-  tm current_tm;
-  gmtime_r(&time, &current_tm);
+  std::string formatted_time;
 
-  std::array<char, 1024> buf;
-  std::string formatted;
-
-  size_t previous = 0;
+  int32_t previous = 0;
   specifier_offsets.reserve(specifiers_.size());
   for (const auto& specifier : specifiers_) {
-    const size_t formatted_length =
-        strftime(&buf[0], buf.size(), specifier.segment_.c_str(), &current_tm);
-    absl::StrAppend(&formatted, absl::string_view(&buf[0], formatted_length),
+    std::string current_format =
+        absl::FormatTime(specifier.segment_, absl::FromTimeT(time), absl::UTCTimeZone());
+    absl::StrAppend(&formatted_time, current_format,
                     specifier.second_ ? seconds_str : std::string(specifier.width_, '?'));
 
     // This computes and saves offset of each specifier's pattern to correct its position after the
     // previous string segment is formatted. An offset can be a negative value.
     //
     // If the current specifier is a second specifier (%s), it needs to be corrected by 2.
-    const int32_t offset = (formatted_length + (specifier.second_ ? (seconds_str.size() - 2) : 0)) -
-                           specifier.segment_.size();
+    const int32_t offset =
+        (current_format.length() + (specifier.second_ ? (seconds_str.size() - 2) : 0)) -
+        specifier.segment_.size();
     specifier_offsets.emplace_back(previous + offset);
     previous += offset;
   }
 
-  return formatted;
+  return formatted_time;
 }
 
 std::string DateFormatter::now(TimeSource& time_source) {
@@ -217,39 +217,24 @@ bool DateUtil::timePointValid(MonotonicTime time_point) {
 
 const char StringUtil::WhitespaceChars[] = " \t\f\v\n\r";
 
-const char* StringUtil::strtoul(const char* str, uint64_t& out, int base) {
+const char* StringUtil::strtoull(const char* str, uint64_t& out, int base) {
   if (strlen(str) == 0) {
     return nullptr;
   }
 
   char* end_ptr;
   errno = 0;
-  out = ::strtoul(str, &end_ptr, base);
-  if (end_ptr == str || (out == ULONG_MAX && errno == ERANGE)) {
+  out = std::strtoull(str, &end_ptr, base);
+  if (end_ptr == str || (out == ULLONG_MAX && errno == ERANGE)) {
     return nullptr;
   } else {
     return end_ptr;
   }
 }
 
-bool StringUtil::atoul(const char* str, uint64_t& out, int base) {
-  const char* end_ptr = StringUtil::strtoul(str, out, base);
+bool StringUtil::atoull(const char* str, uint64_t& out, int base) {
+  const char* end_ptr = StringUtil::strtoull(str, out, base);
   if (end_ptr == nullptr || *end_ptr != '\0') {
-    return false;
-  } else {
-    return true;
-  }
-}
-
-bool StringUtil::atol(const char* str, int64_t& out, int base) {
-  if (strlen(str) == 0) {
-    return false;
-  }
-
-  char* end_ptr;
-  errno = 0;
-  out = strtol(str, &end_ptr, base);
-  if (*end_ptr != '\0' || ((out == LONG_MAX || out == LONG_MIN) && errno == ERANGE)) {
     return false;
   } else {
     return true;
@@ -277,6 +262,16 @@ absl::string_view StringUtil::rtrim(absl::string_view source) {
 }
 
 absl::string_view StringUtil::trim(absl::string_view source) { return ltrim(rtrim(source)); }
+
+absl::string_view StringUtil::removeTrailingCharacters(absl::string_view source, char ch) {
+  const absl::string_view::size_type pos = source.find_last_not_of(ch);
+  if (pos != absl::string_view::npos) {
+    source.remove_suffix(source.size() - pos - 1);
+  } else {
+    source.remove_suffix(source.size());
+  }
+  return source;
+}
 
 bool StringUtil::findToken(absl::string_view source, absl::string_view delimiters,
                            absl::string_view key_token, bool trim_whitespace) {
@@ -339,6 +334,16 @@ std::vector<absl::string_view> StringUtil::splitToken(absl::string_view source,
   return absl::StrSplit(source, absl::ByAnyChar(delimiters), absl::SkipEmpty());
 }
 
+std::string StringUtil::removeTokens(absl::string_view source, absl::string_view delimiters,
+                                     const CaseUnorderedSet& tokens_to_remove,
+                                     absl::string_view joiner) {
+  auto values = Envoy::StringUtil::splitToken(source, delimiters);
+  std::for_each(values.begin(), values.end(), [](auto& v) { v = StringUtil::trim(v); });
+  auto end = std::remove_if(values.begin(), values.end(),
+                            [&](absl::string_view t) { return tokens_to_remove.count(t) != 0; });
+  return absl::StrJoin(values.begin(), end, joiner);
+}
+
 uint32_t StringUtil::itoa(char* out, size_t buffer_size, uint64_t i) {
   // The maximum size required for an unsigned 64-bit integer is 21 chars (including null).
   if (buffer_size < 21) {
@@ -358,22 +363,13 @@ uint32_t StringUtil::itoa(char* out, size_t buffer_size, uint64_t i) {
   }
 
   *current = 0;
-  return current - out;
+  return static_cast<uint32_t>(current - out);
 }
 
 size_t StringUtil::strlcpy(char* dst, const char* src, size_t size) {
   strncpy(dst, src, size - 1);
   dst[size - 1] = '\0';
   return strlen(src);
-}
-
-std::string StringUtil::join(const std::vector<std::string>& source, const std::string& delimiter) {
-  std::ostringstream buf;
-  std::copy(source.begin(), source.end(),
-            std::ostream_iterator<std::string>(buf, delimiter.c_str()));
-  std::string ret = buf.str();
-  // copy will always end with an extra delimiter, we remove it here.
-  return ret.substr(0, ret.length() - delimiter.length());
 }
 
 std::string StringUtil::subspan(absl::string_view source, size_t start, size_t end) {
@@ -408,64 +404,39 @@ std::string StringUtil::escape(const std::string& source) {
   return ret;
 }
 
-std::string AccessLogDateTimeFormatter::fromTime(const SystemTime& time) {
-  static const char DefaultDateFormat[] = "%Y-%m-%dT%H:%M:%S.000Z";
+std::string AccessLogDateTimeFormatter::fromTime(const SystemTime& system_time) {
+  static const std::string DefaultDateFormat = "%Y-%m-%dT%H:%M:%E3SZ";
 
   struct CachedTime {
     std::chrono::seconds epoch_time_seconds;
-    size_t formatted_time_length{0};
-    char formatted_time[32];
+    std::string formatted_time;
   };
   static thread_local CachedTime cached_time;
 
   const std::chrono::milliseconds epoch_time_ms =
-      std::chrono::duration_cast<std::chrono::milliseconds>(time.time_since_epoch());
+      std::chrono::duration_cast<std::chrono::milliseconds>(system_time.time_since_epoch());
 
   const std::chrono::seconds epoch_time_seconds =
       std::chrono::duration_cast<std::chrono::seconds>(epoch_time_ms);
 
-  if (cached_time.formatted_time_length == 0 ||
-      cached_time.epoch_time_seconds != epoch_time_seconds) {
-    time_t time = static_cast<time_t>(epoch_time_seconds.count());
-    tm date_time;
-    gmtime_r(&time, &date_time);
-    cached_time.formatted_time_length =
-        strftime(cached_time.formatted_time, sizeof(cached_time.formatted_time), DefaultDateFormat,
-                 &date_time);
+  if (cached_time.formatted_time.empty() || cached_time.epoch_time_seconds != epoch_time_seconds) {
+    cached_time.formatted_time =
+        absl::FormatTime(DefaultDateFormat, absl::FromChrono(system_time), absl::UTCTimeZone());
     cached_time.epoch_time_seconds = epoch_time_seconds;
+  } else {
+    // Overwrite the digits in the ".000Z" at the end of the string with the
+    // millisecond count from the input time.
+    ASSERT(cached_time.formatted_time.length() == 24);
+    size_t offset = cached_time.formatted_time.length() - 4;
+    uint32_t msec = epoch_time_ms.count() % 1000;
+    cached_time.formatted_time[offset++] = ('0' + (msec / 100));
+    msec %= 100;
+    cached_time.formatted_time[offset++] = ('0' + (msec / 10));
+    msec %= 10;
+    cached_time.formatted_time[offset++] = ('0' + msec);
   }
-
-  ASSERT(cached_time.formatted_time_length == 24 &&
-         cached_time.formatted_time_length < sizeof(cached_time.formatted_time));
-
-  // Overwrite the digits in the ".000Z" at the end of the string with the
-  // millisecond count from the input time.
-  size_t offset = cached_time.formatted_time_length - 4;
-  uint32_t msec = epoch_time_ms.count() % 1000;
-  cached_time.formatted_time[offset++] = ('0' + (msec / 100));
-  msec %= 100;
-  cached_time.formatted_time[offset++] = ('0' + (msec / 10));
-  msec %= 10;
-  cached_time.formatted_time[offset++] = ('0' + msec);
 
   return cached_time.formatted_time;
-}
-
-bool StringUtil::endsWith(const std::string& source, const std::string& end) {
-  if (source.length() < end.length()) {
-    return false;
-  }
-
-  size_t start_position = source.length() - end.length();
-  return std::equal(source.begin() + start_position, source.end(), end.begin());
-}
-
-bool StringUtil::startsWith(const char* source, const std::string& start, bool case_sensitive) {
-  if (case_sensitive) {
-    return strncmp(source, start.c_str(), start.size()) == 0;
-  } else {
-    return strncasecmp(source, start.c_str(), start.size()) == 0;
-  }
 }
 
 const std::string& StringUtil::nonEmptyStringOrDefault(const std::string& s,
@@ -478,6 +449,13 @@ std::string StringUtil::toUpper(absl::string_view s) {
   upper_s.reserve(s.size());
   std::transform(s.cbegin(), s.cend(), std::back_inserter(upper_s), absl::ascii_toupper);
   return upper_s;
+}
+
+std::string StringUtil::toLower(absl::string_view s) {
+  std::string lower_s;
+  lower_s.reserve(s.size());
+  std::transform(s.cbegin(), s.cend(), std::back_inserter(lower_s), absl::ascii_tolower);
+  return lower_s;
 }
 
 bool StringUtil::CaseInsensitiveCompare::operator()(absl::string_view lhs,
@@ -533,22 +511,12 @@ uint32_t Primes::findPrimeLargerThan(uint32_t x) {
   return x;
 }
 
-std::regex RegexUtil::parseRegex(const std::string& regex, std::regex::flag_type flags) {
-  // TODO(zuercher): In the future, PGV (https://github.com/lyft/protoc-gen-validate) annotations
-  // may allow us to remove this in favor of direct validation of regular expressions.
-  try {
-    return std::regex(regex, flags);
-  } catch (const std::regex_error& e) {
-    throw EnvoyException(fmt::format("Invalid regex '{}': {}", regex, e.what()));
-  }
-}
-
 // https://en.wikipedia.org/wiki/Algorithms_for_calculating_variance#Online_algorithm
-void WelfordStandardDeviation::update(double newValue) {
+void WelfordStandardDeviation::update(double new_value) {
   ++count_;
-  const double delta = newValue - mean_;
+  const double delta = new_value - mean_;
   mean_ += delta / count_;
-  const double delta2 = newValue - mean_;
+  const double delta2 = new_value - mean_;
   m2_ += delta * delta2;
 }
 
@@ -564,6 +532,11 @@ double WelfordStandardDeviation::computeStandardDeviation() const {
   // It seems very difficult for variance to go negative, but from the calculation in update()
   // above, I can't quite convince myself it's impossible, so put in a guard to be sure.
   return (std::isnan(variance) || variance < 0) ? std::nan("") : sqrt(variance);
+}
+
+InlineString::InlineString(const char* str, size_t size) : size_(size) {
+  RELEASE_ASSERT(size <= 0xffffffff, "size must fit in 32 bits");
+  memcpy(data_, str, size);
 }
 
 } // namespace Envoy

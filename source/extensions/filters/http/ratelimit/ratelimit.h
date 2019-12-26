@@ -18,6 +18,7 @@
 #include "common/http/header_map_impl.h"
 
 #include "extensions/filters/common/ratelimit/ratelimit.h"
+#include "extensions/filters/common/ratelimit/stat_names.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -44,9 +45,9 @@ public:
         failure_mode_deny_(config.failure_mode_deny()),
         rate_limited_grpc_status_(
             config.rate_limited_as_resource_exhausted()
-                ? absl::make_optional(Grpc::Status::GrpcStatus::ResourceExhausted)
+                ? absl::make_optional(Grpc::Status::WellKnownGrpcStatus::ResourceExhausted)
                 : absl::nullopt),
-        http_context_(http_context) {}
+        http_context_(http_context), stat_names_(scope.symbolTable()) {}
   const std::string& domain() const { return domain_; }
   const LocalInfo::LocalInfo& localInfo() const { return local_info_; }
   uint64_t stage() const { return stage_; }
@@ -58,6 +59,7 @@ public:
     return rate_limited_grpc_status_;
   }
   Http::Context& httpContext() { return http_context_; }
+  Filters::Common::RateLimit::StatNames& statNames() { return stat_names_; }
 
 private:
   static FilterRequestType stringToType(const std::string& request_type) {
@@ -80,9 +82,10 @@ private:
   const bool failure_mode_deny_;
   const absl::optional<Grpc::Status::GrpcStatus> rate_limited_grpc_status_;
   Http::Context& http_context_;
+  Filters::Common::RateLimit::StatNames stat_names_;
 };
 
-typedef std::shared_ptr<FilterConfig> FilterConfigSharedPtr;
+using FilterConfigSharedPtr = std::shared_ptr<FilterConfig>;
 
 /**
  * HTTP rate limit filter. Depending on the route configuration, this filter calls the global
@@ -107,11 +110,13 @@ public:
   Http::FilterHeadersStatus encodeHeaders(Http::HeaderMap& headers, bool end_stream) override;
   Http::FilterDataStatus encodeData(Buffer::Instance& data, bool end_stream) override;
   Http::FilterTrailersStatus encodeTrailers(Http::HeaderMap& trailers) override;
+  Http::FilterMetadataStatus encodeMetadata(Http::MetadataMap&) override;
   void setEncoderFilterCallbacks(Http::StreamEncoderFilterCallbacks& callbacks) override;
 
   // RateLimit::RequestCallbacks
   void complete(Filters::Common::RateLimit::LimitStatus status,
-                Http::HeaderMapPtr&& headers) override;
+                Http::HeaderMapPtr&& response_headers_to_add,
+                Http::HeaderMapPtr&& request_headers_to_add) override;
 
 private:
   void initiateCall(const Http::HeaderMap& headers);
@@ -119,7 +124,9 @@ private:
                                     std::vector<Envoy::RateLimit::Descriptor>& descriptors,
                                     const Router::RouteEntry* route_entry,
                                     const Http::HeaderMap& headers) const;
-  void addHeaders(Http::HeaderMap& headers);
+  void populateResponseHeaders(Http::HeaderMap& response_headers);
+  void appendRequestHeaders(Http::HeaderMapPtr& request_headers_to_add);
+
   Http::Context& httpContext() { return config_->httpContext(); }
 
   enum class State { NotStarted, Calling, Complete, Responded };
@@ -130,7 +137,8 @@ private:
   State state_{State::NotStarted};
   Upstream::ClusterInfoConstSharedPtr cluster_;
   bool initiating_call_{};
-  Http::HeaderMapPtr headers_to_add_;
+  Http::HeaderMapPtr response_headers_to_add_;
+  Http::HeaderMap* request_headers_{};
 };
 
 } // namespace RateLimitFilter

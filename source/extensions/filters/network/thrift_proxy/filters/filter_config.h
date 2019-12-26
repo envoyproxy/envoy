@@ -19,7 +19,7 @@ namespace ThriftFilters {
  */
 class NamedThriftFilterConfigFactory {
 public:
-  virtual ~NamedThriftFilterConfigFactory() {}
+  virtual ~NamedThriftFilterConfigFactory() = default;
 
   /**
    * Create a particular thrift filter factory implementation. If the implementation is unable to
@@ -46,6 +46,13 @@ public:
    * produced by the factory.
    */
   virtual std::string name() PURE;
+
+  /**
+   * @return std::string the identifying category name for objects
+   * created by this factory. Used for automatic registration with
+   * FactoryCategoryRegistry.
+   */
+  static std::string category() { return "thrift_proxy.filters"; }
 };
 
 } // namespace ThriftFilters

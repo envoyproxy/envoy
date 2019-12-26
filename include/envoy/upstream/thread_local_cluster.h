@@ -15,7 +15,7 @@ namespace Upstream {
  */
 class ThreadLocalCluster {
 public:
-  virtual ~ThreadLocalCluster() {}
+  virtual ~ThreadLocalCluster() = default;
 
   /**
    * @return const PrioritySet& the backing priority set.

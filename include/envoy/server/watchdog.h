@@ -17,7 +17,7 @@ namespace Server {
  */
 class WatchDog {
 public:
-  virtual ~WatchDog() {}
+  virtual ~WatchDog() = default;
 
   /**
    * Start a recurring touch timer in the dispatcher passed as argument.
@@ -36,11 +36,11 @@ public:
    * This can be used if this is later used on a thread where there is no dispatcher.
    */
   virtual void touch() PURE;
-  virtual const Thread::ThreadId& threadId() const PURE;
+  virtual Thread::ThreadId threadId() const PURE;
   virtual MonotonicTime lastTouchTime() const PURE;
 };
 
-typedef std::shared_ptr<WatchDog> WatchDogSharedPtr;
+using WatchDogSharedPtr = std::shared_ptr<WatchDog>;
 
 } // namespace Server
 } // namespace Envoy

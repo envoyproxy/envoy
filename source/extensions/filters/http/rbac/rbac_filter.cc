@@ -1,15 +1,24 @@
 #include "extensions/filters/http/rbac/rbac_filter.h"
 
+#include "envoy/config/filter/http/rbac/v2/rbac.pb.h"
 #include "envoy/stats/scope.h"
 
 #include "common/http/utility.h"
 
 #include "extensions/filters/http/well_known_names.h"
 
+#include "absl/strings/str_join.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace RBACFilter {
+
+struct RcDetailsValues {
+  // The rbac filter rejected the request
+  const std::string RbacAccessDenied = "rbac_access_denied";
+};
+using RcDetails = ConstSingleton<RcDetailsValues>;
 
 RoleBasedAccessControlFilterConfig::RoleBasedAccessControlFilterConfig(
     const envoy::config::filter::http::rbac::v2::RBAC& proto_config,
@@ -18,7 +27,7 @@ RoleBasedAccessControlFilterConfig::RoleBasedAccessControlFilterConfig(
       engine_(Filters::Common::RBAC::createEngine(proto_config)),
       shadow_engine_(Filters::Common::RBAC::createShadowEngine(proto_config)) {}
 
-const absl::optional<Filters::Common::RBAC::RoleBasedAccessControlEngineImpl>&
+const Filters::Common::RBAC::RoleBasedAccessControlEngineImpl*
 RoleBasedAccessControlFilterConfig::engine(const Router::RouteConstSharedPtr route,
                                            Filters::Common::RBAC::EnforcementMode mode) const {
   if (!route || !route->routeEntry()) {
@@ -27,12 +36,9 @@ RoleBasedAccessControlFilterConfig::engine(const Router::RouteConstSharedPtr rou
 
   const std::string& name = HttpFilterNames::get().Rbac;
   const auto* entry = route->routeEntry();
-  const auto* tmp =
-      entry->perFilterConfigTyped<RoleBasedAccessControlRouteSpecificFilterConfig>(name);
   const auto* route_local =
-      tmp ? tmp
-          : entry->virtualHost()
-                .perFilterConfigTyped<RoleBasedAccessControlRouteSpecificFilterConfig>(name);
+      entry->mostSpecificPerFilterConfigTyped<RoleBasedAccessControlRouteSpecificFilterConfig>(
+          name);
 
   if (route_local) {
     return route_local->engine(mode);
@@ -48,28 +54,28 @@ RoleBasedAccessControlRouteSpecificFilterConfig::RoleBasedAccessControlRouteSpec
 
 Http::FilterHeadersStatus RoleBasedAccessControlFilter::decodeHeaders(Http::HeaderMap& headers,
                                                                       bool) {
-  ENVOY_LOG(
-      debug,
-      "checking request: remoteAddress: {}, localAddress: {}, ssl: {}, headers: {}, "
-      "dynamicMetadata: {}",
-      callbacks_->connection()->remoteAddress()->asString(),
-      callbacks_->connection()->localAddress()->asString(),
-      callbacks_->connection()->ssl()
-          ? "uriSanPeerCertificate: " + callbacks_->connection()->ssl()->uriSanPeerCertificate() +
-                ", subjectPeerCertificate: " +
-                callbacks_->connection()->ssl()->subjectPeerCertificate()
-          : "none",
-      headers, callbacks_->streamInfo().dynamicMetadata().DebugString());
+  ENVOY_LOG(debug,
+            "checking request: remoteAddress: {}, localAddress: {}, ssl: {}, headers: {}, "
+            "dynamicMetadata: {}",
+            callbacks_->connection()->remoteAddress()->asString(),
+            callbacks_->connection()->localAddress()->asString(),
+            callbacks_->connection()->ssl()
+                ? "uriSanPeerCertificate: " +
+                      absl::StrJoin(callbacks_->connection()->ssl()->uriSanPeerCertificate(), ",") +
+                      ", subjectPeerCertificate: " +
+                      callbacks_->connection()->ssl()->subjectPeerCertificate()
+                : "none",
+            headers, callbacks_->streamInfo().dynamicMetadata().DebugString());
 
   std::string effective_policy_id;
-  const auto& shadow_engine =
+  const auto shadow_engine =
       config_->engine(callbacks_->route(), Filters::Common::RBAC::EnforcementMode::Shadow);
 
-  if (shadow_engine.has_value()) {
+  if (shadow_engine != nullptr) {
     std::string shadow_resp_code =
         Filters::Common::RBAC::DynamicMetadataKeysSingleton::get().EngineResultAllowed;
-    if (shadow_engine->allowed(*callbacks_->connection(), headers,
-                               callbacks_->streamInfo().dynamicMetadata(), &effective_policy_id)) {
+    if (shadow_engine->allowed(*callbacks_->connection(), headers, callbacks_->streamInfo(),
+                               &effective_policy_id)) {
       ENVOY_LOG(debug, "shadow allowed");
       config_->stats().shadow_allowed_.inc();
     } else {
@@ -94,18 +100,17 @@ Http::FilterHeadersStatus RoleBasedAccessControlFilter::decodeHeaders(Http::Head
     callbacks_->streamInfo().setDynamicMetadata(HttpFilterNames::get().Rbac, metrics);
   }
 
-  const auto& engine =
+  const auto engine =
       config_->engine(callbacks_->route(), Filters::Common::RBAC::EnforcementMode::Enforced);
-  if (engine.has_value()) {
-    if (engine->allowed(*callbacks_->connection(), headers,
-                        callbacks_->streamInfo().dynamicMetadata(), nullptr)) {
+  if (engine != nullptr) {
+    if (engine->allowed(*callbacks_->connection(), headers, callbacks_->streamInfo(), nullptr)) {
       ENVOY_LOG(debug, "enforced allowed");
       config_->stats().allowed_.inc();
       return Http::FilterHeadersStatus::Continue;
     } else {
       ENVOY_LOG(debug, "enforced denied");
       callbacks_->sendLocalReply(Http::Code::Forbidden, "RBAC: access denied", nullptr,
-                                 absl::nullopt);
+                                 absl::nullopt, RcDetails::get().RbacAccessDenied);
       config_->stats().denied_.inc();
       return Http::FilterHeadersStatus::StopIteration;
     }

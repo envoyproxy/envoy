@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <string>
 
+#include "envoy/config/filter/network/client_ssl_auth/v2/client_ssl_auth.pb.h"
 #include "envoy/network/connection.h"
 #include "envoy/stats/scope.h"
 
@@ -77,13 +78,15 @@ void ClientSslAuthConfig::parseResponse(const Http::Message& message) {
   stats_.total_principals_.set(new_principals->size());
 }
 
-void ClientSslAuthConfig::onFetchFailure(const EnvoyException*) { stats_.update_failure_.inc(); }
+void ClientSslAuthConfig::onFetchFailure(Config::ConfigUpdateFailureReason, const EnvoyException*) {
+  stats_.update_failure_.inc();
+}
 
 static const std::string Path = "/v1/certs/list/approved";
 
 void ClientSslAuthConfig::createRequest(Http::Message& request) {
-  request.headers().insertMethod().value().setReference(Http::Headers::get().MethodValues.Get);
-  request.headers().insertPath().value(Path);
+  request.headers().setReferenceMethod(Http::Headers::get().MethodValues.Get);
+  request.headers().setPath(Path);
 }
 
 Network::FilterStatus ClientSslAuthFilter::onData(Buffer::Instance&, bool) {

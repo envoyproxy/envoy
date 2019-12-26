@@ -20,7 +20,7 @@ public:
   /**
    * Default constructor. Creates an empty context.
    */
-  SpanContext() : trace_id_high_(0), trace_id_(0), id_(0), parent_id_(0), sampled_(false) {}
+  SpanContext() = default;
 
   /**
    * Constructor that creates a context object from the supplied trace, span and
@@ -75,11 +75,11 @@ public:
   bool sampled() const { return sampled_; }
 
 private:
-  const uint64_t trace_id_high_;
-  const uint64_t trace_id_;
-  const uint64_t id_;
-  const uint64_t parent_id_;
-  const bool sampled_;
+  const uint64_t trace_id_high_{0};
+  const uint64_t trace_id_{0};
+  const uint64_t id_{0};
+  const uint64_t parent_id_{0};
+  const bool sampled_{false};
 };
 
 } // namespace Zipkin

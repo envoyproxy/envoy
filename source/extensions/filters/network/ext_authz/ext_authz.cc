@@ -20,7 +20,8 @@ InstanceStats Config::generateStats(const std::string& name, Stats::Scope& scope
 }
 
 void Filter::callCheck() {
-  Filters::Common::ExtAuthz::CheckRequestUtils::createTcpCheck(filter_callbacks_, check_request_);
+  Filters::Common::ExtAuthz::CheckRequestUtils::createTcpCheck(filter_callbacks_, check_request_,
+                                                               config_->includePeerCertificate());
 
   status_ = Status::Calling;
   config_->stats().active_.inc();
@@ -34,7 +35,7 @@ void Filter::callCheck() {
 Network::FilterStatus Filter::onData(Buffer::Instance&, bool /* end_stream */) {
   if (status_ == Status::NotStarted) {
     // By waiting to invoke the check at onData() the call to authorization service will have
-    // sufficient information to fillout the checkRequest_.
+    // sufficient information to fill out the checkRequest_.
     callCheck();
   }
   return filter_return_ == FilterReturn::Stop ? Network::FilterStatus::StopIteration

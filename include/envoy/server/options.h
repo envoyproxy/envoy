@@ -6,8 +6,8 @@
 
 #include "envoy/admin/v2alpha/server_info.pb.h"
 #include "envoy/common/pure.h"
+#include "envoy/config/bootstrap/v2/bootstrap.pb.h"
 #include "envoy/network/address.h"
-#include "envoy/stats/stats_options.h"
 
 #include "spdlog/spdlog.h"
 
@@ -41,14 +41,14 @@ enum class Mode {
   // to be validated in a non-prod environment.
 };
 
-typedef std::unique_ptr<envoy::admin::v2alpha::CommandLineOptions> CommandLineOptionsPtr;
+using CommandLineOptionsPtr = std::unique_ptr<envoy::admin::v2alpha::CommandLineOptions>;
 
 /**
  * General options for the server.
  */
 class Options {
 public:
-  virtual ~Options() {}
+  virtual ~Options() = default;
 
   /**
    * @return uint64_t the base ID for the server. This is required for system-wide things like
@@ -80,10 +80,20 @@ public:
   virtual const std::string& configYaml() const PURE;
 
   /**
-   * @return bool whether the config should only be parsed as v2. If false, when a v2 parse fails,
-   *              a second attempt to parse the config as v1 will be made.
+   * @return const envoy::config::bootstrap::v2::Bootstrap& a bootstrap proto object
+   * that merges into the config last, after configYaml and configPath.
    */
-  virtual bool v2ConfigOnly() const PURE;
+  virtual const envoy::config::bootstrap::v2::Bootstrap& configProto() const PURE;
+
+  /**
+   * @return bool allow unknown fields in the static configuration?
+   */
+  virtual bool allowUnknownStaticFields() const PURE;
+
+  /**
+   * @return bool allow unknown fields in the dynamic configuration?
+   */
+  virtual bool rejectUnknownDynamicFields() const PURE;
 
   /**
    * @return const std::string& the admin address output file.
@@ -111,6 +121,11 @@ public:
    * @return const std::string& the log format string.
    */
   virtual const std::string& logFormat() const PURE;
+
+  /**
+   * @return const bool indicating whether to escape c-style escape sequences in logs.
+   */
+  virtual bool logFormatEscaped() const PURE;
 
   /**
    * @return const std::string& the log file path.
@@ -155,17 +170,6 @@ public:
   virtual const std::string& serviceZone() const PURE;
 
   /**
-   * @return uint64_t the maximum number of stats gauges and counters.
-   */
-  virtual uint64_t maxStats() const PURE;
-
-  /**
-   * @return StatsOptions& the max stat name / suffix lengths for stats.
-   * router/cluster/listener.
-   */
-  virtual const Stats::StatsOptions& statsOptions() const PURE;
-
-  /**
    * @return bool indicating whether the hot restart functionality has been disabled via cli flags.
    */
   virtual bool hotRestartDisabled() const PURE;
@@ -179,6 +183,21 @@ public:
    * @return bool indicating whether mutex tracing functionality has been enabled.
    */
   virtual bool mutexTracingEnabled() const PURE;
+
+  /**
+   * @return whether to use the fake symbol table implementation.
+   */
+  virtual bool fakeSymbolTableEnabled() const PURE;
+
+  /**
+   * @return bool indicating whether cpuset size should determine the number of worker threads.
+   */
+  virtual bool cpusetThreadsEnabled() const PURE;
+
+  /**
+   * @return the names of extensions to disable.
+   */
+  virtual const std::vector<std::string>& disabledExtensions() const PURE;
 
   /**
    * Converts the Options in to CommandLineOptions proto message defined in server_info.proto.

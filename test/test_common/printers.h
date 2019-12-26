@@ -3,6 +3,8 @@
 #include <iostream>
 #include <memory>
 
+#include "envoy/network/address.h"
+
 namespace Envoy {
 namespace Http {
 /**
@@ -15,7 +17,7 @@ void PrintTo(const HeaderMapImpl& headers, std::ostream* os);
  * Pretty print const HeaderMapPtr&
  */
 class HeaderMap;
-typedef std::unique_ptr<HeaderMap> HeaderMapPtr;
+using HeaderMapPtr = std::unique_ptr<HeaderMap>;
 void PrintTo(const HeaderMap& headers, std::ostream* os);
 void PrintTo(const HeaderMapPtr& headers, std::ostream* os);
 } // namespace Http
@@ -33,4 +35,10 @@ void PrintTo(const Instance& buffer, std::ostream* os);
 class OwnedImpl;
 void PrintTo(const OwnedImpl& buffer, std::ostream* os);
 } // namespace Buffer
+
+namespace Network {
+namespace Address {
+void PrintTo(const Instance& address, std::ostream* os);
+}
+} // namespace Network
 } // namespace Envoy

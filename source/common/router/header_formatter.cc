@@ -13,7 +13,9 @@
 #include "common/json/json_loader.h"
 #include "common/stream_info/utility.h"
 
+#include "absl/strings/match.h"
 #include "absl/strings/str_cat.h"
+#include "absl/strings/str_join.h"
 #include "absl/types/optional.h"
 
 namespace Envoy {
@@ -117,7 +119,7 @@ parseUpstreamMetadataField(absl::string_view params_str) {
     default:
       // Unsupported type or null value.
       ENVOY_LOG_MISC(debug, "unsupported value type for metadata [{}]",
-                     StringUtil::join(params, ", "));
+                     absl::StrJoin(params, ", "));
       return std::string();
     }
   };
@@ -136,7 +138,7 @@ parsePerRequestStateField(absl::string_view param_str) {
     throw EnvoyException(formatPerRequestStateParseException(param_str));
   }
   modified_param_str = modified_param_str.substr(1, modified_param_str.size() - 2); // trim parens
-  if (modified_param_str.size() == 0) {
+  if (modified_param_str.empty()) {
     throw EnvoyException(formatPerRequestStateParseException(param_str));
   }
 
@@ -162,6 +164,58 @@ parsePerRequestStateField(absl::string_view param_str) {
   };
 }
 
+// Parses the parameter for REQ and returns a function suitable for accessing the specified
+// request header from an StreamInfo::StreamInfo. Expects a string formatted as:
+//   (<header_name>)
+std::function<std::string(const Envoy::StreamInfo::StreamInfo&)>
+parseRequestHeader(absl::string_view param) {
+  param = StringUtil::trim(param);
+  if (param.empty() || param.front() != '(') {
+    throw EnvoyException(fmt::format("Invalid header configuration. Expected format "
+                                     "REQ(<header-name>), actual format REQ{}",
+                                     param));
+  }
+  ASSERT(param.back() == ')');               // Ensured by header_parser.
+  param = param.substr(1, param.size() - 2); // Trim parens.
+  Http::LowerCaseString header_name{std::string(param)};
+  return [header_name](const Envoy::StreamInfo::StreamInfo& stream_info) -> std::string {
+    if (const auto* request_headers = stream_info.getRequestHeaders()) {
+      if (const auto* entry = request_headers->get(header_name)) {
+        return std::string(entry->value().getStringView());
+      }
+    }
+    return std::string();
+  };
+}
+
+// Helper that handles the case when the ConnectionInfo is missing or if the desired value is
+// empty.
+StreamInfoHeaderFormatter::FieldExtractor sslConnectionInfoStringHeaderExtractor(
+    std::function<std::string(const Ssl::ConnectionInfo& connection_info)> string_extractor) {
+  return [string_extractor](const StreamInfo::StreamInfo& stream_info) {
+    if (stream_info.downstreamSslConnection() == nullptr) {
+      return std::string();
+    }
+
+    return string_extractor(*stream_info.downstreamSslConnection());
+  };
+}
+
+// Helper that handles the case when the desired time field is empty.
+StreamInfoHeaderFormatter::FieldExtractor sslConnectionInfoStringTimeHeaderExtractor(
+    std::function<absl::optional<SystemTime>(const Ssl::ConnectionInfo& connection_info)>
+        time_extractor) {
+  return sslConnectionInfoStringHeaderExtractor(
+      [time_extractor](const Ssl::ConnectionInfo& connection_info) {
+        absl::optional<SystemTime> time = time_extractor(connection_info);
+        if (!time.has_value()) {
+          return std::string();
+        }
+
+        return AccessLogDateTimeFormatter::fromTime(time.value());
+      });
+}
+
 } // namespace
 
 StreamInfoHeaderFormatter::StreamInfoHeaderFormatter(absl::string_view field_name, bool append)
@@ -169,6 +223,10 @@ StreamInfoHeaderFormatter::StreamInfoHeaderFormatter(absl::string_view field_nam
   if (field_name == "PROTOCOL") {
     field_extractor_ = [](const Envoy::StreamInfo::StreamInfo& stream_info) {
       return Envoy::AccessLog::AccessLogFormatUtils::protocolToString(stream_info.protocol());
+    };
+  } else if (field_name == "DOWNSTREAM_REMOTE_ADDRESS") {
+    field_extractor_ = [](const StreamInfo::StreamInfo& stream_info) {
+      return stream_info.downstreamRemoteAddress()->asString();
     };
   } else if (field_name == "DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT") {
     field_extractor_ = [](const Envoy::StreamInfo::StreamInfo& stream_info) {
@@ -184,7 +242,75 @@ StreamInfoHeaderFormatter::StreamInfoHeaderFormatter(absl::string_view field_nam
       return StreamInfo::Utility::formatDownstreamAddressNoPort(
           *stream_info.downstreamLocalAddress());
     };
-  } else if (field_name.find("START_TIME") == 0) {
+  } else if (field_name == "DOWNSTREAM_PEER_URI_SAN") {
+    field_extractor_ =
+        sslConnectionInfoStringHeaderExtractor([](const Ssl::ConnectionInfo& connection_info) {
+          return absl::StrJoin(connection_info.uriSanPeerCertificate(), ",");
+        });
+  } else if (field_name == "DOWNSTREAM_LOCAL_URI_SAN") {
+    field_extractor_ =
+        sslConnectionInfoStringHeaderExtractor([](const Ssl::ConnectionInfo& connection_info) {
+          return absl::StrJoin(connection_info.uriSanLocalCertificate(), ",");
+        });
+  } else if (field_name == "DOWNSTREAM_PEER_ISSUER") {
+    field_extractor_ =
+        sslConnectionInfoStringHeaderExtractor([](const Ssl::ConnectionInfo& connection_info) {
+          return connection_info.issuerPeerCertificate();
+        });
+  } else if (field_name == "DOWNSTREAM_PEER_SUBJECT") {
+    field_extractor_ =
+        sslConnectionInfoStringHeaderExtractor([](const Ssl::ConnectionInfo& connection_info) {
+          return connection_info.subjectPeerCertificate();
+        });
+  } else if (field_name == "DOWNSTREAM_LOCAL_SUBJECT") {
+    field_extractor_ =
+        sslConnectionInfoStringHeaderExtractor([](const Ssl::ConnectionInfo& connection_info) {
+          return connection_info.subjectLocalCertificate();
+        });
+  } else if (field_name == "DOWNSTREAM_TLS_SESSION_ID") {
+    field_extractor_ = sslConnectionInfoStringHeaderExtractor(
+        [](const Ssl::ConnectionInfo& connection_info) { return connection_info.sessionId(); });
+  } else if (field_name == "DOWNSTREAM_TLS_CIPHER") {
+    field_extractor_ =
+        sslConnectionInfoStringHeaderExtractor([](const Ssl::ConnectionInfo& connection_info) {
+          return connection_info.ciphersuiteString();
+        });
+  } else if (field_name == "DOWNSTREAM_TLS_VERSION") {
+    field_extractor_ = sslConnectionInfoStringHeaderExtractor(
+        [](const Ssl::ConnectionInfo& connection_info) { return connection_info.tlsVersion(); });
+  } else if (field_name == "DOWNSTREAM_PEER_FINGERPRINT_256") {
+    field_extractor_ =
+        sslConnectionInfoStringHeaderExtractor([](const Ssl::ConnectionInfo& connection_info) {
+          return connection_info.sha256PeerCertificateDigest();
+        });
+  } else if (field_name == "DOWNSTREAM_PEER_SERIAL") {
+    field_extractor_ =
+        sslConnectionInfoStringHeaderExtractor([](const Ssl::ConnectionInfo& connection_info) {
+          return connection_info.serialNumberPeerCertificate();
+        });
+  } else if (field_name == "DOWNSTREAM_PEER_CERT") {
+    field_extractor_ =
+        sslConnectionInfoStringHeaderExtractor([](const Ssl::ConnectionInfo& connection_info) {
+          return connection_info.urlEncodedPemEncodedPeerCertificate();
+        });
+  } else if (field_name == "DOWNSTREAM_PEER_CERT_V_START") {
+    field_extractor_ =
+        sslConnectionInfoStringTimeHeaderExtractor([](const Ssl::ConnectionInfo& connection_info) {
+          return connection_info.validFromPeerCertificate();
+        });
+  } else if (field_name == "DOWNSTREAM_PEER_CERT_V_END") {
+    field_extractor_ =
+        sslConnectionInfoStringTimeHeaderExtractor([](const Ssl::ConnectionInfo& connection_info) {
+          return connection_info.expirationPeerCertificate();
+        });
+  } else if (field_name == "UPSTREAM_REMOTE_ADDRESS") {
+    field_extractor_ = [](const Envoy::StreamInfo::StreamInfo& stream_info) -> std::string {
+      if (stream_info.upstreamHost()) {
+        return stream_info.upstreamHost()->address()->asString();
+      }
+      return "";
+    };
+  } else if (absl::StartsWith(field_name, "START_TIME")) {
     const std::string pattern = fmt::format("%{}%", field_name);
     if (start_time_formatters_.find(pattern) == start_time_formatters_.end()) {
       start_time_formatters_.emplace(
@@ -200,12 +326,14 @@ StreamInfoHeaderFormatter::StreamInfoHeaderFormatter(absl::string_view field_nam
       }
       return formatted;
     };
-  } else if (field_name.find("UPSTREAM_METADATA") == 0) {
+  } else if (absl::StartsWith(field_name, "UPSTREAM_METADATA")) {
     field_extractor_ =
         parseUpstreamMetadataField(field_name.substr(STATIC_STRLEN("UPSTREAM_METADATA")));
-  } else if (field_name.find("PER_REQUEST_STATE") == 0) {
+  } else if (absl::StartsWith(field_name, "PER_REQUEST_STATE")) {
     field_extractor_ =
         parsePerRequestStateField(field_name.substr(STATIC_STRLEN("PER_REQUEST_STATE")));
+  } else if (absl::StartsWith(field_name, "REQ")) {
+    field_extractor_ = parseRequestHeader(field_name.substr(STATIC_STRLEN("REQ")));
   } else {
     throw EnvoyException(fmt::format("field '{}' not supported as custom header", field_name));
   }

@@ -16,7 +16,7 @@ namespace Configuration {
  */
 class TracerFactory {
 public:
-  virtual ~TracerFactory() {}
+  virtual ~TracerFactory() = default;
 
   /**
    * Create a particular HttpTracer implementation. If the implementation is unable to produce an
@@ -40,6 +40,13 @@ public:
    * factory.
    */
   virtual std::string name() PURE;
+
+  /**
+   * @return std::string the identifying category name for objects
+   * created by this factory. Used for automatic registration with
+   * FactoryCategoryRegistry.
+   */
+  static std::string category() { return "tracers"; }
 };
 
 } // namespace Configuration

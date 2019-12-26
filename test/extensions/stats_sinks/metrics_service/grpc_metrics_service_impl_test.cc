@@ -1,3 +1,5 @@
+#include "envoy/service/metrics/v2/metrics_service.pb.h"
+
 #include "extensions/stat_sinks/metrics_service/grpc_metrics_service_impl.h"
 
 #include "test/mocks/common.h"
@@ -12,38 +14,39 @@ using testing::_;
 using testing::InSequence;
 using testing::Invoke;
 using testing::NiceMock;
-using testing::Return;
 
 namespace Envoy {
 namespace Extensions {
 namespace StatSinks {
 namespace MetricsService {
+namespace {
 
 class GrpcMetricsStreamerImplTest : public testing::Test {
 public:
-  typedef Grpc::MockAsyncStream MockMetricsStream;
-  typedef Grpc::TypedAsyncStreamCallbacks<envoy::service::metrics::v2::StreamMetricsResponse>
-      MetricsServiceCallbacks;
+  using MockMetricsStream = Grpc::MockAsyncStream;
+  using MetricsServiceCallbacks =
+      Grpc::AsyncStreamCallbacks<envoy::service::metrics::v2::StreamMetricsResponse>;
 
   GrpcMetricsStreamerImplTest() {
     EXPECT_CALL(*factory_, create()).WillOnce(Invoke([this] {
-      return Grpc::AsyncClientPtr{async_client_};
+      return Grpc::RawAsyncClientPtr{async_client_};
     }));
     streamer_ = std::make_unique<GrpcMetricsStreamerImpl>(Grpc::AsyncClientFactoryPtr{factory_},
                                                           local_info_);
   }
 
   void expectStreamStart(MockMetricsStream& stream, MetricsServiceCallbacks** callbacks_to_set) {
-    EXPECT_CALL(*async_client_, start(_, _))
-        .WillOnce(Invoke([&stream, callbacks_to_set](const Protobuf::MethodDescriptor&,
-                                                     Grpc::AsyncStreamCallbacks& callbacks) {
+    EXPECT_CALL(*async_client_, startRaw(_, _, _, _))
+        .WillOnce(Invoke([&stream, callbacks_to_set](absl::string_view, absl::string_view,
+                                                     Grpc::RawAsyncStreamCallbacks& callbacks,
+                                                     const Http::AsyncClient::StreamOptions&) {
           *callbacks_to_set = dynamic_cast<MetricsServiceCallbacks*>(&callbacks);
           return &stream;
         }));
   }
 
   LocalInfo::MockLocalInfo local_info_;
-  Grpc::MockAsyncClient* async_client_{new Grpc::MockAsyncClient};
+  Grpc::MockAsyncClient* async_client_{new NiceMock<Grpc::MockAsyncClient>};
   Grpc::MockAsyncClientFactory* factory_{new Grpc::MockAsyncClientFactory};
   std::unique_ptr<GrpcMetricsStreamerImpl> streamer_;
 };
@@ -57,7 +60,7 @@ TEST_F(GrpcMetricsStreamerImplTest, BasicFlow) {
   MetricsServiceCallbacks* callbacks1;
   expectStreamStart(stream1, &callbacks1);
   EXPECT_CALL(local_info_, node());
-  EXPECT_CALL(stream1, sendMessage(_, false));
+  EXPECT_CALL(stream1, sendMessageRaw_(_, false));
   envoy::service::metrics::v2::StreamMetricsMessage message_metrics1;
   streamer_->send(message_metrics1);
   // Verify that sending an empty response message doesn't do anything bad.
@@ -69,9 +72,10 @@ TEST_F(GrpcMetricsStreamerImplTest, BasicFlow) {
 TEST_F(GrpcMetricsStreamerImplTest, StreamFailure) {
   InSequence s;
 
-  EXPECT_CALL(*async_client_, start(_, _))
+  EXPECT_CALL(*async_client_, startRaw(_, _, _, _))
       .WillOnce(
-          Invoke([](const Protobuf::MethodDescriptor&, Grpc::AsyncStreamCallbacks& callbacks) {
+          Invoke([](absl::string_view, absl::string_view, Grpc::RawAsyncStreamCallbacks& callbacks,
+                    const Http::AsyncClient::StreamOptions&) {
             callbacks.onRemoteClose(Grpc::Status::Internal, "bad");
             return nullptr;
           }));
@@ -90,7 +94,7 @@ class TestGrpcMetricsStreamer : public GrpcMetricsStreamer {
 public:
   int metric_count;
   // GrpcMetricsStreamer
-  void send(envoy::service::metrics::v2::StreamMetricsMessage& message) {
+  void send(envoy::service::metrics::v2::StreamMetricsMessage& message) override {
     metric_count = message.envoy_metrics_size();
   }
 };
@@ -98,7 +102,7 @@ public:
 class MetricsServiceSinkTest : public testing::Test {};
 
 TEST(MetricsServiceSinkTest, CheckSendCall) {
-  NiceMock<Stats::MockSource> source;
+  NiceMock<Stats::MockMetricSnapshot> snapshot;
   Event::SimulatedTimeSystem time_system;
   std::shared_ptr<MockGrpcMetricsStreamer> streamer_{new MockGrpcMetricsStreamer()};
 
@@ -108,13 +112,13 @@ TEST(MetricsServiceSinkTest, CheckSendCall) {
   counter->name_ = "test_counter";
   counter->latch_ = 1;
   counter->used_ = true;
-  source.counters_.push_back(counter);
+  snapshot.counters_.push_back({1, *counter});
 
   auto gauge = std::make_shared<NiceMock<Stats::MockGauge>>();
   gauge->name_ = "test_gauge";
   gauge->value_ = 1;
   gauge->used_ = true;
-  source.gauges_.push_back(gauge);
+  snapshot.gauges_.push_back(*gauge);
 
   auto histogram = std::make_shared<NiceMock<Stats::MockParentHistogram>>();
   histogram->name_ = "test_histogram";
@@ -122,11 +126,11 @@ TEST(MetricsServiceSinkTest, CheckSendCall) {
 
   EXPECT_CALL(*streamer_, send(_));
 
-  sink.flush(source);
+  sink.flush(snapshot);
 }
 
 TEST(MetricsServiceSinkTest, CheckStatsCount) {
-  NiceMock<Stats::MockSource> source;
+  NiceMock<Stats::MockMetricSnapshot> snapshot;
   Event::SimulatedTimeSystem time_system;
   std::shared_ptr<TestGrpcMetricsStreamer> streamer_{new TestGrpcMetricsStreamer()};
 
@@ -136,23 +140,24 @@ TEST(MetricsServiceSinkTest, CheckStatsCount) {
   counter->name_ = "test_counter";
   counter->latch_ = 1;
   counter->used_ = true;
-  source.counters_.push_back(counter);
+  snapshot.counters_.push_back({1, *counter});
 
   auto gauge = std::make_shared<NiceMock<Stats::MockGauge>>();
   gauge->name_ = "test_gauge";
   gauge->value_ = 1;
   gauge->used_ = true;
-  source.gauges_.push_back(gauge);
+  snapshot.gauges_.push_back(*gauge);
 
-  sink.flush(source);
+  sink.flush(snapshot);
   EXPECT_EQ(2, (*streamer_).metric_count);
 
   // Verify only newly added metrics come after endFlush call.
   gauge->used_ = false;
-  sink.flush(source);
+  sink.flush(snapshot);
   EXPECT_EQ(1, (*streamer_).metric_count);
 }
 
+} // namespace
 } // namespace MetricsService
 } // namespace StatSinks
 } // namespace Extensions

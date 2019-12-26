@@ -1,3 +1,6 @@
+#include "envoy/config/bootstrap/v2/bootstrap.pb.h"
+#include "envoy/config/overload/v2alpha/overload.pb.h"
+
 #include "test/integration/http_protocol_integration.h"
 
 #include "absl/strings/str_cat.h"
@@ -18,7 +21,8 @@ protected:
           nanos: 1000000
         resource_monitors:
           - name: "envoy.resource_monitors.injected_resource"
-            config:
+            typed_config:
+              "@type": type.googleapis.com/envoy.config.resource_monitor.injected_resource.v2alpha.InjectedResourceConfig
               filename: "{}"
         actions:
           - name: "envoy.overload_actions.stop_accepting_requests"
@@ -52,9 +56,9 @@ protected:
   AtomicFileUpdater file_updater_;
 };
 
-INSTANTIATE_TEST_CASE_P(Protocols, OverloadIntegrationTest,
-                        testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams()),
-                        HttpProtocolIntegrationTest::protocolTestParamsToString);
+INSTANTIATE_TEST_SUITE_P(Protocols, OverloadIntegrationTest,
+                         testing::ValuesIn(HttpProtocolIntegrationTest::getProtocolTestParams()),
+                         HttpProtocolIntegrationTest::protocolTestParamsToString);
 
 TEST_P(OverloadIntegrationTest, CloseStreamsWhenOverloaded) {
   initialize();
@@ -72,7 +76,7 @@ TEST_P(OverloadIntegrationTest, CloseStreamsWhenOverloaded) {
   response->waitForEndStream();
 
   EXPECT_TRUE(response->complete());
-  EXPECT_STREQ("503", response->headers().Status()->value().c_str());
+  EXPECT_EQ("503", response->headers().Status()->value().getStringView());
   EXPECT_EQ("envoy overloaded", response->body());
   codec_client_->close();
 
@@ -81,7 +85,7 @@ TEST_P(OverloadIntegrationTest, CloseStreamsWhenOverloaded) {
   response->waitForEndStream();
 
   EXPECT_TRUE(response->complete());
-  EXPECT_STREQ("503", response->headers().Status()->value().c_str());
+  EXPECT_EQ("503", response->headers().Status()->value().getStringView());
   EXPECT_EQ("envoy overloaded", response->body());
   codec_client_->close();
 
@@ -95,7 +99,7 @@ TEST_P(OverloadIntegrationTest, CloseStreamsWhenOverloaded) {
   EXPECT_TRUE(upstream_request_->complete());
   EXPECT_EQ(0U, upstream_request_->bodyLength());
   EXPECT_TRUE(response->complete());
-  EXPECT_STREQ("200", response->headers().Status()->value().c_str());
+  EXPECT_EQ("200", response->headers().Status()->value().getStringView());
   EXPECT_EQ(0U, response->body().size());
 }
 
@@ -118,8 +122,8 @@ TEST_P(OverloadIntegrationTest, DisableKeepaliveWhenOverloaded) {
   codec_client_->waitForDisconnect();
 
   EXPECT_TRUE(response->complete());
-  EXPECT_STREQ("200", response->headers().Status()->value().c_str());
-  EXPECT_STREQ("close", response->headers().Connection()->value().c_str());
+  EXPECT_EQ("200", response->headers().Status()->value().getStringView());
+  EXPECT_EQ("close", response->headers().Connection()->value().getStringView());
 
   // Deactivate overload state and check that keepalive is not disabled
   updateResource(0.7);
@@ -129,7 +133,7 @@ TEST_P(OverloadIntegrationTest, DisableKeepaliveWhenOverloaded) {
   response = sendRequestAndWaitForResponse(request_headers, 1, default_response_headers_, 1);
 
   EXPECT_TRUE(response->complete());
-  EXPECT_STREQ("200", response->headers().Status()->value().c_str());
+  EXPECT_EQ("200", response->headers().Status()->value().getStringView());
   EXPECT_EQ(nullptr, response->headers().Connection());
 }
 
@@ -156,7 +160,7 @@ TEST_P(OverloadIntegrationTest, StopAcceptingConnectionsWhenOverloaded) {
   response->waitForEndStream();
 
   EXPECT_TRUE(response->complete());
-  EXPECT_STREQ("503", response->headers().Status()->value().c_str());
+  EXPECT_EQ("503", response->headers().Status()->value().getStringView());
   EXPECT_EQ("envoy overloaded", response->body());
   codec_client_->close();
 }

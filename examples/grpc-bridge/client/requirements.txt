@@ -1,2 +1,4 @@
-requests>=2.20.0
+requests>=2.22.0
 grpcio
+grpcio-tools
+protobuf==3.10.0

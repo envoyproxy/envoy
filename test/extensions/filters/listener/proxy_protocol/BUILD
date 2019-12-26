@@ -19,6 +19,7 @@ envoy_extension_cc_test(
         "//source/common/buffer:buffer_lib",
         "//source/common/event:dispatcher_includes",
         "//source/common/event:dispatcher_lib",
+        "//source/common/network:connection_balancer_lib",
         "//source/common/network:listener_lib",
         "//source/common/network:utility_lib",
         "//source/common/stats:stats_lib",
@@ -32,5 +33,6 @@ envoy_extension_cc_test(
         "//test/test_common:network_utility_lib",
         "//test/test_common:threadsafe_singleton_injector_lib",
         "//test/test_common:utility_lib",
+        "@envoy_api//envoy/api/v2/core:pkg_cc_proto",
     ],
 )

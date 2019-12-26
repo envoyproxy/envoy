@@ -14,6 +14,16 @@ virtual_hosts:
   require_tls: EXTERNAL_ONLY
   routes:
     - match:
+        prefix: /pretest
+      route:
+        prefix_rewrite: /pre/test
+        cluster: www2
+    - match:
+        prefix: /secondtest
+      route:
+        prefix_rewrite: /second/test
+        cluster: www2
+    - match:
         prefix: /
       route:
         cluster: www2
@@ -25,7 +35,6 @@ virtual_hosts:
         prefix: /foo
       redirect:
         host_redirect: new.lyft.com
-
     - match:
         prefix: /bar
       redirect:

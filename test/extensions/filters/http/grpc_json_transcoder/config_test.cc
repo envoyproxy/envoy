@@ -1,3 +1,4 @@
+#include "envoy/config/filter/http/transcoder/v2/transcoder.pb.h"
 #include "envoy/config/filter/http/transcoder/v2/transcoder.pb.validate.h"
 
 #include "extensions/filters/http/grpc_json_transcoder/config.h"
@@ -11,6 +12,7 @@ namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace GrpcJsonTranscoder {
+namespace {
 
 TEST(GrpcJsonTranscoderFilterConfigTest, ValidateFail) {
   NiceMock<Server::Configuration::MockFactoryContext> context;
@@ -20,6 +22,7 @@ TEST(GrpcJsonTranscoderFilterConfigTest, ValidateFail) {
       ProtoValidationException);
 }
 
+} // namespace
 } // namespace GrpcJsonTranscoder
 } // namespace HttpFilters
 } // namespace Extensions

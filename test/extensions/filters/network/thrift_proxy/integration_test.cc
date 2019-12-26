@@ -1,3 +1,5 @@
+#include "envoy/config/bootstrap/v2/bootstrap.pb.h"
+
 #include "extensions/filters/network/thrift_proxy/buffer_helper.h"
 
 #include "test/extensions/filters/network/thrift_proxy/integration.h"
@@ -7,8 +9,8 @@
 #include "gtest/gtest.h"
 
 using testing::Combine;
-using testing::TestParamInfo;
-using testing::TestWithParam;
+using testing::HasSubstr;
+using ::testing::TestParamInfo;
 using testing::Values;
 
 namespace Envoy {
@@ -17,15 +19,16 @@ namespace NetworkFilters {
 namespace ThriftProxy {
 
 class ThriftConnManagerIntegrationTest
-    : public BaseThriftIntegrationTest,
-      public TestWithParam<std::tuple<TransportType, ProtocolType, bool>> {
+    : public testing::TestWithParam<std::tuple<TransportType, ProtocolType, bool>>,
+      public BaseThriftIntegrationTest {
 public:
-  static void SetUpTestCase() {
+  static void SetUpTestSuite() {
     thrift_config_ = ConfigHelper::BASE_CONFIG + R"EOF(
     filter_chains:
       filters:
         - name: envoy.filters.network.thrift_proxy
-          config:
+          typed_config:
+            "@type": type.googleapis.com/envoy.config.filter.network.thrift_proxy.v2alpha1.ThriftProxy
             stat_prefix: thrift_stats
             route_config:
               name: "routes"
@@ -40,7 +43,9 @@ public:
                     - name: "x-header-1"
                       exact_match: "x-value-1"
                     - name: "x-header-2"
-                      regex_match: "0.[5-9]"
+                      safe_regex_match:
+                        google_re2: {}
+                        regex: "0.[5-9]"
                     - name: "x-header-3"
                       range_match:
                         start: 100
@@ -165,7 +170,7 @@ paramToString(const TestParamInfo<std::tuple<TransportType, ProtocolType, bool>>
   return fmt::format("{}{}", transport_name, protocol_name);
 }
 
-INSTANTIATE_TEST_CASE_P(
+INSTANTIATE_TEST_SUITE_P(
     TransportAndProtocol, ThriftConnManagerIntegrationTest,
     Combine(Values(TransportType::Framed, TransportType::Unframed, TransportType::Header),
             Values(ProtocolType::Binary, ProtocolType::Compact), Values(false, true)),
@@ -299,6 +304,37 @@ TEST_P(ThriftConnManagerIntegrationTest, EarlyCloseWithUpstream) {
   EXPECT_EQ(1U, counter->value());
 }
 
+// Regression test for https://github.com/envoyproxy/envoy/issues/9037.
+TEST_P(ThriftConnManagerIntegrationTest, EarlyUpstreamClose) {
+  initializeCall(DriverMode::Success);
+
+  const std::string partial_request =
+      request_bytes_.toString().substr(0, request_bytes_.length() - 5);
+
+  IntegrationTcpClientPtr tcp_client = makeTcpConnection(lookupPort("listener_0"));
+  tcp_client->write(request_bytes_.toString());
+
+  FakeUpstream* expected_upstream = getExpectedUpstream(false);
+  FakeRawConnectionPtr fake_upstream_connection;
+  ASSERT_TRUE(expected_upstream->waitForRawConnection(fake_upstream_connection));
+
+  std::string data;
+  ASSERT_TRUE(fake_upstream_connection->waitForData(request_bytes_.length(), &data));
+  Buffer::OwnedImpl upstream_request(data);
+  EXPECT_EQ(request_bytes_.toString(), upstream_request.toString());
+
+  ASSERT_TRUE(fake_upstream_connection->close());
+
+  tcp_client->waitForDisconnect();
+
+  EXPECT_THAT(tcp_client->data(), HasSubstr("connection failure"));
+
+  Stats::CounterSharedPtr counter = test_server_->counter("thrift.thrift_stats.request_call");
+  EXPECT_EQ(1U, counter->value());
+  counter = test_server_->counter("thrift.thrift_stats.response_exception");
+  EXPECT_EQ(1U, counter->value());
+}
+
 TEST_P(ThriftConnManagerIntegrationTest, Oneway) {
   initializeOneway();
 
@@ -364,10 +400,10 @@ TEST_P(ThriftConnManagerIntegrationTest, OnewayEarlyClosePartialRequest) {
 
 class ThriftTwitterConnManagerIntegrationTest : public ThriftConnManagerIntegrationTest {};
 
-INSTANTIATE_TEST_CASE_P(FramedTwitter, ThriftTwitterConnManagerIntegrationTest,
-                        Combine(Values(TransportType::Framed), Values(ProtocolType::Twitter),
-                                Values(false, true)),
-                        paramToString);
+INSTANTIATE_TEST_SUITE_P(FramedTwitter, ThriftTwitterConnManagerIntegrationTest,
+                         Combine(Values(TransportType::Framed), Values(ProtocolType::Twitter),
+                                 Values(false, true)),
+                         paramToString);
 
 // Because of the protocol upgrade requests and the difficulty of separating them, we test this
 // protocol independently.

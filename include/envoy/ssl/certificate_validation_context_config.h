@@ -5,13 +5,14 @@
 #include <vector>
 
 #include "envoy/common/pure.h"
+#include "envoy/type/matcher/string.pb.h"
 
 namespace Envoy {
 namespace Ssl {
 
 class CertificateValidationContextConfig {
 public:
-  virtual ~CertificateValidationContextConfig() {}
+  virtual ~CertificateValidationContextConfig() = default;
 
   /**
    * @return The CA certificate to use for peer validation.
@@ -36,9 +37,15 @@ public:
   virtual const std::string& certificateRevocationListPath() const PURE;
 
   /**
-   * @return The subject alt names to be verified, if enabled. Otherwise, ""
+   * @return The subject alt names to be verified, if enabled.
    */
   virtual const std::vector<std::string>& verifySubjectAltNameList() const PURE;
+
+  /**
+   * @return The subject alt name matchers to be verified, if enabled.
+   */
+  virtual const std::vector<::envoy::type::matcher::StringMatcher>&
+  subjectAltNameMatchers() const PURE;
 
   /**
    * @return A list of a hex-encoded SHA-256 certificate hashes to be verified.
@@ -56,7 +63,7 @@ public:
   virtual bool allowExpiredCertificate() const PURE;
 };
 
-typedef std::unique_ptr<CertificateValidationContextConfig> CertificateValidationContextConfigPtr;
+using CertificateValidationContextConfigPtr = std::unique_ptr<CertificateValidationContextConfig>;
 
 } // namespace Ssl
 } // namespace Envoy

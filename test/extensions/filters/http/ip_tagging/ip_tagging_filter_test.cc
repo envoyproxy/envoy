@@ -1,7 +1,8 @@
 #include <memory>
 
+#include "envoy/config/filter/http/ip_tagging/v3alpha/ip_tagging.pb.h"
+
 #include "common/buffer/buffer_impl.h"
-#include "common/config/filter_json.h"
 #include "common/http/header_map_impl.h"
 #include "common/network/address_impl.h"
 #include "common/network/utility.h"
@@ -16,7 +17,6 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-using testing::_;
 using testing::Return;
 using testing::ReturnRef;
 
@@ -24,6 +24,7 @@ namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace IpTagging {
+namespace {
 
 class IpTaggingFilterTest : public testing::Test {
 public:
@@ -42,20 +43,20 @@ ip_tags:
 )EOF";
 
   void initializeFilter(const std::string& yaml) {
-    envoy::config::filter::http::ip_tagging::v2::IPTagging config;
-    MessageUtil::loadFromYaml(yaml, config);
+    envoy::config::filter::http::ip_tagging::v3alpha::IPTagging config;
+    TestUtility::loadFromYaml(yaml, config);
     config_.reset(new IpTaggingFilterConfig(config, "prefix.", stats_, runtime_));
     filter_ = std::make_unique<IpTaggingFilter>(config_);
     filter_->setDecoderFilterCallbacks(filter_callbacks_);
   }
 
-  ~IpTaggingFilterTest() { filter_->onDestroy(); }
+  ~IpTaggingFilterTest() override { filter_->onDestroy(); }
 
+  NiceMock<Stats::MockStore> stats_;
   IpTaggingFilterConfigSharedPtr config_;
   std::unique_ptr<IpTaggingFilter> filter_;
   NiceMock<Http::MockStreamDecoderFilterCallbacks> filter_callbacks_;
   Buffer::OwnedImpl data_;
-  NiceMock<Stats::MockStore> stats_;
   NiceMock<Runtime::MockLoader> runtime_;
 };
 
@@ -280,6 +281,7 @@ TEST_F(IpTaggingFilterTest, ClearRouteCache) {
   EXPECT_FALSE(request_headers.has(Http::Headers::get().EnvoyIpTags));
 }
 
+} // namespace
 } // namespace IpTagging
 } // namespace HttpFilters
 } // namespace Extensions

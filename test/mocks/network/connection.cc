@@ -9,8 +9,8 @@ using testing::ReturnRef;
 namespace Envoy {
 namespace Network {
 
-MockConnectionCallbacks::MockConnectionCallbacks() {}
-MockConnectionCallbacks::~MockConnectionCallbacks() {}
+MockConnectionCallbacks::MockConnectionCallbacks() = default;
+MockConnectionCallbacks::~MockConnectionCallbacks() = default;
 
 uint64_t MockConnectionBase::next_id_;
 
@@ -79,7 +79,7 @@ MockConnection::MockConnection() {
   remote_address_ = Utility::resolveUrl("tcp://10.0.0.3:50000");
   initializeMockConnection(*this);
 }
-MockConnection::~MockConnection() {}
+MockConnection::~MockConnection() = default;
 
 MockClientConnection::MockClientConnection() {
   remote_address_ = Utility::resolveUrl("tcp://10.0.0.1:443");
@@ -87,7 +87,18 @@ MockClientConnection::MockClientConnection() {
   initializeMockConnection(*this);
 }
 
-MockClientConnection::~MockClientConnection() {}
+MockClientConnection::~MockClientConnection() = default;
+
+MockFilterManagerConnection::MockFilterManagerConnection() {
+  remote_address_ = Utility::resolveUrl("tcp://10.0.0.3:50000");
+  initializeMockConnection(*this);
+
+  // The real implementation will move the buffer data into the socket.
+  ON_CALL(*this, rawWrite(_, _)).WillByDefault(Invoke([](Buffer::Instance& buffer, bool) -> void {
+    buffer.drain(buffer.length());
+  }));
+}
+MockFilterManagerConnection::~MockFilterManagerConnection() = default;
 
 } // namespace Network
 } // namespace Envoy

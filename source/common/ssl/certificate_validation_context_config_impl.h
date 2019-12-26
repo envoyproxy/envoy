@@ -2,6 +2,7 @@
 
 #include <string>
 
+#include "envoy/api/api.h"
 #include "envoy/api/v2/auth/cert.pb.h"
 #include "envoy/ssl/certificate_validation_context_config.h"
 
@@ -11,7 +12,7 @@ namespace Ssl {
 class CertificateValidationContextConfigImpl : public CertificateValidationContextConfig {
 public:
   CertificateValidationContextConfigImpl(
-      const envoy::api::v2::auth::CertificateValidationContext& config);
+      const envoy::api::v2::auth::CertificateValidationContext& config, Api::Api& api);
 
   const std::string& caCert() const override { return ca_cert_; }
   const std::string& caCertPath() const override { return ca_cert_path_; }
@@ -23,6 +24,10 @@ public:
   }
   const std::vector<std::string>& verifySubjectAltNameList() const override {
     return verify_subject_alt_name_list_;
+  }
+  const std::vector<::envoy::type::matcher::StringMatcher>&
+  subjectAltNameMatchers() const override {
+    return subject_alt_name_matchers_;
   }
   const std::vector<std::string>& verifyCertificateHashList() const override {
     return verify_certificate_hash_list_;
@@ -38,6 +43,7 @@ private:
   const std::string certificate_revocation_list_;
   const std::string certificate_revocation_list_path_;
   const std::vector<std::string> verify_subject_alt_name_list_;
+  const std::vector<::envoy::type::matcher::StringMatcher> subject_alt_name_matchers_;
   const std::vector<std::string> verify_certificate_hash_list_;
   const std::vector<std::string> verify_certificate_spki_list_;
   const bool allow_expired_certificate_;

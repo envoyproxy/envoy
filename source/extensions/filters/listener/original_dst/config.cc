@@ -35,9 +35,7 @@ public:
 /**
  * Static registration for the original dst filter. @see RegisterFactory.
  */
-static Registry::RegisterFactory<OriginalDstConfigFactory,
-                                 Server::Configuration::NamedListenerFilterConfigFactory>
-    registered_;
+REGISTER_FACTORY(OriginalDstConfigFactory, Server::Configuration::NamedListenerFilterConfigFactory);
 
 } // namespace OriginalDst
 } // namespace ListenerFilters

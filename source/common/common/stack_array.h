@@ -7,7 +7,7 @@
 #include <alloca.h>
 #endif
 
-#include <stddef.h>
+#include <cstddef>
 
 #include "common/common/assert.h"
 

@@ -1,9 +1,7 @@
 #pragma once
 
-#include <netinet/in.h>
-#include <netinet/ip.h>
-#include <sys/socket.h>
-
+#include "envoy/api/v2/core/base.pb.h"
+#include "envoy/common/platform.h"
 #include "envoy/network/listen_socket.h"
 
 #include "common/common/logger.h"
@@ -20,8 +18,8 @@ public:
   AddrFamilyAwareSocketOptionImpl(envoy::api::v2::core::SocketOption::SocketState in_state,
                                   SocketOptionName ipv4_optname, SocketOptionName ipv6_optname,
                                   int value)
-      : ipv4_option_(absl::make_unique<SocketOptionImpl>(in_state, ipv4_optname, value)),
-        ipv6_option_(absl::make_unique<SocketOptionImpl>(in_state, ipv6_optname, value)) {}
+      : ipv4_option_(std::make_unique<SocketOptionImpl>(in_state, ipv4_optname, value)),
+        ipv6_option_(std::make_unique<SocketOptionImpl>(in_state, ipv6_optname, value)) {}
 
   // Socket::Option
   bool setOption(Socket& socket,

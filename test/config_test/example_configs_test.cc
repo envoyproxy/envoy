@@ -5,25 +5,28 @@
 #include "gtest/gtest.h"
 
 namespace Envoy {
-TEST(ExampleConfigsTest, All) {
+TEST(ExampleConfigsTest, DEPRECATED_FEATURE_TEST(All)) {
   TestEnvironment::exec(
       {TestEnvironment::runfilesPath("test/config_test/example_configs_test_setup.sh")});
 
   // Change working directory, otherwise we won't be able to read files using relative paths.
+#ifdef PATH_MAX
   char cwd[PATH_MAX];
+#else
+  char cwd[1024];
+#endif
   const std::string& directory = TestEnvironment::temporaryDirectory() + "/test/config_test";
-  RELEASE_ASSERT(::getcwd(cwd, PATH_MAX) != nullptr, "");
+  RELEASE_ASSERT(::getcwd(cwd, sizeof(cwd)) != nullptr, "");
   RELEASE_ASSERT(::chdir(directory.c_str()) == 0, "");
 
 #ifdef __APPLE__
-  // freebind/freebind.yaml is not supported on OS X and disabled via Bazel.
-  EXPECT_EQ(31UL, ConfigTest::run(directory));
+  // freebind/freebind.yaml is not supported on macOS and disabled via Bazel.
+  EXPECT_EQ(20UL, ConfigTest::run(directory));
 #else
-  EXPECT_EQ(32UL, ConfigTest::run(directory));
+  EXPECT_EQ(21UL, ConfigTest::run(directory));
 #endif
 
   ConfigTest::testMerge();
-  ConfigTest::testIncompatibleMerge();
 
   // Return to the original working directory, otherwise "bazel.coverage" breaks (...but why?).
   RELEASE_ASSERT(::chdir(cwd) == 0, "");

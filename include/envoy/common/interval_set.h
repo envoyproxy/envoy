@@ -15,9 +15,9 @@ namespace Envoy {
  */
 template <typename Value> class IntervalSet {
 public:
-  virtual ~IntervalSet() {}
+  virtual ~IntervalSet() = default;
 
-  typedef std::pair<Value, Value> Interval;
+  using Interval = std::pair<Value, Value>;
 
   /**
    * Inserts a new interval into the set, merging any overlaps. The intervals are in

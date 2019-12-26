@@ -1,5 +1,7 @@
 #include "extensions/filters/http/common/jwks_fetcher.h"
 
+#include "envoy/api/v2/core/http_uri.pb.h"
+
 #include "common/common/enum_to_int.h"
 #include "common/http/headers.h"
 #include "common/http/utility.h"
@@ -18,9 +20,9 @@ class JwksFetcherImpl : public JwksFetcher,
 public:
   JwksFetcherImpl(Upstream::ClusterManager& cm) : cm_(cm) { ENVOY_LOG(trace, "{}", __func__); }
 
-  ~JwksFetcherImpl() { cancel(); }
+  ~JwksFetcherImpl() override { cancel(); }
 
-  void cancel() {
+  void cancel() override {
     if (request_ && !complete_) {
       request_->cancel();
       ENVOY_LOG(debug, "fetch pubkey [uri = {}]: canceled", uri_->uri());
@@ -28,23 +30,40 @@ public:
     reset();
   }
 
-  void fetch(const ::envoy::api::v2::core::HttpUri& uri, JwksFetcher::JwksReceiver& receiver) {
+  void fetch(const ::envoy::api::v2::core::HttpUri& uri, Tracing::Span& parent_span,
+             JwksFetcher::JwksReceiver& receiver) override {
     ENVOY_LOG(trace, "{}", __func__);
     ASSERT(!receiver_);
+
     complete_ = false;
     receiver_ = &receiver;
     uri_ = &uri;
+
+    // Check if cluster is configured, fail the request if not.
+    // Otherwise cm_.httpAsyncClientForCluster will throw exception.
+    if (cm_.get(uri.cluster()) == nullptr) {
+      ENVOY_LOG(error, "{}: fetch pubkey [uri = {}] failed: [cluster = {}] is not configured",
+                __func__, uri.uri(), uri.cluster());
+      complete_ = true;
+      receiver_->onJwksError(JwksFetcher::JwksReceiver::Failure::Network);
+      reset();
+      return;
+    }
+
     Http::MessagePtr message = Http::Utility::prepareHeaders(uri);
-    message->headers().insertMethod().value().setReference(Http::Headers::get().MethodValues.Get);
+    message->headers().setReferenceMethod(Http::Headers::get().MethodValues.Get);
     ENVOY_LOG(debug, "fetch pubkey from [uri = {}]: start", uri_->uri());
-    request_ = cm_.httpAsyncClientForCluster(uri.cluster())
-                   .send(std::move(message), *this,
-                         Http::AsyncClient::RequestOptions().setTimeout(std::chrono::milliseconds(
-                             DurationUtil::durationToMilliseconds(uri.timeout()))));
+    auto options = Http::AsyncClient::RequestOptions()
+                       .setTimeout(std::chrono::milliseconds(
+                           DurationUtil::durationToMilliseconds(uri.timeout())))
+                       .setParentSpan(parent_span)
+                       .setChildSpanName("JWT Remote PubKey Fetch");
+    request_ =
+        cm_.httpAsyncClientForCluster(uri.cluster()).send(std::move(message), *this, options);
   }
 
   // HTTP async receive methods
-  void onSuccess(Http::MessagePtr&& response) {
+  void onSuccess(Http::MessagePtr&& response) override {
     ENVOY_LOG(trace, "{}", __func__);
     complete_ = true;
     const uint64_t status_code = Http::Utility::getResponseStatus(response->headers());
@@ -74,7 +93,7 @@ public:
     reset();
   }
 
-  void onFailure(Http::AsyncClient::FailureReason reason) {
+  void onFailure(Http::AsyncClient::FailureReason reason) override {
     ENVOY_LOG(debug, "{}: fetch pubkey [uri = {}]: network error {}", __func__, uri_->uri(),
               enumToInt(reason));
     complete_ = true;

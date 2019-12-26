@@ -10,7 +10,7 @@ DateFormatter DateProviderImplBase::date_formatter_("%a, %d %b %Y %H:%M:%S GMT")
 
 TlsCachingDateProviderImpl::TlsCachingDateProviderImpl(Event::Dispatcher& dispatcher,
                                                        ThreadLocal::SlotAllocator& tls)
-    : DateProviderImplBase(dispatcher.timeSystem()), tls_(tls.allocateSlot()),
+    : DateProviderImplBase(dispatcher.timeSource()), tls_(tls.allocateSlot()),
       refresh_timer_(dispatcher.createTimer([this]() -> void { onRefreshDate(); })) {
 
   onRefreshDate();
@@ -26,11 +26,11 @@ void TlsCachingDateProviderImpl::onRefreshDate() {
 }
 
 void TlsCachingDateProviderImpl::setDateHeader(HeaderMap& headers) {
-  headers.insertDate().value(tls_->getTyped<ThreadLocalCachedDate>().date_string_);
+  headers.setDate(tls_->getTyped<ThreadLocalCachedDate>().date_string_);
 }
 
 void SlowDateProviderImpl::setDateHeader(HeaderMap& headers) {
-  headers.insertDate().value(date_formatter_.now(time_source_));
+  headers.setDate(date_formatter_.now(time_source_));
 }
 
 } // namespace Http

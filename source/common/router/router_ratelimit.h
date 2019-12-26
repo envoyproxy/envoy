@@ -5,10 +5,10 @@
 #include <string>
 #include <vector>
 
+#include "envoy/api/v2/route/route.pb.h"
 #include "envoy/router/router.h"
 #include "envoy/router/router_ratelimit.h"
 
-#include "common/config/rds_json.h"
 #include "common/http/header_utility.h"
 
 namespace Envoy {
@@ -97,7 +97,7 @@ public:
 private:
   const std::string descriptor_value_;
   const bool expect_match_;
-  std::vector<Http::HeaderUtility::HeaderData> action_headers_;
+  const std::vector<Http::HeaderUtility::HeaderDataPtr> action_headers_;
 };
 
 /*

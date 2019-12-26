@@ -12,7 +12,7 @@ namespace Envoy {
  */
 template <class T> class LinkedObject {
 public:
-  typedef std::list<std::unique_ptr<T>> ListType;
+  using ListType = std::list<std::unique_ptr<T>>;
 
   /**
    * @return the list iterator for the object.
@@ -76,11 +76,11 @@ public:
   }
 
 protected:
-  LinkedObject() : inserted_(false) {}
+  LinkedObject() = default;
 
 private:
   typename ListType::iterator entry_;
-  bool inserted_; // iterators do not have any "invalid" value so we need this boolean for sanity
-                  // checking.
+  bool inserted_{false}; // iterators do not have any "invalid" value so we need this boolean for
+                         // sanity checking.
 };
 } // namespace Envoy

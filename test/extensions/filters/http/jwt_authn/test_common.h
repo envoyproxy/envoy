@@ -73,7 +73,7 @@ providers:
         uri: https://pubkey_server/pubkey_path
         cluster: pubkey_cluster
         timeout:
-          seconds: 5 
+          seconds: 5
       cache_duration:
         seconds: 600
     forward_payload_header: sec-istio-auth-userinfo
@@ -82,6 +82,7 @@ rules:
     path: "/"
   requires:
     provider_name: "example_provider"
+bypass_cors_preflight: true
 )";
 
 // The name of provider for above config.

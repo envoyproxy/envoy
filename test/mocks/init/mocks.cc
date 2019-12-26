@@ -1,33 +1,32 @@
-#include "mocks.h"
-
-#include <functional>
-
-#include "gmock/gmock.h"
-#include "gtest/gtest.h"
-
-using testing::_;
-using testing::Invoke;
+#include "test/mocks/init/mocks.h"
 
 namespace Envoy {
 namespace Init {
 
-MockTarget::MockTarget() {
-  ON_CALL(*this, initialize(_))
-      .WillByDefault(Invoke([this](std::function<void()> callback) -> void {
-        EXPECT_EQ(nullptr, callback_);
-        callback_ = callback;
-      }));
+using ::testing::Invoke;
+
+ExpectableWatcherImpl::ExpectableWatcherImpl(absl::string_view name)
+    : WatcherImpl(name, {[this]() { ready(); }}) {}
+::testing::internal::TypedExpectation<void()>& ExpectableWatcherImpl::expectReady() const {
+  return EXPECT_CALL(*this, ready());
 }
 
-MockTarget::~MockTarget() {}
-
-MockManager::MockManager() {
-  ON_CALL(*this, registerTarget(_)).WillByDefault(Invoke([this](Target& target) -> void {
-    targets_.push_back(&target);
-  }));
+ExpectableTargetImpl::ExpectableTargetImpl(absl::string_view name)
+    : TargetImpl(name, {[this]() { initialize(); }}) {}
+::testing::internal::TypedExpectation<void()>& ExpectableTargetImpl::expectInitialize() {
+  return EXPECT_CALL(*this, initialize());
+}
+::testing::internal::TypedExpectation<void()>&
+ExpectableTargetImpl::expectInitializeWillCallReady() {
+  return expectInitialize().WillOnce(Invoke([this]() { ready(); }));
 }
 
-MockManager::~MockManager() {}
-
+ExpectableSharedTargetImpl::ExpectableSharedTargetImpl(absl::string_view name)
+    : ExpectableSharedTargetImpl(name, [this]() { initialize(); }) {}
+ExpectableSharedTargetImpl::ExpectableSharedTargetImpl(absl::string_view name, InitializeFn fn)
+    : SharedTargetImpl(name, fn) {}
+::testing::internal::TypedExpectation<void()>& ExpectableSharedTargetImpl::expectInitialize() {
+  return EXPECT_CALL(*this, initialize());
+}
 } // namespace Init
 } // namespace Envoy

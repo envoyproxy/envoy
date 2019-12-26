@@ -21,14 +21,15 @@ public:
   static const char RESET_AFTER_REQUEST[];
 
   AutonomousStream(FakeHttpConnection& parent, Http::StreamEncoder& encoder,
-                   AutonomousUpstream& upstream);
-  ~AutonomousStream();
+                   AutonomousUpstream& upstream, bool allow_incomplete_streams);
+  ~AutonomousStream() override;
 
   void setEndStream(bool set) override;
 
 private:
   AutonomousUpstream& upstream_;
   void sendResponse();
+  const bool allow_incomplete_streams_{false};
 };
 
 // An upstream which creates AutonomousStreams for new incoming streams.
@@ -37,29 +38,40 @@ public:
   AutonomousHttpConnection(SharedConnectionWrapper& shared_connection, Stats::Store& store,
                            Type type, AutonomousUpstream& upstream);
 
-  Http::StreamDecoder& newStream(Http::StreamEncoder& response_encoder) override;
+  Http::StreamDecoder& newStream(Http::StreamEncoder& response_encoder, bool) override;
 
 private:
   AutonomousUpstream& upstream_;
   std::vector<FakeStreamPtr> streams_;
 };
 
-typedef std::unique_ptr<AutonomousHttpConnection> AutonomousHttpConnectionPtr;
+using AutonomousHttpConnectionPtr = std::unique_ptr<AutonomousHttpConnection>;
 
 // An upstream which creates AutonomousHttpConnection for new incoming connections.
 class AutonomousUpstream : public FakeUpstream {
 public:
-  AutonomousUpstream(uint32_t port, FakeHttpConnection::Type type,
-                     Network::Address::IpVersion version, Event::TestTimeSystem& time_system)
-      : FakeUpstream(port, type, version, time_system) {}
-  ~AutonomousUpstream();
+  AutonomousUpstream(const Network::Address::InstanceConstSharedPtr& address,
+                     FakeHttpConnection::Type type, Event::TestTimeSystem& time_system,
+                     bool allow_incomplete_streams)
+      : FakeUpstream(address, type, time_system),
+        allow_incomplete_streams_(allow_incomplete_streams) {}
+  AutonomousUpstream(Network::TransportSocketFactoryPtr&& transport_socket_factory, uint32_t port,
+                     FakeHttpConnection::Type type, Network::Address::IpVersion version,
+                     Event::TestTimeSystem& time_system, bool allow_incomplete_streams)
+      : FakeUpstream(std::move(transport_socket_factory), port, type, version, time_system),
+        allow_incomplete_streams_(allow_incomplete_streams) {}
+
+  ~AutonomousUpstream() override;
   bool
   createNetworkFilterChain(Network::Connection& connection,
                            const std::vector<Network::FilterFactoryCb>& filter_factories) override;
   bool createListenerFilterChain(Network::ListenerFilterManager& listener) override;
+  void createUdpListenerFilterChain(Network::UdpListenerFilterManager& listener,
+                                    Network::UdpReadFilterCallbacks& callbacks) override;
 
   void setLastRequestHeaders(const Http::HeaderMap& headers);
   std::unique_ptr<Http::TestHeaderMapImpl> lastRequestHeaders();
+  const bool allow_incomplete_streams_{false};
 
 private:
   Thread::MutexBasicLockable headers_lock_;

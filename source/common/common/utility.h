@@ -1,10 +1,7 @@
 #pragma once
 
-#include <strings.h>
-
 #include <chrono>
 #include <cstdint>
-#include <regex>
 #include <set>
 #include <sstream>
 #include <string>
@@ -16,12 +13,13 @@
 
 #include "common/common/assert.h"
 #include "common/common/hash.h"
+#include "common/common/non_copyable.h"
 
 #include "absl/strings/string_view.h"
 
 namespace Envoy {
 /**
- * Utility class for formatting dates given a strftime style format string.
+ * Utility class for formatting dates given an absl::FormatTime style format string.
  */
 class DateFormatter {
 public:
@@ -48,7 +46,7 @@ public:
 private:
   void parse(const std::string& format_string);
 
-  typedef std::vector<int32_t> SpecifierOffsets;
+  using SpecifierOffsets = std::vector<int32_t>;
   std::string fromTimeAndPrepareSpecifierOffsets(time_t time, SpecifierOffsets& specifier_offsets,
                                                  const std::string& seconds_str) const;
 
@@ -70,8 +68,9 @@ private:
     const size_t width_;
 
     // The string before the current specifier's position and after the previous found specifier. A
-    // segment may include strftime accepted specifiers. E.g. given "%3f-this-i%s-a-segment-%4f",
-    // the current specifier is "%4f" and the segment is "-this-i%s-a-segment-".
+    // segment may include absl::FormatTime accepted specifiers. E.g. given
+    // "%3f-this-i%s-a-segment-%4f", the current specifier is "%4f" and the segment is
+    // "-this-i%s-a-segment-".
     const std::string segment_;
 
     // As an indication that this specifier is a %s (expect to be replaced by seconds since the
@@ -145,35 +144,51 @@ public:
  */
 class StringUtil {
 public:
+  /**
+   * Callable struct that returns the result of string comparison ignoring case.
+   * @param lhs supplies the first string view.
+   * @param rhs supplies the second string view.
+   * @return true if strings are semantically the same and false otherwise.
+   */
+  struct CaseInsensitiveCompare {
+    // Enable heterogeneous lookup (https://abseil.io/tips/144)
+    using is_transparent = void; // NOLINT(readability-identifier-naming)
+    bool operator()(absl::string_view lhs, absl::string_view rhs) const;
+  };
+
+  /**
+   * Callable struct that returns the hash representation of a case-insensitive string_view input.
+   * @param key supplies the string view.
+   * @return uint64_t hash representation of the supplied string view.
+   */
+  struct CaseInsensitiveHash {
+    // Enable heterogeneous lookup (https://abseil.io/tips/144)
+    using is_transparent = void; // NOLINT(readability-identifier-naming)
+    uint64_t operator()(absl::string_view key) const;
+  };
+
+  /**
+   * Definition of unordered set of case-insensitive std::string.
+   */
+  using CaseUnorderedSet =
+      absl::flat_hash_set<std::string, CaseInsensitiveHash, CaseInsensitiveCompare>;
+
   static const char WhitespaceChars[];
 
   /**
    * Convert a string to an unsigned long, checking for error.
    * @return pointer to the remainder of 'str' if successful, nullptr otherwise.
    */
-  static const char* strtoul(const char* str, uint64_t& out, int base = 10);
+  static const char* strtoull(const char* str, uint64_t& out, int base = 10);
 
   /**
    * Convert a string to an unsigned long, checking for error.
+   *
+   * Consider absl::SimpleAtoi instead if using base 10.
+   *
    * @param return true if successful, false otherwise.
    */
-  static bool atoul(const char* str, uint64_t& out, int base = 10);
-
-  /**
-   * Convert a string to a long, checking for error.
-   * @param return true if successful, false otherwise.
-   */
-  static bool atol(const char* str, int64_t& out, int base = 10);
-
-  /**
-   * Perform a case insensitive compare of 2 strings.
-   * @param lhs supplies string 1.
-   * @param rhs supplies string 2.
-   * @return < 0, 0, > 0 depending on the comparison result.
-   */
-  static int caseInsensitiveCompare(const char* lhs, const char* rhs) {
-    return strcasecmp(lhs, rhs);
-  }
+  static bool atoull(const char* str, uint64_t& out, int base = 10);
 
   /**
    * Convert an unsigned integer to a base 10 string as fast as possible.
@@ -205,6 +220,15 @@ public:
    * @return trimmed string view.
    */
   static absl::string_view trim(absl::string_view source);
+
+  /**
+   * Removes any specific trailing characters from the end of a string_view.
+   *
+   * @param source the string_view.
+   * @param ch the character to strip from the end of the string_view.
+   * @return a view of the string with the end characters removed.
+   */
+  static absl::string_view removeTrailingCharacters(absl::string_view source, char ch);
 
   /**
    * Look up for an exactly token in a delimiter-separated string view.
@@ -296,17 +320,23 @@ public:
                                                    bool keep_empty_string = false);
 
   /**
+   * Remove tokens from a delimiter-separated string view. The tokens are trimmed before
+   * they are compared ignoring case with the elements of 'tokens_to_remove'. The output is
+   * built from the trimmed tokens preserving case.
+   * @param source supplies the delimiter-separated string view.
+   * @param multi-delimiters supplies chars used to split the delimiter-separated string view.
+   * @param tokens_to_remove supplies a set of tokens which should not appear in the result.
+   * @param joiner contains a string used between tokens in the result.
+   * @return string of the remaining joined tokens.
+   */
+  static std::string removeTokens(absl::string_view source, absl::string_view delimiters,
+                                  const CaseUnorderedSet& tokens_to_remove,
+                                  absl::string_view joiner);
+
+  /**
    * Size-bounded string copying and concatenation
    */
   static size_t strlcpy(char* dst, const char* src, size_t size);
-
-  /**
-   * Join elements of a vector into a string delimited by delimiter.
-   * @param source supplies the strings to join.
-   * @param delimiter supplies the delimiter to join them together.
-   * @return string combining elements of `source` with `delimiter` in between each element.
-   */
-  static std::string join(const std::vector<std::string>& source, const std::string& delimiter);
 
   /**
    * Version of substr() that operates on a start and end index instead of a start index and a
@@ -322,17 +352,6 @@ public:
    * @return escaped string.
    */
   static std::string escape(const std::string& source);
-
-  /**
-   * @return true if @param source ends with @param end.
-   */
-  static bool endsWith(const std::string& source, const std::string& end);
-
-  /**
-   * @param case_sensitive determines if the compare is case sensitive
-   * @return true if @param source starts with @param start and ignores cases.
-   */
-  static bool startsWith(const char* source, const std::string& start, bool case_sensitive = true);
 
   /**
    * Provide a default value for a string if empty.
@@ -351,29 +370,11 @@ public:
   static std::string toUpper(absl::string_view s);
 
   /**
-   * Callable struct that returns the result of string comparison ignoring case.
-   * @param lhs supplies the first string view.
-   * @param rhs supplies the second string view.
-   * @return true if strings are semantically the same and false otherwise.
+   * Convert a string to lower case.
+   * @param s string.
+   * @return std::string s converted to lower case.
    */
-  struct CaseInsensitiveCompare {
-    bool operator()(absl::string_view lhs, absl::string_view rhs) const;
-  };
-
-  /**
-   * Callable struct that returns the hash representation of a case-insensitive string_view input.
-   * @param key supplies the string view.
-   * @return uint64_t hash representation of the supplied string view.
-   */
-  struct CaseInsensitiveHash {
-    uint64_t operator()(absl::string_view key) const;
-  };
-
-  /**
-   * Definition of unordered set of case-insensitive std::string.
-   */
-  typedef std::unordered_set<std::string, CaseInsensitiveHash, CaseInsensitiveCompare>
-      CaseUnorderedSet;
+  static std::string toLower(absl::string_view s);
 
   /**
    * Removes all the character indices from str contained in the interval-set.
@@ -399,22 +400,6 @@ public:
    * Finds the next prime number larger than x.
    */
   static uint32_t findPrimeLargerThan(uint32_t x);
-};
-
-/**
- * Utilities for constructing regular expressions.
- */
-class RegexUtil {
-public:
-  /*
-   * Constructs a std::regex, converting any std::regex_error exception into an EnvoyException.
-   * @param regex std::string containing the regular expression to parse.
-   * @param flags std::regex::flag_type containing parser flags. Defaults to std::regex::optimize.
-   * @return std::regex constructed from regex and flags.
-   * @throw EnvoyException if the regex string is invalid.
-   */
-  static std::regex parseRegex(const std::string& regex,
-                               std::regex::flag_type flags = std::regex::optimize);
 };
 
 /**
@@ -471,7 +456,7 @@ public:
 template <typename Value> class IntervalSetImpl : public IntervalSet<Value> {
 public:
   // Interval is a pair of Values.
-  typedef typename IntervalSet<Value>::Interval Interval;
+  using Interval = typename IntervalSet<Value>::Interval;
 
   void insert(Value left, Value right) override {
     if (left == right) {
@@ -517,10 +502,14 @@ private:
 };
 
 /**
- * Hashing functor for use with unordered_map and unordered_set with string_view as a key.
+ * Hashing functor for use with enum class types.
+ * This is needed for GCC 5.X; newer versions of GCC, as well as clang7, provide native hashing
+ * specializations.
  */
-struct StringViewHash {
-  std::size_t operator()(const absl::string_view& k) const { return HashUtil::xxHash64(k); }
+struct EnumClassHash {
+  template <typename T> std::size_t operator()(T t) const {
+    return std::hash<std::size_t>()(static_cast<std::size_t>(t));
+  }
 };
 
 /**
@@ -531,9 +520,9 @@ class WelfordStandardDeviation {
 public:
   /**
    * Accumulates a new value into the standard deviation.
-   * @param newValue the new value
+   * @param new_value the new value
    */
-  void update(double newValue);
+  void update(double new_value);
 
   /**
    * @return double the computed mean value.
@@ -556,6 +545,190 @@ private:
   uint64_t count_{0};
   double mean_{0};
   double m2_{0};
+};
+
+template <class Value> struct TrieEntry {
+  Value value_{};
+  std::array<std::unique_ptr<TrieEntry>, 256> entries_;
+};
+
+/**
+ * A trie used for faster lookup with lookup time at most equal to the size of the key.
+ */
+template <class Value> struct TrieLookupTable {
+
+  /**
+   * Adds an entry to the Trie at the given Key.
+   * @param key the key used to add the entry.
+   * @param value the value to be associated with the key.
+   * @param overwrite_existing will overwrite the value when the value for a given key already
+   * exists.
+   * @return false when a value already exists for the given key.
+   */
+  bool add(absl::string_view key, Value value, bool overwrite_existing = true) {
+    TrieEntry<Value>* current = &root_;
+    for (uint8_t c : key) {
+      if (!current->entries_[c]) {
+        current->entries_[c] = std::make_unique<TrieEntry<Value>>();
+      }
+      current = current->entries_[c].get();
+    }
+    if (current->value_ && !overwrite_existing) {
+      return false;
+    }
+    current->value_ = value;
+    return true;
+  }
+
+  /**
+   * Finds the entry associated with the key.
+   * @param key the key used to find.
+   * @return the value associated with the key.
+   */
+  Value find(absl::string_view key) const {
+    const TrieEntry<Value>* current = &root_;
+    for (uint8_t c : key) {
+      current = current->entries_[c].get();
+      if (current == nullptr) {
+        return nullptr;
+      }
+    }
+    return current->value_;
+  }
+
+  /**
+   * Finds the entry associated with the longest prefix. Complexity is O(min(longest key prefix, key
+   * length))
+   * @param key the key used to find.
+   * @return the value matching the longest prefix based on the key.
+   */
+  Value findLongestPrefix(const char* key) const {
+    const TrieEntry<Value>* current = &root_;
+    const TrieEntry<Value>* result = nullptr;
+    while (uint8_t c = *key) {
+      if (current->value_) {
+        result = current;
+      }
+
+      // https://github.com/facebook/mcrouter/blob/master/mcrouter/lib/fbi/cpp/Trie-inl.h#L126-L143
+      current = current->entries_[c].get();
+      if (current == nullptr) {
+        return result ? result->value_ : nullptr;
+      }
+
+      key++;
+    }
+    return current ? current->value_ : result->value_;
+  }
+
+  TrieEntry<Value> root_;
+};
+
+// Mix-in class for allocating classes with variable-sized inlined storage.
+//
+// Use this class by inheriting from it, ensuring that:
+//  - The variable sized array is declared as VarType[] as the last
+//    member variable of the class.
+//  - YourType accurately describes the type that will be stored there,
+//    to enable the compiler to perform correct alignment. No casting
+//    should be needed.
+//  - The class constructor is private, because you need to allocate the
+//    class the placed new operator exposed in the protected section below.
+//    Constructing the class directly will not provide space for the
+//    variable-size data.
+//  - You expose a public factory method that return a placement-new, e.g.
+//      static YourClass* alloc(size_t num_elements, constructor_args...) {
+//        new (num_elements * sizeof(VarType)) YourClass(constructor_args...);
+//      }
+//
+// See InlineString below for an example usage.
+//
+//
+// Perf note: The alignment will be correct and safe without further
+// consideration as long as there are no casts. But for micro-optimization,
+// consider this case:
+//   struct MyStruct : public InlineStorage { uint64_t a_; uint16_t b_; uint8_t data_[]; };
+// When compiled with a typical compiler on a 64-bit machine:
+//   sizeof(MyStruct) == 16, because the compiler will round up from 10 for uint64_t alignment.
+// So:
+//   calling new (6) MyStruct() causes an allocation of 16+6=22, rounded up to 24 bytes.
+// But data_ doesn't need 8-byte alignment, so it will wind up adjacent to the uint16_t.
+//   ((char*) my_struct.data) - ((char*) &my_struct) == 10
+// If we had instead declared data_[6], then the whole allocation would have fit in 16 bytes.
+// Instead:
+//   - the starting address of data will not be 8-byte aligned. This is not required
+//     by the C++ standard for a uint8_t, but may be suboptimal on some processors.
+//   - the 6 bytes of data will be at byte offsets 10 to 15, and bytes 16 to 23 will be
+//     unused. This may be surprising to some users, and suboptimal in resource usage.
+// One possible tweak is to declare data_ as a uint64_t[], or to use an `alignas`
+// declaration. As always, micro-optimizations should be informed by
+// microbenchmarks, showing the benefit.
+class InlineStorage : public NonCopyable {
+public:
+  // Custom delete operator to keep C++14 from using the global operator delete(void*, size_t),
+  // which would result in the compiler error:
+  // "exception cleanup for this placement new selects non-placement operator delete"
+  static void operator delete(void* address) { ::operator delete(address); }
+
+protected:
+  /**
+   * @param object_size the size of the base object; supplied automatically by the compiler.
+   * @param data_size the amount of variable-size storage to be added, in bytes.
+   * @return a variable-size object based on data_size_bytes.
+   */
+  static void* operator new(size_t object_size, size_t data_size_bytes) {
+    return ::operator new(object_size + data_size_bytes);
+  }
+};
+
+class InlineString;
+using InlineStringPtr = std::unique_ptr<InlineString>;
+
+// Represents immutable string data, keeping the storage inline with the
+// object. These cannot be copied or held by value; they must be created
+// as unique pointers.
+//
+// Note: this is not yet proven better (smaller or faster) than std::string for
+// all applications, but memory-size improvements have been measured for one
+// application (Stats::SymbolTableImpl). This is presented here to serve as an
+// example of how to use InlineStorage.
+class InlineString : public InlineStorage {
+public:
+  /**
+   * @param str the string_view for which to create an InlineString
+   * @return a unique_ptr to the InlineString containing the bytes of str.
+   */
+  static InlineStringPtr create(absl::string_view str) {
+    return InlineStringPtr(new (str.size()) InlineString(str.data(), str.size()));
+  }
+
+  /**
+   * @return a std::string copy of the InlineString.
+   */
+  std::string toString() const { return std::string(data_, size_); }
+
+  /**
+   * @return a string_view into the InlineString.
+   */
+  absl::string_view toStringView() const { return {data_, size_}; }
+
+  /**
+   * @return the number of bytes in the string
+   */
+  size_t size() const { return size_; }
+
+  /**
+   * @return a pointer to the first byte of the string.
+   */
+  const char* data() const { return data_; }
+
+private:
+  // Constructor is declared private so that no one constructs one without the
+  // proper size allocation. to accommodate the variable-size buffer.
+  InlineString(const char* str, size_t size);
+
+  uint32_t size_;
+  char data_[];
 };
 
 } // namespace Envoy

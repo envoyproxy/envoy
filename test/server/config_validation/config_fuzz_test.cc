@@ -1,5 +1,7 @@
 #include <fstream>
 
+#include "envoy/config/bootstrap/v2/bootstrap.pb.h"
+
 #include "common/common/thread.h"
 #include "common/network/address_impl.h"
 
@@ -13,6 +15,8 @@
 
 namespace Envoy {
 namespace Server {
+namespace {
+
 // Derived from //test/server:server_fuzz_test.cc, but starts the server in configuration validation
 // mode (quits upon validation of the given config)
 DEFINE_PROTO_FUZZER(const envoy::config::bootstrap::v2::Bootstrap& input) {
@@ -20,22 +24,20 @@ DEFINE_PROTO_FUZZER(const envoy::config::bootstrap::v2::Bootstrap& input) {
   TestComponentFactory component_factory;
   Fuzz::PerTestEnvironment test_env;
 
-  RELEASE_ASSERT(validateProtoDescriptors(), "");
-
   const std::string bootstrap_path = test_env.temporaryPath("bootstrap.pb_text");
   std::ofstream bootstrap_file(bootstrap_path);
   bootstrap_file << input.DebugString();
   options.config_path_ = bootstrap_path;
-  options.v2_config_only_ = true;
   options.log_level_ = Fuzz::Runner::logLevel();
 
   try {
     validateConfig(options, Network::Address::InstanceConstSharedPtr(), component_factory,
-                   Thread::threadFactoryForTest());
+                   Thread::threadFactoryForTest(), Filesystem::fileSystemForTest());
   } catch (const EnvoyException& ex) {
     ENVOY_LOG_MISC(debug, "Controlled EnvoyException exit: {}", ex.what());
   }
 }
 
+} // namespace
 } // namespace Server
 } // namespace Envoy

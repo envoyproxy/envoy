@@ -13,13 +13,13 @@ namespace NetworkFilters {
 namespace ThriftProxy {
 
 ConnectionManager::ConnectionManager(Config& config, Runtime::RandomGenerator& random_generator,
-                                     Event::TimeSystem& time_system)
+                                     TimeSource& time_source)
     : config_(config), stats_(config_.stats()), transport_(config.createTransport()),
       protocol_(config.createProtocol()),
       decoder_(std::make_unique<Decoder>(*transport_, *protocol_, *this)),
-      random_generator_(random_generator), time_system_(time_system) {}
+      random_generator_(random_generator), time_source_(time_source) {}
 
-ConnectionManager::~ConnectionManager() {}
+ConnectionManager::~ConnectionManager() = default;
 
 Network::FilterStatus ConnectionManager::onData(Buffer::Instance& data, bool end_stream) {
   request_buffer_.move(data);
@@ -77,8 +77,14 @@ void ConnectionManager::dispatch() {
   } catch (const EnvoyException& ex) {
     ENVOY_CONN_LOG(error, "thrift error: {}", read_callbacks_->connection(), ex.what());
 
-    // Use the current rpc to send an error downstream, if possible.
-    rpcs_.front()->onError(ex.what());
+    if (rpcs_.empty()) {
+      // Transport/protocol mismatch (including errors in automatic detection). Just hang up
+      // since we don't know how to encode a response.
+      read_callbacks_->connection().close(Network::ConnectionCloseType::FlushWrite);
+    } else {
+      // Use the current rpc's transport/protocol to send an error downstream.
+      rpcs_.front()->onError(ex.what());
+    }
   }
 
   stats_.request_decoding_error_.inc();
@@ -87,8 +93,11 @@ void ConnectionManager::dispatch() {
 
 void ConnectionManager::sendLocalReply(MessageMetadata& metadata, const DirectResponse& response,
                                        bool end_stream) {
-  Buffer::OwnedImpl buffer;
+  if (read_callbacks_->connection().state() == Network::Connection::State::Closed) {
+    return;
+  }
 
+  Buffer::OwnedImpl buffer;
   const DirectResponse::ResponseType result = response.encode(metadata, *protocol_, buffer);
 
   Buffer::OwnedImpl response_buffer;
@@ -203,6 +212,11 @@ FilterStatus ConnectionManager::ResponseDecoder::transportEnd() {
   ASSERT(metadata_ != nullptr);
 
   ConnectionManager& cm = parent_.parent_;
+
+  if (cm.read_callbacks_->connection().state() == Network::Connection::State::Closed) {
+    complete_ = true;
+    throw EnvoyException("downstream connection is closed");
+  }
 
   Buffer::OwnedImpl buffer;
 

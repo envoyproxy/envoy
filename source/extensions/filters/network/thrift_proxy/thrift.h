@@ -51,7 +51,7 @@ public:
   }
 };
 
-typedef ConstSingleton<TransportNameValues> TransportNames;
+using TransportNames = ConstSingleton<TransportNameValues>;
 
 enum class ProtocolType {
   Binary,
@@ -102,7 +102,7 @@ public:
   }
 };
 
-typedef ConstSingleton<ProtocolNameValues> ProtocolNames;
+using ProtocolNames = ConstSingleton<ProtocolNameValues>;
 
 /**
  * Thrift protocol message types.
@@ -156,7 +156,14 @@ enum class AppExceptionType {
   ProtocolError = 7,
   InvalidTransform = 8,
   InvalidProtocol = 9,
+  // FBThrift values.
+  // See https://github.com/facebook/fbthrift/blob/master/thrift/lib/cpp/TApplicationException.h#L52
   UnsupportedClientType = 10,
+  LoadShedding = 11,
+  Timeout = 12,
+  InjectedFailure = 13,
+  ChecksumMismatch = 14,
+  Interruption = 15,
 };
 
 } // namespace ThriftProxy

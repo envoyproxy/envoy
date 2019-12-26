@@ -1,0 +1,32 @@
+actions {
+  add_string: 6
+}
+actions {
+  reserve_commit {
+    reserve_length: 971
+    commit_length: 1
+  }
+}
+actions {
+  target_index: 1
+  add_string: 2
+}
+actions {
+  target_index: 1
+  prepend_string: 3
+}
+actions {
+  target_index: 1
+  prepend_buffer: 0
+}
+actions {
+  move {
+    source_index: 1
+  }
+}
+actions {
+  target_index: 1
+  move {
+    length: 11
+  }
+}

@@ -38,7 +38,7 @@ public:
    * Parse operation out of x-amz-target header.
    * @return empty string if operation cannot be parsed.
    */
-  static std::string parseOperation(const Http::HeaderMap& headerMap);
+  static std::string parseOperation(const Http::HeaderMap& header_map);
 
   /**
    * Parse table name out of data, based on the operation.
@@ -57,6 +57,12 @@ public:
    * @throw Json::Exception if data is not in valid Json format.
    */
   static TableDescriptor parseTable(const std::string& operation, const Json::Object& json_data);
+
+  /**
+   * @return string name of table in transaction object, or empty string if none
+   */
+  static absl::optional<std::string>
+  getTableNameFromTransactItem(const Json::Object& transact_item);
 
   /**
    * Parse error details which might be provided for a given response code.
@@ -91,15 +97,28 @@ public:
    */
   static std::vector<PartitionDescriptor> parsePartitions(const Json::Object& json_data);
 
+  using StringFn = std::function<void(const std::string&)>;
+
+  /**
+   * Calls a function for every string that is likely to be included as a token
+   * in a stat. This is not functionally necessary, but can reduce potentially
+   * contented access to create entries in the symbol table in the hot path.
+   *
+   * @param fn the function to call for every potential stat name.
+   */
+  static void forEachStatString(const StringFn& fn);
+
 private:
   static const Http::LowerCaseString X_AMZ_TARGET;
   static const std::vector<std::string> SINGLE_TABLE_OPERATIONS;
   static const std::vector<std::string> BATCH_OPERATIONS;
+  static const std::vector<std::string> TRANSACT_OPERATIONS;
+  static const std::vector<std::string> TRANSACT_ITEM_OPERATIONS;
 
   // http://docs.aws.amazon.com/amazondynamodb/latest/developerguide/Programming.Errors.html
   static const std::vector<std::string> SUPPORTED_ERROR_TYPES;
 
-  RequestParser() {}
+  RequestParser() = default;
 };
 
 } // namespace Dynamo

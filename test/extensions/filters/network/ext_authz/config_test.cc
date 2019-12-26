@@ -1,3 +1,5 @@
+#include "envoy/api/v2/core/grpc_service.pb.h"
+#include "envoy/config/filter/network/ext_authz/v2/ext_authz.pb.h"
 #include "envoy/config/filter/network/ext_authz/v2/ext_authz.pb.validate.h"
 #include "envoy/stats/scope.h"
 
@@ -35,7 +37,7 @@ TEST(ExtAuthzFilterConfigTest, ExtAuthzCorrectProto) {
 
   ExtAuthzConfigFactory factory;
   ProtobufTypes::MessagePtr proto_config = factory.createEmptyConfigProto();
-  MessageUtil::loadFromYaml(yaml, *proto_config);
+  TestUtility::loadFromYaml(yaml, *proto_config);
 
   NiceMock<Server::Configuration::MockFactoryContext> context;
 

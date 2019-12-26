@@ -5,8 +5,11 @@
 
 #include "envoy/common/pure.h"
 #include "envoy/event/dispatcher.h"
-#include "envoy/stats/stat_data_allocator.h"
+#include "envoy/stats/allocator.h"
+#include "envoy/stats/store.h"
 #include "envoy/thread/thread.h"
+
+#include "source/server/hot_restart.pb.h"
 
 namespace Envoy {
 namespace Server {
@@ -20,16 +23,12 @@ class Instance;
  */
 class HotRestart {
 public:
-  struct GetParentStatsInfo {
-    uint64_t memory_allocated_;
-    uint64_t num_connections_;
+  struct ServerStatsFromParent {
+    uint64_t parent_memory_allocated_ = 0;
+    uint64_t parent_connections_ = 0;
   };
 
-  struct ShutdownParentAdminInfo {
-    time_t original_start_time_;
-  };
-
-  virtual ~HotRestart() {}
+  virtual ~HotRestart() = default;
 
   /**
    * Shutdown listeners in the parent process if applicable. Listeners will begin draining to
@@ -46,32 +45,37 @@ public:
   virtual int duplicateParentListenSocket(const std::string& address) PURE;
 
   /**
-   * Retrieve stats from our parent process.
-   * @param info will be filled with information from our parent if it can be retrieved.
-   */
-  virtual void getParentStats(GetParentStatsInfo& info) PURE;
-
-  /**
-   * Initialize the restarter after primary server initialization begins. The hot restart
-   * implementation needs to be created early to deal with shared memory, logging, etc. so
-   * late initialization of needed interfaces is done here.
+   * Initialize the parent logic of our restarter. Meant to be called after initialization of a
+   * new child has begun. The hot restart implementation needs to be created early to deal with
+   * shared memory, logging, etc. so late initialization of needed interfaces is done here.
    */
   virtual void initialize(Event::Dispatcher& dispatcher, Server::Instance& server) PURE;
 
   /**
    * Shutdown admin processing in the parent process if applicable. This allows admin processing
    * to start up in the new process.
-   * @param info will be filled with information from our parent if it can be retrieved.
+   * @param original_start_time will be filled with information from our parent, if retrieved.
    */
-  virtual void shutdownParentAdmin(ShutdownParentAdminInfo& info) PURE;
+  virtual void sendParentAdminShutdownRequest(time_t& original_start_time) PURE;
 
   /**
-   * Tell our parent to gracefully terminate itself.
+   * Tell our parent process to gracefully terminate itself.
    */
-  virtual void terminateParent() PURE;
+  virtual void sendParentTerminateRequest() PURE;
 
   /**
-   * Shutdown the hot restarter.
+   * Retrieve stats from our parent process and merges them into stats_store, taking into account
+   * the stats values we've already seen transferred.
+   * Skips all of the above and returns 0s if there is not currently a parent.
+   * @param stats_store the store whose stats will be updated.
+   * @param stats_proto the stats values we are updating with.
+   * @return special values relating to the "server" stats scope, whose
+   *         merging has to be handled by Server::InstanceImpl.
+   */
+  virtual ServerStatsFromParent mergeParentStatsIfAny(Stats::StoreRoot& stats_store) PURE;
+
+  /**
+   * Shutdown the half of our hot restarter that acts as a parent.
    */
   virtual void shutdown() PURE;
 
@@ -90,11 +94,6 @@ public:
    * @return Thread::BasicLockable& a lock for access logs.
    */
   virtual Thread::BasicLockable& accessLogLock() PURE;
-
-  /**
-   * @returns an allocator for stats.
-   */
-  virtual Stats::StatDataAllocator& statsAllocator() PURE;
 };
 
 } // namespace Server

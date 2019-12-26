@@ -12,11 +12,11 @@ namespace Envoy {
 namespace Extensions {
 namespace TransportSockets {
 namespace Alts {
+namespace {
 
 using testing::NiceMock;
 using testing::Return;
 using testing::ReturnRef;
-using testing::StrictMock;
 
 class TsiSocketTest : public testing::Test {
 protected:
@@ -406,6 +406,7 @@ TEST_F(TsiSocketFactoryTest, ImplementsSecureTransport) {
   EXPECT_TRUE(socket_factory_->implementsSecureTransport());
 }
 
+} // namespace
 } // namespace Alts
 } // namespace TransportSockets
 } // namespace Extensions

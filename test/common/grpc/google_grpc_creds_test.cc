@@ -1,6 +1,13 @@
+#include <cstdlib>
+
+#include "envoy/api/v2/core/grpc_service.pb.h"
+
 #include "common/grpc/google_grpc_creds_impl.h"
 
 #include "test/common/grpc/utility.h"
+#include "test/mocks/stats/mocks.h"
+#include "test/test_common/environment.h"
+#include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
 
@@ -13,27 +20,42 @@ namespace {
 // of getting at the underlying state, we can at best just make sure we don't
 // crash, compare with nullptr and/or look at vector lengths.
 
-TEST(CredsUtility, GetChannelCredentials) {
-  EXPECT_EQ(nullptr, CredsUtility::getChannelCredentials({}));
+class CredsUtilityTest : public testing::Test {
+public:
+  CredsUtilityTest() : api_(Api::createApiForTest()) {}
+
+  Api::ApiPtr api_;
+};
+
+TEST_F(CredsUtilityTest, GetChannelCredentials) {
+  EXPECT_EQ(nullptr, CredsUtility::getChannelCredentials({}, *api_));
   envoy::api::v2::core::GrpcService::GoogleGrpc config;
   auto* creds = config.mutable_channel_credentials();
-  EXPECT_EQ(nullptr, CredsUtility::getChannelCredentials(config));
+  EXPECT_EQ(nullptr, CredsUtility::getChannelCredentials(config, *api_));
   creds->mutable_ssl_credentials();
-  EXPECT_NE(nullptr, CredsUtility::getChannelCredentials(config));
+  EXPECT_NE(nullptr, CredsUtility::getChannelCredentials(config, *api_));
   creds->mutable_local_credentials();
-  EXPECT_NE(nullptr, CredsUtility::getChannelCredentials(config));
+  EXPECT_NE(nullptr, CredsUtility::getChannelCredentials(config, *api_));
+
+  const std::string var_name = "GOOGLE_APPLICATION_CREDENTIALS";
+  EXPECT_EQ(nullptr, ::getenv(var_name.c_str()));
+  const std::string creds_path = TestEnvironment::runfilesPath("test/common/grpc/service_key.json");
+  TestEnvironment::setEnvVar(var_name.c_str(), creds_path.c_str(), 0);
+  creds->mutable_google_default();
+  EXPECT_NE(nullptr, CredsUtility::getChannelCredentials(config, *api_));
+  TestEnvironment::unsetEnvVar(var_name.c_str());
 }
 
-TEST(CredsUtility, DefaultSslChannelCredentials) {
-  EXPECT_NE(nullptr, CredsUtility::defaultSslChannelCredentials({}));
+TEST_F(CredsUtilityTest, DefaultSslChannelCredentials) {
+  EXPECT_NE(nullptr, CredsUtility::defaultSslChannelCredentials({}, *api_));
   envoy::api::v2::core::GrpcService config;
   auto* creds = config.mutable_google_grpc()->mutable_channel_credentials();
-  EXPECT_NE(nullptr, CredsUtility::defaultSslChannelCredentials(config));
+  EXPECT_NE(nullptr, CredsUtility::defaultSslChannelCredentials(config, *api_));
   creds->mutable_ssl_credentials();
-  EXPECT_NE(nullptr, CredsUtility::defaultSslChannelCredentials(config));
+  EXPECT_NE(nullptr, CredsUtility::defaultSslChannelCredentials(config, *api_));
 }
 
-TEST(CredsUtility, CallCredentials) {
+TEST_F(CredsUtilityTest, CallCredentials) {
   EXPECT_TRUE(CredsUtility::callCredentials({}).empty());
   {
     // Invalid refresh token doesn't crash and gets elided.
@@ -58,12 +80,12 @@ TEST(CredsUtility, CallCredentials) {
   // CredsUtility.DefaultChannelCredentials.
 }
 
-TEST(CredsUtility, DefaultChannelCredentials) {
-  { EXPECT_NE(nullptr, CredsUtility::defaultChannelCredentials({})); }
+TEST_F(CredsUtilityTest, DefaultChannelCredentials) {
+  { EXPECT_NE(nullptr, CredsUtility::defaultChannelCredentials({}, *api_)); }
   {
     envoy::api::v2::core::GrpcService config;
     TestUtility::setTestSslGoogleGrpcConfig(config, true);
-    EXPECT_NE(nullptr, CredsUtility::defaultChannelCredentials(config));
+    EXPECT_NE(nullptr, CredsUtility::defaultChannelCredentials(config, *api_));
   }
   {
     envoy::api::v2::core::GrpcService config;
@@ -100,7 +122,16 @@ TEST(CredsUtility, DefaultChannelCredentials) {
     }
     // Should be ignored..
     google_grpc->add_call_credentials()->mutable_from_plugin()->set_name("foo");
-    EXPECT_NE(nullptr, CredsUtility::defaultChannelCredentials(config));
+    EXPECT_NE(nullptr, CredsUtility::defaultChannelCredentials(config, *api_));
+  }
+  {
+    envoy::api::v2::core::GrpcService config;
+    TestUtility::setTestSslGoogleGrpcConfig(config, true);
+    auto* sts_service = config.mutable_google_grpc()->add_call_credentials()->mutable_sts_service();
+    sts_service->set_token_exchange_service_uri("http://tokenexchangeservice.com");
+    sts_service->set_subject_token_path("/var/run/example_token");
+    sts_service->set_subject_token_type("urn:ietf:params:oauth:token-type:access_token");
+    EXPECT_NE(nullptr, CredsUtility::defaultChannelCredentials(config, *api_));
   }
 }
 

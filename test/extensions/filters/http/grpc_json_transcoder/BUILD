@@ -20,13 +20,13 @@ envoy_extension_cc_test(
     ],
     extension_name = "envoy.filters.http.grpc_json_transcoder",
     deps = [
-        "//source/common/config:filter_json_lib",
         "//source/extensions/filters/http/grpc_json_transcoder:json_transcoder_filter_lib",
         "//test/mocks/http:http_mocks",
         "//test/mocks/upstream:upstream_mocks",
-        "//test/proto:bookstore_proto_cc",
+        "//test/proto:bookstore_proto_cc_proto",
         "//test/test_common:environment_lib",
         "//test/test_common:utility_lib",
+        "@envoy_api//envoy/config/filter/http/transcoder/v2:pkg_cc_proto",
     ],
 )
 
@@ -54,7 +54,7 @@ envoy_extension_cc_test(
         "//source/common/http:header_map_lib",
         "//source/extensions/filters/http/grpc_json_transcoder:config",
         "//test/integration:http_integration_lib",
-        "//test/proto:bookstore_proto_cc",
+        "//test/proto:bookstore_proto_cc_proto",
         "//test/test_common:utility_lib",
     ],
 )
@@ -66,5 +66,6 @@ envoy_extension_cc_test(
     deps = [
         "//source/extensions/filters/http/grpc_json_transcoder:config",
         "//test/mocks/server:server_mocks",
+        "@envoy_api//envoy/config/filter/http/transcoder/v2:pkg_cc_proto",
     ],
 )

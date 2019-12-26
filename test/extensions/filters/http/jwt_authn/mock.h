@@ -18,18 +18,20 @@ namespace JwtAuthn {
 
 class MockAuthFactory : public AuthFactory {
 public:
-  MOCK_CONST_METHOD3(create, AuthenticatorPtr(const ::google::jwt_verify::CheckAudience*,
-                                              const absl::optional<std::string>&, bool));
+  MOCK_CONST_METHOD4(create, AuthenticatorPtr(const ::google::jwt_verify::CheckAudience*,
+                                              const absl::optional<std::string>&, bool, bool));
 };
 
 class MockAuthenticator : public Authenticator {
 public:
-  MOCK_METHOD4(doVerify, void(Http::HeaderMap& headers, std::vector<JwtLocationConstPtr>* tokens,
+  MOCK_METHOD5(doVerify, void(Http::HeaderMap& headers, Tracing::Span& parent_span,
+                              std::vector<JwtLocationConstPtr>* tokens,
                               SetPayloadCallback set_payload_cb, AuthenticatorCallback callback));
 
-  void verify(Http::HeaderMap& headers, std::vector<JwtLocationConstPtr>&& tokens,
-              SetPayloadCallback set_payload_cb, AuthenticatorCallback callback) {
-    doVerify(headers, &tokens, std::move(set_payload_cb), std::move(callback));
+  void verify(Http::HeaderMap& headers, Tracing::Span& parent_span,
+              std::vector<JwtLocationConstPtr>&& tokens, SetPayloadCallback set_payload_cb,
+              AuthenticatorCallback callback) override {
+    doVerify(headers, parent_span, &tokens, std::move(set_payload_cb), std::move(callback));
   }
 
   MOCK_METHOD0(onDestroy, void());

@@ -22,6 +22,7 @@ public:
   ConfigTracker& getConfigTracker() override;
   void startHttpListener(const std::string& access_log_path, const std::string& address_out_path,
                          Network::Address::InstanceConstSharedPtr address,
+                         const Network::Socket::OptionsSharedPtr&,
                          Stats::ScopePtr&& listener_scope) override;
   Http::Code request(absl::string_view path_and_query, absl::string_view method,
                      Http::HeaderMap& response_headers, std::string& body) override;

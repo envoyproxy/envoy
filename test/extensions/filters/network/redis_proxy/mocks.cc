@@ -1,105 +1,51 @@
 #include "mocks.h"
 
-#include <cstdint>
-
-#include "common/common/assert.h"
-
-#include "gmock/gmock.h"
-#include "gtest/gtest.h"
-
 using testing::_;
-using testing::Invoke;
+using testing::Return;
+using testing::ReturnRef;
 
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
 namespace RedisProxy {
 
-void PrintTo(const RespValue& value, std::ostream* os) { *os << value.toString(); }
-
-void PrintTo(const RespValuePtr& value, std::ostream* os) { *os << value->toString(); }
-
-bool operator==(const RespValue& lhs, const RespValue& rhs) {
-  if (lhs.type() != rhs.type()) {
-    return false;
-  }
-
-  switch (lhs.type()) {
-  case RespType::Array: {
-    if (lhs.asArray().size() != rhs.asArray().size()) {
-      return false;
-    }
-
-    bool equal = true;
-    for (uint64_t i = 0; i < lhs.asArray().size(); i++) {
-      equal &= (lhs.asArray()[i] == rhs.asArray()[i]);
-    }
-
-    return equal;
-  }
-  case RespType::SimpleString:
-  case RespType::BulkString:
-  case RespType::Error: {
-    return lhs.asString() == rhs.asString();
-  }
-  case RespType::Null: {
-    return true;
-  }
-  case RespType::Integer: {
-    return lhs.asInteger() == rhs.asInteger();
-  }
-  }
-
-  NOT_REACHED_GCOVR_EXCL_LINE;
+MockRouter::MockRouter(RouteSharedPtr route) : route_(std::move(route)) {
+  ON_CALL(*this, upstreamPool(_)).WillByDefault(Return(route_));
 }
+MockRouter::~MockRouter() = default;
 
-MockEncoder::MockEncoder() {
-  ON_CALL(*this, encode(_, _))
-      .WillByDefault(Invoke([this](const RespValue& value, Buffer::Instance& out) -> void {
-        real_encoder_.encode(value, out);
-      }));
+MockRoute::MockRoute(ConnPool::InstanceSharedPtr conn_pool) : conn_pool_(std::move(conn_pool)) {
+  ON_CALL(*this, upstream()).WillByDefault(Return(conn_pool_));
+  ON_CALL(*this, mirrorPolicies()).WillByDefault(ReturnRef(policies_));
 }
+MockRoute::~MockRoute() = default;
 
-MockEncoder::~MockEncoder() {}
-
-MockDecoder::MockDecoder() {}
-MockDecoder::~MockDecoder() {}
+MockMirrorPolicy::MockMirrorPolicy(ConnPool::InstanceSharedPtr conn_pool)
+    : conn_pool_(std::move(conn_pool)) {
+  ON_CALL(*this, upstream()).WillByDefault(Return(conn_pool_));
+  ON_CALL(*this, shouldMirror(_)).WillByDefault(Return(true));
+}
 
 namespace ConnPool {
 
-MockClient::MockClient() {
-  ON_CALL(*this, addConnectionCallbacks(_))
-      .WillByDefault(Invoke([this](Network::ConnectionCallbacks& callbacks) -> void {
-        callbacks_.push_back(&callbacks);
-      }));
-  ON_CALL(*this, close()).WillByDefault(Invoke([this]() -> void {
-    raiseEvent(Network::ConnectionEvent::LocalClose);
-  }));
-}
+MockPoolCallbacks::MockPoolCallbacks() = default;
+MockPoolCallbacks::~MockPoolCallbacks() = default;
 
-MockClient::~MockClient() {}
-
-MockPoolRequest::MockPoolRequest() {}
-MockPoolRequest::~MockPoolRequest() {}
-
-MockPoolCallbacks::MockPoolCallbacks() {}
-MockPoolCallbacks::~MockPoolCallbacks() {}
-
-MockInstance::MockInstance() {}
-MockInstance::~MockInstance() {}
+MockInstance::MockInstance() = default;
+MockInstance::~MockInstance() = default;
 
 } // namespace ConnPool
 
 namespace CommandSplitter {
 
-MockSplitRequest::MockSplitRequest() {}
-MockSplitRequest::~MockSplitRequest() {}
+MockSplitRequest::MockSplitRequest() = default;
+MockSplitRequest::~MockSplitRequest() = default;
 
-MockSplitCallbacks::MockSplitCallbacks() {}
-MockSplitCallbacks::~MockSplitCallbacks() {}
+MockSplitCallbacks::MockSplitCallbacks() = default;
+MockSplitCallbacks::~MockSplitCallbacks() = default;
 
-MockInstance::MockInstance() {}
-MockInstance::~MockInstance() {}
+MockInstance::MockInstance() = default;
+MockInstance::~MockInstance() = default;
 
 } // namespace CommandSplitter
 } // namespace RedisProxy

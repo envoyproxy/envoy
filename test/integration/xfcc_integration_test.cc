@@ -4,15 +4,18 @@
 #include <regex>
 #include <unordered_map>
 
+#include "envoy/api/v2/auth/cert.pb.h"
+#include "envoy/config/bootstrap/v2/bootstrap.pb.h"
 #include "envoy/config/filter/network/http_connection_manager/v2/http_connection_manager.pb.h"
 #include "envoy/stats/scope.h"
 
 #include "common/event/dispatcher_impl.h"
 #include "common/http/header_map_impl.h"
 #include "common/network/utility.h"
-#include "common/ssl/context_config_impl.h"
-#include "common/ssl/context_manager_impl.h"
-#include "common/ssl/ssl_socket.h"
+
+#include "extensions/transport_sockets/tls/context_config_impl.h"
+#include "extensions/transport_sockets/tls/context_manager_impl.h"
+#include "extensions/transport_sockets/tls/ssl_socket.h"
 
 #include "test/test_common/network_utility.h"
 #include "test/test_common/printers.h"
@@ -21,7 +24,6 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 #include "integration.h"
-#include "ssl_integration_test.h"
 #include "utility.h"
 
 namespace Envoy {
@@ -39,50 +41,66 @@ void XfccIntegrationTest::TearDown() {
 }
 
 Network::TransportSocketFactoryPtr XfccIntegrationTest::createClientSslContext(bool mtls) {
-  std::string json_tls = R"EOF(
-{
-  "ca_cert_file": "{{ test_rundir }}/test/config/integration/certs/cacert.pem",
-  "verify_subject_alt_name": [ "spiffe://lyft.com/backend-team", "lyft.com", "www.lyft.com" ]
-}
+  const std::string yaml_tls = R"EOF(
+common_tls_context:
+  validation_context:
+    trusted_ca:
+      filename: {{ test_rundir }}/test/config/integration/certs/cacert.pem
+    match_subject_alt_names: 
+      exact: "spiffe://lyft.com/backend-team"
+      exact: "lyft.com"
+      exact: "www.lyft.com"
 )EOF";
-  std::string json_mtls = R"EOF(
-{
-  "ca_cert_file": "{{ test_rundir }}/test/config/integration/certs/cacert.pem",
-  "cert_chain_file": "{{ test_rundir }}/test/config/integration/certs/clientcert.pem",
-  "private_key_file": "{{ test_rundir }}/test/config/integration/certs/clientkey.pem",
-  "verify_subject_alt_name": [ "spiffe://lyft.com/backend-team", "lyft.com", "www.lyft.com" ]
-}
+
+  const std::string yaml_mtls = R"EOF(
+common_tls_context:
+  validation_context:
+    trusted_ca:
+      filename: {{ test_rundir }}/test/config/integration/certs/cacert.pem
+    match_subject_alt_names: 
+      exact: "spiffe://lyft.com/backend-team"
+      exact: "lyft.com"
+      exact: "www.lyft.com"
+  tls_certificates:
+    certificate_chain:
+      filename: {{ test_rundir }}/test/config/integration/certs/clientcert.pem
+    private_key:
+      filename: {{ test_rundir }}/test/config/integration/certs/clientkey.pem
 )EOF";
 
   std::string target;
   if (mtls) {
-    target = json_mtls;
+    target = yaml_mtls;
   } else {
-    target = json_tls;
+    target = yaml_tls;
   }
-  Json::ObjectSharedPtr loader = TestEnvironment::jsonLoadFromString(target);
-  auto cfg = std::make_unique<Ssl::ClientContextConfigImpl>(*loader, factory_context_);
+  envoy::api::v2::auth::UpstreamTlsContext config;
+  TestUtility::loadFromYaml(TestEnvironment::substitute(target), config);
+  auto cfg = std::make_unique<Extensions::TransportSockets::Tls::ClientContextConfigImpl>(
+      config, factory_context_);
   static auto* client_stats_store = new Stats::TestIsolatedStoreImpl();
   return Network::TransportSocketFactoryPtr{
-      new Ssl::ClientSslSocketFactory(std::move(cfg), *context_manager_, *client_stats_store)};
+      new Extensions::TransportSockets::Tls::ClientSslSocketFactory(
+          std::move(cfg), *context_manager_, *client_stats_store)};
 }
 
 Network::TransportSocketFactoryPtr XfccIntegrationTest::createUpstreamSslContext() {
-  std::string json = R"EOF(
-{
-  "cert_chain_file": "{{ test_rundir }}/test/config/integration/certs/upstreamcert.pem",
-  "private_key_file": "{{ test_rundir }}/test/config/integration/certs/upstreamkey.pem"
-}
-)EOF";
+  envoy::api::v2::auth::DownstreamTlsContext tls_context;
+  auto* common_tls_context = tls_context.mutable_common_tls_context();
+  auto* tls_cert = common_tls_context->add_tls_certificates();
+  tls_cert->mutable_certificate_chain()->set_filename(
+      TestEnvironment::runfilesPath("test/config/integration/certs/upstreamcert.pem"));
+  tls_cert->mutable_private_key()->set_filename(
+      TestEnvironment::runfilesPath("test/config/integration/certs/upstreamkey.pem"));
 
-  Json::ObjectSharedPtr loader = TestEnvironment::jsonLoadFromString(json);
-  auto cfg = std::make_unique<Ssl::ServerContextConfigImpl>(*loader, factory_context_);
+  auto cfg = std::make_unique<Extensions::TransportSockets::Tls::ServerContextConfigImpl>(
+      tls_context, factory_context_);
   static Stats::Scope* upstream_stats_store = new Stats::TestIsolatedStoreImpl();
-  return std::make_unique<Ssl::ServerSslSocketFactory>(
+  return std::make_unique<Extensions::TransportSockets::Tls::ServerSslSocketFactory>(
       std::move(cfg), *context_manager_, *upstream_stats_store, std::vector<std::string>{});
 }
 
-Network::ClientConnectionPtr XfccIntegrationTest::makeClientConnection() {
+Network::ClientConnectionPtr XfccIntegrationTest::makeTcpClientConnection() {
   Network::Address::InstanceConstSharedPtr address =
       Network::Utility::resolveUrl("tcp://" + Network::Test::getLoopbackAddressUrlString(version_) +
                                    ":" + std::to_string(lookupPort("http")));
@@ -113,18 +131,23 @@ void XfccIntegrationTest::initialize() {
       });
 
   config_helper_.addConfigModifier([&](envoy::config::bootstrap::v2::Bootstrap& bootstrap) -> void {
-    auto context = bootstrap.mutable_static_resources()->mutable_clusters(0)->mutable_tls_context();
-    auto* validation_context = context->mutable_common_tls_context()->mutable_validation_context();
+    auto transport_socket =
+        bootstrap.mutable_static_resources()->mutable_clusters(0)->mutable_transport_socket();
+    envoy::api::v2::auth::UpstreamTlsContext context;
+    auto* validation_context = context.mutable_common_tls_context()->mutable_validation_context();
     validation_context->mutable_trusted_ca()->set_filename(
         TestEnvironment::runfilesPath("test/config/integration/certs/upstreamcacert.pem"));
-    validation_context->add_verify_subject_alt_name("foo.lyft.com");
+    validation_context->add_match_subject_alt_names()->set_suffix("lyft.com");
+    transport_socket->set_name("envoy.transport_sockets.tls");
+    transport_socket->mutable_typed_config()->PackFrom(context);
   });
 
   if (tls_) {
     config_helper_.addSslConfig();
   }
 
-  context_manager_ = std::make_unique<Ssl::ContextManagerImpl>(timeSystem());
+  context_manager_ =
+      std::make_unique<Extensions::TransportSockets::Tls::ContextManagerImpl>(timeSystem());
   client_tls_ssl_ctx_ = createClientSslContext(false);
   client_mtls_ssl_ctx_ = createClientSslContext(true);
   HttpIntegrationTest::initialize();
@@ -132,7 +155,7 @@ void XfccIntegrationTest::initialize() {
 
 void XfccIntegrationTest::testRequestAndResponseWithXfccHeader(std::string previous_xfcc,
                                                                std::string expected_xfcc) {
-  Network::ClientConnectionPtr conn = tls_ ? makeMtlsClientConnection() : makeClientConnection();
+  Network::ClientConnectionPtr conn = tls_ ? makeMtlsClientConnection() : makeTcpClientConnection();
   Http::TestHeaderMapImpl header_map;
   if (previous_xfcc.empty()) {
     header_map = Http::TestHeaderMapImpl{{":method", "GET"},
@@ -155,8 +178,8 @@ void XfccIntegrationTest::testRequestAndResponseWithXfccHeader(std::string previ
   if (expected_xfcc.empty()) {
     EXPECT_EQ(nullptr, upstream_request_->headers().ForwardedClientCert());
   } else {
-    EXPECT_STREQ(expected_xfcc.c_str(),
-                 upstream_request_->headers().ForwardedClientCert()->value().c_str());
+    EXPECT_EQ(expected_xfcc,
+              upstream_request_->headers().ForwardedClientCert()->value().getStringView());
   }
   upstream_request_->encodeHeaders(Http::TestHeaderMapImpl{{":status", "200"}}, true);
   response->waitForEndStream();
@@ -164,9 +187,9 @@ void XfccIntegrationTest::testRequestAndResponseWithXfccHeader(std::string previ
   EXPECT_TRUE(response->complete());
 }
 
-INSTANTIATE_TEST_CASE_P(IpVersions, XfccIntegrationTest,
-                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                        TestUtility::ipTestParamsToString);
+INSTANTIATE_TEST_SUITE_P(IpVersions, XfccIntegrationTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
 
 TEST_P(XfccIntegrationTest, MtlsForwardOnly) {
   fcc_ = envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager::
@@ -636,7 +659,6 @@ TEST_P(XfccIntegrationTest, TagExtractedNameGenerationTest) {
       {"http.admin.downstream_rq_tx_reset", "http.downstream_rq_tx_reset"},
       {"http.admin.downstream_flow_control_resumed_reading_total",
        "http.downstream_flow_control_resumed_reading_total"},
-      {"stats.overflow", "stats.overflow"},
       {"http.admin.downstream_cx_total", "http.downstream_cx_total"},
       {"http.admin.downstream_rq_3xx", "http.downstream_rq_xx"},
       {"http.admin.downstream_cx_idle_timeout", "http.downstream_cx_idle_timeout"},

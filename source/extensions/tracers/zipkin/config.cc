@@ -1,5 +1,7 @@
 #include "extensions/tracers/zipkin/config.h"
 
+#include "envoy/config/trace/v2/trace.pb.h"
+#include "envoy/config/trace/v2/trace.pb.validate.h"
 #include "envoy/registry/registry.h"
 
 #include "common/common/utility.h"
@@ -19,7 +21,7 @@ Tracing::HttpTracerPtr ZipkinTracerFactory::createHttpTracerTyped(
     const envoy::config::trace::v2::ZipkinConfig& proto_config, Server::Instance& server) {
   Tracing::DriverPtr zipkin_driver = std::make_unique<Zipkin::Driver>(
       proto_config, server.clusterManager(), server.stats(), server.threadLocal(), server.runtime(),
-      server.localInfo(), server.random(), server.timeSystem());
+      server.localInfo(), server.random(), server.timeSource());
 
   return std::make_unique<Tracing::HttpTracerImpl>(std::move(zipkin_driver), server.localInfo());
 }
@@ -27,8 +29,7 @@ Tracing::HttpTracerPtr ZipkinTracerFactory::createHttpTracerTyped(
 /**
  * Static registration for the lightstep tracer. @see RegisterFactory.
  */
-static Registry::RegisterFactory<ZipkinTracerFactory, Server::Configuration::TracerFactory>
-    register_;
+REGISTER_FACTORY(ZipkinTracerFactory, Server::Configuration::TracerFactory);
 
 } // namespace Zipkin
 } // namespace Tracers

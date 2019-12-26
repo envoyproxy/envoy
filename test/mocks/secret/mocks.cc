@@ -1,5 +1,7 @@
 #include "test/mocks/secret/mocks.h"
 
+#include "envoy/api/v2/auth/cert.pb.h"
+
 #include "common/secret/secret_provider_impl.h"
 
 using testing::_;
@@ -21,11 +23,11 @@ MockSecretManager::MockSecretManager() {
       }));
 }
 
-MockSecretManager::~MockSecretManager() {}
+MockSecretManager::~MockSecretManager() = default;
 
-MockSecretCallbacks::MockSecretCallbacks() {}
+MockSecretCallbacks::MockSecretCallbacks() = default;
 
-MockSecretCallbacks::~MockSecretCallbacks() {}
+MockSecretCallbacks::~MockSecretCallbacks() = default;
 
 } // namespace Secret
 } // namespace Envoy

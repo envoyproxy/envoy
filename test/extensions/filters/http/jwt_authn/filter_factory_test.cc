@@ -1,3 +1,4 @@
+#include "envoy/config/filter/http/jwt_authn/v2alpha/config.pb.h"
 #include "envoy/config/filter/http/jwt_authn/v2alpha/config.pb.validate.h"
 
 #include "extensions/filters/http/jwt_authn/filter_factory.h"
@@ -9,19 +10,18 @@
 #include "gtest/gtest.h"
 
 using ::envoy::config::filter::http::jwt_authn::v2alpha::JwtAuthentication;
-using ::envoy::config::filter::http::jwt_authn::v2alpha::JwtProvider;
 using testing::_;
-using testing::Invoke;
 
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace JwtAuthn {
+namespace {
 
 TEST(HttpJwtAuthnFilterFactoryTest, GoodRemoteJwks) {
   FilterFactory factory;
   ProtobufTypes::MessagePtr proto_config = factory.createEmptyConfigProto();
-  MessageUtil::loadFromYaml(ExampleConfig, *proto_config);
+  TestUtility::loadFromYaml(ExampleConfig, *proto_config);
 
   NiceMock<Server::Configuration::MockFactoryContext> context;
 
@@ -56,7 +56,7 @@ TEST(HttpJwtAuthnFilterFactoryTest, BadLocalJwks) {
   EXPECT_THROW(factory.createFilterFactoryFromProto(proto_config, "stats", context),
                EnvoyException);
 }
-
+} // namespace
 } // namespace JwtAuthn
 } // namespace HttpFilters
 } // namespace Extensions

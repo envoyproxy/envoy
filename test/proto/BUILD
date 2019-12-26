@@ -12,6 +12,11 @@ envoy_package()
 exports_files(["bookstore.proto"])
 
 envoy_proto_library(
+    name = "deprecated_proto",
+    srcs = [":deprecated.proto"],
+)
+
+envoy_proto_library(
     name = "helloworld_proto",
     srcs = [":helloworld.proto"],
 )
@@ -26,6 +31,9 @@ envoy_proto_descriptor(
     name = "bookstore_proto_descriptor",
     srcs = [
         "bookstore.proto",
+        # JSON transcoder doesn't link against ":helloworld_proto_cc_proto", so we can add it to the
+        # descriptor and test that we can actually transcode types not linked into the test binary.
+        "helloworld.proto",
     ],
     out = "bookstore.descriptor",
     external_deps = [

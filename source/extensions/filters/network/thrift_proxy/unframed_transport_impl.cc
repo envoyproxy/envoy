@@ -13,8 +13,7 @@ public:
 /**
  * Static registration for the unframed transport. @see RegisterFactory.
  */
-static Registry::RegisterFactory<UnframedTransportConfigFactory, NamedTransportConfigFactory>
-    register_;
+REGISTER_FACTORY(UnframedTransportConfigFactory, NamedTransportConfigFactory);
 
 } // namespace ThriftProxy
 } // namespace NetworkFilters

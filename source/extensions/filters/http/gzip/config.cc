@@ -1,5 +1,6 @@
 #include "extensions/filters/http/gzip/config.h"
 
+#include "envoy/config/filter/http/gzip/v2/gzip.pb.h"
 #include "envoy/config/filter/http/gzip/v2/gzip.pb.validate.h"
 #include "envoy/registry/registry.h"
 
@@ -23,9 +24,7 @@ Http::FilterFactoryCb GzipFilterFactory::createFilterFactoryFromProtoTyped(
 /**
  * Static registration for the gzip filter. @see NamedHttpFilterConfigFactory.
  */
-static Registry::RegisterFactory<GzipFilterFactory,
-                                 Server::Configuration::NamedHttpFilterConfigFactory>
-    register_;
+REGISTER_FACTORY(GzipFilterFactory, Server::Configuration::NamedHttpFilterConfigFactory);
 
 } // namespace Gzip
 } // namespace HttpFilters

@@ -9,6 +9,23 @@ load(
 envoy_package()
 
 envoy_cc_library(
-    name = "init_interface",
-    hdrs = ["init.h"],
+    name = "watcher_interface",
+    hdrs = ["watcher.h"],
+)
+
+envoy_cc_library(
+    name = "target_interface",
+    hdrs = ["target.h"],
+    deps = [
+        ":watcher_interface",
+    ],
+)
+
+envoy_cc_library(
+    name = "manager_interface",
+    hdrs = ["manager.h"],
+    deps = [
+        ":target_interface",
+        ":watcher_interface",
+    ],
 )

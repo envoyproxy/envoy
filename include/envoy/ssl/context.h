@@ -9,14 +9,14 @@
 namespace Envoy {
 namespace Ssl {
 
-typedef std::unique_ptr<envoy::admin::v2alpha::CertificateDetails> CertificateDetailsPtr;
+using CertificateDetailsPtr = std::unique_ptr<envoy::admin::v2alpha::CertificateDetails>;
 
 /**
  * SSL Context is used as a template for SSL connection configuration.
  */
 class Context {
 public:
-  virtual ~Context() {}
+  virtual ~Context() = default;
 
   /**
    * @return the number of days in this context until the next certificate will expire
@@ -33,13 +33,13 @@ public:
    */
   virtual std::vector<CertificateDetailsPtr> getCertChainInformation() const PURE;
 };
-typedef std::shared_ptr<Context> ContextSharedPtr;
+using ContextSharedPtr = std::shared_ptr<Context>;
 
 class ClientContext : public virtual Context {};
-typedef std::shared_ptr<ClientContext> ClientContextSharedPtr;
+using ClientContextSharedPtr = std::shared_ptr<ClientContext>;
 
 class ServerContext : public virtual Context {};
-typedef std::shared_ptr<ServerContext> ServerContextSharedPtr;
+using ServerContextSharedPtr = std::shared_ptr<ServerContext>;
 
 } // namespace Ssl
 } // namespace Envoy

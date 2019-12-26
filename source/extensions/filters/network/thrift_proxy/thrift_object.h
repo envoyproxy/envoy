@@ -20,7 +20,7 @@ class ThriftBase;
  */
 class ThriftValue {
 public:
-  virtual ~ThriftValue() {}
+  virtual ~ThriftValue() = default;
 
   /**
    * @return FieldType the type of this value
@@ -99,16 +99,16 @@ public:
   static FieldType getFieldType() { return FieldType::String; }
 };
 
-typedef std::unique_ptr<ThriftValue> ThriftValuePtr;
-typedef std::list<ThriftValuePtr> ThriftValuePtrList;
-typedef std::list<std::pair<ThriftValuePtr, ThriftValuePtr>> ThriftValuePtrPairList;
+using ThriftValuePtr = std::unique_ptr<ThriftValue>;
+using ThriftValuePtrList = std::list<ThriftValuePtr>;
+using ThriftValuePtrPairList = std::list<std::pair<ThriftValuePtr, ThriftValuePtr>>;
 
 /**
  * ThriftField is a field within a ThriftStruct.
  */
 class ThriftField {
 public:
-  virtual ~ThriftField() {}
+  virtual ~ThriftField() = default;
 
   /**
    * @return FieldType this field's type
@@ -126,15 +126,15 @@ public:
   virtual const ThriftValue& getValue() const PURE;
 };
 
-typedef std::unique_ptr<ThriftField> ThriftFieldPtr;
-typedef std::list<ThriftFieldPtr> ThriftFieldPtrList;
+using ThriftFieldPtr = std::unique_ptr<ThriftField>;
+using ThriftFieldPtrList = std::list<ThriftFieldPtr>;
 
 /**
  * ThriftListValue is an ordered list of ThriftValues.
  */
 class ThriftListValue {
 public:
-  virtual ~ThriftListValue() {}
+  virtual ~ThriftListValue() = default;
 
   /**
    * @return const ThriftValuePtrList& containing the ThriftValues that comprise the list
@@ -157,7 +157,7 @@ public:
  */
 class ThriftSetValue {
 public:
-  virtual ~ThriftSetValue() {}
+  virtual ~ThriftSetValue() = default;
 
   /**
    * @return const ThriftValuePtrList& containing the ThriftValues that comprise the set
@@ -180,10 +180,10 @@ public:
  */
 class ThriftMapValue {
 public:
-  virtual ~ThriftMapValue() {}
+  virtual ~ThriftMapValue() = default;
 
   /**
-   * @return const ThriftValuePtrPairList& containing the ThriftValue key-value paris that comprise
+   * @return const ThriftValuePtrPairList& containing the ThriftValue key-value pairs that comprise
    *         the map.
    */
   virtual const ThriftValuePtrPairList& elements() const PURE;
@@ -209,7 +209,7 @@ public:
  */
 class ThriftStructValue {
 public:
-  virtual ~ThriftStructValue() {}
+  virtual ~ThriftStructValue() = default;
 
   /**
    * @return const ThriftFieldPtrList& containing the ThriftFields that comprise the struct.
@@ -223,11 +223,11 @@ public:
 };
 
 /**
- * ThriftObject is a ThrfitStructValue that can be read from a Buffer::Instance.
+ * ThriftObject is a ThriftStructValue that can be read from a Buffer::Instance.
  */
 class ThriftObject : public ThriftStructValue {
 public:
-  virtual ~ThriftObject() {}
+  ~ThriftObject() override = default;
 
   /*
    * Consumes bytes from the buffer until a single complete Thrift struct has been consumed.
@@ -239,7 +239,7 @@ public:
   virtual bool onData(Buffer::Instance& buffer) PURE;
 };
 
-typedef std::unique_ptr<ThriftObject> ThriftObjectPtr;
+using ThriftObjectPtr = std::unique_ptr<ThriftObject>;
 
 } // namespace ThriftProxy
 } // namespace NetworkFilters

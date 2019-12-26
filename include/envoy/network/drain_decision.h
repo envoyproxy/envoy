@@ -7,7 +7,7 @@ namespace Network {
 
 class DrainDecision {
 public:
-  virtual ~DrainDecision() {}
+  virtual ~DrainDecision() = default;
 
   /**
    * @return TRUE if a connection should be drained and closed. It is up to individual network

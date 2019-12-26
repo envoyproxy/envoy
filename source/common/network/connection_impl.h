@@ -6,14 +6,11 @@
 #include <memory>
 #include <string>
 
-#include "envoy/event/dispatcher.h"
-#include "envoy/network/connection.h"
 #include "envoy/network/transport_socket.h"
 
 #include "common/buffer/watermark_buffer.h"
-#include "common/common/logger.h"
 #include "common/event/libevent.h"
-#include "common/network/filter_manager_impl.h"
+#include "common/network/connection_impl_base.h"
 #include "common/stream_info/stream_info_impl.h"
 
 #include "absl/types/optional.h"
@@ -44,17 +41,14 @@ public:
 };
 
 /**
- * Implementation of Network::Connection.
+ * Implementation of Network::Connection and Network::FilterManagerConnection.
  */
-class ConnectionImpl : public virtual Connection,
-                       public BufferSource,
-                       public TransportSocketCallbacks,
-                       protected Logger::Loggable<Logger::Id::connection> {
+class ConnectionImpl : public ConnectionImplBase, public TransportSocketCallbacks {
 public:
   ConnectionImpl(Event::Dispatcher& dispatcher, ConnectionSocketPtr&& socket,
                  TransportSocketPtr&& transport_socket, bool connected);
 
-  ~ConnectionImpl();
+  ~ConnectionImpl() override;
 
   // Network::FilterManager
   void addWriteFilter(WriteFilterSharedPtr filter) override;
@@ -63,12 +57,9 @@ public:
   bool initializeReadFilters() override;
 
   // Network::Connection
-  void addConnectionCallbacks(ConnectionCallbacks& cb) override;
   void addBytesSentCallback(BytesSentCb cb) override;
   void enableHalfClose(bool enabled) override;
   void close(ConnectionCloseType type) override;
-  Event::Dispatcher& dispatcher() override;
-  uint64_t id() const override;
   std::string nextProtocol() const override { return transport_socket_->protocol(); }
   void noDelay(bool enable) override;
   void readDisable(bool disable) override;
@@ -80,8 +71,8 @@ public:
   const Address::InstanceConstSharedPtr& localAddress() const override {
     return socket_->localAddress();
   }
-  void setConnectionStats(const ConnectionStats& stats) override;
-  const Ssl::Connection* ssl() const override { return transport_socket_->ssl(); }
+  absl::optional<UnixDomainSocketPeerCredentials> unixSocketPeerCredentials() const override;
+  Ssl::ConnectionInfoConstSharedPtr ssl() const override { return transport_socket_->ssl(); }
   State state() const override;
   void write(Buffer::Instance& data, bool end_stream) override;
   void setBufferLimits(uint32_t limit) override;
@@ -94,17 +85,21 @@ public:
   absl::string_view requestedServerName() const override { return socket_->requestedServerName(); }
   StreamInfo::StreamInfo& streamInfo() override { return stream_info_; }
   const StreamInfo::StreamInfo& streamInfo() const override { return stream_info_; }
-  void setWriteFilterOrder(bool reversed) override { reverse_write_filter_order_ = reversed; }
-  bool reverseWriteFilterOrder() const override { return reverse_write_filter_order_; }
+  absl::string_view transportFailureReason() const override;
 
-  // Network::BufferSource
-  BufferSource::StreamBuffer getReadBuffer() override { return {read_buffer_, read_end_stream_}; }
-  BufferSource::StreamBuffer getWriteBuffer() override {
+  // Network::FilterManagerConnection
+  void rawWrite(Buffer::Instance& data, bool end_stream) override;
+
+  // Network::ReadBufferSource
+  StreamBuffer getReadBuffer() override { return {read_buffer_, read_end_stream_}; }
+  // Network::WriteBufferSource
+  StreamBuffer getWriteBuffer() override {
     return {*current_write_buffer_, current_write_end_stream_};
   }
 
   // Network::TransportSocketCallbacks
-  int fd() const override { return socket_->fd(); }
+  IoHandle& ioHandle() override { return socket_->ioHandle(); }
+  const IoHandle& ioHandle() const override { return socket_->ioHandle(); }
   Connection& connection() override { return *this; }
   void raiseEvent(ConnectionEvent event) override;
   // Should the read buffer be drained?
@@ -121,12 +116,10 @@ public:
   // Obtain global next connection ID. This should only be used in tests.
   static uint64_t nextGlobalIdForTest() { return next_global_id_; }
 
-  void setDelayedCloseTimeout(std::chrono::milliseconds timeout) override {
-    delayed_close_timeout_ = timeout;
-  }
-  std::chrono::milliseconds delayedCloseTimeout() const override { return delayed_close_timeout_; }
-
 protected:
+  // Network::ConnectionImplBase
+  void closeConnectionImmediately() override;
+
   void closeSocket(ConnectionEvent close_type);
 
   void onLowWatermark();
@@ -140,11 +133,10 @@ protected:
   Buffer::OwnedImpl read_buffer_;
   // This must be a WatermarkBuffer, but as it is created by a factory the ConnectionImpl only has
   // a generic pointer.
+  // It MUST be defined after the filter_manager_ as some filters may have callbacks that
+  // write_buffer_ invokes during its clean up.
   Buffer::InstancePtr write_buffer_;
   uint32_t read_buffer_limit_ = 0;
-  std::chrono::milliseconds delayed_close_timeout_{0};
-
-protected:
   bool connecting_{false};
   ConnectionEvent immediate_error_event_{ConnectionEvent::Connected};
   bool bind_error_{false};
@@ -161,38 +153,31 @@ private:
   void updateReadBufferStats(uint64_t num_read, uint64_t new_size);
   void updateWriteBufferStats(uint64_t num_written, uint64_t new_size);
 
+  // Write data to the connection bypassing filter chain (optionally).
+  void write(Buffer::Instance& data, bool end_stream, bool through_filter_chain);
+
   // Returns true iff end of stream has been both written and read.
   bool bothSidesHalfClosed();
 
-  // Callback issued when a delayed close timeout triggers.
-  void onDelayedCloseTimeout();
-
   static std::atomic<uint64_t> next_global_id_;
 
-  Event::Dispatcher& dispatcher_;
-  const uint64_t id_;
-  Event::TimerPtr delayed_close_timer_;
-  std::list<ConnectionCallbacks*> callbacks_;
   std::list<BytesSentCb> bytes_sent_callbacks_;
-  bool read_enabled_{true};
-  bool close_after_flush_{false};
-  bool delayed_close_{false};
-  bool above_high_watermark_{false};
-  bool detect_early_close_{true};
-  bool enable_half_close_{false};
-  bool read_end_stream_raised_{false};
-  bool read_end_stream_{false};
-  bool write_end_stream_{false};
-  bool current_write_end_stream_{false};
-  Buffer::Instance* current_write_buffer_{};
-  uint64_t last_read_buffer_size_{};
-  uint64_t last_write_buffer_size_{};
-  std::unique_ptr<ConnectionStats> connection_stats_;
   // Tracks the number of times reads have been disabled. If N different components call
   // readDisabled(true) this allows the connection to only resume reads when readDisabled(false)
   // has been called N times.
+  uint64_t last_read_buffer_size_{};
+  uint64_t last_write_buffer_size_{};
+  Buffer::Instance* current_write_buffer_{};
   uint32_t read_disable_count_{0};
-  bool reverse_write_filter_order_{false};
+  bool read_enabled_ : 1;
+  bool above_high_watermark_ : 1;
+  bool detect_early_close_ : 1;
+  bool enable_half_close_ : 1;
+  bool read_end_stream_raised_ : 1;
+  bool read_end_stream_ : 1;
+  bool write_end_stream_ : 1;
+  bool current_write_end_stream_ : 1;
+  bool dispatch_buffered_data_ : 1;
 };
 
 /**

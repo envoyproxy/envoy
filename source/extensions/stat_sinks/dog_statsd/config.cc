@@ -19,7 +19,8 @@ namespace DogStatsd {
 Stats::SinkPtr DogStatsdSinkFactory::createStatsSink(const Protobuf::Message& config,
                                                      Server::Instance& server) {
   const auto& sink_config =
-      MessageUtil::downcastAndValidate<const envoy::config::metrics::v2::DogStatsdSink&>(config);
+      MessageUtil::downcastAndValidate<const envoy::config::metrics::v2::DogStatsdSink&>(
+          config, server.messageValidationContext().staticValidationVisitor());
   Network::Address::InstanceConstSharedPtr address =
       Network::Address::resolveProtoAddress(sink_config.address());
   ENVOY_LOG(debug, "dog_statsd UDP ip address: {}", address->asString());
@@ -36,8 +37,7 @@ std::string DogStatsdSinkFactory::name() { return StatsSinkNames::get().DogStats
 /**
  * Static registration for the this sink factory. @see RegisterFactory.
  */
-static Registry::RegisterFactory<DogStatsdSinkFactory, Server::Configuration::StatsSinkFactory>
-    register_;
+REGISTER_FACTORY(DogStatsdSinkFactory, Server::Configuration::StatsSinkFactory);
 
 } // namespace DogStatsd
 } // namespace StatSinks

@@ -44,9 +44,14 @@ class MetadataMapWrapper;
 
 struct MetadataMapHelper {
   static void setValue(lua_State* state, const ProtobufWkt::Value& value);
-  static void
-  createTable(lua_State* state,
-              const Protobuf::Map<Envoy::ProtobufTypes::String, ProtobufWkt::Value>& fields);
+  static void createTable(lua_State* state,
+                          const Protobuf::Map<std::string, ProtobufWkt::Value>& fields);
+  static ProtobufWkt::Value loadValue(lua_State* state);
+
+private:
+  static ProtobufWkt::Struct loadStruct(lua_State* state);
+  static ProtobufWkt::ListValue loadList(lua_State* state, int length);
+  static int tableLength(lua_State* state);
 };
 
 /**
@@ -62,7 +67,7 @@ public:
 
 private:
   MetadataMapWrapper& parent_;
-  Protobuf::Map<Envoy::ProtobufTypes::String, ProtobufWkt::Value>::const_iterator current_;
+  Protobuf::Map<std::string, ProtobufWkt::Value>::const_iterator current_;
 };
 
 /**
@@ -103,11 +108,11 @@ private:
 };
 
 /**
- * Lua wrapper for Ssl::Connection.
+ * Lua wrapper for Ssl::ConnectionInfo.
  */
 class SslConnectionWrapper : public BaseLuaObject<SslConnectionWrapper> {
 public:
-  SslConnectionWrapper(const Ssl::Connection*) {}
+  SslConnectionWrapper(const Ssl::ConnectionInfoConstSharedPtr) {}
   static ExportedFunctions exportedFunctions() { return {}; }
 
   // TODO(dio): Add more Lua APIs around Ssl::Connection.

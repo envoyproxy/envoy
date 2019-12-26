@@ -2,7 +2,7 @@
 
 #include <string>
 
-#ifdef TCMALLOC
+#ifdef PROFILER_AVAILABLE
 
 #include "gperftools/heap-profiler.h"
 #include "gperftools/profiler.h"
@@ -18,11 +18,24 @@ bool Cpu::startProfiler(const std::string& output_path) {
 
 void Cpu::stopProfiler() { ProfilerStop(); }
 
-void Heap::forceLink() {
-  // Currently this is here to force the inclusion of the heap profiler during static linking.
-  // Without this call the heap profiler will not be included and cannot be started via env
-  // variable. In the future we can add admin support.
-  HeapProfilerDump("");
+bool Heap::profilerEnabled() {
+  // determined by PROFILER_AVAILABLE
+  return true;
+}
+
+bool Heap::isProfilerStarted() { return IsHeapProfilerRunning(); }
+bool Heap::startProfiler(const std::string& output_file_name_prefix) {
+  HeapProfilerStart(output_file_name_prefix.c_str());
+  return true;
+}
+
+bool Heap::stopProfiler() {
+  if (!IsHeapProfilerRunning()) {
+    return false;
+  }
+  HeapProfilerDump("stop and dump");
+  HeapProfilerStop();
+  return true;
 }
 
 } // namespace Profiler
@@ -37,6 +50,10 @@ bool Cpu::profilerEnabled() { return false; }
 bool Cpu::startProfiler(const std::string&) { return false; }
 void Cpu::stopProfiler() {}
 
+bool Heap::profilerEnabled() { return false; }
+bool Heap::isProfilerStarted() { return false; }
+bool Heap::startProfiler(const std::string&) { return false; }
+bool Heap::stopProfiler() { return false; }
 } // namespace Profiler
 } // namespace Envoy
 

@@ -60,7 +60,7 @@ requests based on path, authority, content type, :ref:`runtime <arch_overview_ru
 This functionality is most useful when using Envoy as a front/edge proxy but is also leveraged when
 building a service to service mesh.
 
-**gRPC support:** `gRPC <http://www.grpc.io/>`_ is an RPC framework from Google that uses HTTP/2
+**gRPC support:** `gRPC <https://www.grpc.io/>`_ is an RPC framework from Google that uses HTTP/2
 as the underlying multiplexed transport. Envoy :ref:`supports <arch_overview_grpc>` all of the
 HTTP/2 features required to be used as the routing and load balancing substrate for gRPC requests
 and responses. The two systems are very complementary.

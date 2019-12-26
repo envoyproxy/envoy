@@ -8,7 +8,6 @@
 using testing::_;
 using testing::Const;
 using testing::Invoke;
-using testing::Return;
 using testing::ReturnPointee;
 using testing::ReturnRef;
 
@@ -16,7 +15,8 @@ namespace Envoy {
 namespace StreamInfo {
 
 MockStreamInfo::MockStreamInfo()
-    : downstream_local_address_(new Network::Address::Ipv4Instance("127.0.0.2")),
+    : filter_state_(FilterState::LifeSpan::FilterChain),
+      downstream_local_address_(new Network::Address::Ipv4Instance("127.0.0.2")),
       downstream_direct_remote_address_(new Network::Address::Ipv4Instance("127.0.0.1")),
       downstream_remote_address_(new Network::Address::Ipv4Instance("127.0.0.1")) {
   ON_CALL(*this, upstreamHost()).WillByDefault(ReturnPointee(&host_));
@@ -62,8 +62,21 @@ MockStreamInfo::MockStreamInfo()
             downstream_remote_address_ = downstream_remote_address;
           }));
   ON_CALL(*this, downstreamRemoteAddress()).WillByDefault(ReturnRef(downstream_remote_address_));
+  ON_CALL(*this, setDownstreamSslConnection(_))
+      .WillByDefault(Invoke(
+          [this](const auto& connection_info) { downstream_connection_info_ = connection_info; }));
+  ON_CALL(*this, setUpstreamSslConnection(_))
+      .WillByDefault(Invoke(
+          [this](const auto& connection_info) { upstream_connection_info_ = connection_info; }));
+  ON_CALL(*this, downstreamSslConnection()).WillByDefault(Invoke([this]() {
+    return downstream_connection_info_;
+  }));
+  ON_CALL(*this, upstreamSslConnection()).WillByDefault(Invoke([this]() {
+    return upstream_connection_info_;
+  }));
   ON_CALL(*this, protocol()).WillByDefault(ReturnPointee(&protocol_));
   ON_CALL(*this, responseCode()).WillByDefault(ReturnPointee(&response_code_));
+  ON_CALL(*this, responseCodeDetails()).WillByDefault(ReturnPointee(&response_code_details_));
   ON_CALL(*this, addBytesReceived(_)).WillByDefault(Invoke([this](uint64_t bytes_received) {
     bytes_received_ += bytes_received;
   }));
@@ -81,9 +94,15 @@ MockStreamInfo::MockStreamInfo()
         requested_server_name_ = std::string(requested_server_name);
       }));
   ON_CALL(*this, requestedServerName()).WillByDefault(ReturnRef(requested_server_name_));
+  ON_CALL(*this, setRouteName(_)).WillByDefault(Invoke([this](const absl::string_view route_name) {
+    route_name_ = std::string(route_name);
+  }));
+  ON_CALL(*this, getRouteName()).WillByDefault(ReturnRef(route_name_));
+  ON_CALL(*this, upstreamTransportFailureReason())
+      .WillByDefault(ReturnRef(upstream_transport_failure_reason_));
 }
 
-MockStreamInfo::~MockStreamInfo() {}
+MockStreamInfo::~MockStreamInfo() = default;
 
 } // namespace StreamInfo
 } // namespace Envoy

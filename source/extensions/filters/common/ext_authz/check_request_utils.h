@@ -5,6 +5,7 @@
 #include <string>
 #include <vector>
 
+#include "envoy/api/v2/core/base.pb.h"
 #include "envoy/grpc/async_client.h"
 #include "envoy/grpc/async_client_manager.h"
 #include "envoy/http/filter.h"
@@ -13,7 +14,8 @@
 #include "envoy/network/address.h"
 #include "envoy/network/connection.h"
 #include "envoy/network/filter.h"
-#include "envoy/service/auth/v2alpha/external_auth.pb.h"
+#include "envoy/service/auth/v2/attribute_context.pb.h"
+#include "envoy/service/auth/v2/external_auth.pb.h"
 #include "envoy/tracing/http_tracer.h"
 #include "envoy/upstream/cluster_manager.h"
 
@@ -43,34 +45,38 @@ public:
    * @param headers supplies the header map with http headers that will be used to create the
    *        check request.
    * @param request is the reference to the check request that will be filled up.
-   *
+   * @param with_request_body when true, will add the request body to the check request.
+   * @param include_peer_certificate whether to include the peer certificate in the check request.
    */
-  static void
-  createHttpCheck(const Envoy::Http::StreamDecoderFilterCallbacks* callbacks,
-                  const Envoy::Http::HeaderMap& headers,
-                  Protobuf::Map<ProtobufTypes::String, ProtobufTypes::String>&& context_extensions,
-                  envoy::service::auth::v2alpha::CheckRequest& request);
+  static void createHttpCheck(const Envoy::Http::StreamDecoderFilterCallbacks* callbacks,
+                              const Envoy::Http::HeaderMap& headers,
+                              Protobuf::Map<std::string, std::string>&& context_extensions,
+                              envoy::api::v2::core::Metadata&& metadata_context,
+                              envoy::service::auth::v2::CheckRequest& request,
+                              uint64_t max_request_bytes, bool include_peer_certificate);
 
   /**
    * createTcpCheck is used to extract the attributes from the network layer and fill them up
    * in the CheckRequest proto message.
    * @param callbacks supplies the network layer context from which data can be extracted.
    * @param request is the reference to the check request that will be filled up.
-   *
+   * @param include_peer_certificate whether to include the peer certificate in the check request.
    */
   static void createTcpCheck(const Network::ReadFilterCallbacks* callbacks,
-                             envoy::service::auth::v2alpha::CheckRequest& request);
+                             envoy::service::auth::v2::CheckRequest& request,
+                             bool include_peer_certificate);
 
 private:
-  static void setAttrContextPeer(envoy::service::auth::v2alpha::AttributeContext_Peer& peer,
+  static void setAttrContextPeer(envoy::service::auth::v2::AttributeContext_Peer& peer,
                                  const Network::Connection& connection, const std::string& service,
-                                 const bool local);
-  static void setHttpRequest(::envoy::service::auth::v2alpha::AttributeContext_HttpRequest& httpreq,
+                                 const bool local, bool include_certificate);
+  static void setHttpRequest(::envoy::service::auth::v2::AttributeContext_HttpRequest& httpreq,
                              const Envoy::Http::StreamDecoderFilterCallbacks* callbacks,
-                             const Envoy::Http::HeaderMap& headers);
-  static void setAttrContextRequest(::envoy::service::auth::v2alpha::AttributeContext_Request& req,
+                             const Envoy::Http::HeaderMap& headers, uint64_t max_request_bytes);
+  static void setAttrContextRequest(::envoy::service::auth::v2::AttributeContext_Request& req,
                                     const Envoy::Http::StreamDecoderFilterCallbacks* callbacks,
-                                    const Envoy::Http::HeaderMap& headers);
+                                    const Envoy::Http::HeaderMap& headers,
+                                    uint64_t max_request_bytes);
   static std::string getHeaderStr(const Envoy::Http::HeaderEntry* entry);
   static Envoy::Http::HeaderMap::Iterate fillHttpHeaders(const Envoy::Http::HeaderEntry&, void*);
 };

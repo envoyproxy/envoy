@@ -15,7 +15,7 @@ enum class State { Flush, Finish };
  */
 class Compressor {
 public:
-  virtual ~Compressor() {}
+  virtual ~Compressor() = default;
 
   /**
    * Compresses data buffer.

@@ -16,15 +16,14 @@ namespace Envoy {
  */
 class CodecClientForTest : public Http::CodecClient {
 public:
-  typedef std::function<void(CodecClient*)> DestroyCb;
-  CodecClientForTest(Network::ClientConnectionPtr&& connection, Http::ClientConnection* codec,
-                     DestroyCb destroy_cb, Upstream::HostDescriptionConstSharedPtr host,
-                     Event::Dispatcher& dispatcher)
-      : CodecClient(CodecClient::Type::HTTP1, std::move(connection), host, dispatcher),
-        destroy_cb_(destroy_cb) {
+  using DestroyCb = std::function<void(CodecClient*)>;
+  CodecClientForTest(CodecClient::Type type, Network::ClientConnectionPtr&& connection,
+                     Http::ClientConnection* codec, DestroyCb destroy_cb,
+                     Upstream::HostDescriptionConstSharedPtr host, Event::Dispatcher& dispatcher)
+      : CodecClient(type, std::move(connection), host, dispatcher), destroy_cb_(destroy_cb) {
     codec_.reset(codec);
   }
-  ~CodecClientForTest() {
+  ~CodecClientForTest() override {
     if (destroy_cb_) {
       destroy_cb_(this);
     }
@@ -39,14 +38,14 @@ public:
  * Mock callbacks used for conn pool testing.
  */
 struct ConnPoolCallbacks : public Http::ConnectionPool::Callbacks {
-  void onPoolReady(Http::StreamEncoder& encoder,
-                   Upstream::HostDescriptionConstSharedPtr host) override {
+  void onPoolReady(Http::StreamEncoder& encoder, Upstream::HostDescriptionConstSharedPtr host,
+                   const StreamInfo::StreamInfo&) override {
     outer_encoder_ = &encoder;
     host_ = host;
     pool_ready_.ready();
   }
 
-  void onPoolFailure(Http::ConnectionPool::PoolFailureReason,
+  void onPoolFailure(Http::ConnectionPool::PoolFailureReason, absl::string_view,
                      Upstream::HostDescriptionConstSharedPtr host) override {
     host_ = host;
     pool_failure_.ready();

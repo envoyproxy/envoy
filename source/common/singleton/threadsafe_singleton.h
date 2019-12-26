@@ -1,5 +1,9 @@
 #pragma once
 
+#include <memory>
+
+#include "common/common/assert.h"
+
 #include "absl/base/call_once.h"
 
 namespace Envoy {
@@ -21,6 +25,7 @@ namespace Envoy {
  * where state "leaks" across tests.
  *
  * */
+template <class T> class TestThreadsafeSingletonInjector;
 template <class T> class ThreadSafeSingleton {
 public:
   static T& get() {
@@ -40,5 +45,43 @@ protected:
 template <class T> absl::once_flag ThreadSafeSingleton<T>::create_once_;
 
 template <class T> T* ThreadSafeSingleton<T>::instance_ = nullptr;
+
+// An instance of a singleton class which has the same thread safety properties
+// as ThreadSafeSingleton, but must be created via initialize prior to access.
+//
+// As with ThreadSafeSingleton the use of this class is generally discouraged.
+template <class T> class InjectableSingleton {
+public:
+  static T& get() {
+    RELEASE_ASSERT(loader_ != nullptr, "InjectableSingleton used prior to initialization");
+    return *loader_;
+  }
+
+  static T* getExisting() { return loader_; }
+
+  static void initialize(T* value) {
+    RELEASE_ASSERT(value != nullptr, "InjectableSingleton initialized with non-null value.");
+    RELEASE_ASSERT(loader_ == nullptr, "InjectableSingleton initialized multiple times.");
+    loader_ = value;
+  }
+  static void clear() { loader_ = nullptr; }
+
+protected:
+  static T* loader_;
+};
+
+template <class T> T* InjectableSingleton<T>::loader_ = nullptr;
+
+template <class T> class ScopedInjectableLoader {
+public:
+  ScopedInjectableLoader(std::unique_ptr<T>&& instance) {
+    instance_ = std::move(instance);
+    InjectableSingleton<T>::initialize(instance_.get());
+  }
+  ~ScopedInjectableLoader() { InjectableSingleton<T>::clear(); }
+
+private:
+  std::unique_ptr<T> instance_;
+};
 
 } // namespace Envoy

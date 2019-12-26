@@ -44,13 +44,6 @@ public:
    */
   bool onMetadataFrameComplete(bool end_metadata);
 
-  /**
-   * @return payload_.
-   */
-  Buffer::OwnedImpl& payload() { return payload_; }
-
-  MetadataMap& getMetadataMap() { return *metadata_map_; }
-
 private:
   friend class MetadataEncoderDecoderTest_VerifyEncoderDecoderOnMultipleMetadataMaps_Test;
   friend class MetadataEncoderDecoderTest_VerifyEncoderDecoderMultipleMetadataReachSizeLimit_Test;
@@ -77,7 +70,7 @@ private:
 
   // TODO(soya3129): consider sharing the inflater with all streams in a connection. Caveat:
   // inflater failure on one stream can impact other streams.
-  typedef CSmartPtr<nghttp2_hd_inflater, nghttp2_hd_inflate_del> Inflater;
+  using Inflater = CSmartPtr<nghttp2_hd_inflater, nghttp2_hd_inflate_del>;
   Inflater inflater_;
 };
 

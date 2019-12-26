@@ -1,0 +1,12 @@
+static_resources {
+}
+stats_config {
+  use_all_default_tags {
+    value: true
+  }
+}
+overload_manager {
+  resource_monitors {
+    name: "envoy.resource_monitors.fixed_heap"
+  }
+}

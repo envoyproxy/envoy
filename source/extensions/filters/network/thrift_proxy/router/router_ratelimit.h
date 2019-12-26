@@ -22,7 +22,7 @@ namespace Router {
  */
 class RateLimitAction {
 public:
-  virtual ~RateLimitAction() {}
+  virtual ~RateLimitAction() = default;
 
   /**
    * Potentially append a descriptor entry to the end of descriptor.
@@ -39,14 +39,14 @@ public:
                                   const Network::Address::Instance& remote_address) const PURE;
 };
 
-typedef std::unique_ptr<RateLimitAction> RateLimitActionPtr;
+using RateLimitActionPtr = std::unique_ptr<RateLimitAction>;
 
 /**
  * Rate limit configuration.
  */
 class RateLimitPolicyEntry {
 public:
-  virtual ~RateLimitPolicyEntry() {}
+  virtual ~RateLimitPolicyEntry() = default;
 
   /**
    * @return the stage value that the configuration is applicable to.
@@ -78,7 +78,7 @@ public:
  */
 class RateLimitPolicy {
 public:
-  virtual ~RateLimitPolicy() {}
+  virtual ~RateLimitPolicy() = default;
 
   /**
    * @return true if there is no rate limit policy for all stage settings.

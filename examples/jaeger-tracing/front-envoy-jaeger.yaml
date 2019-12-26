@@ -7,7 +7,9 @@ static_resources:
     filter_chains:
     - filters:
       - name: envoy.http_connection_manager
-        config:
+        typed_config:
+          "@type": type.googleapis.com/envoy.config.filter.network.http_connection_manager.v2.HttpConnectionManager
+          generate_request_id: true
           tracing:
             operation_name: egress
           codec_type: auto
@@ -27,29 +29,41 @@ static_resources:
                   operation: checkAvailability
           http_filters:
           - name: envoy.router
-            config: {}
+            typed_config: {}
+          use_remote_address: true
   clusters:
   - name: service1
     connect_timeout: 0.250s
     type: strict_dns
     lb_policy: round_robin
     http2_protocol_options: {}
-    hosts:
-    - socket_address:
-        address: service1
-        port_value: 80
+    load_assignment:
+      cluster_name: service1
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: service1
+                port_value: 80
   - name: jaeger
     connect_timeout: 1s
     type: strict_dns
     lb_policy: round_robin
-    hosts:
-    - socket_address:
-        address: jaeger
-        port_value: 9411
+    load_assignment:
+      cluster_name: jaeger
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: jaeger
+                port_value: 9411
 tracing:
   http:
     name: envoy.zipkin
-    config:
+    typed_config:
+      "@type": type.googleapis.com/envoy.config.trace.v2.ZipkinConfig
       collector_cluster: jaeger
       collector_endpoint: "/api/v1/spans"
       shared_span_context: false

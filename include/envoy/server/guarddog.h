@@ -17,7 +17,7 @@ namespace Server {
  */
 class GuardDog {
 public:
-  virtual ~GuardDog() {}
+  virtual ~GuardDog() = default;
 
   /**
    * Get a WatchDog object pointer to a new WatchDog.
@@ -26,9 +26,11 @@ public:
    * to avoid triggering the GuardDog. If no longer needed use the
    * stopWatching() method to remove it from the list of watched objects.
    *
-   * @param thread_id a Thread::ThreadIdPtr containing the system thread id
+   * @param thread_id a Thread::ThreadId containing the system thread id
+   * @param thread_name supplies the name of the thread which is used for per-thread miss stats.
    */
-  virtual WatchDogSharedPtr createWatchDog(Thread::ThreadIdPtr&& thread_id) PURE;
+  virtual WatchDogSharedPtr createWatchDog(Thread::ThreadId thread_id,
+                                           const std::string& thread_name) PURE;
 
   /**
    * Tell the GuardDog to forget about this WatchDog.

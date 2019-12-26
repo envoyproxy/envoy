@@ -5,6 +5,7 @@ licenses(["notice"])  # Apache 2
 
 load(
     "//bazel:envoy_build_system.bzl",
+    "envoy_cc_extension",
     "envoy_cc_library",
     "envoy_package",
 )
@@ -17,7 +18,7 @@ envoy_cc_library(
     hdrs = ["dynamo_filter.h"],
     deps = [
         ":dynamo_request_parser_lib",
-        ":dynamo_utility_lib",
+        ":dynamo_stats_lib",
         "//include/envoy/http:filter_interface",
         "//include/envoy/runtime:runtime_interface",
         "//source/common/buffer:buffer_lib",
@@ -37,25 +38,27 @@ envoy_cc_library(
     ],
 )
 
-envoy_cc_library(
-    name = "dynamo_utility_lib",
-    srcs = ["dynamo_utility.cc"],
-    hdrs = ["dynamo_utility.h"],
-    deps = [
-        "//include/envoy/stats:stats_interface",
-        "//source/common/stats:stats_lib",
-    ],
-)
-
-envoy_cc_library(
+envoy_cc_extension(
     name = "config",
     srcs = ["config.cc"],
     hdrs = ["config.h"],
+    security_posture = "requires_trusted_downstream_and_upstream",
     deps = [
         ":dynamo_filter_lib",
         "//include/envoy/registry",
         "//include/envoy/server:filter_config_interface",
         "//source/extensions/filters/http:well_known_names",
         "//source/extensions/filters/http/common:empty_http_filter_config_lib",
+    ],
+)
+
+envoy_cc_library(
+    name = "dynamo_stats_lib",
+    srcs = ["dynamo_stats.cc"],
+    hdrs = ["dynamo_stats.h"],
+    deps = [
+        ":dynamo_request_parser_lib",
+        "//include/envoy/stats:stats_interface",
+        "//source/common/stats:symbol_table_lib",
     ],
 )

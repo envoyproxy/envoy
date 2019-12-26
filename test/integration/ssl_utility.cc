@@ -1,10 +1,13 @@
 #include "test/integration/ssl_utility.h"
 
+#include "envoy/api/v2/auth/cert.pb.h"
+
 #include "common/json/json_loader.h"
 #include "common/network/utility.h"
-#include "common/ssl/context_config_impl.h"
-#include "common/ssl/context_manager_impl.h"
-#include "common/ssl/ssl_socket.h"
+
+#include "extensions/transport_sockets/tls/context_config_impl.h"
+#include "extensions/transport_sockets/tls/context_manager_impl.h"
+#include "extensions/transport_sockets/tls/ssl_socket.h"
 
 #include "test/config/utility.h"
 #include "test/integration/server.h"
@@ -12,12 +15,16 @@
 #include "test/test_common/environment.h"
 #include "test/test_common/network_utility.h"
 
+#include "gtest/gtest.h"
+
+using testing::ReturnRef;
+
 namespace Envoy {
 namespace Ssl {
 
 Network::TransportSocketFactoryPtr
 createClientSslTransportSocketFactory(const ClientSslTransportOptions& options,
-                                      ContextManager& context_manager) {
+                                      ContextManager& context_manager, Api::Api& api) {
   std::string yaml_plain = R"EOF(
   common_tls_context:
     validation_context:
@@ -43,7 +50,7 @@ createClientSslTransportSocketFactory(const ClientSslTransportOptions& options,
   }
 
   envoy::api::v2::auth::UpstreamTlsContext tls_context;
-  MessageUtil::loadFromYaml(TestEnvironment::substitute(yaml_plain), tls_context);
+  TestUtility::loadFromYaml(TestEnvironment::substitute(yaml_plain), tls_context);
   auto* common_context = tls_context.mutable_common_tls_context();
 
   if (options.alpn_) {
@@ -62,22 +69,27 @@ createClientSslTransportSocketFactory(const ClientSslTransportOptions& options,
   common_context->mutable_tls_params()->set_tls_maximum_protocol_version(options.tls_version_);
 
   NiceMock<Server::Configuration::MockTransportSocketFactoryContext> mock_factory_ctx;
-  auto cfg =
-      std::make_unique<ClientContextConfigImpl>(tls_context, options.sigalgs_, mock_factory_ctx);
+  ON_CALL(mock_factory_ctx, api()).WillByDefault(ReturnRef(api));
+  auto cfg = std::make_unique<Extensions::TransportSockets::Tls::ClientContextConfigImpl>(
+      tls_context, options.sigalgs_, mock_factory_ctx);
   static auto* client_stats_store = new Stats::TestIsolatedStoreImpl();
   return Network::TransportSocketFactoryPtr{
-      new Ssl::ClientSslSocketFactory(std::move(cfg), context_manager, *client_stats_store)};
+      new Extensions::TransportSockets::Tls::ClientSslSocketFactory(std::move(cfg), context_manager,
+                                                                    *client_stats_store)};
 }
 
-Network::TransportSocketFactoryPtr createUpstreamSslContext(ContextManager& context_manager) {
+Network::TransportSocketFactoryPtr createUpstreamSslContext(ContextManager& context_manager,
+                                                            Api::Api& api) {
   envoy::api::v2::auth::DownstreamTlsContext tls_context;
   ConfigHelper::initializeTls({}, *tls_context.mutable_common_tls_context());
 
   NiceMock<Server::Configuration::MockTransportSocketFactoryContext> mock_factory_ctx;
-  auto cfg = std::make_unique<Ssl::ServerContextConfigImpl>(tls_context, mock_factory_ctx);
+  ON_CALL(mock_factory_ctx, api()).WillByDefault(ReturnRef(api));
+  auto cfg = std::make_unique<Extensions::TransportSockets::Tls::ServerContextConfigImpl>(
+      tls_context, mock_factory_ctx);
 
   static Stats::Scope* upstream_stats_store = new Stats::TestIsolatedStoreImpl();
-  return std::make_unique<Ssl::ServerSslSocketFactory>(
+  return std::make_unique<Extensions::TransportSockets::Tls::ServerSslSocketFactory>(
       std::move(cfg), context_manager, *upstream_stats_store, std::vector<std::string>{});
 }
 

@@ -2,6 +2,7 @@
 
 #include <datadog/opentracing.h>
 
+#include "envoy/config/trace/v2/trace.pb.h"
 #include "envoy/local_info/local_info.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/thread_local/thread_local.h"
@@ -30,8 +31,8 @@ struct DatadogTracerStats {
 };
 
 class TraceReporter;
-typedef std::unique_ptr<TraceReporter> TraceReporterPtr;
-typedef std::shared_ptr<datadog::opentracing::TraceEncoder> TraceEncoderSharedPtr;
+using TraceReporterPtr = std::unique_ptr<TraceReporter>;
+using TraceEncoderSharedPtr = std::shared_ptr<datadog::opentracing::TraceEncoder>;
 
 /**
  * Class for a Datadog-specific Driver.

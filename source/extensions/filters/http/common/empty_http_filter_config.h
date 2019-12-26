@@ -13,7 +13,7 @@ namespace Common {
 
 /**
  * Config registration for http filters that have empty configuration blocks.
- * The boiler plate instantation functions (createFilterFactory, createFilterFactoryFromProto,
+ * The boiler plate instantiation functions (createFilterFactory, createFilterFactoryFromProto,
  * and createEmptyConfigProto) are implemented here. Users of this class have to implement
  * the createFilter function that instantiates the actual filter.
  */
@@ -21,12 +21,6 @@ class EmptyHttpFilterConfig : public Server::Configuration::NamedHttpFilterConfi
 public:
   virtual Http::FilterFactoryCb createFilter(const std::string& stat_prefix,
                                              Server::Configuration::FactoryContext& context) PURE;
-
-  Http::FilterFactoryCb
-  createFilterFactory(const Json::Object&, const std::string& stat_prefix,
-                      Server::Configuration::FactoryContext& context) override {
-    return createFilter(stat_prefix, context);
-  }
 
   Http::FilterFactoryCb
   createFilterFactoryFromProto(const Protobuf::Message&, const std::string& stat_prefix,

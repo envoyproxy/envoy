@@ -1,3 +1,5 @@
+#include "envoy/config/resource_monitor/fixed_heap/v2alpha/fixed_heap.pb.h"
+
 #include "extensions/resource_monitors/fixed_heap/fixed_heap_monitor.h"
 
 #include "absl/types/optional.h"
@@ -8,10 +10,11 @@ namespace Envoy {
 namespace Extensions {
 namespace ResourceMonitors {
 namespace FixedHeapMonitor {
+namespace {
 
 class MockMemoryStatsReader : public MemoryStatsReader {
 public:
-  MockMemoryStatsReader() {}
+  MockMemoryStatsReader() = default;
 
   MOCK_METHOD0(reservedHeapBytes, uint64_t());
   MOCK_METHOD0(unmappedHeapBytes, uint64_t());
@@ -50,6 +53,7 @@ TEST(FixedHeapMonitorTest, ComputesCorrectUsage) {
   EXPECT_EQ(resource.pressure(), 0.7);
 }
 
+} // namespace
 } // namespace FixedHeapMonitor
 } // namespace ResourceMonitors
 } // namespace Extensions

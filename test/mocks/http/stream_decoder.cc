@@ -3,8 +3,8 @@
 namespace Envoy {
 namespace Http {
 
-MockStreamDecoder::MockStreamDecoder() {}
-MockStreamDecoder::~MockStreamDecoder() {}
+MockStreamDecoder::MockStreamDecoder() = default;
+MockStreamDecoder::~MockStreamDecoder() = default;
 
 } // namespace Http
 } // namespace Envoy

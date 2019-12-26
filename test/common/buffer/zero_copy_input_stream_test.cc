@@ -1,6 +1,8 @@
 #include "common/buffer/buffer_impl.h"
 #include "common/buffer/zero_copy_input_stream_impl.h"
 
+#include "test/common/buffer/utility.h"
+
 #include "gtest/gtest.h"
 
 namespace Envoy {
@@ -36,7 +38,6 @@ TEST_F(ZeroCopyInputStreamTest, Next) {
 
 TEST_F(ZeroCopyInputStreamTest, TwoSlices) {
   Buffer::OwnedImpl buffer("efgh");
-
   stream_.move(buffer);
 
   EXPECT_TRUE(stream_.Next(&data_, &size_));

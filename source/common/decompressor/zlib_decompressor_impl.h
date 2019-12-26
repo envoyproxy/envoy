@@ -2,6 +2,8 @@
 
 #include "envoy/decompressor/decompressor.h"
 
+#include "common/common/logger.h"
+
 #include "zlib.h"
 
 namespace Envoy {
@@ -10,7 +12,8 @@ namespace Decompressor {
 /**
  * Implementation of decompressor's interface.
  */
-class ZlibDecompressorImpl : public Decompressor {
+class ZlibDecompressorImpl : public Decompressor,
+                             public Logger::Loggable<Logger::Id::decompression> {
 public:
   ZlibDecompressorImpl();
 
@@ -43,8 +46,13 @@ public:
   // Decompressor
   void decompress(const Buffer::Instance& input_buffer, Buffer::Instance& output_buffer) override;
 
+  // Flag to track whether error occurred during decompression.
+  // When an error occurs, the error code (a negative int) will be stored in this variable.
+  int decompression_error_{0};
+
 private:
   bool inflateNext();
+  void updateOutput(Buffer::Instance& output_buffer);
 
   const uint64_t chunk_size_;
   bool initialized_;

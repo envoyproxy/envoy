@@ -20,6 +20,6 @@ private:
   int tcpdump_pid_;
 };
 
-typedef std::unique_ptr<TcpDump> TcpDumpPtr;
+using TcpDumpPtr = std::unique_ptr<TcpDump>;
 
 } // namespace Envoy

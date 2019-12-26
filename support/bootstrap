@@ -45,14 +45,14 @@ if test ! -d "${DOT_GIT_DIR}"; then
 fi
 
 HOOKS_DIR="${DOT_GIT_DIR}/hooks"
-HOOKS_DIR_RELPATH=$(relpath "${HOOKS_DIR}" "${PWD}")
+HOOKS_DIR_RELPATH=$(relpath "${HOOKS_DIR}" "$(dirname $0)")
 
 if [ ! -e "${HOOKS_DIR}/prepare-commit-msg" ]; then
   echo "Installing hook 'prepare-commit-msg'"
-  ln -s "${HOOKS_DIR_RELPATH}/support/hooks/prepare-commit-msg" "${HOOKS_DIR}/prepare-commit-msg"
+  ln -sf "${HOOKS_DIR_RELPATH}/hooks/prepare-commit-msg" "${HOOKS_DIR}/prepare-commit-msg"
 fi
 
 if [ ! -e "${HOOKS_DIR}/pre-push" ]; then
   echo "Installing hook 'pre-push'"
-  ln -s "${HOOKS_DIR_RELPATH}/support/hooks/pre-push" "${HOOKS_DIR}/pre-push"
+  ln -sf "${HOOKS_DIR_RELPATH}/hooks/pre-push" "${HOOKS_DIR}/pre-push"
 fi

@@ -1,102 +1,27 @@
 #!/bin/bash
 
-set -e
-
-# The following functions are borrowed from PageSpeed's system test
-# infrastructure, where are part of a bash system-test helper library.
-# I'm putting them here for this one test to help me debug it, with
-# the thinking that if there's traction for this infrastructure I'll
-# factor it out into a helpers class for Envoy.  Original source link:
-#
-# https://github.com/apache/incubator-pagespeed-mod/blob/c7cc4f22c79ada8077be2a16afc376dc8f8bd2da/pagespeed/automatic/system_test_helpers.sh#L383
-
-CURRENT_TEST="NONE"
-function start_test() {
-  CURRENT_TEST="$@"
-  echo "TEST: $CURRENT_TEST"
-}
-
-check() {
-  echo "     check" "$@" ...
-  "$@" || handle_failure
-}
-
-BACKGROUND_PID="?"
-run_in_background_saving_pid() {
-  echo "     backgrounding:" "$@" ...
-  "$@" &
-  BACKGROUND_PID="$!"
-}
-
-# By default, print a message like:
-#   failure at line 374
-#   FAIL
-# and then exit with return value 1.  If we expected this test to fail, log to
-# $EXPECTED_FAILURES and return without exiting.
-#
-# If the shell does not support the 'caller' builtin, skip the line number info.
-#
-# Assumes it's being called from a failure-reporting function and that the
-# actual failure the user is interested in is our caller's caller.  If it
-# weren't for this, fail and handle_failure could be the same.
-handle_failure() {
-  if [ $# -eq 1 ]; then
-    echo FAILed Input: "$1"
-  fi
-
-  # From http://stackoverflow.com/questions/685435/bash-stacktrace
-  # to avoid printing 'handle_failure' we start with 1 to skip get_stack caller
-  local i
-  local stack_size=${#FUNCNAME[@]}
-  for (( i=1; i<$stack_size ; i++ )); do
-    local func="${FUNCNAME[$i]}"
-    [ -z "$func" ] && func=MAIN
-    local line_number="${BASH_LINENO[(( i - 1 ))]}"
-    local src="${BASH_SOURCE[$i]}"
-    [ -z "$src" ] && src=non_file_source
-    echo "${src}:${line_number}: $func"
-  done
-
-  # Note: we print line number after "failed input" so that it doesn't get
-  # knocked out of the terminal buffer.
-  if type caller > /dev/null 2>&1 ; then
-    # "caller 1" is our caller's caller.
-    echo "     failure at line $(caller 1 | sed 's/ .*//')" 1>&2
-  fi
-  echo "in '$CURRENT_TEST'"
-  echo FAIL.
-  exit 1
-}
-
-# The heapchecker outputs some data to stderr on every execution.  This gets intermingled
-# with the output from --hot-restart-version, so disable the heap-checker for these runs.
-disableHeapCheck () {
-  SAVED_HEAPCHECK=${HEAPCHECK}
-  unset HEAPCHECK
-}
-
-enableHeapCheck () {
-  HEAPCHECK=${SAVED_HEAPCHECK}
-}
-
-
-[[ -z "${ENVOY_BIN}" ]] && ENVOY_BIN="${TEST_RUNDIR}"/source/exe/envoy-static
+source "$TEST_SRCDIR/envoy/test/integration/test_utility.sh"
 
 # TODO(htuch): In this test script, we are duplicating work done in test_environment.cc via sed.
 # Instead, we can add a simple C++ binary that links against test_environment.cc and uses the
 # substitution methods provided there.
 JSON_TEST_ARRAY=()
 
+# Ensure that the runtime watch root exist.
+mkdir -p "${TEST_TMPDIR}"/test/common/runtime/test_data/current/envoy
+mkdir -p "${TEST_TMPDIR}"/test/common/runtime/test_data/current/envoy_override
+
 # Parameterize IPv4 and IPv6 testing.
 if [[ -z "${ENVOY_IP_TEST_VERSIONS}" ]] || [[ "${ENVOY_IP_TEST_VERSIONS}" == "all" ]] \
   || [[ "${ENVOY_IP_TEST_VERSIONS}" == "v4only" ]]; then
   HOT_RESTART_JSON_V4="${TEST_TMPDIR}"/hot_restart_v4.yaml
   echo building ${HOT_RESTART_JSON_V4} ...
-  cat "${TEST_RUNDIR}"/test/config/integration/server.yaml |
+  cat "${TEST_SRCDIR}/envoy"/test/config/integration/server.yaml |
     sed -e "s#{{ upstream_. }}#0#g" | \
-    sed -e "s#{{ test_rundir }}#$TEST_RUNDIR#" | \
+    sed -e "s#{{ test_rundir }}#$TEST_SRCDIR/envoy#" | \
     sed -e "s#{{ test_tmpdir }}#$TEST_TMPDIR#" | \
     sed -e "s#{{ ip_loopback_address }}#127.0.0.1#" | \
+    sed -e "s#{{ reuse_port }}#false#" | \
     sed -e "s#{{ dns_lookup_family }}#V4_ONLY#" | \
     cat > "${HOT_RESTART_JSON_V4}"
   JSON_TEST_ARRAY+=("${HOT_RESTART_JSON_V4}")
@@ -105,11 +30,12 @@ fi
 if [[ -z "${ENVOY_IP_TEST_VERSIONS}" ]] || [[ "${ENVOY_IP_TEST_VERSIONS}" == "all" ]] \
   || [[ "${ENVOY_IP_TEST_VERSIONS}" == "v6only" ]]; then
   HOT_RESTART_JSON_V6="${TEST_TMPDIR}"/hot_restart_v6.yaml
-  cat "${TEST_RUNDIR}"/test/config/integration/server.yaml |
+  cat "${TEST_SRCDIR}/envoy"/test/config/integration/server.yaml |
     sed -e "s#{{ upstream_. }}#0#g" | \
-    sed -e "s#{{ test_rundir }}#$TEST_RUNDIR#" | \
+    sed -e "s#{{ test_rundir }}#$TEST_SRCDIR/envoy#" | \
     sed -e "s#{{ test_tmpdir }}#$TEST_TMPDIR#" | \
     sed -e "s#{{ ip_loopback_address }}#::1#" | \
+    sed -e "s#{{ reuse_port }}#false#" | \
     sed -e "s#{{ dns_lookup_family }}#v6_only#" | \
     cat > "${HOT_RESTART_JSON_V6}"
   JSON_TEST_ARRAY+=("${HOT_RESTART_JSON_V6}")
@@ -119,11 +45,24 @@ fi
 # upstreams to avoid too much wild sedding.
 HOT_RESTART_JSON_UDS="${TEST_TMPDIR}"/hot_restart_uds.yaml
 SOCKET_DIR="$(mktemp -d /tmp/envoy_test_hotrestart.XXXXXX)"
-cat "${TEST_RUNDIR}"/test/config/integration/server_unix_listener.yaml |
+cat "${TEST_SRCDIR}/envoy"/test/config/integration/server_unix_listener.yaml |
   sed -e "s#{{ socket_dir }}#${SOCKET_DIR}#" | \
   sed -e "s#{{ ip_loopback_address }}#127.0.0.1#" | \
   cat > "${HOT_RESTART_JSON_UDS}"
 JSON_TEST_ARRAY+=("${HOT_RESTART_JSON_UDS}")
+
+# Test reuse port listener.
+HOT_RESTART_JSON_REUSE_PORT="${TEST_TMPDIR}"/hot_restart_v4.yaml
+echo building ${HOT_RESTART_JSON_V4} ...
+cat "${TEST_SRCDIR}/envoy"/test/config/integration/server.yaml |
+  sed -e "s#{{ upstream_. }}#0#g" | \
+  sed -e "s#{{ test_rundir }}#$TEST_SRCDIR/envoy#" | \
+  sed -e "s#{{ test_tmpdir }}#$TEST_TMPDIR#" | \
+  sed -e "s#{{ ip_loopback_address }}#127.0.0.1#" | \
+  sed -e "s#{{ reuse_port }}#true#" | \
+  sed -e "s#{{ dns_lookup_family }}#V4_ONLY#" | \
+  cat > "${HOT_RESTART_JSON_REUSE_PORT}"
+JSON_TEST_ARRAY+=("${HOT_RESTART_JSON_REUSE_PORT}")
 
 # Enable this test to work with --runs_per_test
 if [[ -z "${TEST_RANDOM_SEED}" ]]; then
@@ -155,7 +94,7 @@ do
   start_test Updating original config listener addresses
   sleep 3
   UPDATED_HOT_RESTART_JSON="${TEST_TMPDIR}"/hot_restart_updated."${TEST_INDEX}".yaml
-  "${TEST_RUNDIR}"/tools/socket_passing "-o" "${HOT_RESTART_JSON}" "-a" "${ADMIN_ADDRESS_PATH_0}" \
+  "${TEST_SRCDIR}/envoy"/tools/socket_passing "-o" "${HOT_RESTART_JSON}" "-a" "${ADMIN_ADDRESS_PATH_0}" \
     "-u" "${UPDATED_HOT_RESTART_JSON}"
 
   # Send SIGUSR1 signal to the first server, this should not kill it. Also send SIGHUP which should
@@ -171,32 +110,30 @@ do
   # string, compare it against a hard-coded string.
   start_test Checking for consistency of /hot_restart_version
   CLI_HOT_RESTART_VERSION=$("${ENVOY_BIN}" --hot-restart-version --base-id "${BASE_ID}" 2>&1)
-  EXPECTED_CLI_HOT_RESTART_VERSION="10.200.16384.127.options=capacity=16384, num_slots=8209 hash=228984379728933363 size=2654312"
+  EXPECTED_CLI_HOT_RESTART_VERSION="11.104"
+  echo "The Envoy's hot restart version is ${CLI_HOT_RESTART_VERSION}"
+  echo "Now checking that the above version is what we expected."
   check [ "${CLI_HOT_RESTART_VERSION}" = "${EXPECTED_CLI_HOT_RESTART_VERSION}" ]
 
+  # TODO(fredlas) max-obj-name-len is a deprecated no-op; can probably remove this test soon.
   start_test Checking for consistency of /hot_restart_version with --max-obj-name-len 500
   CLI_HOT_RESTART_VERSION=$("${ENVOY_BIN}" --hot-restart-version --base-id "${BASE_ID}" \
     --max-obj-name-len 500 2>&1)
-  EXPECTED_CLI_HOT_RESTART_VERSION="10.200.16384.567.options=capacity=16384, num_slots=8209 hash=228984379728933363 size=9863272"
+  EXPECTED_CLI_HOT_RESTART_VERSION="11.104"
   check [ "${CLI_HOT_RESTART_VERSION}" = "${EXPECTED_CLI_HOT_RESTART_VERSION}" ]
 
   start_test Checking for match of --hot-restart-version and admin /hot_restart_version
   ADMIN_ADDRESS_0=$(cat "${ADMIN_ADDRESS_PATH_0}")
   echo fetching hot restart version from http://${ADMIN_ADDRESS_0}/hot_restart_version ...
   ADMIN_HOT_RESTART_VERSION=$(curl -sg http://${ADMIN_ADDRESS_0}/hot_restart_version)
+  echo "Fetched ADMIN_HOT_RESTART_VERSION is ${ADMIN_HOT_RESTART_VERSION}"
   CLI_HOT_RESTART_VERSION=$("${ENVOY_BIN}" --hot-restart-version --base-id "${BASE_ID}" \
     --max-obj-name-len 500 2>&1)
   check [ "${ADMIN_HOT_RESTART_VERSION}" = "${CLI_HOT_RESTART_VERSION}" ]
 
-  start_test Checking for hot-restart-version mismatch when max-obj-name-len differs
-  CLI_HOT_RESTART_VERSION=$("${ENVOY_BIN}" --hot-restart-version --base-id "${BASE_ID}" \
-    --max-obj-name-len 1234 2>&1)
-  check [ "${ADMIN_HOT_RESTART_VERSION}" != "${CLI_HOT_RESTART_VERSION}" ]
-
-  start_test Checking for hot-start-version mismatch when max-stats differs
-  CLI_HOT_RESTART_VERSION=$("${ENVOY_BIN}" --hot-restart-version --base-id "${BASE_ID}" \
-    --max-stats 12345 2>&1)
-  check [ "${ADMIN_HOT_RESTART_VERSION}" != "${CLI_HOT_RESTART_VERSION}" ]
+  # Verify we can see server.live in the admin port.
+  SERVER_LIVE_0=$(curl -sg http://${ADMIN_ADDRESS_0}/stats | grep server.live)
+  check [ "$SERVER_LIVE_0" = "server.live: 1" ];
 
   enableHeapCheck
 
@@ -211,9 +148,13 @@ do
   # Wait for stat flushing
   sleep 7
 
+  ADMIN_ADDRESS_1=$(cat "${ADMIN_ADDRESS_PATH_1}")
+  SERVER_LIVE_1=$(curl -sg http://${ADMIN_ADDRESS_1}/stats | grep server.live)
+  check [ "$SERVER_LIVE_1" = "server.live: 1" ];
+
   start_test Checking that listener addresses have not changed
   HOT_RESTART_JSON_1="${TEST_TMPDIR}"/hot_restart.1."${TEST_INDEX}".yaml
-  "${TEST_RUNDIR}"/tools/socket_passing "-o" "${UPDATED_HOT_RESTART_JSON}" "-a" "${ADMIN_ADDRESS_PATH_1}" \
+  "${TEST_SRCDIR}/envoy"/tools/socket_passing "-o" "${UPDATED_HOT_RESTART_JSON}" "-a" "${ADMIN_ADDRESS_PATH_1}" \
     "-u" "${HOT_RESTART_JSON_1}"
   CONFIG_DIFF=$(diff "${UPDATED_HOT_RESTART_JSON}" "${HOT_RESTART_JSON_1}")
   [[ -z "${CONFIG_DIFF}" ]]
@@ -229,7 +170,7 @@ do
 
   start_test Checking that listener addresses have not changed
   HOT_RESTART_JSON_2="${TEST_TMPDIR}"/hot_restart.2."${TEST_INDEX}".yaml
-  "${TEST_RUNDIR}"/tools/socket_passing "-o" "${UPDATED_HOT_RESTART_JSON}" "-a" "${ADMIN_ADDRESS_PATH_2}" \
+  "${TEST_SRCDIR}/envoy"/tools/socket_passing "-o" "${UPDATED_HOT_RESTART_JSON}" "-a" "${ADMIN_ADDRESS_PATH_2}" \
     "-u" "${HOT_RESTART_JSON_2}"
   CONFIG_DIFF=$(diff "${UPDATED_HOT_RESTART_JSON}" "${HOT_RESTART_JSON_2}")
   [[ -z "${CONFIG_DIFF}" ]]
@@ -255,23 +196,6 @@ do
   [[ $? == 0 ]]
   TEST_INDEX=$((TEST_INDEX+1))
 done
-
-# set -e forces the script to exit on non-zero exit codes. Set +e makes it easier to
-# catch the non-zero exit code.
-set +e
-disableHeapCheck
-
-start_test Launching envoy with no parameters. Check the exit value is 1
-${ENVOY_BIN} --base_id "${BASE_ID}"
-EXIT_CODE=$?
-# The test should fail if the Envoy binary exits with anything other than 1.
-if [[ $EXIT_CODE -ne 1 ]]; then
-    echo "Envoy exited with code: ${EXIT_CODE}"
-    exit 1
-fi
-
-enableHeapCheck
-set -e
 
 start_test disabling hot_restart by command line.
 CLI_HOT_RESTART_VERSION=$("${ENVOY_BIN}" --hot-restart-version --disable-hot-restart 2>&1)

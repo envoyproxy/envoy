@@ -74,5 +74,33 @@
       "internal": false
     },
     "validate": {"path_redirect": "https://new.lyft.com/new_baz"}
+  },
+  {
+    "test_name": "Test_9",
+    "input": {
+      ":authority": "api.lyft.com",
+      ":path": "/pretest",
+      "ssl": true
+    },
+    "validate": {
+      "host_rewrite": "api.lyft.com",
+      "virtual_host_name": "api",
+      "path_rewrite": "/pre/test",
+      "cluster_name": "www2"
+    }
+  },
+  {
+    "test_name": "Test_10",
+    "input": {
+      ":authority": "api.lyft.com",
+      ":path": "/secondtest",
+      "ssl": true
+    },
+    "validate": {
+      "host_rewrite": "api.lyft.com",
+      "virtual_host_name": "api",
+      "path_rewrite": "/second/test",
+      "cluster_name": "www2"
+    }
   }
 ]

@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 . tools/shell_utils.sh
 
@@ -16,18 +16,23 @@ then
     exit 1
   fi
   # Check the version_history.rst contains current release version.
-  grep --fixed-strings "$VERSION_NUMBER" docs/root/intro/version_history.rst
+  grep --fixed-strings "$VERSION_NUMBER" docs/root/intro/version_history.rst \
+    || (echo "Git tag not found in version_history.rst" && exit 1)
+
   # Now that we now there is a match, we can use the tag.
   export ENVOY_DOCS_VERSION_STRING="tag-$CIRCLE_TAG"
   export ENVOY_DOCS_RELEASE_LEVEL=tagged
+  export ENVOY_BLOB_SHA="$CIRCLE_TAG"
 else
   BUILD_SHA=$(git rev-parse HEAD)
   VERSION_NUM=$(cat VERSION)
   export ENVOY_DOCS_VERSION_STRING="${VERSION_NUM}"-"${BUILD_SHA:0:6}"
   export ENVOY_DOCS_RELEASE_LEVEL=pre-release
+  export ENVOY_BLOB_SHA="$BUILD_SHA"
 fi
 
 SCRIPT_DIR=$(dirname "$0")
+API_DIR=$(dirname "$dir")/api
 BUILD_DIR=build_docs
 [[ -z "${DOCS_OUTPUT_DIR}" ]] && DOCS_OUTPUT_DIR=generated/docs
 [[ -z "${GENERATED_RST_DIR}" ]] && GENERATED_RST_DIR=generated/rst
@@ -39,108 +44,69 @@ rm -rf "${GENERATED_RST_DIR}"
 mkdir -p "${GENERATED_RST_DIR}"
 
 source_venv "$BUILD_DIR"
-pip install -r "${SCRIPT_DIR}"/requirements.txt
+pip3 install -r "${SCRIPT_DIR}"/requirements.txt
 
+# Clean up any stale files in the API tree output. Bazel remembers valid cached
+# files still.
+rm -rf bazel-bin/external/envoy_api
+
+# This is for local RBE setup, should be no-op for builds without RBE setting in bazelrc files.
+BAZEL_BUILD_OPTIONS+=" --remote_download_outputs=all --strategy=protodoc=sandboxed,local"
+
+export EXTENSION_DB_PATH="$(realpath "${BUILD_DIR}/extension_db.json")"
+
+# Generate extension database. This maps from extension name to extension
+# metadata, based on the envoy_cc_extension() Bazel target attributes.
+./docs/generate_extension_db.py "${EXTENSION_DB_PATH}"
+
+# Generate RST for the lists of trusted/untrusted extensions in
+# intro/arch_overview/security docs.
+mkdir -p "${GENERATED_RST_DIR}"/intro/arch_overview/security
+./docs/generate_extension_rst.py "${EXTENSION_DB_PATH}" "${GENERATED_RST_DIR}"/intro/arch_overview/security
+
+# Generate the extensions docs
 bazel build ${BAZEL_BUILD_OPTIONS} @envoy_api//docs:protos --aspects \
-  tools/protodoc/protodoc.bzl%proto_doc_aspect --output_groups=rst --action_env=CPROFILE_ENABLED  --spawn_strategy=standalone
+  tools/protodoc/protodoc.bzl%protodoc_aspect --output_groups=rst --action_env=CPROFILE_ENABLED=1 \
+  --action_env=ENVOY_BLOB_SHA --action_env=EXTENSION_DB_PATH="${EXTENSION_DB_PATH}" --host_force_python=PY3
 
-# These are the protos we want to put in docs, this list will grow.
-# TODO(htuch): Factor this out of this script.
-PROTO_RST="
-  /envoy/admin/v2alpha/certs/envoy/admin/v2alpha/certs.proto.rst
-  /envoy/admin/v2alpha/clusters/envoy/admin/v2alpha/clusters.proto.rst
-  /envoy/admin/v2alpha/config_dump/envoy/admin/v2alpha/config_dump.proto.rst
-  /envoy/admin/v2alpha/memory/envoy/admin/v2alpha/memory.proto.rst
-  /envoy/admin/v2alpha/clusters/envoy/admin/v2alpha/metrics.proto.rst
-  /envoy/admin/v2alpha/mutex_stats/envoy/admin/v2alpha/mutex_stats.proto.rst
-  /envoy/admin/v2alpha/server_info/envoy/admin/v2alpha/server_info.proto.rst
-  /envoy/api/v2/core/address/envoy/api/v2/core/address.proto.rst
-  /envoy/api/v2/core/base/envoy/api/v2/core/base.proto.rst
-  /envoy/api/v2/core/http_uri/envoy/api/v2/core/http_uri.proto.rst
-  /envoy/api/v2/core/config_source/envoy/api/v2/core/config_source.proto.rst
-  /envoy/api/v2/core/grpc_service/envoy/api/v2/core/grpc_service.proto.rst
-  /envoy/api/v2/core/health_check/envoy/api/v2/core/health_check.proto.rst
-  /envoy/api/v2/core/protocol/envoy/api/v2/core/protocol.proto.rst
-  /envoy/api/v2/discovery/envoy/api/v2/discovery.proto.rst
-  /envoy/api/v2/auth/cert/envoy/api/v2/auth/cert.proto.rst
-  /envoy/api/v2/eds/envoy/api/v2/eds.proto.rst
-  /envoy/api/v2/endpoint/endpoint/envoy/api/v2/endpoint/endpoint.proto.rst
-  /envoy/api/v2/cds/envoy/api/v2/cds.proto.rst
-  /envoy/api/v2/cluster/outlier_detection/envoy/api/v2/cluster/outlier_detection.proto.rst
-  /envoy/api/v2/cluster/circuit_breaker/envoy/api/v2/cluster/circuit_breaker.proto.rst
-  /envoy/api/v2/rds/envoy/api/v2/rds.proto.rst
-  /envoy/api/v2/route/route/envoy/api/v2/route/route.proto.rst
-  /envoy/api/v2/lds/envoy/api/v2/lds.proto.rst
-  /envoy/api/v2/listener/listener/envoy/api/v2/listener/listener.proto.rst
-  /envoy/api/v2/ratelimit/ratelimit/envoy/api/v2/ratelimit/ratelimit.proto.rst
-  /envoy/config/accesslog/v2/als/envoy/config/accesslog/v2/als.proto.rst
-  /envoy/config/accesslog/v2/file/envoy/config/accesslog/v2/file.proto.rst
-  /envoy/config/bootstrap/v2/bootstrap/envoy/config/bootstrap/v2/bootstrap.proto.rst
-  /envoy/config/ratelimit/v2/rls/envoy/config/ratelimit/v2/rls.proto.rst
-  /envoy/config/metrics/v2/metrics_service/envoy/config/metrics/v2/metrics_service.proto.rst
-  /envoy/config/metrics/v2/stats/envoy/config/metrics/v2/stats.proto.rst
-  /envoy/config/trace/v2/trace/envoy/config/trace/v2/trace.proto.rst
-  /envoy/config/filter/accesslog/v2/accesslog/envoy/config/filter/accesslog/v2/accesslog.proto.rst
-  /envoy/config/filter/fault/v2/fault/envoy/config/filter/fault/v2/fault.proto.rst
-  /envoy/config/filter/http/buffer/v2/buffer/envoy/config/filter/http/buffer/v2/buffer.proto.rst
-  /envoy/config/filter/http/ext_authz/v2alpha/ext_authz/envoy/config/filter/http/ext_authz/v2alpha/ext_authz.proto.rst
-  /envoy/config/filter/http/fault/v2/fault/envoy/config/filter/http/fault/v2/fault.proto.rst
-  /envoy/config/filter/http/gzip/v2/gzip/envoy/config/filter/http/gzip/v2/gzip.proto.rst
-  /envoy/config/filter/http/health_check/v2/health_check/envoy/config/filter/http/health_check/v2/health_check.proto.rst
-  /envoy/config/filter/http/header_to_metadata/v2/header_to_metadata/envoy/config/filter/http/header_to_metadata/v2/header_to_metadata.proto.rst
-  /envoy/config/filter/http/ip_tagging/v2/ip_tagging/envoy/config/filter/http/ip_tagging/v2/ip_tagging.proto.rst
-  /envoy/config/filter/http/jwt_authn/v2alpha/jwt_authn/envoy/config/filter/http/jwt_authn/v2alpha/config.proto.rst
-  /envoy/config/filter/http/lua/v2/lua/envoy/config/filter/http/lua/v2/lua.proto.rst
-  /envoy/config/filter/http/rate_limit/v2/rate_limit/envoy/config/filter/http/rate_limit/v2/rate_limit.proto.rst
-  /envoy/config/filter/http/rbac/v2/rbac/envoy/config/filter/http/rbac/v2/rbac.proto.rst
-  /envoy/config/filter/http/router/v2/router/envoy/config/filter/http/router/v2/router.proto.rst
-  /envoy/config/filter/http/squash/v2/squash/envoy/config/filter/http/squash/v2/squash.proto.rst
-  /envoy/config/filter/http/transcoder/v2/transcoder/envoy/config/filter/http/transcoder/v2/transcoder.proto.rst
-  /envoy/config/filter/network/client_ssl_auth/v2/client_ssl_auth/envoy/config/filter/network/client_ssl_auth/v2/client_ssl_auth.proto.rst
-  /envoy/config/filter/network/ext_authz/v2/ext_authz/envoy/config/filter/network/ext_authz/v2/ext_authz.proto.rst
-  /envoy/config/filter/network/http_connection_manager/v2/http_connection_manager/envoy/config/filter/network/http_connection_manager/v2/http_connection_manager.proto.rst
-  /envoy/config/filter/network/mongo_proxy/v2/mongo_proxy/envoy/config/filter/network/mongo_proxy/v2/mongo_proxy.proto.rst
-  /envoy/config/filter/network/rate_limit/v2/rate_limit/envoy/config/filter/network/rate_limit/v2/rate_limit.proto.rst
-  /envoy/config/filter/network/rbac/v2/rbac/envoy/config/filter/network/rbac/v2/rbac.proto.rst
-  /envoy/config/filter/network/redis_proxy/v2/redis_proxy/envoy/config/filter/network/redis_proxy/v2/redis_proxy.proto.rst
-  /envoy/config/filter/network/tcp_proxy/v2/tcp_proxy/envoy/config/filter/network/tcp_proxy/v2/tcp_proxy.proto.rst
-  /envoy/config/filter/network/thrift_proxy/v2alpha1/thrift_proxy/envoy/config/filter/network/thrift_proxy/v2alpha1/thrift_proxy.proto.rst
-  /envoy/config/filter/network/thrift_proxy/v2alpha1/thrift_proxy/envoy/config/filter/network/thrift_proxy/v2alpha1/route.proto.rst
-  /envoy/config/filter/thrift/rate_limit/v2alpha1/rate_limit/envoy/config/filter/thrift/rate_limit/v2alpha1/rate_limit.proto.rst
-  /envoy/config/filter/thrift/router/v2alpha1/router/envoy/config/filter/thrift/router/v2alpha1/router.proto.rst
-  /envoy/config/health_checker/redis/v2/redis/envoy/config/health_checker/redis/v2/redis.proto.rst
-  /envoy/config/overload/v2alpha/overload/envoy/config/overload/v2alpha/overload.proto.rst
-  /envoy/config/rbac/v2alpha/rbac/envoy/config/rbac/v2alpha/rbac.proto.rst
-  /envoy/config/resource_monitor/fixed_heap/v2alpha/fixed_heap/envoy/config/resource_monitor/fixed_heap/v2alpha/fixed_heap.proto.rst
-  /envoy/config/resource_monitor/injected_resource/v2alpha/injected_resource/envoy/config/resource_monitor/injected_resource/v2alpha/injected_resource.proto.rst
-  /envoy/config/transport_socket/capture/v2alpha/capture/envoy/config/transport_socket/capture/v2alpha/capture.proto.rst
-  /envoy/data/accesslog/v2/accesslog/envoy/data/accesslog/v2/accesslog.proto.rst
-  /envoy/data/core/v2alpha/health_check_event/envoy/data/core/v2alpha/health_check_event.proto.rst
-  /envoy/data/tap/v2alpha/capture/envoy/data/tap/v2alpha/capture.proto.rst
-  /envoy/service/accesslog/v2/als/envoy/service/accesslog/v2/als.proto.rst
-  /envoy/service/auth/v2alpha/external_auth/envoy/service/auth/v2alpha/attribute_context.proto.rst
-  /envoy/service/auth/v2alpha/external_auth/envoy/service/auth/v2alpha/external_auth.proto.rst
-  /envoy/service/ratelimit/v2/rls/envoy/service/ratelimit/v2/rls.proto.rst
-  /envoy/type/http_status/envoy/type/http_status.proto.rst
-  /envoy/type/percent/envoy/type/percent.proto.rst
-  /envoy/type/range/envoy/type/range.proto.rst
-  /envoy/type/matcher/metadata/envoy/type/matcher/metadata.proto.rst
-  /envoy/type/matcher/value/envoy/type/matcher/value.proto.rst
-  /envoy/type/matcher/number/envoy/type/matcher/number.proto.rst
-  /envoy/type/matcher/string/envoy/type/matcher/string.proto.rst
-"
+# Fill in boiler plate for extensions that have google.protobuf.Empty as their
+# config.
+bazel run ${BAZEL_BUILD_OPTIONS} //tools/protodoc:generate_empty -- \
+  "${PWD}"/docs/empty_extensions.json "${PWD}/${GENERATED_RST_DIR}"/api-v2/config
 
-# Dump all the generated RST so they can be added to PROTO_RST easily.
-find -L bazel-bin/external/envoy_api -name "*.proto.rst"
+# We do ** matching below to deal with Bazel cache blah (source proto artifacts
+# are nested inside source package targets).
+shopt -s globstar
+
+# Find all source protos.
+declare -r PROTO_TARGET=$(bazel query "labels(srcs, labels(deps, @envoy_api//docs:protos))")
 
 # Only copy in the protos we care about and know how to deal with in protodoc.
-for p in $PROTO_RST
+for p in ${PROTO_TARGET}
 do
-  DEST="${GENERATED_RST_DIR}/api-v2/$(sed -e 's#/envoy\/.*/envoy/##' <<< "$p")"
-  mkdir -p "$(dirname "${DEST}")"
-  cp -f bazel-bin/external/envoy_api/"${p}" "$(dirname "${DEST}")"
-  [ -n "${CPROFILE_ENABLED}" ] && cp -f bazel-bin/"${p}".profile "$(dirname "${DEST}")"
+  declare PROTO_FILE_WITHOUT_PREFIX="${p#@envoy_api//}"
+  declare PROTO_FILE_CANONICAL="${PROTO_FILE_WITHOUT_PREFIX/://}"
+  # We use ** glob matching here to deal with the fact that we have something
+  # like
+  # bazel-bin/external/envoy_api/envoy/admin/v2alpha/pkg/envoy/admin/v2alpha/certs.proto.proto
+  # and we don't want to have to do a nested loop and slow bazel query to
+  # recover the canonical package part of the path.
+  declare SRCS=(bazel-bin/external/envoy_api/**/"${PROTO_FILE_CANONICAL}.rst")
+  # While we may have reformatted the file multiple times due to the transitive
+  # dependencies in the aspect above, they all look the same. So, just pick an
+  # arbitrary match and we're done.
+  declare SRC="${SRCS[0]}"
+  declare DST="${GENERATED_RST_DIR}/api-v2/${PROTO_FILE_CANONICAL#envoy/}".rst
+
+  mkdir -p "$(dirname "${DST}")"
+  cp -f "${SRC}" "$(dirname "${DST}")"
 done
+
+mkdir -p ${GENERATED_RST_DIR}/api-docs
+
+cp -f $API_DIR/xds_protocol.rst "${GENERATED_RST_DIR}/api-docs/xds_protocol.rst"
+
+rsync -rav  $API_DIR/diagrams "${GENERATED_RST_DIR}/api-docs"
 
 rsync -av "${SCRIPT_DIR}"/root/ "${SCRIPT_DIR}"/conf.py "${GENERATED_RST_DIR}"
 

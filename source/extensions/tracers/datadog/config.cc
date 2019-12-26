@@ -1,5 +1,7 @@
 #include "extensions/tracers/datadog/config.h"
 
+#include "envoy/config/trace/v2/trace.pb.h"
+#include "envoy/config/trace/v2/trace.pb.validate.h"
 #include "envoy/registry/registry.h"
 
 #include "common/common/utility.h"
@@ -28,8 +30,7 @@ Tracing::HttpTracerPtr DatadogTracerFactory::createHttpTracerTyped(
 /**
  * Static registration for the Datadog tracer. @see RegisterFactory.
  */
-static Registry::RegisterFactory<DatadogTracerFactory, Server::Configuration::TracerFactory>
-    register_;
+REGISTER_FACTORY(DatadogTracerFactory, Server::Configuration::TracerFactory);
 
 } // namespace Datadog
 } // namespace Tracers

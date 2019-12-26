@@ -17,7 +17,7 @@ namespace JwtAuthn {
 // The Envoy filter to process JWT auth.
 class Filter : public Http::StreamDecoderFilter,
                public Verifier::Callbacks,
-               public Logger::Loggable<Logger::Id::filter> {
+               public Logger::Loggable<Logger::Id::jwt> {
 public:
   Filter(FilterConfigSharedPtr config);
 
@@ -37,7 +37,7 @@ private:
   // It will be called when its verify() call is completed.
   void onComplete(const ::google::jwt_verify::Status& status) override;
 
-  // The callback funcion.
+  // The callback function.
   Http::StreamDecoderFilterCallbacks* decoder_callbacks_;
   // The stats object.
   JwtAuthnFilterStats& stats_;

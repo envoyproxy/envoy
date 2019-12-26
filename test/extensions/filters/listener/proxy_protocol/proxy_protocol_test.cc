@@ -2,10 +2,12 @@
 #include <memory>
 #include <string>
 
+#include "envoy/api/v2/core/base.pb.h"
 #include "envoy/stats/scope.h"
 
 #include "common/buffer/buffer_impl.h"
 #include "common/event/dispatcher_impl.h"
+#include "common/network/connection_balancer_impl.h"
 #include "common/network/listen_socket_impl.h"
 #include "common/network/listener_impl.h"
 #include "common/network/raw_buffer_socket.h"
@@ -22,7 +24,6 @@
 #include "test/test_common/environment.h"
 #include "test/test_common/network_utility.h"
 #include "test/test_common/printers.h"
-#include "test/test_common/test_time.h"
 #include "test/test_common/threadsafe_singleton_injector.h"
 #include "test/test_common/utility.h"
 
@@ -32,15 +33,16 @@
 using testing::_;
 using testing::AnyNumber;
 using testing::AtLeast;
-using testing::InSequence;
 using testing::Invoke;
 using testing::NiceMock;
 using testing::Return;
+using testing::ReturnRef;
 
 namespace Envoy {
 namespace Extensions {
 namespace ListenerFilters {
 namespace ProxyProtocol {
+namespace {
 
 // Build again on the basis of the connection_handler_test.cc
 
@@ -50,33 +52,41 @@ class ProxyProtocolTest : public testing::TestWithParam<Network::Address::IpVers
                           protected Logger::Loggable<Logger::Id::main> {
 public:
   ProxyProtocolTest()
-      : api_(Api::createApiForTest(stats_store_)), dispatcher_(test_time_.timeSystem(), *api_),
-        socket_(Network::Test::getCanonicalLoopbackAddress(GetParam()), nullptr, true),
-        connection_handler_(new Server::ConnectionHandlerImpl(ENVOY_LOGGER(), dispatcher_)),
+      : api_(Api::createApiForTest(stats_store_)), dispatcher_(api_->allocateDispatcher()),
+        socket_(std::make_shared<Network::TcpListenSocket>(
+            Network::Test::getCanonicalLoopbackAddress(GetParam()), nullptr, true)),
+        connection_handler_(new Server::ConnectionHandlerImpl(*dispatcher_, "test_thread")),
         name_("proxy"), filter_chain_(Network::Test::createEmptyFilterChainWithRawBufferSockets()) {
-
+    EXPECT_CALL(socket_factory_, socketType())
+        .WillOnce(Return(Network::Address::SocketType::Stream));
+    EXPECT_CALL(socket_factory_, localAddress()).WillOnce(ReturnRef(socket_->localAddress()));
+    EXPECT_CALL(socket_factory_, getListenSocket()).WillOnce(Return(socket_));
     connection_handler_->addListener(*this);
-    conn_ = dispatcher_.createClientConnection(socket_.localAddress(),
-                                               Network::Address::InstanceConstSharedPtr(),
-                                               Network::Test::createRawBufferSocket(), nullptr);
+    conn_ = dispatcher_->createClientConnection(socket_->localAddress(),
+                                                Network::Address::InstanceConstSharedPtr(),
+                                                Network::Test::createRawBufferSocket(), nullptr);
     conn_->addConnectionCallbacks(connection_callbacks_);
   }
 
   // Network::ListenerConfig
   Network::FilterChainManager& filterChainManager() override { return *this; }
   Network::FilterChainFactory& filterChainFactory() override { return factory_; }
-  Network::Socket& socket() override { return socket_; }
-  const Network::Socket& socket() const override { return socket_; }
+  Network::ListenSocketFactory& listenSocketFactory() override { return socket_factory_; }
   bool bindToPort() override { return true; }
   bool handOffRestoredDestinationConnections() const override { return false; }
   uint32_t perConnectionBufferLimitBytes() const override { return 0; }
   std::chrono::milliseconds listenerFiltersTimeout() const override {
     return std::chrono::milliseconds();
   }
+  bool continueOnListenerFiltersTimeout() const override { return false; }
   Stats::Scope& listenerScope() override { return stats_store_; }
   uint64_t listenerTag() const override { return 1; }
   const std::string& name() const override { return name_; }
-  bool reverseWriteFilterOrder() const override { return true; }
+  const Network::ActiveUdpListenerFactory* udpListenerFactory() override { return nullptr; }
+  envoy::api::v2::core::TrafficDirection direction() const override {
+    return envoy::api::v2::core::TrafficDirection::UNSPECIFIED;
+  }
+  Network::ConnectionBalancer& connectionBalancer() override { return connection_balancer_; }
 
   // Network::FilterChainManager
   const Network::FilterChain* findFilterChain(const Network::ConnectionSocket&) const override {
@@ -84,10 +94,19 @@ public:
   }
 
   void connect(bool read = true) {
+    int expected_callbacks = 2;
+    auto maybeExitDispatcher = [&]() -> void {
+      expected_callbacks--;
+      if (expected_callbacks == 0) {
+        dispatcher_->exit();
+      }
+    };
+
     EXPECT_CALL(factory_, createListenerFilterChain(_))
         .WillOnce(Invoke([&](Network::ListenerFilterManager& filter_manager) -> bool {
           filter_manager.addAcceptFilter(
               std::make_unique<Filter>(std::make_shared<Config>(listenerScope())));
+          maybeExitDispatcher();
           return true;
         }));
     conn_->connect();
@@ -103,8 +122,8 @@ public:
           }));
     }
     EXPECT_CALL(connection_callbacks_, onEvent(Network::ConnectionEvent::Connected))
-        .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { dispatcher_.exit(); }));
-    dispatcher_.run(Event::Dispatcher::RunType::Block);
+        .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { maybeExitDispatcher(); }));
+    dispatcher_->run(Event::Dispatcher::RunType::Block);
   }
 
   void write(const uint8_t* s, ssize_t l) {
@@ -123,37 +142,37 @@ public:
         .WillOnce(Invoke([&](Buffer::Instance& buffer, bool) -> Network::FilterStatus {
           EXPECT_EQ(buffer.toString(), expected);
           buffer.drain(expected.length());
-          dispatcher_.exit();
+          dispatcher_->exit();
           return Network::FilterStatus::Continue;
         }));
 
-    dispatcher_.run(Event::Dispatcher::RunType::Block);
+    dispatcher_->run(Event::Dispatcher::RunType::Block);
   }
 
   void disconnect() {
     EXPECT_CALL(connection_callbacks_, onEvent(Network::ConnectionEvent::LocalClose));
     EXPECT_CALL(server_callbacks_, onEvent(Network::ConnectionEvent::RemoteClose))
-        .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { dispatcher_.exit(); }));
+        .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { dispatcher_->exit(); }));
 
     conn_->close(Network::ConnectionCloseType::NoFlush);
 
-    dispatcher_.run(Event::Dispatcher::RunType::Block);
+    dispatcher_->run(Event::Dispatcher::RunType::Block);
   }
 
   void expectProxyProtoError() {
     EXPECT_CALL(connection_callbacks_, onEvent(Network::ConnectionEvent::RemoteClose))
-        .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { dispatcher_.exit(); }));
+        .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { dispatcher_->exit(); }));
 
-    dispatcher_.run(Event::Dispatcher::RunType::Block);
+    dispatcher_->run(Event::Dispatcher::RunType::Block);
 
     EXPECT_EQ(stats_store_.counter("downstream_cx_proxy_proto_error").value(), 1);
   }
 
   Stats::IsolatedStoreImpl stats_store_;
   Api::ApiPtr api_;
-  DangerousDeprecatedTestTime test_time_;
-  Event::DispatcherImpl dispatcher_;
-  Network::TcpListenSocket socket_;
+  Event::DispatcherPtr dispatcher_;
+  std::shared_ptr<Network::TcpListenSocket> socket_;
+  Network::MockListenSocketFactory socket_factory_;
   Network::ConnectionHandlerPtr connection_handler_;
   Network::MockFilterChainFactory factory_;
   Network::ClientConnectionPtr conn_;
@@ -163,12 +182,13 @@ public:
   std::shared_ptr<Network::MockReadFilter> read_filter_;
   std::string name_;
   const Network::FilterChainSharedPtr filter_chain_;
+  Network::NopConnectionBalancerImpl connection_balancer_;
 };
 
 // Parameterize the listener socket address version.
-INSTANTIATE_TEST_CASE_P(IpVersions, ProxyProtocolTest,
-                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                        TestUtility::ipTestParamsToString);
+INSTANTIATE_TEST_SUITE_P(IpVersions, ProxyProtocolTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
 
 TEST_P(ProxyProtocolTest, v1Basic) {
   connect();
@@ -287,7 +307,10 @@ TEST_P(ProxyProtocolTest, errorRecv_2) {
         const ssize_t rc = ::readv(fd, iov, iovcnt);
         return Api::SysCallSizeResult{rc, errno};
       }));
-
+  EXPECT_CALL(os_sys_calls, close(_)).Times(AnyNumber()).WillRepeatedly(Invoke([](int fd) {
+    const int rc = ::close(fd);
+    return Api::SysCallIntResult{rc, errno};
+  }));
   connect(false);
   write(buffer, sizeof(buffer));
 
@@ -316,7 +339,10 @@ TEST_P(ProxyProtocolTest, errorFIONREAD_1) {
         const ssize_t rc = ::readv(fd, iov, iovcnt);
         return Api::SysCallSizeResult{rc, errno};
       }));
-
+  EXPECT_CALL(os_sys_calls, close(_)).Times(AnyNumber()).WillRepeatedly(Invoke([](int fd) {
+    const int rc = ::close(fd);
+    return Api::SysCallIntResult{rc, errno};
+  }));
   connect(false);
   write(buffer, sizeof(buffer));
 
@@ -478,7 +504,7 @@ TEST_P(ProxyProtocolTest, v2ParseExtensions) {
 
   connect();
   write(buffer, sizeof(buffer));
-  dispatcher_.run(Event::Dispatcher::RunType::NonBlock);
+  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   for (int i = 0; i < 2; i++) {
     write(tlv, sizeof(tlv));
   }
@@ -527,17 +553,20 @@ TEST_P(ProxyProtocolTest, v2ParseExtensionsIoctlError) {
         const ssize_t rc = ::readv(fd, iov, iovcnt);
         return Api::SysCallSizeResult{rc, errno};
       }));
-
+  EXPECT_CALL(os_sys_calls, close(_)).Times(AnyNumber()).WillRepeatedly(Invoke([](int fd) {
+    const int rc = ::close(fd);
+    return Api::SysCallIntResult{rc, errno};
+  }));
   connect(false);
   write(buffer, sizeof(buffer));
-  dispatcher_.run(Event::Dispatcher::RunType::NonBlock);
+  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   write(tlv, sizeof(tlv));
 
   expectProxyProtoError();
 }
 
 TEST_P(ProxyProtocolTest, v2ParseExtensionsFrag) {
-  // A well-formed ipv4/tcp header with 2 TLV/extenions, these are fragmented on delivery
+  // A well-formed ipv4/tcp header with 2 TLV/extensions, these are fragmented on delivery
   constexpr uint8_t buffer[] = {0x0d, 0x0a, 0x0d, 0x0a, 0x00, 0x0d, 0x0a, 0x51, 0x55, 0x49,
                                 0x54, 0x0a, 0x21, 0x11, 0x00, 0x14, 0x01, 0x02, 0x03, 0x04,
                                 0x00, 0x01, 0x01, 0x02, 0x03, 0x05, 0x00, 0x02};
@@ -584,9 +613,9 @@ TEST_P(ProxyProtocolTest, v2Fragmented1) {
                                 'r',  'e',  ' ',  'd',  'a',  't',  'a'};
   connect();
   write(buffer, 10);
-  dispatcher_.run(Event::Dispatcher::RunType::NonBlock);
+  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   write(buffer + 10, 10);
-  dispatcher_.run(Event::Dispatcher::RunType::NonBlock);
+  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   write(buffer + 20, 17);
 
   expectData("more data");
@@ -604,9 +633,9 @@ TEST_P(ProxyProtocolTest, v2Fragmented2) {
                                 'r',  'e',  ' ',  'd',  'a',  't',  'a'};
   connect();
   write(buffer, 17);
-  dispatcher_.run(Event::Dispatcher::RunType::NonBlock);
+  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   write(buffer + 17, 10);
-  dispatcher_.run(Event::Dispatcher::RunType::NonBlock);
+  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   write(buffer + 27, 10);
 
   expectData("more data");
@@ -656,7 +685,10 @@ TEST_P(ProxyProtocolTest, v2Fragmented3Error) {
         const ssize_t rc = ::readv(fd, iov, iovcnt);
         return Api::SysCallSizeResult{rc, errno};
       }));
-
+  EXPECT_CALL(os_sys_calls, close(_)).Times(AnyNumber()).WillRepeatedly(Invoke([](int fd) {
+    const int rc = ::close(fd);
+    return Api::SysCallIntResult{rc, errno};
+  }));
   connect(false);
   write(buffer, 17);
 
@@ -702,10 +734,13 @@ TEST_P(ProxyProtocolTest, v2Fragmented4Error) {
         const ssize_t rc = ::readv(fd, iov, iovcnt);
         return Api::SysCallSizeResult{rc, errno};
       }));
-
+  EXPECT_CALL(os_sys_calls, close(_)).Times(AnyNumber()).WillRepeatedly(Invoke([](int fd) {
+    const int rc = ::close(fd);
+    return Api::SysCallIntResult{rc, errno};
+  }));
   connect(false);
   write(buffer, 10);
-  dispatcher_.run(Event::Dispatcher::RunType::NonBlock);
+  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   write(buffer + 10, 10);
 
   expectProxyProtoError();
@@ -717,7 +752,7 @@ TEST_P(ProxyProtocolTest, PartialRead) {
   write("PROXY TCP4");
   write(" 254.254.2");
 
-  dispatcher_.run(Event::Dispatcher::RunType::NonBlock);
+  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
 
   write("54.254 1.2");
   write(".3.4 65535");
@@ -743,7 +778,7 @@ TEST_P(ProxyProtocolTest, v2PartialRead) {
   for (size_t i = 0; i < sizeof(buffer); i += 9) {
     write(&buffer[i], 9);
     if (i == 0) {
-      dispatcher_.run(Event::Dispatcher::RunType::NonBlock);
+      dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
     }
   }
 
@@ -759,7 +794,7 @@ TEST_P(ProxyProtocolTest, MalformedProxyLine) {
   connect(false);
 
   write("BOGUS\r");
-  dispatcher_.run(Event::Dispatcher::RunType::NonBlock);
+  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   write("\n");
 
   expectProxyProtoError();
@@ -835,25 +870,25 @@ TEST_P(ProxyProtocolTest, AddressVersionsNotMatch2) {
 TEST_P(ProxyProtocolTest, Truncated) {
   connect(false);
   write("PROXY TCP4 1.2.3.4 5.6.7.8 1234 5678");
-  dispatcher_.run(Event::Dispatcher::RunType::NonBlock);
+  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
 
   EXPECT_CALL(connection_callbacks_, onEvent(Network::ConnectionEvent::LocalClose))
-      .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { dispatcher_.exit(); }));
+      .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { dispatcher_->exit(); }));
   conn_->close(Network::ConnectionCloseType::NoFlush);
 
-  dispatcher_.run(Event::Dispatcher::RunType::Block);
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
 }
 
 TEST_P(ProxyProtocolTest, Closed) {
   connect(false);
   write("PROXY TCP4 1.2.3");
-  dispatcher_.run(Event::Dispatcher::RunType::NonBlock);
+  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
 
   EXPECT_CALL(connection_callbacks_, onEvent(Network::ConnectionEvent::LocalClose))
-      .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { dispatcher_.exit(); }));
+      .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { dispatcher_->exit(); }));
   conn_->close(Network::ConnectionCloseType::NoFlush);
 
-  dispatcher_.run(Event::Dispatcher::RunType::Block);
+  dispatcher_->run(Event::Dispatcher::RunType::Block);
 }
 
 TEST_P(ProxyProtocolTest, ClosedEmpty) {
@@ -862,7 +897,7 @@ TEST_P(ProxyProtocolTest, ClosedEmpty) {
   EXPECT_CALL(factory_, createNetworkFilterChain(_, _)).Times(AtLeast(0));
   conn_->connect();
   conn_->close(Network::ConnectionCloseType::NoFlush);
-  dispatcher_.run(Event::Dispatcher::RunType::NonBlock);
+  dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
 }
 
 class WildcardProxyProtocolTest : public testing::TestWithParam<Network::Address::IpVersion>,
@@ -871,17 +906,22 @@ class WildcardProxyProtocolTest : public testing::TestWithParam<Network::Address
                                   protected Logger::Loggable<Logger::Id::main> {
 public:
   WildcardProxyProtocolTest()
-      : api_(Api::createApiForTest(stats_store_)), dispatcher_(test_time_.timeSystem(), *api_),
-        socket_(Network::Test::getAnyAddress(GetParam()), nullptr, true),
+      : api_(Api::createApiForTest(stats_store_)), dispatcher_(api_->allocateDispatcher()),
+        socket_(std::make_shared<Network::TcpListenSocket>(Network::Test::getAnyAddress(GetParam()),
+                                                           nullptr, true)),
         local_dst_address_(Network::Utility::getAddressWithPort(
             *Network::Test::getCanonicalLoopbackAddress(GetParam()),
-            socket_.localAddress()->ip()->port())),
-        connection_handler_(new Server::ConnectionHandlerImpl(ENVOY_LOGGER(), dispatcher_)),
+            socket_->localAddress()->ip()->port())),
+        connection_handler_(new Server::ConnectionHandlerImpl(*dispatcher_, "test_thread")),
         name_("proxy"), filter_chain_(Network::Test::createEmptyFilterChainWithRawBufferSockets()) {
+    EXPECT_CALL(socket_factory_, socketType())
+        .WillOnce(Return(Network::Address::SocketType::Stream));
+    EXPECT_CALL(socket_factory_, localAddress()).WillOnce(ReturnRef(socket_->localAddress()));
+    EXPECT_CALL(socket_factory_, getListenSocket()).WillOnce(Return(socket_));
     connection_handler_->addListener(*this);
-    conn_ = dispatcher_.createClientConnection(local_dst_address_,
-                                               Network::Address::InstanceConstSharedPtr(),
-                                               Network::Test::createRawBufferSocket(), nullptr);
+    conn_ = dispatcher_->createClientConnection(local_dst_address_,
+                                                Network::Address::InstanceConstSharedPtr(),
+                                                Network::Test::createRawBufferSocket(), nullptr);
     conn_->addConnectionCallbacks(connection_callbacks_);
 
     EXPECT_CALL(factory_, createListenerFilterChain(_))
@@ -895,18 +935,22 @@ public:
   // Network::ListenerConfig
   Network::FilterChainManager& filterChainManager() override { return *this; }
   Network::FilterChainFactory& filterChainFactory() override { return factory_; }
-  Network::Socket& socket() override { return socket_; }
-  const Network::Socket& socket() const override { return socket_; }
+  Network::ListenSocketFactory& listenSocketFactory() override { return socket_factory_; }
   bool bindToPort() override { return true; }
   bool handOffRestoredDestinationConnections() const override { return false; }
   uint32_t perConnectionBufferLimitBytes() const override { return 0; }
   std::chrono::milliseconds listenerFiltersTimeout() const override {
     return std::chrono::milliseconds();
   }
+  bool continueOnListenerFiltersTimeout() const override { return false; }
   Stats::Scope& listenerScope() override { return stats_store_; }
   uint64_t listenerTag() const override { return 1; }
   const std::string& name() const override { return name_; }
-  bool reverseWriteFilterOrder() const override { return true; }
+  const Network::ActiveUdpListenerFactory* udpListenerFactory() override { return nullptr; }
+  envoy::api::v2::core::TrafficDirection direction() const override {
+    return envoy::api::v2::core::TrafficDirection::UNSPECIFIED;
+  }
+  Network::ConnectionBalancer& connectionBalancer() override { return connection_balancer_; }
 
   // Network::FilterChainManager
   const Network::FilterChain* findFilterChain(const Network::ConnectionSocket&) const override {
@@ -925,8 +969,8 @@ public:
           return true;
         }));
     EXPECT_CALL(connection_callbacks_, onEvent(Network::ConnectionEvent::Connected))
-        .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { dispatcher_.exit(); }));
-    dispatcher_.run(Event::Dispatcher::RunType::Block);
+        .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { dispatcher_->exit(); }));
+    dispatcher_->run(Event::Dispatcher::RunType::Block);
   }
 
   void write(const std::string& s) {
@@ -940,27 +984,27 @@ public:
         .WillOnce(Invoke([&](Buffer::Instance& buffer, bool) -> Network::FilterStatus {
           EXPECT_EQ(buffer.toString(), expected);
           buffer.drain(expected.length());
-          dispatcher_.exit();
+          dispatcher_->exit();
           return Network::FilterStatus::Continue;
         }));
 
-    dispatcher_.run(Event::Dispatcher::RunType::Block);
+    dispatcher_->run(Event::Dispatcher::RunType::Block);
   }
 
   void disconnect() {
     EXPECT_CALL(connection_callbacks_, onEvent(Network::ConnectionEvent::LocalClose));
     conn_->close(Network::ConnectionCloseType::NoFlush);
     EXPECT_CALL(server_callbacks_, onEvent(Network::ConnectionEvent::RemoteClose))
-        .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { dispatcher_.exit(); }));
+        .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { dispatcher_->exit(); }));
 
-    dispatcher_.run(Event::Dispatcher::RunType::Block);
+    dispatcher_->run(Event::Dispatcher::RunType::Block);
   }
 
   Stats::IsolatedStoreImpl stats_store_;
   Api::ApiPtr api_;
-  DangerousDeprecatedTestTime test_time_;
-  Event::DispatcherImpl dispatcher_;
-  Network::TcpListenSocket socket_;
+  Event::DispatcherPtr dispatcher_;
+  Network::MockListenSocketFactory socket_factory_;
+  std::shared_ptr<Network::TcpListenSocket> socket_;
   Network::Address::InstanceConstSharedPtr local_dst_address_;
   Network::ConnectionHandlerPtr connection_handler_;
   Network::MockFilterChainFactory factory_;
@@ -971,12 +1015,13 @@ public:
   std::shared_ptr<Network::MockReadFilter> read_filter_;
   std::string name_;
   const Network::FilterChainSharedPtr filter_chain_;
+  Network::NopConnectionBalancerImpl connection_balancer_;
 };
 
 // Parameterize the listener socket address version.
-INSTANTIATE_TEST_CASE_P(IpVersions, WildcardProxyProtocolTest,
-                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                        TestUtility::ipTestParamsToString);
+INSTANTIATE_TEST_SUITE_P(IpVersions, WildcardProxyProtocolTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
 
 TEST_P(WildcardProxyProtocolTest, Basic) {
   connect();
@@ -1004,6 +1049,7 @@ TEST_P(WildcardProxyProtocolTest, BasicV6) {
   disconnect();
 }
 
+} // namespace
 } // namespace ProxyProtocol
 } // namespace ListenerFilters
 } // namespace Extensions

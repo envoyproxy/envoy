@@ -20,7 +20,7 @@ namespace Alts {
  */
 class TsiHandshakerCallbacks {
 public:
-  virtual ~TsiHandshakerCallbacks() {}
+  virtual ~TsiHandshakerCallbacks() = default;
 
   struct NextResult {
     // A enum of the result.
@@ -33,7 +33,7 @@ public:
     CHandshakerResultPtr result_;
   };
 
-  typedef std::unique_ptr<NextResult> NextResultPtr;
+  using NextResultPtr = std::unique_ptr<NextResult>;
 
   /**
    * Called when `next` is done, this may be called inline in `next` if the handshaker is not
@@ -51,7 +51,7 @@ public:
 class TsiHandshaker final : public Event::DeferredDeletable {
 public:
   explicit TsiHandshaker(CHandshakerPtr&& handshaker, Event::Dispatcher& dispatcher);
-  ~TsiHandshaker();
+  ~TsiHandshaker() override;
 
   /**
    * Conduct next step of handshake, see
@@ -93,7 +93,7 @@ private:
   Event::Dispatcher& dispatcher_;
 };
 
-typedef std::unique_ptr<TsiHandshaker> TsiHandshakerPtr;
+using TsiHandshakerPtr = std::unique_ptr<TsiHandshaker>;
 
 } // namespace Alts
 } // namespace TransportSockets

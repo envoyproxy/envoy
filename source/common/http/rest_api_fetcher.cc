@@ -12,20 +12,6 @@
 namespace Envoy {
 namespace Http {
 
-RestApiFetcher::RestApiFetcher(Upstream::ClusterManager& cm,
-                               const envoy::api::v2::core::ApiConfigSource& api_config_source,
-                               Event::Dispatcher& dispatcher, Runtime::RandomGenerator& random)
-    : RestApiFetcher(cm, api_config_source.cluster_names()[0], dispatcher, random,
-                     Config::Utility::apiConfigSourceRefreshDelay(api_config_source),
-                     Config::Utility::apiConfigSourceRequestTimeout(api_config_source)) {
-  UNREFERENCED_PARAMETER(api_config_source);
-  // The ApiType must be REST_LEGACY for xDS implementations that call this constructor.
-  ASSERT(api_config_source.api_type() == envoy::api::v2::core::ApiConfigSource::REST_LEGACY);
-  // TODO(htuch): Add support for multiple clusters, #1170.
-  ASSERT(api_config_source.cluster_names().size() == 1);
-  ASSERT(api_config_source.has_refresh_delay());
-}
-
 RestApiFetcher::RestApiFetcher(Upstream::ClusterManager& cm, const std::string& remote_cluster_name,
                                Event::Dispatcher& dispatcher, Runtime::RandomGenerator& random,
                                std::chrono::milliseconds refresh_interval,
@@ -44,7 +30,10 @@ void RestApiFetcher::initialize() { refresh(); }
 
 void RestApiFetcher::onSuccess(Http::MessagePtr&& response) {
   uint64_t response_code = Http::Utility::getResponseStatus(response->headers());
-  if (response_code != enumToInt(Http::Code::OK)) {
+  if (response_code == enumToInt(Http::Code::NotModified)) {
+    requestComplete();
+    return;
+  } else if (response_code != enumToInt(Http::Code::OK)) {
     onFailure(Http::AsyncClient::FailureReason::Reset);
     return;
   }
@@ -52,21 +41,23 @@ void RestApiFetcher::onSuccess(Http::MessagePtr&& response) {
   try {
     parseResponse(*response);
   } catch (EnvoyException& e) {
-    onFetchFailure(&e);
+    onFetchFailure(Config::ConfigUpdateFailureReason::UpdateRejected, &e);
   }
 
   requestComplete();
 }
 
-void RestApiFetcher::onFailure(Http::AsyncClient::FailureReason) {
-  onFetchFailure(nullptr);
+void RestApiFetcher::onFailure(Http::AsyncClient::FailureReason reason) {
+  // Currently Http::AsyncClient::FailureReason only has one value: "Reset".
+  ASSERT(reason == Http::AsyncClient::FailureReason::Reset);
+  onFetchFailure(Config::ConfigUpdateFailureReason::ConnectionFailure, nullptr);
   requestComplete();
 }
 
 void RestApiFetcher::refresh() {
   MessagePtr message(new RequestMessageImpl());
   createRequest(*message);
-  message->headers().insertHost().value(remote_cluster_name_);
+  message->headers().setHost(remote_cluster_name_);
   active_request_ = cm_.httpAsyncClientForCluster(remote_cluster_name_)
                         .send(std::move(message), *this,
                               AsyncClient::RequestOptions().setTimeout(request_timeout_));

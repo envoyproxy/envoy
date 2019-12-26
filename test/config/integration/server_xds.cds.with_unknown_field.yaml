@@ -1,0 +1,17 @@
+version_info: "0"
+resources:
+- "@type": type.googleapis.com/envoy.api.v2.Cluster
+  name: cluster_1
+  connect_timeout: { seconds: 5 }
+  type: EDS
+  eds_cluster_config:
+    eds_config: { path: {{ eds_json_path }} }
+  lb_policy: ROUND_ROBIN
+  http2_protocol_options: {}
+  typed_extension_protocol_options:
+    envoy.test.dynamic_validation:
+      "@type": type.googleapis.com/google.protobuf.Struct
+      value:
+        stat_prefix: blah
+        cluster: blah
+        foo: bar

@@ -1,5 +1,7 @@
 #pragma once
 
+#include "envoy/api/v2/core/http_uri.pb.h"
+
 #include "extensions/filters/http/common/jwks_fetcher.h"
 
 #include "test/mocks/server/mocks.h"
@@ -14,7 +16,8 @@ namespace Common {
 class MockJwksFetcher : public JwksFetcher {
 public:
   MOCK_METHOD0(cancel, void());
-  MOCK_METHOD2(fetch, void(const ::envoy::api::v2::core::HttpUri& uri, JwksReceiver& receiver));
+  MOCK_METHOD3(fetch, void(const ::envoy::api::v2::core::HttpUri& uri, Tracing::Span& parent_span,
+                           JwksReceiver& receiver));
 };
 
 // A mock HTTP upstream.
@@ -46,7 +49,7 @@ public:
    * Expectations and assertions should be made on onJwksSuccessImpl in place
    * of onJwksSuccess.
    */
-  void onJwksSuccess(google::jwt_verify::JwksPtr&& jwks) {
+  void onJwksSuccess(google::jwt_verify::JwksPtr&& jwks) override {
     ASSERT(jwks);
     onJwksSuccessImpl(*jwks.get());
   }

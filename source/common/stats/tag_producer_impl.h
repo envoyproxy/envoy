@@ -17,6 +17,7 @@
 #include "common/config/well_known_names.h"
 #include "common/protobuf/protobuf.h"
 
+#include "absl/container/flat_hash_map.h"
 #include "absl/strings/string_view.h"
 
 namespace Envoy {
@@ -29,7 +30,7 @@ namespace Stats {
 class TagProducerImpl : public TagProducer {
 public:
   TagProducerImpl(const envoy::config::metrics::v2::StatsConfig& config);
-  TagProducerImpl() {}
+  TagProducerImpl() = default;
 
   /**
    * Take a metric name and a vector then add proper tags into the vector and
@@ -37,7 +38,7 @@ public:
    * @param metric_name std::string a name of Stats::Metric (Counter, Gauge, Histogram).
    * @param tags std::vector a set of Stats::Tag.
    */
-  std::string produceTags(const std::string& metric_name, std::vector<Tag>& tags) const override;
+  std::string produceTags(absl::string_view metric_name, std::vector<Tag>& tags) const override;
 
 private:
   friend class DefaultTagRegexTester;
@@ -89,7 +90,7 @@ private:
    * @param stat_name const std::string& the stat name.
    * @param f std::function<void(const TagExtractorPtr&)> function to call for each extractor.
    */
-  void forEachExtractorMatching(const std::string& stat_name,
+  void forEachExtractorMatching(absl::string_view stat_name,
                                 std::function<void(const TagExtractorPtr&)> f) const;
 
   std::vector<TagExtractorPtr> tag_extractors_without_prefix_;
@@ -97,8 +98,7 @@ private:
   // Maps a prefix word extracted out of a regex to a vector of TagExtractors. Note that
   // the storage for the prefix string is owned by the TagExtractor, which, depending on
   // implementation, may need make a copy of the prefix.
-  std::unordered_map<absl::string_view, std::vector<TagExtractorPtr>, StringViewHash>
-      tag_extractor_prefix_map_;
+  absl::flat_hash_map<absl::string_view, std::vector<TagExtractorPtr>> tag_extractor_prefix_map_;
   std::vector<Tag> default_tags_;
 };
 

@@ -1,5 +1,8 @@
 #pragma once
 
+#include "envoy/api/v2/auth/cert.pb.h"
+#include "envoy/api/v2/core/base.pb.h"
+#include "envoy/api/v2/core/grpc_service.pb.h"
 #include "envoy/stats/scope.h"
 
 #include "common/api/api_impl.h"
@@ -13,10 +16,12 @@
 #include "common/http/async_client_impl.h"
 #include "common/http/codes.h"
 #include "common/http/http2/conn_pool.h"
+#include "common/stats/fake_symbol_table_impl.h"
 #include "common/network/connection_impl.h"
 #include "common/network/raw_buffer_socket.h"
-#include "common/ssl/context_config_impl.h"
-#include "common/ssl/ssl_socket.h"
+
+#include "extensions/transport_sockets/tls/context_config_impl.h"
+#include "extensions/transport_sockets/tls/ssl_socket.h"
 
 #include "test/common/grpc/grpc_client_integration.h"
 #include "test/common/grpc/utility.h"
@@ -28,10 +33,12 @@
 #include "test/mocks/upstream/mocks.h"
 #include "test/proto/helloworld.pb.h"
 #include "test/test_common/environment.h"
+#include "test/test_common/global.h"
 #include "test/test_common/test_time.h"
 #include "test/test_common/utility.h"
 
 using testing::_;
+using testing::Eq;
 using testing::Invoke;
 using testing::InvokeWithoutArgs;
 using testing::NiceMock;
@@ -47,7 +54,7 @@ const char HELLO_REPLY[] = "DEFG";
 
 MATCHER_P(HelloworldReplyEq, rhs, "") { return arg.message() == rhs; }
 
-typedef std::vector<std::pair<Http::LowerCaseString, std::string>> TestMetadata;
+using TestMetadata = std::vector<std::pair<Http::LowerCaseString, std::string>>;
 
 // Use in EXPECT_CALL(foo, bar(_)).WillExitIfNeeded() to exit dispatcher loop if
 // there are no longer any pending events in DispatcherHelper.
@@ -144,10 +151,11 @@ public:
   }
 
   void expectGrpcStatus(Status::GrpcStatus grpc_status) {
-    if (grpc_status == Status::GrpcStatus::InvalidCode) {
+    if (grpc_status == Status::WellKnownGrpcStatus::InvalidCode) {
       EXPECT_CALL(*this, onRemoteClose(_, _)).WillExitIfNeeded();
-    } else if (grpc_status > Status::GrpcStatus::MaximumValid) {
-      EXPECT_CALL(*this, onRemoteClose(Status::GrpcStatus::InvalidCode, _)).WillExitIfNeeded();
+    } else if (grpc_status > Status::WellKnownGrpcStatus::MaximumKnown) {
+      EXPECT_CALL(*this, onRemoteClose(Status::WellKnownGrpcStatus::InvalidCode, _))
+          .WillExitIfNeeded();
     } else {
       EXPECT_CALL(*this, onRemoteClose(grpc_status, _)).WillExitIfNeeded();
     }
@@ -186,7 +194,7 @@ public:
 
   DispatcherHelper& dispatcher_helper_;
   FakeStream* fake_stream_{};
-  AsyncStream* grpc_stream_{};
+  AsyncStream<helloworld::HelloRequest> grpc_stream_{};
   const TestMetadata empty_metadata_;
 };
 
@@ -199,7 +207,7 @@ public:
     fake_stream_->startGrpcStream();
     helloworld::HelloReply reply;
     reply.set_message(HELLO_REPLY);
-    EXPECT_CALL(*child_span_, setTag(Tracing::Tags::get().GRPC_STATUS_CODE, "0"));
+    EXPECT_CALL(*child_span_, setTag(Eq(Tracing::Tags::get().GrpcStatusCode), Eq("0")));
     EXPECT_CALL(*this, onSuccess_(HelloworldReplyEq(HELLO_REPLY), _)).WillExitIfNeeded();
     EXPECT_CALL(*child_span_, finishSpan());
     dispatcher_helper_.setStreamEventPending();
@@ -217,7 +225,8 @@ class GrpcClientIntegrationTest : public GrpcClientIntegrationParamTest {
 public:
   GrpcClientIntegrationTest()
       : method_descriptor_(helloworld::Greeter::descriptor()->FindMethodByName("SayHello")),
-        api_(Api::createApiForTest(*stats_store_)), dispatcher_(test_time_.timeSystem(), *api_) {}
+        api_(Api::createApiForTest(*stats_store_, test_time_.timeSystem())),
+        dispatcher_(api_->allocateDispatcher()), http_context_(stats_store_->symbolTable()) {}
 
   virtual void initialize() {
     if (fake_upstream_ == nullptr) {
@@ -235,9 +244,9 @@ public:
     }
     // Setup a test timeout (also needed to maintain an active event in the dispatcher so that
     // .run() will block until timeout rather than exit immediately).
-    timeout_timer_ = dispatcher_.createTimer([this] {
+    timeout_timer_ = dispatcher_->createTimer([this] {
       FAIL() << "Test timeout";
-      dispatcher_.exit();
+      dispatcher_->exit();
     });
     timeout_timer_->enableTimer(std::chrono::milliseconds(10000));
   }
@@ -262,12 +271,12 @@ public:
 
   // Create a Grpc::AsyncClientImpl instance backed by enough fake/mock
   // infrastructure to initiate a loopback TCP connection to fake_upstream_.
-  AsyncClientPtr createAsyncClientImpl() {
+  RawAsyncClientPtr createAsyncClientImpl() {
     client_connection_ = std::make_unique<Network::ClientConnectionImpl>(
-        dispatcher_, fake_upstream_->localAddress(), nullptr,
+        *dispatcher_, fake_upstream_->localAddress(), nullptr,
         std::move(async_client_transport_socket_), nullptr);
     ON_CALL(*mock_cluster_info_, connectTimeout())
-        .WillByDefault(Return(std::chrono::milliseconds(1000)));
+        .WillByDefault(Return(std::chrono::milliseconds(10000)));
     EXPECT_CALL(*mock_cluster_info_, name()).WillRepeatedly(ReturnRef(fake_cluster_name_));
     EXPECT_CALL(cm_, get(_)).WillRepeatedly(Return(&thread_local_cluster_));
     EXPECT_CALL(thread_local_cluster_, info()).WillRepeatedly(Return(cluster_info_ptr_));
@@ -277,19 +286,19 @@ public:
     EXPECT_CALL(*mock_host_, cluster()).WillRepeatedly(ReturnRef(*cluster_info_ptr_));
     EXPECT_CALL(*mock_host_description_, locality()).WillRepeatedly(ReturnRef(host_locality_));
     http_conn_pool_ = std::make_unique<Http::Http2::ProdConnPoolImpl>(
-        dispatcher_, host_ptr_, Upstream::ResourcePriority::Default, nullptr);
+        *dispatcher_, host_ptr_, Upstream::ResourcePriority::Default, nullptr, nullptr);
     EXPECT_CALL(cm_, httpConnPoolForCluster(_, _, _, _))
         .WillRepeatedly(Return(http_conn_pool_.get()));
     http_async_client_ = std::make_unique<Http::AsyncClientImpl>(
-        cluster_info_ptr_, *stats_store_, dispatcher_, local_info_, cm_, runtime_, random_,
+        cluster_info_ptr_, *stats_store_, *dispatcher_, local_info_, cm_, runtime_, random_,
         std::move(shadow_writer_ptr_), http_context_);
     EXPECT_CALL(cm_, httpAsyncClientForCluster(fake_cluster_name_))
         .WillRepeatedly(ReturnRef(*http_async_client_));
-    EXPECT_CALL(cm_, get(fake_cluster_name_)).WillRepeatedly(Return(&thread_local_cluster_));
+    EXPECT_CALL(cm_, get(Eq(fake_cluster_name_))).WillRepeatedly(Return(&thread_local_cluster_));
     envoy::api::v2::core::GrpcService config;
     config.mutable_envoy_grpc()->set_cluster_name(fake_cluster_name_);
     fillServiceWideInitialMetadata(config);
-    return std::make_unique<AsyncClientImpl>(cm_, config, dispatcher_.timeSystem());
+    return std::make_unique<AsyncClientImpl>(cm_, config, dispatcher_->timeSource());
   }
 
   virtual envoy::api::v2::core::GrpcService createGoogleGrpcConfig() {
@@ -301,12 +310,12 @@ public:
     return config;
   }
 
-  AsyncClientPtr createGoogleAsyncClientImpl() {
+  RawAsyncClientPtr createGoogleAsyncClientImpl() {
 #ifdef ENVOY_GOOGLE_GRPC
     google_tls_ = std::make_unique<GoogleAsyncClientThreadLocal>(*api_);
     GoogleGenericStubFactory stub_factory;
-    return std::make_unique<GoogleAsyncClientImpl>(dispatcher_, *google_tls_, stub_factory,
-                                                   stats_scope_, createGoogleGrpcConfig());
+    return std::make_unique<GoogleAsyncClientImpl>(*dispatcher_, *google_tls_, stub_factory,
+                                                   stats_scope_, createGoogleGrpcConfig(), *api_);
 #else
     NOT_REACHED_GCOVR_EXCL_LINE;
 #endif
@@ -345,22 +354,22 @@ public:
     EXPECT_CALL(active_span, spawnChild_(_, "async fake_cluster egress", _))
         .WillOnce(Return(request->child_span_));
     EXPECT_CALL(*request->child_span_,
-                setTag(Tracing::Tags::get().UPSTREAM_CLUSTER, fake_cluster_name_));
+                setTag(Eq(Tracing::Tags::get().UpstreamCluster), Eq(fake_cluster_name_)));
     EXPECT_CALL(*request->child_span_,
-                setTag(Tracing::Tags::get().COMPONENT, Tracing::Tags::get().PROXY));
+                setTag(Eq(Tracing::Tags::get().Component), Eq(Tracing::Tags::get().Proxy)));
     EXPECT_CALL(*request->child_span_, injectContext(_));
 
-    request->grpc_request_ =
-        grpc_client_->send(*method_descriptor_, request_msg, *request, active_span,
-                           absl::optional<std::chrono::milliseconds>());
+    request->grpc_request_ = grpc_client_->send(*method_descriptor_, request_msg, *request,
+                                                active_span, Http::AsyncClient::RequestOptions());
     EXPECT_NE(request->grpc_request_, nullptr);
 
     if (!fake_connection_) {
-      AssertionResult result = fake_upstream_->waitForHttpConnection(dispatcher_, fake_connection_);
+      AssertionResult result =
+          fake_upstream_->waitForHttpConnection(*dispatcher_, fake_connection_);
       RELEASE_ASSERT(result, result.message());
     }
     fake_streams_.emplace_back();
-    AssertionResult result = fake_connection_->waitForNewStream(dispatcher_, fake_streams_.back());
+    AssertionResult result = fake_connection_->waitForNewStream(*dispatcher_, fake_streams_.back());
     RELEASE_ASSERT(result, result.message());
     auto& fake_stream = *fake_streams_.back();
     request->fake_stream_ = &fake_stream;
@@ -369,7 +378,7 @@ public:
     expectExtraHeaders(fake_stream);
 
     helloworld::HelloRequest received_msg;
-    result = fake_stream.waitForGrpcMessage(dispatcher_, received_msg);
+    result = fake_stream.waitForGrpcMessage(*dispatcher_, received_msg);
     RELEASE_ASSERT(result, result.message());
     EXPECT_THAT(request_msg, ProtoEq(received_msg));
 
@@ -385,15 +394,17 @@ public:
           }
         }));
 
-    stream->grpc_stream_ = grpc_client_->start(*method_descriptor_, *stream);
+    stream->grpc_stream_ =
+        grpc_client_->start(*method_descriptor_, *stream, Http::AsyncClient::StreamOptions());
     EXPECT_NE(stream->grpc_stream_, nullptr);
 
     if (!fake_connection_) {
-      AssertionResult result = fake_upstream_->waitForHttpConnection(dispatcher_, fake_connection_);
+      AssertionResult result =
+          fake_upstream_->waitForHttpConnection(*dispatcher_, fake_connection_);
       RELEASE_ASSERT(result, result.message());
     }
     fake_streams_.emplace_back();
-    AssertionResult result = fake_connection_->waitForNewStream(dispatcher_, fake_streams_.back());
+    AssertionResult result = fake_connection_->waitForNewStream(*dispatcher_, fake_streams_.back());
     RELEASE_ASSERT(result, result.message());
     auto& fake_stream = *fake_streams_.back();
     stream->fake_stream_ = &fake_stream;
@@ -409,16 +420,17 @@ public:
   FakeHttpConnectionPtr fake_connection_;
   std::vector<FakeStreamPtr> fake_streams_;
   const Protobuf::MethodDescriptor* method_descriptor_;
-  Stats::IsolatedStoreImpl* stats_store_ = new Stats::IsolatedStoreImpl();
+  Stats::TestSymbolTable symbol_table_;
+  Stats::IsolatedStoreImpl* stats_store_ = new Stats::IsolatedStoreImpl(*symbol_table_);
   Api::ApiPtr api_;
-  Event::DispatcherImpl dispatcher_;
-  DispatcherHelper dispatcher_helper_{dispatcher_};
+  Event::DispatcherPtr dispatcher_;
+  DispatcherHelper dispatcher_helper_{*dispatcher_};
   Stats::ScopeSharedPtr stats_scope_{stats_store_};
   TestMetadata service_wide_initial_metadata_;
 #ifdef ENVOY_GOOGLE_GRPC
   std::unique_ptr<GoogleAsyncClientThreadLocal> google_tls_;
 #endif
-  AsyncClientPtr grpc_client_;
+  AsyncClient<helloworld::HelloRequest, helloworld::HelloReply> grpc_client_;
   Event::TimerPtr timeout_timer_;
   const TestMetadata empty_metadata_;
 
@@ -431,7 +443,7 @@ public:
   Upstream::MockThreadLocalCluster thread_local_cluster_;
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
   Runtime::MockLoader runtime_;
-  Ssl::ContextManagerImpl context_manager_{test_time_.timeSystem()};
+  Extensions::TransportSockets::Tls::ContextManagerImpl context_manager_{test_time_.timeSystem()};
   NiceMock<Runtime::MockRandomGenerator> random_;
   Http::AsyncClientPtr http_async_client_;
   Http::ConnectionPool::InstancePtr http_conn_pool_;
@@ -450,6 +462,9 @@ public:
 // SSL connection credential validation tests.
 class GrpcSslClientIntegrationTest : public GrpcClientIntegrationTest {
 public:
+  GrpcSslClientIntegrationTest() {
+    ON_CALL(factory_context_, api()).WillByDefault(ReturnRef(*api_));
+  }
   void TearDown() override {
     // Reset some state in the superclass before we destruct context_manager_ in our destructor, it
     // doesn't like dangling contexts at destruction.
@@ -457,10 +472,9 @@ public:
     fake_upstream_.reset();
     async_client_transport_socket_.reset();
     client_connection_.reset();
-    mock_cluster_info_->transport_socket_factory_.reset();
   }
 
-  virtual envoy::api::v2::core::GrpcService createGoogleGrpcConfig() override {
+  envoy::api::v2::core::GrpcService createGoogleGrpcConfig() override {
     auto config = GrpcClientIntegrationTest::createGoogleGrpcConfig();
     TestUtility::setTestSslGoogleGrpcConfig(config, use_client_cert_);
     return config;
@@ -479,14 +493,14 @@ public:
       tls_cert->mutable_private_key()->set_filename(
           TestEnvironment::runfilesPath("test/config/integration/certs/clientkey.pem"));
     }
-    auto cfg = std::make_unique<Ssl::ClientContextConfigImpl>(tls_context, factory_context_);
+    auto cfg = std::make_unique<Extensions::TransportSockets::Tls::ClientContextConfigImpl>(
+        tls_context, factory_context_);
 
-    mock_cluster_info_->transport_socket_factory_ = std::make_unique<Ssl::ClientSslSocketFactory>(
-        std::move(cfg), context_manager_, *stats_store_);
-    ON_CALL(*mock_cluster_info_, transportSocketFactory())
-        .WillByDefault(ReturnRef(*mock_cluster_info_->transport_socket_factory_));
+    mock_host_description_->socket_factory_ =
+        std::make_unique<Extensions::TransportSockets::Tls::ClientSslSocketFactory>(
+            std::move(cfg), context_manager_, *stats_store_);
     async_client_transport_socket_ =
-        mock_cluster_info_->transport_socket_factory_->createTransportSocket(nullptr);
+        mock_host_description_->socket_factory_->createTransportSocket(nullptr);
     fake_upstream_ = std::make_unique<FakeUpstream>(createUpstreamSslContext(), 0,
                                                     FakeHttpConnection::Type::HTTP2, ipVersion(),
                                                     test_time_.timeSystem());
@@ -510,10 +524,11 @@ public:
           TestEnvironment::runfilesPath("test/config/integration/certs/cacert.pem"));
     }
 
-    auto cfg = std::make_unique<Ssl::ServerContextConfigImpl>(tls_context, factory_context_);
+    auto cfg = std::make_unique<Extensions::TransportSockets::Tls::ServerContextConfigImpl>(
+        tls_context, factory_context_);
 
     static Stats::Scope* upstream_stats_store = new Stats::IsolatedStoreImpl();
-    return std::make_unique<Ssl::ServerSslSocketFactory>(
+    return std::make_unique<Extensions::TransportSockets::Tls::ServerSslSocketFactory>(
         std::move(cfg), context_manager_, *upstream_stats_store, std::vector<std::string>{});
   }
 

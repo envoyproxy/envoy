@@ -2,6 +2,7 @@
 
 #include <cstdint>
 
+#include "envoy/common/scope_tracker.h"
 #include "envoy/common/time.h"
 #include "envoy/common/token_bucket.h"
 #include "envoy/event/timer.h"
@@ -12,6 +13,7 @@
 
 #include "absl/strings/string_view.h"
 #include "gmock/gmock.h"
+#include "gtest/gtest.h"
 
 namespace Envoy {
 /**
@@ -42,33 +44,25 @@ public:
 class MockTimeSystem : public Event::TestTimeSystem {
 public:
   MockTimeSystem();
-  ~MockTimeSystem();
+  ~MockTimeSystem() override;
 
   // TODO(#4160): Eliminate all uses of MockTimeSystem, replacing with SimulatedTimeSystem,
   // where timer callbacks are triggered by the advancement of time. This implementation
   // matches recent behavior, where real-time timers were created directly in libevent
   // by dispatcher_impl.cc.
-  Event::SchedulerPtr createScheduler(Event::Libevent::BasePtr& base) override {
-    return test_time_.timeSystem().createScheduler(base);
+  Event::SchedulerPtr createScheduler(Event::Scheduler& base_scheduler) override {
+    return real_time_.createScheduler(base_scheduler);
   }
-  void sleep(const Duration& duration) override { test_time_.timeSystem().sleep(duration); }
+  void sleep(const Duration& duration) override { real_time_.sleep(duration); }
   Thread::CondVar::WaitStatus
   waitFor(Thread::MutexBasicLockable& mutex, Thread::CondVar& condvar,
-          const Duration& duration) noexcept EXCLUSIVE_LOCKS_REQUIRED(mutex) override {
-    return test_time_.timeSystem().waitFor(mutex, condvar, duration);
+          const Duration& duration) noexcept ABSL_EXCLUSIVE_LOCKS_REQUIRED(mutex) override {
+    return real_time_.waitFor(mutex, condvar, duration); // NO_CHECK_FORMAT(real_time)
   }
   MOCK_METHOD0(systemTime, SystemTime());
   MOCK_METHOD0(monotonicTime, MonotonicTime());
 
-  DangerousDeprecatedTestTime test_time_;
-};
-
-class MockTokenBucket : public TokenBucket {
-public:
-  MockTokenBucket();
-  ~MockTokenBucket();
-
-  MOCK_METHOD1(consume, bool(uint64_t));
+  Event::TestRealTimeSystem real_time_; // NO_CHECK_FORMAT(real_time)
 };
 
 // Captures absl::string_view parameters into temp strings, for use
@@ -92,5 +86,10 @@ inline bool operator==(const char* str, const StringViewSaver& saver) {
 inline bool operator==(const StringViewSaver& saver, const char* str) {
   return saver.value() == str;
 }
+
+class MockScopedTrackedObject : public ScopeTrackedObject {
+public:
+  MOCK_CONST_METHOD2(dumpState, void(std::ostream&, int));
+};
 
 } // namespace Envoy

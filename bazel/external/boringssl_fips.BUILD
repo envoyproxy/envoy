@@ -1,3 +1,5 @@
+licenses(["notice"])  # Apache 2
+
 load(":genrule_cmd.bzl", "genrule_cmd")
 
 cc_library(

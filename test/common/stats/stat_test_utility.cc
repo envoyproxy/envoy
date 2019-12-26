@@ -1,26 +1,11 @@
 #include "test/common/stats/stat_test_utility.h"
 
+#include "common/common/assert.h"
 #include "common/memory/stats.h"
 
 namespace Envoy {
 namespace Stats {
 namespace TestUtil {
-
-bool hasDeterministicMallocStats() {
-  // We can only test absolute memory usage if the malloc library is a known
-  // quantity. This decision is centralized here. As the preferred malloc
-  // library for Envoy is TCMALLOC that's what we test for here. If we switch
-  // to a different malloc library than we'd have to re-evaluate all the
-  // thresholds in the tests referencing hasDeterministicMallocStats().
-#ifdef TCMALLOC
-  const size_t start_mem = Memory::Stats::totalCurrentlyAllocated();
-  std::unique_ptr<char[]> data(new char[10000]);
-  const size_t end_mem = Memory::Stats::totalCurrentlyAllocated();
-  return end_mem - start_mem >= 10000; // actually 10240
-#else
-  return false;
-#endif
-}
 
 void forEachSampleStat(int num_clusters, std::function<void(absl::string_view)> fn) {
   // These are stats that are repeated for each cluster as of Oct 2018, with a
@@ -113,6 +98,72 @@ void forEachSampleStat(int num_clusters, std::function<void(absl::string_view)> 
   for (const auto& other_stat : other_stats) {
     fn(other_stat);
   }
+}
+
+MemoryTest::Mode MemoryTest::mode() {
+#if !defined(TCMALLOC) || defined(ENVOY_MEMORY_DEBUG_ENABLED)
+  // We can only test absolute memory usage if the malloc library is a known
+  // quantity. This decision is centralized here. As the preferred malloc
+  // library for Envoy is TCMALLOC that's what we test for here. If we switch
+  // to a different malloc library than we'd have to re-evaluate all the
+  // thresholds in the tests referencing MemoryTest.
+  return Mode::Disabled;
+#else
+  // Even when using TCMALLOC is defined, it appears that
+  // Memory::Stats::totalCurrentlyAllocated() does not work as expected
+  // on some platforms, so try to force-allocate some heap memory
+  // and determine whether we can measure it.
+  const size_t start_mem = Memory::Stats::totalCurrentlyAllocated();
+  volatile std::unique_ptr<std::string> long_string = std::make_unique<std::string>(
+      "more than 22 chars to exceed libc++ short-string optimization");
+  const size_t end_mem = Memory::Stats::totalCurrentlyAllocated();
+  bool can_measure_memory = end_mem > start_mem;
+
+  if (getenv("ENVOY_MEMORY_TEST_EXACT") != nullptr) { // Set in "ci/do_ci.sh" for 'release' tests.
+    RELEASE_ASSERT(can_measure_memory,
+                   "$ENVOY_MEMORY_TEST_EXACT is set for canonical memory measurements, "
+                   "but memory measurement looks broken");
+    return Mode::Canonical;
+  } else {
+    // Different versions of STL and other compiler/architecture differences may
+    // also impact memory usage, so when not compiling with MEMORY_TEST_EXACT,
+    // memory comparisons must be given some slack. There have recently emerged
+    // some memory-allocation differences between development and Envoy CI and
+    // Bazel CI (which compiles Envoy as a test of Bazel).
+    return can_measure_memory ? Mode::Approximate : Mode::Disabled;
+  }
+#endif
+}
+
+// TODO(jmarantz): this utility is intended to be costs both for unit tests
+// and fuzz tests. But those have different checking macros, e.g. EXPECT_EQ vs
+// FUZZ_ASSERT.
+std::vector<uint8_t> serializeDeserializeNumber(uint64_t number) {
+  uint64_t num_bytes = SymbolTableImpl::Encoding::encodingSizeBytes(number);
+  const uint64_t block_size = 10;
+  MemBlockBuilder<uint8_t> mem_block(block_size);
+  SymbolTableImpl::Encoding::appendEncoding(number, mem_block);
+  num_bytes += mem_block.capacityRemaining();
+  RELEASE_ASSERT(block_size == num_bytes, absl::StrCat("Encoding size issue: block_size=",
+                                                       block_size, " num_bytes=", num_bytes));
+  absl::Span<uint8_t> span = mem_block.span();
+  RELEASE_ASSERT(number == SymbolTableImpl::Encoding::decodeNumber(span.data()).first, "");
+  return std::vector<uint8_t>(span.data(), span.data() + span.size());
+}
+
+void serializeDeserializeString(absl::string_view in) {
+  MemBlockBuilder<uint8_t> mem_block(SymbolTableImpl::Encoding::totalSizeBytes(in.size()));
+  SymbolTableImpl::Encoding::appendEncoding(in.size(), mem_block);
+  const uint8_t* data = reinterpret_cast<const uint8_t*>(in.data());
+  mem_block.appendData(absl::MakeSpan(data, data + in.size()));
+  RELEASE_ASSERT(mem_block.capacityRemaining() == 0, "");
+  absl::Span<uint8_t> span = mem_block.span();
+  const std::pair<uint64_t, uint64_t> number_consumed =
+      SymbolTableImpl::Encoding::decodeNumber(span.data());
+  RELEASE_ASSERT(number_consumed.first == in.size(), absl::StrCat("size matches: ", in));
+  span.remove_prefix(number_consumed.second);
+  const absl::string_view out(reinterpret_cast<const char*>(span.data()), span.size());
+  RELEASE_ASSERT(in == out, absl::StrCat("'", in, "' != '", out, "'"));
 }
 
 } // namespace TestUtil

@@ -7,7 +7,9 @@
 #include "common/common/utility.h"
 
 #include "absl/strings/string_view.h"
-#include "testing/base/public/benchmark.h"
+#include "benchmark/benchmark.h"
+
+namespace Envoy {
 
 static const char TextToTrim[] = "\t  the quick brown fox jumps over the lazy dog\n\r\n";
 static size_t TextToTrimLength = sizeof(TextToTrim) - 1;
@@ -116,7 +118,7 @@ static void BM_FindToken(benchmark::State& state) {
 }
 BENCHMARK(BM_FindToken);
 
-static bool nextToken(absl::string_view& str, char delim, bool stripWhitespace,
+static bool nextToken(absl::string_view& str, char delim, bool strip_whitespace,
                       absl::string_view* token) {
   while (!str.empty()) {
     absl::string_view::size_type pos = str.find(delim);
@@ -127,7 +129,7 @@ static bool nextToken(absl::string_view& str, char delim, bool stripWhitespace,
       *token = str.substr(0, pos);
       str.remove_prefix(pos + 1); // move past token and delim
     }
-    if (stripWhitespace) {
+    if (strip_whitespace) {
       *token = Envoy::StringUtil::trim(*token);
     }
     if (!token->empty()) {
@@ -141,8 +143,8 @@ static bool nextToken(absl::string_view& str, char delim, bool stripWhitespace,
 // a temp vector, but just iterates through the string_view, tokenizing, and matching against
 // the token we want. It appears to be about 2.5x to 3x faster on this testcase.
 static bool findTokenWithoutSplitting(absl::string_view str, char delim, absl::string_view token,
-                                      bool stripWhitespace) {
-  for (absl::string_view tok; nextToken(str, delim, stripWhitespace, &tok);) {
+                                      bool strip_whitespace) {
+  for (absl::string_view tok; nextToken(str, delim, strip_whitespace, &tok);) {
     if (tok == token) {
       return true;
     }
@@ -204,6 +206,28 @@ static void BM_FindTokenValueNoSplit(benchmark::State& state) {
 }
 BENCHMARK(BM_FindTokenValueNoSplit);
 
+static void BM_RemoveTokensLong(benchmark::State& state) {
+  auto size = state.range(0);
+  std::string input(size, ',');
+  std::vector<std::string> to_remove;
+  StringUtil::CaseUnorderedSet to_remove_set;
+  for (decltype(size) i = 0; i < size; i++) {
+    to_remove.push_back(std::to_string(i));
+  }
+  for (int i = 0; i < size; i++) {
+    if (i & 1) {
+      to_remove_set.insert(to_remove[i]);
+    }
+    input.append(",");
+    input.append(to_remove[i]);
+  }
+  for (auto _ : state) {
+    Envoy::StringUtil::removeTokens(input, ",", to_remove_set, ",");
+    state.SetBytesProcessed(static_cast<int64_t>(state.iterations()) * input.size());
+  }
+}
+BENCHMARK(BM_RemoveTokensLong)->Range(8, 8 << 10);
+
 static void BM_IntervalSetInsert17(benchmark::State& state) {
   for (auto _ : state) {
     Envoy::IntervalSetImpl<size_t> interval_set;
@@ -250,6 +274,7 @@ static void BM_IntervalSet50ToVector(benchmark::State& state) {
   }
 }
 BENCHMARK(BM_IntervalSet50ToVector);
+} // namespace Envoy
 
 // Boilerplate main(), which discovers benchmarks in the same file and runs them.
 int main(int argc, char** argv) {

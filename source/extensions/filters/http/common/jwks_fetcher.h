@@ -12,7 +12,7 @@ namespace HttpFilters {
 namespace Common {
 
 class JwksFetcher;
-typedef std::unique_ptr<JwksFetcher> JwksFetcherPtr;
+using JwksFetcherPtr = std::unique_ptr<JwksFetcher>;
 /**
  * JwksFetcher interface can be used to retrieve remote JWKS
  * (https://tools.ietf.org/html/rfc7517) data structures returning a concrete,
@@ -30,7 +30,7 @@ public:
       InvalidJwks,
     };
 
-    virtual ~JwksReceiver(){};
+    virtual ~JwksReceiver() = default;
     /*
      * Successful retrieval callback.
      * of the returned JWKS object.
@@ -44,7 +44,7 @@ public:
     virtual void onJwksError(Failure reason) PURE;
   };
 
-  virtual ~JwksFetcher(){};
+  virtual ~JwksFetcher() = default;
 
   /*
    * Cancel any in-flight request.
@@ -58,9 +58,11 @@ public:
    * a callback or `cancel()` is invoked, no
    * additional `fetch()` may be issued.
    * @param uri the uri to retrieve the jwks from.
+   * @param parent_span the active span to create children under
    * @param receiver the receiver of the fetched JWKS or error.
    */
-  virtual void fetch(const ::envoy::api::v2::core::HttpUri& uri, JwksReceiver& receiver) PURE;
+  virtual void fetch(const ::envoy::api::v2::core::HttpUri& uri, Tracing::Span& parent_span,
+                     JwksReceiver& receiver) PURE;
 
   /*
    * Factory method for creating a JwksFetcher.

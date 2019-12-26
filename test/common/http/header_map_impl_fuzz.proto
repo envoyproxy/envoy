@@ -4,6 +4,8 @@ package test.common.http;
 
 import "google/protobuf/empty.proto";
 
+import "validate/validate.proto";
+
 // Structured input for header_map_impl_fuzz_test.
 
 message AddReference {
@@ -49,14 +51,37 @@ message GetAndMutate {
   }
 }
 
+message MutateAndMove {
+  string key = 1;
+  oneof mutate_selector {
+    string append = 2;
+    string set_copy = 3;
+    uint64 set_integer = 4;
+    string set_reference = 5;
+  }
+}
+
+message Append {
+  string key = 1;
+  string value = 2;
+}
+
+message Get {
+  string key = 1;
+}
+
 message Action {
   oneof action_selector {
+    option (validate.required) = true;
     AddReference add_reference = 1;
     AddReferenceKey add_reference_key = 2;
     AddCopy add_copy = 3;
     SetReference set_reference = 4;
     SetReferenceKey set_reference_key = 5;
-    GetAndMutate get_and_mutate = 6;
+    GetAndMutate get_and_mutate = 6 [deprecated = true];
+    Get get = 13;
+    MutateAndMove mutate_and_move = 12;
+    Append append = 11;
     google.protobuf.Empty copy = 7;
     string lookup = 8;
     string remove = 9;

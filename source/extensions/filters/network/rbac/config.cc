@@ -1,5 +1,8 @@
 #include "extensions/filters/network/rbac/config.h"
 
+#include "envoy/config/filter/network/rbac/v2/rbac.pb.h"
+#include "envoy/config/filter/network/rbac/v2/rbac.pb.validate.h"
+#include "envoy/config/rbac/v2/rbac.pb.h"
 #include "envoy/network/connection.h"
 #include "envoy/registry/registry.h"
 
@@ -17,7 +20,7 @@ static void validateFail(const std::string& header) {
                                    header));
 }
 
-static void validatePermission(const envoy::config::rbac::v2alpha::Permission& permission) {
+static void validatePermission(const envoy::config::rbac::v2::Permission& permission) {
   if (permission.has_header()) {
     validateFail(permission.header().DebugString());
   }
@@ -36,7 +39,7 @@ static void validatePermission(const envoy::config::rbac::v2alpha::Permission& p
   }
 }
 
-static void validatePrincipal(const envoy::config::rbac::v2alpha::Principal& principal) {
+static void validatePrincipal(const envoy::config::rbac::v2::Principal& principal) {
   if (principal.has_header()) {
     validateFail(principal.header().DebugString());
   }
@@ -58,7 +61,7 @@ static void validatePrincipal(const envoy::config::rbac::v2alpha::Principal& pri
 /**
  * Validate the RBAC rules doesn't include any header or metadata rule.
  */
-static void validateRbacRules(const envoy::config::rbac::v2alpha::RBAC& rules) {
+static void validateRbacRules(const envoy::config::rbac::v2::RBAC& rules) {
   for (const auto& policy : rules.policies()) {
     for (const auto& permission : policy.second.permissions()) {
       validatePermission(permission);
@@ -85,9 +88,8 @@ RoleBasedAccessControlNetworkFilterConfigFactory::createFilterFactoryFromProtoTy
 /**
  * Static registration for the RBAC network filter. @see RegisterFactory.
  */
-static Registry::RegisterFactory<RoleBasedAccessControlNetworkFilterConfigFactory,
-                                 Server::Configuration::NamedNetworkFilterConfigFactory>
-    registered_;
+REGISTER_FACTORY(RoleBasedAccessControlNetworkFilterConfigFactory,
+                 Server::Configuration::NamedNetworkFilterConfigFactory);
 
 } // namespace RBACFilter
 } // namespace NetworkFilters

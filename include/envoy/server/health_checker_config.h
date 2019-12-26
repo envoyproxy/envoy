@@ -1,5 +1,6 @@
 #pragma once
 
+#include "envoy/api/v2/core/health_check.pb.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/upstream/health_checker.h"
 
@@ -9,7 +10,7 @@ namespace Configuration {
 
 class HealthCheckerFactoryContext {
 public:
-  virtual ~HealthCheckerFactoryContext() {}
+  virtual ~HealthCheckerFactoryContext() = default;
 
   /**
    * @return Upstream::Cluster& the owning cluster.
@@ -37,6 +38,17 @@ public:
    * created health checkers. This function may not be idempotent.
    */
   virtual Upstream::HealthCheckEventLoggerPtr eventLogger() PURE;
+
+  /**
+   * @return ProtobufMessage::ValidationVisitor& validation visitor for health checker configuration
+   *         messages.
+   */
+  virtual ProtobufMessage::ValidationVisitor& messageValidationVisitor() PURE;
+
+  /**
+   * @return Api::Api& the API used by the server.
+   */
+  virtual Api::Api& api() PURE;
 };
 
 /**
@@ -45,7 +57,7 @@ public:
  */
 class CustomHealthCheckerFactory {
 public:
-  virtual ~CustomHealthCheckerFactory() {}
+  virtual ~CustomHealthCheckerFactory() = default;
 
   /**
    * Creates a particular custom health checker factory implementation.
@@ -65,6 +77,13 @@ public:
    * checker produced by the factory.
    */
   virtual std::string name() PURE;
+
+  /**
+   * @return std::string the identifying category name for objects
+   * created by this factory. Used for automatic registration with
+   * FactoryCategoryRegistry.
+   */
+  static std::string category() { return "health_checkers"; }
 };
 
 } // namespace Configuration

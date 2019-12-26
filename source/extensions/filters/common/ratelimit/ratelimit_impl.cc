@@ -5,7 +5,9 @@
 #include <string>
 #include <vector>
 
+#include "envoy/api/v2/core/grpc_service.pb.h"
 #include "envoy/api/v2/ratelimit/ratelimit.pb.h"
+#include "envoy/service/ratelimit/v2/rls.pb.h"
 #include "envoy/stats/scope.h"
 
 #include "common/common/assert.h"
@@ -18,7 +20,7 @@ namespace Filters {
 namespace Common {
 namespace RateLimit {
 
-GrpcClientImpl::GrpcClientImpl(Grpc::AsyncClientPtr&& async_client,
+GrpcClientImpl::GrpcClientImpl(Grpc::RawAsyncClientPtr&& async_client,
                                const absl::optional<std::chrono::milliseconds>& timeout)
     : service_method_(*Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
           "envoy.service.ratelimit.v2.RateLimitService.ShouldRateLimit")),
@@ -56,50 +58,58 @@ void GrpcClientImpl::limit(RequestCallbacks& callbacks, const std::string& domai
   envoy::service::ratelimit::v2::RateLimitRequest request;
   createRequest(request, domain, descriptors);
 
-  request_ = async_client_->send(service_method_, request, *this, parent_span, timeout_);
+  request_ = async_client_->send(service_method_, request, *this, parent_span,
+                                 Http::AsyncClient::RequestOptions().setTimeout(timeout_));
 }
 
 void GrpcClientImpl::onSuccess(
     std::unique_ptr<envoy::service::ratelimit::v2::RateLimitResponse>&& response,
     Tracing::Span& span) {
   LimitStatus status = LimitStatus::OK;
-  ASSERT(response->overall_code() != envoy::service::ratelimit::v2::RateLimitResponse_Code_UNKNOWN);
-  if (response->overall_code() ==
-      envoy::service::ratelimit::v2::RateLimitResponse_Code_OVER_LIMIT) {
+  ASSERT(response->overall_code() != envoy::service::ratelimit::v2::RateLimitResponse::UNKNOWN);
+  if (response->overall_code() == envoy::service::ratelimit::v2::RateLimitResponse::OVER_LIMIT) {
     status = LimitStatus::OverLimit;
     span.setTag(Constants::get().TraceStatus, Constants::get().TraceOverLimit);
   } else {
     span.setTag(Constants::get().TraceStatus, Constants::get().TraceOk);
   }
 
-  Http::HeaderMapPtr headers = std::make_unique<Http::HeaderMapImpl>();
-  if (response->headers_size()) {
+  Http::HeaderMapPtr response_headers_to_add, request_headers_to_add;
+  if (!response->headers().empty()) {
+    response_headers_to_add = std::make_unique<Http::HeaderMapImpl>();
     for (const auto& h : response->headers()) {
-      headers->addCopy(Http::LowerCaseString(h.key()), h.value());
+      response_headers_to_add->addCopy(Http::LowerCaseString(h.key()), h.value());
     }
   }
-  callbacks_->complete(status, std::move(headers));
+
+  if (!response->request_headers_to_add().empty()) {
+    request_headers_to_add = std::make_unique<Http::HeaderMapImpl>();
+    for (const auto& h : response->request_headers_to_add()) {
+      request_headers_to_add->addCopy(Http::LowerCaseString(h.key()), h.value());
+    }
+  }
+  callbacks_->complete(status, std::move(response_headers_to_add),
+                       std::move(request_headers_to_add));
   callbacks_ = nullptr;
 }
 
 void GrpcClientImpl::onFailure(Grpc::Status::GrpcStatus status, const std::string&,
                                Tracing::Span&) {
-  ASSERT(status != Grpc::Status::GrpcStatus::Ok);
-  callbacks_->complete(LimitStatus::Error, nullptr);
+  ASSERT(status != Grpc::Status::WellKnownGrpcStatus::Ok);
+  callbacks_->complete(LimitStatus::Error, nullptr, nullptr);
   callbacks_ = nullptr;
 }
 
-GrpcFactoryImpl::GrpcFactoryImpl(const envoy::config::ratelimit::v2::RateLimitServiceConfig& config,
-                                 Grpc::AsyncClientManager& async_client_manager,
-                                 Stats::Scope& scope)
-    : config_(config) {
-  envoy::api::v2::core::GrpcService grpc_service;
-  grpc_service.MergeFrom(config_->grpc_service());
-  async_client_factory_ = async_client_manager.factoryForGrpcService(grpc_service, scope, false);
-}
-
-ClientPtr GrpcFactoryImpl::create(const absl::optional<std::chrono::milliseconds>& timeout) {
-  return std::make_unique<GrpcClientImpl>(async_client_factory_->create(), timeout);
+ClientPtr rateLimitClient(Server::Configuration::FactoryContext& context,
+                          const envoy::api::v2::core::GrpcService& grpc_service,
+                          const std::chrono::milliseconds timeout) {
+  // TODO(ramaraochavali): register client to singleton when GrpcClientImpl supports concurrent
+  // requests.
+  const auto async_client_factory =
+      context.clusterManager().grpcAsyncClientManager().factoryForGrpcService(
+          grpc_service, context.scope(), true);
+  return std::make_unique<Filters::Common::RateLimit::GrpcClientImpl>(
+      async_client_factory->create(), timeout);
 }
 
 } // namespace RateLimit

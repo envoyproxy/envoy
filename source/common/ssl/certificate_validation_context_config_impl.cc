@@ -1,5 +1,6 @@
 #include "common/ssl/certificate_validation_context_config_impl.h"
 
+#include "envoy/api/v2/auth/cert.pb.h"
 #include "envoy/common/exception.h"
 
 #include "common/common/empty_string.h"
@@ -12,16 +13,18 @@ namespace Ssl {
 static const std::string INLINE_STRING = "<inline>";
 
 CertificateValidationContextConfigImpl::CertificateValidationContextConfigImpl(
-    const envoy::api::v2::auth::CertificateValidationContext& config)
-    : ca_cert_(Config::DataSource::read(config.trusted_ca(), true)),
+    const envoy::api::v2::auth::CertificateValidationContext& config, Api::Api& api)
+    : ca_cert_(Config::DataSource::read(config.trusted_ca(), true, api)),
       ca_cert_path_(Config::DataSource::getPath(config.trusted_ca())
                         .value_or(ca_cert_.empty() ? EMPTY_STRING : INLINE_STRING)),
-      certificate_revocation_list_(Config::DataSource::read(config.crl(), true)),
+      certificate_revocation_list_(Config::DataSource::read(config.crl(), true, api)),
       certificate_revocation_list_path_(
           Config::DataSource::getPath(config.crl())
               .value_or(certificate_revocation_list_.empty() ? EMPTY_STRING : INLINE_STRING)),
       verify_subject_alt_name_list_(config.verify_subject_alt_name().begin(),
                                     config.verify_subject_alt_name().end()),
+      subject_alt_name_matchers_(config.match_subject_alt_names().begin(),
+                                 config.match_subject_alt_names().end()),
       verify_certificate_hash_list_(config.verify_certificate_hash().begin(),
                                     config.verify_certificate_hash().end()),
       verify_certificate_spki_list_(config.verify_certificate_spki().begin(),
@@ -32,7 +35,7 @@ CertificateValidationContextConfigImpl::CertificateValidationContextConfigImpl(
       throw EnvoyException(fmt::format("Failed to load CRL from {} without trusted CA",
                                        certificateRevocationListPath()));
     }
-    if (!verify_subject_alt_name_list_.empty()) {
+    if (!subject_alt_name_matchers_.empty() || !verify_subject_alt_name_list_.empty()) {
       throw EnvoyException(fmt::format("SAN-based verification of peer certificates without "
                                        "trusted CA is insecure and not allowed"));
     }

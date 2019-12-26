@@ -6,7 +6,6 @@
 #include <vector>
 
 #include "envoy/common/pure.h"
-#include "envoy/config/ratelimit/v2/rls.pb.h"
 #include "envoy/ratelimit/ratelimit.h"
 #include "envoy/singleton/manager.h"
 #include "envoy/tracing/http_tracer.h"
@@ -36,13 +35,14 @@ enum class LimitStatus {
  */
 class RequestCallbacks {
 public:
-  virtual ~RequestCallbacks() {}
+  virtual ~RequestCallbacks() = default;
 
   /**
-   * Called when a limit request is complete. The resulting status and
-   * response headers are supplied.
+   * Called when a limit request is complete. The resulting status,
+   * response headers and request headers to be forwarded to the upstream are supplied.
    */
-  virtual void complete(LimitStatus status, Http::HeaderMapPtr&& headers) PURE;
+  virtual void complete(LimitStatus status, Http::HeaderMapPtr&& response_headers_to_add,
+                        Http::HeaderMapPtr&& request_headers_to_add) PURE;
 };
 
 /**
@@ -50,7 +50,7 @@ public:
  */
 class Client {
 public:
-  virtual ~Client() {}
+  virtual ~Client() = default;
 
   /**
    * Cancel an inflight limit request.
@@ -74,28 +74,7 @@ public:
                      Tracing::Span& parent_span) PURE;
 };
 
-typedef std::unique_ptr<Client> ClientPtr;
-
-/**
- * An interface for creating a rate limit client.
- */
-class ClientFactory : public Singleton::Instance {
-public:
-  virtual ~ClientFactory() {}
-
-  /**
-   * Returns rate limit client from singleton manager.
-   */
-  virtual ClientPtr create(const absl::optional<std::chrono::milliseconds>& timeout) PURE;
-
-  /**
-   * Returns configuration with which the factory has been built.
-   */
-  virtual const absl::optional<envoy::config::ratelimit::v2::RateLimitServiceConfig>&
-  rateLimitConfig() const PURE;
-};
-
-typedef std::shared_ptr<ClientFactory> ClientFactoryPtr;
+using ClientPtr = std::unique_ptr<Client>;
 
 } // namespace RateLimit
 } // namespace Common

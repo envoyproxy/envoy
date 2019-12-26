@@ -1,6 +1,6 @@
 #pragma once
 
-#include "envoy/config/resource_monitor/fixed_heap/v2alpha/fixed_heap.pb.validate.h"
+#include "envoy/config/resource_monitor/fixed_heap/v2alpha/fixed_heap.pb.h"
 #include "envoy/server/resource_monitor.h"
 
 namespace Envoy {
@@ -13,8 +13,8 @@ namespace FixedHeapMonitor {
  */
 class MemoryStatsReader {
 public:
-  MemoryStatsReader() {}
-  virtual ~MemoryStatsReader() {}
+  MemoryStatsReader() = default;
+  virtual ~MemoryStatsReader() = default;
 
   // Memory reserved for the process by the heap.
   virtual uint64_t reservedHeapBytes();

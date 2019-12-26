@@ -16,17 +16,18 @@ namespace Event {
  */
 class ValidationDispatcher : public DispatcherImpl {
 public:
-  ValidationDispatcher(TimeSystem& time_system, Api::Api& api) : DispatcherImpl(time_system, api) {}
+  ValidationDispatcher(Api::Api& api, Event::TimeSystem& time_system)
+      : DispatcherImpl(api, time_system) {}
 
   Network::ClientConnectionPtr
   createClientConnection(Network::Address::InstanceConstSharedPtr,
                          Network::Address::InstanceConstSharedPtr, Network::TransportSocketPtr&&,
                          const Network::ConnectionSocket::OptionsSharedPtr& options) override;
-  Network::DnsResolverSharedPtr createDnsResolver(
-      const std::vector<Network::Address::InstanceConstSharedPtr>& resolvers) override;
-  Network::ListenerPtr createListener(Network::Socket&, Network::ListenerCallbacks&,
-                                      bool bind_to_port,
-                                      bool hand_off_restored_destination_connections) override;
+  Network::DnsResolverSharedPtr
+  createDnsResolver(const std::vector<Network::Address::InstanceConstSharedPtr>& resolvers,
+                    const bool use_tcp_for_dns_lookups) override;
+  Network::ListenerPtr createListener(Network::SocketSharedPtr&&, Network::ListenerCallbacks&,
+                                      bool bind_to_port) override;
 
 protected:
   std::shared_ptr<Network::ValidationDnsResolver> dns_resolver_{

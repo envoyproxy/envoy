@@ -3,6 +3,9 @@
 #include <queue>
 
 #include "envoy/api/api.h"
+#include "envoy/api/v2/core/base.pb.h"
+#include "envoy/api/v2/core/grpc_service.pb.h"
+#include "envoy/common/platform.h"
 #include "envoy/grpc/async_client.h"
 #include "envoy/stats/scope.h"
 #include "envoy/thread/thread.h"
@@ -12,6 +15,8 @@
 #include "common/common/linked_object.h"
 #include "common/common/thread.h"
 #include "common/common/thread_annotations.h"
+#include "common/grpc/google_grpc_context.h"
+#include "common/grpc/typed_async_client.h"
 #include "common/tracing/http_tracer_impl.h"
 
 #include "grpcpp/generic/generic_stub.h"
@@ -65,7 +70,7 @@ class GoogleAsyncClientThreadLocal : public ThreadLocal::ThreadLocalObject,
                                      Logger::Loggable<Logger::Id::grpc> {
 public:
   GoogleAsyncClientThreadLocal(Api::Api& api);
-  ~GoogleAsyncClientThreadLocal();
+  ~GoogleAsyncClientThreadLocal() override;
 
   grpc::CompletionQueue& completionQueue() { return cq_; }
 
@@ -82,6 +87,14 @@ public:
 
 private:
   void completionThread();
+
+  // There is blanket google-grpc initialization in MainCommonBase, but that
+  // doesn't cover unit tests. However, putting blanket coverage in ProcessWide
+  // causes background threaded memory allocation in all unit tests making it
+  // hard to measure memory. Thus we also initialize grpc using our idempotent
+  // wrapper-class in classes that need it. See
+  // https://github.com/envoyproxy/envoy/issues/8282 for details.
+  GoogleGrpcContext google_grpc_context_;
 
   // The CompletionQueue for in-flight operations. This must precede completion_thread_ to ensure it
   // is constructed before the thread runs.
@@ -107,13 +120,13 @@ struct GoogleAsyncClientStats {
   // .streams_total
   Stats::Counter* streams_total_;
   // .streams_closed_<gRPC status code>
-  std::array<Stats::Counter*, Status::GrpcStatus::MaximumValid + 1> streams_closed_;
+  std::array<Stats::Counter*, Status::WellKnownGrpcStatus::MaximumKnown + 1> streams_closed_;
 };
 
 // Interface to allow the gRPC stub to be mocked out by tests.
 class GoogleStub {
 public:
-  virtual ~GoogleStub() {}
+  virtual ~GoogleStub() = default;
 
   // See grpc::PrepareCall().
   virtual std::unique_ptr<grpc::GenericClientAsyncReaderWriter>
@@ -138,7 +151,7 @@ private:
 // Interface to allow the gRPC stub creation to be mocked out by tests.
 class GoogleStubFactory {
 public:
-  virtual ~GoogleStubFactory() {}
+  virtual ~GoogleStubFactory() = default;
 
   // Create a stub from a given channel.
   virtual std::shared_ptr<GoogleStub> createStub(std::shared_ptr<grpc::Channel> channel) PURE;
@@ -152,22 +165,23 @@ public:
 };
 
 // Google gRPC C++ client library implementation of Grpc::AsyncClient.
-class GoogleAsyncClientImpl final : public AsyncClient, Logger::Loggable<Logger::Id::grpc> {
+class GoogleAsyncClientImpl final : public RawAsyncClient, Logger::Loggable<Logger::Id::grpc> {
 public:
   GoogleAsyncClientImpl(Event::Dispatcher& dispatcher, GoogleAsyncClientThreadLocal& tls,
                         GoogleStubFactory& stub_factory, Stats::ScopeSharedPtr scope,
-                        const envoy::api::v2::core::GrpcService& config);
+                        const envoy::api::v2::core::GrpcService& config, Api::Api& api);
   ~GoogleAsyncClientImpl() override;
 
   // Grpc::AsyncClient
-  AsyncRequest* send(const Protobuf::MethodDescriptor& service_method,
-                     const Protobuf::Message& request, AsyncRequestCallbacks& callbacks,
-                     Tracing::Span& parent_span,
-                     const absl::optional<std::chrono::milliseconds>& timeout) override;
-  AsyncStream* start(const Protobuf::MethodDescriptor& service_method,
-                     AsyncStreamCallbacks& callbacks) override;
+  AsyncRequest* sendRaw(absl::string_view service_full_name, absl::string_view method_name,
+                        Buffer::InstancePtr&& request, RawAsyncRequestCallbacks& callbacks,
+                        Tracing::Span& parent_span,
+                        const Http::AsyncClient::RequestOptions& options) override;
+  RawAsyncStream* startRaw(absl::string_view service_full_name, absl::string_view method_name,
+                           RawAsyncStreamCallbacks& callbacks,
+                           const Http::AsyncClient::StreamOptions& options) override;
 
-  TimeSource& timeSource() { return dispatcher_.timeSystem(); }
+  TimeSource& timeSource() { return dispatcher_.timeSource(); }
 
 private:
   static std::shared_ptr<grpc::Channel>
@@ -190,21 +204,20 @@ private:
   friend class GoogleAsyncStreamImpl;
 };
 
-class GoogleAsyncStreamImpl : public AsyncStream,
+class GoogleAsyncStreamImpl : public RawAsyncStream,
                               public Event::DeferredDeletable,
                               Logger::Loggable<Logger::Id::grpc>,
                               LinkedObject<GoogleAsyncStreamImpl> {
 public:
-  GoogleAsyncStreamImpl(GoogleAsyncClientImpl& parent,
-                        const Protobuf::MethodDescriptor& service_method,
-                        AsyncStreamCallbacks& callbacks,
-                        const absl::optional<std::chrono::milliseconds>& timeout);
-  ~GoogleAsyncStreamImpl();
+  GoogleAsyncStreamImpl(GoogleAsyncClientImpl& parent, absl::string_view service_full_name,
+                        absl::string_view method_name, RawAsyncStreamCallbacks& callbacks,
+                        const Http::AsyncClient::StreamOptions& options);
+  ~GoogleAsyncStreamImpl() override;
 
   virtual void initialize(bool buffer_body_for_retry);
 
-  // Grpc::AsyncStream
-  void sendMessage(const Protobuf::Message& request, bool end_stream) override;
+  // Grpc::RawAsyncStream
+  void sendMessageRaw(Buffer::InstancePtr&& request, bool end_stream) override;
   void closeStream() override;
   void resetStream() override;
 
@@ -235,22 +248,12 @@ private:
   // Pending serialized message on write queue. Only one Operation::Write is in-flight at any
   // point-in-time, so we queue pending writes here.
   struct PendingMessage {
-    // We serialize the message to a grpc::ByteBuffer prior to queueing.
-    PendingMessage(const Protobuf::Message& request, bool end_stream)
-        : buf_([](const Protobuf::Message& request) -> absl::optional<grpc::ByteBuffer> {
-            grpc::ByteBuffer buffer;
-            grpc::ProtoBufferWriter writer(&buffer, grpc::kProtoBufferWriterMaxBufferLength,
-                                           request.ByteSize());
-            return request.SerializeToZeroCopyStream(&writer)
-                       ? absl::make_optional<grpc::ByteBuffer>(buffer)
-                       : absl::nullopt;
-          }(request)),
-          end_stream_(end_stream) {}
+    PendingMessage(Buffer::InstancePtr request, bool end_stream);
     // End-of-stream with no additional message.
-    PendingMessage() : end_stream_(true) {}
+    PendingMessage() = default;
 
     const absl::optional<grpc::ByteBuffer> buf_;
-    const bool end_stream_;
+    const bool end_stream_{true};
   };
 
   GoogleAsyncTag init_tag_{*this, GoogleAsyncTag::Operation::Init};
@@ -270,9 +273,10 @@ private:
   // We hold a ref count on the stub_ to allow the stream to wait for its tags
   // to drain from the CQ on cleanup.
   std::shared_ptr<GoogleStub> stub_;
-  const Protobuf::MethodDescriptor& service_method_;
-  AsyncStreamCallbacks& callbacks_;
-  const absl::optional<std::chrono::milliseconds>& timeout_;
+  std::string service_full_name_;
+  std::string method_name_;
+  RawAsyncStreamCallbacks& callbacks_;
+  const Http::AsyncClient::StreamOptions& options_;
   grpc::ClientContext ctxt_;
   std::unique_ptr<grpc::GenericClientAsyncReaderWriter> rw_;
   std::queue<PendingMessage> write_pending_queue_;
@@ -295,7 +299,7 @@ private:
   // Queue of completed (op, ok) passed from completionThread() to
   // handleOpCompletion().
   std::deque<std::pair<GoogleAsyncTag::Operation, bool>>
-      completed_ops_ GUARDED_BY(completed_ops_lock_);
+      completed_ops_ ABSL_GUARDED_BY(completed_ops_lock_);
   Thread::MutexBasicLockable completed_ops_lock_;
 
   friend class GoogleAsyncClientImpl;
@@ -304,13 +308,12 @@ private:
 
 class GoogleAsyncRequestImpl : public AsyncRequest,
                                public GoogleAsyncStreamImpl,
-                               AsyncStreamCallbacks {
+                               RawAsyncStreamCallbacks {
 public:
-  GoogleAsyncRequestImpl(GoogleAsyncClientImpl& parent,
-                         const Protobuf::MethodDescriptor& service_method,
-                         const Protobuf::Message& request, AsyncRequestCallbacks& callbacks,
-                         Tracing::Span& parent_span,
-                         const absl::optional<std::chrono::milliseconds>& timeout);
+  GoogleAsyncRequestImpl(GoogleAsyncClientImpl& parent, absl::string_view service_full_name,
+                         absl::string_view method_name, Buffer::InstancePtr request,
+                         RawAsyncRequestCallbacks& callbacks, Tracing::Span& parent_span,
+                         const Http::AsyncClient::RequestOptions& options);
 
   void initialize(bool buffer_body_for_retry) override;
 
@@ -318,18 +321,17 @@ public:
   void cancel() override;
 
 private:
-  // Grpc::AsyncStreamCallbacks
+  // Grpc::RawAsyncStreamCallbacks
   void onCreateInitialMetadata(Http::HeaderMap& metadata) override;
   void onReceiveInitialMetadata(Http::HeaderMapPtr&&) override;
-  void onReceiveMessageUntyped(ProtobufTypes::MessagePtr&& message) override;
+  bool onReceiveMessageRaw(Buffer::InstancePtr&& response) override;
   void onReceiveTrailingMetadata(Http::HeaderMapPtr&&) override;
-  ProtobufTypes::MessagePtr createEmptyResponse() override;
   void onRemoteClose(Grpc::Status::GrpcStatus status, const std::string& message) override;
 
-  const Protobuf::Message& request_;
-  AsyncRequestCallbacks& callbacks_;
+  Buffer::InstancePtr request_;
+  RawAsyncRequestCallbacks& callbacks_;
   Tracing::SpanPtr current_span_;
-  ProtobufTypes::MessagePtr response_;
+  Buffer::InstancePtr response_;
 };
 
 } // namespace Grpc

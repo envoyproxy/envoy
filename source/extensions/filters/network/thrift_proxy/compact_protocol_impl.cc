@@ -467,7 +467,7 @@ void CompactProtocolImpl::writeFieldEnd(Buffer::Instance& buffer) {
 
 void CompactProtocolImpl::writeMapBegin(Buffer::Instance& buffer, FieldType key_type,
                                         FieldType value_type, uint32_t size) {
-  if (size > std::numeric_limits<int32_t>::max()) {
+  if (size > static_cast<uint32_t>(std::numeric_limits<int32_t>::max())) {
     throw EnvoyException(fmt::format("illegal compact protocol map size {}", size));
   }
 
@@ -486,7 +486,7 @@ void CompactProtocolImpl::writeMapEnd(Buffer::Instance& buffer) { UNREFERENCED_P
 
 void CompactProtocolImpl::writeListBegin(Buffer::Instance& buffer, FieldType elem_type,
                                          uint32_t size) {
-  if (size > std::numeric_limits<int32_t>::max()) {
+  if (size > static_cast<uint32_t>(std::numeric_limits<int32_t>::max())) {
     throw EnvoyException(fmt::format("illegal compact protocol list/set size {}", size));
   }
 
@@ -625,8 +625,7 @@ public:
 /**
  * Static registration for the binary protocol. @see RegisterFactory.
  */
-static Registry::RegisterFactory<CompactProtocolConfigFactory, NamedProtocolConfigFactory>
-    register_;
+REGISTER_FACTORY(CompactProtocolConfigFactory, NamedProtocolConfigFactory);
 
 } // namespace ThriftProxy
 } // namespace NetworkFilters

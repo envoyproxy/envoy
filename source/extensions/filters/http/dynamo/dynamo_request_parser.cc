@@ -7,6 +7,8 @@
 
 #include "common/common/utility.h"
 
+#include "absl/strings/match.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
@@ -19,7 +21,6 @@ namespace Dynamo {
 const Http::LowerCaseString RequestParser::X_AMZ_TARGET("X-AMZ-TARGET");
 
 // clang-format off
-
 const std::vector<std::string> RequestParser::SINGLE_TABLE_OPERATIONS{
     "CreateTable",
     "DeleteItem",
@@ -36,6 +37,7 @@ const std::vector<std::string> RequestParser::SUPPORTED_ERROR_TYPES{
     // 4xx
     "AccessDeniedException",
     "ConditionalCheckFailedException",
+    "IdempotentParameterMismatchException",
     "IncompleteSignatureException",
     "ItemCollectionSizeLimitExceededException",
     "LimitExceededException",
@@ -44,20 +46,26 @@ const std::vector<std::string> RequestParser::SUPPORTED_ERROR_TYPES{
     "ResourceInUseException",
     "ResourceNotFoundException",
     "ThrottlingException",
+    "TransactionCanceledException",
+    "TransactionInProgressException",
     "UnrecognizedClientException",
     "ValidationException"};
-
 // clang-format on
 
 const std::vector<std::string> RequestParser::BATCH_OPERATIONS{"BatchGetItem", "BatchWriteItem"};
 
-std::string RequestParser::parseOperation(const Http::HeaderMap& headerMap) {
+const std::vector<std::string> RequestParser::TRANSACT_OPERATIONS{"TransactGetItems",
+                                                                  "TransactWriteItems"};
+const std::vector<std::string> RequestParser::TRANSACT_ITEM_OPERATIONS{"ConditionCheck", "Delete",
+                                                                       "Get", "Put", "Update"};
+
+std::string RequestParser::parseOperation(const Http::HeaderMap& header_map) {
   std::string operation;
 
-  const Http::HeaderEntry* x_amz_target = headerMap.get(X_AMZ_TARGET);
+  const Http::HeaderEntry* x_amz_target = header_map.get(X_AMZ_TARGET);
   if (x_amz_target) {
     // Normally x-amz-target contains Version.Operation, e.g., DynamoDB_20160101.GetItem
-    auto version_and_operation = StringUtil::splitToken(x_amz_target->value().c_str(), ".");
+    auto version_and_operation = StringUtil::splitToken(x_amz_target->value().getStringView(), ".");
     if (version_and_operation.size() == 2) {
       operation = std::string{version_and_operation[1]};
     }
@@ -89,10 +97,42 @@ RequestParser::TableDescriptor RequestParser::parseTable(const std::string& oper
       }
       return true;
     });
+  } else if (find(TRANSACT_OPERATIONS.begin(), TRANSACT_OPERATIONS.end(), operation) !=
+             TRANSACT_OPERATIONS.end()) {
+    std::vector<Json::ObjectSharedPtr> transact_items =
+        json_data.getObjectArray("TransactItems", true);
+    for (const Json::ObjectSharedPtr& transact_item : transact_items) {
+      const auto next_table_name = getTableNameFromTransactItem(*transact_item);
+      if (!next_table_name.has_value()) {
+        // if an operation is missing a table name, we want to throw the normal set of errors
+        table.table_name = "";
+        table.is_single_table = true;
+        break;
+      }
+      if (table.table_name.empty()) {
+        table.table_name = next_table_name.value();
+      } else if (table.table_name != next_table_name.value()) {
+        table.table_name = "";
+        table.is_single_table = false;
+        break;
+      }
+    }
   }
-
   return table;
 }
+
+absl::optional<std::string>
+RequestParser::getTableNameFromTransactItem(const Json::Object& transact_item) {
+  for (const std::string& operation : TRANSACT_ITEM_OPERATIONS) {
+    Json::ObjectSharedPtr item = transact_item.getObject(operation, true);
+    std::string table_name = item->getString("TableName", "");
+    if (!table_name.empty()) {
+      return absl::make_optional(table_name);
+    }
+  }
+  return absl::nullopt;
+}
+
 std::vector<std::string> RequestParser::parseBatchUnProcessedKeys(const Json::Object& json_data) {
   std::vector<std::string> unprocessed_tables;
   Json::ObjectSharedPtr tables = json_data.getObject("UnprocessedKeys", true);
@@ -103,6 +143,7 @@ std::vector<std::string> RequestParser::parseBatchUnProcessedKeys(const Json::Ob
 
   return unprocessed_tables;
 }
+
 std::string RequestParser::parseErrorType(const Json::Object& json_data) {
   std::string error_type = json_data.getString("__type", "");
   if (error_type.empty()) {
@@ -110,7 +151,7 @@ std::string RequestParser::parseErrorType(const Json::Object& json_data) {
   }
 
   for (const std::string& supported_error_type : SUPPORTED_ERROR_TYPES) {
-    if (StringUtil::endsWith(error_type, supported_error_type)) {
+    if (absl::EndsWith(error_type, supported_error_type)) {
       return supported_error_type;
     }
   }
@@ -141,6 +182,24 @@ RequestParser::parsePartitions(const Json::Object& json_data) {
   });
 
   return partition_descriptors;
+}
+
+void RequestParser::forEachStatString(const StringFn& fn) {
+  for (const std::string& str : SINGLE_TABLE_OPERATIONS) {
+    fn(str);
+  }
+  for (const std::string& str : SUPPORTED_ERROR_TYPES) {
+    fn(str);
+  }
+  for (const std::string& str : BATCH_OPERATIONS) {
+    fn(str);
+  }
+  for (const std::string& str : TRANSACT_OPERATIONS) {
+    fn(str);
+  }
+  for (const std::string& str : TRANSACT_ITEM_OPERATIONS) {
+    fn(str);
+  }
 }
 
 } // namespace Dynamo

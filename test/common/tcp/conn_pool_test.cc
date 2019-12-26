@@ -18,14 +18,11 @@
 #include "gtest/gtest.h"
 
 using testing::_;
-using testing::DoAll;
 using testing::InSequence;
 using testing::Invoke;
 using testing::NiceMock;
 using testing::Property;
 using testing::Return;
-using testing::ReturnRef;
-using testing::SaveArg;
 
 namespace Envoy {
 namespace Tcp {
@@ -34,7 +31,7 @@ namespace {
 struct TestConnectionState : public ConnectionPool::ConnectionState {
   TestConnectionState(int id, std::function<void()> on_destructor)
       : id_(id), on_destructor_(on_destructor) {}
-  ~TestConnectionState() { on_destructor_(); }
+  ~TestConnectionState() override { on_destructor_(); }
 
   int id_;
   std::function<void()> on_destructor_;
@@ -79,7 +76,7 @@ public:
                      Upstream::ResourcePriority::Default, nullptr, nullptr),
         mock_dispatcher_(dispatcher), mock_upstream_ready_timer_(upstream_ready_timer) {}
 
-  ~ConnPoolImplForTest() {
+  ~ConnPoolImplForTest() override {
     EXPECT_EQ(0U, ready_conns_.size());
     EXPECT_EQ(0U, busy_conns_.size());
     EXPECT_EQ(0U, pending_requests_.size());
@@ -106,17 +103,17 @@ public:
         .WillOnce(Invoke(
             [&](Network::ReadFilterSharedPtr filter) -> void { test_conn.filter_ = filter; }));
     EXPECT_CALL(*test_conn.connection_, connect());
-    EXPECT_CALL(*test_conn.connect_timer_, enableTimer(_));
+    EXPECT_CALL(*test_conn.connect_timer_, enableTimer(_, _));
   }
 
   void expectEnableUpstreamReady() {
     EXPECT_FALSE(upstream_ready_enabled_);
-    EXPECT_CALL(*mock_upstream_ready_timer_, enableTimer(_)).Times(1).RetiresOnSaturation();
+    EXPECT_CALL(*mock_upstream_ready_timer_, enableTimer(_, _)).Times(1).RetiresOnSaturation();
   }
 
   void expectAndRunUpstreamReady() {
     EXPECT_TRUE(upstream_ready_enabled_);
-    mock_upstream_ready_timer_->callback_();
+    mock_upstream_ready_timer_->invokeCallback();
     EXPECT_FALSE(upstream_ready_enabled_);
   }
 
@@ -126,8 +123,8 @@ public:
 
 protected:
   void onConnReleased(ConnPoolImpl::ActiveConn& conn) override {
-    for (auto i = test_conns_.begin(); i != test_conns_.end(); i++) {
-      if (conn.conn_.get() == i->connection_) {
+    for (auto& test_conn : test_conns_) {
+      if (conn.conn_.get() == test_conn.connection_) {
         onConnReleasedForTest();
         break;
       }
@@ -158,11 +155,8 @@ public:
       : upstream_ready_timer_(new NiceMock<Event::MockTimer>(&dispatcher_)),
         conn_pool_(dispatcher_, cluster_, upstream_ready_timer_) {}
 
-  ~TcpConnPoolImplTest() {
-    // Make sure all gauges are 0.
-    for (const Stats::GaugeSharedPtr& gauge : cluster_->stats_store_.gauges()) {
-      EXPECT_EQ(0U, gauge->value());
-    }
+  ~TcpConnPoolImplTest() override {
+    EXPECT_TRUE(TestUtility::gaugesZeroed(cluster_->stats_store_.gauges()));
   }
 
   NiceMock<Event::MockDispatcher> dispatcher_;
@@ -183,13 +177,13 @@ public:
                                     Upstream::makeTestHost(cluster_, "tcp://127.0.0.1:9000"),
                                     Upstream::ResourcePriority::Default, nullptr, nullptr)} {}
 
-  ~TcpConnPoolImplDestructorTest() {}
+  ~TcpConnPoolImplDestructorTest() override = default;
 
   void prepareConn() {
     connection_ = new NiceMock<Network::MockClientConnection>();
     connect_timer_ = new NiceMock<Event::MockTimer>(&dispatcher_);
     EXPECT_CALL(dispatcher_, createClientConnection_(_, _, _, _)).WillOnce(Return(connection_));
-    EXPECT_CALL(*connect_timer_, enableTimer(_));
+    EXPECT_CALL(*connect_timer_, enableTimer(_, _));
 
     callbacks_ = std::make_unique<ConnPoolCallbacks>();
     ConnectionPool::Cancellable* handle = conn_pool_->newConnection(*callbacks_);
@@ -274,7 +268,7 @@ struct ActiveTestConn {
  * Verify that connections are drained when requested.
  */
 TEST_F(TcpConnPoolImplTest, DrainConnections) {
-  cluster_->resetResourceManager(3, 1024, 1024, 1);
+  cluster_->resetResourceManager(3, 1024, 1024, 1, 1);
   InSequence s;
 
   ActiveTestConn c1(*this, 0, ActiveTestConn::Type::CreateConnection);
@@ -487,7 +481,7 @@ TEST_F(TcpConnPoolImplTest, ConnectionStateLifecycle) {
  * Test when we overflow max pending requests.
  */
 TEST_F(TcpConnPoolImplTest, MaxPendingRequests) {
-  cluster_->resetResourceManager(1, 1, 1024, 1);
+  cluster_->resetResourceManager(1, 1, 1024, 1, 1);
 
   ConnPoolCallbacks callbacks;
   conn_pool_.expectConnCreate();
@@ -579,10 +573,10 @@ TEST_F(TcpConnPoolImplTest, ConnectTimeout) {
     EXPECT_NE(nullptr, conn_pool_.newConnection(callbacks2));
   }));
 
-  conn_pool_.test_conns_[0].connect_timer_->callback_();
+  conn_pool_.test_conns_[0].connect_timer_->invokeCallback();
 
   EXPECT_CALL(callbacks2.pool_failure_, ready());
-  conn_pool_.test_conns_[1].connect_timer_->callback_();
+  conn_pool_.test_conns_[1].connect_timer_->invokeCallback();
 
   EXPECT_CALL(conn_pool_, onConnDestroyedForTest()).Times(2);
   dispatcher_.clearDeferredDeleteList();
@@ -660,7 +654,7 @@ TEST_F(TcpConnPoolImplTest, DisconnectWhileBound) {
  * Test upstream disconnection of one request while another is pending.
  */
 TEST_F(TcpConnPoolImplTest, DisconnectWhilePending) {
-  cluster_->resetResourceManager(1, 1024, 1024, 1);
+  cluster_->resetResourceManager(1, 1024, 1024, 1, 1);
   InSequence s;
 
   // First request connected.
@@ -770,7 +764,7 @@ TEST_F(TcpConnPoolImplTest, MaxRequestsPerConnection) {
  * Test that multiple connections can be assigned at once.
  */
 TEST_F(TcpConnPoolImplTest, ConcurrentConnections) {
-  cluster_->resetResourceManager(2, 1024, 1024, 1);
+  cluster_->resetResourceManager(2, 1024, 1024, 1, 1);
   InSequence s;
 
   ActiveTestConn c1(*this, 0, ActiveTestConn::Type::CreateConnection);
@@ -806,7 +800,7 @@ TEST_F(TcpConnPoolImplTest, ConnectionStateWithConcurrentConnections) {
   auto* s2 = new TestConnectionState(2, [&]() -> void { state_destroyed |= 2; });
   auto* s3 = new TestConnectionState(2, [&]() -> void { state_destroyed |= 4; });
 
-  cluster_->resetResourceManager(2, 1024, 1024, 1);
+  cluster_->resetResourceManager(2, 1024, 1024, 1, 1);
   ActiveTestConn c1(*this, 0, ActiveTestConn::Type::CreateConnection);
   c1.callbacks_.conn_data_->setConnectionState(std::unique_ptr<TestConnectionState>(s1));
   ActiveTestConn c2(*this, 1, ActiveTestConn::Type::CreateConnection);
@@ -924,7 +918,7 @@ TEST_F(TcpConnPoolImplDestructorTest, TestPendingConnectionsAreClosed) {
   connection_ = new NiceMock<Network::MockClientConnection>();
   connect_timer_ = new NiceMock<Event::MockTimer>(&dispatcher_);
   EXPECT_CALL(dispatcher_, createClientConnection_(_, _, _, _)).WillOnce(Return(connection_));
-  EXPECT_CALL(*connect_timer_, enableTimer(_));
+  EXPECT_CALL(*connect_timer_, enableTimer(_, _));
 
   callbacks_ = std::make_unique<ConnPoolCallbacks>();
   ConnectionPool::Cancellable* handle = conn_pool_->newConnection(*callbacks_);

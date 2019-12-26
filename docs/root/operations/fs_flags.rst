@@ -10,5 +10,5 @@ in the directory specified in the :ref:`flags_path
 option. The currently supported flag files are:
 
 drain
-  If this file exists, Envoy will start in HC failing mode, similar to after the
+  If this file exists, Envoy will start in health check failing mode, similar to after the
   :http:post:`/healthcheck/fail` command has been executed.

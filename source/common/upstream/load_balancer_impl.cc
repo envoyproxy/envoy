@@ -5,6 +5,7 @@
 #include <string>
 #include <vector>
 
+#include "envoy/api/v2/cds.pb.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/upstream/upstream.h"
 
@@ -19,21 +20,79 @@ namespace {
 static const std::string RuntimeZoneEnabled = "upstream.zone_routing.enabled";
 static const std::string RuntimeMinClusterSize = "upstream.zone_routing.min_cluster_size";
 static const std::string RuntimePanicThreshold = "upstream.healthy_panic_threshold";
+
+// Distributes load between priorities based on the per priority availability and the normalized
+// total availability. Load is assigned to each priority according to how available each priority is
+// adjusted for the normalized total availability.
+//
+// @param per_priority_load vector of loads that should be populated.
+// @param per_priority_availability the percentage availability of each priority, used to determine
+// how much load each priority can handle.
+// @param total_load the amount of load that may be distributed. Will be updated with the amount of
+// load remaining after distribution.
+// @param normalized_total_availability the total availability, up to a max of 100. Used to
+// scale the load when the total availability is less than 100%.
+// @return the first available priority and the remaining load
+std::pair<int32_t, size_t> distributeLoad(PriorityLoad& per_priority_load,
+                                          const PriorityAvailability& per_priority_availability,
+                                          size_t total_load, size_t normalized_total_availability) {
+  int32_t first_available_priority = -1;
+  for (size_t i = 0; i < per_priority_availability.get().size(); ++i) {
+    if (first_available_priority < 0 && per_priority_availability.get()[i] > 0) {
+      first_available_priority = i;
+    }
+    // Now assign as much load as possible to the high priority levels and cease assigning load
+    // when total_load runs out.
+    per_priority_load.get()[i] = std::min<uint32_t>(
+        total_load, per_priority_availability.get()[i] * 100 / normalized_total_availability);
+    total_load -= per_priority_load.get()[i];
+  }
+
+  return {first_available_priority, total_load};
+}
+
+// Returns true if the weights of all the hosts in the HostVector are equal.
+bool hostWeightsAreEqual(const HostVector& hosts) {
+  if (hosts.size() <= 1) {
+    return true;
+  }
+  const uint32_t weight = hosts[0]->weight();
+  for (size_t i = 1; i < hosts.size(); ++i) {
+    if (hosts[i]->weight() != weight) {
+      return false;
+    }
+  }
+  return true;
+}
+
 } // namespace
 
-uint32_t LoadBalancerBase::choosePriority(uint64_t hash,
-                                          const std::vector<uint32_t>& per_priority_load) {
+std::pair<uint32_t, LoadBalancerBase::HostAvailability>
+LoadBalancerBase::choosePriority(uint64_t hash, const HealthyLoad& healthy_per_priority_load,
+                                 const DegradedLoad& degraded_per_priority_load) {
   hash = hash % 100 + 1; // 1-100
   uint32_t aggregate_percentage_load = 0;
   // As with tryChooseLocalLocalityHosts, this can be refactored for efficiency
   // but O(N) is good enough for now given the expected number of priorities is
   // small.
-  for (size_t priority = 0; priority < per_priority_load.size(); ++priority) {
-    aggregate_percentage_load += per_priority_load[priority];
+
+  // We first attempt to select a priority based on healthy availability.
+  for (size_t priority = 0; priority < healthy_per_priority_load.get().size(); ++priority) {
+    aggregate_percentage_load += healthy_per_priority_load.get()[priority];
     if (hash <= aggregate_percentage_load) {
-      return priority;
+      return {static_cast<uint32_t>(priority), HostAvailability::Healthy};
     }
   }
+
+  // If no priorities were selected due to health, we'll select a priority based degraded
+  // availability.
+  for (size_t priority = 0; priority < degraded_per_priority_load.get().size(); ++priority) {
+    aggregate_percentage_load += degraded_per_priority_load.get()[priority];
+    if (hash <= aggregate_percentage_load) {
+      return {static_cast<uint32_t>(priority), HostAvailability::Degraded};
+    }
+  }
+
   // The percentages should always add up to 100 but we have to have a return for the compiler.
   NOT_REACHED_GCOVR_EXCL_LINE;
 }
@@ -47,16 +106,18 @@ LoadBalancerBase::LoadBalancerBase(const PrioritySet& priority_set, ClusterStats
       priority_set_(priority_set) {
   for (auto& host_set : priority_set_.hostSetsPerPriority()) {
     recalculatePerPriorityState(host_set->priority(), priority_set_, per_priority_load_,
-                                per_priority_health_);
+                                per_priority_health_, per_priority_degraded_);
   }
-  // Reclaculate panic mode for all levels.
+  // Recalculate panic mode for all levels.
   recalculatePerPriorityPanic();
 
-  priority_set_.addMemberUpdateCb([this](uint32_t priority, const HostVector&,
-                                         const HostVector&) -> void {
-    recalculatePerPriorityState(priority, priority_set_, per_priority_load_, per_priority_health_);
-  });
-  priority_set_.addMemberUpdateCb(
+  priority_set_.addPriorityUpdateCb(
+      [this](uint32_t priority, const HostVector&, const HostVector&) -> void {
+        recalculatePerPriorityState(priority, priority_set_, per_priority_load_,
+                                    per_priority_health_, per_priority_degraded_);
+      });
+
+  priority_set_.addPriorityUpdateCb(
       [this](uint32_t priority, const HostVector&, const HostVector&) -> void {
         UNREFERENCED_PARAMETER(priority);
         recalculatePerPriorityPanic();
@@ -69,107 +130,148 @@ LoadBalancerBase::LoadBalancerBase(const PrioritySet& priority_set, ClusterStats
 // - normalized total health is = 100%. It means there are enough healthy hosts to handle the load.
 //   Do not enter panic mode, even if a specific priority has low number of healthy hosts.
 // - normalized total health is < 100%. There are not enough healthy hosts to handle the load.
-// Continue
-//   distibuting the load among priority sets, but turn on panic mode for a given priority
+// Continue distributing the load among priority sets, but turn on panic mode for a given priority
 //   if # of healthy hosts in priority set is low.
-// - normalized total health is 0%. All hosts are down. Redirect 100% of traffic to P=0 and enable
-// panic mode.
+// - normalized total health is 0%. All hosts are down. Redirect 100% of traffic to P=0.
+//   And if panic threshold > 0% then enable panic mode for P=0, otherwise disable.
 
 void LoadBalancerBase::recalculatePerPriorityState(uint32_t priority,
                                                    const PrioritySet& priority_set,
-                                                   PriorityLoad& per_priority_load,
-                                                   std::vector<uint32_t>& per_priority_health) {
-  per_priority_load.resize(priority_set.hostSetsPerPriority().size());
-  per_priority_health.resize(priority_set.hostSetsPerPriority().size());
+                                                   HealthyAndDegradedLoad& per_priority_load,
+                                                   HealthyAvailability& per_priority_health,
+                                                   DegradedAvailability& per_priority_degraded) {
+  per_priority_load.healthy_priority_load_.get().resize(priority_set.hostSetsPerPriority().size());
+  per_priority_load.degraded_priority_load_.get().resize(priority_set.hostSetsPerPriority().size());
+  per_priority_health.get().resize(priority_set.hostSetsPerPriority().size());
+  per_priority_degraded.get().resize(priority_set.hostSetsPerPriority().size());
 
   // Determine the health of the newly modified priority level.
-  // Health ranges from 0-100, and is the ratio of healthy hosts to total hosts, modified by the
-  // overprovisioning factor.
+  // Health ranges from 0-100, and is the ratio of healthy/degraded hosts to total hosts, modified
+  // by the overprovisioning factor.
   HostSet& host_set = *priority_set.hostSetsPerPriority()[priority];
-  per_priority_health[priority] = 0;
-  if (host_set.hosts().size() > 0) {
+  per_priority_health.get()[priority] = 0;
+  per_priority_degraded.get()[priority] = 0;
+  const auto host_count = host_set.hosts().size() - host_set.excludedHosts().size();
+
+  if (host_count > 0) {
     // Each priority level's health is ratio of healthy hosts to total number of hosts in a priority
     // multiplied by overprovisioning factor of 1.4 and capped at 100%. It means that if all
     // hosts are healthy that priority's health is 100%*1.4=140% and is capped at 100% which results
-    // in 100%. If 80% of hosts are healty, that priority's health is still 100% (80%*1.4=112% and
+    // in 100%. If 80% of hosts are healthy, that priority's health is still 100% (80%*1.4=112% and
     // capped at 100%).
-    per_priority_health[priority] =
-        std::min<uint32_t>(100, (host_set.overprovisioningFactor() *
-                                 host_set.healthyHosts().size() / host_set.hosts().size()));
+    per_priority_health.get()[priority] = std::min<uint32_t>(
+        100, (host_set.overprovisioningFactor() * host_set.healthyHosts().size() / host_count));
+
+    // We perform the same computation for degraded hosts.
+    per_priority_degraded.get()[priority] = std::min<uint32_t>(
+        100, (host_set.overprovisioningFactor() * host_set.degradedHosts().size() / host_count));
   }
 
   // Now that we've updated health for the changed priority level, we need to calculate percentage
   // load for all priority levels.
 
+  // First, determine if the load needs to be scaled relative to availability (healthy + degraded).
+  // For example if there are 3 host sets with 10% / 20% / 10% health and 20% / 10% / 0% degraded
+  // they will get 16% / 28% / 14% load to healthy hosts and 28% / 14% / 0% load to degraded hosts
+  // to ensure total load adds up to 100. Note the first healthy priority is receiving 2% additional
+  // load due to rounding.
   //
-  // First, determine if the load needs to be scaled relative to health. For example if there are
-  // 3 host sets with 20% / 20% / 10% health they will get 40% / 40% / 20% load to ensure total load
-  // adds up to 100.
-  // Sum of priority levels' health values may exceed 100, so it is capped at 100 and referred as
-  // normalized total health.
-  const uint32_t normalized_total_health = calcNormalizedTotalHealth(per_priority_health);
-  if (normalized_total_health == 0) {
+  // Sum of priority levels' health and degraded values may exceed 100, so it is capped at 100 and
+  // referred as normalized total availability.
+  const uint32_t normalized_total_availability =
+      calculateNormalizedTotalAvailability(per_priority_health, per_priority_degraded);
+  if (normalized_total_availability == 0) {
     // Everything is terrible. Send all load to P=0.
     // In this one case sumEntries(per_priority_load) != 100 since we sinkhole all traffic in P=0.
-    per_priority_load[0] = 100;
+    per_priority_load.healthy_priority_load_.get()[0] = 100;
     return;
   }
 
-  size_t total_load = 100;
-  int32_t first_healthy_priority = -1;
-  for (size_t i = 0; i < per_priority_health.size(); ++i) {
-    if (first_healthy_priority < 0 && per_priority_health[i] > 0) {
-      first_healthy_priority = i;
+  // We start of with a total load of 100 and distribute it between priorities based on
+  // availability. We first attempt to distribute this load to healthy priorities based on healthy
+  // availability.
+  const auto first_healthy_and_remaining =
+      distributeLoad(per_priority_load.healthy_priority_load_, per_priority_health, 100,
+                     normalized_total_availability);
+
+  // Using the remaining load after allocating load to healthy priorities, distribute it based on
+  // degraded availability.
+  const auto remaining_load_for_degraded = first_healthy_and_remaining.second;
+  const auto first_degraded_and_remaining =
+      distributeLoad(per_priority_load.degraded_priority_load_, per_priority_degraded,
+                     remaining_load_for_degraded, normalized_total_availability);
+
+  // Anything that remains should just be rounding errors, so allocate that to the first available
+  // priority, either as healthy or degraded.
+  const auto remaining_load = first_degraded_and_remaining.second;
+  if (remaining_load != 0) {
+    const auto first_healthy = first_healthy_and_remaining.first;
+    const auto first_degraded = first_degraded_and_remaining.first;
+    ASSERT(first_healthy != -1 || first_degraded != -1);
+
+    // Attempt to allocate the remainder to the first healthy priority first. If no such priority
+    // exist, allocate to the first degraded priority.
+    ASSERT(remaining_load < per_priority_load.healthy_priority_load_.get().size() +
+                                per_priority_load.degraded_priority_load_.get().size());
+    if (first_healthy != -1) {
+      per_priority_load.healthy_priority_load_.get()[first_healthy] += remaining_load;
+    } else {
+      per_priority_load.degraded_priority_load_.get()[first_degraded] += remaining_load;
     }
-    // Now assign as much load as possible to the high priority levels and cease assigning load
-    // when total_load runs out.
-    per_priority_load[i] =
-        std::min<uint32_t>(total_load, per_priority_health[i] * 100 / normalized_total_health);
-    total_load -= per_priority_load[i];
   }
 
-  if (total_load != 0) {
-    ASSERT(first_healthy_priority != -1);
-    // Account for rounding errors by assigning it to the first healthy priority.
-    ASSERT(total_load < per_priority_load.size());
-    per_priority_load[first_healthy_priority] += total_load;
-  }
+  // The allocated load between healthy and degraded should be exactly 100.
+  ASSERT(100 == std::accumulate(per_priority_load.healthy_priority_load_.get().begin(),
+                                per_priority_load.healthy_priority_load_.get().end(), 0) +
+                    std::accumulate(per_priority_load.degraded_priority_load_.get().begin(),
+                                    per_priority_load.degraded_priority_load_.get().end(), 0));
 }
 
 // Method iterates through priority levels and turns on/off panic mode.
 void LoadBalancerBase::recalculatePerPriorityPanic() {
   per_priority_panic_.resize(priority_set_.hostSetsPerPriority().size());
 
-  const uint32_t normalized_total_health = calcNormalizedTotalHealth(per_priority_health_);
+  const uint32_t normalized_total_availability =
+      calculateNormalizedTotalAvailability(per_priority_health_, per_priority_degraded_);
 
-  if (normalized_total_health == 0) {
+  const uint64_t panic_threshold = std::min<uint64_t>(
+      100, runtime_.snapshot().getInteger(RuntimePanicThreshold, default_healthy_panic_percent_));
+
+  // Panic mode is disabled only when panic_threshold is 0%.
+  if (panic_threshold > 0 && normalized_total_availability == 0) {
     // Everything is terrible. All load should be to P=0. Turn on panic mode.
-    ASSERT(per_priority_load_[0] == 100);
+    ASSERT(per_priority_load_.healthy_priority_load_.get()[0] == 100);
     per_priority_panic_[0] = true;
     return;
   }
 
-  for (size_t i = 0; i < per_priority_health_.size(); ++i) {
+  for (size_t i = 0; i < per_priority_health_.get().size(); ++i) {
     // For each level check if it should run in panic mode. Never set panic mode if
     // normalized total health is 100%, even when individual priority level has very low # of
     // healthy hosts.
     const HostSet& priority_host_set = *priority_set_.hostSetsPerPriority()[i];
     per_priority_panic_[i] =
-        (normalized_total_health == 100 ? false : isGlobalPanic(priority_host_set));
+        (normalized_total_availability == 100 ? false : isGlobalPanic(priority_host_set));
   }
 }
 
-HostSet& LoadBalancerBase::chooseHostSet(LoadBalancerContext* context) {
+std::pair<HostSet&, LoadBalancerBase::HostAvailability>
+LoadBalancerBase::chooseHostSet(LoadBalancerContext* context) {
   if (context) {
-    const auto& per_priority_load =
-        context->determinePriorityLoad(priority_set_, per_priority_load_);
+    const auto priority_loads = context->determinePriorityLoad(priority_set_, per_priority_load_);
 
-    const uint32_t priority = choosePriority(random_.random(), per_priority_load);
-    return *priority_set_.hostSetsPerPriority()[priority];
+    const auto priority_and_source =
+        choosePriority(random_.random(), priority_loads.healthy_priority_load_,
+                       priority_loads.degraded_priority_load_);
+    return {*priority_set_.hostSetsPerPriority()[priority_and_source.first],
+            priority_and_source.second};
   }
 
-  const uint32_t priority = choosePriority(random_.random(), per_priority_load_);
-  return *priority_set_.hostSetsPerPriority()[priority];
+  const auto priority_and_source =
+      choosePriority(random_.random(), per_priority_load_.healthy_priority_load_,
+                     per_priority_load_.degraded_priority_load_);
+  return {*priority_set_.hostSetsPerPriority()[priority_and_source.first],
+          priority_and_source.second};
 }
 
 ZoneAwareLoadBalancerBase::ZoneAwareLoadBalancerBase(
@@ -181,10 +283,11 @@ ZoneAwareLoadBalancerBase::ZoneAwareLoadBalancerBase(
       routing_enabled_(PROTOBUF_PERCENT_TO_ROUNDED_INTEGER_OR_DEFAULT(
           common_config.zone_aware_lb_config(), routing_enabled, 100, 100)),
       min_cluster_size_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(common_config.zone_aware_lb_config(),
-                                                        min_cluster_size, 6U)) {
+                                                        min_cluster_size, 6U)),
+      fail_traffic_on_panic_(common_config.zone_aware_lb_config().fail_traffic_on_panic()) {
   ASSERT(!priority_set.hostSetsPerPriority().empty());
   resizePerPriorityState();
-  priority_set_.addMemberUpdateCb(
+  priority_set_.addPriorityUpdateCb(
       [this](uint32_t priority, const HostVector&, const HostVector&) -> void {
         // Make sure per_priority_state_ is as large as priority_set_.hostSetsPerPriority()
         resizePerPriorityState();
@@ -200,7 +303,7 @@ ZoneAwareLoadBalancerBase::ZoneAwareLoadBalancerBase(
     // routing (all local Envoys fail over at the same time) and use all priorities when computing
     // the locality routing structure.
     ASSERT(local_priority_set_->hostSetsPerPriority().size() == 1);
-    local_priority_set_member_update_cb_handle_ = local_priority_set_->addMemberUpdateCb(
+    local_priority_set_member_update_cb_handle_ = local_priority_set_->addPriorityUpdateCb(
         [this](uint32_t priority, const HostVector&, const HostVector&) -> void {
           ASSERT(priority == 0);
           // If the set of local Envoys changes, regenerate routing for P=0 as it does priority
@@ -243,7 +346,7 @@ void ZoneAwareLoadBalancerBase::regenerateLocalityRoutingStructures() {
   // half the hosts in all host sets go unhealthy, this priority set will
   // still send half of the incoming load to the local locality and 80% to residual.
   //
-  // Basically, fariness across localities within a priority is guaranteed. Fairness across
+  // Basically, fairness across localities within a priority is guaranteed. Fairness across
   // localities across priorities is not.
   STACK_ARRAY(local_percentage, uint64_t, num_localities);
   calculateLocalityPercentage(localHostSet().healthyHostsPerLocality(), local_percentage.begin());
@@ -352,19 +455,21 @@ HostConstSharedPtr LoadBalancerBase::chooseHost(LoadBalancerContext* context) {
     }
   }
 
-  // If we didnt find anything, return the last host.
+  // If we didn't find anything, return the last host.
   return host;
 }
 
 bool LoadBalancerBase::isGlobalPanic(const HostSet& host_set) {
   uint64_t global_panic_threshold = std::min<uint64_t>(
       100, runtime_.snapshot().getInteger(RuntimePanicThreshold, default_healthy_panic_percent_));
-  double healthy_percent = host_set.hosts().size() == 0
-                               ? 0
-                               : 100.0 * host_set.healthyHosts().size() / host_set.hosts().size();
+  const auto host_count = host_set.hosts().size() - host_set.excludedHosts().size();
+  double healthy_percent =
+      host_count == 0 ? 0.0 : 100.0 * host_set.healthyHosts().size() / host_count;
 
+  double degraded_percent =
+      host_count == 0 ? 0.0 : 100.0 * host_set.degradedHosts().size() / host_count;
   // If the % of healthy hosts in the cluster is less than our panic threshold, we use all hosts.
-  if (healthy_percent < global_panic_threshold) {
+  if ((healthy_percent + degraded_percent) < global_panic_threshold) {
     return true;
   }
 
@@ -377,6 +482,8 @@ void ZoneAwareLoadBalancerBase::calculateLocalityPercentage(
   for (const auto& locality_hosts : hosts_per_locality.get()) {
     total_hosts += locality_hosts.size();
   }
+
+  // TODO(snowp): Should we ignore excluded hosts here too?
 
   size_t i = 0;
   for (const auto& locality_hosts : hosts_per_locality.get()) {
@@ -434,50 +541,69 @@ uint32_t ZoneAwareLoadBalancerBase::tryChooseLocalLocalityHosts(const HostSet& h
   return i;
 }
 
-ZoneAwareLoadBalancerBase::HostsSource
+absl::optional<ZoneAwareLoadBalancerBase::HostsSource>
 ZoneAwareLoadBalancerBase::hostSourceToUse(LoadBalancerContext* context) {
-  HostSet& host_set = chooseHostSet(context);
+  auto host_set_and_source = chooseHostSet(context);
+
+  // The second argument tells us which availability we should target from the selected host set.
+  const auto host_availability = host_set_and_source.second;
+  auto& host_set = host_set_and_source.first;
   HostsSource hosts_source;
   hosts_source.priority_ = host_set.priority();
 
-  // If the selected host set has insufficient healthy hosts, return all hosts.
+  // If the selected host set has insufficient healthy hosts, return all hosts (unless we should
+  // fail traffic on panic, in which case return no host).
   if (per_priority_panic_[hosts_source.priority_]) {
     stats_.lb_healthy_panic_.inc();
-    hosts_source.source_type_ = HostsSource::SourceType::AllHosts;
-    return hosts_source;
+    if (fail_traffic_on_panic_) {
+      return absl::nullopt;
+    } else {
+      hosts_source.source_type_ = HostsSource::SourceType::AllHosts;
+      return hosts_source;
+    }
   }
 
   // If we're doing locality weighted balancing, pick locality.
-  const absl::optional<uint32_t> locality = host_set.chooseLocality();
+  absl::optional<uint32_t> locality;
+  if (host_availability == HostAvailability::Degraded) {
+    locality = host_set.chooseDegradedLocality();
+  } else {
+    locality = host_set.chooseHealthyLocality();
+  }
+
   if (locality.has_value()) {
-    hosts_source.source_type_ = HostsSource::SourceType::LocalityHealthyHosts;
+    hosts_source.source_type_ = localitySourceType(host_availability);
     hosts_source.locality_index_ = locality.value();
     return hosts_source;
   }
 
-  // If we've latched that we can't do priority-based routing, return healthy hosts for the selected
-  // host set.
+  // If we've latched that we can't do priority-based routing, return healthy or degraded hosts
+  // for the selected host set.
   if (per_priority_state_[host_set.priority()]->locality_routing_state_ ==
       LocalityRoutingState::NoLocalityRouting) {
-    hosts_source.source_type_ = HostsSource::SourceType::HealthyHosts;
+    hosts_source.source_type_ = sourceType(host_availability);
     return hosts_source;
   }
 
   // Determine if the load balancer should do zone based routing for this pick.
   if (!runtime_.snapshot().featureEnabled(RuntimeZoneEnabled, routing_enabled_)) {
-    hosts_source.source_type_ = HostsSource::SourceType::HealthyHosts;
+    hosts_source.source_type_ = sourceType(host_availability);
     return hosts_source;
   }
 
   if (isGlobalPanic(localHostSet())) {
     stats_.lb_local_cluster_not_ok_.inc();
-    // If the local Envoy instances are in global panic, do not do locality
-    // based routing.
-    hosts_source.source_type_ = HostsSource::SourceType::HealthyHosts;
-    return hosts_source;
+    // If the local Envoy instances are in global panic, and we should not fail traffic, do
+    // not do locality based routing.
+    if (fail_traffic_on_panic_) {
+      return absl::nullopt;
+    } else {
+      hosts_source.source_type_ = sourceType(host_availability);
+      return hosts_source;
+    }
   }
 
-  hosts_source.source_type_ = HostsSource::SourceType::LocalityHealthyHosts;
+  hosts_source.source_type_ = localitySourceType(host_availability);
   hosts_source.locality_index_ = tryChooseLocalLocalityHosts(host_set);
   return hosts_source;
 }
@@ -489,8 +615,12 @@ const HostVector& ZoneAwareLoadBalancerBase::hostSourceToHosts(HostsSource hosts
     return host_set.hosts();
   case HostsSource::SourceType::HealthyHosts:
     return host_set.healthyHosts();
+  case HostsSource::SourceType::DegradedHosts:
+    return host_set.degradedHosts();
   case HostsSource::SourceType::LocalityHealthyHosts:
     return host_set.healthyHostsPerLocality().get()[hosts_source.locality_index_];
+  case HostsSource::SourceType::LocalityDegradedHosts:
+    return host_set.degradedHostsPerLocality().get()[hosts_source.locality_index_];
   default:
     NOT_REACHED_GCOVR_EXCL_LINE;
   }
@@ -508,7 +638,7 @@ EdfLoadBalancerBase::EdfLoadBalancerBase(
   // The downside of a full recompute is that time complexity is O(n * log n),
   // so we will need to do better at delta tracking to scale (see
   // https://github.com/envoyproxy/envoy/issues/2874).
-  priority_set.addMemberUpdateCb(
+  priority_set.addPriorityUpdateCb(
       [this](uint32_t priority, const HostVector&, const HostVector&) { refresh(priority); });
 }
 
@@ -524,6 +654,16 @@ void EdfLoadBalancerBase::refresh(uint32_t priority) {
     auto& scheduler = scheduler_[source] = Scheduler{};
     refreshHostSource(source);
 
+    // Check if the original host weights are equal and skip EDF creation if they are. When all
+    // original weights are equal we can rely on unweighted host pick to do optimal round robin and
+    // least-loaded host selection with lower memory and CPU overhead.
+    if (hostWeightsAreEqual(hosts)) {
+      // Skip edf creation.
+      return;
+    }
+
+    scheduler.edf_ = std::make_unique<EdfScheduler<const Host>>();
+
     // Populate scheduler with host list.
     // TODO(mattklein123): We must build the EDF schedule even if all of the hosts are currently
     // weighted 1. This is because currently we don't refresh host sets if only weights change.
@@ -534,7 +674,7 @@ void EdfLoadBalancerBase::refresh(uint32_t priority) {
       // notification, this will only be stale until this host is next picked,
       // at which point it is reinserted into the EdfScheduler with its new
       // weight in chooseHost().
-      scheduler.edf_.add(hostWeight(*host), host);
+      scheduler.edf_->add(hostWeight(*host), host);
     }
 
     // Cycle through hosts to achieve the intended offset behavior.
@@ -542,8 +682,8 @@ void EdfLoadBalancerBase::refresh(uint32_t priority) {
     // refreshes for the weighted case.
     if (!hosts.empty()) {
       for (uint32_t i = 0; i < seed_ % hosts.size(); ++i) {
-        auto host = scheduler.edf_.pick();
-        scheduler.edf_.add(hostWeight(*host), host);
+        auto host = scheduler.edf_->pick();
+        scheduler.edf_->add(hostWeight(*host), host);
       }
     }
   };
@@ -553,17 +693,28 @@ void EdfLoadBalancerBase::refresh(uint32_t priority) {
   add_hosts_source(HostsSource(priority, HostsSource::SourceType::AllHosts), host_set->hosts());
   add_hosts_source(HostsSource(priority, HostsSource::SourceType::HealthyHosts),
                    host_set->healthyHosts());
+  add_hosts_source(HostsSource(priority, HostsSource::SourceType::DegradedHosts),
+                   host_set->degradedHosts());
   for (uint32_t locality_index = 0;
        locality_index < host_set->healthyHostsPerLocality().get().size(); ++locality_index) {
     add_hosts_source(
         HostsSource(priority, HostsSource::SourceType::LocalityHealthyHosts, locality_index),
         host_set->healthyHostsPerLocality().get()[locality_index]);
   }
+  for (uint32_t locality_index = 0;
+       locality_index < host_set->degradedHostsPerLocality().get().size(); ++locality_index) {
+    add_hosts_source(
+        HostsSource(priority, HostsSource::SourceType::LocalityDegradedHosts, locality_index),
+        host_set->degradedHostsPerLocality().get()[locality_index]);
+  }
 }
 
 HostConstSharedPtr EdfLoadBalancerBase::chooseHostOnce(LoadBalancerContext* context) {
-  const HostsSource hosts_source = hostSourceToUse(context);
-  auto scheduler_it = scheduler_.find(hosts_source);
+  const absl::optional<HostsSource> hosts_source = hostSourceToUse(context);
+  if (!hosts_source) {
+    return nullptr;
+  }
+  auto scheduler_it = scheduler_.find(*hosts_source);
   // We should always have a scheduler for any return value from
   // hostSourceToUse() via the construction in refresh();
   ASSERT(scheduler_it != scheduler_.end());
@@ -571,23 +722,20 @@ HostConstSharedPtr EdfLoadBalancerBase::chooseHostOnce(LoadBalancerContext* cont
 
   // As has been commented in both EdfLoadBalancerBase::refresh and
   // BaseDynamicClusterImpl::updateDynamicHostList, we must do a runtime pivot here to determine
-  // whether to use EDF or do unweighted (fast) selection.
-  // TODO(mattklein123): As commented elsewhere, this is wasteful, and we should just refresh the
-  // host set if any weights change. Additionally, it has the property that if all weights are
-  // the same but not 1 (like 42), we will use the EDF schedule not the unweighted pick. This is
-  // not optimal. If this is fixed, remove the note in the arch overview docs for the LR LB.
-  if (stats_.max_host_weight_.value() != 1) {
-    auto host = scheduler.edf_.pick();
+  // whether to use EDF or do unweighted (fast) selection. EDF is non-null iff the original weights
+  // of 2 or more hosts differ.
+  if (scheduler.edf_ != nullptr) {
+    auto host = scheduler.edf_->pick();
     if (host != nullptr) {
-      scheduler.edf_.add(hostWeight(*host), host);
+      scheduler.edf_->add(hostWeight(*host), host);
     }
     return host;
   } else {
-    const HostVector& hosts_to_use = hostSourceToHosts(hosts_source);
-    if (hosts_to_use.size() == 0) {
+    const HostVector& hosts_to_use = hostSourceToHosts(*hosts_source);
+    if (hosts_to_use.empty()) {
       return nullptr;
     }
-    return unweightedHostPick(hosts_to_use, hosts_source);
+    return unweightedHostPick(hosts_to_use, *hosts_source);
   }
 }
 
@@ -615,7 +763,12 @@ HostConstSharedPtr LeastRequestLoadBalancer::unweightedHostPick(const HostVector
 }
 
 HostConstSharedPtr RandomLoadBalancer::chooseHostOnce(LoadBalancerContext* context) {
-  const HostVector& hosts_to_use = hostSourceToHosts(hostSourceToUse(context));
+  const absl::optional<HostsSource> hosts_source = hostSourceToUse(context);
+  if (!hosts_source) {
+    return nullptr;
+  }
+
+  const HostVector& hosts_to_use = hostSourceToHosts(*hosts_source);
   if (hosts_to_use.empty()) {
     return nullptr;
   }
@@ -623,5 +776,44 @@ HostConstSharedPtr RandomLoadBalancer::chooseHostOnce(LoadBalancerContext* conte
   return hosts_to_use[random_.random() % hosts_to_use.size()];
 }
 
+SubsetSelectorImpl::SubsetSelectorImpl(
+    const Protobuf::RepeatedPtrField<std::string>& selector_keys,
+    envoy::api::v2::Cluster::LbSubsetConfig::LbSubsetSelector::LbSubsetSelectorFallbackPolicy
+        fallback_policy,
+    const Protobuf::RepeatedPtrField<std::string>& fallback_keys_subset)
+    : selector_keys_(selector_keys.begin(), selector_keys.end()), fallback_policy_(fallback_policy),
+      fallback_keys_subset_(fallback_keys_subset.begin(), fallback_keys_subset.end()) {
+
+  if (fallback_policy_ != envoy::api::v2::Cluster::LbSubsetConfig::LbSubsetSelector::KEYS_SUBSET) {
+    // defining fallback_keys_subset_ for a fallback policy other than KEYS_SUBSET doesn't have
+    // any effect and it is probably a user mistake. We should let the user know about it.
+    if (!fallback_keys_subset_.empty()) {
+      throw EnvoyException("fallback_keys_subset can be set only for KEYS_SUBSET fallback_policy");
+    }
+    return;
+  }
+
+  // if KEYS_SUBSET fallback policy is selected, fallback_keys_subset must not be empty, because
+  // it would be the same as not defining fallback policy at all (global fallback policy would be
+  // used)
+  if (fallback_keys_subset_.empty()) {
+    throw EnvoyException("fallback_keys_subset cannot be empty");
+  }
+
+  // We allow only for a fallback to a subset of the selector keys because this is probably the
+  // only use case that makes sense (fallback from more specific selector to less specific
+  // selector). Potentially we can relax this constraint in the future if there will be a use case
+  // for this.
+  if (!std::includes(selector_keys_.begin(), selector_keys_.end(), fallback_keys_subset_.begin(),
+                     fallback_keys_subset_.end())) {
+    throw EnvoyException("fallback_keys_subset must be a subset of selector keys");
+  }
+
+  // Enforce that the fallback_keys_subset_ set is smaller than the selector_keys_ set. Otherwise
+  // we could end up with a infinite recursion of SubsetLoadBalancer::chooseHost().
+  if (selector_keys_.size() == fallback_keys_subset_.size()) {
+    throw EnvoyException("fallback_keys_subset cannot be equal to keys");
+  }
+}
 } // namespace Upstream
 } // namespace Envoy

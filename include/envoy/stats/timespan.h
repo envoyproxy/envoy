@@ -3,43 +3,31 @@
 #include <chrono>
 #include <memory>
 
-#include "envoy/common/time.h"
-#include "envoy/stats/histogram.h"
-#include "envoy/stats/stats.h"
+#include "envoy/common/pure.h"
 
 namespace Envoy {
 namespace Stats {
 
 /**
- * An individual timespan that flushes its measured value (in milliseconds) to a histogram. The
- * initial time is captured on construction. A timespan must be completed via complete() for it to
- * be stored. If the timespan is deleted this will be treated as a cancellation.
+ * An abstraction of timespan which can be completed.
  */
-class Timespan {
+class CompletableTimespan {
 public:
-  Timespan(Histogram& histogram, TimeSource& time_source)
-      : time_source_(time_source), histogram_(histogram), start_(time_source.monotonicTime()) {}
+  virtual ~CompletableTimespan() = default;
 
   /**
-   * Complete the timespan and send the time to the histogram.
+   * Time elapsed since the creation of the timespan.
    */
-  void complete() { histogram_.recordValue(getRawDuration().count()); }
+  virtual std::chrono::milliseconds elapsed() const PURE;
 
   /**
-   * Get duration since the creation of the span.
+   * Complete the timespan.
    */
-  std::chrono::milliseconds getRawDuration() {
-    return std::chrono::duration_cast<std::chrono::milliseconds>(time_source_.monotonicTime() -
-                                                                 start_);
-  }
-
-private:
-  TimeSource& time_source_;
-  Histogram& histogram_;
-  const MonotonicTime start_;
+  virtual void complete() PURE;
 };
 
-typedef std::unique_ptr<Timespan> TimespanPtr;
+using Timespan = CompletableTimespan;
+using TimespanPtr = std::unique_ptr<Timespan>;
 
 } // namespace Stats
 } // namespace Envoy

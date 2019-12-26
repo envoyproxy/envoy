@@ -15,6 +15,8 @@ envoy_cc_library(
         ":filter_state_lib",
         "//include/envoy/stream_info:stream_info_interface",
         "//source/common/common:assert_lib",
+        "//source/common/common:dump_state_utils",
+        "@envoy_api//envoy/api/v2/core:pkg_cc_proto",
     ],
 )
 

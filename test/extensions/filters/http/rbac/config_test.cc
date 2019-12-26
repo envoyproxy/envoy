@@ -1,3 +1,7 @@
+#include "envoy/config/filter/http/rbac/v2/rbac.pb.h"
+#include "envoy/config/filter/http/rbac/v2/rbac.pb.validate.h"
+#include "envoy/config/rbac/v2/rbac.pb.h"
+
 #include "extensions/filters/common/rbac/engine.h"
 #include "extensions/filters/http/rbac/config.h"
 
@@ -16,7 +20,7 @@ namespace RBACFilter {
 namespace {
 
 TEST(RoleBasedAccessControlFilterConfigFactoryTest, ValidProto) {
-  envoy::config::rbac::v2alpha::Policy policy;
+  envoy::config::rbac::v2::Policy policy;
   policy.add_permissions()->set_any(true);
   policy.add_principals()->set_any(true);
   envoy::config::filter::http::rbac::v2::RBAC config;
@@ -46,13 +50,14 @@ TEST(RoleBasedAccessControlFilterConfigFactoryTest, EmptyRouteProto) {
 
 TEST(RoleBasedAccessControlFilterConfigFactoryTest, RouteSpecificConfig) {
   RoleBasedAccessControlFilterConfigFactory factory;
-  NiceMock<Server::Configuration::MockFactoryContext> context;
+  NiceMock<Server::Configuration::MockServerFactoryContext> context;
 
   ProtobufTypes::MessagePtr proto_config = factory.createEmptyRouteConfigProto();
   EXPECT_TRUE(proto_config.get());
 
   Router::RouteSpecificFilterConfigConstSharedPtr route_config =
-      factory.createRouteSpecificFilterConfig(*proto_config, context);
+      factory.createRouteSpecificFilterConfig(*proto_config, context,
+                                              ProtobufMessage::getNullValidationVisitor());
   EXPECT_TRUE(route_config.get());
 }
 

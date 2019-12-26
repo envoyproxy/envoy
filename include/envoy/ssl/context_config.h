@@ -1,6 +1,7 @@
 #pragma once
 
 #include <array>
+#include <functional>
 #include <string>
 #include <vector>
 
@@ -16,7 +17,7 @@ namespace Ssl {
  */
 class ContextConfig {
 public:
-  virtual ~ContextConfig() {}
+  virtual ~ContextConfig() = default;
 
   /**
    * The list of supported protocols exposed via ALPN. Client connections will send these
@@ -98,7 +99,7 @@ public:
   virtual const std::string& signingAlgorithmsForTest() const PURE;
 };
 
-typedef std::unique_ptr<ClientContextConfig> ClientContextConfigPtr;
+using ClientContextConfigPtr = std::unique_ptr<ClientContextConfig>;
 
 class ServerContextConfig : public virtual ContextConfig {
 public:
@@ -121,7 +122,7 @@ public:
   virtual const std::vector<SessionTicketKey>& sessionTicketKeys() const PURE;
 };
 
-typedef std::unique_ptr<ServerContextConfig> ServerContextConfigPtr;
+using ServerContextConfigPtr = std::unique_ptr<ServerContextConfig>;
 
 } // namespace Ssl
 } // namespace Envoy

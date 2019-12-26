@@ -4,26 +4,77 @@
 
 namespace Envoy {
 namespace Upstream {
+namespace {
+
+void setHealthFlag(Upstream::Host::HealthFlag flag, const Host& host, std::string& health_status) {
+  switch (flag) {
+  case Host::HealthFlag::FAILED_ACTIVE_HC: {
+    if (host.healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC)) {
+      health_status += "/failed_active_hc";
+    }
+    break;
+  }
+
+  case Host::HealthFlag::FAILED_OUTLIER_CHECK: {
+    if (host.healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK)) {
+      health_status += "/failed_outlier_check";
+    }
+    break;
+  }
+
+  case Host::HealthFlag::FAILED_EDS_HEALTH: {
+    if (host.healthFlagGet(Host::HealthFlag::FAILED_EDS_HEALTH)) {
+      health_status += "/failed_eds_health";
+    }
+    break;
+  }
+
+  case Host::HealthFlag::DEGRADED_ACTIVE_HC: {
+    if (host.healthFlagGet(Host::HealthFlag::DEGRADED_ACTIVE_HC)) {
+      health_status += "/degraded_active_hc";
+    }
+    break;
+  }
+
+  case Host::HealthFlag::DEGRADED_EDS_HEALTH: {
+    if (host.healthFlagGet(Host::HealthFlag::DEGRADED_EDS_HEALTH)) {
+      health_status += "/degraded_eds_health";
+    }
+    break;
+  }
+
+  case Host::HealthFlag::PENDING_DYNAMIC_REMOVAL: {
+    if (host.healthFlagGet(Host::HealthFlag::PENDING_DYNAMIC_REMOVAL)) {
+      health_status += "/pending_dynamic_removal";
+    }
+    break;
+  }
+
+  case Host::HealthFlag::PENDING_ACTIVE_HC: {
+    if (host.healthFlagGet(Host::HealthFlag::PENDING_ACTIVE_HC)) {
+      health_status += "/pending_active_hc";
+    }
+    break;
+  }
+  }
+}
+
+} // namespace
 
 std::string HostUtility::healthFlagsToString(const Host& host) {
-  if (host.health() == Host::Health::Healthy) {
+  std::string health_status;
+
+  // Invokes setHealthFlag for each health flag.
+#define SET_HEALTH_FLAG(name, notused)                                                             \
+  setHealthFlag(Upstream::Host::HealthFlag::name, host, health_status);
+  HEALTH_FLAG_ENUM_VALUES(SET_HEALTH_FLAG)
+#undef SET_HEALTH_FLAG
+
+  if (health_status.empty()) {
     return "healthy";
+  } else {
+    return health_status;
   }
-
-  std::string ret;
-  if (host.healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC)) {
-    ret += "/failed_active_hc";
-  }
-
-  if (host.healthFlagGet(Host::HealthFlag::FAILED_OUTLIER_CHECK)) {
-    ret += "/failed_outlier_check";
-  }
-
-  if (host.healthFlagGet(Host::HealthFlag::FAILED_EDS_HEALTH)) {
-    ret += "/failed_eds_health";
-  }
-
-  return ret;
 }
 
 } // namespace Upstream

@@ -1,13 +1,11 @@
 #include "envoy/config/metrics/v2/stats.pb.h"
+#include "envoy/type/matcher/string.pb.h"
 
 #include "common/stats/stats_matcher_impl.h"
 
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
-
-using testing::IsFalse;
-using testing::IsTrue;
 
 namespace Envoy {
 namespace Stats {

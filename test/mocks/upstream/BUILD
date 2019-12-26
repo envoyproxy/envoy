@@ -13,13 +13,17 @@ envoy_cc_mock(
     srcs = ["cluster_info.cc"],
     hdrs = ["cluster_info.h"],
     deps = [
+        ":transport_socket_match_mocks",
         "//include/envoy/upstream:cluster_manager_interface",
         "//include/envoy/upstream:upstream_interface",
+        "//source/common/config:metadata_lib",
         "//source/common/network:raw_buffer_socket_lib",
         "//source/common/upstream:upstream_includes",
         "//source/common/upstream:upstream_lib",
         "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/stats:stats_mocks",
+        "@envoy_api//envoy/api/v2:pkg_cc_proto",
+        "@envoy_api//envoy/api/v2/core:pkg_cc_proto",
     ],
 )
 
@@ -32,6 +36,21 @@ envoy_cc_mock(
         "//include/envoy/upstream:upstream_interface",
         "//source/common/network:utility_lib",
         "//source/common/stats:stats_lib",
+        "//test/mocks/network:transport_socket_mocks",
+        "@envoy_api//envoy/api/v2/core:pkg_cc_proto",
+        "@envoy_api//envoy/data/cluster/v2alpha:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_mock(
+    name = "transport_socket_match_mocks",
+    srcs = ["transport_socket_match.cc"],
+    hdrs = ["transport_socket_match.h"],
+    deps = [
+        "//include/envoy/upstream:upstream_interface",
+        "//source/common/network:raw_buffer_socket_lib",
+        "//source/common/stats:isolated_store_lib",
+        "@envoy_api//envoy/api/v2/core:pkg_cc_proto",
     ],
 )
 
@@ -50,11 +69,14 @@ envoy_cc_mock(
     hdrs = ["mocks.h"],
     deps = [
         ":load_balancer_context_mock",
+        ":transport_socket_match_mocks",
         "//include/envoy/http:async_client_interface",
+        "//include/envoy/upstream:cluster_factory_interface",
         "//include/envoy/upstream:cluster_manager_interface",
         "//include/envoy/upstream:health_checker_interface",
         "//include/envoy/upstream:load_balancer_interface",
         "//include/envoy/upstream:upstream_interface",
+        "//source/common/upstream:cluster_factory_lib",
         "//source/common/upstream:health_discovery_service_lib",
         "//source/common/upstream:upstream_lib",
         "//test/mocks/config:config_mocks",
@@ -64,5 +86,9 @@ envoy_cc_mock(
         "//test/mocks/secret:secret_mocks",
         "//test/mocks/stats:stats_mocks",
         "//test/mocks/tcp:tcp_mocks",
+        "@envoy_api//envoy/api/v2:pkg_cc_proto",
+        "@envoy_api//envoy/api/v2/core:pkg_cc_proto",
+        "@envoy_api//envoy/config/bootstrap/v2:pkg_cc_proto",
+        "@envoy_api//envoy/data/core/v2alpha:pkg_cc_proto",
     ],
 )

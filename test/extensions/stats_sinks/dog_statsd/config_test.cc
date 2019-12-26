@@ -1,4 +1,5 @@
-#include "envoy/config/bootstrap/v2/bootstrap.pb.h"
+#include "envoy/api/v2/core/address.pb.h"
+#include "envoy/config/metrics/v2/stats.pb.h"
 #include "envoy/registry/registry.h"
 
 #include "common/config/well_known_names.h"
@@ -16,20 +17,18 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-using testing::_;
 using testing::NiceMock;
-using testing::Return;
-using testing::ReturnRef;
 
 namespace Envoy {
 namespace Extensions {
 namespace StatSinks {
 namespace DogStatsd {
+namespace {
 
 class DogStatsdConfigLoopbackTest : public testing::TestWithParam<Network::Address::IpVersion> {};
-INSTANTIATE_TEST_CASE_P(IpVersions, DogStatsdConfigLoopbackTest,
-                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                        TestUtility::ipTestParamsToString);
+INSTANTIATE_TEST_SUITE_P(IpVersions, DogStatsdConfigLoopbackTest,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
 
 TEST_P(DogStatsdConfigLoopbackTest, ValidUdpIp) {
   const std::string name = StatsSinkNames::get().DogStatsd;
@@ -47,7 +46,7 @@ TEST_P(DogStatsdConfigLoopbackTest, ValidUdpIp) {
   ASSERT_NE(factory, nullptr);
 
   ProtobufTypes::MessagePtr message = factory->createEmptyConfigProto();
-  MessageUtil::jsonConvert(sink_config, *message);
+  TestUtility::jsonConvert(sink_config, *message);
 
   NiceMock<Server::MockInstance> server;
   Stats::SinkPtr sink = factory->createStatsSink(*message, server);
@@ -85,7 +84,7 @@ TEST_P(DogStatsdConfigLoopbackTest, WithCustomPrefix) {
   ASSERT_NE(factory, nullptr);
 
   ProtobufTypes::MessagePtr message = factory->createEmptyConfigProto();
-  MessageUtil::jsonConvert(sink_config, *message);
+  TestUtility::jsonConvert(sink_config, *message);
 
   NiceMock<Server::MockInstance> server;
   Stats::SinkPtr sink = factory->createStatsSink(*message, server);
@@ -95,6 +94,7 @@ TEST_P(DogStatsdConfigLoopbackTest, WithCustomPrefix) {
   EXPECT_EQ(udp_sink->getPrefix(), customPrefix);
 }
 
+} // namespace
 } // namespace DogStatsd
 } // namespace StatSinks
 } // namespace Extensions

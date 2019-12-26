@@ -6,11 +6,11 @@ namespace Filters {
 namespace Common {
 namespace ExtAuthz {
 
-MockClient::MockClient() {}
-MockClient::~MockClient() {}
+MockClient::MockClient() = default;
+MockClient::~MockClient() = default;
 
-MockRequestCallbacks::MockRequestCallbacks() {}
-MockRequestCallbacks::~MockRequestCallbacks() {}
+MockRequestCallbacks::MockRequestCallbacks() = default;
+MockRequestCallbacks::~MockRequestCallbacks() = default;
 
 } // namespace ExtAuthz
 } // namespace Common

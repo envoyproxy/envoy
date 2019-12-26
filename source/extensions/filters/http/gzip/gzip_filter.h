@@ -11,8 +11,6 @@
 #include "common/buffer/buffer_impl.h"
 #include "common/compressor/zlib_compressor_impl.h"
 #include "common/http/header_map_impl.h"
-#include "common/json/config_schemas.h"
-#include "common/json/json_validator.h"
 #include "common/protobuf/protobuf.h"
 
 namespace Envoy {
@@ -30,20 +28,18 @@ namespace Gzip {
  * the user can measure the memory performance of the
  * compression.
  */
-// clang-format off
-#define ALL_GZIP_STATS(COUNTER)    \
-  COUNTER(compressed)              \
-  COUNTER(not_compressed)          \
-  COUNTER(no_accept_header)        \
-  COUNTER(header_identity)         \
-  COUNTER(header_gzip)             \
-  COUNTER(header_wildcard)         \
-  COUNTER(header_not_valid)        \
-  COUNTER(total_uncompressed_bytes)\
-  COUNTER(total_compressed_bytes)  \
-  COUNTER(content_length_too_small)\
-  COUNTER(not_compressed_etag)     \
-// clang-format on
+#define ALL_GZIP_STATS(COUNTER)                                                                    \
+  COUNTER(compressed)                                                                              \
+  COUNTER(not_compressed)                                                                          \
+  COUNTER(no_accept_header)                                                                        \
+  COUNTER(header_identity)                                                                         \
+  COUNTER(header_gzip)                                                                             \
+  COUNTER(header_wildcard)                                                                         \
+  COUNTER(header_not_valid)                                                                        \
+  COUNTER(total_uncompressed_bytes)                                                                \
+  COUNTER(total_compressed_bytes)                                                                  \
+  COUNTER(content_length_too_small)                                                                \
+  COUNTER(not_compressed_etag)
 
 /**
  * Struct definition for gzip stats. @see stats_macros.h
@@ -59,8 +55,7 @@ class GzipFilterConfig {
 
 public:
   GzipFilterConfig(const envoy::config::filter::http::gzip::v2::Gzip& gzip,
-                   const std::string& stats_prefix,
-                   Stats::Scope& scope, Runtime::Loader& runtime);
+                   const std::string& stats_prefix, Stats::Scope& scope, Runtime::Loader& runtime);
 
   Compressor::ZlibCompressorImpl::CompressionLevel compressionLevel() const {
     return compression_level_;
@@ -84,7 +79,7 @@ private:
   static Compressor::ZlibCompressorImpl::CompressionStrategy compressionStrategyEnum(
       envoy::config::filter::http::gzip::v2::Gzip_CompressionStrategy compression_strategy);
   static StringUtil::CaseUnorderedSet
-  contentTypeSet(const Protobuf::RepeatedPtrField<Envoy::ProtobufTypes::String>& types);
+  contentTypeSet(const Protobuf::RepeatedPtrField<std::string>& types);
 
   static uint64_t contentLengthUint(Protobuf::uint32 length);
   static uint64_t memoryLevelUint(Protobuf::uint32 level);
@@ -107,7 +102,7 @@ private:
   GzipStats stats_;
   Runtime::Loader& runtime_;
 };
-typedef std::shared_ptr<GzipFilterConfig> GzipFilterConfigSharedPtr;
+using GzipFilterConfigSharedPtr = std::shared_ptr<GzipFilterConfig>;
 
 /**
  * A filter that compresses data dispatched from the upstream upon client request.
@@ -137,8 +132,9 @@ public:
   }
   Http::FilterHeadersStatus encodeHeaders(Http::HeaderMap& headers, bool end_stream) override;
   Http::FilterDataStatus encodeData(Buffer::Instance& buffer, bool end_stream) override;
-  Http::FilterTrailersStatus encodeTrailers(Http::HeaderMap&) override {
-    return Http::FilterTrailersStatus::Continue;
+  Http::FilterTrailersStatus encodeTrailers(Http::HeaderMap&) override;
+  Http::FilterMetadataStatus encodeMetadata(Http::MetadataMap&) override {
+    return Http::FilterMetadataStatus::Continue;
   }
   void setEncoderFilterCallbacks(Http::StreamEncoderFilterCallbacks& callbacks) override {
     encoder_callbacks_ = &callbacks;
@@ -146,7 +142,7 @@ public:
 
 private:
   // TODO(gsagula): This is here temporarily and just to facilitate testing. Ideally all
-  // the logic in these private member functions would be availale in another class.
+  // the logic in these private member functions would be available in another class.
   friend class GzipFilterTest;
 
   bool hasCacheControlNoTransform(Http::HeaderMap& headers) const;

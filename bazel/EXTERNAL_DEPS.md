@@ -17,6 +17,18 @@ build process.
    `external_deps` attribute.
 3. `bazel test //test/...`
 
+# Adding external dependencies to Envoy (external CMake)
+
+This is the preferred style of adding dependencies that use CMake for their build system.
+
+1. Define a the source Bazel repository in [`bazel/repositories.bzl`](repositories.bzl), in the
+   `envoy_dependencies()` function.
+2. Add a `cmake_external` rule to [`bazel/foreign_cc/BUILD`](bazel/foreign_cc/BUILD). This will
+   reference the source repository in step 1.
+3. Reference your new external dependency in some `envoy_cc_library` via the name bound in step 1
+   `external_deps` attribute.
+4. `bazel test //test/...`
+
 # Adding external dependencies to Envoy (genrule repository)
 
 This is the newer style of adding dependencies with no upstream Bazel configs.
@@ -42,27 +54,11 @@ Dependencies between external libraries can use the standard Bazel dependency
 resolution logic, using the `$(location)` shell extension to resolve paths
 to binaries, libraries, headers, etc.
 
-# Adding external dependencies to Envoy (build recipe)
-
-This is the older style of adding dependencies. It uses shell scripts to build
-and install dependencies into a shared directory prefix.
-
-1. Add a build recipe X in [`ci/build_container/build_recipes`](../ci/build_container/build_recipes)
-   for developer-local and CI external dependency build flows.
-2. Add a build target Y in [`ci/prebuilt/BUILD`](../ci/prebuilt/BUILD) to consume the headers and
-   libraries produced by the build recipe X.
-3. Add a map from target Y to build recipe X in [`target_recipes.bzl`](target_recipes.bzl).
-4. Reference your new external dependency in some `envoy_cc_library` via Y in the `external_deps`
-   attribute.
-5. `bazel test //test/...`
-
 # Updating an external dependency version
 
-1. If the dependency is a build recipe, update the build recipe in
-[`ci/build_container/build_recipes`](../ci/build_container/build_recipes).
-2. If not, update the corresponding entry in
+1. Update the corresponding entry in
 [the repository locations file.](https://github.com/envoyproxy/envoy/blob/master/bazel/repository_locations.bzl)
-3. `bazel test //test/...`
+2. `bazel test //test/...`
 
 # Overriding an external dependency temporarily
 

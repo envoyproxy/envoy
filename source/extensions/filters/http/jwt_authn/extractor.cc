@@ -2,13 +2,16 @@
 
 #include <memory>
 
+#include "envoy/config/filter/http/jwt_authn/v2alpha/config.pb.h"
+
 #include "common/common/utility.h"
 #include "common/http/headers.h"
 #include "common/http/utility.h"
 #include "common/singleton/const_singleton.h"
 
+#include "absl/strings/match.h"
+
 using ::envoy::config::filter::http::jwt_authn::v2alpha::JwtAuthentication;
-using ::envoy::config::filter::http::jwt_authn::v2alpha::JwtHeader;
 using ::envoy::config::filter::http::jwt_authn::v2alpha::JwtProvider;
 using Envoy::Http::LowerCaseString;
 
@@ -19,7 +22,7 @@ namespace JwtAuthn {
 namespace {
 
 /**
- * Contant values
+ * Constant values
  */
 struct JwtConstValueStruct {
   // The header value prefix for Authorization.
@@ -28,7 +31,7 @@ struct JwtConstValueStruct {
   // The default query parameter name to extract JWT token
   const std::string AccessTokenParam{"access_token"};
 };
-typedef ConstSingleton<JwtConstValueStruct> JwtConstValues;
+using JwtConstValues = ConstSingleton<JwtConstValueStruct>;
 
 // A base JwtLocation object to store token and specified_issuers.
 class JwtLocationBase : public JwtLocation {
@@ -81,11 +84,13 @@ public:
  * The class implements Extractor interface
  *
  */
-class ExtractorImpl : public Extractor {
+class ExtractorImpl : public Logger::Loggable<Logger::Id::jwt>, public Extractor {
 public:
   ExtractorImpl(const JwtProvider& provider);
 
-  ExtractorImpl(const JwtAuthentication& config);
+  ExtractorImpl(
+      const std::vector<const ::envoy::config::filter::http::jwt_authn::v2alpha::JwtProvider*>&
+          providers);
 
   std::vector<JwtLocationConstPtr> extract(const Http::HeaderMap& headers) const override;
 
@@ -100,6 +105,10 @@ private:
   // ctor helper for a jwt provider config
   void addProvider(const JwtProvider& provider);
 
+  // @return what should be the 3-part base64url-encoded substring; see RFC-7519
+  absl::string_view extractJWT(absl::string_view value_str,
+                               absl::string_view::size_type after) const;
+
   // HeaderMap value type to store prefix and issuers that specified this
   // header.
   struct HeaderLocationSpec {
@@ -112,7 +121,7 @@ private:
     // Issuers that specified this header.
     std::unordered_set<std::string> specified_issuers_;
   };
-  typedef std::unique_ptr<HeaderLocationSpec> HeaderLocationSpecPtr;
+  using HeaderLocationSpecPtr = std::unique_ptr<HeaderLocationSpec>;
   // The map of (header + value_prefix) to HeaderLocationSpecPtr
   std::map<std::string, HeaderLocationSpecPtr> header_locations_;
 
@@ -127,14 +136,14 @@ private:
   std::vector<LowerCaseString> forward_payload_headers_;
 };
 
-ExtractorImpl::ExtractorImpl(const JwtAuthentication& config) {
-  for (const auto& it : config.providers()) {
-    const auto& provider = it.second;
-    addProvider(provider);
+ExtractorImpl::ExtractorImpl(const JwtProvider& provider) { addProvider(provider); }
+
+ExtractorImpl::ExtractorImpl(const JwtProviderList& providers) {
+  for (const auto& provider : providers) {
+    ASSERT(provider);
+    addProvider(*provider);
   }
 }
-
-ExtractorImpl::ExtractorImpl(const JwtProvider& provider) { addProvider(provider); }
 
 void ExtractorImpl::addProvider(const JwtProvider& provider) {
   for (const auto& header : provider.from_headers()) {
@@ -156,6 +165,7 @@ void ExtractorImpl::addProvider(const JwtProvider& provider) {
 
 void ExtractorImpl::addHeaderConfig(const std::string& issuer, const LowerCaseString& header_name,
                                     const std::string& value_prefix) {
+  ENVOY_LOG(debug, "addHeaderConfig for issuer {} at {}", issuer, header_name.get());
   const std::string map_key = header_name.get() + value_prefix;
   auto& header_location_spec = header_locations_[map_key];
   if (!header_location_spec) {
@@ -175,15 +185,17 @@ std::vector<JwtLocationConstPtr> ExtractorImpl::extract(const Http::HeaderMap& h
   // Check header locations first
   for (const auto& location_it : header_locations_) {
     const auto& location_spec = location_it.second;
+    ENVOY_LOG(debug, "extract {}", location_it.first);
     const Http::HeaderEntry* entry = headers.get(location_spec->header_);
     if (entry) {
       auto value_str = entry->value().getStringView();
       if (!location_spec->value_prefix_.empty()) {
-        if (!StringUtil::startsWith(value_str.data(), location_spec->value_prefix_, true)) {
-          // prefix doesn't match, skip it.
+        const auto pos = value_str.find(location_spec->value_prefix_);
+        if (pos == absl::string_view::npos) {
+          // value_prefix not found anywhere in value_str, so skip
           continue;
         }
-        value_str = value_str.substr(location_spec->value_prefix_.size());
+        value_str = extractJWT(value_str, pos + location_spec->value_prefix_.length());
       }
       tokens.push_back(std::make_unique<const JwtHeaderLocation>(
           std::string(value_str), location_spec->specified_issuers_, location_spec->header_));
@@ -196,7 +208,7 @@ std::vector<JwtLocationConstPtr> ExtractorImpl::extract(const Http::HeaderMap& h
   }
 
   // Check query parameter locations.
-  const auto& params = Http::Utility::parseQueryString(headers.Path()->value().c_str());
+  const auto& params = Http::Utility::parseQueryString(headers.Path()->value().getStringView());
   for (const auto& location_it : param_locations_) {
     const auto& param_key = location_it.first;
     const auto& location_spec = location_it.second;
@@ -209,6 +221,36 @@ std::vector<JwtLocationConstPtr> ExtractorImpl::extract(const Http::HeaderMap& h
   return tokens;
 }
 
+// as specified in RFC-4648 § 5, plus dot (period, 0x2e), of which two are required in the JWT
+constexpr absl::string_view ConstantBase64UrlEncodingCharsPlusDot =
+    "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_.";
+
+// Returns a token, not a URL: skips non-Base64Url-legal (or dot) characters, collects following
+// Base64Url+dot string until first non-Base64Url char.
+//
+// The input parameters:
+//    "value_str" - the header value string, perhaps "Bearer string....", and
+//    "after" - the offset into that string after which to begin looking for JWT-legal characters
+//
+// For backwards compatibility, if it finds no suitable string, it returns value_str as-is.
+//
+// It is forgiving w.r.t. dots/periods, as the exact syntax will be verified after extraction.
+//
+// See RFC-7519 § 2, RFC-7515 § 2, and RFC-4648 "Base-N Encodings" § 5.
+absl::string_view ExtractorImpl::extractJWT(absl::string_view value_str,
+                                            absl::string_view::size_type after) const {
+  const auto starting = value_str.find_first_of(ConstantBase64UrlEncodingCharsPlusDot, after);
+  if (starting == value_str.npos) {
+    return value_str;
+  }
+  // There should be two dots (periods; 0x2e) inside the string, but we don't verify that here
+  auto ending = value_str.find_first_not_of(ConstantBase64UrlEncodingCharsPlusDot, starting);
+  if (ending == value_str.npos) { // Base64Url-encoded string occupies the rest of the line
+    return value_str.substr(starting);
+  }
+  return value_str.substr(starting, ending - starting);
+}
+
 void ExtractorImpl::sanitizePayloadHeaders(Http::HeaderMap& headers) const {
   for (const auto& header : forward_payload_headers_) {
     headers.remove(header);
@@ -217,12 +259,12 @@ void ExtractorImpl::sanitizePayloadHeaders(Http::HeaderMap& headers) const {
 
 } // namespace
 
-ExtractorConstPtr Extractor::create(const JwtAuthentication& config) {
-  return std::make_unique<ExtractorImpl>(config);
-}
-
 ExtractorConstPtr Extractor::create(const JwtProvider& provider) {
   return std::make_unique<ExtractorImpl>(provider);
+}
+
+ExtractorConstPtr Extractor::create(const JwtProviderList& providers) {
+  return std::make_unique<ExtractorImpl>(providers);
 }
 
 } // namespace JwtAuthn

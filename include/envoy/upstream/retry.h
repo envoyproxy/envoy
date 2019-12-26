@@ -1,12 +1,10 @@
 #pragma once
 
+#include "envoy/upstream/types.h"
 #include "envoy/upstream/upstream.h"
 
 namespace Envoy {
 namespace Upstream {
-
-// Redeclare this here in order to get around cyclical dependencies.
-typedef std::vector<uint32_t> PriorityLoad;
 
 /**
  * Used to optionally modify the PriorityLoad when selecting a priority for
@@ -17,18 +15,20 @@ typedef std::vector<uint32_t> PriorityLoad;
  */
 class RetryPriority {
 public:
-  virtual ~RetryPriority() {}
+  virtual ~RetryPriority() = default;
 
   /**
    * Determines what PriorityLoad to use.
    *
    * @param priority_set current priority set of cluster.
-   * @param original_priority the unmodified PriorityLoad.
-   * @return a reference to the PriorityLoad to use. Return original_priority if no changes should
-   * be made.
+   * @param original_priority_load the unmodified HealthAndDegradedLoad.
+   * @return HealthAndDegradedLoad load that should be used for the next retry. Return
+   * original_priority_load if the original load should be used. a pointer to original_priority,
+   * original_degraded_priority if no changes should be made.
    */
-  virtual const PriorityLoad& determinePriorityLoad(const PrioritySet& priority_set,
-                                                    const PriorityLoad& original_priority) PURE;
+  virtual const HealthyAndDegradedLoad&
+  determinePriorityLoad(const PrioritySet& priority_set,
+                        const HealthyAndDegradedLoad& original_priority_load) PURE;
 
   /**
    * Called after a host has been attempted but before host selection for the next attempt has
@@ -39,7 +39,7 @@ public:
   virtual void onHostAttempted(HostDescriptionConstSharedPtr attempted_host) PURE;
 };
 
-typedef std::shared_ptr<RetryPriority> RetryPrioritySharedPtr;
+using RetryPrioritySharedPtr = std::shared_ptr<RetryPriority>;
 
 /**
  * Used to decide whether a selected host should be rejected during retries. Host selection will be
@@ -51,7 +51,7 @@ typedef std::shared_ptr<RetryPriority> RetryPrioritySharedPtr;
  */
 class RetryHostPredicate {
 public:
-  virtual ~RetryHostPredicate() {}
+  virtual ~RetryHostPredicate() = default;
 
   /**
    * Determines whether a host should be rejected during host selection.
@@ -70,19 +70,28 @@ public:
   virtual void onHostAttempted(HostDescriptionConstSharedPtr attempted_host) PURE;
 };
 
-typedef std::shared_ptr<RetryHostPredicate> RetryHostPredicateSharedPtr;
+using RetryHostPredicateSharedPtr = std::shared_ptr<RetryHostPredicate>;
 
 /**
  * Factory for RetryPriority.
  */
 class RetryPriorityFactory {
 public:
-  virtual ~RetryPriorityFactory() {}
+  virtual ~RetryPriorityFactory() = default;
 
-  virtual RetryPrioritySharedPtr createRetryPriority(const Protobuf::Message& config,
-                                                     uint32_t retry_count) PURE;
+  virtual RetryPrioritySharedPtr
+  createRetryPriority(const Protobuf::Message& config,
+                      ProtobufMessage::ValidationVisitor& validation_visitor,
+                      uint32_t retry_count) PURE;
 
   virtual std::string name() const PURE;
+
+  /**
+   * @return std::string the identifying category name for objects
+   * created by this factory. Used for automatic registration with
+   * FactoryCategoryRegistry.
+   */
+  static std::string category() { return "retry_priorities"; }
 
   virtual ProtobufTypes::MessagePtr createEmptyConfigProto() PURE;
 };
@@ -92,7 +101,7 @@ public:
  */
 class RetryHostPredicateFactory {
 public:
-  virtual ~RetryHostPredicateFactory() {}
+  virtual ~RetryHostPredicateFactory() = default;
 
   virtual RetryHostPredicateSharedPtr createHostPredicate(const Protobuf::Message& config,
                                                           uint32_t retry_count) PURE;
@@ -101,6 +110,8 @@ public:
    * @return name name of this factory.
    */
   virtual std::string name() PURE;
+
+  static std::string category() { return "retry_host_predicates"; }
 
   virtual ProtobufTypes::MessagePtr createEmptyConfigProto() PURE;
 };

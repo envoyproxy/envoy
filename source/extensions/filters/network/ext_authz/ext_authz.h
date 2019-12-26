@@ -9,6 +9,7 @@
 #include "envoy/network/connection.h"
 #include "envoy/network/filter.h"
 #include "envoy/runtime/runtime.h"
+#include "envoy/service/auth/v2/external_auth.pb.h"
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats_macros.h"
 #include "envoy/upstream/cluster_manager.h"
@@ -24,16 +25,14 @@ namespace ExtAuthz {
 /**
  * All tcp external authorization stats. @see stats_macros.h
  */
-// clang-format off
-#define ALL_TCP_EXT_AUTHZ_STATS(COUNTER, GAUGE)         \
-  COUNTER(total)                                        \
-  COUNTER(error)                                        \
-  COUNTER(denied)                                       \
-  COUNTER(failure_mode_allowed)                         \
-  COUNTER(ok)                                           \
-  COUNTER(cx_closed)                                    \
-  GAUGE  (active)
-// clang-format on
+#define ALL_TCP_EXT_AUTHZ_STATS(COUNTER, GAUGE)                                                    \
+  COUNTER(cx_closed)                                                                               \
+  COUNTER(denied)                                                                                  \
+  COUNTER(error)                                                                                   \
+  COUNTER(failure_mode_allowed)                                                                    \
+  COUNTER(ok)                                                                                      \
+  COUNTER(total)                                                                                   \
+  GAUGE(active, Accumulate)
 
 /**
  * Struct definition for all external authorization stats. @see stats_macros.h
@@ -49,19 +48,22 @@ class Config {
 public:
   Config(const envoy::config::filter::network::ext_authz::v2::ExtAuthz& config, Stats::Scope& scope)
       : stats_(generateStats(config.stat_prefix(), scope)),
-        failure_mode_allow_(config.failure_mode_allow()) {}
+        failure_mode_allow_(config.failure_mode_allow()),
+        include_peer_certificate_(config.include_peer_certificate()) {}
 
   const InstanceStats& stats() { return stats_; }
   bool failureModeAllow() const { return failure_mode_allow_; }
   void setFailModeAllow(bool value) { failure_mode_allow_ = value; }
+  bool includePeerCertificate() const { return include_peer_certificate_; }
 
 private:
   static InstanceStats generateStats(const std::string& name, Stats::Scope& scope);
   const InstanceStats stats_;
   bool failure_mode_allow_;
+  const bool include_peer_certificate_;
 };
 
-typedef std::shared_ptr<Config> ConfigSharedPtr;
+using ConfigSharedPtr = std::shared_ptr<Config>;
 
 /**
  * ExtAuthz filter instance. This filter will call the Authorization service with the given
@@ -75,7 +77,7 @@ class Filter : public Network::ReadFilter,
 public:
   Filter(ConfigSharedPtr config, Filters::Common::ExtAuthz::ClientPtr&& client)
       : config_(config), client_(std::move(client)) {}
-  ~Filter() {}
+  ~Filter() override = default;
 
   // Network::ReadFilter
   Network::FilterStatus onData(Buffer::Instance& data, bool end_stream) override;
@@ -111,7 +113,7 @@ private:
   FilterReturn filter_return_{FilterReturn::Stop};
   // Used to identify if the callback to onComplete() is synchronous (on the stack) or asynchronous.
   bool calling_check_{};
-  envoy::service::auth::v2alpha::CheckRequest check_request_{};
+  envoy::service::auth::v2::CheckRequest check_request_{};
 };
 } // namespace ExtAuthz
 } // namespace NetworkFilters

@@ -282,7 +282,7 @@ class THeaderTransport(TTransportBase, CReadableTransport):
   def readFrame(self, req_sz):
     self.__rbuf_frame = True
     word1 = self.getTransport().readAll(4)
-    sz = unpack('!I', word1)[0]
+    sz = unpack(b'!I', word1)[0]
     proto_id = word1[0] if PY3 else ord(word1[0])
     if proto_id == BINARY_PROTO_ID:
       # unframed
@@ -308,7 +308,7 @@ class THeaderTransport(TTransportBase, CReadableTransport):
       self.__rbuf = StringIO(self.handler.data)
     else:
       if sz == BIG_FRAME_MAGIC:
-        sz = unpack('!Q', self.getTransport().readAll(8))[0]
+        sz = unpack(b'!Q', self.getTransport().readAll(8))[0]
       # could be header format or framed.  Check next two bytes.
       magic = self.getTransport().readAll(2)
       proto_id = magic[0] if PY3 else ord(magic[0])
@@ -327,7 +327,7 @@ class THeaderTransport(TTransportBase, CReadableTransport):
         _frame_size_check(sz, self.__max_frame_size)
         # flags(2), seq_id(4), header_size(2)
         n_header_meta = self.getTransport().readAll(8)
-        self.__flags, self.seq_id, header_size = unpack('!HIH', n_header_meta)
+        self.__flags, self.seq_id, header_size = unpack(b'!HIH', n_header_meta)
         data = StringIO()
         data.write(magic)
         data.write(n_header_meta)
@@ -469,13 +469,13 @@ class THeaderTransport(TTransportBase, CReadableTransport):
     # MAGIC(2) | FLAGS(2) + SEQ_ID(4) + HEADER_SIZE(2)
     wsz += header_size + 10
     if wsz > MAX_FRAME_SIZE:
-      buf.write(pack("!I", BIG_FRAME_MAGIC))
-      buf.write(pack("!Q", wsz))
+      buf.write(pack(b"!I", BIG_FRAME_MAGIC))
+      buf.write(pack(b"!Q", wsz))
     else:
-      buf.write(pack("!I", wsz))
-    buf.write(pack("!HH", HEADER_MAGIC >> 16, self.__flags))
-    buf.write(pack("!I", self.seq_id))
-    buf.write(pack("!H", header_size // 4))
+      buf.write(pack(b"!I", wsz))
+    buf.write(pack(b"!HH", HEADER_MAGIC >> 16, self.__flags))
+    buf.write(pack(b"!I", self.seq_id))
+    buf.write(pack(b"!H", header_size // 4))
 
     buf.write(header_data.getvalue())
     buf.write(transform_data.getvalue())
@@ -483,7 +483,7 @@ class THeaderTransport(TTransportBase, CReadableTransport):
 
     # Pad out the header with 0x00
     for _ in range(0, padding_size, 1):
-      buf.write(pack("!c", b'\0'))
+      buf.write(pack(b"!c", b'\0'))
 
     # Send data section
     buf.write(wout)
@@ -505,7 +505,7 @@ class THeaderTransport(TTransportBase, CReadableTransport):
     if self.__client_type == CLIENT_TYPE.HEADER:
       self._flushHeaderMessage(buf, wout, wsz)
     elif self.__client_type in (CLIENT_TYPE.FRAMED_DEPRECATED, CLIENT_TYPE.FRAMED_COMPACT):
-      buf.write(pack("!i", wsz))
+      buf.write(pack(b"!i", wsz))
       buf.write(wout)
     elif self.__client_type in (CLIENT_TYPE.UNFRAMED_DEPRECATED,
                                 CLIENT_TYPE.UNFRAMED_COMPACT_DEPRECATED):
@@ -521,8 +521,9 @@ class THeaderTransport(TTransportBase, CReadableTransport):
 
     # We don't include the framing bytes as part of the frame size check
     frame_size = buf.tell() - (4 if wsz < MAX_FRAME_SIZE else 12)
-    _frame_size_check(
-        frame_size, self.__max_frame_size, header=self.__client_type == CLIENT_TYPE.HEADER)
+    _frame_size_check(frame_size,
+                      self.__max_frame_size,
+                      header=self.__client_type == CLIENT_TYPE.HEADER)
     self.getTransport().write(buf.getvalue())
     if oneway:
       self.getTransport().onewayFlush()

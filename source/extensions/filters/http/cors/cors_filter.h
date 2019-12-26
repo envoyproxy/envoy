@@ -14,11 +14,9 @@ namespace Cors {
 /**
  * All CORS filter stats. @see stats_macros.h
  */
-// clang-format off
-#define ALL_CORS_STATS(COUNTER)\
-  COUNTER(origin_valid)        \
-  COUNTER(origin_invalid)      \
-// clang-format on
+#define ALL_CORS_STATS(COUNTER)                                                                    \
+  COUNTER(origin_valid)                                                                            \
+  COUNTER(origin_invalid)
 
 /**
  * Struct definition for CORS stats. @see stats_macros.h
@@ -42,7 +40,7 @@ private:
 
   CorsStats stats_;
 };
-typedef std::shared_ptr<CorsFilterConfig> CorsFilterConfigSharedPtr;
+using CorsFilterConfigSharedPtr = std::shared_ptr<CorsFilterConfig>;
 
 class CorsFilter : public Http::StreamFilter {
 public:
@@ -72,6 +70,9 @@ public:
   Http::FilterTrailersStatus encodeTrailers(Http::HeaderMap&) override {
     return Http::FilterTrailersStatus::Continue;
   };
+  Http::FilterMetadataStatus encodeMetadata(Http::MetadataMap&) override {
+    return Http::FilterMetadataStatus::Continue;
+  }
   void setEncoderFilterCallbacks(Http::StreamEncoderFilterCallbacks& callbacks) override {
     encoder_callbacks_ = &callbacks;
   };
@@ -79,17 +80,15 @@ public:
 private:
   friend class CorsFilterTest;
 
-  const std::list<std::string>* allowOrigins();
-  const std::list<std::regex>* allowOriginRegexes();
+  const std::vector<Matchers::StringMatcherPtr>* allowOrigins();
   const std::string& allowMethods();
   const std::string& allowHeaders();
   const std::string& exposeHeaders();
   const std::string& maxAge();
   bool allowCredentials();
+  bool shadowEnabled();
   bool enabled();
   bool isOriginAllowed(const Http::HeaderString& origin);
-  bool isOriginAllowedString(const Http::HeaderString& origin);
-  bool isOriginAllowedRegex(const Http::HeaderString& origin);
 
   Http::StreamDecoderFilterCallbacks* decoder_callbacks_{};
   Http::StreamEncoderFilterCallbacks* encoder_callbacks_{};

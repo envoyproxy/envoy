@@ -2,6 +2,8 @@
 
 #include <tuple>
 
+#include "envoy/config/bootstrap/v2/bootstrap.pb.h"
+
 #include "common/common/fmt.h"
 #include "common/http/codec_client.h"
 
@@ -15,11 +17,11 @@
 namespace Envoy {
 
 class UdsUpstreamIntegrationTest
-    : public HttpIntegrationTest,
-      public testing::TestWithParam<std::tuple<Network::Address::IpVersion, bool>> {
+    : public testing::TestWithParam<std::tuple<Network::Address::IpVersion, bool>>,
+      public HttpIntegrationTest {
 public:
   UdsUpstreamIntegrationTest()
-      : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, std::get<0>(GetParam()), realTime()),
+      : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, std::get<0>(GetParam())),
         abstract_namespace_(std::get<1>(GetParam())) {}
 
   void createUpstreams() override {
@@ -46,11 +48,11 @@ protected:
 };
 
 class UdsListenerIntegrationTest
-    : public HttpIntegrationTest,
-      public testing::TestWithParam<std::tuple<Network::Address::IpVersion, bool>> {
+    : public testing::TestWithParam<std::tuple<Network::Address::IpVersion, bool>>,
+      public HttpIntegrationTest {
 public:
   UdsListenerIntegrationTest()
-      : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, std::get<0>(GetParam()), realTime()),
+      : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, std::get<0>(GetParam())),
         abstract_namespace_(std::get<1>(GetParam())) {}
 
   void initialize() override;

@@ -39,7 +39,7 @@ public:
   ProxyProtocolStats stats_;
 };
 
-typedef std::shared_ptr<Config> ConfigSharedPtr;
+using ConfigSharedPtr = std::shared_ptr<Config>;
 
 enum ProxyProtocolVersion { Unknown = -1, InProgress = -2, V1 = 1, V2 = 2 };
 

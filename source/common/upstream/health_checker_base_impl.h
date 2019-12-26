@@ -2,6 +2,7 @@
 
 #include "envoy/access_log/access_log.h"
 #include "envoy/api/v2/core/health_check.pb.h"
+#include "envoy/data/core/v2alpha/health_check_event.pb.h"
 #include "envoy/event/timer.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/stats/scope.h"
@@ -15,16 +16,15 @@ namespace Upstream {
 /**
  * All health checker stats. @see stats_macros.h
  */
-// clang-format off
 #define ALL_HEALTH_CHECKER_STATS(COUNTER, GAUGE)                                                   \
   COUNTER(attempt)                                                                                 \
-  COUNTER(success)                                                                                 \
   COUNTER(failure)                                                                                 \
-  COUNTER(passive_failure)                                                                         \
   COUNTER(network_failure)                                                                         \
+  COUNTER(passive_failure)                                                                         \
+  COUNTER(success)                                                                                 \
   COUNTER(verify_cluster)                                                                          \
-  GAUGE  (healthy)
-// clang-format on
+  GAUGE(degraded, Accumulate)                                                                      \
+  GAUGE(healthy, Accumulate)
 
 /**
  * Definition of all health checker stats. @see stats_macros.h
@@ -45,11 +45,12 @@ public:
   void start() override;
 
 protected:
-  class ActiveHealthCheckSession {
+  class ActiveHealthCheckSession : public Event::DeferredDeletable {
   public:
-    virtual ~ActiveHealthCheckSession();
+    ~ActiveHealthCheckSession() override;
     HealthTransition setUnhealthy(envoy::data::core::v2alpha::HealthCheckFailureType type);
-    void start() { onIntervalBase(); }
+    void onDeferredDeleteBase();
+    void start() { onInitialInterval(); }
 
   protected:
     ActiveHealthCheckSession(HealthCheckerImplBase& parent, HostSharedPtr host);
@@ -61,10 +62,16 @@ protected:
     HostSharedPtr host_;
 
   private:
+    // Clears the pending flag if it is set. By clearing this flag we're marking the host as having
+    // been health checked.
+    // Returns the changed state to use following the flag update.
+    HealthTransition clearPendingFlag(HealthTransition changed_state);
     virtual void onInterval() PURE;
     void onIntervalBase();
     virtual void onTimeout() PURE;
     void onTimeoutBase();
+    virtual void onDeferredDelete() PURE;
+    void onInitialInterval();
 
     HealthCheckerImplBase& parent_;
     Event::TimerPtr interval_timer_;
@@ -74,11 +81,12 @@ protected:
     bool first_check_{true};
   };
 
-  typedef std::unique_ptr<ActiveHealthCheckSession> ActiveHealthCheckSessionPtr;
+  using ActiveHealthCheckSessionPtr = std::unique_ptr<ActiveHealthCheckSession>;
 
   HealthCheckerImplBase(const Cluster& cluster, const envoy::api::v2::core::HealthCheck& config,
                         Event::Dispatcher& dispatcher, Runtime::Loader& runtime,
                         Runtime::RandomGenerator& random, HealthCheckEventLoggerPtr&& event_logger);
+  ~HealthCheckerImplBase() override;
 
   virtual ActiveHealthCheckSessionPtr makeSession(HostSharedPtr host) PURE;
   virtual envoy::data::core::v2alpha::HealthCheckerType healthCheckerType() const PURE;
@@ -110,9 +118,13 @@ private:
 
   void addHosts(const HostVector& hosts);
   void decHealthy();
+  void decDegraded();
   HealthCheckerStats generateStats(Stats::Scope& scope);
   void incHealthy();
+  void incDegraded();
   std::chrono::milliseconds interval(HealthState state, HealthTransition changed_state) const;
+  std::chrono::milliseconds intervalWithJitter(uint64_t base_time_ms,
+                                               std::chrono::milliseconds interval_jitter) const;
   void onClusterMemberUpdate(const HostVector& hosts_added, const HostVector& hosts_removed);
   void refreshHealthyStat();
   void runCallbacks(HostSharedPtr host, HealthTransition changed_state);
@@ -123,6 +135,7 @@ private:
   std::list<HostStatusCb> callbacks_;
   const std::chrono::milliseconds interval_;
   const std::chrono::milliseconds no_traffic_interval_;
+  const std::chrono::milliseconds initial_jitter_;
   const std::chrono::milliseconds interval_jitter_;
   const uint32_t interval_jitter_percent_;
   const std::chrono::milliseconds unhealthy_interval_;
@@ -130,6 +143,7 @@ private:
   const std::chrono::milliseconds healthy_edge_interval_;
   std::unordered_map<HostSharedPtr, ActiveHealthCheckSessionPtr> active_sessions_;
   uint64_t local_process_healthy_{};
+  uint64_t local_process_degraded_{};
 };
 
 class HealthCheckEventLoggerImpl : public HealthCheckEventLogger {
@@ -147,10 +161,18 @@ public:
                     const HostDescriptionConstSharedPtr& host,
                     envoy::data::core::v2alpha::HealthCheckFailureType failure_type,
                     bool first_check) override;
+  void logDegraded(envoy::data::core::v2alpha::HealthCheckerType health_checker_type,
+                   const HostDescriptionConstSharedPtr& host) override;
+  void logNoLongerDegraded(envoy::data::core::v2alpha::HealthCheckerType health_checker_type,
+                           const HostDescriptionConstSharedPtr& host) override;
 
 private:
+  void createHealthCheckEvent(
+      envoy::data::core::v2alpha::HealthCheckerType health_checker_type,
+      const HostDescription& host,
+      std::function<void(envoy::data::core::v2alpha::HealthCheckEvent&)> callback) const;
   TimeSource& time_source_;
-  Filesystem::FileSharedPtr file_;
+  AccessLog::AccessLogFileSharedPtr file_;
 };
 
 } // namespace Upstream

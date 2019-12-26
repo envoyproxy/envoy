@@ -1,11 +1,10 @@
 #pragma once
 
-#include <netdb.h>
-
 #include <cstdint>
 #include <string>
 #include <unordered_map>
 
+#include "envoy/common/platform.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/event/file_event.h"
 #include "envoy/network/dns.h"
@@ -28,7 +27,8 @@ class DnsResolverImplPeer;
 class DnsResolverImpl : public DnsResolver, protected Logger::Loggable<Logger::Id::upstream> {
 public:
   DnsResolverImpl(Event::Dispatcher& dispatcher,
-                  const std::vector<Network::Address::InstanceConstSharedPtr>& resolvers);
+                  const std::vector<Network::Address::InstanceConstSharedPtr>& resolvers,
+                  const bool use_tcp_for_dns_lookups);
   ~DnsResolverImpl() override;
 
   // Network::DnsResolver
@@ -50,17 +50,17 @@ private:
     }
 
     /**
-     * c-ares ares_gethostbyname() query callback.
-     * @param status return status of call to ares_gethostbyname.
+     * ares_getaddrinfo query callback.
+     * @param status return status of call to ares_getaddrinfo.
      * @param timeouts the number of times the request timed out.
-     * @param hostent structure that stores information about a given host.
+     * @param addrinfo structure to store address info.
      */
-    void onAresHostCallback(int status, int timeouts, hostent* hostent);
+    void onAresGetAddrInfoCallback(int status, int timeouts, ares_addrinfo* addrinfo);
     /**
-     * wrapper function of call to ares_gethostbyname.
+     * wrapper function of call to ares_getaddrinfo.
      * @param family currently AF_INET and AF_INET6 are supported.
      */
-    void getHostByName(int family);
+    void getAddrInfo(int family);
 
     // Caller supplied callback to invoke on query completion or error.
     const ResolveCb callback_;

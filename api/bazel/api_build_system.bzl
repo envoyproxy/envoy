@@ -1,158 +1,186 @@
-load("@com_google_protobuf//:protobuf.bzl", "py_proto_library")
-load("@com_lyft_protoc_gen_validate//bazel:pgv_proto_library.bzl", "pgv_cc_proto_library")
+load("@com_envoyproxy_protoc_gen_validate//bazel:pgv_proto_library.bzl", "pgv_cc_proto_library")
+load("@com_github_grpc_grpc//bazel:cc_grpc_library.bzl", "cc_grpc_library")
+load("@com_google_protobuf//:protobuf.bzl", _py_proto_library = "py_proto_library")
 load("@io_bazel_rules_go//proto:def.bzl", "go_grpc_library", "go_proto_library")
 load("@io_bazel_rules_go//go:def.bzl", "go_test")
+load("@rules_proto//proto:defs.bzl", "proto_library")
+load(
+    "//bazel:external_proto_deps.bzl",
+    "EXTERNAL_PROTO_CC_BAZEL_DEP_MAP",
+    "EXTERNAL_PROTO_GO_BAZEL_DEP_MAP",
+    "EXTERNAL_PROTO_PY_BAZEL_DEP_MAP",
+)
 
-_PY_SUFFIX = "_py"
-_CC_SUFFIX = "_cc"
+_PY_PROTO_SUFFIX = "_py_proto"
+_CC_PROTO_SUFFIX = "_cc_proto"
+_CC_GRPC_SUFFIX = "_cc_grpc"
 _GO_PROTO_SUFFIX = "_go_proto"
-_GO_GRPC_SUFFIX = "_go_grpc"
-_GO_IMPORTPATH_PREFIX = "github.com/envoyproxy/data-plane-api/api/"
+_GO_IMPORTPATH_PREFIX = "github.com/envoyproxy/go-control-plane/"
 
-def _Suffix(d, suffix):
-    return d + suffix
+_COMMON_PROTO_DEPS = [
+    "@com_google_protobuf//:any_proto",
+    "@com_google_protobuf//:descriptor_proto",
+    "@com_google_protobuf//:duration_proto",
+    "@com_google_protobuf//:empty_proto",
+    "@com_google_protobuf//:struct_proto",
+    "@com_google_protobuf//:timestamp_proto",
+    "@com_google_protobuf//:wrappers_proto",
+    "@com_google_googleapis//google/api:http_proto",
+    "@com_google_googleapis//google/api:httpbody_proto",
+    "@com_google_googleapis//google/api:annotations_proto",
+    "@com_google_googleapis//google/rpc:status_proto",
+    "@com_envoyproxy_protoc_gen_validate//validate:validate_proto",
+]
 
-def _LibrarySuffix(library_name, suffix):
-    # Transform //a/b/c to //a/b/c:c in preparation for suffix operation below.
-    if library_name.startswith("//") and ":" not in library_name:
-        library_name += ":" + Label(library_name).name
-    return _Suffix(library_name, suffix)
+def _proto_mapping(dep, proto_dep_map, proto_suffix):
+    mapped = proto_dep_map.get(dep)
+    if mapped == None:
+        prefix = "@" + Label(dep).workspace_name if not dep.startswith("//") else ""
+        return prefix + "//" + Label(dep).package + ":" + Label(dep).name + proto_suffix
+    return mapped
 
-# TODO(htuch): has_services is currently ignored but will in future support
-# gRPC stub generation.
+def _go_proto_mapping(dep):
+    return _proto_mapping(dep, EXTERNAL_PROTO_GO_BAZEL_DEP_MAP, _GO_PROTO_SUFFIX)
+
+def _cc_proto_mapping(dep):
+    return _proto_mapping(dep, EXTERNAL_PROTO_CC_BAZEL_DEP_MAP, _CC_PROTO_SUFFIX)
+
+def _py_proto_mapping(dep):
+    return _proto_mapping(dep, EXTERNAL_PROTO_PY_BAZEL_DEP_MAP, _PY_PROTO_SUFFIX)
+
 # TODO(htuch): Convert this to native py_proto_library once
 # https://github.com/bazelbuild/bazel/issues/3935 and/or
 # https://github.com/bazelbuild/bazel/issues/2626 are resolved.
-def api_py_proto_library(name, srcs = [], deps = [], has_services = 0):
-    py_proto_library(
-        name = _Suffix(name, _PY_SUFFIX),
+def _api_py_proto_library(name, srcs = [], deps = []):
+    _py_proto_library(
+        name = name + _PY_PROTO_SUFFIX,
         srcs = srcs,
         default_runtime = "@com_google_protobuf//:protobuf_python",
         protoc = "@com_google_protobuf//:protoc",
-        deps = [_LibrarySuffix(d, _PY_SUFFIX) for d in deps] + [
-            "@com_lyft_protoc_gen_validate//validate:validate_py",
-            "@googleapis//:api_httpbody_protos_py",
-            "@googleapis//:http_api_protos_py",
-            "@googleapis//:rpc_status_protos_py",
-            "@com_github_gogo_protobuf//:gogo_proto_py",
+        deps = [_py_proto_mapping(dep) for dep in deps] + [
+            "@com_envoyproxy_protoc_gen_validate//validate:validate_py",
+            "@com_google_googleapis//google/rpc:status_py_proto",
+            "@com_google_googleapis//google/api:annotations_py_proto",
+            "@com_google_googleapis//google/api:http_py_proto",
+            "@com_google_googleapis//google/api:httpbody_py_proto",
         ],
         visibility = ["//visibility:public"],
     )
 
-def api_go_proto_library(name, proto, deps = []):
-    go_proto_library(
-        name = _Suffix(name, _GO_PROTO_SUFFIX),
-        importpath = _Suffix(_GO_IMPORTPATH_PREFIX, name),
-        proto = proto,
+# This defines googleapis py_proto_library. The repository does not provide its definition and requires
+# overriding it in the consuming project (see https://github.com/grpc/grpc/issues/19255 for more details).
+def py_proto_library(name, deps = [], plugin = None):
+    srcs = [dep[:-6] + ".proto" if dep.endswith("_proto") else dep for dep in deps]
+    proto_deps = []
+
+    # py_proto_library in googleapis specifies *_proto rules in dependencies.
+    # By rewriting *_proto to *.proto above, the dependencies in *_proto rules are not preserved.
+    # As a workaround, manually specify the proto dependencies for the imported python rules.
+    if name == "annotations_py_proto":
+        proto_deps = proto_deps + [":http_py_proto"]
+
+    # py_proto_library does not support plugin as an argument yet at gRPC v1.25.0:
+    # https://github.com/grpc/grpc/blob/v1.25.0/bazel/python_rules.bzl#L72.
+    # plugin should also be passed in here when gRPC version is greater than v1.25.x.
+    _py_proto_library(
+        name = name,
+        srcs = srcs,
+        default_runtime = "@com_google_protobuf//:protobuf_python",
+        protoc = "@com_google_protobuf//:protoc",
+        deps = proto_deps + ["@com_google_protobuf//:protobuf_python"],
         visibility = ["//visibility:public"],
-        deps = deps + [
-            "@com_github_gogo_protobuf//:gogo_proto_go",
-            "@com_github_golang_protobuf//ptypes/duration:go_default_library",
-            "@com_github_golang_protobuf//ptypes/struct:go_default_library",
-            "@com_github_golang_protobuf//ptypes/timestamp:go_default_library",
-            "@com_github_golang_protobuf//ptypes/wrappers:go_default_library",
-            "@com_github_golang_protobuf//ptypes/any:go_default_library",
-            "@com_lyft_protoc_gen_validate//validate:go_default_library",
-            "@googleapis//:rpc_status_go_proto",
-        ],
     )
 
-def api_go_grpc_library(name, proto, deps = []):
-    go_grpc_library(
-        name = _Suffix(name, _GO_GRPC_SUFFIX),
-        importpath = _Suffix(_GO_IMPORTPATH_PREFIX, name),
-        proto = proto,
+def _api_cc_grpc_library(name, proto, deps = []):
+    cc_grpc_library(
+        name = name,
+        srcs = [proto],
+        deps = deps,
+        proto_only = False,
+        grpc_only = True,
         visibility = ["//visibility:public"],
-        deps = deps + [
-            "@com_github_gogo_protobuf//:gogo_proto_go",
-            "@com_github_golang_protobuf//ptypes/duration:go_default_library",
-            "@com_github_golang_protobuf//ptypes/struct:go_default_library",
-            "@com_github_golang_protobuf//ptypes/wrappers:go_default_library",
-            "@com_github_golang_protobuf//ptypes/any:go_default_library",
-            "@com_lyft_protoc_gen_validate//validate:go_default_library",
-            "@googleapis//:http_api_go_proto",
-        ],
     )
 
-# This is api_proto_library plus some logic internal to //envoy/api.
-def api_proto_library_internal(visibility = ["//visibility:private"], **kwargs):
-    # //envoy/docs/build.sh needs visibility in order to generate documents.
-    if visibility == ["//visibility:private"]:
-        visibility = ["//docs"]
-    elif visibility != ["//visibility:public"]:
-        visibility = visibility + ["//docs"]
-
-    api_proto_library(visibility = visibility, **kwargs)
-
-# TODO(htuch): has_services is currently ignored but will in future support
-# gRPC stub generation.
-# TODO(htuch): Automatically generate go_proto_library and go_grpc_library
-# from api_proto_library.
-def api_proto_library(
+def api_cc_py_proto_library(
         name,
         visibility = ["//visibility:private"],
         srcs = [],
         deps = [],
-        external_proto_deps = [],
-        external_cc_proto_deps = [],
-        has_services = 0,
-        linkstatic = None,
-        require_py = 1):
-    native.proto_library(
+        linkstatic = 0,
+        has_services = 0):
+    relative_name = ":" + name
+    proto_library(
         name = name,
         srcs = srcs,
-        deps = deps + external_proto_deps + [
-            "@com_google_protobuf//:any_proto",
-            "@com_google_protobuf//:descriptor_proto",
-            "@com_google_protobuf//:duration_proto",
-            "@com_google_protobuf//:empty_proto",
-            "@com_google_protobuf//:struct_proto",
-            "@com_google_protobuf//:timestamp_proto",
-            "@com_google_protobuf//:wrappers_proto",
-            "@googleapis//:http_api_protos_proto",
-            "@googleapis//:rpc_status_protos_lib",
-            "@com_github_gogo_protobuf//:gogo_proto",
-            "@com_lyft_protoc_gen_validate//validate:validate_proto",
-        ],
+        deps = deps + _COMMON_PROTO_DEPS,
         visibility = visibility,
     )
+    cc_proto_library_name = name + _CC_PROTO_SUFFIX
     pgv_cc_proto_library(
-        name = _Suffix(name, _CC_SUFFIX),
+        name = cc_proto_library_name,
         linkstatic = linkstatic,
-        cc_deps = [_LibrarySuffix(d, _CC_SUFFIX) for d in deps] + external_cc_proto_deps + [
-            "@com_github_gogo_protobuf//:gogo_proto_cc",
-            "@googleapis//:http_api_protos",
-            "@googleapis//:rpc_status_protos",
+        cc_deps = [_cc_proto_mapping(dep) for dep in deps] + [
+            "@com_google_googleapis//google/api:http_cc_proto",
+            "@com_google_googleapis//google/api:httpbody_cc_proto",
+            "@com_google_googleapis//google/api:annotations_cc_proto",
+            "@com_google_googleapis//google/rpc:status_cc_proto",
         ],
-        deps = [":" + name],
+        deps = [relative_name],
         visibility = ["//visibility:public"],
     )
-    py_export_suffixes = []
-    if (require_py == 1):
-        api_py_proto_library(name, srcs, deps, has_services)
-        py_export_suffixes = ["_py", "_py_genproto"]
+    _api_py_proto_library(name, srcs, deps)
 
-    # Allow unlimited visibility for consumers
-    export_suffixes = ["", "_cc", "_cc_validate"] + py_export_suffixes
-    for s in export_suffixes:
-        native.alias(
-            name = name + "_export" + s,
-            actual = name + s,
-            visibility = ["//visibility:public"],
-        )
+    # Optionally define gRPC services
+    if has_services:
+        # TODO: when Python services are required, add to the below stub generations.
+        cc_grpc_name = name + _CC_GRPC_SUFFIX
+        cc_proto_deps = [cc_proto_library_name] + [_cc_proto_mapping(dep) for dep in deps]
+        _api_cc_grpc_library(name = cc_grpc_name, proto = relative_name, deps = cc_proto_deps)
 
-def api_cc_test(name, srcs, proto_deps):
+def api_cc_test(name, **kwargs):
     native.cc_test(
         name = name,
-        srcs = srcs,
-        deps = [_LibrarySuffix(d, _CC_SUFFIX) for d in proto_deps],
+        **kwargs
     )
 
-def api_go_test(name, size, importpath, srcs = [], deps = []):
+def api_go_test(name, **kwargs):
     go_test(
         name = name,
-        size = size,
+        **kwargs
+    )
+
+def api_proto_package(srcs = [], deps = [], has_services = False, visibility = ["//visibility:public"]):
+    if srcs == []:
+        srcs = native.glob(["*.proto"])
+
+    name = "pkg"
+    api_cc_py_proto_library(
+        name = name,
+        visibility = visibility,
         srcs = srcs,
-        importpath = importpath,
         deps = deps,
+        has_services = has_services,
+    )
+
+    compilers = ["@io_bazel_rules_go//proto:go_proto", "//bazel:pgv_plugin_go"]
+    if has_services:
+        compilers = ["@io_bazel_rules_go//proto:go_grpc", "//bazel:pgv_plugin_go"]
+
+    go_proto_library(
+        name = name + _GO_PROTO_SUFFIX,
+        compilers = compilers,
+        importpath = _GO_IMPORTPATH_PREFIX + native.package_name(),
+        proto = name,
+        visibility = ["//visibility:public"],
+        deps = [_go_proto_mapping(dep) for dep in deps] + [
+            "@com_github_golang_protobuf//ptypes:go_default_library",
+            "@com_github_golang_protobuf//ptypes/any:go_default_library",
+            "@com_github_golang_protobuf//ptypes/duration:go_default_library",
+            "@com_github_golang_protobuf//ptypes/struct:go_default_library",
+            "@com_github_golang_protobuf//ptypes/timestamp:go_default_library",
+            "@com_github_golang_protobuf//ptypes/wrappers:go_default_library",
+            "@com_envoyproxy_protoc_gen_validate//validate:go_default_library",
+            "@com_google_googleapis//google/api:annotations_go_proto",
+            "@com_google_googleapis//google/rpc:status_go_proto",
+        ],
     )

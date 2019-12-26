@@ -14,8 +14,18 @@ envoy_cc_mock(
     hdrs = ["connection.h"],
     deps = [
         "//include/envoy/network:connection_interface",
+        "//source/common/network:filter_manager_lib",
         "//test/mocks/event:event_mocks",
         "//test/mocks/stream_info:stream_info_mocks",
+    ],
+)
+
+envoy_cc_mock(
+    name = "io_handle_mocks",
+    srcs = ["io_handle.cc"],
+    hdrs = ["io_handle.h"],
+    deps = [
+        "//include/envoy/network:io_handle_interface",
     ],
 )
 
@@ -25,6 +35,7 @@ envoy_cc_mock(
     hdrs = ["mocks.h"],
     deps = [
         ":connection_mocks",
+        ":transport_socket_mocks",
         "//include/envoy/buffer:buffer_interface",
         "//include/envoy/network:connection_interface",
         "//include/envoy/network:drain_decision_interface",
@@ -38,6 +49,16 @@ envoy_cc_mock(
         "//test/mocks/event:event_mocks",
         "//test/mocks/stream_info:stream_info_mocks",
         "//test/test_common:printers_lib",
-        "@envoy_api//envoy/api/v2/core:base_cc",
+        "@envoy_api//envoy/api/v2/core:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_mock(
+    name = "transport_socket_mocks",
+    srcs = ["transport_socket.cc"],
+    hdrs = ["transport_socket.h"],
+    deps = [
+        "//include/envoy/network:transport_socket_interface",
+        "//source/common/network:utility_lib",
     ],
 )

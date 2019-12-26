@@ -1,0 +1,33 @@
+syntax = "proto3";
+
+package tools.type_whisperer;
+
+message TypeDbDescription {
+  // Fully qualified package name.
+  string qualified_package = 2;
+
+  // Path to .proto from API root.
+  string proto_path = 3;
+
+  // Type's name in the next major version of the API.
+  string next_version_type_name = 4;
+}
+
+message NextVersionFileDescription {
+  // Next version qualified package name.
+  string qualified_package = 1;
+
+  // Next version proto file path.
+  string proto_path = 2;
+}
+
+// API type database. This describes the types in the API and the upgrade path
+// of types, packages and proto paths across major versions of the API.
+message TypeDb {
+  // Map from fully qualified type name to description.
+  map<string, TypeDbDescription> types = 1;
+
+  // Map from .proto path to the proto's path in the next major version of the
+  // API.
+  map<string, NextVersionFileDescription> next_version_protos = 2;
+}

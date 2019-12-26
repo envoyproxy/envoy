@@ -15,7 +15,7 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-using testing::TestParamInfo;
+using ::testing::TestParamInfo;
 
 namespace Envoy {
 namespace Extensions {
@@ -23,8 +23,8 @@ namespace NetworkFilters {
 namespace ThriftProxy {
 namespace {
 
-using Envoy::Buffer::addRepeated;
-using Envoy::Buffer::addSeq;
+using Envoy::Buffer::addRepeated; // NOLINT(misc-unused-using-decls)
+using Envoy::Buffer::addSeq;      // NOLINT(misc-unused-using-decls)
 
 inline std::string fieldTypeToString(const FieldType& field_type) {
   switch (field_type) {

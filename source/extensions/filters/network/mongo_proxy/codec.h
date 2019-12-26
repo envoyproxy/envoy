@@ -22,19 +22,19 @@ namespace MongoProxy {
 class Message {
 public:
   enum class OpCode {
-    OP_REPLY = 1,
-    OP_MSG = 1000,
-    OP_UPDATE = 2001,
-    OP_INSERT = 2002,
-    OP_QUERY = 2004,
-    OP_GET_MORE = 2005,
-    OP_DELETE = 2006,
-    OP_KILL_CURSORS = 2007,
-    OP_COMMAND = 2010,
-    OP_COMMANDREPLY = 2011
+    Reply = 1,
+    Msg = 1000,
+    Update = 2001,
+    Insert = 2002,
+    Query = 2004,
+    GetMore = 2005,
+    Delete = 2006,
+    KillCursors = 2007,
+    Command = 2010,
+    CommandReply = 2011
   };
 
-  virtual ~Message(){};
+  virtual ~Message() = default;
 
   virtual int32_t requestId() const PURE;
   virtual int32_t responseTo() const PURE;
@@ -62,7 +62,7 @@ public:
   virtual void cursorId(int64_t cursor_id) PURE;
 };
 
-typedef std::unique_ptr<GetMoreMessage> GetMoreMessagePtr;
+using GetMoreMessagePtr = std::unique_ptr<GetMoreMessage>;
 
 /**
  * Mongo OP_INSERT message.
@@ -79,7 +79,7 @@ public:
   virtual std::list<Bson::DocumentSharedPtr>& documents() PURE;
 };
 
-typedef std::unique_ptr<InsertMessage> InsertMessagePtr;
+using InsertMessagePtr = std::unique_ptr<InsertMessage>;
 
 /**
  * Mongo OP_KILL_CURSORS message.
@@ -89,12 +89,12 @@ public:
   virtual bool operator==(const KillCursorsMessage& rhs) const PURE;
 
   virtual int32_t numberOfCursorIds() const PURE;
-  virtual void numberOfCursorIds(int32_t number_of_cursors_ids_) PURE;
+  virtual void numberOfCursorIds(int32_t number_of_cursors_ids) PURE;
   virtual const std::vector<int64_t>& cursorIds() const PURE;
   virtual void cursorIds(std::vector<int64_t>&& cursors_ids) PURE;
 };
 
-typedef std::unique_ptr<KillCursorsMessage> KillCursorsMessagePtr;
+using KillCursorsMessagePtr = std::unique_ptr<KillCursorsMessage>;
 
 /**
  * Mongo OP_QUERY message.
@@ -126,7 +126,7 @@ public:
   virtual void returnFieldsSelector(Bson::DocumentSharedPtr&& fields) PURE;
 };
 
-typedef std::unique_ptr<QueryMessage> QueryMessagePtr;
+using QueryMessagePtr = std::unique_ptr<QueryMessage>;
 
 /**
  * Mongo OP_REPLY
@@ -154,7 +154,7 @@ public:
   virtual std::list<Bson::DocumentSharedPtr>& documents() PURE;
 };
 
-typedef std::unique_ptr<ReplyMessage> ReplyMessagePtr;
+using ReplyMessagePtr = std::unique_ptr<ReplyMessage>;
 
 class CommandMessage : public virtual Message {
 public:
@@ -163,16 +163,16 @@ public:
   virtual std::string database() const PURE;
   virtual void database(std::string database) PURE;
   virtual std::string commandName() const PURE;
-  virtual void commandName(std::string commandName) PURE;
+  virtual void commandName(std::string command_name) PURE;
   virtual const Bson::Document* metadata() const PURE;
   virtual void metadata(Bson::DocumentSharedPtr&& metadata) PURE;
   virtual const Bson::Document* commandArgs() const PURE;
-  virtual void commandArgs(Bson::DocumentSharedPtr&& commandArgs) PURE;
+  virtual void commandArgs(Bson::DocumentSharedPtr&& command_args) PURE;
   virtual const std::list<Bson::DocumentSharedPtr>& inputDocs() const PURE;
   virtual std::list<Bson::DocumentSharedPtr>& inputDocs() PURE;
 };
 
-typedef std::unique_ptr<CommandMessage> CommandMessagePtr;
+using CommandMessagePtr = std::unique_ptr<CommandMessage>;
 
 class CommandReplyMessage : public virtual Message {
 public:
@@ -180,19 +180,19 @@ public:
   virtual const Bson::Document* metadata() const PURE;
   virtual void metadata(Bson::DocumentSharedPtr&& metadata) PURE;
   virtual const Bson::Document* commandReply() const PURE;
-  virtual void commandReply(Bson::DocumentSharedPtr&& commandReply) PURE;
+  virtual void commandReply(Bson::DocumentSharedPtr&& command_reply) PURE;
   virtual const std::list<Bson::DocumentSharedPtr>& outputDocs() const PURE;
   virtual std::list<Bson::DocumentSharedPtr>& outputDocs() PURE;
 };
 
-typedef std::unique_ptr<CommandReplyMessage> CommandReplyMessagePtr;
+using CommandReplyMessagePtr = std::unique_ptr<CommandReplyMessage>;
 
 /**
  * General callbacks for dispatching decoded mongo messages to a sink.
  */
 class DecoderCallbacks {
 public:
-  virtual ~DecoderCallbacks() {}
+  virtual ~DecoderCallbacks() = default;
 
   virtual void decodeGetMore(GetMoreMessagePtr&& message) PURE;
   virtual void decodeInsert(InsertMessagePtr&& message) PURE;
@@ -208,19 +208,19 @@ public:
  */
 class Decoder {
 public:
-  virtual ~Decoder() {}
+  virtual ~Decoder() = default;
 
   virtual void onData(Buffer::Instance& data) PURE;
 };
 
-typedef std::unique_ptr<Decoder> DecoderPtr;
+using DecoderPtr = std::unique_ptr<Decoder>;
 
 /**
  * Mongo message encoder.
  */
 class Encoder {
 public:
-  virtual ~Encoder() {}
+  virtual ~Encoder() = default;
 
   virtual void encodeGetMore(const GetMoreMessage& message) PURE;
   virtual void encodeInsert(const InsertMessage& message) PURE;

@@ -58,6 +58,26 @@ Example:
 EXPECT_THAT(response->headers(), HeaderMapEqualRef(expected_headers));
 ```
 
+### ProtoEq, ProtoEqIgnoringField, RepeatedProtoEq
+
+Tests equality of protobufs, with a variant that ignores the value (including
+presence) of a single named field. Another variant can be used to compare two
+instances of Protobuf::RepeatedPtrField element-by-element.
+
+Example:
+
+```cpp
+envoy::api::v2::DeltaDiscoveryRequest expected_request;
+// (not shown: set some fields of expected_request...)
+EXPECT_CALL(async_stream_, sendMessage(ProtoEqIgnoringField(expected_request, "response_nonce"), false));
+
+response->mutable_resources()->Add();
+response->mutable_resources()->Add();
+response->mutable_resources()->Add();
+// (not shown: do something to populate those empty added items...)
+EXPECT_CALL(callbacks_, onConfigUpdate(RepeatedProtoEq(response->resources()), version));
+```
+
 ### IsSubsetOfHeaders and IsSupersetOfHeaders
 
 Tests that one `HeaderMap` argument contains every header in another
@@ -69,3 +89,33 @@ Examples:
 EXPECT_THAT(response->headers(), IsSubsetOfHeaders(allowed_headers));
 EXPECT_THAT(response->headers(), IsSupersetOfHeaders(required_headers));
 ```
+
+## Controlling time in tests
+
+In Envoy production code, time and timers are managed via
+[`Event::TimeSystem`](https://github.com/envoyproxy/envoy/blob/master/include/envoy/event/timer.h),
+which provides a mechanism for querying the time and setting up time-based
+callbacks. Bypassing this abstraction in Envoy code is flagged as a format
+violation in CI.
+
+In tests we use a derivation
+[`Event::TestTimeSystem`](test_common/test_time_system.h) which adds the ability
+to sleep or do a blocking timed wait on a condition variable. There are two
+implementations of the `Event::TestTimeSystem` interface:
+`Event::TestRealTimeSystem`, and `Event::SimulatedTimeSystem`. The latter is
+recommended for all new tests, as it helps avoid flaky tests on slow machines,
+and makes tests run faster.
+
+Typically we do not want to have both real-time and simulated-time in the same
+test; that could lead to hard-to-reproduce results. Thus both implementations
+have a mechanism to enforce that only one of them can be instantiated at once.
+A runtime assertion occurs if an `Event::TestRealTimeSystem` and
+`Event::SimulatedTimeSystem` are instantiated at the same time. Once the
+time-system goes out of scope, usually at the end of a test method, the slate
+is clean and a new test-method can use a different time system.
+
+There is also `Event::GlobalTimeSystem`, which can be instantiated in shared
+test infrastructure that wants to be agnostic to which `TimeSystem` is used in a
+test. When no `TimeSystem` is instantiated in a test, the `Event::GlobalTimeSystem`
+will lazy-initialize itself into a concrete `TimeSystem`. Currently this is
+`TestRealTimeSystem` but will be changed in the future to `SimulatedTimeSystem`.

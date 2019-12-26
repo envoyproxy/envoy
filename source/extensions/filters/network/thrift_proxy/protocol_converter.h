@@ -16,15 +16,15 @@ namespace ThriftProxy {
  */
 class ProtocolConverter : public virtual DecoderEventHandler {
 public:
-  ProtocolConverter() {}
-  virtual ~ProtocolConverter() {}
+  ProtocolConverter() = default;
+  ~ProtocolConverter() override = default;
 
   void initProtocolConverter(Protocol& proto, Buffer::Instance& buffer) {
     proto_ = &proto;
     buffer_ = &buffer;
   }
 
-  // DecoderEventHaandler
+  // DecoderEventHandler
   FilterStatus messageBegin(MessageMetadataSharedPtr metadata) override {
     proto_->writeMessageBegin(*buffer_, *metadata);
     return FilterStatus::Continue;

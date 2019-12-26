@@ -5,7 +5,9 @@
 #include <string>
 
 #include "envoy/api/v2/core/address.pb.h"
+#include "envoy/common/platform.h"
 #include "envoy/network/connection.h"
+#include "envoy/network/listener.h"
 
 #include "absl/strings/string_view.h"
 
@@ -26,7 +28,36 @@ private:
   const uint32_t max_;
 };
 
-typedef std::list<PortRange> PortRangeList;
+using PortRangeList = std::list<PortRange>;
+
+/**
+ * A callback interface used by readFromSocket() to pass packets read from
+ * socket.
+ */
+class UdpPacketProcessor {
+public:
+  virtual ~UdpPacketProcessor() = default;
+
+  /**
+   * Consume the packet read out of the socket with the information from UDP
+   * header.
+   * @param local_address is the destination address in the UDP header.
+   * @param peer_address is the source address in the UDP header.
+   * @param buffer contains the packet read.
+   * @param receive_time is the time when the packet is read.
+   */
+  virtual void processPacket(Address::InstanceConstSharedPtr local_address,
+                             Address::InstanceConstSharedPtr peer_address,
+                             Buffer::InstancePtr buffer, MonotonicTime receive_time) PURE;
+
+  /**
+   * The expected max size of the packet to be read. If it's smaller than
+   * actually packets received, the payload will be truncated.
+   */
+  virtual uint64_t maxPacketSize() const PURE;
+};
+
+static const uint64_t MAX_UDP_PACKET_SIZE = 1500;
 
 /**
  * Common network utility routines.
@@ -137,7 +168,7 @@ public:
    * Determine whether this is a local connection.
    * @return bool the address is a local connection.
    */
-  static bool isLocalConnection(const Network::ConnectionSocket& socket);
+  static bool isLocalConnection(const ConnectionSocket& socket);
 
   /**
    * Determine whether this is an internal (RFC1918) address.
@@ -178,6 +209,16 @@ public:
    *         IPv6 address are to be accepted.
    */
   static Address::InstanceConstSharedPtr getIpv6AnyAddress();
+
+  /**
+   * @return the IPv4 CIDR catch-all address (0.0.0.0/0).
+   */
+  static const std::string& getIpv4CidrCatchAllAddress();
+
+  /**
+   * @return the IPv6 CIDR catch-all address (::/0).
+   */
+  static const std::string& getIpv6CidrCatchAllAddress();
 
   /**
    * @param address IP address instance.
@@ -238,6 +279,67 @@ public:
    */
   static void addressToProtobufAddress(const Address::Instance& address,
                                        envoy::api::v2::core::Address& proto_address);
+
+  /**
+   * Returns socket type corresponding to SocketAddress.protocol value of the
+   * given address, or SocketType::Stream if the address is a pipe address.
+   * @param proto_address the address protobuf
+   * @return socket type
+   */
+  static Address::SocketType
+  protobufAddressSocketType(const envoy::api::v2::core::Address& proto_address);
+
+  /**
+   * Send a packet via given UDP socket with specific source address.
+   * @param handle is the UDP socket used to send.
+   * @param slices points to the buffers containing the packet.
+   * @param num_slices is the number of buffers.
+   * @param local_ip is the source address to be used to send.
+   * @param peer_address is the destination address to send to.
+   */
+  static Api::IoCallUint64Result writeToSocket(IoHandle& handle, Buffer::RawSlice* slices,
+                                               uint64_t num_slices, const Address::Ip* local_ip,
+                                               const Address::Instance& peer_address);
+  static Api::IoCallUint64Result writeToSocket(IoHandle& handle, const Buffer::Instance& buffer,
+                                               const Address::Ip* local_ip,
+                                               const Address::Instance& peer_address);
+
+  /**
+   * Read a packet from a given UDP socket and pass the packet to given UdpPacketProcessor.
+   * @param handle is the UDP socket to read from.
+   * @param local_address is the socket's local address used to populate port.
+   * @param udp_packet_processor is the callback to receive the packet.
+   * @param receive_time is the timestamp passed to udp_packet_processor for the
+   * receive time of the packet.
+   * @param packets_dropped is the output parameter for number of packets dropped in kernel. If the
+   * caller is not interested in it, nullptr can be passed in.
+   */
+  static Api::IoCallUint64Result readFromSocket(IoHandle& handle,
+                                                const Address::Instance& local_address,
+                                                UdpPacketProcessor& udp_packet_processor,
+                                                MonotonicTime receive_time,
+                                                uint32_t* packets_dropped);
+
+  /**
+   * Read available packets from a given UDP socket and pass the packet to a given
+   * UdpPacketProcessor.
+   * @param handle is the UDP socket to read from.
+   * @param local_address is the socket's local address used to populate port.
+   * @param udp_packet_processor is the callback to receive the packets.
+   * @param time_source is the time source used to generate the time stamp of the received packets.
+   * @param packets_dropped is the output parameter for number of packets dropped in kernel.
+   *
+   * TODO(mattklein123): Allow the number of packets read to be limited for fairness. Currently
+   *                     this function will always return an error, even if EAGAIN. In the future
+   *                     we can return no error if we limited the number of packets read and have
+   *                     to fake another read event.
+   * TODO(mattklein123): Can we potentially share this with the TCP stack somehow? Similar code
+   *                     exists there.
+   */
+  static Api::IoErrorPtr readPacketsFromSocket(IoHandle& handle,
+                                               const Address::Instance& local_address,
+                                               UdpPacketProcessor& udp_packet_processor,
+                                               TimeSource& time_source, uint32_t& packets_dropped);
 
 private:
   static void throwWithMalformedIp(const std::string& ip_address);

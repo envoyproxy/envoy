@@ -13,7 +13,7 @@ namespace Http {
  */
 class ContextImpl : public Context {
 public:
-  ContextImpl();
+  explicit ContextImpl(Stats::SymbolTable& symbol_table);
   ~ContextImpl() override = default;
 
   Tracing::HttpTracer& tracer() override { return *tracer_; }

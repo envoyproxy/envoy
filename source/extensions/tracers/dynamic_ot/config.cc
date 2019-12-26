@@ -1,5 +1,7 @@
 #include "extensions/tracers/dynamic_ot/config.h"
 
+#include "envoy/config/trace/v2/trace.pb.h"
+#include "envoy/config/trace/v2/trace.pb.validate.h"
 #include "envoy/registry/registry.h"
 
 #include "common/common/utility.h"
@@ -18,7 +20,7 @@ DynamicOpenTracingTracerFactory::DynamicOpenTracingTracerFactory()
 
 Tracing::HttpTracerPtr DynamicOpenTracingTracerFactory::createHttpTracerTyped(
     const envoy::config::trace::v2::DynamicOtConfig& proto_config, Server::Instance& server) {
-  const std::string library = proto_config.library();
+  const std::string& library = proto_config.library();
   const std::string config = MessageUtil::getJsonStringFromMessage(proto_config.config());
   Tracing::DriverPtr dynamic_driver =
       std::make_unique<DynamicOpenTracingDriver>(server.stats(), library, config);
@@ -28,9 +30,7 @@ Tracing::HttpTracerPtr DynamicOpenTracingTracerFactory::createHttpTracerTyped(
 /**
  * Static registration for the dynamic opentracing tracer. @see RegisterFactory.
  */
-static Registry::RegisterFactory<DynamicOpenTracingTracerFactory,
-                                 Server::Configuration::TracerFactory>
-    register_;
+REGISTER_FACTORY(DynamicOpenTracingTracerFactory, Server::Configuration::TracerFactory);
 
 } // namespace DynamicOt
 } // namespace Tracers

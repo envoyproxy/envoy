@@ -292,7 +292,7 @@ void BinaryProtocolImpl::writeFieldEnd(Buffer::Instance& buffer) { UNREFERENCED_
 
 void BinaryProtocolImpl::writeMapBegin(Buffer::Instance& buffer, FieldType key_type,
                                        FieldType value_type, uint32_t size) {
-  if (size > std::numeric_limits<int32_t>::max()) {
+  if (size > static_cast<uint32_t>(std::numeric_limits<int32_t>::max())) {
     throw EnvoyException(fmt::format("illegal binary protocol map size {}", size));
   }
 
@@ -305,7 +305,7 @@ void BinaryProtocolImpl::writeMapEnd(Buffer::Instance& buffer) { UNREFERENCED_PA
 
 void BinaryProtocolImpl::writeListBegin(Buffer::Instance& buffer, FieldType elem_type,
                                         uint32_t size) {
-  if (size > std::numeric_limits<int32_t>::max()) {
+  if (size > static_cast<uint32_t>(std::numeric_limits<int32_t>::max())) {
     throw EnvoyException(fmt::format("illegal binary protocol list/set size {}", size));
   }
 
@@ -408,7 +408,7 @@ public:
 /**
  * Static registration for the binary protocol. @see RegisterFactory.
  */
-static Registry::RegisterFactory<BinaryProtocolConfigFactory, NamedProtocolConfigFactory> register_;
+REGISTER_FACTORY(BinaryProtocolConfigFactory, NamedProtocolConfigFactory);
 
 class LaxBinaryProtocolConfigFactory : public ProtocolFactoryBase<LaxBinaryProtocolImpl> {
 public:
@@ -418,8 +418,7 @@ public:
 /**
  * Static registration for the auto protocol. @see RegisterFactory.
  */
-static Registry::RegisterFactory<LaxBinaryProtocolConfigFactory, NamedProtocolConfigFactory>
-    register_lax_;
+REGISTER_FACTORY(LaxBinaryProtocolConfigFactory, NamedProtocolConfigFactory);
 
 } // namespace ThriftProxy
 } // namespace NetworkFilters

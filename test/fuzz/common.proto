@@ -3,8 +3,11 @@ syntax = "proto3";
 package test.fuzz;
 
 import "envoy/api/v2/core/base.proto";
+import "envoy/api/v2/core/address.proto";
 
 import "google/protobuf/wrappers.proto";
+
+import "validate/validate.proto";
 
 // Common fuzzing input types.
 
@@ -17,4 +20,7 @@ message StreamInfo {
   uint64 start_time = 2;
   google.protobuf.UInt32Value response_code = 3;
   envoy.api.v2.core.Metadata upstream_metadata = 4;
+  string requested_server_name = 5;
+  envoy.api.v2.core.Address address = 6;
+  envoy.api.v2.core.Address upstream_local_address = 7;
 }

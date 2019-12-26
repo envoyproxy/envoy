@@ -1,17 +1,19 @@
 syntax = "proto3";
 
-// [#proto-status: draft]
-
 package envoy.service.trace.v2;
-option go_package = "v2";
-option java_generic_services = true;
 
 import "envoy/api/v2/core/base.proto";
-import "trace.proto";
 
 import "google/api/annotations.proto";
 
+import "opencensus/proto/trace/v1/trace.proto";
+
 import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.service.trace.v2";
+option java_outer_classname = "TraceServiceProto";
+option java_multiple_files = true;
+option java_generic_services = true;
 
 // Service for streaming traces to server that consumes the trace data. It
 // uses OpenCensus data model as a standard to represent trace information.
@@ -29,7 +31,7 @@ message StreamTracesResponse {
 message StreamTracesMessage {
   message Identifier {
     // The node sending the access log messages over the stream.
-    envoy.api.v2.core.Node node = 1 [(validate.rules).message.required = true];
+    api.v2.core.Node node = 1 [(validate.rules).message = {required: true}];
   }
 
   // Identifier data effectively is a structured metadata.

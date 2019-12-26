@@ -1,5 +1,6 @@
 #include "common/upstream/load_stats_reporter.h"
 
+#include "envoy/service/load_stats/v2/lrs.pb.h"
 #include "envoy/stats/scope.h"
 
 #include "common/protobuf/protobuf.h"
@@ -9,14 +10,14 @@ namespace Upstream {
 
 LoadStatsReporter::LoadStatsReporter(const LocalInfo::LocalInfo& local_info,
                                      ClusterManager& cluster_manager, Stats::Scope& scope,
-                                     Grpc::AsyncClientPtr async_client,
+                                     Grpc::RawAsyncClientPtr async_client,
                                      Event::Dispatcher& dispatcher)
     : cm_(cluster_manager), stats_{ALL_LOAD_REPORTER_STATS(
                                 POOL_COUNTER_PREFIX(scope, "load_reporter."))},
       async_client_(std::move(async_client)),
       service_method_(*Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
           "envoy.service.load_stats.v2.LoadReportingService.StreamLoadStats")),
-      time_source_(dispatcher.timeSystem()) {
+      time_source_(dispatcher.timeSource()) {
   request_.mutable_node()->MergeFrom(local_info.node());
   retry_timer_ = dispatcher.createTimer([this]() -> void { establishNewStream(); });
   response_timer_ = dispatcher.createTimer([this]() -> void { sendLoadStatsRequest(); });
@@ -29,7 +30,7 @@ void LoadStatsReporter::setRetryTimer() {
 
 void LoadStatsReporter::establishNewStream() {
   ENVOY_LOG(debug, "Establishing new gRPC bidi stream for {}", service_method_.DebugString());
-  stream_ = async_client_->start(service_method_, *this);
+  stream_ = async_client_->start(service_method_, *this, Http::AsyncClient::StreamOptions());
   if (stream_ == nullptr) {
     ENVOY_LOG(warn, "Unable to establish new stream");
     handleFailure();
@@ -53,17 +54,22 @@ void LoadStatsReporter::sendLoadStatsRequest() {
     auto& cluster = it->second.get();
     auto* cluster_stats = request_.add_cluster_stats();
     cluster_stats->set_cluster_name(cluster_name);
+    if (cluster.info()->eds_service_name().has_value()) {
+      cluster_stats->set_cluster_service_name(cluster.info()->eds_service_name().value());
+    }
     for (auto& host_set : cluster.prioritySet().hostSetsPerPriority()) {
       ENVOY_LOG(trace, "Load report locality count {}", host_set->hostsPerLocality().get().size());
       for (auto& hosts : host_set->hostsPerLocality().get()) {
-        ASSERT(hosts.size() > 0);
+        ASSERT(!hosts.empty());
         uint64_t rq_success = 0;
         uint64_t rq_error = 0;
         uint64_t rq_active = 0;
-        for (auto host : hosts) {
+        uint64_t rq_issued = 0;
+        for (const auto& host : hosts) {
           rq_success += host->stats().rq_success_.latch();
           rq_error += host->stats().rq_error_.latch();
           rq_active += host->stats().rq_active_.value();
+          rq_issued += host->stats().rq_total_.latch();
         }
         if (rq_success + rq_error + rq_active != 0) {
           auto* locality_stats = cluster_stats->add_upstream_locality_stats();
@@ -72,6 +78,7 @@ void LoadStatsReporter::sendLoadStatsRequest() {
           locality_stats->set_total_successful_requests(rq_success);
           locality_stats->set_total_error_requests(rq_error);
           locality_stats->set_total_requests_in_progress(rq_active);
+          locality_stats->set_total_issued_requests(rq_issued);
         }
       }
     }
@@ -148,9 +155,10 @@ void LoadStatsReporter::startLoadReportPeriod() {
     }
     auto& cluster = it->second.get();
     for (auto& host_set : cluster.prioritySet().hostSetsPerPriority()) {
-      for (auto host : host_set->hosts()) {
+      for (const auto& host : host_set->hosts()) {
         host->stats().rq_success_.latch();
         host->stats().rq_error_.latch();
+        host->stats().rq_total_.latch();
       }
     }
     cluster.info()->loadReportStats().upstream_rq_dropped_.latch();

@@ -4,6 +4,7 @@
 #include <unordered_map>
 
 #include "envoy/common/time.h"
+#include "envoy/config/filter/http/jwt_authn/v2alpha/config.pb.h"
 
 #include "common/common/logger.h"
 #include "common/config/datasource.h"
@@ -25,9 +26,9 @@ namespace {
 // Default cache expiration time in 5 minutes.
 constexpr int PubkeyCacheExpirationSec = 600;
 
-class JwksDataImpl : public JwksCache::JwksData, public Logger::Loggable<Logger::Id::filter> {
+class JwksDataImpl : public JwksCache::JwksData, public Logger::Loggable<Logger::Id::jwt> {
 public:
-  JwksDataImpl(const JwtProvider& jwt_provider, TimeSource& time_source)
+  JwksDataImpl(const JwtProvider& jwt_provider, TimeSource& time_source, Api::Api& api)
       : jwt_provider_(jwt_provider), time_source_(time_source) {
     std::vector<std::string> audiences;
     for (const auto& aud : jwt_provider_.audiences()) {
@@ -35,7 +36,7 @@ public:
     }
     audiences_ = std::make_unique<::google::jwt_verify::CheckAudience>(audiences);
 
-    const auto inline_jwks = Config::DataSource::read(jwt_provider_.local_jwks(), true);
+    const auto inline_jwks = Config::DataSource::read(jwt_provider_.local_jwks(), true, api);
     if (!inline_jwks.empty()) {
       auto ptr = setKey(
           ::google::jwt_verify::Jwks::createFrom(inline_jwks, ::google::jwt_verify::Jwks::JWKS),
@@ -96,10 +97,10 @@ private:
 class JwksCacheImpl : public JwksCache {
 public:
   // Load the config from envoy config.
-  JwksCacheImpl(const JwtAuthentication& config, TimeSource& time_source) {
+  JwksCacheImpl(const JwtAuthentication& config, TimeSource& time_source, Api::Api& api) {
     for (const auto& it : config.providers()) {
       const auto& provider = it.second;
-      jwks_data_map_.emplace(it.first, JwksDataImpl(provider, time_source));
+      jwks_data_map_.emplace(it.first, JwksDataImpl(provider, time_source, api));
       if (issuer_ptr_map_.find(provider.issuer()) == issuer_ptr_map_.end()) {
         issuer_ptr_map_.emplace(provider.issuer(), findByProvider(it.first));
       }
@@ -133,8 +134,8 @@ private:
 
 JwksCachePtr JwksCache::create(
     const ::envoy::config::filter::http::jwt_authn::v2alpha::JwtAuthentication& config,
-    TimeSource& time_source) {
-  return JwksCachePtr(new JwksCacheImpl(config, time_source));
+    TimeSource& time_source, Api::Api& api) {
+  return JwksCachePtr(new JwksCacheImpl(config, time_source, api));
 }
 
 } // namespace JwtAuthn

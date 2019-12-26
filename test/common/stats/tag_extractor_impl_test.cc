@@ -110,7 +110,7 @@ public:
    * @return std::string the metric_name with tags removed.
    */
   std::string produceTagsReverse(const std::string& metric_name, std::vector<Tag>& tags) const {
-    // Note: one discrepency between this and TagProducerImpl::produceTags is that this
+    // Note: one discrepancy between this and TagProducerImpl::produceTags is that this
     // version does not add in tag_extractors_.default_tags_ into tags. That doesn't matter
     // for this test, however.
     std::list<const TagExtractor*> extractors; // Note push-front is used to reverse order.
@@ -327,6 +327,25 @@ TEST(TagExtractorTest, DefaultTagExtractors) {
   regex_tester.testRegex("http.fault_connection_manager.fault.fault_cluster.aborts_injected",
                          "http.fault.aborts_injected",
                          {fault_connection_manager, fault_downstream_cluster});
+
+  Tag rds_hcm;
+  rds_hcm.name_ = tag_names.HTTP_CONN_MANAGER_PREFIX;
+  rds_hcm.value_ = "rds_connection_manager";
+
+  Tag rds_route_config;
+  rds_route_config.name_ = tag_names.RDS_ROUTE_CONFIG;
+  rds_route_config.value_ = "route_config.123";
+
+  regex_tester.testRegex("http.rds_connection_manager.rds.route_config.123.update_success",
+                         "http.rds.update_success", {rds_hcm, rds_route_config});
+
+  // Listener manager worker id
+  Tag worker_id;
+  worker_id.name_ = tag_names.WORKER_ID;
+  worker_id.value_ = "worker_123";
+
+  regex_tester.testRegex("listener_manager.worker_123.dispatcher.loop_duration_us",
+                         "listener_manager.dispatcher.loop_duration_us", {worker_id});
 }
 
 TEST(TagExtractorTest, ExtractRegexPrefix) {

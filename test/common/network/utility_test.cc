@@ -2,6 +2,7 @@
 #include <list>
 #include <string>
 
+#include "envoy/api/v2/core/address.pb.h"
 #include "envoy/common/exception.h"
 
 #include "common/common/thread.h"
@@ -17,6 +18,7 @@
 
 namespace Envoy {
 namespace Network {
+namespace {
 
 TEST(NetworkUtility, Url) {
   EXPECT_EQ("foo", Utility::hostFromTcpUrl("tcp://foo:1234"));
@@ -28,6 +30,7 @@ TEST(NetworkUtility, Url) {
   EXPECT_THROW(Utility::hostFromTcpUrl("tcp://foo"), EnvoyException);
   EXPECT_THROW(Utility::portFromTcpUrl("tcp://foo"), EnvoyException);
   EXPECT_THROW(Utility::portFromTcpUrl("tcp://foo:bar"), EnvoyException);
+  EXPECT_THROW(Utility::portFromTcpUrl("tcp://https://foo:1234"), EnvoyException);
   EXPECT_THROW(Utility::hostFromTcpUrl(""), EnvoyException);
   EXPECT_THROW(Utility::portFromTcpUrl("tcp://foo:999999999999"), EnvoyException);
 }
@@ -39,6 +42,7 @@ TEST(NetworkUtility, udpUrl) {
   EXPECT_THROW(Utility::portFromUdpUrl("bogus://foo:1234"), EnvoyException);
   EXPECT_THROW(Utility::hostFromUdpUrl("tcp://foo"), EnvoyException);
   EXPECT_THROW(Utility::portFromUdpUrl("tcp://foo:1234"), EnvoyException);
+  EXPECT_THROW(Utility::portFromUdpUrl("udp://https://foo:1234"), EnvoyException);
   EXPECT_THROW(Utility::hostFromUdpUrl(""), EnvoyException);
   EXPECT_THROW(Utility::portFromUdpUrl("udp://foo:999999999999"), EnvoyException);
 }
@@ -156,9 +160,9 @@ TEST(NetworkUtility, ParseInternetAddressAndPort) {
 
 class NetworkUtilityGetLocalAddress : public testing::TestWithParam<Address::IpVersion> {};
 
-INSTANTIATE_TEST_CASE_P(IpVersions, NetworkUtilityGetLocalAddress,
-                        testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                        TestUtility::ipTestParamsToString);
+INSTANTIATE_TEST_SUITE_P(IpVersions, NetworkUtilityGetLocalAddress,
+                         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+                         TestUtility::ipTestParamsToString);
 
 TEST_P(NetworkUtilityGetLocalAddress, GetLocalAddress) {
   EXPECT_NE(nullptr, Utility::getLocalAddress(GetParam()));
@@ -172,7 +176,7 @@ TEST(NetworkUtility, LocalConnection) {
 
   testing::NiceMock<Network::MockConnectionSocket> socket;
 
-  EXPECT_CALL(socket, remoteAddress()).WillRepeatedly(testing::ReturnRef(local_addr));
+  EXPECT_CALL(socket, localAddress()).WillRepeatedly(testing::ReturnRef(local_addr));
   EXPECT_CALL(socket, remoteAddress()).WillRepeatedly(testing::ReturnRef(remote_addr));
 
   local_addr.reset(new Network::Address::Ipv4Instance("127.0.0.1"));
@@ -194,12 +198,30 @@ TEST(NetworkUtility, LocalConnection) {
   remote_addr.reset(new Network::Address::Ipv4Instance("8.8.8.8"));
   EXPECT_FALSE(Utility::isLocalConnection(socket));
 
+  local_addr.reset(new Network::Address::Ipv4Instance("4.4.4.4"));
+  remote_addr.reset(new Network::Address::Ipv4Instance("4.4.4.4"));
+  EXPECT_TRUE(Utility::isLocalConnection(socket));
+
+  local_addr.reset(new Network::Address::Ipv4Instance("4.4.4.4", 1234));
+  remote_addr.reset(new Network::Address::Ipv4Instance("4.4.4.4", 4321));
+  EXPECT_TRUE(Utility::isLocalConnection(socket));
+
   local_addr.reset(new Network::Address::Ipv6Instance("::1"));
   remote_addr.reset(new Network::Address::Ipv6Instance("::1"));
   EXPECT_TRUE(Utility::isLocalConnection(socket));
 
   local_addr.reset(new Network::Address::Ipv6Instance("::2"));
   remote_addr.reset(new Network::Address::Ipv6Instance("::1"));
+  EXPECT_TRUE(Utility::isLocalConnection(socket));
+
+  remote_addr.reset(new Network::Address::Ipv6Instance("::3"));
+  EXPECT_FALSE(Utility::isLocalConnection(socket));
+
+  remote_addr.reset(new Network::Address::Ipv6Instance("::2"));
+  EXPECT_TRUE(Utility::isLocalConnection(socket));
+
+  remote_addr.reset(new Network::Address::Ipv6Instance("::2", 4321));
+  local_addr.reset(new Network::Address::Ipv6Instance("::2", 1234));
   EXPECT_TRUE(Utility::isLocalConnection(socket));
 
   remote_addr.reset(new Network::Address::Ipv6Instance("fd00::"));
@@ -320,6 +342,29 @@ TEST(NetworkUtility, AddressToProtobufAddress) {
   }
 }
 
+TEST(NetworkUtility, ProtobufAddressSocketType) {
+  {
+    envoy::api::v2::core::Address proto_address;
+    proto_address.mutable_socket_address();
+    EXPECT_EQ(Address::SocketType::Stream, Utility::protobufAddressSocketType(proto_address));
+  }
+  {
+    envoy::api::v2::core::Address proto_address;
+    proto_address.mutable_socket_address()->set_protocol(envoy::api::v2::core::SocketAddress::TCP);
+    EXPECT_EQ(Address::SocketType::Stream, Utility::protobufAddressSocketType(proto_address));
+  }
+  {
+    envoy::api::v2::core::Address proto_address;
+    proto_address.mutable_socket_address()->set_protocol(envoy::api::v2::core::SocketAddress::UDP);
+    EXPECT_EQ(Address::SocketType::Datagram, Utility::protobufAddressSocketType(proto_address));
+  }
+  {
+    envoy::api::v2::core::Address proto_address;
+    proto_address.mutable_pipe();
+    EXPECT_EQ(Address::SocketType::Stream, Utility::protobufAddressSocketType(proto_address));
+  }
+}
+
 TEST(PortRangeListTest, Errors) {
   {
     std::string port_range_str = "a1";
@@ -436,5 +481,6 @@ TEST(AbslUint128, TestByteOrder) {
   }
 }
 
+} // namespace
 } // namespace Network
 } // namespace Envoy

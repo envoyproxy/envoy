@@ -21,8 +21,8 @@ namespace Server {
  */
 class ConfigTracker {
 public:
-  typedef std::function<ProtobufTypes::MessagePtr()> Cb;
-  typedef std::map<std::string, Cb> CbsMap;
+  using Cb = std::function<ProtobufTypes::MessagePtr()>;
+  using CbsMap = std::map<std::string, Cb>;
 
   /**
    * EntryOwner supplies RAII semantics for entries in the map.
@@ -32,14 +32,14 @@ public:
    */
   class EntryOwner {
   public:
-    virtual ~EntryOwner() {}
+    virtual ~EntryOwner() = default;
 
   protected:
-    EntryOwner(){}; // A sly way to make this class "abstract."
+    EntryOwner() = default; // A sly way to make this class "abstract."
   };
-  typedef std::unique_ptr<EntryOwner> EntryOwnerPtr;
+  using EntryOwnerPtr = std::unique_ptr<EntryOwner>;
 
-  virtual ~ConfigTracker(){};
+  virtual ~ConfigTracker() = default;
 
   /**
    * @return const CbsMap& The map of string keys to tracked callbacks.

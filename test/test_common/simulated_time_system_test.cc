@@ -1,6 +1,9 @@
 #include "common/common/thread.h"
 #include "common/event/libevent.h"
+#include "common/event/libevent_scheduler.h"
+#include "common/event/timer_impl.h"
 
+#include "test/mocks/event/mocks.h"
 #include "test/test_common/simulated_time_system.h"
 #include "test/test_common/utility.h"
 
@@ -10,36 +13,40 @@
 namespace Envoy {
 namespace Event {
 namespace Test {
+namespace {
 
 class SimulatedTimeSystemTest : public testing::Test {
 protected:
   SimulatedTimeSystemTest()
-      : event_system_(event_base_new()), scheduler_(time_system_.createScheduler(event_system_)),
+      : scheduler_(time_system_.createScheduler(base_scheduler_)),
         start_monotonic_time_(time_system_.monotonicTime()),
         start_system_time_(time_system_.systemTime()) {}
 
   void addTask(int64_t delay_ms, char marker) {
     std::chrono::milliseconds delay(delay_ms);
-    TimerPtr timer = scheduler_->createTimer([this, marker, delay]() {
-      output_.append(1, marker);
-      EXPECT_GE(time_system_.monotonicTime(), start_monotonic_time_ + delay);
-    });
+    TimerPtr timer = scheduler_->createTimer(
+        [this, marker, delay]() {
+          output_.append(1, marker);
+          EXPECT_GE(time_system_.monotonicTime(), start_monotonic_time_ + delay);
+        },
+        dispatcher_);
     timer->enableTimer(delay);
     timers_.push_back(std::move(timer));
   }
 
   void sleepMsAndLoop(int64_t delay_ms) {
     time_system_.sleep(std::chrono::milliseconds(delay_ms));
-    event_base_loop(event_system_.get(), EVLOOP_NONBLOCK);
+    base_scheduler_.run(Dispatcher::RunType::NonBlock);
   }
 
   void advanceSystemMsAndLoop(int64_t delay_ms) {
     time_system_.setSystemTime(time_system_.systemTime() + std::chrono::milliseconds(delay_ms));
-    event_base_loop(event_system_.get(), EVLOOP_NONBLOCK);
+    base_scheduler_.run(Dispatcher::RunType::NonBlock);
   }
 
+  testing::NiceMock<Event::MockDispatcher> dispatcher_;
+  LibeventScheduler base_scheduler_;
   SimulatedTimeSystem time_system_;
-  Libevent::BasePtr event_system_;
   SchedulerPtr scheduler_;
   std::string output_;
   std::vector<TimerPtr> timers_;
@@ -63,16 +70,18 @@ TEST_F(SimulatedTimeSystemTest, WaitFor) {
   std::atomic<bool> done(false);
   auto thread = Thread::threadFactoryForTest().createThread([this, &done]() {
     while (!done) {
-      event_base_loop(event_system_.get(), 0);
+      base_scheduler_.run(Dispatcher::RunType::Block);
     }
   });
   Thread::CondVar condvar;
   Thread::MutexBasicLockable mutex;
-  TimerPtr timer = scheduler_->createTimer([&condvar, &mutex, &done]() {
-    Thread::LockGuard lock(mutex);
-    done = true;
-    condvar.notifyOne();
-  });
+  TimerPtr timer = scheduler_->createTimer(
+      [&condvar, &mutex, &done]() {
+        Thread::LockGuard lock(mutex);
+        done = true;
+        condvar.notifyOne();
+      },
+      dispatcher_);
   timer->enableTimer(std::chrono::seconds(60));
 
   // Wait 50 simulated seconds of simulated time, which won't be enough to
@@ -194,6 +203,51 @@ TEST_F(SimulatedTimeSystemTest, DeleteTime) {
   EXPECT_EQ("36", output_);
 }
 
+// Regression test for issues documented in https://github.com/envoyproxy/envoy/pull/6956
+TEST_F(SimulatedTimeSystemTest, DuplicateTimer) {
+  // Set one alarm two times to test that pending does not get duplicated..
+  std::chrono::milliseconds delay(0);
+  TimerPtr zero_timer = scheduler_->createTimer([this]() { output_.append(1, '2'); }, dispatcher_);
+  zero_timer->enableTimer(delay);
+  zero_timer->enableTimer(delay);
+  sleepMsAndLoop(1);
+  EXPECT_EQ("2", output_);
+
+  // Now set an alarm which requires 10ms of progress and make sure waitFor works.
+  std::atomic<bool> done(false);
+  auto thread = Thread::threadFactoryForTest().createThread([this, &done]() {
+    while (!done) {
+      base_scheduler_.run(Dispatcher::RunType::Block);
+    }
+  });
+  Thread::CondVar condvar;
+  Thread::MutexBasicLockable mutex;
+  TimerPtr timer = scheduler_->createTimer(
+      [&condvar, &mutex, &done]() {
+        Thread::LockGuard lock(mutex);
+        done = true;
+        condvar.notifyOne();
+      },
+      dispatcher_);
+  timer->enableTimer(std::chrono::seconds(10));
+
+  {
+    Thread::LockGuard lock(mutex);
+    EXPECT_EQ(Thread::CondVar::WaitStatus::NoTimeout,
+              time_system_.waitFor(mutex, condvar, std::chrono::seconds(10)));
+  }
+  EXPECT_TRUE(done);
+
+  thread->join();
+}
+
+TEST_F(SimulatedTimeSystemTest, Enabled) {
+  TimerPtr timer = scheduler_->createTimer({}, dispatcher_);
+  timer->enableTimer(std::chrono::milliseconds(0));
+  EXPECT_TRUE(timer->enabled());
+}
+
+} // namespace
 } // namespace Test
 } // namespace Event
 } // namespace Envoy

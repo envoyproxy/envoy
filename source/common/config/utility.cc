@@ -2,22 +2,29 @@
 
 #include <unordered_set>
 
-#include "envoy/config/metrics/v2/stats.pb.h"
+#include "envoy/api/v2/cds.pb.h"
+#include "envoy/api/v2/core/address.pb.h"
+#include "envoy/api/v2/core/config_source.pb.h"
+#include "envoy/api/v2/core/grpc_service.pb.h"
+#include "envoy/api/v2/eds.pb.h"
+#include "envoy/api/v2/endpoint/endpoint.pb.h"
+#include "envoy/config/bootstrap/v2/bootstrap.pb.h"
 #include "envoy/stats/scope.h"
 
 #include "common/common/assert.h"
 #include "common/common/fmt.h"
 #include "common/common/hex.h"
 #include "common/common/utility.h"
-#include "common/config/json_utility.h"
+#include "common/config/api_type_oracle.h"
 #include "common/config/resources.h"
+#include "common/config/version_converter.h"
 #include "common/config/well_known_names.h"
-#include "common/filesystem/filesystem_impl.h"
-#include "common/json/config_schemas.h"
 #include "common/protobuf/protobuf.h"
 #include "common/protobuf/utility.h"
 #include "common/stats/stats_matcher_impl.h"
 #include "common/stats/tag_producer_impl.h"
+
+#include "udpa/type/v1/typed_struct.pb.h"
 
 namespace Envoy {
 namespace Config {
@@ -32,8 +39,9 @@ void Utility::translateApiConfigSource(const std::string& cluster, uint32_t refr
     envoy::api::v2::core::GrpcService* grpc_service = api_config_source.add_grpc_services();
     grpc_service->mutable_envoy_grpc()->set_cluster_name(cluster);
   } else {
-    if (api_type == ApiType::get().RestLegacy) {
-      api_config_source.set_api_type(envoy::api::v2::core::ApiConfigSource::REST_LEGACY);
+    if (api_type == ApiType::get().UnsupportedRestLegacy) {
+      api_config_source.set_api_type(
+          envoy::api::v2::core::ApiConfigSource::UNSUPPORTED_REST_LEGACY);
     } else if (api_type == ApiType::get().Rest) {
       api_config_source.set_api_type(envoy::api::v2::core::ApiConfigSource::REST);
     }
@@ -44,7 +52,7 @@ void Utility::translateApiConfigSource(const std::string& cluster, uint32_t refr
       Protobuf::util::TimeUtil::MillisecondsToDuration(refresh_delay_ms));
 }
 
-void Utility::checkCluster(const std::string& error_prefix, const std::string& cluster_name,
+void Utility::checkCluster(absl::string_view error_prefix, absl::string_view cluster_name,
                            Upstream::ClusterManager& cm) {
   Upstream::ThreadLocalCluster* cluster = cm.get(cluster_name);
   if (cluster == nullptr) {
@@ -58,15 +66,14 @@ void Utility::checkCluster(const std::string& error_prefix, const std::string& c
   }
 }
 
-void Utility::checkClusterAndLocalInfo(const std::string& error_prefix,
-                                       const std::string& cluster_name,
-                                       Upstream::ClusterManager& cm,
+void Utility::checkClusterAndLocalInfo(absl::string_view error_prefix,
+                                       absl::string_view cluster_name, Upstream::ClusterManager& cm,
                                        const LocalInfo::LocalInfo& local_info) {
   checkCluster(error_prefix, cluster_name, cm);
   checkLocalInfo(error_prefix, local_info);
 }
 
-void Utility::checkLocalInfo(const std::string& error_prefix,
+void Utility::checkLocalInfo(absl::string_view error_prefix,
                              const LocalInfo::LocalInfo& local_info) {
   if (local_info.clusterName().empty() || local_info.nodeName().empty()) {
     throw EnvoyException(
@@ -76,10 +83,10 @@ void Utility::checkLocalInfo(const std::string& error_prefix,
   }
 }
 
-void Utility::checkFilesystemSubscriptionBackingPath(const std::string& path) {
+void Utility::checkFilesystemSubscriptionBackingPath(const std::string& path, Api::Api& api) {
   // TODO(junr03): the file might be deleted between this check and the
   // watch addition.
-  if (!Filesystem::fileExists(path)) {
+  if (!api.fileSystem().fileExists(path)) {
     throw EnvoyException(fmt::format(
         "envoy::api::v2::Path must refer to an existing path in the system: '{}' does not exist",
         path));
@@ -89,7 +96,8 @@ void Utility::checkFilesystemSubscriptionBackingPath(const std::string& path) {
 void Utility::checkApiConfigSourceNames(
     const envoy::api::v2::core::ApiConfigSource& api_config_source) {
   const bool is_grpc =
-      (api_config_source.api_type() == envoy::api::v2::core::ApiConfigSource::GRPC);
+      (api_config_source.api_type() == envoy::api::v2::core::ApiConfigSource::GRPC ||
+       api_config_source.api_type() == envoy::api::v2::core::ApiConfigSource::DELTA_GRPC);
 
   if (api_config_source.cluster_names().empty() && api_config_source.grpc_services().empty()) {
     throw EnvoyException(
@@ -99,19 +107,19 @@ void Utility::checkApiConfigSourceNames(
 
   if (is_grpc) {
     if (!api_config_source.cluster_names().empty()) {
-      throw EnvoyException(fmt::format(
-          "envoy::api::v2::core::ConfigSource::GRPC must not have a cluster name specified: {}",
-          api_config_source.DebugString()));
+      throw EnvoyException(fmt::format("envoy::api::v2::core::ConfigSource::(DELTA_)GRPC "
+                                       "must not have a cluster name specified: {}",
+                                       api_config_source.DebugString()));
     }
     if (api_config_source.grpc_services().size() > 1) {
-      throw EnvoyException(fmt::format(
-          "envoy::api::v2::core::ConfigSource::GRPC must have a single gRPC service specified: {}",
-          api_config_source.DebugString()));
+      throw EnvoyException(fmt::format("envoy::api::v2::core::ConfigSource::(DELTA_)GRPC "
+                                       "must have a single gRPC service specified: {}",
+                                       api_config_source.DebugString()));
     }
   } else {
     if (!api_config_source.grpc_services().empty()) {
       throw EnvoyException(
-          fmt::format("envoy::api::v2::core::ConfigSource, if not of type gRPC, must not have "
+          fmt::format("envoy::api::v2::core::ConfigSource, if not a gRPC type, must not have "
                       "a gRPC service specified: {}",
                       api_config_source.DebugString()));
     }
@@ -126,6 +134,7 @@ void Utility::checkApiConfigSourceNames(
 void Utility::validateClusterName(const Upstream::ClusterManager::ClusterInfoMap& clusters,
                                   const std::string& cluster_name) {
   const auto& it = clusters.find(cluster_name);
+
   if (it == clusters.end() || it->second.get().info()->addedViaApi() ||
       it->second.get().info()->type() == envoy::api::v2::Cluster::EDS) {
     throw EnvoyException(fmt::format(
@@ -144,7 +153,7 @@ void Utility::checkApiConfigSourceSubscriptionBackingCluster(
       (api_config_source.api_type() == envoy::api::v2::core::ApiConfigSource::GRPC);
 
   if (!api_config_source.cluster_names().empty()) {
-    // All API configs of type REST and REST_LEGACY should have cluster names.
+    // All API configs of type REST and UNSUPPORTED_REST_LEGACY should have cluster names.
     // Additionally, some gRPC API configs might have a cluster name set instead
     // of an envoy gRPC.
     Utility::validateClusterName(clusters, api_config_source.cluster_names()[0]);
@@ -176,45 +185,10 @@ std::chrono::milliseconds Utility::apiConfigSourceRequestTimeout(
       PROTOBUF_GET_MS_OR_DEFAULT(api_config_source, request_timeout, 1000));
 }
 
-void Utility::translateEdsConfig(const Json::Object& json_config,
-                                 envoy::api::v2::core::ConfigSource& eds_config) {
-  translateApiConfigSource(json_config.getObject("cluster")->getString("name"),
-                           json_config.getInteger("refresh_delay_ms", 30000),
-                           json_config.getString("api_type", ApiType::get().RestLegacy),
-                           *eds_config.mutable_api_config_source());
-}
-
-void Utility::translateCdsConfig(const Json::Object& json_config,
-                                 envoy::api::v2::core::ConfigSource& cds_config) {
-  translateApiConfigSource(json_config.getObject("cluster")->getString("name"),
-                           json_config.getInteger("refresh_delay_ms", 30000),
-                           json_config.getString("api_type", ApiType::get().RestLegacy),
-                           *cds_config.mutable_api_config_source());
-}
-
-void Utility::translateRdsConfig(
-    const Json::Object& json_rds,
-    envoy::config::filter::network::http_connection_manager::v2::Rds& rds,
-    const Stats::StatsOptions& stats_options) {
-  json_rds.validateSchema(Json::Schema::RDS_CONFIGURATION_SCHEMA);
-
-  const std::string name = json_rds.getString("route_config_name", "");
-  checkObjNameLength("Invalid route_config name", name, stats_options);
-  rds.set_route_config_name(name);
-
-  translateApiConfigSource(json_rds.getString("cluster"),
-                           json_rds.getInteger("refresh_delay_ms", 30000),
-                           json_rds.getString("api_type", ApiType::get().RestLegacy),
-                           *rds.mutable_config_source()->mutable_api_config_source());
-}
-
-void Utility::translateLdsConfig(const Json::Object& json_lds,
-                                 envoy::api::v2::core::ConfigSource& lds_config) {
-  json_lds.validateSchema(Json::Schema::LDS_CONFIG_SCHEMA);
-  translateApiConfigSource(json_lds.getString("cluster"),
-                           json_lds.getInteger("refresh_delay_ms", 30000),
-                           json_lds.getString("api_type", ApiType::get().RestLegacy),
-                           *lds_config.mutable_api_config_source());
+std::chrono::milliseconds
+Utility::configSourceInitialFetchTimeout(const envoy::api::v2::core::ConfigSource& config_source) {
+  return std::chrono::milliseconds(
+      PROTOBUF_GET_MS_OR_DEFAULT(config_source, initial_fetch_timeout, 15000));
 }
 
 RateLimitSettings
@@ -242,22 +216,14 @@ Utility::createStatsMatcher(const envoy::config::bootstrap::v2::Bootstrap& boots
   return std::make_unique<Stats::StatsMatcherImpl>(bootstrap.stats_config());
 }
 
-void Utility::checkObjNameLength(const std::string& error_prefix, const std::string& name,
-                                 const Stats::StatsOptions& stats_options) {
-  if (name.length() > stats_options.maxNameLength()) {
-    throw EnvoyException(fmt::format("{}: Length of {} ({}) exceeds allowed maximum length ({})",
-                                     error_prefix, name, name.length(),
-                                     stats_options.maxNameLength()));
-  }
-}
-
 Grpc::AsyncClientFactoryPtr Utility::factoryForGrpcApiConfigSource(
     Grpc::AsyncClientManager& async_client_manager,
     const envoy::api::v2::core::ApiConfigSource& api_config_source, Stats::Scope& scope) {
   Utility::checkApiConfigSourceNames(api_config_source);
 
-  if (api_config_source.api_type() != envoy::api::v2::core::ApiConfigSource::GRPC) {
-    throw EnvoyException(fmt::format("envoy::api::v2::core::ConfigSource type must be GRPC: {}",
+  if (api_config_source.api_type() != envoy::api::v2::core::ApiConfigSource::GRPC &&
+      api_config_source.api_type() != envoy::api::v2::core::ApiConfigSource::DELTA_GRPC) {
+    throw EnvoyException(fmt::format("envoy::api::v2::core::ConfigSource type must be gRPC: {}",
                                      api_config_source.DebugString()));
   }
 
@@ -280,6 +246,84 @@ envoy::api::v2::ClusterLoadAssignment Utility::translateClusterHosts(
     lb_endpoint->mutable_load_balancing_weight()->set_value(1);
   }
   return load_assignment;
+}
+
+void Utility::translateOpaqueConfig(absl::string_view extension_name,
+                                    const ProtobufWkt::Any& typed_config,
+                                    const ProtobufWkt::Struct& config,
+                                    ProtobufMessage::ValidationVisitor& validation_visitor,
+                                    Protobuf::Message& out_proto) {
+  const Protobuf::Descriptor* earlier_version_desc = ApiTypeOracle::inferEarlierVersionDescriptor(
+      extension_name, typed_config, out_proto.GetDescriptor()->full_name());
+
+  if (earlier_version_desc != nullptr) {
+    Protobuf::DynamicMessageFactory dmf;
+    // Create a previous version message.
+    auto message = ProtobufTypes::MessagePtr(dmf.GetPrototype(earlier_version_desc)->New());
+    ASSERT(message != nullptr);
+    // Recurse and translateOpaqueConfig for previous version.
+    translateOpaqueConfig(extension_name, typed_config, config, validation_visitor, *message);
+    // Update from previous version to current version.
+    VersionConverter::upgrade(*message, out_proto);
+    return;
+  }
+
+  static const std::string struct_type =
+      ProtobufWkt::Struct::default_instance().GetDescriptor()->full_name();
+  static const std::string typed_struct_type =
+      udpa::type::v1::TypedStruct::default_instance().GetDescriptor()->full_name();
+
+  if (!typed_config.value().empty()) {
+
+    // Unpack methods will only use the fully qualified type name after the last '/'.
+    // https://github.com/protocolbuffers/protobuf/blob/3.6.x/src/google/protobuf/any.proto#L87
+    absl::string_view type = TypeUtil::typeUrlToDescriptorFullName(typed_config.type_url());
+
+    if (type == typed_struct_type) {
+      udpa::type::v1::TypedStruct typed_struct;
+      MessageUtil::unpackTo(typed_config, typed_struct);
+      // if out_proto is expecting Struct, return directly
+      if (out_proto.GetDescriptor()->full_name() == struct_type) {
+        out_proto.CopyFrom(typed_struct.value());
+      } else {
+        type = TypeUtil::typeUrlToDescriptorFullName(typed_struct.type_url());
+        if (type != out_proto.GetDescriptor()->full_name()) {
+          throw EnvoyException("Invalid proto type.\nExpected " +
+                               out_proto.GetDescriptor()->full_name() +
+                               "\nActual: " + std::string(type));
+        }
+        MessageUtil::jsonConvert(typed_struct.value(), validation_visitor, out_proto);
+      }
+    } // out_proto is expecting Struct, unpack directly
+    else if (type != struct_type || out_proto.GetDescriptor()->full_name() == struct_type) {
+      MessageUtil::unpackTo(typed_config, out_proto);
+    } else {
+      ProtobufWkt::Struct struct_config;
+      MessageUtil::unpackTo(typed_config, struct_config);
+      MessageUtil::jsonConvert(struct_config, validation_visitor, out_proto);
+    }
+  }
+
+  if (!config.fields().empty()) {
+    MessageUtil::jsonConvert(config, validation_visitor, out_proto);
+  }
+}
+
+BackOffStrategyPtr Utility::prepareDnsRefreshStrategy(const envoy::api::v2::Cluster& cluster,
+                                                      const uint64_t dns_refresh_rate_ms,
+                                                      Runtime::RandomGenerator& random) {
+  if (cluster.has_dns_failure_refresh_rate()) {
+    uint64_t base_interval_ms =
+        PROTOBUF_GET_MS_REQUIRED(cluster.dns_failure_refresh_rate(), base_interval);
+    uint64_t max_interval_ms = PROTOBUF_GET_MS_OR_DEFAULT(cluster.dns_failure_refresh_rate(),
+                                                          max_interval, base_interval_ms * 10);
+    if (max_interval_ms < base_interval_ms) {
+      throw EnvoyException("cluster.dns_failure_refresh_rate must have max_interval greater than "
+                           "or equal to the base_interval");
+    }
+    return std::make_unique<JitteredBackOffStrategy>(base_interval_ms, max_interval_ms, random);
+  }
+  return std::make_unique<FixedBackOffStrategy>(dns_refresh_rate_ms);
 }
 
 } // namespace Config

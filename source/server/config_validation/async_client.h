@@ -19,11 +19,12 @@ namespace Http {
  */
 class ValidationAsyncClient : public AsyncClient {
 public:
-  ValidationAsyncClient(Event::TimeSystem& time_system, Api::Api& api);
+  ValidationAsyncClient(Api::Api& api, Event::TimeSystem& time_system);
 
   // Http::AsyncClient
   AsyncClient::Request* send(MessagePtr&& request, Callbacks& callbacks,
                              const RequestOptions&) override;
+
   AsyncClient::Stream* start(StreamCallbacks& callbacks, const StreamOptions&) override;
 
   Event::Dispatcher& dispatcher() override { return dispatcher_; }

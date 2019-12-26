@@ -5,16 +5,17 @@
 
 #include "envoy/config/filter/fault/v2/fault.pb.h"
 #include "envoy/stats/stats.h"
+#include "envoy/type/percent.pb.h"
 
 #include "extensions/filters/network/mongo_proxy/bson_impl.h"
 #include "extensions/filters/network/mongo_proxy/codec_impl.h"
+#include "extensions/filters/network/mongo_proxy/mongo_stats.h"
 #include "extensions/filters/network/mongo_proxy/proxy.h"
 #include "extensions/filters/network/well_known_names.h"
 
 #include "test/common/stream_info/test_util.h"
 #include "test/mocks/access_log/mocks.h"
 #include "test/mocks/event/mocks.h"
-#include "test/mocks/filesystem/mocks.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/runtime/mocks.h"
 #include "test/test_common/printers.h"
@@ -23,9 +24,9 @@
 #include "gtest/gtest.h"
 
 using testing::_;
-using testing::AnyNumber;
 using testing::AtLeast;
 using testing::Invoke;
+using testing::Matcher;
 using testing::NiceMock;
 using testing::Property;
 using testing::Return;
@@ -62,7 +63,7 @@ public:
 
 class MongoProxyFilterTest : public testing::Test {
 public:
-  MongoProxyFilterTest() { setup(); }
+  MongoProxyFilterTest() : mongo_stats_(std::make_shared<MongoStats>(store_, "test")) { setup(); }
 
   void setup() {
     ON_CALL(runtime_.snapshot_, featureEnabled("mongo.proxy_enabled", 100))
@@ -78,13 +79,13 @@ public:
         .WillRepeatedly(ReturnRef(stream_info_));
 
     EXPECT_CALL(log_manager_, createAccessLog(_)).WillOnce(Return(file_));
-    access_log_.reset(new AccessLog("test", log_manager_, dispatcher_.timeSystem()));
+    access_log_.reset(new AccessLog("test", log_manager_, dispatcher_.timeSource()));
   }
 
   void initializeFilter(bool emit_dynamic_metadata = false) {
-    filter_ = std::make_unique<TestProxyFilter>("test.", store_, runtime_, access_log_,
-                                                fault_config_, drain_decision_, generator_,
-                                                dispatcher_.timeSystem(), emit_dynamic_metadata);
+    filter_ = std::make_unique<TestProxyFilter>(
+        "test.", store_, runtime_, access_log_, fault_config_, drain_decision_,
+        dispatcher_.timeSource(), emit_dynamic_metadata, mongo_stats_);
     filter_->initializeReadFilterCallbacks(read_filter_callbacks_);
     filter_->onNewConnection();
 
@@ -94,15 +95,16 @@ public:
   }
 
   void setupDelayFault(bool enable_fault) {
-    envoy::config::filter::fault::v2::FaultDelay fault{};
+    envoy::config::filter::fault::v2::FaultDelay fault;
     fault.mutable_percentage()->set_numerator(50);
     fault.mutable_percentage()->set_denominator(envoy::type::FractionalPercent::HUNDRED);
     fault.mutable_fixed_delay()->CopyFrom(Protobuf::util::TimeUtil::MillisecondsToDuration(10));
 
-    fault_config_.reset(new FaultConfig(fault));
+    fault_config_.reset(new Filters::Common::Fault::FaultDelayConfig(fault));
 
-    EXPECT_CALL(runtime_.snapshot_, featureEnabled(_, _, _, 100)).Times(AnyNumber());
-    EXPECT_CALL(runtime_.snapshot_, featureEnabled("mongo.fault.fixed_delay.percent", 50, _, 100))
+    EXPECT_CALL(runtime_.snapshot_,
+                featureEnabled("mongo.fault.fixed_delay.percent",
+                               Matcher<const envoy::type::FractionalPercent&>(Percent(50))))
         .WillOnce(Return(enable_fault));
 
     if (enable_fault) {
@@ -113,16 +115,17 @@ public:
 
   Buffer::OwnedImpl fake_data_;
   NiceMock<TestStatStore> store_;
+  MongoStatsSharedPtr mongo_stats_;
   NiceMock<Runtime::MockLoader> runtime_;
   NiceMock<Event::MockDispatcher> dispatcher_;
-  std::shared_ptr<Filesystem::MockFile> file_{new NiceMock<Filesystem::MockFile>()};
+  std::shared_ptr<Envoy::AccessLog::MockAccessLogFile> file_{
+      new NiceMock<Envoy::AccessLog::MockAccessLogFile>()};
   AccessLogSharedPtr access_log_;
-  FaultConfigSharedPtr fault_config_;
+  Filters::Common::Fault::FaultDelayConfigSharedPtr fault_config_;
   std::unique_ptr<TestProxyFilter> filter_;
   NiceMock<Network::MockReadFilterCallbacks> read_filter_callbacks_;
   Envoy::AccessLog::MockAccessLogManager log_manager_;
   NiceMock<Network::MockDrainDecision> drain_decision_;
-  NiceMock<Runtime::MockRandomGenerator> generator_;
   TestStreamInfo stream_info_;
 };
 
@@ -132,7 +135,7 @@ TEST_F(MongoProxyFilterTest, DelayFaults) {
 
   Event::MockTimer* delay_timer =
       new Event::MockTimer(&read_filter_callbacks_.connection_.dispatcher_);
-  EXPECT_CALL(*delay_timer, enableTimer(std::chrono::milliseconds(10)));
+  EXPECT_CALL(*delay_timer, enableTimer(std::chrono::milliseconds(10), _));
   EXPECT_CALL(*file_, write(_)).Times(AtLeast(1));
 
   EXPECT_CALL(*filter_->decoder_, onData(_)).WillOnce(Invoke([&](Buffer::Instance&) -> void {
@@ -177,7 +180,7 @@ TEST_F(MongoProxyFilterTest, DelayFaults) {
   EXPECT_EQ(1U, store_.counter("test.op_kill_cursors").value());
 
   EXPECT_CALL(read_filter_callbacks_, continueReading());
-  delay_timer->callback_();
+  delay_timer->invokeCallback();
   EXPECT_EQ(1U, store_.counter("test.delays_injected").value());
 }
 
@@ -385,17 +388,17 @@ TEST_F(MongoProxyFilterTest, CommandStats) {
     QueryMessagePtr message(new QueryMessageImpl(0, 0));
     message->fullCollectionName("db.$cmd");
     message->flags(0b1110010);
-    message->query(Bson::DocumentImpl::create()->addString("foo", "bar"));
+    message->query(Bson::DocumentImpl::create()->addString("insert", "bar"));
     filter_->callbacks_->decodeQuery(std::move(message));
   }));
   filter_->onData(fake_data_, false);
 
   EXPECT_CALL(store_, deliverHistogramToSinks(
-                          Property(&Stats::Metric::name, "test.cmd.foo.reply_num_docs"), 1));
+                          Property(&Stats::Metric::name, "test.cmd.insert.reply_num_docs"), 1));
   EXPECT_CALL(store_, deliverHistogramToSinks(
-                          Property(&Stats::Metric::name, "test.cmd.foo.reply_size"), 22));
+                          Property(&Stats::Metric::name, "test.cmd.insert.reply_size"), 22));
   EXPECT_CALL(store_, deliverHistogramToSinks(
-                          Property(&Stats::Metric::name, "test.cmd.foo.reply_time_ms"), _));
+                          Property(&Stats::Metric::name, "test.cmd.insert.reply_time_ms"), _));
 
   EXPECT_CALL(*filter_->decoder_, onData(_)).WillOnce(Invoke([&](Buffer::Instance&) -> void {
     ReplyMessagePtr message(new ReplyMessageImpl(0, 0));
@@ -406,7 +409,7 @@ TEST_F(MongoProxyFilterTest, CommandStats) {
   }));
   filter_->onWrite(fake_data_, false);
 
-  EXPECT_EQ(1U, store_.counter("test.cmd.foo.total").value());
+  EXPECT_EQ(1U, store_.counter("test.cmd.insert.total").value());
 }
 
 TEST_F(MongoProxyFilterTest, CallingFunctionStats) {
@@ -532,7 +535,7 @@ TEST_F(MongoProxyFilterTest, ConcurrentQueryWithDrainClose) {
     filter_->callbacks_->decodeQuery(std::move(message));
   }));
   filter_->onData(fake_data_, false);
-  EXPECT_EQ(2U, store_.gauge("test.op_query_active").value());
+  EXPECT_EQ(2U, store_.gauge("test.op_query_active", Stats::Gauge::ImportMode::Accumulate).value());
 
   Event::MockTimer* drain_timer = nullptr;
   EXPECT_CALL(*filter_->decoder_, onData(_)).WillOnce(Invoke([&](Buffer::Instance&) -> void {
@@ -550,16 +553,16 @@ TEST_F(MongoProxyFilterTest, ConcurrentQueryWithDrainClose) {
         .WillByDefault(Return(true));
     EXPECT_CALL(drain_decision_, drainClose()).WillOnce(Return(true));
     drain_timer = new Event::MockTimer(&read_filter_callbacks_.connection_.dispatcher_);
-    EXPECT_CALL(*drain_timer, enableTimer(std::chrono::milliseconds(0)));
+    EXPECT_CALL(*drain_timer, enableTimer(std::chrono::milliseconds(0), _));
     filter_->callbacks_->decodeReply(std::move(message));
   }));
   filter_->onWrite(fake_data_, false);
 
   EXPECT_CALL(read_filter_callbacks_.connection_, close(Network::ConnectionCloseType::FlushWrite));
   EXPECT_CALL(*drain_timer, disableTimer());
-  drain_timer->callback_();
+  drain_timer->invokeCallback();
 
-  EXPECT_EQ(0U, store_.gauge("test.op_query_active").value());
+  EXPECT_EQ(0U, store_.gauge("test.op_query_active", Stats::Gauge::ImportMode::Accumulate).value());
   EXPECT_EQ(1U, store_.counter("test.cx_drain_close").value());
 }
 
@@ -570,7 +573,7 @@ TEST_F(MongoProxyFilterTest, EmptyActiveQueryList) {
     QueryMessagePtr message(new QueryMessageImpl(0, 0));
     message->fullCollectionName("db.$cmd");
     message->flags(0b1110010);
-    message->query(Bson::DocumentImpl::create()->addString("foo", "bar"));
+    message->query(Bson::DocumentImpl::create()->addString("query", "bar"));
     filter_->callbacks_->decodeQuery(std::move(message));
   }));
   filter_->onData(fake_data_, false);
@@ -594,7 +597,7 @@ TEST_F(MongoProxyFilterTest, ConnectionDestroyLocal) {
 
   Event::MockTimer* delay_timer =
       new Event::MockTimer(&read_filter_callbacks_.connection_.dispatcher_);
-  EXPECT_CALL(*delay_timer, enableTimer(std::chrono::milliseconds(10)));
+  EXPECT_CALL(*delay_timer, enableTimer(std::chrono::milliseconds(10), _));
 
   EXPECT_CALL(*filter_->decoder_, onData(_)).WillOnce(Invoke([&](Buffer::Instance&) -> void {
     QueryMessagePtr message(new QueryMessageImpl(0, 0));
@@ -618,7 +621,7 @@ TEST_F(MongoProxyFilterTest, ConnectionDestroyRemote) {
 
   Event::MockTimer* delay_timer =
       new Event::MockTimer(&read_filter_callbacks_.connection_.dispatcher_);
-  EXPECT_CALL(*delay_timer, enableTimer(std::chrono::milliseconds(10)));
+  EXPECT_CALL(*delay_timer, enableTimer(std::chrono::milliseconds(10), _));
 
   EXPECT_CALL(*filter_->decoder_, onData(_)).WillOnce(Invoke([&](Buffer::Instance&) -> void {
     QueryMessagePtr message(new QueryMessageImpl(0, 0));

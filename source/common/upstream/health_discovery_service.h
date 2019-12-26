@@ -1,5 +1,8 @@
 #pragma once
 
+#include "envoy/api/api.h"
+#include "envoy/api/v2/cds.pb.h"
+#include "envoy/api/v2/core/address.pb.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/server/transport_socket_config.h"
 #include "envoy/service/discovery/v2/hds.pb.h"
@@ -24,12 +27,7 @@ namespace Upstream {
 
 class ProdClusterInfoFactory : public ClusterInfoFactory, Logger::Loggable<Logger::Id::upstream> {
 public:
-  ClusterInfoConstSharedPtr
-  createClusterInfo(Runtime::Loader& runtime, const envoy::api::v2::Cluster& cluster,
-                    const envoy::api::v2::core::BindConfig& bind_config, Stats::Store& stats,
-                    Ssl::ContextManager& ssl_context_manager, bool added_via_api,
-                    ClusterManager& cm, const LocalInfo::LocalInfo& local_info,
-                    Event::Dispatcher& dispatcher, Runtime::RandomGenerator& random) override;
+  ClusterInfoConstSharedPtr createClusterInfo(const CreateClusterInfoParams& params) override;
 };
 
 // TODO(lilika): Add HdsClusters to the /clusters endpoint to get detailed stats about each HC host.
@@ -38,18 +36,19 @@ public:
  * Implementation of Upstream::Cluster for hds clusters, clusters that are used
  * by HdsDelegates
  */
-
 class HdsCluster : public Cluster, Logger::Loggable<Logger::Id::upstream> {
 public:
   static ClusterSharedPtr create();
-  HdsCluster(Runtime::Loader& runtime, const envoy::api::v2::Cluster& cluster,
+  HdsCluster(Server::Admin& admin, Runtime::Loader& runtime, const envoy::api::v2::Cluster& cluster,
              const envoy::api::v2::core::BindConfig& bind_config, Stats::Store& stats,
              Ssl::ContextManager& ssl_context_manager, bool added_via_api,
              ClusterInfoFactory& info_factory, ClusterManager& cm,
              const LocalInfo::LocalInfo& local_info, Event::Dispatcher& dispatcher,
-             Runtime::RandomGenerator& random);
+             Runtime::RandomGenerator& random, Singleton::Manager& singleton_manager,
+             ThreadLocal::SlotAllocator& tls,
+             ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api);
 
-  // From Upstream::Cluster
+  // Upstream::Cluster
   InitializePhase initializePhase() const override { return InitializePhase::Primary; }
   PrioritySet& prioritySet() override { return priority_set_; }
   const PrioritySet& prioritySet() const override { return priority_set_; }
@@ -62,7 +61,8 @@ public:
 
   // Creates and starts healthcheckers to its endpoints
   void startHealthchecks(AccessLog::AccessLogManager& access_log_manager, Runtime::Loader& runtime,
-                         Runtime::RandomGenerator& random, Event::Dispatcher& dispatcher);
+                         Runtime::RandomGenerator& random, Event::Dispatcher& dispatcher,
+                         Api::Api& api);
 
   std::vector<Upstream::HealthCheckerSharedPtr> healthCheckers() { return health_checkers_; };
 
@@ -84,19 +84,18 @@ private:
   HostVectorSharedPtr initial_hosts_;
   ClusterInfoConstSharedPtr info_;
   std::vector<Upstream::HealthCheckerSharedPtr> health_checkers_;
+  ProtobufMessage::ValidationVisitor& validation_visitor_;
 };
 
-typedef std::shared_ptr<HdsCluster> HdsClusterPtr;
+using HdsClusterPtr = std::shared_ptr<HdsCluster>;
 
 /**
  * All hds stats. @see stats_macros.h
  */
-// clang-format off
-#define ALL_HDS_STATS(COUNTER)                                                           \
+#define ALL_HDS_STATS(COUNTER)                                                                     \
   COUNTER(requests)                                                                                \
   COUNTER(responses)                                                                               \
   COUNTER(errors)
-// clang-format on
 
 /**
  * Struct definition for all hds stats. @see stats_macros.h
@@ -112,18 +111,18 @@ struct HdsDelegateStats {
  * server with a set of hosts to healthcheck, healthchecking them, and reporting
  * back the results.
  */
-class HdsDelegate
-    : Grpc::TypedAsyncStreamCallbacks<envoy::service::discovery::v2::HealthCheckSpecifier>,
-      Logger::Loggable<Logger::Id::upstream> {
+class HdsDelegate : Grpc::AsyncStreamCallbacks<envoy::service::discovery::v2::HealthCheckSpecifier>,
+                    Logger::Loggable<Logger::Id::upstream> {
 public:
-  HdsDelegate(const envoy::api::v2::core::Node& node, Stats::Scope& scope,
-              Grpc::AsyncClientPtr async_client, Event::Dispatcher& dispatcher,
-              Runtime::Loader& runtime, Envoy::Stats::Store& stats,
+  HdsDelegate(Stats::Scope& scope, Grpc::RawAsyncClientPtr async_client,
+              Event::Dispatcher& dispatcher, Runtime::Loader& runtime, Envoy::Stats::Store& stats,
               Ssl::ContextManager& ssl_context_manager, Runtime::RandomGenerator& random,
               ClusterInfoFactory& info_factory, AccessLog::AccessLogManager& access_log_manager,
-              ClusterManager& cm, const LocalInfo::LocalInfo& local_info);
+              ClusterManager& cm, const LocalInfo::LocalInfo& local_info, Server::Admin& admin,
+              Singleton::Manager& singleton_manager, ThreadLocal::SlotAllocator& tls,
+              ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api);
 
-  // Grpc::TypedAsyncStreamCallbacks
+  // Grpc::AsyncStreamCallbacks
   void onCreateInitialMetadata(Http::HeaderMap& metadata) override;
   void onReceiveInitialMetadata(Http::HeaderMapPtr&& metadata) override;
   void onReceiveMessage(
@@ -148,17 +147,23 @@ private:
   HdsDelegateStats stats_;
   const Protobuf::MethodDescriptor& service_method_;
 
-  Grpc::AsyncClientPtr async_client_;
-  Grpc::AsyncStream* stream_{};
+  Grpc::AsyncClient<envoy::service::discovery::v2::HealthCheckRequestOrEndpointHealthResponse,
+                    envoy::service::discovery::v2::HealthCheckSpecifier>
+      async_client_;
+  Grpc::AsyncStream<envoy::service::discovery::v2::HealthCheckRequestOrEndpointHealthResponse>
+      stream_{};
   Event::Dispatcher& dispatcher_;
   Runtime::Loader& runtime_;
-  Envoy::Stats::Store& store_stats;
+  Envoy::Stats::Store& store_stats_;
   Ssl::ContextManager& ssl_context_manager_;
   Runtime::RandomGenerator& random_;
   ClusterInfoFactory& info_factory_;
   AccessLog::AccessLogManager& access_log_manager_;
   ClusterManager& cm_;
   const LocalInfo::LocalInfo& local_info_;
+  Server::Admin& admin_;
+  Singleton::Manager& singleton_manager_;
+  ThreadLocal::SlotAllocator& tls_;
 
   envoy::service::discovery::v2::HealthCheckRequestOrEndpointHealthResponse health_check_request_;
   std::unique_ptr<envoy::service::discovery::v2::HealthCheckSpecifier> health_check_message_;
@@ -170,16 +175,6 @@ private:
   Event::TimerPtr hds_retry_timer_;
   BackOffStrategyPtr backoff_strategy_;
 
-  /**
-   * TODO(lilika): Add API knob for RetryInitialDelayMilliseconds
-   * and RetryMaxDelayMilliseconds, instead of hardcoding them.
-   *
-   * Parameters of the jittered backoff strategy that defines how often
-   * we retry to establish a stream to the management server
-   */
-  const uint32_t RetryInitialDelayMilliseconds = 1000;
-  const uint32_t RetryMaxDelayMilliseconds = 30000;
-
   // Soft limit on size of the cluster’s connections read and write buffers.
   static constexpr uint32_t ClusterConnectionBufferLimitBytes = 32768;
 
@@ -190,9 +185,12 @@ private:
 
   // How often envoy reports the healthcheck results to the server
   uint32_t server_response_ms_ = 0;
+
+  ProtobufMessage::ValidationVisitor& validation_visitor_;
+  Api::Api& api_;
 };
 
-typedef std::unique_ptr<HdsDelegate> HdsDelegatePtr;
+using HdsDelegatePtr = std::unique_ptr<HdsDelegate>;
 
 } // namespace Upstream
 } // namespace Envoy

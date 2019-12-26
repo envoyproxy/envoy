@@ -1,3 +1,4 @@
+#include "envoy/config/bootstrap/v2/bootstrap.pb.h"
 #include "envoy/config/metrics/v2/metrics_service.pb.h"
 #include "envoy/service/metrics/v2/metrics_service.pb.h"
 
@@ -17,11 +18,11 @@ using testing::AssertionResult;
 namespace Envoy {
 namespace {
 
-class MetricsServiceIntegrationTest : public HttpIntegrationTest,
-                                      public Grpc::GrpcClientIntegrationParamTest {
+class MetricsServiceIntegrationTest : public Grpc::GrpcClientIntegrationParamTest,
+                                      public HttpIntegrationTest {
 public:
   MetricsServiceIntegrationTest()
-      : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, ipVersion(), realTime()) {}
+      : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, ipVersion()) {}
 
   void createUpstreams() override {
     HttpIntegrationTest::createUpstreams();
@@ -43,7 +44,7 @@ public:
       envoy::config::metrics::v2::MetricsServiceConfig config;
       setGrpcService(*config.mutable_grpc_service(), "metrics_service",
                      fake_upstreams_.back()->localAddress());
-      MessageUtil::jsonConvert(config, *metrics_sink->mutable_config());
+      metrics_sink->mutable_typed_config()->PackFrom(config);
       // Shrink reporting period down to 1s to make test not take forever.
       bootstrap.mutable_stats_flush_interval()->CopyFrom(
           Protobuf::util::TimeUtil::MillisecondsToDuration(100));
@@ -66,9 +67,11 @@ public:
 
   ABSL_MUST_USE_RESULT
   AssertionResult waitForMetricsRequest() {
+    bool known_summary_exists = false;
     bool known_histogram_exists = false;
     bool known_counter_exists = false;
     bool known_gauge_exists = false;
+
     // Sometimes stats do not come in the first flush cycle, this loop ensures that we wait till
     // required stats are flushed.
     // TODO(ramaraochavali): Figure out a more robust way to find out all required stats have been
@@ -76,16 +79,16 @@ public:
     while (!(known_counter_exists && known_gauge_exists && known_histogram_exists)) {
       envoy::service::metrics::v2::StreamMetricsMessage request_msg;
       VERIFY_ASSERTION(metrics_service_request_->waitForGrpcMessage(*dispatcher_, request_msg));
-      EXPECT_STREQ("POST", metrics_service_request_->headers().Method()->value().c_str());
-      EXPECT_STREQ("/envoy.service.metrics.v2.MetricsService/StreamMetrics",
-                   metrics_service_request_->headers().Path()->value().c_str());
-      EXPECT_STREQ("application/grpc",
-                   metrics_service_request_->headers().ContentType()->value().c_str());
+      EXPECT_EQ("POST", metrics_service_request_->headers().Method()->value().getStringView());
+      EXPECT_EQ("/envoy.service.metrics.v2.MetricsService/StreamMetrics",
+                metrics_service_request_->headers().Path()->value().getStringView());
+      EXPECT_EQ("application/grpc",
+                metrics_service_request_->headers().ContentType()->value().getStringView());
       EXPECT_TRUE(request_msg.envoy_metrics_size() > 0);
       const Protobuf::RepeatedPtrField<::io::prometheus::client::MetricFamily>& envoy_metrics =
           request_msg.envoy_metrics();
 
-      for (::io::prometheus::client::MetricFamily metrics_family : envoy_metrics) {
+      for (const ::io::prometheus::client::MetricFamily& metrics_family : envoy_metrics) {
         if (metrics_family.name() == "cluster.cluster_0.membership_change" &&
             metrics_family.type() == ::io::prometheus::client::MetricType::COUNTER) {
           known_counter_exists = true;
@@ -98,10 +101,17 @@ public:
         }
         if (metrics_family.name() == "cluster.cluster_0.upstream_rq_time" &&
             metrics_family.type() == ::io::prometheus::client::MetricType::SUMMARY) {
-          known_histogram_exists = true;
+          known_summary_exists = true;
           Stats::HistogramStatisticsImpl empty_statistics;
           EXPECT_EQ(metrics_family.metric(0).summary().quantile_size(),
                     empty_statistics.supportedQuantiles().size());
+        }
+        if (metrics_family.name() == "cluster.cluster_0.upstream_rq_time" &&
+            metrics_family.type() == ::io::prometheus::client::MetricType::HISTOGRAM) {
+          known_histogram_exists = true;
+          Stats::HistogramStatisticsImpl empty_statistics;
+          EXPECT_EQ(metrics_family.metric(0).histogram().bucket_size(),
+                    empty_statistics.supportedBuckets().size());
         }
         ASSERT(metrics_family.metric(0).has_timestamp_ms());
         if (known_counter_exists && known_gauge_exists && known_histogram_exists) {
@@ -111,6 +121,7 @@ public:
     }
     EXPECT_TRUE(known_counter_exists);
     EXPECT_TRUE(known_gauge_exists);
+    EXPECT_TRUE(known_summary_exists);
     EXPECT_TRUE(known_histogram_exists);
 
     return AssertionSuccess();
@@ -129,8 +140,8 @@ public:
   FakeStreamPtr metrics_service_request_;
 };
 
-INSTANTIATE_TEST_CASE_P(IpVersionsClientType, MetricsServiceIntegrationTest,
-                        GRPC_CLIENT_INTEGRATION_PARAMS);
+INSTANTIATE_TEST_SUITE_P(IpVersionsClientType, MetricsServiceIntegrationTest,
+                         GRPC_CLIENT_INTEGRATION_PARAMS);
 
 // Test a basic metric service flow.
 TEST_P(MetricsServiceIntegrationTest, BasicFlow) {

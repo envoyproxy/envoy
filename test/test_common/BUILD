@@ -14,13 +14,19 @@ envoy_package()
 envoy_basic_cc_library(
     name = "printers_includes",
     hdrs = ["printers.h"],
+    deps = [
+        "//include/envoy/network:address_interface",
+    ],
 )
 
 envoy_cc_test_library(
     name = "environment_lib",
     srcs = ["environment.cc"],
     hdrs = ["environment.h"],
-    external_deps = ["abseil_optional"],
+    external_deps = [
+        "abseil_optional",
+        "bazel_runfiles",
+    ],
     deps = [
         ":network_utility_lib",
         "//include/envoy/server:options_interface",
@@ -31,6 +37,7 @@ envoy_cc_test_library(
         "//source/common/json:json_loader_lib",
         "//source/common/network:utility_lib",
         "//source/server:options_lib",
+        "//test/common/runtime:utility_lib",
     ],
 )
 
@@ -87,24 +94,68 @@ envoy_cc_test_library(
         "abseil_strings",
     ],
     deps = [
+        ":file_system_for_test_lib",
+        ":test_time_lib",
+        ":thread_factory_for_test_lib",
         "//include/envoy/buffer:buffer_interface",
         "//include/envoy/http:codec_interface",
         "//include/envoy/network:address_interface",
         "//source/common/api:api_lib",
-        "//source/common/common:block_memory_hash_set_lib",
         "//source/common/common:empty_string",
         "//source/common/common:thread_lib",
         "//source/common/common:utility_lib",
-        "//source/common/config:bootstrap_json_lib",
+        "//source/common/config:resources_lib",
         "//source/common/filesystem:directory_lib",
+        "//source/common/filesystem:filesystem_lib",
         "//source/common/http:header_map_lib",
         "//source/common/json:json_loader_lib",
         "//source/common/network:address_lib",
         "//source/common/network:utility_lib",
         "//source/common/protobuf:utility_lib",
+        "//source/common/stats:fake_symbol_table_lib",
         "//source/common/stats:stats_lib",
-        "//source/common/stats:stats_options_lib",
-        "@envoy_api//envoy/config/bootstrap/v2:bootstrap_cc",
+        "//test/mocks/stats:stats_mocks",
+        "@envoy_api//envoy/api/v2:pkg_cc_proto",
+        "@envoy_api//envoy/api/v2/route:pkg_cc_proto",
+        "@envoy_api//envoy/service/discovery/v2:pkg_cc_proto",
+        "@envoy_api//envoy/type:pkg_cc_proto",
+        "@envoy_api//envoy/type/matcher:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_test_library(
+    name = "test_runtime_lib",
+    hdrs = ["test_runtime.h"],
+    deps = [
+        "//source/common/runtime:runtime_lib",
+        "//source/common/stats:isolated_store_lib",
+        "//test/mocks/event:event_mocks",
+        "//test/mocks/init:init_mocks",
+        "//test/mocks/local_info:local_info_mocks",
+        "//test/mocks/protobuf:protobuf_mocks",
+        "//test/mocks/runtime:runtime_mocks",
+        "//test/mocks/thread_local:thread_local_mocks",
+        "@envoy_api//envoy/config/bootstrap/v2:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_test_library(
+    name = "thread_factory_for_test_lib",
+    srcs = ["thread_factory_for_test.cc"],
+    hdrs = ["thread_factory_for_test.h"],
+    deps = [
+        "//source/common/common:thread_lib",
+        "//source/common/common:utility_lib",
+    ],
+)
+
+envoy_cc_test_library(
+    name = "file_system_for_test_lib",
+    srcs = ["file_system_for_test.cc"],
+    hdrs = ["file_system_for_test.h"],
+    deps = [
+        "//source/common/common:utility_lib",
+        "//source/common/filesystem:filesystem_lib",
     ],
 )
 
@@ -113,6 +164,7 @@ envoy_cc_test(
     srcs = ["utility_test.cc"],
     deps = [
         ":utility_lib",
+        "@envoy_api//envoy/api/v2:pkg_cc_proto",
     ],
 )
 
@@ -134,7 +186,7 @@ envoy_cc_library(
     ],
 )
 
-envoy_cc_test_library(
+envoy_cc_library(
     name = "global_lib",
     srcs = ["global.cc"],
     hdrs = ["global.h"],
@@ -153,10 +205,19 @@ envoy_cc_test(
 )
 
 envoy_cc_test_library(
+    name = "only_one_thread_lib",
+    srcs = ["only_one_thread.cc"],
+    hdrs = ["only_one_thread.h"],
+    deps = [":thread_factory_for_test_lib"],
+)
+
+envoy_cc_test_library(
     name = "test_time_lib",
     srcs = ["test_time.cc"],
     hdrs = ["test_time.h"],
     deps = [
+        ":global_lib",
+        ":only_one_thread_lib",
         ":test_time_system_interface",
         "//source/common/event:real_time_system_lib",
     ],
@@ -164,8 +225,10 @@ envoy_cc_test_library(
 
 envoy_cc_test_library(
     name = "test_time_system_interface",
+    srcs = ["test_time_system.cc"],
     hdrs = ["test_time_system.h"],
     deps = [
+        ":global_lib",
         "//include/envoy/event:timer_interface",
         "//source/common/common:thread_lib",
     ],
@@ -176,8 +239,11 @@ envoy_cc_test_library(
     srcs = ["simulated_time_system.cc"],
     hdrs = ["simulated_time_system.h"],
     deps = [
+        ":only_one_thread_lib",
         ":test_time_system_interface",
+        "//source/common/event:event_impl_base_lib",
         "//source/common/event:real_time_system_lib",
+        "//source/common/event:timer_lib",
     ],
 )
 
@@ -186,16 +252,18 @@ envoy_cc_test(
     srcs = ["simulated_time_system_test.cc"],
     deps = [
         ":simulated_time_system_lib",
-        "//test/test_common:utility_lib",
+        ":utility_lib",
+        "//source/common/event:libevent_scheduler_lib",
+        "//test/mocks/event:event_mocks",
     ],
 )
 
-envoy_cc_library(
-    name = "tls_utility_lib",
-    srcs = ["tls_utility.cc"],
-    hdrs = ["tls_utility.h"],
-    external_deps = ["ssl"],
+envoy_cc_test(
+    name = "test_time_system_test",
+    srcs = ["test_time_system_test.cc"],
     deps = [
-        "//source/common/common:assert_lib",
+        ":simulated_time_system_lib",
+        ":test_time_lib",
+        ":utility_lib",
     ],
 )

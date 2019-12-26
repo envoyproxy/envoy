@@ -4,9 +4,11 @@
 #include "envoy/config/metrics/v2/metrics_service.pb.validate.h"
 #include "envoy/registry/registry.h"
 
+#include "common/common/assert.h"
 #include "common/grpc/async_client_impl.h"
 #include "common/network/resolver_impl.h"
 
+#include "extensions/stat_sinks/metrics_service/grpc_metrics_proto_descriptors.h"
 #include "extensions/stat_sinks/metrics_service/grpc_metrics_service_impl.h"
 #include "extensions/stat_sinks/well_known_names.h"
 
@@ -17,9 +19,11 @@ namespace MetricsService {
 
 Stats::SinkPtr MetricsServiceSinkFactory::createStatsSink(const Protobuf::Message& config,
                                                           Server::Instance& server) {
+  validateProtoDescriptors();
+
   const auto& sink_config =
       MessageUtil::downcastAndValidate<const envoy::config::metrics::v2::MetricsServiceConfig&>(
-          config);
+          config, server.messageValidationContext().staticValidationVisitor());
   const auto& grpc_service = sink_config.grpc_service();
   ENVOY_LOG(debug, "Metrics Service gRPC service configuration: {}", grpc_service.DebugString());
 
@@ -29,7 +33,7 @@ Stats::SinkPtr MetricsServiceSinkFactory::createStatsSink(const Protobuf::Messag
               grpc_service, server.stats(), false),
           server.localInfo());
 
-  return std::make_unique<MetricsServiceSink>(grpc_metrics_streamer, server.timeSystem());
+  return std::make_unique<MetricsServiceSink>(grpc_metrics_streamer, server.timeSource());
 }
 
 ProtobufTypes::MessagePtr MetricsServiceSinkFactory::createEmptyConfigProto() {
@@ -42,8 +46,7 @@ std::string MetricsServiceSinkFactory::name() { return StatsSinkNames::get().Met
 /**
  * Static registration for the this sink factory. @see RegisterFactory.
  */
-static Registry::RegisterFactory<MetricsServiceSinkFactory, Server::Configuration::StatsSinkFactory>
-    register_;
+REGISTER_FACTORY(MetricsServiceSinkFactory, Server::Configuration::StatsSinkFactory);
 
 } // namespace MetricsService
 } // namespace StatSinks

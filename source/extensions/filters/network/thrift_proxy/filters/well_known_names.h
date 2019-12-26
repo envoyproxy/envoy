@@ -23,7 +23,7 @@ public:
   const std::string ROUTER = "envoy.filters.thrift.router";
 };
 
-typedef ConstSingleton<ThriftFilterNameValues> ThriftFilterNames;
+using ThriftFilterNames = ConstSingleton<ThriftFilterNameValues>;
 
 } // namespace ThriftFilters
 } // namespace ThriftProxy

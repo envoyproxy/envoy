@@ -3,6 +3,9 @@
 #include "common/common/thread.h"
 #include "common/common/utility.h"
 #include "common/event/libevent.h"
+#include "common/http/http2/codec_impl.h"
+
+#include "exe/process_wide.h"
 
 #include "test/test_common/environment.h"
 
@@ -23,8 +26,9 @@ PerTestEnvironment::PerTestEnvironment()
 PerTestEnvironment::~PerTestEnvironment() { TestEnvironment::removePath(test_tmpdir_); }
 
 void Runner::setupEnvironment(int argc, char** argv, spdlog::level::level_enum default_log_level) {
-  Event::Libevent::Global::initialize();
-
+  // We hold on to process_wide to provide RAII cleanup of process-wide
+  // state.
+  ProcessWide process_wide;
   TestEnvironment::initializeOptions(argc, argv);
 
   const auto environment_log_level = TestEnvironment::getOptions().logLevel();
@@ -39,7 +43,7 @@ void Runner::setupEnvironment(int argc, char** argv, spdlog::level::level_enum d
   // https://github.com/llvm-mirror/compiler-rt/blob/master/lib/fuzzer/FuzzerInterface.h).
   static auto* lock = new Thread::MutexBasicLockable();
   static auto* logging_context =
-      new Logger::Context(log_level_, TestEnvironment::getOptions().logFormat(), *lock);
+      new Logger::Context(log_level_, TestEnvironment::getOptions().logFormat(), *lock, false);
   UNREFERENCED_PARAMETER(logging_context);
 }
 

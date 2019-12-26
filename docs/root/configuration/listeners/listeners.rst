@@ -3,13 +3,12 @@
 Listeners
 =========
 
-The top level Envoy configuration contains a list of :ref:`listeners <arch_overview_listeners>`.
-Each individual listener configuration has the following format:
-
-* :ref:`v2 API reference <envoy_api_msg_Listener>`
-
 .. toctree::
-  :hidden:
+  :maxdepth: 2
 
+  overview
   stats
+  listener_filters/listener_filters
+  network_filters/network_filters
+  udp_filters/udp_filters
   lds

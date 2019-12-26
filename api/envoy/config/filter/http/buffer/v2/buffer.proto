@@ -1,28 +1,26 @@
 syntax = "proto3";
 
 package envoy.config.filter.http.buffer.v2;
-option go_package = "v2";
 
-import "google/protobuf/duration.proto";
 import "google/protobuf/wrappers.proto";
 
 import "validate/validate.proto";
-import "gogoproto/gogo.proto";
+
+option java_package = "io.envoyproxy.envoy.config.filter.http.buffer.v2";
+option java_outer_classname = "BufferProto";
+option java_multiple_files = true;
 
 // [#protodoc-title: Buffer]
 // Buffer :ref:`configuration overview <config_http_filters_buffer>`.
+// [#extension: envoy.filters.http.buffer]
 
 message Buffer {
+  reserved 2;
+
   // The maximum request size that the filter will buffer before the connection
   // manager will stop buffering and return a 413 response.
-  google.protobuf.UInt32Value max_request_bytes = 1 [(validate.rules).uint32.gt = 0];
-
-  // The maximum number of seconds that the filter will wait for a complete
-  // request before returning a 408 response.
-  // deprecated in favor of http connection manager of :ref:request timeouts
-  // <envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.request_timeout>
-  google.protobuf.Duration max_request_time = 2
-      [deprecated = true, (validate.rules).duration = {gt: {}}, (gogoproto.stdduration) = true];
+  google.protobuf.UInt32Value max_request_bytes = 1
+      [(validate.rules).uint32 = {gt: 0}, (validate.rules).message = {required: true}];
 }
 
 message BufferPerRoute {
@@ -30,9 +28,9 @@ message BufferPerRoute {
     option (validate.required) = true;
 
     // Disable the buffer filter for this particular vhost or route.
-    bool disabled = 1 [(validate.rules).bool.const = true];
+    bool disabled = 1 [(validate.rules).bool = {const: true}];
 
     // Override the global configuration of the filter with this new config.
-    Buffer buffer = 2 [(validate.rules).message.required = true];
+    Buffer buffer = 2 [(validate.rules).message = {required: true}];
   }
 }

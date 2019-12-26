@@ -3,6 +3,8 @@
 #include <string>
 #include <vector>
 
+#include "envoy/api/api.h"
+
 #include "common/common/lock_guard.h"
 #include "common/common/mutex_tracer_impl.h"
 #include "common/common/thread.h"
@@ -20,15 +22,20 @@ namespace TestUtil {
 
 class ContentionGenerator {
 public:
+  ContentionGenerator(Api::Api& api) : api_(api) {}
+
   /**
    * Generates at least once occurrence of mutex contention, as measured by tracer.
    */
-  static void generateContention(MutexTracerImpl& tracer);
+  void generateContention(MutexTracerImpl& tracer);
 
 private:
-  static Envoy::Thread::ThreadPtr launchThread(MutexTracerImpl& tracer, MutexBasicLockable* mu);
+  ThreadPtr launchThread(MutexTracerImpl& tracer);
+  void holdUntilContention(MutexTracerImpl& tracer);
 
-  static void holdUntilContention(MutexTracerImpl& tracer, MutexBasicLockable* mu);
+  MutexBasicLockable mutex_;
+  Api::Api& api_;
+  std::atomic<bool> found_contention_{false};
 };
 
 } // namespace TestUtil

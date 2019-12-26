@@ -2,6 +2,10 @@
 
 #include <memory>
 
+#include "envoy/api/v2/core/base.pb.h"
+#include "envoy/service/auth/v2/external_auth.pb.h"
+#include "envoy/type/http_status.pb.h"
+
 #include "test/mocks/upstream/mocks.h"
 
 namespace Envoy {
@@ -14,11 +18,11 @@ CheckResponsePtr TestCommon::makeCheckResponse(Grpc::Status::GrpcStatus response
                                                envoy::type::StatusCode http_status_code,
                                                const std::string& body,
                                                const HeaderValueOptionVector& headers) {
-  auto response = std::make_unique<envoy::service::auth::v2alpha::CheckResponse>();
+  auto response = std::make_unique<envoy::service::auth::v2::CheckResponse>();
   auto status = response->mutable_status();
   status->set_code(response_status);
 
-  if (response_status != Grpc::Status::GrpcStatus::Ok) {
+  if (response_status != Grpc::Status::WellKnownGrpcStatus::Ok) {
     const auto denied_response = response->mutable_denied_response();
     if (!body.empty()) {
       denied_response->set_body(body);
@@ -71,7 +75,7 @@ Response TestCommon::makeAuthzResponse(CheckStatus status, Http::Code status_cod
 
 HeaderValueOptionVector TestCommon::makeHeaderValueOption(KeyValueOptionVector&& headers) {
   HeaderValueOptionVector header_option_vector{};
-  for (auto header : headers) {
+  for (const auto& header : headers) {
     envoy::api::v2::core::HeaderValueOption header_value_option;
     auto* mutable_header = header_value_option.mutable_header();
     mutable_header->set_key(header.key);
@@ -93,6 +97,11 @@ Http::MessagePtr TestCommon::makeMessageResponse(const HeaderValueOptionVector& 
   response->body() = std::make_unique<Buffer::OwnedImpl>(body);
   return response;
 };
+
+bool TestCommon::CompareHeaderVector(const Http::HeaderVector& lhs, const Http::HeaderVector& rhs) {
+  return std::set<std::pair<Http::LowerCaseString, std::string>>(lhs.begin(), lhs.end()) ==
+         std::set<std::pair<Http::LowerCaseString, std::string>>(rhs.begin(), rhs.end());
+}
 
 } // namespace ExtAuthz
 } // namespace Common

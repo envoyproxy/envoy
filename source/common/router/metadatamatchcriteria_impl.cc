@@ -20,7 +20,7 @@ MetadataMatchCriteriaImpl::extractMetadataMatchCriteria(const MetadataMatchCrite
   }
 
   // Add values from matches, replacing name/values copied from parent.
-  for (const auto it : matches.fields()) {
+  for (const auto& it : matches.fields()) {
     const auto index_it = existing.find(it.first);
     if (index_it != existing.end()) {
       v[index_it->second] = std::make_shared<MetadataMatchCriterionImpl>(it.first, it.second);
@@ -38,5 +38,23 @@ MetadataMatchCriteriaImpl::extractMetadataMatchCriteria(const MetadataMatchCrite
 
   return v;
 }
+
+MetadataMatchCriteriaConstPtr
+MetadataMatchCriteriaImpl::filterMatchCriteria(const std::set<std::string>& names) const {
+
+  std::vector<MetadataMatchCriterionConstSharedPtr> v;
+
+  // iterating over metadata_match_criteria_ ensures correct order without sorting
+  for (const auto& it : metadata_match_criteria_) {
+    if (names.count(it->name()) == 1) {
+      v.emplace_back(it);
+    }
+  }
+  if (v.empty()) {
+    return nullptr;
+  }
+  return MetadataMatchCriteriaImplConstPtr(new MetadataMatchCriteriaImpl(v));
+};
+
 } // namespace Router
 } // namespace Envoy

@@ -20,7 +20,7 @@ class RateLimitPolicy;
  */
 class RouteEntry {
 public:
-  virtual ~RouteEntry() {}
+  virtual ~RouteEntry() = default;
 
   /**
    * @return const std::string& the upstream cluster that owns the route.
@@ -37,6 +37,16 @@ public:
    * @return const RateLimitPolicy& the rate limit policy for the route.
    */
   virtual const RateLimitPolicy& rateLimitPolicy() const PURE;
+
+  /**
+   * @return bool should the service name prefix be stripped from the method.
+   */
+  virtual bool stripServiceName() const PURE;
+
+  /**
+   * @return const Http::LowerCaseString& the header used to determine the cluster.
+   */
+  virtual const Http::LowerCaseString& clusterHeader() const PURE;
 };
 
 /**
@@ -44,7 +54,7 @@ public:
  */
 class Route {
 public:
-  virtual ~Route() {}
+  virtual ~Route() = default;
 
   /**
    * @return the route entry or nullptr if there is no matching route for the request.
@@ -52,14 +62,14 @@ public:
   virtual const RouteEntry* routeEntry() const PURE;
 };
 
-typedef std::shared_ptr<const Route> RouteConstSharedPtr;
+using RouteConstSharedPtr = std::shared_ptr<const Route>;
 
 /**
  * The router configuration.
  */
 class Config {
 public:
-  virtual ~Config() {}
+  virtual ~Config() = default;
 
   /**
    * Based on the incoming Thrift request transport and/or protocol data, determine the target
@@ -72,7 +82,7 @@ public:
                                     uint64_t random_value) const PURE;
 };
 
-typedef std::shared_ptr<const Config> ConfigConstSharedPtr;
+using ConfigConstSharedPtr = std::shared_ptr<const Config>;
 
 } // namespace Router
 } // namespace ThriftProxy

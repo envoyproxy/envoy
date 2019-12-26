@@ -198,7 +198,7 @@ void HeaderTransportImpl::encodeFrame(Buffer::Instance& buffer, const MessageMet
   }
 
   BufferHelper::writeVarIntI32(header_buffer, 0); // num transforms
-  if (headers.size() > 0) {
+  if (!headers.empty()) {
     // Info ID 1
     header_buffer.writeByte(1);
 
@@ -312,8 +312,7 @@ public:
 /**
  * Static registration for the header transport. @see RegisterFactory.
  */
-static Registry::RegisterFactory<HeaderTransportConfigFactory, NamedTransportConfigFactory>
-    register_;
+REGISTER_FACTORY(HeaderTransportConfigFactory, NamedTransportConfigFactory);
 
 } // namespace ThriftProxy
 } // namespace NetworkFilters

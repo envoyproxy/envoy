@@ -3,6 +3,8 @@
 #include <memory>
 #include <string>
 
+#include "envoy/config/filter/network/http_connection_manager/v2/http_connection_manager.pb.h"
+
 #include "test/config/integration/certs/clientcert_hash.h"
 #include "test/integration/http_integration.h"
 #include "test/integration/server.h"
@@ -14,12 +16,13 @@
 #include "gtest/gtest.h"
 
 using testing::NiceMock;
+using testing::ReturnRef;
 
 namespace Envoy {
 namespace Xfcc {
 
-class XfccIntegrationTest : public HttpIntegrationTest,
-                            public testing::TestWithParam<Network::Address::IpVersion> {
+class XfccIntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
+                            public HttpIntegrationTest {
 public:
   const std::string previous_xfcc_ =
       "By=spiffe://lyft.com/frontend;Hash=123456;URI=spiffe://lyft.com/testclient";
@@ -34,8 +37,9 @@ public:
   const std::string client_uri_san_ = "URI=spiffe://lyft.com/frontend-team";
   const std::string client_dns_san_ = "DNS=lyft.com;DNS=www.lyft.com";
 
-  XfccIntegrationTest()
-      : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam(), realTime()) {}
+  XfccIntegrationTest() : HttpIntegrationTest(Http::CodecClient::Type::HTTP1, GetParam()) {
+    ON_CALL(factory_context_, api()).WillByDefault(ReturnRef(*api_));
+  }
 
   void initialize() override;
   void createUpstreams() override;
@@ -44,7 +48,7 @@ public:
 
   Network::TransportSocketFactoryPtr createUpstreamSslContext();
   Network::TransportSocketFactoryPtr createClientSslContext(bool mtls);
-  Network::ClientConnectionPtr makeClientConnection();
+  Network::ClientConnectionPtr makeTcpClientConnection();
   Network::ClientConnectionPtr makeTlsClientConnection();
   Network::ClientConnectionPtr makeMtlsClientConnection();
   void testRequestAndResponseWithXfccHeader(std::string privous_xfcc, std::string expected_xfcc);

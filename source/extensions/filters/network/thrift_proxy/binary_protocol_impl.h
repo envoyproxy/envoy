@@ -18,7 +18,7 @@ namespace ThriftProxy {
  */
 class BinaryProtocolImpl : public Protocol {
 public:
-  BinaryProtocolImpl() {}
+  BinaryProtocolImpl() = default;
 
   // Protocol
   const std::string& name() const override { return ProtocolNames::get().BINARY; }
@@ -89,7 +89,7 @@ private:
  */
 class LaxBinaryProtocolImpl : public BinaryProtocolImpl {
 public:
-  LaxBinaryProtocolImpl() {}
+  LaxBinaryProtocolImpl() = default;
 
   const std::string& name() const override { return ProtocolNames::get().LAX_BINARY; }
 

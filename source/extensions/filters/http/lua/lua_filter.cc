@@ -7,6 +7,7 @@
 #include "common/buffer/buffer_impl.h"
 #include "common/common/assert.h"
 #include "common/common/enum_to_int.h"
+#include "common/crypto/utility.h"
 #include "common/http/message_impl.h"
 
 namespace Envoy {
@@ -118,7 +119,7 @@ int StreamHandleWrapper::luaRespond(lua_State* state) {
 
   uint64_t status;
   if (headers->Status() == nullptr ||
-      !StringUtil::atoul(headers->Status()->value().c_str(), status) || status < 200 ||
+      !absl::SimpleAtoi(headers->Status()->value().getStringView(), &status) || status < 200 ||
       status >= 600) {
     luaL_error(state, ":status must be between 200-599");
   }
@@ -126,7 +127,7 @@ int StreamHandleWrapper::luaRespond(lua_State* state) {
   Buffer::InstancePtr body;
   if (raw_body != nullptr) {
     body = std::make_unique<Buffer::OwnedImpl>(raw_body, body_size);
-    headers->insertContentLength().value(body_size);
+    headers->setContentLength(body_size);
   }
 
   // Once we respond we treat that as the end of the script even if there is more code. Thus we
@@ -145,9 +146,19 @@ Http::HeaderMapPtr StreamHandleWrapper::buildHeadersFromTable(lua_State* state, 
   while (lua_next(state, table_index) != 0) {
     // Uses 'key' (at index -2) and 'value' (at index -1).
     const char* key = luaL_checkstring(state, -2);
-    const char* value = luaL_checkstring(state, -1);
-    headers->addCopy(Http::LowerCaseString(key), value);
-
+    // Check if the current value is a table, we iterate through the table and add each element of
+    // it as a header entry value for the current key.
+    if (lua_istable(state, -1)) {
+      lua_pushnil(state);
+      while (lua_next(state, -2) != 0) {
+        const char* value = luaL_checkstring(state, -1);
+        headers->addCopy(Http::LowerCaseString(key), value);
+        lua_pop(state, 1);
+      }
+    } else {
+      const char* value = luaL_checkstring(state, -1);
+      headers->addCopy(Http::LowerCaseString(key), value);
+    }
     // Removes 'value'; keeps 'key' for next iteration. This is the input for lua_next() so that
     // it can push the next key/value pair onto the stack.
     lua_pop(state, 1);
@@ -182,7 +193,7 @@ int StreamHandleWrapper::luaHttpCall(lua_State* state) {
 
   if (body != nullptr) {
     message->body() = std::make_unique<Buffer::OwnedImpl>(body, body_size);
-    message->headers().insertContentLength().value(body_size);
+    message->headers().setContentLength(body_size);
   }
 
   absl::optional<std::chrono::milliseconds> timeout;
@@ -212,8 +223,10 @@ void StreamHandleWrapper::onSuccess(Http::MessagePtr&& response) {
   response->headers().iterate(
       [](const Http::HeaderEntry& header, void* context) -> Http::HeaderMap::Iterate {
         lua_State* state = static_cast<lua_State*>(context);
-        lua_pushstring(state, header.key().c_str());
-        lua_pushstring(state, header.value().c_str());
+        lua_pushlstring(state, header.key().getStringView().data(),
+                        header.key().getStringView().length());
+        lua_pushlstring(state, header.value().getStringView().data(),
+                        header.value().getStringView().length());
         lua_settable(state, -3);
         return Http::HeaderMap::Iterate::Continue;
       },
@@ -426,6 +439,51 @@ int StreamHandleWrapper::luaLogCritical(lua_State* state) {
   return 0;
 }
 
+int StreamHandleWrapper::luaVerifySignature(lua_State* state) {
+  // Step 1: get hash function
+  absl::string_view hash = luaL_checkstring(state, 2);
+
+  // Step 2: get key pointer
+  auto ptr = lua_touserdata(state, 3);
+
+  // Step 3: get signature
+  const char* signature = luaL_checkstring(state, 4);
+  int sig_len = luaL_checknumber(state, 5);
+  const std::vector<uint8_t> sig_vec(signature, signature + sig_len);
+
+  // Step 4: get clear text
+  const char* clear_text = luaL_checkstring(state, 6);
+  int text_len = luaL_checknumber(state, 7);
+  const std::vector<uint8_t> text_vec(clear_text, clear_text + text_len);
+  // Step 5: verify signature
+  auto crypto = reinterpret_cast<Common::Crypto::CryptoObject*>(ptr);
+  auto& crypto_util = Envoy::Common::Crypto::UtilitySingleton::get();
+  auto output = crypto_util.verifySignature(hash, *crypto, sig_vec, text_vec);
+  lua_pushboolean(state, output.result_);
+  if (output.result_) {
+    lua_pushnil(state);
+  } else {
+    lua_pushlstring(state, output.error_message_.data(), output.error_message_.length());
+  }
+  return 2;
+}
+
+int StreamHandleWrapper::luaImportPublicKey(lua_State* state) {
+  // Get byte array and the length.
+  const char* str = luaL_checkstring(state, 2);
+  int n = luaL_checknumber(state, 3);
+  std::vector<uint8_t> key(str, str + n);
+  if (public_key_wrapper_.get() != nullptr) {
+    public_key_wrapper_.pushStack();
+  } else {
+    auto& crypto_util = Envoy::Common::Crypto::UtilitySingleton::get();
+    Common::Crypto::CryptoObjectPtr crypto_ptr = crypto_util.importPublicKey(key);
+    public_key_wrapper_.reset(PublicKeyWrapper::create(state, std::move(crypto_ptr)), true);
+  }
+
+  return 1;
+}
+
 FilterConfig::FilterConfig(const std::string& lua_code, ThreadLocal::SlotAllocator& tls,
                            Upstream::ClusterManager& cluster_manager)
     : cluster_manager_(cluster_manager), lua_state_(lua_code, tls) {
@@ -440,6 +498,7 @@ FilterConfig::FilterConfig(const std::string& lua_code, ThreadLocal::SlotAllocat
   lua_state_.registerType<DynamicMetadataMapWrapper>();
   lua_state_.registerType<DynamicMetadataMapIterator>();
   lua_state_.registerType<StreamHandleWrapper>();
+  lua_state_.registerType<PublicKeyWrapper>();
 
   request_function_slot_ = lua_state_.registerGlobal("envoy_on_request");
   if (lua_state_.getGlobalRef(request_function_slot_) == LUA_REFNIL) {

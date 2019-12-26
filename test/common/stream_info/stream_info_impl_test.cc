@@ -35,6 +35,7 @@ protected:
 TEST_F(StreamInfoImplTest, TimingTest) {
   MonotonicTime pre_start = test_time_.timeSystem().monotonicTime();
   StreamInfoImpl info(Http::Protocol::Http2, test_time_.timeSystem());
+  Envoy::StreamInfo::UpstreamTiming upstream_timing;
   MonotonicTime post_start = test_time_.timeSystem().monotonicTime();
 
   const MonotonicTime& start = info.startTimeMonotonic();
@@ -48,19 +49,23 @@ TEST_F(StreamInfoImplTest, TimingTest) {
       checkDuration(std::chrono::nanoseconds{0}, info.lastDownstreamRxByteReceived());
 
   EXPECT_FALSE(info.firstUpstreamTxByteSent());
-  info.onFirstUpstreamTxByteSent();
+  upstream_timing.onFirstUpstreamTxByteSent(test_time_.timeSystem());
+  info.setUpstreamTiming(upstream_timing);
   dur = checkDuration(dur, info.firstUpstreamTxByteSent());
 
   EXPECT_FALSE(info.lastUpstreamTxByteSent());
-  info.onLastUpstreamTxByteSent();
+  upstream_timing.onLastUpstreamTxByteSent(test_time_.timeSystem());
+  info.setUpstreamTiming(upstream_timing);
   dur = checkDuration(dur, info.lastUpstreamTxByteSent());
 
   EXPECT_FALSE(info.firstUpstreamRxByteReceived());
-  info.onFirstUpstreamRxByteReceived();
+  upstream_timing.onFirstUpstreamRxByteReceived(test_time_.timeSystem());
+  info.setUpstreamTiming(upstream_timing);
   dur = checkDuration(dur, info.firstUpstreamRxByteReceived());
 
   EXPECT_FALSE(info.lastUpstreamRxByteReceived());
-  info.onLastUpstreamRxByteReceived();
+  upstream_timing.onLastUpstreamRxByteReceived(test_time_.timeSystem());
+  info.setUpstreamTiming(upstream_timing);
   dur = checkDuration(dur, info.lastUpstreamRxByteReceived());
 
   EXPECT_FALSE(info.firstDownstreamTxByteSent());
@@ -116,6 +121,7 @@ TEST_F(StreamInfoImplTest, ResponseFlagTest) {
         << fmt::format("Flag: {} was expected to be set", flag);
   }
   EXPECT_TRUE(stream_info.hasAnyResponseFlag());
+  EXPECT_EQ(0xFFF, stream_info.responseFlags());
 
   StreamInfoImpl stream_info2(Http::Protocol::Http2, test_time_.timeSystem());
   stream_info2.setResponseFlag(FailedLocalHealthCheck);
@@ -137,6 +143,11 @@ TEST_F(StreamInfoImplTest, MiscSettersAndGetters) {
     ASSERT_TRUE(stream_info.responseCode());
     EXPECT_EQ(200, stream_info.responseCode().value());
 
+    EXPECT_FALSE(stream_info.responseCodeDetails().has_value());
+    stream_info.setResponseCodeDetails(ResponseCodeDetails::get().ViaUpstream);
+    ASSERT_TRUE(stream_info.responseCodeDetails().has_value());
+    EXPECT_EQ(ResponseCodeDetails::get().ViaUpstream, stream_info.responseCodeDetails().value());
+
     EXPECT_EQ(nullptr, stream_info.upstreamHost());
     Upstream::HostDescriptionConstSharedPtr host(new NiceMock<Upstream::MockHostDescription>());
     stream_info.onUpstreamHostSelected(host);
@@ -152,7 +163,8 @@ TEST_F(StreamInfoImplTest, MiscSettersAndGetters) {
     EXPECT_EQ(&route_entry, stream_info.routeEntry());
 
     stream_info.filterState().setData("test", std::make_unique<TestIntAccessor>(1),
-                                      FilterState::StateType::ReadOnly);
+                                      FilterState::StateType::ReadOnly,
+                                      FilterState::LifeSpan::FilterChain);
     EXPECT_EQ(1, stream_info.filterState().getDataReadOnly<TestIntAccessor>("test").access());
 
     EXPECT_EQ("", stream_info.requestedServerName());
@@ -182,13 +194,36 @@ TEST_F(StreamInfoImplTest, DynamicMetadataTest) {
   EXPECT_EQ("test_value",
             Config::Metadata::metadataValue(stream_info.dynamicMetadata(), "com.test", "test_key")
                 .string_value());
-  ProtobufTypes::String json;
+  std::string json;
   const auto test_struct = stream_info.dynamicMetadata().filter_metadata().at("com.test");
   const auto status = Protobuf::util::MessageToJsonString(test_struct, &json);
   EXPECT_TRUE(status.ok());
   // check json contains the key and values we set
   EXPECT_TRUE(json.find("\"test_key\":\"test_value\"") != std::string::npos);
   EXPECT_TRUE(json.find("\"another_key\":\"another_value\"") != std::string::npos);
+}
+
+TEST_F(StreamInfoImplTest, DumpStateTest) {
+  StreamInfoImpl stream_info(Http::Protocol::Http2, test_time_.timeSystem());
+  std::string prefix = "";
+
+  for (int i = 0; i < 7; ++i) {
+    std::stringstream out;
+    stream_info.dumpState(out, i);
+    std::string state = out.str();
+    EXPECT_TRUE(absl::StartsWith(state, prefix));
+    EXPECT_THAT(state, testing::HasSubstr("protocol_: 2"));
+    prefix = prefix + "  ";
+  }
+}
+
+TEST_F(StreamInfoImplTest, RequestHeadersTest) {
+  StreamInfoImpl stream_info(Http::Protocol::Http2, test_time_.timeSystem());
+  EXPECT_FALSE(stream_info.getRequestHeaders());
+
+  Http::HeaderMapImpl headers;
+  stream_info.setRequestHeaders(headers);
+  EXPECT_EQ(&headers, stream_info.getRequestHeaders());
 }
 
 } // namespace

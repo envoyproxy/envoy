@@ -1,8 +1,11 @@
 #pragma once
 
+#include <regex>
+
 #include "envoy/config/filter/http/squash/v2/squash.pb.h"
 #include "envoy/http/async_client.h"
 #include "envoy/http/filter.h"
+#include "envoy/json/json_object.h"
 #include "envoy/upstream/cluster_manager.h"
 
 #include "common/common/logger.h"
@@ -18,12 +21,12 @@ namespace Squash {
 class SquashFilterConfig : protected Logger::Loggable<Logger::Id::config> {
 public:
   SquashFilterConfig(const envoy::config::filter::http::squash::v2::Squash& proto_config,
-                     Upstream::ClusterManager& clusterManager);
-  const std::string& clusterName() { return cluster_name_; }
-  const std::string& attachmentJson() { return attachment_json_; }
-  const std::chrono::milliseconds& attachmentTimeout() { return attachment_timeout_; }
-  const std::chrono::milliseconds& attachmentPollPeriod() { return attachment_poll_period_; }
-  const std::chrono::milliseconds& requestTimeout() { return request_timeout_; }
+                     Upstream::ClusterManager& cluster_manager);
+  const std::string& clusterName() const { return cluster_name_; }
+  const std::string& attachmentJson() const { return attachment_json_; }
+  const std::chrono::milliseconds& attachmentTimeout() const { return attachment_timeout_; }
+  const std::chrono::milliseconds& attachmentPollPeriod() const { return attachment_poll_period_; }
+  const std::chrono::milliseconds& requestTimeout() const { return request_timeout_; }
 
 private:
   // Get the attachment body, and returns a JSON representations with environment variables
@@ -51,7 +54,7 @@ private:
   const static std::regex ENV_REGEX;
 };
 
-typedef std::shared_ptr<SquashFilterConfig> SquashFilterConfigSharedPtr;
+using SquashFilterConfigSharedPtr = std::shared_ptr<SquashFilterConfig>;
 
 class AsyncClientCallbackShim : public Http::AsyncClient::Callbacks {
 public:
@@ -71,7 +74,7 @@ class SquashFilter : public Http::StreamDecoderFilter,
                      protected Logger::Loggable<Logger::Id::filter> {
 public:
   SquashFilter(SquashFilterConfigSharedPtr config, Upstream::ClusterManager& cm);
-  ~SquashFilter();
+  ~SquashFilter() override;
 
   // Http::StreamFilterBase
   void onDestroy() override;
@@ -103,7 +106,7 @@ private:
   const SquashFilterConfigSharedPtr config_;
 
   // Current state of the squash filter. If is_squashing_ is true, Hold the request while we
-  // communicate with the squash server to attach a debugger. If it is false, let the the request
+  // communicate with the squash server to attach a debugger. If it is false, let the request
   // pass-through.
   bool is_squashing_;
   // The API path of the created debug attachment (used for polling its state).

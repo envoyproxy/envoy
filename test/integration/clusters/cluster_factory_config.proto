@@ -1,0 +1,9 @@
+syntax = "proto3";
+
+package test.integration.clusters;
+
+message CustomStaticConfig {
+  uint32 priority = 1;
+  string address = 2;
+  uint32 port_value = 3;
+}

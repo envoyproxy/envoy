@@ -3,6 +3,8 @@
 #include <chrono>
 #include <string>
 
+#include "envoy/api/v2/core/grpc_service.pb.h"
+#include "envoy/config/filter/network/ext_authz/v2/ext_authz.pb.h"
 #include "envoy/config/filter/network/ext_authz/v2/ext_authz.pb.validate.h"
 #include "envoy/network/connection.h"
 #include "envoy/registry/registry.h"
@@ -31,7 +33,7 @@ Network::FilterFactoryCb ExtAuthzConfigFactory::createFilterFactoryFromProtoType
             grpc_service, context.scope(), true);
 
     auto client = std::make_unique<Filters::Common::ExtAuthz::GrpcClientImpl>(
-        async_client_factory->create(), std::chrono::milliseconds(timeout_ms));
+        async_client_factory->create(), std::chrono::milliseconds(timeout_ms), false);
     filter_manager.addReadFilter(Network::ReadFilterSharedPtr{
         std::make_shared<Filter>(ext_authz_config, std::move(client))});
   };
@@ -40,9 +42,7 @@ Network::FilterFactoryCb ExtAuthzConfigFactory::createFilterFactoryFromProtoType
 /**
  * Static registration for the external authorization filter. @see RegisterFactory.
  */
-static Registry::RegisterFactory<ExtAuthzConfigFactory,
-                                 Server::Configuration::NamedNetworkFilterConfigFactory>
-    registered_;
+REGISTER_FACTORY(ExtAuthzConfigFactory, Server::Configuration::NamedNetworkFilterConfigFactory);
 
 } // namespace ExtAuthz
 } // namespace NetworkFilters

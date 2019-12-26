@@ -1,7 +1,5 @@
 #pragma once
 
-#include "envoy/config/filter/http/rbac/v2/rbac.pb.h"
-#include "envoy/config/filter/network/rbac/v2/rbac.pb.h"
 #include "envoy/stats/stats_macros.h"
 
 #include "common/singleton/const_singleton.h"
@@ -22,18 +20,16 @@ public:
   const std::string EngineResultDenied{"denied"};
 };
 
-typedef ConstSingleton<DynamicMetadataKeys> DynamicMetadataKeysSingleton;
+using DynamicMetadataKeysSingleton = ConstSingleton<DynamicMetadataKeys>;
 
 /**
  * All stats for the RBAC filter. @see stats_macros.h
  */
-// clang-format off
 #define ALL_RBAC_FILTER_STATS(COUNTER)                                                             \
   COUNTER(allowed)                                                                                 \
   COUNTER(denied)                                                                                  \
   COUNTER(shadow_allowed)                                                                          \
   COUNTER(shadow_denied)
-// clang-format on
 
 /**
  * Wrapper struct for RBAC filter stats. @see stats_macros.h
@@ -47,16 +43,16 @@ RoleBasedAccessControlFilterStats generateStats(const std::string& prefix, Stats
 enum class EnforcementMode { Enforced, Shadow };
 
 template <class ConfigType>
-absl::optional<RoleBasedAccessControlEngineImpl> createEngine(const ConfigType& config) {
-  return config.has_rules() ? absl::make_optional<RoleBasedAccessControlEngineImpl>(config.rules())
-                            : absl::nullopt;
+std::unique_ptr<RoleBasedAccessControlEngineImpl> createEngine(const ConfigType& config) {
+  return config.has_rules() ? std::make_unique<RoleBasedAccessControlEngineImpl>(config.rules())
+                            : nullptr;
 }
 
 template <class ConfigType>
-absl::optional<RoleBasedAccessControlEngineImpl> createShadowEngine(const ConfigType& config) {
+std::unique_ptr<RoleBasedAccessControlEngineImpl> createShadowEngine(const ConfigType& config) {
   return config.has_shadow_rules()
-             ? absl::make_optional<RoleBasedAccessControlEngineImpl>(config.shadow_rules())
-             : absl::nullopt;
+             ? std::make_unique<RoleBasedAccessControlEngineImpl>(config.shadow_rules())
+             : nullptr;
 }
 
 } // namespace RBAC

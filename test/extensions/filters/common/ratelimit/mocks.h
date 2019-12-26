@@ -18,7 +18,7 @@ namespace RateLimit {
 class MockClient : public Client {
 public:
   MockClient();
-  ~MockClient();
+  ~MockClient() override;
 
   // RateLimit::Client
   MOCK_METHOD0(cancel, void());

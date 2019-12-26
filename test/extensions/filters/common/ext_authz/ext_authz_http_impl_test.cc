@@ -1,4 +1,5 @@
-#include "envoy/api/v2/core/base.pb.h"
+#include "envoy/config/filter/http/ext_authz/v2/ext_authz.pb.h"
+#include "envoy/service/auth/v2/external_auth.pb.h"
 
 #include "common/http/headers.h"
 #include "common/http/message_impl.h"
@@ -16,209 +17,389 @@
 
 using testing::_;
 using testing::AllOf;
+using testing::Eq;
+using testing::InSequence;
 using testing::Invoke;
-using testing::Ref;
 using testing::Return;
-using testing::ReturnPointee;
 using testing::ReturnRef;
 using testing::WhenDynamicCastTo;
-using testing::WithArg;
 
 namespace Envoy {
 namespace Extensions {
 namespace Filters {
 namespace Common {
 namespace ExtAuthz {
-
-typedef std::vector<envoy::api::v2::core::HeaderValueOption> HeaderValueOptionVector;
+namespace {
 
 class ExtAuthzHttpClientTest : public testing::Test {
 public:
   ExtAuthzHttpClientTest()
-      : cluster_name_{"foo"}, cluster_manager_{}, timeout_{}, path_prefix_{"/bar"},
-        allowed_authorization_headers_{Http::LowerCaseString{"bar"}},
-        allowed_request_headers_{Http::LowerCaseString{":method"}, Http::LowerCaseString{":path"}},
-        async_client_{}, async_request_{&async_client_},
-        client_(cluster_name_, cluster_manager_, timeout_, path_prefix_,
-                allowed_authorization_headers_, allowed_request_headers_,
-                authorization_headers_to_add_) {
-    ON_CALL(cluster_manager_, httpAsyncClientForCluster(cluster_name_))
+      : async_request_{&async_client_}, config_{createConfig()},
+        time_source_{async_client_.dispatcher().timeSource()}, client_{cm_, config_, time_source_} {
+    ON_CALL(cm_, httpAsyncClientForCluster(config_->cluster()))
         .WillByDefault(ReturnRef(async_client_));
   }
 
-  std::string cluster_name_;
-  NiceMock<Upstream::MockClusterManager> cluster_manager_;
-  MockRequestCallbacks request_callbacks_;
-  absl::optional<std::chrono::milliseconds> timeout_;
-  std::string path_prefix_;
-  Http::LowerCaseStrUnorderedSet allowed_authorization_headers_;
-  Http::LowerCaseStrUnorderedSet allowed_request_headers_;
+  static ClientConfigSharedPtr createConfig(std::string yaml = "", uint32_t timeout = 250,
+                                            std::string path_prefix = "/bar") {
+    envoy::config::filter::http::ext_authz::v2::ExtAuthz proto_config{};
+    if (yaml.empty()) {
+      std::string default_yaml = R"EOF(
+        http_service:
+          server_uri:
+            uri: "ext_authz:9000"
+            cluster: "ext_authz"
+            timeout: 0.25s
+
+          authorization_request:
+            allowed_headers:
+              patterns:
+              - exact: Baz
+              - prefix: "x-"
+            headers_to_add:
+            - key: "x-authz-header1"
+              value: "value"
+            - key: "x-authz-header2"
+              value: "value"
+
+          authorization_response:
+            allowed_upstream_headers:
+              patterns:
+              - exact: Bar
+              - prefix: "x-"
+            allowed_client_headers:
+              patterns:
+              - exact: Foo
+              - prefix: "x-"
+        )EOF";
+      TestUtility::loadFromYaml(default_yaml, proto_config);
+    } else {
+      TestUtility::loadFromYaml(yaml, proto_config);
+    }
+
+    return std::make_shared<ClientConfig>(ClientConfig{proto_config, timeout, path_prefix});
+  }
+
+  Http::MessagePtr sendRequest(std::unordered_map<std::string, std::string>&& headers) {
+    envoy::service::auth::v2::CheckRequest request{};
+    auto mutable_headers =
+        request.mutable_attributes()->mutable_request()->mutable_http()->mutable_headers();
+    for (const auto& header : headers) {
+      (*mutable_headers)[header.first] = header.second;
+    }
+
+    Http::MessagePtr message_ptr;
+    EXPECT_CALL(async_client_, send_(_, _, _))
+        .WillOnce(Invoke(
+            [&](Http::MessagePtr& message, Http::AsyncClient::Callbacks&,
+                const Envoy::Http::AsyncClient::RequestOptions) -> Http::AsyncClient::Request* {
+              message_ptr = std::move(message);
+              return nullptr;
+            }));
+
+    const auto expected_headers = TestCommon::makeHeaderValueOption({{":status", "200", false}});
+    const auto authz_response = TestCommon::makeAuthzResponse(CheckStatus::OK);
+    auto check_response = TestCommon::makeMessageResponse(expected_headers);
+
+    client_.check(request_callbacks_, request, Tracing::NullSpan::instance());
+    EXPECT_CALL(request_callbacks_,
+                onComplete_(WhenDynamicCastTo<ResponsePtr&>(AuthzOkResponse(authz_response))));
+    client_.onSuccess(std::move(check_response));
+
+    return message_ptr;
+  }
+
+  NiceMock<Upstream::MockClusterManager> cm_;
   NiceMock<Http::MockAsyncClient> async_client_;
   NiceMock<Http::MockAsyncClientRequest> async_request_;
-  HeaderKeyValueVector authorization_headers_to_add_;
+  ClientConfigSharedPtr config_;
+  TimeSource& time_source_;
   RawHttpClientImpl client_;
+  MockRequestCallbacks request_callbacks_;
+  Tracing::MockSpan active_span_;
 };
 
-// Test the client when an ok response is received.
-TEST_F(ExtAuthzHttpClientTest, AuthorizationOk) {
-  const auto expected_headers = TestCommon::makeHeaderValueOption({{":status", "200", false}});
-  const auto authz_response = TestCommon::makeAuthzResponse(CheckStatus::OK);
-  auto check_response = TestCommon::makeMessageResponse(expected_headers);
-  envoy::service::auth::v2alpha::CheckRequest request;
+// Test HTTP client config default values.
+TEST_F(ExtAuthzHttpClientTest, ClientConfig) {
+  const Http::LowerCaseString foo{"foo"};
+  const Http::LowerCaseString baz{"baz"};
+  const Http::LowerCaseString bar{"bar"};
 
-  client_.check(request_callbacks_, request, Tracing::NullSpan::instance());
-  EXPECT_CALL(request_callbacks_,
-              onComplete_(WhenDynamicCastTo<ResponsePtr&>(AuthzOkResponse(authz_response))));
+  // Check allowed request headers.
+  EXPECT_TRUE(config_->requestHeaderMatchers()->matches(Http::Headers::get().Method.get()));
+  EXPECT_TRUE(config_->requestHeaderMatchers()->matches(Http::Headers::get().Host.get()));
+  EXPECT_TRUE(config_->requestHeaderMatchers()->matches(Http::Headers::get().Authorization.get()));
+  EXPECT_FALSE(config_->requestHeaderMatchers()->matches(Http::Headers::get().ContentLength.get()));
+  EXPECT_TRUE(config_->requestHeaderMatchers()->matches(baz.get()));
 
-  client_.onSuccess(std::move(check_response));
+  // // Check allowed client headers.
+  EXPECT_TRUE(config_->clientHeaderMatchers()->matches(Http::Headers::get().Status.get()));
+  EXPECT_TRUE(config_->clientHeaderMatchers()->matches(Http::Headers::get().ContentLength.get()));
+  EXPECT_FALSE(config_->clientHeaderMatchers()->matches(Http::Headers::get().Path.get()));
+  EXPECT_FALSE(config_->clientHeaderMatchers()->matches(Http::Headers::get().Host.get()));
+  EXPECT_TRUE(config_->clientHeaderMatchers()->matches(Http::Headers::get().WWWAuthenticate.get()));
+  EXPECT_FALSE(config_->clientHeaderMatchers()->matches(Http::Headers::get().Origin.get()));
+  EXPECT_TRUE(config_->clientHeaderMatchers()->matches(foo.get()));
+
+  // // Check allowed upstream headers.
+  EXPECT_TRUE(config_->upstreamHeaderMatchers()->matches(bar.get()));
+
+  // // Check other attributes.
+  EXPECT_EQ(config_->pathPrefix(), "/bar");
+  EXPECT_EQ(config_->cluster(), "ext_authz");
+  EXPECT_EQ(config_->tracingName(), "async ext_authz egress");
+  EXPECT_EQ(config_->timeout(), std::chrono::milliseconds{250});
 }
 
-// Test the client when authorization headers to add are specified.
-TEST_F(ExtAuthzHttpClientTest, AuthorizationOkWithAddedAuthzHeaders) {
-  auto header1 = std::make_pair(Http::LowerCaseString("x-authz-header1"), "value");
-  auto header2 = std::make_pair(Http::LowerCaseString("x-authz-header2"), "value");
-  authorization_headers_to_add_.push_back(header1);
-  authorization_headers_to_add_.push_back(header2);
-  allowed_request_headers_.insert(header2.first);
+// Test default allowed headers in the HTTP client.
+TEST_F(ExtAuthzHttpClientTest, TestDefaultAllowedHeaders) {
+  std::string yaml = R"EOF(
+  http_service:
+    server_uri:
+      uri: "ext_authz:9000"
+      cluster: "ext_authz"
+      timeout: 0.25s
+  failure_mode_allow: true
+  )EOF";
 
-  const auto expected_headers = TestCommon::makeHeaderValueOption({{":status", "200", false}});
-  const auto authz_response = TestCommon::makeAuthzResponse(CheckStatus::OK);
-  auto check_response = TestCommon::makeMessageResponse(expected_headers);
-  envoy::service::auth::v2alpha::CheckRequest request;
-  auto mutable_headers =
-      request.mutable_attributes()->mutable_request()->mutable_http()->mutable_headers();
-  (*mutable_headers)[std::string{":x-authz-header2"}] = std::string{"forged-value"};
+  const auto config_ = createConfig(yaml);
+  const auto key = Http::LowerCaseString{"key"};
 
-  // Expect that header1 will be added and header2 correctly overwritten.
-  EXPECT_CALL(async_client_,
-              send_(AllOf(ContainsPairAsHeader(header1), ContainsPairAsHeader(header2)), _, _));
-  client_.check(request_callbacks_, request, Tracing::NullSpan::instance());
+  // Check allowed request headers.
+  EXPECT_TRUE(config_->requestHeaderMatchers()->matches(Http::Headers::get().Method.get()));
+  EXPECT_TRUE(config_->requestHeaderMatchers()->matches(Http::Headers::get().Host.get()));
+  EXPECT_TRUE(config_->requestHeaderMatchers()->matches(Http::Headers::get().Authorization.get()));
+  EXPECT_FALSE(config_->requestHeaderMatchers()->matches(Http::Headers::get().ContentLength.get()));
 
-  EXPECT_CALL(request_callbacks_,
-              onComplete_(WhenDynamicCastTo<ResponsePtr&>(AuthzOkResponse(authz_response))));
-  client_.onSuccess(std::move(check_response));
+  // Check allowed client headers.
+  EXPECT_TRUE(config_->clientHeaderMatchers()->matches(Http::Headers::get().ContentLength.get()));
+  EXPECT_FALSE(config_->clientHeaderMatchers()->matches(Http::Headers::get().Host.get()));
+
+  // Check allowed upstream headers.
+  EXPECT_FALSE(
+      config_->upstreamHeaderMatchers()->matches(Http::Headers::get().ContentLength.get()));
 }
 
-// Test the client when a request contains path to be re-written and ok response is received.
+// Verify client response when the authorization server returns a 200 OK and path_prefix is
+// configured.
 TEST_F(ExtAuthzHttpClientTest, AuthorizationOkWithPathRewrite) {
-  const auto expected_headers = TestCommon::makeHeaderValueOption({{":status", "200", false}});
-  const auto authz_response = TestCommon::makeAuthzResponse(CheckStatus::OK);
-  auto check_response = TestCommon::makeMessageResponse(expected_headers);
+  Http::MessagePtr message_ptr = sendRequest({{":path", "/foo"}, {"foo", "bar"}});
 
-  envoy::service::auth::v2alpha::CheckRequest request{};
-  auto mutable_headers =
-      request.mutable_attributes()->mutable_request()->mutable_http()->mutable_headers();
-  (*mutable_headers)[std::string{":path"}] = std::string{"/foo"};
-  (*mutable_headers)[std::string{"foo"}] = std::string{"bar"};
-
-  EXPECT_CALL(async_client_, send_(_, _, _))
-      .WillOnce(
-          Invoke([&](Http::MessagePtr& message, Http::AsyncClient::Callbacks&,
-                     const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
-            const auto* length_header_entry = message->headers().get(Http::Headers::get().Path);
-            EXPECT_EQ(length_header_entry->value().getStringView(), "/bar/foo");
-            return nullptr;
-          }));
-  client_.check(request_callbacks_, request, Tracing::NullSpan::instance());
-
-  EXPECT_CALL(request_callbacks_,
-              onComplete_(WhenDynamicCastTo<ResponsePtr&>(AuthzOkResponse(authz_response))));
-  client_.onSuccess(std::move(check_response));
+  const auto* path = message_ptr->headers().get(Http::Headers::get().Path);
+  ASSERT_NE(path, nullptr);
+  EXPECT_EQ(path->value().getStringView(), "/bar/foo");
 }
 
 // Test the client when a request contains Content-Length greater than 0.
 TEST_F(ExtAuthzHttpClientTest, ContentLengthEqualZero) {
+  Http::MessagePtr message_ptr =
+      sendRequest({{Http::Headers::get().ContentLength.get(), std::string{"47"}},
+                   {Http::Headers::get().Method.get(), std::string{"POST"}}});
+
+  const auto* content_length = message_ptr->headers().get(Http::Headers::get().ContentLength);
+  ASSERT_NE(content_length, nullptr);
+  EXPECT_EQ(content_length->value().getStringView(), "0");
+
+  const auto* method = message_ptr->headers().get(Http::Headers::get().Method);
+  ASSERT_NE(method, nullptr);
+  EXPECT_EQ(method->value().getStringView(), "POST");
+}
+
+// Test the client when a request contains headers in the prefix matchers.
+TEST_F(ExtAuthzHttpClientTest, AllowedRequestHeadersPrefix) {
+  Http::MessagePtr message_ptr =
+      sendRequest({{Http::Headers::get().XContentTypeOptions.get(), "foobar"},
+                   {Http::Headers::get().XSquashDebug.get(), "foo"},
+                   {Http::Headers::get().ContentType.get(), "bar"}});
+
+  EXPECT_EQ(message_ptr->headers().get(Http::Headers::get().ContentType), nullptr);
+  const auto* x_squash = message_ptr->headers().get(Http::Headers::get().XSquashDebug);
+  ASSERT_NE(x_squash, nullptr);
+  EXPECT_EQ(x_squash->value().getStringView(), "foo");
+
+  const auto* x_content_type = message_ptr->headers().get(Http::Headers::get().XContentTypeOptions);
+  ASSERT_NE(x_content_type, nullptr);
+  EXPECT_EQ(x_content_type->value().getStringView(), "foobar");
+}
+
+// Verify client response when authorization server returns a 200 OK.
+TEST_F(ExtAuthzHttpClientTest, AuthorizationOk) {
+  Tracing::MockSpan* child_span{new Tracing::MockSpan()};
   const auto expected_headers = TestCommon::makeHeaderValueOption({{":status", "200", false}});
   const auto authz_response = TestCommon::makeAuthzResponse(CheckStatus::OK);
   auto check_response = TestCommon::makeMessageResponse(expected_headers);
+  envoy::service::auth::v2::CheckRequest request;
 
-  envoy::service::auth::v2alpha::CheckRequest request{};
-  auto mutable_headers =
-      request.mutable_attributes()->mutable_request()->mutable_http()->mutable_headers();
-  (*mutable_headers)[Http::Headers::get().ContentLength.get()] = std::string{"47"};
-  (*mutable_headers)[Http::Headers::get().Method.get()] = std::string{"POST"};
+  EXPECT_CALL(active_span_, spawnChild_(_, config_->tracingName(), _)).WillOnce(Return(child_span));
+  EXPECT_CALL(*child_span,
+              setTag(Eq(Tracing::Tags::get().UpstreamCluster), Eq(config_->cluster())));
+  EXPECT_CALL(*child_span, injectContext(_));
 
-  EXPECT_CALL(async_client_, send_(_, _, _))
-      .WillOnce(
-          Invoke([&](Http::MessagePtr& message, Http::AsyncClient::Callbacks&,
-                     const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
-            const auto* length_header_entry =
-                message->headers().get(Http::Headers::get().ContentLength);
-            EXPECT_EQ(length_header_entry->value().getStringView(), "0");
-            const auto* method_header_entry = message->headers().get(Http::Headers::get().Method);
-            EXPECT_EQ(method_header_entry->value().getStringView(), "POST");
-            return nullptr;
-          }));
+  client_.check(request_callbacks_, request, active_span_);
 
-  client_.check(request_callbacks_, request, Tracing::NullSpan::instance());
   EXPECT_CALL(request_callbacks_,
               onComplete_(WhenDynamicCastTo<ResponsePtr&>(AuthzOkResponse(authz_response))));
+  EXPECT_CALL(*child_span, setTag(Eq("ext_authz_status"), Eq("ext_authz_ok")));
+  EXPECT_CALL(*child_span, setTag(Eq("ext_authz_http_status"), Eq("OK")));
+  EXPECT_CALL(*child_span, finishSpan());
   client_.onSuccess(std::move(check_response));
 }
 
-// Test that the client allows only header in the whitelist to be sent to the upstream.
+// Verify client response headers when authorization_headers_to_add is configured.
+TEST_F(ExtAuthzHttpClientTest, AuthorizationOkWithAddedAuthzHeaders) {
+  Tracing::MockSpan* child_span{new Tracing::MockSpan()};
+  const auto expected_headers = TestCommon::makeHeaderValueOption({{":status", "200", false}});
+  const auto authz_response = TestCommon::makeAuthzResponse(CheckStatus::OK);
+  auto check_response = TestCommon::makeMessageResponse(expected_headers);
+  envoy::service::auth::v2::CheckRequest request;
+  auto mutable_headers =
+      request.mutable_attributes()->mutable_request()->mutable_http()->mutable_headers();
+  (*mutable_headers)[std::string{":x-authz-header2"}] = std::string{"forged-value"};
+
+  EXPECT_CALL(active_span_, spawnChild_(_, config_->tracingName(), _)).WillOnce(Return(child_span));
+  EXPECT_CALL(*child_span,
+              setTag(Eq(Tracing::Tags::get().UpstreamCluster), Eq(config_->cluster())));
+  EXPECT_CALL(*child_span, injectContext(_));
+  // Expect that header1 will be added and header2 correctly overwritten.
+  EXPECT_CALL(async_client_, send_(AllOf(ContainsPairAsHeader(config_->headersToAdd().front()),
+                                         ContainsPairAsHeader(config_->headersToAdd().back())),
+                                   _, _));
+  client_.check(request_callbacks_, request, active_span_);
+
+  EXPECT_CALL(request_callbacks_,
+              onComplete_(WhenDynamicCastTo<ResponsePtr&>(AuthzOkResponse(authz_response))));
+  EXPECT_CALL(*child_span, setTag(Eq("ext_authz_status"), Eq("ext_authz_ok")));
+  EXPECT_CALL(*child_span, setTag(Eq("ext_authz_http_status"), Eq("OK")));
+  EXPECT_CALL(*child_span, finishSpan());
+  client_.onSuccess(std::move(check_response));
+}
+
+// Verify client response headers when allow_upstream_headers is configured.
 TEST_F(ExtAuthzHttpClientTest, AuthorizationOkWithAllowHeader) {
-  const auto expected_headers = TestCommon::makeHeaderValueOption({{"bar", "foo", false}});
+  Tracing::MockSpan* child_span{new Tracing::MockSpan()};
   const std::string empty_body{};
+  const auto expected_headers =
+      TestCommon::makeHeaderValueOption({{"x-baz", "foo", false}, {"bar", "foo", false}});
   const auto authz_response =
       TestCommon::makeAuthzResponse(CheckStatus::OK, Http::Code::OK, empty_body, expected_headers);
+
+  envoy::service::auth::v2::CheckRequest request;
+  EXPECT_CALL(request_callbacks_,
+              onComplete_(WhenDynamicCastTo<ResponsePtr&>(AuthzOkResponse(authz_response))));
+  EXPECT_CALL(active_span_, spawnChild_(_, config_->tracingName(), _)).WillOnce(Return(child_span));
+  EXPECT_CALL(*child_span,
+              setTag(Eq(Tracing::Tags::get().UpstreamCluster), Eq(config_->cluster())));
+  EXPECT_CALL(*child_span, injectContext(_));
+  client_.check(request_callbacks_, request, active_span_);
+
   const auto check_response_headers =
       TestCommon::makeHeaderValueOption({{":status", "200", false},
                                          {":path", "/bar", false},
                                          {":method", "post", false},
                                          {"content-length", "post", false},
                                          {"bar", "foo", false},
+                                         {"x-baz", "foo", false},
                                          {"foobar", "foo", false}});
+
+  EXPECT_CALL(*child_span, setTag(Eq("ext_authz_status"), Eq("ext_authz_ok")));
+  EXPECT_CALL(*child_span, setTag(Eq("ext_authz_http_status"), Eq("OK")));
+  EXPECT_CALL(*child_span, finishSpan());
   auto message_response = TestCommon::makeMessageResponse(check_response_headers);
-
-  envoy::service::auth::v2alpha::CheckRequest request;
-  client_.check(request_callbacks_, request, Tracing::NullSpan::instance());
-  EXPECT_CALL(request_callbacks_,
-              onComplete_(WhenDynamicCastTo<ResponsePtr&>(AuthzOkResponse(authz_response))));
-
   client_.onSuccess(std::move(message_response));
 }
 
 // Test the client when a denied response is received.
 TEST_F(ExtAuthzHttpClientTest, AuthorizationDenied) {
+  Tracing::MockSpan* child_span{new Tracing::MockSpan()};
   const auto expected_headers = TestCommon::makeHeaderValueOption({{":status", "403", false}});
   const auto authz_response = TestCommon::makeAuthzResponse(
       CheckStatus::Denied, Http::Code::Forbidden, "", expected_headers);
-  auto check_response = TestCommon::makeMessageResponse(expected_headers);
 
-  envoy::service::auth::v2alpha::CheckRequest request;
-  client_.check(request_callbacks_, request, Tracing::NullSpan::instance());
+  envoy::service::auth::v2::CheckRequest request;
+  EXPECT_CALL(active_span_, spawnChild_(_, config_->tracingName(), _)).WillOnce(Return(child_span));
+  EXPECT_CALL(*child_span,
+              setTag(Eq(Tracing::Tags::get().UpstreamCluster), Eq(config_->cluster())));
+  EXPECT_CALL(*child_span, injectContext(_));
+  client_.check(request_callbacks_, request, active_span_);
 
+  EXPECT_CALL(*child_span, setTag(Eq("ext_authz_status"), Eq("ext_authz_unauthorized")));
+  EXPECT_CALL(*child_span, setTag(Eq("ext_authz_http_status"), Eq("Forbidden")));
+  EXPECT_CALL(*child_span, finishSpan());
   EXPECT_CALL(request_callbacks_,
               onComplete_(WhenDynamicCastTo<ResponsePtr&>(AuthzDeniedResponse(authz_response))));
-
-  client_.onSuccess(std::move(check_response));
+  client_.onSuccess(TestCommon::makeMessageResponse(expected_headers));
 }
 
-// Test the client when a denied response is received and it contains additional HTTP attributes.
+// Verify client response headers and body when the authorization server denies the request.
 TEST_F(ExtAuthzHttpClientTest, AuthorizationDeniedWithAllAttributes) {
+  Tracing::MockSpan* child_span{new Tracing::MockSpan()};
   const auto expected_body = std::string{"test"};
-  const auto expected_headers = TestCommon::makeHeaderValueOption({{":status", "401", false}});
+  const auto expected_headers = TestCommon::makeHeaderValueOption(
+      {{":status", "401", false}, {"foo", "bar", false}, {"x-foobar", "bar", false}});
   const auto authz_response = TestCommon::makeAuthzResponse(
       CheckStatus::Denied, Http::Code::Unauthorized, expected_body, expected_headers);
-  auto check_response = TestCommon::makeMessageResponse(expected_headers, expected_body);
 
-  envoy::service::auth::v2alpha::CheckRequest request;
-  client_.check(request_callbacks_, request, Tracing::NullSpan::instance());
+  EXPECT_CALL(active_span_, spawnChild_(_, config_->tracingName(), _)).WillOnce(Return(child_span));
+  EXPECT_CALL(*child_span,
+              setTag(Eq(Tracing::Tags::get().UpstreamCluster), Eq(config_->cluster())));
+  EXPECT_CALL(*child_span, injectContext(_));
 
+  envoy::service::auth::v2::CheckRequest request;
+  client_.check(request_callbacks_, request, active_span_);
+
+  EXPECT_CALL(*child_span, setTag(Eq("ext_authz_status"), Eq("ext_authz_unauthorized")));
+  EXPECT_CALL(*child_span, setTag(Eq("ext_authz_http_status"), Eq("Unauthorized")));
+  EXPECT_CALL(*child_span, finishSpan());
   EXPECT_CALL(request_callbacks_,
               onComplete_(WhenDynamicCastTo<ResponsePtr&>(AuthzDeniedResponse(authz_response))));
+  client_.onSuccess(TestCommon::makeMessageResponse(expected_headers, expected_body));
+}
 
-  client_.onSuccess(std::move(check_response));
+// Verify client response headers when the authorization server denies the request and
+// allowed_client_headers is configured.
+TEST_F(ExtAuthzHttpClientTest, AuthorizationDeniedAndAllowedClientHeaders) {
+  Tracing::MockSpan* child_span{new Tracing::MockSpan()};
+  const auto expected_body = std::string{"test"};
+  const auto authz_response = TestCommon::makeAuthzResponse(
+      CheckStatus::Denied, Http::Code::Unauthorized, expected_body,
+      TestCommon::makeHeaderValueOption(
+          {{"x-foo", "bar", false}, {":status", "401", false}, {"foo", "bar", false}}));
+
+  EXPECT_CALL(active_span_, spawnChild_(_, config_->tracingName(), _)).WillOnce(Return(child_span));
+  EXPECT_CALL(*child_span,
+              setTag(Eq(Tracing::Tags::get().UpstreamCluster), Eq(config_->cluster())));
+  EXPECT_CALL(*child_span, injectContext(_));
+
+  envoy::service::auth::v2::CheckRequest request;
+  client_.check(request_callbacks_, request, active_span_);
+  EXPECT_CALL(request_callbacks_,
+              onComplete_(WhenDynamicCastTo<ResponsePtr&>(AuthzDeniedResponse(authz_response))));
+  EXPECT_CALL(*child_span, setTag(Eq("ext_authz_status"), Eq("ext_authz_unauthorized")));
+  EXPECT_CALL(*child_span, setTag(Eq("ext_authz_http_status"), Eq("Unauthorized")));
+  EXPECT_CALL(*child_span, finishSpan());
+  const auto check_response_headers = TestCommon::makeHeaderValueOption({{":method", "post", false},
+                                                                         {"x-foo", "bar", false},
+                                                                         {":status", "401", false},
+                                                                         {"foo", "bar", false}});
+  client_.onSuccess(TestCommon::makeMessageResponse(check_response_headers, expected_body));
 }
 
 // Test the client when an unknown error occurs.
 TEST_F(ExtAuthzHttpClientTest, AuthorizationRequestError) {
-  envoy::service::auth::v2alpha::CheckRequest request;
-  client_.check(request_callbacks_, request, Tracing::NullSpan::instance());
+  Tracing::MockSpan* child_span{new Tracing::MockSpan()};
+  envoy::service::auth::v2::CheckRequest request;
+
+  EXPECT_CALL(active_span_, spawnChild_(_, config_->tracingName(), _)).WillOnce(Return(child_span));
+  EXPECT_CALL(*child_span,
+              setTag(Eq(Tracing::Tags::get().UpstreamCluster), Eq(config_->cluster())));
+  EXPECT_CALL(*child_span, injectContext(_));
+
+  client_.check(request_callbacks_, request, active_span_);
 
   EXPECT_CALL(request_callbacks_,
               onComplete_(WhenDynamicCastTo<ResponsePtr&>(AuthzErrorResponse(CheckStatus::Error))));
+  EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().Error), Eq(Tracing::Tags::get().True)));
+  EXPECT_CALL(*child_span, finishSpan());
   client_.onFailure(Http::AsyncClient::FailureReason::Reset);
 }
 
@@ -226,38 +407,82 @@ TEST_F(ExtAuthzHttpClientTest, AuthorizationRequestError) {
 TEST_F(ExtAuthzHttpClientTest, AuthorizationRequest5xxError) {
   Http::MessagePtr check_response(new Http::ResponseMessageImpl(
       Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "503"}}}));
-  envoy::service::auth::v2alpha::CheckRequest request;
-  client_.check(request_callbacks_, request, Tracing::NullSpan::instance());
+  Tracing::MockSpan* child_span{new Tracing::MockSpan()};
+  envoy::service::auth::v2::CheckRequest request;
+
+  EXPECT_CALL(active_span_, spawnChild_(_, config_->tracingName(), _)).WillOnce(Return(child_span));
+  EXPECT_CALL(*child_span,
+              setTag(Eq(Tracing::Tags::get().UpstreamCluster), Eq(config_->cluster())));
+  EXPECT_CALL(*child_span, injectContext(_));
+
+  client_.check(request_callbacks_, request, active_span_);
 
   EXPECT_CALL(request_callbacks_,
               onComplete_(WhenDynamicCastTo<ResponsePtr&>(AuthzErrorResponse(CheckStatus::Error))));
-
+  EXPECT_CALL(*child_span, setTag(Eq("ext_authz_http_status"), Eq("Service Unavailable")));
+  EXPECT_CALL(*child_span, finishSpan());
   client_.onSuccess(std::move(check_response));
 }
 
-// Test the client when a call to authorization server returns a status code that cannot be parsed.
+// Test the client when a call to authorization server returns a status code that cannot be
+// parsed.
 TEST_F(ExtAuthzHttpClientTest, AuthorizationRequestErrorParsingStatusCode) {
   Http::MessagePtr check_response(new Http::ResponseMessageImpl(
       Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "foo"}}}));
-  envoy::service::auth::v2alpha::CheckRequest request;
-  client_.check(request_callbacks_, request, Tracing::NullSpan::instance());
+  Tracing::MockSpan* child_span{new Tracing::MockSpan()};
+  envoy::service::auth::v2::CheckRequest request;
+
+  EXPECT_CALL(active_span_, spawnChild_(_, config_->tracingName(), _)).WillOnce(Return(child_span));
+  EXPECT_CALL(*child_span,
+              setTag(Eq(Tracing::Tags::get().UpstreamCluster), Eq(config_->cluster())));
+  EXPECT_CALL(*child_span, injectContext(_));
+
+  client_.check(request_callbacks_, request, active_span_);
 
   EXPECT_CALL(request_callbacks_,
               onComplete_(WhenDynamicCastTo<ResponsePtr&>(AuthzErrorResponse(CheckStatus::Error))));
-
+  EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().Error), Eq(Tracing::Tags::get().True)));
+  EXPECT_CALL(*child_span, finishSpan());
   client_.onSuccess(std::move(check_response));
 }
 
 // Test the client when the request is canceled.
 TEST_F(ExtAuthzHttpClientTest, CancelledAuthorizationRequest) {
-  envoy::service::auth::v2alpha::CheckRequest request;
+  Tracing::MockSpan* child_span{new Tracing::MockSpan()};
+  envoy::service::auth::v2::CheckRequest request;
+
+  EXPECT_CALL(active_span_, spawnChild_(_, config_->tracingName(), _)).WillOnce(Return(child_span));
+  EXPECT_CALL(*child_span,
+              setTag(Eq(Tracing::Tags::get().UpstreamCluster), Eq(config_->cluster())));
+  EXPECT_CALL(*child_span, injectContext(_));
   EXPECT_CALL(async_client_, send_(_, _, _)).WillOnce(Return(&async_request_));
-  client_.check(request_callbacks_, request, Tracing::NullSpan::instance());
+  client_.check(request_callbacks_, request, active_span_);
 
   EXPECT_CALL(async_request_, cancel());
+  EXPECT_CALL(*child_span,
+              setTag(Eq(Tracing::Tags::get().Status), Eq(Tracing::Tags::get().Canceled)));
+  EXPECT_CALL(*child_span, finishSpan());
   client_.cancel();
 }
 
+// Test the client when the configured cluster is missing/removed.
+TEST_F(ExtAuthzHttpClientTest, NoCluster) {
+  InSequence s;
+  Tracing::MockSpan* child_span{new Tracing::MockSpan()};
+
+  EXPECT_CALL(active_span_, spawnChild_(_, config_->tracingName(), _)).WillOnce(Return(child_span));
+  EXPECT_CALL(*child_span,
+              setTag(Eq(Tracing::Tags::get().UpstreamCluster), Eq(config_->cluster())));
+  EXPECT_CALL(cm_, get(Eq("ext_authz"))).WillOnce(Return(nullptr));
+  EXPECT_CALL(cm_, httpAsyncClientForCluster("ext_authz")).Times(0);
+  EXPECT_CALL(request_callbacks_,
+              onComplete_(WhenDynamicCastTo<ResponsePtr&>(AuthzErrorResponse(CheckStatus::Error))));
+  EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().Error), Eq(Tracing::Tags::get().True)));
+  EXPECT_CALL(*child_span, finishSpan());
+  client_.check(request_callbacks_, envoy::service::auth::v2::CheckRequest{}, active_span_);
+}
+
+} // namespace
 } // namespace ExtAuthz
 } // namespace Common
 } // namespace Filters

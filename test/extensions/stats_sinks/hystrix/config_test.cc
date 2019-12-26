@@ -1,4 +1,4 @@
-#include "envoy/config/bootstrap/v2/bootstrap.pb.h"
+#include "envoy/config/metrics/v2/stats.pb.h"
 #include "envoy/registry/registry.h"
 
 #include "common/protobuf/utility.h"
@@ -15,15 +15,13 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-using testing::_;
 using testing::NiceMock;
-using testing::Return;
-using testing::ReturnRef;
 
 namespace Envoy {
 namespace Extensions {
 namespace StatSinks {
 namespace Hystrix {
+namespace {
 
 TEST(StatsConfigTest, ValidHystrixSink) {
   const std::string name = StatsSinkNames::get().Hystrix;
@@ -35,7 +33,7 @@ TEST(StatsConfigTest, ValidHystrixSink) {
   ASSERT_NE(factory, nullptr);
 
   ProtobufTypes::MessagePtr message = factory->createEmptyConfigProto();
-  MessageUtil::jsonConvert(sink_config, *message);
+  TestUtility::jsonConvert(sink_config, *message);
 
   NiceMock<Server::MockInstance> server;
   Stats::SinkPtr sink = factory->createStatsSink(*message, server);
@@ -43,6 +41,7 @@ TEST(StatsConfigTest, ValidHystrixSink) {
   EXPECT_NE(dynamic_cast<Hystrix::HystrixSink*>(sink.get()), nullptr);
 }
 
+} // namespace
 } // namespace Hystrix
 } // namespace StatSinks
 } // namespace Extensions

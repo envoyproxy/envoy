@@ -9,19 +9,18 @@ namespace Extensions {
 namespace HttpFilters {
 namespace GrpcWeb {
 
-Http::FilterFactoryCb GrpcWebFilterConfig::createFilter(const std::string&,
-                                                        Server::Configuration::FactoryContext&) {
-  return [](Http::FilterChainFactoryCallbacks& callbacks) -> void {
-    callbacks.addStreamFilter(std::make_shared<GrpcWebFilter>());
+Http::FilterFactoryCb
+GrpcWebFilterConfig::createFilter(const std::string&,
+                                  Server::Configuration::FactoryContext& factory_context) {
+  return [&factory_context](Http::FilterChainFactoryCallbacks& callbacks) {
+    callbacks.addStreamFilter(std::make_shared<GrpcWebFilter>(factory_context.grpcContext()));
   };
 }
 
 /**
  * Static registration for the gRPC-Web filter. @see RegisterFactory.
  */
-static Registry::RegisterFactory<GrpcWebFilterConfig,
-                                 Server::Configuration::NamedHttpFilterConfigFactory>
-    register_;
+REGISTER_FACTORY(GrpcWebFilterConfig, Server::Configuration::NamedHttpFilterConfigFactory);
 
 } // namespace GrpcWeb
 } // namespace HttpFilters

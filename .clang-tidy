@@ -1,7 +1,55 @@
-Checks:          'clang-diagnostic-*,clang-analyzer-*,abseil-*,bugprone-*,modernize-*,performance-*,readability-redundant-*,readability-braces-around-statements'
+Checks:          'abseil-*,
+                  bugprone-*,
+                  clang-analyzer-*,
+                  clang-diagnostic-*,
+                  misc-unused-using-decls,
+                  modernize-*,
+                  -modernize-pass-by-value,
+                  -modernize-use-trailing-return-type,
+                  performance-*,
+                  readability-braces-around-statements,
+                  readability-container-size-empty,
+                  readability-identifier-naming,
+                  readability-redundant-*'
 
 #TODO(lizan): grow this list, fix possible warnings and make more checks as error
-WarningsAsErrors: 'bugprone-assert-side-effect,modernize-make-shared,modernize-make-unique,readability-redundant-smartptr-get,readability-braces-around-statements,readability-redundant-string-cstr,bugprone-use-after-move'
+WarningsAsErrors: 'abseil-duration-*,
+                   abseil-faster-strsplit-delimiter,
+                   abseil-no-namespace,
+                   abseil-redundant-strcat-calls,
+                   abseil-str-cat-append,
+                   abseil-string-find-startswith,
+                   abseil-upgrade-duration-conversions,
+                   bugprone-assert-side-effect,
+                   bugprone-unused-raii,
+                   bugprone-use-after-move,
+                   clang-analyzer-core.DivideZero,
+                   misc-unused-using-decls,
+                   modernize-deprecated-headers,
+                   modernize-loop-convert,
+                   modernize-make-shared,
+                   modernize-make-unique,
+                   modernize-return-braced-init-list,
+                   modernize-use-default-member-init,
+                   modernize-use-equals-default,
+                   modernize-use-nullptr,
+                   modernize-use-override,
+                   modernize-use-using,
+                   performance-faster-string-find,
+                   performance-for-range-copy,
+                   performance-inefficient-algorithm,
+                   performance-inefficient-vector-operation,
+                   performance-noexcept-move-constructor,
+                   performance-move-constructor-init,
+                   performance-type-promotion-in-math-fn,
+                   performance-unnecessary-copy-initialization,
+                   readability-braces-around-statements,
+                   readability-container-size-empty,
+                   readability-identifier-naming,
+                   readability-redundant-control-flow,
+                   readability-redundant-member-init,
+                   readability-redundant-smartptr-get,
+                   readability-redundant-string-cstr'
 
 CheckOptions:
   - key:             bugprone-assert-side-effect.AssertMacros
@@ -12,3 +60,30 @@ CheckOptions:
 
   - key:             modernize-use-auto.MinTypeNameLength
     value:           '10'
+
+  - key:             readability-identifier-naming.ClassCase
+    value:           'CamelCase'
+
+  - key:             readability-identifier-naming.EnumCase
+    value:           'CamelCase'
+
+  - key:             readability-identifier-naming.EnumConstantCase
+    value:           'CamelCase'
+
+  - key:             readability-identifier-naming.ParameterCase
+    value:           'lower_case'
+
+  - key:             readability-identifier-naming.PrivateMemberCase
+    value:           'lower_case'
+
+  - key:             readability-identifier-naming.PrivateMemberSuffix
+    value:           '_'
+
+  - key:             readability-identifier-naming.StructCase
+    value:           'CamelCase'
+
+  - key:             readability-identifier-naming.TypeAliasCase
+    value:           'CamelCase'
+
+  - key:             readability-identifier-naming.UnionCase
+    value:           'CamelCase'

@@ -1,0 +1,64 @@
+version: "3.7"
+
+services:
+
+  # Requires the build of the stubs first
+  grpc-server:
+    image: envoyproxy/example-kv-server
+    build:
+      context: server
+    expose:
+      - "8081"
+    ports:
+      - "8081:8081"
+    networks:
+      envoymesh:
+        aliases:
+          - kv-backend-service
+
+  grpc-server-proxy:
+    image: envoyproxy/envoy:latest
+    command: /usr/local/bin/envoy -c /etc/server-envoy-proxy.yaml --service-cluster backend-proxy
+    volumes:
+      - ./server/envoy-proxy.yaml:/etc/server-envoy-proxy.yaml
+    networks:
+      envoymesh:
+        aliases:
+          - kv-backend-proxy
+    expose:
+      - "8811"
+      - "8881"
+    ports:
+      - "8811:8811"
+      - "8881:8881"
+
+  # Requires the build of the stubs first
+  grpc-client:
+    image: envoyproxy/example-kv-client
+    build:
+      context: client
+    environment:
+      - CLIENT_PROXY=http://kv-client-proxy:9911
+    networks:
+      envoymesh:
+        aliases:
+          - grpc-client
+
+  grpc-client-proxy:
+    image: envoyproxy/envoy:latest
+    command: /usr/local/bin/envoy -c /etc/client-envoy-proxy.yaml
+    volumes:
+      - ./client/envoy-proxy.yaml:/etc/client-envoy-proxy.yaml
+    networks:
+      envoymesh:
+        aliases:
+          - kv-client-proxy
+    expose:
+      - "9911"
+      - "9991"
+    ports:
+      - "9911:9911"
+      - "9991:9991"
+
+networks:
+  envoymesh: {}

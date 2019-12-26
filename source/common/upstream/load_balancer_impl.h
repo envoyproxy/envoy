@@ -24,11 +24,16 @@ static constexpr uint32_t kDefaultOverProvisioningFactor = 140;
  */
 class LoadBalancerBase : public LoadBalancer {
 public:
+  enum class HostAvailability { Healthy, Degraded };
+
   // A utility function to chose a priority level based on a precomputed hash and
-  // a priority vector in the style of per_priority_load_
+  // two PriorityLoad vectors, one for healthy load and one for degraded.
   //
-  // Returns the priority, a number between 0 and per_priority_load.size()-1
-  static uint32_t choosePriority(uint64_t hash, const std::vector<uint32_t>& per_priority_load);
+  // Returns the priority, a number between 0 and per_priority_load.size()-1 as well as which host
+  // availability level was chosen.
+  static std::pair<uint32_t, HostAvailability>
+  choosePriority(uint64_t hash, const HealthyLoad& healthy_per_priority_load,
+                 const DegradedLoad& degraded_per_priority_load);
 
   HostConstSharedPtr chooseHost(LoadBalancerContext* context) override;
 
@@ -59,10 +64,20 @@ protected:
                    Runtime::RandomGenerator& random,
                    const envoy::api::v2::Cluster::CommonLbConfig& common_config);
 
-  // Choose host set randomly, based on the per_priority_load_;
-  HostSet& chooseHostSet(LoadBalancerContext* context);
+  // Choose host set randomly, based on the healthy_per_priority_load_ and
+  // degraded_per_priority_load_. per_priority_load_ is consulted first, spilling over to
+  // degraded_per_priority_load_ if necessary. When a host set is selected based on
+  // degraded_per_priority_load_, only degraded hosts should be selected from that host set.
+  //
+  // @return host set to use and which availability to target.
+  std::pair<HostSet&, HostAvailability> chooseHostSet(LoadBalancerContext* context);
 
-  uint32_t percentageLoad(uint32_t priority) const { return per_priority_load_[priority]; }
+  uint32_t percentageLoad(uint32_t priority) const {
+    return per_priority_load_.healthy_priority_load_.get()[priority];
+  }
+  uint32_t percentageDegradedLoad(uint32_t priority) const {
+    return per_priority_load_.degraded_priority_load_.get()[priority];
+  }
   bool isInPanic(uint32_t priority) const { return per_priority_panic_[priority]; }
 
   ClusterStats& stats_;
@@ -77,25 +92,39 @@ public:
   // per_priority_health for that priority level, and may update per_priority_load for all
   // priority levels.
   void static recalculatePerPriorityState(uint32_t priority, const PrioritySet& priority_set,
-                                          PriorityLoad& priority_load,
-                                          std::vector<uint32_t>& per_priority_health);
+                                          HealthyAndDegradedLoad& priority_load,
+                                          HealthyAvailability& per_priority_health,
+                                          DegradedAvailability& per_priority_degraded);
   void recalculatePerPriorityPanic();
 
 protected:
-  // Method calculates normalized total health. Each priority level's health is ratio of
-  // healthy hosts to total number of hosts in a priority multiplied by overprovisioning factor
-  // of 1.4 and capped at 100%. Effectively each priority's health is a value between 0-100%.
-  // Calculating normalized total health starts with summarizing all priorities' health values.
-  // It can exceed 100%. For example if there are three priorities and each is 100% healthy, the
-  // total of all priorities is 300%. Normalized total health is then capped at 100%.
-  static uint32_t calcNormalizedTotalHealth(std::vector<uint32_t>& per_priority_health) {
-    return std::min<uint32_t>(
-        std::accumulate(per_priority_health.begin(), per_priority_health.end(), 0), 100);
+  // Method calculates normalized total availability.
+  //
+  // The availability of a priority is ratio of available (healthy/degraded) hosts over the total
+  // number of hosts multiplied by 100 and the overprovisioning factor. The total availability is
+  // the sum of the availability of each priority, up to a maximum of 100.
+  //
+  // For example, using the default overprovisioning factor of 1.4, a if priority A has 4 hosts,
+  // of which 1 is degraded and 1 is healthy, it will have availability of 2/4 * 100 * 1.4 = 70.
+  //
+  // Assuming two priorities with availability 60 and 70, the total availability would be 100.
+  static uint32_t
+  calculateNormalizedTotalAvailability(HealthyAvailability& per_priority_health,
+                                       DegradedAvailability& per_priority_degraded) {
+    const auto health =
+        std::accumulate(per_priority_health.get().begin(), per_priority_health.get().end(), 0);
+    const auto degraded =
+        std::accumulate(per_priority_degraded.get().begin(), per_priority_degraded.get().end(), 0);
+
+    return std::min<uint32_t>(health + degraded, 100);
   }
-  // The percentage load (0-100) for each priority level
-  std::vector<uint32_t> per_priority_load_;
-  // The health (0-100) for each priority level.
-  std::vector<uint32_t> per_priority_health_;
+  // The percentage load (0-100) for each priority level when targeting healthy hosts and
+  // the percentage load (0-100) for each priority level when targeting degraded hosts.
+  HealthyAndDegradedLoad per_priority_load_;
+  // The health percentage (0-100) for each priority level.
+  HealthyAvailability per_priority_health_;
+  // The degraded percentage (0-100) for each priority level.
+  DegradedAvailability per_priority_degraded_;
   // Levels which are in panic
   std::vector<bool> per_priority_panic_;
 };
@@ -110,14 +139,21 @@ public:
 
   const Http::HeaderMap* downstreamHeaders() const override { return nullptr; }
 
-  const PriorityLoad& determinePriorityLoad(const PrioritySet&,
-                                            const PriorityLoad& original_priority_load) override {
+  const HealthyAndDegradedLoad&
+  determinePriorityLoad(const PrioritySet&,
+                        const HealthyAndDegradedLoad& original_priority_load) override {
     return original_priority_load;
   }
 
   bool shouldSelectAnotherHost(const Host&) override { return false; }
 
   uint32_t hostSelectionRetryCount() const override { return 1; }
+
+  Network::Socket::OptionsSharedPtr upstreamSocketOptions() const override { return nullptr; }
+
+  Network::TransportSocketOptionsSharedPtr upstreamTransportSocketOptions() const override {
+    return nullptr;
+  }
 };
 
 /**
@@ -130,7 +166,7 @@ protected:
                             ClusterStats& stats, Runtime::Loader& runtime,
                             Runtime::RandomGenerator& random,
                             const envoy::api::v2::Cluster::CommonLbConfig& common_config);
-  ~ZoneAwareLoadBalancerBase();
+  ~ZoneAwareLoadBalancerBase() override;
 
   // When deciding which hosts to use on an LB decision, we need to know how to index into the
   // priority_set. This priority_set cursor is used by ZoneAwareLoadBalancerBase subclasses, e.g.
@@ -142,20 +178,26 @@ protected:
       AllHosts,
       // All healthy hosts in the host set.
       HealthyHosts,
+      // All degraded hosts in the host set.
+      DegradedHosts,
       // Healthy hosts for locality @ locality_index.
       LocalityHealthyHosts,
+      // Degraded hosts for locality @ locality_index.
+      LocalityDegradedHosts,
     };
 
-    HostsSource() {}
+    HostsSource() = default;
 
     HostsSource(uint32_t priority, SourceType source_type)
         : priority_(priority), source_type_(source_type) {
-      ASSERT(source_type == SourceType::AllHosts || source_type == SourceType::HealthyHosts);
+      ASSERT(source_type == SourceType::AllHosts || source_type == SourceType::HealthyHosts ||
+             source_type == SourceType::DegradedHosts);
     }
 
     HostsSource(uint32_t priority, SourceType source_type, uint32_t locality_index)
         : priority_(priority), source_type_(source_type), locality_index_(locality_index) {
-      ASSERT(source_type == SourceType::LocalityHealthyHosts);
+      ASSERT(source_type == SourceType::LocalityHealthyHosts ||
+             source_type == SourceType::LocalityDegradedHosts);
     }
 
     // Priority in PrioritySet.
@@ -185,8 +227,9 @@ protected:
 
   /**
    * Pick the host source to use, doing zone aware routing when the hosts are sufficiently healthy.
+   * If no host is chosen (due to fail_traffic_on_panic being set), return absl::nullopt.
    */
-  HostsSource hostSourceToUse(LoadBalancerContext* context);
+  absl::optional<HostsSource> hostSourceToUse(LoadBalancerContext* context);
 
   /**
    * Index into priority_set via hosts source descriptor.
@@ -235,11 +278,34 @@ private:
 
   HostSet& localHostSet() const { return *local_priority_set_->hostSetsPerPriority()[0]; }
 
+  static HostsSource::SourceType localitySourceType(HostAvailability host_availability) {
+    switch (host_availability) {
+    case HostAvailability::Healthy:
+      return HostsSource::SourceType::LocalityHealthyHosts;
+    case HostAvailability::Degraded:
+      return HostsSource::SourceType::LocalityDegradedHosts;
+    default:
+      NOT_REACHED_GCOVR_EXCL_LINE;
+    }
+  }
+
+  static HostsSource::SourceType sourceType(HostAvailability host_availability) {
+    switch (host_availability) {
+    case HostAvailability::Healthy:
+      return HostsSource::SourceType::HealthyHosts;
+    case HostAvailability::Degraded:
+      return HostsSource::SourceType::DegradedHosts;
+    default:
+      NOT_REACHED_GCOVR_EXCL_LINE;
+    }
+  }
+
   // The set of local Envoy instances which are load balancing across priority_set_.
   const PrioritySet* local_priority_set_;
 
   const uint32_t routing_enabled_;
   const uint64_t min_cluster_size_;
+  const bool fail_traffic_on_panic_;
 
   struct PerPriorityState {
     // The percent of requests which can be routed to the local locality.
@@ -251,7 +317,7 @@ private:
     // routed where.
     std::vector<uint64_t> residual_capacity_;
   };
-  typedef std::unique_ptr<PerPriorityState> PerPriorityStatePtr;
+  using PerPriorityStatePtr = std::unique_ptr<PerPriorityState>;
   // Routing state broken out for each priority level in priority_set_.
   std::vector<PerPriorityStatePtr> per_priority_state_;
   Common::CallbackHandle* local_priority_set_member_update_cb_handle_{};
@@ -286,8 +352,10 @@ public:
 
 protected:
   struct Scheduler {
-    // EdfScheduler for weighted LB.
-    EdfScheduler<const Host> edf_;
+    // EdfScheduler for weighted LB. The edf_ is only created when the original
+    // host weights of 2 or more hosts differ. When not present, the
+    // implementation of chooseHostOnce falls back to unweightedHostPick.
+    std::unique_ptr<EdfScheduler<const Host>> edf_;
   };
 
   void initialize();
@@ -311,7 +379,7 @@ private:
 };
 
 /**
- * A round roubin load balancer. When in weighted mode, EDF scheduling is used. When in not
+ * A round robin load balancer. When in weighted mode, EDF scheduling is used. When in not
  * weighted mode, simple RR index selection is used.
  */
 class RoundRobinLoadBalancer : public EdfLoadBalancerBase {
@@ -348,12 +416,12 @@ private:
 /**
  * Weighted Least Request load balancer.
  *
- * In a normal setup when all hosts have the same weight of 1 it randomly picks up N healthy hosts
+ * In a normal setup when all hosts have the same weight it randomly picks up N healthy hosts
  * (where N is specified in the LB configuration) and compares number of active requests. Technique
  * is based on http://www.eecs.harvard.edu/~michaelm/postscripts/mythesis.pdf and is known as P2C
  * (power of two choices).
  *
- * When any hosts have a weight that is not 1, an RR EDF schedule is used. Host weight is scaled
+ * When hosts have different weights, an RR EDF schedule is used. Host weight is scaled
  * by the number of active requests at pick/insert time. Thus, hosts will never fully drain as
  * they would in normal P2C, though they will get picked less and less often. In the future, we
  * can consider two alternate algorithms:
@@ -382,11 +450,9 @@ private:
   void refreshHostSource(const HostsSource&) override {}
   double hostWeight(const Host& host) override {
     // Here we scale host weight by the number of active requests at the time we do the pick. We
-    // always add 1 to avoid division by 0. Note that if all weights are 1, the EDF schedule is
-    // unlikely to yield the same result as P2C given the lack of randomness as well as the fact
-    // that hosts are always picked, regardless of their current request load at the time of pick.
-    // It might be posible to do better by picking two hosts off of the schedule, and selecting
-    // the one with fewer active requests at the time of selection.
+    // always add 1 to avoid division by 0. It might be possible to do better by picking two hosts
+    // off of the schedule, and selecting the one with fewer active requests at the time of
+    // selection.
     // TODO(mattklein123): @htuch brings up the point that how we are scaling weight here might not
     // be the only/best way of doing this. Essentially, it makes weight and active requests equally
     // important. Are they equally important in practice? There is no right answer here and we might
@@ -415,6 +481,32 @@ public:
 };
 
 /**
+ * Implementation of SubsetSelector
+ */
+class SubsetSelectorImpl : public SubsetSelector {
+public:
+  SubsetSelectorImpl(
+      const Protobuf::RepeatedPtrField<std::string>& selector_keys,
+      envoy::api::v2::Cluster::LbSubsetConfig::LbSubsetSelector::LbSubsetSelectorFallbackPolicy
+          fallback_policy,
+      const Protobuf::RepeatedPtrField<std::string>& fallback_keys_subset);
+
+  // SubsetSelector
+  const std::set<std::string>& selectorKeys() const override { return selector_keys_; }
+  envoy::api::v2::Cluster_LbSubsetConfig_LbSubsetSelector::LbSubsetSelectorFallbackPolicy
+  fallbackPolicy() const override {
+    return fallback_policy_;
+  }
+  const std::set<std::string>& fallbackKeysSubset() const override { return fallback_keys_subset_; }
+
+private:
+  const std::set<std::string> selector_keys_;
+  const envoy::api::v2::Cluster::LbSubsetConfig::LbSubsetSelector::LbSubsetSelectorFallbackPolicy
+      fallback_policy_;
+  const std::set<std::string> fallback_keys_subset_;
+};
+
+/**
  * Implementation of LoadBalancerSubsetInfo.
  */
 class LoadBalancerSubsetInfoImpl : public LoadBalancerSubsetInfo {
@@ -424,11 +516,12 @@ public:
         fallback_policy_(subset_config.fallback_policy()),
         default_subset_(subset_config.default_subset()),
         locality_weight_aware_(subset_config.locality_weight_aware()),
-        scale_locality_weight_(subset_config.scale_locality_weight()) {
+        scale_locality_weight_(subset_config.scale_locality_weight()),
+        panic_mode_any_(subset_config.panic_mode_any()), list_as_any_(subset_config.list_as_any()) {
     for (const auto& subset : subset_config.subset_selectors()) {
       if (!subset.keys().empty()) {
-        subset_keys_.emplace_back(
-            std::set<std::string>(subset.keys().begin(), subset.keys().end()));
+        subset_selectors_.emplace_back(std::make_shared<SubsetSelectorImpl>(
+            subset.keys(), subset.fallback_policy(), subset.fallback_keys_subset()));
       }
     }
   }
@@ -439,17 +532,23 @@ public:
     return fallback_policy_;
   }
   const ProtobufWkt::Struct& defaultSubset() const override { return default_subset_; }
-  const std::vector<std::set<std::string>>& subsetKeys() const override { return subset_keys_; }
+  const std::vector<SubsetSelectorPtr>& subsetSelectors() const override {
+    return subset_selectors_;
+  }
   bool localityWeightAware() const override { return locality_weight_aware_; }
   bool scaleLocalityWeight() const override { return scale_locality_weight_; }
+  bool panicModeAny() const override { return panic_mode_any_; }
+  bool listAsAny() const override { return list_as_any_; }
 
 private:
   const bool enabled_;
   const envoy::api::v2::Cluster::LbSubsetConfig::LbSubsetFallbackPolicy fallback_policy_;
   const ProtobufWkt::Struct default_subset_;
-  std::vector<std::set<std::string>> subset_keys_;
+  std::vector<SubsetSelectorPtr> subset_selectors_;
   const bool locality_weight_aware_;
   const bool scale_locality_weight_;
+  const bool panic_mode_any_;
+  const bool list_as_any_;
 };
 
 } // namespace Upstream

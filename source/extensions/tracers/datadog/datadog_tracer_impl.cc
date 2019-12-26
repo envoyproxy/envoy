@@ -1,5 +1,7 @@
 #include "extensions/tracers/datadog/datadog_tracer_impl.h"
 
+#include "envoy/config/trace/v2/trace.pb.h"
+
 #include "common/common/enum_to_int.h"
 #include "common/common/fmt.h"
 #include "common/common/utility.h"
@@ -80,14 +82,14 @@ void TraceReporter::enableTimer() {
 
 void TraceReporter::flushTraces() {
   auto pendingTraces = encoder_->pendingTraces();
-  ENVOY_LOG(debug, "flushing traces: {} traces", pendingTraces);
   if (pendingTraces) {
+    ENVOY_LOG(debug, "flushing traces: {} traces", pendingTraces);
     driver_.tracerStats().traces_sent_.add(pendingTraces);
 
     Http::MessagePtr message(new Http::RequestMessageImpl());
-    message->headers().insertMethod().value().setReference(Http::Headers::get().MethodValues.Post);
-    message->headers().insertPath().value().setReference(encoder_->path());
-    message->headers().insertHost().value().setReference(driver_.cluster()->name());
+    message->headers().setReferenceMethod(Http::Headers::get().MethodValues.Post);
+    message->headers().setReferencePath(encoder_->path());
+    message->headers().setReferenceHost(driver_.cluster()->name());
     for (auto& h : encoder_->headers()) {
       message->headers().setReferenceKey(lower_case_headers_.at(h.first), h.second);
     }
@@ -95,7 +97,7 @@ void TraceReporter::flushTraces() {
     Buffer::InstancePtr body(new Buffer::OwnedImpl());
     body->add(encoder_->payload());
     message->body() = std::move(body);
-    ENVOY_LOG(debug, "submitting {} trace(s) to {} with payload {}", pendingTraces,
+    ENVOY_LOG(debug, "submitting {} trace(s) to {} with payload size {}", pendingTraces,
               encoder_->path(), encoder_->payload().size());
 
     driver_.clusterManager()

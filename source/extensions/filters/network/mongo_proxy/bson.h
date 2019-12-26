@@ -18,7 +18,7 @@ namespace Bson {
  * Implementation of http://bsonspec.org/spec.html
  */
 class Document;
-typedef std::shared_ptr<Document> DocumentSharedPtr;
+using DocumentSharedPtr = std::shared_ptr<Document>;
 
 /**
  * A BSON document field. This is essentially a variably typed parameter that can be "cast" to
@@ -30,25 +30,26 @@ public:
    * Raw field type.
    */
   enum class Type : uint8_t {
-    DOUBLE = 0x01,
-    STRING = 0x02,
-    DOCUMENT = 0x03,
-    ARRAY = 0x04,
-    BINARY = 0x05,
-    OBJECT_ID = 0x07,
-    BOOLEAN = 0x08,
-    DATETIME = 0x09,
-    NULL_VALUE = 0x0A,
-    REGEX = 0x0B,
-    INT32 = 0x10,
-    TIMESTAMP = 0x11,
-    INT64 = 0x12
+    Double = 0x01,
+    String = 0x02,
+    Document = 0x03,
+    Array = 0x04,
+    Binary = 0x05,
+    ObjectId = 0x07,
+    Boolean = 0x08,
+    Datetime = 0x09,
+    NullValue = 0x0A,
+    Regex = 0x0B,
+    Symbol = 0x0E,
+    Int32 = 0x10,
+    Timestamp = 0x11,
+    Int64 = 0x12
   };
 
   /**
    * 12 byte ObjectId type.
    */
-  typedef std::array<uint8_t, 12> ObjectId;
+  using ObjectId = std::array<uint8_t, 12>;
 
   /**
    * Regex type.
@@ -62,10 +63,11 @@ public:
     std::string options_;
   };
 
-  virtual ~Field() {}
+  virtual ~Field() = default;
 
   virtual double asDouble() const PURE;
   virtual const std::string& asString() const PURE;
+  virtual const std::string& asSymbol() const PURE;
   virtual const Document& asDocument() const PURE;
   virtual const Document& asArray() const PURE;
   virtual const std::string& asBinary() const PURE;
@@ -85,17 +87,18 @@ public:
   virtual Type type() const PURE;
 };
 
-typedef std::unique_ptr<Field> FieldPtr;
+using FieldPtr = std::unique_ptr<Field>;
 
 /**
  * A BSON document. add*() is used to add strongly typed fields.
  */
 class Document {
 public:
-  virtual ~Document() {}
+  virtual ~Document() = default;
 
   virtual DocumentSharedPtr addDouble(const std::string& key, double value) PURE;
   virtual DocumentSharedPtr addString(const std::string& key, std::string&& value) PURE;
+  virtual DocumentSharedPtr addSymbol(const std::string& key, std::string&& value) PURE;
   virtual DocumentSharedPtr addDocument(const std::string& key, DocumentSharedPtr value) PURE;
   virtual DocumentSharedPtr addArray(const std::string& key, DocumentSharedPtr value) PURE;
   virtual DocumentSharedPtr addBinary(const std::string& key, std::string&& value) PURE;

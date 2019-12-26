@@ -1,15 +1,14 @@
 #include "common/network/cidr_range.h"
 
-#include <arpa/inet.h>
-#include <netinet/ip.h>
-#include <sys/socket.h>
-
 #include <array>
 #include <cstdint>
 #include <string>
 #include <vector>
 
+#include "envoy/api/v2/core/address.pb.h"
+#include "envoy/api/v3alpha/core/address.pb.h"
 #include "envoy/common/exception.h"
+#include "envoy/common/platform.h"
 
 #include "common/common/assert.h"
 #include "common/common/fmt.h"
@@ -34,13 +33,9 @@ CidrRange::CidrRange(InstanceConstSharedPtr address, int length)
   }
 }
 
-CidrRange::CidrRange(const CidrRange& other) : address_(other.address_), length_(other.length_) {}
+CidrRange::CidrRange(const CidrRange& other) = default;
 
-CidrRange& CidrRange::operator=(const CidrRange& other) {
-  address_ = other.address_;
-  length_ = other.length_;
-  return *this;
-}
+CidrRange& CidrRange::operator=(const CidrRange& other) = default;
 
 bool CidrRange::operator==(const CidrRange& other) const {
   // Lengths must be the same, and must be valid (i.e. not -1).
@@ -121,6 +116,10 @@ CidrRange CidrRange::create(const envoy::api::v2::core::CidrRange& cidr) {
   return create(Utility::parseInternetAddress(cidr.address_prefix()), cidr.prefix_len().value());
 }
 
+CidrRange CidrRange::create(const envoy::api::v3alpha::core::CidrRange& cidr) {
+  return create(Utility::parseInternetAddress(cidr.address_prefix()), cidr.prefix_len().value());
+}
+
 // static
 CidrRange CidrRange::create(const std::string& range) {
   const auto parts = StringUtil::splitToken(range, "/");
@@ -128,8 +127,7 @@ CidrRange CidrRange::create(const std::string& range) {
     InstanceConstSharedPtr ptr = Utility::parseInternetAddress(std::string{parts[0]});
     if (ptr->type() == Type::Ip) {
       uint64_t length64;
-      const std::string part{parts[1]};
-      if (StringUtil::atoul(part.c_str(), length64, 10)) {
+      if (absl::SimpleAtoi(parts[1], &length64)) {
         if ((ptr->ip()->version() == IpVersion::v6 && length64 <= 128) ||
             (ptr->ip()->version() == IpVersion::v4 && length64 <= 32)) {
           return create(std::move(ptr), static_cast<uint32_t>(length64));

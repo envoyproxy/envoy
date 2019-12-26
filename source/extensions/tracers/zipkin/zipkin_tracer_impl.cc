@@ -1,5 +1,7 @@
 #include "extensions/tracers/zipkin/zipkin_tracer_impl.h"
 
+#include "envoy/config/trace/v2/trace.pb.h"
+
 #include "common/common/enum_to_int.h"
 #include "common/common/fmt.h"
 #include "common/common/utility.h"
@@ -22,10 +24,16 @@ ZipkinSpan::ZipkinSpan(Zipkin::Span& span, Zipkin::Tracer& tracer) : span_(span)
 
 void ZipkinSpan::finishSpan() { span_.finish(); }
 
-void ZipkinSpan::setOperation(const std::string& operation) { span_.setName(operation); }
+void ZipkinSpan::setOperation(absl::string_view operation) {
+  span_.setName(std::string(operation));
+}
 
-void ZipkinSpan::setTag(const std::string& name, const std::string& value) {
+void ZipkinSpan::setTag(absl::string_view name, absl::string_view value) {
   span_.setTag(name, value);
+}
+
+void ZipkinSpan::log(SystemTime timestamp, const std::string& event) {
+  span_.log(timestamp, event);
 }
 
 void ZipkinSpan::injectContext(Http::HeaderMap& request_headers) {
@@ -50,9 +58,9 @@ void ZipkinSpan::setSampled(bool sampled) { span_.setSampled(sampled); }
 
 Tracing::SpanPtr ZipkinSpan::spawnChild(const Tracing::Config& config, const std::string& name,
                                         SystemTime start_time) {
-  SpanContext context(span_);
-  return Tracing::SpanPtr{
-      new ZipkinSpan(*tracer_.startSpan(config, name, start_time, context), tracer_)};
+  SpanContext previous_context(span_);
+  return std::make_unique<ZipkinSpan>(
+      *tracer_.startSpan(config, name, start_time, previous_context), tracer_);
 }
 
 Driver::TlsTracer::TlsTracer(TracerPtr&& tracer, Driver& driver)
@@ -70,23 +78,26 @@ Driver::Driver(const envoy::config::trace::v2::ZipkinConfig& zipkin_config,
   Config::Utility::checkCluster(TracerNames::get().Zipkin, zipkin_config.collector_cluster(), cm_);
   cluster_ = cm_.get(zipkin_config.collector_cluster())->info();
 
-  std::string collector_endpoint = ZipkinCoreConstants::get().DEFAULT_COLLECTOR_ENDPOINT;
-  if (zipkin_config.collector_endpoint().size() > 0) {
-    collector_endpoint = zipkin_config.collector_endpoint();
+  CollectorInfo collector;
+  if (!zipkin_config.collector_endpoint().empty()) {
+    collector.endpoint_ = zipkin_config.collector_endpoint();
   }
-
+  // The current default version of collector_endpoint_version is HTTP_JSON_V1.
+  collector.version_ = zipkin_config.collector_endpoint_version();
   const bool trace_id_128bit = zipkin_config.trace_id_128bit();
 
   const bool shared_span_context = PROTOBUF_GET_WRAPPED_OR_DEFAULT(
       zipkin_config, shared_span_context, ZipkinCoreConstants::get().DEFAULT_SHARED_SPAN_CONTEXT);
+  collector.shared_span_context_ = shared_span_context;
 
-  tls_->set([this, collector_endpoint, &random_generator, trace_id_128bit, shared_span_context](
+  tls_->set([this, collector, &random_generator, trace_id_128bit, shared_span_context](
                 Event::Dispatcher& dispatcher) -> ThreadLocal::ThreadLocalObjectSharedPtr {
-    TracerPtr tracer(new Tracer(local_info_.clusterName(), local_info_.address(), random_generator,
-                                trace_id_128bit, shared_span_context, time_source_));
+    TracerPtr tracer =
+        std::make_unique<Tracer>(local_info_.clusterName(), local_info_.address(), random_generator,
+                                 trace_id_128bit, shared_span_context, time_source_);
     tracer->setReporter(
-        ReporterImpl::NewInstance(std::ref(*this), std::ref(dispatcher), collector_endpoint));
-    return ThreadLocal::ThreadLocalObjectSharedPtr{new TlsTracer(std::move(tracer), *this)};
+        ReporterImpl::NewInstance(std::ref(*this), std::ref(dispatcher), collector));
+    return std::make_shared<TlsTracer>(std::move(tracer), *this);
   });
 }
 
@@ -101,25 +112,28 @@ Tracing::SpanPtr Driver::startSpan(const Tracing::Config& config, Http::HeaderMa
     auto ret_span_context = extractor.extractSpanContext(sampled);
     if (!ret_span_context.second) {
       // Create a root Zipkin span. No context was found in the headers.
-      new_zipkin_span =
-          tracer.startSpan(config, request_headers.Host()->value().c_str(), start_time);
+      new_zipkin_span = tracer.startSpan(
+          config, std::string(request_headers.Host()->value().getStringView()), start_time);
       new_zipkin_span->setSampled(sampled);
     } else {
-      new_zipkin_span = tracer.startSpan(config, request_headers.Host()->value().c_str(),
-                                         start_time, ret_span_context.first);
+      new_zipkin_span =
+          tracer.startSpan(config, std::string(request_headers.Host()->value().getStringView()),
+                           start_time, ret_span_context.first);
     }
 
   } catch (const ExtractorException& e) {
-    return Tracing::SpanPtr(new Tracing::NullSpan());
+    return std::make_unique<Tracing::NullSpan>();
   }
 
-  ZipkinSpanPtr active_span(new ZipkinSpan(*new_zipkin_span, tracer));
-  return std::move(active_span);
+  // Return the active Zipkin span.
+  return std::make_unique<ZipkinSpan>(*new_zipkin_span, tracer);
 }
 
 ReporterImpl::ReporterImpl(Driver& driver, Event::Dispatcher& dispatcher,
-                           const std::string& collector_endpoint)
-    : driver_(driver), collector_endpoint_(collector_endpoint) {
+                           const CollectorInfo& collector)
+    : driver_(driver),
+      collector_(collector), span_buffer_{std::make_unique<SpanBuffer>(
+                                 collector.version_, collector.shared_span_context_)} {
   flush_timer_ = dispatcher.createTimer([this]() -> void {
     driver_.tracerStats().timer_flushed_.inc();
     flushSpans();
@@ -128,24 +142,23 @@ ReporterImpl::ReporterImpl(Driver& driver, Event::Dispatcher& dispatcher,
 
   const uint64_t min_flush_spans =
       driver_.runtime().snapshot().getInteger("tracing.zipkin.min_flush_spans", 5U);
-  span_buffer_.allocateBuffer(min_flush_spans);
+  span_buffer_->allocateBuffer(min_flush_spans);
 
   enableTimer();
 }
 
 ReporterPtr ReporterImpl::NewInstance(Driver& driver, Event::Dispatcher& dispatcher,
-                                      const std::string& collector_endpoint) {
-  return ReporterPtr(new ReporterImpl(driver, dispatcher, collector_endpoint));
+                                      const CollectorInfo& collector) {
+  return std::make_unique<ReporterImpl>(driver, dispatcher, collector);
 }
 
-// TODO(fabolive): Need to avoid the copy to improve performance.
-void ReporterImpl::reportSpan(const Span& span) {
-  span_buffer_.addSpan(span);
+void ReporterImpl::reportSpan(Span&& span) {
+  span_buffer_->addSpan(std::move(span));
 
   const uint64_t min_flush_spans =
       driver_.runtime().snapshot().getInteger("tracing.zipkin.min_flush_spans", 5U);
 
-  if (span_buffer_.pendingSpans() == min_flush_spans) {
+  if (span_buffer_->pendingSpans() == min_flush_spans) {
     flushSpans();
   }
 }
@@ -157,18 +170,19 @@ void ReporterImpl::enableTimer() {
 }
 
 void ReporterImpl::flushSpans() {
-  if (span_buffer_.pendingSpans()) {
-    driver_.tracerStats().spans_sent_.add(span_buffer_.pendingSpans());
+  if (span_buffer_->pendingSpans()) {
+    driver_.tracerStats().spans_sent_.add(span_buffer_->pendingSpans());
+    const std::string request_body = span_buffer_->serialize();
+    Http::MessagePtr message = std::make_unique<Http::RequestMessageImpl>();
+    message->headers().setReferenceMethod(Http::Headers::get().MethodValues.Post);
+    message->headers().setPath(collector_.endpoint_);
+    message->headers().setHost(driver_.cluster()->name());
+    message->headers().setReferenceContentType(
+        collector_.version_ == envoy::config::trace::v2::ZipkinConfig::HTTP_PROTO
+            ? Http::Headers::get().ContentTypeValues.Protobuf
+            : Http::Headers::get().ContentTypeValues.Json);
 
-    const std::string request_body = span_buffer_.toStringifiedJsonArray();
-    Http::MessagePtr message(new Http::RequestMessageImpl());
-    message->headers().insertMethod().value().setReference(Http::Headers::get().MethodValues.Post);
-    message->headers().insertPath().value(collector_endpoint_);
-    message->headers().insertHost().value(driver_.cluster()->name());
-    message->headers().insertContentType().value().setReference(
-        Http::Headers::get().ContentTypeValues.Json);
-
-    Buffer::InstancePtr body(new Buffer::OwnedImpl());
+    Buffer::InstancePtr body = std::make_unique<Buffer::OwnedImpl>();
     body->add(request_body);
     message->body() = std::move(body);
 
@@ -179,7 +193,7 @@ void ReporterImpl::flushSpans() {
         .send(std::move(message), *this,
               Http::AsyncClient::RequestOptions().setTimeout(std::chrono::milliseconds(timeout)));
 
-    span_buffer_.clear();
+    span_buffer_->clear();
   }
 }
 

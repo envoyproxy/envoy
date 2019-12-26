@@ -13,20 +13,18 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-using testing::NiceMock;
 using testing::Return;
 
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
 namespace ThriftProxy {
-
 namespace {
 
 class MockBuffer : public Envoy::MockBuffer {
 public:
-  MockBuffer() {}
-  ~MockBuffer() {}
+  MockBuffer() = default;
+  ~MockBuffer() override = default;
 
   MOCK_CONST_METHOD0(length, uint64_t());
 };

@@ -7,4 +7,5 @@ Envoy data
 
   accesslog/accesslog
   core/core
+  cluster/cluster
   tap/tap

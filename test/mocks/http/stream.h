@@ -10,7 +10,7 @@ namespace Http {
 class MockStream : public Stream {
 public:
   MockStream();
-  ~MockStream();
+  ~MockStream() override;
 
   // Http::Stream
   MOCK_METHOD1(addCallbacks, void(StreamCallbacks& callbacks));
@@ -19,8 +19,10 @@ public:
   MOCK_METHOD1(readDisable, void(bool disable));
   MOCK_METHOD2(setWriteBufferWatermarks, void(uint32_t, uint32_t));
   MOCK_METHOD0(bufferLimit, uint32_t());
+  MOCK_METHOD0(connectionLocalAddress, const Network::Address::InstanceConstSharedPtr&());
 
   std::list<StreamCallbacks*> callbacks_{};
+  Network::Address::InstanceConstSharedPtr connection_local_address_;
 
   void runHighWatermarkCallbacks() {
     for (auto* callback : callbacks_) {

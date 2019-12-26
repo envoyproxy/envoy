@@ -2,8 +2,6 @@ syntax = "proto3";
 
 package envoy.service.discovery.v2;
 
-option java_generic_services = true;
-
 import "envoy/api/v2/core/base.proto";
 import "envoy/api/v2/core/health_check.proto";
 import "envoy/api/v2/endpoint/endpoint.proto";
@@ -11,7 +9,11 @@ import "envoy/api/v2/endpoint/endpoint.proto";
 import "google/api/annotations.proto";
 import "google/protobuf/duration.proto";
 
-// [#proto-status: experimental]
+option java_package = "io.envoyproxy.envoy.service.discovery.v2";
+option java_outer_classname = "HdsProto";
+option java_multiple_files = true;
+option java_generic_services = true;
+
 // HDS is Health Discovery Service. It compliments Envoy’s health checking
 // service by designating this Envoy to be a healthchecker for a subset of hosts
 // in the cluster. The status of these health checks will be reported to the
@@ -34,7 +36,7 @@ service HealthDiscoveryService {
   //    it to endpoint(ip:port) of Host 1 and 2. Based on the HealthCheck
   //    configuration Envoy waits upon the arrival of the probe response and
   //    looks at the content of the response to decide whether the endpoint is
-  //    healthy or not. If a response hasn’t been received within the timeout
+  //    healthy or not. If a response hasn't been received within the timeout
   //    interval, the endpoint health status is considered TIMEOUT.
   // 4. Envoy reports results back in an EndpointHealthResponse message.
   //    Envoy streams responses as often as the interval configured by the
@@ -60,10 +62,8 @@ service HealthDiscoveryService {
   // request/response. Should we add an identifier to the HealthCheckSpecifier
   // to bind with the response?
   rpc FetchHealthCheck(HealthCheckRequestOrEndpointHealthResponse) returns (HealthCheckSpecifier) {
-    option (google.api.http) = {
-      post: "/v2/discovery:health_check"
-      body: "*"
-    };
+    option (google.api.http).post = "/v2/discovery:health_check";
+    option (google.api.http).body = "*";
   }
 }
 
@@ -77,17 +77,20 @@ message Capability {
     TCP = 1;
     REDIS = 2;
   }
+
   repeated Protocol health_check_protocols = 1;
 }
 
 message HealthCheckRequest {
-  envoy.api.v2.core.Node node = 1;
+  api.v2.core.Node node = 1;
+
   Capability capability = 2;
 }
 
 message EndpointHealth {
-  envoy.api.v2.endpoint.Endpoint endpoint = 1;
-  envoy.api.v2.core.HealthStatus health_status = 2;
+  api.v2.endpoint.Endpoint endpoint = 1;
+
+  api.v2.core.HealthStatus health_status = 2;
 }
 
 message EndpointHealthResponse {
@@ -97,13 +100,15 @@ message EndpointHealthResponse {
 message HealthCheckRequestOrEndpointHealthResponse {
   oneof request_type {
     HealthCheckRequest health_check_request = 1;
+
     EndpointHealthResponse endpoint_health_response = 2;
   }
 }
 
 message LocalityEndpoints {
-  envoy.api.v2.core.Locality locality = 1;
-  repeated envoy.api.v2.endpoint.Endpoint endpoints = 2;
+  api.v2.core.Locality locality = 1;
+
+  repeated api.v2.endpoint.Endpoint endpoints = 2;
 }
 
 // The cluster name and locality is provided to Envoy for the endpoints that it
@@ -112,12 +117,15 @@ message LocalityEndpoints {
 // same cluster structure as that provided by EDS.
 message ClusterHealthCheck {
   string cluster_name = 1;
-  repeated envoy.api.v2.core.HealthCheck health_checks = 2;
+
+  repeated api.v2.core.HealthCheck health_checks = 2;
+
   repeated LocalityEndpoints locality_endpoints = 3;
 }
 
 message HealthCheckSpecifier {
   repeated ClusterHealthCheck cluster_health_checks = 1;
+
   // The default is 1 second.
   google.protobuf.Duration interval = 2;
 }

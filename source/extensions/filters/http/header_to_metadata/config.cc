@@ -2,6 +2,7 @@
 
 #include <string>
 
+#include "envoy/config/filter/http/header_to_metadata/v2/header_to_metadata.pb.h"
 #include "envoy/config/filter/http/header_to_metadata/v2/header_to_metadata.pb.validate.h"
 #include "envoy/registry/registry.h"
 
@@ -28,9 +29,7 @@ Http::FilterFactoryCb HeaderToMetadataConfig::createFilterFactoryFromProtoTyped(
 /**
  * Static registration for the header-to-metadata filter. @see RegisterFactory.
  */
-static Registry::RegisterFactory<HeaderToMetadataConfig,
-                                 Server::Configuration::NamedHttpFilterConfigFactory>
-    register_;
+REGISTER_FACTORY(HeaderToMetadataConfig, Server::Configuration::NamedHttpFilterConfigFactory);
 
 } // namespace HeaderToMetadataFilter
 } // namespace HttpFilters

@@ -13,6 +13,9 @@ namespace Zipkin {
 
 class ZipkinCoreConstantValues {
 public:
+  const std::string KIND_CLIENT = "CLIENT";
+  const std::string KIND_SERVER = "SERVER";
+
   const std::string CLIENT_SEND = "cs";
   const std::string CLIENT_RECV = "cr";
   const std::string SERVER_SEND = "ss";
@@ -48,7 +51,7 @@ public:
   const bool DEFAULT_SHARED_SPAN_CONTEXT = true;
 };
 
-typedef ConstSingleton<ZipkinCoreConstantValues> ZipkinCoreConstants;
+using ZipkinCoreConstants = ConstSingleton<ZipkinCoreConstantValues>;
 
 } // namespace Zipkin
 } // namespace Tracers

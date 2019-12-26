@@ -1,5 +1,6 @@
 #include "extensions/filters/network/thrift_proxy/router/router_ratelimit_impl.h"
 
+#include "envoy/api/v2/route/route.pb.h"
 #include "envoy/common/exception.h"
 #include "envoy/ratelimit/ratelimit.h"
 
@@ -44,7 +45,8 @@ bool RequestHeadersAction::populateDescriptor(const RouteEntry&, RateLimit::Desc
     return false;
   }
 
-  descriptor.entries_.push_back({descriptor_key_, header_value->value().c_str()});
+  descriptor.entries_.push_back(
+      {descriptor_key_, std::string(header_value->value().getStringView())});
   return true;
 }
 
@@ -69,11 +71,8 @@ bool GenericKeyAction::populateDescriptor(const RouteEntry&, RateLimit::Descript
 HeaderValueMatchAction::HeaderValueMatchAction(
     const envoy::api::v2::route::RateLimit::Action::HeaderValueMatch& action)
     : descriptor_value_(action.descriptor_value()),
-      expect_match_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(action, expect_match, true)) {
-  for (const auto& header_matcher : action.headers()) {
-    action_headers_.push_back(header_matcher);
-  }
-}
+      expect_match_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(action, expect_match, true)),
+      action_headers_(Http::HeaderUtility::buildHeaderDataVector(action.headers())) {}
 
 bool HeaderValueMatchAction::populateDescriptor(const RouteEntry&,
                                                 RateLimit::Descriptor& descriptor,

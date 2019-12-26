@@ -19,7 +19,7 @@ enum class FilterStatus {
 
 class DecoderEventHandler {
 public:
-  virtual ~DecoderEventHandler() {}
+  virtual ~DecoderEventHandler() = default;
 
   /**
    * Indicates the start of a Thrift transport frame was detected. Unframed transports generate
@@ -134,7 +134,7 @@ public:
   virtual FilterStatus setEnd() PURE;
 };
 
-typedef std::shared_ptr<DecoderEventHandler> DecoderEventHandlerSharedPtr;
+using DecoderEventHandlerSharedPtr = std::shared_ptr<DecoderEventHandler>;
 
 } // namespace ThriftProxy
 } // namespace NetworkFilters

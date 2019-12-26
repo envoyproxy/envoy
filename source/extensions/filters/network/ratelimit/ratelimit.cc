@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <string>
 
+#include "envoy/config/filter/network/rate_limit/v2/rate_limit.pb.h"
 #include "envoy/stats/scope.h"
 
 #include "common/common/fmt.h"
@@ -68,7 +69,8 @@ void Filter::onEvent(Network::ConnectionEvent event) {
   }
 }
 
-void Filter::complete(Filters::Common::RateLimit::LimitStatus status, Http::HeaderMapPtr&&) {
+void Filter::complete(Filters::Common::RateLimit::LimitStatus status, Http::HeaderMapPtr&&,
+                      Http::HeaderMapPtr&&) {
   status_ = Status::Complete;
   config_->stats().active_.dec();
 

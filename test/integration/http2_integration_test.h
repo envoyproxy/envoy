@@ -1,19 +1,32 @@
 #pragma once
 
+#include "envoy/config/bootstrap/v2/bootstrap.pb.h"
+#include "envoy/config/filter/network/http_connection_manager/v2/http_connection_manager.pb.h"
+
+#include "test/common/http/http2/http2_frame.h"
 #include "test/integration/http_integration.h"
 
 #include "gtest/gtest.h"
 
+using Envoy::Http::Http2::Http2Frame;
+
 namespace Envoy {
-class Http2IntegrationTest : public HttpIntegrationTest,
-                             public testing::TestWithParam<Network::Address::IpVersion> {
+class Http2IntegrationTest : public testing::TestWithParam<Network::Address::IpVersion>,
+                             public HttpIntegrationTest {
 public:
-  Http2IntegrationTest()
-      : HttpIntegrationTest(Http::CodecClient::Type::HTTP2, GetParam(), realTime()) {}
+  Http2IntegrationTest() : HttpIntegrationTest(Http::CodecClient::Type::HTTP2, GetParam()) {}
 
   void SetUp() override { setDownstreamProtocol(Http::CodecClient::Type::HTTP2); }
 
   void simultaneousRequest(int32_t request1_bytes, int32_t request2_bytes);
+
+protected:
+  // Utility function to add filters.
+  void addFilters(std::vector<std::string> filters) {
+    for (const auto& filter : filters) {
+      config_helper_.addFilter(filter);
+    }
+  }
 };
 
 class Http2RingHashIntegrationTest : public Http2IntegrationTest {
@@ -46,5 +59,29 @@ public:
     setDownstreamProtocol(Http::CodecClient::Type::HTTP2);
     setUpstreamProtocol(FakeHttpConnection::Type::HTTP2);
   }
+
+  void testRequestMetadataWithStopAllFilter();
+
+  void verifyHeadersOnlyTest();
+
+  void runHeaderOnlyTest(bool send_request_body, size_t body_size);
+};
+
+class Http2FloodMitigationTest : public testing::TestWithParam<Network::Address::IpVersion>,
+                                 public HttpIntegrationTest {
+public:
+  Http2FloodMitigationTest() : HttpIntegrationTest(Http::CodecClient::Type::HTTP2, GetParam()) {}
+
+protected:
+  void startHttp2Session();
+  void floodServer(const Http2Frame& frame, const std::string& flood_stat);
+  void floodServer(absl::string_view host, absl::string_view path,
+                   Http2Frame::ResponseStatus expected_http_status, const std::string& flood_stat);
+  Http2Frame readFrame();
+  void sendFame(const Http2Frame& frame);
+  void setNetworkConnectionBufferSize();
+  void beginSession();
+
+  IntegrationTcpClientPtr tcp_client_;
 };
 } // namespace Envoy

@@ -5,6 +5,7 @@
 #include <string>
 #include <vector>
 
+#include "envoy/api/v2/core/base.pb.h"
 #include "envoy/grpc/async_client.h"
 #include "envoy/grpc/async_client_manager.h"
 #include "envoy/http/filter.h"
@@ -13,10 +14,11 @@
 #include "envoy/network/address.h"
 #include "envoy/network/connection.h"
 #include "envoy/network/filter.h"
+#include "envoy/service/auth/v2/external_auth.pb.h"
 #include "envoy/tracing/http_tracer.h"
 #include "envoy/upstream/cluster_manager.h"
 
-#include "common/singleton/const_singleton.h"
+#include "common/grpc/typed_async_client.h"
 
 #include "extensions/filters/common/ext_authz/check_request_utils.h"
 #include "extensions/filters/common/ext_authz/ext_authz.h"
@@ -27,16 +29,7 @@ namespace Filters {
 namespace Common {
 namespace ExtAuthz {
 
-typedef Grpc::TypedAsyncRequestCallbacks<envoy::service::auth::v2alpha::CheckResponse>
-    ExtAuthzAsyncCallbacks;
-
-struct ConstantValues {
-  const std::string TraceStatus = "ext_authz_status";
-  const std::string TraceUnauthz = "ext_authz_unauthorized";
-  const std::string TraceOk = "ext_authz_ok";
-};
-
-typedef ConstSingleton<ConstantValues> Constants;
+using ExtAuthzAsyncCallbacks = Grpc::AsyncRequestCallbacks<envoy::service::auth::v2::CheckResponse>;
 
 /*
  * This client implementation is used when the Ext_Authz filter needs to communicate with an gRPC
@@ -47,29 +40,31 @@ typedef ConstSingleton<ConstantValues> Constants;
  */
 class GrpcClientImpl : public Client, public ExtAuthzAsyncCallbacks {
 public:
-  GrpcClientImpl(Grpc::AsyncClientPtr&& async_client,
-                 const absl::optional<std::chrono::milliseconds>& timeout);
-  ~GrpcClientImpl();
+  // TODO(gsagula): remove `use_alpha` param when V2Alpha gets deprecated.
+  GrpcClientImpl(Grpc::RawAsyncClientPtr&& async_client,
+                 const absl::optional<std::chrono::milliseconds>& timeout, bool use_alpha);
+  ~GrpcClientImpl() override;
 
   // ExtAuthz::Client
   void cancel() override;
-  void check(RequestCallbacks& callbacks,
-             const envoy::service::auth::v2alpha::CheckRequest& request,
+  void check(RequestCallbacks& callbacks, const envoy::service::auth::v2::CheckRequest& request,
              Tracing::Span& parent_span) override;
 
   // Grpc::AsyncRequestCallbacks
   void onCreateInitialMetadata(Http::HeaderMap&) override {}
-  void onSuccess(std::unique_ptr<envoy::service::auth::v2alpha::CheckResponse>&& response,
+  void onSuccess(std::unique_ptr<envoy::service::auth::v2::CheckResponse>&& response,
                  Tracing::Span& span) override;
   void onFailure(Grpc::Status::GrpcStatus status, const std::string& message,
                  Tracing::Span& span) override;
 
 private:
+  static const Protobuf::MethodDescriptor& getMethodDescriptor(bool use_alpha);
   void toAuthzResponseHeader(
       ResponsePtr& response,
       const Protobuf::RepeatedPtrField<envoy::api::v2::core::HeaderValueOption>& headers);
   const Protobuf::MethodDescriptor& service_method_;
-  Grpc::AsyncClientPtr async_client_;
+  Grpc::AsyncClient<envoy::service::auth::v2::CheckRequest, envoy::service::auth::v2::CheckResponse>
+      async_client_;
   Grpc::AsyncRequest* request_{};
   absl::optional<std::chrono::milliseconds> timeout_;
   RequestCallbacks* callbacks_{};

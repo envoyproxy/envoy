@@ -2,11 +2,10 @@
 #include <string>
 #include <vector>
 
+#include "envoy/config/filter/network/rate_limit/v2/rate_limit.pb.h"
 #include "envoy/stats/stats.h"
 
 #include "common/buffer/buffer_impl.h"
-#include "common/config/filter_json.h"
-#include "common/json/json_loader.h"
 
 #include "extensions/filters/network/ratelimit/ratelimit.h"
 
@@ -34,8 +33,6 @@ namespace RateLimitFilter {
 
 class RateLimitFilterTest : public testing::Test {
 public:
-  RateLimitFilterTest() {}
-
   void SetUpTest(const std::string& yaml) {
     ON_CALL(runtime_.snapshot_, featureEnabled("ratelimit.tcp_filter_enabled", 100))
         .WillByDefault(Return(true));
@@ -43,7 +40,7 @@ public:
         .WillByDefault(Return(true));
 
     envoy::config::filter::network::rate_limit::v2::RateLimit proto_config{};
-    MessageUtil::loadFromYaml(yaml, proto_config);
+    TestUtility::loadFromYaml(yaml, proto_config);
     config_.reset(new Config(proto_config, stats_store_, runtime_));
     client_ = new Filters::Common::RateLimit::MockClient();
     filter_ = std::make_unique<Filter>(config_, Filters::Common::RateLimit::ClientPtr{client_});
@@ -54,7 +51,7 @@ public:
     filter_->onBelowWriteBufferLowWatermark();
   }
 
-  ~RateLimitFilterTest() {
+  ~RateLimitFilterTest() override {
     for (const Stats::GaugeSharedPtr& gauge : stats_store_.gauges()) {
       EXPECT_EQ(0U, gauge->value());
     }
@@ -98,23 +95,6 @@ failure_mode_deny: true
   Filters::Common::RateLimit::RequestCallbacks* request_callbacks_{};
 };
 
-TEST_F(RateLimitFilterTest, BadRatelimitConfig) {
-  std::string json_string = R"EOF(
-  {
-    "stat_prefix": "my_stat_prefix",
-    "domain" : "fake_domain",
-    "descriptors": [[{ "key" : "my_key",  "value" : "my_value" }]],
-    "ip_white_list": "12"
-  }
-  )EOF";
-
-  Json::ObjectSharedPtr json_config = Json::Factory::loadFromString(json_string);
-  envoy::config::filter::network::rate_limit::v2::RateLimit proto_config{};
-
-  EXPECT_THROW(Envoy::Config::FilterJson::translateTcpRateLimitFilter(*json_config, proto_config),
-               Json::Exception);
-}
-
 TEST_F(RateLimitFilterTest, OK) {
   InSequence s;
   SetUpTest(filter_config_);
@@ -134,7 +114,7 @@ TEST_F(RateLimitFilterTest, OK) {
   EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(data, false));
 
   EXPECT_CALL(filter_callbacks_, continueReading());
-  request_callbacks_->complete(Filters::Common::RateLimit::LimitStatus::OK, nullptr);
+  request_callbacks_->complete(Filters::Common::RateLimit::LimitStatus::OK, nullptr, nullptr);
 
   EXPECT_EQ(Network::FilterStatus::Continue, filter_->onData(data, false));
 
@@ -161,7 +141,8 @@ TEST_F(RateLimitFilterTest, OverLimit) {
 
   EXPECT_CALL(filter_callbacks_.connection_, close(Network::ConnectionCloseType::NoFlush));
   EXPECT_CALL(*client_, cancel()).Times(0);
-  request_callbacks_->complete(Filters::Common::RateLimit::LimitStatus::OverLimit, nullptr);
+  request_callbacks_->complete(Filters::Common::RateLimit::LimitStatus::OverLimit, nullptr,
+                               nullptr);
 
   EXPECT_EQ(Network::FilterStatus::Continue, filter_->onData(data, false));
 
@@ -189,7 +170,8 @@ TEST_F(RateLimitFilterTest, OverLimitNotEnforcing) {
   EXPECT_CALL(filter_callbacks_.connection_, close(_)).Times(0);
   EXPECT_CALL(*client_, cancel()).Times(0);
   EXPECT_CALL(filter_callbacks_, continueReading());
-  request_callbacks_->complete(Filters::Common::RateLimit::LimitStatus::OverLimit, nullptr);
+  request_callbacks_->complete(Filters::Common::RateLimit::LimitStatus::OverLimit, nullptr,
+                               nullptr);
 
   EXPECT_EQ(Network::FilterStatus::Continue, filter_->onData(data, false));
 
@@ -213,7 +195,7 @@ TEST_F(RateLimitFilterTest, Error) {
   EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(data, false));
 
   EXPECT_CALL(filter_callbacks_, continueReading());
-  request_callbacks_->complete(Filters::Common::RateLimit::LimitStatus::Error, nullptr);
+  request_callbacks_->complete(Filters::Common::RateLimit::LimitStatus::Error, nullptr, nullptr);
 
   EXPECT_EQ(Network::FilterStatus::Continue, filter_->onData(data, false));
 
@@ -253,7 +235,7 @@ TEST_F(RateLimitFilterTest, ImmediateOK) {
   EXPECT_CALL(*client_, limit(_, "foo", _, _))
       .WillOnce(
           WithArgs<0>(Invoke([&](Filters::Common::RateLimit::RequestCallbacks& callbacks) -> void {
-            callbacks.complete(Filters::Common::RateLimit::LimitStatus::OK, nullptr);
+            callbacks.complete(Filters::Common::RateLimit::LimitStatus::OK, nullptr, nullptr);
           })));
 
   EXPECT_EQ(Network::FilterStatus::Continue, filter_->onNewConnection());
@@ -276,7 +258,7 @@ TEST_F(RateLimitFilterTest, ImmediateError) {
   EXPECT_CALL(*client_, limit(_, "foo", _, _))
       .WillOnce(
           WithArgs<0>(Invoke([&](Filters::Common::RateLimit::RequestCallbacks& callbacks) -> void {
-            callbacks.complete(Filters::Common::RateLimit::LimitStatus::Error, nullptr);
+            callbacks.complete(Filters::Common::RateLimit::LimitStatus::Error, nullptr, nullptr);
           })));
 
   EXPECT_EQ(Network::FilterStatus::Continue, filter_->onNewConnection());
@@ -318,7 +300,7 @@ TEST_F(RateLimitFilterTest, ErrorResponseWithFailureModeAllowOff) {
   EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onNewConnection());
   Buffer::OwnedImpl data("hello");
   EXPECT_EQ(Network::FilterStatus::StopIteration, filter_->onData(data, false));
-  request_callbacks_->complete(Filters::Common::RateLimit::LimitStatus::Error, nullptr);
+  request_callbacks_->complete(Filters::Common::RateLimit::LimitStatus::Error, nullptr, nullptr);
 
   EXPECT_EQ(Network::FilterStatus::Continue, filter_->onData(data, false));
 

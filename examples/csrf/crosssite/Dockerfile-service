@@ -1,0 +1,9 @@
+FROM envoyproxy/envoy-alpine-dev:latest
+
+RUN apk update && apk add python3 bash
+RUN pip3 install -q Flask==0.11.1
+RUN mkdir /code
+ADD ./crosssite/service.py ./index.html /code/
+ADD ./start_service.sh /usr/local/bin/start_service.sh
+RUN chmod u+x /usr/local/bin/start_service.sh
+ENTRYPOINT /usr/local/bin/start_service.sh

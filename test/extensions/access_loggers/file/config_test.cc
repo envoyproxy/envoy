@@ -1,4 +1,5 @@
 #include "envoy/config/accesslog/v2/file.pb.h"
+#include "envoy/config/filter/accesslog/v2/accesslog.pb.h"
 #include "envoy/registry/registry.h"
 
 #include "common/access_log/access_log_impl.h"
@@ -17,6 +18,7 @@ namespace Envoy {
 namespace Extensions {
 namespace AccessLoggers {
 namespace File {
+namespace {
 
 TEST(FileAccessLogConfigTest, ValidateFail) {
   NiceMock<Server::Configuration::MockFactoryContext> context;
@@ -32,7 +34,7 @@ TEST(FileAccessLogConfigTest, ConfigureFromProto) {
   envoy::config::accesslog::v2::FileAccessLog fal_config;
   fal_config.set_path("/dev/null");
 
-  MessageUtil::jsonConvert(fal_config, *config.mutable_config());
+  TestUtility::jsonConvert(fal_config, *config.mutable_config());
 
   NiceMock<Server::Configuration::MockFactoryContext> context;
   EXPECT_THROW_WITH_MESSAGE(AccessLog::AccessLogFactory::fromProto(config, context), EnvoyException,
@@ -63,7 +65,7 @@ TEST(FileAccessLogConfigTest, FileAccessLogTest) {
   envoy::config::accesslog::v2::FileAccessLog file_access_log;
   file_access_log.set_path("/dev/null");
   file_access_log.set_format("%START_TIME%");
-  MessageUtil::jsonConvert(file_access_log, *message);
+  TestUtility::jsonConvert(file_access_log, *message);
 
   AccessLog::FilterPtr filter;
   NiceMock<Server::Configuration::MockFactoryContext> context;
@@ -88,7 +90,7 @@ TEST(FileAccessLogConfigTest, FileAccessLogJsonTest) {
 
   EXPECT_EQ(fal_config.access_log_format_case(),
             envoy::config::accesslog::v2::FileAccessLog::kJsonFormat);
-  MessageUtil::jsonConvert(fal_config, *config.mutable_config());
+  TestUtility::jsonConvert(fal_config, *config.mutable_config());
 
   NiceMock<Server::Configuration::MockFactoryContext> context;
   EXPECT_THROW_WITH_MESSAGE(AccessLog::AccessLogFactory::fromProto(config, context), EnvoyException,
@@ -107,6 +109,31 @@ TEST(FileAccessLogConfigTest, FileAccessLogJsonTest) {
                             "Didn't find a registered implementation for name: 'INVALID'");
 }
 
+TEST(FileAccessLogConfigTest, FileAccessLogTypedJsonTest) {
+  envoy::config::filter::accesslog::v2::AccessLog config;
+
+  envoy::config::accesslog::v2::FileAccessLog fal_config;
+  fal_config.set_path("/dev/null");
+
+  ProtobufWkt::Value string_value;
+  string_value.set_string_value("%PROTOCOL%");
+
+  auto json_format = fal_config.mutable_typed_json_format();
+  (*json_format->mutable_fields())["protocol"] = string_value;
+
+  EXPECT_EQ(fal_config.access_log_format_case(),
+            envoy::config::accesslog::v2::FileAccessLog::kTypedJsonFormat);
+  TestUtility::jsonConvert(fal_config, *config.mutable_config());
+
+  config.set_name(AccessLogNames::get().File);
+
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+  AccessLog::InstanceSharedPtr log = AccessLog::AccessLogFactory::fromProto(config, context);
+
+  EXPECT_NE(nullptr, log);
+  EXPECT_NE(nullptr, dynamic_cast<FileAccessLog*>(log.get()));
+}
+
 TEST(FileAccessLogConfigTest, FileAccessLogJsonWithBoolValueTest) {
   {
     // Make sure we fail if you set a bool value in the format dictionary
@@ -120,7 +147,7 @@ TEST(FileAccessLogConfigTest, FileAccessLogJsonWithBoolValueTest) {
     auto json_format = fal_config.mutable_json_format();
     (*json_format->mutable_fields())["protocol"] = bool_value;
 
-    MessageUtil::jsonConvert(fal_config, *config.mutable_config());
+    TestUtility::jsonConvert(fal_config, *config.mutable_config());
     NiceMock<Server::Configuration::MockFactoryContext> context;
 
     EXPECT_THROW_WITH_MESSAGE(AccessLog::AccessLogFactory::fromProto(config, context),
@@ -146,7 +173,7 @@ TEST(FileAccessLogConfigTest, FileAccessLogJsonWithNestedKeyTest) {
     auto json_format = fal_config.mutable_json_format();
     (*json_format->mutable_fields())["top_level_key"] = struct_value;
 
-    MessageUtil::jsonConvert(fal_config, *config.mutable_config());
+    TestUtility::jsonConvert(fal_config, *config.mutable_config());
     NiceMock<Server::Configuration::MockFactoryContext> context;
 
     EXPECT_THROW_WITH_MESSAGE(AccessLog::AccessLogFactory::fromProto(config, context),
@@ -155,6 +182,7 @@ TEST(FileAccessLogConfigTest, FileAccessLogJsonWithNestedKeyTest) {
   }
 }
 
+} // namespace
 } // namespace File
 } // namespace AccessLoggers
 } // namespace Extensions

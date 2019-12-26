@@ -5,17 +5,20 @@
 
 #include "common/common/thread.h"
 #include "common/event/real_time_system.h"
+#include "common/grpc/google_grpc_context.h"
+#include "common/stats/fake_symbol_table_impl.h"
 #include "common/stats/thread_local_store.h"
 #include "common/thread_local/thread_local_impl.h"
 
 #include "exe/platform_impl.h"
+#include "exe/process_wide.h"
 
+#include "server/listener_hooks.h"
 #include "server/options_impl.h"
 #include "server/server.h"
-#include "server/test_hooks.h"
 
 #ifdef ENVOY_HANDLE_SIGNALS
-#include "exe/signal_action.h"
+#include "common/signal/signal_action.h"
 #include "exe/terminate_handler.h"
 #endif
 
@@ -33,11 +36,11 @@ class MainCommonBase {
 public:
   // Consumer must guarantee that all passed references are alive until this object is
   // destructed.
-  MainCommonBase(OptionsImpl& options, Event::TimeSystem& time_system, TestHooks& test_hooks,
-                 Server::ComponentFactory& component_factory,
+  MainCommonBase(const OptionsImpl& options, Event::TimeSystem& time_system,
+                 ListenerHooks& listener_hooks, Server::ComponentFactory& component_factory,
                  std::unique_ptr<Runtime::RandomGenerator>&& random_generator,
-                 Thread::ThreadFactory& thread_factory);
-  ~MainCommonBase();
+                 Thread::ThreadFactory& thread_factory, Filesystem::Instance& file_system,
+                 std::unique_ptr<ProcessContext> process_context);
 
   bool run();
 
@@ -63,15 +66,23 @@ public:
                     const AdminRequestFn& handler);
 
 protected:
-  Envoy::OptionsImpl& options_;
-
+  ProcessWide process_wide_; // Process-wide state setup/teardown (excluding grpc).
+  // We instantiate this class regardless of ENVOY_GOOGLE_GRPC, to avoid having
+  // an ifdef in a header file exposed in a C++ library. It is too easy to have
+  // the ifdef be inconsistent across build-system boundaries.
+  Grpc::GoogleGrpcContext google_grpc_context_;
+  const Envoy::OptionsImpl& options_;
   Server::ComponentFactory& component_factory_;
   Thread::ThreadFactory& thread_factory_;
+  Filesystem::Instance& file_system_;
+  Stats::SymbolTablePtr symbol_table_;
+  Stats::AllocatorImpl stats_allocator_;
 
   std::unique_ptr<ThreadLocal::InstanceImpl> tls_;
   std::unique_ptr<Server::HotRestart> restarter_;
   std::unique_ptr<Stats::ThreadLocalStoreImpl> stats_store_;
   std::unique_ptr<Logger::Context> logging_context_;
+  std::unique_ptr<Init::Manager> init_manager_{std::make_unique<Init::ManagerImpl>("Server")};
   std::unique_ptr<Server::InstanceImpl> server_;
 
 private:
@@ -84,6 +95,8 @@ class MainCommon {
 public:
   MainCommon(int argc, const char* const* argv);
   bool run() { return base_.run(); }
+  // Only tests have a legitimate need for this today.
+  Event::Dispatcher& dispatcherForTest() { return base_.server()->dispatcher(); }
 
   // Makes an admin-console request by path, calling handler() when complete.
   // The caller can initiate this from any thread, but it posts the request
@@ -99,19 +112,24 @@ public:
     base_.adminRequest(path_and_query, method, handler);
   }
 
-  static std::string hotRestartVersion(uint64_t max_num_stats, uint64_t max_stat_name_len,
-                                       bool hot_restart_enabled);
+  static std::string hotRestartVersion(bool hot_restart_enabled);
+
+  /**
+   * @return a pointer to the server instance, or nullptr if initialized into
+   *         validation mode.
+   */
+  Server::Instance* server() { return base_.server(); }
 
 private:
 #ifdef ENVOY_HANDLE_SIGNALS
-  Envoy::SignalAction handle_sigs;
-  Envoy::TerminateHandler log_on_terminate;
+  Envoy::SignalAction handle_sigs_;
+  Envoy::TerminateHandler log_on_terminate_;
 #endif
 
   PlatformImpl platform_impl_;
   Envoy::OptionsImpl options_;
   Event::RealTimeSystem real_time_system_;
-  DefaultTestHooks default_test_hooks_;
+  DefaultListenerHooks default_listener_hooks_;
   ProdComponentFactory prod_component_factory_;
   MainCommonBase base_;
 };

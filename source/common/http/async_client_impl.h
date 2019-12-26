@@ -9,6 +9,9 @@
 #include <string>
 #include <vector>
 
+#include "envoy/api/v2/core/base.pb.h"
+#include "envoy/api/v2/route/route.pb.h"
+#include "envoy/common/scope_tracker.h"
 #include "envoy/config/typed_metadata.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/http/async_client.h"
@@ -22,6 +25,7 @@
 #include "envoy/server/filter_config.h"
 #include "envoy/ssl/connection.h"
 #include "envoy/tracing/http_tracer.h"
+#include "envoy/type/percent.pb.h"
 #include "envoy/upstream/load_balancer.h"
 #include "envoy/upstream/upstream.h"
 
@@ -73,7 +77,8 @@ class AsyncStreamImpl : public AsyncClient::Stream,
                         public StreamDecoderFilterCallbacks,
                         public Event::DeferredDeletable,
                         Logger::Loggable<Logger::Id::http>,
-                        LinkedObject<AsyncStreamImpl> {
+                        LinkedObject<AsyncStreamImpl>,
+                        public ScopeTrackedObject {
 public:
   AsyncStreamImpl(AsyncClientImpl& parent, AsyncClient::StreamCallbacks& callbacks,
                   const AsyncClient::StreamOptions& options);
@@ -86,26 +91,21 @@ public:
 
 protected:
   bool remoteClosed() { return remote_closed_; }
+  void closeLocal(bool end_stream);
+  StreamInfo::StreamInfoImpl& streamInfo() override { return stream_info_; }
 
   AsyncClientImpl& parent_;
 
 private:
-  struct NullCorsPolicy : public Router::CorsPolicy {
-    // Router::CorsPolicy
-    const std::list<std::string>& allowOrigins() const override { return allow_origin_; };
-    const std::list<std::regex>& allowOriginRegexes() const override {
-      return allow_origin_regex_;
-    };
-    const std::string& allowMethods() const override { return EMPTY_STRING; };
-    const std::string& allowHeaders() const override { return EMPTY_STRING; };
-    const std::string& exposeHeaders() const override { return EMPTY_STRING; };
-    const std::string& maxAge() const override { return EMPTY_STRING; };
-    const absl::optional<bool>& allowCredentials() const override { return allow_credentials_; };
-    bool enabled() const override { return false; };
+  struct NullHedgePolicy : public Router::HedgePolicy {
+    // Router::HedgePolicy
+    uint32_t initialRequests() const override { return 1; }
+    const envoy::type::FractionalPercent& additionalRequestChance() const override {
+      return additional_request_chance_;
+    }
+    bool hedgeOnPerTryTimeout() const override { return false; }
 
-    static const std::list<std::string> allow_origin_;
-    static const std::list<std::regex> allow_origin_regex_;
-    static const absl::optional<bool> allow_credentials_;
+    const envoy::type::FractionalPercent additional_request_chance_;
   };
 
   struct NullRateLimitPolicy : public Router::RateLimitPolicy {
@@ -136,8 +136,20 @@ private:
     const std::vector<uint32_t>& retriableStatusCodes() const override {
       return retriable_status_codes_;
     }
+    const std::vector<Http::HeaderMatcherSharedPtr>& retriableHeaders() const override {
+      return retriable_headers_;
+    }
+    const std::vector<Http::HeaderMatcherSharedPtr>& retriableRequestHeaders() const override {
+      return retriable_request_headers_;
+    }
+    absl::optional<std::chrono::milliseconds> baseInterval() const override {
+      return absl::nullopt;
+    }
+    absl::optional<std::chrono::milliseconds> maxInterval() const override { return absl::nullopt; }
 
-    const std::vector<uint32_t> retriable_status_codes_;
+    const std::vector<uint32_t> retriable_status_codes_{};
+    const std::vector<Http::HeaderMatcherSharedPtr> retriable_headers_{};
+    const std::vector<Http::HeaderMatcherSharedPtr> retriable_request_headers_{};
   };
 
   struct NullShadowPolicy : public Router::ShadowPolicy {
@@ -151,7 +163,8 @@ private:
   };
 
   struct NullConfig : public Router::Config {
-    Router::RouteConstSharedPtr route(const Http::HeaderMap&, uint64_t) const override {
+    Router::RouteConstSharedPtr route(const Http::HeaderMap&, const StreamInfo::StreamInfo&,
+                                      uint64_t) const override {
       return nullptr;
     }
 
@@ -160,13 +173,15 @@ private:
     }
 
     const std::string& name() const override { return EMPTY_STRING; }
+    bool usesVhds() const override { return false; }
+    bool mostSpecificHeaderMutationsWins() const override { return false; }
 
     static const std::list<LowerCaseString> internal_only_headers_;
   };
 
   struct NullVirtualHost : public Router::VirtualHost {
     // Router::VirtualHost
-    const std::string& name() const override { return EMPTY_STRING; }
+    Stats::StatName statName() const override { return {}; }
     const Router::RateLimitPolicy& rateLimitPolicy() const override { return rate_limit_policy_; }
     const Router::CorsPolicy* corsPolicy() const override { return nullptr; }
     const Router::Config& routeConfig() const override { return route_configuration_; }
@@ -174,7 +189,9 @@ private:
       return nullptr;
     }
     bool includeAttemptCount() const override { return false; }
-
+    uint32_t retryShadowBufferLimit() const override {
+      return std::numeric_limits<uint32_t>::max();
+    }
     static const NullRateLimitPolicy rate_limit_policy_;
     static const NullConfig route_configuration_;
   };
@@ -186,8 +203,14 @@ private:
 
   struct RouteEntryImpl : public Router::RouteEntry {
     RouteEntryImpl(const std::string& cluster_name,
-                   const absl::optional<std::chrono::milliseconds>& timeout)
-        : cluster_name_(cluster_name), timeout_(timeout) {}
+                   const absl::optional<std::chrono::milliseconds>& timeout,
+                   const Protobuf::RepeatedPtrField<envoy::api::v2::route::RouteAction::HashPolicy>&
+                       hash_policy)
+        : cluster_name_(cluster_name), timeout_(timeout) {
+      if (!hash_policy.empty()) {
+        hash_policy_ = std::make_unique<HashPolicyImpl>(hash_policy);
+      }
+    }
 
     // Router::RouteEntry
     const std::string& clusterName() const override { return cluster_name_; }
@@ -198,13 +221,17 @@ private:
     void finalizeRequestHeaders(Http::HeaderMap&, const StreamInfo::StreamInfo&,
                                 bool) const override {}
     void finalizeResponseHeaders(Http::HeaderMap&, const StreamInfo::StreamInfo&) const override {}
-    const Router::HashPolicy* hashPolicy() const override { return nullptr; }
+    const HashPolicy* hashPolicy() const override { return hash_policy_.get(); }
+    const Router::HedgePolicy& hedgePolicy() const override { return hedge_policy_; }
     const Router::MetadataMatchCriteria* metadataMatchCriteria() const override { return nullptr; }
     Upstream::ResourcePriority priority() const override {
       return Upstream::ResourcePriority::Default;
     }
     const Router::RateLimitPolicy& rateLimitPolicy() const override { return rate_limit_policy_; }
     const Router::RetryPolicy& retryPolicy() const override { return retry_policy_; }
+    uint32_t retryShadowBufferLimit() const override {
+      return std::numeric_limits<uint32_t>::max();
+    }
     const Router::ShadowPolicy& shadowPolicy() const override { return shadow_policy_; }
     std::chrono::milliseconds timeout() const override {
       if (timeout_) {
@@ -217,7 +244,13 @@ private:
     absl::optional<std::chrono::milliseconds> maxGrpcTimeout() const override {
       return absl::nullopt;
     }
+    absl::optional<std::chrono::milliseconds> grpcTimeoutOffset() const override {
+      return absl::nullopt;
+    }
     const Router::VirtualCluster* virtualCluster(const Http::HeaderMap&) const override {
+      return nullptr;
+    }
+    const Router::TlsContextMatchCriteria* tlsContextMatchCriteria() const override {
       return nullptr;
     }
     const std::multimap<std::string, std::string>& opaqueConfig() const override {
@@ -238,7 +271,12 @@ private:
 
     bool includeAttemptCount() const override { return false; }
     const Router::RouteEntry::UpgradeMap& upgradeMap() const override { return upgrade_map_; }
-
+    Router::InternalRedirectAction internalRedirectAction() const override {
+      return Router::InternalRedirectAction::PassThrough;
+    }
+    const std::string& routeName() const override { return route_name_; }
+    std::unique_ptr<const HashPolicyImpl> hash_policy_;
+    static const NullHedgePolicy hedge_policy_;
     static const NullRateLimitPolicy rate_limit_policy_;
     static const NullRetryPolicy retry_policy_;
     static const NullShadowPolicy shadow_policy_;
@@ -252,17 +290,21 @@ private:
     Router::RouteEntry::UpgradeMap upgrade_map_;
     const std::string& cluster_name_;
     absl::optional<std::chrono::milliseconds> timeout_;
+    const std::string route_name_;
   };
 
   struct RouteImpl : public Router::Route {
     RouteImpl(const std::string& cluster_name,
-              const absl::optional<std::chrono::milliseconds>& timeout)
-        : route_entry_(cluster_name, timeout) {}
+              const absl::optional<std::chrono::milliseconds>& timeout,
+              const Protobuf::RepeatedPtrField<envoy::api::v2::route::RouteAction::HashPolicy>&
+                  hash_policy)
+        : route_entry_(cluster_name, timeout, hash_policy) {}
 
     // Router::Route
     const Router::DirectResponseEntry* directResponseEntry() const override { return nullptr; }
     const Router::RouteEntry* routeEntry() const override { return &route_entry_; }
     const Router::Decorator* decorator() const override { return nullptr; }
+    const Router::RouteTracing* tracingConfig() const override { return nullptr; }
     const Router::RouteSpecificFilterConfig* perFilterConfig(const std::string&) const override {
       return nullptr;
     }
@@ -271,7 +313,6 @@ private:
   };
 
   void cleanup();
-  void closeLocal(bool end_stream);
   void closeRemote(bool end_stream);
   bool complete() { return local_closed_ && remote_closed_; }
 
@@ -283,16 +324,29 @@ private:
   Upstream::ClusterInfoConstSharedPtr clusterInfo() override { return parent_.cluster_; }
   void clearRouteCache() override {}
   uint64_t streamId() override { return stream_id_; }
-  StreamInfo::StreamInfo& streamInfo() override { return stream_info_; }
   Tracing::Span& activeSpan() override { return active_span_; }
   const Tracing::Config& tracingConfig() override { return tracing_config_; }
   void continueDecoding() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
   HeaderMap& addDecodedTrailers() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
-  void addDecodedData(Buffer::Instance&, bool) override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
+  void addDecodedData(Buffer::Instance&, bool) override {
+    // This should only be called if the user has set up buffering. The request is already fully
+    // buffered. Note that this is only called via the async client's internal use of the router
+    // filter which uses this function for buffering.
+    ASSERT(buffered_body_ != nullptr);
+  }
+  MetadataMapVector& addDecodedMetadata() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
+  void injectDecodedDataToFilterChain(Buffer::Instance&, bool) override {
+    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+  }
   const Buffer::Instance* decodingBuffer() override { return buffered_body_.get(); }
+  void modifyDecodingBuffer(std::function<void(Buffer::Instance&)>) override {
+    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+  }
   void sendLocalReply(Code code, absl::string_view body,
                       std::function<void(HeaderMap& headers)> modify_headers,
-                      const absl::optional<Grpc::Status::GrpcStatus> grpc_status) override {
+                      const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
+                      absl::string_view details) override {
+    stream_info_.setResponseCodeDetails(details);
     Utility::sendLocalReply(
         is_grpc_request_,
         [this, modify_headers](HeaderMapPtr&& headers, bool end_stream) -> void {
@@ -317,6 +371,17 @@ private:
   void removeDownstreamWatermarkCallbacks(DownstreamWatermarkCallbacks&) override {}
   void setDecoderBufferLimit(uint32_t) override {}
   uint32_t decoderBufferLimit() override { return 0; }
+  bool recreateStream() override { return false; }
+  const ScopeTrackedObject& scope() override { return *this; }
+  void addUpstreamSocketOptions(const Network::Socket::OptionsSharedPtr&) override {}
+  Network::Socket::OptionsSharedPtr getUpstreamSocketOptions() const override { return {}; }
+
+  // ScopeTrackedObject
+  void dumpState(std::ostream& os, int indent_level) const override {
+    const char* spaces = spacesForLevel(indent_level);
+    os << spaces << "AsyncClient " << this << DUMP_MEMBER(stream_id_) << "\n";
+    DUMP_DETAILS(&stream_info_);
+  }
 
   AsyncClient::StreamCallbacks& stream_callbacks_;
   const uint64_t stream_id_;
@@ -331,7 +396,9 @@ private:
   bool is_grpc_request_{};
   bool is_head_request_{false};
   bool send_xff_{true};
+
   friend class AsyncClientImpl;
+  friend class AsyncClientImplUnitTest;
 };
 
 class AsyncRequestImpl final : public AsyncClient::Request,
@@ -342,25 +409,33 @@ public:
                    const AsyncClient::RequestOptions& options);
 
   // AsyncClient::Request
-  virtual void cancel() override;
+  void cancel() override;
 
 private:
   void initialize();
-  void onComplete();
 
   // AsyncClient::StreamCallbacks
   void onHeaders(HeaderMapPtr&& headers, bool end_stream) override;
   void onData(Buffer::Instance& data, bool end_stream) override;
   void onTrailers(HeaderMapPtr&& trailers) override;
+  void onComplete() override;
   void onReset() override;
 
   // Http::StreamDecoderFilterCallbacks
+  void addDecodedData(Buffer::Instance&, bool) override {
+    // The request is already fully buffered. Note that this is only called via the async client's
+    // internal use of the router filter which uses this function for buffering.
+  }
   const Buffer::Instance* decodingBuffer() override { return request_->body().get(); }
+  void modifyDecodingBuffer(std::function<void(Buffer::Instance&)>) override {
+    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+  }
 
   MessagePtr request_;
   AsyncClient::Callbacks& callbacks_;
   std::unique_ptr<MessageImpl> response_;
   bool cancelled_{};
+  Tracing::SpanPtr child_span_;
 
   friend class AsyncClientImpl;
 };
