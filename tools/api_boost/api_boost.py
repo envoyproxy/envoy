@@ -159,8 +159,8 @@ def ApiBoostTree(target_paths,
                            file_paths)
       # Apply Clang replacements before header fixups, since the replacements
       # are all relative to the original file.
-      for prefix in target_paths:
-        sp.run(['clang-apply-replacements', PrefixDirectory(prefix)], check=True)
+      for prefix_dir in set(map(PrefixDirectory, target_paths)):
+        sp.run(['clang-apply-replacements', prefix_dir], check=True)
       # Fixup headers.
       p.map(RewriteIncludes, zip(file_paths, api_includes))
   finally:
