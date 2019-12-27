@@ -673,6 +673,7 @@ bool ListenerManagerImpl::removeListener(const std::string& name) {
 void ListenerManagerImpl::startWorkers(GuardDog& guard_dog) {
   ENVOY_LOG(info, "all dependencies initialized. starting workers");
   ASSERT(!workers_started_);
+  workers_started_ = true;
   uint32_t i = 0;
   const auto listeners_pending_init =
       std::make_shared<std::atomic<uint64_t>>(workers_.size() * active_listeners_.size());
@@ -681,7 +682,6 @@ void ListenerManagerImpl::startWorkers(GuardDog& guard_dog) {
     for (const auto& listener : active_listeners_) {
       addListenerToWorker(*worker, *listener, [this, listeners_pending_init]() {
         if (--(*listeners_pending_init) == 0) {
-          workers_started_ = true;
           stats_.workers_started_.set(1);
         }
       });
@@ -692,7 +692,6 @@ void ListenerManagerImpl::startWorkers(GuardDog& guard_dog) {
     }
   }
   if (active_listeners_.size() == 0) {
-    workers_started_ = true;
     stats_.workers_started_.set(1);
   }
 }
