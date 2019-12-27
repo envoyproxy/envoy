@@ -87,11 +87,12 @@ message Locality {
 message BuildVersion {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.core.BuildVersion";
 
-  // SemVer version of extension
+  // SemVer version of extension.
   type.v3alpha.SemanticVersion version = 1;
 
-  // Free-form build information i.e. 'alpha'
-  repeated string labels = 2;
+  // Free-form build information.
+  // Envoy defines several well known keys in the source/common/common/version.h file
+  google.protobuf.Struct metadata = 2;
 }
 
 // Version and identification for an Envoy extension.
