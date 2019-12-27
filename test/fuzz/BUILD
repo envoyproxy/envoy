@@ -12,7 +12,7 @@ envoy_package()
 envoy_proto_library(
     name = "common_proto",
     srcs = ["common.proto"],
-    deps = ["@envoy_api_shadow//envoy/api/v2/core:pkg"],
+    deps = ["@envoy_api//envoy/api/v2/core:pkg"],
 )
 
 envoy_cc_test_library(
@@ -57,6 +57,6 @@ envoy_cc_test_library(
         "//test/mocks/ssl:ssl_mocks",
         "//test/mocks/upstream:upstream_mocks",
         "//test/test_common:utility_lib",
-        "@envoy_api_shadow//envoy/api/v2/core:pkg_cc_proto",
+        "@envoy_api//envoy/api/v2/core:pkg_cc_proto",
     ],
 )

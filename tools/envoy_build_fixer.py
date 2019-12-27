@@ -109,7 +109,7 @@ def FindApiHeaders(source_path):
   return api_hdrs
 
 
-# Infer and adjust rule dependencies in BUILD files for @envoy_api_shadow proto
+# Infer and adjust rule dependencies in BUILD files for @envoy_api proto
 # files. This is very cheap to do purely via a grep+buildozer syntax level
 # step.
 #
@@ -148,7 +148,7 @@ def FixApiDeps(path, contents):
       # We're not smart enough to infer on generated files.
       if os.path.exists(p):
         api_hdrs = api_hdrs.union(FindApiHeaders(p))
-    actual_api_deps = set(['@envoy_api_shadow//%s:pkg_cc_proto' % h for h in api_hdrs])
+    actual_api_deps = set(['@envoy_api//%s:pkg_cc_proto' % h for h in api_hdrs])
     existing_api_deps = set([])
     if deps != 'missing':
       existing_api_deps = set([
