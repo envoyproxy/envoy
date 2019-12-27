@@ -10,6 +10,7 @@
 #include "envoy/api/v2/listener/listener.pb.h"
 #include "envoy/network/filter.h"
 #include "envoy/network/listen_socket.h"
+#include "envoy/server/api_listener.h"
 #include "envoy/server/filter_config.h"
 #include "envoy/server/instance.h"
 #include "envoy/server/listener_manager.h"
@@ -17,7 +18,6 @@
 #include "envoy/server/worker.h"
 #include "envoy/stats/scope.h"
 
-#include "server/api_listener.h"
 #include "server/filter_chain_manager_impl.h"
 #include "server/lds_api.h"
 #include "server/listener_impl.h"
@@ -146,7 +146,7 @@ public:
   void beginListenerUpdate() override { error_state_tracker_.clear(); }
   void endListenerUpdate(FailureStates&& failure_state) override;
   Http::Context& httpContext() { return server_.httpContext(); }
-  Http::ServerConnectionCallbacks* apiListener(const std::string& name) override;
+  ApiListenerHandle* apiListener() override;
 
   Instance& server_;
   ListenerComponentFactory& factory_;
@@ -216,7 +216,7 @@ private:
   createListenSocketFactory(const envoy::api::v2::core::Address& proto_address,
                             ListenerImpl& listener, bool reuse_port);
 
-  std::unordered_map<std::string, std::unique_ptr<HttpApiListener>> api_listeners_;
+  ApiListenerPtr api_listener_;
   // Active listeners are listeners that are currently accepting new connections on the workers.
   ListenerList active_listeners_;
   // Warming listeners are listeners that may need further initialization via the listener's init

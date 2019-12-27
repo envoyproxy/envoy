@@ -5,6 +5,7 @@
 #include "envoy/api/v2/lds.pb.h"
 #include "envoy/network/connection.h"
 #include "envoy/network/filter.h"
+#include "envoy/server/api_listener.h"
 #include "envoy/server/drain_manager.h"
 #include "envoy/server/filter_config.h"
 #include "envoy/server/listener_manager.h"
@@ -16,8 +17,6 @@
 #include "common/init/manager_impl.h"
 #include "common/stream_info/stream_info_impl.h"
 
-#include "extensions/filters/network/http_connection_manager/config.h"
-
 namespace Envoy {
 namespace Server {
 
@@ -27,16 +26,20 @@ class ListenerManagerImpl;
  * Listener that provides a handle to inject HTTP calls into envoy via the traditional HCM path.
  * Thus it provides full access to Envoy's L7 features, e.g HTTP filters.
  */
-class HttpApiListener : public Configuration::FactoryContext,
-                        public Network::DrainDecision,
-                        Logger::Loggable<Logger::Id::http> {
+class HttpApiListenerImpl : public ApiListener,
+                            public Configuration::FactoryContext,
+                            public Network::DrainDecision,
+                            Logger::Loggable<Logger::Id::http> {
 public:
-  HttpApiListener(const envoy::api::v2::Listener& config, ListenerManagerImpl& parent,
-                  const std::string& name, ProtobufMessage::ValidationVisitor& validation_visitor);
+  HttpApiListenerImpl(const envoy::api::v2::Listener& config, ListenerManagerImpl& parent,
+                      const std::string& name,
+                      ProtobufMessage::ValidationVisitor& validation_visitor);
 
-  // see thoughts on what this API handle could be at server/listener_manager.h
-  Http::ServerConnectionCallbacks* apiHandle();
   const Network::Address::InstanceConstSharedPtr& address() const { return address_; }
+
+  // ApiListener
+  absl::string_view name() const override { return name_; }
+  ApiListenerHandle* handle() override;
 
   // TODO(junr03): the majority of this surface could be moved out of the listener via some sort of
   // base class context.
@@ -73,7 +76,7 @@ public:
 private:
   class SyntheticReadCallbacks : public Network::ReadFilterCallbacks {
   public:
-    SyntheticReadCallbacks(HttpApiListener& parent)
+    SyntheticReadCallbacks(HttpApiListenerImpl& parent)
         : parent_(parent), connection_(SyntheticConnection(*this)) {}
 
     // Network::ReadFilterCallbacks
@@ -139,7 +142,7 @@ private:
       Network::ConnectionSocket::OptionsSharedPtr options_;
     };
 
-    HttpApiListener& parent_;
+    HttpApiListenerImpl& parent_;
     SyntheticConnection connection_;
   };
 

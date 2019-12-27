@@ -267,15 +267,16 @@ envoy_cc_library(
 envoy_cc_library(
     name = "api_listener_lib",
     srcs = [
-        "api_listener.cc",
+        "api_listener_impl.cc",
     ],
     hdrs = [
-        "api_listener.h",
+        "api_listener_impl.h",
     ],
     deps = [
         ":drain_manager_lib",
         ":listener_manager_impl",
         "//include/envoy/network:connection_interface",
+        "//include/envoy/server:api_listener_interface",
         "//include/envoy/server:filter_config_interface",
         "//include/envoy/server:listener_manager_interface",
         "//source/common/common:empty_string",
@@ -332,7 +333,7 @@ envoy_cc_library(
         "listener_manager_impl.cc",
     ],
     hdrs = [
-        "api_listener.h",
+        "api_listener_impl.h",
         "listener_impl.h",
         "listener_manager_impl.h",
     ],

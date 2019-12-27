@@ -30,6 +30,7 @@ envoy_cc_library(
         ":protocol_interface",
         "//include/envoy/buffer:buffer_interface",
         "//include/envoy/network:address_interface",
+        "//include/envoy/server:api_listener_interface",
     ],
 )
 

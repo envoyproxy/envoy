@@ -10,6 +10,7 @@
 #include "envoy/http/metadata_interface.h"
 #include "envoy/http/protocol.h"
 #include "envoy/network/address.h"
+#include "envoy/server/api_listener.h"
 
 namespace Envoy {
 namespace Http {
@@ -413,7 +414,8 @@ public:
 /**
  * Callbacks for server connections.
  */
-class ServerConnectionCallbacks : public virtual ConnectionCallbacks {
+class ServerConnectionCallbacks : public virtual ConnectionCallbacks,
+                                  public virtual Server::ApiListenerHandle {
 public:
   /**
    * Invoked when a new request stream is initiated by the remote.

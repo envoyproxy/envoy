@@ -32,6 +32,11 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "api_listener_interface",
+    hdrs = ["api_listener.h"],
+)
+
+envoy_cc_library(
     name = "configuration_interface",
     hdrs = ["configuration.h"],
     external_deps = ["abseil_optional"],
