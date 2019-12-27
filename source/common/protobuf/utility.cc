@@ -118,12 +118,13 @@ void jsonConvertInternal(const Protobuf::Message& source,
 // This relies on the property that any v3 configuration that is ingestible as
 // v2 has the same semantics in v2/v3, which holds due to the highly structured
 // vN/v(N+1) mechanical transforms.
-void tryWithApiBoosting(std::function<void(Protobuf::Message&)> f, Protobuf::Message& message) {
+void tryWithApiBoosting(std::function<void(Protobuf::Message&, bool)> f,
+                        Protobuf::Message& message) {
   const Protobuf::Descriptor* earlier_version_desc =
       Config::ApiTypeOracle::getEarlierVersionDescriptor(message);
   // If there is no earlier version of a message, just apply f directly.
   if (earlier_version_desc == nullptr) {
-    f(message);
+    f(message, true);
     return;
   }
   Protobuf::DynamicMessageFactory dmf;
@@ -132,14 +133,14 @@ void tryWithApiBoosting(std::function<void(Protobuf::Message&)> f, Protobuf::Mes
   try {
     // Try apply f with an earlier version of the message, then upgrade the
     // result.
-    f(*earlier_message);
+    f(*earlier_message, false);
     Config::VersionConverter::upgrade(*earlier_message, message);
   } catch (EnvoyException&) {
     // If we fail at the earlier version, try f at the current version of the
     // message.
     bool newer_error = false;
     try {
-      f(message);
+      f(message, true);
     } catch (EnvoyException&) {
       // If we fail this time, we should throw.
       // TODO(htuch): currently throwing the v2 error, rather than v3 error, to
@@ -220,7 +221,7 @@ size_t MessageUtil::hash(const Protobuf::Message& message) {
 void MessageUtil::loadFromJson(const std::string& json, Protobuf::Message& message,
                                ProtobufMessage::ValidationVisitor& validation_visitor) {
   tryWithApiBoosting(
-      [&json, &validation_visitor](Protobuf::Message& message) {
+      [&json, &validation_visitor](Protobuf::Message& message, bool latest_version) {
         Protobuf::util::JsonParseOptions options;
         options.case_insensitive_enum_parsing = true;
         // Let's first try and get a clean parse when checking for unknown fields;
@@ -244,9 +245,15 @@ void MessageUtil::loadFromJson(const std::string& json, Protobuf::Message& messa
           throw EnvoyException("Unable to parse JSON as proto (" + relaxed_status.ToString() +
                                "): " + json);
         }
-        // We know it's an unknown field at this point.
-        validation_visitor.onUnknownField("type " + message.GetTypeName() + " reason " +
-                                          strict_status.ToString());
+        // We know it's an unknown field at this point. If we're at the latest
+        // version, then it's definitely an unknown field, otherwise we try to
+        // load again at a later version.
+        if (latest_version) {
+          validation_visitor.onUnknownField("type " + message.GetTypeName() + " reason " +
+                                            strict_status.ToString());
+        } else {
+          throw EnvoyException("Unknown field, possibly a rename, try again.");
+        }
       },
       message);
 }
@@ -481,7 +488,7 @@ std::string MessageUtil::getJsonStringFromMessage(const Protobuf::Message& messa
 
 void MessageUtil::unpackTo(const ProtobufWkt::Any& any_message, Protobuf::Message& message) {
   tryWithApiBoosting(
-      [&any_message](Protobuf::Message& message) {
+      [&any_message](Protobuf::Message& message, bool) {
         if (!any_message.UnpackTo(&message)) {
           throw EnvoyException(fmt::format("Unable to unpack as {}: {}",
                                            message.GetDescriptor()->full_name(),

@@ -1,9 +1,9 @@
 #include "envoy/api/v2/cds.pb.h"
 #include "envoy/api/v2/core/config_source.pb.h"
 #include "envoy/api/v2/core/grpc_service.pb.h"
-#include "envoy/api/v3alpha/cds.pb.h"
 #include "envoy/common/exception.h"
 #include "envoy/config/bootstrap/v2/bootstrap.pb.h"
+#include "envoy/config/bootstrap/v3alpha/bootstrap.pb.h"
 
 #include "common/common/fmt.h"
 #include "common/config/api_version.h"
@@ -302,24 +302,140 @@ TEST(UtilityTest, TypedStructToStruct) {
   EXPECT_THAT(out, ProtoEq(untyped_struct));
 }
 
-// Verify that udpa.type.v1.TypedStruct can be translated into an arbitrary message of correct type
-TEST(UtilityTest, TypedStructToBootstrap) {
+// Verify that regular Struct can be translated into an arbitrary message of correct type
+// (v2 API, no upgrading).
+TEST(UtilityTest, StructToClusterV2) {
   ProtobufWkt::Any typed_config;
-  envoy::config::bootstrap::v2::Bootstrap bootstrap;
-  const std::string bootstrap_config_yaml = R"EOF(
-    admin:
-      access_log_path: /dev/null
-      address:
-        pipe:
-          path: "/"
+  API_NO_BOOST(envoy::api::v2::Cluster) cluster;
+  ProtobufWkt::Struct cluster_struct;
+  const std::string cluster_config_yaml = R"EOF(
+    drain_connections_on_host_removal: true
   )EOF";
-  TestUtility::loadFromYaml(bootstrap_config_yaml, bootstrap);
-  packTypedStructIntoAny(typed_config, bootstrap);
+  TestUtility::loadFromYaml(cluster_config_yaml, cluster);
+  TestUtility::loadFromYaml(cluster_config_yaml, cluster_struct);
 
-  envoy::config::bootstrap::v2::Bootstrap out;
+  {
+    API_NO_BOOST(envoy::api::v2::Cluster) out;
+    Utility::translateOpaqueConfig({}, cluster_struct, ProtobufMessage::getNullValidationVisitor(),
+                                   out);
+    EXPECT_THAT(out, ProtoEq(cluster));
+  }
+  {
+    API_NO_BOOST(envoy::api::v2::Cluster) out;
+    Utility::translateOpaqueConfig({}, cluster_struct,
+                                   ProtobufMessage::getStrictValidationVisitor(), out);
+    EXPECT_THAT(out, ProtoEq(cluster));
+  }
+}
+
+// Verify that regular Struct can be translated into an arbitrary message of correct type
+// (v3 API, upgrading).
+TEST(UtilityTest, StructToClusterV3) {
+  ProtobufWkt::Any typed_config;
+  API_NO_BOOST(envoy::api::v3alpha::Cluster) cluster;
+  ProtobufWkt::Struct cluster_struct;
+  const std::string cluster_config_yaml = R"EOF(
+    ignore_health_on_host_removal: true
+  )EOF";
+  TestUtility::loadFromYaml(cluster_config_yaml, cluster);
+  TestUtility::loadFromYaml(cluster_config_yaml, cluster_struct);
+
+  {
+    API_NO_BOOST(envoy::api::v3alpha::Cluster) out;
+    Utility::translateOpaqueConfig({}, cluster_struct, ProtobufMessage::getNullValidationVisitor(),
+                                   out);
+    EXPECT_THAT(out, ProtoEq(cluster));
+  }
+  {
+    API_NO_BOOST(envoy::api::v3alpha::Cluster) out;
+    Utility::translateOpaqueConfig({}, cluster_struct,
+                                   ProtobufMessage::getStrictValidationVisitor(), out);
+    EXPECT_THAT(out, ProtoEq(cluster));
+  }
+}
+
+// Verify that udpa.type.v1.TypedStruct can be translated into an arbitrary message of correct type
+// (v2 API, no upgrading).
+TEST(UtilityTest, TypedStructToClusterV2) {
+  ProtobufWkt::Any typed_config;
+  API_NO_BOOST(envoy::api::v2::Cluster) cluster;
+  const std::string cluster_config_yaml = R"EOF(
+    drain_connections_on_host_removal: true
+  )EOF";
+  TestUtility::loadFromYaml(cluster_config_yaml, cluster);
+  packTypedStructIntoAny(typed_config, cluster);
+
+  {
+    API_NO_BOOST(envoy::api::v2::Cluster) out;
+    Utility::translateOpaqueConfig(typed_config, ProtobufWkt::Struct(),
+                                   ProtobufMessage::getNullValidationVisitor(), out);
+    EXPECT_THAT(out, ProtoEq(cluster));
+  }
+  {
+    API_NO_BOOST(envoy::api::v2::Cluster) out;
+    Utility::translateOpaqueConfig(typed_config, ProtobufWkt::Struct(),
+                                   ProtobufMessage::getStrictValidationVisitor(), out);
+    EXPECT_THAT(out, ProtoEq(cluster));
+  }
+}
+
+// Verify that udpa.type.v1.TypedStruct can be translated into an arbitrary message of correct type
+// (v3 API, upgrading).
+TEST(UtilityTest, TypedStructToClusterV3) {
+  ProtobufWkt::Any typed_config;
+  API_NO_BOOST(envoy::api::v3alpha::Cluster) cluster;
+  const std::string cluster_config_yaml = R"EOF(
+    ignore_health_on_host_removal: true
+  )EOF";
+  TestUtility::loadFromYaml(cluster_config_yaml, cluster);
+  packTypedStructIntoAny(typed_config, cluster);
+
+  {
+    API_NO_BOOST(envoy::api::v3alpha::Cluster) out;
+    Utility::translateOpaqueConfig(typed_config, ProtobufWkt::Struct(),
+                                   ProtobufMessage::getNullValidationVisitor(), out);
+    EXPECT_THAT(out, ProtoEq(cluster));
+  }
+  {
+    API_NO_BOOST(envoy::api::v3alpha::Cluster) out;
+    Utility::translateOpaqueConfig(typed_config, ProtobufWkt::Struct(),
+                                   ProtobufMessage::getStrictValidationVisitor(), out);
+    EXPECT_THAT(out, ProtoEq(cluster));
+  }
+}
+
+// Verify that Any can be translated into an arbitrary message of correct type
+// (v2 API, no upgrading).
+TEST(UtilityTest, AnyToClusterV2) {
+  ProtobufWkt::Any typed_config;
+  API_NO_BOOST(envoy::api::v2::Cluster) cluster;
+  const std::string cluster_config_yaml = R"EOF(
+    drain_connections_on_host_removal: true
+  )EOF";
+  TestUtility::loadFromYaml(cluster_config_yaml, cluster);
+  typed_config.PackFrom(cluster);
+
+  API_NO_BOOST(envoy::api::v2::Cluster) out;
   Utility::translateOpaqueConfig(typed_config, ProtobufWkt::Struct(),
                                  ProtobufMessage::getStrictValidationVisitor(), out);
-  EXPECT_THAT(out, ProtoEq(bootstrap));
+  EXPECT_THAT(out, ProtoEq(cluster));
+}
+
+// Verify that Any can be translated into an arbitrary message of correct type
+// (v3 API, upgrading).
+TEST(UtilityTest, AnyToClusterV3) {
+  ProtobufWkt::Any typed_config;
+  API_NO_BOOST(envoy::api::v3alpha::Cluster) cluster;
+  const std::string cluster_config_yaml = R"EOF(
+    ignore_health_on_host_removal: true
+  )EOF";
+  TestUtility::loadFromYaml(cluster_config_yaml, cluster);
+  typed_config.PackFrom(cluster);
+
+  API_NO_BOOST(envoy::api::v3alpha::Cluster) out;
+  Utility::translateOpaqueConfig(typed_config, ProtobufWkt::Struct(),
+                                 ProtobufMessage::getStrictValidationVisitor(), out);
+  EXPECT_THAT(out, ProtoEq(cluster));
 }
 
 // Verify that translation from udpa.type.v1.TypedStruct into message of incorrect type fails
@@ -343,62 +459,6 @@ TEST(UtilityTest, TypedStructToInvalidType) {
       EnvoyException, "Unable to parse JSON as proto");
 }
 
-// TODO(htuch): write a bunch of tests for translateOpaqueConfig that reflect
-// the tests we used to have for ApiTypeOracle.
-#if 0
-  // Struct upgrade to v3alpha.
-  {
-    const auto* desc = ApiTypeOracle::inferEarlierVersionDescriptor(
-        "envoy.ip_tagging", {}, "envoy.config.filter.http.ip_tagging.v3alpha.IPTagging");
-    EXPECT_EQ("envoy.config.filter.http.ip_tagging.v2.IPTagging", desc->full_name());
-  }
-
-  // Any upgrade from v2 to v3alpha.
-  {
-    ProtobufWkt::Any typed_config;
-    typed_config.set_type_url("envoy.config.filter.http.ip_tagging.v2.IPTagging");
-    const auto* desc = ApiTypeOracle::inferEarlierVersionDescriptor(
-        "envoy.ip_tagging", typed_config, "envoy.config.filter.http.ip_tagging.v3alpha.IPTagging");
-    EXPECT_EQ("envoy.config.filter.http.ip_tagging.v2.IPTagging", desc->full_name());
-  }
-
-  // There is no upgrade for same Any and target type URL.
-  {
-    ProtobufWkt::Any typed_config;
-    typed_config.set_type_url("envoy.config.filter.http.ip_tagging.v3alpha.IPTagging");
-    EXPECT_EQ(nullptr, ApiTypeOracle::inferEarlierVersionDescriptor(
-                           "envoy.ip_tagging", typed_config,
-                           "envoy.config.filter.http.ip_tagging.v3alpha.IPTagging"));
-  }
-
-  // TypedStruct upgrade from v2 to v3alpha.
-  {
-    ProtobufWkt::Any typed_config;
-    udpa::type::v1::TypedStruct typed_struct;
-    typed_struct.set_type_url("envoy.config.filter.http.ip_tagging.v2.IPTagging");
-    typed_config.PackFrom(typed_struct);
-    const auto* desc = ApiTypeOracle::inferEarlierVersionDescriptor(
-        "envoy.ip_tagging", typed_config, "envoy.config.filter.http.ip_tagging.v3alpha.IPTagging");
-    EXPECT_EQ("envoy.config.filter.http.ip_tagging.v2.IPTagging", desc->full_name());
-  }
-
-  // There is no upgrade for same TypedStruct and target type URL.
-  {
-    ProtobufWkt::Any typed_config;
-    udpa::type::v1::TypedStruct typed_struct;
-    typed_struct.set_type_url(
-        "type.googleapis.com/envoy.config.filter.http.ip_tagging.v3alpha.IPTagging");
-    typed_config.PackFrom(typed_struct);
-    EXPECT_EQ(nullptr, ApiTypeOracle::inferEarlierVersionDescriptor(
-                           "envoy.ip_tagging", typed_config,
-                           "envoy.config.filter.http.ip_tagging.v3alpha.IPTagging"));
-  }
-
-  // There is no upgrade for v2.
-  EXPECT_EQ(nullptr,
-            ApiTypeOracle::inferEarlierVersionDescriptor(
-                "envoy.ip_tagging", {}, "envoy.config.filter.http.ip_tagging.v2.IPTagging"));
-#endif
 TEST(CheckApiConfigSourceSubscriptionBackingClusterTest, GrpcClusterTestAcrossTypes) {
   envoy::api::v2::core::ConfigSource config;
   auto* api_config_source = config.mutable_api_config_source();

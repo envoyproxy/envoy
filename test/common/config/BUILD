@@ -307,8 +307,8 @@ envoy_cc_test(
         "@com_github_cncf_udpa//udpa/type/v1:pkg_cc_proto",
         "@envoy_api//envoy/api/v2:pkg_cc_proto",
         "@envoy_api//envoy/api/v2/core:pkg_cc_proto",
-        "@envoy_api//envoy/api/v3alpha:pkg_cc_proto",
         "@envoy_api//envoy/config/bootstrap/v2:pkg_cc_proto",
+        "@envoy_api//envoy/config/bootstrap/v3alpha:pkg_cc_proto",
     ],
 )
 
@@ -376,8 +376,11 @@ envoy_cc_test(
     srcs = ["version_converter_test.cc"],
     deps = [
         ":version_converter_proto_cc_proto",
+        "//source/common/config:api_version_lib",
         "//source/common/config:version_converter_lib",
         "//test/test_common:test_time_lib",
         "//test/test_common:utility_lib",
+        "@envoy_api//envoy/api/v2:pkg_cc_proto",
+        "@envoy_api//envoy/api/v3alpha:pkg_cc_proto",
     ],
 )
