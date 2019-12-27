@@ -21,12 +21,12 @@
 #include "common/network/utility.h"
 #include "common/protobuf/utility.h"
 
+#include "server/api_listener_impl.h"
 #include "server/configuration_impl.h"
 #include "server/drain_manager_impl.h"
 #include "server/filter_chain_manager_impl.h"
 #include "server/transport_socket_config_impl.h"
 #include "server/well_known_names.h"
-#include "server/api_listener_impl.h"
 
 #include "extensions/filters/listener/well_known_names.h"
 #include "extensions/transport_sockets/well_known_names.h"
