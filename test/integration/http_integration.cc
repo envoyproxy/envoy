@@ -867,6 +867,32 @@ void HttpIntegrationTest::testEnvoyProxying100Continue(bool continue_before_upst
   EXPECT_EQ("200", response->headers().Status()->value().getStringView());
 }
 
+void HttpIntegrationTest::testResponseFramedByConnectionCloseWithReadLimits(
+    ConnectionCreationFunction* create_connection) {
+  // Set a small buffer limit on the downstream in order to trigger a call to trigger readDisable on
+  // the upstream when proxying the response. Upstream limit needs to be larger so that
+  // RawBufferSocket::doRead reads the response body and detects the upstream close in the same call
+  // stack.
+  config_helper_.setBufferLimits(100000, 2); // Setting high watermark to 1 doesn't work, see #9499
+  initialize();
+
+  codec_client_ = makeHttpConnection(
+      create_connection ? ((*create_connection)()) : makeClientConnection((lookupPort("http"))));
+  fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
+
+  auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
+  waitForNextUpstreamRequest();
+  // Disable chunking to trigger framing by connection close.
+  upstream_request_->encodeHeaders(Http::TestHeaderMapImpl{{":status", "200"}, {":no-chunks", "1"}},
+                                   false);
+  upstream_request_->encodeData(512, true);
+  ASSERT_TRUE(fake_upstream_connection_->close());
+
+  response->waitForEndStream();
+
+  EXPECT_TRUE(response->complete());
+}
+
 void HttpIntegrationTest::testTwoRequests(bool network_backup) {
   // if network_backup is false, this simply tests that Envoy can handle multiple
   // requests on a connection.

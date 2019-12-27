@@ -279,13 +279,8 @@ void ConnectionImpl::enableHalfClose(bool enabled) {
 }
 
 void ConnectionImpl::readDisable(bool disable) {
-  ASSERT(state() == State::Open);
-  if (state() != State::Open || file_event_ == nullptr) {
-    // If readDisable is called on a closed connection in error, do not crash.
-    return;
-  }
-
-  ENVOY_CONN_LOG(trace, "readDisable: enabled={} disable={}", *this, read_enabled_, disable);
+  ENVOY_CONN_LOG(trace, "readDisable: enabled={} disable={} state={}", *this, read_enabled_,
+                 disable, static_cast<int>(state()));
 
   // When we disable reads, we still allow for early close notifications (the equivalent of
   // EPOLLRDHUP for an epoll backend). For backends that support it, this allows us to apply
@@ -302,6 +297,11 @@ void ConnectionImpl::readDisable(bool disable) {
     ASSERT(read_enabled_);
     read_enabled_ = false;
 
+    if (state() != State::Open || file_event_ == nullptr) {
+      // If readDisable is called on a closed connection, do not crash.
+      return;
+    }
+
     // If half-close semantics are enabled, we never want early close notifications; we
     // always want to read all available data, even if the other side has closed.
     if (detect_early_close_ && !enable_half_close_) {
@@ -316,6 +316,12 @@ void ConnectionImpl::readDisable(bool disable) {
     }
     ASSERT(!read_enabled_);
     read_enabled_ = true;
+
+    if (state() != State::Open || file_event_ == nullptr) {
+      // If readDisable is called on a closed connection, do not crash.
+      return;
+    }
+
     // We never ask for both early close and read at the same time. If we are reading, we want to
     // consume all available data.
     file_event_->setEnabled(Event::FileReadyType::Read | Event::FileReadyType::Write);

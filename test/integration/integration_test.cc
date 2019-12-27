@@ -221,6 +221,10 @@ TEST_P(IntegrationTest, RouterUpstreamDisconnectBeforeResponseComplete) {
   testRouterUpstreamDisconnectBeforeResponseComplete();
 }
 
+TEST_P(IntegrationTest, ResponseFramedByConnectionCloseWithReadLimits) {
+  testResponseFramedByConnectionCloseWithReadLimits();
+}
+
 TEST_P(IntegrationTest, RouterDownstreamDisconnectBeforeRequestComplete) {
   testRouterDownstreamDisconnectBeforeRequestComplete();
 }
