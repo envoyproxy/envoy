@@ -155,9 +155,11 @@ ListenerImpl::ListenerImpl(const envoy::api::v2::Listener& config, const std::st
   if (PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, freebind, false)) {
     addListenSocketOptions(Network::SocketOptionFactory::buildIpFreebindOptions());
   }
-  if ((socket_type == Network::Address::SocketType::Datagram && concurrency > 1) ||
-      config.reuse_port()) {
+  if (config.reuse_port()) {
     addListenSocketOptions(Network::SocketOptionFactory::buildReusePortOptions());
+  } else if (socket_type == Network::Address::SocketType::Datagram && concurrency > 1) {
+    ENVOY_LOG(warn, "Listening on UDP without SO_REUSEPORT socket option may result to unstable "
+                    "packet proxying.");
   }
   if (!config.socket_options().empty()) {
     addListenSocketOptions(

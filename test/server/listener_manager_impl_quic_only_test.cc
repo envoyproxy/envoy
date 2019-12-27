@@ -39,6 +39,7 @@ filter_chains:
           verify_subject_alt_name:
           - localhost
           - 127.0.0.1
+reuse_port: true
 udp_listener_config:
   udp_listener_name: "quiche_quic_listener"
   )EOF",
@@ -48,7 +49,7 @@ udp_listener_config:
   EXPECT_CALL(server_.random_, uuid());
   expectCreateListenSocket(envoy::api::v2::core::SocketOption::STATE_PREBIND,
 #ifdef SO_RXQ_OVFL
-                           /* expected_num_options */ 3, // SO_REUSEPORT is on forcibly for UDP
+                           /* expected_num_options */ 3, // SO_REUSEPORT is on as configured
 #else
                            /* expected_num_options */ 2,
 #endif
