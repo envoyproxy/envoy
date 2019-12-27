@@ -839,7 +839,7 @@ if __name__ == "__main__":
   parser.add_argument("--api-prefix", type=str, default="./api/", help="path of the API tree.")
   parser.add_argument("--api-shadow-prefix",
                       type=str,
-                      default="./api_shadow/",
+                      default="./generated_api_shadow/",
                       help="path of the shadow API tree.")
   parser.add_argument("--skip_envoy_build_rule_check",
                       action="store_true",

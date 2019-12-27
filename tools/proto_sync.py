@@ -299,7 +299,7 @@ if __name__ == '__main__':
   parser = argparse.ArgumentParser()
   parser.add_argument('--mode', choices=['check', 'fix'])
   parser.add_argument('--api_root', default='./api')
-  parser.add_argument('--api_shadow_root', default='./api_shadow')
+  parser.add_argument('--api_shadow_root', default='./generated_api_shadow')
   parser.add_argument('labels', nargs='*')
   args = parser.parse_args()
 

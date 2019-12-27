@@ -28,7 +28,7 @@ def envoy_api_binding():
 
     # We also need a shadow for now, see #9479.
     if "envoy_api_shadow" not in native.existing_rules().keys():
-        _default_envoy_api(name = "envoy_api_shadow", reldir = "api_shadow")
+        _default_envoy_api(name = "envoy_api_shadow", reldir = "generated_api_shadow")
 
     # TODO(https://github.com/envoyproxy/envoy/issues/7719) need to remove both bindings and use canonical rules
     native.bind(
