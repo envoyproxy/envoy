@@ -211,6 +211,7 @@ tracing:
 
 TEST_F(HttpConnectionManagerConfigTest, DEPRECATED_FEATURE_TEST(RequestHeaderForTagsConfig)) {
   const std::string yaml_string = R"EOF(
+stat_prefix: router
 route_config:
   name: local_route
 tracing:
