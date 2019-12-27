@@ -112,7 +112,8 @@ message HealthCheck {
 
     // Specifies a list of HTTP response statuses considered healthy. If provided, replaces default
     // 200-only policy - 200 must be included explicitly as needed. Ranges follow half-open
-    // semantics of :ref:`Int64Range <envoy_api_msg_type.v3alpha.Int64Range>`.
+    // semantics of :ref:`Int64Range <envoy_api_msg_type.v3alpha.Int64Range>`. The start and end of
+    // each range are required. Only statuses in the range [100, 600) are allowed.
     repeated type.v3alpha.Int64Range expected_statuses = 9;
 
     // Use specified application protocol for health checks. This is to replace
@@ -222,12 +223,12 @@ message HealthCheck {
   // The number of unhealthy health checks required before a host is marked
   // unhealthy. Note that for *http* health checking if a host responds with 503
   // this threshold is ignored and the host is considered unhealthy immediately.
-  google.protobuf.UInt32Value unhealthy_threshold = 4;
+  google.protobuf.UInt32Value unhealthy_threshold = 4 [(validate.rules).message = {required: true}];
 
   // The number of healthy health checks required before a host is marked
   // healthy. Note that during startup, only a single successful health check is
   // required to mark a host healthy.
-  google.protobuf.UInt32Value healthy_threshold = 5;
+  google.protobuf.UInt32Value healthy_threshold = 5 [(validate.rules).message = {required: true}];
 
   // [#not-implemented-hide:] Non-serving port for health checking.
   google.protobuf.UInt32Value alt_port = 6;
