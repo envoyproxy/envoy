@@ -80,11 +80,12 @@ message Locality {
 // BuildVersion combines SemVer version of extension with free-form build information
 // (i.e. 'alpha', 'private-build') as a set of strings.
 message BuildVersion {
-  // SemVer version of extension
+  // SemVer version of extension.
   type.SemanticVersion version = 1;
 
-  // Free-form build information i.e. 'alpha'
-  repeated string labels = 2;
+  // Free-form build information.
+  // Envoy defines several well known keys in the source/common/common/version.h file
+  google.protobuf.Struct metadata = 2;
 }
 
 // Version and identification for an Envoy extension.

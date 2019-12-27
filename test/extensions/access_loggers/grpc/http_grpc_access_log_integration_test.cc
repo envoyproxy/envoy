@@ -91,6 +91,7 @@ public:
     if (request_msg.has_identifier()) {
       auto* node = request_msg.mutable_identifier()->mutable_node();
       node->clear_extensions();
+      node->clear_user_agent_build_version();
     }
     EXPECT_EQ(request_msg.DebugString(), expected_request_msg.DebugString());
 
@@ -127,7 +128,6 @@ identifier:
       zone: zone_name
     build_version: {}
     user_agent_name: "envoy"
-    user_agent_version: {}
   log_name: foo
 http_logs:
   log_entry:
@@ -146,7 +146,7 @@ http_logs:
       response_code_details: "route_not_found"
       response_headers_bytes: 54
 )EOF",
-                                                  VersionInfo::version(), VersionInfo::version())));
+                                                  VersionInfo::version())));
 
   BufferingStreamDecoderPtr response = IntegrationUtil::makeSingleRequest(
       lookupPort("http"), "GET", "/notfound", "", downstream_protocol_, version_);
@@ -201,7 +201,6 @@ identifier:
       zone: zone_name
     build_version: {}
     user_agent_name: "envoy"
-    user_agent_version: {}
   log_name: foo
 http_logs:
   log_entry:
@@ -220,7 +219,7 @@ http_logs:
       response_code_details: "route_not_found"
       response_headers_bytes: 54
 )EOF",
-                                                  VersionInfo::version(), VersionInfo::version())));
+                                                  VersionInfo::version())));
   cleanup();
 }
 

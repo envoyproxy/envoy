@@ -221,10 +221,12 @@ protected:
     std::string version_string =
         absl::StrCat(build_version.version().major(), ".", build_version.version().minor(), ".",
                      build_version.version().patch());
-    for (const auto& label : build_version.labels()) {
-      absl::StrAppend(&version_string, "-", label);
+    const auto& fields = build_version.metadata().fields();
+    if (fields.find(BuildVersionMetadataKeys::get().BuildLabel) != fields.end()) {
+      absl::StrAppend(&version_string, "-",
+                      fields.at(BuildVersionMetadataKeys::get().BuildLabel).string_value());
     }
-    EXPECT_TRUE(absl::StartsWith(version_string, BUILD_VERSION_NUMBER));
+    EXPECT_EQ(BUILD_VERSION_NUMBER, version_string);
   }
 
   // Returns the server's tracer as a pointer, for use in dynamic_cast tests.

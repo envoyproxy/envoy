@@ -111,6 +111,7 @@ public:
     if (request_msg.has_identifier()) {
       auto* node = request_msg.mutable_identifier()->mutable_node();
       node->clear_extensions();
+      node->clear_user_agent_build_version();
     }
     EXPECT_EQ(request_msg.DebugString(), expected_request_msg.DebugString());
 
@@ -156,8 +157,8 @@ TEST_P(TcpGrpcAccessLogIntegrationTest, BasicAccessLogFlow) {
 
   ASSERT_TRUE(waitForAccessLogConnection());
   ASSERT_TRUE(waitForAccessLogStream());
-  ASSERT_TRUE(
-      waitForAccessLogRequest(fmt::format(R"EOF(
+  ASSERT_TRUE(waitForAccessLogRequest(
+      fmt::format(R"EOF(
 identifier:
   node:
     id: node_name
@@ -166,7 +167,6 @@ identifier:
       zone: zone_name
     build_version: {}
     user_agent_name: "envoy"
-    user_agent_version: {}
   log_name: foo
 tcp_logs:
   log_entry:
@@ -188,11 +188,10 @@ tcp_logs:
       received_bytes: 3
       sent_bytes: 5
 )EOF",
-                                          VersionInfo::version(), VersionInfo::version(),
-                                          Network::Test::getLoopbackAddressString(ipVersion()),
-                                          Network::Test::getLoopbackAddressString(ipVersion()),
-                                          Network::Test::getLoopbackAddressString(ipVersion()),
-                                          Network::Test::getLoopbackAddressString(ipVersion()))));
+                  VersionInfo::version(), Network::Test::getLoopbackAddressString(ipVersion()),
+                  Network::Test::getLoopbackAddressString(ipVersion()),
+                  Network::Test::getLoopbackAddressString(ipVersion()),
+                  Network::Test::getLoopbackAddressString(ipVersion()))));
 
   cleanup();
 }

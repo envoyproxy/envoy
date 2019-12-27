@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <functional>
+#include <map>
 #include <string>
 #include <vector>
 
@@ -11,6 +12,7 @@
 #include "common/common/assert.h"
 #include "common/common/fmt.h"
 #include "common/common/logger.h"
+#include "common/protobuf/utility.h"
 
 #include "absl/base/attributes.h"
 #include "absl/container/flat_hash_map.h"
@@ -388,17 +390,17 @@ public:
    * vendor specific version.
    */
   RegisterFactory(uint32_t major, uint32_t minor, uint32_t patch,
-                  std::initializer_list<absl::string_view> labels)
-      : RegisterFactory(major, minor, patch, labels, {}) {}
+                  const std::map<std::string, std::string>& version_metadata)
+      : RegisterFactory(major, minor, patch, version_metadata, {}) {}
 
   /**
    * Constructor that registers an instance of the factory with the FactoryRegistry along with
    * vendor specific version and deprecated names.
    */
   RegisterFactory(uint32_t major, uint32_t minor, uint32_t patch,
-                  std::initializer_list<absl::string_view> labels,
+                  const std::map<std::string, std::string>& version_metadata,
                   std::initializer_list<absl::string_view> deprecated_names) {
-    auto version = makeBuildVersion(major, minor, patch, labels);
+    auto version = makeBuildVersion(major, minor, patch, version_metadata);
     if (instance_.name().empty()) {
       ASSERT(deprecated_names.size() != 0);
     } else {
@@ -419,14 +421,12 @@ public:
 private:
   static envoy::api::v2::core::BuildVersion
   makeBuildVersion(uint32_t major, uint32_t minor, uint32_t patch,
-                   std::initializer_list<absl::string_view> labels) {
+                   const std::map<std::string, std::string>& metadata) {
     envoy::api::v2::core::BuildVersion version;
     version.mutable_version()->set_major(major);
     version.mutable_version()->set_minor(minor);
     version.mutable_version()->set_patch(patch);
-    for (const auto& label : labels) {
-      version.add_labels(std::string(label));
-    }
+    *version.mutable_metadata() = MessageUtil::keyValueStruct(metadata);
     return version;
   }
 
@@ -461,7 +461,7 @@ private:
                                           FACTORY, BASE>                                           \
       FACTORY##_registered
 
-#define FACTORY_VERSION(major, minor, patch, build_info) major, minor, patch, build_info
+#define FACTORY_VERSION(major, minor, patch, ...) major, minor, patch, __VA_ARGS__
 
 /**
  * Macro used for static registration declaration.

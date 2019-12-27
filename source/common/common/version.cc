@@ -1,10 +1,12 @@
 #include "common/common/version.h"
 
+#include <map>
 #include <string>
 
 #include "common/common/fmt.h"
 #include "common/common/macros.h"
 #include "common/common/version_linkstamp.h"
+#include "common/protobuf/utility.h"
 
 #include "absl/strings/numbers.h"
 #include "absl/strings/str_split.h"
@@ -66,13 +68,15 @@ envoy::api::v2::core::BuildVersion VersionInfo::makeBuildVersion() {
   if (ver.size() > 2 && absl::SimpleAtoi(ver[2], &value)) {
     result.mutable_version()->set_patch(value);
   }
+  std::map<std::string, std::string> fields;
   if (ver_label.size() > 1) {
-    result.add_labels(ver_label[1]);
+    fields[BuildVersionMetadataKeys::get().BuildLabel] = ver_label[1];
   }
-  result.add_labels(buildType());
-  result.add_labels(sslVersion());
-  result.add_labels(revision());
-  result.add_labels(revisionStatus());
+  fields[BuildVersionMetadataKeys::get().BuildType] = buildType();
+  fields[BuildVersionMetadataKeys::get().SslVersion] = sslVersion();
+  fields[BuildVersionMetadataKeys::get().RevisionSHA] = revision();
+  fields[BuildVersionMetadataKeys::get().RevisionStatus] = revisionStatus();
+  *result.mutable_metadata() = MessageUtil::keyValueStruct(fields);
   return result;
 }
 

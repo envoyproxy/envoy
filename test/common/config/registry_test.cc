@@ -108,7 +108,8 @@ public:
   std::string name() override { return "testing.published.versioned"; }
 };
 
-REGISTER_FACTORY(TestVersionedFactory, PublishedFactory){FACTORY_VERSION(2, 5, 39, {"alpha"})};
+REGISTER_FACTORY(TestVersionedFactory,
+                 PublishedFactory){FACTORY_VERSION(2, 5, 39, {{"build.label", "alpha"}})};
 
 // Test registration of versioned factory
 TEST(RegistryTest, VersionedFactory) {
@@ -131,8 +132,8 @@ TEST(RegistryTest, VersionedFactory) {
   EXPECT_EQ(2, version.value().version().major());
   EXPECT_EQ(5, version.value().version().minor());
   EXPECT_EQ(39, version.value().version().patch());
-  EXPECT_EQ(1, version.value().labels().size());
-  EXPECT_EQ("alpha", version.value().labels()[0]);
+  EXPECT_EQ(1, version.value().metadata().fields().size());
+  EXPECT_EQ("alpha", version.value().metadata().fields().at("build.label").string_value());
 }
 
 class TestVersionedWithDeprecatedNamesFactory : public PublishedFactory {
@@ -140,8 +141,9 @@ public:
   std::string name() override { return "testing.published.versioned.instead_name"; }
 };
 
-REGISTER_FACTORY(TestVersionedWithDeprecatedNamesFactory, PublishedFactory){
-    FACTORY_VERSION(0, 0, 1, {"private"}), {"testing.published.versioned.deprecated_name"}};
+REGISTER_FACTORY(TestVersionedWithDeprecatedNamesFactory,
+                 PublishedFactory){FACTORY_VERSION(0, 0, 1, {{"build.kind", "private"}}),
+                                   {"testing.published.versioned.deprecated_name"}};
 
 // Test registration of versioned factory that also uses deprecated names
 TEST(RegistryTest, VersionedWithDeprecatednamesFactory) {
@@ -163,8 +165,8 @@ TEST(RegistryTest, VersionedWithDeprecatednamesFactory) {
   EXPECT_EQ(0, version.value().version().major());
   EXPECT_EQ(0, version.value().version().minor());
   EXPECT_EQ(1, version.value().version().patch());
-  EXPECT_EQ(1, version.value().labels().size());
-  EXPECT_EQ("private", version.value().labels()[0]);
+  EXPECT_EQ(1, version.value().metadata().fields().size());
+  EXPECT_EQ("private", version.value().metadata().fields().at("build.kind").string_value());
   // Get the version using deprecated name and check that it matches the
   // version obtained through the new name.
   auto deprecated_version =
