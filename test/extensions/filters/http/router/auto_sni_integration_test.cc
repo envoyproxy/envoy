@@ -35,8 +35,6 @@ public:
     });
 
     HttpIntegrationTest::initialize();
-    test_server_->waitForCounterEq("cluster_manager.cluster_added", 1);
-    test_server_->waitForGaugeEq("cluster_manager.warming_clusters", 0);
   }
 
   void createUpstreams() override {
@@ -67,14 +65,12 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, AutoSniIntegrationTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
                          TestUtility::ipTestParamsToString);
 
-TEST_P(AutoSniIntegrationTest, Test) {
+TEST_P(AutoSniIntegrationTest, BasicAutoSniTest) {
   setup();
   codec_client_ = makeHttpConnection(lookupPort("http"));
-  const auto hostname =
-      fmt::format("localhost:{}", fake_upstreams_[0]->localAddress()->ip()->port());
   const auto response_ = sendRequestAndWaitForResponse(
       Http::TestHeaderMapImpl{
-          {":method", "GET"}, {":path", "/"}, {":scheme", "http"}, {":authority", hostname}},
+          {":method", "GET"}, {":path", "/"}, {":scheme", "http"}, {":authority", "localhost"}},
       0, default_response_headers_, 0);
 
   EXPECT_TRUE(upstream_request_->complete());
@@ -83,8 +79,25 @@ TEST_P(AutoSniIntegrationTest, Test) {
   const Extensions::TransportSockets::Tls::SslSocketInfo* ssl_socket =
       dynamic_cast<const Extensions::TransportSockets::Tls::SslSocketInfo*>(
           fake_upstream_connection_->connection().ssl().get());
-  EXPECT_STREQ(hostname.c_str(),
+  EXPECT_STREQ("localhost",
                SSL_get_servername(ssl_socket->rawSslForTest(), TLSEXT_NAMETYPE_host_name));
+}
+
+TEST_P(AutoSniIntegrationTest, PassingNotDNS) {
+  setup();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  const auto response_ = sendRequestAndWaitForResponse(
+      Http::TestHeaderMapImpl{
+          {":method", "GET"}, {":path", "/"}, {":scheme", "http"}, {":authority", "127.0.0.1"}},
+      0, default_response_headers_, 0);
+
+  EXPECT_TRUE(upstream_request_->complete());
+  EXPECT_TRUE(response_->complete());
+
+  const Extensions::TransportSockets::Tls::SslSocketInfo* ssl_socket =
+      dynamic_cast<const Extensions::TransportSockets::Tls::SslSocketInfo*>(
+          fake_upstream_connection_->connection().ssl().get());
+  EXPECT_STREQ(NULL, SSL_get_servername(ssl_socket->rawSslForTest(), TLSEXT_NAMETYPE_host_name));
 }
 
 } // namespace

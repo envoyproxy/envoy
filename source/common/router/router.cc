@@ -488,12 +488,11 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
   }
 
   // Fetch a connection pool for the upstream cluster.
-  const auto http_protocol_options = cluster_->httpProtocolOptions();
+  const auto& http_protocol_options = cluster_->httpProtocolOptions();
 
   if (http_protocol_options.has_value() && http_protocol_options.value().auto_sni()) {
     const auto host_str = headers.Host()->value().getStringView();
-    const auto parsed_authority = Http::Utility::parseAuthority(host_str.data());
-
+    const auto parsed_authority = Http::Utility::parseAuthority(host_str);
     if (!parsed_authority.is_ip_address_) {
       // Update filter state with the host/authority to use for setting SNI in the transport socket
       // options. This is referenced during the getConnPool() call below.
