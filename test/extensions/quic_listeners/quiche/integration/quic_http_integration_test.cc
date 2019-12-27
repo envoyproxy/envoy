@@ -226,12 +226,13 @@ TEST_P(QuicHttpIntegrationTest, TestDelayedConnectionTeardownTimeoutTrigger) {
 }
 
 TEST_P(QuicHttpIntegrationTest, MultipleQuicListenersWithBPF) {
+#if defined(SO_ATTACH_REUSEPORT_CBPF) && defined(__linux__)
   concurrency_ = 8;
   initialize();
   std::vector<IntegrationCodecClientPtr> codec_clients;
   quic::QuicCryptoClientConfig::CachedState* cached = crypto_config_.LookupOrCreate(server_id_);
   for (size_t i = 1; i <= concurrency_; ++i) {
-    // The BPF filter looks at the 1st byte of connection id in the packet
+    // The BPF filter looks at the 1st word of connection id in the packet
     // header. And currently all QUIC versions support 8 bytes connection id. So
     // create connections with the first 4 bytes of connection id different from each
     // other so they should be evenly distributed.
@@ -243,7 +244,6 @@ TEST_P(QuicHttpIntegrationTest, MultipleQuicListenersWithBPF) {
   } else {
     test_server_->waitForCounterEq("listener.[__]_0.downstream_cx_total", 8u);
   }
-#ifdef SO_ATTACH_REUSEPORT_CBPF
   for (size_t i = 0; i < concurrency_; ++i) {
     if (GetParam() == Network::Address::IpVersion::v4) {
       test_server_->waitForGaugeEq(
@@ -257,10 +257,10 @@ TEST_P(QuicHttpIntegrationTest, MultipleQuicListenersWithBPF) {
           fmt::format("listener.[__]_0.worker_{}.downstream_cx_total", i), 1u);
     }
   }
-#endif
   for (size_t i = 0; i < concurrency_; ++i) {
     codec_clients[i]->close();
   }
+#endif
 }
 
 TEST_P(QuicHttpIntegrationTest, MultipleQuicListenersNoBPF) {

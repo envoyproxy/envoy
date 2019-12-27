@@ -123,7 +123,7 @@ ActiveQuicListenerFactory::createActiveUdpListener(Network::ConnectionHandler& p
                                                    Event::Dispatcher& disptacher,
                                                    Network::ListenerConfig& config) {
   std::unique_ptr<Network::Socket::Options> options = std::make_unique<Network::Socket::Options>();
-#ifdef SO_ATTACH_REUSEPORT_CBPF
+#if defined(SO_ATTACH_REUSEPORT_CBPF) && defined(__linux__)
   // This BPF filter reads the 1st word of QUIC connection id in the UDP payload and mod it by the
   // number of workers to get the socket index in the SO_REUSEPORT socket groups. QUIC packets
   // should be at least 9 bytes, with the 1st byte indicates one of the below QUIC packet headers:
