@@ -1265,8 +1265,7 @@ TEST_F(AsyncClientImplUnitTest, RouteImplInitTest) {
   EXPECT_TRUE(route_impl_.routeEntry()->upgradeMap().empty());
   EXPECT_EQ(Router::InternalRedirectAction::PassThrough,
             route_impl_.routeEntry()->internalRedirectAction());
-  EXPECT_TRUE(route_impl_.routeEntry()->shadowPolicy().runtimeKey().empty());
-  EXPECT_EQ(0, route_impl_.routeEntry()->shadowPolicy().defaultValue().numerator());
+  EXPECT_TRUE(route_impl_.routeEntry()->shadowPolicies().empty());
   EXPECT_TRUE(route_impl_.routeEntry()->virtualHost().rateLimitPolicy().empty());
   EXPECT_EQ(nullptr, route_impl_.routeEntry()->virtualHost().corsPolicy());
   EXPECT_EQ(nullptr, route_impl_.routeEntry()->virtualHost().perFilterConfig("bar"));
