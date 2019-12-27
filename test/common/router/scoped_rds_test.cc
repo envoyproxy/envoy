@@ -11,6 +11,7 @@
 #include "envoy/init/manager.h"
 #include "envoy/stats/scope.h"
 
+#include "common/config/api_version.h"
 #include "common/config/grpc_mux_impl.h"
 #include "common/router/scoped_rds.h"
 
@@ -122,12 +123,13 @@ protected:
                 subscriptionFromConfigSource(_, _, _, _))
         .Times(AnyNumber());
     // rds subscription
-    EXPECT_CALL(server_factory_context_.cluster_manager_.subscription_factory_,
-                subscriptionFromConfigSource(
-                    _,
-                    Eq(Grpc::Common::typeUrl(
-                        envoy::api::v2::RouteConfiguration().GetDescriptor()->full_name())),
-                    _, _))
+    EXPECT_CALL(
+        server_factory_context_.cluster_manager_.subscription_factory_,
+        subscriptionFromConfigSource(
+            _,
+            Eq(Grpc::Common::typeUrl(
+                API_NO_BOOST(envoy::api::v2::RouteConfiguration)().GetDescriptor()->full_name())),
+            _, _))
         .Times(AnyNumber())
         .WillRepeatedly(Invoke([this](const envoy::api::v2::core::ConfigSource&, absl::string_view,
                                       Stats::Scope&,

@@ -11,6 +11,7 @@
 #include "envoy/stats/scope.h"
 
 #include "common/common/cleanup.h"
+#include "common/config/api_version.h"
 #include "common/config/resources.h"
 #include "common/config/utility.h"
 #include "common/protobuf/utility.h"
@@ -135,9 +136,11 @@ std::string LdsApiImpl::loadTypeUrl() {
   // automatically set api version as V2
   case envoy::api::v2::core::ConfigSource::AUTO:
   case envoy::api::v2::core::ConfigSource::V2:
-    return Grpc::Common::typeUrl(envoy::api::v2::Listener().GetDescriptor()->full_name());
+    return Grpc::Common::typeUrl(
+        API_NO_BOOST(envoy::api::v2::Listener().GetDescriptor()->full_name()));
   case envoy::api::v2::core::ConfigSource::V3ALPHA:
-    return Grpc::Common::typeUrl(envoy::api::v3alpha::Listener().GetDescriptor()->full_name());
+    return Grpc::Common::typeUrl(
+        API_NO_BOOST(envoy::api::v3alpha::Listener().GetDescriptor()->full_name()));
   default:
     throw EnvoyException(fmt::format("type {} is not supported", xds_api_version_));
   }

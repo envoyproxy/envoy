@@ -66,6 +66,7 @@ envoy_cc_library(
         "//include/envoy/ssl:context_config_interface",
         "//source/common/common:assert_lib",
         "//source/common/common:empty_string",
+        "//source/common/common:matchers_lib",
         "//source/common/config:datasource_lib",
         "//source/common/json:json_loader_lib",
         "//source/common/protobuf:utility_lib",

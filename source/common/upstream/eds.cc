@@ -9,6 +9,7 @@
 #include "envoy/common/exception.h"
 
 #include "common/common/utility.h"
+#include "common/config/api_version.h"
 
 namespace Envoy {
 namespace Upstream {
@@ -222,10 +223,10 @@ std::string EdsClusterImpl::loadTypeUrl() {
   case envoy::api::v2::core::ConfigSource::AUTO:
   case envoy::api::v2::core::ConfigSource::V2:
     return Grpc::Common::typeUrl(
-        envoy::api::v2::ClusterLoadAssignment().GetDescriptor()->full_name());
+        API_NO_BOOST(envoy::api::v2::ClusterLoadAssignment().GetDescriptor()->full_name()));
   case envoy::api::v2::core::ConfigSource::V3ALPHA:
     return Grpc::Common::typeUrl(
-        envoy::api::v3alpha::ClusterLoadAssignment().GetDescriptor()->full_name());
+        API_NO_BOOST(envoy::api::v3alpha::ClusterLoadAssignment().GetDescriptor()->full_name()));
   default:
     throw EnvoyException(fmt::format("type {} is not supported", xds_api_version_));
   }

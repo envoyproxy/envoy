@@ -141,8 +141,9 @@ class UpgradeVisitor(visitor.Visitor):
         if dependency not in ("udpa/annotations/migrate.proto")
     ]
     # Upgrade package.
-    upgraded_proto.package = self._typedb.next_version_packages[upgraded_proto.package]
-    upgraded_proto.name = self._typedb.next_version_proto_paths[upgraded_proto.name]
+    upgraded_proto.package = self._typedb.next_version_protos[upgraded_proto.name].qualified_package
+    upgraded_proto.name = self._typedb.next_version_protos[upgraded_proto.name].proto_path
+    upgraded_proto.options.ClearExtension(migrate_pb2.file_migrate)
     # Upgrade comments.
     for location in upgraded_proto.source_code_info.location:
       location.leading_comments = self._UpgradedComment(location.leading_comments)
@@ -174,8 +175,8 @@ def V3MigrationXform(file_proto):
   # Load type database.
   typedb = utils.GetTypeDb()
   # If this isn't a proto in an upgraded package, return None.
-  if file_proto.package not in typedb.next_version_packages or not typedb.next_version_packages[
-      file_proto.package]:
+  if file_proto.name not in typedb.next_version_protos or not typedb.next_version_protos[
+      file_proto.name]:
     return None
   # Otherwise, this .proto needs upgrading, do it.
   return traverse.TraverseFile(file_proto, UpgradeVisitor(typedb))

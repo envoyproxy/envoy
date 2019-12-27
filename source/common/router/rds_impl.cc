@@ -14,6 +14,7 @@
 
 #include "common/common/assert.h"
 #include "common/common/fmt.h"
+#include "common/config/api_version.h"
 #include "common/config/utility.h"
 #include "common/protobuf/utility.h"
 #include "common/router/config_impl.h"
@@ -205,10 +206,11 @@ std::string RdsRouteConfigSubscription::loadTypeUrl() {
   // automatically set api version as V2
   case envoy::api::v2::core::ConfigSource::AUTO:
   case envoy::api::v2::core::ConfigSource::V2:
-    return Grpc::Common::typeUrl(envoy::api::v2::RouteConfiguration().GetDescriptor()->full_name());
+    return Grpc::Common::typeUrl(
+        API_NO_BOOST(envoy::api::v2::RouteConfiguration().GetDescriptor()->full_name()));
   case envoy::api::v2::core::ConfigSource::V3ALPHA:
     return Grpc::Common::typeUrl(
-        envoy::api::v3alpha::RouteConfiguration().GetDescriptor()->full_name());
+        API_NO_BOOST(envoy::api::v3alpha::RouteConfiguration().GetDescriptor()->full_name()));
   default:
     throw EnvoyException(fmt::format("type {} is not supported", xds_api_version_));
   }

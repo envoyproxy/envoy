@@ -18,6 +18,7 @@
 #include "common/common/assert.h"
 #include "common/common/fmt.h"
 #include "common/common/utility.h"
+#include "common/config/api_version.h"
 #include "common/filesystem/directory.h"
 #include "common/grpc/common.h"
 #include "common/protobuf/message_validator_impl.h"
@@ -608,10 +609,10 @@ std::string RtdsSubscription::loadTypeUrl() {
   case envoy::api::v2::core::ConfigSource::AUTO:
   case envoy::api::v2::core::ConfigSource::V2:
     return Grpc::Common::typeUrl(
-        envoy::service::discovery::v2::Runtime().GetDescriptor()->full_name());
+        API_NO_BOOST(envoy::service::discovery::v2::Runtime().GetDescriptor()->full_name()));
   case envoy::api::v2::core::ConfigSource::V3ALPHA:
     return Grpc::Common::typeUrl(
-        envoy::service::discovery::v3alpha::Runtime().GetDescriptor()->full_name());
+        API_NO_BOOST(envoy::service::discovery::v3alpha::Runtime().GetDescriptor()->full_name()));
   default:
     throw EnvoyException(fmt::format("type {} is not supported", xds_api_version_));
   }
