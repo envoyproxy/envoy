@@ -2,6 +2,7 @@
 
 #include "envoy/common/pure.h"
 
+#include "common/common/assert.h"
 #include "common/protobuf/protobuf.h"
 
 namespace Envoy {
@@ -49,9 +50,7 @@ public:
 
   const std::string configType() override {
     auto ptr = createEmptyConfigProto();
-    if (ptr == nullptr) {
-      return "";
-    }
+    ASSERT(ptr != nullptr);
     return ptr->GetDescriptor()->full_name();
   }
 };
