@@ -115,7 +115,7 @@ void jsonConvertInternal(const Protobuf::Message& source,
 // First we try with the message's earlier type, and if unsuccessful (or no
 // earlier) type, then the current type. This allows us to take a v3 Envoy
 // internal proto and ingest both v2 and v3 in methods such as loadFromJson.
-// This relies on the property that any v3 configuration that is ingestible as
+// This relies on the property that any v3 configuration that is readable as
 // v2 has the same semantics in v2/v3, which holds due to the highly structured
 // vN/v(N+1) mechanical transforms.
 void tryWithApiBoosting(std::function<void(Protobuf::Message&, bool)> f,
@@ -145,7 +145,7 @@ void tryWithApiBoosting(std::function<void(Protobuf::Message&, bool)> f,
       // If we fail this time, we should throw.
       // TODO(htuch): currently throwing the v2 error, rather than v3 error, to
       // make it easier to handle existing v2 tests during API boosting. We
-      // probably want to provide a more details exception message contaiing
+      // probably want to provide a more details exception message containing
       // both v2 and v3 exception info.
       newer_error = true;
     }

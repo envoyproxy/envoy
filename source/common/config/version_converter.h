@@ -8,7 +8,7 @@
 namespace Envoy {
 namespace Config {
 
-// A message that has been downgraded, e.g. from v3alphato v2.
+// A message that has been downgraded, e.g. from v3alpha to v2.
 struct DowngradedMessage {
   // The dynamic message factory must outlive the message.
   Protobuf::DynamicMessageFactory dmf_;
@@ -23,12 +23,12 @@ class VersionConverter {
 public:
   /**
    * Upgrade a message from an earlier to later version of the Envoy API. This
-   * performs a simple wire-level reinterpreation of the fields. As a result of
-   * shadow protos, earlier deprecated fields such as foo are rematerialized as
+   * performs a simple wire-level reinterpretation of the fields. As a result of
+   * shadow protos, earlier deprecated fields such as foo are materialized as
    * hidden_envoy_deprecated_foo.
    *
    * @param prev_message previous version message input.
-   * @param next_nmessage next version message to generate.
+   * @param next_message next version message to generate.
    */
   static void upgrade(const Protobuf::Message& prev_message, Protobuf::Message& next_message);
 
