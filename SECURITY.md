@@ -131,7 +131,7 @@ or mitigation so that a realistic timeline can be communicated to users.
 
 **Disclosure of Forthcoming Fix to Users** (Completed within 1-7 days of Disclosure)
 
-- The Fix Lead will email [envoy-announce@googlegroups.com](https://groups.google.com/forum/#!forum/envoy-announce)
+- The Fix Lead will email [envoy-security-announce@googlegroups.com](https://groups.google.com/forum/#!forum/envoy-security-announce)
   informing users that a security vulnerability has been disclosed and that a fix will be made
   available at YYYY-MM-DD HH:MM UTC in the future via this list. This time is the Release Date.
 - The Fix Lead will include any mitigating steps users can take until a fix is available.
