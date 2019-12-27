@@ -25,7 +25,10 @@ envoy_cc_test_library(
         "//source/common/stats:isolated_store_lib",
         "//test/test_common:environment_lib",
         "//test/test_common:utility_lib",
-    ],
+    ] + select({
+        "//bazel:disable_signal_trace": [],
+        "//conditions:default": ["//source/common/signal:sigaction_lib"],
+    }),
 )
 
 envoy_cc_test_library(
