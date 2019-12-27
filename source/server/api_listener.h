@@ -10,9 +10,9 @@
 #include "envoy/server/listener_manager.h"
 #include "envoy/stats/scope.h"
 
-#include "common/http/conn_manager_impl.h"
 #include "common/common/empty_string.h"
 #include "common/common/logger.h"
+#include "common/http/conn_manager_impl.h"
 #include "common/init/manager_impl.h"
 #include "common/stream_info/stream_info_impl.h"
 

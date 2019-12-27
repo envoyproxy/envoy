@@ -10,8 +10,8 @@
 #include "envoy/config/config_provider_manager.h"
 #include "envoy/config/filter/network/http_connection_manager/v2/http_connection_manager.pb.h"
 #include "envoy/config/filter/network/http_connection_manager/v2/http_connection_manager.pb.validate.h"
-#include "envoy/http/filter.h"
 #include "envoy/http/codec.h"
+#include "envoy/http/filter.h"
 #include "envoy/router/route_config_provider_manager.h"
 
 #include "common/common/logger.h"

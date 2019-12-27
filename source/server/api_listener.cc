@@ -5,8 +5,8 @@
 #include "envoy/stats/scope.h"
 
 #include "common/http/conn_manager_impl.h"
-#include "common/protobuf/utility.h"
 #include "common/network/resolver_impl.h"
+#include "common/protobuf/utility.h"
 
 #include "server/drain_manager_impl.h"
 #include "server/listener_manager_impl.h"

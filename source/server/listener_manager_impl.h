@@ -17,11 +17,10 @@
 #include "envoy/server/worker.h"
 #include "envoy/stats/scope.h"
 
+#include "server/api_listener.h"
 #include "server/filter_chain_manager_impl.h"
 #include "server/lds_api.h"
 #include "server/listener_impl.h"
-#include "server/api_listener.h"
-
 
 namespace Envoy {
 namespace Server {
