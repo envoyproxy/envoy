@@ -124,7 +124,11 @@ using WasmCallback_dd = double (*)(void*, double);
                       _f(WasmCallback_WWl) _f(WasmCallback_WWlWW) _f(WasmCallback_WWm)             \
                           _f(WasmCallback_dd)
 
-enum class Cloneable { NotCloneable, CompiledBytecode, InstantiatedModule };
+enum class Cloneable {
+  NotCloneable,      // VMs can not be cloned and should be created from scratch.
+  CompiledBytecode,  // VMs can be clone with compiled bytecode.
+  InstantiatedModule // VMs can be cloned from an instatiated module.
+};
 
 // Wasm VM instance. Provides the low level WASM interface.
 class WasmVm : public Logger::Loggable<Logger::Id::wasm> {
