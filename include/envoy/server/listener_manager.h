@@ -212,9 +212,9 @@ public:
   using FailureStates = std::vector<std::unique_ptr<envoy::admin::v2alpha::UpdateFailureState>>;
   virtual void endListenerUpdate(FailureStates&& failure_states) PURE;
 
-  // TODO(junr03): once Api Listeners support warming and draining, this function should return a
-  // weak ptr to its caller. This would allow the caller to verify is the listener is
-  // available to receive API calls on it.
+  // TODO(junr03): once ApiListeners support warming and draining, this function should return a
+  // weak_ptr of the ApiListenerHandle to its caller. This would allow the caller to verify if the
+  // ApiListener that backs the handle is available to receive API calls on it.
   /**
    * @return ApiListenerHandle* a handle to the API Listener if it exists, nullptr if
    * it does not.

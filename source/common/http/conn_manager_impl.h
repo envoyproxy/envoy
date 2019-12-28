@@ -66,10 +66,14 @@ public:
                                                               Stats::Scope& scope);
   static const HeaderMapImpl& continueHeader();
 
-  void forceCodecCreation() {
-    ASSERT(!codec_);
-    codec_ = config_.createCodec(read_callbacks_->connection(), Buffer::OwnedImpl(), *this);
-  }
+  // Currently the ConnectionManager creates a codec lazily when either:
+  //   a) onConnection for H3.
+  //   b) onData for H1 and H2.
+  // With the introduction of ApiListeners, neither even occurs. This function allows us to force
+  // create a codec.
+  // TODO(junr03): consider passing a synthetic codec instead of creating once. The codec in the
+  // ApiListener case is solely used to determine the protocol version.
+  void forceCodecCreation();
 
   // Network::ReadFilter
   Network::FilterStatus onData(Buffer::Instance& data, bool end_stream) override;
