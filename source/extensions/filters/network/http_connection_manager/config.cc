@@ -494,10 +494,12 @@ SINGLETON_MANAGER_REGISTRATION(hcm_date_provider);
 SINGLETON_MANAGER_REGISTRATION(hcm_route_config_provider_manager);
 SINGLETON_MANAGER_REGISTRATION(hcm_scoped_routes_config_provider_manager);
 
-std::function<Http::ServerConnectionCallbacksPtr(Network::ReadFilterCallbacks&)>
+// TODO(junr03): some of this code can be DRYed up and shared with the other factory code. Clean up
+// if this factory approach is well received by reviewers.
+std::function<Http::ServerConnectionCallbacksPtr()>
 HttpConnectionManagerFactory::createHttpConnectionManagerFactoryFromProto(
-    const ProtobufWkt::Any& proto_config, Server::Configuration::FactoryContext& context) {
-  ENVOY_LOG_MISC(error, "In factory");
+    const ProtobufWkt::Any& proto_config, Server::Configuration::FactoryContext& context,
+    Network::ReadFilterCallbacks& read_callbacks) {
   auto typed_config = MessageUtil::anyConvert<
       envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager>(
       proto_config);
@@ -533,10 +535,8 @@ HttpConnectionManagerFactory::createHttpConnectionManagerFactoryFromProto(
   // Keep in mind the lambda capture list **doesn't** determine the destruction order, but it's fine
   // as these captured objects are also global singletons.
   return [hcm_scoped_routes_config_provider_manager, hcm_route_config_provider_manager,
-          hcm_date_provider, filter_config, &context](
-             Network::ReadFilterCallbacks& read_callbacks) -> Http::ServerConnectionCallbacksPtr {
-    ENVOY_LOG_MISC(error, "Inside of factory lambda");
-
+          hcm_date_provider, filter_config, &context,
+          &read_callbacks]() -> Http::ServerConnectionCallbacksPtr {
     auto conn_manager = std::make_unique<Http::ConnectionManagerImpl>(
         *filter_config, context.drainDecision(), context.random(), context.httpContext(),
         context.runtime(), context.localInfo(), context.clusterManager(),
@@ -544,10 +544,10 @@ HttpConnectionManagerFactory::createHttpConnectionManagerFactoryFromProto(
 
     // This factory creates a new ConnectionManagerImpl in the absence of its usual environment as
     // an L4 filter, so this factory needs to take a few actions.
+
     // When a new connection is creating its filter chain it hydrates the factory with a filter
     // manager which provides the ConnectionManager with its "read_callbacks".
     conn_manager->initializeReadFilterCallbacks(read_callbacks);
-    ENVOY_LOG_MISC(error, "initialized");
 
     // When the connection first calls onData on the ConnectionManager, the ConnectionManager
     // creates a codec. Here we force create a codec as onData will not be called.

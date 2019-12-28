@@ -200,11 +200,15 @@ private:
   static const uint64_t RequestTimeoutMs = 0;
 };
 
+/**
+ * Factory to create an HttpConnectionManager outside of a Network Filter Chain.
+ */
 class HttpConnectionManagerFactory {
 public:
-  static std::function<Http::ServerConnectionCallbacksPtr(Network::ReadFilterCallbacks&)>
+  static std::function<Http::ServerConnectionCallbacksPtr()>
   createHttpConnectionManagerFactoryFromProto(const ProtobufWkt::Any& proto_config,
-                                              Server::Configuration::FactoryContext& context);
+                                              Server::Configuration::FactoryContext& context,
+                                              Network::ReadFilterCallbacks& read_callbacks);
 };
 
 } // namespace HttpConnectionManager

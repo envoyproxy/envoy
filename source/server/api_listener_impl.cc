@@ -24,17 +24,15 @@ HttpApiListenerImpl::HttpApiListenerImpl(const envoy::api::v2::Listener& config,
       validation_visitor_(validation_visitor),
       global_scope_(parent_.server_.stats().createScope("")),
       listener_scope_(parent_.server_.stats().createScope(fmt::format("listener.api.{}.", name_))),
-      read_callbacks_(SyntheticReadCallbacks(*this)) {
-  ENVOY_LOG(error, "In API listener constructor");
-  http_connection_manager_factory_ =
-      Envoy::Extensions::NetworkFilters::HttpConnectionManager::HttpConnectionManagerFactory::
-          createHttpConnectionManagerFactoryFromProto(config.api_listener().api_listener(), *this);
-  ENVOY_LOG(error, "Created lambda");
-}
+      read_callbacks_(SyntheticReadCallbacks(*this)),
+      http_connection_manager_factory_(
+          Envoy::Extensions::NetworkFilters::HttpConnectionManager::HttpConnectionManagerFactory::
+              createHttpConnectionManagerFactoryFromProto(config.api_listener().api_listener(),
+                                                          *this, read_callbacks_)) {}
 
 ApiListenerHandle* HttpApiListenerImpl::handle() {
   if (!http_connection_manager_) {
-    http_connection_manager_ = http_connection_manager_factory_(read_callbacks_);
+    http_connection_manager_ = http_connection_manager_factory_();
   }
   return http_connection_manager_.get();
 }

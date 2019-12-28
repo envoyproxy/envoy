@@ -164,10 +164,10 @@ private:
   Stats::ScopePtr global_scope_;
   Stats::ScopePtr listener_scope_;
   SyntheticReadCallbacks read_callbacks_;
-  // Need to store the factory due to the shared_ptrs we need to keep alive: date provider, route
-  // config manager, scoped route config manager.
-  std::function<Http::ServerConnectionCallbacksPtr(Network::ReadFilterCallbacks&)>
-      http_connection_manager_factory_;
+  // Need to store the factory due to the shared_ptrs that need to be kept alive: date provider,
+  // route config manager, scoped route config manager.
+  std::function<Http::ServerConnectionCallbacksPtr()> http_connection_manager_factory_;
+  // Http::ServerConnectionCallbacks is the API surface that this class provides via its handle().
   Http::ServerConnectionCallbacksPtr http_connection_manager_;
 };
 
