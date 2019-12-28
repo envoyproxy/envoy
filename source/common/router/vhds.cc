@@ -11,6 +11,7 @@
 
 #include "common/common/assert.h"
 #include "common/common/fmt.h"
+#include "common/config/api_version.h"
 #include "common/config/utility.h"
 #include "common/protobuf/utility.h"
 #include "common/router/config_impl.h"
@@ -42,7 +43,8 @@ VhdsSubscription::VhdsSubscription(RouteConfigUpdatePtr& config_update_info,
   subscription_ =
       factory_context.clusterManager().subscriptionFactory().subscriptionFromConfigSource(
           config_update_info_->routeConfiguration().vhds().config_source(),
-          Grpc::Common::typeUrl(envoy::api::v2::route::VirtualHost().GetDescriptor()->full_name()),
+          Grpc::Common::typeUrl(
+              API_NO_BOOST(envoy::api::v2::route::VirtualHost)().GetDescriptor()->full_name()),
           *scope_, *this);
 }
 

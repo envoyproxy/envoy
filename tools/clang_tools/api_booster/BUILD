@@ -21,8 +21,12 @@ clang_tools_cc_binary(
 
 clang_tools_cc_library(
     name = "proto_cxx_utils_lib",
+    srcs = ["proto_cxx_utils.cc"],
     hdrs = ["proto_cxx_utils.h"],
-    deps = ["@com_google_absl//absl/strings"],
+    deps = [
+        "@com_google_absl//absl/strings",
+        "@com_google_absl//absl/types:optional",
+    ],
 )
 
 clang_tools_cc_test(

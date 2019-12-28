@@ -552,7 +552,7 @@ message Cluster {
   // *TransportSocketMatch* in this field. Other client Envoys receive CDS without
   // *transport_socket_match* set, and still send plain text traffic to the same cluster.
   //
-  // TODO(incfly): add a detailed architecture doc on intended usage.
+  // [#comment:TODO(incfly): add a detailed architecture doc on intended usage.]
   repeated TransportSocketMatch transport_socket_matches = 43;
 
   // Supplies the name of the cluster which must be unique across all clusters.

@@ -4,6 +4,7 @@ Version history
 1.13.0 (pending)
 ================
 * access log: added FILTER_STATE :ref:`access log formatters <config_access_log_format>` and gRPC access logger.
+* admin: added the ability to filter :ref:`/config_dump <operations_admin_interface_config_dump>`.
 * access log: added a :ref:`typed JSON logging mode <config_access_log_format_dictionaries>` to output access logs in JSON format with non-string values
 * access log: fixed UPSTREAM_LOCAL_ADDRESS :ref:`access log formatters <config_access_log_format>` to work for http requests
 * api: remove all support for v1
@@ -28,18 +29,20 @@ Version history
 * redis: correctly follow MOVE/ASK redirection for mirrored clusters.
 * redis: add :ref:`host_degraded_refresh_threshold <envoy_api_field_config.cluster.redis.RedisClusterConfig.host_degraded_refresh_threshold>` and :ref:`failure_refresh_threshold <envoy_api_field_config.cluster.redis.RedisClusterConfig.failure_refresh_threshold>` to refresh topology when nodes are degraded or when requests fails.
 * router: added support for REQ(header-name) :ref:`header formatter <config_http_conn_man_headers_custom_request_headers>`.
+* router: added :ref:`request_mirror_policies<envoy_api_field_route.RouteAction.request_mirror_policies>` to support sending multiple mirrored requests in one route.
 * router: allow using a :ref:`query parameter
   <envoy_api_field_route.RouteAction.HashPolicy.query_parameter>` for HTTP consistent hashing.
 * router: skip the Location header when the response code is not a 201 or a 3xx.
-* server: added the :option:`--disable-extensions` CLI option, to disable extensions at startup.
 * router: exposed DOWNSTREAM_REMOTE_ADDRESS as custom HTTP request/response headers.
 * router check tool: added support for testing and marking coverage for routes of runtime fraction 0.
-* server: fixed a bug in config validation for configs with runtime layers
-* tcp_proxy: added :ref:`ClusterWeight.metadata_match<envoy_api_field_config.filter.network.tcp_proxy.v2.TcpProxy.WeightedCluster.ClusterWeight.metadata_match>`
-* tcp_proxy: added :ref:`hash_policy<envoy_api_field_config.filter.network.tcp_proxy.v2.TcpProxy.hash_policy>`
+* server: added the :option:`--disable-extensions` CLI option, to disable extensions at startup.
+* server: fixed a bug in config validation for configs with runtime layers.
+* tcp_proxy: added :ref:`ClusterWeight.metadata_match<envoy_api_field_config.filter.network.tcp_proxy.v2.TcpProxy.WeightedCluster.ClusterWeight.metadata_match>`.
+* tcp_proxy: added :ref:`hash_policy<envoy_api_field_config.filter.network.tcp_proxy.v2.TcpProxy.hash_policy>`.
 * thrift_proxy: added support for cluster header based routing.
 * thrift_proxy: added stats to the router filter.
 * tls: remove TLS 1.0 and 1.1 from client defaults
+* tls: added support for :ref:`generic string matcher <envoy_api_field_auth.CertificateValidationContext.match_subject_alt_names>` for subject alternative names.
 * tracing: added the ability to set custom tags on both the :ref:`HTTP connection manager<envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.tracing>` and the :ref:`HTTP route <envoy_api_field_route.Route.tracing>`.
 * tracing: added upstream_address tag.
 * tracing: added initial support for AWS X-Ray (local sampling rules only) :ref:`X-Ray Tracing <envoy_api_msg_config.trace.v2alpha.XRayConfig>`.
