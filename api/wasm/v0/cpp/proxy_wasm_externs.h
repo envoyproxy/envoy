@@ -86,7 +86,7 @@ extern "C" void proxy_on_delete(uint32_t context_id);
 
 /**
  * Called from the VM to get any configuration. Valid only when in proxy_on_start() (where it will
- * return a VM configuration), proxy_on_configure() (where it will return a plugin configuraiton) or
+ * return a VM configuration), proxy_on_configure() (where it will return a plugin configuration) or
  * in proxy_validate_configuration() (where it will return a VM configuration before
  * proxy_on_start() has been called and a plugin configuration after).
  * @param configuration_ptr a pointer to a location which will be filled with either nullptr (if no
