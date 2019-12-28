@@ -259,7 +259,7 @@ TEST_P(ClusterMemoryTestRunner, MemoryLargeClusterSizeWithFakeSymbolTable) {
   // 2019/10/17  8484     43340       44000   stats: add unit support to histogram
   // 2019/11/01  8859     43563       44000   build: switch to libc++ by default
   // 2019/11/15  9040     43371       44000   build: update protobuf to 3.10.1
-  // 2019/11/15  9040     43403       35500   upstream: track whether cluster is local
+  // 2019/11/15  9040     43403       44000   upstream: track whether cluster is local
   // 2019/12/10  8779     42919       43500   use var-length coding for name length
   // 2019/12/20  9069     43413       43500   upstream: Implement retry concurrency budgets
 
