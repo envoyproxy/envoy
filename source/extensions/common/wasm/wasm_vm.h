@@ -126,7 +126,7 @@ using WasmCallback_dd = double (*)(void*, double);
 
 enum class Cloneable {
   NotCloneable,      // VMs can not be cloned and should be created from scratch.
-  CompiledBytecode,  // VMs can be clone with compiled bytecode.
+  CompiledBytecode,  // VMs can be cloned with compiled bytecode.
   InstantiatedModule // VMs can be cloned from an instatiated module.
 };
 
