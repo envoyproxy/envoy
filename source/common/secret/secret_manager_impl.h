@@ -2,6 +2,8 @@
 
 #include <unordered_map>
 
+#include "envoy/api/v2/auth/cert.pb.h"
+#include "envoy/api/v2/core/config_source.pb.h"
 #include "envoy/secret/secret_manager.h"
 #include "envoy/secret/secret_provider.h"
 #include "envoy/server/transport_socket_config.h"

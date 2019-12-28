@@ -1,5 +1,7 @@
 #include "extensions/common/dynamic_forward_proxy/dns_cache_manager_impl.h"
 
+#include "envoy/config/common/dynamic_forward_proxy/v2alpha/dns_cache.pb.h"
+
 #include "common/protobuf/protobuf.h"
 
 #include "extensions/common/dynamic_forward_proxy/dns_cache_impl.h"

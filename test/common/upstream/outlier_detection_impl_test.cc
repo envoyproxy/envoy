@@ -4,7 +4,9 @@
 #include <string>
 #include <vector>
 
+#include "envoy/api/v2/cluster/outlier_detection.pb.h"
 #include "envoy/common/time.h"
+#include "envoy/data/cluster/v2alpha/outlier_detection_event.pb.h"
 
 #include "common/network/utility.h"
 #include "common/upstream/outlier_detection_impl.h"

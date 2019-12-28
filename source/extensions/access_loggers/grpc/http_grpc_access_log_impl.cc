@@ -1,5 +1,9 @@
 #include "extensions/access_loggers/grpc/http_grpc_access_log_impl.h"
 
+#include "envoy/api/v2/core/base.pb.h"
+#include "envoy/config/accesslog/v2/als.pb.h"
+#include "envoy/data/accesslog/v2/accesslog.pb.h"
+
 #include "common/common/assert.h"
 #include "common/network/utility.h"
 #include "common/stream_info/utility.h"

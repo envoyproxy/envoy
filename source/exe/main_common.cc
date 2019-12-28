@@ -29,8 +29,7 @@ Server::DrainManagerPtr ProdComponentFactory::createDrainManager(Server::Instanc
   // The global drain manager only triggers on listener modification, which effectively is
   // hot restart at the global level. The per-listener drain managers decide whether to
   // to include /healthcheck/fail status.
-  return std::make_unique<Server::DrainManagerImpl>(server,
-                                                    envoy::api::v2::Listener_DrainType_MODIFY_ONLY);
+  return std::make_unique<Server::DrainManagerImpl>(server, envoy::api::v2::Listener::MODIFY_ONLY);
 }
 
 Runtime::LoaderPtr ProdComponentFactory::createRuntime(Server::Instance& server,
@@ -49,6 +48,10 @@ MainCommonBase::MainCommonBase(const OptionsImpl& options, Event::TimeSystem& ti
       file_system_(file_system), symbol_table_(Stats::SymbolTableCreator::initAndMakeSymbolTable(
                                      options_.fakeSymbolTableEnabled())),
       stats_allocator_(*symbol_table_) {
+  // Process the option to disable extensions as early as possible,
+  // before we do any configuration loading.
+  OptionsImpl::disableExtensions(options.disabledExtensions());
+
   switch (options_.mode()) {
   case Server::Mode::InitOnly:
   case Server::Mode::Serve: {

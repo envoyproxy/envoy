@@ -1,7 +1,5 @@
 #include "extensions/access_loggers/grpc/grpc_access_log_proto_descriptors.h"
 
-#include "envoy/service/accesslog/v2/als.pb.h"
-
 #include "common/common/assert.h"
 #include "common/common/fmt.h"
 #include "common/protobuf/protobuf.h"

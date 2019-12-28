@@ -1,3 +1,5 @@
+#include "envoy/config/trace/v2/trace.pb.h"
+#include "envoy/config/trace/v2/trace.pb.validate.h"
 #include "envoy/registry/registry.h"
 
 #include "extensions/tracers/opencensus/config.h"

@@ -1,5 +1,8 @@
 #include "extensions/filters/http/ip_tagging/ip_tagging_filter.h"
 
+#include "envoy/api/v3alpha/core/address.pb.h"
+#include "envoy/config/filter/http/ip_tagging/v3alpha/ip_tagging.pb.h"
+
 #include "common/http/header_map_impl.h"
 #include "common/http/headers.h"
 
@@ -81,7 +84,6 @@ Http::FilterHeadersStatus IpTaggingFilter::decodeHeaders(Http::HeaderMap& header
     headers.appendEnvoyIpTags(tags_join, ",");
 
     // We must clear the route cache or else we can't match on x-envoy-ip-tags.
-    // TODO(rgs): this should either be configurable, because it's expensive, or optimized.
     callbacks_->clearRouteCache();
 
     // For a large number(ex > 1000) of tags, stats cardinality will be an issue.

@@ -8,9 +8,13 @@
 #include <string>
 #include <vector>
 
+#include "envoy/api/v2/core/base.pb.h"
+#include "envoy/api/v2/rds.pb.h"
+#include "envoy/api/v2/route/route.pb.h"
 #include "envoy/http/header_map.h"
 #include "envoy/runtime/runtime.h"
-#include "envoy/type/percent.pb.validate.h"
+#include "envoy/type/matcher/string.pb.h"
+#include "envoy/type/percent.pb.h"
 #include "envoy/upstream/cluster_manager.h"
 #include "envoy/upstream/upstream.h"
 
@@ -154,7 +158,7 @@ CorsPolicyImpl::CorsPolicyImpl(const envoy::api::v2::route::CorsPolicy& config,
     : config_(config), loader_(loader), allow_methods_(config.allow_methods()),
       allow_headers_(config.allow_headers()), expose_headers_(config.expose_headers()),
       max_age_(config.max_age()),
-      legacy_enabled_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, enabled, true)) {
+      legacy_enabled_(config.has_enabled() ? config.enabled().value() : true) {
   for (const auto& origin : config.allow_origin()) {
     envoy::type::matcher::StringMatcher matcher_config;
     matcher_config.set_exact(origin);
@@ -173,18 +177,15 @@ CorsPolicyImpl::CorsPolicyImpl(const envoy::api::v2::route::CorsPolicy& config,
   }
 }
 
-ShadowPolicyImpl::ShadowPolicyImpl(const envoy::api::v2::route::RouteAction& config) {
-  if (!config.has_request_mirror_policy()) {
-    return;
-  }
+ShadowPolicyImpl::ShadowPolicyImpl(const RequestMirrorPolicy& config) {
 
-  cluster_ = config.request_mirror_policy().cluster();
+  cluster_ = config.cluster();
 
-  if (config.request_mirror_policy().has_runtime_fraction()) {
-    runtime_key_ = config.request_mirror_policy().runtime_fraction().runtime_key();
-    default_value_ = config.request_mirror_policy().runtime_fraction().default_value();
+  if (config.has_runtime_fraction()) {
+    runtime_key_ = config.runtime_fraction().runtime_key();
+    default_value_ = config.runtime_fraction().default_value();
   } else {
-    runtime_key_ = config.request_mirror_policy().runtime_key();
+    runtime_key_ = config.runtime_key();
     default_value_.set_numerator(0);
   }
 }
@@ -268,7 +269,7 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
       strip_query_(route.redirect().strip_query()),
       hedge_policy_(buildHedgePolicy(vhost.hedgePolicy(), route.route())),
       retry_policy_(buildRetryPolicy(vhost.retryPolicy(), route.route(), validator)),
-      rate_limit_policy_(route.route().rate_limits()), shadow_policy_(route.route()),
+      rate_limit_policy_(route.route().rate_limits()),
       priority_(ConfigUtility::parsePriority(route.route().priority())),
       config_headers_(Http::HeaderUtility::buildHeaderDataVector(route.match().headers())),
       total_cluster_weight_(
@@ -294,6 +295,24 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
     if (filter_it != route.route().metadata_match().filter_metadata().end()) {
       metadata_match_criteria_ = std::make_unique<MetadataMatchCriteriaImpl>(filter_it->second);
     }
+  }
+
+  if (!route.route().request_mirror_policies().empty()) {
+    if (route.route().has_request_mirror_policy()) {
+      // protobuf does not allow `oneof` to contain a field labeled `repeated`, so we do our own
+      // xor-like check.
+      // https://github.com/protocolbuffers/protobuf/issues/2592
+      // The alternative solution suggested (wrapping the oneof in a repeated message) would still
+      // break wire compatibility.
+      // (see https://github.com/envoyproxy/envoy/issues/439#issuecomment-383622723)
+      throw EnvoyException("Cannot specify both request_mirror_policy and request_mirror_policies");
+    }
+    for (const auto& mirror_policy_config : route.route().request_mirror_policies()) {
+      shadow_policies_.push_back(std::make_unique<ShadowPolicyImpl>(mirror_policy_config));
+    }
+  } else if (route.route().has_request_mirror_policy()) {
+    shadow_policies_.push_back(
+        std::make_unique<ShadowPolicyImpl>(route.route().request_mirror_policy()));
   }
 
   // If this is a weighted_cluster, we create N internal route entries
@@ -387,6 +406,12 @@ bool RouteEntryImplBase::matchRoute(const Http::HeaderMap& headers,
                                     const StreamInfo::StreamInfo& stream_info,
                                     uint64_t random_value) const {
   bool matches = true;
+
+  // TODO(mattklein123): Currently all match types require a path header. When we support CONNECT
+  // we will need to figure out how to safely relax this.
+  if (headers.Path() == nullptr) {
+    return false;
+  }
 
   matches &= evaluateRuntimeMatch(random_value);
   if (!matches) {
@@ -927,10 +952,11 @@ VirtualHostImpl::VirtualHostImpl(const envoy::api::v2::route::VirtualHost& virtu
 
     if (validate_clusters) {
       routes_.back()->validateClusters(factory_context.clusterManager());
-      if (!routes_.back()->shadowPolicy().cluster().empty()) {
-        if (!factory_context.clusterManager().get(routes_.back()->shadowPolicy().cluster())) {
-          throw EnvoyException(fmt::format("route: unknown shadow cluster '{}'",
-                                           routes_.back()->shadowPolicy().cluster()));
+      for (const auto& shadow_policy : routes_.back()->shadowPolicies()) {
+        ASSERT(!shadow_policy->cluster().empty());
+        if (!factory_context.clusterManager().get(shadow_policy->cluster())) {
+          throw EnvoyException(
+              fmt::format("route: unknown shadow cluster '{}'", shadow_policy->cluster()));
         }
       }
     }
@@ -1068,6 +1094,11 @@ const VirtualHostImpl* RouteMatcher::findVirtualHost(const Http::HeaderMap& head
   if (virtual_hosts_.empty() && wildcard_virtual_host_suffixes_.empty() &&
       wildcard_virtual_host_prefixes_.empty()) {
     return default_virtual_host_.get();
+  }
+
+  // There may be no authority in early reply paths in the HTTP connection manager.
+  if (headers.Host() == nullptr) {
+    return nullptr;
   }
 
   // TODO (@rshriram) Match Origin header in WebSocket

@@ -1,5 +1,8 @@
 #include "extensions/common/tap/extension_config_base.h"
 
+#include "envoy/config/common/tap/v2alpha/common.pb.h"
+#include "envoy/service/tap/v2alpha/common.pb.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace Common {

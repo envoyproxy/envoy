@@ -1,3 +1,5 @@
+#include "envoy/service/metrics/v2/metrics_service.pb.h"
+
 #include "extensions/stat_sinks/metrics_service/grpc_metrics_service_impl.h"
 
 #include "test/mocks/common.h"

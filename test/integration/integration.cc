@@ -8,7 +8,12 @@
 #include <string>
 #include <vector>
 
+#include "envoy/admin/v2alpha/config_dump.pb.h"
+#include "envoy/api/v2/auth/cert.pb.h"
+#include "envoy/api/v2/discovery.pb.h"
+#include "envoy/api/v2/endpoint/endpoint.pb.h"
 #include "envoy/buffer/buffer.h"
+#include "envoy/config/bootstrap/v2/bootstrap.pb.h"
 #include "envoy/http/header_map.h"
 
 #include "common/api/api_impl.h"
@@ -16,6 +21,7 @@
 #include "common/common/assert.h"
 #include "common/common/fmt.h"
 #include "common/common/stack_array.h"
+#include "common/config/api_version.h"
 #include "common/event/dispatcher_impl.h"
 #include "common/event/libevent.h"
 #include "common/network/connection_impl.h"
@@ -294,8 +300,8 @@ void BaseIntegrationTest::createUpstreams() {
   for (uint32_t i = 0; i < fake_upstreams_count_; ++i) {
     auto endpoint = upstream_address_fn_(i);
     if (autonomous_upstream_) {
-      fake_upstreams_.emplace_back(
-          new AutonomousUpstream(endpoint, upstream_protocol_, *time_system_));
+      fake_upstreams_.emplace_back(new AutonomousUpstream(
+          endpoint, upstream_protocol_, *time_system_, autonomous_allow_incomplete_streams_));
     } else {
       fake_upstreams_.emplace_back(new FakeUpstream(endpoint, upstream_protocol_, *time_system_,
                                                     enable_half_close_, udp_fake_upstream_));
@@ -330,7 +336,7 @@ void BaseIntegrationTest::createEnvoy() {
   if (use_lds_) {
     // After the config has been finalized, write the final listener config to the lds file.
     const std::string lds_path = config_helper_.bootstrap().dynamic_resources().lds_config().path();
-    envoy::api::v2::DiscoveryResponse lds;
+    API_NO_BOOST(envoy::api::v2::DiscoveryResponse) lds;
     lds.set_version_info("0");
     for (auto& listener : config_helper_.bootstrap().static_resources().listeners()) {
       ProtobufWkt::Any* resource = lds.add_resources();
@@ -577,7 +583,7 @@ AssertionResult BaseIntegrationTest::compareSotwDiscoveryRequest(
     const std::string& expected_type_url, const std::string& expected_version,
     const std::vector<std::string>& expected_resource_names, bool expect_node,
     const Protobuf::int32 expected_error_code, const std::string& expected_error_substring) {
-  envoy::api::v2::DiscoveryRequest discovery_request;
+  API_NO_BOOST(envoy::api::v2::DiscoveryRequest) discovery_request;
   VERIFY_ASSERTION(xds_stream_->waitForGrpcMessage(*dispatcher_, discovery_request));
 
   if (expect_node) {
@@ -635,7 +641,7 @@ AssertionResult BaseIntegrationTest::compareDeltaDiscoveryRequest(
     const std::vector<std::string>& expected_resource_subscriptions,
     const std::vector<std::string>& expected_resource_unsubscriptions, FakeStreamPtr& xds_stream,
     const Protobuf::int32 expected_error_code, const std::string& expected_error_substring) {
-  envoy::api::v2::DeltaDiscoveryRequest request;
+  API_NO_BOOST(envoy::api::v2::DeltaDiscoveryRequest) request;
   VERIFY_ASSERTION(xds_stream->waitForGrpcMessage(*dispatcher_, request));
 
   // Verify all we care about node.

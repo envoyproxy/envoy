@@ -1,3 +1,4 @@
+#include "envoy/api/v2/core/base.pb.h"
 #include "envoy/config/filter/http/original_src/v2alpha1/original_src.pb.h"
 
 #include "common/network/socket_option_impl.h"

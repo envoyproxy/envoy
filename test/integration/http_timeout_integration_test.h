@@ -1,5 +1,8 @@
 #pragma once
 
+#include "envoy/config/filter/http/router/v2/router.pb.h"
+#include "envoy/config/filter/network/http_connection_manager/v2/http_connection_manager.pb.h"
+
 #include "test/integration/http_integration.h"
 
 #include "gtest/gtest.h"

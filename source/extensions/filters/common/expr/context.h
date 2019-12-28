@@ -1,5 +1,6 @@
 #pragma once
 
+#include "envoy/api/v2/core/base.pb.h"
 #include "envoy/stream_info/stream_info.h"
 
 #include "common/http/headers.h"
@@ -30,6 +31,7 @@ constexpr absl::string_view UserAgent = "useragent";
 constexpr absl::string_view Size = "size";
 constexpr absl::string_view TotalSize = "total_size";
 constexpr absl::string_view Duration = "duration";
+constexpr absl::string_view Protocol = "protocol";
 
 // Symbols for traversing the response properties
 constexpr absl::string_view Response = "response";

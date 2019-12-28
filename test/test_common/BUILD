@@ -117,8 +117,9 @@ envoy_cc_test_library(
         "//test/mocks/stats:stats_mocks",
         "@envoy_api//envoy/api/v2:pkg_cc_proto",
         "@envoy_api//envoy/api/v2/route:pkg_cc_proto",
-        "@envoy_api//envoy/config/bootstrap/v2:pkg_cc_proto",
         "@envoy_api//envoy/service/discovery/v2:pkg_cc_proto",
+        "@envoy_api//envoy/type:pkg_cc_proto",
+        "@envoy_api//envoy/type/matcher:pkg_cc_proto",
     ],
 )
 
@@ -134,6 +135,7 @@ envoy_cc_test_library(
         "//test/mocks/protobuf:protobuf_mocks",
         "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/thread_local:thread_local_mocks",
+        "@envoy_api//envoy/config/bootstrap/v2:pkg_cc_proto",
     ],
 )
 

@@ -1,6 +1,5 @@
 #include <list>
 
-#include "envoy/config/bootstrap/v2/bootstrap.pb.h"
 #include "envoy/server/filter_config.h"
 
 #include "test/integration/integration.h"

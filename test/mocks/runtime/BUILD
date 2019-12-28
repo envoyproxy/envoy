@@ -17,5 +17,6 @@ envoy_cc_mock(
         "//include/envoy/runtime:runtime_interface",
         "//include/envoy/upstream:cluster_manager_interface",
         "//test/mocks:common_lib",
+        "@envoy_api//envoy/type:pkg_cc_proto",
     ],
 )

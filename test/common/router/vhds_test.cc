@@ -2,8 +2,9 @@
 #include <memory>
 #include <string>
 
-#include "envoy/admin/v2alpha/config_dump.pb.h"
-#include "envoy/admin/v2alpha/config_dump.pb.validate.h"
+#include "envoy/api/v2/discovery.pb.h"
+#include "envoy/api/v2/rds.pb.h"
+#include "envoy/api/v2/route/route.pb.h"
 #include "envoy/stats/scope.h"
 
 #include "common/config/utility.h"

@@ -2,9 +2,9 @@ syntax = "proto3";
 
 package envoy.type.v3alpha;
 
+option java_package = "io.envoyproxy.envoy.type.v3alpha";
 option java_outer_classname = "HttpProto";
 option java_multiple_files = true;
-option java_package = "io.envoyproxy.envoy.type.v3alpha";
 
 enum CodecClientType {
   HTTP1 = 0;

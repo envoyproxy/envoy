@@ -10,11 +10,13 @@
 #include <unordered_map>
 #include <vector>
 
+#include "envoy/api/v2/core/base.pb.h"
 #include "envoy/api/v2/rds.pb.h"
 #include "envoy/api/v2/route/route.pb.h"
 #include "envoy/router/router.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/server/filter_config.h"
+#include "envoy/type/percent.pb.h"
 #include "envoy/upstream/cluster_manager.h"
 
 #include "common/config/metadata.h"
@@ -281,7 +283,8 @@ private:
  */
 class ShadowPolicyImpl : public ShadowPolicy {
 public:
-  explicit ShadowPolicyImpl(const envoy::api::v2::route::RouteAction& config);
+  using RequestMirrorPolicy = envoy::api::v2::route::RouteAction::RequestMirrorPolicy;
+  explicit ShadowPolicyImpl(const RequestMirrorPolicy& config);
 
   // Router::ShadowPolicy
   const std::string& cluster() const override { return cluster_; }
@@ -414,7 +417,7 @@ public:
   const RateLimitPolicy& rateLimitPolicy() const override { return rate_limit_policy_; }
   const RetryPolicy& retryPolicy() const override { return retry_policy_; }
   uint32_t retryShadowBufferLimit() const override { return retry_shadow_buffer_limit_; }
-  const ShadowPolicy& shadowPolicy() const override { return shadow_policy_; }
+  const std::vector<ShadowPolicyPtr>& shadowPolicies() const override { return shadow_policies_; }
   const VirtualCluster* virtualCluster(const Http::HeaderMap& headers) const override {
     return vhost_.virtualClusterFromEntries(headers);
   }
@@ -508,7 +511,9 @@ private:
     const RateLimitPolicy& rateLimitPolicy() const override { return parent_->rateLimitPolicy(); }
     const RetryPolicy& retryPolicy() const override { return parent_->retryPolicy(); }
     uint32_t retryShadowBufferLimit() const override { return parent_->retryShadowBufferLimit(); }
-    const ShadowPolicy& shadowPolicy() const override { return parent_->shadowPolicy(); }
+    const std::vector<ShadowPolicyPtr>& shadowPolicies() const override {
+      return parent_->shadowPolicies();
+    }
     std::chrono::milliseconds timeout() const override { return parent_->timeout(); }
     absl::optional<std::chrono::milliseconds> idleTimeout() const override {
       return parent_->idleTimeout();
@@ -666,7 +671,7 @@ private:
   const HedgePolicyImpl hedge_policy_;
   const RetryPolicyImpl retry_policy_;
   const RateLimitPolicyImpl rate_limit_policy_;
-  const ShadowPolicyImpl shadow_policy_;
+  std::vector<ShadowPolicyPtr> shadow_policies_;
   const Upstream::ResourcePriority priority_;
   std::vector<Http::HeaderUtility::HeaderDataPtr> config_headers_;
   std::vector<ConfigUtility::QueryParameterMatcherPtr> config_query_parameters_;

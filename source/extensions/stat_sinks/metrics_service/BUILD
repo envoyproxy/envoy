@@ -33,7 +33,6 @@ envoy_cc_library(
     deps = [
         "//source/common/common:assert_lib",
         "//source/common/protobuf",
-        "@envoy_api//envoy/service/metrics/v2:pkg_cc_proto",
     ],
 )
 

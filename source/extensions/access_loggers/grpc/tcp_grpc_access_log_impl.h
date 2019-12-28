@@ -4,11 +4,9 @@
 #include <vector>
 
 #include "envoy/config/accesslog/v2/als.pb.h"
-#include "envoy/config/filter/accesslog/v2/accesslog.pb.h"
 #include "envoy/grpc/async_client.h"
 #include "envoy/grpc/async_client_manager.h"
 #include "envoy/local_info/local_info.h"
-#include "envoy/service/accesslog/v2/als.pb.h"
 #include "envoy/singleton/instance.h"
 #include "envoy/thread_local/thread_local.h"
 

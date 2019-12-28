@@ -5,6 +5,7 @@
 #include "envoy/http/filter.h"
 #include "envoy/router/rds.h"
 #include "envoy/stats/scope.h"
+#include "envoy/type/percent.pb.h"
 
 #include "common/http/date_provider.h"
 #include "common/network/utility.h"

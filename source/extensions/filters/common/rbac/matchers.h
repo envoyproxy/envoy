@@ -2,10 +2,12 @@
 
 #include <memory>
 
-#include "envoy/api/v2/core/base.pb.h"
+#include "envoy/api/v2/core/address.pb.h"
+#include "envoy/api/v2/route/route.pb.h"
 #include "envoy/config/rbac/v2/rbac.pb.h"
 #include "envoy/http/header_map.h"
 #include "envoy/network/connection.h"
+#include "envoy/type/matcher/string.pb.h"
 
 #include "common/common/matchers.h"
 #include "common/http/header_utility.h"

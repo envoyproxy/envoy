@@ -2,6 +2,8 @@
 
 #include <memory>
 
+#include "envoy/api/v2/discovery.pb.h"
+
 #include "common/buffer/buffer_impl.h"
 #include "common/common/assert.h"
 #include "common/common/macros.h"

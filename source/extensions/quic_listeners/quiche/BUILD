@@ -232,6 +232,7 @@ envoy_cc_library(
         ":envoy_quic_packet_writer_lib",
         "//include/envoy/event:dispatcher_interface",
         "//source/common/network:socket_option_factory_lib",
+        "@envoy_api//envoy/api/v2/core:pkg_cc_proto",
     ],
 )
 
@@ -302,6 +303,7 @@ envoy_cc_library(
         "//source/common/network:listen_socket_lib",
         "//source/common/network:socket_option_factory_lib",
         "@com_googlesource_quiche//:quic_core_http_header_list_lib",
+        "@envoy_api//envoy/api/v2/core:pkg_cc_proto",
     ],
 )
 

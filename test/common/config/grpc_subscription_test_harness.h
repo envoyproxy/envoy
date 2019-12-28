@@ -2,9 +2,12 @@
 
 #include <memory>
 
+#include "envoy/api/v2/core/base.pb.h"
+#include "envoy/api/v2/discovery.pb.h"
 #include "envoy/api/v2/eds.pb.h"
 
 #include "common/common/hash.h"
+#include "common/config/api_version.h"
 #include "common/config/grpc_subscription_impl.h"
 #include "common/config/resources.h"
 
@@ -60,7 +63,7 @@ public:
                          bool expect_node, const Protobuf::int32 error_code,
                          const std::string& error_message) {
     UNREFERENCED_PARAMETER(expect_node);
-    envoy::api::v2::DiscoveryRequest expected_request;
+    API_NO_BOOST(envoy::api::v2::DiscoveryRequest) expected_request;
     if (expect_node) {
       expected_request.mutable_node()->CopyFrom(node_);
     }

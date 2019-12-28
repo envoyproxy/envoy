@@ -1,6 +1,9 @@
 #include "extensions/filters/http/tap/config.h"
 
+#include "envoy/config/filter/http/tap/v2alpha/tap.pb.h"
+#include "envoy/config/filter/http/tap/v2alpha/tap.pb.validate.h"
 #include "envoy/registry/registry.h"
+#include "envoy/service/tap/v2alpha/common.pb.h"
 
 #include "extensions/filters/http/tap/tap_config_impl.h"
 #include "extensions/filters/http/tap/tap_filter.h"

@@ -5,7 +5,7 @@
 #include <iostream>
 #include <vector>
 
-#include "envoy/config/trace/v2/trace.pb.validate.h"
+#include "envoy/config/trace/v2/trace.pb.h"
 
 #include "common/common/base64.h"
 

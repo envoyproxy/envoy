@@ -2,11 +2,15 @@
 
 #include <unordered_map>
 
+#include "envoy/admin/v2alpha/config_dump.pb.h"
+#include "envoy/api/v2/core/config_source.pb.h"
+#include "envoy/api/v2/discovery.pb.h"
+#include "envoy/api/v2/lds.pb.h"
 #include "envoy/api/v2/lds.pb.validate.h"
-#include "envoy/api/v2/listener/listener.pb.validate.h"
 #include "envoy/stats/scope.h"
 
 #include "common/common/cleanup.h"
+#include "common/config/api_version.h"
 #include "common/config/resources.h"
 #include "common/config/utility.h"
 #include "common/protobuf/utility.h"
@@ -24,7 +28,8 @@ LdsApiImpl::LdsApiImpl(const envoy::api::v2::core::ConfigSource& lds_config,
       init_target_("LDS", [this]() { subscription_->start({}); }),
       validation_visitor_(validation_visitor) {
   subscription_ = cm.subscriptionFactory().subscriptionFromConfigSource(
-      lds_config, Grpc::Common::typeUrl(envoy::api::v2::Listener().GetDescriptor()->full_name()),
+      lds_config,
+      Grpc::Common::typeUrl(API_NO_BOOST(envoy::api::v2::Listener)().GetDescriptor()->full_name()),
       *scope_, *this);
   init_manager.add(init_target_);
 }

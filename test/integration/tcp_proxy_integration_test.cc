@@ -2,9 +2,13 @@
 
 #include <memory>
 
+#include "envoy/api/v2/cds.pb.h"
+#include "envoy/api/v2/core/base.pb.h"
 #include "envoy/config/accesslog/v2/file.pb.h"
-#include "envoy/config/filter/network/tcp_proxy/v2/tcp_proxy.pb.validate.h"
+#include "envoy/config/bootstrap/v2/bootstrap.pb.h"
+#include "envoy/config/filter/network/tcp_proxy/v2/tcp_proxy.pb.h"
 
+#include "common/config/api_version.h"
 #include "common/network/utility.h"
 
 #include "extensions/transport_sockets/tls/context_manager_impl.h"
@@ -237,10 +241,10 @@ TEST_P(TcpProxyIntegrationTest, AccessLog) {
     auto* filter_chain = listener->mutable_filter_chains(0);
     auto* config_blob = filter_chain->mutable_filters(0)->mutable_typed_config();
 
-    ASSERT_TRUE(config_blob->Is<envoy::config::filter::network::tcp_proxy::v2::TcpProxy>());
-    auto tcp_proxy_config =
-        MessageUtil::anyConvert<envoy::config::filter::network::tcp_proxy::v2::TcpProxy>(
-            *config_blob);
+    ASSERT_TRUE(
+        config_blob->Is<API_NO_BOOST(envoy::config::filter::network::tcp_proxy::v2::TcpProxy)>());
+    auto tcp_proxy_config = MessageUtil::anyConvert<API_NO_BOOST(
+        envoy::config::filter::network::tcp_proxy::v2::TcpProxy)>(*config_blob);
 
     auto* access_log = tcp_proxy_config.add_access_log();
     access_log->set_name("envoy.file_access_log");
@@ -326,10 +330,10 @@ TEST_P(TcpProxyIntegrationTest, TestIdletimeoutWithNoData) {
     auto* filter_chain = listener->mutable_filter_chains(0);
     auto* config_blob = filter_chain->mutable_filters(0)->mutable_typed_config();
 
-    ASSERT_TRUE(config_blob->Is<envoy::config::filter::network::tcp_proxy::v2::TcpProxy>());
-    auto tcp_proxy_config =
-        MessageUtil::anyConvert<envoy::config::filter::network::tcp_proxy::v2::TcpProxy>(
-            *config_blob);
+    ASSERT_TRUE(
+        config_blob->Is<API_NO_BOOST(envoy::config::filter::network::tcp_proxy::v2::TcpProxy)>());
+    auto tcp_proxy_config = MessageUtil::anyConvert<API_NO_BOOST(
+        envoy::config::filter::network::tcp_proxy::v2::TcpProxy)>(*config_blob);
     tcp_proxy_config.mutable_idle_timeout()->set_nanos(
         std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::milliseconds(100))
             .count());
@@ -349,10 +353,10 @@ TEST_P(TcpProxyIntegrationTest, TestIdletimeoutWithLargeOutstandingData) {
     auto* filter_chain = listener->mutable_filter_chains(0);
     auto* config_blob = filter_chain->mutable_filters(0)->mutable_typed_config();
 
-    ASSERT_TRUE(config_blob->Is<envoy::config::filter::network::tcp_proxy::v2::TcpProxy>());
-    auto tcp_proxy_config =
-        MessageUtil::anyConvert<envoy::config::filter::network::tcp_proxy::v2::TcpProxy>(
-            *config_blob);
+    ASSERT_TRUE(
+        config_blob->Is<API_NO_BOOST(envoy::config::filter::network::tcp_proxy::v2::TcpProxy)>());
+    auto tcp_proxy_config = MessageUtil::anyConvert<API_NO_BOOST(
+        envoy::config::filter::network::tcp_proxy::v2::TcpProxy)>(*config_blob);
     tcp_proxy_config.mutable_idle_timeout()->set_nanos(
         std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::milliseconds(500))
             .count());

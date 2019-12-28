@@ -3,6 +3,10 @@
 #include <algorithm>
 
 #include "envoy/admin/v2alpha/config_dump.pb.h"
+#include "envoy/api/v2/core/address.pb.h"
+#include "envoy/api/v2/core/base.pb.h"
+#include "envoy/api/v2/lds.pb.h"
+#include "envoy/api/v2/listener/listener.pb.h"
 #include "envoy/registry/registry.h"
 #include "envoy/server/active_udp_listener_config.h"
 #include "envoy/server/transport_socket_config.h"
@@ -165,6 +169,10 @@ Network::SocketSharedPtr ProdListenerComponentFactory::createListenSocket(
   // For each listener config we share a single socket among all threaded listeners.
   // First we try to get the socket from our parent if applicable.
   if (address->type() == Network::Address::Type::Pipe) {
+// No such thing as AF_UNIX on Windows
+#ifdef WIN32
+    throw EnvoyException("network type pipe not supported on Windows");
+#else
     if (socket_type != Network::Address::SocketType::Stream) {
       // This could be implemented in the future, since Unix domain sockets
       // support SOCK_DGRAM, but there would need to be a way to specify it in
@@ -180,6 +188,7 @@ Network::SocketSharedPtr ProdListenerComponentFactory::createListenSocket(
       return std::make_shared<Network::UdsListenSocket>(std::move(io_handle), address);
     }
     return std::make_shared<Network::UdsListenSocket>(address);
+#endif
   }
 
   const std::string scheme = (socket_type == Network::Address::SocketType::Stream)
@@ -676,7 +685,7 @@ void ListenerManagerImpl::startWorkers(GuardDog& guard_dog) {
 
 void ListenerManagerImpl::stopListener(Network::ListenerConfig& listener,
                                        std::function<void()> callback) {
-  const auto workers_pending_stop = std::make_shared<std::atomic<uint32_t>>(workers_.size());
+  const auto workers_pending_stop = std::make_shared<std::atomic<uint64_t>>(workers_.size());
   for (const auto& worker : workers_) {
     worker->stopListener(listener, [this, callback, workers_pending_stop]() {
       if (--(*workers_pending_stop) == 0) {
@@ -747,7 +756,7 @@ std::unique_ptr<Network::FilterChain> ListenerFilterChainFactoryBuilder::buildFi
   if (!filter_chain.has_transport_socket()) {
     if (filter_chain.has_tls_context()) {
       transport_socket.set_name(Extensions::TransportSockets::TransportSocketNames::get().Tls);
-      MessageUtil::jsonConvert(filter_chain.tls_context(), *transport_socket.mutable_config());
+      transport_socket.mutable_typed_config()->PackFrom(filter_chain.tls_context());
     } else {
       transport_socket.set_name(
           Extensions::TransportSockets::TransportSocketNames::get().RawBuffer);

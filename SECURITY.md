@@ -420,3 +420,4 @@ and security team to ensure they still qualify for inclusion on the list.
 | envoy-security@solo.io                                | solo.io       | No       | 12/19       |
 | envoy-security@tetrate.io                             | Tetrate       | No       | 12/19       |
 | security@vmware.com                                   | VMware        | No       | 12/19       |
+| envoy-security@pinterest.com                          | Pinterest     | Yes      | 12/19       |

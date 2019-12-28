@@ -2,26 +2,26 @@ syntax = "proto3";
 
 package envoy.api.v3alpha.auth;
 
-option java_outer_classname = "CertProto";
-option java_multiple_files = true;
-option java_package = "io.envoyproxy.envoy.api.v3alpha.auth";
-
 import "envoy/api/v3alpha/core/base.proto";
 import "envoy/api/v3alpha/core/config_source.proto";
+import "envoy/type/matcher/v3alpha/string.proto";
 
 import "google/protobuf/any.proto";
 import "google/protobuf/struct.proto";
 import "google/protobuf/wrappers.proto";
 
-import "udpa/api/annotations/versioning.proto";
+import "udpa/annotations/versioning.proto";
 
 import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.api.v3alpha.auth";
+option java_outer_classname = "CertProto";
+option java_multiple_files = true;
 
 // [#protodoc-title: Common TLS configuration]
 
 message TlsParameters {
-  option (udpa.api.annotations.versioning).previous_message_type =
-      "envoy.api.v2.auth.TlsParameters";
+  option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.auth.TlsParameters";
 
   enum TlsProtocol {
     // Envoy will choose the optimal TLS version.
@@ -110,7 +110,7 @@ message TlsParameters {
 // (potentially asynchronous) signing and decryption operations. Some use cases for private key
 // methods would be TPM support and TLS acceleration.
 message PrivateKeyProvider {
-  option (udpa.api.annotations.versioning).previous_message_type =
+  option (udpa.annotations.versioning).previous_message_type =
       "envoy.api.v2.auth.PrivateKeyProvider";
 
   reserved 2;
@@ -129,8 +129,7 @@ message PrivateKeyProvider {
 
 // [#next-free-field: 7]
 message TlsCertificate {
-  option (udpa.api.annotations.versioning).previous_message_type =
-      "envoy.api.v2.auth.TlsCertificate";
+  option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.auth.TlsCertificate";
 
   // The TLS certificate chain.
   core.DataSource certificate_chain = 1;
@@ -159,7 +158,7 @@ message TlsCertificate {
 }
 
 message TlsSessionTicketKeys {
-  option (udpa.api.annotations.versioning).previous_message_type =
+  option (udpa.annotations.versioning).previous_message_type =
       "envoy.api.v2.auth.TlsSessionTicketKeys";
 
   // Keys for encrypting and decrypting TLS session tickets. The
@@ -189,10 +188,14 @@ message TlsSessionTicketKeys {
   repeated core.DataSource keys = 1 [(validate.rules).repeated = {min_items: 1}];
 }
 
-// [#next-free-field: 9]
+// [#next-free-field: 10]
 message CertificateValidationContext {
-  option (udpa.api.annotations.versioning).previous_message_type =
+  option (udpa.annotations.versioning).previous_message_type =
       "envoy.api.v2.auth.CertificateValidationContext";
+
+  reserved 4;
+
+  reserved "verify_subject_alt_name";
 
   // TLS certificate data containing certificate authority certificates to use in verifying
   // a presented peer certificate (e.g. server certificate for clusters or client certificate
@@ -279,15 +282,15 @@ message CertificateValidationContext {
   repeated string verify_certificate_hash = 2
       [(validate.rules).repeated = {items {string {min_bytes: 64 max_bytes: 95}}}];
 
-  // An optional list of Subject Alternative Names. If specified, Envoy will verify that the
-  // Subject Alternative Name of the presented certificate matches one of the specified values.
+  // An optional list of Subject Alternative name matchers. Envoy will verify that the
+  // Subject Alternative Name of the presented certificate matches one of the specified matches.
   //
   // .. attention::
   //
   //   Subject Alternative Names are easily spoofable and verifying only them is insecure,
   //   therefore this option must be used together with :ref:`trusted_ca
   //   <envoy_api_field_api.v3alpha.auth.CertificateValidationContext.trusted_ca>`.
-  repeated string verify_subject_alt_name = 4;
+  repeated type.matcher.v3alpha.StringMatcher match_subject_alt_names = 9;
 
   // [#not-implemented-hide:] Must present a signed time-stamped OCSP response.
   google.protobuf.BoolValue require_ocsp_staple = 5;
@@ -309,11 +312,10 @@ message CertificateValidationContext {
 // TLS context shared by both client and server TLS contexts.
 // [#next-free-field: 9]
 message CommonTlsContext {
-  option (udpa.api.annotations.versioning).previous_message_type =
-      "envoy.api.v2.auth.CommonTlsContext";
+  option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.auth.CommonTlsContext";
 
   message CombinedCertificateValidationContext {
-    option (udpa.api.annotations.versioning).previous_message_type =
+    option (udpa.annotations.versioning).previous_message_type =
         "envoy.api.v2.auth.CommonTlsContext.CombinedCertificateValidationContext";
 
     // How to validate peer certificates.
@@ -373,7 +375,7 @@ message CommonTlsContext {
 }
 
 message UpstreamTlsContext {
-  option (udpa.api.annotations.versioning).previous_message_type =
+  option (udpa.annotations.versioning).previous_message_type =
       "envoy.api.v2.auth.UpstreamTlsContext";
 
   // Common TLS context settings.
@@ -404,7 +406,7 @@ message UpstreamTlsContext {
 
 // [#next-free-field: 6]
 message DownstreamTlsContext {
-  option (udpa.api.annotations.versioning).previous_message_type =
+  option (udpa.annotations.versioning).previous_message_type =
       "envoy.api.v2.auth.DownstreamTlsContext";
 
   // Common TLS context settings.
@@ -428,8 +430,7 @@ message DownstreamTlsContext {
 }
 
 message SdsSecretConfig {
-  option (udpa.api.annotations.versioning).previous_message_type =
-      "envoy.api.v2.auth.SdsSecretConfig";
+  option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.auth.SdsSecretConfig";
 
   // Name (FQDN, UUID, SPKI, SHA256, etc.) by which the secret can be uniquely referred to.
   // When both name and config are specified, then secret can be fetched and/or reloaded via SDS.
@@ -441,7 +442,7 @@ message SdsSecretConfig {
 }
 
 message Secret {
-  option (udpa.api.annotations.versioning).previous_message_type = "envoy.api.v2.auth.Secret";
+  option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.auth.Secret";
 
   // Name (FQDN, UUID, SPKI, SHA256, etc.) by which the secret can be uniquely referred to.
   string name = 1;

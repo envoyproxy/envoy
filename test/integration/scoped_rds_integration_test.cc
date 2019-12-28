@@ -1,5 +1,12 @@
+#include "envoy/api/v2/core/config_source.pb.h"
+#include "envoy/api/v2/core/grpc_service.pb.h"
+#include "envoy/api/v2/discovery.pb.h"
+#include "envoy/api/v2/rds.pb.h"
 #include "envoy/api/v2/srds.pb.h"
+#include "envoy/config/bootstrap/v2/bootstrap.pb.h"
+#include "envoy/config/filter/network/http_connection_manager/v2/http_connection_manager.pb.h"
 
+#include "common/config/api_version.h"
 #include "common/config/resources.h"
 
 #include "test/common/grpc/grpc_client_integration.h"
@@ -154,7 +161,7 @@ fragments:
   }
 
   void sendRdsResponse(const std::string& route_config, const std::string& version) {
-    envoy::api::v2::DiscoveryResponse response;
+    API_NO_BOOST(envoy::api::v2::DiscoveryResponse) response;
     response.set_version_info(version);
     response.set_type_url(Config::TypeUrl::get().RouteConfiguration);
     auto route_configuration =
@@ -181,7 +188,7 @@ fragments:
                                   const std::string& version) {
     ASSERT(scoped_rds_upstream_info_.stream_by_resource_name_[srds_config_name_] != nullptr);
 
-    envoy::api::v2::DeltaDiscoveryResponse response;
+    API_NO_BOOST(envoy::api::v2::DeltaDiscoveryResponse) response;
     response.set_system_version_info(version);
     response.set_type_url(Config::TypeUrl::get().ScopedRouteConfiguration);
 
@@ -204,7 +211,7 @@ fragments:
                                  const std::string& version) {
     ASSERT(scoped_rds_upstream_info_.stream_by_resource_name_[srds_config_name_] != nullptr);
 
-    envoy::api::v2::DiscoveryResponse response;
+    API_NO_BOOST(envoy::api::v2::DiscoveryResponse) response;
     response.set_version_info(version);
     response.set_type_url(Config::TypeUrl::get().ScopedRouteConfiguration);
 

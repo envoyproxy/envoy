@@ -4,6 +4,7 @@
 #include <string>
 #include <unordered_map>
 
+#include "envoy/api/v2/cds.pb.h"
 #include "envoy/router/router.h"
 
 #include "common/network/utility.h"
@@ -207,8 +208,7 @@ TEST_P(RingHashLoadBalancerTest, BasicWithMurmur2) {
   hostSet().runCallbacks({}, {});
 
   config_ = envoy::api::v2::Cluster::RingHashLbConfig();
-  config_.value().set_hash_function(envoy::api::v2::Cluster_RingHashLbConfig_HashFunction::
-                                        Cluster_RingHashLbConfig_HashFunction_MURMUR_HASH_2);
+  config_.value().set_hash_function(envoy::api::v2::Cluster::RingHashLbConfig::MURMUR_HASH_2);
   config_.value().mutable_minimum_ring_size()->set_value(12);
   init();
   EXPECT_EQ(12, lb_->stats().size_.value());

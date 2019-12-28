@@ -1,5 +1,8 @@
 #include <memory>
 
+#include "envoy/config/filter/network/rbac/v2/rbac.pb.h"
+#include "envoy/config/rbac/v2/rbac.pb.h"
+
 #include "common/network/utility.h"
 
 #include "extensions/filters/common/rbac/utility.h"

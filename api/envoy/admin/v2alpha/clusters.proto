@@ -2,14 +2,14 @@ syntax = "proto3";
 
 package envoy.admin.v2alpha;
 
-option java_outer_classname = "ClustersProto";
-option java_multiple_files = true;
-option java_package = "io.envoyproxy.envoy.admin.v2alpha";
-
 import "envoy/admin/v2alpha/metrics.proto";
 import "envoy/api/v2/core/address.proto";
 import "envoy/api/v2/core/health_check.proto";
 import "envoy/type/percent.proto";
+
+option java_package = "io.envoyproxy.envoy.admin.v2alpha";
+option java_outer_classname = "ClustersProto";
+option java_multiple_files = true;
 
 // [#protodoc-title: Clusters]
 
@@ -141,6 +141,6 @@ message HostHealthStatus {
 
   // Health status as reported by EDS. Note: only HEALTHY and UNHEALTHY are currently supported
   // here.
-  // TODO(mrice32): pipe through remaining EDS health status possibilities.
+  // [#comment:TODO(mrice32): pipe through remaining EDS health status possibilities.]
   api.v2.core.HealthStatus eds_health_status = 3;
 }

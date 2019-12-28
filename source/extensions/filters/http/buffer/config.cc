@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <string>
 
+#include "envoy/config/filter/http/buffer/v2/buffer.pb.h"
 #include "envoy/config/filter/http/buffer/v2/buffer.pb.validate.h"
 #include "envoy/registry/registry.h"
 

@@ -18,8 +18,8 @@ namespace JwtAuthn {
 
 class MockAuthFactory : public AuthFactory {
 public:
-  MOCK_CONST_METHOD3(create, AuthenticatorPtr(const ::google::jwt_verify::CheckAudience*,
-                                              const absl::optional<std::string>&, bool));
+  MOCK_CONST_METHOD4(create, AuthenticatorPtr(const ::google::jwt_verify::CheckAudience*,
+                                              const absl::optional<std::string>&, bool, bool));
 };
 
 class MockAuthenticator : public Authenticator {
