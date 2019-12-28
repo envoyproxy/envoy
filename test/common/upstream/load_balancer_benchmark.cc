@@ -2,6 +2,8 @@
 
 #include <memory>
 
+#include "envoy/api/v2/cds.pb.h"
+
 #include "common/memory/stats.h"
 #include "common/runtime/runtime_impl.h"
 #include "common/upstream/maglev_lb.h"

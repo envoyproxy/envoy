@@ -1,3 +1,5 @@
+#include "envoy/config/bootstrap/v2/bootstrap.pb.h"
+
 #include "test/integration/integration.h"
 
 namespace Envoy {

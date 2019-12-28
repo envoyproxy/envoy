@@ -4,6 +4,8 @@
 #include <string>
 #include <unordered_map>
 
+#include "envoy/config/trace/v2/trace.pb.h"
+
 #include "common/http/header_map_impl.h"
 #include "common/http/headers.h"
 #include "common/http/message_impl.h"

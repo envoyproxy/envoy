@@ -1,5 +1,7 @@
 #include "extensions/filters/common/original_src/original_src_socket_option.h"
 
+#include "envoy/api/v2/core/base.pb.h"
+
 #include "common/common/assert.h"
 
 namespace Envoy {

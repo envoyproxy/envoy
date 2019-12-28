@@ -1,5 +1,7 @@
 #include "extensions/filters/common/rbac/matchers.h"
 
+#include "envoy/config/rbac/v2/rbac.pb.h"
+
 #include "common/common/assert.h"
 
 namespace Envoy {
@@ -148,16 +150,15 @@ bool AuthenticatedMatcher::matches(const Network::Connection& connection,
         return true;
       }
     }
-  } else if (!ssl->dnsSansPeerCertificate().empty()) {
+  }
+  if (!ssl->dnsSansPeerCertificate().empty()) {
     for (const std::string& dns : ssl->dnsSansPeerCertificate()) {
       if (matcher_.value().match(dns)) {
         return true;
       }
     }
-  } else {
-    return matcher_.value().match(ssl->subjectPeerCertificate());
   }
-  return false;
+  return matcher_.value().match(ssl->subjectPeerCertificate());
 }
 
 bool MetadataMatcher::matches(const Network::Connection&, const Envoy::Http::HeaderMap&,

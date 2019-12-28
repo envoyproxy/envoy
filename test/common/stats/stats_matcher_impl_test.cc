@@ -1,4 +1,5 @@
 #include "envoy/config/metrics/v2/stats.pb.h"
+#include "envoy/type/matcher/string.pb.h"
 
 #include "common/stats/stats_matcher_impl.h"
 

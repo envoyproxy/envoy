@@ -1,5 +1,8 @@
 #include <memory>
 
+#include "envoy/config/accesslog/v2/als.pb.h"
+#include "envoy/data/accesslog/v2/accesslog.pb.h"
+
 #include "common/buffer/zero_copy_input_stream_impl.h"
 #include "common/network/address_impl.h"
 #include "common/router/string_accessor_impl.h"
@@ -143,9 +146,11 @@ TEST_F(HttpGrpcAccessLogTest, Marshalling) {
     (*stream_info.metadata_.mutable_filter_metadata())["foo"] = ProtobufWkt::Struct();
     stream_info.filter_state_.setData("string_accessor",
                                       std::make_unique<Router::StringAccessorImpl>("test_value"),
-                                      StreamInfo::FilterState::StateType::ReadOnly);
+                                      StreamInfo::FilterState::StateType::ReadOnly,
+                                      StreamInfo::FilterState::LifeSpan::FilterChain);
     stream_info.filter_state_.setData("serialized", std::make_unique<TestSerializedFilterState>(),
-                                      StreamInfo::FilterState::StateType::ReadOnly);
+                                      StreamInfo::FilterState::StateType::ReadOnly,
+                                      StreamInfo::FilterState::LifeSpan::FilterChain);
     expectLog(R"EOF(
 common_properties:
   downstream_remote_address:

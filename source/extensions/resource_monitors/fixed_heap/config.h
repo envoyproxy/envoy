@@ -1,5 +1,6 @@
 #pragma once
 
+#include "envoy/config/resource_monitor/fixed_heap/v2alpha/fixed_heap.pb.h"
 #include "envoy/config/resource_monitor/fixed_heap/v2alpha/fixed_heap.pb.validate.h"
 #include "envoy/server/resource_monitor_config.h"
 

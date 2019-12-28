@@ -2,7 +2,13 @@
 
 #include <unordered_set>
 
-#include "envoy/config/metrics/v2/stats.pb.h"
+#include "envoy/api/v2/cds.pb.h"
+#include "envoy/api/v2/core/address.pb.h"
+#include "envoy/api/v2/core/config_source.pb.h"
+#include "envoy/api/v2/core/grpc_service.pb.h"
+#include "envoy/api/v2/eds.pb.h"
+#include "envoy/api/v2/endpoint/endpoint.pb.h"
+#include "envoy/config/bootstrap/v2/bootstrap.pb.h"
 #include "envoy/stats/scope.h"
 
 #include "common/common/assert.h"

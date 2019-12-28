@@ -2,6 +2,7 @@
 
 #include <fstream>
 
+#include "envoy/api/v2/discovery.pb.h"
 #include "envoy/api/v2/eds.pb.h"
 
 #include "common/config/filesystem_subscription_impl.h"

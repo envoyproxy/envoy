@@ -137,6 +137,19 @@ SystemTime Utility::getExpirationTime(const X509& cert) {
   return std::chrono::system_clock::from_time_t(static_cast<time_t>(days) * 24 * 60 * 60 + seconds);
 }
 
+absl::optional<std::string> Utility::getLastCryptoError() {
+  auto err = ERR_get_error();
+
+  if (err != 0) {
+    char errbuf[256];
+
+    ERR_error_string_n(err, errbuf, sizeof(errbuf));
+    return std::string(errbuf);
+  }
+
+  return absl::nullopt;
+}
+
 } // namespace Tls
 } // namespace TransportSockets
 } // namespace Extensions

@@ -1,5 +1,7 @@
 #pragma once
 
+#include "envoy/api/v2/core/base.pb.h"
+#include "envoy/api/v2/core/grpc_service.pb.h"
 #include "envoy/grpc/async_client.h"
 
 #include "common/common/linked_object.h"

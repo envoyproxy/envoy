@@ -76,6 +76,9 @@ public:
   }
   void removeCallbacks(Http::StreamCallbacks& callbacks) override { removeCallbacks_(callbacks); }
   uint32_t bufferLimit() override { return send_buffer_simulation_.highWatermark(); }
+  const Network::Address::InstanceConstSharedPtr& connectionLocalAddress() override {
+    return connection()->localAddress();
+  }
 
   // Needs to be called during quic stream creation before the stream receives
   // any headers and data.

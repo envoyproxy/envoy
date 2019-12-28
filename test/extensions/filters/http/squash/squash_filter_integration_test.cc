@@ -1,5 +1,7 @@
 #include <cstdlib>
 
+#include "envoy/config/bootstrap/v2/bootstrap.pb.h"
+
 #include "common/protobuf/protobuf.h"
 
 #include "test/integration/autonomous_upstream.h"

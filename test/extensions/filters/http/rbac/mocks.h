@@ -1,5 +1,7 @@
 #pragma once
 
+#include "envoy/config/filter/http/rbac/v2/rbac.pb.h"
+
 #include "extensions/filters/common/rbac/utility.h"
 #include "extensions/filters/http/rbac/rbac_filter.h"
 

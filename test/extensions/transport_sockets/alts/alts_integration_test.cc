@@ -1,3 +1,4 @@
+#include "envoy/config/bootstrap/v2/bootstrap.pb.h"
 #include "envoy/config/transport_socket/alts/v2alpha/alts.pb.h"
 
 #include "common/common/thread.h"

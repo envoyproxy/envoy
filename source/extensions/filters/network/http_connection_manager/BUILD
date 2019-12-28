@@ -42,6 +42,9 @@ envoy_cc_extension(
         "//source/common/tracing:http_tracer_lib",
         "//source/extensions/filters/network:well_known_names",
         "//source/extensions/filters/network/common:factory_base_lib",
+        "@envoy_api//envoy/api/v2/core:pkg_cc_proto",
         "@envoy_api//envoy/config/filter/network/http_connection_manager/v2:pkg_cc_proto",
+        "@envoy_api//envoy/type:pkg_cc_proto",
+        "@envoy_api//envoy/type/tracing/v2:pkg_cc_proto",
     ],
 )

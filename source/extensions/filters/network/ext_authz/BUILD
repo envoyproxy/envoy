@@ -27,6 +27,7 @@ envoy_cc_library(
         "//source/extensions/filters/common/ext_authz:ext_authz_grpc_lib",
         "//source/extensions/filters/common/ext_authz:ext_authz_interface",
         "@envoy_api//envoy/config/filter/network/ext_authz/v2:pkg_cc_proto",
+        "@envoy_api//envoy/service/auth/v2:pkg_cc_proto",
     ],
 )
 
@@ -41,6 +42,7 @@ envoy_cc_extension(
         "//source/extensions/filters/network:well_known_names",
         "//source/extensions/filters/network/common:factory_base_lib",
         "//source/extensions/filters/network/ext_authz",
+        "@envoy_api//envoy/api/v2/core:pkg_cc_proto",
         "@envoy_api//envoy/config/filter/network/ext_authz/v2:pkg_cc_proto",
     ],
 )

@@ -31,9 +31,9 @@ extensions/filters/common/original_src @snowp @klarose
 # sni_cluster extension
 /*/extensions/filters/network/sni_cluster @rshriram @lizan
 # tracers.datadog extension
-/*/extensions/tracers/datadog @cgilmour @palazzem
+/*/extensions/tracers/datadog @cgilmour @palazzem @mattklein123
 # tracers.xray extension
-/*/extensions/tracers/xray @marcomagdy @lavignes
+/*/extensions/tracers/xray @marcomagdy @lavignes @mattklein123
 # mysql_proxy extension
 /*/extensions/filters/network/mysql_proxy @rshriram @venilnoronha @mattklein123
 # quic extension
@@ -57,9 +57,9 @@ extensions/filters/common/original_src @snowp @klarose
 # http inspector
 /*/extensions/filters/listener/http_inspector @yxue @PiotrSikora @lizan
 # attribute context
-/*/extensions/filters/common/expr @kyessenov @yangminzhu
+/*/extensions/filters/common/expr @kyessenov @yangminzhu @lizan
 # webassembly common extension
-/*/extensions/common/wasm @jplevyak @PiotrSikora
+/*/extensions/common/wasm @jplevyak @PiotrSikora @lizan
 # common crypto extension
 /*/extensions/common/crypto @lizan @PiotrSikora @bdecoste
 /*/extensions/filters/http/grpc_http1_bridge @snowp @jose

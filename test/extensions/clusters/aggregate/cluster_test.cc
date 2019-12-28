@@ -1,3 +1,7 @@
+#include "envoy/api/v2/cds.pb.h"
+#include "envoy/config/cluster/aggregate/v2alpha/cluster.pb.h"
+#include "envoy/config/cluster/aggregate/v2alpha/cluster.pb.validate.h"
+
 #include "common/singleton/manager_impl.h"
 
 #include "extensions/clusters/aggregate/cluster.h"

@@ -1,5 +1,7 @@
 #include "common/network/socket_option_factory.h"
 
+#include "envoy/api/v2/core/base.pb.h"
+
 #include "common/common/fmt.h"
 #include "common/network/addr_family_aware_socket_option_impl.h"
 #include "common/network/socket_option_impl.h"

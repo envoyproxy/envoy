@@ -1,5 +1,7 @@
 #include "extensions/filters/http/original_src/original_src_config_factory.h"
 
+#include "envoy/config/filter/http/original_src/v2alpha1/original_src.pb.h"
+#include "envoy/config/filter/http/original_src/v2alpha1/original_src.pb.validate.h"
 #include "envoy/registry/registry.h"
 
 #include "extensions/filters/http/original_src/config.h"

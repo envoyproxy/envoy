@@ -2,10 +2,6 @@ syntax = "proto3";
 
 package envoy.config.filter.network.tcp_proxy.v3alpha;
 
-option java_outer_classname = "TcpProxyProto";
-option java_multiple_files = true;
-option java_package = "io.envoyproxy.envoy.config.filter.network.tcp_proxy.v3alpha";
-
 import "envoy/api/v3alpha/core/address.proto";
 import "envoy/api/v3alpha/core/base.proto";
 import "envoy/config/filter/accesslog/v3alpha/accesslog.proto";
@@ -14,9 +10,13 @@ import "envoy/type/v3alpha/hash_policy.proto";
 import "google/protobuf/duration.proto";
 import "google/protobuf/wrappers.proto";
 
-import "udpa/api/annotations/versioning.proto";
+import "udpa/annotations/versioning.proto";
 
 import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.config.filter.network.tcp_proxy.v3alpha";
+option java_outer_classname = "TcpProxyProto";
+option java_multiple_files = true;
 
 // [#protodoc-title: TCP Proxy]
 // TCP Proxy :ref:`configuration overview <config_network_filters_tcp_proxy>`.
@@ -24,18 +24,18 @@ import "validate/validate.proto";
 
 // [#next-free-field: 12]
 message TcpProxy {
-  option (udpa.api.annotations.versioning).previous_message_type =
+  option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.network.tcp_proxy.v2.TcpProxy";
 
   // Allows for specification of multiple upstream clusters along with weights
   // that indicate the percentage of traffic to be forwarded to each cluster.
   // The router selects an upstream cluster based on these weights.
   message WeightedCluster {
-    option (udpa.api.annotations.versioning).previous_message_type =
+    option (udpa.annotations.versioning).previous_message_type =
         "envoy.config.filter.network.tcp_proxy.v2.TcpProxy.WeightedCluster";
 
     message ClusterWeight {
-      option (udpa.api.annotations.versioning).previous_message_type =
+      option (udpa.annotations.versioning).previous_message_type =
           "envoy.config.filter.network.tcp_proxy.v2.TcpProxy.WeightedCluster.ClusterWeight";
 
       // Name of the upstream cluster.

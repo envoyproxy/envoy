@@ -1,5 +1,6 @@
 #include "common/grpc/async_client_manager_impl.h"
 
+#include "envoy/api/v2/core/grpc_service.pb.h"
 #include "envoy/stats/scope.h"
 
 #include "common/grpc/async_client_impl.h"

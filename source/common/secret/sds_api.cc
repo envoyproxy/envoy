@@ -2,8 +2,12 @@
 
 #include <unordered_map>
 
+#include "envoy/api/v2/auth/cert.pb.h"
 #include "envoy/api/v2/auth/cert.pb.validate.h"
+#include "envoy/api/v2/core/config_source.pb.h"
+#include "envoy/api/v2/discovery.pb.h"
 
+#include "common/config/api_version.h"
 #include "common/config/resources.h"
 #include "common/protobuf/utility.h"
 
@@ -78,8 +82,9 @@ void SdsApi::validateUpdateSize(int num_resources) {
 void SdsApi::initialize() {
   subscription_ = subscription_factory_.subscriptionFromConfigSource(
       sds_config_,
-      Grpc::Common::typeUrl(envoy::api::v2::auth::Secret().GetDescriptor()->full_name()), stats_,
-      *this);
+      Grpc::Common::typeUrl(
+          API_NO_BOOST(envoy::api::v2::auth::Secret)().GetDescriptor()->full_name()),
+      stats_, *this);
   subscription_->start({sds_config_name_});
 }
 

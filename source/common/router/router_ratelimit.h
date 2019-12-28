@@ -5,6 +5,7 @@
 #include <string>
 #include <vector>
 
+#include "envoy/api/v2/route/route.pb.h"
 #include "envoy/router/router.h"
 #include "envoy/router/router_ratelimit.h"
 

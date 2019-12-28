@@ -2,6 +2,8 @@
 #include <memory>
 #include <string>
 
+#include "envoy/config/filter/network/client_ssl_auth/v2/client_ssl_auth.pb.h"
+
 #include "common/http/message_impl.h"
 #include "common/network/address_impl.h"
 

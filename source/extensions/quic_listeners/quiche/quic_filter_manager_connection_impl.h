@@ -40,7 +40,6 @@ public:
   void noDelay(bool /*enable*/) override {
     // No-op. TCP_NODELAY doesn't apply to UDP.
   }
-  void setDelayedCloseTimeout(std::chrono::milliseconds timeout) override;
   void readDisable(bool /*disable*/) override { NOT_REACHED_GCOVR_EXCL_LINE; }
   void detectEarlyCloseWhenReadDisabled(bool /*value*/) override { NOT_REACHED_GCOVR_EXCL_LINE; }
   bool readEnabled() const override { return true; }
@@ -98,12 +97,19 @@ public:
   // streams, and run watermark check.
   void adjustBytesToSend(int64_t delta);
 
+  // Called after each write when a previous connection close call is postponed.
+  void maybeApplyDelayClosePolicy();
+
+  uint32_t bytesToSend() { return bytes_to_send_; }
+
 protected:
   // Propagate connection close to network_connection_callbacks_.
   void onConnectionCloseEvent(const quic::QuicConnectionCloseFrame& frame,
                               quic::ConnectionCloseSource source);
 
   void closeConnectionImmediately() override;
+
+  virtual bool hasDataToWrite() PURE;
 
   EnvoyQuicConnection* quic_connection_{nullptr};
 

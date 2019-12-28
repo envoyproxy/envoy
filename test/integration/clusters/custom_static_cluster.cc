@@ -1,5 +1,9 @@
 #include "custom_static_cluster.h"
 
+#include "envoy/api/v2/core/base.pb.h"
+#include "envoy/api/v2/core/health_check.pb.h"
+#include "envoy/api/v2/endpoint/endpoint.pb.h"
+
 namespace Envoy {
 
 // ClusterImplBase

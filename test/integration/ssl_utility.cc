@@ -1,5 +1,7 @@
 #include "test/integration/ssl_utility.h"
 
+#include "envoy/api/v2/auth/cert.pb.h"
+
 #include "common/json/json_loader.h"
 #include "common/network/utility.h"
 

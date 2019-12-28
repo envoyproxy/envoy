@@ -17,6 +17,7 @@
 #include "envoy/http/hash_policy.h"
 #include "envoy/http/header_map.h"
 #include "envoy/tracing/http_tracer.h"
+#include "envoy/type/percent.pb.h"
 #include "envoy/upstream/resource_manager.h"
 #include "envoy/upstream/retry.h"
 
@@ -362,6 +363,8 @@ public:
   virtual const envoy::type::FractionalPercent& defaultValue() const PURE;
 };
 
+using ShadowPolicyPtr = std::unique_ptr<ShadowPolicy>;
+
 /**
  * Virtual cluster definition (allows splitting a virtual host into virtual clusters orthogonal to
  * routes for stat tracking and priority purposes).
@@ -641,10 +644,10 @@ public:
   virtual uint32_t retryShadowBufferLimit() const PURE;
 
   /**
-   * @return const ShadowPolicy& the shadow policy for the route. All routes have a shadow policy
-   *         even if no shadowing takes place.
+   * @return const std::vector<ShadowPolicy>& the shadow policies for the route. The vector is empty
+   *         if no shadowing takes place.
    */
-  virtual const ShadowPolicy& shadowPolicy() const PURE;
+  virtual const std::vector<ShadowPolicyPtr>& shadowPolicies() const PURE;
 
   /**
    * @return std::chrono::milliseconds the route's timeout.

@@ -15,8 +15,10 @@
 #include "envoy/admin/v2alpha/config_dump.pb.h"
 #include "envoy/admin/v2alpha/listeners.pb.h"
 #include "envoy/admin/v2alpha/memory.pb.h"
+#include "envoy/admin/v2alpha/metrics.pb.h"
 #include "envoy/admin/v2alpha/mutex_stats.pb.h"
 #include "envoy/admin/v2alpha/server_info.pb.h"
+#include "envoy/api/v2/core/health_check.pb.h"
 #include "envoy/filesystem/filesystem.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/server/hot_restart.h"
@@ -176,10 +178,26 @@ bool filterParam(Http::Utility::QueryParams params, Buffer::Instance& response,
   return true;
 }
 
-// Helper method to get the format parameter
-absl::optional<std::string> formatParam(Http::Utility::QueryParams params) {
-  return (params.find("format") != params.end()) ? absl::optional<std::string>{params.at("format")}
-                                                 : absl::nullopt;
+// Helper method to get a query parameter.
+absl::optional<std::string> queryParam(const Http::Utility::QueryParams& params,
+                                       const std::string& key) {
+  return (params.find(key) != params.end()) ? absl::optional<std::string>{params.at(key)}
+                                            : absl::nullopt;
+}
+
+// Helper method to get the format parameter.
+absl::optional<std::string> formatParam(const Http::Utility::QueryParams& params) {
+  return queryParam(params, "format");
+}
+
+// Helper method to get the resource parameter.
+absl::optional<std::string> resourceParam(const Http::Utility::QueryParams& params) {
+  return queryParam(params, "resource");
+}
+
+// Helper method to get the mask parameter.
+absl::optional<std::string> maskParam(const Http::Utility::QueryParams& params) {
+  return queryParam(params, "mask");
 }
 
 // Helper method that ensures that we've setting flags based on all the health flag values on the
@@ -529,15 +547,78 @@ Http::Code AdminImpl::handlerClusters(absl::string_view url, Http::HeaderMap& re
   return Http::Code::OK;
 }
 
-// TODO(jsedgwick) Use query params to list available dumps, selectively dump, etc
-Http::Code AdminImpl::handlerConfigDump(absl::string_view, Http::HeaderMap& response_headers,
-                                        Buffer::Instance& response, AdminStream&) const {
-  envoy::admin::v2alpha::ConfigDump dump;
+void AdminImpl::addAllConfigToDump(envoy::admin::v2alpha::ConfigDump& dump,
+                                   const absl::optional<std::string>& mask) const {
   for (const auto& key_callback_pair : config_tracker_.getCallbacksMap()) {
     ProtobufTypes::MessagePtr message = key_callback_pair.second();
-    RELEASE_ASSERT(message, "");
-    auto& any_message = *(dump.add_configs());
-    any_message.PackFrom(*message);
+    ASSERT(message);
+
+    if (mask.has_value()) {
+      Protobuf::FieldMask field_mask;
+      ProtobufUtil::FieldMaskUtil::FromString(mask.value(), &field_mask);
+      ProtobufUtil::FieldMaskUtil::TrimMessage(field_mask, message.get());
+    }
+
+    auto* config = dump.add_configs();
+    config->PackFrom(*message);
+  }
+}
+
+absl::optional<std::pair<Http::Code, std::string>>
+AdminImpl::addResourceToDump(envoy::admin::v2alpha::ConfigDump& dump,
+                             const absl::optional<std::string>& mask,
+                             const std::string& resource) const {
+  for (const auto& key_callback_pair : config_tracker_.getCallbacksMap()) {
+    ProtobufTypes::MessagePtr message = key_callback_pair.second();
+    ASSERT(message);
+
+    auto field_descriptor = message->GetDescriptor()->FindFieldByName(resource);
+    const Protobuf::Reflection* reflection = message->GetReflection();
+    if (!field_descriptor) {
+      continue;
+    } else if (!field_descriptor->is_repeated()) {
+      return absl::optional<std::pair<Http::Code, std::string>>{std::make_pair(
+          Http::Code::BadRequest,
+          fmt::format("{} is not a repeated field. Use ?mask={} to get only this field",
+                      field_descriptor->name(), field_descriptor->name()))};
+    }
+
+    auto repeated = reflection->GetRepeatedPtrField<Protobuf::Message>(*message, field_descriptor);
+    for (Protobuf::Message& msg : repeated) {
+      if (mask.has_value()) {
+        Protobuf::FieldMask field_mask;
+        ProtobufUtil::FieldMaskUtil::FromString(mask.value(), &field_mask);
+        ProtobufUtil::FieldMaskUtil::TrimMessage(field_mask, &msg);
+      }
+      auto* config = dump.add_configs();
+      config->PackFrom(msg);
+    }
+
+    // We found the desired resource so there is no need to continue iterating over
+    // the other keys.
+    return absl::nullopt;
+  }
+
+  return absl::optional<std::pair<Http::Code, std::string>>{
+      std::make_pair(Http::Code::NotFound, fmt::format("{} not found in config dump", resource))};
+}
+
+Http::Code AdminImpl::handlerConfigDump(absl::string_view url, Http::HeaderMap& response_headers,
+                                        Buffer::Instance& response, AdminStream&) const {
+  Http::Utility::QueryParams query_params = Http::Utility::parseQueryString(url);
+  const auto resource = resourceParam(query_params);
+  const auto mask = maskParam(query_params);
+
+  envoy::admin::v2alpha::ConfigDump dump;
+
+  if (resource.has_value()) {
+    auto err = addResourceToDump(dump, mask, resource.value());
+    if (err.has_value()) {
+      response.add(err.value().second);
+      return err.value().first;
+    }
+  } else {
+    addAllConfigToDump(dump, mask);
   }
 
   response_headers.setReferenceContentType(Http::Headers::get().ContentTypeValues.Json);
@@ -780,8 +861,8 @@ Http::Code AdminImpl::handlerReady(absl::string_view, Http::HeaderMap&, Buffer::
   const envoy::admin::v2alpha::ServerInfo::State state =
       Utility::serverState(server_.initManager().state(), server_.healthCheckFailed());
 
-  response.add(envoy::admin::v2alpha::ServerInfo_State_Name(state) + "\n");
-  Http::Code code = state == envoy::admin::v2alpha::ServerInfo_State_LIVE
+  response.add(envoy::admin::v2alpha::ServerInfo::State_Name(state) + "\n");
+  Http::Code code = state == envoy::admin::v2alpha::ServerInfo::LIVE
                         ? Http::Code::OK
                         : Http::Code::ServiceUnavailable;
   return code;
@@ -1455,7 +1536,7 @@ bool AdminImpl::addHandler(const std::string& prefix, const std::string& help_te
 }
 
 bool AdminImpl::removeHandler(const std::string& prefix) {
-  const uint size_before_removal = handlers_.size();
+  const size_t size_before_removal = handlers_.size();
   handlers_.remove_if(
       [&prefix](const UrlHandler& entry) { return prefix == entry.prefix_ && entry.removable_; });
   if (handlers_.size() != size_before_removal) {

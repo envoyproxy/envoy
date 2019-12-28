@@ -32,6 +32,7 @@ envoy_cc_library(
         "//source/common/stream_info:stream_info_lib",
         "//source/common/tracing:http_tracer_lib",
         "@envoy_api//envoy/config/filter/accesslog/v2:pkg_cc_proto",
+        "@envoy_api//envoy/type:pkg_cc_proto",
     ],
 )
 
@@ -49,6 +50,7 @@ envoy_cc_library(
         "//source/common/http:utility_lib",
         "//source/common/protobuf:message_validator_lib",
         "//source/common/stream_info:utility_lib",
+        "@envoy_api//envoy/api/v2/core:pkg_cc_proto",
     ],
 )
 

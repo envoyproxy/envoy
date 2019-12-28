@@ -1,6 +1,8 @@
 #include "extensions/filters/http/tap/tap_config_impl.h"
 
+#include "envoy/api/v2/core/base.pb.h"
 #include "envoy/data/tap/v2alpha/http.pb.h"
+#include "envoy/service/tap/v2alpha/common.pb.h"
 
 #include "common/common/assert.h"
 #include "common/protobuf/protobuf.h"

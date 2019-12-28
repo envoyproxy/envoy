@@ -1,5 +1,8 @@
 #include "common/config/metadata.h"
 
+#include "envoy/api/v2/core/base.pb.h"
+#include "envoy/type/metadata/v2/metadata.pb.h"
+
 #include "common/protobuf/utility.h"
 
 namespace Envoy {

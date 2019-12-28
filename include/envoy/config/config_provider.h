@@ -121,7 +121,7 @@ public:
     for (const auto* elem : config_protos) {
       ret_protos.push_back(static_cast<const P*>(elem));
     }
-    return ConfigProtoInfoVector<P>{ret_protos, getConfigVersion()};
+    return ConfigProtoInfoVector<P>{std::move(ret_protos), getConfigVersion()};
   }
 
   /**

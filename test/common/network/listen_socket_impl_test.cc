@@ -1,3 +1,5 @@
+#include "envoy/api/v2/core/base.pb.h"
+
 #include "common/network/io_socket_handle_impl.h"
 #include "common/network/listen_socket_impl.h"
 #include "common/network/utility.h"

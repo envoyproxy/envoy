@@ -1,3 +1,6 @@
+#include "envoy/api/v2/cds.pb.h"
+#include "envoy/api/v2/discovery.pb.h"
+
 #include "common/config/delta_subscription_state.h"
 #include "common/config/utility.h"
 #include "common/stats/isolated_store_impl.h"

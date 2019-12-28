@@ -1,5 +1,6 @@
 #include "extensions/filters/network/mongo_proxy/config.h"
 
+#include "envoy/config/filter/network/mongo_proxy/v2/mongo_proxy.pb.h"
 #include "envoy/config/filter/network/mongo_proxy/v2/mongo_proxy.pb.validate.h"
 #include "envoy/network/connection.h"
 #include "envoy/registry/registry.h"

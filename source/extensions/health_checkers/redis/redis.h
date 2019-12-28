@@ -3,7 +3,10 @@
 #include <chrono>
 
 #include "envoy/api/api.h"
-#include "envoy/config/health_checker/redis/v2/redis.pb.validate.h"
+#include "envoy/api/v2/core/health_check.pb.h"
+#include "envoy/config/filter/network/redis_proxy/v2/redis_proxy.pb.validate.h"
+#include "envoy/config/health_checker/redis/v2/redis.pb.h"
+#include "envoy/data/core/v2alpha/health_check_event.pb.h"
 
 #include "common/upstream/health_checker_base_impl.h"
 

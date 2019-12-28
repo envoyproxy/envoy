@@ -5,8 +5,11 @@
 #include <string>
 #include <vector>
 
+#include "envoy/api/v2/discovery.pb.h"
+#include "envoy/api/v2/endpoint/endpoint.pb.h"
 #include "envoy/server/process_context.h"
 
+#include "common/config/api_version.h"
 #include "common/http/codec_client.h"
 
 #include "test/common/grpc/grpc_client_integration.h"
@@ -269,7 +272,7 @@ public:
   template <class T>
   void sendSotwDiscoveryResponse(const std::string& type_url, const std::vector<T>& messages,
                                  const std::string& version) {
-    envoy::api::v2::DiscoveryResponse discovery_response;
+    API_NO_BOOST(envoy::api::v2::DiscoveryResponse) discovery_response;
     discovery_response.set_version_info(version);
     discovery_response.set_type_url(type_url);
     for (const auto& message : messages) {
@@ -291,7 +294,7 @@ public:
                                   const std::vector<T>& added_or_updated,
                                   const std::vector<std::string>& removed,
                                   const std::string& version, FakeStreamPtr& stream) {
-    envoy::api::v2::DeltaDiscoveryResponse response;
+    API_NO_BOOST(envoy::api::v2::DeltaDiscoveryResponse) response;
     response.set_system_version_info("system_version_info_this_is_a_test");
     response.set_type_url(type_url);
     for (const auto& message : added_or_updated) {
@@ -368,6 +371,10 @@ protected:
 
   // If true, use AutonomousUpstream for fake upstreams.
   bool autonomous_upstream_{false};
+
+  // If true, allow incomplete streams in AutonomousUpstream
+  // This does nothing if autonomous_upstream_ is false
+  bool autonomous_allow_incomplete_streams_{false};
 
   bool enable_half_close_{false};
 

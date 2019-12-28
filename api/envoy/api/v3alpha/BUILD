@@ -15,6 +15,6 @@ api_proto_package(
         "//envoy/api/v3alpha/route:pkg",
         "//envoy/config/listener/v2:pkg",
         "//envoy/type/v3alpha:pkg",
-        "@com_github_cncf_udpa//udpa/api/annotations:pkg",
+        "@com_github_cncf_udpa//udpa/annotations:pkg",
     ],
 )

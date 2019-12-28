@@ -4,6 +4,7 @@
 #include <csetjmp>
 #include <cstring>
 
+#include "envoy/api/v2/core/base.pb.h"
 #include "envoy/buffer/buffer.h"
 #include "envoy/common/exception.h"
 #include "envoy/common/platform.h"

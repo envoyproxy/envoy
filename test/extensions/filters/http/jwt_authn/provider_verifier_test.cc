@@ -1,3 +1,5 @@
+#include "envoy/config/filter/http/jwt_authn/v2alpha/config.pb.h"
+
 #include "extensions/filters/http/jwt_authn/filter_config.h"
 #include "extensions/filters/http/jwt_authn/verifier.h"
 
@@ -34,7 +36,7 @@ public:
   void createVerifier() {
     filter_config_ = ::std::make_shared<FilterConfig>(proto_config_, "", mock_factory_ctx_);
     verifier_ = Verifier::create(proto_config_.rules(0).requires(), proto_config_.providers(),
-                                 *filter_config_, filter_config_->getExtractor());
+                                 *filter_config_);
   }
 
   JwtAuthentication proto_config_;

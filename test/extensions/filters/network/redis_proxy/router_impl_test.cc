@@ -1,5 +1,8 @@
 #include <string>
 
+#include "envoy/config/filter/network/redis_proxy/v2/redis_proxy.pb.h"
+#include "envoy/type/percent.pb.h"
+
 #include "extensions/filters/network/redis_proxy/conn_pool_impl.h"
 #include "extensions/filters/network/redis_proxy/router_impl.h"
 
