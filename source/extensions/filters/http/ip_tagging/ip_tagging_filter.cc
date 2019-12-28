@@ -1,7 +1,7 @@
 #include "extensions/filters/http/ip_tagging/ip_tagging_filter.h"
 
 #include "envoy/api/v3alpha/core/address.pb.h"
-#include "envoy/config/filter/http/ip_tagging/v3alpha/ip_tagging.pb.h"
+#include "envoy/extensions/filter/http/ip_tagging/v3alpha/ip_tagging.pb.h"
 
 #include "common/http/header_map_impl.h"
 #include "common/http/headers.h"
@@ -14,7 +14,7 @@ namespace HttpFilters {
 namespace IpTagging {
 
 IpTaggingFilterConfig::IpTaggingFilterConfig(
-    const envoy::config::filter::http::ip_tagging::v3alpha::IPTagging& config,
+    const envoy::extensions::filter::http::ip_tagging::v3alpha::IPTagging& config,
     const std::string& stat_prefix, Stats::Scope& scope, Runtime::Loader& runtime)
     : request_type_(requestTypeEnum(config.request_type())), scope_(scope), runtime_(runtime),
       stat_name_set_(scope.symbolTable().makeSet("IpTagging")),

@@ -16,7 +16,7 @@ envoy_cc_test(
     deps = [
         "//source/common/config:api_type_oracle_lib",
         "@envoy_api//envoy/config/filter/http/ip_tagging/v2:pkg_cc_proto",
-        "@envoy_api//envoy/config/filter/http/ip_tagging/v3alpha:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filter/http/ip_tagging/v3alpha:pkg_cc_proto",
     ],
 )
 
