@@ -152,6 +152,6 @@ message HostHealthStatus {
 
   // Health status as reported by EDS. Note: only HEALTHY and UNHEALTHY are currently supported
   // here.
-  // TODO(mrice32): pipe through remaining EDS health status possibilities.
+  // [#comment:TODO(mrice32): pipe through remaining EDS health status possibilities.]
   api.v3alpha.core.HealthStatus eds_health_status = 3;
 }

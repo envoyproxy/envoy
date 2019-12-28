@@ -25,6 +25,7 @@ envoy_cc_test(
     srcs = ["delta_subscription_impl_test.cc"],
     deps = [
         ":delta_subscription_test_harness",
+        "//source/common/config:api_version_lib",
         "//source/common/config:delta_subscription_lib",
         "//source/common/stats:isolated_store_lib",
         "//test/mocks:common_lib",
@@ -89,6 +90,7 @@ envoy_cc_test(
     name = "grpc_mux_impl_test",
     srcs = ["grpc_mux_impl_test.cc"],
     deps = [
+        "//source/common/config:api_version_lib",
         "//source/common/config:grpc_mux_lib",
         "//source/common/config:protobuf_link_hacks",
         "//source/common/config:resources_lib",
@@ -157,6 +159,7 @@ envoy_cc_test_library(
     deps = [
         ":subscription_test_harness",
         "//source/common/common:hash_lib",
+        "//source/common/config:api_version_lib",
         "//source/common/config:grpc_subscription_lib",
         "//source/common/config:resources_lib",
         "//test/mocks/config:config_mocks",

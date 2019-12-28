@@ -4,6 +4,7 @@ package envoy.api.v2.auth;
 
 import "envoy/api/v2/core/base.proto";
 import "envoy/api/v2/core/config_source.proto";
+import "envoy/type/matcher/string.proto";
 
 import "google/protobuf/any.proto";
 import "google/protobuf/struct.proto";
@@ -172,7 +173,7 @@ message TlsSessionTicketKeys {
   repeated core.DataSource keys = 1 [(validate.rules).repeated = {min_items: 1}];
 }
 
-// [#next-free-field: 9]
+// [#next-free-field: 10]
 message CertificateValidationContext {
   // TLS certificate data containing certificate authority certificates to use in verifying
   // a presented peer certificate (e.g. server certificate for clusters or client certificate
@@ -265,7 +266,17 @@ message CertificateValidationContext {
   //   Subject Alternative Names are easily spoofable and verifying only them is insecure,
   //   therefore this option must be used together with :ref:`trusted_ca
   //   <envoy_api_field_auth.CertificateValidationContext.trusted_ca>`.
-  repeated string verify_subject_alt_name = 4;
+  repeated string verify_subject_alt_name = 4 [deprecated = true];
+
+  // An optional list of Subject Alternative name matchers. Envoy will verify that the
+  // Subject Alternative Name of the presented certificate matches one of the specified matches.
+  //
+  // .. attention::
+  //
+  //   Subject Alternative Names are easily spoofable and verifying only them is insecure,
+  //   therefore this option must be used together with :ref:`trusted_ca
+  //   <envoy_api_field_auth.CertificateValidationContext.trusted_ca>`.
+  repeated type.matcher.StringMatcher match_subject_alt_names = 9;
 
   // [#not-implemented-hide:] Must present a signed time-stamped OCSP response.
   google.protobuf.BoolValue require_ocsp_staple = 5;
