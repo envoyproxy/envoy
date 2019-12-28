@@ -2,8 +2,8 @@ syntax = "proto3";
 
 package envoy.api.v3alpha;
 
-import "envoy/api/v3alpha/discovery.proto";
 import "envoy/api/v3alpha/endpoint/endpoint.proto";
+import "envoy/service/discovery/v3alpha/discovery.proto";
 import "envoy/type/v3alpha/percent.proto";
 
 import "google/api/annotations.proto";
@@ -25,13 +25,16 @@ option java_generic_services = true;
 service EndpointDiscoveryService {
   // The resource_names field in DiscoveryRequest specifies a list of clusters
   // to subscribe to updates for.
-  rpc StreamEndpoints(stream DiscoveryRequest) returns (stream DiscoveryResponse) {
+  rpc StreamEndpoints(stream service.discovery.v3alpha.DiscoveryRequest)
+      returns (stream service.discovery.v3alpha.DiscoveryResponse) {
   }
 
-  rpc DeltaEndpoints(stream DeltaDiscoveryRequest) returns (stream DeltaDiscoveryResponse) {
+  rpc DeltaEndpoints(stream service.discovery.v3alpha.DeltaDiscoveryRequest)
+      returns (stream service.discovery.v3alpha.DeltaDiscoveryResponse) {
   }
 
-  rpc FetchEndpoints(DiscoveryRequest) returns (DiscoveryResponse) {
+  rpc FetchEndpoints(service.discovery.v3alpha.DiscoveryRequest)
+      returns (service.discovery.v3alpha.DiscoveryResponse) {
     option (google.api.http).post = "/v3alpha/discovery:endpoints";
     option (google.api.http).body = "*";
   }

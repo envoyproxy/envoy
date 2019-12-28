@@ -2,7 +2,6 @@ syntax = "proto3";
 
 package envoy.config.bootstrap.v3alpha;
 
-import "envoy/api/v3alpha/auth/cert.proto";
 import "envoy/api/v3alpha/cds.proto";
 import "envoy/api/v3alpha/core/address.proto";
 import "envoy/api/v3alpha/core/base.proto";
@@ -11,6 +10,7 @@ import "envoy/api/v3alpha/lds.proto";
 import "envoy/config/metrics/v3alpha/stats.proto";
 import "envoy/config/overload/v3alpha/overload.proto";
 import "envoy/config/trace/v3alpha/trace.proto";
+import "envoy/extensions/transport_sockets/tls/v3alpha/cert.proto";
 
 import "google/protobuf/duration.proto";
 import "google/protobuf/struct.proto";
@@ -51,8 +51,8 @@ message Bootstrap {
     repeated api.v3alpha.Cluster clusters = 2;
 
     // These static secrets can be used by :ref:`SdsSecretConfig
-    // <envoy_api_msg_api.v3alpha.auth.SdsSecretConfig>`
-    repeated api.v3alpha.auth.Secret secrets = 3;
+    // <envoy_api_msg_extensions.transport_sockets.tls.v3alpha.SdsSecretConfig>`
+    repeated extensions.transport_sockets.tls.v3alpha.Secret secrets = 3;
   }
 
   message DynamicResources {

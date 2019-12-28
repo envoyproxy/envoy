@@ -2,16 +2,16 @@ syntax = "proto3";
 
 package envoy.api.v3alpha;
 
-import "envoy/api/v3alpha/cluster/circuit_breaker.proto";
-import "envoy/api/v3alpha/cluster/filter.proto";
-import "envoy/api/v3alpha/cluster/outlier_detection.proto";
 import "envoy/api/v3alpha/core/address.proto";
 import "envoy/api/v3alpha/core/base.proto";
 import "envoy/api/v3alpha/core/config_source.proto";
 import "envoy/api/v3alpha/core/health_check.proto";
 import "envoy/api/v3alpha/core/protocol.proto";
-import "envoy/api/v3alpha/discovery.proto";
 import "envoy/api/v3alpha/eds.proto";
+import "envoy/config/cluster/v3alpha/circuit_breaker.proto";
+import "envoy/config/cluster/v3alpha/filter.proto";
+import "envoy/config/cluster/v3alpha/outlier_detection.proto";
+import "envoy/service/discovery/v3alpha/discovery.proto";
 import "envoy/type/v3alpha/percent.proto";
 
 import "google/api/annotations.proto";
@@ -33,13 +33,16 @@ option java_generic_services = true;
 
 // Return list of all clusters this proxy will load balance to.
 service ClusterDiscoveryService {
-  rpc StreamClusters(stream DiscoveryRequest) returns (stream DiscoveryResponse) {
+  rpc StreamClusters(stream service.discovery.v3alpha.DiscoveryRequest)
+      returns (stream service.discovery.v3alpha.DiscoveryResponse) {
   }
 
-  rpc DeltaClusters(stream DeltaDiscoveryRequest) returns (stream DeltaDiscoveryResponse) {
+  rpc DeltaClusters(stream service.discovery.v3alpha.DeltaDiscoveryRequest)
+      returns (stream service.discovery.v3alpha.DeltaDiscoveryResponse) {
   }
 
-  rpc FetchClusters(DiscoveryRequest) returns (DiscoveryResponse) {
+  rpc FetchClusters(service.discovery.v3alpha.DiscoveryRequest)
+      returns (service.discovery.v3alpha.DiscoveryResponse) {
     option (google.api.http).post = "/v3alpha/discovery:clusters";
     option (google.api.http).body = "*";
   }
@@ -633,7 +636,7 @@ message Cluster {
   google.protobuf.UInt32Value max_requests_per_connection = 9;
 
   // Optional :ref:`circuit breaking <arch_overview_circuit_break>` for the cluster.
-  cluster.CircuitBreakers circuit_breakers = 10;
+  config.cluster.v3alpha.CircuitBreakers circuit_breakers = 10;
 
   // Additional options when handling HTTP requests upstream. These options will be applicable to
   // both HTTP1 and HTTP2 requests.
@@ -710,7 +713,7 @@ message Cluster {
   // If specified, outlier detection will be enabled for this upstream cluster.
   // Each of the configuration values can be overridden via
   // :ref:`runtime values <config_cluster_manager_cluster_runtime_outlier_detection>`.
-  cluster.OutlierDetection outlier_detection = 19;
+  config.cluster.v3alpha.OutlierDetection outlier_detection = 19;
 
   // The interval for removing stale hosts from a cluster type
   // :ref:`ORIGINAL_DST<envoy_api_enum_value_api.v3alpha.Cluster.DiscoveryType.ORIGINAL_DST>`.
@@ -758,7 +761,8 @@ message Cluster {
 
   // Optional custom transport socket implementation to use for upstream connections.
   // To setup TLS, set a transport socket with name `tls` and
-  // :ref:`UpstreamTlsContexts <envoy_api_msg_api.v3alpha.auth.UpstreamTlsContext>` in the
+  // :ref:`UpstreamTlsContexts
+  // <envoy_api_msg_extensions.transport_sockets.tls.v3alpha.UpstreamTlsContext>` in the
   // `typed_config`. If no transport socket configuration is specified, new connections will be set
   // up with plaintext.
   core.TransportSocket transport_socket = 24;
@@ -799,7 +803,7 @@ message Cluster {
   // An (optional) network filter chain, listed in the order the filters should be applied.
   // The chain will be applied to all outgoing connections that Envoy makes to the upstream
   // servers of this cluster.
-  repeated cluster.Filter filters = 40;
+  repeated config.cluster.v3alpha.Filter filters = 40;
 
   // [#not-implemented-hide:] New mechanism for LB policy configuration. Used only if the
   // :ref:`lb_policy<envoy_api_field_api.v3alpha.Cluster.lb_policy>` field has the value

@@ -4,8 +4,8 @@ package envoy.api.v3alpha;
 
 import "envoy/api/v3alpha/core/base.proto";
 import "envoy/api/v3alpha/core/config_source.proto";
-import "envoy/api/v3alpha/discovery.proto";
-import "envoy/api/v3alpha/route/route.proto";
+import "envoy/config/route/v3alpha/route.proto";
+import "envoy/service/discovery/v3alpha/discovery.proto";
 
 import "google/api/annotations.proto";
 import "google/protobuf/wrappers.proto";
@@ -29,13 +29,16 @@ option java_generic_services = true;
 // configurations. Each listener will bind its HTTP connection manager filter to
 // a route table via this identifier.
 service RouteDiscoveryService {
-  rpc StreamRoutes(stream DiscoveryRequest) returns (stream DiscoveryResponse) {
+  rpc StreamRoutes(stream service.discovery.v3alpha.DiscoveryRequest)
+      returns (stream service.discovery.v3alpha.DiscoveryResponse) {
   }
 
-  rpc DeltaRoutes(stream DeltaDiscoveryRequest) returns (stream DeltaDiscoveryResponse) {
+  rpc DeltaRoutes(stream service.discovery.v3alpha.DeltaDiscoveryRequest)
+      returns (stream service.discovery.v3alpha.DeltaDiscoveryResponse) {
   }
 
-  rpc FetchRoutes(DiscoveryRequest) returns (DiscoveryResponse) {
+  rpc FetchRoutes(service.discovery.v3alpha.DiscoveryRequest)
+      returns (service.discovery.v3alpha.DiscoveryResponse) {
     option (google.api.http).post = "/v3alpha/discovery:routes";
     option (google.api.http).body = "*";
   }
@@ -45,15 +48,17 @@ service RouteDiscoveryService {
 // a given RouteConfiguration. If VHDS is configured a virtual host list update will be triggered
 // during the processing of an HTTP request if a route for the request cannot be resolved. The
 // :ref:`resource_names_subscribe
-// <envoy_api_field_api.v3alpha.DeltaDiscoveryRequest.resource_names_subscribe>` field contains a
-// list of virtual host names or aliases to track. The contents of an alias would be the contents of
-// a *host* or *authority* header used to make an http request. An xDS server will match an alias to
-// a virtual host based on the content of :ref:`domains'
-// <envoy_api_field_api.v3alpha.route.VirtualHost.domains>` field. The *resource_names_unsubscribe*
-// field contains a list of virtual host names that have been :ref:`unsubscribed
-// <xds_protocol_unsubscribe>` from the routing table associated with the RouteConfiguration.
+// <envoy_api_field_service.discovery.v3alpha.DeltaDiscoveryRequest.resource_names_subscribe>` field
+// contains a list of virtual host names or aliases to track. The contents of an alias would be the
+// contents of a *host* or *authority* header used to make an http request. An xDS server will match
+// an alias to a virtual host based on the content of :ref:`domains'
+// <envoy_api_field_config.route.v3alpha.VirtualHost.domains>` field. The
+// *resource_names_unsubscribe* field contains a list of virtual host names that have been
+// :ref:`unsubscribed <xds_protocol_unsubscribe>` from the routing table associated with the
+// RouteConfiguration.
 service VirtualHostDiscoveryService {
-  rpc DeltaVirtualHosts(stream DeltaDiscoveryRequest) returns (stream DeltaDiscoveryResponse) {
+  rpc DeltaVirtualHosts(stream service.discovery.v3alpha.DeltaDiscoveryRequest)
+      returns (stream service.discovery.v3alpha.DeltaDiscoveryResponse) {
   }
 }
 
@@ -63,12 +68,12 @@ message RouteConfiguration {
 
   // The name of the route configuration. For example, it might match
   // :ref:`route_config_name
-  // <envoy_api_field_config.filter.network.http_connection_manager.v3alpha.Rds.route_config_name>`
+  // <envoy_api_field_extensions.filters.network.http_connection_manager.v3alpha.Rds.route_config_name>`
   // in :ref:`envoy_api_msg_config.filter.network.http_connection_manager.v2.Rds`.
   string name = 1;
 
   // An array of virtual hosts that make up the route table.
-  repeated route.VirtualHost virtual_hosts = 2;
+  repeated config.route.v3alpha.VirtualHost virtual_hosts = 2;
 
   // An array of virtual hosts will be dynamically loaded via the VHDS API.
   // Both *virtual_hosts* and *vhds* fields will be used when present. *virtual_hosts* can be used
@@ -129,10 +134,10 @@ message RouteConfiguration {
   // route table will load and the router filter will return a 404 if the route
   // is selected at runtime. This setting defaults to true if the route table
   // is statically defined via the :ref:`route_config
-  // <envoy_api_field_config.filter.network.http_connection_manager.v3alpha.HttpConnectionManager.route_config>`
+  // <envoy_api_field_extensions.filters.network.http_connection_manager.v3alpha.HttpConnectionManager.route_config>`
   // option. This setting default to false if the route table is loaded dynamically via the
   // :ref:`rds
-  // <envoy_api_field_config.filter.network.http_connection_manager.v3alpha.HttpConnectionManager.rds>`
+  // <envoy_api_field_extensions.filters.network.http_connection_manager.v3alpha.HttpConnectionManager.rds>`
   // option. Users may wish to override the default behavior in certain cases (for example when
   // using CDS with a static route table).
   google.protobuf.BoolValue validate_clusters = 7;

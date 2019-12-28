@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package envoy.service.discovery.v3alpha;
 
-import "envoy/api/v3alpha/discovery.proto";
+import "envoy/service/discovery/v3alpha/discovery.proto";
 
 import "google/api/annotations.proto";
 
@@ -14,15 +14,13 @@ option java_multiple_files = true;
 option java_generic_services = true;
 
 service SecretDiscoveryService {
-  rpc DeltaSecrets(stream api.v3alpha.DeltaDiscoveryRequest)
-      returns (stream api.v3alpha.DeltaDiscoveryResponse) {
+  rpc DeltaSecrets(stream DeltaDiscoveryRequest) returns (stream DeltaDiscoveryResponse) {
   }
 
-  rpc StreamSecrets(stream api.v3alpha.DiscoveryRequest)
-      returns (stream api.v3alpha.DiscoveryResponse) {
+  rpc StreamSecrets(stream DiscoveryRequest) returns (stream DiscoveryResponse) {
   }
 
-  rpc FetchSecrets(api.v3alpha.DiscoveryRequest) returns (api.v3alpha.DiscoveryResponse) {
+  rpc FetchSecrets(DiscoveryRequest) returns (DiscoveryResponse) {
     option (google.api.http).post = "/v3alpha/discovery:secrets";
     option (google.api.http).body = "*";
   }

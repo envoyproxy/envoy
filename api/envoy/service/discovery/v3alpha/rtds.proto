@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package envoy.service.discovery.v3alpha;
 
-import "envoy/api/v3alpha/discovery.proto";
+import "envoy/service/discovery/v3alpha/discovery.proto";
 
 import "google/api/annotations.proto";
 import "google/protobuf/struct.proto";
@@ -21,15 +21,13 @@ option java_generic_services = true;
 
 // Discovery service for Runtime resources.
 service RuntimeDiscoveryService {
-  rpc StreamRuntime(stream api.v3alpha.DiscoveryRequest)
-      returns (stream api.v3alpha.DiscoveryResponse) {
+  rpc StreamRuntime(stream DiscoveryRequest) returns (stream DiscoveryResponse) {
   }
 
-  rpc DeltaRuntime(stream api.v3alpha.DeltaDiscoveryRequest)
-      returns (stream api.v3alpha.DeltaDiscoveryResponse) {
+  rpc DeltaRuntime(stream DeltaDiscoveryRequest) returns (stream DeltaDiscoveryResponse) {
   }
 
-  rpc FetchRuntime(api.v3alpha.DiscoveryRequest) returns (api.v3alpha.DiscoveryResponse) {
+  rpc FetchRuntime(DiscoveryRequest) returns (DiscoveryResponse) {
     option (google.api.http).post = "/v3alpha/discovery:runtime";
     option (google.api.http).body = "*";
   }

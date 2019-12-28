@@ -4,10 +4,10 @@ package envoy.api.v3alpha;
 
 import "envoy/api/v3alpha/core/address.proto";
 import "envoy/api/v3alpha/core/base.proto";
-import "envoy/api/v3alpha/discovery.proto";
-import "envoy/api/v3alpha/listener/listener.proto";
-import "envoy/api/v3alpha/listener/udp_listener_config.proto";
 import "envoy/config/listener/v2/api_listener.proto";
+import "envoy/config/listener/v3alpha/listener.proto";
+import "envoy/config/listener/v3alpha/udp_listener_config.proto";
+import "envoy/service/discovery/v3alpha/discovery.proto";
 
 import "google/api/annotations.proto";
 import "google/protobuf/duration.proto";
@@ -30,13 +30,16 @@ option java_generic_services = true;
 // consist of a complete update of all listeners. Existing connections will be
 // allowed to drain from listeners that are no longer present.
 service ListenerDiscoveryService {
-  rpc DeltaListeners(stream DeltaDiscoveryRequest) returns (stream DeltaDiscoveryResponse) {
+  rpc DeltaListeners(stream service.discovery.v3alpha.DeltaDiscoveryRequest)
+      returns (stream service.discovery.v3alpha.DeltaDiscoveryResponse) {
   }
 
-  rpc StreamListeners(stream DiscoveryRequest) returns (stream DiscoveryResponse) {
+  rpc StreamListeners(stream service.discovery.v3alpha.DiscoveryRequest)
+      returns (stream service.discovery.v3alpha.DiscoveryResponse) {
   }
 
-  rpc FetchListeners(DiscoveryRequest) returns (DiscoveryResponse) {
+  rpc FetchListeners(service.discovery.v3alpha.DiscoveryRequest)
+      returns (service.discovery.v3alpha.DiscoveryResponse) {
     option (google.api.http).post = "/v3alpha/discovery:listeners";
     option (google.api.http).body = "*";
   }
@@ -114,13 +117,13 @@ message Listener {
   core.Address address = 2 [(validate.rules).message = {required: true}];
 
   // A list of filter chains to consider for this listener. The
-  // :ref:`FilterChain <envoy_api_msg_api.v3alpha.listener.FilterChain>` with the most specific
-  // :ref:`FilterChainMatch <envoy_api_msg_api.v3alpha.listener.FilterChainMatch>` criteria is used
-  // on a connection.
+  // :ref:`FilterChain <envoy_api_msg_config.listener.v3alpha.FilterChain>` with the most specific
+  // :ref:`FilterChainMatch <envoy_api_msg_config.listener.v3alpha.FilterChainMatch>` criteria is
+  // used on a connection.
   //
   // Example using SNI for filter chain selection can be found in the
   // :ref:`FAQ entry <faq_how_to_setup_sni>`.
-  repeated listener.FilterChain filter_chains = 3;
+  repeated config.listener.v3alpha.FilterChain filter_chains = 3;
 
   // Soft limit on size of the listener’s new connection read and write buffers.
   // If unspecified, an implementation defined default is applied (1MiB).
@@ -144,7 +147,7 @@ message Listener {
   // :ref:`protocol <envoy_api_field_api.v3alpha.core.SocketAddress.protocol>` is :ref:`UDP
   // <envoy_api_enum_value_api.v3alpha.core.SocketAddress.Protocol.UDP>`.
   // UDP listeners currently support a single filter.
-  repeated listener.ListenerFilter listener_filters = 9;
+  repeated config.listener.v3alpha.ListenerFilter listener_filters = 9;
 
   // The timeout to wait for all listener filters to complete operation. If the timeout is reached,
   // the accepted socket is closed without a connection being created unless
@@ -211,10 +214,10 @@ message Listener {
   // <envoy_api_field_api.v3alpha.core.SocketAddress.protocol>` is :ref:`UDP
   // <envoy_api_enum_value_api.v3alpha.core.SocketAddress.Protocol.UDP>`, this field specifies the
   // actual udp listener to create, i.e. :ref:`udp_listener_name
-  // <envoy_api_field_api.v3alpha.listener.UdpListenerConfig.udp_listener_name>` =
+  // <envoy_api_field_config.listener.v3alpha.UdpListenerConfig.udp_listener_name>` =
   // "raw_udp_listener" for creating a packet-oriented UDP listener. If not present, treat it as
   // "raw_udp_listener".
-  listener.UdpListenerConfig udp_listener_config = 18;
+  config.listener.v3alpha.UdpListenerConfig udp_listener_config = 18;
 
   // [#not-implemented-hide:]
   // Used to represent an API listener, which is used in non-proxy clients. The type of API

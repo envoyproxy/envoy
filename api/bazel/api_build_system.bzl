@@ -153,6 +153,9 @@ def api_proto_package(srcs = [], deps = [], has_services = False, visibility = [
     if srcs == []:
         srcs = native.glob(["*.proto"])
 
+    if "@com_github_cncf_udpa//udpa/annotations:pkg" not in deps:
+        deps = deps + ["@com_github_cncf_udpa//udpa/annotations:pkg"]
+
     name = "pkg"
     api_cc_py_proto_library(
         name = name,

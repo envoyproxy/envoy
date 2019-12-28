@@ -78,7 +78,7 @@ message LbEndpoint {
   // name should be specified as *envoy.lb*. An example boolean key-value pair
   // is *canary*, providing the optional canary status of the upstream host.
   // This may be matched against in a route's
-  // :ref:`RouteAction <envoy_api_msg_api.v3alpha.route.RouteAction>` metadata_match field
+  // :ref:`RouteAction <envoy_api_msg_config.route.v3alpha.RouteAction>` metadata_match field
   // to subset the endpoints considered in cluster load balancing.
   core.Metadata metadata = 3;
 

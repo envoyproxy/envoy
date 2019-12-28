@@ -102,7 +102,7 @@ message Node {
   // verification <envoy_api_field_api.v3alpha.core.HealthCheck.HttpHealthCheck.service_name>`,
   // :ref:`runtime override directory <envoy_api_msg_config.bootstrap.v3alpha.Runtime>`,
   // :ref:`user agent addition
-  // <envoy_api_field_config.filter.network.http_connection_manager.v3alpha.HttpConnectionManager.add_user_agent>`,
+  // <envoy_api_field_extensions.filters.network.http_connection_manager.v3alpha.HttpConnectionManager.add_user_agent>`,
   // :ref:`HTTP global rate limiting <config_http_filters_rate_limit>`,
   // :ref:`CDS <config_cluster_manager_cds>`, and :ref:`HTTP tracing
   // <arch_overview_tracing>`, either in this message or via

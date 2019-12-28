@@ -4,7 +4,7 @@ package envoy.service.tap.v3alpha;
 
 import "envoy/api/v3alpha/core/base.proto";
 import "envoy/api/v3alpha/core/grpc_service.proto";
-import "envoy/api/v3alpha/route/route.proto";
+import "envoy/config/route/v3alpha/route.proto";
 
 import "google/protobuf/wrappers.proto";
 
@@ -97,7 +97,7 @@ message HttpHeadersMatch {
       "envoy.service.tap.v2alpha.HttpHeadersMatch";
 
   // HTTP headers to match.
-  repeated api.v3alpha.route.HeaderMatcher headers = 1;
+  repeated config.route.v3alpha.HeaderMatcher headers = 1;
 }
 
 // Tap output configuration.
