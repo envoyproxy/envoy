@@ -23,7 +23,7 @@ namespace Server {
 class ListenerManagerImpl;
 
 /**
- * Listener that provides a handle to inject HTTP calls into envoy via the traditional HCM path.
+ * Listener that provides a handle to inject HTTP calls into envoy via an Http::ConnectionManager.
  * Thus it provides full access to Envoy's L7 features, e.g HTTP filters.
  */
 class HttpApiListenerImpl : public ApiListener,
@@ -35,6 +35,8 @@ public:
                       const std::string& name,
                       ProtobufMessage::ValidationVisitor& validation_visitor);
 
+  // TODO(junr03): consider moving Envoy Mobile's SyntheticAddressImpl to Envoy in order to return
+  // that rather than this semi-real one.
   const Network::Address::InstanceConstSharedPtr& address() const { return address_; }
 
   // ApiListener
@@ -71,9 +73,15 @@ public:
   Configuration::ServerFactoryContext& getServerFactoryContext() const override;
   Stats::Scope& listenerScope() override;
 
-  bool drainClose() const override;
+  // Network::DrainDecision
+  // TODO(junr03): hook up draining to listener state management.
+  bool drainClose() const override { return false; }
 
 private:
+  // Synthetic class that acts as a stub Network::ReadFilterCallbacks.
+  // TODO(junr03): if we are able to separate the Network Filter aspects of the
+  // Http::ConnectionManagerImpl from the http management aspects of it, it is possible we would not
+  // need this and the SyntheticConnection stub anymore.
   class SyntheticReadCallbacks : public Network::ReadFilterCallbacks {
   public:
     SyntheticReadCallbacks(HttpApiListenerImpl& parent)
@@ -86,6 +94,8 @@ private:
     void upstreamHost(Upstream::HostDescriptionConstSharedPtr) override {}
     Network::Connection& connection() override { return connection_; }
 
+    // Synthetic class that acts as a stub for the connection backing the
+    // Network::ReadFilterCallbacks.
     class SyntheticConnection : public Network::Connection {
     public:
       SyntheticConnection(SyntheticReadCallbacks& parent)

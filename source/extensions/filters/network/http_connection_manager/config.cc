@@ -6,6 +6,8 @@
 #include <vector>
 
 #include "envoy/api/v2/core/base.pb.h"
+#include "envoy/config/filter/network/http_connection_manager/v2/http_connection_manager.pb.h"
+#include "envoy/config/filter/network/http_connection_manager/v2/http_connection_manager.pb.validate.h"
 #include "envoy/filesystem/filesystem.h"
 #include "envoy/server/admin.h"
 #include "envoy/tracing/http_tracer.h"
@@ -499,7 +501,6 @@ HttpConnectionManagerFactory::createHttpConnectionManagerFactoryFromProto(
   auto typed_config = MessageUtil::anyConvert<
       envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager>(
       proto_config);
-  ENVOY_LOG_MISC(error, "Downcasted proto successfully");
 
   std::shared_ptr<Http::TlsCachingDateProviderImpl> hcm_date_provider =
       context.singletonManager().getTyped<Http::TlsCachingDateProviderImpl>(
@@ -507,15 +508,12 @@ HttpConnectionManagerFactory::createHttpConnectionManagerFactoryFromProto(
             return std::make_shared<Http::TlsCachingDateProviderImpl>(context.dispatcher(),
                                                                       context.threadLocal());
           });
-  ENVOY_LOG_MISC(error, "Built date provider");
 
   std::shared_ptr<Router::RouteConfigProviderManager> hcm_route_config_provider_manager =
       context.singletonManager().getTyped<Router::RouteConfigProviderManager>(
           SINGLETON_MANAGER_REGISTERED_NAME(hcm_route_config_provider_manager), [&context] {
             return std::make_shared<Router::RouteConfigProviderManagerImpl>(context.admin());
           });
-
-  ENVOY_LOG_MISC(error, "Built route config provider");
 
   std::shared_ptr<Router::ScopedRoutesConfigProviderManager>
       hcm_scoped_routes_config_provider_manager =
@@ -525,19 +523,15 @@ HttpConnectionManagerFactory::createHttpConnectionManagerFactoryFromProto(
                 return std::make_shared<Router::ScopedRoutesConfigProviderManager>(
                     context.admin(), *hcm_route_config_provider_manager);
               });
-  ENVOY_LOG_MISC(error, "built scoped route provider");
 
   std::shared_ptr<HttpConnectionManagerConfig> filter_config(new HttpConnectionManagerConfig(
       typed_config, context, *hcm_date_provider, *hcm_route_config_provider_manager,
       *hcm_scoped_routes_config_provider_manager));
-  ENVOY_LOG_MISC(error, "built config");
 
   // This lambda captures the shared_ptrs created above, thus preserving the
   // reference count.
   // Keep in mind the lambda capture list **doesn't** determine the destruction order, but it's fine
   // as these captured objects are also global singletons.
-  ENVOY_LOG_MISC(error, "about to return lambda");
-
   return [hcm_scoped_routes_config_provider_manager, hcm_route_config_provider_manager,
           hcm_date_provider, filter_config, &context](
              Network::ReadFilterCallbacks& read_callbacks) -> Http::ServerConnectionCallbacksPtr {
@@ -548,11 +542,15 @@ HttpConnectionManagerFactory::createHttpConnectionManagerFactoryFromProto(
         context.runtime(), context.localInfo(), context.clusterManager(),
         &context.overloadManager(), context.dispatcher().timeSource());
 
-    // Additional actions taken in the normal path.
+    // This factory creates a new ConnectionManagerImpl in the absence of its usual environment as
+    // an L4 filter, so this factory needs to take a few actions.
     // When a new connection is creating its filter chain it hydrates the factory with a filter
-    // manager which provides the hcm with the "read_callbacks".
+    // manager which provides the ConnectionManager with its "read_callbacks".
     conn_manager->initializeReadFilterCallbacks(read_callbacks);
-    // When the connection first sends data through the hcm, the hcm creates a codec.
+    ENVOY_LOG_MISC(error, "initialized");
+
+    // When the connection first calls onData on the ConnectionManager, the ConnectionManager
+    // creates a codec. Here we force create a codec as onData will not be called.
     conn_manager->forceCodecCreation();
 
     return conn_manager;

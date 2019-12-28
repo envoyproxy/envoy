@@ -20,9 +20,7 @@ HttpApiListenerImpl::HttpApiListenerImpl(const envoy::api::v2::Listener& config,
                                          ListenerManagerImpl& parent, const std::string& name,
                                          ProtobufMessage::ValidationVisitor& validation_visitor)
     : config_(config), parent_(parent), name_(name),
-      address_(Network::Address::resolveProtoAddress(
-          config.address())), // TODO(junr03): consider moving the SyntheticAddressImpl from Envoy
-                              // Mobile to Envoy.
+      address_(Network::Address::resolveProtoAddress(config.address())),
       validation_visitor_(validation_visitor),
       global_scope_(parent_.server_.stats().createScope("")),
       listener_scope_(parent_.server_.stats().createScope(fmt::format("listener.api.{}.", name_))),
@@ -89,7 +87,6 @@ Configuration::ServerFactoryContext& HttpApiListenerImpl::getServerFactoryContex
   return parent_.server_.serverFactoryContext();
 }
 Stats::Scope& HttpApiListenerImpl::listenerScope() { return *listener_scope_; }
-bool HttpApiListenerImpl::drainClose() const { return false; }
 
 } // namespace Server
 } // namespace Envoy
