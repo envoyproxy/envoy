@@ -3,6 +3,7 @@
 #include <string>
 
 #include "envoy/common/exception.h"
+#include "envoy/config/metrics/v2/stats.pb.h"
 
 #include "common/common/utility.h"
 #include "common/stats/tag_extractor_impl.h"

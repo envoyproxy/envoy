@@ -2,16 +2,16 @@ syntax = "proto3";
 
 package envoy.api.v2.core;
 
-option java_outer_classname = "ConfigSourceProto";
-option java_multiple_files = true;
-option java_package = "io.envoyproxy.envoy.api.v2.core";
-
 import "envoy/api/v2/core/grpc_service.proto";
 
 import "google/protobuf/duration.proto";
 import "google/protobuf/wrappers.proto";
 
 import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.api.v2.core";
+option java_outer_classname = "ConfigSourceProto";
+option java_multiple_files = true;
 
 // [#protodoc-title: Configuration sources]
 
@@ -38,7 +38,8 @@ message ApiConfigSource {
     // with every update, the xDS server only sends what has changed since the last update.
     //
     // DELTA_GRPC is not yet entirely implemented! Initially, only CDS is available.
-    // Do not use for other xDSes. TODO(fredlas) update/remove this warning when appropriate.
+    // Do not use for other xDSes.
+    // [#comment:TODO(fredlas) update/remove this warning when appropriate.]
     DELTA_GRPC = 3;
   }
 

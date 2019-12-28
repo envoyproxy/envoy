@@ -5,13 +5,19 @@
 #include <string>
 #include <unordered_map>
 
+#include "envoy/api/v2/discovery.pb.h"
+#include "envoy/config/bootstrap/v2/bootstrap.pb.h"
 #include "envoy/event/dispatcher.h"
+#include "envoy/service/discovery/v2/rtds.pb.h"
+#include "envoy/service/discovery/v2/rtds.pb.validate.h"
 #include "envoy/thread_local/thread_local.h"
+#include "envoy/type/percent.pb.h"
 #include "envoy/type/percent.pb.validate.h"
 
 #include "common/common/assert.h"
 #include "common/common/fmt.h"
 #include "common/common/utility.h"
+#include "common/config/api_version.h"
 #include "common/filesystem/directory.h"
 #include "common/grpc/common.h"
 #include "common/protobuf/message_validator_impl.h"
@@ -24,9 +30,29 @@
 
 namespace Envoy {
 namespace Runtime {
+namespace {
+
+// Before ASSERTS were added to ensure runtime features were restricted to
+// booleans, several integer features were added. isLegacyFeatures exempts
+// existing integer features from the checks until they can be cleaned up.
+// This includes
+// envoy.reloadable_features.max_[request|response]_headers_count from
+// include/envoy/http/codec.h as well as the http2_protocol_options overrides in
+// source/common/http/http2/codec_impl.cc
+bool isLegacyFeature(absl::string_view feature) {
+  return absl::StartsWith(feature, "envoy.reloadable_features.http2_protocol_options.") ||
+         absl::StartsWith(feature, "envoy.reloadable_features.max_re");
+}
+
+bool isRuntimeFeature(absl::string_view feature) {
+  return RuntimeFeaturesDefaults::get().enabledByDefault(feature) ||
+         RuntimeFeaturesDefaults::get().existsButDisabled(feature);
+}
+
+} // namespace
 
 bool runtimeFeatureEnabled(absl::string_view feature) {
-  ASSERT(absl::StartsWith(feature, "envoy.reloadable_features"));
+  ASSERT(isRuntimeFeature(feature));
   if (Runtime::LoaderSingleton::getExisting()) {
     return Runtime::LoaderSingleton::getExisting()->threadsafeSnapshot()->runtimeFeatureEnabled(
         feature);
@@ -220,6 +246,7 @@ bool SnapshotImpl::featureEnabled(const std::string& key, uint64_t default_value
 }
 
 const std::string& SnapshotImpl::get(const std::string& key) const {
+  ASSERT(!isRuntimeFeature(key)); // Make sure runtime guarding is only used for getBoolean
   auto entry = values_.find(key);
   if (entry == values_.end()) {
     return EMPTY_STRING;
@@ -261,6 +288,7 @@ bool SnapshotImpl::featureEnabled(const std::string& key,
 }
 
 uint64_t SnapshotImpl::getInteger(const std::string& key, uint64_t default_value) const {
+  ASSERT(isLegacyFeature(key) || !isRuntimeFeature(key));
   auto entry = values_.find(key);
   if (entry == values_.end() || !entry->second.uint_value_) {
     return default_value;
@@ -270,6 +298,7 @@ uint64_t SnapshotImpl::getInteger(const std::string& key, uint64_t default_value
 }
 
 double SnapshotImpl::getDouble(const std::string& key, double default_value) const {
+  ASSERT(!isRuntimeFeature(key)); // Make sure runtime guarding is only used for getBoolean
   auto entry = values_.find(key);
   if (entry == values_.end() || !entry->second.double_value_) {
     return default_value;
@@ -562,7 +591,8 @@ void RtdsSubscription::start() {
   // instantiated in the server instance.
   subscription_ = parent_.cm_->subscriptionFactory().subscriptionFromConfigSource(
       config_source_,
-      Grpc::Common::typeUrl(envoy::service::discovery::v2::Runtime().GetDescriptor()->full_name()),
+      Grpc::Common::typeUrl(
+          API_NO_BOOST(envoy::service::discovery::v2::Runtime)().GetDescriptor()->full_name()),
       store_, *this);
   subscription_->start({resource_name_});
 }

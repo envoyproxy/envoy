@@ -1,3 +1,5 @@
+#include "envoy/api/v2/core/grpc_service.pb.h"
+#include "envoy/config/filter/thrift/rate_limit/v2alpha1/rate_limit.pb.h"
 #include "envoy/config/filter/thrift/rate_limit/v2alpha1/rate_limit.pb.validate.h"
 
 #include "extensions/filters/network/thrift_proxy/filters/ratelimit/config.h"

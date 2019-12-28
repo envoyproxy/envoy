@@ -2,6 +2,7 @@
 #include <memory>
 #include <string>
 
+#include "envoy/api/v2/core/base.pb.h"
 #include "envoy/stats/scope.h"
 
 #include "common/buffer/buffer_impl.h"

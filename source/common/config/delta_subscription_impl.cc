@@ -1,5 +1,7 @@
 #include "common/config/delta_subscription_impl.h"
 
+#include "envoy/api/v2/discovery.pb.h"
+
 namespace Envoy {
 namespace Config {
 

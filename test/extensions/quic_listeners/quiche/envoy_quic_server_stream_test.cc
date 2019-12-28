@@ -106,12 +106,8 @@ public:
           EXPECT_EQ(Http::Headers::get().MethodValues.Post,
                     headers->Method()->value().getStringView());
         }));
-    if (quic::VersionUsesHttp3(quic_version_.transport_version)) {
-      quic_stream_->OnHeadersDecoded(request_headers_);
-    } else {
-      quic_stream_->OnStreamHeaderList(/*fin=*/false, request_headers_.uncompressed_header_bytes(),
-                                       request_headers_);
-    }
+    quic_stream_->OnStreamHeaderList(/*fin=*/false, request_headers_.uncompressed_header_bytes(),
+                                     request_headers_);
     EXPECT_TRUE(quic_stream_->FinishedReadingHeaders());
 
     EXPECT_CALL(stream_decoder_, decodeData(_, _))
@@ -279,12 +275,8 @@ TEST_P(EnvoyQuicServerStreamTest, ReadDisableAndReEnableImmediately) {
         EXPECT_EQ(Http::Headers::get().MethodValues.Post,
                   headers->Method()->value().getStringView());
       }));
-  if (quic::VersionUsesHttp3(quic_version_.transport_version)) {
-    quic_stream_->OnHeadersDecoded(request_headers_);
-  } else {
-    quic_stream_->OnStreamHeaderList(/*fin=*/false, request_headers_.uncompressed_header_bytes(),
-                                     request_headers_);
-  }
+  quic_stream_->OnStreamHeaderList(/*fin=*/false, request_headers_.uncompressed_header_bytes(),
+                                   request_headers_);
   EXPECT_TRUE(quic_stream_->FinishedReadingHeaders());
 
   std::string payload(1024, 'a');

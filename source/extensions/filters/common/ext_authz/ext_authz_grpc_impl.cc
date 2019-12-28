@@ -1,5 +1,8 @@
 #include "extensions/filters/common/ext_authz/ext_authz_grpc_impl.h"
 
+#include "envoy/api/v2/core/base.pb.h"
+#include "envoy/service/auth/v2/external_auth.pb.h"
+
 #include "common/common/assert.h"
 #include "common/grpc/async_client_impl.h"
 #include "common/http/headers.h"

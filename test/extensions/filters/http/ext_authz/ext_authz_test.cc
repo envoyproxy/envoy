@@ -2,9 +2,12 @@
 #include <string>
 #include <vector>
 
+#include "envoy/api/v2/core/base.pb.h"
 #include "envoy/config/filter/http/ext_authz/v2/ext_authz.pb.h"
 #include "envoy/config/filter/http/ext_authz/v2/ext_authz.pb.validate.h"
 #include "envoy/http/codes.h"
+#include "envoy/service/auth/v2/external_auth.pb.h"
+#include "envoy/type/percent.pb.h"
 
 #include "common/buffer/buffer_impl.h"
 #include "common/common/empty_string.h"

@@ -1,9 +1,18 @@
 #include "test/config/utility.h"
 
+#include "envoy/api/v2/auth/cert.pb.h"
+#include "envoy/api/v2/cds.pb.h"
+#include "envoy/api/v2/core/base.pb.h"
+#include "envoy/api/v2/discovery.pb.h"
+#include "envoy/api/v2/eds.pb.h"
+#include "envoy/api/v2/listener/listener.pb.h"
+#include "envoy/api/v2/route/route.pb.h"
 #include "envoy/config/accesslog/v2/file.pb.h"
+#include "envoy/config/bootstrap/v2/bootstrap.pb.h"
 #include "envoy/config/filter/network/http_connection_manager/v2/http_connection_manager.pb.h"
 #include "envoy/config/transport_socket/tap/v2alpha/tap.pb.h"
 #include "envoy/http/codec.h"
+#include "envoy/service/tap/v2alpha/common.pb.h"
 
 #include "common/common/assert.h"
 #include "common/config/resources.h"
@@ -135,7 +144,8 @@ const std::string ConfigHelper::QUIC_HTTP_PROXY_CONFIG = BASE_UDP_LISTENER_CONFI
             name: envoy.file_access_log
             filter:
               not_health_check_filter:  {}
-            config:
+            typed_config:
+              "@type": type.googleapis.com/envoy.config.accesslog.v2.FileAccessLog
               path: /dev/null
           route_config:
             virtual_hosts:

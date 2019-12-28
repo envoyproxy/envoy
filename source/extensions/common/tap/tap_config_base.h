@@ -3,6 +3,8 @@
 #include <fstream>
 
 #include "envoy/buffer/buffer.h"
+#include "envoy/data/tap/v2alpha/common.pb.h"
+#include "envoy/data/tap/v2alpha/wrapper.pb.h"
 #include "envoy/service/tap/v2alpha/common.pb.h"
 
 #include "extensions/common/tap/tap.h"

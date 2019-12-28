@@ -14,10 +14,11 @@
 
 #include "envoy/api/api.h"
 #include "envoy/api/v2/cds.pb.h"
-#include "envoy/api/v2/core/base.pb.h"
+#include "envoy/api/v2/eds.pb.h"
 #include "envoy/api/v2/endpoint/endpoint.pb.h"
 #include "envoy/config/cluster/redis/redis_cluster.pb.h"
 #include "envoy/config/cluster/redis/redis_cluster.pb.validate.h"
+#include "envoy/config/filter/network/redis_proxy/v2/redis_proxy.pb.validate.h"
 #include "envoy/config/typed_metadata.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/event/timer.h"
@@ -57,7 +58,7 @@
 #include "server/transport_socket_config_impl.h"
 
 #include "extensions/clusters/well_known_names.h"
-#include "extensions/common/redis/redirection_mgr_impl.h"
+#include "extensions/common/redis/cluster_refresh_manager_impl.h"
 #include "extensions/filters/network/common/redis/client.h"
 #include "extensions/filters/network/common/redis/client_impl.h"
 #include "extensions/filters/network/common/redis/codec.h"
@@ -257,6 +258,8 @@ private:
   const std::chrono::milliseconds cluster_refresh_timeout_;
   const std::chrono::milliseconds redirect_refresh_interval_;
   const uint32_t redirect_refresh_threshold_;
+  const uint32_t failure_refresh_threshold_;
+  const uint32_t host_degraded_refresh_threshold_;
   std::list<DnsDiscoveryResolveTargetPtr> dns_discovery_resolve_targets_;
   Event::Dispatcher& dispatcher_;
   Network::DnsResolverSharedPtr dns_resolver_;
@@ -271,8 +274,9 @@ private:
   Upstream::HostMap all_hosts_;
 
   const std::string auth_password_;
-  const Common::Redis::RedirectionManagerSharedPtr redirection_manager_;
-  const Common::Redis::RedirectionManager::HandlePtr registration_handle_;
+  const std::string cluster_name_;
+  const Common::Redis::ClusterRefreshManagerSharedPtr refresh_manager_;
+  const Common::Redis::ClusterRefreshManager::HandlePtr registration_handle_;
 };
 
 class RedisClusterFactory : public Upstream::ConfigurableClusterFactoryBase<

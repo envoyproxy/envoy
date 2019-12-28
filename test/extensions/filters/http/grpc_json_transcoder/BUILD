@@ -26,6 +26,7 @@ envoy_extension_cc_test(
         "//test/proto:bookstore_proto_cc_proto",
         "//test/test_common:environment_lib",
         "//test/test_common:utility_lib",
+        "@envoy_api//envoy/config/filter/http/transcoder/v2:pkg_cc_proto",
     ],
 )
 

@@ -9,12 +9,15 @@
 
 #include "envoy/buffer/buffer.h"
 #include "envoy/common/time.h"
+#include "envoy/config/filter/network/http_connection_manager/v2/http_connection_manager.pb.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/network/drain_decision.h"
 #include "envoy/router/router.h"
 #include "envoy/ssl/connection.h"
 #include "envoy/stats/scope.h"
+#include "envoy/stream_info/filter_state.h"
 #include "envoy/tracing/http_tracer.h"
+#include "envoy/type/percent.pb.h"
 
 #include "common/buffer/buffer_impl.h"
 #include "common/common/assert.h"
@@ -296,40 +299,52 @@ Network::FilterStatus ConnectionManagerImpl::onData(Buffer::Instance& data, bool
     }
   }
 
-  try {
-    codec_->dispatch(data);
-  } catch (const FrameFloodException& e) {
-    // TODO(mattklein123): This is an emergency substitute for the lack of connection level
-    // logging in the HCM. In a public follow up change we will add full support for connection
-    // level logging in the HCM, similar to what we have in tcp_proxy. This will allow abuse
-    // indicators to be stored in the connection level stream info, and then matched, sampled,
-    // etc. when logged.
-    const envoy::type::FractionalPercent default_value; // 0
-    if (runtime_.snapshot().featureEnabled("http.connection_manager.log_flood_exception",
-                                           default_value)) {
-      ENVOY_CONN_LOG(warn, "downstream HTTP flood from IP '{}': {}", read_callbacks_->connection(),
-                     read_callbacks_->connection().remoteAddress()->asString(), e.what());
+  bool redispatch;
+  do {
+    redispatch = false;
+
+    try {
+      codec_->dispatch(data);
+    } catch (const FrameFloodException& e) {
+      // TODO(mattklein123): This is an emergency substitute for the lack of connection level
+      // logging in the HCM. In a public follow up change we will add full support for connection
+      // level logging in the HCM, similar to what we have in tcp_proxy. This will allow abuse
+      // indicators to be stored in the connection level stream info, and then matched, sampled,
+      // etc. when logged.
+      const envoy::type::FractionalPercent default_value; // 0
+      if (runtime_.snapshot().featureEnabled("http.connection_manager.log_flood_exception",
+                                             default_value)) {
+        ENVOY_CONN_LOG(warn, "downstream HTTP flood from IP '{}': {}",
+                       read_callbacks_->connection(),
+                       read_callbacks_->connection().remoteAddress()->asString(), e.what());
+      }
+
+      handleCodecException(e.what());
+      return Network::FilterStatus::StopIteration;
+    } catch (const CodecProtocolException& e) {
+      stats_.named_.downstream_cx_protocol_error_.inc();
+      handleCodecException(e.what());
+      return Network::FilterStatus::StopIteration;
     }
 
-    handleCodecException(e.what());
-    return Network::FilterStatus::StopIteration;
-  } catch (const CodecProtocolException& e) {
-    stats_.named_.downstream_cx_protocol_error_.inc();
-    handleCodecException(e.what());
-    return Network::FilterStatus::StopIteration;
-  }
+    // Processing incoming data may release outbound data so check for closure here as well.
+    checkForDeferredClose();
 
-  // Processing incoming data may release outbound data so check for closure here as well.
-  checkForDeferredClose();
+    // The HTTP/1 codec will pause dispatch after a single message is complete. We want to
+    // either redispatch if there are no streams and we have more data. If we have a single
+    // complete non-WebSocket stream but have not responded yet we will pause socket reads
+    // to apply back pressure.
+    if (codec_->protocol() < Protocol::Http2) {
+      if (read_callbacks_->connection().state() == Network::Connection::State::Open &&
+          data.length() > 0 && streams_.empty()) {
+        redispatch = true;
+      }
 
-  // The HTTP/1 codec will pause parsing after a single message is complete. If we have a single
-  // complete non-WebSocket stream but have not responded yet we will pause socket reads
-  // to apply back pressure.
-  if (codec_->protocol() < Protocol::Http2) {
-    if (!streams_.empty() && streams_.front()->state_.remote_complete_) {
-      read_callbacks_->connection().readDisable(true);
+      if (!streams_.empty() && streams_.front()->state_.remote_complete_) {
+        read_callbacks_->connection().readDisable(true);
+      }
     }
-  }
+  } while (redispatch);
 
   return Network::FilterStatus::StopIteration;
 }
@@ -367,6 +382,10 @@ void ConnectionManagerImpl::resetAllStreams(
     stream.onResetStream(StreamResetReason::ConnectionTermination, absl::string_view());
     if (response_flag.has_value()) {
       stream.stream_info_.setResponseFlag(response_flag.value());
+      if (*response_flag == StreamInfo::ResponseFlag::DownstreamProtocolError) {
+        stream.stream_info_.setResponseCodeDetails(
+            stream.response_encoder_->getStream().responseDetails());
+      }
     }
   }
 }
@@ -473,7 +492,8 @@ ConnectionManagerImpl::ActiveStream::ActiveStream(ConnectionManagerImpl& connect
       stream_id_(connection_manager.random_generator_.random()),
       request_response_timespan_(new Stats::HistogramCompletableTimespanImpl(
           connection_manager_.stats_.named_.downstream_rq_time_, connection_manager_.timeSource())),
-      stream_info_(connection_manager_.codec_->protocol(), connection_manager_.timeSource()),
+      stream_info_(connection_manager_.codec_->protocol(), connection_manager_.timeSource(),
+                   connection_manager.filterState()),
       upstream_options_(std::make_shared<Network::Socket::Options>()) {
   ASSERT(!connection_manager.config_.isRoutable() ||
              ((connection_manager.config_.routeConfigProvider() == nullptr &&
@@ -752,6 +772,15 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(HeaderMapPtr&& headers, 
                      StreamInfo::ResponseCodeDetails::get().MissingHost);
       return;
     }
+  }
+
+  // Make sure the host is valid.
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.strict_authority_validation") &&
+      !HeaderUtility::authorityIsValid(request_headers_->Host()->value().getStringView())) {
+    sendLocalReply(Grpc::Common::hasGrpcContentType(*request_headers_), Code::BadRequest, "",
+                   nullptr, is_head_request_, absl::nullopt,
+                   StreamInfo::ResponseCodeDetails::get().InvalidAuthority);
+    return;
   }
 
   // Currently we only support relative paths at the application layer. We expect the codec to have
@@ -2223,6 +2252,17 @@ bool ConnectionManagerImpl::ActiveStreamDecoderFilter::recreateStream() {
   parent_.connection_manager_.doEndStream(this->parent_);
 
   StreamDecoder& new_stream = parent_.connection_manager_.newStream(*response_encoder, true);
+  // We don't need to copy over the old parent FilterState from the old StreamInfo if it did not
+  // store any objects with a LifeSpan at or above DownstreamRequest. This is to avoid unnecessary
+  // heap allocation.
+  if (parent_.stream_info_.filter_state_->hasDataAtOrAboveLifeSpan(
+          StreamInfo::FilterState::LifeSpan::DownstreamRequest)) {
+    (*parent_.connection_manager_.streams_.begin())->stream_info_.filter_state_ =
+        std::make_shared<StreamInfo::FilterStateImpl>(
+            parent_.stream_info_.filter_state_->parent(),
+            StreamInfo::FilterState::LifeSpan::FilterChain);
+  }
+
   new_stream.decodeHeaders(std::move(request_headers), true);
   return true;
 }

@@ -9,6 +9,7 @@
 #include "envoy/config/filter/accesslog/v2/accesslog.pb.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/server/access_log_config.h"
+#include "envoy/type/percent.pb.h"
 
 #include "common/grpc/status.h"
 #include "common/http/header_utility.h"

@@ -1,4 +1,9 @@
+#include "envoy/api/v2/core/base.pb.h"
+#include "envoy/api/v2/discovery.pb.h"
+#include "envoy/api/v2/eds.pb.h"
+
 #include "common/buffer/zero_copy_input_stream_impl.h"
+#include "common/config/api_version.h"
 
 #include "test/common/config/delta_subscription_test_harness.h"
 
@@ -105,7 +110,7 @@ TEST_F(DeltaSubscriptionImplTest, PauseQueuesAcks) {
   // All ACK sendMessage()s will happen upon calling resume().
   EXPECT_CALL(async_stream_, sendMessageRaw_(_, _))
       .WillRepeatedly(Invoke([this](Buffer::InstancePtr& buffer, bool) {
-        envoy::api::v2::DeltaDiscoveryRequest message;
+        API_NO_BOOST(envoy::api::v2::DeltaDiscoveryRequest) message;
         EXPECT_TRUE(Grpc::Common::parseBufferInstance(std::move(buffer), message));
         const std::string nonce = message.response_nonce();
         if (!nonce.empty()) {

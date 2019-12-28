@@ -3,7 +3,10 @@
 #include "envoy/access_log/access_log.h"
 #include "envoy/api/api.h"
 #include "envoy/api/v2/core/health_check.pb.h"
+#include "envoy/data/core/v2alpha/health_check_event.pb.h"
 #include "envoy/grpc/status.h"
+#include "envoy/type/http.pb.h"
+#include "envoy/type/range.pb.h"
 
 #include "common/common/logger.h"
 #include "common/grpc/codec.h"

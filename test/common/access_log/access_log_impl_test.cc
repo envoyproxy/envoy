@@ -3,6 +3,7 @@
 #include <memory>
 #include <string>
 
+#include "envoy/config/filter/accesslog/v2/accesslog.pb.h"
 #include "envoy/config/filter/accesslog/v2/accesslog.pb.validate.h"
 #include "envoy/upstream/cluster_manager.h"
 #include "envoy/upstream/upstream.h"
@@ -1049,7 +1050,7 @@ typed_config:
   path: /dev/null
 )EOF";
 
-  const auto desc = envoy::config::filter::accesslog::v2::GrpcStatusFilter_Status_descriptor();
+  const auto desc = envoy::config::filter::accesslog::v2::GrpcStatusFilter::Status_descriptor();
   const int grpcStatuses = static_cast<int>(Grpc::Status::WellKnownGrpcStatus::MaximumKnown) + 1;
   if (desc->value_count() != grpcStatuses) {
     FAIL() << "Mismatch in number of gRPC statuses, GrpcStatus has " << grpcStatuses

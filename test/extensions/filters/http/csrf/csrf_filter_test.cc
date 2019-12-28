@@ -1,3 +1,6 @@
+#include "envoy/config/filter/http/csrf/v2/csrf.pb.h"
+#include "envoy/type/percent.pb.h"
+
 #include "common/http/header_map_impl.h"
 
 #include "extensions/filters/http/csrf/csrf_filter.h"

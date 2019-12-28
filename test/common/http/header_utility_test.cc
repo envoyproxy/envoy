@@ -464,6 +464,13 @@ TEST(HeaderIsValidTest, ValidHeaderValuesAreAccepted) {
   EXPECT_TRUE(HeaderUtility::headerIsValid("Some Other Value"));
 }
 
+TEST(HeaderIsValidTest, AuthIsValid) {
+  EXPECT_TRUE(HeaderUtility::authorityIsValid("strangebutlegal$-%&'"));
+  EXPECT_FALSE(HeaderUtility::authorityIsValid("illegal{}"));
+  // Full checks are done by Http2CodecImplTest.CheckAuthority, cross checking
+  // against nghttp2 compliance.
+}
+
 TEST(HeaderAddTest, HeaderAdd) {
   TestHeaderMapImpl headers{{"myheader1", "123value"}};
   TestHeaderMapImpl headers_to_add{{"myheader2", "456value"}};

@@ -2,6 +2,9 @@
 #include <memory>
 #include <string>
 
+#include "envoy/api/v2/auth/cert.pb.h"
+#include "envoy/api/v2/lds.pb.h"
+#include "envoy/api/v2/listener/listener.pb.h"
 #include "envoy/network/transport_socket.h"
 
 #include "common/buffer/buffer_impl.h"
@@ -13,7 +16,6 @@
 #include "common/network/transport_socket_options_impl.h"
 #include "common/network/utility.h"
 
-#include "extensions/filters/listener/tls_inspector/tls_inspector.h"
 #include "extensions/transport_sockets/tls/context_config_impl.h"
 #include "extensions/transport_sockets/tls/context_impl.h"
 #include "extensions/transport_sockets/tls/private_key/private_key_manager_impl.h"
@@ -1672,7 +1674,6 @@ TEST_P(SslSocketTest, CertificatesWithPassword) {
   TestUtilOptionsV2 test_options(listener, client, true, GetParam());
   testUtilV2(test_options.setExpectedClientCertUri("spiffe://lyft.com/test-team")
                  .setExpectedServerCertDigest(TEST_PASSWORD_PROTECTED_CERT_HASH));
-  testUtilV2(test_options);
 
   // Works even with client renegotiation.
   client.set_allow_renegotiation(true);
@@ -3605,7 +3606,9 @@ TEST_P(SslSocketTest, SignatureAlgorithms) {
 
   // Connection using defaults (client & server) succeeds.
   TestUtilOptionsV2 algorithm_test_options(listener, client, true, GetParam());
-  algorithm_test_options.setExpectedClientCertUri("spiffe://lyft.com/test-team");
+  algorithm_test_options.setExpectedClientCertUri("spiffe://lyft.com/test-team")
+      .setExpectedServerStats("ssl.sigalgs.rsa_pss_rsae_sha256")
+      .setExpectedClientStats("ssl.sigalgs.ecdsa_secp256r1_sha256");
   testUtilV2(algorithm_test_options);
 
   // Connection using defaults (client & server) succeeds, even with client renegotiation.

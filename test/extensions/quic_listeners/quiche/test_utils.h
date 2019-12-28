@@ -51,6 +51,9 @@ public:
 
   using quic::QuicSpdySession::ActivateStream;
 
+protected:
+  bool hasDataToWrite() override { return HasDataToWrite(); }
+
 private:
   std::unique_ptr<quic::QuicCryptoStream> crypto_stream_;
 };
@@ -86,6 +89,9 @@ public:
   }
 
   using quic::QuicSpdySession::ActivateStream;
+
+protected:
+  bool hasDataToWrite() override { return HasDataToWrite(); }
 
 private:
   quic::QuicCryptoClientConfig crypto_config_;

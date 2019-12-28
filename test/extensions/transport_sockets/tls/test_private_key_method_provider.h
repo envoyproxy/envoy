@@ -1,5 +1,6 @@
 #pragma once
 
+#include "envoy/api/v2/auth/cert.pb.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/server/transport_socket_config.h"
 #include "envoy/ssl/private_key/private_key.h"

@@ -18,7 +18,8 @@ namespace Quic {
 class QuicHttpConnectionImplBase : public virtual Http::Connection,
                                    protected Logger::Loggable<Logger::Id::quic> {
 public:
-  QuicHttpConnectionImplBase(quic::QuicSpdySession& quic_session) : quic_session_(quic_session) {}
+  QuicHttpConnectionImplBase(QuicFilterManagerConnectionImpl& quic_session)
+      : quic_session_(quic_session) {}
 
   // Http::Connection
   void dispatch(Buffer::Instance& /*data*/) override {
@@ -35,7 +36,7 @@ public:
       bool high_watermark);
 
 protected:
-  quic::QuicSpdySession& quic_session_;
+  QuicFilterManagerConnectionImpl& quic_session_;
 };
 
 class QuicHttpServerConnectionImpl : public QuicHttpConnectionImplBase,

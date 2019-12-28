@@ -1,5 +1,7 @@
 #include "common/upstream/health_checker_base_impl.h"
 
+#include "envoy/api/v2/core/address.pb.h"
+#include "envoy/api/v2/core/health_check.pb.h"
 #include "envoy/data/core/v2alpha/health_check_event.pb.h"
 #include "envoy/stats/scope.h"
 

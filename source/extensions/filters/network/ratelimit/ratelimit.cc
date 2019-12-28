@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <string>
 
+#include "envoy/config/filter/network/rate_limit/v2/rate_limit.pb.h"
 #include "envoy/stats/scope.h"
 
 #include "common/common/fmt.h"

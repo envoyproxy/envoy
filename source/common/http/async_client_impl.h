@@ -9,6 +9,8 @@
 #include <string>
 #include <vector>
 
+#include "envoy/api/v2/core/base.pb.h"
+#include "envoy/api/v2/route/route.pb.h"
 #include "envoy/common/scope_tracker.h"
 #include "envoy/config/typed_metadata.h"
 #include "envoy/event/dispatcher.h"
@@ -23,6 +25,7 @@
 #include "envoy/server/filter_config.h"
 #include "envoy/ssl/connection.h"
 #include "envoy/tracing/http_tracer.h"
+#include "envoy/type/percent.pb.h"
 #include "envoy/upstream/load_balancer.h"
 #include "envoy/upstream/upstream.h"
 
@@ -149,16 +152,6 @@ private:
     const std::vector<Http::HeaderMatcherSharedPtr> retriable_request_headers_{};
   };
 
-  struct NullShadowPolicy : public Router::ShadowPolicy {
-    // Router::ShadowPolicy
-    const std::string& cluster() const override { return EMPTY_STRING; }
-    const std::string& runtimeKey() const override { return EMPTY_STRING; }
-    const envoy::type::FractionalPercent& defaultValue() const override { return default_value_; }
-
-  private:
-    envoy::type::FractionalPercent default_value_;
-  };
-
   struct NullConfig : public Router::Config {
     Router::RouteConstSharedPtr route(const Http::HeaderMap&, const StreamInfo::StreamInfo&,
                                       uint64_t) const override {
@@ -229,7 +222,9 @@ private:
     uint32_t retryShadowBufferLimit() const override {
       return std::numeric_limits<uint32_t>::max();
     }
-    const Router::ShadowPolicy& shadowPolicy() const override { return shadow_policy_; }
+    const std::vector<Router::ShadowPolicyPtr>& shadowPolicies() const override {
+      return shadow_policies_;
+    }
     std::chrono::milliseconds timeout() const override {
       if (timeout_) {
         return timeout_.value();
@@ -276,7 +271,7 @@ private:
     static const NullHedgePolicy hedge_policy_;
     static const NullRateLimitPolicy rate_limit_policy_;
     static const NullRetryPolicy retry_policy_;
-    static const NullShadowPolicy shadow_policy_;
+    static const std::vector<Router::ShadowPolicyPtr> shadow_policies_;
     static const NullVirtualHost virtual_host_;
     static const std::multimap<std::string, std::string> opaque_config_;
     static const envoy::api::v2::core::Metadata metadata_;

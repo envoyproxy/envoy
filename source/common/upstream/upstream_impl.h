@@ -11,8 +11,10 @@
 #include <utility>
 #include <vector>
 
+#include "envoy/api/v2/cds.pb.h"
+#include "envoy/api/v2/core/address.pb.h"
 #include "envoy/api/v2/core/base.pb.h"
-#include "envoy/api/v2/eds.pb.h"
+#include "envoy/api/v2/core/health_check.pb.h"
 #include "envoy/api/v2/endpoint/endpoint.pb.h"
 #include "envoy/config/typed_metadata.h"
 #include "envoy/event/timer.h"
@@ -86,9 +88,6 @@ public:
   // endpoints churning during a deploy of a large cluster). A possible improvement
   // would be to use TLS and post metadata updates from the main thread. This model would
   // possibly benefit other related and expensive computations too (e.g.: updating subsets).
-  //
-  // TODO(rgs1): we should move to absl locks, once there's support for R/W locks. We should
-  // also add lock annotations, once they work correctly with R/W locks.
   const std::shared_ptr<envoy::api::v2::core::Metadata> metadata() const override {
     absl::ReaderMutexLock lock(&metadata_mutex_);
     return metadata_;

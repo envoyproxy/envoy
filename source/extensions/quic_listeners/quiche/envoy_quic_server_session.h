@@ -50,6 +50,7 @@ public:
                           quic::ConnectionCloseSource source) override;
   void Initialize() override;
   void SendGoAway(quic::QuicErrorCode error_code, const std::string& reason) override;
+  void OnCanWrite() override;
   // quic::QuicSpdySession
   void OnCryptoHandshakeEvent(CryptoHandshakeEvent event) override;
 
@@ -67,6 +68,9 @@ protected:
   quic::QuicSpdyStream* CreateIncomingStream(quic::PendingStream* pending) override;
   quic::QuicSpdyStream* CreateOutgoingBidirectionalStream() override;
   quic::QuicSpdyStream* CreateOutgoingUnidirectionalStream() override;
+
+  // QuicFilterManagerConnectionImpl
+  bool hasDataToWrite() override;
 
 private:
   void setUpRequestDecoder(EnvoyQuicStream& stream);

@@ -1,5 +1,8 @@
 #include "extensions/filters/network/redis_proxy/router_impl.h"
 
+#include "envoy/config/filter/network/redis_proxy/v2/redis_proxy.pb.h"
+#include "envoy/type/percent.pb.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {

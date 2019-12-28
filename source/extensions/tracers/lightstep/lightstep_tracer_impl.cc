@@ -5,6 +5,8 @@
 #include <memory>
 #include <string>
 
+#include "envoy/config/trace/v2/trace.pb.h"
+
 #include "common/buffer/zero_copy_input_stream_impl.h"
 #include "common/common/base64.h"
 #include "common/common/fmt.h"

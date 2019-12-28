@@ -1,6 +1,8 @@
 #include <memory>
 #include <string>
 
+#include "envoy/config/filter/network/redis_proxy/v2/redis_proxy.pb.h"
+
 #include "extensions/filters/network/redis_proxy/proxy_filter.h"
 
 #include "test/extensions/filters/network/common/redis/mocks.h"

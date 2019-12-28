@@ -70,6 +70,7 @@ public:
   MOCK_METHOD6(mmap, SysCallPtrResult(void* addr, size_t length, int prot, int flags, int fd,
                                       off_t offset));
   MOCK_METHOD2(stat, SysCallIntResult(const char* name, struct stat* stat));
+  MOCK_METHOD2(chmod, SysCallIntResult(const std::string& name, mode_t mode));
   MOCK_METHOD5(setsockopt_,
                int(int sockfd, int level, int optname, const void* optval, socklen_t optlen));
   MOCK_METHOD5(getsockopt_,

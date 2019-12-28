@@ -2,6 +2,7 @@
 
 #include <string>
 
+#include "envoy/api/v2/core/base.pb.h"
 #include "envoy/local_info/local_info.h"
 
 namespace Envoy {

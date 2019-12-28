@@ -1,5 +1,7 @@
 #include "common/upstream/maglev_lb.h"
 
+#include "envoy/api/v2/cds.pb.h"
+
 namespace Envoy {
 namespace Upstream {
 

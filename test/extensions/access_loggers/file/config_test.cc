@@ -1,4 +1,5 @@
 #include "envoy/config/accesslog/v2/file.pb.h"
+#include "envoy/config/filter/accesslog/v2/accesslog.pb.h"
 #include "envoy/registry/registry.h"
 
 #include "common/access_log/access_log_impl.h"

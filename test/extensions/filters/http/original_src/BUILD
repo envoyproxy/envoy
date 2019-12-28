@@ -47,6 +47,7 @@ envoy_extension_cc_test(
         "//test/mocks/network:network_mocks",
         "//test/test_common:printers_lib",
         "//test/test_common:utility_lib",
+        "@envoy_api//envoy/api/v2/core:pkg_cc_proto",
         "@envoy_api//envoy/config/filter/http/original_src/v2alpha1:pkg_cc_proto",
     ],
 )

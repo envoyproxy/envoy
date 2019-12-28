@@ -1,6 +1,8 @@
 #include <memory>
 #include <string>
 
+#include "envoy/api/v2/auth/cert.pb.h"
+#include "envoy/config/bootstrap/v2/bootstrap.pb.h"
 #include "envoy/stats/scope.h"
 
 #include "common/event/dispatcher_impl.h"

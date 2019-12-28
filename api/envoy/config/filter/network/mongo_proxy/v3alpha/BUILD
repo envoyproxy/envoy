@@ -8,6 +8,6 @@ api_proto_package(
     deps = [
         "//envoy/config/filter/fault/v3alpha:pkg",
         "//envoy/config/filter/network/mongo_proxy/v2:pkg",
-        "@com_github_cncf_udpa//udpa/api/annotations:pkg",
+        "@com_github_cncf_udpa//udpa/annotations:pkg",
     ],
 )

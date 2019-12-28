@@ -78,5 +78,5 @@ SPELLING_WHITELIST_WORDS_FILE="${ROOTDIR}/tools/spelling_whitelist_words.txt"
 WHITELIST_WORDS=$(echo -n $(cat "${SPELLING_WHITELIST_WORDS_FILE}" | \
                   grep -v "^#"|grep -v "^$") | tr ' ' ',')
 SKIP_FILES=$(echo $(cat "${SPELLING_SKIP_FILES}") | sed "s| | -e |g")
-git ls-files | grep -v -e "${SKIP_FILES}" | xargs "${TMP_DIR}/misspell" -i \
+git ls-files | grep -v -e ${SKIP_FILES} | xargs "${TMP_DIR}/misspell" -i \
   "${WHITELIST_WORDS}" ${MISSPELL_ARGS}

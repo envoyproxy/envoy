@@ -3,6 +3,10 @@
 #include <memory>
 #include <vector>
 
+#include "envoy/api/v2/cds.pb.h"
+#include "envoy/config/cluster/redis/redis_cluster.pb.h"
+#include "envoy/config/cluster/redis/redis_cluster.pb.validate.h"
+#include "envoy/config/filter/network/redis_proxy/v2/redis_proxy.pb.validate.h"
 #include "envoy/stats/scope.h"
 
 #include "common/network/utility.h"

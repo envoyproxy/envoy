@@ -2,7 +2,7 @@
 
 #include "common/protobuf/utility.h"
 
-#include "udpa/api/annotations/versioning.pb.h"
+#include "udpa/annotations/versioning.pb.h"
 #include "udpa/type/v1/typed_struct.pb.h"
 
 namespace Envoy {
@@ -53,9 +53,9 @@ ApiTypeOracle::inferEarlierVersionDescriptor(absl::string_view extension_name,
     ENVOY_LOG_MISC(trace, "No descriptor found for {}", target_type);
     return nullptr;
   }
-  if (desc->options().HasExtension(udpa::api::annotations::versioning)) {
+  if (desc->options().HasExtension(udpa::annotations::versioning)) {
     previous_target_type =
-        desc->options().GetExtension(udpa::api::annotations::versioning).previous_message_type();
+        desc->options().GetExtension(udpa::annotations::versioning).previous_message_type();
   }
 
   if (!previous_target_type.empty() && type != target_type) {

@@ -1,5 +1,7 @@
 #include "common/router/tls_context_match_criteria_impl.h"
 
+#include "envoy/api/v2/route/route.pb.h"
+
 namespace Envoy {
 namespace Router {
 

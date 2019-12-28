@@ -25,6 +25,7 @@ envoy_cc_library(
         "//source/common/tracing:http_tracer_lib",
         "//source/extensions/tracers:well_known_names",
         "//source/extensions/tracers/common/ot:opentracing_driver_lib",
+        "@envoy_api//envoy/config/trace/v2:pkg_cc_proto",
     ],
 )
 

@@ -1,3 +1,6 @@
+#include "envoy/api/v2/core/base.pb.h"
+#include "envoy/api/v2/lds.pb.h"
+
 #include "extensions/quic_listeners/quiche/quic_transport_socket_factory.h"
 
 #include "test/server/listener_manager_impl_test.h"

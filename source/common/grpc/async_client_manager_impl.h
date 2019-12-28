@@ -1,6 +1,7 @@
 #pragma once
 
 #include "envoy/api/api.h"
+#include "envoy/api/v2/core/grpc_service.pb.h"
 #include "envoy/grpc/async_client_manager.h"
 #include "envoy/singleton/manager.h"
 #include "envoy/stats/scope.h"

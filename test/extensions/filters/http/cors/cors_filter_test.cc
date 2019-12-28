@@ -1,3 +1,5 @@
+#include "envoy/type/matcher/string.pb.h"
+
 #include "common/common/matchers.h"
 #include "common/http/header_map_impl.h"
 

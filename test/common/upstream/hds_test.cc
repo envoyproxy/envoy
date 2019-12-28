@@ -1,5 +1,7 @@
 #include <memory>
 
+#include "envoy/api/v2/core/base.pb.h"
+#include "envoy/api/v2/core/health_check.pb.h"
 #include "envoy/service/discovery/v2/hds.pb.h"
 
 #include "common/singleton/manager_impl.h"

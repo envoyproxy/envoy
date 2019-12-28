@@ -1,5 +1,9 @@
 #include "extensions/common/tap/tap_config_base.h"
 
+#include "envoy/data/tap/v2alpha/common.pb.h"
+#include "envoy/data/tap/v2alpha/wrapper.pb.h"
+#include "envoy/service/tap/v2alpha/common.pb.h"
+
 #include "common/common/assert.h"
 #include "common/common/stack_array.h"
 #include "common/protobuf/utility.h"

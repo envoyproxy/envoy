@@ -1,3 +1,4 @@
+#include "envoy/api/v2/core/grpc_service.pb.h"
 #include "envoy/stats/scope.h"
 
 #include "common/api/api_impl.h"

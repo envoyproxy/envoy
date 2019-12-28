@@ -1,5 +1,7 @@
 #pragma once
 
+#include "envoy/config/rbac/v2/rbac.pb.h"
+
 #include "extensions/filters/common/rbac/engine_impl.h"
 
 #include "gmock/gmock.h"

@@ -1,7 +1,7 @@
 #include <memory>
 
-#include "envoy/api/v2/eds.pb.h"
 #include "envoy/api/v2/endpoint/load_report.pb.h"
+#include "envoy/service/load_stats/v2/lrs.pb.h"
 
 #include "common/upstream/load_stats_reporter.h"
 

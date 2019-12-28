@@ -1,8 +1,13 @@
 #include "common/upstream/eds.h"
 
+#include "envoy/api/v2/cds.pb.h"
+#include "envoy/api/v2/core/config_source.pb.h"
+#include "envoy/api/v2/discovery.pb.h"
+#include "envoy/api/v2/eds.pb.h"
 #include "envoy/api/v2/eds.pb.validate.h"
 
 #include "common/common/utility.h"
+#include "common/config/api_version.h"
 
 namespace Envoy {
 namespace Upstream {
@@ -31,7 +36,7 @@ EdsClusterImpl::EdsClusterImpl(
       factory_context.clusterManager().subscriptionFactory().subscriptionFromConfigSource(
           eds_config,
           Grpc::Common::typeUrl(
-              envoy::api::v2::ClusterLoadAssignment().GetDescriptor()->full_name()),
+              API_NO_BOOST(envoy::api::v2::ClusterLoadAssignment)().GetDescriptor()->full_name()),
           info_->statsScope(), *this);
 }
 

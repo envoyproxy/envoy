@@ -12,6 +12,8 @@
 // * Idle/drain timeouts.
 // * HTTP 1.0 special cases
 // * Fuzz config settings
+#include "envoy/config/filter/network/http_connection_manager/v2/http_connection_manager.pb.h"
+
 #include "common/common/empty_string.h"
 #include "common/http/conn_manager_impl.h"
 #include "common/http/context_impl.h"
