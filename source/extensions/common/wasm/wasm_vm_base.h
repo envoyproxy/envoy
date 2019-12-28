@@ -30,9 +30,9 @@ class WasmVmBase : public WasmVm {
 public:
   WasmVmBase(const Stats::ScopeSharedPtr& scope, absl::string_view runtime)
       : scope_(scope), runtime_prefix_(absl::StrCat("wasm_vm.", runtime, ".")),
+        runtime_(std::string(runtime)),
         stats_(VmStats{ALL_VM_STATS(POOL_COUNTER_PREFIX(*scope_, runtime_prefix_),
-                                    POOL_GAUGE_PREFIX(*scope_, runtime_prefix_))}),
-        runtime_(std::string(runtime)) {
+                                    POOL_GAUGE_PREFIX(*scope_, runtime_prefix_))}) {
     stats_.created_.inc();
     stats_.active_.inc();
     ENVOY_LOG(debug, "WasmVm created {} now active", runtime_, stats_.active_.value());
@@ -43,10 +43,10 @@ public:
   }
 
 protected:
-  Stats::ScopeSharedPtr scope_;
-  std::string runtime_prefix_;
+  const Stats::ScopeSharedPtr scope_;
+  const std::string runtime_prefix_;
+  const std::string runtime_; // The runtime e.g. "v8".
   VmStats stats_;
-  std::string runtime_; // The runtime e.g. "v8".
 };
 
 } // namespace Wasm
