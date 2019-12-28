@@ -307,11 +307,6 @@ ListenerManagerStats ListenerManagerImpl::generateStats(Stats::Scope& scope) {
 bool ListenerManagerImpl::addOrUpdateListener(const envoy::api::v2::Listener& config,
                                               const std::string& version_info, bool added_via_api) {
 
-  // FIXME HttpApiListenerImpl is very prescriptive about "what" and API Listener is.
-  // Whereas the config is very non-prescriptive -- through the use of an Any.
-  // Perhaps this path should similar to several parts in the codebase that have registered
-  // factories for all the different types. The problem is that I can't quite see what the abstract
-  // type that we store is; it entirely depends on what the API surface of the API listener is.
   // TODO(junr03): currently only one ApiListener can be installed via bootstrap to avoid having to
   // build a collection of listeners, and to have to be able to warm and drain the listeners. In the
   // future allow multiple ApiListeners, and allow them to be created via LDS as well as bootstrap.
