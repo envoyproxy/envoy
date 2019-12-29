@@ -1,18 +1,7 @@
 #include "common/common/thread_synchronizer.h"
 
-#include "common/common/assert.h"
-
 namespace Envoy {
 namespace Thread {
-
-ThreadSynchronizer::~ThreadSynchronizer() {
-  if (data_ != nullptr) {
-    // Make sure we don't have any pending signals which would indicate a bad test.
-    for (auto& entry : data_->entries_) {
-      ASSERT(!entry.second->signaled_);
-    }
-  }
-}
 
 void ThreadSynchronizer::enable() {
   ASSERT(data_ == nullptr);
