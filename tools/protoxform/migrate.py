@@ -20,8 +20,9 @@ class UpgradeVisitor(visitor.Visitor):
   See visitor.Visitor for visitor method docs comments.
   """
 
-  def __init__(self, typedb):
+  def __init__(self, typedb, envoy_internal_shadow):
     self._typedb = typedb
+    self._envoy_internal_shadow = envoy_internal_shadow
 
   def _UpgradedComment(self, c):
 
@@ -67,11 +68,14 @@ class UpgradeVisitor(visitor.Visitor):
       proto: DescriptorProto or EnumDescriptorProto message.
       field_or_value: field or value inside proto.
     """
-    reserved = proto.reserved_range.add()
-    reserved.start = field_or_value.number
-    reserved.end = field_or_value.number + 1
-    proto.reserved_name.append(field_or_value.name)
-    options.AddHideOption(field_or_value.options)
+    if self._envoy_internal_shadow:
+      field_or_value.name = 'hidden_envoy_deprecated_' + field_or_value.name
+    else:
+      reserved = proto.reserved_range.add()
+      reserved.start = field_or_value.number
+      reserved.end = field_or_value.number + 1
+      proto.reserved_name.append(field_or_value.name)
+      options.AddHideOption(field_or_value.options)
 
   def _Rename(self, proto, migrate_annotation):
     """Rename a field/enum/service/message
@@ -98,16 +102,23 @@ class UpgradeVisitor(visitor.Visitor):
 
   def VisitMessage(self, msg_proto, type_context, nested_msgs, nested_enums):
     upgraded_proto = copy.deepcopy(msg_proto)
-    if upgraded_proto.options.deprecated:
+    if upgraded_proto.options.deprecated and not self._envoy_internal_shadow:
       options.AddHideOption(upgraded_proto.options)
     options.SetVersioningAnnotation(upgraded_proto.options, type_context.name)
     # Mark deprecated fields as ready for deletion by protoxform.
     for f in upgraded_proto.field:
       if f.options.deprecated:
         self._Deprecate(upgraded_proto, f)
-        # Make sure the type name is erased so it isn't picked up by protoxform
-        # when computing deps.
-        f.type_name = ""
+        if self._envoy_internal_shadow:
+          # When shadowing, we use the upgraded version of types (which should
+          # themselves also be shadowed), to allow us to avoid unnecessary
+          # references to the previous version (and complexities around
+          # upgrading during API boosting).
+          f.type_name = self._UpgradedType(f.type_name)
+        else:
+          # Make sure the type name is erased so it isn't picked up by protoxform
+          # when computing deps.
+          f.type_name = ""
       else:
         f.type_name = self._UpgradedType(f.type_name)
       if f.options.HasExtension(migrate_pb2.field_migrate):
@@ -126,7 +137,7 @@ class UpgradeVisitor(visitor.Visitor):
       if v.options.deprecated:
         # We need special handling for the zero field, as proto3 needs some value
         # here.
-        if v.number == 0:
+        if v.number == 0 and not self._envoy_internal_shadow:
           v.name = 'DEPRECATED_AND_UNAVAILABLE_DO_NOT_USE'
         else:
           # Mark deprecated enum values as ready for deletion by protoxform.
@@ -163,10 +174,11 @@ class UpgradeVisitor(visitor.Visitor):
     return upgraded_proto
 
 
-def V3MigrationXform(file_proto):
+def V3MigrationXform(envoy_internal_shadow, file_proto):
   """Transform a FileDescriptorProto from v2[alpha\d] to v3alpha.
 
   Args:
+    envoy_internal_shadow: generate a shadow for Envoy internal use containing deprecated fields.
     file_proto: v2[alpha\d] FileDescriptorProto message.
 
   Returns:
@@ -179,4 +191,4 @@ def V3MigrationXform(file_proto):
       file_proto.name]:
     return None
   # Otherwise, this .proto needs upgrading, do it.
-  return traverse.TraverseFile(file_proto, UpgradeVisitor(typedb))
+  return traverse.TraverseFile(file_proto, UpgradeVisitor(typedb, envoy_internal_shadow))
