@@ -4,6 +4,12 @@ package envoy.v2;
 
 import "udpa/annotations/migrate.proto";
 
+enum SomeEnum {
+  DEFAULT = 0 [deprecated = true];
+  FOO = 1;
+  BAR = 2 [deprecated = true];
+}
+
 message Sample {
   message Entry {
     string key = 1;

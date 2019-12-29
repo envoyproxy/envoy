@@ -7,7 +7,7 @@
 # generation to support automation of Envoy API version translation.
 #
 # See https://github.com/google/protobuf/blob/master/src/google/protobuf/descriptor.proto
-# for the underlying protos mentioned in this file. See
+# for the underlying protos mentioned in this file.
 
 from collections import deque
 import functools
@@ -536,7 +536,10 @@ def ParameterCallback(parameter):
 def Main():
   plugin.Plugin([
       plugin.DirectOutputDescriptor('.v2.proto', ProtoFormatVisitor),
-      plugin.OutputDescriptor('.v3alpha.proto', ProtoFormatVisitor, migrate.V3MigrationXform)
+      plugin.OutputDescriptor('.v3alpha.proto', ProtoFormatVisitor,
+                              functools.partial(migrate.V3MigrationXform, False)),
+      plugin.OutputDescriptor('.v3alpha.envoy_internal.proto', ProtoFormatVisitor,
+                              functools.partial(migrate.V3MigrationXform, True))
   ], ParameterCallback)
 
 
