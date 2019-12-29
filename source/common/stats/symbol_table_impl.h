@@ -202,15 +202,18 @@ private:
   mutable Thread::MutexBasicLockable lock_;
 
   /**
-   * Decodes a vector of symbols back into its period-delimited stat name. If
-   * decoding fails on any part of the symbol_vec, we release_assert and crash
-   * hard, since this should never happen, and we don't want to continue running
-   * with a corrupt stats set.
+   * Decodes a uint8_t array into an array of period-delimited strings. Note
+   * that some of the strings may have periods in them, in the case where
+   * StatNameDynamicStorage was used.
    *
-   * @param symbols the vector of symbols to decode.
+   * If decoding fails on any part of the encoding, we RELEASE_ASSERT and crash,
+   * since this should never happen, and we don't want to continue running with
+   * corrupt stat names.
+   *
+   * @param array the uint8_t array of encoded symbols and dynamic strings.
+   * @param size the size of the array in bytes.
    * @return std::string the retrieved stat name.
    */
-  // std::string decodeSymbolVec(const SymbolVec& symbols) const;
   std::vector<absl::string_view> decodeStrings(const Storage array, uint64_t size) const;
 
   /**
@@ -270,6 +273,40 @@ private:
   RecentLookups recent_lookups_ GUARDED_BY(lock_);
 };
 
+// Base class for holding the backing-storing for a StatName. The two derived
+// classes, StatNameStorage and StatNameDynamicStore, share a need to hold an
+// array of bytes, but use different representations.
+class StatNameStorageBase {
+public:
+  StatNameStorageBase(SymbolTable::StoragePtr&& bytes) : bytes_(std::move(bytes)) {}
+  StatNameStorageBase(StatNameStorageBase&& src) : bytes_(std::move(src.bytes_)) {}
+  StatNameStorageBase() {}
+
+  /*  StatNameStorageBase& operator=(StatNameStorageBase&& src) {
+    if (&src != this && src.bytes_ != bytes_) {
+      bytes_ = std::move(src.bytes_);
+    }
+    return *this;
+    }*/
+
+  /**
+   * @return a reference to the owned storage.
+   */
+  inline StatName statName() const;
+
+  /**
+   * @return the encoded data as a const pointer.
+   */
+  const uint8_t* bytes() const { return bytes_.get(); }
+
+protected:
+  void setBytes(SymbolTable::StoragePtr&& bytes) { bytes_ = std::move(bytes); }
+  void clear() { bytes_.reset(); }
+
+private:
+  SymbolTable::StoragePtr bytes_;
+};
+
 /**
  * Holds backing storage for a StatName. Usage of this is not required, as some
  * applications may want to hold multiple StatName objects in one contiguous
@@ -283,7 +320,7 @@ private:
  * Thus this class is inconvenient to directly use as temp storage for building
  * a StatName from a string. Instead it should be used via StatNameManagedStorage.
  */
-class StatNameStorage {
+class StatNameStorage : public StatNameStorageBase {
 public:
   // Basic constructor for when you have a name as a string, and need to
   // generate symbols for it.
@@ -291,7 +328,7 @@ public:
 
   // Move constructor; needed for using StatNameStorage as an
   // absl::flat_hash_map value.
-  StatNameStorage(StatNameStorage&& src) noexcept : bytes_(std::move(src.bytes_)) {}
+  StatNameStorage(StatNameStorage&& src) noexcept : StatNameStorageBase(std::move(src)) {}
 
   // Obtains new backing storage for an already existing StatName. Used to
   // record a computed StatName held in a temp into a more persistent data
@@ -311,18 +348,6 @@ public:
    * @param table the symbol table.
    */
   void free(SymbolTable& table);
-
-  /**
-   * @return StatName a reference to the owned storage.
-   */
-  inline StatName statName() const;
-
-  uint8_t* bytes() { return bytes_.get(); }
-
-protected:
-  explicit StatNameStorage(SymbolTable::StoragePtr bytes) : bytes_(std::move(bytes)) {}
-
-  SymbolTable::StoragePtr bytes_;
 };
 
 /**
@@ -432,7 +457,7 @@ private:
   const uint8_t* size_and_data_{nullptr};
 };
 
-StatName StatNameStorage::statName() const { return StatName(bytes_.get()); }
+StatName StatNameStorageBase::statName() const { return StatName(bytes_.get()); }
 
 /**
  * Contains the backing store for a StatName and enough context so it can
@@ -464,17 +489,21 @@ private:
   SymbolTable& symbol_table_;
 };
 
-class StatNameDynamicStorage : public StatNameStorage {
+/**
+ * Holds backing-store for a dynamic stat, where are no global locks needed
+ * to create a StatName from a string, but there is no sharing of token data
+ * between names, so there may be more memory consumed.
+ */
+class StatNameDynamicStorage : public StatNameStorageBase {
 public:
-  // Basic constructor for when you have a name and need to generate an
-  // inlined StatName representation for it. Note that this will not access
-  // the SymbolTable lock, but it will cost considerably more memory as
-  // there will be no symbol sharing.
+  // Basic constructor based on a name. Note the table is used for
+  // a virtual-function call to encode the name, but no locks are taken
+  // in either implementation of the SymbolTable api.
   StatNameDynamicStorage(absl::string_view name, SymbolTable& table)
-      : StatNameStorage(table.makeDynamicStorage(name)) {}
+      : StatNameStorageBase(table.makeDynamicStorage(name)) {}
+  // Move constructor.
   StatNameDynamicStorage(StatNameDynamicStorage&& src) noexcept
-      : StatNameStorage(std::move(src.bytes_)) {}
-  ~StatNameDynamicStorage() { bytes_.reset(); }
+      : StatNameStorageBase(std::move(src)) {}
 };
 
 /**
@@ -487,7 +516,7 @@ public:
  *   StatNamePool pool(symbol_table);
  *   StatName name1 = pool.add("name1");
  *   StatName name2 = pool.add("name2");
- *   uint8_t* storage = pool.addReturningStorage("name3");
+ *   const uint8_t* storage = pool.addReturningStorage("name3");
  *   StatName name3(storage);
  */
 class StatNamePool {
@@ -522,7 +551,7 @@ public:
    * @return a pointer to the bytes held in the container for this name, suitable for
    *         using to construct a StatName.
    */
-  uint8_t* addReturningStorage(absl::string_view name);
+  const uint8_t* addReturningStorage(absl::string_view name);
 
 private:
   // We keep the stat names in a vector of StatNameStorage, storing the

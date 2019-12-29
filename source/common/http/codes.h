@@ -108,7 +108,7 @@ private:
 
   static constexpr uint32_t NumHttpCodes = 500;
   static constexpr uint32_t HttpCodeOffset = 100; // code 100 is at index 0.
-  mutable std::atomic<uint8_t*> rc_stat_names_[NumHttpCodes];
+  mutable std::atomic<const uint8_t*> rc_stat_names_[NumHttpCodes];
 };
 
 /**

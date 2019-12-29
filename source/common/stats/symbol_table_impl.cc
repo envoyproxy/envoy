@@ -24,10 +24,10 @@ static constexpr uint32_t Low7Bits = 0x7f;
 // When storing Symbol arrays, we disallow Symbol 0, which is the only Symbol
 // that will decode into uint8_t array starting (and ending) with {0}. Thus we
 // can use a leading 0 in in the first byte to indicate that what follows is
-// little char data, rather than symbol-table entries. Literal char data is
-// useful for dynamically discovered stat-name tokens where you don't want to
-// take a symbol table lock, and would rather pay extra memory overhead to
-// store the token fully elaborated.
+// literal char data, rather than symbol-table entries. Literal char data is
+// used for dynamically discovered stat-name tokens where you don't want to take
+// a symbol table lock, and would rather pay extra memory overhead to store the
+// tokens as fully elaborated strings.
 static constexpr Symbol FirstValidSymbol = 1;
 static constexpr uint8_t LiteralStringIndicator = 0;
 
@@ -202,6 +202,10 @@ void SymbolTableImpl::addTokensToEncoding(const absl::string_view name, Encoding
     Thread::LockGuard lock(lock_);
     recent_lookups_.lookup(name);
     for (auto& token : tokens) {
+      // TODO(jmarantz): consider using StatNameDynamicStorage for tokens with
+      // length below some threshold, say 4 bytes. It might be preferable not to
+      // reserve Symbols for every 3 digit number found (for example) in ipv4
+      // addresses.
       symbols.push_back(toSymbol(token));
     }
   }
@@ -224,20 +228,6 @@ void SymbolTableImpl::callWithStringView(StatName stat_name,
                                          const std::function<void(absl::string_view)>& fn) const {
   fn(toString(stat_name));
 }
-
-/*
-std::string SymbolTableImpl::decodeSymbolVec(const SymbolVec& symbols) const {
-  std::vector<absl::string_view> name_tokens;
-  name_tokens.reserve(symbols.size());
-  {
-    // Hold the lock only while decoding symbols.
-    Thread::LockGuard lock(lock_);
-    for (Symbol symbol : symbols) {
-      name_tokens.push_back(fromSymbol(symbol));
-    }
-  }
-  return absl::StrJoin(name_tokens, ".");
-  }*/
 
 void SymbolTableImpl::incRefCount(const StatName& stat_name) {
   // Before taking the lock, decode the array of symbols from the SymbolTable::Storage.
@@ -285,8 +275,8 @@ uint64_t SymbolTableImpl::getRecentLookups(const RecentLookupsFn& iter) const {
   uint64_t total = 0;
   absl::flat_hash_map<std::string, uint64_t> name_count_map;
 
-  // We also don't want to hold lock_ while calling the iterator, but we need it
-  // to access recent_lookups_.
+  // We don't want to hold lock_ while calling the iterator, but we need it to
+  // access recent_lookups_, so we buffer in name_count_map.
   {
     Thread::LockGuard lock(lock_);
     recent_lookups_.forEach(
@@ -419,13 +409,13 @@ SymbolTable::StoragePtr SymbolTableImpl::encode(absl::string_view name) {
 }
 
 StatNameStorage::StatNameStorage(absl::string_view name, SymbolTable& table)
-    : bytes_(table.encode(name)) {}
+    : StatNameStorageBase(table.encode(name)) {}
 
 StatNameStorage::StatNameStorage(StatName src, SymbolTable& table) {
   const uint64_t size = src.size();
   MemBlockBuilder<uint8_t> storage(size);
   src.copyToMemBlock(storage);
-  bytes_ = storage.release();
+  setBytes(storage.release());
   table.incRefCount(statName());
 }
 
@@ -463,12 +453,12 @@ StatNameStorage::~StatNameStorage() {
   // decrement the reference counts held by the SymbolTable on behalf of
   // this StatName. This saves 8 bytes of storage per stat, relative to
   // holding a SymbolTable& in each StatNameStorage object.
-  ASSERT(bytes_ == nullptr);
+  ASSERT(bytes() == nullptr);
 }
 
 void StatNameStorage::free(SymbolTable& table) {
   table.free(statName());
-  bytes_.reset();
+  clear();
 }
 
 void StatNamePool::clear() {
@@ -478,7 +468,7 @@ void StatNamePool::clear() {
   storage_vector_.clear();
 }
 
-uint8_t* StatNamePool::addReturningStorage(absl::string_view str) {
+const uint8_t* StatNamePool::addReturningStorage(absl::string_view str) {
   storage_vector_.push_back(Stats::StatNameStorage(str, symbol_table_));
   return storage_vector_.back().bytes();
 }

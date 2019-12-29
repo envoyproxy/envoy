@@ -180,7 +180,7 @@ Stats::StatName CodeStatsImpl::upstreamRqStatName(Code response_code) const {
   if (rc_index >= NumHttpCodes) {
     return upstream_rq_unknown_;
   }
-  std::atomic<uint8_t*>& atomic_ref = rc_stat_names_[rc_index];
+  std::atomic<const uint8_t*>& atomic_ref = rc_stat_names_[rc_index];
   if (atomic_ref.load() == nullptr) {
     absl::MutexLock lock(&mutex_);
 
