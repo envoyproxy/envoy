@@ -8,7 +8,7 @@ tap files; it is not a literal wire tap.
 
 Usage:
 
-bazel run @envoy_api//tools:tap2pcap <tap .pb/.pb_text> <pcap path>
+bazel run @envoy_api_canonical//tools:tap2pcap <tap .pb/.pb_text> <pcap path>
 
 Known issues:
 - IPv6 PCAP generation has malformed TCP packets. This appears to be a text2pcap
