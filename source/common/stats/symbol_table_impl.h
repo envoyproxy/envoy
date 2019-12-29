@@ -94,6 +94,18 @@ public:
      * Decodes a uint8_t array into a SymbolVec.
      */
     static SymbolVec decodeSymbols(const SymbolTable::Storage array, uint64_t size);
+
+    /**
+     * Decodes a uint8_t array into a sequence of symbols and literal strings.
+     * There are distinct lambdas for these two options. Calls to these lambdas
+     * will be interleaved based on the sequencing of literal strings and
+     * symbols held in the data.
+     *
+     * @param array the StatName encoded as a uint8_t array.
+     * @param size the size of the array in bytes.
+     * @param symbolTokenFn a function to be called whenever a symbol is encountered in the array.
+     * @param stringVIewTokeNFn a function to be called whenever a string literal is encountered.
+     */
     static void decodeTokens(const SymbolTable::Storage array, uint64_t size,
                              const std::function<void(Symbol)>& symbolTokenFn,
                              const std::function<void(absl::string_view)>& stringViewTokenFn);
@@ -279,15 +291,7 @@ private:
 class StatNameStorageBase {
 public:
   StatNameStorageBase(SymbolTable::StoragePtr&& bytes) : bytes_(std::move(bytes)) {}
-  StatNameStorageBase(StatNameStorageBase&& src) : bytes_(std::move(src.bytes_)) {}
   StatNameStorageBase() {}
-
-  /*  StatNameStorageBase& operator=(StatNameStorageBase&& src) {
-    if (&src != this && src.bytes_ != bytes_) {
-      bytes_ = std::move(src.bytes_);
-    }
-    return *this;
-    }*/
 
   /**
    * @return a reference to the owned storage.

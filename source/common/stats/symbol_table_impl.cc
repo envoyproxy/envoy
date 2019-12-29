@@ -130,8 +130,8 @@ void SymbolTableImpl::Encoding::decodeTokens(
     const std::function<void(absl::string_view)>& stringViewTokenFn) {
   while (size > 0) {
     if (*array == LiteralStringIndicator) {
-      // To avoid scanning memory during decode
-
+      // To avoid scanning memory to find the literal size during decode, we
+      // var-length encode the size of the literal string prior to the data.
       ASSERT(size > 1);
       ++array;
       --size;
