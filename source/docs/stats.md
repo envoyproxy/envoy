@@ -40,8 +40,8 @@ This implementation is complicated so here is a rough overview of the threading 
    shared across all worker threads.
  * Per thread caches are checked, and if empty, they are populated from the central cache.
  * Scopes are entirely owned by the caller. The store only keeps weak pointers.
- * When a scope is destroyed, a cache flush operation is run on all threads to flush any cached
-   data owned by the destroyed scope.
+ * When a scope is destroyed, a cache flush operation is posted on all threads to flush any
+   cached data owned by the destroyed scope.
  * Scopes use a unique incrementing ID for the cache key. This ensures that if a new scope is
    created at the same address as a recently deleted scope, cache references will not accidentally
    reference the old scope which may be about to be cache flushed.
@@ -130,8 +130,21 @@ across the codebase.
 `const StatName` member variables. Most names should be established during
 process initializion or in response to xDS updates.
 
-`StatNameSet` provides some associative lookups at runtime, using two maps: a
-static map and a dynamic map.
+`StatNameSet` provides some associative lookups at runtime. The associations
+should be created before the set is used for requests, via
+`StatNameSet::rememberBuiltin`. This is useful in scenarios where stat-names are
+derived from data in a request, but there are limited set of known tokens, such
+as SSL ciphers or Redis commands.
+
+### Dynamic stat tokens
+
+While stats are usually composed of tokens that are known at compile-time, there
+are scenarios where the names are newly discovered from data in requests. To
+avoid taking locks in this case, tokens can be formed dynamically using
+`StatNameDynamicStorage` or `StatNameDynamicPool`. In this case we lose
+substring sharing but we avoid taking locks. Dynamically generaeted tokens can
+be combined with symbolized tokens from `StatNameSet` or `StatNamePool` using
+`SymbolTable::join()`.
 
 ### Current State and Strategy To Deploy Symbol Tables
 
