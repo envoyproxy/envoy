@@ -180,6 +180,7 @@ envoy_cc_test_library(
     hdrs = ["listener_manager_impl_test.h"],
     data = ["//test/extensions/transport_sockets/tls/test_data:certs"],
     deps = [
+        "//source/server:api_listener_lib",
         "//source/server:listener_lib",
         "//test/mocks/network:network_mocks",
         "//test/mocks/server:server_mocks",
