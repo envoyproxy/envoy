@@ -25,19 +25,19 @@ absence of a version header could be:
   http_filters:
     - name: envoy.filters.http.header_to_metadata
       typed_config:
-				"@type": type.googleapis.com/envoy.config.filter.http.header_to_metadata.v2.Config
+        "@type": type.googleapis.com/envoy.config.filter.http.header_to_metadata.v2.Config
         request_rules:
-	  - header: x-version
-	    on_header_present:
-	      metadata_namespace: envoy.lb
-	      key: version
-	      type: STRING
-	    on_header_missing:
-	      metadata_namespace: envoy.lb
-	      key: default
-	      value: 'true'
-	      type: STRING
-	    remove: false
+          - header: x-version
+            on_header_present:
+              metadata_namespace: envoy.lb
+              key: version
+              type: STRING
+            on_header_missing:
+              metadata_namespace: envoy.lb
+              key: default
+              value: 'true'
+              type: STRING
+            remove: false
 
 
 A corresponding upstream cluster configuration could be:
