@@ -261,42 +261,47 @@ def GenerateCurrentApiDir(api_dir, dst_dir):
   shutil.rmtree(str(dst.joinpath("service", "auth", "v2alpha")))
 
 
-if __name__ == '__main__':
-  parser = argparse.ArgumentParser()
-  parser.add_argument('--mode', choices=['check', 'fix'])
-  parser.add_argument('--api_repo', default='envoy_api')
-  parser.add_argument('--api_root', default='api')
-  parser.add_argument('labels', nargs='*')
-  args = parser.parse_args()
+def Sync(api_root, mode, labels, shadow):
   pkg_deps = []
-
   with tempfile.TemporaryDirectory() as tmp:
     dst_dir = pathlib.Path(tmp).joinpath("b")
-    for label in args.labels:
-      pkg_deps += SyncProtoFile(args.mode, utils.BazelBinPathForOutputArtifact(label, '.v2.proto'),
+    for label in labels:
+      pkg_deps += SyncProtoFile(mode, utils.BazelBinPathForOutputArtifact(label, '.v2.proto'),
                                 dst_dir)
-      pkg_deps += SyncProtoFile(args.mode,
-                                utils.BazelBinPathForOutputArtifact(label, '.v3alpha.proto'),
-                                dst_dir)
-    SyncBuildFiles(args.mode, dst_dir)
+      pkg_deps += SyncProtoFile(
+          mode,
+          utils.BazelBinPathForOutputArtifact(
+              label, '.v3alpha.envoy_internal.proto' if shadow else '.v3alpha.proto'), dst_dir)
+    SyncBuildFiles(mode, dst_dir)
 
     current_api_dir = pathlib.Path(tmp).joinpath("a")
     current_api_dir.mkdir(0o755, True, True)
-    api_root = pathlib.Path(args.api_root)
-    GenerateCurrentApiDir(api_root, current_api_dir)
+    api_root_path = pathlib.Path(api_root)
+    GenerateCurrentApiDir(api_root_path, current_api_dir)
 
     diff = subprocess.run(['diff', '-Npur', "a", "b"], cwd=tmp, stdout=subprocess.PIPE).stdout
 
     if diff.strip():
-      if args.mode == "check":
-        print("Please apply following patch to directory '{}'".format(args.api_root),
-              file=sys.stderr)
+      if mode == "check":
+        print("Please apply following patch to directory '{}'".format(api_root), file=sys.stderr)
         print(diff.decode(), file=sys.stderr)
         sys.exit(1)
-      if args.mode == "fix":
-        subprocess.run(['patch', '-p1'], input=diff, cwd=str(api_root.resolve()))
+      if mode == "fix":
+        subprocess.run(['patch', '-p1'], input=diff, cwd=str(api_root_path.resolve()))
 
-  with open('./api/BUILD', 'w') as f:
+  with open(os.path.join(api_root, 'BUILD'), 'w') as f:
     formatted_deps = '\n'.join(
         '        "%s",' % d for d in sorted(set(pkg_deps), key=BuildOrderKey))
     f.write(TOP_LEVEL_API_BUILD_FILE_TEMPLATE.substitute(deps=formatted_deps))
+
+
+if __name__ == '__main__':
+  parser = argparse.ArgumentParser()
+  parser.add_argument('--mode', choices=['check', 'fix'])
+  parser.add_argument('--api_root', default='./api')
+  parser.add_argument('--api_shadow_root', default='./generated_api_shadow')
+  parser.add_argument('labels', nargs='*')
+  args = parser.parse_args()
+
+  Sync(args.api_root, args.mode, args.labels, False)
+  Sync(args.api_shadow_root, args.mode, args.labels, True)
