@@ -3360,7 +3360,7 @@ envoy_cc_test_library(
     srcs = [
         "quiche/common/platform/api/quiche_endian_test.cc",
         "quiche/common/platform/api/quiche_str_cat_test.cc",
-        "quiche/common/platform/api/quiche_test_utils_test.cc",
+        "quiche/common/platform/api/quiche_text_utils_test.cc",
     ],
     hdrs = ["quiche/common/platform/api/quiche_test.h"],
     repository = "@envoy",
