@@ -3344,7 +3344,7 @@ envoy_cc_library(
         "quiche/common/platform/api/quiche_string_piece.h",
         "quiche/common/platform/api/quiche_test.h",
         "quiche/common/platform/api/quiche_text_utils.h",
-	"quiche/common/platform/api/quiche_unordered_containers.h",
+        "quiche/common/platform/api/quiche_unordered_containers.h",
     ],
     repository = "@envoy",
     tags = ["nofips"],
@@ -3358,15 +3358,15 @@ envoy_cc_library(
 envoy_cc_test_library(
     name = "quiche_common_platform_test",
     srcs = [
-	"quiche/common/platform/api/quiche_endian_test.cc",
-	"quiche/common/platform/api/quiche_str_cat_test.cc",
-	"quiche/common/platform/api/quiche_text_utils_test.cc",
+        "quiche/common/platform/api/quiche_endian_test.cc",
+        "quiche/common/platform/api/quiche_str_cat_test.cc",
+        "quiche/common/platform/api/quiche_text_utils_test.cc",
     ],
     hdrs = ["quiche/common/platform/api/quiche_test.h"],
     repository = "@envoy",
     tags = ["nofips"],
     deps = [
-    	":quiche_common_platform",
+        ":quiche_common_platform",
         ":quiche_common_platform_endian",
         "@envoy//test/extensions/quic_listeners/quiche/platform:quiche_common_platform_test_impl_lib",
     ],
