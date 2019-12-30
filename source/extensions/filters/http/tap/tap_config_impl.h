@@ -45,10 +45,11 @@ public:
   bool onDestroyLog() override;
 
 private:
-  using MutableBodyChunk =
-      envoy::data::tap::v2alpha::Body* (envoy::data::tap::v2alpha::HttpStreamedTraceSegment::*)();
-  using MutableMessage = envoy::data::tap::v2alpha::HttpBufferedTrace::Message* (
-      envoy::data::tap::v2alpha::HttpBufferedTrace::*)();
+  using HttpStreamedTraceSegment = envoy::data::tap::v2alpha::HttpStreamedTraceSegment;
+  using MutableBodyChunk = envoy::data::tap::v2alpha::Body* (HttpStreamedTraceSegment::*)();
+  using HttpBufferedTrace = envoy::data::tap::v2alpha::HttpBufferedTrace;
+  using MutableMessage =
+      envoy::data::tap::v2alpha::HttpBufferedTrace::Message* (HttpBufferedTrace::*)();
 
   void onBody(const Buffer::Instance& data,
               Extensions::Common::Tap::TraceWrapperPtr& buffered_streamed_body,
