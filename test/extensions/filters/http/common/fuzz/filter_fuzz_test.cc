@@ -25,10 +25,18 @@ namespace HttpFilters {
 
 class UberFilterFuzzer {
 public:
-  UberFilterFuzzer() {}
+  UberFilterFuzzer() {
+    ON_CALL(filter_callback_, addStreamDecoderFilter(_))
+        .WillByDefault(
+            Invoke([&](std::shared_ptr<Envoy::Http::StreamDecoderFilter> filter) -> void {
+              filter_ = filter;
+              filter_->setDecoderFilterCallbacks(callbacks_);
+            }));
+  }
 
   // This executes the methods to be fuzzed.
   void decode(Http::StreamDecoderFilter* filter, const test::fuzz::HttpData& data) {
+    ENVOY_LOG_MISC(info, "Decoding {} with filter", data.DebugString());
     bool end_stream = false;
 
     Http::TestHeaderMapImpl headers = Fuzz::fromHeaders(data.headers());
@@ -53,14 +61,13 @@ public:
 
   // This sets expectations on the mock to run the code to be fuzzed.
   void fuzz(const Http::FilterFactoryCb& cb, const test::fuzz::HttpData& data) {
-    // Need to reset this expectation hack each call. This causes a 10x slowdown.
-    ON_CALL(filter_callback_, addStreamFilter(_))
-        .WillByDefault(Invoke(
-            [data, this](Http::StreamFilterSharedPtr filter) { decode(filter.get(), data); }));
     cb(filter_callback_);
+    decode(filter_.get(), data);
   }
 
+  NiceMock<Http::MockStreamDecoderFilterCallbacks> callbacks_;
   NiceMock<Http::MockFilterChainFactoryCallbacks> filter_callback_;
+  std::shared_ptr<Http::StreamDecoderFilter> filter_;
 };
 
 DEFINE_PROTO_FUZZER(const test::extensions::filters::http::FilterFuzzTestCase& input) {
