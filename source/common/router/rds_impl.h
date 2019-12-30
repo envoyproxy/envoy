@@ -140,12 +140,11 @@ private:
       const uint64_t manager_identifier,
       Server::Configuration::ServerFactoryContext& factory_context,
       ProtobufMessage::ValidationVisitor& validator, Init::Manager& init_manager,
-      const std::string& stat_prefix, RouteConfigProviderManagerImpl& route_config_provider_manager,
-      const envoy::api::v2::core::ConfigSource::XdsApiVersion xds_api_version =
-          envoy::api::v2::core::ConfigSource::AUTO);
+      const std::string& stat_prefix,
+      RouteConfigProviderManagerImpl& route_config_provider_manager);
 
   bool validateUpdateSize(int num_resources);
-  std::string loadTypeUrl();
+  static std::string loadTypeUrl(envoy::api::v2::core::ApiVersion resource_api_version);
 
   Init::Manager& getRdsConfigInitManager() { return init_manager_; }
 
@@ -165,7 +164,6 @@ private:
   VhdsSubscriptionPtr vhds_subscription_;
   RouteConfigUpdatePtr config_update_info_;
   Common::CallbackManager<> update_callback_manager_;
-  envoy::api::v2::core::ConfigSource::XdsApiVersion xds_api_version_;
 
   friend class RouteConfigProviderManagerImpl;
   // Access to addUpdateCallback

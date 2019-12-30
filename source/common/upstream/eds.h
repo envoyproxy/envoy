@@ -43,7 +43,7 @@ private:
   std::string resourceName(const ProtobufWkt::Any& resource) override {
     return MessageUtil::anyConvert<envoy::api::v2::ClusterLoadAssignment>(resource).cluster_name();
   }
-  std::string loadTypeUrl();
+  static std::string loadTypeUrl(envoy::api::v2::core::ApiVersion resource_api_version);
   using LocalityWeightsMap =
       std::unordered_map<envoy::api::v2::core::Locality, uint32_t, LocalityHash, LocalityEqualTo>;
   bool updateHostsPerLocality(const uint32_t priority, const uint32_t overprovisioning_factor,
@@ -80,7 +80,6 @@ private:
   Event::TimerPtr assignment_timeout_;
   ProtobufMessage::ValidationVisitor& validation_visitor_;
   InitializePhase initialize_phase_;
-  envoy::api::v2::core::ConfigSource::XdsApiVersion xds_api_version_;
 };
 
 class EdsClusterFactory : public ClusterFactoryImplBase {

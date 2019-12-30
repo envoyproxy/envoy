@@ -6,6 +6,7 @@
 #include "envoy/config/subscription.h"
 
 #include "common/common/logger.h"
+#include "common/config/api_version.h"
 #include "common/config/delta_subscription_state.h"
 #include "common/config/grpc_stream.h"
 #include "common/config/pausable_ack_queue.h"
@@ -110,7 +111,8 @@ private:
   // the order of Envoy's dependency ordering).
   std::list<std::string> subscription_ordering_;
 
-  GrpcStream<envoy::api::v2::DeltaDiscoveryRequest, envoy::api::v2::DeltaDiscoveryResponse>
+  GrpcStream<API_NO_BOOST(envoy::api::v2::DeltaDiscoveryRequest),
+             envoy::api::v2::DeltaDiscoveryResponse>
       grpc_stream_;
 };
 

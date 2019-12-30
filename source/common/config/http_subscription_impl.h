@@ -4,6 +4,7 @@
 #include "envoy/config/subscription.h"
 #include "envoy/event/dispatcher.h"
 
+#include "common/config/api_version.h"
 #include "common/http/rest_api_fetcher.h"
 
 namespace Envoy {
@@ -45,7 +46,7 @@ private:
 
   std::string path_;
   Protobuf::RepeatedPtrField<std::string> resources_;
-  envoy::api::v2::DiscoveryRequest request_;
+  API_NO_BOOST(envoy::api::v2::DiscoveryRequest) request_;
   Config::SubscriptionCallbacks& callbacks_;
   SubscriptionStats stats_;
   Event::Dispatcher& dispatcher_;

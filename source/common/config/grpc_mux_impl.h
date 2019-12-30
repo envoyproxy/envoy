@@ -13,6 +13,7 @@
 
 #include "common/common/cleanup.h"
 #include "common/common/logger.h"
+#include "common/config/api_version.h"
 #include "common/config/grpc_stream.h"
 #include "common/config/utility.h"
 
@@ -59,7 +60,7 @@ public:
   void onDiscoveryResponse(std::unique_ptr<envoy::api::v2::DiscoveryResponse>&& message) override;
   void onWriteable() override;
 
-  GrpcStream<envoy::api::v2::DiscoveryRequest, envoy::api::v2::DiscoveryResponse>&
+  GrpcStream<API_NO_BOOST(envoy::api::v2::DiscoveryRequest), envoy::api::v2::DiscoveryResponse>&
   grpcStreamForTest() {
     return grpc_stream_;
   }
@@ -102,7 +103,7 @@ private:
     // Watches on the returned resources for the API;
     std::list<GrpcMuxWatchImpl*> watches_;
     // Current DiscoveryRequest for API.
-    envoy::api::v2::DiscoveryRequest request_;
+    API_NO_BOOST(envoy::api::v2::DiscoveryRequest) request_;
     // Paused via pause()?
     bool paused_{};
     // Was a DiscoveryRequest elided during a pause?
@@ -115,7 +116,8 @@ private:
   void queueDiscoveryRequest(const std::string& queue_item);
   void clearRequestQueue();
 
-  GrpcStream<envoy::api::v2::DiscoveryRequest, envoy::api::v2::DiscoveryResponse> grpc_stream_;
+  GrpcStream<API_NO_BOOST(envoy::api::v2::DiscoveryRequest), envoy::api::v2::DiscoveryResponse>
+      grpc_stream_;
   const LocalInfo::LocalInfo& local_info_;
   const bool skip_subsequent_node_;
   bool first_stream_request_;

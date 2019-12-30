@@ -41,8 +41,8 @@ public:
                    Server::Configuration::ServerFactoryContext& factory_context,
                    const std::string& stat_prefix,
                    std::unordered_set<RouteConfigProvider*>& route_config_providers,
-                   const envoy::api::v2::core::ConfigSource::XdsApiVersion xds_api_version =
-                       envoy::api::v2::core::ConfigSource::AUTO);
+                   const envoy::api::v2::core::ApiVersion xds_api_version =
+                       envoy::api::v2::core::ApiVersion::AUTO);
   ~VhdsSubscription() override { init_target_.ready(); }
 
   void registerInitTargetWithInitManager(Init::Manager& m) { m.add(init_target_); }
@@ -60,7 +60,7 @@ private:
   std::string resourceName(const ProtobufWkt::Any& resource) override {
     return MessageUtil::anyConvert<envoy::api::v2::route::VirtualHost>(resource).name();
   }
-  std::string loadTypeUrl();
+  static std::string loadTypeUrl(envoy::api::v2::core::ApiVersion resource_api_version);
 
   RouteConfigUpdatePtr& config_update_info_;
   Stats::ScopePtr scope_;
@@ -68,7 +68,7 @@ private:
   std::unique_ptr<Envoy::Config::Subscription> subscription_;
   Init::TargetImpl init_target_;
   std::unordered_set<RouteConfigProvider*>& route_config_providers_;
-  envoy::api::v2::core::ConfigSource::XdsApiVersion xds_api_version_;
+  envoy::api::v2::core::ApiVersion resource_api_version_;
 };
 
 using VhdsSubscriptionPtr = std::unique_ptr<VhdsSubscription>;

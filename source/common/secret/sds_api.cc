@@ -7,6 +7,7 @@
 #include "envoy/api/v2/core/config_source.pb.h"
 #include "envoy/api/v2/discovery.pb.h"
 
+#include "common/common/assert.h"
 #include "common/config/api_version.h"
 #include "common/config/resources.h"
 #include "common/protobuf/utility.h"
@@ -23,8 +24,7 @@ SdsApi::SdsApi(envoy::api::v2::core::ConfigSource sds_config, absl::string_view 
       secret_hash_(0), clean_up_(std::move(destructor_cb)), validation_visitor_(validation_visitor),
       subscription_factory_(subscription_factory),
       time_source_(time_source), secret_data_{sds_config_name_, "uninitialized",
-                                              time_source_.systemTime()},
-      xds_api_version_(sds_config_.xds_api_version()) {
+                                              time_source_.systemTime()} {
   // TODO(JimmyCYJ): Implement chained_init_manager, so that multiple init_manager
   // can be chained together to behave as one init_manager. In that way, we let
   // two listeners which share same SdsApi to register at separate init managers, and
@@ -81,23 +81,23 @@ void SdsApi::validateUpdateSize(int num_resources) {
 }
 
 void SdsApi::initialize() {
-  subscription_ =
-      subscription_factory_.subscriptionFromConfigSource(sds_config_, loadTypeUrl(), stats_, *this);
+  subscription_ = subscription_factory_.subscriptionFromConfigSource(
+      sds_config_, loadTypeUrl(sds_config_.resource_api_version()), stats_, *this);
   subscription_->start({sds_config_name_});
 }
 
-std::string SdsApi::loadTypeUrl() {
-  switch (xds_api_version_) {
+std::string SdsApi::loadTypeUrl(envoy::api::v2::core::ApiVersion resource_api_version) {
+  switch (resource_api_version) {
   // automatically set api version as V2
-  case envoy::api::v2::core::ConfigSource::AUTO:
-  case envoy::api::v2::core::ConfigSource::V2:
+  case envoy::api::v2::core::ApiVersion::AUTO:
+  case envoy::api::v2::core::ApiVersion::V2:
     return Grpc::Common::typeUrl(
         API_NO_BOOST(envoy::api::v2::auth::Secret().GetDescriptor()->full_name()));
-  case envoy::api::v2::core::ConfigSource::V3ALPHA:
+  case envoy::api::v2::core::ApiVersion::V3ALPHA:
     return Grpc::Common::typeUrl(
         API_NO_BOOST(envoy::api::v2::auth::Secret().GetDescriptor()->full_name()));
   default:
-    throw EnvoyException(fmt::format("type {} is not supported", xds_api_version_));
+    NOT_REACHED_GCOVR_EXCL_LINE;
   }
 }
 

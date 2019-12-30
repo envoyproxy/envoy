@@ -64,6 +64,7 @@ envoy_cc_library(
     srcs = ["delta_subscription_impl.cc"],
     hdrs = ["delta_subscription_impl.h"],
     deps = [
+        ":api_version_lib",
         ":grpc_stream_lib",
         ":new_grpc_mux_lib",
         ":utility_lib",
@@ -136,6 +137,7 @@ envoy_cc_library(
     srcs = ["grpc_mux_impl.cc"],
     hdrs = ["grpc_mux_impl.h"],
     deps = [
+        ":api_version_lib",
         ":grpc_stream_lib",
         ":utility_lib",
         "//include/envoy/config:grpc_mux_interface",
@@ -197,6 +199,7 @@ envoy_cc_library(
         "http_api_protos",
     ],
     deps = [
+        ":api_version_lib",
         "//include/envoy/config:subscription_interface",
         "//include/envoy/event:dispatcher_interface",
         "//source/common/buffer:buffer_lib",
@@ -299,6 +302,7 @@ envoy_cc_library(
         "//source/common/protobuf",
         "@envoy_api//envoy/api/v2:pkg_cc_proto",
         "@envoy_api//envoy/api/v2/auth:pkg_cc_proto",
+        "@envoy_api//envoy/api/v2/core:pkg_cc_proto",
         "@envoy_api//envoy/api/v2/route:pkg_cc_proto",
         "@envoy_api//envoy/service/discovery/v2:pkg_cc_proto",
     ],
