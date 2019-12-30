@@ -11,6 +11,7 @@ Types
   ../type/percent.proto
   ../type/range.proto
   ../type/semantic_version.proto
+  ../type/token_bucket.proto
   ../type/matcher/metadata.proto
   ../type/matcher/number.proto
   ../type/matcher/regex.proto
