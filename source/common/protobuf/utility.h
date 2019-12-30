@@ -56,12 +56,6 @@
   ((message).has_##field_name() ? DurationUtil::durationToSeconds((message).field_name())          \
                                 : throw MissingFieldException(#field_name, (message)))
 
-// Obtain the seconds value of a google.protobuf.Duration field if set. Otherwise, return the
-// default value.
-#define PROTOBUF_GET_SECONDS_OR_DEFAULT(message, field_name, default_value)                        \
-  ((message).has_##field_name() ? DurationUtil::durationToSeconds((message).field_name())          \
-                                : (default_value))
-
 namespace Envoy {
 namespace ProtobufPercentHelper {
 
