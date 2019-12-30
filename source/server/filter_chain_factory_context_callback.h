@@ -10,7 +10,8 @@ namespace Envoy {
 namespace Server {
 
 /**
- * Handles FilterChainFactoryContext creation. Filter chain contexts are maintained in batch.
+ * Handles FilterChainFactoryContext creation. Filter chain contexts are maintained in batch. All
+ * the contexts in the batch are conceptually tracked by the same init manager.
  */
 class FilterChainFactoryContextCallback {
 public:
@@ -29,7 +30,7 @@ public:
       const ::envoy::api::v2::listener::FilterChain* const filter_chain) PURE;
 
   /**
-   * Ends the creation of the filter chain context batch.
+   * End the creation of the filter chain context batch.
    */
   virtual void commitFilterChainFactoryContexts() PURE;
 };
