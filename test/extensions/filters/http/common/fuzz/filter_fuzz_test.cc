@@ -59,12 +59,25 @@ public:
     }
   }
 
-  // This sets expectations on the mock to run the code to be fuzzed.
-  void fuzz(const Http::FilterFactoryCb& cb, const test::fuzz::HttpData& data) {
+  // This creates the filter from the proto and runs decode.
+  void
+  fuzz(const envoy::config::filter::network::http_connection_manager::v2::HttpFilter& proto_config,
+       const test::fuzz::HttpData& data) {
+    // TODO: Dissociate filter creation from active stream.
+    auto& factory =
+        Config::Utility::getAndCheckFactory<Server::Configuration::NamedHttpFilterConfigFactory>(
+            proto_config.name());
+    ProtobufTypes::MessagePtr message = Config::Utility::translateToFactoryConfig(
+        proto_config, Envoy::ProtobufMessage::getNullValidationVisitor(), factory);
+    Http::FilterFactoryCb cb =
+        factory.createFilterFactoryFromProto(*message, "fuzz", factory_context_);
+
+    // Set the filter_ and execute the code to  be fuzzed.
     cb(filter_callback_);
     decode(filter_.get(), data);
   }
 
+  NiceMock<Server::Configuration::MockFactoryContext> factory_context_;
   NiceMock<Http::MockStreamDecoderFilterCallbacks> callbacks_;
   NiceMock<Http::MockFilterChainFactoryCallbacks> filter_callback_;
   std::shared_ptr<Http::StreamDecoderFilter> filter_;
@@ -79,24 +92,13 @@ typed_config:
     "@type": type.googleapis.com/envoy.config.filter.http.buffer.v2.Buffer
     max_request_bytes : 5242880
 )EOF";
-
-  // Create proto_config.
+  // Create proto_config from the string.
   envoy::config::filter::network::http_connection_manager::v2::HttpFilter proto_config;
   TestUtility::loadFromYaml(config_string, proto_config);
 
-  // TODO: Dissociate filter creation from active stream.
-  static NiceMock<Server::Configuration::MockFactoryContext> factory_context_;
-  auto& factory =
-      Config::Utility::getAndCheckFactory<Server::Configuration::NamedHttpFilterConfigFactory>(
-          proto_config.name());
-  ProtobufTypes::MessagePtr message = Config::Utility::translateToFactoryConfig(
-      proto_config, Envoy::ProtobufMessage::getNullValidationVisitor(), factory);
-  Http::FilterFactoryCb cb =
-      factory.createFilterFactoryFromProto(*message, "fuzz", factory_context_);
-
   // Fuzz filter.
   static UberFilterFuzzer fuzzer;
-  fuzzer.fuzz(cb, input.data());
+  fuzzer.fuzz(proto_config, input.data());
 }
 
 } // namespace HttpFilters
