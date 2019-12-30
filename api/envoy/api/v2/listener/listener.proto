@@ -10,6 +10,7 @@ import "google/protobuf/any.proto";
 import "google/protobuf/struct.proto";
 import "google/protobuf/wrappers.proto";
 
+import "udpa/annotations/migrate.proto";
 import "validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.api.v2.listener";
@@ -72,7 +73,7 @@ message FilterChainMatch {
     ANY = 0;
 
     // Match a connection originating from the same host.
-    LOCAL = 1;
+    LOCAL = 1 [(udpa.annotations.enum_value_migrate).rename = "SAME_IP_OR_LOOPBACK"];
 
     // Match a connection originating from a different host.
     EXTERNAL = 2;

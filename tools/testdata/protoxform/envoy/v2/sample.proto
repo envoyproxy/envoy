@@ -8,6 +8,7 @@ enum SomeEnum {
   DEFAULT = 0 [deprecated = true];
   FOO = 1;
   BAR = 2 [deprecated = true];
+  BAZ = 3 [(udpa.annotations.enum_value_migrate).rename = "WOW"];
 }
 
 message Sample {
