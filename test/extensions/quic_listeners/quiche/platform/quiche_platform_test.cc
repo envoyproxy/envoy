@@ -16,7 +16,7 @@ TEST(QuichePlatformTest, Arraysize) {
   EXPECT_EQ(5, QUICHE_ARRAYSIZE(array));
 }
 
-TEST(QuicPlatformTest, StringPiece) {
+TEST(QuichePlatformTest, StringPiece) {
   std::string s = "bar";
   QuicheStringPiece sp(s);
   EXPECT_EQ('b', sp[0]);

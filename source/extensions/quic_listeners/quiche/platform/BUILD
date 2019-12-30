@@ -269,6 +269,7 @@ envoy_cc_library(
     visibility = ["//visibility:public"],
     deps = [
         ":quic_platform_logging_impl_lib",
+        ":string_utils_lib",
     ],
 )
 
