@@ -8,6 +8,7 @@
 #include "envoy/api/v2/srds.pb.h"
 #include "envoy/api/v2/srds.pb.validate.h"
 #include "envoy/config/filter/network/http_connection_manager/v2/http_connection_manager.pb.h"
+#include "envoy/service/route/v3alpha/srds.pb.h"
 
 #include "common/common/assert.h"
 #include "common/common/cleanup.h"
@@ -99,14 +100,11 @@ ScopedRdsConfigSubscription::ScopedRdsConfigSubscription(
       stats_({ALL_SCOPED_RDS_STATS(POOL_COUNTER(*scope_))}),
       rds_config_source_(std::move(rds_config_source)),
       validation_visitor_(factory_context.messageValidationVisitor()), stat_prefix_(stat_prefix),
-      route_config_provider_manager_(route_config_provider_manager) {
+      route_config_provider_manager_(route_config_provider_manager),
+      xds_api_version_(rds_config_source_.xds_api_version()) {
   subscription_ =
       factory_context.clusterManager().subscriptionFactory().subscriptionFromConfigSource(
-          scoped_rds.scoped_rds_config_source(),
-          Grpc::Common::typeUrl(API_NO_BOOST(envoy::api::v2::ScopedRouteConfiguration)()
-                                    .GetDescriptor()
-                                    ->full_name()),
-          *scope_, *this);
+          scoped_rds.scoped_rds_config_source(), loadTypeUrl(), *scope_, *this);
 
   initialize([scope_key_builder]() -> Envoy::Config::ConfigProvider::ConfigConstSharedPtr {
     return std::make_shared<ScopedConfigImpl>(
@@ -343,6 +341,21 @@ void ScopedRdsConfigSubscription::onConfigUpdate(
     *to_remove_repeated.Add() = scoped_route.first;
   }
   onConfigUpdate(to_add_repeated, to_remove_repeated, version_info);
+}
+
+std::string ScopedRdsConfigSubscription::loadTypeUrl() {
+  switch (xds_api_version_) {
+  // automatically set api version as V2
+  case envoy::api::v2::core::ConfigSource::AUTO:
+  case envoy::api::v2::core::ConfigSource::V2:
+    return Grpc::Common::typeUrl(
+        API_NO_BOOST(envoy::api::v2::ScopedRouteConfiguration().GetDescriptor()->full_name()));
+  case envoy::api::v2::core::ConfigSource::V3ALPHA:
+    return Grpc::Common::typeUrl(API_NO_BOOST(
+        envoy::service::route::v3alpha::ScopedRouteConfiguration().GetDescriptor()->full_name()));
+  default:
+    throw EnvoyException(fmt::format("type {} is not supported", xds_api_version_));
+  }
 }
 
 ScopedRdsConfigProvider::ScopedRdsConfigProvider(
