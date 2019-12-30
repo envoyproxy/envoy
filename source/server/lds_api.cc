@@ -7,6 +7,7 @@
 #include "envoy/api/v2/discovery.pb.h"
 #include "envoy/api/v2/lds.pb.h"
 #include "envoy/api/v2/lds.pb.validate.h"
+#include "envoy/api/v3alpha/lds.pb.h"
 #include "envoy/stats/scope.h"
 
 #include "common/common/cleanup.h"
@@ -26,11 +27,9 @@ LdsApiImpl::LdsApiImpl(const envoy::api::v2::core::ConfigSource& lds_config,
                        ProtobufMessage::ValidationVisitor& validation_visitor)
     : listener_manager_(lm), scope_(scope.createScope("listener_manager.lds.")), cm_(cm),
       init_target_("LDS", [this]() { subscription_->start({}); }),
-      validation_visitor_(validation_visitor) {
-  subscription_ = cm.subscriptionFactory().subscriptionFromConfigSource(
-      lds_config,
-      Grpc::Common::typeUrl(API_NO_BOOST(envoy::api::v2::Listener)().GetDescriptor()->full_name()),
-      *scope_, *this);
+      validation_visitor_(validation_visitor), xds_api_version_(lds_config.xds_api_version()) {
+  subscription_ = cm.subscriptionFactory().subscriptionFromConfigSource(lds_config, loadTypeUrl(),
+                                                                        *scope_, *this);
   init_manager.add(init_target_);
 }
 
@@ -132,5 +131,19 @@ void LdsApiImpl::onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason r
   init_target_.ready();
 }
 
+std::string LdsApiImpl::loadTypeUrl() {
+  switch (xds_api_version_) {
+  // automatically set api version as V2
+  case envoy::api::v2::core::ConfigSource::AUTO:
+  case envoy::api::v2::core::ConfigSource::V2:
+    return Grpc::Common::typeUrl(
+        API_NO_BOOST(envoy::api::v2::Listener().GetDescriptor()->full_name()));
+  case envoy::api::v2::core::ConfigSource::V3ALPHA:
+    return Grpc::Common::typeUrl(
+        API_NO_BOOST(envoy::api::v3alpha::Listener().GetDescriptor()->full_name()));
+  default:
+    throw EnvoyException(fmt::format("type {} is not supported", xds_api_version_));
+  }
+}
 } // namespace Server
 } // namespace Envoy

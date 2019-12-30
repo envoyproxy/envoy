@@ -722,6 +722,19 @@ envoy::api::v2::listener::Filter* ConfigHelper::getFilterFromListener(const std:
   return nullptr;
 }
 
+void ConfigHelper::addNetworkFilter(const std::string& filter_yaml) {
+  RELEASE_ASSERT(!finalized_, "");
+  auto* filter_chain =
+      bootstrap_.mutable_static_resources()->mutable_listeners(0)->mutable_filter_chains(0);
+  auto* filter_list_back = filter_chain->add_filters();
+  TestUtility::loadFromYaml(filter_yaml, *filter_list_back);
+
+  // Now move it to the front.
+  for (int i = filter_chain->filters_size() - 1; i > 0; --i) {
+    filter_chain->mutable_filters()->SwapElements(i, i - 1);
+  }
+}
+
 bool ConfigHelper::loadHttpConnectionManager(
     envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager& hcm) {
   RELEASE_ASSERT(!finalized_, "");

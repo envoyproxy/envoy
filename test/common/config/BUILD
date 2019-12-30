@@ -11,6 +11,12 @@ load(
 envoy_package()
 
 envoy_cc_test(
+    name = "api_shadow_test",
+    srcs = ["api_shadow_test.cc"],
+    deps = ["@envoy_api//envoy/api/v3alpha:pkg_cc_proto"],
+)
+
+envoy_cc_test(
     name = "api_type_oracle_test",
     srcs = ["api_type_oracle_test.cc"],
     deps = [
