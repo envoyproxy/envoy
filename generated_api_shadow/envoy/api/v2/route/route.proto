@@ -1178,7 +1178,7 @@ message VirtualCluster {
   core.RequestMethod method = 3 [deprecated = true];
 }
 
-// Global rate limiting :ref:`architecture overview <arch_overview_rate_limit>`.
+// Global rate limiting :ref:`architecture overview <arch_overview_global_rate_limit>`.
 message RateLimit {
   // [#next-free-field: 7]
   message Action {
