@@ -610,12 +610,12 @@ ProtobufWkt::Value ValueUtil::structValue(const ProtobufWkt::Struct& obj) {
 }
 
 ProtobufWkt::Value ValueUtil::listValue(const std::vector<ProtobufWkt::Value>& values) {
-  auto* list = new ProtobufWkt::ListValue();
+  auto list = std::make_unique<ProtobufWkt::ListValue>();
   for (const auto& value : values) {
     *list->add_values() = value;
   }
   ProtobufWkt::Value val;
-  val.set_allocated_list_value(list);
+  val.set_allocated_list_value(list.release());
   return val;
 }
 
