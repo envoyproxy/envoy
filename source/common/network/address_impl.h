@@ -228,12 +228,12 @@ public:
   /**
    * Construct from an existing unix address.
    */
-  explicit PipeInstance(const sockaddr_un* address, socklen_t ss_len);
+  explicit PipeInstance(const sockaddr_un* address, socklen_t ss_len, mode_t mode = 0);
 
   /**
    * Construct from a string pipe path.
    */
-  explicit PipeInstance(const std::string& pipe_path);
+  explicit PipeInstance(const std::string& pipe_path, mode_t mode = 0);
 
   // Network::Address::Instance
   bool operator==(const Instance& rhs) const override;
@@ -256,6 +256,7 @@ private:
   // For abstract namespaces.
   bool abstract_namespace_{false};
   uint32_t address_length_{0};
+  mode_t mode{0};
 };
 
 } // namespace Address

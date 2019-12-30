@@ -6,6 +6,7 @@ from tools.api_proto_plugin import plugin
 from tools.api_proto_plugin import visitor
 
 from tools.type_whisperer.types_pb2 import Types
+from udpa.annotations import migrate_pb2
 
 
 class TypeWhispererVisitor(visitor.Visitor):
@@ -36,9 +37,15 @@ class TypeWhispererVisitor(visitor.Visitor):
     type_desc.type_dependencies.extend(type_deps)
 
   def VisitFile(self, file_proto, type_context, services, msgs, enums):
+    next_version_package = ""
+    if file_proto.options.HasExtension(migrate_pb2.file_migrate):
+      next_version_package = file_proto.options.Extensions[migrate_pb2.file_migrate].move_to_package
     for t in self._types.types.values():
       t.qualified_package = file_proto.package
       t.proto_path = file_proto.name
+      if next_version_package:
+        t.next_version_package = next_version_package
+        t.next_version_upgrade = True
     # Return in text proto format. This makes things easier to debug, these
     # don't need to be compact as they are only interim build artifacts.
     return str(self._types)

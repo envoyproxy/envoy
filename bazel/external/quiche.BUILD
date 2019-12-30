@@ -25,6 +25,7 @@ licenses(["notice"])  # Apache 2
 # QUICHE platform APIs in //source/extensions/quic_listeners/quiche/platform/,
 # should remain largely the same.
 
+load("@rules_proto//proto:defs.bzl", "proto_library")
 load(":genrule_cmd.bzl", "genrule_cmd")
 load(
     "@envoy//bazel:envoy_build_system.bzl",

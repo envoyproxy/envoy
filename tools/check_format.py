@@ -71,7 +71,8 @@ STD_REGEX_WHITELIST = ("./source/common/common/utility.cc", "./source/common/com
                        "./source/extensions/filters/http/squash/squash_filter.h",
                        "./source/extensions/filters/http/squash/squash_filter.cc",
                        "./source/server/http/admin.h", "./source/server/http/admin.cc",
-                       "./tools/clang_tools/api_booster/main.cc")
+                       "./tools/clang_tools/api_booster/main.cc",
+                       "./tools/clang_tools/api_booster/proto_cxx_utils.cc")
 
 # Only one C++ file should instantiate grpc_init
 GRPC_INIT_WHITELIST = ("./source/common/grpc/google_grpc_context.cc")
@@ -330,7 +331,7 @@ def errorIfNoSubstringFound(pattern, file_path, error_message):
 
 
 def isApiFile(file_path):
-  return file_path.startswith(args.api_prefix)
+  return file_path.startswith(args.api_prefix) or file_path.startswith(args.api_shadow_prefix)
 
 
 def isBuildFile(file_path):
@@ -564,6 +565,9 @@ def checkSourceLine(line, file_path, reportError):
      ('.counter(' in line or '.gauge(' in line or '.histogram(' in line):
     reportError("Don't lookup stats by name at runtime; use StatName saved during construction")
 
+  if re.search("envoy::[a-z0-9_:]+::[A-Z]\w*_\w*_[A-Z]{2}", line):
+    reportError("Don't use mangled Protobuf names for enum constants")
+
   hist_m = re.search("(?<=HISTOGRAM\()[a-zA-Z0-9_]+_(b|kb|mb|ns|us|ms|s)(?=,)", line)
   if hist_m and not whitelistedForHistogramSiSuffix(hist_m.group(0)):
     reportError(
@@ -629,7 +633,8 @@ def checkBuildPath(file_path):
     command = "%s %s | diff %s -" % (ENVOY_BUILD_FIXER_PATH, file_path, file_path)
     error_messages += executeCommand(command, "envoy_build_fixer check failed", file_path)
 
-  if isBuildFile(file_path) and file_path.startswith(args.api_prefix + "envoy"):
+  if isBuildFile(file_path) and (file_path.startswith(args.api_prefix + "envoy") or
+                                 file_path.startswith(args.api_shadow_prefix + "envoy")):
     found = False
     for line in readLines(file_path):
       if "api_proto_package(" in line:
@@ -832,6 +837,10 @@ if __name__ == "__main__":
                       default=multiprocessing.cpu_count(),
                       help="number of worker processes to use; defaults to one per core.")
   parser.add_argument("--api-prefix", type=str, default="./api/", help="path of the API tree.")
+  parser.add_argument("--api-shadow-prefix",
+                      type=str,
+                      default="./generated_api_shadow/",
+                      help="path of the shadow API tree.")
   parser.add_argument("--skip_envoy_build_rule_check",
                       action="store_true",
                       help="skip checking for '@envoy//' prefix in build rules.")
@@ -860,7 +869,10 @@ if __name__ == "__main__":
   target_path = args.target_path
   envoy_build_rule_check = not args.skip_envoy_build_rule_check
   namespace_check = args.namespace_check
-  namespace_check_excluded_paths = args.namespace_check_excluded_paths
+  namespace_check_excluded_paths = args.namespace_check_excluded_paths + [
+      "./tools/api_boost/testdata/",
+      "./tools/clang_tools/",
+  ]
   build_fixer_check_excluded_paths = args.build_fixer_check_excluded_paths + [
       "./bazel/external/",
       "./bazel/toolchains/",
