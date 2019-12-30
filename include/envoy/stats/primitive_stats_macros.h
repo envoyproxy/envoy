@@ -40,12 +40,20 @@ namespace Envoy {
  */
 
 // Fully-qualified for use in external callsites.
-#define GENERATE_PRIMITIVE_COUNTER_STRUCT(NAME) Envoy::Stats::PrimitiveCounter NAME##_;
-#define GENERATE_PRIMITIVE_GAUGE_STRUCT(NAME) Envoy::Stats::PrimitiveGauge NAME##_;
+#define DATA_PRIMITIVE_STATS_DECL(NAME) host_stats_data.NAME##_,
+
+#define GENERATE_PRIMITIVE_COUNTER_STRUCT(NAME) Envoy::Stats::PrimitiveCounterImpl NAME##_;
+#define GENERATE_PRIMITIVE_GAUGE_STRUCT(NAME) Envoy::Stats::PrimitiveGaugeImpl NAME##_;
+
+#define GENERATE_NULL_PRIMITIVE_COUNTER_STRUCT(NAME) Envoy::Stats::NullPrimitiveCounterImpl NAME##_;
+#define GENERATE_NULL_PRIMITIVE_GAUGE_STRUCT(NAME) Envoy::Stats::NullPrimitiveGaugeImpl NAME##_;
+
+#define GENERATE_PRIMITIVE_COUNTER_STRUCT_REFERENCE(NAME) Envoy::Stats::PrimitiveCounter& NAME##_;
+#define GENERATE_PRIMITIVE_GAUGE_STRUCT_REFERENCE(NAME) Envoy::Stats::PrimitiveGauge& NAME##_;
 
 // Name and counter/gauge reference pair used to construct map of counters/gauges.
-#define PRIMITIVE_COUNTER_NAME_AND_REFERENCE(X) {absl::string_view(#X), std::ref(X##_)},
-#define PRIMITIVE_GAUGE_NAME_AND_REFERENCE(X) {absl::string_view(#X), std::ref(X##_)},
+#define PRIMITIVE_COUNTER_NAME_AND_REFERENCE(X) {absl::string_view(#X), X##_},
+#define PRIMITIVE_GAUGE_NAME_AND_REFERENCE(X) {absl::string_view(#X), X##_},
 
 // Ignore a counter or gauge.
 #define IGNORE_PRIMITIVE_COUNTER(X)

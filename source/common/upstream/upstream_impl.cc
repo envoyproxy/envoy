@@ -24,6 +24,7 @@
 #include "envoy/ssl/context_manager.h"
 #include "envoy/stats/scope.h"
 #include "envoy/upstream/health_checker.h"
+#include "envoy/upstream/host_description.h"
 
 #include "common/common/enum_to_int.h"
 #include "common/common/fmt.h"
@@ -222,6 +223,18 @@ HostVector filterHosts(const std::unordered_set<HostSharedPtr>& hosts,
 
 } // namespace
 
+HostStats HostDescriptionImpl::generateStats(bool disable_host_stats) {
+  if (!disable_host_stats) {
+    auto data = std::make_unique<HostStatsData>();
+    HostStatsData& host_stats_data(*data);
+    return {std::move(data), ALL_HOST_STATS(DATA_PRIMITIVE_STATS_DECL, DATA_PRIMITIVE_STATS_DECL)};
+  }
+
+  auto data = std::make_unique<NullHostStatsData>();
+  NullHostStatsData& host_stats_data(*data);
+  return {std::move(data), ALL_HOST_STATS(DATA_PRIMITIVE_STATS_DECL, DATA_PRIMITIVE_STATS_DECL)};
+}
+
 HostDescriptionImpl::HostDescriptionImpl(
     ClusterInfoConstSharedPtr cluster, const std::string& hostname,
     Network::Address::InstanceConstSharedPtr dest_address,
@@ -234,7 +247,8 @@ HostDescriptionImpl::HostDescriptionImpl(
                   .bool_value()),
       metadata_(std::make_shared<envoy::api::v2::core::Metadata>(metadata)), locality_(locality),
       locality_zone_stat_name_(locality.zone(), cluster->statsScope().symbolTable()),
-      priority_(priority), socket_factory_(resolveTransportSocketFactory(dest_address, metadata)) {
+      stats_(HostDescriptionImpl::generateStats(cluster->disableHostStats())), priority_(priority),
+      socket_factory_(resolveTransportSocketFactory(dest_address, metadata)) {
   if (health_check_config.port_value() != 0 && dest_address->type() != Network::Address::Type::Ip) {
     // Setting the health check port to non-0 only works for IP-type addresses. Setting the port
     // for a pipe address is a misconfiguration. Throw an exception.
@@ -665,7 +679,8 @@ ClusterInfoImpl::ClusterInfoImpl(
                               config.cluster_type())
                         : absl::nullopt),
       factory_context_(
-          std::make_unique<FactoryContextImpl>(*stats_scope_, runtime, factory_context)) {
+          std::make_unique<FactoryContextImpl>(*stats_scope_, runtime, factory_context)),
+      disable_host_stats_(config.disable_host_stats()) {
   switch (config.lb_policy()) {
   case envoy::api::v2::Cluster::ROUND_ROBIN:
     lb_type_ = LoadBalancerType::RoundRobin;

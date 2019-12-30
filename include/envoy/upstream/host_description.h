@@ -13,12 +13,13 @@
 #include "envoy/upstream/outlier_detection.h"
 
 #include "absl/strings/string_view.h"
+#include "absl/types/variant.h"
 
 namespace Envoy {
 namespace Upstream {
 
 /**
- * All per host stats. @see stats_macros.h
+ * All per host stats. @see primitive_stats_macros.h
  *
  * {rq_success, rq_error} have specific semantics driven by the needs of EDS load reporting. See
  * envoy.api.v2.endpoint.UpstreamLocalityStats for the definitions of success/error. These are
@@ -34,12 +35,24 @@ namespace Upstream {
   GAUGE(cx_active)                                                                                 \
   GAUGE(rq_active)
 
+struct HostStatsData {
+  ALL_HOST_STATS(GENERATE_PRIMITIVE_COUNTER_STRUCT, GENERATE_PRIMITIVE_GAUGE_STRUCT);
+};
+
+struct NullHostStatsData {
+  ALL_HOST_STATS(GENERATE_NULL_PRIMITIVE_COUNTER_STRUCT, GENERATE_NULL_PRIMITIVE_GAUGE_STRUCT);
+};
+
+using StatsOrNullStats =
+    absl::variant<std::unique_ptr<HostStatsData>, std::unique_ptr<NullHostStatsData>>;
+
 /**
- * All per host stats defined. @see stats_macros.h
+ * All per host stats defined. @see primitive_stats_macros.h
  */
 struct HostStats {
-  ALL_HOST_STATS(GENERATE_PRIMITIVE_COUNTER_STRUCT, GENERATE_PRIMITIVE_GAUGE_STRUCT);
-
+  StatsOrNullStats data_;
+  ALL_HOST_STATS(GENERATE_PRIMITIVE_COUNTER_STRUCT_REFERENCE,
+                 GENERATE_PRIMITIVE_GAUGE_STRUCT_REFERENCE);
   // Provide access to name,counter pairs.
   std::vector<std::pair<absl::string_view, Stats::PrimitiveCounterReference>> counters() const {
     return {ALL_HOST_STATS(PRIMITIVE_COUNTER_NAME_AND_REFERENCE, IGNORE_PRIMITIVE_GAUGE)};

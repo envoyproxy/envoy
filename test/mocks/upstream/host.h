@@ -10,6 +10,7 @@
 #include "envoy/upstream/upstream.h"
 
 #include "common/stats/fake_symbol_table_impl.h"
+#include "common/upstream/upstream_impl.h"
 
 #include "test/mocks/network/transport_socket.h"
 #include "test/mocks/upstream/cluster_info.h"
@@ -110,7 +111,7 @@ public:
   testing::NiceMock<MockHealthCheckHostMonitor> health_checker_;
   Network::TransportSocketFactoryPtr socket_factory_;
   testing::NiceMock<MockClusterInfo> cluster_;
-  HostStats stats_;
+  HostStats stats_{HostDescriptionImpl::generateStats(false)};
   mutable Stats::TestSymbolTable symbol_table_;
   mutable std::unique_ptr<Stats::StatNameManagedStorage> locality_zone_stat_name_;
 };
@@ -191,7 +192,7 @@ public:
   testing::NiceMock<MockClusterInfo> cluster_;
   Network::TransportSocketFactoryPtr socket_factory_;
   testing::NiceMock<Outlier::MockDetectorHostMonitor> outlier_detector_;
-  HostStats stats_;
+  HostStats stats_{HostDescriptionImpl::generateStats(false)};
   mutable Stats::TestSymbolTable symbol_table_;
   mutable std::unique_ptr<Stats::StatNameManagedStorage> locality_zone_stat_name_;
 };

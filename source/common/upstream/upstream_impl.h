@@ -74,7 +74,7 @@ public:
       const envoy::api::v2::core::Locality& locality,
       const envoy::api::v2::endpoint::Endpoint::HealthCheckConfig& health_check_config,
       uint32_t priority);
-
+  static HostStats generateStats(bool disable_host_stats);
   Network::TransportSocketFactory& transportSocketFactory() const override {
     return socket_factory_;
   }
@@ -578,6 +578,7 @@ public:
   void createNetworkFilterChain(Network::Connection&) const override;
   Http::Protocol
   upstreamHttpProtocol(absl::optional<Http::Protocol> downstream_protocol) const override;
+  bool disableHostStats() const override { return disable_host_stats_; }
 
 private:
   struct ResourceManagers {
@@ -628,6 +629,7 @@ private:
   const absl::optional<envoy::api::v2::Cluster::CustomClusterType> cluster_type_;
   const std::unique_ptr<Server::Configuration::CommonFactoryContext> factory_context_;
   std::vector<Network::FilterFactoryCb> filter_factories_;
+  const bool disable_host_stats_;
 };
 
 /**

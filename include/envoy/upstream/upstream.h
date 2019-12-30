@@ -870,6 +870,11 @@ public:
   virtual Http::Protocol
   upstreamHttpProtocol(absl::optional<Http::Protocol> downstream_protocol) const PURE;
 
+  /**
+   * @return Whether to disable host stats to reduce memory consumption
+   */
+  virtual bool disableHostStats() const PURE;
+
 protected:
   /**
    * Invoked by extensionProtocolOptionsTyped.
