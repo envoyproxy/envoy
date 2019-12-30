@@ -118,7 +118,7 @@ extern "C" WasmResult proxy_log(uint32_t level, const char* log_message, size_t 
 
 /**
  * Called from the VM by a root context after returning zero from proxy_on_done() to indicate that
- * the root context is now done and the proxy_on_delete can be called and the VM shutdown nand
+ * the root context is now done and the proxy_on_delete can be called and the VM shutdown and
  * deleted.
  * @return a WasmResult: OK, NotFound (if the caller did not previous return zero from
  * proxy_on_done()).
