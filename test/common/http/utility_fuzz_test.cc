@@ -17,6 +17,7 @@ DEFINE_PROTO_FUZZER(const test::common::http::UtilityTestCase& input) {
   }
   case test::common::http::UtilityTestCase::kParseCookieValue: {
     const auto& parse_cookie_value = input.parse_cookie_value();
+    // Use the production HeaderMapImpl to avoid timeouts from TestHeaderMapImpl verifications.
     Http::HeaderMapImpl headers;
     for (const std::string& cookie : parse_cookie_value.cookies()) {
       headers.addCopy(Http::LowerCaseString("cookie"), replaceInvalidCharacters(cookie));
@@ -26,6 +27,7 @@ DEFINE_PROTO_FUZZER(const test::common::http::UtilityTestCase& input) {
   }
   case test::common::http::UtilityTestCase::kGetLastAddressFromXff: {
     const auto& get_last_address_from_xff = input.get_last_address_from_xff();
+    // Use the production HeaderMapImpl to avoid timeouts from TestHeaderMapImpl verifications.
     Http::HeaderMapImpl headers;
     headers.addCopy(Http::LowerCaseString("x-forwarded-for"),
                     replaceInvalidCharacters(get_last_address_from_xff.xff()));
