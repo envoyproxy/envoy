@@ -11,7 +11,7 @@ namespace Config {
 const Protobuf::Descriptor*
 ApiTypeOracle::getEarlierVersionDescriptor(const Protobuf::Message& message) {
   const std::string target_type = message.GetDescriptor()->full_name();
-  ENVOY_LOG_MISC(trace, "Inferring earlier type for {} (extension {})", target_type);
+  ENVOY_LOG_MISC(trace, "Inferring earlier type for {}", target_type);
 
   // Determine if there is an earlier API version for target_type.
   const Protobuf::Descriptor* desc =
