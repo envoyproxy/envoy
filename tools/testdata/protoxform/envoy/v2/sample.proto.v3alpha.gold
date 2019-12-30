@@ -15,6 +15,7 @@ enum SomeEnum {
 
   DEPRECATED_AND_UNAVAILABLE_DO_NOT_USE = 0 [deprecated = true];
   FOO = 1;
+  WOW = 3;
 }
 
 message Sample {
