@@ -16,7 +16,7 @@ public:
     return std::make_shared<OmitCanaryHostsRetryPredicate>();
   }
 
-  const std::string name() const override {
+  std::string name() const override {
     return RetryHostPredicateValues::get().OmitCanaryHostsPredicate;
   }
 

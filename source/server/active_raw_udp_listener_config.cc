@@ -23,7 +23,7 @@ ActiveRawUdpListenerConfigFactory::createActiveUdpListenerFactory(
   return std::make_unique<Server::ActiveRawUdpListenerFactory>();
 }
 
-const std::string ActiveRawUdpListenerConfigFactory::name() const {
+std::string ActiveRawUdpListenerConfigFactory::name() const {
   return UdpListenerNames::get().RawUdp;
 }
 

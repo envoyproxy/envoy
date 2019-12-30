@@ -18,7 +18,7 @@ public:
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override;
 
-  const std::string name() const override;
+  std::string name() const override;
 
 private:
   std::unordered_map<std::string, std::string> convertJsonFormatToMap(ProtobufWkt::Struct config);

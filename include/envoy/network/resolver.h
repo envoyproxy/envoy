@@ -29,7 +29,7 @@ public:
   virtual InstanceConstSharedPtr
   resolve(const envoy::api::v2::core::SocketAddress& socket_address) PURE;
 
-  const std::string category() const override { return "resolvers"; }
+  std::string category() const override { return "resolvers"; }
 };
 
 } // namespace Address

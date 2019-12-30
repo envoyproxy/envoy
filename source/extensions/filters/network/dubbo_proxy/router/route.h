@@ -79,7 +79,7 @@ public:
   virtual RouteMatcherPtr createRouteMatcher(const RouteConfigurations& route_configs,
                                              Server::Configuration::FactoryContext& context) PURE;
 
-  const std::string category() const override { return "dubbo_proxy.route_matchers"; }
+  std::string category() const override { return "dubbo_proxy.route_matchers"; }
 
   /**
    * Convenience method to lookup a factory by type.
@@ -103,7 +103,7 @@ public:
     return std::make_unique<RouteMatcherImpl>(route_configs, context);
   }
 
-  const std::string name() const override { return name_; }
+  std::string name() const override { return name_; }
 
 protected:
   RouteMatcherFactoryBase(RouteMatcherType type) : name_(RouteMatcherNames::get().fromType(type)) {}

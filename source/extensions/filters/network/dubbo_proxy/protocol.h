@@ -109,7 +109,7 @@ public:
    */
   virtual ProtocolPtr createProtocol(SerializationType serialization_type) PURE;
 
-  const std::string category() const override { return "dubbo_proxy.protocols"; }
+  std::string category() const override { return "dubbo_proxy.protocols"; }
 
   /**
    * Convenience method to lookup a factory by type.
@@ -133,7 +133,7 @@ public:
     return protocol;
   }
 
-  const std::string name() const override { return name_; }
+  std::string name() const override { return name_; }
 
 protected:
   ProtocolFactoryBase(ProtocolType type) : name_(ProtocolNames::get().fromType(type)) {}

@@ -30,7 +30,7 @@ public:
     return std::make_unique<Envoy::ProtobufWkt::Empty>();
   }
 
-  const std::string name() const override { return ListenerFilterNames::get().TlsInspector; }
+  std::string name() const override { return ListenerFilterNames::get().TlsInspector; }
 };
 
 /**

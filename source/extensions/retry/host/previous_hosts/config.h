@@ -17,7 +17,7 @@ public:
     return std::make_shared<PreviousHostsRetryPredicate>(retry_count);
   }
 
-  const std::string name() const override {
+  std::string name() const override {
     return RetryHostPredicateValues::get().PreviousHostsPredicate;
   }
 

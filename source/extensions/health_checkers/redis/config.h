@@ -21,7 +21,7 @@ public:
   createCustomHealthChecker(const envoy::api::v2::core::HealthCheck& config,
                             Server::Configuration::HealthCheckerFactoryContext& context) override;
 
-  const std::string name() const override { return HealthCheckerNames::get().RedisHealthChecker; }
+  std::string name() const override { return HealthCheckerNames::get().RedisHealthChecker; }
 };
 
 } // namespace RedisHealthChecker

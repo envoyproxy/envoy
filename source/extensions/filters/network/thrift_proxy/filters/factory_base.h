@@ -25,7 +25,7 @@ public:
     return std::make_unique<ConfigProto>();
   }
 
-  const std::string name() const override { return name_; }
+  std::string name() const override { return name_; }
 
 protected:
   FactoryBase(const std::string& name) : name_(name) {}

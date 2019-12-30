@@ -32,7 +32,7 @@ ProtobufTypes::MessagePtr DogStatsdSinkFactory::createEmptyConfigProto() {
   return std::make_unique<envoy::config::metrics::v2::DogStatsdSink>();
 }
 
-const std::string DogStatsdSinkFactory::name() const { return StatsSinkNames::get().DogStatsd; }
+std::string DogStatsdSinkFactory::name() const { return StatsSinkNames::get().DogStatsd; }
 
 /**
  * Static registration for the this sink factory. @see RegisterFactory.

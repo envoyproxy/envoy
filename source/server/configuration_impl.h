@@ -44,7 +44,7 @@ public:
    */
   virtual Stats::SinkPtr createStatsSink(const Protobuf::Message& config, Instance& server) PURE;
 
-  const std::string category() const override { return "stats_sinks"; }
+  std::string category() const override { return "stats_sinks"; }
 };
 
 /**

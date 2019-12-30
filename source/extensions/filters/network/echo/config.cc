@@ -27,7 +27,7 @@ public:
     return ProtobufTypes::MessagePtr{new Envoy::ProtobufWkt::Empty()};
   }
 
-  const std::string name() const override { return NetworkFilterNames::get().Echo; }
+  std::string name() const override { return NetworkFilterNames::get().Echo; }
   bool isTerminalFilter() override { return true; }
 };
 

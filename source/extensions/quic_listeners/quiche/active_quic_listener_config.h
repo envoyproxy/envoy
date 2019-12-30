@@ -18,7 +18,7 @@ public:
   Network::ActiveUdpListenerFactoryPtr
   createActiveUdpListenerFactory(const Protobuf::Message&) override;
 
-  const std::string name() const override;
+  std::string name() const override;
 };
 
 DECLARE_FACTORY(ActiveQuicListenerConfigFactory);

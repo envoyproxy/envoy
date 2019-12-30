@@ -93,7 +93,7 @@ public:
    */
   virtual TransportPtr createTransport() PURE;
 
-  const std::string category() const override { return "thrift_proxy.transports"; }
+  std::string category() const override { return "thrift_proxy.transports"; }
 
   /**
    * Convenience method to lookup a factory by type.
@@ -113,7 +113,7 @@ template <class TransportImpl> class TransportFactoryBase : public NamedTranspor
 public:
   TransportPtr createTransport() override { return std::move(std::make_unique<TransportImpl>()); }
 
-  const std::string name() const override { return name_; }
+  std::string name() const override { return name_; }
 
 protected:
   TransportFactoryBase(const std::string& name) : name_(name) {}

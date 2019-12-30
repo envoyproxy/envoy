@@ -454,23 +454,23 @@ TEST_F(OptionsImplPlatformLinuxTest, AffinityTest4) {
 class TestFactory : public Config::UntypedFactory {
 public:
   virtual ~TestFactory() = default;
-  const std::string category() const override { return "test"; }
+  std::string category() const override { return "test"; }
 };
 
 class TestTestFactory : public TestFactory {
 public:
-  const std::string name() const override { return "test"; }
+  std::string name() const override { return "test"; }
 };
 
 class TestingFactory : public Config::UntypedFactory {
 public:
   virtual ~TestingFactory() = default;
-  const std::string category() const override { return "testing"; }
+  std::string category() const override { return "testing"; }
 };
 
 class TestTestingFactory : public TestingFactory {
 public:
-  const std::string name() const override { return "test"; }
+  std::string name() const override { return "test"; }
 };
 
 REGISTER_FACTORY(TestTestFactory, TestFactory){"test-1", "test-2"};

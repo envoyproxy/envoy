@@ -19,19 +19,19 @@ public:
    * Name of the factory, a reversed DNS name is encouraged to avoid cross-org conflict.
    * It's used as key in the metadata map, as well as key in the factory registry.
    */
-  virtual const std::string name() const PURE;
+  virtual std::string name() const PURE;
 
   /**
    * @return std::string the identifying category name for objects
    * created by this factory. Used for automatic registration with
    * FactoryCategoryRegistry.
    */
-  virtual const std::string category() const PURE;
+  virtual std::string category() const PURE;
 
   /**
    * @return configuration proto full name, or empty for untyped factories.
    */
-  virtual const std::string configType() { return ""; }
+  virtual std::string configType() { return ""; }
 };
 
 /**
@@ -48,7 +48,7 @@ public:
    */
   virtual ProtobufTypes::MessagePtr createEmptyConfigProto() PURE;
 
-  const std::string configType() override {
+  std::string configType() override {
     auto ptr = createEmptyConfigProto();
     ASSERT(ptr != nullptr);
     return ptr->GetDescriptor()->full_name();

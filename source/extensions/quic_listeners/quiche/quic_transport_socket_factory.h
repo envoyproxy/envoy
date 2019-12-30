@@ -54,7 +54,7 @@ class QuicTransportSocketConfigFactory
     : public virtual Server::Configuration::TransportSocketConfigFactory {
 public:
   // Server::Configuration::TransportSocketConfigFactory
-  const std::string name() const override {
+  std::string name() const override {
     return Extensions::TransportSockets::TransportSocketNames::get().Quic;
   }
 };
@@ -73,7 +73,7 @@ public:
   ProtobufTypes::MessagePtr createEmptyConfigProto() override;
 
   // Prevent double registration for the config proto
-  const std::string configType() override { return ""; }
+  std::string configType() override { return ""; }
 };
 
 DECLARE_FACTORY(QuicServerTransportSocketConfigFactory);
@@ -91,7 +91,7 @@ public:
   ProtobufTypes::MessagePtr createEmptyConfigProto() override;
 
   // Prevent double registration for the config proto
-  const std::string configType() override { return ""; }
+  std::string configType() override { return ""; }
 };
 
 DECLARE_FACTORY(QuicClientTransportSocketConfigFactory);

@@ -38,7 +38,7 @@ public:
         proto_config, validation_visitor));
   }
 
-  const std::string name() const override { return name_; }
+  std::string name() const override { return name_; }
 
   bool isTerminalFilter() override { return is_terminal_filter_; }
 

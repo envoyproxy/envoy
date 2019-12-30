@@ -96,7 +96,7 @@ public:
     name_mappings_[logical] = physical;
   }
 
-  const std::string name() const override { return "envoy.test.resolver"; }
+  std::string name() const override { return "envoy.test.resolver"; }
 
 private:
   std::string getPhysicalName(const std::string& logical) {

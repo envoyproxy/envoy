@@ -89,7 +89,7 @@ public:
    */
   virtual SerializerPtr createSerializer() PURE;
 
-  const std::string category() const override { return "dubbo_proxy.serializers"; }
+  std::string category() const override { return "dubbo_proxy.serializers"; }
 
   /**
    * Convenience method to lookup a factory by type.
@@ -110,7 +110,7 @@ template <class SerializerImpl> class SerializerFactoryBase : public NamedSerial
 public:
   SerializerPtr createSerializer() override { return std::make_unique<SerializerImpl>(); }
 
-  const std::string name() const override { return name_; }
+  std::string name() const override { return name_; }
 
 protected:
   SerializerFactoryBase(ProtocolType protocol_type, SerializationType type)

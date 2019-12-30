@@ -139,7 +139,7 @@ public:
   virtual std::pair<ClusterSharedPtr, ThreadAwareLoadBalancerPtr>
   create(const envoy::api::v2::Cluster& cluster, ClusterFactoryContext& context) PURE;
 
-  const std::string category() const override { return "clusters"; }
+  std::string category() const override { return "clusters"; }
 };
 
 } // namespace Upstream

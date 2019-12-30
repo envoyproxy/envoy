@@ -17,12 +17,12 @@ namespace {
 class InternalFactory : public Config::UntypedFactory {
 public:
   virtual ~InternalFactory() = default;
-  const std::string category() const override { return ""; }
+  std::string category() const override { return ""; }
 };
 
 class TestInternalFactory : public InternalFactory {
 public:
-  const std::string name() const override { return "testing.internal.test"; }
+  std::string name() const override { return "testing.internal.test"; }
 };
 
 static Registry::RegisterInternalFactory<TestInternalFactory, InternalFactory>
@@ -50,12 +50,12 @@ TEST(RegistryTest, InternalFactoryNotPublished) {
 class PublishedFactory : public Config::UntypedFactory {
 public:
   virtual ~PublishedFactory() = default;
-  const std::string category() const override { return "testing.published"; }
+  std::string category() const override { return "testing.published"; }
 };
 
 class TestPublishedFactory : public PublishedFactory {
 public:
-  const std::string name() const override { return "testing.published.test"; }
+  std::string name() const override { return "testing.published.test"; }
 };
 
 REGISTER_FACTORY(TestPublishedFactory, PublishedFactory);
@@ -77,7 +77,7 @@ TEST(RegistryTest, DefaultFactoryPublished) {
 
 class TestWithDeprecatedPublishedFactory : public PublishedFactory {
 public:
-  const std::string name() const override { return "testing.published.instead_name"; }
+  std::string name() const override { return "testing.published.instead_name"; }
 };
 
 REGISTER_FACTORY(TestWithDeprecatedPublishedFactory,

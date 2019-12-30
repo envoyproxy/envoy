@@ -32,7 +32,7 @@ public:
     return std::make_unique<envoy::config::grpc_credential::v2alpha::FileBasedMetadataConfig>();
   }
 
-  const std::string name() const override { return GrpcCredentialsNames::get().FileBasedMetadata; }
+  std::string name() const override { return GrpcCredentialsNames::get().FileBasedMetadata; }
 };
 
 class FileBasedMetadataAuthenticator : public grpc::MetadataCredentialsPlugin {

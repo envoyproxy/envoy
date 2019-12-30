@@ -509,7 +509,7 @@ public:
    */
   virtual ProtocolPtr createProtocol() PURE;
 
-  const std::string category() const override { return "thrift_proxy.protocols"; }
+  std::string category() const override { return "thrift_proxy.protocols"; }
 
   /**
    * Convenience method to lookup a factory by type.
@@ -529,7 +529,7 @@ template <class ProtocolImpl> class ProtocolFactoryBase : public NamedProtocolCo
 public:
   ProtocolPtr createProtocol() override { return std::move(std::make_unique<ProtocolImpl>()); }
 
-  const std::string name() const override { return name_; }
+  std::string name() const override { return name_; }
 
 protected:
   ProtocolFactoryBase(const std::string& name) : name_(name) {}

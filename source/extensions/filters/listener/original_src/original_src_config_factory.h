@@ -21,7 +21,7 @@ public:
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override;
 
-  const std::string name() const override { return ListenerFilterNames::get().OriginalSrc; }
+  std::string name() const override { return ListenerFilterNames::get().OriginalSrc; }
 };
 
 } // namespace OriginalSrc

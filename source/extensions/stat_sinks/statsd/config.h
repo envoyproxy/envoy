@@ -21,7 +21,7 @@ public:
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override;
 
-  const std::string name() const override;
+  std::string name() const override;
 };
 
 } // namespace Statsd

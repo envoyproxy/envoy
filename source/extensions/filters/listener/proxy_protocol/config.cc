@@ -28,7 +28,7 @@ public:
     return std::make_unique<Envoy::ProtobufWkt::Empty>();
   }
 
-  const std::string name() const override { return ListenerFilterNames::get().ProxyProtocol; }
+  std::string name() const override { return ListenerFilterNames::get().ProxyProtocol; }
 };
 
 /**

@@ -57,8 +57,8 @@ public:
   virtual ContextManagerPtr createContextManager(TimeSource& time_source) PURE;
 
   // There could be only one factory thus the name is static.
-  const std::string name() const override { return "ssl_context_manager"; }
-  const std::string category() const override { return "ssl_context_manager"; }
+  std::string name() const override { return "ssl_context_manager"; }
+  std::string category() const override { return "ssl_context_manager"; }
 };
 
 } // namespace Ssl

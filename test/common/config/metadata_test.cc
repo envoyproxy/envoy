@@ -62,7 +62,7 @@ public:
 
   class FooFactory : public TypedMetadataFactory {
   public:
-    const std::string name() const override { return "foo"; }
+    std::string name() const override { return "foo"; }
     // Throws EnvoyException (conversion failure) if d is empty.
     std::unique_ptr<const TypedMetadata::Object>
     parse(const ProtobufWkt::Struct& d) const override {

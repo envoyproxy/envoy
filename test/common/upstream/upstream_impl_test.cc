@@ -1867,7 +1867,7 @@ struct Baz : public Envoy::Config::TypedMetadata::Object {
 
 class BazFactory : public ClusterTypedMetadataFactory {
 public:
-  const std::string name() const override { return "baz"; }
+  std::string name() const override { return "baz"; }
   // Returns nullptr (conversion failure) if d is empty.
   std::unique_ptr<const Envoy::Config::TypedMetadata::Object>
   parse(const ProtobufWkt::Struct& d) const override {
@@ -2133,10 +2133,8 @@ public:
                               ProtobufMessage::ValidationVisitor&) override {
     return parent_.createProtocolOptionsConfig(msg);
   }
-  const std::string name() const override {
-    CONSTRUCT_ON_FIRST_USE(std::string, "envoy.test.filter");
-  }
-  const std::string configType() override { return ""; };
+  std::string name() const override { CONSTRUCT_ON_FIRST_USE(std::string, "envoy.test.filter"); }
+  std::string configType() override { return ""; };
 
   TestFilterConfigFactoryBase& parent_;
 };
@@ -2170,10 +2168,8 @@ public:
                               ProtobufMessage::ValidationVisitor&) override {
     return parent_.createProtocolOptionsConfig(msg);
   }
-  const std::string name() const override {
-    CONSTRUCT_ON_FIRST_USE(std::string, "envoy.test.filter");
-  }
-  const std::string configType() override { return ""; };
+  std::string name() const override { CONSTRUCT_ON_FIRST_USE(std::string, "envoy.test.filter"); }
+  std::string configType() override { return ""; };
 
   TestFilterConfigFactoryBase& parent_;
 };

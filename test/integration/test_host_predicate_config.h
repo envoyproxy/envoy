@@ -9,7 +9,7 @@
 namespace Envoy {
 class TestHostPredicateFactory : public Upstream::RetryHostPredicateFactory {
 public:
-  const std::string name() const override { return "envoy.test_host_predicate"; }
+  std::string name() const override { return "envoy.test_host_predicate"; }
 
   Upstream::RetryHostPredicateSharedPtr createHostPredicate(const Protobuf::Message&,
                                                             uint32_t) override {
