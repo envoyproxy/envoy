@@ -55,7 +55,7 @@ TEST_P(Http2UpstreamIntegrationTest, Retry) { testRetry(); }
 
 TEST_P(Http2UpstreamIntegrationTest, GrpcRetry) { testGrpcRetry(); }
 
-TEST_P(Http2UpstreamIntegrationTest, Trailers) { testTrailers(1024, 2048); }
+TEST_P(Http2UpstreamIntegrationTest, Trailers) { testTrailers(1024, 2048, true, true); }
 
 // Ensure Envoy handles streaming requests and responses simultaneously.
 void Http2UpstreamIntegrationTest::bidirectionalStreaming(uint32_t bytes) {
