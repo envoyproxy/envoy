@@ -24,7 +24,8 @@ absence of a version header could be:
 
   http_filters:
     - name: envoy.filters.http.header_to_metadata
-      config:
+      typed_config:
+				"@type": type.googleapis.com/envoy.config.filter.http.header_to_metadata.v2.Config
         request_rules:
 	  - header: x-version
 	    on_header_present:
