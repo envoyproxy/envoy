@@ -624,7 +624,10 @@ def _com_googlesource_quiche():
         genrule_cmd_file = "@envoy//bazel/external:quiche.genrule_cmd",
         build_file = "@envoy//bazel/external:quiche.BUILD",
     )
-
+    native.bind(
+        name = "quiche_common_platform",
+        actual = "@com_googlesource_quiche//:quiche_common_platform",
+    )
     native.bind(
         name = "quiche_http2_platform",
         actual = "@com_googlesource_quiche//:http2_platform",

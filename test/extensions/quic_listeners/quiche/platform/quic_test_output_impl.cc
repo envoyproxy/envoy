@@ -71,13 +71,13 @@ void QuicSaveTestOutputImpl(quiche::QuicheStringPiece filename, quiche::QuicheSt
 bool QuicLoadTestOutputImpl(quiche::QuicheStringPiece filename, std::string* data) {
   const char* read_dir_env = std::getenv("QUIC_TEST_OUTPUT_DIR");
   if (read_dir_env == nullptr) {
-    QUIC_LOG(WARNING) << "Could not save test output since QUIC_TEST_OUTPUT_DIR is not set";
+    QUIC_LOG(WARNING) << "Could not load test output since QUIC_TEST_OUTPUT_DIR is not set";
     return false;
   }
 
   std::string read_dir = read_dir_env;
   if (read_dir.empty()) {
-    QUIC_LOG(WARNING) << "Could not save test output since QUIC_TEST_OUTPUT_DIR is empty";
+    QUIC_LOG(WARNING) << "Could not load test output since QUIC_TEST_OUTPUT_DIR is empty";
     return false;
   }
 
@@ -88,6 +88,10 @@ bool QuicLoadTestOutputImpl(quiche::QuicheStringPiece filename, std::string* dat
   const std::string read_path = read_dir + filename.data();
 
   Envoy::Filesystem::InstanceImplPosix file_system;
+  if (!file_system.fileExists(read_path)) {
+    QUIC_LOG(ERROR) << "Test output file does not exist: " << read_path;
+    return false;
+  }
   *data = file_system.fileReadToEnd(read_path);
   return true;
 }

@@ -28,8 +28,6 @@
 #include "fmt/printf.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
-#include "quiche/common/platform/api/quiche_arraysize.h"
-#include "quiche/common/platform/api/quiche_endian.h"
 #include "quiche/common/platform/api/quiche_string_piece.h"
 #include "quiche/epoll_server/fake_simple_epoll_server.h"
 #include "quiche/quic/platform/api/quic_aligned.h"
@@ -96,11 +94,6 @@ protected:
 };
 
 TEST_F(QuicPlatformTest, QuicAlignOf) { EXPECT_LT(0, QUIC_ALIGN_OF(int)); }
-
-TEST_F(QuicPlatformTest, QuicheArraysize) {
-  int array[] = {0, 1, 2, 3, 4};
-  EXPECT_EQ(5, QUICHE_ARRAYSIZE(array));
-}
 
 enum class TestEnum { ZERO = 0, ONE, TWO, COUNT };
 
@@ -189,12 +182,6 @@ TEST_F(QuicPlatformTest, QuicInlinedVector) {
   EXPECT_EQ(3, vec[0]);
 }
 
-TEST_F(QuicPlatformTest, QuicheEndian) {
-  EXPECT_EQ(0x1234, quiche::QuicheEndian::NetToHost16(quiche::QuicheEndian::HostToNet16(0x1234)));
-  EXPECT_EQ(0x12345678,
-            quiche::QuicheEndian::NetToHost32(quiche::QuicheEndian::HostToNet32(0x12345678)));
-}
-
 TEST_F(QuicPlatformTest, QuicEstimateMemoryUsage) {
   std::string s = "foo";
   // Stubbed out to always return 0.
@@ -263,12 +250,6 @@ TEST_F(QuicPlatformTest, QuicStackTraceTest) {
 }
 
 TEST_F(QuicPlatformTest, QuicSleep) { QuicSleep(QuicTime::Delta::FromMilliseconds(20)); }
-
-TEST_F(QuicPlatformTest, QuicheStringPiece) {
-  std::string s = "bar";
-  quiche::QuicheStringPiece sp(s);
-  EXPECT_EQ('b', sp[0]);
-}
 
 TEST_F(QuicPlatformTest, QuicThread) {
   class AdderThread : public QuicThread {
@@ -526,6 +507,7 @@ TEST_F(QuicPlatformTest, QuicTestOutput) {
   std::string content;
   EXPECT_TRUE(QuicLoadTestOutput(filename, &content));
   EXPECT_EQ("output 4 content\n", content);
+  EXPECT_FALSE(QuicLoadTestOutput("nonexisting_file", &content));
 }
 
 TEST_F(QuicPlatformTest, ApproximateNowInUsec) {
