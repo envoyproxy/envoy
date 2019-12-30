@@ -165,7 +165,7 @@ private:
   VhdsSubscriptionPtr vhds_subscription_;
   RouteConfigUpdatePtr config_update_info_;
   Common::CallbackManager<> update_callback_manager_;
-  const envoy::api::v2::core::ConfigSource::XdsApiVersion xds_api_version_;
+  envoy::api::v2::core::ConfigSource::XdsApiVersion xds_api_version_;
 
   friend class RouteConfigProviderManagerImpl;
   // Access to addUpdateCallback

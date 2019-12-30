@@ -117,7 +117,8 @@ message ConfigSource {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.core.ConfigSource";
 
   enum XdsApiVersion {
-    // set api version automatically, default version is set as v2.
+    // use for describing explicitly that xDS API version is set automatically. In default, xDS API
+    // version is V2
     AUTO = 0;
 
     // use xDS v2 API

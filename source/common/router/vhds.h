@@ -68,7 +68,7 @@ private:
   std::unique_ptr<Envoy::Config::Subscription> subscription_;
   Init::TargetImpl init_target_;
   std::unordered_set<RouteConfigProvider*>& route_config_providers_;
-  const envoy::api::v2::core::ConfigSource::XdsApiVersion xds_api_version_;
+  envoy::api::v2::core::ConfigSource::XdsApiVersion xds_api_version_;
 };
 
 using VhdsSubscriptionPtr = std::unique_ptr<VhdsSubscription>;

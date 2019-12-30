@@ -58,7 +58,7 @@ private:
   std::function<void()> initialize_callback_;
   Stats::ScopePtr scope_;
   ProtobufMessage::ValidationVisitor& validation_visitor_;
-  const envoy::api::v2::core::ConfigSource::XdsApiVersion xds_api_version_;
+  envoy::api::v2::core::ConfigSource::XdsApiVersion xds_api_version_;
 };
 
 } // namespace Upstream

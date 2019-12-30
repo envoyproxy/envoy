@@ -105,7 +105,8 @@ message RateLimitSettings {
 // [#next-free-field: 7]
 message ConfigSource {
   enum XdsApiVersion {
-    // set api version automatically, default version is set as v2.
+    // use for describing explicitly that xDS API version is set automatically. In default, xDS API
+    // version is V2
     AUTO = 0;
 
     // use xDS v2 API

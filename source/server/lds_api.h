@@ -53,7 +53,7 @@ private:
   Upstream::ClusterManager& cm_;
   Init::TargetImpl init_target_;
   ProtobufMessage::ValidationVisitor& validation_visitor_;
-  const envoy::api::v2::core::ConfigSource::XdsApiVersion xds_api_version_;
+  envoy::api::v2::core::ConfigSource::XdsApiVersion xds_api_version_;
 };
 
 } // namespace Server
