@@ -3,6 +3,8 @@
 *.generated.pb_text -diff -merge
 /generated_api_shadow/envoy/** linguist-generated=true
 /generated_api_shadow/envoy/** -diff -merge
+/generated_api_shadow/bazel/** linguist-generated=true
+/generated_api_shadow/bazel/** -diff -merge
 *.svg binary
 /test/**/*_corpus/* linguist-generated=true
 /test/**/*_corpus/* -diff -merge

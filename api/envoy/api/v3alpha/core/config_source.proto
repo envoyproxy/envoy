@@ -113,9 +113,21 @@ message RateLimitSettings {
 // <arch_overview_service_discovery>` etc. may either be sourced from the
 // filesystem or from an xDS API source. Filesystem configs are watched with
 // inotify for updates.
-// [#next-free-field: 6]
+// [#next-free-field: 7]
 message ConfigSource {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.core.ConfigSource";
+
+  enum XdsApiVersion {
+    // use for describing explicitly that xDS API version is set automatically. In default, xDS API
+    // version is V2
+    AUTO = 0;
+
+    // use xDS v2 API
+    V2 = 1;
+
+    // use xDS v3alpha API
+    V3ALPHA = 2;
+  }
 
   oneof config_source_specifier {
     option (validate.required) = true;
@@ -162,4 +174,7 @@ message ConfigSource {
   // means no timeout - Envoy will wait indefinitely for the first xDS config (unless another
   // timeout applies). The default is 15s.
   google.protobuf.Duration initial_fetch_timeout = 4;
+
+  // API version for xDS endpoint
+  XdsApiVersion xds_api_version = 6;
 }
