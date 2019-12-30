@@ -29,8 +29,6 @@ routing PRs, questions, etc. to the right place.
   * Fuzzing, security, headers, HTTP/gRPC, router, access log, tests.
 * Jose Nino ([junr03](https://github.com/junr03)) (jnino@lyft.com)
   * Outlier detection, HTTP routing, xDS, configuration/operational questions.
-* Dan Noé ([dnoe](https://github.com/dnoe)) (dpn@google.com)
-  * Base server (watchdog, workers, startup, stack trace handling, etc.).
 * Dhi Aurrahman ([dio](https://github.com/dio)) (dio@tetrate.io)
   * Lua, access logging, and general miscellany.
 * Joshua Marantz ([jmarantz](https://github.com/jmarantz)) (jmarantz@google.com)
@@ -48,6 +46,7 @@ routing PRs, questions, etc. to the right place.
 * Roman Dzhabarov ([RomanDzhabarov](https://github.com/RomanDzhabarov)) (rdzhabarov@lyft.com)
 * Bill Gallagher ([wgallagher](https://github.com/wgallagher)) (bgallagher@lyft.com)
 * Greg Greenway ([ggreenway](https://github.com/ggreenway)) (greg.greenway@gmail.com, formerly ggreenway@apple.com)
+* Dan Noé ([dnoe](https://github.com/dnoe)) (dpn@google.com)
 
 # Friends of Envoy
 

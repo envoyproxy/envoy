@@ -1,9 +1,11 @@
 #pragma once
 
 #include <regex>
+#include <unordered_map>
 
 #include "absl/strings/str_join.h"
 #include "absl/strings/str_split.h"
+#include "absl/types/optional.h"
 
 namespace ApiBooster {
 
@@ -16,30 +18,19 @@ class ProtoCxxUtils {
 public:
   // Convert from a C++ type, e.g. foo::bar::v2, to a protobuf type, e.g.
   // foo.bar.v2.
-  static std::string cxxToProtoType(const std::string& cxx_type_name) {
-    // Convert from C++ to a qualified proto type. This is fairly hacky stuff,
-    // we're essentially reversing the conventions that the protobuf C++
-    // compiler is using, e.g. replacing _ and :: with . as needed, guessing
-    // that a Case suffix implies some enum switching.
-    const std::string dotted_path = std::regex_replace(cxx_type_name, std::regex("::"), ".");
-    std::vector<std::string> frags = absl::StrSplit(dotted_path, '.');
-    for (std::string& frag : frags) {
-      if (!frag.empty() && isupper(frag[0])) {
-        frag = std::regex_replace(frag, std::regex("_"), ".");
-      }
-    }
-    if (absl::EndsWith(frags.back(), "Case")) {
-      frags.pop_back();
-    }
-    return absl::StrJoin(frags, ".");
-  }
+  static std::string cxxToProtoType(const std::string& cxx_type_name);
+
+  // Given a method, e.g. mutable_foo, rele, and a map of renames in a give proto,
+  // determine if the method is covered by a generated C++ stub for a renamed
+  // field in proto, and if so, return the new method name.
+  static absl::optional<std::string>
+  renameMethod(absl::string_view method_name,
+               const std::unordered_map<std::string, std::string> field_renames);
 
   // Convert from a protobuf type, e.g. foo.bar.v2, to a C++ type, e.g.
   // foo::bar::v2.
-  static std::string protoToCxxType(const std::string& proto_type_name) {
-    // TODO(htuch): add support for recovering foo::bar::Baz_Blah from foo.bar.Baz.Blah.
-    return std::regex_replace(proto_type_name, std::regex(R"(\.)"), "::");
-  }
+  static std::string protoToCxxType(const std::string& proto_type_name, bool qualified,
+                                    bool enum_type);
 };
 
 } // namespace ApiBooster
