@@ -149,11 +149,15 @@ def api_go_test(name, **kwargs):
         **kwargs
     )
 
-def api_proto_package(srcs = [], deps = [], has_services = False, visibility = ["//visibility:public"]):
+def api_proto_package(
+        name = "pkg",
+        srcs = [],
+        deps = [],
+        has_services = False,
+        visibility = ["//visibility:public"]):
     if srcs == []:
         srcs = native.glob(["*.proto"])
 
-    name = "pkg"
     api_cc_py_proto_library(
         name = name,
         visibility = visibility,
@@ -162,9 +166,9 @@ def api_proto_package(srcs = [], deps = [], has_services = False, visibility = [
         has_services = has_services,
     )
 
-    compilers = ["@io_bazel_rules_go//proto:go_proto", "//bazel:pgv_plugin_go"]
+    compilers = ["@io_bazel_rules_go//proto:go_proto", "@envoy_api//bazel:pgv_plugin_go"]
     if has_services:
-        compilers = ["@io_bazel_rules_go//proto:go_grpc", "//bazel:pgv_plugin_go"]
+        compilers = ["@io_bazel_rules_go//proto:go_grpc", "@envoy_api//bazel:pgv_plugin_go"]
 
     go_proto_library(
         name = name + _GO_PROTO_SUFFIX,
