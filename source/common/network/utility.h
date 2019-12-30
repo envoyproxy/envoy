@@ -168,7 +168,7 @@ public:
    * Determine whether this is a local connection.
    * @return bool the address is a local connection.
    */
-  static bool isLocalConnection(const ConnectionSocket& socket);
+  static bool isSameIpOrLoopback(const ConnectionSocket& socket);
 
   /**
    * Determine whether this is an internal (RFC1918) address.

@@ -364,10 +364,10 @@ const Network::FilterChain* FilterChainManagerImpl::findFilterChainForSourceType
   const auto& filter_chain_external =
       source_types[envoy::api::v2::listener::FilterChainMatch::EXTERNAL];
 
-  // isLocalConnection can be expensive. Call it only if LOCAL or EXTERNAL have entries.
+  // isSameIpOrLoopback can be expensive. Call it only if LOCAL or EXTERNAL have entries.
   const bool is_local_connection =
       (!filter_chain_local.first.empty() || !filter_chain_external.first.empty())
-          ? Network::Utility::isLocalConnection(socket)
+          ? Network::Utility::isSameIpOrLoopback(socket)
           : false;
 
   if (is_local_connection) {

@@ -42,7 +42,8 @@ message ApiConfigSource {
     // with every update, the xDS server only sends what has changed since the last update.
     //
     // DELTA_GRPC is not yet entirely implemented! Initially, only CDS is available.
-    // Do not use for other xDSes. TODO(fredlas) update/remove this warning when appropriate.
+    // Do not use for other xDSes.
+    // [#comment:TODO(fredlas) update/remove this warning when appropriate.]
     DELTA_GRPC = 3;
   }
 
