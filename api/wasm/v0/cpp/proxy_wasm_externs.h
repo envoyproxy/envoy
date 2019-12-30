@@ -32,7 +32,7 @@ extern "C" uint32_t proxy_on_vm_start(uint32_t root_context_id, uint32_t vm_conf
 /**
  * Can be called to validate a configuration (e.g. from bootstrap or xDS) both before
  * proxy_on_start() to verify the VM configuration or after proxy_on_start() to verify a plugin
- * configuation.
+ * configuration.
  * @param root_context_id is a unique identifier for the configuration verification context.
  * @param configuration_size is the size of any configuration available via
  * proxy_get_configuration().
