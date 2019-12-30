@@ -22,7 +22,7 @@ DEFINE_PROTO_FUZZER(
   BufferFilterConfigSharedPtr config(std::make_shared<BufferFilterConfig>(input.config()));
   BufferFilter filter(config);
   DecoderFuzzFilter decoder_filter(&filter);
-  // decoder_filter.fuzz(input.data());
+  decoder_filter.fuzz(input.data());
 }
 
 } // namespace BufferFilter
