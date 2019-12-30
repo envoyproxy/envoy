@@ -22,9 +22,4 @@ TEST(QuicPlatformTest, StringPiece) {
   EXPECT_EQ('b', sp[0]);
 }
 
-TEST(QuichePlatformTest, Endian) {
-  EXPECT_EQ(0x1234, QuicheEndian::NetToHost16(QuicheEndian::HostToNet16(0x1234)));
-  EXPECT_EQ(0x12345678, QuicheEndian::NetToHost32(QuicheEndian::HostToNet32(0x12345678)));
-}
-
 } // namespace quiche
