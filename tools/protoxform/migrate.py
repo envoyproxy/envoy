@@ -142,6 +142,8 @@ class UpgradeVisitor(visitor.Visitor):
         else:
           # Mark deprecated enum values as ready for deletion by protoxform.
           self._Deprecate(upgraded_proto, v)
+      elif v.options.HasExtension(migrate_pb2.enum_value_migrate):
+        self._Rename(v, v.options.Extensions[migrate_pb2.enum_value_migrate])
     return upgraded_proto
 
   def VisitFile(self, file_proto, type_context, services, msgs, enums):

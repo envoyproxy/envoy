@@ -12,6 +12,7 @@ enum SomeEnum {
   hidden_envoy_deprecated_DEFAULT = 0 [deprecated = true];
   FOO = 1;
   hidden_envoy_deprecated_BAR = 2 [deprecated = true];
+  WOW = 3;
 }
 
 message Sample {
