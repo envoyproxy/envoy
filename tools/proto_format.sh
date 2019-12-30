@@ -26,3 +26,4 @@ bazel build ${BAZEL_BUILD_OPTIONS} --//tools/api_proto_plugin:default_type_db_ta
   --action_env=CPROFILE_ENABLED=1 --host_force_python=PY3
 
 ./tools/proto_sync.py "--mode=$1" ${PROTO_TARGETS}
+cp -f  ./api/bazel/*.bzl ./api/bazel/BUILD ./generated_api_shadow/bazel
