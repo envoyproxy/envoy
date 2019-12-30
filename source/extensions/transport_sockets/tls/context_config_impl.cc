@@ -363,8 +363,8 @@ ServerContextConfigImpl::ServerContextConfigImpl(
                         DEFAULT_CIPHER_SUITES, DEFAULT_CURVES, factory_context),
       require_client_certificate_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, require_client_certificate, false)),
-      session_ticket_keys_provider_(getTlsSessionTicketKeysConfigProvider(factory_context, config)),
-      session_timeout_(PROTOBUF_GET_SECONDS_OR_DEFAULT(config, session_timeout, 0)) {
+      session_ticket_keys_provider_(
+          getTlsSessionTicketKeysConfigProvider(factory_context, config)) {
   if (session_ticket_keys_provider_ != nullptr) {
     // Validate tls session ticket keys early to reject bad sds updates.
     stk_validation_callback_handle_ = session_ticket_keys_provider_->addValidationCallback(
@@ -385,6 +385,11 @@ ServerContextConfigImpl::ServerContextConfigImpl(
   } else if (!config.common_tls_context().tls_certificates().empty() &&
              !config.common_tls_context().tls_certificate_sds_secret_configs().empty()) {
     throw EnvoyException("SDS and non-SDS TLS certificates may not be mixed in server contexts");
+  }
+
+  if (config.has_session_timeout()) {
+    session_timeout_ =
+        std::chrono::seconds(DurationUtil::durationToSeconds(config.session_timeout()));
   }
 }
 

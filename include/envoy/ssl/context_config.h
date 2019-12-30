@@ -1,6 +1,7 @@
 #pragma once
 
 #include <array>
+#include <chrono>
 #include <functional>
 #include <string>
 #include <vector>
@@ -8,6 +9,8 @@
 #include "envoy/common/pure.h"
 #include "envoy/ssl/certificate_validation_context_config.h"
 #include "envoy/ssl/tls_certificate_config.h"
+
+#include "absl/types/optional.h"
 
 namespace Envoy {
 namespace Ssl {
@@ -125,7 +128,7 @@ public:
    * @return timeout in seconds for the session.
    * Session timeout is used to specify lifetime hint of tls tickets.
    */
-  virtual uint32_t sessionTimeout() const PURE;
+  virtual absl::optional<std::chrono::seconds> sessionTimeout() const PURE;
 };
 
 using ServerContextConfigPtr = std::unique_ptr<ServerContextConfig>;

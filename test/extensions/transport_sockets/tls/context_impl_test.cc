@@ -415,24 +415,6 @@ TEST_F(SslServerContextImplTicketTest, TicketKeySuccess) {
   EXPECT_NO_THROW(loadConfigYaml(yaml));
 }
 
-TEST_F(SslServerContextImplTicketTest, TicketKeySuccessWithCustomLifetimeHint) {
-  // Both keys are valid; no error should be thrown. non default ticket's lifetime hint
-  const std::string yaml = R"EOF(
-  common_tls_context:
-    tls_certificates:
-      certificate_chain:
-        filename: "{{ test_tmpdir }}/unittestcert.pem"
-      private_key:
-        filename: "{{ test_tmpdir }}/unittestkey.pem"
-  session_ticket_keys:
-    keys:
-      filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ticket_key_a"
-      filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ticket_key_b"
-  session_timeout: 2307s
-)EOF";
-  EXPECT_NO_THROW(loadConfigYaml(yaml));
-}
-
 TEST_F(SslServerContextImplTicketTest, TicketKeyInvalidLen) {
   // First key is valid, second key isn't. Should throw if any keys are invalid.
   const std::string yaml = R"EOF(
