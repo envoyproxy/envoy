@@ -2,21 +2,25 @@ syntax = "proto3";
 
 package envoy.config.wasm.v3alpha;
 
-option java_outer_classname = "WasmProto";
-option java_multiple_files = true;
-option java_package = "io.envoyproxy.envoy.config.wasm.v3alpha";
-
 import "envoy/api/v3alpha/core/base.proto";
 
 import "google/protobuf/any.proto";
 
+import "udpa/annotations/versioning.proto";
+
 import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.config.wasm.v3alpha";
+option java_outer_classname = "WasmProto";
+option java_multiple_files = true;
 
 // [#protodoc-title: Wasm service]
 
 // Configuration for a Wasm VM.
 // [#next-free-field: 6]
 message VmConfig {
+  option (udpa.annotations.versioning).previous_message_type = "envoy.config.wasm.v2alpha.VmConfig";
+
   // An ID which will be used along with a hash of the wasm code (or null_vm_id) to determine which
   // VM will be used for the plugin. All plugins which use the same vm_id and code will use the same
   // VM. May be left blank. Sharing a VM between plugins can reduce memory utilization and make
@@ -39,6 +43,9 @@ message VmConfig {
 
 // Base Configuration for Wasm Plugins e.g. filters and services.
 message PluginConfig {
+  option (udpa.annotations.versioning).previous_message_type =
+      "envoy.config.wasm.v2alpha.PluginConfig";
+
   // A unique name for a filters/services in a VM for use in identifying the filter/service if
   // multiple filters/services are handled by the same vm_id and root_id and for logging/debugging.
   string name = 1;
@@ -60,6 +67,9 @@ message PluginConfig {
 // <envoy_api_msg_config.wasm.v3alpha.WasmService>`. This opaque configuration will be used to
 // create a Wasm Service.
 message WasmService {
+  option (udpa.annotations.versioning).previous_message_type =
+      "envoy.config.wasm.v2alpha.WasmService";
+
   // General plugin configuration.
   PluginConfig config = 1;
 
@@ -67,6 +77,6 @@ message WasmService {
   // not be used with filters.
   bool singleton = 2;
 
-  // If set add 'stat_prefix' as a prefix to all stats.
+  // If set add 'stat_prefix' as a prefix to all stats. May be left blank.
   string stat_prefix = 3;
 }

@@ -2,15 +2,15 @@ syntax = "proto3";
 
 package envoy.config.wasm.v2alpha;
 
-option java_outer_classname = "WasmProto";
-option java_multiple_files = true;
-option java_package = "io.envoyproxy.envoy.config.wasm.v2alpha";
-
 import "envoy/api/v2/core/base.proto";
 
 import "google/protobuf/any.proto";
 
 import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.config.wasm.v2alpha";
+option java_outer_classname = "WasmProto";
+option java_multiple_files = true;
 
 // [#protodoc-title: Wasm service]
 
