@@ -1,0 +1,1 @@
+../../api/bazel/external_proto_deps.bzl

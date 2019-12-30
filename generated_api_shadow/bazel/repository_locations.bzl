@@ -1,0 +1,1 @@
+../../api/bazel/repository_locations.bzl
