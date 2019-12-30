@@ -202,6 +202,7 @@ envoy_cc_test_library(
     deps = [
         "//source/common/filesystem:filesystem_lib",
         "@com_googlesource_quiche//:quic_platform_base",
+        "@com_googlesource_quiche//:quiche_common_platform",
     ],
 )
 

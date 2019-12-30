@@ -9,14 +9,14 @@
 // consumed or referenced directly by other Envoy code. It serves purely as a
 // porting layer for QUICHE.
 
-namespace quic {
+namespace quiche {
 
-template <typename... Args> inline std::string QuicStrCatImpl(const Args&... args) {
+template <typename... Args> inline std::string QuicheStrCatImpl(const Args&... args) {
   return absl::StrCat(args...);
 }
 
-template <typename... Args> inline std::string QuicStringPrintfImpl(const Args&... args) {
+template <typename... Args> inline std::string QuicheStringPrintfImpl(const Args&... args) {
   return fmt::sprintf(std::forward<const Args&>(args)...);
 }
 
-} // namespace quic
+} // namespace quiche

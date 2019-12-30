@@ -25,12 +25,14 @@
 #include "test/test_common/threadsafe_singleton_injector.h"
 #include "test/test_common/utility.h"
 
+#include "fmt/printf.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
+#include "quiche/common/platform/api/quiche_arraysize.h"
 #include "quiche/common/platform/api/quiche_endian.h"
+#include "quiche/common/platform/api/quiche_string_piece.h"
 #include "quiche/epoll_server/fake_simple_epoll_server.h"
 #include "quiche/quic/platform/api/quic_aligned.h"
-#include "quiche/quic/platform/api/quic_arraysize.h"
 #include "quiche/quic/platform/api/quic_bug_tracker.h"
 #include "quiche/quic/platform/api/quic_cert_utils.h"
 #include "quiche/quic/platform/api/quic_client_stats.h"
@@ -57,7 +59,6 @@
 #include "quiche/quic/platform/api/quic_sleep.h"
 #include "quiche/quic/platform/api/quic_stack_trace.h"
 #include "quiche/quic/platform/api/quic_stream_buffer_allocator.h"
-#include "quiche/quic/platform/api/quic_string_piece.h"
 #include "quiche/quic/platform/api/quic_system_event_loop.h"
 #include "quiche/quic/platform/api/quic_test.h"
 #include "quiche/quic/platform/api/quic_test_output.h"
@@ -96,9 +97,9 @@ protected:
 
 TEST_F(QuicPlatformTest, QuicAlignOf) { EXPECT_LT(0, QUIC_ALIGN_OF(int)); }
 
-TEST_F(QuicPlatformTest, QuicArraysize) {
+TEST_F(QuicPlatformTest, QuicheArraysize) {
   int array[] = {0, 1, 2, 3, 4};
-  EXPECT_EQ(5, QUIC_ARRAYSIZE(array));
+  EXPECT_EQ(5, QUICHE_ARRAYSIZE(array));
 }
 
 enum class TestEnum { ZERO = 0, ONE, TWO, COUNT };
@@ -263,9 +264,9 @@ TEST_F(QuicPlatformTest, QuicStackTraceTest) {
 
 TEST_F(QuicPlatformTest, QuicSleep) { QuicSleep(QuicTime::Delta::FromMilliseconds(20)); }
 
-TEST_F(QuicPlatformTest, QuicStringPiece) {
+TEST_F(QuicPlatformTest, QuicheStringPiece) {
   std::string s = "bar";
-  QuicStringPiece sp(s);
+  quiche::QuicheStringPiece sp(s);
   EXPECT_EQ('b', sp[0]);
 }
 
@@ -488,9 +489,9 @@ TEST_F(QuicPlatformTest, QuicCertUtils) {
   unsigned char* der = nullptr;
   int len = i2d_X509(x509_cert.get(), &der);
   ASSERT_GT(len, 0);
-  QuicStringPiece out;
+  quiche::QuicheStringPiece out;
   QuicCertUtils::ExtractSubjectNameFromDERCert(
-      QuicStringPiece(reinterpret_cast<const char*>(der), len), &out);
+      quiche::QuicheStringPiece(reinterpret_cast<const char*>(der), len), &out);
   EXPECT_EQ("0z1\v0\t\x6\x3U\x4\x6\x13\x2US1\x13"
             "0\x11\x6\x3U\x4\b\f\nCalifornia1\x16"
             "0\x14\x6\x3U\x4\a\f\rSan Francisco1\r"
@@ -507,12 +508,24 @@ TEST_F(QuicPlatformTest, QuicTestOutput) {
   // Set log level to INFO to see the test output path in log.
   GetLogger().set_level(INFO);
 
-  EXPECT_LOG_NOT_CONTAINS("warn", "",
-                          QuicRecordTestOutput("quic_test_output.1", "output 1 content\n"));
-  EXPECT_LOG_NOT_CONTAINS("error", "",
-                          QuicRecordTestOutput("quic_test_output.2", "output 2 content\n"));
+  EXPECT_LOG_NOT_CONTAINS("warn", "", QuicRecordTrace("quic_test_output.1", "output 1 content\n"));
+  EXPECT_LOG_NOT_CONTAINS("error", "", QuicRecordTrace("quic_test_output.2", "output 2 content\n"));
   EXPECT_LOG_CONTAINS("info", "Recorded test output into",
-                      QuicRecordTestOutput("quic_test_output.3", "output 3 content\n"));
+                      QuicRecordTrace("quic_test_output.3", "output 3 content\n"));
+
+  std::string content4{"output 4 content\n"};
+  const testing::TestInfo* test_info = testing::UnitTest::GetInstance()->current_test_info();
+
+  std::string timestamp = absl::FormatTime("%Y%m%d%H%M%S", absl::Now(), absl::LocalTimeZone());
+
+  std::string filename = fmt::sprintf("%s.%s.%s.%s.qtr", test_info->name(),
+                                      test_info->test_case_name(), "quic_test_output.4", timestamp);
+
+  EXPECT_LOG_CONTAINS("info", "Recorded test output into", QuicSaveTestOutput(filename, content4));
+
+  std::string content;
+  EXPECT_TRUE(QuicLoadTestOutput(filename, &content));
+  EXPECT_EQ("output 4 content\n", content);
 }
 
 TEST_F(QuicPlatformTest, ApproximateNowInUsec) {
