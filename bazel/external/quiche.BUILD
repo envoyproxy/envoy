@@ -3367,6 +3367,7 @@ envoy_cc_test_library(
     tags = ["nofips"],
     deps =
         [
+	    ":quiche_common_platform",
             ":quiche_common_platform_endian",
             "@envoy//test/extensions/quic_listeners/quiche/platform:quiche_common_platform_test_impl_lib",
         ],
