@@ -25,7 +25,7 @@ VhdsSubscription::VhdsSubscription(
     RouteConfigUpdatePtr& config_update_info,
     Server::Configuration::ServerFactoryContext& factory_context, const std::string& stat_prefix,
     std::unordered_set<RouteConfigProvider*>& route_config_providers,
-    const envoy::api::v2::core::ConfigSource::XdsApiVersion xds_api_version)
+    envoy::api::v2::core::ConfigSource::XdsApiVersion xds_api_version)
     : config_update_info_(config_update_info),
       scope_(factory_context.scope().createScope(stat_prefix + "vhds." +
                                                  config_update_info_->routeConfigName() + ".")),

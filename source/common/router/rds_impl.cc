@@ -63,7 +63,7 @@ RdsRouteConfigSubscription::RdsRouteConfigSubscription(
     ProtobufMessage::ValidationVisitor& validator, Init::Manager& init_manager,
     const std::string& stat_prefix,
     Envoy::Router::RouteConfigProviderManagerImpl& route_config_provider_manager,
-    const envoy::api::v2::core::ConfigSource::XdsApiVersion xds_api_version)
+    envoy::api::v2::core::ConfigSource::XdsApiVersion xds_api_version)
     : route_config_name_(rds.route_config_name()), factory_context_(factory_context),
       validator_(validator), init_manager_(init_manager),
       init_target_(fmt::format("RdsRouteConfigSubscription {}", route_config_name_),
