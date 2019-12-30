@@ -30,7 +30,7 @@ private:
   // RELEASE or DEBUG
   static const std::string& buildType();
   static const std::string& sslVersion();
-  static envoy::api::v2::core::BuildVersion makeBuildVersion();
+  static envoy::api::v2::core::BuildVersion makeBuildVersion(const char* version);
 };
 
 class BuildVersionMetadata {

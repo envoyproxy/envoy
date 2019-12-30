@@ -283,7 +283,8 @@ public:
    */
   static bool isFactoryDisabled(absl::string_view name) {
     auto it = factories().find(name);
-    return it == factories().end() || it->second == nullptr;
+    ASSERT(it != factories().end());
+    return it->second == nullptr;
   }
 
   /**

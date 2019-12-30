@@ -1,6 +1,7 @@
 #include "common/common/version.h"
 
 #include <map>
+#include <regex>
 #include <string>
 
 #include "common/common/fmt.h"
@@ -31,8 +32,9 @@ const std::string& VersionInfo::version() {
 }
 
 const envoy::api::v2::core::BuildVersion& VersionInfo::buildVersion() {
-  static envoy::api::v2::core::BuildVersion result = makeBuildVersion();
-  return result;
+  static const auto* result =
+      new envoy::api::v2::core::BuildVersion(makeBuildVersion(BUILD_VERSION_NUMBER));
+  return *result;
 }
 
 const std::string& VersionInfo::buildType() {
@@ -53,24 +55,31 @@ const std::string& VersionInfo::sslVersion() {
   return ssl_version;
 }
 
-envoy::api::v2::core::BuildVersion VersionInfo::makeBuildVersion() {
+envoy::api::v2::core::BuildVersion VersionInfo::makeBuildVersion(const char* version) {
   envoy::api::v2::core::BuildVersion result;
-  // Split BUILD_VERSION_NUMBER into version and a possible build label after the '-'
-  std::vector<std::string> ver_label = absl::StrSplit(BUILD_VERSION_NUMBER, '-');
-  std::vector<std::string> ver = absl::StrSplit(ver_label[0], '.');
-  int value = 0;
-  if (ver.size() > 0 && absl::SimpleAtoi(ver[0], &value)) {
-    result.mutable_version()->set_major(value);
-  }
-  if (ver.size() > 1 && absl::SimpleAtoi(ver[1], &value)) {
-    result.mutable_version()->set_minor(value);
-  }
-  if (ver.size() > 2 && absl::SimpleAtoi(ver[2], &value)) {
-    result.mutable_version()->set_patch(value);
+  // Split BUILD_VERSION_NUMBER into version and an optional build label after the '-'
+  std::regex ver_regex("([\\d]+)\\.([\\d]+)\\.([\\d]+)(-(.*))?");
+  // Match indexes, given the regex above
+  constexpr std::cmatch::size_type major = 1;
+  constexpr std::cmatch::size_type minor = 2;
+  constexpr std::cmatch::size_type patch = 3;
+  constexpr std::cmatch::size_type label = 5;
+  std::cmatch match;
+  if (std::regex_match(version, match, ver_regex)) {
+    int value = 0;
+    if (absl::SimpleAtoi(match.str(major), &value)) {
+      result.mutable_version()->set_major(value);
+    }
+    if (absl::SimpleAtoi(match.str(minor), &value)) {
+      result.mutable_version()->set_minor(value);
+    }
+    if (absl::SimpleAtoi(match.str(patch), &value)) {
+      result.mutable_version()->set_patch(value);
+    }
   }
   std::map<std::string, std::string> fields;
-  if (ver_label.size() > 1) {
-    fields[BuildVersionMetadataKeys::get().BuildLabel] = ver_label[1];
+  if (!match.str(label).empty()) {
+    fields[BuildVersionMetadataKeys::get().BuildLabel] = match.str(label);
   }
   fields[BuildVersionMetadataKeys::get().BuildType] = buildType();
   fields[BuildVersionMetadataKeys::get().SslVersion] = sslVersion();

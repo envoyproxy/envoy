@@ -11,6 +11,9 @@ class VersionInfoTestPeer {
 public:
   static const std::string& buildType() { return VersionInfo::buildType(); }
   static const std::string& sslVersion() { return VersionInfo::sslVersion(); }
+  static envoy::api::v2::core::BuildVersion makeBuildVersion(const char* version) {
+    return VersionInfo::makeBuildVersion(version);
+  }
 };
 
 TEST(VersionTest, BuildVersion) {
@@ -33,6 +36,38 @@ TEST(VersionTest, BuildVersion) {
             fields.at(BuildVersionMetadataKeys::get().BuildType).string_value());
   EXPECT_EQ(VersionInfoTestPeer::sslVersion(),
             fields.at(BuildVersionMetadataKeys::get().SslVersion).string_value());
+}
+
+TEST(VersionTest, MakeBuildVersionWithLabel) {
+  auto build_version = VersionInfoTestPeer::makeBuildVersion("1.2.3-foo-bar");
+  EXPECT_EQ(1, build_version.version().major());
+  EXPECT_EQ(2, build_version.version().minor());
+  EXPECT_EQ(3, build_version.version().patch());
+  const auto& fields = build_version.metadata().fields();
+  EXPECT_GE(fields.size(), 1);
+  EXPECT_EQ("foo-bar", fields.at(BuildVersionMetadataKeys::get().BuildLabel).string_value());
+}
+
+TEST(VersionTest, MakeBuildVersionWithoutLabel) {
+  auto build_version = VersionInfoTestPeer::makeBuildVersion("1.2.3");
+  EXPECT_EQ(1, build_version.version().major());
+  EXPECT_EQ(2, build_version.version().minor());
+  EXPECT_EQ(3, build_version.version().patch());
+  const auto& fields = build_version.metadata().fields();
+  EXPECT_EQ(fields.find(BuildVersionMetadataKeys::get().BuildLabel), fields.end());
+  // Other metadata should still be present
+  EXPECT_GE(fields.size(), 1);
+}
+
+TEST(VersionTest, MakeBadBuildVersion) {
+  auto build_version = VersionInfoTestPeer::makeBuildVersion("1.foo.3-bar");
+  EXPECT_EQ(0, build_version.version().major());
+  EXPECT_EQ(0, build_version.version().minor());
+  EXPECT_EQ(0, build_version.version().patch());
+  const auto& fields = build_version.metadata().fields();
+  EXPECT_EQ(fields.find(BuildVersionMetadataKeys::get().BuildLabel), fields.end());
+  // Other metadata should still be present
+  EXPECT_GE(fields.size(), 1);
 }
 
 } // namespace Envoy
