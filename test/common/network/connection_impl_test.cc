@@ -880,7 +880,7 @@ TEST_P(ConnectionImplTest, WatermarkFuzzing) {
     // If after the bytes are flushed upstream the number of bytes remaining is
     // below the low watermark and the bytes were not previously below the low
     // watermark, expect the callback for going below.
-    if (new_bytes_buffered < 5 && is_above) {
+    if (new_bytes_buffered <= 5 && is_above) {
       ENVOY_LOG_MISC(trace, "Expect onBelowWriteBufferLowWatermark");
       EXPECT_CALL(client_callbacks_, onBelowWriteBufferLowWatermark());
       is_below = true;
