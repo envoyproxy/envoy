@@ -331,7 +331,7 @@ def errorIfNoSubstringFound(pattern, file_path, error_message):
 
 
 def isApiFile(file_path):
-  return file_path.startswith(args.api_prefix)
+  return file_path.startswith(args.api_prefix) or file_path.startswith(args.api_shadow_prefix)
 
 
 def isBuildFile(file_path):
@@ -633,7 +633,8 @@ def checkBuildPath(file_path):
     command = "%s %s | diff %s -" % (ENVOY_BUILD_FIXER_PATH, file_path, file_path)
     error_messages += executeCommand(command, "envoy_build_fixer check failed", file_path)
 
-  if isBuildFile(file_path) and file_path.startswith(args.api_prefix + "envoy"):
+  if isBuildFile(file_path) and (file_path.startswith(args.api_prefix + "envoy") or
+                                 file_path.startswith(args.api_shadow_prefix + "envoy")):
     found = False
     for line in readLines(file_path):
       if "api_proto_package(" in line:
@@ -836,6 +837,10 @@ if __name__ == "__main__":
                       default=multiprocessing.cpu_count(),
                       help="number of worker processes to use; defaults to one per core.")
   parser.add_argument("--api-prefix", type=str, default="./api/", help="path of the API tree.")
+  parser.add_argument("--api-shadow-prefix",
+                      type=str,
+                      default="./generated_api_shadow/",
+                      help="path of the shadow API tree.")
   parser.add_argument("--skip_envoy_build_rule_check",
                       action="store_true",
                       help="skip checking for '@envoy//' prefix in build rules.")
