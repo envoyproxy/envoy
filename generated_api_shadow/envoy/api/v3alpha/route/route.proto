@@ -1256,7 +1256,7 @@ message VirtualCluster {
   core.RequestMethod hidden_envoy_deprecated_method = 3 [deprecated = true];
 }
 
-// Global rate limiting :ref:`architecture overview <arch_overview_rate_limit>`.
+// Global rate limiting :ref:`architecture overview <arch_overview_global_rate_limit>`.
 message RateLimit {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.route.RateLimit";
 

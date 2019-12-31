@@ -610,6 +610,7 @@ idx
 ie
 ifdef
 iff
+ified
 impl
 implementors
 impls
@@ -872,6 +873,7 @@ refetch
 regex
 regexes
 reimplements
+rele
 releasor
 reloadable
 reparse
@@ -954,6 +956,7 @@ strerr
 strerror
 stringbuf
 stringified
+stringify
 stringstream
 strtoull
 struct
@@ -987,6 +990,7 @@ superset
 symlink
 symlinked
 symlinks
+synchronizer
 syncookie
 sys
 syscall

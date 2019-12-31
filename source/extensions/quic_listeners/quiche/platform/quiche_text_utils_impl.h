@@ -1,6 +1,6 @@
 #pragma once
 
-#include "extensions/quic_listeners/quiche/platform/quic_string_piece_impl.h"
+#include "extensions/quic_listeners/quiche/platform/quiche_string_piece_impl.h"
 #include "extensions/quic_listeners/quiche/platform/string_utils.h"
 
 #include "absl/strings/ascii.h"
@@ -17,65 +17,65 @@
 // consumed or referenced directly by other Envoy code. It serves purely as a
 // porting layer for QUICHE.
 
-namespace quic {
+namespace quiche {
 
-class QuicTextUtilsImpl {
+class QuicheTextUtilsImpl {
 public:
-  static bool StartsWith(QuicStringPieceImpl data, QuicStringPieceImpl prefix) {
+  static bool StartsWith(QuicheStringPieceImpl data, QuicheStringPieceImpl prefix) {
     return absl::StartsWith(data, prefix);
   }
 
-  static bool EndsWithIgnoreCase(QuicStringPieceImpl data, QuicStringPieceImpl suffix) {
+  static bool EndsWithIgnoreCase(QuicheStringPieceImpl data, QuicheStringPieceImpl suffix) {
     return absl::EndsWithIgnoreCase(data, suffix);
   }
 
-  static std::string ToLower(QuicStringPieceImpl data) { return absl::AsciiStrToLower(data); }
+  static std::string ToLower(QuicheStringPieceImpl data) { return absl::AsciiStrToLower(data); }
 
-  static void RemoveLeadingAndTrailingWhitespace(QuicStringPieceImpl* data) {
+  static void RemoveLeadingAndTrailingWhitespace(QuicheStringPieceImpl* data) {
     *data = absl::StripAsciiWhitespace(*data);
   }
 
-  static bool StringToUint64(QuicStringPieceImpl in, uint64_t* out) {
+  static bool StringToUint64(QuicheStringPieceImpl in, uint64_t* out) {
     return absl::SimpleAtoi(in, out);
   }
 
-  static bool StringToInt(QuicStringPieceImpl in, int* out) { return absl::SimpleAtoi(in, out); }
+  static bool StringToInt(QuicheStringPieceImpl in, int* out) { return absl::SimpleAtoi(in, out); }
 
-  static bool StringToUint32(QuicStringPieceImpl in, uint32_t* out) {
+  static bool StringToUint32(QuicheStringPieceImpl in, uint32_t* out) {
     return absl::SimpleAtoi(in, out);
   }
 
-  static bool StringToSizeT(QuicStringPieceImpl in, size_t* out) {
+  static bool StringToSizeT(QuicheStringPieceImpl in, size_t* out) {
     return absl::SimpleAtoi(in, out);
   }
 
   static std::string Uint64ToString(uint64_t in) { return absl::StrCat(in); }
 
-  static std::string HexEncode(QuicStringPieceImpl data) { return absl::BytesToHexString(data); }
+  static std::string HexEncode(QuicheStringPieceImpl data) { return absl::BytesToHexString(data); }
 
   static std::string Hex(uint32_t v) { return absl::StrCat(absl::Hex(v)); }
 
-  static std::string HexDecode(QuicStringPieceImpl data) { return absl::HexStringToBytes(data); }
+  static std::string HexDecode(QuicheStringPieceImpl data) { return absl::HexStringToBytes(data); }
 
   static void Base64Encode(const uint8_t* data, size_t data_len, std::string* output) {
     return quiche::Base64Encode(data, data_len, output);
   }
 
-  static std::string HexDump(QuicStringPieceImpl binary_data) {
+  static std::string HexDump(QuicheStringPieceImpl binary_data) {
     return quiche::HexDump(binary_data);
   }
 
-  static bool ContainsUpperCase(QuicStringPieceImpl data) {
+  static bool ContainsUpperCase(QuicheStringPieceImpl data) {
     return std::any_of(data.begin(), data.end(), absl::ascii_isupper);
   }
 
-  static bool IsAllDigits(QuicStringPieceImpl data) {
+  static bool IsAllDigits(QuicheStringPieceImpl data) {
     return std::all_of(data.begin(), data.end(), absl::ascii_isdigit);
   }
 
-  static std::vector<QuicStringPieceImpl> Split(QuicStringPieceImpl data, char delim) {
+  static std::vector<QuicheStringPieceImpl> Split(QuicheStringPieceImpl data, char delim) {
     return absl::StrSplit(data, delim);
   }
 };
 
-} // namespace quic
+} // namespace quiche
