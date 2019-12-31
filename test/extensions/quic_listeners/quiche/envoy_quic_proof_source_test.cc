@@ -42,7 +42,7 @@ protected:
   std::string hostname_{"www.fake.com"};
   quic::QuicSocketAddress server_address_;
   quic::QuicTransportVersion version_{quic::QUIC_VERSION_UNSUPPORTED};
-  quic::QuicStringPiece chlo_hash_{""};
+  quiche::QuicheStringPiece chlo_hash_{""};
   std::string server_config_{"Server Config"};
   std::vector<std::string> expected_certs_{"Fake cert"};
   std::string expected_signature_{absl::StrCat("Fake signature for { ", server_config_, " }")};
