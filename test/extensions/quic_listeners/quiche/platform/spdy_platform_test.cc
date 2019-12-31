@@ -6,7 +6,6 @@
 #include "test/test_common/logging.h"
 
 #include "gtest/gtest.h"
-#include "quiche/spdy/platform/api/spdy_arraysize.h"
 #include "quiche/spdy/platform/api/spdy_bug_tracker.h"
 #include "quiche/spdy/platform/api/spdy_containers.h"
 #include "quiche/spdy/platform/api/spdy_endianness_util.h"
@@ -28,11 +27,6 @@ namespace Extensions {
 namespace QuicListeners {
 namespace Quiche {
 namespace {
-
-TEST(SpdyPlatformTest, SpdyArraysize) {
-  int array[] = {0, 1, 2, 3, 4};
-  EXPECT_EQ(5, SPDY_ARRAYSIZE(array));
-}
 
 TEST(SpdyPlatformTest, SpdyBugTracker) {
   EXPECT_DEBUG_DEATH(SPDY_BUG << "Here is a bug,", " bug");
