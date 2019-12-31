@@ -32,6 +32,10 @@ std::ostream& operator<<(std::ostream& os, CacheEntryStatus status) {
   return os;
 }
 
+std::ostream& operator<<(std::ostream& os, const AdjustedByteRange& range) {
+  return os << "[" << range.begin() << "," << range.end() << ")";
+}
+
 LookupRequest::LookupRequest(const Http::HeaderMap& request_headers, SystemTime timestamp)
     : timestamp_(timestamp),
       request_cache_control_(request_headers.CacheControl() == nullptr
@@ -110,8 +114,12 @@ bool adjustByteRangeSet(std::vector<AdjustedByteRange>& response_ranges,
   for (const RawByteRange& spec : request_range_spec) {
     if (spec.isSuffix()) {
       // spec is a suffix-byte-range-spec
+      if (spec.suffixLength() == 0) {
+        // This range is unsatisfiable, so skip it.
+        continue;
+      }
       if (spec.suffixLength() >= content_length) {
-        // All bytes are being requested, so we may as well send a normal '200
+        // All bytes are being requested, so we may as well send a '200
         // OK' response.
         response_ranges.clear();
         return true;
@@ -124,9 +132,15 @@ bool adjustByteRangeSet(std::vector<AdjustedByteRange>& response_ranges,
         continue;
       }
       if (spec.lastBytePos() >= content_length - 1) {
+        if (spec.firstBytePos() == 0) {
+          // All bytes are being requested, so we may as well send a '200
+          // OK' response.
+          response_ranges.clear();
+          return true;
+        }
         response_ranges.emplace_back(spec.firstBytePos(), content_length);
       } else {
-        response_ranges.emplace_back(spec.firstBytePos(), spec.lastBytePos());
+        response_ranges.emplace_back(spec.firstBytePos(), spec.lastBytePos() + 1);
       }
     }
   }

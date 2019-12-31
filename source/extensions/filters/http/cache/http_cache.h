@@ -91,6 +91,12 @@ private:
   uint64_t last_;
 };
 
+inline bool operator==(const AdjustedByteRange& lhs, const AdjustedByteRange& rhs) {
+  return lhs.begin() == rhs.begin() && lhs.end() == rhs.end();
+}
+
+std::ostream& operator<<(std::ostream& os, const AdjustedByteRange& range);
+
 // Adjusts request_range_spec to fit a cached response of size content_length, putting the results
 // in response_ranges. Returns true if response_ranges is satisfiable (empty is considered
 // satisfiable, as it denotes the entire body).

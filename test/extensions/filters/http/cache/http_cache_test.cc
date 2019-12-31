@@ -6,6 +6,10 @@
 
 #include "gtest/gtest.h"
 
+using testing::ContainerEq;
+using testing::TestWithParam;
+using testing::ValuesIn;
+
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
@@ -181,11 +185,69 @@ TEST_F(LookupRequestTest, FullRange) {
   EXPECT_FALSE(lookup_response.has_trailers);
 }
 
-TEST(AdjustByteRangeSet, FullRange) {
+struct AdjustByteRangeParams {
+  std::vector<RawByteRange> request;
   std::vector<AdjustedByteRange> result;
-  EXPECT_TRUE(adjustByteRangeSet(result, {{0, 99}}, 4));
-  ASSERT_EQ(result.size(), 1);
-  EXPECT_EQ(result[0].length(), 4);
+  uint64_t content_length;
+};
+
+AdjustByteRangeParams satisfiable_ranges[] =
+    // request, result, content_length
+    {
+        // Various ways to request the full body. Full responses are signaled by empty result
+        // vectors.
+        {{{0, 3}}, {}, 4},                       // byte-range-spec, exact
+        {{{UINT64_MAX, 4}}, {}, 4},              // suffix-byte-range-spec, exact
+        {{{0, 99}}, {}, 4},                      // byte-range-spec, overlong
+        {{{0, UINT64_MAX}}, {}, 4},              // byte-range-spec, overlong
+        {{{UINT64_MAX, 5}}, {}, 4},              // suffix-byte-range-spec, overlong
+        {{{UINT64_MAX, UINT64_MAX - 1}}, {}, 4}, // suffix-byte-range-spec, overlong
+        {{{UINT64_MAX, UINT64_MAX}}, {}, 4},     // suffix-byte-range-spec, overlong
+
+        // Single bytes
+        {{{0, 0}}, {{0, 1}}, 4},
+        {{{1, 1}}, {{1, 2}}, 4},
+        {{{3, 3}}, {{3, 4}}, 4},
+        {{{UINT64_MAX, 1}}, {{3, 4}}, 4},
+
+        // Multiple bytes, starting in the middle
+        {{{1, 2}}, {{1, 3}}, 4},           // fully in the middle
+        {{{1, 3}}, {{1, 4}}, 4},           // to the end
+        {{{2, 21}}, {{2, 4}}, 4},          // overlong
+        {{{1, UINT64_MAX}}, {{1, 4}}, 4}}; // overlong
+// TODO(toddmgreer) Before enabling support for multi-range requests, test it.
+
+class AdjustByteRangeTest : public TestWithParam<AdjustByteRangeParams> {};
+
+TEST_P(AdjustByteRangeTest, All) {
+  std::vector<AdjustedByteRange> result;
+  ASSERT_TRUE(adjustByteRangeSet(result, GetParam().request, GetParam().content_length));
+  EXPECT_THAT(result, ContainerEq(GetParam().result));
+}
+
+INSTANTIATE_TEST_SUITE_P(AdjustByteRangeTest, AdjustByteRangeTest, ValuesIn(satisfiable_ranges));
+
+class AdjustByteRangeUnsatisfiableTest : public TestWithParam<std::vector<RawByteRange>> {};
+
+std::vector<RawByteRange> unsatisfiable_ranges[] = {
+    {{4, 5}},
+    {{4, 9}},
+    {{7, UINT64_MAX}},
+    {{UINT64_MAX, 0}},
+};
+
+TEST_P(AdjustByteRangeUnsatisfiableTest, All) {
+  std::vector<AdjustedByteRange> result;
+  ASSERT_FALSE(adjustByteRangeSet(result, GetParam(), 3));
+}
+
+INSTANTIATE_TEST_SUITE_P(AdjustByteRangeUnsatisfiableTest, AdjustByteRangeUnsatisfiableTest,
+                         ValuesIn(unsatisfiable_ranges));
+
+TEST(AdjustByteRange, NoRangeRequest) {
+  std::vector<AdjustedByteRange> result;
+  ASSERT_TRUE(adjustByteRangeSet(result, {}, 8));
+  EXPECT_THAT(result, ContainerEq(std::vector<AdjustedByteRange>{}));
 }
 
 } // namespace Cache
