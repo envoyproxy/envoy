@@ -98,8 +98,8 @@ class UpgradeVisitor(visitor.Visitor):
     """
     if migrate_annotation.oneof_promotion:
       oneof_index = -1
-      for n, od in enumerate(msg_proto.oneof_decl):
-        if od.name == migrate_annotation.oneof_promotion:
+      for n, oneof_decl in enumerate(msg_proto.oneof_decl):
+        if oneof_decl.name == migrate_annotation.oneof_promotion:
           oneof_index = n
       if oneof_index == -1:
         oneof_index = len(msg_proto.oneof_decl)
