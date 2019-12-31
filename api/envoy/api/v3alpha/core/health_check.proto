@@ -71,7 +71,7 @@ message HealthCheck {
     }
   }
 
-  // [#next-free-field: 13]
+  // [#next-free-field: 12]
   message HttpHealthCheck {
     option (udpa.annotations.versioning).previous_message_type =
         "envoy.api.v2.core.HealthCheck.HttpHealthCheck";
@@ -124,10 +124,6 @@ message HealthCheck {
     // <envoy_api_msg_type.matcher.v3alpha.StringMatcher>`. See the :ref:`architecture overview
     // <arch_overview_health_checking_identity>` for more information.
     type.matcher.v3alpha.StringMatcher service_name_matcher = 11;
-
-    // An optional parameter to control cluster identity validation using :ref:`StringMatcher
-    // <envoy_api_msg_type.matcher.v3alpha.StringMatcher>`. This is set to true by default.
-    RuntimeFeatureFlag service_name_matcher_enabled = 12;
   }
 
   message TcpHealthCheck {

@@ -146,20 +146,12 @@ then come back with the same IP address, but as a different host type. One solut
 is having a different HTTP health checking URL for every service type. The downside of that approach
 is that overall configuration becomes more complicated as every health check URL is fully custom.
 
-The Envoy HTTP health checker supports the :ref:`service_name
-<envoy_api_field_core.HealthCheck.HttpHealthCheck.service_name>` option. If this option is set, the health checker
-additionally compares the value of the *x-envoy-upstream-healthchecked-cluster* response header to
-*service_name*. If *service_name* is not a prefix of *x-envoy-upstream-healthchecked-cluster* the values do not match
-and the health check does not pass. The upstream health check filter appends 
-*x-envoy-upstream-healthchecked-cluster* to the response headers. The appended value is determined by
-the :option:`--service-cluster` command line option. This option is deprecated in favour of 
-:ref:`service_name_matcher <envoy_api_field_core.HealthCheck.HttpHealthCheck.service_name_matcher>`.
-
-The :ref:`service_name_matcher <envoy_api_field_core.HealthCheck.HttpHealthCheck.service_name_matcher>`
-option uses :ref:`StringMatcher <envoy_api_msg_type.matcher.StringMatcher>` to enable more fine grained
-comparison between the *x-envoy-upstream-healthchecked-cluster* and the service name's pattern. The
-service name is contructed out of the `--service-cluster` command line option to envoy and could be a
-pattern e.g. `service-environment-region`.
+The Envoy HTTP health checker supports the :ref:`service_name_matcher
+<envoy_api_field_core.HealthCheck.HttpHealthCheck.service_name_matcher> option. If this option is set,
+the health checker additionally compares the value of the *x-envoy-upstream-healthchecked-cluster* 
+response header to *service_name_matcher*. If the values do not match, the health check does not pass.
+The upstream health check filter appends *x-envoy-upstream-healthchecked-cluster* to the response headers.
+The appended value is determined by the :option:`--service-cluster` command line option.
 
 .. _arch_overview_health_checking_degraded:
 
