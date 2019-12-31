@@ -147,7 +147,7 @@ is having a different HTTP health checking URL for every service type. The downs
 is that overall configuration becomes more complicated as every health check URL is fully custom.
 
 The Envoy HTTP health checker supports the :ref:`service_name_matcher
-<envoy_api_field_core.HealthCheck.HttpHealthCheck.service_name_matcher> option. If this option is set,
+<envoy_api_field_core.HealthCheck.HttpHealthCheck.service_name_matcher>` option. If this option is set,
 the health checker additionally compares the value of the *x-envoy-upstream-healthchecked-cluster* 
 response header to *service_name_matcher*. If the values do not match, the health check does not pass.
 The upstream health check filter appends *x-envoy-upstream-healthchecked-cluster* to the response headers.
