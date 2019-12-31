@@ -11,7 +11,7 @@ namespace Config {
 // A message that has been downgraded, e.g. from v3alpha to v2.
 struct DowngradedMessage {
   // The dynamic message factory must outlive the message.
-  Protobuf::DynamicMessageFactory dmf_;
+  Protobuf::DynamicMessageFactory dynamic_msg_factory_;
 
   // Downgraded message.
   std::unique_ptr<Protobuf::Message> msg_;

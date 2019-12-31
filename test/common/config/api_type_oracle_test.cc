@@ -19,8 +19,8 @@ TEST(ApiTypeOracleTest, All) {
   EXPECT_EQ(nullptr, ApiTypeOracle::getEarlierVersionDescriptor(non_api_type));
   EXPECT_EQ(nullptr, ApiTypeOracle::getEarlierVersionDescriptor(v2_config));
   const auto* desc = ApiTypeOracle::getEarlierVersionDescriptor(v3_config);
-  EXPECT_EQ(envoy::config::filter::http::ip_tagging::v3alpha::IPTagging::descriptor()->name(),
-            desc->name());
+  EXPECT_EQ(envoy::config::filter::http::ip_tagging::v2::IPTagging::descriptor()->full_name(),
+            desc->full_name());
 }
 
 } // namespace
