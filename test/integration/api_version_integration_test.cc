@@ -1,3 +1,4 @@
+#include "common/common/assert.h"
 #include "envoy/api/v2/core/config_source.pb.h"
 
 #include "test/integration/http_integration.h"
@@ -40,19 +41,70 @@ public:
 
   AssertionResult validateDiscoveryRequest(const std::string& expected_v2_sotw_endpoint,
                                            const std::string& expected_v2_delta_endpoint,
-                                           const std::string& expected_type_url) {
+                                           const std::string& expected_v3alpha_sotw_endpoint,
+                                           const std::string& expected_v3alpha_delta_endpoint,
+                                           const std::string& expected_v2_type_url,
+                                           const std::string& expected_v3alpha_type_url) {
     std::string expected_endpoint;
+    std::string expected_type_url;
     std::string actual_type_url;
-    if (sotw_or_delta_ == Grpc::SotwOrDelta::Sotw) {
-      API_NO_BOOST(envoy::api::v2::DiscoveryRequest) discovery_request;
-      VERIFY_ASSERTION(xds_stream_->waitForGrpcMessage(*dispatcher_, discovery_request));
-      expected_endpoint = expected_v2_sotw_endpoint;
-      actual_type_url = discovery_request.type_url();
-    } else {
-      API_NO_BOOST(envoy::api::v2::DeltaDiscoveryRequest) delta_discovery_request;
-      VERIFY_ASSERTION(xds_stream_->waitForGrpcMessage(*dispatcher_, delta_discovery_request));
-      expected_endpoint = expected_v2_delta_endpoint;
-      actual_type_url = delta_discovery_request.type_url();
+    switch (transportApiVersion()) {
+    case envoy::api::v2::core::ApiVersion::AUTO:
+    case envoy::api::v2::core::ApiVersion::V2: {
+      switch (apiType()) {
+      case envoy::api::v2::core::ApiConfigSource::GRPC: {
+        API_NO_BOOST(envoy::api::v2::DiscoveryRequest) discovery_request;
+        VERIFY_ASSERTION(xds_stream_->waitForGrpcMessage(*dispatcher_, discovery_request));
+        actual_type_url = discovery_request.type_url();
+        expected_endpoint = expected_v2_sotw_endpoint;
+        break;
+      }
+      case envoy::api::v2::core::ApiConfigSource::DELTA_GRPC: {
+        API_NO_BOOST(envoy::api::v2::DeltaDiscoveryRequest) delta_discovery_request;
+        VERIFY_ASSERTION(xds_stream_->waitForGrpcMessage(*dispatcher_, delta_discovery_request));
+        actual_type_url = delta_discovery_request.type_url();
+        expected_endpoint = expected_v2_delta_endpoint;
+        break;
+      }
+      default:
+        return AssertionFailure() << "not implemented yet";
+      }
+      break;
+    }
+    case envoy::api::v2::core::ApiVersion::V3ALPHA: {
+      switch (apiType()) {
+      case envoy::api::v2::core::ApiConfigSource::GRPC: {
+        API_NO_BOOST(envoy::api::v3alpha::DiscoveryRequest) discovery_request;
+        VERIFY_ASSERTION(xds_stream_->waitForGrpcMessage(*dispatcher_, discovery_request));
+        actual_type_url = discovery_request.type_url();
+        expected_endpoint = expected_v3alpha_sotw_endpoint;
+        break;
+      }
+      case envoy::api::v2::core::ApiConfigSource::DELTA_GRPC: {
+        API_NO_BOOST(envoy::api::v3alpha::DeltaDiscoveryRequest) delta_discovery_request;
+        VERIFY_ASSERTION(xds_stream_->waitForGrpcMessage(*dispatcher_, delta_discovery_request));
+        actual_type_url = delta_discovery_request.type_url();
+        expected_endpoint = expected_v3alpha_delta_endpoint;
+        break;
+      }
+      default:
+        return AssertionFailure() << "not implemented yet";
+      }
+      break;
+    }
+    default:
+      NOT_REACHED_GCOVR_EXCL_LINE;
+    }
+    switch (resourceApiVersion()) {
+    case envoy::api::v2::core::ApiVersion::AUTO:
+    case envoy::api::v2::core::ApiVersion::V2:
+      expected_type_url = expected_v2_type_url;
+      break;
+    case envoy::api::v2::core::ApiVersion::V3ALPHA:
+      expected_type_url = expected_v3alpha_type_url;
+      break;
+    default:
+      NOT_REACHED_GCOVR_EXCL_LINE;
     }
     if (endpoint_ != expected_endpoint) {
       return AssertionFailure() << "Expected endpoint " << expected_endpoint << ", got "
@@ -77,7 +129,7 @@ public:
 INSTANTIATE_TEST_SUITE_P(
     IpVersionsApiConfigSourcesApiVersions, ApiVersionIntegrationTest,
     testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-                     testing::Values(envoy::api::v2::core::ApiConfigSource::REST,
+                     testing::Values(/*envoy::api::v2::core::ApiConfigSource::REST,*/
                                      envoy::api::v2::core::ApiConfigSource::GRPC,
                                      envoy::api::v2::core::ApiConfigSource::DELTA_GRPC),
                      testing::Values(envoy::api::v2::core::ApiVersion::AUTO,
@@ -103,9 +155,13 @@ TEST_P(ApiVersionIntegrationTest, Lds) {
     lds_cluster->mutable_http2_protocol_options();
   });
   initialize();
-  ASSERT_TRUE(validateDiscoveryRequest("/envoy.api.v2.ListenerDiscoveryService/StreamListeners",
-                                       "/envoy.api.v2.ListenerDiscoveryService/DeltaListeners",
-                                       "type.googleapis.com/envoy.api.v2.Listener"));
+  ASSERT_TRUE(
+      validateDiscoveryRequest("/envoy.api.v2.ListenerDiscoveryService/StreamListeners",
+                               "/envoy.api.v2.ListenerDiscoveryService/DeltaListeners",
+                               "/envoy.api.v3alpha.ListenerDiscoveryService/StreamListeners",
+                               "/envoy.api.v3alpha.ListenerDiscoveryService/DeltaListeners",
+                               "type.googleapis.com/envoy.api.v2.Listener",
+                               "type.googleapis.com/envoy.api.v3alpha.Listener"));
 }
 
 } // namespace
