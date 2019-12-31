@@ -1,5 +1,20 @@
 load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive", "http_file", "http_jar")
 
+# Patch protobuf to prevent duplicate symbols: https://github.com/lyft/envoy-mobile/issues/617
+# More details: https://github.com/protocolbuffers/protobuf/issues/7046
+# TODO: Remove after https://github.com/bazelbuild/bazel/pull/10493 is merged to Bazel
+# Reverts:
+# - https://github.com/protocolbuffers/protobuf/commit/7b28278c7d4f4175e70aef2f89d304696eb85ae3
+# - https://github.com/protocolbuffers/protobuf/commit/a03d332aca5d33c5d4b2cd25037c9e37d57eff02
+http_archive(
+    name = "com_google_protobuf",
+    patch_args = ["-p1"],
+    patches = ["@envoy//bazel:protobuf.patch", "//bazel:protobuf.patch"],
+    sha256 = "d7cfd31620a352b2ee8c1ed883222a0d77e44346643458e062e86b1d069ace3e",
+    strip_prefix = "protobuf-3.10.1",
+    urls = ["https://github.com/protocolbuffers/protobuf/releases/download/v3.10.1/protobuf-all-3.10.1.tar.gz"],
+)
+
 # Patch upstream Abseil to prevent Foundation dependency from leaking into Android builds.
 # Workaround for https://github.com/abseil/abseil-cpp/issues/326.
 # TODO: Should be removed in https://github.com/lyft/envoy-mobile/issues/136 once rules_android
