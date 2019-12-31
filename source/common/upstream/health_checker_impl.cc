@@ -110,16 +110,15 @@ HttpHealthCheckerImpl::HttpHealthCheckerImpl(const Cluster& cluster,
                                              ? envoy::type::HTTP2
                                              : config.http_health_check().codec_client_type())) {
 
-  if (config.http_health_check().has_service_name_matcher()) {
-    service_name_matcher_ = std::make_unique<Matchers::StringMatcherImpl>(
-        config.http_health_check().service_name_matcher());
-  }
   if (!config.http_health_check().service_name().empty()) {
     envoy::api::v2::core::HealthCheck mutable_config = config;
     mutable_config.mutable_http_health_check()->mutable_service_name_matcher()->set_prefix(
         config.http_health_check().service_name());
     service_name_matcher_ = std::make_unique<Matchers::StringMatcherImpl>(
         mutable_config.http_health_check().service_name_matcher());
+  } else if (config.http_health_check().has_service_name_matcher()) {
+    service_name_matcher_ = std::make_unique<Matchers::StringMatcherImpl>(
+        config.http_health_check().service_name_matcher());
   }
 }
 
@@ -268,8 +267,9 @@ HttpHealthCheckerImpl::HttpActiveHealthCheckSession::healthCheckResult() {
 
   const auto degraded = response_headers_->EnvoyDegraded() != nullptr;
 
-  if (parent_.service_name_matcher_ != nullptr &&
+  if (parent_.service_name_matcher_ &&
       parent_.runtime_.snapshot().featureEnabled("health_check.verify_cluster", 100UL)) {
+    parent_.stats_.verify_cluster_.inc();
     std::string service_cluster_healthchecked =
         response_headers_->EnvoyUpstreamHealthCheckedCluster()
             ? std::string(
