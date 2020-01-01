@@ -72,7 +72,6 @@ envoy_cc_library(
         "http2_logging_impl.h",
         "http2_macros_impl.h",
         "http2_optional_impl.h",
-        "http2_string_piece_impl.h",
         "http2_string_utils_impl.h",
     ],
     external_deps = [
@@ -117,7 +116,6 @@ envoy_cc_library(
     ],
     hdrs = [
         "quic_aligned_impl.h",
-        "quic_arraysize_impl.h",
         "quic_client_stats_impl.h",
         "quic_containers_impl.h",
         "quic_error_code_wrappers_impl.h",
@@ -135,10 +133,7 @@ envoy_cc_library(
         "quic_reference_counted_impl.h",
         "quic_server_stats_impl.h",
         "quic_stack_trace_impl.h",
-        "quic_str_cat_impl.h",
         "quic_stream_buffer_allocator_impl.h",
-        "quic_string_piece_impl.h",
-        "quic_text_utils_impl.h",
         "quic_uint128_impl.h",
     ],
     external_deps = [
@@ -260,7 +255,11 @@ envoy_cc_library(
 envoy_cc_library(
     name = "quiche_common_platform_impl_lib",
     hdrs = [
+        "quiche_arraysize_impl.h",
         "quiche_logging_impl.h",
+        "quiche_str_cat_impl.h",
+        "quiche_string_piece_impl.h",
+        "quiche_text_utils_impl.h",
         "quiche_unordered_containers_impl.h",
     ],
     external_deps = [
@@ -270,6 +269,7 @@ envoy_cc_library(
     visibility = ["//visibility:public"],
     deps = [
         ":quic_platform_logging_impl_lib",
+        ":string_utils_lib",
     ],
 )
 

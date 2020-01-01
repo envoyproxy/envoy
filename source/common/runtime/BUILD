@@ -32,6 +32,7 @@ envoy_cc_library(
         "//source/common/common:minimal_logger_lib",
         "//source/common/common:thread_lib",
         "//source/common/common:utility_lib",
+        "//source/common/config:api_version_lib",
         "//source/common/filesystem:directory_lib",
         "//source/common/grpc:common_lib",
         "//source/common/init:target_lib",
@@ -41,6 +42,7 @@ envoy_cc_library(
         "@envoy_api//envoy/api/v2/core:pkg_cc_proto",
         "@envoy_api//envoy/config/bootstrap/v2:pkg_cc_proto",
         "@envoy_api//envoy/service/discovery/v2:pkg_cc_proto",
+        "@envoy_api//envoy/service/discovery/v3alpha:pkg_cc_proto",
         "@envoy_api//envoy/type:pkg_cc_proto",
     ],
 )
