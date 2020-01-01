@@ -4380,7 +4380,8 @@ TEST(HealthCheckProto, Validation) {
     unhealthy_threshold: 1
     no_traffic_interval: 0s
     http_health_check:
-      service_name: locations
+      service_name_matcher:
+        prefix: locations
       path: /healthcheck
     )EOF";
     EXPECT_THROW_WITH_REGEX(TestUtility::validate(parseHealthCheckFromV2Yaml(yaml)), EnvoyException,
@@ -4394,7 +4395,8 @@ TEST(HealthCheckProto, Validation) {
     unhealthy_threshold: 1
     unhealthy_interval: 0s
     http_health_check:
-      service_name: locations
+      service_name_matcher:
+        prefix: locations
       path: /healthcheck
     )EOF";
     EXPECT_THROW_WITH_REGEX(TestUtility::validate(parseHealthCheckFromV2Yaml(yaml)), EnvoyException,
@@ -4408,7 +4410,8 @@ TEST(HealthCheckProto, Validation) {
     unhealthy_threshold: 1
     unhealthy_edge_interval: 0s
     http_health_check:
-      service_name: locations
+      service_name_matcher:
+        prefix: locations
       path: /healthcheck
     )EOF";
     EXPECT_THROW_WITH_REGEX(TestUtility::validate(parseHealthCheckFromV2Yaml(yaml)), EnvoyException,
@@ -4422,7 +4425,8 @@ TEST(HealthCheckProto, Validation) {
     unhealthy_threshold: 1
     healthy_edge_interval: 0s
     http_health_check:
-      service_name: locations
+      service_name_matcher:
+        prefix: locations
       path: /healthcheck
     )EOF";
     EXPECT_THROW_WITH_REGEX(TestUtility::validate(parseHealthCheckFromV2Yaml(yaml)), EnvoyException,
@@ -4434,7 +4438,8 @@ TEST(HealthCheckProto, Validation) {
     interval: 1s
     unhealthy_threshold: 1
     http_health_check:
-      service_name: locations
+      service_name_matcher:
+        prefix: locations
       path: /healthcheck
     )EOF";
     EXPECT_THROW_WITH_REGEX(TestUtility::validate(parseHealthCheckFromV2Yaml(yaml)), EnvoyException,
@@ -4446,7 +4451,8 @@ TEST(HealthCheckProto, Validation) {
     interval: 1s
     healthy_threshold: 1
     http_health_check:
-      service_name: locations
+      service_name_matcher:
+        prefix: locations
       path: /healthcheck
     )EOF";
     EXPECT_THROW_WITH_REGEX(TestUtility::validate(parseHealthCheckFromV2Yaml(yaml)), EnvoyException,
