@@ -112,10 +112,10 @@ void jsonConvertInternal(const Protobuf::Message& source,
 }
 
 enum class MessageVersion {
-  // No known version of the message type exists at an earlier version.
-  EARLIEST_KNOWN,
-  // An earlier version of the message type exists.
-  NOT_EARLIEST,
+  // This is an earlier version of a message, a later one exists.
+  EARLIER_VERSION,
+  // This is the latest version of a message.
+  LATEST_VERSION,
 };
 
 using MessageXformFn = std::function<void(Protobuf::Message&, MessageVersion)>;
@@ -132,7 +132,7 @@ void tryWithApiBoosting(MessageXformFn f, Protobuf::Message& message) {
       Config::ApiTypeOracle::getEarlierVersionDescriptor(message);
   // If there is no earlier version of a message, just apply f directly.
   if (earlier_version_desc == nullptr) {
-    f(message, MessageVersion::EARLIEST_KNOWN);
+    f(message, MessageVersion::LATEST_VERSION);
     return;
   }
   Protobuf::DynamicMessageFactory dmf;
@@ -141,14 +141,14 @@ void tryWithApiBoosting(MessageXformFn f, Protobuf::Message& message) {
   try {
     // Try apply f with an earlier version of the message, then upgrade the
     // result.
-    f(*earlier_message, MessageVersion::NOT_EARLIEST);
+    f(*earlier_message, MessageVersion::EARLIER_VERSION);
     Config::VersionConverter::upgrade(*earlier_message, message);
   } catch (EnvoyException&) {
     // If we fail at the earlier version, try f at the current version of the
     // message.
     bool newer_error = false;
     try {
-      f(message, MessageVersion::EARLIEST_KNOWN);
+      f(message, MessageVersion::LATEST_VERSION);
     } catch (EnvoyException&) {
       // If we fail this time, we should throw.
       // TODO(htuch): currently throwing the v2 error, rather than v3 error, to
@@ -256,7 +256,7 @@ void MessageUtil::loadFromJson(const std::string& json, Protobuf::Message& messa
         // We know it's an unknown field at this point. If we're at the latest
         // version, then it's definitely an unknown field, otherwise we try to
         // load again at a later version.
-        if (message_version == MessageVersion::EARLIEST_KNOWN) {
+        if (message_version == MessageVersion::LATEST_VERSION) {
           validation_visitor.onUnknownField("type " + message.GetTypeName() + " reason " +
                                             strict_status.ToString());
         } else {
