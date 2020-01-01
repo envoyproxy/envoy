@@ -57,7 +57,7 @@ typedef NSDictionary<NSString *, NSArray<NSString *> *> EnvoyHeaders;
  * response is already complete. It will fire no more than once, and no other callbacks for the
  * stream will be issued afterwards.
  */
-@property (nonatomic, strong) void (^onCancel)();
+@property (nonatomic, strong) void (^onCancel)(void);
 
 @end
 
@@ -172,7 +172,7 @@ typedef NSDictionary<NSString *, NSArray<NSString *> *> EnvoyHeaders;
 /**
  Run the Envoy engine with the provided configuration and log level.
 
- @param configuration The EnvoyConfiguration used to start Envoy.
+ @param config The EnvoyConfiguration used to start Envoy.
  @param logLevel The log level to use when starting Envoy.
  @return A status indicating if the action was successful.
  */
