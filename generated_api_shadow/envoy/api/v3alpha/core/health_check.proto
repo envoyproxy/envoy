@@ -96,8 +96,9 @@ message HealthCheck {
     // <arch_overview_health_checking_identity>` for more information.
     //
     // .. attention::
-    // This field has been deprecated in favor of `service_name_matcher` for better flexibility
-    // over matching with service-cluster name.
+    //
+    //   This field has been deprecated in favor of `service_name_matcher` for better flexibility
+    //   over matching with service-cluster name.
     string hidden_envoy_deprecated_service_name = 5 [deprecated = true];
 
     // Specifies a list of HTTP headers that should be added to each request that is sent to the
