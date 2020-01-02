@@ -838,6 +838,7 @@ qps
 quantile
 quantiles
 queueing
+quiesce
 quitquitquit
 qvalue
 rapidjson

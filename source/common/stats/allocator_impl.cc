@@ -194,7 +194,7 @@ public:
   }
 };
 
-template<class StatType>static void warnOnManyUses(StatType& stat) {
+template <class StatType> static void warnOnManyUses(StatType& stat) {
   // This is called when we are about to increment the ref-count, so use that
   // incremented number in the arithmetic. Issue a warning message only when
   // the use-count gets very high, and then only once in 10k uses.

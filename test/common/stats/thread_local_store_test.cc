@@ -1297,9 +1297,8 @@ public:
 
   void incCountersAllThreads() {
     BlockingScope blocking_scope(NumThreads);
-    for (uint32_t i = 0; i < thread_dispatchers_.size(); ++i) {
-      thread_dispatchers_[i]->post(blocking_scope.run([this]() { incCounters(); }));
-      //thread_dispatchers_[i]->post([this]() { incCounters(); });
+    for (Event::DispatcherPtr& thread_dispatcher : thread_dispatchers_) {
+      thread_dispatcher->post(blocking_scope.run([this]() { incCounters(); }));
     }
   }
 
@@ -1315,7 +1314,7 @@ public:
 };
 
 TEST_F(ClusterShutdownCleanupStarvationTest, TenThreadsWithBlockade) {
-  for (uint32_t j = 0; j < NumIters; ++j) {
+  for (uint32_t i = 0; i < NumIters; ++i) {
     incCountersAllThreads();
 
     // With this blockade, use_counts for the counter get into the hundreds.
@@ -1331,7 +1330,7 @@ TEST_F(ClusterShutdownCleanupStarvationTest, TenThreadsWithBlockade) {
 }
 
 TEST_F(ClusterShutdownCleanupStarvationTest, TenThreadsWithoutBlockade) {
-  for (uint32_t j = 0; j < NumIters; ++j) {
+  for (uint32_t i = 0; i < NumIters; ++i) {
     incCountersAllThreads();
     // Here we don't quiesce the threads, so there is no time to run their
     // cross-thread cleanup callback following scope deletion.
