@@ -20,9 +20,7 @@ envoy_cc_library(
 envoy_cc_library(
     name = "context_interface",
     hdrs = ["context.h"],
-    deps = [
-        "@envoy_api//envoy/admin/v2alpha:pkg_cc_proto",
-    ],
+    deps = ["@envoy_api//envoy/admin/v2alpha:pkg_cc_proto"],
 )
 
 envoy_cc_library(

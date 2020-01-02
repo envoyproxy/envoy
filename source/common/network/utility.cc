@@ -232,7 +232,7 @@ Address::InstanceConstSharedPtr Utility::getLocalAddress(const Address::IpVersio
   return ret;
 }
 
-bool Utility::isLocalConnection(const ConnectionSocket& socket) {
+bool Utility::isSameIpOrLoopback(const ConnectionSocket& socket) {
   // These are local:
   // - Pipes
   // - Sockets to a loopback address

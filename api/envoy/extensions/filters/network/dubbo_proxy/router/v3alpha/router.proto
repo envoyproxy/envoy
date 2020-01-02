@@ -1,0 +1,14 @@
+syntax = "proto3";
+
+package envoy.extensions.filters.network.dubbo_proxy.router.v3alpha;
+
+import "udpa/annotations/versioning.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.filters.network.dubbo_proxy.router.v3alpha";
+option java_outer_classname = "RouterProto";
+option java_multiple_files = true;
+
+message Router {
+  option (udpa.annotations.versioning).previous_message_type =
+      "envoy.config.filter.dubbo.router.v2alpha1.Router";
+}

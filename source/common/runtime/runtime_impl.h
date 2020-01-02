@@ -219,6 +219,7 @@ struct RtdsSubscription : Config::SubscriptionCallbacks, Logger::Loggable<Logger
 
   void start();
   void validateUpdateSize(uint32_t num_resources);
+  std::string loadTypeUrl();
 
   LoaderImpl& parent_;
   const envoy::api::v2::core::ConfigSource config_source_;
@@ -228,6 +229,7 @@ struct RtdsSubscription : Config::SubscriptionCallbacks, Logger::Loggable<Logger
   Init::TargetImpl init_target_;
   ProtobufWkt::Struct proto_;
   ProtobufMessage::ValidationVisitor& validation_visitor_;
+  envoy::api::v2::core::ConfigSource::XdsApiVersion xds_api_version_;
 };
 
 using RtdsSubscriptionPtr = std::unique_ptr<RtdsSubscription>;

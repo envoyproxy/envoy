@@ -52,7 +52,7 @@ message Bootstrap {
 
     // These static secrets can be used by :ref:`SdsSecretConfig
     // <envoy_api_msg_extensions.transport_sockets.tls.v3alpha.SdsSecretConfig>`
-    repeated extensions.transport_sockets.tls.v3alpha.Secret secrets = 3;
+    repeated envoy.extensions.transport_sockets.tls.v3alpha.Secret secrets = 3;
   }
 
   message DynamicResources {

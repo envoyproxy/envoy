@@ -11,12 +11,18 @@ load(
 envoy_package()
 
 envoy_cc_test(
+    name = "api_shadow_test",
+    srcs = ["api_shadow_test.cc"],
+    deps = ["@envoy_api//envoy/api/v3alpha:pkg_cc_proto"],
+)
+
+envoy_cc_test(
     name = "api_type_oracle_test",
     srcs = ["api_type_oracle_test.cc"],
     deps = [
         "//source/common/config:api_type_oracle_lib",
         "@envoy_api//envoy/config/filter/http/ip_tagging/v2:pkg_cc_proto",
-        "@envoy_api//envoy/extensions/filter/http/ip_tagging/v3alpha:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/http/ip_tagging/v3alpha:pkg_cc_proto",
     ],
 )
 

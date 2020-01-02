@@ -241,7 +241,6 @@ message Listener {
   // create one socket for each worker thread. This makes inbound connections
   // distribute among worker threads roughly evenly in cases where there are a high number
   // of connections. When this flag is set to false, all worker threads share one socket.
-  // For UDP this flag is set to true forcibly.
   //
   // Before Linux v4.19-rc1, new TCP connections may be rejected during hot restart
   // (see `3rd paragraph in 'soreuseport' commit message
