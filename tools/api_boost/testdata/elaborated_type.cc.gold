@@ -5,4 +5,6 @@ class ThresholdTriggerImpl {
 public:
   ThresholdTriggerImpl(const envoy::config::overload::v3alpha::ThresholdTrigger& /*config*/) {}
   void someMethod(envoy::service::cluster::v3alpha::Cluster_LbPolicy) {}
+
+  const envoy::config::overload::v3alpha::Trigger::TriggerOneofCase case_{};
 };
