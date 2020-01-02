@@ -1,6 +1,6 @@
 syntax = "proto3";
 
-package envoy.service.discovery.v3alpha;
+package envoy.service.runtime.v3alpha;
 
 import "envoy/service/discovery/v3alpha/discovery.proto";
 
@@ -11,7 +11,7 @@ import "udpa/annotations/versioning.proto";
 
 import "validate/validate.proto";
 
-option java_package = "io.envoyproxy.envoy.service.discovery.v3alpha";
+option java_package = "io.envoyproxy.envoy.service.runtime.v3alpha";
 option java_outer_classname = "RtdsProto";
 option java_multiple_files = true;
 option java_generic_services = true;
@@ -21,13 +21,16 @@ option java_generic_services = true;
 
 // Discovery service for Runtime resources.
 service RuntimeDiscoveryService {
-  rpc StreamRuntime(stream DiscoveryRequest) returns (stream DiscoveryResponse) {
+  rpc StreamRuntime(stream discovery.v3alpha.DiscoveryRequest)
+      returns (stream discovery.v3alpha.DiscoveryResponse) {
   }
 
-  rpc DeltaRuntime(stream DeltaDiscoveryRequest) returns (stream DeltaDiscoveryResponse) {
+  rpc DeltaRuntime(stream discovery.v3alpha.DeltaDiscoveryRequest)
+      returns (stream discovery.v3alpha.DeltaDiscoveryResponse) {
   }
 
-  rpc FetchRuntime(DiscoveryRequest) returns (DiscoveryResponse) {
+  rpc FetchRuntime(discovery.v3alpha.DiscoveryRequest)
+      returns (discovery.v3alpha.DiscoveryResponse) {
     option (google.api.http).post = "/v3alpha/discovery:runtime";
     option (google.api.http).body = "*";
   }
