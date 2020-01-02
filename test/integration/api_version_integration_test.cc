@@ -172,7 +172,9 @@ public:
   }
 
   void TearDown() override {
-    cleanUpXdsConnection();
+    if (xds_stream_ != nullptr) {
+      cleanUpXdsConnection();
+    }
     test_server_.reset();
     fake_upstreams_.clear();
   }
@@ -236,6 +238,23 @@ TEST_P(ApiVersionIntegrationTest, Cds) {
       "type.googleapis.com/envoy.api.v2.Cluster", "type.googleapis.com/envoy.api.v3alpha.Cluster"));
 }
 
+TEST_P(ApiVersionIntegrationTest, Eds) {
+  config_helper_.addConfigModifier([this](envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
+    auto* cluster = bootstrap.mutable_static_resources()->add_clusters();
+    cluster->MergeFrom(bootstrap.static_resources().clusters(0));
+    cluster->set_name("some_cluster");
+    cluster->set_type(envoy::api::v2::Cluster::EDS);
+    setupConfigSource(*cluster->mutable_eds_cluster_config()->mutable_eds_config());
+  });
+  initialize();
+  ASSERT_TRUE(validateDiscoveryRequest(
+      "/envoy.api.v2.EndpointDiscoveryService/StreamEndpoints",
+      "/envoy.api.v2.EndpointDiscoveryService/DeltaEndpoints", "/v2/discovery:endpoints",
+      "/envoy.api.v3alpha.EndpointDiscoveryService/StreamEndpoints",
+      "/envoy.api.v3alpha.EndpointDiscoveryService/DeltaEndpoints", "/v3alpha/discovery:endpoints",
+      "type.googleapis.com/envoy.api.v2.ClusterLoadAssignment", "type.googleapis.com/envoy.api.v3alpha.ClusterLoadAssignment"));
+}
+
 TEST_P(ApiVersionIntegrationTest, Rtds) {
   config_helper_.addConfigModifier([this](envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
     auto* admin_layer = bootstrap.mutable_layered_runtime()->add_layers();
@@ -253,6 +272,30 @@ TEST_P(ApiVersionIntegrationTest, Rtds) {
       "/envoy.service.discovery.v3alpha.RuntimeDiscoveryService/DeltaRuntime",
       "/v3alpha/discovery:runtime", "type.googleapis.com/envoy.service.discovery.v2.Runtime",
       "type.googleapis.com/envoy.service.discovery.v3alpha.Runtime"));
+}
+
+TEST_P(ApiVersionIntegrationTest, Rds) {
+  // TODO(htuch): this segfaults, this is likely some undertesting existing
+  // issue.
+  if (apiType() == envoy::api::v2::core::ApiConfigSource::DELTA_GRPC) {
+    return;
+  }
+  config_helper_.addConfigModifier(
+      [this](envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager&
+                 http_connection_manager) {
+        auto* rds = http_connection_manager.mutable_rds();
+        rds->set_route_config_name("rds");
+        setupConfigSource(*rds->mutable_config_source());
+      });
+  initialize();
+  ASSERT_TRUE(validateDiscoveryRequest(
+      "/envoy.api.v2.RouteDiscoveryService/StreamRoutes",
+      "/envoy.api.v2.RouteDiscoveryService/DeltaRoutes", "/v2/discovery:routes",
+      "/envoy.api.v3alpha.RouteDiscoveryService/StreamRoutes",
+      "/envoy.api.v3alpha.RouteDiscoveryService/DeltaRoutes",
+      "/v3alpha/discovery:routes",
+      "type.googleapis.com/envoy.api.v2.RouteConfiguration",
+      "type.googleapis.com/envoy.api.v3alpha.RouteConfiguration"));
 }
 
 TEST_P(ApiVersionIntegrationTest, Srds) {
@@ -286,6 +329,29 @@ fragments:
       "/v3alpha/discovery:scoped-routes",
       "type.googleapis.com/envoy.api.v2.ScopedRouteConfiguration",
       "type.googleapis.com/envoy.service.route.v3alpha.ScopedRouteConfiguration"));
+}
+
+TEST_P(ApiVersionIntegrationTest, Sds) {
+  config_helper_.addConfigModifier([this](envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
+    auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
+    auto* transport_socket = listener->mutable_filter_chains(0)->mutable_transport_socket();
+    envoy::api::v2::auth::DownstreamTlsContext tls_context;
+    auto* common_tls_context = tls_context.mutable_common_tls_context();
+    auto* secret_config = common_tls_context->add_tls_certificate_sds_secret_configs();
+    secret_config->set_name("sds");
+    setupConfigSource(*secret_config->mutable_sds_config());
+    transport_socket->set_name("envoy.transport_sockets.tls");
+    transport_socket->mutable_typed_config()->PackFrom(tls_context);
+  });
+  initialize();
+  ASSERT_TRUE(validateDiscoveryRequest(
+      "/envoy.service.discovery.v2.SecretDiscoveryService/StreamSecrets",
+      "/envoy.service.discovery.v2.SecretDiscoveryService/DeltaSecrets", "/v2/discovery:secrets",
+      "/envoy.service.discovery.v3alpha.SecretDiscoveryService/StreamSecrets",
+      "/envoy.service.discovery.v3alpha.SecretDiscoveryService/DeltaSecrets",
+      "/v3alpha/discovery:secrets",
+      "type.googleapis.com/envoy.api.v2.auth.Secret",
+      "type.googleapis.com/envoy.api.v3alpha.auth.Secret"));
 }
 
 } // namespace

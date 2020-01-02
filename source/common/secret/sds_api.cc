@@ -3,6 +3,7 @@
 #include <unordered_map>
 
 #include "envoy/api/v2/auth/cert.pb.h"
+#include "envoy/api/v3alpha/auth/cert.pb.h"
 #include "envoy/api/v2/auth/cert.pb.validate.h"
 #include "envoy/api/v2/core/config_source.pb.h"
 #include "envoy/api/v2/discovery.pb.h"
@@ -95,7 +96,7 @@ std::string SdsApi::loadTypeUrl(envoy::api::v2::core::ApiVersion resource_api_ve
         API_NO_BOOST(envoy::api::v2::auth::Secret().GetDescriptor()->full_name()));
   case envoy::api::v2::core::ApiVersion::V3ALPHA:
     return Grpc::Common::typeUrl(
-        API_NO_BOOST(envoy::api::v2::auth::Secret().GetDescriptor()->full_name()));
+        API_NO_BOOST(envoy::api::v3alpha::auth::Secret().GetDescriptor()->full_name()));
   default:
     NOT_REACHED_GCOVR_EXCL_LINE;
   }

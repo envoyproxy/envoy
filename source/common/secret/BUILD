@@ -63,5 +63,6 @@ envoy_cc_library(
         "@envoy_api//envoy/api/v2:pkg_cc_proto",
         "@envoy_api//envoy/api/v2/auth:pkg_cc_proto",
         "@envoy_api//envoy/api/v2/core:pkg_cc_proto",
+        "@envoy_api//envoy/api/v3alpha/auth:pkg_cc_proto",
     ],
 )
