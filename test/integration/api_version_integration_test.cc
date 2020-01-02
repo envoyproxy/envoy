@@ -18,6 +18,7 @@ public:
     use_lds_ = false;
     create_xds_upstream_ = true;
     tls_xds_upstream_ = false;
+    defer_listener_finalization_ = true;
     skipPortUsageValidation();
   }
 
@@ -36,7 +37,6 @@ public:
 
   void initialize() override {
     config_helper_.addConfigModifier([](envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
-      bootstrap.mutable_static_resources()->clear_listeners();
       auto* xds_cluster = bootstrap.mutable_static_resources()->add_clusters();
       xds_cluster->MergeFrom(bootstrap.static_resources().clusters()[0]);
       xds_cluster->set_name("xds_cluster");
@@ -180,18 +180,33 @@ public:
   std::string endpoint_;
 };
 
+// We manage the permutations below to reduce combinatorial explosion:
+// - We only care about testing on one IP version, there should be no
+//   material difference between v4/v6.
+// - We do care about all the different ApiConfigSource variations.
+// - We explicitly give the AUTO versions their own independent test suite,
+//   since they are equivalent to v2, so we want to test them once but they are
+//   mostly redundant.
 INSTANTIATE_TEST_SUITE_P(
-    IpVersionsApiConfigSourcesApiVersions, ApiVersionIntegrationTest,
-    testing::Combine(testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
+    ApiConfigSourcesExplicitApiVersions, ApiVersionIntegrationTest,
+    testing::Combine(testing::Values(TestEnvironment::getIpVersionsForTest()[0]),
                      testing::Values(envoy::api::v2::core::ApiConfigSource::REST,
                                      envoy::api::v2::core::ApiConfigSource::GRPC,
                                      envoy::api::v2::core::ApiConfigSource::DELTA_GRPC),
-                     testing::Values(envoy::api::v2::core::ApiVersion::AUTO,
-                                     envoy::api::v2::core::ApiVersion::V2,
+                     testing::Values(envoy::api::v2::core::ApiVersion::V2,
                                      envoy::api::v2::core::ApiVersion::V3ALPHA),
-                     testing::Values(envoy::api::v2::core::ApiVersion::AUTO,
-                                     envoy::api::v2::core::ApiVersion::V2,
+                     testing::Values(envoy::api::v2::core::ApiVersion::V2,
                                      envoy::api::v2::core::ApiVersion::V3ALPHA)),
+    ApiVersionIntegrationTest::paramsToString);
+
+INSTANTIATE_TEST_SUITE_P(
+    ApiConfigSourcesAutoApiVersions, ApiVersionIntegrationTest,
+    testing::Combine(testing::Values(TestEnvironment::getIpVersionsForTest()[0]),
+                     testing::Values(envoy::api::v2::core::ApiConfigSource::REST,
+                                     envoy::api::v2::core::ApiConfigSource::GRPC,
+                                     envoy::api::v2::core::ApiConfigSource::DELTA_GRPC),
+                     testing::Values(envoy::api::v2::core::ApiVersion::AUTO),
+                     testing::Values(envoy::api::v2::core::ApiVersion::AUTO)),
     ApiVersionIntegrationTest::paramsToString);
 
 TEST_P(ApiVersionIntegrationTest, Lds) {
@@ -238,6 +253,39 @@ TEST_P(ApiVersionIntegrationTest, Rtds) {
       "/envoy.service.discovery.v3alpha.RuntimeDiscoveryService/DeltaRuntime",
       "/v3alpha/discovery:runtime", "type.googleapis.com/envoy.service.discovery.v2.Runtime",
       "type.googleapis.com/envoy.service.discovery.v3alpha.Runtime"));
+}
+
+TEST_P(ApiVersionIntegrationTest, Srds) {
+  config_helper_.addConfigModifier(
+      [this](envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager&
+                 http_connection_manager) {
+        auto* scoped_routes = http_connection_manager.mutable_scoped_routes();
+        scoped_routes->set_name("scoped_routes");
+        const std::string& scope_key_builder_config_yaml = R"EOF(
+fragments:
+  - header_value_extractor:
+      name: Addr
+      element_separator: ;
+      element:
+        key: x-foo-key
+        separator: =
+)EOF";
+        envoy::config::filter::network::http_connection_manager::v2::ScopedRoutes::ScopeKeyBuilder
+            scope_key_builder;
+        TestUtility::loadFromYaml(scope_key_builder_config_yaml,
+                                  *scoped_routes->mutable_scope_key_builder());
+        setupConfigSource(*scoped_routes->mutable_scoped_rds()->mutable_scoped_rds_config_source());
+        setupConfigSource(*scoped_routes->mutable_rds_config_source());
+      });
+  initialize();
+  ASSERT_TRUE(validateDiscoveryRequest(
+      "/envoy.api.v2.ScopedRoutesDiscoveryService/StreamScopedRoutes",
+      "/envoy.api.v2.ScopedRoutesDiscoveryService/DeltaScopedRoutes", "/v2/discovery:scoped-routes",
+      "/envoy.service.route.v3alpha.ScopedRoutesDiscoveryService/StreamScopedRoutes",
+      "/envoy.service.route.v3alpha.ScopedRoutesDiscoveryService/DeltaScopedRoutes",
+      "/v3alpha/discovery:scoped-routes",
+      "type.googleapis.com/envoy.api.v2.ScopedRouteConfiguration",
+      "type.googleapis.com/envoy.service.route.v3alpha.ScopedRouteConfiguration"));
 }
 
 } // namespace
