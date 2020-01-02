@@ -29,6 +29,7 @@ envoy_cc_library(
         ":metadata_interface",
         ":protocol_interface",
         "//include/envoy/buffer:buffer_interface",
+        "//include/envoy/network:address_interface",
     ],
 )
 
