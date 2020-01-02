@@ -360,7 +360,7 @@ envoy_cc_library(
         "//source/extensions/clusters:well_known_names",
         "@envoy_api//envoy/api/v2:pkg_cc_proto",
         "@envoy_api//envoy/api/v2/core:pkg_cc_proto",
-        "@envoy_api//envoy/service/cluster/v3alpha:pkg_cc_proto",
+        "@envoy_api//envoy/service/endpoint/v3alpha:pkg_cc_proto",
     ],
 )
 
