@@ -141,7 +141,7 @@ private:
 
   const std::string path_;
   const std::string host_value_;
-  Envoy::Matchers::StringMatcherPtr service_name_matcher_;
+  absl::optional<Matchers::StringMatcherImpl> service_name_matcher_;
   Router::HeaderParserPtr request_headers_parser_;
   const HttpStatusChecker http_status_checker_;
 
