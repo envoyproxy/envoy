@@ -308,8 +308,7 @@ TEST_P(ApiVersionIntegrationTest, Rtds) {
 }
 
 TEST_P(ApiVersionIntegrationTest, Rds) {
-  // TODO(htuch): this segfaults, this is likely some undertesting existing
-  // issue.
+  // TODO(htuch): this segfaults, this is likely some untested existing issue.
   if (apiType() == envoy::api::v2::core::ApiConfigSource::DELTA_GRPC) {
     return;
   }

@@ -20,7 +20,7 @@ option java_multiple_files = true;
 // xDS API version. This is used to describe both resource and transport
 // protocol versions (in distinct configuration fields).
 enum ApiVersion {
-  // When not specified, we asssume v2, to ease migration to Envoy's stable API
+  // When not specified, we assume v2, to ease migration to Envoy's stable API
   // versioning. If a client does not support v2 (e.g. due to deprecation), this
   // is an invalid value.
   AUTO = 0;
