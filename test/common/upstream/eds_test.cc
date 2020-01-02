@@ -841,7 +841,7 @@ TEST_F(EdsTest, EndpointMovedToNewPriority) {
     EXPECT_FALSE(hosts[0]->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC));
   }
 
-  // Moves the endpoints all to priority 1.
+  // Moves all the endpoints to priority 1.
   cluster_load_assignment.clear_endpoints();
   add_endpoint(80, 1);
   add_endpoint(81, 1);
