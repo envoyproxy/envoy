@@ -1222,8 +1222,9 @@ public:
   };
 
   ClusterShutdownCleanupStarvationTest()
-      : api_(Api::createApiForTest()), thread_factory_(api_->threadFactory()),
-        pool_(store_->symbolTable()), my_counter_name_(pool_.add("my_counter")) {
+      : start_time_(time_system_.monotonicTime()), api_(Api::createApiForTest()),
+        thread_factory_(api_->threadFactory()), pool_(store_->symbolTable()),
+        my_counter_name_(pool_.add("my_counter")) {
     // This is the same order as InstanceImpl::initialize in source/server/server.cc.
     thread_dispatchers_.resize(NumThreads);
     {
@@ -1302,6 +1303,13 @@ public:
     }
   }
 
+  std::chrono::seconds elapsedTime() {
+    return std::chrono::duration_cast<std::chrono::seconds>(time_system_.monotonicTime() -
+                                                            start_time_);
+  }
+
+  Event::TestRealTimeSystem time_system_;
+  MonotonicTime start_time_;
   Api::ApiPtr api_;
   Event::DispatcherPtr main_dispatcher_;
   std::vector<Event::DispatcherPtr> thread_dispatchers_;
@@ -1314,7 +1322,7 @@ public:
 };
 
 TEST_F(ClusterShutdownCleanupStarvationTest, TenThreadsWithBlockade) {
-  for (uint32_t i = 0; i < NumIters; ++i) {
+  for (uint32_t i = 0; i < NumIters && elapsedTime() < std::chrono::seconds(15); ++i) {
     incCountersAllThreads();
 
     // With this blockade, use_counts for the counter get into the hundreds.
@@ -1330,7 +1338,7 @@ TEST_F(ClusterShutdownCleanupStarvationTest, TenThreadsWithBlockade) {
 }
 
 TEST_F(ClusterShutdownCleanupStarvationTest, TenThreadsWithoutBlockade) {
-  for (uint32_t i = 0; i < NumIters; ++i) {
+  for (uint32_t i = 0; i < NumIters && elapsedTime() < std::chrono::seconds(15); ++i) {
     incCountersAllThreads();
     // Here we don't quiesce the threads, so there is no time to run their
     // cross-thread cleanup callback following scope deletion.
