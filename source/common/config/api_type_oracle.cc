@@ -19,12 +19,11 @@ ApiTypeOracle::getEarlierVersionDescriptor(const Protobuf::Message& message) {
     return nullptr;
   }
   if (desc->options().HasExtension(udpa::annotations::versioning)) {
-    const std::string previous_target_type =
-        desc->options().GetExtension(udpa::annotations::versioning).previous_message_type();
-    const Protobuf::Descriptor* desc =
-        Protobuf::DescriptorPool::generated_pool()->FindMessageTypeByName(previous_target_type);
-    ASSERT(desc != nullptr);
-    return desc;
+    const Protobuf::Descriptor* earlier_desc =
+        Protobuf::DescriptorPool::generated_pool()->FindMessageTypeByName(
+            desc->options().GetExtension(udpa::annotations::versioning).previous_message_type());
+    ASSERT(earlier_desc != nullptr);
+    return earlier_desc;
   }
 
   return nullptr;

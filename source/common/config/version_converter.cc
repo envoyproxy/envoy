@@ -11,9 +11,7 @@ namespace {
 // wire format and back. This only works for messages that can be effectively
 // duck typed this way, e.g. with a subtype relationship modulo field name.
 void wireCast(const Protobuf::Message& src, Protobuf::Message& dst) {
-  std::string s;
-  src.SerializeToString(&s);
-  dst.ParseFromString(s);
+  dst.ParseFromString(src.SerializeAsString());
 }
 
 } // namespace
