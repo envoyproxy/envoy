@@ -205,10 +205,21 @@ public:
 
   /**
    * Called whenever data is received by the underlying udp socket.
+   * TODO(danzh2010): Consider returning a value to indicate if more work is to
+   * be done in the next event loop due to a limit on how much processing is
+   * allowed in each event loop.
    *
    * @param data UdpRecvData from the underlying socket.
    */
   virtual void onData(UdpRecvData& data) PURE;
+
+  /**
+   * Called when the underlying socket is ready for read, before onData() is
+   * called. Called only once per event loop, even if followed by multiple
+   * onData() calls.
+   *
+   */
+  virtual void onReadReady() PURE;
 
   /**
    * Called when the underlying socket is ready for write.

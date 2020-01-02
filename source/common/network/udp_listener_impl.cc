@@ -69,6 +69,7 @@ void UdpListenerImpl::onSocketEvent(short flags) {
 
 void UdpListenerImpl::handleReadCallback() {
   ENVOY_UDP_LOG(trace, "handleReadCallback");
+  cb_.onReadReady();
   const Api::IoErrorPtr result = Utility::readPacketsFromSocket(
       socket_->ioHandle(), *socket_->localAddress(), *this, time_source_, packets_dropped_);
   // TODO(mattklein123): Handle no error when we limit the number of packets read.
