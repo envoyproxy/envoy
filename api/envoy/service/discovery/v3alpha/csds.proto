@@ -16,7 +16,8 @@ import "google/protobuf/struct.proto";
 import "udpa/annotations/versioning.proto";
 
 // CSDS is Client Status Discovery Service. It can be used to get the status of
-// xDS-compliant client from the management server's point of view.
+// xDS-compliant client from the management server's point of view. It can also
+// be used as an interface to get the current state of the client.
 service ClientStatusService {
   rpc StreamClientStatus(stream ClientStatusRequest) returns (stream ClientStatusResponse) {
   }
