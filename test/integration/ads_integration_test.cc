@@ -790,10 +790,6 @@ TEST_P(AdsIntegrationTest, NodeMessage) {
   }
   EXPECT_THAT(node->user_agent_build_version(), ProtoEq(VersionInfo::buildVersion()));
   EXPECT_GE(node->extensions().size(), 0);
-  // Check that all extensions are enabled and version the same as the user-agent
-  for (const auto& ext : node->extensions()) {
-    EXPECT_FALSE(ext.disabled());
-  }
   EXPECT_EQ(0, node->client_features().size());
   xds_stream_->finishGrpcStream(Grpc::Status::Ok);
 }
