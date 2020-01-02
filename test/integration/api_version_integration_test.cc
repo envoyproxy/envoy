@@ -8,7 +8,7 @@ namespace Envoy {
 namespace {
 
 using Params =
-    std::tuple<Network::Address::IpVersion, envoy::api::v2::core::ApiConfigSource::ApiType,
+    std::tuple<Network::Address::IpVersion, bool, envoy::api::v2::core::ApiConfigSource::ApiType,
                envoy::api::v2::core::ApiVersion, envoy::api::v2::core::ApiVersion>;
 
 class ApiVersionIntegrationTest : public testing::TestWithParam<Params>,
@@ -23,24 +23,33 @@ public:
   }
 
   static std::string paramsToString(const testing::TestParamInfo<Params>& p) {
-    return fmt::format("{}_{}_Resource_{}_Transport_{}",
+    return fmt::format("{}_{}_{}_Resource_{}_Transport_{}",
                        std::get<0>(p.param) == Network::Address::IpVersion::v4 ? "IPv4" : "IPv6",
-                       envoy::api::v2::core::ApiConfigSource::ApiType_Name(std::get<1>(p.param)),
-                       envoy::api::v2::core::ApiVersion_Name(std::get<2>(p.param)),
-                       envoy::api::v2::core::ApiVersion_Name(std::get<3>(p.param)));
+                       std::get<1>(p.param) ? "ADS" : "SingletonXds",
+                       envoy::api::v2::core::ApiConfigSource::ApiType_Name(std::get<2>(p.param)),
+                       envoy::api::v2::core::ApiVersion_Name(std::get<3>(p.param)),
+                       envoy::api::v2::core::ApiVersion_Name(std::get<4>(p.param)));
   }
 
   Network::Address::IpVersion ipVersion() const { return std::get<0>(GetParam()); }
-  envoy::api::v2::core::ApiConfigSource::ApiType apiType() const { return std::get<1>(GetParam()); }
-  envoy::api::v2::core::ApiVersion resourceApiVersion() const { return std::get<2>(GetParam()); }
-  envoy::api::v2::core::ApiVersion transportApiVersion() const { return std::get<3>(GetParam()); }
+  bool ads() const { return std::get<1>(GetParam()); }
+  envoy::api::v2::core::ApiConfigSource::ApiType apiType() const { return std::get<2>(GetParam()); }
+  envoy::api::v2::core::ApiVersion resourceApiVersion() const { return std::get<3>(GetParam()); }
+  envoy::api::v2::core::ApiVersion transportApiVersion() const { return std::get<4>(GetParam()); }
 
   void initialize() override {
-    config_helper_.addConfigModifier([](envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
+    config_helper_.addConfigModifier([this](envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
       auto* xds_cluster = bootstrap.mutable_static_resources()->add_clusters();
       xds_cluster->MergeFrom(bootstrap.static_resources().clusters()[0]);
       xds_cluster->set_name("xds_cluster");
       xds_cluster->mutable_http2_protocol_options();
+      if (ads()) {
+        auto* api_config_source = bootstrap.mutable_dynamic_resources()->mutable_ads_config();
+        api_config_source->set_transport_api_version(transportApiVersion());
+        api_config_source->set_api_type(apiType());
+        auto* grpc_service = api_config_source->add_grpc_services();
+        grpc_service->mutable_envoy_grpc()->set_cluster_name("xds_cluster");
+      }
     });
     setUpstreamProtocol(FakeHttpConnection::Type::HTTP2);
     HttpIntegrationTest::initialize();
@@ -57,6 +66,10 @@ public:
 
   void setupConfigSource(envoy::api::v2::core::ConfigSource& config_source) {
     config_source.set_resource_api_version(resourceApiVersion());
+    if (ads()) {
+      config_source.mutable_ads();
+      return;
+    }
     auto* api_config_source = config_source.mutable_api_config_source();
     api_config_source->set_transport_api_version(transportApiVersion());
     api_config_source->set_api_type(apiType());
@@ -80,6 +93,8 @@ public:
     std::string expected_endpoint;
     std::string expected_type_url;
     std::string actual_type_url;
+    const char ads_v2_sotw_endpoint[] = "/envoy.service.discovery.v2.AggregatedDiscoveryService/StreamAggregatedResources";
+    const char ads_v3alpha_delta_endpoint[] = "/envoy.service.discovery.v3alpha.AggregatedDiscoveryService/StreamAggregatedResources";
     switch (transportApiVersion()) {
     case envoy::api::v2::core::ApiVersion::AUTO:
     case envoy::api::v2::core::ApiVersion::V2: {
@@ -89,7 +104,7 @@ public:
         VERIFY_ASSERTION(xds_stream_->waitForGrpcMessage(*dispatcher_, discovery_request));
         xds_stream_->startGrpcStream();
         actual_type_url = discovery_request.type_url();
-        expected_endpoint = expected_v2_sotw_endpoint;
+        expected_endpoint = ads() ? ads_v2_sotw_endpoint : expected_v2_sotw_endpoint;
         break;
       }
       case envoy::api::v2::core::ApiConfigSource::DELTA_GRPC: {
@@ -121,7 +136,7 @@ public:
         API_NO_BOOST(envoy::api::v3alpha::DiscoveryRequest) discovery_request;
         VERIFY_ASSERTION(xds_stream_->waitForGrpcMessage(*dispatcher_, discovery_request));
         actual_type_url = discovery_request.type_url();
-        expected_endpoint = expected_v3alpha_sotw_endpoint;
+        expected_endpoint = ads() ? ads_v3alpha_delta_endpoint : expected_v3alpha_sotw_endpoint;
         break;
       }
       case envoy::api::v2::core::ApiConfigSource::DELTA_GRPC: {
@@ -189,9 +204,12 @@ public:
 // - We explicitly give the AUTO versions their own independent test suite,
 //   since they are equivalent to v2, so we want to test them once but they are
 //   mostly redundant.
+// - We treat ADS and singleton xDS differently. ADS doesn't care about REST and
+//   doesn't currently support delta xDS.
 INSTANTIATE_TEST_SUITE_P(
-    ApiConfigSourcesExplicitApiVersions, ApiVersionIntegrationTest,
+    SingletonApiConfigSourcesExplicitApiVersions, ApiVersionIntegrationTest,
     testing::Combine(testing::Values(TestEnvironment::getIpVersionsForTest()[0]),
+                     testing::Values(false),
                      testing::Values(envoy::api::v2::core::ApiConfigSource::REST,
                                      envoy::api::v2::core::ApiConfigSource::GRPC,
                                      envoy::api::v2::core::ApiConfigSource::DELTA_GRPC),
@@ -202,13 +220,25 @@ INSTANTIATE_TEST_SUITE_P(
     ApiVersionIntegrationTest::paramsToString);
 
 INSTANTIATE_TEST_SUITE_P(
-    ApiConfigSourcesAutoApiVersions, ApiVersionIntegrationTest,
+    SingletonApiConfigSourcesAutoApiVersions, ApiVersionIntegrationTest,
     testing::Combine(testing::Values(TestEnvironment::getIpVersionsForTest()[0]),
+                     testing::Values(false),
                      testing::Values(envoy::api::v2::core::ApiConfigSource::REST,
                                      envoy::api::v2::core::ApiConfigSource::GRPC,
                                      envoy::api::v2::core::ApiConfigSource::DELTA_GRPC),
                      testing::Values(envoy::api::v2::core::ApiVersion::AUTO),
                      testing::Values(envoy::api::v2::core::ApiVersion::AUTO)),
+    ApiVersionIntegrationTest::paramsToString);
+
+INSTANTIATE_TEST_SUITE_P(
+    AdsApiConfigSourcesExplicitApiVersions, ApiVersionIntegrationTest,
+    testing::Combine(testing::Values(TestEnvironment::getIpVersionsForTest()[0]),
+                     testing::Values(true),
+                     testing::Values(envoy::api::v2::core::ApiConfigSource::GRPC),
+                     testing::Values(envoy::api::v2::core::ApiVersion::V2,
+                                     envoy::api::v2::core::ApiVersion::V3ALPHA),
+                     testing::Values(envoy::api::v2::core::ApiVersion::V2,
+                                     envoy::api::v2::core::ApiVersion::V3ALPHA)),
     ApiVersionIntegrationTest::paramsToString);
 
 TEST_P(ApiVersionIntegrationTest, Lds) {
