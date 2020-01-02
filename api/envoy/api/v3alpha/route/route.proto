@@ -1167,7 +1167,7 @@ message VirtualCluster {
   string name = 2 [(validate.rules).string = {min_bytes: 1}];
 }
 
-// Global rate limiting :ref:`architecture overview <arch_overview_rate_limit>`.
+// Global rate limiting :ref:`architecture overview <arch_overview_global_rate_limit>`.
 message RateLimit {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.route.RateLimit";
 
