@@ -873,7 +873,7 @@ void HttpIntegrationTest::testResponseFramedByConnectionCloseWithReadLimits(
   // the upstream when proxying the response. Upstream limit needs to be larger so that
   // RawBufferSocket::doRead reads the response body and detects the upstream close in the same call
   // stack.
-  config_helper_.setBufferLimits(100000, 2); // Setting high watermark to 1 doesn't work, see #9499
+  config_helper_.setBufferLimits(100000, 1);
   initialize();
 
   codec_client_ = makeHttpConnection(
