@@ -41,6 +41,8 @@ to find out more about the origin story and design philosophy of Envoy
 
 * [envoy-announce](https://groups.google.com/forum/#!forum/envoy-announce): Low frequency mailing
   list where we will email announcements only.
+* [envoy-security-announce](https://groups.google.com/forum/#!forum/envoy-security-announce): Low frequency mailing
+  list where we will email security related announcements only.
 * [envoy-users](https://groups.google.com/forum/#!forum/envoy-users): General user discussion.
 * [envoy-dev](https://groups.google.com/forum/#!forum/envoy-dev): Envoy developer discussion (APIs,
   feature design, etc.).

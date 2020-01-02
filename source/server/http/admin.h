@@ -236,6 +236,20 @@ private:
   void writeListenersAsJson(Buffer::Instance& response);
   void writeListenersAsText(Buffer::Instance& response);
 
+  /**
+   * Helper methods for the /config_dump url handler.
+   */
+  void addAllConfigToDump(envoy::admin::v2alpha::ConfigDump& dump,
+                          const absl::optional<std::string>& mask) const;
+  /**
+   * Add the config matching the passed resource to the passed config dump.
+   * @return absl::nullopt on success, else the Http::Code and an error message that should be added
+   * to the admin response.
+   */
+  absl::optional<std::pair<Http::Code, std::string>>
+  addResourceToDump(envoy::admin::v2alpha::ConfigDump& dump,
+                    const absl::optional<std::string>& mask, const std::string& resource) const;
+
   template <class StatType>
   static bool shouldShowMetric(const StatType& metric, const bool used_only,
                                const absl::optional<std::regex>& regex) {
