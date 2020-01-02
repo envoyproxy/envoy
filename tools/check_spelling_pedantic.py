@@ -574,7 +574,7 @@ if __name__ == "__main__":
 
   paths = args.target_paths
   if not paths:
-    paths = ['./api', './include', './source', './test']
+    paths = ['./api', './include', './source', './test', './tools']
 
   exts = ['.cc', '.h', '.proto']
   target_paths = []

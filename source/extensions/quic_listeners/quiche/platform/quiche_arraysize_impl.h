@@ -1,6 +1,6 @@
 #pragma once
 
-#include "absl/strings/string_view.h"
+#include "absl/base/macros.h"
 
 // NOLINT(namespace-envoy)
 
@@ -8,8 +8,4 @@
 // consumed or referenced directly by other Envoy code. It serves purely as a
 // porting layer for QUICHE.
 
-namespace quic {
-
-using QuicStringPieceImpl = absl::string_view;
-
-} // namespace quic
+#define QUICHE_ARRAYSIZE_IMPL(array) ABSL_ARRAYSIZE(array)
