@@ -97,44 +97,45 @@ BENCHMARK(BM_LcTrieLookupMinimal);
 
 } // namespace Envoy
 
-// Boilerplate main(), which discovers benchmarks in the same file and runs them.
-int main(int argc, char** argv) {
-
-  // Random test addresses from RFC 5737 netblocks
-  static const std::string test_addresses[] = {
-      "192.0.2.225",   "198.51.100.55", "198.51.100.105", "192.0.2.150",   "203.0.113.162",
-      "203.0.113.110", "203.0.113.99",  "198.51.100.23",  "198.51.100.24", "203.0.113.12"};
-  for (const auto& address : test_addresses) {
-    addresses.push_back(Envoy::Network::Utility::parseInternetAddress(address));
-  }
-
-  // Construct three sets of prefixes: one consisting of 1,024 addresses in an
-  // RFC 5737 netblock, another consisting of those same addresses plus
-  // 0.0.0.0/0 (to exercise the LC Trie's support for nested prefixes),
-  // and finally a set containing only 0.0.0.0/0.
-  for (int i = 0; i < 32; i++) {
-    for (int j = 0; j < 32; j++) {
-      tag_data.emplace_back(std::pair<std::string, std::vector<Envoy::Network::Address::CidrRange>>(
-          {"tag_1",
-           {Envoy::Network::Address::CidrRange::create(fmt::format("192.0.{}.{}/32", i, j))}}));
+// Hack to initialize the global variables used by the benchmarks above.
+class GlobalInitialize {
+public:
+  GlobalInitialize() {
+    // Random test addresses from RFC 5737 netblocks
+    static const std::string test_addresses[] = {
+        "192.0.2.225",   "198.51.100.55", "198.51.100.105", "192.0.2.150",   "203.0.113.162",
+        "203.0.113.110", "203.0.113.99",  "198.51.100.23",  "198.51.100.24", "203.0.113.12"};
+    for (const auto& address : test_addresses) {
+      addresses.push_back(Envoy::Network::Utility::parseInternetAddress(address));
     }
-  }
-  tag_data_nested_prefixes = tag_data;
-  tag_data_nested_prefixes.emplace_back(
-      std::pair<std::string, std::vector<Envoy::Network::Address::CidrRange>>(
-          {"tag_0", {Envoy::Network::Address::CidrRange::create("0.0.0.0/0")}}));
-  tag_data_minimal.emplace_back(
-      std::pair<std::string, std::vector<Envoy::Network::Address::CidrRange>>(
-          {"tag_1", {Envoy::Network::Address::CidrRange::create("0.0.0.0/0")}}));
 
-  lc_trie = std::make_unique<Envoy::Network::LcTrie::LcTrie<std::string>>(tag_data);
-  lc_trie_nested_prefixes =
-      std::make_unique<Envoy::Network::LcTrie::LcTrie<std::string>>(tag_data_nested_prefixes);
-  lc_trie_minimal = std::make_unique<Envoy::Network::LcTrie::LcTrie<std::string>>(tag_data_minimal);
+    // Construct three sets of prefixes: one consisting of 1,024 addresses in an
+    // RFC 5737 netblock, another consisting of those same addresses plus
+    // 0.0.0.0/0 (to exercise the LC Trie's support for nested prefixes),
+    // and finally a set containing only 0.0.0.0/0.
+    for (int i = 0; i < 32; i++) {
+      for (int j = 0; j < 32; j++) {
+        tag_data.emplace_back(
+            std::pair<std::string, std::vector<Envoy::Network::Address::CidrRange>>(
+                {"tag_1",
+                 {Envoy::Network::Address::CidrRange::create(
+                     fmt::format("192.0.{}.{}/32", i, j))}}));
+      }
+    }
+    tag_data_nested_prefixes = tag_data;
+    tag_data_nested_prefixes.emplace_back(
+        std::pair<std::string, std::vector<Envoy::Network::Address::CidrRange>>(
+            {"tag_0", {Envoy::Network::Address::CidrRange::create("0.0.0.0/0")}}));
+    tag_data_minimal.emplace_back(
+        std::pair<std::string, std::vector<Envoy::Network::Address::CidrRange>>(
+            {"tag_1", {Envoy::Network::Address::CidrRange::create("0.0.0.0/0")}}));
 
-  benchmark::Initialize(&argc, argv);
-  if (benchmark::ReportUnrecognizedArguments(argc, argv)) {
-    return 1;
+    lc_trie = std::make_unique<Envoy::Network::LcTrie::LcTrie<std::string>>(tag_data);
+    lc_trie_nested_prefixes =
+        std::make_unique<Envoy::Network::LcTrie::LcTrie<std::string>>(tag_data_nested_prefixes);
+    lc_trie_minimal =
+        std::make_unique<Envoy::Network::LcTrie::LcTrie<std::string>>(tag_data_minimal);
   }
-  benchmark::RunSpecifiedBenchmarks();
-}
+};
+
+GlobalInitialize initialize;

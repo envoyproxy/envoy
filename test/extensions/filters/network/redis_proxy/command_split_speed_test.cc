@@ -130,13 +130,3 @@ static void BM_Split_CreateVariant(benchmark::State& state) {
   state.counters["use_count"] = request.use_count();
 }
 BENCHMARK(BM_Split_CreateVariant)->Ranges({{1, 100}, {64, 8 << 14}});
-
-// Boilerplate main(), which discovers benchmarks in the same file and runs them.
-int main(int argc, char** argv) {
-  benchmark::Initialize(&argc, argv);
-
-  if (benchmark::ReportUnrecognizedArguments(argc, argv)) {
-    return 1;
-  }
-  benchmark::RunSpecifiedBenchmarks();
-}

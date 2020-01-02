@@ -50,6 +50,9 @@ public:
   }
 
   void initThreading() {
+    if (!Envoy::Event::Libevent::Global::initialized()) {
+      Envoy::Event::Libevent::Global::initialize();
+    }
     dispatcher_ = api_->allocateDispatcher();
     tls_ = std::make_unique<ThreadLocal::InstanceImpl>();
     store_.initializeThreading(*dispatcher_, *tls_);
@@ -95,14 +98,3 @@ BENCHMARK(BM_StatsWithTls);
 
 // TODO(jmarantz): add multi-threaded variant of this test, that aggressively
 // looks up stats in multiple threads to try to trigger contention issues.
-
-// Boilerplate main(), which discovers benchmarks in the same file and runs them.
-int main(int argc, char** argv) {
-  benchmark::Initialize(&argc, argv);
-
-  Envoy::Event::Libevent::Global::initialize();
-  if (benchmark::ReportUnrecognizedArguments(argc, argv)) {
-    return 1;
-  }
-  benchmark::RunSpecifiedBenchmarks();
-}
