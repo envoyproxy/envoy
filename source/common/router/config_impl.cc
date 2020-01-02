@@ -192,23 +192,20 @@ CorsPolicyImpl::CorsPolicyImpl(
   for (const auto& string_match : config.allow_origin_string_match()) {
     allow_origins_.push_back(std::make_unique<Matchers::StringMatcherImpl>(string_match));
   }
+
   if (config.has_allow_credentials()) {
     allow_credentials_ = PROTOBUF_GET_WRAPPED_REQUIRED(config, allow_credentials);
   }
 }
 
-ShadowPolicyImpl::ShadowPolicyImpl(const envoy::api::v2::route::RouteAction& config) {
-  if (!config.has_request_mirror_policy()) {
-    return;
-  }
+ShadowPolicyImpl::ShadowPolicyImpl(const RequestMirrorPolicy& config) {
+  cluster_ = config.cluster();
 
-  cluster_ = config.request_mirror_policy().cluster();
-
-  if (config.request_mirror_policy().has_runtime_fraction()) {
-    runtime_key_ = config.request_mirror_policy().runtime_fraction().runtime_key();
-    default_value_ = config.request_mirror_policy().runtime_fraction().default_value();
+  if (config.has_runtime_fraction()) {
+    runtime_key_ = config.runtime_fraction().runtime_key();
+    default_value_ = config.runtime_fraction().default_value();
   } else {
-    runtime_key_ = config.request_mirror_policy().runtime_key();
+    runtime_key_ = config.runtime_key();
     default_value_.set_numerator(0);
   }
 }
@@ -292,7 +289,7 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
       strip_query_(route.redirect().strip_query()),
       hedge_policy_(buildHedgePolicy(vhost.hedgePolicy(), route.route())),
       retry_policy_(buildRetryPolicy(vhost.retryPolicy(), route.route(), validator)),
-      rate_limit_policy_(route.route().rate_limits()), shadow_policy_(route.route()),
+      rate_limit_policy_(route.route().rate_limits()),
       priority_(ConfigUtility::parsePriority(route.route().priority())),
       config_headers_(Http::HeaderUtility::buildHeaderDataVector(route.match().headers())),
       total_cluster_weight_(
@@ -318,6 +315,24 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
     if (filter_it != route.route().metadata_match().filter_metadata().end()) {
       metadata_match_criteria_ = std::make_unique<MetadataMatchCriteriaImpl>(filter_it->second);
     }
+  }
+
+  if (!route.route().request_mirror_policies().empty()) {
+    if (route.route().has_request_mirror_policy()) {
+      // protobuf does not allow `oneof` to contain a field labeled `repeated`, so we do our own
+      // xor-like check.
+      // https://github.com/protocolbuffers/protobuf/issues/2592
+      // The alternative solution suggested (wrapping the oneof in a repeated message) would still
+      // break wire compatibility.
+      // (see https://github.com/envoyproxy/envoy/issues/439#issuecomment-383622723)
+      throw EnvoyException("Cannot specify both request_mirror_policy and request_mirror_policies");
+    }
+    for (const auto& mirror_policy_config : route.route().request_mirror_policies()) {
+      shadow_policies_.push_back(std::make_unique<ShadowPolicyImpl>(mirror_policy_config));
+    }
+  } else if (route.route().has_request_mirror_policy()) {
+    shadow_policies_.push_back(
+        std::make_unique<ShadowPolicyImpl>(route.route().request_mirror_policy()));
   }
 
   // If this is a weighted_cluster, we create N internal route entries
@@ -957,10 +972,11 @@ VirtualHostImpl::VirtualHostImpl(const envoy::api::v2::route::VirtualHost& virtu
 
     if (validate_clusters) {
       routes_.back()->validateClusters(factory_context.clusterManager());
-      if (!routes_.back()->shadowPolicy().cluster().empty()) {
-        if (!factory_context.clusterManager().get(routes_.back()->shadowPolicy().cluster())) {
-          throw EnvoyException(fmt::format("route: unknown shadow cluster '{}'",
-                                           routes_.back()->shadowPolicy().cluster()));
+      for (const auto& shadow_policy : routes_.back()->shadowPolicies()) {
+        ASSERT(!shadow_policy->cluster().empty());
+        if (!factory_context.clusterManager().get(shadow_policy->cluster())) {
+          throw EnvoyException(
+              fmt::format("route: unknown shadow cluster '{}'", shadow_policy->cluster()));
         }
       }
     }
@@ -1193,8 +1209,7 @@ createRouteSpecificFilterConfig(const std::string& name, const ProtobufWkt::Any&
   auto& factory = Envoy::Config::Utility::getAndCheckFactory<
       Server::Configuration::NamedHttpFilterConfigFactory>(name);
   ProtobufTypes::MessagePtr proto_config = factory.createEmptyRouteConfigProto();
-  Envoy::Config::Utility::translateOpaqueConfig(name, typed_config, config, validator,
-                                                *proto_config);
+  Envoy::Config::Utility::translateOpaqueConfig(typed_config, config, validator, *proto_config);
   return factory.createRouteSpecificFilterConfig(*proto_config, factory_context, validator);
 }
 

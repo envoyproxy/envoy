@@ -6,7 +6,9 @@
 #include "envoy/config/bootstrap/v2/bootstrap.pb.h"
 #include "envoy/config/filter/network/http_connection_manager/v2/http_connection_manager.pb.h"
 
+#include "common/config/api_version.h"
 #include "common/config/resources.h"
+#include "common/config/version_converter.h"
 
 #include "test/common/grpc/grpc_client_integration.h"
 #include "test/integration/http_integration.h"
@@ -160,12 +162,12 @@ fragments:
   }
 
   void sendRdsResponse(const std::string& route_config, const std::string& version) {
-    envoy::api::v2::DiscoveryResponse response;
+    API_NO_BOOST(envoy::api::v2::DiscoveryResponse) response;
     response.set_version_info(version);
     response.set_type_url(Config::TypeUrl::get().RouteConfiguration);
     auto route_configuration =
         TestUtility::parseYaml<envoy::api::v2::RouteConfiguration>(route_config);
-    response.add_resources()->PackFrom(route_configuration);
+    response.add_resources()->PackFrom(API_DOWNGRADE(route_configuration));
     ASSERT(rds_upstream_info_.stream_by_resource_name_[route_configuration.name()] != nullptr);
     rds_upstream_info_.stream_by_resource_name_[route_configuration.name()]->sendGrpcMessage(
         response);
@@ -187,7 +189,7 @@ fragments:
                                   const std::string& version) {
     ASSERT(scoped_rds_upstream_info_.stream_by_resource_name_[srds_config_name_] != nullptr);
 
-    envoy::api::v2::DeltaDiscoveryResponse response;
+    API_NO_BOOST(envoy::api::v2::DeltaDiscoveryResponse) response;
     response.set_system_version_info(version);
     response.set_type_url(Config::TypeUrl::get().ScopedRouteConfiguration);
 
@@ -200,7 +202,7 @@ fragments:
       auto resource = response.add_resources();
       resource->set_name(scoped_route_proto.name());
       resource->set_version(version);
-      resource->mutable_resource()->PackFrom(scoped_route_proto);
+      resource->mutable_resource()->PackFrom(API_DOWNGRADE(scoped_route_proto));
     }
     scoped_rds_upstream_info_.stream_by_resource_name_[srds_config_name_]->sendGrpcMessage(
         response);
@@ -210,14 +212,14 @@ fragments:
                                  const std::string& version) {
     ASSERT(scoped_rds_upstream_info_.stream_by_resource_name_[srds_config_name_] != nullptr);
 
-    envoy::api::v2::DiscoveryResponse response;
+    API_NO_BOOST(envoy::api::v2::DiscoveryResponse) response;
     response.set_version_info(version);
     response.set_type_url(Config::TypeUrl::get().ScopedRouteConfiguration);
 
     for (const auto& resource_proto : resource_protos) {
       envoy::api::v2::ScopedRouteConfiguration scoped_route_proto;
       TestUtility::loadFromYaml(resource_proto, scoped_route_proto);
-      response.add_resources()->PackFrom(scoped_route_proto);
+      response.add_resources()->PackFrom(API_DOWNGRADE(scoped_route_proto));
     }
     scoped_rds_upstream_info_.stream_by_resource_name_[srds_config_name_]->sendGrpcMessage(
         response);

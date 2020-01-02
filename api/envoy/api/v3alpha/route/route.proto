@@ -484,7 +484,7 @@ message CorsPolicy {
   core.RuntimeFractionalPercent shadow_enabled = 10;
 }
 
-// [#next-free-field: 30]
+// [#next-free-field: 31]
 message RouteAction {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.route.RouteAction";
 
@@ -658,9 +658,9 @@ message RouteAction {
     google.protobuf.BoolValue enabled = 2;
   }
 
-  reserved 12, 18, 19, 16, 22, 21, 17;
+  reserved 12, 18, 19, 16, 22, 21, 10, 17;
 
-  reserved "cors";
+  reserved "request_mirror_policy", "cors";
 
   oneof cluster_specifier {
     option (validate.required) = true;
@@ -791,8 +791,8 @@ message RouteAction {
   // (e.g.: policies are not merged, most internal one becomes the enforced policy).
   RetryPolicy retry_policy = 9;
 
-  // Indicates that the route has a request mirroring policy.
-  RequestMirrorPolicy request_mirror_policy = 10;
+  // Indicates that the route has request mirroring policies.
+  repeated RequestMirrorPolicy request_mirror_policies = 30;
 
   // Optionally specifies the :ref:`routing priority <arch_overview_http_routing_priority>`.
   core.RoutingPriority priority = 11 [(validate.rules).enum = {defined_only: true}];
@@ -1161,7 +1161,7 @@ message VirtualCluster {
   string name = 2 [(validate.rules).string = {min_bytes: 1}];
 }
 
-// Global rate limiting :ref:`architecture overview <arch_overview_rate_limit>`.
+// Global rate limiting :ref:`architecture overview <arch_overview_global_rate_limit>`.
 message RateLimit {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.route.RateLimit";
 

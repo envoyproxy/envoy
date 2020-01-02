@@ -7,8 +7,7 @@
 #
 # Usage (from a clean tree):
 #
-# api_boost.py --generate_compilation_database \
-#   --build_api_booster
+# api_boost.py --generate_compilation_database --build_api_booster
 
 import argparse
 import functools
@@ -17,10 +16,14 @@ import os
 import multiprocessing as mp
 import pathlib
 import re
+import shlex
 import subprocess as sp
 
 # Detect API #includes.
 API_INCLUDE_REGEX = re.compile('#include "(envoy/.*)/[^/]+\.pb\.(validate\.)?h"')
+
+# Needed for CI to pass down bazel options.
+BAZEL_BUILD_OPTIONS = shlex.split(os.environ.get('BAZEL_BUILD_OPTIONS', ''))
 
 
 # Obtain the directory containing a path prefix, e.g. ./foo/bar.txt is ./foo,
@@ -32,6 +35,10 @@ def PrefixDirectory(path_prefix):
 # Update a C++ file to the latest API.
 def ApiBoostFile(llvm_include_path, debug_log, path):
   print('Processing %s' % path)
+  if 'API_NO_BOOST_FILE' in pathlib.Path(path).read_text():
+    if debug_log:
+      print('Not boosting %s due to API_NO_BOOST_FILE\n' % path)
+    return None
   # Run the booster
   try:
     result = sp.run([
@@ -57,6 +64,9 @@ def ApiBoostFile(llvm_include_path, debug_log, path):
 # below, we have more control over special casing as well, so ¯\_(ツ)_/¯.
 def RewriteIncludes(args):
   path, api_includes = args
+  # Files with API_NO_BOOST_FILE will have None returned by ApiBoostFile.
+  if api_includes is None:
+    return
   # We just dump the inferred API header includes at the start of the #includes
   # in the file and remove all the present API header includes. This does not
   # match Envoy style; we rely on later invocations of fix_format.sh to take
@@ -89,6 +99,7 @@ def ApiBoostTree(target_paths,
   # Optional setup of state. We need the compilation database and api_booster
   # tool in place before we can start boosting.
   if generate_compilation_database:
+    print('Building compilation database for %s' % dep_build_targets)
     sp.run(['./tools/gen_compilation_database.py', '--run_bazel_build', '--include_headers'] +
            dep_build_targets,
            check=True)
@@ -116,13 +127,15 @@ def ApiBoostTree(target_paths,
         'build',
         '--strip=always',
         '@envoy_dev//clang_tools/api_booster',
-    ] + extra_api_booster_args,
+    ] + BAZEL_BUILD_OPTIONS + extra_api_booster_args,
            check=True)
     sp.run([
         'bazel',
         'build',
+        '--config=libc++',
         '--strip=always',
-    ] + dep_lib_build_targets, check=True)
+    ] + BAZEL_BUILD_OPTIONS + dep_lib_build_targets,
+           check=True)
 
   # Figure out where the LLVM include path is. We need to provide this
   # explicitly as the api_booster is built inside the Bazel cache and doesn't
@@ -159,8 +172,8 @@ def ApiBoostTree(target_paths,
                            file_paths)
       # Apply Clang replacements before header fixups, since the replacements
       # are all relative to the original file.
-      for prefix in target_paths:
-        sp.run(['clang-apply-replacements', PrefixDirectory(prefix)], check=True)
+      for prefix_dir in set(map(PrefixDirectory, target_paths)):
+        sp.run(['clang-apply-replacements', prefix_dir], check=True)
       # Fixup headers.
       p.map(RewriteIncludes, zip(file_paths, api_includes))
   finally:
