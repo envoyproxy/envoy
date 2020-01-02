@@ -7,7 +7,7 @@ import "test/fuzz/common.proto";
 import "validate/validate.proto";
 
 message FilterFuzzTestCase {
-  string config_values = 1; // Random data to use to optionally fuzz critical values of the config.
+  int32 filter_index = 1;
 
   test.fuzz.HttpData data = 2;
 }

@@ -11,10 +11,12 @@
 #include "extensions/filters/http/buffer/buffer_filter.h"
 #include "extensions/filters/http/well_known_names.h"
 
+#include "libprotobuf_mutator/src/mutator.h"
+
 #include "test/config/utility.h"
-#include "test/extensions/filters/http/common/fuzz/decoder_filter_fuzz.h"
 #include "test/extensions/filters/http/common/fuzz/filter_fuzz.pb.h"
 #include "test/fuzz/fuzz_runner.h"
+#include "test/fuzz/utility.h"
 #include "test/mocks/buffer/mocks.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/server/mocks.h"
@@ -36,7 +38,7 @@ public:
 
   // This executes the methods to be fuzzed.
   void decode(Http::StreamDecoderFilter* filter, const test::fuzz::HttpData& data) {
-    ENVOY_LOG_MISC(info, "Decoding {} with filter", data.DebugString());
+    ENVOY_LOG_MISC(debug, "Decoding {} with filter", data.DebugString());
     bool end_stream = false;
 
     Http::TestHeaderMapImpl headers = Fuzz::fromHeaders(data.headers());
@@ -59,22 +61,28 @@ public:
     }
   }
 
-  // This creates the filter from the proto and runs decode.
-  void
-  fuzz(const envoy::config::filter::network::http_connection_manager::v2::HttpFilter& proto_config,
-       const test::fuzz::HttpData& data) {
-    // TODO: Dissociate filter creation from active stream.
+  // This creates and mutates the filter config and runs decode.
+  void fuzz(const std::string filter_name, const test::fuzz::HttpData& data) {
     auto& factory =
         Config::Utility::getAndCheckFactory<Server::Configuration::NamedHttpFilterConfigFactory>(
-            proto_config.name());
-    ProtobufTypes::MessagePtr message = Config::Utility::translateToFactoryConfig(
-        proto_config, Envoy::ProtobufMessage::getNullValidationVisitor(), factory);
-    Http::FilterFactoryCb cb =
-        factory.createFilterFactoryFromProto(*message, "fuzz", factory_context_);
+            filter_name);
+    auto proto_config = factory.createEmptyConfigProto();
 
-    // Set the filter_ and execute the code to  be fuzzed.
-    cb(filter_callback_);
-    decode(filter_.get(), data);
+    protobuf_mutator::Mutator mutator;
+    try {
+      // Mutate and validate the chosen filter protobuf directly.
+      mutator.Mutate(proto_config.get(), 200);
+      Http::FilterFactoryCb cb =
+          factory.createFilterFactoryFromProto(*proto_config, "stats", factory_context_);
+      ENVOY_LOG_MISC(debug, "Using mutated filter config {}", proto_config->DebugString());
+
+      cb(filter_callback_);
+      decode(filter_.get(), data);
+    } catch (const ProtoValidationException& e) {
+      // Abort if the mutator creates an invalid protobuf.
+      ENVOY_LOG_MISC(debug, "Invalid protobuf {}", e.what());
+      return;
+    }
   }
 
   NiceMock<Server::Configuration::MockFactoryContext> factory_context_;
@@ -84,21 +92,12 @@ public:
 };
 
 DEFINE_PROTO_FUZZER(const test::extensions::filters::http::FilterFuzzTestCase& input) {
-  // TODO: Hard-coded right now. Replace with pulling from a directory.
-  const std::string config_string =
-      R"EOF(
-name: envoy.buffer
-typed_config:
-    "@type": type.googleapis.com/envoy.config.filter.http.buffer.v2.Buffer
-    max_request_bytes : 5242880
-)EOF";
-  // Create proto_config from the string.
-  envoy::config::filter::network::http_connection_manager::v2::HttpFilter proto_config;
-  TestUtility::loadFromYaml(config_string, proto_config);
+  // TODO: Randomize the well known http filter name with the input int.
+  const std::string buffer_name = "envoy.buffer";
 
   // Fuzz filter.
   static UberFilterFuzzer fuzzer;
-  fuzzer.fuzz(proto_config, input.data());
+  fuzzer.fuzz(buffer_name, input.data());
 }
 
 } // namespace HttpFilters
