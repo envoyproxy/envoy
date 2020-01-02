@@ -7,16 +7,15 @@
 #include "envoy/api/v2/rds.pb.h"
 #include "envoy/api/v2/route/route.pb.h"
 #include "envoy/api/v2/srds.pb.h"
-#include "envoy/service/discovery/v2/rtds.pb.h"
-
 #include "envoy/api/v3alpha/auth/cert.pb.h"
 #include "envoy/api/v3alpha/cds.pb.h"
 #include "envoy/api/v3alpha/eds.pb.h"
 #include "envoy/api/v3alpha/lds.pb.h"
 #include "envoy/api/v3alpha/rds.pb.h"
 #include "envoy/api/v3alpha/route/route.pb.h"
-#include "envoy/service/route/v3alpha/srds.pb.h"
+#include "envoy/service/discovery/v2/rtds.pb.h"
 #include "envoy/service/discovery/v3alpha/rtds.pb.h"
+#include "envoy/service/route/v3alpha/srds.pb.h"
 
 #include "common/common/assert.h"
 #include "common/grpc/common.h"
