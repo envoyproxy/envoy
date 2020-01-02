@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package envoy.extensions.filters.network.ext_authz.v3alpha;
 
-import "envoy/api/v3alpha/core/grpc_service.proto";
+import "envoy/config/core/v3alpha/grpc_service.proto";
 
 import "udpa/annotations/versioning.proto";
 
@@ -30,7 +30,7 @@ message ExtAuthz {
 
   // The external authorization gRPC service configuration.
   // The default timeout is set to 200ms by this filter.
-  api.v3alpha.core.GrpcService grpc_service = 2;
+  config.core.v3alpha.GrpcService grpc_service = 2;
 
   // The filter's behaviour in case the external authorization service does
   // not respond back. When it is set to true, Envoy will also allow traffic in case of

@@ -2,11 +2,11 @@ syntax = "proto3";
 
 package envoy.admin.v3alpha;
 
-import "envoy/api/v3alpha/cds.proto";
-import "envoy/api/v3alpha/lds.proto";
-import "envoy/api/v3alpha/rds.proto";
 import "envoy/config/bootstrap/v3alpha/bootstrap.proto";
 import "envoy/extensions/transport_sockets/tls/v3alpha/cert.proto";
+import "envoy/service/cluster/v3alpha/cds.proto";
+import "envoy/service/listener/v3alpha/lds.proto";
+import "envoy/service/route/v3alpha/rds.proto";
 import "envoy/service/route/v3alpha/srds.proto";
 
 import "google/protobuf/any.proto";
@@ -85,7 +85,7 @@ message ListenersConfigDump {
         "envoy.admin.v2alpha.ListenersConfigDump.StaticListener";
 
     // The listener config.
-    api.v3alpha.Listener listener = 1;
+    service.listener.v3alpha.Listener listener = 1;
 
     // The timestamp when the Listener was last successfully updated.
     google.protobuf.Timestamp last_updated = 2;
@@ -103,7 +103,7 @@ message ListenersConfigDump {
     string version_info = 1;
 
     // The listener config.
-    api.v3alpha.Listener listener = 2;
+    service.listener.v3alpha.Listener listener = 2;
 
     // The timestamp when the Listener was last successfully updated.
     google.protobuf.Timestamp last_updated = 3;
@@ -164,7 +164,7 @@ message ClustersConfigDump {
         "envoy.admin.v2alpha.ClustersConfigDump.StaticCluster";
 
     // The cluster config.
-    api.v3alpha.Cluster cluster = 1;
+    service.cluster.v3alpha.Cluster cluster = 1;
 
     // The timestamp when the Cluster was last updated.
     google.protobuf.Timestamp last_updated = 2;
@@ -183,7 +183,7 @@ message ClustersConfigDump {
     string version_info = 1;
 
     // The cluster config.
-    api.v3alpha.Cluster cluster = 2;
+    service.cluster.v3alpha.Cluster cluster = 2;
 
     // The timestamp when the Cluster was last updated.
     google.protobuf.Timestamp last_updated = 3;
@@ -223,7 +223,7 @@ message RoutesConfigDump {
         "envoy.admin.v2alpha.RoutesConfigDump.StaticRouteConfig";
 
     // The route config.
-    api.v3alpha.RouteConfiguration route_config = 1;
+    service.route.v3alpha.RouteConfiguration route_config = 1;
 
     // The timestamp when the Route was last updated.
     google.protobuf.Timestamp last_updated = 2;
@@ -240,7 +240,7 @@ message RoutesConfigDump {
     string version_info = 1;
 
     // The route config.
-    api.v3alpha.RouteConfiguration route_config = 2;
+    service.route.v3alpha.RouteConfiguration route_config = 2;
 
     // The timestamp when the Route was last updated.
     google.protobuf.Timestamp last_updated = 3;

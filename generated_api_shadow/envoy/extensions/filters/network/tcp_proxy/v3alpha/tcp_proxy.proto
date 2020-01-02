@@ -2,8 +2,8 @@ syntax = "proto3";
 
 package envoy.extensions.filters.network.tcp_proxy.v3alpha;
 
-import "envoy/api/v3alpha/core/address.proto";
-import "envoy/api/v3alpha/core/base.proto";
+import "envoy/config/core/v3alpha/address.proto";
+import "envoy/config/core/v3alpha/base.proto";
 import "envoy/config/filter/accesslog/v3alpha/accesslog.proto";
 import "envoy/type/v3alpha/hash_policy.proto";
 
@@ -58,7 +58,7 @@ message TcpProxy {
       // address of the downstream connection might be different from the
       // addresses on which the proxy is listening if the connection has been
       // redirected.
-      repeated api.v3alpha.core.CidrRange destination_ip_list = 2;
+      repeated config.core.v3alpha.CidrRange destination_ip_list = 2;
 
       // An optional string containing a comma-separated list of port numbers
       // or ranges. The criteria is satisfied if the destination port of the
@@ -74,7 +74,7 @@ message TcpProxy {
       // of the downstream connection is contained in at least one of the
       // specified subnets. If the parameter is not specified or the list is
       // empty, the source IP address is ignored.
-      repeated api.v3alpha.core.CidrRange source_ip_list = 4;
+      repeated config.core.v3alpha.CidrRange source_ip_list = 4;
 
       // An optional string containing a comma-separated list of port numbers
       // or ranges. The criteria is satisfied if the source port of the
@@ -114,7 +114,7 @@ message TcpProxy {
       // :ref:`TcpProxy.metadata_match
       // <envoy_api_field_extensions.filters.network.tcp_proxy.v3alpha.TcpProxy.metadata_match>`,
       // with values here taking precedence. The filter name should be specified as *envoy.lb*.
-      api.v3alpha.core.Metadata metadata_match = 3;
+      config.core.v3alpha.Metadata metadata_match = 3;
     }
 
     // Specifies one or more upstream clusters associated with the route.
@@ -140,7 +140,7 @@ message TcpProxy {
   // Optional endpoint metadata match criteria. Only endpoints in the upstream
   // cluster with metadata matching that set in metadata_match will be
   // considered. The filter name should be specified as *envoy.lb*.
-  api.v3alpha.core.Metadata metadata_match = 9;
+  config.core.v3alpha.Metadata metadata_match = 9;
 
   // The idle timeout for connections managed by the TCP proxy filter. The idle timeout
   // is defined as the period in which there are no bytes sent or received on either

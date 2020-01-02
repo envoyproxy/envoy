@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package envoy.config.route.v3alpha;
 
-import "envoy/api/v3alpha/core/base.proto";
+import "envoy/config/core/v3alpha/base.proto";
 import "envoy/type/matcher/v3alpha/regex.proto";
 import "envoy/type/matcher/v3alpha/string.proto";
 import "envoy/type/tracing/v2/custom_tag.proto";
@@ -94,7 +94,7 @@ message VirtualHost {
   // enclosing :ref:`envoy_api_msg_RouteConfiguration`. For more information, including
   // details on header value syntax, see the documentation on :ref:`custom request headers
   // <config_http_conn_man_headers_custom_request_headers>`.
-  repeated api.v3alpha.core.HeaderValueOption request_headers_to_add = 7
+  repeated core.v3alpha.HeaderValueOption request_headers_to_add = 7
       [(validate.rules).repeated = {max_items: 1000}];
 
   // Specifies a list of HTTP headers that should be removed from each request
@@ -107,7 +107,7 @@ message VirtualHost {
   // enclosing :ref:`envoy_api_msg_RouteConfiguration`. For more information, including
   // details on header value syntax, see the documentation on :ref:`custom request headers
   // <config_http_conn_man_headers_custom_request_headers>`.
-  repeated api.v3alpha.core.HeaderValueOption response_headers_to_add = 10
+  repeated core.v3alpha.HeaderValueOption response_headers_to_add = 10
       [(validate.rules).repeated = {max_items: 1000}];
 
   // Specifies a list of HTTP headers that should be removed from each response
@@ -207,7 +207,7 @@ message Route {
   // The metadata should go under the filter namespace that will need it.
   // For instance, if the metadata is intended for the Router filter,
   // the filter name should be specified as *envoy.router*.
-  api.v3alpha.core.Metadata metadata = 4;
+  core.v3alpha.Metadata metadata = 4;
 
   // Decorator for the matched route.
   Decorator decorator = 5;
@@ -233,7 +233,7 @@ message Route {
   // :ref:`envoy_api_msg_RouteConfiguration`. For more information, including details on
   // header value syntax, see the documentation on :ref:`custom request headers
   // <config_http_conn_man_headers_custom_request_headers>`.
-  repeated api.v3alpha.core.HeaderValueOption request_headers_to_add = 9
+  repeated core.v3alpha.HeaderValueOption request_headers_to_add = 9
       [(validate.rules).repeated = {max_items: 1000}];
 
   // Specifies a list of HTTP headers that should be removed from each request
@@ -246,7 +246,7 @@ message Route {
   // :ref:`envoy_api_msg_RouteConfiguration`. For more information, including
   // details on header value syntax, see the documentation on
   // :ref:`custom request headers <config_http_conn_man_headers_custom_request_headers>`.
-  repeated api.v3alpha.core.HeaderValueOption response_headers_to_add = 10
+  repeated core.v3alpha.HeaderValueOption response_headers_to_add = 10
       [(validate.rules).repeated = {max_items: 1000}];
 
   // Specifies a list of HTTP headers that should be removed from each response
@@ -296,7 +296,7 @@ message WeightedCluster {
     // :ref:`RouteAction.metadata_match
     // <envoy_api_field_config.route.v3alpha.RouteAction.metadata_match>`, with values here taking
     // precedence. The filter name should be specified as *envoy.lb*.
-    api.v3alpha.core.Metadata metadata_match = 3;
+    core.v3alpha.Metadata metadata_match = 3;
 
     // Specifies a list of headers to be added to requests when this cluster is selected
     // through the enclosing :ref:`envoy_api_msg_route.RouteAction`.
@@ -305,7 +305,7 @@ message WeightedCluster {
     // :ref:`envoy_api_msg_RouteConfiguration`. For more information, including details on
     // header value syntax, see the documentation on :ref:`custom request headers
     // <config_http_conn_man_headers_custom_request_headers>`.
-    repeated api.v3alpha.core.HeaderValueOption request_headers_to_add = 4
+    repeated core.v3alpha.HeaderValueOption request_headers_to_add = 4
         [(validate.rules).repeated = {max_items: 1000}];
 
     // Specifies a list of HTTP headers that should be removed from each request when
@@ -319,7 +319,7 @@ message WeightedCluster {
     // :ref:`envoy_api_msg_RouteConfiguration`. For more information, including details on
     // header value syntax, see the documentation on :ref:`custom request headers
     // <config_http_conn_man_headers_custom_request_headers>`.
-    repeated api.v3alpha.core.HeaderValueOption response_headers_to_add = 5
+    repeated core.v3alpha.HeaderValueOption response_headers_to_add = 5
         [(validate.rules).repeated = {max_items: 1000}];
 
     // Specifies a list of headers to be removed from responses when this cluster is selected
@@ -444,7 +444,7 @@ message RouteMatch {
   //    integer with the assumption that the value is an integral percentage out of 100. For
   //    instance, a runtime key lookup returning the value "42" would parse as a FractionalPercent
   //    whose numerator is 42 and denominator is HUNDRED. This preserves legacy semantics.
-  api.v3alpha.core.RuntimeFractionalPercent runtime_fraction = 9;
+  core.v3alpha.RuntimeFractionalPercent runtime_fraction = 9;
 
   // Specifies a set of headers that the route should match on. The router will
   // check the request’s headers against all the specified headers in the route
@@ -530,7 +530,7 @@ message CorsPolicy {
     //
     // If :ref:`runtime_key <envoy_api_field_core.runtimefractionalpercent.runtime_key>` is
     // specified, Envoy will lookup the runtime key to get the percentage of requests to filter.
-    api.v3alpha.core.RuntimeFractionalPercent filter_enabled = 9;
+    core.v3alpha.RuntimeFractionalPercent filter_enabled = 9;
   }
 
   // Specifies the % of requests for which the CORS policies will be evaluated and tracked, but not
@@ -542,7 +542,7 @@ message CorsPolicy {
   // If :ref:`runtime_key <envoy_api_field_core.runtimefractionalpercent.runtime_key>` is specified,
   // Envoy will lookup the runtime key to get the percentage of requests for which it will evaluate
   // and track the request's *Origin* to determine if it's valid but will not enforce any policies.
-  api.v3alpha.core.RuntimeFractionalPercent shadow_enabled = 10;
+  core.v3alpha.RuntimeFractionalPercent shadow_enabled = 10;
 }
 
 // [#next-free-field: 31]
@@ -603,7 +603,7 @@ message RouteAction {
     // For some fraction N/D, a random number in the range [0,D) is selected. If the
     // number is <= the value of the numerator N, or if the key is not present, the default
     // value, the request will be mirrored.
-    api.v3alpha.core.RuntimeFractionalPercent runtime_fraction = 3;
+    core.v3alpha.RuntimeFractionalPercent runtime_fraction = 3;
   }
 
   // Specifies the route's hashing policy if the upstream cluster uses a hashing :ref:`load balancer
@@ -769,7 +769,7 @@ message RouteAction {
   // <envoy_api_field_config.route.v3alpha.RouteAction.weighted_clusters>`, metadata will be merged,
   // with values provided there taking precedence. The filter name should be specified as
   // *envoy.lb*.
-  api.v3alpha.core.Metadata metadata_match = 4;
+  core.v3alpha.Metadata metadata_match = 4;
 
   // Indicates that during forwarding, the matched prefix (or path) should be
   // swapped with this value. This option allows application URLs to be rooted
@@ -873,7 +873,7 @@ message RouteAction {
   repeated RequestMirrorPolicy request_mirror_policies = 30;
 
   // Optionally specifies the :ref:`routing priority <arch_overview_http_routing_priority>`.
-  api.v3alpha.core.RoutingPriority priority = 11 [(validate.rules).enum = {defined_only: true}];
+  core.v3alpha.RoutingPriority priority = 11 [(validate.rules).enum = {defined_only: true}];
 
   // Specifies a set of rate limit configurations that could be applied to the
   // route.
@@ -1149,7 +1149,7 @@ message DirectResponseAction {
   //   Headers can be specified using *response_headers_to_add* in the enclosing
   //   :ref:`envoy_api_msg_route.Route`, :ref:`envoy_api_msg_RouteConfiguration` or
   //   :ref:`envoy_api_msg_route.VirtualHost`.
-  api.v3alpha.core.DataSource body = 2;
+  core.v3alpha.DataSource body = 2;
 }
 
 message Decorator {
@@ -1254,7 +1254,7 @@ message VirtualCluster {
   //
   // .. attention::
   //   This field has been deprecated in favor of `headers`.
-  api.v3alpha.core.RequestMethod hidden_envoy_deprecated_method = 3 [deprecated = true];
+  core.v3alpha.RequestMethod hidden_envoy_deprecated_method = 3 [deprecated = true];
 }
 
 // Global rate limiting :ref:`architecture overview <arch_overview_global_rate_limit>`.
@@ -1285,8 +1285,8 @@ message RateLimit {
     //   ("destination_cluster", "<routed target cluster>")
     //
     // Once a request matches against a route table rule, a routed cluster is determined by one of
-    // the following :ref:`route table configuration <envoy_api_msg_api.v3alpha.RouteConfiguration>`
-    // settings:
+    // the following :ref:`route table configuration
+    // <envoy_api_msg_service.route.v3alpha.RouteConfiguration>` settings:
     //
     // * :ref:`cluster <envoy_api_field_config.route.v3alpha.RouteAction.cluster>` indicates the
     // upstream cluster

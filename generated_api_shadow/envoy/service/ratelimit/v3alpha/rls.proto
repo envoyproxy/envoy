@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package envoy.service.ratelimit.v3alpha;
 
-import "envoy/api/v3alpha/core/base.proto";
+import "envoy/config/core/v3alpha/base.proto";
 import "envoy/extensions/common/ratelimit/v3alpha/ratelimit.proto";
 
 import "udpa/annotations/versioning.proto";
@@ -116,8 +116,8 @@ message RateLimitResponse {
   repeated DescriptorStatus statuses = 2;
 
   // A list of headers to add to the response
-  repeated api.v3alpha.core.HeaderValue response_headers_to_add = 3;
+  repeated config.core.v3alpha.HeaderValue response_headers_to_add = 3;
 
   // A list of headers to add to the request when forwarded
-  repeated api.v3alpha.core.HeaderValue request_headers_to_add = 4;
+  repeated config.core.v3alpha.HeaderValue request_headers_to_add = 4;
 }

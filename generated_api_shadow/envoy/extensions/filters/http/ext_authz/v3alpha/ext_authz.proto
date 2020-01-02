@@ -2,9 +2,9 @@ syntax = "proto3";
 
 package envoy.extensions.filters.http.ext_authz.v3alpha;
 
-import "envoy/api/v3alpha/core/base.proto";
-import "envoy/api/v3alpha/core/grpc_service.proto";
-import "envoy/api/v3alpha/core/http_uri.proto";
+import "envoy/config/core/v3alpha/base.proto";
+import "envoy/config/core/v3alpha/grpc_service.proto";
+import "envoy/config/core/v3alpha/http_uri.proto";
 import "envoy/type/matcher/v3alpha/string.proto";
 import "envoy/type/v3alpha/http_status.proto";
 
@@ -28,7 +28,7 @@ message ExtAuthz {
   // External authorization service configuration.
   oneof services {
     // gRPC service configuration (default timeout: 200ms).
-    api.v3alpha.core.GrpcService grpc_service = 1;
+    config.core.v3alpha.GrpcService grpc_service = 1;
 
     // HTTP service configuration (default timeout: 200ms).
     HttpService http_service = 3;
@@ -95,7 +95,7 @@ message ExtAuthz {
   // Envoy will lookup the runtime key to get the percentage of requests to filter.
   //
   // If this field is not specified, the filter will be enabled for all requests.
-  api.v3alpha.core.RuntimeFractionalPercent filter_enabled = 9;
+  config.core.v3alpha.RuntimeFractionalPercent filter_enabled = 9;
 
   // Specifies if the peer certificate is sent to the external service.
   //
@@ -153,7 +153,7 @@ message HttpService {
   reserved 3, 4, 5, 6;
 
   // Sets the HTTP server URI which the authorization requests must be sent to.
-  api.v3alpha.core.HttpUri server_uri = 1;
+  config.core.v3alpha.HttpUri server_uri = 1;
 
   // Sets a prefix to the value of authorization request header *Path*.
   string path_prefix = 2;
@@ -182,7 +182,7 @@ message AuthorizationRequest {
 
   // Sets a list of headers that will be included to the request to authorization service. Note that
   // client request of the same key will be overridden.
-  repeated api.v3alpha.core.HeaderValue headers_to_add = 2;
+  repeated config.core.v3alpha.HeaderValue headers_to_add = 2;
 }
 
 message AuthorizationResponse {

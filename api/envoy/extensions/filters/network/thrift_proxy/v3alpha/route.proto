@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package envoy.extensions.filters.network.thrift_proxy.v3alpha;
 
-import "envoy/api/v3alpha/core/base.proto";
+import "envoy/config/core/v3alpha/base.proto";
 import "envoy/config/route/v3alpha/route.proto";
 
 import "google/protobuf/wrappers.proto";
@@ -112,7 +112,7 @@ message RouteAction {
   // <envoy_api_field_extensions.filters.network.thrift_proxy.v3alpha.WeightedCluster.ClusterWeight.metadata_match>`,
   // with values there taking precedence. Keys and values should be provided under the "envoy.lb"
   // metadata key.
-  api.v3alpha.core.Metadata metadata_match = 3;
+  config.core.v3alpha.Metadata metadata_match = 3;
 
   // Specifies a set of rate limit configurations that could be applied to the route.
   // N.B. Thrift service or method name matching can be achieved by specifying a RequestHeaders
@@ -149,7 +149,7 @@ message WeightedCluster {
     // <envoy_api_field_extensions.filters.network.thrift_proxy.v3alpha.RouteAction.metadata_match>`,
     // will be considered. Values here will take precedence. Keys and values should be provided
     // under the "envoy.lb" metadata key.
-    api.v3alpha.core.Metadata metadata_match = 3;
+    config.core.v3alpha.Metadata metadata_match = 3;
   }
 
   // Specifies one or more upstream clusters associated with the route.

@@ -2,8 +2,8 @@ syntax = "proto3";
 
 package envoy.extensions.filters.http.jwt_authn.v3alpha;
 
-import "envoy/api/v3alpha/core/base.proto";
-import "envoy/api/v3alpha/core/http_uri.proto";
+import "envoy/config/core/v3alpha/base.proto";
+import "envoy/config/core/v3alpha/http_uri.proto";
 import "envoy/config/route/v3alpha/route.proto";
 
 import "google/protobuf/duration.proto";
@@ -115,7 +115,7 @@ message JwtProvider {
     //    local_jwks:
     //      inline_string: ACADADADADA
     //
-    api.v3alpha.core.DataSource local_jwks = 4;
+    config.core.v3alpha.DataSource local_jwks = 4;
   }
 
   // If false, the JWT is removed in the request after a success verification. If true, the JWT is
@@ -204,7 +204,7 @@ message RemoteJwks {
   //      uri: https://www.googleapis.com/oauth2/v1/certs
   //      cluster: jwt.www.googleapis.com|443
   //
-  api.v3alpha.core.HttpUri http_uri = 1;
+  config.core.v3alpha.HttpUri http_uri = 1;
 
   // Duration after which the cached JWKS should be expired. If not specified, default cache
   // duration is 5 minutes.

@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package envoy.config.filter.accesslog.v3alpha;
 
-import "envoy/api/v3alpha/core/base.proto";
+import "envoy/config/core/v3alpha/base.proto";
 import "envoy/config/route/v3alpha/route.proto";
 import "envoy/type/v3alpha/percent.proto";
 
@@ -113,7 +113,7 @@ message ComparisonFilter {
   Op op = 1 [(validate.rules).enum = {defined_only: true}];
 
   // Value to compare against.
-  api.v3alpha.core.RuntimeUInt32 value = 2;
+  core.v3alpha.RuntimeUInt32 value = 2;
 }
 
 // Filters on HTTP response/status code.

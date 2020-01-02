@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package envoy.extensions.filters.network.redis_proxy.v3alpha;
 
-import "envoy/api/v3alpha/core/base.proto";
+import "envoy/config/core/v3alpha/base.proto";
 
 import "google/protobuf/duration.proto";
 import "google/protobuf/wrappers.proto";
@@ -139,7 +139,7 @@ message RedisProxy {
         //
         // If specified, Envoy will lookup the runtime key to get the percentage of requests to the
         // mirror.
-        api.v3alpha.core.RuntimeFractionalPercent runtime_fraction = 2;
+        config.core.v3alpha.RuntimeFractionalPercent runtime_fraction = 2;
 
         // Set this to TRUE to only mirror write commands, this is effectively replicating the
         // writes in a "fire and forget" manner.
@@ -226,11 +226,11 @@ message RedisProxy {
   // password is set, then a "NOAUTH Authentication required." error response will be sent to the
   // client. If an AUTH command is received when the password is not set, then an "ERR Client sent
   // AUTH, but no password is set" error will be returned.
-  api.v3alpha.core.DataSource downstream_auth_password = 6;
+  config.core.v3alpha.DataSource downstream_auth_password = 6;
 }
 
 // RedisProtocolOptions specifies Redis upstream protocol options. This object is used in
-// :ref:`extension_protocol_options<envoy_api_field_api.v3alpha.Cluster.extension_protocol_options>`,
+// :ref:`extension_protocol_options<envoy_api_field_service.cluster.v3alpha.Cluster.extension_protocol_options>`,
 // keyed by the name `envoy.redis_proxy`.
 message RedisProtocolOptions {
   option (udpa.annotations.versioning).previous_message_type =
@@ -238,5 +238,5 @@ message RedisProtocolOptions {
 
   // Upstream server password as defined by the `requirepass` directive
   // <https://redis.io/topics/config>`_ in the server's configuration file.
-  api.v3alpha.core.DataSource auth_password = 1;
+  config.core.v3alpha.DataSource auth_password = 1;
 }

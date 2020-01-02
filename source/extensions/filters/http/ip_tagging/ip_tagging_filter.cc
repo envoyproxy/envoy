@@ -1,6 +1,6 @@
 #include "extensions/filters/http/ip_tagging/ip_tagging_filter.h"
 
-#include "envoy/api/v3alpha/core/address.pb.h"
+#include "envoy/config/core/v3alpha/address.pb.h"
 #include "envoy/extensions/filters/http/ip_tagging/v3alpha/ip_tagging.pb.h"
 
 #include "common/http/header_map_impl.h"
@@ -36,7 +36,7 @@ IpTaggingFilterConfig::IpTaggingFilterConfig(
   for (const auto& ip_tag : config.ip_tags()) {
     std::vector<Network::Address::CidrRange> cidr_set;
     cidr_set.reserve(ip_tag.ip_list().size());
-    for (const envoy::api::v3alpha::core::CidrRange& entry : ip_tag.ip_list()) {
+    for (const envoy::config::core::v3alpha::CidrRange& entry : ip_tag.ip_list()) {
 
       // Currently, CidrRange::create doesn't guarantee that the CidrRanges are valid.
       Network::Address::CidrRange cidr_entry = Network::Address::CidrRange::create(entry);

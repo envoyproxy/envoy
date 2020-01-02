@@ -2,8 +2,8 @@ syntax = "proto3";
 
 package envoy.extensions.transport_sockets.tls.v3alpha;
 
-import "envoy/api/v3alpha/core/base.proto";
-import "envoy/api/v3alpha/core/config_source.proto";
+import "envoy/config/core/v3alpha/base.proto";
+import "envoy/config/core/v3alpha/config_source.proto";
 import "envoy/type/matcher/v3alpha/string.proto";
 
 import "google/protobuf/any.proto";
@@ -130,10 +130,10 @@ message TlsCertificate {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.auth.TlsCertificate";
 
   // The TLS certificate chain.
-  api.v3alpha.core.DataSource certificate_chain = 1;
+  config.core.v3alpha.DataSource certificate_chain = 1;
 
   // The TLS private key.
-  api.v3alpha.core.DataSource private_key = 2;
+  config.core.v3alpha.DataSource private_key = 2;
 
   // BoringSSL private key method provider. This is an alternative to :ref:`private_key
   // <envoy_api_field_extensions.transport_sockets.tls.v3alpha.TlsCertificate.private_key>` field.
@@ -147,13 +147,13 @@ message TlsCertificate {
 
   // The password to decrypt the TLS private key. If this field is not set, it is assumed that the
   // TLS private key is not password encrypted.
-  api.v3alpha.core.DataSource password = 3;
+  config.core.v3alpha.DataSource password = 3;
 
   // [#not-implemented-hide:]
-  api.v3alpha.core.DataSource ocsp_staple = 4;
+  config.core.v3alpha.DataSource ocsp_staple = 4;
 
   // [#not-implemented-hide:]
-  repeated api.v3alpha.core.DataSource signed_certificate_timestamp = 5;
+  repeated config.core.v3alpha.DataSource signed_certificate_timestamp = 5;
 }
 
 message TlsSessionTicketKeys {
@@ -184,7 +184,7 @@ message TlsSessionTicketKeys {
   //   * Keep the session ticket keys at least as secure as your TLS certificate private keys
   //   * Rotate session ticket keys at least daily, and preferably hourly
   //   * Always generate keys using a cryptographically-secure random data source
-  repeated api.v3alpha.core.DataSource keys = 1 [(validate.rules).repeated = {min_items: 1}];
+  repeated config.core.v3alpha.DataSource keys = 1 [(validate.rules).repeated = {min_items: 1}];
 }
 
 // [#next-free-field: 10]
@@ -211,7 +211,7 @@ message CertificateValidationContext {
   //
   // See :ref:`the TLS overview <arch_overview_ssl_enabling_verification>` for a list of common
   // system CA locations.
-  api.v3alpha.core.DataSource trusted_ca = 1;
+  config.core.v3alpha.DataSource trusted_ca = 1;
 
   // An optional list of base64-encoded SHA-256 hashes. If specified, Envoy will verify that the
   // SHA-256 of the DER-encoded Subject Public Key Information (SPKI) of the presented certificate
@@ -308,7 +308,7 @@ message CertificateValidationContext {
   // (in PEM format). If specified, Envoy will verify that the presented peer
   // certificate has not been revoked by this CRL. If this DataSource contains
   // multiple CRLs, all of them will be used.
-  api.v3alpha.core.DataSource crl = 7;
+  config.core.v3alpha.DataSource crl = 7;
 
   // If specified, Envoy will not reject expired certificates.
   bool allow_expired_certificate = 8;
@@ -443,7 +443,7 @@ message SdsSecretConfig {
   // resources.
   string name = 1;
 
-  api.v3alpha.core.ConfigSource sds_config = 2;
+  config.core.v3alpha.ConfigSource sds_config = 2;
 }
 
 message Secret {

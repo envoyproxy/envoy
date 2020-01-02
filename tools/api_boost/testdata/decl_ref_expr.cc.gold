@@ -1,4 +1,4 @@
-#include "envoy/api/v3alpha/cds.pb.h"
+#include "envoy/service/cluster/v3alpha/cds.pb.h"
 #include "envoy/config/overload/v2alpha/overload.pb.h"
 #include "envoy/config/overload/v3alpha/overload.pb.h"
 
@@ -28,7 +28,7 @@ public:
     BAR(envoy::config::overload::v3alpha::Trigger) baz;
     envoy::config::overload::v3alpha::ThresholdTrigger::default_instance();
     ASSERT(envoy::config::overload::v3alpha::Trigger::kThreshold == Trigger::kThreshold);
-    envoy::api::v3alpha::Cluster_LbPolicy_Name(0);
-    static_cast<void>(envoy::api::v3alpha::Cluster::ORIGINAL_DST_LB);
+    envoy::service::cluster::v3alpha::Cluster_LbPolicy_Name(0);
+    static_cast<void>(envoy::service::cluster::v3alpha::Cluster::ORIGINAL_DST_LB);
   }
 };

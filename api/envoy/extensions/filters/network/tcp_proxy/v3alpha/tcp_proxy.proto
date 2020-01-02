@@ -2,8 +2,8 @@ syntax = "proto3";
 
 package envoy.extensions.filters.network.tcp_proxy.v3alpha;
 
-import "envoy/api/v3alpha/core/address.proto";
-import "envoy/api/v3alpha/core/base.proto";
+import "envoy/config/core/v3alpha/address.proto";
+import "envoy/config/core/v3alpha/base.proto";
 import "envoy/config/filter/accesslog/v3alpha/accesslog.proto";
 import "envoy/type/v3alpha/hash_policy.proto";
 
@@ -52,7 +52,7 @@ message TcpProxy {
       // :ref:`TcpProxy.metadata_match
       // <envoy_api_field_extensions.filters.network.tcp_proxy.v3alpha.TcpProxy.metadata_match>`,
       // with values here taking precedence. The filter name should be specified as *envoy.lb*.
-      api.v3alpha.core.Metadata metadata_match = 3;
+      config.core.v3alpha.Metadata metadata_match = 3;
     }
 
     // Specifies one or more upstream clusters associated with the route.
@@ -82,7 +82,7 @@ message TcpProxy {
   // Optional endpoint metadata match criteria. Only endpoints in the upstream
   // cluster with metadata matching that set in metadata_match will be
   // considered. The filter name should be specified as *envoy.lb*.
-  api.v3alpha.core.Metadata metadata_match = 9;
+  config.core.v3alpha.Metadata metadata_match = 9;
 
   // The idle timeout for connections managed by the TCP proxy filter. The idle timeout
   // is defined as the period in which there are no bytes sent or received on either

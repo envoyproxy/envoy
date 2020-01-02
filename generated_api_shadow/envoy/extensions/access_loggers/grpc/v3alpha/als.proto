@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package envoy.extensions.access_loggers.grpc.v3alpha;
 
-import "envoy/api/v3alpha/core/grpc_service.proto";
+import "envoy/config/core/v3alpha/grpc_service.proto";
 
 import "google/protobuf/duration.proto";
 import "google/protobuf/wrappers.proto";
@@ -63,7 +63,7 @@ message CommonGrpcAccessLogConfig {
   string log_name = 1 [(validate.rules).string = {min_bytes: 1}];
 
   // The gRPC service for the access log service.
-  api.v3alpha.core.GrpcService grpc_service = 2 [(validate.rules).message = {required: true}];
+  config.core.v3alpha.GrpcService grpc_service = 2 [(validate.rules).message = {required: true}];
 
   // Interval for flushing access logs to the gRPC stream. Logger will flush requests every time
   // this interval is elapsed, or when batch size limit is hit, whichever comes first. Defaults to

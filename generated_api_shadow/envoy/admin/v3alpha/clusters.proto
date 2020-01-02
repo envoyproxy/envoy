@@ -3,8 +3,8 @@ syntax = "proto3";
 package envoy.admin.v3alpha;
 
 import "envoy/admin/v3alpha/metrics.proto";
-import "envoy/api/v3alpha/core/address.proto";
-import "envoy/api/v3alpha/core/health_check.proto";
+import "envoy/config/core/v3alpha/address.proto";
+import "envoy/config/core/v3alpha/health_check.proto";
 import "envoy/type/v3alpha/percent.proto";
 
 import "udpa/annotations/versioning.proto";
@@ -81,7 +81,7 @@ message HostStatus {
   option (udpa.annotations.versioning).previous_message_type = "envoy.admin.v2alpha.HostStatus";
 
   // Address of this host.
-  api.v3alpha.core.Address address = 1;
+  config.core.v3alpha.Address address = 1;
 
   // List of stats specific to this host.
   repeated SimpleMetric stats = 2;
@@ -153,5 +153,5 @@ message HostHealthStatus {
   // Health status as reported by EDS. Note: only HEALTHY and UNHEALTHY are currently supported
   // here.
   // [#comment:TODO(mrice32): pipe through remaining EDS health status possibilities.]
-  api.v3alpha.core.HealthStatus eds_health_status = 3;
+  config.core.v3alpha.HealthStatus eds_health_status = 3;
 }

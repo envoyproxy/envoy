@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package envoy.extensions.filters.http.ip_tagging.v3alpha;
 
-import "envoy/api/v3alpha/core/address.proto";
+import "envoy/config/core/v3alpha/address.proto";
 
 import "udpa/annotations/versioning.proto";
 
@@ -47,7 +47,7 @@ message IPTagging {
 
     // A list of IP address subnets that will be tagged with
     // ip_tag_name. Both IPv4 and IPv6 are supported.
-    repeated api.v3alpha.core.CidrRange ip_list = 2;
+    repeated config.core.v3alpha.CidrRange ip_list = 2;
   }
 
   // The type of request the filter should apply to.

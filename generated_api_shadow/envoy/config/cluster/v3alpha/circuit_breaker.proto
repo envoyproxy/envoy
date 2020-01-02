@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package envoy.config.cluster.v3alpha;
 
-import "envoy/api/v3alpha/core/base.proto";
+import "envoy/config/core/v3alpha/base.proto";
 
 import "google/protobuf/wrappers.proto";
 
@@ -23,15 +23,15 @@ message CircuitBreakers {
       "envoy.api.v2.cluster.CircuitBreakers";
 
   // A Thresholds defines CircuitBreaker settings for a
-  // :ref:`RoutingPriority<envoy_api_enum_api.v3alpha.core.RoutingPriority>`.
+  // :ref:`RoutingPriority<envoy_api_enum_config.core.v3alpha.RoutingPriority>`.
   // [#next-free-field: 8]
   message Thresholds {
     option (udpa.annotations.versioning).previous_message_type =
         "envoy.api.v2.cluster.CircuitBreakers.Thresholds";
 
-    // The :ref:`RoutingPriority<envoy_api_enum_api.v3alpha.core.RoutingPriority>`
+    // The :ref:`RoutingPriority<envoy_api_enum_config.core.v3alpha.RoutingPriority>`
     // the specified CircuitBreaker settings apply to.
-    api.v3alpha.core.RoutingPriority priority = 1 [(validate.rules).enum = {defined_only: true}];
+    core.v3alpha.RoutingPriority priority = 1 [(validate.rules).enum = {defined_only: true}];
 
     // The maximum number of connections that Envoy will make to the upstream
     // cluster. If not specified, the default is 1024.
@@ -64,9 +64,9 @@ message CircuitBreakers {
 
   // If multiple :ref:`Thresholds<envoy_api_msg_config.cluster.v3alpha.CircuitBreakers.Thresholds>`
   // are defined with the same
-  // :ref:`RoutingPriority<envoy_api_enum_api.v3alpha.core.RoutingPriority>`, the first one in the
-  // list is used. If no Thresholds is defined for a given
-  // :ref:`RoutingPriority<envoy_api_enum_api.v3alpha.core.RoutingPriority>`, the default values
+  // :ref:`RoutingPriority<envoy_api_enum_config.core.v3alpha.RoutingPriority>`, the first one in
+  // the list is used. If no Thresholds is defined for a given
+  // :ref:`RoutingPriority<envoy_api_enum_config.core.v3alpha.RoutingPriority>`, the default values
   // are used.
   repeated Thresholds thresholds = 1;
 }

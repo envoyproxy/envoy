@@ -2,10 +2,10 @@ syntax = "proto3";
 
 package envoy.extensions.filters.network.http_connection_manager.v3alpha;
 
-import "envoy/api/v3alpha/core/config_source.proto";
-import "envoy/api/v3alpha/core/protocol.proto";
-import "envoy/api/v3alpha/rds.proto";
+import "envoy/config/core/v3alpha/config_source.proto";
+import "envoy/config/core/v3alpha/protocol.proto";
 import "envoy/config/filter/accesslog/v3alpha/accesslog.proto";
+import "envoy/service/route/v3alpha/rds.proto";
 import "envoy/service/route/v3alpha/srds.proto";
 import "envoy/type/tracing/v2/custom_tag.proto";
 import "envoy/type/v3alpha/percent.proto";
@@ -239,7 +239,7 @@ message HttpConnectionManager {
     Rds rds = 3;
 
     // The route table for the connection manager is static and is specified in this property.
-    api.v3alpha.RouteConfiguration route_config = 4;
+    service.route.v3alpha.RouteConfiguration route_config = 4;
 
     // A route table will be dynamically assigned to each request based on request attributes
     // (e.g., the value of a header). The "routing scopes" (i.e., route tables) and "scope keys" are
@@ -264,13 +264,13 @@ message HttpConnectionManager {
 
   // Additional settings for HTTP requests handled by the connection manager. These will be
   // applicable to both HTTP1 and HTTP2 requests.
-  api.v3alpha.core.HttpProtocolOptions common_http_protocol_options = 35;
+  config.core.v3alpha.HttpProtocolOptions common_http_protocol_options = 35;
 
   // Additional HTTP/1 settings that are passed to the HTTP/1 codec.
-  api.v3alpha.core.Http1ProtocolOptions http_protocol_options = 8;
+  config.core.v3alpha.Http1ProtocolOptions http_protocol_options = 8;
 
   // Additional HTTP/2 settings that are passed directly to the HTTP/2 codec.
-  api.v3alpha.core.Http2ProtocolOptions http2_protocol_options = 9;
+  config.core.v3alpha.Http2ProtocolOptions http2_protocol_options = 9;
 
   // An optional override that the connection manager will write to the server
   // header in responses. If not set, the default is *envoy*.
@@ -481,7 +481,7 @@ message Rds {
       "envoy.config.filter.network.http_connection_manager.v2.Rds";
 
   // Configuration source specifier for RDS.
-  api.v3alpha.core.ConfigSource config_source = 1 [(validate.rules).message = {required: true}];
+  config.core.v3alpha.ConfigSource config_source = 1 [(validate.rules).message = {required: true}];
 
   // The name of the route configuration. This name will be passed to the RDS
   // API. This allows an Envoy configuration with multiple HTTP listeners (and
@@ -514,8 +514,8 @@ message ScopedRoutes {
   //
   // Upon receiving a request's headers, the Router will build a key using the algorithm specified
   // by this message. This key will be used to look up the routing table (i.e., the
-  // :ref:`RouteConfiguration<envoy_api_msg_api.v3alpha.RouteConfiguration>`) to use for the
-  // request.
+  // :ref:`RouteConfiguration<envoy_api_msg_service.route.v3alpha.RouteConfiguration>`) to use for
+  // the request.
   message ScopeKeyBuilder {
     option (udpa.annotations.versioning).previous_message_type =
         "envoy.config.filter.network.http_connection_manager.v2.ScopedRoutes.ScopeKeyBuilder";
@@ -606,7 +606,8 @@ message ScopedRoutes {
   // Configuration source specifier for RDS.
   // This config source is used to subscribe to RouteConfiguration resources specified in
   // ScopedRouteConfiguration messages.
-  api.v3alpha.core.ConfigSource rds_config_source = 3 [(validate.rules).message = {required: true}];
+  config.core.v3alpha.ConfigSource rds_config_source = 3
+      [(validate.rules).message = {required: true}];
 
   oneof config_specifier {
     option (validate.required) = true;
@@ -632,7 +633,7 @@ message ScopedRds {
       "envoy.config.filter.network.http_connection_manager.v2.ScopedRds";
 
   // Configuration source specifier for scoped RDS.
-  api.v3alpha.core.ConfigSource scoped_rds_config_source = 1
+  config.core.v3alpha.ConfigSource scoped_rds_config_source = 1
       [(validate.rules).message = {required: true}];
 }
 

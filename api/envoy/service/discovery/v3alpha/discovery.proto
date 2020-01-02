@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package envoy.service.discovery.v3alpha;
 
-import "envoy/api/v3alpha/core/base.proto";
+import "envoy/config/core/v3alpha/base.proto";
 
 import "google/protobuf/any.proto";
 import "google/rpc/status.proto";
@@ -31,7 +31,7 @@ message DiscoveryRequest {
   string version_info = 1;
 
   // The node making the request.
-  api.v3alpha.core.Node node = 2;
+  config.core.v3alpha.Node node = 2;
 
   // List of resources to subscribe to, e.g. list of cluster names or a route
   // configuration name. If this is empty, all resources for the API are
@@ -104,7 +104,7 @@ message DiscoveryResponse {
 
   // [#not-implemented-hide:]
   // The control plane instance that sent the response.
-  api.v3alpha.core.ControlPlane control_plane = 6;
+  config.core.v3alpha.ControlPlane control_plane = 6;
 }
 
 // DeltaDiscoveryRequest and DeltaDiscoveryResponse are used in a new gRPC
@@ -144,7 +144,7 @@ message DeltaDiscoveryRequest {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.DeltaDiscoveryRequest";
 
   // The node making the request.
-  api.v3alpha.core.Node node = 1;
+  config.core.v3alpha.Node node = 1;
 
   // Type of the resource that is being requested, e.g.
   // "type.googleapis.com/envoy.api.v2.ClusterLoadAssignment".

@@ -11,16 +11,13 @@ import "google/protobuf/duration.proto";
 import "google/protobuf/struct.proto";
 import "google/protobuf/wrappers.proto";
 
+import "udpa/annotations/migrate.proto";
 import "validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.api.v2.core";
 option java_outer_classname = "HealthCheckProto";
 option java_multiple_files = true;
-
-// [#protodoc-title: Health check]
-// * Health checking :ref:`architecture overview <arch_overview_health_checking>`.
-// * If health checking is configured for a cluster, additional statistics are emitted. They are
-//   documented :ref:`here <config_cluster_manager_cluster_stats>`.
+option (udpa.annotations.file_migrate).move_to_package = "envoy.config.core.v3alpha";
 
 // Endpoint health status.
 enum HealthStatus {

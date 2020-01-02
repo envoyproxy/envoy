@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package envoy.extensions.transport_sockets.tap.v3alpha;
 
-import "envoy/api/v3alpha/core/base.proto";
+import "envoy/config/core/v3alpha/base.proto";
 import "envoy/extensions/common/tap/v3alpha/common.proto";
 
 import "udpa/annotations/versioning.proto";
@@ -24,6 +24,6 @@ message Tap {
       [(validate.rules).message = {required: true}];
 
   // The underlying transport socket being wrapped.
-  api.v3alpha.core.TransportSocket transport_socket = 2
+  config.core.v3alpha.TransportSocket transport_socket = 2
       [(validate.rules).message = {required: true}];
 }
