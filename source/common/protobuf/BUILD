@@ -66,6 +66,8 @@ envoy_cc_library(
         "//source/common/common:hash_lib",
         "//source/common/common:macros",
         "//source/common/common:utility_lib",
+        "//source/common/config:api_type_oracle_lib",
+        "//source/common/config:version_converter_lib",
         "@com_github_cncf_udpa//udpa/annotations:pkg_cc_proto",
         "@com_github_cncf_udpa//udpa/type/v1:pkg_cc_proto",
         "@envoy_api//envoy/api/v2/core:pkg_cc_proto",

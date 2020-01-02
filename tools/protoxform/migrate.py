@@ -20,8 +20,9 @@ class UpgradeVisitor(visitor.Visitor):
   See visitor.Visitor for visitor method docs comments.
   """
 
-  def __init__(self, typedb):
+  def __init__(self, typedb, envoy_internal_shadow):
     self._typedb = typedb
+    self._envoy_internal_shadow = envoy_internal_shadow
 
   def _UpgradedComment(self, c):
 
@@ -67,11 +68,14 @@ class UpgradeVisitor(visitor.Visitor):
       proto: DescriptorProto or EnumDescriptorProto message.
       field_or_value: field or value inside proto.
     """
-    reserved = proto.reserved_range.add()
-    reserved.start = field_or_value.number
-    reserved.end = field_or_value.number + 1
-    proto.reserved_name.append(field_or_value.name)
-    options.AddHideOption(field_or_value.options)
+    if self._envoy_internal_shadow:
+      field_or_value.name = 'hidden_envoy_deprecated_' + field_or_value.name
+    else:
+      reserved = proto.reserved_range.add()
+      reserved.start = field_or_value.number
+      reserved.end = field_or_value.number + 1
+      proto.reserved_name.append(field_or_value.name)
+      options.AddHideOption(field_or_value.options)
 
   def _Rename(self, proto, migrate_annotation):
     """Rename a field/enum/service/message
@@ -83,6 +87,26 @@ class UpgradeVisitor(visitor.Visitor):
     if migrate_annotation.rename:
       proto.name = migrate_annotation.rename
       migrate_annotation.rename = ""
+
+  def _OneofPromotion(self, msg_proto, field_proto, migrate_annotation):
+    """Promote a field to a oneof.
+
+    Args:
+      msg_proto: DescriptorProto for message containing field.
+      field_proto: FieldDescriptorProto for field.
+      migrate_annotation: udpa.annotations.FieldMigrateAnnotation message
+    """
+    if migrate_annotation.oneof_promotion:
+      oneof_index = -1
+      for n, oneof_decl in enumerate(msg_proto.oneof_decl):
+        if oneof_decl.name == migrate_annotation.oneof_promotion:
+          oneof_index = n
+      if oneof_index == -1:
+        oneof_index = len(msg_proto.oneof_decl)
+        oneof_decl = msg_proto.oneof_decl.add()
+        oneof_decl.name = migrate_annotation.oneof_promotion
+      field_proto.oneof_index = oneof_index
+      migrate_annotation.oneof_promotion = ""
 
   def VisitService(self, service_proto, type_context):
     upgraded_proto = copy.deepcopy(service_proto)
@@ -98,20 +122,29 @@ class UpgradeVisitor(visitor.Visitor):
 
   def VisitMessage(self, msg_proto, type_context, nested_msgs, nested_enums):
     upgraded_proto = copy.deepcopy(msg_proto)
-    if upgraded_proto.options.deprecated:
+    if upgraded_proto.options.deprecated and not self._envoy_internal_shadow:
       options.AddHideOption(upgraded_proto.options)
     options.SetVersioningAnnotation(upgraded_proto.options, type_context.name)
     # Mark deprecated fields as ready for deletion by protoxform.
     for f in upgraded_proto.field:
       if f.options.deprecated:
         self._Deprecate(upgraded_proto, f)
-        # Make sure the type name is erased so it isn't picked up by protoxform
-        # when computing deps.
-        f.type_name = ""
+        if self._envoy_internal_shadow:
+          # When shadowing, we use the upgraded version of types (which should
+          # themselves also be shadowed), to allow us to avoid unnecessary
+          # references to the previous version (and complexities around
+          # upgrading during API boosting).
+          f.type_name = self._UpgradedType(f.type_name)
+        else:
+          # Make sure the type name is erased so it isn't picked up by protoxform
+          # when computing deps.
+          f.type_name = ""
       else:
         f.type_name = self._UpgradedType(f.type_name)
       if f.options.HasExtension(migrate_pb2.field_migrate):
-        self._Rename(f, f.options.Extensions[migrate_pb2.field_migrate])
+        field_migrate = f.options.Extensions[migrate_pb2.field_migrate]
+        self._Rename(f, field_migrate)
+        self._OneofPromotion(upgraded_proto, f, field_migrate)
     # Upgrade nested messages.
     del upgraded_proto.nested_type[:]
     upgraded_proto.nested_type.extend(nested_msgs)
@@ -126,11 +159,13 @@ class UpgradeVisitor(visitor.Visitor):
       if v.options.deprecated:
         # We need special handling for the zero field, as proto3 needs some value
         # here.
-        if v.number == 0:
+        if v.number == 0 and not self._envoy_internal_shadow:
           v.name = 'DEPRECATED_AND_UNAVAILABLE_DO_NOT_USE'
         else:
           # Mark deprecated enum values as ready for deletion by protoxform.
           self._Deprecate(upgraded_proto, v)
+      elif v.options.HasExtension(migrate_pb2.enum_value_migrate):
+        self._Rename(v, v.options.Extensions[migrate_pb2.enum_value_migrate])
     return upgraded_proto
 
   def VisitFile(self, file_proto, type_context, services, msgs, enums):
@@ -141,8 +176,9 @@ class UpgradeVisitor(visitor.Visitor):
         if dependency not in ("udpa/annotations/migrate.proto")
     ]
     # Upgrade package.
-    upgraded_proto.package = self._typedb.next_version_packages[upgraded_proto.package]
-    upgraded_proto.name = self._typedb.next_version_proto_paths[upgraded_proto.name]
+    upgraded_proto.package = self._typedb.next_version_protos[upgraded_proto.name].qualified_package
+    upgraded_proto.name = self._typedb.next_version_protos[upgraded_proto.name].proto_path
+    upgraded_proto.options.ClearExtension(migrate_pb2.file_migrate)
     # Upgrade comments.
     for location in upgraded_proto.source_code_info.location:
       location.leading_comments = self._UpgradedComment(location.leading_comments)
@@ -162,10 +198,11 @@ class UpgradeVisitor(visitor.Visitor):
     return upgraded_proto
 
 
-def V3MigrationXform(file_proto):
+def V3MigrationXform(envoy_internal_shadow, file_proto):
   """Transform a FileDescriptorProto from v2[alpha\d] to v3alpha.
 
   Args:
+    envoy_internal_shadow: generate a shadow for Envoy internal use containing deprecated fields.
     file_proto: v2[alpha\d] FileDescriptorProto message.
 
   Returns:
@@ -174,8 +211,8 @@ def V3MigrationXform(file_proto):
   # Load type database.
   typedb = utils.GetTypeDb()
   # If this isn't a proto in an upgraded package, return None.
-  if file_proto.package not in typedb.next_version_packages or not typedb.next_version_packages[
-      file_proto.package]:
+  if file_proto.name not in typedb.next_version_protos or not typedb.next_version_protos[
+      file_proto.name]:
     return None
   # Otherwise, this .proto needs upgrading, do it.
-  return traverse.TraverseFile(file_proto, UpgradeVisitor(typedb))
+  return traverse.TraverseFile(file_proto, UpgradeVisitor(typedb, envoy_internal_shadow))

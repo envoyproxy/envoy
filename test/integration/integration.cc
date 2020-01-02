@@ -21,6 +21,7 @@
 #include "common/common/assert.h"
 #include "common/common/fmt.h"
 #include "common/common/stack_array.h"
+#include "common/config/api_version.h"
 #include "common/event/dispatcher_impl.h"
 #include "common/event/libevent.h"
 #include "common/network/connection_impl.h"
@@ -335,7 +336,7 @@ void BaseIntegrationTest::createEnvoy() {
   if (use_lds_) {
     // After the config has been finalized, write the final listener config to the lds file.
     const std::string lds_path = config_helper_.bootstrap().dynamic_resources().lds_config().path();
-    envoy::api::v2::DiscoveryResponse lds;
+    API_NO_BOOST(envoy::api::v2::DiscoveryResponse) lds;
     lds.set_version_info("0");
     for (auto& listener : config_helper_.bootstrap().static_resources().listeners()) {
       ProtobufWkt::Any* resource = lds.add_resources();
@@ -582,7 +583,7 @@ AssertionResult BaseIntegrationTest::compareSotwDiscoveryRequest(
     const std::string& expected_type_url, const std::string& expected_version,
     const std::vector<std::string>& expected_resource_names, bool expect_node,
     const Protobuf::int32 expected_error_code, const std::string& expected_error_substring) {
-  envoy::api::v2::DiscoveryRequest discovery_request;
+  API_NO_BOOST(envoy::api::v2::DiscoveryRequest) discovery_request;
   VERIFY_ASSERTION(xds_stream_->waitForGrpcMessage(*dispatcher_, discovery_request));
 
   if (expect_node) {
@@ -640,7 +641,7 @@ AssertionResult BaseIntegrationTest::compareDeltaDiscoveryRequest(
     const std::vector<std::string>& expected_resource_subscriptions,
     const std::vector<std::string>& expected_resource_unsubscriptions, FakeStreamPtr& xds_stream,
     const Protobuf::int32 expected_error_code, const std::string& expected_error_substring) {
-  envoy::api::v2::DeltaDiscoveryRequest request;
+  API_NO_BOOST(envoy::api::v2::DeltaDiscoveryRequest) request;
   VERIFY_ASSERTION(xds_stream->waitForGrpcMessage(*dispatcher_, request));
 
   // Verify all we care about node.

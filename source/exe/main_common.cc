@@ -29,8 +29,7 @@ Server::DrainManagerPtr ProdComponentFactory::createDrainManager(Server::Instanc
   // The global drain manager only triggers on listener modification, which effectively is
   // hot restart at the global level. The per-listener drain managers decide whether to
   // to include /healthcheck/fail status.
-  return std::make_unique<Server::DrainManagerImpl>(server,
-                                                    envoy::api::v2::Listener_DrainType_MODIFY_ONLY);
+  return std::make_unique<Server::DrainManagerImpl>(server, envoy::api::v2::Listener::MODIFY_ONLY);
 }
 
 Runtime::LoaderPtr ProdComponentFactory::createRuntime(Server::Instance& server,

@@ -160,6 +160,7 @@ private:
   std::string resourceName(const ProtobufWkt::Any& resource) override {
     return MessageUtil::anyConvert<envoy::api::v2::ScopedRouteConfiguration>(resource).name();
   }
+  std::string loadTypeUrl();
   // Propagate RDS updates to ScopeConfigImpl in workers.
   void onRdsConfigUpdate(const std::string& scope_name,
                          RdsRouteConfigSubscription& rds_subscription);
@@ -183,6 +184,7 @@ private:
   ProtobufMessage::ValidationVisitor& validation_visitor_;
   const std::string stat_prefix_;
   RouteConfigProviderManager& route_config_provider_manager_;
+  envoy::api::v2::core::ConfigSource::XdsApiVersion xds_api_version_;
 };
 
 using ScopedRdsConfigSubscriptionSharedPtr = std::shared_ptr<ScopedRdsConfigSubscription>;
