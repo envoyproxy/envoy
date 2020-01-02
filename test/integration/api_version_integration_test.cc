@@ -114,6 +114,7 @@ public:
         break;
       }
       break;
+    }
     case envoy::api::v2::core::ApiVersion::V3ALPHA: {
       switch (apiType()) {
       case envoy::api::v2::core::ApiConfigSource::GRPC: {
@@ -147,7 +148,6 @@ public:
     }
     default:
       NOT_REACHED_GCOVR_EXCL_LINE;
-    }
     }
     switch (resourceApiVersion()) {
     case envoy::api::v2::core::ApiVersion::AUTO:
