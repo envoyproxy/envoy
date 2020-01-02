@@ -7,6 +7,10 @@ load(
     "envoy_package",
     "envoy_proto_library",
 )
+load(
+    "//source/extensions:all_extensions.bzl",
+    "envoy_all_extensions",
+)
 
 envoy_package()
 
@@ -26,7 +30,6 @@ envoy_cc_fuzz_test(
         ":filter_fuzz_proto_cc_proto",
         "//source/common/config:utility_lib",
         "//source/common/protobuf:utility_lib",
-        "//source/extensions/filters/http/buffer:config",
         "//test/config:utility_lib",
         "//test/fuzz:utility_lib",
         "//test/mocks/buffer:buffer_mocks",
@@ -36,5 +39,5 @@ envoy_cc_fuzz_test(
         "@envoy_api//envoy/config/bootstrap/v2:pkg_cc_proto",
         "@envoy_api//envoy/config/filter/http/buffer/v2:pkg_cc_proto",
         "@envoy_api//envoy/config/filter/network/http_connection_manager/v2:pkg_cc_proto",
-    ],
+    ] + envoy_all_extensions(),
 )

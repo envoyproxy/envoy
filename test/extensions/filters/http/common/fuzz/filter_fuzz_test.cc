@@ -2,7 +2,6 @@
 #include <memory>
 
 #include "envoy/config/bootstrap/v2/bootstrap.pb.h"
-#include "envoy/config/filter/http/buffer/v2/buffer.pb.h"
 #include "envoy/config/filter/network/http_connection_manager/v2/http_connection_manager.pb.h"
 
 #include "common/config/utility.h"
@@ -62,10 +61,11 @@ public:
   }
 
   // This creates and mutates the filter config and runs decode.
-  void fuzz(const std::string filter_name, const test::fuzz::HttpData& data) {
+  void fuzz(absl::string_view filter_name, const test::fuzz::HttpData& data) {
+    // TODO: clean this up and just use the factories method and take the proto config.
     auto& factory =
         Config::Utility::getAndCheckFactory<Server::Configuration::NamedHttpFilterConfigFactory>(
-            filter_name);
+            std::string(filter_name));
     auto proto_config = factory.createEmptyConfigProto();
 
     protobuf_mutator::Mutator mutator;
@@ -92,12 +92,15 @@ public:
 };
 
 DEFINE_PROTO_FUZZER(const test::extensions::filters::http::FilterFuzzTestCase& input) {
-  // TODO: Randomize the well known http filter name with the input int.
-  const std::string buffer_name = "envoy.buffer";
+  // Choose the HTTP filter with the fuzzed input int.
+  // TODO: clean this up and just use the factories() method to grab the Factory at random.
+  const std::vector<absl::string_view> filter_names =
+      Registry::FactoryRegistry<Server::Configuration::NamedHttpFilterConfigFactory>::registeredNames();
+  absl::string_view filter_name = filter_names[input.filter_index() % filter_names.size()];
 
   // Fuzz filter.
   static UberFilterFuzzer fuzzer;
-  fuzzer.fuzz(buffer_name, input.data());
+  fuzzer.fuzz(filter_name, input.data());
 }
 
 } // namespace HttpFilters
