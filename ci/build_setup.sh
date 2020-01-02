@@ -8,7 +8,9 @@ export PPROF_PATH=/thirdparty_build/bin/pprof
 
 [ -z "${NUM_CPUS}" ] && NUM_CPUS=`grep -c ^processor /proc/cpuinfo`
 [ -z "${ENVOY_SRCDIR}" ] && export ENVOY_SRCDIR=/source
+[ -z "${ENVOY_BUILD_TARGET}" ] && export ENVOY_BUILD_TARGET=//source/exe:envoy-static
 echo "ENVOY_SRCDIR=${ENVOY_SRCDIR}"
+echo "ENVOY_BUILD_TARGET=${ENVOY_BUILD_TARGET}"
 
 function setup_gcc_toolchain() {
   if [[ ! -z "${ENVOY_STDLIB}" && "${ENVOY_STDLIB}" != "libstdc++" ]]; then
@@ -80,7 +82,7 @@ cleanup
 trap cleanup EXIT
 
 export LLVM_ROOT=/opt/llvm
-bazel/setup_clang.sh "${LLVM_ROOT}"
+"$(dirname "$0")"/../bazel/setup_clang.sh "${LLVM_ROOT}"
 
 [[ "${BUILD_REASON}" != "PullRequest" ]] && BAZEL_EXTRA_TEST_OPTIONS+=" --nocache_test_results --test_output=all"
 
@@ -129,7 +131,7 @@ mkdir -p "${ENVOY_BUILD_PROFILE}"
 mkdir -p "${ENVOY_FILTER_EXAMPLE_SRCDIR}"/bazel
 ln -sf "${ENVOY_SRCDIR}"/bazel/get_workspace_status "${ENVOY_FILTER_EXAMPLE_SRCDIR}"/bazel/
 cp -f "${ENVOY_SRCDIR}"/.bazelrc "${ENVOY_FILTER_EXAMPLE_SRCDIR}"/
-cp -f "${ENVOY_SRCDIR}"/*.bazelrc "${ENVOY_FILTER_EXAMPLE_SRCDIR}"/
+cp -f "$(bazel info workspace)"/*.bazelrc "${ENVOY_FILTER_EXAMPLE_SRCDIR}"/
 
 export BUILDIFIER_BIN="/usr/local/bin/buildifier"
 export BUILDOZER_BIN="/usr/local/bin/buildozer"
