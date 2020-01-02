@@ -168,7 +168,7 @@ ActiveQuicListenerFactory::createActiveUdpListener(Network::ConnectionHandler& p
   if (concurrency_ > 1) {
 #ifdef __APPLE__
     // TODO(#8794) Figure out how SO_REUSEPORT behave in Mac OS.
-    ENVOY_LOG(error, "Because SO_REUSEPORT doesn't guarantee stable hashing from netowrk 5 tuple "
+    ENVOY_LOG(error, "Because SO_REUSEPORT doesn't guarantee stable hashing from network 5 tuple "
                      "to socket in Mac OS. QUIC connection is not stable with concurrency > 1");
 #else
     ENVOY_LOG(warn, "BPF filter is not supported on this platform. QUIC won't support connection "
