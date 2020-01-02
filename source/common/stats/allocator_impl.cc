@@ -79,7 +79,22 @@ public:
   void incRefCount() override { ++ref_count_; }
   bool decRefCount() override {
     ASSERT(ref_count_ >= 1);
-    return --ref_count_ == 0;
+    return--ref_count_ == 0;
+
+    /*
+    // There's a possible race here, where we detect that the ref-count goes to
+    // zero, causing us to destruct the Stat. In the Stat's destructor, we then
+    // take a lock and remove the map entry. However, after is_zero is
+    // calculated, and before the lock, another thread may attempt to allocate
+    // the same stat, bumping the ref_count_ from 0 to 1. We can ensure this
+    // did not occur by double-checking
+
+    bool is_zero = --ref_count_ == 0;
+    if (is_zero) {
+      Thread::LockGuard lock(alloc_.mutex_);
+      is_zero = --ref_count_ == 0;
+    }
+    */
   }
   uint32_t use_count() const override { return ref_count_; }
 

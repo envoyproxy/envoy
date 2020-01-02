@@ -18,6 +18,7 @@ envoy_cc_test(
         "//source/common/stats:allocator_lib",
         "//source/common/stats:symbol_table_creator_lib",
         "//test/test_common:logging_lib",
+        "//test/test_common:thread_factory_for_test_lib",
     ],
 )
 

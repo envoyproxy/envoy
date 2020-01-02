@@ -35,6 +35,8 @@ public:
 #endif
 
 private:
+  template <class BaseClass> friend class StatsSharedImpl;
+
   struct HeapStatHash {
     using is_transparent = void; // NOLINT(readability-identifier-naming)
     size_t operator()(const Metric* a) const { return a->statName().hash(); }
