@@ -252,7 +252,8 @@ TEST_P(ApiVersionIntegrationTest, Eds) {
       "/envoy.api.v2.EndpointDiscoveryService/DeltaEndpoints", "/v2/discovery:endpoints",
       "/envoy.api.v3alpha.EndpointDiscoveryService/StreamEndpoints",
       "/envoy.api.v3alpha.EndpointDiscoveryService/DeltaEndpoints", "/v3alpha/discovery:endpoints",
-      "type.googleapis.com/envoy.api.v2.ClusterLoadAssignment", "type.googleapis.com/envoy.api.v3alpha.ClusterLoadAssignment"));
+      "type.googleapis.com/envoy.api.v2.ClusterLoadAssignment",
+      "type.googleapis.com/envoy.api.v3alpha.ClusterLoadAssignment"));
 }
 
 TEST_P(ApiVersionIntegrationTest, Rtds) {
@@ -292,29 +293,14 @@ TEST_P(ApiVersionIntegrationTest, Rds) {
       "/envoy.api.v2.RouteDiscoveryService/StreamRoutes",
       "/envoy.api.v2.RouteDiscoveryService/DeltaRoutes", "/v2/discovery:routes",
       "/envoy.api.v3alpha.RouteDiscoveryService/StreamRoutes",
-      "/envoy.api.v3alpha.RouteDiscoveryService/DeltaRoutes",
-      "/v3alpha/discovery:routes",
+      "/envoy.api.v3alpha.RouteDiscoveryService/DeltaRoutes", "/v3alpha/discovery:routes",
       "type.googleapis.com/envoy.api.v2.RouteConfiguration",
       "type.googleapis.com/envoy.api.v3alpha.RouteConfiguration"));
 }
 
-TEST_P(ApiVersionIntegrationTest, Vhds) {
-  config_helper_.addConfigModifier(
-      [this](envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager&
-                 http_connection_manager) {
-        auto* route_config = http_connection_manager.mutable_route_config();
-        setupConfigSource(*route_config->mutable_vhds()->mutable_config_source());
-      });
-  initialize();
-  ASSERT_TRUE(validateDiscoveryRequest(
-      "/envoy.api.v2.RouteDiscoveryService/StreamRoutes",
-      "/envoy.api.v2.RouteDiscoveryService/DeltaRoutes", "/v2/discovery:routes",
-      "/envoy.api.v3alpha.RouteDiscoveryService/StreamRoutes",
-      "/envoy.api.v3alpha.RouteDiscoveryService/DeltaRoutes",
-      "/v3alpha/discovery:routes",
-      "type.googleapis.com/envoy.api.v2.RouteConfiguration",
-      "type.googleapis.com/envoy.api.v3alpha.RouteConfiguration"));
-}
+// TODO(htuch): add VHDS tests once VHDS lands.
+// TEST_P(ApiVersionIntegrationTest, Vhds) {
+// }
 
 TEST_P(ApiVersionIntegrationTest, Srds) {
   config_helper_.addConfigModifier(
@@ -367,8 +353,7 @@ TEST_P(ApiVersionIntegrationTest, Sds) {
       "/envoy.service.discovery.v2.SecretDiscoveryService/DeltaSecrets", "/v2/discovery:secrets",
       "/envoy.service.discovery.v3alpha.SecretDiscoveryService/StreamSecrets",
       "/envoy.service.discovery.v3alpha.SecretDiscoveryService/DeltaSecrets",
-      "/v3alpha/discovery:secrets",
-      "type.googleapis.com/envoy.api.v2.auth.Secret",
+      "/v3alpha/discovery:secrets", "type.googleapis.com/envoy.api.v2.auth.Secret",
       "type.googleapis.com/envoy.api.v3alpha.auth.Secret"));
 }
 
