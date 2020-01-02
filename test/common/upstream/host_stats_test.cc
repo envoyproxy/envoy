@@ -1,5 +1,7 @@
 #include "envoy/upstream/host_description.h"
 
+#include "common/upstream/upstream_impl.h"
+
 #include "gtest/gtest.h"
 
 namespace Envoy {
@@ -8,7 +10,7 @@ namespace {
 
 // Verify that counters are sorted by name.
 TEST(HostStatsTest, CountersSortedByName) {
-  HostStats host_stats;
+  HostStats host_stats(HostDescriptionImpl::generateStats(false));
   std::vector<std::pair<absl::string_view, Stats::PrimitiveCounterReference>> counters =
       host_stats.counters();
   EXPECT_FALSE(counters.empty());
@@ -20,7 +22,7 @@ TEST(HostStatsTest, CountersSortedByName) {
 
 // Verify that gauges are sorted by name.
 TEST(HostStatsTest, GaugesSortedByName) {
-  HostStats host_stats;
+  HostStats host_stats(HostDescriptionImpl::generateStats(false));
   std::vector<std::pair<absl::string_view, Stats::PrimitiveGaugeReference>> gauges =
       host_stats.gauges();
   EXPECT_FALSE(gauges.empty());

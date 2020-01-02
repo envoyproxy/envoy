@@ -116,6 +116,8 @@ envoy_cc_test(
     srcs = ["host_stats_test.cc"],
     deps = [
         "//include/envoy/upstream:host_description_interface",
+        "//source/common/upstream:upstream_includes",
+        "//source/common/upstream:upstream_lib",
     ],
 )
 
