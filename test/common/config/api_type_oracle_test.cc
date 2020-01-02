@@ -15,7 +15,8 @@ namespace {
 TEST(ApiTypeOracleTest, All) {
   // For proto descriptors only
   static_cast<void>(envoy::config::filter::http::ip_tagging::v2::IPTagging::RequestType());
-  static_cast<void>(envoy::extensions::filters::http::ip_tagging::v3alpha::IPTagging::RequestType());
+  static_cast<void>(
+      envoy::extensions::filters::http::ip_tagging::v3alpha::IPTagging::RequestType());
 
   EXPECT_EQ(nullptr, ApiTypeOracle::inferEarlierVersionDescriptor("foo", {}, ""));
   EXPECT_EQ(nullptr, ApiTypeOracle::inferEarlierVersionDescriptor("envoy.ip_tagging", {}, ""));
