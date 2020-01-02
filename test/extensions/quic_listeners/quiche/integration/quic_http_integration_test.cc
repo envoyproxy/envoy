@@ -268,6 +268,9 @@ TEST_P(QuicHttpIntegrationTest, MultipleQuicListenersWithBPF) {
 }
 
 TEST_P(QuicHttpIntegrationTest, MultipleQuicListenersNoBPF) {
+#ifdef __APPLE_
+  return;
+#endif
   concurrency_ = 8;
   set_reuse_port_ = true;
   initialize();
@@ -323,7 +326,7 @@ TEST_P(QuicHttpIntegrationTest, MultipleQuicListenersNoBPF) {
 }
 
 TEST_P(QuicHttpIntegrationTest, ConnectionMigration) {
-#ifdef SO_ATTACH_REUSEPORT_CBPF
+#if defined(SO_ATTACH_REUSEPORT_CBPF) && defined(__linux__)
   concurrency_ = 2;
   set_reuse_port_ = true;
   initialize();

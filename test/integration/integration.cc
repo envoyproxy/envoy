@@ -462,7 +462,6 @@ void BaseIntegrationTest::createGeneratedApiTestServer(const std::string& bootst
       time_system_.sleep(std::chrono::milliseconds(10));
     }
 
-    ASSERT(test_server_->counter("listener_manager.listener_create_success")->value() == concurrency_);
     registerTestServerPorts(port_names);
   }
 }
