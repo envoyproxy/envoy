@@ -28,6 +28,7 @@ envoy_cc_library(
         ":tap_matcher",
         "//source/common/common:assert_lib",
         "//source/common/common:stack_array",
+        "@envoy_api//envoy/data/tap/v2alpha:pkg_cc_proto",
         "@envoy_api//envoy/service/tap/v2alpha:pkg_cc_proto",
     ],
 )
@@ -52,6 +53,8 @@ envoy_cc_library(
         "//include/envoy/singleton:manager_interface",
         "//source/common/buffer:buffer_lib",
         "@envoy_api//envoy/admin/v2alpha:pkg_cc_proto",
+        "@envoy_api//envoy/data/tap/v2alpha:pkg_cc_proto",
+        "@envoy_api//envoy/service/tap/v2alpha:pkg_cc_proto",
     ],
 )
 
@@ -63,5 +66,6 @@ envoy_cc_library(
         "//include/envoy/thread_local:thread_local_interface",
         "//source/extensions/common/tap:admin",
         "@envoy_api//envoy/config/common/tap/v2alpha:pkg_cc_proto",
+        "@envoy_api//envoy/service/tap/v2alpha:pkg_cc_proto",
     ],
 )

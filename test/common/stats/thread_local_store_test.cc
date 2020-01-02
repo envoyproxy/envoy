@@ -911,8 +911,8 @@ TEST_F(StatsThreadLocalStoreTestNoFixture, MemoryWithoutTlsFakeSymbolTable) {
   TestUtil::MemoryTest memory_test;
   TestUtil::forEachSampleStat(
       1000, [this](absl::string_view name) { store_->counter(std::string(name)); });
-  EXPECT_MEMORY_EQ(memory_test.consumedBytes(), 15268336); // June 30, 2019
-  EXPECT_MEMORY_LE(memory_test.consumedBytes(), 16 * million_);
+  EXPECT_MEMORY_EQ(memory_test.consumedBytes(), 14892880); // Oct 28, 2019
+  EXPECT_MEMORY_LE(memory_test.consumedBytes(), 15 * million_);
 }
 
 TEST_F(StatsThreadLocalStoreTestNoFixture, MemoryWithTlsFakeSymbolTable) {
@@ -921,7 +921,7 @@ TEST_F(StatsThreadLocalStoreTestNoFixture, MemoryWithTlsFakeSymbolTable) {
   TestUtil::MemoryTest memory_test;
   TestUtil::forEachSampleStat(
       1000, [this](absl::string_view name) { store_->counter(std::string(name)); });
-  EXPECT_MEMORY_EQ(memory_test.consumedBytes(), 17496848); // June 30, 2019
+  EXPECT_MEMORY_EQ(memory_test.consumedBytes(), 17121392); // Oct 28, 2019
   EXPECT_MEMORY_LE(memory_test.consumedBytes(), 18 * million_);
 }
 
@@ -931,8 +931,8 @@ TEST_F(StatsThreadLocalStoreTestNoFixture, MemoryWithoutTlsRealSymbolTable) {
   TestUtil::MemoryTest memory_test;
   TestUtil::forEachSampleStat(
       1000, [this](absl::string_view name) { store_->counter(std::string(name)); });
-  EXPECT_MEMORY_EQ(memory_test.consumedBytes(), 9139120); // Aug 9, 2019
-  EXPECT_MEMORY_LE(memory_test.consumedBytes(), 10 * million_);
+  EXPECT_MEMORY_EQ(memory_test.consumedBytes(), 8017968); // Oct 28, 2019
+  EXPECT_MEMORY_LE(memory_test.consumedBytes(), 9 * million_);
 }
 
 TEST_F(StatsThreadLocalStoreTestNoFixture, MemoryWithTlsRealSymbolTable) {
@@ -941,8 +941,8 @@ TEST_F(StatsThreadLocalStoreTestNoFixture, MemoryWithTlsRealSymbolTable) {
   TestUtil::MemoryTest memory_test;
   TestUtil::forEachSampleStat(
       1000, [this](absl::string_view name) { store_->counter(std::string(name)); });
-  EXPECT_MEMORY_EQ(memory_test.consumedBytes(), 11367632); // Aug 9, 2019
-  EXPECT_MEMORY_LE(memory_test.consumedBytes(), 12 * million_);
+  EXPECT_MEMORY_EQ(memory_test.consumedBytes(), 10246480); // Oct 28, 2019
+  EXPECT_MEMORY_LE(memory_test.consumedBytes(), 11 * million_);
 }
 
 TEST_F(StatsThreadLocalStoreTest, ShuttingDown) {

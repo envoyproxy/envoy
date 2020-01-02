@@ -5,10 +5,14 @@
 #include <string>
 #include <vector>
 
+#include "envoy/api/v2/core/base.pb.h"
+#include "envoy/config/filter/network/http_connection_manager/v2/http_connection_manager.pb.h"
 #include "envoy/config/filter/network/http_connection_manager/v2/http_connection_manager.pb.validate.h"
 #include "envoy/filesystem/filesystem.h"
 #include "envoy/server/admin.h"
 #include "envoy/tracing/http_tracer.h"
+#include "envoy/type/percent.pb.h"
+#include "envoy/type/tracing/v2/custom_tag.pb.h"
 
 #include "common/access_log/access_log_impl.h"
 #include "common/common/fmt.h"

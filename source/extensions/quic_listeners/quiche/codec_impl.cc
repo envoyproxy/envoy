@@ -13,7 +13,7 @@ EnvoyQuicStream* quicStreamToEnvoyStream(quic::QuicStream* stream) {
   return dynamic_cast<EnvoyQuicStream*>(stream);
 }
 
-bool QuicHttpConnectionImplBase::wantsToWrite() { return quic_session_.HasDataToWrite(); }
+bool QuicHttpConnectionImplBase::wantsToWrite() { return quic_session_.bytesToSend() > 0; }
 
 void QuicHttpConnectionImplBase::runWatermarkCallbacksForEachStream(
     quic::QuicSmallMap<quic::QuicStreamId, std::unique_ptr<quic::QuicStream>, 10>& stream_map,

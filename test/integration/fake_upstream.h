@@ -6,6 +6,7 @@
 #include <string>
 
 #include "envoy/api/api.h"
+#include "envoy/api/v2/core/base.pb.h"
 #include "envoy/event/timer.h"
 #include "envoy/grpc/status.h"
 #include "envoy/http/codec.h"

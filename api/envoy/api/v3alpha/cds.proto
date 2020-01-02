@@ -2,11 +2,6 @@ syntax = "proto3";
 
 package envoy.api.v3alpha;
 
-option java_package = "io.envoyproxy.envoy.api.v3alpha";
-option java_outer_classname = "CdsProto";
-option java_multiple_files = true;
-option java_generic_services = true;
-
 import "envoy/api/v3alpha/cluster/circuit_breaker.proto";
 import "envoy/api/v3alpha/cluster/filter.proto";
 import "envoy/api/v3alpha/cluster/outlier_detection.proto";
@@ -28,6 +23,11 @@ import "google/protobuf/wrappers.proto";
 import "udpa/annotations/versioning.proto";
 
 import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.api.v3alpha";
+option java_outer_classname = "CdsProto";
+option java_multiple_files = true;
+option java_generic_services = true;
 
 // [#protodoc-title: Clusters]
 
@@ -522,12 +522,12 @@ message Cluster {
   //    match:
   //      acceptMTLS: true
   //    transport_socket:
-  //      name: tls
+  //      name: envoy.transport_sockets.tls
   //      config: { ... } # tls socket configuration
   //  - name: "defaultToPlaintext"
   //    match: {}
   //    transport_socket:
-  //      name: "rawbuffer"
+  //      name: envoy.transport_sockets.raw_buffer
   //
   // Connections to the endpoints whose metadata value under *envoy.transport_socket*
   // having "acceptMTLS"/"true" key/value pair use the "enableMTLS" socket configuration.
@@ -552,7 +552,7 @@ message Cluster {
   // *TransportSocketMatch* in this field. Other client Envoys receive CDS without
   // *transport_socket_match* set, and still send plain text traffic to the same cluster.
   //
-  // TODO(incfly): add a detailed architecture doc on intended usage.
+  // [#comment:TODO(incfly): add a detailed architecture doc on intended usage.]
   repeated TransportSocketMatch transport_socket_matches = 43;
 
   // Supplies the name of the cluster which must be unique across all clusters.
@@ -791,13 +791,10 @@ message Cluster {
   //   time exclusively closing these connections, and not processing any other traffic.
   bool close_connections_on_host_health_failure = 31;
 
-  // If this cluster uses EDS or STRICT_DNS to configure its hosts, immediately drain
-  // connections from any hosts that are removed from service discovery.
-  //
-  // This only affects behavior for hosts that are being actively health checked.
-  // If this flag is not set to true, Envoy will wait until the hosts fail active health
-  // checking before removing it from the cluster.
-  bool drain_connections_on_host_removal = 32;
+  // If set to true, Envoy will ignore the health value of a host when processing its removal
+  // from service discovery. This means that if active health checking is used, Envoy will *not*
+  // wait for the endpoint to go unhealthy before removing it.
+  bool ignore_health_on_host_removal = 32;
 
   // An (optional) network filter chain, listed in the order the filters should be applied.
   // The chain will be applied to all outgoing connections that Envoy makes to the upstream

@@ -16,5 +16,6 @@ envoy_cc_mock(
         "//include/envoy/stream_info:stream_info_interface",
         "//include/envoy/upstream:upstream_interface",
         "//test/mocks/upstream:host_mocks",
+        "@envoy_api//envoy/api/v2/core:pkg_cc_proto",
     ],
 )

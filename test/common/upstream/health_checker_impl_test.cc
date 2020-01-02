@@ -3,7 +3,11 @@
 #include <string>
 #include <vector>
 
+#include "envoy/api/v2/core/base.pb.h"
+#include "envoy/api/v2/core/health_check.pb.h"
 #include "envoy/api/v2/core/health_check.pb.validate.h"
+#include "envoy/api/v2/endpoint/endpoint.pb.h"
+#include "envoy/data/core/v2alpha/health_check_event.pb.h"
 
 #include "common/buffer/buffer_impl.h"
 #include "common/buffer/zero_copy_input_stream_impl.h"
@@ -4142,6 +4146,8 @@ TEST(HealthCheckProto, Validation) {
     const std::string yaml = R"EOF(
     timeout: 1s
     interval: 1s
+    healthy_threshold: 1
+    unhealthy_threshold: 1
     no_traffic_interval: 0s
     http_health_check:
       service_name: locations
@@ -4154,6 +4160,8 @@ TEST(HealthCheckProto, Validation) {
     const std::string yaml = R"EOF(
     timeout: 1s
     interval: 1s
+    healthy_threshold: 1
+    unhealthy_threshold: 1
     unhealthy_interval: 0s
     http_health_check:
       service_name: locations
@@ -4166,6 +4174,8 @@ TEST(HealthCheckProto, Validation) {
     const std::string yaml = R"EOF(
     timeout: 1s
     interval: 1s
+    healthy_threshold: 1
+    unhealthy_threshold: 1
     unhealthy_edge_interval: 0s
     http_health_check:
       service_name: locations
@@ -4178,6 +4188,8 @@ TEST(HealthCheckProto, Validation) {
     const std::string yaml = R"EOF(
     timeout: 1s
     interval: 1s
+    healthy_threshold: 1
+    unhealthy_threshold: 1
     healthy_edge_interval: 0s
     http_health_check:
       service_name: locations
@@ -4185,6 +4197,30 @@ TEST(HealthCheckProto, Validation) {
     )EOF";
     EXPECT_THROW_WITH_REGEX(TestUtility::validate(parseHealthCheckFromV2Yaml(yaml)), EnvoyException,
                             "Proto constraint validation failed.*value must be greater than.*");
+  }
+  {
+    const std::string yaml = R"EOF(
+    timeout: 1s
+    interval: 1s
+    unhealthy_threshold: 1
+    http_health_check:
+      service_name: locations
+      path: /healthcheck
+    )EOF";
+    EXPECT_THROW_WITH_REGEX(TestUtility::validate(parseHealthCheckFromV2Yaml(yaml)), EnvoyException,
+                            "Proto constraint validation failed.*value is required.*");
+  }
+  {
+    const std::string yaml = R"EOF(
+    timeout: 1s
+    interval: 1s
+    healthy_threshold: 1
+    http_health_check:
+      service_name: locations
+      path: /healthcheck
+    )EOF";
+    EXPECT_THROW_WITH_REGEX(TestUtility::validate(parseHealthCheckFromV2Yaml(yaml)), EnvoyException,
+                            "Proto constraint validation failed.*value is required.*");
   }
 }
 

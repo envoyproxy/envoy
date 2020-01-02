@@ -3,6 +3,9 @@
 #include <algorithm>
 #include <string>
 
+#include "envoy/config/bootstrap/v2/bootstrap.pb.h"
+#include "envoy/config/filter/network/http_connection_manager/v2/http_connection_manager.pb.h"
+
 #include "common/buffer/buffer_impl.h"
 #include "common/http/header_map_impl.h"
 
@@ -837,9 +840,11 @@ TEST_P(Http2IntegrationTest, GoAway) {
   EXPECT_EQ("200", response->headers().Status()->value().getStringView());
 }
 
-TEST_P(Http2IntegrationTest, Trailers) { testTrailers(1024, 2048); }
+TEST_P(Http2IntegrationTest, Trailers) { testTrailers(1024, 2048, false, false); }
 
-TEST_P(Http2IntegrationTest, TrailersGiantBody) { testTrailers(1024 * 1024, 1024 * 1024); }
+TEST_P(Http2IntegrationTest, TrailersGiantBody) {
+  testTrailers(1024 * 1024, 1024 * 1024, false, false);
+}
 
 TEST_P(Http2IntegrationTest, GrpcRequestTimeout) {
   config_helper_.addConfigModifier(
@@ -965,12 +970,12 @@ TEST_P(Http2IntegrationTest, RequestMirrorWithBody) {
   config_helper_.addConfigModifier(
       [&](envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager& hcm)
           -> void {
-        hcm.mutable_route_config()
-            ->mutable_virtual_hosts(0)
-            ->mutable_routes(0)
-            ->mutable_route()
-            ->mutable_request_mirror_policy()
-            ->set_cluster("cluster_0");
+        auto* mirror_policy = hcm.mutable_route_config()
+                                  ->mutable_virtual_hosts(0)
+                                  ->mutable_routes(0)
+                                  ->mutable_route()
+                                  ->add_request_mirror_policies();
+        mirror_policy->set_cluster("cluster_0");
       });
 
   initialize();
@@ -1196,7 +1201,7 @@ Http2RingHashIntegrationTest::Http2RingHashIntegrationTest() {
   config_helper_.addConfigModifier([&](envoy::config::bootstrap::v2::Bootstrap& bootstrap) -> void {
     auto* cluster = bootstrap.mutable_static_resources()->mutable_clusters(0);
     cluster->clear_hosts();
-    cluster->set_lb_policy(envoy::api::v2::Cluster_LbPolicy_RING_HASH);
+    cluster->set_lb_policy(envoy::api::v2::Cluster::RING_HASH);
     for (int i = 0; i < num_upstreams_; i++) {
       auto* socket = cluster->add_hosts()->mutable_socket_address();
       socket->set_address(Network::Test::getLoopbackAddressString(version_));

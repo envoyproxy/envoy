@@ -1,7 +1,5 @@
 #pragma once
 
-#include "envoy/config/filter/http/rbac/v2/rbac.pb.h"
-#include "envoy/config/filter/network/rbac/v2/rbac.pb.h"
 #include "envoy/stats/stats_macros.h"
 
 #include "common/singleton/const_singleton.h"

@@ -15,5 +15,6 @@ envoy_cc_mock(
     deps = [
         "//include/envoy/local_info:local_info_interface",
         "//source/common/network:address_lib",
+        "@envoy_api//envoy/api/v2/core:pkg_cc_proto",
     ],
 )

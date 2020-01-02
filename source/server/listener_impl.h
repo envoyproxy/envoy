@@ -2,7 +2,8 @@
 
 #include <memory>
 
-#include "envoy/api/v2/listener/listener.pb.h"
+#include "envoy/api/v2/core/base.pb.h"
+#include "envoy/api/v2/lds.pb.h"
 #include "envoy/network/filter.h"
 #include "envoy/server/drain_manager.h"
 #include "envoy/server/filter_config.h"
@@ -95,7 +96,7 @@ public:
   ListenerImpl(const envoy::api::v2::Listener& config, const std::string& version_info,
                ListenerManagerImpl& parent, const std::string& name, bool added_via_api,
                bool workers_started, uint64_t hash,
-               ProtobufMessage::ValidationVisitor& validation_visitor);
+               ProtobufMessage::ValidationVisitor& validation_visitor, uint32_t concurrency);
   ~ListenerImpl() override;
 
   /**

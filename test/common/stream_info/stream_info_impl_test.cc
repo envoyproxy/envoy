@@ -163,7 +163,8 @@ TEST_F(StreamInfoImplTest, MiscSettersAndGetters) {
     EXPECT_EQ(&route_entry, stream_info.routeEntry());
 
     stream_info.filterState().setData("test", std::make_unique<TestIntAccessor>(1),
-                                      FilterState::StateType::ReadOnly);
+                                      FilterState::StateType::ReadOnly,
+                                      FilterState::LifeSpan::FilterChain);
     EXPECT_EQ(1, stream_info.filterState().getDataReadOnly<TestIntAccessor>("test").access());
 
     EXPECT_EQ("", stream_info.requestedServerName());

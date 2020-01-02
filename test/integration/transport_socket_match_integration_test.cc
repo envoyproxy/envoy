@@ -1,3 +1,8 @@
+#include "envoy/api/v2/auth/cert.pb.h"
+#include "envoy/api/v2/route/route.pb.h"
+#include "envoy/config/bootstrap/v2/bootstrap.pb.h"
+#include "envoy/config/filter/network/http_connection_manager/v2/http_connection_manager.pb.h"
+
 #include "extensions/transport_sockets/tls/context_config_impl.h"
 #include "extensions/transport_sockets/tls/context_impl.h"
 #include "extensions/transport_sockets/tls/ssl_socket.h"
@@ -33,7 +38,7 @@ name: "tls_socket"
 match:
   mtlsReady: "true"
 transport_socket:
-  name: "tls"
+  name: envoy.transport_sockets.tls
   typed_config:
     "@type": type.googleapis.com/envoy.api.v2.auth.UpstreamTlsContext
     common_tls_context:
@@ -144,11 +149,11 @@ require_client_certificate: true
       if (isTLSUpstream(i)) {
         fake_upstreams_.emplace_back(new AutonomousUpstream(
             createUpstreamSslContext(), endpoint->ip()->port(), FakeHttpConnection::Type::HTTP1,
-            endpoint->ip()->version(), timeSystem()));
+            endpoint->ip()->version(), timeSystem(), false));
       } else {
         fake_upstreams_.emplace_back(new AutonomousUpstream(
             Network::Test::createRawBufferSocketFactory(), endpoint->ip()->port(),
-            FakeHttpConnection::Type::HTTP1, endpoint->ip()->version(), timeSystem()));
+            FakeHttpConnection::Type::HTTP1, endpoint->ip()->version(), timeSystem(), false));
       }
     }
   }

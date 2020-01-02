@@ -1,5 +1,7 @@
 #include "extensions/quic_listeners/quiche/envoy_quic_client_connection.h"
 
+#include "envoy/api/v2/core/base.pb.h"
+
 #include "common/network/listen_socket_impl.h"
 #include "common/network/socket_option_factory.h"
 

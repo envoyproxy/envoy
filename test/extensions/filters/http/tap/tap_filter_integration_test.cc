@@ -1,5 +1,6 @@
 #include <fstream>
 
+#include "envoy/api/v2/core/base.pb.h"
 #include "envoy/data/tap/v2alpha/wrapper.pb.h"
 
 #include "test/integration/http_integration.h"

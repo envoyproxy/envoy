@@ -1,5 +1,10 @@
 #include <memory>
 
+#include "envoy/api/v2/core/grpc_service.pb.h"
+#include "envoy/config/accesslog/v2/als.pb.h"
+#include "envoy/data/accesslog/v2/accesslog.pb.h"
+#include "envoy/service/accesslog/v2/als.pb.h"
+
 #include "common/buffer/zero_copy_input_stream_impl.h"
 #include "common/network/address_impl.h"
 

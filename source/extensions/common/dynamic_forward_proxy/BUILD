@@ -26,6 +26,7 @@ envoy_cc_library(
     deps = [
         ":dns_cache_impl",
         "//source/common/protobuf",
+        "@envoy_api//envoy/config/common/dynamic_forward_proxy/v2alpha:pkg_cc_proto",
     ],
 )
 
@@ -40,5 +41,6 @@ envoy_cc_library(
         "//source/common/common:cleanup_lib",
         "//source/common/network:utility_lib",
         "//source/common/upstream:upstream_lib",
+        "@envoy_api//envoy/config/common/dynamic_forward_proxy/v2alpha:pkg_cc_proto",
     ],
 )

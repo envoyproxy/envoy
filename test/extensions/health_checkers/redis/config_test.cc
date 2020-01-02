@@ -1,3 +1,5 @@
+#include "envoy/config/filter/network/redis_proxy/v2/redis_proxy.pb.validate.h"
+
 #include "common/upstream/health_checker_impl.h"
 
 #include "extensions/health_checkers/redis/config.h"

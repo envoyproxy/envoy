@@ -2,6 +2,7 @@
 
 #include <memory>
 
+#include "envoy/config/filter/http/squash/v2/squash.pb.h"
 #include "envoy/http/codes.h"
 
 #include "common/common/empty_string.h"

@@ -1,3 +1,9 @@
+#include "envoy/api/v2/core/address.pb.h"
+#include "envoy/api/v2/core/base.pb.h"
+#include "envoy/api/v2/route/route.pb.h"
+#include "envoy/config/rbac/v2/rbac.pb.h"
+#include "envoy/type/matcher/metadata.pb.h"
+
 #include "common/network/utility.h"
 
 #include "extensions/filters/common/rbac/matchers.h"

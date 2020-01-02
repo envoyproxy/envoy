@@ -1,4 +1,5 @@
-#include "envoy/api/v2/eds.pb.h"
+#include "envoy/api/v2/cds.pb.h"
+#include "envoy/config/bootstrap/v2/bootstrap.pb.h"
 
 #include "common/network/address_impl.h"
 #include "common/upstream/load_balancer_impl.h"

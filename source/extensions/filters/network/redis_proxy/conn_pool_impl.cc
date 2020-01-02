@@ -5,6 +5,12 @@
 #include <string>
 #include <vector>
 
+#include "envoy/api/v2/core/base.pb.h"
+#include "envoy/api/v2/core/health_check.pb.h"
+#include "envoy/api/v2/endpoint/endpoint.pb.h"
+#include "envoy/config/filter/network/redis_proxy/v2/redis_proxy.pb.h"
+#include "envoy/config/filter/network/redis_proxy/v2/redis_proxy.pb.validate.h"
+
 #include "common/common/assert.h"
 #include "common/stats/utility.h"
 
@@ -35,12 +41,12 @@ InstanceImpl::InstanceImpl(
     const envoy::config::filter::network::redis_proxy::v2::RedisProxy::ConnPoolSettings& config,
     Api::Api& api, Stats::ScopePtr&& stats_scope,
     const Common::Redis::RedisCommandStatsSharedPtr& redis_command_stats,
-    Extensions::Common::Redis::RedirectionManagerSharedPtr redirection_manager)
+    Extensions::Common::Redis::ClusterRefreshManagerSharedPtr refresh_manager)
     : cluster_name_(cluster_name), cm_(cm), client_factory_(client_factory),
       tls_(tls.allocateSlot()), config_(config), api_(api), stats_scope_(std::move(stats_scope)),
       redis_command_stats_(redis_command_stats), redis_cluster_stats_{REDIS_CLUSTER_STATS(
                                                      POOL_COUNTER(*stats_scope_))},
-      redirection_manager_(std::move(redirection_manager)) {
+      refresh_manager_(std::move(refresh_manager)) {
   tls_->set([this, cluster_name](
                 Event::Dispatcher& dispatcher) -> ThreadLocal::ThreadLocalObjectSharedPtr {
     return std::make_shared<ThreadLocalPool>(*this, dispatcher, cluster_name);
@@ -373,6 +379,7 @@ void InstanceImpl::PendingRequest::onResponse(Common::Redis::RespValuePtr&& resp
 void InstanceImpl::PendingRequest::onFailure() {
   request_handler_ = nullptr;
   pool_callbacks_.onFailure();
+  parent_.parent_.onFailure();
   parent_.onRequestCompleted();
 }
 

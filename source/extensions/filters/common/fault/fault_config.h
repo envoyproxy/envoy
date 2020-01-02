@@ -2,6 +2,7 @@
 
 #include "envoy/config/filter/fault/v2/fault.pb.h"
 #include "envoy/http/header_map.h"
+#include "envoy/type/percent.pb.h"
 
 #include "common/http/headers.h"
 #include "common/singleton/const_singleton.h"

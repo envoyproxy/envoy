@@ -1,5 +1,8 @@
 #include "extensions/filters/http/ip_tagging/ip_tagging_filter.h"
 
+#include "envoy/api/v3alpha/core/address.pb.h"
+#include "envoy/config/filter/http/ip_tagging/v3alpha/ip_tagging.pb.h"
+
 #include "common/http/header_map_impl.h"
 #include "common/http/headers.h"
 

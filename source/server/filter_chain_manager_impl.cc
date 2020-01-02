@@ -1,5 +1,7 @@
 #include "server/filter_chain_manager_impl.h"
 
+#include "envoy/api/v2/listener/listener.pb.h"
+
 #include "common/common/empty_string.h"
 #include "common/common/fmt.h"
 #include "common/config/utility.h"
@@ -357,18 +359,15 @@ const Network::FilterChain* FilterChainManagerImpl::findFilterChainForApplicatio
 const Network::FilterChain* FilterChainManagerImpl::findFilterChainForSourceTypes(
     const SourceTypesArray& source_types, const Network::ConnectionSocket& socket) const {
 
-  const auto& filter_chain_local =
-      source_types[envoy::api::v2::listener::FilterChainMatch_ConnectionSourceType::
-                       FilterChainMatch_ConnectionSourceType_LOCAL];
+  const auto& filter_chain_local = source_types[envoy::api::v2::listener::FilterChainMatch::LOCAL];
 
   const auto& filter_chain_external =
-      source_types[envoy::api::v2::listener::FilterChainMatch_ConnectionSourceType::
-                       FilterChainMatch_ConnectionSourceType_EXTERNAL];
+      source_types[envoy::api::v2::listener::FilterChainMatch::EXTERNAL];
 
-  // isLocalConnection can be expensive. Call it only if LOCAL or EXTERNAL have entries.
+  // isSameIpOrLoopback can be expensive. Call it only if LOCAL or EXTERNAL have entries.
   const bool is_local_connection =
       (!filter_chain_local.first.empty() || !filter_chain_external.first.empty())
-          ? Network::Utility::isLocalConnection(socket)
+          ? Network::Utility::isSameIpOrLoopback(socket)
           : false;
 
   if (is_local_connection) {
@@ -381,9 +380,7 @@ const Network::FilterChain* FilterChainManagerImpl::findFilterChainForSourceType
     }
   }
 
-  const auto& filter_chain_any =
-      source_types[envoy::api::v2::listener::FilterChainMatch_ConnectionSourceType::
-                       FilterChainMatch_ConnectionSourceType_ANY];
+  const auto& filter_chain_any = source_types[envoy::api::v2::listener::FilterChainMatch::ANY];
 
   if (!filter_chain_any.first.empty()) {
     return findFilterChainForSourceIpAndPort(*filter_chain_any.second, socket);

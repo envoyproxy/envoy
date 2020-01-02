@@ -13,6 +13,7 @@ API
 ASAN
 ASCII
 ASSERTs
+AST
 AWS
 BACKTRACE
 BSON
@@ -22,6 +23,7 @@ CDS
 CEL
 CHACHA
 CHLO
+CHMOD
 CHLOS
 CIDR
 CLA
@@ -46,6 +48,7 @@ CTXs
 CVC
 CVE
 CX
+CYGWIN
 DER
 DESC
 DFATAL
@@ -55,7 +58,9 @@ DNS
 DRYs
 DS
 DST
+DW
 EADDRINUSE
+EADDRNOTAVAIL
 EAGAIN
 ECDH
 ECDHE
@@ -89,6 +94,7 @@ FCDS
 FFFF
 FIN
 FIPS
+FIRSTHDR
 FQDN
 FREEBIND
 FUZZER
@@ -148,6 +154,7 @@ LDS
 LEV
 LF
 LHS
+LLVM
 LRS
 MB
 MD
@@ -163,6 +170,7 @@ NACKs
 NBF
 NBSP
 NDEBUG
+NEXTHDR
 NGHTTP
 NOAUTH
 NODELAY
@@ -297,10 +305,12 @@ VLOG
 VM
 WASM
 WAVM
+WIP
 WKT
 WRR
 WS
 Welford's
+Wi
 XDS
 XFCC
 XFF
@@ -456,6 +466,7 @@ deallocating
 deallocation
 dec
 dechunking
+decl
 decls
 decompressor
 decrement
@@ -523,7 +534,9 @@ evented
 evwatch
 exe
 execlp
+exprfor
 expectable
+extrahelp
 faceplant
 facto
 failover
@@ -567,6 +580,7 @@ goog
 google
 goto
 gzip
+hackery
 hacky
 handshaker
 hardcoded
@@ -596,6 +610,7 @@ idx
 ie
 ifdef
 iff
+ified
 impl
 implementors
 impls
@@ -643,7 +658,9 @@ lenenc
 lexically
 libc
 libevent
+libtool
 libstdc
+libtooling
 lifecycle
 lightstep
 linearization
@@ -651,6 +668,8 @@ linearize
 linearized
 linux
 livelock
+llvm
+loc
 localhost
 lockless
 login
@@ -854,6 +873,7 @@ refetch
 regex
 regexes
 reimplements
+rele
 releasor
 reloadable
 reparse
@@ -936,6 +956,7 @@ strerr
 strerror
 stringbuf
 stringified
+stringify
 stringstream
 strtoull
 struct
@@ -969,6 +990,7 @@ superset
 symlink
 symlinked
 symlinks
+synchronizer
 syncookie
 sys
 syscall
@@ -988,6 +1010,7 @@ templatizing
 testability
 testcase
 testcases
+testdata
 testee
 th
 threadsafe
@@ -995,6 +1018,7 @@ thru
 timespan
 timestamp
 timestamps
+timeval
 tm
 tmp
 tmpfile

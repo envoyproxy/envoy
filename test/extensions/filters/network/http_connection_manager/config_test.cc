@@ -1,4 +1,7 @@
+#include "envoy/api/v2/core/base.pb.h"
+#include "envoy/config/filter/network/http_connection_manager/v2/http_connection_manager.pb.h"
 #include "envoy/config/filter/network/http_connection_manager/v2/http_connection_manager.pb.validate.h"
+#include "envoy/type/percent.pb.h"
 
 #include "common/buffer/buffer_impl.h"
 #include "common/http/date_provider_impl.h"

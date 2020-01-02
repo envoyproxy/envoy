@@ -6,16 +6,18 @@
 #include <unordered_map>
 
 #include "envoy/api/api.h"
+#include "envoy/api/v2/core/config_source.pb.h"
+#include "envoy/api/v2/discovery.pb.h"
 #include "envoy/common/exception.h"
 #include "envoy/config/bootstrap/v2/bootstrap.pb.h"
 #include "envoy/config/subscription.h"
 #include "envoy/init/manager.h"
 #include "envoy/runtime/runtime.h"
-#include "envoy/service/discovery/v2/rtds.pb.validate.h"
+#include "envoy/service/discovery/v2/rtds.pb.h"
 #include "envoy/stats/stats_macros.h"
 #include "envoy/stats/store.h"
 #include "envoy/thread_local/thread_local.h"
-#include "envoy/type/percent.pb.validate.h"
+#include "envoy/type/percent.pb.h"
 #include "envoy/upstream/cluster_manager.h"
 
 #include "common/common/assert.h"
@@ -217,6 +219,7 @@ struct RtdsSubscription : Config::SubscriptionCallbacks, Logger::Loggable<Logger
 
   void start();
   void validateUpdateSize(uint32_t num_resources);
+  std::string loadTypeUrl();
 
   LoaderImpl& parent_;
   const envoy::api::v2::core::ConfigSource config_source_;
@@ -226,6 +229,7 @@ struct RtdsSubscription : Config::SubscriptionCallbacks, Logger::Loggable<Logger
   Init::TargetImpl init_target_;
   ProtobufWkt::Struct proto_;
   ProtobufMessage::ValidationVisitor& validation_visitor_;
+  envoy::api::v2::core::ConfigSource::XdsApiVersion xds_api_version_;
 };
 
 using RtdsSubscriptionPtr = std::unique_ptr<RtdsSubscription>;

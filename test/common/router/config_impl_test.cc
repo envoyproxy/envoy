@@ -5,9 +5,11 @@
 #include <memory>
 #include <string>
 
+#include "envoy/api/v2/rds.pb.h"
 #include "envoy/api/v2/rds.pb.validate.h"
-#include "envoy/api/v2/route/route.pb.validate.h"
+#include "envoy/api/v2/route/route.pb.h"
 #include "envoy/server/filter_config.h"
+#include "envoy/type/percent.pb.h"
 
 #include "common/config/metadata.h"
 #include "common/config/well_known_names.h"
@@ -2394,7 +2396,7 @@ virtual_hosts:
     route->routeEntry()->priority();
     route->routeEntry()->rateLimitPolicy();
     route->routeEntry()->retryPolicy();
-    route->routeEntry()->shadowPolicy();
+    route->routeEntry()->shadowPolicies();
     route->routeEntry()->virtualCluster(headers);
     route->routeEntry()->virtualHost();
     route->routeEntry()->virtualHost().rateLimitPolicy();
@@ -2679,7 +2681,8 @@ virtual_hosts:
             config.route(headers, 0)->routeEntry()->clusterNotFoundResponseCode());
 }
 
-TEST_F(RouteMatcherTest, Shadow) {
+// TODO(dereka) DEPRECATED_FEATURE_TEST can be removed when `request_mirror_policy` is removed.
+TEST_F(RouteMatcherTest, DEPRECATED_FEATURE_TEST(Shadow)) {
   const std::string yaml = R"EOF(
 virtual_hosts:
 - name: www2
@@ -2698,45 +2701,77 @@ virtual_hosts:
       request_mirror_policy:
         cluster: some_cluster2
         runtime_fraction:
-           default_value:
-             numerator: 20
-             denominator: HUNDRED
-           runtime_key: foo
+          default_value:
+            numerator: 20
+            denominator: HUNDRED
+          runtime_key: foo
       cluster: www2
   - match:
       prefix: "/baz"
     route:
       cluster: www2
+  - match:
+      prefix: "/boz"
+    route:
+      request_mirror_policies:
+        - cluster: some_cluster
+        - cluster: some_cluster2
+          runtime_fraction:
+            default_value:
+              numerator: 20
+              denominator: HUNDRED
+            runtime_key: foo
+      cluster: www2
   )EOF";
 
   TestConfigImpl config(parseRouteConfigurationFromV2Yaml(yaml), factory_context_, true);
 
-  EXPECT_EQ("some_cluster", config.route(genHeaders("www.lyft.com", "/foo", "GET"), 0)
-                                ->routeEntry()
-                                ->shadowPolicy()
-                                .cluster());
-  EXPECT_EQ("", config.route(genHeaders("www.lyft.com", "/foo", "GET"), 0)
-                    ->routeEntry()
-                    ->shadowPolicy()
-                    .runtimeKey());
+  const auto& foo_shadow_policies =
+      config.route(genHeaders("www.lyft.com", "/foo", "GET"), 0)->routeEntry()->shadowPolicies();
+  EXPECT_EQ(1, foo_shadow_policies.size());
+  EXPECT_EQ("some_cluster", foo_shadow_policies[0]->cluster());
+  EXPECT_EQ("", foo_shadow_policies[0]->runtimeKey());
 
-  EXPECT_EQ("some_cluster2", config.route(genHeaders("www.lyft.com", "/bar", "GET"), 0)
-                                 ->routeEntry()
-                                 ->shadowPolicy()
-                                 .cluster());
-  EXPECT_EQ("foo", config.route(genHeaders("www.lyft.com", "/bar", "GET"), 0)
-                       ->routeEntry()
-                       ->shadowPolicy()
-                       .runtimeKey());
+  const auto& bar_shadow_policies =
+      config.route(genHeaders("www.lyft.com", "/bar", "GET"), 0)->routeEntry()->shadowPolicies();
+  EXPECT_EQ(1, bar_shadow_policies.size());
+  EXPECT_EQ("some_cluster2", bar_shadow_policies[0]->cluster());
+  EXPECT_EQ("foo", bar_shadow_policies[0]->runtimeKey());
 
-  EXPECT_EQ("", config.route(genHeaders("www.lyft.com", "/baz", "GET"), 0)
-                    ->routeEntry()
-                    ->shadowPolicy()
-                    .cluster());
-  EXPECT_EQ("", config.route(genHeaders("www.lyft.com", "/baz", "GET"), 0)
-                    ->routeEntry()
-                    ->shadowPolicy()
-                    .runtimeKey());
+  EXPECT_EQ(0, config.route(genHeaders("www.lyft.com", "/baz", "GET"), 0)
+                   ->routeEntry()
+                   ->shadowPolicies()
+                   .size());
+
+  const auto& boz_shadow_policies =
+      config.route(genHeaders("www.lyft.com", "/boz", "GET"), 0)->routeEntry()->shadowPolicies();
+  EXPECT_EQ(2, boz_shadow_policies.size());
+  EXPECT_EQ("some_cluster", boz_shadow_policies[0]->cluster());
+  EXPECT_EQ("", boz_shadow_policies[0]->runtimeKey());
+  EXPECT_EQ("some_cluster2", boz_shadow_policies[1]->cluster());
+  EXPECT_EQ("foo", boz_shadow_policies[1]->runtimeKey());
+}
+
+TEST_F(RouteMatcherTest, DEPRECATED_FEATURE_TEST(ShadowPolicyAndPolicies)) {
+  const std::string yaml = R"EOF(
+virtual_hosts:
+- name: www2
+  domains:
+  - www.lyft.com
+  routes:
+  - match:
+      prefix: "/foo"
+    route:
+      request_mirror_policy:
+        cluster: some_cluster
+      request_mirror_policies:
+      - cluster: some_other_cluster
+      cluster: www2
+  )EOF";
+
+  EXPECT_THROW_WITH_MESSAGE(
+      TestConfigImpl(parseRouteConfigurationFromV2Yaml(yaml), factory_context_, true),
+      EnvoyException, "Cannot specify both request_mirror_policy and request_mirror_policies");
 }
 
 class RouteConfigurationV2 : public testing::Test, public ConfigImplTestBase {};
@@ -2767,19 +2802,19 @@ virtual_hosts:
 
   EXPECT_EQ("foo_mirror", config.route(genHeaders("mirror.lyft.com", "/foo", "GET"), 0)
                               ->routeEntry()
-                              ->shadowPolicy()
-                              .cluster());
+                              ->shadowPolicies()[0]
+                              ->cluster());
 
   // `runtime_fraction` takes precedence over the deprecated `runtime_key` field.
   EXPECT_EQ("mirror_key", config.route(genHeaders("mirror.lyft.com", "/foo", "GET"), 0)
                               ->routeEntry()
-                              ->shadowPolicy()
-                              .runtimeKey());
+                              ->shadowPolicies()[0]
+                              ->runtimeKey());
 
   const auto& default_value = config.route(genHeaders("mirror.lyft.com", "/foo", "GET"), 0)
                                   ->routeEntry()
-                                  ->shadowPolicy()
-                                  .defaultValue();
+                                  ->shadowPolicies()[0]
+                                  ->defaultValue();
   EXPECT_EQ(20, default_value.numerator());
   EXPECT_EQ(envoy::type::FractionalPercent::HUNDRED, default_value.denominator());
 }

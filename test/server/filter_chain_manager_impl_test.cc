@@ -4,7 +4,7 @@
 #include <utility>
 #include <vector>
 
-#include "envoy/admin/v2alpha/config_dump.pb.h"
+#include "envoy/api/v2/listener/listener.pb.h"
 #include "envoy/registry/registry.h"
 #include "envoy/server/filter_config.h"
 
@@ -21,7 +21,6 @@
 #include "server/filter_chain_manager_impl.h"
 #include "server/listener_manager_impl.h"
 
-#include "extensions/filters/listener/original_dst/original_dst.h"
 #include "extensions/transport_sockets/tls/ssl_socket.h"
 
 #include "test/mocks/network/mocks.h"

@@ -1,6 +1,8 @@
 #include <string>
 
+#include "envoy/api/v2/core/base.pb.h"
 #include "envoy/api/v2/core/base.pb.validate.h"
+#include "envoy/type/percent.pb.h"
 
 #include "common/runtime/runtime_features.h"
 

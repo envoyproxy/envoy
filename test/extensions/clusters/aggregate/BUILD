@@ -23,6 +23,8 @@ envoy_extension_cc_test(
         "//test/mocks/server:server_mocks",
         "//test/mocks/ssl:ssl_mocks",
         "//test/test_common:environment_lib",
+        "@envoy_api//envoy/api/v2:pkg_cc_proto",
+        "@envoy_api//envoy/config/cluster/aggregate/v2alpha:pkg_cc_proto",
     ],
 )
 
@@ -42,6 +44,8 @@ envoy_extension_cc_test(
         "//test/mocks/ssl:ssl_mocks",
         "//test/test_common:environment_lib",
         "//test/test_common:simulated_time_system_lib",
+        "@envoy_api//envoy/config/bootstrap/v2:pkg_cc_proto",
+        "@envoy_api//envoy/config/cluster/aggregate/v2alpha:pkg_cc_proto",
     ],
 )
 

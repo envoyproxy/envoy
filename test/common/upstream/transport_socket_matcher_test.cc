@@ -2,6 +2,9 @@
 #include <vector>
 
 #include "envoy/api/api.h"
+#include "envoy/api/v2/cds.pb.h"
+#include "envoy/api/v2/core/base.pb.h"
+#include "envoy/api/v2/core/base.pb.validate.h"
 #include "envoy/network/transport_socket.h"
 #include "envoy/stats/scope.h"
 

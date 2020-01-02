@@ -9,6 +9,8 @@
 #include "envoy/access_log/access_log.h"
 #include "envoy/api/api.h"
 #include "envoy/api/v2/cds.pb.h"
+#include "envoy/api/v2/core/address.pb.h"
+#include "envoy/api/v2/core/config_source.pb.h"
 #include "envoy/config/bootstrap/v2/bootstrap.pb.h"
 #include "envoy/config/grpc_mux.h"
 #include "envoy/config/subscription_factory.h"

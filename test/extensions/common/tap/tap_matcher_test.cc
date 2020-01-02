@@ -1,3 +1,5 @@
+#include "envoy/service/tap/v2alpha/common.pb.h"
+
 #include "common/protobuf/utility.h"
 
 #include "extensions/common/tap/tap_matcher.h"

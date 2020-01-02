@@ -4,6 +4,7 @@
 #include <unordered_set>
 
 #include "envoy/api/v2/cds.pb.h"
+#include "envoy/api/v2/core/base.pb.h"
 #include "envoy/runtime/runtime.h"
 
 #include "common/common/assert.h"

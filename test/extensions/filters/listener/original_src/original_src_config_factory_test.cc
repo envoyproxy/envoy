@@ -1,6 +1,3 @@
-#include "envoy/config/filter/listener/original_src/v2alpha1/original_src.pb.h"
-#include "envoy/config/filter/listener/original_src/v2alpha1/original_src.pb.validate.h"
-
 #include "extensions/filters/listener/original_src/config.h"
 #include "extensions/filters/listener/original_src/original_src.h"
 #include "extensions/filters/listener/original_src/original_src_config_factory.h"

@@ -2,6 +2,10 @@
 
 #include <string>
 
+#include "envoy/api/v2/core/base.pb.h"
+#include "envoy/type/metadata/v2/metadata.pb.h"
+#include "envoy/type/tracing/v2/custom_tag.pb.h"
+
 #include "common/access_log/access_log_formatter.h"
 #include "common/common/assert.h"
 #include "common/common/fmt.h"

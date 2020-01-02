@@ -1,4 +1,6 @@
 #ifdef ENVOY_GOOGLE_GRPC
+#include "envoy/api/v2/core/grpc_service.pb.h"
+
 #include "common/grpc/google_async_client_impl.h"
 
 #include "extensions/grpc_credentials/well_known_names.h"

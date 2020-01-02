@@ -17,6 +17,13 @@ namespace Stats {
 static const uint32_t SpilloverMask = 0x80;
 static const uint32_t Low7Bits = 0x7f;
 
+uint64_t StatName::dataSize() const {
+  if (size_and_data_ == nullptr) {
+    return 0;
+  }
+  return SymbolTableImpl::Encoding::decodeNumber(size_and_data_).first;
+}
+
 #ifndef ENVOY_CONFIG_COVERAGE
 void StatName::debugPrint() {
   if (size_and_data_ == nullptr) {
@@ -38,12 +45,22 @@ void StatName::debugPrint() {
 #endif
 
 SymbolTableImpl::Encoding::~Encoding() {
-  // Verifies that moveToStorage() was called on this encoding. Failure
-  // to call moveToStorage() will result in leaks symbols.
-  ASSERT(vec_.empty());
+  // Verifies that moveToMemBlock() was called on this encoding. Failure
+  // to call moveToMemBlock() will result in leaks symbols.
+  ASSERT(mem_block_.capacity() == 0);
 }
 
-void SymbolTableImpl::Encoding::addSymbol(Symbol symbol) {
+uint64_t SymbolTableImpl::Encoding::encodingSizeBytes(uint64_t number) {
+  uint64_t num_bytes = 0;
+  do {
+    ++num_bytes;
+    number >>= 7;
+  } while (number != 0);
+  return num_bytes;
+}
+
+void SymbolTableImpl::Encoding::appendEncoding(uint64_t number,
+                                               MemBlockBuilder<uint8_t>& mem_block) {
   // UTF-8-like encoding where a value 127 or less gets written as a single
   // byte. For higher values we write the low-order 7 bits with a 1 in
   // the high-order bit. Then we right-shift 7 bits and keep adding more bytes
@@ -52,45 +69,54 @@ void SymbolTableImpl::Encoding::addSymbol(Symbol symbol) {
   // When decoding, we stop consuming uint8_t when we see a uint8_t with
   // high-order bit 0.
   do {
-    if (symbol < (1 << 7)) {
-      vec_.push_back(symbol); // symbols <= 127 get encoded in one byte.
+    if (number < (1 << 7)) {
+      mem_block.appendOne(number); // number <= 127 gets encoded in one byte.
     } else {
-      vec_.push_back((symbol & Low7Bits) | SpilloverMask); // symbols >= 128 need spillover bytes.
+      mem_block.appendOne((number & Low7Bits) | SpilloverMask); // >= 128 need spillover bytes.
     }
-    symbol >>= 7;
-  } while (symbol != 0);
+    number >>= 7;
+  } while (number != 0);
+}
+
+void SymbolTableImpl::Encoding::addSymbols(const std::vector<Symbol>& symbols) {
+  ASSERT(data_bytes_required_ == 0);
+  for (Symbol symbol : symbols) {
+    data_bytes_required_ += encodingSizeBytes(symbol);
+  }
+  mem_block_.setCapacity(data_bytes_required_);
+  for (Symbol symbol : symbols) {
+    appendEncoding(symbol, mem_block_);
+  }
+}
+
+std::pair<uint64_t, uint64_t> SymbolTableImpl::Encoding::decodeNumber(const uint8_t* encoding) {
+  uint64_t number = 0;
+  uint64_t uc = SpilloverMask;
+  const uint8_t* start = encoding;
+  for (uint32_t shift = 0; (uc & SpilloverMask) != 0; ++encoding, shift += 7) {
+    uc = static_cast<uint32_t>(*encoding);
+    number |= (uc & Low7Bits) << shift;
+  }
+  return std::make_pair(number, encoding - start);
 }
 
 SymbolVec SymbolTableImpl::Encoding::decodeSymbols(const SymbolTable::Storage array,
                                                    uint64_t size) {
   SymbolVec symbol_vec;
-  Symbol symbol = 0;
-  for (uint32_t shift = 0; size > 0; --size, ++array) {
-    uint32_t uc = static_cast<uint32_t>(*array);
-
-    // Inverse addSymbol encoding, walking down the bytes, shifting them into
-    // symbol, until a byte with a zero high order bit indicates this symbol is
-    // complete and we can move to the next one.
-    symbol |= (uc & Low7Bits) << shift;
-    if ((uc & SpilloverMask) == 0) {
-      symbol_vec.push_back(symbol);
-      shift = 0;
-      symbol = 0;
-    } else {
-      shift += 7;
-    }
+  symbol_vec.reserve(size);
+  while (size > 0) {
+    std::pair<uint64_t, uint64_t> symbol_consumed = decodeNumber(array);
+    symbol_vec.push_back(symbol_consumed.first);
+    size -= symbol_consumed.second;
+    array += symbol_consumed.second;
   }
   return symbol_vec;
 }
 
-uint64_t SymbolTableImpl::Encoding::moveToStorage(SymbolTable::Storage symbol_array) {
-  const uint64_t sz = dataBytesRequired();
-  symbol_array = writeLengthReturningNext(sz, symbol_array);
-  if (sz != 0) {
-    memcpy(symbol_array, vec_.data(), sz * sizeof(uint8_t));
-  }
-  vec_.clear(); // Logically transfer ownership, enabling empty assert on destruct.
-  return sz + StatNameSizeEncodingBytes;
+void SymbolTableImpl::Encoding::moveToMemBlock(MemBlockBuilder<uint8_t>& mem_block) {
+  appendEncoding(data_bytes_required_, mem_block);
+  mem_block.appendBlock(mem_block_);
+  mem_block_.reset(); // Logically transfer ownership, enabling empty assert on destruct.
 }
 
 SymbolTableImpl::SymbolTableImpl()
@@ -130,9 +156,7 @@ void SymbolTableImpl::addTokensToEncoding(const absl::string_view name, Encoding
   }
 
   // Now efficiently encode the array of 32-bit symbols into a uint8_t array.
-  for (Symbol symbol : symbols) {
-    encoding.addSymbol(symbol);
-  }
+  encoding.addSymbols(symbols);
 }
 
 uint64_t SymbolTableImpl::numSymbols() const {
@@ -380,9 +404,9 @@ SymbolTable::StoragePtr SymbolTableImpl::encode(absl::string_view name) {
   name = StringUtil::removeTrailingCharacters(name, '.');
   Encoding encoding;
   addTokensToEncoding(name, encoding);
-  auto bytes = std::make_unique<Storage>(encoding.bytesRequired());
-  encoding.moveToStorage(bytes.get());
-  return bytes;
+  MemBlockBuilder<uint8_t> mem_block(Encoding::totalSizeBytes(encoding.bytesRequired()));
+  encoding.moveToMemBlock(mem_block);
+  return mem_block.release();
 }
 
 StatNameStorage::StatNameStorage(absl::string_view name, SymbolTable& table)
@@ -390,8 +414,9 @@ StatNameStorage::StatNameStorage(absl::string_view name, SymbolTable& table)
 
 StatNameStorage::StatNameStorage(StatName src, SymbolTable& table) {
   const uint64_t size = src.size();
-  bytes_ = std::make_unique<SymbolTable::Storage>(size);
-  src.copyToStorage(bytes_.get());
+  MemBlockBuilder<uint8_t> storage(size);
+  src.copyToMemBlock(storage);
+  bytes_ = storage.release();
   table.incRefCount(statName());
 }
 
@@ -457,14 +482,12 @@ SymbolTable::StoragePtr SymbolTableImpl::join(const StatNameVec& stat_names) con
   for (StatName stat_name : stat_names) {
     num_bytes += stat_name.dataSize();
   }
-  auto bytes = std::make_unique<Storage>(num_bytes + StatNameSizeEncodingBytes);
-  uint8_t* p = writeLengthReturningNext(num_bytes, bytes.get());
+  MemBlockBuilder<uint8_t> mem_block(Encoding::totalSizeBytes(num_bytes));
+  Encoding::appendEncoding(num_bytes, mem_block);
   for (StatName stat_name : stat_names) {
-    const uint64_t stat_name_bytes = stat_name.dataSize();
-    memcpy(p, stat_name.data(), stat_name_bytes);
-    p += stat_name_bytes;
+    stat_name.appendDataToMemBlock(mem_block);
   }
-  return bytes;
+  return mem_block.release();
 }
 
 void SymbolTableImpl::populateList(const absl::string_view* names, uint32_t num_names,
@@ -483,19 +506,18 @@ void SymbolTableImpl::populateList(const absl::string_view* names, uint32_t num_
 
   // Now allocate the exact number of bytes required and move the encodings
   // into storage.
-  auto storage = std::make_unique<Storage>(total_size_bytes);
-  uint8_t* p = &storage[0];
-  *p++ = num_names;
+  MemBlockBuilder<uint8_t> mem_block(total_size_bytes);
+  mem_block.appendOne(num_names);
   for (auto& encoding : encodings) {
-    p += encoding.moveToStorage(p);
+    encoding.moveToMemBlock(mem_block);
   }
 
   // This assertion double-checks the arithmetic where we computed
   // total_size_bytes. After appending all the encoded data into the
-  // allocated byte array, we should wind up with a pointer difference of
-  // total_size_bytes from the beginning of the allocation.
-  ASSERT(p == &storage[0] + total_size_bytes);
-  list.moveStorageIntoList(std::move(storage));
+  // allocated byte array, we should have exhausted all the memory
+  // we though we needed.
+  ASSERT(mem_block.capacityRemaining() == 0);
+  list.moveStorageIntoList(mem_block.release());
 }
 
 StatNameList::~StatNameList() { ASSERT(!populated()); }

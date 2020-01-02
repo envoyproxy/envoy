@@ -3,7 +3,8 @@
 #include <memory>
 #include <string>
 
-#include "envoy/api/v2/core/base.pb.h"
+#include "envoy/api/v2/rds.pb.h"
+#include "envoy/type/percent.pb.h"
 
 #include "common/common/logger.h"
 #include "common/common/utility.h"

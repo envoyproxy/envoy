@@ -1,8 +1,13 @@
 #include <memory>
 #include <string>
 
+#include "envoy/api/v2/auth/cert.pb.h"
+#include "envoy/api/v2/core/config_source.pb.h"
+#include "envoy/api/v2/discovery.pb.h"
+#include "envoy/config/bootstrap/v2/bootstrap.pb.h"
 #include "envoy/service/discovery/v2/sds.pb.h"
 
+#include "common/config/api_version.h"
 #include "common/config/resources.h"
 #include "common/event/dispatcher_impl.h"
 #include "common/network/connection_impl.h"
@@ -113,7 +118,7 @@ protected:
   }
 
   void sendSdsResponse(const envoy::api::v2::auth::Secret& secret) {
-    envoy::api::v2::DiscoveryResponse discovery_response;
+    API_NO_BOOST(envoy::api::v2::DiscoveryResponse) discovery_response;
     discovery_response.set_version_info("1");
     discovery_response.set_type_url(Config::TypeUrl::get().Secret);
     discovery_response.add_resources()->PackFrom(secret);
