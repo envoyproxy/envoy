@@ -17,6 +17,8 @@ option java_outer_classname = "GrpcServiceProto";
 option java_multiple_files = true;
 option (udpa.annotations.file_migrate).move_to_package = "envoy.config.core.v3alpha";
 
+// [#protodoc-title: gRPC services]
+
 // gRPC service configuration. This is used by :ref:`ApiConfigSource
 // <envoy_api_msg_core.ApiConfigSource>` and filter configurations.
 // [#next-free-field: 6]

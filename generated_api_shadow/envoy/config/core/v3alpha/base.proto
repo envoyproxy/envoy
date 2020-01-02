@@ -17,6 +17,8 @@ option java_package = "io.envoyproxy.envoy.config.core.v3alpha";
 option java_outer_classname = "BaseProto";
 option java_multiple_files = true;
 
+// [#protodoc-title: Common types]
+
 // Envoy supports :ref:`upstream priority routing
 // <arch_overview_http_routing_priority>` both at the route and the virtual
 // cluster level. The current priority implementation uses different connection

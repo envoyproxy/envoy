@@ -12,6 +12,8 @@ option java_outer_classname = "HttpUriProto";
 option java_multiple_files = true;
 option (udpa.annotations.file_migrate).move_to_package = "envoy.config.core.v3alpha";
 
+// [#protodoc-title: HTTP Service URI ]
+
 // Envoy external URI descriptor
 message HttpUri {
   // The HTTP server URI. It should be a full FQDN with protocol, host and path.

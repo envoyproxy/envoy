@@ -19,6 +19,11 @@ option java_outer_classname = "HealthCheckProto";
 option java_multiple_files = true;
 option (udpa.annotations.file_migrate).move_to_package = "envoy.config.core.v3alpha";
 
+// [#protodoc-title: Health check]
+// * Health checking :ref:`architecture overview <arch_overview_health_checking>`.
+// * If health checking is configured for a cluster, additional statistics are emitted. They are
+//   documented :ref:`here <config_cluster_manager_cluster_stats>`.
+
 // Endpoint health status.
 enum HealthStatus {
   // The health status is not known. This is interpreted by Envoy as *HEALTHY*.

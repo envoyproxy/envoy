@@ -19,6 +19,10 @@ option java_outer_classname = "RdsProto";
 option java_multiple_files = true;
 option java_generic_services = true;
 
+// [#protodoc-title: HTTP route configuration]
+// * Routing :ref:`architecture overview <arch_overview_http_routing>`
+// * HTTP :ref:`router filter <config_http_filters_router>`
+
 // The resource_names field in DiscoveryRequest specifies a route configuration.
 // This allows an Envoy configuration with multiple HTTP listeners (and
 // associated HTTP connection manager filters) to use different route

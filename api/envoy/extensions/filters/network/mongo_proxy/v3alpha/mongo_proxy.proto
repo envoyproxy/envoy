@@ -12,6 +12,10 @@ option java_package = "io.envoyproxy.envoy.extensions.filters.network.mongo_prox
 option java_outer_classname = "MongoProxyProto";
 option java_multiple_files = true;
 
+// [#protodoc-title: Mongo proxy]
+// MongoDB :ref:`configuration overview <config_network_filters_mongo_proxy>`.
+// [#extension: envoy.filters.network.mongo_proxy]
+
 message MongoProxy {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.network.mongo_proxy.v2.MongoProxy";

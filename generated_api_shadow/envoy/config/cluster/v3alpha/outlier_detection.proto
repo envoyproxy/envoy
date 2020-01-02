@@ -13,6 +13,8 @@ option java_package = "io.envoyproxy.envoy.config.cluster.v3alpha";
 option java_outer_classname = "OutlierDetectionProto";
 option java_multiple_files = true;
 
+// [#protodoc-title: Outlier detection]
+
 // See the :ref:`architecture overview <arch_overview_outlier_detection>` for
 // more information on outlier detection.
 // [#next-free-field: 21]

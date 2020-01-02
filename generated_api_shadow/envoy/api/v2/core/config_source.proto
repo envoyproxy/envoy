@@ -15,6 +15,8 @@ option java_outer_classname = "ConfigSourceProto";
 option java_multiple_files = true;
 option (udpa.annotations.file_migrate).move_to_package = "envoy.config.core.v3alpha";
 
+// [#protodoc-title: Configuration sources]
+
 // API configuration source. This identifies the API type and cluster that Envoy
 // will use to fetch an xDS API.
 // [#next-free-field: 8]
