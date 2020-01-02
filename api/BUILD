@@ -118,6 +118,7 @@ proto_library(
         "//envoy/config/rbac/v3alpha:pkg",
         "//envoy/config/resource_monitor/fixed_heap/v2alpha:pkg",
         "//envoy/config/resource_monitor/injected_resource/v2alpha:pkg",
+        "//envoy/config/retry/omit_hosts:pkg",
         "//envoy/config/retry/previous_priorities:pkg",
         "//envoy/config/trace/v2:pkg",
         "//envoy/config/trace/v2alpha:pkg",
