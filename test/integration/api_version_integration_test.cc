@@ -298,6 +298,24 @@ TEST_P(ApiVersionIntegrationTest, Rds) {
       "type.googleapis.com/envoy.api.v3alpha.RouteConfiguration"));
 }
 
+TEST_P(ApiVersionIntegrationTest, Vhds) {
+  config_helper_.addConfigModifier(
+      [this](envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager&
+                 http_connection_manager) {
+        auto* route_config = http_connection_manager.mutable_route_config();
+        setupConfigSource(*route_config->mutable_vhds()->mutable_config_source());
+      });
+  initialize();
+  ASSERT_TRUE(validateDiscoveryRequest(
+      "/envoy.api.v2.RouteDiscoveryService/StreamRoutes",
+      "/envoy.api.v2.RouteDiscoveryService/DeltaRoutes", "/v2/discovery:routes",
+      "/envoy.api.v3alpha.RouteDiscoveryService/StreamRoutes",
+      "/envoy.api.v3alpha.RouteDiscoveryService/DeltaRoutes",
+      "/v3alpha/discovery:routes",
+      "type.googleapis.com/envoy.api.v2.RouteConfiguration",
+      "type.googleapis.com/envoy.api.v3alpha.RouteConfiguration"));
+}
+
 TEST_P(ApiVersionIntegrationTest, Srds) {
   config_helper_.addConfigModifier(
       [this](envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager&
