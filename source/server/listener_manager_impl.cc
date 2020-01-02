@@ -310,14 +310,17 @@ bool ListenerManagerImpl::addOrUpdateListener(const envoy::api::v2::Listener& co
   // TODO(junr03): currently only one ApiListener can be installed via bootstrap to avoid having to
   // build a collection of listeners, and to have to be able to warm and drain the listeners. In the
   // future allow multiple ApiListeners, and allow them to be created via LDS as well as bootstrap.
-  if (!api_listener_ && !added_via_api && config.has_api_listener()) {
-    api_listener_ = std::make_unique<HttpApiListenerImpl>(
-        config, *this, config.name(), server_.messageValidationContext().staticValidationVisitor());
-    return true;
-  } else {
-    ENVOY_LOG(debug, "listener {} can not be added because currently only one ApiListener is "
-                     "allowed, and it can only be added via bootstrap configuration");
-    return false;
+  if (config.has_api_listener()) {
+    if (!api_listener_ && !added_via_api) {
+      api_listener_ = std::make_unique<HttpApiListenerImpl>(
+          config, *this, config.name(),
+          server_.messageValidationContext().staticValidationVisitor());
+      return true;
+    } else {
+      ENVOY_LOG(debug, "listener {} can not be added because currently only one ApiListener is "
+                       "allowed, and it can only be added via bootstrap configuration");
+      return false;
+    }
   }
 
   std::string name;

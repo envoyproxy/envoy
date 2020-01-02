@@ -3565,7 +3565,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, VerifySanWithNoCA) {
               - certificate_chain: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_cert.pem" }
                 private_key: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_key.pem" }
             validation_context:
-              match_subject_alt_names: 
+              match_subject_alt_names:
                  exact: "spiffe://lyft.com/testclient"
   )EOF",
                                                        Network::Address::IpVersion::v4);

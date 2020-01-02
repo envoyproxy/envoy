@@ -219,7 +219,6 @@ message Listener {
   // creating a packet-oriented UDP listener. If not present, treat it as "raw_udp_listener".
   listener.UdpListenerConfig udp_listener_config = 18;
 
-  // [#not-implemented-hide:]
   // Used to represent an API listener, which is used in non-proxy clients. The type of API
   // exposed to the non-proxy application depends on the type of API listener.
   // When this field is set, no other field except for :ref:`name<envoy_api_field_Listener.name>`
