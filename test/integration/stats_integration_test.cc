@@ -147,7 +147,8 @@ public:
       : BaseIntegrationTest(testing::TestWithParam<Network::Address::IpVersion>::GetParam()) {}
 
   static size_t computeMemoryDelta(int initial_num_clusters, int initial_num_hosts,
-                                   int final_num_clusters, int final_num_hosts, bool allow_stats) {
+                                   int final_num_clusters, int final_num_hosts, bool allow_stats,
+                                   bool disable_host_stats) {
     // Use the same number of fake upstreams for both helpers in order to exclude memory overhead
     // added by the fake upstreams.
     int fake_upstreams_count = 1 + final_num_clusters * final_num_hosts;
@@ -157,13 +158,14 @@ public:
       ClusterMemoryTestHelper helper;
       helper.setUpstreamCount(fake_upstreams_count);
       helper.skipPortUsageValidation();
-      initial_memory =
-          helper.clusterMemoryHelper(initial_num_clusters, initial_num_hosts, allow_stats);
+      initial_memory = helper.clusterMemoryHelper(initial_num_clusters, initial_num_hosts,
+                                                  allow_stats, disable_host_stats);
     }
 
     ClusterMemoryTestHelper helper;
     helper.setUpstreamCount(fake_upstreams_count);
-    return helper.clusterMemoryHelper(final_num_clusters, final_num_hosts, allow_stats) -
+    return helper.clusterMemoryHelper(final_num_clusters, final_num_hosts, allow_stats,
+                                      disable_host_stats) -
            initial_memory;
   }
 
@@ -171,9 +173,11 @@ private:
   /**
    * @param num_clusters number of clusters appended to bootstrap_config
    * @param allow_stats if false, enable set_reject_all in stats_config
+   * * @param disable_host_stats if false, enable host stats
    * @return size_t the total memory allocated
    */
-  size_t clusterMemoryHelper(int num_clusters, int num_hosts, bool allow_stats) {
+  size_t clusterMemoryHelper(int num_clusters, int num_hosts, bool allow_stats,
+                             bool disable_host_stats) {
     Stats::TestUtil::MemoryTest memory_test;
     config_helper_.addConfigModifier([&](envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
       if (!allow_stats) {
@@ -186,6 +190,7 @@ private:
 
       for (int i = 0; i < num_clusters; ++i) {
         auto* cluster = bootstrap.mutable_static_resources()->mutable_clusters(i);
+        cluster->set_disable_host_stats(disable_host_stats);
         for (int j = 0; j < num_hosts; ++j) {
           auto* host = cluster->add_hosts();
           auto* socket_address = host->mutable_socket_address();
@@ -221,7 +226,7 @@ TEST_P(ClusterMemoryTestRunner, MemoryLargeClusterSizeWithFakeSymbolTable) {
   // A unique instance of ClusterMemoryTest allows for multiple runs of Envoy with
   // differing configuration. This is necessary for measuring the memory consumption
   // between the different instances within the same test.
-  const size_t m1000 = ClusterMemoryTestHelper::computeMemoryDelta(1, 0, 1001, 0, true);
+  const size_t m1000 = ClusterMemoryTestHelper::computeMemoryDelta(1, 0, 1001, 0, true, false);
   const size_t m_per_cluster = (m1000) / 1000;
 
   // Note: if you are increasing this golden value because you are adding a
@@ -284,7 +289,7 @@ TEST_P(ClusterMemoryTestRunner, MemoryLargeClusterSizeWithRealSymbolTable) {
   // A unique instance of ClusterMemoryTest allows for multiple runs of Envoy with
   // differing configuration. This is necessary for measuring the memory consumption
   // between the different instances within the same test.
-  const size_t m1000 = ClusterMemoryTestHelper::computeMemoryDelta(1, 0, 1001, 0, true);
+  const size_t m1000 = ClusterMemoryTestHelper::computeMemoryDelta(1, 0, 1001, 0, true, false);
   const size_t m_per_cluster = (m1000) / 1000;
 
   // Note: if you are increasing this golden value because you are adding a
@@ -332,7 +337,7 @@ TEST_P(ClusterMemoryTestRunner, MemoryLargeHostSizeWithStats) {
   // A unique instance of ClusterMemoryTest allows for multiple runs of Envoy with
   // differing configuration. This is necessary for measuring the memory consumption
   // between the different instances within the same test.
-  const size_t m1000 = ClusterMemoryTestHelper::computeMemoryDelta(1, 1, 1, 1001, true);
+  const size_t m1000 = ClusterMemoryTestHelper::computeMemoryDelta(1, 1, 1, 1001, true, false);
   const size_t m_per_host = (m1000) / 1000;
 
   // Note: if you are increasing this golden value because you are adding a
