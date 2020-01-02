@@ -49,7 +49,7 @@ public:
     }));
     subscription_ = std::make_unique<HttpSubscriptionImpl>(
         local_info_, cm_, "eds_cluster", dispatcher_, random_gen_, std::chrono::milliseconds(1),
-        std::chrono::milliseconds(1000), *method_descriptor_, callbacks_, stats_,
+        std::chrono::milliseconds(1000), *method_descriptor_, Config::TypeUrl::get().ClusterLoadAssignment, callbacks_, stats_,
         init_fetch_timeout, validation_visitor_);
   }
 
@@ -92,6 +92,7 @@ public:
             }
             expected_request += "\"resource_names\":[\"" + joined_cluster_names + "\"]";
           }
+          expected_request += ",\"type_url\":\"type.googleapis.com/envoy.api.v2.ClusterLoadAssignment\"";
           expected_request += "}";
           EXPECT_EQ(expected_request, request->bodyAsString());
           EXPECT_EQ(fmt::format_int(expected_request.size()).str(),

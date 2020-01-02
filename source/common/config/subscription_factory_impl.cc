@@ -49,8 +49,8 @@ SubscriptionPtr SubscriptionFactoryImpl::subscriptionFromConfigSource(
           local_info_, cm_, api_config_source.cluster_names()[0], dispatcher_, random_,
           Utility::apiConfigSourceRefreshDelay(api_config_source),
           Utility::apiConfigSourceRequestTimeout(api_config_source),
-          restMethod(type_url, api_config_source.transport_api_version()), callbacks, stats,
-          Utility::configSourceInitialFetchTimeout(config), validation_visitor_);
+          restMethod(type_url, api_config_source.transport_api_version()), type_url, callbacks,
+          stats, Utility::configSourceInitialFetchTimeout(config), validation_visitor_);
       break;
     case envoy::api::v2::core::ApiConfigSource::GRPC:
       result = std::make_unique<GrpcSubscriptionImpl>(
