@@ -2442,7 +2442,7 @@ void testTicketSessionResumption(const std::string& server_ctx_yaml1,
         EXPECT_TRUE(SSL_SESSION_is_resumable(ssl_session));
         if (expected_lifetime_hint) {
           auto lifetime_hint = SSL_SESSION_get_ticket_lifetime_hint(ssl_session);
-          EXPECT_EQ(lifetime_hint, expected_lifetime_hint);
+          EXPECT_TRUE(lifetime_hint <= expected_lifetime_hint);
         }
         client_connection->close(Network::ConnectionCloseType::NoFlush);
         server_connection->close(Network::ConnectionCloseType::NoFlush);
