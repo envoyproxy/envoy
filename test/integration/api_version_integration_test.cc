@@ -93,8 +93,10 @@ public:
     std::string expected_endpoint;
     std::string expected_type_url;
     std::string actual_type_url;
-    const char ads_v2_sotw_endpoint[] = "/envoy.service.discovery.v2.AggregatedDiscoveryService/StreamAggregatedResources";
-    const char ads_v3alpha_delta_endpoint[] = "/envoy.service.discovery.v3alpha.AggregatedDiscoveryService/StreamAggregatedResources";
+    const char ads_v2_sotw_endpoint[] =
+        "/envoy.service.discovery.v2.AggregatedDiscoveryService/StreamAggregatedResources";
+    const char ads_v3alpha_delta_endpoint[] =
+        "/envoy.service.discovery.v3alpha.AggregatedDiscoveryService/StreamAggregatedResources";
     switch (transportApiVersion()) {
     case envoy::api::v2::core::ApiVersion::AUTO:
     case envoy::api::v2::core::ApiVersion::V2: {

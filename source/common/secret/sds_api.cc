@@ -3,10 +3,10 @@
 #include <unordered_map>
 
 #include "envoy/api/v2/auth/cert.pb.h"
-#include "envoy/api/v3alpha/auth/cert.pb.h"
 #include "envoy/api/v2/auth/cert.pb.validate.h"
 #include "envoy/api/v2/core/config_source.pb.h"
 #include "envoy/api/v2/discovery.pb.h"
+#include "envoy/api/v3alpha/auth/cert.pb.h"
 
 #include "common/common/assert.h"
 #include "common/config/api_version.h"
