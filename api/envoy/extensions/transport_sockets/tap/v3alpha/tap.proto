@@ -13,6 +13,9 @@ option java_package = "io.envoyproxy.envoy.extensions.transport_sockets.tap.v3al
 option java_outer_classname = "TapProto";
 option java_multiple_files = true;
 
+// [#protodoc-title: Tap]
+// [#extension: envoy.transport_sockets.tap]
+
 // Configuration for tap transport socket. This wraps another transport socket, providing the
 // ability to interpose and record in plain text any traffic that is surfaced to Envoy.
 message Tap {

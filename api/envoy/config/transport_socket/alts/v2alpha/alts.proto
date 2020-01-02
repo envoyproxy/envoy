@@ -11,6 +11,9 @@ option java_multiple_files = true;
 option (udpa.annotations.file_migrate).move_to_package =
     "envoy.extensions.transport_sockets.alts.v3alpha";
 
+// [#protodoc-title: ALTS]
+// [#extension: envoy.transport_sockets.alts]
+
 // Configuration for ALTS transport socket. This provides Google's ALTS protocol to Envoy.
 // https://cloud.google.com/security/encryption-in-transit/application-layer-transport-security/
 message Alts {

@@ -30,6 +30,8 @@ option java_multiple_files = true;
 option java_generic_services = true;
 option (udpa.annotations.file_migrate).move_to_package = "envoy.service.cluster.v3alpha";
 
+// [#protodoc-title: Clusters]
+
 // Return list of all clusters this proxy will load balance to.
 service ClusterDiscoveryService {
   rpc StreamClusters(stream DiscoveryRequest) returns (stream DiscoveryResponse) {
