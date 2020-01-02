@@ -7,8 +7,7 @@
 #
 # Usage (from a clean tree):
 #
-# api_boost.py --generate_compilation_database \
-#   --build_api_booster
+# api_boost.py --generate_compilation_database --build_api_booster
 
 import argparse
 import functools
@@ -100,6 +99,7 @@ def ApiBoostTree(target_paths,
   # Optional setup of state. We need the compilation database and api_booster
   # tool in place before we can start boosting.
   if generate_compilation_database:
+    print('Building compilation database for %s' % dep_build_targets)
     sp.run(['./tools/gen_compilation_database.py', '--run_bazel_build', '--include_headers'] +
            dep_build_targets,
            check=True)
@@ -132,6 +132,7 @@ def ApiBoostTree(target_paths,
     sp.run([
         'bazel',
         'build',
+        '--config=libc++',
         '--strip=always',
     ] + BAZEL_BUILD_OPTIONS + dep_lib_build_targets,
            check=True)
