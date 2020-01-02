@@ -25,18 +25,6 @@ AllocatorImpl::~AllocatorImpl() {
   ASSERT(gauges_.empty());
 }
 
-void AllocatorImpl::removeCounterFromSet(Counter* counter) {
-  Thread::LockGuard lock(mutex_);
-  const size_t count = counters_.erase(counter->statName());
-  ASSERT(count == 1);
-}
-
-void AllocatorImpl::removeGaugeFromSet(Gauge* gauge) {
-  Thread::LockGuard lock(mutex_);
-  const size_t count = gauges_.erase(gauge->statName());
-  ASSERT(count == 1);
-}
-
 #ifndef ENVOY_CONFIG_COVERAGE
 void AllocatorImpl::debugPrint() {
   Thread::LockGuard lock(mutex_);
@@ -78,25 +66,33 @@ public:
   // RefcountInterface
   void incRefCount() override { ++ref_count_; }
   bool decRefCount() override {
+    // We must, unfortunately, hold the allocator's lock when decrementing the
+    // mutex. Otherwise another thread may simultaneously try to allocate the
+    // same name'd stat after we decrement it, and we'll wind up with a
+    // dtor/update race. To avoid this we must hold the lock until the stat
+    // is removed from the lock.
+    //
+    // It might be worth thinking about a race-free way to decrement ref-counts
+    // without a lock, for the case where ref_count > 2, and we don't need to
+    // destruct anything. But it seems preferable at to be conservative here,
+    // as stats will only go out of scope when a scope is destructed (i.e. on an
+    // xDS) or during admin stats operations.
+    Thread::LockGuard lock(alloc_.mutex_);
     ASSERT(ref_count_ >= 1);
-    return--ref_count_ == 0;
-
-    /*
-    // There's a possible race here, where we detect that the ref-count goes to
-    // zero, causing us to destruct the Stat. In the Stat's destructor, we then
-    // take a lock and remove the map entry. However, after is_zero is
-    // calculated, and before the lock, another thread may attempt to allocate
-    // the same stat, bumping the ref_count_ from 0 to 1. We can ensure this
-    // did not occur by double-checking
-
-    bool is_zero = --ref_count_ == 0;
-    if (is_zero) {
-      Thread::LockGuard lock(alloc_.mutex_);
-      is_zero = --ref_count_ == 0;
+    if (--ref_count_ == 0) {
+      removeFromSetLockHeld();
+      return true;
     }
-    */
+    return false;
   }
   uint32_t use_count() const override { return ref_count_; }
+
+  /**
+   * We must atomically remove the counter/gauges the set when our ref-count
+   * decrement hits zero. The counters and gauges are held in distinct sets
+   * so we virtualize this removal helper.
+   */
+  virtual void removeFromSetLockHeld() EXCLUSIVE_LOCKS_REQUIRED(alloc_.mutex_) PURE;
 
 protected:
   AllocatorImpl& alloc_;
@@ -113,7 +109,11 @@ public:
   CounterImpl(StatName name, AllocatorImpl& alloc, absl::string_view tag_extracted_name,
               const std::vector<Tag>& tags)
       : StatsSharedImpl(name, alloc, tag_extracted_name, tags) {}
-  ~CounterImpl() override { alloc_.removeCounterFromSet(this); }
+
+  void removeFromSetLockHeld() EXCLUSIVE_LOCKS_REQUIRED(alloc_.mutex_) override {
+    const size_t count = alloc_.counters_.erase(statName());
+    ASSERT(count == 1);
+  }
 
   // Stats::Counter
   void add(uint64_t amount) override {
@@ -123,6 +123,7 @@ public:
     pending_increment_ += amount;
     flags_ |= Flags::Used;
   }
+
   void inc() override { add(1); }
   uint64_t latch() override { return pending_increment_.exchange(0); }
   void reset() override { value_ = 0; }
@@ -152,7 +153,11 @@ public:
       break;
     }
   }
-  ~GaugeImpl() override { alloc_.removeGaugeFromSet(this); }
+
+  void removeFromSetLockHeld() override EXCLUSIVE_LOCKS_REQUIRED(alloc_.mutex_) {
+    const size_t count = alloc_.gauges_.erase(statName());
+    ASSERT(count == 1);
+  }
 
   // Stats::Gauge
   void add(uint64_t amount) override {

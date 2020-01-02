@@ -6,6 +6,7 @@
 #include "test/test_common/logging.h"
 #include "test/test_common/thread_factory_for_test.h"
 
+#include "absl/synchronization/notification.h"
 #include "gtest/gtest.h"
 
 namespace Envoy {
@@ -76,59 +77,29 @@ TEST_F(AllocatorImplTest, GaugesWithSameName) {
   EXPECT_EQ(0, g2->value());
 }
 
-TEST_F(AllocatorImplTest, Threads1) {
+TEST_F(AllocatorImplTest, Threads) {
   StatName counter_name = makeStat("counter.name");
+  StatName gauge_name = makeStat("gauge.name");
   Thread::ThreadFactory& thread_factory = Thread::threadFactoryForTest();
 
   const uint32_t num_threads = 12;
+  const uint32_t iters = 10000;
   std::vector<Thread::ThreadPtr> threads;
-  std::atomic<bool> cont(true);
-  std::atomic<uint64_t> count(0);
+  absl::Notification go;
   for (uint32_t i = 0; i < num_threads; ++i) {
-    threads.push_back(thread_factory.createThread([this, &counter_name, &cont, &count]() {
-      while (cont) {
-        CounterSharedPtr c1 = alloc_.makeCounter(counter_name, "", std::vector<Tag>());
-        ++count;
+    threads.push_back(thread_factory.createThread([&]() {
+      go.WaitForNotification();
+      for (uint32_t i = 0; i < iters; ++i) {
+        alloc_.makeCounter(counter_name, "", std::vector<Tag>());
+        alloc_.makeGauge(gauge_name, "", std::vector<Tag>(), Gauge::ImportMode::NeverImport);
       }
     }));
   }
-  sleep(5);
-  cont = false;
+  go.Notify();
   for (uint32_t i = 0; i < num_threads; ++i) {
     threads[i]->join();
   }
-  ENVOY_LOG_MISC(error, "Count={}", count);
 }
-
-/*
-TEST(RefcountPtr, Threads2) {
-  Thread::ThreadFactory& thread_factory = Thread::threadFactoryForTest();
-
-  const uint32_t num_threads = 20;
-  const uint32_t num_iters = 200;
-
-  for (uint32_t j = 0; j < num_iters; ++j) {
-    RefcountedString* ptr = new RefcountedString("Hello, World!");
-    Thread::ThreadPtr threads[num_threads];
-    std::unique_ptr<SharedString> strings[num_threads];
-
-    for (uint32_t i = 0; i < num_threads; ++i) {
-      strings[i] = std::make_unique<SharedString>(ptr);
-    }
-    absl::Notification go;
-    for (uint32_t i = 0; i < num_threads; ++i) {
-      threads[i] = thread_factory.createThread([&strings, i, &go]() {
-        go.WaitForNotification();
-        strings[i].reset();
-      });
-    }
-    go.Notify();
-    for (uint32_t i = 0; i < num_threads; ++i) {
-      threads[i]->join();
-    }
-  }
-}
-*/
 
 } // namespace
 } // namespace Stats

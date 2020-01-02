@@ -19,9 +19,6 @@ public:
   AllocatorImpl(SymbolTable& symbol_table) : symbol_table_(symbol_table) {}
   ~AllocatorImpl() override;
 
-  void removeCounterFromSet(Counter* counter);
-  void removeGaugeFromSet(Gauge* gauge);
-
   // Allocator
   CounterSharedPtr makeCounter(StatName name, absl::string_view tag_extracted_name,
                                const std::vector<Tag>& tags) override;
@@ -36,6 +33,8 @@ public:
 
 private:
   template <class BaseClass> friend class StatsSharedImpl;
+  friend class CounterImpl;
+  friend class GaugeImpl;
 
   struct HeapStatHash {
     using is_transparent = void; // NOLINT(readability-identifier-naming)
@@ -50,6 +49,9 @@ private:
     }
     bool operator()(const Metric* a, StatName b) const { return a->statName() == b; }
   };
+
+  void removeCounterFromSetLockHeld(Counter* counter) EXCLUSIVE_LOCKS_REQUIRED(mutex_);
+  void removeGaugeFromSetLockHeld(Gauge* gauge) EXCLUSIVE_LOCKS_REQUIRED(mutex_);
 
   // An unordered set of HeapStatData pointers which keys off the key()
   // field in each object. This necessitates a custom comparator and hasher, which key off of the
