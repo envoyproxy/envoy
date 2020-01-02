@@ -63,6 +63,7 @@ ActiveQuicListener::ActiveQuicListener(Event::Dispatcher& dispatcher,
       std::move(alarm_factory), quic::kQuicDefaultConnectionIdLength, parent, config_, stats_,
       per_worker_stats_, dispatcher, listen_socket_);
   quic_dispatcher_->InitializeWithWriter(new EnvoyQuicPacketWriter(listen_socket_));
+  std::cerr << "========= Created ActiveQuicListener\n";
 }
 
 ActiveQuicListener::~ActiveQuicListener() { onListenerShutdown(); }
@@ -157,6 +158,7 @@ ActiveQuicListenerFactory::createActiveUdpListener(Network::ConnectionHandler& p
   // group. One of the listener will be created with this socket option.
   absl::call_once(install_bpf_once_, [&]() {
     if (concurrency_ > 1) {
+      std::cerr << "========== Install BPF\n";
       prog.len = filter.size();
       prog.filter = filter.data();
       options->push_back(std::make_shared<Network::SocketOptionImpl>(
@@ -166,11 +168,11 @@ ActiveQuicListenerFactory::createActiveUdpListener(Network::ConnectionHandler& p
   });
 #else
   if (concurrency_ > 1) {
+    std::cerr << "======== BPF filter is not supported on this platform\n";
     ENVOY_LOG(warn, "BPF filter is not supported on this platform. QUIC won't support connection "
                     "migration and NET rebinding.");
   }
 #endif
-  std::cerr << "========= Created ActiveQuicListener\n";
   return std::make_unique<ActiveQuicListener>(disptacher, parent, config, quic_config_,
                                               std::move(options));
 }

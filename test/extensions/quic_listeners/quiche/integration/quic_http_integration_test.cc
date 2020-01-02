@@ -100,13 +100,15 @@ public:
   }
 
   void initialize() override {
-    config_helper_.addConfigModifier([](envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
+    config_helper_.addConfigModifier([this](envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
       envoy::api::v2::auth::DownstreamTlsContext tls_context;
       ConfigHelper::initializeTls({}, *tls_context.mutable_common_tls_context());
       auto* filter_chain =
           bootstrap.mutable_static_resources()->mutable_listeners(0)->mutable_filter_chains(0);
       auto* transport_socket = filter_chain->mutable_transport_socket();
       transport_socket->mutable_typed_config()->PackFrom(tls_context);
+
+      bootstrap.mutable_static_resources()->mutable_listeners(0)->set_reuse_port(set_reuse_port_);
     });
     config_helper_.addConfigModifier(
         [](envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager&
@@ -130,6 +132,7 @@ protected:
   CodecClientCallbacksForTest client_codec_callback_;
   Network::Address::InstanceConstSharedPtr server_addr_;
   EnvoyQuicClientConnection* quic_connection_{nullptr};
+  bool set_reuse_port_{false};
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, QuicHttpIntegrationTest,
@@ -228,6 +231,7 @@ TEST_P(QuicHttpIntegrationTest, TestDelayedConnectionTeardownTimeoutTrigger) {
 TEST_P(QuicHttpIntegrationTest, MultipleQuicListenersWithBPF) {
 #if defined(SO_ATTACH_REUSEPORT_CBPF) && defined(__linux__)
   concurrency_ = 8;
+  set_reuse_port_ = true;
   initialize();
   std::vector<IntegrationCodecClientPtr> codec_clients;
   quic::QuicCryptoClientConfig::CachedState* cached = crypto_config_.LookupOrCreate(server_id_);
@@ -265,7 +269,9 @@ TEST_P(QuicHttpIntegrationTest, MultipleQuicListenersWithBPF) {
 
 TEST_P(QuicHttpIntegrationTest, MultipleQuicListenersNoBPF) {
   concurrency_ = 8;
+  set_reuse_port_ = true;
   initialize();
+  quic::SetVerbosityLogThreshold(1);
 #ifdef SO_ATTACH_REUSEPORT_CBPF
 #define SO_ATTACH_REUSEPORT_CBPF_TMP SO_ATTACH_REUSEPORT_CBPF
 #undef SO_ATTACH_REUSEPORT_CBPF
@@ -319,6 +325,7 @@ TEST_P(QuicHttpIntegrationTest, MultipleQuicListenersNoBPF) {
 TEST_P(QuicHttpIntegrationTest, ConnectionMigration) {
 #ifdef SO_ATTACH_REUSEPORT_CBPF
   concurrency_ = 2;
+  set_reuse_port_ = true;
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
   auto encoder_decoder =

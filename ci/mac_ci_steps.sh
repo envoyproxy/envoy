@@ -26,10 +26,10 @@ BAZEL_BUILD_OPTIONS="--curses=no --show_task_finish --verbose_failures \
 if [[ $# -gt 0 ]]; then
   TEST_TARGETS=$*
 else
-  TEST_TARGETS=//test/...
+  TEST_TARGETS=//test/extensions/quic_listeners/quiche/integration:quic_http_integration_test
 fi
 
 if [[ "$TEST_TARGETS" == "//test/..." ]]; then
   bazel build ${BAZEL_BUILD_OPTIONS} //source/exe:envoy-static
 fi
-bazel test ${BAZEL_BUILD_OPTIONS} ${TEST_TARGETS}
+bazel test ${BAZEL_BUILD_OPTIONS} --test_arg="-l trace" ${TEST_TARGETS}
