@@ -793,7 +793,6 @@ TEST_P(AdsIntegrationTest, NodeMessage) {
   // Check that all extensions are enabled and version the same as the user-agent
   for (const auto& ext : node->extensions()) {
     EXPECT_FALSE(ext.disabled());
-    EXPECT_FALSE(ext.has_version());
   }
   EXPECT_EQ(0, node->client_features().size());
   xds_stream_->finishGrpcStream(Grpc::Status::Ok);
