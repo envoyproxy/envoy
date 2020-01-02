@@ -226,14 +226,14 @@ void ThreadLocalStoreImpl::releaseScopeCrossThread(ScopeImpl* scope) {
     // to release the memory immediately, however, in which case we remove
     // the rejected stats set from purgatory.
     rejected_stats_purgatory_.insert(rejected_stats);
-    auto clean_central_cache = [this, rejected_stats, scope_id]() {
+    auto clean_central_cache = [this, rejected_stats /*, scope_id*/]() {
       {
         Thread::LockGuard lock(lock_);
         rejected_stats_purgatory_.erase(rejected_stats);
       }
       rejected_stats->free(symbolTable());
       delete rejected_stats;
-      ENVOY_LOG_MISC(error, "x-scope cleanining done for scope {}", scope_id);
+      // ENVOY_LOG_MISC(error, "x-scope cleanining done for scope {}", scope_id);
     };
     lock.release();
     main_thread_dispatcher_->post([this, clean_central_cache, scope_id]() {

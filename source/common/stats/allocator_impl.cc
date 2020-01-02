@@ -200,6 +200,7 @@ CounterSharedPtr AllocatorImpl::makeCounter(StatName name, absl::string_view tag
   ASSERT(gauges_.find(name) == gauges_.end());
   auto iter = counters_.find(name);
   if (iter != counters_.end()) {
+    RELEASE_ASSERT((*iter)->use_count() < 20, (*iter)->name());
     return CounterSharedPtr(*iter);
   }
   CounterSharedPtr counter(new CounterImpl(name, *this, tag_extracted_name, tags));
@@ -214,6 +215,7 @@ GaugeSharedPtr AllocatorImpl::makeGauge(StatName name, absl::string_view tag_ext
   ASSERT(counters_.find(name) == counters_.end());
   auto iter = gauges_.find(name);
   if (iter != gauges_.end()) {
+    RELEASE_ASSERT((*iter)->use_count() < 20, (*iter)->name());
     return GaugeSharedPtr(*iter);
   }
   GaugeSharedPtr gauge(new GaugeImpl(name, *this, tag_extracted_name, tags, import_mode));
