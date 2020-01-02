@@ -357,10 +357,11 @@ bool ListenerManagerImpl::addOrUpdateListenerInternal(const envoy::api::v2::List
     return false;
   }
 
-  ListenerImplPtr new_listener(new ListenerImpl(
-      config, version_info, *this, name, added_via_api, workers_started_, hash,
-      added_via_api ? server_.messageValidationContext().dynamicValidationVisitor()
-                    : server_.messageValidationContext().staticValidationVisitor()));
+  ListenerImplPtr new_listener(
+      new ListenerImpl(config, version_info, *this, name, added_via_api, workers_started_, hash,
+                       added_via_api ? server_.messageValidationContext().dynamicValidationVisitor()
+                                     : server_.messageValidationContext().staticValidationVisitor(),
+                       server_.options().concurrency()));
   ListenerImpl& new_listener_ref = *new_listener;
 
   // We mandate that a listener with the same name must have the same configured address. This
