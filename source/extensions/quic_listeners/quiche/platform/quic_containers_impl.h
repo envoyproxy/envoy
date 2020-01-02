@@ -11,6 +11,7 @@
 #include "absl/container/node_hash_map.h"
 #include "absl/container/node_hash_set.h"
 #include "quiche/common/simple_linked_hash_map.h"
+#include "quiche/quic/platform/api/quic_flags.h"
 
 // NOLINT(namespace-envoy)
 

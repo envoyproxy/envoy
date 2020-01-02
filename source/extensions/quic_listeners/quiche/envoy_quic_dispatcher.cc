@@ -46,14 +46,14 @@ void EnvoyQuicDispatcher::OnConnectionClosed(quic::QuicConnectionId connection_i
   connection_handler_.decNumConnections();
 }
 
-quic::QuicSession* EnvoyQuicDispatcher::CreateQuicSession(
+std::unique_ptr<quic::QuicSession> EnvoyQuicDispatcher::CreateQuicSession(
     quic::QuicConnectionId server_connection_id, const quic::QuicSocketAddress& peer_address,
-    quic::QuicStringPiece /*alpn*/, const quic::ParsedQuicVersion& version) {
+    quiche::QuicheStringPiece /*alpn*/, const quic::ParsedQuicVersion& version) {
   auto quic_connection = std::make_unique<EnvoyQuicServerConnection>(
       server_connection_id, peer_address, *helper(), *alarm_factory(), writer(),
       /*owns_writer=*/false, quic::ParsedQuicVersionVector{version}, listener_config_,
       listener_stats_, listen_socket_);
-  auto quic_session = new EnvoyQuicServerSession(
+  auto quic_session = std::make_unique<EnvoyQuicServerSession>(
       config(), quic::ParsedQuicVersionVector{version}, std::move(quic_connection), this,
       session_helper(), crypto_config(), compressed_certs_cache(), dispatcher_,
       listener_config_.perConnectionBufferLimitBytes());

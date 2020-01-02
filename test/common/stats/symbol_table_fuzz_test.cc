@@ -32,6 +32,8 @@ DEFINE_FUZZER(const uint8_t* buf, size_t len) {
     // Grab the first few bytes from next_data to synthesize together a random uint64_t.
     if (next_data.size() > 1) {
       uint32_t num_bytes = (next_data[0] % 8) + 1; // random number between 1 and 8 inclusive.
+      num_bytes = std::min(static_cast<uint32_t>(next_data.size()),
+                           num_bytes); // restrict number up to the size of next_data
       uint64_t number = 0;
       for (uint32_t i = 0; i < num_bytes; ++i) {
         number = 256 * number + next_data[i + 1];

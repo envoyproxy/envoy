@@ -278,9 +278,15 @@ TEST_P(TcpProxyIntegrationTest, AccessLog) {
   } while (log_result.empty());
 
   // Regex matching localhost:port
+#ifndef GTEST_USES_SIMPLE_RE
   const std::string ip_port_regex = (GetParam() == Network::Address::IpVersion::v4)
                                         ? R"EOF(127\.0\.0\.1:[0-9]+)EOF"
                                         : R"EOF(\[::1\]:[0-9]+)EOF";
+#else
+  const std::string ip_port_regex = (GetParam() == Network::Address::IpVersion::v4)
+                                        ? R"EOF(127\.0\.0\.1:\d+)EOF"
+                                        : R"EOF(\[::1\]:\d+)EOF";
+#endif
 
   const std::string ip_regex =
       (GetParam() == Network::Address::IpVersion::v4) ? R"EOF(127\.0\.0\.1)EOF" : R"EOF(::1)EOF";
@@ -288,7 +294,7 @@ TEST_P(TcpProxyIntegrationTest, AccessLog) {
   // Test that all three addresses were populated correctly. Only check the first line of
   // log output for simplicity.
   EXPECT_THAT(log_result,
-              MatchesRegex(fmt::format("upstreamlocal={0} upstreamhost={0} downstream={1}\n.*",
+              MatchesRegex(fmt::format("upstreamlocal={0} upstreamhost={0} downstream={1}\r?\n.*",
                                        ip_port_regex, ip_regex)));
 }
 

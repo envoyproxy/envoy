@@ -2,12 +2,12 @@
 
 This is a collection of email templates to handle various situations the security team encounters.
 
-## Upcoming security release to envoy-announce@googlegroups.com
+## Upcoming security release to envoy-security-announce@googlegroups.com
 
 ```
 Subject: Upcoming security release of Envoy $VERSION
-To: envoy-announce@googlegroups.com
-Cc: envoy-security@googlegroups.com, envoy-maintainers@googlegroups.com
+To: envoy-security-announce@googlegroups.com
+Cc: envoy-announce@googlegroups.com, envoy-security@googlegroups.com, envoy-maintainers@googlegroups.com
 
 Hello Envoy Community,
 
@@ -105,8 +105,8 @@ $PERSON (on behalf of the Envoy security team and maintainers)
 
 ```
 Subject: Security release of Envoy $VERSION is now available
-To: envoy-announce@googlegroups.com
-Cc: envoy-security@googlegroups.com, envoy-maintainers@googlegroups.com
+To: envoy-security-announce@googlegroups.com
+Cc: envoy-announce@googlegroups.com, envoy-security@googlegroups.com, envoy-maintainers@googlegroups.com
 
 Hello Envoy Community,
 
