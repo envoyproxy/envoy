@@ -89,8 +89,8 @@ protected:
   // Holds backing store shared by both CounterImpl and GaugeImpl. CounterImpl
   // adds another field, pending_increment_, that is not used in Gauge.
   std::atomic<uint64_t> value_{0};
+  std::atomic<uint32_t> ref_count_{0};
   std::atomic<uint16_t> flags_{0};
-  std::atomic<uint16_t> ref_count_{0};
 };
 
 class CounterImpl : public StatsSharedImpl<Counter> {
@@ -199,7 +199,7 @@ template<class StatType>static void warnOnManyUses(StatType& stat) {
   // incremented number in the arithmetic. Issue a warning message only when
   // the use-count gets very high, and then only once in 10k uses.
   uint64_t use_count = stat.use_count() + 1;
-  if (use_count >= 50000 && (use_count % 10000) == 0) {
+  if ((use_count % 10000) == 0) {
     ENVOY_LOG_MISC(warn, "{}: very high use-count: {}", stat.name(), use_count);
   }
 }

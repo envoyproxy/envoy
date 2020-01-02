@@ -1199,7 +1199,7 @@ class ClusterShutdownCleanupStarvationTest : public ThreadLocalStoreNoMocksTestB
 public:
   static constexpr uint32_t NumThreads = 8;
   static constexpr uint32_t NumScopes = 100;
-  static constexpr uint32_t NumIters = 100;
+  static constexpr uint32_t NumIters = 200;
 
   // Helper class to block on a number of multi-threaded operations occurring.
   class BlockingScope {
@@ -1295,6 +1295,14 @@ public:
     main_dispatcher_->run(Event::Dispatcher::RunType::RunUntilExit);
   }
 
+  void incCountersAllThreads() {
+    BlockingScope blocking_scope(NumThreads);
+    for (uint32_t i = 0; i < thread_dispatchers_.size(); ++i) {
+      thread_dispatchers_[i]->post(blocking_scope.run([this]() { incCounters(); }));
+      //thread_dispatchers_[i]->post([this]() { incCounters(); });
+    }
+  }
+
   Api::ApiPtr api_;
   Event::DispatcherPtr main_dispatcher_;
   std::vector<Event::DispatcherPtr> thread_dispatchers_;
@@ -1302,19 +1310,13 @@ public:
   std::unique_ptr<ThreadLocal::InstanceImpl> tls_;
   Thread::ThreadPtr main_thread_;
   std::vector<Thread::ThreadPtr> threads_;
-  absl::Notification make_counters_done_;
   StatNamePool pool_;
   StatName my_counter_name_;
 };
 
 TEST_F(ClusterShutdownCleanupStarvationTest, TenThreadsWithBlockade) {
   for (uint32_t j = 0; j < NumIters; ++j) {
-    {
-      BlockingScope blocking_scope(NumThreads);
-      for (uint32_t i = 0; i < thread_dispatchers_.size(); ++i) {
-        thread_dispatchers_[i]->post(blocking_scope.run([this]() { incCounters(); }));
-      }
-    }
+    incCountersAllThreads();
 
     // With this blockade, use_counts for the counter get into the hundreds.
     // Without it, they go deep into the tens of thousands, blowing through
@@ -1330,9 +1332,7 @@ TEST_F(ClusterShutdownCleanupStarvationTest, TenThreadsWithBlockade) {
 
 TEST_F(ClusterShutdownCleanupStarvationTest, TenThreadsWithoutBlockade) {
   for (uint32_t j = 0; j < NumIters; ++j) {
-    for (uint32_t i = 0; i < thread_dispatchers_.size(); ++i) {
-      thread_dispatchers_[i]->post([this]() { incCounters(); });
-    }
+    incCountersAllThreads();
     // Here we don't quiesce the threads, so there is no time to run their
     // cross-thread cleanup callback following scope deletion.
   }
