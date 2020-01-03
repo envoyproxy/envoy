@@ -1,6 +1,8 @@
 #pragma once
 
 #include "envoy/api/api.h"
+#include "envoy/api/v2/cds.pb.h"
+#include "envoy/api/v2/core/address.pb.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/server/transport_socket_config.h"
 #include "envoy/service/discovery/v2/hds.pb.h"
@@ -90,12 +92,10 @@ using HdsClusterPtr = std::shared_ptr<HdsCluster>;
 /**
  * All hds stats. @see stats_macros.h
  */
-// clang-format off
-#define ALL_HDS_STATS(COUNTER)                                                           \
+#define ALL_HDS_STATS(COUNTER)                                                                     \
   COUNTER(requests)                                                                                \
   COUNTER(responses)                                                                               \
   COUNTER(errors)
-// clang-format on
 
 /**
  * Struct definition for all hds stats. @see stats_macros.h

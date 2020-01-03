@@ -1,14 +1,5 @@
 #include "server/proto_descriptors.h"
 
-#include "envoy/api/v2/cds.pb.h"
-#include "envoy/api/v2/eds.pb.h"
-#include "envoy/api/v2/lds.pb.h"
-#include "envoy/api/v2/rds.pb.h"
-#include "envoy/api/v2/srds.pb.h"
-#include "envoy/service/discovery/v2/ads.pb.h"
-#include "envoy/service/discovery/v2/hds.pb.h"
-#include "envoy/service/ratelimit/v2/rls.pb.h"
-
 #include "common/common/assert.h"
 #include "common/common/fmt.h"
 #include "common/config/protobuf_link_hacks.h"

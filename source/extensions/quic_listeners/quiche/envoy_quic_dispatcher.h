@@ -27,13 +27,6 @@ public:
   ~EnvoyQuicCryptoServerStreamHelper() override = default;
 
   // quic::QuicCryptoServerStream::Helper
-  quic::QuicConnectionId
-  GenerateConnectionIdForReject(quic::QuicTransportVersion /*version*/,
-                                quic::QuicConnectionId /*connection_id*/) const override {
-    // TODO(danzh): create reject connection id based on given connection_id.
-    return quic::QuicUtils::CreateRandomConnectionId();
-  }
-
   bool CanAcceptClientHello(const quic::CryptoHandshakeMessage& /*message*/,
                             const quic::QuicSocketAddress& /*client_address*/,
                             const quic::QuicSocketAddress& /*peer_address*/,
@@ -55,11 +48,19 @@ public:
                       uint8_t expected_server_connection_id_length,
                       Network::ConnectionHandler& connection_handler,
                       Network::ListenerConfig& listener_config,
-                      Server::ListenerStats& listener_stats, Event::Dispatcher& dispatcher);
+                      Server::ListenerStats& listener_stats, Event::Dispatcher& dispatcher,
+                      Network::Socket& listen_socket);
 
   void OnConnectionClosed(quic::QuicConnectionId connection_id, quic::QuicErrorCode error,
                           const std::string& error_details,
                           quic::ConnectionCloseSource source) override;
+
+  quic::QuicConnectionId
+  GenerateNewServerConnectionId(quic::ParsedQuicVersion /*version*/,
+                                quic::QuicConnectionId /*connection_id*/) const override {
+    // TODO(danzh): create reject connection id based on given connection_id.
+    return quic::QuicUtils::CreateRandomConnectionId();
+  }
 
 protected:
   quic::QuicSession* CreateQuicSession(quic::QuicConnectionId server_connection_id,
@@ -72,6 +73,7 @@ private:
   Network::ListenerConfig& listener_config_;
   Server::ListenerStats& listener_stats_;
   Event::Dispatcher& dispatcher_;
+  Network::Socket& listen_socket_;
 };
 
 } // namespace Quic

@@ -1,5 +1,7 @@
 #include "extensions/filters/http/common/jwks_fetcher.h"
 
+#include "envoy/api/v2/core/http_uri.pb.h"
+
 #include "common/common/enum_to_int.h"
 #include "common/http/headers.h"
 #include "common/http/utility.h"
@@ -49,7 +51,7 @@ public:
     }
 
     Http::MessagePtr message = Http::Utility::prepareHeaders(uri);
-    message->headers().insertMethod().value().setReference(Http::Headers::get().MethodValues.Get);
+    message->headers().setReferenceMethod(Http::Headers::get().MethodValues.Get);
     ENVOY_LOG(debug, "fetch pubkey from [uri = {}]: start", uri_->uri());
     auto options = Http::AsyncClient::RequestOptions()
                        .setTimeout(std::chrono::milliseconds(

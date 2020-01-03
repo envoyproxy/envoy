@@ -378,6 +378,13 @@ public:
    */
   virtual void onData(UdpRecvData& data) PURE;
 
+  /**
+   * Called when there is an error event in the receive data path.
+   *
+   * @param error_code supplies the received error on the listener.
+   */
+  virtual void onReceiveError(Api::IoError::IoErrorCode error_code) PURE;
+
 protected:
   /**
    * @param callbacks supplies the read filter callbacks used to interact with the filter manager.

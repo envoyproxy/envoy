@@ -11,6 +11,8 @@
 
 #pragma once
 
+#include "envoy/config/bootstrap/v2/bootstrap.pb.h"
+
 #include "common/runtime/runtime_impl.h"
 #include "common/stats/isolated_store_impl.h"
 

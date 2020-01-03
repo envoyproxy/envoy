@@ -8,11 +8,12 @@
 
 #include "envoy/api/api.h"
 #include "envoy/buffer/buffer.h"
-#include "envoy/config/bootstrap/v2/bootstrap.pb.h"
 #include "envoy/network/address.h"
 #include "envoy/stats/stats.h"
 #include "envoy/stats/store.h"
 #include "envoy/thread/thread.h"
+#include "envoy/type/matcher/string.pb.h"
+#include "envoy/type/percent.pb.h"
 
 #include "common/buffer/buffer_impl.h"
 #include "common/common/c_smart_ptr.h"
@@ -642,8 +643,10 @@ public:
   void remove(const std::string& key);
   std::string get_(const std::string& key) const;
   std::string get_(const LowerCaseString& key) const;
-  bool has(const std::string& key);
-  bool has(const LowerCaseString& key);
+  bool has(const std::string& key) const;
+  bool has(const LowerCaseString& key) const;
+
+  void verifyByteSize() override { ASSERT(cached_byte_size_ == byteSizeInternal()); }
 };
 
 // Helper method to create a header map from an initializer list. Useful due to make_unique's

@@ -1,3 +1,5 @@
+#include "envoy/config/filter/http/jwt_authn/v2alpha/config.pb.h"
+
 #include "extensions/filters/http/jwt_authn/filter.h"
 #include "extensions/filters/http/well_known_names.h"
 
@@ -39,6 +41,7 @@ public:
 class FilterTest : public testing::Test {
 public:
   void SetUp() override {
+    proto_config_.set_bypass_cors_preflight(true);
     mock_config_ = ::std::make_shared<MockFilterConfig>(proto_config_, "", mock_context_);
 
     mock_verifier_ = std::make_unique<MockVerifier>();
@@ -77,6 +80,24 @@ TEST_F(FilterTest, InlineOK) {
   Buffer::OwnedImpl data("");
   EXPECT_EQ(Http::FilterDataStatus::Continue, filter_->decodeData(data, false));
   EXPECT_EQ(Http::FilterTrailersStatus::Continue, filter_->decodeTrailers(headers));
+}
+
+// This test verifies Verifier::Callback is not called for CORS preflight request.
+TEST_F(FilterTest, CorsPreflight) {
+  auto headers = Http::TestHeaderMapImpl{
+      {":method", "OPTIONS"},
+      {":path", "/"},
+      {":scheme", "http"},
+      {":authority", "host"},
+      {"access-control-request-method", "GET"},
+      {"origin", "test-origin"},
+  };
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(headers, false));
+  Http::MetadataMap metadata_map{{"metadata", "metadata"}};
+  EXPECT_EQ(Http::FilterMetadataStatus::Continue, filter_->decodeMetadata(metadata_map));
+  EXPECT_EQ(1U, mock_config_->stats().allowed_.value());
+  EXPECT_EQ(1U, mock_config_->stats().cors_preflight_bypassed_.value());
+  EXPECT_EQ(0U, mock_config_->stats().denied_.value());
 }
 
 // This test verifies the setPayload call is handled correctly

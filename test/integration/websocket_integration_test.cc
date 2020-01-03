@@ -2,7 +2,8 @@
 
 #include <string>
 
-#include "envoy/config/accesslog/v2/file.pb.h"
+#include "envoy/config/bootstrap/v2/bootstrap.pb.h"
+#include "envoy/config/filter/network/http_connection_manager/v2/http_connection_manager.pb.h"
 
 #include "common/http/header_map_impl.h"
 #include "common/protobuf/utility.h"
@@ -55,7 +56,7 @@ void WebsocketIntegrationTest::validateUpgradeRequestHeaders(
   if (proxied_request_headers.Scheme()) {
     ASSERT_EQ(proxied_request_headers.Scheme()->value().getStringView(), "http");
   } else {
-    proxied_request_headers.insertScheme().value().append("http", 4);
+    proxied_request_headers.setScheme("http");
   }
 
   commonValidate(proxied_request_headers, original_request_headers);
@@ -86,7 +87,7 @@ void WebsocketIntegrationTest::commonValidate(Http::HeaderMap& proxied_headers,
   // 0 byte content lengths may be stripped on the H2 path - ignore that as a difference by adding
   // it back to the proxied headers.
   if (original_headers.ContentLength() && proxied_headers.ContentLength() == nullptr) {
-    proxied_headers.insertContentLength().value(size_t(0));
+    proxied_headers.setContentLength(size_t(0));
   }
   // If no content length is specified, the HTTP1 codec will add a chunked encoding header.
   if (original_headers.ContentLength() == nullptr &&
@@ -100,7 +101,7 @@ void WebsocketIntegrationTest::commonValidate(Http::HeaderMap& proxied_headers,
       original_headers.Connection()->value() == "keep-alive, upgrade") {
     // The keep-alive is implicit for HTTP/1.1, so Envoy only sets the upgrade
     // header when converting from HTTP/1.1 to H2
-    proxied_headers.Connection()->value().setCopy("keep-alive, upgrade", 19);
+    proxied_headers.setConnection("keep-alive, upgrade");
   }
 }
 
@@ -353,9 +354,7 @@ TEST_P(WebsocketIntegrationTest, WebsocketCustomFilterChain) {
         auto* foo_upgrade = hcm.add_upgrade_configs();
         foo_upgrade->set_upgrade_type("foo");
         auto* filter_list_back = foo_upgrade->add_filters();
-        const std::string json =
-            Json::Factory::loadFromYamlString("name: envoy.router")->asJsonString();
-        TestUtility::loadFromJson(json, *filter_list_back);
+        TestUtility::loadFromYaml("name: envoy.router", *filter_list_back);
       });
   initialize();
 

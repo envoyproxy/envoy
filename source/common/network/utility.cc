@@ -6,6 +6,7 @@
 #include <string>
 #include <vector>
 
+#include "envoy/api/v2/core/address.pb.h"
 #include "envoy/common/exception.h"
 #include "envoy/common/platform.h"
 #include "envoy/network/connection.h"
@@ -454,7 +455,8 @@ Utility::protobufAddressToAddress(const envoy::api::v2::core::Address& proto_add
                                          proto_address.socket_address().port_value(),
                                          !proto_address.socket_address().ipv4_compat());
   case envoy::api::v2::core::Address::kPipe:
-    return std::make_shared<Address::PipeInstance>(proto_address.pipe().path());
+    return std::make_shared<Address::PipeInstance>(proto_address.pipe().path(),
+                                                   proto_address.pipe().mode());
   default:
     NOT_REACHED_GCOVR_EXCL_LINE;
   }
@@ -514,7 +516,7 @@ Api::IoCallUint64Result Utility::writeToSocket(IoHandle& handle, Buffer::RawSlic
            send_result.err_->getErrorCode() == Api::IoError::IoErrorCode::Interrupt);
 
   if (send_result.ok()) {
-    ENVOY_LOG_MISC(trace, "sendmsg sent:{} bytes", send_result.rc_);
+    ENVOY_LOG_MISC(trace, "sendmsg bytes {}", send_result.rc_);
   } else {
     ENVOY_LOG_MISC(debug, "sendmsg failed with error code {}: {}",
                    static_cast<int>(send_result.err_->getErrorCode()),

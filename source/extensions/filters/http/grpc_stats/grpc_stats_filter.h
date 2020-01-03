@@ -17,6 +17,13 @@ namespace GrpcStats {
 struct GrpcStatsObject : public StreamInfo::FilterState::Object {
   uint64_t request_message_count = 0;
   uint64_t response_message_count = 0;
+
+  ProtobufTypes::MessagePtr serializeAsProto() const override {
+    auto msg = std::make_unique<envoy::config::filter::http::grpc_stats::v2alpha::FilterObject>();
+    msg->set_request_message_count(request_message_count);
+    msg->set_response_message_count(response_message_count);
+    return msg;
+  }
 };
 
 class GrpcStatsFilterConfig

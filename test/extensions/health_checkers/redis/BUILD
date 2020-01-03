@@ -27,6 +27,8 @@ envoy_extension_cc_test(
         "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/upstream:upstream_mocks",
         "//test/test_common:utility_lib",
+        "@envoy_api//envoy/config/filter/network/redis_proxy/v2:pkg_cc_proto",
+        "@envoy_api//envoy/config/health_checker/redis/v2:pkg_cc_proto",
     ],
 )
 
@@ -42,5 +44,6 @@ envoy_extension_cc_test(
         "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/server:server_mocks",
         "//test/mocks/upstream:upstream_mocks",
+        "@envoy_api//envoy/config/filter/network/redis_proxy/v2:pkg_cc_proto",
     ],
 )

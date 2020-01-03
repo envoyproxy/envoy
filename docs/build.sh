@@ -51,7 +51,7 @@ pip3 install -r "${SCRIPT_DIR}"/requirements.txt
 rm -rf bazel-bin/external/envoy_api
 
 # This is for local RBE setup, should be no-op for builds without RBE setting in bazelrc files.
-BAZEL_BUILD_OPTIONS+=" --remote_download_outputs=all"
+BAZEL_BUILD_OPTIONS+=" --remote_download_outputs=all --strategy=protodoc=sandboxed,local"
 
 export EXTENSION_DB_PATH="$(realpath "${BUILD_DIR}/extension_db.json")"
 

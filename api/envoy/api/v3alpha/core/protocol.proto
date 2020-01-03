@@ -2,22 +2,29 @@ syntax = "proto3";
 
 package envoy.api.v3alpha.core;
 
-option java_outer_classname = "ProtocolProto";
-option java_multiple_files = true;
-option java_package = "io.envoyproxy.envoy.api.v3alpha.core";
-
 import "google/protobuf/duration.proto";
 import "google/protobuf/wrappers.proto";
 
+import "udpa/annotations/versioning.proto";
+
 import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.api.v3alpha.core";
+option java_outer_classname = "ProtocolProto";
+option java_multiple_files = true;
 
 // [#protodoc-title: Protocol options]
 
 // [#not-implemented-hide:]
 message TcpProtocolOptions {
+  option (udpa.annotations.versioning).previous_message_type =
+      "envoy.api.v2.core.TcpProtocolOptions";
 }
 
 message HttpProtocolOptions {
+  option (udpa.annotations.versioning).previous_message_type =
+      "envoy.api.v2.core.HttpProtocolOptions";
+
   // The idle timeout for connections. The idle timeout is defined as the
   // period in which there are no active requests. If not set, there is no idle timeout. When the
   // idle timeout is reached the connection will be closed. If the connection is an HTTP/2
@@ -46,9 +53,18 @@ message HttpProtocolOptions {
   google.protobuf.UInt32Value max_headers_count = 2 [(validate.rules).uint32 = {gte: 1}];
 }
 
+// [#next-free-field: 6]
 message Http1ProtocolOptions {
+  option (udpa.annotations.versioning).previous_message_type =
+      "envoy.api.v2.core.Http1ProtocolOptions";
+
   message HeaderKeyFormat {
+    option (udpa.annotations.versioning).previous_message_type =
+        "envoy.api.v2.core.Http1ProtocolOptions.HeaderKeyFormat";
+
     message ProperCaseWords {
+      option (udpa.annotations.versioning).previous_message_type =
+          "envoy.api.v2.core.Http1ProtocolOptions.HeaderKeyFormat.ProperCaseWords";
     }
 
     oneof header_format {
@@ -83,10 +99,24 @@ message Http1ProtocolOptions {
   // Describes how the keys for response headers should be formatted. By default, all header keys
   // are lower cased.
   HeaderKeyFormat header_key_format = 4;
+
+  // Enables trailers for HTTP/1. By default the HTTP/1 codec drops proxied trailers.
+  //
+  // .. attention::
+  //
+  //   Note that this only happens when Envoy is chunk encoding which occurs when:
+  //   - The request is HTTP/1.1.
+  //   - Is neither a HEAD only request nor a HTTP Upgrade.
+  //   - Not a response to a HEAD request.
+  //   - The content length header is not present.
+  bool enable_trailers = 5;
 }
 
 // [#next-free-field: 13]
 message Http2ProtocolOptions {
+  option (udpa.annotations.versioning).previous_message_type =
+      "envoy.api.v2.core.Http2ProtocolOptions";
+
   // `Maximum table size <https://httpwg.org/specs/rfc7541.html#rfc.section.4.2>`_
   // (in octets) that the encoder is permitted to use for the dynamic HPACK table. Valid values
   // range from 0 to 4294967295 (2^32 - 1) and defaults to 4096. 0 effectively disables header
@@ -189,5 +219,8 @@ message Http2ProtocolOptions {
 
 // [#not-implemented-hide:]
 message GrpcProtocolOptions {
+  option (udpa.annotations.versioning).previous_message_type =
+      "envoy.api.v2.core.GrpcProtocolOptions";
+
   Http2ProtocolOptions http2_protocol_options = 1;
 }

@@ -287,17 +287,14 @@ Http::Code HystrixSink::handlerHystrixEventStream(absl::string_view,
                                                   Buffer::Instance&,
                                                   Server::AdminStream& admin_stream) {
 
-  response_headers.insertContentType().value().setReference(
-      Http::Headers::get().ContentTypeValues.TextEventStream);
-  response_headers.insertCacheControl().value().setReference(
-      Http::Headers::get().CacheControlValues.NoCache);
-  response_headers.insertConnection().value().setReference(
-      Http::Headers::get().ConnectionValues.Close);
-  response_headers.insertAccessControlAllowHeaders().value().setReference(
+  response_headers.setReferenceContentType(Http::Headers::get().ContentTypeValues.TextEventStream);
+  response_headers.setReferenceCacheControl(Http::Headers::get().CacheControlValues.NoCache);
+  response_headers.setReferenceConnection(Http::Headers::get().ConnectionValues.Close);
+  response_headers.setReferenceAccessControlAllowHeaders(
       AccessControlAllowHeadersValue.AllowHeadersHystrix);
-  response_headers.insertAccessControlAllowOrigin().value().setReference(
+  response_headers.setReferenceAccessControlAllowOrigin(
       Http::Headers::get().AccessControlAllowOriginValue.All);
-  response_headers.insertNoChunks().value().setInteger(0);
+  response_headers.setNoChunks(0);
 
   Http::StreamDecoderFilterCallbacks& stream_decoder_filter_callbacks =
       admin_stream.getDecoderFilterCallbacks();

@@ -1,3 +1,6 @@
+#include "envoy/config/filter/http/grpc_stats/v2alpha/config.pb.h"
+#include "envoy/config/filter/http/grpc_stats/v2alpha/config.pb.validate.h"
+
 #include "common/grpc/common.h"
 
 #include "extensions/filters/http/grpc_stats/grpc_stats_filter.h"
@@ -173,6 +176,12 @@ TEST_F(GrpcStatsFilterConfigTest, MessageCounts) {
                 .value());
   EXPECT_EQ(2U, data.request_message_count);
   EXPECT_EQ(3U, data.response_message_count);
+
+  auto filter_object =
+      *dynamic_cast<envoy::config::filter::http::grpc_stats::v2alpha::FilterObject*>(
+          data.serializeAsProto().get());
+  EXPECT_EQ(2U, filter_object.request_message_count());
+  EXPECT_EQ(3U, filter_object.response_message_count());
 }
 
 } // namespace

@@ -1,5 +1,6 @@
 #include <string>
 
+#include "envoy/config/filter/http/lua/v2/lua.pb.h"
 #include "envoy/config/filter/http/lua/v2/lua.pb.validate.h"
 
 #include "extensions/filters/http/lua/config.h"

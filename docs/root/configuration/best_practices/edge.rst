@@ -72,14 +72,14 @@ The following is a YAML example of the above recommendation.
             tls_certificates:
             - certificate_chain: { filename: "example_com_cert.pem" }
               private_key: { filename: "example_com_key.pem" }
+        # Uncomment if Envoy is behind a load balancer that exposes client IP address using the PROXY protocol.
+        # use_proxy_proto: true
         filters:
         - name: envoy.http_connection_manager
           typed_config:
             "@type": type.googleapis.com/envoy.config.filter.network.http_connection_manager.v2.HttpConnectionManager
             stat_prefix: ingress_http
             use_remote_address: true
-            # Uncomment if Envoy is behind a load balancer that exposes client IP address using the PROXY protocol.
-            # use_proxy_proto: true
             common_http_protocol_options:
               idle_timeout: 3600s # 1 hour
             http2_protocol_options:

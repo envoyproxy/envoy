@@ -29,7 +29,6 @@ namespace Extensions {
 namespace TransportSockets {
 namespace Tls {
 
-// clang-format off
 #define ALL_SSL_STATS(COUNTER, GAUGE, HISTOGRAM)                                                   \
   COUNTER(connection_error)                                                                        \
   COUNTER(handshake)                                                                               \
@@ -39,7 +38,6 @@ namespace Tls {
   COUNTER(fail_verify_error)                                                                       \
   COUNTER(fail_verify_san)                                                                         \
   COUNTER(fail_verify_cert_hash)
-// clang-format on
 
 /**
  * Wrapper struct for SSL stats. @see stats_macros.h

@@ -2,6 +2,8 @@
 
 #include <memory>
 
+#include "envoy/api/v2/discovery.pb.h"
+
 #include "common/buffer/buffer_impl.h"
 #include "common/common/assert.h"
 #include "common/common/macros.h"
@@ -60,13 +62,12 @@ void HttpSubscriptionImpl::updateResourceInterest(
 void HttpSubscriptionImpl::createRequest(Http::Message& request) {
   ENVOY_LOG(debug, "Sending REST request for {}", path_);
   stats_.update_attempt_.inc();
-  request.headers().insertMethod().value().setReference(Http::Headers::get().MethodValues.Post);
-  request.headers().insertPath().value(path_);
+  request.headers().setReferenceMethod(Http::Headers::get().MethodValues.Post);
+  request.headers().setPath(path_);
   request.body() =
       std::make_unique<Buffer::OwnedImpl>(MessageUtil::getJsonStringFromMessage(request_));
-  request.headers().insertContentType().value().setReference(
-      Http::Headers::get().ContentTypeValues.Json);
-  request.headers().insertContentLength().value(request.body()->length());
+  request.headers().setReferenceContentType(Http::Headers::get().ContentTypeValues.Json);
+  request.headers().setContentLength(request.body()->length());
 }
 
 void HttpSubscriptionImpl::parseResponse(const Http::Message& response) {

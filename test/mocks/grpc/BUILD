@@ -17,5 +17,6 @@ envoy_cc_mock(
         "//include/envoy/grpc:async_client_manager_interface",
         "//source/common/grpc:typed_async_client_lib",
         "//test/test_common:utility_lib",
+        "@envoy_api//envoy/api/v2/core:pkg_cc_proto",
     ],
 )

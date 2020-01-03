@@ -7,11 +7,22 @@
 #include "envoy/api/v2/core/base.pb.h"
 #include "envoy/config/typed_metadata.h"
 #include "envoy/registry/registry.h"
+#include "envoy/type/metadata/v2/metadata.pb.h"
 
 #include "common/protobuf/protobuf.h"
 
 namespace Envoy {
 namespace Config {
+
+/**
+ * MetadataKey presents the key name and path to retrieve value from metadata.
+ */
+struct MetadataKey {
+  std::string key_;
+  std::vector<std::string> path_;
+
+  MetadataKey(const envoy::type::metadata::v2::MetadataKey& metadata_key);
+};
 
 /**
  * Config metadata helpers.
@@ -38,6 +49,15 @@ public:
   static const ProtobufWkt::Value& metadataValue(const envoy::api::v2::core::Metadata& metadata,
                                                  const std::string& filter,
                                                  const std::vector<std::string>& path);
+  /**
+   * Lookup the value by a metadata key from a Metadata.
+   * @param metadata reference.
+   * @param metadata_key with key name and path to retrieve the value.
+   * @return const ProtobufWkt::Value& value if found, empty if not found.
+   */
+  static const ProtobufWkt::Value& metadataValue(const envoy::api::v2::core::Metadata& metadata,
+                                                 const MetadataKey& metadata_key);
+
   /**
    * Obtain mutable reference to metadata value for a given filter and key.
    * @param metadata reference.

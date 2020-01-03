@@ -1,4 +1,10 @@
+#include "envoy/api/v2/core/config_source.pb.h"
+#include "envoy/api/v2/core/grpc_service.pb.h"
+#include "envoy/api/v2/discovery.pb.h"
+#include "envoy/api/v2/rds.pb.h"
 #include "envoy/api/v2/srds.pb.h"
+#include "envoy/config/bootstrap/v2/bootstrap.pb.h"
+#include "envoy/config/filter/network/http_connection_manager/v2/http_connection_manager.pb.h"
 
 #include "common/config/resources.h"
 
@@ -82,7 +88,7 @@ fragments:
               scoped_routes->mutable_scoped_rds()
                   ->mutable_scoped_rds_config_source()
                   ->mutable_api_config_source();
-          if (sotwOrDelta() == Grpc::SotwOrDelta::Delta) {
+          if (isDelta()) {
             srds_api_config_source->set_api_type(envoy::api::v2::core::ApiConfigSource::DELTA_GRPC);
           } else {
             srds_api_config_source->set_api_type(envoy::api::v2::core::ApiConfigSource::GRPC);
@@ -169,7 +175,7 @@ fragments:
                         const std::vector<std::string>& to_add_list,
                         const std::vector<std::string>& to_delete_list,
                         const std::string& version) {
-    if (sotwOrDelta() == Grpc::SotwOrDelta::Delta) {
+    if (isDelta()) {
       sendDeltaScopedRdsResponse(to_add_list, to_delete_list, version);
     } else {
       sendSotwScopedRdsResponse(sotw_list, version);
@@ -216,6 +222,8 @@ fragments:
     scoped_rds_upstream_info_.stream_by_resource_name_[srds_config_name_]->sendGrpcMessage(
         response);
   }
+
+  bool isDelta() { return sotwOrDelta() == Grpc::SotwOrDelta::Delta; }
 
   const std::string srds_config_name_{"foo-scoped-routes"};
   FakeUpstreamInfo scoped_rds_upstream_info_;
@@ -283,7 +291,7 @@ key:
   }
   test_server_->waitForCounterGe("http.config_test.scoped_rds.foo-scoped-routes.update_attempt",
                                  // update_attempt only increase after a response
-                                 sotwOrDelta() == Grpc::SotwOrDelta::Delta ? 1 : 2);
+                                 isDelta() ? 1 : 2);
   test_server_->waitForCounterGe("http.config_test.scoped_rds.foo-scoped-routes.update_success", 1);
   // The version gauge should be set to xxHash64("1").
   test_server_->waitForGaugeEq("http.config_test.scoped_rds.foo-scoped-routes.version",

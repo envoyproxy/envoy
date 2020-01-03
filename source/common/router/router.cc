@@ -76,16 +76,16 @@ bool convertRequestHeadersForInternalRedirect(Http::HeaderMap& downstream_header
   }
 
   // Preserve the original request URL for the second pass.
-  downstream_headers.insertEnvoyOriginalUrl().value(
+  downstream_headers.setEnvoyOriginalUrl(
       absl::StrCat(scheme_is_http ? Http::Headers::get().SchemeValues.Http
                                   : Http::Headers::get().SchemeValues.Https,
                    "://", downstream_headers.Host()->value().getStringView(),
                    downstream_headers.Path()->value().getStringView()));
 
   // Replace the original host, scheme and path.
-  downstream_headers.insertScheme().value(std::string(absolute_url.scheme()));
-  downstream_headers.insertHost().value(std::string(absolute_url.host_and_port()));
-  downstream_headers.insertPath().value(std::string(absolute_url.path_and_query_params()));
+  downstream_headers.setScheme(absolute_url.scheme());
+  downstream_headers.setHost(absolute_url.host_and_port());
+  downstream_headers.setPath(absolute_url.path_and_query_params());
 
   return true;
 }
@@ -94,9 +94,9 @@ bool convertRequestHeadersForInternalRedirect(Http::HeaderMap& downstream_header
 
 void FilterUtility::setUpstreamScheme(Http::HeaderMap& headers, bool use_secure_transport) {
   if (use_secure_transport) {
-    headers.insertScheme().value().setReference(Http::Headers::get().SchemeValues.Https);
+    headers.setReferenceScheme(Http::Headers::get().SchemeValues.Https);
   } else {
-    headers.insertScheme().value().setReference(Http::Headers::get().SchemeValues.Http);
+    headers.setReferenceScheme(Http::Headers::get().SchemeValues.Http);
   }
 }
 
@@ -160,26 +160,28 @@ FilterUtility::finalTimeout(const RouteEntry& route, Http::HeaderMap& request_he
     // If present, use that value as route timeout and don't override
     // *x-envoy-expected-rq-timeout-ms* header. At this point *x-envoy-upstream-rq-timeout-ms*
     // header should have been sanitized by egress Envoy.
-    Http::HeaderEntry* header_expected_timeout_entry =
+    const Http::HeaderEntry* header_expected_timeout_entry =
         request_headers.EnvoyExpectedRequestTimeoutMs();
     if (header_expected_timeout_entry) {
       trySetGlobalTimeout(header_expected_timeout_entry, timeout);
     } else {
-      Http::HeaderEntry* header_timeout_entry = request_headers.EnvoyUpstreamRequestTimeoutMs();
+      const Http::HeaderEntry* header_timeout_entry =
+          request_headers.EnvoyUpstreamRequestTimeoutMs();
 
       if (trySetGlobalTimeout(header_timeout_entry, timeout)) {
         request_headers.removeEnvoyUpstreamRequestTimeoutMs();
       }
     }
   } else {
-    Http::HeaderEntry* header_timeout_entry = request_headers.EnvoyUpstreamRequestTimeoutMs();
+    const Http::HeaderEntry* header_timeout_entry = request_headers.EnvoyUpstreamRequestTimeoutMs();
     if (trySetGlobalTimeout(header_timeout_entry, timeout)) {
       request_headers.removeEnvoyUpstreamRequestTimeoutMs();
     }
   }
 
   // See if there is a per try/retry timeout. If it's >= global we just ignore it.
-  Http::HeaderEntry* per_try_timeout_entry = request_headers.EnvoyUpstreamRequestPerTryTimeoutMs();
+  const Http::HeaderEntry* per_try_timeout_entry =
+      request_headers.EnvoyUpstreamRequestPerTryTimeoutMs();
   if (per_try_timeout_entry) {
     if (absl::SimpleAtoi(per_try_timeout_entry->value().getStringView(), &header_timeout)) {
       timeout.per_try_timeout_ = std::chrono::milliseconds(header_timeout);
@@ -201,7 +203,7 @@ FilterUtility::finalTimeout(const RouteEntry& route, Http::HeaderMap& request_he
   }
 
   if (insert_envoy_expected_request_timeout_ms && expected_timeout > 0) {
-    request_headers.insertEnvoyExpectedRequestTimeoutMs().value(expected_timeout);
+    request_headers.setEnvoyExpectedRequestTimeoutMs(expected_timeout);
   }
 
   // If we've configured max_grpc_timeout, override the grpc-timeout header with
@@ -209,8 +211,7 @@ FilterUtility::finalTimeout(const RouteEntry& route, Http::HeaderMap& request_he
   // in grpc-timeout, ensuring that the upstream gRPC server is aware of the actual timeout.
   // If the expected timeout is 0 set no timeout, as Envoy treats 0 as infinite timeout.
   if (grpc_request && route.maxGrpcTimeout() && expected_timeout != 0) {
-    Grpc::Common::toGrpcTimeout(std::chrono::milliseconds(expected_timeout),
-                                request_headers.insertGrpcTimeout().value());
+    Grpc::Common::toGrpcTimeout(std::chrono::milliseconds(expected_timeout), request_headers);
   }
 
   return timeout;
@@ -233,7 +234,8 @@ FilterUtility::HedgingParams FilterUtility::finalHedgingParams(const RouteEntry&
   HedgingParams hedging_params;
   hedging_params.hedge_on_per_try_timeout_ = route.hedgePolicy().hedgeOnPerTryTimeout();
 
-  Http::HeaderEntry* hedge_on_per_try_timeout_entry = request_headers.EnvoyHedgeOnPerTryTimeout();
+  const Http::HeaderEntry* hedge_on_per_try_timeout_entry =
+      request_headers.EnvoyHedgeOnPerTryTimeout();
   if (hedge_on_per_try_timeout_entry) {
     if (hedge_on_per_try_timeout_entry->value() == "true") {
       hedging_params.hedge_on_per_try_timeout_ = true;
@@ -391,7 +393,11 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
         [this, direct_response,
          &request_headers = headers](Http::HeaderMap& response_headers) -> void {
           const auto new_path = direct_response->newPath(request_headers);
-          if (!new_path.empty()) {
+          // See https://tools.ietf.org/html/rfc7231#section-7.1.2.
+          const auto add_location =
+              direct_response->responseCode() == Http::Code::Created ||
+              Http::CodeUtility::is3xx(enumToInt(direct_response->responseCode()));
+          if (!new_path.empty() && add_location) {
             response_headers.addReferenceKey(Http::Headers::get().Location, new_path);
           }
           direct_response->finalizeResponseHeaders(response_headers, callbacks_->streamInfo());
@@ -470,7 +476,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
         Http::Code::ServiceUnavailable, "maintenance mode",
         [modify_headers, this](Http::HeaderMap& headers) {
           if (!config_.suppress_envoy_headers_) {
-            headers.insertEnvoyOverloaded().value(Http::Headers::get().EnvoyOverloadedValues.True);
+            headers.setReferenceEnvoyOverloaded(Http::Headers::get().EnvoyOverloadedValues.True);
           }
           // Note: append_cluster_info does not respect suppress_envoy_headers.
           modify_headers(headers);
@@ -526,7 +532,7 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
 
   include_attempt_count_ = route_entry_->includeAttemptCount();
   if (include_attempt_count_) {
-    headers.insertEnvoyAttemptCount().value(attempt_count_);
+    headers.setEnvoyAttemptCount(attempt_count_);
   }
 
   // Inject the active span's tracing context into the request headers.
@@ -869,7 +875,7 @@ void Filter::onUpstreamAbort(Http::Code code, StreamInfo::ResponseFlag response_
         code, body,
         [dropped, this](Http::HeaderMap& headers) {
           if (dropped && !config_.suppress_envoy_headers_) {
-            headers.insertEnvoyOverloaded().value(Http::Headers::get().EnvoyOverloadedValues.True);
+            headers.setReferenceEnvoyOverloaded(Http::Headers::get().EnvoyOverloadedValues.True);
           }
           modify_headers_(headers);
         },
@@ -1131,7 +1137,7 @@ void Filter::onUpstreamHeaders(uint64_t response_code, Http::HeaderMapPtr&& head
     std::chrono::milliseconds ms = std::chrono::duration_cast<std::chrono::milliseconds>(
         response_received_time - downstream_request_complete_time_);
     if (!config_.suppress_envoy_headers_) {
-      headers->insertEnvoyUpstreamServiceTime().value(ms.count());
+      headers->setEnvoyUpstreamServiceTime(ms.count());
     }
   }
 
@@ -1321,7 +1327,7 @@ void Filter::doRetry() {
   }
 
   if (include_attempt_count_) {
-    downstream_headers_->insertEnvoyAttemptCount().value(attempt_count_);
+    downstream_headers_->setEnvoyAttemptCount(attempt_count_);
   }
 
   ASSERT(response_timeout_ || timeout_.global_timeout_.count() == 0);
@@ -1385,15 +1391,6 @@ Filter::UpstreamRequest::~UpstreamRequest() {
 
   stream_info_.setUpstreamTiming(upstream_timing_);
   stream_info_.onRequestComplete();
-  // Prior to logging, refresh the byte size of the HeaderMaps.
-  // TODO(asraa): Remove this when entries in HeaderMap can no longer be modified by reference and
-  // HeaderMap holds an accurate internal byte size count.
-  if (upstream_headers_ != nullptr) {
-    upstream_headers_->refreshByteSize();
-  }
-  if (upstream_trailers_ != nullptr) {
-    upstream_trailers_->refreshByteSize();
-  }
   for (const auto& upstream_log : parent_.config_.upstream_logs_) {
     upstream_log->log(parent_.downstream_headers_, upstream_headers_.get(),
                       upstream_trailers_.get(), stream_info_);
@@ -1618,9 +1615,12 @@ void Filter::UpstreamRequest::onPoolReady(Http::StreamEncoder& request_encoder,
 
   host->outlierDetector().putResult(Upstream::Outlier::Result::LocalOriginConnectSuccess);
 
-  // TODO(ggreenway): set upstream local address in the StreamInfo.
   onUpstreamHostSelected(host);
   request_encoder.getStream().addCallbacks(*this);
+
+  stream_info_.setUpstreamLocalAddress(request_encoder.getStream().connectionLocalAddress());
+  parent_.callbacks_->streamInfo().setUpstreamLocalAddress(
+      request_encoder.getStream().connectionLocalAddress());
 
   stream_info_.setUpstreamSslConnection(info.downstreamSslConnection());
   parent_.callbacks_->streamInfo().setUpstreamSslConnection(info.downstreamSslConnection());
@@ -1635,7 +1635,7 @@ void Filter::UpstreamRequest::onPoolReady(Http::StreamEncoder& request_encoder,
   setRequestEncoder(request_encoder);
   calling_encode_headers_ = true;
   if (parent_.route_entry_->autoHostRewrite() && !host->hostname().empty()) {
-    parent_.downstream_headers_->Host()->value(host->hostname());
+    parent_.downstream_headers_->setHost(host->hostname());
   }
 
   if (span_ != nullptr) {

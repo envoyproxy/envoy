@@ -83,7 +83,7 @@ public:
     connection_->addConnectionCallbacks(callbacks);
   }
   void close() override;
-  PoolRequest* makeRequest(const RespValue& request, PoolCallbacks& callbacks) override;
+  PoolRequest* makeRequest(const RespValue& request, ClientCallbacks& callbacks) override;
   bool active() override { return !pending_requests_.empty(); }
   void flushBufferAndResetTimer();
   void initialize(const std::string& auth_password) override;
@@ -104,14 +104,14 @@ private:
   };
 
   struct PendingRequest : public PoolRequest {
-    PendingRequest(ClientImpl& parent, PoolCallbacks& callbacks, Stats::StatName stat_name);
+    PendingRequest(ClientImpl& parent, ClientCallbacks& callbacks, Stats::StatName stat_name);
     ~PendingRequest() override;
 
     // PoolRequest
     void cancel() override;
 
     ClientImpl& parent_;
-    PoolCallbacks& callbacks_;
+    ClientCallbacks& callbacks_;
     Stats::StatName command_;
     bool canceled_{};
     Stats::TimespanPtr aggregate_request_timer_;

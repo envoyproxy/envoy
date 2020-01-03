@@ -5,6 +5,7 @@
 #include "envoy/config/filter/http/squash/v2/squash.pb.h"
 #include "envoy/http/async_client.h"
 #include "envoy/http/filter.h"
+#include "envoy/json/json_object.h"
 #include "envoy/upstream/cluster_manager.h"
 
 #include "common/common/logger.h"

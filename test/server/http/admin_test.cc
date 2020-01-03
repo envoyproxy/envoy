@@ -3,8 +3,12 @@
 #include <regex>
 #include <unordered_map>
 
+#include "envoy/admin/v2alpha/clusters.pb.h"
 #include "envoy/admin/v2alpha/memory.pb.h"
 #include "envoy/admin/v2alpha/server_info.pb.h"
+#include "envoy/api/v2/auth/cert.pb.h"
+#include "envoy/api/v2/core/base.pb.h"
+#include "envoy/config/filter/network/http_connection_manager/v2/http_connection_manager.pb.h"
 #include "envoy/json/json_object.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/stats/stats.h"
@@ -617,12 +621,12 @@ public:
                          Buffer::Instance& response, absl::string_view method,
                          absl::string_view body = absl::string_view()) {
     if (!body.empty()) {
-      request_headers_.insertContentType().value(
+      request_headers_.setReferenceContentType(
           Http::Headers::get().ContentTypeValues.FormUrlEncoded);
       callbacks_.buffer_ = std::make_unique<Buffer::OwnedImpl>(body);
     }
 
-    request_headers_.insertMethod().value(method.data(), method.size());
+    request_headers_.setMethod(method);
     admin_filter_.decodeHeaders(request_headers_, false);
 
     return admin_.runCallback(path_and_query, response_headers, response, admin_filter_);
@@ -725,7 +729,7 @@ TEST_P(AdminInstanceTest, AdminBadProfiler) {
                                    server_);
   Http::HeaderMapImpl header_map;
   const absl::string_view post = Http::Headers::get().MethodValues.Post;
-  request_headers_.insertMethod().value(post.data(), post.size());
+  request_headers_.setMethod(post);
   admin_filter_.decodeHeaders(request_headers_, false);
   EXPECT_NO_LOGS(EXPECT_EQ(Http::Code::InternalServerError,
                            admin_bad_profile_path.runCallback("/cpuprofiler?enable=y", header_map,
@@ -839,7 +843,7 @@ TEST_P(AdminInstanceTest, EscapeHelpTextWithPunctuation) {
   Http::HeaderMapImpl header_map;
   Buffer::OwnedImpl response;
   EXPECT_EQ(Http::Code::OK, getCallback("/", header_map, response));
-  Http::HeaderString& content_type = header_map.ContentType()->value();
+  const Http::HeaderString& content_type = header_map.ContentType()->value();
   EXPECT_THAT(std::string(content_type.getStringView()), testing::HasSubstr("text/html"));
   EXPECT_EQ(-1, response.search(planets.data(), planets.size(), 0));
   const std::string escaped_planets = "jupiter&gt;saturn&gt;mars";
@@ -929,6 +933,153 @@ TEST_P(AdminInstanceTest, ConfigDumpMaintainsOrder) {
     const std::string output = response.toString();
     EXPECT_EQ(expected_json, output);
   }
+}
+
+// Test that using the resource query parameter filters the config dump.
+// We add both static and dynamic listener config to the dump, but expect only
+// dynamic in the JSON with ?resource=dynamic_listeners.
+TEST_P(AdminInstanceTest, ConfigDumpFiltersByResource) {
+  Buffer::OwnedImpl response;
+  Http::HeaderMapImpl header_map;
+  auto listeners = admin_.getConfigTracker().add("listeners", [] {
+    auto msg = std::make_unique<envoy::admin::v2alpha::ListenersConfigDump>();
+    auto dyn_listener = msg->add_dynamic_listeners();
+    dyn_listener->set_name("foo");
+    auto stat_listener = msg->add_static_listeners();
+    auto listener = stat_listener->mutable_listener();
+    listener->set_name("bar");
+    return msg;
+  });
+  const std::string expected_json = R"EOF({
+ "configs": [
+  {
+   "@type": "type.googleapis.com/envoy.admin.v2alpha.ListenersConfigDump.DynamicListener",
+   "name": "foo"
+  }
+ ]
+}
+)EOF";
+  EXPECT_EQ(Http::Code::OK,
+            getCallback("/config_dump?resource=dynamic_listeners", header_map, response));
+  std::string output = response.toString();
+  EXPECT_EQ(expected_json, output);
+}
+
+// Test that using the mask query parameter filters the config dump.
+// We add both static and dynamic listener config to the dump, but expect only
+// dynamic in the JSON with ?mask=dynamic_listeners.
+TEST_P(AdminInstanceTest, ConfigDumpFiltersByMask) {
+  Buffer::OwnedImpl response;
+  Http::HeaderMapImpl header_map;
+  auto listeners = admin_.getConfigTracker().add("listeners", [] {
+    auto msg = std::make_unique<envoy::admin::v2alpha::ListenersConfigDump>();
+    auto dyn_listener = msg->add_dynamic_listeners();
+    dyn_listener->set_name("foo");
+    auto stat_listener = msg->add_static_listeners();
+    auto listener = stat_listener->mutable_listener();
+    listener->set_name("bar");
+    return msg;
+  });
+  const std::string expected_json = R"EOF({
+ "configs": [
+  {
+   "@type": "type.googleapis.com/envoy.admin.v2alpha.ListenersConfigDump",
+   "dynamic_listeners": [
+    {
+     "name": "foo"
+    }
+   ]
+  }
+ ]
+}
+)EOF";
+  EXPECT_EQ(Http::Code::OK,
+            getCallback("/config_dump?mask=dynamic_listeners", header_map, response));
+  std::string output = response.toString();
+  EXPECT_EQ(expected_json, output);
+}
+
+ProtobufTypes::MessagePtr testDumpClustersConfig() {
+  auto msg = std::make_unique<envoy::admin::v2alpha::ClustersConfigDump>();
+  auto static_cluster = msg->add_static_clusters();
+  auto inner_cluster = static_cluster->mutable_cluster();
+  inner_cluster->set_name("foo");
+  inner_cluster->set_drain_connections_on_host_removal(true);
+
+  auto dyn_cluster = msg->add_dynamic_active_clusters();
+  auto inner_dyn_cluster = dyn_cluster->mutable_cluster();
+  inner_dyn_cluster->set_name("bar");
+  return msg;
+}
+
+// Test that when using both resource and mask query parameters the JSON output contains
+// only the desired resource and the fields specified in the mask.
+TEST_P(AdminInstanceTest, ConfigDumpFiltersByResourceAndMask) {
+  Buffer::OwnedImpl response;
+  Http::HeaderMapImpl header_map;
+  auto clusters = admin_.getConfigTracker().add("clusters", testDumpClustersConfig);
+  const std::string expected_json = R"EOF({
+ "configs": [
+  {
+   "@type": "type.googleapis.com/envoy.admin.v2alpha.ClustersConfigDump.StaticCluster",
+   "cluster": {
+    "name": "foo"
+   }
+  }
+ ]
+}
+)EOF";
+  EXPECT_EQ(Http::Code::OK, getCallback("/config_dump?resource=static_clusters&mask=cluster.name",
+                                        header_map, response));
+  std::string output = response.toString();
+  EXPECT_EQ(expected_json, output);
+}
+
+// Test that no fields are present in the JSON output if there is no intersection between the fields
+// of the config dump and the fields present in the mask query parameter.
+TEST_P(AdminInstanceTest, ConfigDumpNonExistentMask) {
+  Buffer::OwnedImpl response;
+  Http::HeaderMapImpl header_map;
+  auto clusters = admin_.getConfigTracker().add("clusters", testDumpClustersConfig);
+  const std::string expected_json = R"EOF({
+ "configs": [
+  {
+   "@type": "type.googleapis.com/envoy.admin.v2alpha.ClustersConfigDump.StaticCluster"
+  }
+ ]
+}
+)EOF";
+  EXPECT_EQ(Http::Code::OK,
+            getCallback("/config_dump?resource=static_clusters&mask=bad", header_map, response));
+  std::string output = response.toString();
+  EXPECT_EQ(expected_json, output);
+}
+
+// Test that a 404 Not found is returned if a non-existent resource is passed in as the
+// resource query parameter.
+TEST_P(AdminInstanceTest, ConfigDumpNonExistentResource) {
+  Buffer::OwnedImpl response;
+  Http::HeaderMapImpl header_map;
+  auto listeners = admin_.getConfigTracker().add("listeners", [] {
+    auto msg = std::make_unique<ProtobufWkt::StringValue>();
+    msg->set_value("listeners_config");
+    return msg;
+  });
+  EXPECT_EQ(Http::Code::NotFound, getCallback("/config_dump?resource=foo", header_map, response));
+}
+
+// Test that a 400 Bad Request is returned if the passed resource query parameter is not a
+// repeated field.
+TEST_P(AdminInstanceTest, ConfigDumpResourceNotRepeated) {
+  Buffer::OwnedImpl response;
+  Http::HeaderMapImpl header_map;
+  auto clusters = admin_.getConfigTracker().add("clusters", [] {
+    auto msg = std::make_unique<envoy::admin::v2alpha::ClustersConfigDump>();
+    msg->set_version_info("foo");
+    return msg;
+  });
+  EXPECT_EQ(Http::Code::BadRequest,
+            getCallback("/config_dump?resource=version_info", header_map, response));
 }
 
 TEST_P(AdminInstanceTest, Memory) {

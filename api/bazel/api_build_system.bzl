@@ -1,8 +1,9 @@
-load("@com_google_protobuf//:protobuf.bzl", _py_proto_library = "py_proto_library")
 load("@com_envoyproxy_protoc_gen_validate//bazel:pgv_proto_library.bzl", "pgv_cc_proto_library")
+load("@com_github_grpc_grpc//bazel:cc_grpc_library.bzl", "cc_grpc_library")
+load("@com_google_protobuf//:protobuf.bzl", _py_proto_library = "py_proto_library")
 load("@io_bazel_rules_go//proto:def.bzl", "go_grpc_library", "go_proto_library")
 load("@io_bazel_rules_go//go:def.bzl", "go_test")
-load("@com_github_grpc_grpc//bazel:cc_grpc_library.bzl", "cc_grpc_library")
+load("@rules_proto//proto:defs.bzl", "proto_library")
 load(
     "//bazel:external_proto_deps.bzl",
     "EXTERNAL_PROTO_CC_BAZEL_DEP_MAP",
@@ -68,7 +69,7 @@ def _api_py_proto_library(name, srcs = [], deps = []):
 
 # This defines googleapis py_proto_library. The repository does not provide its definition and requires
 # overriding it in the consuming project (see https://github.com/grpc/grpc/issues/19255 for more details).
-def py_proto_library(name, deps = []):
+def py_proto_library(name, deps = [], plugin = None):
     srcs = [dep[:-6] + ".proto" if dep.endswith("_proto") else dep for dep in deps]
     proto_deps = []
 
@@ -77,6 +78,10 @@ def py_proto_library(name, deps = []):
     # As a workaround, manually specify the proto dependencies for the imported python rules.
     if name == "annotations_py_proto":
         proto_deps = proto_deps + [":http_py_proto"]
+
+    # py_proto_library does not support plugin as an argument yet at gRPC v1.25.0:
+    # https://github.com/grpc/grpc/blob/v1.25.0/bazel/python_rules.bzl#L72.
+    # plugin should also be passed in here when gRPC version is greater than v1.25.x.
     _py_proto_library(
         name = name,
         srcs = srcs,
@@ -104,7 +109,7 @@ def api_cc_py_proto_library(
         linkstatic = 0,
         has_services = 0):
     relative_name = ":" + name
-    native.proto_library(
+    proto_library(
         name = name,
         srcs = srcs,
         deps = deps + _COMMON_PROTO_DEPS,

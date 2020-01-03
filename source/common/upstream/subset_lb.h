@@ -6,6 +6,7 @@
 #include <string>
 #include <unordered_map>
 
+#include "envoy/api/v2/cds.pb.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/stats/scope.h"
 #include "envoy/upstream/load_balancer.h"
@@ -36,14 +37,14 @@ public:
 
 private:
   using HostPredicate = std::function<bool(const Host&)>;
+  struct SubsetSelectorFallbackParams;
 
   void initSubsetSelectorMap();
   void initSelectorFallbackSubset(const envoy::api::v2::Cluster::LbSubsetConfig::LbSubsetSelector::
                                       LbSubsetSelectorFallbackPolicy&);
-  HostConstSharedPtr chooseHostForSelectorFallbackPolicy(
-      const envoy::api::v2::Cluster::LbSubsetConfig::LbSubsetSelector::
-          LbSubsetSelectorFallbackPolicy& fallback_policy,
-      LoadBalancerContext* context);
+  HostConstSharedPtr
+  chooseHostForSelectorFallbackPolicy(const SubsetSelectorFallbackParams& fallback_params,
+                                      LoadBalancerContext* context);
 
   // Represents a subset of an original HostSet.
   class HostSubsetImpl : public HostSetImpl {
@@ -125,11 +126,56 @@ private:
   using SubsetSelectorMapPtr = std::shared_ptr<SubsetSelectorMap>;
   using ValueSubsetMap = std::unordered_map<HashedValue, LbSubsetEntryPtr>;
   using LbSubsetMap = std::unordered_map<std::string, ValueSubsetMap>;
+  using SubsetSelectorFallbackParamsRef = std::reference_wrapper<SubsetSelectorFallbackParams>;
+
+  class LoadBalancerContextWrapper : public LoadBalancerContext {
+  public:
+    LoadBalancerContextWrapper(LoadBalancerContext* wrapped,
+                               const std::set<std::string>& filtered_metadata_match_criteria_names);
+
+    // LoadBalancerContext
+    absl::optional<uint64_t> computeHashKey() override { return wrapped_->computeHashKey(); }
+    const Router::MetadataMatchCriteria* metadataMatchCriteria() override {
+      return metadata_match_.get();
+    }
+    const Network::Connection* downstreamConnection() const override {
+      return wrapped_->downstreamConnection();
+    }
+    const Http::HeaderMap* downstreamHeaders() const override {
+      return wrapped_->downstreamHeaders();
+    }
+    const HealthyAndDegradedLoad&
+    determinePriorityLoad(const PrioritySet& priority_set,
+                          const HealthyAndDegradedLoad& original_priority_load) override {
+      return wrapped_->determinePriorityLoad(priority_set, original_priority_load);
+    }
+    bool shouldSelectAnotherHost(const Host& host) override {
+      return wrapped_->shouldSelectAnotherHost(host);
+    }
+    uint32_t hostSelectionRetryCount() const override {
+      return wrapped_->hostSelectionRetryCount();
+    }
+    Network::Socket::OptionsSharedPtr upstreamSocketOptions() const override {
+      return wrapped_->upstreamSocketOptions();
+    }
+    Network::TransportSocketOptionsSharedPtr upstreamTransportSocketOptions() const override {
+      return wrapped_->upstreamTransportSocketOptions();
+    }
+
+  private:
+    LoadBalancerContext* wrapped_;
+    Router::MetadataMatchCriteriaConstPtr metadata_match_;
+  };
+
+  struct SubsetSelectorFallbackParams {
+    envoy::api::v2::Cluster::LbSubsetConfig::LbSubsetSelector::LbSubsetSelectorFallbackPolicy
+        fallback_policy_;
+    const std::set<std::string>* fallback_keys_subset_ = nullptr;
+  };
 
   struct SubsetSelectorMap {
     std::unordered_map<std::string, SubsetSelectorMapPtr> subset_keys_;
-    envoy::api::v2::Cluster::LbSubsetConfig::LbSubsetSelector::LbSubsetSelectorFallbackPolicy
-        fallback_policy_;
+    SubsetSelectorFallbackParams fallback_params_;
   };
 
   // Entry in the subset hierarchy.
@@ -162,9 +208,8 @@ private:
 
   HostConstSharedPtr tryChooseHostFromContext(LoadBalancerContext* context, bool& host_chosen);
 
-  absl::optional<
-      envoy::api::v2::Cluster::LbSubsetConfig::LbSubsetSelector::LbSubsetSelectorFallbackPolicy>
-  tryFindSelectorFallbackPolicy(LoadBalancerContext* context);
+  absl::optional<SubsetSelectorFallbackParamsRef>
+  tryFindSelectorFallbackParams(LoadBalancerContext* context);
 
   bool hostMatches(const SubsetMetadata& kvs, const Host& host);
 

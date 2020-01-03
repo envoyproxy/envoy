@@ -1,6 +1,8 @@
 #include <string>
 #include <vector>
 
+#include "envoy/admin/v2alpha/certs.pb.h"
+#include "envoy/api/v2/auth/cert.pb.h"
 #include "envoy/api/v2/auth/cert.pb.validate.h"
 
 #include "common/json/json_loader.h"

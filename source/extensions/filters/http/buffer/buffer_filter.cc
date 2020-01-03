@@ -1,5 +1,6 @@
 #include "extensions/filters/http/buffer/buffer_filter.h"
 
+#include "envoy/config/filter/http/buffer/v2/buffer.pb.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/http/codes.h"
 
@@ -101,7 +102,7 @@ void BufferFilter::maybeAddContentLength() {
     ASSERT(!settings_->disabled());
     if (Runtime::runtimeFeatureEnabled(
             "envoy.reloadable_features.buffer_filter_populate_content_length")) {
-      request_headers_->insertContentLength().value(content_length_);
+      request_headers_->setContentLength(content_length_);
     }
   }
 }

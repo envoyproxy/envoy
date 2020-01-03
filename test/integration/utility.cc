@@ -85,12 +85,12 @@ IntegrationUtil::makeSingleRequest(const Network::Address::InstanceConstSharedPt
   encoder.getStream().addCallbacks(*response);
 
   Http::HeaderMapImpl headers;
-  headers.insertMethod().value(method);
-  headers.insertPath().value(url);
-  headers.insertHost().value(host);
-  headers.insertScheme().value(Http::Headers::get().SchemeValues.Http);
+  headers.setMethod(method);
+  headers.setPath(url);
+  headers.setHost(host);
+  headers.setReferenceScheme(Http::Headers::get().SchemeValues.Http);
   if (!content_type.empty()) {
-    headers.insertContentType().value(content_type);
+    headers.setContentType(content_type);
   }
   encoder.encodeHeaders(headers, body.empty());
   if (!body.empty()) {

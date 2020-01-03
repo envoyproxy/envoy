@@ -2,6 +2,7 @@
 
 #include <string>
 
+#include "envoy/config/trace/v2/trace.pb.h"
 #include "envoy/config/trace/v2/trace.pb.validate.h"
 
 #include "extensions/tracers/common/factory_base.h"

@@ -1,5 +1,7 @@
 #include "extensions/filters/listener/original_src/config.h"
 
+#include "envoy/config/filter/listener/original_src/v2alpha1/original_src.pb.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace ListenerFilters {

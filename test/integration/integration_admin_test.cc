@@ -3,6 +3,8 @@
 #include <string>
 
 #include "envoy/admin/v2alpha/config_dump.pb.h"
+#include "envoy/api/v2/core/base.pb.h"
+#include "envoy/config/bootstrap/v2/bootstrap.pb.h"
 #include "envoy/config/metrics/v2/stats.pb.h"
 #include "envoy/http/header_map.h"
 
@@ -311,8 +313,9 @@ TEST_P(IntegrationAdminTest, Admin) {
   auto listener_it = listeners.cbegin();
   for (; listener_it != listeners.end(); ++listener_it) {
     EXPECT_THAT(response->body(),
-                HasSubstr(fmt::format("{}::{}", listener_it->get().name(),
-                                      listener_it->get().socket().localAddress()->asString())));
+                HasSubstr(fmt::format(
+                    "{}::{}", listener_it->get().name(),
+                    listener_it->get().listenSocketFactory().localAddress()->asString())));
   }
 
   EXPECT_EQ("200", request("admin", "GET", "/listeners?format=json", response));
@@ -327,9 +330,9 @@ TEST_P(IntegrationAdminTest, Admin) {
        ++listener_info_it, ++listener_it) {
     auto local_address = (*listener_info_it)->getObject("local_address");
     auto socket_address = local_address->getObject("socket_address");
-    EXPECT_EQ(listener_it->get().socket().localAddress()->ip()->addressAsString(),
+    EXPECT_EQ(listener_it->get().listenSocketFactory().localAddress()->ip()->addressAsString(),
               socket_address->getString("address"));
-    EXPECT_EQ(listener_it->get().socket().localAddress()->ip()->port(),
+    EXPECT_EQ(listener_it->get().listenSocketFactory().localAddress()->ip()->port(),
               socket_address->getInteger("port_value"));
   }
 

@@ -1,3 +1,4 @@
+#include "envoy/config/filter/network/redis_proxy/v2/redis_proxy.pb.h"
 #include "envoy/config/filter/network/redis_proxy/v2/redis_proxy.pb.validate.h"
 
 #include "common/protobuf/utility.h"

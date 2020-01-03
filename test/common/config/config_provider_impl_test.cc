@@ -1,5 +1,8 @@
 #include <memory>
 
+#include "envoy/api/v2/core/config_source.pb.h"
+#include "envoy/api/v2/discovery.pb.h"
+
 #include "common/config/config_provider_impl.h"
 #include "common/protobuf/utility.h"
 

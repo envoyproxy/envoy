@@ -98,12 +98,12 @@ protected:
       }
 
       Http::TestHeaderMapImpl response_headers;
-      response_headers.insertStatus().value(200);
-      response_headers.insertContentType().value(std::string("application/grpc"));
+      response_headers.setStatus(200);
+      response_headers.setContentType("application/grpc");
       if (grpc_response_messages.empty() && !always_send_trailers) {
-        response_headers.insertGrpcStatus().value(static_cast<uint64_t>(grpc_status.error_code()));
-        response_headers.insertGrpcMessage().value(absl::string_view(
-            grpc_status.error_message().data(), grpc_status.error_message().size()));
+        response_headers.setGrpcStatus(static_cast<uint64_t>(grpc_status.error_code()));
+        response_headers.setGrpcMessage(absl::string_view(grpc_status.error_message().data(),
+                                                          grpc_status.error_message().size()));
         upstream_request_->encodeHeaders(response_headers, true);
       } else {
         response_headers.addCopy(Http::LowerCaseString("trailer"), "Grpc-Status");
@@ -116,9 +116,9 @@ protected:
           upstream_request_->encodeData(*buffer, false);
         }
         Http::TestHeaderMapImpl response_trailers;
-        response_trailers.insertGrpcStatus().value(static_cast<uint64_t>(grpc_status.error_code()));
-        response_trailers.insertGrpcMessage().value(absl::string_view(
-            grpc_status.error_message().data(), grpc_status.error_message().size()));
+        response_trailers.setGrpcStatus(static_cast<uint64_t>(grpc_status.error_code()));
+        response_trailers.setGrpcMessage(absl::string_view(grpc_status.error_message().data(),
+                                                           grpc_status.error_message().size()));
         upstream_request_->encodeTrailers(response_trailers);
       }
       EXPECT_TRUE(upstream_request_->complete());

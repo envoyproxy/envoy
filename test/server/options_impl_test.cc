@@ -5,6 +5,7 @@
 #include <string>
 #include <vector>
 
+#include "envoy/admin/v2alpha/server_info.pb.h"
 #include "envoy/common/exception.h"
 #include "envoy/config/bootstrap/v2/bootstrap.pb.h"
 
@@ -32,15 +33,12 @@ namespace {
 class OptionsImplTest : public testing::Test {
 
 public:
-  // Do the ugly work of turning a std::string into a char** and create an OptionsImpl. Args are
+  // Do the ugly work of turning a std::string into a vector and create an OptionsImpl. Args are
   // separated by a single space: no fancy quoting or escaping.
   std::unique_ptr<OptionsImpl> createOptionsImpl(const std::string& args) {
     std::vector<std::string> words = TestUtility::split(args, ' ');
-    std::vector<const char*> argv;
-    std::transform(words.cbegin(), words.cend(), std::back_inserter(argv),
-                   [](const std::string& arg) { return arg.c_str(); });
     return std::make_unique<OptionsImpl>(
-        argv.size(), argv.data(), [](bool) { return "1"; }, spdlog::level::warn);
+        std::move(words), [](bool) { return "1"; }, spdlog::level::warn);
   }
 };
 
@@ -252,6 +250,25 @@ TEST_F(OptionsImplTest, OptionsAreInSyncWithProto) {
   EXPECT_EQ(options->count() - 6, command_line_options->GetDescriptor()->field_count());
 }
 
+TEST_F(OptionsImplTest, OptionsFromArgv) {
+  const std::array<const char*, 3> args{"envoy", "-c", "hello"};
+  std::unique_ptr<OptionsImpl> options = std::make_unique<OptionsImpl>(
+      static_cast<int>(args.size()), args.data(), [](bool) { return "1"; }, spdlog::level::warn);
+  // Spot check that the arguments were parsed.
+  EXPECT_EQ("hello", options->configPath());
+}
+
+TEST_F(OptionsImplTest, OptionsFromArgvPrefix) {
+  const std::array<const char*, 5> args{"envoy", "-c", "hello", "--admin-address-path", "goodbye"};
+  std::unique_ptr<OptionsImpl> options = std::make_unique<OptionsImpl>(
+      static_cast<int>(args.size()) - 2, // Pass in only a prefix of the args
+      args.data(), [](bool) { return "1"; }, spdlog::level::warn);
+  EXPECT_EQ("hello", options->configPath());
+  // This should still have the default value since the extra arguments are
+  // ignored.
+  EXPECT_EQ("", options->adminAddressPath());
+}
+
 TEST_F(OptionsImplTest, BadCliOption) {
   EXPECT_THROW_WITH_REGEX(createOptionsImpl("envoy -c hello --local-address-ip-version foo"),
                           MalformedArgvException, "error: unknown IP address version 'foo'");
@@ -432,6 +449,61 @@ TEST_F(OptionsImplPlatformLinuxTest, AffinityTest4) {
 }
 
 #endif
+
+class TestFactory {
+public:
+  virtual ~TestFactory() = default;
+  virtual std::string name() PURE;
+  static std::string category() { return "test"; }
+};
+
+class TestTestFactory : public TestFactory {
+public:
+  std::string name() override { return "test"; }
+};
+
+class TestingFactory {
+public:
+  virtual ~TestingFactory() = default;
+  virtual std::string name() PURE;
+  static std::string category() { return "testing"; }
+};
+
+class TestTestingFactory : public TestingFactory {
+public:
+  std::string name() override { return "test"; }
+};
+
+REGISTER_FACTORY(TestTestFactory, TestFactory){"test-1", "test-2"};
+REGISTER_FACTORY(TestTestingFactory, TestingFactory){"test-1", "test-2"};
+
+TEST(DisableExtensions, IsDisabled) {
+  EXPECT_LOG_CONTAINS("warning", "failed to disable invalid extension name 'not.a.factory'",
+                      OptionsImpl::disableExtensions({"not.a.factory"}));
+
+  EXPECT_LOG_CONTAINS("warning", "failed to disable unknown extension 'no/such.factory'",
+                      OptionsImpl::disableExtensions({"no/such.factory"}));
+
+  EXPECT_NE(Registry::FactoryRegistry<TestFactory>::getFactory("test"), nullptr);
+  EXPECT_NE(Registry::FactoryRegistry<TestFactory>::getFactory("test-1"), nullptr);
+  EXPECT_NE(Registry::FactoryRegistry<TestFactory>::getFactory("test-2"), nullptr);
+
+  EXPECT_NE(Registry::FactoryRegistry<TestingFactory>::getFactory("test"), nullptr);
+  EXPECT_NE(Registry::FactoryRegistry<TestingFactory>::getFactory("test-1"), nullptr);
+  EXPECT_NE(Registry::FactoryRegistry<TestingFactory>::getFactory("test-2"), nullptr);
+
+  OptionsImpl::disableExtensions({"test/test", "testing/test-2"});
+
+  // When we disable an extension, all its aliases should also be disabled.
+  EXPECT_EQ(Registry::FactoryRegistry<TestFactory>::getFactory("test"), nullptr);
+  EXPECT_EQ(Registry::FactoryRegistry<TestFactory>::getFactory("test-1"), nullptr);
+  EXPECT_EQ(Registry::FactoryRegistry<TestFactory>::getFactory("test-2"), nullptr);
+
+  // When we disable an extension, all its aliases should also be disabled.
+  EXPECT_EQ(Registry::FactoryRegistry<TestingFactory>::getFactory("test"), nullptr);
+  EXPECT_EQ(Registry::FactoryRegistry<TestingFactory>::getFactory("test-1"), nullptr);
+  EXPECT_EQ(Registry::FactoryRegistry<TestingFactory>::getFactory("test-2"), nullptr);
+}
 
 } // namespace
 } // namespace Envoy

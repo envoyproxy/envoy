@@ -1,5 +1,7 @@
 #include "common/config/remote_data_fetcher.h"
 
+#include "envoy/api/v2/core/http_uri.pb.h"
+
 #include "common/common/enum_to_int.h"
 #include "common/common/hex.h"
 #include "common/crypto/utility.h"
@@ -29,7 +31,7 @@ void RemoteDataFetcher::cancel() {
 
 void RemoteDataFetcher::fetch() {
   Http::MessagePtr message = Http::Utility::prepareHeaders(uri_);
-  message->headers().insertMethod().value().setReference(Http::Headers::get().MethodValues.Get);
+  message->headers().setReferenceMethod(Http::Headers::get().MethodValues.Get);
   ENVOY_LOG(debug, "fetch remote data from [uri = {}]: start", uri_.uri());
   request_ = cm_.httpAsyncClientForCluster(uri_.cluster())
                  .send(std::move(message), *this,

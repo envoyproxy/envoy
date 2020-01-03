@@ -1,5 +1,9 @@
 #include <string>
 
+#include "envoy/api/v2/route/route.pb.h"
+#include "envoy/config/filter/http/health_check/v2/health_check.pb.h"
+#include "envoy/config/filter/http/health_check/v2/health_check.pb.validate.h"
+
 #include "extensions/filters/http/health_check/config.h"
 
 #include "test/mocks/server/mocks.h"

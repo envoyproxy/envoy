@@ -14,13 +14,12 @@ envoy_cc_library(
     hdrs = ["json_loader.h"],
     external_deps = [
         "rapidjson",
-        "yaml_cpp",
     ],
     deps = [
-        "//include/envoy/api:api_interface",
         "//include/envoy/json:json_object_interface",
         "//source/common/common:assert_lib",
         "//source/common/common:hash_lib",
         "//source/common/common:utility_lib",
+        "//source/common/protobuf:utility_lib",
     ],
 )

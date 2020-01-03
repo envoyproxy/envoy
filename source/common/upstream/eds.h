@@ -1,6 +1,8 @@
 #pragma once
 
+#include "envoy/api/v2/cds.pb.h"
 #include "envoy/api/v2/core/base.pb.h"
+#include "envoy/api/v2/discovery.pb.h"
 #include "envoy/api/v2/eds.pb.h"
 #include "envoy/config/subscription.h"
 #include "envoy/config/subscription_factory.h"
@@ -69,7 +71,6 @@ private:
     const envoy::api::v2::ClusterLoadAssignment& cluster_load_assignment_;
   };
 
-  const ClusterManager& cm_;
   std::unique_ptr<Config::Subscription> subscription_;
   const LocalInfo::LocalInfo& local_info_;
   const std::string cluster_name_;

@@ -25,6 +25,48 @@ struct ControlPlaneStats {
   ALL_CONTROL_PLANE_STATS(GENERATE_COUNTER_STRUCT, GENERATE_GAUGE_STRUCT)
 };
 
+// TODO(fredlas) redundant to SubscriptionCallbacks; remove this one.
+class GrpcMuxCallbacks {
+public:
+  virtual ~GrpcMuxCallbacks() = default;
+
+  /**
+   * Called when a configuration update is received.
+   * @param resources vector of fetched resources corresponding to the configuration update.
+   * @param version_info update version.
+   * @throw EnvoyException with reason if the configuration is rejected. Otherwise the configuration
+   *        is accepted. Accepted configurations have their version_info reflected in subsequent
+   *        requests.
+   */
+  virtual void onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
+                              const std::string& version_info) PURE;
+
+  /**
+   * Called when either the subscription is unable to fetch a config update or when onConfigUpdate
+   * invokes an exception.
+   * @param reason supplies the update failure reason.
+   * @param e supplies any exception data on why the fetch failed. May be nullptr.
+   */
+  virtual void onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason reason,
+                                    const EnvoyException* e) PURE;
+
+  /**
+   * Obtain the "name" of a v2 API resource in a google.protobuf.Any, e.g. the route config name for
+   * a RouteConfiguration, based on the underlying resource type.
+   */
+  virtual std::string resourceName(const ProtobufWkt::Any& resource) PURE;
+};
+
+/**
+ * Handle on an muxed gRPC subscription. The subscription is canceled on destruction.
+ */
+class GrpcMuxWatch {
+public:
+  virtual ~GrpcMuxWatch() = default;
+};
+
+using GrpcMuxWatchPtr = std::unique_ptr<GrpcMuxWatch>;
+
 struct Watch;
 
 /**
@@ -41,11 +83,26 @@ public:
   virtual void start() PURE;
 
   /**
+   * Start a configuration subscription asynchronously for some API type and resources.
+   * @param type_url type URL corresponding to xDS API, e.g.
+   * type.googleapis.com/envoy.api.v2.Cluster.
+   * @param resources set of resource names to watch for. If this is empty, then all
+   *                  resources for type_url will result in callbacks.
+   * @param callbacks the callbacks to be notified of configuration updates. These must be valid
+   *                  until GrpcMuxWatch is destroyed.
+   * @return GrpcMuxWatchPtr a handle to cancel the subscription with. E.g. when a cluster goes
+   * away, its EDS updates should be cancelled by destroying the GrpcMuxWatchPtr.
+   */
+  virtual GrpcMuxWatchPtr subscribe(const std::string& type_url,
+                                    const std::set<std::string>& resources,
+                                    GrpcMuxCallbacks& callbacks) PURE;
+
+  /**
    * Pause discovery requests for a given API type. This is useful when we're processing an update
    * for LDS or CDS and don't want a flood of updates for RDS or EDS respectively. Discovery
    * requests may later be resumed with resume().
    * @param type_url type URL corresponding to xDS API, e.g.
-   * type.googleapis.com/envoy.api.v2.Cluster
+   * type.googleapis.com/envoy.api.v2.Cluster.
    */
   virtual void pause(const std::string& type_url) PURE;
 
@@ -56,30 +113,18 @@ public:
    */
   virtual void resume(const std::string& type_url) PURE;
 
+  // TODO(fredlas) PR #8478 will remove this.
   /**
-   * Registers a GrpcSubscription with the GrpcMux. 'watch' may be null (meaning this is an add),
-   * or it may be the Watch* previously returned by this function (which makes it an update).
-   * @param type_url type URL corresponding to xDS API e.g. type.googleapis.com/envoy.api.v2.Cluster
-   * @param watch the Watch* to be updated, or nullptr to add one.
-   * @param resources the set of resource names for 'watch' to start out interested in. If empty,
-   *                  'watch' is treated as interested in *all* resources (of type type_url).
-   * @param callbacks the callbacks that receive updates for 'resources' when they arrive.
-   * @param init_fetch_timeout how long to wait for this new subscription's first update. Ignored
-   *                           unless the addOrUpdateWatch() call is the first for 'type_url'.
-   * @return Watch* the opaque watch token added or updated, to be used in future addOrUpdateWatch
-   *                calls.
+   * Whether this GrpcMux is delta.
+   * @return bool whether this GrpcMux is delta.
    */
+  virtual bool isDelta() const PURE;
+
+  // For delta
   virtual Watch* addOrUpdateWatch(const std::string& type_url, Watch* watch,
                                   const std::set<std::string>& resources,
                                   SubscriptionCallbacks& callbacks,
                                   std::chrono::milliseconds init_fetch_timeout) PURE;
-
-  /**
-   * Cleanup of a Watch* added by addOrUpdateWatch(). Receiving a Watch* from addOrUpdateWatch()
-   * makes you responsible for eventually invoking this cleanup.
-   * @param type_url type URL corresponding to xDS API e.g. type.googleapis.com/envoy.api.v2.Cluster
-   * @param watch the watch to be cleaned up.
-   */
   virtual void removeWatch(const std::string& type_url, Watch* watch) PURE;
 
   /**
@@ -89,12 +134,6 @@ public:
    * @return bool whether the API is paused.
    */
   virtual bool paused(const std::string& type_url) const PURE;
-
-  /**
-   * Passes through to all multiplexed SubscriptionStates. To be called when something
-   * definitive happens with the initial fetch: either an update is successfully received,
-   * or some sort of error happened.*/
-  virtual void disableInitFetchTimeoutTimer() PURE;
 };
 
 using GrpcMuxPtr = std::unique_ptr<GrpcMux>;

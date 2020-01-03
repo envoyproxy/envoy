@@ -1,10 +1,12 @@
 #include "test/integration/ads_integration.h"
 
+#include "envoy/admin/v2alpha/config_dump.pb.h"
+#include "envoy/api/v2/auth/cert.pb.h"
 #include "envoy/api/v2/cds.pb.h"
-#include "envoy/api/v2/discovery.pb.h"
 #include "envoy/api/v2/eds.pb.h"
 #include "envoy/api/v2/lds.pb.h"
 #include "envoy/api/v2/rds.pb.h"
+#include "envoy/config/bootstrap/v2/bootstrap.pb.h"
 
 #include "common/config/protobuf_link_hacks.h"
 #include "common/config/resources.h"

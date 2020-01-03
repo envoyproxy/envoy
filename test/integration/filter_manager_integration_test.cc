@@ -2,6 +2,8 @@
 
 #include <regex>
 
+#include "envoy/config/bootstrap/v2/bootstrap.pb.h"
+
 #include "test/integration/http_integration.h"
 #include "test/integration/integration.h"
 #include "test/integration/utility.h"
@@ -93,8 +95,7 @@ protected:
 
           auto* filter_chain = l->mutable_filter_chains(0);
           auto* filter_list_back = filter_chain->add_filters();
-          const std::string json = Json::Factory::loadFromYamlString(filter_yaml)->asJsonString();
-          TestUtility::loadFromJson(json, *filter_list_back);
+          TestUtility::loadFromYaml(filter_yaml, *filter_list_back);
 
           // Now move it to the front.
           for (int i = filter_chain->filters_size() - 1; i > 0; --i) {

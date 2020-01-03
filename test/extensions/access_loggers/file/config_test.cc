@@ -1,4 +1,5 @@
 #include "envoy/config/accesslog/v2/file.pb.h"
+#include "envoy/config/filter/accesslog/v2/accesslog.pb.h"
 #include "envoy/registry/registry.h"
 
 #include "common/access_log/access_log_impl.h"
@@ -106,6 +107,31 @@ TEST(FileAccessLogConfigTest, FileAccessLogJsonTest) {
 
   EXPECT_THROW_WITH_MESSAGE(AccessLog::AccessLogFactory::fromProto(config, context), EnvoyException,
                             "Didn't find a registered implementation for name: 'INVALID'");
+}
+
+TEST(FileAccessLogConfigTest, FileAccessLogTypedJsonTest) {
+  envoy::config::filter::accesslog::v2::AccessLog config;
+
+  envoy::config::accesslog::v2::FileAccessLog fal_config;
+  fal_config.set_path("/dev/null");
+
+  ProtobufWkt::Value string_value;
+  string_value.set_string_value("%PROTOCOL%");
+
+  auto json_format = fal_config.mutable_typed_json_format();
+  (*json_format->mutable_fields())["protocol"] = string_value;
+
+  EXPECT_EQ(fal_config.access_log_format_case(),
+            envoy::config::accesslog::v2::FileAccessLog::kTypedJsonFormat);
+  TestUtility::jsonConvert(fal_config, *config.mutable_config());
+
+  config.set_name(AccessLogNames::get().File);
+
+  NiceMock<Server::Configuration::MockFactoryContext> context;
+  AccessLog::InstanceSharedPtr log = AccessLog::AccessLogFactory::fromProto(config, context);
+
+  EXPECT_NE(nullptr, log);
+  EXPECT_NE(nullptr, dynamic_cast<FileAccessLog*>(log.get()));
 }
 
 TEST(FileAccessLogConfigTest, FileAccessLogJsonWithBoolValueTest) {

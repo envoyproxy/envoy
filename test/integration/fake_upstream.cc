@@ -222,9 +222,12 @@ FakeHttpConnection::FakeHttpConnection(SharedConnectionWrapper& shared_connectio
                                        uint32_t max_request_headers_count)
     : FakeConnectionBase(shared_connection, time_system) {
   if (type == Type::HTTP1) {
+    Http::Http1Settings http1_settings;
+    // For the purpose of testing, we always have the upstream encode the trailers if any
+    http1_settings.enable_trailers_ = true;
     codec_ = std::make_unique<Http::Http1::ServerConnectionImpl>(
-        shared_connection_.connection(), store, *this, Http::Http1Settings(),
-        max_request_headers_kb, max_request_headers_count);
+        shared_connection_.connection(), store, *this, http1_settings, max_request_headers_kb,
+        max_request_headers_count);
   } else {
     auto settings = Http::Http2Settings();
     settings.allow_connect_ = true;
@@ -408,7 +411,8 @@ FakeUpstream::FakeUpstream(Network::TransportSocketFactoryPtr&& transport_socket
 FakeUpstream::FakeUpstream(Network::TransportSocketFactoryPtr&& transport_socket_factory,
                            Network::SocketPtr&& listen_socket, FakeHttpConnection::Type type,
                            Event::TestTimeSystem& time_system, bool enable_half_close)
-    : http_type_(type), socket_(std::move(listen_socket)),
+    : http_type_(type), socket_(Network::SocketSharedPtr(listen_socket.release())),
+      socket_factory_(std::make_shared<FakeListenSocketFactory>(socket_)),
       api_(Api::createApiForTest(stats_store_)), time_system_(time_system),
       dispatcher_(api_->allocateDispatcher()),
       handler_(new Server::ConnectionHandlerImpl(*dispatcher_, "fake_upstream")),
@@ -579,10 +583,10 @@ void FakeUpstream::onRecvDatagram(Network::UdpRecvData& data) {
 }
 
 void FakeUpstream::sendUdpDatagram(const std::string& buffer,
-                                   const Network::Address::Instance& peer) {
-  dispatcher_->post([this, buffer, &peer] {
+                                   const Network::Address::InstanceConstSharedPtr& peer) {
+  dispatcher_->post([this, buffer, peer] {
     const auto rc = Network::Utility::writeToSocket(socket_->ioHandle(), Buffer::OwnedImpl(buffer),
-                                                    nullptr, peer);
+                                                    nullptr, *peer);
     EXPECT_TRUE(rc.rc_ == buffer.length());
   });
 }

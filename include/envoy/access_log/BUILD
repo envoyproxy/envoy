@@ -14,5 +14,6 @@ envoy_cc_library(
     deps = [
         "//include/envoy/http:header_map_interface",
         "//include/envoy/stream_info:stream_info_interface",
+        "//source/common/protobuf",
     ],
 )

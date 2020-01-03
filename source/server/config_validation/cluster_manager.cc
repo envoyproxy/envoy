@@ -1,5 +1,8 @@
 #include "server/config_validation/cluster_manager.h"
 
+#include "envoy/api/v2/core/config_source.pb.h"
+#include "envoy/config/bootstrap/v2/bootstrap.pb.h"
+
 #include "common/common/utility.h"
 
 namespace Envoy {

@@ -1,0 +1,21 @@
+#include "envoy/config/overload/v3alpha/overload.pb.h"
+
+using envoy::config::overload::v3alpha::Trigger;
+
+class ThresholdTriggerImpl {
+public:
+  ThresholdTriggerImpl(const envoy::config::overload::v3alpha::Trigger& config) {
+    switch (config.trigger_oneof_case()) {
+    case envoy::config::overload::v3alpha::Trigger::kThreshold:
+      break;
+    default:
+      break;
+    }
+    switch (config.trigger_oneof_case()) {
+    case Trigger::kThreshold:
+      break;
+    default:
+      break;
+    }
+  }
+};

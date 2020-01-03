@@ -2,12 +2,19 @@
 
 #include <list>
 
-#include "common/config/update_ack.h"
-
 #include "absl/container/flat_hash_map.h"
+#include "google/rpc/status.pb.h"
 
 namespace Envoy {
 namespace Config {
+
+struct UpdateAck {
+  UpdateAck(absl::string_view nonce, absl::string_view type_url)
+      : nonce_(nonce), type_url_(type_url) {}
+  std::string nonce_;
+  std::string type_url_;
+  ::google::rpc::Status error_detail_;
+};
 
 // There is a head-of-line blocking issue resulting from the intersection of 1) ADS's need for
 // subscription request ordering and 2) the ability to "pause" one of the resource types within ADS.

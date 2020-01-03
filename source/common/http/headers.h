@@ -251,6 +251,7 @@ public:
     const std::string Chunked{"chunked"};
     const std::string Deflate{"deflate"};
     const std::string Gzip{"gzip"};
+    const std::string Identity{"identity"};
   } TransferEncodingValues;
 
   struct {

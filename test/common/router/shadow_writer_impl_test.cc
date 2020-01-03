@@ -24,7 +24,7 @@ class ShadowWriterImplTest : public testing::Test {
 public:
   void expectShadowWriter(absl::string_view host, absl::string_view shadowed_host) {
     Http::MessagePtr message(new Http::RequestMessageImpl());
-    message->headers().insertHost().value(std::string(host));
+    message->headers().setHost(host);
     EXPECT_CALL(cm_, get(Eq("foo")));
     EXPECT_CALL(cm_, httpAsyncClientForCluster("foo")).WillOnce(ReturnRef(cm_.async_client_));
     Http::MockAsyncClientRequest request(&cm_.async_client_);

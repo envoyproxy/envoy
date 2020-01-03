@@ -1,6 +1,10 @@
 #include "common/upstream/health_checker_impl.h"
 
+#include "envoy/api/v2/core/health_check.pb.h"
+#include "envoy/data/core/v2alpha/health_check_event.pb.h"
 #include "envoy/server/health_checker_config.h"
+#include "envoy/type/http.pb.h"
+#include "envoy/type/range.pb.h"
 
 #include "common/buffer/zero_copy_input_stream_impl.h"
 #include "common/common/empty_string.h"
@@ -635,11 +639,10 @@ void GrpcHealthCheckerImpl::GrpcActiveHealthCheckSession::onInterval() {
   auto headers_message =
       Grpc::Common::prepareHeaders(authority, parent_.service_method_.service()->full_name(),
                                    parent_.service_method_.name(), absl::nullopt);
-  headers_message->headers().insertUserAgent().value().setReference(
+  headers_message->headers().setReferenceUserAgent(
       Http::Headers::get().UserAgentValues.EnvoyHealthChecker);
 
-  Grpc::Common::toGrpcTimeout(parent_.timeout_,
-                              headers_message->headers().insertGrpcTimeout().value());
+  Grpc::Common::toGrpcTimeout(parent_.timeout_, headers_message->headers());
 
   Router::FilterUtility::setUpstreamScheme(
       headers_message->headers(), host_->transportSocketFactory().implementsSecureTransport());

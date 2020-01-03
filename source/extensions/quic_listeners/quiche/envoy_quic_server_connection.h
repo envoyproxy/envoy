@@ -16,7 +16,7 @@ public:
                             bool owns_writer,
                             const quic::ParsedQuicVersionVector& supported_versions,
                             Network::ListenerConfig& listener_config,
-                            Server::ListenerStats& listener_stats);
+                            Server::ListenerStats& listener_stats, Network::Socket& listen_socket);
 
   // EnvoyQuicConnection
   // Overridden to set connection_socket_ with initialized self address and retrieve filter chain.

@@ -6,6 +6,8 @@
 #include <string>
 #include <vector>
 
+#include "envoy/api/v2/core/base.pb.h"
+
 #include "common/grpc/common.h"
 #include "common/http/utility.h"
 #include "common/tracing/http_tracer_impl.h"
@@ -131,8 +133,7 @@ void AsyncStreamImpl::sendHeaders(HeaderMap& headers, bool end_stream) {
   }
 
   is_grpc_request_ = Grpc::Common::hasGrpcContentType(headers);
-  headers.insertEnvoyInternalRequest().value().setReference(
-      Headers::get().EnvoyInternalRequestValues.True);
+  headers.setReferenceEnvoyInternalRequest(Headers::get().EnvoyInternalRequestValues.True);
   if (send_xff_) {
     Utility::appendXff(headers, *parent_.config_.local_info_.address());
   }

@@ -22,7 +22,7 @@ public:
   createFilterFactoryFromProto(const Protobuf::Message& config,
                                Server::Configuration::ListenerFactoryContext& context) override {
     auto shared_config = std::make_shared<UdpProxyFilterConfig>(
-        context.clusterManager(), context.timeSource(),
+        context.clusterManager(), context.timeSource(), context.scope(),
         MessageUtil::downcastAndValidate<
             const envoy::config::filter::udp::udp_proxy::v2alpha::UdpProxyConfig&>(
             config, context.messageValidationVisitor()));

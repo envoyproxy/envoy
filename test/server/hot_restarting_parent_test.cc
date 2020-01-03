@@ -50,7 +50,8 @@ TEST_F(HotRestartingParentTest, getListenSocketsForChildNotBindPort) {
   listeners.push_back(std::ref(*static_cast<Network::ListenerConfig*>(&listener_config)));
   EXPECT_CALL(server_, listenerManager()).WillOnce(ReturnRef(listener_manager));
   EXPECT_CALL(listener_manager, listeners()).WillOnce(Return(listeners));
-  EXPECT_CALL(listener_config, socket()).Times(1);
+  EXPECT_CALL(listener_config, listenSocketFactory());
+  EXPECT_CALL(listener_config.socket_factory_, localAddress());
   EXPECT_CALL(listener_config, bindToPort()).WillOnce(Return(false));
 
   HotRestartMessage::Request request;
@@ -92,6 +93,20 @@ TEST_F(HotRestartingParentTest, exportStatsToChild) {
     EXPECT_EQ(0, stats.gauges().at("g0"));
     EXPECT_EQ(124, stats.gauges().at("g1"));
     EXPECT_EQ(455, stats.gauges().at("g2"));
+  }
+
+  // When a counter and gauge are not used, they should not be included in the message.
+  {
+    store.counter("unused_counter");
+    store.counter("used_counter").inc();
+    store.gauge("unused_gauge", Stats::Gauge::ImportMode::Accumulate);
+    store.gauge("used_gauge", Stats::Gauge::ImportMode::Accumulate).add(1);
+    HotRestartMessage::Reply::Stats stats;
+    hot_restarting_parent_.exportStatsToChild(&stats);
+    EXPECT_EQ(stats.counter_deltas().end(), stats.counter_deltas().find("unused_counter"));
+    EXPECT_EQ(1, stats.counter_deltas().at("used_counter"));
+    EXPECT_EQ(stats.gauges().end(), stats.counter_deltas().find("unused_gauge"));
+    EXPECT_EQ(1, stats.gauges().at("used_gauge"));
   }
 }
 

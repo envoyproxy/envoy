@@ -1,5 +1,7 @@
 #include "common/config/datasource.h"
 
+#include "envoy/api/v2/core/base.pb.h"
+
 #include "fmt/format.h"
 
 namespace Envoy {

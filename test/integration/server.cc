@@ -115,7 +115,7 @@ void IntegrationTestServer::start(
   if (tap_path) {
     std::vector<uint32_t> ports;
     for (auto listener : server().listenerManager().listeners()) {
-      const auto listen_addr = listener.get().socket().localAddress();
+      const auto listen_addr = listener.get().listenSocketFactory().localAddress();
       if (listen_addr->type() == Network::Address::Type::Ip) {
         ports.push_back(listen_addr->ip()->port());
       }

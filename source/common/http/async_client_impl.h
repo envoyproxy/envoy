@@ -9,6 +9,8 @@
 #include <string>
 #include <vector>
 
+#include "envoy/api/v2/core/base.pb.h"
+#include "envoy/api/v2/route/route.pb.h"
 #include "envoy/common/scope_tracker.h"
 #include "envoy/config/typed_metadata.h"
 #include "envoy/event/dispatcher.h"
@@ -23,6 +25,7 @@
 #include "envoy/server/filter_config.h"
 #include "envoy/ssl/connection.h"
 #include "envoy/tracing/http_tracer.h"
+#include "envoy/type/percent.pb.h"
 #include "envoy/upstream/load_balancer.h"
 #include "envoy/upstream/upstream.h"
 
@@ -144,9 +147,9 @@ private:
     }
     absl::optional<std::chrono::milliseconds> maxInterval() const override { return absl::nullopt; }
 
-    const std::vector<uint32_t> retriable_status_codes_;
-    const std::vector<Http::HeaderMatcherSharedPtr> retriable_headers_;
-    const std::vector<Http::HeaderMatcherSharedPtr> retriable_request_headers_;
+    const std::vector<uint32_t> retriable_status_codes_{};
+    const std::vector<Http::HeaderMatcherSharedPtr> retriable_headers_{};
+    const std::vector<Http::HeaderMatcherSharedPtr> retriable_request_headers_{};
   };
 
   struct NullShadowPolicy : public Router::ShadowPolicy {

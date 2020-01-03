@@ -1,7 +1,7 @@
 #include "extensions/filters/network/dubbo_proxy/router/route_matcher.h"
 
-#include "envoy/config/filter/network/dubbo_proxy/v2alpha1/dubbo_proxy.pb.h"
-#include "envoy/config/filter/network/dubbo_proxy/v2alpha1/route.pb.validate.h"
+#include "envoy/api/v2/route/route.pb.h"
+#include "envoy/config/filter/network/dubbo_proxy/v2alpha1/route.pb.h"
 
 #include "common/protobuf/utility.h"
 
@@ -167,7 +167,7 @@ RouteConstSharedPtr MethodRouteEntryImpl::matches(const MessageMetadata& metadat
   return clusterEntry(random_value);
 }
 
-SignleRouteMatcherImpl::SignleRouteMatcherImpl(const RouteConfig& config,
+SingleRouteMatcherImpl::SingleRouteMatcherImpl(const RouteConfig& config,
                                                Server::Configuration::FactoryContext&)
     : service_name_(config.interface()), group_(config.group()), version_(config.version()) {
   using envoy::config::filter::network::dubbo_proxy::v2alpha1::RouteMatch;
@@ -178,7 +178,7 @@ SignleRouteMatcherImpl::SignleRouteMatcherImpl(const RouteConfig& config,
   ENVOY_LOG(debug, "dubbo route matcher: routes list size {}", routes_.size());
 }
 
-RouteConstSharedPtr SignleRouteMatcherImpl::route(const MessageMetadata& metadata,
+RouteConstSharedPtr SingleRouteMatcherImpl::route(const MessageMetadata& metadata,
                                                   uint64_t random_value) const {
   ASSERT(metadata.hasInvocationInfo());
   const auto& invocation = metadata.invocation_info();
@@ -205,7 +205,7 @@ MultiRouteMatcher::MultiRouteMatcher(const RouteConfigList& route_config_list,
                                      Server::Configuration::FactoryContext& context) {
   for (const auto& route_config : route_config_list) {
     route_matcher_list_.emplace_back(
-        std::make_unique<SignleRouteMatcherImpl>(route_config, context));
+        std::make_unique<SingleRouteMatcherImpl>(route_config, context));
   }
   ENVOY_LOG(debug, "route matcher list size {}", route_matcher_list_.size());
 }

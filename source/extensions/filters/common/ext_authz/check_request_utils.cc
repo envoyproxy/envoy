@@ -5,6 +5,9 @@
 #include <string>
 #include <vector>
 
+#include "envoy/api/v2/core/base.pb.h"
+#include "envoy/service/auth/v2/attribute_context.pb.h"
+#include "envoy/service/auth/v2/external_auth.pb.h"
 #include "envoy/ssl/connection.h"
 
 #include "common/buffer/buffer_impl.h"

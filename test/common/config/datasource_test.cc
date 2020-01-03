@@ -1,5 +1,4 @@
 #include "envoy/api/v2/core/base.pb.h"
-#include "envoy/api/v2/core/base.pb.validate.h"
 
 #include "common/common/empty_string.h"
 #include "common/config/datasource.h"
@@ -323,13 +322,51 @@ TEST_F(AsyncDataSourceTest, loadRemoteDataSourceExpectNetworkFailure) {
     init_target_handle_ = target.createHandle("test");
   }));
 
+  std::string async_data = "non-empty";
+  auto provider = std::make_unique<Config::DataSource::RemoteAsyncDataProvider>(
+      cm_, init_manager_, config.remote(), true,
+      [&async_data](const std::string& str) { async_data = str; });
+
+  EXPECT_CALL(init_watcher_, ready());
+  init_target_handle_->initialize(init_watcher_);
+  EXPECT_EQ(async_data, EMPTY_STRING);
+  EXPECT_NE(nullptr, provider.get());
+}
+
+TEST_F(AsyncDataSourceTest, loadRemoteDataSourceDoNotAllowEmptyExpectNetworkFailure) {
+  AsyncDataSourcePb config;
+
+  std::string yaml = R"EOF(
+    remote:
+      http_uri:
+        uri: https://example.com/data
+        cluster: cluster_1
+      sha256:
+        xxxxxx
+  )EOF";
+  TestUtility::loadFromYaml(yaml, config);
+  EXPECT_TRUE(config.has_remote());
+
+  EXPECT_CALL(cm_, httpAsyncClientForCluster("cluster_1")).WillOnce(ReturnRef(cm_.async_client_));
+  EXPECT_CALL(cm_.async_client_, send_(_, _, _))
+      .WillOnce(
+          Invoke([&](Http::MessagePtr&, Http::AsyncClient::Callbacks& callbacks,
+                     const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+            callbacks.onSuccess(Http::MessagePtr{new Http::ResponseMessageImpl(
+                Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "503"}}})});
+            return nullptr;
+          }));
+
+  EXPECT_CALL(init_manager_, add(_)).WillOnce(Invoke([this](const Init::Target& target) {
+    init_target_handle_ = target.createHandle("test");
+  }));
+
   auto provider = std::make_unique<Config::DataSource::RemoteAsyncDataProvider>(
       cm_, init_manager_, config.remote(), false, [](const std::string&) {});
 
-  EXPECT_THROW_WITH_MESSAGE(init_target_handle_->initialize(init_watcher_), EnvoyException,
-                            "Failed to fetch remote data. Failure reason: 0");
-  EXPECT_NE(nullptr, provider.get());
   EXPECT_CALL(init_watcher_, ready());
+  init_target_handle_->initialize(init_watcher_);
+  EXPECT_NE(nullptr, provider.get());
 }
 
 TEST_F(AsyncDataSourceTest, loadRemoteDataSourceExpectInvalidData) {
@@ -368,10 +405,60 @@ TEST_F(AsyncDataSourceTest, loadRemoteDataSourceExpectInvalidData) {
   auto provider = std::make_unique<Config::DataSource::RemoteAsyncDataProvider>(
       cm_, init_manager_, config.remote(), false, [](const std::string&) {});
 
-  EXPECT_THROW_WITH_MESSAGE(init_target_handle_->initialize(init_watcher_), EnvoyException,
-                            "Failed to fetch remote data. Failure reason: 1");
-  EXPECT_NE(nullptr, provider.get());
   EXPECT_CALL(init_watcher_, ready());
+  init_target_handle_->initialize(init_watcher_);
+  EXPECT_NE(nullptr, provider.get());
+}
+
+TEST_F(AsyncDataSourceTest, datasourceReleasedBeforeFetchingData) {
+  const std::string body = "hello world";
+  std::string async_data = "non-empty";
+  std::unique_ptr<Config::DataSource::RemoteAsyncDataProvider> provider;
+
+  {
+    AsyncDataSourcePb config;
+
+    std::string yaml = R"EOF(
+    remote:
+      http_uri:
+        uri: https://example.com/data
+        cluster: cluster_1
+      sha256:
+        b94d27b9934d3e08a52e52d7da7dabfac484efe37a5380ee9088f7ace2efcde9
+  )EOF";
+    TestUtility::loadFromYaml(yaml, config);
+    EXPECT_TRUE(config.has_remote());
+
+    EXPECT_CALL(cm_, httpAsyncClientForCluster("cluster_1")).WillOnce(ReturnRef(cm_.async_client_));
+    EXPECT_CALL(cm_.async_client_, send_(_, _, _))
+        .WillOnce(
+            Invoke([&](Http::MessagePtr&, Http::AsyncClient::Callbacks& callbacks,
+                       const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+              Http::MessagePtr response(new Http::ResponseMessageImpl(
+                  Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "200"}}}));
+              response->body() = std::make_unique<Buffer::OwnedImpl>(body);
+
+              callbacks.onSuccess(std::move(response));
+              return nullptr;
+            }));
+
+    EXPECT_CALL(init_manager_, add(_)).WillOnce(Invoke([this](const Init::Target& target) {
+      init_target_handle_ = target.createHandle("test");
+    }));
+
+    provider = std::make_unique<Config::DataSource::RemoteAsyncDataProvider>(
+        cm_, init_manager_, config.remote(), true, [&](const std::string& data) {
+          EXPECT_EQ(init_manager_.state(), Init::Manager::State::Initializing);
+          EXPECT_EQ(data, body);
+          async_data = data;
+        });
+  }
+
+  EXPECT_CALL(init_manager_, state()).WillOnce(Return(Init::Manager::State::Initializing));
+  EXPECT_CALL(init_watcher_, ready());
+  init_target_handle_->initialize(init_watcher_);
+  EXPECT_EQ(async_data, body);
+  EXPECT_NE(nullptr, provider.get());
 }
 
 } // namespace

@@ -488,15 +488,18 @@ used to delimit variable names.
 
 Supported variable names are:
 
-%DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT%
-    Remote address of the downstream connection. If the address is an IP address the output does
-    *not* include port.
+%DOWNSTREAM_REMOTE_ADDRESS%
+    Remote address of the downstream connection. If the address is an IP address it includes both
+    address and port.
 
     .. note::
 
       This may not be the physical remote address of the peer if the address has been inferred from
       :ref:`proxy proto <envoy_api_field_listener.FilterChain.use_proxy_proto>` or :ref:`x-forwarded-for
       <config_http_conn_man_headers_x-forwarded-for>`.
+
+%DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT%
+    Same as **%DOWNSTREAM_REMOTE_ADDRESS%** excluding port if the address is an IP address.
 
 %DOWNSTREAM_LOCAL_ADDRESS%
     Local address of the downstream connection. If the address is an IP address it includes both

@@ -37,18 +37,19 @@ GradientControllerConfig::GradientControllerConfig(
           proto_config.concurrency_limit_params(), max_concurrency_limit, 1000)),
       min_rtt_aggregate_request_count_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(proto_config.min_rtt_calc_params(), request_count, 50)),
-      max_gradient_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(proto_config.concurrency_limit_params(),
-                                                    max_gradient, 2.0)),
       sample_aggregate_percentile_(
-          PROTOBUF_PERCENT_TO_DOUBLE_OR_DEFAULT(proto_config, sample_aggregate_percentile, 50)) {}
-
+          PROTOBUF_PERCENT_TO_DOUBLE_OR_DEFAULT(proto_config, sample_aggregate_percentile, 50)),
+      min_concurrency_(
+          PROTOBUF_GET_WRAPPED_OR_DEFAULT(proto_config.min_rtt_calc_params(), min_concurrency, 3)),
+      min_rtt_buffer_pct_(
+          PROTOBUF_PERCENT_TO_DOUBLE_OR_DEFAULT(proto_config.min_rtt_calc_params(), buffer, 25)) {}
 GradientController::GradientController(GradientControllerConfig config,
                                        Event::Dispatcher& dispatcher, Runtime::Loader&,
                                        const std::string& stats_prefix, Stats::Scope& scope,
                                        Runtime::RandomGenerator& random)
     : config_(std::move(config)), dispatcher_(dispatcher), scope_(scope),
       stats_(generateStats(scope_, stats_prefix)), random_(random), deferred_limit_value_(1),
-      num_rq_outstanding_(0), concurrency_limit_(1),
+      num_rq_outstanding_(0), concurrency_limit_(config_.minConcurrency()),
       latency_sample_hist_(hist_fast_alloc(), hist_free) {
   min_rtt_calc_timer_ = dispatcher_.createTimer([this]() -> void { enterMinRTTSamplingWindow(); });
 
@@ -82,13 +83,13 @@ GradientControllerStats GradientController::generateStats(Stats::Scope& scope,
 void GradientController::enterMinRTTSamplingWindow() {
   absl::MutexLock ml(&sample_mutation_mtx_);
 
-  stats_.min_rtt_calculation_active_.set(1);
+  stats_.min_rtt_calculation_active_.set(config_.minConcurrency());
 
   // Set the minRTT flag to indicate we're gathering samples to update the value. This will
   // prevent the sample window from resetting until enough requests are gathered to complete the
   // recalculation.
   deferred_limit_value_.store(concurrencyLimit());
-  updateConcurrencyLimit(1);
+  updateConcurrencyLimit(config_.minConcurrency());
 
   // Throw away any latency samples from before the recalculation window as it may not represent
   // the minRTT.
@@ -146,10 +147,14 @@ std::chrono::microseconds GradientController::processLatencySamplesAndClear() {
 }
 
 uint32_t GradientController::calculateNewLimit() {
-  // Calculate the gradient value, ensuring it remains below the configured maximum.
   ASSERT(sample_rtt_.count() > 0);
-  const double raw_gradient = static_cast<double>(min_rtt_.count()) / sample_rtt_.count();
-  const double gradient = std::min(config_.maxGradient(), raw_gradient);
+
+  // Calculate the gradient value, ensuring it's clamped between 0.5 and 2.0.
+  // This prevents extreme changes in the concurrency limit between each sample
+  // window.
+  const auto buffered_min_rtt = min_rtt_.count() + min_rtt_.count() * config_.minRTTBufferPercent();
+  const double raw_gradient = static_cast<double>(buffered_min_rtt) / sample_rtt_.count();
+  const double gradient = std::max<double>(0.5, std::min<double>(2.0, raw_gradient));
   stats_.gradient_.set(gradient);
 
   const double limit = concurrencyLimit() * gradient;
@@ -158,9 +163,8 @@ uint32_t GradientController::calculateNewLimit() {
 
   // The final concurrency value factors in the burst headroom and must be clamped to keep the value
   // in the range [1, configured_max].
-  const auto clamp = [](int min, int max, int val) { return std::max(min, std::min(max, val)); };
   const uint32_t new_limit = limit + burst_headroom;
-  return clamp(1, config_.maxConcurrencyLimit(), new_limit);
+  return std::max<uint32_t>(1, std::min<uint32_t>(config_.maxConcurrencyLimit(), new_limit));
 }
 
 RequestForwardingAction GradientController::forwardingDecision() {

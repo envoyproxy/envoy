@@ -1,6 +1,7 @@
 #include "extensions/grpc_credentials/file_based_metadata/config.h"
 
 #include "envoy/api/v2/core/grpc_service.pb.h"
+#include "envoy/config/grpc_credential/v2alpha/file_based_metadata.pb.h"
 #include "envoy/config/grpc_credential/v2alpha/file_based_metadata.pb.validate.h"
 #include "envoy/grpc/google_grpc_creds.h"
 #include "envoy/registry/registry.h"

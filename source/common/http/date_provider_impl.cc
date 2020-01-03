@@ -26,11 +26,11 @@ void TlsCachingDateProviderImpl::onRefreshDate() {
 }
 
 void TlsCachingDateProviderImpl::setDateHeader(HeaderMap& headers) {
-  headers.insertDate().value(tls_->getTyped<ThreadLocalCachedDate>().date_string_);
+  headers.setDate(tls_->getTyped<ThreadLocalCachedDate>().date_string_);
 }
 
 void SlowDateProviderImpl::setDateHeader(HeaderMap& headers) {
-  headers.insertDate().value(date_formatter_.now(time_source_));
+  headers.setDate(date_formatter_.now(time_source_));
 }
 
 } // namespace Http

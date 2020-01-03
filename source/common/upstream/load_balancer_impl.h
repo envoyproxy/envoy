@@ -481,6 +481,32 @@ public:
 };
 
 /**
+ * Implementation of SubsetSelector
+ */
+class SubsetSelectorImpl : public SubsetSelector {
+public:
+  SubsetSelectorImpl(
+      const Protobuf::RepeatedPtrField<std::string>& selector_keys,
+      envoy::api::v2::Cluster::LbSubsetConfig::LbSubsetSelector::LbSubsetSelectorFallbackPolicy
+          fallback_policy,
+      const Protobuf::RepeatedPtrField<std::string>& fallback_keys_subset);
+
+  // SubsetSelector
+  const std::set<std::string>& selectorKeys() const override { return selector_keys_; }
+  envoy::api::v2::Cluster_LbSubsetConfig_LbSubsetSelector::LbSubsetSelectorFallbackPolicy
+  fallbackPolicy() const override {
+    return fallback_policy_;
+  }
+  const std::set<std::string>& fallbackKeysSubset() const override { return fallback_keys_subset_; }
+
+private:
+  const std::set<std::string> selector_keys_;
+  const envoy::api::v2::Cluster::LbSubsetConfig::LbSubsetSelector::LbSubsetSelectorFallbackPolicy
+      fallback_policy_;
+  const std::set<std::string> fallback_keys_subset_;
+};
+
+/**
  * Implementation of LoadBalancerSubsetInfo.
  */
 class LoadBalancerSubsetInfoImpl : public LoadBalancerSubsetInfo {
@@ -494,9 +520,8 @@ public:
         panic_mode_any_(subset_config.panic_mode_any()), list_as_any_(subset_config.list_as_any()) {
     for (const auto& subset : subset_config.subset_selectors()) {
       if (!subset.keys().empty()) {
-        subset_selectors_.emplace_back(std::make_shared<SubsetSelector>(
-            SubsetSelector{std::set<std::string>(subset.keys().begin(), subset.keys().end()),
-                           subset.fallback_policy()}));
+        subset_selectors_.emplace_back(std::make_shared<SubsetSelectorImpl>(
+            subset.keys(), subset.fallback_policy(), subset.fallback_keys_subset()));
       }
     }
   }

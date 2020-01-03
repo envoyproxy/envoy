@@ -9,7 +9,7 @@ function fix {
   ci/do_ci.sh fix_format
   ci/do_ci.sh fix_spelling
   ci/do_ci.sh fix_spelling_pedantic
-  echo "Format check faild, try apply following patch to fix:"
+  echo "Format check failed, try apply following patch to fix:"
   git diff HEAD | tee "${DIFF_OUTPUT}"
 
   exit 1

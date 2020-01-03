@@ -2,6 +2,9 @@
 
 #include <iostream>
 
+#include "envoy/config/bootstrap/v2/bootstrap.pb.h"
+#include "envoy/config/filter/network/http_connection_manager/v2/http_connection_manager.pb.h"
+
 #include "common/http/header_map_impl.h"
 
 #include "test/integration/autonomous_upstream.h"
@@ -52,7 +55,7 @@ TEST_P(Http2UpstreamIntegrationTest, Retry) { testRetry(); }
 
 TEST_P(Http2UpstreamIntegrationTest, GrpcRetry) { testGrpcRetry(); }
 
-TEST_P(Http2UpstreamIntegrationTest, Trailers) { testTrailers(1024, 2048); }
+TEST_P(Http2UpstreamIntegrationTest, Trailers) { testTrailers(1024, 2048, true, true); }
 
 // Ensure Envoy handles streaming requests and responses simultaneously.
 void Http2UpstreamIntegrationTest::bidirectionalStreaming(uint32_t bytes) {
@@ -334,8 +337,7 @@ typed_config:
       "@type": type.googleapis.com/envoy.config.accesslog.v2.FileAccessLog
       path: /dev/null
   )EOF";
-        const std::string json = Json::Factory::loadFromYamlString(yaml_string)->asJsonString();
-        TestUtility::loadFromJson(json, *hcm.mutable_http_filters(1));
+        TestUtility::loadFromYaml(yaml_string, *hcm.mutable_http_filters(1));
       });
 
   // As with ProtocolIntegrationTest.HittingEncoderFilterLimit use a filter

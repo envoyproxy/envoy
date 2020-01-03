@@ -27,12 +27,14 @@ public:
   // Http::FilterHeadersStatus::StopAllIterationAndWatermark for headers. Triggers a timer to
   // continue iteration after 5s.
   Http::FilterHeadersStatus decodeHeaders(Http::HeaderMap& header_map, bool) override {
-    Http::HeaderEntry* entry_content = header_map.get(Envoy::Http::LowerCaseString("content_size"));
-    Http::HeaderEntry* entry_added = header_map.get(Envoy::Http::LowerCaseString("added_size"));
+    const Http::HeaderEntry* entry_content =
+        header_map.get(Envoy::Http::LowerCaseString("content_size"));
+    const Http::HeaderEntry* entry_added =
+        header_map.get(Envoy::Http::LowerCaseString("added_size"));
     ASSERT(entry_content != nullptr && entry_added != nullptr);
     content_size_ = std::stoul(std::string(entry_content->value().getStringView()));
     added_size_ = std::stoul(std::string(entry_added->value().getStringView()));
-    Http::HeaderEntry* entry_is_first_trigger =
+    const Http::HeaderEntry* entry_is_first_trigger =
         header_map.get(Envoy::Http::LowerCaseString("is_first_trigger"));
     is_first_trigger_ = entry_is_first_trigger != nullptr;
     // Remove "first_trigger" headers so that if the filter is registered twice in a filter chain,
@@ -41,7 +43,8 @@ public:
 
     createTimerForContinue();
 
-    Http::HeaderEntry* entry_buffer = header_map.get(Envoy::Http::LowerCaseString("buffer_limit"));
+    const Http::HeaderEntry* entry_buffer =
+        header_map.get(Envoy::Http::LowerCaseString("buffer_limit"));
     if (entry_buffer == nullptr || !is_first_trigger_) {
       return Http::FilterHeadersStatus::StopAllIterationAndBuffer;
     } else {

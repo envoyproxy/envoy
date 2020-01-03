@@ -46,7 +46,7 @@ class TypeWhispererVisitor(visitor.Visitor):
 
 def Main():
   plugin.Plugin([
-      plugin.DirectOutputDescriptor('.types.pb_text', TypeWhispererVisitor()),
+      plugin.DirectOutputDescriptor('.types.pb_text', TypeWhispererVisitor),
   ])
 
 

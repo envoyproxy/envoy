@@ -1,6 +1,8 @@
 #include <memory>
 
 #include "envoy/api/api.h"
+#include "envoy/config/filter/network/redis_proxy/v2/redis_proxy.pb.validate.h"
+#include "envoy/config/health_checker/redis/v2/redis.pb.validate.h"
 
 #include "extensions/health_checkers/redis/redis.h"
 #include "extensions/health_checkers/redis/utility.h"
@@ -146,13 +148,13 @@ public:
   }
 
   void expectExistsRequestCreate() {
-    EXPECT_CALL(*client_, makeRequest(Ref(RedisHealthChecker::existsHealthCheckRequest("")), _))
+    EXPECT_CALL(*client_, makeRequest_(Ref(RedisHealthChecker::existsHealthCheckRequest("")), _))
         .WillOnce(DoAll(WithArg<1>(SaveArgAddress(&pool_callbacks_)), Return(&pool_request_)));
     EXPECT_CALL(*timeout_timer_, enableTimer(_, _));
   }
 
   void expectPingRequestCreate() {
-    EXPECT_CALL(*client_, makeRequest(Ref(RedisHealthChecker::pingHealthCheckRequest()), _))
+    EXPECT_CALL(*client_, makeRequest_(Ref(RedisHealthChecker::pingHealthCheckRequest()), _))
         .WillOnce(DoAll(WithArg<1>(SaveArgAddress(&pool_callbacks_)), Return(&pool_request_)));
     EXPECT_CALL(*timeout_timer_, enableTimer(_, _));
   }
@@ -183,7 +185,7 @@ public:
   Event::MockTimer* interval_timer_{};
   Extensions::NetworkFilters::Common::Redis::Client::MockClient* client_{};
   Extensions::NetworkFilters::Common::Redis::Client::MockPoolRequest pool_request_;
-  Extensions::NetworkFilters::Common::Redis::Client::PoolCallbacks* pool_callbacks_{};
+  Extensions::NetworkFilters::Common::Redis::Client::ClientCallbacks* pool_callbacks_{};
   std::shared_ptr<RedisHealthChecker> health_checker_;
   Api::ApiPtr api_;
 };
@@ -437,10 +439,11 @@ TEST_F(RedisHealthCheckerTest, ExistsRedirected) {
   // Success with moved redirection
   EXPECT_CALL(*timeout_timer_, disableTimer());
   EXPECT_CALL(*interval_timer_, enableTimer(_, _));
-  NetworkFilters::Common::Redis::RespValue moved_response;
-  moved_response.type(NetworkFilters::Common::Redis::RespType::Error);
-  moved_response.asString() = "MOVED 1111 127.0.0.1:81"; // exact values not important
-  pool_callbacks_->onRedirection(moved_response);
+  NetworkFilters::Common::Redis::RespValuePtr moved_response{
+      new NetworkFilters::Common::Redis::RespValue()};
+  moved_response->type(NetworkFilters::Common::Redis::RespType::Error);
+  moved_response->asString() = "MOVED 1111 127.0.0.1:81"; // exact values not important
+  pool_callbacks_->onRedirection(std::move(moved_response), "127.0.0.1:81", false);
 
   expectExistsRequestCreate();
   interval_timer_->invokeCallback();
@@ -448,10 +451,11 @@ TEST_F(RedisHealthCheckerTest, ExistsRedirected) {
   // Success with ask redirection
   EXPECT_CALL(*timeout_timer_, disableTimer());
   EXPECT_CALL(*interval_timer_, enableTimer(_, _));
-  NetworkFilters::Common::Redis::RespValue ask_response;
-  ask_response.type(NetworkFilters::Common::Redis::RespType::Error);
-  ask_response.asString() = "ASK 1111 127.0.0.1:81"; // exact values not important
-  pool_callbacks_->onRedirection(ask_response);
+  NetworkFilters::Common::Redis::RespValuePtr ask_response{
+      new NetworkFilters::Common::Redis::RespValue()};
+  ask_response->type(NetworkFilters::Common::Redis::RespType::Error);
+  ask_response->asString() = "ASK 1111 127.0.0.1:81"; // exact values not important
+  pool_callbacks_->onRedirection(std::move(ask_response), "127.0.0.1:81", true);
 
   EXPECT_CALL(*client_, close());
 

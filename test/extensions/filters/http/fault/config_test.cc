@@ -1,4 +1,6 @@
+#include "envoy/config/filter/http/fault/v2/fault.pb.h"
 #include "envoy/config/filter/http/fault/v2/fault.pb.validate.h"
+#include "envoy/type/percent.pb.h"
 
 #include "extensions/filters/http/fault/config.h"
 

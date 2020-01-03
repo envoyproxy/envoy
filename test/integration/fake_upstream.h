@@ -6,6 +6,7 @@
 #include <string>
 
 #include "envoy/api/api.h"
+#include "envoy/api/v2/core/base.pb.h"
 #include "envoy/event/timer.h"
 #include "envoy/grpc/status.h"
 #include "envoy/http/codec.h"
@@ -24,6 +25,7 @@
 #include "common/common/thread.h"
 #include "common/grpc/codec.h"
 #include "common/grpc/common.h"
+#include "common/http/exception.h"
 #include "common/network/connection_balancer_impl.h"
 #include "common/network/filter_impl.h"
 #include "common/network/listen_socket_impl.h"
@@ -437,10 +439,24 @@ private:
 
     // Network::ReadFilter
     Network::FilterStatus onData(Buffer::Instance& data, bool) override {
-      parent_.codec_->dispatch(data);
+      try {
+        parent_.codec_->dispatch(data);
+      } catch (const Http::CodecProtocolException& e) {
+        ENVOY_LOG(debug, "FakeUpstream dispatch error: {}", e.what());
+        // We don't do a full stream shutdown like HCM, but just shutdown the
+        // connection for now.
+        read_filter_callbacks_->connection().close(
+            Network::ConnectionCloseType::FlushWriteAndDelay);
+      }
       return Network::FilterStatus::StopIteration;
     }
 
+    void
+    initializeReadFilterCallbacks(Network::ReadFilterCallbacks& read_filter_callbacks) override {
+      read_filter_callbacks_ = &read_filter_callbacks;
+    }
+
+    Network::ReadFilterCallbacks* read_filter_callbacks_{};
     FakeHttpConnection& parent_;
   };
 
@@ -569,7 +585,8 @@ public:
                      std::chrono::milliseconds timeout = TestUtility::DefaultTimeout);
 
   // Send a UDP datagram on the fake upstream thread.
-  void sendUdpDatagram(const std::string& buffer, const Network::Address::Instance& peer);
+  void sendUdpDatagram(const std::string& buffer,
+                       const Network::Address::InstanceConstSharedPtr& peer);
 
   // Network::FilterChainManager
   const Network::FilterChain* findFilterChain(const Network::ConnectionSocket&) const override {
@@ -600,6 +617,26 @@ private:
                Network::SocketPtr&& connection, FakeHttpConnection::Type type,
                Event::TestTimeSystem& time_system, bool enable_half_close);
 
+  class FakeListenSocketFactory : public Network::ListenSocketFactory {
+  public:
+    FakeListenSocketFactory(Network::SocketSharedPtr socket) : socket_(socket) {}
+
+    // Network::ListenSocketFactory
+    Network::Address::SocketType socketType() const override { return socket_->socketType(); }
+
+    const Network::Address::InstanceConstSharedPtr& localAddress() const override {
+      return socket_->localAddress();
+    }
+
+    Network::SocketSharedPtr getListenSocket() override { return socket_; }
+    absl::optional<std::reference_wrapper<Network::Socket>> sharedSocket() const override {
+      return *socket_;
+    }
+
+  private:
+    Network::SocketSharedPtr socket_;
+  };
+
   class FakeUpstreamUdpFilter : public Network::UdpListenerReadFilter {
   public:
     FakeUpstreamUdpFilter(FakeUpstream& parent, Network::UdpReadFilterCallbacks& callbacks)
@@ -607,6 +644,7 @@ private:
 
     // Network::UdpListenerReadFilter
     void onData(Network::UdpRecvData& data) override { parent_.onRecvDatagram(data); }
+    void onReceiveError(Api::IoError::IoErrorCode) override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
 
   private:
     FakeUpstream& parent_;
@@ -622,8 +660,9 @@ private:
     // Network::ListenerConfig
     Network::FilterChainManager& filterChainManager() override { return parent_; }
     Network::FilterChainFactory& filterChainFactory() override { return parent_; }
-    Network::Socket& socket() override { return *parent_.socket_; }
-    const Network::Socket& socket() const override { return *parent_.socket_; }
+    Network::ListenSocketFactory& listenSocketFactory() override {
+      return *parent_.socket_factory_;
+    }
     bool bindToPort() override { return true; }
     bool handOffRestoredDestinationConnections() const override { return false; }
     uint32_t perConnectionBufferLimitBytes() const override { return 0; }
@@ -652,7 +691,8 @@ private:
   SharedConnectionWrapper& consumeConnection() ABSL_EXCLUSIVE_LOCKS_REQUIRED(lock_);
   void onRecvDatagram(Network::UdpRecvData& data);
 
-  Network::SocketPtr socket_;
+  Network::SocketSharedPtr socket_;
+  Network::ListenSocketFactorySharedPtr socket_factory_;
   ConditionalInitializer server_initialized_;
   // Guards any objects which can be altered both in the upstream thread and the
   // main test thread.

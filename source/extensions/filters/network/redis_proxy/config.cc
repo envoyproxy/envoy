@@ -1,6 +1,9 @@
 #include "extensions/filters/network/redis_proxy/config.h"
 
-#include "extensions/common/redis/redirection_mgr_impl.h"
+#include "envoy/config/filter/network/redis_proxy/v2/redis_proxy.pb.h"
+#include "envoy/config/filter/network/redis_proxy/v2/redis_proxy.pb.validate.h"
+
+#include "extensions/common/redis/cluster_refresh_manager_impl.h"
 #include "extensions/filters/network/common/redis/client_impl.h"
 #include "extensions/filters/network/redis_proxy/command_splitter_impl.h"
 #include "extensions/filters/network/redis_proxy/proxy_filter.h"
@@ -31,8 +34,8 @@ Network::FilterFactoryCb RedisProxyFilterConfigFactory::createFilterFactoryFromP
   ASSERT(!proto_config.stat_prefix().empty());
   ASSERT(proto_config.has_settings());
 
-  Extensions::Common::Redis::RedirectionManagerSharedPtr redirection_manager =
-      Extensions::Common::Redis::getRedirectionManager(
+  Extensions::Common::Redis::ClusterRefreshManagerSharedPtr refresh_manager =
+      Extensions::Common::Redis::getClusterRefreshManager(
           context.singletonManager(), context.dispatcher(), context.clusterManager(),
           context.timeSource());
 
@@ -69,12 +72,11 @@ Network::FilterFactoryCb RedisProxyFilterConfigFactory::createFilterFactoryFromP
     Stats::ScopePtr stats_scope =
         context.scope().createScope(fmt::format("cluster.{}.redis_cluster", cluster));
 
-    upstreams.emplace(cluster,
-                      std::make_shared<ConnPool::InstanceImpl>(
-                          cluster, context.clusterManager(),
-                          Common::Redis::Client::ClientFactoryImpl::instance_,
-                          context.threadLocal(), proto_config.settings(), context.api(),
-                          std::move(stats_scope), redis_command_stats, redirection_manager));
+    upstreams.emplace(cluster, std::make_shared<ConnPool::InstanceImpl>(
+                                   cluster, context.clusterManager(),
+                                   Common::Redis::Client::ClientFactoryImpl::instance_,
+                                   context.threadLocal(), proto_config.settings(), context.api(),
+                                   std::move(stats_scope), redis_command_stats, refresh_manager));
   }
 
   auto router =

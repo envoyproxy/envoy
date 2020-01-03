@@ -109,7 +109,7 @@ TEST(UtilityTest, TestVerifySignature) {
   EXPECT_EQ(false, result.result_);
   EXPECT_EQ("unknown is not supported.", result.error_message_);
 
-  PublicKeyObject* empty_crypto = new PublicKeyObject();
+  auto empty_crypto = std::make_unique<PublicKeyObject>();
   result = UtilitySingleton::get().verifySignature(hash_func, *empty_crypto, sig, text);
   EXPECT_EQ(false, result.result_);
   EXPECT_EQ("Failed to initialize digest verify.", result.error_message_);

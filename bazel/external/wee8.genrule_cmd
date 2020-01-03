@@ -33,13 +33,14 @@ export NM=$${NM:-nm}
 if [[ $${ENVOY_ASAN-} == "1" ]]; then
   WEE8_BUILD_ARGS+=" is_asan=true"
   WEE8_BUILD_ARGS+=" is_lsan=true"
-  WEE8_BUILD_ARGS+=" is_ubsan=true"
 fi
 if [[ $${ENVOY_UBSAN_VPTR-} == "1" ]]; then
+  WEE8_BUILD_ARGS+=" is_ubsan=true"
   WEE8_BUILD_ARGS+=" is_ubsan_vptr=true"
 fi
 if [[ $${ENVOY_MSAN-} == "1" ]]; then
   WEE8_BUILD_ARGS+=" is_msan=true"
+  export LDFLAGS="$${LDFLAGS} -L/opt/libcxx_msan/lib -Wl,-rpath,/opt/libcxx_msan/lib"
 fi
 if [[ $${ENVOY_TSAN-} == "1" ]]; then
   WEE8_BUILD_ARGS+=" is_tsan=true"

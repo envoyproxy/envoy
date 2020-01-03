@@ -3,6 +3,10 @@
 #include <algorithm>
 
 #include "envoy/admin/v2alpha/config_dump.pb.h"
+#include "envoy/api/v2/core/address.pb.h"
+#include "envoy/api/v2/core/base.pb.h"
+#include "envoy/api/v2/lds.pb.h"
+#include "envoy/api/v2/listener/listener.pb.h"
 #include "envoy/registry/registry.h"
 #include "envoy/server/active_udp_listener_config.h"
 #include "envoy/server/transport_socket_config.h"
@@ -68,6 +72,15 @@ void fillState(envoy::admin::v2alpha::ListenersConfigDump_DynamicListenerState& 
 
 } // namespace
 
+bool ListenSocketCreationParams::operator==(const ListenSocketCreationParams& rhs) const {
+  return (bind_to_port == rhs.bind_to_port) &&
+         (duplicate_parent_socket == rhs.duplicate_parent_socket);
+}
+
+bool ListenSocketCreationParams::operator!=(const ListenSocketCreationParams& rhs) const {
+  return !operator==(rhs);
+}
+
 std::vector<Network::FilterFactoryCb> ProdListenerComponentFactory::createNetworkFilterFactoryList_(
     const Protobuf::RepeatedPtrField<envoy::api::v2::listener::Filter>& filters,
     Configuration::FactoryContext& context) {
@@ -77,9 +90,8 @@ std::vector<Network::FilterFactoryCb> ProdListenerComponentFactory::createNetwor
     const std::string& string_name = proto_config.name();
     ENVOY_LOG(debug, "  filter #{}:", i);
     ENVOY_LOG(debug, "    name: {}", string_name);
-    const Json::ObjectSharedPtr filter_config =
-        MessageUtil::getJsonObjectFromMessage(proto_config.config());
-    ENVOY_LOG(debug, "  config: {}", filter_config->asJsonString());
+    ENVOY_LOG(debug, "  config: {}",
+              MessageUtil::getJsonStringFromMessage(proto_config.config(), true));
 
     // Now see if there is a factory that will accept the config.
     auto& factory =
@@ -107,9 +119,8 @@ ProdListenerComponentFactory::createListenerFilterFactoryList_(
     const std::string& string_name = proto_config.name();
     ENVOY_LOG(debug, "  filter #{}:", i);
     ENVOY_LOG(debug, "    name: {}", string_name);
-    const Json::ObjectSharedPtr filter_config =
-        MessageUtil::getJsonObjectFromMessage(proto_config.config());
-    ENVOY_LOG(debug, "  config: {}", filter_config->asJsonString());
+    ENVOY_LOG(debug, "  config: {}",
+              MessageUtil::getJsonStringFromMessage(proto_config.config(), true));
 
     // Now see if there is a factory that will accept the config.
     auto& factory =
@@ -132,9 +143,8 @@ ProdListenerComponentFactory::createUdpListenerFilterFactoryList_(
     const std::string& string_name = proto_config.name();
     ENVOY_LOG(debug, "  filter #{}:", i);
     ENVOY_LOG(debug, "    name: {}", string_name);
-    const Json::ObjectSharedPtr filter_config =
-        MessageUtil::getJsonObjectFromMessage(proto_config.config());
-    ENVOY_LOG(debug, "  config: {}", filter_config->asJsonString());
+    ENVOY_LOG(debug, "  config: {}",
+              MessageUtil::getJsonStringFromMessage(proto_config.config(), true));
 
     // Now see if there is a factory that will accept the config.
     auto& factory =
@@ -150,7 +160,7 @@ ProdListenerComponentFactory::createUdpListenerFilterFactoryList_(
 
 Network::SocketSharedPtr ProdListenerComponentFactory::createListenSocket(
     Network::Address::InstanceConstSharedPtr address, Network::Address::SocketType socket_type,
-    const Network::Socket::OptionsSharedPtr& options, bool bind_to_port) {
+    const Network::Socket::OptionsSharedPtr& options, const ListenSocketCreationParams& params) {
   ASSERT(address->type() == Network::Address::Type::Ip ||
          address->type() == Network::Address::Type::Pipe);
   ASSERT(socket_type == Network::Address::SocketType::Stream ||
@@ -181,7 +191,7 @@ Network::SocketSharedPtr ProdListenerComponentFactory::createListenSocket(
                                  : Network::Utility::UDP_SCHEME;
   const std::string addr = absl::StrCat(scheme, address->asString());
 
-  if (bind_to_port) {
+  if (params.bind_to_port && params.duplicate_parent_socket) {
     const int fd = server_.hotRestart().duplicateParentListenSocket(addr);
     if (fd != -1) {
       ENVOY_LOG(debug, "obtained socket for address {} from parent", addr);
@@ -195,9 +205,9 @@ Network::SocketSharedPtr ProdListenerComponentFactory::createListenSocket(
   }
 
   if (socket_type == Network::Address::SocketType::Stream) {
-    return std::make_shared<Network::TcpListenSocket>(address, options, bind_to_port);
+    return std::make_shared<Network::TcpListenSocket>(address, options, params.bind_to_port);
   } else {
-    return std::make_shared<Network::UdpListenSocket>(address, options, bind_to_port);
+    return std::make_shared<Network::UdpListenSocket>(address, options, params.bind_to_port);
   }
 }
 
@@ -368,12 +378,12 @@ bool ListenerManagerImpl::addOrUpdateListenerInternal(const envoy::api::v2::List
     // In this case we can just replace inline.
     ASSERT(workers_started_);
     new_listener->debugLog("update warming listener");
-    new_listener->setSocket((*existing_warming_listener)->getSocket());
+    new_listener->setSocketFactory((*existing_warming_listener)->getSocketFactory());
     *existing_warming_listener = std::move(new_listener);
   } else if (existing_active_listener != active_listeners_.end()) {
     // In this case we have no warming listener, so what we do depends on whether workers
     // have been started or not. Either way we get the socket from the existing listener.
-    new_listener->setSocket((*existing_active_listener)->getSocket());
+    new_listener->setSocketFactory((*existing_active_listener)->getSocketFactory());
     if (workers_started_) {
       new_listener->debugLog("add warming listener");
       warming_listeners_.emplace_back(std::move(new_listener));
@@ -399,26 +409,32 @@ bool ListenerManagerImpl::addOrUpdateListenerInternal(const envoy::api::v2::List
 
     // We have no warming or active listener so we need to make a new one. What we do depends on
     // whether workers have been started or not. Additionally, search through draining listeners
-    // to see if there is a listener that has a socket bound to the address we are configured for.
-    // This is an edge case, but may happen if a listener is removed and then added back with a same
-    // or different name and intended to listen on the same address. This should work and not fail.
-    Network::SocketSharedPtr draining_listener_socket;
+    // to see if there is a listener that has a socket factory for the same address we are
+    // configured for and doesn't not use SO_REUSEPORT. This is an edge case, but may happen if a
+    // listener is removed and then added back with a same or different name and intended to listen
+    // on the same address. This should work and not fail.
+    Network::ListenSocketFactorySharedPtr draining_listen_socket_factory;
     auto existing_draining_listener = std::find_if(
         draining_listeners_.cbegin(), draining_listeners_.cend(),
         [&new_listener](const DrainingListener& listener) {
-          return listener.listener_->socket().isOpen() &&
-                 *new_listener->address() == *listener.listener_->socket().localAddress();
+          return listener.listener_->listenSocketFactory().sharedSocket().has_value() &&
+                 listener.listener_->listenSocketFactory().sharedSocket()->get().isOpen() &&
+                 *new_listener->address() ==
+                     *listener.listener_->listenSocketFactory().localAddress();
         });
+
     if (existing_draining_listener != draining_listeners_.cend()) {
-      draining_listener_socket = existing_draining_listener->listener_->getSocket();
+      draining_listen_socket_factory = existing_draining_listener->listener_->getSocketFactory();
     }
 
-    new_listener->setSocket(draining_listener_socket
-                                ? draining_listener_socket
-                                : factory_.createListenSocket(new_listener->address(),
-                                                              new_listener->socketType(),
-                                                              new_listener->listenSocketOptions(),
-                                                              new_listener->bindToPort()));
+    Network::Address::SocketType socket_type =
+        Network::Utility::protobufAddressSocketType(config.address());
+    new_listener->setSocketFactory(
+        draining_listen_socket_factory
+            ? draining_listen_socket_factory
+            : createListenSocketFactory(config.address(), *new_listener,
+                                        (socket_type == Network::Address::SocketType::Datagram) ||
+                                            config.reuse_port()));
     if (workers_started_) {
       new_listener->debugLog("add warming listener");
       warming_listeners_.emplace_back(std::move(new_listener));
@@ -451,10 +467,11 @@ bool ListenerManagerImpl::hasListenerWithAddress(const ListenerList& list,
   return false;
 }
 
-bool ListenerManagerImpl::hasListenerWithSocket(const ListenerList& list,
-                                                const Network::SocketSharedPtr& socket) {
+bool ListenerManagerImpl::shareSocketWithOtherListener(
+    const ListenerList& list, const Network::ListenSocketFactorySharedPtr& socket_factory) {
+  ASSERT(socket_factory->sharedSocket().has_value());
   for (const auto& listener : list) {
-    if (listener->getSocket() == socket) {
+    if (listener->getSocketFactory() == socket_factory) {
       return true;
     }
   }
@@ -473,21 +490,30 @@ void ListenerManagerImpl::drainListener(ListenerImplPtr&& listener) {
   // Tell all workers to stop accepting new connections on this listener.
   draining_it->listener_->debugLog("draining listener");
   const uint64_t listener_tag = draining_it->listener_->listenerTag();
-  stopListener(*draining_it->listener_, [this, listener_tag]() {
-    for (auto& listener : draining_listeners_) {
-      if (listener.listener_->listenerTag() == listener_tag) {
-        // Handle the edge case when new listener is added for the same address as the drained
-        // one. In this case the socket is shared between both listeners so one should avoid
-        // closing it.
-        const auto& socket = listener.listener_->getSocket();
-        if (!hasListenerWithSocket(active_listeners_, socket) &&
-            !hasListenerWithSocket(warming_listeners_, socket)) {
-          // Close the socket iff it is not used anymore.
-          listener.listener_->socket().close();
+  stopListener(
+      *draining_it->listener_,
+      [this,
+       share_socket = draining_it->listener_->listenSocketFactory().sharedSocket().has_value(),
+       listener_tag]() {
+        if (!share_socket) {
+          // Each listener has its individual socket and closes the socket on its own.
+          return;
         }
-      }
-    }
-  });
+        for (auto& listener : draining_listeners_) {
+          if (listener.listener_->listenerTag() == listener_tag) {
+            // Handle the edge case when new listener is added for the same address as the drained
+            // one. In this case the socket is shared between both listeners so one should avoid
+            // closing it.
+            const auto& socket_factory = listener.listener_->getSocketFactory();
+            if (!shareSocketWithOtherListener(active_listeners_, socket_factory) &&
+                !shareSocketWithOtherListener(warming_listeners_, socket_factory)) {
+              // Close the socket iff it is not used anymore.
+              ASSERT(listener.listener_->listenSocketFactory().sharedSocket().has_value());
+              listener.listener_->listenSocketFactory().sharedSocket()->get().close();
+            }
+          }
+        }
+      });
 
   // Start the drain sequence which completes when the listener's drain manager has completed
   // draining at whatever the server configured drain times are.
@@ -552,7 +578,7 @@ void ListenerManagerImpl::addListenerToWorker(Worker& worker, ListenerImpl& list
         //                     a startup option here to cause the server to exit. I think we
         //                     probably want this at Lyft but I will do it in a follow up.
         ENVOY_LOG(critical, "listener '{}' failed to listen on address '{}' on worker",
-                  listener.name(), listener.socket().localAddress()->asString());
+                  listener.name(), listener.listenSocketFactory().localAddress()->asString());
         stats_.listener_create_failure_.inc();
         removeListener(listener.name());
       }
@@ -679,14 +705,21 @@ void ListenerManagerImpl::stopListeners(StopListenersType stop_listeners_type) {
       // Close the socket once all workers stopped accepting its connections.
       // This allows clients to fast fail instead of waiting in the accept queue.
       const uint64_t listener_tag = listener.listenerTag();
-      stopListener(listener, [this, listener_tag]() {
-        for (auto& listener : active_listeners_) {
-          if (listener->listenerTag() == listener_tag) {
-            listener->socket().close();
-          }
-        }
-        stats_.listener_stopped_.inc();
-      });
+      stopListener(listener,
+                   [this, share_socket = listener.listenSocketFactory().sharedSocket().has_value(),
+                    listener_tag]() {
+                     stats_.listener_stopped_.inc();
+                     if (!share_socket) {
+                       // Each listener has its own socket and closes the socket
+                       // on its own.
+                       return;
+                     }
+                     for (auto& listener : active_listeners_) {
+                       if (listener->listenerTag() == listener_tag) {
+                         listener->listenSocketFactory().sharedSocket()->get().close();
+                       }
+                     }
+                   });
     }
   }
 }
@@ -737,6 +770,16 @@ std::unique_ptr<Network::FilterChain> ListenerFilterChainFactoryBuilder::buildFi
       config_factory.createTransportSocketFactory(*message, factory_context_,
                                                   std::move(server_names)),
       parent_.parent_.factory_.createNetworkFilterFactoryList(filter_chain.filters(), parent_));
+}
+
+Network::ListenSocketFactorySharedPtr
+ListenerManagerImpl::createListenSocketFactory(const envoy::api::v2::core::Address& proto_address,
+                                               ListenerImpl& listener, bool reuse_port) {
+  Network::Address::SocketType socket_type =
+      Network::Utility::protobufAddressSocketType(proto_address);
+  return std::make_shared<ListenSocketFactoryImpl>(
+      factory_, listener.address(), socket_type, listener.listenSocketOptions(),
+      listener.bindToPort(), listener.name(), reuse_port);
 }
 
 } // namespace Server

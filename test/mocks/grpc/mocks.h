@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <string>
 
+#include "envoy/api/v2/core/grpc_service.pb.h"
 #include "envoy/grpc/async_client.h"
 #include "envoy/grpc/async_client_manager.h"
 #include "envoy/stats/scope.h"
@@ -103,7 +104,7 @@ public:
 
 MATCHER_P(ProtoBufferEq, expected, "") {
   typename std::remove_const<decltype(expected)>::type proto;
-  if (!proto.ParseFromArray(static_cast<char*>(arg->linearize(arg->length())), arg->length())) {
+  if (!proto.ParseFromString(arg->toString())) {
     *result_listener << "\nParse of buffer failed\n";
     return false;
   }

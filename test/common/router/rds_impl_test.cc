@@ -4,6 +4,9 @@
 
 #include "envoy/admin/v2alpha/config_dump.pb.h"
 #include "envoy/admin/v2alpha/config_dump.pb.validate.h"
+#include "envoy/api/v2/discovery.pb.h"
+#include "envoy/api/v2/rds.pb.h"
+#include "envoy/config/filter/network/http_connection_manager/v2/http_connection_manager.pb.h"
 #include "envoy/stats/scope.h"
 
 #include "common/config/utility.h"
@@ -28,6 +31,7 @@ using testing::_;
 using testing::Eq;
 using testing::InSequence;
 using testing::Invoke;
+using testing::Return;
 using testing::ReturnRef;
 
 namespace Envoy {
@@ -116,7 +120,7 @@ http_filters:
 
   NiceMock<Server::MockInstance> server_;
   std::unique_ptr<RouteConfigProviderManagerImpl> route_config_provider_manager_;
-  RouteConfigProviderPtr rds_;
+  RouteConfigProviderSharedPtr rds_;
 };
 
 TEST_F(RdsImplTest, RdsAndStatic) {
@@ -263,6 +267,50 @@ TEST_F(RdsImplTest, FailureSubscription) {
   rds_callbacks_->onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason::FetchTimedout, {});
 }
 
+class RdsRouteConfigSubscriptionTest : public RdsTestBase {
+public:
+  RdsRouteConfigSubscriptionTest() {
+    EXPECT_CALL(server_factory_context_.admin_.config_tracker_, add_("routes", _));
+    route_config_provider_manager_ =
+        std::make_unique<RouteConfigProviderManagerImpl>(server_factory_context_.admin_);
+  }
+
+  ~RdsRouteConfigSubscriptionTest() override {
+    server_factory_context_.thread_local_.shutdownThread();
+  }
+
+  std::unique_ptr<RouteConfigProviderManagerImpl> route_config_provider_manager_;
+};
+
+// Verifies that maybeCreateInitManager() creates a noop init manager if the main init manager is in
+// Initialized state already
+TEST_F(RdsRouteConfigSubscriptionTest, CreatesNoopInitManager) {
+  const std::string rds_config = R"EOF(
+  route_config_name: my_route
+  config_source:
+    api_config_source:
+      api_type: GRPC
+      grpc_services:
+        envoy_grpc:
+          cluster_name: xds_cluster
+)EOF";
+  EXPECT_CALL(outer_init_manager_, state()).WillOnce(Return(Init::Manager::State::Initialized));
+  const auto rds =
+      TestUtility::parseYaml<envoy::config::filter::network::http_connection_manager::v2::Rds>(
+          rds_config);
+  const auto route_config_provider = route_config_provider_manager_->createRdsRouteConfigProvider(
+      rds, mock_factory_context_, "stat_prefix", outer_init_manager_);
+  RdsRouteConfigSubscription& subscription =
+      (dynamic_cast<RdsRouteConfigProviderImpl*>(route_config_provider.get()))->subscription();
+
+  std::unique_ptr<Init::ManagerImpl> noop_init_manager;
+  std::unique_ptr<Cleanup> init_vhds;
+  subscription.maybeCreateInitManager("version_info", noop_init_manager, init_vhds);
+
+  EXPECT_TRUE(init_vhds);
+  EXPECT_TRUE(noop_init_manager);
+}
+
 class RouteConfigProviderManagerImplTest : public RdsTestBase {
 public:
   void setup() {
@@ -286,7 +334,7 @@ public:
 
   envoy::config::filter::network::http_connection_manager::v2::Rds rds_;
   std::unique_ptr<RouteConfigProviderManagerImpl> route_config_provider_manager_;
-  RouteConfigProviderPtr provider_;
+  RouteConfigProviderSharedPtr provider_;
 };
 
 envoy::api::v2::RouteConfiguration parseRouteConfigurationFromV2Yaml(const std::string& yaml) {
@@ -425,11 +473,14 @@ virtual_hosts:
   server_factory_context_.cluster_manager_.subscription_factory_.callbacks_->onConfigUpdate(
       route_configs, "1");
 
-  RouteConfigProviderPtr provider2 = route_config_provider_manager_->createRdsRouteConfigProvider(
-      rds_, mock_factory_context_, "foo_prefix", outer_init_manager_);
+  RouteConfigProviderSharedPtr provider2 =
+      route_config_provider_manager_->createRdsRouteConfigProvider(
+          rds_, mock_factory_context_, "foo_prefix", outer_init_manager_);
 
   // provider2 should have route config immediately after create
   EXPECT_TRUE(provider2->configInfo().has_value());
+
+  EXPECT_EQ(provider_, provider2) << "fail to obtain the same rds config provider object";
 
   // So this means that both provider have same subscription.
   EXPECT_EQ(&dynamic_cast<RdsRouteConfigProviderImpl&>(*provider_).subscription(),
@@ -439,8 +490,9 @@ virtual_hosts:
   envoy::config::filter::network::http_connection_manager::v2::Rds rds2;
   rds2.set_route_config_name("foo_route_config");
   rds2.mutable_config_source()->set_path("bar_path");
-  RouteConfigProviderPtr provider3 = route_config_provider_manager_->createRdsRouteConfigProvider(
-      rds2, mock_factory_context_, "foo_prefix", mock_factory_context_.initManager());
+  RouteConfigProviderSharedPtr provider3 =
+      route_config_provider_manager_->createRdsRouteConfigProvider(
+          rds2, mock_factory_context_, "foo_prefix", mock_factory_context_.initManager());
   EXPECT_NE(provider3, provider_);
   server_factory_context_.cluster_manager_.subscription_factory_.callbacks_->onConfigUpdate(
       route_configs, "provider3");
@@ -463,6 +515,49 @@ virtual_hosts:
 
   EXPECT_EQ(0UL,
             route_config_provider_manager_->dumpRouteConfigs()->dynamic_route_configs().size());
+}
+
+TEST_F(RouteConfigProviderManagerImplTest, SameProviderOnTwoInitManager) {
+  Buffer::OwnedImpl data;
+  // Get a RouteConfigProvider. This one should create an entry in the RouteConfigProviderManager.
+  setup();
+
+  EXPECT_FALSE(provider_->configInfo().has_value());
+
+  NiceMock<Server::Configuration::MockFactoryContext> mock_factory_context2;
+
+  Init::WatcherImpl real_watcher("real", []() {});
+  Init::ManagerImpl real_init_manager("real");
+
+  RouteConfigProviderSharedPtr provider2 =
+      route_config_provider_manager_->createRdsRouteConfigProvider(rds_, mock_factory_context2,
+                                                                   "foo_prefix", real_init_manager);
+
+  EXPECT_FALSE(provider2->configInfo().has_value());
+
+  EXPECT_EQ(provider_, provider2) << "fail to obtain the same rds config provider object";
+  real_init_manager.initialize(real_watcher);
+  EXPECT_EQ(Init::Manager::State::Initializing, real_init_manager.state());
+
+  {
+    Protobuf::RepeatedPtrField<ProtobufWkt::Any> route_configs;
+    route_configs.Add()->PackFrom(parseRouteConfigurationFromV2Yaml(R"EOF(
+name: foo_route_config
+virtual_hosts:
+  - name: bar
+    domains: ["*"]
+    routes:
+      - match: { prefix: "/" }
+        route: { cluster: baz }
+)EOF"));
+
+    server_factory_context_.cluster_manager_.subscription_factory_.callbacks_->onConfigUpdate(
+        route_configs, "1");
+
+    EXPECT_TRUE(provider_->configInfo().has_value());
+    EXPECT_TRUE(provider2->configInfo().has_value());
+    EXPECT_EQ(Init::Manager::State::Initialized, real_init_manager.state());
+  }
 }
 
 // Negative test for protoc-gen-validate constraints.

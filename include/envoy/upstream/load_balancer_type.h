@@ -25,10 +25,28 @@ enum class LoadBalancerType {
   ClusterProvided
 };
 
-struct SubsetSelector {
-  std::set<std::string> selector_keys_;
-  envoy::api::v2::Cluster::LbSubsetConfig::LbSubsetSelector::LbSubsetSelectorFallbackPolicy
-      fallback_policy_;
+/**
+ * Subset selector configuration
+ */
+class SubsetSelector {
+public:
+  virtual ~SubsetSelector() = default;
+
+  /**
+   * @return keys defined for this selector
+   */
+  virtual const std::set<std::string>& selectorKeys() const PURE;
+
+  /**
+   * @return fallback policy defined for this selector, or NOT_DEFINED
+   */
+  virtual envoy::api::v2::Cluster::LbSubsetConfig::LbSubsetSelector::LbSubsetSelectorFallbackPolicy
+  fallbackPolicy() const PURE;
+
+  /**
+   * @return fallback keys subset defined for this selector, or empty set
+   */
+  virtual const std::set<std::string>& fallbackKeysSubset() const PURE;
 };
 
 using SubsetSelectorPtr = std::shared_ptr<SubsetSelector>;

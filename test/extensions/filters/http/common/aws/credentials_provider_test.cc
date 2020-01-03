@@ -16,7 +16,7 @@ TEST(Credentials, Default) {
 }
 
 TEST(Credentials, AllNull) {
-  const auto c = Credentials(nullptr, nullptr, nullptr);
+  const auto c = Credentials({}, {}, {});
   EXPECT_FALSE(c.accessKeyId().has_value());
   EXPECT_FALSE(c.secretAccessKey().has_value());
   EXPECT_FALSE(c.sessionToken().has_value());
