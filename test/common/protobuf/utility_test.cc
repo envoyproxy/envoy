@@ -488,6 +488,14 @@ TEST_F(ProtobufUtilityTest, UnpackToNextVersion) {
   EXPECT_TRUE(dst.ignore_health_on_host_removal());
 }
 
+// MessageUtility::loadFromJson() throws on garbage JSON.
+TEST_F(ProtobufUtilityTest, LoadFromJsonGarbage) {
+  envoy::api::v2::Cluster dst;
+  EXPECT_THROW_WITH_REGEX(MessageUtil::loadFromJson("{drain_connections_on_host_removal: true", dst,
+                                                    ProtobufMessage::getNullValidationVisitor()),
+                          EnvoyException, "Unable to parse JSON as proto.*after key:value pair.");
+}
+
 // MessageUtility::loadFromJson() with API message works at same version.
 TEST_F(ProtobufUtilityTest, LoadFromJsonSameVersion) {
   {
