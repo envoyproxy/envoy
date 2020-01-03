@@ -45,9 +45,9 @@ namespace Envoy {
 namespace Server {
 
 class MockFilterChainFactoryBuilder : public FilterChainFactoryBuilder {
-
   std::unique_ptr<Network::FilterChain>
-  buildFilterChain(const ::envoy::api::v2::listener::FilterChain&) const override {
+  buildFilterChain(const ::envoy::api::v2::listener::FilterChain&,
+                   FilterChainFactoryContextCallback&) const override {
     // Won't dereference but requires not nullptr.
     return std::make_unique<Network::MockFilterChain>();
   }
@@ -98,7 +98,8 @@ public:
   void addSingleFilterChainHelper(const envoy::api::v2::listener::FilterChain& filter_chain) {
     filter_chain_manager_.addFilterChain(
         std::vector<const envoy::api::v2::listener::FilterChain*>{&filter_chain},
-        filter_chain_factory_builder_);
+        filter_chain_factory_builder_,
+        *filter_chain_manager_.createFilterChainFactoryContextCallback(parent_context_));
   }
 
   // Intermediate states.
@@ -143,11 +144,12 @@ TEST_F(FilterChainManagerImplTest, AddSingleFilterChain) {
 }
 
 TEST_F(FilterChainManagerImplTest, AddZeroFilterChain) {
+  std::vector<std::shared_ptr<Configuration::FilterChainFactoryContext>> contexts;
   {
     auto callback = filter_chain_manager_.createFilterChainFactoryContextCallback(parent_context_);
-    callback->prepareFilterChainFactoryContexts();
   }
   // Successfully reach here.
+  EXPECT_TRUE(contexts.empty());
 }
 
 // The commit filter chain contexts are co-owned by filter chain manager.
@@ -155,7 +157,6 @@ TEST_F(FilterChainManagerImplTest, CommittedFilterChainContext) {
   std::vector<std::shared_ptr<Configuration::FilterChainFactoryContext>> contexts;
   {
     auto callback = filter_chain_manager_.createFilterChainFactoryContextCallback(parent_context_);
-    callback->prepareFilterChainFactoryContexts();
     contexts.push_back(callback->createFilterChainFactoryContext(&filter_chain_template_));
   }
   for (const auto& shared_ptr : contexts) {
@@ -168,7 +169,6 @@ TEST_F(FilterChainManagerImplTest, FilterChainContextsAreUnique) {
   std::set<std::shared_ptr<Configuration::FilterChainFactoryContext>> contexts;
   {
     auto callback = filter_chain_manager_.createFilterChainFactoryContextCallback(parent_context_);
-    callback->prepareFilterChainFactoryContexts();
     for (int i = 0; i < 2; i++) {
       contexts.insert(callback->createFilterChainFactoryContext(&filter_chain_template_));
     }

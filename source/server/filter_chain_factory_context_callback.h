@@ -10,29 +10,18 @@ namespace Envoy {
 namespace Server {
 
 /**
- * Handles FilterChainFactoryContext creation. Filter chain contexts are maintained in batch. All
- * the contexts in the batch are conceptually tracked by the same init manager.
+ * Handles FilterChainFactoryContext creation.
  */
 class FilterChainFactoryContextCallback {
 public:
   virtual ~FilterChainFactoryContextCallback() = default;
 
   /**
-   * Begin a new batch of context creation.
-   */
-  virtual void prepareFilterChainFactoryContexts() PURE;
-
-  /**
-   * Generate the filter chain factory context from proto.
-   * Notes the callback will own the filter chain context.
+   * Generate the filter chain factory context from proto. Notes the callback will own the filter
+   * chain context.
    */
   virtual std::shared_ptr<Configuration::FilterChainFactoryContext> createFilterChainFactoryContext(
       const ::envoy::api::v2::listener::FilterChain* const filter_chain) PURE;
-
-  /**
-   * End the creation of the filter chain context batch.
-   */
-  virtual void commitFilterChainFactoryContexts() PURE;
 };
 
 } // namespace Server

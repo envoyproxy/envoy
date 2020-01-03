@@ -723,27 +723,22 @@ void ListenerManagerImpl::endListenerUpdate(FailureStates&& failure_states) {
 
 ListenerFilterChainFactoryBuilder::ListenerFilterChainFactoryBuilder(
     ListenerImpl& listener,
-    Server::Configuration::TransportSocketFactoryContextImpl& factory_context,
-    std::unique_ptr<FilterChainFactoryContextCallback>&& filter_chain_factory_context_callback)
+    Server::Configuration::TransportSocketFactoryContextImpl& factory_context)
     : ListenerFilterChainFactoryBuilder(listener.messageValidationVisitor(),
-                                        listener.parent_.factory_, factory_context,
-                                        std::move(filter_chain_factory_context_callback)) {}
+                                        listener.parent_.factory_, factory_context) {}
 
 ListenerFilterChainFactoryBuilder::ListenerFilterChainFactoryBuilder(
     ProtobufMessage::ValidationVisitor& validator,
     ListenerComponentFactory& listener_component_factory,
-    Server::Configuration::TransportSocketFactoryContextImpl& factory_context,
-    std::unique_ptr<FilterChainFactoryContextCallback>&& filter_chain_factory_context_callback)
+    Server::Configuration::TransportSocketFactoryContextImpl& factory_context)
     : validator_(validator), listener_component_factory_(listener_component_factory),
-      factory_context_(factory_context),
-      filter_chain_factory_context_callback_(std::move(filter_chain_factory_context_callback)) {
-  filter_chain_factory_context_callback_->prepareFilterChainFactoryContexts();
-}
+      factory_context_(factory_context) {}
 
 std::unique_ptr<Network::FilterChain> ListenerFilterChainFactoryBuilder::buildFilterChain(
-    const ::envoy::api::v2::listener::FilterChain& filter_chain) const {
+    const ::envoy::api::v2::listener::FilterChain& filter_chain,
+    FilterChainFactoryContextCallback& callback) const {
   std::shared_ptr<Configuration::FilterChainFactoryContext> context =
-      filter_chain_factory_context_callback_->createFilterChainFactoryContext(&filter_chain);
+      callback.createFilterChainFactoryContext(&filter_chain);
   return buildFilterChainInternal(filter_chain, context);
 }
 

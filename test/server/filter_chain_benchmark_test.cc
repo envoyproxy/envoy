@@ -24,10 +24,18 @@ namespace Envoy {
 namespace Server {
 
 namespace {
-
+class EmptyFilterChainFactoryContextCallback : public FilterChainFactoryContextCallback {
+public:
+  ~EmptyFilterChainFactoryContextCallback() override = default;
+  std::shared_ptr<Configuration::FilterChainFactoryContext>
+  createFilterChainFactoryContext(const ::envoy::api::v2::listener::FilterChain* const) override {
+    return nullptr;
+  }
+};
 class MockFilterChainFactoryBuilder : public FilterChainFactoryBuilder {
   std::unique_ptr<Network::FilterChain>
-  buildFilterChain(const ::envoy::api::v2::listener::FilterChain&) const override {
+  buildFilterChain(const ::envoy::api::v2::listener::FilterChain&,
+                   FilterChainFactoryContextCallback&) const override {
     // A place holder to be found
     return std::make_unique<Network::MockFilterChain>();
   }
@@ -183,10 +191,15 @@ public:
 
 BENCHMARK_DEFINE_F(FilterChainBenchmarkFixture, FilterChainManagerBuildTest)
 (::benchmark::State& state) {
+  EmptyFilterChainFactoryContextCallback callback;
+
   for (auto _ : state) {
     FilterChainManagerImpl filter_chain_manager{
         std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 1234)};
-    filter_chain_manager.addFilterChain(filter_chains_, dummy_builder_);
+    filter_chain_manager.addFilterChain(
+        filter_chains_, dummy_builder_,
+        /*filter_chain_manager.createFilterChainFactoryContextCallback()*/
+        callback);
   }
 }
 
@@ -198,9 +211,12 @@ BENCHMARK_DEFINE_F(FilterChainBenchmarkFixture, FilterChainFindTest)
     sockets.push_back(std::move(*MockConnectionSocket::createMockConnectionSocket(
         10000 + i, "127.0.0.1", "", "tls", {}, "8.8.8.8", 111)));
   }
+  EmptyFilterChainFactoryContextCallback callback;
+
   FilterChainManagerImpl filter_chain_manager{
       std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 1234)};
-  filter_chain_manager.addFilterChain(filter_chains_, dummy_builder_);
+
+  filter_chain_manager.addFilterChain(filter_chains_, dummy_builder_, callback);
   for (auto _ : state) {
     for (int i = 0; i < state.range(0); i++) {
       filter_chain_manager.findFilterChain(sockets[i]);

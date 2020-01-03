@@ -132,7 +132,8 @@ bool FilterChainManagerImpl::isWildcardServerName(const std::string& name) {
 
 void FilterChainManagerImpl::addFilterChain(
     absl::Span<const ::envoy::api::v2::listener::FilterChain* const> filter_chain_span,
-    FilterChainFactoryBuilder& filter_chain_factory_builder) {
+    FilterChainFactoryBuilder& filter_chain_factory_builder,
+    FilterChainFactoryContextCallback& callback) {
   std::unordered_set<envoy::api::v2::listener::FilterChainMatch, MessageUtil, MessageUtil>
       filter_chains;
   for (const auto& filter_chain : filter_chain_span) {
@@ -182,7 +183,7 @@ void FilterChainManagerImpl::addFilterChain(
         filter_chain_match.application_protocols(), filter_chain_match.source_type(), source_ips,
         filter_chain_match.source_ports(),
         std::shared_ptr<Network::FilterChain>(
-            filter_chain_factory_builder.buildFilterChain(*filter_chain)));
+            filter_chain_factory_builder.buildFilterChain(*filter_chain, callback)));
   }
   convertIPsToTries();
 }
@@ -572,32 +573,22 @@ void FilterChainManagerImpl::convertIPsToTries() {
 std::unique_ptr<FilterChainFactoryContextCallback>
 FilterChainManagerImpl::createFilterChainFactoryContextCallback(
     Configuration::FactoryContext& parent_context) {
-  return std::make_unique<FilterChainContextCallbackImpl>(*this, parent_context);
+  return std::make_unique<ImmediateAppendFilterChainContextCallbackImpl>(*this, parent_context);
 }
 
-FilterChainManagerImpl::FilterChainContextCallbackImpl::FilterChainContextCallbackImpl(
-    FilterChainManagerImpl& parent, Configuration::FactoryContext& parent_context)
+FilterChainManagerImpl::ImmediateAppendFilterChainContextCallbackImpl::
+    ImmediateAppendFilterChainContextCallbackImpl(FilterChainManagerImpl& parent,
+                                                  Configuration::FactoryContext& parent_context)
     : parent_(parent), parent_context_(parent_context) {}
 
-void FilterChainManagerImpl::FilterChainContextCallbackImpl::prepareFilterChainFactoryContexts() {
-  // The previous add might fail. Clean it here.
-  parent_.factory_contexts_.clear();
-}
-
-std::shared_ptr<Configuration::FilterChainFactoryContext>
-FilterChainManagerImpl::FilterChainContextCallbackImpl::createFilterChainFactoryContext(
-    const ::envoy::api::v2::listener::FilterChain* const filter_chain) {
+std::shared_ptr<Configuration::FilterChainFactoryContext> FilterChainManagerImpl::
+    ImmediateAppendFilterChainContextCallbackImpl::createFilterChainFactoryContext(
+        const ::envoy::api::v2::listener::FilterChain* const filter_chain) {
   // TODO(lambdai): drain close should be saved in per filter chain context
   UNREFERENCED_PARAMETER(filter_chain);
   auto res = std::make_shared<FilterChainFactoryContextImpl>(parent_context_);
   parent_.factory_contexts_.push_back(res);
   return res;
-}
-
-void FilterChainManagerImpl::FilterChainContextCallbackImpl::commitFilterChainFactoryContexts() {}
-
-FilterChainManagerImpl::FilterChainContextCallbackImpl::~FilterChainContextCallbackImpl() {
-  commitFilterChainFactoryContexts();
 }
 } // namespace Server
 } // namespace Envoy

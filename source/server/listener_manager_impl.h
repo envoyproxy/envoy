@@ -237,19 +237,17 @@ private:
 
 class ListenerFilterChainFactoryBuilder : public FilterChainFactoryBuilder {
 public:
-  using TagsIndex = std::unordered_map<const ::envoy::api::v2::listener::FilterChain*, int64_t>;
   ListenerFilterChainFactoryBuilder(
-      ListenerImpl& listener, Configuration::TransportSocketFactoryContextImpl& factory_context,
-      std::unique_ptr<FilterChainFactoryContextCallback>&& filter_chain_factory_context_callback);
+      ListenerImpl& listener, Configuration::TransportSocketFactoryContextImpl& factory_context);
 
   ListenerFilterChainFactoryBuilder(
       ProtobufMessage::ValidationVisitor& validator,
       ListenerComponentFactory& listener_component_factory,
-      Server::Configuration::TransportSocketFactoryContextImpl& factory_context,
-      std::unique_ptr<FilterChainFactoryContextCallback>&& filter_chain_factory_context_callback);
+      Server::Configuration::TransportSocketFactoryContextImpl& factory_context);
 
   std::unique_ptr<Network::FilterChain>
-  buildFilterChain(const ::envoy::api::v2::listener::FilterChain& filter_chain) const override;
+  buildFilterChain(const ::envoy::api::v2::listener::FilterChain& filter_chain,
+                   FilterChainFactoryContextCallback& callback) const override;
 
 private:
   std::unique_ptr<Network::FilterChain>
@@ -259,7 +257,6 @@ private:
 
   ProtobufMessage::ValidationVisitor& validator_;
   ListenerComponentFactory& listener_component_factory_;
-
   Configuration::TransportSocketFactoryContextImpl& factory_context_;
   std::unique_ptr<FilterChainFactoryContextCallback> filter_chain_factory_context_callback_;
 };

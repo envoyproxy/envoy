@@ -25,7 +25,8 @@ class FilterChainFactoryBuilder {
 public:
   virtual ~FilterChainFactoryBuilder() = default;
   virtual std::unique_ptr<Network::FilterChain>
-  buildFilterChain(const ::envoy::api::v2::listener::FilterChain& filter_chain) const PURE;
+  buildFilterChain(const ::envoy::api::v2::listener::FilterChain& filter_chain,
+                   FilterChainFactoryContextCallback& callback) const PURE;
 };
 
 // FilterChainFactoryContextImpl is supposed to used by network filter chain.
@@ -72,8 +73,6 @@ private:
   Configuration::FactoryContext& parent_context_;
 };
 
-class FilterChainManagerImpl;
-
 /**
  * Implementation of FilterChainManager.
  */
@@ -89,22 +88,21 @@ public:
 
   void
   addFilterChain(absl::Span<const ::envoy::api::v2::listener::FilterChain* const> filter_chain_span,
-                 FilterChainFactoryBuilder& b);
+                 FilterChainFactoryBuilder& b, FilterChainFactoryContextCallback& callback);
 
   static bool isWildcardServerName(const std::string& name);
 
   std::unique_ptr<FilterChainFactoryContextCallback>
   createFilterChainFactoryContextCallback(Configuration::FactoryContext& parent_context);
 
-  class FilterChainContextCallbackImpl : public FilterChainFactoryContextCallback {
+  // A naive implementation which commits the context as soon as the context is created.
+  class ImmediateAppendFilterChainContextCallbackImpl : public FilterChainFactoryContextCallback {
   public:
-    FilterChainContextCallbackImpl(FilterChainManagerImpl& parent,
-                                   Configuration::FactoryContext& parent_context);
-    ~FilterChainContextCallbackImpl() override;
-    void prepareFilterChainFactoryContexts() override;
+    ImmediateAppendFilterChainContextCallbackImpl(FilterChainManagerImpl& parent,
+                                                  Configuration::FactoryContext& parent_context);
+    ~ImmediateAppendFilterChainContextCallbackImpl() override = default;
     std::shared_ptr<Configuration::FilterChainFactoryContext> createFilterChainFactoryContext(
         const ::envoy::api::v2::listener::FilterChain* const filter_chain) override;
-    void commitFilterChainFactoryContexts() override;
 
   private:
     FilterChainManagerImpl& parent_;
@@ -204,7 +202,7 @@ private:
   // and application protocols, using structures defined above.
   DestinationPortsMap destination_ports_map_;
   const Network::Address::InstanceConstSharedPtr address_;
-  friend class FilterChainContextCallbackImpl;
+  friend class ImmediateAppendFilterChainContextCallbackImpl;
   std::list<std::shared_ptr<Configuration::FilterChainFactoryContext>> factory_contexts_;
 };
 
