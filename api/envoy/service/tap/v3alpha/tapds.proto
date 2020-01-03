@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package envoy.service.tap.v3alpha;
 
-import "envoy/api/v3alpha/discovery.proto";
+import "envoy/service/discovery/v3alpha/discovery.proto";
 import "envoy/service/tap/v3alpha/common.proto";
 
 import "google/api/annotations.proto";
@@ -20,15 +20,16 @@ option java_generic_services = true;
 
 // [#not-implemented-hide:] Tap discovery service.
 service TapDiscoveryService {
-  rpc StreamTapConfigs(stream api.v3alpha.DiscoveryRequest)
-      returns (stream api.v3alpha.DiscoveryResponse) {
+  rpc StreamTapConfigs(stream discovery.v3alpha.DiscoveryRequest)
+      returns (stream discovery.v3alpha.DiscoveryResponse) {
   }
 
-  rpc DeltaTapConfigs(stream api.v3alpha.DeltaDiscoveryRequest)
-      returns (stream api.v3alpha.DeltaDiscoveryResponse) {
+  rpc DeltaTapConfigs(stream discovery.v3alpha.DeltaDiscoveryRequest)
+      returns (stream discovery.v3alpha.DeltaDiscoveryResponse) {
   }
 
-  rpc FetchTapConfigs(api.v3alpha.DiscoveryRequest) returns (api.v3alpha.DiscoveryResponse) {
+  rpc FetchTapConfigs(discovery.v3alpha.DiscoveryRequest)
+      returns (discovery.v3alpha.DiscoveryResponse) {
     option (google.api.http).post = "/v3alpha/discovery:tap_configs";
     option (google.api.http).body = "*";
   }

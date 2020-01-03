@@ -1,5 +1,5 @@
 #include "envoy/config/filter/http/ip_tagging/v2/ip_tagging.pb.h"
-#include "envoy/config/filter/http/ip_tagging/v3alpha/ip_tagging.pb.h"
+#include "envoy/extensions/filters/http/ip_tagging/v3alpha/ip_tagging.pb.h"
 
 #include "common/config/api_type_oracle.h"
 
@@ -13,7 +13,7 @@ namespace {
 
 TEST(ApiTypeOracleTest, All) {
   envoy::config::filter::http::ip_tagging::v2::IPTagging v2_config;
-  envoy::config::filter::http::ip_tagging::v3alpha::IPTagging v3_config;
+  envoy::extensions::filters::http::ip_tagging::v3alpha::IPTagging v3_config;
   ProtobufWkt::Any non_api_type;
 
   EXPECT_EQ(nullptr, ApiTypeOracle::getEarlierVersionDescriptor(non_api_type));

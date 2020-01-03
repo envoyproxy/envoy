@@ -7,12 +7,14 @@ import "envoy/api/v2/discovery.proto";
 import "google/api/annotations.proto";
 import "google/protobuf/struct.proto";
 
+import "udpa/annotations/migrate.proto";
 import "validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.service.discovery.v2";
 option java_outer_classname = "RtdsProto";
 option java_multiple_files = true;
 option java_generic_services = true;
+option (udpa.annotations.file_migrate).move_to_package = "envoy.service.runtime.v3alpha";
 
 // [#protodoc-title: Runtime Discovery Service (RTDS)]
 // RTDS :ref:`configuration overview <config_runtime_rtds>`

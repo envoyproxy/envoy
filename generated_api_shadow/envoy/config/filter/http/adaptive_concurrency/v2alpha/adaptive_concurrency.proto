@@ -9,11 +9,14 @@ import "google/api/annotations.proto";
 import "google/protobuf/duration.proto";
 import "google/protobuf/wrappers.proto";
 
+import "udpa/annotations/migrate.proto";
 import "validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.config.filter.http.adaptive_concurrency.v2alpha";
 option java_outer_classname = "AdaptiveConcurrencyProto";
 option java_multiple_files = true;
+option (udpa.annotations.file_migrate).move_to_package =
+    "envoy.extensions.filters.http.adaptive_concurrency.v3alpha";
 
 // [#protodoc-title: Adaptive Concurrency]
 // Adaptive Concurrency Control :ref:`configuration overview

@@ -1,7 +1,7 @@
-#include "envoy/api/v3alpha/route/route.pb.h"
+#include "envoy/config/route/v3alpha/route.pb.h"
 
 void test() {
-  envoy::api::v3alpha::route::RouteAction route_action;
+  envoy::config::route::v3alpha::RouteAction route_action;
   route_action.host_rewrite_literal();
   route_action.set_host_rewrite_literal("blah");
 }
