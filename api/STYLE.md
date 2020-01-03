@@ -98,11 +98,11 @@ resources such as `Cluster`;
 throughout the API.
 
 In Envoy API v3, API definitions are layered hierarchically in packages from top-to-bottom as following:
-- `envoy.extensions` contaisn all definitions for the extensions, the package should match what in `source` directory.
+- `envoy.extensions` contains all definitions for the extensions, the package should match the structure of the `source` directory.
 - `envoy.service` contains gRPC definitions of supporting services and top-level messages for the services.
 e.g. `envoy.service.route.v3` contains RDS, `envoy.service.listener.v3` contains LDS.
-- `envoy.config` contains other definitions for service configuration and bootstrap.
-- `envoy.data` contains data types for services that Envoy is emitting.
+- `envoy.config` contains other definitions for service configuration, bootstrap and some legacy core types.
+- `envoy.data` contains data format declaration for data types that Envoy produces.
 - `envoy.type` contains common protobuf types such as percent, range and matchers.
 
 Dependencies are enforced from top-to-bottom using visibility constraints in
