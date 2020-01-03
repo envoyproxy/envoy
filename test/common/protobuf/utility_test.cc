@@ -265,18 +265,73 @@ TEST_F(ProtobufUtilityTest, LoadTextProtoFromFile_Failure) {
                                 "\" as a text protobuf (type envoy.config.bootstrap.v2.Bootstrap)");
 }
 
-TEST_F(ProtobufUtilityTest, Redact) {
-  // Message to redact: contains a bunch of sensitive data.
-  envoy::test::Sensitive actual;
+// String fields annotated as sensitive should be converted to the string "[redacted]". String
+// fields that are neither annotated as sensitive nor contained in a sensitive message should be
+// left alone.
+TEST_F(ProtobufUtilityTest, RedactString) {
+  envoy::test::Sensitive actual, expected;
   TestUtility::loadFromYaml(R"EOF(
 sensitive_string: This field should be redacted.
 sensitive_repeated_string:
   - This field should be redacted (1 of 2).
   - This field should be redacted (2 of 2).
+insensitive_string: This field should not be redacted.
+insensitive_repeated_string:
+  - This field should not be redacted (1 of 2).
+  - This field should not be redacted (2 of 2).
+)EOF",
+                            actual);
+
+  TestUtility::loadFromYaml(R"EOF(
+sensitive_string: '[redacted]'
+sensitive_repeated_string:
+  - '[redacted]'
+  - '[redacted]'
+insensitive_string: This field should not be redacted.
+insensitive_repeated_string:
+  - This field should not be redacted (1 of 2).
+  - This field should not be redacted (2 of 2).
+)EOF",
+                            expected);
+
+  MessageUtil::redact(actual);
+  EXPECT_TRUE(TestUtility::protoEqual(expected, actual));
+}
+
+// Ints annotated as sensitive should be cleared. Ints that are neither annotated as sensitive nor
+// contained in a sensitive message should be left alone. Note that the same logic should apply to
+// any primitive type (including `bytes`), although we omit tests for that here.
+TEST_F(ProtobufUtilityTest, RedactInts) {
+  envoy::test::Sensitive actual, expected;
+  TestUtility::loadFromYaml(R"EOF(
 sensitive_int: 1
 sensitive_repeated_int:
   - 1
   - 2
+insensitive_int: 1
+insensitive_repeated_int:
+  - 1
+  - 2
+)EOF",
+                            actual);
+
+  TestUtility::loadFromYaml(R"EOF(
+insensitive_int: 1
+insensitive_repeated_int:
+  - 1
+  - 2
+)EOF",
+                            expected);
+
+  MessageUtil::redact(actual);
+  EXPECT_TRUE(TestUtility::protoEqual(expected, actual));
+}
+
+// Messages annotated as sensitive should have all their fields redacted recursively. Messages that
+// are neither annotated as sensitive nor contained in a sensitive message should be left alone.
+TEST_F(ProtobufUtilityTest, RedactMessage) {
+  envoy::test::Sensitive actual, expected;
+  TestUtility::loadFromYaml(R"EOF(
 sensitive_message:
   insensitive_string: This field should be redacted because of its parent.
   insensitive_repeated_string:
@@ -303,251 +358,6 @@ sensitive_repeated_message:
     insensitive_repeated_int:
       - 3
       - 4
-sensitive_any:
-  '@type': type.googleapis.com/envoy.test.Sensitive
-  insensitive_string: This field should be redacted because of its parent.
-  insensitive_repeated_string:
-    - This field should be redacted because of its parent (1 of 2).
-    - This field should be redacted because of its parent (1 of 2).
-  insensitive_int: 1
-  insensitive_repeated_int:
-    - 1
-    - 2
-sensitive_repeated_any:
-  - '@type': type.googleapis.com/envoy.test.Sensitive
-    insensitive_string: This field should be redacted because of its parent (1 of 2).
-    insensitive_repeated_string:
-      - This field should be redacted because of its parent (1 of 4).
-      - This field should be redacted because of its parent (2 of 4).
-    insensitive_int: 1
-    insensitive_repeated_int:
-      - 1
-      - 2
-  - '@type': type.googleapis.com/envoy.test.Sensitive
-    insensitive_string: This field should be redacted because of its parent (2 of 2).
-    insensitive_repeated_string:
-      - This field should be redacted because of its parent (3 of 4).
-      - This field should be redacted because of its parent (4 of 4).
-    insensitive_int: 2
-    insensitive_repeated_int:
-      - 3
-      - 4
-sensitive_typed_struct:
-  type_url: type.googleapis.com/envoy.test.Sensitive
-  value:
-    insensitive_string: This field should be redacted because of its parent.
-    insensitive_repeated_string:
-      - This field should be redacted because of its parent (1 of 2).
-      - This field should be redacted because of its parent (1 of 2).
-    insensitive_int: '1'
-    insensitive_repeated_int:
-      - '1'
-      - '2'
-sensitive_repeated_typed_struct:
-  - type_url: type.googleapis.com/envoy.test.Sensitive
-    value:
-      insensitive_string: This field should be redacted because of its parent (1 of 2).
-      insensitive_repeated_string:
-        - This field should be redacted because of its parent (1 of 4).
-        - This field should be redacted because of its parent (2 of 4).
-      insensitive_int: '1'
-      insensitive_repeated_int:
-        - '1'
-        - '2'
-  - type_url: type.googleapis.com/envoy.test.Sensitive
-    value:
-      insensitive_string: This field should be redacted because of its parent (2 of 2).
-      insensitive_repeated_string:
-        - This field should be redacted because of its parent (3 of 4).
-        - This field should be redacted because of its parent (4 of 4).
-      insensitive_int: '2'
-      insensitive_repeated_int:
-        - '3'
-        - '4'
-sensitive_data_source:
-  - {}
-  - filename: This filename should not be redacted despite its parent.
-  - inline_bytes: 8EDAC7ED
-  - inline_string: This inline string should be redacted because of its parent.
-insensitive_any:
-  '@type': type.googleapis.com/envoy.test.Sensitive
-  sensitive_string: This field should be redacted.
-  sensitive_repeated_string:
-    - This field should be redacted (1 of 2).
-    - This field should be redacted (2 of 2).
-  sensitive_int: 1
-  sensitive_repeated_int:
-    - 1
-    - 2
-insensitive_repeated_any:
-  - '@type': type.googleapis.com/envoy.test.Sensitive
-    sensitive_string: This field should be redacted (1 of 2).
-    sensitive_repeated_string:
-      - This field should be redacted (1 of 4).
-      - This field should be redacted (2 of 4).
-    sensitive_int: 1
-    sensitive_repeated_int:
-      - 1
-      - 2
-  - '@type': type.googleapis.com/envoy.test.Sensitive
-    sensitive_string: This field should be redacted (2 of 2).
-    sensitive_repeated_string:
-      - This field should be redacted (3 of 4).
-      - This field should be redacted (4 of 4).
-    sensitive_int: 2
-    sensitive_repeated_int:
-      - 3
-      - 4
-insensitive_typed_struct:
-  type_url: type.googleapis.com/envoy.test.Sensitive
-  value:
-    sensitive_string: This field should be redacted.
-    sensitive_repeated_string:
-      - This field should be redacted (1 of 2).
-      - This field should be redacted (2 of 2).
-    sensitive_int: '1'
-    sensitive_repeated_int:
-      - '1'
-      - '2'
-insensitive_repeated_typed_struct:
-  - type_url: type.googleapis.com/envoy.test.Sensitive
-    value:
-      sensitive_string: This field should be redacted (1 of 2).
-      sensitive_repeated_string:
-        - This field should be redacted (1 of 4).
-        - This field should be redacted (2 of 4).
-      sensitive_int: '1'
-      sensitive_repeated_int:
-        - '1'
-        - '2'
-  - type_url: type.googleapis.com/envoy.test.Sensitive
-    value:
-      sensitive_string: This field should be redacted (2 of 2).
-      sensitive_repeated_string:
-        - This field should be redacted (3 of 4).
-        - This field should be redacted (4 of 4).
-      sensitive_int: '2'
-      sensitive_repeated_int:
-        - '3'
-        - '4'
-)EOF",
-                            actual);
-
-  // Expected result: all sensitive data is redacted.
-  envoy::test::Sensitive expected;
-  TestUtility::loadFromYaml(R"EOF(
-sensitive_string: '[redacted]'
-sensitive_repeated_string:
-  - '[redacted]'
-  - '[redacted]'
-sensitive_message:
-  insensitive_string: '[redacted]'
-  insensitive_repeated_string:
-    - '[redacted]'
-    - '[redacted]'
-sensitive_repeated_message:
-  - insensitive_string: '[redacted]'
-    insensitive_repeated_string:
-      - '[redacted]'
-      - '[redacted]'
-  - insensitive_string: '[redacted]'
-    insensitive_repeated_string:
-      - '[redacted]'
-      - '[redacted]'
-sensitive_any:
-  '@type': type.googleapis.com/envoy.test.Sensitive
-  insensitive_string: '[redacted]'
-  insensitive_repeated_string:
-    - '[redacted]'
-    - '[redacted]'
-sensitive_repeated_any:
-  - '@type': type.googleapis.com/envoy.test.Sensitive
-    insensitive_string: '[redacted]'
-    insensitive_repeated_string:
-      - '[redacted]'
-      - '[redacted]'
-  - '@type': type.googleapis.com/envoy.test.Sensitive
-    insensitive_string: '[redacted]'
-    insensitive_repeated_string:
-      - '[redacted]'
-      - '[redacted]'
-sensitive_typed_struct:
-  type_url: type.googleapis.com/envoy.test.Sensitive
-  value:
-    insensitive_string: '[redacted]'
-    insensitive_repeated_string:
-      - '[redacted]'
-      - '[redacted]'
-sensitive_repeated_typed_struct:
-  - type_url: type.googleapis.com/envoy.test.Sensitive
-    value:
-      insensitive_string: '[redacted]'
-      insensitive_repeated_string:
-        - '[redacted]'
-        - '[redacted]'
-  - type_url: type.googleapis.com/envoy.test.Sensitive
-    value:
-      insensitive_string: '[redacted]'
-      insensitive_repeated_string:
-        - '[redacted]'
-        - '[redacted]'
-sensitive_data_source:
-  - {}
-  - filename: This filename should not be redacted despite its parent.
-  - inline_string: '[redacted]'
-  - inline_string: '[redacted]'
-insensitive_any:
-  '@type': type.googleapis.com/envoy.test.Sensitive
-  sensitive_string: '[redacted]'
-  sensitive_repeated_string:
-    - '[redacted]'
-    - '[redacted]'
-insensitive_repeated_any:
-  - '@type': type.googleapis.com/envoy.test.Sensitive
-    sensitive_string: '[redacted]'
-    sensitive_repeated_string:
-      - '[redacted]'
-      - '[redacted]'
-  - '@type': type.googleapis.com/envoy.test.Sensitive
-    sensitive_string: '[redacted]'
-    sensitive_repeated_string:
-      - '[redacted]'
-      - '[redacted]'
-insensitive_typed_struct:
-  type_url: type.googleapis.com/envoy.test.Sensitive
-  value:
-    sensitive_string: '[redacted]'
-    sensitive_repeated_string:
-      - '[redacted]'
-      - '[redacted]'
-insensitive_repeated_typed_struct:
-  - type_url: type.googleapis.com/envoy.test.Sensitive
-    value:
-      sensitive_string: '[redacted]'
-      sensitive_repeated_string:
-        - '[redacted]'
-        - '[redacted]'
-  - type_url: type.googleapis.com/envoy.test.Sensitive
-    value:
-      sensitive_string: '[redacted]'
-      sensitive_repeated_string:
-        - '[redacted]'
-        - '[redacted]'
-)EOF",
-                            expected);
-
-  // Append a bit of insensitive data to both the original and expected messages.
-  // The expectation is that it shouldn't be redacted.
-  envoy::test::Sensitive insensitive;
-  TestUtility::loadFromYaml(R"EOF(
-insensitive_string: This field should not be redacted.
-insensitive_repeated_string:
-  - This field should not be redacted (1 of 2).
-  - This field should not be redacted (2 of 2).
-insensitive_int: 1
-insensitive_repeated_int:
-  - 1
-  - 2
 insensitive_message:
   insensitive_string: This field should not be redacted.
   insensitive_repeated_string:
@@ -575,14 +385,212 @@ insensitive_repeated_message:
       - 3
       - 4
 )EOF",
-                            insensitive);
-  actual.MergeFrom(insensitive);
-  expected.MergeFrom(insensitive);
+                            actual);
+
+  TestUtility::loadFromYaml(R"EOF(
+sensitive_message:
+  insensitive_string: '[redacted]'
+  insensitive_repeated_string:
+    - '[redacted]'
+    - '[redacted]'
+sensitive_repeated_message:
+  - insensitive_string: '[redacted]'
+    insensitive_repeated_string:
+      - '[redacted]'
+      - '[redacted]'
+  - insensitive_string: '[redacted]'
+    insensitive_repeated_string:
+      - '[redacted]'
+      - '[redacted]'
+insensitive_message:
+  insensitive_string: This field should not be redacted.
+  insensitive_repeated_string:
+    - This field should not be redacted (1 of 2).
+    - This field should not be redacted (2 of 2).
+  insensitive_int: 1
+  insensitive_repeated_int:
+    - 1
+    - 2
+insensitive_repeated_message:
+  - insensitive_string: This field should not be redacted (1 of 2).
+    insensitive_repeated_string:
+      - This field should not be redacted (1 of 4).
+      - This field should not be redacted (2 of 4).
+    insensitive_int: 1
+    insensitive_repeated_int:
+      - 1
+      - 2
+  - insensitive_string: This field should not be redacted (2 of 2).
+    insensitive_repeated_string:
+      - This field should not be redacted (3 of 4).
+      - This field should not be redacted (4 of 4).
+    insensitive_int: 2
+    insensitive_repeated_int:
+      - 3
+      - 4
+)EOF",
+                            expected);
 
   MessageUtil::redact(actual);
   EXPECT_TRUE(TestUtility::protoEqual(expected, actual));
 }
 
+// Messages packed into `Any` should be treated the same as normal messages.
+TEST_F(ProtobufUtilityTest, RedactAny) {
+  envoy::test::Sensitive actual, expected;
+  TestUtility::loadFromYaml(R"EOF(
+sensitive_any:
+  '@type': type.googleapis.com/envoy.test.Sensitive
+  insensitive_string: This field should be redacted because of its parent.
+  insensitive_repeated_string:
+    - This field should be redacted because of its parent (1 of 2).
+    - This field should be redacted because of its parent (2 of 2).
+  insensitive_int: 1
+  insensitive_repeated_int:
+    - 1
+    - 2
+sensitive_repeated_any:
+  - '@type': type.googleapis.com/envoy.test.Sensitive
+    insensitive_string: This field should be redacted because of its parent (1 of 2).
+    insensitive_repeated_string:
+      - This field should be redacted because of its parent (1 of 4).
+      - This field should be redacted because of its parent (2 of 4).
+    insensitive_int: 1
+    insensitive_repeated_int:
+      - 1
+      - 2
+  - '@type': type.googleapis.com/envoy.test.Sensitive
+    insensitive_string: This field should be redacted because of its parent (2 of 2).
+    insensitive_repeated_string:
+      - This field should be redacted because of its parent (3 of 4).
+      - This field should be redacted because of its parent (4 of 4).
+    insensitive_int: 2
+    insensitive_repeated_int:
+      - 3
+      - 4
+insensitive_any:
+  '@type': type.googleapis.com/envoy.test.Sensitive
+  sensitive_string: This field should be redacted.
+  sensitive_repeated_string:
+    - This field should be redacted (1 of 2).
+    - This field should be redacted (2 of 2).
+  sensitive_int: 1
+  sensitive_repeated_int:
+    - 1
+    - 2
+  insensitive_string: This field should not be redacted.
+  insensitive_repeated_string:
+    - This field should not be redacted (1 of 2).
+    - This field should not be redacted (2 of 2).
+  insensitive_int: 1
+  insensitive_repeated_int:
+    - 1
+    - 2
+insensitive_repeated_any:
+  - '@type': type.googleapis.com/envoy.test.Sensitive
+    sensitive_string: This field should be redacted (1 of 2).
+    sensitive_repeated_string:
+      - This field should be redacted (1 of 4).
+      - This field should be redacted (2 of 4).
+    sensitive_int: 1
+    sensitive_repeated_int:
+      - 1
+      - 2
+    insensitive_string: This field should not be redacted.
+    insensitive_repeated_string:
+      - This field should not be redacted (1 of 4).
+      - This field should not be redacted (2 of 4).
+    insensitive_int: 1
+    insensitive_repeated_int:
+      - 1
+      - 2
+  - '@type': type.googleapis.com/envoy.test.Sensitive
+    sensitive_string: This field should be redacted (2 of 2).
+    sensitive_repeated_string:
+      - This field should be redacted (3 of 4).
+      - This field should be redacted (4 of 4).
+    sensitive_int: 2
+    sensitive_repeated_int:
+      - 3
+      - 4
+    insensitive_string: This field should not be redacted.
+    insensitive_repeated_string:
+      - This field should not be redacted (3 of 4).
+      - This field should not be redacted (4 of 4).
+    insensitive_int: 2
+    insensitive_repeated_int:
+      - 3
+      - 4
+)EOF",
+                            actual);
+
+  TestUtility::loadFromYaml(R"EOF(
+sensitive_any:
+  '@type': type.googleapis.com/envoy.test.Sensitive
+  insensitive_string: '[redacted]'
+  insensitive_repeated_string:
+    - '[redacted]'
+    - '[redacted]'
+sensitive_repeated_any:
+  - '@type': type.googleapis.com/envoy.test.Sensitive
+    insensitive_string: '[redacted]'
+    insensitive_repeated_string:
+      - '[redacted]'
+      - '[redacted]'
+  - '@type': type.googleapis.com/envoy.test.Sensitive
+    insensitive_string: '[redacted]'
+    insensitive_repeated_string:
+      - '[redacted]'
+      - '[redacted]'
+insensitive_any:
+  '@type': type.googleapis.com/envoy.test.Sensitive
+  sensitive_string: '[redacted]'
+  sensitive_repeated_string:
+    - '[redacted]'
+    - '[redacted]'
+  insensitive_string: This field should not be redacted.
+  insensitive_repeated_string:
+    - This field should not be redacted (1 of 2).
+    - This field should not be redacted (2 of 2).
+  insensitive_int: 1
+  insensitive_repeated_int:
+    - 1
+    - 2
+insensitive_repeated_any:
+  - '@type': type.googleapis.com/envoy.test.Sensitive
+    sensitive_string: '[redacted]'
+    sensitive_repeated_string:
+      - '[redacted]'
+      - '[redacted]'
+    insensitive_string: This field should not be redacted.
+    insensitive_repeated_string:
+      - This field should not be redacted (1 of 4).
+      - This field should not be redacted (2 of 4).
+    insensitive_int: 1
+    insensitive_repeated_int:
+      - 1
+      - 2
+  - '@type': type.googleapis.com/envoy.test.Sensitive
+    sensitive_string: '[redacted]'
+    sensitive_repeated_string:
+      - '[redacted]'
+      - '[redacted]'
+    insensitive_string: This field should not be redacted.
+    insensitive_repeated_string:
+      - This field should not be redacted (3 of 4).
+      - This field should not be redacted (4 of 4).
+    insensitive_int: 2
+    insensitive_repeated_int:
+      - 3
+      - 4
+)EOF",
+                            expected);
+
+  MessageUtil::redact(actual);
+  EXPECT_TRUE(TestUtility::protoEqual(expected, actual));
+}
+
+// Messages packed into `Any` with unknown type URLs are skipped.
 TEST_F(ProtobufUtilityTest, RedactAnyWithUnknownTypeUrl) {
   ProtobufWkt::Any actual;
   // Note, `loadFromYaml` validates the type when populating `Any`, so we have to pass the real type
@@ -599,6 +607,175 @@ sensitive_string: This field is sensitive, but we have no way of knowing.
   EXPECT_TRUE(TestUtility::protoEqual(expected, actual));
 }
 
+// Messages packed into `TypedStruct` should be treated the same as normal messages. Note that
+// ints are quoted as strings here because that's what happens in the JSON conversion.
+TEST_F(ProtobufUtilityTest, RedactTypedStruct) {
+  envoy::test::Sensitive actual, expected;
+  TestUtility::loadFromYaml(R"EOF(
+sensitive_typed_struct:
+  type_url: type.googleapis.com/envoy.test.Sensitive
+  value:
+    insensitive_string: This field should be redacted because of its parent.
+    insensitive_repeated_string:
+      - This field should be redacted because of its parent (1 of 2).
+      - This field should be redacted because of its parent (2 of 2).
+    insensitive_int: '1'
+    insensitive_repeated_int:
+      - '1'
+      - '2'
+sensitive_repeated_typed_struct:
+  - type_url: type.googleapis.com/envoy.test.Sensitive
+    value:
+      insensitive_string: This field should be redacted because of its parent (1 of 2).
+      insensitive_repeated_string:
+        - This field should be redacted because of its parent (1 of 4).
+        - This field should be redacted because of its parent (2 of 4).
+      insensitive_int: '1'
+      insensitive_repeated_int:
+        - '1'
+        - '2'
+  - type_url: type.googleapis.com/envoy.test.Sensitive
+    value:
+      insensitive_string: This field should be redacted because of its parent (2 of 2).
+      insensitive_repeated_string:
+        - This field should be redacted because of its parent (3 of 4).
+        - This field should be redacted because of its parent (4 of 4).
+      insensitive_int: '2'
+      insensitive_repeated_int:
+        - '3'
+        - '4'
+insensitive_typed_struct:
+  type_url: type.googleapis.com/envoy.test.Sensitive
+  value:
+    sensitive_string: This field should be redacted.
+    sensitive_repeated_string:
+      - This field should be redacted (1 of 2).
+      - This field should be redacted (2 of 2).
+    sensitive_int: '1'
+    sensitive_repeated_int:
+      - '1'
+      - '2'
+    insensitive_string: This field should not be redacted.
+    insensitive_repeated_string:
+      - This field should not be redacted (1 of 2).
+      - This field should not be redacted (2 of 2).
+    insensitive_int: '1'
+    insensitive_repeated_int:
+      - '1'
+      - '2'
+insensitive_repeated_typed_struct:
+  - type_url: type.googleapis.com/envoy.test.Sensitive
+    value:
+      sensitive_string: This field should be redacted (1 of 2).
+      sensitive_repeated_string:
+        - This field should be redacted (1 of 4).
+        - This field should be redacted (2 of 4).
+      sensitive_int: '1'
+      sensitive_repeated_int:
+        - '1'
+        - '2'
+      insensitive_string: This field should not be redacted.
+      insensitive_repeated_string:
+        - This field should not be redacted (1 of 4).
+        - This field should not be redacted (2 of 4).
+      insensitive_int: '1'
+      insensitive_repeated_int:
+        - '1'
+        - '2'
+  - type_url: type.googleapis.com/envoy.test.Sensitive
+    value:
+      sensitive_string: This field should be redacted (2 of 2).
+      sensitive_repeated_string:
+        - This field should be redacted (3 of 4).
+        - This field should be redacted (4 of 4).
+      sensitive_int: '2'
+      sensitive_repeated_int:
+        - '3'
+        - '4'
+      insensitive_string: This field should not be redacted.
+      insensitive_repeated_string:
+        - This field should not be redacted (3 of 4).
+        - This field should not be redacted (4 of 4).
+      insensitive_int: '2'
+      insensitive_repeated_int:
+        - '3'
+        - '4'
+)EOF",
+                            actual);
+
+  TestUtility::loadFromYaml(R"EOF(
+sensitive_typed_struct:
+  type_url: type.googleapis.com/envoy.test.Sensitive
+  value:
+    insensitive_string: '[redacted]'
+    insensitive_repeated_string:
+      - '[redacted]'
+      - '[redacted]'
+sensitive_repeated_typed_struct:
+  - type_url: type.googleapis.com/envoy.test.Sensitive
+    value:
+      insensitive_string: '[redacted]'
+      insensitive_repeated_string:
+        - '[redacted]'
+        - '[redacted]'
+  - type_url: type.googleapis.com/envoy.test.Sensitive
+    value:
+      insensitive_string: '[redacted]'
+      insensitive_repeated_string:
+        - '[redacted]'
+        - '[redacted]'
+insensitive_typed_struct:
+  type_url: type.googleapis.com/envoy.test.Sensitive
+  value:
+    sensitive_string: '[redacted]'
+    sensitive_repeated_string:
+      - '[redacted]'
+      - '[redacted]'
+    insensitive_string: This field should not be redacted.
+    insensitive_repeated_string:
+      - This field should not be redacted (1 of 2).
+      - This field should not be redacted (2 of 2).
+    insensitive_int: '1'
+    insensitive_repeated_int:
+      - '1'
+      - '2'
+insensitive_repeated_typed_struct:
+  - type_url: type.googleapis.com/envoy.test.Sensitive
+    value:
+      sensitive_string: '[redacted]'
+      sensitive_repeated_string:
+        - '[redacted]'
+        - '[redacted]'
+      insensitive_string: This field should not be redacted.
+      insensitive_repeated_string:
+        - This field should not be redacted (1 of 4).
+        - This field should not be redacted (2 of 4).
+      insensitive_int: '1'
+      insensitive_repeated_int:
+        - '1'
+        - '2'
+  - type_url: type.googleapis.com/envoy.test.Sensitive
+    value:
+      sensitive_string: '[redacted]'
+      sensitive_repeated_string:
+        - '[redacted]'
+        - '[redacted]'
+      insensitive_string: This field should not be redacted.
+      insensitive_repeated_string:
+        - This field should not be redacted (3 of 4).
+        - This field should not be redacted (4 of 4).
+      insensitive_int: '2'
+      insensitive_repeated_int:
+        - '3'
+        - '4'
+)EOF",
+                            expected);
+
+  MessageUtil::redact(actual);
+  EXPECT_TRUE(TestUtility::protoEqual(expected, actual));
+}
+
+// Messages packed into `TypedStruct` with unknown type URLs are skipped.
 TEST_F(ProtobufUtilityTest, RedactTypedStructWithUnknownTypeUrl) {
   udpa::type::v1::TypedStruct actual;
   TestUtility::loadFromYaml(R"EOF(
@@ -609,6 +786,41 @@ value:
                             actual);
 
   udpa::type::v1::TypedStruct expected = actual;
+  MessageUtil::redact(actual);
+  EXPECT_TRUE(TestUtility::protoEqual(expected, actual));
+}
+
+// `DataSource` gets special handling for its uses in `TlsCertificate` and `TlsSessionTicketKeys`.
+TEST_F(ProtobufUtilityTest, RedactDataSource) {
+  envoy::test::Sensitive actual, expected;
+  TestUtility::loadFromYaml(R"EOF(
+sensitive_data_source:
+  - {}
+  - filename: This filename should not be redacted despite its parent.
+  - inline_bytes: 8EDAC7ED
+  - inline_string: This inline string should be redacted because of its parent.
+insensitive_data_source:
+  - {}
+  - filename: This filename should not be redacted.
+  - inline_bytes: 1234ABCD
+  - inline_string: This inline string should not be redacted.
+)EOF",
+                            actual);
+
+  TestUtility::loadFromYaml(R"EOF(
+sensitive_data_source:
+  - {}
+  - filename: This filename should not be redacted despite its parent.
+  - inline_string: '[redacted]'
+  - inline_string: '[redacted]'
+insensitive_data_source:
+  - {}
+  - filename: This filename should not be redacted.
+  - inline_bytes: 1234ABCD
+  - inline_string: This inline string should not be redacted.
+)EOF",
+                            expected);
+
   MessageUtil::redact(actual);
   EXPECT_TRUE(TestUtility::protoEqual(expected, actual));
 }
