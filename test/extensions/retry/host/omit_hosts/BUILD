@@ -19,6 +19,6 @@ envoy_extension_cc_test(
         "//source/extensions/retry/host:well_known_names",
         "//source/extensions/retry/host/omit_hosts:config",
         "//test/mocks/upstream:upstream_mocks",
-        "@envoy_api//envoy/config/retry/omit_hosts:pkg_cc_proto",
+        "@envoy_api//envoy/config/retry/omit_hosts/v2:pkg_cc_proto",
     ],
 )

@@ -28,6 +28,6 @@ envoy_cc_extension(
         "//include/envoy/upstream:retry_interface",
         "//source/common/protobuf",
         "//source/extensions/retry/host:well_known_names",
-        "@envoy_api//envoy/config/retry/omit_hosts:pkg_cc_proto",
+        "@envoy_api//envoy/config/retry/omit_hosts/v2:pkg_cc_proto",
     ],
 )

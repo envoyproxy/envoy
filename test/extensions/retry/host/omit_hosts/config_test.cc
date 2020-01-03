@@ -1,4 +1,4 @@
-#include "envoy/config/retry/omit_hosts/omit_hosts_config.pb.validate.h"
+#include "envoy/config/retry/omit_hosts/v2/omit_hosts_config.pb.validate.h"
 #include "envoy/registry/registry.h"
 #include "envoy/upstream/retry.h"
 
@@ -24,7 +24,7 @@ TEST(OmitHostsRetryPredicateTest, PredicateTest) {
 
   ASSERT_NE(nullptr, factory);
 
-  envoy::config::retry::omit_hosts::OmitHostsConfig config;
+  envoy::config::retry::omit_hosts::v2::OmitHostsConfig config;
   auto* metadata_match = config.mutable_metadata_match();
   Envoy::Config::Metadata::mutableMetadataValue(
       *metadata_match, Envoy::Config::MetadataFilters::get().ENVOY_LB, "key")

@@ -1,0 +1,20 @@
+syntax = "proto3";
+
+package envoy.config.retry.omit_hosts.v2;
+
+option java_package = "io.envoyproxy.envoy.config.retry.omit_hosts.v2";
+option java_outer_classname = "OmitHostsConfigProto";
+option java_multiple_files = true;
+
+import "envoy/api/v2/core/base.proto";
+
+// A retry host predicate that can be used to reject a host based on 
+// predefined metadata match criteria
+// [#extension: envoy.retry_host_predicates.omit_hosts]
+message OmitHostsConfig {
+  // Retry host predicate metadata match criteria. The hosts in
+  // the upstream cluster with metadata matching will be omitted while
+  // attempting retry of a failed request. The filter name should be 
+  // specified as *envoy.lb*.
+  api.v2.core.Metadata metadata_match = 1;
+}

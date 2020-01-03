@@ -2,6 +2,7 @@
 
 #include "envoy/upstream/retry.h"
 #include "envoy/upstream/upstream.h"
+
 #include "extensions/retry/host/well_known_names.h"
 
 namespace Envoy {
@@ -9,8 +10,7 @@ class OmitHostsRetryPredicate : public Upstream::RetryHostPredicate {
 public:
   OmitHostsRetryPredicate(envoy::api::v2::core::Metadata metadata_match_criteria,
                           uint32_t retry_count)
-      : attempted_hosts_(retry_count), 
-        metadata_match_criteria_(metadata_match_criteria) {}
+      : attempted_hosts_(retry_count), metadata_match_criteria_(metadata_match_criteria) {}
 
   bool shouldSelectAnotherHost(const Upstream::Host& host) override {
     const auto& match_criteria_filter_it = metadata_match_criteria_.filter_metadata().find(
