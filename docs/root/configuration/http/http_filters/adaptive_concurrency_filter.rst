@@ -115,7 +115,8 @@ fields can be overridden via runtime settings.
 .. code-block:: yaml
 
   name: envoy.filters.http.adaptive_concurrency
-  config:
+  typed_config:
+    "@type": type.googleapis.com/envoy.config.filter.http.adaptive_concurrency.v2alpha.AdaptiveConcurrency
     gradient_controller_config:
       sample_aggregate_percentile:
         value: 90
