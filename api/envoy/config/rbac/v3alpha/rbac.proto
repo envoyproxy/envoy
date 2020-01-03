@@ -2,8 +2,8 @@ syntax = "proto3";
 
 package envoy.config.rbac.v3alpha;
 
-import "envoy/api/v3alpha/core/address.proto";
-import "envoy/api/v3alpha/route/route.proto";
+import "envoy/config/core/v3alpha/address.proto";
+import "envoy/config/route/v3alpha/route.proto";
 import "envoy/type/matcher/v3alpha/metadata.proto";
 import "envoy/type/matcher/v3alpha/string.proto";
 
@@ -132,10 +132,10 @@ message Permission {
 
     // A header (or pseudo-header such as :path or :method) on the incoming HTTP request. Only
     // available for HTTP request.
-    api.v3alpha.route.HeaderMatcher header = 4;
+    route.v3alpha.HeaderMatcher header = 4;
 
     // A CIDR block that describes the destination IP.
-    api.v3alpha.core.CidrRange destination_ip = 5;
+    core.v3alpha.CidrRange destination_ip = 5;
 
     // A port number that describes the destination port connecting to.
     uint32 destination_port = 6 [(validate.rules).uint32 = {lte: 65535}];
@@ -159,8 +159,8 @@ message Permission {
     //   * If the :ref:`TLS Inspector <config_listener_filters_tls_inspector>`
     //     filter is not added, and if a `FilterChainMatch` is not defined for
     //     the :ref:`server name
-    //     <envoy_api_field_api.v3alpha.listener.FilterChainMatch.server_names>`, a TLS connection's
-    //     requested SNI server name will be treated as if it wasn't present.
+    //     <envoy_api_field_config.listener.v3alpha.FilterChainMatch.server_names>`, a TLS
+    //     connection's requested SNI server name will be treated as if it wasn't present.
     //
     //   * A :ref:`listener filter <arch_overview_listener_filters>` may
     //     overwrite a connection's requested server name within Envoy.
@@ -214,11 +214,11 @@ message Principal {
     Authenticated authenticated = 4;
 
     // A CIDR block that describes the downstream IP.
-    api.v3alpha.core.CidrRange source_ip = 5;
+    core.v3alpha.CidrRange source_ip = 5;
 
     // A header (or pseudo-header such as :path or :method) on the incoming HTTP request. Only
     // available for HTTP request.
-    api.v3alpha.route.HeaderMatcher header = 6;
+    route.v3alpha.HeaderMatcher header = 6;
 
     // Metadata that describes additional information about the principal.
     type.matcher.v3alpha.MetadataMatcher metadata = 7;

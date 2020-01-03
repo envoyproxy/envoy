@@ -7,7 +7,6 @@
 #include "envoy/api/v2/discovery.pb.h"
 #include "envoy/api/v2/lds.pb.h"
 #include "envoy/api/v2/lds.pb.validate.h"
-#include "envoy/api/v3alpha/lds.pb.h"
 #include "envoy/stats/scope.h"
 
 #include "common/common/assert.h"
@@ -141,7 +140,7 @@ std::string LdsApiImpl::loadTypeUrl(envoy::api::v2::core::ApiVersion resource_ap
         API_NO_BOOST(envoy::api::v2::Listener().GetDescriptor()->full_name()));
   case envoy::api::v2::core::ApiVersion::V3ALPHA:
     return Grpc::Common::typeUrl(
-        API_NO_BOOST(envoy::api::v3alpha::Listener().GetDescriptor()->full_name()));
+        API_NO_BOOST(envoy::service::listener::v3alpha::Listener().GetDescriptor()->full_name()));
   default:
     NOT_REACHED_GCOVR_EXCL_LINE;
   }

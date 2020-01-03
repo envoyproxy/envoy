@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package envoy.service.auth.v3alpha;
 
-import "envoy/api/v3alpha/core/base.proto";
+import "envoy/config/core/v3alpha/base.proto";
 import "envoy/service/auth/v3alpha/attribute_context.proto";
 import "envoy/type/v3alpha/http_status.proto";
 
@@ -49,7 +49,7 @@ message DeniedHttpResponse {
 
   // This field allows the authorization service to send HTTP response headers
   // to the downstream client.
-  repeated api.v3alpha.core.HeaderValueOption headers = 2;
+  repeated config.core.v3alpha.HeaderValueOption headers = 2;
 
   // This field allows the authorization service to send a response body data
   // to the downstream client.
@@ -67,7 +67,7 @@ message OkHttpResponse {
   // the filter will append the correspondent header value to the matched request header. Note that
   // by Leaving `append` as false, the filter will either add a new header, or override an existing
   // one if there is a match.
-  repeated api.v3alpha.core.HeaderValueOption headers = 2;
+  repeated config.core.v3alpha.HeaderValueOption headers = 2;
 }
 
 // Intended for gRPC and Network Authorization servers `only`.

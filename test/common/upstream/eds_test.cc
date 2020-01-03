@@ -808,6 +808,13 @@ TEST_F(EdsTest, EndpointMovedToNewPriority) {
   cluster_load_assignment.clear_endpoints();
   add_endpoint(81, 0);
   add_endpoint(80, 1);
+
+  // Verify that no hosts gets added or removed to/from the PrioritySet.
+  cluster_->prioritySet().addMemberUpdateCb([&](const auto& added, const auto& removed) {
+    EXPECT_TRUE(added.empty());
+    EXPECT_TRUE(removed.empty());
+  });
+
   doOnConfigUpdateVerifyNoThrow(cluster_load_assignment);
 
   {
@@ -832,6 +839,28 @@ TEST_F(EdsTest, EndpointMovedToNewPriority) {
     // The endpoint was healthy in the original priority, so moving it
     // around should preserve that.
     EXPECT_FALSE(hosts[0]->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC));
+  }
+
+  // Moves all the endpoints to priority 1.
+  cluster_load_assignment.clear_endpoints();
+  add_endpoint(80, 1);
+  add_endpoint(81, 1);
+
+  doOnConfigUpdateVerifyNoThrow(cluster_load_assignment);
+
+  {
+    // Priority 0 should now be empty.
+    auto& hosts = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts();
+    EXPECT_EQ(hosts.size(), 0);
+  }
+
+  {
+    auto& hosts = cluster_->prioritySet().hostSetsPerPriority()[1]->hosts();
+    EXPECT_EQ(hosts.size(), 2);
+
+    // The endpoints were healthy, so moving them around should preserve that.
+    EXPECT_FALSE(hosts[0]->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC));
+    EXPECT_FALSE(hosts[1]->healthFlagGet(Host::HealthFlag::FAILED_ACTIVE_HC));
   }
 }
 
@@ -1348,8 +1377,8 @@ TEST_F(EdsTest, EndpointHostsPerPriority) {
   EXPECT_EQ(2, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().size());
   EXPECT_EQ(1, cluster_->prioritySet().hostSetsPerPriority()[1]->hosts().size());
 
-  // Add 2 more hosts to priority 0, and add five hosts to priority 2.
-  // Note the (illegal) gap (no priority 1.)  Until we have config validation,
+  // Add 2 more hosts to priority 0, and add five hosts to priority 3.
+  // Note the (illegal) gap (no priority 2.)  Until we have config validation,
   // make sure bad config does no harm.
   add_hosts_to_priority(0, 2);
   add_hosts_to_priority(3, 5);
@@ -1361,14 +1390,14 @@ TEST_F(EdsTest, EndpointHostsPerPriority) {
   EXPECT_EQ(0, cluster_->prioritySet().hostSetsPerPriority()[2]->hosts().size());
   EXPECT_EQ(5, cluster_->prioritySet().hostSetsPerPriority()[3]->hosts().size());
 
-  // Update the number of hosts in priority #4. Make sure no other priority
-  // levels are affected.
+  // Update the number of hosts in priority 3. Make sure we clear out the priorities previously
+  // occupied by hosts.
   cluster_load_assignment.clear_endpoints();
   add_hosts_to_priority(3, 4);
   doOnConfigUpdateVerifyNoThrow(cluster_load_assignment);
   ASSERT_EQ(4, cluster_->prioritySet().hostSetsPerPriority().size());
-  EXPECT_EQ(4, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().size());
-  EXPECT_EQ(1, cluster_->prioritySet().hostSetsPerPriority()[1]->hosts().size());
+  EXPECT_EQ(0, cluster_->prioritySet().hostSetsPerPriority()[0]->hosts().size());
+  EXPECT_EQ(0, cluster_->prioritySet().hostSetsPerPriority()[1]->hosts().size());
   EXPECT_EQ(0, cluster_->prioritySet().hostSetsPerPriority()[2]->hosts().size());
   EXPECT_EQ(4, cluster_->prioritySet().hostSetsPerPriority()[3]->hosts().size());
 }
