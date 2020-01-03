@@ -16,7 +16,7 @@ namespace {
 // Wire-style upgrading between versions.
 TEST(VersionConverterTest, Upgrade) {
   API_NO_BOOST(envoy::api::v2::Cluster) source;
-  API_NO_BOOST(source.set_drain_connections_on_host_removal(true));
+  source.set_drain_connections_on_host_removal(true);
   API_NO_BOOST(envoy::service::cluster::v3alpha::Cluster) dst;
   VersionConverter::upgrade(source, dst);
   EXPECT_TRUE(dst.ignore_health_on_host_removal());
@@ -37,7 +37,7 @@ TEST(VersionConverterTest, DowngradeEarlier) {
 // Downgrading is idempotent if no earlier version.
 TEST(VersionConverterTest, DowngradeSame) {
   API_NO_BOOST(envoy::api::v2::Cluster) source;
-  API_NO_BOOST(source.set_drain_connections_on_host_removal(true));
+  source.set_drain_connections_on_host_removal(true);
   auto downgraded = VersionConverter::downgrade(source);
   const Protobuf::Descriptor* desc = downgraded->msg_->GetDescriptor();
   const Protobuf::Reflection* reflection = downgraded->msg_->GetReflection();

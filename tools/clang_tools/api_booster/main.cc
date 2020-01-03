@@ -272,7 +272,7 @@ private:
     }
   }
 
-  // Match callback clang::CallMemberExpr. We rewrite things like
+  // Match callback for clang::CxxMemberCallExpr. We rewrite things like
   // ->mutable_foo() to ->mutable_foo_new_name() during renames.
   void onMemberCallExprMatch(const clang::CXXMemberCallExpr& member_call_expr,
                              const clang::SourceManager& source_manager) {
@@ -283,15 +283,23 @@ private:
     if (!latest_type_info) {
       return;
     }
+    // Figure out if the referenced object was declared under API_NO_BOOST. This
+    // only works for simple cases, best effort.
+    const auto* object_expr = member_call_expr.getImplicitObjectArgument();
+    if (object_expr != nullptr) {
+      const auto* decl = object_expr->getReferencedDeclOfCallee();
+      if (decl != nullptr &&
+          getSourceText(decl->getSourceRange(), source_manager).find("API_NO_BOOST") !=
+              std::string::npos) {
+        DEBUG_LOG("Skipping method replacement due to API_NO_BOOST");
+        return;
+      }
+    }
     tryRenameMethod(*latest_type_info, member_call_expr.getExprLoc(), source_manager);
   }
 
   bool tryRenameMethod(const TypeInformation& type_info, clang::SourceLocation method_loc,
                        const clang::SourceManager& source_manager) {
-    if (underApiNoBoost(method_loc, source_manager)) {
-      DEBUG_LOG("Skipping method replacement due to API_NO_BOOST");
-      return false;
-    }
     const clang::SourceRange source_range = {source_manager.getSpellingLoc(method_loc),
                                              source_manager.getSpellingLoc(method_loc)};
     const std::string method_name = getSourceText(source_range, source_manager);

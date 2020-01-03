@@ -459,12 +459,12 @@ TEST_F(ProtobufUtilityTest, UnpackToWrongType) {
 TEST_F(ProtobufUtilityTest, UnpackToSameVersion) {
   {
     API_NO_BOOST(envoy::api::v2::Cluster) source;
-    API_NO_BOOST(source.set_drain_connections_on_host_removal(true));
+    source.set_drain_connections_on_host_removal(true);
     ProtobufWkt::Any source_any;
     source_any.PackFrom(source);
     API_NO_BOOST(envoy::api::v2::Cluster) dst;
     MessageUtil::unpackTo(source_any, dst);
-    EXPECT_TRUE(API_NO_BOOST(dst.drain_connections_on_host_removal()));
+    EXPECT_TRUE(dst.drain_connections_on_host_removal());
   }
   {
     API_NO_BOOST(envoy::service::cluster::v3alpha::Cluster) source;
@@ -480,7 +480,7 @@ TEST_F(ProtobufUtilityTest, UnpackToSameVersion) {
 // MessageUtility::unpackTo() with API message works across version.
 TEST_F(ProtobufUtilityTest, UnpackToNextVersion) {
   API_NO_BOOST(envoy::api::v2::Cluster) source;
-  API_NO_BOOST(source.set_drain_connections_on_host_removal(true));
+  source.set_drain_connections_on_host_removal(true);
   ProtobufWkt::Any source_any;
   source_any.PackFrom(source);
   API_NO_BOOST(envoy::service::cluster::v3alpha::Cluster) dst;
@@ -502,13 +502,13 @@ TEST_F(ProtobufUtilityTest, LoadFromJsonSameVersion) {
     API_NO_BOOST(envoy::api::v2::Cluster) dst;
     MessageUtil::loadFromJson("{drain_connections_on_host_removal: true}", dst,
                               ProtobufMessage::getNullValidationVisitor());
-    EXPECT_TRUE(API_NO_BOOST(dst.drain_connections_on_host_removal()));
+    EXPECT_TRUE(dst.drain_connections_on_host_removal());
   }
   {
     API_NO_BOOST(envoy::api::v2::Cluster) dst;
     MessageUtil::loadFromJson("{drain_connections_on_host_removal: true}", dst,
                               ProtobufMessage::getStrictValidationVisitor());
-    EXPECT_TRUE(API_NO_BOOST(dst.drain_connections_on_host_removal()));
+    EXPECT_TRUE(dst.drain_connections_on_host_removal());
   }
   {
     API_NO_BOOST(envoy::service::cluster::v3alpha::Cluster) dst;
