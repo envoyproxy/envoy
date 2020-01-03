@@ -2,15 +2,15 @@ syntax = "proto3";
 
 package envoy.config.bootstrap.v3alpha;
 
-import "envoy/api/v3alpha/auth/cert.proto";
-import "envoy/api/v3alpha/cds.proto";
-import "envoy/api/v3alpha/core/address.proto";
-import "envoy/api/v3alpha/core/base.proto";
-import "envoy/api/v3alpha/core/config_source.proto";
-import "envoy/api/v3alpha/lds.proto";
+import "envoy/config/core/v3alpha/address.proto";
+import "envoy/config/core/v3alpha/base.proto";
+import "envoy/config/core/v3alpha/config_source.proto";
 import "envoy/config/metrics/v3alpha/stats.proto";
 import "envoy/config/overload/v3alpha/overload.proto";
 import "envoy/config/trace/v3alpha/trace.proto";
+import "envoy/extensions/transport_sockets/tls/v3alpha/cert.proto";
+import "envoy/service/cluster/v3alpha/cds.proto";
+import "envoy/service/listener/v3alpha/lds.proto";
 
 import "google/protobuf/duration.proto";
 import "google/protobuf/struct.proto";
@@ -39,20 +39,20 @@ message Bootstrap {
     option (udpa.annotations.versioning).previous_message_type =
         "envoy.config.bootstrap.v2.Bootstrap.StaticResources";
 
-    // Static :ref:`Listeners <envoy_api_msg_api.v3alpha.Listener>`. These listeners are
-    // available regardless of LDS configuration.
-    repeated api.v3alpha.Listener listeners = 1;
+    // Static :ref:`Listeners <envoy_api_msg_service.listener.v3alpha.Listener>`. These listeners
+    // are available regardless of LDS configuration.
+    repeated service.listener.v3alpha.Listener listeners = 1;
 
     // If a network based configuration source is specified for :ref:`cds_config
     // <envoy_api_field_config.bootstrap.v3alpha.Bootstrap.DynamicResources.cds_config>`, it's
     // necessary to have some initial cluster definitions available to allow Envoy to know how to
     // speak to the management server. These cluster definitions may not use :ref:`EDS
     // <arch_overview_dynamic_config_eds>` (i.e. they should be static IP or DNS-based).
-    repeated api.v3alpha.Cluster clusters = 2;
+    repeated service.cluster.v3alpha.Cluster clusters = 2;
 
     // These static secrets can be used by :ref:`SdsSecretConfig
-    // <envoy_api_msg_api.v3alpha.auth.SdsSecretConfig>`
-    repeated api.v3alpha.auth.Secret secrets = 3;
+    // <envoy_api_msg_extensions.transport_sockets.tls.v3alpha.SdsSecretConfig>`
+    repeated envoy.extensions.transport_sockets.tls.v3alpha.Secret secrets = 3;
   }
 
   message DynamicResources {
@@ -61,23 +61,22 @@ message Bootstrap {
 
     reserved 4;
 
-    // All :ref:`Listeners <envoy_api_msg_api.v3alpha.Listener>` are provided by a single
-    // :ref:`LDS <arch_overview_dynamic_config_lds>` configuration source.
-    api.v3alpha.core.ConfigSource lds_config = 1;
+    // All :ref:`Listeners <envoy_api_msg_service.listener.v3alpha.Listener>` are provided by a
+    // single :ref:`LDS <arch_overview_dynamic_config_lds>` configuration source.
+    core.v3alpha.ConfigSource lds_config = 1;
 
-    // All post-bootstrap :ref:`Cluster <envoy_api_msg_api.v3alpha.Cluster>` definitions are
-    // provided by a single :ref:`CDS <arch_overview_dynamic_config_cds>`
-    // configuration source.
-    api.v3alpha.core.ConfigSource cds_config = 2;
+    // All post-bootstrap :ref:`Cluster <envoy_api_msg_service.cluster.v3alpha.Cluster>` definitions
+    // are provided by a single :ref:`CDS <arch_overview_dynamic_config_cds>` configuration source.
+    core.v3alpha.ConfigSource cds_config = 2;
 
     // A single :ref:`ADS <config_overview_v2_ads>` source may be optionally
     // specified. This must have :ref:`api_type
-    // <envoy_api_field_api.v3alpha.core.ApiConfigSource.api_type>` :ref:`GRPC
-    // <envoy_api_enum_value_api.v3alpha.core.ApiConfigSource.ApiType.GRPC>`. Only
-    // :ref:`ConfigSources <envoy_api_msg_api.v3alpha.core.ConfigSource>` that have
-    // the :ref:`ads <envoy_api_field_api.v3alpha.core.ConfigSource.ads>` field set will be
+    // <envoy_api_field_config.core.v3alpha.ApiConfigSource.api_type>` :ref:`GRPC
+    // <envoy_api_enum_value_config.core.v3alpha.ApiConfigSource.ApiType.GRPC>`. Only
+    // :ref:`ConfigSources <envoy_api_msg_config.core.v3alpha.ConfigSource>` that have
+    // the :ref:`ads <envoy_api_field_config.core.v3alpha.ConfigSource.ads>` field set will be
     // streamed on the ADS channel.
-    api.v3alpha.core.ApiConfigSource ads_config = 3;
+    core.v3alpha.ApiConfigSource ads_config = 3;
   }
 
   reserved 10, 11;
@@ -86,7 +85,7 @@ message Bootstrap {
 
   // Node identity to present to the management server and for instance
   // identification purposes (e.g. in generated headers).
-  api.v3alpha.core.Node node = 1;
+  core.v3alpha.Node node = 1;
 
   // Statically specified resources.
   StaticResources static_resources = 2;
@@ -99,8 +98,8 @@ message Bootstrap {
   ClusterManager cluster_manager = 4;
 
   // Health discovery service config option.
-  // (:ref:`core.ApiConfigSource <envoy_api_msg_api.v3alpha.core.ApiConfigSource>`)
-  api.v3alpha.core.ApiConfigSource hds_config = 14;
+  // (:ref:`core.ApiConfigSource <envoy_api_msg_config.core.v3alpha.ApiConfigSource>`)
+  core.v3alpha.ApiConfigSource hds_config = 14;
 
   // Optional file system path to search for startup flag files.
   string flags_path = 5;
@@ -165,9 +164,9 @@ message Bootstrap {
 
   // Always use TCP queries instead of UDP queries for DNS lookups.
   // This may be overridden on a per-cluster basis in cds_config,
-  // when :ref:`dns_resolvers <envoy_api_field_api.v3alpha.Cluster.dns_resolvers>` and
-  // :ref:`use_tcp_for_dns_lookups <envoy_api_field_api.v3alpha.Cluster.use_tcp_for_dns_lookups>`
-  // are specified.
+  // when :ref:`dns_resolvers <envoy_api_field_service.cluster.v3alpha.Cluster.dns_resolvers>` and
+  // :ref:`use_tcp_for_dns_lookups
+  // <envoy_api_field_service.cluster.v3alpha.Cluster.use_tcp_for_dns_lookups>` are specified.
   bool use_tcp_for_dns_lookups = 20;
 }
 
@@ -187,11 +186,11 @@ message Admin {
 
   // The TCP address that the administration server will listen on.
   // If not specified, Envoy will not start an administration server.
-  api.v3alpha.core.Address address = 3;
+  core.v3alpha.Address address = 3;
 
   // Additional socket options that may not be present in Envoy source code or
   // precompiled binaries.
-  repeated api.v3alpha.core.SocketOption socket_options = 4;
+  repeated core.v3alpha.SocketOption socket_options = 4;
 }
 
 // Cluster manager :ref:`architecture overview <arch_overview_cluster_manager>`.
@@ -211,7 +210,7 @@ message ClusterManager {
   // this configuration). In order to enable :ref:`zone aware routing
   // <arch_overview_load_balancing_zone_aware_routing>` this option must be set.
   // If *local_cluster_name* is defined then :ref:`clusters
-  // <envoy_api_msg_api.v3alpha.Cluster>` must be defined in the :ref:`Bootstrap
+  // <envoy_api_msg_service.cluster.v3alpha.Cluster>` must be defined in the :ref:`Bootstrap
   // static cluster resources
   // <envoy_api_field_config.bootstrap.v3alpha.Bootstrap.StaticResources.clusters>`. This is
   // unrelated to the :option:`--service-cluster` option which does not `affect zone aware routing
@@ -223,13 +222,13 @@ message ClusterManager {
 
   // Optional configuration used to bind newly established upstream connections.
   // This may be overridden on a per-cluster basis by upstream_bind_config in the cds_config.
-  api.v3alpha.core.BindConfig upstream_bind_config = 3;
+  core.v3alpha.BindConfig upstream_bind_config = 3;
 
   // A management server endpoint to stream load stats to via
   // *StreamLoadStats*. This must have :ref:`api_type
-  // <envoy_api_field_api.v3alpha.core.ApiConfigSource.api_type>` :ref:`GRPC
-  // <envoy_api_enum_value_api.v3alpha.core.ApiConfigSource.ApiType.GRPC>`.
-  api.v3alpha.core.ApiConfigSource load_stats_config = 4;
+  // <envoy_api_field_config.core.v3alpha.ApiConfigSource.api_type>` :ref:`GRPC
+  // <envoy_api_enum_value_config.core.v3alpha.ApiConfigSource.ApiType.GRPC>`.
+  core.v3alpha.ApiConfigSource load_stats_config = 4;
 }
 
 // Envoy process watchdog configuration. When configured, this monitors for
@@ -334,7 +333,7 @@ message RuntimeLayer {
     string name = 1;
 
     // RTDS configuration source.
-    api.v3alpha.core.ConfigSource rtds_config = 2;
+    core.v3alpha.ConfigSource rtds_config = 2;
   }
 
   // Descriptive name for the runtime layer. This is only used for the runtime

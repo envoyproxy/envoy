@@ -1,6 +1,6 @@
-load("@rules_proto//proto:defs.bzl", "proto_library")
-
 licenses(["notice"])  # Apache 2
+
+load("@rules_proto//proto:defs.bzl", "proto_library")
 
 package_group(
     name = "docs",

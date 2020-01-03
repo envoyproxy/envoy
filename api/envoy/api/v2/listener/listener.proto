@@ -18,6 +18,7 @@ option java_outer_classname = "ListenerProto";
 option java_multiple_files = true;
 option csharp_namespace = "Envoy.Api.V2.ListenerNS";
 option ruby_package = "Envoy.Api.V2.ListenerNS";
+option (udpa.annotations.file_migrate).move_to_package = "envoy.config.listener.v3alpha";
 
 // [#protodoc-title: Listener components]
 // Listener :ref:`configuration overview <config_listeners>`
