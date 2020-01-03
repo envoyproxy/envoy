@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package envoy.service.discovery.v3alpha;
 
-import "envoy/api/v3alpha/discovery.proto";
+import "envoy/service/discovery/v3alpha/discovery.proto";
 
 import "udpa/annotations/versioning.proto";
 
@@ -24,12 +24,11 @@ option java_generic_services = true;
 // the multiplexed singleton APIs at the Envoy instance and management server.
 service AggregatedDiscoveryService {
   // This is a gRPC-only API.
-  rpc StreamAggregatedResources(stream api.v3alpha.DiscoveryRequest)
-      returns (stream api.v3alpha.DiscoveryResponse) {
+  rpc StreamAggregatedResources(stream DiscoveryRequest) returns (stream DiscoveryResponse) {
   }
 
-  rpc DeltaAggregatedResources(stream api.v3alpha.DeltaDiscoveryRequest)
-      returns (stream api.v3alpha.DeltaDiscoveryResponse) {
+  rpc DeltaAggregatedResources(stream DeltaDiscoveryRequest)
+      returns (stream DeltaDiscoveryResponse) {
   }
 }
 
