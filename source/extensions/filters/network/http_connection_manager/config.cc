@@ -494,7 +494,7 @@ SINGLETON_MANAGER_REGISTRATION(hcm_date_provider);
 SINGLETON_MANAGER_REGISTRATION(hcm_route_config_provider_manager);
 SINGLETON_MANAGER_REGISTRATION(hcm_scoped_routes_config_provider_manager);
 
-// TODO(junr03): some of this code can be DRYed up and shared with the other factory code. Clean up
+// TODO(junr03): some of this code can be shared with the other factory code. Clean up
 // if this factory approach is well received by reviewers.
 std::function<Http::ServerConnectionCallbacksPtr()>
 HttpConnectionManagerFactory::createHttpConnectionManagerFactoryFromProto(
