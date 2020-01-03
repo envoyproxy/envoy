@@ -143,7 +143,7 @@ createProtocolOptionsConfig(const std::string& name, const ProtobufWkt::Any& typ
     throw EnvoyException(fmt::format("filter {} does not support protocol options", name));
   }
 
-  Envoy::Config::Utility::translateOpaqueConfig(name, typed_config, config, validation_visitor,
+  Envoy::Config::Utility::translateOpaqueConfig(typed_config, config, validation_visitor,
                                                 *proto_config);
 
   return factory->createProtocolOptionsConfig(*proto_config, validation_visitor);
@@ -684,13 +684,13 @@ ClusterInfoImpl::ClusterInfoImpl(
       throw EnvoyException(
           fmt::format("cluster: LB policy {} is not valid for Cluster type {}. 'ORIGINAL_DST_LB' "
                       "is allowed only with cluster type 'ORIGINAL_DST'",
-                      envoy::api::v2::Cluster_LbPolicy_Name(config.lb_policy()),
+                      envoy::api::v2::Cluster::LbPolicy_Name(config.lb_policy()),
                       envoy::api::v2::Cluster_DiscoveryType_Name(config.type())));
     }
     if (config.has_lb_subset_config()) {
       throw EnvoyException(
           fmt::format("cluster: LB policy {} cannot be combined with lb_subset_config",
-                      envoy::api::v2::Cluster_LbPolicy_Name(config.lb_policy())));
+                      envoy::api::v2::Cluster::LbPolicy_Name(config.lb_policy())));
     }
 
     lb_type_ = LoadBalancerType::ClusterProvided;
@@ -702,7 +702,7 @@ ClusterInfoImpl::ClusterInfoImpl(
     if (config.has_lb_subset_config()) {
       throw EnvoyException(
           fmt::format("cluster: LB policy {} cannot be combined with lb_subset_config",
-                      envoy::api::v2::Cluster_LbPolicy_Name(config.lb_policy())));
+                      envoy::api::v2::Cluster::LbPolicy_Name(config.lb_policy())));
     }
 
     lb_type_ = LoadBalancerType::ClusterProvided;

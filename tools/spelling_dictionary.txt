@@ -48,6 +48,7 @@ CTXs
 CVC
 CVE
 CX
+Cxx
 CYGWIN
 DER
 DESC
@@ -466,6 +467,7 @@ deallocating
 deallocation
 dec
 dechunking
+decl
 decls
 decompressor
 decrement
@@ -533,6 +535,7 @@ evented
 evwatch
 exe
 execlp
+exprfor
 expectable
 extrahelp
 faceplant
@@ -608,6 +611,7 @@ idx
 ie
 ifdef
 iff
+ified
 impl
 implementors
 impls
@@ -666,6 +670,7 @@ linearized
 linux
 livelock
 llvm
+loc
 localhost
 lockless
 login
@@ -869,6 +874,7 @@ refetch
 regex
 regexes
 reimplements
+rele
 releasor
 reloadable
 reparse
@@ -951,6 +957,7 @@ strerr
 strerror
 stringbuf
 stringified
+stringify
 stringstream
 strtoull
 struct
@@ -984,6 +991,7 @@ superset
 symlink
 symlinked
 symlinks
+synchronizer
 syncookie
 sys
 syscall

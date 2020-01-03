@@ -23,6 +23,7 @@ envoy_cc_test(
     name = "utility_test",
     srcs = ["utility_test.cc"],
     deps = [
+        "//source/common/config:api_version_lib",
         "//source/common/protobuf:utility_lib",
         "//source/common/stats:isolated_store_lib",
         "//test/mocks/init:init_mocks",
@@ -35,6 +36,7 @@ envoy_cc_test(
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/api/v2:pkg_cc_proto",
         "@envoy_api//envoy/config/bootstrap/v2:pkg_cc_proto",
+        "@envoy_api//envoy/service/cluster/v3alpha:pkg_cc_proto",
         "@envoy_api//envoy/type:pkg_cc_proto",
     ],
 )

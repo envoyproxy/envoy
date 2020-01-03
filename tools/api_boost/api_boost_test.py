@@ -22,9 +22,13 @@ TestCase = namedtuple('TestCase', ['name', 'description'])
 # List of test in the form [(file_name, explanation)]
 TESTS = list(
     map(lambda x: TestCase(*x), [
+        ('deprecate', 'Deprecations'),
         ('elaborated_type', 'ElaboratedTypeLoc type upgrades'),
         ('using_decl', 'UsingDecl upgrades for named types'),
+        ('rename', 'Annotation-based renaming'),
         ('decl_ref_expr', 'DeclRefExpr upgrades for named constants'),
+        ('no_boost_file', 'API_NO_BOOST_FILE annotations'),
+        ('validate', 'Validation proto header inference'),
     ]))
 
 TESTDATA_PATH = 'tools/api_boost/testdata'
@@ -63,7 +67,9 @@ if __name__ == '__main__':
 
     # Run API booster.
     relpath_to_testdata = str(pathlib.Path(path).relative_to(pathlib.Path.cwd()))
-    api_boost.ApiBoostTree([relpath_to_testdata],
+    api_boost.ApiBoostTree([
+        os.path.join(relpath_to_testdata, test.name) for test in TESTS if ShouldRunTest(test.name)
+    ],
                            generate_compilation_database=True,
                            build_api_booster=True,
                            debug_log=True,

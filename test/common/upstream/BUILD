@@ -2,8 +2,8 @@ licenses(["notice"])  # Apache 2
 
 load(
     "//bazel:envoy_build_system.bzl",
-    "envoy_cc_binary",
     "envoy_cc_test",
+    "envoy_cc_test_binary",
     "envoy_cc_test_library",
     "envoy_package",
 )
@@ -326,9 +326,8 @@ envoy_cc_test(
     ],
 )
 
-envoy_cc_binary(
+envoy_cc_test_binary(
     name = "load_balancer_benchmark",
-    testonly = 1,
     srcs = ["load_balancer_benchmark.cc"],
     external_deps = [
         "benchmark",
