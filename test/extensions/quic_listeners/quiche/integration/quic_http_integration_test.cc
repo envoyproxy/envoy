@@ -268,13 +268,12 @@ TEST_P(QuicHttpIntegrationTest, MultipleQuicListenersWithBPF) {
 }
 
 TEST_P(QuicHttpIntegrationTest, MultipleQuicListenersNoBPF) {
-#ifdef __APPLE_
+#ifdef __APPLE__
   return;
 #endif
   concurrency_ = 8;
   set_reuse_port_ = true;
   initialize();
-  quic::SetVerbosityLogThreshold(1);
 #ifdef SO_ATTACH_REUSEPORT_CBPF
 #define SO_ATTACH_REUSEPORT_CBPF_TMP SO_ATTACH_REUSEPORT_CBPF
 #undef SO_ATTACH_REUSEPORT_CBPF
