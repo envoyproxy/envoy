@@ -1,3 +1,4 @@
+#include "envoy/api/v2/route/route.pb.h"
 #include "envoy/config/overload/v2alpha/overload.pb.h"
 #include "envoy/config/overload/v3alpha/overload.pb.h"
 #include "envoy/service/cluster/v3alpha/cds.pb.h"
@@ -26,6 +27,8 @@ public:
     default:
       break;
     }
+    API_NO_BOOST(envoy::api::v2::route::RouteAction) route_action;
+    route_action.host_rewrite();
     API_NO_BOOST(envoy::config::overload::v2alpha::Trigger) foo;
     BAR(API_NO_BOOST(envoy::config::overload::v2alpha::Trigger)) bar;
     BAR(envoy::config::overload::v3alpha::Trigger) baz;
