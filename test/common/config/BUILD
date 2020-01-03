@@ -13,7 +13,7 @@ envoy_package()
 envoy_cc_test(
     name = "api_shadow_test",
     srcs = ["api_shadow_test.cc"],
-    deps = ["@envoy_api//envoy/api/v3alpha:pkg_cc_proto"],
+    deps = ["@envoy_api//envoy/service/cluster/v3alpha:pkg_cc_proto"],
 )
 
 envoy_cc_test(
@@ -22,7 +22,7 @@ envoy_cc_test(
     deps = [
         "//source/common/config:api_type_oracle_lib",
         "@envoy_api//envoy/config/filter/http/ip_tagging/v2:pkg_cc_proto",
-        "@envoy_api//envoy/config/filter/http/ip_tagging/v3alpha:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/http/ip_tagging/v3alpha:pkg_cc_proto",
     ],
 )
 
@@ -315,6 +315,7 @@ envoy_cc_test(
         "@envoy_api//envoy/api/v2/core:pkg_cc_proto",
         "@envoy_api//envoy/config/bootstrap/v2:pkg_cc_proto",
         "@envoy_api//envoy/config/bootstrap/v3alpha:pkg_cc_proto",
+        "@envoy_api//envoy/service/cluster/v3alpha:pkg_cc_proto",
     ],
 )
 
@@ -387,6 +388,6 @@ envoy_cc_test(
         "//test/test_common:test_time_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/api/v2:pkg_cc_proto",
-        "@envoy_api//envoy/api/v3alpha:pkg_cc_proto",
+        "@envoy_api//envoy/service/cluster/v3alpha:pkg_cc_proto",
     ],
 )

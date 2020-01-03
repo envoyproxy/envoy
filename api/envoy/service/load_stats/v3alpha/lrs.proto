@@ -2,8 +2,8 @@ syntax = "proto3";
 
 package envoy.service.load_stats.v3alpha;
 
-import "envoy/api/v3alpha/core/base.proto";
-import "envoy/api/v3alpha/endpoint/load_report.proto";
+import "envoy/config/core/v3alpha/base.proto";
+import "envoy/config/endpoint/v3alpha/load_report.proto";
 
 import "google/protobuf/duration.proto";
 
@@ -58,10 +58,10 @@ message LoadStatsRequest {
       "envoy.service.load_stats.v2.LoadStatsRequest";
 
   // Node identifier for Envoy instance.
-  api.v3alpha.core.Node node = 1;
+  config.core.v3alpha.Node node = 1;
 
   // A list of load stats to report.
-  repeated api.v3alpha.endpoint.ClusterStats cluster_stats = 2;
+  repeated config.endpoint.v3alpha.ClusterStats cluster_stats = 2;
 }
 
 // The management server sends envoy a LoadStatsResponse with all clusters it

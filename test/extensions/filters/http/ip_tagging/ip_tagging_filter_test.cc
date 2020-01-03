@@ -1,6 +1,6 @@
 #include <memory>
 
-#include "envoy/config/filter/http/ip_tagging/v3alpha/ip_tagging.pb.h"
+#include "envoy/extensions/filters/http/ip_tagging/v3alpha/ip_tagging.pb.h"
 
 #include "common/buffer/buffer_impl.h"
 #include "common/http/header_map_impl.h"
@@ -43,7 +43,7 @@ ip_tags:
 )EOF";
 
   void initializeFilter(const std::string& yaml) {
-    envoy::config::filter::http::ip_tagging::v3alpha::IPTagging config;
+    envoy::extensions::filters::http::ip_tagging::v3alpha::IPTagging config;
     TestUtility::loadFromYaml(yaml, config);
     config_.reset(new IpTaggingFilterConfig(config, "prefix.", stats_, runtime_));
     filter_ = std::make_unique<IpTaggingFilter>(config_);

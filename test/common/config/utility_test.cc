@@ -4,6 +4,7 @@
 #include "envoy/common/exception.h"
 #include "envoy/config/bootstrap/v2/bootstrap.pb.h"
 #include "envoy/config/bootstrap/v3alpha/bootstrap.pb.h"
+#include "envoy/service/cluster/v3alpha/cds.pb.h"
 
 #include "common/common/fmt.h"
 #include "common/config/api_version.h"
@@ -332,7 +333,7 @@ TEST(UtilityTest, StructToClusterV2) {
 // (v3 API, upgrading).
 TEST(UtilityTest, StructToClusterV3) {
   ProtobufWkt::Any typed_config;
-  API_NO_BOOST(envoy::api::v3alpha::Cluster) cluster;
+  API_NO_BOOST(envoy::service::cluster::v3alpha::Cluster) cluster;
   ProtobufWkt::Struct cluster_struct;
   const std::string cluster_config_yaml = R"EOF(
     ignore_health_on_host_removal: true
@@ -341,13 +342,13 @@ TEST(UtilityTest, StructToClusterV3) {
   TestUtility::loadFromYaml(cluster_config_yaml, cluster_struct);
 
   {
-    API_NO_BOOST(envoy::api::v3alpha::Cluster) out;
+    API_NO_BOOST(envoy::service::cluster::v3alpha::Cluster) out;
     Utility::translateOpaqueConfig({}, cluster_struct, ProtobufMessage::getNullValidationVisitor(),
                                    out);
     EXPECT_THAT(out, ProtoEq(cluster));
   }
   {
-    API_NO_BOOST(envoy::api::v3alpha::Cluster) out;
+    API_NO_BOOST(envoy::service::cluster::v3alpha::Cluster) out;
     Utility::translateOpaqueConfig({}, cluster_struct,
                                    ProtobufMessage::getStrictValidationVisitor(), out);
     EXPECT_THAT(out, ProtoEq(cluster));
@@ -383,7 +384,7 @@ TEST(UtilityTest, TypedStructToClusterV2) {
 // (v3 API, upgrading).
 TEST(UtilityTest, TypedStructToClusterV3) {
   ProtobufWkt::Any typed_config;
-  API_NO_BOOST(envoy::api::v3alpha::Cluster) cluster;
+  API_NO_BOOST(envoy::service::cluster::v3alpha::Cluster) cluster;
   const std::string cluster_config_yaml = R"EOF(
     ignore_health_on_host_removal: true
   )EOF";
@@ -391,13 +392,13 @@ TEST(UtilityTest, TypedStructToClusterV3) {
   packTypedStructIntoAny(typed_config, cluster);
 
   {
-    API_NO_BOOST(envoy::api::v3alpha::Cluster) out;
+    API_NO_BOOST(envoy::service::cluster::v3alpha::Cluster) out;
     Utility::translateOpaqueConfig(typed_config, ProtobufWkt::Struct(),
                                    ProtobufMessage::getNullValidationVisitor(), out);
     EXPECT_THAT(out, ProtoEq(cluster));
   }
   {
-    API_NO_BOOST(envoy::api::v3alpha::Cluster) out;
+    API_NO_BOOST(envoy::service::cluster::v3alpha::Cluster) out;
     Utility::translateOpaqueConfig(typed_config, ProtobufWkt::Struct(),
                                    ProtobufMessage::getStrictValidationVisitor(), out);
     EXPECT_THAT(out, ProtoEq(cluster));
@@ -425,14 +426,14 @@ TEST(UtilityTest, AnyToClusterV2) {
 // (v3 API, upgrading).
 TEST(UtilityTest, AnyToClusterV3) {
   ProtobufWkt::Any typed_config;
-  API_NO_BOOST(envoy::api::v3alpha::Cluster) cluster;
+  API_NO_BOOST(envoy::service::cluster::v3alpha::Cluster) cluster;
   const std::string cluster_config_yaml = R"EOF(
     ignore_health_on_host_removal: true
   )EOF";
   TestUtility::loadFromYaml(cluster_config_yaml, cluster);
   typed_config.PackFrom(cluster);
 
-  API_NO_BOOST(envoy::api::v3alpha::Cluster) out;
+  API_NO_BOOST(envoy::service::cluster::v3alpha::Cluster) out;
   Utility::translateOpaqueConfig(typed_config, ProtobufWkt::Struct(),
                                  ProtobufMessage::getStrictValidationVisitor(), out);
   EXPECT_THAT(out, ProtoEq(cluster));

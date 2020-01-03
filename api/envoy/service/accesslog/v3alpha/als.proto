@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package envoy.service.accesslog.v3alpha;
 
-import "envoy/api/v3alpha/core/base.proto";
+import "envoy/config/core/v3alpha/base.proto";
 import "envoy/data/accesslog/v3alpha/accesslog.proto";
 
 import "udpa/annotations/versioning.proto";
@@ -45,10 +45,10 @@ message StreamAccessLogsMessage {
         "envoy.service.accesslog.v2.StreamAccessLogsMessage.Identifier";
 
     // The node sending the access log messages over the stream.
-    api.v3alpha.core.Node node = 1 [(validate.rules).message = {required: true}];
+    config.core.v3alpha.Node node = 1 [(validate.rules).message = {required: true}];
 
     // The friendly name of the log configured in :ref:`CommonGrpcAccessLogConfig
-    // <envoy_api_msg_config.accesslog.v3alpha.CommonGrpcAccessLogConfig>`.
+    // <envoy_api_msg_extensions.access_loggers.grpc.v3alpha.CommonGrpcAccessLogConfig>`.
     string log_name = 2 [(validate.rules).string = {min_bytes: 1}];
   }
 
