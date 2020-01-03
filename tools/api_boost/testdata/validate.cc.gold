@@ -1,0 +1,10 @@
+#include "envoy/service/cluster/v3alpha/cds.pb.h"
+#include "envoy/service/cluster/v3alpha/cds.pb.validate.h"
+#include "envoy/protobuf/message_validator.h"
+
+#include "common/protobuf/utility.h"
+
+void foo(Envoy::ProtobufMessage::ValidationVisitor& validator) {
+  envoy::service::cluster::v3alpha::Cluster msg;
+  Envoy::MessageUtil::downcastAndValidate<const envoy::service::cluster::v3alpha::Cluster&>(msg, validator);
+}

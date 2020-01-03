@@ -2,6 +2,7 @@
 
 #include <chrono>
 #include <cstdint>
+#include <functional>
 #include <memory>
 #include <string>
 
@@ -549,8 +550,15 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
   retry_state_ =
       createRetryState(route_entry_->retryPolicy(), headers, *cluster_, config_.runtime_,
                        config_.random_, callbacks_->dispatcher(), route_entry_->priority());
-  do_shadowing_ = FilterUtility::shouldShadow(route_entry_->shadowPolicy(), config_.runtime_,
-                                              callbacks_->streamId());
+
+  // Determine which shadow policies to use. It's possible that we don't do any shadowing due to
+  // runtime keys.
+  for (const auto& shadow_policy : route_entry_->shadowPolicies()) {
+    const auto& policy_ref = *shadow_policy;
+    if (FilterUtility::shouldShadow(policy_ref, config_.runtime_, callbacks_->streamId())) {
+      active_shadow_policies_.push_back(std::cref(policy_ref));
+    }
+  }
 
   ENVOY_STREAM_LOG(debug, "router decoding headers:\n{}", *callbacks_, headers);
 
@@ -593,14 +601,14 @@ Http::FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool end_strea
   // try timeout timer is not started until onUpstreamComplete().
   ASSERT(upstream_requests_.size() == 1);
 
-  bool buffering = (retry_state_ && retry_state_->enabled()) || do_shadowing_;
+  bool buffering = (retry_state_ && retry_state_->enabled()) || !active_shadow_policies_.empty();
   if (buffering &&
       getLength(callbacks_->decodingBuffer()) + data.length() > retry_shadow_buffer_limit_) {
     // The request is larger than we should buffer. Give up on the retry/shadow
     cluster_->stats().retry_or_shadow_abandoned_.inc();
     retry_state_.reset();
     buffering = false;
-    do_shadowing_ = false;
+    active_shadow_policies_.clear();
   }
 
   if (buffering) {
@@ -675,22 +683,22 @@ void Filter::cleanup() {
 }
 
 void Filter::maybeDoShadowing() {
-  if (!do_shadowing_) {
-    return;
-  }
+  for (const auto& shadow_policy_wrapper : active_shadow_policies_) {
+    const auto& shadow_policy = shadow_policy_wrapper.get();
 
-  ASSERT(!route_entry_->shadowPolicy().cluster().empty());
-  Http::MessagePtr request(new Http::RequestMessageImpl(
-      Http::HeaderMapPtr{new Http::HeaderMapImpl(*downstream_headers_)}));
-  if (callbacks_->decodingBuffer()) {
-    request->body() = std::make_unique<Buffer::OwnedImpl>(*callbacks_->decodingBuffer());
-  }
-  if (downstream_trailers_) {
-    request->trailers(Http::HeaderMapPtr{new Http::HeaderMapImpl(*downstream_trailers_)});
-  }
+    ASSERT(!shadow_policy.cluster().empty());
+    Http::MessagePtr request(new Http::RequestMessageImpl(
+        Http::HeaderMapPtr{new Http::HeaderMapImpl(*downstream_headers_)}));
+    if (callbacks_->decodingBuffer()) {
+      request->body() = std::make_unique<Buffer::OwnedImpl>(*callbacks_->decodingBuffer());
+    }
+    if (downstream_trailers_) {
+      request->trailers(Http::HeaderMapPtr{new Http::HeaderMapImpl(*downstream_trailers_)});
+    }
 
-  config_.shadowWriter().shadow(route_entry_->shadowPolicy().cluster(), std::move(request),
-                                timeout_.global_timeout_);
+    config_.shadowWriter().shadow(shadow_policy.cluster(), std::move(request),
+                                  timeout_.global_timeout_);
+  }
 }
 
 void Filter::onRequestComplete() {
@@ -1615,9 +1623,12 @@ void Filter::UpstreamRequest::onPoolReady(Http::StreamEncoder& request_encoder,
 
   host->outlierDetector().putResult(Upstream::Outlier::Result::LocalOriginConnectSuccess);
 
-  // TODO(ggreenway): set upstream local address in the StreamInfo.
   onUpstreamHostSelected(host);
   request_encoder.getStream().addCallbacks(*this);
+
+  stream_info_.setUpstreamLocalAddress(request_encoder.getStream().connectionLocalAddress());
+  parent_.callbacks_->streamInfo().setUpstreamLocalAddress(
+      request_encoder.getStream().connectionLocalAddress());
 
   stream_info_.setUpstreamSslConnection(info.downstreamSslConnection());
   parent_.callbacks_->streamInfo().setUpstreamSslConnection(info.downstreamSslConnection());

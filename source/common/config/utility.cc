@@ -251,11 +251,11 @@ envoy::api::v2::ClusterLoadAssignment Utility::translateClusterHosts(
   return load_assignment;
 }
 
-void Utility::translateOpaqueConfig(absl::string_view extension_name,
-                                    const ProtobufWkt::Any& typed_config,
+void Utility::translateOpaqueConfig(const ProtobufWkt::Any& typed_config,
                                     const ProtobufWkt::Struct& config,
                                     ProtobufMessage::ValidationVisitor& validation_visitor,
                                     Protobuf::Message& out_proto) {
+/*
   std::cout << extension_name << std::endl;
   const Protobuf::Descriptor* earlier_version_desc = ApiTypeOracle::inferEarlierVersionDescriptor(
       extension_name, typed_config, out_proto.GetDescriptor()->full_name());
@@ -271,6 +271,7 @@ void Utility::translateOpaqueConfig(absl::string_view extension_name,
     VersionConverter::upgrade(*message, out_proto);
     return;
   }
+*/
 
   static const std::string struct_type =
       ProtobufWkt::Struct::default_instance().GetDescriptor()->full_name();
@@ -278,8 +279,6 @@ void Utility::translateOpaqueConfig(absl::string_view extension_name,
       udpa::type::v1::TypedStruct::default_instance().GetDescriptor()->full_name();
 
   if (!typed_config.value().empty()) {
-    std::cout << "value is empty" << std::endl;
-
     // Unpack methods will only use the fully qualified type name after the last '/'.
     // https://github.com/protocolbuffers/protobuf/blob/3.6.x/src/google/protobuf/any.proto#L87
     absl::string_view type = TypeUtil::typeUrlToDescriptorFullName(typed_config.type_url());
@@ -292,12 +291,8 @@ void Utility::translateOpaqueConfig(absl::string_view extension_name,
         std::cout << "hit this conditional" << std::endl;
         out_proto.CopyFrom(typed_struct.value());
       } else {
-        type = TypeUtil::typeUrlToDescriptorFullName(typed_struct.type_url());
-        if (type != out_proto.GetDescriptor()->full_name()) {
-          throw EnvoyException("Invalid proto type.\nExpected " +
-                               out_proto.GetDescriptor()->full_name() +
-                               "\nActual: " + std::string(type));
-        }
+        // The typed struct might match out_proto, or some earlier version, let
+        // MessageUtil::jsonConvert sort this out.
         MessageUtil::jsonConvert(typed_struct.value(), validation_visitor, out_proto);
       }
     } // out_proto is expecting Struct, unpack directly

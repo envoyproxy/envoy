@@ -253,6 +253,7 @@ envoy_cc_library(
         "//include/envoy/init:manager_interface",
         "//include/envoy/server:listener_manager_interface",
         "//source/common/common:cleanup_lib",
+        "//source/common/config:api_version_lib",
         "//source/common/config:resources_lib",
         "//source/common/config:utility_lib",
         "//source/common/init:target_lib",
@@ -260,6 +261,7 @@ envoy_cc_library(
         "@envoy_api//envoy/admin/v2alpha:pkg_cc_proto",
         "@envoy_api//envoy/api/v2:pkg_cc_proto",
         "@envoy_api//envoy/api/v2/core:pkg_cc_proto",
+        "@envoy_api//envoy/config/listener/v3alpha:pkg_cc_proto",
     ],
 )
 

@@ -468,6 +468,9 @@ RunHelper::RunHelper(Instance& instance, const Options& options, Event::Dispatch
       }) {
   // Setup signals.
   if (options.signalHandlingEnabled()) {
+// TODO(Pivotal): Figure out solution to graceful shutdown on Windows. None of these signals exist
+// on Windows.
+#ifndef WIN32
     sigterm_ = dispatcher.listenForSignal(SIGTERM, [&instance]() {
       ENVOY_LOG(warn, "caught SIGTERM");
       instance.shutdown();
@@ -486,6 +489,7 @@ RunHelper::RunHelper(Instance& instance, const Options& options, Event::Dispatch
     sig_hup_ = dispatcher.listenForSignal(SIGHUP, []() {
       ENVOY_LOG(warn, "caught and eating SIGHUP. See documentation for how to hot restart.");
     });
+#endif
   }
 
   // Start overload manager before workers.
@@ -623,12 +627,10 @@ void InstanceImpl::notifyCallbacksForStage(Stage stage, Event::PostCb completion
 
   // Wrap completion_cb so that it only gets invoked when all callbacks for this stage
   // have finished their work.
-  std::shared_ptr<Event::PostCb> cb_guard(new Event::PostCb([] {}),
-                                          [this, completion_cb](Event::PostCb* cb) {
-                                            ASSERT(std::this_thread::get_id() == main_thread_id_);
-                                            completion_cb();
-                                            delete cb;
-                                          });
+  std::shared_ptr<void> cb_guard(new int(0), [this, completion_cb](int* sentinel) {
+    dispatcher_->post(completion_cb);
+    delete sentinel;
+  });
 
   // Registrations which take a completion callback are typically implemented by executing a
   // callback on all worker threads using Slot::runOnAllThreads which will hang indefinitely if
@@ -639,7 +641,7 @@ void InstanceImpl::notifyCallbacksForStage(Stage stage, Event::PostCb completion
     if (it2 != stage_completable_callbacks_.end()) {
       ENVOY_LOG(info, "Notifying {} callback(s) with completion.", it2->second.size());
       for (const StageCallbackWithCompletion& callback : it2->second) {
-        callback([cb_guard] { (*cb_guard)(); });
+        callback([cb_guard] {});
       }
     }
   }

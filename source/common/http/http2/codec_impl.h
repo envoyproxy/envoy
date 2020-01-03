@@ -173,6 +173,9 @@ protected:
     void resetStream(StreamResetReason reason) override;
     void readDisable(bool disable) override;
     uint32_t bufferLimit() override { return pending_recv_data_.highWatermark(); }
+    const Network::Address::InstanceConstSharedPtr& connectionLocalAddress() override {
+      return parent_.connection_.localAddress();
+    }
 
     void setWriteBufferWatermarks(uint32_t low_watermark, uint32_t high_watermark) {
       pending_recv_data_.setWatermarks(low_watermark, high_watermark);

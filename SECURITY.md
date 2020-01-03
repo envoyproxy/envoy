@@ -74,8 +74,9 @@ If a vulnerability does not affect any point release but only master, additional
 
 * If the issue is detected and a fix is available within 5 days of the introduction of the
   vulnerability, the fix will be publicly reviewed and landed on master. A courtesy e-mail will be
-  sent to envoy-users@googlegroups.com, envoy-dev@googlegroups.com and
-  cncf-envoy-distributors-announce@lists.cncf.io if the severity is medium or greater.
+  sent to envoy-users@googlegroups.com, envoy-dev@googlegroups.com,
+  envoy-security-announce@googlegroups.com and cncf-envoy-distributors-announce@lists.cncf.io if 
+  the severity is medium or greater.
 * If the vulnerability has been in existence for more than 5 days, we will activate the security
   release process for any medium or higher vulnerabilities. Low severity vulnerabilities will still
   be merged onto master as soon as a fix is available.
@@ -131,7 +132,8 @@ or mitigation so that a realistic timeline can be communicated to users.
 
 **Disclosure of Forthcoming Fix to Users** (Completed within 1-7 days of Disclosure)
 
-- The Fix Lead will email [envoy-announce@googlegroups.com](https://groups.google.com/forum/#!forum/envoy-announce)
+- The Fix Lead will email [envoy-security-announce@googlegroups.com](https://groups.google.com/forum/#!forum/envoy-security-announce)
+  (CC [envoy-announce@googlegroups.com](https://groups.google.com/forum/#!forum/envoy-announce))
   informing users that a security vulnerability has been disclosed and that a fix will be made
   available at YYYY-MM-DD HH:MM UTC in the future via this list. This time is the Release Date.
 - The Fix Lead will include any mitigating steps users can take until a fix is available.

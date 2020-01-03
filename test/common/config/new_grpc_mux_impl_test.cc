@@ -8,6 +8,7 @@
 #include "common/config/protobuf_link_hacks.h"
 #include "common/config/resources.h"
 #include "common/config/utility.h"
+#include "common/config/version_converter.h"
 #include "common/protobuf/protobuf.h"
 #include "common/stats/isolated_store_impl.h"
 
@@ -97,15 +98,16 @@ TEST_F(NewGrpcMuxImplTest, DiscoveryResponseNonexistentSub) {
     response->set_system_version_info("1");
     envoy::api::v2::ClusterLoadAssignment load_assignment;
     load_assignment.set_cluster_name("x");
-    response->add_resources()->mutable_resource()->PackFrom(load_assignment);
+    response->add_resources()->mutable_resource()->PackFrom(API_DOWNGRADE(load_assignment));
     EXPECT_CALL(callbacks_, onConfigUpdate(_, _, "1"))
         .WillOnce(
             Invoke([&load_assignment](
                        const Protobuf::RepeatedPtrField<envoy::api::v2::Resource>& added_resources,
                        const Protobuf::RepeatedPtrField<std::string>&, const std::string&) {
               EXPECT_EQ(1, added_resources.size());
-              envoy::api::v2::ClusterLoadAssignment expected_assignment;
-              added_resources[0].resource().UnpackTo(&expected_assignment);
+              envoy::api::v2::ClusterLoadAssignment expected_assignment =
+                  MessageUtil::anyConvert<envoy::api::v2::ClusterLoadAssignment>(
+                      added_resources[0].resource());
               EXPECT_TRUE(TestUtility::protoEqual(expected_assignment, load_assignment));
             }));
     grpc_mux_->onDiscoveryResponse(std::move(response));

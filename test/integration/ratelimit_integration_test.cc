@@ -174,7 +174,7 @@ public:
   void basicFlow() {
     initiateClientConnection();
     waitForRatelimitRequest();
-    sendRateLimitResponse(envoy::service::ratelimit::v2::RateLimitResponse_Code_OK,
+    sendRateLimitResponse(envoy::service::ratelimit::v2::RateLimitResponse::OK,
                           Http::HeaderMapImpl{}, Http::HeaderMapImpl{});
     waitForSuccessfulUpstreamResponse();
     cleanup();
@@ -218,7 +218,7 @@ TEST_P(RatelimitIntegrationTest, OkWithHeaders) {
                                                      {"x-ratelimit-remaining", "500"}};
   Http::TestHeaderMapImpl request_headers_to_add{{"x-ratelimit-done", "true"}};
 
-  sendRateLimitResponse(envoy::service::ratelimit::v2::RateLimitResponse_Code_OK,
+  sendRateLimitResponse(envoy::service::ratelimit::v2::RateLimitResponse::OK,
                         ratelimit_response_headers, request_headers_to_add);
   waitForSuccessfulUpstreamResponse();
 
@@ -250,7 +250,7 @@ TEST_P(RatelimitIntegrationTest, OkWithHeaders) {
 TEST_P(RatelimitIntegrationTest, OverLimit) {
   initiateClientConnection();
   waitForRatelimitRequest();
-  sendRateLimitResponse(envoy::service::ratelimit::v2::RateLimitResponse_Code_OVER_LIMIT,
+  sendRateLimitResponse(envoy::service::ratelimit::v2::RateLimitResponse::OVER_LIMIT,
                         Http::HeaderMapImpl{}, Http::HeaderMapImpl{});
   waitForFailedUpstreamResponse(429);
   cleanup();
@@ -265,7 +265,7 @@ TEST_P(RatelimitIntegrationTest, OverLimitWithHeaders) {
   waitForRatelimitRequest();
   Http::TestHeaderMapImpl ratelimit_response_headers{
       {"x-ratelimit-limit", "1000"}, {"x-ratelimit-remaining", "0"}, {"retry-after", "33"}};
-  sendRateLimitResponse(envoy::service::ratelimit::v2::RateLimitResponse_Code_OVER_LIMIT,
+  sendRateLimitResponse(envoy::service::ratelimit::v2::RateLimitResponse::OVER_LIMIT,
                         ratelimit_response_headers, Http::HeaderMapImpl{});
   waitForFailedUpstreamResponse(429);
 

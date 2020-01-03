@@ -4,12 +4,12 @@ def _type_database_impl(ctx):
     type_db_deps = []
     for target in ctx.attr.targets:
         type_db_deps.append(target[OutputGroupInfo].types_pb_text)
-
     type_db_deps = depset(transitive = type_db_deps)
 
     args = [ctx.outputs.pb_text.path]
     for dep in type_db_deps.to_list():
-        if dep.owner.workspace_name in ctx.attr.proto_repositories:
+        ws_name = dep.owner.workspace_name
+        if (not ws_name) or ws_name in ctx.attr.proto_repositories:
             args.append(dep.path)
 
     ctx.actions.run(
@@ -28,7 +28,7 @@ type_database = rule(
             doc = "List of all proto_library target to be included.",
         ),
         "proto_repositories": attr.string_list(
-            default = ["envoy_api"],
+            default = ["envoy_api_canonical"],
             allow_empty = False,
         ),
         "_type_db_gen": attr.label(
