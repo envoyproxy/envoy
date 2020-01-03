@@ -56,12 +56,9 @@ public:
       auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
       auto* filter_chain = listener->mutable_filter_chains(0);
       auto* config_blob = filter_chain->mutable_filters(0)->mutable_typed_config();
-
-      ASSERT_TRUE(config_blob->Is<envoy::config::filter::network::tcp_proxy::v2::TcpProxy>());
       auto tcp_proxy_config =
           MessageUtil::anyConvert<envoy::config::filter::network::tcp_proxy::v2::TcpProxy>(
               *config_blob);
-
       auto* access_log = tcp_proxy_config.add_access_log();
       access_log->set_name("envoy.tcp_grpc_access_log");
       envoy::config::accesslog::v2::TcpGrpcAccessLogConfig access_log_config;

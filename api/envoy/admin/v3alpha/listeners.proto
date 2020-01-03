@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package envoy.admin.v3alpha;
 
-import "envoy/api/v3alpha/core/address.proto";
+import "envoy/config/core/v3alpha/address.proto";
 
 import "udpa/annotations/versioning.proto";
 
@@ -30,5 +30,5 @@ message ListenerStatus {
 
   // The actual local address that the listener is listening on. If a listener was configured
   // to listen on port 0, then this address has the port that was allocated by the OS.
-  api.v3alpha.core.Address local_address = 2;
+  config.core.v3alpha.Address local_address = 2;
 }
