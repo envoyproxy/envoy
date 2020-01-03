@@ -105,11 +105,12 @@ def Run(path, filename, version):
 if __name__ == "__main__":
   messages = ""
   logging.basicConfig(format='%(message)s')
-  path, filename = PathAndFilename(sys.argv[1])
-  messages += Run(path, filename, 'v2')
-  messages += Run(path, filename, 'v3alpha')
-  messages += Run(path, filename, 'v3alpha')
-  messages += Run(path, filename, 'v3alpha.envoy_internal')
+  for target in sys.argv[1:]:
+    path, filename = PathAndFilename(target)
+    messages += Run(path, filename, 'v2')
+    messages += Run(path, filename, 'v3alpha')
+    messages += Run(path, filename, 'v3alpha')
+    messages += Run(path, filename, 'v3alpha.envoy_internal')
 
   if len(messages) == 0:
     logging.warning("PASS")

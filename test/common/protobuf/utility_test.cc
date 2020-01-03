@@ -4,9 +4,11 @@
 #include "envoy/api/v2/cds.pb.validate.h"
 #include "envoy/config/bootstrap/v2/bootstrap.pb.h"
 #include "envoy/config/bootstrap/v2/bootstrap.pb.validate.h"
+#include "envoy/service/cluster/v3alpha/cds.pb.h"
 #include "envoy/type/percent.pb.h"
 
 #include "common/common/base64.h"
+#include "common/config/api_version.h"
 #include "common/protobuf/message_validator_impl.h"
 #include "common/protobuf/protobuf.h"
 #include "common/protobuf/utility.h"
@@ -451,6 +453,95 @@ TEST_F(ProtobufUtilityTest, UnpackToWrongType) {
   EXPECT_THROW_WITH_REGEX(
       MessageUtil::unpackTo(source_any, dst), EnvoyException,
       R"(Unable to unpack as google.protobuf.Timestamp: \[type.googleapis.com/google.protobuf.Duration\] .*)");
+}
+
+// MessageUtility::unpackTo() with API message works at same version.
+TEST_F(ProtobufUtilityTest, UnpackToSameVersion) {
+  {
+    API_NO_BOOST(envoy::api::v2::Cluster) source;
+    source.set_drain_connections_on_host_removal(true);
+    ProtobufWkt::Any source_any;
+    source_any.PackFrom(source);
+    API_NO_BOOST(envoy::api::v2::Cluster) dst;
+    MessageUtil::unpackTo(source_any, dst);
+    EXPECT_TRUE(dst.drain_connections_on_host_removal());
+  }
+  {
+    API_NO_BOOST(envoy::service::cluster::v3alpha::Cluster) source;
+    source.set_ignore_health_on_host_removal(true);
+    ProtobufWkt::Any source_any;
+    source_any.PackFrom(source);
+    API_NO_BOOST(envoy::service::cluster::v3alpha::Cluster) dst;
+    MessageUtil::unpackTo(source_any, dst);
+    EXPECT_TRUE(dst.ignore_health_on_host_removal());
+  }
+}
+
+// MessageUtility::unpackTo() with API message works across version.
+TEST_F(ProtobufUtilityTest, UnpackToNextVersion) {
+  API_NO_BOOST(envoy::api::v2::Cluster) source;
+  source.set_drain_connections_on_host_removal(true);
+  ProtobufWkt::Any source_any;
+  source_any.PackFrom(source);
+  API_NO_BOOST(envoy::service::cluster::v3alpha::Cluster) dst;
+  MessageUtil::unpackTo(source_any, dst);
+  EXPECT_TRUE(dst.ignore_health_on_host_removal());
+}
+
+// MessageUtility::loadFromJson() with API message works at same version.
+TEST_F(ProtobufUtilityTest, LoadFromJsonSameVersion) {
+  {
+    API_NO_BOOST(envoy::api::v2::Cluster) dst;
+    MessageUtil::loadFromJson("{drain_connections_on_host_removal: true}", dst,
+                              ProtobufMessage::getNullValidationVisitor());
+    EXPECT_TRUE(dst.drain_connections_on_host_removal());
+  }
+  {
+    API_NO_BOOST(envoy::api::v2::Cluster) dst;
+    MessageUtil::loadFromJson("{drain_connections_on_host_removal: true}", dst,
+                              ProtobufMessage::getStrictValidationVisitor());
+    EXPECT_TRUE(dst.drain_connections_on_host_removal());
+  }
+  {
+    API_NO_BOOST(envoy::service::cluster::v3alpha::Cluster) dst;
+    MessageUtil::loadFromJson("{ignore_health_on_host_removal: true}", dst,
+                              ProtobufMessage::getNullValidationVisitor());
+    EXPECT_TRUE(dst.ignore_health_on_host_removal());
+  }
+  {
+    API_NO_BOOST(envoy::service::cluster::v3alpha::Cluster) dst;
+    MessageUtil::loadFromJson("{ignore_health_on_host_removal: true}", dst,
+                              ProtobufMessage::getStrictValidationVisitor());
+    EXPECT_TRUE(dst.ignore_health_on_host_removal());
+  }
+}
+
+// MessageUtility::loadFromJson() with API message works across version.
+TEST_F(ProtobufUtilityTest, LoadFromJsonNextVersion) {
+  {
+    API_NO_BOOST(envoy::service::cluster::v3alpha::Cluster) dst;
+    MessageUtil::loadFromJson("{use_tcp_for_dns_lookups: true}", dst,
+                              ProtobufMessage::getNullValidationVisitor());
+    EXPECT_TRUE(dst.use_tcp_for_dns_lookups());
+  }
+  {
+    API_NO_BOOST(envoy::service::cluster::v3alpha::Cluster) dst;
+    MessageUtil::loadFromJson("{use_tcp_for_dns_lookups: true}", dst,
+                              ProtobufMessage::getStrictValidationVisitor());
+    EXPECT_TRUE(dst.use_tcp_for_dns_lookups());
+  }
+  {
+    API_NO_BOOST(envoy::service::cluster::v3alpha::Cluster) dst;
+    MessageUtil::loadFromJson("{drain_connections_on_host_removal: true}", dst,
+                              ProtobufMessage::getNullValidationVisitor());
+    EXPECT_TRUE(dst.ignore_health_on_host_removal());
+  }
+  {
+    API_NO_BOOST(envoy::service::cluster::v3alpha::Cluster) dst;
+    MessageUtil::loadFromJson("{drain_connections_on_host_removal: true}", dst,
+                              ProtobufMessage::getStrictValidationVisitor());
+    EXPECT_TRUE(dst.ignore_health_on_host_removal());
+  }
 }
 
 TEST_F(ProtobufUtilityTest, JsonConvertSuccess) {

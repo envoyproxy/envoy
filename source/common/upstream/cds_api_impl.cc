@@ -6,7 +6,7 @@
 #include "envoy/api/v2/cds.pb.validate.h"
 #include "envoy/api/v2/core/config_source.pb.h"
 #include "envoy/api/v2/discovery.pb.h"
-#include "envoy/api/v3alpha/cds.pb.h"
+#include "envoy/service/cluster/v3alpha/cds.pb.h"
 #include "envoy/stats/scope.h"
 
 #include "common/common/cleanup.h"
@@ -134,7 +134,7 @@ std::string CdsApiImpl::loadTypeUrl() {
         API_NO_BOOST(envoy::api::v2::Cluster().GetDescriptor()->full_name()));
   case envoy::api::v2::core::ConfigSource::V3ALPHA:
     return Grpc::Common::typeUrl(
-        API_NO_BOOST(envoy::api::v3alpha::Cluster().GetDescriptor()->full_name()));
+        API_NO_BOOST(envoy::service::cluster::v3alpha::Cluster().GetDescriptor()->full_name()));
   default:
     throw EnvoyException(fmt::format("type {} is not supported", xds_api_version_));
   }

@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package envoy.config.metrics.v3alpha;
 
-import "envoy/api/v3alpha/core/address.proto";
+import "envoy/config/core/v3alpha/address.proto";
 import "envoy/type/matcher/v3alpha/string.proto";
 
 import "google/protobuf/any.proto";
@@ -266,7 +266,7 @@ message StatsdSink {
     // The UDP address of a running `statsd <https://github.com/etsy/statsd>`_
     // compliant listener. If specified, statistics will be flushed to this
     // address.
-    api.v3alpha.core.Address address = 1;
+    core.v3alpha.Address address = 1;
 
     // The name of a cluster that is running a TCP `statsd
     // <https://github.com/etsy/statsd>`_ compliant listener. If specified,
@@ -319,7 +319,7 @@ message DogStatsdSink {
 
     // The UDP address of a running DogStatsD compliant listener. If specified,
     // statistics will be flushed to this address.
-    api.v3alpha.core.Address address = 1;
+    core.v3alpha.Address address = 1;
   }
 
   // Optional custom metric name prefix. See :ref:`StatsdSink's prefix field

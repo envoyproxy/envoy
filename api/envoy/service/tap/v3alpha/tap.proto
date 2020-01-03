@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package envoy.service.tap.v3alpha;
 
-import "envoy/api/v3alpha/core/base.proto";
+import "envoy/config/core/v3alpha/base.proto";
 import "envoy/data/tap/v3alpha/wrapper.proto";
 
 import "udpa/annotations/versioning.proto";
@@ -37,7 +37,7 @@ message StreamTapsRequest {
         "envoy.service.tap.v2alpha.StreamTapsRequest.Identifier";
 
     // The node sending taps over the stream.
-    api.v3alpha.core.Node node = 1 [(validate.rules).message = {required: true}];
+    config.core.v3alpha.Node node = 1 [(validate.rules).message = {required: true}];
 
     // The opaque identifier that was set in the :ref:`output config
     // <envoy_api_field_service.tap.v3alpha.StreamingGrpcSink.tap_id>`.

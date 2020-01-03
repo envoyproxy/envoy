@@ -278,6 +278,11 @@ def NormalizeFieldTypeName(type_context, field_fqn):
     while remaining_field_fqn_splits and not EquivalentInTypeContext(normalized_splits):
       normalized_splits.appendleft(remaining_field_fqn_splits.pop())
 
+    # `extensions` is a keyword in proto2, and protoc will throw error if a type name
+    # starts with `extensions.`.
+    if normalized_splits[0] == "extensions":
+      normalized_splits.appendleft(remaining_field_fqn_splits.pop())
+
     return '.'.join(normalized_splits)
   return field_fqn
 

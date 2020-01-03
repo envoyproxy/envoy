@@ -6,9 +6,9 @@
 #include <vector>
 
 #include "envoy/api/v2/core/address.pb.h"
-#include "envoy/api/v3alpha/core/address.pb.h"
 #include "envoy/common/exception.h"
 #include "envoy/common/platform.h"
+#include "envoy/config/core/v3alpha/address.pb.h"
 
 #include "common/common/assert.h"
 #include "common/common/fmt.h"
@@ -116,7 +116,7 @@ CidrRange CidrRange::create(const envoy::api::v2::core::CidrRange& cidr) {
   return create(Utility::parseInternetAddress(cidr.address_prefix()), cidr.prefix_len().value());
 }
 
-CidrRange CidrRange::create(const envoy::api::v3alpha::core::CidrRange& cidr) {
+CidrRange CidrRange::create(const envoy::config::core::v3alpha::CidrRange& cidr) {
   return create(Utility::parseInternetAddress(cidr.address_prefix()), cidr.prefix_len().value());
 }
 
