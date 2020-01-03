@@ -10,8 +10,8 @@
 
 #include "common/common/assert.h"
 #include "common/common/fmt.h"
-#include "common/config/api_type_oracle.h"
 #include "common/common/macros.h"
+#include "common/config/api_type_oracle.h"
 #include "common/config/version_converter.h"
 #include "common/protobuf/message_validator_impl.h"
 #include "common/protobuf/protobuf.h"
