@@ -61,6 +61,11 @@ private:
   static void onTrailersAsync(const CacheFilterSharedPtr& self, Http::HeaderMapPtr&& trailers);
   void post(std::function<void()> f) const;
 
+  // These don't require private access, but are members per envoy convention.
+  static bool isCacheableRequest(Http::HeaderMap& headers);
+  static bool isCacheableResponse(Http::HeaderMap& headers);
+  static HttpCache& getCache(const envoy::config::filter::http::cache::v3alpha::Cache& config);
+
   TimeSource& time_source_;
   HttpCache& cache_;
   LookupContextPtr lookup_;

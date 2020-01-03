@@ -11,9 +11,8 @@ namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace Cache {
-namespace {
 
-bool isCacheableRequest(Http::HeaderMap& headers) {
+bool CacheFilter::isCacheableRequest(Http::HeaderMap& headers) {
   const Http::HeaderEntry* method = headers.Method();
   const Http::HeaderEntry* forwarded_proto = headers.ForwardedProto();
   const Http::HeaderValues& header_values = Http::Headers::get();
@@ -25,7 +24,7 @@ bool isCacheableRequest(Http::HeaderMap& headers) {
           forwarded_proto->value() == header_values.SchemeValues.Https);
 }
 
-bool isCacheableResponse(Http::HeaderMap& headers) {
+bool CacheFilter::isCacheableResponse(Http::HeaderMap& headers) {
   const Http::HeaderEntry* cache_control = headers.CacheControl();
   // TODO(toddmgreer) fully check for cacheability. See for example
   // https://github.com/apache/incubator-pagespeed-mod/blob/master/pagespeed/kernel/http/caching_headers.h.
@@ -36,7 +35,7 @@ bool isCacheableResponse(Http::HeaderMap& headers) {
   return false;
 }
 
-HttpCache& getCache(const envoy::config::filter::http::cache::v3alpha::Cache& config) {
+HttpCache& CacheFilter::getCache(const envoy::config::filter::http::cache::v3alpha::Cache& config) {
   HttpCacheFactory* factory =
       Registry::FactoryRegistry<HttpCacheFactory>::getFactory(config.name());
   if (!factory) {
@@ -45,7 +44,6 @@ HttpCache& getCache(const envoy::config::filter::http::cache::v3alpha::Cache& co
   }
   return factory->getCache();
 }
-} // namespace
 
 CacheFilter::CacheFilter(const envoy::config::filter::http::cache::v3alpha::Cache& config,
                          const std::string&, Stats::Scope&, TimeSource& time_source)
