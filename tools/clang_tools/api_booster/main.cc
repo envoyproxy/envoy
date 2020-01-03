@@ -135,9 +135,14 @@ private:
         isEnvoyNamespace(getSourceText(
             getSpellingRange(unqual_type_loc.getSourceRange(), source_manager), source_manager))) {
       source_range = absl::make_optional<clang::SourceRange>(unqual_type_loc.getSourceRange());
+      tryBoostType(type_name, source_range, source_manager, type_loc.getType()->getTypeClassName(),
+                   false);
+    } else {
+      // If we're not going to rewrite, we still deliver SourceLocation to
+      // tryBoostType to assist with determination of API_NO_BOOST().
+      tryBoostType(type_name, unqual_type_loc.getBeginLoc(), -1, source_manager,
+                   type_loc.getType()->getTypeClassName(), false);
     }
-    tryBoostType(type_name, source_range, source_manager, type_loc.getType()->getTypeClassName(),
-                 false);
   }
 
   // Match callback for clang::UsingDecl. These are 'using' aliases for API type
@@ -278,17 +283,17 @@ private:
     if (!latest_type_info) {
       return;
     }
-    const clang::SourceRange source_range = {
-        source_manager.getSpellingLoc(member_call_expr.getExprLoc()),
-        source_manager.getSpellingLoc(member_call_expr.getExprLoc())};
-    const std::string method_name = getSourceText(source_range, source_manager);
-    DEBUG_LOG(
-        absl::StrCat("Matched member call expr on ", type_name, " with method ", method_name));
-    tryRenameMethod(*latest_type_info, source_range, source_manager);
+    tryRenameMethod(*latest_type_info, member_call_expr.getExprLoc(), source_manager);
   }
 
-  bool tryRenameMethod(const TypeInformation& type_info, clang::SourceRange source_range,
+  bool tryRenameMethod(const TypeInformation& type_info, clang::SourceLocation method_loc,
                        const clang::SourceManager& source_manager) {
+    if (underApiNoBoost(method_loc, source_manager)) {
+      DEBUG_LOG("Skipping method replacement due to API_NO_BOOST");
+      return false;
+    }
+    const clang::SourceRange source_range = {source_manager.getSpellingLoc(method_loc),
+                                             source_manager.getSpellingLoc(method_loc)};
     const std::string method_name = getSourceText(source_range, source_manager);
     DEBUG_LOG(absl::StrCat("Checking for rename of ", method_name));
     const auto method_rename = ProtoCxxUtils::renameMethod(method_name, type_info.renames_);
@@ -352,17 +357,23 @@ private:
     }
   }
 
+  bool underApiNoBoost(clang::SourceLocation loc, const clang::SourceManager& source_manager) {
+    if (loc.isMacroID()) {
+      const auto macro_name = clang::Lexer::getImmediateMacroName(loc, source_manager, lexer_lopt_);
+      if (macro_name.str() == "API_NO_BOOST") {
+        return true;
+      }
+    }
+    return false;
+  }
+
   void tryBoostType(const std::string& type_name, clang::SourceLocation begin_loc, int length,
                     const clang::SourceManager& source_manager, absl::string_view debug_description,
                     bool requires_enum_truncation, bool validation_required = false) {
     bool is_skip_macro = false;
-    if (begin_loc.isMacroID()) {
-      const auto macro_name =
-          clang::Lexer::getImmediateMacroName(begin_loc, source_manager, lexer_lopt_);
-      if (macro_name.str() == "API_NO_BOOST") {
-        DEBUG_LOG("Skipping replacement due to API_NO_BOOST");
-        is_skip_macro = true;
-      }
+    if (underApiNoBoost(begin_loc, source_manager)) {
+      DEBUG_LOG("Skipping replacement due to API_NO_BOOST");
+      is_skip_macro = true;
     }
     const auto type_info = getTypeInformationFromCType(type_name, !is_skip_macro);
     // If this isn't a known API type, our work here is done.
