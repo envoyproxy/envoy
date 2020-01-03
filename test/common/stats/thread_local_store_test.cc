@@ -1321,8 +1321,8 @@ public:
   StatName my_counter_name_;
 };
 
-TEST_F(ClusterShutdownCleanupStarvationTest, TenThreadsWithBlockade) {
-  for (uint32_t i = 0; i < NumIters && elapsedTime() < std::chrono::seconds(15); ++i) {
+TEST_F(ClusterShutdownCleanupStarvationTest, EightThreadsWithBlockade) {
+  for (uint32_t i = 0; i < NumIters && elapsedTime() < std::chrono::seconds(10); ++i) {
     incCountersAllThreads();
 
     // With this blockade, use_counts for the counter get into the hundreds.
@@ -1337,8 +1337,8 @@ TEST_F(ClusterShutdownCleanupStarvationTest, TenThreadsWithBlockade) {
   }
 }
 
-TEST_F(ClusterShutdownCleanupStarvationTest, TenThreadsWithoutBlockade) {
-  for (uint32_t i = 0; i < NumIters && elapsedTime() < std::chrono::seconds(15); ++i) {
+TEST_F(ClusterShutdownCleanupStarvationTest, EightThreadsWithoutBlockade) {
+  for (uint32_t i = 0; i < NumIters && elapsedTime() < std::chrono::seconds(10); ++i) {
     incCountersAllThreads();
     // Here we don't quiesce the threads, so there is no time to run their
     // cross-thread cleanup callback following scope deletion.

@@ -67,15 +67,15 @@ public:
   void incRefCount() override { ++ref_count_; }
   bool decRefCount() override {
     // We must, unfortunately, hold the allocator's lock when decrementing the
-    // mutex. Otherwise another thread may simultaneously try to allocate the
+    // refcount. Otherwise another thread may simultaneously try to allocate the
     // same name'd stat after we decrement it, and we'll wind up with a
-    // dtor/update race. To avoid this we must hold the lock until the stat
-    // is removed from the lock.
+    // dtor/update race. To avoid this we must hold the lock until the stat is
+    // removed from the map.
     //
     // It might be worth thinking about a race-free way to decrement ref-counts
     // without a lock, for the case where ref_count > 2, and we don't need to
     // destruct anything. But it seems preferable at to be conservative here,
-    // as stats will only go out of scope when a scope is destructed (i.e. on an
+    // as stats will only go out of scope when a scope is destructed (during
     // xDS) or during admin stats operations.
     Thread::LockGuard lock(alloc_.mutex_);
     ASSERT(ref_count_ >= 1);
