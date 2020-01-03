@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package envoy.extensions.filters.http.fault.v3alpha;
 
-import "envoy/config/route/v3alpha/route.proto";
+import "envoy/config/route/v3alpha/route_components.proto";
 import "envoy/extensions/filters/common/fault/v3alpha/fault.proto";
 import "envoy/type/v3alpha/percent.proto";
 

@@ -1,7 +1,7 @@
 #include <unordered_set>
 
 #include "envoy/api/v2/cds.pb.h"
-#include "envoy/api/v2/cds.pb.validate.h"
+#include "envoy/api/v2/cluster.pb.validate.h"
 #include "envoy/config/bootstrap/v2/bootstrap.pb.h"
 #include "envoy/config/bootstrap/v2/bootstrap.pb.validate.h"
 #include "envoy/service/cluster/v3alpha/cds.pb.h"
