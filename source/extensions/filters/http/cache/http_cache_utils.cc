@@ -12,16 +12,13 @@ namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace Cache {
-namespace Internal {
-
-namespace {
 
 // True for characters defined as tchars by
 // https://tools.ietf.org/html/rfc7230#section-3.2.6
 //
 // tchar           = "!" / "#" / "$" / "%" / "&" / "'" / "*" / "+"
 //                 / "-" / "." / "^" / "_" / "`" / "|" / "~" / DIGIT / ALPHA
-bool tchar(char c) {
+bool Utils::tchar(char c) {
   switch (c) {
   case '!':
   case '#':
@@ -47,7 +44,7 @@ bool tchar(char c) {
 // token was present.
 //
 // token           = 1*tchar
-bool eatToken(absl::string_view& s) {
+bool Utils::eatToken(absl::string_view& s) {
   const absl::string_view::iterator token_end = c_find_if_not(s, &tchar);
   if (token_end == s.begin()) {
     return false;
@@ -68,7 +65,7 @@ bool eatToken(absl::string_view& s) {
 //
 // For example, the directive "my-extension=42" has an argument of "42", so an
 // input of "public, my-extension=42, max-age=999"
-void eatDirectiveArgument(absl::string_view& s) {
+void Utils::eatDirectiveArgument(absl::string_view& s) {
   if (s.empty()) {
     return;
   }
@@ -80,14 +77,13 @@ void eatDirectiveArgument(absl::string_view& s) {
     eatToken(s);
   }
 }
-} // namespace
 
 // If s is non-null and begins with a decimal number ([0-9]+), removes it from
 // the input and returns a SystemTime::duration representing that many seconds.
 // If s is null or doesn't begin with digits, returns
 // SystemTime::duration::zero(). If parsing overflows, returns
 // SystemTime::duration::max().
-SystemTime::duration eatLeadingDuration(absl::string_view& s) {
+SystemTime::duration Utils::eatLeadingDuration(absl::string_view& s) {
   const absl::string_view::iterator digits_end = c_find_if_not(s, &absl::ascii_isdigit);
   const size_t digits_length = digits_end - s.begin();
   if (digits_length == 0) {
@@ -105,7 +101,7 @@ SystemTime::duration eatLeadingDuration(absl::string_view& s) {
 //
 // TODO(toddmgreer) Write a CacheControl class to fully parse the cache-control
 // header value. Consider sharing with the gzip filter.
-SystemTime::duration effectiveMaxAge(absl::string_view cache_control) {
+SystemTime::duration Utils::effectiveMaxAge(absl::string_view cache_control) {
   // The grammar for This Cache-Control header value should be:
   // Cache-Control   = 1#cache-directive
   // cache-directive = token [ "=" ( token / quoted-string ) ]
@@ -164,7 +160,7 @@ SystemTime::duration effectiveMaxAge(absl::string_view cache_control) {
   return max_age;
 }
 
-SystemTime httpTime(const Http::HeaderEntry* header_entry) {
+SystemTime Utils::httpTime(const Http::HeaderEntry* header_entry) {
   if (!header_entry) {
     return {};
   }
@@ -186,7 +182,6 @@ SystemTime httpTime(const Http::HeaderEntry* header_entry) {
   }
   return {};
 }
-} // namespace Internal
 } // namespace Cache
 } // namespace HttpFilters
 } // namespace Extensions

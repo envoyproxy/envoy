@@ -12,8 +12,10 @@ namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
 namespace Cache {
-namespace Internal {
 namespace {
+
+// TODO(toddmgreer) Add tests for eat* functions
+// TODO(toddmgreer) More tests for httpTime, effectiveMaxAge
 
 class HttpTimeTest : public testing::TestWithParam<const char*> {
 protected:
@@ -29,22 +31,21 @@ const char* const ok_times[] = {
 INSTANTIATE_TEST_SUITE_P(Ok, HttpTimeTest, testing::ValuesIn(ok_times));
 
 TEST_P(HttpTimeTest, Ok) {
-  const std::time_t time = SystemTime::clock::to_time_t(httpTime(response_headers_.Date()));
+  const std::time_t time = SystemTime::clock::to_time_t(Utils::httpTime(response_headers_.Date()));
   EXPECT_STREQ(ctime(&time), "Sun Nov  6 08:49:37 1994\n");
 }
 
-TEST(HttpTime, Null) { EXPECT_EQ(httpTime(nullptr), SystemTime()); }
+TEST(HttpTime, Null) { EXPECT_EQ(Utils::httpTime(nullptr), SystemTime()); }
 
 TEST(EffectiveMaxAge, Ok) {
-  EXPECT_EQ(std::chrono::seconds(3600), effectiveMaxAge("public, max-age=3600"));
+  EXPECT_EQ(std::chrono::seconds(3600), Utils::effectiveMaxAge("public, max-age=3600"));
 }
 
 TEST(EffectiveMaxAge, NegativeMaxAge) {
-  EXPECT_EQ(SystemTime::duration::zero(), effectiveMaxAge("public, max-age=-1"));
+  EXPECT_EQ(SystemTime::duration::zero(), Utils::effectiveMaxAge("public, max-age=-1"));
 }
 
 } // namespace
-} // namespace Internal
 } // namespace Cache
 } // namespace HttpFilters
 } // namespace Extensions

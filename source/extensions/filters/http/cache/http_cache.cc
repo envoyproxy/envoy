@@ -74,12 +74,12 @@ bool LookupRequest::isFresh(const Http::HeaderMap& response_headers) const {
   const Http::HeaderEntry* cache_control_header = response_headers.CacheControl();
   if (cache_control_header) {
     const SystemTime::duration effective_max_age =
-        Internal::effectiveMaxAge(cache_control_header->value().getStringView());
-    return timestamp_ - Internal::httpTime(response_headers.Date()) < effective_max_age;
+        Utils::effectiveMaxAge(cache_control_header->value().getStringView());
+    return timestamp_ - Utils::httpTime(response_headers.Date()) < effective_max_age;
   }
   // We didn't find a cache-control header with enough info to determine
   // freshness, so fall back to the expires header.
-  return timestamp_ <= Internal::httpTime(response_headers.Expires());
+  return timestamp_ <= Utils::httpTime(response_headers.Expires());
 }
 
 LookupResult LookupRequest::makeLookupResult(Http::HeaderMapPtr&& response_headers,
