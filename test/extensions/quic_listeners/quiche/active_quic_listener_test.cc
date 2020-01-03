@@ -114,7 +114,7 @@ protected:
 
   // TODO(bencebeky): Factor out parts common with
   // EnvoyQuicDispatcherTest::createFullChloPacket() to test_utils.
-  void GenerateCHLO(quic::QuicConnectionId connection_id) {
+  void SendFullCHLO(quic::QuicConnectionId connection_id) {
     client_sockets_.push_back(std::make_unique<Socket>(local_address_, nullptr, /*bind*/ false));
     quic::CryptoHandshakeMessage chlo = quic::test::crypto_test_utils::GenerateDefaultInchoateCHLO(
         &clock_, quic::AllSupportedVersions()[0].transport_version,
@@ -215,7 +215,7 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, ActiveQuicListenerTest,
 
 TEST_P(ActiveQuicListenerTest, ReceiveFullQuicCHLO) {
   ConfigureMocks(/* connection_count = */ 1);
-  GenerateCHLO(quic::test::TestConnectionId(1));
+  SendFullCHLO(quic::test::TestConnectionId(1));
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
   ReadFromClientSockets();
 }
@@ -226,29 +226,29 @@ TEST_P(ActiveQuicListenerTest, ProcessBufferedChlos) {
   quic::QuicBufferedPacketStore* const buffered_packets =
       quic::test::QuicDispatcherPeer::GetBufferedPackets(envoy_quic_dispatcher);
 
-  ConfigureMocks(ActiveQuicListener::kNumSessionsToCreatePerEpoll + 2);
+  ConfigureMocks(ActiveQuicListener::kNumSessionsToCreatePerLoop + 2);
 
   // Generate one more CHLO than can be processed immediately.
-  for (size_t i = 1; i <= ActiveQuicListener::kNumSessionsToCreatePerEpoll + 1; ++i) {
-    GenerateCHLO(quic::test::TestConnectionId(i));
+  for (size_t i = 1; i <= ActiveQuicListener::kNumSessionsToCreatePerLoop + 1; ++i) {
+    SendFullCHLO(quic::test::TestConnectionId(i));
   }
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
 
-  // The first kNumSessionsToCreatePerEpoll CHLOs are processed,
+  // The first kNumSessionsToCreatePerLoop CHLOs are processed,
   // the last one is buffered.
-  for (size_t i = 1; i <= ActiveQuicListener::kNumSessionsToCreatePerEpoll; ++i) {
+  for (size_t i = 1; i <= ActiveQuicListener::kNumSessionsToCreatePerLoop; ++i) {
     EXPECT_FALSE(buffered_packets->HasBufferedPackets(quic::test::TestConnectionId(i)));
   }
   EXPECT_TRUE(buffered_packets->HasBufferedPackets(
-      quic::test::TestConnectionId(ActiveQuicListener::kNumSessionsToCreatePerEpoll + 1)));
+      quic::test::TestConnectionId(ActiveQuicListener::kNumSessionsToCreatePerLoop + 1)));
   EXPECT_TRUE(buffered_packets->HasChlosBuffered());
 
   // Generate more data to trigger a socket read during the next event loop.
-  GenerateCHLO(quic::test::TestConnectionId(ActiveQuicListener::kNumSessionsToCreatePerEpoll + 2));
+  SendFullCHLO(quic::test::TestConnectionId(ActiveQuicListener::kNumSessionsToCreatePerLoop + 2));
   dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
 
   // The socket read results in processing all CHLOs.
-  for (size_t i = 1; i <= ActiveQuicListener::kNumSessionsToCreatePerEpoll + 2; ++i) {
+  for (size_t i = 1; i <= ActiveQuicListener::kNumSessionsToCreatePerLoop + 2; ++i) {
     EXPECT_FALSE(buffered_packets->HasBufferedPackets(quic::test::TestConnectionId(i)));
   }
   EXPECT_FALSE(buffered_packets->HasChlosBuffered());

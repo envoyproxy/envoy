@@ -20,7 +20,7 @@ class ActiveQuicListener : public Network::UdpListenerCallbacks,
                            Logger::Loggable<Logger::Id::quic> {
 public:
   // TODO(bencebeky): Tune this value.
-  static const size_t kNumSessionsToCreatePerEpoll = 16;
+  static const size_t kNumSessionsToCreatePerLoop = 16;
 
   ActiveQuicListener(Event::Dispatcher& dispatcher, Network::ConnectionHandler& parent,
                      Network::ListenerConfig& listener_config, const quic::QuicConfig& quic_config);

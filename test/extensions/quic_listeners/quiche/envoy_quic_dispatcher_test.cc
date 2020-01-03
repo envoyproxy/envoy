@@ -41,7 +41,7 @@ namespace Envoy {
 namespace Quic {
 
 namespace {
-const size_t kNumSessionsToCreatePerEpollForTests = 16;
+const size_t kNumSessionsToCreatePerLoopForTests = 16;
 }
 
 class EnvoyQuicDispatcherTest : public testing::TestWithParam<Network::Address::IpVersion>,
@@ -93,7 +93,7 @@ public:
   }
 
   // TODO(bencebeky): Factor out parts common with
-  // ActiveQuicListenerTest::GenerateCHLO() to test_utils.
+  // ActiveQuicListenerTest::SendFullCHLO() to test_utils.
   std::unique_ptr<quic::QuicReceivedPacket>
   createFullChloPacket(quic::QuicSocketAddress client_address) {
     EnvoyQuicClock clock(*dispatcher_);
@@ -198,9 +198,9 @@ TEST_P(EnvoyQuicDispatcherTest, CreateNewConnectionUponCHLO) {
   EXPECT_FALSE(buffered_packets->HasBufferedPackets(connection_id_));
 
   // Set QuicDispatcher::new_sessions_allowed_per_event_loop_ to
-  // |kNumSessionsToCreatePerEpollForTests| so that received CHLOs can be
+  // |kNumSessionsToCreatePerLoopForTests| so that received CHLOs can be
   // processed immediately.
-  envoy_quic_dispatcher_.ProcessBufferedChlos(kNumSessionsToCreatePerEpollForTests);
+  envoy_quic_dispatcher_.ProcessBufferedChlos(kNumSessionsToCreatePerLoopForTests);
 
   std::unique_ptr<quic::QuicReceivedPacket> received_packet = createFullChloPacket(peer_addr);
   envoy_quic_dispatcher_.ProcessPacket(
@@ -273,7 +273,8 @@ TEST_P(EnvoyQuicDispatcherTest, CreateNewConnectionUponBufferedCHLO) {
   EXPECT_FALSE(buffered_packets->HasChlosBuffered());
   EXPECT_FALSE(buffered_packets->HasBufferedPackets(connection_id_));
 
-  // Incoming CHLO packet is buffered.
+  // Incoming CHLO packet is buffered, because ProcessPacket() is called before
+  // ProcessBufferedChlos().
   std::unique_ptr<quic::QuicReceivedPacket> received_packet = createFullChloPacket(peer_addr);
   envoy_quic_dispatcher_.ProcessPacket(
       envoyAddressInstanceToQuicSocketAddress(listen_socket_->localAddress()), peer_addr,
@@ -282,7 +283,7 @@ TEST_P(EnvoyQuicDispatcherTest, CreateNewConnectionUponBufferedCHLO) {
   EXPECT_TRUE(buffered_packets->HasBufferedPackets(connection_id_));
 
   // Process buffered CHLO.
-  envoy_quic_dispatcher_.ProcessBufferedChlos(kNumSessionsToCreatePerEpollForTests);
+  envoy_quic_dispatcher_.ProcessBufferedChlos(kNumSessionsToCreatePerLoopForTests);
   EXPECT_FALSE(buffered_packets->HasChlosBuffered());
   EXPECT_FALSE(buffered_packets->HasBufferedPackets(connection_id_));
 
@@ -314,7 +315,7 @@ TEST_P(EnvoyQuicDispatcherTest, CloseConnectionDueToMissingFilterChain) {
         return nullptr;
       }));
   std::unique_ptr<quic::QuicReceivedPacket> received_packet = createFullChloPacket(peer_addr);
-  envoy_quic_dispatcher_.ProcessBufferedChlos(kNumSessionsToCreatePerEpollForTests);
+  envoy_quic_dispatcher_.ProcessBufferedChlos(kNumSessionsToCreatePerLoopForTests);
   envoy_quic_dispatcher_.ProcessPacket(
       envoyAddressInstanceToQuicSocketAddress(listen_socket_->localAddress()), peer_addr,
       *received_packet);
@@ -344,7 +345,7 @@ TEST_P(EnvoyQuicDispatcherTest, CloseConnectionDueToEmptyFilterChain) {
   EXPECT_CALL(filter_chain, networkFilterFactories()).WillOnce(ReturnRef(filter_factory));
 
   std::unique_ptr<quic::QuicReceivedPacket> received_packet = createFullChloPacket(peer_addr);
-  envoy_quic_dispatcher_.ProcessBufferedChlos(kNumSessionsToCreatePerEpollForTests);
+  envoy_quic_dispatcher_.ProcessBufferedChlos(kNumSessionsToCreatePerLoopForTests);
   envoy_quic_dispatcher_.ProcessPacket(
       envoyAddressInstanceToQuicSocketAddress(listen_socket_->localAddress()), peer_addr,
       *received_packet);

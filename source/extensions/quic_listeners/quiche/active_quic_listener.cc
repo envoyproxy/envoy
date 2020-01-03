@@ -75,7 +75,7 @@ void ActiveQuicListener::onData(Network::UdpRecvData& data) {
 }
 
 void ActiveQuicListener::onReadReady() {
-  quic_dispatcher_->ProcessBufferedChlos(kNumSessionsToCreatePerEpoll);
+  quic_dispatcher_->ProcessBufferedChlos(kNumSessionsToCreatePerLoop);
 }
 
 void ActiveQuicListener::onWriteReady(const Network::Socket& /*socket*/) {
