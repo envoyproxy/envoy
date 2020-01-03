@@ -37,12 +37,43 @@ TEST_P(HttpTimeTest, Ok) {
 
 TEST(HttpTime, Null) { EXPECT_EQ(Utils::httpTime(nullptr), SystemTime()); }
 
-TEST(EffectiveMaxAge, Ok) {
-  EXPECT_EQ(std::chrono::seconds(3600), Utils::effectiveMaxAge("public, max-age=3600"));
-}
+struct EffectiveMaxAgeParams {
+  absl::string_view cache_control;
+  int effective_max_age_secs;
+};
 
-TEST(EffectiveMaxAge, NegativeMaxAge) {
-  EXPECT_EQ(SystemTime::duration::zero(), Utils::effectiveMaxAge("public, max-age=-1"));
+EffectiveMaxAgeParams params[] = {
+    {"public, max-age=3600", 3600},
+    {"public, max-age=-1", 0},
+    {"max-age=20", 20},
+    {"max-age=86400, public", 86400},
+    {"public,max-age=\"0\"", 0},
+    {"public,max-age=8", 8},
+    {"public,max-age=3,no-cache", 0},
+    {"s-maxage=0", 0},
+    {"max-age=10,s-maxage=0", 0},
+    {"s-maxage=10", 10},
+    {"no-cache", 0},
+    {"max-age=0", 0},
+    {"no-cache", 0},
+    {"public", 0},
+    // TODO(toddmgreer) parse quoted forms
+    // {"max-age=20, s-maxage=\"25\"",25},
+    // {"public,max-age=\"8\",foo=11",8},
+    // {"public,max-age=\"8\",bar=\"11\"",8},
+    // TODO(toddmgreer) parse public/private
+    // {"private,max-age=10",0}
+    // {"private",0},
+    // {"private,s-maxage=8",0},
+};
+
+class EffectiveMaxAgeTest : public testing::TestWithParam<EffectiveMaxAgeParams> {};
+
+INSTANTIATE_TEST_SUITE_P(EffectiveMaxAgeTest, EffectiveMaxAgeTest, testing::ValuesIn(params));
+
+TEST_P(EffectiveMaxAgeTest, EffectiveMaxAgeTest) {
+  EXPECT_EQ(Utils::effectiveMaxAge(GetParam().cache_control),
+            std::chrono::seconds(GetParam().effective_max_age_secs));
 }
 
 } // namespace
