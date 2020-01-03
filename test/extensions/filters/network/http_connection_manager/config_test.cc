@@ -32,15 +32,6 @@ envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManag
 parseHttpConnectionManagerFromV2Yaml(const std::string& yaml) {
   envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager
       http_connection_manager;
-  TestUtility::loadFromYaml(yaml, http_connection_manager);
-  return http_connection_manager;
-}
-
-// TODO(yittg): always validate config and split all cases using deprecated feature.
-envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager
-parseHttpConnectionManagerFromV2YamlAndValidate(const std::string& yaml) {
-  envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager
-      http_connection_manager;
   TestUtility::loadFromYamlAndValidate(yaml, http_connection_manager);
   return http_connection_manager;
 }
@@ -81,7 +72,6 @@ route_config:
         cluster: cluster
 http_filters:
 - name: foo
-  config: {}
   )EOF";
 
   EXPECT_THROW_WITH_MESSAGE(
@@ -108,10 +98,10 @@ route_config:
         cluster: cluster
 http_filters:
 - name: envoy.router
-  config: {}
 - name: envoy.health_check
-  config:
-      pass_through_mode: false
+  typed_config:
+    "@type": type.googleapis.com/envoy.config.filter.http.health_check.v2.HealthCheck
+    pass_through_mode: false
   )EOF";
 
   EXPECT_THROW_WITH_MESSAGE(
@@ -138,8 +128,9 @@ route_config:
         cluster: cluster
 http_filters:
 - name: envoy.health_check
-  config:
-      pass_through_mode: false
+  typed_config:
+    "@type": type.googleapis.com/envoy.config.filter.http.health_check.v2.HealthCheck
+    pass_through_mode: false
   )EOF";
 
   EXPECT_THROW_WITH_MESSAGE(
@@ -170,7 +161,6 @@ tracing:
   max_path_tag_length: 128
 http_filters:
 - name: envoy.router
-  config: {}
   )EOF";
 
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromV2Yaml(yaml_string), context_,
@@ -208,8 +198,8 @@ tracing:
         key: com.bar.foo
         path: [ { key: xx }, { key: yy } ]
   )EOF";
-  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromV2YamlAndValidate(yaml_string),
-                                     context_, date_provider_, route_config_provider_manager_,
+  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromV2Yaml(yaml_string), context_,
+                                     date_provider_, route_config_provider_manager_,
                                      scoped_routes_config_provider_manager_);
 
   std::vector<std::string> custom_tags{"ltag", "etag", "rtag", "mtag"};
@@ -221,6 +211,7 @@ tracing:
 
 TEST_F(HttpConnectionManagerConfigTest, DEPRECATED_FEATURE_TEST(RequestHeaderForTagsConfig)) {
   const std::string yaml_string = R"EOF(
+stat_prefix: router
 route_config:
   name: local_route
 tracing:
@@ -238,7 +229,8 @@ tracing:
   EXPECT_EQ(foo->tag(), "foo");
 }
 
-TEST_F(HttpConnectionManagerConfigTest, ListenerDirectionOutboundOverride) {
+TEST_F(HttpConnectionManagerConfigTest,
+       DEPRECATED_FEATURE_TEST(ListenerDirectionOutboundOverride)) {
   const std::string yaml_string = R"EOF(
 stat_prefix: router
 route_config:
@@ -255,7 +247,6 @@ tracing:
   operation_name: ingress
 http_filters:
 - name: envoy.router
-  config: {}
   )EOF";
 
   ON_CALL(context_, direction())
@@ -266,7 +257,7 @@ http_filters:
   EXPECT_EQ(Tracing::OperationName::Egress, config.tracingConfig()->operation_name_);
 }
 
-TEST_F(HttpConnectionManagerConfigTest, ListenerDirectionInboundOverride) {
+TEST_F(HttpConnectionManagerConfigTest, DEPRECATED_FEATURE_TEST(ListenerDirectionInboundOverride)) {
   const std::string yaml_string = R"EOF(
 stat_prefix: router
 route_config:
@@ -283,7 +274,6 @@ tracing:
   operation_name: egress
 http_filters:
 - name: envoy.router
-  config: {}
   )EOF";
 
   ON_CALL(context_, direction())
@@ -478,7 +468,7 @@ TEST_F(HttpConnectionManagerConfigTest, DisabledStreamIdleTimeout) {
 }
 
 // Validate that deprecated idle_timeout is still ingested.
-TEST_F(HttpConnectionManagerConfigTest, DeprecatedIdleTimeout) {
+TEST_F(HttpConnectionManagerConfigTest, DEPRECATED_FEATURE_TEST(IdleTimeout)) {
   const std::string yaml_string = R"EOF(
   stat_prefix: ingress_http
   idle_timeout: 1s
@@ -986,9 +976,7 @@ route_config:
         cluster: cluster
 http_filters:
 - name: envoy.http_dynamo_filter
-  config: {}
 - name: envoy.router
-  config: {}
 
   )EOF";
 };
