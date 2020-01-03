@@ -11,5 +11,6 @@ api_proto_package(
         "//envoy/config/filter/accesslog/v2:pkg",
         "//envoy/type:pkg",
         "//envoy/type/tracing/v2:pkg",
+        "@com_github_cncf_udpa//udpa/annotations:pkg",
     ],
 )

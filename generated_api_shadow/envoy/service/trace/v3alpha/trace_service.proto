@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package envoy.service.trace.v3alpha;
 
-import "envoy/api/v3alpha/core/base.proto";
+import "envoy/config/core/v3alpha/base.proto";
 
 import "google/api/annotations.proto";
 
@@ -40,7 +40,7 @@ message StreamTracesMessage {
         "envoy.service.trace.v2.StreamTracesMessage.Identifier";
 
     // The node sending the access log messages over the stream.
-    api.v3alpha.core.Node node = 1 [(validate.rules).message = {required: true}];
+    config.core.v3alpha.Node node = 1 [(validate.rules).message = {required: true}];
   }
 
   // Identifier data effectively is a structured metadata.

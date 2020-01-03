@@ -7,7 +7,6 @@
 #include "envoy/api/v2/discovery.pb.h"
 #include "envoy/api/v2/lds.pb.h"
 #include "envoy/api/v2/lds.pb.validate.h"
-#include "envoy/api/v3alpha/lds.pb.h"
 #include "envoy/stats/scope.h"
 
 #include "common/common/cleanup.h"
@@ -140,7 +139,7 @@ std::string LdsApiImpl::loadTypeUrl() {
         API_NO_BOOST(envoy::api::v2::Listener().GetDescriptor()->full_name()));
   case envoy::api::v2::core::ConfigSource::V3ALPHA:
     return Grpc::Common::typeUrl(
-        API_NO_BOOST(envoy::api::v3alpha::Listener().GetDescriptor()->full_name()));
+        API_NO_BOOST(envoy::service::listener::v3alpha::Listener().GetDescriptor()->full_name()));
   default:
     throw EnvoyException(fmt::format("type {} is not supported", xds_api_version_));
   }
