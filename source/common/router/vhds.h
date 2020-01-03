@@ -6,6 +6,7 @@
 #include <unordered_map>
 #include <unordered_set>
 
+#include "envoy/api/v2/core/config_source.pb.h"
 #include "envoy/api/v2/discovery.pb.h"
 #include "envoy/api/v2/route/route.pb.h"
 #include "envoy/config/subscription.h"
@@ -39,7 +40,9 @@ public:
   VhdsSubscription(RouteConfigUpdatePtr& config_update_info,
                    Server::Configuration::ServerFactoryContext& factory_context,
                    const std::string& stat_prefix,
-                   std::unordered_set<RouteConfigProvider*>& route_config_providers);
+                   std::unordered_set<RouteConfigProvider*>& route_config_providers,
+                   const envoy::api::v2::core::ConfigSource::XdsApiVersion xds_api_version =
+                       envoy::api::v2::core::ConfigSource::AUTO);
   ~VhdsSubscription() override { init_target_.ready(); }
 
   void registerInitTargetWithInitManager(Init::Manager& m) { m.add(init_target_); }
@@ -57,6 +60,7 @@ private:
   std::string resourceName(const ProtobufWkt::Any& resource) override {
     return MessageUtil::anyConvert<envoy::api::v2::route::VirtualHost>(resource).name();
   }
+  std::string loadTypeUrl();
 
   RouteConfigUpdatePtr& config_update_info_;
   Stats::ScopePtr scope_;
@@ -64,6 +68,7 @@ private:
   std::unique_ptr<Envoy::Config::Subscription> subscription_;
   Init::TargetImpl init_target_;
   std::unordered_set<RouteConfigProvider*>& route_config_providers_;
+  envoy::api::v2::core::ConfigSource::XdsApiVersion xds_api_version_;
 };
 
 using VhdsSubscriptionPtr = std::unique_ptr<VhdsSubscription>;

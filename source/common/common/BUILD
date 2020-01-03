@@ -237,6 +237,16 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "thread_synchronizer_lib",
+    srcs = ["thread_synchronizer.cc"],
+    hdrs = ["thread_synchronizer.h"],
+    external_deps = ["abseil_synchronization"],
+    deps = [
+        ":assert_lib",
+    ],
+)
+
+envoy_cc_library(
     name = "thread_lib",
     hdrs = ["thread.h"],
     external_deps = ["abseil_synchronization"],
