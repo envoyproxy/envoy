@@ -2,8 +2,8 @@ syntax = "proto3";
 
 package envoy.data.accesslog.v3alpha;
 
-import "envoy/api/v3alpha/core/address.proto";
-import "envoy/api/v3alpha/core/base.proto";
+import "envoy/config/core/v3alpha/address.proto";
+import "envoy/config/core/v3alpha/base.proto";
 
 import "google/protobuf/any.proto";
 import "google/protobuf/duration.proto";
@@ -91,10 +91,10 @@ message AccessLogCommon {
   // This field is the remote/origin address on which the request from the user was received.
   // Note: This may not be the physical peer. E.g, if the remote address is inferred from for
   // example the x-forwarder-for header, proxy protocol, etc.
-  api.v3alpha.core.Address downstream_remote_address = 2;
+  config.core.v3alpha.Address downstream_remote_address = 2;
 
   // This field is the local/destination address on which the request from the user was received.
-  api.v3alpha.core.Address downstream_local_address = 3;
+  config.core.v3alpha.Address downstream_local_address = 3;
 
   // If the connection is secure,S this field will contain TLS properties.
   TLSProperties tls_properties = 4;
@@ -143,10 +143,10 @@ message AccessLogCommon {
 
   // The upstream remote/destination address that handles this exchange. This does not include
   // retries.
-  api.v3alpha.core.Address upstream_remote_address = 13;
+  config.core.v3alpha.Address upstream_remote_address = 13;
 
   // The upstream local/origin address that handles this exchange. This does not include retries.
-  api.v3alpha.core.Address upstream_local_address = 14;
+  config.core.v3alpha.Address upstream_local_address = 14;
 
   // The upstream cluster that *upstream_remote_address* belongs to.
   string upstream_cluster = 15;
@@ -162,7 +162,7 @@ message AccessLogCommon {
   // route created from a higher level forwarding rule with some ID can place
   // that ID in this field and cross reference later. It can also be used to
   // determine if a canary endpoint was used or not.
-  api.v3alpha.core.Metadata metadata = 17;
+  config.core.v3alpha.Metadata metadata = 17;
 
   // If upstream connection failed due to transport socket (e.g. TLS handshake), provides the
   // failure reason from the transport socket. The format of this field depends on the configured
@@ -176,7 +176,7 @@ message AccessLogCommon {
   // This field is the downstream direct remote address on which the request from the user was
   // received. Note: This is always the physical peer, even if the remote address is inferred from
   // for example the x-forwarder-for header, proxy protocol, etc.
-  api.v3alpha.core.Address downstream_direct_remote_address = 20;
+  config.core.v3alpha.Address downstream_direct_remote_address = 20;
 
   // Map of filter state in stream info that have been configured to be logged. If the filter
   // state serialized to any message other than `google.protobuf.Any` it will be packed into
@@ -330,7 +330,8 @@ message HTTPRequestProperties {
       "envoy.data.accesslog.v2.HTTPRequestProperties";
 
   // The request method (RFC 7231/2616).
-  api.v3alpha.core.RequestMethod request_method = 1 [(validate.rules).enum = {defined_only: true}];
+  config.core.v3alpha.RequestMethod request_method = 1
+      [(validate.rules).enum = {defined_only: true}];
 
   // The scheme portion of the incoming request URI.
   string scheme = 2;

@@ -53,7 +53,7 @@ TEST_P(VersionIntegrationTest, IpTaggingV3AlphaStaticTypedStructConfig) {
 name: envoy.ip_tagging
 typed_config:
   "@type": type.googleapis.com/udpa.type.v1.TypedStruct
-  type_url: type.googleapis.com/envoy.config.filter.http.ip_tagging.v3alpha.IPTagging
+  type_url: type.googleapis.com/envoy.extensions.filters.http.ip_tagging.v3alpha.IPTagging
   value:
   )EOF",
                                         ExampleIpTaggingConfig));
@@ -76,7 +76,7 @@ TEST_P(VersionIntegrationTest, IpTaggingV3AlphaStaticTypedConfig) {
   config_helper_.addFilter(absl::StrCat(R"EOF(
   name: envoy.ip_tagging
   typed_config:
-    "@type": type.googleapis.com/envoy.config.filter.http.ip_tagging.v3alpha.IPTagging
+    "@type": type.googleapis.com/envoy.extensions.filters.http.ip_tagging.v3alpha.IPTagging
   )EOF",
                                         ExampleIpTaggingConfig));
   initialize();

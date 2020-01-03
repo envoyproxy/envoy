@@ -5,11 +5,14 @@ package envoy.api.v2.listener;
 import "google/protobuf/duration.proto";
 import "google/protobuf/wrappers.proto";
 
+import "udpa/annotations/migrate.proto";
+
 option java_package = "io.envoyproxy.envoy.api.v2.listener";
 option java_outer_classname = "QuicConfigProto";
 option java_multiple_files = true;
 option csharp_namespace = "Envoy.Api.V2.ListenerNS";
 option ruby_package = "Envoy.Api.V2.ListenerNS";
+option (udpa.annotations.file_migrate).move_to_package = "envoy.config.listener.v3alpha";
 
 // [#protodoc-title: QUIC listener Config]
 

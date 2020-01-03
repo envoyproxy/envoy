@@ -7,10 +7,11 @@ licenses(["notice"])  # Apache 2
 api_proto_package(
     deps = [
         "//envoy/admin/v2alpha:pkg",
-        "//envoy/api/v3alpha:pkg",
-        "//envoy/api/v3alpha/auth:pkg",
-        "//envoy/api/v3alpha/core:pkg",
         "//envoy/config/bootstrap/v3alpha:pkg",
+        "//envoy/config/core/v3alpha:pkg",
+        "//envoy/extensions/transport_sockets/tls/v3alpha:pkg",
+        "//envoy/service/cluster/v3alpha:pkg",
+        "//envoy/service/listener/v3alpha:pkg",
         "//envoy/service/route/v3alpha:pkg",
         "//envoy/service/tap/v3alpha:pkg",
         "//envoy/type/v3alpha:pkg",

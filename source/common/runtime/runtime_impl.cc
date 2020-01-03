@@ -10,7 +10,7 @@
 #include "envoy/event/dispatcher.h"
 #include "envoy/service/discovery/v2/rtds.pb.h"
 #include "envoy/service/discovery/v2/rtds.pb.validate.h"
-#include "envoy/service/discovery/v3alpha/rtds.pb.h"
+#include "envoy/service/runtime/v3alpha/rtds.pb.h"
 #include "envoy/thread_local/thread_local.h"
 #include "envoy/type/percent.pb.h"
 #include "envoy/type/percent.pb.validate.h"
@@ -612,7 +612,7 @@ std::string RtdsSubscription::loadTypeUrl() {
         API_NO_BOOST(envoy::service::discovery::v2::Runtime().GetDescriptor()->full_name()));
   case envoy::api::v2::core::ConfigSource::V3ALPHA:
     return Grpc::Common::typeUrl(
-        API_NO_BOOST(envoy::service::discovery::v3alpha::Runtime().GetDescriptor()->full_name()));
+        API_NO_BOOST(envoy::service::runtime::v3alpha::Runtime().GetDescriptor()->full_name()));
   default:
     throw EnvoyException(fmt::format("type {} is not supported", xds_api_version_));
   }
