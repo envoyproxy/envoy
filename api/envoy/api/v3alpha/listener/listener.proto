@@ -76,7 +76,7 @@ message FilterChainMatch {
     ANY = 0;
 
     // Match a connection originating from the same host.
-    LOCAL = 1;
+    SAME_IP_OR_LOOPBACK = 1;
 
     // Match a connection originating from a different host.
     EXTERNAL = 2;
