@@ -3361,7 +3361,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, ReusePortListenerEnabledForTcp) {
                    /* expected_creation_params */ {true, false});
 }
 
-TEST_F(ListenerManagerImplWithRealFiltersTest, ReusePortListenerEnabledForUdp) {
+TEST_F(ListenerManagerImplWithRealFiltersTest, ReusePortListenerDisabled) {
 
   auto listener = createIPv4Listener("UdpListener");
   listener.mutable_address()->mutable_socket_address()->set_protocol(
@@ -3376,9 +3376,9 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, ReusePortListenerEnabledForUdp) {
   // IpPacketInfo and RxQueueOverFlow are always set if supported
   expectCreateListenSocket(envoy::api::v2::core::SocketOption::STATE_PREBIND,
 #ifdef SO_RXQ_OVFL
-                           /* expected_num_options */ 3,
-#else
                            /* expected_num_options */ 2,
+#else
+                           /* expected_num_options */ 1,
 #endif
                            /* expected_creation_params */ {true, false});
 
@@ -3395,12 +3395,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, ReusePortListenerEnabledForUdp) {
                    /* expected_num_calls */ 1);
 #endif
 
-  expectSetsockopt(os_sys_calls_,
-                   /* expected_sockopt_level */ SOL_SOCKET,
-                   /* expected_sockopt_name */ SO_REUSEPORT,
-                   /* expected_value */ 1,
-                   /* expected_num_calls */ 1);
-
+  server_.options_.concurrency_ = 2;
   manager_->addOrUpdateListener(listener, "", true);
   EXPECT_EQ(1U, manager_->listeners().size());
 }

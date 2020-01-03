@@ -121,7 +121,7 @@ protected:
     API_NO_BOOST(envoy::api::v2::DiscoveryResponse) discovery_response;
     discovery_response.set_version_info("1");
     discovery_response.set_type_url(Config::TypeUrl::get().Secret);
-    discovery_response.add_resources()->PackFrom(secret);
+    discovery_response.add_resources()->PackFrom(API_DOWNGRADE(secret));
 
     xds_stream_->sendGrpcMessage(discovery_response);
   }

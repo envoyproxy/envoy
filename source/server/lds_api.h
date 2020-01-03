@@ -9,6 +9,7 @@
 #include "envoy/config/subscription_factory.h"
 #include "envoy/init/manager.h"
 #include "envoy/server/listener_manager.h"
+#include "envoy/service/listener/v3alpha/lds.pb.h"
 #include "envoy/stats/scope.h"
 
 #include "common/common/logger.h"
@@ -43,6 +44,7 @@ private:
   std::string resourceName(const ProtobufWkt::Any& resource) override {
     return MessageUtil::anyConvert<envoy::api::v2::Listener>(resource).name();
   }
+  std::string loadTypeUrl();
 
   std::unique_ptr<Config::Subscription> subscription_;
   std::string system_version_info_;
@@ -51,6 +53,7 @@ private:
   Upstream::ClusterManager& cm_;
   Init::TargetImpl init_target_;
   ProtobufMessage::ValidationVisitor& validation_visitor_;
+  envoy::api::v2::core::ConfigSource::XdsApiVersion xds_api_version_;
 };
 
 } // namespace Server

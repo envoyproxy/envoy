@@ -7,6 +7,7 @@
 #include <unordered_set>
 
 #include "envoy/admin/v2alpha/config_dump.pb.h"
+#include "envoy/api/v2/core/config_source.pb.h"
 #include "envoy/api/v2/discovery.pb.h"
 #include "envoy/api/v2/rds.pb.h"
 #include "envoy/config/filter/network/http_connection_manager/v2/http_connection_manager.pb.h"
@@ -139,10 +140,12 @@ private:
       const uint64_t manager_identifier,
       Server::Configuration::ServerFactoryContext& factory_context,
       ProtobufMessage::ValidationVisitor& validator, Init::Manager& init_manager,
-      const std::string& stat_prefix,
-      RouteConfigProviderManagerImpl& route_config_provider_manager);
+      const std::string& stat_prefix, RouteConfigProviderManagerImpl& route_config_provider_manager,
+      const envoy::api::v2::core::ConfigSource::XdsApiVersion xds_api_version =
+          envoy::api::v2::core::ConfigSource::AUTO);
 
   bool validateUpdateSize(int num_resources);
+  std::string loadTypeUrl();
 
   Init::Manager& getRdsConfigInitManager() { return init_manager_; }
 
@@ -162,6 +165,7 @@ private:
   VhdsSubscriptionPtr vhds_subscription_;
   RouteConfigUpdatePtr config_update_info_;
   Common::CallbackManager<> update_callback_manager_;
+  envoy::api::v2::core::ConfigSource::XdsApiVersion xds_api_version_;
 
   friend class RouteConfigProviderManagerImpl;
   // Access to addUpdateCallback

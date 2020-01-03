@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package envoy.service.route.v3alpha;
 
-import "envoy/api/v3alpha/discovery.proto";
+import "envoy/service/discovery/v3alpha/discovery.proto";
 
 import "google/api/annotations.proto";
 
@@ -23,18 +23,19 @@ option java_generic_services = true;
 // resources. Each ScopedRouteConfiguration resource represents a "routing
 // scope" containing a mapping that allows the HTTP connection manager to
 // dynamically assign a routing table (specified via a
-// :ref:`RouteConfiguration<envoy_api_msg_api.v3alpha.RouteConfiguration>` message) to each
-// HTTP request.
+// :ref:`RouteConfiguration<envoy_api_msg_service.route.v3alpha.RouteConfiguration>` message) to
+// each HTTP request.
 service ScopedRoutesDiscoveryService {
-  rpc StreamScopedRoutes(stream api.v3alpha.DiscoveryRequest)
-      returns (stream api.v3alpha.DiscoveryResponse) {
+  rpc StreamScopedRoutes(stream discovery.v3alpha.DiscoveryRequest)
+      returns (stream discovery.v3alpha.DiscoveryResponse) {
   }
 
-  rpc DeltaScopedRoutes(stream api.v3alpha.DeltaDiscoveryRequest)
-      returns (stream api.v3alpha.DeltaDiscoveryResponse) {
+  rpc DeltaScopedRoutes(stream discovery.v3alpha.DeltaDiscoveryRequest)
+      returns (stream discovery.v3alpha.DeltaDiscoveryResponse) {
   }
 
-  rpc FetchScopedRoutes(api.v3alpha.DiscoveryRequest) returns (api.v3alpha.DiscoveryResponse) {
+  rpc FetchScopedRoutes(discovery.v3alpha.DiscoveryRequest)
+      returns (discovery.v3alpha.DiscoveryResponse) {
     option (google.api.http).post = "/v3alpha/discovery:scoped-routes";
     option (google.api.http).body = "*";
   }
@@ -47,7 +48,7 @@ service ScopedRoutesDiscoveryService {
 // The HTTP connection manager builds up a table consisting of these Key to
 // RouteConfiguration mappings, and looks up the RouteConfiguration to use per
 // request according to the algorithm specified in the
-// :ref:`scope_key_builder<envoy_api_field_config.filter.network.http_connection_manager.v3alpha.ScopedRoutes.scope_key_builder>`
+// :ref:`scope_key_builder<envoy_api_field_extensions.filters.network.http_connection_manager.v3alpha.ScopedRoutes.scope_key_builder>`
 // assigned to the HttpConnectionManager.
 //
 // For example, with the following configurations (in YAML):
@@ -69,7 +70,7 @@ service ScopedRoutesDiscoveryService {
 //               key: vip
 //
 // ScopedRouteConfiguration resources (specified statically via
-// :ref:`scoped_route_configurations_list<envoy_api_field_config.filter.network.http_connection_manager.v3alpha.ScopedRoutes.scoped_route_configurations_list>`
+// :ref:`scoped_route_configurations_list<envoy_api_field_extensions.filters.network.http_connection_manager.v3alpha.ScopedRoutes.scoped_route_configurations_list>`
 // or obtained dynamically via SRDS):
 //
 // .. code::
@@ -104,7 +105,7 @@ message ScopedRouteConfiguration {
       "envoy.api.v2.ScopedRouteConfiguration";
 
   // Specifies a key which is matched against the output of the
-  // :ref:`scope_key_builder<envoy_api_field_config.filter.network.http_connection_manager.v3alpha.ScopedRoutes.scope_key_builder>`
+  // :ref:`scope_key_builder<envoy_api_field_extensions.filters.network.http_connection_manager.v3alpha.ScopedRoutes.scope_key_builder>`
   // specified in the HttpConnectionManager. The matching is done per HTTP
   // request and is dependent on the order of the fragments contained in the
   // Key.
@@ -126,7 +127,7 @@ message ScopedRouteConfiguration {
 
     // The ordered set of fragments to match against. The order must match the
     // fragments in the corresponding
-    // :ref:`scope_key_builder<envoy_api_field_config.filter.network.http_connection_manager.v3alpha.ScopedRoutes.scope_key_builder>`.
+    // :ref:`scope_key_builder<envoy_api_field_extensions.filters.network.http_connection_manager.v3alpha.ScopedRoutes.scope_key_builder>`.
     repeated Fragment fragments = 1 [(validate.rules).repeated = {min_items: 1}];
   }
 

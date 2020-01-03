@@ -10,6 +10,7 @@
 #include "common/config/api_version.h"
 #include "common/config/grpc_subscription_impl.h"
 #include "common/config/resources.h"
+#include "common/config/version_converter.h"
 
 #include "test/common/config/subscription_test_harness.h"
 #include "test/mocks/config/mocks.h"
@@ -65,7 +66,7 @@ public:
     UNREFERENCED_PARAMETER(expect_node);
     API_NO_BOOST(envoy::api::v2::DiscoveryRequest) expected_request;
     if (expect_node) {
-      expected_request.mutable_node()->CopyFrom(node_);
+      expected_request.mutable_node()->CopyFrom(API_DOWNGRADE(node_));
     }
     for (const auto& cluster : cluster_names) {
       expected_request.add_resource_names(cluster);
@@ -104,7 +105,7 @@ public:
           last_cluster_names_.end()) {
         envoy::api::v2::ClusterLoadAssignment* load_assignment = typed_resources.Add();
         load_assignment->set_cluster_name(cluster);
-        response->add_resources()->PackFrom(*load_assignment);
+        response->add_resources()->PackFrom(API_DOWNGRADE(*load_assignment));
       }
     }
     EXPECT_CALL(callbacks_, onConfigUpdate(RepeatedProtoEq(response->resources()), version))

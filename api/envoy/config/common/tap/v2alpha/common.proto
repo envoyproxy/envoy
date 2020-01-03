@@ -5,11 +5,13 @@ package envoy.config.common.tap.v2alpha;
 import "envoy/api/v2/core/config_source.proto";
 import "envoy/service/tap/v2alpha/common.proto";
 
+import "udpa/annotations/migrate.proto";
 import "validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.config.common.tap.v2alpha";
 option java_outer_classname = "CommonProto";
 option java_multiple_files = true;
+option (udpa.annotations.file_migrate).move_to_package = "envoy.extensions.common.tap.v3alpha";
 
 // [#protodoc-title: Common tap extension configuration]
 

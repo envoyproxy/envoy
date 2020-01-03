@@ -1,6 +1,6 @@
-#include "envoy/api/v3alpha/cds.pb.h"
 #include "envoy/config/overload/v2alpha/overload.pb.h"
 #include "envoy/config/overload/v3alpha/overload.pb.h"
+#include "envoy/service/cluster/v3alpha/cds.pb.h"
 
 #define API_NO_BOOST(x) x
 #define BAR(x) x
@@ -8,11 +8,14 @@
 
 using envoy::config::overload::v3alpha::Trigger;
 
+using envoy::service::cluster::v3alpha::Cluster;
+using MutableStringClusterAccessor = std::string* (Cluster::*)();
+
 class ThresholdTriggerImpl {
 public:
   ThresholdTriggerImpl(const envoy::config::overload::v3alpha::Trigger& config) {
     switch (config.trigger_oneof_case()) {
-    case envoy::config::overload::v3alpha::Trigger::kThreshold:
+    case envoy::config::overload::v3alpha::Trigger::TriggerOneofCase::kThreshold:
       break;
     default:
       break;
@@ -27,8 +30,13 @@ public:
     BAR(API_NO_BOOST(envoy::config::overload::v2alpha::Trigger)) bar;
     BAR(envoy::config::overload::v3alpha::Trigger) baz;
     envoy::config::overload::v3alpha::ThresholdTrigger::default_instance();
-    ASSERT(envoy::config::overload::v3alpha::Trigger::kThreshold == Trigger::kThreshold);
-    envoy::api::v3alpha::Cluster_LbPolicy_Name(0);
-    static_cast<void>(envoy::api::v3alpha::Cluster::ORIGINAL_DST_LB);
+    ASSERT(envoy::config::overload::v3alpha::Trigger::TriggerOneofCase::kThreshold == Trigger::kThreshold);
+    ASSERT(Foo::kThreshold == Trigger::kThreshold);
+    envoy::service::cluster::v3alpha::Cluster::LbPolicy_Name(0);
+    static_cast<void>(envoy::service::cluster::v3alpha::Cluster::MAGLEV);
+    MutableStringClusterAccessor foo2 = &envoy::service::cluster::v3alpha::Cluster::mutable_name;
+    static_cast<void>(foo2);
   }
+
+  using Foo = envoy::config::overload::v3alpha::Trigger;
 };
