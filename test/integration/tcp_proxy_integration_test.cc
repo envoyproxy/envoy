@@ -8,6 +8,7 @@
 #include "envoy/config/bootstrap/v2/bootstrap.pb.h"
 #include "envoy/config/filter/network/tcp_proxy/v2/tcp_proxy.pb.h"
 
+#include "common/config/api_version.h"
 #include "common/network/utility.h"
 
 #include "extensions/transport_sockets/tls/context_manager_impl.h"
@@ -240,10 +241,10 @@ TEST_P(TcpProxyIntegrationTest, AccessLog) {
     auto* filter_chain = listener->mutable_filter_chains(0);
     auto* config_blob = filter_chain->mutable_filters(0)->mutable_typed_config();
 
-    ASSERT_TRUE(config_blob->Is<envoy::config::filter::network::tcp_proxy::v2::TcpProxy>());
-    auto tcp_proxy_config =
-        MessageUtil::anyConvert<envoy::config::filter::network::tcp_proxy::v2::TcpProxy>(
-            *config_blob);
+    ASSERT_TRUE(
+        config_blob->Is<API_NO_BOOST(envoy::config::filter::network::tcp_proxy::v2::TcpProxy)>());
+    auto tcp_proxy_config = MessageUtil::anyConvert<API_NO_BOOST(
+        envoy::config::filter::network::tcp_proxy::v2::TcpProxy)>(*config_blob);
 
     auto* access_log = tcp_proxy_config.add_access_log();
     access_log->set_name("envoy.file_access_log");
@@ -277,9 +278,15 @@ TEST_P(TcpProxyIntegrationTest, AccessLog) {
   } while (log_result.empty());
 
   // Regex matching localhost:port
+#ifndef GTEST_USES_SIMPLE_RE
   const std::string ip_port_regex = (GetParam() == Network::Address::IpVersion::v4)
                                         ? R"EOF(127\.0\.0\.1:[0-9]+)EOF"
                                         : R"EOF(\[::1\]:[0-9]+)EOF";
+#else
+  const std::string ip_port_regex = (GetParam() == Network::Address::IpVersion::v4)
+                                        ? R"EOF(127\.0\.0\.1:\d+)EOF"
+                                        : R"EOF(\[::1\]:\d+)EOF";
+#endif
 
   const std::string ip_regex =
       (GetParam() == Network::Address::IpVersion::v4) ? R"EOF(127\.0\.0\.1)EOF" : R"EOF(::1)EOF";
@@ -287,7 +294,7 @@ TEST_P(TcpProxyIntegrationTest, AccessLog) {
   // Test that all three addresses were populated correctly. Only check the first line of
   // log output for simplicity.
   EXPECT_THAT(log_result,
-              MatchesRegex(fmt::format("upstreamlocal={0} upstreamhost={0} downstream={1}\n.*",
+              MatchesRegex(fmt::format("upstreamlocal={0} upstreamhost={0} downstream={1}\r?\n.*",
                                        ip_port_regex, ip_regex)));
 }
 
@@ -329,10 +336,10 @@ TEST_P(TcpProxyIntegrationTest, TestIdletimeoutWithNoData) {
     auto* filter_chain = listener->mutable_filter_chains(0);
     auto* config_blob = filter_chain->mutable_filters(0)->mutable_typed_config();
 
-    ASSERT_TRUE(config_blob->Is<envoy::config::filter::network::tcp_proxy::v2::TcpProxy>());
-    auto tcp_proxy_config =
-        MessageUtil::anyConvert<envoy::config::filter::network::tcp_proxy::v2::TcpProxy>(
-            *config_blob);
+    ASSERT_TRUE(
+        config_blob->Is<API_NO_BOOST(envoy::config::filter::network::tcp_proxy::v2::TcpProxy)>());
+    auto tcp_proxy_config = MessageUtil::anyConvert<API_NO_BOOST(
+        envoy::config::filter::network::tcp_proxy::v2::TcpProxy)>(*config_blob);
     tcp_proxy_config.mutable_idle_timeout()->set_nanos(
         std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::milliseconds(100))
             .count());
@@ -352,10 +359,10 @@ TEST_P(TcpProxyIntegrationTest, TestIdletimeoutWithLargeOutstandingData) {
     auto* filter_chain = listener->mutable_filter_chains(0);
     auto* config_blob = filter_chain->mutable_filters(0)->mutable_typed_config();
 
-    ASSERT_TRUE(config_blob->Is<envoy::config::filter::network::tcp_proxy::v2::TcpProxy>());
-    auto tcp_proxy_config =
-        MessageUtil::anyConvert<envoy::config::filter::network::tcp_proxy::v2::TcpProxy>(
-            *config_blob);
+    ASSERT_TRUE(
+        config_blob->Is<API_NO_BOOST(envoy::config::filter::network::tcp_proxy::v2::TcpProxy)>());
+    auto tcp_proxy_config = MessageUtil::anyConvert<API_NO_BOOST(
+        envoy::config::filter::network::tcp_proxy::v2::TcpProxy)>(*config_blob);
     tcp_proxy_config.mutable_idle_timeout()->set_nanos(
         std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::milliseconds(500))
             .count());

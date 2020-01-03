@@ -185,7 +185,7 @@ OriginalDstClusterFactory::createClusterImpl(
     throw EnvoyException(fmt::format(
         "cluster: LB policy {} is not valid for Cluster type {}. Only 'CLUSTER_PROVIDED' or "
         "'ORIGINAL_DST_LB' is allowed with cluster type 'ORIGINAL_DST'",
-        envoy::api::v2::Cluster_LbPolicy_Name(cluster.lb_policy()),
+        envoy::api::v2::Cluster::LbPolicy_Name(cluster.lb_policy()),
         envoy::api::v2::Cluster_DiscoveryType_Name(cluster.type())));
   }
 
