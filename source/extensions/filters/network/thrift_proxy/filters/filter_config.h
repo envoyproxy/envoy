@@ -52,7 +52,10 @@ public:
    * created by this factory. Used for automatic registration with
    * FactoryCategoryRegistry.
    */
-  static std::string category() { return "thrift_proxy.filters"; }
+  static std::string category() {
+    static const char FACTORY_CATEGORY[] = "thrift_proxy.filters";
+    return FACTORY_CATEGORY;
+  }
 };
 
 } // namespace ThriftFilters

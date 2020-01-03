@@ -45,7 +45,10 @@ public:
    * created by this factory. Used for automatic registration with
    * FactoryCategoryRegistry.
    */
-  static std::string category() { return "grpc_credentials"; }
+  static std::string category() {
+    static const char FACTORY_CATEGORY[] = "grpc_credentials";
+    return FACTORY_CATEGORY;
+  }
 };
 
 } // namespace Grpc

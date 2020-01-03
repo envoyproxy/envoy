@@ -3,8 +3,8 @@
 Registered Factory Categories
 =============================
 
-Envoy comes with a vairety of extensions that add or provide alternative implementation to Envoy's
-subsystems. The list fo available extensions is configurable to the build time. Extensions are 
+Envoy comes with a variety of extensions that add or provide alternative implementation of Envoy's
+subsystems. The list of available extensions is configurable at the build time. Extensions are 
 grouped together into the named categories, based on the functionality they provide. The table below 
 lists all known extension categories and their source code.
 

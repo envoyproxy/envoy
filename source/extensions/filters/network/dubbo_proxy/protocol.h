@@ -119,7 +119,10 @@ public:
    * created by this factory. Used for automatic registration with
    * FactoryCategoryRegistry.
    */
-  static std::string category() { return "dubbo_proxy.protocols"; }
+  static std::string category() {
+    static const char FACTORY_CATEGORY[] = "dubbo_proxy.protocols";
+    return FACTORY_CATEGORY;
+  }
 
   /**
    * Convenience method to lookup a factory by type.

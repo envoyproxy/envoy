@@ -61,7 +61,10 @@ public:
    * created by this factory. Used for automatic registration with
    * FactoryCategoryRegistry.
    */
-  static std::string category() { return "stats_sinks"; }
+  static std::string category() {
+    static const char FACTORY_CATEGORY[] = "stats_sinks";
+    return FACTORY_CATEGORY;
+  }
 };
 
 /**

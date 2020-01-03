@@ -150,7 +150,10 @@ public:
    * created by this factory. Used for automatic registration with
    * FactoryCategoryRegistry.
    */
-  static std::string category() { return "transport_sockets.upstream"; }
+  static std::string category() {
+    static const char FACTORY_CATEGORY[] = "transport_sockets.upstream";
+    return FACTORY_CATEGORY;
+  }
 };
 
 /**
@@ -182,7 +185,10 @@ public:
    * created by this factory. Used for automatic registration with
    * FactoryCategoryRegistry.
    */
-  static std::string category() { return "transport_sockets.downstream"; }
+  static std::string category() {
+    static const char FACTORY_CATEGORY[] = "transport_sockets.downstream";
+    return FACTORY_CATEGORY;
+  }
 };
 
 } // namespace Configuration

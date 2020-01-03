@@ -46,7 +46,10 @@ public:
    * created by this factory. Used for automatic registration with
    * FactoryCategoryRegistry.
    */
-  static std::string category() { return "tracers"; }
+  static std::string category() {
+    static const char FACTORY_CATEGORY[] = "tracers";
+    return FACTORY_CATEGORY;
+  }
 };
 
 } // namespace Configuration

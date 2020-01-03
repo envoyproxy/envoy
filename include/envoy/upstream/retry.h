@@ -91,7 +91,10 @@ public:
    * created by this factory. Used for automatic registration with
    * FactoryCategoryRegistry.
    */
-  static std::string category() { return "retry_priorities"; }
+  static std::string category() {
+    static const char FACTORY_CATEGORY[] = "retry_priorities";
+    return FACTORY_CATEGORY;
+  }
 
   virtual ProtobufTypes::MessagePtr createEmptyConfigProto() PURE;
 };
@@ -111,7 +114,10 @@ public:
    */
   virtual std::string name() PURE;
 
-  static std::string category() { return "retry_host_predicates"; }
+  static std::string category() {
+    static const char FACTORY_CATEGORY[] = "retry_host_predicates";
+    return FACTORY_CATEGORY;
+  }
 
   virtual ProtobufTypes::MessagePtr createEmptyConfigProto() PURE;
 };

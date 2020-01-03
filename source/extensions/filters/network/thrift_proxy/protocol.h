@@ -519,7 +519,10 @@ public:
    * created by this factory. Used for automatic registration with
    * FactoryCategoryRegistry.
    */
-  static std::string category() { return "thrift_proxy.protocols"; }
+  static std::string category() {
+    static const char FACTORY_CATEGORY[] = "thrift_proxy.protocols";
+    return FACTORY_CATEGORY;
+  }
 
   /**
    * Convenience method to lookup a factory by type.

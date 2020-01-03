@@ -50,7 +50,10 @@ public:
    * created by this factory. Used for automatic registration with
    * FactoryCategoryRegistry.
    */
-  static std::string category() { return "access_loggers"; }
+  static std::string category() {
+    static const char FACTORY_CATEGORY[] = "access_loggers";
+    return FACTORY_CATEGORY;
+  }
 };
 
 } // namespace Configuration

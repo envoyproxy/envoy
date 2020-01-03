@@ -40,7 +40,10 @@ public:
    * created by this factory. Used for automatic registration with
    * FactoryCategoryRegistry.
    */
-  static std::string category() { return "wasm.null_vms"; }
+  static std::string category() {
+    static const char FACTORY_CATEGORY[] = "wasm.null_vms";
+    return FACTORY_CATEGORY;
+  }
 
   /**
    * Create an instance of the plugin.

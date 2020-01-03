@@ -83,7 +83,10 @@ public:
    * created by this factory. Used for automatic registration with
    * FactoryCategoryRegistry.
    */
-  static std::string category() { return "health_checkers"; }
+  static std::string category() {
+    static const char FACTORY_CATEGORY[] = "health_checkers";
+    return FACTORY_CATEGORY;
+  }
 };
 
 } // namespace Configuration

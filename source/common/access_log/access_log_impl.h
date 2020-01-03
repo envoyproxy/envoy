@@ -265,7 +265,10 @@ public:
    * created by this factory. Used for automatic registration with
    * FactoryCategoryRegistry.
    */
-  static std::string category() { return "access_logger.extension_filters"; }
+  static std::string category() {
+    static const char FACTORY_CATEGORY[] = "access_logger.extension_filters";
+    return FACTORY_CATEGORY;
+  }
 };
 
 /**

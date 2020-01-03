@@ -33,7 +33,10 @@ public:
    * created by this factory. Used for automatic registration with
    * FactoryCategoryRegistry.
    */
-  static std::string category() { return "udp_listeners"; }
+  static std::string category() {
+    static const char FACTORY_CATEGORY[] = "udp_listeners";
+    return FACTORY_CATEGORY;
+  }
 };
 
 } // namespace Server

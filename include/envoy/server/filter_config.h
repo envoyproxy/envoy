@@ -254,7 +254,10 @@ public:
    * created by this factory. Used for automatic registration with
    * FactoryCategoryRegistry.
    */
-  static std::string category() { return "filters.listener"; }
+  static std::string category() {
+    static const char FACTORY_CATEGORY[] = "filters.listener";
+    return FACTORY_CATEGORY;
+  }
 };
 
 /**
@@ -282,7 +285,10 @@ public:
    * created by this factory. Used for automatic registration with
    * FactoryCategoryRegistry.
    */
-  static std::string category() { return "filters.udp_listener"; }
+  static std::string category() {
+    static const char FACTORY_CATEGORY[] = "filters.udp_listener";
+    return FACTORY_CATEGORY;
+  }
 };
 
 /**
@@ -353,7 +359,10 @@ public:
    * created by this factory. Used for automatic registration with
    * FactoryCategoryRegistry.
    */
-  static std::string category() { return "filters.network"; }
+  static std::string category() {
+    static const char FACTORY_CATEGORY[] = "filters.network";
+    return FACTORY_CATEGORY;
+  }
 
   /**
    * @return bool true if this filter must be the last filter in a filter chain, false otherwise.
@@ -393,7 +402,10 @@ public:
    * created by this factory. Used for automatic registration with
    * FactoryCategoryRegistry.
    */
-  static std::string category() { return "filters.upstream_network"; }
+  static std::string category() {
+    static const char FACTORY_CATEGORY[] = "filters.upstream_network";
+    return FACTORY_CATEGORY;
+  }
 };
 
 /**
@@ -457,7 +469,10 @@ public:
    * created by this factory. Used for automatic registration with
    * FactoryCategoryRegistry.
    */
-  static std::string category() { return "filters.http"; }
+  static std::string category() {
+    static const char FACTORY_CATEGORY[] = "filters.http";
+    return FACTORY_CATEGORY;
+  }
 
   /**
    * @return bool true if this filter must be the last filter in a filter chain, false otherwise.

@@ -73,7 +73,10 @@ public:
   virtual std::unique_ptr<const TypedMetadata::Object>
   parse(const ProtobufWkt::Struct& data) const PURE;
 
-  static std::string category() { return "typed_metadata"; }
+  static std::string category() {
+    static const char FACTORY_CATEGORY[] = "typed_metadata";
+    return FACTORY_CATEGORY;
+  }
 };
 
 } // namespace Config
