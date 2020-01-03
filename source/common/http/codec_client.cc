@@ -6,9 +6,12 @@
 #include "envoy/http/codec.h"
 
 #include "common/common/enum_to_int.h"
+#include "common/config/utility.h"
 #include "common/http/exception.h"
 #include "common/http/http1/codec_impl.h"
 #include "common/http/http2/codec_impl.h"
+#include "common/http/http3/quic_codec_factory.h"
+#include "common/http/http3/well_known_names.h"
 #include "common/http/utility.h"
 
 namespace Envoy {
@@ -158,8 +161,10 @@ CodecClientProd::CodecClientProd(Type type, Network::ClientConnectionPtr&& conne
     break;
   }
   case Type::HTTP3: {
-    // TODO(danzh) Add QUIC codec;
-    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+    codec_ = std::unique_ptr<ClientConnection>(
+        Config::Utility::getAndCheckFactory<Http::QuicHttpClientConnectionFactory>(
+            Http::QuicCodecNames::get().Quiche)
+            .createQuicClientConnection(*connection_, *this));
   }
   }
 }

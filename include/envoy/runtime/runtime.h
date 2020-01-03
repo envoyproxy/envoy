@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <limits>
 #include <memory>
 #include <string>
 #include <unordered_map>
@@ -30,10 +31,30 @@ class RandomGenerator {
 public:
   virtual ~RandomGenerator() = default;
 
+  using result_type = uint64_t; // NOLINT(readability-identifier-naming)
+
   /**
    * @return uint64_t a new random number.
    */
-  virtual uint64_t random() PURE;
+  virtual result_type random() PURE;
+
+  /*
+   * @return the smallest value that `operator()` may return. The value is
+   * strictly less than `max()`.
+   */
+  constexpr static result_type min() noexcept { return std::numeric_limits<result_type>::min(); };
+
+  /*
+   * @return the largest value that `operator()` may return. The value is
+   * strictly greater than `min()`.
+   */
+  constexpr static result_type max() noexcept { return std::numeric_limits<result_type>::max(); };
+
+  /*
+   * @return a value in the closed interval `[min(), max()]`. Has amortized
+   * constant complexity.
+   */
+  result_type operator()() { return result_type(random()); };
 
   /**
    * @return std::string containing uuid4 of 36 char length.

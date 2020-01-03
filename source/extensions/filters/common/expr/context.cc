@@ -1,5 +1,7 @@
 #include "extensions/filters/common/expr/context.h"
 
+#include "common/http/utility.h"
+
 #include "absl/strings/numbers.h"
 #include "absl/time/time.h"
 
@@ -82,6 +84,12 @@ absl::optional<CelValue> RequestWrapper::operator[](CelValue key) const {
     if (duration.has_value()) {
       return CelValue::CreateDuration(absl::FromChrono(duration.value()));
     }
+  } else if (value == Protocol) {
+    if (info_.protocol().has_value()) {
+      return CelValue::CreateString(&Http::Utility::getProtocolString(info_.protocol().value()));
+    } else {
+      return {};
+    }
   }
 
   if (headers_.value_ != nullptr) {
@@ -107,7 +115,7 @@ absl::optional<CelValue> RequestWrapper::operator[](CelValue key) const {
     } else if (value == UserAgent) {
       return convertHeaderEntry(headers_.value_->UserAgent());
     } else if (value == TotalSize) {
-      return CelValue::CreateInt64(info_.bytesReceived() + headers_.value_->byteSize().value());
+      return CelValue::CreateInt64(info_.bytesReceived() + headers_.value_->byteSize());
     }
   }
   return {};

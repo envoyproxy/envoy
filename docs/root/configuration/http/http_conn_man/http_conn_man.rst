@@ -15,3 +15,4 @@ HTTP connection manager
   stats
   runtime
   rds
+  vhds

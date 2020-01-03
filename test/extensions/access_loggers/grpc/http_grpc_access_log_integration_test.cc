@@ -1,4 +1,6 @@
 #include "envoy/config/accesslog/v2/als.pb.h"
+#include "envoy/config/bootstrap/v2/bootstrap.pb.h"
+#include "envoy/config/filter/network/http_connection_manager/v2/http_connection_manager.pb.h"
 #include "envoy/service/accesslog/v2/als.pb.h"
 
 #include "common/buffer/zero_copy_input_stream_impl.h"

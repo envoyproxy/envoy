@@ -4,6 +4,8 @@
 #include <utility>
 #include <vector>
 
+#include "envoy/api/v2/cds.pb.h"
+
 #include "common/network/utility.h"
 #include "common/upstream/load_balancer_impl.h"
 #include "common/upstream/upstream_impl.h"

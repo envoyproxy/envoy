@@ -24,6 +24,7 @@ envoy_extension_cc_test(
         "//test/mocks/server:server_mocks",
         "//test/mocks/upstream:upstream_mocks",
         "//test/test_common:environment_lib",
+        "@envoy_api//envoy/config/filter/http/squash/v2:pkg_cc_proto",
     ],
 )
 
@@ -34,6 +35,7 @@ envoy_extension_cc_test(
     deps = [
         "//source/extensions/filters/http/squash:config",
         "//test/integration:http_integration_lib",
+        "@envoy_api//envoy/config/bootstrap/v2:pkg_cc_proto",
     ],
 )
 

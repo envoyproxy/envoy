@@ -21,6 +21,7 @@ if [[ -z "${ENVOY_IP_TEST_VERSIONS}" ]] || [[ "${ENVOY_IP_TEST_VERSIONS}" == "al
     sed -e "s#{{ test_rundir }}#$TEST_SRCDIR/envoy#" | \
     sed -e "s#{{ test_tmpdir }}#$TEST_TMPDIR#" | \
     sed -e "s#{{ ip_loopback_address }}#127.0.0.1#" | \
+    sed -e "s#{{ reuse_port }}#false#" | \
     sed -e "s#{{ dns_lookup_family }}#V4_ONLY#" | \
     cat > "${HOT_RESTART_JSON_V4}"
   JSON_TEST_ARRAY+=("${HOT_RESTART_JSON_V4}")
@@ -34,6 +35,7 @@ if [[ -z "${ENVOY_IP_TEST_VERSIONS}" ]] || [[ "${ENVOY_IP_TEST_VERSIONS}" == "al
     sed -e "s#{{ test_rundir }}#$TEST_SRCDIR/envoy#" | \
     sed -e "s#{{ test_tmpdir }}#$TEST_TMPDIR#" | \
     sed -e "s#{{ ip_loopback_address }}#::1#" | \
+    sed -e "s#{{ reuse_port }}#false#" | \
     sed -e "s#{{ dns_lookup_family }}#v6_only#" | \
     cat > "${HOT_RESTART_JSON_V6}"
   JSON_TEST_ARRAY+=("${HOT_RESTART_JSON_V6}")
@@ -48,6 +50,19 @@ cat "${TEST_SRCDIR}/envoy"/test/config/integration/server_unix_listener.yaml |
   sed -e "s#{{ ip_loopback_address }}#127.0.0.1#" | \
   cat > "${HOT_RESTART_JSON_UDS}"
 JSON_TEST_ARRAY+=("${HOT_RESTART_JSON_UDS}")
+
+# Test reuse port listener.
+HOT_RESTART_JSON_REUSE_PORT="${TEST_TMPDIR}"/hot_restart_v4.yaml
+echo building ${HOT_RESTART_JSON_V4} ...
+cat "${TEST_SRCDIR}/envoy"/test/config/integration/server.yaml |
+  sed -e "s#{{ upstream_. }}#0#g" | \
+  sed -e "s#{{ test_rundir }}#$TEST_SRCDIR/envoy#" | \
+  sed -e "s#{{ test_tmpdir }}#$TEST_TMPDIR#" | \
+  sed -e "s#{{ ip_loopback_address }}#127.0.0.1#" | \
+  sed -e "s#{{ reuse_port }}#true#" | \
+  sed -e "s#{{ dns_lookup_family }}#V4_ONLY#" | \
+  cat > "${HOT_RESTART_JSON_REUSE_PORT}"
+JSON_TEST_ARRAY+=("${HOT_RESTART_JSON_REUSE_PORT}")
 
 # Enable this test to work with --runs_per_test
 if [[ -z "${TEST_RANDOM_SEED}" ]]; then

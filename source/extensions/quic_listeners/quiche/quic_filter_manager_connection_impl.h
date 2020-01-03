@@ -17,7 +17,7 @@ namespace Quic {
 // Act as a Network::Connection to HCM and a FilterManager to FilterFactoryCb.
 class QuicFilterManagerConnectionImpl : public Network::ConnectionImplBase {
 public:
-  QuicFilterManagerConnectionImpl(EnvoyQuicConnection* connection, Event::Dispatcher& dispatcher,
+  QuicFilterManagerConnectionImpl(EnvoyQuicConnection& connection, Event::Dispatcher& dispatcher,
                                   uint32_t send_buffer_limit);
 
   // Network::FilterManager
@@ -40,7 +40,6 @@ public:
   void noDelay(bool /*enable*/) override {
     // No-op. TCP_NODELAY doesn't apply to UDP.
   }
-  void setDelayedCloseTimeout(std::chrono::milliseconds timeout) override;
   void readDisable(bool /*disable*/) override { NOT_REACHED_GCOVR_EXCL_LINE; }
   void detectEarlyCloseWhenReadDisabled(bool /*value*/) override { NOT_REACHED_GCOVR_EXCL_LINE; }
   bool readEnabled() const override { return true; }
@@ -98,6 +97,11 @@ public:
   // streams, and run watermark check.
   void adjustBytesToSend(int64_t delta);
 
+  // Called after each write when a previous connection close call is postponed.
+  void maybeApplyDelayClosePolicy();
+
+  uint32_t bytesToSend() { return bytes_to_send_; }
+
 protected:
   // Propagate connection close to network_connection_callbacks_.
   void onConnectionCloseEvent(const quic::QuicConnectionCloseFrame& frame,
@@ -105,7 +109,9 @@ protected:
 
   void closeConnectionImmediately() override;
 
-  EnvoyQuicConnection* quic_connection_;
+  virtual bool hasDataToWrite() PURE;
+
+  EnvoyQuicConnection* quic_connection_{nullptr};
 
 private:
   // Called when aggregated buffered bytes across all the streams exceeds high watermark.

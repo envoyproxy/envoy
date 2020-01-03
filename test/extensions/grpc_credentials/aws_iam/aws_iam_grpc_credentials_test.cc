@@ -1,3 +1,4 @@
+#include "envoy/api/v2/core/grpc_service.pb.h"
 #include "envoy/config/grpc_credential/v2alpha/aws_iam.pb.h"
 
 #include "common/common/fmt.h"

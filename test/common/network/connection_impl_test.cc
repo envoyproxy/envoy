@@ -2,6 +2,7 @@
 #include <memory>
 #include <string>
 
+#include "envoy/api/v2/core/base.pb.h"
 #include "envoy/common/platform.h"
 
 #include "common/buffer/buffer_impl.h"
@@ -334,6 +335,11 @@ TEST_P(ConnectionImplTest, SocketOptions) {
       }));
 
   dispatcher_->run(Event::Dispatcher::RunType::Block);
+
+  // Assert that upstream connection gets the socket options
+  ASSERT(upstream_connection_ != nullptr);
+  ASSERT(upstream_connection_->socketOptions() != nullptr);
+  ASSERT(upstream_connection_->socketOptions()->front() == option);
 }
 
 TEST_P(ConnectionImplTest, SocketOptionsFailureTest) {
@@ -874,7 +880,7 @@ TEST_P(ConnectionImplTest, WatermarkFuzzing) {
     // If after the bytes are flushed upstream the number of bytes remaining is
     // below the low watermark and the bytes were not previously below the low
     // watermark, expect the callback for going below.
-    if (new_bytes_buffered < 5 && is_above) {
+    if (new_bytes_buffered <= 5 && is_above) {
       ENVOY_LOG_MISC(trace, "Expect onBelowWriteBufferLowWatermark");
       EXPECT_CALL(client_callbacks_, onBelowWriteBufferLowWatermark());
       is_below = true;

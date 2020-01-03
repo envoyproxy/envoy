@@ -5,13 +5,20 @@
 #include <string>
 #include <unordered_map>
 
+#include "envoy/api/v2/discovery.pb.h"
+#include "envoy/config/bootstrap/v2/bootstrap.pb.h"
 #include "envoy/event/dispatcher.h"
+#include "envoy/service/discovery/v2/rtds.pb.h"
+#include "envoy/service/discovery/v2/rtds.pb.validate.h"
+#include "envoy/service/runtime/v3alpha/rtds.pb.h"
 #include "envoy/thread_local/thread_local.h"
+#include "envoy/type/percent.pb.h"
 #include "envoy/type/percent.pb.validate.h"
 
 #include "common/common/assert.h"
 #include "common/common/fmt.h"
 #include "common/common/utility.h"
+#include "common/config/api_version.h"
 #include "common/filesystem/directory.h"
 #include "common/grpc/common.h"
 #include "common/protobuf/message_validator_impl.h"
@@ -24,9 +31,29 @@
 
 namespace Envoy {
 namespace Runtime {
+namespace {
+
+// Before ASSERTS were added to ensure runtime features were restricted to
+// booleans, several integer features were added. isLegacyFeatures exempts
+// existing integer features from the checks until they can be cleaned up.
+// This includes
+// envoy.reloadable_features.max_[request|response]_headers_count from
+// include/envoy/http/codec.h as well as the http2_protocol_options overrides in
+// source/common/http/http2/codec_impl.cc
+bool isLegacyFeature(absl::string_view feature) {
+  return absl::StartsWith(feature, "envoy.reloadable_features.http2_protocol_options.") ||
+         absl::StartsWith(feature, "envoy.reloadable_features.max_re");
+}
+
+bool isRuntimeFeature(absl::string_view feature) {
+  return RuntimeFeaturesDefaults::get().enabledByDefault(feature) ||
+         RuntimeFeaturesDefaults::get().existsButDisabled(feature);
+}
+
+} // namespace
 
 bool runtimeFeatureEnabled(absl::string_view feature) {
-  ASSERT(absl::StartsWith(feature, "envoy.reloadable_features"));
+  ASSERT(isRuntimeFeature(feature));
   if (Runtime::LoaderSingleton::getExisting()) {
     return Runtime::LoaderSingleton::getExisting()->threadsafeSnapshot()->runtimeFeatureEnabled(
         feature);
@@ -220,6 +247,7 @@ bool SnapshotImpl::featureEnabled(const std::string& key, uint64_t default_value
 }
 
 const std::string& SnapshotImpl::get(const std::string& key) const {
+  ASSERT(!isRuntimeFeature(key)); // Make sure runtime guarding is only used for getBoolean
   auto entry = values_.find(key);
   if (entry == values_.end()) {
     return EMPTY_STRING;
@@ -261,6 +289,7 @@ bool SnapshotImpl::featureEnabled(const std::string& key,
 }
 
 uint64_t SnapshotImpl::getInteger(const std::string& key, uint64_t default_value) const {
+  ASSERT(isLegacyFeature(key) || !isRuntimeFeature(key));
   auto entry = values_.find(key);
   if (entry == values_.end() || !entry->second.uint_value_) {
     return default_value;
@@ -270,6 +299,7 @@ uint64_t SnapshotImpl::getInteger(const std::string& key, uint64_t default_value
 }
 
 double SnapshotImpl::getDouble(const std::string& key, double default_value) const {
+  ASSERT(!isRuntimeFeature(key)); // Make sure runtime guarding is only used for getBoolean
   auto entry = values_.find(key);
   if (entry == values_.end() || !entry->second.double_value_) {
     return default_value;
@@ -522,7 +552,7 @@ RtdsSubscription::RtdsSubscription(
     : parent_(parent), config_source_(rtds_layer.rtds_config()), store_(store),
       resource_name_(rtds_layer.name()),
       init_target_("RTDS " + resource_name_, [this]() { start(); }),
-      validation_visitor_(validation_visitor) {}
+      validation_visitor_(validation_visitor), xds_api_version_(config_source_.xds_api_version()) {}
 
 void RtdsSubscription::onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
                                       const std::string&) {
@@ -561,9 +591,7 @@ void RtdsSubscription::start() {
   // cluster manager resources are not available in the constructor when
   // instantiated in the server instance.
   subscription_ = parent_.cm_->subscriptionFactory().subscriptionFromConfigSource(
-      config_source_,
-      Grpc::Common::typeUrl(envoy::service::discovery::v2::Runtime().GetDescriptor()->full_name()),
-      store_, *this);
+      config_source_, loadTypeUrl(), store_, *this);
   subscription_->start({resource_name_});
 }
 
@@ -572,6 +600,21 @@ void RtdsSubscription::validateUpdateSize(uint32_t num_resources) {
     init_target_.ready();
     throw EnvoyException(fmt::format("Unexpected RTDS resource length: {}", num_resources));
     // (would be a return false here)
+  }
+}
+
+std::string RtdsSubscription::loadTypeUrl() {
+  switch (xds_api_version_) {
+  // automatically set api version as V2
+  case envoy::api::v2::core::ConfigSource::AUTO:
+  case envoy::api::v2::core::ConfigSource::V2:
+    return Grpc::Common::typeUrl(
+        API_NO_BOOST(envoy::service::discovery::v2::Runtime().GetDescriptor()->full_name()));
+  case envoy::api::v2::core::ConfigSource::V3ALPHA:
+    return Grpc::Common::typeUrl(
+        API_NO_BOOST(envoy::service::runtime::v3alpha::Runtime().GetDescriptor()->full_name()));
+  default:
+    throw EnvoyException(fmt::format("type {} is not supported", xds_api_version_));
   }
 }
 

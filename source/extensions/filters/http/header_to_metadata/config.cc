@@ -2,6 +2,7 @@
 
 #include <string>
 
+#include "envoy/config/filter/http/header_to_metadata/v2/header_to_metadata.pb.h"
 #include "envoy/config/filter/http/header_to_metadata/v2/header_to_metadata.pb.validate.h"
 #include "envoy/registry/registry.h"
 

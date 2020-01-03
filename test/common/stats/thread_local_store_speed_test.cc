@@ -1,6 +1,8 @@
 // Note: this should be run with --compilation_mode=opt, and would benefit from a
 // quiescent system with disabled cstate power management.
 
+#include "envoy/config/metrics/v2/stats.pb.h"
+
 #include "common/common/logger.h"
 #include "common/common/thread.h"
 #include "common/event/dispatcher_impl.h"

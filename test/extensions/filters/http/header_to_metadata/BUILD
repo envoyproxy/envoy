@@ -19,6 +19,7 @@ envoy_extension_cc_test(
         "//source/common/common:base64_lib",
         "//source/extensions/filters/http/header_to_metadata:header_to_metadata_filter_lib",
         "//test/mocks/server:server_mocks",
+        "@envoy_api//envoy/config/filter/http/header_to_metadata/v2:pkg_cc_proto",
     ],
 )
 

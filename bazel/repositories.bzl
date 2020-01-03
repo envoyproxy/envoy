@@ -1,4 +1,5 @@
 load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
+load(":dev_binding.bzl", "envoy_dev_binding")
 load(":genrule_repository.bzl", "genrule_repository")
 load("@envoy_api//bazel:envoy_http_archive.bzl", "envoy_http_archive")
 load(":repository_locations.bzl", "REPOSITORY_LOCATIONS")
@@ -90,6 +91,9 @@ def _go_deps(skip_targets):
         _repository_impl("bazel_gazelle")
 
 def envoy_dependencies(skip_targets = []):
+    # Setup Envoy developer tools.
+    envoy_dev_binding()
+
     # Treat Envoy's overall build config as an external repo, so projects that
     # build Envoy as a subcomponent can easily override the config.
     if "envoy_build_config" not in native.existing_rules().keys():
@@ -97,7 +101,6 @@ def envoy_dependencies(skip_targets = []):
 
     # Setup external Bazel rules
     _foreign_cc_dependencies()
-    _rules_proto_dependencies()
 
     # Binding to an alias pointing to the selected version of BoringSSL:
     # - BoringSSL FIPS from @boringssl_fips//:ssl,
@@ -509,6 +512,7 @@ def _com_google_absl():
     )
 
 def _com_google_protobuf():
+    _repository_impl("rules_python")
     _repository_impl(
         "com_google_protobuf",
         patches = ["@envoy//bazel:protobuf.patch"],
@@ -620,7 +624,10 @@ def _com_googlesource_quiche():
         genrule_cmd_file = "@envoy//bazel/external:quiche.genrule_cmd",
         build_file = "@envoy//bazel/external:quiche.BUILD",
     )
-
+    native.bind(
+        name = "quiche_common_platform",
+        actual = "@com_googlesource_quiche//:quiche_common_platform",
+    )
     native.bind(
         name = "quiche_http2_platform",
         actual = "@com_googlesource_quiche//:http2_platform",
@@ -735,10 +742,6 @@ def _com_github_gperftools_gperftools():
 
 def _foreign_cc_dependencies():
     _repository_impl("rules_foreign_cc")
-
-def _rules_proto_dependencies():
-    _repository_impl("rules_proto")
-    _repository_impl("rules_python")
 
 def _is_linux(ctxt):
     return ctxt.os.name == "linux"

@@ -1,6 +1,7 @@
 #include <fstream>
 
-#include "envoy/config/bootstrap/v2/bootstrap.pb.validate.h"
+#include "envoy/api/v2/core/address.pb.h"
+#include "envoy/config/bootstrap/v2/bootstrap.pb.h"
 
 #include "common/network/address_impl.h"
 #include "common/thread_local/thread_local_impl.h"
@@ -51,6 +52,11 @@ makeHermeticPathsAndPorts(Fuzz::PerTestEnvironment& test_env,
     }
   }
   for (auto& cluster : *output.mutable_static_resources()->mutable_clusters()) {
+    for (auto& health_check : *cluster.mutable_health_checks()) {
+      // TODO(asraa): QUIC is not enabled in production code yet, so remove references for HTTP3.
+      // Tracked at https://github.com/envoyproxy/envoy/issues/9513.
+      health_check.mutable_http_health_check()->clear_codec_client_type();
+    }
     for (auto& host : *cluster.mutable_hosts()) {
       makePortHermetic(test_env, host);
     }

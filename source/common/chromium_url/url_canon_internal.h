@@ -112,17 +112,6 @@ inline void AppendEscapedChar(UINCHAR ch, CanonOutputT<OUTCHAR>* output) {
 
 // UTF-8 functions ------------------------------------------------------------
 
-// Reads one character in UTF-8 starting at |*begin| in |str| and places
-// the decoded value into |*code_point|. If the character is valid, we will
-// return true. If invalid, we'll return false and put the
-// kUnicodeReplacementCharacter into |*code_point|.
-//
-// |*begin| will be updated to point to the last character consumed so it
-// can be incremented in a loop and will be ready for the next character.
-// (for a single-byte ASCII character, it will not be changed).
-COMPONENT_EXPORT(URL)
-bool ReadUTFChar(const char* str, int* begin, int length, unsigned* code_point_out);
-
 // Generic To-UTF-8 converter. This will call the given append method for each
 // character that should be appended, with the given output method. Wrappers
 // are provided below for escaped and non-escaped versions of this.
@@ -174,37 +163,6 @@ inline void AppendUTF8Value(unsigned char_value, CanonOutput* output) {
 // it is appending is valid to append.
 inline void AppendUTF8EscapedValue(unsigned char_value, CanonOutput* output) {
   DoAppendUTF8<CanonOutput, AppendEscapedChar>(char_value, output);
-}
-
-// Escaping functions ---------------------------------------------------------
-
-// Writes the given character to the output as UTF-8, escaped. Call this
-// function only when the input is wide. Returns true on success. Failure
-// means there was some problem with the encoding, we'll still try to
-// update the |*begin| pointer and add a placeholder character to the
-// output so processing can continue.
-//
-// We will append the character starting at ch[begin] with the buffer ch
-// being |length|. |*begin| will be updated to point to the last character
-// consumed (we may consume more than one for UTF-16) so that if called in
-// a loop, incrementing the pointer will move to the next character.
-//
-// Every single output character will be escaped. This means that if you
-// give it an ASCII character as input, it will be escaped. Some code uses
-// this when it knows that a character is invalid according to its rules
-// for validity. If you don't want escaping for ASCII characters, you will
-// have to filter them out prior to calling this function.
-//
-// Assumes that ch[begin] is within range in the array, but does not assume
-// that any following characters are.
-inline bool AppendUTF8EscapedChar(const char* str, int* begin, int length, CanonOutput* output) {
-  // ReadUTF8Char will handle invalid characters for us and give us the
-  // kUnicodeReplacementCharacter, so we don't have to do special checking
-  // after failure, just pass through the failure to the caller.
-  unsigned ch;
-  bool success = ReadUTFChar(str, begin, length, &ch);
-  AppendUTF8EscapedValue(ch, output);
-  return success;
 }
 
 // Given a '%' character at |*begin| in the string |spec|, this will decode

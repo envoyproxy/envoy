@@ -2,6 +2,8 @@
 
 #include <string>
 
+#include "envoy/api/v2/core/config_source.pb.h"
+#include "envoy/api/v2/discovery.pb.h"
 #include "envoy/api/v2/srds.pb.h"
 #include "envoy/common/callback.h"
 #include "envoy/config/filter/network/http_connection_manager/v2/http_connection_manager.pb.h"
@@ -105,7 +107,7 @@ public:
   const ScopedRouteMap& scopedRouteMap() const { return scoped_route_map_; }
 
 private:
-  // A helper class that takes care the life cycle management of a RDS route provider and the
+  // A helper class that takes care of the life cycle management of a RDS route provider and the
   // update callback handle.
   struct RdsRouteConfigProviderHelper {
     RdsRouteConfigProviderHelper(
@@ -117,7 +119,7 @@ private:
 
     ScopedRdsConfigSubscription& parent_;
     std::string scope_name_;
-    std::unique_ptr<RdsRouteConfigProviderImpl> route_provider_;
+    std::shared_ptr<RdsRouteConfigProviderImpl> route_provider_;
     // This handle_ is owned by the route config provider's RDS subscription, when the helper
     // destructs, the handle is deleted as well.
     Common::CallbackHandle* rds_update_callback_handle_;
@@ -130,9 +132,11 @@ private:
                          Init::Manager& init_manager, const std::string& version_info,
                          std::vector<std::string>& exception_msgs);
   // Removes given scopes from the managed set of scopes.
-  // Returns true if any scope updated, false otherwise.
-  bool removeScopes(const Protobuf::RepeatedPtrField<std::string>& scope_names,
-                    const std::string& version_info);
+  // Returns a list of to be removed helpers which is temporally held in the onConfigUpdate method,
+  // to make sure new scopes sharing the same RDS source configs could reuse the subscriptions.
+  std::list<std::unique_ptr<RdsRouteConfigProviderHelper>>
+  removeScopes(const Protobuf::RepeatedPtrField<std::string>& scope_names,
+               const std::string& version_info);
 
   // Envoy::Config::DeltaConfigSubscriptionInstance
   void start() override { subscription_->start({}); }
@@ -156,6 +160,7 @@ private:
   std::string resourceName(const ProtobufWkt::Any& resource) override {
     return MessageUtil::anyConvert<envoy::api::v2::ScopedRouteConfiguration>(resource).name();
   }
+  std::string loadTypeUrl();
   // Propagate RDS updates to ScopeConfigImpl in workers.
   void onRdsConfigUpdate(const std::string& scope_name,
                          RdsRouteConfigSubscription& rds_subscription);
@@ -179,6 +184,7 @@ private:
   ProtobufMessage::ValidationVisitor& validation_visitor_;
   const std::string stat_prefix_;
   RouteConfigProviderManager& route_config_provider_manager_;
+  envoy::api::v2::core::ConfigSource::XdsApiVersion xds_api_version_;
 };
 
 using ScopedRdsConfigSubscriptionSharedPtr = std::shared_ptr<ScopedRdsConfigSubscription>;

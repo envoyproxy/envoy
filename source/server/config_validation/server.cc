@@ -3,7 +3,6 @@
 #include <memory>
 
 #include "envoy/config/bootstrap/v2/bootstrap.pb.h"
-#include "envoy/config/bootstrap/v2/bootstrap.pb.validate.h"
 
 #include "common/common/utility.h"
 #include "common/common/version.h"

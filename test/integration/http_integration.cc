@@ -8,6 +8,7 @@
 #include <vector>
 
 #include "envoy/buffer/buffer.h"
+#include "envoy/config/filter/network/http_connection_manager/v2/http_connection_manager.pb.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/http/header_map.h"
 #include "envoy/network/address.h"
@@ -32,6 +33,7 @@
 #include "test/test_common/network_utility.h"
 #include "test/test_common/registry.h"
 
+#include "absl/time/time.h"
 #include "gtest/gtest.h"
 
 namespace Envoy {
@@ -46,6 +48,9 @@ typeToCodecType(Http::CodecClient::Type type) {
   case Http::CodecClient::Type::HTTP2:
     return envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager::
         HTTP2;
+  case Http::CodecClient::Type::HTTP3:
+    return envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager::
+        HTTP3;
   default:
     RELEASE_ASSERT(0, "");
   }
@@ -180,6 +185,13 @@ void IntegrationCodecClient::ConnectionCallbacks::onEvent(Network::ConnectionEve
     parent_.disconnected_ = true;
     parent_.connection_->dispatcher().exit();
   } else {
+    if (parent_.type() == CodecClient::Type::HTTP3 && !parent_.connected_) {
+      // Before handshake gets established, any connection failure should exit the loop. I.e. a QUIC
+      // connection may fail of INVALID_VERSION if both this client doesn't support any of the
+      // versions the server advertised before handshake established. In this case the connection is
+      // closed locally and this is in a blocking event loop.
+      parent_.connection_->dispatcher().exit();
+    }
     parent_.disconnected_ = true;
   }
 }
@@ -194,6 +206,7 @@ HttpIntegrationTest::makeRawHttpConnection(Network::ClientConnectionPtr&& conn) 
   cluster->max_response_headers_count_ = 200;
   cluster->http2_settings_.allow_connect_ = true;
   cluster->http2_settings_.allow_metadata_ = true;
+  cluster->http1_settings_.enable_trailers_ = true;
   Upstream::HostDescriptionConstSharedPtr host_description{Upstream::makeTestHostDescription(
       cluster, fmt::format("tcp://{}:80", Network::Test::getLoopbackAddressUrlString(version_)))};
   return std::make_unique<IntegrationCodecClient>(*dispatcher_, std::move(conn), host_description,
@@ -203,7 +216,7 @@ HttpIntegrationTest::makeRawHttpConnection(Network::ClientConnectionPtr&& conn) 
 IntegrationCodecClientPtr
 HttpIntegrationTest::makeHttpConnection(Network::ClientConnectionPtr&& conn) {
   auto codec = makeRawHttpConnection(std::move(conn));
-  EXPECT_TRUE(codec->connected());
+  EXPECT_TRUE(codec->connected()) << codec->connection()->transportFailureReason();
   return codec;
 }
 
@@ -230,9 +243,9 @@ HttpIntegrationTest::HttpIntegrationTest(Http::CodecClient::Type downstream_prot
   config_helper_.setClientCodec(typeToCodecType(downstream_protocol_));
 }
 
-void HttpIntegrationTest::useAccessLog() {
+void HttpIntegrationTest::useAccessLog(absl::string_view format) {
   access_log_name_ = TestEnvironment::temporaryPath(TestUtility::uniqueFilename());
-  ASSERT_TRUE(config_helper_.setAccessLog(access_log_name_));
+  ASSERT_TRUE(config_helper_.setAccessLog(access_log_name_, format));
 }
 
 HttpIntegrationTest::~HttpIntegrationTest() {
@@ -248,7 +261,7 @@ std::string HttpIntegrationTest::waitForAccessLog(const std::string& filename) {
     if (contents.length() > 0) {
       return contents;
     }
-    usleep(1000);
+    absl::SleepFor(absl::Milliseconds(1));
   }
   RELEASE_ASSERT(0, "Timed out waiting for access log");
   return "";
@@ -257,6 +270,23 @@ std::string HttpIntegrationTest::waitForAccessLog(const std::string& filename) {
 void HttpIntegrationTest::setDownstreamProtocol(Http::CodecClient::Type downstream_protocol) {
   downstream_protocol_ = downstream_protocol;
   config_helper_.setClientCodec(typeToCodecType(downstream_protocol_));
+}
+
+ConfigHelper::HttpModifierFunction HttpIntegrationTest::setEnableDownstreamTrailersHttp1() {
+  return
+      [](envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager& hcm) {
+        hcm.mutable_http_protocol_options()->set_enable_trailers(true);
+      };
+}
+
+ConfigHelper::ConfigModifierFunction HttpIntegrationTest::setEnableUpstreamTrailersHttp1() {
+  return [&](envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
+    RELEASE_ASSERT(bootstrap.mutable_static_resources()->clusters_size() == 1, "");
+    if (fake_upstreams_[0]->httpType() == FakeHttpConnection::Type::HTTP1) {
+      auto* cluster = bootstrap.mutable_static_resources()->mutable_clusters(0);
+      cluster->mutable_http_protocol_options()->set_enable_trailers(true);
+    }
+  };
 }
 
 IntegrationStreamDecoderPtr HttpIntegrationTest::sendRequestAndWaitForResponse(
@@ -532,8 +562,8 @@ void HttpIntegrationTest::testRouterDownstreamDisconnectBeforeRequestComplete(
 
 void HttpIntegrationTest::testRouterDownstreamDisconnectBeforeResponseComplete(
     ConnectionCreationFunction* create_connection) {
-#ifdef __APPLE__
-  // Skip this test on macOS: we can't detect the early close on macOS, and we
+#if defined(__APPLE__) || defined(WIN32)
+  // Skip this test on OS/X + Windows: we can't detect the early close, and we
   // won't clean up the upstream connection until it times out. See #4294.
   if (downstream_protocol_ == Http::CodecClient::Type::HTTP1) {
     return;
@@ -903,6 +933,7 @@ void HttpIntegrationTest::testLargeRequestHeaders(uint32_t size, uint32_t count,
 
   Http::TestHeaderMapImpl big_headers{
       {":method", "GET"}, {":path", "/test/long/url"}, {":scheme", "http"}, {":authority", "host"}};
+
   // Already added four headers.
   for (unsigned int i = 0; i < count; i++) {
     big_headers.addCopy(std::to_string(i), std::string(size * 1024, 'a'));
@@ -953,13 +984,18 @@ void HttpIntegrationTest::testLargeRequestTrailers(uint32_t size, uint32_t max_s
   codec_client_->sendData(*request_encoder_, 10, false);
   codec_client_->sendTrailers(*request_encoder_, request_trailers);
 
-  if (size >= max_size && downstream_protocol_ == Http::CodecClient::Type::HTTP2) {
-    // For HTTP/2, expect a stream reset when the size of the trailers is larger than the maximum
-    // limit.
-    response->waitForReset();
-    codec_client_->close();
-    EXPECT_FALSE(response->complete());
-
+  if (size >= max_size) {
+    if (downstream_protocol_ == Http::CodecClient::Type::HTTP1) {
+      codec_client_->waitForDisconnect();
+      EXPECT_TRUE(response->complete());
+      EXPECT_EQ("431", response->headers().Status()->value().getStringView());
+    } else {
+      // Expect a stream reset when the size of the trailers is larger than the maximum
+      // limit.
+      response->waitForReset();
+      codec_client_->close();
+      EXPECT_FALSE(response->complete());
+    }
   } else {
     waitForNextUpstreamRequest();
     upstream_request_->encodeHeaders(default_response_headers_, true);
@@ -969,6 +1005,8 @@ void HttpIntegrationTest::testLargeRequestTrailers(uint32_t size, uint32_t max_s
 }
 
 void HttpIntegrationTest::testManyRequestHeaders(std::chrono::milliseconds time) {
+  // This test uses an Http::HeaderMapImpl instead of an Http::TestHeaderMapImpl to avoid
+  // time-consuming asserts when using a large number of headers.
   max_request_headers_kb_ = 96;
   max_request_headers_count_ = 20005;
 
@@ -980,11 +1018,13 @@ void HttpIntegrationTest::testManyRequestHeaders(std::chrono::milliseconds time)
             max_request_headers_count_);
       });
 
-  Http::TestHeaderMapImpl big_headers{
-      {":method", "GET"}, {":path", "/test/long/url"}, {":scheme", "http"}, {":authority", "host"}};
+  Http::HeaderMapImpl big_headers{{Http::Headers::get().Method, "GET"},
+                                  {Http::Headers::get().Path, "/test/long/url"},
+                                  {Http::Headers::get().Scheme, "http"},
+                                  {Http::Headers::get().Host, "host"}};
 
   for (int i = 0; i < 20000; i++) {
-    big_headers.addCopy(std::to_string(i), std::string(0, 'a'));
+    big_headers.addCopy(Http::LowerCaseString(std::to_string(i)), std::string(0, 'a'));
   }
   initialize();
 
@@ -1039,7 +1079,8 @@ void HttpIntegrationTest::testDownstreamResetBeforeResponseComplete() {
   EXPECT_EQ(512U, response->body().size());
 }
 
-void HttpIntegrationTest::testTrailers(uint64_t request_size, uint64_t response_size) {
+void HttpIntegrationTest::testTrailers(uint64_t request_size, uint64_t response_size,
+                                       bool check_request, bool check_response) {
   Http::TestHeaderMapImpl request_trailers{{"request1", "trailer1"}, {"request2", "trailer2"}};
   Http::TestHeaderMapImpl response_trailers{{"response1", "trailer1"}, {"response2", "trailer2"}};
 
@@ -1062,15 +1103,19 @@ void HttpIntegrationTest::testTrailers(uint64_t request_size, uint64_t response_
 
   EXPECT_TRUE(upstream_request_->complete());
   EXPECT_EQ(request_size, upstream_request_->bodyLength());
-  if (fake_upstreams_[0]->httpType() == FakeHttpConnection::Type::HTTP2) {
+  if (check_request) {
     EXPECT_THAT(*upstream_request_->trailers(), HeaderMapEqualRef(&request_trailers));
+  } else {
+    EXPECT_EQ(upstream_request_->trailers(), nullptr);
   }
 
   EXPECT_TRUE(response->complete());
   EXPECT_EQ("200", response->headers().Status()->value().getStringView());
   EXPECT_EQ(response_size, response->body().size());
-  if (fake_upstreams_[0]->httpType() == FakeHttpConnection::Type::HTTP2) {
+  if (check_response) {
     EXPECT_THAT(*response->trailers(), HeaderMapEqualRef(&response_trailers));
+  } else {
+    EXPECT_EQ(response->trailers(), nullptr);
   }
 }
 

@@ -6,12 +6,12 @@
 #include <unordered_set>
 #include <vector>
 
-#include "envoy/api/v2/route/route.pb.h"
 #include "envoy/config/filter/http/fault/v2/fault.pb.h"
 #include "envoy/http/filter.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats_macros.h"
+#include "envoy/type/percent.pb.h"
 
 #include "common/buffer/watermark_buffer.h"
 #include "common/common/token_bucket_impl.h"

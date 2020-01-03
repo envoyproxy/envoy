@@ -5,6 +5,7 @@
 #include "envoy/api/api.h"
 #include "envoy/api/v2/auth/cert.pb.h"
 #include "envoy/api/v2/core/config_source.pb.h"
+#include "envoy/api/v2/discovery.pb.h"
 #include "envoy/config/subscription.h"
 #include "envoy/config/subscription_factory.h"
 #include "envoy/event/dispatcher.h"
@@ -61,6 +62,7 @@ protected:
   std::string resourceName(const ProtobufWkt::Any& resource) override {
     return MessageUtil::anyConvert<envoy::api::v2::auth::Secret>(resource).name();
   }
+  std::string loadTypeUrl();
 
 private:
   void validateUpdateSize(int num_resources);
@@ -78,6 +80,7 @@ private:
   Config::SubscriptionFactory& subscription_factory_;
   TimeSource& time_source_;
   SecretData secret_data_;
+  envoy::api::v2::core::ConfigSource::XdsApiVersion xds_api_version_;
 };
 
 class TlsCertificateSdsApi;

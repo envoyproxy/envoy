@@ -1,5 +1,7 @@
 #include "extensions/transport_sockets/tap/tap_config_impl.h"
 
+#include "envoy/data/tap/v2alpha/transport.pb.h"
+
 #include "common/common/assert.h"
 #include "common/network/utility.h"
 

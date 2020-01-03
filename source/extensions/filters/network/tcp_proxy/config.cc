@@ -1,5 +1,7 @@
 #include "extensions/filters/network/tcp_proxy/config.h"
 
+#include "envoy/config/filter/network/tcp_proxy/v2/tcp_proxy.pb.h"
+#include "envoy/config/filter/network/tcp_proxy/v2/tcp_proxy.pb.validate.h"
 #include "envoy/registry/registry.h"
 
 #include "common/tcp_proxy/tcp_proxy.h"

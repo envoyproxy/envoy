@@ -2,7 +2,9 @@
 #include <memory>
 #include <string>
 
+#include "envoy/api/v2/listener/listener.pb.h"
 #include "envoy/common/platform.h"
+#include "envoy/config/bootstrap/v2/bootstrap.pb.h"
 
 #include "common/common/fmt.h"
 #include "common/protobuf/utility.h"

@@ -1,7 +1,7 @@
 #pragma once
 
 #include <algorithm>
-#include <map>
+#include <functional>
 #include <string>
 #include <vector>
 
@@ -23,27 +23,37 @@ template <class Base> class FactoryRegistry;
 template <class T, class Base> class RegisterFactory;
 
 /**
- * Helper class to call `registeredNames` for a specialized
- * FactoryRegistry.
+ * FactoryRegistryProxy is a proxy object that provides access to the
+ * static methods of a strongly-typed factory registry.
  */
-class BaseFactoryCategoryNames {
+class FactoryRegistryProxy {
 public:
-  virtual ~BaseFactoryCategoryNames() = default;
+  virtual ~FactoryRegistryProxy() = default;
   virtual std::vector<absl::string_view> registeredNames() const PURE;
+  virtual bool disableFactory(absl::string_view) PURE;
 };
 
-template <class Base> class FactoryCategoryNames : public BaseFactoryCategoryNames {
+template <class Base> class FactoryRegistryProxyImpl : public FactoryRegistryProxy {
 public:
   using FactoryRegistry = Envoy::Registry::FactoryRegistry<Base>;
 
   std::vector<absl::string_view> registeredNames() const override {
     return FactoryRegistry::registeredNames();
   }
+
+  bool disableFactory(absl::string_view name) override {
+    return FactoryRegistry::disableFactory(name);
+  }
 };
 
+/**
+ * BaseFactoryCategoryRegistry holds the static factory map for
+ * FactoryCategoryRegistry, ensuring that friends of that class
+ * cannot get non-const access to it.
+ */
 class BaseFactoryCategoryRegistry {
 protected:
-  using MapType = std::map<std::string, BaseFactoryCategoryNames*>;
+  using MapType = absl::flat_hash_map<std::string, FactoryRegistryProxy*>;
 
   static MapType& factories() {
     static auto* factories = new MapType();
@@ -60,8 +70,6 @@ protected:
  */
 class FactoryCategoryRegistry : public BaseFactoryCategoryRegistry {
 public:
-  using MapType = BaseFactoryCategoryRegistry::MapType;
-
   /**
    * @return a read-only reference to the map of registered factory
    * registries.
@@ -71,8 +79,18 @@ public:
   /**
    * @return whether the given category name is already registered.
    */
-  static bool isRegistered(const std::string& category) {
+  static bool isRegistered(absl::string_view category) {
     return factories().find(category) != factories().end();
+  }
+
+  static bool disableFactory(absl::string_view category, absl::string_view name) {
+    auto registry = factories().find(category);
+
+    if (registry != factories().end()) {
+      return registry->second->disableFactory(name);
+    }
+
+    return false;
   }
 
 private:
@@ -80,8 +98,7 @@ private:
   // This enforces correct use of the registration machinery.
   template <class T, class Base> friend class RegisterFactory;
 
-  static void registerCategory(const std::string& category,
-                               BaseFactoryCategoryNames* factoryNames) {
+  static void registerCategory(const std::string& category, FactoryRegistryProxy* factoryNames) {
     auto result = factories().emplace(std::make_pair(category, factoryNames));
     RELEASE_ASSERT(result.second == true,
                    fmt::format("Double registration for category: '{}'", category));
@@ -117,7 +134,10 @@ public:
     ret.reserve(factories().size());
 
     for (const auto& factory : factories()) {
-      ret.push_back(factory.first);
+      // Only publish the name of factories that have not been disabled.
+      if (factory.second) {
+        ret.push_back(factory.first);
+      }
     }
 
     std::sort(ret.begin(), ret.end());
@@ -153,15 +173,54 @@ public:
   }
 
   /**
+   * Permanently disables the named factory by setting the corresponding
+   * factory pointer to null. If the factory is registered under multiple
+   * (deprecated) names, all the possible names are disabled.
+   */
+  static bool disableFactory(absl::string_view name) {
+    const auto disable = [](absl::string_view name) -> bool {
+      auto it = factories().find(name);
+      if (it != factories().end()) {
+        it->second = nullptr;
+        return true;
+      }
+      return false;
+    };
+
+    // First, find the canonical name for this factory.
+    absl::string_view canonicalName = canonicalFactoryName(name);
+
+    // Next, disable the factory by all its deprecated names.
+    for (const auto& entry : deprecatedFactoryNames()) {
+      if (entry.second == canonicalName) {
+        disable(entry.first);
+      }
+    }
+
+    // Finally, disable the factory by its canonical name.
+    return disable(canonicalName);
+  }
+
+  /**
    * Gets a factory by name. If the name isn't found in the registry, returns nullptr.
    */
   static Base* getFactory(absl::string_view name) {
-    checkDeprecated(name);
     auto it = factories().find(name);
     if (it == factories().end()) {
       return nullptr;
     }
+
+    checkDeprecated(name);
     return it->second;
+  }
+
+  /**
+   * @return the canonical name of the factory. If the given name is a
+   * deprecated factory name, the canonical name is returned instead.
+   */
+  static absl::string_view canonicalFactoryName(absl::string_view name) {
+    const auto it = deprecatedFactoryNames().find(name);
+    return (it == deprecatedFactoryNames().end()) ? name : it->second;
   }
 
   static void checkDeprecated(absl::string_view name) {
@@ -232,7 +291,8 @@ public:
     // multiple attempts to register the same category and can't detect
     // duplicate categories.
     if (!FactoryCategoryRegistry::isRegistered(Base::category())) {
-      FactoryCategoryRegistry::registerCategory(Base::category(), new FactoryCategoryNames<Base>());
+      FactoryCategoryRegistry::registerCategory(Base::category(),
+                                                new FactoryRegistryProxyImpl<Base>());
     }
   }
 
@@ -253,7 +313,8 @@ public:
     }
 
     if (!FactoryCategoryRegistry::isRegistered(Base::category())) {
-      FactoryCategoryRegistry::registerCategory(Base::category(), new FactoryCategoryNames<Base>());
+      FactoryCategoryRegistry::registerCategory(Base::category(),
+                                                new FactoryRegistryProxyImpl<Base>());
     }
   }
 

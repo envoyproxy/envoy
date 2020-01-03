@@ -1,4 +1,5 @@
 #include "envoy/common/exception.h"
+#include "envoy/type/matcher/regex.pb.h"
 
 #include "common/common/regex.h"
 
@@ -50,8 +51,13 @@ TEST(Utility, ParseRegex) {
     envoy::type::matcher::RegexMatcher matcher;
     matcher.mutable_google_re2()->mutable_max_program_size()->set_value(1);
     matcher.set_regex("/asdf/.*");
+#ifndef GTEST_USES_SIMPLE_RE
     EXPECT_THROW_WITH_REGEX(Utility::parseRegex(matcher), EnvoyException,
                             "RE2 program size of [0-9]+ > max program size of 1\\.");
+#else
+    EXPECT_THROW_WITH_REGEX(Utility::parseRegex(matcher), EnvoyException,
+                            "RE2 program size of \\d+ > max program size of 1\\.");
+#endif
   }
 }
 

@@ -1,5 +1,7 @@
 #include "common/upstream/cluster_factory_impl.h"
 
+#include "envoy/api/v2/cds.pb.h"
+
 #include "common/http/utility.h"
 #include "common/network/address_impl.h"
 #include "common/network/resolver_impl.h"
@@ -84,7 +86,8 @@ ClusterFactoryImplBase::selectDnsResolver(const envoy::api::v2::Cluster& cluster
     for (const auto& resolver_addr : resolver_addrs) {
       resolvers.push_back(Network::Address::resolveProtoAddress(resolver_addr));
     }
-    return context.dispatcher().createDnsResolver(resolvers);
+    const bool use_tcp_for_dns_lookups = cluster.use_tcp_for_dns_lookups();
+    return context.dispatcher().createDnsResolver(resolvers, use_tcp_for_dns_lookups);
   }
 
   return context.dnsResolver();

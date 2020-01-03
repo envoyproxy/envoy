@@ -45,6 +45,14 @@ public:
 
 namespace Client {
 
+class MockPoolRequest : public PoolRequest {
+public:
+  MockPoolRequest();
+  ~MockPoolRequest() override;
+
+  MOCK_METHOD0(cancel, void());
+};
+
 class MockClient : public Client {
 public:
   MockClient();
@@ -68,34 +76,38 @@ public:
     }
   }
 
+  PoolRequest* makeRequest(const Common::Redis::RespValue& request,
+                           ClientCallbacks& callbacks) override {
+    client_callbacks_.push_back(&callbacks);
+    return makeRequest_(request, callbacks);
+  }
+
   MOCK_METHOD1(addConnectionCallbacks, void(Network::ConnectionCallbacks& callbacks));
   MOCK_METHOD0(active, bool());
   MOCK_METHOD0(close, void());
-  MOCK_METHOD2(makeRequest,
-               PoolRequest*(const Common::Redis::RespValue& request, PoolCallbacks& callbacks));
+  MOCK_METHOD2(makeRequest_,
+               PoolRequest*(const Common::Redis::RespValue& request, ClientCallbacks& callbacks));
   MOCK_METHOD1(initialize, void(const std::string& password));
 
   std::list<Network::ConnectionCallbacks*> callbacks_;
+  std::list<ClientCallbacks*> client_callbacks_;
 };
 
-class MockPoolRequest : public PoolRequest {
+class MockClientCallbacks : public ClientCallbacks {
 public:
-  MockPoolRequest();
-  ~MockPoolRequest() override;
-
-  MOCK_METHOD0(cancel, void());
-};
-
-class MockPoolCallbacks : public PoolCallbacks {
-public:
-  MockPoolCallbacks();
-  ~MockPoolCallbacks() override;
+  MockClientCallbacks();
+  ~MockClientCallbacks() override;
 
   void onResponse(Common::Redis::RespValuePtr&& value) override { onResponse_(value); }
+  bool onRedirection(Common::Redis::RespValuePtr&& value, const std::string& host_address,
+                     bool ask_redirection) override {
+    return onRedirection_(value, host_address, ask_redirection);
+  }
 
   MOCK_METHOD1(onResponse_, void(Common::Redis::RespValuePtr& value));
   MOCK_METHOD0(onFailure, void());
-  MOCK_METHOD1(onRedirection, bool(const Common::Redis::RespValue& value));
+  MOCK_METHOD3(onRedirection_, bool(Common::Redis::RespValuePtr& value,
+                                    const std::string& host_address, bool ask_redirection));
 };
 
 } // namespace Client

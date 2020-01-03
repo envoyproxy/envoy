@@ -1,5 +1,5 @@
-#include "envoy/api/v2/discovery.pb.h"
 #include "envoy/api/v2/rds.pb.h"
+#include "envoy/api/v2/route/route.pb.h"
 #include "envoy/grpc/status.h"
 #include "envoy/stats/scope.h"
 

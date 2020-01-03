@@ -1,5 +1,7 @@
 #include "extensions/access_loggers/grpc/grpc_access_log_impl.h"
 
+#include "envoy/config/accesslog/v2/als.pb.h"
+#include "envoy/data/accesslog/v2/accesslog.pb.h"
 #include "envoy/upstream/upstream.h"
 
 #include "common/common/assert.h"

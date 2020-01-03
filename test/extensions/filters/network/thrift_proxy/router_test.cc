@@ -1,7 +1,6 @@
 #include <memory>
 
-#include "envoy/config/filter/network/thrift_proxy/v2alpha1/route.pb.h"
-#include "envoy/config/filter/network/thrift_proxy/v2alpha1/route.pb.validate.h"
+#include "envoy/config/filter/thrift/router/v2alpha1/router.pb.validate.h"
 #include "envoy/tcp/conn_pool.h"
 
 #include "common/buffer/buffer_impl.h"
@@ -85,7 +84,7 @@ public:
     route_ = new NiceMock<MockRoute>();
     route_ptr_.reset(route_);
 
-    router_ = std::make_unique<Router>(context_.clusterManager());
+    router_ = std::make_unique<Router>(context_.clusterManager(), "test", context_.scope());
 
     EXPECT_EQ(nullptr, router_->downstreamConnection());
 
@@ -437,6 +436,7 @@ TEST_F(ThriftRouterTest, NoRoute) {
         EXPECT_TRUE(end_stream);
       }));
   EXPECT_EQ(FilterStatus::StopIteration, router_->messageBegin(metadata_));
+  EXPECT_EQ(1U, context_.scope().counter("test.route_missing").value());
 }
 
 TEST_F(ThriftRouterTest, NoCluster) {
@@ -455,6 +455,7 @@ TEST_F(ThriftRouterTest, NoCluster) {
         EXPECT_TRUE(end_stream);
       }));
   EXPECT_EQ(FilterStatus::StopIteration, router_->messageBegin(metadata_));
+  EXPECT_EQ(1U, context_.scope().counter("test.unknown_cluster").value());
 }
 
 TEST_F(ThriftRouterTest, ClusterMaintenanceMode) {
@@ -475,6 +476,7 @@ TEST_F(ThriftRouterTest, ClusterMaintenanceMode) {
         EXPECT_TRUE(end_stream);
       }));
   EXPECT_EQ(FilterStatus::StopIteration, router_->messageBegin(metadata_));
+  EXPECT_EQ(1U, context_.scope().counter("test.upstream_rq_maintenance_mode").value());
 }
 
 TEST_F(ThriftRouterTest, NoHealthyHosts) {
@@ -496,6 +498,7 @@ TEST_F(ThriftRouterTest, NoHealthyHosts) {
       }));
 
   EXPECT_EQ(FilterStatus::StopIteration, router_->messageBegin(metadata_));
+  EXPECT_EQ(1U, context_.scope().counter("test.no_healthy_upstream").value());
 }
 
 TEST_F(ThriftRouterTest, TruncatedResponse) {

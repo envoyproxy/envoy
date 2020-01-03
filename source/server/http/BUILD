@@ -62,6 +62,9 @@ envoy_cc_library(
         "//source/extensions/access_loggers/file:file_access_log_lib",
         "//source/server:drain_manager_lib",
         "@envoy_api//envoy/admin/v2alpha:pkg_cc_proto",
+        "@envoy_api//envoy/api/v2:pkg_cc_proto",
+        "@envoy_api//envoy/api/v2/core:pkg_cc_proto",
+        "@envoy_api//envoy/config/filter/network/http_connection_manager/v2:pkg_cc_proto",
     ],
 )
 

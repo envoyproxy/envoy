@@ -28,5 +28,9 @@ envoy_cc_mock(
         "//source/common/stats:fake_symbol_table_lib",
         "//test/mocks:common_lib",
         "//test/mocks/stats:stats_mocks",
+        "@envoy_api//envoy/api/v2:pkg_cc_proto",
+        "@envoy_api//envoy/api/v2/core:pkg_cc_proto",
+        "@envoy_api//envoy/config/filter/network/http_connection_manager/v2:pkg_cc_proto",
+        "@envoy_api//envoy/type:pkg_cc_proto",
     ],
 )

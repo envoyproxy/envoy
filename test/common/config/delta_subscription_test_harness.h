@@ -2,7 +2,12 @@
 
 #include <queue>
 
+#include "envoy/api/v2/core/base.pb.h"
+#include "envoy/api/v2/discovery.pb.h"
+#include "envoy/api/v2/eds.pb.h"
+
 #include "common/config/delta_subscription_impl.h"
+#include "common/config/version_converter.h"
 #include "common/grpc/common.h"
 
 #include "test/common/config/subscription_test_harness.h"
@@ -136,7 +141,7 @@ public:
         auto* resource = response->add_resources();
         resource->set_name(cluster);
         resource->set_version(version);
-        resource->mutable_resource()->PackFrom(*load_assignment);
+        resource->mutable_resource()->PackFrom(API_DOWNGRADE(*load_assignment));
       }
     }
     Protobuf::RepeatedPtrField<std::string> removed_resources;

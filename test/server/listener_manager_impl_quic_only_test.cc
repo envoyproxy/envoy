@@ -1,3 +1,6 @@
+#include "envoy/api/v2/core/base.pb.h"
+#include "envoy/api/v2/lds.pb.h"
+
 #include "extensions/quic_listeners/quiche/quic_transport_socket_factory.h"
 
 #include "test/server/listener_manager_impl_test.h"
@@ -36,6 +39,7 @@ filter_chains:
           verify_subject_alt_name:
           - localhost
           - 127.0.0.1
+reuse_port: true
 udp_listener_config:
   udp_listener_name: "quiche_quic_listener"
   )EOF",
@@ -45,10 +49,12 @@ udp_listener_config:
   EXPECT_CALL(server_.random_, uuid());
   expectCreateListenSocket(envoy::api::v2::core::SocketOption::STATE_PREBIND,
 #ifdef SO_RXQ_OVFL
-                           /* expected_num_options */ 2);
+                           /* expected_num_options */ 3, // SO_REUSEPORT is on as configured
 #else
-                           /* expected_num_options */ 1);
+                           /* expected_num_options */ 2,
 #endif
+                           /* expected_creation_params */ {true, false});
+
   expectSetsockopt(os_sys_calls_,
                    /* expected_sockopt_level */ IPPROTO_IP,
                    /* expected_sockopt_name */ ENVOY_IP_PKTINFO,
@@ -61,6 +67,12 @@ udp_listener_config:
                    /* expected_value */ 1,
                    /* expected_num_calls */ 1);
 #endif
+
+  expectSetsockopt(os_sys_calls_,
+                   /* expected_sockopt_level */ SOL_SOCKET,
+                   /* expected_sockopt_name */ SO_REUSEPORT,
+                   /* expected_value */ 1,
+                   /* expected_num_calls */ 1);
 
   manager_->addOrUpdateListener(listener_proto, "", true);
   EXPECT_EQ(1u, manager_->listeners().size());

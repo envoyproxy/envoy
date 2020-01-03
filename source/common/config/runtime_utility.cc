@@ -1,5 +1,7 @@
 #include "common/config/runtime_utility.h"
 
+#include "envoy/config/bootstrap/v2/bootstrap.pb.h"
+
 namespace Envoy {
 namespace Config {
 

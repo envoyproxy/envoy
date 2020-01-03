@@ -1,5 +1,7 @@
 #include <cstdlib>
 
+#include "envoy/api/v2/core/grpc_service.pb.h"
+
 #include "common/grpc/google_grpc_creds_impl.h"
 
 #include "test/common/grpc/utility.h"
@@ -35,13 +37,13 @@ TEST_F(CredsUtilityTest, GetChannelCredentials) {
   creds->mutable_local_credentials();
   EXPECT_NE(nullptr, CredsUtility::getChannelCredentials(config, *api_));
 
-  const char var_name[] = "GOOGLE_APPLICATION_CREDENTIALS";
-  EXPECT_EQ(nullptr, ::getenv(var_name));
-  const auto creds_path = TestEnvironment::runfilesPath("test/common/grpc/service_key.json");
-  ::setenv(var_name, creds_path.c_str(), 0);
+  const std::string var_name = "GOOGLE_APPLICATION_CREDENTIALS";
+  EXPECT_EQ(nullptr, ::getenv(var_name.c_str()));
+  const std::string creds_path = TestEnvironment::runfilesPath("test/common/grpc/service_key.json");
+  TestEnvironment::setEnvVar(var_name.c_str(), creds_path.c_str(), 0);
   creds->mutable_google_default();
   EXPECT_NE(nullptr, CredsUtility::getChannelCredentials(config, *api_));
-  ::unsetenv(var_name);
+  TestEnvironment::unsetEnvVar(var_name.c_str());
 }
 
 TEST_F(CredsUtilityTest, DefaultSslChannelCredentials) {
@@ -120,6 +122,15 @@ TEST_F(CredsUtilityTest, DefaultChannelCredentials) {
     }
     // Should be ignored..
     google_grpc->add_call_credentials()->mutable_from_plugin()->set_name("foo");
+    EXPECT_NE(nullptr, CredsUtility::defaultChannelCredentials(config, *api_));
+  }
+  {
+    envoy::api::v2::core::GrpcService config;
+    TestUtility::setTestSslGoogleGrpcConfig(config, true);
+    auto* sts_service = config.mutable_google_grpc()->add_call_credentials()->mutable_sts_service();
+    sts_service->set_token_exchange_service_uri("http://tokenexchangeservice.com");
+    sts_service->set_subject_token_path("/var/run/example_token");
+    sts_service->set_subject_token_type("urn:ietf:params:oauth:token-type:access_token");
     EXPECT_NE(nullptr, CredsUtility::defaultChannelCredentials(config, *api_));
   }
 }

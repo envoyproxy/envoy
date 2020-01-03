@@ -1,5 +1,7 @@
 #include "common/config/subscription_factory_impl.h"
 
+#include "envoy/api/v2/core/config_source.pb.h"
+
 #include "common/config/delta_subscription_impl.h"
 #include "common/config/filesystem_subscription_impl.h"
 #include "common/config/grpc_mux_subscription_impl.h"

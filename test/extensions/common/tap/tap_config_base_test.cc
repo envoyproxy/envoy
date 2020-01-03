@@ -1,5 +1,9 @@
 #include <vector>
 
+#include "envoy/data/tap/v2alpha/common.pb.h"
+#include "envoy/data/tap/v2alpha/wrapper.pb.h"
+#include "envoy/service/tap/v2alpha/common.pb.h"
+
 #include "common/buffer/buffer_impl.h"
 
 #include "extensions/common/tap/tap_config_base.h"

@@ -1,5 +1,8 @@
 #pragma once
 
+#include "envoy/api/v2/auth/cert.pb.h"
+#include "envoy/api/v2/core/base.pb.h"
+#include "envoy/api/v2/core/grpc_service.pb.h"
 #include "envoy/stats/scope.h"
 
 #include "common/api/api_impl.h"

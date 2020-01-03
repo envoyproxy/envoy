@@ -1,5 +1,6 @@
 #include "extensions/filters/http/grpc_http1_reverse_bridge/config.h"
 
+#include "envoy/config/filter/http/grpc_http1_reverse_bridge/v2alpha1/config.pb.h"
 #include "envoy/config/filter/http/grpc_http1_reverse_bridge/v2alpha1/config.pb.validate.h"
 #include "envoy/registry/registry.h"
 

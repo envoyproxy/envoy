@@ -6,6 +6,7 @@
 #include <string>
 #include <unordered_map>
 
+#include "envoy/api/v2/cds.pb.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/stats/scope.h"
 #include "envoy/upstream/load_balancer.h"

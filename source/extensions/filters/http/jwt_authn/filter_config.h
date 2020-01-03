@@ -1,6 +1,7 @@
 #pragma once
 
 #include "envoy/api/api.h"
+#include "envoy/config/filter/http/jwt_authn/v2alpha/config.pb.h"
 #include "envoy/router/string_accessor.h"
 #include "envoy/server/filter_config.h"
 #include "envoy/stats/scope.h"
@@ -42,13 +43,10 @@ private:
 /**
  * All stats for the Jwt Authn filter. @see stats_macros.h
  */
-
-// clang-format off
 #define ALL_JWT_AUTHN_FILTER_STATS(COUNTER)                                                        \
   COUNTER(allowed)                                                                                 \
   COUNTER(cors_preflight_bypassed)                                                                 \
   COUNTER(denied)
-// clang-format on
 
 /**
  * Wrapper struct for jwt_authn filter stats. @see stats_macros.h
@@ -74,20 +72,17 @@ public:
     tls_->set([this](Event::Dispatcher&) -> ThreadLocal::ThreadLocalObjectSharedPtr {
       return std::make_shared<ThreadLocalCache>(proto_config_, time_source_, api_);
     });
-    extractor_ = Extractor::create(proto_config_);
 
     for (const auto& rule : proto_config_.rules()) {
-      rule_pairs_.emplace_back(
-          Matcher::create(rule),
-          Verifier::create(rule.requires(), proto_config_.providers(), *this, getExtractor()));
+      rule_pairs_.emplace_back(Matcher::create(rule),
+                               Verifier::create(rule.requires(), proto_config_.providers(), *this));
     }
 
     if (proto_config_.has_filter_state_rules()) {
       filter_state_name_ = proto_config_.filter_state_rules().name();
       for (const auto& it : proto_config_.filter_state_rules().requires()) {
         filter_state_verifiers_.emplace(
-            it.first,
-            Verifier::create(it.second, proto_config_.providers(), *this, getExtractor()));
+            it.first, Verifier::create(it.second, proto_config_.providers(), *this));
       }
     }
   }
@@ -99,9 +94,6 @@ public:
 
   Upstream::ClusterManager& cm() const { return cm_; }
   TimeSource& timeSource() const { return time_source_; }
-
-  // Get the token  extractor.
-  const Extractor& getExtractor() const { return *extractor_; }
 
   // Finds the matcher that matched the header
   virtual const Verifier* findVerifier(const Http::HeaderMap& headers,
@@ -125,10 +117,11 @@ public:
 
   // methods for AuthFactory interface. Factory method to help create authenticators.
   AuthenticatorPtr create(const ::google::jwt_verify::CheckAudience* check_audience,
-                          const absl::optional<std::string>& provider,
-                          bool allow_failed) const override {
-    return Authenticator::create(check_audience, provider, allow_failed, getCache().getJwksCache(),
-                                 cm(), Common::JwksFetcher::create, timeSource());
+                          const absl::optional<std::string>& provider, bool allow_failed,
+                          bool allow_missing) const override {
+    return Authenticator::create(check_audience, provider, allow_failed, allow_missing,
+                                 getCache().getJwksCache(), cm(), Common::JwksFetcher::create,
+                                 timeSource());
   }
 
   bool bypassCorsPreflightRequest() { return proto_config_.bypass_cors_preflight(); }
@@ -154,8 +147,6 @@ private:
   ThreadLocal::SlotPtr tls_;
   // the cluster manager object.
   Upstream::ClusterManager& cm_;
-  // The object to extract tokens.
-  ExtractorConstPtr extractor_;
   // The list of rule matchers.
   std::vector<MatcherVerifierPair> rule_pairs_;
   // The filter state name to lookup filter_state_rules.

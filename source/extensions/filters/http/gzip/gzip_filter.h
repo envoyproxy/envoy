@@ -28,20 +28,18 @@ namespace Gzip {
  * the user can measure the memory performance of the
  * compression.
  */
-// clang-format off
-#define ALL_GZIP_STATS(COUNTER)    \
-  COUNTER(compressed)              \
-  COUNTER(not_compressed)          \
-  COUNTER(no_accept_header)        \
-  COUNTER(header_identity)         \
-  COUNTER(header_gzip)             \
-  COUNTER(header_wildcard)         \
-  COUNTER(header_not_valid)        \
-  COUNTER(total_uncompressed_bytes)\
-  COUNTER(total_compressed_bytes)  \
-  COUNTER(content_length_too_small)\
-  COUNTER(not_compressed_etag)     \
-// clang-format on
+#define ALL_GZIP_STATS(COUNTER)                                                                    \
+  COUNTER(compressed)                                                                              \
+  COUNTER(not_compressed)                                                                          \
+  COUNTER(no_accept_header)                                                                        \
+  COUNTER(header_identity)                                                                         \
+  COUNTER(header_gzip)                                                                             \
+  COUNTER(header_wildcard)                                                                         \
+  COUNTER(header_not_valid)                                                                        \
+  COUNTER(total_uncompressed_bytes)                                                                \
+  COUNTER(total_compressed_bytes)                                                                  \
+  COUNTER(content_length_too_small)                                                                \
+  COUNTER(not_compressed_etag)
 
 /**
  * Struct definition for gzip stats. @see stats_macros.h
@@ -57,8 +55,7 @@ class GzipFilterConfig {
 
 public:
   GzipFilterConfig(const envoy::config::filter::http::gzip::v2::Gzip& gzip,
-                   const std::string& stats_prefix,
-                   Stats::Scope& scope, Runtime::Loader& runtime);
+                   const std::string& stats_prefix, Stats::Scope& scope, Runtime::Loader& runtime);
 
   Compressor::ZlibCompressorImpl::CompressionLevel compressionLevel() const {
     return compression_level_;

@@ -2,6 +2,7 @@
 
 #include <chrono>
 #include <cstdint>
+#include <functional>
 #include <memory>
 #include <string>
 
@@ -160,26 +161,28 @@ FilterUtility::finalTimeout(const RouteEntry& route, Http::HeaderMap& request_he
     // If present, use that value as route timeout and don't override
     // *x-envoy-expected-rq-timeout-ms* header. At this point *x-envoy-upstream-rq-timeout-ms*
     // header should have been sanitized by egress Envoy.
-    Http::HeaderEntry* header_expected_timeout_entry =
+    const Http::HeaderEntry* header_expected_timeout_entry =
         request_headers.EnvoyExpectedRequestTimeoutMs();
     if (header_expected_timeout_entry) {
       trySetGlobalTimeout(header_expected_timeout_entry, timeout);
     } else {
-      Http::HeaderEntry* header_timeout_entry = request_headers.EnvoyUpstreamRequestTimeoutMs();
+      const Http::HeaderEntry* header_timeout_entry =
+          request_headers.EnvoyUpstreamRequestTimeoutMs();
 
       if (trySetGlobalTimeout(header_timeout_entry, timeout)) {
         request_headers.removeEnvoyUpstreamRequestTimeoutMs();
       }
     }
   } else {
-    Http::HeaderEntry* header_timeout_entry = request_headers.EnvoyUpstreamRequestTimeoutMs();
+    const Http::HeaderEntry* header_timeout_entry = request_headers.EnvoyUpstreamRequestTimeoutMs();
     if (trySetGlobalTimeout(header_timeout_entry, timeout)) {
       request_headers.removeEnvoyUpstreamRequestTimeoutMs();
     }
   }
 
   // See if there is a per try/retry timeout. If it's >= global we just ignore it.
-  Http::HeaderEntry* per_try_timeout_entry = request_headers.EnvoyUpstreamRequestPerTryTimeoutMs();
+  const Http::HeaderEntry* per_try_timeout_entry =
+      request_headers.EnvoyUpstreamRequestPerTryTimeoutMs();
   if (per_try_timeout_entry) {
     if (absl::SimpleAtoi(per_try_timeout_entry->value().getStringView(), &header_timeout)) {
       timeout.per_try_timeout_ = std::chrono::milliseconds(header_timeout);
@@ -209,8 +212,7 @@ FilterUtility::finalTimeout(const RouteEntry& route, Http::HeaderMap& request_he
   // in grpc-timeout, ensuring that the upstream gRPC server is aware of the actual timeout.
   // If the expected timeout is 0 set no timeout, as Envoy treats 0 as infinite timeout.
   if (grpc_request && route.maxGrpcTimeout() && expected_timeout != 0) {
-    Grpc::Common::toGrpcTimeout(std::chrono::milliseconds(expected_timeout),
-                                request_headers.insertGrpcTimeout().value());
+    Grpc::Common::toGrpcTimeout(std::chrono::milliseconds(expected_timeout), request_headers);
   }
 
   return timeout;
@@ -233,7 +235,8 @@ FilterUtility::HedgingParams FilterUtility::finalHedgingParams(const RouteEntry&
   HedgingParams hedging_params;
   hedging_params.hedge_on_per_try_timeout_ = route.hedgePolicy().hedgeOnPerTryTimeout();
 
-  Http::HeaderEntry* hedge_on_per_try_timeout_entry = request_headers.EnvoyHedgeOnPerTryTimeout();
+  const Http::HeaderEntry* hedge_on_per_try_timeout_entry =
+      request_headers.EnvoyHedgeOnPerTryTimeout();
   if (hedge_on_per_try_timeout_entry) {
     if (hedge_on_per_try_timeout_entry->value() == "true") {
       hedging_params.hedge_on_per_try_timeout_ = true;
@@ -547,8 +550,15 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
   retry_state_ =
       createRetryState(route_entry_->retryPolicy(), headers, *cluster_, config_.runtime_,
                        config_.random_, callbacks_->dispatcher(), route_entry_->priority());
-  do_shadowing_ = FilterUtility::shouldShadow(route_entry_->shadowPolicy(), config_.runtime_,
-                                              callbacks_->streamId());
+
+  // Determine which shadow policies to use. It's possible that we don't do any shadowing due to
+  // runtime keys.
+  for (const auto& shadow_policy : route_entry_->shadowPolicies()) {
+    const auto& policy_ref = *shadow_policy;
+    if (FilterUtility::shouldShadow(policy_ref, config_.runtime_, callbacks_->streamId())) {
+      active_shadow_policies_.push_back(std::cref(policy_ref));
+    }
+  }
 
   ENVOY_STREAM_LOG(debug, "router decoding headers:\n{}", *callbacks_, headers);
 
@@ -591,14 +601,14 @@ Http::FilterDataStatus Filter::decodeData(Buffer::Instance& data, bool end_strea
   // try timeout timer is not started until onUpstreamComplete().
   ASSERT(upstream_requests_.size() == 1);
 
-  bool buffering = (retry_state_ && retry_state_->enabled()) || do_shadowing_;
+  bool buffering = (retry_state_ && retry_state_->enabled()) || !active_shadow_policies_.empty();
   if (buffering &&
       getLength(callbacks_->decodingBuffer()) + data.length() > retry_shadow_buffer_limit_) {
     // The request is larger than we should buffer. Give up on the retry/shadow
     cluster_->stats().retry_or_shadow_abandoned_.inc();
     retry_state_.reset();
     buffering = false;
-    do_shadowing_ = false;
+    active_shadow_policies_.clear();
   }
 
   if (buffering) {
@@ -673,22 +683,22 @@ void Filter::cleanup() {
 }
 
 void Filter::maybeDoShadowing() {
-  if (!do_shadowing_) {
-    return;
-  }
+  for (const auto& shadow_policy_wrapper : active_shadow_policies_) {
+    const auto& shadow_policy = shadow_policy_wrapper.get();
 
-  ASSERT(!route_entry_->shadowPolicy().cluster().empty());
-  Http::MessagePtr request(new Http::RequestMessageImpl(
-      Http::HeaderMapPtr{new Http::HeaderMapImpl(*downstream_headers_)}));
-  if (callbacks_->decodingBuffer()) {
-    request->body() = std::make_unique<Buffer::OwnedImpl>(*callbacks_->decodingBuffer());
-  }
-  if (downstream_trailers_) {
-    request->trailers(Http::HeaderMapPtr{new Http::HeaderMapImpl(*downstream_trailers_)});
-  }
+    ASSERT(!shadow_policy.cluster().empty());
+    Http::MessagePtr request(new Http::RequestMessageImpl(
+        Http::HeaderMapPtr{new Http::HeaderMapImpl(*downstream_headers_)}));
+    if (callbacks_->decodingBuffer()) {
+      request->body() = std::make_unique<Buffer::OwnedImpl>(*callbacks_->decodingBuffer());
+    }
+    if (downstream_trailers_) {
+      request->trailers(Http::HeaderMapPtr{new Http::HeaderMapImpl(*downstream_trailers_)});
+    }
 
-  config_.shadowWriter().shadow(route_entry_->shadowPolicy().cluster(), std::move(request),
-                                timeout_.global_timeout_);
+    config_.shadowWriter().shadow(shadow_policy.cluster(), std::move(request),
+                                  timeout_.global_timeout_);
+  }
 }
 
 void Filter::onRequestComplete() {
@@ -1389,15 +1399,6 @@ Filter::UpstreamRequest::~UpstreamRequest() {
 
   stream_info_.setUpstreamTiming(upstream_timing_);
   stream_info_.onRequestComplete();
-  // Prior to logging, refresh the byte size of the HeaderMaps.
-  // TODO(asraa): Remove this when entries in HeaderMap can no longer be modified by reference and
-  // HeaderMap holds an accurate internal byte size count.
-  if (upstream_headers_ != nullptr) {
-    upstream_headers_->refreshByteSize();
-  }
-  if (upstream_trailers_ != nullptr) {
-    upstream_trailers_->refreshByteSize();
-  }
   for (const auto& upstream_log : parent_.config_.upstream_logs_) {
     upstream_log->log(parent_.downstream_headers_, upstream_headers_.get(),
                       upstream_trailers_.get(), stream_info_);
@@ -1622,9 +1623,12 @@ void Filter::UpstreamRequest::onPoolReady(Http::StreamEncoder& request_encoder,
 
   host->outlierDetector().putResult(Upstream::Outlier::Result::LocalOriginConnectSuccess);
 
-  // TODO(ggreenway): set upstream local address in the StreamInfo.
   onUpstreamHostSelected(host);
   request_encoder.getStream().addCallbacks(*this);
+
+  stream_info_.setUpstreamLocalAddress(request_encoder.getStream().connectionLocalAddress());
+  parent_.callbacks_->streamInfo().setUpstreamLocalAddress(
+      request_encoder.getStream().connectionLocalAddress());
 
   stream_info_.setUpstreamSslConnection(info.downstreamSslConnection());
   parent_.callbacks_->streamInfo().setUpstreamSslConnection(info.downstreamSslConnection());
@@ -1639,7 +1643,7 @@ void Filter::UpstreamRequest::onPoolReady(Http::StreamEncoder& request_encoder,
   setRequestEncoder(request_encoder);
   calling_encode_headers_ = true;
   if (parent_.route_entry_->autoHostRewrite() && !host->hostname().empty()) {
-    parent_.downstream_headers_->Host()->value(host->hostname());
+    parent_.downstream_headers_->setHost(host->hostname());
   }
 
   if (span_ != nullptr) {

@@ -1090,6 +1090,25 @@ TEST_P(Http2CodecImplTest, LargeRequestHeadersAccepted) {
   request_encoder_->encodeHeaders(request_headers, false);
 }
 
+// This is the HTTP/2 variant of the HTTP/1 regression test for CVE-2019-18801.
+// Large method headers should not trigger ASSERTs or ASAN. The underlying issue
+// in CVE-2019-18801 only affected the HTTP/1 encoder, but we include a test
+// here for belt-and-braces. This also demonstrates that the HTTP/2 codec will
+// accept arbitrary :method headers, unlike the HTTP/1 codec (see
+// Http1ServerConnectionImplTest.RejectInvalidMethod for comparison).
+TEST_P(Http2CodecImplTest, LargeMethodRequestEncode) {
+  max_request_headers_kb_ = 80;
+  initialize();
+
+  const std::string long_method = std::string(79 * 1024, 'a');
+  TestHeaderMapImpl request_headers;
+  HttpTestUtility::addDefaultHeaders(request_headers);
+  request_headers.setReferenceKey(Headers::get().Method, long_method);
+  EXPECT_CALL(request_decoder_, decodeHeaders_(HeaderMapEqual(&request_headers), false));
+  EXPECT_CALL(server_stream_callbacks_, onResetStream(_, _)).Times(0);
+  request_encoder_->encodeHeaders(request_headers, false);
+}
+
 // Tests stream reset when the number of request headers exceeds the default maximum of 100.
 TEST_P(Http2CodecImplTest, ManyRequestHeadersInvokeResetStream) {
   initialize();
@@ -1143,19 +1162,17 @@ TEST_P(Http2CodecImplTest, LargeRequestHeadersAtLimitAccepted) {
 
   TestHeaderMapImpl request_headers;
   HttpTestUtility::addDefaultHeaders(request_headers);
-  // Refresh byte size after adding default inline headers by reference.
-  request_headers.refreshByteSize();
   std::string key = "big";
   uint32_t head_room = 77;
   uint32_t long_string_length =
-      codec_limit_kb * 1024 - request_headers.byteSize().value() - key.length() - head_room;
+      codec_limit_kb * 1024 - request_headers.byteSize() - key.length() - head_room;
   std::string long_string = std::string(long_string_length, 'q');
   request_headers.addCopy(key, long_string);
 
   // The amount of data sent to the codec is not equivalent to the size of the
   // request headers that Envoy computes, as the codec limits based on the
   // entire http2 frame. The exact head room needed (76) was found through iteration.
-  ASSERT_EQ(request_headers.byteSize().value() + head_room, codec_limit_kb * 1024);
+  ASSERT_EQ(request_headers.byteSize() + head_room, codec_limit_kb * 1024);
 
   EXPECT_CALL(request_decoder_, decodeHeaders_(_, _));
   request_encoder_->encodeHeaders(request_headers, true);

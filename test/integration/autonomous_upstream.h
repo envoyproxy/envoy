@@ -21,7 +21,7 @@ public:
   static const char RESET_AFTER_REQUEST[];
 
   AutonomousStream(FakeHttpConnection& parent, Http::StreamEncoder& encoder,
-                   AutonomousUpstream& upstream);
+                   AutonomousUpstream& upstream, bool allow_incomplete_streams);
   ~AutonomousStream() override;
 
   void setEndStream(bool set) override;
@@ -29,6 +29,7 @@ public:
 private:
   AutonomousUpstream& upstream_;
   void sendResponse();
+  const bool allow_incomplete_streams_{false};
 };
 
 // An upstream which creates AutonomousStreams for new incoming streams.
@@ -50,15 +51,15 @@ using AutonomousHttpConnectionPtr = std::unique_ptr<AutonomousHttpConnection>;
 class AutonomousUpstream : public FakeUpstream {
 public:
   AutonomousUpstream(const Network::Address::InstanceConstSharedPtr& address,
-                     FakeHttpConnection::Type type, Event::TestTimeSystem& time_system)
-      : FakeUpstream(address, type, time_system) {}
-  AutonomousUpstream(uint32_t port, FakeHttpConnection::Type type,
-                     Network::Address::IpVersion version, Event::TestTimeSystem& time_system)
-      : FakeUpstream(port, type, version, time_system) {}
+                     FakeHttpConnection::Type type, Event::TestTimeSystem& time_system,
+                     bool allow_incomplete_streams)
+      : FakeUpstream(address, type, time_system),
+        allow_incomplete_streams_(allow_incomplete_streams) {}
   AutonomousUpstream(Network::TransportSocketFactoryPtr&& transport_socket_factory, uint32_t port,
                      FakeHttpConnection::Type type, Network::Address::IpVersion version,
-                     Event::TestTimeSystem& time_system)
-      : FakeUpstream(std::move(transport_socket_factory), port, type, version, time_system) {}
+                     Event::TestTimeSystem& time_system, bool allow_incomplete_streams)
+      : FakeUpstream(std::move(transport_socket_factory), port, type, version, time_system),
+        allow_incomplete_streams_(allow_incomplete_streams) {}
 
   ~AutonomousUpstream() override;
   bool
@@ -70,6 +71,7 @@ public:
 
   void setLastRequestHeaders(const Http::HeaderMap& headers);
   std::unique_ptr<Http::TestHeaderMapImpl> lastRequestHeaders();
+  const bool allow_incomplete_streams_{false};
 
 private:
   Thread::MutexBasicLockable headers_lock_;

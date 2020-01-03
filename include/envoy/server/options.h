@@ -195,6 +195,11 @@ public:
   virtual bool cpusetThreadsEnabled() const PURE;
 
   /**
+   * @return the names of extensions to disable.
+   */
+  virtual const std::vector<std::string>& disabledExtensions() const PURE;
+
+  /**
    * Converts the Options in to CommandLineOptions proto message defined in server_info.proto.
    * @return CommandLineOptionsPtr the protobuf representation of the options.
    */

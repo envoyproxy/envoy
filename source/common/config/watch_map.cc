@@ -1,5 +1,7 @@
 #include "common/config/watch_map.h"
 
+#include "envoy/api/v2/discovery.pb.h"
+
 namespace Envoy {
 namespace Config {
 
@@ -150,6 +152,7 @@ std::set<std::string> WatchMap::findAdditions(const std::vector<std::string>& ne
       newly_added_to_subscription.insert(name);
       watch_interest_[name] = {watch};
     } else {
+      // Add this watch to the already-existing set at watch_interest_[name]
       entry->second.insert(watch);
     }
   }

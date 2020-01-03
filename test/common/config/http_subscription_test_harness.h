@@ -2,6 +2,8 @@
 
 #include <memory>
 
+#include "envoy/api/v2/core/base.pb.h"
+#include "envoy/api/v2/discovery.pb.h"
 #include "envoy/api/v2/eds.pb.h"
 #include "envoy/http/async_client.h"
 
