@@ -13,10 +13,10 @@ envoy_cc_library(
     srcs = ["api_type_oracle.cc"],
     hdrs = ["api_type_oracle.h"],
     deps = [
+        "//source/common/common:assert_lib",
+        "//source/common/common:logger_lib",
         "//source/common/protobuf",
-        "//source/common/protobuf:utility_lib",
         "@com_github_cncf_udpa//udpa/annotations:pkg_cc_proto",
-        "@com_github_cncf_udpa//udpa/type/v1:pkg_cc_proto",
     ],
 )
 
@@ -342,7 +342,7 @@ envoy_cc_library(
     srcs = ["version_converter.cc"],
     hdrs = ["version_converter.h"],
     deps = [
-        "//source/common/common:assert_lib",
+        ":api_type_oracle_lib",
         "//source/common/protobuf",
     ],
 )
