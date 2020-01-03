@@ -23,7 +23,8 @@ struct TypeInformation {
   // Is this an enum type?
   const bool enum_type_;
 
-  std::unordered_map<std::string, std::string> field_renames_;
+  // Field or enum value renames.
+  std::unordered_map<std::string, std::string> renames_;
 };
 
 // We don't expose the raw API type database to consumers, as this requires RTTI
