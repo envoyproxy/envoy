@@ -495,7 +495,8 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
     const auto host_str = headers.Host()->value().getStringView();
     const auto parsed_authority = Http::Utility::parseAuthority(host_str);
     if (!parsed_authority.is_ip_address_) {
-      // TODO: Update filter state with the host/authority to use for setting SNI in the transport
+      // TODO: Add SAN verification here and use it from dynamic_forward_proxy
+      // Update filter state with the host/authority to use for setting SNI in the transport
       // socket options. This is referenced during the getConnPool() call below.
       callbacks_->streamInfo().filterState().setData(
           Network::UpstreamServerName::key(),

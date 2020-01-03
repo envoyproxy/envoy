@@ -1,6 +1,6 @@
 syntax = "proto3";
 
-package envoy.api.v3alpha.core;
+package envoy.config.core.v3alpha;
 
 import "google/protobuf/duration.proto";
 import "google/protobuf/wrappers.proto";
@@ -9,7 +9,7 @@ import "udpa/annotations/versioning.proto";
 
 import "validate/validate.proto";
 
-option java_package = "io.envoyproxy.envoy.api.v3alpha.core";
+option java_package = "io.envoyproxy.envoy.config.core.v3alpha";
 option java_outer_classname = "ProtocolProto";
 option java_multiple_files = true;
 
@@ -30,7 +30,7 @@ message HttpProtocolOptions {
   // idle timeout is reached the connection will be closed. If the connection is an HTTP/2
   // downstream connection a drain sequence will occur prior to closing the connection, see
   // :ref:`drain_timeout
-  // <envoy_api_field_config.filter.network.http_connection_manager.v3alpha.HttpConnectionManager.drain_timeout>`.
+  // <envoy_api_field_extensions.filters.network.http_connection_manager.v3alpha.HttpConnectionManager.drain_timeout>`.
   // Note that request based timeouts mean that HTTP/2 PINGs will not keep the connection alive.
   // If not specified, this defaults to 1 hour. To disable idle timeouts explicitly set this to 0.
   //
@@ -43,7 +43,7 @@ message HttpProtocolOptions {
   // was established. If not set, there is no max duration. When max_connection_duration is reached
   // the connection will be closed. Drain sequence will occur prior to closing the connection if
   // if's applicable. See :ref:`drain_timeout
-  // <envoy_api_field_config.filter.network.http_connection_manager.v3alpha.HttpConnectionManager.drain_timeout>`.
+  // <envoy_api_field_extensions.filters.network.http_connection_manager.v3alpha.HttpConnectionManager.drain_timeout>`.
   // Note: not implemented for upstream connections.
   google.protobuf.Duration max_connection_duration = 3;
 
