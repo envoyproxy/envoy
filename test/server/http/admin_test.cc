@@ -56,13 +56,6 @@ using testing::StartsWith;
 namespace Envoy {
 namespace Server {
 
-namespace {
-void expectEqualSerialized(const std::string& str1, const std::string& str2) {
-  EXPECT_TRUE(
-      TestUtility::protoEqual(TestUtility::jsonToStruct(str1), TestUtility::jsonToStruct(str2)));
-}
-} // namespace
-
 class AdminStatsTest : public testing::TestWithParam<Network::Address::IpVersion> {
 public:
   AdminStatsTest()
@@ -260,7 +253,7 @@ TEST_P(AdminStatsTest, StatsAsJson) {
     ]
 })EOF";
 
-  expectEqualSerialized(expected_json, actual_json);
+  EXPECT_THAT(expected_json, JsonStringEq(actual_json));
   store_->shutdownThreading();
 }
 
@@ -358,7 +351,7 @@ TEST_P(AdminStatsTest, UsedOnlyStatsAsJson) {
     ]
 })EOF";
 
-  expectEqualSerialized(expected_json, actual_json);
+  EXPECT_THAT(expected_json, JsonStringEq(actual_json));
   store_->shutdownThreading();
 }
 
@@ -458,7 +451,7 @@ TEST_P(AdminStatsTest, StatsAsJsonFilterString) {
     ]
 })EOF";
 
-  expectEqualSerialized(expected_json, actual_json);
+  EXPECT_THAT(expected_json, JsonStringEq(actual_json));
   store_->shutdownThreading();
 }
 
@@ -567,7 +560,7 @@ TEST_P(AdminStatsTest, UsedOnlyStatsAsJsonFilterString) {
     ]
 })EOF";
 
-  expectEqualSerialized(expected_json, actual_json);
+  EXPECT_THAT(expected_json, JsonStringEq(actual_json));
   store_->shutdownThreading();
 }
 
@@ -1197,7 +1190,7 @@ TEST_P(AdminInstanceTest, Runtime) {
   EXPECT_CALL(loader, snapshot()).WillRepeatedly(testing::ReturnPointee(&snapshot));
   EXPECT_CALL(server_, runtime()).WillRepeatedly(testing::ReturnPointee(&loader));
   EXPECT_EQ(Http::Code::OK, getCallback("/runtime", header_map, response));
-  expectEqualSerialized(expected_json, response.toString());
+  EXPECT_THAT(expected_json, JsonStringEq(response.toString()));
 }
 
 TEST_P(AdminInstanceTest, RuntimeModify) {

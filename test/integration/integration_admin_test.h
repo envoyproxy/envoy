@@ -75,11 +75,6 @@ public:
     // Validate that the stats JSON has expected histograms element.
     EXPECT_EQ(expected_hist_count, histogram_count);
   }
-
-  void expectEqualSerialized(const std::string& str1, const std::string& str2) {
-    EXPECT_TRUE(
-        TestUtility::protoEqual(TestUtility::jsonToStruct(str1), TestUtility::jsonToStruct(str2)));
-  }
 };
 
 } // namespace Envoy
