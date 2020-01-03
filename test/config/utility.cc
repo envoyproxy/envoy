@@ -741,8 +741,6 @@ bool ConfigHelper::loadHttpConnectionManager(
   auto* hcm_filter = getFilterFromListener("envoy.http_connection_manager");
   if (hcm_filter) {
     auto* config = hcm_filter->mutable_typed_config();
-    ASSERT(config->Is<
-           envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager>());
     hcm = MessageUtil::anyConvert<
         envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager>(
         *config);
