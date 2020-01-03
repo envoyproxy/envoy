@@ -5,12 +5,12 @@ package envoy.config.bootstrap.v3alpha;
 import "envoy/config/core/v3alpha/address.proto";
 import "envoy/config/core/v3alpha/base.proto";
 import "envoy/config/core/v3alpha/config_source.proto";
+import "envoy/config/listener/v3alpha/listener.proto";
 import "envoy/config/metrics/v3alpha/stats.proto";
 import "envoy/config/overload/v3alpha/overload.proto";
 import "envoy/config/trace/v3alpha/trace.proto";
 import "envoy/extensions/transport_sockets/tls/v3alpha/cert.proto";
 import "envoy/service/cluster/v3alpha/cds.proto";
-import "envoy/service/listener/v3alpha/lds.proto";
 
 import "google/protobuf/duration.proto";
 import "google/protobuf/struct.proto";
@@ -39,9 +39,9 @@ message Bootstrap {
     option (udpa.annotations.versioning).previous_message_type =
         "envoy.config.bootstrap.v2.Bootstrap.StaticResources";
 
-    // Static :ref:`Listeners <envoy_api_msg_service.listener.v3alpha.Listener>`. These listeners
-    // are available regardless of LDS configuration.
-    repeated service.listener.v3alpha.Listener listeners = 1;
+    // Static :ref:`Listeners <envoy_api_msg_config.listener.v3alpha.Listener>`. These listeners are
+    // available regardless of LDS configuration.
+    repeated listener.v3alpha.Listener listeners = 1;
 
     // If a network based configuration source is specified for :ref:`cds_config
     // <envoy_api_field_config.bootstrap.v3alpha.Bootstrap.DynamicResources.cds_config>`, it's
@@ -61,7 +61,7 @@ message Bootstrap {
 
     reserved 4;
 
-    // All :ref:`Listeners <envoy_api_msg_service.listener.v3alpha.Listener>` are provided by a
+    // All :ref:`Listeners <envoy_api_msg_config.listener.v3alpha.Listener>` are provided by a
     // single :ref:`LDS <arch_overview_dynamic_config_lds>` configuration source.
     core.v3alpha.ConfigSource lds_config = 1;
 

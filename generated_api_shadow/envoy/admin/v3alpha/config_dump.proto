@@ -3,9 +3,9 @@ syntax = "proto3";
 package envoy.admin.v3alpha;
 
 import "envoy/config/bootstrap/v3alpha/bootstrap.proto";
+import "envoy/config/listener/v3alpha/listener.proto";
 import "envoy/extensions/transport_sockets/tls/v3alpha/cert.proto";
 import "envoy/service/cluster/v3alpha/cds.proto";
-import "envoy/service/listener/v3alpha/lds.proto";
 import "envoy/service/route/v3alpha/rds.proto";
 import "envoy/service/route/v3alpha/srds.proto";
 
@@ -85,7 +85,7 @@ message ListenersConfigDump {
         "envoy.admin.v2alpha.ListenersConfigDump.StaticListener";
 
     // The listener config.
-    service.listener.v3alpha.Listener listener = 1;
+    config.listener.v3alpha.Listener listener = 1;
 
     // The timestamp when the Listener was last successfully updated.
     google.protobuf.Timestamp last_updated = 2;
@@ -103,7 +103,7 @@ message ListenersConfigDump {
     string version_info = 1;
 
     // The listener config.
-    service.listener.v3alpha.Listener listener = 2;
+    config.listener.v3alpha.Listener listener = 2;
 
     // The timestamp when the Listener was last successfully updated.
     google.protobuf.Timestamp last_updated = 3;
