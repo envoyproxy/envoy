@@ -4,7 +4,6 @@
 #include <numeric>
 
 #include "envoy/api/v2/core/base.pb.h"
-#include "envoy/api/v3alpha/core/base.pb.h"
 #include "envoy/protobuf/message_validator.h"
 #include "envoy/type/percent.pb.h"
 
@@ -643,23 +642,22 @@ bool redactTypedStruct(Protobuf::Message* message, bool ancestor_is_sensitive) {
 
 // `DataSource`, which is annotated as `sensitive` in `TlsCertificate` and `TlsSessionTicketKeys`
 // requires special handling.
-template <typename DataSource>
 bool redactDataSource(Protobuf::Message* message, bool ancestor_is_sensitive) {
-  auto* data_source = dynamic_cast<DataSource*>(message);
+  auto* data_source = dynamic_cast<envoy::api::v2::core::DataSource*>(message);
   if (data_source != nullptr) {
     if (ancestor_is_sensitive) {
       switch (data_source->specifier_case()) {
-      case DataSource::SPECIFIER_NOT_SET:
+      case envoy::api::v2::core::DataSource::SPECIFIER_NOT_SET:
         // If the data source is empty, no work is needed.
         break;
-      case DataSource::kFilename:
+      case envoy::api::v2::core::DataSource::kFilename:
         // Don't redact filenames (SecretManagerImplTest::ConfigDumpNotRedactFilenamePrivateKey).
         break;
-      case DataSource::kInlineBytes:
+      case envoy::api::v2::core::DataSource::kInlineBytes:
         // Clear inline bytes and treat it as a string (fall through).
         data_source->clear_inline_bytes();
         FALLTHRU;
-      case DataSource::kInlineString:
+      case envoy::api::v2::core::DataSource::kInlineString:
         // Redact strings the usual way.
         data_source->set_inline_string("[redacted]");
         break;
@@ -676,8 +674,7 @@ bool redactDataSource(Protobuf::Message* message, bool ancestor_is_sensitive) {
 void redact(Protobuf::Message* message, bool ancestor_is_sensitive) {
   if (redactAny(message, ancestor_is_sensitive) ||
       redactTypedStruct(message, ancestor_is_sensitive) ||
-      redactDataSource<envoy::api::v2::core::DataSource>(message, ancestor_is_sensitive) ||
-      redactDataSource<envoy::api::v3alpha::core::DataSource>(message, ancestor_is_sensitive)) {
+      redactDataSource(message, ancestor_is_sensitive)) {
     return;
   }
 

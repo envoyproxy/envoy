@@ -71,7 +71,6 @@ envoy_cc_library(
         "@com_github_cncf_udpa//udpa/annotations:pkg_cc_proto",
         "@com_github_cncf_udpa//udpa/type/v1:pkg_cc_proto",
         "@envoy_api//envoy/api/v2/core:pkg_cc_proto",
-        "@envoy_api//envoy/api/v3alpha/core:pkg_cc_proto",
         "@envoy_api//envoy/type:pkg_cc_proto",
     ],
 )

@@ -50,6 +50,5 @@ envoy_proto_library(
         "@com_github_cncf_udpa//udpa/annotations:pkg",
         "@com_github_cncf_udpa//udpa/type/v1:pkg",
         "@envoy_api//envoy/api/v2/core:pkg",
-        "@envoy_api//envoy/api/v3alpha/core:pkg",
     ],
 )
