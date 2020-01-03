@@ -1279,8 +1279,14 @@ public:
 
   void incCounters() {
     for (uint32_t i = 0; i < NumScopes; ++i) {
-      ScopePtr scope = store_->createScope("scope."); // absl::StrCat("scope", i, "."));
-      scope->counterFromStatName(my_counter_name_).inc();
+      ScopePtr scope = store_->createScope("scope.");
+      Counter& counter = scope->counterFromStatName(my_counter_name_);
+      counter.inc();
+      uint32_t use_count = counter.use_count();
+      if ((use_count % 10000) == 0) {
+        // Run with "-l info" to see this message. For some reason, "-l warn" does not work.
+        ENVOY_LOG_MISC(warn, "{}: very high use-count: {}", counter.name(), use_count);
+      }
     }
   }
 
@@ -1321,6 +1327,10 @@ public:
   StatName my_counter_name_;
 };
 
+// Tests the scenario where a cluster and stat are allocated in multiple
+// concurrent threads, but after each round of allocation/free we post() an
+// empty callback to main to ensure that cross-scope thread cleanups complete.
+// In this test, we don't expect the use-count of the stat to get very high.
 TEST_F(ClusterShutdownCleanupStarvationTest, EightThreadsWithBlockade) {
   for (uint32_t i = 0; i < NumIters && elapsedTime() < std::chrono::seconds(10); ++i) {
     incCountersAllThreads();
@@ -1337,6 +1347,12 @@ TEST_F(ClusterShutdownCleanupStarvationTest, EightThreadsWithBlockade) {
   }
 }
 
+// In this test, we don't run the main-callback post() in between each
+// iteration, so the cross-thread cleanup never gets a chance to run. Thus with
+// the parameters defined here, and a normal build (not tsan, not asan), the
+// use-count of a stat will likely exceed 64k. We observe this with logging, but
+// don't EXPECT it as it's dependent on the speed of the computer on which the
+// test runs.
 TEST_F(ClusterShutdownCleanupStarvationTest, EightThreadsWithoutBlockade) {
   for (uint32_t i = 0; i < NumIters && elapsedTime() < std::chrono::seconds(10); ++i) {
     incCountersAllThreads();

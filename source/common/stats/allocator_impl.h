@@ -6,6 +6,7 @@
 #include "envoy/stats/stats.h"
 #include "envoy/stats/symbol_table.h"
 
+#include "common/common/thread_synchronizer.h"
 #include "common/stats/metric_impl.h"
 
 #include "absl/container/flat_hash_set.h"
@@ -16,6 +17,8 @@ namespace Stats {
 
 class AllocatorImpl : public Allocator {
 public:
+  static const char DecrementToZeroSyncPoint[];
+
   AllocatorImpl(SymbolTable& symbol_table) : symbol_table_(symbol_table) {}
   ~AllocatorImpl() override;
 
@@ -30,6 +33,11 @@ public:
 #ifndef ENVOY_CONFIG_COVERAGE
   void debugPrint();
 #endif
+
+  /**
+   * @return a thread synchronizer object used for reproducing a race-condition in tests.
+   */
+  Thread::ThreadSynchronizer& sync() { return sync_; }
 
 private:
   template <class BaseClass> friend class StatsSharedImpl;
@@ -68,6 +76,8 @@ private:
   // free() operations are made from the destructors of the individual stat objects, which are not
   // protected by locks.
   Thread::MutexBasicLockable mutex_;
+
+  Thread::ThreadSynchronizer sync_;
 };
 
 } // namespace Stats

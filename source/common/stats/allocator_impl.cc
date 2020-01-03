@@ -20,6 +20,8 @@
 namespace Envoy {
 namespace Stats {
 
+const char AllocatorImpl::DecrementToZeroSyncPoint[] = "decrement-zero";
+
 AllocatorImpl::~AllocatorImpl() {
   ASSERT(counters_.empty());
   ASSERT(gauges_.empty());
@@ -80,6 +82,7 @@ public:
     Thread::LockGuard lock(alloc_.mutex_);
     ASSERT(ref_count_ >= 1);
     if (--ref_count_ == 0) {
+      alloc_.sync().syncPoint(AllocatorImpl::DecrementToZeroSyncPoint);
       removeFromSetLockHeld();
       return true;
     }
@@ -214,23 +217,12 @@ public:
   }
 };
 
-template <class StatType> static void warnOnManyUses(StatType& stat) {
-  // This is called when we are about to increment the ref-count, so use that
-  // incremented number in the arithmetic. Issue a warning message only when
-  // the use-count gets very high, and then only once in 10k uses.
-  uint64_t use_count = stat.use_count() + 1;
-  if ((use_count % 10000) == 0) {
-    ENVOY_LOG_MISC(warn, "{}: very high use-count: {}", stat.name(), use_count);
-  }
-}
-
 CounterSharedPtr AllocatorImpl::makeCounter(StatName name, absl::string_view tag_extracted_name,
                                             const std::vector<Tag>& tags) {
   Thread::LockGuard lock(mutex_);
   ASSERT(gauges_.find(name) == gauges_.end());
   auto iter = counters_.find(name);
   if (iter != counters_.end()) {
-    warnOnManyUses(**iter);
     return CounterSharedPtr(*iter);
   }
   auto counter = CounterSharedPtr(new CounterImpl(name, *this, tag_extracted_name, tags));
@@ -245,7 +237,6 @@ GaugeSharedPtr AllocatorImpl::makeGauge(StatName name, absl::string_view tag_ext
   ASSERT(counters_.find(name) == counters_.end());
   auto iter = gauges_.find(name);
   if (iter != gauges_.end()) {
-    warnOnManyUses(**iter);
     return GaugeSharedPtr(*iter);
   }
   auto gauge = GaugeSharedPtr(new GaugeImpl(name, *this, tag_extracted_name, tags, import_mode));

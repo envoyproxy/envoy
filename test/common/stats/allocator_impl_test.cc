@@ -77,7 +77,11 @@ TEST_F(AllocatorImplTest, GaugesWithSameName) {
   EXPECT_EQ(0, g2->value());
 }
 
-TEST_F(AllocatorImplTest, Threads) {
+// Test for a race-condition where we may decrement the ref-count of a stat to
+// zero at the same time as we are allocating another instance of that
+// stat. This test reproduces that race organically by having a 12 threads each
+// iterate 10k times.
+TEST_F(AllocatorImplTest, RefCountDecAllocRaceOrganic) {
   StatName counter_name = makeStat("counter.name");
   StatName gauge_name = makeStat("gauge.name");
   Thread::ThreadFactory& thread_factory = Thread::threadFactoryForTest();
@@ -99,6 +103,59 @@ TEST_F(AllocatorImplTest, Threads) {
   for (uint32_t i = 0; i < num_threads; ++i) {
     threads[i]->join();
   }
+}
+
+// Tests the same scenario as RefCountDecAllocRaceOrganic, but using just two
+// threads and the ThreadSynchronizer, in one iteration. Note that if the code
+// has the bug in it, this test fails fast as expected. However, if the bug is
+// fixed, the allocator's mutex will cause the second thread to block in
+// makeCounter() until the first thread finishes destructing the object. Thus
+// the test gives thread2 5 seconds to complete before releasing thread 1 to
+// complete its destruction of the counter.
+TEST_F(AllocatorImplTest, RefCountDecAllocRaceSynchronized) {
+  StatName counter_name = makeStat("counter.name");
+  Thread::ThreadFactory& thread_factory = Thread::threadFactoryForTest();
+  alloc_.sync().enable();
+  alloc_.sync().waitOn(AllocatorImpl::DecrementToZeroSyncPoint);
+  absl::Notification alloc_done;
+  Thread::ThreadPtr thread1 = thread_factory.createThread([&]() {
+    CounterSharedPtr counter1 = alloc_.makeCounter(counter_name, "", std::vector<Tag>());
+    alloc_done.Notify();
+    counter1->inc();
+    counter1->reset(); // Blocks in thread synchronizer waiting on DecrementToZeroSyncPoint
+  });
+
+  alloc_done.WaitForNotification();
+
+  Thread::CondVar counter2_created;
+  Thread::MutexBasicLockable counter2_created_mutex;
+
+  // counter1 has now been allocated in the thread, and is now in the middle of
+  // destructing it.
+  Thread::ThreadPtr thread2 = thread_factory.createThread([&]() {
+    CounterSharedPtr counter2 = alloc_.makeCounter(counter_name, "", std::vector<Tag>());
+    {
+      Thread::LockGuard lock(counter2_created_mutex);
+      counter2_created.notifyAll();
+    }
+    counter2->inc();
+
+    // We test for a value of 1 here to show that the first instance of the
+    // counter was destructed prior to the second instance being created, and
+    // thus starts again from zero.
+    EXPECT_EQ(1, counter2->value());
+  });
+
+  {
+    Thread::LockGuard lock(counter2_created_mutex);
+    Thread::CondVar::WaitStatus status = counter2_created.waitFor( // NO_CHECK_FORMAT(real_time)
+        counter2_created_mutex, std::chrono::seconds(5));
+    EXPECT_EQ(Thread::CondVar::WaitStatus::Timeout, status);
+  }
+  alloc_.sync().signal(AllocatorImpl::DecrementToZeroSyncPoint);
+
+  thread1->join();
+  thread2->join();
 }
 
 } // namespace
