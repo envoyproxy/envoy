@@ -27,7 +27,7 @@ option java_outer_classname = "ClusterProto";
 option java_multiple_files = true;
 option (udpa.annotations.file_migrate).move_to_package = "envoy.config.cluster.v3alpha";
 
-// [#protodoc-title: Clusters]
+// [#protodoc-title: Cluster configuration]
 
 // Configuration for a single upstream cluster.
 // [#next-free-field: 46]
