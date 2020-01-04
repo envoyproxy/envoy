@@ -261,6 +261,7 @@ TEST_P(ClusterMemoryTestRunner, MemoryLargeClusterSizeWithFakeSymbolTable) {
   // 2019/11/15  9040     43371       44000   build: update protobuf to 3.10.1
   // 2019/11/15  9040     43403       44000   upstream: track whether cluster is local
   // 2019/12/10  8779     42919       43500   use var-length coding for name length
+  // 2020/01/04  8889     42728       43500   api: add UpstreamHttpProtocolOptions message
 
   // Note: when adjusting this value: EXPECT_MEMORY_EQ is active only in CI
   // 'release' builds, where we control the platform and tool-chain. So you
@@ -274,7 +275,7 @@ TEST_P(ClusterMemoryTestRunner, MemoryLargeClusterSizeWithFakeSymbolTable) {
   // If you encounter a failure here, please see
   // https://github.com/envoyproxy/envoy/blob/master/source/docs/stats.md#stats-memory-tests
   // for details on how to fix.
-  EXPECT_MEMORY_EQ(m_per_cluster, 42919); // 104 bytes higher than a debug build.
+  EXPECT_MEMORY_EQ(m_per_cluster, 42728); // 104 bytes higher than a debug build.
   EXPECT_MEMORY_LE(m_per_cluster, 43500);
 }
 
@@ -309,6 +310,7 @@ TEST_P(ClusterMemoryTestRunner, MemoryLargeClusterSizeWithRealSymbolTable) {
   // 2019/11/15  9040     35029       35500   build: update protobuf to 3.10.1
   // 2019/11/15  9040     35061       35500   upstream: track whether cluster is local
   // 2019/12/10  8779     35053       35000   use var-length coding for name lengths
+  // 2020/01/04  8889     34862       35500   api: add UpstreamHttpProtocolOptions message
 
   // Note: when adjusting this value: EXPECT_MEMORY_EQ is active only in CI
   // 'release' builds, where we control the platform and tool-chain. So you
@@ -322,7 +324,7 @@ TEST_P(ClusterMemoryTestRunner, MemoryLargeClusterSizeWithRealSymbolTable) {
   // If you encounter a failure here, please see
   // https://github.com/envoyproxy/envoy/blob/master/source/docs/stats.md#stats-memory-tests
   // for details on how to fix.
-  EXPECT_MEMORY_EQ(m_per_cluster, 35053); // 104 bytes higher than a debug build.
+  EXPECT_MEMORY_EQ(m_per_cluster, 34862); // 104 bytes higher than a debug build.
   EXPECT_MEMORY_LE(m_per_cluster, 35500);
 }
 
