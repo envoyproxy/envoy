@@ -489,9 +489,10 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
   }
 
   // Fetch a connection pool for the upstream cluster.
-  const auto& http_protocol_options = cluster_->httpProtocolOptions();
+  const auto& upstream_http_protocol_options = cluster_->upstreamHttpProtocolOptions();
 
-  if (http_protocol_options.has_value() && http_protocol_options.value().auto_sni()) {
+  if (upstream_http_protocol_options.has_value() &&
+      upstream_http_protocol_options.value().auto_sni()) {
     const auto host_str = headers.Host()->value().getStringView();
     const auto parsed_authority = Http::Utility::parseAuthority(host_str);
     if (!parsed_authority.is_ip_address_) {

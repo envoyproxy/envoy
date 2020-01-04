@@ -282,9 +282,9 @@ public:
 
 TEST_F(RouterTest, UpdateFilterState) {
   NiceMock<StreamInfo::MockStreamInfo> stream_info;
-  auto dummy_option = absl::make_optional<envoy::api::v2::core::HttpProtocolOptions>();
+  auto dummy_option = absl::make_optional<envoy::api::v2::core::UpstreamHttpProtocolOptions>();
   dummy_option.value().set_auto_sni(true);
-  ON_CALL(*cm_.thread_local_cluster_.cluster_.info_, httpProtocolOptions())
+  ON_CALL(*cm_.thread_local_cluster_.cluster_.info_, upstreamHttpProtocolOptions())
       .WillByDefault(ReturnRef(dummy_option));
   ON_CALL(callbacks_.stream_info_, filterState())
       .WillByDefault(ReturnRef(stream_info.filterState()));

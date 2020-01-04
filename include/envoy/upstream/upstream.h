@@ -874,8 +874,8 @@ public:
   /**
    * @return http protocol options for upstream connection
    */
-  virtual const absl::optional<envoy::api::v2::core::HttpProtocolOptions>&
-  httpProtocolOptions() const PURE;
+  virtual const absl::optional<envoy::api::v2::core::UpstreamHttpProtocolOptions>&
+  upstreamHttpProtocolOptions() const PURE;
 
 protected:
   /**

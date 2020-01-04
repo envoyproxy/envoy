@@ -49,7 +49,7 @@ service ClusterDiscoveryService {
 }
 
 // Configuration for a single upstream cluster.
-// [#next-free-field: 46]
+// [#next-free-field: 47]
 message Cluster {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.Cluster";
 
@@ -646,6 +646,10 @@ message Cluster {
 
   // Optional :ref:`circuit breaking <arch_overview_circuit_break>` for the cluster.
   config.cluster.v3alpha.CircuitBreakers circuit_breakers = 10;
+
+  // Http protocol options that is applied only upstream HTTP connections.
+  // Currently, this affects regardless of HTTP version
+  config.core.v3alpha.UpstreamHttpProtocolOptions upstream_http_protocol_options = 46;
 
   // Additional options when handling HTTP requests upstream. These options will be applicable to
   // both HTTP1 and HTTP2 requests.

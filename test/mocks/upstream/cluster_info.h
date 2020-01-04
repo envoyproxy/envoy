@@ -110,8 +110,8 @@ public:
   MOCK_CONST_METHOD0(clusterSocketOptions, const Network::ConnectionSocket::OptionsSharedPtr&());
   MOCK_CONST_METHOD0(drainConnectionsOnHostRemoval, bool());
   MOCK_CONST_METHOD0(warmHosts, bool());
-  MOCK_CONST_METHOD0(httpProtocolOptions,
-                     const absl::optional<envoy::api::v2::core::HttpProtocolOptions>&());
+  MOCK_CONST_METHOD0(upstreamHttpProtocolOptions,
+                     const absl::optional<envoy::api::v2::core::UpstreamHttpProtocolOptions>&());
   MOCK_CONST_METHOD0(eds_service_name, absl::optional<std::string>());
   MOCK_CONST_METHOD1(createNetworkFilterChain, void(Network::Connection&));
   MOCK_CONST_METHOD1(upstreamHttpProtocol, Http::Protocol(absl::optional<Http::Protocol>));
@@ -138,7 +138,7 @@ public:
   NiceMock<MockLoadBalancerSubsetInfo> lb_subset_;
   absl::optional<envoy::api::v2::Cluster::RingHashLbConfig> lb_ring_hash_config_;
   absl::optional<envoy::api::v2::Cluster::OriginalDstLbConfig> lb_original_dst_config_;
-  absl::optional<envoy::api::v2::core::HttpProtocolOptions> http_protocol_options_;
+  absl::optional<envoy::api::v2::core::UpstreamHttpProtocolOptions> upstream_http_protocol_options_;
   Network::ConnectionSocket::OptionsSharedPtr cluster_socket_options_;
   envoy::api::v2::Cluster::CommonLbConfig lb_config_;
   envoy::api::v2::core::Metadata metadata_;

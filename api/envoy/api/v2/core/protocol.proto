@@ -19,6 +19,11 @@ option (udpa.annotations.file_migrate).move_to_package = "envoy.config.core.v3al
 message TcpProtocolOptions {
 }
 
+message UpstreamHttpProtocolOptions {
+  // Set transport socket SNI for new upstream connections based on HTTP host/authority header.
+  bool auto_sni = 1;
+}
+
 message HttpProtocolOptions {
   // The idle timeout for connections. The idle timeout is defined as the
   // period in which there are no active requests. If not set, there is no idle timeout. When the
@@ -46,9 +51,6 @@ message HttpProtocolOptions {
   // maximum number of request headers allowed is 100. Requests that exceed this limit will receive
   // a 431 response for HTTP/1.x and cause a stream reset for HTTP/2.
   google.protobuf.UInt32Value max_headers_count = 2 [(validate.rules).uint32 = {gte: 1}];
-
-  // Set transport socket SNI for new upstream connections based on HTTP host/authority header.
-  bool auto_sni = 4;
 }
 
 // [#next-free-field: 6]
