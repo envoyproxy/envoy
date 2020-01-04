@@ -2,8 +2,8 @@ syntax = "proto3";
 
 package envoy.config.filter.accesslog.v3alpha;
 
-import "envoy/api/v3alpha/core/base.proto";
-import "envoy/api/v3alpha/route/route.proto";
+import "envoy/config/core/v3alpha/base.proto";
+import "envoy/config/route/v3alpha/route.proto";
 import "envoy/type/v3alpha/percent.proto";
 
 import "google/protobuf/any.proto";
@@ -42,11 +42,11 @@ message AccessLog {
   // configurations include:
   //
   // #. "envoy.file_access_log": :ref:`FileAccessLog
-  //    <envoy_api_msg_config.accesslog.v3alpha.FileAccessLog>`
+  //    <envoy_api_msg_extensions.access_loggers.grpc.v3alpha.FileAccessLog>`
   // #. "envoy.http_grpc_access_log": :ref:`HttpGrpcAccessLogConfig
-  //    <envoy_api_msg_config.accesslog.v3alpha.HttpGrpcAccessLogConfig>`
+  //    <envoy_api_msg_extensions.access_loggers.grpc.v3alpha.HttpGrpcAccessLogConfig>`
   // #. "envoy.tcp_grpc_access_log": :ref:`TcpGrpcAccessLogConfig
-  //    <envoy_api_msg_config.accesslog.v3alpha.TcpGrpcAccessLogConfig>`
+  //    <envoy_api_msg_extensions.access_loggers.grpc.v3alpha.TcpGrpcAccessLogConfig>`
   oneof config_type {
     google.protobuf.Any typed_config = 4;
   }
@@ -115,7 +115,7 @@ message ComparisonFilter {
   Op op = 1 [(validate.rules).enum = {defined_only: true}];
 
   // Value to compare against.
-  api.v3alpha.core.RuntimeUInt32 value = 2;
+  core.v3alpha.RuntimeUInt32 value = 2;
 }
 
 // Filters on HTTP response/status code.
@@ -204,7 +204,7 @@ message HeaderFilter {
 
   // Only requests with a header which matches the specified HeaderMatcher will pass the filter
   // check.
-  api.v3alpha.route.HeaderMatcher header = 1 [(validate.rules).message = {required: true}];
+  route.v3alpha.HeaderMatcher header = 1 [(validate.rules).message = {required: true}];
 }
 
 // Filters requests that received responses with an Envoy response flag set.

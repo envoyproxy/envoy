@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package envoy.data.tap.v3alpha;
 
-import "envoy/api/v3alpha/core/base.proto";
+import "envoy/config/core/v3alpha/base.proto";
 import "envoy/data/tap/v3alpha/common.proto";
 
 import "udpa/annotations/versioning.proto";
@@ -24,13 +24,13 @@ message HttpBufferedTrace {
         "envoy.data.tap.v2alpha.HttpBufferedTrace.Message";
 
     // Message headers.
-    repeated api.v3alpha.core.HeaderValue headers = 1;
+    repeated config.core.v3alpha.HeaderValue headers = 1;
 
     // Message body.
     Body body = 2;
 
     // Message trailers.
-    repeated api.v3alpha.core.HeaderValue trailers = 3;
+    repeated config.core.v3alpha.HeaderValue trailers = 3;
   }
 
   // Request message.
@@ -52,21 +52,21 @@ message HttpStreamedTraceSegment {
 
   oneof message_piece {
     // Request headers.
-    api.v3alpha.core.HeaderMap request_headers = 2;
+    config.core.v3alpha.HeaderMap request_headers = 2;
 
     // Request body chunk.
     Body request_body_chunk = 3;
 
     // Request trailers.
-    api.v3alpha.core.HeaderMap request_trailers = 4;
+    config.core.v3alpha.HeaderMap request_trailers = 4;
 
     // Response headers.
-    api.v3alpha.core.HeaderMap response_headers = 5;
+    config.core.v3alpha.HeaderMap response_headers = 5;
 
     // Response body chunk.
     Body response_body_chunk = 6;
 
     // Response trailers.
-    api.v3alpha.core.HeaderMap response_trailers = 7;
+    config.core.v3alpha.HeaderMap response_trailers = 7;
   }
 }
