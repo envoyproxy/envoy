@@ -199,8 +199,12 @@ def FormatHeaderFromFile(source_code_info, file_proto):
   google_imports = []
   infra_imports = []
   misc_imports = []
+  public_imports = []
 
-  for d in file_proto.dependency:
+  for idx, d in enumerate(file_proto.dependency):
+    if idx in file_proto.public_dependency:
+      public_imports.append(d)
+      continue
     if d.startswith('envoy/'):
       # We ignore existing envoy/ imports, since these are computed explicitly
       # from type_dependencies.
@@ -225,8 +229,14 @@ def FormatHeaderFromFile(source_code_info, file_proto):
       return ''
     return FormatBlock('\n'.join(sorted('import "%s";' % x for x in xs)))
 
+  def FormatPublicImportBlock(xs):
+    if not xs:
+      return ''
+    return FormatBlock('\n'.join(sorted('import public "%s";' % x for x in xs)))
+
   import_block = '\n'.join(
       map(FormatImportBlock, [envoy_imports, google_imports, misc_imports, infra_imports]))
+  import_block += '\n' + FormatPublicImportBlock(public_imports)
   comment_block = FormatComments(source_code_info.file_level_comments)
 
   return ''.join(map(FormatBlock, [file_block, import_block, options_block, comment_block]))

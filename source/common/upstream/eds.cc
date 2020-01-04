@@ -63,16 +63,24 @@ void EdsClusterImpl::BatchUpdateHelper::batchUpdate(PrioritySet::HostUpdateCb& h
   const uint32_t overprovisioning_factor = PROTOBUF_GET_WRAPPED_OR_DEFAULT(
       cluster_load_assignment_.policy(), overprovisioning_factor, kDefaultOverProvisioningFactor);
 
+  LocalityWeightsMap empty_locality_map;
+
   // Loop over all priorities that exist in the new configuration.
   auto& priority_state = priority_state_manager.priorityState();
   for (size_t i = 0; i < priority_state.size(); ++i) {
+    if (parent_.locality_weights_map_.size() <= i) {
+      parent_.locality_weights_map_.resize(i + 1);
+    }
     if (priority_state[i].first != nullptr) {
-      if (parent_.locality_weights_map_.size() <= i) {
-        parent_.locality_weights_map_.resize(i + 1);
-      }
       cluster_rebuilt |= parent_.updateHostsPerLocality(
           i, overprovisioning_factor, *priority_state[i].first, parent_.locality_weights_map_[i],
           priority_state[i].second, priority_state_manager, updated_hosts);
+    } else {
+      // If the new update contains a priority with no hosts, call the update function with an empty
+      // set of hosts.
+      cluster_rebuilt |= parent_.updateHostsPerLocality(
+          i, overprovisioning_factor, {}, parent_.locality_weights_map_[i], empty_locality_map,
+          priority_state_manager, updated_hosts);
     }
   }
 
@@ -80,15 +88,12 @@ void EdsClusterImpl::BatchUpdateHelper::batchUpdate(PrioritySet::HostUpdateCb& h
   // empty out any remaining priority that the config update did not refer to.
   for (size_t i = priority_state.size(); i < parent_.priority_set_.hostSetsPerPriority().size();
        ++i) {
-    const HostVector empty_hosts;
-    LocalityWeightsMap empty_locality_map;
-
     if (parent_.locality_weights_map_.size() <= i) {
       parent_.locality_weights_map_.resize(i + 1);
     }
     cluster_rebuilt |= parent_.updateHostsPerLocality(
-        i, overprovisioning_factor, empty_hosts, parent_.locality_weights_map_[i],
-        empty_locality_map, priority_state_manager, updated_hosts);
+        i, overprovisioning_factor, {}, parent_.locality_weights_map_[i], empty_locality_map,
+        priority_state_manager, updated_hosts);
   }
 
   parent_.all_hosts_ = std::move(updated_hosts);
