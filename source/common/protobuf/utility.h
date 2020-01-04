@@ -255,13 +255,6 @@ public:
   }
 
   template <class MessageType>
-  static void loadFromFileAndValidate(const std::string& path, MessageType& message,
-                                      ProtobufMessage::ValidationVisitor& validation_visitor) {
-    loadFromFile(path, message, validation_visitor);
-    validate(message, validation_visitor);
-  }
-
-  template <class MessageType>
   static void loadFromYamlAndValidate(const std::string& yaml, MessageType& message,
                                       ProtobufMessage::ValidationVisitor& validation_visitor) {
     loadFromYaml(yaml, message, validation_visitor);

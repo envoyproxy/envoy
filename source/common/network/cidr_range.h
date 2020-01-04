@@ -4,7 +4,7 @@
 #include <vector>
 
 #include "envoy/api/v2/core/address.pb.h"
-#include "envoy/api/v3alpha/core/address.pb.h"
+#include "envoy/config/core/v3alpha/address.pb.h"
 #include "envoy/json/json_object.h"
 #include "envoy/network/address.h"
 
@@ -102,7 +102,7 @@ public:
   static CidrRange create(const envoy::api::v2::core::CidrRange& cidr);
   // The ::v2 and ::v3alpha variants will merge once we land API boosting
   // automation. TODO(htuch): make sure this happens.
-  static CidrRange create(const envoy::api::v3alpha::core::CidrRange& cidr);
+  static CidrRange create(const envoy::config::core::v3alpha::CidrRange& cidr);
 
   /**
    * Given an IP address and a length of high order bits to keep, returns an address

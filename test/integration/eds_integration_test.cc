@@ -27,6 +27,37 @@ public:
 
   // We need to supply the endpoints via EDS to provide health status. Use a
   // filesystem delivery to simplify test mechanics.
+  void setEndpointsInPriorities(uint32_t first_priority, uint32_t second_priority,
+                                bool await_update = true) {
+    envoy::api::v2::ClusterLoadAssignment cluster_load_assignment;
+    cluster_load_assignment.set_cluster_name("cluster_0");
+
+    {
+      for (uint32_t i = 0; i < first_priority; ++i) {
+        auto* locality_lb_endpoints = cluster_load_assignment.add_endpoints();
+        auto* endpoint = locality_lb_endpoints->add_lb_endpoints();
+        setUpstreamAddress(i, *endpoint);
+      }
+    }
+
+    {
+      for (uint32_t i = first_priority; i < first_priority + second_priority; ++i) {
+        auto* locality_lb_endpoints = cluster_load_assignment.add_endpoints();
+        locality_lb_endpoints->set_priority(1);
+        auto* endpoint = locality_lb_endpoints->add_lb_endpoints();
+        setUpstreamAddress(i, *endpoint);
+      }
+    }
+
+    if (await_update) {
+      eds_helper_.setEdsAndWait({cluster_load_assignment}, *test_server_);
+    } else {
+      eds_helper_.setEds({cluster_load_assignment});
+    }
+  }
+
+  // We need to supply the endpoints via EDS to provide health status. Use a
+  // filesystem delivery to simplify test mechanics.
   void setEndpoints(uint32_t total_endpoints, uint32_t healthy_endpoints,
                     uint32_t degraded_endpoints, bool remaining_unhealthy = true,
                     absl::optional<uint32_t> overprovisioning_factor = absl::nullopt,
@@ -111,6 +142,24 @@ public:
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, EdsIntegrationTest,
                          testing::ValuesIn(TestEnvironment::getIpVersionsForTest()));
+
+// Validates that endpoints can be added and then moved to other priorities without causing crashes.
+// Primarily as a regression test for https://github.com/envoyproxy/envoy/issues/8764
+TEST_P(EdsIntegrationTest, Http2UpdatePriorities) {
+  codec_client_type_ = envoy::type::HTTP2;
+  initializeTest(true);
+
+  fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
+  fake_upstreams_[1]->set_allow_unexpected_disconnects(true);
+  fake_upstreams_[2]->set_allow_unexpected_disconnects(true);
+  fake_upstreams_[3]->set_allow_unexpected_disconnects(true);
+
+  setEndpointsInPriorities(2, 2);
+
+  setEndpointsInPriorities(4, 0);
+
+  setEndpointsInPriorities(0, 4);
+}
 
 // Verifies that a new cluster can we warmed when using HTTP/2 health checking. Regression test
 // of the issue detailed in issue #6951.

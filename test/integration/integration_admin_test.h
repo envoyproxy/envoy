@@ -6,6 +6,7 @@
 #include "common/json/json_loader.h"
 
 #include "test/integration/http_protocol_integration.h"
+#include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
 
@@ -45,7 +46,7 @@ public:
   /**
    * Validates that the passed in string conforms to output of stats in JSON format.
    */
-  void validateStatsJson(const std::string stats_json, const uint64_t expected_hist_count) {
+  void validateStatsJson(const std::string& stats_json, const uint64_t expected_hist_count) {
     Json::ObjectSharedPtr statsjson = Json::Factory::loadFromString(stats_json);
     EXPECT_TRUE(statsjson->hasObject("stats"));
     uint64_t histogram_count = 0;

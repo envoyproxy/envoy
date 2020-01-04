@@ -32,7 +32,8 @@ A sample filter configuration could be:
 
   filters:
     - name: envoy.ext_authz
-      config:
+      typed_config:
+        "@type": type.googleapis.com/envoy.config.filter.http.ext_authz.v2.ExtAuthz
         stat_prefix: ext_authz
         grpc_service:
           envoy_grpc:

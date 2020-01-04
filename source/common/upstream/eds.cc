@@ -5,8 +5,11 @@
 #include "envoy/api/v2/discovery.pb.h"
 #include "envoy/api/v2/eds.pb.h"
 #include "envoy/api/v2/eds.pb.validate.h"
+#include "envoy/common/exception.h"
+#include "envoy/service/endpoint/v3alpha/eds.pb.h"
 
 #include "common/common/utility.h"
+#include "common/config/api_version.h"
 
 namespace Envoy {
 namespace Upstream {
@@ -21,7 +24,8 @@ EdsClusterImpl::EdsClusterImpl(
       cluster_name_(cluster.eds_cluster_config().service_name().empty()
                         ? cluster.name()
                         : cluster.eds_cluster_config().service_name()),
-      validation_visitor_(factory_context.messageValidationVisitor()) {
+      validation_visitor_(factory_context.messageValidationVisitor()),
+      xds_api_version_(cluster.eds_cluster_config().eds_config().xds_api_version()) {
   Event::Dispatcher& dispatcher = factory_context.dispatcher();
   assignment_timeout_ = dispatcher.createTimer([this]() -> void { onAssignmentTimeout(); });
   const auto& eds_config = cluster.eds_cluster_config().eds_config();
@@ -33,10 +37,7 @@ EdsClusterImpl::EdsClusterImpl(
   }
   subscription_ =
       factory_context.clusterManager().subscriptionFactory().subscriptionFromConfigSource(
-          eds_config,
-          Grpc::Common::typeUrl(
-              envoy::api::v2::ClusterLoadAssignment().GetDescriptor()->full_name()),
-          info_->statsScope(), *this);
+          eds_config, loadTypeUrl(), info_->statsScope(), *this);
 }
 
 void EdsClusterImpl::startPreInit() { subscription_->start({cluster_name_}); }
@@ -62,16 +63,24 @@ void EdsClusterImpl::BatchUpdateHelper::batchUpdate(PrioritySet::HostUpdateCb& h
   const uint32_t overprovisioning_factor = PROTOBUF_GET_WRAPPED_OR_DEFAULT(
       cluster_load_assignment_.policy(), overprovisioning_factor, kDefaultOverProvisioningFactor);
 
+  LocalityWeightsMap empty_locality_map;
+
   // Loop over all priorities that exist in the new configuration.
   auto& priority_state = priority_state_manager.priorityState();
   for (size_t i = 0; i < priority_state.size(); ++i) {
+    if (parent_.locality_weights_map_.size() <= i) {
+      parent_.locality_weights_map_.resize(i + 1);
+    }
     if (priority_state[i].first != nullptr) {
-      if (parent_.locality_weights_map_.size() <= i) {
-        parent_.locality_weights_map_.resize(i + 1);
-      }
       cluster_rebuilt |= parent_.updateHostsPerLocality(
           i, overprovisioning_factor, *priority_state[i].first, parent_.locality_weights_map_[i],
           priority_state[i].second, priority_state_manager, updated_hosts);
+    } else {
+      // If the new update contains a priority with no hosts, call the update function with an empty
+      // set of hosts.
+      cluster_rebuilt |= parent_.updateHostsPerLocality(
+          i, overprovisioning_factor, {}, parent_.locality_weights_map_[i], empty_locality_map,
+          priority_state_manager, updated_hosts);
     }
   }
 
@@ -79,15 +88,12 @@ void EdsClusterImpl::BatchUpdateHelper::batchUpdate(PrioritySet::HostUpdateCb& h
   // empty out any remaining priority that the config update did not refer to.
   for (size_t i = priority_state.size(); i < parent_.priority_set_.hostSetsPerPriority().size();
        ++i) {
-    const HostVector empty_hosts;
-    LocalityWeightsMap empty_locality_map;
-
     if (parent_.locality_weights_map_.size() <= i) {
       parent_.locality_weights_map_.resize(i + 1);
     }
     cluster_rebuilt |= parent_.updateHostsPerLocality(
-        i, overprovisioning_factor, empty_hosts, parent_.locality_weights_map_[i],
-        empty_locality_map, priority_state_manager, updated_hosts);
+        i, overprovisioning_factor, {}, parent_.locality_weights_map_[i], empty_locality_map,
+        priority_state_manager, updated_hosts);
   }
 
   parent_.all_hosts_ = std::move(updated_hosts);
@@ -213,6 +219,21 @@ void EdsClusterImpl::reloadHealthyHostsHelper(const HostSharedPtr& host) {
   if (host_to_exclude != nullptr) {
     ASSERT(all_hosts_.find(host_to_exclude->address()->asString()) != all_hosts_.end());
     all_hosts_.erase(host_to_exclude->address()->asString());
+  }
+}
+
+std::string EdsClusterImpl::loadTypeUrl() {
+  switch (xds_api_version_) {
+  // automatically set api version as V2
+  case envoy::api::v2::core::ConfigSource::AUTO:
+  case envoy::api::v2::core::ConfigSource::V2:
+    return Grpc::Common::typeUrl(
+        API_NO_BOOST(envoy::api::v2::ClusterLoadAssignment().GetDescriptor()->full_name()));
+  case envoy::api::v2::core::ConfigSource::V3ALPHA:
+    return Grpc::Common::typeUrl(API_NO_BOOST(
+        envoy::service::endpoint::v3alpha::ClusterLoadAssignment().GetDescriptor()->full_name()));
+  default:
+    throw EnvoyException(fmt::format("type {} is not supported", xds_api_version_));
   }
 }
 
