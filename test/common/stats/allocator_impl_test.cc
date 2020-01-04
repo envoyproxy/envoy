@@ -127,16 +127,16 @@ TEST_F(AllocatorImplTest, RefCountDecAllocRaceSynchronized) {
 
   alloc_done.WaitForNotification();
 
-  Thread::CondVar counter2_created;
-  Thread::MutexBasicLockable counter2_created_mutex;
+  absl::Mutex counter2_created_mutex;
+  bool counter2_created = false;
 
   // counter1 has now been allocated in the thread, and is now in the middle of
   // destructing it.
   Thread::ThreadPtr thread2 = thread_factory.createThread([&]() {
     CounterSharedPtr counter2 = alloc_.makeCounter(counter_name, "", std::vector<Tag>());
     {
-      Thread::LockGuard lock(counter2_created_mutex);
-      counter2_created.notifyAll();
+      absl::MutexLock lock(&counter2_created_mutex);
+      counter2_created = true;
     }
     counter2->inc();
 
@@ -147,10 +147,9 @@ TEST_F(AllocatorImplTest, RefCountDecAllocRaceSynchronized) {
   });
 
   {
-    Thread::LockGuard lock(counter2_created_mutex);
-    Thread::CondVar::WaitStatus status = counter2_created.waitFor( // NO_CHECK_FORMAT(real_time)
-        counter2_created_mutex, std::chrono::seconds(5));
-    EXPECT_EQ(Thread::CondVar::WaitStatus::Timeout, status);
+    absl::MutexLock lock(&counter2_created_mutex);
+    counter2_created_mutex.AwaitWithTimeout(absl::Condition(&counter2_created), absl::Seconds(5));
+    EXPECT_FALSE(counter2_created);
   }
   alloc_.sync().signal(AllocatorImpl::DecrementToZeroSyncPoint);
 

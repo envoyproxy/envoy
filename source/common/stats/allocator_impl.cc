@@ -91,9 +91,9 @@ public:
   uint32_t use_count() const override { return ref_count_; }
 
   /**
-   * We must atomically remove the counter/gauges the set when our ref-count
-   * decrement hits zero. The counters and gauges are held in distinct sets
-   * so we virtualize this removal helper.
+   * We must atomically remove the counter/gauges from the allocator's sets when
+   * our ref-count decrement hits zero. The counters and gauges are held in
+   * distinct sets so we virtualize this removal helper.
    */
   virtual void removeFromSetLockHeld() EXCLUSIVE_LOCKS_REQUIRED(alloc_.mutex_) PURE;
 
@@ -126,7 +126,6 @@ public:
     pending_increment_ += amount;
     flags_ |= Flags::Used;
   }
-
   void inc() override { add(1); }
   uint64_t latch() override { return pending_increment_.exchange(0); }
   void reset() override { value_ = 0; }

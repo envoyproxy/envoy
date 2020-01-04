@@ -1207,7 +1207,12 @@ public:
     explicit BlockingScope(uint32_t count) : blocking_counter_(count) {}
     ~BlockingScope() { blocking_counter_.Wait(); }
 
-    //
+    /**
+     * Returns a function that first executes 'f', and then decrements the count
+     * toward unblocking the scope. This is intended to be used as a post() callback.
+     *
+     * @param f the function to run prior to decrementing the count.
+     */
     std::function<void()> run(std::function<void()> f) {
       return [this, f]() {
         f();
@@ -1284,7 +1289,7 @@ public:
       counter.inc();
       uint32_t use_count = counter.use_count();
       if ((use_count % 10000) == 0) {
-        // Run with "-l info" to see this message. For some reason, "-l warn" does not work.
+        // Run tests with "-l warning" to see this message.
         ENVOY_LOG_MISC(warn, "{}: very high use-count: {}", counter.name(), use_count);
       }
     }
