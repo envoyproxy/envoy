@@ -255,7 +255,6 @@ void Utility::translateOpaqueConfig(const ProtobufWkt::Any& typed_config,
                                     const ProtobufWkt::Struct& config,
                                     ProtobufMessage::ValidationVisitor& validation_visitor,
                                     Protobuf::Message& out_proto) {
-/*
   std::cout << extension_name << std::endl;
   const Protobuf::Descriptor* earlier_version_desc = ApiTypeOracle::inferEarlierVersionDescriptor(
       extension_name, typed_config, out_proto.GetDescriptor()->full_name());
@@ -271,7 +270,6 @@ void Utility::translateOpaqueConfig(const ProtobufWkt::Any& typed_config,
     VersionConverter::upgrade(*message, out_proto);
     return;
   }
-*/
 
   static const std::string struct_type =
       ProtobufWkt::Struct::default_instance().GetDescriptor()->full_name();

@@ -18,9 +18,10 @@ class CorsFilterFactory : public Common::FactoryBase<envoy::config::filter::http
 public:
   CorsFilterFactory() : FactoryBase(HttpFilterNames::get().Cors) {}
 
-  Http::FilterFactoryCb createFilterFactoryFromProtoTyped(
-      const envoy::config::filter::http::cors::v2::Cors& proto_config,
-      const std::string& stats_prefix, Server::Configuration::FactoryContext& context) override;
+  Http::FilterFactoryCb
+  createFilterFactoryFromProtoTyped(const envoy::config::filter::http::cors::v2::Cors& proto_config,
+                                    const std::string& stats_prefix,
+                                    Server::Configuration::FactoryContext& context) override;
 };
 
 } // namespace Cors

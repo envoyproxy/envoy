@@ -1,10 +1,9 @@
 #include "extensions/filters/network/sni_cluster/config.h"
 
-#include "envoy/registry/registry.h"
-#include "envoy/server/filter_config.h"
-
 #include "envoy/config/filter/network/sni_cluster/v2/sni_cluster.pb.h"
 #include "envoy/config/filter/network/sni_cluster/v2/sni_cluster.pb.validate.h"
+#include "envoy/registry/registry.h"
+#include "envoy/server/filter_config.h"
 
 #include "extensions/filters/network/sni_cluster/sni_cluster.h"
 

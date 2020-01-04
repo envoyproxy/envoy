@@ -10,8 +10,8 @@ namespace HttpFilters {
 namespace Cors {
 
 Http::FilterFactoryCb CorsFilterFactory::createFilterFactoryFromProtoTyped(
-      const envoy::config::filter::http::cors::v2::Cors&,
-      const std::string& stats_prefix, Server::Configuration::FactoryContext& context) {
+    const envoy::config::filter::http::cors::v2::Cors&, const std::string& stats_prefix,
+    Server::Configuration::FactoryContext& context) {
   CorsFilterConfigSharedPtr config =
       std::make_shared<CorsFilterConfig>(stats_prefix, context.scope());
   return [config](Http::FilterChainFactoryCallbacks& callbacks) -> void {

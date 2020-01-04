@@ -16,12 +16,15 @@ namespace Dynamo {
 /**
  * Config registration for http dynamodb filter.
  */
-class DynamoFilterConfig : public Common::FactoryBase<envoy::config::filter::http::dynamo::v2::Dynamo> {
+class DynamoFilterConfig
+    : public Common::FactoryBase<envoy::config::filter::http::dynamo::v2::Dynamo> {
 public:
   DynamoFilterConfig() : FactoryBase(HttpFilterNames::get().Dynamo) {}
 
 private:
-  Http::FilterFactoryCb  createFilterFactoryFromProtoTyped(const envoy::config::filter::http::dynamo::v2::Dynamo& proto_config, const std::string& stats_prefix, Server::Configuration::FactoryContext& context) override;
+  Http::FilterFactoryCb createFilterFactoryFromProtoTyped(
+      const envoy::config::filter::http::dynamo::v2::Dynamo& proto_config,
+      const std::string& stats_prefix, Server::Configuration::FactoryContext& context) override;
 };
 
 } // namespace Dynamo
