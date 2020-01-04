@@ -371,6 +371,25 @@ bool ListenerManagerImpl::addOrUpdateListenerInternal(
     return false;
   }
 
+  // Support in place update only when no tradition update is occurring.
+  if (existing_active_listener != active_listeners_.end() &&
+      existing_warming_listener == warming_listeners_.end()) {
+    auto update_decision =
+        (*existing_active_listener)->supportUpdateFilterChain(config, workers_started_);
+    switch (update_decision) {
+    // TODO(lambdai): Optimize when ongoing update is equivalent to the new config
+    /*case UpdateDecision::UpdateInFlight*/
+    case UpdateDecision::Update:
+      (*existing_active_listener)->updateFilterChain(config);
+      stats_.listener_modified_.inc();
+      return true;
+    case UpdateDecision::NotSupported:
+      // noop if there is no ongoing update
+      (*existing_active_listener)->cancelUpdate();
+      break;
+    }
+  }
+  // Fallback to traditional listener update. This is rare.
   ListenerImplPtr new_listener(
       new ListenerImpl(config, version_info, *this, name, added_via_api, workers_started_, hash,
                        added_via_api ? server_.messageValidationContext().dynamicValidationVisitor()

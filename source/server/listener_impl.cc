@@ -406,5 +406,18 @@ void ListenerImpl::setSocketFactory(const Network::ListenSocketFactorySharedPtr&
   socket_factory_ = socket_factory;
 }
 
+UpdateDecision ListenerImpl::supportUpdateFilterChain(const envoy::api::v2::Listener& config,
+                                                      bool worker_started) {
+  // It's adding very little value to support filter chain only update at start phase.
+  if (!worker_started) {
+    return UpdateDecision::NotSupported;
+  }
+  UNREFERENCED_PARAMETER(config);
+  return UpdateDecision::NotSupported;
+}
+
+void ListenerImpl::updateFilterChain(const envoy::api::v2::Listener& config) { UNREFERENCED_PARAMETER(config); }
+
+void ListenerImpl::cancelUpdate() {}
 } // namespace Server
 } // namespace Envoy

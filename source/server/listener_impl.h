@@ -69,6 +69,8 @@ private:
   absl::once_flag steal_once_;
 };
 
+enum class UpdateDecision { Update, NotSupported };
+
 // TODO(mattklein123): Consider getting rid of pre-worker start and post-worker start code by
 //                     initializing all listeners after workers are started.
 
@@ -98,6 +100,14 @@ public:
                const std::string& name, bool added_via_api, bool workers_started, uint64_t hash,
                ProtobufMessage::ValidationVisitor& validation_visitor, uint32_t concurrency);
   ~ListenerImpl() override;
+
+  /**
+   * Implement filter chain in place update
+   */
+  UpdateDecision supportUpdateFilterChain(const envoy::api::v2::Listener& config,
+                                          bool worker_started);
+  void updateFilterChain(const envoy::api::v2::Listener& config);
+  void cancelUpdate();
 
   /**
    * Helper functions to determine whether a listener is blocked for update or remove.
