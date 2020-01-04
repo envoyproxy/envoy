@@ -1197,9 +1197,9 @@ TEST_F(HistogramTest, ParentHistogramBucketSummary) {
 
 class ClusterShutdownCleanupStarvationTest : public ThreadLocalStoreNoMocksTestBase {
 public:
-  static constexpr uint32_t NumThreads = 8;
-  static constexpr uint32_t NumScopes = 100;
-  static constexpr uint32_t NumIters = 200;
+  static constexpr uint32_t NumThreads = 12;
+  static constexpr uint32_t NumScopes = 200;
+  static constexpr uint32_t NumIters = 150;
 
   // Helper class to block on a number of multi-threaded operations occurring.
   class BlockingScope {
@@ -1336,8 +1336,8 @@ public:
 // concurrent threads, but after each round of allocation/free we post() an
 // empty callback to main to ensure that cross-scope thread cleanups complete.
 // In this test, we don't expect the use-count of the stat to get very high.
-TEST_F(ClusterShutdownCleanupStarvationTest, EightThreadsWithBlockade) {
-  for (uint32_t i = 0; i < NumIters && elapsedTime() < std::chrono::seconds(10); ++i) {
+TEST_F(ClusterShutdownCleanupStarvationTest, TwelveThreadsWithBlockade) {
+  for (uint32_t i = 0; i < NumIters && elapsedTime() < std::chrono::seconds(8); ++i) {
     incCountersAllThreads();
 
     // With this blockade, use_counts for the counter get into the hundreds.
@@ -1358,8 +1358,8 @@ TEST_F(ClusterShutdownCleanupStarvationTest, EightThreadsWithBlockade) {
 // use-count of a stat will likely exceed 64k. We observe this with logging, but
 // don't EXPECT it as it's dependent on the speed of the computer on which the
 // test runs.
-TEST_F(ClusterShutdownCleanupStarvationTest, EightThreadsWithoutBlockade) {
-  for (uint32_t i = 0; i < NumIters && elapsedTime() < std::chrono::seconds(10); ++i) {
+TEST_F(ClusterShutdownCleanupStarvationTest, TwelveThreadsWithoutBlockade) {
+  for (uint32_t i = 0; i < NumIters && elapsedTime() < std::chrono::seconds(8); ++i) {
     incCountersAllThreads();
     // Here we don't quiesce the threads, so there is no time to run their
     // cross-thread cleanup callback following scope deletion.
