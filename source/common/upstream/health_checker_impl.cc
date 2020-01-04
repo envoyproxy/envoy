@@ -110,11 +110,13 @@ HttpHealthCheckerImpl::HttpHealthCheckerImpl(const Cluster& cluster,
                                              ? envoy::type::HTTP2
                                              : config.http_health_check().codec_client_type())) {
 
+  // The deprecated service_name field was previously being used to compare with the health checked
+  // cluster name using a StartsWith comparison. Since StartsWith is essentially a prefix comparison,
+  // representing the intent by using a StringMatcher prefix is a more natural way.
   if (!config.http_health_check().service_name().empty()) {
-    envoy::api::v2::core::HealthCheck mutable_config = config;
-    mutable_config.mutable_http_health_check()->mutable_service_name_matcher()->set_prefix(
-        config.http_health_check().service_name());
-    service_name_matcher_.emplace(mutable_config.http_health_check().service_name_matcher());
+    envoy::type::matcher::StringMatcher matcher;
+    matcher.set_prefix(config.http_health_check().service_name());
+    service_name_matcher_.emplace(matcher);
   } else if (config.http_health_check().has_service_name_matcher()) {
     service_name_matcher_.emplace(config.http_health_check().service_name_matcher());
   }
