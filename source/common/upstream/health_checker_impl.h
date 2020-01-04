@@ -12,7 +12,6 @@
 #include "common/grpc/codec.h"
 #include "common/http/codec_client.h"
 #include "common/router/header_parser.h"
-#include "common/runtime/runtime_features.h"
 #include "common/stream_info/stream_info_impl.h"
 #include "common/upstream/health_checker_base_impl.h"
 
