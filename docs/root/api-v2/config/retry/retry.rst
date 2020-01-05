@@ -6,4 +6,5 @@ Retry Predicates
   :maxdepth: 2
 
   */empty/*
+  omit_hosts/v2/*
   */*
