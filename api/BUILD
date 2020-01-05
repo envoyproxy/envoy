@@ -92,6 +92,7 @@ proto_library(
         "//envoy/config/retry/omit_hosts/v3alpha:pkg",
         "//envoy/config/retry/previous_priorities:pkg",
         "//envoy/config/route/v3alpha:pkg",
+        "//envoy/config/tap/v3alpha:pkg",
         "//envoy/config/trace/v2:pkg",
         "//envoy/config/trace/v2alpha:pkg",
         "//envoy/config/trace/v3alpha:pkg",

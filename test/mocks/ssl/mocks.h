@@ -104,6 +104,7 @@ public:
   MOCK_CONST_METHOD0(minProtocolVersion, unsigned());
   MOCK_CONST_METHOD0(maxProtocolVersion, unsigned());
   MOCK_CONST_METHOD0(isReady, bool());
+  MOCK_CONST_METHOD0(sessionTimeout, absl::optional<std::chrono::seconds>());
   MOCK_METHOD1(setSecretUpdateCallback, void(std::function<void()> callback));
 
   MOCK_CONST_METHOD0(requireClientCertificate, bool());

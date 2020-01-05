@@ -30,8 +30,8 @@ message GrpcService {
         "envoy.api.v2.core.GrpcService.EnvoyGrpc";
 
     // The name of the upstream gRPC cluster. SSL credentials will be supplied
-    // in the :ref:`Cluster <envoy_api_msg_service.cluster.v3alpha.Cluster>` :ref:`transport_socket
-    // <envoy_api_field_service.cluster.v3alpha.Cluster.transport_socket>`.
+    // in the :ref:`Cluster <envoy_api_msg_config.cluster.v3alpha.Cluster>` :ref:`transport_socket
+    // <envoy_api_field_config.cluster.v3alpha.Cluster.transport_socket>`.
     string cluster_name = 1 [(validate.rules).string = {min_bytes: 1}];
   }
 

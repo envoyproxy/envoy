@@ -3,7 +3,7 @@ syntax = "proto3";
 package envoy.config.filter.accesslog.v3alpha;
 
 import "envoy/config/core/v3alpha/base.proto";
-import "envoy/config/route/v3alpha/route.proto";
+import "envoy/config/route/v3alpha/route_components.proto";
 import "envoy/type/v3alpha/percent.proto";
 
 import "google/protobuf/any.proto";
