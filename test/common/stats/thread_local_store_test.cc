@@ -262,10 +262,10 @@ TEST_F(StatsThreadLocalStoreTest, Tls) {
 
   EXPECT_EQ(1UL, store_->counters().size());
   EXPECT_EQ(&c1, TestUtility::findCounter(*store_, "c1").get());
-  EXPECT_EQ(3L, TestUtility::findCounter(*store_, "c1").use_count());
+  EXPECT_EQ(2L, TestUtility::findCounter(*store_, "c1").use_count());
   EXPECT_EQ(1UL, store_->gauges().size());
   EXPECT_EQ(&g1, store_->gauges().front().get()); // front() ok when size()==1
-  EXPECT_EQ(3L, store_->gauges().front().use_count());
+  EXPECT_EQ(2L, store_->gauges().front().use_count());
 
   store_->shutdownThreading();
   tls_.shutdownThread();
@@ -965,8 +965,8 @@ TEST_F(StatsThreadLocalStoreTest, ShuttingDown) {
   store_->gauge("g2", Gauge::ImportMode::Accumulate);
 
   // c1, g1 should have a thread local ref, but c2, g2 should not.
-  EXPECT_EQ(3L, TestUtility::findCounter(*store_, "c1").use_count());
-  EXPECT_EQ(3L, TestUtility::findGauge(*store_, "g1").use_count());
+  EXPECT_EQ(2L, TestUtility::findCounter(*store_, "c1").use_count());
+  EXPECT_EQ(2L, TestUtility::findGauge(*store_, "g1").use_count());
   EXPECT_EQ(2L, TestUtility::findCounter(*store_, "c2").use_count());
   EXPECT_EQ(2L, TestUtility::findGauge(*store_, "g2").use_count());
 
@@ -1197,8 +1197,8 @@ TEST_F(HistogramTest, ParentHistogramBucketSummary) {
 
 class ClusterShutdownCleanupStarvationTest : public ThreadLocalStoreNoMocksTestBase {
 public:
-  static constexpr uint32_t NumThreads = 1; // Test seems to go fastest with 1 worker thread.
-  static constexpr uint32_t NumScopes = 2000;
+  static constexpr uint32_t NumThreads = 2;
+  static constexpr uint32_t NumScopes = 1000;
   static constexpr uint32_t NumIters = 35;
 
   // Helper class to block on a number of multi-threaded operations occurring.
@@ -1342,20 +1342,28 @@ TEST_F(ClusterShutdownCleanupStarvationTest, TwelveThreadsWithBlockade) {
   for (uint32_t i = 0; i < NumIters && elapsedTime() < std::chrono::seconds(5); ++i) {
     incCountersAllThreads();
 
-    // With this blockade, use_counts for the counter get into the hundreds.
-    // Without it, they go deep into the tens of thousands, potentially blowing
-    // through a 16-bit ref-count.
-    {
-      BlockingScope blocking_scope(NumThreads + 1);
+    // To ensure all stats are freed we have to wait for a few posts() to clear.
+    // First, wait for the main-dispatcher to initiate the cross-thread TLS cleanup.
+    auto main_dispatch_block = [this]() {
+      BlockingScope blocking_scope(1);
       main_dispatcher_->post(blocking_scope.run([]() {}));
+    };
+    main_dispatch_block();
+
+    // Next, wait for all the worker threads to complete their TLS cleanup.
+    {
+      BlockingScope blocking_scope(NumThreads);
       for (Event::DispatcherPtr& thread_dispatcher : thread_dispatchers_) {
         thread_dispatcher->post(blocking_scope.run([]() {}));
       }
     }
 
+    // Finally, wait for the final central-cache cleanup, which occurs on the main thread.
+    main_dispatch_block();
+
     // Here we show that the counter cleanups have finished, because the use-count is 1.
     CounterSharedPtr counter = alloc_.makeCounter(my_counter_scoped_name_, "", std::vector<Tag>());
-    EXPECT_EQ(1, counter->use_count());
+    EXPECT_EQ(1, counter->use_count()) << "index=" << i;
   }
 }
 

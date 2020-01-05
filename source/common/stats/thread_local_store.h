@@ -240,8 +240,8 @@ private:
   template <class Stat> using StatMap = StatNameHashMap<Stat>;
 
   struct TlsCacheEntry {
-    StatMap<CounterSharedPtr> counters_;
-    StatMap<GaugeSharedPtr> gauges_;
+    StatMap<Counter*> counters_;
+    StatMap<Gauge*> gauges_;
     StatMap<TlsHistogramSharedPtr> histograms_;
     StatMap<ParentHistogramSharedPtr> parent_histograms_;
 
@@ -260,6 +260,7 @@ private:
     StatMap<ParentHistogramImplSharedPtr> histograms_;
     StatNameStorageSet rejected_stats_;
   };
+  using CentralCacheEntryPtr = std::unique_ptr<CentralCacheEntry>;
 
   struct ScopeImpl : public TlsScope {
     ScopeImpl(ThreadLocalStoreImpl& parent, const std::string& prefix);
@@ -317,8 +318,7 @@ private:
     template <class StatType>
     StatType& safeMakeStat(StatName name, StatMap<RefcountPtr<StatType>>& central_cache_map,
                            StatNameStorageSet& central_rejected_stats,
-                           MakeStatFn<StatType> make_stat,
-                           StatMap<RefcountPtr<StatType>>* tls_cache,
+                           MakeStatFn<StatType> make_stat, StatMap<StatType*>* tls_cache,
                            StatNameHashSet* tls_rejected_stats, StatType& null_stat);
 
     /**
@@ -343,7 +343,7 @@ private:
     const uint64_t scope_id_;
     ThreadLocalStoreImpl& parent_;
     StatNameStorage prefix_;
-    mutable CentralCacheEntry central_cache_;
+    mutable CentralCacheEntryPtr central_cache_;
   };
 
   struct TlsCache : public ThreadLocal::ThreadLocalObject {
@@ -398,7 +398,7 @@ private:
   std::vector<GaugeSharedPtr> deleted_gauges_;
   std::vector<HistogramSharedPtr> deleted_histograms_;
 
-  absl::flat_hash_set<StatNameStorageSet*> rejected_stats_purgatory_ GUARDED_BY(lock_);
+  absl::flat_hash_set<CentralCacheEntry*> central_cache_purgatory_ GUARDED_BY(lock_);
   Thread::ThreadSynchronizer sync_;
 };
 
