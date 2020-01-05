@@ -3,7 +3,7 @@ syntax = "proto3";
 package envoy.config.rbac.v3alpha;
 
 import "envoy/config/core/v3alpha/address.proto";
-import "envoy/config/route/v3alpha/route.proto";
+import "envoy/config/route/v3alpha/route_components.proto";
 import "envoy/type/matcher/v3alpha/metadata.proto";
 import "envoy/type/matcher/v3alpha/string.proto";
 

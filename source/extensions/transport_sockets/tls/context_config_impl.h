@@ -134,6 +134,7 @@ public:
   const std::vector<SessionTicketKey>& sessionTicketKeys() const override {
     return session_ticket_keys_;
   }
+  absl::optional<std::chrono::seconds> sessionTimeout() const override { return session_timeout_; }
 
   bool isReady() const override {
     const bool parent_is_ready = ContextConfigImpl::isReady();
@@ -159,6 +160,8 @@ private:
   std::vector<ServerContextConfig::SessionTicketKey>
   getSessionTicketKeys(const envoy::api::v2::auth::TlsSessionTicketKeys& keys);
   ServerContextConfig::SessionTicketKey getSessionTicketKey(const std::string& key_data);
+
+  absl::optional<std::chrono::seconds> session_timeout_;
 };
 
 } // namespace Tls

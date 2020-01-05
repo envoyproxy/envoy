@@ -8,9 +8,9 @@
 #include "envoy/admin/v2alpha/config_dump.pb.h"
 #include "envoy/api/v2/discovery.pb.h"
 #include "envoy/api/v2/rds.pb.h"
-#include "envoy/api/v2/rds.pb.validate.h"
+#include "envoy/api/v2/route.pb.validate.h"
 #include "envoy/config/filter/network/http_connection_manager/v2/http_connection_manager.pb.h"
-#include "envoy/service/route/v3alpha/rds.pb.h"
+#include "envoy/config/route/v3alpha/route.pb.h"
 
 #include "common/common/assert.h"
 #include "common/common/fmt.h"
@@ -211,7 +211,7 @@ RdsRouteConfigSubscription::loadTypeUrl(envoy::api::v2::core::ApiVersion resourc
         API_NO_BOOST(envoy::api::v2::RouteConfiguration().GetDescriptor()->full_name()));
   case envoy::api::v2::core::ApiVersion::V3ALPHA:
     return Grpc::Common::typeUrl(API_NO_BOOST(
-        envoy::service::route::v3alpha::RouteConfiguration().GetDescriptor()->full_name()));
+        envoy::config::route::v3alpha::RouteConfiguration().GetDescriptor()->full_name()));
   default:
     NOT_REACHED_GCOVR_EXCL_LINE;
   }

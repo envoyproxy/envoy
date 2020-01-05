@@ -4,8 +4,8 @@ package envoy.config.filter.network.http_connection_manager.v2;
 
 import "envoy/api/v2/core/config_source.proto";
 import "envoy/api/v2/core/protocol.proto";
-import "envoy/api/v2/rds.proto";
-import "envoy/api/v2/srds.proto";
+import "envoy/api/v2/route.proto";
+import "envoy/api/v2/scoped_route.proto";
 import "envoy/config/filter/accesslog/v2/accesslog.proto";
 import "envoy/type/percent.proto";
 import "envoy/type/tracing/v2/custom_tag.proto";

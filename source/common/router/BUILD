@@ -174,7 +174,7 @@ envoy_cc_library(
         "@envoy_api//envoy/api/v2:pkg_cc_proto",
         "@envoy_api//envoy/api/v2/core:pkg_cc_proto",
         "@envoy_api//envoy/config/filter/network/http_connection_manager/v2:pkg_cc_proto",
-        "@envoy_api//envoy/service/route/v3alpha:pkg_cc_proto",
+        "@envoy_api//envoy/config/route/v3alpha:pkg_cc_proto",
     ],
 )
 
@@ -217,7 +217,7 @@ envoy_cc_library(
         "@envoy_api//envoy/api/v2:pkg_cc_proto",
         "@envoy_api//envoy/api/v2/core:pkg_cc_proto",
         "@envoy_api//envoy/config/filter/network/http_connection_manager/v2:pkg_cc_proto",
-        "@envoy_api//envoy/service/route/v3alpha:pkg_cc_proto",
+        "@envoy_api//envoy/config/route/v3alpha:pkg_cc_proto",
     ],
 )
 

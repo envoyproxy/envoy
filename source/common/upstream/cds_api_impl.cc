@@ -3,10 +3,10 @@
 #include <string>
 
 #include "envoy/api/v2/cds.pb.h"
-#include "envoy/api/v2/cds.pb.validate.h"
+#include "envoy/api/v2/cluster.pb.validate.h"
 #include "envoy/api/v2/core/config_source.pb.h"
 #include "envoy/api/v2/discovery.pb.h"
-#include "envoy/service/cluster/v3alpha/cds.pb.h"
+#include "envoy/config/cluster/v3alpha/cluster.pb.h"
 #include "envoy/stats/scope.h"
 
 #include "common/common/assert.h"
@@ -135,7 +135,7 @@ std::string CdsApiImpl::loadTypeUrl(envoy::api::v2::core::ApiVersion resource_ap
         API_NO_BOOST(envoy::api::v2::Cluster().GetDescriptor()->full_name()));
   case envoy::api::v2::core::ApiVersion::V3ALPHA:
     return Grpc::Common::typeUrl(
-        API_NO_BOOST(envoy::service::cluster::v3alpha::Cluster().GetDescriptor()->full_name()));
+        API_NO_BOOST(envoy::config::cluster::v3alpha::Cluster().GetDescriptor()->full_name()));
   default:
     NOT_REACHED_GCOVR_EXCL_LINE;
   }
