@@ -4,9 +4,9 @@
 #include "envoy/api/v2/core/config_source.pb.h"
 #include "envoy/api/v2/discovery.pb.h"
 #include "envoy/api/v2/eds.pb.h"
-#include "envoy/api/v2/eds.pb.validate.h"
+#include "envoy/api/v2/endpoint.pb.validate.h"
 #include "envoy/common/exception.h"
-#include "envoy/service/endpoint/v3alpha/eds.pb.h"
+#include "envoy/config/endpoint/v3alpha/endpoint.pb.h"
 
 #include "common/common/utility.h"
 #include "common/config/api_version.h"
@@ -231,7 +231,7 @@ std::string EdsClusterImpl::loadTypeUrl() {
         API_NO_BOOST(envoy::api::v2::ClusterLoadAssignment().GetDescriptor()->full_name()));
   case envoy::api::v2::core::ConfigSource::V3ALPHA:
     return Grpc::Common::typeUrl(API_NO_BOOST(
-        envoy::service::endpoint::v3alpha::ClusterLoadAssignment().GetDescriptor()->full_name()));
+        envoy::config::endpoint::v3alpha::ClusterLoadAssignment().GetDescriptor()->full_name()));
   default:
     throw EnvoyException(fmt::format("type {} is not supported", xds_api_version_));
   }

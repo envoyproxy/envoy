@@ -1,4 +1,4 @@
-#include "envoy/config/route/v3alpha/route.pb.h"
+#include "envoy/config/route/v3alpha/route_components.pb.h"
 
 void test() {
   envoy::config::route::v3alpha::RouteAction route_action;

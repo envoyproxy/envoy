@@ -6,7 +6,6 @@
 #include "envoy/api/v2/core/config_source.pb.h"
 #include "envoy/api/v2/discovery.pb.h"
 #include "envoy/api/v2/lds.pb.h"
-#include "envoy/api/v2/lds.pb.validate.h"
 #include "envoy/api/v2/listener.pb.validate.h"
 #include "envoy/config/listener/v3alpha/listener.pb.h"
 #include "envoy/stats/scope.h"
