@@ -2,6 +2,7 @@ syntax = "proto3";
 
 package envoy.config.bootstrap.v3alpha;
 
+import "envoy/config/cluster/v3alpha/cluster.proto";
 import "envoy/config/core/v3alpha/address.proto";
 import "envoy/config/core/v3alpha/base.proto";
 import "envoy/config/core/v3alpha/config_source.proto";
@@ -10,7 +11,6 @@ import "envoy/config/metrics/v3alpha/stats.proto";
 import "envoy/config/overload/v3alpha/overload.proto";
 import "envoy/config/trace/v3alpha/trace.proto";
 import "envoy/extensions/transport_sockets/tls/v3alpha/cert.proto";
-import "envoy/service/cluster/v3alpha/cds.proto";
 
 import "google/protobuf/duration.proto";
 import "google/protobuf/struct.proto";
@@ -48,7 +48,7 @@ message Bootstrap {
     // necessary to have some initial cluster definitions available to allow Envoy to know how to
     // speak to the management server. These cluster definitions may not use :ref:`EDS
     // <arch_overview_dynamic_config_eds>` (i.e. they should be static IP or DNS-based).
-    repeated service.cluster.v3alpha.Cluster clusters = 2;
+    repeated cluster.v3alpha.Cluster clusters = 2;
 
     // These static secrets can be used by :ref:`SdsSecretConfig
     // <envoy_api_msg_extensions.transport_sockets.tls.v3alpha.SdsSecretConfig>`
@@ -65,7 +65,7 @@ message Bootstrap {
     // single :ref:`LDS <arch_overview_dynamic_config_lds>` configuration source.
     core.v3alpha.ConfigSource lds_config = 1;
 
-    // All post-bootstrap :ref:`Cluster <envoy_api_msg_service.cluster.v3alpha.Cluster>` definitions
+    // All post-bootstrap :ref:`Cluster <envoy_api_msg_config.cluster.v3alpha.Cluster>` definitions
     // are provided by a single :ref:`CDS <arch_overview_dynamic_config_cds>` configuration source.
     core.v3alpha.ConfigSource cds_config = 2;
 
@@ -164,9 +164,9 @@ message Bootstrap {
 
   // Always use TCP queries instead of UDP queries for DNS lookups.
   // This may be overridden on a per-cluster basis in cds_config,
-  // when :ref:`dns_resolvers <envoy_api_field_service.cluster.v3alpha.Cluster.dns_resolvers>` and
+  // when :ref:`dns_resolvers <envoy_api_field_config.cluster.v3alpha.Cluster.dns_resolvers>` and
   // :ref:`use_tcp_for_dns_lookups
-  // <envoy_api_field_service.cluster.v3alpha.Cluster.use_tcp_for_dns_lookups>` are specified.
+  // <envoy_api_field_config.cluster.v3alpha.Cluster.use_tcp_for_dns_lookups>` are specified.
   bool use_tcp_for_dns_lookups = 20;
 }
 
@@ -210,7 +210,7 @@ message ClusterManager {
   // this configuration). In order to enable :ref:`zone aware routing
   // <arch_overview_load_balancing_zone_aware_routing>` this option must be set.
   // If *local_cluster_name* is defined then :ref:`clusters
-  // <envoy_api_msg_service.cluster.v3alpha.Cluster>` must be defined in the :ref:`Bootstrap
+  // <envoy_api_msg_config.cluster.v3alpha.Cluster>` must be defined in the :ref:`Bootstrap
   // static cluster resources
   // <envoy_api_field_config.bootstrap.v3alpha.Bootstrap.StaticResources.clusters>`. This is
   // unrelated to the :option:`--service-cluster` option which does not `affect zone aware routing

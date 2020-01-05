@@ -257,7 +257,7 @@ message AsyncDataSource {
 }
 
 // Configuration for transport socket in :ref:`listeners <config_listeners>` and
-// :ref:`clusters <envoy_api_msg_service.cluster.v3alpha.Cluster>`. If the configuration is
+// :ref:`clusters <envoy_api_msg_config.cluster.v3alpha.Cluster>`. If the configuration is
 // empty, a default transport socket implementation and configuration will be
 // chosen based on the platform and existence of tls_context.
 message TransportSocket {

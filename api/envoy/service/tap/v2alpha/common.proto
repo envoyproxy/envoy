@@ -4,15 +4,17 @@ package envoy.service.tap.v2alpha;
 
 import "envoy/api/v2/core/base.proto";
 import "envoy/api/v2/core/grpc_service.proto";
-import "envoy/api/v2/route/route.proto";
+import "envoy/api/v2/route/route_components.proto";
 
 import "google/protobuf/wrappers.proto";
 
+import "udpa/annotations/migrate.proto";
 import "validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.service.tap.v2alpha";
 option java_outer_classname = "CommonProto";
 option java_multiple_files = true;
+option (udpa.annotations.file_migrate).move_to_package = "envoy.config.tap.v3alpha";
 
 // [#protodoc-title: Common tap configuration]
 

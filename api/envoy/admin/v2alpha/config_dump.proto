@@ -3,10 +3,10 @@ syntax = "proto3";
 package envoy.admin.v2alpha;
 
 import "envoy/api/v2/auth/cert.proto";
-import "envoy/api/v2/cds.proto";
+import "envoy/api/v2/cluster.proto";
 import "envoy/api/v2/listener.proto";
-import "envoy/api/v2/rds.proto";
-import "envoy/api/v2/srds.proto";
+import "envoy/api/v2/route.proto";
+import "envoy/api/v2/scoped_route.proto";
 import "envoy/config/bootstrap/v2/bootstrap.proto";
 
 import "google/protobuf/any.proto";

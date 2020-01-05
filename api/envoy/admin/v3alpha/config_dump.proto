@@ -3,11 +3,11 @@ syntax = "proto3";
 package envoy.admin.v3alpha;
 
 import "envoy/config/bootstrap/v3alpha/bootstrap.proto";
+import "envoy/config/cluster/v3alpha/cluster.proto";
 import "envoy/config/listener/v3alpha/listener.proto";
+import "envoy/config/route/v3alpha/route.proto";
+import "envoy/config/route/v3alpha/scoped_route.proto";
 import "envoy/extensions/transport_sockets/tls/v3alpha/cert.proto";
-import "envoy/service/cluster/v3alpha/cds.proto";
-import "envoy/service/route/v3alpha/rds.proto";
-import "envoy/service/route/v3alpha/srds.proto";
 
 import "google/protobuf/any.proto";
 import "google/protobuf/timestamp.proto";
@@ -164,7 +164,7 @@ message ClustersConfigDump {
         "envoy.admin.v2alpha.ClustersConfigDump.StaticCluster";
 
     // The cluster config.
-    service.cluster.v3alpha.Cluster cluster = 1;
+    config.cluster.v3alpha.Cluster cluster = 1;
 
     // The timestamp when the Cluster was last updated.
     google.protobuf.Timestamp last_updated = 2;
@@ -183,7 +183,7 @@ message ClustersConfigDump {
     string version_info = 1;
 
     // The cluster config.
-    service.cluster.v3alpha.Cluster cluster = 2;
+    config.cluster.v3alpha.Cluster cluster = 2;
 
     // The timestamp when the Cluster was last updated.
     google.protobuf.Timestamp last_updated = 3;
@@ -223,7 +223,7 @@ message RoutesConfigDump {
         "envoy.admin.v2alpha.RoutesConfigDump.StaticRouteConfig";
 
     // The route config.
-    service.route.v3alpha.RouteConfiguration route_config = 1;
+    config.route.v3alpha.RouteConfiguration route_config = 1;
 
     // The timestamp when the Route was last updated.
     google.protobuf.Timestamp last_updated = 2;
@@ -240,7 +240,7 @@ message RoutesConfigDump {
     string version_info = 1;
 
     // The route config.
-    service.route.v3alpha.RouteConfiguration route_config = 2;
+    config.route.v3alpha.RouteConfiguration route_config = 2;
 
     // The timestamp when the Route was last updated.
     google.protobuf.Timestamp last_updated = 3;
@@ -269,7 +269,7 @@ message ScopedRoutesConfigDump {
     string name = 1;
 
     // The scoped route configurations.
-    repeated service.route.v3alpha.ScopedRouteConfiguration scoped_route_configs = 2;
+    repeated config.route.v3alpha.ScopedRouteConfiguration scoped_route_configs = 2;
 
     // The timestamp when the scoped route config set was last updated.
     google.protobuf.Timestamp last_updated = 3;
@@ -289,7 +289,7 @@ message ScopedRoutesConfigDump {
     string version_info = 2;
 
     // The scoped route configurations.
-    repeated service.route.v3alpha.ScopedRouteConfiguration scoped_route_configs = 3;
+    repeated config.route.v3alpha.ScopedRouteConfiguration scoped_route_configs = 3;
 
     // The timestamp when the scoped route config set was last updated.
     google.protobuf.Timestamp last_updated = 4;

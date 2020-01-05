@@ -386,6 +386,11 @@ ServerContextConfigImpl::ServerContextConfigImpl(
              !config.common_tls_context().tls_certificate_sds_secret_configs().empty()) {
     throw EnvoyException("SDS and non-SDS TLS certificates may not be mixed in server contexts");
   }
+
+  if (config.has_session_timeout()) {
+    session_timeout_ =
+        std::chrono::seconds(DurationUtil::durationToSeconds(config.session_timeout()));
+  }
 }
 
 ServerContextConfigImpl::~ServerContextConfigImpl() {
