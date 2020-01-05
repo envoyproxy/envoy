@@ -1197,9 +1197,9 @@ TEST_F(HistogramTest, ParentHistogramBucketSummary) {
 
 class ClusterShutdownCleanupStarvationTest : public ThreadLocalStoreNoMocksTestBase {
 public:
-  static constexpr uint32_t NumThreads = 12;
-  static constexpr uint32_t NumScopes = 200;
-  static constexpr uint32_t NumIters = 150;
+  static constexpr uint32_t NumThreads = 1; // Test seems to go fastest with 1 worker thread.
+  static constexpr uint32_t NumScopes = 2000;
+  static constexpr uint32_t NumIters = 35;
 
   // Helper class to block on a number of multi-threaded operations occurring.
   class BlockingScope {
@@ -1229,7 +1229,8 @@ public:
   ClusterShutdownCleanupStarvationTest()
       : start_time_(time_system_.monotonicTime()), api_(Api::createApiForTest()),
         thread_factory_(api_->threadFactory()), pool_(store_->symbolTable()),
-        my_counter_name_(pool_.add("my_counter")) {
+        my_counter_name_(pool_.add("my_counter")),
+        my_counter_scoped_name_(pool_.add("scope.my_counter")) {
     // This is the same order as InstanceImpl::initialize in source/server/server.cc.
     thread_dispatchers_.resize(NumThreads);
     {
@@ -1330,6 +1331,7 @@ public:
   std::vector<Thread::ThreadPtr> threads_;
   StatNamePool pool_;
   StatName my_counter_name_;
+  StatName my_counter_scoped_name_;
 };
 
 // Tests the scenario where a cluster and stat are allocated in multiple
@@ -1337,33 +1339,51 @@ public:
 // empty callback to main to ensure that cross-scope thread cleanups complete.
 // In this test, we don't expect the use-count of the stat to get very high.
 TEST_F(ClusterShutdownCleanupStarvationTest, TwelveThreadsWithBlockade) {
-  for (uint32_t i = 0; i < NumIters && elapsedTime() < std::chrono::seconds(8); ++i) {
+  for (uint32_t i = 0; i < NumIters && elapsedTime() < std::chrono::seconds(5); ++i) {
     incCountersAllThreads();
 
     // With this blockade, use_counts for the counter get into the hundreds.
-    // Without it, they go deep into the tens of thousands, blowing through
-    // a 16-bit ref-count. So depending on the dynamics of an xDS update as
-    // described in #9448, the behavior could be due to ref-count overrun,
-    // and will be easily fixed.
+    // Without it, they go deep into the tens of thousands, potentially blowing
+    // through a 16-bit ref-count.
     {
-      BlockingScope blocking_scope(1);
+      BlockingScope blocking_scope(NumThreads + 1);
       main_dispatcher_->post(blocking_scope.run([]() {}));
+      for (Event::DispatcherPtr& thread_dispatcher : thread_dispatchers_) {
+        thread_dispatcher->post(blocking_scope.run([]() {}));
+      }
     }
+
+    // Here we show that the counter cleanups have finished, because the use-count is 1.
+    CounterSharedPtr counter = alloc_.makeCounter(my_counter_scoped_name_, "", std::vector<Tag>());
+    EXPECT_EQ(1, counter->use_count());
   }
 }
 
 // In this test, we don't run the main-callback post() in between each
-// iteration, so the cross-thread cleanup never gets a chance to run. Thus with
-// the parameters defined here, and a normal build (not tsan, not asan), the
-// use-count of a stat will likely exceed 64k. We observe this with logging, but
-// don't EXPECT it as it's dependent on the speed of the computer on which the
-// test runs.
+// iteration, and we use a thread synchronizer to block the cross-thread
+// cleanup. Thus no stat references in the caches get freed and the use_count()
+// grows without bound.
 TEST_F(ClusterShutdownCleanupStarvationTest, TwelveThreadsWithoutBlockade) {
-  for (uint32_t i = 0; i < NumIters && elapsedTime() < std::chrono::seconds(8); ++i) {
+  store_->sync().enable();
+  store_->sync().waitOn(ThreadLocalStoreImpl::MainDispatcherCleanupSync);
+  for (uint32_t i = 0; i < NumIters && elapsedTime() < std::chrono::seconds(5); ++i) {
     incCountersAllThreads();
-    // Here we don't quiesce the threads, so there is no time to run their
-    // cross-thread cleanup callback following scope deletion.
+    // As we have blocked the main dispatcher cleanup function above, nothing
+    // gets cleaned up and use-counts grow without bound as we recreate scopes,
+    // recreating the same counter in each one.
+
+    // Compute the use-count of one of the counters. This shows that by blocking
+    // the main-dispatcher cleanup thread, the use-counts grow without bound.
+    // We set our parameters so we attempt to exceed a use-count of 64k when
+    // running the test: NumScopes*NumThreads*NumIters == 70000, We use a timer
+    // so we don't time out on asan/tsan tests, In opt builds this test takes
+    // less than a second, and in fastbuild it takes less than 5.
+    CounterSharedPtr counter = alloc_.makeCounter(my_counter_scoped_name_, "", std::vector<Tag>());
+    uint32_t use_count = counter->use_count() - 1; // Subtract off this instance.
+    EXPECT_EQ((i + 1) * NumScopes * NumThreads, use_count);
   }
+  EXPECT_EQ(70000, NumThreads * NumScopes * NumIters);
+  store_->sync().signal(ThreadLocalStoreImpl::MainDispatcherCleanupSync);
 }
 
 } // namespace Stats
