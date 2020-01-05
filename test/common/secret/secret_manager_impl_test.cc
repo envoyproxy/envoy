@@ -8,6 +8,7 @@
 
 #include "common/common/base64.h"
 #include "common/common/logger.h"
+#include "common/config/api_version.h"
 #include "common/secret/sds_api.h"
 #include "common/secret/secret_manager_impl.h"
 #include "common/ssl/certificate_validation_context_config_impl.h"
@@ -262,7 +263,8 @@ api_config_source:
   auto secret_provider2 =
       secret_manager->findOrCreateTlsCertificateProvider(config_source, "abc.com", secret_context);
 
-  envoy::config::grpc_credential::v2alpha::FileBasedMetadataConfig file_based_metadata_config;
+  API_NO_BOOST(envoy::config::grpc_credential::v2alpha::FileBasedMetadataConfig)
+  file_based_metadata_config;
   TestUtility::loadFromYaml(R"(
 header_key: x-token-bin
 secret_data:

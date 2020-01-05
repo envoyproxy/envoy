@@ -9,7 +9,6 @@
 #include "envoy/config/subscription_factory.h"
 #include "envoy/init/manager.h"
 #include "envoy/server/listener_manager.h"
-#include "envoy/service/listener/v3alpha/lds.pb.h"
 #include "envoy/stats/scope.h"
 
 #include "common/common/logger.h"

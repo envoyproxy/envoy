@@ -5,7 +5,7 @@
 #include "envoy/api/v2/discovery.pb.h"
 #include "envoy/api/v2/rds.pb.h"
 #include "envoy/api/v2/route/route.pb.h"
-#include "envoy/api/v2/route/route.pb.validate.h"
+#include "envoy/api/v2/route/route_components.pb.validate.h"
 
 #include "common/common/assert.h"
 #include "common/common/fmt.h"

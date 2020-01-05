@@ -290,6 +290,19 @@ public:
   }
 
   /**
+   * Compare two JSON strings serialized from ProtobufWkt::Struct for equality. When two identical
+   * ProtobufWkt::Struct are serialized into JSON strings, the results have the same set of
+   * properties (values), but the positions may be different.
+   *
+   * @param lhs JSON string on LHS.
+   * @param rhs JSON string on RHS.
+   * @return bool indicating whether the JSON strings are equal.
+   */
+  static bool jsonStringEqual(const std::string& lhs, const std::string& rhs) {
+    return protoEqual(jsonToStruct(lhs), jsonToStruct(rhs));
+  }
+
+  /**
    * Symmetrically pad a string with '=' out to a desired length.
    * @param to_pad the string being padded around.
    * @param desired_length the length we want the padding to bring the string up to.
@@ -541,6 +554,12 @@ public:
     MessageUtil::jsonConvert(source, tmp);
     MessageUtil::jsonConvert(tmp, ProtobufMessage::getStrictValidationVisitor(), dest);
   }
+
+  static ProtobufWkt::Struct jsonToStruct(const std::string& json) {
+    ProtobufWkt::Struct message;
+    MessageUtil::loadFromJson(json, message);
+    return message;
+  }
 };
 
 /**
@@ -739,6 +758,20 @@ MATCHER_P(Percent, rhs, "") {
   expected.set_numerator(rhs);
   expected.set_denominator(envoy::type::FractionalPercent::HUNDRED);
   return TestUtility::protoEqual(expected, arg, /*ignore_repeated_field_ordering=*/false);
+}
+
+MATCHER_P(JsonStringEq, expected, "") {
+  const bool equal = TestUtility::jsonStringEqual(arg, expected);
+  if (!equal) {
+    *result_listener << "\n"
+                     << TestUtility::addLeftAndRightPadding("Expected JSON string:") << "\n"
+                     << expected
+                     << TestUtility::addLeftAndRightPadding("is not equal to actual JSON string:")
+                     << "\n"
+                     << arg << TestUtility::addLeftAndRightPadding("") // line full of padding
+                     << "\n";
+  }
+  return equal;
 }
 
 } // namespace Envoy

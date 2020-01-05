@@ -5,8 +5,8 @@ package envoy.extensions.filters.network.http_connection_manager.v3alpha;
 import "envoy/config/core/v3alpha/config_source.proto";
 import "envoy/config/core/v3alpha/protocol.proto";
 import "envoy/config/filter/accesslog/v3alpha/accesslog.proto";
-import "envoy/service/route/v3alpha/rds.proto";
-import "envoy/service/route/v3alpha/srds.proto";
+import "envoy/config/route/v3alpha/route.proto";
+import "envoy/config/route/v3alpha/scoped_route.proto";
 import "envoy/type/tracing/v2/custom_tag.proto";
 import "envoy/type/v3alpha/percent.proto";
 
@@ -239,7 +239,7 @@ message HttpConnectionManager {
     Rds rds = 3;
 
     // The route table for the connection manager is static and is specified in this property.
-    service.route.v3alpha.RouteConfiguration route_config = 4;
+    config.route.v3alpha.RouteConfiguration route_config = 4;
 
     // A route table will be dynamically assigned to each request based on request attributes
     // (e.g., the value of a header). The "routing scopes" (i.e., route tables) and "scope keys" are
@@ -495,7 +495,7 @@ message ScopedRouteConfigurationsList {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.network.http_connection_manager.v2.ScopedRouteConfigurationsList";
 
-  repeated service.route.v3alpha.ScopedRouteConfiguration scoped_route_configurations = 1
+  repeated config.route.v3alpha.ScopedRouteConfiguration scoped_route_configurations = 1
       [(validate.rules).repeated = {min_items: 1}];
 }
 
@@ -506,15 +506,15 @@ message ScopedRoutes {
 
   // Specifies the mechanism for constructing "scope keys" based on HTTP request attributes. These
   // keys are matched against a set of
-  // :ref:`Key<envoy_api_msg_service.route.v3alpha.ScopedRouteConfiguration.Key>` objects assembled
+  // :ref:`Key<envoy_api_msg_config.route.v3alpha.ScopedRouteConfiguration.Key>` objects assembled
   // from
-  // :ref:`ScopedRouteConfiguration<envoy_api_msg_service.route.v3alpha.ScopedRouteConfiguration>`
+  // :ref:`ScopedRouteConfiguration<envoy_api_msg_config.route.v3alpha.ScopedRouteConfiguration>`
   // messages distributed via SRDS (the Scoped Route Discovery Service) or assigned statically via
   // :ref:`scoped_route_configurations_list<envoy_api_field_extensions.filters.network.http_connection_manager.v3alpha.ScopedRoutes.scoped_route_configurations_list>`.
   //
   // Upon receiving a request's headers, the Router will build a key using the algorithm specified
   // by this message. This key will be used to look up the routing table (i.e., the
-  // :ref:`RouteConfiguration<envoy_api_msg_service.route.v3alpha.RouteConfiguration>`) to use for
+  // :ref:`RouteConfiguration<envoy_api_msg_config.route.v3alpha.RouteConfiguration>`) to use for
   // the request.
   message ScopeKeyBuilder {
     option (udpa.annotations.versioning).previous_message_type =

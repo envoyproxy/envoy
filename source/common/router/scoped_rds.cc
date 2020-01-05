@@ -5,10 +5,10 @@
 #include "envoy/admin/v2alpha/config_dump.pb.h"
 #include "envoy/api/v2/core/config_source.pb.h"
 #include "envoy/api/v2/discovery.pb.h"
+#include "envoy/api/v2/scoped_route.pb.validate.h"
 #include "envoy/api/v2/srds.pb.h"
-#include "envoy/api/v2/srds.pb.validate.h"
 #include "envoy/config/filter/network/http_connection_manager/v2/http_connection_manager.pb.h"
-#include "envoy/service/route/v3alpha/srds.pb.h"
+#include "envoy/config/route/v3alpha/scoped_route.pb.h"
 
 #include "common/common/assert.h"
 #include "common/common/cleanup.h"
@@ -352,7 +352,7 @@ std::string ScopedRdsConfigSubscription::loadTypeUrl() {
         API_NO_BOOST(envoy::api::v2::ScopedRouteConfiguration().GetDescriptor()->full_name()));
   case envoy::api::v2::core::ConfigSource::V3ALPHA:
     return Grpc::Common::typeUrl(API_NO_BOOST(
-        envoy::service::route::v3alpha::ScopedRouteConfiguration().GetDescriptor()->full_name()));
+        envoy::config::route::v3alpha::ScopedRouteConfiguration().GetDescriptor()->full_name()));
   default:
     throw EnvoyException(fmt::format("type {} is not supported", xds_api_version_));
   }

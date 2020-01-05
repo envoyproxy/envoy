@@ -109,7 +109,7 @@ message RateLimitSettings {
 
 // Configuration for :ref:`listeners <config_listeners>`, :ref:`clusters
 // <config_cluster_manager>`, :ref:`routes
-// <envoy_api_msg_service.route.v3alpha.RouteConfiguration>`, :ref:`endpoints
+// <envoy_api_msg_config.route.v3alpha.RouteConfiguration>`, :ref:`endpoints
 // <arch_overview_service_discovery>` etc. may either be sourced from the
 // filesystem or from an xDS API source. Filesystem configs are watched with
 // inotify for updates.
