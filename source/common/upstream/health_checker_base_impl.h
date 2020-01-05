@@ -44,7 +44,7 @@ public:
   // Upstream::HealthChecker
   void addHostCheckCompleteCb(HostStatusCb callback) override { callbacks_.push_back(callback); }
   void start() override;
-  std::shared_ptr<Network::TransportSocketOptionsImpl> transportSocketOptions() const {
+  std::shared_ptr<const Network::TransportSocketOptionsImpl> transportSocketOptions() const {
     return transport_socket_options_;
   }
 
@@ -133,7 +133,7 @@ private:
   void refreshHealthyStat();
   void runCallbacks(HostSharedPtr host, HealthTransition changed_state);
   void setUnhealthyCrossThread(const HostSharedPtr& host);
-  std::shared_ptr<Network::TransportSocketOptionsImpl>
+  std::shared_ptr<const Network::TransportSocketOptionsImpl>
   initTransportSocketOptions(const envoy::api::v2::core::HealthCheck& config) const;
 
   static const std::chrono::milliseconds NO_TRAFFIC_INTERVAL;
@@ -150,7 +150,7 @@ private:
   std::unordered_map<HostSharedPtr, ActiveHealthCheckSessionPtr> active_sessions_;
   uint64_t local_process_healthy_{};
   uint64_t local_process_degraded_{};
-  std::shared_ptr<Network::TransportSocketOptionsImpl> transport_socket_options_;
+  const std::shared_ptr<const Network::TransportSocketOptionsImpl> transport_socket_options_;
 };
 
 class HealthCheckEventLoggerImpl : public HealthCheckEventLogger {
