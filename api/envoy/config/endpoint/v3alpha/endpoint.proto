@@ -2,10 +2,11 @@ syntax = "proto3";
 
 package envoy.config.endpoint.v3alpha;
 
-import "envoy/config/core/v3alpha/address.proto";
-import "envoy/config/core/v3alpha/base.proto";
-import "envoy/config/core/v3alpha/health_check.proto";
+import "envoy/config/endpoint/v3alpha/endpoint_components.proto";
+import "envoy/type/v3alpha/percent.proto";
 
+import "google/api/annotations.proto";
+import "google/protobuf/duration.proto";
 import "google/protobuf/wrappers.proto";
 
 import "udpa/annotations/versioning.proto";
@@ -16,126 +17,109 @@ option java_package = "io.envoyproxy.envoy.config.endpoint.v3alpha";
 option java_outer_classname = "EndpointProto";
 option java_multiple_files = true;
 
-// [#protodoc-title: Endpoints]
+// [#protodoc-title: Endpoint configuration]
+// Endpoint discovery :ref:`architecture overview <arch_overview_service_discovery_types_eds>`
 
-// Upstream host identifier.
-message Endpoint {
-  option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.endpoint.Endpoint";
-
-  // The optional health check configuration.
-  message HealthCheckConfig {
-    option (udpa.annotations.versioning).previous_message_type =
-        "envoy.api.v2.endpoint.Endpoint.HealthCheckConfig";
-
-    // Optional alternative health check port value.
-    //
-    // By default the health check address port of an upstream host is the same
-    // as the host's serving address port. This provides an alternative health
-    // check port. Setting this with a non-zero value allows an upstream host
-    // to have different health check address port.
-    uint32 port_value = 1 [(validate.rules).uint32 = {lte: 65535}];
-  }
-
-  // The upstream host address.
-  //
-  // .. attention::
-  //
-  //   The form of host address depends on the given cluster type. For STATIC or EDS,
-  //   it is expected to be a direct IP address (or something resolvable by the
-  //   specified :ref:`resolver <envoy_api_field_config.core.v3alpha.SocketAddress.resolver_name>`
-  //   in the Address). For LOGICAL or STRICT DNS, it is expected to be hostname,
-  //   and will be resolved via DNS.
-  core.v3alpha.Address address = 1;
-
-  // The optional health check configuration is used as configuration for the
-  // health checker to contact the health checked host.
-  //
-  // .. attention::
-  //
-  //   This takes into effect only for upstream clusters with
-  //   :ref:`active health checking <arch_overview_health_checking>` enabled.
-  HealthCheckConfig health_check_config = 2;
-}
-
-// An Endpoint that Envoy can route traffic to.
+// Each route from RDS will map to a single cluster or traffic split across
+// clusters using weights expressed in the RDS WeightedCluster.
+//
+// With EDS, each cluster is treated independently from a LB perspective, with
+// LB taking place between the Localities within a cluster and at a finer
+// granularity between the hosts within a locality. The percentage of traffic
+// for each endpoint is determined by both its load_balancing_weight, and the
+// load_balancing_weight of its locality. First, a locality will be selected,
+// then an endpoint within that locality will be chose based on its weight.
 // [#next-free-field: 6]
-message LbEndpoint {
-  option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.endpoint.LbEndpoint";
+message ClusterLoadAssignment {
+  option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.ClusterLoadAssignment";
 
-  // Upstream host identifier or a named reference.
-  oneof host_identifier {
-    Endpoint endpoint = 1;
+  // Load balancing policy settings.
+  // [#next-free-field: 6]
+  message Policy {
+    option (udpa.annotations.versioning).previous_message_type =
+        "envoy.api.v2.ClusterLoadAssignment.Policy";
 
+    message DropOverload {
+      option (udpa.annotations.versioning).previous_message_type =
+          "envoy.api.v2.ClusterLoadAssignment.Policy.DropOverload";
+
+      // Identifier for the policy specifying the drop.
+      string category = 1 [(validate.rules).string = {min_bytes: 1}];
+
+      // Percentage of traffic that should be dropped for the category.
+      type.v3alpha.FractionalPercent drop_percentage = 2;
+    }
+
+    reserved 1;
+
+    // Action to trim the overall incoming traffic to protect the upstream
+    // hosts. This action allows protection in case the hosts are unable to
+    // recover from an outage, or unable to autoscale or unable to handle
+    // incoming traffic volume for any reason.
+    //
+    // At the client each category is applied one after the other to generate
+    // the 'actual' drop percentage on all outgoing traffic. For example:
+    //
+    // .. code-block:: json
+    //
+    //  { "drop_overloads": [
+    //      { "category": "throttle", "drop_percentage": 60 }
+    //      { "category": "lb", "drop_percentage": 50 }
+    //  ]}
+    //
+    // The actual drop percentages applied to the traffic at the clients will be
+    //    "throttle"_drop = 60%
+    //    "lb"_drop = 20%  // 50% of the remaining 'actual' load, which is 40%.
+    //    actual_outgoing_load = 20% // remaining after applying all categories.
+    repeated DropOverload drop_overloads = 2;
+
+    // Priority levels and localities are considered overprovisioned with this
+    // factor (in percentage). This means that we don't consider a priority
+    // level or locality unhealthy until the percentage of healthy hosts
+    // multiplied by the overprovisioning factor drops below 100.
+    // With the default value 140(1.4), Envoy doesn't consider a priority level
+    // or a locality unhealthy until their percentage of healthy hosts drops
+    // below 72%. For example:
+    //
+    // .. code-block:: json
+    //
+    //  { "overprovisioning_factor": 100 }
+    //
+    // Read more at :ref:`priority levels <arch_overview_load_balancing_priority_levels>` and
+    // :ref:`localities <arch_overview_load_balancing_locality_weighted_lb>`.
+    google.protobuf.UInt32Value overprovisioning_factor = 3 [(validate.rules).uint32 = {gt: 0}];
+
+    // The max time until which the endpoints from this assignment can be used.
+    // If no new assignments are received before this time expires the endpoints
+    // are considered stale and should be marked unhealthy.
+    // Defaults to 0 which means endpoints never go stale.
+    google.protobuf.Duration endpoint_stale_after = 4 [(validate.rules).duration = {gt {}}];
+
+    // The flag to disable overprovisioning. If it is set to true,
+    // :ref:`overprovisioning factor
+    // <arch_overview_load_balancing_overprovisioning_factor>` will be ignored
+    // and Envoy will not perform graceful failover between priority levels or
+    // localities as endpoints become unhealthy. Otherwise Envoy will perform
+    // graceful failover as :ref:`overprovisioning factor
+    // <arch_overview_load_balancing_overprovisioning_factor>` suggests.
+    // [#next-major-version: Unify with overprovisioning config as a single message.]
     // [#not-implemented-hide:]
-    string endpoint_name = 5;
+    bool disable_overprovisioning = 5;
   }
 
-  // Optional health status when known and supplied by EDS server.
-  core.v3alpha.HealthStatus health_status = 2;
+  // Name of the cluster. This will be the :ref:`service_name
+  // <envoy_api_field_config.cluster.v3alpha.Cluster.EdsClusterConfig.service_name>` value if
+  // specified in the cluster :ref:`EdsClusterConfig
+  // <envoy_api_msg_config.cluster.v3alpha.Cluster.EdsClusterConfig>`.
+  string cluster_name = 1 [(validate.rules).string = {min_bytes: 1}];
 
-  // The endpoint metadata specifies values that may be used by the load
-  // balancer to select endpoints in a cluster for a given request. The filter
-  // name should be specified as *envoy.lb*. An example boolean key-value pair
-  // is *canary*, providing the optional canary status of the upstream host.
-  // This may be matched against in a route's
-  // :ref:`RouteAction <envoy_api_msg_config.route.v3alpha.RouteAction>` metadata_match field
-  // to subset the endpoints considered in cluster load balancing.
-  core.v3alpha.Metadata metadata = 3;
+  // List of endpoints to load balance to.
+  repeated LocalityLbEndpoints endpoints = 2;
 
-  // The optional load balancing weight of the upstream host; at least 1.
-  // Envoy uses the load balancing weight in some of the built in load
-  // balancers. The load balancing weight for an endpoint is divided by the sum
-  // of the weights of all endpoints in the endpoint's locality to produce a
-  // percentage of traffic for the endpoint. This percentage is then further
-  // weighted by the endpoint's locality's load balancing weight from
-  // LocalityLbEndpoints. If unspecified, each host is presumed to have equal
-  // weight in a locality.
-  google.protobuf.UInt32Value load_balancing_weight = 4 [(validate.rules).uint32 = {gte: 1}];
-}
-
-// A group of endpoints belonging to a Locality.
-// One can have multiple LocalityLbEndpoints for a locality, but this is
-// generally only done if the different groups need to have different load
-// balancing weights or different priorities.
-// [#next-free-field: 7]
-message LocalityLbEndpoints {
-  option (udpa.annotations.versioning).previous_message_type =
-      "envoy.api.v2.endpoint.LocalityLbEndpoints";
-
-  // Identifies location of where the upstream hosts run.
-  core.v3alpha.Locality locality = 1;
-
-  // The group of endpoints belonging to the locality specified.
-  repeated LbEndpoint lb_endpoints = 2;
-
-  // Optional: Per priority/region/zone/sub_zone weight; at least 1. The load
-  // balancing weight for a locality is divided by the sum of the weights of all
-  // localities  at the same priority level to produce the effective percentage
-  // of traffic for the locality.
-  //
-  // Locality weights are only considered when :ref:`locality weighted load
-  // balancing <arch_overview_load_balancing_locality_weighted_lb>` is
-  // configured. These weights are ignored otherwise. If no weights are
-  // specified when locality weighted load balancing is enabled, the locality is
-  // assigned no load.
-  google.protobuf.UInt32Value load_balancing_weight = 3 [(validate.rules).uint32 = {gte: 1}];
-
-  // Optional: the priority for this LocalityLbEndpoints. If unspecified this will
-  // default to the highest priority (0).
-  //
-  // Under usual circumstances, Envoy will only select endpoints for the highest
-  // priority (0). In the event all endpoints for a particular priority are
-  // unavailable/unhealthy, Envoy will fail over to selecting endpoints for the
-  // next highest priority group.
-  //
-  // Priorities should range from 0 (highest) to N (lowest) without skipping.
-  uint32 priority = 5 [(validate.rules).uint32 = {lte: 128}];
-
-  // Optional: Per locality proximity value which indicates how close this
-  // locality is from the source locality. This value only provides ordering
-  // information (lower the value, closer it is to the source locality).
-  // This will be consumed by load balancing schemes that need proximity order
-  // to determine where to route the requests.
+  // Map of named endpoints that can be referenced in LocalityLbEndpoints.
   // [#not-implemented-hide:]
-  google.protobuf.UInt32Value proximity = 6;
+  map<string, Endpoint> named_endpoints = 5;
+
+  // Load balancing policy settings.
+  Policy policy = 4;
 }

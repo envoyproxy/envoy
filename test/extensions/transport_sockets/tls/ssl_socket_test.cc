@@ -2368,7 +2368,8 @@ void testTicketSessionResumption(const std::string& server_ctx_yaml1,
                                  const std::string& server_ctx_yaml2,
                                  const std::vector<std::string>& server_names2,
                                  const std::string& client_ctx_yaml, bool expect_reuse,
-                                 const Network::Address::IpVersion ip_version) {
+                                 const Network::Address::IpVersion ip_version,
+                                 const uint32_t expected_lifetime_hint = 0) {
   Event::SimulatedTimeSystem time_system;
   ContextManagerImpl manager(*time_system);
 
@@ -2439,6 +2440,10 @@ void testTicketSessionResumption(const std::string& server_ctx_yaml1,
             dynamic_cast<const SslSocketInfo*>(client_connection->ssl().get());
         ssl_session = SSL_get1_session(ssl_socket->rawSslForTest());
         EXPECT_TRUE(SSL_SESSION_is_resumable(ssl_session));
+        if (expected_lifetime_hint) {
+          auto lifetime_hint = SSL_SESSION_get_ticket_lifetime_hint(ssl_session);
+          EXPECT_TRUE(lifetime_hint <= expected_lifetime_hint);
+        }
         client_connection->close(Network::ConnectionCloseType::NoFlush);
         server_connection->close(Network::ConnectionCloseType::NoFlush);
         dispatcher->exit();
@@ -2525,6 +2530,31 @@ TEST_P(SslSocketTest, TicketSessionResumption) {
 
   testTicketSessionResumption(server_ctx_yaml, {}, server_ctx_yaml, {}, client_ctx_yaml, true,
                               GetParam());
+}
+
+TEST_P(SslSocketTest, TicketSessionResumptionCustomTimeout) {
+  const std::string server_ctx_yaml = R"EOF(
+  common_tls_context:
+    tls_params:
+      tls_minimum_protocol_version: TLSv1_0
+      tls_maximum_protocol_version: TLSv1_2
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_tmpdir }}/unittestcert.pem"
+      private_key:
+        filename: "{{ test_tmpdir }}/unittestkey.pem"
+  session_ticket_keys:
+    keys:
+      filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ticket_key_a"
+  session_timeout: 2307s
+)EOF";
+
+  const std::string client_ctx_yaml = R"EOF(
+    common_tls_context:
+  )EOF";
+
+  testTicketSessionResumption(server_ctx_yaml, {}, server_ctx_yaml, {}, client_ctx_yaml, true,
+                              GetParam(), 2307);
 }
 
 TEST_P(SslSocketTest, TicketSessionResumptionWithClientCA) {
