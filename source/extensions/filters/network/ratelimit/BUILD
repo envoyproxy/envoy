@@ -24,7 +24,7 @@ envoy_cc_library(
         "//include/envoy/stats:stats_macros",
         "//source/common/tracing:http_tracer_lib",
         "//source/extensions/filters/common/ratelimit:ratelimit_client_interface",
-        "@envoy_api//envoy/config/filter/network/rate_limit/v2:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/network/ratelimit/v3alpha:pkg_cc_proto",
     ],
 )
 
@@ -41,6 +41,6 @@ envoy_cc_extension(
         "//source/extensions/filters/network:well_known_names",
         "//source/extensions/filters/network/common:factory_base_lib",
         "//source/extensions/filters/network/ratelimit:ratelimit_lib",
-        "@envoy_api//envoy/config/filter/network/rate_limit/v2:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/network/ratelimit/v3alpha:pkg_cc_proto",
     ],
 )

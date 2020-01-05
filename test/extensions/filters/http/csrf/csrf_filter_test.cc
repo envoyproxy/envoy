@@ -1,5 +1,5 @@
-#include "envoy/config/filter/http/csrf/v2/csrf.pb.h"
-#include "envoy/type/percent.pb.h"
+#include "envoy/extensions/filters/http/csrf/v3alpha/csrf.pb.h"
+#include "envoy/type/v3alpha/percent.pb.h"
 
 #include "common/http/header_map_impl.h"
 
@@ -25,24 +25,24 @@ namespace Csrf {
 class CsrfFilterTest : public testing::Test {
 public:
   CsrfFilterConfigSharedPtr setupConfig() {
-    envoy::config::filter::http::csrf::v2::CsrfPolicy policy;
+    envoy::extensions::filters::http::csrf::v3alpha::CsrfPolicy policy;
     const auto& filter_enabled = policy.mutable_filter_enabled();
     filter_enabled->mutable_default_value()->set_numerator(100);
     filter_enabled->mutable_default_value()->set_denominator(
-        envoy::type::FractionalPercent::HUNDRED);
+        envoy::type::v3alpha::FractionalPercent::HUNDRED);
     filter_enabled->set_runtime_key("csrf.enabled");
 
     const auto& shadow_enabled = policy.mutable_shadow_enabled();
     shadow_enabled->mutable_default_value()->set_numerator(0);
     shadow_enabled->mutable_default_value()->set_denominator(
-        envoy::type::FractionalPercent::HUNDRED);
+        envoy::type::v3alpha::FractionalPercent::HUNDRED);
     shadow_enabled->set_runtime_key("csrf.shadow_enabled");
 
     const auto& add_exact_origin = policy.mutable_additional_origins()->Add();
     add_exact_origin->set_exact("additionalhost");
 
     const auto& add_regex_origin = policy.mutable_additional_origins()->Add();
-    add_regex_origin->set_regex(R"(www\-[0-9]\.allow\.com)");
+    add_regex_origin->set_hidden_envoy_deprecated_regex(R"(www\-[0-9]\.allow\.com)");
 
     return std::make_shared<CsrfFilterConfig>(policy, "test", stats_, runtime_);
   }
@@ -70,16 +70,16 @@ public:
   }
 
   void setFilterEnabled(bool enabled) {
-    ON_CALL(
-        runtime_.snapshot_,
-        featureEnabled("csrf.enabled", testing::Matcher<const envoy::type::FractionalPercent&>(_)))
+    ON_CALL(runtime_.snapshot_,
+            featureEnabled("csrf.enabled",
+                           testing::Matcher<const envoy::type::v3alpha::FractionalPercent&>(_)))
         .WillByDefault(Return(enabled));
   }
 
   void setShadowEnabled(bool enabled) {
     ON_CALL(runtime_.snapshot_,
             featureEnabled("csrf.shadow_enabled",
-                           testing::Matcher<const envoy::type::FractionalPercent&>(_)))
+                           testing::Matcher<const envoy::type::v3alpha::FractionalPercent&>(_)))
         .WillByDefault(Return(enabled));
   }
 

@@ -19,6 +19,6 @@ envoy_extension_cc_test(
         "//source/extensions/filters/http/router:config",
         "//test/mocks/server:server_mocks",
         "//test/test_common:utility_lib",
-        "@envoy_api//envoy/config/filter/http/router/v2:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/http/router/v3alpha:pkg_cc_proto",
     ],
 )

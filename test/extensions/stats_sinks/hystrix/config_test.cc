@@ -1,4 +1,4 @@
-#include "envoy/config/metrics/v2/stats.pb.h"
+#include "envoy/config/metrics/v3alpha/stats.pb.h"
 #include "envoy/registry/registry.h"
 
 #include "common/protobuf/utility.h"
@@ -26,7 +26,7 @@ namespace {
 TEST(StatsConfigTest, ValidHystrixSink) {
   const std::string name = StatsSinkNames::get().Hystrix;
 
-  envoy::config::metrics::v2::HystrixSink sink_config;
+  envoy::config::metrics::v3alpha::HystrixSink sink_config;
 
   Server::Configuration::StatsSinkFactory* factory =
       Registry::FactoryRegistry<Server::Configuration::StatsSinkFactory>::getFactory(name);

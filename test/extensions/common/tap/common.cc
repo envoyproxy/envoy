@@ -1,6 +1,6 @@
 #include "test/extensions/common/tap/common.h"
 
-#include "envoy/data/tap/v2alpha/wrapper.pb.h"
+#include "envoy/data/tap/v3alpha/wrapper.pb.h"
 
 namespace envoy {
 namespace data {

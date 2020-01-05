@@ -19,7 +19,7 @@ envoy_extension_cc_test(
         "//source/extensions/access_loggers/file:config",
         "//test/mocks/server:server_mocks",
         "//test/test_common:environment_lib",
-        "@envoy_api//envoy/config/accesslog/v2:pkg_cc_proto",
-        "@envoy_api//envoy/config/filter/accesslog/v2:pkg_cc_proto",
+        "@envoy_api//envoy/config/filter/accesslog/v3alpha:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/access_loggers/grpc/v3alpha:pkg_cc_proto",
     ],
 )

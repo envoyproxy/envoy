@@ -1,4 +1,5 @@
-#include "envoy/config/filter/network/local_rate_limit/v2alpha/local_rate_limit.pb.validate.h"
+#include "envoy/config/filter/network/local_rate_limit/v3alpha/local_rate_limit.pb.h"
+#include "envoy/config/filter/network/local_rate_limit/v3alpha/local_rate_limit.pb.validate.h"
 
 #include "common/stats/isolated_store_impl.h"
 
@@ -24,7 +25,7 @@ namespace LocalRateLimitFilter {
 class LocalRateLimitTestBase : public testing::Test {
 public:
   void initialize(const std::string& filter_yaml, bool expect_timer_create = true) {
-    envoy::config::filter::network::local_rate_limit::v2alpha::LocalRateLimit proto_config;
+    envoy::config::filter::network::local_rate_limit::v3alpha::LocalRateLimit proto_config;
     TestUtility::loadFromYamlAndValidate(filter_yaml, proto_config);
     fill_timer_ = new Event::MockTimer(&dispatcher_);
     if (expect_timer_create) {

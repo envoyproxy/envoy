@@ -1,5 +1,8 @@
 #include "extensions/filters/network/local_ratelimit/config.h"
 
+#include "envoy/config/filter/network/local_rate_limit/v3alpha/local_rate_limit.pb.h"
+#include "envoy/config/filter/network/local_rate_limit/v3alpha/local_rate_limit.pb.validate.h"
+
 #include "extensions/filters/network/local_ratelimit/local_ratelimit.h"
 
 namespace Envoy {
@@ -8,7 +11,7 @@ namespace NetworkFilters {
 namespace LocalRateLimitFilter {
 
 Network::FilterFactoryCb LocalRateLimitConfigFactory::createFilterFactoryFromProtoTyped(
-    const envoy::config::filter::network::local_rate_limit::v2alpha::LocalRateLimit& proto_config,
+    const envoy::config::filter::network::local_rate_limit::v3alpha::LocalRateLimit& proto_config,
     Server::Configuration::FactoryContext& context) {
   ConfigSharedPtr filter_config(
       new Config(proto_config, context.dispatcher(), context.scope(), context.runtime()));
