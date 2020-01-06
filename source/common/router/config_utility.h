@@ -4,8 +4,8 @@
 #include <string>
 #include <vector>
 
-#include "envoy/api/v2/core/base.pb.h"
-#include "envoy/api/v2/route/route.pb.h"
+#include "envoy/config/core/v3alpha/base.pb.h"
+#include "envoy/config/route/v3alpha/route_components.pb.h"
 #include "envoy/http/codes.h"
 #include "envoy/json/json_object.h"
 #include "envoy/upstream/resource_manager.h"
@@ -32,7 +32,7 @@ public:
   // equivalent of the QueryParameterMatcher proto in the RDS v2 API.
   class QueryParameterMatcher {
   public:
-    QueryParameterMatcher(const envoy::api::v2::route::QueryParameterMatcher& config);
+    QueryParameterMatcher(const envoy::config::route::v3alpha::QueryParameterMatcher& config);
 
     /**
      * Check if the query parameters for a request contain a match for this
@@ -53,7 +53,7 @@ public:
    * @return the resource priority parsed from proto.
    */
   static Upstream::ResourcePriority
-  parsePriority(const envoy::api::v2::core::RoutingPriority& priority);
+  parsePriority(const envoy::config::core::v3alpha::RoutingPriority& priority);
 
   /**
    * See if the query parameters specified in the config are present in a request.
@@ -71,7 +71,7 @@ public:
    * @return Returns the Http::Code version of the RedirectResponseCode.
    */
   static Http::Code parseRedirectResponseCode(
-      const envoy::api::v2::route::RedirectAction::RedirectResponseCode& code);
+      const envoy::config::route::v3alpha::RedirectAction::RedirectResponseCode& code);
 
   /**
    * Returns the HTTP Status Code enum parsed from the route's redirect or direct_response.
@@ -81,7 +81,7 @@ public:
    * absl::optional otherwise.
    */
   static absl::optional<Http::Code>
-  parseDirectResponseCode(const envoy::api::v2::route::Route& route);
+  parseDirectResponseCode(const envoy::config::route::v3alpha::Route& route);
 
   /**
    * Returns the content of the response body to send with direct responses from a route.
@@ -92,7 +92,7 @@ public:
    *         route's direct_response if specified, or an empty string otherwise.
    * @throw EnvoyException if the route configuration contains an error.
    */
-  static std::string parseDirectResponseBody(const envoy::api::v2::route::Route& route,
+  static std::string parseDirectResponseBody(const envoy::config::route::v3alpha::Route& route,
                                              Api::Api& api);
 
   /**
@@ -101,7 +101,7 @@ public:
    * @return Returns the Http::Code version of the ClusterNotFoundResponseCode enum.
    */
   static Http::Code parseClusterNotFoundResponseCode(
-      const envoy::api::v2::route::RouteAction::ClusterNotFoundResponseCode& code);
+      const envoy::config::route::v3alpha::RouteAction::ClusterNotFoundResponseCode& code);
 };
 
 } // namespace Router

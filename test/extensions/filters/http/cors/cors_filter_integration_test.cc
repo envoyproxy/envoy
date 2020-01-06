@@ -1,4 +1,4 @@
-#include "envoy/config/filter/network/http_connection_manager/v2/http_connection_manager.pb.h"
+#include "envoy/extensions/filters/network/http_connection_manager/v3alpha/http_connection_manager.pb.h"
 
 #include "test/integration/http_integration.h"
 #include "test/mocks/http/mocks.h"
@@ -16,13 +16,13 @@ public:
   void initialize() override {
     config_helper_.addFilter("name: envoy.cors");
     config_helper_.addConfigModifier(
-        [&](envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager& hcm)
-            -> void {
+        [&](envoy::extensions::filters::network::http_connection_manager::v3alpha::
+                HttpConnectionManager& hcm) -> void {
           auto* route_config = hcm.mutable_route_config();
           auto* virtual_host = route_config->mutable_virtual_hosts(0);
           {
             auto* cors = virtual_host->mutable_cors();
-            cors->add_allow_origin("*");
+            cors->add_hidden_envoy_deprecated_allow_origin("*");
             cors->set_allow_headers("content-type,x-grpc-web");
             cors->set_allow_methods("GET,POST");
           }
@@ -48,8 +48,8 @@ public:
             route->mutable_match()->set_prefix("/cors-route-config");
             route->mutable_route()->set_cluster("cluster_0");
             auto* cors = route->mutable_route()->mutable_cors();
-            cors->add_allow_origin("test-origin-1");
-            cors->add_allow_origin("test-host-2");
+            cors->add_hidden_envoy_deprecated_allow_origin("test-origin-1");
+            cors->add_hidden_envoy_deprecated_allow_origin("test-host-2");
             cors->set_allow_headers("content-type");
             cors->set_allow_methods("POST");
             cors->set_max_age("100");
@@ -62,7 +62,7 @@ public:
             route->mutable_match()->set_prefix("/cors-credentials-allowed");
             route->mutable_route()->set_cluster("cluster_0");
             auto* cors = route->mutable_route()->mutable_cors();
-            cors->add_allow_origin("test-origin-1");
+            cors->add_hidden_envoy_deprecated_allow_origin("test-origin-1");
             cors->mutable_allow_credentials()->set_value(true);
           }
 
@@ -82,7 +82,7 @@ public:
             route->mutable_match()->set_prefix("/cors-expose-headers");
             route->mutable_route()->set_cluster("cluster_0");
             auto* cors = route->mutable_route()->mutable_cors();
-            cors->add_allow_origin("test-origin-1");
+            cors->add_hidden_envoy_deprecated_allow_origin("test-origin-1");
             cors->set_expose_headers("custom-header-1,custom-header-2");
           }
         });
@@ -198,16 +198,17 @@ TEST_P(CorsFilterIntegrationTest, DEPRECATED_FEATURE_TEST(TestCorsDisabled)) {
 }
 
 TEST_P(CorsFilterIntegrationTest, DEPRECATED_FEATURE_TEST(TestLegacyCorsDisabled)) {
-  config_helper_.addConfigModifier(
-      [&](envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager& hcm)
-          -> void {
-        auto* route_config = hcm.mutable_route_config();
-        auto* virtual_host = route_config->mutable_virtual_hosts(0);
-        auto* route = virtual_host->add_routes();
-        route->mutable_match()->set_prefix("/legacy-no-cors");
-        route->mutable_route()->set_cluster("cluster_0");
-        route->mutable_route()->mutable_cors()->mutable_enabled()->set_value(false);
-      });
+  config_helper_.addConfigModifier([&](envoy::extensions::filters::network::
+                                           http_connection_manager::v3alpha::HttpConnectionManager&
+                                               hcm) -> void {
+    auto* route_config = hcm.mutable_route_config();
+    auto* virtual_host = route_config->mutable_virtual_hosts(0);
+    auto* route = virtual_host->add_routes();
+    route->mutable_match()->set_prefix("/legacy-no-cors");
+    route->mutable_route()->set_cluster("cluster_0");
+    route->mutable_route()->mutable_cors()->mutable_hidden_envoy_deprecated_enabled()->set_value(
+        false);
+  });
   testNormalRequest(
       Http::TestHeaderMapImpl{
           {":method", "OPTIONS"},

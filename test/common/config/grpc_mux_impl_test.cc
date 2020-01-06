@@ -1,7 +1,8 @@
 #include <memory>
 
 #include "envoy/api/v2/discovery.pb.h"
-#include "envoy/api/v2/eds.pb.h"
+#include "envoy/config/endpoint/v3alpha/endpoint.pb.h"
+#include "envoy/service/discovery/v3alpha/discovery.pb.h"
 
 #include "common/common/empty_string.h"
 #include "common/config/api_version.h"
@@ -202,8 +203,8 @@ TEST_F(GrpcMuxImplTest, PauseResume) {
 TEST_F(GrpcMuxImplTest, TypeUrlMismatch) {
   setup();
 
-  std::unique_ptr<envoy::api::v2::DiscoveryResponse> invalid_response(
-      new envoy::api::v2::DiscoveryResponse());
+  std::unique_ptr<envoy::service::discovery::v3alpha::DiscoveryResponse> invalid_response(
+      new envoy::service::discovery::v3alpha::DiscoveryResponse());
   InSequence s;
   auto foo_sub = grpc_mux_->subscribe("foo", {"x", "y"}, callbacks_);
 
@@ -212,8 +213,8 @@ TEST_F(GrpcMuxImplTest, TypeUrlMismatch) {
   grpc_mux_->start();
 
   {
-    std::unique_ptr<envoy::api::v2::DiscoveryResponse> response(
-        new envoy::api::v2::DiscoveryResponse());
+    std::unique_ptr<envoy::service::discovery::v3alpha::DiscoveryResponse> response(
+        new envoy::service::discovery::v3alpha::DiscoveryResponse());
     response->set_type_url("bar");
     grpc_mux_->grpcStreamForTest().onReceiveMessage(std::move(response));
   }
@@ -249,11 +250,11 @@ TEST_F(GrpcMuxImplTest, WildcardWatch) {
   grpc_mux_->start();
 
   {
-    std::unique_ptr<envoy::api::v2::DiscoveryResponse> response(
-        new envoy::api::v2::DiscoveryResponse());
+    std::unique_ptr<envoy::service::discovery::v3alpha::DiscoveryResponse> response(
+        new envoy::service::discovery::v3alpha::DiscoveryResponse());
     response->set_type_url(type_url);
     response->set_version_info("1");
-    envoy::api::v2::ClusterLoadAssignment load_assignment;
+    envoy::config::endpoint::v3alpha::ClusterLoadAssignment load_assignment;
     load_assignment.set_cluster_name("x");
     response->add_resources()->PackFrom(API_DOWNGRADE(load_assignment));
     EXPECT_CALL(callbacks_, onConfigUpdate(_, "1"))
@@ -261,8 +262,9 @@ TEST_F(GrpcMuxImplTest, WildcardWatch) {
             Invoke([&load_assignment](const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
                                       const std::string&) {
               EXPECT_EQ(1, resources.size());
-              envoy::api::v2::ClusterLoadAssignment expected_assignment =
-                  MessageUtil::anyConvert<envoy::api::v2::ClusterLoadAssignment>(resources[0]);
+              envoy::config::endpoint::v3alpha::ClusterLoadAssignment expected_assignment =
+                  MessageUtil::anyConvert<envoy::config::endpoint::v3alpha::ClusterLoadAssignment>(
+                      resources[0]);
               EXPECT_TRUE(TestUtility::protoEqual(expected_assignment, load_assignment));
             }));
     expectSendMessage(type_url, {}, "1");
@@ -285,11 +287,11 @@ TEST_F(GrpcMuxImplTest, WatchDemux) {
   grpc_mux_->start();
 
   {
-    std::unique_ptr<envoy::api::v2::DiscoveryResponse> response(
-        new envoy::api::v2::DiscoveryResponse());
+    std::unique_ptr<envoy::service::discovery::v3alpha::DiscoveryResponse> response(
+        new envoy::service::discovery::v3alpha::DiscoveryResponse());
     response->set_type_url(type_url);
     response->set_version_info("1");
-    envoy::api::v2::ClusterLoadAssignment load_assignment;
+    envoy::config::endpoint::v3alpha::ClusterLoadAssignment load_assignment;
     load_assignment.set_cluster_name("x");
     response->add_resources()->PackFrom(API_DOWNGRADE(load_assignment));
     EXPECT_CALL(bar_callbacks, onConfigUpdate(_, "1")).Times(0);
@@ -298,8 +300,9 @@ TEST_F(GrpcMuxImplTest, WatchDemux) {
             Invoke([&load_assignment](const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
                                       const std::string&) {
               EXPECT_EQ(1, resources.size());
-              envoy::api::v2::ClusterLoadAssignment expected_assignment =
-                  MessageUtil::anyConvert<envoy::api::v2::ClusterLoadAssignment>(resources[0]);
+              envoy::config::endpoint::v3alpha::ClusterLoadAssignment expected_assignment =
+                  MessageUtil::anyConvert<envoy::config::endpoint::v3alpha::ClusterLoadAssignment>(
+                      resources[0]);
               EXPECT_TRUE(TestUtility::protoEqual(expected_assignment, load_assignment));
             }));
     expectSendMessage(type_url, {"y", "z", "x"}, "1");
@@ -307,17 +310,17 @@ TEST_F(GrpcMuxImplTest, WatchDemux) {
   }
 
   {
-    std::unique_ptr<envoy::api::v2::DiscoveryResponse> response(
-        new envoy::api::v2::DiscoveryResponse());
+    std::unique_ptr<envoy::service::discovery::v3alpha::DiscoveryResponse> response(
+        new envoy::service::discovery::v3alpha::DiscoveryResponse());
     response->set_type_url(type_url);
     response->set_version_info("2");
-    envoy::api::v2::ClusterLoadAssignment load_assignment_x;
+    envoy::config::endpoint::v3alpha::ClusterLoadAssignment load_assignment_x;
     load_assignment_x.set_cluster_name("x");
     response->add_resources()->PackFrom(API_DOWNGRADE(load_assignment_x));
-    envoy::api::v2::ClusterLoadAssignment load_assignment_y;
+    envoy::config::endpoint::v3alpha::ClusterLoadAssignment load_assignment_y;
     load_assignment_y.set_cluster_name("y");
     response->add_resources()->PackFrom(API_DOWNGRADE(load_assignment_y));
-    envoy::api::v2::ClusterLoadAssignment load_assignment_z;
+    envoy::config::endpoint::v3alpha::ClusterLoadAssignment load_assignment_z;
     load_assignment_z.set_cluster_name("z");
     response->add_resources()->PackFrom(API_DOWNGRADE(load_assignment_z));
     EXPECT_CALL(bar_callbacks, onConfigUpdate(_, "2"))
@@ -325,11 +328,13 @@ TEST_F(GrpcMuxImplTest, WatchDemux) {
             [&load_assignment_y, &load_assignment_z](
                 const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources, const std::string&) {
               EXPECT_EQ(2, resources.size());
-              envoy::api::v2::ClusterLoadAssignment expected_assignment =
-                  MessageUtil::anyConvert<envoy::api::v2::ClusterLoadAssignment>(resources[0]);
+              envoy::config::endpoint::v3alpha::ClusterLoadAssignment expected_assignment =
+                  MessageUtil::anyConvert<envoy::config::endpoint::v3alpha::ClusterLoadAssignment>(
+                      resources[0]);
               EXPECT_TRUE(TestUtility::protoEqual(expected_assignment, load_assignment_y));
               expected_assignment =
-                  MessageUtil::anyConvert<envoy::api::v2::ClusterLoadAssignment>(resources[1]);
+                  MessageUtil::anyConvert<envoy::config::endpoint::v3alpha::ClusterLoadAssignment>(
+                      resources[1]);
               EXPECT_TRUE(TestUtility::protoEqual(expected_assignment, load_assignment_z));
             }));
     EXPECT_CALL(foo_callbacks, onConfigUpdate(_, "2"))
@@ -337,11 +342,13 @@ TEST_F(GrpcMuxImplTest, WatchDemux) {
             [&load_assignment_x, &load_assignment_y](
                 const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources, const std::string&) {
               EXPECT_EQ(2, resources.size());
-              envoy::api::v2::ClusterLoadAssignment expected_assignment =
-                  MessageUtil::anyConvert<envoy::api::v2::ClusterLoadAssignment>(resources[0]);
+              envoy::config::endpoint::v3alpha::ClusterLoadAssignment expected_assignment =
+                  MessageUtil::anyConvert<envoy::config::endpoint::v3alpha::ClusterLoadAssignment>(
+                      resources[0]);
               EXPECT_TRUE(TestUtility::protoEqual(expected_assignment, load_assignment_x));
               expected_assignment =
-                  MessageUtil::anyConvert<envoy::api::v2::ClusterLoadAssignment>(resources[1]);
+                  MessageUtil::anyConvert<envoy::config::endpoint::v3alpha::ClusterLoadAssignment>(
+                      resources[1]);
               EXPECT_TRUE(TestUtility::protoEqual(expected_assignment, load_assignment_y));
             }));
     expectSendMessage(type_url, {"y", "z", "x"}, "2");
@@ -364,8 +371,8 @@ TEST_F(GrpcMuxImplTest, MultipleWatcherWithEmptyUpdates) {
   expectSendMessage(type_url, {"x", "y"}, "", true);
   grpc_mux_->start();
 
-  std::unique_ptr<envoy::api::v2::DiscoveryResponse> response(
-      new envoy::api::v2::DiscoveryResponse());
+  std::unique_ptr<envoy::service::discovery::v3alpha::DiscoveryResponse> response(
+      new envoy::service::discovery::v3alpha::DiscoveryResponse());
   response->set_type_url(type_url);
   response->set_version_info("1");
 
@@ -387,8 +394,8 @@ TEST_F(GrpcMuxImplTest, SingleWatcherWithEmptyUpdates) {
   expectSendMessage(type_url, {}, "", true);
   grpc_mux_->start();
 
-  std::unique_ptr<envoy::api::v2::DiscoveryResponse> response(
-      new envoy::api::v2::DiscoveryResponse());
+  std::unique_ptr<envoy::service::discovery::v3alpha::DiscoveryResponse> response(
+      new envoy::service::discovery::v3alpha::DiscoveryResponse());
   response->set_type_url(type_url);
   response->set_version_info("1");
   // Validate that onConfigUpdate is called with empty resources.
@@ -428,8 +435,8 @@ TEST_F(GrpcMuxImplTestWithMockTimeSystem, TooManyRequestsWithDefaultSettings) {
 
   const auto onReceiveMessage = [&](uint64_t burst) {
     for (uint64_t i = 0; i < burst; i++) {
-      std::unique_ptr<envoy::api::v2::DiscoveryResponse> response(
-          new envoy::api::v2::DiscoveryResponse());
+      std::unique_ptr<envoy::service::discovery::v3alpha::DiscoveryResponse> response(
+          new envoy::service::discovery::v3alpha::DiscoveryResponse());
       response->set_version_info("baz");
       response->set_nonce("bar");
       response->set_type_url("foo");
@@ -481,8 +488,8 @@ TEST_F(GrpcMuxImplTestWithMockTimeSystem, TooManyRequestsWithEmptyRateLimitSetti
 
   const auto onReceiveMessage = [&](uint64_t burst) {
     for (uint64_t i = 0; i < burst; i++) {
-      std::unique_ptr<envoy::api::v2::DiscoveryResponse> response(
-          new envoy::api::v2::DiscoveryResponse());
+      std::unique_ptr<envoy::service::discovery::v3alpha::DiscoveryResponse> response(
+          new envoy::service::discovery::v3alpha::DiscoveryResponse());
       response->set_version_info("baz");
       response->set_nonce("bar");
       response->set_type_url("foo");
@@ -537,8 +544,8 @@ TEST_F(GrpcMuxImplTest, TooManyRequestsWithCustomRateLimitSettings) {
 
   const auto onReceiveMessage = [&](uint64_t burst) {
     for (uint64_t i = 0; i < burst; i++) {
-      std::unique_ptr<envoy::api::v2::DiscoveryResponse> response(
-          new envoy::api::v2::DiscoveryResponse());
+      std::unique_ptr<envoy::service::discovery::v3alpha::DiscoveryResponse> response(
+          new envoy::service::discovery::v3alpha::DiscoveryResponse());
       response->set_version_info("baz");
       response->set_nonce("bar");
       response->set_type_url("foo");
@@ -588,8 +595,8 @@ TEST_F(GrpcMuxImplTest, UnwatchedTypeAcceptsEmptyResources) {
   }
 
   // simulate the server sending empty CLA message to notify envoy that the CLA was removed.
-  std::unique_ptr<envoy::api::v2::DiscoveryResponse> response(
-      new envoy::api::v2::DiscoveryResponse());
+  std::unique_ptr<envoy::service::discovery::v3alpha::DiscoveryResponse> response(
+      new envoy::service::discovery::v3alpha::DiscoveryResponse());
   response->set_nonce("bar");
   response->set_version_info("1");
   response->set_type_url(type_url);
@@ -624,13 +631,13 @@ TEST_F(GrpcMuxImplTest, UnwatchedTypeRejectsResources) {
 
   // simulate the server sending CLA message to notify envoy that the CLA was added,
   // even though envoy doesn't expect it. Envoy should reject this update.
-  std::unique_ptr<envoy::api::v2::DiscoveryResponse> response(
-      new envoy::api::v2::DiscoveryResponse());
+  std::unique_ptr<envoy::service::discovery::v3alpha::DiscoveryResponse> response(
+      new envoy::service::discovery::v3alpha::DiscoveryResponse());
   response->set_nonce("bar");
   response->set_version_info("1");
   response->set_type_url(type_url);
 
-  envoy::api::v2::ClusterLoadAssignment load_assignment;
+  envoy::config::endpoint::v3alpha::ClusterLoadAssignment load_assignment;
   load_assignment.set_cluster_name("x");
   response->add_resources()->PackFrom(load_assignment);
 

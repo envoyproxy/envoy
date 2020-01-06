@@ -10,15 +10,15 @@
 #include <string>
 #include <vector>
 
-#include "envoy/api/v2/cds.pb.h"
-#include "envoy/api/v2/eds.pb.h"
-#include "envoy/api/v2/lds.pb.h"
-#include "envoy/api/v2/rds.pb.h"
-#include "envoy/api/v2/route/route.pb.h"
 #include "envoy/buffer/buffer.h"
 #include "envoy/common/platform.h"
+#include "envoy/config/cluster/v3alpha/cluster.pb.h"
+#include "envoy/config/endpoint/v3alpha/endpoint.pb.h"
+#include "envoy/config/listener/v3alpha/listener.pb.h"
+#include "envoy/config/route/v3alpha/route.pb.h"
+#include "envoy/config/route/v3alpha/route_components.pb.h"
 #include "envoy/http/codec.h"
-#include "envoy/service/discovery/v2/rtds.pb.h"
+#include "envoy/service/runtime/v3alpha/rtds.pb.h"
 
 #include "common/api/api_impl.h"
 #include "common/common/empty_string.h"
@@ -202,22 +202,25 @@ std::vector<std::string> TestUtility::listFiles(const std::string& path, bool re
 
 std::string TestUtility::xdsResourceName(const ProtobufWkt::Any& resource) {
   if (resource.type_url() == Config::TypeUrl::get().Listener) {
-    return TestUtility::anyConvert<envoy::api::v2::Listener>(resource).name();
+    return TestUtility::anyConvert<envoy::config::listener::v3alpha::Listener>(resource).name();
   }
   if (resource.type_url() == Config::TypeUrl::get().RouteConfiguration) {
-    return TestUtility::anyConvert<envoy::api::v2::RouteConfiguration>(resource).name();
+    return TestUtility::anyConvert<envoy::config::route::v3alpha::RouteConfiguration>(resource)
+        .name();
   }
   if (resource.type_url() == Config::TypeUrl::get().Cluster) {
-    return TestUtility::anyConvert<envoy::api::v2::Cluster>(resource).name();
+    return TestUtility::anyConvert<envoy::config::cluster::v3alpha::Cluster>(resource).name();
   }
   if (resource.type_url() == Config::TypeUrl::get().ClusterLoadAssignment) {
-    return TestUtility::anyConvert<envoy::api::v2::ClusterLoadAssignment>(resource).cluster_name();
+    return TestUtility::anyConvert<envoy::config::endpoint::v3alpha::ClusterLoadAssignment>(
+               resource)
+        .cluster_name();
   }
   if (resource.type_url() == Config::TypeUrl::get().VirtualHost) {
-    return TestUtility::anyConvert<envoy::api::v2::route::VirtualHost>(resource).name();
+    return TestUtility::anyConvert<envoy::config::route::v3alpha::VirtualHost>(resource).name();
   }
   if (resource.type_url() == Config::TypeUrl::get().Runtime) {
-    return TestUtility::anyConvert<envoy::service::discovery::v2::Runtime>(resource).name();
+    return TestUtility::anyConvert<envoy::service::runtime::v3alpha::Runtime>(resource).name();
   }
   throw EnvoyException(
       fmt::format("xdsResourceName does not know about type URL {}", resource.type_url()));

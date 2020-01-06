@@ -1,7 +1,7 @@
 #include "extensions/filters/http/jwt_authn/matcher.h"
 
-#include "envoy/api/v2/route/route.pb.h"
-#include "envoy/config/filter/http/jwt_authn/v2alpha/config.pb.h"
+#include "envoy/config/route/v3alpha/route_components.pb.h"
+#include "envoy/extensions/filters/http/jwt_authn/v3alpha/config.pb.h"
 
 #include "common/common/logger.h"
 #include "common/common/regex.h"
@@ -9,8 +9,8 @@
 
 #include "absl/strings/match.h"
 
-using ::envoy::api::v2::route::RouteMatch;
-using ::envoy::config::filter::http::jwt_authn::v2alpha::RequirementRule;
+using envoy::config::route::v3alpha::RouteMatch;
+using envoy::extensions::filters::http::jwt_authn::v3alpha::RequirementRule;
 using Envoy::Router::ConfigUtility;
 
 namespace Envoy {
@@ -114,11 +114,14 @@ private:
 class RegexMatcherImpl : public BaseMatcherImpl {
 public:
   RegexMatcherImpl(const RequirementRule& rule) : BaseMatcherImpl(rule) {
-    if (rule.match().path_specifier_case() == envoy::api::v2::route::RouteMatch::kRegex) {
-      regex_ = Regex::Utility::parseStdRegexAsCompiledMatcher(rule.match().regex());
-      regex_str_ = rule.match().regex();
+    if (rule.match().path_specifier_case() ==
+        envoy::config::route::v3alpha::RouteMatch::PathSpecifierCase::kHiddenEnvoyDeprecatedRegex) {
+      regex_ = Regex::Utility::parseStdRegexAsCompiledMatcher(
+          rule.match().hidden_envoy_deprecated_regex());
+      regex_str_ = rule.match().hidden_envoy_deprecated_regex();
     } else {
-      ASSERT(rule.match().path_specifier_case() == envoy::api::v2::route::RouteMatch::kSafeRegex);
+      ASSERT(rule.match().path_specifier_case() ==
+             envoy::config::route::v3alpha::RouteMatch::PathSpecifierCase::kSafeRegex);
       regex_ = Regex::Utility::parseRegex(rule.match().safe_regex());
       regex_str_ = rule.match().safe_regex().regex();
     }
@@ -152,7 +155,7 @@ MatcherConstPtr Matcher::create(const RequirementRule& rule) {
     return std::make_unique<PrefixMatcherImpl>(rule);
   case RouteMatch::PathSpecifierCase::kPath:
     return std::make_unique<PathMatcherImpl>(rule);
-  case RouteMatch::PathSpecifierCase::kRegex:
+  case RouteMatch::PathSpecifierCase::kHiddenEnvoyDeprecatedRegex:
   case RouteMatch::PathSpecifierCase::kSafeRegex:
     return std::make_unique<RegexMatcherImpl>(rule);
   // path specifier is required.

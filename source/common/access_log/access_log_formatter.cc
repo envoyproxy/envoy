@@ -5,7 +5,7 @@
 #include <string>
 #include <vector>
 
-#include "envoy/api/v2/core/base.pb.h"
+#include "envoy/config/core/v3alpha/base.pb.h"
 
 #include "common/common/assert.h"
 #include "common/common/fmt.h"
@@ -843,7 +843,7 @@ MetadataFormatter::MetadataFormatter(const std::string& filter_namespace,
     : filter_namespace_(filter_namespace), path_(path), max_length_(max_length) {}
 
 std::string
-MetadataFormatter::formatMetadata(const envoy::api::v2::core::Metadata& metadata) const {
+MetadataFormatter::formatMetadata(const envoy::config::core::v3alpha::Metadata& metadata) const {
   ProtobufWkt::Value value = formatMetadataValue(metadata);
   if (value.kind_case() == ProtobufWkt::Value::kNullValue) {
     return UnspecifiedValueString;
@@ -854,8 +854,8 @@ MetadataFormatter::formatMetadata(const envoy::api::v2::core::Metadata& metadata
   return json;
 }
 
-ProtobufWkt::Value
-MetadataFormatter::formatMetadataValue(const envoy::api::v2::core::Metadata& metadata) const {
+ProtobufWkt::Value MetadataFormatter::formatMetadataValue(
+    const envoy::config::core::v3alpha::Metadata& metadata) const {
   if (path_.empty()) {
     const auto filter_it = metadata.filter_metadata().find(filter_namespace_);
     if (filter_it == metadata.filter_metadata().end()) {
