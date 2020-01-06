@@ -423,9 +423,6 @@ struct AuthorityAttributes {
  * @return hostname parse result. that includes whether host is IP Address, hostname and port-name
  */
 AuthorityAttributes parseAuthority(absl::string_view host);
-
-bool requestHeadersValid(const HeaderMapPtr&& headers, const std::string** details);
-
 } // namespace Utility
 } // namespace Http
 } // namespace Envoy
