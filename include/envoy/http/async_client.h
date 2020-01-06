@@ -3,7 +3,7 @@
 #include <chrono>
 #include <memory>
 
-#include "envoy/api/v2/route/route.pb.h"
+#include "envoy/config/route/v3alpha/route_components.pb.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/http/message.h"
 #include "envoy/tracing/http_tracer.h"
@@ -163,7 +163,8 @@ public:
       return *this;
     }
     StreamOptions& setHashPolicy(
-        const Protobuf::RepeatedPtrField<envoy::api::v2::route::RouteAction::HashPolicy>& v) {
+        const Protobuf::RepeatedPtrField<envoy::config::route::v3alpha::RouteAction::HashPolicy>&
+            v) {
       hash_policy = v;
       return *this;
     }
@@ -188,7 +189,7 @@ public:
     bool send_xff{true};
 
     // Provides the hash policy for hashing load balancing strategies.
-    Protobuf::RepeatedPtrField<envoy::api::v2::route::RouteAction::HashPolicy> hash_policy;
+    Protobuf::RepeatedPtrField<envoy::config::route::v3alpha::RouteAction::HashPolicy> hash_policy;
   };
 
   /**
@@ -212,7 +213,8 @@ public:
       return *this;
     }
     RequestOptions& setHashPolicy(
-        const Protobuf::RepeatedPtrField<envoy::api::v2::route::RouteAction::HashPolicy>& v) {
+        const Protobuf::RepeatedPtrField<envoy::config::route::v3alpha::RouteAction::HashPolicy>&
+            v) {
       StreamOptions::setHashPolicy(v);
       return *this;
     }

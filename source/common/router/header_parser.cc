@@ -4,7 +4,7 @@
 #include <memory>
 #include <string>
 
-#include "envoy/api/v2/core/base.pb.h"
+#include "envoy/config/core/v3alpha/base.pb.h"
 
 #include "common/common/assert.h"
 #include "common/http/headers.h"
@@ -37,7 +37,7 @@ std::string unescape(absl::string_view sv) { return absl::StrReplaceAll(sv, {{"%
 // names of valid variables. Interpretation of the variable name and arguments is delegated to
 // StreamInfoHeaderFormatter.
 HeaderFormatterPtr
-parseInternal(const envoy::api::v2::core::HeaderValueOption& header_value_option) {
+parseInternal(const envoy::config::core::v3alpha::HeaderValueOption& header_value_option) {
   const std::string& key = header_value_option.header().key();
   // PGV constraints provide this guarantee.
   ASSERT(!key.empty());
@@ -222,7 +222,8 @@ parseInternal(const envoy::api::v2::core::HeaderValueOption& header_value_option
 } // namespace
 
 HeaderParserPtr HeaderParser::configure(
-    const Protobuf::RepeatedPtrField<envoy::api::v2::core::HeaderValueOption>& headers_to_add) {
+    const Protobuf::RepeatedPtrField<envoy::config::core::v3alpha::HeaderValueOption>&
+        headers_to_add) {
   HeaderParserPtr header_parser(new HeaderParser());
 
   for (const auto& header_value_option : headers_to_add) {
@@ -236,7 +237,8 @@ HeaderParserPtr HeaderParser::configure(
 }
 
 HeaderParserPtr HeaderParser::configure(
-    const Protobuf::RepeatedPtrField<envoy::api::v2::core::HeaderValueOption>& headers_to_add,
+    const Protobuf::RepeatedPtrField<envoy::config::core::v3alpha::HeaderValueOption>&
+        headers_to_add,
     const Protobuf::RepeatedPtrField<std::string>& headers_to_remove) {
   HeaderParserPtr header_parser = configure(headers_to_add);
 

@@ -30,7 +30,7 @@ ActiveQuicListener::ActiveQuicListener(Event::Dispatcher& dispatcher,
   quic::QuicRandom* const random = quic::QuicRandom::GetInstance();
   random->RandBytes(random_seed_, sizeof(random_seed_));
   crypto_config_ = std::make_unique<quic::QuicCryptoServerConfig>(
-      quic::QuicStringPiece(reinterpret_cast<char*>(random_seed_), sizeof(random_seed_)),
+      quiche::QuicheStringPiece(reinterpret_cast<char*>(random_seed_), sizeof(random_seed_)),
       quic::QuicRandom::GetInstance(), std::make_unique<EnvoyQuicFakeProofSource>(),
       quic::KeyExchangeSource::Default());
   auto connection_helper = std::make_unique<EnvoyQuicConnectionHelper>(dispatcher_);

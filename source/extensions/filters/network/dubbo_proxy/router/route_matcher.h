@@ -4,9 +4,9 @@
 #include <string>
 #include <vector>
 
-#include "envoy/api/v2/route/route.pb.h"
-#include "envoy/config/filter/network/dubbo_proxy/v2alpha1/route.pb.h"
-#include "envoy/type/range.pb.h"
+#include "envoy/config/route/v3alpha/route_components.pb.h"
+#include "envoy/extensions/filters/network/dubbo_proxy/v3alpha/route.pb.h"
+#include "envoy/type/v3alpha/range.pb.h"
 
 #include "common/common/logger.h"
 #include "common/common/matchers.h"
@@ -30,7 +30,7 @@ class RouteEntryImplBase : public RouteEntry,
                            public std::enable_shared_from_this<RouteEntryImplBase>,
                            public Logger::Loggable<Logger::Id::dubbo> {
 public:
-  RouteEntryImplBase(const envoy::config::filter::network::dubbo_proxy::v2alpha1::Route& route);
+  RouteEntryImplBase(const envoy::extensions::filters::network::dubbo_proxy::v3alpha::Route& route);
   ~RouteEntryImplBase() override = default;
 
   // Router::RouteEntry
@@ -52,7 +52,7 @@ protected:
 private:
   class WeightedClusterEntry : public RouteEntry, public Route {
   public:
-    using WeightedCluster = envoy::api::v2::route::WeightedCluster_ClusterWeight;
+    using WeightedCluster = envoy::config::route::v3alpha::WeightedCluster::ClusterWeight;
     WeightedClusterEntry(const RouteEntryImplBase& parent, const WeightedCluster& cluster);
 
     uint64_t clusterWeight() const { return cluster_weight_; }
@@ -90,17 +90,17 @@ using RouteEntryImplBaseConstSharedPtr = std::shared_ptr<const RouteEntryImplBas
 class ParameterRouteEntryImpl : public RouteEntryImplBase {
 public:
   ParameterRouteEntryImpl(
-      const envoy::config::filter::network::dubbo_proxy::v2alpha1::Route& route);
+      const envoy::extensions::filters::network::dubbo_proxy::v3alpha::Route& route);
   ~ParameterRouteEntryImpl() override;
 
   struct ParameterData {
-    using ParameterMatchSpecifier =
-        envoy::config::filter::network::dubbo_proxy::v2alpha1::MethodMatch_ParameterMatchSpecifier;
+    using ParameterMatchSpecifier = envoy::extensions::filters::network::dubbo_proxy::v3alpha::
+        MethodMatch::ParameterMatchSpecifier;
     ParameterData(uint32_t index, const ParameterMatchSpecifier& config);
 
     Http::HeaderUtility::HeaderMatchType match_type_;
     std::string value_;
-    envoy::type::Int64Range range_;
+    envoy::type::v3alpha::Int64Range range_;
     uint32_t index_;
   };
 
@@ -116,7 +116,8 @@ private:
 
 class MethodRouteEntryImpl : public RouteEntryImplBase {
 public:
-  MethodRouteEntryImpl(const envoy::config::filter::network::dubbo_proxy::v2alpha1::Route& route);
+  MethodRouteEntryImpl(
+      const envoy::extensions::filters::network::dubbo_proxy::v3alpha::Route& route);
   ~MethodRouteEntryImpl() override;
 
   // RoutEntryImplBase
@@ -130,7 +131,7 @@ private:
 
 class SingleRouteMatcherImpl : public RouteMatcher, public Logger::Loggable<Logger::Id::dubbo> {
 public:
-  using RouteConfig = envoy::config::filter::network::dubbo_proxy::v2alpha1::RouteConfiguration;
+  using RouteConfig = envoy::extensions::filters::network::dubbo_proxy::v3alpha::RouteConfiguration;
   SingleRouteMatcherImpl(const RouteConfig& config, Server::Configuration::FactoryContext& context);
 
   RouteConstSharedPtr route(const MessageMetadata& metadata, uint64_t random_value) const override;
@@ -145,7 +146,7 @@ private:
 class MultiRouteMatcher : public RouteMatcher, public Logger::Loggable<Logger::Id::dubbo> {
 public:
   using RouteConfigList = Envoy::Protobuf::RepeatedPtrField<
-      ::envoy::config::filter::network::dubbo_proxy::v2alpha1::RouteConfiguration>;
+      envoy::extensions::filters::network::dubbo_proxy::v3alpha::RouteConfiguration>;
   MultiRouteMatcher(const RouteConfigList& route_config_list,
                     Server::Configuration::FactoryContext& context);
 

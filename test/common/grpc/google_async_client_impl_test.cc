@@ -1,4 +1,4 @@
-#include "envoy/api/v2/core/grpc_service.pb.h"
+#include "envoy/config/core/v3alpha/grpc_service.pb.h"
 #include "envoy/stats/scope.h"
 
 #include "common/api/api_impl.h"
@@ -52,7 +52,7 @@ public:
       : stats_store_(new Stats::IsolatedStoreImpl), api_(Api::createApiForTest(*stats_store_)),
         dispatcher_(api_->allocateDispatcher()), scope_(stats_store_),
         method_descriptor_(helloworld::Greeter::descriptor()->FindMethodByName("SayHello")) {
-    envoy::api::v2::core::GrpcService config;
+    envoy::config::core::v3alpha::GrpcService config;
     auto* google_grpc = config.mutable_google_grpc();
     google_grpc->set_target_uri("fake_address");
     google_grpc->set_stat_prefix("test_cluster");

@@ -2,8 +2,12 @@
 
 #include <memory>
 
+<<<<<<< HEAD
 #include "envoy/api/v2/rds.pb.h"
 #include "envoy/http/filter.h"
+=======
+#include "envoy/config/route/v3alpha/route.pb.h"
+>>>>>>> upstream/master
 #include "envoy/router/router.h"
 
 namespace Envoy {
@@ -17,7 +21,7 @@ public:
   struct ConfigInfo {
     // A reference to the currently loaded route configuration. Do not hold this reference beyond
     // the caller of configInfo()'s scope.
-    const envoy::api::v2::RouteConfiguration& config_;
+    const envoy::config::route::v3alpha::RouteConfiguration& config_;
 
     // The discovery version that supplied this route. This will be set to "" in the case of
     // static clusters.
@@ -53,7 +57,7 @@ public:
   /**
    * Validate if the route configuration can be applied to the context of the route config provider.
    */
-  virtual void validateConfig(const envoy::api::v2::RouteConfiguration& config) const PURE;
+  virtual void validateConfig(const envoy::config::route::v3alpha::RouteConfiguration& config) const PURE;
 
   /**
    * Callback used to request an update to the route configuration from the management server.

@@ -1,4 +1,4 @@
-#include "envoy/api/v2/core/base.pb.h"
+#include "envoy/config/core/v3alpha/base.pb.h"
 
 #include "common/common/empty_string.h"
 #include "common/config/datasource.h"
@@ -21,7 +21,7 @@ class AsyncDataSourceTest : public testing::Test {
 protected:
   AsyncDataSourceTest() : api_(Api::createApiForTest()) {}
 
-  using AsyncDataSourcePb = envoy::api::v2::core::AsyncDataSource;
+  using AsyncDataSourcePb = envoy::config::core::v3alpha::AsyncDataSource;
 
   NiceMock<Upstream::MockClusterManager> cm_;
   Init::MockManager init_manager_;
@@ -322,13 +322,51 @@ TEST_F(AsyncDataSourceTest, loadRemoteDataSourceExpectNetworkFailure) {
     init_target_handle_ = target.createHandle("test");
   }));
 
+  std::string async_data = "non-empty";
+  auto provider = std::make_unique<Config::DataSource::RemoteAsyncDataProvider>(
+      cm_, init_manager_, config.remote(), true,
+      [&async_data](const std::string& str) { async_data = str; });
+
+  EXPECT_CALL(init_watcher_, ready());
+  init_target_handle_->initialize(init_watcher_);
+  EXPECT_EQ(async_data, EMPTY_STRING);
+  EXPECT_NE(nullptr, provider.get());
+}
+
+TEST_F(AsyncDataSourceTest, loadRemoteDataSourceDoNotAllowEmptyExpectNetworkFailure) {
+  AsyncDataSourcePb config;
+
+  std::string yaml = R"EOF(
+    remote:
+      http_uri:
+        uri: https://example.com/data
+        cluster: cluster_1
+      sha256:
+        xxxxxx
+  )EOF";
+  TestUtility::loadFromYaml(yaml, config);
+  EXPECT_TRUE(config.has_remote());
+
+  EXPECT_CALL(cm_, httpAsyncClientForCluster("cluster_1")).WillOnce(ReturnRef(cm_.async_client_));
+  EXPECT_CALL(cm_.async_client_, send_(_, _, _))
+      .WillOnce(
+          Invoke([&](Http::MessagePtr&, Http::AsyncClient::Callbacks& callbacks,
+                     const Http::AsyncClient::RequestOptions&) -> Http::AsyncClient::Request* {
+            callbacks.onSuccess(Http::MessagePtr{new Http::ResponseMessageImpl(
+                Http::HeaderMapPtr{new Http::TestHeaderMapImpl{{":status", "503"}}})});
+            return nullptr;
+          }));
+
+  EXPECT_CALL(init_manager_, add(_)).WillOnce(Invoke([this](const Init::Target& target) {
+    init_target_handle_ = target.createHandle("test");
+  }));
+
   auto provider = std::make_unique<Config::DataSource::RemoteAsyncDataProvider>(
       cm_, init_manager_, config.remote(), false, [](const std::string&) {});
 
-  EXPECT_THROW_WITH_MESSAGE(init_target_handle_->initialize(init_watcher_), EnvoyException,
-                            "Failed to fetch remote data. Failure reason: 0");
-  EXPECT_NE(nullptr, provider.get());
   EXPECT_CALL(init_watcher_, ready());
+  init_target_handle_->initialize(init_watcher_);
+  EXPECT_NE(nullptr, provider.get());
 }
 
 TEST_F(AsyncDataSourceTest, loadRemoteDataSourceExpectInvalidData) {
@@ -367,10 +405,9 @@ TEST_F(AsyncDataSourceTest, loadRemoteDataSourceExpectInvalidData) {
   auto provider = std::make_unique<Config::DataSource::RemoteAsyncDataProvider>(
       cm_, init_manager_, config.remote(), false, [](const std::string&) {});
 
-  EXPECT_THROW_WITH_MESSAGE(init_target_handle_->initialize(init_watcher_), EnvoyException,
-                            "Failed to fetch remote data. Failure reason: 1");
-  EXPECT_NE(nullptr, provider.get());
   EXPECT_CALL(init_watcher_, ready());
+  init_target_handle_->initialize(init_watcher_);
+  EXPECT_NE(nullptr, provider.get());
 }
 
 TEST_F(AsyncDataSourceTest, datasourceReleasedBeforeFetchingData) {

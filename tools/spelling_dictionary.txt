@@ -48,6 +48,8 @@ CTXs
 CVC
 CVE
 CX
+Cxx
+CYGWIN
 DER
 DESC
 DFATAL
@@ -57,7 +59,9 @@ DNS
 DRYs
 DS
 DST
+DW
 EADDRINUSE
+EADDRNOTAVAIL
 EAGAIN
 ECDH
 ECDHE
@@ -91,6 +95,7 @@ FCDS
 FFFF
 FIN
 FIPS
+FIRSTHDR
 FQDN
 FREEBIND
 FUZZER
@@ -150,6 +155,7 @@ LDS
 LEV
 LF
 LHS
+LLVM
 LRS
 MB
 MD
@@ -165,6 +171,7 @@ NACKs
 NBF
 NBSP
 NDEBUG
+NEXTHDR
 NGHTTP
 NOAUTH
 NODELAY
@@ -299,6 +306,7 @@ VLOG
 VM
 WASM
 WAVM
+WIP
 WKT
 WRR
 WS
@@ -421,7 +429,6 @@ codings
 combinatorial
 comparator
 compat
-compiation
 completable
 cond
 condvar
@@ -460,6 +467,7 @@ deallocating
 deallocation
 dec
 dechunking
+decl
 decls
 decompressor
 decrement
@@ -484,6 +492,7 @@ deserialize
 deserialized
 deserializer
 deserializers
+deserializing
 dest
 destructor
 destructors
@@ -527,6 +536,7 @@ evented
 evwatch
 exe
 execlp
+exprfor
 expectable
 extrahelp
 faceplant
@@ -572,6 +582,7 @@ goog
 google
 goto
 gzip
+hackery
 hacky
 handshaker
 hardcoded
@@ -601,6 +612,7 @@ idx
 ie
 ifdef
 iff
+ified
 impl
 implementors
 impls
@@ -633,6 +645,7 @@ iteratively
 javascript
 jitter
 jittered
+kafka
 keepalive
 keepalives
 ketama
@@ -648,6 +661,7 @@ lenenc
 lexically
 libc
 libevent
+libtool
 libstdc
 libtooling
 lifecycle
@@ -658,6 +672,7 @@ linearized
 linux
 livelock
 llvm
+loc
 localhost
 lockless
 login
@@ -671,7 +686,6 @@ lowp
 ltrim
 lua
 lyft
-mabye
 maglev
 malloc
 matchable
@@ -862,6 +876,7 @@ refetch
 regex
 regexes
 reimplements
+rele
 releasor
 reloadable
 reparse
@@ -944,6 +959,7 @@ strerr
 strerror
 stringbuf
 stringified
+stringify
 stringstream
 strtoull
 struct
@@ -977,6 +993,7 @@ superset
 symlink
 symlinked
 symlinks
+synchronizer
 syncookie
 sys
 syscall

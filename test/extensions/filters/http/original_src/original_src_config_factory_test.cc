@@ -1,4 +1,5 @@
-#include "envoy/config/filter/http/original_src/v2alpha1/original_src.pb.validate.h"
+#include "envoy/extensions/filters/http/original_src/v3alpha/original_src.pb.h"
+#include "envoy/extensions/filters/http/original_src/v3alpha/original_src.pb.validate.h"
 
 #include "extensions/filters/http/original_src/config.h"
 #include "extensions/filters/http/original_src/original_src.h"

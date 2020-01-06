@@ -1,6 +1,6 @@
 #include "common/config/new_grpc_mux_impl.h"
 
-#include "envoy/api/v2/discovery.pb.h"
+#include "envoy/service/discovery/v3alpha/discovery.pb.h"
 
 #include "common/common/assert.h"
 #include "common/common/backoff_strategy.h"
@@ -54,7 +54,7 @@ bool NewGrpcMuxImpl::paused(const std::string& type_url) const {
 }
 
 void NewGrpcMuxImpl::onDiscoveryResponse(
-    std::unique_ptr<envoy::api::v2::DeltaDiscoveryResponse>&& message) {
+    std::unique_ptr<envoy::service::discovery::v3alpha::DeltaDiscoveryResponse>&& message) {
   ENVOY_LOG(debug, "Received DeltaDiscoveryResponse for {} at version {}", message->type_url(),
             message->system_version_info());
   auto sub = subscriptions_.find(message->type_url());
