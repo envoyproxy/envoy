@@ -522,8 +522,9 @@ TEST_F(Http1ServerConnectionImplTest, HeaderInvalidAuthority) {
         return decoder;
       }));
   Buffer::OwnedImpl buffer(absl::StrCat("GET / HTTP/1.1\r\nHOST: h.\"com\r\n\r\n"));
-  EXPECT_THROW_WITH_MESSAGE(codec_->dispatch(buffer), CodecProtocolException,
-                            "http/1.1 protocol error: Host header failed spec compliance checks");
+  EXPECT_THROW_WITH_MESSAGE(
+      codec_->dispatch(buffer), CodecProtocolException,
+      "http/1.1 protocol error: request headers failed spec compliance checks");
   EXPECT_EQ("http1.invalid_authority", response_encoder->getStream().responseDetails());
 }
 

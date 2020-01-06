@@ -31,7 +31,6 @@ struct Http1ResponseCodeDetailValues {
   const absl::string_view InvalidCharacters = "http1.invalid_characters";
   const absl::string_view ConnectionHeaderSanitization = "http1.connection_header_rejected";
   const absl::string_view InvalidUrl = "http1.invalid_url";
-  const absl::string_view InvalidAuthority = "http1.invalid_authority";
 };
 
 using Http1ResponseCodeDetails = ConstSingleton<Http1ResponseCodeDetailValues>;
@@ -674,13 +673,12 @@ int ServerConnectionImpl::onHeadersComplete(HeaderMapImplPtr&& headers) {
 
     headers->setMethod(method_string);
 
+    const std::string* details = nullptr;
     // Make sure the host is valid.
-    if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.strict_authority_validation") &&
-        headers->Host() &&
-        !HeaderUtility::authorityIsValid(headers->Host()->value().getStringView())) {
-      sendProtocolError(Http1ResponseCodeDetails::get().InvalidAuthority);
+    if (!HeaderUtility::requestHeadersValid(*headers, &details)) {
+      sendProtocolError(*details);
       throw CodecProtocolException(
-          "http/1.1 protocol error: Host header failed spec compliance checks");
+          "http/1.1 protocol error: request headers failed spec compliance checks");
     }
 
     // Determine here whether we have a body or not. This uses the new RFC semantics where the

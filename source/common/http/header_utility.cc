@@ -11,6 +11,12 @@
 namespace Envoy {
 namespace Http {
 
+struct SharedResponseCodeDetailsValues {
+  const std::string InvalidAuthority = "http1.invalid_authority";
+};
+
+using SharedResponseCodeDetails = ConstSingleton<SharedResponseCodeDetailsValues>;
+
 // HeaderMatcher will consist of:
 //   header_match_specifier which can be any one of exact_match, regex_match, range_match,
 //   present_match, prefix_match or suffix_match.
@@ -157,6 +163,18 @@ bool HeaderUtility::isEnvoyInternalRequest(const HeaderMap& headers) {
   const HeaderEntry* internal_request_header = headers.EnvoyInternalRequest();
   return internal_request_header != nullptr &&
          internal_request_header->value() == Headers::get().EnvoyInternalRequestValues.True;
+}
+
+bool HeaderUtility::requestHeadersValid(const HeaderMap& headers, const std::string** details) {
+  // Make sure the host is valid.
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.strict_authority_validation") &&
+      headers.Host() && !HeaderUtility::authorityIsValid(headers.Host()->value().getStringView())) {
+    if (details != nullptr) {
+      *details = &SharedResponseCodeDetails::get().InvalidAuthority;
+    }
+    return false;
+  }
+  return true;
 }
 
 } // namespace Http

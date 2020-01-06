@@ -9,6 +9,7 @@
 #include "envoy/type/range.pb.h"
 
 #include "common/protobuf/protobuf.h"
+#include "common/runtime/runtime_impl.h"
 
 namespace Envoy {
 namespace Http {
@@ -113,6 +114,14 @@ public:
    * @brief a helper function to determine if the headers represent an envoy internal request
    */
   static bool isEnvoyInternalRequest(const HeaderMap& headers);
+
+  /**
+   * Determines if request headers pass Envoy validity checks.
+   * @param headers to validate
+   * @param details optional location to return failure details. If this is non-null and the
+   *   headers are not valid, a details string MUST be provided here by requestHeadersValid.
+   */
+  static bool requestHeadersValid(const HeaderMap& headers, const std::string** details);
 };
 } // namespace Http
 } // namespace Envoy
