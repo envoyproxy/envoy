@@ -1,7 +1,7 @@
 #pragma once
 
-#include "envoy/api/v2/core/base.pb.h"
-#include "envoy/api/v2/endpoint/endpoint.pb.h"
+#include "envoy/config/core/v3alpha/base.pb.h"
+#include "envoy/config/endpoint/v3alpha/endpoint_components.pb.h"
 
 #include "common/upstream/upstream_impl.h"
 
@@ -16,8 +16,8 @@ class LogicalHost : public HostImpl {
 public:
   LogicalHost(const ClusterInfoConstSharedPtr& cluster, const std::string& hostname,
               const Network::Address::InstanceConstSharedPtr& address,
-              const envoy::api::v2::endpoint::LocalityLbEndpoints& locality_lb_endpoint,
-              const envoy::api::v2::endpoint::LbEndpoint& lb_endpoint,
+              const envoy::config::endpoint::v3alpha::LocalityLbEndpoints& locality_lb_endpoint,
+              const envoy::config::endpoint::v3alpha::LbEndpoint& lb_endpoint,
               const Network::TransportSocketOptionsSharedPtr& override_transport_socket_options)
       : HostImpl(cluster, hostname, address, lb_endpoint.metadata(),
                  lb_endpoint.load_balancing_weight().value(), locality_lb_endpoint.locality(),
@@ -30,7 +30,7 @@ public:
   // used on the main thread, but we do so anyway since it shouldn't be perf critical and will
   // future proof the code.
   void setNewAddress(const Network::Address::InstanceConstSharedPtr& address,
-                     const envoy::api::v2::endpoint::LbEndpoint& lb_endpoint) {
+                     const envoy::config::endpoint::v3alpha::LbEndpoint& lb_endpoint) {
     const auto& port_value = lb_endpoint.endpoint().health_check_config().port_value();
     auto health_check_address =
         port_value == 0 ? address : Network::Utility::getAddressWithPort(*address, port_value);
@@ -74,10 +74,12 @@ public:
   // Upstream:HostDescription
   bool canary() const override { return logical_host_->canary(); }
   void canary(bool) override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
-  const std::shared_ptr<envoy::api::v2::core::Metadata> metadata() const override {
+  const std::shared_ptr<envoy::config::core::v3alpha::Metadata> metadata() const override {
     return logical_host_->metadata();
   }
-  void metadata(const envoy::api::v2::core::Metadata&) override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
+  void metadata(const envoy::config::core::v3alpha::Metadata&) override {
+    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+  }
 
   Network::TransportSocketFactory& transportSocketFactory() const override {
     return logical_host_->transportSocketFactory();
@@ -90,7 +92,7 @@ public:
   HostStats& stats() const override { return logical_host_->stats(); }
   const std::string& hostname() const override { return logical_host_->hostname(); }
   Network::Address::InstanceConstSharedPtr address() const override { return address_; }
-  const envoy::api::v2::core::Locality& locality() const override {
+  const envoy::config::core::v3alpha::Locality& locality() const override {
     return logical_host_->locality();
   }
   Stats::StatName localityZoneStatName() const override {

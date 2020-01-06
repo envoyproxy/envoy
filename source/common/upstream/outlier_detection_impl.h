@@ -10,9 +10,9 @@
 #include <vector>
 
 #include "envoy/access_log/access_log.h"
-#include "envoy/api/v2/cds.pb.h"
-#include "envoy/api/v2/cluster/outlier_detection.pb.h"
 #include "envoy/common/time.h"
+#include "envoy/config/cluster/v3alpha/cluster.pb.h"
+#include "envoy/config/cluster/v3alpha/outlier_detection.pb.h"
 #include "envoy/data/cluster/v2alpha/outlier_detection_event.pb.h"
 #include "envoy/event/timer.h"
 #include "envoy/http/codes.h"
@@ -48,10 +48,10 @@ private:
  */
 class DetectorImplFactory {
 public:
-  static DetectorSharedPtr createForCluster(Cluster& cluster,
-                                            const envoy::api::v2::Cluster& cluster_config,
-                                            Event::Dispatcher& dispatcher, Runtime::Loader& runtime,
-                                            EventLoggerSharedPtr event_logger);
+  static DetectorSharedPtr
+  createForCluster(Cluster& cluster, const envoy::config::cluster::v3alpha::Cluster& cluster_config,
+                   Event::Dispatcher& dispatcher, Runtime::Loader& runtime,
+                   EventLoggerSharedPtr event_logger);
 };
 
 /**
@@ -245,7 +245,7 @@ struct DetectionStats {
  */
 class DetectorConfig {
 public:
-  DetectorConfig(const envoy::api::v2::cluster::OutlierDetection& config);
+  DetectorConfig(const envoy::config::cluster::v3alpha::OutlierDetection& config);
 
   uint64_t intervalMs() const { return interval_ms_; }
   uint64_t baseEjectionTimeMs() const { return base_ejection_time_ms_; }
@@ -325,7 +325,7 @@ private:
 class DetectorImpl : public Detector, public std::enable_shared_from_this<DetectorImpl> {
 public:
   static std::shared_ptr<DetectorImpl>
-  create(const Cluster& cluster, const envoy::api::v2::cluster::OutlierDetection& config,
+  create(const Cluster& cluster, const envoy::config::cluster::v3alpha::OutlierDetection& config,
          Event::Dispatcher& dispatcher, Runtime::Loader& runtime, TimeSource& time_source,
          EventLoggerSharedPtr event_logger);
   ~DetectorImpl() override;
@@ -366,7 +366,8 @@ public:
                                double success_rate_stdev_factor);
 
 private:
-  DetectorImpl(const Cluster& cluster, const envoy::api::v2::cluster::OutlierDetection& config,
+  DetectorImpl(const Cluster& cluster,
+               const envoy::config::cluster::v3alpha::OutlierDetection& config,
                Event::Dispatcher& dispatcher, Runtime::Loader& runtime, TimeSource& time_source,
                EventLoggerSharedPtr event_logger);
 

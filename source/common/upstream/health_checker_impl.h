@@ -2,11 +2,11 @@
 
 #include "envoy/access_log/access_log.h"
 #include "envoy/api/api.h"
-#include "envoy/api/v2/core/health_check.pb.h"
-#include "envoy/data/core/v2alpha/health_check_event.pb.h"
+#include "envoy/config/core/v3alpha/health_check.pb.h"
+#include "envoy/data/core/v3alpha/health_check_event.pb.h"
 #include "envoy/grpc/status.h"
-#include "envoy/type/http.pb.h"
-#include "envoy/type/range.pb.h"
+#include "envoy/type/v3alpha/http.pb.h"
+#include "envoy/type/v3alpha/range.pb.h"
 
 #include "common/common/logger.h"
 #include "common/grpc/codec.h"
@@ -37,9 +37,9 @@ public:
    * @return a health checker.
    */
   static HealthCheckerSharedPtr
-  create(const envoy::api::v2::core::HealthCheck& health_check_config, Upstream::Cluster& cluster,
-         Runtime::Loader& runtime, Runtime::RandomGenerator& random, Event::Dispatcher& dispatcher,
-         AccessLog::AccessLogManager& log_manager,
+  create(const envoy::config::core::v3alpha::HealthCheck& health_check_config,
+         Upstream::Cluster& cluster, Runtime::Loader& runtime, Runtime::RandomGenerator& random,
+         Event::Dispatcher& dispatcher, AccessLog::AccessLogManager& log_manager,
          ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api);
 };
 
@@ -48,7 +48,8 @@ public:
  */
 class HttpHealthCheckerImpl : public HealthCheckerImplBase {
 public:
-  HttpHealthCheckerImpl(const Cluster& cluster, const envoy::api::v2::core::HealthCheck& config,
+  HttpHealthCheckerImpl(const Cluster& cluster,
+                        const envoy::config::core::v3alpha::HealthCheck& config,
                         Event::Dispatcher& dispatcher, Runtime::Loader& runtime,
                         Runtime::RandomGenerator& random, HealthCheckEventLoggerPtr&& event_logger);
 
@@ -57,8 +58,9 @@ public:
    */
   class HttpStatusChecker {
   public:
-    HttpStatusChecker(const Protobuf::RepeatedPtrField<envoy::type::Int64Range>& expected_statuses,
-                      uint64_t default_expected_status);
+    HttpStatusChecker(
+        const Protobuf::RepeatedPtrField<envoy::type::v3alpha::Int64Range>& expected_statuses,
+        uint64_t default_expected_status);
 
     bool inRange(uint64_t http_status) const;
 
@@ -132,11 +134,11 @@ private:
   ActiveHealthCheckSessionPtr makeSession(HostSharedPtr host) override {
     return std::make_unique<HttpActiveHealthCheckSession>(*this, host);
   }
-  envoy::data::core::v2alpha::HealthCheckerType healthCheckerType() const override {
-    return envoy::data::core::v2alpha::HealthCheckerType::HTTP;
+  envoy::data::core::v3alpha::HealthCheckerType healthCheckerType() const override {
+    return envoy::data::core::v3alpha::HTTP;
   }
 
-  Http::CodecClient::Type codecClientType(const envoy::type::CodecClientType& type);
+  Http::CodecClient::Type codecClientType(const envoy::type::v3alpha::CodecClientType& type);
 
   const std::string path_;
   const std::string host_value_;
@@ -207,7 +209,8 @@ public:
   using MatchSegments = std::list<std::vector<uint8_t>>;
 
   static MatchSegments loadProtoBytes(
-      const Protobuf::RepeatedPtrField<envoy::api::v2::core::HealthCheck::Payload>& byte_array);
+      const Protobuf::RepeatedPtrField<envoy::config::core::v3alpha::HealthCheck::Payload>&
+          byte_array);
   static bool match(const MatchSegments& expected, const Buffer::Instance& buffer);
 };
 
@@ -216,7 +219,8 @@ public:
  */
 class TcpHealthCheckerImpl : public HealthCheckerImplBase {
 public:
-  TcpHealthCheckerImpl(const Cluster& cluster, const envoy::api::v2::core::HealthCheck& config,
+  TcpHealthCheckerImpl(const Cluster& cluster,
+                       const envoy::config::core::v3alpha::HealthCheck& config,
                        Event::Dispatcher& dispatcher, Runtime::Loader& runtime,
                        Runtime::RandomGenerator& random, HealthCheckEventLoggerPtr&& event_logger);
 
@@ -268,8 +272,8 @@ private:
   ActiveHealthCheckSessionPtr makeSession(HostSharedPtr host) override {
     return std::make_unique<TcpActiveHealthCheckSession>(*this, host);
   }
-  envoy::data::core::v2alpha::HealthCheckerType healthCheckerType() const override {
-    return envoy::data::core::v2alpha::HealthCheckerType::TCP;
+  envoy::data::core::v3alpha::HealthCheckerType healthCheckerType() const override {
+    return envoy::data::core::v3alpha::TCP;
   }
 
   const TcpHealthCheckMatcher::MatchSegments send_bytes_;
@@ -281,7 +285,8 @@ private:
  */
 class GrpcHealthCheckerImpl : public HealthCheckerImplBase {
 public:
-  GrpcHealthCheckerImpl(const Cluster& cluster, const envoy::api::v2::core::HealthCheck& config,
+  GrpcHealthCheckerImpl(const Cluster& cluster,
+                        const envoy::config::core::v3alpha::HealthCheck& config,
                         Event::Dispatcher& dispatcher, Runtime::Loader& runtime,
                         Runtime::RandomGenerator& random, HealthCheckEventLoggerPtr&& event_logger);
 
@@ -361,8 +366,8 @@ private:
   ActiveHealthCheckSessionPtr makeSession(HostSharedPtr host) override {
     return std::make_unique<GrpcActiveHealthCheckSession>(*this, host);
   }
-  envoy::data::core::v2alpha::HealthCheckerType healthCheckerType() const override {
-    return envoy::data::core::v2alpha::HealthCheckerType::GRPC;
+  envoy::data::core::v3alpha::HealthCheckerType healthCheckerType() const override {
+    return envoy::data::core::v3alpha::GRPC;
   }
 
   const Protobuf::MethodDescriptor& service_method_;

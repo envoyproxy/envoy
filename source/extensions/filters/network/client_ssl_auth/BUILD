@@ -32,7 +32,7 @@ envoy_cc_library(
         "//source/common/json:json_loader_lib",
         "//source/common/network:cidr_range_lib",
         "//source/common/network:utility_lib",
-        "@envoy_api//envoy/config/filter/network/client_ssl_auth/v2:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/network/client_ssl_auth/v3alpha:pkg_cc_proto",
     ],
 )
 
@@ -46,6 +46,6 @@ envoy_cc_extension(
         "//include/envoy/registry",
         "//source/extensions/filters/network:well_known_names",
         "//source/extensions/filters/network/common:factory_base_lib",
-        "@envoy_api//envoy/config/filter/network/client_ssl_auth/v2:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/network/client_ssl_auth/v3alpha:pkg_cc_proto",
     ],
 )

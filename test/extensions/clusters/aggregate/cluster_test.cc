@@ -1,6 +1,6 @@
-#include "envoy/api/v2/cds.pb.h"
-#include "envoy/config/cluster/aggregate/v2alpha/cluster.pb.h"
-#include "envoy/config/cluster/aggregate/v2alpha/cluster.pb.validate.h"
+#include "envoy/config/cluster/v3alpha/cluster.pb.h"
+#include "envoy/extensions/clusters/aggregate/v3alpha/cluster.pb.h"
+#include "envoy/extensions/clusters/aggregate/v3alpha/cluster.pb.validate.h"
 
 #include "common/singleton/manager_impl.h"
 
@@ -74,8 +74,9 @@ public:
   }
 
   void initialize(const std::string& yaml_config) {
-    envoy::api::v2::Cluster cluster_config = Upstream::parseClusterFromV2Yaml(yaml_config);
-    envoy::config::cluster::aggregate::v2alpha::ClusterConfig config;
+    envoy::config::cluster::v3alpha::Cluster cluster_config =
+        Upstream::parseClusterFromV2Yaml(yaml_config);
+    envoy::extensions::clusters::aggregate::v3alpha::ClusterConfig config;
     Config::Utility::translateOpaqueConfig(cluster_config.cluster_type().typed_config(),
                                            ProtobufWkt::Struct::default_instance(),
                                            ProtobufMessage::getStrictValidationVisitor(), config);

@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package envoy.service.metrics.v3alpha;
 
-import "envoy/api/v3alpha/core/base.proto";
+import "envoy/config/core/v3alpha/base.proto";
 
 import "metrics.proto";
 import "udpa/annotations/versioning.proto";
@@ -37,7 +37,7 @@ message StreamMetricsMessage {
         "envoy.service.metrics.v2.StreamMetricsMessage.Identifier";
 
     // The node sending metrics over the stream.
-    api.v3alpha.core.Node node = 1 [(validate.rules).message = {required: true}];
+    config.core.v3alpha.Node node = 1 [(validate.rules).message = {required: true}];
   }
 
   // Identifier data effectively is a structured metadata. As a performance optimization this will

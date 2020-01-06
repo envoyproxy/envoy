@@ -5,10 +5,10 @@
 #include <string>
 #include <vector>
 
-#include "envoy/api/v2/cds.pb.h"
-#include "envoy/api/v2/core/base.pb.h"
-#include "envoy/api/v2/core/health_check.pb.h"
-#include "envoy/api/v2/endpoint/endpoint.pb.h"
+#include "envoy/config/cluster/v3alpha/cluster.pb.h"
+#include "envoy/config/core/v3alpha/base.pb.h"
+#include "envoy/config/core/v3alpha/health_check.pb.h"
+#include "envoy/config/endpoint/v3alpha/endpoint_components.pb.h"
 #include "envoy/stats/scope.h"
 
 #include "common/http/headers.h"
@@ -55,10 +55,10 @@ HostConstSharedPtr OriginalDstCluster::LoadBalancer::chooseHost(LoadBalancerCont
         auto info = parent_->info();
         HostSharedPtr host(std::make_shared<HostImpl>(
             info, info->name() + dst_addr.asString(), std::move(host_ip_port),
-            envoy::api::v2::core::Metadata::default_instance(), 1,
-            envoy::api::v2::core::Locality().default_instance(),
-            envoy::api::v2::endpoint::Endpoint::HealthCheckConfig().default_instance(), 0,
-            envoy::api::v2::core::HealthStatus::UNKNOWN));
+            envoy::config::core::v3alpha::Metadata::default_instance(), 1,
+            envoy::config::core::v3alpha::Locality().default_instance(),
+            envoy::config::endpoint::v3alpha::Endpoint::HealthCheckConfig().default_instance(), 0,
+            envoy::config::core::v3alpha::UNKNOWN));
         ENVOY_LOG(debug, "Created host {}.", host->address()->asString());
 
         // Tell the cluster about the new host
@@ -103,7 +103,7 @@ OriginalDstCluster::LoadBalancer::requestOverrideHost(LoadBalancerContext* conte
 }
 
 OriginalDstCluster::OriginalDstCluster(
-    const envoy::api::v2::Cluster& config, Runtime::Loader& runtime,
+    const envoy::config::cluster::v3alpha::Cluster& config, Runtime::Loader& runtime,
     Server::Configuration::TransportSocketFactoryContext& factory_context,
     Stats::ScopePtr&& stats_scope, bool added_via_api)
     : ClusterImplBase(config, runtime, factory_context, std::move(stats_scope), added_via_api),
@@ -177,16 +177,17 @@ void OriginalDstCluster::cleanup() {
 
 std::pair<ClusterImplBaseSharedPtr, ThreadAwareLoadBalancerPtr>
 OriginalDstClusterFactory::createClusterImpl(
-    const envoy::api::v2::Cluster& cluster, ClusterFactoryContext& context,
+    const envoy::config::cluster::v3alpha::Cluster& cluster, ClusterFactoryContext& context,
     Server::Configuration::TransportSocketFactoryContext& socket_factory_context,
     Stats::ScopePtr&& stats_scope) {
-  if (cluster.lb_policy() != envoy::api::v2::Cluster::ORIGINAL_DST_LB &&
-      cluster.lb_policy() != envoy::api::v2::Cluster::CLUSTER_PROVIDED) {
+  if (cluster.lb_policy() !=
+          envoy::config::cluster::v3alpha::Cluster::hidden_envoy_deprecated_ORIGINAL_DST_LB &&
+      cluster.lb_policy() != envoy::config::cluster::v3alpha::Cluster::CLUSTER_PROVIDED) {
     throw EnvoyException(fmt::format(
         "cluster: LB policy {} is not valid for Cluster type {}. Only 'CLUSTER_PROVIDED' or "
         "'ORIGINAL_DST_LB' is allowed with cluster type 'ORIGINAL_DST'",
-        envoy::api::v2::Cluster::LbPolicy_Name(cluster.lb_policy()),
-        envoy::api::v2::Cluster_DiscoveryType_Name(cluster.type())));
+        envoy::config::cluster::v3alpha::Cluster::LbPolicy_Name(cluster.lb_policy()),
+        envoy::config::cluster::v3alpha::Cluster::DiscoveryType_Name(cluster.type())));
   }
 
   // TODO(mattklein123): The original DST load balancer type should be deprecated and instead

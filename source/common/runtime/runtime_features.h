@@ -2,9 +2,9 @@
 
 #include <string>
 
-#include "envoy/api/v2/core/base.pb.h"
+#include "envoy/config/core/v3alpha/base.pb.h"
 #include "envoy/runtime/runtime.h"
-#include "envoy/type/percent.pb.h"
+#include "envoy/type/v3alpha/percent.pb.h"
 
 #include "common/protobuf/utility.h"
 #include "common/singleton/const_singleton.h"
@@ -47,7 +47,7 @@ using RuntimeFeaturesDefaults = ConstSingleton<RuntimeFeatures>;
 // Helper class for runtime-derived boolean feature flags.
 class FeatureFlag {
 public:
-  FeatureFlag(const envoy::api::v2::core::RuntimeFeatureFlag& feature_flag_proto,
+  FeatureFlag(const envoy::config::core::v3alpha::RuntimeFeatureFlag& feature_flag_proto,
               Runtime::Loader& runtime)
       : runtime_key_(feature_flag_proto.runtime_key()),
         default_value_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(feature_flag_proto, default_value, true)),
@@ -64,8 +64,9 @@ private:
 // Helper class for runtime-derived fractional percent flags.
 class FractionalPercent {
 public:
-  FractionalPercent(const envoy::api::v2::core::RuntimeFractionalPercent& fractional_percent_proto,
-                    Runtime::Loader& runtime)
+  FractionalPercent(
+      const envoy::config::core::v3alpha::RuntimeFractionalPercent& fractional_percent_proto,
+      Runtime::Loader& runtime)
       : runtime_key_(fractional_percent_proto.runtime_key()),
         default_value_(fractional_percent_proto.default_value()), runtime_(runtime) {}
 
@@ -73,7 +74,7 @@ public:
 
 private:
   const std::string runtime_key_;
-  const envoy::type::FractionalPercent default_value_;
+  const envoy::type::v3alpha::FractionalPercent default_value_;
   Runtime::Loader& runtime_;
 };
 

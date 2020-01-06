@@ -5,7 +5,7 @@
 #include <iostream>
 #include <vector>
 
-#include "envoy/config/trace/v2/trace.pb.h"
+#include "envoy/config/trace/v3alpha/trace.pb.h"
 
 #include "common/common/base64.h"
 
@@ -46,7 +46,7 @@ namespace Extensions {
 namespace Tracers {
 namespace OpenCensus {
 
-using envoy::config::trace::v2::OpenCensusConfig;
+using envoy::config::trace::v3alpha::OpenCensusConfig;
 using ::opencensus::trace::exporter::SpanData;
 using ::opencensus::trace::exporter::SpanExporter;
 

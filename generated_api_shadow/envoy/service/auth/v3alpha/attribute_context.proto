@@ -2,8 +2,8 @@ syntax = "proto3";
 
 package envoy.service.auth.v3alpha;
 
-import "envoy/api/v3alpha/core/address.proto";
-import "envoy/api/v3alpha/core/base.proto";
+import "envoy/config/core/v3alpha/address.proto";
+import "envoy/config/core/v3alpha/base.proto";
 
 import "google/protobuf/timestamp.proto";
 
@@ -51,7 +51,7 @@ message AttributeContext {
 
     // The address of the peer, this is typically the IP address.
     // It can also be UDS path, or others.
-    api.v3alpha.core.Address address = 1;
+    config.core.v3alpha.Address address = 1;
 
     // The canonical service name of the peer.
     // It should be set to :ref:`the HTTP x-envoy-downstream-service-cluster
@@ -165,5 +165,5 @@ message AttributeContext {
   map<string, string> context_extensions = 10;
 
   // Dynamic metadata associated with the request.
-  api.v3alpha.core.Metadata metadata_context = 11;
+  config.core.v3alpha.Metadata metadata_context = 11;
 }

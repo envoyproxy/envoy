@@ -1,6 +1,6 @@
-#include "envoy/api/v2/rds.pb.h"
-#include "envoy/api/v2/rds.pb.validate.h"
-#include "envoy/api/v2/route/route.pb.h"
+#include "envoy/config/route/v3alpha/route.pb.h"
+#include "envoy/config/route/v3alpha/route.pb.validate.h"
+#include "envoy/config/route/v3alpha/route_components.pb.h"
 
 #include "common/router/config_impl.h"
 
@@ -31,24 +31,25 @@ template <class T> T replaceInvalidHeaders(const T& config) {
 }
 
 // Removes invalid headers from the RouteConfiguration as well as in each of the virtual hosts.
-envoy::api::v2::RouteConfiguration
-cleanRouteConfig(envoy::api::v2::RouteConfiguration route_config) {
+envoy::config::route::v3alpha::RouteConfiguration
+cleanRouteConfig(envoy::config::route::v3alpha::RouteConfiguration route_config) {
   // A route config contains a list of HTTP headers that should be added and/or removed to each
   // request and/or response the connection manager routes. This removes invalid characters the
   // headers.
-  envoy::api::v2::RouteConfiguration clean_config =
-      replaceInvalidHeaders<envoy::api::v2::RouteConfiguration>(route_config);
+  envoy::config::route::v3alpha::RouteConfiguration clean_config =
+      replaceInvalidHeaders<envoy::config::route::v3alpha::RouteConfiguration>(route_config);
   auto internal_only_headers = clean_config.mutable_internal_only_headers();
   std::for_each(internal_only_headers->begin(), internal_only_headers->end(),
                 [](std::string& n) { n = Fuzz::replaceInvalidCharacters(n); });
   auto virtual_hosts = clean_config.mutable_virtual_hosts();
   std::for_each(
       virtual_hosts->begin(), virtual_hosts->end(),
-      [](envoy::api::v2::route::VirtualHost& virtual_host) {
+      [](envoy::config::route::v3alpha::VirtualHost& virtual_host) {
         // Each virtual host in the routing configuration contains a list of headers to add and/or
         // remove from each request and response that get routed through it. This replaces invalid
         // header characters in these fields.
-        virtual_host = replaceInvalidHeaders<envoy::api::v2::route::VirtualHost>(virtual_host);
+        virtual_host =
+            replaceInvalidHeaders<envoy::config::route::v3alpha::VirtualHost>(virtual_host);
         // Envoy can determine the cluster to route to by reading the HTTP header named by the
         // cluster_header from the request header. Because these cluster_headers are destined to be
         // added to a Header Map, we iterate through each route in and remove invalid characters
@@ -59,7 +60,8 @@ cleanRouteConfig(envoy::api::v2::RouteConfiguration route_config) {
           // wildcards are matched against very long headers.
           // See https://github.com/envoyproxy/envoy/issues/7728.
           if (routes->Get(i).match().path_specifier_case() ==
-              envoy::api::v2::route::RouteMatch::kRegex) {
+              envoy::config::route::v3alpha::RouteMatch::PathSpecifierCase::
+                  kHiddenEnvoyDeprecatedRegex) {
             routes->erase(routes->begin() + i);
           } else {
             if (routes->Get(i).has_route()) {

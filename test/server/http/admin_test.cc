@@ -3,12 +3,13 @@
 #include <regex>
 #include <unordered_map>
 
-#include "envoy/admin/v2alpha/clusters.pb.h"
-#include "envoy/admin/v2alpha/memory.pb.h"
-#include "envoy/admin/v2alpha/server_info.pb.h"
-#include "envoy/api/v2/auth/cert.pb.h"
-#include "envoy/api/v2/core/base.pb.h"
-#include "envoy/config/filter/network/http_connection_manager/v2/http_connection_manager.pb.h"
+#include "envoy/admin/v3alpha/clusters.pb.h"
+#include "envoy/admin/v3alpha/config_dump.pb.h"
+#include "envoy/admin/v3alpha/memory.pb.h"
+#include "envoy/admin/v3alpha/server_info.pb.h"
+#include "envoy/config/core/v3alpha/base.pb.h"
+#include "envoy/extensions/filters/network/http_connection_manager/v3alpha/http_connection_manager.pb.h"
+#include "envoy/extensions/transport_sockets/tls/v3alpha/cert.pb.h"
 #include "envoy/json/json_object.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/stats/stats.h"
@@ -253,7 +254,7 @@ TEST_P(AdminStatsTest, StatsAsJson) {
     ]
 })EOF";
 
-  EXPECT_EQ(expected_json, actual_json);
+  EXPECT_THAT(expected_json, JsonStringEq(actual_json));
   store_->shutdownThreading();
 }
 
@@ -351,7 +352,7 @@ TEST_P(AdminStatsTest, UsedOnlyStatsAsJson) {
     ]
 })EOF";
 
-  EXPECT_EQ(expected_json, actual_json);
+  EXPECT_THAT(expected_json, JsonStringEq(actual_json));
   store_->shutdownThreading();
 }
 
@@ -451,7 +452,7 @@ TEST_P(AdminStatsTest, StatsAsJsonFilterString) {
     ]
 })EOF";
 
-  EXPECT_EQ(expected_json, actual_json);
+  EXPECT_THAT(expected_json, JsonStringEq(actual_json));
   store_->shutdownThreading();
 }
 
@@ -560,7 +561,7 @@ TEST_P(AdminStatsTest, UsedOnlyStatsAsJsonFilterString) {
     ]
 })EOF";
 
-  EXPECT_EQ(expected_json, actual_json);
+  EXPECT_THAT(expected_json, JsonStringEq(actual_json));
   store_->shutdownThreading();
 }
 
@@ -942,7 +943,7 @@ TEST_P(AdminInstanceTest, ConfigDumpFiltersByResource) {
   Buffer::OwnedImpl response;
   Http::HeaderMapImpl header_map;
   auto listeners = admin_.getConfigTracker().add("listeners", [] {
-    auto msg = std::make_unique<envoy::admin::v2alpha::ListenersConfigDump>();
+    auto msg = std::make_unique<envoy::admin::v3alpha::ListenersConfigDump>();
     auto dyn_listener = msg->add_dynamic_listeners();
     dyn_listener->set_name("foo");
     auto stat_listener = msg->add_static_listeners();
@@ -953,7 +954,7 @@ TEST_P(AdminInstanceTest, ConfigDumpFiltersByResource) {
   const std::string expected_json = R"EOF({
  "configs": [
   {
-   "@type": "type.googleapis.com/envoy.admin.v2alpha.ListenersConfigDump.DynamicListener",
+   "@type": "type.googleapis.com/envoy.admin.v3alpha.ListenersConfigDump.DynamicListener",
    "name": "foo"
   }
  ]
@@ -972,7 +973,7 @@ TEST_P(AdminInstanceTest, ConfigDumpFiltersByMask) {
   Buffer::OwnedImpl response;
   Http::HeaderMapImpl header_map;
   auto listeners = admin_.getConfigTracker().add("listeners", [] {
-    auto msg = std::make_unique<envoy::admin::v2alpha::ListenersConfigDump>();
+    auto msg = std::make_unique<envoy::admin::v3alpha::ListenersConfigDump>();
     auto dyn_listener = msg->add_dynamic_listeners();
     dyn_listener->set_name("foo");
     auto stat_listener = msg->add_static_listeners();
@@ -983,7 +984,7 @@ TEST_P(AdminInstanceTest, ConfigDumpFiltersByMask) {
   const std::string expected_json = R"EOF({
  "configs": [
   {
-   "@type": "type.googleapis.com/envoy.admin.v2alpha.ListenersConfigDump",
+   "@type": "type.googleapis.com/envoy.admin.v3alpha.ListenersConfigDump",
    "dynamic_listeners": [
     {
      "name": "foo"
@@ -1000,11 +1001,11 @@ TEST_P(AdminInstanceTest, ConfigDumpFiltersByMask) {
 }
 
 ProtobufTypes::MessagePtr testDumpClustersConfig() {
-  auto msg = std::make_unique<envoy::admin::v2alpha::ClustersConfigDump>();
+  auto msg = std::make_unique<envoy::admin::v3alpha::ClustersConfigDump>();
   auto static_cluster = msg->add_static_clusters();
   auto inner_cluster = static_cluster->mutable_cluster();
   inner_cluster->set_name("foo");
-  inner_cluster->set_drain_connections_on_host_removal(true);
+  inner_cluster->set_ignore_health_on_host_removal(true);
 
   auto dyn_cluster = msg->add_dynamic_active_clusters();
   auto inner_dyn_cluster = dyn_cluster->mutable_cluster();
@@ -1021,7 +1022,7 @@ TEST_P(AdminInstanceTest, ConfigDumpFiltersByResourceAndMask) {
   const std::string expected_json = R"EOF({
  "configs": [
   {
-   "@type": "type.googleapis.com/envoy.admin.v2alpha.ClustersConfigDump.StaticCluster",
+   "@type": "type.googleapis.com/envoy.admin.v3alpha.ClustersConfigDump.StaticCluster",
    "cluster": {
     "name": "foo"
    }
@@ -1044,7 +1045,7 @@ TEST_P(AdminInstanceTest, ConfigDumpNonExistentMask) {
   const std::string expected_json = R"EOF({
  "configs": [
   {
-   "@type": "type.googleapis.com/envoy.admin.v2alpha.ClustersConfigDump.StaticCluster"
+   "@type": "type.googleapis.com/envoy.admin.v3alpha.ClustersConfigDump.StaticCluster"
   }
  ]
 }
@@ -1074,7 +1075,7 @@ TEST_P(AdminInstanceTest, ConfigDumpResourceNotRepeated) {
   Buffer::OwnedImpl response;
   Http::HeaderMapImpl header_map;
   auto clusters = admin_.getConfigTracker().add("clusters", [] {
-    auto msg = std::make_unique<envoy::admin::v2alpha::ClustersConfigDump>();
+    auto msg = std::make_unique<envoy::admin::v3alpha::ClustersConfigDump>();
     msg->set_version_info("foo");
     return msg;
   });
@@ -1087,14 +1088,14 @@ TEST_P(AdminInstanceTest, Memory) {
   Buffer::OwnedImpl response;
   EXPECT_EQ(Http::Code::OK, getCallback("/memory", header_map, response));
   const std::string output_json = response.toString();
-  envoy::admin::v2alpha::Memory output_proto;
+  envoy::admin::v3alpha::Memory output_proto;
   TestUtility::loadFromJson(output_json, output_proto);
   EXPECT_THAT(output_proto,
-              AllOf(Property(&envoy::admin::v2alpha::Memory::allocated, Ge(0)),
-                    Property(&envoy::admin::v2alpha::Memory::heap_size, Ge(0)),
-                    Property(&envoy::admin::v2alpha::Memory::pageheap_unmapped, Ge(0)),
-                    Property(&envoy::admin::v2alpha::Memory::pageheap_free, Ge(0)),
-                    Property(&envoy::admin::v2alpha::Memory::total_thread_cache, Ge(0))));
+              AllOf(Property(&envoy::admin::v3alpha::Memory::allocated, Ge(0)),
+                    Property(&envoy::admin::v3alpha::Memory::heap_size, Ge(0)),
+                    Property(&envoy::admin::v3alpha::Memory::pageheap_unmapped, Ge(0)),
+                    Property(&envoy::admin::v3alpha::Memory::pageheap_free, Ge(0)),
+                    Property(&envoy::admin::v3alpha::Memory::total_thread_cache, Ge(0))));
 }
 
 TEST_P(AdminInstanceTest, ContextThatReturnsNullCertDetails) {
@@ -1103,7 +1104,7 @@ TEST_P(AdminInstanceTest, ContextThatReturnsNullCertDetails) {
 
   // Setup a context that returns null cert details.
   testing::NiceMock<Server::Configuration::MockTransportSocketFactoryContext> factory_context;
-  envoy::api::v2::auth::UpstreamTlsContext config;
+  envoy::extensions::transport_sockets::tls::v3alpha::UpstreamTlsContext config;
   Extensions::TransportSockets::Tls::ClientContextConfigImpl cfg(config, factory_context);
   Stats::IsolatedStoreImpl store;
   Envoy::Ssl::ClientContextSharedPtr client_ctx(
@@ -1190,7 +1191,7 @@ TEST_P(AdminInstanceTest, Runtime) {
   EXPECT_CALL(loader, snapshot()).WillRepeatedly(testing::ReturnPointee(&snapshot));
   EXPECT_CALL(server_, runtime()).WillRepeatedly(testing::ReturnPointee(&loader));
   EXPECT_EQ(Http::Code::OK, getCallback("/runtime", header_map, response));
-  EXPECT_EQ(expected_json, response.toString());
+  EXPECT_THAT(expected_json, JsonStringEq(response.toString()));
 }
 
 TEST_P(AdminInstanceTest, RuntimeModify) {
@@ -1264,7 +1265,7 @@ TEST_P(AdminInstanceTest, ClustersJson) {
   Upstream::MockHostSet* host_set = cluster.priority_set_.getMockHostSet(0);
   auto host = std::make_shared<NiceMock<Upstream::MockHost>>();
 
-  envoy::api::v2::core::Locality locality;
+  envoy::config::core::v3alpha::Locality locality;
   locality.set_region("test_region");
   locality.set_zone("test_zone");
   locality.set_sub_zone("test_sub_zone");
@@ -1327,7 +1328,7 @@ TEST_P(AdminInstanceTest, ClustersJson) {
   Http::HeaderMapImpl header_map;
   EXPECT_EQ(Http::Code::OK, getCallback("/clusters?format=json", header_map, response));
   std::string output_json = response.toString();
-  envoy::admin::v2alpha::Clusters output_proto;
+  envoy::admin::v3alpha::Clusters output_proto;
   TestUtility::loadFromJson(output_json, output_proto);
 
   const std::string expected_json = R"EOF({
@@ -1400,7 +1401,7 @@ TEST_P(AdminInstanceTest, ClustersJson) {
 }
 )EOF";
 
-  envoy::admin::v2alpha::Clusters expected_proto;
+  envoy::admin::v3alpha::Clusters expected_proto;
   TestUtility::loadFromJson(expected_json, expected_proto);
 
   // Ensure the protos created from each JSON are equivalent.
@@ -1444,7 +1445,7 @@ fake_cluster::1.2.3.4:80::local_origin_success_rate::93.2
 TEST_P(AdminInstanceTest, GetRequest) {
   EXPECT_CALL(server_.options_, toCommandLineOptions()).WillRepeatedly(Invoke([] {
     Server::CommandLineOptionsPtr command_line_options =
-        std::make_unique<envoy::admin::v2alpha::CommandLineOptions>();
+        std::make_unique<envoy::admin::v3alpha::CommandLineOptions>();
     command_line_options->set_restart_epoch(2);
     command_line_options->set_service_cluster("cluster");
     return command_line_options;
@@ -1459,14 +1460,14 @@ TEST_P(AdminInstanceTest, GetRequest) {
 
     ON_CALL(initManager, state()).WillByDefault(Return(Init::Manager::State::Initialized));
     EXPECT_EQ(Http::Code::OK, admin_.request("/server_info", "GET", response_headers, body));
-    envoy::admin::v2alpha::ServerInfo server_info_proto;
+    envoy::admin::v3alpha::ServerInfo server_info_proto;
     EXPECT_THAT(std::string(response_headers.ContentType()->value().getStringView()),
                 HasSubstr("application/json"));
 
     // We only test that it parses as the proto and that some fields are correct, since
     // values such as timestamps + Envoy version are tricky to test for.
     TestUtility::loadFromJson(body, server_info_proto);
-    EXPECT_EQ(server_info_proto.state(), envoy::admin::v2alpha::ServerInfo::LIVE);
+    EXPECT_EQ(server_info_proto.state(), envoy::admin::v3alpha::ServerInfo::LIVE);
     EXPECT_EQ(server_info_proto.hot_restart_version(), "foo_version");
     EXPECT_EQ(server_info_proto.command_line_options().restart_epoch(), 2);
     EXPECT_EQ(server_info_proto.command_line_options().service_cluster(), "cluster");
@@ -1478,14 +1479,14 @@ TEST_P(AdminInstanceTest, GetRequest) {
 
     ON_CALL(initManager, state()).WillByDefault(Return(Init::Manager::State::Uninitialized));
     EXPECT_EQ(Http::Code::OK, admin_.request("/server_info", "GET", response_headers, body));
-    envoy::admin::v2alpha::ServerInfo server_info_proto;
+    envoy::admin::v3alpha::ServerInfo server_info_proto;
     EXPECT_THAT(std::string(response_headers.ContentType()->value().getStringView()),
                 HasSubstr("application/json"));
 
     // We only test that it parses as the proto and that some fields are correct, since
     // values such as timestamps + Envoy version are tricky to test for.
     TestUtility::loadFromJson(body, server_info_proto);
-    EXPECT_EQ(server_info_proto.state(), envoy::admin::v2alpha::ServerInfo::PRE_INITIALIZING);
+    EXPECT_EQ(server_info_proto.state(), envoy::admin::v3alpha::ServerInfo::PRE_INITIALIZING);
     EXPECT_EQ(server_info_proto.command_line_options().restart_epoch(), 2);
     EXPECT_EQ(server_info_proto.command_line_options().service_cluster(), "cluster");
   }
@@ -1495,14 +1496,14 @@ TEST_P(AdminInstanceTest, GetRequest) {
 
   ON_CALL(initManager, state()).WillByDefault(Return(Init::Manager::State::Initializing));
   EXPECT_EQ(Http::Code::OK, admin_.request("/server_info", "GET", response_headers, body));
-  envoy::admin::v2alpha::ServerInfo server_info_proto;
+  envoy::admin::v3alpha::ServerInfo server_info_proto;
   EXPECT_THAT(std::string(response_headers.ContentType()->value().getStringView()),
               HasSubstr("application/json"));
 
   // We only test that it parses as the proto and that some fields are correct, since
   // values such as timestamps + Envoy version are tricky to test for.
   TestUtility::loadFromJson(body, server_info_proto);
-  EXPECT_EQ(server_info_proto.state(), envoy::admin::v2alpha::ServerInfo::INITIALIZING);
+  EXPECT_EQ(server_info_proto.state(), envoy::admin::v3alpha::ServerInfo::INITIALIZING);
   EXPECT_EQ(server_info_proto.command_line_options().restart_epoch(), 2);
   EXPECT_EQ(server_info_proto.command_line_options().service_cluster(), "cluster");
 }
