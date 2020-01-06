@@ -2,8 +2,8 @@ syntax = "proto3";
 
 package envoy.service.tap.v3alpha;
 
+import "envoy/config/tap/v3alpha/common.proto";
 import "envoy/service/discovery/v3alpha/discovery.proto";
-import "envoy/service/tap/v3alpha/common.proto";
 
 import "google/api/annotations.proto";
 
@@ -45,5 +45,5 @@ message TapResource {
   string name = 1 [(validate.rules).string = {min_bytes: 1}];
 
   // Tap config to apply
-  TapConfig config = 2;
+  config.tap.v3alpha.TapConfig config = 2;
 }

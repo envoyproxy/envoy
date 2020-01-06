@@ -4,10 +4,10 @@
 #include <string>
 
 #include "envoy/buffer/buffer.h"
-#include "envoy/config/filter/accesslog/v2/accesslog.pb.h"
-#include "envoy/config/filter/network/tcp_proxy/v2/tcp_proxy.pb.h"
+#include "envoy/config/filter/accesslog/v3alpha/accesslog.pb.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/event/timer.h"
+#include "envoy/extensions/filters/network/tcp_proxy/v3alpha/tcp_proxy.pb.h"
 #include "envoy/stats/scope.h"
 #include "envoy/upstream/cluster_manager.h"
 #include "envoy/upstream/upstream.h"
@@ -34,7 +34,8 @@ const std::string& PerConnectionCluster::key() {
 
 Config::RouteImpl::RouteImpl(
     const Config& parent,
-    const envoy::config::filter::network::tcp_proxy::v2::TcpProxy::DeprecatedV1::TCPRoute& config)
+    const envoy::extensions::filters::network::tcp_proxy::v3alpha::TcpProxy::DeprecatedV1::TCPRoute&
+        config)
     : parent_(parent) {
   cluster_name_ = config.cluster();
 
@@ -74,9 +75,8 @@ bool Config::RouteImpl::matches(Network::Connection& connection) const {
 }
 
 Config::WeightedClusterEntry::WeightedClusterEntry(
-    const Config& parent,
-    const envoy::config::filter::network::tcp_proxy::v2::TcpProxy::WeightedCluster::ClusterWeight&
-        config)
+    const Config& parent, const envoy::extensions::filters::network::tcp_proxy::v3alpha::TcpProxy::
+                              WeightedCluster::ClusterWeight& config)
     : parent_(parent), cluster_name_(config.name()), cluster_weight_(config.weight()) {
   if (config.has_metadata_match()) {
     const auto filter_it = config.metadata_match().filter_metadata().find(
@@ -94,7 +94,7 @@ Config::WeightedClusterEntry::WeightedClusterEntry(
 }
 
 Config::SharedConfig::SharedConfig(
-    const envoy::config::filter::network::tcp_proxy::v2::TcpProxy& config,
+    const envoy::extensions::filters::network::tcp_proxy::v3alpha::TcpProxy& config,
     Server::Configuration::FactoryContext& context)
     : stats_scope_(context.scope().createScope(fmt::format("tcp.{}", config.stat_prefix()))),
       stats_(generateStats(*stats_scope_)) {
@@ -108,7 +108,7 @@ Config::SharedConfig::SharedConfig(
   }
 }
 
-Config::Config(const envoy::config::filter::network::tcp_proxy::v2::TcpProxy& config,
+Config::Config(const envoy::extensions::filters::network::tcp_proxy::v3alpha::TcpProxy& config,
                Server::Configuration::FactoryContext& context)
     : max_connect_attempts_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, max_connect_attempts, 1)),
       upstream_drain_manager_slot_(context.threadLocal().allocateSlot()),
@@ -119,15 +119,16 @@ Config::Config(const envoy::config::filter::network::tcp_proxy::v2::TcpProxy& co
     return ThreadLocal::ThreadLocalObjectSharedPtr(new UpstreamDrainManager());
   });
 
-  if (config.has_deprecated_v1()) {
-    for (const envoy::config::filter::network::tcp_proxy::v2::TcpProxy::DeprecatedV1::TCPRoute&
-             route_desc : config.deprecated_v1().routes()) {
+  if (config.has_hidden_envoy_deprecated_deprecated_v1()) {
+    for (const envoy::extensions::filters::network::tcp_proxy::v3alpha::TcpProxy::DeprecatedV1::
+             TCPRoute& route_desc : config.hidden_envoy_deprecated_deprecated_v1().routes()) {
       routes_.emplace_back(std::make_shared<const RouteImpl>(*this, route_desc));
     }
   }
 
   if (!config.cluster().empty()) {
-    envoy::config::filter::network::tcp_proxy::v2::TcpProxy::DeprecatedV1::TCPRoute default_route;
+    envoy::extensions::filters::network::tcp_proxy::v3alpha::TcpProxy::DeprecatedV1::TCPRoute
+        default_route;
     default_route.set_cluster(config.cluster());
     routes_.emplace_back(std::make_shared<const RouteImpl>(*this, default_route));
   }
@@ -147,7 +148,7 @@ Config::Config(const envoy::config::filter::network::tcp_proxy::v2::TcpProxy& co
   // deprecated v1 routes are absent.
   if (routes_.empty() && config.has_weighted_clusters()) {
     total_cluster_weight_ = 0;
-    for (const envoy::config::filter::network::tcp_proxy::v2::TcpProxy::WeightedCluster::
+    for (const envoy::extensions::filters::network::tcp_proxy::v3alpha::TcpProxy::WeightedCluster::
              ClusterWeight& cluster_desc : config.weighted_clusters().clusters()) {
       WeightedClusterEntryConstSharedPtr cluster_entry(
           std::make_shared<const WeightedClusterEntry>(*this, cluster_desc));
@@ -156,7 +157,8 @@ Config::Config(const envoy::config::filter::network::tcp_proxy::v2::TcpProxy& co
     }
   }
 
-  for (const envoy::config::filter::accesslog::v2::AccessLog& log_config : config.access_log()) {
+  for (const envoy::config::filter::accesslog::v3alpha::AccessLog& log_config :
+       config.access_log()) {
     access_logs_.emplace_back(AccessLog::AccessLogFactory::fromProto(log_config, context));
   }
 
@@ -173,7 +175,7 @@ RouteConstSharedPtr Config::getRegularRouteFromEntries(Network::Connection& conn
         connection.streamInfo().filterState().getDataReadOnly<PerConnectionCluster>(
             PerConnectionCluster::key());
 
-    envoy::config::filter::network::tcp_proxy::v2::TcpProxy::DeprecatedV1::TCPRoute
+    envoy::extensions::filters::network::tcp_proxy::v3alpha::TcpProxy::DeprecatedV1::TCPRoute
         per_connection_route;
     per_connection_route.set_cluster(per_connection_cluster.value());
     return std::make_shared<const RouteImpl>(*this, per_connection_route);

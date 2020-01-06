@@ -4,7 +4,7 @@ package envoy.config.filter.http.jwt_authn.v2alpha;
 
 import "envoy/api/v2/core/base.proto";
 import "envoy/api/v2/core/http_uri.proto";
-import "envoy/api/v2/route/route.proto";
+import "envoy/api/v2/route/route_components.proto";
 
 import "google/protobuf/duration.proto";
 import "google/protobuf/empty.proto";

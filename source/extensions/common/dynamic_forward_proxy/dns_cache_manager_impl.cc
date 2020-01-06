@@ -1,6 +1,6 @@
 #include "extensions/common/dynamic_forward_proxy/dns_cache_manager_impl.h"
 
-#include "envoy/config/common/dynamic_forward_proxy/v2alpha/dns_cache.pb.h"
+#include "envoy/extensions/common/dynamic_forward_proxy/v3alpha/dns_cache.pb.h"
 
 #include "common/protobuf/protobuf.h"
 
@@ -16,7 +16,7 @@ namespace DynamicForwardProxy {
 SINGLETON_MANAGER_REGISTRATION(dns_cache_manager);
 
 DnsCacheSharedPtr DnsCacheManagerImpl::getCache(
-    const envoy::config::common::dynamic_forward_proxy::v2alpha::DnsCacheConfig& config) {
+    const envoy::extensions::common::dynamic_forward_proxy::v3alpha::DnsCacheConfig& config) {
   const auto& existing_cache = caches_.find(config.name());
   if (existing_cache != caches_.end()) {
     if (!Protobuf::util::MessageDifferencer::Equivalent(config, existing_cache->second.config_)) {

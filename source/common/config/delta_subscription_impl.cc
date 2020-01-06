@@ -1,6 +1,6 @@
 #include "common/config/delta_subscription_impl.h"
 
-#include "envoy/api/v2/discovery.pb.h"
+#include "envoy/service/discovery/v3alpha/discovery.pb.h"
 
 namespace Envoy {
 namespace Config {
@@ -52,7 +52,7 @@ void DeltaSubscriptionImpl::onConfigUpdate(
 }
 
 void DeltaSubscriptionImpl::onConfigUpdate(
-    const Protobuf::RepeatedPtrField<envoy::api::v2::Resource>& added_resources,
+    const Protobuf::RepeatedPtrField<envoy::service::discovery::v3alpha::Resource>& added_resources,
     const Protobuf::RepeatedPtrField<std::string>& removed_resources,
     const std::string& system_version_info) {
   stats_.update_attempt_.inc();

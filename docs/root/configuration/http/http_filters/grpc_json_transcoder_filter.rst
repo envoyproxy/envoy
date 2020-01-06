@@ -121,8 +121,9 @@ gRPC or RESTful JSON requests to localhost:51051.
                 - match: { prefix: "/helloworld.Greeter" }
                   route: { cluster: grpc, timeout: { seconds: 60 } }
             http_filters:
-            - name: envoy.grpc_json_transcoder
-              config:
+            - name: envoy.
+              "@type": type.googleapis.com/envoy.config.filter.http.transcoder.v2.GrpcJsonTranscoder
+              typed_config:
                 proto_descriptor: "/tmp/envoy/proto.pb"
                 services: ["helloworld.Greeter"]
                 print_options:

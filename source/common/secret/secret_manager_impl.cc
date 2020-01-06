@@ -1,10 +1,10 @@
 #include "common/secret/secret_manager_impl.h"
 
-#include "envoy/admin/v2alpha/config_dump.pb.h"
-#include "envoy/api/v2/auth/cert.pb.h"
-#include "envoy/api/v2/core/base.pb.h"
-#include "envoy/api/v2/core/config_source.pb.h"
+#include "envoy/admin/v3alpha/config_dump.pb.h"
 #include "envoy/common/exception.h"
+#include "envoy/config/core/v3alpha/base.pb.h"
+#include "envoy/config/core/v3alpha/config_source.pb.h"
+#include "envoy/extensions/transport_sockets/tls/v3alpha/cert.pb.h"
 
 #include "common/common/assert.h"
 #include "common/common/logger.h"
@@ -20,9 +20,10 @@ namespace Secret {
 SecretManagerImpl::SecretManagerImpl(Server::ConfigTracker& config_tracker)
     : config_tracker_entry_(config_tracker.add("secrets", [this] { return dumpSecretConfigs(); })) {
 }
-void SecretManagerImpl::addStaticSecret(const envoy::api::v2::auth::Secret& secret) {
+void SecretManagerImpl::addStaticSecret(
+    const envoy::extensions::transport_sockets::tls::v3alpha::Secret& secret) {
   switch (secret.type_case()) {
-  case envoy::api::v2::auth::Secret::TypeCase::kTlsCertificate: {
+  case envoy::extensions::transport_sockets::tls::v3alpha::Secret::TypeCase::kTlsCertificate: {
     auto secret_provider =
         std::make_shared<TlsCertificateConfigProviderImpl>(secret.tls_certificate());
     if (!static_tls_certificate_providers_.insert(std::make_pair(secret.name(), secret_provider))
@@ -32,7 +33,7 @@ void SecretManagerImpl::addStaticSecret(const envoy::api::v2::auth::Secret& secr
     }
     break;
   }
-  case envoy::api::v2::auth::Secret::TypeCase::kValidationContext: {
+  case envoy::extensions::transport_sockets::tls::v3alpha::Secret::TypeCase::kValidationContext: {
     auto secret_provider = std::make_shared<CertificateValidationContextConfigProviderImpl>(
         secret.validation_context());
     if (!static_certificate_validation_context_providers_
@@ -43,7 +44,7 @@ void SecretManagerImpl::addStaticSecret(const envoy::api::v2::auth::Secret& secr
     }
     break;
   }
-  case envoy::api::v2::auth::Secret::TypeCase::kSessionTicketKeys: {
+  case envoy::extensions::transport_sockets::tls::v3alpha::Secret::TypeCase::kSessionTicketKeys: {
     auto secret_provider =
         std::make_shared<TlsSessionTicketKeysConfigProviderImpl>(secret.session_ticket_keys());
     if (!static_session_ticket_keys_providers_
@@ -79,25 +80,28 @@ SecretManagerImpl::findStaticTlsSessionTicketKeysContextProvider(const std::stri
 }
 
 TlsCertificateConfigProviderSharedPtr SecretManagerImpl::createInlineTlsCertificateProvider(
-    const envoy::api::v2::auth::TlsCertificate& tls_certificate) {
+    const envoy::extensions::transport_sockets::tls::v3alpha::TlsCertificate& tls_certificate) {
   return std::make_shared<TlsCertificateConfigProviderImpl>(tls_certificate);
 }
 
 CertificateValidationContextConfigProviderSharedPtr
 SecretManagerImpl::createInlineCertificateValidationContextProvider(
-    const envoy::api::v2::auth::CertificateValidationContext& certificate_validation_context) {
+    const envoy::extensions::transport_sockets::tls::v3alpha::CertificateValidationContext&
+        certificate_validation_context) {
   return std::make_shared<CertificateValidationContextConfigProviderImpl>(
       certificate_validation_context);
 }
 
 TlsSessionTicketKeysConfigProviderSharedPtr
 SecretManagerImpl::createInlineTlsSessionTicketKeysProvider(
-    const envoy::api::v2::auth::TlsSessionTicketKeys& tls_session_ticket_keys) {
+    const envoy::extensions::transport_sockets::tls::v3alpha::TlsSessionTicketKeys&
+        tls_session_ticket_keys) {
   return std::make_shared<TlsSessionTicketKeysConfigProviderImpl>(tls_session_ticket_keys);
 }
 
 TlsCertificateConfigProviderSharedPtr SecretManagerImpl::findOrCreateTlsCertificateProvider(
-    const envoy::api::v2::core::ConfigSource& sds_config_source, const std::string& config_name,
+    const envoy::config::core::v3alpha::ConfigSource& sds_config_source,
+    const std::string& config_name,
     Server::Configuration::TransportSocketFactoryContext& secret_provider_context) {
   return certificate_providers_.findOrCreate(sds_config_source, config_name,
                                              secret_provider_context);
@@ -105,7 +109,8 @@ TlsCertificateConfigProviderSharedPtr SecretManagerImpl::findOrCreateTlsCertific
 
 CertificateValidationContextConfigProviderSharedPtr
 SecretManagerImpl::findOrCreateCertificateValidationContextProvider(
-    const envoy::api::v2::core::ConfigSource& sds_config_source, const std::string& config_name,
+    const envoy::config::core::v3alpha::ConfigSource& sds_config_source,
+    const std::string& config_name,
     Server::Configuration::TransportSocketFactoryContext& secret_provider_context) {
   return validation_context_providers_.findOrCreate(sds_config_source, config_name,
                                                     secret_provider_context);
@@ -113,14 +118,15 @@ SecretManagerImpl::findOrCreateCertificateValidationContextProvider(
 
 TlsSessionTicketKeysConfigProviderSharedPtr
 SecretManagerImpl::findOrCreateTlsSessionTicketKeysContextProvider(
-    const envoy::api::v2::core::ConfigSource& sds_config_source, const std::string& config_name,
+    const envoy::config::core::v3alpha::ConfigSource& sds_config_source,
+    const std::string& config_name,
     Server::Configuration::TransportSocketFactoryContext& secret_provider_context) {
   return session_ticket_keys_providers_.findOrCreate(sds_config_source, config_name,
                                                      secret_provider_context);
 }
 
 ProtobufTypes::MessagePtr SecretManagerImpl::dumpSecretConfigs() {
-  auto config_dump = std::make_unique<envoy::admin::v2alpha::SecretsConfigDump>();
+  auto config_dump = std::make_unique<envoy::admin::v3alpha::SecretsConfigDump>();
   // Handle static tls key/cert providers.
   for (const auto& cert_iter : static_tls_certificate_providers_) {
     const auto& tls_cert = cert_iter.second;
@@ -163,7 +169,7 @@ ProtobufTypes::MessagePtr SecretManagerImpl::dumpSecretConfigs() {
   for (const auto& cert_secrets : providers) {
     const auto& secret_data = cert_secrets->secretData();
     const auto& tls_cert = cert_secrets->secret();
-    ::envoy::admin::v2alpha::SecretsConfigDump_DynamicSecret* dump_secret;
+    envoy::admin::v3alpha::SecretsConfigDump::DynamicSecret* dump_secret;
     const bool secret_ready = tls_cert != nullptr;
     if (secret_ready) {
       dump_secret = config_dump->mutable_dynamic_active_secrets()->Add();
@@ -189,7 +195,7 @@ ProtobufTypes::MessagePtr SecretManagerImpl::dumpSecretConfigs() {
   for (const auto& validation_context_secret : context_secret_provider) {
     const auto& secret_data = validation_context_secret->secretData();
     const auto& validation_context = validation_context_secret->secret();
-    ::envoy::admin::v2alpha::SecretsConfigDump_DynamicSecret* dump_secret;
+    envoy::admin::v3alpha::SecretsConfigDump::DynamicSecret* dump_secret;
     const bool secret_ready = validation_context != nullptr;
     if (secret_ready) {
       dump_secret = config_dump->mutable_dynamic_active_secrets()->Add();
@@ -213,7 +219,7 @@ ProtobufTypes::MessagePtr SecretManagerImpl::dumpSecretConfigs() {
   for (const auto& stek_secrets : stek_providers) {
     const auto& secret_data = stek_secrets->secretData();
     const auto& tls_stek = stek_secrets->secret();
-    ::envoy::admin::v2alpha::SecretsConfigDump_DynamicSecret* dump_secret;
+    envoy::admin::v3alpha::SecretsConfigDump::DynamicSecret* dump_secret;
     const bool secret_ready = tls_stek != nullptr;
     if (secret_ready) {
       dump_secret = config_dump->mutable_dynamic_active_secrets()->Add();

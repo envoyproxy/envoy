@@ -1,14 +1,15 @@
 #include <string>
 
-#include "envoy/admin/v2alpha/config_dump.pb.h"
-#include "envoy/admin/v2alpha/config_dump.pb.validate.h"
-#include "envoy/api/v2/core/config_source.pb.h"
-#include "envoy/api/v2/discovery.pb.h"
-#include "envoy/api/v2/rds.pb.h"
-#include "envoy/api/v2/srds.pb.h"
-#include "envoy/config/filter/network/http_connection_manager/v2/http_connection_manager.pb.h"
+#include "envoy/admin/v3alpha/config_dump.pb.h"
+#include "envoy/admin/v3alpha/config_dump.pb.validate.h"
+#include "envoy/api/v2/route.pb.h"
+#include "envoy/config/core/v3alpha/config_source.pb.h"
+#include "envoy/config/route/v3alpha/route.pb.h"
+#include "envoy/config/route/v3alpha/scoped_route.pb.h"
 #include "envoy/config/subscription.h"
+#include "envoy/extensions/filters/network/http_connection_manager/v3alpha/http_connection_manager.pb.h"
 #include "envoy/init/manager.h"
+#include "envoy/service/discovery/v3alpha/discovery.pb.h"
 #include "envoy/stats/scope.h"
 
 #include "common/config/api_version.h"
@@ -40,9 +41,9 @@ namespace {
 
 using ::Envoy::Http::TestHeaderMapImpl;
 
-envoy::api::v2::ScopedRouteConfiguration
+envoy::config::route::v3alpha::ScopedRouteConfiguration
 parseScopedRouteConfigurationFromYaml(const std::string& yaml) {
-  envoy::api::v2::ScopedRouteConfiguration scoped_route_config;
+  envoy::config::route::v3alpha::ScopedRouteConfiguration scoped_route_config;
   TestUtility::loadFromYaml(yaml, scoped_route_config);
   return scoped_route_config;
 }
@@ -52,9 +53,9 @@ void parseScopedRouteConfigurationFromYaml(ProtobufWkt::Any& scoped_route_config
   scoped_route_config.PackFrom(parseScopedRouteConfigurationFromYaml(yaml));
 }
 
-envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager
+envoy::extensions::filters::network::http_connection_manager::v3alpha::HttpConnectionManager
 parseHttpConnectionManagerFromYaml(const std::string& config_yaml) {
-  envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager
+  envoy::extensions::filters::network::http_connection_manager::v3alpha::HttpConnectionManager
       http_connection_manager;
   TestUtility::loadFromYaml(config_yaml, http_connection_manager);
   return http_connection_manager;
@@ -79,12 +80,14 @@ protected:
   ~ScopedRoutesTestBase() override { factory_context_.thread_local_.shutdownThread(); }
 
   // The delta style API helper.
-  Protobuf::RepeatedPtrField<envoy::api::v2::Resource>
+  Protobuf::RepeatedPtrField<envoy::service::discovery::v3alpha::Resource>
   anyToResource(Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
                 const std::string& version) {
-    Protobuf::RepeatedPtrField<envoy::api::v2::Resource> added_resources;
+    Protobuf::RepeatedPtrField<envoy::service::discovery::v3alpha::Resource> added_resources;
     for (const auto& resource_any : resources) {
-      auto config = TestUtility::anyConvert<envoy::api::v2::ScopedRouteConfiguration>(resource_any);
+      auto config =
+          TestUtility::anyConvert<envoy::config::route::v3alpha::ScopedRouteConfiguration>(
+              resource_any);
       auto* to_add = added_resources.Add();
       to_add->set_name(config.name());
       to_add->set_version(version);
@@ -131,8 +134,8 @@ protected:
                 API_NO_BOOST(envoy::api::v2::RouteConfiguration)().GetDescriptor()->full_name())),
             _, _))
         .Times(AnyNumber())
-        .WillRepeatedly(Invoke([this](const envoy::api::v2::core::ConfigSource&, absl::string_view,
-                                      Stats::Scope&,
+        .WillRepeatedly(Invoke([this](const envoy::config::core::v3alpha::ConfigSource&,
+                                      absl::string_view, Stats::Scope&,
                                       Envoy::Config::SubscriptionCallbacks& callbacks) {
           auto ret = std::make_unique<NiceMock<Envoy::Config::MockSubscription>>();
           rds_subscription_by_config_subscription_[ret.get()] = &callbacks;
@@ -167,7 +170,8 @@ scope_key_builder:
           key: x-foo-key
           separator: ;
 )EOF";
-    envoy::config::filter::network::http_connection_manager::v2::ScopedRoutes scoped_routes_config;
+    envoy::extensions::filters::network::http_connection_manager::v3alpha::ScopedRoutes
+        scoped_routes_config;
     TestUtility::loadFromYaml(config_yaml, scoped_routes_config);
     provider_ = config_provider_manager_->createXdsConfigProvider(
         scoped_routes_config.scoped_rds(), factory_context_, "foo.",
@@ -192,8 +196,9 @@ scope_key_builder:
 )EOF";
     for (const std::string& name : route_config_names) {
       Protobuf::RepeatedPtrField<ProtobufWkt::Any> resources;
-      resources.Add()->PackFrom(TestUtility::parseYaml<envoy::api::v2::RouteConfiguration>(
-          fmt::format(route_config_tmpl, name)));
+      resources.Add()->PackFrom(
+          TestUtility::parseYaml<envoy::config::route::v3alpha::RouteConfiguration>(
+              fmt::format(route_config_tmpl, name)));
       rds_subscription_by_name_[name]->onConfigUpdate(resources, version);
     }
   }
@@ -692,11 +697,11 @@ TEST_F(ScopedRdsTest, ConfigDump) {
   auto message_ptr =
       factory_context_.admin_.config_tracker_.config_tracker_callbacks_["route_scopes"]();
   const auto& scoped_routes_config_dump =
-      TestUtility::downcastAndValidate<const envoy::admin::v2alpha::ScopedRoutesConfigDump&>(
+      TestUtility::downcastAndValidate<const envoy::admin::v3alpha::ScopedRoutesConfigDump&>(
           *message_ptr);
 
   // No routes at all(no SRDS push yet), no last_updated timestamp
-  envoy::admin::v2alpha::ScopedRoutesConfigDump expected_config_dump;
+  envoy::admin::v3alpha::ScopedRoutesConfigDump expected_config_dump;
   TestUtility::loadFromYaml(R"EOF(
 inline_scoped_route_configs:
 dynamic_scoped_route_configs:
@@ -740,7 +745,7 @@ $1
       factory_context_, "foo.", *config_provider_manager_);
   message_ptr = factory_context_.admin_.config_tracker_.config_tracker_callbacks_["route_scopes"]();
   const auto& scoped_routes_config_dump2 =
-      TestUtility::downcastAndValidate<const envoy::admin::v2alpha::ScopedRoutesConfigDump&>(
+      TestUtility::downcastAndValidate<const envoy::admin::v3alpha::ScopedRoutesConfigDump&>(
           *message_ptr);
   TestUtility::loadFromYaml(R"EOF(
 inline_scoped_route_configs:
@@ -804,7 +809,7 @@ dynamic_scoped_route_configs:
                             expected_config_dump);
   message_ptr = factory_context_.admin_.config_tracker_.config_tracker_callbacks_["route_scopes"]();
   const auto& scoped_routes_config_dump3 =
-      TestUtility::downcastAndValidate<const envoy::admin::v2alpha::ScopedRoutesConfigDump&>(
+      TestUtility::downcastAndValidate<const envoy::admin::v3alpha::ScopedRoutesConfigDump&>(
           *message_ptr);
   EXPECT_TRUE(TestUtility::protoEqual(expected_config_dump, scoped_routes_config_dump3));
 
@@ -835,7 +840,7 @@ dynamic_scoped_route_configs:
                             expected_config_dump);
   message_ptr = factory_context_.admin_.config_tracker_.config_tracker_callbacks_["route_scopes"]();
   const auto& scoped_routes_config_dump4 =
-      TestUtility::downcastAndValidate<const envoy::admin::v2alpha::ScopedRoutesConfigDump&>(
+      TestUtility::downcastAndValidate<const envoy::admin::v3alpha::ScopedRoutesConfigDump&>(
           *message_ptr);
   EXPECT_TRUE(TestUtility::protoEqual(expected_config_dump, scoped_routes_config_dump4));
 }

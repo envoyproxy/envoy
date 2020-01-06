@@ -13,6 +13,7 @@ envoy_cc_library(
     srcs = ["decl_ref_expr.cc"],
     deps = [
         "@envoy_api//envoy/api/v2:pkg_cc_proto",
+        "@envoy_api//envoy/api/v2/route:pkg_cc_proto",
         "@envoy_api//envoy/config/overload/v2alpha:pkg_cc_proto",
     ],
 )

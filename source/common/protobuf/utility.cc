@@ -3,9 +3,9 @@
 #include <limits>
 #include <numeric>
 
-#include "envoy/api/v2/core/base.pb.h"
+#include "envoy/config/core/v3alpha/base.pb.h"
 #include "envoy/protobuf/message_validator.h"
-#include "envoy/type/percent.pb.h"
+#include "envoy/type/v3alpha/percent.pb.h"
 
 #include "common/common/assert.h"
 #include "common/common/fmt.h"
@@ -124,6 +124,11 @@ enum class MessageVersion {
 
 using MessageXformFn = std::function<void(Protobuf::Message&, MessageVersion)>;
 
+class ApiBoostRetryException : public EnvoyException {
+public:
+  ApiBoostRetryException(const std::string& message) : EnvoyException(message) {}
+};
+
 // Apply a function transforming a message (e.g. loading JSON into the message).
 // First we try with the message's earlier type, and if unsuccessful (or no
 // earlier) type, then the current type. This allows us to take a v3 Envoy
@@ -147,23 +152,10 @@ void tryWithApiBoosting(MessageXformFn f, Protobuf::Message& message) {
     // result.
     f(*earlier_message, MessageVersion::EARLIER_VERSION);
     Config::VersionConverter::upgrade(*earlier_message, message);
-  } catch (EnvoyException&) {
+  } catch (ApiBoostRetryException&) {
     // If we fail at the earlier version, try f at the current version of the
     // message.
-    bool newer_error = false;
-    try {
-      f(message, MessageVersion::LATEST_VERSION);
-    } catch (EnvoyException&) {
-      // If we fail this time, we should throw.
-      // TODO(htuch): currently throwing the v2 error, rather than v3 error, to
-      // make it easier to handle existing v2 tests during API boosting. We
-      // probably want to provide a more details exception message containing
-      // both v2 and v3 exception info.
-      newer_error = true;
-    }
-    if (newer_error) {
-      throw;
-    }
+    f(message, MessageVersion::LATEST_VERSION);
   }
 }
 
@@ -182,19 +174,20 @@ uint64_t convertPercent(double percent, uint64_t max_value) {
   return max_value * (percent / 100.0);
 }
 
-bool evaluateFractionalPercent(envoy::type::FractionalPercent percent, uint64_t random_value) {
+bool evaluateFractionalPercent(envoy::type::v3alpha::FractionalPercent percent,
+                               uint64_t random_value) {
   return random_value % fractionalPercentDenominatorToInt(percent.denominator()) <
          percent.numerator();
 }
 
 uint64_t fractionalPercentDenominatorToInt(
-    const envoy::type::FractionalPercent::DenominatorType& denominator) {
+    const envoy::type::v3alpha::FractionalPercent::DenominatorType& denominator) {
   switch (denominator) {
-  case envoy::type::FractionalPercent::HUNDRED:
+  case envoy::type::v3alpha::FractionalPercent::HUNDRED:
     return 100;
-  case envoy::type::FractionalPercent::TEN_THOUSAND:
+  case envoy::type::v3alpha::FractionalPercent::TEN_THOUSAND:
     return 10000;
-  case envoy::type::FractionalPercent::MILLION:
+  case envoy::type::v3alpha::FractionalPercent::MILLION:
     return 1000000;
   default:
     // Checked by schema.
@@ -264,7 +257,7 @@ void MessageUtil::loadFromJson(const std::string& json, Protobuf::Message& messa
           validation_visitor.onUnknownField("type " + message.GetTypeName() + " reason " +
                                             strict_status.ToString());
         } else {
-          throw EnvoyException("Unknown field, possibly a rename, try again.");
+          throw ApiBoostRetryException("Unknown field, possibly a rename, try again.");
         }
       },
       message);
@@ -499,15 +492,34 @@ std::string MessageUtil::getJsonStringFromMessage(const Protobuf::Message& messa
 }
 
 void MessageUtil::unpackTo(const ProtobufWkt::Any& any_message, Protobuf::Message& message) {
-  tryWithApiBoosting(
-      [&any_message](Protobuf::Message& message, MessageVersion) {
-        if (!any_message.UnpackTo(&message)) {
-          throw EnvoyException(fmt::format("Unable to unpack as {}: {}",
-                                           message.GetDescriptor()->full_name(),
-                                           any_message.DebugString()));
-        }
-      },
-      message);
+  // If we don't have a type URL match, try an earlier version.
+  const absl::string_view any_full_name =
+      TypeUtil::typeUrlToDescriptorFullName(any_message.type_url());
+  if (any_full_name != message.GetDescriptor()->full_name()) {
+    const Protobuf::Descriptor* earlier_version_desc =
+        Config::ApiTypeOracle::getEarlierVersionDescriptor(message);
+    // If the earlier version matches, unpack and upgrade.
+    if (earlier_version_desc != nullptr && any_full_name == earlier_version_desc->full_name()) {
+      Protobuf::DynamicMessageFactory dmf;
+      auto earlier_message =
+          ProtobufTypes::MessagePtr(dmf.GetPrototype(earlier_version_desc)->New());
+      ASSERT(earlier_message != nullptr);
+      if (!any_message.UnpackTo(earlier_message.get())) {
+        throw EnvoyException(fmt::format("Unable to unpack as {}: {}",
+                                         earlier_message->GetDescriptor()->full_name(),
+                                         any_message.DebugString()));
+      }
+      Config::VersionConverter::upgrade(*earlier_message, message);
+      return;
+    }
+  }
+  // Otherwise, just unpack to the message. Type URL mismatches will be signaled
+  // by UnpackTo failure.
+  if (!any_message.UnpackTo(&message)) {
+    throw EnvoyException(fmt::format("Unable to unpack as {}: {}",
+                                     message.GetDescriptor()->full_name(),
+                                     any_message.DebugString()));
+  }
 }
 
 void MessageUtil::jsonConvert(const Protobuf::Message& source, ProtobufWkt::Struct& dest) {
@@ -643,21 +655,21 @@ bool redactTypedStruct(Protobuf::Message* message, bool ancestor_is_sensitive) {
 // `DataSource`, which is annotated as `sensitive` in `TlsCertificate` and `TlsSessionTicketKeys`
 // requires special handling.
 bool redactDataSource(Protobuf::Message* message, bool ancestor_is_sensitive) {
-  auto* data_source = dynamic_cast<envoy::api::v2::core::DataSource*>(message);
+  auto* data_source = dynamic_cast<envoy::config::core::v3alpha::DataSource*>(message);
   if (data_source != nullptr) {
     if (ancestor_is_sensitive) {
       switch (data_source->specifier_case()) {
-      case envoy::api::v2::core::DataSource::SPECIFIER_NOT_SET:
+      case envoy::config::core::v3alpha::DataSource::SPECIFIER_NOT_SET:
         // If the data source is empty, no work is needed.
         break;
-      case envoy::api::v2::core::DataSource::kFilename:
+      case envoy::config::core::v3alpha::DataSource::kFilename:
         // Don't redact filenames (SecretManagerImplTest::ConfigDumpNotRedactFilenamePrivateKey).
         break;
-      case envoy::api::v2::core::DataSource::kInlineBytes:
+      case envoy::config::core::v3alpha::DataSource::kInlineBytes:
         // Clear inline bytes and treat it as a string (fall through).
         data_source->clear_inline_bytes();
         FALLTHRU;
-      case envoy::api::v2::core::DataSource::kInlineString:
+      case envoy::config::core::v3alpha::DataSource::kInlineString:
         // Redact strings the usual way.
         data_source->set_inline_string("[redacted]");
         break;
@@ -794,6 +806,43 @@ bool ValueUtil::equal(const ProtobufWkt::Value& v1, const ProtobufWkt::Value& v2
   default:
     NOT_REACHED_GCOVR_EXCL_LINE;
   }
+}
+
+const ProtobufWkt::Value& ValueUtil::nullValue() {
+  static const auto* v = []() -> ProtobufWkt::Value* {
+    auto* vv = new ProtobufWkt::Value();
+    vv->set_null_value(ProtobufWkt::NULL_VALUE);
+    return vv;
+  }();
+  return *v;
+}
+
+ProtobufWkt::Value ValueUtil::stringValue(const std::string& str) {
+  ProtobufWkt::Value val;
+  val.set_string_value(str);
+  return val;
+}
+
+ProtobufWkt::Value ValueUtil::boolValue(bool b) {
+  ProtobufWkt::Value val;
+  val.set_bool_value(b);
+  return val;
+}
+
+ProtobufWkt::Value ValueUtil::structValue(const ProtobufWkt::Struct& obj) {
+  ProtobufWkt::Value val;
+  (*val.mutable_struct_value()) = obj;
+  return val;
+}
+
+ProtobufWkt::Value ValueUtil::listValue(const std::vector<ProtobufWkt::Value>& values) {
+  auto list = std::make_unique<ProtobufWkt::ListValue>();
+  for (const auto& value : values) {
+    *list->add_values() = value;
+  }
+  ProtobufWkt::Value val;
+  val.set_allocated_list_value(list.release());
+  return val;
 }
 
 namespace {

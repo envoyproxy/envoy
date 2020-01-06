@@ -1,6 +1,6 @@
-#include "envoy/config/filter/http/rbac/v2/rbac.pb.h"
-#include "envoy/config/filter/http/rbac/v2/rbac.pb.validate.h"
-#include "envoy/config/rbac/v2/rbac.pb.h"
+#include "envoy/config/rbac/v3alpha/rbac.pb.h"
+#include "envoy/extensions/filters/http/rbac/v3alpha/rbac.pb.h"
+#include "envoy/extensions/filters/http/rbac/v3alpha/rbac.pb.validate.h"
 
 #include "extensions/filters/common/rbac/engine.h"
 #include "extensions/filters/http/rbac/config.h"
@@ -20,10 +20,10 @@ namespace RBACFilter {
 namespace {
 
 TEST(RoleBasedAccessControlFilterConfigFactoryTest, ValidProto) {
-  envoy::config::rbac::v2::Policy policy;
+  envoy::config::rbac::v3alpha::Policy policy;
   policy.add_permissions()->set_any(true);
   policy.add_principals()->set_any(true);
-  envoy::config::filter::http::rbac::v2::RBAC config;
+  envoy::extensions::filters::http::rbac::v3alpha::RBAC config;
   (*config.mutable_rules()->mutable_policies())["foo"] = policy;
 
   NiceMock<Server::Configuration::MockFactoryContext> context;
@@ -36,14 +36,14 @@ TEST(RoleBasedAccessControlFilterConfigFactoryTest, ValidProto) {
 
 TEST(RoleBasedAccessControlFilterConfigFactoryTest, EmptyProto) {
   RoleBasedAccessControlFilterConfigFactory factory;
-  auto* config = dynamic_cast<envoy::config::filter::http::rbac::v2::RBAC*>(
+  auto* config = dynamic_cast<envoy::extensions::filters::http::rbac::v3alpha::RBAC*>(
       factory.createEmptyConfigProto().get());
   EXPECT_NE(nullptr, config);
 }
 
 TEST(RoleBasedAccessControlFilterConfigFactoryTest, EmptyRouteProto) {
   RoleBasedAccessControlFilterConfigFactory factory;
-  auto* config = dynamic_cast<envoy::config::filter::http::rbac::v2::RBACPerRoute*>(
+  auto* config = dynamic_cast<envoy::extensions::filters::http::rbac::v3alpha::RBACPerRoute*>(
       factory.createEmptyRouteConfigProto().get());
   EXPECT_NE(nullptr, config);
 }

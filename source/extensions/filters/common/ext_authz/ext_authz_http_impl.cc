@@ -1,9 +1,9 @@
 #include "extensions/filters/common/ext_authz/ext_authz_http_impl.h"
 
-#include "envoy/api/v2/core/base.pb.h"
-#include "envoy/config/filter/http/ext_authz/v2/ext_authz.pb.h"
-#include "envoy/service/auth/v2/external_auth.pb.h"
-#include "envoy/type/matcher/string.pb.h"
+#include "envoy/config/core/v3alpha/base.pb.h"
+#include "envoy/extensions/filters/http/ext_authz/v3alpha/ext_authz.pb.h"
+#include "envoy/service/auth/v3alpha/external_auth.pb.h"
+#include "envoy/type/matcher/v3alpha/string.pb.h"
 
 #include "common/common/enum_to_int.h"
 #include "common/common/fmt.h"
@@ -58,7 +58,7 @@ struct SuccessResponse {
 };
 
 std::vector<Matchers::LowerCaseStringMatcherPtr>
-createLowerCaseMatchers(const envoy::type::matcher::ListStringMatcher& list) {
+createLowerCaseMatchers(const envoy::type::matcher::v3alpha::ListStringMatcher& list) {
   std::vector<Matchers::LowerCaseStringMatcherPtr> matchers;
   for (const auto& matcher : list.patterns()) {
     matchers.push_back(std::make_unique<Matchers::LowerCaseStringMatcher>(matcher));
@@ -83,8 +83,9 @@ NotHeaderKeyMatcher::NotHeaderKeyMatcher(std::vector<Matchers::LowerCaseStringMa
 bool NotHeaderKeyMatcher::matches(absl::string_view key) const { return !matcher_.matches(key); }
 
 // Config
-ClientConfig::ClientConfig(const envoy::config::filter::http::ext_authz::v2::ExtAuthz& config,
-                           uint32_t timeout, absl::string_view path_prefix)
+ClientConfig::ClientConfig(
+    const envoy::extensions::filters::http::ext_authz::v3alpha::ExtAuthz& config, uint32_t timeout,
+    absl::string_view path_prefix)
     : request_header_matchers_(
           toRequestMatchers(config.http_service().authorization_request().allowed_headers())),
       client_header_matchers_(toClientMatchers(
@@ -98,14 +99,14 @@ ClientConfig::ClientConfig(const envoy::config::filter::http::ext_authz::v2::Ext
       tracing_name_(fmt::format("async {} egress", config.http_service().server_uri().cluster())) {}
 
 MatcherSharedPtr
-ClientConfig::toRequestMatchers(const envoy::type::matcher::ListStringMatcher& list) {
+ClientConfig::toRequestMatchers(const envoy::type::matcher::v3alpha::ListStringMatcher& list) {
   const std::vector<Http::LowerCaseString> keys{
       {Http::Headers::get().Authorization, Http::Headers::get().Method, Http::Headers::get().Path,
        Http::Headers::get().Host}};
 
   std::vector<Matchers::LowerCaseStringMatcherPtr> matchers(createLowerCaseMatchers(list));
   for (const auto& key : keys) {
-    envoy::type::matcher::StringMatcher matcher;
+    envoy::type::matcher::v3alpha::StringMatcher matcher;
     matcher.set_exact(key.get());
     matchers.push_back(std::make_unique<Matchers::LowerCaseStringMatcher>(matcher));
   }
@@ -114,13 +115,13 @@ ClientConfig::toRequestMatchers(const envoy::type::matcher::ListStringMatcher& l
 }
 
 MatcherSharedPtr
-ClientConfig::toClientMatchers(const envoy::type::matcher::ListStringMatcher& list) {
+ClientConfig::toClientMatchers(const envoy::type::matcher::v3alpha::ListStringMatcher& list) {
   std::vector<Matchers::LowerCaseStringMatcherPtr> matchers(createLowerCaseMatchers(list));
 
   // If list is empty, all authorization response headers, except Host, should be added to
   // the client response.
   if (matchers.empty()) {
-    envoy::type::matcher::StringMatcher matcher;
+    envoy::type::matcher::v3alpha::StringMatcher matcher;
     matcher.set_exact(Http::Headers::get().Host.get());
     matchers.push_back(std::make_unique<Matchers::LowerCaseStringMatcher>(matcher));
 
@@ -134,7 +135,7 @@ ClientConfig::toClientMatchers(const envoy::type::matcher::ListStringMatcher& li
        Http::Headers::get().WWWAuthenticate, Http::Headers::get().Location}};
 
   for (const auto& key : keys) {
-    envoy::type::matcher::StringMatcher matcher;
+    envoy::type::matcher::v3alpha::StringMatcher matcher;
     matcher.set_exact(key.get());
     matchers.push_back(std::make_unique<Matchers::LowerCaseStringMatcher>(matcher));
   }
@@ -143,12 +144,12 @@ ClientConfig::toClientMatchers(const envoy::type::matcher::ListStringMatcher& li
 }
 
 MatcherSharedPtr
-ClientConfig::toUpstreamMatchers(const envoy::type::matcher::ListStringMatcher& list) {
+ClientConfig::toUpstreamMatchers(const envoy::type::matcher::v3alpha::ListStringMatcher& list) {
   return std::make_unique<HeaderKeyMatcher>(createLowerCaseMatchers(list));
 }
 
 Http::LowerCaseStrPairVector ClientConfig::toHeadersAdd(
-    const Protobuf::RepeatedPtrField<envoy::api::v2::core::HeaderValue>& headers) {
+    const Protobuf::RepeatedPtrField<envoy::config::core::v3alpha::HeaderValue>& headers) {
   Http::LowerCaseStrPairVector header_vec;
   header_vec.reserve(headers.size());
   for (const auto& header : headers) {
@@ -178,7 +179,7 @@ void RawHttpClientImpl::cancel() {
 
 // Client
 void RawHttpClientImpl::check(RequestCallbacks& callbacks,
-                              const envoy::service::auth::v2::CheckRequest& request,
+                              const envoy::service::auth::v3alpha::CheckRequest& request,
                               Tracing::Span& parent_span) {
   ASSERT(callbacks_ == nullptr);
   ASSERT(span_ == nullptr);
