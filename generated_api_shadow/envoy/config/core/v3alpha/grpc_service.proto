@@ -1,8 +1,8 @@
 syntax = "proto3";
 
-package envoy.api.v3alpha.core;
+package envoy.config.core.v3alpha;
 
-import "envoy/api/v3alpha/core/base.proto";
+import "envoy/config/core/v3alpha/base.proto";
 
 import "google/protobuf/any.proto";
 import "google/protobuf/duration.proto";
@@ -13,14 +13,14 @@ import "udpa/annotations/versioning.proto";
 
 import "validate/validate.proto";
 
-option java_package = "io.envoyproxy.envoy.api.v3alpha.core";
+option java_package = "io.envoyproxy.envoy.config.core.v3alpha";
 option java_outer_classname = "GrpcServiceProto";
 option java_multiple_files = true;
 
 // [#protodoc-title: gRPC services]
 
 // gRPC service configuration. This is used by :ref:`ApiConfigSource
-// <envoy_api_msg_api.v3alpha.core.ApiConfigSource>` and filter configurations.
+// <envoy_api_msg_config.core.v3alpha.ApiConfigSource>` and filter configurations.
 // [#next-free-field: 6]
 message GrpcService {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.core.GrpcService";
@@ -30,8 +30,8 @@ message GrpcService {
         "envoy.api.v2.core.GrpcService.EnvoyGrpc";
 
     // The name of the upstream gRPC cluster. SSL credentials will be supplied
-    // in the :ref:`Cluster <envoy_api_msg_api.v3alpha.Cluster>` :ref:`transport_socket
-    // <envoy_api_field_api.v3alpha.Cluster.transport_socket>`.
+    // in the :ref:`Cluster <envoy_api_msg_config.cluster.v3alpha.Cluster>` :ref:`transport_socket
+    // <envoy_api_field_config.cluster.v3alpha.Cluster.transport_socket>`.
     string cluster_name = 1 [(validate.rules).string = {min_bytes: 1}];
   }
 
@@ -201,7 +201,7 @@ message GrpcService {
     // The target URI when using the `Google C++ gRPC client
     // <https://github.com/grpc/grpc>`_. SSL credentials will be supplied in
     // :ref:`channel_credentials
-    // <envoy_api_field_api.v3alpha.core.GrpcService.GoogleGrpc.channel_credentials>`.
+    // <envoy_api_field_config.core.v3alpha.GrpcService.GoogleGrpc.channel_credentials>`.
     string target_uri = 1 [(validate.rules).string = {min_bytes: 1}];
 
     ChannelCredentials channel_credentials = 2;
