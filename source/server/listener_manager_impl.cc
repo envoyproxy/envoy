@@ -307,9 +307,9 @@ ListenerManagerStats ListenerManagerImpl::generateStats(Stats::Scope& scope) {
   return {ALL_LISTENER_MANAGER_STATS(POOL_COUNTER(scope), POOL_GAUGE(scope))};
 }
 
-<<<<<<< HEAD
-bool ListenerManagerImpl::addOrUpdateListener(envoy::config::listener::v3alpha::Listener& config,
-                                              const std::string& version_info, bool added_via_api) {
+bool ListenerManagerImpl::addOrUpdateListener(
+    const envoy::config::listener::v3alpha::Listener& config, const std::string& version_info,
+    bool added_via_api) {
 
   // TODO(junr03): currently only one ApiListener can be installed via bootstrap to avoid having to
   // build a collection of listeners, and to have to be able to warm and drain the listeners. In the

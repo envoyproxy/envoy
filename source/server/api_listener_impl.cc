@@ -16,7 +16,7 @@
 namespace Envoy {
 namespace Server {
 
-HttpApiListenerImpl::HttpApiListenerImpl(const envoy::api::v2::Listener& config,
+HttpApiListenerImpl::HttpApiListenerImpl(const envoy::config::listener::v3alpha::Listener& config,
                                          ListenerManagerImpl& parent, const std::string& name,
                                          ProtobufMessage::ValidationVisitor& validation_visitor)
     : config_(config), parent_(parent), name_(name),
@@ -64,10 +64,10 @@ OverloadManager& HttpApiListenerImpl::overloadManager() {
 }
 ThreadLocal::Instance& HttpApiListenerImpl::threadLocal() { return parent_.server_.threadLocal(); }
 Admin& HttpApiListenerImpl::admin() { return parent_.server_.admin(); }
-const envoy::api::v2::core::Metadata& HttpApiListenerImpl::listenerMetadata() const {
+const envoy::config::core::v3alpha::Metadata& HttpApiListenerImpl::listenerMetadata() const {
   return config_.metadata();
 };
-envoy::api::v2::core::TrafficDirection HttpApiListenerImpl::direction() const {
+envoy::config::core::v3alpha::TrafficDirection HttpApiListenerImpl::direction() const {
   return config_.traffic_direction();
 };
 TimeSource& HttpApiListenerImpl::timeSource() { return api().timeSource(); }

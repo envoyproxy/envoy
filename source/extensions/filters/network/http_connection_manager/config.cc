@@ -510,7 +510,7 @@ HttpConnectionManagerFactory::createHttpConnectionManagerFactoryFromProto(
     const ProtobufWkt::Any& proto_config, Server::Configuration::FactoryContext& context,
     Network::ReadFilterCallbacks& read_callbacks) {
   auto typed_config = MessageUtil::anyConvert<
-      envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager>(
+      envoy::extensions::filters::network::http_connection_manager::v3alpha::HttpConnectionManager>(
       proto_config);
 
   std::shared_ptr<Http::TlsCachingDateProviderImpl> hcm_date_provider =

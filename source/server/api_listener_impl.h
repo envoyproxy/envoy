@@ -2,7 +2,8 @@
 
 #include <memory>
 
-#include "envoy/api/v2/lds.pb.h"
+#include "envoy/config/core/v3alpha/base.pb.h"
+#include "envoy/config/listener/v3alpha/listener.pb.h"
 #include "envoy/network/connection.h"
 #include "envoy/network/filter.h"
 #include "envoy/server/api_listener.h"
@@ -31,8 +32,8 @@ class HttpApiListenerImpl : public ApiListener,
                             public Network::DrainDecision,
                             Logger::Loggable<Logger::Id::http> {
 public:
-  HttpApiListenerImpl(const envoy::api::v2::Listener& config, ListenerManagerImpl& parent,
-                      const std::string& name,
+  HttpApiListenerImpl(const envoy::config::listener::v3alpha::Listener& config,
+                      ListenerManagerImpl& parent, const std::string& name,
                       ProtobufMessage::ValidationVisitor& validation_visitor);
 
   // TODO(junr03): consider moving Envoy Mobile's SyntheticAddressImpl to Envoy in order to return
@@ -63,8 +64,8 @@ public:
   OverloadManager& overloadManager() override;
   ThreadLocal::Instance& threadLocal() override;
   Admin& admin() override;
-  const envoy::api::v2::core::Metadata& listenerMetadata() const override;
-  envoy::api::v2::core::TrafficDirection direction() const override;
+  const envoy::config::core::v3alpha::Metadata& listenerMetadata() const override;
+  envoy::config::core::v3alpha::TrafficDirection direction() const override;
   TimeSource& timeSource() override;
   ProtobufMessage::ValidationVisitor& messageValidationVisitor() override;
   Api::Api& api() override;
@@ -156,7 +157,7 @@ private:
     SyntheticConnection connection_;
   };
 
-  const envoy::api::v2::Listener& config_;
+  const envoy::config::listener::v3alpha::Listener& config_;
   ListenerManagerImpl& parent_;
   const std::string name_;
   Network::Address::InstanceConstSharedPtr address_;
