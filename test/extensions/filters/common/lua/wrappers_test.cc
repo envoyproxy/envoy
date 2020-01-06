@@ -1,4 +1,4 @@
-#include "envoy/api/v2/core/base.pb.h"
+#include "envoy/config/core/v3alpha/base.pb.h"
 
 #include "common/buffer/buffer_impl.h"
 
@@ -25,8 +25,8 @@ public:
     state_->registerType<MetadataMapIterator>();
   }
 
-  envoy::api::v2::core::Metadata parseMetadataFromYaml(const std::string& yaml_string) {
-    envoy::api::v2::core::Metadata metadata;
+  envoy::config::core::v3alpha::Metadata parseMetadataFromYaml(const std::string& yaml_string) {
+    envoy::config::core::v3alpha::Metadata metadata;
     TestUtility::loadFromYaml(yaml_string, metadata);
     return metadata;
   }
@@ -165,7 +165,7 @@ TEST_F(LuaMetadataMapWrapperTest, Methods) {
           value: ~
     )EOF";
 
-  envoy::api::v2::core::Metadata metadata = parseMetadataFromYaml(yaml);
+  envoy::config::core::v3alpha::Metadata metadata = parseMetadataFromYaml(yaml);
   const auto filter_metadata = metadata.filter_metadata().at("envoy.lua");
   MetadataMapWrapper::create(coroutine_->luaState(), filter_metadata);
 
@@ -221,7 +221,7 @@ TEST_F(LuaMetadataMapWrapperTest, Iterators) {
   // The underlying map is unordered.
   setup(SCRIPT);
 
-  envoy::api::v2::core::Metadata metadata = parseMetadataFromYaml(yaml);
+  envoy::config::core::v3alpha::Metadata metadata = parseMetadataFromYaml(yaml);
   const auto filter_metadata = metadata.filter_metadata().at("envoy.lua");
   MetadataMapWrapper::create(coroutine_->luaState(), filter_metadata);
 
@@ -258,7 +258,7 @@ TEST_F(LuaMetadataMapWrapperTest, DontFinishIteration) {
           name: nothing
     )EOF";
 
-  envoy::api::v2::core::Metadata metadata = parseMetadataFromYaml(yaml);
+  envoy::config::core::v3alpha::Metadata metadata = parseMetadataFromYaml(yaml);
   const auto filter_metadata = metadata.filter_metadata().at("envoy.lua");
   MetadataMapWrapper::create(coroutine_->luaState(), filter_metadata);
   EXPECT_THROW_WITH_MESSAGE(

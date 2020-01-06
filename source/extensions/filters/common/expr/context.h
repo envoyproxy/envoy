@@ -1,6 +1,6 @@
 #pragma once
 
-#include "envoy/api/v2/core/base.pb.h"
+#include "envoy/config/core/v3alpha/base.pb.h"
 #include "envoy/stream_info/stream_info.h"
 
 #include "common/http/headers.h"
@@ -147,13 +147,13 @@ private:
 
 class MetadataProducer : public google::api::expr::runtime::CelValueProducer {
 public:
-  MetadataProducer(const envoy::api::v2::core::Metadata& metadata) : metadata_(metadata) {}
+  MetadataProducer(const envoy::config::core::v3alpha::Metadata& metadata) : metadata_(metadata) {}
   CelValue Produce(ProtobufWkt::Arena* arena) override {
     return CelValue::CreateMessage(&metadata_, arena);
   }
 
 private:
-  const envoy::api::v2::core::Metadata& metadata_;
+  const envoy::config::core::v3alpha::Metadata& metadata_;
 };
 
 } // namespace Expr

@@ -10,7 +10,7 @@
 
 #include "envoy/access_log/access_log.h"
 #include "envoy/api/api.h"
-#include "envoy/api/v2/cds.pb.h"
+#include "envoy/config/cluster/v3alpha/cluster.pb.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/local_info/local_info.h"
 #include "envoy/network/dns.h"
@@ -136,7 +136,8 @@ public:
    *         balancer if this cluster has an integrated load balancer.
    */
   virtual std::pair<ClusterSharedPtr, ThreadAwareLoadBalancerPtr>
-  create(const envoy::api::v2::Cluster& cluster, ClusterFactoryContext& context) PURE;
+  create(const envoy::config::cluster::v3alpha::Cluster& cluster,
+         ClusterFactoryContext& context) PURE;
 
   /**
    * @return std::string the identifying name for a particular implementation of a cluster factory.

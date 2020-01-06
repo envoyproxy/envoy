@@ -2,10 +2,10 @@
 #include <string>
 #include <vector>
 
-#include "envoy/api/v2/cds.pb.h"
-#include "envoy/api/v2/core/base.pb.h"
-#include "envoy/api/v2/core/health_check.pb.h"
-#include "envoy/api/v2/endpoint/endpoint.pb.h"
+#include "envoy/config/cluster/v3alpha/cluster.pb.h"
+#include "envoy/config/core/v3alpha/base.pb.h"
+#include "envoy/config/core/v3alpha/health_check.pb.h"
+#include "envoy/config/endpoint/v3alpha/endpoint_components.pb.h"
 
 #include "common/common/fmt.h"
 #include "common/network/utility.h"
@@ -30,13 +30,13 @@ namespace {
 static HostSharedPtr newTestHost(Upstream::ClusterInfoConstSharedPtr cluster,
                                  const std::string& url, uint32_t weight = 1,
                                  const std::string& zone = "") {
-  envoy::api::v2::core::Locality locality;
+  envoy::config::core::v3alpha::Locality locality;
   locality.set_zone(zone);
-  return HostSharedPtr{
-      new HostImpl(cluster, "", Network::Utility::resolveUrl(url),
-                   envoy::api::v2::core::Metadata::default_instance(), weight, locality,
-                   envoy::api::v2::endpoint::Endpoint::HealthCheckConfig::default_instance(), 0,
-                   envoy::api::v2::core::HealthStatus::UNKNOWN)};
+  return HostSharedPtr{new HostImpl(
+      cluster, "", Network::Utility::resolveUrl(url),
+      envoy::config::core::v3alpha::Metadata::default_instance(), weight, locality,
+      envoy::config::endpoint::v3alpha::Endpoint::HealthCheckConfig::default_instance(), 0,
+      envoy::config::core::v3alpha::UNKNOWN)};
 }
 
 // Simulate weighted LR load balancer.
@@ -71,8 +71,8 @@ TEST(DISABLED_LeastRequestLoadBalancerWeightTest, Weight) {
   stats.max_host_weight_.set(weight);
   NiceMock<Runtime::MockLoader> runtime;
   Runtime::RandomGeneratorImpl random;
-  envoy::api::v2::Cluster::LeastRequestLbConfig least_request_lb_config;
-  envoy::api::v2::Cluster::CommonLbConfig common_config;
+  envoy::config::cluster::v3alpha::Cluster::LeastRequestLbConfig least_request_lb_config;
+  envoy::config::cluster::v3alpha::Cluster::CommonLbConfig common_config;
   LeastRequestLoadBalancer lb_{
       priority_set, nullptr, stats, runtime, random, common_config, least_request_lb_config};
 
@@ -239,7 +239,7 @@ public:
   Runtime::RandomGeneratorImpl random_;
   Stats::IsolatedStoreImpl stats_store_;
   ClusterStats stats_;
-  envoy::api::v2::Cluster::CommonLbConfig common_config_;
+  envoy::config::cluster::v3alpha::Cluster::CommonLbConfig common_config_;
 };
 
 TEST_F(DISABLED_SimulationTest, strictlyEqualDistribution) {

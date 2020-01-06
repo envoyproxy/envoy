@@ -1,7 +1,7 @@
 #include "common/common/regex.h"
 
 #include "envoy/common/exception.h"
-#include "envoy/type/matcher/regex.pb.h"
+#include "envoy/type/matcher/v3alpha/regex.pb.h"
 
 #include "common/common/assert.h"
 #include "common/common/fmt.h"
@@ -28,7 +28,7 @@ private:
 
 class CompiledGoogleReMatcher : public CompiledMatcher {
 public:
-  CompiledGoogleReMatcher(const envoy::type::matcher::RegexMatcher& config)
+  CompiledGoogleReMatcher(const envoy::type::matcher::v3alpha::RegexMatcher& config)
       : regex_(config.regex(), re2::RE2::Quiet) {
     if (!regex_.ok()) {
       throw EnvoyException(regex_.error());
@@ -54,7 +54,7 @@ private:
 
 } // namespace
 
-CompiledMatcherPtr Utility::parseRegex(const envoy::type::matcher::RegexMatcher& matcher) {
+CompiledMatcherPtr Utility::parseRegex(const envoy::type::matcher::v3alpha::RegexMatcher& matcher) {
   // Google Re is the only currently supported engine.
   ASSERT(matcher.has_google_re2());
   return std::make_unique<CompiledGoogleReMatcher>(matcher);

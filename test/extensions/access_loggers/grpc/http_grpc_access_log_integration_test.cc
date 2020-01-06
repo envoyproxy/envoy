@@ -1,7 +1,7 @@
-#include "envoy/config/accesslog/v2/als.pb.h"
-#include "envoy/config/bootstrap/v2/bootstrap.pb.h"
-#include "envoy/config/filter/network/http_connection_manager/v2/http_connection_manager.pb.h"
-#include "envoy/service/accesslog/v2/als.pb.h"
+#include "envoy/config/bootstrap/v3alpha/bootstrap.pb.h"
+#include "envoy/extensions/access_loggers/grpc/v3alpha/als.pb.h"
+#include "envoy/extensions/filters/network/http_connection_manager/v3alpha/http_connection_manager.pb.h"
+#include "envoy/service/accesslog/v3alpha/als.pb.h"
 
 #include "common/buffer/zero_copy_input_stream_impl.h"
 #include "common/common/version.h"
@@ -31,7 +31,7 @@ public:
   }
 
   void initialize() override {
-    config_helper_.addConfigModifier([](envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
+    config_helper_.addConfigModifier([](envoy::config::bootstrap::v3alpha::Bootstrap& bootstrap) {
       auto* accesslog_cluster = bootstrap.mutable_static_resources()->add_clusters();
       accesslog_cluster->MergeFrom(bootstrap.static_resources().clusters()[0]);
       accesslog_cluster->set_name("accesslog");
@@ -39,12 +39,12 @@ public:
     });
 
     config_helper_.addConfigModifier(
-        [this](envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager&
-                   hcm) {
+        [this](envoy::extensions::filters::network::http_connection_manager::v3alpha::
+                   HttpConnectionManager& hcm) {
           auto* access_log = hcm.add_access_log();
           access_log->set_name("envoy.http_grpc_access_log");
 
-          envoy::config::accesslog::v2::HttpGrpcAccessLogConfig config;
+          envoy::extensions::access_loggers::grpc::v3alpha::HttpGrpcAccessLogConfig config;
           auto* common_config = config.mutable_common_config();
           common_config->set_log_name("foo");
           setGrpcService(*common_config->mutable_grpc_service(), "accesslog",
@@ -67,7 +67,7 @@ public:
 
   ABSL_MUST_USE_RESULT
   AssertionResult waitForAccessLogRequest(const std::string& expected_request_msg_yaml) {
-    envoy::service::accesslog::v2::StreamAccessLogsMessage request_msg;
+    envoy::service::accesslog::v3alpha::StreamAccessLogsMessage request_msg;
     VERIFY_ASSERTION(access_log_request_->waitForGrpcMessage(*dispatcher_, request_msg));
     EXPECT_EQ("POST", access_log_request_->headers().Method()->value().getStringView());
     EXPECT_EQ("/envoy.service.accesslog.v2.AccessLogService/StreamAccessLogs",
@@ -75,7 +75,7 @@ public:
     EXPECT_EQ("application/grpc",
               access_log_request_->headers().ContentType()->value().getStringView());
 
-    envoy::service::accesslog::v2::StreamAccessLogsMessage expected_request_msg;
+    envoy::service::accesslog::v3alpha::StreamAccessLogsMessage expected_request_msg;
     TestUtility::loadFromYaml(expected_request_msg_yaml, expected_request_msg);
 
     // Clear fields which are not deterministic.
@@ -168,7 +168,7 @@ http_logs:
   // Send an empty response and end the stream. This should never happen but make sure nothing
   // breaks and we make a new stream on a follow up request.
   access_log_request_->startGrpcStream();
-  envoy::service::accesslog::v2::StreamAccessLogsResponse response_msg;
+  envoy::service::accesslog::v3alpha::StreamAccessLogsResponse response_msg;
   access_log_request_->sendGrpcMessage(response_msg);
   access_log_request_->finishGrpcStream(Grpc::Status::Ok);
   switch (clientType()) {

@@ -1,8 +1,8 @@
 #include "extensions/filters/http/tap/tap_config_impl.h"
 
-#include "envoy/api/v2/core/base.pb.h"
-#include "envoy/data/tap/v2alpha/http.pb.h"
-#include "envoy/service/tap/v2alpha/common.pb.h"
+#include "envoy/config/core/v3alpha/base.pb.h"
+#include "envoy/config/tap/v3alpha/common.pb.h"
+#include "envoy/data/tap/v3alpha/http.pb.h"
 
 #include "common/common/assert.h"
 #include "common/protobuf/protobuf.h"
@@ -16,8 +16,9 @@ namespace TapCommon = Extensions::Common::Tap;
 
 namespace {
 Http::HeaderMap::Iterate fillHeaderList(const Http::HeaderEntry& header, void* context) {
-  Protobuf::RepeatedPtrField<envoy::api::v2::core::HeaderValue>& header_list =
-      *reinterpret_cast<Protobuf::RepeatedPtrField<envoy::api::v2::core::HeaderValue>*>(context);
+  Protobuf::RepeatedPtrField<envoy::config::core::v3alpha::HeaderValue>& header_list =
+      *reinterpret_cast<Protobuf::RepeatedPtrField<envoy::config::core::v3alpha::HeaderValue>*>(
+          context);
   auto& new_header = *header_list.Add();
   new_header.set_key(std::string(header.key().getStringView()));
   new_header.set_value(std::string(header.value().getStringView()));
@@ -25,7 +26,7 @@ Http::HeaderMap::Iterate fillHeaderList(const Http::HeaderEntry& header, void* c
 }
 } // namespace
 
-HttpTapConfigImpl::HttpTapConfigImpl(envoy::service::tap::v2alpha::TapConfig&& proto_config,
+HttpTapConfigImpl::HttpTapConfigImpl(envoy::config::tap::v3alpha::TapConfig&& proto_config,
                                      Common::Tap::Sink* admin_streamer)
     : TapCommon::TapConfigBaseImpl(std::move(proto_config), admin_streamer) {}
 
@@ -60,8 +61,8 @@ void HttpPerRequestTapperImpl::streamBufferedRequestBody() {
 
 void HttpPerRequestTapperImpl::onRequestBody(const Buffer::Instance& data) {
   onBody(data, buffered_streamed_request_body_, config_->maxBufferedRxBytes(),
-         &envoy::data::tap::v2alpha::HttpStreamedTraceSegment::mutable_request_body_chunk,
-         &envoy::data::tap::v2alpha::HttpBufferedTrace::mutable_request);
+         &envoy::data::tap::v3alpha::HttpStreamedTraceSegment::mutable_request_body_chunk,
+         &envoy::data::tap::v3alpha::HttpBufferedTrace::mutable_request);
 }
 
 void HttpPerRequestTapperImpl::streamRequestTrailers() {
@@ -122,8 +123,8 @@ void HttpPerRequestTapperImpl::streamBufferedResponseBody() {
 
 void HttpPerRequestTapperImpl::onResponseBody(const Buffer::Instance& data) {
   onBody(data, buffered_streamed_response_body_, config_->maxBufferedTxBytes(),
-         &envoy::data::tap::v2alpha::HttpStreamedTraceSegment::mutable_response_body_chunk,
-         &envoy::data::tap::v2alpha::HttpBufferedTrace::mutable_response);
+         &envoy::data::tap::v3alpha::HttpStreamedTraceSegment::mutable_response_body_chunk,
+         &envoy::data::tap::v3alpha::HttpBufferedTrace::mutable_response);
 }
 
 void HttpPerRequestTapperImpl::onResponseTrailers(const Http::HeaderMap& trailers) {

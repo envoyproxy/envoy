@@ -1,5 +1,5 @@
-#include "envoy/config/bootstrap/v2/bootstrap.pb.h"
-#include "envoy/config/filter/network/http_connection_manager/v2/http_connection_manager.pb.h"
+#include "envoy/config/bootstrap/v3alpha/bootstrap.pb.h"
+#include "envoy/extensions/filters/network/http_connection_manager/v3alpha/http_connection_manager.pb.h"
 
 #include "common/buffer/buffer_impl.h"
 
@@ -21,12 +21,13 @@ public:
   }
 
   void initialize() override {
-    config_helper_.addConfigModifier([](envoy::config::filter::network::http_connection_manager::
-                                            v2::HttpConnectionManager& hcm) {
+    config_helper_.addConfigModifier([](envoy::extensions::filters::network::
+                                            http_connection_manager::v3alpha::HttpConnectionManager&
+                                                hcm) {
       hcm.mutable_http_protocol_options()->mutable_header_key_format()->mutable_proper_case_words();
     });
 
-    config_helper_.addConfigModifier([](envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
+    config_helper_.addConfigModifier([](envoy::config::bootstrap::v3alpha::Bootstrap& bootstrap) {
       bootstrap.mutable_static_resources()
           ->mutable_clusters(0)
           ->mutable_http_protocol_options()
