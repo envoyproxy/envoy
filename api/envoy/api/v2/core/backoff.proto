@@ -1,0 +1,29 @@
+syntax = "proto3";
+
+package envoy.api.v2.core;
+
+option java_package = "io.envoyproxy.envoy.api.v2.core";
+option java_outer_classname = "BackoffProto";
+option java_multiple_files = true;
+
+import "google/protobuf/duration.proto";
+
+import "validate/validate.proto";
+
+// [#protodoc-title: Backoff]
+
+// Configuration defining a jittered exponential back off strategy.
+message BackOffStrategy {
+    // The base interval to be used for the next back off computation. It should be greater than
+    // zero and less than or equal to :ref:`max_interval <max_interval>`.
+    google.protobuf.Duration base_interval = 1 [(validate.rules).duration = {
+    required: true
+    gt {}
+   }];
+
+    // The cap on the next back off value.
+    google.protobuf.Duration max_interval = 2 [(validate.rules).duration = {
+    required: true
+    gt {}
+  }];
+}
