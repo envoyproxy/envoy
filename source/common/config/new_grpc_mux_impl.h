@@ -1,5 +1,6 @@
 #pragma once
 
+#include "envoy/api/v2/discovery.pb.h"
 #include "envoy/common/token_bucket.h"
 #include "envoy/config/grpc_mux.h"
 #include "envoy/config/subscription.h"
@@ -113,7 +114,7 @@ private:
   // the order of Envoy's dependency ordering).
   std::list<std::string> subscription_ordering_;
 
-  GrpcStream<API_NO_BOOST(envoy::api::v2::DeltaDiscoveryRequest),
+  GrpcStream<envoy::service::discovery::v3alpha::DeltaDiscoveryRequest,
              envoy::service::discovery::v3alpha::DeltaDiscoveryResponse>
       grpc_stream_;
 };

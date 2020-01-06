@@ -20,11 +20,11 @@ namespace Envoy {
 namespace Router {
 
 // Implements callbacks to handle DeltaDiscovery protocol for VirtualHostDiscoveryService
-VhdsSubscription::VhdsSubscription(
-    RouteConfigUpdatePtr& config_update_info,
-    Server::Configuration::ServerFactoryContext& factory_context, const std::string& stat_prefix,
-    std::unordered_set<RouteConfigProvider*>& route_config_providers,
-    envoy::config::core::v3alpha::ConfigSource::ApiVersion resource_api_version)
+VhdsSubscription::VhdsSubscription(RouteConfigUpdatePtr& config_update_info,
+                                   Server::Configuration::ServerFactoryContext& factory_context,
+                                   const std::string& stat_prefix,
+                                   std::unordered_set<RouteConfigProvider*>& route_config_providers,
+                                   envoy::config::core::v3alpha::ApiVersion resource_api_version)
     : config_update_info_(config_update_info),
       scope_(factory_context.scope().createScope(stat_prefix + "vhds." +
                                                  config_update_info_->routeConfigName() + ".")),
@@ -71,7 +71,8 @@ void VhdsSubscription::onConfigUpdate(
   init_target_.ready();
 }
 
-std::string VhdsSubscription::loadTypeUrl(envoy::api::v2::core::ApiVersion resource_api_version) {
+std::string
+VhdsSubscription::loadTypeUrl(envoy::config::core::v3alpha::ApiVersion resource_api_version) {
   switch (resource_api_version) {
   // automatically set api version as V2
   case envoy::config::core::v3alpha::ApiVersion::AUTO:

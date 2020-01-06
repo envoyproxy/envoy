@@ -90,7 +90,7 @@ void SdsApi::initialize() {
   subscription_->start({sds_config_name_});
 }
 
-std::string SdsApi::loadTypeUrl(envoy::api::v2::core::ApiVersion resource_api_version) {
+std::string SdsApi::loadTypeUrl(envoy::config::core::v3alpha::ApiVersion resource_api_version) {
   switch (resource_api_version) {
   // automatically set api version as V2
   case envoy::config::core::v3alpha::ApiVersion::AUTO:
@@ -98,8 +98,8 @@ std::string SdsApi::loadTypeUrl(envoy::api::v2::core::ApiVersion resource_api_ve
     return Grpc::Common::typeUrl(
         API_NO_BOOST(envoy::api::v2::auth::Secret().GetDescriptor()->full_name()));
   case envoy::config::core::v3alpha::ApiVersion::V3ALPHA:
-    return Grpc::Common::typeUrl(
-        API_NO_BOOST(envoy::api::v3alpha::auth::Secret().GetDescriptor()->full_name()));
+    return Grpc::Common::typeUrl(API_NO_BOOST(
+        envoy::extensions::transport_sockets::tls::v3alpha::Secret().GetDescriptor()->full_name()));
   default:
     NOT_REACHED_GCOVR_EXCL_LINE;
   }

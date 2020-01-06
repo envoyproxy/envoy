@@ -3,6 +3,7 @@
 #include <queue>
 #include <unordered_map>
 
+#include "envoy/api/v2/discovery.pb.h"
 #include "envoy/common/time.h"
 #include "envoy/config/grpc_mux.h"
 #include "envoy/config/subscription.h"
@@ -63,7 +64,8 @@ public:
       std::unique_ptr<envoy::service::discovery::v3alpha::DiscoveryResponse>&& message) override;
   void onWriteable() override;
 
-  GrpcStream<API_NO_BOOST(envoy::api::v2::DiscoveryRequest), envoy::service::discovery::v3alpha::DiscoveryResponse>&
+  GrpcStream<envoy::service::discovery::v3alpha::DiscoveryRequest,
+             envoy::service::discovery::v3alpha::DiscoveryResponse>&
   grpcStreamForTest() {
     return grpc_stream_;
   }
@@ -106,7 +108,7 @@ private:
     // Watches on the returned resources for the API;
     std::list<GrpcMuxWatchImpl*> watches_;
     // Current DiscoveryRequest for API.
-    API_NO_BOOST(envoy::api::v2::DiscoveryRequest) request_;
+    envoy::service::discovery::v3alpha::DiscoveryRequest request_;
     // Paused via pause()?
     bool paused_{};
     // Was a DiscoveryRequest elided during a pause?
@@ -119,7 +121,8 @@ private:
   void queueDiscoveryRequest(const std::string& queue_item);
   void clearRequestQueue();
 
-  GrpcStream<API_NO_BOOST(envoy::api::v2::DiscoveryRequest), envoy::service::discovery::v3alpha::DiscoveryResponse>
+  GrpcStream<envoy::service::discovery::v3alpha::DiscoveryRequest,
+             envoy::service::discovery::v3alpha::DiscoveryResponse>
       grpc_stream_;
   const LocalInfo::LocalInfo& local_info_;
   const bool skip_subsequent_node_;

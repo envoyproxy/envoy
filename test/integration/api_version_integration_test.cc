@@ -8,8 +8,9 @@ namespace Envoy {
 namespace {
 
 using Params =
-    std::tuple<Network::Address::IpVersion, bool, envoy::api::v2::core::ApiConfigSource::ApiType,
-               envoy::api::v2::core::ApiVersion, envoy::api::v2::core::ApiVersion>;
+    std::tuple<Network::Address::IpVersion, bool,
+               envoy::config::core::v3alpha::ApiConfigSource::ApiType,
+               envoy::config::core::v3alpha::ApiVersion, envoy::config::core::v3alpha::ApiVersion>;
 
 class ApiVersionIntegrationTest : public testing::TestWithParam<Params>,
                                   public HttpIntegrationTest {
@@ -23,34 +24,42 @@ public:
   }
 
   static std::string paramsToString(const testing::TestParamInfo<Params>& p) {
-    return fmt::format("{}_{}_{}_Resource_{}_Transport_{}",
-                       std::get<0>(p.param) == Network::Address::IpVersion::v4 ? "IPv4" : "IPv6",
-                       std::get<1>(p.param) ? "ADS" : "SingletonXds",
-                       envoy::api::v2::core::ApiConfigSource::ApiType_Name(std::get<2>(p.param)),
-                       envoy::api::v2::core::ApiVersion_Name(std::get<3>(p.param)),
-                       envoy::api::v2::core::ApiVersion_Name(std::get<4>(p.param)));
+    return fmt::format(
+        "{}_{}_{}_Resource_{}_Transport_{}",
+        std::get<0>(p.param) == Network::Address::IpVersion::v4 ? "IPv4" : "IPv6",
+        std::get<1>(p.param) ? "ADS" : "SingletonXds",
+        envoy::config::core::v3alpha::ApiConfigSource::ApiType_Name(std::get<2>(p.param)),
+        envoy::config::core::v3alpha::ApiVersion_Name(std::get<3>(p.param)),
+        envoy::config::core::v3alpha::ApiVersion_Name(std::get<4>(p.param)));
   }
 
   Network::Address::IpVersion ipVersion() const { return std::get<0>(GetParam()); }
   bool ads() const { return std::get<1>(GetParam()); }
-  envoy::api::v2::core::ApiConfigSource::ApiType apiType() const { return std::get<2>(GetParam()); }
-  envoy::api::v2::core::ApiVersion resourceApiVersion() const { return std::get<3>(GetParam()); }
-  envoy::api::v2::core::ApiVersion transportApiVersion() const { return std::get<4>(GetParam()); }
+  envoy::config::core::v3alpha::ApiConfigSource::ApiType apiType() const {
+    return std::get<2>(GetParam());
+  }
+  envoy::config::core::v3alpha::ApiVersion resourceApiVersion() const {
+    return std::get<3>(GetParam());
+  }
+  envoy::config::core::v3alpha::ApiVersion transportApiVersion() const {
+    return std::get<4>(GetParam());
+  }
 
   void initialize() override {
-    config_helper_.addConfigModifier([this](envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
-      auto* xds_cluster = bootstrap.mutable_static_resources()->add_clusters();
-      xds_cluster->MergeFrom(bootstrap.static_resources().clusters()[0]);
-      xds_cluster->set_name("xds_cluster");
-      xds_cluster->mutable_http2_protocol_options();
-      if (ads()) {
-        auto* api_config_source = bootstrap.mutable_dynamic_resources()->mutable_ads_config();
-        api_config_source->set_transport_api_version(transportApiVersion());
-        api_config_source->set_api_type(apiType());
-        auto* grpc_service = api_config_source->add_grpc_services();
-        grpc_service->mutable_envoy_grpc()->set_cluster_name("xds_cluster");
-      }
-    });
+    config_helper_.addConfigModifier(
+        [this](envoy::config::bootstrap::v3alpha::Bootstrap& bootstrap) {
+          auto* xds_cluster = bootstrap.mutable_static_resources()->add_clusters();
+          xds_cluster->MergeFrom(bootstrap.static_resources().clusters()[0]);
+          xds_cluster->set_name("xds_cluster");
+          xds_cluster->mutable_http2_protocol_options();
+          if (ads()) {
+            auto* api_config_source = bootstrap.mutable_dynamic_resources()->mutable_ads_config();
+            api_config_source->set_transport_api_version(transportApiVersion());
+            api_config_source->set_api_type(apiType());
+            auto* grpc_service = api_config_source->add_grpc_services();
+            grpc_service->mutable_envoy_grpc()->set_cluster_name("xds_cluster");
+          }
+        });
     setUpstreamProtocol(FakeHttpConnection::Type::HTTP2);
     HttpIntegrationTest::initialize();
     if (xds_stream_ == nullptr) {
@@ -64,7 +73,7 @@ public:
     }
   }
 
-  void setupConfigSource(envoy::api::v2::core::ConfigSource& config_source) {
+  void setupConfigSource(envoy::config::core::v3alpha::ConfigSource& config_source) {
     config_source.set_resource_api_version(resourceApiVersion());
     if (ads()) {
       config_source.mutable_ads();
@@ -73,7 +82,7 @@ public:
     auto* api_config_source = config_source.mutable_api_config_source();
     api_config_source->set_transport_api_version(transportApiVersion());
     api_config_source->set_api_type(apiType());
-    if (apiType() == envoy::api::v2::core::ApiConfigSource::REST) {
+    if (apiType() == envoy::config::core::v3alpha::ApiConfigSource::REST) {
       api_config_source->add_cluster_names("xds_cluster");
       api_config_source->mutable_refresh_delay()->set_seconds(1);
     } else {
@@ -90,6 +99,10 @@ public:
                                            const std::string& expected_v3alpha_rest_endpoint,
                                            const std::string& expected_v2_type_url,
                                            const std::string& expected_v3alpha_type_url) {
+    // Only with ADS do we allow mixed transport/resource versions.
+    if (!ads() && resourceApiVersion() != transportApiVersion()) {
+      return AssertionSuccess();
+    }
     std::string expected_endpoint;
     std::string expected_type_url;
     std::string actual_type_url;
@@ -98,10 +111,10 @@ public:
     const char ads_v3alpha_delta_endpoint[] =
         "/envoy.service.discovery.v3alpha.AggregatedDiscoveryService/StreamAggregatedResources";
     switch (transportApiVersion()) {
-    case envoy::api::v2::core::ApiVersion::AUTO:
-    case envoy::api::v2::core::ApiVersion::V2: {
+    case envoy::config::core::v3alpha::ApiVersion::AUTO:
+    case envoy::config::core::v3alpha::ApiVersion::V2: {
       switch (apiType()) {
-      case envoy::api::v2::core::ApiConfigSource::GRPC: {
+      case envoy::config::core::v3alpha::ApiConfigSource::GRPC: {
         API_NO_BOOST(envoy::api::v2::DiscoveryRequest) discovery_request;
         VERIFY_ASSERTION(xds_stream_->waitForGrpcMessage(*dispatcher_, discovery_request));
         xds_stream_->startGrpcStream();
@@ -109,7 +122,7 @@ public:
         expected_endpoint = ads() ? ads_v2_sotw_endpoint : expected_v2_sotw_endpoint;
         break;
       }
-      case envoy::api::v2::core::ApiConfigSource::DELTA_GRPC: {
+      case envoy::config::core::v3alpha::ApiConfigSource::DELTA_GRPC: {
         API_NO_BOOST(envoy::api::v2::DeltaDiscoveryRequest) delta_discovery_request;
         VERIFY_ASSERTION(xds_stream_->waitForGrpcMessage(*dispatcher_, delta_discovery_request));
         xds_stream_->startGrpcStream();
@@ -117,7 +130,7 @@ public:
         expected_endpoint = expected_v2_delta_endpoint;
         break;
       }
-      case envoy::api::v2::core::ApiConfigSource::REST: {
+      case envoy::config::core::v3alpha::ApiConfigSource::REST: {
         API_NO_BOOST(envoy::api::v2::DiscoveryRequest) discovery_request;
         VERIFY_ASSERTION(xds_stream_->waitForEndStream(*dispatcher_));
         MessageUtil::loadFromJson(xds_stream_->body().toString(), discovery_request,
@@ -132,24 +145,24 @@ public:
       }
       break;
     }
-    case envoy::api::v2::core::ApiVersion::V3ALPHA: {
+    case envoy::config::core::v3alpha::ApiVersion::V3ALPHA: {
       switch (apiType()) {
-      case envoy::api::v2::core::ApiConfigSource::GRPC: {
-        API_NO_BOOST(envoy::api::v3alpha::DiscoveryRequest) discovery_request;
+      case envoy::config::core::v3alpha::ApiConfigSource::GRPC: {
+        API_NO_BOOST(envoy::api::v2::DiscoveryRequest) discovery_request;
         VERIFY_ASSERTION(xds_stream_->waitForGrpcMessage(*dispatcher_, discovery_request));
         actual_type_url = discovery_request.type_url();
         expected_endpoint = ads() ? ads_v3alpha_delta_endpoint : expected_v3alpha_sotw_endpoint;
         break;
       }
-      case envoy::api::v2::core::ApiConfigSource::DELTA_GRPC: {
-        API_NO_BOOST(envoy::api::v3alpha::DeltaDiscoveryRequest) delta_discovery_request;
+      case envoy::config::core::v3alpha::ApiConfigSource::DELTA_GRPC: {
+        API_NO_BOOST(envoy::api::v2::DeltaDiscoveryRequest) delta_discovery_request;
         VERIFY_ASSERTION(xds_stream_->waitForGrpcMessage(*dispatcher_, delta_discovery_request));
         actual_type_url = delta_discovery_request.type_url();
         expected_endpoint = expected_v3alpha_delta_endpoint;
         break;
       }
-      case envoy::api::v2::core::ApiConfigSource::REST: {
-        API_NO_BOOST(envoy::api::v3alpha::DiscoveryRequest) discovery_request;
+      case envoy::config::core::v3alpha::ApiConfigSource::REST: {
+        API_NO_BOOST(envoy::api::v2::DiscoveryRequest) discovery_request;
         VERIFY_ASSERTION(xds_stream_->waitForEndStream(*dispatcher_));
         MessageUtil::loadFromJson(xds_stream_->body().toString(), discovery_request,
                                   ProtobufMessage::getStrictValidationVisitor());
@@ -167,11 +180,11 @@ public:
       NOT_REACHED_GCOVR_EXCL_LINE;
     }
     switch (resourceApiVersion()) {
-    case envoy::api::v2::core::ApiVersion::AUTO:
-    case envoy::api::v2::core::ApiVersion::V2:
+    case envoy::config::core::v3alpha::ApiVersion::AUTO:
+    case envoy::config::core::v3alpha::ApiVersion::V2:
       expected_type_url = expected_v2_type_url;
       break;
-    case envoy::api::v2::core::ApiVersion::V3ALPHA:
+    case envoy::config::core::v3alpha::ApiVersion::V3ALPHA:
       expected_type_url = expected_v3alpha_type_url;
       break;
     default:
@@ -212,84 +225,85 @@ INSTANTIATE_TEST_SUITE_P(
     SingletonApiConfigSourcesExplicitApiVersions, ApiVersionIntegrationTest,
     testing::Combine(testing::Values(TestEnvironment::getIpVersionsForTest()[0]),
                      testing::Values(false),
-                     testing::Values(envoy::api::v2::core::ApiConfigSource::REST,
-                                     envoy::api::v2::core::ApiConfigSource::GRPC,
-                                     envoy::api::v2::core::ApiConfigSource::DELTA_GRPC),
-                     testing::Values(envoy::api::v2::core::ApiVersion::V2,
-                                     envoy::api::v2::core::ApiVersion::V3ALPHA),
-                     testing::Values(envoy::api::v2::core::ApiVersion::V2,
-                                     envoy::api::v2::core::ApiVersion::V3ALPHA)),
+                     testing::Values(envoy::config::core::v3alpha::ApiConfigSource::REST,
+                                     envoy::config::core::v3alpha::ApiConfigSource::GRPC,
+                                     envoy::config::core::v3alpha::ApiConfigSource::DELTA_GRPC),
+                     testing::Values(envoy::config::core::v3alpha::ApiVersion::V2,
+                                     envoy::config::core::v3alpha::ApiVersion::V3ALPHA),
+                     testing::Values(envoy::config::core::v3alpha::ApiVersion::V2,
+                                     envoy::config::core::v3alpha::ApiVersion::V3ALPHA)),
     ApiVersionIntegrationTest::paramsToString);
 
 INSTANTIATE_TEST_SUITE_P(
     SingletonApiConfigSourcesAutoApiVersions, ApiVersionIntegrationTest,
     testing::Combine(testing::Values(TestEnvironment::getIpVersionsForTest()[0]),
                      testing::Values(false),
-                     testing::Values(envoy::api::v2::core::ApiConfigSource::REST,
-                                     envoy::api::v2::core::ApiConfigSource::GRPC,
-                                     envoy::api::v2::core::ApiConfigSource::DELTA_GRPC),
-                     testing::Values(envoy::api::v2::core::ApiVersion::AUTO),
-                     testing::Values(envoy::api::v2::core::ApiVersion::AUTO)),
+                     testing::Values(envoy::config::core::v3alpha::ApiConfigSource::REST,
+                                     envoy::config::core::v3alpha::ApiConfigSource::GRPC,
+                                     envoy::config::core::v3alpha::ApiConfigSource::DELTA_GRPC),
+                     testing::Values(envoy::config::core::v3alpha::ApiVersion::AUTO),
+                     testing::Values(envoy::config::core::v3alpha::ApiVersion::AUTO)),
     ApiVersionIntegrationTest::paramsToString);
 
 INSTANTIATE_TEST_SUITE_P(
     AdsApiConfigSourcesExplicitApiVersions, ApiVersionIntegrationTest,
     testing::Combine(testing::Values(TestEnvironment::getIpVersionsForTest()[0]),
                      testing::Values(true),
-                     testing::Values(envoy::api::v2::core::ApiConfigSource::GRPC),
-                     testing::Values(envoy::api::v2::core::ApiVersion::V2,
-                                     envoy::api::v2::core::ApiVersion::V3ALPHA),
-                     testing::Values(envoy::api::v2::core::ApiVersion::V2,
-                                     envoy::api::v2::core::ApiVersion::V3ALPHA)),
+                     testing::Values(envoy::config::core::v3alpha::ApiConfigSource::GRPC),
+                     testing::Values(envoy::config::core::v3alpha::ApiVersion::V2,
+                                     envoy::config::core::v3alpha::ApiVersion::V3ALPHA),
+                     testing::Values(envoy::config::core::v3alpha::ApiVersion::V2,
+                                     envoy::config::core::v3alpha::ApiVersion::V3ALPHA)),
     ApiVersionIntegrationTest::paramsToString);
 
 TEST_P(ApiVersionIntegrationTest, Lds) {
-  config_helper_.addConfigModifier([this](envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
+  config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3alpha::Bootstrap& bootstrap) {
     setupConfigSource(*bootstrap.mutable_dynamic_resources()->mutable_lds_config());
   });
   initialize();
   ASSERT_TRUE(validateDiscoveryRequest(
       "/envoy.api.v2.ListenerDiscoveryService/StreamListeners",
       "/envoy.api.v2.ListenerDiscoveryService/DeltaListeners", "/v2/discovery:listeners",
-      "/envoy.api.v3alpha.ListenerDiscoveryService/StreamListeners",
-      "/envoy.api.v3alpha.ListenerDiscoveryService/DeltaListeners", "/v3alpha/discovery:listeners",
-      "type.googleapis.com/envoy.api.v2.Listener",
-      "type.googleapis.com/envoy.api.v3alpha.Listener"));
+      "/envoy.service.listener.v3alpha.ListenerDiscoveryService/StreamListeners",
+      "/envoy.service.listener.v3alpha.ListenerDiscoveryService/DeltaListeners",
+      "/v3alpha/discovery:listeners", "type.googleapis.com/envoy.api.v2.Listener",
+      "type.googleapis.com/envoy.config.listener.v3alpha.Listener"));
 }
 
 TEST_P(ApiVersionIntegrationTest, Cds) {
-  config_helper_.addConfigModifier([this](envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
+  config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3alpha::Bootstrap& bootstrap) {
     setupConfigSource(*bootstrap.mutable_dynamic_resources()->mutable_cds_config());
   });
   initialize();
   ASSERT_TRUE(validateDiscoveryRequest(
       "/envoy.api.v2.ClusterDiscoveryService/StreamClusters",
       "/envoy.api.v2.ClusterDiscoveryService/DeltaClusters", "/v2/discovery:clusters",
-      "/envoy.api.v3alpha.ClusterDiscoveryService/StreamClusters",
-      "/envoy.api.v3alpha.ClusterDiscoveryService/DeltaClusters", "/v3alpha/discovery:clusters",
-      "type.googleapis.com/envoy.api.v2.Cluster", "type.googleapis.com/envoy.api.v3alpha.Cluster"));
+      "/envoy.service.cluster.v3alpha.ClusterDiscoveryService/StreamClusters",
+      "/envoy.service.cluster.v3alpha.ClusterDiscoveryService/DeltaClusters",
+      "/v3alpha/discovery:clusters", "type.googleapis.com/envoy.api.v2.Cluster",
+      "type.googleapis.com/envoy.config.cluster.v3alpha.Cluster"));
 }
 
 TEST_P(ApiVersionIntegrationTest, Eds) {
-  config_helper_.addConfigModifier([this](envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
+  config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3alpha::Bootstrap& bootstrap) {
     auto* cluster = bootstrap.mutable_static_resources()->add_clusters();
     cluster->MergeFrom(bootstrap.static_resources().clusters(0));
     cluster->set_name("some_cluster");
-    cluster->set_type(envoy::api::v2::Cluster::EDS);
+    cluster->set_type(envoy::config::cluster::v3alpha::Cluster::EDS);
     setupConfigSource(*cluster->mutable_eds_cluster_config()->mutable_eds_config());
   });
   initialize();
   ASSERT_TRUE(validateDiscoveryRequest(
       "/envoy.api.v2.EndpointDiscoveryService/StreamEndpoints",
       "/envoy.api.v2.EndpointDiscoveryService/DeltaEndpoints", "/v2/discovery:endpoints",
-      "/envoy.api.v3alpha.EndpointDiscoveryService/StreamEndpoints",
-      "/envoy.api.v3alpha.EndpointDiscoveryService/DeltaEndpoints", "/v3alpha/discovery:endpoints",
-      "type.googleapis.com/envoy.api.v2.ClusterLoadAssignment",
-      "type.googleapis.com/envoy.api.v3alpha.ClusterLoadAssignment"));
+      "/envoy.service.endpoint.v3alpha.EndpointDiscoveryService/StreamEndpoints",
+      "/envoy.service.endpoint.v3alpha.EndpointDiscoveryService/DeltaEndpoints",
+      "/v3alpha/discovery:endpoints", "type.googleapis.com/envoy.api.v2.ClusterLoadAssignment",
+      "type.googleapis.com/envoy.config.endpoint.v3alpha.ClusterLoadAssignment"));
 }
 
 TEST_P(ApiVersionIntegrationTest, Rtds) {
-  config_helper_.addConfigModifier([this](envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
+  config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3alpha::Bootstrap& bootstrap) {
     auto* admin_layer = bootstrap.mutable_layered_runtime()->add_layers();
     admin_layer->set_name("admin layer");
     admin_layer->mutable_admin_layer();
@@ -301,20 +315,20 @@ TEST_P(ApiVersionIntegrationTest, Rtds) {
   ASSERT_TRUE(validateDiscoveryRequest(
       "/envoy.service.discovery.v2.RuntimeDiscoveryService/StreamRuntime",
       "/envoy.service.discovery.v2.RuntimeDiscoveryService/DeltaRuntime", "/v2/discovery:runtime",
-      "/envoy.service.discovery.v3alpha.RuntimeDiscoveryService/StreamRuntime",
-      "/envoy.service.discovery.v3alpha.RuntimeDiscoveryService/DeltaRuntime",
+      "/envoy.service.runtime.v3alpha.RuntimeDiscoveryService/StreamRuntime",
+      "/envoy.service.runtime.v3alpha.RuntimeDiscoveryService/DeltaRuntime",
       "/v3alpha/discovery:runtime", "type.googleapis.com/envoy.service.discovery.v2.Runtime",
-      "type.googleapis.com/envoy.service.discovery.v3alpha.Runtime"));
+      "type.googleapis.com/envoy.service.runtime.v3alpha.Runtime"));
 }
 
 TEST_P(ApiVersionIntegrationTest, Rds) {
   // TODO(htuch): this segfaults, this is likely some untested existing issue.
-  if (apiType() == envoy::api::v2::core::ApiConfigSource::DELTA_GRPC) {
+  if (apiType() == envoy::config::core::v3alpha::ApiConfigSource::DELTA_GRPC) {
     return;
   }
   config_helper_.addConfigModifier(
-      [this](envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager&
-                 http_connection_manager) {
+      [this](envoy::extensions::filters::network::http_connection_manager::v3alpha::
+                 HttpConnectionManager& http_connection_manager) {
         auto* rds = http_connection_manager.mutable_rds();
         rds->set_route_config_name("rds");
         setupConfigSource(*rds->mutable_config_source());
@@ -323,10 +337,10 @@ TEST_P(ApiVersionIntegrationTest, Rds) {
   ASSERT_TRUE(validateDiscoveryRequest(
       "/envoy.api.v2.RouteDiscoveryService/StreamRoutes",
       "/envoy.api.v2.RouteDiscoveryService/DeltaRoutes", "/v2/discovery:routes",
-      "/envoy.api.v3alpha.RouteDiscoveryService/StreamRoutes",
-      "/envoy.api.v3alpha.RouteDiscoveryService/DeltaRoutes", "/v3alpha/discovery:routes",
+      "/envoy.service.route.v3alpha.RouteDiscoveryService/StreamRoutes",
+      "/envoy.service.route.v3alpha.RouteDiscoveryService/DeltaRoutes", "/v3alpha/discovery:routes",
       "type.googleapis.com/envoy.api.v2.RouteConfiguration",
-      "type.googleapis.com/envoy.api.v3alpha.RouteConfiguration"));
+      "type.googleapis.com/envoy.config.route.v3alpha.RouteConfiguration"));
 }
 
 // TODO(htuch): add VHDS tests once VHDS lands.
@@ -335,8 +349,8 @@ TEST_P(ApiVersionIntegrationTest, Rds) {
 
 TEST_P(ApiVersionIntegrationTest, Srds) {
   config_helper_.addConfigModifier(
-      [this](envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager&
-                 http_connection_manager) {
+      [this](envoy::extensions::filters::network::http_connection_manager::v3alpha::
+                 HttpConnectionManager& http_connection_manager) {
         auto* scoped_routes = http_connection_manager.mutable_scoped_routes();
         scoped_routes->set_name("scoped_routes");
         const std::string& scope_key_builder_config_yaml = R"EOF(
@@ -348,8 +362,8 @@ fragments:
         key: x-foo-key
         separator: =
 )EOF";
-        envoy::config::filter::network::http_connection_manager::v2::ScopedRoutes::ScopeKeyBuilder
-            scope_key_builder;
+        envoy::extensions::filters::network::http_connection_manager::v3alpha::ScopedRoutes::
+            ScopeKeyBuilder scope_key_builder;
         TestUtility::loadFromYaml(scope_key_builder_config_yaml,
                                   *scoped_routes->mutable_scope_key_builder());
         setupConfigSource(*scoped_routes->mutable_scoped_rds()->mutable_scoped_rds_config_source());
@@ -363,14 +377,14 @@ fragments:
       "/envoy.service.route.v3alpha.ScopedRoutesDiscoveryService/DeltaScopedRoutes",
       "/v3alpha/discovery:scoped-routes",
       "type.googleapis.com/envoy.api.v2.ScopedRouteConfiguration",
-      "type.googleapis.com/envoy.service.route.v3alpha.ScopedRouteConfiguration"));
+      "type.googleapis.com/envoy.config.route.v3alpha.ScopedRouteConfiguration"));
 }
 
 TEST_P(ApiVersionIntegrationTest, Sds) {
-  config_helper_.addConfigModifier([this](envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
+  config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3alpha::Bootstrap& bootstrap) {
     auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
     auto* transport_socket = listener->mutable_filter_chains(0)->mutable_transport_socket();
-    envoy::api::v2::auth::DownstreamTlsContext tls_context;
+    envoy::extensions::transport_sockets::tls::v3alpha::DownstreamTlsContext tls_context;
     auto* common_tls_context = tls_context.mutable_common_tls_context();
     auto* secret_config = common_tls_context->add_tls_certificate_sds_secret_configs();
     secret_config->set_name("sds");
@@ -382,10 +396,10 @@ TEST_P(ApiVersionIntegrationTest, Sds) {
   ASSERT_TRUE(validateDiscoveryRequest(
       "/envoy.service.discovery.v2.SecretDiscoveryService/StreamSecrets",
       "/envoy.service.discovery.v2.SecretDiscoveryService/DeltaSecrets", "/v2/discovery:secrets",
-      "/envoy.service.discovery.v3alpha.SecretDiscoveryService/StreamSecrets",
-      "/envoy.service.discovery.v3alpha.SecretDiscoveryService/DeltaSecrets",
+      "/envoy.service.secret.v3alpha.SecretDiscoveryService/StreamSecrets",
+      "/envoy.service.secret.v3alpha.SecretDiscoveryService/DeltaSecrets",
       "/v3alpha/discovery:secrets", "type.googleapis.com/envoy.api.v2.auth.Secret",
-      "type.googleapis.com/envoy.api.v3alpha.auth.Secret"));
+      "type.googleapis.com/envoy.extensions.transport_sockets.tls.v3alpha.Secret"));
 }
 
 } // namespace

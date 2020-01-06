@@ -147,7 +147,7 @@ private:
       RouteConfigProviderManagerImpl& route_config_provider_manager);
 
   bool validateUpdateSize(int num_resources);
-  static std::string loadTypeUrl(envoy::api::v2::core::ApiVersion resource_api_version);
+  static std::string loadTypeUrl(envoy::config::core::v3alpha::ApiVersion resource_api_version);
 
   Init::Manager& getRdsConfigInitManager() { return init_manager_; }
 

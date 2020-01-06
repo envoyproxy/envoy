@@ -45,7 +45,7 @@ private:
   std::string resourceName(const ProtobufWkt::Any& resource) override {
     return MessageUtil::anyConvert<envoy::config::listener::v3alpha::Listener>(resource).name();
   }
-  static std::string loadTypeUrl(envoy::api::v2::core::ApiVersion resource_api_version);
+  static std::string loadTypeUrl(envoy::config::core::v3alpha::ApiVersion resource_api_version);
 
   std::unique_ptr<Config::Subscription> subscription_;
   std::string system_version_info_;

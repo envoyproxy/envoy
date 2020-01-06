@@ -349,8 +349,8 @@ void ScopedRdsConfigSubscription::onConfigUpdate(
   onConfigUpdate(to_add_repeated, to_remove_repeated, version_info);
 }
 
-std::string
-ScopedRdsConfigSubscription::loadTypeUrl(envoy::api::v2::core::ApiVersion resource_api_version) {
+std::string ScopedRdsConfigSubscription::loadTypeUrl(
+    envoy::config::core::v3alpha::ApiVersion resource_api_version) {
   switch (resource_api_version) {
   // automatically set api version as V2
   case envoy::config::core::v3alpha::ApiVersion::AUTO:

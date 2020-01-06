@@ -50,9 +50,8 @@ SubscriptionPtr SubscriptionFactoryImpl::subscriptionFromConfigSource(
       result = std::make_unique<HttpSubscriptionImpl>(
           local_info_, cm_, api_config_source.cluster_names()[0], dispatcher_, random_,
           Utility::apiConfigSourceRefreshDelay(api_config_source),
-          Utility::apiConfigSourceRequestTimeout(api_config_source),
-          restMethod(type_url, api_config_source.transport_api_version()), type_url, callbacks,
-          stats, Utility::configSourceInitialFetchTimeout(config), validation_visitor_);
+          Utility::apiConfigSourceRequestTimeout(api_config_source), restMethod(type_url), type_url,
+          callbacks, stats, Utility::configSourceInitialFetchTimeout(config), validation_visitor_);
       break;
     case envoy::config::core::v3alpha::ApiConfigSource::GRPC:
       result = std::make_unique<GrpcSubscriptionImpl>(
@@ -60,8 +59,8 @@ SubscriptionPtr SubscriptionFactoryImpl::subscriptionFromConfigSource(
           Config::Utility::factoryForGrpcApiConfigSource(cm_.grpcAsyncClientManager(),
                                                          api_config_source, scope)
               ->create(),
-          dispatcher_, random_, sotwGrpcMethod(type_url, api_config_source.transport_api_version()),
-          type_url, callbacks, stats, scope, Utility::parseRateLimitSettings(api_config_source),
+          dispatcher_, random_, sotwGrpcMethod(type_url), type_url, callbacks, stats, scope,
+          Utility::parseRateLimitSettings(api_config_source),
           Utility::configSourceInitialFetchTimeout(config),
           api_config_source.set_node_on_first_message_only());
       break;
@@ -72,8 +71,8 @@ SubscriptionPtr SubscriptionFactoryImpl::subscriptionFromConfigSource(
               Config::Utility::factoryForGrpcApiConfigSource(cm_.grpcAsyncClientManager(),
                                                              api_config_source, scope)
                   ->create(),
-              dispatcher_, deltaGrpcMethod(type_url, api_config_source.transport_api_version()),
-              random_, scope, Utility::parseRateLimitSettings(api_config_source), local_info_),
+              dispatcher_, deltaGrpcMethod(type_url), random_, scope,
+              Utility::parseRateLimitSettings(api_config_source), local_info_),
           type_url, callbacks, stats, Utility::configSourceInitialFetchTimeout(config), false);
       break;
     }

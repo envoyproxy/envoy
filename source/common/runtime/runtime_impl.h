@@ -222,7 +222,7 @@ struct RtdsSubscription : Config::SubscriptionCallbacks, Logger::Loggable<Logger
 
   void start();
   void validateUpdateSize(uint32_t num_resources);
-  static std::string loadTypeUrl(envoy::api::v2::core::ApiVersion resource_api_version);
+  static std::string loadTypeUrl(envoy::config::core::v3alpha::ApiVersion resource_api_version);
 
   LoaderImpl& parent_;
   const envoy::config::core::v3alpha::ConfigSource config_source_;

@@ -66,7 +66,7 @@ protected:
                resource)
         .name();
   }
-  static std::string loadTypeUrl(envoy::api::v2::core::ApiVersion resource_api_version);
+  static std::string loadTypeUrl(envoy::config::core::v3alpha::ApiVersion resource_api_version);
 
 private:
   void validateUpdateSize(int num_resources);

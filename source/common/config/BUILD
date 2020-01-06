@@ -85,6 +85,7 @@ envoy_cc_library(
     srcs = ["delta_subscription_state.cc"],
     hdrs = ["delta_subscription_state.h"],
     deps = [
+        ":api_version_lib",
         ":pausable_ack_queue_lib",
         "//include/envoy/config:subscription_interface",
         "//include/envoy/event:dispatcher_interface",
@@ -94,6 +95,7 @@ envoy_cc_library(
         "//source/common/common:token_bucket_impl_lib",
         "//source/common/grpc:common_lib",
         "//source/common/protobuf",
+        "@envoy_api//envoy/api/v2:pkg_cc_proto",
         "@envoy_api//envoy/service/discovery/v3alpha:pkg_cc_proto",
     ],
 )
@@ -145,6 +147,7 @@ envoy_cc_library(
         "//include/envoy/upstream:cluster_manager_interface",
         "//source/common/common:minimal_logger_lib",
         "//source/common/protobuf",
+        "@envoy_api//envoy/api/v2:pkg_cc_proto",
         "@envoy_api//envoy/service/discovery/v3alpha:pkg_cc_proto",
     ],
 )
@@ -187,6 +190,7 @@ envoy_cc_library(
         ":watch_map_lib",
         "//include/envoy/event:dispatcher_interface",
         "//include/envoy/grpc:async_client_interface",
+        "@envoy_api//envoy/api/v2:pkg_cc_proto",
         "@envoy_api//envoy/service/discovery/v3alpha:pkg_cc_proto",
     ],
 )
@@ -209,6 +213,7 @@ envoy_cc_library(
         "//source/common/http:rest_api_fetcher_lib",
         "//source/common/protobuf",
         "//source/common/protobuf:utility_lib",
+        "@envoy_api//envoy/api/v2:pkg_cc_proto",
         "@envoy_api//envoy/service/discovery/v3alpha:pkg_cc_proto",
     ],
 )
@@ -242,8 +247,15 @@ envoy_cc_library(
     name = "protobuf_link_hacks",
     hdrs = ["protobuf_link_hacks.h"],
     deps = [
+        "@envoy_api//envoy/api/v2:pkg_cc_proto",
+        "@envoy_api//envoy/service/cluster/v3alpha:pkg_cc_proto",
+        "@envoy_api//envoy/service/discovery/v2:pkg_cc_proto",
         "@envoy_api//envoy/service/discovery/v3alpha:pkg_cc_proto",
+        "@envoy_api//envoy/service/endpoint/v3alpha:pkg_cc_proto",
+        "@envoy_api//envoy/service/listener/v3alpha:pkg_cc_proto",
+        "@envoy_api//envoy/service/ratelimit/v2:pkg_cc_proto",
         "@envoy_api//envoy/service/ratelimit/v3alpha:pkg_cc_proto",
+        "@envoy_api//envoy/service/route/v3alpha:pkg_cc_proto",
         "@envoy_api//envoy/service/runtime/v3alpha:pkg_cc_proto",
         "@envoy_api//envoy/service/secret/v3alpha:pkg_cc_proto",
     ],
@@ -303,6 +315,7 @@ envoy_cc_library(
         "//source/common/grpc:common_lib",
         "//source/common/protobuf",
         "@envoy_api//envoy/annotations:pkg_cc_proto",
+        "@envoy_api//envoy/config/core/v3alpha:pkg_cc_proto",
     ],
 )
 

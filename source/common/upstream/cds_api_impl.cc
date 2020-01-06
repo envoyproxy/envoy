@@ -129,7 +129,7 @@ void CdsApiImpl::runInitializeCallbackIfAny() {
   }
 }
 
-std::string CdsApiImpl::loadTypeUrl(envoy::api::v2::core::ApiVersion resource_api_version) {
+std::string CdsApiImpl::loadTypeUrl(envoy::config::core::v3alpha::ApiVersion resource_api_version) {
   switch (resource_api_version) {
   // automatically set api version as V2
   case envoy::config::core::v3alpha::ApiVersion::AUTO:

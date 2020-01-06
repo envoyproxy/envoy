@@ -282,7 +282,7 @@ ClusterManagerImpl::ClusterManagerImpl(
           main_thread_dispatcher,
           *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
               dyn_resources.ads_config().transport_api_version() ==
-                      envoy::api::v2::core::ApiVersion::V3ALPHA
+                      envoy::config::core::v3alpha::ApiVersion::V3ALPHA
                   ? "envoy.service.discovery.v3alpha.AggregatedDiscoveryService."
                     "StreamAggregatedResources"
                   : "envoy.service.discovery.v2.AggregatedDiscoveryService."

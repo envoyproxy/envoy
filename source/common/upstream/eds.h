@@ -46,7 +46,7 @@ private:
                resource)
         .cluster_name();
   }
-  std::string loadTypeUrl();
+  static std::string loadTypeUrl(envoy::config::core::v3alpha::ApiVersion resource_api_version);
   using LocalityWeightsMap = std::unordered_map<envoy::config::core::v3alpha::Locality, uint32_t,
                                                 LocalityHash, LocalityEqualTo>;
   bool updateHostsPerLocality(const uint32_t priority, const uint32_t overprovisioning_factor,
