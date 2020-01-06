@@ -30,7 +30,7 @@ option (udpa.annotations.file_migrate).move_to_package = "envoy.config.cluster.v
 // [#protodoc-title: Cluster configuration]
 
 // Configuration for a single upstream cluster.
-// [#next-free-field: 46]
+// [#next-free-field: 47]
 message Cluster {
   // Refer to :ref:`service discovery type <arch_overview_service_discovery_types>`
   // for an explanation on each type.
