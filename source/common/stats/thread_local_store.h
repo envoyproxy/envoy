@@ -237,13 +237,13 @@ public:
   Thread::ThreadSynchronizer& sync() { return sync_; }
 
 private:
-  template <class Stat> using StatMap = StatNameHashMap<Stat>;
+  template <class Stat> using StatRefMap = StatNameHashMap<std::reference_wrapper<Stat>>;
 
   struct TlsCacheEntry {
-    StatMap<Counter*> counters_;
-    StatMap<Gauge*> gauges_;
-    StatMap<TlsHistogramSharedPtr> histograms_;
-    StatMap<ParentHistogramSharedPtr> parent_histograms_;
+    StatRefMap<Counter> counters_;
+    StatRefMap<Gauge> gauges_;
+    StatNameHashMap<TlsHistogramSharedPtr> histograms_;
+    StatNameHashMap<ParentHistogramSharedPtr> parent_histograms_;
 
     // We keep a TLS cache of rejected stat names. This costs memory, but
     // reduces runtime overhead running the matcher. Moreover, once symbol
@@ -261,9 +261,9 @@ private:
           histograms_(std::move(src.histograms_)), rejected_stats_(std::move(src.rejected_stats_)) {
     }
 
-    StatMap<CounterSharedPtr> counters_;
-    StatMap<GaugeSharedPtr> gauges_;
-    StatMap<ParentHistogramImplSharedPtr> histograms_;
+    StatNameHashMap<CounterSharedPtr> counters_;
+    StatNameHashMap<GaugeSharedPtr> gauges_;
+    StatNameHashMap<ParentHistogramImplSharedPtr> histograms_;
     StatNameStorageSet rejected_stats_;
   };
 
@@ -321,9 +321,9 @@ private:
      *     used if non-empty, or filled in if empty (and non-null).
      */
     template <class StatType>
-    StatType& safeMakeStat(StatName name, StatMap<RefcountPtr<StatType>>& central_cache_map,
+    StatType& safeMakeStat(StatName name, StatNameHashMap<RefcountPtr<StatType>>& central_cache_map,
                            StatNameStorageSet& central_rejected_stats,
-                           MakeStatFn<StatType> make_stat, StatMap<StatType*>* tls_cache,
+                           MakeStatFn<StatType> make_stat, StatRefMap<StatType>* tls_cache,
                            StatNameHashSet* tls_rejected_stats, StatType& null_stat);
 
     /**
@@ -337,7 +337,7 @@ private:
      */
     template <class StatType>
     absl::optional<std::reference_wrapper<const StatType>>
-    findStatLockHeld(StatName name, StatMap<RefcountPtr<StatType>>& central_cache_map) const;
+    findStatLockHeld(StatName name, StatNameHashMap<RefcountPtr<StatType>>& central_cache_map) const;
 
     void extractTagsAndTruncate(StatName& name,
                                 std::unique_ptr<StatNameManagedStorage>& truncated_name_storage,

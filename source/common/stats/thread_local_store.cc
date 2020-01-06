@@ -321,9 +321,10 @@ bool ThreadLocalStoreImpl::checkAndRememberRejection(StatName name,
 
 template <class StatType>
 StatType& ThreadLocalStoreImpl::ScopeImpl::safeMakeStat(
-    StatName name, StatMap<RefcountPtr<StatType>>& central_cache_map,
+    StatName name, StatNameHashMap<RefcountPtr<StatType>>& central_cache_map,
     StatNameStorageSet& central_rejected_stats, MakeStatFn<StatType> make_stat,
-    StatMap<StatType*>* tls_cache, StatNameHashSet* tls_rejected_stats, StatType& null_stat) {
+    StatRefMap<StatType>* tls_cache, StatNameHashSet* tls_rejected_stats,
+    StatType& null_stat) {
 
   if (tls_rejected_stats != nullptr &&
       tls_rejected_stats->find(name) != tls_rejected_stats->end()) {
@@ -334,7 +335,7 @@ StatType& ThreadLocalStoreImpl::ScopeImpl::safeMakeStat(
   if (tls_cache) {
     auto pos = tls_cache->find(name);
     if (pos != tls_cache->end()) {
-      return *pos->second;
+      return pos->second;
     }
   }
 
@@ -358,18 +359,19 @@ StatType& ThreadLocalStoreImpl::ScopeImpl::safeMakeStat(
   }
 
   // If we have a TLS cache, insert the stat.
+  StatType& ret = **central_ref;
   if (tls_cache) {
-    tls_cache->insert(std::make_pair((*central_ref)->statName(), central_ref->get()));
+    tls_cache->insert(std::make_pair(ret.statName(), std::reference_wrapper<StatType>(ret)));
   }
 
   // Finally we return the reference.
-  return **central_ref;
+  return ret;
 }
 
 template <class StatType>
 absl::optional<std::reference_wrapper<const StatType>>
 ThreadLocalStoreImpl::ScopeImpl::findStatLockHeld(
-    StatName name, StatMap<RefcountPtr<StatType>>& central_cache_map) const {
+    StatName name, StatNameHashMap<RefcountPtr<StatType>>& central_cache_map) const {
   auto iter = central_cache_map.find(name);
   if (iter == central_cache_map.end()) {
     return absl::nullopt;
@@ -397,7 +399,7 @@ Counter& ThreadLocalStoreImpl::ScopeImpl::counterFromStatName(StatName name) {
 
   // We now find the TLS cache. This might remain null if we don't have TLS
   // initialized currently.
-  StatMap<Counter*>* tls_cache = nullptr;
+  StatRefMap<Counter>* tls_cache = nullptr;
   StatNameHashSet* tls_rejected_stats = nullptr;
   if (!parent_.shutting_down_ && parent_.tls_) {
     TlsCacheEntry& entry = parent_.tls_->getTyped<TlsCache>().scope_cache_[this->scope_id_];
@@ -447,7 +449,7 @@ Gauge& ThreadLocalStoreImpl::ScopeImpl::gaugeFromStatName(StatName name,
   Stats::SymbolTable::StoragePtr final_name = symbolTable().join({prefix_.statName(), name});
   StatName final_stat_name(final_name.get());
 
-  StatMap<Gauge*>* tls_cache = nullptr;
+  StatRefMap<Gauge>* tls_cache = nullptr;
   StatNameHashSet* tls_rejected_stats = nullptr;
   if (!parent_.shutting_down_ && parent_.tls_) {
     TlsCacheEntry& entry = parent_.tls_->getTyped<TlsCache>().scope_cache_[this->scope_id_];
@@ -483,7 +485,7 @@ Histogram& ThreadLocalStoreImpl::ScopeImpl::histogramFromStatName(StatName name,
   Stats::SymbolTable::StoragePtr final_name = symbolTable().join({prefix_.statName(), name});
   StatName final_stat_name(final_name.get());
 
-  StatMap<ParentHistogramSharedPtr>* tls_cache = nullptr;
+  StatNameHashMap<ParentHistogramSharedPtr>* tls_cache = nullptr;
   StatNameHashSet* tls_rejected_stats = nullptr;
   if (!parent_.shutting_down_ && parent_.tls_) {
     TlsCacheEntry& entry = parent_.tls_->getTyped<TlsCache>().scope_cache_[this->scope_id_];
@@ -547,7 +549,7 @@ Histogram& ThreadLocalStoreImpl::ScopeImpl::tlsHistogram(StatName name,
 
   // See comments in counterFromStatName() which explains the logic here.
 
-  StatMap<TlsHistogramSharedPtr>* tls_cache = nullptr;
+  StatNameHashMap<TlsHistogramSharedPtr>* tls_cache = nullptr;
   if (!parent_.shutting_down_ && parent_.tls_) {
     tls_cache = &parent_.tls_->getTyped<TlsCache>().scope_cache_[this->scope_id_].histograms_;
     auto iter = tls_cache->find(name);
