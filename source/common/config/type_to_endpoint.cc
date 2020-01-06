@@ -2,6 +2,8 @@
 
 #include "common/grpc/common.h"
 
+#include "envoy/annotations/resource.pb.h"
+
 namespace Envoy {
 namespace Config {
 
