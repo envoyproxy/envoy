@@ -26,7 +26,7 @@ public:
     auto handle_max_3_hop =
         config_helper_.createVirtualHost("handle.internal.redirect.max.three.hop");
     handle_max_3_hop.mutable_routes(0)->mutable_route()->set_internal_redirect_action(
-        envoy::api::v2::route::RouteAction::HANDLE_INTERNAL_REDIRECT);
+        envoy::config::route::v3alpha::RouteAction::HANDLE_INTERNAL_REDIRECT);
     handle_max_3_hop.mutable_routes(0)
         ->mutable_route()
         ->mutable_max_previous_internal_redirect()
@@ -141,9 +141,8 @@ TEST_P(RedirectIntegrationTest, BasicInternalRedirect) {
 TEST_P(RedirectIntegrationTest, InternalRedirectWithThreeHopLimit) {
   // Validate that header sanitization is only called once.
   config_helper_.addConfigModifier(
-      [](envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager& hcm) {
-        hcm.set_via("via_value");
-      });
+      [](envoy::extensions::filters::network::http_connection_manager::v3alpha::
+             HttpConnectionManager& hcm) { hcm.set_via("via_value"); });
   initialize();
   fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
 
