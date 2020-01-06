@@ -299,6 +299,7 @@ envoy_cc_library(
     deps = [
         "//source/common/grpc:common_lib",
         "//source/common/protobuf",
+        "@envoy_api//envoy/annotations:pkg_cc_proto",
     ],
 )
 

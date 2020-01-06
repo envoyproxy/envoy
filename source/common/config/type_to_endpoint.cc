@@ -1,8 +1,8 @@
 #include "common/config/type_to_endpoint.h"
 
-#include "common/grpc/common.h"
-
 #include "envoy/annotations/resource.pb.h"
+
+#include "common/grpc/common.h"
 
 namespace Envoy {
 namespace Config {
