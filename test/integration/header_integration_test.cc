@@ -6,6 +6,7 @@
 #include "envoy/config/filter/http/router/v2/router.pb.h"
 #include "envoy/config/filter/network/http_connection_manager/v2/http_connection_manager.pb.h"
 
+#include "common/config/api_version.h"
 #include "common/config/metadata.h"
 #include "common/config/resources.h"
 #include "common/http/exception.h"
@@ -368,16 +369,16 @@ public:
         RELEASE_ASSERT(result, result.message());
         eds_stream_->startGrpcStream();
 
-        envoy::api::v2::DiscoveryRequest discovery_request;
+        API_NO_BOOST(envoy::api::v2::DiscoveryRequest) discovery_request;
         result = eds_stream_->waitForGrpcMessage(*dispatcher_, discovery_request);
         RELEASE_ASSERT(result, result.message());
 
-        envoy::api::v2::DiscoveryResponse discovery_response;
+        API_NO_BOOST(envoy::api::v2::DiscoveryResponse) discovery_response;
         discovery_response.set_version_info("1");
         discovery_response.set_type_url(Config::TypeUrl::get().ClusterLoadAssignment);
 
-        envoy::api::v2::ClusterLoadAssignment cluster_load_assignment =
-            TestUtility::parseYaml<envoy::api::v2::ClusterLoadAssignment>(fmt::format(
+        auto cluster_load_assignment =
+            TestUtility::parseYaml<API_NO_BOOST(envoy::api::v2::ClusterLoadAssignment)>(fmt::format(
                 R"EOF(
                 cluster_name: cluster_0
                 endpoints:

@@ -13,6 +13,7 @@
 #include "common/common/cleanup.h"
 #include "common/common/logger.h"
 #include "common/common/utility.h"
+#include "common/config/api_version.h"
 #include "common/config/resources.h"
 #include "common/init/manager_impl.h"
 #include "common/init/watcher_impl.h"
@@ -102,8 +103,9 @@ ScopedRdsConfigSubscription::ScopedRdsConfigSubscription(
   subscription_ =
       factory_context.clusterManager().subscriptionFactory().subscriptionFromConfigSource(
           scoped_rds.scoped_rds_config_source(),
-          Grpc::Common::typeUrl(
-              envoy::api::v2::ScopedRouteConfiguration().GetDescriptor()->full_name()),
+          Grpc::Common::typeUrl(API_NO_BOOST(envoy::api::v2::ScopedRouteConfiguration)()
+                                    .GetDescriptor()
+                                    ->full_name()),
           *scope_, *this);
 
   initialize([scope_key_builder]() -> Envoy::Config::ConfigProvider::ConfigConstSharedPtr {

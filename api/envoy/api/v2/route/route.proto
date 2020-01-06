@@ -517,7 +517,7 @@ message CorsPolicy {
   core.RuntimeFractionalPercent shadow_enabled = 10;
 }
 
-// [#next-free-field: 30]
+// [#next-free-field: 31]
 message RouteAction {
   enum ClusterNotFoundResponseCode {
     // HTTP status code - 503 Service Unavailable.
@@ -810,7 +810,14 @@ message RouteAction {
   RetryPolicy retry_policy = 9;
 
   // Indicates that the route has a request mirroring policy.
-  RequestMirrorPolicy request_mirror_policy = 10;
+  //
+  // .. attention::
+  //   This field has been deprecated in favor of `request_mirror_policies` which supports one or
+  //   more mirroring policies.
+  RequestMirrorPolicy request_mirror_policy = 10 [deprecated = true];
+
+  // Indicates that the route has request mirroring policies.
+  repeated RequestMirrorPolicy request_mirror_policies = 30;
 
   // Optionally specifies the :ref:`routing priority <arch_overview_http_routing_priority>`.
   core.RoutingPriority priority = 11 [(validate.rules).enum = {defined_only: true}];

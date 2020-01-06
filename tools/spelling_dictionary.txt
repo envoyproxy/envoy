@@ -490,6 +490,7 @@ deallocating
 deallocation
 dec
 dechunking
+decl
 decls
 decompressor
 decrement
@@ -557,6 +558,7 @@ evented
 evwatch
 exe
 execlp
+exprfor
 expectable
 extrahelp
 faceplant
@@ -690,6 +692,7 @@ linearized
 linux
 livelock
 llvm
+loc
 localhost
 lockless
 login

@@ -217,6 +217,7 @@ envoy_cc_test(
     ],
     deps = [
         ":http_integration_lib",
+        "//source/common/config:api_version_lib",
         "//source/common/protobuf",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/api/v2:pkg_cc_proto",
@@ -482,6 +483,7 @@ envoy_cc_test_library(
         "//source/common/buffer:zero_copy_input_stream_lib",
         "//source/common/common:assert_lib",
         "//source/common/common:minimal_logger_lib",
+        "//source/common/config:api_version_lib",
         "//source/common/event:dispatcher_lib",
         "//source/common/grpc:codec_lib",
         "//source/common/grpc:common_lib",
@@ -769,6 +771,7 @@ envoy_cc_test(
     ],
     deps = [
         ":http_integration_lib",
+        "//source/common/config:api_version_lib",
         "//source/common/config:protobuf_link_hacks",
         "//source/common/config:resources_lib",
         "//source/common/event:dispatcher_includes",
@@ -801,6 +804,7 @@ envoy_cc_test(
     ],
     deps = [
         ":integration_lib",
+        "//source/common/config:api_version_lib",
         "//source/common/event:dispatcher_includes",
         "//source/common/event:dispatcher_lib",
         "//source/common/network:utility_lib",
@@ -956,6 +960,7 @@ envoy_cc_test(
     ],
     deps = [
         ":http_integration_lib",
+        "//source/common/config:api_version_lib",
         "//source/common/config:resources_lib",
         "//source/common/event:dispatcher_includes",
         "//source/common/event:dispatcher_lib",
