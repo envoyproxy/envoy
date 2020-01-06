@@ -19,6 +19,8 @@
 #include "test/test_common/environment.h"
 #include "test/test_common/utility.h"
 
+#include "absl/debugging/symbolize.h"
+
 #ifdef ENVOY_HANDLE_SIGNALS
 #include "common/signal/signal_action.h"
 #endif

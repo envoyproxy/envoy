@@ -18,6 +18,9 @@ envoy_proto_library(
 envoy_cc_test_library(
     name = "main",
     srcs = ["main.cc"],
+    external_deps = [
+        "abseil_symbolize",
+    ],
     deps = [
         ":fuzz_runner_lib",
         "//source/common/common:assert_lib",
