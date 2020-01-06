@@ -1,17 +1,29 @@
 #include "test/test_common/environment.h"
 
 // TODO(asraa): Remove <experimental/filesystem> and rely only on <filesystem> when Envoy requires
-// stdc++17
+// stdc++17.
 #if defined __has_include
-#if __has_include(<filesystem>)
-#include <filesystem>
-#elif __has_include(<experimental/filesystem>)
+#if (__cplusplus < 201703L) && __has_include(<experimental/filesystem>)
 #include <experimental/filesystem>
+#if defined __cpp_lib_experimental_filesystem
+namespace fs = std::experimental::filesystem;
+#else
+#define MISSING_FILESYSTEM
+#endif
+#elif (__cplusplus >= 201703L) && __has_include(<filesystem>)
+#include <filesystem>
+#if defined __cpp_lib_filesystem && defined FUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION
+namespace fs = std::__fs::filesystem;
+#elif defined __cpp_lib_filesystem
+namespace fs = std::filesystem;
+#else
+#define MISSING_FILESYSTEM
+#endif
 #endif
 #else
-// __has_include was a key feature of stdc++17, so if it is absent,
-// we presume that only experimental/filesystem could be available.
-#include <experimental/filesystem>
+// Pre-stdc++17, may still have experimental/filesystem
+// but missing __has_include. How to detect?
+#define MISSING_FILESYSTEM
 #endif
 #include <fstream>
 #include <iostream>
@@ -47,11 +59,7 @@ std::string makeTempDir(std::string basename_template) {
   char* dirname = ::_mktemp(&name_template[0]);
   RELEASE_ASSERT(dirname != nullptr, fmt::format("failed to create tempdir from template: {} {}",
                                                  name_template, strerror(errno)));
-#if defined(_LIBCPP_VERSION) && _LIBCPP_VERSION >= 9000 && !defined(__APPLE__)
-  std::__fs::filesystem::create_directories(dirname);
-#elif defined __cpp_lib_experimental_filesystem && !defined(__APPLE__)
-  std::experimental::filesystem::create_directories(dirname);
-#endif
+  fs::create_directories(dirname);
 #else
   std::string name_template = "/tmp/" + basename_template;
   char* dirname = ::mkdtemp(&name_template[0]);
@@ -89,27 +97,24 @@ char** argv_;
 } // namespace
 
 void TestEnvironment::createPath(const std::string& path) {
-#if defined(_LIBCPP_VERSION) && _LIBCPP_VERSION >= 9000 && !defined(__APPLE__)
+#ifndef MISSING_FILESYSTEM
   // We don't want to rely on mkdir etc. if we can avoid it, since it might not
   // exist in some environments such as ClusterFuzz.
-  std::__fs::filesystem::create_directories(std::__fs::filesystem::path(path));
-#elif defined __cpp_lib_experimental_filesystem
-  std::experimental::filesystem::create_directories(std::experimental::filesystem::path(path));
+  fs::create_directories(fs::path(path));
 #else
+  // TODO(wrowe): why is this not posix ::mkdir()?
   // No support on this system for std::filesystem or std::experimental::filesystem.
   RELEASE_ASSERT(::system(("mkdir -p " + path).c_str()) == 0, "");
 #endif
 }
 
 void TestEnvironment::createParentPath(const std::string& path) {
-#if defined(_LIBCPP_VERSION) && _LIBCPP_VERSION >= 9000 && !defined(__APPLE__)
+#ifndef MISSING_FILESYSTEM
   // We don't want to rely on mkdir etc. if we can avoid it, since it might not
   // exist in some environments such as ClusterFuzz.
-  std::__fs::filesystem::create_directories(std::__fs::filesystem::path(path).parent_path());
-#elif defined __cpp_lib_experimental_filesystem && !defined(__APPLE__)
-  std::experimental::filesystem::create_directories(
-      std::experimental::filesystem::path(path).parent_path());
+  fs::create_directories(fs::path(path).parent_path());
 #else
+  // TODO(wrowe): why is this even useful given mkdir -p of the temp paths?
   // No support on this system for std::filesystem or std::experimental::filesystem.
   RELEASE_ASSERT(::system(("mkdir -p $(dirname " + path + ")").c_str()) == 0, "");
 #endif
@@ -117,20 +122,16 @@ void TestEnvironment::createParentPath(const std::string& path) {
 
 void TestEnvironment::removePath(const std::string& path) {
   RELEASE_ASSERT(absl::StartsWith(path, TestEnvironment::temporaryDirectory()), "");
-#if defined(_LIBCPP_VERSION) && _LIBCPP_VERSION >= 9000 && !defined(__APPLE__)
+#ifndef MISSING_FILESYSTEM
   // We don't want to rely on mkdir etc. if we can avoid it, since it might not
   // exist in some environments such as ClusterFuzz.
-  if (!std::__fs::filesystem::exists(path)) {
+  if (!fs::exists(path)) {
     return;
   }
-  std::__fs::filesystem::remove_all(std::__fs::filesystem::path(path));
-#elif defined __cpp_lib_experimental_filesystem && !defined(__APPLE__)
-  if (!std::experimental::filesystem::exists(path)) {
-    return;
-  }
-  std::experimental::filesystem::remove_all(std::experimental::filesystem::path(path));
+  fs::remove_all(fs::path(path));
 #else
   // No support on this system for std::filesystem or std::experimental::filesystem.
+  // TODO(wrowe): why is this not coded using posix primiatives?
   RELEASE_ASSERT(::system(("rm -rf " + path).c_str()) == 0, "");
 #endif
 }

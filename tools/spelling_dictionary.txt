@@ -947,6 +947,7 @@ stacktrace
 startup
 stateful
 statsd
+stdc
 stderr
 stdev
 stdout
