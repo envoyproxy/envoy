@@ -249,5 +249,13 @@ GaugeSharedPtr AllocatorImpl::makeGauge(StatName name, absl::string_view tag_ext
   return gauge;
 }
 
+bool AllocatorImpl::isMutexLocked() {
+  bool locked = mutex_.tryLock();
+  if (locked) {
+    mutex_.unlock();
+  }
+  return !locked;
+}
+
 } // namespace Stats
 } // namespace Envoy

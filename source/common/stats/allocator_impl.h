@@ -39,6 +39,11 @@ public:
    */
   Thread::ThreadSynchronizer& sync() { return sync_; }
 
+  /**
+   * @return whether the allocator's mutex is locked, exposed for testing purposes.
+   */
+  bool isMutexLocked();
+
 private:
   template <class BaseClass> friend class StatsSharedImpl;
   friend class CounterImpl;

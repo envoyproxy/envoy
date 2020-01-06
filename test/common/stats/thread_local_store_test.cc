@@ -1199,8 +1199,8 @@ TEST_F(HistogramTest, ParentHistogramBucketSummary) {
 
 class ClusterShutdownCleanupStarvationTest : public ThreadLocalStoreNoMocksTestBase {
 public:
-  static constexpr uint32_t NumThreads = 1; // Test seems to go fastest with 1 worker thread.
-  static constexpr uint32_t NumScopes = 2000;
+  static constexpr uint32_t NumThreads = 2;
+  static constexpr uint32_t NumScopes = 1000;
   static constexpr uint32_t NumIters = 35;
 
   // Helper class to block on a number of multi-threaded operations occurring.
@@ -1347,20 +1347,28 @@ TEST_F(ClusterShutdownCleanupStarvationTest, TwelveThreadsWithBlockade) {
   for (uint32_t i = 0; i < NumIters && elapsedTime() < std::chrono::seconds(5); ++i) {
     createScopesIncCountersAndCleanupAllThreads();
 
-    // With this blockade, use_counts for the counter get into the hundreds.
-    // Without it, they go deep into the tens of thousands, potentially blowing
-    // through a 16-bit ref-count.
+    // To ensure all stats are freed we have to wait for a few posts() to clear.
+    // First, wait for the main-dispatcher to initiate the cross-thread TLS cleanup.
+    auto main_dispatch_block = [this]() {
+      BlockingBarrier blocking_barrier(1);
+      main_dispatcher_->post(blocking_barrier.run([]() {}));
+    };
+    main_dispatch_block();
+
+    // Next, wait for all the worker threads to complete their TLS cleanup.
     {
-      BlockingBarrier blocking_barrier(NumThreads + 1);
-      main_dispatcher_->post(blocking_barrier.decrementCountFn());
+      BlockingBarrier blocking_barrier(NumThreads);
       for (Event::DispatcherPtr& thread_dispatcher : thread_dispatchers_) {
-        thread_dispatcher->post(blocking_barrier.decrementCountFn());
+        thread_dispatcher->post(blocking_barrier.run([]() {}));
       }
     }
 
+    // Finally, wait for the final central-cache cleanup, which occurs on the main thread.
+    main_dispatch_block();
+
     // Here we show that the counter cleanups have finished, because the use-count is 1.
     CounterSharedPtr counter = alloc_.makeCounter(my_counter_scoped_name_, "", std::vector<Tag>());
-    EXPECT_EQ(1, counter->use_count());
+    EXPECT_EQ(1, counter->use_count()) << "index=" << i;
   }
 }
 
