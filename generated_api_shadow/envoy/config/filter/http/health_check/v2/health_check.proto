@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package envoy.config.filter.http.health_check.v2;
 
-import "envoy/api/v2/route/route.proto";
+import "envoy/api/v2/route/route_components.proto";
 import "envoy/type/percent.proto";
 
 import "google/protobuf/duration.proto";

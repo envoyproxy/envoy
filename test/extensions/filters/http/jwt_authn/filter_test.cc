@@ -1,4 +1,4 @@
-#include "envoy/config/filter/http/jwt_authn/v2alpha/config.pb.h"
+#include "envoy/extensions/filters/http/jwt_authn/v3alpha/config.pb.h"
 
 #include "extensions/filters/http/jwt_authn/filter.h"
 #include "extensions/filters/http/well_known_names.h"
@@ -10,7 +10,7 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-using ::envoy::config::filter::http::jwt_authn::v2alpha::JwtAuthentication;
+using envoy::extensions::filters::http::jwt_authn::v3alpha::JwtAuthentication;
 using ::google::jwt_verify::Status;
 
 using testing::_;
@@ -31,7 +31,7 @@ public:
 class MockFilterConfig : public FilterConfig {
 public:
   MockFilterConfig(
-      const ::envoy::config::filter::http::jwt_authn::v2alpha::JwtAuthentication& proto_config,
+      const envoy::extensions::filters::http::jwt_authn::v3alpha::JwtAuthentication& proto_config,
       const std::string& stats_prefix, Server::Configuration::FactoryContext& context)
       : FilterConfig(proto_config, stats_prefix, context) {}
   MOCK_CONST_METHOD2(findVerifier, const Verifier*(const Http::HeaderMap& headers,

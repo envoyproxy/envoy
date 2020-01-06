@@ -5,7 +5,7 @@
 #include <list>
 #include <string>
 
-#include "envoy/api/v2/core/base.pb.h"
+#include "envoy/config/core/v3alpha/base.pb.h"
 #include "envoy/data/cluster/v2alpha/outlier_detection_event.pb.h"
 #include "envoy/upstream/upstream.h"
 
@@ -86,15 +86,15 @@ public:
   MOCK_CONST_METHOD0(healthCheckAddress, Network::Address::InstanceConstSharedPtr());
   MOCK_CONST_METHOD0(canary, bool());
   MOCK_METHOD1(canary, void(bool new_canary));
-  MOCK_CONST_METHOD0(metadata, const std::shared_ptr<envoy::api::v2::core::Metadata>());
-  MOCK_METHOD1(metadata, void(const envoy::api::v2::core::Metadata&));
+  MOCK_CONST_METHOD0(metadata, const std::shared_ptr<envoy::config::core::v3alpha::Metadata>());
+  MOCK_METHOD1(metadata, void(const envoy::config::core::v3alpha::Metadata&));
   MOCK_CONST_METHOD0(cluster, const ClusterInfo&());
   MOCK_CONST_METHOD0(outlierDetector, Outlier::DetectorHostMonitor&());
   MOCK_CONST_METHOD0(healthChecker, HealthCheckHostMonitor&());
   MOCK_CONST_METHOD0(hostname, const std::string&());
   MOCK_CONST_METHOD0(transportSocketFactory, Network::TransportSocketFactory&());
   MOCK_CONST_METHOD0(stats, HostStats&());
-  MOCK_CONST_METHOD0(locality, const envoy::api::v2::core::Locality&());
+  MOCK_CONST_METHOD0(locality, const envoy::config::core::v3alpha::Locality&());
   MOCK_CONST_METHOD0(priority, uint32_t());
   MOCK_METHOD1(priority, void(uint32_t));
   Stats::StatName localityZoneStatName() const override {
@@ -155,8 +155,8 @@ public:
   MOCK_CONST_METHOD0(healthCheckAddress, Network::Address::InstanceConstSharedPtr());
   MOCK_CONST_METHOD0(canary, bool());
   MOCK_METHOD1(canary, void(bool new_canary));
-  MOCK_CONST_METHOD0(metadata, const std::shared_ptr<envoy::api::v2::core::Metadata>());
-  MOCK_METHOD1(metadata, void(const envoy::api::v2::core::Metadata&));
+  MOCK_CONST_METHOD0(metadata, const std::shared_ptr<envoy::config::core::v3alpha::Metadata>());
+  MOCK_METHOD1(metadata, void(const envoy::config::core::v3alpha::Metadata&));
   MOCK_CONST_METHOD0(cluster, const ClusterInfo&());
   MOCK_CONST_METHOD0(counters,
                      std::vector<std::pair<absl::string_view, Stats::PrimitiveCounterReference>>());
@@ -183,7 +183,7 @@ public:
   MOCK_METHOD1(weight, void(uint32_t new_weight));
   MOCK_CONST_METHOD0(used, bool());
   MOCK_METHOD1(used, void(bool new_used));
-  MOCK_CONST_METHOD0(locality, const envoy::api::v2::core::Locality&());
+  MOCK_CONST_METHOD0(locality, const envoy::config::core::v3alpha::Locality&());
   MOCK_CONST_METHOD0(priority, uint32_t());
   MOCK_METHOD1(priority, void(uint32_t));
   MOCK_CONST_METHOD0(warmed, bool());

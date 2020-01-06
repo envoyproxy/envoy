@@ -7,10 +7,10 @@
 #include <set>
 #include <string>
 
-#include "envoy/config/filter/network/redis_proxy/v2/redis_proxy.pb.h"
+#include "envoy/extensions/filters/network/redis_proxy/v3alpha/redis_proxy.pb.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/thread_local/thread_local.h"
-#include "envoy/type/percent.pb.h"
+#include "envoy/type/v3alpha/percent.pb.h"
 #include "envoy/upstream/cluster_manager.h"
 
 #include "common/common/to_lower_table.h"
@@ -28,8 +28,8 @@ using Upstreams = std::map<std::string, ConnPool::InstanceSharedPtr>;
 
 class MirrorPolicyImpl : public MirrorPolicy {
 public:
-  MirrorPolicyImpl(const envoy::config::filter::network::redis_proxy::v2::RedisProxy::PrefixRoutes::
-                       Route::RequestMirrorPolicy&,
+  MirrorPolicyImpl(const envoy::extensions::filters::network::redis_proxy::v3alpha::RedisProxy::
+                       PrefixRoutes::Route::RequestMirrorPolicy&,
                    const ConnPool::InstanceSharedPtr, Runtime::Loader& runtime);
 
   ConnPool::InstanceSharedPtr upstream() const override { return upstream_; };
@@ -38,7 +38,7 @@ public:
 
 private:
   const std::string runtime_key_;
-  const absl::optional<envoy::type::FractionalPercent> default_value_;
+  const absl::optional<envoy::type::v3alpha::FractionalPercent> default_value_;
   const bool exclude_read_commands_;
   ConnPool::InstanceSharedPtr upstream_;
   Runtime::Loader& runtime_;
@@ -47,9 +47,9 @@ private:
 
 class Prefix : public Route {
 public:
-  Prefix(
-      const envoy::config::filter::network::redis_proxy::v2::RedisProxy::PrefixRoutes::Route route,
-      Upstreams& upstreams, Runtime::Loader& runtime);
+  Prefix(const envoy::extensions::filters::network::redis_proxy::v3alpha::RedisProxy::PrefixRoutes::
+             Route route,
+         Upstreams& upstreams, Runtime::Loader& runtime);
 
   ConnPool::InstanceSharedPtr upstream() const override { return upstream_; }
   const MirrorPolicies& mirrorPolicies() const override { return mirror_policies_; };
@@ -67,9 +67,10 @@ using PrefixSharedPtr = std::shared_ptr<Prefix>;
 
 class PrefixRoutes : public Router {
 public:
-  PrefixRoutes(const envoy::config::filter::network::redis_proxy::v2::RedisProxy::PrefixRoutes&
-                   prefix_routes,
-               Upstreams&& upstreams, Runtime::Loader& runtime);
+  PrefixRoutes(
+      const envoy::extensions::filters::network::redis_proxy::v3alpha::RedisProxy::PrefixRoutes&
+          prefix_routes,
+      Upstreams&& upstreams, Runtime::Loader& runtime);
 
   RouteSharedPtr upstreamPool(std::string& key) override;
 

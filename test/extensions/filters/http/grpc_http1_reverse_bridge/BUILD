@@ -20,7 +20,7 @@ envoy_extension_cc_test(
         "//source/common/http:header_map_lib",
         "//source/extensions/filters/http/grpc_http1_reverse_bridge:filter_lib",
         "//test/mocks/upstream:upstream_mocks",
-        "@envoy_api//envoy/config/filter/http/grpc_http1_reverse_bridge/v2alpha1:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/http/grpc_http1_reverse_bridge/v3alpha:pkg_cc_proto",
     ],
 )
 

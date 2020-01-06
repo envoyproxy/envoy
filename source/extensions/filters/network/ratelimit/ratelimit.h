@@ -5,7 +5,7 @@
 #include <string>
 #include <vector>
 
-#include "envoy/config/filter/network/rate_limit/v2/rate_limit.pb.h"
+#include "envoy/extensions/filters/network/ratelimit/v3alpha/rate_limit.pb.h"
 #include "envoy/network/connection.h"
 #include "envoy/network/filter.h"
 #include "envoy/ratelimit/ratelimit.h"
@@ -44,7 +44,7 @@ struct InstanceStats {
  */
 class Config {
 public:
-  Config(const envoy::config::filter::network::rate_limit::v2::RateLimit& config,
+  Config(const envoy::extensions::filters::network::ratelimit::v3alpha::RateLimit& config,
          Stats::Scope& scope, Runtime::Loader& runtime);
   const std::string& domain() { return domain_; }
   const std::vector<RateLimit::Descriptor>& descriptors() { return descriptors_; }

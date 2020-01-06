@@ -28,8 +28,8 @@ envoy_cc_library(
         "//source/common/config:datasource_lib",
         "//source/extensions/filters/network:well_known_names",
         "//source/extensions/filters/network/common:factory_base_lib",
-        "@envoy_api//envoy/api/v2/core:pkg_cc_proto",
-        "@envoy_api//envoy/config/filter/network/redis_proxy/v2:pkg_cc_proto",
+        "@envoy_api//envoy/config/core/v3alpha:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/network/redis_proxy/v3alpha:pkg_cc_proto",
     ],
 )
 
@@ -91,9 +91,9 @@ envoy_cc_library(
         "//source/extensions/common/redis:cluster_refresh_manager_interface",
         "//source/extensions/filters/network/common/redis:client_lib",
         "//source/extensions/filters/network/common/redis:utility_lib",
-        "@envoy_api//envoy/api/v2/core:pkg_cc_proto",
-        "@envoy_api//envoy/api/v2/endpoint:pkg_cc_proto",
-        "@envoy_api//envoy/config/filter/network/redis_proxy/v2:pkg_cc_proto",
+        "@envoy_api//envoy/config/core/v3alpha:pkg_cc_proto",
+        "@envoy_api//envoy/config/endpoint/v3alpha:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/network/redis_proxy/v3alpha:pkg_cc_proto",
     ],
 )
 
@@ -111,7 +111,7 @@ envoy_cc_library(
         "//source/common/config:datasource_lib",
         "//source/common/config:utility_lib",
         "//source/extensions/filters/network/common/redis:codec_interface",
-        "@envoy_api//envoy/config/filter/network/redis_proxy/v2:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/network/redis_proxy/v3alpha:pkg_cc_proto",
     ],
 )
 
@@ -131,8 +131,8 @@ envoy_cc_extension(
         "//source/extensions/filters/network/redis_proxy:conn_pool_lib",
         "//source/extensions/filters/network/redis_proxy:proxy_filter_lib",
         "//source/extensions/filters/network/redis_proxy:router_lib",
-        "@envoy_api//envoy/api/v2/core:pkg_cc_proto",
-        "@envoy_api//envoy/config/filter/network/redis_proxy/v2:pkg_cc_proto",
+        "@envoy_api//envoy/config/core/v3alpha:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/network/redis_proxy/v3alpha:pkg_cc_proto",
     ],
 )
 
@@ -149,7 +149,7 @@ envoy_cc_library(
         "//source/extensions/filters/network/common/redis:supported_commands_lib",
         "//source/extensions/filters/network/common/redis:utility_lib",
         "//source/extensions/filters/network/redis_proxy:conn_pool_lib",
-        "@envoy_api//envoy/config/filter/network/redis_proxy/v2:pkg_cc_proto",
-        "@envoy_api//envoy/type:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/network/redis_proxy/v3alpha:pkg_cc_proto",
+        "@envoy_api//envoy/type/v3alpha:pkg_cc_proto",
     ],
 )

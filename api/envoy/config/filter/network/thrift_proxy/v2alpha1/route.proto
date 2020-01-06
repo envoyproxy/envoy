@@ -3,7 +3,7 @@ syntax = "proto3";
 package envoy.config.filter.network.thrift_proxy.v2alpha1;
 
 import "envoy/api/v2/core/base.proto";
-import "envoy/api/v2/route/route.proto";
+import "envoy/api/v2/route/route_components.proto";
 
 import "google/protobuf/wrappers.proto";
 

@@ -10,10 +10,10 @@
 #include <vector>
 
 #include "envoy/api/api.h"
-#include "envoy/api/v2/cds.pb.h"
-#include "envoy/api/v2/core/address.pb.h"
-#include "envoy/api/v2/core/config_source.pb.h"
-#include "envoy/config/bootstrap/v2/bootstrap.pb.h"
+#include "envoy/config/bootstrap/v3alpha/bootstrap.pb.h"
+#include "envoy/config/cluster/v3alpha/cluster.pb.h"
+#include "envoy/config/core/v3alpha/address.pb.h"
+#include "envoy/config/core/v3alpha/config_source.pb.h"
 #include "envoy/http/codes.h"
 #include "envoy/local_info/local_info.h"
 #include "envoy/runtime/runtime.h"
@@ -58,7 +58,7 @@ public:
 
   // Upstream::ClusterManagerFactory
   ClusterManagerPtr
-  clusterManagerFromProto(const envoy::config::bootstrap::v2::Bootstrap& bootstrap) override;
+  clusterManagerFromProto(const envoy::config::bootstrap::v3alpha::Bootstrap& bootstrap) override;
   Http::ConnectionPool::InstancePtr allocateConnPool(
       Event::Dispatcher& dispatcher, HostConstSharedPtr host, ResourcePriority priority,
       Http::Protocol protocol, const Network::ConnectionSocket::OptionsSharedPtr& options,
@@ -69,9 +69,9 @@ public:
                       const Network::ConnectionSocket::OptionsSharedPtr& options,
                       Network::TransportSocketOptionsSharedPtr transport_socket_options) override;
   std::pair<ClusterSharedPtr, ThreadAwareLoadBalancerPtr>
-  clusterFromProto(const envoy::api::v2::Cluster& cluster, ClusterManager& cm,
+  clusterFromProto(const envoy::config::cluster::v3alpha::Cluster& cluster, ClusterManager& cm,
                    Outlier::EventLoggerSharedPtr outlier_event_logger, bool added_via_api) override;
-  CdsApiPtr createCds(const envoy::api::v2::core::ConfigSource& cds_config,
+  CdsApiPtr createCds(const envoy::config::core::v3alpha::ConfigSource& cds_config,
                       ClusterManager& cm) override;
   Secret::SecretManager& secretManager() override { return secret_manager_; }
 
@@ -179,7 +179,7 @@ struct ClusterManagerStats {
  */
 class ClusterManagerImpl : public ClusterManager, Logger::Loggable<Logger::Id::upstream> {
 public:
-  ClusterManagerImpl(const envoy::config::bootstrap::v2::Bootstrap& bootstrap,
+  ClusterManagerImpl(const envoy::config::bootstrap::v3alpha::Bootstrap& bootstrap,
                      ClusterManagerFactory& factory, Stats::Store& stats,
                      ThreadLocal::Instance& tls, Runtime::Loader& runtime,
                      Runtime::RandomGenerator& random, const LocalInfo::LocalInfo& local_info,
@@ -191,7 +191,7 @@ public:
   std::size_t warmingClusterCount() const { return warming_clusters_.size(); }
 
   // Upstream::ClusterManager
-  bool addOrUpdateCluster(const envoy::api::v2::Cluster& cluster,
+  bool addOrUpdateCluster(const envoy::config::cluster::v3alpha::Cluster& cluster,
                           const std::string& version_info) override;
   void setInitializedCb(std::function<void()> callback) override {
     init_helper_.setInitializedCb(callback);
@@ -227,7 +227,9 @@ public:
     updateClusterCounts();
   }
 
-  const envoy::api::v2::core::BindConfig& bindConfig() const override { return bind_config_; }
+  const envoy::config::core::v3alpha::BindConfig& bindConfig() const override {
+    return bind_config_;
+  }
 
   Config::GrpcMuxSharedPtr adsMux() override { return ads_mux_; }
   Grpc::AsyncClientManager& grpcAsyncClientManager() override { return *async_client_manager_; }
@@ -370,8 +372,9 @@ private:
   };
 
   struct ClusterData {
-    ClusterData(const envoy::api::v2::Cluster& cluster_config, const std::string& version_info,
-                bool added_via_api, ClusterSharedPtr&& cluster, TimeSource& time_source)
+    ClusterData(const envoy::config::cluster::v3alpha::Cluster& cluster_config,
+                const std::string& version_info, bool added_via_api, ClusterSharedPtr&& cluster,
+                TimeSource& time_source)
         : cluster_config_(cluster_config), config_hash_(MessageUtil::hash(cluster_config)),
           version_info_(version_info), added_via_api_(added_via_api), cluster_(std::move(cluster)),
           last_updated_(time_source.systemTime()) {}
@@ -386,7 +389,7 @@ private:
       }
     }
 
-    const envoy::api::v2::Cluster cluster_config_;
+    const envoy::config::cluster::v3alpha::Cluster cluster_config_;
     const uint64_t config_hash_;
     const std::string version_info_;
     const bool added_via_api_;
@@ -450,8 +453,8 @@ private:
   void createOrUpdateThreadLocalCluster(ClusterData& cluster);
   ProtobufTypes::MessagePtr dumpClusterConfigs();
   static ClusterManagerStats generateStats(Stats::Scope& scope);
-  void loadCluster(const envoy::api::v2::Cluster& cluster, const std::string& version_info,
-                   bool added_via_api, ClusterMap& cluster_map);
+  void loadCluster(const envoy::config::cluster::v3alpha::Cluster& cluster,
+                   const std::string& version_info, bool added_via_api, ClusterMap& cluster_map);
   void onClusterInit(Cluster& cluster);
   void postThreadLocalHealthFailure(const HostSharedPtr& host);
   void updateClusterCounts();
@@ -467,7 +470,7 @@ protected:
 
 private:
   ClusterMap warming_clusters_;
-  envoy::api::v2::core::BindConfig bind_config_;
+  envoy::config::core::v3alpha::BindConfig bind_config_;
   Outlier::EventLoggerSharedPtr outlier_event_logger_;
   const LocalInfo::LocalInfo& local_info_;
   CdsApiPtr cds_api_;
