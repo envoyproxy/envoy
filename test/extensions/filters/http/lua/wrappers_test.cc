@@ -1,3 +1,5 @@
+#include "envoy/config/core/v3alpha/base.pb.h"
+
 #include "common/http/utility.h"
 #include "common/stream_info/stream_info_impl.h"
 
@@ -246,8 +248,8 @@ protected:
     wrapper.reset();
   }
 
-  envoy::api::v2::core::Metadata parseMetadataFromYaml(const std::string& yaml_string) {
-    envoy::api::v2::core::Metadata metadata;
+  envoy::config::core::v3alpha::Metadata parseMetadataFromYaml(const std::string& yaml_string) {
+    envoy::config::core::v3alpha::Metadata metadata;
     TestUtility::loadFromYaml(yaml_string, metadata);
     return metadata;
   }

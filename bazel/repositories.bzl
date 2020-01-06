@@ -101,7 +101,6 @@ def envoy_dependencies(skip_targets = []):
 
     # Setup external Bazel rules
     _foreign_cc_dependencies()
-    _rules_proto_dependencies()
 
     # Binding to an alias pointing to the selected version of BoringSSL:
     # - BoringSSL FIPS from @boringssl_fips//:ssl,
@@ -160,6 +159,7 @@ def envoy_dependencies(skip_targets = []):
     _python_deps()
     _cc_deps()
     _go_deps(skip_targets)
+    _kafka_deps()
 
     switched_rules_by_language(
         name = "com_google_googleapis_imports",
@@ -513,6 +513,7 @@ def _com_google_absl():
     )
 
 def _com_google_protobuf():
+    _repository_impl("rules_python")
     _repository_impl(
         "com_google_protobuf",
         patches = ["@envoy//bazel:protobuf.patch"],
@@ -624,7 +625,10 @@ def _com_googlesource_quiche():
         genrule_cmd_file = "@envoy//bazel/external:quiche.genrule_cmd",
         build_file = "@envoy//bazel/external:quiche.BUILD",
     )
-
+    native.bind(
+        name = "quiche_common_platform",
+        actual = "@com_googlesource_quiche//:quiche_common_platform",
+    )
     native.bind(
         name = "quiche_http2_platform",
         actual = "@com_googlesource_quiche//:http2_platform",
@@ -737,12 +741,45 @@ def _com_github_gperftools_gperftools():
         actual = "@envoy//bazel/foreign_cc:gperftools",
     )
 
+def _kafka_deps():
+    # This archive contains Kafka client source code.
+    # We are using request/response message format files to generate parser code.
+    KAFKASOURCE_BUILD_CONTENT = """
+filegroup(
+    name = "request_protocol_files",
+    srcs = glob(["*Request.json"]),
+    visibility = ["//visibility:public"],
+)
+filegroup(
+    name = "response_protocol_files",
+    srcs = glob(["*Response.json"]),
+    visibility = ["//visibility:public"],
+)
+    """
+    http_archive(
+        name = "kafka_source",
+        build_file_content = KAFKASOURCE_BUILD_CONTENT,
+        **REPOSITORY_LOCATIONS["kafka_source"]
+    )
+
+    # This archive provides Kafka (and Zookeeper) binaries, that are used during Kafka integration
+    # tests.
+    http_archive(
+        name = "kafka_server_binary",
+        build_file_content = BUILD_ALL_CONTENT,
+        **REPOSITORY_LOCATIONS["kafka_server_binary"]
+    )
+
+    # This archive provides Kafka client in Python, so we can use it to interact with Kafka server
+    # during interation tests.
+    http_archive(
+        name = "kafka_python_client",
+        build_file_content = BUILD_ALL_CONTENT,
+        **REPOSITORY_LOCATIONS["kafka_python_client"]
+    )
+
 def _foreign_cc_dependencies():
     _repository_impl("rules_foreign_cc")
-
-def _rules_proto_dependencies():
-    _repository_impl("rules_proto")
-    _repository_impl("rules_python")
 
 def _is_linux(ctxt):
     return ctxt.os.name == "linux"

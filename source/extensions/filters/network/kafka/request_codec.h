@@ -73,6 +73,8 @@ private:
   const RequestParserResolver& parser_resolver_;
 };
 
+using RequestDecoderSharedPtr = std::shared_ptr<RequestDecoder>;
+
 /**
  * Encodes requests into underlying buffer.
  */

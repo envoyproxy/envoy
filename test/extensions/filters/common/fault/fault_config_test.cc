@@ -1,3 +1,5 @@
+#include "envoy/extensions/filters/common/fault/v3alpha/fault.pb.h"
+
 #include "extensions/filters/common/fault/fault_config.h"
 
 #include "test/test_common/utility.h"
@@ -12,7 +14,7 @@ namespace Fault {
 namespace {
 
 TEST(FaultConfigTest, FaultDelayHeaderConfig) {
-  envoy::config::filter::fault::v2::FaultDelay proto_config;
+  envoy::extensions::filters::common::fault::v3alpha::FaultDelay proto_config;
   proto_config.mutable_header_delay();
   FaultDelayConfig config(proto_config);
 
@@ -30,7 +32,7 @@ TEST(FaultConfigTest, FaultDelayHeaderConfig) {
 }
 
 TEST(FaultConfigTest, FaultRateLimitHeaderConfig) {
-  envoy::config::filter::fault::v2::FaultRateLimit proto_config;
+  envoy::extensions::filters::common::fault::v3alpha::FaultRateLimit proto_config;
   proto_config.mutable_header_limit();
   FaultRateLimitConfig config(proto_config);
 

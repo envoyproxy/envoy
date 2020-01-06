@@ -1,6 +1,6 @@
 #pragma once
 
-#include "envoy/api/v2/core/base.pb.h"
+#include "envoy/config/core/v3alpha/base.pb.h"
 
 #include "common/protobuf/utility.h"
 
@@ -9,21 +9,21 @@ namespace Upstream {
 
 // TODO(htuch): should these be templated in protobuf/utility.h?
 struct LocalityHash {
-  size_t operator()(const envoy::api::v2::core::Locality& locality) const {
+  size_t operator()(const envoy::config::core::v3alpha::Locality& locality) const {
     return MessageUtil::hash(locality);
   }
 };
 
 struct LocalityEqualTo {
-  bool operator()(const envoy::api::v2::core::Locality& lhs,
-                  const envoy::api::v2::core::Locality& rhs) const {
+  bool operator()(const envoy::config::core::v3alpha::Locality& lhs,
+                  const envoy::config::core::v3alpha::Locality& rhs) const {
     return Protobuf::util::MessageDifferencer::Equivalent(lhs, rhs);
   }
 };
 
 struct LocalityLess {
-  bool operator()(const envoy::api::v2::core::Locality& lhs,
-                  const envoy::api::v2::core::Locality& rhs) const {
+  bool operator()(const envoy::config::core::v3alpha::Locality& lhs,
+                  const envoy::config::core::v3alpha::Locality& rhs) const {
     using LocalityTuple = std::tuple<const std::string&, const std::string&, const std::string&>;
     const LocalityTuple lhs_tuple = LocalityTuple(lhs.region(), lhs.zone(), lhs.sub_zone());
     const LocalityTuple rhs_tuple = LocalityTuple(rhs.region(), rhs.zone(), rhs.sub_zone());
@@ -32,9 +32,9 @@ struct LocalityLess {
 };
 
 // For tests etc. where this is convenient.
-static inline envoy::api::v2::core::Locality
+static inline envoy::config::core::v3alpha::Locality
 Locality(const std::string& region, const std::string& zone, const std::string sub_zone) {
-  envoy::api::v2::core::Locality locality;
+  envoy::config::core::v3alpha::Locality locality;
   locality.set_region(region);
   locality.set_zone(zone);
   locality.set_sub_zone(sub_zone);
@@ -46,16 +46,16 @@ Locality(const std::string& region, const std::string& zone, const std::string s
 
 // Something heinous this way comes. Required to allow == for LocalityWeightsMap.h in eds.h.
 namespace envoy {
-namespace api {
-namespace v2 {
+namespace config {
 namespace core {
+namespace v3alpha {
 
-inline bool operator==(const envoy::api::v2::core::Locality& x,
-                       const envoy::api::v2::core::Locality& y) {
+inline bool operator==(const envoy::config::core::v3alpha::Locality& x,
+                       const envoy::config::core::v3alpha::Locality& y) {
   return Envoy::Upstream::LocalityEqualTo()(x, y);
 }
 
+} // namespace v3alpha
 } // namespace core
-} // namespace v2
-} // namespace api
+} // namespace config
 } // namespace envoy

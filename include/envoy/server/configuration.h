@@ -7,6 +7,7 @@
 #include <string>
 #include <vector>
 
+#include "envoy/config/bootstrap/v3alpha/bootstrap.pb.h"
 #include "envoy/stats/sink.h"
 #include "envoy/tracing/http_tracer.h"
 #include "envoy/upstream/cluster_manager.h"
@@ -120,7 +121,7 @@ public:
    * @return const envoy::config::bootstrap::v2::LayeredRuntime& runtime
    *         configuration.
    */
-  virtual const envoy::config::bootstrap::v2::LayeredRuntime& runtime() PURE;
+  virtual const envoy::config::bootstrap::v3alpha::LayeredRuntime& runtime() PURE;
 };
 
 } // namespace Configuration

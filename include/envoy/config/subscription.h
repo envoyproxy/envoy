@@ -3,9 +3,9 @@
 #include <string>
 #include <vector>
 
-#include "envoy/api/v2/discovery.pb.h"
 #include "envoy/common/exception.h"
 #include "envoy/common/pure.h"
+#include "envoy/service/discovery/v3alpha/discovery.pb.h"
 #include "envoy/stats/stats_macros.h"
 
 #include "common/protobuf/protobuf.h"
@@ -50,7 +50,8 @@ public:
    *        are accepted. Accepted changes have their version_info reflected in subsequent requests.
    */
   virtual void
-  onConfigUpdate(const Protobuf::RepeatedPtrField<envoy::api::v2::Resource>& added_resources,
+  onConfigUpdate(const Protobuf::RepeatedPtrField<envoy::service::discovery::v3alpha::Resource>&
+                     added_resources,
                  const Protobuf::RepeatedPtrField<std::string>& removed_resources,
                  const std::string& system_version_info) PURE;
 

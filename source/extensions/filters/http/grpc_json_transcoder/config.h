@@ -1,7 +1,7 @@
 #pragma once
 
-#include "envoy/config/filter/http/transcoder/v2/transcoder.pb.h"
-#include "envoy/config/filter/http/transcoder/v2/transcoder.pb.validate.h"
+#include "envoy/extensions/filters/http/grpc_json_transcoder/v3alpha/transcoder.pb.h"
+#include "envoy/extensions/filters/http/grpc_json_transcoder/v3alpha/transcoder.pb.validate.h"
 
 #include "extensions/filters/http/common/factory_base.h"
 #include "extensions/filters/http/well_known_names.h"
@@ -15,13 +15,15 @@ namespace GrpcJsonTranscoder {
  * Config registration for the gRPC JSON transcoder filter. @see NamedHttpFilterConfigFactory.
  */
 class GrpcJsonTranscoderFilterConfig
-    : public Common::FactoryBase<envoy::config::filter::http::transcoder::v2::GrpcJsonTranscoder> {
+    : public Common::FactoryBase<
+          envoy::extensions::filters::http::grpc_json_transcoder::v3alpha::GrpcJsonTranscoder> {
 public:
   GrpcJsonTranscoderFilterConfig() : FactoryBase(HttpFilterNames::get().GrpcJsonTranscoder) {}
 
 private:
   Http::FilterFactoryCb createFilterFactoryFromProtoTyped(
-      const envoy::config::filter::http::transcoder::v2::GrpcJsonTranscoder& proto_config,
+      const envoy::extensions::filters::http::grpc_json_transcoder::v3alpha::GrpcJsonTranscoder&
+          proto_config,
       const std::string& stats_prefix, Server::Configuration::FactoryContext& context) override;
 };
 

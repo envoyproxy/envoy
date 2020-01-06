@@ -1,3 +1,6 @@
+#include "envoy/config/trace/v3alpha/trace.pb.h"
+#include "envoy/config/trace/v3alpha/trace.pb.validate.h"
+
 #include "extensions/tracers/lightstep/config.h"
 
 #include "test/mocks/server/mocks.h"
@@ -29,7 +32,7 @@ TEST(LightstepTracerConfigTest, LightstepHttpTracer) {
       collector_cluster: fake_cluster
       access_token_file: fake_file
    )EOF";
-  envoy::config::trace::v2::Tracing configuration;
+  envoy::config::trace::v3alpha::Tracing configuration;
   TestUtility::loadFromYaml(yaml_string, configuration);
 
   LightstepTracerFactory factory;

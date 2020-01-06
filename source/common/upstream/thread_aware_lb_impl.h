@@ -1,5 +1,7 @@
 #pragma once
 
+#include "envoy/config/cluster/v3alpha/cluster.pb.h"
+
 #include "common/upstream/load_balancer_impl.h"
 
 #include "absl/synchronization/mutex.h"
@@ -36,9 +38,10 @@ public:
   }
 
 protected:
-  ThreadAwareLoadBalancerBase(const PrioritySet& priority_set, ClusterStats& stats,
-                              Runtime::Loader& runtime, Runtime::RandomGenerator& random,
-                              const envoy::api::v2::Cluster::CommonLbConfig& common_config)
+  ThreadAwareLoadBalancerBase(
+      const PrioritySet& priority_set, ClusterStats& stats, Runtime::Loader& runtime,
+      Runtime::RandomGenerator& random,
+      const envoy::config::cluster::v3alpha::Cluster::CommonLbConfig& common_config)
       : LoadBalancerBase(priority_set, stats, runtime, random, common_config),
         factory_(new LoadBalancerFactoryImpl(stats, random)) {}
 

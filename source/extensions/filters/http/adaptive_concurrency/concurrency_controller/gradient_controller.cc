@@ -3,8 +3,8 @@
 #include <atomic>
 #include <chrono>
 
-#include "envoy/config/filter/http/adaptive_concurrency/v2alpha/adaptive_concurrency.pb.h"
 #include "envoy/event/dispatcher.h"
+#include "envoy/extensions/filters/http/adaptive_concurrency/v3alpha/adaptive_concurrency.pb.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/stats/stats.h"
 
@@ -23,7 +23,7 @@ namespace AdaptiveConcurrency {
 namespace ConcurrencyController {
 
 GradientControllerConfig::GradientControllerConfig(
-    const envoy::config::filter::http::adaptive_concurrency::v2alpha::GradientControllerConfig&
+    const envoy::extensions::filters::http::adaptive_concurrency::v3alpha::GradientControllerConfig&
         proto_config,
     Runtime::Loader& runtime)
     : runtime_(runtime),

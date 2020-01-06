@@ -68,6 +68,12 @@ void invokeDebugAssertionFailureRecordAction_ForAssertMacroUseOnly();
  */
 #define RELEASE_ASSERT(X, DETAILS) _ASSERT_IMPL(X, #X, abort(), DETAILS)
 
+/**
+ * Assert macro intended for security guarantees. It has the same functionality
+ * as RELEASE_ASSERT, but is intended for memory bounds-checking.
+ */
+#define SECURITY_ASSERT(X, DETAILS) _ASSERT_IMPL(X, #X, abort(), DETAILS)
+
 #if !defined(NDEBUG) || defined(ENVOY_LOG_DEBUG_ASSERT_IN_RELEASE)
 
 #if !defined(NDEBUG) // If this is a debug build.
