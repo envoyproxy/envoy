@@ -1,8 +1,8 @@
 #pragma once
 
 #include "envoy/api/os_sys_calls.h"
-#include "envoy/api/v2/core/base.pb.h"
 #include "envoy/common/platform.h"
+#include "envoy/config/core/v3alpha/base.pb.h"
 #include "envoy/network/listen_socket.h"
 
 #include "common/common/assert.h"
@@ -100,13 +100,13 @@ static_assert(IP_RECVDSTADDR == IP_SENDSRCADDR);
 
 class SocketOptionImpl : public Socket::Option, Logger::Loggable<Logger::Id::connection> {
 public:
-  SocketOptionImpl(envoy::api::v2::core::SocketOption::SocketState in_state,
+  SocketOptionImpl(envoy::config::core::v3alpha::SocketOption::SocketState in_state,
                    Network::SocketOptionName optname,
                    int value) // Yup, int. See setsockopt(2).
       : SocketOptionImpl(in_state, optname,
                          absl::string_view(reinterpret_cast<char*>(&value), sizeof(value))) {}
 
-  SocketOptionImpl(envoy::api::v2::core::SocketOption::SocketState in_state,
+  SocketOptionImpl(envoy::config::core::v3alpha::SocketOption::SocketState in_state,
                    Network::SocketOptionName optname, absl::string_view value)
       : in_state_(in_state), optname_(optname), value_(value.begin(), value.end()) {
     ASSERT(reinterpret_cast<uintptr_t>(value_.data()) % alignof(void*) == 0);
@@ -114,14 +114,14 @@ public:
 
   // Socket::Option
   bool setOption(Socket& socket,
-                 envoy::api::v2::core::SocketOption::SocketState state) const override;
+                 envoy::config::core::v3alpha::SocketOption::SocketState state) const override;
 
   // The common socket options don't require a hash key.
   void hashKey(std::vector<uint8_t>&) const override {}
 
   absl::optional<Details>
   getOptionDetails(const Socket& socket,
-                   envoy::api::v2::core::SocketOption::SocketState state) const override;
+                   envoy::config::core::v3alpha::SocketOption::SocketState state) const override;
 
   bool isSupported() const;
 
@@ -139,7 +139,7 @@ public:
                                                const void* value, size_t size);
 
 private:
-  const envoy::api::v2::core::SocketOption::SocketState in_state_;
+  const envoy::config::core::v3alpha::SocketOption::SocketState in_state_;
   const Network::SocketOptionName optname_;
   // This has to be a std::vector<uint8_t> but not std::string because std::string might inline
   // the buffer so its data() is not aligned in to alignof(void*).

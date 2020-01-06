@@ -1,8 +1,8 @@
 #pragma once
 
-#include "envoy/api/v2/discovery.pb.h"
 #include "envoy/config/subscription.h"
 #include "envoy/event/dispatcher.h"
+#include "envoy/service/discovery/v3alpha/discovery.pb.h"
 
 #include "common/config/api_version.h"
 #include "common/http/rest_api_fetcher.h"

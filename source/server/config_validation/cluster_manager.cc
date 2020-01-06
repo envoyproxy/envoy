@@ -1,7 +1,7 @@
 #include "server/config_validation/cluster_manager.h"
 
-#include "envoy/api/v2/core/config_source.pb.h"
-#include "envoy/config/bootstrap/v2/bootstrap.pb.h"
+#include "envoy/config/bootstrap/v3alpha/bootstrap.pb.h"
+#include "envoy/config/core/v3alpha/config_source.pb.h"
 
 #include "common/common/utility.h"
 
@@ -9,15 +9,14 @@ namespace Envoy {
 namespace Upstream {
 
 ClusterManagerPtr ValidationClusterManagerFactory::clusterManagerFromProto(
-    const envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
+    const envoy::config::bootstrap::v3alpha::Bootstrap& bootstrap) {
   return std::make_unique<ValidationClusterManager>(
       bootstrap, *this, stats_, tls_, runtime_, random_, local_info_, log_manager_,
       main_thread_dispatcher_, admin_, validation_context_, api_, http_context_, time_system_);
 }
 
-CdsApiPtr
-ValidationClusterManagerFactory::createCds(const envoy::api::v2::core::ConfigSource& cds_config,
-                                           ClusterManager& cm) {
+CdsApiPtr ValidationClusterManagerFactory::createCds(
+    const envoy::config::core::v3alpha::ConfigSource& cds_config, ClusterManager& cm) {
   // Create the CdsApiImpl...
   ProdClusterManagerFactory::createCds(cds_config, cm);
   // ... and then throw it away, so that we don't actually connect to it.
@@ -25,7 +24,7 @@ ValidationClusterManagerFactory::createCds(const envoy::api::v2::core::ConfigSou
 }
 
 ValidationClusterManager::ValidationClusterManager(
-    const envoy::config::bootstrap::v2::Bootstrap& bootstrap, ClusterManagerFactory& factory,
+    const envoy::config::bootstrap::v3alpha::Bootstrap& bootstrap, ClusterManagerFactory& factory,
     Stats::Store& stats, ThreadLocal::Instance& tls, Runtime::Loader& runtime,
     Runtime::RandomGenerator& random, const LocalInfo::LocalInfo& local_info,
     AccessLog::AccessLogManager& log_manager, Event::Dispatcher& main_thread_dispatcher,

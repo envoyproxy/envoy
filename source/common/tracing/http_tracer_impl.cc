@@ -2,7 +2,7 @@
 
 #include <string>
 
-#include "envoy/api/v2/core/base.pb.h"
+#include "envoy/config/core/v3alpha/base.pb.h"
 #include "envoy/type/metadata/v2/metadata.pb.h"
 #include "envoy/type/tracing/v2/custom_tag.pb.h"
 
@@ -237,13 +237,13 @@ void HttpTracerUtility::setCommonTags(Span& span, const Http::HeaderMap* respons
 CustomTagConstSharedPtr
 HttpTracerUtility::createCustomTag(const envoy::type::tracing::v2::CustomTag& tag) {
   switch (tag.type_case()) {
-  case envoy::type::tracing::v2::CustomTag::kLiteral:
+  case envoy::type::tracing::v2::CustomTag::TypeCase::kLiteral:
     return std::make_shared<const Tracing::LiteralCustomTag>(tag.tag(), tag.literal());
-  case envoy::type::tracing::v2::CustomTag::kEnvironment:
+  case envoy::type::tracing::v2::CustomTag::TypeCase::kEnvironment:
     return std::make_shared<const Tracing::EnvironmentCustomTag>(tag.tag(), tag.environment());
-  case envoy::type::tracing::v2::CustomTag::kRequestHeader:
+  case envoy::type::tracing::v2::CustomTag::TypeCase::kRequestHeader:
     return std::make_shared<const Tracing::RequestHeaderCustomTag>(tag.tag(), tag.request_header());
-  case envoy::type::tracing::v2::CustomTag::kMetadata:
+  case envoy::type::tracing::v2::CustomTag::TypeCase::kMetadata:
     return std::make_shared<const Tracing::MetadataCustomTag>(tag.tag(), tag.metadata());
   default:
     NOT_REACHED_GCOVR_EXCL_LINE;
@@ -308,7 +308,7 @@ MetadataCustomTag::MetadataCustomTag(const std::string& tag,
       metadata_key_(metadata.metadata_key()), default_value_(metadata.default_value()) {}
 
 void MetadataCustomTag::apply(Span& span, const CustomTagContext& ctx) const {
-  const envoy::api::v2::core::Metadata* meta = metadata(ctx);
+  const envoy::config::core::v3alpha::Metadata* meta = metadata(ctx);
   if (!meta) {
     if (!default_value_.empty()) {
       span.setTag(tag(), default_value_);
@@ -340,21 +340,21 @@ void MetadataCustomTag::apply(Span& span, const CustomTagContext& ctx) const {
   }
 }
 
-const envoy::api::v2::core::Metadata*
+const envoy::config::core::v3alpha::Metadata*
 MetadataCustomTag::metadata(const CustomTagContext& ctx) const {
   const StreamInfo::StreamInfo& info = ctx.stream_info;
   switch (kind_) {
-  case envoy::type::metadata::v2::MetadataKind::kRequest:
+  case envoy::type::metadata::v2::MetadataKind::KindCase::kRequest:
     return &info.dynamicMetadata();
-  case envoy::type::metadata::v2::MetadataKind::kRoute: {
+  case envoy::type::metadata::v2::MetadataKind::KindCase::kRoute: {
     const Router::RouteEntry* route_entry = info.routeEntry();
     return route_entry ? &route_entry->metadata() : nullptr;
   }
-  case envoy::type::metadata::v2::MetadataKind::kCluster: {
+  case envoy::type::metadata::v2::MetadataKind::KindCase::kCluster: {
     const auto& hostPtr = info.upstreamHost();
     return hostPtr ? &hostPtr->cluster().metadata() : nullptr;
   }
-  case envoy::type::metadata::v2::MetadataKind::kHost: {
+  case envoy::type::metadata::v2::MetadataKind::KindCase::kHost: {
     const auto& hostPtr = info.upstreamHost();
     return hostPtr ? hostPtr->metadata().get() : nullptr;
   }

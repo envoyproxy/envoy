@@ -3,12 +3,12 @@
 #include <queue>
 #include <unordered_map>
 
-#include "envoy/api/v2/discovery.pb.h"
 #include "envoy/common/time.h"
 #include "envoy/config/grpc_mux.h"
 #include "envoy/config/subscription.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/grpc/status.h"
+#include "envoy/service/discovery/v3alpha/discovery.pb.h"
 #include "envoy/upstream/cluster_manager.h"
 
 #include "common/common/cleanup.h"
@@ -23,9 +23,10 @@ namespace Config {
 /**
  * ADS API implementation that fetches via gRPC.
  */
-class GrpcMuxImpl : public GrpcMux,
-                    public GrpcStreamCallbacks<envoy::api::v2::DiscoveryResponse>,
-                    public Logger::Loggable<Logger::Id::config> {
+class GrpcMuxImpl
+    : public GrpcMux,
+      public GrpcStreamCallbacks<envoy::service::discovery::v3alpha::DiscoveryResponse>,
+      public Logger::Loggable<Logger::Id::config> {
 public:
   GrpcMuxImpl(const LocalInfo::LocalInfo& local_info, Grpc::RawAsyncClientPtr async_client,
               Event::Dispatcher& dispatcher, const Protobuf::MethodDescriptor& service_method,
@@ -50,17 +51,19 @@ public:
   }
   void removeWatch(const std::string&, Watch*) override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
 
-  void handleDiscoveryResponse(std::unique_ptr<envoy::api::v2::DiscoveryResponse>&& message);
+  void handleDiscoveryResponse(
+      std::unique_ptr<envoy::service::discovery::v3alpha::DiscoveryResponse>&& message);
 
   void sendDiscoveryRequest(const std::string& type_url);
 
   // Config::GrpcStreamCallbacks
   void onStreamEstablished() override;
   void onEstablishmentFailure() override;
-  void onDiscoveryResponse(std::unique_ptr<envoy::api::v2::DiscoveryResponse>&& message) override;
+  void onDiscoveryResponse(
+      std::unique_ptr<envoy::service::discovery::v3alpha::DiscoveryResponse>&& message) override;
   void onWriteable() override;
 
-  GrpcStream<API_NO_BOOST(envoy::api::v2::DiscoveryRequest), envoy::api::v2::DiscoveryResponse>&
+  GrpcStream<API_NO_BOOST(envoy::api::v2::DiscoveryRequest), envoy::service::discovery::v3alpha::DiscoveryResponse>&
   grpcStreamForTest() {
     return grpc_stream_;
   }
@@ -116,7 +119,7 @@ private:
   void queueDiscoveryRequest(const std::string& queue_item);
   void clearRequestQueue();
 
-  GrpcStream<API_NO_BOOST(envoy::api::v2::DiscoveryRequest), envoy::api::v2::DiscoveryResponse>
+  GrpcStream<API_NO_BOOST(envoy::api::v2::DiscoveryRequest), envoy::service::discovery::v3alpha::DiscoveryResponse>
       grpc_stream_;
   const LocalInfo::LocalInfo& local_info_;
   const bool skip_subsequent_node_;
@@ -131,7 +134,8 @@ private:
   std::queue<std::string> request_queue_;
 };
 
-class NullGrpcMuxImpl : public GrpcMux, GrpcStreamCallbacks<envoy::api::v2::DiscoveryResponse> {
+class NullGrpcMuxImpl : public GrpcMux,
+                        GrpcStreamCallbacks<envoy::service::discovery::v3alpha::DiscoveryResponse> {
 public:
   void start() override {}
   GrpcMuxWatchPtr subscribe(const std::string&, const std::set<std::string>&,
@@ -155,7 +159,8 @@ public:
   void onWriteable() override {}
   void onStreamEstablished() override {}
   void onEstablishmentFailure() override {}
-  void onDiscoveryResponse(std::unique_ptr<envoy::api::v2::DiscoveryResponse>&&) override {}
+  void onDiscoveryResponse(
+      std::unique_ptr<envoy::service::discovery::v3alpha::DiscoveryResponse>&&) override {}
 };
 
 } // namespace Config

@@ -1,158 +1,101 @@
 #include "common/config/type_to_endpoint.h"
 
-#include "envoy/api/v2/auth/cert.pb.h"
-#include "envoy/api/v2/cds.pb.h"
-#include "envoy/api/v2/eds.pb.h"
-#include "envoy/api/v2/lds.pb.h"
-#include "envoy/api/v2/rds.pb.h"
-#include "envoy/api/v2/route/route.pb.h"
-#include "envoy/api/v2/srds.pb.h"
-#include "envoy/api/v3alpha/auth/cert.pb.h"
-#include "envoy/config/route/v3alpha/route/route.pb.h"
-#include "envoy/service/cluster/v3alpha/cds.pb.h"
-#include "envoy/service/discovery/v2/rtds.pb.h"
-#include "envoy/service/discovery/v3alpha/rtds.pb.h"
-#include "envoy/service/endpoint/v3alpha/eds.pb.h"
-#include "envoy/service/listener/v3alpha/lds.pb.h"
-#include "envoy/service/route/v3alpha/rds.pb.h"
-#include "envoy/service/route/v3alpha/srds.pb.h"
+#include "envoy/annotations/resource.pb.h"
 
-#include "common/common/assert.h"
 #include "common/grpc/common.h"
-
-// API_NO_BOOST_FILE
-// TODO(htuch): the cross product of transport, resource version and type is
-// kind of crazy, we should use API annotations to link resources to their
-// service methods. See https://github.com/envoyproxy/envoy/issues/9454.
 
 namespace Envoy {
 namespace Config {
 
-const char UnknownMethod[] = "could_not_lookup_method_due_to_unknown_type_url";
-
 namespace {
 
-bool typeUrlIs(absl::string_view type_url, const Protobuf::Message& v2_msg,
-               const Protobuf::Message& v3_msg) {
-  return Grpc::Common::typeUrl(v2_msg.GetDescriptor()->full_name()) == type_url ||
-         Grpc::Common::typeUrl(v3_msg.GetDescriptor()->full_name()) == type_url;
+// service RPC method fully qualified names.
+struct Service {
+  std::string sotw_grpc_method_;
+  std::string delta_grpc_method_;
+  std::string rest_method_;
+};
+
+// Map from resource type URL to service RPC methods.
+using TypeUrlToServiceMap = std::unordered_map<std::string, Service>;
+
+TypeUrlToServiceMap* buildTypeUrlToServiceMap() {
+  auto* type_url_to_service_map = new TypeUrlToServiceMap();
+  // This happens once in the lifetime of Envoy. We build a reverse map from resource type URL to
+  // service methods. We explicitly enumerate all services, since DescriptorPool doesn't support
+  // iterating over all descriptors, due its lazy load design, see
+  // https://www.mail-archive.com/protobuf@googlegroups.com/msg04540.html.
+  for (const std::string& service_name : {
+           "envoy.api.v2.RouteDiscoveryService",
+           "envoy.service.route.v3alpha.RouteDiscoveryService",
+           "envoy.api.v2.ScopedRoutesDiscoveryService",
+           "envoy.service.route.v3alpha.ScopedRoutesDiscoveryService",
+           "envoy.api.v2.VirtualHostDiscoveryService",
+           "envoy.service.route.v3alpha.VirtualHostDiscoveryService",
+           "envoy.service.discovery.v2.SecretDiscoveryService",
+           "envoy.service.secret.v3alpha.SecretDiscoveryService",
+           "envoy.api.v2.ClusterDiscoveryService",
+           "envoy.service.cluster.v3alpha.ClusterDiscoveryService",
+           "envoy.api.v2.EndpointDiscoveryService",
+           "envoy.service.endpoint.v3alpha.EndpointDiscoveryService",
+           "envoy.api.v2.ListenerDiscoveryService",
+           "envoy.service.listener.v3alpha.ListenerDiscoveryService",
+           "envoy.service.discovery.v2.RuntimeDiscoveryService",
+           "envoy.service.runtime.v3alpha.RuntimeDiscoveryService",
+       }) {
+    const auto* service_desc =
+        Protobuf::DescriptorPool::generated_pool()->FindServiceByName(service_name);
+    // TODO(htuch): this should become an ASSERT once all v3 descriptors are linked in.
+    if (service_desc == nullptr) {
+      continue;
+    }
+    ASSERT(service_desc->options().HasExtension(envoy::annotations::resource));
+    const std::string resource_type_url = Grpc::Common::typeUrl(
+        service_desc->options().GetExtension(envoy::annotations::resource).type());
+    Service& service = (*type_url_to_service_map)[resource_type_url];
+    // We populate the service methods that are known below, but it's possible that some services
+    // don't implement all, e.g. VHDS doesn't support SotW or REST.
+    for (int method_index = 0; method_index < service_desc->method_count(); ++method_index) {
+      const auto& method_desc = *service_desc->method(method_index);
+      if (absl::StartsWith(method_desc.name(), "Stream")) {
+        service.sotw_grpc_method_ = method_desc.full_name();
+      } else if (absl::StartsWith(method_desc.name(), "Delta")) {
+        service.delta_grpc_method_ = method_desc.full_name();
+      } else if (absl::StartsWith(method_desc.name(), "Fetch")) {
+        service.rest_method_ = method_desc.full_name();
+      } else {
+        ASSERT(false, "Unknown xDS service method");
+      }
+    }
+  }
+  return type_url_to_service_map;
 }
 
-std::string versionString(envoy::api::v2::core::ApiVersion transport_api_version) {
-  switch (transport_api_version) {
-  case envoy::api::v2::core::ApiVersion::AUTO:
-  case envoy::api::v2::core::ApiVersion::V2:
-    return "v2";
-  case envoy::api::v2::core::ApiVersion::V3ALPHA:
-    return "v3alpha";
-  default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
-  }
+TypeUrlToServiceMap& typeUrlToServiceMap() {
+  static TypeUrlToServiceMap* type_url_to_service_map = buildTypeUrlToServiceMap();
+  return *type_url_to_service_map;
 }
 
 } // namespace
 
-const Protobuf::MethodDescriptor&
-deltaGrpcMethod(absl::string_view type_url,
-                envoy::api::v2::core::ApiVersion transport_api_version) {
-  std::string method_name = UnknownMethod;
-  const std::string version = versionString(transport_api_version);
-  if (typeUrlIs(type_url, envoy::api::v2::RouteConfiguration(),
-                envoy::api::v3alpha::RouteConfiguration())) {
-    method_name = "envoy.api." + version + ".RouteDiscoveryService.DeltaRoutes";
-  } else if (typeUrlIs(type_url, envoy::api::v2::ScopedRouteConfiguration(),
-                       envoy::service::route::v3alpha::ScopedRouteConfiguration())) {
-    if (version == "v2") {
-      method_name = "envoy.api.v2.ScopedRoutesDiscoveryService.DeltaScopedRoutes";
-    } else {
-      ASSERT(version == "v3alpha");
-      method_name = "envoy.service.route.v3alpha.ScopedRoutesDiscoveryService.DeltaScopedRoutes";
-    }
-  } else if (typeUrlIs(type_url, envoy::api::v2::route::VirtualHost(),
-                       envoy::api::v3alpha::route::VirtualHost())) {
-    method_name = "envoy.api." + version + ".VirtualHostDiscoveryService.DeltaVirtualHosts";
-  } else if (typeUrlIs(type_url, envoy::api::v2::auth::Secret(),
-                       envoy::api::v3alpha::auth::Secret())) {
-    method_name = "envoy.service.discovery." + version + ".SecretDiscoveryService.DeltaSecrets";
-  } else if (typeUrlIs(type_url, envoy::api::v2::Cluster(), envoy::api::v3alpha::Cluster())) {
-    method_name = "envoy.api." + version + ".ClusterDiscoveryService.DeltaClusters";
-  } else if (typeUrlIs(type_url, envoy::api::v2::ClusterLoadAssignment(),
-                       envoy::api::v3alpha::ClusterLoadAssignment())) {
-    method_name = "envoy.api." + version + ".EndpointDiscoveryService.DeltaEndpoints";
-  } else if (typeUrlIs(type_url, envoy::api::v2::Listener(), envoy::api::v3alpha::Listener())) {
-    method_name = "envoy.api." + version + ".ListenerDiscoveryService.DeltaListeners";
-  } else if (typeUrlIs(type_url, envoy::service::discovery::v2::Runtime(),
-                       envoy::service::discovery::v3alpha::Runtime())) {
-    method_name = "envoy.service.discovery." + version + ".RuntimeDiscoveryService.DeltaRuntime";
-  }
-  ASSERT(method_name != UnknownMethod);
-  return *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(method_name);
+const Protobuf::MethodDescriptor& deltaGrpcMethod(absl::string_view type_url) {
+  const auto it = typeUrlToServiceMap().find(static_cast<std::string>(type_url));
+  ASSERT(it != typeUrlToServiceMap().cend());
+  return *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
+      it->second.delta_grpc_method_);
 }
 
-const Protobuf::MethodDescriptor&
-sotwGrpcMethod(absl::string_view type_url, envoy::api::v2::core::ApiVersion transport_api_version) {
-  std::string method_name = UnknownMethod;
-  const std::string version = versionString(transport_api_version);
-  if (typeUrlIs(type_url, envoy::api::v2::RouteConfiguration(),
-                envoy::api::v3alpha::RouteConfiguration())) {
-    method_name = "envoy.api." + version + ".RouteDiscoveryService.StreamRoutes";
-  } else if (typeUrlIs(type_url, envoy::api::v2::ScopedRouteConfiguration(),
-                       envoy::service::route::v3alpha::ScopedRouteConfiguration())) {
-    if (version == "v2") {
-      method_name = "envoy.api.v2.ScopedRoutesDiscoveryService.StreamScopedRoutes";
-    } else {
-      ASSERT(version == "v3alpha");
-      method_name = "envoy.service.route.v3alpha.ScopedRoutesDiscoveryService.StreamScopedRoutes";
-    }
-  } else if (typeUrlIs(type_url, envoy::api::v2::auth::Secret(),
-                       envoy::api::v3alpha::auth::Secret())) {
-    method_name = "envoy.service.discovery." + version + ".SecretDiscoveryService.StreamSecrets";
-  } else if (typeUrlIs(type_url, envoy::api::v2::Cluster(), envoy::api::v3alpha::Cluster())) {
-    method_name = "envoy.api." + version + ".ClusterDiscoveryService.StreamClusters";
-  } else if (typeUrlIs(type_url, envoy::api::v2::ClusterLoadAssignment(),
-                       envoy::api::v3alpha::ClusterLoadAssignment())) {
-    method_name = "envoy.api." + version + ".EndpointDiscoveryService.StreamEndpoints";
-  } else if (typeUrlIs(type_url, envoy::api::v2::Listener(), envoy::api::v3alpha::Listener())) {
-    method_name = "envoy.api." + version + ".ListenerDiscoveryService.StreamListeners";
-  } else if (typeUrlIs(type_url, envoy::service::discovery::v2::Runtime(),
-                       envoy::service::discovery::v3alpha::Runtime())) {
-    method_name = "envoy.service.discovery." + version + ".RuntimeDiscoveryService.StreamRuntime";
-  }
-  ASSERT(method_name != UnknownMethod);
-  return *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(method_name);
+const Protobuf::MethodDescriptor& sotwGrpcMethod(absl::string_view type_url) {
+  const auto it = typeUrlToServiceMap().find(static_cast<std::string>(type_url));
+  ASSERT(it != typeUrlToServiceMap().cend());
+  return *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
+      it->second.sotw_grpc_method_);
 }
 
-const Protobuf::MethodDescriptor&
-restMethod(absl::string_view type_url, envoy::api::v2::core::ApiVersion transport_api_version) {
-  std::string method_name = UnknownMethod;
-  const std::string version = versionString(transport_api_version);
-  if (typeUrlIs(type_url, envoy::api::v2::RouteConfiguration(),
-                envoy::api::v3alpha::RouteConfiguration())) {
-    method_name = "envoy.api." + version + ".RouteDiscoveryService.FetchRoutes";
-  } else if (typeUrlIs(type_url, envoy::api::v2::ScopedRouteConfiguration(),
-                       envoy::service::route::v3alpha::ScopedRouteConfiguration())) {
-    if (version == "v2") {
-      method_name = "envoy.api.v2.ScopedRoutesDiscoveryService.FetchScopedRoutes";
-    } else {
-      ASSERT(version == "v3alpha");
-      method_name = "envoy.service.route.v3alpha.ScopedRoutesDiscoveryService.FetchScopedRoutes";
-    }
-  } else if (typeUrlIs(type_url, envoy::api::v2::auth::Secret(),
-                       envoy::api::v3alpha::auth::Secret())) {
-    method_name = "envoy.service.discovery." + version + ".SecretDiscoveryService.FetchSecrets";
-  } else if (typeUrlIs(type_url, envoy::api::v2::Cluster(), envoy::api::v3alpha::Cluster())) {
-    method_name = "envoy.api." + version + ".ClusterDiscoveryService.FetchClusters";
-  } else if (typeUrlIs(type_url, envoy::api::v2::ClusterLoadAssignment(),
-                       envoy::api::v3alpha::ClusterLoadAssignment())) {
-    method_name = "envoy.api." + version + ".EndpointDiscoveryService.FetchEndpoints";
-  } else if (typeUrlIs(type_url, envoy::api::v2::Listener(), envoy::api::v3alpha::Listener())) {
-    method_name = "envoy.api." + version + ".ListenerDiscoveryService.FetchListeners";
-  } else if (typeUrlIs(type_url, envoy::service::discovery::v2::Runtime(),
-                       envoy::service::discovery::v3alpha::Runtime())) {
-    method_name = "envoy.service.discovery." + version + ".RuntimeDiscoveryService.FetchRuntime";
-  }
-  ASSERT(method_name != UnknownMethod);
-  return *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(method_name);
+const Protobuf::MethodDescriptor& restMethod(absl::string_view type_url) {
+  const auto it = typeUrlToServiceMap().find(static_cast<std::string>(type_url));
+  ASSERT(it != typeUrlToServiceMap().cend());
+  return *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(it->second.rest_method_);
 }
 
 } // namespace Config

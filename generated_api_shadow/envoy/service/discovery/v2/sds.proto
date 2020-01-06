@@ -6,6 +6,7 @@ import "envoy/api/v2/discovery.proto";
 
 import "google/api/annotations.proto";
 
+import "envoy/annotations/resource.proto";
 import "udpa/annotations/migrate.proto";
 
 option java_package = "io.envoyproxy.envoy.service.discovery.v2";
@@ -15,6 +16,8 @@ option java_generic_services = true;
 option (udpa.annotations.file_migrate).move_to_package = "envoy.service.secret.v3alpha";
 
 service SecretDiscoveryService {
+  option (envoy.annotations.resource).type = "envoy.api.v2.auth.Secret";
+
   rpc DeltaSecrets(stream api.v2.DeltaDiscoveryRequest)
       returns (stream api.v2.DeltaDiscoveryResponse) {
   }
