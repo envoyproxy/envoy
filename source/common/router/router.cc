@@ -38,6 +38,8 @@
 namespace Envoy {
 namespace Router {
 namespace {
+constexpr char NumPreviousInternalRedirectFilterStateName[] = "num_previous_internal_redirect";
+
 uint32_t getLength(const Buffer::Instance* instance) { return instance ? instance->length() : 0; }
 
 bool schemeIsHttp(const Http::HeaderMap& downstream_headers,
@@ -54,12 +56,10 @@ bool schemeIsHttp(const Http::HeaderMap& downstream_headers,
 }
 
 bool convertRequestHeadersForInternalRedirect(Http::HeaderMap& downstream_headers,
+                                              StreamInfo::FilterState& filter_state,
+                                              uint32_t max_previous_internal_redirect,
                                               const Http::HeaderEntry& internal_redirect,
                                               const Network::Connection& connection) {
-  // Envoy does not currently support multiple rounds of redirects.
-  if (downstream_headers.EnvoyOriginalUrl()) {
-    return false;
-  }
   // Make sure the redirect response contains a URL to redirect to.
   if (internal_redirect.value().getStringView().length() == 0) {
     return false;
@@ -75,6 +75,20 @@ bool convertRequestHeadersForInternalRedirect(Http::HeaderMap& downstream_header
     // Don't allow serving TLS responses over plaintext.
     return false;
   }
+
+  if (!filter_state.hasData<UInt32Accessor>(NumPreviousInternalRedirectFilterStateName)) {
+    filter_state.setData(NumPreviousInternalRedirectFilterStateName,
+                         std::make_shared<UInt32Accessor>(0),
+                         StreamInfo::FilterState::StateType::Mutable,
+                         StreamInfo::FilterState::LifeSpan::DownstreamRequest);
+  }
+  UInt32Accessor& num_previous_internal_redirect =
+      filter_state.getDataMutable<UInt32Accessor>(NumPreviousInternalRedirectFilterStateName);
+
+  if (num_previous_internal_redirect.value() >= max_previous_internal_redirect) {
+    return false;
+  }
+  num_previous_internal_redirect.increment();
 
   // Preserve the original request URL for the second pass.
   downstream_headers.setEnvoyOriginalUrl(
@@ -1304,12 +1318,15 @@ bool Filter::setupRedirect(const Http::HeaderMap& headers, UpstreamRequest& upst
   attempting_internal_redirect_with_complete_stream_ =
       upstream_request.upstream_timing_.last_upstream_rx_byte_received_ && downstream_end_stream_;
 
+  StreamInfo::FilterState& filter_state = callbacks_->streamInfo().filterState();
+  
   // As with setupRetry, redirects are not supported for streaming requests yet.
   if (downstream_end_stream_ &&
       !callbacks_->decodingBuffer() && // Redirects with body not yet supported.
       location != nullptr &&
-      convertRequestHeadersForInternalRedirect(*downstream_headers_, *location,
-                                               *callbacks_->connection()) &&
+      convertRequestHeadersForInternalRedirect(*downstream_headers_, filter_state,
+                                               route_entry_->maxPreviousInternalRedirect(),
+                                               *location, *callbacks_->connection()) &&
       callbacks_->recreateStream()) {
     cluster_->stats().upstream_internal_redirect_succeeded_total_.inc();
     return true;

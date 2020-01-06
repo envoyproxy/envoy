@@ -443,6 +443,7 @@ public:
   InternalRedirectAction internalRedirectAction() const override {
     return internal_redirect_action_;
   }
+  uint32_t maxPreviousInternalRedirect() const override { return max_previous_internal_redirect_; }
 
   // Router::DirectResponseEntry
   std::string newPath(const Http::HeaderMap& headers) const override;
@@ -556,6 +557,9 @@ private:
     const UpgradeMap& upgradeMap() const override { return parent_->upgradeMap(); }
     InternalRedirectAction internalRedirectAction() const override {
       return parent_->internalRedirectAction();
+    }
+    uint32_t maxPreviousInternalRedirect() const override {
+      return parent_->maxPreviousInternalRedirect();
     }
 
     // Router::Route
@@ -700,6 +704,7 @@ private:
   const std::string route_name_;
   TimeSource& time_source_;
   InternalRedirectAction internal_redirect_action_;
+  uint32_t max_previous_internal_redirect_{1};
 };
 
 /**

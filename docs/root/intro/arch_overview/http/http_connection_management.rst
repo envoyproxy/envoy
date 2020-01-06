@@ -134,8 +134,9 @@ Envoy supports handling 302 redirects internally, that is capturing a 302 redire
 synthesizing a new request, sending it to the upstream specified by the new route match, and
 returning the redirected response as the response to the original request.
 
-Internal redirects are configured via the ref:`redirect action
-<envoy_api_field_route.RouteAction.redirect_action>` field in
+Internal redirects are configured via the ref:`internal redirect action
+<envoy_api_field_route.RouteAction.internal_redirect_action>` and
+`max previous internal redirect <envoy_api_field_route.RouteAction.max_previous_internal_redirect>` field in
 route configuration. When redirect handling is on, any 302 response from upstream is
 subject to the redirect being handled by Envoy.
 
@@ -145,9 +146,19 @@ For a redirect to be handled successfully it must pass the following checks:
 2. Have a *location* header with a valid, fully qualified URL matching the scheme of the original request.
 3. The request must have been fully processed by Envoy.
 4. The request must not have a body.
-5. The request must have not been previously redirected, as determined by the presence of an x-envoy-original-url header.
+5. The number of previously handled internal redirect within a given downstream request does not exceed
+   `max previous internal redirect <envoy_api_field_route.RouteAction.max_previous_internal_redirect>` of the route
+   that the request or redirected request is hitting.
 
 Any failure will result in redirect being passed downstream instead.
+
+Since a redirected request may be bounced between different routes, any route the chain of redirects hit that
+
+1. does not have internal redirect enabled
+2. has a `max previous internal redirect <envoy_api_field_route.RouteAction.max_previous_internal_redirect>`
+   smaller or equal to the redirect chain length when the redirect chain hits it
+
+will cause the redirect to be passed downstream.
 
 Once the redirect has passed these checks, the request headers which were shipped to the original
 upstream will be modified by:

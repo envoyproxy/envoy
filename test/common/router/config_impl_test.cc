@@ -2406,6 +2406,7 @@ virtual_hosts:
     route->routeEntry()->grpcTimeoutOffset();
     route->routeEntry()->upgradeMap();
     route->routeEntry()->internalRedirectAction();
+    route->routeEntry()->maxPreviousInternalRedirect();
   }
 }
 

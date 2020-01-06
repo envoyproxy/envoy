@@ -48,6 +48,27 @@ namespace Router {
   COUNTER(rq_retry_skipped_request_not_complete)
 // clang-format on
 
+class UInt32Accessor : public StreamInfo::FilterState::Object {
+ public:
+  UInt32Accessor(uint32_t value) : value_(value) {}
+
+  ProtobufTypes::MessagePtr serializeAsProto() const override {
+    auto message = std::make_unique<ProtobufWkt::UInt32Value>();
+    message->set_value(value_);
+    return message;
+  }
+
+  void increment() { value_++; }
+
+  uint32_t value() const {
+    return value_;
+  }
+
+ private:
+  uint32_t value_;
+
+};
+
 /**
  * Struct definition for all router filter stats. @see stats_macros.h
  */
