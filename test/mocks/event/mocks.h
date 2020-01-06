@@ -33,7 +33,6 @@ public:
   ~MockDispatcher() override;
 
   // Dispatcher
-  TimeSource& timeSource() override { return time_system_; }
   Network::ConnectionPtr
   createServerConnection(Network::ConnectionSocketPtr&& socket,
                          Network::TransportSocketPtr&& transport_socket) override {
@@ -87,6 +86,7 @@ public:
   }
 
   // Event::Dispatcher
+  MOCK_METHOD0(timeSource, TimeSource&());
   MOCK_METHOD2(initializeStats, void(Stats::Scope&, const std::string&));
   MOCK_METHOD0(clearDeferredDeleteList, void());
   MOCK_METHOD0(createServerConnection_, Network::Connection*());
