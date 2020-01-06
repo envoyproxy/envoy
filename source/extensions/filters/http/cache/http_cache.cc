@@ -92,7 +92,7 @@ LookupResult LookupRequest::makeLookupResult(Http::HeaderMapPtr&& response_heade
   result.headers = std::move(response_headers);
   result.content_length = content_length;
   if (!adjustByteRangeSet(result.response_ranges, request_range_spec_, content_length)) {
-    result.headers->insertStatus().value(416); // Range Not Satisfiable
+    result.headers->setStatus(416); // Range Not Satisfiable
   }
   result.has_trailers = false;
   return result;

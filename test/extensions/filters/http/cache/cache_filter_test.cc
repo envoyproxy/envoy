@@ -38,7 +38,7 @@ protected:
 };
 
 TEST_F(CacheFilterTest, ImmediateHitNoBody) {
-  request_headers_.insertHost().value(absl::string_view("ImmediateHitNoBody"));
+  request_headers_.setHost("ImmediateHitNoBody");
   ON_CALL(decoder_callbacks_, dispatcher()).WillByDefault(ReturnRef(context_.dispatcher_));
   ON_CALL(context_.dispatcher_, post(_)).WillByDefault(::testing::InvokeArgument<0>());
 
@@ -73,7 +73,7 @@ TEST_F(CacheFilterTest, ImmediateHitNoBody) {
 }
 
 TEST_F(CacheFilterTest, ImmediateHitBody) {
-  request_headers_.insertHost().value(absl::string_view("ImmediateHitBody"));
+  request_headers_.setHost("ImmediateHitBody");
   ON_CALL(decoder_callbacks_, dispatcher()).WillByDefault(ReturnRef(context_.dispatcher_));
   ON_CALL(context_.dispatcher_, post(_)).WillByDefault(::testing::InvokeArgument<0>());
 
@@ -90,9 +90,8 @@ TEST_F(CacheFilterTest, ImmediateHitBody) {
 
   // Encode response header
   const std::string body = "abc";
-  const uint64_t content_length = body.size();
   Buffer::OwnedImpl buffer(body);
-  response_headers_.insertContentLength().value(content_length);
+  response_headers_.setContentLength(body.size());
   EXPECT_EQ(filter->encodeHeaders(response_headers_, false), Http::FilterHeadersStatus::Continue);
   EXPECT_EQ(filter->encodeData(buffer, true), Http::FilterDataStatus::Continue);
   filter->onDestroy();

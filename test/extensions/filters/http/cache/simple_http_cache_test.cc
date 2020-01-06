@@ -21,10 +21,10 @@ const std::string EpochDate = "Thu, 01 Jan 1970 00:00:00 GMT";
 class SimpleHttpCacheTest : public testing::Test {
 protected:
   SimpleHttpCacheTest() {
-    request_headers_.insertMethod().value(absl::string_view(("GET")));
-    request_headers_.insertHost().value(absl::string_view(("example.com")));
-    request_headers_.insertForwardedProto().value(absl::string_view(("https")));
-    request_headers_.insertCacheControl().value(absl::string_view(("max-age=3600")));
+    request_headers_.setMethod("GET");
+    request_headers_.setHost("example.com");
+    request_headers_.setForwardedProto("https");
+    request_headers_.setCacheControl("max-age=3600");
   }
 
   // Performs a cache lookup.
@@ -61,7 +61,7 @@ protected:
   }
 
   LookupRequest makeLookupRequest(absl::string_view request_path) {
-    request_headers_.insertPath().value(request_path);
+    request_headers_.setPath(request_path);
     return LookupRequest(request_headers_, current_time_);
   }
 
