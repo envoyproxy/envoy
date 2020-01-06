@@ -3,7 +3,7 @@
 #include <string>
 #include <unordered_map>
 
-#include "envoy/config/metrics/v2/stats.pb.h"
+#include "envoy/config/metrics/v3alpha/stats.pb.h"
 
 #include "common/common/c_smart_ptr.h"
 #include "common/event/dispatcher_impl.h"
@@ -522,7 +522,7 @@ TEST_F(LookupWithStatNameTest, NotFound) {
 
 class StatsMatcherTLSTest : public StatsThreadLocalStoreTest {
 public:
-  envoy::config::metrics::v2::StatsConfig stats_config_;
+  envoy::config::metrics::v3alpha::StatsConfig stats_config_;
 };
 
 TEST_F(StatsMatcherTLSTest, TestNoOpStatImpls) {
@@ -591,8 +591,10 @@ TEST_F(StatsMatcherTLSTest, TestExclusionRegex) {
   // Expected to alloc lowercase_counter, lowercase_gauge, valid_counter, valid_gauge
 
   // Will block all stats containing any capital alphanumeric letter.
-  stats_config_.mutable_stats_matcher()->mutable_exclusion_list()->add_patterns()->set_regex(
-      ".*[A-Z].*");
+  stats_config_.mutable_stats_matcher()
+      ->mutable_exclusion_list()
+      ->add_patterns()
+      ->set_hidden_envoy_deprecated_regex(".*[A-Z].*");
   store_->setStatsMatcher(std::make_unique<StatsMatcherImpl>(stats_config_));
 
   // The creation of counters/gauges/histograms which have no uppercase letters should succeed.
@@ -829,7 +831,7 @@ TEST_F(StatsThreadLocalStoreTest, RemoveRejectedStats) {
   EXPECT_EQ("h1", store_->histograms()[0]->name());
 
   // Will effectively block all stats, and remove all the non-matching stats.
-  envoy::config::metrics::v2::StatsConfig stats_config;
+  envoy::config::metrics::v3alpha::StatsConfig stats_config;
   stats_config.mutable_stats_matcher()->mutable_inclusion_list()->add_patterns()->set_exact(
       "no-such-stat");
   store_->setStatsMatcher(std::make_unique<StatsMatcherImpl>(stats_config));
@@ -884,7 +886,7 @@ protected:
     store_->addSink(sink_);
 
     // Use a tag producer that will produce tags.
-    envoy::config::metrics::v2::StatsConfig stats_config;
+    envoy::config::metrics::v3alpha::StatsConfig stats_config;
     store_->setTagProducer(std::make_unique<TagProducerImpl>(stats_config));
   }
 
@@ -911,8 +913,8 @@ TEST_F(StatsThreadLocalStoreTestNoFixture, MemoryWithoutTlsFakeSymbolTable) {
   TestUtil::MemoryTest memory_test;
   TestUtil::forEachSampleStat(
       1000, [this](absl::string_view name) { store_->counter(std::string(name)); });
-  EXPECT_MEMORY_EQ(memory_test.consumedBytes(), 15268336); // June 30, 2019
-  EXPECT_MEMORY_LE(memory_test.consumedBytes(), 16 * million_);
+  EXPECT_MEMORY_EQ(memory_test.consumedBytes(), 14892880); // Oct 28, 2019
+  EXPECT_MEMORY_LE(memory_test.consumedBytes(), 15 * million_);
 }
 
 TEST_F(StatsThreadLocalStoreTestNoFixture, MemoryWithTlsFakeSymbolTable) {
@@ -921,7 +923,7 @@ TEST_F(StatsThreadLocalStoreTestNoFixture, MemoryWithTlsFakeSymbolTable) {
   TestUtil::MemoryTest memory_test;
   TestUtil::forEachSampleStat(
       1000, [this](absl::string_view name) { store_->counter(std::string(name)); });
-  EXPECT_MEMORY_EQ(memory_test.consumedBytes(), 17496848); // June 30, 2019
+  EXPECT_MEMORY_EQ(memory_test.consumedBytes(), 17121392); // Oct 28, 2019
   EXPECT_MEMORY_LE(memory_test.consumedBytes(), 18 * million_);
 }
 
@@ -931,8 +933,8 @@ TEST_F(StatsThreadLocalStoreTestNoFixture, MemoryWithoutTlsRealSymbolTable) {
   TestUtil::MemoryTest memory_test;
   TestUtil::forEachSampleStat(
       1000, [this](absl::string_view name) { store_->counter(std::string(name)); });
-  EXPECT_MEMORY_EQ(memory_test.consumedBytes(), 9139120); // Aug 9, 2019
-  EXPECT_MEMORY_LE(memory_test.consumedBytes(), 10 * million_);
+  EXPECT_MEMORY_EQ(memory_test.consumedBytes(), 8017968); // Oct 28, 2019
+  EXPECT_MEMORY_LE(memory_test.consumedBytes(), 9 * million_);
 }
 
 TEST_F(StatsThreadLocalStoreTestNoFixture, MemoryWithTlsRealSymbolTable) {
@@ -941,8 +943,8 @@ TEST_F(StatsThreadLocalStoreTestNoFixture, MemoryWithTlsRealSymbolTable) {
   TestUtil::MemoryTest memory_test;
   TestUtil::forEachSampleStat(
       1000, [this](absl::string_view name) { store_->counter(std::string(name)); });
-  EXPECT_MEMORY_EQ(memory_test.consumedBytes(), 11367632); // Aug 9, 2019
-  EXPECT_MEMORY_LE(memory_test.consumedBytes(), 12 * million_);
+  EXPECT_MEMORY_EQ(memory_test.consumedBytes(), 10246480); // Oct 28, 2019
+  EXPECT_MEMORY_LE(memory_test.consumedBytes(), 11 * million_);
 }
 
 TEST_F(StatsThreadLocalStoreTest, ShuttingDown) {

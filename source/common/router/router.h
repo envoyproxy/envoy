@@ -2,10 +2,11 @@
 
 #include <chrono>
 #include <cstdint>
+#include <functional>
 #include <memory>
 #include <string>
 
-#include "envoy/config/filter/http/router/v2/router.pb.h"
+#include "envoy/extensions/filters/http/router/v3alpha/router.pb.h"
 #include "envoy/http/codec.h"
 #include "envoy/http/codes.h"
 #include "envoy/http/filter.h"
@@ -187,7 +188,7 @@ public:
 
   FilterConfig(const std::string& stat_prefix, Server::Configuration::FactoryContext& context,
                ShadowWriterPtr&& shadow_writer,
-               const envoy::config::filter::http::router::v2::Router& config)
+               const envoy::extensions::filters::http::router::v3alpha::Router& config)
       : FilterConfig(stat_prefix, context.localInfo(), context.scope(), context.clusterManager(),
                      context.runtime(), context.random(), std::move(shadow_writer),
                      PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, dynamic_stats, true),
@@ -239,7 +240,7 @@ class Filter : Logger::Loggable<Logger::Id::router>,
 public:
   Filter(FilterConfig& config)
       : config_(config), final_upstream_request_(nullptr), downstream_response_started_(false),
-        downstream_end_stream_(false), do_shadowing_(false), is_retry_(false),
+        downstream_end_stream_(false), is_retry_(false),
         attempting_internal_redirect_with_complete_stream_(false) {}
 
   ~Filter() override;
@@ -575,13 +576,13 @@ private:
   uint32_t retry_shadow_buffer_limit_{std::numeric_limits<uint32_t>::max()};
   MetadataMatchCriteriaConstPtr metadata_match_;
   std::function<void(Http::HeaderMap&)> modify_headers_;
+  std::vector<std::reference_wrapper<const ShadowPolicy>> active_shadow_policies_{};
 
   // list of cookies to add to upstream headers
   std::vector<std::string> downstream_set_cookies_;
 
   bool downstream_response_started_ : 1;
   bool downstream_end_stream_ : 1;
-  bool do_shadowing_ : 1;
   bool is_retry_ : 1;
   bool include_attempt_count_ : 1;
   bool attempting_internal_redirect_with_complete_stream_ : 1;

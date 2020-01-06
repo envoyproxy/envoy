@@ -1,10 +1,10 @@
 #pragma once
 
-#include "envoy/api/v2/core/base.pb.h"
-#include "envoy/config/filter/http/ext_authz/v2/ext_authz.pb.h"
-#include "envoy/service/auth/v2/external_auth.pb.h"
+#include "envoy/config/core/v3alpha/base.pb.h"
+#include "envoy/extensions/filters/http/ext_authz/v3alpha/ext_authz.pb.h"
+#include "envoy/service/auth/v3alpha/external_auth.pb.h"
 #include "envoy/tracing/http_tracer.h"
-#include "envoy/type/matcher/string.pb.h"
+#include "envoy/type/matcher/v3alpha/string.pb.h"
 #include "envoy/upstream/cluster_manager.h"
 
 #include "common/common/logger.h"
@@ -61,8 +61,8 @@ private:
  */
 class ClientConfig {
 public:
-  ClientConfig(const envoy::config::filter::http::ext_authz::v2::ExtAuthz& config, uint32_t timeout,
-               absl::string_view path_prefix);
+  ClientConfig(const envoy::extensions::filters::http::ext_authz::v3alpha::ExtAuthz& config,
+               uint32_t timeout, absl::string_view path_prefix);
 
   /**
    * Returns the name of the authorization cluster.
@@ -108,12 +108,14 @@ public:
   const std::string& tracingName() { return tracing_name_; }
 
 private:
-  static MatcherSharedPtr toRequestMatchers(const envoy::type::matcher::ListStringMatcher& matcher);
-  static MatcherSharedPtr toClientMatchers(const envoy::type::matcher::ListStringMatcher& matcher);
   static MatcherSharedPtr
-  toUpstreamMatchers(const envoy::type::matcher::ListStringMatcher& matcher);
+  toRequestMatchers(const envoy::type::matcher::v3alpha::ListStringMatcher& matcher);
+  static MatcherSharedPtr
+  toClientMatchers(const envoy::type::matcher::v3alpha::ListStringMatcher& matcher);
+  static MatcherSharedPtr
+  toUpstreamMatchers(const envoy::type::matcher::v3alpha::ListStringMatcher& matcher);
   static Http::LowerCaseStrPairVector
-  toHeadersAdd(const Protobuf::RepeatedPtrField<envoy::api::v2::core::HeaderValue>&);
+  toHeadersAdd(const Protobuf::RepeatedPtrField<envoy::config::core::v3alpha::HeaderValue>&);
 
   const MatcherSharedPtr request_header_matchers_;
   const MatcherSharedPtr client_header_matchers_;
@@ -144,8 +146,8 @@ public:
 
   // ExtAuthz::Client
   void cancel() override;
-  void check(RequestCallbacks& callbacks, const envoy::service::auth::v2::CheckRequest& request,
-             Tracing::Span&) override;
+  void check(RequestCallbacks& callbacks,
+             const envoy::service::auth::v3alpha::CheckRequest& request, Tracing::Span&) override;
 
   // Http::AsyncClient::Callbacks
   void onSuccess(Http::MessagePtr&& message) override;

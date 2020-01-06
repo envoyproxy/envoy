@@ -1,6 +1,6 @@
 #pragma once
 
-#include "envoy/config/filter/http/rbac/v2/rbac.pb.h"
+#include "envoy/extensions/filters/http/rbac/v3alpha/rbac.pb.h"
 
 #include "extensions/filters/common/rbac/utility.h"
 #include "extensions/filters/http/rbac/rbac_filter.h"
@@ -17,7 +17,7 @@ class MockRoleBasedAccessControlRouteSpecificFilterConfig
     : public RoleBasedAccessControlRouteSpecificFilterConfig {
 public:
   MockRoleBasedAccessControlRouteSpecificFilterConfig(
-      const envoy::config::filter::http::rbac::v2::RBACPerRoute& r)
+      const envoy::extensions::filters::http::rbac::v3alpha::RBACPerRoute& r)
       : RoleBasedAccessControlRouteSpecificFilterConfig(r){};
 
   MOCK_CONST_METHOD0(engine, Filters::Common::RBAC::RoleBasedAccessControlEngineImpl&());

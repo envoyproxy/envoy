@@ -1,7 +1,7 @@
 #pragma once
 
 #include "envoy/access_log/access_log.h"
-#include "envoy/config/filter/http/tap/v2alpha/tap.pb.h"
+#include "envoy/extensions/filters/http/tap/v3alpha/tap.pb.h"
 #include "envoy/http/filter.h"
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats_macros.h"
@@ -56,7 +56,7 @@ using FilterConfigSharedPtr = std::shared_ptr<FilterConfig>;
  */
 class FilterConfigImpl : public FilterConfig, public Extensions::Common::Tap::ExtensionConfigBase {
 public:
-  FilterConfigImpl(const envoy::config::filter::http::tap::v2alpha::Tap& proto_config,
+  FilterConfigImpl(const envoy::extensions::filters::http::tap::v3alpha::Tap& proto_config,
                    const std::string& stats_prefix,
                    Extensions::Common::Tap::TapConfigFactoryPtr&& config_factory,
                    Stats::Scope& scope, Server::Admin& admin, Singleton::Manager& singleton_manager,

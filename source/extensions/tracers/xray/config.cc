@@ -2,9 +2,9 @@
 
 #include <string>
 
-#include "envoy/api/v2/core/address.pb.h"
-#include "envoy/config/trace/v2alpha/xray.pb.h"
-#include "envoy/config/trace/v2alpha/xray.pb.validate.h"
+#include "envoy/config/core/v3alpha/address.pb.h"
+#include "envoy/config/trace/v3alpha/xray.pb.h"
+#include "envoy/config/trace/v3alpha/xray.pb.validate.h"
 #include "envoy/registry/registry.h"
 
 #include "common/common/utility.h"
@@ -19,14 +19,10 @@ namespace Extensions {
 namespace Tracers {
 namespace XRay {
 
-namespace api = ::envoy::api::v2;
-namespace trace = envoy::config::trace::v2alpha;
-
 XRayTracerFactory::XRayTracerFactory() : FactoryBase(TracerNames::get().XRay) {}
 
-Tracing::HttpTracerPtr
-XRayTracerFactory::createHttpTracerTyped(const trace::XRayConfig& proto_config,
-                                         Server::Instance& server) {
+Tracing::HttpTracerPtr XRayTracerFactory::createHttpTracerTyped(
+    const envoy::config::trace::v3alpha::XRayConfig& proto_config, Server::Instance& server) {
   std::string sampling_rules_json;
   try {
     sampling_rules_json =
@@ -36,12 +32,12 @@ XRayTracerFactory::createHttpTracerTyped(const trace::XRayConfig& proto_config,
   }
 
   if (proto_config.daemon_endpoint().protocol() !=
-      api::core::SocketAddress::Protocol::SocketAddress_Protocol_UDP) {
+      envoy::config::core::v3alpha::SocketAddress::UDP) {
     throw EnvoyException("X-Ray daemon endpoint must be a UDP socket address");
   }
 
   if (proto_config.daemon_endpoint().port_specifier_case() !=
-      api::core::SocketAddress::PortSpecifierCase::kPortValue) {
+      envoy::config::core::v3alpha::SocketAddress::PortSpecifierCase::kPortValue) {
     throw EnvoyException("X-Ray daemon port must be specified as number. Not a named port.");
   }
 

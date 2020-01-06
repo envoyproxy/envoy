@@ -20,20 +20,12 @@ TYPE_UPGRADE_REGEXES = [
     ('envoy\.type', 'envoy.type.v3alpha'),
 ]
 
-# As with TYPE_UPGRADE_REGEXES but for API .proto paths.
-PATH_UPGRADE_REGEXES = [
-    (r'(envoy/[\w/]*/)(v1alpha\d?|v1)', r'\1v3alpha'),
-    (r'(envoy/[\w/]*/)(v2alpha\d?|v2)', r'\1v3alpha'),
-    # These are special cases, e.g. upgrading versionless packages.
-    ('envoy/type/matcher', 'envoy/type/matcher/v3alpha'),
-    ('envoy/type', 'envoy/type/v3alpha'),
-]
-
 # These packages must be upgraded to v3alpha, even if there are no protos
 # modified. This is largely for situations where we know we want to be doing
 # structural change to have the APIs follow the x/y//vN/z.proto structure of
 # organization.
 PKG_FORCE_UPGRADE = [
+    'envoy.v2',
     'envoy.api.v2',
     'envoy.api.v2.auth',
     'envoy.api.v2.cluster',
@@ -47,20 +39,35 @@ PKG_FORCE_UPGRADE = [
 ]
 
 
-def UpgradedType(type_name):
-  """Determine upgraded type name."""
+def UpgradedPackage(type_desc):
+  """Determine upgrade package for a type."""
+  if type_desc.next_version_package:
+    return type_desc.next_version_package
+
   for pattern, repl in TYPE_UPGRADE_REGEXES:
-    s = re.sub(pattern, repl, type_name)
-    if s != type_name:
+    s = re.sub(pattern, repl, type_desc.qualified_package)
+    if s != type_desc.qualified_package:
       return s
+  raise ValueError("{} is not upgradable".format(type_desc.qualified_package))
 
 
-def UpgradedPath(proto_path):
+def UpgradedType(type_name, type_desc):
+  """Determine upgraded type name."""
+  upgraded_package = UpgradedPackage(type_desc)
+  return type_name.replace(type_desc.qualified_package, upgraded_package)
+
+
+def UpgradedPath(proto_path, upgraded_package):
   """Determine upgraded API .proto path."""
-  for pattern, repl in PATH_UPGRADE_REGEXES:
-    s = re.sub(pattern, repl, proto_path)
-    if s != proto_path:
-      return s
+  return '/'.join([upgraded_package.replace('.', '/'), proto_path.split('/')[-1]])
+
+
+def UpgradedTypeWithDescription(type_name, type_desc):
+  upgrade_type_desc = TypeDescription()
+  upgrade_type_desc.qualified_package = UpgradedPackage(type_desc)
+  upgrade_type_desc.proto_path = UpgradedPath(type_desc.proto_path,
+                                              upgrade_type_desc.qualified_package)
+  return (UpgradedType(type_name, type_desc), upgrade_type_desc)
 
 
 def LoadTypes(path):
@@ -139,36 +146,31 @@ if __name__ == '__main__':
   ])
 
   # Generate type map entries for upgraded types.
-  upgraded_types = []
-  for type_name, type_desc in type_map.items():
-    if type_desc.qualified_package in next_versions_pkgs:
-      upgrade_type_desc = TypeDescription()
-      upgrade_type_desc.qualified_package = UpgradedType(type_desc.qualified_package)
-      upgrade_type_desc.proto_path = UpgradedPath(type_desc.proto_path)
-      upgraded_types.append((UpgradedType(type_name), upgrade_type_desc))
-  for n, t in upgraded_types:
-    type_map[n] = t
+  type_map.update([
+      UpgradedTypeWithDescription(type_name, type_desc)
+      for type_name, type_desc in type_map.items()
+      if type_desc.qualified_package in next_versions_pkgs
+  ])
 
   # Generate the type database proto. To provide some stability across runs, in
   # terms of the emitted proto binary blob that we track in git, we sort before
   # loading the map entries in the proto. This seems to work in practice, but
   # has no guarantees.
   type_db = TypeDb()
-  next_proto_path = {}
+  next_proto_info = {}
   for t in sorted(type_map):
     type_desc = type_db.types[t]
     type_desc.qualified_package = type_map[t].qualified_package
     type_desc.proto_path = type_map[t].proto_path
     if type_desc.qualified_package in next_versions_pkgs:
-      type_desc.next_version_type_name = UpgradedType(t)
+      type_desc.next_version_type_name = UpgradedType(t, type_map[t])
       assert (type_desc.next_version_type_name != t)
-      next_proto_path[type_map[t].proto_path] = type_map[
-          type_desc.next_version_type_name].proto_path
-  for pkg in sorted(all_pkgs):
-    if pkg in next_versions_pkgs:
-      type_db.next_version_packages[pkg] = UpgradedType(pkg)
-  for proto_path in sorted(next_proto_path):
-    type_db.next_version_proto_paths[proto_path] = UpgradedPath(proto_path)
+      next_proto_info[type_map[t].proto_path] = (
+          type_map[type_desc.next_version_type_name].proto_path,
+          type_map[type_desc.next_version_type_name].qualified_package)
+  for proto_path, (next_proto_path, next_package) in sorted(next_proto_info.items()):
+    type_db.next_version_protos[proto_path].proto_path = next_proto_path
+    type_db.next_version_protos[proto_path].qualified_package = next_package
 
   # Write out proto text.
   with open(out_path, 'w') as f:
