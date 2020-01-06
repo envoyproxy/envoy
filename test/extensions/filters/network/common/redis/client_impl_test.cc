@@ -489,7 +489,7 @@ TEST_F(RedisClientImplTest, CommandStatsEnabledTwoRequests) {
                 putResult(Upstream::Outlier::Result::ExtOriginRequestSuccess, _));
     callbacks_->onRespValue(std::move(response2));
 
-    // Redis command stats reflect one successful and one failred request
+    // Redis command stats reflect one successful and one failed request
     EXPECT_EQ(1UL, stats_.counter("upstream_commands.get.success").value());
     EXPECT_EQ(1UL, stats_.counter("upstream_commands.get.failure").value());
     EXPECT_EQ(2UL, stats_.counter("upstream_commands.get.total").value());
