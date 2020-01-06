@@ -882,7 +882,7 @@ void HttpIntegrationTest::testResponseFramedByConnectionCloseWithReadLimits(
 
   auto response = codec_client_->makeHeaderOnlyRequest(default_request_headers_);
   waitForNextUpstreamRequest();
-  // Disable chunking to trigger framing by connection close.
+  // Disable chunk encoding to trigger framing by connection close.
   upstream_request_->encodeHeaders(Http::TestHeaderMapImpl{{":status", "200"}, {":no-chunks", "1"}},
                                    false);
   upstream_request_->encodeData(512, true);

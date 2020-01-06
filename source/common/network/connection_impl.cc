@@ -279,6 +279,10 @@ void ConnectionImpl::enableHalfClose(bool enabled) {
 }
 
 void ConnectionImpl::readDisable(bool disable) {
+  // Calls to readEnabled on a closed socket are considered to be an error.
+  ASSERT(state() == State::Open);
+  ASSERT(file_event_ != nullptr);
+
   ENVOY_CONN_LOG(trace, "readDisable: enabled={} disable={} state={}", *this, read_enabled_,
                  disable, static_cast<int>(state()));
 
@@ -348,7 +352,12 @@ void ConnectionImpl::raiseEvent(ConnectionEvent event) {
   }
 }
 
-bool ConnectionImpl::readEnabled() const { return read_enabled_; }
+bool ConnectionImpl::readEnabled() const {
+  // Calls to readEnabled on a closed socket are considered to be an error.
+  ASSERT(state() == State::Open);
+  ASSERT(file_event_ != nullptr);
+  return read_enabled_;
+}
 
 void ConnectionImpl::addBytesSentCallback(BytesSentCb cb) {
   bytes_sent_callbacks_.emplace_back(cb);

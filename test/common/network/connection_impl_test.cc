@@ -594,12 +594,21 @@ TEST_P(ConnectionImplTest, ReadDisableAfterCloseHandledGracefully) {
   client_connection_->readDisable(true);
   client_connection_->readDisable(true);
   disconnect(false);
+#ifndef NDEBUG
+  // When running in debug mode, verify that calls to readDisable and readEnabled on a closed socket
+  // trigger ASSERT failures.
+  EXPECT_DEBUG_DEATH(client_connection_->readEnabled(), "");
+  EXPECT_DEBUG_DEATH(client_connection_->readDisable(true), "");
+  EXPECT_DEBUG_DEATH(client_connection_->readDisable(false), "");
+#else
+  // When running in release mode, verify that calls to readDisable change the readEnabled state.
   client_connection_->readDisable(false);
   client_connection_->readDisable(true);
   client_connection_->readDisable(false);
   EXPECT_FALSE(client_connection_->readEnabled());
   client_connection_->readDisable(false);
   EXPECT_TRUE(client_connection_->readEnabled());
+#endif
 }
 
 TEST_P(ConnectionImplTest, EarlyCloseOnReadDisabledConnection) {
