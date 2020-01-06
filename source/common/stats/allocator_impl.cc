@@ -105,7 +105,7 @@ protected:
   std::atomic<uint64_t> value_{0};
 
   // ref_count_ can be incremented as an atomic, without holding a
-  // lock. However, we must old alloc_.mutex_ when decrementing ref_count_ so
+  // lock. However, we must hold alloc_.mutex_ when decrementing ref_count_ so
   // that when it hits zero we can atomically remove it from alloc_.counters_ or
   // alloc_.gauges_. We leave it atomic to avoid taking the lock on increment.
   std::atomic<uint32_t> ref_count_{0};

@@ -117,21 +117,17 @@ TEST_F(AllocatorImplTest, RefCountDecAllocRaceSynchronized) {
   Thread::ThreadFactory& thread_factory = Thread::threadFactoryForTest();
   alloc_.sync().enable();
   alloc_.sync().waitOn(AllocatorImpl::DecrementToZeroSyncPoint);
-  absl::Notification alloc_done;
-  Thread::ThreadPtr thread1 = thread_factory.createThread([&]() {
-    CounterSharedPtr counter1 = alloc_.makeCounter(counter_name, "", std::vector<Tag>());
-    alloc_done.Notify();
-    counter1->inc();
-    counter1->reset(); // Blocks in thread synchronizer waiting on DecrementToZeroSyncPoint
+  Thread::ThreadPtr thread = thread_factory.createThread([&]() {
+    CounterSharedPtr counter = alloc_.makeCounter(counter_name, "", std::vector<Tag>());
+    counter->inc();
+    counter->reset(); // Blocks in thread synchronizer waiting on DecrementToZeroSyncPoint
   });
 
-  alloc_done.WaitForNotification();
   alloc_.sync().barrierOn(AllocatorImpl::DecrementToZeroSyncPoint);
   EXPECT_TRUE(alloc_.isMutexLocked());
   alloc_.sync().signal(AllocatorImpl::DecrementToZeroSyncPoint);
-  thread1->join();
+  thread->join();
   EXPECT_FALSE(alloc_.isMutexLocked());
-  // thread2->join();
 }
 
 } // namespace
