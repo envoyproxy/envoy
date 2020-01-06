@@ -10,14 +10,15 @@ namespace Envoy {
 namespace Server {
 
 /**
- * Handles FilterChainFactoryContext creation.
+ * Handles FilterChainFactoryContext creation. It is used by listener to adding new filter chain
+ * without worrying the lifetime of each factory context.
  */
 class FilterChainFactoryContextCallback {
 public:
   virtual ~FilterChainFactoryContextCallback() = default;
 
   /**
-   * Generate the filter chain factory context from proto. Notes the callback will own the filter
+   * Generate the filter chain factory context from proto. Note the callback will own the filter
    * chain context.
    */
   virtual std::shared_ptr<Configuration::FilterChainFactoryContext> createFilterChainFactoryContext(

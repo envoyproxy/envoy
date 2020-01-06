@@ -91,6 +91,8 @@ void ConnectionHandlerImpl::ActiveTcpListener::removeConnection(ActiveTcpConnect
   if (active_connections.connections_.empty()) {
     auto iter = connections_by_context_.find(&active_connections.filter_chain_);
     ASSERT(iter != connections_by_context_.end());
+    // To cover the lifetime of every single connection, Connections need to be deferred deleted
+    // because the previously contained connection is deferred deleted.
     parent_.dispatcher_.deferredDelete(std::move(iter->second));
     // The erase will break the iteration over the connections_by_context_ during the deletion.
     if (!is_deleting_) {

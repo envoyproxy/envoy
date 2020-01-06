@@ -202,7 +202,7 @@ public:
 
 /**
  * An implementation of FactoryContext. The life time is no shorter than the created filter chains.
- * The life time is no longer than the belonged listener. It should be used to create
+ * The life time is no longer than the owning listener. It should be used to create
  * NetworkFilterChain.
  */
 class FilterChainFactoryContext : public virtual FactoryContext {};
@@ -340,7 +340,7 @@ public:
    * produce a factory with the provided parameters, it should throw an EnvoyException. The returned
    * callback should always be initialized.
    * @param config supplies the general json configuration for the filter
-   * @param context supplies the filter's context.
+   * @param filter_chain_factory_context supplies the filter's context.
    * @return Network::FilterFactoryCb the factory creation function.
    */
   virtual Network::FilterFactoryCb

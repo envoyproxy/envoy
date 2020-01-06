@@ -29,7 +29,7 @@ public:
                    FilterChainFactoryContextCallback& callback) const PURE;
 };
 
-// FilterChainFactoryContextImpl is supposed to used by network filter chain.
+// FilterChainFactoryContextImpl is supposed to be used by network filter chain.
 // Its lifetime must cover the created network filter chain.
 // Its lifetime should be covered by the owned listeners so as to support replacing the active
 // filter chains in the listener.
@@ -95,6 +95,8 @@ public:
   createFilterChainFactoryContextCallback(Configuration::FactoryContext& parent_context);
 
   // A naive implementation which commits the context as soon as the context is created.
+  // This implementation can support listeners which doesn't transfer the ownership of filter chain
+  // context to the descendant listener with new config.
   class ImmediateAppendFilterChainContextCallbackImpl : public FilterChainFactoryContextCallback {
   public:
     ImmediateAppendFilterChainContextCallbackImpl(FilterChainManagerImpl& parent,
