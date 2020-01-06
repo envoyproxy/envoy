@@ -47,8 +47,8 @@ namespace Envoy {
 #define GENERATE_NULL_PRIMITIVE_GAUGE_STRUCT(NAME) Envoy::Stats::NullPrimitiveGaugeImpl NAME##_;
 
 // Name and counter/gauge reference pair used to construct map of counters/gauges.
-#define PRIMITIVE_COUNTER_NAME_AND_REFERENCE(X) {absl::string_view(#X), std::ref(X##_)},
-#define PRIMITIVE_GAUGE_NAME_AND_REFERENCE(X) {absl::string_view(#X), std::ref(X##_)},
+#define PRIMITIVE_COUNTER_NAME_AND_REFERENCE(X) {absl::string_view(#X), X##_},
+#define PRIMITIVE_GAUGE_NAME_AND_REFERENCE(X) {absl::string_view(#X), X##_},
 
 // Ignore a counter or gauge.
 #define IGNORE_PRIMITIVE_COUNTER(X)
