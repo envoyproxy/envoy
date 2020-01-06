@@ -42,7 +42,7 @@ HealthCheckerImplBase::HealthCheckerImplBase(
 
 std::shared_ptr<const Network::TransportSocketOptionsImpl>
 HealthCheckerImplBase::initTransportSocketOptions(
-    const envoy::api::v2::core::HealthCheck& config) const {
+    const envoy::config::core::v3alpha::HealthCheck& config) const {
   if (config.has_tls_options()) {
     std::vector<std::string> protocols{config.tls_options().alpn_protocols().begin(),
                                        config.tls_options().alpn_protocols().end()};
