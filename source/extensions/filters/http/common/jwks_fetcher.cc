@@ -1,6 +1,6 @@
 #include "extensions/filters/http/common/jwks_fetcher.h"
 
-#include "envoy/api/v2/core/http_uri.pb.h"
+#include "envoy/config/core/v3alpha/http_uri.pb.h"
 
 #include "common/common/enum_to_int.h"
 #include "common/http/headers.h"
@@ -30,7 +30,7 @@ public:
     reset();
   }
 
-  void fetch(const ::envoy::api::v2::core::HttpUri& uri, Tracing::Span& parent_span,
+  void fetch(const envoy::config::core::v3alpha::HttpUri& uri, Tracing::Span& parent_span,
              JwksFetcher::JwksReceiver& receiver) override {
     ENVOY_LOG(trace, "{}", __func__);
     ASSERT(!receiver_);
@@ -105,7 +105,7 @@ private:
   Upstream::ClusterManager& cm_;
   bool complete_{};
   JwksFetcher::JwksReceiver* receiver_{};
-  const envoy::api::v2::core::HttpUri* uri_{};
+  const envoy::config::core::v3alpha::HttpUri* uri_{};
   Http::AsyncClient::Request* request_{};
 
   void reset() {

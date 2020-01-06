@@ -4,8 +4,8 @@
 #include <list>
 #include <string>
 
-#include "envoy/api/v2/core/address.pb.h"
 #include "envoy/common/platform.h"
+#include "envoy/config/core/v3alpha/address.pb.h"
 #include "envoy/network/connection.h"
 #include "envoy/network/listener.h"
 
@@ -270,7 +270,7 @@ public:
   static absl::uint128 Ip6htonl(const absl::uint128& address);
 
   static Address::InstanceConstSharedPtr
-  protobufAddressToAddress(const envoy::api::v2::core::Address& proto_address);
+  protobufAddressToAddress(const envoy::config::core::v3alpha::Address& proto_address);
 
   /**
    * Copies the address instance into the protobuf representation of an address.
@@ -278,7 +278,7 @@ public:
    * @param proto_address is the protobuf address to which the address instance is copied into.
    */
   static void addressToProtobufAddress(const Address::Instance& address,
-                                       envoy::api::v2::core::Address& proto_address);
+                                       envoy::config::core::v3alpha::Address& proto_address);
 
   /**
    * Returns socket type corresponding to SocketAddress.protocol value of the
@@ -287,7 +287,7 @@ public:
    * @return socket type
    */
   static Address::SocketType
-  protobufAddressSocketType(const envoy::api::v2::core::Address& proto_address);
+  protobufAddressSocketType(const envoy::config::core::v3alpha::Address& proto_address);
 
   /**
    * Send a packet via given UDP socket with specific source address.

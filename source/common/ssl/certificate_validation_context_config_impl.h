@@ -3,8 +3,9 @@
 #include <string>
 
 #include "envoy/api/api.h"
-#include "envoy/api/v2/auth/cert.pb.h"
+#include "envoy/extensions/transport_sockets/tls/v3alpha/cert.pb.h"
 #include "envoy/ssl/certificate_validation_context_config.h"
+#include "envoy/type/matcher/v3alpha/string.pb.h"
 
 namespace Envoy {
 namespace Ssl {
@@ -12,7 +13,9 @@ namespace Ssl {
 class CertificateValidationContextConfigImpl : public CertificateValidationContextConfig {
 public:
   CertificateValidationContextConfigImpl(
-      const envoy::api::v2::auth::CertificateValidationContext& config, Api::Api& api);
+      const envoy::extensions::transport_sockets::tls::v3alpha::CertificateValidationContext&
+          config,
+      Api::Api& api);
 
   const std::string& caCert() const override { return ca_cert_; }
   const std::string& caCertPath() const override { return ca_cert_path_; }
@@ -25,7 +28,7 @@ public:
   const std::vector<std::string>& verifySubjectAltNameList() const override {
     return verify_subject_alt_name_list_;
   }
-  const std::vector<::envoy::type::matcher::StringMatcher>&
+  const std::vector<envoy::type::matcher::v3alpha::StringMatcher>&
   subjectAltNameMatchers() const override {
     return subject_alt_name_matchers_;
   }
@@ -43,7 +46,7 @@ private:
   const std::string certificate_revocation_list_;
   const std::string certificate_revocation_list_path_;
   const std::vector<std::string> verify_subject_alt_name_list_;
-  const std::vector<::envoy::type::matcher::StringMatcher> subject_alt_name_matchers_;
+  const std::vector<envoy::type::matcher::v3alpha::StringMatcher> subject_alt_name_matchers_;
   const std::vector<std::string> verify_certificate_hash_list_;
   const std::vector<std::string> verify_certificate_spki_list_;
   const bool allow_expired_certificate_;

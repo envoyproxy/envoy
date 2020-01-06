@@ -1,7 +1,7 @@
 #pragma once
 
-#include "envoy/api/v2/core/config_source.pb.h"
-#include "envoy/config/bootstrap/v2/bootstrap.pb.h"
+#include "envoy/config/bootstrap/v3alpha/bootstrap.pb.h"
+#include "envoy/config/core/v3alpha/config_source.pb.h"
 #include "envoy/secret/secret_manager.h"
 #include "envoy/upstream/cluster_manager.h"
 
@@ -36,11 +36,11 @@ public:
         time_system_(time_system) {}
 
   ClusterManagerPtr
-  clusterManagerFromProto(const envoy::config::bootstrap::v2::Bootstrap& bootstrap) override;
+  clusterManagerFromProto(const envoy::config::bootstrap::v3alpha::Bootstrap& bootstrap) override;
 
   // Delegates to ProdClusterManagerFactory::createCds, but discards the result and returns nullptr
   // unconditionally.
-  CdsApiPtr createCds(const envoy::api::v2::core::ConfigSource& cds_config,
+  CdsApiPtr createCds(const envoy::config::core::v3alpha::ConfigSource& cds_config,
                       ClusterManager& cm) override;
 
 private:
@@ -52,7 +52,7 @@ private:
  */
 class ValidationClusterManager : public ClusterManagerImpl {
 public:
-  ValidationClusterManager(const envoy::config::bootstrap::v2::Bootstrap& bootstrap,
+  ValidationClusterManager(const envoy::config::bootstrap::v3alpha::Bootstrap& bootstrap,
                            ClusterManagerFactory& factory, Stats::Store& stats,
                            ThreadLocal::Instance& tls, Runtime::Loader& runtime,
                            Runtime::RandomGenerator& random, const LocalInfo::LocalInfo& local_info,

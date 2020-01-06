@@ -12,7 +12,7 @@
 // * Idle/drain timeouts.
 // * HTTP 1.0 special cases
 // * Fuzz config settings
-#include "envoy/config/filter/network/http_connection_manager/v2/http_connection_manager.pb.h"
+#include "envoy/extensions/filters/network/http_connection_manager/v3alpha/http_connection_manager.pb.h"
 
 #include "common/common/empty_string.h"
 #include "common/http/conn_manager_impl.h"
@@ -133,7 +133,8 @@ public:
   bool shouldNormalizePath() const override { return false; }
   bool shouldMergeSlashes() const override { return false; }
 
-  const envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager config_;
+  const envoy::extensions::filters::network::http_connection_manager::v3alpha::HttpConnectionManager
+      config_;
   std::list<AccessLog::InstanceSharedPtr> access_logs_;
   MockServerConnection* codec_{};
   MockStreamDecoderFilter* decoder_filter_{};

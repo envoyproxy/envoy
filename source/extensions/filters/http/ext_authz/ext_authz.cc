@@ -1,6 +1,6 @@
 #include "extensions/filters/http/ext_authz/ext_authz.h"
 
-#include "envoy/api/v2/core/base.pb.h"
+#include "envoy/config/core/v3alpha/base.pb.h"
 
 #include "common/common/assert.h"
 #include "common/common/enum_to_int.h"
@@ -66,7 +66,7 @@ void Filter::initiateCall(const Http::HeaderMap& headers) {
   }
 
   // If metadata_context_namespaces is specified, pass matching metadata to the ext_authz service
-  envoy::api::v2::core::Metadata metadata_context;
+  envoy::config::core::v3alpha::Metadata metadata_context;
   const auto& request_metadata = callbacks_->streamInfo().dynamicMetadata().filter_metadata();
   for (const auto& context_key : config_->metadataContextNamespaces()) {
     const auto& metadata_it = request_metadata.find(context_key);

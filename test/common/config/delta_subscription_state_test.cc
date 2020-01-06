@@ -1,5 +1,5 @@
-#include "envoy/api/v2/cds.pb.h"
-#include "envoy/api/v2/discovery.pb.h"
+#include "envoy/config/cluster/v3alpha/cluster.pb.h"
+#include "envoy/service/discovery/v3alpha/discovery.pb.h"
 
 #include "common/config/delta_subscription_state.h"
 #include "common/config/utility.h"
@@ -27,17 +27,19 @@ protected:
   DeltaSubscriptionStateTest()
       : state_(TypeUrl, callbacks_, local_info_, std::chrono::milliseconds(0U), dispatcher_) {
     state_.updateSubscriptionInterest({"name1", "name2", "name3"}, {});
-    envoy::api::v2::DeltaDiscoveryRequest cur_request = state_.getNextRequestAckless();
+    envoy::service::discovery::v3alpha::DeltaDiscoveryRequest cur_request =
+        state_.getNextRequestAckless();
     EXPECT_THAT(cur_request.resource_names_subscribe(),
                 UnorderedElementsAre("name1", "name2", "name3"));
   }
 
   UpdateAck deliverDiscoveryResponse(
-      const Protobuf::RepeatedPtrField<envoy::api::v2::Resource>& added_resources,
+      const Protobuf::RepeatedPtrField<envoy::service::discovery::v3alpha::Resource>&
+          added_resources,
       const Protobuf::RepeatedPtrField<std::string>& removed_resources,
       const std::string& version_info, absl::optional<std::string> nonce = absl::nullopt,
       bool expect_config_update_call = true) {
-    envoy::api::v2::DeltaDiscoveryResponse message;
+    envoy::service::discovery::v3alpha::DeltaDiscoveryResponse message;
     *message.mutable_resources() = added_resources;
     *message.mutable_removed_resources() = removed_resources;
     message.set_system_version_info(version_info);
@@ -49,10 +51,11 @@ protected:
   }
 
   UpdateAck deliverBadDiscoveryResponse(
-      const Protobuf::RepeatedPtrField<envoy::api::v2::Resource>& added_resources,
+      const Protobuf::RepeatedPtrField<envoy::service::discovery::v3alpha::Resource>&
+          added_resources,
       const Protobuf::RepeatedPtrField<std::string>& removed_resources,
       const std::string& version_info, std::string nonce) {
-    envoy::api::v2::DeltaDiscoveryResponse message;
+    envoy::service::discovery::v3alpha::DeltaDiscoveryResponse message;
     *message.mutable_resources() = added_resources;
     *message.mutable_removed_resources() = removed_resources;
     message.set_system_version_info(version_info);
@@ -61,16 +64,16 @@ protected:
     return state_.handleResponse(message);
   }
 
-  NiceMock<MockSubscriptionCallbacks<envoy::api::v2::Cluster>> callbacks_;
+  NiceMock<MockSubscriptionCallbacks<envoy::config::cluster::v3alpha::Cluster>> callbacks_;
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
   NiceMock<Event::MockDispatcher> dispatcher_;
   // We start out interested in three resources: name1, name2, and name3.
   DeltaSubscriptionState state_;
 };
 
-Protobuf::RepeatedPtrField<envoy::api::v2::Resource>
+Protobuf::RepeatedPtrField<envoy::service::discovery::v3alpha::Resource>
 populateRepeatedResource(std::vector<std::pair<std::string, std::string>> items) {
-  Protobuf::RepeatedPtrField<envoy::api::v2::Resource> add_to;
+  Protobuf::RepeatedPtrField<envoy::service::discovery::v3alpha::Resource> add_to;
   for (const auto& item : items) {
     auto* resource = add_to.Add();
     resource->set_name(item.first);
@@ -83,13 +86,15 @@ populateRepeatedResource(std::vector<std::pair<std::string, std::string>> items)
 TEST_F(DeltaSubscriptionStateTest, SubscribeAndUnsubscribe) {
   {
     state_.updateSubscriptionInterest({"name4"}, {"name1"});
-    envoy::api::v2::DeltaDiscoveryRequest cur_request = state_.getNextRequestAckless();
+    envoy::service::discovery::v3alpha::DeltaDiscoveryRequest cur_request =
+        state_.getNextRequestAckless();
     EXPECT_THAT(cur_request.resource_names_subscribe(), UnorderedElementsAre("name4"));
     EXPECT_THAT(cur_request.resource_names_unsubscribe(), UnorderedElementsAre("name1"));
   }
   {
     state_.updateSubscriptionInterest({"name1"}, {"name3", "name4"});
-    envoy::api::v2::DeltaDiscoveryRequest cur_request = state_.getNextRequestAckless();
+    envoy::service::discovery::v3alpha::DeltaDiscoveryRequest cur_request =
+        state_.getNextRequestAckless();
     EXPECT_THAT(cur_request.resource_names_subscribe(), UnorderedElementsAre("name1"));
     EXPECT_THAT(cur_request.resource_names_unsubscribe(), UnorderedElementsAre("name3", "name4"));
   }
@@ -107,7 +112,8 @@ TEST_F(DeltaSubscriptionStateTest, SubscribeAndUnsubscribe) {
 TEST_F(DeltaSubscriptionStateTest, RemoveThenAdd) {
   state_.updateSubscriptionInterest({}, {"name3"});
   state_.updateSubscriptionInterest({"name3"}, {});
-  envoy::api::v2::DeltaDiscoveryRequest cur_request = state_.getNextRequestAckless();
+  envoy::service::discovery::v3alpha::DeltaDiscoveryRequest cur_request =
+      state_.getNextRequestAckless();
   EXPECT_THAT(cur_request.resource_names_subscribe(), UnorderedElementsAre("name3"));
   EXPECT_TRUE(cur_request.resource_names_unsubscribe().empty());
 }
@@ -123,7 +129,8 @@ TEST_F(DeltaSubscriptionStateTest, RemoveThenAdd) {
 TEST_F(DeltaSubscriptionStateTest, AddThenRemove) {
   state_.updateSubscriptionInterest({"name4"}, {});
   state_.updateSubscriptionInterest({}, {"name4"});
-  envoy::api::v2::DeltaDiscoveryRequest cur_request = state_.getNextRequestAckless();
+  envoy::service::discovery::v3alpha::DeltaDiscoveryRequest cur_request =
+      state_.getNextRequestAckless();
   EXPECT_TRUE(cur_request.resource_names_subscribe().empty());
   EXPECT_THAT(cur_request.resource_names_unsubscribe(), UnorderedElementsAre("name4"));
 }
@@ -133,7 +140,8 @@ TEST_F(DeltaSubscriptionStateTest, AddRemoveAdd) {
   state_.updateSubscriptionInterest({"name4"}, {});
   state_.updateSubscriptionInterest({}, {"name4"});
   state_.updateSubscriptionInterest({"name4"}, {});
-  envoy::api::v2::DeltaDiscoveryRequest cur_request = state_.getNextRequestAckless();
+  envoy::service::discovery::v3alpha::DeltaDiscoveryRequest cur_request =
+      state_.getNextRequestAckless();
   EXPECT_THAT(cur_request.resource_names_subscribe(), UnorderedElementsAre("name4"));
   EXPECT_TRUE(cur_request.resource_names_unsubscribe().empty());
 }
@@ -143,7 +151,8 @@ TEST_F(DeltaSubscriptionStateTest, RemoveAddRemove) {
   state_.updateSubscriptionInterest({}, {"name3"});
   state_.updateSubscriptionInterest({"name3"}, {});
   state_.updateSubscriptionInterest({}, {"name3"});
-  envoy::api::v2::DeltaDiscoveryRequest cur_request = state_.getNextRequestAckless();
+  envoy::service::discovery::v3alpha::DeltaDiscoveryRequest cur_request =
+      state_.getNextRequestAckless();
   EXPECT_TRUE(cur_request.resource_names_subscribe().empty());
   EXPECT_THAT(cur_request.resource_names_unsubscribe(), UnorderedElementsAre("name3"));
 }
@@ -154,7 +163,8 @@ TEST_F(DeltaSubscriptionStateTest, BothAddAndRemove) {
   state_.updateSubscriptionInterest({"name4"}, {"name1", "name2", "name3"});
   state_.updateSubscriptionInterest({"name1", "name2", "name3"}, {"name4"});
   state_.updateSubscriptionInterest({"name4"}, {"name1", "name2", "name3"});
-  envoy::api::v2::DeltaDiscoveryRequest cur_request = state_.getNextRequestAckless();
+  envoy::service::discovery::v3alpha::DeltaDiscoveryRequest cur_request =
+      state_.getNextRequestAckless();
   EXPECT_THAT(cur_request.resource_names_subscribe(), UnorderedElementsAre("name4"));
   EXPECT_THAT(cur_request.resource_names_unsubscribe(),
               UnorderedElementsAre("name1", "name2", "name3"));
@@ -163,7 +173,8 @@ TEST_F(DeltaSubscriptionStateTest, BothAddAndRemove) {
 TEST_F(DeltaSubscriptionStateTest, CumulativeUpdates) {
   state_.updateSubscriptionInterest({"name4"}, {});
   state_.updateSubscriptionInterest({"name5"}, {});
-  envoy::api::v2::DeltaDiscoveryRequest cur_request = state_.getNextRequestAckless();
+  envoy::service::discovery::v3alpha::DeltaDiscoveryRequest cur_request =
+      state_.getNextRequestAckless();
   EXPECT_THAT(cur_request.resource_names_subscribe(), UnorderedElementsAre("name4", "name5"));
   EXPECT_TRUE(cur_request.resource_names_unsubscribe().empty());
 }
@@ -173,7 +184,7 @@ TEST_F(DeltaSubscriptionStateTest, CumulativeUpdates) {
 TEST_F(DeltaSubscriptionStateTest, AckGenerated) {
   // The xDS server's first response includes items for name1 and 2, but not 3.
   {
-    Protobuf::RepeatedPtrField<envoy::api::v2::Resource> added_resources =
+    Protobuf::RepeatedPtrField<envoy::service::discovery::v3alpha::Resource> added_resources =
         populateRepeatedResource({{"name1", "version1A"}, {"name2", "version2A"}});
     UpdateAck ack = deliverDiscoveryResponse(added_resources, {}, "debug1", "nonce1");
     EXPECT_EQ("nonce1", ack.nonce_);
@@ -181,24 +192,27 @@ TEST_F(DeltaSubscriptionStateTest, AckGenerated) {
   }
   // The next response updates 1 and 2, and adds 3.
   {
-    Protobuf::RepeatedPtrField<envoy::api::v2::Resource> added_resources = populateRepeatedResource(
-        {{"name1", "version1B"}, {"name2", "version2B"}, {"name3", "version3A"}});
+    Protobuf::RepeatedPtrField<envoy::service::discovery::v3alpha::Resource> added_resources =
+        populateRepeatedResource(
+            {{"name1", "version1B"}, {"name2", "version2B"}, {"name3", "version3A"}});
     UpdateAck ack = deliverDiscoveryResponse(added_resources, {}, "debug2", "nonce2");
     EXPECT_EQ("nonce2", ack.nonce_);
     EXPECT_EQ(Grpc::Status::WellKnownGrpcStatus::Ok, ack.error_detail_.code());
   }
   // The next response tries but fails to update all 3, and so should produce a NACK.
   {
-    Protobuf::RepeatedPtrField<envoy::api::v2::Resource> added_resources = populateRepeatedResource(
-        {{"name1", "version1C"}, {"name2", "version2C"}, {"name3", "version3B"}});
+    Protobuf::RepeatedPtrField<envoy::service::discovery::v3alpha::Resource> added_resources =
+        populateRepeatedResource(
+            {{"name1", "version1C"}, {"name2", "version2C"}, {"name3", "version3B"}});
     UpdateAck ack = deliverBadDiscoveryResponse(added_resources, {}, "debug3", "nonce3");
     EXPECT_EQ("nonce3", ack.nonce_);
     EXPECT_NE(Grpc::Status::WellKnownGrpcStatus::Ok, ack.error_detail_.code());
   }
   // The last response successfully updates all 3.
   {
-    Protobuf::RepeatedPtrField<envoy::api::v2::Resource> added_resources = populateRepeatedResource(
-        {{"name1", "version1D"}, {"name2", "version2D"}, {"name3", "version3C"}});
+    Protobuf::RepeatedPtrField<envoy::service::discovery::v3alpha::Resource> added_resources =
+        populateRepeatedResource(
+            {{"name1", "version1D"}, {"name2", "version2D"}, {"name3", "version3C"}});
     UpdateAck ack = deliverDiscoveryResponse(added_resources, {}, "debug4", "nonce4");
     EXPECT_EQ("nonce4", ack.nonce_);
     EXPECT_EQ(Grpc::Status::WellKnownGrpcStatus::Ok, ack.error_detail_.code());
@@ -213,11 +227,12 @@ TEST_F(DeltaSubscriptionStateTest, AckGenerated) {
 TEST_F(DeltaSubscriptionStateTest, ResourceGoneLeadsToBlankInitialVersion) {
   {
     // The xDS server's first update includes items for name1 and 2, but not 3.
-    Protobuf::RepeatedPtrField<envoy::api::v2::Resource> add1_2 =
+    Protobuf::RepeatedPtrField<envoy::service::discovery::v3alpha::Resource> add1_2 =
         populateRepeatedResource({{"name1", "version1A"}, {"name2", "version2A"}});
     deliverDiscoveryResponse(add1_2, {}, "debugversion1");
     state_.markStreamFresh(); // simulate a stream reconnection
-    envoy::api::v2::DeltaDiscoveryRequest cur_request = state_.getNextRequestAckless();
+    envoy::service::discovery::v3alpha::DeltaDiscoveryRequest cur_request =
+        state_.getNextRequestAckless();
     EXPECT_EQ("version1A", cur_request.initial_resource_versions().at("name1"));
     EXPECT_EQ("version2A", cur_request.initial_resource_versions().at("name2"));
     EXPECT_EQ(cur_request.initial_resource_versions().end(),
@@ -226,13 +241,14 @@ TEST_F(DeltaSubscriptionStateTest, ResourceGoneLeadsToBlankInitialVersion) {
 
   {
     // The next update updates 1, removes 2, and adds 3. The map should then have 1 and 3.
-    Protobuf::RepeatedPtrField<envoy::api::v2::Resource> add1_3 =
+    Protobuf::RepeatedPtrField<envoy::service::discovery::v3alpha::Resource> add1_3 =
         populateRepeatedResource({{"name1", "version1B"}, {"name3", "version3A"}});
     Protobuf::RepeatedPtrField<std::string> remove2;
     *remove2.Add() = "name2";
     deliverDiscoveryResponse(add1_3, remove2, "debugversion2");
     state_.markStreamFresh(); // simulate a stream reconnection
-    envoy::api::v2::DeltaDiscoveryRequest cur_request = state_.getNextRequestAckless();
+    envoy::service::discovery::v3alpha::DeltaDiscoveryRequest cur_request =
+        state_.getNextRequestAckless();
     EXPECT_EQ("version1B", cur_request.initial_resource_versions().at("name1"));
     EXPECT_EQ(cur_request.initial_resource_versions().end(),
               cur_request.initial_resource_versions().find("name2"));
@@ -246,7 +262,8 @@ TEST_F(DeltaSubscriptionStateTest, ResourceGoneLeadsToBlankInitialVersion) {
     *remove1_3.Add() = "name3";
     deliverDiscoveryResponse({}, remove1_3, "debugversion3");
     state_.markStreamFresh(); // simulate a stream reconnection
-    envoy::api::v2::DeltaDiscoveryRequest cur_request = state_.getNextRequestAckless();
+    envoy::service::discovery::v3alpha::DeltaDiscoveryRequest cur_request =
+        state_.getNextRequestAckless();
     EXPECT_TRUE(cur_request.initial_resource_versions().empty());
   }
 
@@ -254,7 +271,8 @@ TEST_F(DeltaSubscriptionStateTest, ResourceGoneLeadsToBlankInitialVersion) {
     // ...but our own map should remember our interest. In particular, losing interest in a
     // resource should cause its name to appear in the next request's resource_names_unsubscribe.
     state_.updateSubscriptionInterest({"name4"}, {"name1", "name2"});
-    envoy::api::v2::DeltaDiscoveryRequest cur_request = state_.getNextRequestAckless();
+    envoy::service::discovery::v3alpha::DeltaDiscoveryRequest cur_request =
+        state_.getNextRequestAckless();
     EXPECT_THAT(cur_request.resource_names_subscribe(), UnorderedElementsAre("name4"));
     EXPECT_THAT(cur_request.resource_names_unsubscribe(), UnorderedElementsAre("name1", "name2"));
   }
@@ -269,13 +287,14 @@ TEST_F(DeltaSubscriptionStateTest, ResourceGoneLeadsToBlankInitialVersion) {
 // lost interest in a resource. The unsubscription implicitly takes effect by simply saying
 // nothing about the resource in the newly reconnected stream.
 TEST_F(DeltaSubscriptionStateTest, SubscribeAndUnsubscribeAfterReconnect) {
-  Protobuf::RepeatedPtrField<envoy::api::v2::Resource> add1_2 =
+  Protobuf::RepeatedPtrField<envoy::service::discovery::v3alpha::Resource> add1_2 =
       populateRepeatedResource({{"name1", "version1A"}, {"name2", "version2A"}});
   deliverDiscoveryResponse(add1_2, {}, "debugversion1");
 
   state_.updateSubscriptionInterest({"name4"}, {"name1"});
   state_.markStreamFresh(); // simulate a stream reconnection
-  envoy::api::v2::DeltaDiscoveryRequest cur_request = state_.getNextRequestAckless();
+  envoy::service::discovery::v3alpha::DeltaDiscoveryRequest cur_request =
+      state_.getNextRequestAckless();
   // Regarding the resource_names_subscribe field:
   // name1: do not include: we lost interest.
   // name2: yes do include: we're interested and we have a version of it.
@@ -292,11 +311,13 @@ TEST_F(DeltaSubscriptionStateTest, InitialVersionMapFirstMessageOnly) {
   // First, verify that the first message of a new stream sends initial versions.
   {
     // The xDS server's first update gives us all three resources.
-    Protobuf::RepeatedPtrField<envoy::api::v2::Resource> add_all = populateRepeatedResource(
-        {{"name1", "version1A"}, {"name2", "version2A"}, {"name3", "version3A"}});
+    Protobuf::RepeatedPtrField<envoy::service::discovery::v3alpha::Resource> add_all =
+        populateRepeatedResource(
+            {{"name1", "version1A"}, {"name2", "version2A"}, {"name3", "version3A"}});
     deliverDiscoveryResponse(add_all, {}, "debugversion1");
     state_.markStreamFresh(); // simulate a stream reconnection
-    envoy::api::v2::DeltaDiscoveryRequest cur_request = state_.getNextRequestAckless();
+    envoy::service::discovery::v3alpha::DeltaDiscoveryRequest cur_request =
+        state_.getNextRequestAckless();
     EXPECT_EQ("version1A", cur_request.initial_resource_versions().at("name1"));
     EXPECT_EQ("version2A", cur_request.initial_resource_versions().at("name2"));
     EXPECT_EQ("version3A", cur_request.initial_resource_versions().at("name3"));
@@ -306,13 +327,14 @@ TEST_F(DeltaSubscriptionStateTest, InitialVersionMapFirstMessageOnly) {
   {
     state_.updateSubscriptionInterest({"name4"}, {});
     // The xDS server updates our resources, and gives us our newly requested one too.
-    Protobuf::RepeatedPtrField<envoy::api::v2::Resource> add_all =
+    Protobuf::RepeatedPtrField<envoy::service::discovery::v3alpha::Resource> add_all =
         populateRepeatedResource({{"name1", "version1B"},
                                   {"name2", "version2B"},
                                   {"name3", "version3B"},
                                   {"name4", "version4A"}});
     deliverDiscoveryResponse(add_all, {}, "debugversion2");
-    envoy::api::v2::DeltaDiscoveryRequest cur_request = state_.getNextRequestAckless();
+    envoy::service::discovery::v3alpha::DeltaDiscoveryRequest cur_request =
+        state_.getNextRequestAckless();
     EXPECT_TRUE(cur_request.initial_resource_versions().empty());
   }
 }
@@ -335,7 +357,7 @@ TEST_F(DeltaSubscriptionStateTest, CheckUpdatePending) {
 // DeltaSubscriptionState to reject the update without even trying to hand it to the consuming API's
 // onConfigUpdate().
 TEST_F(DeltaSubscriptionStateTest, DuplicatedAdd) {
-  Protobuf::RepeatedPtrField<envoy::api::v2::Resource> additions =
+  Protobuf::RepeatedPtrField<envoy::service::discovery::v3alpha::Resource> additions =
       populateRepeatedResource({{"name1", "version1A"}, {"name1", "sdfsdfsdfds"}});
   UpdateAck ack = deliverDiscoveryResponse(additions, {}, "debugversion1", absl::nullopt, false);
   EXPECT_EQ("duplicate name name1 found among added/updated resources",
@@ -352,7 +374,7 @@ TEST_F(DeltaSubscriptionStateTest, DuplicatedRemove) {
 }
 
 TEST_F(DeltaSubscriptionStateTest, AddedAndRemoved) {
-  Protobuf::RepeatedPtrField<envoy::api::v2::Resource> additions =
+  Protobuf::RepeatedPtrField<envoy::service::discovery::v3alpha::Resource> additions =
       populateRepeatedResource({{"name1", "version1A"}});
   Protobuf::RepeatedPtrField<std::string> removals;
   *removals.Add() = "name1";
