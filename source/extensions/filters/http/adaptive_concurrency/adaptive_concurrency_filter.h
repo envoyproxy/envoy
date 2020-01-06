@@ -12,7 +12,7 @@
 #include "envoy/stats/stats_macros.h"
 
 #include "common/common/cleanup.h"
-#include "common/runtime/runtime_features.h"
+#include "common/runtime/runtime_protos.h"
 
 #include "extensions/filters/http/adaptive_concurrency/concurrency_controller/concurrency_controller.h"
 #include "extensions/filters/http/common/pass_through_filter.h"
