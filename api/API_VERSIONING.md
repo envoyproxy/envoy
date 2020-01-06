@@ -26,7 +26,7 @@ API. These may be at `vN`, `v(N-1)`, etc. The Envoy API is technically a DAG of 
 namespaces. When we talk about the `vN xDS API`, we really refer to the `N` of the root
 configuration resources (e.g. bootstrap, xDS resources such as `Cluster`). The
 v3 API bootstrap configuration is `envoy.config.bootstrap.v3.Boostrap`, even
-though it might might transitively reference `envoy.service.trace.v2`.
+though it might transitively reference `envoy.service.trace.v2`.
 
 # Backwards compatibility
 

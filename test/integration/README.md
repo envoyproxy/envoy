@@ -152,7 +152,7 @@ the test to flake less often (i.e. if two tests are interfering with each other,
 scoping to your specific test name may harm rather than help reproducibility.)
 but if it works it lets you iterate faster.
 
-Another helpful tip for debugging is turn turn up Envoy trace logs with
+Another helpful tip for debugging is turn up Envoy trace logs with
 `--test_arg="-l trace"`. Again if the test failure is due to a race, this may make
 it harder to reproduce, and it may also hide any custom logging you add, but it's a
 handy thing to know of to follow the general flow.

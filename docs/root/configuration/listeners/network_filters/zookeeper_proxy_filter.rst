@@ -126,4 +126,4 @@ The ZooKeeper filter emits the following dynamic metadata for each message parse
   <zxid>, string, "The zxid field in a response header"
   <error>, string, "The error field in a response header"
   <client_state>, string, "The state field in a watch event"
-  <event_type>, string, "The event type in a a watch event"
+  <event_type>, string, "The event type in a watch event"

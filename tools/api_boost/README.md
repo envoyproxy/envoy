@@ -3,7 +3,7 @@
 This directory contains tooling to support the [Envoy API versioning
 guidelines](api/API_VERSIONING.md). Envoy internally tracks the latest API
 version for any given package. Since each package may have a different API
-version, and we have have > 15k of API protos, we require machine assistance to
+version, and we have > 15k of API protos, we require machine assistance to
 scale the upgrade process.
 
 We refer to the process of upgrading Envoy to the latest version of the API as

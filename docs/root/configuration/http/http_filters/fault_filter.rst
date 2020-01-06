@@ -107,7 +107,7 @@ fault.http.delay.fixed_duration_ms
   <envoy_api_field_config.filter.http.fault.v2.HTTPFault.delay>`.
 
 fault.http.max_active_faults
-  The maximum number of active faults (of all types) that Envoy will will inject via the fault
+  The maximum number of active faults (of all types) that Envoy will inject via the fault
   filter. This can be used in cases where it is desired that faults are 100% injected,
   but the user wants to avoid a situation in which too many unexpected concurrent faulting requests
   cause resource constraint issues. If not specified, the :ref:`max_active_faults
