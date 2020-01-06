@@ -136,9 +136,9 @@ TEST_P(LoadBalancerBaseTest, PrioritySelection) {
   EXPECT_EQ(50, lb_.percentageLoad(1));
   EXPECT_EQ(&host_set_, &lb_.chooseHostSet(&context).first);
 
-  // Modify number of hosts in failover, but leave them in unhealthy state
+  // Modify number of hosts in failover, but leave them in the unhealthy state
   // primary and secondary are in panic mode, so load distribution is
-  // based on number of host regardless on their health.
+  // based on number of host regardless of their health.
   updateHostSet(failover_host_set_, 2, 0);
   EXPECT_EQ(34, lb_.percentageLoad(0));
   EXPECT_EQ(66, lb_.percentageLoad(1));
@@ -412,8 +412,13 @@ TEST_P(LoadBalancerBaseTest, GentleFailoverWithExtraLevels) {
   ASSERT_THAT(getDegradedLoadPercentage(), ElementsAre(0, 0, 0));
   ASSERT_THAT(getPanic(), ElementsAre(false, false, false));
 
-  // All levels are completely down. 100% of traffic should go to P=0
-  // and P=0 should be in panic mode
+  // All levels are completely down - situation called TotalPanic.
+  // Load is distributed based on the number
+  // of hosts in the priority in relation to the total number of hosts.
+  // Here the total number of hosts is 10.
+  // priority 0 will receive 5/10: 50% of the traffic
+  // priority 1 will receive 3/10: 30% of the traffic
+  // priority 2 will receive 2/10: 20% of the traffic
   updateHostSet(host_set_, 5 /* num_hosts */, 0 /* num_healthy_hosts */);
   updateHostSet(failover_host_set_, 3 /* num_hosts */, 0 /* num_healthy_hosts */);
   updateHostSet(tertiary_host_set_, 2 /* num_hosts */, 0 /* num_healthy_hosts */);
@@ -421,10 +426,10 @@ TEST_P(LoadBalancerBaseTest, GentleFailoverWithExtraLevels) {
   ASSERT_THAT(getDegradedLoadPercentage(), ElementsAre(0, 0, 0));
   ASSERT_THAT(getPanic(), ElementsAre(true, true, true));
 
-  // Rounding errors should be picked up by the first healthy priority.
-  // This situation is called TotalPanic, as all priority levels are in panic
-  // mode. The load calculation is based not on the number of healthy
-  // hosts but based on total number of hosts.
+  // Rounding errors should be picked up by the first priority.
+  // All priorities are in panic mode - situation called TotalPanic.
+  // Load is distributed based on the number
+  // of hosts in the priority in relation to the total number of hosts.
   // Total number of hosts is 5+6+3=14.
   // priority 0 should receive 5/14=37% of traffic
   // priority 1 should receive 6/14=42% of traffic
@@ -434,6 +439,7 @@ TEST_P(LoadBalancerBaseTest, GentleFailoverWithExtraLevels) {
   updateHostSet(tertiary_host_set_, 3 /* num_hosts */, 1 /* num_healthy_hosts */);
   ASSERT_THAT(getLoadPercentage(), ElementsAre(37, 42, 21));
   ASSERT_THAT(getDegradedLoadPercentage(), ElementsAre(0, 0, 0));
+  ASSERT_THAT(getPanic(), ElementsAre(true, true, true));
 
   // Load should spill over into degraded.
   updateHostSet(host_set_, 5 /* num_hosts */, 0 /* num_healthy_hosts */,
@@ -446,8 +452,7 @@ TEST_P(LoadBalancerBaseTest, GentleFailoverWithExtraLevels) {
 
   // Rounding errors should be picked up by the first priority with degraded hosts when
   // there are no healthy priorities.
-  // Just disable panic threshold. Otherwise TotalPanic calculation
-  // will kick in.
+  // Disable panic threshold to prevent total panic from kicking in.
   EXPECT_CALL(runtime_.snapshot_, getInteger("upstream.healthy_panic_threshold", 50))
       .WillRepeatedly(Return(0));
   updateHostSet(host_set_, 5 /* num_hosts */, 0 /* num_healthy_hosts */);

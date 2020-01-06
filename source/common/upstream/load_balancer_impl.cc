@@ -252,7 +252,7 @@ void LoadBalancerBase::recalculatePerPriorityPanic() {
     // healthy hosts.
     const HostSet& priority_host_set = *priority_set_.hostSetsPerPriority()[i];
     per_priority_panic_[i] =
-        (normalized_total_availability == 100 ? false : isGlobalPanic(priority_host_set));
+        (normalized_total_availability == 100 ? false : isHostSetInPanic(priority_host_set));
     total_panic = total_panic && per_priority_panic_[i];
   }
 
@@ -503,7 +503,7 @@ HostConstSharedPtr LoadBalancerBase::chooseHost(LoadBalancerContext* context) {
   return host;
 }
 
-bool LoadBalancerBase::isGlobalPanic(const HostSet& host_set) {
+bool LoadBalancerBase::isHostSetInPanic(const HostSet& host_set) {
   uint64_t global_panic_threshold = std::min<uint64_t>(
       100, runtime_.snapshot().getInteger(RuntimePanicThreshold, default_healthy_panic_percent_));
   const auto host_count = host_set.hosts().size() - host_set.excludedHosts().size();
@@ -635,7 +635,7 @@ ZoneAwareLoadBalancerBase::hostSourceToUse(LoadBalancerContext* context) {
     return hosts_source;
   }
 
-  if (isGlobalPanic(localHostSet())) {
+  if (isHostSetInPanic(localHostSet())) {
     stats_.lb_local_cluster_not_ok_.inc();
     // If the local Envoy instances are in global panic, and we should not fail traffic, do
     // not do locality based routing.
