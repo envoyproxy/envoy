@@ -5,9 +5,9 @@
 #include <functional>
 #include <string>
 
-#include "envoy/api/v2/cds.pb.h"
-#include "envoy/api/v2/eds.pb.h"
-#include "envoy/api/v2/endpoint/endpoint.pb.h"
+#include "envoy/config/cluster/v3alpha/cluster.pb.h"
+#include "envoy/config/endpoint/v3alpha/endpoint.pb.h"
+#include "envoy/config/endpoint/v3alpha/endpoint_components.pb.h"
 #include "envoy/stats/scope.h"
 
 #include "common/common/empty_string.h"
@@ -35,8 +35,8 @@ namespace Upstream {
  */
 class LogicalDnsCluster : public ClusterImplBase {
 public:
-  LogicalDnsCluster(const envoy::api::v2::Cluster& cluster, Runtime::Loader& runtime,
-                    Network::DnsResolverSharedPtr dns_resolver,
+  LogicalDnsCluster(const envoy::config::cluster::v3alpha::Cluster& cluster,
+                    Runtime::Loader& runtime, Network::DnsResolverSharedPtr dns_resolver,
                     Server::Configuration::TransportSocketFactoryContext& factory_context,
                     Stats::ScopePtr&& stats_scope, bool added_via_api);
 
@@ -46,13 +46,13 @@ public:
   InitializePhase initializePhase() const override { return InitializePhase::Primary; }
 
 private:
-  const envoy::api::v2::endpoint::LocalityLbEndpoints& localityLbEndpoint() const {
+  const envoy::config::endpoint::v3alpha::LocalityLbEndpoints& localityLbEndpoint() const {
     // This is checked in the constructor, i.e. at config load time.
     ASSERT(load_assignment_.endpoints().size() == 1);
     return load_assignment_.endpoints()[0];
   }
 
-  const envoy::api::v2::endpoint::LbEndpoint& lbEndpoint() const {
+  const envoy::config::endpoint::v3alpha::LbEndpoint& lbEndpoint() const {
     // This is checked in the constructor, i.e. at config load time.
     ASSERT(localityLbEndpoint().lb_endpoints().size() == 1);
     return localityLbEndpoint().lb_endpoints()[0];
@@ -75,7 +75,7 @@ private:
   LogicalHostSharedPtr logical_host_;
   Network::ActiveDnsQuery* active_dns_query_{};
   const LocalInfo::LocalInfo& local_info_;
-  const envoy::api::v2::ClusterLoadAssignment load_assignment_;
+  const envoy::config::endpoint::v3alpha::ClusterLoadAssignment load_assignment_;
 };
 
 class LogicalDnsClusterFactory : public ClusterFactoryImplBase {
@@ -85,7 +85,8 @@ public:
 
 private:
   std::pair<ClusterImplBaseSharedPtr, ThreadAwareLoadBalancerPtr>
-  createClusterImpl(const envoy::api::v2::Cluster& cluster, ClusterFactoryContext& context,
+  createClusterImpl(const envoy::config::cluster::v3alpha::Cluster& cluster,
+                    ClusterFactoryContext& context,
                     Server::Configuration::TransportSocketFactoryContext& socket_factory_context,
                     Stats::ScopePtr&& stats_scope) override;
 };

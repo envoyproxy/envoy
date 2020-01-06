@@ -5,11 +5,11 @@
 #include <string>
 #include <vector>
 
-#include "envoy/api/v2/core/base.pb.h"
-#include "envoy/api/v2/core/health_check.pb.h"
-#include "envoy/api/v2/endpoint/endpoint.pb.h"
-#include "envoy/config/filter/network/redis_proxy/v2/redis_proxy.pb.h"
-#include "envoy/config/filter/network/redis_proxy/v2/redis_proxy.pb.validate.h"
+#include "envoy/config/core/v3alpha/base.pb.h"
+#include "envoy/config/core/v3alpha/health_check.pb.h"
+#include "envoy/config/endpoint/v3alpha/endpoint_components.pb.h"
+#include "envoy/extensions/filters/network/redis_proxy/v3alpha/redis_proxy.pb.h"
+#include "envoy/extensions/filters/network/redis_proxy/v3alpha/redis_proxy.pb.validate.h"
 
 #include "common/common/assert.h"
 #include "common/stats/utility.h"
@@ -38,7 +38,8 @@ const Common::Redis::RespValue& getRequest(const RespVariant& request) {
 InstanceImpl::InstanceImpl(
     const std::string& cluster_name, Upstream::ClusterManager& cm,
     Common::Redis::Client::ClientFactory& client_factory, ThreadLocal::SlotAllocator& tls,
-    const envoy::config::filter::network::redis_proxy::v2::RedisProxy::ConnPoolSettings& config,
+    const envoy::extensions::filters::network::redis_proxy::v3alpha::RedisProxy::ConnPoolSettings&
+        config,
     Api::Api& api, Stats::ScopePtr&& stats_scope,
     const Common::Redis::RedisCommandStatsSharedPtr& redis_command_stats,
     Extensions::Common::Redis::ClusterRefreshManagerSharedPtr refresh_manager)
@@ -307,10 +308,11 @@ Common::Redis::Client::PoolRequest* InstanceImpl::ThreadLocalPool::makeRequestTo
       }
     }
     Upstream::HostSharedPtr new_host{new Upstream::HostImpl(
-        cluster_->info(), "", address_ptr, envoy::api::v2::core::Metadata::default_instance(), 1,
-        envoy::api::v2::core::Locality(),
-        envoy::api::v2::endpoint::Endpoint::HealthCheckConfig::default_instance(), 0,
-        envoy::api::v2::core::HealthStatus::UNKNOWN)};
+        cluster_->info(), "", address_ptr,
+        envoy::config::core::v3alpha::Metadata::default_instance(), 1,
+        envoy::config::core::v3alpha::Locality(),
+        envoy::config::endpoint::v3alpha::Endpoint::HealthCheckConfig::default_instance(), 0,
+        envoy::config::core::v3alpha::UNKNOWN)};
     host_address_map_[host_address_map_key] = new_host;
     created_via_redirect_hosts_.push_back(new_host);
     it = host_address_map_.find(host_address_map_key);

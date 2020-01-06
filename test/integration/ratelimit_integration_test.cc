@@ -1,9 +1,9 @@
-#include "envoy/api/v2/listener/listener.pb.h"
-#include "envoy/config/bootstrap/v2/bootstrap.pb.h"
-#include "envoy/config/filter/http/rate_limit/v2/rate_limit.pb.h"
-#include "envoy/config/filter/http/rate_limit/v2/rate_limit.pb.validate.h"
-#include "envoy/config/filter/network/http_connection_manager/v2/http_connection_manager.pb.h"
-#include "envoy/service/ratelimit/v2/rls.pb.h"
+#include "envoy/config/bootstrap/v3alpha/bootstrap.pb.h"
+#include "envoy/config/listener/v3alpha/listener_components.pb.h"
+#include "envoy/extensions/filters/http/ratelimit/v3alpha/rate_limit.pb.h"
+#include "envoy/extensions/filters/http/ratelimit/v3alpha/rate_limit.pb.validate.h"
+#include "envoy/extensions/filters/network/http_connection_manager/v3alpha/http_connection_manager.pb.h"
+#include "envoy/service/ratelimit/v3alpha/rls.pb.h"
 
 #include "common/buffer/zero_copy_input_stream_impl.h"
 #include "common/grpc/codec.h"
@@ -35,26 +35,27 @@ public:
 
   void initialize() override {
 
-    config_helper_.addConfigModifier([this](envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
-      auto* ratelimit_cluster = bootstrap.mutable_static_resources()->add_clusters();
-      ratelimit_cluster->MergeFrom(bootstrap.static_resources().clusters()[0]);
-      ratelimit_cluster->set_name("ratelimit");
-      ratelimit_cluster->mutable_http2_protocol_options();
-
-      // enhance rate limit filter config based on the configuration of test.
-      TestUtility::loadFromYaml(base_filter_config_, proto_config_);
-      proto_config_.set_failure_mode_deny(failure_mode_deny_);
-      setGrpcService(*proto_config_.mutable_rate_limit_service()->mutable_grpc_service(),
-                     "ratelimit", fake_upstreams_.back()->localAddress());
-
-      envoy::api::v2::listener::Filter ratelimit_filter;
-      ratelimit_filter.set_name("envoy.rate_limit");
-      ratelimit_filter.mutable_typed_config()->PackFrom(proto_config_);
-      config_helper_.addFilter(MessageUtil::getJsonStringFromMessage(ratelimit_filter));
-    });
     config_helper_.addConfigModifier(
-        [](envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager&
-               hcm) {
+        [this](envoy::config::bootstrap::v3alpha::Bootstrap& bootstrap) {
+          auto* ratelimit_cluster = bootstrap.mutable_static_resources()->add_clusters();
+          ratelimit_cluster->MergeFrom(bootstrap.static_resources().clusters()[0]);
+          ratelimit_cluster->set_name("ratelimit");
+          ratelimit_cluster->mutable_http2_protocol_options();
+
+          // enhance rate limit filter config based on the configuration of test.
+          TestUtility::loadFromYaml(base_filter_config_, proto_config_);
+          proto_config_.set_failure_mode_deny(failure_mode_deny_);
+          setGrpcService(*proto_config_.mutable_rate_limit_service()->mutable_grpc_service(),
+                         "ratelimit", fake_upstreams_.back()->localAddress());
+
+          envoy::config::listener::v3alpha::Filter ratelimit_filter;
+          ratelimit_filter.set_name("envoy.rate_limit");
+          ratelimit_filter.mutable_typed_config()->PackFrom(proto_config_);
+          config_helper_.addFilter(MessageUtil::getJsonStringFromMessage(ratelimit_filter));
+        });
+    config_helper_.addConfigModifier(
+        [](envoy::extensions::filters::network::http_connection_manager::v3alpha::
+               HttpConnectionManager& hcm) {
           auto* rate_limit = hcm.mutable_route_config()
                                  ->mutable_virtual_hosts(0)
                                  ->mutable_routes(0)
@@ -80,7 +81,7 @@ public:
     RELEASE_ASSERT(result, result.message());
     result = fake_ratelimit_connection_->waitForNewStream(*dispatcher_, ratelimit_request_);
     RELEASE_ASSERT(result, result.message());
-    envoy::service::ratelimit::v2::RateLimitRequest request_msg;
+    envoy::service::ratelimit::v3alpha::RateLimitRequest request_msg;
     result = ratelimit_request_->waitForGrpcMessage(*dispatcher_, request_msg);
     RELEASE_ASSERT(result, result.message());
     result = ratelimit_request_->waitForEndStream(*dispatcher_);
@@ -91,7 +92,7 @@ public:
     EXPECT_EQ("application/grpc",
               ratelimit_request_->headers().ContentType()->value().getStringView());
 
-    envoy::service::ratelimit::v2::RateLimitRequest expected_request_msg;
+    envoy::service::ratelimit::v3alpha::RateLimitRequest expected_request_msg;
     expected_request_msg.set_domain("some_domain");
     auto* entry = expected_request_msg.add_descriptors()->add_entries();
     entry->set_key("destination_cluster");
@@ -127,17 +128,17 @@ public:
               response_->headers().Status()->value().getStringView());
   }
 
-  void sendRateLimitResponse(envoy::service::ratelimit::v2::RateLimitResponse_Code code,
+  void sendRateLimitResponse(envoy::service::ratelimit::v3alpha::RateLimitResponse::Code code,
                              const Http::HeaderMapImpl& response_headers_to_add,
                              const Http::HeaderMapImpl& request_headers_to_add) {
     ratelimit_request_->startGrpcStream();
-    envoy::service::ratelimit::v2::RateLimitResponse response_msg;
+    envoy::service::ratelimit::v3alpha::RateLimitResponse response_msg;
     response_msg.set_overall_code(code);
 
     response_headers_to_add.iterate(
         [](const Http::HeaderEntry& h, void* context) -> Http::HeaderMap::Iterate {
-          auto header = static_cast<envoy::service::ratelimit::v2::RateLimitResponse*>(context)
-                            ->mutable_headers()
+          auto header = static_cast<envoy::service::ratelimit::v3alpha::RateLimitResponse*>(context)
+                            ->mutable_response_headers_to_add()
                             ->Add();
           header->set_key(std::string(h.key().getStringView()));
           header->set_value(std::string(h.value().getStringView()));
@@ -146,7 +147,7 @@ public:
         &response_msg);
     request_headers_to_add.iterate(
         [](const Http::HeaderEntry& h, void* context) -> Http::HeaderMap::Iterate {
-          auto header = static_cast<envoy::service::ratelimit::v2::RateLimitResponse*>(context)
+          auto header = static_cast<envoy::service::ratelimit::v3alpha::RateLimitResponse*>(context)
                             ->mutable_request_headers_to_add()
                             ->Add();
           header->set_key(std::string(h.key().getStringView()));
@@ -174,7 +175,7 @@ public:
   void basicFlow() {
     initiateClientConnection();
     waitForRatelimitRequest();
-    sendRateLimitResponse(envoy::service::ratelimit::v2::RateLimitResponse::OK,
+    sendRateLimitResponse(envoy::service::ratelimit::v3alpha::RateLimitResponse::OK,
                           Http::HeaderMapImpl{}, Http::HeaderMapImpl{});
     waitForSuccessfulUpstreamResponse();
     cleanup();
@@ -191,7 +192,7 @@ public:
   const uint64_t request_size_ = 1024;
   const uint64_t response_size_ = 512;
   bool failure_mode_deny_ = false;
-  envoy::config::filter::http::rate_limit::v2::RateLimit proto_config_{};
+  envoy::extensions::filters::http::ratelimit::v3alpha::RateLimit proto_config_{};
   const std::string base_filter_config_ = R"EOF(
     domain: some_domain
     timeout: 0.5s
@@ -218,7 +219,7 @@ TEST_P(RatelimitIntegrationTest, OkWithHeaders) {
                                                      {"x-ratelimit-remaining", "500"}};
   Http::TestHeaderMapImpl request_headers_to_add{{"x-ratelimit-done", "true"}};
 
-  sendRateLimitResponse(envoy::service::ratelimit::v2::RateLimitResponse::OK,
+  sendRateLimitResponse(envoy::service::ratelimit::v3alpha::RateLimitResponse::OK,
                         ratelimit_response_headers, request_headers_to_add);
   waitForSuccessfulUpstreamResponse();
 
@@ -250,7 +251,7 @@ TEST_P(RatelimitIntegrationTest, OkWithHeaders) {
 TEST_P(RatelimitIntegrationTest, OverLimit) {
   initiateClientConnection();
   waitForRatelimitRequest();
-  sendRateLimitResponse(envoy::service::ratelimit::v2::RateLimitResponse::OVER_LIMIT,
+  sendRateLimitResponse(envoy::service::ratelimit::v3alpha::RateLimitResponse::OVER_LIMIT,
                         Http::HeaderMapImpl{}, Http::HeaderMapImpl{});
   waitForFailedUpstreamResponse(429);
   cleanup();
@@ -265,7 +266,7 @@ TEST_P(RatelimitIntegrationTest, OverLimitWithHeaders) {
   waitForRatelimitRequest();
   Http::TestHeaderMapImpl ratelimit_response_headers{
       {"x-ratelimit-limit", "1000"}, {"x-ratelimit-remaining", "0"}, {"retry-after", "33"}};
-  sendRateLimitResponse(envoy::service::ratelimit::v2::RateLimitResponse::OVER_LIMIT,
+  sendRateLimitResponse(envoy::service::ratelimit::v3alpha::RateLimitResponse::OVER_LIMIT,
                         ratelimit_response_headers, Http::HeaderMapImpl{});
   waitForFailedUpstreamResponse(429);
 

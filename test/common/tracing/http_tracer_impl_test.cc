@@ -2,7 +2,7 @@
 #include <memory>
 #include <string>
 
-#include "envoy/api/v2/core/base.pb.h"
+#include "envoy/config/core/v3alpha/base.pb.h"
 #include "envoy/type/tracing/v2/custom_tag.pb.h"
 
 #include "common/common/base64.h"
@@ -353,8 +353,8 @@ ree:
   NiceMock<Router::MockRouteEntry> route_entry;
   EXPECT_CALL(stream_info, routeEntry()).WillRepeatedly(Return(&route_entry));
   (*route_entry.metadata_.mutable_filter_metadata())["m.rot"].MergeFrom(fake_struct);
-  std::shared_ptr<envoy::api::v2::core::Metadata> host_metadata =
-      std::make_shared<envoy::api::v2::core::Metadata>();
+  std::shared_ptr<envoy::config::core::v3alpha::Metadata> host_metadata =
+      std::make_shared<envoy::config::core::v3alpha::Metadata>();
   (*host_metadata->mutable_filter_metadata())["m.host"].MergeFrom(fake_struct);
   (*stream_info.host_->cluster_.metadata_.mutable_filter_metadata())["m.cluster"].MergeFrom(
       fake_struct);

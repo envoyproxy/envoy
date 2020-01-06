@@ -3,7 +3,7 @@
 #include <cstdint>
 #include <string>
 
-#include "envoy/api/v2/core/grpc_service.pb.h"
+#include "envoy/config/core/v3alpha/grpc_service.pb.h"
 #include "envoy/grpc/async_client.h"
 #include "envoy/grpc/async_client_manager.h"
 #include "envoy/stats/scope.h"
@@ -98,7 +98,7 @@ public:
   ~MockAsyncClientManager() override;
 
   MOCK_METHOD3(factoryForGrpcService,
-               AsyncClientFactoryPtr(const envoy::api::v2::core::GrpcService& grpc_service,
+               AsyncClientFactoryPtr(const envoy::config::core::v3alpha::GrpcService& grpc_service,
                                      Stats::Scope& scope, bool skip_cluster_check));
 };
 
