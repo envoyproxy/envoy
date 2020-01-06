@@ -22,7 +22,7 @@ TEST(TypeToEndpoint, All) {
   EXPECT_EQ("envoy.service.route.v3alpha.RouteDiscoveryService.DeltaRoutes",
             deltaGrpcMethod("type.googleapis.com/envoy.config.route.v3alpha.RouteConfiguration")
                 .full_name());
-  // SoTW gRPC endpoints.
+  // SotW gRPC endpoints.
   EXPECT_EQ("envoy.api.v2.RouteDiscoveryService.StreamRoutes",
             sotwGrpcMethod("type.googleapis.com/envoy.api.v2.RouteConfiguration").full_name());
   EXPECT_EQ("envoy.service.route.v3alpha.RouteDiscoveryService.StreamRoutes",
