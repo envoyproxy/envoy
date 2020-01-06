@@ -4,8 +4,8 @@
 
 #include "envoy/api/api.h"
 #include "envoy/common/pure.h"
-#include "envoy/config/typed_config.h"
 #include "envoy/config/core/v3alpha/grpc_service.pb.h"
+#include "envoy/config/typed_config.h"
 
 #include "grpcpp/grpcpp.h"
 

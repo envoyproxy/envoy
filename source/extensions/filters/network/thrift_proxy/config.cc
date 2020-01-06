@@ -162,7 +162,7 @@ void ConfigImpl::processFilter(
   const std::string& string_name = proto_config.name();
 
   ENVOY_LOG(debug, "    thrift filter #{}", filter_factories_.size());
-  ENVOY_LOG(debug, "      name: {}", proto_config.name());
+  ENVOY_LOG(debug, "      name: {}", string_name);
   ENVOY_LOG(
       debug, "    config: {}",
       MessageUtil::getJsonStringFromMessage(proto_config.hidden_envoy_deprecated_config(), true));

@@ -3,8 +3,8 @@
 #include <memory>
 #include <string>
 
-#include "envoy/extensions/filters/network/dubbo_proxy/v3alpha/route.pb.h"
 #include "envoy/config/typed_config.h"
+#include "envoy/extensions/filters/network/dubbo_proxy/v3alpha/route.pb.h"
 #include "envoy/router/router.h"
 #include "envoy/server/filter_config.h"
 

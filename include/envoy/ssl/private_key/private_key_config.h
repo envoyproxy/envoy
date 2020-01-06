@@ -1,7 +1,7 @@
 #pragma once
 
-#include "envoy/extensions/transport_sockets/tls/v3alpha/cert.pb.h"
 #include "envoy/config/typed_config.h"
+#include "envoy/extensions/transport_sockets/tls/v3alpha/cert.pb.h"
 #include "envoy/registry/registry.h"
 #include "envoy/ssl/private_key/private_key.h"
 
