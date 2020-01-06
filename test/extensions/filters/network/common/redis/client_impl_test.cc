@@ -351,7 +351,8 @@ class ConfigEnableCommandStats : public Config {
   bool enableCommandStats() const override { return true; }
 };
 
-void initializeRedisSimpleCommand(Common::Redis::RespValue *request, std::string command_name, std::string key) {
+void initializeRedisSimpleCommand(Common::Redis::RespValue* request, std::string command_name,
+                                  std::string key) {
   std::vector<Common::Redis::RespValue> command(2);
   command[0].type(Common::Redis::RespType::BulkString);
   command[0].asString() = command_name;
@@ -363,7 +364,8 @@ void initializeRedisSimpleCommand(Common::Redis::RespValue *request, std::string
 }
 
 TEST_F(RedisClientImplTest, CommandStatsDisabledSingleRequest) {
-  // Single successful GET request. The upstream command timer works even with stats disabled; however the per command timers and counts will not be recorded.
+  // Single successful GET request. The upstream command timer works even with stats disabled;
+  // however the per command timers and counts will not be recorded.
   InSequence s;
 
   setup();
@@ -394,7 +396,9 @@ TEST_F(RedisClientImplTest, CommandStatsDisabledSingleRequest) {
 
     time_system_.setMonotonicTime(std::chrono::microseconds(10));
 
-    EXPECT_CALL(stats_, deliverHistogramToSinks(Property(&Stats::Metric::name, "upstream_commands.upstream_rq_time"), 10));
+    EXPECT_CALL(stats_,
+                deliverHistogramToSinks(
+                    Property(&Stats::Metric::name, "upstream_commands.upstream_rq_time"), 10));
 
     Common::Redis::RespValuePtr response1(new Common::Redis::RespValue());
     EXPECT_CALL(callbacks1, onResponse_(Ref(response1)));
@@ -456,8 +460,11 @@ TEST_F(RedisClientImplTest, CommandStatsEnabledTwoRequests) {
 
     time_system_.setMonotonicTime(std::chrono::microseconds(10));
 
-    EXPECT_CALL(stats_, deliverHistogramToSinks(Property(&Stats::Metric::name, "upstream_commands.get.latency"), 10));
-    EXPECT_CALL(stats_, deliverHistogramToSinks(Property(&Stats::Metric::name, "upstream_commands.upstream_rq_time"), 10));
+    EXPECT_CALL(stats_, deliverHistogramToSinks(
+                            Property(&Stats::Metric::name, "upstream_commands.get.latency"), 10));
+    EXPECT_CALL(stats_,
+                deliverHistogramToSinks(
+                    Property(&Stats::Metric::name, "upstream_commands.upstream_rq_time"), 10));
 
     // First request is successful
     Common::Redis::RespValuePtr response1(new Common::Redis::RespValue());
@@ -467,8 +474,11 @@ TEST_F(RedisClientImplTest, CommandStatsEnabledTwoRequests) {
                 putResult(Upstream::Outlier::Result::ExtOriginRequestSuccess, _));
     callbacks_->onRespValue(std::move(response1));
 
-    EXPECT_CALL(stats_, deliverHistogramToSinks(Property(&Stats::Metric::name, "upstream_commands.get.latency"), 10));
-    EXPECT_CALL(stats_, deliverHistogramToSinks(Property(&Stats::Metric::name, "upstream_commands.upstream_rq_time"), 10));
+    EXPECT_CALL(stats_, deliverHistogramToSinks(
+                            Property(&Stats::Metric::name, "upstream_commands.get.latency"), 10));
+    EXPECT_CALL(stats_,
+                deliverHistogramToSinks(
+                    Property(&Stats::Metric::name, "upstream_commands.upstream_rq_time"), 10));
 
     // Second request errors out
     Common::Redis::RespValuePtr response2(new Common::Redis::RespValue());
