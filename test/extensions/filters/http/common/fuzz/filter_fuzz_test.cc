@@ -27,34 +27,49 @@ namespace HttpFilters {
 class UberFilterFuzzer {
 public:
   UberFilterFuzzer() {
+    // Need to set for both a decoder filter and an encoder/decoder filter.
     ON_CALL(filter_callback_, addStreamDecoderFilter(_))
         .WillByDefault(
             Invoke([&](std::shared_ptr<Envoy::Http::StreamDecoderFilter> filter) -> void {
               filter_ = filter;
               filter_->setDecoderFilterCallbacks(callbacks_);
             }));
+    ON_CALL(filter_callback_, addStreamFilter(_))
+        .WillByDefault(
+            Invoke([&](std::shared_ptr<Envoy::Http::StreamDecoderFilter> filter) -> void {
+              filter_ = filter;
+              filter_->setDecoderFilterCallbacks(callbacks_);
+            }));
+    callbacks_.stream_info_.protocol_ = Envoy::Http::Protocol::Http2;
   }
 
   // This executes the methods to be fuzzed.
   void decode(Http::StreamDecoderFilter* filter, const test::fuzz::HttpData& data) {
-    ENVOY_LOG_MISC(debug, "Decoding {} with filter", data.DebugString());
     bool end_stream = false;
 
     Http::TestHeaderMapImpl headers = Fuzz::fromHeaders(data.headers());
     if (data.data().size() == 0 && !data.has_trailers()) {
       end_stream = true;
     }
-    filter->decodeHeaders(headers, end_stream);
+    ENVOY_LOG_MISC(debug, "Decoding headers: {} ", data.headers().DebugString());
+    const auto& headersStatus = filter->decodeHeaders(headers, end_stream);
+    if (headersStatus != Http::FilterHeadersStatus::Continue ||
+        headersStatus != Http::FilterHeadersStatus::StopIteration) {
+      return;
+    }
 
     for (int i = 0; i < data.data().size(); i++) {
       if (i == data.data().size() - 1 && !data.has_trailers()) {
         end_stream = true;
       }
       Buffer::OwnedImpl buffer(data.data().Get(i));
-      filter->decodeData(buffer, end_stream);
+      ENVOY_LOG_MISC(debug, "Decoding data: {} ", buffer.toString());
+      if (filter->decodeData(buffer, end_stream) != Http::FilterDataStatus::Continue) {
+      }
     }
 
     if (data.has_trailers()) {
+      ENVOY_LOG_MISC(debug, "Decoding trailers: {} ", data.trailers().DebugString());
       Http::TestHeaderMapImpl trailers = Fuzz::fromHeaders(data.trailers());
       filter->decodeTrailers(trailers);
     }
@@ -62,7 +77,7 @@ public:
 
   // This creates and mutates the filter config and runs decode.
   void fuzz(absl::string_view filter_name, const test::fuzz::HttpData& data) {
-    ENVOY_LOG_MISC(info, "Fuzzing filter {}", filter_name);
+    ENVOY_LOG_MISC(info, "Fuzzing filter: {}", filter_name);
 
     auto& factory =
         Config::Utility::getAndCheckFactory<Server::Configuration::NamedHttpFilterConfigFactory>(
@@ -75,11 +90,10 @@ public:
       mutator.Mutate(proto_config.get(), 200);
       Http::FilterFactoryCb cb =
           factory.createFilterFactoryFromProto(*proto_config, "stats", factory_context_);
-      ENVOY_LOG_MISC(debug, "Mutated filter config {}", proto_config->DebugString());
+      ENVOY_LOG_MISC(debug, "Mutated created configuration: {}", proto_config->DebugString());
       cb(filter_callback_);
     } catch (const EnvoyException& e) {
-      // Abort if the mutator creates an invalid protobuf.
-      ENVOY_LOG_MISC(debug, "Invalid protobuf {}", e.what());
+      ENVOY_LOG_MISC(debug, "Mutator created an invalid configuration: {}", e.what());
       return;
     }
 
@@ -94,7 +108,6 @@ public:
 
 DEFINE_PROTO_FUZZER(const test::extensions::filters::http::FilterFuzzTestCase& input) {
   // Choose the HTTP filter with the fuzzed input int.
-  // TODO: clean this up and just use the factories() method to grab the Factory at random.
   const std::vector<absl::string_view> filter_names = Registry::FactoryRegistry<
       Server::Configuration::NamedHttpFilterConfigFactory>::registeredNames();
   absl::string_view filter_name = filter_names[input.filter_index() % filter_names.size()];
