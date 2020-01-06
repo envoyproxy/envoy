@@ -20,6 +20,8 @@ public:
   const std::string DubboProxy = "envoy.filters.network.dubbo_proxy";
   // HTTP connection manager filter
   const std::string HttpConnectionManager = "envoy.http_connection_manager";
+  // Local rate limit filter
+  const std::string LocalRateLimit = "envoy.filters.network.local_ratelimit";
   // Mongo proxy filter
   const std::string MongoProxy = "envoy.mongo_proxy";
   // MySQL proxy filter
@@ -32,6 +34,8 @@ public:
   const std::string TcpProxy = "envoy.tcp_proxy";
   // Authorization filter
   const std::string ExtAuthorization = "envoy.ext_authz";
+  // Kafka Broker filter
+  const std::string KafkaBroker = "envoy.filters.network.kafka_broker";
   // Thrift proxy filter
   const std::string ThriftProxy = "envoy.filters.network.thrift_proxy";
   // Role based access control filter

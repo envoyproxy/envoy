@@ -4,7 +4,7 @@
 #include <string>
 #include <unordered_map>
 
-#include "envoy/api/v2/core/base.pb.h"
+#include "envoy/config/core/v3alpha/base.pb.h"
 #include "envoy/config/typed_metadata.h"
 #include "envoy/registry/registry.h"
 #include "envoy/type/metadata/v2/metadata.pb.h"
@@ -36,8 +36,9 @@ public:
    * @param key for filter metadata.
    * @return const ProtobufWkt::Value& value if found, empty if not found.
    */
-  static const ProtobufWkt::Value& metadataValue(const envoy::api::v2::core::Metadata& metadata,
-                                                 const std::string& filter, const std::string& key);
+  static const ProtobufWkt::Value&
+  metadataValue(const envoy::config::core::v3alpha::Metadata& metadata, const std::string& filter,
+                const std::string& key);
   /**
    * Lookup value by a multi-key path for a given filter in Metadata. If path is empty
    * will return the empty struct.
@@ -46,17 +47,18 @@ public:
    * @param path multi-key path.
    * @return const ProtobufWkt::Value& value if found, empty if not found.
    */
-  static const ProtobufWkt::Value& metadataValue(const envoy::api::v2::core::Metadata& metadata,
-                                                 const std::string& filter,
-                                                 const std::vector<std::string>& path);
+  static const ProtobufWkt::Value&
+  metadataValue(const envoy::config::core::v3alpha::Metadata& metadata, const std::string& filter,
+                const std::vector<std::string>& path);
   /**
    * Lookup the value by a metadata key from a Metadata.
    * @param metadata reference.
    * @param metadata_key with key name and path to retrieve the value.
    * @return const ProtobufWkt::Value& value if found, empty if not found.
    */
-  static const ProtobufWkt::Value& metadataValue(const envoy::api::v2::core::Metadata& metadata,
-                                                 const MetadataKey& metadata_key);
+  static const ProtobufWkt::Value&
+  metadataValue(const envoy::config::core::v3alpha::Metadata& metadata,
+                const MetadataKey& metadata_key);
 
   /**
    * Obtain mutable reference to metadata value for a given filter and key.
@@ -65,7 +67,7 @@ public:
    * @param key for filter metadata.
    * @return ProtobufWkt::Value&. A Value message is created if not found.
    */
-  static ProtobufWkt::Value& mutableMetadataValue(envoy::api::v2::core::Metadata& metadata,
+  static ProtobufWkt::Value& mutableMetadataValue(envoy::config::core::v3alpha::Metadata& metadata,
                                                   const std::string& filter,
                                                   const std::string& key);
 
@@ -80,7 +82,7 @@ public:
    * the element equals to the input label_set, it's considered as match.
    */
   static bool metadataLabelMatch(const LabelSet& label_set,
-                                 const envoy::api::v2::core::Metadata& host_metadata,
+                                 const envoy::config::core::v3alpha::Metadata& host_metadata,
                                  const std::string& filter_key, bool list_as_any);
 };
 
@@ -88,7 +90,9 @@ template <typename factoryClass> class TypedMetadataImpl : public TypedMetadata 
 public:
   static_assert(std::is_base_of<Config::TypedMetadataFactory, factoryClass>::value,
                 "Factory type must be inherited from Envoy::Config::TypedMetadataFactory.");
-  TypedMetadataImpl(const envoy::api::v2::core::Metadata& metadata) { populateFrom(metadata); }
+  TypedMetadataImpl(const envoy::config::core::v3alpha::Metadata& metadata) {
+    populateFrom(metadata);
+  }
 
   const TypedMetadata::Object* getData(const std::string& key) const override {
     const auto& it = data_.find(key);
@@ -99,7 +103,7 @@ protected:
   /* Attempt to run each of the registered factories for TypedMetadata, to
    * populate the data_ map.
    */
-  void populateFrom(const envoy::api::v2::core::Metadata& metadata) {
+  void populateFrom(const envoy::config::core::v3alpha::Metadata& metadata) {
     auto& data_by_key = metadata.filter_metadata();
     for (const auto& it : Registry::FactoryRegistry<factoryClass>::factories()) {
       const auto& meta_iter = data_by_key.find(it.first);

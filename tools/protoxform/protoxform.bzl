@@ -1,7 +1,7 @@
 load("//tools/api_proto_plugin:plugin.bzl", "api_proto_plugin_aspect", "api_proto_plugin_impl")
 
 def _protoxform_impl(target, ctx):
-    return api_proto_plugin_impl(target, ctx, "proto", "protoxform", [".v2.proto", ".v3alpha.proto"])
+    return api_proto_plugin_impl(target, ctx, "proto", "protoxform", [".v2.proto", ".v3alpha.proto", ".v3alpha.envoy_internal.proto"])
 
 # Bazel aspect (https://docs.bazel.build/versions/master/skylark/aspects.html)
 # that can be invoked from the CLI to perform API transforms via //tools/protoxform for

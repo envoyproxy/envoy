@@ -2,8 +2,8 @@
 
 #include <string>
 
-#include "envoy/admin/v2alpha/server_info.pb.h"
-#include "envoy/api/v2/core/base.pb.h"
+#include "envoy/admin/v3alpha/server_info.pb.h"
+#include "envoy/config/core/v3alpha/base.pb.h"
 
 #include "common/singleton/manager_impl.h"
 
@@ -44,7 +44,7 @@ MockOptions::MockOptions(const std::string& config_path) : config_path_(config_p
   ON_CALL(*this, cpusetThreadsEnabled()).WillByDefault(ReturnPointee(&cpuset_threads_enabled_));
   ON_CALL(*this, disabledExtensions()).WillByDefault(ReturnRef(disabled_extensions_));
   ON_CALL(*this, toCommandLineOptions()).WillByDefault(Invoke([] {
-    return std::make_unique<envoy::admin::v2alpha::CommandLineOptions>();
+    return std::make_unique<envoy::admin::v3alpha::CommandLineOptions>();
   }));
 }
 MockOptions::~MockOptions() = default;
@@ -99,8 +99,8 @@ MockListenerComponentFactory::MockListenerComponentFactory()
           Invoke([&](Network::Address::InstanceConstSharedPtr, Network::Address::SocketType,
                      const Network::Socket::OptionsSharedPtr& options,
                      const ListenSocketCreationParams&) -> Network::SocketSharedPtr {
-            if (!Network::Socket::applyOptions(options, *socket_,
-                                               envoy::api::v2::core::SocketOption::STATE_PREBIND)) {
+            if (!Network::Socket::applyOptions(
+                    options, *socket_, envoy::config::core::v3alpha::SocketOption::STATE_PREBIND)) {
               throw EnvoyException("MockListenerComponentFactory: Setting socket options failed");
             }
             return socket_;

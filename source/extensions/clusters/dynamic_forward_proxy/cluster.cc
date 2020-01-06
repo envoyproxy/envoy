@@ -1,8 +1,8 @@
 #include "extensions/clusters/dynamic_forward_proxy/cluster.h"
 
-#include "envoy/api/v2/cds.pb.h"
-#include "envoy/config/cluster/dynamic_forward_proxy/v2alpha/cluster.pb.h"
-#include "envoy/config/cluster/dynamic_forward_proxy/v2alpha/cluster.pb.validate.h"
+#include "envoy/config/cluster/v3alpha/cluster.pb.h"
+#include "envoy/extensions/clusters/dynamic_forward_proxy/v3alpha/cluster.pb.h"
+#include "envoy/extensions/clusters/dynamic_forward_proxy/v3alpha/cluster.pb.validate.h"
 
 #include "common/network/transport_socket_options_impl.h"
 
@@ -14,8 +14,8 @@ namespace Clusters {
 namespace DynamicForwardProxy {
 
 Cluster::Cluster(
-    const envoy::api::v2::Cluster& cluster,
-    const envoy::config::cluster::dynamic_forward_proxy::v2alpha::ClusterConfig& config,
+    const envoy::config::cluster::v3alpha::Cluster& cluster,
+    const envoy::extensions::clusters::dynamic_forward_proxy::v3alpha::ClusterConfig& config,
     Runtime::Loader& runtime,
     Extensions::Common::DynamicForwardProxy::DnsCacheManagerFactory& cache_manager_factory,
     const LocalInfo::LocalInfo& local_info,
@@ -31,11 +31,12 @@ Cluster::Cluster(
   // support these parameters dynamically in the future. This is not an exhaustive list of
   // parameters that don't make sense but should be the most obvious ones that a user might set
   // in error.
-  if (!cluster.tls_context().sni().empty() || !cluster.tls_context()
-                                                   .common_tls_context()
-                                                   .validation_context()
-                                                   .verify_subject_alt_name()
-                                                   .empty()) {
+  if (!cluster.hidden_envoy_deprecated_tls_context().sni().empty() ||
+      !cluster.hidden_envoy_deprecated_tls_context()
+           .common_tls_context()
+           .validation_context()
+           .hidden_envoy_deprecated_verify_subject_alt_name()
+           .empty()) {
     throw EnvoyException(
         "dynamic_forward_proxy cluster cannot configure 'sni' or 'verify_subject_alt_name'");
   }
@@ -187,8 +188,8 @@ Cluster::LoadBalancer::chooseHost(Upstream::LoadBalancerContext* context) {
 
 std::pair<Upstream::ClusterImplBaseSharedPtr, Upstream::ThreadAwareLoadBalancerPtr>
 ClusterFactory::createClusterWithConfig(
-    const envoy::api::v2::Cluster& cluster,
-    const envoy::config::cluster::dynamic_forward_proxy::v2alpha::ClusterConfig& proto_config,
+    const envoy::config::cluster::v3alpha::Cluster& cluster,
+    const envoy::extensions::clusters::dynamic_forward_proxy::v3alpha::ClusterConfig& proto_config,
     Upstream::ClusterFactoryContext& context,
     Server::Configuration::TransportSocketFactoryContext& socket_factory_context,
     Stats::ScopePtr&& stats_scope) {

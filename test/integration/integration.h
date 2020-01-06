@@ -6,9 +6,11 @@
 #include <vector>
 
 #include "envoy/api/v2/discovery.pb.h"
-#include "envoy/api/v2/endpoint/endpoint.pb.h"
+#include "envoy/config/endpoint/v3alpha/endpoint_components.pb.h"
 #include "envoy/server/process_context.h"
 
+#include "common/config/api_version.h"
+#include "common/config/version_converter.h"
 #include "common/http/codec_client.h"
 
 #include "test/common/grpc/grpc_client_integration.h"
@@ -191,7 +193,7 @@ public:
 
   // Set the endpoint's socket address to point at upstream at given index.
   void setUpstreamAddress(uint32_t upstream_index,
-                          envoy::api::v2::endpoint::LbEndpoint& endpoint) const;
+                          envoy::config::endpoint::v3alpha::LbEndpoint& endpoint) const;
 
   virtual Network::ClientConnectionPtr makeClientConnection(uint32_t port);
 
@@ -271,11 +273,11 @@ public:
   template <class T>
   void sendSotwDiscoveryResponse(const std::string& type_url, const std::vector<T>& messages,
                                  const std::string& version) {
-    envoy::api::v2::DiscoveryResponse discovery_response;
+    API_NO_BOOST(envoy::api::v2::DiscoveryResponse) discovery_response;
     discovery_response.set_version_info(version);
     discovery_response.set_type_url(type_url);
     for (const auto& message : messages) {
-      discovery_response.add_resources()->PackFrom(message);
+      discovery_response.add_resources()->PackFrom(API_DOWNGRADE(message));
     }
     static int next_nonce_counter = 0;
     discovery_response.set_nonce(absl::StrCat("nonce", next_nonce_counter++));
@@ -293,16 +295,16 @@ public:
                                   const std::vector<T>& added_or_updated,
                                   const std::vector<std::string>& removed,
                                   const std::string& version, FakeStreamPtr& stream) {
-    envoy::api::v2::DeltaDiscoveryResponse response;
+    API_NO_BOOST(envoy::api::v2::DeltaDiscoveryResponse) response;
     response.set_system_version_info("system_version_info_this_is_a_test");
     response.set_type_url(type_url);
     for (const auto& message : added_or_updated) {
       auto* resource = response.add_resources();
       ProtobufWkt::Any temp_any;
-      temp_any.PackFrom(message);
+      temp_any.PackFrom(API_DOWNGRADE(message));
       resource->set_name(TestUtility::xdsResourceName(temp_any));
       resource->set_version(version);
-      resource->mutable_resource()->PackFrom(message);
+      resource->mutable_resource()->PackFrom(API_DOWNGRADE(message));
     }
     *response.mutable_removed_resources() = {removed.begin(), removed.end()};
     static int next_nonce_counter = 0;

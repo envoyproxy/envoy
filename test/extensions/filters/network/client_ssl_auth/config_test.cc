@@ -1,5 +1,5 @@
-#include "envoy/config/filter/network/client_ssl_auth/v2/client_ssl_auth.pb.h"
-#include "envoy/config/filter/network/client_ssl_auth/v2/client_ssl_auth.pb.validate.h"
+#include "envoy/extensions/filters/network/client_ssl_auth/v3alpha/client_ssl_auth.pb.h"
+#include "envoy/extensions/filters/network/client_ssl_auth/v3alpha/client_ssl_auth.pb.validate.h"
 #include "envoy/registry/registry.h"
 
 #include "common/protobuf/utility.h"
@@ -41,7 +41,7 @@ auth_api_cluster: fake_cluster
 ip_white_list:
 )EOF" + GetParam();
 
-  envoy::config::filter::network::client_ssl_auth::v2::ClientSSLAuth proto_config;
+  envoy::extensions::filters::network::client_ssl_auth::v3alpha::ClientSSLAuth proto_config;
   TestUtility::loadFromYamlAndValidate(yaml, proto_config);
   NiceMock<Server::Configuration::MockFactoryContext> context;
   ClientSslAuthConfigFactory factory;
@@ -58,7 +58,7 @@ auth_api_cluster: fake_cluster
 ip_white_list:
 )EOF" + GetParam();
 
-  envoy::config::filter::network::client_ssl_auth::v2::ClientSSLAuth proto_config;
+  envoy::extensions::filters::network::client_ssl_auth::v3alpha::ClientSSLAuth proto_config;
   TestUtility::loadFromYamlAndValidate(yaml, proto_config);
   NiceMock<Server::Configuration::MockFactoryContext> context;
   ClientSslAuthConfigFactory factory;
@@ -77,8 +77,8 @@ ip_white_list:
 
   NiceMock<Server::Configuration::MockFactoryContext> context;
   ClientSslAuthConfigFactory factory;
-  envoy::config::filter::network::client_ssl_auth::v2::ClientSSLAuth proto_config =
-      *dynamic_cast<envoy::config::filter::network::client_ssl_auth::v2::ClientSSLAuth*>(
+  envoy::extensions::filters::network::client_ssl_auth::v3alpha::ClientSSLAuth proto_config =
+      *dynamic_cast<envoy::extensions::filters::network::client_ssl_auth::v3alpha::ClientSSLAuth*>(
           factory.createEmptyConfigProto().get());
 
   TestUtility::loadFromYamlAndValidate(yaml, proto_config);
@@ -90,9 +90,10 @@ ip_white_list:
 
 TEST(ClientSslAuthConfigFactoryTest, ValidateFail) {
   NiceMock<Server::Configuration::MockFactoryContext> context;
-  EXPECT_THROW(ClientSslAuthConfigFactory().createFilterFactoryFromProto(
-                   envoy::config::filter::network::client_ssl_auth::v2::ClientSSLAuth(), context),
-               ProtoValidationException);
+  EXPECT_THROW(
+      ClientSslAuthConfigFactory().createFilterFactoryFromProto(
+          envoy::extensions::filters::network::client_ssl_auth::v3alpha::ClientSSLAuth(), context),
+      ProtoValidationException);
 }
 
 TEST(ClientSslAuthConfigFactoryTest, DoubleRegistrationTest) {

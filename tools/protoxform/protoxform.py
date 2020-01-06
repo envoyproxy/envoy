@@ -7,7 +7,7 @@
 # generation to support automation of Envoy API version translation.
 #
 # See https://github.com/google/protobuf/blob/master/src/google/protobuf/descriptor.proto
-# for the underlying protos mentioned in this file. See
+# for the underlying protos mentioned in this file.
 
 from collections import deque
 import functools
@@ -33,6 +33,7 @@ from google.protobuf import text_format
 # this also serves as whitelist of extended options.
 from google.api import annotations_pb2 as _
 from validate import validate_pb2 as _
+from udpa.annotations import migrate_pb2
 
 CLANG_FORMAT_STYLE = ('{ColumnLimit: 100, SpacesInContainerLiterals: false, '
                       'AllowShortFunctionsOnASingleLine: false}')
@@ -184,6 +185,11 @@ def FormatHeaderFromFile(source_code_info, file_proto):
 
   if file_proto.service:
     options.java_generic_services = True
+
+  if file_proto.options.HasExtension(migrate_pb2.file_migrate):
+    options.Extensions[migrate_pb2.file_migrate].CopyFrom(
+        file_proto.options.Extensions[migrate_pb2.file_migrate])
+
   options_block = FormatOptions(options)
 
   requires_versioning_import = any(
@@ -193,8 +199,12 @@ def FormatHeaderFromFile(source_code_info, file_proto):
   google_imports = []
   infra_imports = []
   misc_imports = []
+  public_imports = []
 
-  for d in file_proto.dependency:
+  for idx, d in enumerate(file_proto.dependency):
+    if idx in file_proto.public_dependency:
+      public_imports.append(d)
+      continue
     if d.startswith('envoy/'):
       # We ignore existing envoy/ imports, since these are computed explicitly
       # from type_dependencies.
@@ -219,8 +229,14 @@ def FormatHeaderFromFile(source_code_info, file_proto):
       return ''
     return FormatBlock('\n'.join(sorted('import "%s";' % x for x in xs)))
 
+  def FormatPublicImportBlock(xs):
+    if not xs:
+      return ''
+    return FormatBlock('\n'.join(sorted('import public "%s";' % x for x in xs)))
+
   import_block = '\n'.join(
       map(FormatImportBlock, [envoy_imports, google_imports, misc_imports, infra_imports]))
+  import_block += '\n' + FormatPublicImportBlock(public_imports)
   comment_block = FormatComments(source_code_info.file_level_comments)
 
   return ''.join(map(FormatBlock, [file_block, import_block, options_block, comment_block]))
@@ -270,6 +286,11 @@ def NormalizeFieldTypeName(type_context, field_fqn):
       return False
 
     while remaining_field_fqn_splits and not EquivalentInTypeContext(normalized_splits):
+      normalized_splits.appendleft(remaining_field_fqn_splits.pop())
+
+    # `extensions` is a keyword in proto2, and protoc will throw error if a type name
+    # starts with `extensions.`.
+    if normalized_splits[0] == "extensions":
       normalized_splits.appendleft(remaining_field_fqn_splits.pop())
 
     return '.'.join(normalized_splits)
@@ -530,7 +551,10 @@ def ParameterCallback(parameter):
 def Main():
   plugin.Plugin([
       plugin.DirectOutputDescriptor('.v2.proto', ProtoFormatVisitor),
-      plugin.OutputDescriptor('.v3alpha.proto', ProtoFormatVisitor, migrate.V3MigrationXform)
+      plugin.OutputDescriptor('.v3alpha.proto', ProtoFormatVisitor,
+                              functools.partial(migrate.V3MigrationXform, False)),
+      plugin.OutputDescriptor('.v3alpha.envoy_internal.proto', ProtoFormatVisitor,
+                              functools.partial(migrate.V3MigrationXform, True))
   ], ParameterCallback)
 
 

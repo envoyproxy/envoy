@@ -48,6 +48,7 @@ CTXs
 CVC
 CVE
 CX
+Cxx
 CYGWIN
 DER
 DESC
@@ -466,6 +467,7 @@ deallocating
 deallocation
 dec
 dechunking
+decl
 decls
 decompressor
 decrement
@@ -490,6 +492,7 @@ deserialize
 deserialized
 deserializer
 deserializers
+deserializing
 dest
 destructor
 destructors
@@ -533,6 +536,7 @@ evented
 evwatch
 exe
 execlp
+exprfor
 expectable
 extrahelp
 faceplant
@@ -608,6 +612,7 @@ idx
 ie
 ifdef
 iff
+ified
 impl
 implementors
 impls
@@ -640,6 +645,7 @@ iteratively
 javascript
 jitter
 jittered
+kafka
 keepalive
 keepalives
 ketama
@@ -666,6 +672,7 @@ linearized
 linux
 livelock
 llvm
+loc
 localhost
 lockless
 login
@@ -869,6 +876,7 @@ refetch
 regex
 regexes
 reimplements
+rele
 releasor
 reloadable
 reparse
@@ -951,6 +959,7 @@ strerr
 strerror
 stringbuf
 stringified
+stringify
 stringstream
 strtoull
 struct
@@ -984,6 +993,7 @@ superset
 symlink
 symlinked
 symlinks
+synchronizer
 syncookie
 sys
 syscall

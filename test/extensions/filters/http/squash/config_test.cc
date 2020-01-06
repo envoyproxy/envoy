@@ -1,5 +1,5 @@
-#include "envoy/config/filter/http/squash/v2/squash.pb.h"
-#include "envoy/config/filter/http/squash/v2/squash.pb.validate.h"
+#include "envoy/extensions/filters/http/squash/v3alpha/squash.pb.h"
+#include "envoy/extensions/filters/http/squash/v3alpha/squash.pb.validate.h"
 
 #include "extensions/filters/http/squash/config.h"
 
@@ -27,7 +27,7 @@ TEST(SquashFilterConfigFactoryTest, SquashFilterCorrectYaml) {
   attachment_timeout: 3.003s
   )EOF";
 
-  envoy::config::filter::http::squash::v2::Squash proto_config;
+  envoy::extensions::filters::http::squash::v3alpha::Squash proto_config;
   TestUtility::loadFromYaml(yaml_string, proto_config);
   NiceMock<Server::Configuration::MockFactoryContext> context;
   SquashFilterConfigFactory factory;

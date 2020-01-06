@@ -2,7 +2,7 @@
 #include <string>
 #include <vector>
 
-#include "envoy/api/v2/core/base.pb.h"
+#include "envoy/config/core/v3alpha/base.pb.h"
 
 #include "common/network/address_impl.h"
 #include "common/network/socket_option_factory.h"
@@ -19,6 +19,7 @@
 #include "test/test_common/threadsafe_singleton_injector.h"
 #include "test/test_common/utility.h"
 
+#include "absl/time/time.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
@@ -108,7 +109,7 @@ TEST_P(UdpListenerImplTest, UdpSetListeningSocketOptionsSuccess) {
                                                            nullptr, true);
   std::shared_ptr<MockSocketOption> option = std::make_shared<MockSocketOption>();
   socket->addOption(option);
-  EXPECT_CALL(*option, setOption(_, envoy::api::v2::core::SocketOption::STATE_BOUND))
+  EXPECT_CALL(*option, setOption(_, envoy::config::core::v3alpha::SocketOption::STATE_BOUND))
       .WillOnce(Return(true));
   UdpListenerImpl listener(dispatcherImpl(), socket, listener_callbacks,
                            dispatcherImpl().timeSource());
@@ -414,7 +415,7 @@ TEST_P(UdpListenerImplTest, SendData) {
     }
 
     retry++;
-    ::usleep(10000);
+    absl::SleepFor(absl::Milliseconds(10));
     ASSERT(bytes_read == 0);
   } while (true);
   EXPECT_EQ(bytes_to_read, bytes_read);
