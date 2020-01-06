@@ -51,6 +51,8 @@ TypeUrlToServiceMap* buildTypeUrlToServiceMap() {
     const std::string resource_type_url = Grpc::Common::typeUrl(
         service_desc->options().GetExtension(envoy::annotations::resource).type());
     Service& service = (*type_url_to_service_map)[resource_type_url];
+    // We populate the service methods that are known below, but it's possible that some services
+    // don't implement all, e.g. VHDS doesn't support SotW or REST.
     for (int method_index = 0; method_index < service_desc->method_count(); ++method_index) {
       const auto& method_desc = *service_desc->method(method_index);
       if (absl::StartsWith(method_desc.name(), "Stream")) {
@@ -59,6 +61,8 @@ TypeUrlToServiceMap* buildTypeUrlToServiceMap() {
         service.delta_grpc_method_ = method_desc.full_name();
       } else if (absl::StartsWith(method_desc.name(), "Fetch")) {
         service.rest_method_ = method_desc.full_name();
+      } else {
+        ASSERT(false, "Unknown xDS service method");
       }
     }
   }
