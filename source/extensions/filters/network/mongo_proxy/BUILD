@@ -79,7 +79,6 @@ envoy_cc_library(
         "//source/common/singleton:const_singleton",
         "//source/extensions/filters/common/fault:fault_config_lib",
         "//source/extensions/filters/network:well_known_names",
-        "@envoy_api//envoy/config/filter/network/mongo_proxy/v2:pkg_cc_proto",
     ],
 )
 
@@ -113,6 +112,6 @@ envoy_cc_extension(
         "//include/envoy/registry",
         "//source/extensions/filters/network:well_known_names",
         "//source/extensions/filters/network/common:factory_base_lib",
-        "@envoy_api//envoy/config/filter/network/mongo_proxy/v2:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/network/mongo_proxy/v3alpha:pkg_cc_proto",
     ],
 )

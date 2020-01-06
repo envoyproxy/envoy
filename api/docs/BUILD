@@ -1,5 +1,7 @@
 licenses(["notice"])  # Apache 2
 
+load("@rules_proto//proto:defs.bzl", "proto_library")
+
 package_group(
     name = "docs",
     packages = [
@@ -10,6 +12,7 @@ package_group(
 # This is where you add protos that will participate in docs RST generation.
 proto_library(
     name = "protos",
+    visibility = ["//visibility:public"],
     deps = [
         "//envoy/admin/v2alpha:pkg",
         "//envoy/api/v2:pkg",
@@ -57,6 +60,7 @@ proto_library(
         "//envoy/config/filter/network/ext_authz/v2:pkg",
         "//envoy/config/filter/network/http_connection_manager/v2:pkg",
         "//envoy/config/filter/network/kafka_broker/v2alpha1:pkg",
+        "//envoy/config/filter/network/local_rate_limit/v2alpha:pkg",
         "//envoy/config/filter/network/mongo_proxy/v2:pkg",
         "//envoy/config/filter/network/mysql_proxy/v1alpha1:pkg",
         "//envoy/config/filter/network/rate_limit/v2:pkg",

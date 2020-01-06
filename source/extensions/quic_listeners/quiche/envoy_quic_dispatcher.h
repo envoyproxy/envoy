@@ -63,10 +63,10 @@ public:
   }
 
 protected:
-  quic::QuicSession* CreateQuicSession(quic::QuicConnectionId server_connection_id,
-                                       const quic::QuicSocketAddress& peer_address,
-                                       quic::QuicStringPiece alpn,
-                                       const quic::ParsedQuicVersion& version) override;
+  std::unique_ptr<quic::QuicSession>
+  CreateQuicSession(quic::QuicConnectionId server_connection_id,
+                    const quic::QuicSocketAddress& peer_address, quiche::QuicheStringPiece alpn,
+                    const quic::ParsedQuicVersion& version) override;
 
 private:
   Network::ConnectionHandler& connection_handler_;

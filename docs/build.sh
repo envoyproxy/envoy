@@ -48,10 +48,10 @@ pip3 install -r "${SCRIPT_DIR}"/requirements.txt
 
 # Clean up any stale files in the API tree output. Bazel remembers valid cached
 # files still.
-rm -rf bazel-bin/external/envoy_api
+rm -rf bazel-bin/external/envoy_api_canonical
 
 # This is for local RBE setup, should be no-op for builds without RBE setting in bazelrc files.
-BAZEL_BUILD_OPTIONS+=" --remote_download_outputs=all"
+BAZEL_BUILD_OPTIONS+=" --remote_download_outputs=all --strategy=protodoc=sandboxed,local"
 
 export EXTENSION_DB_PATH="$(realpath "${BUILD_DIR}/extension_db.json")"
 
@@ -65,7 +65,7 @@ mkdir -p "${GENERATED_RST_DIR}"/intro/arch_overview/security
 ./docs/generate_extension_rst.py "${EXTENSION_DB_PATH}" "${GENERATED_RST_DIR}"/intro/arch_overview/security
 
 # Generate the extensions docs
-bazel build ${BAZEL_BUILD_OPTIONS} @envoy_api//docs:protos --aspects \
+bazel build ${BAZEL_BUILD_OPTIONS} @envoy_api_canonical//docs:protos --aspects \
   tools/protodoc/protodoc.bzl%protodoc_aspect --output_groups=rst --action_env=CPROFILE_ENABLED=1 \
   --action_env=ENVOY_BLOB_SHA --action_env=EXTENSION_DB_PATH="${EXTENSION_DB_PATH}" --host_force_python=PY3
 
@@ -79,19 +79,19 @@ bazel run ${BAZEL_BUILD_OPTIONS} //tools/protodoc:generate_empty -- \
 shopt -s globstar
 
 # Find all source protos.
-declare -r PROTO_TARGET=$(bazel query "labels(srcs, labels(deps, @envoy_api//docs:protos))")
+declare -r PROTO_TARGET=$(bazel query "labels(srcs, labels(deps, @envoy_api_canonical//docs:protos))")
 
 # Only copy in the protos we care about and know how to deal with in protodoc.
 for p in ${PROTO_TARGET}
 do
-  declare PROTO_FILE_WITHOUT_PREFIX="${p#@envoy_api//}"
+  declare PROTO_FILE_WITHOUT_PREFIX="${p#@envoy_api_canonical//}"
   declare PROTO_FILE_CANONICAL="${PROTO_FILE_WITHOUT_PREFIX/://}"
   # We use ** glob matching here to deal with the fact that we have something
   # like
-  # bazel-bin/external/envoy_api/envoy/admin/v2alpha/pkg/envoy/admin/v2alpha/certs.proto.proto
+  # bazel-bin/external/envoy_api_canonical/envoy/admin/v2alpha/pkg/envoy/admin/v2alpha/certs.proto.proto
   # and we don't want to have to do a nested loop and slow bazel query to
   # recover the canonical package part of the path.
-  declare SRCS=(bazel-bin/external/envoy_api/**/"${PROTO_FILE_CANONICAL}.rst")
+  declare SRCS=(bazel-bin/external/envoy_api_canonical/**/"${PROTO_FILE_CANONICAL}.rst")
   # While we may have reformatted the file multiple times due to the transitive
   # dependencies in the aspect above, they all look the same. So, just pick an
   # arbitrary match and we're done.

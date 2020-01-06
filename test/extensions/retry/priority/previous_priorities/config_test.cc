@@ -1,4 +1,4 @@
-#include "envoy/config/retry/previous_priorities/previous_priorities_config.pb.validate.h"
+#include "envoy/config/retry/previous_priorities/previous_priorities_config.pb.h"
 #include "envoy/registry/registry.h"
 #include "envoy/upstream/retry.h"
 
@@ -253,7 +253,7 @@ TEST_F(RetryPriorityTest, DefaultFrequencyUnhealthyPrioritiesDegradedLoadSpillov
 
 // Tests that we can override the frequency at which we update the priority load with the
 // update_frequency parameter.
-TEST_F(RetryPriorityTest, OverridenFrequency) {
+TEST_F(RetryPriorityTest, OverriddenFrequency) {
   update_frequency_ = 2;
 
   const Upstream::HealthyLoad original_priority_load({100, 0});
@@ -281,6 +281,18 @@ TEST_F(RetryPriorityTest, OverridenFrequency) {
   const Upstream::DegradedLoad expected_degraded_priority_load({0, 0});
   retry_priority_->onHostAttempted(host1);
   verifyPriorityLoads(expected_priority_load, expected_degraded_priority_load);
+}
+
+// Tests that an invalid frequency results into a config error.
+TEST_F(RetryPriorityTest, OverriddenFrequencyInvalidValue) {
+  update_frequency_ = 0;
+
+  const Upstream::HealthyLoad original_priority_load({100, 0});
+  const Upstream::DegradedLoad original_degraded_priority_load({0, 0});
+
+  EXPECT_THROW_WITH_REGEX(initialize(original_priority_load, original_degraded_priority_load),
+                          EnvoyException,
+                          "Proto constraint validation failed.*value must be greater than.*");
 }
 
 } // namespace

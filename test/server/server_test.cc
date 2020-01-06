@@ -1,5 +1,7 @@
 #include <memory>
 
+#include "envoy/config/core/v3alpha/base.pb.h"
+
 #include "common/common/assert.h"
 #include "common/common/version.h"
 #include "common/network/address_impl.h"
@@ -735,7 +737,7 @@ TEST_P(ServerInstanceImplTest, BootstrapNodeWithSocketOptions) {
   // both of them use SO_REUSEPORT socket option.
   auto options = std::make_shared<Network::Socket::Options>();
   options->emplace_back(std::make_shared<Network::SocketOptionImpl>(
-      envoy::api::v2::core::SocketOption::STATE_PREBIND,
+      envoy::config::core::v3alpha::SocketOption::STATE_PREBIND,
       ENVOY_MAKE_SOCKET_OPTION_NAME(SOL_SOCKET, SO_REUSEPORT), 1));
   EXPECT_NO_THROW(bindAndListenTcpSocket(address, options));
 }

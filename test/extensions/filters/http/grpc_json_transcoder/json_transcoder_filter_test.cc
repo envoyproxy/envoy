@@ -1,6 +1,8 @@
 #include <fstream>
 #include <functional>
 
+#include "envoy/extensions/filters/http/grpc_json_transcoder/v3alpha/transcoder.pb.h"
+
 #include "common/buffer/buffer_impl.h"
 #include "common/grpc/codec.h"
 #include "common/grpc/common.h"
@@ -47,13 +49,14 @@ protected:
 
 class GrpcJsonTranscoderConfigTest : public testing::Test, public GrpcJsonTranscoderFilterTestBase {
 protected:
-  const envoy::config::filter::http::transcoder::v2::GrpcJsonTranscoder
+  const envoy::extensions::filters::http::grpc_json_transcoder::v3alpha::GrpcJsonTranscoder
   getProtoConfig(const std::string& descriptor_path, const std::string& service_name,
                  bool match_incoming_request_route = false,
                  const std::vector<std::string>& ignored_query_parameters = {}) {
     const std::string json_string = "{\"proto_descriptor\": \"" + descriptor_path +
                                     "\",\"services\": [\"" + service_name + "\"]}";
-    envoy::config::filter::http::transcoder::v2::GrpcJsonTranscoder proto_config;
+    envoy::extensions::filters::http::grpc_json_transcoder::v3alpha::GrpcJsonTranscoder
+        proto_config;
     TestUtility::loadFromJson(json_string, proto_config);
     proto_config.set_match_incoming_request_route(match_incoming_request_route);
     for (const auto& query_param : ignored_query_parameters) {
@@ -72,7 +75,7 @@ protected:
 
     TestUtility::createDirectory(TestEnvironment::temporaryPath("envoy_test"));
     std::string path = TestEnvironment::temporaryPath("envoy_test/proto.descriptor");
-    std::ofstream file(path);
+    std::ofstream file(path, std::ios::binary);
     descriptor_set.SerializeToOstream(&file);
 
     return path;
@@ -126,7 +129,7 @@ TEST_F(GrpcJsonTranscoderConfigTest, ParseConfigSkipRecalculating) {
 }
 
 TEST_F(GrpcJsonTranscoderConfigTest, ParseBinaryConfig) {
-  envoy::config::filter::http::transcoder::v2::GrpcJsonTranscoder proto_config;
+  envoy::extensions::filters::http::grpc_json_transcoder::v3alpha::GrpcJsonTranscoder proto_config;
   proto_config.set_proto_descriptor_bin(api_->fileSystem().fileReadToEnd(
       TestEnvironment::runfilesPath("test/proto/bookstore.descriptor")));
   proto_config.add_services("bookstore.Bookstore");
@@ -163,7 +166,7 @@ TEST_F(GrpcJsonTranscoderConfigTest, NonProto) {
 }
 
 TEST_F(GrpcJsonTranscoderConfigTest, NonBinaryProto) {
-  envoy::config::filter::http::transcoder::v2::GrpcJsonTranscoder proto_config;
+  envoy::extensions::filters::http::grpc_json_transcoder::v3alpha::GrpcJsonTranscoder proto_config;
   proto_config.set_proto_descriptor_bin("This is invalid proto");
   proto_config.add_services("bookstore.Bookstore");
   EXPECT_THROW_WITH_MESSAGE(JsonTranscoderConfig config(proto_config, *api_), EnvoyException,
@@ -306,18 +309,20 @@ TEST_F(GrpcJsonTranscoderConfigTest, InvalidVariableBinding) {
 
 class GrpcJsonTranscoderFilterTest : public testing::Test, public GrpcJsonTranscoderFilterTestBase {
 protected:
-  GrpcJsonTranscoderFilterTest(envoy::config::filter::http::transcoder::v2::GrpcJsonTranscoder
-                                   proto_config = bookstoreProtoConfig())
+  GrpcJsonTranscoderFilterTest(
+      envoy::extensions::filters::http::grpc_json_transcoder::v3alpha::GrpcJsonTranscoder
+          proto_config = bookstoreProtoConfig())
       : config_(proto_config, *api_), filter_(config_) {
     filter_.setDecoderFilterCallbacks(decoder_callbacks_);
     filter_.setEncoderFilterCallbacks(encoder_callbacks_);
   }
 
-  static const envoy::config::filter::http::transcoder::v2::GrpcJsonTranscoder
+  static const envoy::extensions::filters::http::grpc_json_transcoder::v3alpha::GrpcJsonTranscoder
   bookstoreProtoConfig() {
     const std::string json_string = "{\"proto_descriptor\": \"" + bookstoreDescriptorPath() +
                                     "\",\"services\": [\"bookstore.Bookstore\"]}";
-    envoy::config::filter::http::transcoder::v2::GrpcJsonTranscoder proto_config;
+    envoy::extensions::filters::http::grpc_json_transcoder::v3alpha::GrpcJsonTranscoder
+        proto_config;
     TestUtility::loadFromJson(json_string, proto_config);
     return proto_config;
   }
@@ -575,7 +580,8 @@ public:
       : GrpcJsonTranscoderFilterTest(makeProtoConfig()) {}
 
 private:
-  const envoy::config::filter::http::transcoder::v2::GrpcJsonTranscoder makeProtoConfig() {
+  const envoy::extensions::filters::http::grpc_json_transcoder::v3alpha::GrpcJsonTranscoder
+  makeProtoConfig() {
     auto proto_config = bookstoreProtoConfig();
     proto_config.set_match_incoming_request_route(true);
     return proto_config;
@@ -742,7 +748,8 @@ TEST_F(GrpcJsonTranscoderFilterTest, TranscodingUnaryWithHttpBodyAsOutputAndSpli
 class GrpcJsonTranscoderFilterGrpcStatusTest : public GrpcJsonTranscoderFilterTest {
 public:
   GrpcJsonTranscoderFilterGrpcStatusTest(
-      const envoy::config::filter::http::transcoder::v2::GrpcJsonTranscoder& proto_config)
+      const envoy::extensions::filters::http::grpc_json_transcoder::v3alpha::GrpcJsonTranscoder&
+          proto_config)
       : GrpcJsonTranscoderFilterTest(proto_config) {}
   GrpcJsonTranscoderFilterGrpcStatusTest() : GrpcJsonTranscoderFilterTest(makeProtoConfig()) {}
 
@@ -761,7 +768,8 @@ public:
   }
 
 private:
-  const envoy::config::filter::http::transcoder::v2::GrpcJsonTranscoder makeProtoConfig() {
+  const envoy::extensions::filters::http::grpc_json_transcoder::v3alpha::GrpcJsonTranscoder
+  makeProtoConfig() {
     auto proto_config = bookstoreProtoConfig();
     return proto_config;
   }
@@ -774,7 +782,8 @@ public:
       : GrpcJsonTranscoderFilterGrpcStatusTest(makeProtoConfig()) {}
 
 private:
-  const envoy::config::filter::http::transcoder::v2::GrpcJsonTranscoder makeProtoConfig() {
+  const envoy::extensions::filters::http::grpc_json_transcoder::v3alpha::GrpcJsonTranscoder
+  makeProtoConfig() {
     auto proto_config = bookstoreProtoConfig();
     proto_config.set_convert_grpc_status(true);
     return proto_config;
@@ -921,7 +930,8 @@ class GrpcJsonTranscoderFilterPrintTest
       public GrpcJsonTranscoderFilterTestBase {
 protected:
   GrpcJsonTranscoderFilterPrintTest() {
-    envoy::config::filter::http::transcoder::v2::GrpcJsonTranscoder proto_config;
+    envoy::extensions::filters::http::grpc_json_transcoder::v3alpha::GrpcJsonTranscoder
+        proto_config;
     TestUtility::loadFromJson(TestEnvironment::substitute(GetParam().config_json_), proto_config);
     config_ = new JsonTranscoderConfig(proto_config, *api_);
     filter_ = new JsonTranscoderFilter(*config_);

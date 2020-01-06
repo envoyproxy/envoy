@@ -1,3 +1,8 @@
+#include "envoy/config/bootstrap/v3alpha/bootstrap.pb.h"
+#include "envoy/config/listener/v3alpha/listener_components.pb.h"
+#include "envoy/extensions/filters/network/rbac/v3alpha/rbac.pb.h"
+#include "envoy/extensions/filters/network/rbac/v3alpha/rbac.pb.validate.h"
+
 #include "extensions/filters/network/rbac/config.h"
 
 #include "test/integration/integration.h"
@@ -44,15 +49,16 @@ public:
   }
 
   void initializeFilter(const std::string& config) {
-    config_helper_.addConfigModifier([config](envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
-      envoy::api::v2::listener::Filter filter;
-      TestUtility::loadFromYaml(config, filter);
-      ASSERT_GT(bootstrap.mutable_static_resources()->listeners_size(), 0);
-      auto l = bootstrap.mutable_static_resources()->mutable_listeners(0);
-      ASSERT_GT(l->filter_chains_size(), 0);
-      ASSERT_GT(l->filter_chains(0).filters_size(), 0);
-      l->mutable_filter_chains(0)->mutable_filters(0)->Swap(&filter);
-    });
+    config_helper_.addConfigModifier(
+        [config](envoy::config::bootstrap::v3alpha::Bootstrap& bootstrap) {
+          envoy::config::listener::v3alpha::Filter filter;
+          TestUtility::loadFromYaml(config, filter);
+          ASSERT_GT(bootstrap.mutable_static_resources()->listeners_size(), 0);
+          auto l = bootstrap.mutable_static_resources()->mutable_listeners(0);
+          ASSERT_GT(l->filter_chains_size(), 0);
+          ASSERT_GT(l->filter_chains(0).filters_size(), 0);
+          l->mutable_filter_chains(0)->mutable_filters(0)->Swap(&filter);
+        });
 
     BaseIntegrationTest::initialize();
   }

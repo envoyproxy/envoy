@@ -2,24 +2,31 @@
 
 #include <unordered_map>
 
-#include "envoy/api/v2/auth/cert.pb.validate.h"
+#include "envoy/api/v2/auth/cert.pb.h"
+#include "envoy/config/core/v3alpha/config_source.pb.h"
+#include "envoy/extensions/transport_sockets/tls/v3alpha/cert.pb.h"
+#include "envoy/extensions/transport_sockets/tls/v3alpha/cert.pb.validate.h"
+#include "envoy/service/discovery/v3alpha/discovery.pb.h"
 
+#include "common/config/api_version.h"
 #include "common/config/resources.h"
 #include "common/protobuf/utility.h"
 
 namespace Envoy {
 namespace Secret {
 
-SdsApi::SdsApi(envoy::api::v2::core::ConfigSource sds_config, absl::string_view sds_config_name,
-               Config::SubscriptionFactory& subscription_factory, TimeSource& time_source,
-               ProtobufMessage::ValidationVisitor& validation_visitor, Stats::Store& stats,
-               Init::Manager& init_manager, std::function<void()> destructor_cb)
+SdsApi::SdsApi(envoy::config::core::v3alpha::ConfigSource sds_config,
+               absl::string_view sds_config_name, Config::SubscriptionFactory& subscription_factory,
+               TimeSource& time_source, ProtobufMessage::ValidationVisitor& validation_visitor,
+               Stats::Store& stats, Init::Manager& init_manager,
+               std::function<void()> destructor_cb)
     : init_target_(fmt::format("SdsApi {}", sds_config_name), [this] { initialize(); }),
       stats_(stats), sds_config_(std::move(sds_config)), sds_config_name_(sds_config_name),
       secret_hash_(0), clean_up_(std::move(destructor_cb)), validation_visitor_(validation_visitor),
       subscription_factory_(subscription_factory),
       time_source_(time_source), secret_data_{sds_config_name_, "uninitialized",
-                                              time_source_.systemTime()} {
+                                              time_source_.systemTime()},
+      xds_api_version_(sds_config_.xds_api_version()) {
   // TODO(JimmyCYJ): Implement chained_init_manager, so that multiple init_manager
   // can be chained together to behave as one init_manager. In that way, we let
   // two listeners which share same SdsApi to register at separate init managers, and
@@ -30,7 +37,8 @@ SdsApi::SdsApi(envoy::api::v2::core::ConfigSource sds_config, absl::string_view 
 void SdsApi::onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
                             const std::string& version_info) {
   validateUpdateSize(resources.size());
-  auto secret = MessageUtil::anyConvert<envoy::api::v2::auth::Secret>(resources[0]);
+  auto secret = MessageUtil::anyConvert<envoy::extensions::transport_sockets::tls::v3alpha::Secret>(
+      resources[0]);
   MessageUtil::validate(secret, validation_visitor_);
 
   if (secret.name() != sds_config_name_) {
@@ -50,8 +58,9 @@ void SdsApi::onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& 
   init_target_.ready();
 }
 
-void SdsApi::onConfigUpdate(const Protobuf::RepeatedPtrField<envoy::api::v2::Resource>& resources,
-                            const Protobuf::RepeatedPtrField<std::string>&, const std::string&) {
+void SdsApi::onConfigUpdate(
+    const Protobuf::RepeatedPtrField<envoy::service::discovery::v3alpha::Resource>& resources,
+    const Protobuf::RepeatedPtrField<std::string>&, const std::string&) {
   validateUpdateSize(resources.size());
   Protobuf::RepeatedPtrField<ProtobufWkt::Any> unwrapped_resource;
   *unwrapped_resource.Add() = resources[0].resource();
@@ -76,11 +85,24 @@ void SdsApi::validateUpdateSize(int num_resources) {
 }
 
 void SdsApi::initialize() {
-  subscription_ = subscription_factory_.subscriptionFromConfigSource(
-      sds_config_,
-      Grpc::Common::typeUrl(envoy::api::v2::auth::Secret().GetDescriptor()->full_name()), stats_,
-      *this);
+  subscription_ =
+      subscription_factory_.subscriptionFromConfigSource(sds_config_, loadTypeUrl(), stats_, *this);
   subscription_->start({sds_config_name_});
+}
+
+std::string SdsApi::loadTypeUrl() {
+  switch (xds_api_version_) {
+  // automatically set api version as V2
+  case envoy::config::core::v3alpha::ConfigSource::AUTO:
+  case envoy::config::core::v3alpha::ConfigSource::V2:
+    return Grpc::Common::typeUrl(
+        API_NO_BOOST(envoy::api::v2::auth::Secret().GetDescriptor()->full_name()));
+  case envoy::config::core::v3alpha::ConfigSource::V3ALPHA:
+    return Grpc::Common::typeUrl(
+        API_NO_BOOST(envoy::api::v2::auth::Secret().GetDescriptor()->full_name()));
+  default:
+    throw EnvoyException(fmt::format("type {} is not supported", xds_api_version_));
+  }
 }
 
 SdsApi::SecretData SdsApi::secretData() { return secret_data_; }

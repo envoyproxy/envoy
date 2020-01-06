@@ -17,7 +17,7 @@ namespace {
 // For example:
 // { "format": "json", "version": 1}
 std::string createHeader(const std::string& format, uint32_t version) {
-  envoy::tracers::xray::daemon::Header header;
+  source::extensions::tracers::xray::daemon::Header header;
   header.set_format(format);
   header.set_version(version);
 

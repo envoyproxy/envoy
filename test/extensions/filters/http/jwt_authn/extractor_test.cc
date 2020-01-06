@@ -1,3 +1,5 @@
+#include "envoy/extensions/filters/http/jwt_authn/v3alpha/config.pb.h"
+
 #include "common/protobuf/utility.h"
 
 #include "extensions/filters/http/jwt_authn/extractor.h"
@@ -5,8 +7,8 @@
 #include "test/extensions/filters/http/jwt_authn/test_common.h"
 #include "test/test_common/utility.h"
 
-using ::envoy::config::filter::http::jwt_authn::v2alpha::JwtAuthentication;
-using ::envoy::config::filter::http::jwt_authn::v2alpha::JwtProvider;
+using envoy::extensions::filters::http::jwt_authn::v3alpha::JwtAuthentication;
+using envoy::extensions::filters::http::jwt_authn::v3alpha::JwtProvider;
 using Envoy::Http::TestHeaderMapImpl;
 
 namespace Envoy {
@@ -59,7 +61,11 @@ class ExtractorTest : public testing::Test {
 public:
   void SetUp() override {
     TestUtility::loadFromYaml(ExampleConfig, config_);
-    extractor_ = Extractor::create(config_);
+    JwtProviderList providers;
+    for (const auto& it : config_.providers()) {
+      providers.emplace_back(&it.second);
+    }
+    extractor_ = Extractor::create(providers);
   }
 
   JwtAuthentication config_;
