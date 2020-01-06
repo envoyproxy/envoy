@@ -36,7 +36,7 @@ Version history
 * router: skip the Location header when the response code is not a 201 or a 3xx.
 * router: exposed DOWNSTREAM_REMOTE_ADDRESS as custom HTTP request/response headers.
 * router check tool: added support for testing and marking coverage for routes of runtime fraction 0.
-* router: added support for configurable maximum internal redirect hops.
+* router: added support for :ref:`max_previous_internal_redirect <envoy_api_field_route.RouteAction.max_previous_internal_redirect>` for configurable maximum internal redirect hops.
 * server: added the :option:`--disable-extensions` CLI option, to disable extensions at startup.
 * server: fixed a bug in config validation for configs with runtime layers.
 * tcp_proxy: added :ref:`ClusterWeight.metadata_match<envoy_api_field_config.filter.network.tcp_proxy.v2.TcpProxy.WeightedCluster.ClusterWeight.metadata_match>`.
