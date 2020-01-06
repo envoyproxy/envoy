@@ -877,7 +877,7 @@ message RouteAction {
 
   // An internal redirect is handled, iff the number of previous internal redirects that a
   // downstream request has encountered is lower than this value, and internal_redirect_action
-  // is set to PASS_THROUGH_INTERNAL_REDIRECT.
+  // is set to HANDLE_INTERNAL_REDIRECT.
   // In the case of a downstream request is bounced among multiple routes by internal redirect,
   // the first route that hits this threshold or has internal_redirect_action set to
   // PASS_THROUGH_INTERNAL_REDIRECT will pass the redirect back to downstream.

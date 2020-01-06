@@ -48,10 +48,14 @@ namespace Router {
   COUNTER(rq_retry_skipped_request_not_complete)
 // clang-format on
 
+/*
+ * A FilterState object that tracks a single uint32_t value.
+ */
 class UInt32Accessor : public StreamInfo::FilterState::Object {
  public:
   UInt32Accessor(uint32_t value) : value_(value) {}
 
+  // From StreamInfo::FilterState::Object
   ProtobufTypes::MessagePtr serializeAsProto() const override {
     auto message = std::make_unique<ProtobufWkt::UInt32Value>();
     message->set_value(value_);
@@ -59,14 +63,10 @@ class UInt32Accessor : public StreamInfo::FilterState::Object {
   }
 
   void increment() { value_++; }
+  uint32_t value() const { return value_; }
 
-  uint32_t value() const {
-    return value_;
-  }
-
- private:
+private:
   uint32_t value_;
-
 };
 
 /**

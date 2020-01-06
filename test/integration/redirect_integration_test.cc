@@ -36,6 +36,7 @@ public:
   }
 
 protected:
+  // Returns the next stream that the fake upstream receives.
   FakeStreamPtr waitForNextStream() {
     FakeStreamPtr new_stream = nullptr;
     auto wait_new_stream_fn = [this, &new_stream](FakeHttpConnectionPtr& connection) -> AssertionResult {
@@ -47,6 +48,8 @@ protected:
       return result;
     };
 
+    // Using a while loop to poll for new connections and new streams on all
+    // connections because connection reuse may or may not be triggered.
     while (new_stream == nullptr) {
       FakeHttpConnectionPtr new_connection = nullptr;
 

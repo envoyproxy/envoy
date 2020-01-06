@@ -154,10 +154,11 @@ For a redirect to be handled successfully it must pass the following checks:
 
 Any failure will result in redirect being passed downstream instead.
 
-Since a redirected request may be bounced between different routes, any route the chain of redirects hit that
+Since a redirected request may be bounced between different routes, any route in the chain of redirects that
 
 1. does not have internal redirect enabled
-2. has a `max previous internal redirect <envoy_api_field_route.RouteAction.max_previous_internal_redirect>`
+2. or has a `max previous internal redirect
+   <envoy_api_field_route.RouteAction.max_previous_internal_redirect>`
    smaller or equal to the redirect chain length when the redirect chain hits it
 
 will cause the redirect to be passed downstream.
