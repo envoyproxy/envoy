@@ -10,24 +10,48 @@
 namespace Envoy {
 namespace Stats {
 
+class PrimitiveCounter {
+public:
+  virtual ~PrimitiveCounter() = default;
+
+  virtual uint64_t value() const PURE;
+
+  virtual void add(uint64_t) PURE;
+  virtual void inc() PURE;
+  virtual void reset() PURE;
+  virtual uint64_t latch() PURE;
+};
+
+class NullPrimitiveCounterImpl : public PrimitiveCounter {
+public:
+  ~NullPrimitiveCounterImpl() override = default;
+
+  uint64_t value() const override { return 0; }
+
+  void add(uint64_t) override {}
+  void inc() override {}
+  void reset() override {}
+  uint64_t latch() override { return 0; }
+};
+
 /**
  * Primitive, low-memory-overhead counter with incrementing and latching capabilities. Each
  * increment is added both to a global counter as well as periodic counter. Calling latch()
  * returns the periodic counter and clears it.
  */
-class PrimitiveCounter : NonCopyable {
+class PrimitiveCounterImpl : NonCopyable, public PrimitiveCounter {
 public:
-  PrimitiveCounter() = default;
+  ~PrimitiveCounterImpl() override = default;
 
-  uint64_t value() const { return value_; }
+  uint64_t value() const override { return value_; }
 
-  void add(uint64_t amount) {
+  void add(uint64_t amount) override {
     value_ += amount;
     pending_increment_ += amount;
   }
-  void inc() { add(1); }
-  void reset() { value_ = 0; }
-  uint64_t latch() { return pending_increment_.exchange(0); }
+  void inc() override { add(1); }
+  void reset() override { value_ = 0; }
+  uint64_t latch() override { return pending_increment_.exchange(0); }
 
 private:
   std::atomic<uint64_t> value_{0};
@@ -36,20 +60,44 @@ private:
 
 using PrimitiveCounterReference = std::reference_wrapper<const PrimitiveCounter>;
 
+class PrimitiveGauge {
+public:
+  virtual ~PrimitiveGauge() = default;
+  virtual uint64_t value() const PURE;
+
+  virtual void add(uint64_t) PURE;
+  virtual void dec() PURE;
+  virtual void inc() PURE;
+  virtual void set(uint64_t) PURE;
+  virtual void sub(uint64_t) PURE;
+};
+
+class NullPrimitiveGaugeImpl : public PrimitiveGauge {
+public:
+  ~NullPrimitiveGaugeImpl() override = default;
+  uint64_t value() const override { return 0; }
+
+  void add(uint64_t) override {}
+  void dec() override {}
+  void inc() override {}
+  void set(uint64_t) override {}
+  void sub(uint64_t) override {}
+};
+
 /**
  * Primitive, low-memory-overhead gauge with increment and decrement capabilities.
  */
-class PrimitiveGauge : NonCopyable {
+class PrimitiveGaugeImpl : NonCopyable, public PrimitiveGauge {
 public:
-  PrimitiveGauge() = default;
+  ~PrimitiveGaugeImpl() override = default;
 
-  uint64_t value() const { return value_; }
+  uint64_t value() const override { return value_; }
 
-  void add(uint64_t amount) { value_ += amount; }
-  void dec() { sub(1); }
-  void inc() { add(1); }
-  void set(uint64_t value) { value_ = value; }
-  void sub(uint64_t amount) {
+  void add(uint64_t amount) override { value_ += amount; }
+  void dec() override { sub(1); }
+  void inc() override { add(1); }
+  void set(uint64_t value) override { value_ = value; }
+  void sub(uint64_t amount) override {
     ASSERT(value_ >= amount);
     value_ -= amount;
   }
