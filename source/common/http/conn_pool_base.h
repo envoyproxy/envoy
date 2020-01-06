@@ -17,6 +17,8 @@ protected:
       : host_(host), priority_(priority) {}
   virtual ~ConnPoolImplBase() = default;
 
+  // ActiveClient provides a base class for connection pool clients that handles connection timings
+  // as well as managing the connection timeout.
   class ActiveClient {
   public:
     ActiveClient(Event::Dispatcher& dispatcher, const Upstream::ClusterInfo& cluster);
@@ -71,6 +73,6 @@ protected:
   // When calling purgePendingRequests, this list will be used to hold the requests we are about
   // to purge. We need this if one cancelled requests cancels a different pending request
   std::list<PendingRequestPtr> pending_requests_to_purge_;
-}; // namespace Http
+};
 } // namespace Http
 } // namespace Envoy
