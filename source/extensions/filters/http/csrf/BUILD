@@ -24,8 +24,8 @@ envoy_cc_library(
         "//source/common/http:headers_lib",
         "//source/common/http:utility_lib",
         "//source/extensions/filters/http:well_known_names",
-        "@envoy_api//envoy/api/v2/core:pkg_cc_proto",
-        "@envoy_api//envoy/config/filter/http/csrf/v2:pkg_cc_proto",
+        "@envoy_api//envoy/config/core/v3alpha:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/http/csrf/v3alpha:pkg_cc_proto",
     ],
 )
 
@@ -39,6 +39,6 @@ envoy_cc_extension(
         "//source/extensions/filters/http:well_known_names",
         "//source/extensions/filters/http/common:factory_base_lib",
         "//source/extensions/filters/http/csrf:csrf_filter_lib",
-        "@envoy_api//envoy/config/filter/http/csrf/v2:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/http/csrf/v3alpha:pkg_cc_proto",
     ],
 )

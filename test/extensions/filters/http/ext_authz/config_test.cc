@@ -1,5 +1,6 @@
-#include "envoy/api/v2/core/grpc_service.pb.h"
-#include "envoy/config/filter/http/ext_authz/v2/ext_authz.pb.validate.h"
+#include "envoy/config/core/v3alpha/grpc_service.pb.h"
+#include "envoy/extensions/filters/http/ext_authz/v3alpha/ext_authz.pb.h"
+#include "envoy/extensions/filters/http/ext_authz/v3alpha/ext_authz.pb.validate.h"
 #include "envoy/stats/scope.h"
 
 #include "extensions/filters/http/ext_authz/config.h"
@@ -38,7 +39,7 @@ TEST(HttpExtAuthzConfigTest, CorrectProtoGrpc) {
   EXPECT_CALL(context, runtime()).Times(1);
   EXPECT_CALL(context, scope()).Times(2);
   EXPECT_CALL(context.cluster_manager_.async_client_manager_, factoryForGrpcService(_, _, _))
-      .WillOnce(Invoke([](const envoy::api::v2::core::GrpcService&, Stats::Scope&, bool) {
+      .WillOnce(Invoke([](const envoy::config::core::v3alpha::GrpcService&, Stats::Scope&, bool) {
         return std::make_unique<NiceMock<Grpc::MockAsyncClientFactory>>();
       }));
   Http::FilterFactoryCb cb = factory.createFilterFactoryFromProto(*proto_config, "stats", context);

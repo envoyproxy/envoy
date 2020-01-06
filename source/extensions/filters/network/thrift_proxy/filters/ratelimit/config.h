@@ -1,7 +1,7 @@
 #pragma once
 
-#include "envoy/config/filter/thrift/rate_limit/v2alpha1/rate_limit.pb.h"
-#include "envoy/config/filter/thrift/rate_limit/v2alpha1/rate_limit.pb.validate.h"
+#include "envoy/config/filter/thrift/rate_limit/v3alpha/rate_limit.pb.h"
+#include "envoy/config/filter/thrift/rate_limit/v3alpha/rate_limit.pb.validate.h"
 
 #include "extensions/filters/common/ratelimit/ratelimit.h"
 #include "extensions/filters/network/thrift_proxy/filters/factory_base.h"
@@ -18,14 +18,14 @@ using namespace Envoy::Extensions::NetworkFilters;
  * Config registration for the rate limit filter. @see NamedThriftFilterConfigFactory.
  */
 class RateLimitFilterConfig : public ThriftProxy::ThriftFilters::FactoryBase<
-                                  envoy::config::filter::thrift::rate_limit::v2alpha1::RateLimit> {
+                                  envoy::config::filter::thrift::rate_limit::v3alpha::RateLimit> {
 public:
   RateLimitFilterConfig()
       : FactoryBase(ThriftProxy::ThriftFilters::ThriftFilterNames::get().RATE_LIMIT) {}
 
 private:
   ThriftProxy::ThriftFilters::FilterFactoryCb createFilterFactoryFromProtoTyped(
-      const envoy::config::filter::thrift::rate_limit::v2alpha1::RateLimit& proto_config,
+      const envoy::config::filter::thrift::rate_limit::v3alpha::RateLimit& proto_config,
       const std::string& stats_prefix, Server::Configuration::FactoryContext& context) override;
 };
 

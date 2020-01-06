@@ -1,6 +1,6 @@
 #include "extensions/quic_listeners/quiche/envoy_quic_client_connection.h"
 
-#include "envoy/api/v2/core/base.pb.h"
+#include "envoy/config/core/v3alpha/base.pb.h"
 
 #include "common/network/listen_socket_impl.h"
 #include "common/network/socket_option_factory.h"
@@ -80,8 +80,9 @@ void EnvoyQuicClientConnection::setUpConnectionSocket() {
         [this](uint32_t events) -> void { onFileEvent(events); }, Event::FileTriggerType::Edge,
         Event::FileReadyType::Read | Event::FileReadyType::Write);
 
-    if (!Network::Socket::applyOptions(connectionSocket()->options(), *connectionSocket(),
-                                       envoy::api::v2::core::SocketOption::STATE_LISTENING)) {
+    if (!Network::Socket::applyOptions(
+            connectionSocket()->options(), *connectionSocket(),
+            envoy::config::core::v3alpha::SocketOption::STATE_LISTENING)) {
       ENVOY_CONN_LOG(error, "Fail to apply listening options", *this);
       connectionSocket()->close();
     }

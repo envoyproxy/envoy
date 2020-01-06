@@ -32,10 +32,10 @@ envoy_cc_library(
         "//source/common/http:header_utility_lib",
         "//source/common/network:cidr_range_lib",
         "//source/extensions/filters/common/expr:evaluator_lib",
-        "@envoy_api//envoy/api/v2/core:pkg_cc_proto",
-        "@envoy_api//envoy/api/v2/route:pkg_cc_proto",
-        "@envoy_api//envoy/config/rbac/v2:pkg_cc_proto",
-        "@envoy_api//envoy/type/matcher:pkg_cc_proto",
+        "@envoy_api//envoy/config/core/v3alpha:pkg_cc_proto",
+        "@envoy_api//envoy/config/rbac/v3alpha:pkg_cc_proto",
+        "@envoy_api//envoy/config/route/v3alpha:pkg_cc_proto",
+        "@envoy_api//envoy/type/matcher/v3alpha:pkg_cc_proto",
     ],
 )
 
@@ -56,6 +56,6 @@ envoy_cc_library(
     deps = [
         "//source/extensions/filters/common/rbac:engine_interface",
         "//source/extensions/filters/common/rbac:matchers_lib",
-        "@envoy_api//envoy/config/rbac/v2:pkg_cc_proto",
+        "@envoy_api//envoy/config/rbac/v3alpha:pkg_cc_proto",
     ],
 )

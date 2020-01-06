@@ -8,7 +8,7 @@
 #include <memory>
 #include <string>
 
-#include "envoy/config/bootstrap/v2/bootstrap.pb.h"
+#include "envoy/config/bootstrap/v3alpha/bootstrap.pb.h"
 #include "envoy/event/timer.h"
 #include "envoy/server/drain_manager.h"
 #include "envoy/server/guarddog.h"
@@ -121,7 +121,8 @@ public:
    * @return BootstrapVersion to indicate which version of the API was parsed.
    */
   static BootstrapVersion
-  loadBootstrapConfig(envoy::config::bootstrap::v2::Bootstrap& bootstrap, const Options& options,
+  loadBootstrapConfig(envoy::config::bootstrap::v3alpha::Bootstrap& bootstrap,
+                      const Options& options,
                       ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api);
 };
 
@@ -301,7 +302,7 @@ private:
   std::unique_ptr<Server::GuardDog> guard_dog_;
   bool terminated_;
   std::unique_ptr<Logger::FileSinkDelegate> file_logger_;
-  envoy::config::bootstrap::v2::Bootstrap bootstrap_;
+  envoy::config::bootstrap::v3alpha::Bootstrap bootstrap_;
   ConfigTracker::EntryOwnerPtr config_tracker_entry_;
   SystemTime bootstrap_config_update_time_;
   Grpc::AsyncClientManagerPtr async_client_manager_;

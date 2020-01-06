@@ -1,7 +1,7 @@
 #include "extensions/filters/common/ext_authz/ext_authz_grpc_impl.h"
 
-#include "envoy/api/v2/core/base.pb.h"
-#include "envoy/service/auth/v2/external_auth.pb.h"
+#include "envoy/config/core/v3alpha/base.pb.h"
+#include "envoy/service/auth/v3alpha/external_auth.pb.h"
 
 #include "common/common/assert.h"
 #include "common/grpc/async_client_impl.h"
@@ -36,7 +36,7 @@ void GrpcClientImpl::cancel() {
 }
 
 void GrpcClientImpl::check(RequestCallbacks& callbacks,
-                           const envoy::service::auth::v2::CheckRequest& request,
+                           const envoy::service::auth::v3alpha::CheckRequest& request,
                            Tracing::Span& parent_span) {
   ASSERT(callbacks_ == nullptr);
   callbacks_ = &callbacks;
@@ -45,8 +45,8 @@ void GrpcClientImpl::check(RequestCallbacks& callbacks,
                                  Http::AsyncClient::RequestOptions().setTimeout(timeout_));
 }
 
-void GrpcClientImpl::onSuccess(std::unique_ptr<envoy::service::auth::v2::CheckResponse>&& response,
-                               Tracing::Span& span) {
+void GrpcClientImpl::onSuccess(
+    std::unique_ptr<envoy::service::auth::v3alpha::CheckResponse>&& response, Tracing::Span& span) {
   ResponsePtr authz_response = std::make_unique<Response>(Response{});
   if (response->status().code() == Grpc::Status::WellKnownGrpcStatus::Ok) {
     span.setTag(TracingConstants::get().TraceStatus, TracingConstants::get().TraceOk);
@@ -83,7 +83,7 @@ void GrpcClientImpl::onFailure(Grpc::Status::GrpcStatus status, const std::strin
 
 void GrpcClientImpl::toAuthzResponseHeader(
     ResponsePtr& response,
-    const Protobuf::RepeatedPtrField<envoy::api::v2::core::HeaderValueOption>& headers) {
+    const Protobuf::RepeatedPtrField<envoy::config::core::v3alpha::HeaderValueOption>& headers) {
   for (const auto& header : headers) {
     if (header.append().value()) {
       response->headers_to_append.emplace_back(Http::LowerCaseString(header.header().key()),

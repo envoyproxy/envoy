@@ -1,7 +1,7 @@
-#include "envoy/api/v2/auth/cert.pb.h"
-#include "envoy/api/v2/route/route.pb.h"
-#include "envoy/config/bootstrap/v2/bootstrap.pb.h"
-#include "envoy/config/filter/network/http_connection_manager/v2/http_connection_manager.pb.h"
+#include "envoy/config/bootstrap/v3alpha/bootstrap.pb.h"
+#include "envoy/config/route/v3alpha/route_components.pb.h"
+#include "envoy/extensions/filters/network/http_connection_manager/v3alpha/http_connection_manager.pb.h"
+#include "envoy/extensions/transport_sockets/tls/v3alpha/cert.pb.h"
 
 #include "extensions/transport_sockets/tls/context_config_impl.h"
 #include "extensions/transport_sockets/tls/context_impl.h"
@@ -27,7 +27,7 @@ public:
   }
 
   void initialize() override {
-    config_helper_.addConfigModifier([&](envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
+    config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3alpha::Bootstrap& bootstrap) {
       auto* static_resources = bootstrap.mutable_static_resources();
       auto* cluster = static_resources->mutable_clusters(0);
       cluster->mutable_lb_subset_config()->add_subset_selectors()->add_keys(type_key_);
@@ -77,8 +77,8 @@ transport_socket:
       }
     });
     config_helper_.addConfigModifier(
-        [&](envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager&
-                hcm) {
+        [&](envoy::extensions::filters::network::http_connection_manager::v3alpha::
+                HttpConnectionManager& hcm) {
           auto* vhost = hcm.mutable_route_config()->mutable_virtual_hosts(0);
 
           // Report the host's type metadata and remote address on every response.
@@ -101,7 +101,7 @@ transport_socket:
     HttpIntegrationTest::initialize();
   }
 
-  void configureRoute(envoy::api::v2::route::Route* route, const std::string& host_type) {
+  void configureRoute(envoy::config::route::v3alpha::Route* route, const std::string& host_type) {
     auto* match = route->mutable_match();
     match->set_prefix("/");
 
@@ -119,7 +119,7 @@ transport_socket:
   };
 
   Network::TransportSocketFactoryPtr createUpstreamSslContext() {
-    envoy::api::v2::auth::DownstreamTlsContext tls_context;
+    envoy::extensions::transport_sockets::tls::v3alpha::DownstreamTlsContext tls_context;
     const std::string yaml = absl::StrFormat(
         R"EOF(
 common_tls_context:

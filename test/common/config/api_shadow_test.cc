@@ -1,4 +1,4 @@
-#include "envoy/service/cluster/v3alpha/cds.pb.h"
+#include "envoy/config/cluster/v3alpha/cluster.pb.h"
 
 #include "gtest/gtest.h"
 
@@ -8,11 +8,11 @@ namespace {
 
 // Validate that deprecated fields are accessible via the shadow protos.
 TEST(ApiShadowTest, All) {
-  envoy::service::cluster::v3alpha::Cluster cluster;
+  envoy::config::cluster::v3alpha::Cluster cluster;
 
   cluster.mutable_hidden_envoy_deprecated_tls_context();
   cluster.set_lb_policy(
-      envoy::service::cluster::v3alpha::Cluster::hidden_envoy_deprecated_ORIGINAL_DST_LB);
+      envoy::config::cluster::v3alpha::Cluster::hidden_envoy_deprecated_ORIGINAL_DST_LB);
 }
 
 } // namespace

@@ -3,8 +3,8 @@
 #include <string>
 #include <vector>
 
-#include "envoy/api/v2/cds.pb.h"
-#include "envoy/api/v2/core/base.pb.h"
+#include "envoy/config/cluster/v3alpha/cluster.pb.h"
+#include "envoy/config/core/v3alpha/base.pb.h"
 #include "envoy/config/typed_metadata.h"
 #include "envoy/server/transport_socket_config.h"
 #include "envoy/stats/scope.h"
@@ -33,12 +33,12 @@ public:
   };
 
   TransportSocketMatcherImpl(
-      const Protobuf::RepeatedPtrField<envoy::api::v2::Cluster_TransportSocketMatch>&
-          socket_matches,
+      const Protobuf::RepeatedPtrField<
+          envoy::config::cluster::v3alpha::Cluster::TransportSocketMatch>& socket_matches,
       Server::Configuration::TransportSocketFactoryContext& factory_context,
       Network::TransportSocketFactoryPtr& default_factory, Stats::Scope& stats_scope);
 
-  MatchData resolve(const envoy::api::v2::core::Metadata& metadata) const override;
+  MatchData resolve(const envoy::config::core::v3alpha::Metadata& metadata) const override;
 
 protected:
   TransportSocketMatchStats generateStats(const std::string& prefix);
