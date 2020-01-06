@@ -1,7 +1,7 @@
 #include "extensions/filters/http/adaptive_concurrency/config.h"
 
-#include "envoy/config/filter/http/adaptive_concurrency/v2alpha/adaptive_concurrency.pb.h"
-#include "envoy/config/filter/http/adaptive_concurrency/v2alpha/adaptive_concurrency.pb.validate.h"
+#include "envoy/extensions/filters/http/adaptive_concurrency/v3alpha/adaptive_concurrency.pb.h"
+#include "envoy/extensions/filters/http/adaptive_concurrency/v3alpha/adaptive_concurrency.pb.validate.h"
 #include "envoy/registry/registry.h"
 
 #include "extensions/filters/http/adaptive_concurrency/adaptive_concurrency_filter.h"
@@ -13,13 +13,15 @@ namespace HttpFilters {
 namespace AdaptiveConcurrency {
 
 Http::FilterFactoryCb AdaptiveConcurrencyFilterFactory::createFilterFactoryFromProtoTyped(
-    const envoy::config::filter::http::adaptive_concurrency::v2alpha::AdaptiveConcurrency& config,
+    const envoy::extensions::filters::http::adaptive_concurrency::v3alpha::AdaptiveConcurrency&
+        config,
     const std::string& stats_prefix, Server::Configuration::FactoryContext& context) {
 
   auto acc_stats_prefix = stats_prefix + "adaptive_concurrency.";
 
   std::shared_ptr<ConcurrencyController::ConcurrencyController> controller;
-  using Proto = envoy::config::filter::http::adaptive_concurrency::v2alpha::AdaptiveConcurrency;
+  using Proto =
+      envoy::extensions::filters::http::adaptive_concurrency::v3alpha::AdaptiveConcurrency;
   ASSERT(config.concurrency_controller_config_case() ==
          Proto::ConcurrencyControllerConfigCase::kGradientControllerConfig);
   auto gradient_controller_config = ConcurrencyController::GradientControllerConfig(

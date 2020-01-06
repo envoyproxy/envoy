@@ -4,7 +4,7 @@ package envoy.service.discovery.v2;
 
 import "envoy/api/v2/core/base.proto";
 import "envoy/api/v2/core/health_check.proto";
-import "envoy/api/v2/endpoint/endpoint.proto";
+import "envoy/api/v2/endpoint/endpoint_components.proto";
 
 import "google/api/annotations.proto";
 import "google/protobuf/duration.proto";

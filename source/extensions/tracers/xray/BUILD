@@ -62,7 +62,7 @@ envoy_cc_extension(
         "//source/common/config:datasource_lib",
         "//source/extensions/tracers:well_known_names",
         "//source/extensions/tracers/common:factory_base_lib",
-        "@envoy_api//envoy/api/v2/core:pkg_cc_proto",
-        "@envoy_api//envoy/config/trace/v2alpha:pkg_cc_proto",
+        "@envoy_api//envoy/config/core/v3alpha:pkg_cc_proto",
+        "@envoy_api//envoy/config/trace/v3alpha:pkg_cc_proto",
     ],
 )

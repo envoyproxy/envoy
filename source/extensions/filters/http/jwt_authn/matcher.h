@@ -1,6 +1,6 @@
 #pragma once
 
-#include "envoy/config/filter/http/jwt_authn/v2alpha/config.pb.h"
+#include "envoy/extensions/filters/http/jwt_authn/v3alpha/config.pb.h"
 #include "envoy/http/header_map.h"
 
 namespace Envoy {
@@ -34,7 +34,7 @@ public:
    * @return the matcher instance.
    */
   static MatcherConstPtr
-  create(const ::envoy::config::filter::http::jwt_authn::v2alpha::RequirementRule& rule);
+  create(const envoy::extensions::filters::http::jwt_authn::v3alpha::RequirementRule& rule);
 };
 
 } // namespace JwtAuthn

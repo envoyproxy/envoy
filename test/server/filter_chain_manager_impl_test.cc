@@ -4,7 +4,7 @@
 #include <utility>
 #include <vector>
 
-#include "envoy/api/v2/listener/listener.pb.h"
+#include "envoy/config/listener/v3alpha/listener_components.pb.h"
 #include "envoy/registry/registry.h"
 #include "envoy/server/filter_config.h"
 
@@ -45,7 +45,7 @@ namespace Server {
 
 class MockFilterChainFactoryBuilder : public FilterChainFactoryBuilder {
   std::unique_ptr<Network::FilterChain>
-  buildFilterChain(const ::envoy::api::v2::listener::FilterChain&,
+  buildFilterChain(const envoy::config::listener::v3alpha::FilterChain&,
                    FilterChainFactoryContextCallback&) const override {
     // Won't dereference but requires not nullptr.
     return std::make_unique<Network::MockFilterChain>();
@@ -94,9 +94,10 @@ public:
     return filter_chain_manager_.findFilterChain(*mock_socket);
   }
 
-  void addSingleFilterChainHelper(const envoy::api::v2::listener::FilterChain& filter_chain) {
+  void
+  addSingleFilterChainHelper(const envoy::config::listener::v3alpha::FilterChain& filter_chain) {
     filter_chain_manager_.addFilterChain(
-        std::vector<const envoy::api::v2::listener::FilterChain*>{&filter_chain},
+        std::vector<const envoy::config::listener::v3alpha::FilterChain*>{&filter_chain},
         filter_chain_factory_builder_,
         *filter_chain_manager_.createFilterChainFactoryContextCallback(parent_context_));
   }
@@ -122,7 +123,7 @@ public:
             keys:
             - filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ticket_key_a"
   )EOF";
-  envoy::api::v2::listener::FilterChain filter_chain_template_;
+  envoy::config::listener::v3alpha::FilterChain filter_chain_template_;
   MockFilterChainFactoryBuilder filter_chain_factory_builder_;
   NiceMock<Server::Configuration::MockFactoryContext> parent_context_;
 

@@ -1,9 +1,10 @@
 #include <memory>
 
-#include "envoy/api/v2/cds.pb.h"
+#include "envoy/config/cluster/redis/redis_cluster.pb.h"
 #include "envoy/config/cluster/redis/redis_cluster.pb.validate.h"
-#include "envoy/config/filter/network/redis_proxy/v2/redis_proxy.pb.h"
-#include "envoy/config/filter/network/redis_proxy/v2/redis_proxy.pb.validate.h"
+#include "envoy/config/cluster/v3alpha/cluster.pb.h"
+#include "envoy/extensions/filters/network/redis_proxy/v3alpha/redis_proxy.pb.h"
+#include "envoy/extensions/filters/network/redis_proxy/v3alpha/redis_proxy.pb.validate.h"
 
 #include "common/network/utility.h"
 #include "common/upstream/upstream_impl.h"
@@ -203,10 +204,9 @@ public:
     return Common::Redis::Client::ClientPtr{create_(host)};
   }
 
-  void testReadPolicy(
-      envoy::config::filter::network::redis_proxy::v2::RedisProxy::ConnPoolSettings::ReadPolicy
-          read_policy,
-      NetworkFilters::Common::Redis::Client::ReadPolicy expected_read_policy) {
+  void testReadPolicy(envoy::extensions::filters::network::redis_proxy::v3alpha::RedisProxy::
+                          ConnPoolSettings::ReadPolicy read_policy,
+                      NetworkFilters::Common::Redis::Client::ReadPolicy expected_read_policy) {
     InSequence s;
 
     read_policy_ = read_policy;
@@ -274,9 +274,9 @@ public:
   Network::Address::InstanceConstSharedPtr test_address_;
   std::string auth_password_;
   NiceMock<Api::MockApi> api_;
-  envoy::config::filter::network::redis_proxy::v2::RedisProxy::ConnPoolSettings::ReadPolicy
-      read_policy_ =
-          envoy::config::filter::network::redis_proxy::v2::RedisProxy::ConnPoolSettings::MASTER;
+  envoy::extensions::filters::network::redis_proxy::v3alpha::RedisProxy::ConnPoolSettings::
+      ReadPolicy read_policy_ = envoy::extensions::filters::network::redis_proxy::v3alpha::
+          RedisProxy::ConnPoolSettings::MASTER;
   NiceMock<Stats::MockCounter> upstream_cx_drained_;
   NiceMock<Stats::MockCounter> max_upstream_unknown_connections_reached_;
   std::shared_ptr<NiceMock<Extensions::Common::Redis::MockClusterRefreshManager>>
@@ -375,17 +375,18 @@ TEST_F(RedisConnPoolImplTest, ClientRequestFailed) {
 };
 
 TEST_F(RedisConnPoolImplTest, BasicWithReadPolicy) {
+  testReadPolicy(envoy::extensions::filters::network::redis_proxy::v3alpha::RedisProxy::
+                     ConnPoolSettings::PREFER_MASTER,
+                 NetworkFilters::Common::Redis::Client::ReadPolicy::PreferMaster);
+  testReadPolicy(envoy::extensions::filters::network::redis_proxy::v3alpha::RedisProxy::
+                     ConnPoolSettings::REPLICA,
+                 NetworkFilters::Common::Redis::Client::ReadPolicy::Replica);
+  testReadPolicy(envoy::extensions::filters::network::redis_proxy::v3alpha::RedisProxy::
+                     ConnPoolSettings::PREFER_REPLICA,
+                 NetworkFilters::Common::Redis::Client::ReadPolicy::PreferReplica);
   testReadPolicy(
-      envoy::config::filter::network::redis_proxy::v2::RedisProxy::ConnPoolSettings::PREFER_MASTER,
-      NetworkFilters::Common::Redis::Client::ReadPolicy::PreferMaster);
-  testReadPolicy(
-      envoy::config::filter::network::redis_proxy::v2::RedisProxy::ConnPoolSettings::REPLICA,
-      NetworkFilters::Common::Redis::Client::ReadPolicy::Replica);
-  testReadPolicy(
-      envoy::config::filter::network::redis_proxy::v2::RedisProxy::ConnPoolSettings::PREFER_REPLICA,
-      NetworkFilters::Common::Redis::Client::ReadPolicy::PreferReplica);
-  testReadPolicy(envoy::config::filter::network::redis_proxy::v2::RedisProxy::ConnPoolSettings::ANY,
-                 NetworkFilters::Common::Redis::Client::ReadPolicy::Any);
+      envoy::extensions::filters::network::redis_proxy::v3alpha::RedisProxy::ConnPoolSettings::ANY,
+      NetworkFilters::Common::Redis::Client::ReadPolicy::Any);
 };
 
 TEST_F(RedisConnPoolImplTest, Hashtagging) {
@@ -955,7 +956,7 @@ TEST_F(RedisConnPoolImplTest, HostsAddedAndEndWithClusterRemoval) {
 
 TEST_F(RedisConnPoolImplTest, MakeRequestToRedisCluster) {
 
-  absl::optional<envoy::api::v2::Cluster::CustomClusterType> cluster_type;
+  absl::optional<envoy::config::cluster::v3alpha::Cluster::CustomClusterType> cluster_type;
   cluster_type.emplace();
   cluster_type->set_name("envoy.clusters.redis");
   EXPECT_CALL(*cm_.thread_local_cluster_.cluster_.info_, clusterType())
@@ -975,7 +976,7 @@ TEST_F(RedisConnPoolImplTest, MakeRequestToRedisCluster) {
 
 TEST_F(RedisConnPoolImplTest, MakeRequestToRedisClusterHashtag) {
 
-  absl::optional<envoy::api::v2::Cluster::CustomClusterType> cluster_type;
+  absl::optional<envoy::config::cluster::v3alpha::Cluster::CustomClusterType> cluster_type;
   cluster_type.emplace();
   cluster_type->set_name("envoy.clusters.redis");
   EXPECT_CALL(*cm_.thread_local_cluster_.cluster_.info_, clusterType())

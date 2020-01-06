@@ -3,7 +3,7 @@ syntax = "proto3";
 package envoy.extensions.common.tap.v3alpha;
 
 import "envoy/config/core/v3alpha/config_source.proto";
-import "envoy/service/tap/v3alpha/common.proto";
+import "envoy/config/tap/v3alpha/common.proto";
 
 import "udpa/annotations/versioning.proto";
 
@@ -41,7 +41,7 @@ message CommonExtensionConfig {
 
     // If specified, the tap filter will be configured via a static configuration that cannot be
     // changed.
-    service.tap.v3alpha.TapConfig static_config = 2;
+    config.tap.v3alpha.TapConfig static_config = 2;
 
     // [#not-implemented-hide:] Configuration to use for TapDS updates for the filter.
     TapDSConfig tapds_config = 3;

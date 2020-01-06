@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package envoy.extensions.common.dynamic_forward_proxy.v3alpha;
 
-import "envoy/service/cluster/v3alpha/cds.proto";
+import "envoy/config/cluster/v3alpha/cluster.proto";
 
 import "google/protobuf/duration.proto";
 import "google/protobuf/wrappers.proto";
@@ -39,7 +39,7 @@ message DnsCacheConfig {
   // likely build a "happy eyeballs" connection pool which would race the primary / fall back
   // address and return the one that wins. This same method could potentially also be used for
   // QUIC to TCP fall back.]
-  service.cluster.v3alpha.Cluster.DnsLookupFamily dns_lookup_family = 2
+  config.cluster.v3alpha.Cluster.DnsLookupFamily dns_lookup_family = 2
       [(validate.rules).enum = {defined_only: true}];
 
   // The DNS refresh rate for currently cached DNS hosts. If not specified defaults to 60s.

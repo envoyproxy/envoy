@@ -1,7 +1,7 @@
 #pragma once
 
-#include "envoy/api/v2/core/base.pb.h"
 #include "envoy/common/platform.h"
+#include "envoy/config/core/v3alpha/base.pb.h"
 #include "envoy/network/listen_socket.h"
 
 #include "common/common/logger.h"
@@ -28,7 +28,7 @@ public:
   static std::unique_ptr<Socket::Options> buildSocketMarkOptions(uint32_t mark);
   static std::unique_ptr<Socket::Options> buildTcpFastOpenOptions(uint32_t queue_length);
   static std::unique_ptr<Socket::Options> buildLiteralOptions(
-      const Protobuf::RepeatedPtrField<envoy::api::v2::core::SocketOption>& socket_options);
+      const Protobuf::RepeatedPtrField<envoy::config::core::v3alpha::SocketOption>& socket_options);
   static std::unique_ptr<Socket::Options> buildIpPacketInfoOptions();
   static std::unique_ptr<Socket::Options> buildRxQueueOverFlowOptions();
   static std::unique_ptr<Socket::Options> buildReusePortOptions();

@@ -1,8 +1,8 @@
 #include <iostream>
 #include <unordered_map>
 
-#include "envoy/api/v2/lds.pb.h"
-#include "envoy/api/v2/listener/listener.pb.h"
+#include "envoy/config/listener/v3alpha/listener.pb.h"
+#include "envoy/config/listener/v3alpha/listener_components.pb.h"
 #include "envoy/network/connection.h"
 #include "envoy/network/listen_socket.h"
 #include "envoy/protobuf/message_validator.h"
@@ -29,14 +29,14 @@ namespace {
 class EmptyFilterChainFactoryContextCallback : public FilterChainFactoryContextCallback {
 public:
   ~EmptyFilterChainFactoryContextCallback() override = default;
-  std::shared_ptr<Configuration::FilterChainFactoryContext>
-  createFilterChainFactoryContext(const ::envoy::api::v2::listener::FilterChain* const) override {
+  std::shared_ptr<Configuration::FilterChainFactoryContext> createFilterChainFactoryContext(
+      const ::envoy::config::listener::v3alpha::FilterChain* const) override {
     return nullptr;
   }
 };
 class MockFilterChainFactoryBuilder : public FilterChainFactoryBuilder {
   std::unique_ptr<Network::FilterChain>
-  buildFilterChain(const ::envoy::api::v2::listener::FilterChain&,
+  buildFilterChain(const envoy::config::listener::v3alpha::FilterChain&,
                    FilterChainFactoryContextCallback&) const override {
     // A place holder to be found
     return std::make_unique<Network::MockFilterChain>();
@@ -183,9 +183,9 @@ public:
     TestUtility::loadFromYaml(listener_yaml_config_, listener_config_);
     filter_chains_ = listener_config_.filter_chains();
   }
-  absl::Span<const envoy::api::v2::listener::FilterChain* const> filter_chains_;
+  absl::Span<const envoy::config::listener::v3alpha::FilterChain* const> filter_chains_;
   std::string listener_yaml_config_;
-  envoy::api::v2::Listener listener_config_;
+  envoy::config::listener::v3alpha::Listener listener_config_;
   MockFilterChainFactoryBuilder dummy_builder_;
   FilterChainManagerImpl filter_chain_manager_{
       std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 1234)};

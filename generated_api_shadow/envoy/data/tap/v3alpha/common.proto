@@ -21,15 +21,15 @@ message Body {
     bytes as_bytes = 1;
 
     // Body data as string. This field is only used when the :ref:`JSON_BODY_AS_STRING
-    // <envoy_api_enum_value_service.tap.v3alpha.OutputSink.Format.JSON_BODY_AS_STRING>` sink
+    // <envoy_api_enum_value_config.tap.v3alpha.OutputSink.Format.JSON_BODY_AS_STRING>` sink
     // format type is selected. See the documentation for that option for why this is useful.
     string as_string = 2;
   }
 
   // Specifies whether body data has been truncated to fit within the specified
   // :ref:`max_buffered_rx_bytes
-  // <envoy_api_field_service.tap.v3alpha.OutputConfig.max_buffered_rx_bytes>` and
+  // <envoy_api_field_config.tap.v3alpha.OutputConfig.max_buffered_rx_bytes>` and
   // :ref:`max_buffered_tx_bytes
-  // <envoy_api_field_service.tap.v3alpha.OutputConfig.max_buffered_tx_bytes>` settings.
+  // <envoy_api_field_config.tap.v3alpha.OutputConfig.max_buffered_tx_bytes>` settings.
   bool truncated = 3;
 }

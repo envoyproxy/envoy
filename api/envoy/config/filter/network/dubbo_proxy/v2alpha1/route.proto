@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package envoy.config.filter.network.dubbo_proxy.v2alpha1;
 
-import "envoy/api/v2/route/route.proto";
+import "envoy/api/v2/route/route_components.proto";
 import "envoy/type/matcher/string.proto";
 import "envoy/type/range.proto";
 

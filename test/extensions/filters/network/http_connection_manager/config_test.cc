@@ -1,7 +1,7 @@
-#include "envoy/api/v2/core/base.pb.h"
-#include "envoy/config/filter/network/http_connection_manager/v2/http_connection_manager.pb.h"
-#include "envoy/config/filter/network/http_connection_manager/v2/http_connection_manager.pb.validate.h"
-#include "envoy/type/percent.pb.h"
+#include "envoy/config/core/v3alpha/base.pb.h"
+#include "envoy/extensions/filters/network/http_connection_manager/v3alpha/http_connection_manager.pb.h"
+#include "envoy/extensions/filters/network/http_connection_manager/v3alpha/http_connection_manager.pb.validate.h"
+#include "envoy/type/v3alpha/percent.pb.h"
 
 #include "common/buffer/buffer_impl.h"
 #include "common/http/date_provider_impl.h"
@@ -28,9 +28,9 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace HttpConnectionManager {
 
-envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager
+envoy::extensions::filters::network::http_connection_manager::v3alpha::HttpConnectionManager
 parseHttpConnectionManagerFromV2Yaml(const std::string& yaml) {
-  envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager
+  envoy::extensions::filters::network::http_connection_manager::v3alpha::HttpConnectionManager
       http_connection_manager;
   TestUtility::loadFromYamlAndValidate(yaml, http_connection_manager);
   return http_connection_manager;
@@ -49,11 +49,11 @@ public:
 };
 
 TEST_F(HttpConnectionManagerConfigTest, ValidateFail) {
-  EXPECT_THROW(
-      HttpConnectionManagerFilterConfigFactory().createFilterFactoryFromProto(
-          envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager(),
-          context_),
-      ProtoValidationException);
+  EXPECT_THROW(HttpConnectionManagerFilterConfigFactory().createFilterFactoryFromProto(
+                   envoy::extensions::filters::network::http_connection_manager::v3alpha::
+                       HttpConnectionManager(),
+                   context_),
+               ProtoValidationException);
 }
 
 TEST_F(HttpConnectionManagerConfigTest, InvalidFilterName) {
@@ -249,8 +249,7 @@ http_filters:
 - name: envoy.router
   )EOF";
 
-  ON_CALL(context_, direction())
-      .WillByDefault(Return(envoy::api::v2::core::TrafficDirection::OUTBOUND));
+  ON_CALL(context_, direction()).WillByDefault(Return(envoy::config::core::v3alpha::OUTBOUND));
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromV2Yaml(yaml_string), context_,
                                      date_provider_, route_config_provider_manager_,
                                      scoped_routes_config_provider_manager_);
@@ -276,8 +275,7 @@ http_filters:
 - name: envoy.router
   )EOF";
 
-  ON_CALL(context_, direction())
-      .WillByDefault(Return(envoy::api::v2::core::TrafficDirection::INBOUND));
+  ON_CALL(context_, direction()).WillByDefault(Return(envoy::config::core::v3alpha::INBOUND));
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromV2Yaml(yaml_string), context_,
                                      date_provider_, route_config_provider_manager_,
                                      scoped_routes_config_provider_manager_);
@@ -303,13 +301,13 @@ TEST_F(HttpConnectionManagerConfigTest, SamplingDefault) {
 
   EXPECT_EQ(100, config.tracingConfig()->client_sampling_.numerator());
   EXPECT_EQ(Tracing::DefaultMaxPathTagLength, config.tracingConfig()->max_path_tag_length_);
-  EXPECT_EQ(envoy::type::FractionalPercent::HUNDRED,
+  EXPECT_EQ(envoy::type::v3alpha::FractionalPercent::HUNDRED,
             config.tracingConfig()->client_sampling_.denominator());
   EXPECT_EQ(10000, config.tracingConfig()->random_sampling_.numerator());
-  EXPECT_EQ(envoy::type::FractionalPercent::TEN_THOUSAND,
+  EXPECT_EQ(envoy::type::v3alpha::FractionalPercent::TEN_THOUSAND,
             config.tracingConfig()->random_sampling_.denominator());
   EXPECT_EQ(100, config.tracingConfig()->overall_sampling_.numerator());
-  EXPECT_EQ(envoy::type::FractionalPercent::HUNDRED,
+  EXPECT_EQ(envoy::type::v3alpha::FractionalPercent::HUNDRED,
             config.tracingConfig()->overall_sampling_.denominator());
 }
 
@@ -337,13 +335,13 @@ TEST_F(HttpConnectionManagerConfigTest, SamplingConfigured) {
                                      scoped_routes_config_provider_manager_);
 
   EXPECT_EQ(1, config.tracingConfig()->client_sampling_.numerator());
-  EXPECT_EQ(envoy::type::FractionalPercent::HUNDRED,
+  EXPECT_EQ(envoy::type::v3alpha::FractionalPercent::HUNDRED,
             config.tracingConfig()->client_sampling_.denominator());
   EXPECT_EQ(200, config.tracingConfig()->random_sampling_.numerator());
-  EXPECT_EQ(envoy::type::FractionalPercent::TEN_THOUSAND,
+  EXPECT_EQ(envoy::type::v3alpha::FractionalPercent::TEN_THOUSAND,
             config.tracingConfig()->random_sampling_.denominator());
   EXPECT_EQ(3, config.tracingConfig()->overall_sampling_.numerator());
-  EXPECT_EQ(envoy::type::FractionalPercent::HUNDRED,
+  EXPECT_EQ(envoy::type::v3alpha::FractionalPercent::HUNDRED,
             config.tracingConfig()->overall_sampling_.denominator());
 }
 
@@ -371,13 +369,13 @@ TEST_F(HttpConnectionManagerConfigTest, FractionalSamplingConfigured) {
                                      scoped_routes_config_provider_manager_);
 
   EXPECT_EQ(0, config.tracingConfig()->client_sampling_.numerator());
-  EXPECT_EQ(envoy::type::FractionalPercent::HUNDRED,
+  EXPECT_EQ(envoy::type::v3alpha::FractionalPercent::HUNDRED,
             config.tracingConfig()->client_sampling_.denominator());
   EXPECT_EQ(20, config.tracingConfig()->random_sampling_.numerator());
-  EXPECT_EQ(envoy::type::FractionalPercent::TEN_THOUSAND,
+  EXPECT_EQ(envoy::type::v3alpha::FractionalPercent::TEN_THOUSAND,
             config.tracingConfig()->random_sampling_.denominator());
   EXPECT_EQ(0, config.tracingConfig()->overall_sampling_.numerator());
-  EXPECT_EQ(envoy::type::FractionalPercent::HUNDRED,
+  EXPECT_EQ(envoy::type::v3alpha::FractionalPercent::HUNDRED,
             config.tracingConfig()->overall_sampling_.denominator());
 }
 
@@ -906,7 +904,7 @@ route_config:
         cluster: fake_cluster
 http_filters:
 - name: envoy.http_dynamo_filter
-  config: {}
+  typed_config: {}
 access_log:
 - name: envoy.file_access_log
   typed_config:
@@ -936,7 +934,7 @@ route_config:
         cluster: fake_cluster
 http_filters:
 - name: envoy.http_dynamo_filter
-  config: {}
+  typed_config: {}
 access_log:
 - name: envoy.file_access_log
   typed_config:

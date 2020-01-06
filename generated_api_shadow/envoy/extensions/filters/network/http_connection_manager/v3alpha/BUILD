@@ -9,7 +9,7 @@ api_proto_package(
         "//envoy/config/core/v3alpha:pkg",
         "//envoy/config/filter/accesslog/v3alpha:pkg",
         "//envoy/config/filter/network/http_connection_manager/v2:pkg",
-        "//envoy/service/route/v3alpha:pkg",
+        "//envoy/config/route/v3alpha:pkg",
         "//envoy/type/tracing/v2:pkg",
         "//envoy/type/v3alpha:pkg",
         "@com_github_cncf_udpa//udpa/annotations:pkg",

@@ -4,7 +4,7 @@
 #include <numeric>
 
 #include "envoy/protobuf/message_validator.h"
-#include "envoy/type/percent.pb.h"
+#include "envoy/type/v3alpha/percent.pb.h"
 
 #include "common/common/assert.h"
 #include "common/common/fmt.h"
@@ -170,19 +170,20 @@ uint64_t convertPercent(double percent, uint64_t max_value) {
   return max_value * (percent / 100.0);
 }
 
-bool evaluateFractionalPercent(envoy::type::FractionalPercent percent, uint64_t random_value) {
+bool evaluateFractionalPercent(envoy::type::v3alpha::FractionalPercent percent,
+                               uint64_t random_value) {
   return random_value % fractionalPercentDenominatorToInt(percent.denominator()) <
          percent.numerator();
 }
 
 uint64_t fractionalPercentDenominatorToInt(
-    const envoy::type::FractionalPercent::DenominatorType& denominator) {
+    const envoy::type::v3alpha::FractionalPercent::DenominatorType& denominator) {
   switch (denominator) {
-  case envoy::type::FractionalPercent::HUNDRED:
+  case envoy::type::v3alpha::FractionalPercent::HUNDRED:
     return 100;
-  case envoy::type::FractionalPercent::TEN_THOUSAND:
+  case envoy::type::v3alpha::FractionalPercent::TEN_THOUSAND:
     return 10000;
-  case envoy::type::FractionalPercent::MILLION:
+  case envoy::type::v3alpha::FractionalPercent::MILLION:
     return 1000000;
   default:
     // Checked by schema.
@@ -659,6 +660,43 @@ bool ValueUtil::equal(const ProtobufWkt::Value& v1, const ProtobufWkt::Value& v2
   default:
     NOT_REACHED_GCOVR_EXCL_LINE;
   }
+}
+
+const ProtobufWkt::Value& ValueUtil::nullValue() {
+  static const auto* v = []() -> ProtobufWkt::Value* {
+    auto* vv = new ProtobufWkt::Value();
+    vv->set_null_value(ProtobufWkt::NULL_VALUE);
+    return vv;
+  }();
+  return *v;
+}
+
+ProtobufWkt::Value ValueUtil::stringValue(const std::string& str) {
+  ProtobufWkt::Value val;
+  val.set_string_value(str);
+  return val;
+}
+
+ProtobufWkt::Value ValueUtil::boolValue(bool b) {
+  ProtobufWkt::Value val;
+  val.set_bool_value(b);
+  return val;
+}
+
+ProtobufWkt::Value ValueUtil::structValue(const ProtobufWkt::Struct& obj) {
+  ProtobufWkt::Value val;
+  (*val.mutable_struct_value()) = obj;
+  return val;
+}
+
+ProtobufWkt::Value ValueUtil::listValue(const std::vector<ProtobufWkt::Value>& values) {
+  auto list = std::make_unique<ProtobufWkt::ListValue>();
+  for (const auto& value : values) {
+    *list->add_values() = value;
+  }
+  ProtobufWkt::Value val;
+  val.set_allocated_list_value(list.release());
+  return val;
 }
 
 namespace {

@@ -2,8 +2,8 @@
 
 #include <fstream>
 
-#include "envoy/api/v2/discovery.pb.h"
-#include "envoy/api/v2/eds.pb.h"
+#include "envoy/config/endpoint/v3alpha/endpoint.pb.h"
+#include "envoy/service/discovery/v3alpha/discovery.pb.h"
 
 #include "common/config/filesystem_subscription_impl.h"
 #include "common/config/utility.h"
@@ -75,7 +75,7 @@ public:
     }
     file_json.pop_back();
     file_json += "]}";
-    envoy::api::v2::DiscoveryResponse response_pb;
+    envoy::service::discovery::v3alpha::DiscoveryResponse response_pb;
     TestUtility::loadFromJson(file_json, response_pb);
     EXPECT_CALL(callbacks_, onConfigUpdate(RepeatedProtoEq(response_pb.resources()), version))
         .WillOnce(ThrowOnRejectedConfig(accept));
@@ -115,7 +115,9 @@ public:
   NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor_;
   Api::ApiPtr api_;
   Event::DispatcherPtr dispatcher_;
-  NiceMock<Config::MockSubscriptionCallbacks<envoy::api::v2::ClusterLoadAssignment>> callbacks_;
+  NiceMock<
+      Config::MockSubscriptionCallbacks<envoy::config::endpoint::v3alpha::ClusterLoadAssignment>>
+      callbacks_;
   FilesystemSubscriptionImpl subscription_;
   bool file_at_start_{false};
 };

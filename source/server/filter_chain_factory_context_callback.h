@@ -21,7 +21,7 @@ public:
    * chain context.
    */
   virtual std::shared_ptr<Configuration::FilterChainFactoryContext> createFilterChainFactoryContext(
-      const ::envoy::api::v2::listener::FilterChain* const filter_chain) PURE;
+      const ::envoy::config::listener::v3alpha::FilterChain* const filter_chain) PURE;
 };
 
 } // namespace Server

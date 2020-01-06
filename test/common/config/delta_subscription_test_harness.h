@@ -2,9 +2,9 @@
 
 #include <queue>
 
-#include "envoy/api/v2/core/base.pb.h"
-#include "envoy/api/v2/discovery.pb.h"
-#include "envoy/api/v2/eds.pb.h"
+#include "envoy/config/core/v3alpha/base.pb.h"
+#include "envoy/config/endpoint/v3alpha/endpoint.pb.h"
+#include "envoy/service/discovery/v3alpha/discovery.pb.h"
 
 #include "common/config/delta_subscription_impl.h"
 #include "common/config/version_converter.h"
@@ -88,7 +88,7 @@ public:
                          const std::set<std::string>& unsubscribe, const Protobuf::int32 error_code,
                          const std::string& error_message,
                          std::map<std::string, std::string> initial_resource_versions) {
-    envoy::api::v2::DeltaDiscoveryRequest expected_request;
+    envoy::service::discovery::v3alpha::DeltaDiscoveryRequest expected_request;
     expected_request.mutable_node()->CopyFrom(node_);
     std::copy(
         subscribe.begin(), subscribe.end(),
@@ -115,7 +115,7 @@ public:
                 sendMessageRaw_(
                     Grpc::ProtoBufferEqIgnoringField(expected_request, "response_nonce"), false))
         .WillOnce([this](Buffer::InstancePtr& buffer, bool) {
-          envoy::api::v2::DeltaDiscoveryRequest message;
+          envoy::service::discovery::v3alpha::DeltaDiscoveryRequest message;
           EXPECT_TRUE(Grpc::Common::parseBufferInstance(std::move(buffer), message));
           const std::string nonce = message.response_nonce();
           if (!nonce.empty()) {
@@ -126,17 +126,19 @@ public:
 
   void deliverConfigUpdate(const std::vector<std::string>& cluster_names,
                            const std::string& version, bool accept) override {
-    auto response = std::make_unique<envoy::api::v2::DeltaDiscoveryResponse>();
+    auto response = std::make_unique<envoy::service::discovery::v3alpha::DeltaDiscoveryResponse>();
     last_response_nonce_ = std::to_string(HashUtil::xxHash64(version));
     response->set_nonce(last_response_nonce_);
     response->set_system_version_info(version);
     response->set_type_url(Config::TypeUrl::get().ClusterLoadAssignment);
 
-    Protobuf::RepeatedPtrField<envoy::api::v2::ClusterLoadAssignment> typed_resources;
+    Protobuf::RepeatedPtrField<envoy::config::endpoint::v3alpha::ClusterLoadAssignment>
+        typed_resources;
     for (const auto& cluster : cluster_names) {
       if (std::find(last_cluster_names_.begin(), last_cluster_names_.end(), cluster) !=
           last_cluster_names_.end()) {
-        envoy::api::v2::ClusterLoadAssignment* load_assignment = typed_resources.Add();
+        envoy::config::endpoint::v3alpha::ClusterLoadAssignment* load_assignment =
+            typed_resources.Add();
         load_assignment->set_cluster_name(cluster);
         auto* resource = response->add_resources();
         resource->set_name(cluster);
@@ -200,8 +202,10 @@ public:
   std::set<std::string> last_cluster_names_;
   Envoy::Config::RateLimitSettings rate_limit_settings_;
   Event::MockTimer* init_timeout_timer_;
-  envoy::api::v2::core::Node node_;
-  NiceMock<Config::MockSubscriptionCallbacks<envoy::api::v2::ClusterLoadAssignment>> callbacks_;
+  envoy::config::core::v3alpha::Node node_;
+  NiceMock<
+      Config::MockSubscriptionCallbacks<envoy::config::endpoint::v3alpha::ClusterLoadAssignment>>
+      callbacks_;
   std::queue<std::string> nonce_acks_required_;
   std::queue<std::string> nonce_acks_sent_;
   bool subscription_started_{};

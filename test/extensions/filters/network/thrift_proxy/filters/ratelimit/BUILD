@@ -27,7 +27,7 @@ envoy_extension_cc_test(
         "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/upstream:upstream_mocks",
         "//test/test_common:utility_lib",
-        "@envoy_api//envoy/config/filter/thrift/rate_limit/v2alpha1:pkg_cc_proto",
+        "@envoy_api//envoy/config/filter/thrift/rate_limit/v3alpha:pkg_cc_proto",
     ],
 )
 
@@ -39,7 +39,7 @@ envoy_extension_cc_test(
         "//source/extensions/filters/network/thrift_proxy/filters/ratelimit:config",
         "//test/extensions/filters/network/thrift_proxy:mocks",
         "//test/mocks/server:server_mocks",
-        "@envoy_api//envoy/api/v2/core:pkg_cc_proto",
-        "@envoy_api//envoy/config/filter/thrift/rate_limit/v2alpha1:pkg_cc_proto",
+        "@envoy_api//envoy/config/core/v3alpha:pkg_cc_proto",
+        "@envoy_api//envoy/config/filter/thrift/rate_limit/v3alpha:pkg_cc_proto",
     ],
 )

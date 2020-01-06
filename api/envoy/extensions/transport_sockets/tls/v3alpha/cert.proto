@@ -7,6 +7,7 @@ import "envoy/config/core/v3alpha/config_source.proto";
 import "envoy/type/matcher/v3alpha/string.proto";
 
 import "google/protobuf/any.proto";
+import "google/protobuf/duration.proto";
 import "google/protobuf/struct.proto";
 import "google/protobuf/wrappers.proto";
 
@@ -405,7 +406,7 @@ message UpstreamTlsContext {
   google.protobuf.UInt32Value max_session_keys = 4;
 }
 
-// [#next-free-field: 6]
+// [#next-free-field: 7]
 message DownstreamTlsContext {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.api.v2.auth.DownstreamTlsContext";
@@ -428,15 +429,23 @@ message DownstreamTlsContext {
     // Config for fetching TLS session ticket keys via SDS API.
     SdsSecretConfig session_ticket_keys_sds_secret_config = 5;
   }
+
+  // If specified, session_timeout will change maximum lifetime (in seconds) of TLS session
+  // Currently this value is used as a hint to `TLS session ticket lifetime (for TLSv1.2)
+  // <https://tools.ietf.org/html/rfc5077#section-5.6>`
+  // only seconds could be specified (fractional seconds are going to be ignored).
+  google.protobuf.Duration session_timeout = 6 [(validate.rules).duration = {
+    lt {seconds: 4294967296}
+    gte {}
+  }];
 }
 
 message SdsSecretConfig {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.auth.SdsSecretConfig";
 
   // Name (FQDN, UUID, SPKI, SHA256, etc.) by which the secret can be uniquely referred to.
-  // When both name and config are specified, then secret can be fetched and/or reloaded via SDS.
-  // When only name is specified, then secret will be loaded from static
-  // resources.
+  // When both name and config are specified, then secret can be fetched and/or reloaded via
+  // SDS. When only name is specified, then secret will be loaded from static resources.
   string name = 1;
 
   config.core.v3alpha.ConfigSource sds_config = 2;
