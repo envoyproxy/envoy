@@ -193,9 +193,6 @@ protected:
       ConnectionCreationFunction* creator = nullptr);
   void testRouterUpstreamResponseBeforeRequestComplete();
 
-  void testResponseFramedByConnectionCloseWithReadLimits(
-      ConnectionCreationFunction* create_connection = nullptr);
-
   void testTwoRequests(bool force_network_backup = false);
   void testLargeHeaders(Http::TestHeaderMapImpl request_headers,
                         Http::TestHeaderMapImpl request_trailers, uint32_t size, uint32_t max_size);
