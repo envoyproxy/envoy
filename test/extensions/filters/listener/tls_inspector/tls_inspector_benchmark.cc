@@ -79,7 +79,7 @@ static void BM_TlsInspector(benchmark::State& state) {
   for (auto _ : state) {
     Filter filter(cfg);
     filter.onAccept(cb);
-    dispatcher.file_event_callback_(Event::FileReadyType::Read);
+    RELEASE_ASSERT(dispatcher.file_event_callback_ == nullptr, "");
     RELEASE_ASSERT(socket.detectedTransportProtocol() == "tls", "");
     RELEASE_ASSERT(socket.requestedServerName() == "example.com", "");
     RELEASE_ASSERT(socket.requestedApplicationProtocols().size() == 2 &&

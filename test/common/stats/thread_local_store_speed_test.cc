@@ -41,6 +41,9 @@ public:
     if (tls_) {
       tls_->shutdownGlobalThreading();
     }
+    if (dispatcher_) {
+      dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
+    }
   }
 
   void accessCounters() {

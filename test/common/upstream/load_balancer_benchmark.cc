@@ -40,6 +40,12 @@ public:
                                     {}, hosts, {}, absl::nullopt);
   }
 
+  Envoy::Thread::MutexBasicLockable lock_;
+  // Reduce default log level to warn while running this benchmark to avoid problems due to
+  // excessive debug logging in upstream_impl.cc
+  Envoy::Logger::Context logging_context_{spdlog::level::warn,
+                                          Envoy::Logger::Logger::DEFAULT_LOG_FORMAT, lock_, false};
+
   PrioritySetImpl priority_set_;
   PrioritySetImpl local_priority_set_;
   Stats::IsolatedStoreImpl stats_store_;
@@ -482,13 +488,3 @@ BENCHMARK(BM_MaglevLoadBalancerWeighted)
 } // namespace
 } // namespace Upstream
 } // namespace Envoy
-
-class GlobalInitialize {
-  Envoy::Thread::MutexBasicLockable lock_;
-  // Reduce default log level to warn while running this benchmark to avoid problems due to
-  // excessive debug logging in upstream_impl.cc
-  Envoy::Logger::Context logging_context_{spdlog::level::warn,
-                                          Envoy::Logger::Logger::DEFAULT_LOG_FORMAT, lock_, false};
-};
-
-GlobalInitialize initialize;

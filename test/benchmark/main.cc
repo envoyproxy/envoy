@@ -8,6 +8,8 @@
 
 #include "benchmark/benchmark.h"
 
+#include "absl/debugging/symbolize.h"
+
 // Boilerplate main(), which discovers benchmarks and runs them.
 int main(int argc, char** argv) {
 #ifndef __APPLE__

@@ -2,10 +2,14 @@ licenses(["notice"])  # Apache 2
 
 load(
     "//bazel:envoy_build_system.bzl",
-    "envoy_cc_benchmark_binary_and_test",
     "envoy_cc_library",
     "envoy_cc_test",
     "envoy_package",
+)
+load(
+    "//test/extensions:extensions_build_system.bzl",
+    "envoy_extension_benchmark_test",
+    "envoy_extension_cc_benchmark_binary",
 )
 
 envoy_package()
@@ -23,9 +27,10 @@ envoy_cc_test(
     ],
 )
 
-envoy_cc_benchmark_binary_and_test(
+envoy_extension_cc_benchmark_binary(
     name = "tls_inspector_benchmark",
     srcs = ["tls_inspector_benchmark.cc"],
+    extension_name = "envoy.filters.listener.tls_inspector",
     external_deps = [
         "benchmark",
     ],
@@ -38,6 +43,12 @@ envoy_cc_benchmark_binary_and_test(
         "//test/mocks/stats:stats_mocks",
         "//test/test_common:threadsafe_singleton_injector_lib",
     ],
+)
+
+envoy_extension_benchmark_test(
+    name = "tls_inspector_benchmark_test",
+    benchmark_binary = "tls_inspector_benchmark",
+    extension_name = "envoy.filters.listener.tls_inspector",
 )
 
 envoy_cc_library(

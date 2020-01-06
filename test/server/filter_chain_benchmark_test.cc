@@ -248,4 +248,3 @@ clang-format on
 */
 } // namespace Server
 } // namespace Envoy
-BENCHMARK_MAIN();

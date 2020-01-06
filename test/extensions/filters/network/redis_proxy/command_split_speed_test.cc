@@ -49,7 +49,7 @@ public:
   void createShared(Common::Redis::RespValueSharedPtr request) {
     for (uint64_t i = 1; i < request->asArray().size(); i += 2) {
       auto single_set = std::make_shared<const Common::Redis::RespValue>(
-          request, Common::Redis::Utility::SetRequest::instance(), i, i + 2);
+          request, Common::Redis::Utility::SetRequest::instance(), i, i + 1);
     }
   }
 

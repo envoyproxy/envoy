@@ -7,7 +7,8 @@ load(
 )
 load(
     "//test/extensions:extensions_build_system.bzl",
-    "envoy_extension_benchmark_binary_and_test",
+    "envoy_extension_benchmark_test",
+    "envoy_extension_cc_benchmark_binary",
     "envoy_extension_cc_test",
 )
 
@@ -101,7 +102,7 @@ envoy_extension_cc_test(
     ],
 )
 
-envoy_extension_benchmark_binary_and_test(
+envoy_extension_cc_benchmark_binary(
     name = "command_lookup_speed_test",
     srcs = ["command_lookup_speed_test.cc"],
     extension_name = "envoy.filters.network.redis_proxy",
@@ -116,6 +117,12 @@ envoy_extension_benchmark_binary_and_test(
         "//test/test_common:printers_lib",
         "//test/test_common:simulated_time_system_lib",
     ],
+)
+
+envoy_extension_benchmark_test(
+    name = "command_lookup_speed_test_benchmark_test",
+    benchmark_binary = "command_lookup_speed_test",
+    extension_name = "envoy.filters.network.redis_proxy",
 )
 
 envoy_extension_cc_test(
@@ -143,7 +150,7 @@ envoy_extension_cc_test(
     ],
 )
 
-envoy_extension_benchmark_binary_and_test(
+envoy_extension_cc_benchmark_binary(
     name = "command_split_speed_test",
     srcs = ["command_split_speed_test.cc"],
     extension_name = "envoy.filters.network.redis_proxy",
@@ -159,4 +166,10 @@ envoy_extension_benchmark_binary_and_test(
         "//test/test_common:printers_lib",
         "//test/test_common:simulated_time_system_lib",
     ],
+)
+
+envoy_extension_benchmark_test(
+    name = "command_split_speed_test_benchmark_test",
+    benchmark_binary = "command_split_speed_test",
+    extension_name = "envoy.filters.network.redis_proxy",
 )

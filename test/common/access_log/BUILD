@@ -2,7 +2,8 @@ licenses(["notice"])  # Apache 2
 
 load(
     "//bazel:envoy_build_system.bzl",
-    "envoy_cc_benchmark_binary_and_test",
+    "envoy_benchmark_test",
+    "envoy_cc_benchmark_binary",
     "envoy_cc_fuzz_test",
     "envoy_cc_test",
     "envoy_package",
@@ -78,7 +79,7 @@ envoy_cc_test(
     ],
 )
 
-envoy_cc_benchmark_binary_and_test(
+envoy_cc_benchmark_binary(
     name = "access_log_formatter_speed_test",
     srcs = ["access_log_formatter_speed_test.cc"],
     external_deps = [
@@ -93,4 +94,9 @@ envoy_cc_benchmark_binary_and_test(
         "//test/mocks/stream_info:stream_info_mocks",
         "//test/test_common:printers_lib",
     ],
+)
+
+envoy_benchmark_test(
+    name = "access_log_formatter_speed_test_benchmark_test",
+    benchmark_binary = "access_log_formatter_speed_test",
 )

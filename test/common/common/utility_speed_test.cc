@@ -246,8 +246,8 @@ static void BM_IntervalSetInsert17(benchmark::State& state) {
     interval_set.insert(3, 6);
     interval_set.insert(3, 20);
     interval_set.insert(3, 22);
-    interval_set.insert(-2, 23);
-    interval_set.insert(-3, 24);
+    interval_set.insert(23, 9223372036854775806UL);
+    interval_set.insert(24, 9223372036854775805UL);
   }
 }
 BENCHMARK(BM_IntervalSetInsert17);
