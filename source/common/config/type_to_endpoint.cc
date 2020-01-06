@@ -22,7 +22,9 @@ using TypeUrlToServiceMap = std::unordered_map<std::string, Service>;
 TypeUrlToServiceMap* buildTypeUrlToServiceMap() {
   auto* type_url_to_service_map = new TypeUrlToServiceMap();
   // This happens once in the lifetime of Envoy. We build a reverse map from resource type URL to
-  // service methods.
+  // service methods. We explicitly enumerate all services, since DescriptorPool doesn't support
+  // iterating over all descriptors, due its lazy load design, see
+  // https://www.mail-archive.com/protobuf@googlegroups.com/msg04540.html.
   for (const std::string& service_name : {
            "envoy.api.v2.RouteDiscoveryService",
            "envoy.service.route.v3alpha.RouteDiscoveryService",
