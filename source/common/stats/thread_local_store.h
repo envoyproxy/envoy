@@ -266,7 +266,6 @@ private:
     StatMap<ParentHistogramImplSharedPtr> histograms_;
     StatNameStorageSet rejected_stats_;
   };
-  // using CentralCacheEntryPtr = std::unique_ptr<CentralCacheEntry>;
 
   struct ScopeImpl : public TlsScope {
     ScopeImpl(ThreadLocalStoreImpl& parent, const std::string& prefix);
