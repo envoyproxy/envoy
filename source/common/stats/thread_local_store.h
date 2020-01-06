@@ -255,12 +255,18 @@ private:
   };
 
   struct CentralCacheEntry {
+    CentralCacheEntry() = default;
+    CentralCacheEntry(CentralCacheEntry&& src)
+        : counters_(std::move(src.counters_)), gauges_(std::move(src.gauges_)),
+          histograms_(std::move(src.histograms_)), rejected_stats_(std::move(src.rejected_stats_)) {
+    }
+
     StatMap<CounterSharedPtr> counters_;
     StatMap<GaugeSharedPtr> gauges_;
     StatMap<ParentHistogramImplSharedPtr> histograms_;
     StatNameStorageSet rejected_stats_;
   };
-  using CentralCacheEntryPtr = std::unique_ptr<CentralCacheEntry>;
+  // using CentralCacheEntryPtr = std::unique_ptr<CentralCacheEntry>;
 
   struct ScopeImpl : public TlsScope {
     ScopeImpl(ThreadLocalStoreImpl& parent, const std::string& prefix);
@@ -343,7 +349,7 @@ private:
     const uint64_t scope_id_;
     ThreadLocalStoreImpl& parent_;
     StatNameStorage prefix_;
-    mutable CentralCacheEntryPtr central_cache_;
+    mutable CentralCacheEntry central_cache_;
   };
 
   struct TlsCache : public ThreadLocal::ThreadLocalObject {
