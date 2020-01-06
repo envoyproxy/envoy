@@ -259,6 +259,7 @@ envoy_cc_test(
         "//source/extensions/transport_sockets/raw_buffer:config",
         "//source/extensions/transport_sockets/tls:config",
         "//source/extensions/transport_sockets/tls:ssl_socket_lib",
+        "//source/server:api_listener_lib",
         "//source/server:filter_chain_manager_lib",
         "//source/server:listener_lib",
         "//test/mocks/network:network_mocks",

@@ -156,6 +156,7 @@ envoy_cc_library(
     srcs = envoy_select_hot_restart(["hot_restarting_parent.cc"]),
     hdrs = envoy_select_hot_restart(["hot_restarting_parent.h"]),
     deps = [
+        ":api_listener_lib",
         ":hot_restarting_base",
         ":listener_lib",
         "//source/common/memory:stats_lib",
