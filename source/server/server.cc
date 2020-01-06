@@ -627,10 +627,8 @@ void InstanceImpl::notifyCallbacksForStage(Stage stage, Event::PostCb completion
 
   // Wrap completion_cb so that it only gets invoked when all callbacks for this stage
   // have finished their work.
-  std::shared_ptr<void> cb_guard(new int(0), [this, completion_cb](int* sentinel) {
-    dispatcher_->post(completion_cb);
-    delete sentinel;
-  });
+  std::shared_ptr<void> cb_guard(
+      new Cleanup([this, completion_cb]() { dispatcher_->post(completion_cb); }));
 
   // Registrations which take a completion callback are typically implemented by executing a
   // callback on all worker threads using Slot::runOnAllThreads which will hang indefinitely if
