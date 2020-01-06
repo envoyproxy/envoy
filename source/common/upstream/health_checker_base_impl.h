@@ -134,8 +134,8 @@ private:
   void refreshHealthyStat();
   void runCallbacks(HostSharedPtr host, HealthTransition changed_state);
   void setUnhealthyCrossThread(const HostSharedPtr& host);
-  std::shared_ptr<const Network::TransportSocketOptionsImpl>
-  initTransportSocketOptions(const envoy::config::core::v3alpha::HealthCheck& config) const;
+  static std::shared_ptr<const Network::TransportSocketOptionsImpl>
+  initTransportSocketOptions(const envoy::config::core::v3alpha::HealthCheck& config);
 
   static const std::chrono::milliseconds NO_TRAFFIC_INTERVAL;
 
