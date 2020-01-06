@@ -2,14 +2,16 @@
 
 // TODO(asraa): Remove <experimental/filesystem> and rely only on <filesystem> when Envoy requires
 // stdc++17
-#if defined(_LIBCPP_VERSION) && !defined(__APPLE__)
+#if defined __has_include
+#if __has_include(<filesystem>)
 #include <filesystem>
-#elif defined(_MSVC_LANG) && _MSVC_LANG >= 201703L
-#include <filesystem>
-#elif defined __has_include
-#if __has_include(<experimental/filesystem>) && !defined(__APPLE__)
+#elif __has_include(<experimental/filesystem>)
 #include <experimental/filesystem>
 #endif
+#else
+// __has_include was a key feature of stdc++17, so if it is absent,
+// we presume that only experimental/filesystem could be available.
+#include <experimental/filesystem>
 #endif
 #include <fstream>
 #include <iostream>
