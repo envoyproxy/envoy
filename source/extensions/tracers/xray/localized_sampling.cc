@@ -10,17 +10,17 @@ namespace Extensions {
 namespace Tracers {
 namespace XRay {
 
-constexpr static double DefaultRate = 0.5;
-constexpr static int DefaultFixedTarget = 1;
-constexpr static int SamplingFileVersion = 2;
-constexpr static char VersionJsonKey[] = "version";
-constexpr static char DefaultRuleJsonKey[] = "default";
-constexpr static char FixedTargetJsonKey[] = "fixed_target";
-constexpr static char RateJsonKey[] = "rate";
-constexpr static char CustomRulesJsonKey[] = "rules";
-constexpr static char HostJsonKey[] = "host";
-constexpr static char HttpMethodJsonKey[] = "http_method";
-constexpr static char UrlPathJsonKey[] = "url_path";
+constexpr double DefaultRate = 0.5;
+constexpr int DefaultFixedTarget = 1;
+constexpr int SamplingFileVersion = 2;
+constexpr auto VersionJsonKey = "version";
+constexpr auto DefaultRuleJsonKey = "default";
+constexpr auto FixedTargetJsonKey = "fixed_target";
+constexpr auto RateJsonKey = "rate";
+constexpr auto CustomRulesJsonKey = "rules";
+constexpr auto HostJsonKey = "host";
+constexpr auto HttpMethodJsonKey = "http_method";
+constexpr auto UrlPathJsonKey = "url_path";
 
 namespace {
 void fail(absl::string_view msg) {
@@ -30,9 +30,8 @@ void fail(absl::string_view msg) {
 
 bool is_valid_rate(double n) { return n >= 0 && n <= 1.0; }
 bool is_valid_fixed_target(double n) { return n >= 0 && static_cast<uint32_t>(n) == n; }
-} // namespace
 
-static bool validateRule(const ProtobufWkt::Struct& rule) {
+bool validateRule(const ProtobufWkt::Struct& rule) {
   using ProtobufWkt::Value;
 
   const auto host_it = rule.fields().find(HostJsonKey);
@@ -73,6 +72,7 @@ static bool validateRule(const ProtobufWkt::Struct& rule) {
   }
   return true;
 }
+} // namespace
 
 LocalizedSamplingRule LocalizedSamplingRule::createDefault() {
   return LocalizedSamplingRule(DefaultFixedTarget, DefaultRate);

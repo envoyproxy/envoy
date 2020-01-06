@@ -73,5 +73,6 @@ marked with 123.
     listener_filters:
       - name: envoy.listener.proxy_protocol
       - name: envoy.listener.original_src
-        config:
+        typed_config:
+          "@type": type.googleapis.com/envoy.config.filter.listener.original_src.v2alpha1.OriginalSrc
           mark: 123

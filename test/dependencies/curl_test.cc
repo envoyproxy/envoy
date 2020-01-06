@@ -14,7 +14,12 @@ TEST(CurlTest, BuiltWithExpectedFeatures) {
   EXPECT_NE(0, info->features & CURL_VERSION_HTTP2);
   EXPECT_NE(0, info->features & CURL_VERSION_LIBZ);
   EXPECT_NE(0, info->features & CURL_VERSION_IPV6);
+
+#ifndef WIN32
   EXPECT_NE(0, info->features & CURL_VERSION_UNIX_SOCKETS);
+#else
+  EXPECT_EQ(0, info->features & CURL_VERSION_UNIX_SOCKETS);
+#endif
 
   EXPECT_EQ(0, info->features & CURL_VERSION_BROTLI);
   EXPECT_EQ(0, info->features & CURL_VERSION_GSSAPI);

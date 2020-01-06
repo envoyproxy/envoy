@@ -1,5 +1,7 @@
 #include <vector>
 
+#include "envoy/extensions/filters/network/redis_proxy/v3alpha/redis_proxy.pb.h"
+
 #include "common/buffer/buffer_impl.h"
 #include "common/network/utility.h"
 #include "common/upstream/upstream_impl.h"
@@ -100,9 +102,8 @@ public:
     client_impl->onRespValue(std::move(response1));
   }
 
-  void testInitializeReadPolicy(
-      envoy::config::filter::network::redis_proxy::v2::RedisProxy::ConnPoolSettings::ReadPolicy
-          read_policy) {
+  void testInitializeReadPolicy(envoy::extensions::filters::network::redis_proxy::v3alpha::
+                                    RedisProxy::ConnPoolSettings::ReadPolicy read_policy) {
     InSequence s;
 
     setup(std::make_unique<ConfigImpl>(createConnPoolSettings(20, true, true, 100, read_policy)));
@@ -353,23 +354,23 @@ TEST_F(RedisClientImplTest, InitializedWithAuthPassword) {
 }
 
 TEST_F(RedisClientImplTest, InitializedWithPreferMasterReadPolicy) {
-  testInitializeReadPolicy(envoy::config::filter::network::redis_proxy::v2::
-                               RedisProxy_ConnPoolSettings_ReadPolicy_PREFER_MASTER);
+  testInitializeReadPolicy(envoy::extensions::filters::network::redis_proxy::v3alpha::RedisProxy::
+                               ConnPoolSettings::PREFER_MASTER);
 }
 
 TEST_F(RedisClientImplTest, InitializedWithReplicaReadPolicy) {
-  testInitializeReadPolicy(envoy::config::filter::network::redis_proxy::v2::
-                               RedisProxy_ConnPoolSettings_ReadPolicy_REPLICA);
+  testInitializeReadPolicy(envoy::extensions::filters::network::redis_proxy::v3alpha::RedisProxy::
+                               ConnPoolSettings::REPLICA);
 }
 
 TEST_F(RedisClientImplTest, InitializedWithPreferReplicaReadPolicy) {
-  testInitializeReadPolicy(envoy::config::filter::network::redis_proxy::v2::
-                               RedisProxy_ConnPoolSettings_ReadPolicy_PREFER_REPLICA);
+  testInitializeReadPolicy(envoy::extensions::filters::network::redis_proxy::v3alpha::RedisProxy::
+                               ConnPoolSettings::PREFER_REPLICA);
 }
 
 TEST_F(RedisClientImplTest, InitializedWithAnyReadPolicy) {
   testInitializeReadPolicy(
-      envoy::config::filter::network::redis_proxy::v2::RedisProxy_ConnPoolSettings_ReadPolicy_ANY);
+      envoy::extensions::filters::network::redis_proxy::v3alpha::RedisProxy::ConnPoolSettings::ANY);
 }
 
 TEST_F(RedisClientImplTest, Cancel) {

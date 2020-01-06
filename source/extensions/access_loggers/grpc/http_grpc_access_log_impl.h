@@ -3,12 +3,10 @@
 #include <unordered_map>
 #include <vector>
 
-#include "envoy/config/accesslog/v2/als.pb.h"
-#include "envoy/config/filter/accesslog/v2/accesslog.pb.h"
+#include "envoy/extensions/access_loggers/grpc/v3alpha/als.pb.h"
 #include "envoy/grpc/async_client.h"
 #include "envoy/grpc/async_client_manager.h"
 #include "envoy/local_info/local_info.h"
-#include "envoy/service/accesslog/v2/als.pb.h"
 #include "envoy/singleton/instance.h"
 #include "envoy/thread_local/thread_local.h"
 
@@ -29,10 +27,11 @@ namespace HttpGrpc {
  */
 class HttpGrpcAccessLog : public Common::ImplBase {
 public:
-  HttpGrpcAccessLog(AccessLog::FilterPtr&& filter,
-                    envoy::config::accesslog::v2::HttpGrpcAccessLogConfig config,
-                    ThreadLocal::SlotAllocator& tls,
-                    GrpcCommon::GrpcAccessLoggerCacheSharedPtr access_logger_cache);
+  HttpGrpcAccessLog(
+      AccessLog::FilterPtr&& filter,
+      envoy::extensions::access_loggers::grpc::v3alpha::HttpGrpcAccessLogConfig config,
+      ThreadLocal::SlotAllocator& tls,
+      GrpcCommon::GrpcAccessLoggerCacheSharedPtr access_logger_cache);
 
 private:
   /**
@@ -49,7 +48,7 @@ private:
                const Http::HeaderMap& response_trailers,
                const StreamInfo::StreamInfo& stream_info) override;
 
-  const envoy::config::accesslog::v2::HttpGrpcAccessLogConfig config_;
+  const envoy::extensions::access_loggers::grpc::v3alpha::HttpGrpcAccessLogConfig config_;
   const ThreadLocal::SlotPtr tls_slot_;
   const GrpcCommon::GrpcAccessLoggerCacheSharedPtr access_logger_cache_;
   std::vector<Http::LowerCaseString> request_headers_to_log_;

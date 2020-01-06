@@ -1,5 +1,6 @@
 licenses(["notice"])  # Apache 2
 
+load("@rules_proto//proto:defs.bzl", "proto_library")
 load(
     "//bazel:envoy_build_system.bzl",
     "envoy_cc_library",
@@ -64,6 +65,8 @@ envoy_cc_library(
         "//source/common/common:assert_lib",
         "//source/common/common:hash_lib",
         "//source/common/common:utility_lib",
-        "@envoy_api//envoy/type:pkg_cc_proto",
+        "//source/common/config:api_type_oracle_lib",
+        "//source/common/config:version_converter_lib",
+        "@envoy_api//envoy/type/v3alpha:pkg_cc_proto",
     ],
 )

@@ -6,7 +6,7 @@ Proxy Protocol
 This listener filter adds support for
 `HAProxy Proxy Protocol <https://www.haproxy.org/download/1.9/doc/proxy-protocol.txt>`_.
 
-In this mode, the upstream connection is assumed to come from a proxy
+In this mode, the downstream connection is assumed to come from a proxy
 which places the original coordinates (IP, PORT) into a connection-string.
 Envoy then extracts these and uses them as the remote address.
 

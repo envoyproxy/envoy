@@ -1,5 +1,7 @@
 #pragma once
 
+#include "envoy/extensions/common/dynamic_forward_proxy/v3alpha/dns_cache.pb.h"
+
 #include "extensions/common/dynamic_forward_proxy/dns_cache.h"
 
 #include "gmock/gmock.h"
@@ -53,7 +55,7 @@ public:
   MOCK_METHOD1(
       getCache,
       DnsCacheSharedPtr(
-          const envoy::config::common::dynamic_forward_proxy::v2alpha::DnsCacheConfig& config));
+          const envoy::extensions::common::dynamic_forward_proxy::v3alpha::DnsCacheConfig& config));
 
   std::shared_ptr<MockDnsCache> dns_cache_{new MockDnsCache()};
 };

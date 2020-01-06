@@ -1,5 +1,7 @@
 #pragma once
 
+#include "envoy/extensions/common/dynamic_forward_proxy/v3alpha/dns_cache.pb.h"
+
 #include "extensions/common/dynamic_forward_proxy/dns_cache.h"
 
 #include "absl/container/flat_hash_map.h"
@@ -16,16 +18,18 @@ public:
       : main_thread_dispatcher_(main_thread_dispatcher), tls_(tls), root_scope_(root_scope) {}
 
   // DnsCacheManager
-  DnsCacheSharedPtr getCache(
-      const envoy::config::common::dynamic_forward_proxy::v2alpha::DnsCacheConfig& config) override;
+  DnsCacheSharedPtr
+  getCache(const envoy::extensions::common::dynamic_forward_proxy::v3alpha::DnsCacheConfig& config)
+      override;
 
 private:
   struct ActiveCache {
-    ActiveCache(const envoy::config::common::dynamic_forward_proxy::v2alpha::DnsCacheConfig& config,
-                DnsCacheSharedPtr cache)
+    ActiveCache(
+        const envoy::extensions::common::dynamic_forward_proxy::v3alpha::DnsCacheConfig& config,
+        DnsCacheSharedPtr cache)
         : config_(config), cache_(cache) {}
 
-    const envoy::config::common::dynamic_forward_proxy::v2alpha::DnsCacheConfig config_;
+    const envoy::extensions::common::dynamic_forward_proxy::v3alpha::DnsCacheConfig config_;
     DnsCacheSharedPtr cache_;
   };
 

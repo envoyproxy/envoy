@@ -70,6 +70,10 @@ protected:
 
   StatName makeStat(absl::string_view name) { return pool_->add(name); }
 
+  std::vector<uint8_t> serializeDeserialize(uint64_t number) {
+    return TestUtil::serializeDeserializeNumber(number);
+  }
+
   FakeSymbolTableImpl* fake_symbol_table_{nullptr};
   SymbolTableImpl* real_symbol_table_{nullptr};
   std::unique_ptr<SymbolTable> table_;
@@ -78,6 +82,48 @@ protected:
 
 INSTANTIATE_TEST_SUITE_P(StatNameTest, StatNameTest,
                          testing::ValuesIn({SymbolTableType::Real, SymbolTableType::Fake}));
+
+TEST_P(StatNameTest, SerializeBytes) {
+  EXPECT_EQ(std::vector<uint8_t>{1}, serializeDeserialize(1));
+  EXPECT_EQ(std::vector<uint8_t>{127}, serializeDeserialize(127));
+  EXPECT_EQ((std::vector<uint8_t>{128, 1}), serializeDeserialize(128));
+  EXPECT_EQ((std::vector<uint8_t>{129, 1}), serializeDeserialize(129));
+  EXPECT_EQ((std::vector<uint8_t>{255, 1}), serializeDeserialize(255));
+  EXPECT_EQ((std::vector<uint8_t>{255, 127}), serializeDeserialize(16383));
+  EXPECT_EQ((std::vector<uint8_t>{128, 128, 1}), serializeDeserialize(16384));
+  EXPECT_EQ((std::vector<uint8_t>{129, 128, 1}), serializeDeserialize(16385));
+
+  auto power2 = [](uint32_t exp) -> uint64_t {
+    uint64_t one = 1;
+    return one << exp;
+  };
+  EXPECT_EQ((std::vector<uint8_t>{255, 255, 127}), serializeDeserialize(power2(21) - 1));
+  EXPECT_EQ((std::vector<uint8_t>{128, 128, 128, 1}), serializeDeserialize(power2(21)));
+  EXPECT_EQ((std::vector<uint8_t>{129, 128, 128, 1}), serializeDeserialize(power2(21) + 1));
+  EXPECT_EQ((std::vector<uint8_t>{255, 255, 255, 127}), serializeDeserialize(power2(28) - 1));
+  EXPECT_EQ((std::vector<uint8_t>{128, 128, 128, 128, 1}), serializeDeserialize(power2(28)));
+  EXPECT_EQ((std::vector<uint8_t>{129, 128, 128, 128, 1}), serializeDeserialize(power2(28) + 1));
+  EXPECT_EQ((std::vector<uint8_t>{255, 255, 255, 255, 127}), serializeDeserialize(power2(35) - 1));
+  EXPECT_EQ((std::vector<uint8_t>{128, 128, 128, 128, 128, 1}), serializeDeserialize(power2(35)));
+  EXPECT_EQ((std::vector<uint8_t>{129, 128, 128, 128, 128, 1}),
+            serializeDeserialize(power2(35) + 1));
+
+  for (uint32_t i = 0; i < 17000; ++i) {
+    serializeDeserialize(i);
+  }
+}
+
+TEST_P(StatNameTest, SerializeStrings) {
+  TestUtil::serializeDeserializeString("");
+  TestUtil::serializeDeserializeString("Hello, world!");
+  TestUtil::serializeDeserializeString("embedded\0\nul");
+  TestUtil::serializeDeserializeString(std::string(200, 'a'));
+  TestUtil::serializeDeserializeString(std::string(2000, 'a'));
+  TestUtil::serializeDeserializeString(std::string(20000, 'a'));
+  TestUtil::serializeDeserializeString(std::string(200000, 'a'));
+  TestUtil::serializeDeserializeString(std::string(2000000, 'a'));
+  TestUtil::serializeDeserializeString(std::string(20000000, 'a'));
+}
 
 TEST_P(StatNameTest, AllocFree) { encodeDecode("hello.world"); }
 
@@ -99,6 +145,28 @@ TEST_P(StatNameTest, Test100KSymbolsRoundtrip) {
     const std::string stat_name = absl::StrCat("symbol_", i);
     EXPECT_EQ(stat_name, encodeDecode(stat_name));
   }
+}
+
+TEST_P(StatNameTest, TwoHundredTwoLevel) {
+  for (int i = 0; i < 200; ++i) {
+    const std::string stat_name = absl::StrCat("symbol_", i);
+    EXPECT_EQ(stat_name, encodeDecode(stat_name));
+  }
+  EXPECT_EQ("http.foo", encodeDecode("http.foo"));
+}
+
+TEST_P(StatNameTest, TestLongSymbolName) {
+  std::string long_name(100000, 'a');
+  EXPECT_EQ(long_name, encodeDecode(long_name));
+}
+
+TEST_P(StatNameTest, TestLongSequence) {
+  std::string long_name("a");
+  for (int i = 0; i < 100000; ++i) {
+    absl::StrAppend(&long_name, ".a");
+  }
+
+  EXPECT_EQ(long_name, encodeDecode(long_name));
 }
 
 TEST_P(StatNameTest, TestUnusualDelimitersRoundtrip) {
