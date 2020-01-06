@@ -1278,20 +1278,20 @@ TEST_P(AdminInstanceTest, ClustersJson) {
   ON_CALL(*host, hostname()).WillByDefault(ReturnRef(hostname));
 
   // Add stats in random order and validate that they come in order.
-  Stats::PrimitiveCounter test_counter;
+  Stats::PrimitiveCounterImpl test_counter;
   test_counter.add(10);
-  Stats::PrimitiveCounter rest_counter;
+  Stats::PrimitiveCounterImpl rest_counter;
   rest_counter.add(10);
-  Stats::PrimitiveCounter arest_counter;
+  Stats::PrimitiveCounterImpl arest_counter;
   arest_counter.add(5);
   std::vector<std::pair<absl::string_view, Stats::PrimitiveCounterReference>> counters = {
       {"arest_counter", arest_counter},
       {"rest_counter", rest_counter},
       {"test_counter", test_counter},
   };
-  Stats::PrimitiveGauge test_gauge;
+  Stats::PrimitiveGaugeImpl test_gauge;
   test_gauge.set(11);
-  Stats::PrimitiveGauge atest_gauge;
+  Stats::PrimitiveGaugeImpl atest_gauge;
   atest_gauge.set(10);
   std::vector<std::pair<absl::string_view, Stats::PrimitiveGaugeReference>> gauges = {
       {"atest_gauge", atest_gauge},
