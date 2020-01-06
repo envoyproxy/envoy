@@ -137,7 +137,7 @@ synthesizing a new request, sending it to the upstream specified by the new rout
 returning the redirected response as the response to the original request.
 
 Internal redirects are configured via the ref:`internal redirect action
-<envoy_api_field_route.RouteAction.internal_redirect_action>` and
+<envoy_api_field_route.RouteAction.internal_redirect_action>` field and
 `max previous internal redirect <envoy_api_field_route.RouteAction.max_previous_internal_redirect>` field in
 route configuration. When redirect handling is on, any 302 response from upstream is
 subject to the redirect being handled by Envoy.
