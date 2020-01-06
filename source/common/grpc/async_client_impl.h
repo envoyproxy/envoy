@@ -1,7 +1,7 @@
 #pragma once
 
-#include "envoy/api/v2/core/base.pb.h"
-#include "envoy/api/v2/core/grpc_service.pb.h"
+#include "envoy/config/core/v3alpha/base.pb.h"
+#include "envoy/config/core/v3alpha/grpc_service.pb.h"
 #include "envoy/grpc/async_client.h"
 
 #include "common/common/linked_object.h"
@@ -17,8 +17,8 @@ class AsyncStreamImpl;
 
 class AsyncClientImpl final : public RawAsyncClient {
 public:
-  AsyncClientImpl(Upstream::ClusterManager& cm, const envoy::api::v2::core::GrpcService& config,
-                  TimeSource& time_source);
+  AsyncClientImpl(Upstream::ClusterManager& cm,
+                  const envoy::config::core::v3alpha::GrpcService& config, TimeSource& time_source);
   ~AsyncClientImpl() override;
 
   // Grpc::AsyncClient
@@ -33,7 +33,7 @@ public:
 private:
   Upstream::ClusterManager& cm_;
   const std::string remote_cluster_name_;
-  const Protobuf::RepeatedPtrField<envoy::api::v2::core::HeaderValue> initial_metadata_;
+  const Protobuf::RepeatedPtrField<envoy::config::core::v3alpha::HeaderValue> initial_metadata_;
   std::list<std::unique_ptr<AsyncStreamImpl>> active_streams_;
   TimeSource& time_source_;
 

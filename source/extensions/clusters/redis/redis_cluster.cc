@@ -2,10 +2,11 @@
 
 #include <err.h>
 
-#include "envoy/api/v2/cds.pb.h"
 #include "envoy/config/cluster/redis/redis_cluster.pb.h"
 #include "envoy/config/cluster/redis/redis_cluster.pb.validate.h"
-#include "envoy/config/filter/network/redis_proxy/v2/redis_proxy.pb.validate.h"
+#include "envoy/config/cluster/v3alpha/cluster.pb.h"
+#include "envoy/extensions/filters/network/redis_proxy/v3alpha/redis_proxy.pb.h"
+#include "envoy/extensions/filters/network/redis_proxy/v3alpha/redis_proxy.pb.validate.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -17,7 +18,7 @@ Extensions::NetworkFilters::Common::Redis::Client::DoNothingPoolCallbacks null_p
 } // namespace
 
 RedisCluster::RedisCluster(
-    const envoy::api::v2::Cluster& cluster,
+    const envoy::config::cluster::v3alpha::Cluster& cluster,
     const envoy::config::cluster::redis::RedisClusterConfig& redis_cluster,
     NetworkFilters::Common::Redis::Client::ClientFactory& redis_client_factory,
     Upstream::ClusterManager& cluster_manager, Runtime::Loader& runtime, Api::Api& api,
@@ -360,7 +361,7 @@ RedisCluster::ClusterSlotsRequest RedisCluster::ClusterSlotsRequest::instance_;
 
 std::pair<Upstream::ClusterImplBaseSharedPtr, Upstream::ThreadAwareLoadBalancerPtr>
 RedisClusterFactory::createClusterWithConfig(
-    const envoy::api::v2::Cluster& cluster,
+    const envoy::config::cluster::v3alpha::Cluster& cluster,
     const envoy::config::cluster::redis::RedisClusterConfig& proto_config,
     Upstream::ClusterFactoryContext& context,
     Envoy::Server::Configuration::TransportSocketFactoryContext& socket_factory_context,
@@ -371,7 +372,7 @@ RedisClusterFactory::createClusterWithConfig(
   }
   // TODO(hyang): This is needed to migrate existing cluster, disallow using other lb_policy
   // in the future
-  if (cluster.lb_policy() != envoy::api::v2::Cluster::CLUSTER_PROVIDED) {
+  if (cluster.lb_policy() != envoy::config::cluster::v3alpha::Cluster::CLUSTER_PROVIDED) {
     return std::make_pair(std::make_shared<RedisCluster>(
                               cluster, proto_config,
                               NetworkFilters::Common::Redis::Client::ClientFactoryImpl::instance_,

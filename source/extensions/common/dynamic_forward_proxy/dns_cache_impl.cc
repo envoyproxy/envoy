@@ -1,6 +1,6 @@
 #include "extensions/common/dynamic_forward_proxy/dns_cache_impl.h"
 
-#include "envoy/config/common/dynamic_forward_proxy/v2alpha/dns_cache.pb.h"
+#include "envoy/extensions/common/dynamic_forward_proxy/v3alpha/dns_cache.pb.h"
 
 #include "common/http/utility.h"
 #include "common/network/utility.h"
@@ -16,7 +16,7 @@ namespace DynamicForwardProxy {
 DnsCacheImpl::DnsCacheImpl(
     Event::Dispatcher& main_thread_dispatcher, ThreadLocal::SlotAllocator& tls,
     Stats::Scope& root_scope,
-    const envoy::config::common::dynamic_forward_proxy::v2alpha::DnsCacheConfig& config)
+    const envoy::extensions::common::dynamic_forward_proxy::v3alpha::DnsCacheConfig& config)
     : main_thread_dispatcher_(main_thread_dispatcher),
       dns_lookup_family_(Upstream::getDnsLookupFamilyFromEnum(config.dns_lookup_family())),
       resolver_(main_thread_dispatcher.createDnsResolver({}, false)), tls_slot_(tls.allocateSlot()),

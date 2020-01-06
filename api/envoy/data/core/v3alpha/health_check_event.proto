@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package envoy.data.core.v3alpha;
 
-import "envoy/api/v3alpha/core/address.proto";
+import "envoy/config/core/v3alpha/address.proto";
 
 import "google/protobuf/timestamp.proto";
 
@@ -37,7 +37,7 @@ message HealthCheckEvent {
 
   HealthCheckerType health_checker_type = 1 [(validate.rules).enum = {defined_only: true}];
 
-  api.v3alpha.core.Address host = 2;
+  config.core.v3alpha.Address host = 2;
 
   string cluster_name = 3 [(validate.rules).string = {min_bytes: 1}];
 
@@ -78,8 +78,8 @@ message HealthCheckAddHealthy {
 
   // Whether this addition is the result of the first ever health check on a host, in which case
   // the configured :ref:`healthy threshold
-  // <envoy_api_field_api.v3alpha.core.HealthCheck.healthy_threshold>` is bypassed and the host is
-  // immediately added.
+  // <envoy_api_field_config.core.v3alpha.HealthCheck.healthy_threshold>` is bypassed and the host
+  // is immediately added.
   bool first_check = 1;
 }
 

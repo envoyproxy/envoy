@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package envoy.data.tap.v3alpha;
 
-import "envoy/api/v3alpha/core/address.proto";
+import "envoy/config/core/v3alpha/address.proto";
 import "envoy/data/tap/v3alpha/common.proto";
 
 import "google/protobuf/timestamp.proto";
@@ -22,10 +22,10 @@ message Connection {
   option (udpa.annotations.versioning).previous_message_type = "envoy.data.tap.v2alpha.Connection";
 
   // Local address.
-  api.v3alpha.core.Address local_address = 2;
+  config.core.v3alpha.Address local_address = 2;
 
   // Remote address.
-  api.v3alpha.core.Address remote_address = 3;
+  config.core.v3alpha.Address remote_address = 3;
 }
 
 // Event in a socket trace.
@@ -93,11 +93,11 @@ message SocketBufferedTrace {
   repeated SocketEvent events = 3;
 
   // Set to true if read events were truncated due to the :ref:`max_buffered_rx_bytes
-  // <envoy_api_field_service.tap.v3alpha.OutputConfig.max_buffered_rx_bytes>` setting.
+  // <envoy_api_field_config.tap.v3alpha.OutputConfig.max_buffered_rx_bytes>` setting.
   bool read_truncated = 4;
 
   // Set to true if write events were truncated due to the :ref:`max_buffered_tx_bytes
-  // <envoy_api_field_service.tap.v3alpha.OutputConfig.max_buffered_tx_bytes>` setting.
+  // <envoy_api_field_config.tap.v3alpha.OutputConfig.max_buffered_tx_bytes>` setting.
   bool write_truncated = 5;
 }
 

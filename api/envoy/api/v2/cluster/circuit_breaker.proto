@@ -7,6 +7,7 @@ import "envoy/type/percent.proto";
 
 import "google/protobuf/wrappers.proto";
 
+import "udpa/annotations/migrate.proto";
 import "validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.api.v2.cluster";
@@ -14,6 +15,7 @@ option java_outer_classname = "CircuitBreakerProto";
 option java_multiple_files = true;
 option csharp_namespace = "Envoy.Api.V2.ClusterNS";
 option ruby_package = "Envoy.Api.V2.ClusterNS";
+option (udpa.annotations.file_migrate).move_to_package = "envoy.config.cluster.v3alpha";
 
 // [#protodoc-title: Circuit breakers]
 

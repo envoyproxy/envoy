@@ -1,4 +1,4 @@
-#include "envoy/api/v2/discovery.pb.h"
+#include "envoy/service/discovery/v3alpha/discovery.pb.h"
 
 #include "common/config/grpc_stream.h"
 #include "common/protobuf/protobuf.h"
@@ -38,7 +38,9 @@ protected:
   std::unique_ptr<Grpc::MockAsyncClient> async_client_owner_;
   Grpc::MockAsyncClient* async_client_;
 
-  GrpcStream<envoy::api::v2::DiscoveryRequest, envoy::api::v2::DiscoveryResponse> grpc_stream_;
+  GrpcStream<envoy::service::discovery::v3alpha::DiscoveryRequest,
+             envoy::service::discovery::v3alpha::DiscoveryResponse>
+      grpc_stream_;
 };
 
 // Tests that establishNewStream() establishes it, a second call does nothing, and a third call
@@ -84,7 +86,7 @@ TEST_F(GrpcStreamTest, FailToEstablishNewStream) {
 TEST_F(GrpcStreamTest, SendMessage) {
   EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
   grpc_stream_.establishNewStream();
-  envoy::api::v2::DiscoveryRequest request;
+  envoy::service::discovery::v3alpha::DiscoveryRequest request;
   request.set_response_nonce("grpc_stream_test_noncense");
   EXPECT_CALL(async_stream_, sendMessageRaw_(Grpc::ProtoBufferEq(request), false));
   grpc_stream_.sendMessage(request);
@@ -94,14 +96,17 @@ TEST_F(GrpcStreamTest, SendMessage) {
 // underlying gRPC machinery, the received proto will make it up to the GrpcStreamCallbacks that the
 // GrpcStream was given.
 TEST_F(GrpcStreamTest, ReceiveMessage) {
-  envoy::api::v2::DiscoveryResponse response_copy;
+  envoy::service::discovery::v3alpha::DiscoveryResponse response_copy;
   response_copy.set_type_url("faketypeURL");
-  auto response = std::make_unique<envoy::api::v2::DiscoveryResponse>(response_copy);
-  envoy::api::v2::DiscoveryResponse received_message;
+  auto response =
+      std::make_unique<envoy::service::discovery::v3alpha::DiscoveryResponse>(response_copy);
+  envoy::service::discovery::v3alpha::DiscoveryResponse received_message;
   EXPECT_CALL(callbacks_, onDiscoveryResponse(_))
-      .WillOnce([&received_message](std::unique_ptr<envoy::api::v2::DiscoveryResponse>&& message) {
-        received_message = *message;
-      });
+      .WillOnce(
+          [&received_message](
+              std::unique_ptr<envoy::service::discovery::v3alpha::DiscoveryResponse>&& message) {
+            received_message = *message;
+          });
   grpc_stream_.onReceiveMessage(std::move(response));
   EXPECT_TRUE(TestUtility::protoEqual(response_copy, received_message));
 }

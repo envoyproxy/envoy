@@ -1,7 +1,7 @@
 #include "extensions/access_loggers/grpc/grpc_access_log_utils.h"
 
-#include "envoy/config/accesslog/v2/als.pb.h"
-#include "envoy/data/accesslog/v2/accesslog.pb.h"
+#include "envoy/data/accesslog/v3alpha/accesslog.pb.h"
+#include "envoy/extensions/access_loggers/grpc/v3alpha/als.pb.h"
 #include "envoy/upstream/upstream.h"
 
 #include "common/network/utility.h"
@@ -13,7 +13,7 @@ namespace GrpcCommon {
 
 namespace {
 
-using namespace envoy::data::accesslog::v2;
+using namespace envoy::data::accesslog::v3alpha;
 
 // Helper function to convert from a BoringSSL textual representation of the
 // TLS version to the corresponding enum value used in gRPC access logs.
@@ -34,7 +34,7 @@ TLSProperties_TLSVersion tlsVersionStringToEnum(const std::string& tls_version) 
 } // namespace
 
 void Utility::responseFlagsToAccessLogResponseFlags(
-    envoy::data::accesslog::v2::AccessLogCommon& common_access_log,
+    envoy::data::accesslog::v3alpha::AccessLogCommon& common_access_log,
     const StreamInfo::StreamInfo& stream_info) {
 
   static_assert(StreamInfo::ResponseFlag::LastFlag == 0x40000,
@@ -90,7 +90,7 @@ void Utility::responseFlagsToAccessLogResponseFlags(
 
   if (stream_info.hasResponseFlag(StreamInfo::ResponseFlag::UnauthorizedExternalService)) {
     common_access_log.mutable_response_flags()->mutable_unauthorized_details()->set_reason(
-        envoy::data::accesslog::v2::ResponseFlags::Unauthorized::EXTERNAL_SERVICE);
+        envoy::data::accesslog::v3alpha::ResponseFlags::Unauthorized::EXTERNAL_SERVICE);
   }
 
   if (stream_info.hasResponseFlag(StreamInfo::ResponseFlag::RateLimitServiceError)) {
@@ -119,9 +119,9 @@ void Utility::responseFlagsToAccessLogResponseFlags(
 }
 
 void Utility::extractCommonAccessLogProperties(
-    envoy::data::accesslog::v2::AccessLogCommon& common_access_log,
+    envoy::data::accesslog::v3alpha::AccessLogCommon& common_access_log,
     const StreamInfo::StreamInfo& stream_info,
-    const envoy::config::accesslog::v2::CommonGrpcAccessLogConfig& config) {
+    const envoy::extensions::access_loggers::grpc::v3alpha::CommonGrpcAccessLogConfig& config) {
   // TODO(mattklein123): Populate sample_rate field.
   if (stream_info.downstreamRemoteAddress() != nullptr) {
     Network::Utility::addressToProtobufAddress(
