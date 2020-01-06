@@ -351,6 +351,7 @@ TEST_P(ClusterMemoryTestRunner, MemoryLargeHostSizeWithStats) {
   // 2019/11/01  8859     1299         1315   build: switch to libc++ by default
   // 2019/11/12  8998     1299         1350   test: adjust memory limit for macOS
   // 2019/11/15  9040     1283         1350   build: update protobuf to 3.10.1
+  // 2020/01/06  9565     1347         1350   Refactor primitive stats and add null primitive stats
 
   // Note: when adjusting this value: EXPECT_MEMORY_EQ is active only in CI
   // 'release' builds, where we control the platform and tool-chain. So you
@@ -360,7 +361,7 @@ TEST_P(ClusterMemoryTestRunner, MemoryLargeHostSizeWithStats) {
   // If you encounter a failure here, please see
   // https://github.com/envoyproxy/envoy/blob/master/source/docs/stats.md#stats-memory-tests
   // for details on how to fix.
-  EXPECT_MEMORY_EQ(m_per_host, 1283);
+  EXPECT_MEMORY_EQ(m_per_host, 1347);
   EXPECT_MEMORY_LE(m_per_host, 1350);
 }
 
