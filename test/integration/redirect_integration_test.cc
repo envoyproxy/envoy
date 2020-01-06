@@ -6,7 +6,8 @@
 namespace Envoy {
 
 namespace {
-constexpr char HandleThreeHopLocationFormat[] = "http://handle.internal.redirect.max.three.hop/path{}";
+constexpr char HandleThreeHopLocationFormat[] =
+    "http://handle.internal.redirect.max.three.hop/path{}";
 }
 
 class RedirectIntegrationTest : public HttpProtocolIntegrationTest {
@@ -39,7 +40,8 @@ protected:
   // Returns the next stream that the fake upstream receives.
   FakeStreamPtr waitForNextStream() {
     FakeStreamPtr new_stream = nullptr;
-    auto wait_new_stream_fn = [this, &new_stream](FakeHttpConnectionPtr& connection) -> AssertionResult {
+    auto wait_new_stream_fn = [this,
+                               &new_stream](FakeHttpConnectionPtr& connection) -> AssertionResult {
       AssertionResult result = connection->waitForNewStream(*dispatcher_, new_stream, false,
                                                             std::chrono::milliseconds(50));
       if (result) {

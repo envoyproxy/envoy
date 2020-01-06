@@ -52,7 +52,7 @@ namespace Router {
  * A FilterState object that tracks a single uint32_t value.
  */
 class UInt32Accessor : public StreamInfo::FilterState::Object {
- public:
+public:
   UInt32Accessor(uint32_t value) : value_(value) {}
 
   // From StreamInfo::FilterState::Object

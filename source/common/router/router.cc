@@ -1319,7 +1319,7 @@ bool Filter::setupRedirect(const Http::HeaderMap& headers, UpstreamRequest& upst
       upstream_request.upstream_timing_.last_upstream_rx_byte_received_ && downstream_end_stream_;
 
   StreamInfo::FilterState& filter_state = callbacks_->streamInfo().filterState();
-  
+
   // As with setupRetry, redirects are not supported for streaming requests yet.
   if (downstream_end_stream_ &&
       !callbacks_->decodingBuffer() && // Redirects with body not yet supported.

@@ -227,7 +227,7 @@ public:
     ON_CALL(callbacks_.route_->route_entry_, maxPreviousInternalRedirect())
         .WillByDefault(Return(max_previous_redirect));
   }
-  
+
   void setNumPreviousRedirect(uint32_t num_previous_redirects) {
     callbacks_.streamInfo().filterState().setData(
         "num_previous_internal_redirect", std::make_shared<UInt32Accessor>(num_previous_redirects),
