@@ -3,9 +3,9 @@
 #include <memory>
 
 #include "envoy/api/api.h"
-#include "envoy/api/v2/core/grpc_service.pb.h"
 #include "envoy/common/pure.h"
 #include "envoy/config/typed_config.h"
+#include "envoy/config/core/v3alpha/grpc_service.pb.h"
 
 #include "grpcpp/grpcpp.h"
 
@@ -32,7 +32,7 @@ public:
    * channel.
    */
   virtual std::shared_ptr<grpc::ChannelCredentials>
-  getChannelCredentials(const envoy::api::v2::core::GrpcService& grpc_service_config,
+  getChannelCredentials(const envoy::config::core::v3alpha::GrpcService& grpc_service_config,
                         Api::Api& api) PURE;
 
   std::string category() const override { return "grpc_credentials"; }

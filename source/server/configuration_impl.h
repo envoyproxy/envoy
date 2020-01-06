@@ -9,8 +9,8 @@
 #include <unordered_map>
 #include <utility>
 
-#include "envoy/config/bootstrap/v2/bootstrap.pb.h"
-#include "envoy/config/trace/v2/trace.pb.h"
+#include "envoy/config/bootstrap/v3alpha/bootstrap.pb.h"
+#include "envoy/config/trace/v3alpha/trace.pb.h"
 #include "envoy/config/typed_config.h"
 #include "envoy/http/filter.h"
 #include "envoy/network/filter.h"
@@ -94,7 +94,7 @@ public:
    * @param server supplies the owning server.
    * @param cluster_manager_factory supplies the cluster manager creation factory.
    */
-  void initialize(const envoy::config::bootstrap::v2::Bootstrap& bootstrap, Instance& server,
+  void initialize(const envoy::config::bootstrap::v3alpha::Bootstrap& bootstrap, Instance& server,
                   Upstream::ClusterManagerFactory& cluster_manager_factory);
 
   // Server::Configuration::Main
@@ -115,9 +115,10 @@ private:
   /**
    * Initialize tracers and corresponding sinks.
    */
-  void initializeTracers(const envoy::config::trace::v2::Tracing& configuration, Instance& server);
+  void initializeTracers(const envoy::config::trace::v3alpha::Tracing& configuration,
+                         Instance& server);
 
-  void initializeStatsSinks(const envoy::config::bootstrap::v2::Bootstrap& bootstrap,
+  void initializeStatsSinks(const envoy::config::bootstrap::v3alpha::Bootstrap& bootstrap,
                             Instance& server);
 
   std::unique_ptr<Upstream::ClusterManager> cluster_manager_;
@@ -135,12 +136,12 @@ private:
  */
 class InitialImpl : public Initial {
 public:
-  InitialImpl(const envoy::config::bootstrap::v2::Bootstrap& bootstrap);
+  InitialImpl(const envoy::config::bootstrap::v3alpha::Bootstrap& bootstrap);
 
   // Server::Configuration::Initial
   Admin& admin() override { return admin_; }
   absl::optional<std::string> flagsPath() override { return flags_path_; }
-  const envoy::config::bootstrap::v2::LayeredRuntime& runtime() override {
+  const envoy::config::bootstrap::v3alpha::LayeredRuntime& runtime() override {
     return layered_runtime_;
   }
 
@@ -160,7 +161,7 @@ private:
 
   AdminImpl admin_;
   absl::optional<std::string> flags_path_;
-  envoy::config::bootstrap::v2::LayeredRuntime layered_runtime_;
+  envoy::config::bootstrap::v3alpha::LayeredRuntime layered_runtime_;
 };
 
 } // namespace Configuration

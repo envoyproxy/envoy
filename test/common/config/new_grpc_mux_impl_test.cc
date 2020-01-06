@@ -1,7 +1,7 @@
 #include <memory>
 
-#include "envoy/api/v2/discovery.pb.h"
-#include "envoy/api/v2/eds.pb.h"
+#include "envoy/config/endpoint/v3alpha/endpoint.pb.h"
+#include "envoy/service/discovery/v3alpha/discovery.pb.h"
 
 #include "common/common/empty_string.h"
 #include "common/config/new_grpc_mux_impl.h"
@@ -57,7 +57,9 @@ public:
   Grpc::MockAsyncClient* async_client_;
   NiceMock<Grpc::MockAsyncStream> async_stream_;
   std::unique_ptr<NewGrpcMuxImpl> grpc_mux_;
-  NiceMock<Config::MockSubscriptionCallbacks<envoy::api::v2::ClusterLoadAssignment>> callbacks_;
+  NiceMock<
+      Config::MockSubscriptionCallbacks<envoy::config::endpoint::v3alpha::ClusterLoadAssignment>>
+      callbacks_;
   NiceMock<LocalInfo::MockLocalInfo> local_info_;
   Stats::IsolatedStoreImpl stats_;
   Envoy::Config::RateLimitSettings rate_limit_settings_;
@@ -86,27 +88,29 @@ TEST_F(NewGrpcMuxImplTest, DiscoveryResponseNonexistentSub) {
   grpc_mux_->start();
 
   {
-    auto unexpected_response = std::make_unique<envoy::api::v2::DeltaDiscoveryResponse>();
+    auto unexpected_response =
+        std::make_unique<envoy::service::discovery::v3alpha::DeltaDiscoveryResponse>();
     unexpected_response->set_type_url(type_url);
     unexpected_response->set_system_version_info("0");
     EXPECT_CALL(callbacks_, onConfigUpdate(_, _, "0")).Times(0);
     grpc_mux_->onDiscoveryResponse(std::move(unexpected_response));
   }
   {
-    auto response = std::make_unique<envoy::api::v2::DeltaDiscoveryResponse>();
+    auto response = std::make_unique<envoy::service::discovery::v3alpha::DeltaDiscoveryResponse>();
     response->set_type_url(type_url);
     response->set_system_version_info("1");
-    envoy::api::v2::ClusterLoadAssignment load_assignment;
+    envoy::config::endpoint::v3alpha::ClusterLoadAssignment load_assignment;
     load_assignment.set_cluster_name("x");
     response->add_resources()->mutable_resource()->PackFrom(API_DOWNGRADE(load_assignment));
     EXPECT_CALL(callbacks_, onConfigUpdate(_, _, "1"))
-        .WillOnce(
-            Invoke([&load_assignment](
-                       const Protobuf::RepeatedPtrField<envoy::api::v2::Resource>& added_resources,
-                       const Protobuf::RepeatedPtrField<std::string>&, const std::string&) {
+        .WillOnce(Invoke(
+            [&load_assignment](
+                const Protobuf::RepeatedPtrField<envoy::service::discovery::v3alpha::Resource>&
+                    added_resources,
+                const Protobuf::RepeatedPtrField<std::string>&, const std::string&) {
               EXPECT_EQ(1, added_resources.size());
-              envoy::api::v2::ClusterLoadAssignment expected_assignment =
-                  MessageUtil::anyConvert<envoy::api::v2::ClusterLoadAssignment>(
+              envoy::config::endpoint::v3alpha::ClusterLoadAssignment expected_assignment =
+                  MessageUtil::anyConvert<envoy::config::endpoint::v3alpha::ClusterLoadAssignment>(
                       added_resources[0].resource());
               EXPECT_TRUE(TestUtility::protoEqual(expected_assignment, load_assignment));
             }));

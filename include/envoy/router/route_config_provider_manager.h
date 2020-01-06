@@ -2,9 +2,9 @@
 
 #include <string>
 
-#include "envoy/api/v2/rds.pb.h"
-#include "envoy/config/filter/network/http_connection_manager/v2/http_connection_manager.pb.h"
+#include "envoy/config/route/v3alpha/route.pb.h"
 #include "envoy/event/dispatcher.h"
+#include "envoy/extensions/filters/network/http_connection_manager/v3alpha/http_connection_manager.pb.h"
 #include "envoy/json/json_object.h"
 #include "envoy/local_info/local_info.h"
 #include "envoy/router/rds.h"
@@ -38,7 +38,7 @@ public:
    * subscription.
    */
   virtual RouteConfigProviderSharedPtr createRdsRouteConfigProvider(
-      const envoy::config::filter::network::http_connection_manager::v2::Rds& rds,
+      const envoy::extensions::filters::network::http_connection_manager::v3alpha::Rds& rds,
       Server::Configuration::FactoryContext& factory_context, const std::string& stat_prefix,
       Init::Manager& init_manager) PURE;
 
@@ -49,9 +49,9 @@ public:
    * @param runtime supplies the runtime loader.
    * @param cm supplies the ClusterManager.
    */
-  virtual RouteConfigProviderPtr
-  createStaticRouteConfigProvider(const envoy::api::v2::RouteConfiguration& route_config,
-                                  Server::Configuration::FactoryContext& factory_context) PURE;
+  virtual RouteConfigProviderPtr createStaticRouteConfigProvider(
+      const envoy::config::route::v3alpha::RouteConfiguration& route_config,
+      Server::Configuration::FactoryContext& factory_context) PURE;
 };
 
 } // namespace Router

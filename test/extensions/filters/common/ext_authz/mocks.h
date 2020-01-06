@@ -3,7 +3,7 @@
 #include <string>
 #include <vector>
 
-#include "envoy/service/auth/v2/external_auth.pb.h"
+#include "envoy/service/auth/v3alpha/external_auth.pb.h"
 
 #include "extensions/filters/common/ext_authz/ext_authz.h"
 
@@ -23,7 +23,7 @@ public:
   // ExtAuthz::Client
   MOCK_METHOD0(cancel, void());
   MOCK_METHOD3(check, void(RequestCallbacks& callbacks,
-                           const envoy::service::auth::v2::CheckRequest& request,
+                           const envoy::service::auth::v3alpha::CheckRequest& request,
                            Tracing::Span& parent_span));
 };
 

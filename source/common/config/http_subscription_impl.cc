@@ -2,7 +2,7 @@
 
 #include <memory>
 
-#include "envoy/api/v2/discovery.pb.h"
+#include "envoy/service/discovery/v3alpha/discovery.pb.h"
 
 #include "common/buffer/buffer_impl.h"
 #include "common/common/assert.h"
@@ -72,7 +72,7 @@ void HttpSubscriptionImpl::createRequest(Http::Message& request) {
 
 void HttpSubscriptionImpl::parseResponse(const Http::Message& response) {
   disableInitFetchTimeoutTimer();
-  envoy::api::v2::DiscoveryResponse message;
+  envoy::service::discovery::v3alpha::DiscoveryResponse message;
   try {
     MessageUtil::loadFromJson(response.bodyAsString(), message, validation_visitor_);
   } catch (const EnvoyException& e) {

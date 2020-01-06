@@ -24,7 +24,7 @@ envoy_extension_cc_test(
         "//test/mocks/thread_local:thread_local_mocks",
         "//test/mocks/upstream:upstream_mocks",
         "//test/test_common:utility_lib",
-        "@envoy_api//envoy/api/v2/core:pkg_cc_proto",
+        "@envoy_api//envoy/config/core/v3alpha:pkg_cc_proto",
     ],
 )
 
@@ -38,7 +38,7 @@ envoy_extension_cc_test(
         "//test/extensions/filters/common/lua:lua_wrappers_lib",
         "//test/mocks/stream_info:stream_info_mocks",
         "//test/test_common:utility_lib",
-        "@envoy_api//envoy/api/v2/core:pkg_cc_proto",
+        "@envoy_api//envoy/config/core/v3alpha:pkg_cc_proto",
     ],
 )
 
@@ -50,8 +50,8 @@ envoy_extension_cc_test(
         "//source/extensions/filters/http/lua:config",
         "//test/integration:http_integration_lib",
         "//test/test_common:utility_lib",
-        "@envoy_api//envoy/config/bootstrap/v2:pkg_cc_proto",
-        "@envoy_api//envoy/config/filter/network/http_connection_manager/v2:pkg_cc_proto",
+        "@envoy_api//envoy/config/bootstrap/v3alpha:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3alpha:pkg_cc_proto",
     ],
 )
 
@@ -63,6 +63,6 @@ envoy_extension_cc_test(
         "//source/extensions/filters/http/lua:config",
         "//test/mocks/server:server_mocks",
         "//test/test_common:utility_lib",
-        "@envoy_api//envoy/config/filter/http/lua/v2:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/http/lua/v3alpha:pkg_cc_proto",
     ],
 )
