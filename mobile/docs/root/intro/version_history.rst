@@ -1,6 +1,16 @@
 Version history
 ---------------
 
+0.2.1 (Jan 6, 2020)
+===================
+
+This release of Envoy Mobile contains some small improvements:
+
+- Maven release script for Android builds
+- Streams are now limited to a single "terminal" callback
+- Keepalive settings are now in place to better support connection switching and long-lived streams
+- Properly support IPv6 networks by using updated DNS settings
+
 0.2.0 (Nov 4, 2019)
 ===================
 
