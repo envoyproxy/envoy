@@ -10,8 +10,6 @@
 #include "extensions/filters/http/buffer/buffer_filter.h"
 #include "extensions/filters/http/well_known_names.h"
 
-#include "libprotobuf_mutator/src/mutator.h"
-
 #include "test/config/utility.h"
 #include "test/extensions/filters/http/common/fuzz/filter_fuzz.pb.h"
 #include "test/fuzz/fuzz_runner.h"
@@ -19,6 +17,8 @@
 #include "test/mocks/buffer/mocks.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/server/mocks.h"
+
+#include "libprotobuf_mutator/src/mutator.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -62,7 +62,8 @@ public:
 
   // This creates and mutates the filter config and runs decode.
   void fuzz(absl::string_view filter_name, const test::fuzz::HttpData& data) {
-    // TODO: clean this up and just use the factories method and take the proto config.
+    ENVOY_LOG_MISC(info, "Fuzzing filter {}", filter_name);
+
     auto& factory =
         Config::Utility::getAndCheckFactory<Server::Configuration::NamedHttpFilterConfigFactory>(
             std::string(filter_name));
@@ -74,15 +75,15 @@ public:
       mutator.Mutate(proto_config.get(), 200);
       Http::FilterFactoryCb cb =
           factory.createFilterFactoryFromProto(*proto_config, "stats", factory_context_);
-      ENVOY_LOG_MISC(debug, "Using mutated filter config {}", proto_config->DebugString());
-
+      ENVOY_LOG_MISC(debug, "Mutated filter config {}", proto_config->DebugString());
       cb(filter_callback_);
-      decode(filter_.get(), data);
-    } catch (const ProtoValidationException& e) {
+    } catch (const EnvoyException& e) {
       // Abort if the mutator creates an invalid protobuf.
       ENVOY_LOG_MISC(debug, "Invalid protobuf {}", e.what());
       return;
     }
+
+    decode(filter_.get(), data);
   }
 
   NiceMock<Server::Configuration::MockFactoryContext> factory_context_;
@@ -94,8 +95,8 @@ public:
 DEFINE_PROTO_FUZZER(const test::extensions::filters::http::FilterFuzzTestCase& input) {
   // Choose the HTTP filter with the fuzzed input int.
   // TODO: clean this up and just use the factories() method to grab the Factory at random.
-  const std::vector<absl::string_view> filter_names =
-      Registry::FactoryRegistry<Server::Configuration::NamedHttpFilterConfigFactory>::registeredNames();
+  const std::vector<absl::string_view> filter_names = Registry::FactoryRegistry<
+      Server::Configuration::NamedHttpFilterConfigFactory>::registeredNames();
   absl::string_view filter_name = filter_names[input.filter_index() % filter_names.size()];
 
   // Fuzz filter.
