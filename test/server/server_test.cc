@@ -265,7 +265,7 @@ public:
   }
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return ProtobufTypes::MessagePtr{new Envoy::ProtobufWkt::Empty()};
+    return ProtobufTypes::MessagePtr{new Envoy::ProtobufWkt::Struct()};
   }
 
   std::string name() const override { return "envoy.custom_stats_sink"; }
@@ -990,7 +990,7 @@ public:
   }
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return ProtobufTypes::MessagePtr{new Envoy::ProtobufWkt::Empty()};
+    return ProtobufTypes::MessagePtr{new Envoy::ProtobufWkt::Struct()};
   }
 
   std::string name() const override { return "envoy.callbacks_stats_sink"; }

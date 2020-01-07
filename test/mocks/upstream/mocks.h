@@ -155,7 +155,7 @@ public:
 
   std::string name() const override { return "envoy.test_retry_priority"; }
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return ProtobufTypes::MessagePtr{new Envoy::ProtobufWkt::Empty()};
+    return ProtobufTypes::MessagePtr{new Envoy::ProtobufWkt::Struct()};
   }
 
 private:
@@ -425,7 +425,7 @@ public:
 
   std::string name() const override { return "envoy.test_host_predicate"; }
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return ProtobufTypes::MessagePtr{new Envoy::ProtobufWkt::Empty()};
+    return ProtobufTypes::MessagePtr{new Envoy::ProtobufWkt::Struct()};
   }
 };
 } // namespace Upstream

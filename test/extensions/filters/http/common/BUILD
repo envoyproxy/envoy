@@ -35,7 +35,6 @@ envoy_cc_test_library(
     ],
 )
 
-
 envoy_extension_cc_test(
     name = "jwks_fetcher_test",
     srcs = [

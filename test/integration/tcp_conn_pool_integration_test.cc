@@ -94,7 +94,7 @@ public:
   }
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return ProtobufTypes::MessagePtr{new Envoy::ProtobufWkt::Empty()};
+    return ProtobufTypes::MessagePtr{new Envoy::ProtobufWkt::Struct()};
   }
 
   std::string name() const override { CONSTRUCT_ON_FIRST_USE(std::string, "envoy.test.router"); }

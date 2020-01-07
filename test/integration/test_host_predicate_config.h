@@ -16,7 +16,7 @@ public:
     return std::make_shared<testing::NiceMock<TestHostPredicate>>();
   }
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return ProtobufTypes::MessagePtr{new Envoy::ProtobufWkt::Empty()};
+    return ProtobufTypes::MessagePtr{new Envoy::ProtobufWkt::Struct()};
   }
 };
 } // namespace Envoy
