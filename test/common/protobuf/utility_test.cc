@@ -770,7 +770,9 @@ TEST_F(DeprecatedFieldsTest,
 
   // Now create a new snapshot with this feature allowed.
   Runtime::LoaderSingleton::getExisting()->mergeValues(
-      {{"envoy.deprecated_features.deprecated.proto:is_deprecated_fatal", "TrUe "}});
+      {{"envoy.deprecated_features.deprecated.proto:envoy.test.deprecation_test.Base.is_deprecated_"
+        "fatal",
+        "TrUe "}});
 
   // Now the same deprecation check should only trigger a warning.
   EXPECT_LOG_CONTAINS(
@@ -790,7 +792,8 @@ TEST_F(DeprecatedFieldsTest, DEPRECATED_FEATURE_TEST(DisallowViaRuntime)) {
 
   // Now create a new snapshot with this feature disallowed.
   Runtime::LoaderSingleton::getExisting()->mergeValues(
-      {{"envoy.deprecated_features.deprecated.proto:is_deprecated", " false"}});
+      {{"envoy.deprecated_features.deprecated.proto:envoy.test.deprecation_test.Base.is_deprecated",
+        " false"}});
 
   EXPECT_THROW_WITH_REGEX(
       checkForDeprecation(base), ProtoValidationException,
@@ -898,11 +901,29 @@ TEST_F(DeprecatedFieldsTest, DEPRECATED_FEATURE_TEST(RuntimeOverrideEnumDefault)
   base.mutable_enum_container();
 
   Runtime::LoaderSingleton::getExisting()->mergeValues(
-      {{"envoy.deprecated_features.deprecated.proto:DEPRECATED_DEFAULT", "false"}});
+      {{"envoy.deprecated_features.deprecated.proto:envoy.test.deprecation_test.Base.DEPRECATED_"
+        "DEFAULT",
+        "false"}});
 
   // Make sure this is set up right.
   EXPECT_THROW_WITH_REGEX(checkForDeprecation(base), ProtoValidationException,
                           "Using the default now-deprecated value DEPRECATED_DEFAULT");
+}
+
+// Make sure the runtime overrides for allowing fatal enums work.
+TEST_F(DeprecatedFieldsTest, DEPRECATED_FEATURE_TEST(FatalEnum)) {
+  envoy::test::deprecation_test::Base base;
+  base.mutable_enum_container()->set_deprecated_enum(
+      envoy::test::deprecation_test::Base::DEPRECATED_FATAL);
+  EXPECT_THROW_WITH_REGEX(checkForDeprecation(base), ProtoValidationException,
+                          "Using deprecated value DEPRECATED_FATAL");
+
+  Runtime::LoaderSingleton::getExisting()->mergeValues(
+      {{"envoy.deprecated_features.deprecated.proto:envoy.test.deprecation_test.Base.DEPRECATED_"
+        "FATAL",
+        "true"}});
+
+  checkForDeprecation(base);
 }
 
 class TimestampUtilTest : public testing::Test, public ::testing::WithParamInterface<int64_t> {};

@@ -1,0 +1,15 @@
+syntax = "proto3";
+
+package envoy.annotations;
+
+import "google/protobuf/descriptor.proto";
+
+// Magic number in this file derived from top 28bit of SHA256 digest of "envoy.annotation.do_not_use"
+extend google.protobuf.FieldOptions {
+  bool do_not_use = 169129351;
+}
+
+// Magic number in this file derived from top 28bit of SHA256 digest of "envoy.annotation.do_not_use_enum"
+extend google.protobuf.EnumValueOptions {
+  bool do_not_use_enum = 162744140;
+}

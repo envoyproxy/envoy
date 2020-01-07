@@ -61,9 +61,8 @@ constexpr const char* disabled_runtime_features[] = {
 // The release cycle after a feature has been marked disallowed, it is officially removable, and
 // the maintainer team will run a script creating a tracking issue for proto and code clean up.
 constexpr const char* disallowed_features[] = {
-    // Acts as both a test entry for deprecated.proto and a marker for the Envoy
-    // deprecation scripts.
-    "envoy.deprecated_features.deprecated.proto:is_deprecated_fatal",
+    // FIXME(alyssar) annotate all of these as deprecated and remove this const
+    // char* and all references.
     // 1.10.0
     "envoy.deprecated_features.config_source.proto:UNSUPPORTED_REST_LEGACY",
     "envoy.deprecated_features.ext_authz.proto:use_alpha",
