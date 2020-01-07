@@ -45,7 +45,7 @@ proto_library(
         "//envoy/config/filter/http/adaptive_concurrency/v2alpha:pkg",
         "//envoy/config/filter/http/adaptive_concurrency/v3alpha:pkg",
         "//envoy/config/filter/http/buffer/v2:pkg",
-        "//envoy/config/filter/http/cache/v3alpha:pkg",
+        "//envoy/config/filter/http/cache/v2:pkg",
         "//envoy/config/filter/http/csrf/v2:pkg",
         "//envoy/config/filter/http/csrf/v3alpha:pkg",
         "//envoy/config/filter/http/dynamic_forward_proxy/v2alpha:pkg",

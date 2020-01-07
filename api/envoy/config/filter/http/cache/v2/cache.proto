@@ -1,16 +1,18 @@
 syntax = "proto3";
 
-package envoy.config.filter.http.cache.v3alpha;
+package envoy.config.filter.http.cache.v2;
 
 import "validate/validate.proto";
 
-option java_package = "io.envoyproxy.envoy.config.filter.http.cache.v3alpha";
+option java_package = "io.envoyproxy.envoy.config.filter.http.cache.v2";
 option java_outer_classname = "CacheProto";
 option java_multiple_files = true;
 
 // [#protodoc-title: HTTP Cache Filter]
-// `Design<https://docs.google.com/document/d/1WPuim_GzhfdsnIj_tf-fIeutK0jO4aVQfVrLJFoLN3g/view>`_
+// Pluggable HTTP Cache :ref:`configuration overview <config_http_filters_cache>`.
+// [#extension: envoy.filters.http.cache]
 
+// bqDesign<https://docs.google.com/document/d/1WPuim_GzhfdsnIj_tf-fIeutK0jO4aVQfVrLJFoLN3g/view>bq_
 message Cache {
   message KeyCreatorParams {
     // If true, exclude the URL scheme from the cache key.

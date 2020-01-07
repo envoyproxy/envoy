@@ -35,7 +35,7 @@ bool CacheFilter::isCacheableResponse(Http::HeaderMap& headers) {
   return false;
 }
 
-HttpCache& CacheFilter::getCache(const envoy::config::filter::http::cache::v3alpha::Cache& config) {
+HttpCache& CacheFilter::getCache(const envoy::config::filter::http::cache::v2::Cache& config) {
   HttpCacheFactory* factory =
       Registry::FactoryRegistry<HttpCacheFactory>::getFactory(config.name());
   if (!factory) {
@@ -45,7 +45,7 @@ HttpCache& CacheFilter::getCache(const envoy::config::filter::http::cache::v3alp
   return factory->getCache();
 }
 
-CacheFilter::CacheFilter(const envoy::config::filter::http::cache::v3alpha::Cache& config,
+CacheFilter::CacheFilter(const envoy::config::filter::http::cache::v2::Cache& config,
                          const std::string&, Stats::Scope&, TimeSource& time_source)
     : time_source_(time_source), cache_(getCache(config)) {}
 

@@ -5,7 +5,7 @@
 #include <string>
 #include <vector>
 
-#include "envoy/config/filter/http/cache/v3alpha/cache.pb.h"
+#include "envoy/config/filter/http/cache/v2/cache.pb.h"
 
 #include "common/common/logger.h"
 
@@ -29,7 +29,7 @@ class CacheFilter : public Http::PassThroughFilter,
                     public std::enable_shared_from_this<CacheFilter> {
 public:
   // Throws ProtoValidationException if no registered HttpCacheFactory for config.name.
-  static CacheFilterSharedPtr make(const envoy::config::filter::http::cache::v3alpha::Cache& config,
+  static CacheFilterSharedPtr make(const envoy::config::filter::http::cache::v2::Cache& config,
                                    const std::string& stats_prefix, Stats::Scope& scope,
                                    TimeSource& time_source) {
     // Can't use make_shared due to private constructor.
@@ -47,7 +47,7 @@ private:
   // Throws EnvoyException if no registered HttpCacheFactory for config.name.
   // Constructor is private to enforce enable_shared_from_this's requirement that this must be owned
   // by a shared_ptr.
-  CacheFilter(const envoy::config::filter::http::cache::v3alpha::Cache& config,
+  CacheFilter(const envoy::config::filter::http::cache::v2::Cache& config,
               const std::string& stats_prefix, Stats::Scope& scope, TimeSource& time_source);
 
   void getBody();
@@ -64,7 +64,7 @@ private:
   // These don't require private access, but are members per envoy convention.
   static bool isCacheableRequest(Http::HeaderMap& headers);
   static bool isCacheableResponse(Http::HeaderMap& headers);
-  static HttpCache& getCache(const envoy::config::filter::http::cache::v3alpha::Cache& config);
+  static HttpCache& getCache(const envoy::config::filter::http::cache::v2::Cache& config);
 
   TimeSource& time_source_;
   HttpCache& cache_;
