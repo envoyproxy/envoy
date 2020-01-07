@@ -268,7 +268,7 @@ public:
     return ProtobufTypes::MessagePtr{new Envoy::ProtobufWkt::Empty()};
   }
 
-  std::string name() override { return "envoy.custom_stats_sink"; }
+  std::string name() const override { return "envoy.custom_stats_sink"; }
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, ServerInstanceImplTest,
@@ -993,7 +993,7 @@ public:
     return ProtobufTypes::MessagePtr{new Envoy::ProtobufWkt::Empty()};
   }
 
-  std::string name() override { return "envoy.callbacks_stats_sink"; }
+  std::string name() const override { return "envoy.callbacks_stats_sink"; }
 };
 
 REGISTER_FACTORY(CallbacksStatsSinkFactory, Server::Configuration::StatsSinkFactory);

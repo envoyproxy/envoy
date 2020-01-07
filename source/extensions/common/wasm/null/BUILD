@@ -12,6 +12,7 @@ envoy_cc_library(
     name = "null_vm_plugin_interface",
     hdrs = ["null_vm_plugin.h"],
     deps = [
+        "//include/envoy/config:typed_config_interface",
         "//source/extensions/common/wasm:wasm_vm_interface",
         "//source/extensions/common/wasm:well_known_names",
     ],

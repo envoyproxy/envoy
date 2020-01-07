@@ -15,6 +15,7 @@ envoy_cc_library(
     external_deps = ["abseil_hash"],
     deps = [
         "//include/envoy/access_log:access_log_interface",
+        "//include/envoy/config:typed_config_interface",
         "//include/envoy/filesystem:filesystem_interface",
         "//include/envoy/http:header_map_interface",
         "//include/envoy/runtime:runtime_interface",

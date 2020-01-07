@@ -403,10 +403,8 @@ void HttpConnectionManagerConfig::processFilter(
         proto_config,
     int i, absl::string_view prefix, std::list<Http::FilterFactoryCb>& filter_factories,
     bool& is_terminal) {
-  const std::string& string_name = proto_config.name();
-
   ENVOY_LOG(debug, "    {} filter #{}", prefix, i);
-  ENVOY_LOG(debug, "      name: {}", string_name);
+  ENVOY_LOG(debug, "      name: {}", proto_config.name());
   ENVOY_LOG(
       debug, "    config: {}",
       MessageUtil::getJsonStringFromMessage(proto_config.hidden_envoy_deprecated_config(), true));
@@ -414,7 +412,7 @@ void HttpConnectionManagerConfig::processFilter(
   // Now see if there is a factory that will accept the config.
   auto& factory =
       Config::Utility::getAndCheckFactory<Server::Configuration::NamedHttpFilterConfigFactory>(
-          string_name);
+          proto_config);
   ProtobufTypes::MessagePtr message = Config::Utility::translateToFactoryConfig(
       proto_config, context_.messageValidationVisitor(), factory);
   Http::FilterFactoryCb callback =
@@ -442,7 +440,7 @@ HttpConnectionManagerConfig::createCodec(Network::Connection& connection,
     // from HttpConnectionManager protobuf. This is not essential till there are multiple
     // implementations of QUIC.
     return std::unique_ptr<Http::ServerConnection>(
-        Config::Utility::getAndCheckFactory<Http::QuicHttpServerConnectionFactory>(
+        Config::Utility::getAndCheckFactoryByName<Http::QuicHttpServerConnectionFactory>(
             Http::QuicCodecNames::get().Quiche)
             .createQuicServerConnection(connection, callbacks));
   case CodecType::AUTO:

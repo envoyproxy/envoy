@@ -7,7 +7,7 @@
 #include "envoy/stats/stats_macros.h"
 
 #include "common/common/thread_synchronizer.h"
-#include "common/runtime/runtime_features.h"
+#include "common/runtime/runtime_protos.h"
 
 namespace Envoy {
 namespace Extensions {

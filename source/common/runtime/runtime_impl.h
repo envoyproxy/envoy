@@ -98,6 +98,7 @@ public:
   double getDouble(const std::string& key, double default_value) const override;
   bool getBoolean(absl::string_view key, bool value) const override;
   const std::vector<OverrideLayerConstPtr>& getLayers() const override;
+  bool exists(const std::string& key) const override { return values_.contains(key); }
 
   static Entry createEntry(const std::string& value);
   static Entry createEntry(const ProtobufWkt::Value& value);
