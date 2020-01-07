@@ -70,7 +70,8 @@ protected:
       }
     }
 
-    ASSERT(new_stream->waitForEndStream(*dispatcher_));
+    AssertionResult result = new_stream->waitForEndStream(*dispatcher_);
+    ASSERT(result);
     return new_stream;
   }
 
