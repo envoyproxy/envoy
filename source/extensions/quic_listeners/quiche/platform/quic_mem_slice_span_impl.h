@@ -10,9 +10,9 @@
 
 #include "common/common/stack_array.h"
 
+#include "quiche/common/platform/api/quiche_string_piece.h"
 #include "quiche/quic/core/quic_types.h"
 #include "quiche/quic/platform/api/quic_mem_slice.h"
-#include "quiche/quic/platform/api/quic_string_piece.h"
 
 namespace quic {
 
@@ -44,7 +44,7 @@ public:
   }
 
   // QuicMemSliceSpan
-  QuicStringPiece GetData(size_t index);
+  quiche::QuicheStringPiece GetData(size_t index);
   QuicByteCount total_length() { return buffer_->length(); };
   size_t NumSlices() { return buffer_->getRawSlices(nullptr, 0); }
   template <typename ConsumeFunction> QuicByteCount ConsumeAll(ConsumeFunction consume);

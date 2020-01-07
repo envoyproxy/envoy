@@ -2,7 +2,7 @@
 
 #include <initializer_list>
 
-#include "envoy/config/filter/network/thrift_proxy/v2alpha1/thrift_proxy.pb.h"
+#include "envoy/extensions/filters/network/thrift_proxy/v3alpha/thrift_proxy.pb.h"
 
 #include "common/buffer/buffer_impl.h"
 #include "common/common/byte_order.h"
@@ -63,27 +63,27 @@ inline std::string fieldTypeParamToString(const TestParamInfo<FieldType>& params
   return fieldTypeToString(params.param);
 }
 
-inline envoy::config::filter::network::thrift_proxy::v2alpha1::TransportType
+inline envoy::extensions::filters::network::thrift_proxy::v3alpha::TransportType
 transportTypeToProto(TransportType transport_type) {
   switch (transport_type) {
   case TransportType::Framed:
-    return envoy::config::filter::network::thrift_proxy::v2alpha1::TransportType::FRAMED;
+    return envoy::extensions::filters::network::thrift_proxy::v3alpha::FRAMED;
   case TransportType::Unframed:
-    return envoy::config::filter::network::thrift_proxy::v2alpha1::TransportType::UNFRAMED;
+    return envoy::extensions::filters::network::thrift_proxy::v3alpha::UNFRAMED;
   case TransportType::Header:
-    return envoy::config::filter::network::thrift_proxy::v2alpha1::TransportType::HEADER;
+    return envoy::extensions::filters::network::thrift_proxy::v3alpha::HEADER;
   default:
     NOT_REACHED_GCOVR_EXCL_LINE;
   }
 }
 
-inline envoy::config::filter::network::thrift_proxy::v2alpha1::ProtocolType
+inline envoy::extensions::filters::network::thrift_proxy::v3alpha::ProtocolType
 protocolTypeToProto(ProtocolType protocol_type) {
   switch (protocol_type) {
   case ProtocolType::Binary:
-    return envoy::config::filter::network::thrift_proxy::v2alpha1::ProtocolType::BINARY;
+    return envoy::extensions::filters::network::thrift_proxy::v3alpha::BINARY;
   case ProtocolType::Compact:
-    return envoy::config::filter::network::thrift_proxy::v2alpha1::ProtocolType::COMPACT;
+    return envoy::extensions::filters::network::thrift_proxy::v3alpha::COMPACT;
   default:
     NOT_REACHED_GCOVR_EXCL_LINE;
   }

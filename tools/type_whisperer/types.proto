@@ -16,6 +16,9 @@ message TypeDescription {
   // Does this type have a breaking change? If so, it needs to be upgraded at
   // the next major version.
   bool next_version_upgrade = 5;
+
+  // The package of the type in next version
+  string next_version_package = 6;
 }
 
 message Types {

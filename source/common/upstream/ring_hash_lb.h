@@ -2,7 +2,7 @@
 
 #include <vector>
 
-#include "envoy/api/v2/cds.pb.h"
+#include "envoy/config/cluster/v3alpha/cluster.pb.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats_macros.h"
@@ -40,15 +40,16 @@ struct RingHashLoadBalancerStats {
 class RingHashLoadBalancer : public ThreadAwareLoadBalancerBase,
                              Logger::Loggable<Logger::Id::upstream> {
 public:
-  RingHashLoadBalancer(const PrioritySet& priority_set, ClusterStats& stats, Stats::Scope& scope,
-                       Runtime::Loader& runtime, Runtime::RandomGenerator& random,
-                       const absl::optional<envoy::api::v2::Cluster::RingHashLbConfig>& config,
-                       const envoy::api::v2::Cluster::CommonLbConfig& common_config);
+  RingHashLoadBalancer(
+      const PrioritySet& priority_set, ClusterStats& stats, Stats::Scope& scope,
+      Runtime::Loader& runtime, Runtime::RandomGenerator& random,
+      const absl::optional<envoy::config::cluster::v3alpha::Cluster::RingHashLbConfig>& config,
+      const envoy::config::cluster::v3alpha::Cluster::CommonLbConfig& common_config);
 
   const RingHashLoadBalancerStats& stats() const { return stats_; }
 
 private:
-  using HashFunction = envoy::api::v2::Cluster_RingHashLbConfig_HashFunction;
+  using HashFunction = envoy::config::cluster::v3alpha::Cluster::RingHashLbConfig::HashFunction;
 
   struct RingEntry {
     uint64_t hash_;

@@ -1,7 +1,7 @@
 #include <memory>
 
-#include "envoy/config/accesslog/v2/als.pb.h"
-#include "envoy/data/accesslog/v2/accesslog.pb.h"
+#include "envoy/data/accesslog/v3alpha/accesslog.pb.h"
+#include "envoy/extensions/access_loggers/grpc/v3alpha/als.pb.h"
 
 #include "common/buffer/zero_copy_input_stream_impl.h"
 #include "common/network/address_impl.h"
@@ -31,22 +31,23 @@ namespace AccessLoggers {
 namespace HttpGrpc {
 namespace {
 
-using envoy::data::accesslog::v2::HTTPAccessLogEntry;
+using envoy::data::accesslog::v3alpha::HTTPAccessLogEntry;
 
 class MockGrpcAccessLogger : public GrpcCommon::GrpcAccessLogger {
 public:
   // GrpcAccessLogger
   MOCK_METHOD1(log, void(HTTPAccessLogEntry&& entry));
-  MOCK_METHOD1(log, void(envoy::data::accesslog::v2::TCPAccessLogEntry&& entry));
+  MOCK_METHOD1(log, void(envoy::data::accesslog::v3alpha::TCPAccessLogEntry&& entry));
 };
 
 class MockGrpcAccessLoggerCache : public GrpcCommon::GrpcAccessLoggerCache {
 public:
   // GrpcAccessLoggerCache
-  MOCK_METHOD2(getOrCreateLogger,
-               GrpcCommon::GrpcAccessLoggerSharedPtr(
-                   const ::envoy::config::accesslog::v2::CommonGrpcAccessLogConfig& config,
-                   GrpcCommon::GrpcAccessLoggerType logger_type));
+  MOCK_METHOD2(
+      getOrCreateLogger,
+      GrpcCommon::GrpcAccessLoggerSharedPtr(
+          const envoy::extensions::access_loggers::grpc::v3alpha::CommonGrpcAccessLogConfig& config,
+          GrpcCommon::GrpcAccessLoggerType logger_type));
 };
 
 class HttpGrpcAccessLogTest : public testing::Test {
@@ -57,12 +58,15 @@ public:
     config_.mutable_common_config()->add_filter_state_objects_to_log("string_accessor");
     config_.mutable_common_config()->add_filter_state_objects_to_log("serialized");
     EXPECT_CALL(*logger_cache_, getOrCreateLogger(_, _))
-        .WillOnce([this](const ::envoy::config::accesslog::v2::CommonGrpcAccessLogConfig& config,
-                         GrpcCommon::GrpcAccessLoggerType logger_type) {
-          EXPECT_EQ(config.DebugString(), config_.common_config().DebugString());
-          EXPECT_EQ(GrpcCommon::GrpcAccessLoggerType::HTTP, logger_type);
-          return logger_;
-        });
+        .WillOnce(
+            [this](
+                const envoy::extensions::access_loggers::grpc::v3alpha::CommonGrpcAccessLogConfig&
+                    config,
+                GrpcCommon::GrpcAccessLoggerType logger_type) {
+              EXPECT_EQ(config.DebugString(), config_.common_config().DebugString());
+              EXPECT_EQ(GrpcCommon::GrpcAccessLoggerType::HTTP, logger_type);
+              return logger_;
+            });
     access_log_ = std::make_unique<HttpGrpcAccessLog>(AccessLog::FilterPtr{filter_}, config_, tls_,
                                                       logger_cache_);
   }
@@ -75,8 +79,8 @@ public:
     HTTPAccessLogEntry expected_log_entry;
     TestUtility::loadFromYaml(expected_log_entry_yaml, expected_log_entry);
     EXPECT_CALL(*logger_, log(An<HTTPAccessLogEntry&&>()))
-        .WillOnce(
-            Invoke([expected_log_entry](envoy::data::accesslog::v2::HTTPAccessLogEntry&& entry) {
+        .WillOnce(Invoke(
+            [expected_log_entry](envoy::data::accesslog::v3alpha::HTTPAccessLogEntry&& entry) {
               EXPECT_EQ(entry.DebugString(), expected_log_entry.DebugString());
             }));
   }
@@ -115,7 +119,7 @@ response: {{}}
 
   AccessLog::MockFilter* filter_{new NiceMock<AccessLog::MockFilter>()};
   NiceMock<ThreadLocal::MockInstance> tls_;
-  envoy::config::accesslog::v2::HttpGrpcAccessLogConfig config_;
+  envoy::extensions::access_loggers::grpc::v3alpha::HttpGrpcAccessLogConfig config_;
   std::shared_ptr<MockGrpcAccessLogger> logger_{new MockGrpcAccessLogger()};
   std::shared_ptr<MockGrpcAccessLoggerCache> logger_cache_{new MockGrpcAccessLoggerCache()};
   std::unique_ptr<HttpGrpcAccessLog> access_log_;

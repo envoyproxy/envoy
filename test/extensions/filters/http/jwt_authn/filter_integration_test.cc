@@ -1,6 +1,6 @@
-#include "envoy/config/bootstrap/v2/bootstrap.pb.h"
-#include "envoy/config/filter/http/jwt_authn/v2alpha/config.pb.h"
-#include "envoy/config/filter/network/http_connection_manager/v2/http_connection_manager.pb.h"
+#include "envoy/config/bootstrap/v3alpha/bootstrap.pb.h"
+#include "envoy/extensions/filters/http/jwt_authn/v3alpha/config.pb.h"
+#include "envoy/extensions/filters/network/http_connection_manager/v3alpha/http_connection_manager.pb.h"
 
 #include "common/router/string_accessor_impl.h"
 
@@ -11,8 +11,8 @@
 #include "test/extensions/filters/http/jwt_authn/test_common.h"
 #include "test/integration/http_protocol_integration.h"
 
-using ::envoy::config::filter::http::jwt_authn::v2alpha::JwtAuthentication;
-using ::envoy::config::filter::network::http_connection_manager::v2::HttpFilter;
+using envoy::extensions::filters::http::jwt_authn::v3alpha::JwtAuthentication;
+using envoy::extensions::filters::network::http_connection_manager::v3alpha::HttpFilter;
 
 namespace Envoy {
 namespace Extensions {
@@ -314,7 +314,7 @@ public:
     config_helper_.addFilter(getFilterConfig(false));
 
     if (add_cluster) {
-      config_helper_.addConfigModifier([](envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
+      config_helper_.addConfigModifier([](envoy::config::bootstrap::v3alpha::Bootstrap& bootstrap) {
         auto* jwks_cluster = bootstrap.mutable_static_resources()->add_clusters();
         jwks_cluster->MergeFrom(bootstrap.static_resources().clusters()[0]);
         jwks_cluster->set_name("pubkey_cluster");

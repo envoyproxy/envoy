@@ -481,7 +481,7 @@ TEST_P(Http2CodecImplTest, InvalidHeadersFrameAllowed) {
   server_wrapper_.dispatch(Buffer::OwnedImpl(), *server_);
 }
 
-TEST_P(Http2CodecImplTest, InvalidHeadersFrameOverriden) {
+TEST_P(Http2CodecImplTest, InvalidHeadersFrameOverridden) {
   Runtime::LoaderSingleton::getExisting()->mergeValues(
       {{"envoy.reloadable_features.http2_protocol_options.stream_error_on_invalid_http_messaging",
         "true"}});

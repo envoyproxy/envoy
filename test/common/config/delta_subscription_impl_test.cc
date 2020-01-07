@@ -1,8 +1,10 @@
-#include "envoy/api/v2/core/base.pb.h"
 #include "envoy/api/v2/discovery.pb.h"
-#include "envoy/api/v2/eds.pb.h"
+#include "envoy/config/core/v3alpha/base.pb.h"
+#include "envoy/config/endpoint/v3alpha/endpoint.pb.h"
+#include "envoy/service/discovery/v3alpha/discovery.pb.h"
 
 #include "common/buffer/zero_copy_input_stream_impl.h"
+#include "common/config/api_version.h"
 
 #include "test/common/config/delta_subscription_test_harness.h"
 
@@ -67,7 +69,7 @@ TEST_F(DeltaSubscriptionImplTest, PauseQueuesAcks) {
   // The server gives us our first version of resource name1.
   // subscription_ now wants to ACK name1 (but can't due to pause).
   {
-    auto message = std::make_unique<envoy::api::v2::DeltaDiscoveryResponse>();
+    auto message = std::make_unique<envoy::service::discovery::v3alpha::DeltaDiscoveryResponse>();
     auto* resource = message->mutable_resources()->Add();
     resource->set_name("name1");
     resource->set_version("version1A");
@@ -81,7 +83,7 @@ TEST_F(DeltaSubscriptionImplTest, PauseQueuesAcks) {
   // The server gives us our first version of resource name2.
   // subscription_ now wants to ACK name1 and then name2 (but can't due to pause).
   {
-    auto message = std::make_unique<envoy::api::v2::DeltaDiscoveryResponse>();
+    auto message = std::make_unique<envoy::service::discovery::v3alpha::DeltaDiscoveryResponse>();
     auto* resource = message->mutable_resources()->Add();
     resource->set_name("name2");
     resource->set_version("version2A");
@@ -95,7 +97,7 @@ TEST_F(DeltaSubscriptionImplTest, PauseQueuesAcks) {
   // The server gives us an updated version of resource name1.
   // subscription_ now wants to ACK name1A, then name2, then name1B (but can't due to pause).
   {
-    auto message = std::make_unique<envoy::api::v2::DeltaDiscoveryResponse>();
+    auto message = std::make_unique<envoy::service::discovery::v3alpha::DeltaDiscoveryResponse>();
     auto* resource = message->mutable_resources()->Add();
     resource->set_name("name1");
     resource->set_version("version1B");
@@ -109,7 +111,7 @@ TEST_F(DeltaSubscriptionImplTest, PauseQueuesAcks) {
   // All ACK sendMessage()s will happen upon calling resume().
   EXPECT_CALL(async_stream_, sendMessageRaw_(_, _))
       .WillRepeatedly(Invoke([this](Buffer::InstancePtr& buffer, bool) {
-        envoy::api::v2::DeltaDiscoveryRequest message;
+        API_NO_BOOST(envoy::api::v2::DeltaDiscoveryRequest) message;
         EXPECT_TRUE(Grpc::Common::parseBufferInstance(std::move(buffer), message));
         const std::string nonce = message.response_nonce();
         if (!nonce.empty()) {
@@ -125,7 +127,7 @@ TEST(DeltaSubscriptionImplFixturelessTest, NoGrpcStream) {
   Stats::IsolatedStoreImpl stats_store;
   SubscriptionStats stats(Utility::generateStats(stats_store));
 
-  envoy::api::v2::core::Node node;
+  envoy::config::core::v3alpha::Node node;
   node.set_id("fo0");
   NiceMock<LocalInfo::MockLocalInfo> local_info;
   EXPECT_CALL(local_info, node()).WillRepeatedly(testing::ReturnRef(node));
@@ -133,7 +135,9 @@ TEST(DeltaSubscriptionImplFixturelessTest, NoGrpcStream) {
   NiceMock<Event::MockDispatcher> dispatcher;
   NiceMock<Runtime::MockRandomGenerator> random;
   Envoy::Config::RateLimitSettings rate_limit_settings;
-  NiceMock<Config::MockSubscriptionCallbacks<envoy::api::v2::ClusterLoadAssignment>> callbacks;
+  NiceMock<
+      Config::MockSubscriptionCallbacks<envoy::config::endpoint::v3alpha::ClusterLoadAssignment>>
+      callbacks;
   auto* async_client = new Grpc::MockAsyncClient();
 
   const Protobuf::MethodDescriptor* method_descriptor =

@@ -32,7 +32,7 @@ public:
    * Callback method invoked when message is successfully decoded.
    * @param message message that has been decoded.
    */
-  virtual void onMessage(MessageType response) PURE;
+  virtual void onMessage(MessageType message) PURE;
 
   /**
    * Callback method invoked when message could not be decoded.
@@ -72,6 +72,11 @@ public:
       doParse(slice);
     }
   }
+
+  /**
+   * Erases codec state.
+   */
+  virtual void reset() { current_parser_ = nullptr; }
 
   ParserType getCurrentParserForTest() const { return current_parser_; }
 

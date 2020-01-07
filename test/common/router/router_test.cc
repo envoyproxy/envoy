@@ -2,8 +2,8 @@
 #include <cstdint>
 #include <string>
 
-#include "envoy/api/v2/core/base.pb.h"
-#include "envoy/type/percent.pb.h"
+#include "envoy/config/core/v3alpha/base.pb.h"
+#include "envoy/type/v3alpha/percent.pb.h"
 
 #include "common/buffer/buffer_impl.h"
 #include "common/common/empty_string.h"
@@ -225,10 +225,10 @@ public:
   void enableHedgeOnPerTryTimeout() {
     callbacks_.route_->route_entry_.hedge_policy_.hedge_on_per_try_timeout_ = true;
     callbacks_.route_->route_entry_.hedge_policy_.additional_request_chance_ =
-        envoy::type::FractionalPercent{};
+        envoy::type::v3alpha::FractionalPercent{};
     callbacks_.route_->route_entry_.hedge_policy_.additional_request_chance_.set_numerator(0);
     callbacks_.route_->route_entry_.hedge_policy_.additional_request_chance_.set_denominator(
-        envoy::type::FractionalPercent::HUNDRED);
+        envoy::type::v3alpha::FractionalPercent::HUNDRED);
   }
 
   void testAppendCluster(absl::optional<Http::LowerCaseString> cluster_header_name);
@@ -238,7 +238,7 @@ public:
 
   Event::SimulatedTimeSystem test_time_;
   std::string upstream_zone_{"to_az"};
-  envoy::api::v2::core::Locality upstream_locality_;
+  envoy::config::core::v3alpha::Locality upstream_locality_;
   NiceMock<Stats::MockIsolatedStatsStore> stats_store_;
   NiceMock<Upstream::MockClusterManager> cm_;
   NiceMock<Runtime::MockLoader> runtime_;
@@ -3241,8 +3241,10 @@ TEST_F(RouterTest, HttpsInternalRedirectSucceeded) {
 }
 
 TEST_F(RouterTest, Shadow) {
-  callbacks_.route_->route_entry_.shadow_policy_.cluster_ = "foo";
-  callbacks_.route_->route_entry_.shadow_policy_.runtime_key_ = "bar";
+  ShadowPolicyPtr policy = std::make_unique<TestShadowPolicy>("foo", "bar");
+  callbacks_.route_->route_entry_.shadow_policies_.push_back(std::move(policy));
+  policy = std::make_unique<TestShadowPolicy>("fizz", "buzz");
+  callbacks_.route_->route_entry_.shadow_policies_.push_back(std::move(policy));
   ON_CALL(callbacks_, streamId()).WillByDefault(Return(43));
 
   NiceMock<Http::MockStreamEncoder> encoder;
@@ -3257,6 +3259,7 @@ TEST_F(RouterTest, Shadow) {
   expectResponseTimerCreate();
 
   EXPECT_CALL(runtime_.snapshot_, featureEnabled("bar", 0, 43, 10000)).WillOnce(Return(true));
+  EXPECT_CALL(runtime_.snapshot_, featureEnabled("buzz", 0, 43, 10000)).WillOnce(Return(true));
 
   Http::TestHeaderMapImpl headers;
   HttpTestUtility::addDefaultHeaders(headers);
@@ -3268,9 +3271,15 @@ TEST_F(RouterTest, Shadow) {
 
   Http::TestHeaderMapImpl trailers{{"some", "trailer"}};
   EXPECT_CALL(callbacks_, decodingBuffer())
-      .Times(AtLeast(1))
+      .Times(AtLeast(2))
       .WillRepeatedly(Return(body_data.get()));
   EXPECT_CALL(*shadow_writer_, shadow_("foo", _, std::chrono::milliseconds(10)))
+      .WillOnce(Invoke(
+          [](const std::string&, Http::MessagePtr& request, std::chrono::milliseconds) -> void {
+            EXPECT_NE(nullptr, request->body());
+            EXPECT_NE(nullptr, request->trailers());
+          }));
+  EXPECT_CALL(*shadow_writer_, shadow_("fizz", _, std::chrono::milliseconds(10)))
       .WillOnce(Invoke(
           [](const std::string&, Http::MessagePtr& request, std::chrono::milliseconds) -> void {
             EXPECT_NE(nullptr, request->body());
@@ -4134,40 +4143,33 @@ TEST(RouterFilterUtilityTest, ShouldShadow) {
     EXPECT_FALSE(FilterUtility::shouldShadow(policy, runtime, 5));
   }
   {
-    TestShadowPolicy policy;
-    policy.cluster_ = "cluster";
+    TestShadowPolicy policy("cluster");
     NiceMock<Runtime::MockLoader> runtime;
     EXPECT_CALL(runtime.snapshot_, featureEnabled(_, _, _, _)).Times(0);
     EXPECT_TRUE(FilterUtility::shouldShadow(policy, runtime, 5));
   }
   {
-    TestShadowPolicy policy;
-    policy.cluster_ = "cluster";
-    policy.runtime_key_ = "foo";
+    TestShadowPolicy policy("cluster", "foo");
     NiceMock<Runtime::MockLoader> runtime;
     EXPECT_CALL(runtime.snapshot_, featureEnabled("foo", 0, 5, 10000)).WillOnce(Return(false));
     EXPECT_FALSE(FilterUtility::shouldShadow(policy, runtime, 5));
   }
   {
-    TestShadowPolicy policy;
-    policy.cluster_ = "cluster";
-    policy.runtime_key_ = "foo";
+    TestShadowPolicy policy("cluster", "foo");
     NiceMock<Runtime::MockLoader> runtime;
     EXPECT_CALL(runtime.snapshot_, featureEnabled("foo", 0, 5, 10000)).WillOnce(Return(true));
     EXPECT_TRUE(FilterUtility::shouldShadow(policy, runtime, 5));
   }
   // Use default value instead of runtime key.
   {
-    TestShadowPolicy policy;
-    envoy::type::FractionalPercent fractional_percent;
+    envoy::type::v3alpha::FractionalPercent fractional_percent;
     fractional_percent.set_numerator(5);
-    fractional_percent.set_denominator(envoy::type::FractionalPercent::TEN_THOUSAND);
-    policy.cluster_ = "cluster";
-    policy.runtime_key_ = "foo";
-    policy.default_value_ = fractional_percent;
+    fractional_percent.set_denominator(envoy::type::v3alpha::FractionalPercent::TEN_THOUSAND);
+    TestShadowPolicy policy("cluster", "foo", fractional_percent);
     NiceMock<Runtime::MockLoader> runtime;
-    EXPECT_CALL(runtime.snapshot_,
-                featureEnabled("foo", Matcher<const envoy::type::FractionalPercent&>(_), 3))
+    EXPECT_CALL(
+        runtime.snapshot_,
+        featureEnabled("foo", Matcher<const envoy::type::v3alpha::FractionalPercent&>(_), 3))
         .WillOnce(Return(true));
     EXPECT_TRUE(FilterUtility::shouldShadow(policy, runtime, 3));
   }
@@ -4374,7 +4376,7 @@ public:
     EXPECT_CALL(stream_, addCallbacks(_)).WillOnce(Invoke([&](Http::StreamCallbacks& callbacks) {
       stream_callbacks_ = &callbacks;
     }));
-    EXPECT_CALL(encoder_, getStream()).WillOnce(ReturnRef(stream_));
+    EXPECT_CALL(encoder_, getStream()).WillRepeatedly(ReturnRef(stream_));
     EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
         .WillOnce(Invoke(
             [&](Http::StreamDecoder& decoder,

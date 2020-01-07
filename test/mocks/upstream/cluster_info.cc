@@ -2,7 +2,7 @@
 
 #include <limits>
 
-#include "envoy/api/v2/cds.pb.h"
+#include "envoy/config/cluster/v3alpha/cluster.pb.h"
 #include "envoy/upstream/host_description.h"
 #include "envoy/upstream/upstream.h"
 
@@ -22,7 +22,8 @@ namespace Upstream {
 MockLoadBalancerSubsetInfo::MockLoadBalancerSubsetInfo() {
   ON_CALL(*this, isEnabled()).WillByDefault(Return(false));
   ON_CALL(*this, fallbackPolicy())
-      .WillByDefault(Return(envoy::api::v2::Cluster::LbSubsetConfig::ANY_ENDPOINT));
+      .WillByDefault(
+          Return(envoy::config::cluster::v3alpha::Cluster::LbSubsetConfig::ANY_ENDPOINT));
   ON_CALL(*this, defaultSubset()).WillByDefault(ReturnRef(ProtobufWkt::Struct::default_instance()));
   ON_CALL(*this, subsetSelectors()).WillByDefault(ReturnRef(subset_selectors_));
 }
@@ -41,9 +42,9 @@ MockClusterInfo::MockClusterInfo()
       load_report_stats_(ClusterInfoImpl::generateLoadReportStats(load_report_stats_store_)),
       circuit_breakers_stats_(
           ClusterInfoImpl::generateCircuitBreakersStats(stats_store_, "default", true)),
-      resource_manager_(new Upstream::ResourceManagerImpl(runtime_, "fake_key", 1, 1024, 1024, 1,
-                                                          std::numeric_limits<uint64_t>::max(),
-                                                          circuit_breakers_stats_)) {
+      resource_manager_(new Upstream::ResourceManagerImpl(
+          runtime_, "fake_key", 1, 1024, 1024, 1, std::numeric_limits<uint64_t>::max(),
+          circuit_breakers_stats_, absl::nullopt, absl::nullopt)) {
   ON_CALL(*this, connectTimeout()).WillByDefault(Return(std::chrono::milliseconds(1)));
   ON_CALL(*this, idleTimeout()).WillByDefault(Return(absl::optional<std::chrono::milliseconds>()));
   ON_CALL(*this, name()).WillByDefault(ReturnRef(name_));

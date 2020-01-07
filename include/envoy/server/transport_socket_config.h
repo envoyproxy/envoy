@@ -2,6 +2,7 @@
 
 #include <string>
 
+#include "envoy/config/typed_config.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/init/manager.h"
 #include "envoy/local_info/local_info.h"
@@ -106,22 +107,9 @@ public:
   virtual Api::Api& api() PURE;
 };
 
-class TransportSocketConfigFactory {
+class TransportSocketConfigFactory : public Config::TypedFactory {
 public:
   virtual ~TransportSocketConfigFactory() = default;
-
-  /**
-   * @return ProtobufTypes::MessagePtr create empty config proto message. The transport socket
-   *         config, which arrives in an opaque google.protobuf.Struct message, will be converted
-   *         to JSON and then parsed into this empty proto.
-   */
-  virtual ProtobufTypes::MessagePtr createEmptyConfigProto() PURE;
-
-  /**
-   * @return std::string the identifying name for a particular TransportSocketFactoryPtr
-   *         implementation produced by the factory.
-   */
-  virtual std::string name() const PURE;
 };
 
 /**
@@ -145,12 +133,7 @@ public:
   createTransportSocketFactory(const Protobuf::Message& config,
                                TransportSocketFactoryContext& context) PURE;
 
-  /**
-   * @return std::string the identifying category name for objects
-   * created by this factory. Used for automatic registration with
-   * FactoryCategoryRegistry.
-   */
-  static std::string category() {
+  std::string category() const override {
     static const char FACTORY_CATEGORY[] = "transport_sockets.upstream";
     return FACTORY_CATEGORY;
   }
@@ -180,12 +163,7 @@ public:
                                TransportSocketFactoryContext& context,
                                const std::vector<std::string>& server_names) PURE;
 
-  /**
-   * @return std::string the identifying category name for objects
-   * created by this factory. Used for automatic registration with
-   * FactoryCategoryRegistry.
-   */
-  static std::string category() {
+  std::string category() const override {
     static const char FACTORY_CATEGORY[] = "transport_sockets.downstream";
     return FACTORY_CATEGORY;
   }

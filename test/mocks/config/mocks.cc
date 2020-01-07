@@ -1,6 +1,6 @@
 #include "test/mocks/config/mocks.h"
 
-#include "envoy/api/v2/core/config_source.pb.h"
+#include "envoy/config/core/v3alpha/config_source.pb.h"
 
 #include "test/test_common/utility.h"
 
@@ -9,7 +9,7 @@ namespace Config {
 
 MockSubscriptionFactory::MockSubscriptionFactory() {
   ON_CALL(*this, subscriptionFromConfigSource(_, _, _, _))
-      .WillByDefault(testing::Invoke([this](const envoy::api::v2::core::ConfigSource&,
+      .WillByDefault(testing::Invoke([this](const envoy::config::core::v3alpha::ConfigSource&,
                                             absl::string_view, Stats::Scope&,
                                             SubscriptionCallbacks& callbacks) -> SubscriptionPtr {
         auto ret = std::make_unique<testing::NiceMock<MockSubscription>>();

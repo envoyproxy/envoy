@@ -17,7 +17,9 @@ public:
     return std::make_shared<PreviousHostsRetryPredicate>(retry_count);
   }
 
-  std::string name() override { return RetryHostPredicateValues::get().PreviousHostsPredicate; }
+  std::string name() const override {
+    return RetryHostPredicateValues::get().PreviousHostsPredicate;
+  }
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
     return std::make_unique<Envoy::ProtobufWkt::Empty>();

@@ -74,7 +74,7 @@ Every cluster has a statistics tree rooted at *cluster.<name>.* with the followi
   upstream_rq_tx_reset, Counter, Total requests that were reset locally
   upstream_rq_retry, Counter, Total request retries
   upstream_rq_retry_success, Counter, Total request retry successes
-  upstream_rq_retry_overflow, Counter, Total requests not retried due to circuit breaking
+  upstream_rq_retry_overflow, Counter, Total requests not retried due to circuit breaking or exceeding the retry budget
   upstream_flow_control_paused_reading_total, Counter, Total number of times flow control paused reading from upstream
   upstream_flow_control_resumed_reading_total, Counter, Total number of times flow control resumed reading from upstream
   upstream_flow_control_backed_up_total, Counter, Total number of times the upstream connection backed up and paused reads from downstream

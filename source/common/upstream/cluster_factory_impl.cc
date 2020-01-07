@@ -1,6 +1,6 @@
 #include "common/upstream/cluster_factory_impl.h"
 
-#include "envoy/api/v2/cds.pb.h"
+#include "envoy/config/cluster/v3alpha/cluster.pb.h"
 
 #include "common/http/utility.h"
 #include "common/network/address_impl.h"
@@ -15,7 +15,8 @@ namespace Upstream {
 
 namespace {
 
-Stats::ScopePtr generateStatsScope(const envoy::api::v2::Cluster& config, Stats::Store& stats) {
+Stats::ScopePtr generateStatsScope(const envoy::config::cluster::v3alpha::Cluster& config,
+                                   Stats::Store& stats) {
   return stats.createScope(fmt::format(
       "cluster.{}.", config.alt_stat_name().empty() ? config.name() : config.alt_stat_name()));
 }
@@ -23,8 +24,8 @@ Stats::ScopePtr generateStatsScope(const envoy::api::v2::Cluster& config, Stats:
 } // namespace
 
 std::pair<ClusterSharedPtr, ThreadAwareLoadBalancerPtr> ClusterFactoryImplBase::create(
-    const envoy::api::v2::Cluster& cluster, ClusterManager& cluster_manager, Stats::Store& stats,
-    ThreadLocal::Instance& tls, Network::DnsResolverSharedPtr dns_resolver,
+    const envoy::config::cluster::v3alpha::Cluster& cluster, ClusterManager& cluster_manager,
+    Stats::Store& stats, ThreadLocal::Instance& tls, Network::DnsResolverSharedPtr dns_resolver,
     Ssl::ContextManager& ssl_context_manager, Runtime::Loader& runtime,
     Runtime::RandomGenerator& random, Event::Dispatcher& dispatcher,
     AccessLog::AccessLogManager& log_manager, const LocalInfo::LocalInfo& local_info,
@@ -35,19 +36,19 @@ std::pair<ClusterSharedPtr, ThreadAwareLoadBalancerPtr> ClusterFactoryImplBase::
 
   if (!cluster.has_cluster_type()) {
     switch (cluster.type()) {
-    case envoy::api::v2::Cluster::STATIC:
+    case envoy::config::cluster::v3alpha::Cluster::STATIC:
       cluster_type = Extensions::Clusters::ClusterTypes::get().Static;
       break;
-    case envoy::api::v2::Cluster::STRICT_DNS:
+    case envoy::config::cluster::v3alpha::Cluster::STRICT_DNS:
       cluster_type = Extensions::Clusters::ClusterTypes::get().StrictDns;
       break;
-    case envoy::api::v2::Cluster::LOGICAL_DNS:
+    case envoy::config::cluster::v3alpha::Cluster::LOGICAL_DNS:
       cluster_type = Extensions::Clusters::ClusterTypes::get().LogicalDns;
       break;
-    case envoy::api::v2::Cluster::ORIGINAL_DST:
+    case envoy::config::cluster::v3alpha::Cluster::ORIGINAL_DST:
       cluster_type = Extensions::Clusters::ClusterTypes::get().OriginalDst;
       break;
-    case envoy::api::v2::Cluster::EDS:
+    case envoy::config::cluster::v3alpha::Cluster::EDS:
       cluster_type = Extensions::Clusters::ClusterTypes::get().Eds;
       break;
     default:
@@ -71,7 +72,7 @@ std::pair<ClusterSharedPtr, ThreadAwareLoadBalancerPtr> ClusterFactoryImplBase::
 }
 
 Network::DnsResolverSharedPtr
-ClusterFactoryImplBase::selectDnsResolver(const envoy::api::v2::Cluster& cluster,
+ClusterFactoryImplBase::selectDnsResolver(const envoy::config::cluster::v3alpha::Cluster& cluster,
                                           ClusterFactoryContext& context) {
   // We make this a shared pointer to deal with the distinct ownership
   // scenarios that can exist: in one case, we pass in the "default"
@@ -94,7 +95,7 @@ ClusterFactoryImplBase::selectDnsResolver(const envoy::api::v2::Cluster& cluster
 }
 
 std::pair<ClusterSharedPtr, ThreadAwareLoadBalancerPtr>
-ClusterFactoryImplBase::create(const envoy::api::v2::Cluster& cluster,
+ClusterFactoryImplBase::create(const envoy::config::cluster::v3alpha::Cluster& cluster,
                                ClusterFactoryContext& context) {
   auto stats_scope = generateStatsScope(cluster, context.stats());
   Server::Configuration::TransportSocketFactoryContextImpl factory_context(
