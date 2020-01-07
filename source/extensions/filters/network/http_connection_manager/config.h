@@ -220,7 +220,10 @@ public:
 class Utility {
 public:
   /**
+   * Create/get singletons needed for config creation.
    *
+   * @param context supplies the context used to create the singletons.
+   * @return a tuple containing all the singletons.
    */
   static std::tuple<std::shared_ptr<Http::TlsCachingDateProviderImpl>,
                     std::shared_ptr<Router::RouteConfigProviderManager>,
@@ -228,7 +231,14 @@ public:
   createSingletons(Server::Configuration::FactoryContext& context);
 
   /**
+   * Create the HttpConnectionManagerConfig.
    *
+   * @param proto_config supplies the config to install.
+   * @param context supplies the context used to create the config.
+   * @param date_provider the singleton used in config creation.
+   * @param route_config_provider_manager the singleton used in config creation.
+   * @param scoped_routes_config_provider_manager the singleton used in config creation.
+   * @return a shared_ptr to the created config object.
    */
   static std::shared_ptr<HttpConnectionManagerConfig>
   createConfig(const envoy::extensions::filters::network::http_connection_manager::v3alpha::

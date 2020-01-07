@@ -204,7 +204,8 @@ message Listener {
   //
   // .. note::
   //
-  //  Currently only one ApiListener can be installed via bootstrap
+  //  Currently only one ApiListener can be installed; and it can only be done via bootstrap config,
+  //  not LDS.
   //
   // [#next-major-version: In the v3 API, instead of this messy approach where the socket
   // listener fields are directly in the top-level Listener message and the API listener types
