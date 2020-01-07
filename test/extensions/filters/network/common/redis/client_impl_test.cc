@@ -35,14 +35,9 @@ namespace Common {
 namespace Redis {
 namespace Client {
 
-class MockDispatcherWithTimeOverride : public Event::MockDispatcher {
-  // We want to override the time source, but not affect other the multitude of other tests using
-  // MockDispatcher with strict mock.
-public:
-  MOCK_METHOD0(timeSource, TimeSource&());
-};
-
-class RedisClientImplTest : public testing::Test, public Common::Redis::DecoderFactory {
+class RedisClientImplTest : public testing::Test,
+                            public Event::TestUsingSimulatedTime,
+                            public Common::Redis::DecoderFactory {
 public:
   // Common::Redis::DecoderFactory
   Common::Redis::DecoderPtr create(Common::Redis::DecoderCallbacks& callbacks) override {
@@ -76,7 +71,6 @@ public:
     connect_or_op_timer_ = new Event::MockTimer(&dispatcher_);
     flush_timer_ = new Event::MockTimer(&dispatcher_);
 
-    EXPECT_CALL(dispatcher_, timeSource()).WillOnce(ReturnRef(time_system_));
     EXPECT_CALL(*connect_or_op_timer_, enableTimer(_, _));
     EXPECT_CALL(*host_, createConnection_(_, _)).WillOnce(Return(conn_info));
     EXPECT_CALL(*upstream_connection_, addReadFilter(_))
@@ -136,7 +130,7 @@ public:
 
   const std::string cluster_name_{"foo"};
   std::shared_ptr<Upstream::MockHost> host_{new NiceMock<Upstream::MockHost>()};
-  MockDispatcherWithTimeOverride dispatcher_;
+  Event::MockDispatcher dispatcher_;
   Event::MockTimer* flush_timer_{};
   Event::MockTimer* connect_or_op_timer_{};
   MockEncoder* encoder_{new MockEncoder()};
@@ -147,7 +141,6 @@ public:
   std::unique_ptr<Config> config_;
   ClientPtr client_;
   NiceMock<Stats::MockIsolatedStatsStore> stats_;
-  Event::SimulatedTimeSystem time_system_;
   Stats::ScopePtr stats_scope_;
   Common::Redis::RedisCommandStatsSharedPtr redis_command_stats_;
   std::string auth_password_;
@@ -401,7 +394,7 @@ TEST_F(RedisClientImplTest, CommandStatsDisabledSingleRequest) {
   EXPECT_CALL(*decoder_, decode(Ref(fake_data))).WillOnce(Invoke([&](Buffer::Instance&) -> void {
     InSequence s;
 
-    time_system_.setMonotonicTime(std::chrono::microseconds(10));
+    simTime().setMonotonicTime(std::chrono::microseconds(10));
 
     EXPECT_CALL(stats_,
                 deliverHistogramToSinks(
@@ -465,7 +458,7 @@ TEST_F(RedisClientImplTest, CommandStatsEnabledTwoRequests) {
   EXPECT_CALL(*decoder_, decode(Ref(fake_data))).WillOnce(Invoke([&](Buffer::Instance&) -> void {
     InSequence s;
 
-    time_system_.setMonotonicTime(std::chrono::microseconds(10));
+    simTime().setMonotonicTime(std::chrono::microseconds(10));
 
     EXPECT_CALL(stats_, deliverHistogramToSinks(
                             Property(&Stats::Metric::name, "upstream_commands.get.latency"), 10));
