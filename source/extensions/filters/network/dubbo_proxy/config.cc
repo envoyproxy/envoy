@@ -137,15 +137,14 @@ ProtocolPtr ConfigImpl::createProtocol() {
 }
 
 void ConfigImpl::registerFilter(const DubboFilterConfig& proto_config) {
-  const std::string& string_name = proto_config.name();
-
+  const auto& string_name = proto_config.name();
   ENVOY_LOG(debug, "    dubbo filter #{}", filter_factories_.size());
   ENVOY_LOG(debug, "      name: {}", string_name);
   ENVOY_LOG(debug, "    config: {}",
             MessageUtil::getJsonStringFromMessage(proto_config.config(), true));
 
   auto& factory =
-      Envoy::Config::Utility::getAndCheckFactory<DubboFilters::NamedDubboFilterConfigFactory>(
+      Envoy::Config::Utility::getAndCheckFactoryByName<DubboFilters::NamedDubboFilterConfigFactory>(
           string_name);
   ProtobufTypes::MessagePtr message = factory.createEmptyConfigProto();
   Envoy::Config::Utility::translateOpaqueConfig(proto_config.config(),

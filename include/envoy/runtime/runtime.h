@@ -209,6 +209,13 @@ public:
   virtual const std::string& get(const std::string& key) const PURE;
 
   /**
+   * Returns whether the key has any value set.
+   * @param key supplies the key to check.
+   * @return bool if the key exists.
+   */
+  virtual bool exists(const std::string& key) const PURE;
+
+  /**
    * Fetch an integer runtime key. Runtime keys larger than ~2^53 may not be accurately converted
    * into integers and will return default_value.
    * @param key supplies the key to fetch.

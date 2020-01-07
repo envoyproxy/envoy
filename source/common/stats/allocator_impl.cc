@@ -20,21 +20,11 @@
 namespace Envoy {
 namespace Stats {
 
+const char AllocatorImpl::DecrementToZeroSyncPoint[] = "decrement-zero";
+
 AllocatorImpl::~AllocatorImpl() {
   ASSERT(counters_.empty());
   ASSERT(gauges_.empty());
-}
-
-void AllocatorImpl::removeCounterFromSet(Counter* counter) {
-  Thread::LockGuard lock(mutex_);
-  const size_t count = counters_.erase(counter->statName());
-  ASSERT(count == 1);
-}
-
-void AllocatorImpl::removeGaugeFromSet(Gauge* gauge) {
-  Thread::LockGuard lock(mutex_);
-  const size_t count = gauges_.erase(gauge->statName());
-  ASSERT(count == 1);
 }
 
 #ifndef ENVOY_CONFIG_COVERAGE
@@ -78,10 +68,34 @@ public:
   // RefcountInterface
   void incRefCount() override { ++ref_count_; }
   bool decRefCount() override {
+    // We must, unfortunately, hold the allocator's lock when decrementing the
+    // refcount. Otherwise another thread may simultaneously try to allocate the
+    // same name'd stat after we decrement it, and we'll wind up with a
+    // dtor/update race. To avoid this we must hold the lock until the stat is
+    // removed from the map.
+    //
+    // It might be worth thinking about a race-free way to decrement ref-counts
+    // without a lock, for the case where ref_count > 2, and we don't need to
+    // destruct anything. But it seems preferable at to be conservative here,
+    // as stats will only go out of scope when a scope is destructed (during
+    // xDS) or during admin stats operations.
+    Thread::LockGuard lock(alloc_.mutex_);
     ASSERT(ref_count_ >= 1);
-    return --ref_count_ == 0;
+    if (--ref_count_ == 0) {
+      alloc_.sync().syncPoint(AllocatorImpl::DecrementToZeroSyncPoint);
+      removeFromSetLockHeld();
+      return true;
+    }
+    return false;
   }
   uint32_t use_count() const override { return ref_count_; }
+
+  /**
+   * We must atomically remove the counter/gauges from the allocator's sets when
+   * our ref-count decrement hits zero. The counters and gauges are held in
+   * distinct sets so we virtualize this removal helper.
+   */
+  virtual void removeFromSetLockHeld() EXCLUSIVE_LOCKS_REQUIRED(alloc_.mutex_) PURE;
 
 protected:
   AllocatorImpl& alloc_;
@@ -89,8 +103,14 @@ protected:
   // Holds backing store shared by both CounterImpl and GaugeImpl. CounterImpl
   // adds another field, pending_increment_, that is not used in Gauge.
   std::atomic<uint64_t> value_{0};
+
+  // ref_count_ can be incremented as an atomic, without holding a
+  // lock. However, we must hold alloc_.mutex_ when decrementing ref_count_ so
+  // that when it hits zero we can atomically remove it from alloc_.counters_ or
+  // alloc_.gauges_. We leave it atomic to avoid taking the lock on increment.
+  std::atomic<uint32_t> ref_count_{0};
+
   std::atomic<uint16_t> flags_{0};
-  std::atomic<uint16_t> ref_count_{0};
 };
 
 class CounterImpl : public StatsSharedImpl<Counter> {
@@ -98,7 +118,11 @@ public:
   CounterImpl(StatName name, AllocatorImpl& alloc, absl::string_view tag_extracted_name,
               const std::vector<Tag>& tags)
       : StatsSharedImpl(name, alloc, tag_extracted_name, tags) {}
-  ~CounterImpl() override { alloc_.removeCounterFromSet(this); }
+
+  void removeFromSetLockHeld() EXCLUSIVE_LOCKS_REQUIRED(alloc_.mutex_) override {
+    const size_t count = alloc_.counters_.erase(statName());
+    ASSERT(count == 1);
+  }
 
   // Stats::Counter
   void add(uint64_t amount) override {
@@ -137,7 +161,11 @@ public:
       break;
     }
   }
-  ~GaugeImpl() override { alloc_.removeGaugeFromSet(this); }
+
+  void removeFromSetLockHeld() override EXCLUSIVE_LOCKS_REQUIRED(alloc_.mutex_) {
+    const size_t count = alloc_.gauges_.erase(statName());
+    ASSERT(count == 1);
+  }
 
   // Stats::Gauge
   void add(uint64_t amount) override {
@@ -219,6 +247,14 @@ GaugeSharedPtr AllocatorImpl::makeGauge(StatName name, absl::string_view tag_ext
   auto gauge = GaugeSharedPtr(new GaugeImpl(name, *this, tag_extracted_name, tags, import_mode));
   gauges_.insert(gauge.get());
   return gauge;
+}
+
+bool AllocatorImpl::isMutexLocked() {
+  bool locked = mutex_.tryLock();
+  if (locked) {
+    mutex_.unlock();
+  }
+  return !locked;
 }
 
 } // namespace Stats
