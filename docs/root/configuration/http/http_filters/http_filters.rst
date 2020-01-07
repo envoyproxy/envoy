@@ -8,6 +8,7 @@ HTTP filters
 
   adaptive_concurrency_filter
   buffer_filter
+  cache_filter
   cors_filter
   csrf_filter
   dynamic_forward_proxy_filter
