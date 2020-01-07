@@ -415,8 +415,8 @@ public:
       FactoryRegistry<Base>::registerFactory(instance_, deprecated_name, version, instance_.name());
     }
 
-    if (!FactoryCategoryRegistry::isRegistered(Base::category())) {
-      FactoryCategoryRegistry::registerCategory(Base::category(),
+    if (!FactoryCategoryRegistry::isRegistered(instance_.category())) {
+      FactoryCategoryRegistry::registerCategory(instance_.category(),
                                                 new FactoryRegistryProxyImpl<Base>());
     }
   }

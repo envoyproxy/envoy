@@ -105,7 +105,7 @@ TEST(RegistryTest, WithDeprecatedFactoryPublished) {
 
 class TestVersionedFactory : public PublishedFactory {
 public:
-  std::string name() override { return "testing.published.versioned"; }
+  std::string name() const override { return "testing.published.versioned"; }
 };
 
 REGISTER_FACTORY(TestVersionedFactory,
@@ -138,7 +138,7 @@ TEST(RegistryTest, VersionedFactory) {
 
 class TestVersionedWithDeprecatedNamesFactory : public PublishedFactory {
 public:
-  std::string name() override { return "testing.published.versioned.instead_name"; }
+  std::string name() const override { return "testing.published.versioned.instead_name"; }
 };
 
 REGISTER_FACTORY(TestVersionedWithDeprecatedNamesFactory,
