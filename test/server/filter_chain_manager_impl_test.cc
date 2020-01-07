@@ -99,8 +99,7 @@ public:
   addSingleFilterChainHelper(const envoy::config::listener::v3alpha::FilterChain& filter_chain) {
     filter_chain_manager_.addFilterChain(
         std::vector<const envoy::config::listener::v3alpha::FilterChain*>{&filter_chain},
-        filter_chain_factory_builder_,
-        *filter_chain_manager_.createFilterChainFactoryContextCreator(parent_context_));
+        filter_chain_factory_builder_, filter_chain_manager_);
   }
 
   // Intermediate states.
@@ -130,7 +129,7 @@ public:
 
   // Test target.
   FilterChainManagerImpl filter_chain_manager_{
-      std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 1234)};
+      std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 1234), parent_context_};
 };
 
 TEST_F(FilterChainManagerImplTest, FilterChainMatchNothing) {
@@ -148,9 +147,9 @@ TEST_F(FilterChainManagerImplTest, AddSingleFilterChain) {
 TEST_F(FilterChainManagerImplTest, FilterChainContextsAreUnique) {
   std::set<Configuration::FilterChainFactoryContext*> contexts;
   {
-    auto creator = filter_chain_manager_.createFilterChainFactoryContextCreator(parent_context_);
     for (int i = 0; i < 2; i++) {
-      contexts.insert(&callback->createFilterChainFactoryContext(&filter_chain_template_));
+      contexts.insert(
+          &filter_chain_manager_.createFilterChainFactoryContext(&filter_chain_template_));
     }
   }
   EXPECT_EQ(contexts.size(), 2);

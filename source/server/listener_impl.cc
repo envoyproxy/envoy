@@ -129,7 +129,8 @@ ListenerImpl::ListenerImpl(const envoy::config::listener::v3alpha::Listener& con
                            uint64_t hash, ProtobufMessage::ValidationVisitor& validation_visitor,
                            uint32_t concurrency)
     : parent_(parent), address_(Network::Address::resolveProtoAddress(config.address())),
-      filter_chain_manager_(address_), global_scope_(parent_.server_.stats().createScope("")),
+      filter_chain_manager_(address_, *this),
+      global_scope_(parent_.server_.stats().createScope("")),
       listener_scope_(
           parent_.server_.stats().createScope(fmt::format("listener.{}.", address_->asString()))),
       bind_to_port_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config.deprecated_v1(), bind_to_port, true)),
@@ -230,9 +231,7 @@ ListenerImpl::ListenerImpl(const envoy::config::listener::v3alpha::Listener& con
   // network filter chain update.
   // TODO(lambdai): create builder from filter_chain_manager to obtain the init manager
   ListenerFilterChainFactoryBuilder builder(*this, transport_factory_context);
-  filter_chain_manager_.addFilterChain(
-      config.filter_chains(), builder,
-      *filter_chain_manager_.createFilterChainFactoryContextCreator(*this));
+  filter_chain_manager_.addFilterChain(config.filter_chains(), builder, filter_chain_manager_);
 
   if (socket_type == Network::Address::SocketType::Datagram) {
     return;

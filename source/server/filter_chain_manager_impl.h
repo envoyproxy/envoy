@@ -36,7 +36,7 @@ public:
 class FilterChainFactoryContextImpl : public Configuration::FilterChainFactoryContext,
                                       public Network::DrainDecision {
 public:
-  FilterChainFactoryContextImpl(Configuration::FactoryContext& parent_context);
+  explicit FilterChainFactoryContextImpl(Configuration::FactoryContext& parent_context);
 
   // DrainDecision
   bool drainClose() const override;
@@ -77,10 +77,16 @@ private:
  * Implementation of FilterChainManager.
  */
 class FilterChainManagerImpl : public Network::FilterChainManager,
+                               public FilterChainFactoryContextCreator,
                                Logger::Loggable<Logger::Id::config> {
 public:
-  explicit FilterChainManagerImpl(const Network::Address::InstanceConstSharedPtr& address)
-      : address_(address) {}
+  FilterChainManagerImpl(const Network::Address::InstanceConstSharedPtr& address,
+                         Configuration::FactoryContext& factory_context)
+      : address_(address), parent_context_(factory_context) {}
+
+  // FilterChainFactoryContextCreator
+  Configuration::FilterChainFactoryContext& createFilterChainFactoryContext(
+      const ::envoy::config::listener::v3alpha::FilterChain* const filter_chain) override;
 
   // Network::FilterChainManager
   const Network::FilterChain*
@@ -90,25 +96,6 @@ public:
       absl::Span<const envoy::config::listener::v3alpha::FilterChain* const> filter_chain_span,
       FilterChainFactoryBuilder& b, FilterChainFactoryContextCreator& callback);
   static bool isWildcardServerName(const std::string& name);
-
-  std::unique_ptr<FilterChainFactoryContextCreator>
-  createFilterChainFactoryContextCreator(Configuration::FactoryContext& parent_context);
-
-  // A naive implementation which commits the context as soon as the context is created.
-  // This implementation can support listeners which doesn't transfer the ownership of filter chain
-  // context to the descendant listener with new config.
-  class ImmediateAppendFilterChainContextCallbackImpl : public FilterChainFactoryContextCreator {
-  public:
-    ImmediateAppendFilterChainContextCallbackImpl(FilterChainManagerImpl& parent,
-                                                  Configuration::FactoryContext& parent_context);
-    ~ImmediateAppendFilterChainContextCallbackImpl() override = default;
-    Configuration::FilterChainFactoryContext& createFilterChainFactoryContext(
-        const ::envoy::config::listener::v3alpha::FilterChain* const filter_chain) override;
-
-  private:
-    FilterChainManagerImpl& parent_;
-    Configuration::FactoryContext& parent_context_;
-  };
 
 private:
   void convertIPsToTries();
@@ -203,7 +190,7 @@ private:
   // and application protocols, using structures defined above.
   DestinationPortsMap destination_ports_map_;
   const Network::Address::InstanceConstSharedPtr address_;
-  friend class ImmediateAppendFilterChainContextCallbackImpl;
+  Configuration::FactoryContext& parent_context_;
   std::list<std::shared_ptr<Configuration::FilterChainFactoryContext>> factory_contexts_;
 };
 

@@ -570,25 +570,12 @@ void FilterChainManagerImpl::convertIPsToTries() {
   }
 }
 
-std::unique_ptr<FilterChainFactoryContextCreator>
-FilterChainManagerImpl::createFilterChainFactoryContextCreator(
-    Configuration::FactoryContext& parent_context) {
-  return std::make_unique<ImmediateAppendFilterChainContextCallbackImpl>(*this, parent_context);
-}
-
-FilterChainManagerImpl::ImmediateAppendFilterChainContextCallbackImpl::
-    ImmediateAppendFilterChainContextCallbackImpl(FilterChainManagerImpl& parent,
-                                                  Configuration::FactoryContext& parent_context)
-    : parent_(parent), parent_context_(parent_context) {}
-
-Configuration::FilterChainFactoryContext& FilterChainManagerImpl::
-    ImmediateAppendFilterChainContextCallbackImpl::createFilterChainFactoryContext(
-        const ::envoy::config::listener::v3alpha::FilterChain* const filter_chain) {
+Configuration::FilterChainFactoryContext& FilterChainManagerImpl::createFilterChainFactoryContext(
+    const ::envoy::config::listener::v3alpha::FilterChain* const filter_chain) {
   // TODO(lambdai): drain close should be saved in per filter chain context
   UNREFERENCED_PARAMETER(filter_chain);
-  parent_.factory_contexts_.push_back(
-      std::make_shared<FilterChainFactoryContextImpl>(parent_context_));
-  return *parent_.factory_contexts_.back();
+  factory_contexts_.push_back(std::make_shared<FilterChainFactoryContextImpl>(parent_context_));
+  return *factory_contexts_.back();
 }
 } // namespace Server
 } // namespace Envoy
