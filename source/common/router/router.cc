@@ -31,6 +31,7 @@
 #include "common/router/debug_config.h"
 #include "common/router/retry_state_impl.h"
 #include "common/runtime/runtime_impl.h"
+#include "common/stream_info/uint32_accessor_impl.h"
 #include "common/tracing/http_tracer_impl.h"
 
 #include "extensions/filters/http/well_known_names.h"
@@ -76,14 +77,16 @@ bool convertRequestHeadersForInternalRedirect(Http::HeaderMap& downstream_header
     return false;
   }
 
-  if (!filter_state.hasData<UInt32Accessor>(NumPreviousInternalRedirectFilterStateName)) {
+  if (!filter_state.hasData<StreamInfo::UInt32Accessor>(
+          NumPreviousInternalRedirectFilterStateName)) {
     filter_state.setData(NumPreviousInternalRedirectFilterStateName,
-                         std::make_shared<UInt32Accessor>(0),
+                         std::make_shared<StreamInfo::UInt32AccessorImpl>(0),
                          StreamInfo::FilterState::StateType::Mutable,
                          StreamInfo::FilterState::LifeSpan::DownstreamRequest);
   }
-  UInt32Accessor& num_previous_internal_redirect =
-      filter_state.getDataMutable<UInt32Accessor>(NumPreviousInternalRedirectFilterStateName);
+  StreamInfo::UInt32Accessor& num_previous_internal_redirect =
+      filter_state.getDataMutable<StreamInfo::UInt32Accessor>(
+          NumPreviousInternalRedirectFilterStateName);
 
   if (num_previous_internal_redirect.value() >= max_previous_internal_redirect) {
     return false;

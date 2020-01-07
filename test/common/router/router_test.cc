@@ -16,6 +16,7 @@
 #include "common/router/config_impl.h"
 #include "common/router/debug_config.h"
 #include "common/router/router.h"
+#include "common/stream_info/uint32_accessor_impl.h"
 #include "common/tracing/http_tracer_impl.h"
 #include "common/upstream/upstream_impl.h"
 
@@ -230,7 +231,8 @@ public:
 
   void setNumPreviousRedirect(uint32_t num_previous_redirects) {
     callbacks_.streamInfo().filterState().setData(
-        "num_previous_internal_redirect", std::make_shared<UInt32Accessor>(num_previous_redirects),
+        "num_previous_internal_redirect",
+        std::make_shared<StreamInfo::UInt32AccessorImpl>(num_previous_redirects),
         StreamInfo::FilterState::StateType::Mutable,
         StreamInfo::FilterState::LifeSpan::DownstreamRequest);
   }
@@ -3237,7 +3239,7 @@ TEST_F(RouterTest, HttpInternalRedirectSucceeded) {
   router_.onDestroy();
   EXPECT_EQ(3, callbacks_.streamInfo()
                    .filterState()
-                   .getDataMutable<UInt32Accessor>("num_previous_internal_redirect")
+                   .getDataMutable<StreamInfo::UInt32Accessor>("num_previous_internal_redirect")
                    .value());
 }
 

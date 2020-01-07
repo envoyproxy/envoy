@@ -59,3 +59,11 @@ envoy_cc_test(
         "//test/mocks/stream_info:stream_info_mocks",
     ],
 )
+
+envoy_cc_test(
+    name = "uint32_accessor_impl_test",
+    srcs = ["uint32_accessor_impl_test.cc"],
+    deps = [
+        "//source/common/stream_info:uint32_accessor_lib",
+    ],
+)

@@ -252,6 +252,7 @@ envoy_cc_test(
         "//source/common/network:application_protocol_lib",
         "//source/common/network:utility_lib",
         "//source/common/router:router_lib",
+        "//source/common/stream_info:uint32_accessor_lib",
         "//source/common/upstream:upstream_includes",
         "//source/common/upstream:upstream_lib",
         "//test/common/http:common_lib",
