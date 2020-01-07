@@ -32,6 +32,7 @@ public:
     ON_CALL(loader_.snapshot_, featureEnabled("dynamodb.filter_enabled", 100))
         .WillByDefault(Return(enabled));
     EXPECT_CALL(loader_.snapshot_, featureEnabled("dynamodb.filter_enabled", 100));
+    EXPECT_CALL(decoder_callbacks_.dispatcher_, timeSource());
 
     auto stats = std::make_shared<DynamoStats>(stats_, "prefix.");
     filter_ = std::make_unique<DynamoFilter>(loader_, stats,
