@@ -15,8 +15,8 @@ namespace HttpFilters {
 namespace Cache {
 
 Http::FilterFactoryCb CacheFilterFactory::createFilterFactoryFromProtoTyped(
-    const envoy::config::filter::http::cache::v2::Cache& config,
-    const std::string& stats_prefix, Server::Configuration::FactoryContext& context) {
+    const envoy::config::filter::http::cache::v2::Cache& config, const std::string& stats_prefix,
+    Server::Configuration::FactoryContext& context) {
   return [config, stats_prefix, &context](Http::FilterChainFactoryCallbacks& callbacks) -> void {
     callbacks.addStreamFilter(
         CacheFilter::make(config, stats_prefix, context.scope(), context.timeSource()));
