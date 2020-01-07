@@ -6,6 +6,7 @@
 #include <string>
 
 #include "envoy/api/api.h"
+#include "envoy/config/core/v3alpha/health_check.pb.validate.h"
 #include "envoy/http/codec.h"
 #include "envoy/http/header_map.h"
 #include "envoy/network/filter.h"
