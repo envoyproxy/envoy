@@ -64,7 +64,7 @@ can be used to modify this behavior, and they fall into two categories:
     Hosts are marked by setting ``canary: true`` for the ``envoy.lb`` filter in the endpoint's filter metadata.
     See :ref:`LbEndpoint <envoy_api_msg_endpoint.LbEndpoint>` for more details.
 
-  * *envoy.retry_host_predicates.omit_hosts*: This will reject any host based on predefined metadata match criteria. 
+  * *envoy.retry_host_predicates.omit_host_metadata*: This will reject any host based on predefined metadata match criteria. 
     See the configuration example below for more details.
 
 * :ref:`Priority Predicates<envoy_api_field_route.RetryPolicy.retry_priority>`: These predicates can
@@ -100,15 +100,15 @@ on attempts is necessary in order to deal with scenarios in which finding an acc
 impossible (no hosts satisfy the predicate) or very unlikely (the only suitable host has a very low
 relative weight).
 
-To reject a host based on its metadata match, ``envoy.retry_host_predicates.omit_hosts`` can be used:
+To reject a host based on its metadata match, ``envoy.retry_host_predicates.omit_host_metadata`` can be used:
 
 .. code-block:: yaml
 
   retry_policy:
     retry_host_predicate:
-    - name: envoy.retry_host_predicates.omit_hosts
+    - name: envoy.retry_host_predicates.omit_host_metadata
       typed_config:
-        "@type": type.googleapis.com/envoy.config.retry.omit_hosts.v2.OmitHostsConfig
+        "@type": type.googleapis.com/envoy.config.retry.omit_host_metadata.v2.OmitHostMetadataConfig
         metadata_match:
           filter_metadata:
             envoy.lb:

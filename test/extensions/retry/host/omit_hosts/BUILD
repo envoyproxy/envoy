@@ -14,11 +14,11 @@ envoy_package()
 envoy_extension_cc_test(
     name = "config_test",
     srcs = ["config_test.cc"],
-    extension_name = "envoy.retry_host_predicates.omit_hosts",
+    extension_name = "envoy.retry_host_predicates.omit_host_metadata",
     deps = [
         "//source/extensions/retry/host:well_known_names",
-        "//source/extensions/retry/host/omit_hosts:config",
+        "//source/extensions/retry/host/omit_host_metadata:config",
         "//test/mocks/upstream:upstream_mocks",
-        "@envoy_api//envoy/config/retry/omit_hosts/v2:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/retry/omit_host_metadata/v3alpha:pkg_cc_proto",
     ],
 )
