@@ -43,7 +43,7 @@ public:
   void testFormatting(const Envoy::StreamInfo::MockStreamInfo& stream_info,
                       const std::string& variable, const std::string& expected_output) {
     {
-      auto f = StreamInfoHeaderFormatter(variable, false);
+      auto f = StreamInfoHeaderFormatter(variable, false, false);
       const std::string formatted_string = f.format(stream_info);
       EXPECT_EQ(expected_output, formatted_string);
     }
@@ -55,7 +55,7 @@ public:
   }
 
   void testInvalidFormat(const std::string& variable) {
-    EXPECT_THROW_WITH_MESSAGE(StreamInfoHeaderFormatter(variable, false), EnvoyException,
+    EXPECT_THROW_WITH_MESSAGE(StreamInfoHeaderFormatter(variable, false, false), EnvoyException,
                               fmt::format("field '{}' not supported as custom header", variable));
   }
 };
@@ -577,18 +577,18 @@ TEST_F(StreamInfoHeaderFormatterTest, TestFormatWithNonStringPerRequestStateVari
 
 TEST_F(StreamInfoHeaderFormatterTest, WrongFormatOnPerRequestStateVariable) {
   // No parameters
-  EXPECT_THROW_WITH_MESSAGE(StreamInfoHeaderFormatter("PER_REQUEST_STATE()", false), EnvoyException,
+  EXPECT_THROW_WITH_MESSAGE(StreamInfoHeaderFormatter("PER_REQUEST_STATE()", false, false), EnvoyException,
                             "Invalid header configuration. Expected format "
                             "PER_REQUEST_STATE(<data_name>), actual format "
                             "PER_REQUEST_STATE()");
 
   // Missing single parens
-  EXPECT_THROW_WITH_MESSAGE(StreamInfoHeaderFormatter("PER_REQUEST_STATE(testing", false),
+  EXPECT_THROW_WITH_MESSAGE(StreamInfoHeaderFormatter("PER_REQUEST_STATE(testing", false, false),
                             EnvoyException,
                             "Invalid header configuration. Expected format "
                             "PER_REQUEST_STATE(<data_name>), actual format "
                             "PER_REQUEST_STATE(testing");
-  EXPECT_THROW_WITH_MESSAGE(StreamInfoHeaderFormatter("PER_REQUEST_STATE testing)", false),
+  EXPECT_THROW_WITH_MESSAGE(StreamInfoHeaderFormatter("PER_REQUEST_STATE testing)", false, false),
                             EnvoyException,
                             "Invalid header configuration. Expected format "
                             "PER_REQUEST_STATE(<data_name>), actual format "
@@ -599,7 +599,7 @@ TEST_F(StreamInfoHeaderFormatterTest, UnknownVariable) { testInvalidFormat("INVA
 
 TEST_F(StreamInfoHeaderFormatterTest, WrongFormatOnUpstreamMetadataVariable) {
   // Invalid JSON.
-  EXPECT_THROW_WITH_MESSAGE(StreamInfoHeaderFormatter("UPSTREAM_METADATA(abcd)", false),
+  EXPECT_THROW_WITH_MESSAGE(StreamInfoHeaderFormatter("UPSTREAM_METADATA(abcd)", false, false),
                             EnvoyException,
                             "Invalid header configuration. Expected format "
                             "UPSTREAM_METADATA([\"namespace\", \"k\", ...]), actual format "
@@ -607,37 +607,37 @@ TEST_F(StreamInfoHeaderFormatterTest, WrongFormatOnUpstreamMetadataVariable) {
                             "Error(offset 0, line 1): Invalid value.\n");
 
   // No parameters.
-  EXPECT_THROW_WITH_MESSAGE(StreamInfoHeaderFormatter("UPSTREAM_METADATA", false), EnvoyException,
+  EXPECT_THROW_WITH_MESSAGE(StreamInfoHeaderFormatter("UPSTREAM_METADATA", false, false), EnvoyException,
                             "Invalid header configuration. Expected format "
                             "UPSTREAM_METADATA([\"namespace\", \"k\", ...]), actual format "
                             "UPSTREAM_METADATA");
 
-  EXPECT_THROW_WITH_MESSAGE(StreamInfoHeaderFormatter("UPSTREAM_METADATA()", false), EnvoyException,
+  EXPECT_THROW_WITH_MESSAGE(StreamInfoHeaderFormatter("UPSTREAM_METADATA()", false, false), EnvoyException,
                             "Invalid header configuration. Expected format "
                             "UPSTREAM_METADATA([\"namespace\", \"k\", ...]), actual format "
                             "UPSTREAM_METADATA(), because JSON supplied is not valid. "
                             "Error(offset 0, line 1): The document is empty.\n");
 
   // One parameter.
-  EXPECT_THROW_WITH_MESSAGE(StreamInfoHeaderFormatter("UPSTREAM_METADATA([\"ns\"])", false),
+  EXPECT_THROW_WITH_MESSAGE(StreamInfoHeaderFormatter("UPSTREAM_METADATA([\"ns\"])", false, false),
                             EnvoyException,
                             "Invalid header configuration. Expected format "
                             "UPSTREAM_METADATA([\"namespace\", \"k\", ...]), actual format "
                             "UPSTREAM_METADATA([\"ns\"])");
 
   // Missing close paren.
-  EXPECT_THROW_WITH_MESSAGE(StreamInfoHeaderFormatter("UPSTREAM_METADATA(", false), EnvoyException,
+  EXPECT_THROW_WITH_MESSAGE(StreamInfoHeaderFormatter("UPSTREAM_METADATA(", false, false), EnvoyException,
                             "Invalid header configuration. Expected format "
                             "UPSTREAM_METADATA([\"namespace\", \"k\", ...]), actual format "
                             "UPSTREAM_METADATA(");
 
-  EXPECT_THROW_WITH_MESSAGE(StreamInfoHeaderFormatter("UPSTREAM_METADATA([a,b,c,d]", false),
+  EXPECT_THROW_WITH_MESSAGE(StreamInfoHeaderFormatter("UPSTREAM_METADATA([a,b,c,d]", false, false),
                             EnvoyException,
                             "Invalid header configuration. Expected format "
                             "UPSTREAM_METADATA([\"namespace\", \"k\", ...]), actual format "
                             "UPSTREAM_METADATA([a,b,c,d]");
 
-  EXPECT_THROW_WITH_MESSAGE(StreamInfoHeaderFormatter("UPSTREAM_METADATA([\"a\",\"b\"]", false),
+  EXPECT_THROW_WITH_MESSAGE(StreamInfoHeaderFormatter("UPSTREAM_METADATA([\"a\",\"b\"]", false, false),
                             EnvoyException,
                             "Invalid header configuration. Expected format "
                             "UPSTREAM_METADATA([\"namespace\", \"k\", ...]), actual format "
@@ -645,7 +645,7 @@ TEST_F(StreamInfoHeaderFormatterTest, WrongFormatOnUpstreamMetadataVariable) {
 
   // Non-string elements.
   EXPECT_THROW_WITH_MESSAGE(
-      StreamInfoHeaderFormatter("UPSTREAM_METADATA([\"a\", 1])", false), EnvoyException,
+      StreamInfoHeaderFormatter("UPSTREAM_METADATA([\"a\", 1])", false, false), EnvoyException,
       "Invalid header configuration. Expected format "
       "UPSTREAM_METADATA([\"namespace\", \"k\", ...]), actual format "
       "UPSTREAM_METADATA([\"a\", 1]), because JSON field from line 1 accessed with type 'String' "
@@ -653,7 +653,7 @@ TEST_F(StreamInfoHeaderFormatterTest, WrongFormatOnUpstreamMetadataVariable) {
 
   // Invalid string elements.
   EXPECT_THROW_WITH_MESSAGE(
-      StreamInfoHeaderFormatter("UPSTREAM_METADATA([\"a\", \"\\unothex\"])", false), EnvoyException,
+      StreamInfoHeaderFormatter("UPSTREAM_METADATA([\"a\", \"\\unothex\"])", false, false), EnvoyException,
       "Invalid header configuration. Expected format "
       "UPSTREAM_METADATA([\"namespace\", \"k\", ...]), actual format "
       "UPSTREAM_METADATA([\"a\", \"\\unothex\"]), because JSON supplied is not valid. "
@@ -661,7 +661,7 @@ TEST_F(StreamInfoHeaderFormatterTest, WrongFormatOnUpstreamMetadataVariable) {
 
   // Non-array parameters.
   EXPECT_THROW_WITH_MESSAGE(
-      StreamInfoHeaderFormatter("UPSTREAM_METADATA({\"a\":1})", false), EnvoyException,
+      StreamInfoHeaderFormatter("UPSTREAM_METADATA({\"a\":1})", false, false), EnvoyException,
       "Invalid header configuration. Expected format "
       "UPSTREAM_METADATA([\"namespace\", \"k\", ...]), actual format "
       "UPSTREAM_METADATA({\"a\":1}), because JSON field from line 1 accessed with type 'Array' "
@@ -1029,7 +1029,7 @@ request_headers_to_remove: ["x-nope"]
 }
 
 TEST(HeaderParserTest, EvaluateHeadersWithAppendFalse) {
-  const std::string ymal = R"EOF(
+  const std::string yaml = R"EOF(
 match: { prefix: "/new_endpoint" }
 route:
   cluster: "www2"
@@ -1038,15 +1038,15 @@ request_headers_to_add:
   - header:
       key: "static-header"
       value: "static-value"
-    append: true
+    append: false
   - header:
       key: "x-client-ip"
       value: "%DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT%"
-    append: true
+    append: false
   - header:
       key: "x-request-start"
       value: "%START_TIME(%s%3f)%"
-    append: true
+    append: false
   - header:
       key: "x-request-start-default"
       value: "%START_TIME%"
@@ -1058,10 +1058,7 @@ request_headers_to_add:
 )EOF";
 
   // Disable append mode.
-  envoy::api::v2::route::Route route = parseRouteFromV2Yaml(ymal);
-  route.mutable_request_headers_to_add(0)->mutable_append()->set_value(false);
-  route.mutable_request_headers_to_add(1)->mutable_append()->set_value(false);
-  route.mutable_request_headers_to_add(2)->mutable_append()->set_value(false);
+  envoy::api::v2::route::Route route = parseRouteFromV2Yaml(yaml);
 
   HeaderParserPtr req_header_parser =
       Router::HeaderParser::configure(route.request_headers_to_add());
@@ -1231,6 +1228,36 @@ response_headers_to_remove: ["x-foo-header"]
 
   resp_header_parser->evaluateHeaders(header_map, stream_info);
   EXPECT_EQ("bar", header_map.get_("x-foo-header"));
+}
+
+TEST(HeaderParserTest, EvaluateHeadersSkipIfPresent) {
+  const std::string yaml = R"EOF(
+match: { prefix: "/new_endpoint" }
+route:
+  cluster: www2
+response_headers_to_add:
+  - header:
+      key: "x-foo-header"
+      value: "bar"
+    skip_if_present: true
+  - header:
+      key: "x-fizz-header"
+      value: "buzz"
+    append: false
+)EOF";
+
+  const auto route = parseRouteFromV2Yaml(yaml);
+  HeaderParserPtr resp_header_parser =
+      HeaderParser::configure(route.response_headers_to_add(), route.response_headers_to_remove());
+  Http::TestHeaderMapImpl header_map{
+    {"x-foo-header", "foo"},
+    {"x-fizz-header", "fuzz"},
+  };
+  NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
+
+  resp_header_parser->evaluateHeaders(header_map, stream_info);
+  EXPECT_EQ("foo", header_map.get_("x-foo-header"));
+  EXPECT_EQ("buzz", header_map.get_("x-fizz-header"));
 }
 
 } // namespace

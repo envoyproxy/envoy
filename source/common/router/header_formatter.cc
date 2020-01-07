@@ -218,8 +218,8 @@ StreamInfoHeaderFormatter::FieldExtractor sslConnectionInfoStringTimeHeaderExtra
 
 } // namespace
 
-StreamInfoHeaderFormatter::StreamInfoHeaderFormatter(absl::string_view field_name, bool append)
-    : append_(append) {
+StreamInfoHeaderFormatter::StreamInfoHeaderFormatter(absl::string_view field_name, bool append, bool skip_if_present)
+    : append_(append), skip_if_present_(skip_if_present) {
   if (field_name == "PROTOCOL") {
     field_extractor_ = [](const Envoy::StreamInfo::StreamInfo& stream_info) {
       return Envoy::AccessLog::AccessLogFormatUtils::protocolToString(stream_info.protocol());

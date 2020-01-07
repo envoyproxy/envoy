@@ -51,10 +51,11 @@ parseInternal(const envoy::api::v2::core::HeaderValueOption& header_value_option
   }
 
   const bool append = PROTOBUF_GET_WRAPPED_OR_DEFAULT(header_value_option, append, true);
+  const bool skip_if_present = header_value_option.skip_if_present().value();
 
   absl::string_view format(header_value_option.header().value());
   if (format.empty()) {
-    return std::make_unique<PlainHeaderFormatter>("", append);
+    return std::make_unique<PlainHeaderFormatter>("", append, skip_if_present);
   }
 
   std::vector<HeaderFormatterPtr> formatters;
@@ -88,7 +89,7 @@ parseInternal(const envoy::api::v2::core::HeaderValueOption& header_value_option
       state = ParserState::VariableName;
       if (pos > start) {
         absl::string_view literal = format.substr(start, pos - start);
-        formatters.emplace_back(new PlainHeaderFormatter(unescape(literal), append));
+        formatters.emplace_back(new PlainHeaderFormatter(unescape(literal), append, skip_if_present));
       }
       start = pos + 1;
       break;
@@ -98,7 +99,7 @@ parseInternal(const envoy::api::v2::core::HeaderValueOption& header_value_option
       if (ch == '%') {
         // Found complete variable name, add formatter.
         formatters.emplace_back(
-            new StreamInfoHeaderFormatter(format.substr(start, pos - start), append));
+            new StreamInfoHeaderFormatter(format.substr(start, pos - start), append, skip_if_present));
         start = pos + 1;
         state = ParserState::Literal;
         break;
@@ -179,7 +180,7 @@ parseInternal(const envoy::api::v2::core::HeaderValueOption& header_value_option
       // Search for closing % of a %VAR(...)% expression
       if (ch == '%') {
         formatters.emplace_back(
-            new StreamInfoHeaderFormatter(format.substr(start, pos - start), append));
+            new StreamInfoHeaderFormatter(format.substr(start, pos - start), append, skip_if_present));
         start = pos + 1;
         state = ParserState::Literal;
         break;
@@ -207,7 +208,7 @@ parseInternal(const envoy::api::v2::core::HeaderValueOption& header_value_option
   if (pos > start) {
     // Trailing constant data.
     absl::string_view literal = format.substr(start, pos - start);
-    formatters.emplace_back(new PlainHeaderFormatter(unescape(literal), append));
+    formatters.emplace_back(new PlainHeaderFormatter(unescape(literal), append, skip_if_present));
   }
 
   ASSERT(!formatters.empty());
@@ -216,7 +217,7 @@ parseInternal(const envoy::api::v2::core::HeaderValueOption& header_value_option
     return std::move(formatters[0]);
   }
 
-  return std::make_unique<CompoundHeaderFormatter>(std::move(formatters), append);
+  return std::make_unique<CompoundHeaderFormatter>(std::move(formatters), append, skip_if_present);
 }
 
 } // namespace
@@ -264,6 +265,9 @@ void HeaderParser::evaluateHeaders(Http::HeaderMap& headers,
   for (const auto& formatter : headers_to_add_) {
     const std::string value = formatter.second->format(stream_info);
     if (!value.empty()) {
+      if (formatter.second->skipIfPresent() && headers.get(formatter.first) != nullptr) {
+        continue;
+      }
       if (formatter.second->append()) {
         headers.addReferenceKey(formatter.first, value);
       } else {
