@@ -1,5 +1,5 @@
-#include "envoy/api/v2/core/base.pb.h"
-#include "envoy/api/v2/listener/udp_listener_config.pb.h"
+#include "envoy/config/core/v3alpha/base.pb.h"
+#include "envoy/config/listener/v3alpha/udp_listener_config.pb.h"
 #include "envoy/server/active_udp_listener_config.h"
 #include "envoy/stats/scope.h"
 
@@ -57,11 +57,11 @@ public:
           name_(name), listener_filters_timeout_(listener_filters_timeout),
           continue_on_listener_filters_timeout_(continue_on_listener_filters_timeout),
           connection_balancer_(std::make_unique<Network::NopConnectionBalancerImpl>()) {
-      envoy::api::v2::listener::UdpListenerConfig dummy;
+      envoy::config::listener::v3alpha::UdpListenerConfig dummy;
       std::string listener_name("raw_udp_listener");
       dummy.set_udp_listener_name(listener_name);
       udp_listener_factory_ =
-          Config::Utility::getAndCheckFactory<ActiveUdpListenerConfigFactory>(listener_name)
+          Config::Utility::getAndCheckFactoryByName<ActiveUdpListenerConfigFactory>(listener_name)
               .createActiveUdpListenerFactory(dummy);
       ON_CALL(*socket_, socketType()).WillByDefault(Return(socket_type));
     }
@@ -87,8 +87,8 @@ public:
     const Network::ActiveUdpListenerFactory* udpListenerFactory() override {
       return udp_listener_factory_.get();
     }
-    envoy::api::v2::core::TrafficDirection direction() const override {
-      return envoy::api::v2::core::TrafficDirection::UNSPECIFIED;
+    envoy::config::core::v3alpha::TrafficDirection direction() const override {
+      return envoy::config::core::v3alpha::UNSPECIFIED;
     }
     Network::ConnectionBalancer& connectionBalancer() override { return *connection_balancer_; }
 

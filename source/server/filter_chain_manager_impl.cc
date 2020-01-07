@@ -1,6 +1,6 @@
 #include "server/filter_chain_manager_impl.h"
 
-#include "envoy/api/v2/listener/listener.pb.h"
+#include "envoy/config/listener/v3alpha/listener_components.pb.h"
 
 #include "common/common/empty_string.h"
 #include "common/common/fmt.h"
@@ -30,9 +30,9 @@ bool FilterChainManagerImpl::isWildcardServerName(const std::string& name) {
 }
 
 void FilterChainManagerImpl::addFilterChain(
-    absl::Span<const ::envoy::api::v2::listener::FilterChain* const> filter_chain_span,
+    absl::Span<const envoy::config::listener::v3alpha::FilterChain* const> filter_chain_span,
     FilterChainFactoryBuilder& filter_chain_factory_builder) {
-  std::unordered_set<envoy::api::v2::listener::FilterChainMatch, MessageUtil, MessageUtil>
+  std::unordered_set<envoy::config::listener::v3alpha::FilterChainMatch, MessageUtil, MessageUtil>
       filter_chains;
   for (const auto& filter_chain : filter_chain_span) {
     const auto& filter_chain_match = filter_chain->filter_chain_match();
@@ -91,7 +91,7 @@ void FilterChainManagerImpl::addFilterChainForDestinationPorts(
     const std::vector<std::string>& destination_ips,
     const absl::Span<const std::string* const> server_names, const std::string& transport_protocol,
     const absl::Span<const std::string* const> application_protocols,
-    const envoy::api::v2::listener::FilterChainMatch_ConnectionSourceType source_type,
+    const envoy::config::listener::v3alpha::FilterChainMatch::ConnectionSourceType source_type,
     const std::vector<std::string>& source_ips,
     const absl::Span<const Protobuf::uint32> source_ports,
     const Network::FilterChainSharedPtr& filter_chain) {
@@ -108,7 +108,7 @@ void FilterChainManagerImpl::addFilterChainForDestinationIPs(
     DestinationIPsMap& destination_ips_map, const std::vector<std::string>& destination_ips,
     const absl::Span<const std::string* const> server_names, const std::string& transport_protocol,
     const absl::Span<const std::string* const> application_protocols,
-    const envoy::api::v2::listener::FilterChainMatch_ConnectionSourceType source_type,
+    const envoy::config::listener::v3alpha::FilterChainMatch::ConnectionSourceType source_type,
     const std::vector<std::string>& source_ips,
     const absl::Span<const Protobuf::uint32> source_ports,
     const Network::FilterChainSharedPtr& filter_chain) {
@@ -129,7 +129,7 @@ void FilterChainManagerImpl::addFilterChainForServerNames(
     ServerNamesMapSharedPtr& server_names_map_ptr,
     const absl::Span<const std::string* const> server_names, const std::string& transport_protocol,
     const absl::Span<const std::string* const> application_protocols,
-    const envoy::api::v2::listener::FilterChainMatch_ConnectionSourceType source_type,
+    const envoy::config::listener::v3alpha::FilterChainMatch::ConnectionSourceType source_type,
     const std::vector<std::string>& source_ips,
     const absl::Span<const Protobuf::uint32> source_ports,
     const Network::FilterChainSharedPtr& filter_chain) {
@@ -161,7 +161,7 @@ void FilterChainManagerImpl::addFilterChainForServerNames(
 void FilterChainManagerImpl::addFilterChainForApplicationProtocols(
     ApplicationProtocolsMap& application_protocols_map,
     const absl::Span<const std::string* const> application_protocols,
-    const envoy::api::v2::listener::FilterChainMatch_ConnectionSourceType source_type,
+    const envoy::config::listener::v3alpha::FilterChainMatch::ConnectionSourceType source_type,
     const std::vector<std::string>& source_ips,
     const absl::Span<const Protobuf::uint32> source_ports,
     const Network::FilterChainSharedPtr& filter_chain) {
@@ -178,7 +178,7 @@ void FilterChainManagerImpl::addFilterChainForApplicationProtocols(
 
 void FilterChainManagerImpl::addFilterChainForSourceTypes(
     SourceTypesArray& source_types_array,
-    const envoy::api::v2::listener::FilterChainMatch_ConnectionSourceType source_type,
+    const envoy::config::listener::v3alpha::FilterChainMatch::ConnectionSourceType source_type,
     const std::vector<std::string>& source_ips,
     const absl::Span<const Protobuf::uint32> source_ports,
     const Network::FilterChainSharedPtr& filter_chain) {
@@ -359,10 +359,11 @@ const Network::FilterChain* FilterChainManagerImpl::findFilterChainForApplicatio
 const Network::FilterChain* FilterChainManagerImpl::findFilterChainForSourceTypes(
     const SourceTypesArray& source_types, const Network::ConnectionSocket& socket) const {
 
-  const auto& filter_chain_local = source_types[envoy::api::v2::listener::FilterChainMatch::LOCAL];
+  const auto& filter_chain_local =
+      source_types[envoy::config::listener::v3alpha::FilterChainMatch::SAME_IP_OR_LOOPBACK];
 
   const auto& filter_chain_external =
-      source_types[envoy::api::v2::listener::FilterChainMatch::EXTERNAL];
+      source_types[envoy::config::listener::v3alpha::FilterChainMatch::EXTERNAL];
 
   // isSameIpOrLoopback can be expensive. Call it only if LOCAL or EXTERNAL have entries.
   const bool is_local_connection =
@@ -380,7 +381,8 @@ const Network::FilterChain* FilterChainManagerImpl::findFilterChainForSourceType
     }
   }
 
-  const auto& filter_chain_any = source_types[envoy::api::v2::listener::FilterChainMatch::ANY];
+  const auto& filter_chain_any =
+      source_types[envoy::config::listener::v3alpha::FilterChainMatch::ANY];
 
   if (!filter_chain_any.first.empty()) {
     return findFilterChainForSourceIpAndPort(*filter_chain_any.second, socket);

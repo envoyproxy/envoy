@@ -20,6 +20,8 @@
 namespace Envoy {
 namespace Stats {
 
+const char ThreadLocalStoreImpl::MainDispatcherCleanupSync[] = "main-dispatcher-cleanup";
+
 ThreadLocalStoreImpl::ThreadLocalStoreImpl(Allocator& alloc)
     : alloc_(alloc), default_scope_(createScope("")),
       tag_producer_(std::make_unique<TagProducerImpl>()),
@@ -234,6 +236,7 @@ void ThreadLocalStoreImpl::releaseScopeCrossThread(ScopeImpl* scope) {
     };
     lock.release();
     main_thread_dispatcher_->post([this, clean_central_cache, scope_id]() {
+      sync_.syncPoint(MainDispatcherCleanupSync);
       clearScopeFromCaches(scope_id, clean_central_cache);
     });
   } else {

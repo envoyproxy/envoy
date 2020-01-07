@@ -3,7 +3,7 @@
 #include <string>
 #include <unordered_map>
 
-#include "envoy/config/metrics/v2/stats.pb.h"
+#include "envoy/config/metrics/v3alpha/stats.pb.h"
 
 #include "common/common/c_smart_ptr.h"
 #include "common/event/dispatcher_impl.h"
@@ -11,6 +11,7 @@
 #include "common/stats/stats_matcher_impl.h"
 #include "common/stats/tag_producer_impl.h"
 #include "common/stats/thread_local_store.h"
+#include "common/thread_local/thread_local_impl.h"
 
 #include "test/common/stats/stat_test_utility.h"
 #include "test/mocks/event/mocks.h"
@@ -21,6 +22,8 @@
 #include "test/test_common/utility.h"
 
 #include "absl/strings/str_split.h"
+#include "absl/synchronization/blocking_counter.h"
+#include "absl/synchronization/notification.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
@@ -453,24 +456,30 @@ TEST_F(StatsThreadLocalStoreTest, OverlappingScopes) {
   tls_.shutdownThread();
 }
 
-class LookupWithStatNameTest : public testing::Test {
+class ThreadLocalStoreNoMocksTestBase : public testing::Test {
 public:
-  LookupWithStatNameTest()
+  ThreadLocalStoreNoMocksTestBase()
       : symbol_table_(SymbolTableCreator::makeSymbolTable()), alloc_(*symbol_table_),
-        store_(alloc_), pool_(*symbol_table_) {}
-  ~LookupWithStatNameTest() override { store_.shutdownThreading(); }
+        store_(std::make_unique<ThreadLocalStoreImpl>(alloc_)), pool_(*symbol_table_) {}
+  ~ThreadLocalStoreNoMocksTestBase() override {
+    if (store_ != nullptr) {
+      store_->shutdownThreading();
+    }
+  }
 
   StatName makeStatName(absl::string_view name) { return pool_.add(name); }
 
   SymbolTablePtr symbol_table_;
   AllocatorImpl alloc_;
-  ThreadLocalStoreImpl store_;
+  std::unique_ptr<ThreadLocalStoreImpl> store_;
   StatNamePool pool_;
 };
 
+class LookupWithStatNameTest : public ThreadLocalStoreNoMocksTestBase {};
+
 TEST_F(LookupWithStatNameTest, All) {
-  ScopePtr scope1 = store_.createScope("scope1.");
-  Counter& c1 = store_.counterFromStatName(makeStatName("c1"));
+  ScopePtr scope1 = store_->createScope("scope1.");
+  Counter& c1 = store_->counterFromStatName(makeStatName("c1"));
   Counter& c2 = scope1->counterFromStatName(makeStatName("c2"));
   EXPECT_EQ("c1", c1.name());
   EXPECT_EQ("scope1.c2", c2.name());
@@ -479,7 +488,7 @@ TEST_F(LookupWithStatNameTest, All) {
   EXPECT_EQ(0, c1.tags().size());
   EXPECT_EQ(0, c1.tags().size());
 
-  Gauge& g1 = store_.gaugeFromStatName(makeStatName("g1"), Gauge::ImportMode::Accumulate);
+  Gauge& g1 = store_->gaugeFromStatName(makeStatName("g1"), Gauge::ImportMode::Accumulate);
   Gauge& g2 = scope1->gaugeFromStatName(makeStatName("g2"), Gauge::ImportMode::Accumulate);
   EXPECT_EQ("g1", g1.name());
   EXPECT_EQ("scope1.g2", g2.name());
@@ -489,7 +498,7 @@ TEST_F(LookupWithStatNameTest, All) {
   EXPECT_EQ(0, g1.tags().size());
 
   Histogram& h1 =
-      store_.histogramFromStatName(makeStatName("h1"), Stats::Histogram::Unit::Unspecified);
+      store_->histogramFromStatName(makeStatName("h1"), Stats::Histogram::Unit::Unspecified);
   Histogram& h2 =
       scope1->histogramFromStatName(makeStatName("h2"), Stats::Histogram::Unit::Unspecified);
   scope1->deliverHistogramToSinks(h2, 0);
@@ -509,20 +518,20 @@ TEST_F(LookupWithStatNameTest, All) {
   ScopePtr scope3 = scope1->createScope(std::string("foo:\0:.", 7));
   EXPECT_EQ("scope1.foo___.bar", scope3->counter("bar").name());
 
-  EXPECT_EQ(4UL, store_.counters().size());
-  EXPECT_EQ(2UL, store_.gauges().size());
+  EXPECT_EQ(4UL, store_->counters().size());
+  EXPECT_EQ(2UL, store_->gauges().size());
 }
 
 TEST_F(LookupWithStatNameTest, NotFound) {
   StatName not_found(makeStatName("not_found"));
-  EXPECT_FALSE(store_.findCounter(not_found));
-  EXPECT_FALSE(store_.findGauge(not_found));
-  EXPECT_FALSE(store_.findHistogram(not_found));
+  EXPECT_FALSE(store_->findCounter(not_found));
+  EXPECT_FALSE(store_->findGauge(not_found));
+  EXPECT_FALSE(store_->findHistogram(not_found));
 }
 
 class StatsMatcherTLSTest : public StatsThreadLocalStoreTest {
 public:
-  envoy::config::metrics::v2::StatsConfig stats_config_;
+  envoy::config::metrics::v3alpha::StatsConfig stats_config_;
 };
 
 TEST_F(StatsMatcherTLSTest, TestNoOpStatImpls) {
@@ -591,8 +600,10 @@ TEST_F(StatsMatcherTLSTest, TestExclusionRegex) {
   // Expected to alloc lowercase_counter, lowercase_gauge, valid_counter, valid_gauge
 
   // Will block all stats containing any capital alphanumeric letter.
-  stats_config_.mutable_stats_matcher()->mutable_exclusion_list()->add_patterns()->set_regex(
-      ".*[A-Z].*");
+  stats_config_.mutable_stats_matcher()
+      ->mutable_exclusion_list()
+      ->add_patterns()
+      ->set_hidden_envoy_deprecated_regex(".*[A-Z].*");
   store_->setStatsMatcher(std::make_unique<StatsMatcherImpl>(stats_config_));
 
   // The creation of counters/gauges/histograms which have no uppercase letters should succeed.
@@ -829,7 +840,7 @@ TEST_F(StatsThreadLocalStoreTest, RemoveRejectedStats) {
   EXPECT_EQ("h1", store_->histograms()[0]->name());
 
   // Will effectively block all stats, and remove all the non-matching stats.
-  envoy::config::metrics::v2::StatsConfig stats_config;
+  envoy::config::metrics::v3alpha::StatsConfig stats_config;
   stats_config.mutable_stats_matcher()->mutable_inclusion_list()->add_patterns()->set_exact(
       "no-such-stat");
   store_->setStatsMatcher(std::make_unique<StatsMatcherImpl>(stats_config));
@@ -884,7 +895,7 @@ protected:
     store_->addSink(sink_);
 
     // Use a tag producer that will produce tags.
-    envoy::config::metrics::v2::StatsConfig stats_config;
+    envoy::config::metrics::v3alpha::StatsConfig stats_config;
     store_->setTagProducer(std::make_unique<TagProducerImpl>(stats_config));
   }
 
@@ -1184,6 +1195,208 @@ TEST_F(HistogramTest, ParentHistogramBucketSummary) {
             "B30000(1,1) B60000(1,1) B300000(1,1) B600000(1,1) B1.8e+06(1,1) "
             "B3.6e+06(1,1)",
             parent_histogram->bucketSummary());
+}
+
+class ClusterShutdownCleanupStarvationTest : public ThreadLocalStoreNoMocksTestBase {
+public:
+  static constexpr uint32_t NumThreads = 2;
+  static constexpr uint32_t NumScopes = 1000;
+  static constexpr uint32_t NumIters = 35;
+
+  // Helper class to block on a number of multi-threaded operations occurring.
+  class BlockingBarrier {
+  public:
+    explicit BlockingBarrier(uint32_t count) : blocking_counter_(count) {}
+    ~BlockingBarrier() { blocking_counter_.Wait(); }
+
+    /**
+     * Returns a function that first executes 'f', and then decrements the count
+     * toward unblocking the scope. This is intended to be used as a post() callback.
+     *
+     * @param f the function to run prior to decrementing the count.
+     */
+    std::function<void()> run(std::function<void()> f) {
+      return [this, f]() {
+        f();
+        decrementCount();
+      };
+    }
+
+    /**
+     * @return a function that, when run, decrements the count, intended for passing to post().
+     */
+    std::function<void()> decrementCountFn() {
+      return [this] { decrementCount(); };
+    }
+
+    void decrementCount() { blocking_counter_.DecrementCount(); }
+
+  private:
+    absl::BlockingCounter blocking_counter_;
+  };
+
+  ClusterShutdownCleanupStarvationTest()
+      : start_time_(time_system_.monotonicTime()), api_(Api::createApiForTest()),
+        thread_factory_(api_->threadFactory()), pool_(store_->symbolTable()),
+        my_counter_name_(pool_.add("my_counter")),
+        my_counter_scoped_name_(pool_.add("scope.my_counter")) {
+    // This is the same order as InstanceImpl::initialize in source/server/server.cc.
+    thread_dispatchers_.resize(NumThreads);
+    {
+      BlockingBarrier blocking_barrier(NumThreads + 1);
+      main_thread_ = thread_factory_.createThread(
+          [this, &blocking_barrier]() { mainThreadFn(blocking_barrier); });
+      for (uint32_t i = 0; i < NumThreads; ++i) {
+        threads_.emplace_back(thread_factory_.createThread(
+            [this, i, &blocking_barrier]() { workerThreadFn(i, blocking_barrier); }));
+      }
+    }
+
+    {
+      BlockingBarrier blocking_barrier(1);
+      main_dispatcher_->post(blocking_barrier.run([this]() {
+        tls_ = std::make_unique<ThreadLocal::InstanceImpl>();
+        tls_->registerThread(*main_dispatcher_, true);
+        for (Event::DispatcherPtr& dispatcher : thread_dispatchers_) {
+          // Worker threads must be registered from the main thread, per assert in registerThread().
+          tls_->registerThread(*dispatcher, false);
+        }
+        store_->initializeThreading(*main_dispatcher_, *tls_);
+      }));
+    }
+  }
+
+  ~ClusterShutdownCleanupStarvationTest() {
+    {
+      BlockingBarrier blocking_barrier(1);
+      main_dispatcher_->post(blocking_barrier.run([this]() {
+        store_->shutdownThreading();
+        tls_->shutdownGlobalThreading();
+        tls_->shutdownThread();
+      }));
+    }
+
+    for (Event::DispatcherPtr& dispatcher : thread_dispatchers_) {
+      dispatcher->post([&dispatcher]() { dispatcher->exit(); });
+    }
+
+    for (Thread::ThreadPtr& thread : threads_) {
+      thread->join();
+    }
+
+    main_dispatcher_->post([this]() {
+      store_.reset();
+      tls_.reset();
+      main_dispatcher_->exit();
+    });
+    main_thread_->join();
+  }
+
+  void createScopesIncCountersAndCleanup() {
+    for (uint32_t i = 0; i < NumScopes; ++i) {
+      ScopePtr scope = store_->createScope("scope.");
+      Counter& counter = scope->counterFromStatName(my_counter_name_);
+      counter.inc();
+    }
+  }
+
+  void workerThreadFn(uint32_t thread_index, BlockingBarrier& blocking_barrier) {
+    thread_dispatchers_[thread_index] = api_->allocateDispatcher();
+    blocking_barrier.decrementCount();
+    thread_dispatchers_[thread_index]->run(Event::Dispatcher::RunType::RunUntilExit);
+  }
+
+  void mainThreadFn(BlockingBarrier& blocking_barrier) {
+    main_dispatcher_ = api_->allocateDispatcher();
+    blocking_barrier.decrementCount();
+    main_dispatcher_->run(Event::Dispatcher::RunType::RunUntilExit);
+  }
+
+  void createScopesIncCountersAndCleanupAllThreads() {
+    BlockingBarrier blocking_barrier(NumThreads);
+    for (Event::DispatcherPtr& thread_dispatcher : thread_dispatchers_) {
+      thread_dispatcher->post(
+          blocking_barrier.run([this]() { createScopesIncCountersAndCleanup(); }));
+    }
+  }
+
+  std::chrono::seconds elapsedTime() {
+    return std::chrono::duration_cast<std::chrono::seconds>(time_system_.monotonicTime() -
+                                                            start_time_);
+  }
+
+  Event::TestRealTimeSystem time_system_;
+  MonotonicTime start_time_;
+  Api::ApiPtr api_;
+  Event::DispatcherPtr main_dispatcher_;
+  std::vector<Event::DispatcherPtr> thread_dispatchers_;
+  Thread::ThreadFactory& thread_factory_;
+  std::unique_ptr<ThreadLocal::InstanceImpl> tls_;
+  Thread::ThreadPtr main_thread_;
+  std::vector<Thread::ThreadPtr> threads_;
+  StatNamePool pool_;
+  StatName my_counter_name_;
+  StatName my_counter_scoped_name_;
+};
+
+// Tests the scenario where a cluster and stat are allocated in multiple
+// concurrent threads, but after each round of allocation/free we post() an
+// empty callback to main to ensure that cross-scope thread cleanups complete.
+// In this test, we don't expect the use-count of the stat to get very high.
+TEST_F(ClusterShutdownCleanupStarvationTest, TwelveThreadsWithBlockade) {
+  for (uint32_t i = 0; i < NumIters && elapsedTime() < std::chrono::seconds(5); ++i) {
+    createScopesIncCountersAndCleanupAllThreads();
+
+    // To ensure all stats are freed we have to wait for a few posts() to clear.
+    // First, wait for the main-dispatcher to initiate the cross-thread TLS cleanup.
+    auto main_dispatch_block = [this]() {
+      BlockingBarrier blocking_barrier(1);
+      main_dispatcher_->post(blocking_barrier.run([]() {}));
+    };
+    main_dispatch_block();
+
+    // Next, wait for all the worker threads to complete their TLS cleanup.
+    {
+      BlockingBarrier blocking_barrier(NumThreads);
+      for (Event::DispatcherPtr& thread_dispatcher : thread_dispatchers_) {
+        thread_dispatcher->post(blocking_barrier.run([]() {}));
+      }
+    }
+
+    // Finally, wait for the final central-cache cleanup, which occurs on the main thread.
+    main_dispatch_block();
+
+    // Here we show that the counter cleanups have finished, because the use-count is 1.
+    CounterSharedPtr counter = alloc_.makeCounter(my_counter_scoped_name_, "", std::vector<Tag>());
+    EXPECT_EQ(1, counter->use_count()) << "index=" << i;
+  }
+}
+
+// In this test, we don't run the main-callback post() in between each
+// iteration, and we use a thread synchronizer to block the cross-thread
+// cleanup. Thus no stat references in the caches get freed and the use_count()
+// grows without bound.
+TEST_F(ClusterShutdownCleanupStarvationTest, TwelveThreadsWithoutBlockade) {
+  store_->sync().enable();
+  store_->sync().waitOn(ThreadLocalStoreImpl::MainDispatcherCleanupSync);
+  for (uint32_t i = 0; i < NumIters && elapsedTime() < std::chrono::seconds(5); ++i) {
+    createScopesIncCountersAndCleanupAllThreads();
+    // As we have blocked the main dispatcher cleanup function above, nothing
+    // gets cleaned up and use-counts grow without bound as we recreate scopes,
+    // recreating the same counter in each one.
+
+    // Compute the use-count of one of the counters. This shows that by blocking
+    // the main-dispatcher cleanup thread, the use-counts grow without bound.
+    // We set our parameters so we attempt to exceed a use-count of 64k when
+    // running the test: NumScopes*NumThreads*NumIters == 70000, We use a timer
+    // so we don't time out on asan/tsan tests, In opt builds this test takes
+    // less than a second, and in fastbuild it takes less than 5.
+    CounterSharedPtr counter = alloc_.makeCounter(my_counter_scoped_name_, "", std::vector<Tag>());
+    uint32_t use_count = counter->use_count() - 1; // Subtract off this instance.
+    EXPECT_EQ((i + 1) * NumScopes * NumThreads, use_count);
+  }
+  EXPECT_EQ(70000, NumThreads * NumScopes * NumIters);
+  store_->sync().signal(ThreadLocalStoreImpl::MainDispatcherCleanupSync);
 }
 
 } // namespace Stats

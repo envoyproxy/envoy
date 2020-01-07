@@ -1,8 +1,8 @@
 #include <string>
 
-#include "envoy/api/v2/route/route.pb.h"
-#include "envoy/config/filter/http/health_check/v2/health_check.pb.h"
-#include "envoy/config/filter/http/health_check/v2/health_check.pb.validate.h"
+#include "envoy/config/route/v3alpha/route_components.pb.h"
+#include "envoy/extensions/filters/http/health_check/v3alpha/health_check.pb.h"
+#include "envoy/extensions/filters/http/health_check/v3alpha/health_check.pb.validate.h"
 
 #include "extensions/filters/http/health_check/config.h"
 
@@ -29,7 +29,7 @@ TEST(HealthCheckFilterConfig, HealthCheckFilter) {
       exact_match: "/hc"
   )EOF";
 
-  envoy::config::filter::http::health_check::v2::HealthCheck proto_config;
+  envoy::extensions::filters::http::health_check::v3alpha::HealthCheck proto_config;
   TestUtility::loadFromYaml(yaml_string, proto_config);
   NiceMock<Server::Configuration::MockFactoryContext> context;
   HealthCheckFilterConfig factory;
@@ -48,7 +48,7 @@ TEST(HealthCheckFilterConfig, BadHealthCheckFilterConfig) {
   status: 500
   )EOF";
 
-  envoy::config::filter::http::health_check::v2::HealthCheck proto_config;
+  envoy::extensions::filters::http::health_check::v3alpha::HealthCheck proto_config;
   EXPECT_THROW_WITH_REGEX(TestUtility::loadFromYaml(yaml_string, proto_config), EnvoyException,
                           "status: Cannot find field");
 }
@@ -62,7 +62,7 @@ TEST(HealthCheckFilterConfig, FailsWhenNotPassThroughButTimeoutSetYaml) {
       exact_match: "/foo"
   )EOF";
 
-  envoy::config::filter::http::health_check::v2::HealthCheck proto_config;
+  envoy::extensions::filters::http::health_check::v3alpha::HealthCheck proto_config;
   TestUtility::loadFromYaml(yaml_string, proto_config);
 
   HealthCheckFilterConfig factory;
@@ -81,7 +81,7 @@ TEST(HealthCheckFilterConfig, NotFailingWhenNotPassThroughAndTimeoutNotSetYaml) 
       exact_match: "/foo"
   )EOF";
 
-  envoy::config::filter::http::health_check::v2::HealthCheck proto_config;
+  envoy::extensions::filters::http::health_check::v3alpha::HealthCheck proto_config;
   TestUtility::loadFromYaml(yaml_string, proto_config);
 
   HealthCheckFilterConfig factory;
@@ -93,12 +93,12 @@ TEST(HealthCheckFilterConfig, NotFailingWhenNotPassThroughAndTimeoutNotSetYaml) 
 
 TEST(HealthCheckFilterConfig, FailsWhenNotPassThroughButTimeoutSetProto) {
   HealthCheckFilterConfig healthCheckFilterConfig;
-  envoy::config::filter::http::health_check::v2::HealthCheck config{};
+  envoy::extensions::filters::http::health_check::v3alpha::HealthCheck config{};
   NiceMock<Server::Configuration::MockFactoryContext> context;
 
   config.mutable_pass_through_mode()->set_value(false);
   config.mutable_cache_time()->set_seconds(10);
-  envoy::api::v2::route::HeaderMatcher& header = *config.add_headers();
+  envoy::config::route::v3alpha::HeaderMatcher& header = *config.add_headers();
   header.set_name(":path");
   header.set_exact_match("foo");
 
@@ -109,11 +109,11 @@ TEST(HealthCheckFilterConfig, FailsWhenNotPassThroughButTimeoutSetProto) {
 
 TEST(HealthCheckFilterConfig, NotFailingWhenNotPassThroughAndTimeoutNotSetProto) {
   HealthCheckFilterConfig healthCheckFilterConfig;
-  envoy::config::filter::http::health_check::v2::HealthCheck config{};
+  envoy::extensions::filters::http::health_check::v3alpha::HealthCheck config{};
   NiceMock<Server::Configuration::MockFactoryContext> context;
 
   config.mutable_pass_through_mode()->set_value(false);
-  envoy::api::v2::route::HeaderMatcher& header = *config.add_headers();
+  envoy::config::route::v3alpha::HeaderMatcher& header = *config.add_headers();
   header.set_name(":path");
   header.set_exact_match("foo");
   healthCheckFilterConfig.createFilterFactoryFromProto(config, "dummy_stats_prefix", context);
@@ -122,25 +122,25 @@ TEST(HealthCheckFilterConfig, NotFailingWhenNotPassThroughAndTimeoutNotSetProto)
 TEST(HealthCheckFilterConfig, HealthCheckFilterWithEmptyProto) {
   HealthCheckFilterConfig healthCheckFilterConfig;
   NiceMock<Server::Configuration::MockFactoryContext> context;
-  envoy::config::filter::http::health_check::v2::HealthCheck config =
-      *dynamic_cast<envoy::config::filter::http::health_check::v2::HealthCheck*>(
+  envoy::extensions::filters::http::health_check::v3alpha::HealthCheck config =
+      *dynamic_cast<envoy::extensions::filters::http::health_check::v3alpha::HealthCheck*>(
           healthCheckFilterConfig.createEmptyConfigProto().get());
 
   config.mutable_pass_through_mode()->set_value(false);
-  envoy::api::v2::route::HeaderMatcher& header = *config.add_headers();
+  envoy::config::route::v3alpha::HeaderMatcher& header = *config.add_headers();
   header.set_name(":path");
   header.set_exact_match("foo");
   healthCheckFilterConfig.createFilterFactoryFromProto(config, "dummy_stats_prefix", context);
 }
 
 void testHealthCheckHeaderMatch(
-    const envoy::config::filter::http::health_check::v2::HealthCheck& input_config,
+    const envoy::extensions::filters::http::health_check::v3alpha::HealthCheck& input_config,
     Http::TestHeaderMapImpl& input_headers, bool expect_health_check_response) {
   HealthCheckFilterConfig healthCheckFilterConfig;
   NiceMock<Server::Configuration::MockFactoryContext> context;
   ProtobufTypes::MessagePtr config_msg = healthCheckFilterConfig.createEmptyConfigProto();
-  auto config =
-      dynamic_cast<envoy::config::filter::http::health_check::v2::HealthCheck*>(config_msg.get());
+  auto config = dynamic_cast<envoy::extensions::filters::http::health_check::v3alpha::HealthCheck*>(
+      config_msg.get());
   ASSERT_NE(config, nullptr);
 
   *config = input_config;
@@ -175,14 +175,14 @@ void testHealthCheckHeaderMatch(
 
 // Basic header match with two conditions should match if both conditions are satisfied.
 TEST(HealthCheckFilterConfig, HealthCheckFilterHeaderMatch) {
-  envoy::config::filter::http::health_check::v2::HealthCheck config;
+  envoy::extensions::filters::http::health_check::v3alpha::HealthCheck config;
 
   config.mutable_pass_through_mode()->set_value(false);
 
-  envoy::api::v2::route::HeaderMatcher& xheader = *config.add_headers();
+  envoy::config::route::v3alpha::HeaderMatcher& xheader = *config.add_headers();
   xheader.set_name("x-healthcheck");
 
-  envoy::api::v2::route::HeaderMatcher& yheader = *config.add_headers();
+  envoy::config::route::v3alpha::HeaderMatcher& yheader = *config.add_headers();
   yheader.set_name("y-healthcheck");
   yheader.set_exact_match("foo");
 
@@ -193,14 +193,14 @@ TEST(HealthCheckFilterConfig, HealthCheckFilterHeaderMatch) {
 
 // The match should fail if a single header value fails to match.
 TEST(HealthCheckFilterConfig, HealthCheckFilterHeaderMatchWrongValue) {
-  envoy::config::filter::http::health_check::v2::HealthCheck config;
+  envoy::extensions::filters::http::health_check::v3alpha::HealthCheck config;
 
   config.mutable_pass_through_mode()->set_value(false);
 
-  envoy::api::v2::route::HeaderMatcher& xheader = *config.add_headers();
+  envoy::config::route::v3alpha::HeaderMatcher& xheader = *config.add_headers();
   xheader.set_name("x-healthcheck");
 
-  envoy::api::v2::route::HeaderMatcher& yheader = *config.add_headers();
+  envoy::config::route::v3alpha::HeaderMatcher& yheader = *config.add_headers();
   yheader.set_name("y-healthcheck");
   yheader.set_exact_match("foo");
 
@@ -211,14 +211,14 @@ TEST(HealthCheckFilterConfig, HealthCheckFilterHeaderMatchWrongValue) {
 
 // If either of the specified headers is completely missing the match should fail.
 TEST(HealthCheckFilterConfig, HealthCheckFilterHeaderMatchMissingHeader) {
-  envoy::config::filter::http::health_check::v2::HealthCheck config;
+  envoy::extensions::filters::http::health_check::v3alpha::HealthCheck config;
 
   config.mutable_pass_through_mode()->set_value(false);
 
-  envoy::api::v2::route::HeaderMatcher& xheader = *config.add_headers();
+  envoy::config::route::v3alpha::HeaderMatcher& xheader = *config.add_headers();
   xheader.set_name("x-healthcheck");
 
-  envoy::api::v2::route::HeaderMatcher& yheader = *config.add_headers();
+  envoy::config::route::v3alpha::HeaderMatcher& yheader = *config.add_headers();
   yheader.set_name("y-healthcheck");
   yheader.set_exact_match("foo");
 
@@ -229,15 +229,15 @@ TEST(HealthCheckFilterConfig, HealthCheckFilterHeaderMatchMissingHeader) {
 
 // Conditions for the same header should match if they are both satisfied.
 TEST(HealthCheckFilterConfig, HealthCheckFilterDuplicateMatch) {
-  envoy::config::filter::http::health_check::v2::HealthCheck config;
+  envoy::extensions::filters::http::health_check::v3alpha::HealthCheck config;
 
   config.mutable_pass_through_mode()->set_value(false);
 
-  envoy::api::v2::route::HeaderMatcher& header = *config.add_headers();
+  envoy::config::route::v3alpha::HeaderMatcher& header = *config.add_headers();
   header.set_name("x-healthcheck");
   header.set_exact_match("foo");
 
-  envoy::api::v2::route::HeaderMatcher& dup_header = *config.add_headers();
+  envoy::config::route::v3alpha::HeaderMatcher& dup_header = *config.add_headers();
   dup_header.set_name("x-healthcheck");
 
   Http::TestHeaderMapImpl headers{{"x-healthcheck", "foo"}};
@@ -247,15 +247,15 @@ TEST(HealthCheckFilterConfig, HealthCheckFilterDuplicateMatch) {
 
 // Conditions on the same header should not match if one or more is not satisfied.
 TEST(HealthCheckFilterConfig, HealthCheckFilterDuplicateNoMatch) {
-  envoy::config::filter::http::health_check::v2::HealthCheck config;
+  envoy::extensions::filters::http::health_check::v3alpha::HealthCheck config;
 
   config.mutable_pass_through_mode()->set_value(false);
 
-  envoy::api::v2::route::HeaderMatcher& header = *config.add_headers();
+  envoy::config::route::v3alpha::HeaderMatcher& header = *config.add_headers();
   header.set_name("x-healthcheck");
   header.set_exact_match("foo");
 
-  envoy::api::v2::route::HeaderMatcher& dup_header = *config.add_headers();
+  envoy::config::route::v3alpha::HeaderMatcher& dup_header = *config.add_headers();
   dup_header.set_name("x-healthcheck");
   dup_header.set_exact_match("bar");
 

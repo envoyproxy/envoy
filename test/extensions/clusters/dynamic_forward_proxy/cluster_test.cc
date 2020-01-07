@@ -1,6 +1,6 @@
-#include "envoy/api/v2/cds.pb.h"
-#include "envoy/config/cluster/dynamic_forward_proxy/v2alpha/cluster.pb.h"
-#include "envoy/config/cluster/dynamic_forward_proxy/v2alpha/cluster.pb.validate.h"
+#include "envoy/config/cluster/v3alpha/cluster.pb.h"
+#include "envoy/extensions/clusters/dynamic_forward_proxy/v3alpha/cluster.pb.h"
+#include "envoy/extensions/clusters/dynamic_forward_proxy/v3alpha/cluster.pb.validate.h"
 
 #include "common/singleton/manager_impl.h"
 
@@ -28,10 +28,10 @@ class ClusterTest : public testing::Test,
                     public Extensions::Common::DynamicForwardProxy::DnsCacheManagerFactory {
 public:
   void initialize(const std::string& yaml_config, bool uses_tls) {
-    envoy::api::v2::Cluster cluster_config = Upstream::parseClusterFromV2Yaml(yaml_config);
-    envoy::config::cluster::dynamic_forward_proxy::v2alpha::ClusterConfig config;
-    Config::Utility::translateOpaqueConfig(cluster_config.cluster_type().name(),
-                                           cluster_config.cluster_type().typed_config(),
+    envoy::config::cluster::v3alpha::Cluster cluster_config =
+        Upstream::parseClusterFromV2Yaml(yaml_config);
+    envoy::extensions::clusters::dynamic_forward_proxy::v3alpha::ClusterConfig config;
+    Config::Utility::translateOpaqueConfig(cluster_config.cluster_type().typed_config(),
                                            ProtobufWkt::Struct::default_instance(),
                                            ProtobufMessage::getStrictValidationVisitor(), config);
     Stats::ScopePtr scope = stats_store_.createScope("cluster.name.");

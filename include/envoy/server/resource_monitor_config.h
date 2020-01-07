@@ -2,6 +2,7 @@
 
 #include "envoy/api/api.h"
 #include "envoy/common/pure.h"
+#include "envoy/config/typed_config.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/protobuf/message_validator.h"
 #include "envoy/server/resource_monitor.h"
@@ -38,7 +39,7 @@ public:
  * Implemented by each resource monitor and registered via Registry::registerFactory()
  * or the convenience class RegistryFactory.
  */
-class ResourceMonitorFactory {
+class ResourceMonitorFactory : public Config::TypedFactory {
 public:
   virtual ~ResourceMonitorFactory() = default;
 
@@ -54,25 +55,7 @@ public:
   virtual ResourceMonitorPtr createResourceMonitor(const Protobuf::Message& config,
                                                    ResourceMonitorFactoryContext& context) PURE;
 
-  /**
-   * @return ProtobufTypes::MessagePtr create empty config proto message. The resource monitor
-   *         config, which arrives in an opaque google.protobuf.Struct message, will be converted
-   *         to JSON and then parsed into this empty proto.
-   */
-  virtual ProtobufTypes::MessagePtr createEmptyConfigProto() PURE;
-
-  /**
-   * @return std::string the identifying name for a particular implementation of a resource
-   * monitor produced by the factory.
-   */
-  virtual std::string name() PURE;
-
-  /**
-   * @return std::string the identifying category name for objects
-   * created by this factory. Used for automatic registration with
-   * FactoryCategoryRegistry.
-   */
-  static std::string category() { return "resource_monitors"; }
+  std::string category() const override { return "resource_monitors"; }
 };
 
 } // namespace Configuration

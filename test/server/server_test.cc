@@ -1,6 +1,6 @@
 #include <memory>
 
-#include "envoy/api/v2/core/base.pb.h"
+#include "envoy/config/core/v3alpha/base.pb.h"
 
 #include "common/common/assert.h"
 #include "common/common/version.h"
@@ -268,7 +268,7 @@ public:
     return ProtobufTypes::MessagePtr{new Envoy::ProtobufWkt::Empty()};
   }
 
-  std::string name() override { return "envoy.custom_stats_sink"; }
+  std::string name() const override { return "envoy.custom_stats_sink"; }
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, ServerInstanceImplTest,
@@ -737,7 +737,7 @@ TEST_P(ServerInstanceImplTest, BootstrapNodeWithSocketOptions) {
   // both of them use SO_REUSEPORT socket option.
   auto options = std::make_shared<Network::Socket::Options>();
   options->emplace_back(std::make_shared<Network::SocketOptionImpl>(
-      envoy::api::v2::core::SocketOption::STATE_PREBIND,
+      envoy::config::core::v3alpha::SocketOption::STATE_PREBIND,
       ENVOY_MAKE_SOCKET_OPTION_NAME(SOL_SOCKET, SO_REUSEPORT), 1));
   EXPECT_NO_THROW(bindAndListenTcpSocket(address, options));
 }
@@ -993,7 +993,7 @@ public:
     return ProtobufTypes::MessagePtr{new Envoy::ProtobufWkt::Empty()};
   }
 
-  std::string name() override { return "envoy.callbacks_stats_sink"; }
+  std::string name() const override { return "envoy.callbacks_stats_sink"; }
 };
 
 REGISTER_FACTORY(CallbacksStatsSinkFactory, Server::Configuration::StatsSinkFactory);

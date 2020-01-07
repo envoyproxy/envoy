@@ -1,4 +1,4 @@
-#include "envoy/api/v2/core/base.pb.h"
+#include "envoy/config/core/v3alpha/base.pb.h"
 
 #include "common/common/empty_string.h"
 #include "common/config/datasource.h"
@@ -21,7 +21,7 @@ class AsyncDataSourceTest : public testing::Test {
 protected:
   AsyncDataSourceTest() : api_(Api::createApiForTest()) {}
 
-  using AsyncDataSourcePb = envoy::api::v2::core::AsyncDataSource;
+  using AsyncDataSourcePb = envoy::config::core::v3alpha::AsyncDataSource;
 
   NiceMock<Upstream::MockClusterManager> cm_;
   Init::MockManager init_manager_;

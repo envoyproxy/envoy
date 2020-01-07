@@ -1,8 +1,10 @@
-#include "envoy/api/v3alpha/cds.pb.h"
+#include "envoy/config/cluster/v3alpha/cluster.pb.h"
 #include "envoy/config/overload/v3alpha/overload.pb.h"
 
 class ThresholdTriggerImpl {
 public:
   ThresholdTriggerImpl(const envoy::config::overload::v3alpha::ThresholdTrigger& /*config*/) {}
-  void someMethod(envoy::api::v3alpha::Cluster_LbPolicy) {}
+  void someMethod(envoy::config::cluster::v3alpha::Cluster::LbPolicy) {}
+
+  const envoy::config::overload::v3alpha::Trigger::TriggerOneofCase case_{};
 };
