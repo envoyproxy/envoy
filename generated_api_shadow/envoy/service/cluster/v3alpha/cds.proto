@@ -8,6 +8,8 @@ import "google/api/annotations.proto";
 
 import "udpa/annotations/versioning.proto";
 
+import "envoy/annotations/resource.proto";
+
 option java_package = "io.envoyproxy.envoy.service.cluster.v3alpha";
 option java_outer_classname = "CdsProto";
 option java_multiple_files = true;
@@ -17,6 +19,8 @@ option java_generic_services = true;
 
 // Return list of all clusters this proxy will load balance to.
 service ClusterDiscoveryService {
+  option (envoy.annotations.resource).type = "envoy.config.cluster.v3alpha.Cluster";
+
   rpc StreamClusters(stream discovery.v3alpha.DiscoveryRequest)
       returns (stream discovery.v3alpha.DiscoveryResponse) {
   }

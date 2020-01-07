@@ -323,8 +323,7 @@ template <class StatType>
 StatType& ThreadLocalStoreImpl::ScopeImpl::safeMakeStat(
     StatName name, StatNameHashMap<RefcountPtr<StatType>>& central_cache_map,
     StatNameStorageSet& central_rejected_stats, MakeStatFn<StatType> make_stat,
-    StatRefMap<StatType>* tls_cache, StatNameHashSet* tls_rejected_stats,
-    StatType& null_stat) {
+    StatRefMap<StatType>* tls_cache, StatNameHashSet* tls_rejected_stats, StatType& null_stat) {
 
   if (tls_rejected_stats != nullptr &&
       tls_rejected_stats->find(name) != tls_rejected_stats->end()) {

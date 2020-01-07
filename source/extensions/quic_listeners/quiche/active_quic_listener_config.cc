@@ -18,7 +18,7 @@ ActiveQuicListenerConfigFactory::createActiveUdpListenerFactory(const Protobuf::
   return std::make_unique<ActiveQuicListenerFactory>(config);
 }
 
-std::string ActiveQuicListenerConfigFactory::name() { return QuicListenerName; }
+std::string ActiveQuicListenerConfigFactory::name() const { return QuicListenerName; }
 
 REGISTER_FACTORY(ActiveQuicListenerConfigFactory, Server::ActiveUdpListenerConfigFactory);
 

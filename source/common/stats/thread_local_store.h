@@ -337,7 +337,8 @@ private:
      */
     template <class StatType>
     absl::optional<std::reference_wrapper<const StatType>>
-    findStatLockHeld(StatName name, StatNameHashMap<RefcountPtr<StatType>>& central_cache_map) const;
+    findStatLockHeld(StatName name,
+                     StatNameHashMap<RefcountPtr<StatType>>& central_cache_map) const;
 
     void extractTagsAndTruncate(StatName& name,
                                 std::unique_ptr<StatNameManagedStorage>& truncated_name_storage,
