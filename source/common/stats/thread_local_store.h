@@ -240,8 +240,15 @@ private:
   template <class Stat> using StatRefMap = StatNameHashMap<std::reference_wrapper<Stat>>;
 
   struct TlsCacheEntry {
+    // The counters and gauges in the TLS cache are stored by reference,
+    // depending on the CentralCache for backing store. This avoids a potential
+    // contention-storm when destructing a scope, as the counter/gauge ref-count
+    // decrement in allocator_impl.cc needs to hold the single allocator mutex.
     StatRefMap<Counter> counters_;
     StatRefMap<Gauge> gauges_;
+
+    // The histogram objects are not shared with the central cache, and don't
+    // require taking a lock when decrementing their ref-count.
     StatNameHashMap<TlsHistogramSharedPtr> histograms_;
     StatNameHashMap<ParentHistogramSharedPtr> parent_histograms_;
 
@@ -255,6 +262,9 @@ private:
   };
 
   struct CentralCacheEntry {
+    // We need to support default-construction and also a move-constructor, which
+    // is used during scope destruction, where we detach the central cache data
+    // from the scope so it can be destroyed after the TLS caches.
     CentralCacheEntry() = default;
     CentralCacheEntry(CentralCacheEntry&& src)
         : counters_(std::move(src.counters_)), gauges_(std::move(src.gauges_)),

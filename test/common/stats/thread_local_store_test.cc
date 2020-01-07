@@ -966,7 +966,9 @@ TEST_F(StatsThreadLocalStoreTest, ShuttingDown) {
   store_->counter("c2");
   store_->gauge("g2", Gauge::ImportMode::Accumulate);
 
-  // c1, g1 should have a thread local ref, but c2, g2 should not.
+  // We do not keep ref-counts for counters and gauges in the TLS cache, so
+  // all these stats should have a ref-count of 2: one for the SharedPtr
+  // returned from find*(), and one for the central cache.
   EXPECT_EQ(2L, TestUtility::findCounter(*store_, "c1").use_count());
   EXPECT_EQ(2L, TestUtility::findGauge(*store_, "g1").use_count());
   EXPECT_EQ(2L, TestUtility::findCounter(*store_, "c2").use_count());

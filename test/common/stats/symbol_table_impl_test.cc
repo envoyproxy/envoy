@@ -603,12 +603,11 @@ TEST_P(StatNameTest, SharedStatNameStorageSetInsertAndFind) {
   set.free(*table_);
 }
 
-TEST_P(StatNameTest, SharedStatNameStorageSetSwap) {
-  StatNameStorageSet set1, set2;
+TEST_P(StatNameTest, SharedStatNameStorageSetMove) {
+  StatNameStorageSet set1;
   set1.insert(StatNameStorage("foo", *table_));
   EXPECT_EQ(1, set1.size());
-  EXPECT_EQ(0, set2.size());
-  set1.swap(set2);
+  StatNameStorageSet set2(std::move(set1));
   EXPECT_EQ(0, set1.size());
   EXPECT_EQ(1, set2.size());
   set2.free(*table_);
