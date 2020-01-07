@@ -35,6 +35,13 @@ namespace Common {
 namespace Redis {
 namespace Client {
 
+class MockDispatcherWithTimeOverride : public Event::MockDispatcher {
+  // We want to override the time source, but not affect other the multitude of other tests using
+  // MockDispatcher with strict mock.
+public:
+  MOCK_METHOD0(timeSource, TimeSource&());
+};
+
 class RedisClientImplTest : public testing::Test, public Common::Redis::DecoderFactory {
 public:
   // Common::Redis::DecoderFactory
@@ -129,7 +136,7 @@ public:
 
   const std::string cluster_name_{"foo"};
   std::shared_ptr<Upstream::MockHost> host_{new NiceMock<Upstream::MockHost>()};
-  Event::MockDispatcher dispatcher_;
+  MockDispatcherWithTimeOverride dispatcher_;
   Event::MockTimer* flush_timer_{};
   Event::MockTimer* connect_or_op_timer_{};
   MockEncoder* encoder_{new MockEncoder()};

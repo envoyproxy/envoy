@@ -10,14 +10,12 @@ using testing::NiceMock;
 using testing::Return;
 using testing::ReturnNew;
 using testing::ReturnPointee;
-using testing::ReturnRef;
 using testing::SaveArg;
 
 namespace Envoy {
 namespace Event {
 
 MockDispatcher::MockDispatcher() {
-  ON_CALL(*this, timeSource()).WillByDefault(ReturnRef(time_system_));
   ON_CALL(*this, initializeStats(_, _)).WillByDefault(Return());
   ON_CALL(*this, clearDeferredDeleteList()).WillByDefault(Invoke([this]() -> void {
     to_delete_.clear();
