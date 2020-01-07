@@ -7,6 +7,7 @@ option java_outer_classname = "SniClusterProto";
 option java_multiple_files = true;
 
 // [#protodoc-title: SNI Cluster Filter]
+// Set the upstream cluster name from the SNI field in the TLS connection.
 // [#extension: envoy.filters.network.sni_cluster]
 
 message SniCluster {

@@ -1,7 +1,5 @@
 #pragma once
 
-#include <iostream>
-
 #include "envoy/api/api.h"
 #include "envoy/config/bootstrap/v3alpha/bootstrap.pb.h"
 #include "envoy/config/cluster/v3alpha/cluster.pb.h"
@@ -226,16 +224,7 @@ public:
   translateToFactoryConfig(const ProtoMessage& enclosing_message,
                            ProtobufMessage::ValidationVisitor& validation_visitor,
                            Factory& factory) {
-    std::cout << "in translateToFactoryConfig" << std::endl;
     ProtobufTypes::MessagePtr config = factory.createEmptyConfigProto();
-
-    /** TODO
-     * Possible fix is to have the list of names here, and if any of the named factories are here
-     * then swap in ProtobufWkt::Empty?
-     *
-     * or add a property on factory, something like useGoogleProtobufEmpty()
-     * yeah I actually like that...
-     */
 
     // Fail in an obvious way if a plugin does not return a proto.
     RELEASE_ASSERT(config != nullptr, "");

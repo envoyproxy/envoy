@@ -8,7 +8,7 @@ option java_multiple_files = true;
 
 // [#protodoc-title: gRPC Web]
 // gRPC Web :ref:`configuration overview <config_http_filters_grpc_web>`.
-// [#extension: envoy.filters.http.dynamo]
+// [#extension: envoy.filters.http.grpc_web]
 
 // gRPC Web filter config.
 message GrpcWeb {

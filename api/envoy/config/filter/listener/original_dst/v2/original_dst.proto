@@ -7,7 +7,7 @@ option java_outer_classname = "OriginalDstProto";
 option java_multiple_files = true;
 
 // [#protodoc-title: Original Dst Filter]
-// Use the Original destination address on downstream(?) connections.
+// Use the Original destination address on downstream connections.
 // [#extension: envoy.filters.listener.original_dst]
 
 message OriginalDst {
