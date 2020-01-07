@@ -894,7 +894,7 @@ void ClientConnectionImpl::onMessageComplete() {
     // reused, unwind any outstanding readDisable() calls here. Only do this if there are no
     // pipelined responses remaining. Also do this before we dispatch end_stream in case the caller
     // immediately reuses the connection.
-    if (pending_responses_.empty()) {
+    if (connection_.state() == Network::Connection::State::Open && pending_responses_.empty()) {
       while (!connection_.readEnabled()) {
         connection_.readDisable(false);
       }

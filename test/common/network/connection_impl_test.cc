@@ -570,15 +570,38 @@ TEST_P(ConnectionImplTest, KickUndone) {
   disconnect(true);
 }
 
-// Regression test for (at least one failure mode of)
-// https://github.com/envoyproxy/envoy/issues/3639 where readDisable on a close
-// connection caused a crash.
-TEST_P(ConnectionImplTest, ReadDisableAfterClose) {
+// Ensure that calls to readDisable on a closed connection are handled gracefully. Known past issues
+// include a crash on https://github.com/envoyproxy/envoy/issues/3639, and ASSERT failure followed
+// by infinite loop in https://github.com/envoyproxy/envoy/issues/9508
+TEST_P(ConnectionImplTest, ReadDisableAfterCloseHandledGracefully) {
   setUpBasicConnection();
-  disconnect(false);
 
+  client_connection_->readDisable(true);
+  client_connection_->readDisable(false);
+
+  client_connection_->readDisable(true);
+  client_connection_->readDisable(true);
+  client_connection_->readDisable(false);
+  client_connection_->readDisable(false);
+
+  client_connection_->readDisable(true);
+  client_connection_->readDisable(true);
+  disconnect(false);
+#ifndef NDEBUG
+  // When running in debug mode, verify that calls to readDisable and readEnabled on a closed socket
+  // trigger ASSERT failures.
+  EXPECT_DEBUG_DEATH(client_connection_->readEnabled(), "");
   EXPECT_DEBUG_DEATH(client_connection_->readDisable(true), "");
   EXPECT_DEBUG_DEATH(client_connection_->readDisable(false), "");
+#else
+  // When running in release mode, verify that calls to readDisable change the readEnabled state.
+  client_connection_->readDisable(false);
+  client_connection_->readDisable(true);
+  client_connection_->readDisable(false);
+  EXPECT_FALSE(client_connection_->readEnabled());
+  client_connection_->readDisable(false);
+  EXPECT_TRUE(client_connection_->readEnabled());
+#endif
 }
 
 TEST_P(ConnectionImplTest, EarlyCloseOnReadDisabledConnection) {
