@@ -205,8 +205,7 @@ message HeaderValueOption {
   google.protobuf.BoolValue append = 2;
 
   // Whether the header should be modified when it is already present in the request or response.
-  // Defaults to false.
-  google.protobuf.BoolValue skip_if_present = 3;
+  bool skip_if_present = 3;
 }
 
 // Wrapper for a set of headers.

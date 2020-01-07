@@ -51,7 +51,7 @@ parseInternal(const envoy::config::core::v3alpha::HeaderValueOption& header_valu
   }
 
   const bool append = PROTOBUF_GET_WRAPPED_OR_DEFAULT(header_value_option, append, true);
-  const bool skip_if_present = header_value_option.skip_if_present().value();
+  const bool skip_if_present = header_value_option.skip_if_present();
 
   absl::string_view format(header_value_option.header().value());
   if (format.empty()) {
