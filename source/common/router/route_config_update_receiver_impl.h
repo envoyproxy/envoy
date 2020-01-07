@@ -36,7 +36,7 @@ public:
       const std::map<std::string, envoy::config::route::v3alpha::VirtualHost>& rds_vhosts,
       const std::map<std::string, envoy::config::route::v3alpha::VirtualHost>& vhds_vhosts,
       envoy::config::route::v3alpha::RouteConfiguration& route_config);
-  bool aliasResolutionFailed(const envoy::service::discovery::v3alpha::Resource& resource) const;
+  bool onDemandFetchFailed(const envoy::service::discovery::v3alpha::Resource& resource) const;
   void onUpdateCommon(const envoy::config::route::v3alpha::RouteConfiguration& rc,
                       const std::string& version_info);
 

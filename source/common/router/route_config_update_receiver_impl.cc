@@ -90,7 +90,7 @@ bool RouteConfigUpdateReceiverImpl::updateVhosts(
   bool vhosts_added = false;
   for (const auto& resource : added_resources) {
     // the management server returns empty resources for aliases that it couldn't resolve.
-    if (aliasResolutionFailed(resource)) {
+    if (onDemandFetchFailed(resource)) {
       continue;
     }
     envoy::config::route::v3alpha::VirtualHost vhost =
@@ -119,7 +119,7 @@ void RouteConfigUpdateReceiverImpl::rebuildRouteConfig(
   }
 }
 
-bool RouteConfigUpdateReceiverImpl::aliasResolutionFailed(
+bool RouteConfigUpdateReceiverImpl::onDemandFetchFailed(
     const envoy::service::discovery::v3alpha::Resource& resource) const {
   return !resource.has_resource();
 }

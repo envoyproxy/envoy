@@ -86,7 +86,8 @@ public:
   virtual SystemTime lastUpdated() const PURE;
 
   /**
-   * @return aliases received with the last VHDS update.
+   * @return the union of all resource names and aliases (if any) received with the last VHDS
+   * update.
    */
   virtual const std::set<std::string>& resourceIdsInLastVhdsUpdate() PURE;
 };
