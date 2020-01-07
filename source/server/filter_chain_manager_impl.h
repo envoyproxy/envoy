@@ -26,7 +26,7 @@ public:
   virtual ~FilterChainFactoryBuilder() = default;
   virtual std::unique_ptr<Network::FilterChain>
   buildFilterChain(const envoy::config::listener::v3alpha::FilterChain& filter_chain,
-                   FilterChainFactoryContextCreator& callback) const PURE;
+                   FilterChainFactoryContextCreator& context_creator) const PURE;
 };
 
 // FilterChainFactoryContextImpl is supposed to be used by network filter chain.
@@ -94,7 +94,7 @@ public:
 
   void addFilterChain(
       absl::Span<const envoy::config::listener::v3alpha::FilterChain* const> filter_chain_span,
-      FilterChainFactoryBuilder& b, FilterChainFactoryContextCreator& callback);
+      FilterChainFactoryBuilder& b, FilterChainFactoryContextCreator& context_creator);
   static bool isWildcardServerName(const std::string& name);
 
 private:
@@ -191,7 +191,7 @@ private:
   DestinationPortsMap destination_ports_map_;
   const Network::Address::InstanceConstSharedPtr address_;
   Configuration::FactoryContext& parent_context_;
-  std::list<std::shared_ptr<Configuration::FilterChainFactoryContext>> factory_contexts_;
+  std::list<std::unique_ptr<Configuration::FilterChainFactoryContext>> factory_contexts_;
 };
 
 class FilterChainImpl : public Network::FilterChain {

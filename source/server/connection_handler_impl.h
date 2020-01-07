@@ -161,7 +161,7 @@ private:
     ActiveConnections(ActiveTcpListener& listener, const Network::FilterChain& filter_chain);
     ~ActiveConnections();
 
-    // listener filterchain pair is the owner of the connections
+    // listener filter chain pair is the owner of the connections
     ActiveTcpListener& listener_;
     const Network::FilterChain& filter_chain_;
     // Owned connections

@@ -764,9 +764,9 @@ ListenerFilterChainFactoryBuilder::ListenerFilterChainFactoryBuilder(
 
 std::unique_ptr<Network::FilterChain> ListenerFilterChainFactoryBuilder::buildFilterChain(
     const envoy::config::listener::v3alpha::FilterChain& filter_chain,
-    FilterChainFactoryContextCreator& creator) const {
+    FilterChainFactoryContextCreator& context_creator) const {
   return buildFilterChainInternal(filter_chain,
-                                  creator.createFilterChainFactoryContext(&filter_chain));
+                                  context_creator.createFilterChainFactoryContext(&filter_chain));
 }
 
 std::unique_ptr<Network::FilterChain> ListenerFilterChainFactoryBuilder::buildFilterChainInternal(

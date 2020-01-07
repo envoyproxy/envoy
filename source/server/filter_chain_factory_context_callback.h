@@ -18,7 +18,7 @@ public:
   virtual ~FilterChainFactoryContextCreator() = default;
 
   /**
-   * Generate the filter chain factory context from proto. Note the callback will own the filter
+   * Generate the filter chain factory context from proto. Note the caller does not own the filter
    * chain context.
    */
   virtual Configuration::FilterChainFactoryContext& createFilterChainFactoryContext(

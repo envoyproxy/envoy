@@ -136,7 +136,7 @@ bool FilterChainManagerImpl::isWildcardServerName(const std::string& name) {
 void FilterChainManagerImpl::addFilterChain(
     absl::Span<const envoy::config::listener::v3alpha::FilterChain* const> filter_chain_span,
     FilterChainFactoryBuilder& filter_chain_factory_builder,
-    FilterChainFactoryContextCreator& callback) {
+    FilterChainFactoryContextCreator& context_creator) {
   std::unordered_set<envoy::config::listener::v3alpha::FilterChainMatch, MessageUtil, MessageUtil>
       filter_chains;
   for (const auto& filter_chain : filter_chain_span) {
@@ -186,7 +186,7 @@ void FilterChainManagerImpl::addFilterChain(
         filter_chain_match.application_protocols(), filter_chain_match.source_type(), source_ips,
         filter_chain_match.source_ports(),
         std::shared_ptr<Network::FilterChain>(
-            filter_chain_factory_builder.buildFilterChain(*filter_chain, callback)));
+            filter_chain_factory_builder.buildFilterChain(*filter_chain, context_creator)));
   }
   convertIPsToTries();
 }
@@ -574,7 +574,7 @@ Configuration::FilterChainFactoryContext& FilterChainManagerImpl::createFilterCh
     const ::envoy::config::listener::v3alpha::FilterChain* const filter_chain) {
   // TODO(lambdai): drain close should be saved in per filter chain context
   UNREFERENCED_PARAMETER(filter_chain);
-  factory_contexts_.push_back(std::make_shared<FilterChainFactoryContextImpl>(parent_context_));
+  factory_contexts_.push_back(std::make_unique<FilterChainFactoryContextImpl>(parent_context_));
   return *factory_contexts_.back();
 }
 } // namespace Server
