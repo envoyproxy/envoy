@@ -284,6 +284,16 @@ envoy_cc_test_library(
 )
 
 envoy_cc_test(
+    name = "type_to_endpoint_test",
+    srcs = ["type_to_endpoint_test.cc"],
+    deps = [
+        "//source/common/config:type_to_endpoint_lib",
+        "@envoy_api//envoy/api/v2:pkg_cc_proto",
+        "@envoy_api//envoy/service/route/v3alpha:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_test(
     name = "metadata_test",
     srcs = ["metadata_test.cc"],
     deps = [
@@ -334,6 +344,7 @@ envoy_cc_test(
     name = "registry_test",
     srcs = ["registry_test.cc"],
     deps = [
+        "//include/envoy/config:typed_config_interface",
         "//test/test_common:logging_lib",
         "//test/test_common:utility_lib",
     ],

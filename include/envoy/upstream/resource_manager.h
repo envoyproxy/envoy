@@ -47,6 +47,11 @@ public:
    * @return the current maximum allowed number of this resource.
    */
   virtual uint64_t max() PURE;
+
+  /**
+   * @return the current resource count.
+   */
+  virtual uint64_t count() const PURE;
 };
 
 /**

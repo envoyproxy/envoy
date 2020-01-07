@@ -137,6 +137,7 @@ IPs
 IPv
 ITOA
 Isode
+Iters
 JSON
 JSONs
 JWKS
@@ -543,6 +544,7 @@ faceplant
 facto
 failover
 fallbacks
+fastbuild
 favicon
 fd
 fds
@@ -841,6 +843,7 @@ qps
 quantile
 quantiles
 queueing
+quiesce
 quitquitquit
 qvalue
 rapidjson
@@ -1128,6 +1131,7 @@ vhost
 viewable
 vip
 virtualhost
+virtualize
 vptr
 wakeup
 wakeups
