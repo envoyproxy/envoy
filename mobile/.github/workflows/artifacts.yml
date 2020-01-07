@@ -52,3 +52,26 @@ jobs:
         with:
           name: envoy_ios_framework
           path: dist/ios_artifact
+  master_ios_cocoapods:
+    name: master_ios_cocoapods
+    runs-on: macOS-10.14
+    timeout-minutes: 45
+    needs: [master_ios_dist]
+    steps:
+      - uses: actions/checkout@v1
+      - name: 'Install dependencies'
+        run: ./ci/mac_ci_setup.sh
+      - uses: actions/download-artifact@v1
+        with:
+          name: envoy_ios_framework
+          path: dist/envoy_ios_cocoapods
+      - name: 'Copy license for CocoaPods'
+        run: cp LICENSE dist/envoy_ios_cocoapods
+      - name: 'Create empty Swift sources directory'
+        run: mkdir -p dist/envoy_ios_cocoapods/Envoy.framework/Swift
+      - name: 'Create empty Swift file to force Swift libraries to link properly'
+        run: touch dist/envoy_ios_cocoapods/Envoy.framework/Swift/Empty.swift
+      - uses: actions/upload-artifact@v1
+        with:
+          name: envoy_ios_cocoapods
+          path: dist/envoy_ios_cocoapods
