@@ -30,6 +30,7 @@ public:
   RouterRetryStateImplTest() : callback_([this]() -> void { callback_ready_.ready(); }) {
     ON_CALL(runtime_.snapshot_, featureEnabled("upstream.use_retry", 100))
         .WillByDefault(Return(true));
+    policy_.num_retries_ = 1;
   }
 
   void setup() {
@@ -678,6 +679,16 @@ TEST_F(RouterRetryStateImplTest, PolicyLimitedByRequestHeaders) {
     setup(request_headers);
     EXPECT_FALSE(state_->enabled());
   }
+}
+
+TEST_F(RouterRetryStateImplTest, RouteConfigNoRetriesAllowed) {
+  policy_.num_retries_ = 0;
+  policy_.retry_on_ = RetryPolicy::RETRY_ON_CONNECT_FAILURE;
+  setup();
+
+  EXPECT_TRUE(state_->enabled());
+  EXPECT_EQ(RetryStatus::NoRetryLimitExceeded,
+            state_->shouldRetryReset(connect_failure_, callback_));
 }
 
 TEST_F(RouterRetryStateImplTest, RouteConfigNoHeaderConfig) {
