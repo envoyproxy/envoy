@@ -20,9 +20,7 @@ envoy_cc_library(
 envoy_cc_library(
     name = "context_interface",
     hdrs = ["context.h"],
-    deps = [
-        "@envoy_api//envoy/admin/v2alpha:pkg_cc_proto",
-    ],
+    deps = ["@envoy_api//envoy/admin/v3alpha:pkg_cc_proto"],
 )
 
 envoy_cc_library(
@@ -41,6 +39,7 @@ envoy_cc_library(
         ":context_config_interface",
         ":context_interface",
         "//include/envoy/common:time_interface",
+        "//include/envoy/config:typed_config_interface",
         "//include/envoy/stats:stats_interface",
     ],
 )
@@ -56,4 +55,8 @@ envoy_cc_library(
 envoy_cc_library(
     name = "certificate_validation_context_config_interface",
     hdrs = ["certificate_validation_context_config.h"],
+    deps = [
+        "//source/common/common:matchers_lib",
+        "@envoy_api//envoy/type/matcher/v3alpha:pkg_cc_proto",
+    ],
 )

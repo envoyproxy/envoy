@@ -1,6 +1,6 @@
 #include "common/http/hash_policy.h"
 
-#include "envoy/api/v2/route/route.pb.h"
+#include "envoy/config/route/v3alpha/route_components.pb.h"
 
 #include "common/http/utility.h"
 
@@ -111,17 +111,17 @@ private:
 };
 
 HashPolicyImpl::HashPolicyImpl(
-    absl::Span<const envoy::api::v2::route::RouteAction::HashPolicy* const> hash_policies) {
+    absl::Span<const envoy::config::route::v3alpha::RouteAction::HashPolicy* const> hash_policies) {
   // TODO(htuch): Add support for cookie hash policies, #1295
   hash_impls_.reserve(hash_policies.size());
 
   for (auto* hash_policy : hash_policies) {
     switch (hash_policy->policy_specifier_case()) {
-    case envoy::api::v2::route::RouteAction::HashPolicy::kHeader:
+    case envoy::config::route::v3alpha::RouteAction::HashPolicy::PolicySpecifierCase::kHeader:
       hash_impls_.emplace_back(
           new HeaderHashMethod(hash_policy->header().header_name(), hash_policy->terminal()));
       break;
-    case envoy::api::v2::route::RouteAction::HashPolicy::kCookie: {
+    case envoy::config::route::v3alpha::RouteAction::HashPolicy::PolicySpecifierCase::kCookie: {
       absl::optional<std::chrono::seconds> ttl;
       if (hash_policy->cookie().has_ttl()) {
         ttl = std::chrono::seconds(hash_policy->cookie().ttl().seconds());
@@ -131,12 +131,14 @@ HashPolicyImpl::HashPolicyImpl(
                                                     hash_policy->terminal()));
       break;
     }
-    case envoy::api::v2::route::RouteAction::HashPolicy::kConnectionProperties:
+    case envoy::config::route::v3alpha::RouteAction::HashPolicy::PolicySpecifierCase::
+        kConnectionProperties:
       if (hash_policy->connection_properties().source_ip()) {
         hash_impls_.emplace_back(new IpHashMethod(hash_policy->terminal()));
       }
       break;
-    case envoy::api::v2::route::RouteAction::HashPolicy::kQueryParameter:
+    case envoy::config::route::v3alpha::RouteAction::HashPolicy::PolicySpecifierCase::
+        kQueryParameter:
       hash_impls_.emplace_back(new QueryParameterHashMethod(hash_policy->query_parameter().name(),
                                                             hash_policy->terminal()));
       break;

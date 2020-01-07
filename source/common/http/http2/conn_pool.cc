@@ -153,7 +153,6 @@ ConnPoolImpl::ActiveClient::ActiveClient(ConnPoolImpl& parent)
   codec_client_->addConnectionCallbacks(*this);
   codec_client_->setCodecClientCallbacks(*this);
   codec_client_->setCodecConnectionCallbacks(*this);
-  connect_timer_->enableTimer(parent_.host_->cluster().connectTimeout());
 
   parent_.host_->stats().cx_total_.inc();
   parent_.host_->stats().cx_active_.inc();
@@ -172,7 +171,6 @@ ConnPoolImpl::ActiveClient::ActiveClient(ConnPoolImpl& parent)
 ConnPoolImpl::ActiveClient::~ActiveClient() {
   parent_.host_->stats().cx_active_.dec();
   parent_.host_->cluster().stats().upstream_cx_active_.dec();
-  conn_length_->complete();
 }
 
 CodecClientPtr ProdConnPoolImpl::createCodecClient(Upstream::Host::CreateConnectionData& data) {

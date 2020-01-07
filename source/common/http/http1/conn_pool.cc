@@ -155,11 +155,20 @@ ConnPoolImpl::StreamWrapper::StreamWrapper(StreamDecoder& response_decoder, Acti
   StreamEncoderWrapper::inner_.getStream().addCallbacks(*this);
   parent_.parent_.host_->cluster().stats().upstream_rq_active_.inc();
   parent_.parent_.host_->stats().rq_active_.inc();
+
+  // TODO (tonya11en): At the time of writing, there is no way to mix different versions of HTTP
+  // traffic in the same cluster, so incrementing the request count in the per-cluster resource
+  // manager will not affect circuit breaking in any unexpected ways. Ideally, outstanding requests
+  // counts would be tracked the same way in all HTTP versions.
+  //
+  // See: https://github.com/envoyproxy/envoy/issues/9215
+  parent_.parent_.host_->cluster().resourceManager(parent_.parent_.priority_).requests().inc();
 }
 
 ConnPoolImpl::StreamWrapper::~StreamWrapper() {
   parent_.parent_.host_->cluster().stats().upstream_rq_active_.dec();
   parent_.parent_.host_->stats().rq_active_.dec();
+  parent_.parent_.host_->cluster().resourceManager(parent_.parent_.priority_).requests().dec();
 }
 
 void ConnPoolImpl::StreamWrapper::onEncodeComplete() { encode_complete_ = true; }
@@ -205,7 +214,6 @@ ConnPoolImpl::ActiveClient::ActiveClient(ConnPoolImpl& parent)
   parent_.host_->cluster().stats().upstream_cx_http1_total_.inc();
   parent_.host_->stats().cx_total_.inc();
   parent_.host_->stats().cx_active_.inc();
-  connect_timer_->enableTimer(parent_.host_->cluster().connectTimeout());
   parent_.host_->cluster().resourceManager(parent_.priority_).connections().inc();
 
   codec_client_->setConnectionStats(
@@ -219,7 +227,6 @@ ConnPoolImpl::ActiveClient::ActiveClient(ConnPoolImpl& parent)
 ConnPoolImpl::ActiveClient::~ActiveClient() {
   parent_.host_->cluster().stats().upstream_cx_active_.dec();
   parent_.host_->stats().cx_active_.dec();
-  conn_length_->complete();
   parent_.host_->cluster().resourceManager(parent_.priority_).connections().dec();
 }
 

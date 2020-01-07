@@ -1,8 +1,9 @@
 #include <memory>
 
-#include "envoy/api/v2/core/base.pb.h"
-#include "envoy/api/v2/core/health_check.pb.h"
-#include "envoy/service/discovery/v2/hds.pb.h"
+#include "envoy/config/core/v3alpha/base.pb.h"
+#include "envoy/config/core/v3alpha/health_check.pb.h"
+#include "envoy/service/health/v3alpha/hds.pb.h"
+#include "envoy/type/v3alpha/http.pb.h"
 
 #include "common/singleton/manager_impl.h"
 #include "common/upstream/health_discovery_service.h"
@@ -40,7 +41,7 @@ public:
   // Allows access to private function processMessage
   void processPrivateMessage(
       HdsDelegate& hd,
-      std::unique_ptr<envoy::service::discovery::v2::HealthCheckSpecifier>&& message) {
+      std::unique_ptr<envoy::service::health::v3alpha::HealthCheckSpecifier>&& message) {
     hd.processMessage(std::move(message));
   };
 };
@@ -75,9 +76,9 @@ protected:
 
   // Creates a HealthCheckSpecifier message that contains one endpoint and one
   // healthcheck
-  envoy::service::discovery::v2::HealthCheckSpecifier* createSimpleMessage() {
-    envoy::service::discovery::v2::HealthCheckSpecifier* msg =
-        new envoy::service::discovery::v2::HealthCheckSpecifier;
+  envoy::service::health::v3alpha::HealthCheckSpecifier* createSimpleMessage() {
+    envoy::service::health::v3alpha::HealthCheckSpecifier* msg =
+        new envoy::service::health::v3alpha::HealthCheckSpecifier;
     msg->mutable_interval()->set_seconds(1);
 
     auto* health_check = msg->add_cluster_health_checks();
@@ -88,7 +89,7 @@ protected:
     health_check->mutable_health_checks(0)->mutable_healthy_threshold()->set_value(2);
     health_check->mutable_health_checks(0)->mutable_grpc_health_check();
     health_check->mutable_health_checks(0)->mutable_http_health_check()->set_codec_client_type(
-        envoy::type::HTTP1);
+        envoy::type::v3alpha::HTTP1);
     health_check->mutable_health_checks(0)->mutable_http_health_check()->set_path("/healthcheck");
 
     auto* socket_address = health_check->add_locality_endpoints()
@@ -102,7 +103,7 @@ protected:
   }
 
   Event::SimulatedTimeSystem time_system_;
-  envoy::api::v2::core::Node node_;
+  envoy::config::core::v3alpha::Node node_;
   Event::MockDispatcher dispatcher_;
   Stats::IsolatedStoreImpl stats_store_;
   MockClusterInfoFactory test_factory_;
@@ -117,7 +118,7 @@ protected:
 
   std::shared_ptr<Upstream::MockClusterInfo> cluster_info_{
       new NiceMock<Upstream::MockClusterInfo>()};
-  std::unique_ptr<envoy::service::discovery::v2::HealthCheckSpecifier> message;
+  std::unique_ptr<envoy::service::health::v3alpha::HealthCheckSpecifier> message;
   Grpc::MockAsyncStream async_stream_;
   Grpc::MockAsyncClient* async_client_;
   Runtime::MockLoader runtime_;
@@ -135,12 +136,12 @@ protected:
 
 // Test that HdsDelegate builds and sends initial message correctly
 TEST_F(HdsTest, HealthCheckRequest) {
-  envoy::service::discovery::v2::HealthCheckRequestOrEndpointHealthResponse request;
+  envoy::service::health::v3alpha::HealthCheckRequestOrEndpointHealthResponse request;
   request.mutable_health_check_request()->mutable_node()->set_id("hds-node");
   request.mutable_health_check_request()->mutable_capability()->add_health_check_protocols(
-      envoy::service::discovery::v2::Capability::HTTP);
+      envoy::service::health::v3alpha::Capability::HTTP);
   request.mutable_health_check_request()->mutable_capability()->add_health_check_protocols(
-      envoy::service::discovery::v2::Capability::TCP);
+      envoy::service::health::v3alpha::Capability::TCP);
 
   EXPECT_CALL(local_info_, node()).WillOnce(ReturnRef(node_));
   EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
@@ -158,7 +159,7 @@ TEST_F(HdsTest, TestProcessMessageEndpoints) {
   // Create Message
   // - Cluster "anna0" with 3 endpoints
   // - Cluster "anna1" with 3 endpoints
-  message = std::make_unique<envoy::service::discovery::v2::HealthCheckSpecifier>();
+  message = std::make_unique<envoy::service::health::v3alpha::HealthCheckSpecifier>();
   message->mutable_interval()->set_seconds(1);
 
   for (int i = 0; i < 2; i++) {
@@ -196,7 +197,7 @@ TEST_F(HdsTest, TestProcessMessageHealthChecks) {
   // Create Message
   // - Cluster "minkowski0" with 2 health_checks
   // - Cluster "minkowski1" with 3 health_checks
-  message = std::make_unique<envoy::service::discovery::v2::HealthCheckSpecifier>();
+  message = std::make_unique<envoy::service::health::v3alpha::HealthCheckSpecifier>();
   message->mutable_interval()->set_seconds(1);
 
   for (int i = 0; i < 2; i++) {
@@ -209,7 +210,7 @@ TEST_F(HdsTest, TestProcessMessageHealthChecks) {
       hc->mutable_unhealthy_threshold()->set_value(j + 1);
       hc->mutable_healthy_threshold()->set_value(j + 1);
       hc->mutable_grpc_health_check();
-      hc->mutable_http_health_check()->set_codec_client_type(envoy::type::HTTP1);
+      hc->mutable_http_health_check()->set_codec_client_type(envoy::type::v3alpha::HTTP1);
       hc->mutable_http_health_check()->set_path("/healthcheck");
     }
   }
@@ -231,7 +232,7 @@ TEST_F(HdsTest, TestMinimalOnReceiveMessage) {
   createHdsDelegate();
 
   // Create Message
-  message = std::make_unique<envoy::service::discovery::v2::HealthCheckSpecifier>();
+  message = std::make_unique<envoy::service::health::v3alpha::HealthCheckSpecifier>();
   message->mutable_interval()->set_seconds(1);
 
   // Process message
@@ -246,7 +247,7 @@ TEST_F(HdsTest, TestDefaultIntervalOnReceiveMessage) {
   createHdsDelegate();
 
   // Create Message
-  message = std::make_unique<envoy::service::discovery::v2::HealthCheckSpecifier>();
+  message = std::make_unique<envoy::service::health::v3alpha::HealthCheckSpecifier>();
   // notice that interval field is intentionally left undefined
 
   // Process message
@@ -263,7 +264,7 @@ TEST_F(HdsTest, TestMinimalSendResponse) {
   createHdsDelegate();
 
   // Create Message
-  message = std::make_unique<envoy::service::discovery::v2::HealthCheckSpecifier>();
+  message = std::make_unique<envoy::service::health::v3alpha::HealthCheckSpecifier>();
   message->mutable_interval()->set_seconds(1);
 
   // Process message and send 2 responses
@@ -330,7 +331,7 @@ TEST_F(HdsTest, TestSendResponseOneEndpointTimeout) {
 
   // Correctness
   EXPECT_EQ(msg.endpoint_health_response().endpoints_health(0).health_status(),
-            envoy::api::v2::core::HealthStatus::UNHEALTHY);
+            envoy::config::core::v3alpha::UNHEALTHY);
   EXPECT_EQ(msg.endpoint_health_response()
                 .endpoints_health(0)
                 .endpoint()

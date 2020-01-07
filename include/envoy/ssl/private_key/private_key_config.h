@@ -1,6 +1,7 @@
 #pragma once
 
-#include "envoy/api/v2/auth/cert.pb.h"
+#include "envoy/config/typed_config.h"
+#include "envoy/extensions/transport_sockets/tls/v3alpha/cert.pb.h"
 #include "envoy/registry/registry.h"
 #include "envoy/ssl/private_key/private_key.h"
 
@@ -9,7 +10,7 @@ namespace Ssl {
 
 // Base class which the private key operation provider implementations can register.
 
-class PrivateKeyMethodProviderInstanceFactory {
+class PrivateKeyMethodProviderInstanceFactory : public Config::UntypedFactory {
 public:
   virtual ~PrivateKeyMethodProviderInstanceFactory() = default;
 
@@ -21,20 +22,10 @@ public:
    * @param context supplies the factory context
    */
   virtual PrivateKeyMethodProviderSharedPtr createPrivateKeyMethodProviderInstance(
-      const envoy::api::v2::auth::PrivateKeyProvider& config,
+      const envoy::extensions::transport_sockets::tls::v3alpha::PrivateKeyProvider& config,
       Server::Configuration::TransportSocketFactoryContext& factory_context) PURE;
 
-  /**
-   * @return std::string the identifying name for a particular implementation of
-   * PrivateKeyMethodProvider produced by the factory.
-   */
-  virtual std::string name() const PURE;
-
-  /**
-   * @return std::string the identifying category name for objects created by this factory.
-   * Used for automatic registration with FactoryCategoryRegistry.
-   */
-  static std::string category() { return "tls.key_providers"; };
+  std::string category() const override { return "tls.key_providers"; };
 };
 
 } // namespace Ssl

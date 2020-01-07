@@ -30,9 +30,9 @@ envoy_cc_library(
         "//source/common/router:config_lib",
         "//source/extensions/filters/common/ext_authz:ext_authz_grpc_lib",
         "//source/extensions/filters/common/ext_authz:ext_authz_http_lib",
-        "@envoy_api//envoy/api/v2/core:pkg_cc_proto",
-        "@envoy_api//envoy/config/filter/http/ext_authz/v2:pkg_cc_proto",
-        "@envoy_api//envoy/service/auth/v2:pkg_cc_proto",
+        "@envoy_api//envoy/config/core/v3alpha:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/http/ext_authz/v3alpha:pkg_cc_proto",
+        "@envoy_api//envoy/service/auth/v3alpha:pkg_cc_proto",
     ],
 )
 
@@ -49,7 +49,7 @@ envoy_cc_extension(
         "//source/extensions/filters/common/ext_authz:ext_authz_http_lib",
         "//source/extensions/filters/http:well_known_names",
         "//source/extensions/filters/http/common:factory_base_lib",
-        "@envoy_api//envoy/api/v2/core:pkg_cc_proto",
-        "@envoy_api//envoy/config/filter/http/ext_authz/v2:pkg_cc_proto",
+        "@envoy_api//envoy/config/core/v3alpha:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/http/ext_authz/v3alpha:pkg_cc_proto",
     ],
 )

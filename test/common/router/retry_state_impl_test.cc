@@ -1,6 +1,6 @@
 #include <chrono>
 
-#include "envoy/api/v2/route/route.pb.h"
+#include "envoy/config/route/v3alpha/route_components.pb.h"
 #include "envoy/stats/stats.h"
 
 #include "common/http/header_map_impl.h"
@@ -27,6 +27,8 @@ namespace {
 
 class RouterRetryStateImplTest : public testing::Test {
 public:
+  enum TestResourceType { Connection, Request, PendingRequest, Retry };
+
   RouterRetryStateImplTest() : callback_([this]() -> void { callback_ready_.ready(); }) {
     ON_CALL(runtime_.snapshot_, featureEnabled("upstream.use_retry", 100))
         .WillByDefault(Return(true));
@@ -47,6 +49,46 @@ public:
     EXPECT_CALL(*retry_timer_, enableTimer(_, _));
   }
 
+  void incrOutstandingResource(TestResourceType resource, uint32_t num) {
+    for (uint32_t i = 0; i < num; ++i) {
+      switch (resource) {
+      case TestResourceType::Retry:
+        cluster_.resourceManager(Upstream::ResourcePriority::Default).retries().inc();
+        resource_manager_cleanup_tasks_.emplace_back([this]() {
+          cluster_.resourceManager(Upstream::ResourcePriority::Default).retries().dec();
+        });
+        break;
+      case TestResourceType::Connection:
+        cluster_.resourceManager(Upstream::ResourcePriority::Default).connections().inc();
+        resource_manager_cleanup_tasks_.emplace_back([this]() {
+          cluster_.resourceManager(Upstream::ResourcePriority::Default).connections().dec();
+        });
+        break;
+      case TestResourceType::Request:
+        cluster_.resourceManager(Upstream::ResourcePriority::Default).requests().inc();
+        resource_manager_cleanup_tasks_.emplace_back([this]() {
+          cluster_.resourceManager(Upstream::ResourcePriority::Default).requests().dec();
+        });
+        break;
+      case TestResourceType::PendingRequest:
+        cluster_.resourceManager(Upstream::ResourcePriority::Default).pendingRequests().inc();
+        resource_manager_cleanup_tasks_.emplace_back([this]() {
+          cluster_.resourceManager(Upstream::ResourcePriority::Default).pendingRequests().dec();
+        });
+        break;
+      }
+    }
+  }
+
+  void cleanupOutstandingResources() {
+    for (auto& task : resource_manager_cleanup_tasks_) {
+      task();
+    }
+    resource_manager_cleanup_tasks_.clear();
+  }
+
+  void TearDown() override { cleanupOutstandingResources(); }
+
   NiceMock<TestRetryPolicy> policy_;
   NiceMock<Upstream::MockClusterInfo> cluster_;
   NiceMock<Runtime::MockLoader> runtime_;
@@ -56,6 +98,7 @@ public:
   RetryStatePtr state_;
   ReadyWatcher callback_ready_;
   RetryState::DoRetryCallback callback_;
+  std::vector<std::function<void()>> resource_manager_cleanup_tasks_;
 
   const Http::StreamResetReason remote_reset_{Http::StreamResetReason::RemoteReset};
   const Http::StreamResetReason remote_refused_stream_reset_{
@@ -418,7 +461,7 @@ TEST_F(RouterRetryStateImplTest, RetriableStatusCodesHeader) {
 TEST_F(RouterRetryStateImplTest, RetriableHeadersPolicySetViaRequestHeader) {
   policy_.retry_on_ = RetryPolicy::RETRY_ON_5XX;
 
-  Protobuf::RepeatedPtrField<envoy::api::v2::route::HeaderMatcher> matchers;
+  Protobuf::RepeatedPtrField<envoy::config::route::v3alpha::HeaderMatcher> matchers;
   auto* matcher = matchers.Add();
   matcher->set_name("X-Upstream-Pushback");
 
@@ -451,7 +494,7 @@ TEST_F(RouterRetryStateImplTest, RetriableHeadersPolicySetViaRequestHeader) {
 TEST_F(RouterRetryStateImplTest, RetriableHeadersPolicyViaRetryPolicyConfiguration) {
   policy_.retry_on_ = RetryPolicy::RETRY_ON_RETRIABLE_HEADERS;
 
-  Protobuf::RepeatedPtrField<envoy::api::v2::route::HeaderMatcher> matchers;
+  Protobuf::RepeatedPtrField<envoy::config::route::v3alpha::HeaderMatcher> matchers;
 
   auto* matcher1 = matchers.Add();
   matcher1->set_name("X-Upstream-Pushback");
@@ -596,7 +639,7 @@ TEST_F(RouterRetryStateImplTest, RetriableHeadersSetViaRequestHeader) {
 TEST_F(RouterRetryStateImplTest, RetriableHeadersMergedConfigAndRequestHeaders) {
   policy_.retry_on_ = RetryPolicy::RETRY_ON_RETRIABLE_HEADERS;
 
-  Protobuf::RepeatedPtrField<envoy::api::v2::route::HeaderMatcher> matchers;
+  Protobuf::RepeatedPtrField<envoy::config::route::v3alpha::HeaderMatcher> matchers;
 
   // Config says: retry if response is not 200.
   auto* matcher = matchers.Add();
@@ -644,7 +687,7 @@ TEST_F(RouterRetryStateImplTest, PolicyResetRemoteReset) {
 }
 
 TEST_F(RouterRetryStateImplTest, PolicyLimitedByRequestHeaders) {
-  Protobuf::RepeatedPtrField<envoy::api::v2::route::HeaderMatcher> matchers;
+  Protobuf::RepeatedPtrField<envoy::config::route::v3alpha::HeaderMatcher> matchers;
   auto* matcher = matchers.Add();
   matcher->set_name(":method");
   matcher->set_exact_match("GET");
@@ -891,6 +934,111 @@ TEST_F(RouterRetryStateImplTest, NoPreferredOverLimitExceeded) {
 
   Http::TestHeaderMapImpl good_response_headers{{":status", "200"}};
   EXPECT_EQ(RetryStatus::No, state_->shouldRetryHeaders(good_response_headers, callback_));
+}
+
+TEST_F(RouterRetryStateImplTest, BudgetAvailableRetries) {
+  // Expect no available retries from resource manager and override the max_retries CB via retry
+  // budget. As configured, there are no allowed retries via max_retries CB.
+  cluster_.resetResourceManagerWithRetryBudget(
+      0 /* cx */, 0 /* rq_pending */, 0 /* rq */, 0 /* rq_retry */, 0 /* conn_pool */,
+      20.0 /* budget_percent */, 3 /* min_retry_concurrency */);
+
+  Http::TestHeaderMapImpl request_headers{{"x-envoy-retry-on", "5xx"}};
+
+  setup(request_headers);
+  EXPECT_TRUE(state_->enabled());
+
+  expectTimerCreateAndEnable();
+  Http::TestHeaderMapImpl response_headers{{":status", "500"}};
+  EXPECT_EQ(RetryStatus::Yes, state_->shouldRetryHeaders(response_headers, callback_));
+}
+
+TEST_F(RouterRetryStateImplTest, BudgetNoAvailableRetries) {
+  // Expect no available retries from resource manager. Override the max_retries CB via a retry
+  // budget that won't let any retries. As configured, there are 5 allowed retries via max_retries
+  // CB.
+  cluster_.resetResourceManagerWithRetryBudget(
+      0 /* cx */, 0 /* rq_pending */, 20 /* rq */, 5 /* rq_retry */, 0 /* conn_pool */,
+      0 /* budget_percent */, 0 /* min_retry_concurrency */);
+
+  Http::TestHeaderMapImpl request_headers{{"x-envoy-retry-on", "5xx"}};
+
+  setup(request_headers);
+  EXPECT_TRUE(state_->enabled());
+
+  Http::TestHeaderMapImpl response_headers{{":status", "500"}};
+  EXPECT_EQ(RetryStatus::NoOverflow, state_->shouldRetryHeaders(response_headers, callback_));
+}
+
+TEST_F(RouterRetryStateImplTest, BudgetVerifyMinimumConcurrency) {
+  // Expect no available retries from resource manager.
+  cluster_.resetResourceManagerWithRetryBudget(
+      0 /* cx */, 0 /* rq_pending */, 0 /* rq */, 0 /* rq_retry */, 0 /* conn_pool */,
+      20.0 /* budget_percent */, 3 /* min_retry_concurrency */);
+
+  Http::TestHeaderMapImpl request_headers{{"x-envoy-retry-on", "5xx"},
+                                          {"x-envoy-max-retries", "42"}};
+  Http::TestHeaderMapImpl response_headers{{":status", "500"}};
+
+  setup(request_headers);
+  EXPECT_TRUE(state_->enabled());
+
+  // Load up 2 outstanding retries and verify the 3rd one is allowed when there are no outstanding
+  // requests. This verifies the minimum allowed outstanding retries before the budget is scaled
+  // with the request concurrency.
+  incrOutstandingResource(TestResourceType::Retry, 2);
+
+  expectTimerCreateAndEnable();
+  EXPECT_EQ(RetryStatus::Yes, state_->shouldRetryHeaders(response_headers, callback_));
+
+  // 3 outstanding retries.
+  incrOutstandingResource(TestResourceType::Retry, 1);
+
+  EXPECT_EQ(RetryStatus::NoOverflow, state_->shouldRetryHeaders(response_headers, callback_));
+
+  incrOutstandingResource(TestResourceType::Request, 20);
+
+  EXPECT_CALL(*retry_timer_, enableTimer(_, _));
+  EXPECT_EQ(RetryStatus::Yes, state_->shouldRetryHeaders(response_headers, callback_));
+
+  // 4 outstanding retries.
+  incrOutstandingResource(TestResourceType::Retry, 1);
+
+  EXPECT_EQ(RetryStatus::NoOverflow, state_->shouldRetryHeaders(response_headers, callback_));
+
+  // Override via runtime and expect successful retry.
+  EXPECT_CALL(cluster_.runtime_.snapshot_, exists("fake_clusterretry_budget.budget_percent"))
+      .WillRepeatedly(Return(true));
+  EXPECT_CALL(cluster_.runtime_.snapshot_, getDouble("fake_clusterretry_budget.budget_percent", _))
+      .WillRepeatedly(Return(100.0));
+
+  EXPECT_CALL(*retry_timer_, enableTimer(_, _));
+  EXPECT_EQ(RetryStatus::Yes, state_->shouldRetryHeaders(response_headers, callback_));
+}
+
+TEST_F(RouterRetryStateImplTest, BudgetRuntimeSetOnly) {
+  // Expect no available retries from resource manager, so no retries allowed according to
+  // max_retries CB. Don't configure retry budgets. We'll rely on runtime config only.
+  cluster_.resetResourceManager(0 /* cx */, 0 /* rq_pending */, 0 /* rq */, 0 /* rq_retry */,
+                                0 /* conn_pool */);
+
+  EXPECT_CALL(cluster_.runtime_.snapshot_, exists("fake_clusterretry_budget.min_retry_concurrency"))
+      .WillRepeatedly(Return(true));
+  EXPECT_CALL(cluster_.runtime_.snapshot_, exists("fake_clusterretry_budget.budget_percent"))
+      .WillRepeatedly(Return(true));
+  EXPECT_CALL(cluster_.runtime_.snapshot_, getDouble("fake_clusterretry_budget.budget_percent", _))
+      .WillRepeatedly(Return(20.0));
+
+  Http::TestHeaderMapImpl request_headers{{"x-envoy-retry-on", "5xx"}};
+
+  setup(request_headers);
+  EXPECT_TRUE(state_->enabled());
+
+  incrOutstandingResource(TestResourceType::Retry, 2);
+
+  expectTimerCreateAndEnable();
+  Http::TestHeaderMapImpl response_headers{{":status", "500"}};
+  EXPECT_EQ(RetryStatus::Yes, state_->shouldRetryHeaders(response_headers, callback_));
 }
 
 } // namespace

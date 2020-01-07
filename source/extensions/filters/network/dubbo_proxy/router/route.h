@@ -3,7 +3,8 @@
 #include <memory>
 #include <string>
 
-#include "envoy/config/filter/network/dubbo_proxy/v2alpha1/route.pb.h"
+#include "envoy/config/typed_config.h"
+#include "envoy/extensions/filters/network/dubbo_proxy/v3alpha/route.pb.h"
 #include "envoy/router/router.h"
 #include "envoy/server/filter_config.h"
 
@@ -20,7 +21,7 @@ namespace DubboProxy {
 namespace Router {
 
 using RouteConfigurations = Protobuf::RepeatedPtrField<
-    ::envoy::config::filter::network::dubbo_proxy::v2alpha1::RouteConfiguration>;
+    envoy::extensions::filters::network::dubbo_proxy::v3alpha::RouteConfiguration>;
 
 enum class RouteMatcherType : uint8_t {
   Default,
@@ -66,7 +67,7 @@ using RouteMatcherConstSharedPtr = std::shared_ptr<const RouteMatcher>;
  * Implemented by each Dubbo protocol and registered via Registry::registerFactory or the
  * convenience class RegisterFactory.
  */
-class NamedRouteMatcherConfigFactory {
+class NamedRouteMatcherConfigFactory : public Envoy::Config::UntypedFactory {
 public:
   virtual ~NamedRouteMatcherConfigFactory() = default;
 
@@ -78,18 +79,7 @@ public:
   virtual RouteMatcherPtr createRouteMatcher(const RouteConfigurations& route_configs,
                                              Server::Configuration::FactoryContext& context) PURE;
 
-  /**
-   * @return std::string the identifying name for a particular implementation of Dubbo protocol
-   * produced by the factory.
-   */
-  virtual std::string name() PURE;
-
-  /**
-   * @return std::string the identifying category name for objects
-   * created by this factory. Used for automatic registration with
-   * FactoryCategoryRegistry.
-   */
-  static std::string category() { return "dubbo_proxy.route_matchers"; }
+  std::string category() const override { return "dubbo_proxy.route_matchers"; }
 
   /**
    * Convenience method to lookup a factory by type.
@@ -98,7 +88,7 @@ public:
    */
   static NamedRouteMatcherConfigFactory& getFactory(RouteMatcherType type) {
     const std::string& name = RouteMatcherNames::get().fromType(type);
-    return Envoy::Config::Utility::getAndCheckFactory<NamedRouteMatcherConfigFactory>(name);
+    return Envoy::Config::Utility::getAndCheckFactoryByName<NamedRouteMatcherConfigFactory>(name);
   }
 };
 
@@ -113,7 +103,7 @@ public:
     return std::make_unique<RouteMatcherImpl>(route_configs, context);
   }
 
-  std::string name() override { return name_; }
+  std::string name() const override { return name_; }
 
 protected:
   RouteMatcherFactoryBase(RouteMatcherType type) : name_(RouteMatcherNames::get().fromType(type)) {}

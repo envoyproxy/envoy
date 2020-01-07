@@ -1,6 +1,7 @@
 #pragma once
 
-#include "envoy/api/v2/core/health_check.pb.h"
+#include "envoy/config/core/v3alpha/health_check.pb.h"
+#include "envoy/config/typed_config.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/upstream/health_checker.h"
 
@@ -55,7 +56,7 @@ public:
  * Implemented by each custom health checker and registered via Registry::registerFactory()
  * or the convenience class RegisterFactory.
  */
-class CustomHealthCheckerFactory {
+class CustomHealthCheckerFactory : public Config::UntypedFactory {
 public:
   virtual ~CustomHealthCheckerFactory() = default;
 
@@ -69,21 +70,10 @@ public:
    * @return HealthCheckerSharedPtr the pointer of a health checker instance.
    */
   virtual Upstream::HealthCheckerSharedPtr
-  createCustomHealthChecker(const envoy::api::v2::core::HealthCheck& config,
+  createCustomHealthChecker(const envoy::config::core::v3alpha::HealthCheck& config,
                             HealthCheckerFactoryContext& context) PURE;
 
-  /**
-   * @return std::string the identifying name for a particular implementation of a custom health
-   * checker produced by the factory.
-   */
-  virtual std::string name() PURE;
-
-  /**
-   * @return std::string the identifying category name for objects
-   * created by this factory. Used for automatic registration with
-   * FactoryCategoryRegistry.
-   */
-  static std::string category() { return "health_checkers"; }
+  std::string category() const override { return "health_checkers"; }
 };
 
 } // namespace Configuration

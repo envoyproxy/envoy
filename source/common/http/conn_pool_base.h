@@ -28,26 +28,14 @@ protected:
       : host_(host), priority_(priority), dispatcher_(dispatcher) {}
   virtual ~ConnPoolImplBase();
 
-  struct PendingRequest : LinkedObject<PendingRequest>, public ConnectionPool::Cancellable {
-    PendingRequest(ConnPoolImplBase& parent, StreamDecoder& decoder,
-                   ConnectionPool::Callbacks& callbacks);
-    ~PendingRequest() override;
-
-    // ConnectionPool::Cancellable
-    void cancel() override { parent_.onPendingRequestCancel(*this); }
-
-    ConnPoolImplBase& parent_;
-    StreamDecoder& decoder_;
-    ConnectionPool::Callbacks& callbacks_;
-  };
-
-  using PendingRequestPtr = std::unique_ptr<PendingRequest>;
-
-  struct ActiveClient : LinkedObject<ActiveClient>,
-                        public Network::ConnectionCallbacks,
-                        public Event::DeferredDeletable {
+  // ActiveClient provides a base class for connection pool clients that handles connection timings
+  // as well as managing the connection timeout.
+  class ActiveClient : public LinkedObject<ActiveClient>,
+                       public Network::ConnectionCallbacks,
+                       public Event::DeferredDeletable {
+  public:
     ActiveClient(ConnPoolImplBase& parent);
-    virtual ~ActiveClient() = default;
+    virtual ~ActiveClient() { conn_length_->complete(); }
 
     // Network::ConnectionCallbacks
     void onEvent(Network::ConnectionEvent event) override {
@@ -75,6 +63,21 @@ protected:
   };
 
   using ActiveClientPtr = std::unique_ptr<ActiveClient>;
+
+  struct PendingRequest : LinkedObject<PendingRequest>, public ConnectionPool::Cancellable {
+    PendingRequest(ConnPoolImplBase& parent, StreamDecoder& decoder,
+                   ConnectionPool::Callbacks& callbacks);
+    ~PendingRequest() override;
+
+    // ConnectionPool::Cancellable
+    void cancel() override { parent_.onPendingRequestCancel(*this); }
+
+    ConnPoolImplBase& parent_;
+    StreamDecoder& decoder_;
+    ConnectionPool::Callbacks& callbacks_;
+  };
+
+  using PendingRequestPtr = std::unique_ptr<PendingRequest>;
 
   // Gets a pointer to the list that currently owns this client.
   std::list<ActiveClientPtr>* owningList(ActiveClient& client);

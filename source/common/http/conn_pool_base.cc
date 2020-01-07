@@ -2,8 +2,27 @@
 #include "common/stats/timespan_impl.h"
 #include "common/upstream/upstream_impl.h"
 
+#include "common/stats/timespan_impl.h"
+
 namespace Envoy {
 namespace Http {
+ConnPoolImplBase::ActiveClient::ActiveClient(ConnPoolImplBase& parent)
+    : base_parent_(parent), connect_timer_(base_parent_.dispatcher_.createTimer(
+                                [this]() -> void { onConnectTimeout(); })) {
+  conn_connect_ms_ = std::make_unique<Stats::HistogramCompletableTimespanImpl>(
+      base_parent_.host_->cluster().stats().upstream_cx_connect_ms_,
+      base_parent_.dispatcher_.timeSource());
+  conn_length_ = std::make_unique<Stats::HistogramCompletableTimespanImpl>(
+      base_parent_.host_->cluster().stats().upstream_cx_length_ms_,
+      base_parent_.dispatcher_.timeSource());
+  connect_timer_->enableTimer(base_parent_.host_->cluster().connectTimeout());
+}
+
+void ConnPoolImplBase::ActiveClient::onConnectTimeout() {
+  ENVOY_CONN_ID_LOG(debug, "connect timeout", connectionId());
+  base_parent_.host_->cluster().stats().upstream_cx_connect_timeout_.inc();
+  close();
+}
 
 ConnPoolImplBase::~ConnPoolImplBase() {
   for (auto* list : {&ready_clients_, &busy_clients_, &draining_clients_}) {
@@ -221,23 +240,6 @@ void ConnPoolImplBase::onPendingRequestCancel(PendingRequest& request) {
 
   host_->cluster().stats().upstream_rq_cancelled_.inc();
   checkForDrained();
-}
-
-ConnPoolImplBase::ActiveClient::ActiveClient(ConnPoolImplBase& parent)
-    : base_parent_(parent), connect_timer_(base_parent_.dispatcher_.createTimer(
-                                [this]() -> void { onConnectTimeout(); })) {
-  conn_connect_ms_ = std::make_unique<Stats::HistogramCompletableTimespanImpl>(
-      base_parent_.host_->cluster().stats().upstream_cx_connect_ms_,
-      base_parent_.dispatcher_.timeSource());
-  conn_length_ = std::make_unique<Stats::HistogramCompletableTimespanImpl>(
-      base_parent_.host_->cluster().stats().upstream_cx_length_ms_,
-      base_parent_.dispatcher_.timeSource());
-}
-
-void ConnPoolImplBase::ActiveClient::onConnectTimeout() {
-  ENVOY_CONN_ID_LOG(debug, "connect timeout", connectionId());
-  base_parent_.host_->cluster().stats().upstream_cx_connect_timeout_.inc();
-  close();
 }
 
 } // namespace Http

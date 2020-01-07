@@ -30,7 +30,7 @@ class PluginFactory : public Null::NullVmPluginFactory {
 public:
   PluginFactory() = default;
 
-  const std::string name() const override { return "test_null_vm_plugin"; }
+  std::string name() const override { return "test_null_vm_plugin"; }
   std::unique_ptr<Null::NullVmPlugin> create() const override;
 };
 
