@@ -1,6 +1,5 @@
 #include <list>
 
-#include "envoy/config/bootstrap/v2/bootstrap.pb.h"
 #include "envoy/server/filter_config.h"
 
 #include "test/integration/integration.h"
@@ -98,7 +97,7 @@ public:
     return ProtobufTypes::MessagePtr{new Envoy::ProtobufWkt::Empty()};
   }
 
-  std::string name() override { CONSTRUCT_ON_FIRST_USE(std::string, "envoy.test.router"); }
+  std::string name() const override { CONSTRUCT_ON_FIRST_USE(std::string, "envoy.test.router"); }
   bool isTerminalFilter() override { return true; }
 };
 

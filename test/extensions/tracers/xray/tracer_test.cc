@@ -25,7 +25,7 @@ namespace XRay {
 namespace {
 using ::testing::_;
 using ::testing::Invoke;
-using namespace envoy::tracers::xray;
+using namespace source::extensions::tracers::xray;
 
 struct MockDaemonBroker : DaemonBroker {
   MockDaemonBroker(const std::string& endpoint) { UNREFERENCED_PARAMETER(endpoint); }

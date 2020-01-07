@@ -13,6 +13,7 @@ API
 ASAN
 ASCII
 ASSERTs
+AST
 AWS
 BACKTRACE
 BSON
@@ -22,6 +23,7 @@ CDS
 CEL
 CHACHA
 CHLO
+CHMOD
 CHLOS
 CIDR
 CLA
@@ -46,6 +48,8 @@ CTXs
 CVC
 CVE
 CX
+Cxx
+CYGWIN
 DER
 DESC
 DFATAL
@@ -55,7 +59,9 @@ DNS
 DRYs
 DS
 DST
+DW
 EADDRINUSE
+EADDRNOTAVAIL
 EAGAIN
 ECDH
 ECDHE
@@ -89,6 +95,7 @@ FCDS
 FFFF
 FIN
 FIPS
+FIRSTHDR
 FQDN
 FREEBIND
 FUZZER
@@ -130,6 +137,7 @@ IPs
 IPv
 ITOA
 Isode
+Iters
 JSON
 JSONs
 JWKS
@@ -148,6 +156,7 @@ LDS
 LEV
 LF
 LHS
+LLVM
 LRS
 MB
 MD
@@ -163,6 +172,7 @@ NACKs
 NBF
 NBSP
 NDEBUG
+NEXTHDR
 NGHTTP
 NOAUTH
 NODELAY
@@ -297,10 +307,12 @@ VLOG
 VM
 WASM
 WAVM
+WIP
 WKT
 WRR
 WS
 Welford's
+Wi
 XDS
 XFCC
 XFF
@@ -456,6 +468,7 @@ deallocating
 deallocation
 dec
 dechunking
+decl
 decls
 decompressor
 decrement
@@ -480,6 +493,7 @@ deserialize
 deserialized
 deserializer
 deserializers
+deserializing
 dest
 destructor
 destructors
@@ -523,11 +537,14 @@ evented
 evwatch
 exe
 execlp
+exprfor
 expectable
+extrahelp
 faceplant
 facto
 failover
 fallbacks
+fastbuild
 favicon
 fd
 fds
@@ -567,6 +584,7 @@ goog
 google
 goto
 gzip
+hackery
 hacky
 handshaker
 hardcoded
@@ -596,6 +614,7 @@ idx
 ie
 ifdef
 iff
+ified
 impl
 implementors
 impls
@@ -628,6 +647,7 @@ iteratively
 javascript
 jitter
 jittered
+kafka
 keepalive
 keepalives
 ketama
@@ -643,7 +663,9 @@ lenenc
 lexically
 libc
 libevent
+libtool
 libstdc
+libtooling
 lifecycle
 lightstep
 linearization
@@ -651,6 +673,8 @@ linearize
 linearized
 linux
 livelock
+llvm
+loc
 localhost
 lockless
 login
@@ -819,6 +843,7 @@ qps
 quantile
 quantiles
 queueing
+quiesce
 quitquitquit
 qvalue
 rapidjson
@@ -854,6 +879,7 @@ refetch
 regex
 regexes
 reimplements
+rele
 releasor
 reloadable
 reparse
@@ -936,6 +962,7 @@ strerr
 strerror
 stringbuf
 stringified
+stringify
 stringstream
 strtoull
 struct
@@ -969,6 +996,7 @@ superset
 symlink
 symlinked
 symlinks
+synchronizer
 syncookie
 sys
 syscall
@@ -988,6 +1016,7 @@ templatizing
 testability
 testcase
 testcases
+testdata
 testee
 th
 threadsafe
@@ -995,6 +1024,7 @@ thru
 timespan
 timestamp
 timestamps
+timeval
 tm
 tmp
 tmpfile
@@ -1101,6 +1131,7 @@ vhost
 viewable
 vip
 virtualhost
+virtualize
 vptr
 wakeup
 wakeups

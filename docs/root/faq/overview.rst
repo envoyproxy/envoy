@@ -44,3 +44,4 @@ Load balancing
   load_balancing/concurrency_lb
   load_balancing/disable_circuit_breaking
   load_balancing/transient_failures
+  load_balancing/region_failover

@@ -1,5 +1,7 @@
 #include "extensions/filters/http/grpc_stats/grpc_stats_filter.h"
 
+#include "envoy/extensions/filters/http/grpc_stats/v3alpha/config.pb.h"
+#include "envoy/extensions/filters/http/grpc_stats/v3alpha/config.pb.validate.h"
 #include "envoy/registry/registry.h"
 
 #include "common/grpc/codec.h"
@@ -103,7 +105,7 @@ private:
 } // namespace
 
 Http::FilterFactoryCb GrpcStatsFilterConfig::createFilterFactoryFromProtoTyped(
-    const envoy::config::filter::http::grpc_stats::v2alpha::FilterConfig& config,
+    const envoy::extensions::filters::http::grpc_stats::v3alpha::FilterConfig& config,
     const std::string&, Server::Configuration::FactoryContext& factory_context) {
   return [&factory_context, emit_filter_state = config.emit_filter_state()](
              Http::FilterChainFactoryCallbacks& callbacks) {

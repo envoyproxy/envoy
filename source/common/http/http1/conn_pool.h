@@ -83,13 +83,14 @@ protected:
 
   using StreamWrapperPtr = std::unique_ptr<StreamWrapper>;
 
-  struct ActiveClient : LinkedObject<ActiveClient>,
+  struct ActiveClient : ConnPoolImplBase::ActiveClient,
+                        LinkedObject<ActiveClient>,
                         public Network::ConnectionCallbacks,
                         public Event::DeferredDeletable {
     ActiveClient(ConnPoolImpl& parent);
     ~ActiveClient() override;
 
-    void onConnectTimeout();
+    void onConnectTimeout() override;
 
     // Network::ConnectionCallbacks
     void onEvent(Network::ConnectionEvent event) override {
@@ -102,9 +103,6 @@ protected:
     CodecClientPtr codec_client_;
     Upstream::HostDescriptionConstSharedPtr real_host_description_;
     StreamWrapperPtr stream_wrapper_;
-    Event::TimerPtr connect_timer_;
-    Stats::TimespanPtr conn_connect_ms_;
-    Stats::TimespanPtr conn_length_;
     uint64_t remaining_requests_;
   };
 

@@ -22,6 +22,11 @@ public:
   virtual SysCallIntResult bind(int sockfd, const sockaddr* addr, socklen_t addrlen) PURE;
 
   /**
+   * @see chmod (man 2 chmod)
+   */
+  virtual SysCallIntResult chmod(const std::string& path, mode_t mode) PURE;
+
+  /**
    * @see ioctl (man 2 ioctl)
    */
   virtual SysCallIntResult ioctl(int sockfd, unsigned long int request, void* argp) PURE;

@@ -1,3 +1,5 @@
+#include "envoy/extensions/filters/http/jwt_authn/v3alpha/config.pb.h"
+
 #include "common/router/string_accessor_impl.h"
 #include "common/stream_info/filter_state_impl.h"
 
@@ -9,7 +11,7 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-using ::envoy::config::filter::http::jwt_authn::v2alpha::JwtAuthentication;
+using envoy::extensions::filters::http::jwt_authn::v3alpha::JwtAuthentication;
 
 namespace Envoy {
 namespace Extensions {

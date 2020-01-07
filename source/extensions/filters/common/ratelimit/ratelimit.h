@@ -6,7 +6,6 @@
 #include <vector>
 
 #include "envoy/common/pure.h"
-#include "envoy/config/ratelimit/v2/rls.pb.h"
 #include "envoy/ratelimit/ratelimit.h"
 #include "envoy/singleton/manager.h"
 #include "envoy/tracing/http_tracer.h"

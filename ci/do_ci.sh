@@ -235,10 +235,15 @@ elif [[ "$CI_TARGET" == "bazel.compile_time_options" ]]; then
 elif [[ "$CI_TARGET" == "bazel.api" ]]; then
   setup_clang_toolchain
   echo "Building API..."
-  bazel build ${BAZEL_BUILD_OPTIONS} -c fastbuild @envoy_api//envoy/...
+  bazel build ${BAZEL_BUILD_OPTIONS} -c fastbuild @envoy_api_canonical//envoy/...
   echo "Testing API..."
-  bazel_with_collection test ${BAZEL_BUILD_OPTIONS} -c fastbuild @envoy_api//test/... @envoy_api//tools/... \
-    @envoy_api//tools:tap2pcap_test
+  bazel_with_collection test ${BAZEL_BUILD_OPTIONS} -c fastbuild @envoy_api_canonical//test/... @envoy_api_canonical//tools/... \
+    @envoy_api_canonical//tools:tap2pcap_test
+  echo "Testing API boosting (unit tests)..."
+  bazel_with_collection test ${BAZEL_BUILD_OPTIONS} -c fastbuild @envoy_dev//clang_tools/api_booster/...
+  echo "Testing API boosting (golden C++ tests)..."
+  # We use custom BAZEL_BUILD_OPTIONS here; the API booster isn't capable of working with libc++ yet.
+  LLVM_CONFIG="${LLVM_ROOT}"/bin/llvm-config BAZEL_BUILD_OPTIONS="--config=clang" python3.8 ./tools/api_boost/api_boost_test.py
   exit 0
 elif [[ "$CI_TARGET" == "bazel.coverage" ]]; then
   setup_clang_toolchain
@@ -291,6 +296,8 @@ elif [[ "$CI_TARGET" == "bazel.fuzzit" ]]; then
 elif [[ "$CI_TARGET" == "fix_format" ]]; then
   # proto_format.sh needs to build protobuf.
   setup_clang_toolchain
+  echo "protoxform_test..."
+  ./tools/protoxform_test.sh
   echo "fix_format..."
   ./tools/check_format.py fix
   ./tools/format_python_tools.sh fix
