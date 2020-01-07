@@ -150,6 +150,8 @@ struct ActiveTestRequest {
 
   ActiveTestRequest(Http1ConnPoolImplTest& parent, size_t client_index, Type type)
       : parent_(parent), client_index_(client_index) {
+    uint64_t active_rq_observed =
+        parent_.cluster_->resourceManager(Upstream::ResourcePriority::Default).requests().count();
     uint64_t current_rq_total = parent_.cluster_->stats_.upstream_rq_total_.value();
     if (type == Type::CreateConnection) {
       parent.conn_pool_.expectClientCreate();
@@ -175,6 +177,10 @@ struct ActiveTestRequest {
     }
     if (type != Type::Pending) {
       EXPECT_EQ(current_rq_total + 1, parent_.cluster_->stats_.upstream_rq_total_.value());
+      EXPECT_EQ(active_rq_observed + 1,
+                parent_.cluster_->resourceManager(Upstream::ResourcePriority::Default)
+                    .requests()
+                    .count());
     }
   }
 
