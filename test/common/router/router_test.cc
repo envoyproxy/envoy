@@ -2,8 +2,8 @@
 #include <cstdint>
 #include <string>
 
-#include "envoy/api/v3alpha/auth/cert.pb.h"
 #include "envoy/config/core/v3alpha/base.pb.h"
+#include "envoy/extensions/transport_sockets/tls/v3alpha/cert.pb.h"
 #include "envoy/type/v3alpha/percent.pb.h"
 
 #include "common/buffer/buffer_impl.h"
