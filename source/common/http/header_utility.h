@@ -9,7 +9,6 @@
 #include "envoy/type/v3alpha/range.pb.h"
 
 #include "common/protobuf/protobuf.h"
-#include "common/runtime/runtime_impl.h"
 
 namespace Envoy {
 namespace Http {
@@ -120,10 +119,10 @@ public:
   /**
    * Determines if request headers pass Envoy validity checks.
    * @param headers to validate
-   * @param details optional location to return failure details. If this is non-null and the
-   *   headers are not valid, a details string MUST be provided here by requestHeadersValid.
+   * @return details of the error if an error is present, otherwise absl::nullopt
    */
-  static bool requestHeadersValid(const HeaderMap& headers, const std::string** details);
+  static absl::optional<std::reference_wrapper<const absl::string_view>>
+  requestHeadersValid(const HeaderMap& headers);
 };
 } // namespace Http
 } // namespace Envoy

@@ -6,6 +6,7 @@
 #include "common/common/utility.h"
 #include "common/http/header_map_impl.h"
 #include "common/protobuf/utility.h"
+#include "common/runtime/runtime_impl.h"
 
 #include "absl/strings/match.h"
 #include "nghttp2/nghttp2.h"
@@ -14,7 +15,7 @@ namespace Envoy {
 namespace Http {
 
 struct SharedResponseCodeDetailsValues {
-  const std::string InvalidAuthority = "http1.invalid_authority";
+  const absl::string_view InvalidAuthority = "http.invalid_authority";
 };
 
 using SharedResponseCodeDetails = ConstSingleton<SharedResponseCodeDetailsValues>;
@@ -170,16 +171,14 @@ bool HeaderUtility::isEnvoyInternalRequest(const HeaderMap& headers) {
          internal_request_header->value() == Headers::get().EnvoyInternalRequestValues.True;
 }
 
-bool HeaderUtility::requestHeadersValid(const HeaderMap& headers, const std::string** details) {
+absl::optional<std::reference_wrapper<const absl::string_view>>
+HeaderUtility::requestHeadersValid(const HeaderMap& headers) {
   // Make sure the host is valid.
   if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.strict_authority_validation") &&
       headers.Host() && !HeaderUtility::authorityIsValid(headers.Host()->value().getStringView())) {
-    if (details != nullptr) {
-      *details = &SharedResponseCodeDetails::get().InvalidAuthority;
-    }
-    return false;
+    return SharedResponseCodeDetails::get().InvalidAuthority;
   }
-  return true;
+  return absl::nullopt;
 }
 
 } // namespace Http

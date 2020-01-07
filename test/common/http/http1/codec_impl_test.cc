@@ -682,7 +682,7 @@ TEST_F(Http1ServerConnectionImplTest, HeaderInvalidAuthority) {
   EXPECT_THROW_WITH_MESSAGE(
       codec_->dispatch(buffer), CodecProtocolException,
       "http/1.1 protocol error: request headers failed spec compliance checks");
-  EXPECT_EQ("http1.invalid_authority", response_encoder->getStream().responseDetails());
+  EXPECT_EQ("http.invalid_authority", response_encoder->getStream().responseDetails());
 }
 
 // Regression test for http-parser allowing embedded NULs in header values,

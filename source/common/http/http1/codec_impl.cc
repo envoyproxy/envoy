@@ -753,10 +753,10 @@ int ServerConnectionImpl::onHeadersComplete(HeaderMapImplPtr&& headers) {
 
     headers->setMethod(method_string);
 
-    const std::string* details = nullptr;
     // Make sure the host is valid.
-    if (!HeaderUtility::requestHeadersValid(*headers, &details)) {
-      sendProtocolError(*details);
+    auto details = HeaderUtility::requestHeadersValid(*headers);
+    if (details.has_value()) {
+      sendProtocolError(details.value().get());
       throw CodecProtocolException(
           "http/1.1 protocol error: request headers failed spec compliance checks");
     }
