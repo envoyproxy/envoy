@@ -26,7 +26,8 @@ def generate_main_code(type, main_header_file, resolver_cc_file, metrics_header_
 
   for message in messages:
     # For each child structure that is used by request/response, render its matching C++ code.
-    for dependency in message.declaration_chain:
+    dependencies = message.compute_declaration_chain()
+    for dependency in dependencies:
       main_header_contents += complex_type_template.render(complex_type=dependency)
     # Each top-level structure (e.g. FetchRequest/FetchResponse) needs corresponding parsers.
     main_header_contents += parsers_template.render(complex_type=message)
@@ -101,6 +102,8 @@ class StatefulProcessor:
     self.known_types = set()
     # Name of parent message type that's being processed right now.
     self.currently_processed_message_type = None
+    # Common structs declared in this message type.
+    self.common_structs = {}
 
   def parse_messages(self, input_files):
     """
@@ -114,12 +117,17 @@ class StatefulProcessor:
     input_files.sort()
     # For each specification file, remove comments, and parse the remains.
     for input_file in input_files:
-      with open(input_file, 'r') as fd:
-        raw_contents = fd.read()
-        without_comments = re.sub(r'//.*\n', '', raw_contents)
-        message_spec = json.loads(without_comments)
-        message = self.parse_top_level_element(message_spec)
-        messages.append(message)
+      try:
+        with open(input_file, 'r') as fd:
+          raw_contents = fd.read()
+          without_comments = re.sub(r'\s*//.*\n', '\n', raw_contents)
+          without_empty_newlines = re.sub(r'^\s*$', '', without_comments, flags=re.MULTILINE)
+          message_spec = json.loads(without_empty_newlines)
+          message = self.parse_top_level_element(message_spec)
+          messages.append(message)
+      except Exception as e:
+        print('could not process %s' % input_file)
+        raise
 
     # Sort messages by api_key.
     messages.sort(key=lambda x: x.get_extra('api_key'))
@@ -133,32 +141,57 @@ class StatefulProcessor:
     """
     self.currently_processed_message_type = spec['name']
     versions = Statics.parse_version_string(spec['validVersions'], 2 << 16 - 1)
-    complex_type = self.parse_complex_type(self.currently_processed_message_type, spec, versions)
-    # Request / response types need to carry api key version.
-    return complex_type.with_extra('api_key', spec['apiKey'])
+
+    try:
+      # In 2.4 some types are declared at top level, and only referenced inside.
+      # So let's parse them and store them in state.
+      common_structs = spec.get('commonStructs')
+      if common_structs is not None:
+        for common_struct in common_structs:
+          common_struct_name = common_struct['name']
+          common_struct_versions = Statics.parse_version_string(common_struct['versions'],
+                                                                versions[-1])
+          parsed_complex = self.parse_complex_type(common_struct_name, common_struct,
+                                                   common_struct_versions)
+          self.common_structs[parsed_complex.name] = parsed_complex
+
+      complex_type = self.parse_complex_type(self.currently_processed_message_type, spec, versions)
+      # Request / response types need to carry api key version.
+      result = complex_type.with_extra('api_key', spec['apiKey'])
+      return result
+
+    finally:
+      self.common_structs = {}
+      self.currently_processed_message_type = None
 
   def parse_complex_type(self, type_name, field_spec, versions):
     """
     Parse given complex type, returning a structure that holds its name, field specification and
     allowed versions.
     """
-    fields = []
-    for child_field in field_spec['fields']:
-      child = self.parse_field(child_field, versions[-1])
-      fields.append(child)
+    fields_el = field_spec.get('fields')
 
-    # Some of the types repeat multiple times (e.g. AlterableConfig).
-    # In such a case, every second or later occurrence of the same name is going to be prefixed
-    # with parent type, e.g. we have AlterableConfig (for AlterConfigsRequest) and then
-    # IncrementalAlterConfigsRequestAlterableConfig (for IncrementalAlterConfigsRequest).
-    # This keeps names unique, while keeping non-duplicate ones short.
-    if type_name not in self.known_types:
-      self.known_types.add(type_name)
+    if fields_el is not None:
+      fields = []
+      for child_field in field_spec['fields']:
+        child = self.parse_field(child_field, versions[-1])
+        fields.append(child)
+
+      # Some of the types repeat multiple times (e.g. AlterableConfig).
+      # In such a case, every second or later occurrence of the same name is going to be prefixed
+      # with parent type, e.g. we have AlterableConfig (for AlterConfigsRequest) and then
+      # IncrementalAlterConfigsRequestAlterableConfig (for IncrementalAlterConfigsRequest).
+      # This keeps names unique, while keeping non-duplicate ones short.
+      if type_name not in self.known_types:
+        self.known_types.add(type_name)
+      else:
+        type_name = self.currently_processed_message_type + type_name
+        self.known_types.add(type_name)
+
+      return Complex(type_name, fields, versions)
+
     else:
-      type_name = self.currently_processed_message_type + type_name
-      self.known_types.add(type_name)
-
-    return Complex(type_name, fields, versions)
+      return self.common_structs[type_name]
 
   def parse_field(self, field_spec, highest_possible_version):
     """
@@ -339,6 +372,12 @@ class FieldSpec:
 
 class TypeSpecification:
 
+  def compute_declaration_chain(self):
+    """
+    Computes types that need to be declared before this type can be declared, in C++ sense.
+    """
+    raise NotImplementedError()
+
   def deserializer_name_in_version(self, version):
     """
     Renders the deserializer name of given type, in message with given version.
@@ -367,11 +406,14 @@ class Array(TypeSpecification):
 
   def __init__(self, underlying):
     self.underlying = underlying
-    self.declaration_chain = self.underlying.declaration_chain
 
   @property
   def name(self):
     return 'std::vector<%s>' % self.underlying.name
+
+  def compute_declaration_chain(self):
+    # To use an array of type T, we just need to be capable of using type T.
+    return self.underlying.compute_declaration_chain()
 
   def deserializer_name_in_version(self, version):
     return 'ArrayDeserializer<%s, %s>' % (self.underlying.name,
@@ -441,7 +483,6 @@ class Primitive(TypeSpecification):
     self.original_name = name
     self.name = Primitive.compute(name, Primitive.KAFKA_TYPE_TO_ENVOY_TYPE)
     self.custom_default_value = custom_default_value
-    self.declaration_chain = []
     self.deserializer_name = Primitive.compute(name, Primitive.KAFKA_TYPE_TO_DESERIALIZER)
 
   @staticmethod
@@ -450,6 +491,10 @@ class Primitive(TypeSpecification):
       return map[name]
     else:
       raise ValueError(name)
+
+  def compute_declaration_chain(self):
+    # Primitives need no declarations.
+    return []
 
   def deserializer_name_in_version(self, version):
     return self.deserializer_name
@@ -477,17 +522,19 @@ class Complex(TypeSpecification):
     self.name = name
     self.fields = fields
     self.versions = versions
-    self.declaration_chain = self.__compute_declaration_chain()
     self.attributes = {}
 
-  def __compute_declaration_chain(self):
+  def compute_declaration_chain(self):
     """
     Computes all dependencies, what means all non-primitive types used by this type.
     They need to be declared before this struct is declared.
     """
     result = []
     for field in self.fields:
-      result.extend(field.type.declaration_chain)
+      field_dependencies = field.type.compute_declaration_chain()
+      for field_dependency in field_dependencies:
+        if field_dependency not in result:
+          result.append(field_dependency)
     result.append(self)
     return result
 
