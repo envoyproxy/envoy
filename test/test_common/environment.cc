@@ -78,6 +78,20 @@ std::string getTemporaryDirectory() {
   return makeTempDir("envoy_test_tmp.XXXXXX");
 }
 
+void createParentPath(const std::string& path) {
+#if defined(_LIBCPP_VERSION) && _LIBCPP_VERSION >= 9000 && !defined(__APPLE__)
+  // We don't want to rely on mkdir etc. if we can avoid it, since it might not
+  // exist in some environments such as ClusterFuzz.
+  std::__fs::filesystem::create_directories(std::__fs::filesystem::path(path).parent_path());
+#elif defined __cpp_lib_experimental_filesystem && !defined(__APPLE__)
+  std::experimental::filesystem::create_directories(
+      std::experimental::filesystem::path(path).parent_path());
+#else
+  // No support on this system for std::filesystem or std::experimental::filesystem.
+  RELEASE_ASSERT(::system(("mkdir -p $(dirname " + path + ")").c_str()) == 0, "");
+#endif
+}
+
 // Allow initializeOptions() to remember CLI args for getOptions().
 int argc_;
 char** argv_;
@@ -94,20 +108,6 @@ void TestEnvironment::createPath(const std::string& path) {
 #else
   // No support on this system for std::filesystem or std::experimental::filesystem.
   RELEASE_ASSERT(::system(("mkdir -p " + path).c_str()) == 0, "");
-#endif
-}
-
-void TestEnvironment::createParentPath(const std::string& path) {
-#if defined(_LIBCPP_VERSION) && _LIBCPP_VERSION >= 9000 && !defined(__APPLE__)
-  // We don't want to rely on mkdir etc. if we can avoid it, since it might not
-  // exist in some environments such as ClusterFuzz.
-  std::__fs::filesystem::create_directories(std::__fs::filesystem::path(path).parent_path());
-#elif defined __cpp_lib_experimental_filesystem && !defined(__APPLE__)
-  std::experimental::filesystem::create_directories(
-      std::experimental::filesystem::path(path).parent_path());
-#else
-  // No support on this system for std::filesystem or std::experimental::filesystem.
-  RELEASE_ASSERT(::system(("mkdir -p $(dirname " + path + ")").c_str()) == 0, "");
 #endif
 }
 

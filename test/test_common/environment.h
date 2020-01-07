@@ -188,12 +188,6 @@ public:
   static void createPath(const std::string& path);
 
   /**
-   * Create a parent path on the filesystem (mkdir -p $(dirname ...) equivalent).
-   * @param path.
-   */
-  static void createParentPath(const std::string& path);
-
-  /**
    * Remove a path on the filesystem (rm -rf ... equivalent).
    * @param path.
    */
