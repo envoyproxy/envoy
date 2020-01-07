@@ -344,6 +344,7 @@ envoy_cc_test(
     name = "registry_test",
     srcs = ["registry_test.cc"],
     deps = [
+        "//include/envoy/config:typed_config_interface",
         "//test/test_common:logging_lib",
         "//test/test_common:utility_lib",
     ],

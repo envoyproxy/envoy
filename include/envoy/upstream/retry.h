@@ -1,5 +1,6 @@
 #pragma once
 
+#include "envoy/config/typed_config.h"
 #include "envoy/upstream/types.h"
 #include "envoy/upstream/upstream.h"
 
@@ -75,7 +76,7 @@ using RetryHostPredicateSharedPtr = std::shared_ptr<RetryHostPredicate>;
 /**
  * Factory for RetryPriority.
  */
-class RetryPriorityFactory {
+class RetryPriorityFactory : public Config::TypedFactory {
 public:
   virtual ~RetryPriorityFactory() = default;
 
@@ -84,36 +85,20 @@ public:
                       ProtobufMessage::ValidationVisitor& validation_visitor,
                       uint32_t retry_count) PURE;
 
-  virtual std::string name() const PURE;
-
-  /**
-   * @return std::string the identifying category name for objects
-   * created by this factory. Used for automatic registration with
-   * FactoryCategoryRegistry.
-   */
-  static std::string category() { return "retry_priorities"; }
-
-  virtual ProtobufTypes::MessagePtr createEmptyConfigProto() PURE;
+  std::string category() const override { return "retry_priorities"; }
 };
 
 /**
  * Factory for RetryHostPredicate.
  */
-class RetryHostPredicateFactory {
+class RetryHostPredicateFactory : public Config::TypedFactory {
 public:
   virtual ~RetryHostPredicateFactory() = default;
 
   virtual RetryHostPredicateSharedPtr createHostPredicate(const Protobuf::Message& config,
                                                           uint32_t retry_count) PURE;
 
-  /**
-   * @return name name of this factory.
-   */
-  virtual std::string name() PURE;
-
-  static std::string category() { return "retry_host_predicates"; }
-
-  virtual ProtobufTypes::MessagePtr createEmptyConfigProto() PURE;
+  std::string category() const override { return "retry_host_predicates"; }
 };
 
 } // namespace Upstream

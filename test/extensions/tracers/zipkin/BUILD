@@ -17,7 +17,6 @@ envoy_extension_cc_test(
         "span_buffer_test.cc",
         "span_context_extractor_test.cc",
         "tracer_test.cc",
-        "util_test.cc",
         "zipkin_core_types_test.cc",
         "zipkin_tracer_impl_test.cc",
     ],
