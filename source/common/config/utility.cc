@@ -1,8 +1,5 @@
 #include "common/config/utility.h"
 
-#include <chrono>
-#include <iostream>
-#include <string>
 #include <unordered_set>
 
 #include "envoy/config/bootstrap/v3alpha/bootstrap.pb.h"
@@ -256,22 +253,6 @@ void Utility::translateOpaqueConfig(const ProtobufWkt::Any& typed_config,
                                     const ProtobufWkt::Struct& config,
                                     ProtobufMessage::ValidationVisitor& validation_visitor,
                                     Protobuf::Message& out_proto) {
-  std::cout << extension_name << std::endl;
-  const Protobuf::Descriptor* earlier_version_desc = ApiTypeOracle::inferEarlierVersionDescriptor(
-      extension_name, typed_config, out_proto.GetDescriptor()->full_name());
-
-  if (earlier_version_desc != nullptr) {
-    Protobuf::DynamicMessageFactory dmf;
-    // Create a previous version message.
-    auto message = ProtobufTypes::MessagePtr(dmf.GetPrototype(earlier_version_desc)->New());
-    ASSERT(message != nullptr);
-    // Recurse and translateOpaqueConfig for previous version.
-    translateOpaqueConfig(extension_name, typed_config, config, validation_visitor, *message);
-    // Update from previous version to current version.
-    VersionConverter::upgrade(*message, out_proto);
-    return;
-  }
-
   static const std::string struct_type =
       ProtobufWkt::Struct::default_instance().GetDescriptor()->full_name();
   static const std::string typed_struct_type =
@@ -287,7 +268,6 @@ void Utility::translateOpaqueConfig(const ProtobufWkt::Any& typed_config,
       MessageUtil::unpackTo(typed_config, typed_struct);
       // if out_proto is expecting Struct, return directly
       if (out_proto.GetDescriptor()->full_name() == struct_type) {
-        std::cout << "hit this conditional" << std::endl;
         out_proto.CopyFrom(typed_struct.value());
       } else {
         // The typed struct might match out_proto, or some earlier version, let
