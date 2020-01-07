@@ -92,7 +92,6 @@ const Protobuf::MethodDescriptor& sotwGrpcMethod(absl::string_view type_url) {
 
 const Protobuf::MethodDescriptor& restMethod(absl::string_view type_url) {
   const auto it = typeUrlToServiceMap().find(static_cast<std::string>(type_url));
-  ENVOY_LOG_MISC(debug, "HTD {}", type_url);
   ASSERT(it != typeUrlToServiceMap().cend());
   return *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(it->second.rest_method_);
 }
