@@ -10,7 +10,7 @@ public final class EnvoyError: NSObject, Error {
   /// Optional cause for the error.
   public let cause: Error?
 
-  init(errorCode: UInt64, message: String, cause: Swift.Error?) {
+  public init(errorCode: UInt64, message: String, cause: Error?) {
     self.errorCode = errorCode
     self.message = message
     self.cause = cause
