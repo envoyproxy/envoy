@@ -92,8 +92,8 @@ FilterFactory::fromProto(const envoy::config::filter::accesslog::v3alpha::Access
       kExtensionFilter:
     MessageUtil::validate(config, validation_visitor);
     {
-      auto& factory = Config::Utility::getAndCheckFactory<ExtensionFilterFactory>(
-          config.extension_filter().name());
+      auto& factory =
+          Config::Utility::getAndCheckFactory<ExtensionFilterFactory>(config.extension_filter());
       return factory.createFilter(config.extension_filter(), runtime, random);
     }
   default:
@@ -288,8 +288,7 @@ AccessLogFactory::fromProto(const envoy::config::filter::accesslog::v3alpha::Acc
   }
 
   auto& factory =
-      Config::Utility::getAndCheckFactory<Server::Configuration::AccessLogInstanceFactory>(
-          config.name());
+      Config::Utility::getAndCheckFactory<Server::Configuration::AccessLogInstanceFactory>(config);
   ProtobufTypes::MessagePtr message = Config::Utility::translateToFactoryConfig(
       config, context.messageValidationVisitor(), factory);
 

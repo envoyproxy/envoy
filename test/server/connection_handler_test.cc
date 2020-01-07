@@ -61,7 +61,7 @@ public:
       std::string listener_name("raw_udp_listener");
       dummy.set_udp_listener_name(listener_name);
       udp_listener_factory_ =
-          Config::Utility::getAndCheckFactory<ActiveUdpListenerConfigFactory>(listener_name)
+          Config::Utility::getAndCheckFactoryByName<ActiveUdpListenerConfigFactory>(listener_name)
               .createActiveUdpListenerFactory(dummy);
       ON_CALL(*socket_, socketType()).WillByDefault(Return(socket_type));
     }

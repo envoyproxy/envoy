@@ -127,6 +127,7 @@ envoy_cc_library(
     hdrs = ["resolver.h"],
     deps = [
         ":address_interface",
+        "//include/envoy/config:typed_config_interface",
         "@envoy_api//envoy/config/core/v3alpha:pkg_cc_proto",
     ],
 )
