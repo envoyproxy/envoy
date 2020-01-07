@@ -7,6 +7,6 @@ option java_outer_classname = "PreviousHostsProto";
 option java_multiple_files = true;
 
 // [#protodoc-title: Previous Hosts Predicate]
-// [#extension: envoy.retry_priorities.previous_hosts]
+// [#extension: envoy.retry_host_predicates.previous_hosts]
 message PreviousHostsPredicate {
 }

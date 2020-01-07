@@ -1,6 +1,7 @@
 #include <string>
 
-#include "envoy/config/filter/listener/tls_inspector/v2/tls_inspector.pb.validate.h"
+#include "envoy/extensions/filters/listener/tls_inspector/v3alpha/tls_inspector.pb.h"
+#include "envoy/extensions/filters/listener/tls_inspector/v3alpha/tls_inspector.pb.validate.h"
 #include "envoy/registry/registry.h"
 #include "envoy/server/filter_config.h"
 
@@ -28,7 +29,7 @@ public:
   }
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return std::make_unique<envoy::config::filter::listener::tls_inspector::v2::TlsInspector>();
+    return std::make_unique<envoy::extensions::filters::listener::tls_inspector::v3alpha::TlsInspector>();
   }
 
   std::string name() const override { return ListenerFilterNames::get().TlsInspector; }
