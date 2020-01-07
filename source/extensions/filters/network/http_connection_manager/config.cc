@@ -541,8 +541,8 @@ HttpConnectionManagerFactory::createHttpConnectionManagerFactoryFromProto(
   // reference count.
   // Keep in mind the lambda capture list **doesn't** determine the destruction order, but it's fine
   // as these captured objects are also global singletons.
-  return [scoped_routes_config_provider_manager, route_config_provider_manager,
-          date_provider, filter_config, &context, &read_callbacks]() -> Http::ApiListenerPtr {
+  return [scoped_routes_config_provider_manager, route_config_provider_manager, date_provider,
+          filter_config, &context, &read_callbacks]() -> Http::ApiListenerPtr {
     auto conn_manager = std::make_unique<Http::ConnectionManagerImpl>(
         *filter_config, context.drainDecision(), context.random(), context.httpContext(),
         context.runtime(), context.localInfo(), context.clusterManager(),
