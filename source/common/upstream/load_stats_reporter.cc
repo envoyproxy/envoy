@@ -1,6 +1,6 @@
 #include "common/upstream/load_stats_reporter.h"
 
-#include "envoy/service/load_stats/v2/lrs.pb.h"
+#include "envoy/service/load_stats/v3alpha/lrs.pb.h"
 #include "envoy/stats/scope.h"
 
 #include "common/protobuf/protobuf.h"
@@ -118,7 +118,7 @@ void LoadStatsReporter::onReceiveInitialMetadata(Http::HeaderMapPtr&& metadata) 
 }
 
 void LoadStatsReporter::onReceiveMessage(
-    std::unique_ptr<envoy::service::load_stats::v2::LoadStatsResponse>&& message) {
+    std::unique_ptr<envoy::service::load_stats::v3alpha::LoadStatsResponse>&& message) {
   ENVOY_LOG(debug, "New load report epoch: {}", message->DebugString());
   stats_.requests_.inc();
   message_ = std::move(message);

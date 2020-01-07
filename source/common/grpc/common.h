@@ -15,6 +15,7 @@
 #include "common/protobuf/protobuf.h"
 
 #include "absl/types/optional.h"
+#include "google/rpc/status.pb.h"
 
 namespace Envoy {
 namespace Grpc {

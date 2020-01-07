@@ -4,8 +4,8 @@
 #include <tuple>
 #include <vector>
 
-#include "envoy/api/v2/cds.pb.h"
-#include "envoy/api/v2/core/base.pb.h"
+#include "envoy/config/cluster/v3alpha/cluster.pb.h"
+#include "envoy/config/core/v3alpha/base.pb.h"
 #include "envoy/stats/scope.h"
 
 #include "common/network/utility.h"
@@ -45,7 +45,7 @@ protected:
   void setupFromV2Yaml(const std::string& yaml) {
     resolve_timer_ = new Event::MockTimer(&dispatcher_);
     NiceMock<MockClusterManager> cm;
-    envoy::api::v2::Cluster cluster_config = parseClusterFromV2Yaml(yaml);
+    envoy::config::cluster::v3alpha::Cluster cluster_config = parseClusterFromV2Yaml(yaml);
     Envoy::Stats::ScopePtr scope = stats_store_.createScope(fmt::format(
         "cluster.{}.", cluster_config.alt_stat_name().empty() ? cluster_config.name()
                                                               : cluster_config.alt_stat_name()));
@@ -130,7 +130,7 @@ protected:
     EXPECT_EQ("", data.host_description_->locality().zone());
     EXPECT_EQ("", data.host_description_->locality().sub_zone());
     EXPECT_EQ("foo.bar.com", data.host_description_->hostname());
-    EXPECT_TRUE(TestUtility::protoEqual(envoy::api::v2::core::Metadata::default_instance(),
+    EXPECT_TRUE(TestUtility::protoEqual(envoy::config::core::v3alpha::Metadata::default_instance(),
                                         *data.host_description_->metadata()));
     data.host_description_->outlierDetector().putHttpResponseCode(200);
     data.host_description_->healthChecker().setUnhealthy();

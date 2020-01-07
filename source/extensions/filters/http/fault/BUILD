@@ -35,8 +35,8 @@ envoy_cc_library(
         "//source/common/protobuf:utility_lib",
         "//source/extensions/filters/common/fault:fault_config_lib",
         "//source/extensions/filters/http:well_known_names",
-        "@envoy_api//envoy/config/filter/http/fault/v2:pkg_cc_proto",
-        "@envoy_api//envoy/type:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/http/fault/v3alpha:pkg_cc_proto",
+        "@envoy_api//envoy/type/v3alpha:pkg_cc_proto",
     ],
 )
 
@@ -50,6 +50,6 @@ envoy_cc_extension(
         "//source/extensions/filters/http:well_known_names",
         "//source/extensions/filters/http/common:factory_base_lib",
         "//source/extensions/filters/http/fault:fault_filter_lib",
-        "@envoy_api//envoy/config/filter/http/fault/v2:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/http/fault/v3alpha:pkg_cc_proto",
     ],
 )

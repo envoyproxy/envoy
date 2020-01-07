@@ -1,7 +1,7 @@
 #include <memory>
 
-#include "envoy/config/filter/network/rbac/v2/rbac.pb.h"
-#include "envoy/config/rbac/v2/rbac.pb.h"
+#include "envoy/config/rbac/v3alpha/rbac.pb.h"
+#include "envoy/extensions/filters/network/rbac/v3alpha/rbac.pb.h"
 
 #include "common/network/utility.h"
 
@@ -24,29 +24,31 @@ class RoleBasedAccessControlNetworkFilterTest : public testing::Test {
 public:
   RoleBasedAccessControlFilterConfigSharedPtr setupConfig(bool with_policy = true,
                                                           bool continuous = false) {
-    envoy::config::filter::network::rbac::v2::RBAC config;
+    envoy::extensions::filters::network::rbac::v3alpha::RBAC config;
     config.set_stat_prefix("tcp.");
 
     if (with_policy) {
-      envoy::config::rbac::v2::Policy policy;
+      envoy::config::rbac::v3alpha::Policy policy;
       auto policy_rules = policy.add_permissions()->mutable_or_rules();
-      policy_rules->add_rules()->mutable_requested_server_name()->set_regex(".*cncf.io");
+      policy_rules->add_rules()->mutable_requested_server_name()->set_hidden_envoy_deprecated_regex(
+          ".*cncf.io");
       policy_rules->add_rules()->set_destination_port(123);
       policy.add_principals()->set_any(true);
-      config.mutable_rules()->set_action(envoy::config::rbac::v2::RBAC::ALLOW);
+      config.mutable_rules()->set_action(envoy::config::rbac::v3alpha::RBAC::ALLOW);
       (*config.mutable_rules()->mutable_policies())["foo"] = policy;
 
-      envoy::config::rbac::v2::Policy shadow_policy;
+      envoy::config::rbac::v3alpha::Policy shadow_policy;
       auto shadow_policy_rules = shadow_policy.add_permissions()->mutable_or_rules();
       shadow_policy_rules->add_rules()->mutable_requested_server_name()->set_exact("xyz.cncf.io");
       shadow_policy_rules->add_rules()->set_destination_port(456);
       shadow_policy.add_principals()->set_any(true);
-      config.mutable_shadow_rules()->set_action(envoy::config::rbac::v2::RBAC::ALLOW);
+      config.mutable_shadow_rules()->set_action(envoy::config::rbac::v3alpha::RBAC::ALLOW);
       (*config.mutable_shadow_rules()->mutable_policies())["bar"] = shadow_policy;
     }
 
     if (continuous) {
-      config.set_enforcement_type(envoy::config::filter::network::rbac::v2::RBAC::CONTINUOUS);
+      config.set_enforcement_type(
+          envoy::extensions::filters::network::rbac::v3alpha::RBAC::CONTINUOUS);
     }
 
     return std::make_shared<RoleBasedAccessControlFilterConfig>(config, store_);

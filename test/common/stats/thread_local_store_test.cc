@@ -3,7 +3,7 @@
 #include <string>
 #include <unordered_map>
 
-#include "envoy/config/metrics/v2/stats.pb.h"
+#include "envoy/config/metrics/v3alpha/stats.pb.h"
 
 #include "common/common/c_smart_ptr.h"
 #include "common/event/dispatcher_impl.h"
@@ -531,7 +531,7 @@ TEST_F(LookupWithStatNameTest, NotFound) {
 
 class StatsMatcherTLSTest : public StatsThreadLocalStoreTest {
 public:
-  envoy::config::metrics::v2::StatsConfig stats_config_;
+  envoy::config::metrics::v3alpha::StatsConfig stats_config_;
 };
 
 TEST_F(StatsMatcherTLSTest, TestNoOpStatImpls) {
@@ -600,8 +600,10 @@ TEST_F(StatsMatcherTLSTest, TestExclusionRegex) {
   // Expected to alloc lowercase_counter, lowercase_gauge, valid_counter, valid_gauge
 
   // Will block all stats containing any capital alphanumeric letter.
-  stats_config_.mutable_stats_matcher()->mutable_exclusion_list()->add_patterns()->set_regex(
-      ".*[A-Z].*");
+  stats_config_.mutable_stats_matcher()
+      ->mutable_exclusion_list()
+      ->add_patterns()
+      ->set_hidden_envoy_deprecated_regex(".*[A-Z].*");
   store_->setStatsMatcher(std::make_unique<StatsMatcherImpl>(stats_config_));
 
   // The creation of counters/gauges/histograms which have no uppercase letters should succeed.
@@ -838,7 +840,7 @@ TEST_F(StatsThreadLocalStoreTest, RemoveRejectedStats) {
   EXPECT_EQ("h1", store_->histograms()[0]->name());
 
   // Will effectively block all stats, and remove all the non-matching stats.
-  envoy::config::metrics::v2::StatsConfig stats_config;
+  envoy::config::metrics::v3alpha::StatsConfig stats_config;
   stats_config.mutable_stats_matcher()->mutable_inclusion_list()->add_patterns()->set_exact(
       "no-such-stat");
   store_->setStatsMatcher(std::make_unique<StatsMatcherImpl>(stats_config));
@@ -893,7 +895,7 @@ protected:
     store_->addSink(sink_);
 
     // Use a tag producer that will produce tags.
-    envoy::config::metrics::v2::StatsConfig stats_config;
+    envoy::config::metrics::v3alpha::StatsConfig stats_config;
     store_->setTagProducer(std::make_unique<TagProducerImpl>(stats_config));
   }
 
@@ -1202,10 +1204,10 @@ public:
   static constexpr uint32_t NumIters = 35;
 
   // Helper class to block on a number of multi-threaded operations occurring.
-  class BlockingScope {
+  class BlockingBarrier {
   public:
-    explicit BlockingScope(uint32_t count) : blocking_counter_(count) {}
-    ~BlockingScope() { blocking_counter_.Wait(); }
+    explicit BlockingBarrier(uint32_t count) : blocking_counter_(count) {}
+    ~BlockingBarrier() { blocking_counter_.Wait(); }
 
     /**
      * Returns a function that first executes 'f', and then decrements the count
@@ -1218,6 +1220,13 @@ public:
         f();
         decrementCount();
       };
+    }
+
+    /**
+     * @return a function that, when run, decrements the count, intended for passing to post().
+     */
+    std::function<void()> decrementCountFn() {
+      return [this] { decrementCount(); };
     }
 
     void decrementCount() { blocking_counter_.DecrementCount(); }
@@ -1234,18 +1243,18 @@ public:
     // This is the same order as InstanceImpl::initialize in source/server/server.cc.
     thread_dispatchers_.resize(NumThreads);
     {
-      BlockingScope blocking_scope(NumThreads + 1);
-      main_thread_ =
-          thread_factory_.createThread([this, &blocking_scope]() { mainThreadFn(blocking_scope); });
+      BlockingBarrier blocking_barrier(NumThreads + 1);
+      main_thread_ = thread_factory_.createThread(
+          [this, &blocking_barrier]() { mainThreadFn(blocking_barrier); });
       for (uint32_t i = 0; i < NumThreads; ++i) {
         threads_.emplace_back(thread_factory_.createThread(
-            [this, i, &blocking_scope]() { workerThreadFn(i, blocking_scope); }));
+            [this, i, &blocking_barrier]() { workerThreadFn(i, blocking_barrier); }));
       }
     }
 
     {
-      BlockingScope blocking_scope(1);
-      main_dispatcher_->post(blocking_scope.run([this]() {
+      BlockingBarrier blocking_barrier(1);
+      main_dispatcher_->post(blocking_barrier.run([this]() {
         tls_ = std::make_unique<ThreadLocal::InstanceImpl>();
         tls_->registerThread(*main_dispatcher_, true);
         for (Event::DispatcherPtr& dispatcher : thread_dispatchers_) {
@@ -1259,8 +1268,8 @@ public:
 
   ~ClusterShutdownCleanupStarvationTest() {
     {
-      BlockingScope blocking_scope(1);
-      main_dispatcher_->post(blocking_scope.run([this]() {
+      BlockingBarrier blocking_barrier(1);
+      main_dispatcher_->post(blocking_barrier.run([this]() {
         store_->shutdownThreading();
         tls_->shutdownGlobalThreading();
         tls_->shutdownThread();
@@ -1283,35 +1292,31 @@ public:
     main_thread_->join();
   }
 
-  void incCounters() {
+  void createScopesIncCountersAndCleanup() {
     for (uint32_t i = 0; i < NumScopes; ++i) {
       ScopePtr scope = store_->createScope("scope.");
       Counter& counter = scope->counterFromStatName(my_counter_name_);
       counter.inc();
-      uint32_t use_count = counter.use_count();
-      if ((use_count % 10000) == 0) {
-        // Run tests with "-l warning" to see this message.
-        ENVOY_LOG_MISC(warn, "{}: very high use-count: {}", counter.name(), use_count);
-      }
     }
   }
 
-  void workerThreadFn(uint32_t thread_index, BlockingScope& blocking_scope) {
+  void workerThreadFn(uint32_t thread_index, BlockingBarrier& blocking_barrier) {
     thread_dispatchers_[thread_index] = api_->allocateDispatcher();
-    blocking_scope.decrementCount();
+    blocking_barrier.decrementCount();
     thread_dispatchers_[thread_index]->run(Event::Dispatcher::RunType::RunUntilExit);
   }
 
-  void mainThreadFn(BlockingScope& blocking_scope) {
+  void mainThreadFn(BlockingBarrier& blocking_barrier) {
     main_dispatcher_ = api_->allocateDispatcher();
-    blocking_scope.decrementCount();
+    blocking_barrier.decrementCount();
     main_dispatcher_->run(Event::Dispatcher::RunType::RunUntilExit);
   }
 
-  void incCountersAllThreads() {
-    BlockingScope blocking_scope(NumThreads);
+  void createScopesIncCountersAndCleanupAllThreads() {
+    BlockingBarrier blocking_barrier(NumThreads);
     for (Event::DispatcherPtr& thread_dispatcher : thread_dispatchers_) {
-      thread_dispatcher->post(blocking_scope.run([this]() { incCounters(); }));
+      thread_dispatcher->post(
+          blocking_barrier.run([this]() { createScopesIncCountersAndCleanup(); }));
     }
   }
 
@@ -1340,21 +1345,21 @@ public:
 // In this test, we don't expect the use-count of the stat to get very high.
 TEST_F(ClusterShutdownCleanupStarvationTest, TwelveThreadsWithBlockade) {
   for (uint32_t i = 0; i < NumIters && elapsedTime() < std::chrono::seconds(5); ++i) {
-    incCountersAllThreads();
+    createScopesIncCountersAndCleanupAllThreads();
 
     // To ensure all stats are freed we have to wait for a few posts() to clear.
     // First, wait for the main-dispatcher to initiate the cross-thread TLS cleanup.
     auto main_dispatch_block = [this]() {
-      BlockingScope blocking_scope(1);
-      main_dispatcher_->post(blocking_scope.run([]() {}));
+      BlockingBarrier blocking_barrier(1);
+      main_dispatcher_->post(blocking_barrier.run([]() {}));
     };
     main_dispatch_block();
 
     // Next, wait for all the worker threads to complete their TLS cleanup.
     {
-      BlockingScope blocking_scope(NumThreads);
+      BlockingBarrier blocking_barrier(NumThreads);
       for (Event::DispatcherPtr& thread_dispatcher : thread_dispatchers_) {
-        thread_dispatcher->post(blocking_scope.run([]() {}));
+        thread_dispatcher->post(blocking_barrier.run([]() {}));
       }
     }
 
@@ -1375,7 +1380,7 @@ TEST_F(ClusterShutdownCleanupStarvationTest, TwelveThreadsWithoutBlockade) {
   store_->sync().enable();
   store_->sync().waitOn(ThreadLocalStoreImpl::MainDispatcherCleanupSync);
   for (uint32_t i = 0; i < NumIters && elapsedTime() < std::chrono::seconds(5); ++i) {
-    incCountersAllThreads();
+    createScopesIncCountersAndCleanupAllThreads();
     // As we have blocked the main dispatcher cleanup function above, nothing
     // gets cleaned up and use-counts grow without bound as we recreate scopes,
     // recreating the same counter in each one.

@@ -5,15 +5,16 @@
 #include <string>
 #include <unordered_map>
 
-#include "envoy/api/v2/discovery.pb.h"
-#include "envoy/config/bootstrap/v2/bootstrap.pb.h"
+#include "envoy/config/bootstrap/v3alpha/bootstrap.pb.h"
+#include "envoy/config/core/v3alpha/config_source.pb.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/service/discovery/v2/rtds.pb.h"
-#include "envoy/service/discovery/v2/rtds.pb.validate.h"
+#include "envoy/service/discovery/v3alpha/discovery.pb.h"
 #include "envoy/service/runtime/v3alpha/rtds.pb.h"
+#include "envoy/service/runtime/v3alpha/rtds.pb.validate.h"
 #include "envoy/thread_local/thread_local.h"
-#include "envoy/type/percent.pb.h"
-#include "envoy/type/percent.pb.validate.h"
+#include "envoy/type/v3alpha/percent.pb.h"
+#include "envoy/type/v3alpha/percent.pb.validate.h"
 
 #include "common/common/assert.h"
 #include "common/common/fmt.h"
@@ -256,16 +257,16 @@ const std::string& SnapshotImpl::get(const std::string& key) const {
   }
 }
 
-bool SnapshotImpl::featureEnabled(const std::string& key,
-                                  const envoy::type::FractionalPercent& default_value) const {
+bool SnapshotImpl::featureEnabled(
+    const std::string& key, const envoy::type::v3alpha::FractionalPercent& default_value) const {
   return featureEnabled(key, default_value, generator_.random());
 }
 
 bool SnapshotImpl::featureEnabled(const std::string& key,
-                                  const envoy::type::FractionalPercent& default_value,
+                                  const envoy::type::v3alpha::FractionalPercent& default_value,
                                   uint64_t random_value) const {
   const auto& entry = values_.find(key);
-  envoy::type::FractionalPercent percent;
+  envoy::type::v3alpha::FractionalPercent percent;
   if (entry != values_.end() && entry->second.fractional_percent_value_.has_value()) {
     percent = entry->second.fractional_percent_value_.value();
   } else if (entry != values_.end() && entry->second.uint_value_.has_value()) {
@@ -280,7 +281,7 @@ bool SnapshotImpl::featureEnabled(const std::string& key,
     // percent proto. To preserve legacy semantics, we treat it as a percentage
     // (i.e. denominator of 100).
     percent.set_numerator(entry->second.uint_value_.value());
-    percent.set_denominator(envoy::type::FractionalPercent::HUNDRED);
+    percent.set_denominator(envoy::type::v3alpha::FractionalPercent::HUNDRED);
   } else {
     percent = default_value;
   }
@@ -374,7 +375,7 @@ bool SnapshotImpl::parseEntryDoubleValue(Entry& entry) {
 }
 
 void SnapshotImpl::parseEntryFractionalPercentValue(Entry& entry) {
-  envoy::type::FractionalPercent converted_fractional_percent;
+  envoy::type::v3alpha::FractionalPercent converted_fractional_percent;
   try {
     MessageUtil::loadFromYamlAndValidate(entry.raw_string_value_, converted_fractional_percent,
                                          ProtobufMessage::getStrictValidationVisitor());
@@ -501,7 +502,7 @@ void ProtoLayer::walkProtoValue(const ProtobufWkt::Value& v, const std::string& 
 }
 
 LoaderImpl::LoaderImpl(Event::Dispatcher& dispatcher, ThreadLocal::SlotAllocator& tls,
-                       const envoy::config::bootstrap::v2::LayeredRuntime& config,
+                       const envoy::config::bootstrap::v3alpha::LayeredRuntime& config,
                        const LocalInfo::LocalInfo& local_info, Init::Manager& init_manager,
                        Stats::Store& store, RandomGenerator& generator,
                        ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api)
@@ -514,24 +515,24 @@ LoaderImpl::LoaderImpl(Event::Dispatcher& dispatcher, ThreadLocal::SlotAllocator
       throw EnvoyException(absl::StrCat("Duplicate layer name: ", layer.name()));
     }
     switch (layer.layer_specifier_case()) {
-    case envoy::config::bootstrap::v2::RuntimeLayer::kStaticLayer:
+    case envoy::config::bootstrap::v3alpha::RuntimeLayer::LayerSpecifierCase::kStaticLayer:
       // Nothing needs to be done here.
       break;
-    case envoy::config::bootstrap::v2::RuntimeLayer::kAdminLayer:
+    case envoy::config::bootstrap::v3alpha::RuntimeLayer::LayerSpecifierCase::kAdminLayer:
       if (admin_layer_ != nullptr) {
         throw EnvoyException(
             "Too many admin layers specified in LayeredRuntime, at most one may be specified");
       }
       admin_layer_ = std::make_unique<AdminLayer>(layer.name(), stats_);
       break;
-    case envoy::config::bootstrap::v2::RuntimeLayer::kDiskLayer:
+    case envoy::config::bootstrap::v3alpha::RuntimeLayer::LayerSpecifierCase::kDiskLayer:
       if (watcher_ == nullptr) {
         watcher_ = dispatcher.createFilesystemWatcher();
       }
       watcher_->addWatch(layer.disk_layer().symlink_root(), Filesystem::Watcher::Events::MovedTo,
                          [this](uint32_t) -> void { loadNewSnapshot(); });
       break;
-    case envoy::config::bootstrap::v2::RuntimeLayer::kRtdsLayer:
+    case envoy::config::bootstrap::v3alpha::RuntimeLayer::LayerSpecifierCase::kRtdsLayer:
       subscriptions_.emplace_back(
           std::make_unique<RtdsSubscription>(*this, layer.rtds_layer(), store, validation_visitor));
       init_manager.add(subscriptions_.back()->init_target_);
@@ -547,7 +548,8 @@ LoaderImpl::LoaderImpl(Event::Dispatcher& dispatcher, ThreadLocal::SlotAllocator
 void LoaderImpl::initialize(Upstream::ClusterManager& cm) { cm_ = &cm; }
 
 RtdsSubscription::RtdsSubscription(
-    LoaderImpl& parent, const envoy::config::bootstrap::v2::RuntimeLayer::RtdsLayer& rtds_layer,
+    LoaderImpl& parent,
+    const envoy::config::bootstrap::v3alpha::RuntimeLayer::RtdsLayer& rtds_layer,
     Stats::Store& store, ProtobufMessage::ValidationVisitor& validation_visitor)
     : parent_(parent), config_source_(rtds_layer.rtds_config()), store_(store),
       resource_name_(rtds_layer.name()),
@@ -557,7 +559,7 @@ RtdsSubscription::RtdsSubscription(
 void RtdsSubscription::onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
                                       const std::string&) {
   validateUpdateSize(resources.size());
-  auto runtime = MessageUtil::anyConvert<envoy::service::discovery::v2::Runtime>(resources[0]);
+  auto runtime = MessageUtil::anyConvert<envoy::service::runtime::v3alpha::Runtime>(resources[0]);
   MessageUtil::validate(runtime, validation_visitor_);
   if (runtime.name() != resource_name_) {
     throw EnvoyException(
@@ -570,7 +572,7 @@ void RtdsSubscription::onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufW
 }
 
 void RtdsSubscription::onConfigUpdate(
-    const Protobuf::RepeatedPtrField<envoy::api::v2::Resource>& resources,
+    const Protobuf::RepeatedPtrField<envoy::service::discovery::v3alpha::Resource>& resources,
     const Protobuf::RepeatedPtrField<std::string>&, const std::string&) {
   validateUpdateSize(resources.size());
   Protobuf::RepeatedPtrField<ProtobufWkt::Any> unwrapped_resource;
@@ -606,11 +608,11 @@ void RtdsSubscription::validateUpdateSize(uint32_t num_resources) {
 std::string RtdsSubscription::loadTypeUrl() {
   switch (xds_api_version_) {
   // automatically set api version as V2
-  case envoy::api::v2::core::ConfigSource::AUTO:
-  case envoy::api::v2::core::ConfigSource::V2:
+  case envoy::config::core::v3alpha::ConfigSource::AUTO:
+  case envoy::config::core::v3alpha::ConfigSource::V2:
     return Grpc::Common::typeUrl(
         API_NO_BOOST(envoy::service::discovery::v2::Runtime().GetDescriptor()->full_name()));
-  case envoy::api::v2::core::ConfigSource::V3ALPHA:
+  case envoy::config::core::v3alpha::ConfigSource::V3ALPHA:
     return Grpc::Common::typeUrl(
         API_NO_BOOST(envoy::service::runtime::v3alpha::Runtime().GetDescriptor()->full_name()));
   default:
@@ -668,10 +670,10 @@ std::unique_ptr<SnapshotImpl> LoaderImpl::createNewSnapshot() {
   uint32_t rtds_layer = 0;
   for (const auto& layer : config_.layers()) {
     switch (layer.layer_specifier_case()) {
-    case envoy::config::bootstrap::v2::RuntimeLayer::kStaticLayer:
+    case envoy::config::bootstrap::v3alpha::RuntimeLayer::LayerSpecifierCase::kStaticLayer:
       layers.emplace_back(std::make_unique<const ProtoLayer>(layer.name(), layer.static_layer()));
       break;
-    case envoy::config::bootstrap::v2::RuntimeLayer::kDiskLayer: {
+    case envoy::config::bootstrap::v3alpha::RuntimeLayer::LayerSpecifierCase::kDiskLayer: {
       std::string path =
           layer.disk_layer().symlink_root() + "/" + layer.disk_layer().subdirectory();
       if (layer.disk_layer().append_service_cluster()) {
@@ -691,10 +693,10 @@ std::unique_ptr<SnapshotImpl> LoaderImpl::createNewSnapshot() {
       }
       break;
     }
-    case envoy::config::bootstrap::v2::RuntimeLayer::kAdminLayer:
+    case envoy::config::bootstrap::v3alpha::RuntimeLayer::LayerSpecifierCase::kAdminLayer:
       layers.push_back(std::make_unique<AdminLayer>(*admin_layer_));
       break;
-    case envoy::config::bootstrap::v2::RuntimeLayer::kRtdsLayer: {
+    case envoy::config::bootstrap::v3alpha::RuntimeLayer::LayerSpecifierCase::kRtdsLayer: {
       auto* subscription = subscriptions_[rtds_layer++].get();
       layers.emplace_back(std::make_unique<const ProtoLayer>(layer.name(), subscription->proto_));
       break;

@@ -1,4 +1,4 @@
-#include "envoy/api/v2/core/base.pb.h"
+#include "envoy/config/core/v3alpha/base.pb.h"
 
 #include "common/network/io_socket_handle_impl.h"
 #include "common/network/listen_socket_impl.h"
@@ -57,7 +57,7 @@ protected:
 
       auto option = std::make_unique<MockSocketOption>();
       auto options = std::make_shared<std::vector<Network::Socket::OptionConstSharedPtr>>();
-      EXPECT_CALL(*option, setOption(_, envoy::api::v2::core::SocketOption::STATE_PREBIND))
+      EXPECT_CALL(*option, setOption(_, envoy::config::core::v3alpha::SocketOption::STATE_PREBIND))
           .WillOnce(Return(true));
       options->emplace_back(std::move(option));
       std::unique_ptr<ListenSocketImpl> socket1;
@@ -88,7 +88,7 @@ protected:
 
       auto option2 = std::make_unique<MockSocketOption>();
       auto options2 = std::make_shared<std::vector<Network::Socket::OptionConstSharedPtr>>();
-      EXPECT_CALL(*option2, setOption(_, envoy::api::v2::core::SocketOption::STATE_PREBIND))
+      EXPECT_CALL(*option2, setOption(_, envoy::config::core::v3alpha::SocketOption::STATE_PREBIND))
           .WillOnce(Return(true));
       options2->emplace_back(std::move(option2));
       // The address and port are bound already, should throw exception.

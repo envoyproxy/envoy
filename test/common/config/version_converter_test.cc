@@ -1,4 +1,4 @@
-#include "envoy/api/v2/cds.pb.h"
+#include "envoy/api/v2/cluster.pb.h"
 #include "envoy/config/cluster/v3alpha/cluster.pb.h"
 
 #include "common/config/api_version.h"

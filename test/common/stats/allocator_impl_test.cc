@@ -117,44 +117,17 @@ TEST_F(AllocatorImplTest, RefCountDecAllocRaceSynchronized) {
   Thread::ThreadFactory& thread_factory = Thread::threadFactoryForTest();
   alloc_.sync().enable();
   alloc_.sync().waitOn(AllocatorImpl::DecrementToZeroSyncPoint);
-  absl::Notification alloc_done;
-  Thread::ThreadPtr thread1 = thread_factory.createThread([&]() {
-    CounterSharedPtr counter1 = alloc_.makeCounter(counter_name, "", std::vector<Tag>());
-    alloc_done.Notify();
-    counter1->inc();
-    counter1->reset(); // Blocks in thread synchronizer waiting on DecrementToZeroSyncPoint
+  Thread::ThreadPtr thread = thread_factory.createThread([&]() {
+    CounterSharedPtr counter = alloc_.makeCounter(counter_name, "", std::vector<Tag>());
+    counter->inc();
+    counter->reset(); // Blocks in thread synchronizer waiting on DecrementToZeroSyncPoint
   });
 
-  alloc_done.WaitForNotification();
-
-  absl::Mutex counter2_created_mutex;
-  bool counter2_created = false;
-
-  // counter1 has now been allocated in the thread, and is now in the middle of
-  // destructing it.
-  Thread::ThreadPtr thread2 = thread_factory.createThread([&]() {
-    CounterSharedPtr counter2 = alloc_.makeCounter(counter_name, "", std::vector<Tag>());
-    {
-      absl::MutexLock lock(&counter2_created_mutex);
-      counter2_created = true;
-    }
-    counter2->inc();
-
-    // We test for a value of 1 here to show that the first instance of the
-    // counter was destructed prior to the second instance being created, and
-    // thus starts again from zero.
-    EXPECT_EQ(1, counter2->value());
-  });
-
-  {
-    absl::MutexLock lock(&counter2_created_mutex);
-    counter2_created_mutex.AwaitWithTimeout(absl::Condition(&counter2_created), absl::Seconds(5));
-    EXPECT_FALSE(counter2_created);
-  }
+  alloc_.sync().barrierOn(AllocatorImpl::DecrementToZeroSyncPoint);
+  EXPECT_TRUE(alloc_.isMutexLocked());
   alloc_.sync().signal(AllocatorImpl::DecrementToZeroSyncPoint);
-
-  thread1->join();
-  thread2->join();
+  thread->join();
+  EXPECT_FALSE(alloc_.isMutexLocked());
 }
 
 } // namespace

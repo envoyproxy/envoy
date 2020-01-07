@@ -103,7 +103,13 @@ protected:
   // Holds backing store shared by both CounterImpl and GaugeImpl. CounterImpl
   // adds another field, pending_increment_, that is not used in Gauge.
   std::atomic<uint64_t> value_{0};
+
+  // ref_count_ can be incremented as an atomic, without holding a
+  // lock. However, we must hold alloc_.mutex_ when decrementing ref_count_ so
+  // that when it hits zero we can atomically remove it from alloc_.counters_ or
+  // alloc_.gauges_. We leave it atomic to avoid taking the lock on increment.
   std::atomic<uint32_t> ref_count_{0};
+
   std::atomic<uint16_t> flags_{0};
 };
 
@@ -241,6 +247,14 @@ GaugeSharedPtr AllocatorImpl::makeGauge(StatName name, absl::string_view tag_ext
   auto gauge = GaugeSharedPtr(new GaugeImpl(name, *this, tag_extracted_name, tags, import_mode));
   gauges_.insert(gauge.get());
   return gauge;
+}
+
+bool AllocatorImpl::isMutexLocked() {
+  bool locked = mutex_.tryLock();
+  if (locked) {
+    mutex_.unlock();
+  }
+  return !locked;
 }
 
 } // namespace Stats
