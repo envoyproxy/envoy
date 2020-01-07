@@ -20,8 +20,8 @@ envoy_cc_extension(
         "//source/extensions/clusters:well_known_names",
         "//source/extensions/common/dynamic_forward_proxy:dns_cache_interface",
         "//source/extensions/common/dynamic_forward_proxy:dns_cache_manager_impl",
-        "@envoy_api//envoy/api/v2:pkg_cc_proto",
-        "@envoy_api//envoy/api/v2/endpoint:pkg_cc_proto",
-        "@envoy_api//envoy/config/cluster/dynamic_forward_proxy/v2alpha:pkg_cc_proto",
+        "@envoy_api//envoy/config/cluster/v3alpha:pkg_cc_proto",
+        "@envoy_api//envoy/config/endpoint/v3alpha:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/clusters/dynamic_forward_proxy/v3alpha:pkg_cc_proto",
     ],
 )

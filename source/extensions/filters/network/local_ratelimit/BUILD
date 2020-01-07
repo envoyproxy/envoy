@@ -25,7 +25,7 @@ envoy_cc_library(
         "//source/common/common:thread_synchronizer_lib",
         "//source/common/protobuf:utility_lib",
         "//source/common/runtime:runtime_lib",
-        "@envoy_api//envoy/config/filter/network/local_rate_limit/v2alpha:pkg_cc_proto",
+        "@envoy_api//envoy/config/filter/network/local_rate_limit/v3alpha:pkg_cc_proto",
     ],
 )
 
@@ -38,6 +38,6 @@ envoy_cc_extension(
         "//source/extensions/filters/network:well_known_names",
         "//source/extensions/filters/network/common:factory_base_lib",
         "//source/extensions/filters/network/local_ratelimit:local_ratelimit_lib",
-        "@envoy_api//envoy/config/filter/network/local_rate_limit/v2alpha:pkg_cc_proto",
+        "@envoy_api//envoy/config/filter/network/local_rate_limit/v3alpha:pkg_cc_proto",
     ],
 )

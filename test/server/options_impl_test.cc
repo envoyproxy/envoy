@@ -5,9 +5,9 @@
 #include <string>
 #include <vector>
 
-#include "envoy/admin/v2alpha/server_info.pb.h"
+#include "envoy/admin/v3alpha/server_info.pb.h"
 #include "envoy/common/exception.h"
-#include "envoy/config/bootstrap/v2/bootstrap.pb.h"
+#include "envoy/config/bootstrap/v3alpha/bootstrap.pb.h"
 
 #include "common/common/utility.h"
 
@@ -130,7 +130,7 @@ TEST_F(OptionsImplTest, SetAll) {
   options->setBaseId(109876);
   options->setConcurrency(42);
   options->setConfigPath("foo");
-  envoy::config::bootstrap::v2::Bootstrap bootstrap_foo{};
+  envoy::config::bootstrap::v3alpha::Bootstrap bootstrap_foo{};
   bootstrap_foo.mutable_node()->set_id("foo");
   options->setConfigProto(bootstrap_foo);
   options->setConfigYaml("bogus:");
@@ -157,7 +157,7 @@ TEST_F(OptionsImplTest, SetAll) {
   EXPECT_EQ(109876, options->baseId());
   EXPECT_EQ(42U, options->concurrency());
   EXPECT_EQ("foo", options->configPath());
-  envoy::config::bootstrap::v2::Bootstrap bootstrap_bar{};
+  envoy::config::bootstrap::v3alpha::Bootstrap bootstrap_bar{};
   bootstrap_bar.mutable_node()->set_id("foo");
   EXPECT_TRUE(TestUtility::protoEqual(bootstrap_bar, options->configProto()));
   EXPECT_EQ("bogus:", options->configYaml());
@@ -189,7 +189,7 @@ TEST_F(OptionsImplTest, SetAll) {
   EXPECT_EQ(options->configPath(), command_line_options->config_path());
   EXPECT_EQ(options->configYaml(), command_line_options->config_yaml());
   EXPECT_EQ(options->adminAddressPath(), command_line_options->admin_address_path());
-  EXPECT_EQ(envoy::admin::v2alpha::CommandLineOptions::v6,
+  EXPECT_EQ(envoy::admin::v3alpha::CommandLineOptions::v6,
             command_line_options->local_address_ip_version());
   EXPECT_EQ(options->drainTime().count(), command_line_options->drain_time().seconds());
   EXPECT_EQ(spdlog::level::to_string_view(options->logLevel()), command_line_options->log_level());
@@ -200,7 +200,7 @@ TEST_F(OptionsImplTest, SetAll) {
   EXPECT_EQ(options->restartEpoch(), command_line_options->restart_epoch());
   EXPECT_EQ(options->fileFlushIntervalMsec().count() / 1000,
             command_line_options->file_flush_interval().seconds());
-  EXPECT_EQ(envoy::admin::v2alpha::CommandLineOptions::Validate, command_line_options->mode());
+  EXPECT_EQ(envoy::admin::v3alpha::CommandLineOptions::Validate, command_line_options->mode());
   EXPECT_EQ(options->serviceClusterName(), command_line_options->service_cluster());
   EXPECT_EQ(options->serviceNodeName(), command_line_options->service_node());
   EXPECT_EQ(options->serviceZone(), command_line_options->service_zone());
@@ -225,9 +225,9 @@ TEST_F(OptionsImplTest, DefaultParams) {
   EXPECT_EQ(600, command_line_options->drain_time().seconds());
   EXPECT_EQ(900, command_line_options->parent_shutdown_time().seconds());
   EXPECT_EQ("", command_line_options->admin_address_path());
-  EXPECT_EQ(envoy::admin::v2alpha::CommandLineOptions::v4,
+  EXPECT_EQ(envoy::admin::v3alpha::CommandLineOptions::v4,
             command_line_options->local_address_ip_version());
-  EXPECT_EQ(envoy::admin::v2alpha::CommandLineOptions::Serve, command_line_options->mode());
+  EXPECT_EQ(envoy::admin::v3alpha::CommandLineOptions::Serve, command_line_options->mode());
   EXPECT_FALSE(command_line_options->disable_hot_restart());
   EXPECT_FALSE(command_line_options->cpuset_threads());
   EXPECT_FALSE(command_line_options->allow_unknown_static_fields());

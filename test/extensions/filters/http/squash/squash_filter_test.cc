@@ -2,7 +2,7 @@
 #include <memory>
 #include <string>
 
-#include "envoy/config/filter/http/squash/v2/squash.pb.h"
+#include "envoy/extensions/filters/http/squash/v3alpha/squash.pb.h"
 
 #include "common/http/message_impl.h"
 #include "common/protobuf/protobuf.h"
@@ -34,7 +34,7 @@ namespace {
 
 SquashFilterConfig constructSquashFilterConfigFromYaml(
     const std::string& yaml, NiceMock<Envoy::Server::Configuration::MockFactoryContext>& context) {
-  envoy::config::filter::http::squash::v2::Squash proto_config;
+  envoy::extensions::filters::http::squash::v3alpha::Squash proto_config;
   TestUtility::loadFromYaml(yaml, proto_config);
   return SquashFilterConfig(proto_config, context.cluster_manager_);
 }
@@ -163,7 +163,7 @@ protected:
   void SetUp() override {}
 
   void initFilter() {
-    envoy::config::filter::http::squash::v2::Squash p;
+    envoy::extensions::filters::http::squash::v3alpha::Squash p;
     p.set_cluster("squash");
     config_ = std::make_shared<SquashFilterConfig>(p, factory_context_.cluster_manager_);
 

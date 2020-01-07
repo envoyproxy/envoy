@@ -4,7 +4,7 @@
 #include <cstdint>
 #include <string>
 
-#include "envoy/config/filter/network/client_ssl_auth/v2/client_ssl_auth.pb.h"
+#include "envoy/extensions/filters/network/client_ssl_auth/v3alpha/client_ssl_auth.pb.h"
 #include "envoy/network/connection.h"
 #include "envoy/stats/scope.h"
 
@@ -22,7 +22,7 @@ namespace NetworkFilters {
 namespace ClientSslAuth {
 
 ClientSslAuthConfig::ClientSslAuthConfig(
-    const envoy::config::filter::network::client_ssl_auth::v2::ClientSSLAuth& config,
+    const envoy::extensions::filters::network::client_ssl_auth::v3alpha::ClientSSLAuth& config,
     ThreadLocal::SlotAllocator& tls, Upstream::ClusterManager& cm, Event::Dispatcher& dispatcher,
     Stats::Scope& scope, Runtime::RandomGenerator& random)
     : RestApiFetcher(
@@ -43,7 +43,7 @@ ClientSslAuthConfig::ClientSslAuthConfig(
 }
 
 ClientSslAuthConfigSharedPtr ClientSslAuthConfig::create(
-    const envoy::config::filter::network::client_ssl_auth::v2::ClientSSLAuth& config,
+    const envoy::extensions::filters::network::client_ssl_auth::v3alpha::ClientSSLAuth& config,
     ThreadLocal::SlotAllocator& tls, Upstream::ClusterManager& cm, Event::Dispatcher& dispatcher,
     Stats::Scope& scope, Runtime::RandomGenerator& random) {
   ClientSslAuthConfigSharedPtr new_config(
