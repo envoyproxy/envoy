@@ -15,7 +15,7 @@ envoy_cc_library(
     name = "config_lib",
     srcs = ["config.cc"],
     hdrs = ["config.h"],
-    deps = ["@envoy_api//envoy/config/filter/listener/original_src/v2alpha1:pkg_cc_proto"],
+    deps = ["@envoy_api//envoy/extensions/filters/listener/original_src/v3alpha:pkg_cc_proto"],
 )
 
 envoy_cc_library(
@@ -46,6 +46,6 @@ envoy_cc_extension(
         "//include/envoy/registry",
         "//include/envoy/server:filter_config_interface",
         "//source/extensions/filters/listener:well_known_names",
-        "@envoy_api//envoy/config/filter/listener/original_src/v2alpha1:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/listener/original_src/v3alpha:pkg_cc_proto",
     ],
 )

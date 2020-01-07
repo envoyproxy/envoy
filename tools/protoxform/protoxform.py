@@ -33,6 +33,7 @@ from google.protobuf import text_format
 # this also serves as whitelist of extended options.
 from google.api import annotations_pb2 as _
 from validate import validate_pb2 as _
+from envoy.annotations import resource_pb2
 from udpa.annotations import migrate_pb2
 
 CLANG_FORMAT_STYLE = ('{ColumnLimit: 100, SpacesInContainerLiterals: false, '
@@ -125,7 +126,8 @@ def FormatTypeContextComments(type_context, annotation_xforms=None):
 
   Args:
     type_context: contextual information for message/enum/field.
-    annotation_xforms: a dict of transformers for annotations in leading comment.
+    annotation_xforms: a dict of transformers for annotations in leading
+      comment.
 
   Returns:
     Tuple of formatted leading and trailing comment blocks.
@@ -172,7 +174,7 @@ def FormatHeaderFromFile(source_code_info, file_proto):
   options = descriptor_pb2.FileOptions()
   options.java_outer_classname = CamelCase(os.path.basename(file_proto.name))
   options.java_multiple_files = True
-  options.java_package = "io.envoyproxy." + file_proto.package
+  options.java_package = 'io.envoyproxy.' + file_proto.package
 
   # This is a workaround for C#/Ruby namespace conflicts between packages and
   # objects, see https://github.com/envoyproxy/envoy/pull/3854.
@@ -199,9 +201,15 @@ def FormatHeaderFromFile(source_code_info, file_proto):
   google_imports = []
   infra_imports = []
   misc_imports = []
+  public_imports = []
 
-  for d in file_proto.dependency:
-    if d.startswith('envoy/'):
+  for idx, d in enumerate(file_proto.dependency):
+    if idx in file_proto.public_dependency:
+      public_imports.append(d)
+      continue
+    elif d in ['envoy/annotations/resource.proto', 'udpa/annotations/migrate.proto']:
+      infra_imports.append(d)
+    elif d.startswith('envoy/'):
       # We ignore existing envoy/ imports, since these are computed explicitly
       # from type_dependencies.
       pass
@@ -212,8 +220,6 @@ def FormatHeaderFromFile(source_code_info, file_proto):
     elif d in ['udpa/annotations/versioning.proto']:
       # Skip, we decide to add this based on requires_versioning_import
       pass
-    elif d in ['udpa/annotations/migrate.proto']:
-      infra_imports.append(d)
     else:
       misc_imports.append(d)
 
@@ -225,8 +231,14 @@ def FormatHeaderFromFile(source_code_info, file_proto):
       return ''
     return FormatBlock('\n'.join(sorted('import "%s";' % x for x in xs)))
 
+  def FormatPublicImportBlock(xs):
+    if not xs:
+      return ''
+    return FormatBlock('\n'.join(sorted('import public "%s";' % x for x in xs)))
+
   import_block = '\n'.join(
       map(FormatImportBlock, [envoy_imports, google_imports, misc_imports, infra_imports]))
+  import_block += '\n' + FormatPublicImportBlock(public_imports)
   comment_block = FormatComments(source_code_info.file_level_comments)
 
   return ''.join(map(FormatBlock, [file_block, import_block, options_block, comment_block]))
@@ -280,7 +292,7 @@ def NormalizeFieldTypeName(type_context, field_fqn):
 
     # `extensions` is a keyword in proto2, and protoc will throw error if a type name
     # starts with `extensions.`.
-    if normalized_splits[0] == "extensions":
+    if normalized_splits[0] == 'extensions':
       normalized_splits.appendleft(remaining_field_fqn_splits.pop())
 
     return '.'.join(normalized_splits)
@@ -410,7 +422,9 @@ def TextFormatValue(field, value):
 
 
 def FormatOptions(options):
-  """Format *Options (e.g. MessageOptions, FieldOptions) message.
+  """Format *Options (e.g.
+
+  MessageOptions, FieldOptions) message.
 
   Args:
     options: A *Options (e.g. MessageOptions, FieldOptions) message.
@@ -421,15 +435,15 @@ def FormatOptions(options):
 
   formatted_options = []
   for option_descriptor, option_value in sorted(options.ListFields(), key=lambda x: x[0].number):
-    option_name = "({})".format(
+    option_name = '({})'.format(
         option_descriptor.full_name) if option_descriptor.is_extension else option_descriptor.name
     if option_descriptor.message_type and option_descriptor.label != option_descriptor.LABEL_REPEATED:
       formatted_options.extend([
-          "{}.{} = {}".format(option_name, subfield.name, TextFormatValue(subfield, value))
+          '{}.{} = {}'.format(option_name, subfield.name, TextFormatValue(subfield, value))
           for subfield, value in option_value.ListFields()
       ])
     else:
-      formatted_options.append("{} = {}".format(option_name,
+      formatted_options.append('{} = {}'.format(option_name,
                                                 TextFormatValue(option_descriptor, option_value)))
 
   if formatted_options:
@@ -437,7 +451,7 @@ def FormatOptions(options):
       return '[{}]'.format(','.join(formatted_options))
     else:
       return FormatBlock(''.join(
-          "option {};\n".format(formatted_option) for formatted_option in formatted_options))
+          'option {};\n'.format(formatted_option) for formatted_option in formatted_options))
   return ''
 
 
@@ -470,8 +484,9 @@ class ProtoFormatVisitor(visitor.Visitor):
     methods = '\n'.join(
         FormatServiceMethod(type_context.ExtendMethod(index, m.name), m)
         for index, m in enumerate(service_proto.method))
-    return '%sservice %s {\n%s%s\n}\n' % (leading_comment, service_proto.name, trailing_comment,
-                                          methods)
+    options = FormatBlock(FormatOptions(service_proto.options))
+    return '%sservice %s {\n%s%s%s\n}\n' % (leading_comment, service_proto.name, options,
+                                            trailing_comment, methods)
 
   def VisitEnum(self, enum_proto, type_context):
     leading_comment, trailing_comment = FormatTypeContextComments(type_context)
@@ -534,8 +549,8 @@ class ProtoFormatVisitor(visitor.Visitor):
 
 def ParameterCallback(parameter):
   params = dict(param.split('=') for param in parameter.split(','))
-  if params["type_db_path"]:
-    utils.LoadTypeDb(params["type_db_path"])
+  if params['type_db_path']:
+    utils.LoadTypeDb(params['type_db_path'])
 
 
 def Main():

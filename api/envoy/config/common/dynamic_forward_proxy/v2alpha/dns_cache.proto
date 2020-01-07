@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package envoy.config.common.dynamic_forward_proxy.v2alpha;
 
-import "envoy/api/v2/cds.proto";
+import "envoy/api/v2/cluster.proto";
 
 import "google/protobuf/duration.proto";
 import "google/protobuf/wrappers.proto";

@@ -1,8 +1,8 @@
 #include <memory>
 
-#include "envoy/api/v2/auth/cert.pb.h"
-#include "envoy/api/v2/cds.pb.h"
-#include "envoy/api/v2/core/protocol.pb.h"
+#include "envoy/config/cluster/v3alpha/cluster.pb.h"
+#include "envoy/config/core/v3alpha/protocol.pb.h"
+#include "envoy/extensions/transport_sockets/tls/v3alpha/cert.pb.h"
 #include "envoy/upstream/upstream.h"
 
 #include "extensions/transport_sockets/tls/context_config_impl.h"

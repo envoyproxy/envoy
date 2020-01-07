@@ -159,6 +159,7 @@ def envoy_dependencies(skip_targets = []):
     _python_deps()
     _cc_deps()
     _go_deps(skip_targets)
+    _kafka_deps()
 
     switched_rules_by_language(
         name = "com_google_googleapis_imports",
@@ -738,6 +739,43 @@ def _com_github_gperftools_gperftools():
     native.bind(
         name = "gperftools",
         actual = "@envoy//bazel/foreign_cc:gperftools",
+    )
+
+def _kafka_deps():
+    # This archive contains Kafka client source code.
+    # We are using request/response message format files to generate parser code.
+    KAFKASOURCE_BUILD_CONTENT = """
+filegroup(
+    name = "request_protocol_files",
+    srcs = glob(["*Request.json"]),
+    visibility = ["//visibility:public"],
+)
+filegroup(
+    name = "response_protocol_files",
+    srcs = glob(["*Response.json"]),
+    visibility = ["//visibility:public"],
+)
+    """
+    http_archive(
+        name = "kafka_source",
+        build_file_content = KAFKASOURCE_BUILD_CONTENT,
+        **REPOSITORY_LOCATIONS["kafka_source"]
+    )
+
+    # This archive provides Kafka (and Zookeeper) binaries, that are used during Kafka integration
+    # tests.
+    http_archive(
+        name = "kafka_server_binary",
+        build_file_content = BUILD_ALL_CONTENT,
+        **REPOSITORY_LOCATIONS["kafka_server_binary"]
+    )
+
+    # This archive provides Kafka client in Python, so we can use it to interact with Kafka server
+    # during interation tests.
+    http_archive(
+        name = "kafka_python_client",
+        build_file_content = BUILD_ALL_CONTENT,
+        **REPOSITORY_LOCATIONS["kafka_python_client"]
     )
 
 def _foreign_cc_dependencies():

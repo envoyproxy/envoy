@@ -5,7 +5,6 @@
 #include <string>
 #include <vector>
 
-#include "envoy/api/v2/core/address.pb.h"
 #include "envoy/common/exception.h"
 #include "envoy/common/platform.h"
 #include "envoy/config/core/v3alpha/address.pb.h"
@@ -112,10 +111,6 @@ CidrRange CidrRange::create(const std::string& address, int length) {
   return create(Utility::parseInternetAddress(address), length);
 }
 
-CidrRange CidrRange::create(const envoy::api::v2::core::CidrRange& cidr) {
-  return create(Utility::parseInternetAddress(cidr.address_prefix()), cidr.prefix_len().value());
-}
-
 CidrRange CidrRange::create(const envoy::config::core::v3alpha::CidrRange& cidr) {
   return create(Utility::parseInternetAddress(cidr.address_prefix()), cidr.prefix_len().value());
 }
@@ -207,8 +202,8 @@ IpList::IpList(const std::vector<std::string>& subnets) {
   }
 }
 
-IpList::IpList(const Protobuf::RepeatedPtrField<envoy::api::v2::core::CidrRange>& cidrs) {
-  for (const envoy::api::v2::core::CidrRange& entry : cidrs) {
+IpList::IpList(const Protobuf::RepeatedPtrField<envoy::config::core::v3alpha::CidrRange>& cidrs) {
+  for (const envoy::config::core::v3alpha::CidrRange& entry : cidrs) {
     CidrRange list_entry = CidrRange::create(entry);
     if (list_entry.isValid()) {
       ip_list_.push_back(list_entry);
