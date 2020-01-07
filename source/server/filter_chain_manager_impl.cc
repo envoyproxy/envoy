@@ -136,7 +136,7 @@ bool FilterChainManagerImpl::isWildcardServerName(const std::string& name) {
 void FilterChainManagerImpl::addFilterChain(
     absl::Span<const envoy::config::listener::v3alpha::FilterChain* const> filter_chain_span,
     FilterChainFactoryBuilder& filter_chain_factory_builder,
-    FilterChainFactoryContextCallback& callback) {
+    FilterChainFactoryContextCreator& callback) {
   std::unordered_set<envoy::config::listener::v3alpha::FilterChainMatch, MessageUtil, MessageUtil>
       filter_chains;
   for (const auto& filter_chain : filter_chain_span) {
@@ -570,8 +570,8 @@ void FilterChainManagerImpl::convertIPsToTries() {
   }
 }
 
-std::unique_ptr<FilterChainFactoryContextCallback>
-FilterChainManagerImpl::createFilterChainFactoryContextCallback(
+std::unique_ptr<FilterChainFactoryContextCreator>
+FilterChainManagerImpl::createFilterChainFactoryContextCreator(
     Configuration::FactoryContext& parent_context) {
   return std::make_unique<ImmediateAppendFilterChainContextCallbackImpl>(*this, parent_context);
 }
@@ -581,14 +581,14 @@ FilterChainManagerImpl::ImmediateAppendFilterChainContextCallbackImpl::
                                                   Configuration::FactoryContext& parent_context)
     : parent_(parent), parent_context_(parent_context) {}
 
-std::shared_ptr<Configuration::FilterChainFactoryContext> FilterChainManagerImpl::
+Configuration::FilterChainFactoryContext& FilterChainManagerImpl::
     ImmediateAppendFilterChainContextCallbackImpl::createFilterChainFactoryContext(
         const ::envoy::config::listener::v3alpha::FilterChain* const filter_chain) {
   // TODO(lambdai): drain close should be saved in per filter chain context
   UNREFERENCED_PARAMETER(filter_chain);
-  auto res = std::make_shared<FilterChainFactoryContextImpl>(parent_context_);
-  parent_.factory_contexts_.push_back(res);
-  return res;
+  parent_.factory_contexts_.push_back(
+      std::make_shared<FilterChainFactoryContextImpl>(parent_context_));
+  return *parent_.factory_contexts_.back();
 }
 } // namespace Server
 } // namespace Envoy

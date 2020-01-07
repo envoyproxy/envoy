@@ -1,4 +1,5 @@
 #include <chrono>
+#include <functional>
 #include <memory>
 #include <string>
 #include <utility>
@@ -46,7 +47,7 @@ namespace Server {
 class MockFilterChainFactoryBuilder : public FilterChainFactoryBuilder {
   std::unique_ptr<Network::FilterChain>
   buildFilterChain(const envoy::config::listener::v3alpha::FilterChain&,
-                   FilterChainFactoryContextCallback&) const override {
+                   FilterChainFactoryContextCreator&) const override {
     // Won't dereference but requires not nullptr.
     return std::make_unique<Network::MockFilterChain>();
   }
@@ -99,7 +100,7 @@ public:
     filter_chain_manager_.addFilterChain(
         std::vector<const envoy::config::listener::v3alpha::FilterChain*>{&filter_chain},
         filter_chain_factory_builder_,
-        *filter_chain_manager_.createFilterChainFactoryContextCallback(parent_context_));
+        *filter_chain_manager_.createFilterChainFactoryContextCreator(parent_context_));
   }
 
   // Intermediate states.
@@ -143,34 +144,13 @@ TEST_F(FilterChainManagerImplTest, AddSingleFilterChain) {
   EXPECT_NE(filter_chain, nullptr);
 }
 
-TEST_F(FilterChainManagerImplTest, AddZeroFilterChain) {
-  std::vector<std::shared_ptr<Configuration::FilterChainFactoryContext>> contexts;
-  {
-    auto callback = filter_chain_manager_.createFilterChainFactoryContextCallback(parent_context_);
-  }
-  // Successfully reach here.
-  EXPECT_TRUE(contexts.empty());
-}
-
-// The commit filter chain contexts are co-owned by filter chain manager.
-TEST_F(FilterChainManagerImplTest, CommittedFilterChainContext) {
-  std::vector<std::shared_ptr<Configuration::FilterChainFactoryContext>> contexts;
-  {
-    auto callback = filter_chain_manager_.createFilterChainFactoryContextCallback(parent_context_);
-    contexts.push_back(callback->createFilterChainFactoryContext(&filter_chain_template_));
-  }
-  for (const auto& shared_ptr : contexts) {
-    EXPECT_GT(shared_ptr.use_count(), 1);
-  }
-}
-
-// The current implementation generated independent contexts for the same filter_chain
+// The current implementation generates independent contexts for the same filter chain
 TEST_F(FilterChainManagerImplTest, FilterChainContextsAreUnique) {
-  std::set<std::shared_ptr<Configuration::FilterChainFactoryContext>> contexts;
+  std::set<Configuration::FilterChainFactoryContext*> contexts;
   {
-    auto callback = filter_chain_manager_.createFilterChainFactoryContextCallback(parent_context_);
+    auto creator = filter_chain_manager_.createFilterChainFactoryContextCreator(parent_context_);
     for (int i = 0; i < 2; i++) {
-      contexts.insert(callback->createFilterChainFactoryContext(&filter_chain_template_));
+      contexts.insert(&callback->createFilterChainFactoryContext(&filter_chain_template_));
     }
   }
   EXPECT_EQ(contexts.size(), 2);

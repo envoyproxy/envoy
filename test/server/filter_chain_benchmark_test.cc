@@ -12,6 +12,7 @@
 #include "extensions/transport_sockets/well_known_names.h"
 
 #include "test/mocks/network/mocks.h"
+#include "test/mocks/server/mocks.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/utility.h"
 
@@ -26,18 +27,22 @@ namespace Envoy {
 namespace Server {
 
 namespace {
-class EmptyFilterChainFactoryContextCallback : public FilterChainFactoryContextCallback {
+class EmptyFilterChainFactoryContextCreator : public FilterChainFactoryContextCreator {
 public:
-  ~EmptyFilterChainFactoryContextCallback() override = default;
-  std::shared_ptr<Configuration::FilterChainFactoryContext> createFilterChainFactoryContext(
+  ~EmptyFilterChainFactoryContextCreator() override = default;
+  Configuration::FilterChainFactoryContext& createFilterChainFactoryContext(
       const ::envoy::config::listener::v3alpha::FilterChain* const) override {
-    return nullptr;
+    return filter_chain_context_;
   }
+
+private:
+  Configuration::MockFactoryContext parent_context_;
+  FilterChainFactoryContextImpl filter_chain_context_{parent_context_};
 };
 class MockFilterChainFactoryBuilder : public FilterChainFactoryBuilder {
   std::unique_ptr<Network::FilterChain>
   buildFilterChain(const envoy::config::listener::v3alpha::FilterChain&,
-                   FilterChainFactoryContextCallback&) const override {
+                   FilterChainFactoryContextCreator&) const override {
     // A place holder to be found
     return std::make_unique<Network::MockFilterChain>();
   }
@@ -193,15 +198,12 @@ public:
 
 BENCHMARK_DEFINE_F(FilterChainBenchmarkFixture, FilterChainManagerBuildTest)
 (::benchmark::State& state) {
-  EmptyFilterChainFactoryContextCallback callback;
+  EmptyFilterChainFactoryContextCreator creator;
 
   for (auto _ : state) {
     FilterChainManagerImpl filter_chain_manager{
         std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 1234)};
-    filter_chain_manager.addFilterChain(
-        filter_chains_, dummy_builder_,
-        /*filter_chain_manager.createFilterChainFactoryContextCallback()*/
-        callback);
+    filter_chain_manager.addFilterChain(filter_chains_, dummy_builder_, creator);
   }
 }
 
@@ -213,12 +215,12 @@ BENCHMARK_DEFINE_F(FilterChainBenchmarkFixture, FilterChainFindTest)
     sockets.push_back(std::move(*MockConnectionSocket::createMockConnectionSocket(
         10000 + i, "127.0.0.1", "", "tls", {}, "8.8.8.8", 111)));
   }
-  EmptyFilterChainFactoryContextCallback callback;
+  EmptyFilterChainFactoryContextCreator creator;
 
   FilterChainManagerImpl filter_chain_manager{
       std::make_shared<Network::Address::Ipv4Instance>("127.0.0.1", 1234)};
 
-  filter_chain_manager.addFilterChain(filter_chains_, dummy_builder_, callback);
+  filter_chain_manager.addFilterChain(filter_chains_, dummy_builder_, creator);
   for (auto _ : state) {
     for (int i = 0; i < state.range(0); i++) {
       filter_chain_manager.findFilterChain(sockets[i]);

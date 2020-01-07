@@ -232,7 +232,7 @@ ListenerImpl::ListenerImpl(const envoy::config::listener::v3alpha::Listener& con
   ListenerFilterChainFactoryBuilder builder(*this, transport_factory_context);
   filter_chain_manager_.addFilterChain(
       config.filter_chains(), builder,
-      *filter_chain_manager_.createFilterChainFactoryContextCallback(*this));
+      *filter_chain_manager_.createFilterChainFactoryContextCreator(*this));
 
   if (socket_type == Network::Address::SocketType::Datagram) {
     return;

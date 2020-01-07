@@ -26,7 +26,7 @@ public:
   virtual ~FilterChainFactoryBuilder() = default;
   virtual std::unique_ptr<Network::FilterChain>
   buildFilterChain(const envoy::config::listener::v3alpha::FilterChain& filter_chain,
-                   FilterChainFactoryContextCallback& callback) const PURE;
+                   FilterChainFactoryContextCreator& callback) const PURE;
 };
 
 // FilterChainFactoryContextImpl is supposed to be used by network filter chain.
@@ -88,21 +88,21 @@ public:
 
   void addFilterChain(
       absl::Span<const envoy::config::listener::v3alpha::FilterChain* const> filter_chain_span,
-      FilterChainFactoryBuilder& b, FilterChainFactoryContextCallback& callback);
+      FilterChainFactoryBuilder& b, FilterChainFactoryContextCreator& callback);
   static bool isWildcardServerName(const std::string& name);
 
-  std::unique_ptr<FilterChainFactoryContextCallback>
-  createFilterChainFactoryContextCallback(Configuration::FactoryContext& parent_context);
+  std::unique_ptr<FilterChainFactoryContextCreator>
+  createFilterChainFactoryContextCreator(Configuration::FactoryContext& parent_context);
 
   // A naive implementation which commits the context as soon as the context is created.
   // This implementation can support listeners which doesn't transfer the ownership of filter chain
   // context to the descendant listener with new config.
-  class ImmediateAppendFilterChainContextCallbackImpl : public FilterChainFactoryContextCallback {
+  class ImmediateAppendFilterChainContextCallbackImpl : public FilterChainFactoryContextCreator {
   public:
     ImmediateAppendFilterChainContextCallbackImpl(FilterChainManagerImpl& parent,
                                                   Configuration::FactoryContext& parent_context);
     ~ImmediateAppendFilterChainContextCallbackImpl() override = default;
-    std::shared_ptr<Configuration::FilterChainFactoryContext> createFilterChainFactoryContext(
+    Configuration::FilterChainFactoryContext& createFilterChainFactoryContext(
         const ::envoy::config::listener::v3alpha::FilterChain* const filter_chain) override;
 
   private:

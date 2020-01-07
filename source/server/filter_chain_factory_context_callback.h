@@ -11,17 +11,17 @@ namespace Server {
 
 /**
  * Handles FilterChainFactoryContext creation. It is used by listener to adding new filter chain
- * without worrying the lifetime of each factory context.
+ * without worrying about the lifetime of each factory context.
  */
-class FilterChainFactoryContextCallback {
+class FilterChainFactoryContextCreator {
 public:
-  virtual ~FilterChainFactoryContextCallback() = default;
+  virtual ~FilterChainFactoryContextCreator() = default;
 
   /**
    * Generate the filter chain factory context from proto. Note the callback will own the filter
    * chain context.
    */
-  virtual std::shared_ptr<Configuration::FilterChainFactoryContext> createFilterChainFactoryContext(
+  virtual Configuration::FilterChainFactoryContext& createFilterChainFactoryContext(
       const ::envoy::config::listener::v3alpha::FilterChain* const filter_chain) PURE;
 };
 

@@ -764,15 +764,14 @@ ListenerFilterChainFactoryBuilder::ListenerFilterChainFactoryBuilder(
 
 std::unique_ptr<Network::FilterChain> ListenerFilterChainFactoryBuilder::buildFilterChain(
     const envoy::config::listener::v3alpha::FilterChain& filter_chain,
-    FilterChainFactoryContextCallback& callback) const {
-  std::shared_ptr<Configuration::FilterChainFactoryContext> context =
-      callback.createFilterChainFactoryContext(&filter_chain);
-  return buildFilterChainInternal(filter_chain, context);
+    FilterChainFactoryContextCreator& creator) const {
+  return buildFilterChainInternal(filter_chain,
+                                  creator.createFilterChainFactoryContext(&filter_chain));
 }
 
 std::unique_ptr<Network::FilterChain> ListenerFilterChainFactoryBuilder::buildFilterChainInternal(
     const envoy::config::listener::v3alpha::FilterChain& filter_chain,
-    std::shared_ptr<Configuration::FilterChainFactoryContext>& filter_chain_factory_context) const {
+    Configuration::FilterChainFactoryContext& filter_chain_factory_context) const {
   // If the cluster doesn't have transport socket configured, then use the default "raw_buffer"
   // transport socket or BoringSSL-based "tls" transport socket if TLS settings are configured.
   // We copy by value first then override if necessary.
@@ -799,7 +798,7 @@ std::unique_ptr<Network::FilterChain> ListenerFilterChainFactoryBuilder::buildFi
       config_factory.createTransportSocketFactory(*message, factory_context_,
                                                   std::move(server_names)),
       listener_component_factory_.createNetworkFilterFactoryList(filter_chain.filters(),
-                                                                 *filter_chain_factory_context));
+                                                                 filter_chain_factory_context));
 }
 
 Network::ListenSocketFactorySharedPtr ListenerManagerImpl::createListenSocketFactory(
