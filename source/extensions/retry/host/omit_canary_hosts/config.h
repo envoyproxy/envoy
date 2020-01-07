@@ -17,7 +17,9 @@ public:
     return std::make_shared<OmitCanaryHostsRetryPredicate>();
   }
 
-  std::string name() override { return RetryHostPredicateValues::get().OmitCanaryHostsPredicate; }
+  std::string name() const override {
+    return RetryHostPredicateValues::get().OmitCanaryHostsPredicate;
+  }
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
     return std::make_unique<envoy::config::retry::omit_canary_hosts::OmitCanaryHostsPredicate>();

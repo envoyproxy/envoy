@@ -8,6 +8,7 @@ from tools.api_proto_plugin import visitor
 from tools.protoxform import options
 from tools.protoxform import utils
 
+from envoy.annotations import resource_pb2
 from udpa.annotations import migrate_pb2
 from google.api import annotations_pb2
 
@@ -53,13 +54,20 @@ class UpgradeVisitor(visitor.Visitor):
   def _UpgradedPostMethod(self, m):
     return re.sub(r'^/v2/', '/v3alpha/', m)
 
+  # Upgraded type using canonical type naming, e.g. foo.bar.
+  def _UpgradedTypeCanonical(self, t):
+    if not t.startswith('envoy'):
+      return t
+    type_desc = self._typedb.types[t]
+    if type_desc.next_version_type_name:
+      return type_desc.next_version_type_name
+    return t
+
+  # Upgraded type using internal type naming, e.g. .foo.bar.
   def _UpgradedType(self, t):
     if not t.startswith('.envoy'):
       return t
-    type_desc = self._typedb.types[t[1:]]
-    if type_desc.next_version_type_name:
-      return '.' + type_desc.next_version_type_name
-    return t
+    return '.' + self._UpgradedTypeCanonical(t[1:])
 
   def _Deprecate(self, proto, field_or_value):
     """Deprecate a field or value in a message/enum proto.
@@ -118,6 +126,9 @@ class UpgradeVisitor(visitor.Visitor):
         http_options.post = self._UpgradedPostMethod(http_options.post)
       m.input_type = self._UpgradedType(m.input_type)
       m.output_type = self._UpgradedType(m.output_type)
+    if service_proto.options.HasExtension(resource_pb2.resource):
+      upgraded_proto.options.Extensions[resource_pb2.resource].type = self._UpgradedTypeCanonical(
+          service_proto.options.Extensions[resource_pb2.resource].type)
     return upgraded_proto
 
   def VisitMessage(self, msg_proto, type_context, nested_msgs, nested_enums):

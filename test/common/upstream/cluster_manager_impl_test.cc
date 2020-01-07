@@ -2736,7 +2736,7 @@ public:
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
     return std::make_unique<Envoy::ProtobufWkt::Empty>();
   }
-  std::string name() override { return "envoy.test.filter"; }
+  std::string name() const override { return "envoy.test.filter"; }
 };
 
 // Verify that configured upstream filters are added to client connections.

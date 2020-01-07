@@ -753,6 +753,14 @@ int ServerConnectionImpl::onHeadersComplete(HeaderMapImplPtr&& headers) {
 
     headers->setMethod(method_string);
 
+    // Make sure the host is valid.
+    auto details = HeaderUtility::requestHeadersValid(*headers);
+    if (details.has_value()) {
+      sendProtocolError(details.value().get());
+      throw CodecProtocolException(
+          "http/1.1 protocol error: request headers failed spec compliance checks");
+    }
+
     // Determine here whether we have a body or not. This uses the new RFC semantics where the
     // presence of content-length or chunked transfer-encoding indicates a body vs. a particular
     // method. If there is no body, we defer raising decodeHeaders() until the parser is flushed
@@ -944,7 +952,7 @@ void ClientConnectionImpl::onMessageComplete(HeaderMapImplPtr&& trailers) {
     // reused, unwind any outstanding readDisable() calls here. Only do this if there are no
     // pipelined responses remaining. Also do this before we dispatch end_stream in case the caller
     // immediately reuses the connection.
-    if (pending_responses_.empty()) {
+    if (connection_.state() == Network::Connection::State::Open && pending_responses_.empty()) {
       while (!connection_.readEnabled()) {
         connection_.readDisable(false);
       }

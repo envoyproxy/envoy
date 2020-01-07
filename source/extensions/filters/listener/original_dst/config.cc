@@ -30,7 +30,7 @@ public:
     return std::make_unique<envoy::config::filter::listener::original_dst::v2::OriginalDst>();
   }
 
-  std::string name() override { return ListenerFilterNames::get().OriginalDst; }
+  std::string name() const override { return ListenerFilterNames::get().OriginalDst; }
 };
 
 /**

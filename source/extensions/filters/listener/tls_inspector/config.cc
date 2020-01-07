@@ -31,7 +31,7 @@ public:
     return std::make_unique<envoy::config::filter::listener::tls_inspector::v2::TlsInspector>();
   }
 
-  std::string name() override { return ListenerFilterNames::get().TlsInspector; }
+  std::string name() const override { return ListenerFilterNames::get().TlsInspector; }
 };
 
 /**

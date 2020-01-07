@@ -29,7 +29,7 @@ public:
     return std::make_unique<envoy::config::filter::listener::proxy_protocol::v2::ProxyProtocol>();
   }
 
-  std::string name() override { return ListenerFilterNames::get().ProxyProtocol; }
+  std::string name() const override { return ListenerFilterNames::get().ProxyProtocol; }
 };
 
 /**

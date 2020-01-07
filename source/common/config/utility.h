@@ -194,7 +194,7 @@ public:
    * @param name string identifier for the particular implementation. Note: this is a proto string
    * because it is assumed that this value will be pulled directly from the configuration proto.
    */
-  template <class Factory> static Factory& getAndCheckFactory(const std::string& name) {
+  template <class Factory> static Factory& getAndCheckFactoryByName(const std::string& name) {
     if (name.empty()) {
       throw EnvoyException("Provided name for static registration lookup was empty.");
     }
@@ -207,6 +207,16 @@ public:
     }
 
     return *factory;
+  }
+
+  /**
+   * Get a Factory from the registry with error checking to ensure the name and the factory are
+   * valid.
+   * @param message proto that contains fields 'name' and 'typed_config'.
+   */
+  template <class Factory, class ProtoMessage>
+  static Factory& getAndCheckFactory(const ProtoMessage& message) {
+    return Utility::getAndCheckFactoryByName<Factory>(message.name());
   }
 
   /**

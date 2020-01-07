@@ -8,6 +8,8 @@ import "google/api/annotations.proto";
 
 import "udpa/annotations/versioning.proto";
 
+import "envoy/annotations/resource.proto";
+
 option java_package = "io.envoyproxy.envoy.service.route.v3alpha";
 option java_outer_classname = "SrdsProto";
 option java_multiple_files = true;
@@ -24,6 +26,8 @@ option java_generic_services = true;
 // :ref:`RouteConfiguration<envoy_api_msg_config.route.v3alpha.RouteConfiguration>` message) to each
 // HTTP request.
 service ScopedRoutesDiscoveryService {
+  option (envoy.annotations.resource).type = "envoy.config.route.v3alpha.ScopedRouteConfiguration";
+
   rpc StreamScopedRoutes(stream discovery.v3alpha.DiscoveryRequest)
       returns (stream discovery.v3alpha.DiscoveryResponse) {
   }

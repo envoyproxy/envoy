@@ -423,7 +423,7 @@ public:
     return std::make_shared<NiceMock<MockRetryHostPredicate>>();
   }
 
-  std::string name() override { return "envoy.test_host_predicate"; }
+  std::string name() const override { return "envoy.test_host_predicate"; }
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
     return ProtobufTypes::MessagePtr{new Envoy::ProtobufWkt::Empty()};
   }
