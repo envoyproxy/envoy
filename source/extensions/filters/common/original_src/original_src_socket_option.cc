@@ -1,6 +1,6 @@
 #include "extensions/filters/common/original_src/original_src_socket_option.h"
 
-#include "envoy/api/v2/core/base.pb.h"
+#include "envoy/config/core/v3alpha/base.pb.h"
 
 #include "common/common/assert.h"
 
@@ -18,9 +18,9 @@ OriginalSrcSocketOption::OriginalSrcSocketOption(
 }
 
 bool OriginalSrcSocketOption::setOption(
-    Network::Socket& socket, envoy::api::v2::core::SocketOption::SocketState state) const {
+    Network::Socket& socket, envoy::config::core::v3alpha::SocketOption::SocketState state) const {
 
-  if (state == envoy::api::v2::core::SocketOption::STATE_PREBIND) {
+  if (state == envoy::config::core::v3alpha::SocketOption::STATE_PREBIND) {
     socket.setLocalAddress(src_address_);
   }
 
@@ -52,9 +52,8 @@ void OriginalSrcSocketOption::hashKey(std::vector<uint8_t>& key) const {
   }
 }
 
-absl::optional<Network::Socket::Option::Details>
-OriginalSrcSocketOption::getOptionDetails(const Network::Socket&,
-                                          envoy::api::v2::core::SocketOption::SocketState) const {
+absl::optional<Network::Socket::Option::Details> OriginalSrcSocketOption::getOptionDetails(
+    const Network::Socket&, envoy::config::core::v3alpha::SocketOption::SocketState) const {
   // no details for this option.
   return absl::nullopt;
 }

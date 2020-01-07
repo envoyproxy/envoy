@@ -3,7 +3,7 @@
 #include <functional>
 #include <string>
 
-#include "envoy/api/v2/auth/cert.pb.h"
+#include "envoy/extensions/transport_sockets/tls/v3alpha/cert.pb.h"
 #include "envoy/ssl/certificate_validation_context_config.h"
 #include "envoy/ssl/connection.h"
 #include "envoy/ssl/context.h"
@@ -104,6 +104,7 @@ public:
   MOCK_CONST_METHOD0(minProtocolVersion, unsigned());
   MOCK_CONST_METHOD0(maxProtocolVersion, unsigned());
   MOCK_CONST_METHOD0(isReady, bool());
+  MOCK_CONST_METHOD0(sessionTimeout, absl::optional<std::chrono::seconds>());
   MOCK_METHOD1(setSecretUpdateCallback, void(std::function<void()> callback));
 
   MOCK_CONST_METHOD0(requireClientCertificate, bool());
@@ -115,10 +116,11 @@ public:
   MockPrivateKeyMethodManager();
   ~MockPrivateKeyMethodManager() override;
 
-  MOCK_METHOD2(createPrivateKeyMethodProvider,
-               PrivateKeyMethodProviderSharedPtr(
-                   const envoy::api::v2::auth::PrivateKeyProvider& config,
-                   Envoy::Server::Configuration::TransportSocketFactoryContext& factory_context));
+  MOCK_METHOD2(
+      createPrivateKeyMethodProvider,
+      PrivateKeyMethodProviderSharedPtr(
+          const envoy::extensions::transport_sockets::tls::v3alpha::PrivateKeyProvider& config,
+          Envoy::Server::Configuration::TransportSocketFactoryContext& factory_context));
 };
 
 class MockPrivateKeyMethodProvider : public PrivateKeyMethodProvider {

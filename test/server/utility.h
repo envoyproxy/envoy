@@ -2,7 +2,7 @@
 
 #include <string>
 
-#include "envoy/api/v2/lds.pb.h"
+#include "envoy/config/listener/v3alpha/listener.pb.h"
 
 #include "common/protobuf/utility.h"
 
@@ -12,8 +12,8 @@ namespace Envoy {
 namespace Server {
 namespace {
 
-inline envoy::api::v2::Listener parseListenerFromV2Yaml(const std::string& yaml) {
-  envoy::api::v2::Listener listener;
+inline envoy::config::listener::v3alpha::Listener parseListenerFromV2Yaml(const std::string& yaml) {
+  envoy::config::listener::v3alpha::Listener listener;
   TestUtility::loadFromYaml(yaml, listener);
   return listener;
 }

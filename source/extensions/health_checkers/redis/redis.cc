@@ -1,9 +1,10 @@
 #include "extensions/health_checkers/redis/redis.h"
 
-#include "envoy/api/v2/core/health_check.pb.h"
-#include "envoy/config/filter/network/redis_proxy/v2/redis_proxy.pb.validate.h"
+#include "envoy/config/core/v3alpha/health_check.pb.h"
 #include "envoy/config/health_checker/redis/v2/redis.pb.h"
-#include "envoy/data/core/v2alpha/health_check_event.pb.h"
+#include "envoy/data/core/v3alpha/health_check_event.pb.h"
+#include "envoy/extensions/filters/network/redis_proxy/v3alpha/redis_proxy.pb.h"
+#include "envoy/extensions/filters/network/redis_proxy/v3alpha/redis_proxy.pb.validate.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -11,7 +12,7 @@ namespace HealthCheckers {
 namespace RedisHealthChecker {
 
 RedisHealthChecker::RedisHealthChecker(
-    const Upstream::Cluster& cluster, const envoy::api::v2::core::HealthCheck& config,
+    const Upstream::Cluster& cluster, const envoy::config::core::v3alpha::HealthCheck& config,
     const envoy::config::health_checker::redis::v2::Redis& redis_config,
     Event::Dispatcher& dispatcher, Runtime::Loader& runtime, Runtime::RandomGenerator& random,
     Upstream::HealthCheckEventLoggerPtr&& event_logger, Api::Api& api,
@@ -92,7 +93,7 @@ void RedisHealthChecker::RedisActiveHealthCheckSession::onResponse(
         value->asInteger() == 0) {
       handleSuccess();
     } else {
-      handleFailure(envoy::data::core::v2alpha::HealthCheckFailureType::ACTIVE);
+      handleFailure(envoy::data::core::v3alpha::ACTIVE);
     }
     break;
   case Type::Ping:
@@ -100,7 +101,7 @@ void RedisHealthChecker::RedisActiveHealthCheckSession::onResponse(
         value->asString() == "PONG") {
       handleSuccess();
     } else {
-      handleFailure(envoy::data::core::v2alpha::HealthCheckFailureType::ACTIVE);
+      handleFailure(envoy::data::core::v3alpha::ACTIVE);
     }
     break;
   default:
@@ -114,7 +115,7 @@ void RedisHealthChecker::RedisActiveHealthCheckSession::onResponse(
 
 void RedisHealthChecker::RedisActiveHealthCheckSession::onFailure() {
   current_request_ = nullptr;
-  handleFailure(envoy::data::core::v2alpha::HealthCheckFailureType::NETWORK);
+  handleFailure(envoy::data::core::v3alpha::NETWORK);
 }
 
 bool RedisHealthChecker::RedisActiveHealthCheckSession::onRedirection(

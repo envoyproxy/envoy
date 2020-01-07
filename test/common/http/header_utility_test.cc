@@ -1,7 +1,7 @@
 #include <regex>
 #include <vector>
 
-#include "envoy/api/v2/route/route.pb.h"
+#include "envoy/config/route/v3alpha/route_components.pb.h"
 #include "envoy/json/json_object.h"
 
 #include "common/http/header_utility.h"
@@ -14,8 +14,8 @@
 namespace Envoy {
 namespace Http {
 
-envoy::api::v2::route::HeaderMatcher parseHeaderMatcherFromYaml(const std::string& yaml) {
-  envoy::api::v2::route::HeaderMatcher header_matcher;
+envoy::config::route::v3alpha::HeaderMatcher parseHeaderMatcherFromYaml(const std::string& yaml) {
+  envoy::config::route::v3alpha::HeaderMatcher header_matcher;
   TestUtility::loadFromYaml(yaml, header_matcher);
   return header_matcher;
 }
@@ -464,11 +464,9 @@ TEST(HeaderIsValidTest, ValidHeaderValuesAreAccepted) {
   EXPECT_TRUE(HeaderUtility::headerIsValid("Some Other Value"));
 }
 
-TEST(HeaderIsValidTest, AuthIsValid) {
+TEST(HeaderIsValidTest, AuthorityIsValid) {
   EXPECT_TRUE(HeaderUtility::authorityIsValid("strangebutlegal$-%&'"));
   EXPECT_FALSE(HeaderUtility::authorityIsValid("illegal{}"));
-  // Full checks are done by Http2CodecImplTest.CheckAuthority, cross checking
-  // against nghttp2 compliance.
 }
 
 TEST(HeaderAddTest, HeaderAdd) {

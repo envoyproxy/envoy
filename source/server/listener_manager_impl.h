@@ -2,12 +2,12 @@
 
 #include <memory>
 
-#include "envoy/admin/v2alpha/config_dump.pb.h"
-#include "envoy/api/v2/core/address.pb.h"
-#include "envoy/api/v2/core/base.pb.h"
-#include "envoy/api/v2/core/config_source.pb.h"
-#include "envoy/api/v2/lds.pb.h"
-#include "envoy/api/v2/listener/listener.pb.h"
+#include "envoy/admin/v3alpha/config_dump.pb.h"
+#include "envoy/config/core/v3alpha/address.pb.h"
+#include "envoy/config/core/v3alpha/base.pb.h"
+#include "envoy/config/core/v3alpha/config_source.pb.h"
+#include "envoy/config/listener/v3alpha/listener.pb.h"
+#include "envoy/config/listener/v3alpha/listener_components.pb.h"
 #include "envoy/network/filter.h"
 #include "envoy/network/listen_socket.h"
 #include "envoy/server/filter_config.h"
@@ -44,40 +44,40 @@ public:
    * Static worker for createNetworkFilterFactoryList() that can be used directly in tests.
    */
   static std::vector<Network::FilterFactoryCb> createNetworkFilterFactoryList_(
-      const Protobuf::RepeatedPtrField<envoy::api::v2::listener::Filter>& filters,
+      const Protobuf::RepeatedPtrField<envoy::config::listener::v3alpha::Filter>& filters,
       Configuration::FactoryContext& context);
   /**
    * Static worker for createListenerFilterFactoryList() that can be used directly in tests.
    */
   static std::vector<Network::ListenerFilterFactoryCb> createListenerFilterFactoryList_(
-      const Protobuf::RepeatedPtrField<envoy::api::v2::listener::ListenerFilter>& filters,
+      const Protobuf::RepeatedPtrField<envoy::config::listener::v3alpha::ListenerFilter>& filters,
       Configuration::ListenerFactoryContext& context);
 
   /**
    * Static worker for createUdpListenerFilterFactoryList() that can be used directly in tests.
    */
   static std::vector<Network::UdpListenerFilterFactoryCb> createUdpListenerFilterFactoryList_(
-      const Protobuf::RepeatedPtrField<envoy::api::v2::listener::ListenerFilter>& filters,
+      const Protobuf::RepeatedPtrField<envoy::config::listener::v3alpha::ListenerFilter>& filters,
       Configuration::ListenerFactoryContext& context);
 
   // Server::ListenerComponentFactory
-  LdsApiPtr createLdsApi(const envoy::api::v2::core::ConfigSource& lds_config) override {
+  LdsApiPtr createLdsApi(const envoy::config::core::v3alpha::ConfigSource& lds_config) override {
     return std::make_unique<LdsApiImpl>(
         lds_config, server_.clusterManager(), server_.initManager(), server_.stats(),
         server_.listenerManager(), server_.messageValidationContext().dynamicValidationVisitor());
   }
   std::vector<Network::FilterFactoryCb> createNetworkFilterFactoryList(
-      const Protobuf::RepeatedPtrField<envoy::api::v2::listener::Filter>& filters,
+      const Protobuf::RepeatedPtrField<envoy::config::listener::v3alpha::Filter>& filters,
       Configuration::FactoryContext& context) override {
     return createNetworkFilterFactoryList_(filters, context);
   }
   std::vector<Network::ListenerFilterFactoryCb> createListenerFilterFactoryList(
-      const Protobuf::RepeatedPtrField<envoy::api::v2::listener::ListenerFilter>& filters,
+      const Protobuf::RepeatedPtrField<envoy::config::listener::v3alpha::ListenerFilter>& filters,
       Configuration::ListenerFactoryContext& context) override {
     return createListenerFilterFactoryList_(filters, context);
   }
   std::vector<Network::UdpListenerFilterFactoryCb> createUdpListenerFilterFactoryList(
-      const Protobuf::RepeatedPtrField<envoy::api::v2::listener::ListenerFilter>& filters,
+      const Protobuf::RepeatedPtrField<envoy::config::listener::v3alpha::ListenerFilter>& filters,
       Configuration::ListenerFactoryContext& context) override {
     return createUdpListenerFilterFactoryList_(filters, context);
   }
@@ -87,7 +87,8 @@ public:
                                               const Network::Socket::OptionsSharedPtr& options,
                                               const ListenSocketCreationParams& params) override;
 
-  DrainManagerPtr createDrainManager(envoy::api::v2::Listener::DrainType drain_type) override;
+  DrainManagerPtr
+  createDrainManager(envoy::config::listener::v3alpha::Listener::DrainType drain_type) override;
   uint64_t nextListenerTag() override { return next_listener_tag_++; }
 
 private:
@@ -130,9 +131,9 @@ public:
   void onListenerWarmed(ListenerImpl& listener);
 
   // Server::ListenerManager
-  bool addOrUpdateListener(const envoy::api::v2::Listener& config, const std::string& version_info,
-                           bool added_via_api) override;
-  void createLdsApi(const envoy::api::v2::core::ConfigSource& lds_config) override {
+  bool addOrUpdateListener(const envoy::config::listener::v3alpha::Listener& config,
+                           const std::string& version_info, bool added_via_api) override;
+  void createLdsApi(const envoy::config::core::v3alpha::ConfigSource& lds_config) override {
     ASSERT(lds_api_ == nullptr);
     lds_api_ = factory_.createLdsApi(lds_config);
   }
@@ -152,7 +153,7 @@ public:
 private:
   using ListenerList = std::list<ListenerImplPtr>;
 
-  bool addOrUpdateListenerInternal(const envoy::api::v2::Listener& config,
+  bool addOrUpdateListenerInternal(const envoy::config::listener::v3alpha::Listener& config,
                                    const std::string& version_info, bool added_via_api,
                                    const std::string& name);
   struct DrainingListener {
@@ -177,13 +178,13 @@ private:
     stats_.total_listeners_warming_.set(warming_listeners_.size());
     stats_.total_listeners_active_.set(active_listeners_.size());
   }
-  bool listenersStopped(const envoy::api::v2::Listener& config) {
+  bool listenersStopped(const envoy::config::listener::v3alpha::Listener& config) {
     // Currently all listeners in a given direction are stopped because of the way admin
     // drain_listener functionality is implemented. This needs to be revisited, if that changes - if
     // we support drain by listener name,for example.
     return stop_listeners_type_ == StopListenersType::All ||
            (stop_listeners_type_ == StopListenersType::InboundOnly &&
-            config.traffic_direction() == envoy::api::v2::core::TrafficDirection::INBOUND);
+            config.traffic_direction() == envoy::config::core::v3alpha::INBOUND);
   }
 
   /**
@@ -211,7 +212,7 @@ private:
   ListenerList::iterator getListenerByName(ListenerList& listeners, const std::string& name);
 
   Network::ListenSocketFactorySharedPtr
-  createListenSocketFactory(const envoy::api::v2::core::Address& proto_address,
+  createListenSocketFactory(const envoy::config::core::v3alpha::Address& proto_address,
                             ListenerImpl& listener, bool reuse_port);
 
   // Active listeners are listeners that are currently accepting new connections on the workers.
@@ -233,7 +234,7 @@ private:
   ConfigTracker::EntryOwnerPtr config_tracker_entry_;
   LdsApiPtr lds_api_;
   const bool enable_dispatcher_stats_{};
-  using UpdateFailureState = envoy::admin::v2alpha::UpdateFailureState;
+  using UpdateFailureState = envoy::admin::v3alpha::UpdateFailureState;
   absl::flat_hash_map<std::string, std::unique_ptr<UpdateFailureState>> error_state_tracker_;
   FailureStates overall_error_state_;
 };
@@ -242,8 +243,8 @@ class ListenerFilterChainFactoryBuilder : public FilterChainFactoryBuilder {
 public:
   ListenerFilterChainFactoryBuilder(
       ListenerImpl& listener, Configuration::TransportSocketFactoryContextImpl& factory_context);
-  std::unique_ptr<Network::FilterChain>
-  buildFilterChain(const ::envoy::api::v2::listener::FilterChain& filter_chain) const override;
+  std::unique_ptr<Network::FilterChain> buildFilterChain(
+      const envoy::config::listener::v3alpha::FilterChain& filter_chain) const override;
 
 private:
   ListenerImpl& parent_;

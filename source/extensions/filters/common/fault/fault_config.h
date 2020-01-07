@@ -1,8 +1,8 @@
 #pragma once
 
-#include "envoy/config/filter/fault/v2/fault.pb.h"
+#include "envoy/extensions/filters/common/fault/v3alpha/fault.pb.h"
 #include "envoy/http/header_map.h"
-#include "envoy/type/percent.pb.h"
+#include "envoy/type/v3alpha/percent.pb.h"
 
 #include "common/http/headers.h"
 #include "common/singleton/const_singleton.h"
@@ -29,9 +29,10 @@ using HeaderNames = ConstSingleton<HeaderNameValues>;
  */
 class FaultDelayConfig {
 public:
-  FaultDelayConfig(const envoy::config::filter::fault::v2::FaultDelay& delay_config);
+  FaultDelayConfig(
+      const envoy::extensions::filters::common::fault::v3alpha::FaultDelay& delay_config);
 
-  const envoy::type::FractionalPercent& percentage() const { return percentage_; }
+  const envoy::type::v3alpha::FractionalPercent& percentage() const { return percentage_; }
   absl::optional<std::chrono::milliseconds> duration(const Http::HeaderEntry* header) const {
     return provider_->duration(header);
   }
@@ -73,7 +74,7 @@ private:
   using DelayProviderPtr = std::unique_ptr<DelayProvider>;
 
   DelayProviderPtr provider_;
-  const envoy::type::FractionalPercent percentage_;
+  const envoy::type::v3alpha::FractionalPercent percentage_;
 };
 
 using FaultDelayConfigPtr = std::unique_ptr<FaultDelayConfig>;
@@ -84,9 +85,10 @@ using FaultDelayConfigSharedPtr = std::shared_ptr<FaultDelayConfig>;
  */
 class FaultRateLimitConfig {
 public:
-  FaultRateLimitConfig(const envoy::config::filter::fault::v2::FaultRateLimit& rate_limit_config);
+  FaultRateLimitConfig(
+      const envoy::extensions::filters::common::fault::v3alpha::FaultRateLimit& rate_limit_config);
 
-  const envoy::type::FractionalPercent& percentage() const { return percentage_; }
+  const envoy::type::v3alpha::FractionalPercent& percentage() const { return percentage_; }
   absl::optional<uint64_t> rateKbps(const Http::HeaderEntry* header) const {
     return provider_->rateKbps(header);
   }
@@ -123,7 +125,7 @@ private:
   using RateLimitProviderPtr = std::unique_ptr<RateLimitProvider>;
 
   RateLimitProviderPtr provider_;
-  const envoy::type::FractionalPercent percentage_;
+  const envoy::type::v3alpha::FractionalPercent percentage_;
 };
 
 using FaultRateLimitConfigPtr = std::unique_ptr<FaultRateLimitConfig>;

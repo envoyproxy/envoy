@@ -1,6 +1,6 @@
-#include "envoy/api/v2/core/grpc_service.pb.h"
-#include "envoy/config/filter/network/ext_authz/v2/ext_authz.pb.h"
-#include "envoy/config/filter/network/ext_authz/v2/ext_authz.pb.validate.h"
+#include "envoy/config/core/v3alpha/grpc_service.pb.h"
+#include "envoy/extensions/filters/network/ext_authz/v3alpha/ext_authz.pb.h"
+#include "envoy/extensions/filters/network/ext_authz/v3alpha/ext_authz.pb.validate.h"
 #include "envoy/stats/scope.h"
 
 #include "extensions/filters/network/ext_authz/config.h"
@@ -21,7 +21,7 @@ namespace ExtAuthz {
 TEST(ExtAuthzFilterConfigTest, ValidateFail) {
   NiceMock<Server::Configuration::MockFactoryContext> context;
   EXPECT_THROW(ExtAuthzConfigFactory().createFilterFactoryFromProto(
-                   envoy::config::filter::network::ext_authz::v2::ExtAuthz(), context),
+                   envoy::extensions::filters::network::ext_authz::v3alpha::ExtAuthz(), context),
                ProtoValidationException);
 }
 
@@ -42,7 +42,7 @@ TEST(ExtAuthzFilterConfigTest, ExtAuthzCorrectProto) {
   NiceMock<Server::Configuration::MockFactoryContext> context;
 
   EXPECT_CALL(context.cluster_manager_.async_client_manager_, factoryForGrpcService(_, _, _))
-      .WillOnce(Invoke([](const envoy::api::v2::core::GrpcService&, Stats::Scope&, bool) {
+      .WillOnce(Invoke([](const envoy::config::core::v3alpha::GrpcService&, Stats::Scope&, bool) {
         return std::make_unique<NiceMock<Grpc::MockAsyncClientFactory>>();
       }));
   Network::FilterFactoryCb cb = factory.createFilterFactoryFromProto(*proto_config, context);

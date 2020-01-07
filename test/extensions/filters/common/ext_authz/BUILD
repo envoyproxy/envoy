@@ -21,8 +21,8 @@ envoy_cc_test(
         "//test/mocks/stream_info:stream_info_mocks",
         "//test/mocks/upstream:upstream_mocks",
         "//test/test_common:utility_lib",
-        "@envoy_api//envoy/api/v2/core:pkg_cc_proto",
-        "@envoy_api//envoy/service/auth/v2:pkg_cc_proto",
+        "@envoy_api//envoy/config/core/v3alpha:pkg_cc_proto",
+        "@envoy_api//envoy/service/auth/v3alpha:pkg_cc_proto",
     ],
 )
 
@@ -32,9 +32,9 @@ envoy_cc_test(
     deps = [
         "//source/extensions/filters/common/ext_authz:ext_authz_grpc_lib",
         "//test/extensions/filters/common/ext_authz:ext_authz_test_common",
-        "@envoy_api//envoy/service/auth/v2:pkg_cc_proto",
         "@envoy_api//envoy/service/auth/v2alpha:pkg_cc_proto",
-        "@envoy_api//envoy/type:pkg_cc_proto",
+        "@envoy_api//envoy/service/auth/v3alpha:pkg_cc_proto",
+        "@envoy_api//envoy/type/v3alpha:pkg_cc_proto",
     ],
 )
 
@@ -44,8 +44,8 @@ envoy_cc_test(
     deps = [
         "//source/extensions/filters/common/ext_authz:ext_authz_http_lib",
         "//test/extensions/filters/common/ext_authz:ext_authz_test_common",
-        "@envoy_api//envoy/config/filter/http/ext_authz/v2:pkg_cc_proto",
-        "@envoy_api//envoy/service/auth/v2:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/http/ext_authz/v3alpha:pkg_cc_proto",
+        "@envoy_api//envoy/service/auth/v3alpha:pkg_cc_proto",
     ],
 )
 
@@ -55,7 +55,7 @@ envoy_cc_mock(
     hdrs = ["mocks.h"],
     deps = [
         "//source/extensions/filters/common/ext_authz:ext_authz_interface",
-        "@envoy_api//envoy/service/auth/v2:pkg_cc_proto",
+        "@envoy_api//envoy/service/auth/v3alpha:pkg_cc_proto",
     ],
 )
 
@@ -70,8 +70,8 @@ envoy_cc_mock(
         "//test/extensions/filters/common/ext_authz:ext_authz_mocks",
         "//test/mocks/grpc:grpc_mocks",
         "//test/mocks/upstream:upstream_mocks",
-        "@envoy_api//envoy/api/v2/core:pkg_cc_proto",
-        "@envoy_api//envoy/service/auth/v2:pkg_cc_proto",
-        "@envoy_api//envoy/type:pkg_cc_proto",
+        "@envoy_api//envoy/config/core/v3alpha:pkg_cc_proto",
+        "@envoy_api//envoy/service/auth/v3alpha:pkg_cc_proto",
+        "@envoy_api//envoy/type/v3alpha:pkg_cc_proto",
     ],
 )

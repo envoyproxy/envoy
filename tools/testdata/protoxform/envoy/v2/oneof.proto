@@ -1,0 +1,15 @@
+syntax = "proto3";
+
+package envoy.v2;
+
+import "udpa/annotations/migrate.proto";
+
+message OneofExample {
+  string foo = 1 [(udpa.annotations.field_migrate).oneof_promotion = "baz_specifier"];
+
+  oneof bar_specifier {
+    string bar = 2;
+  }
+
+  string blah = 3 [(udpa.annotations.field_migrate).oneof_promotion = "bar_specifier"];
+}

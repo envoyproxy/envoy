@@ -12,8 +12,8 @@ def ProtoFileCanonicalFromLabel(label):
     A string with the path, e.g. for @envoy_api//envoy/type/matcher:metadata.proto
     this would be envoy/type/matcher/matcher.proto.
   """
-  assert (label.startswith('@envoy_api//'))
-  return label[len('@envoy_api//'):].replace(':', '/')
+  assert (label.startswith('@envoy_api_canonical//'))
+  return label[len('@envoy_api_canonical//'):].replace(':', '/')
 
 
 def BazelBinPathForOutputArtifact(label, suffix, root=''):
@@ -25,7 +25,7 @@ def BazelBinPathForOutputArtifact(label, suffix, root=''):
     root: location of bazel-bin/, if not specified, PWD.
 
   Returns:
-    Path in bazel-bin/external/envoy_api for label output with given suffix.
+    Path in bazel-bin/external/envoy_api_canonical for label output with given suffix.
   """
   # We use ** glob matching here to deal with the fact that we have something
   # like
@@ -36,5 +36,6 @@ def BazelBinPathForOutputArtifact(label, suffix, root=''):
   # dependencies in the aspect above, they all look the same. So, just pick an
   # arbitrary match and we're done.
   glob_pattern = os.path.join(
-      root, 'bazel-bin/external/envoy_api/**/%s%s' % (ProtoFileCanonicalFromLabel(label), suffix))
+      root, 'bazel-bin/external/envoy_api_canonical/**/%s%s' %
+      (ProtoFileCanonicalFromLabel(label), suffix))
   return glob.glob(glob_pattern, recursive=True)[0]

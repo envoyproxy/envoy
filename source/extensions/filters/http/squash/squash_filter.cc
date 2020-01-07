@@ -2,7 +2,7 @@
 
 #include <memory>
 
-#include "envoy/config/filter/http/squash/v2/squash.pb.h"
+#include "envoy/extensions/filters/http/squash/v3alpha/squash.pb.h"
 #include "envoy/http/codes.h"
 
 #include "common/common/empty_string.h"
@@ -30,7 +30,7 @@ const std::string SquashFilter::ATTACHED_STATE = "attached";
 const std::string SquashFilter::ERROR_STATE = "error";
 
 SquashFilterConfig::SquashFilterConfig(
-    const envoy::config::filter::http::squash::v2::Squash& proto_config,
+    const envoy::extensions::filters::http::squash::v3alpha::Squash& proto_config,
     Upstream::ClusterManager& cluster_manager)
     : cluster_name_(proto_config.cluster()),
       attachment_json_(getAttachment(proto_config.attachment_template())),

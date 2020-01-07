@@ -2,7 +2,7 @@
 
 #include <memory>
 
-#include "envoy/config/bootstrap/v2/bootstrap.pb.h"
+#include "envoy/config/bootstrap/v3alpha/bootstrap.pb.h"
 
 #include "common/common/utility.h"
 #include "common/common/version.h"
@@ -74,7 +74,7 @@ void ValidationInstance::initialize(const Options& options,
   // If we get all the way through that stripped-down initialization flow, to the point where we'd
   // be ready to serve, then the config has passed validation.
   // Handle configuration that needs to take place prior to the main configuration load.
-  envoy::config::bootstrap::v2::Bootstrap bootstrap;
+  envoy::config::bootstrap::v3alpha::Bootstrap bootstrap;
   InstanceUtil::loadBootstrapConfig(bootstrap, options,
                                     messageValidationContext().staticValidationVisitor(), *api_);
 
@@ -94,8 +94,7 @@ void ValidationInstance::initialize(const Options& options,
   thread_local_.registerThread(*dispatcher_, true);
   runtime_loader_ = component_factory.createRuntime(*this, initial_config);
   secret_manager_ = std::make_unique<Secret::SecretManagerImpl>(admin().getConfigTracker());
-  ssl_context_manager_ =
-      createContextManager(Ssl::ContextManagerFactory::name(), api_->timeSource());
+  ssl_context_manager_ = createContextManager("ssl_context_manager", api_->timeSource());
   cluster_manager_factory_ = std::make_unique<Upstream::ValidationClusterManagerFactory>(
       admin(), runtime(), stats(), threadLocal(), random(), dnsResolver(), sslContextManager(),
       dispatcher(), localInfo(), *secret_manager_, messageValidationContext(), *api_, http_context_,
