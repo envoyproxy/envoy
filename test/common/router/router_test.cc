@@ -105,6 +105,9 @@ public:
 
     // Allow any number of setTrackedObject calls for the dispatcher strict mock.
     EXPECT_CALL(callbacks_.dispatcher_, setTrackedObject(_)).Times(AnyNumber());
+
+    // The dispatcher uses the simulated time system.
+    EXPECT_CALL(callbacks_.dispatcher_, timeSource()).WillRepeatedly(ReturnRef(test_time_));
   }
 
   void expectResponseTimerCreate() {
