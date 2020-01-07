@@ -55,7 +55,7 @@ TEST(OmitHostsRetryPredicateTest, PredicateTest) {
 
   ASSERT_TRUE(predicate->shouldSelectAnotherHost(*host1));
 
-  // Test: if host doesn't have mathcing metadata criteria, it should not be rejected.
+  // Test: if host doesn't have matching metadata criteria, it should not be rejected.
   ON_CALL(*host2, metadata())
       .WillByDefault(Return(std::make_shared<envoy::config::core::v3alpha::Metadata>(
           TestUtility::parseYaml<envoy::config::core::v3alpha::Metadata>(
