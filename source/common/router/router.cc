@@ -769,7 +769,7 @@ void Filter::onResponseTimeout() {
       if (cluster_->timeoutBudgetStats().has_value()) {
         // Cancel firing per-try timeout information, because the per-try timeout did not come into
         // play when the global timeout was hit.
-        upstream_request->timeout_budget_stats_->cancel();
+        upstream_request->record_timeout_budget_ = false;
       }
 
       if (upstream_request->upstream_host_) {
@@ -1403,10 +1403,12 @@ uint32_t Filter::numRequestsAwaitingHeaders() {
 Filter::UpstreamRequest::UpstreamRequest(Filter& parent, Http::ConnectionPool::Instance& pool)
     : parent_(parent), conn_pool_(pool), grpc_rq_success_deferred_(false),
       stream_info_(pool.protocol(), parent_.callbacks_->dispatcher().timeSource()),
+      start_time_(parent_.callbacks_->dispatcher().timeSource().monotonicTime()),
       calling_encode_headers_(false), upstream_canary_(false), decode_complete_(false),
       encode_complete_(false), encode_trailers_(false), retried_(false), awaiting_headers_(true),
       outlier_detection_timeout_recorded_(false),
-      create_per_try_timeout_on_request_complete_(false) {
+      create_per_try_timeout_on_request_complete_(false),
+      record_timeout_budget_(parent_.cluster_->timeoutBudgetStats().has_value()) {
   if (parent_.config_.start_child_span_) {
     span_ = parent_.callbacks_->activeSpan().spawnChild(
         parent_.callbacks_->tracingConfig(), "router " + parent.cluster_->name() + " egress",
@@ -1415,23 +1417,6 @@ Filter::UpstreamRequest::UpstreamRequest(Filter& parent, Http::ConnectionPool::I
       // This is a retry request, add this metadata to span.
       span_->setTag(Tracing::Tags::get().RetryCount, std::to_string(parent.attempt_count_ - 1));
     }
-  }
-
-  // If configured, set up the per-try histogram to fire when the UpstreamRequest
-  // completes. This is done via a Cleanup so that it can be cancelled if the global
-  // timeout is what cancels the request instead of the per-try timeout, and then avoid
-  // writing a misleading value into the histogram.
-  if (parent_.cluster_->timeoutBudgetStats().has_value()) {
-    const auto start_time = parent_.callbacks_->dispatcher().timeSource().monotonicTime();
-    timeout_budget_stats_ = std::make_unique<Cleanup>([this, start_time]() {
-      Event::Dispatcher& dispatcher = parent_.callbacks_->dispatcher();
-      const MonotonicTime end_time = dispatcher.timeSource().monotonicTime();
-      const std::chrono::milliseconds response_time =
-          std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time);
-      parent_.cluster_->timeoutBudgetStats()
-          ->upstream_rq_timeout_budget_per_try_percent_used_.recordValue(
-              percentageOfTimeout(response_time, parent_.timeout_.per_try_timeout_));
-    });
   }
 
   stream_info_.healthCheck(parent_.callbacks_->streamInfo().healthCheck());
@@ -1449,6 +1434,18 @@ Filter::UpstreamRequest::~UpstreamRequest() {
     per_try_timeout_->disableTimer();
   }
   clearRequestEncoder();
+
+  // If desired, fire the per-try histogram when the UpstreamRequest
+  // completes.
+  if (record_timeout_budget_) {
+    Event::Dispatcher& dispatcher = parent_.callbacks_->dispatcher();
+    const MonotonicTime end_time = dispatcher.timeSource().monotonicTime();
+    const std::chrono::milliseconds response_time =
+        std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time_);
+    parent_.cluster_->timeoutBudgetStats()
+        ->upstream_rq_timeout_budget_per_try_percent_used_.recordValue(
+            percentageOfTimeout(response_time, parent_.timeout_.per_try_timeout_));
+  }
 
   stream_info_.setUpstreamTiming(upstream_timing_);
   stream_info_.onRequestComplete();

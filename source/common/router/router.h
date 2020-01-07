@@ -471,6 +471,7 @@ private:
     Tracing::SpanPtr span_;
     StreamInfo::StreamInfoImpl stream_info_;
     StreamInfo::UpstreamTiming upstream_timing_;
+    const MonotonicTime start_time_;
     // Copies of upstream headers/trailers. These are only set if upstream
     // access logging is configured.
     Http::HeaderMapPtr upstream_headers_;
@@ -489,10 +490,9 @@ private:
     // had not been completed yet.
     bool create_per_try_timeout_on_request_complete_ : 1;
 
-    // If configured for the cluster, this will fire a histogram to indicate what
-    // percentage of the per-try timeout was used whenever the UpstreamRequest
-    // finishes.
-    std::unique_ptr<Cleanup> timeout_budget_stats_;
+    // Sentinel to indicate if timeout budget tracking is configured for the cluster,
+    // and if so, if the per-try histogram should record a value.
+    bool record_timeout_budget_ : 1;
   };
 
   using UpstreamRequestPtr = std::unique_ptr<UpstreamRequest>;
