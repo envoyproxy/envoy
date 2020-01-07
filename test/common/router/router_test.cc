@@ -221,12 +221,12 @@ public:
     ON_CALL(callbacks_.route_->route_entry_, internalRedirectAction())
         .WillByDefault(Return(InternalRedirectAction::Handle));
     ON_CALL(callbacks_, connection()).WillByDefault(Return(&connection_));
-    setMaxPreviousRedirect(1);
+    setMaxInternalRedirects(1);
   }
 
-  void setMaxPreviousRedirect(uint32_t max_previous_redirect) {
-    ON_CALL(callbacks_.route_->route_entry_, maxPreviousInternalRedirect())
-        .WillByDefault(Return(max_previous_redirect));
+  void setMaxInternalRedirects(uint32_t max_internal_redirects) {
+    ON_CALL(callbacks_.route_->route_entry_, maxInternalRedirects())
+        .WillByDefault(Return(max_internal_redirects));
   }
 
   void setNumPreviousRedirect(uint32_t num_previous_redirects) {
@@ -3126,7 +3126,7 @@ TEST_F(RouterTest, RetryRespectsRetryHostPredicate) {
 
 TEST_F(RouterTest, InternalRedirectRejectedWhenReachingMaxPreviousInternalRedirect) {
   enableRedirects();
-  setMaxPreviousRedirect(3);
+  setMaxInternalRedirects(3);
   setNumPreviousRedirect(3);
   sendRequest();
 
@@ -3223,7 +3223,7 @@ TEST_F(RouterTest, InternalRedirectRejectedWithCrossSchemeRedirect) {
 
 TEST_F(RouterTest, HttpInternalRedirectSucceeded) {
   enableRedirects();
-  setMaxPreviousRedirect(3);
+  setMaxInternalRedirects(3);
   setNumPreviousRedirect(2);
   default_request_headers_.setForwardedProto("http");
   sendRequest();
@@ -3246,7 +3246,7 @@ TEST_F(RouterTest, HttpInternalRedirectSucceeded) {
 TEST_F(RouterTest, HttpsInternalRedirectSucceeded) {
   auto ssl_connection = std::make_shared<Ssl::MockConnectionInfo>();
   enableRedirects();
-  setMaxPreviousRedirect(3);
+  setMaxInternalRedirects(3);
   setNumPreviousRedirect(1);
 
   sendRequest();

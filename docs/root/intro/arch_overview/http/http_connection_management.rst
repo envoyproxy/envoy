@@ -138,7 +138,7 @@ returning the redirected response as the response to the original request.
 
 Internal redirects are configured via the ref:`internal redirect action
 <envoy_api_field_route.RouteAction.internal_redirect_action>` field and
-`max previous internal redirect <envoy_api_field_route.RouteAction.max_previous_internal_redirect>` field in
+`max internal redirects <envoy_api_field_route.RouteAction.max_internal_redirects>` field in
 route configuration. When redirect handling is on, any 302 response from upstream is
 subject to the redirect being handled by Envoy.
 
@@ -149,7 +149,7 @@ For a redirect to be handled successfully it must pass the following checks:
 3. The request must have been fully processed by Envoy.
 4. The request must not have a body.
 5. The number of previously handled internal redirect within a given downstream request does not exceed
-   `max previous internal redirect <envoy_api_field_route.RouteAction.max_previous_internal_redirect>` of the route
+   `max internal redirects <envoy_api_field_route.RouteAction.max_internal_redirects>` of the route
    that the request or redirected request is hitting.
 
 Any failure will result in redirect being passed downstream instead.
@@ -157,8 +157,8 @@ Any failure will result in redirect being passed downstream instead.
 Since a redirected request may be bounced between different routes, any route in the chain of redirects that
 
 1. does not have internal redirect enabled
-2. or has a `max previous internal redirect
-   <envoy_api_field_route.RouteAction.max_previous_internal_redirect>`
+2. or has a `max internal redirects
+   <envoy_api_field_route.RouteAction.max_internal_redirects>`
    smaller or equal to the redirect chain length when the redirect chain hits it
 
 will cause the redirect to be passed downstream.

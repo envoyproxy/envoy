@@ -292,8 +292,8 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
                           validator),
       route_name_(route.name()), time_source_(factory_context.dispatcher().timeSource()),
       internal_redirect_action_(convertInternalRedirectAction(route.route())),
-      max_previous_internal_redirect_(
-          PROTOBUF_GET_WRAPPED_OR_DEFAULT(route.route(), max_previous_internal_redirect, 1)) {
+      max_internal_redirects_(
+          PROTOBUF_GET_WRAPPED_OR_DEFAULT(route.route(), max_internal_redirects, 1)) {
   if (route.route().has_metadata_match()) {
     const auto filter_it = route.route().metadata_match().filter_metadata().find(
         Envoy::Config::MetadataFilters::get().ENVOY_LB);

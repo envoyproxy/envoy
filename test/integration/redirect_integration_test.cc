@@ -29,7 +29,7 @@ public:
         envoy::config::route::v3alpha::RouteAction::HANDLE_INTERNAL_REDIRECT);
     handle_max_3_hop.mutable_routes(0)
         ->mutable_route()
-        ->mutable_max_previous_internal_redirect()
+        ->mutable_max_internal_redirects()
         ->set_value(3);
     config_helper_.addVirtualHost(handle_max_3_hop);
 

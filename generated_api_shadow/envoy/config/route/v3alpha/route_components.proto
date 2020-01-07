@@ -935,7 +935,7 @@ message RouteAction {
   // PASS_THROUGH_INTERNAL_REDIRECT will pass the redirect back to downstream.
   //
   // If not specified, at most one redirect will be followed.
-  google.protobuf.UInt32Value max_previous_internal_redirect = 31;
+  google.protobuf.UInt32Value max_internal_redirects = 31;
 
   // Indicates that the route has a hedge policy. Note that if this is set,
   // it'll take precedence over the virtual host level hedge policy entirely

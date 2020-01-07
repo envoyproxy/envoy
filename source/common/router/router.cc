@@ -58,7 +58,7 @@ bool schemeIsHttp(const Http::HeaderMap& downstream_headers,
 
 bool convertRequestHeadersForInternalRedirect(Http::HeaderMap& downstream_headers,
                                               StreamInfo::FilterState& filter_state,
-                                              uint32_t max_previous_internal_redirect,
+                                              uint32_t max_internal_redirects,
                                               const Http::HeaderEntry& internal_redirect,
                                               const Network::Connection& connection) {
   // Make sure the redirect response contains a URL to redirect to.
@@ -71,12 +71,14 @@ bool convertRequestHeadersForInternalRedirect(Http::HeaderMap& downstream_header
     return false;
   }
 
+  // Don't allow serving TLS responses over plaintext.
   bool scheme_is_http = schemeIsHttp(downstream_headers, connection);
   if (scheme_is_http && absolute_url.scheme() == Http::Headers::get().SchemeValues.Https) {
-    // Don't allow serving TLS responses over plaintext.
     return false;
   }
 
+  // Make sure that performing the redirect won't result in exceeding the configured number of
+  // redirects allowed for this route.
   if (!filter_state.hasData<StreamInfo::UInt32Accessor>(
           NumPreviousInternalRedirectFilterStateName)) {
     filter_state.setData(NumPreviousInternalRedirectFilterStateName,
@@ -88,7 +90,7 @@ bool convertRequestHeadersForInternalRedirect(Http::HeaderMap& downstream_header
       filter_state.getDataMutable<StreamInfo::UInt32Accessor>(
           NumPreviousInternalRedirectFilterStateName);
 
-  if (num_previous_internal_redirect.value() >= max_previous_internal_redirect) {
+  if (num_previous_internal_redirect.value() >= max_internal_redirects) {
     return false;
   }
   num_previous_internal_redirect.increment();
@@ -1328,7 +1330,7 @@ bool Filter::setupRedirect(const Http::HeaderMap& headers, UpstreamRequest& upst
       !callbacks_->decodingBuffer() && // Redirects with body not yet supported.
       location != nullptr &&
       convertRequestHeadersForInternalRedirect(*downstream_headers_, filter_state,
-                                               route_entry_->maxPreviousInternalRedirect(),
+                                               route_entry_->maxInternalRedirects(),
                                                *location, *callbacks_->connection()) &&
       callbacks_->recreateStream()) {
     cluster_->stats().upstream_internal_redirect_succeeded_total_.inc();
