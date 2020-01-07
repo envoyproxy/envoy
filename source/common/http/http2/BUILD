@@ -70,7 +70,6 @@ envoy_cc_library(
         "//source/common/http:codec_client_lib",
         "//source/common/http:conn_pool_base_lib",
         "//source/common/network:utility_lib",
-        "//source/common/stats:timespan_lib",
         "//source/common/upstream:upstream_lib",
     ],
 )

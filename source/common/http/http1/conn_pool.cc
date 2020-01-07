@@ -16,8 +16,6 @@
 #include "common/http/headers.h"
 #include "common/network/utility.h"
 #include "common/runtime/runtime_impl.h"
-#include "common/stats/timespan_impl.h"
-#include "common/upstream/upstream_impl.h"
 
 #include "absl/strings/match.h"
 
@@ -37,22 +35,6 @@ ConnPoolImpl::ConnPoolImpl(Event::Dispatcher& dispatcher, Upstream::HostConstSha
 
 ConnPoolImpl::~ConnPoolImpl() {}
 
-void ConnPoolImpl::drainConnections() {
-  while (!ready_clients_.empty()) {
-    firstReady().codec_client_->close();
-  }
-
-  // We drain busy clients by manually setting remaining requests to 1. Thus, when the next
-  // response completes the client will be destroyed.
-  for (const auto& client : busy_clients_) {
-    static_cast<ActiveClient&>(*client).remaining_requests_ = 1;
-  }
-}
-
-bool ConnPoolImpl::hasActiveConnections() const {
-  return !pending_requests_.empty() || !busy_clients_.empty();
-}
-
 void ConnPoolImpl::attachRequestToClient(ActiveClient& client, StreamDecoder& response_decoder,
                                          ConnectionPool::Callbacks& callbacks) {
   ASSERT(!client.stream_wrapper_);
@@ -63,27 +45,17 @@ void ConnPoolImpl::attachRequestToClient(ActiveClient& client, StreamDecoder& re
                         client.codec_client_->streamInfo());
 }
 
-void ConnPoolImpl::checkForDrained() {
-  if (!drained_callbacks_.empty() && pending_requests_.empty() && busy_clients_.empty()) {
-    while (!ready_clients_.empty()) {
-      firstReady().codec_client_->close();
-    }
-
-    for (const DrainedCb& cb : drained_callbacks_) {
-      cb();
-    }
-  }
-}
-
 void ConnPoolImpl::createNewConnection() {
   ENVOY_LOG(debug, "creating a new connection");
   auto client = std::make_unique<ConnPoolImpl::ActiveClient>(*this);
+  client->state_ = ConnPoolImplBase::ActiveClient::State::BUSY;
   client->moveIntoList(std::move(client), busy_clients_);
 }
 
 ConnectionPool::Cancellable* ConnPoolImpl::newStream(StreamDecoder& response_decoder,
                                                      ConnectionPool::Callbacks& callbacks) {
   if (!ready_clients_.empty()) {
+    firstReady().state_ = ConnPoolImplBase::ActiveClient::State::BUSY;
     firstReady().moveBetweenLists(ready_clients_, busy_clients_);
     ENVOY_CONN_LOG(debug, "using existing connection", *firstBusy().codec_client_);
     attachRequestToClient(firstBusy(), response_decoder, callbacks);
@@ -109,75 +81,6 @@ ConnectionPool::Cancellable* ConnPoolImpl::newStream(StreamDecoder& response_dec
                             nullptr);
     host_->cluster().stats().upstream_rq_pending_overflow_.inc();
     return nullptr;
-  }
-}
-
-void ConnPoolImpl::onConnectionEvent(ActiveClient& client, Network::ConnectionEvent event) {
-  if (event == Network::ConnectionEvent::RemoteClose ||
-      event == Network::ConnectionEvent::LocalClose) {
-    // The client died.
-    ENVOY_CONN_LOG(debug, "client disconnected, failure reason: {}", *client.codec_client_,
-                   client.codec_client_->connectionFailureReason());
-
-    Envoy::Upstream::reportUpstreamCxDestroy(host_, event);
-    ActiveClientPtr removed;
-    bool check_for_drained = true;
-    if (client.stream_wrapper_) {
-      if (!client.stream_wrapper_->decode_complete_) {
-        Envoy::Upstream::reportUpstreamCxDestroyActiveRequest(host_, event);
-      }
-
-      // There is an active request attached to this client. The underlying codec client will
-      // already have "reset" the stream to fire the reset callback. All we do here is just
-      // destroy the client.
-      removed = client.removeFromList(busy_clients_);
-    } else if (!client.connect_timer_) {
-      // The connect timer is destroyed on connect. The lack of a connect timer means that this
-      // client is idle and in the ready pool.
-      removed = client.removeFromList(ready_clients_);
-      check_for_drained = false;
-    } else {
-      // The only time this happens is if we actually saw a connect failure.
-      host_->cluster().stats().upstream_cx_connect_fail_.inc();
-      host_->stats().cx_connect_fail_.inc();
-
-      removed = client.removeFromList(busy_clients_);
-
-      // Raw connect failures should never happen under normal circumstances. If we have an upstream
-      // that is behaving badly, requests can get stuck here in the pending state. If we see a
-      // connect failure, we purge all pending requests so that calling code can determine what to
-      // do with the request.
-      ENVOY_CONN_LOG(debug, "purge pending, failure reason: {}", *client.codec_client_,
-                     client.codec_client_->connectionFailureReason());
-      purgePendingRequests(client.real_host_description_,
-                           client.codec_client_->connectionFailureReason());
-    }
-
-    dispatcher_.deferredDelete(std::move(removed));
-
-    // If we have pending requests and we just lost a connection we should make a new one.
-    if (pending_requests_.size() > (ready_clients_.size() + busy_clients_.size())) {
-      createNewConnection();
-    }
-
-    if (check_for_drained) {
-      checkForDrained();
-    }
-  }
-
-  if (client.connect_timer_) {
-    client.connect_timer_->disableTimer();
-    client.connect_timer_.reset();
-  }
-
-  // Note that the order in this function is important. Concretely, we must destroy the connect
-  // timer before we process a connected idle client, because if this results in an immediate
-  // drain/destruction event, we key off of the existence of the connect timer above to determine
-  // whether the client is in the ready list (connected) or the busy list (failed to connect).
-  if (event == Network::ConnectionEvent::Connected) {
-    client.conn_connect_ms_->complete();
-    client.conn_connect_ms_.reset();
-    processIdleClient(client, false);
   }
 }
 
@@ -236,6 +139,7 @@ void ConnPoolImpl::processIdleClient(ActiveClient& client, bool delay) {
     pending_requests_.pop_back();
   }
 
+  //
   if (delay && !pending_requests_.empty() && !upstream_ready_enabled_) {
     upstream_ready_enabled_ = true;
     upstream_ready_timer_->enableTimer(std::chrono::milliseconds(0));
@@ -287,12 +191,9 @@ void ConnPoolImpl::StreamWrapper::onDecodeComplete() {
 }
 
 ConnPoolImpl::ActiveClient::ActiveClient(ConnPoolImpl& parent)
-    : parent_(parent),
-      connect_timer_(parent_.dispatcher_.createTimer([this]() -> void { onConnectTimeout(); })),
+    : ConnPoolImplBase::ActiveClient(parent), parent_(parent),
       remaining_requests_(parent_.host_->cluster().maxRequestsPerConnection()) {
 
-  conn_connect_ms_ = std::make_unique<Stats::HistogramCompletableTimespanImpl>(
-      parent_.host_->cluster().stats().upstream_cx_connect_ms_, parent_.dispatcher_.timeSource());
   Upstream::Host::CreateConnectionData data = parent_.host_->createConnection(
       parent_.dispatcher_, parent_.socket_options_, parent_.transport_socket_options_);
   real_host_description_ = data.host_description_;
@@ -304,8 +205,6 @@ ConnPoolImpl::ActiveClient::ActiveClient(ConnPoolImpl& parent)
   parent_.host_->cluster().stats().upstream_cx_http1_total_.inc();
   parent_.host_->stats().cx_total_.inc();
   parent_.host_->stats().cx_active_.inc();
-  conn_length_ = std::make_unique<Stats::HistogramCompletableTimespanImpl>(
-      parent_.host_->cluster().stats().upstream_cx_length_ms_, parent_.dispatcher_.timeSource());
   connect_timer_->enableTimer(parent_.host_->cluster().connectTimeout());
   parent_.host_->cluster().resourceManager(parent_.priority_).connections().inc();
 
@@ -322,14 +221,6 @@ ConnPoolImpl::ActiveClient::~ActiveClient() {
   parent_.host_->stats().cx_active_.dec();
   conn_length_->complete();
   parent_.host_->cluster().resourceManager(parent_.priority_).connections().dec();
-}
-
-void ConnPoolImpl::ActiveClient::onConnectTimeout() {
-  // We just close the client at this point. This will result in both a timeout and a connect
-  // failure and will fold into all the normal connect failure logic.
-  ENVOY_CONN_LOG(debug, "connect timeout", *codec_client_);
-  parent_.host_->cluster().stats().upstream_cx_connect_timeout_.inc();
-  codec_client_->close();
 }
 
 CodecClientPtr ProdConnPoolImpl::createCodecClient(Upstream::Host::CreateConnectionData& data) {

@@ -9,11 +9,9 @@
 #include "envoy/http/codec.h"
 #include "envoy/http/conn_pool.h"
 #include "envoy/network/connection.h"
-#include "envoy/stats/timespan.h"
 #include "envoy/upstream/upstream.h"
 
 #include "common/common/linked_object.h"
-#include "common/http/codec_client.h"
 #include "common/http/codec_wrappers.h"
 #include "common/http/conn_pool_base.h"
 
@@ -41,14 +39,9 @@ public:
 
   // ConnectionPool::Instance
   Http::Protocol protocol() const override { return Http::Protocol::Http11; }
-  void drainConnections() override;
-  bool hasActiveConnections() const override;
   ConnectionPool::Cancellable* newStream(StreamDecoder& response_decoder,
                                          ConnectionPool::Callbacks& callbacks) override;
   Upstream::HostDescriptionConstSharedPtr host() const override { return host_; };
-
-  // ConnPoolImplBase
-  void checkForDrained() override;
 
 protected:
   struct ActiveClient;
@@ -82,30 +75,18 @@ protected:
 
   using StreamWrapperPtr = std::unique_ptr<StreamWrapper>;
 
-  struct ActiveClient : public Network::ConnectionCallbacks, public ConnPoolImplBase::ActiveClient {
+  struct ActiveClient : public ConnPoolImplBase::ActiveClient {
     ActiveClient(ConnPoolImpl& parent);
     ~ActiveClient() override;
 
     // ConnPoolImplBase::ActiveClient
-    void close() override { codec_client_->close(); }
-    uint64_t connectionId() const override { return codec_client_->id(); }
-
-    void onConnectTimeout();
-
-    // Network::ConnectionCallbacks
-    void onEvent(Network::ConnectionEvent event) override {
-      parent_.onConnectionEvent(*this, event);
+    bool hasActiveRequests() const override { return stream_wrapper_ != nullptr; }
+    bool closingWithIncompleteRequest() const override {
+      return (stream_wrapper_ != nullptr) && (!stream_wrapper_->decode_complete_);
     }
-    void onAboveWriteBufferHighWatermark() override {}
-    void onBelowWriteBufferLowWatermark() override {}
 
     ConnPoolImpl& parent_;
-    CodecClientPtr codec_client_;
-    Upstream::HostDescriptionConstSharedPtr real_host_description_;
     StreamWrapperPtr stream_wrapper_;
-    Event::TimerPtr connect_timer_;
-    Stats::TimespanPtr conn_connect_ms_;
-    Stats::TimespanPtr conn_length_;
     uint64_t remaining_requests_;
   };
 
@@ -113,7 +94,6 @@ protected:
                              ConnectionPool::Callbacks& callbacks);
   virtual CodecClientPtr createCodecClient(Upstream::Host::CreateConnectionData& data) PURE;
   void createNewConnection();
-  void onConnectionEvent(ActiveClient& client, Network::ConnectionEvent event);
   void onDownstreamReset(ActiveClient& client);
   void onResponseComplete(ActiveClient& client);
   void onUpstreamReady();

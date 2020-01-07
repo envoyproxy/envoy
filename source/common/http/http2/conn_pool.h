@@ -10,7 +10,6 @@
 #include "envoy/stats/timespan.h"
 #include "envoy/upstream/upstream.h"
 
-#include "common/http/codec_client.h"
 #include "common/http/conn_pool_base.h"
 
 namespace Envoy {
@@ -28,36 +27,23 @@ public:
                Upstream::ResourcePriority priority,
                const Network::ConnectionSocket::OptionsSharedPtr& options,
                const Network::TransportSocketOptionsSharedPtr& transport_socket_options);
-  ~ConnPoolImpl() override;
 
   // Http::ConnectionPool::Instance
   Http::Protocol protocol() const override { return Http::Protocol::Http2; }
-  void drainConnections() override;
-  bool hasActiveConnections() const override;
   ConnectionPool::Cancellable* newStream(Http::StreamDecoder& response_decoder,
                                          ConnectionPool::Callbacks& callbacks) override;
   Upstream::HostDescriptionConstSharedPtr host() const override { return host_; };
 
 protected:
-  struct ActiveClient : public Network::ConnectionCallbacks,
-                        public CodecClientCallbacks,
+  struct ActiveClient : public CodecClientCallbacks,
                         public Http::ConnectionCallbacks,
                         public ConnPoolImplBase::ActiveClient {
     ActiveClient(ConnPoolImpl& parent);
     ~ActiveClient() override;
 
-    void onConnectTimeout() { parent_.onConnectTimeout(*this); }
-
     // ConnPoolImpl::ActiveClient
-    void close() override { client_->close(); }
-    uint64_t connectionId() const override { return client_->id(); }
-
-    // Network::ConnectionCallbacks
-    void onEvent(Network::ConnectionEvent event) override {
-      parent_.onConnectionEvent(*this, event);
-    }
-    void onAboveWriteBufferHighWatermark() override {}
-    void onBelowWriteBufferLowWatermark() override {}
+    bool hasActiveRequests() const override { return codec_client_->numActiveRequests() > 0; }
+    bool closingWithIncompleteRequest() const override { return closed_with_active_rq_; }
 
     // CodecClientCallbacks
     void onStreamDestroy() override { parent_.onStreamDestroy(*this); }
@@ -69,33 +55,35 @@ protected:
     void onGoAway() override { parent_.onGoAway(*this); }
 
     ConnPoolImpl& parent_;
-    CodecClientPtr client_;
-    Upstream::HostDescriptionConstSharedPtr real_host_description_;
     uint64_t total_streams_{};
-    Event::TimerPtr connect_timer_;
-    bool upstream_ready_{};
-    Stats::TimespanPtr conn_length_;
     bool closed_with_active_rq_{};
   };
 
   using ActiveClientPtr = std::unique_ptr<ActiveClient>;
 
-  // Http::ConnPoolImplBase
-  void checkForDrained() override;
+  // TODO: delete me when no longer needed
+  ActiveClient* primaryClient() {
+    if (!ready_clients_.empty()) {
+      return static_cast<ActiveClient*>(ready_clients_.front().get());
+    }
+
+    if (!busy_clients_.empty()) {
+      return static_cast<ActiveClient*>(busy_clients_.front().get());
+    }
+
+    return nullptr;
+  }
 
   virtual CodecClientPtr createCodecClient(Upstream::Host::CreateConnectionData& data) PURE;
   virtual uint32_t maxTotalStreams() PURE;
   void movePrimaryClientToDraining();
-  void onConnectionEvent(ActiveClient& client, Network::ConnectionEvent event);
   void onGoAway(ActiveClient& client);
   void onStreamDestroy(ActiveClient& client);
   void onStreamReset(ActiveClient& client, Http::StreamResetReason reason);
-  void newClientStream(Http::StreamDecoder& response_decoder, ConnectionPool::Callbacks& callbacks);
+  void newClientStream(ActiveClient& client, Http::StreamDecoder& response_decoder,
+                       ConnectionPool::Callbacks& callbacks);
   void onUpstreamReady();
 
-  Stats::TimespanPtr conn_connect_ms_;
-  ActiveClientPtr primary_client_;
-  ActiveClientPtr draining_client_;
   const Network::ConnectionSocket::OptionsSharedPtr socket_options_;
   const Network::TransportSocketOptionsSharedPtr transport_socket_options_;
 };
