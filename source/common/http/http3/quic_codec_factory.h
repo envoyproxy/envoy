@@ -2,6 +2,7 @@
 
 #include <string>
 
+#include "envoy/config/typed_config.h"
 #include "envoy/http/codec.h"
 #include "envoy/network/connection.h"
 
@@ -9,29 +10,25 @@ namespace Envoy {
 namespace Http {
 
 // A factory to create Http::ServerConnection instance for QUIC.
-class QuicHttpServerConnectionFactory {
+class QuicHttpServerConnectionFactory : public Config::UntypedFactory {
 public:
   virtual ~QuicHttpServerConnectionFactory() {}
-
-  virtual std::string name() const PURE;
 
   virtual std::unique_ptr<ServerConnection>
   createQuicServerConnection(Network::Connection& connection, ConnectionCallbacks& callbacks) PURE;
 
-  static std::string category() { return "quic_client_codec"; }
+  std::string category() const override { return "quic_client_codec"; }
 };
 
 // A factory to create Http::ClientConnection instance for QUIC.
-class QuicHttpClientConnectionFactory {
+class QuicHttpClientConnectionFactory : public Config::UntypedFactory {
 public:
   virtual ~QuicHttpClientConnectionFactory() {}
-
-  virtual std::string name() const PURE;
 
   virtual std::unique_ptr<ClientConnection>
   createQuicClientConnection(Network::Connection& connection, ConnectionCallbacks& callbacks) PURE;
 
-  static std::string category() { return "quic_server_codec"; }
+  std::string category() const override { return "quic_server_codec"; }
 };
 
 } // namespace Http

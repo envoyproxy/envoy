@@ -8,6 +8,7 @@ import "google/api/annotations.proto";
 import "google/protobuf/duration.proto";
 import "google/protobuf/wrappers.proto";
 
+import "envoy/annotations/resource.proto";
 import "udpa/annotations/migrate.proto";
 import "validate/validate.proto";
 
@@ -27,6 +28,8 @@ option (udpa.annotations.file_migrate).move_to_package = "envoy.service.listener
 // consist of a complete update of all listeners. Existing connections will be
 // allowed to drain from listeners that are no longer present.
 service ListenerDiscoveryService {
+  option (envoy.annotations.resource).type = "envoy.api.v2.Listener";
+
   rpc DeltaListeners(stream DeltaDiscoveryRequest) returns (stream DeltaDiscoveryResponse) {
   }
 

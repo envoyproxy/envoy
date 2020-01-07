@@ -1,5 +1,6 @@
 #pragma once
 
+#include <map>
 #include <memory>
 
 #include "extensions/filters/network/kafka/kafka_response.h"
@@ -20,21 +21,14 @@ using ResponseParserSharedPtr = std::shared_ptr<ResponseParser>;
 struct ResponseContext {
 
   /**
-   * Creates a context for parsing a message with given expected metadata.
-   * @param metadata expected response metadata.
-   */
-  ResponseContext(const int16_t api_key, const int16_t api_version)
-      : api_key_{api_key}, api_version_{api_version} {};
-
-  /**
    * Api key of response that's being parsed.
    */
-  const int16_t api_key_;
+  int16_t api_key_;
 
   /**
    * Api version of response that's being parsed.
    */
-  const int16_t api_version_;
+  int16_t api_version_;
 
   /**
    * Bytes left to process.
@@ -58,6 +52,12 @@ struct ResponseContext {
 };
 
 using ResponseContextSharedPtr = std::shared_ptr<ResponseContext>;
+
+// Helper container for response api key & version.
+using ExpectedResponseSpec = std::pair<int16_t, int16_t>;
+// Response metadata store (maps from correlation id to api key & version).
+using ExpectedResponses = std::map<int32_t, ExpectedResponseSpec>;
+using ExpectedResponsesSharedPtr = std::shared_ptr<ExpectedResponses>;
 
 /**
  * Response decoder configuration object.
@@ -89,15 +89,21 @@ public:
 class ResponseHeaderParser : public ResponseParser {
 public:
   /**
-   * Creates a parser with given context and parser resolver.
+   * Creates a parser with necessary dependencies (store of expected responses & parser resolver).
+   * @param expected_responses store containing mapping from response correlation id to api key &
+   * version.
+   * @param parser_resolver factory used to create the following payload parser.
    */
-  ResponseHeaderParser(ResponseContextSharedPtr context,
+  ResponseHeaderParser(ExpectedResponsesSharedPtr expected_responses,
                        const ResponseParserResolver& parser_resolver)
-      : context_{context}, parser_resolver_{parser_resolver} {};
+      : expected_responses_{expected_responses},
+        parser_resolver_{parser_resolver}, context_{std::make_shared<ResponseContext>()} {};
 
   /**
-   * Consumes 8 bytes (2 x INT32) as response length and correlation id and updates the context with
-   * that value, then creates the following payload parser depending on metadata provided.
+   * Consumes 8 bytes (2 x INT32) as response length and correlation id.
+   * Uses correlation id to resolve response's api version & key (throws if not possible).
+   * Updates the context with data resolved, and then creates the following payload parser using the
+   * parser resolver.
    * @return ResponseParser instance to process the response payload.
    */
   ResponseParseResponse parse(absl::string_view& data) override;
@@ -105,8 +111,11 @@ public:
   const ResponseContextSharedPtr contextForTest() const { return context_; }
 
 private:
-  ResponseContextSharedPtr context_;
+  ExpectedResponseSpec getResponseSpec(int32_t correlation_id);
+
+  const ExpectedResponsesSharedPtr expected_responses_;
   const ResponseParserResolver& parser_resolver_;
+  const ResponseContextSharedPtr context_;
 
   Int32Deserializer length_deserializer_;
   Int32Deserializer correlation_id_deserializer_;

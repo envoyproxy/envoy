@@ -27,8 +27,8 @@ envoy_cc_test_library(
 )
 
 envoy_cc_test(
-    name = "runtime_features_test",
-    srcs = ["runtime_features_test.cc"],
+    name = "runtime_protos_test",
+    srcs = ["runtime_protos_test.cc"],
     deps = [
         "//source/common/runtime:runtime_lib",
         "//test/mocks/runtime:runtime_mocks",

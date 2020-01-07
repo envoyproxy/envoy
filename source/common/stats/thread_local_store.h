@@ -9,6 +9,7 @@
 #include "envoy/thread_local/thread_local.h"
 
 #include "common/common/hash.h"
+#include "common/common/thread_synchronizer.h"
 #include "common/stats/allocator_impl.h"
 #include "common/stats/histogram_impl.h"
 #include "common/stats/null_counter.h"
@@ -151,6 +152,8 @@ public:
  */
 class ThreadLocalStoreImpl : Logger::Loggable<Logger::Id::stats>, public StoreRoot {
 public:
+  static const char MainDispatcherCleanupSync[];
+
   ThreadLocalStoreImpl(Allocator& alloc);
   ~ThreadLocalStoreImpl() override;
 
@@ -227,6 +230,11 @@ public:
                            ThreadLocal::Instance& tls) override;
   void shutdownThreading() override;
   void mergeHistograms(PostMergeCb merge_cb) override;
+
+  /**
+   * @return a thread synchronizer object used for controlling thread behavior in tests.
+   */
+  Thread::ThreadSynchronizer& sync() { return sync_; }
 
 private:
   template <class Stat> using StatMap = StatNameHashMap<Stat>;
@@ -391,6 +399,7 @@ private:
   std::vector<HistogramSharedPtr> deleted_histograms_;
 
   absl::flat_hash_set<StatNameStorageSet*> rejected_stats_purgatory_ GUARDED_BY(lock_);
+  Thread::ThreadSynchronizer sync_;
 };
 
 } // namespace Stats
