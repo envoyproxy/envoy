@@ -89,7 +89,8 @@ parseInternal(const envoy::config::core::v3alpha::HeaderValueOption& header_valu
       state = ParserState::VariableName;
       if (pos > start) {
         absl::string_view literal = format.substr(start, pos - start);
-        formatters.emplace_back(new PlainHeaderFormatter(unescape(literal), append, skip_if_present));
+        formatters.emplace_back(
+            new PlainHeaderFormatter(unescape(literal), append, skip_if_present));
       }
       start = pos + 1;
       break;
@@ -98,8 +99,8 @@ parseInternal(const envoy::config::core::v3alpha::HeaderValueOption& header_valu
       // Consume "VAR" from "%VAR%" or "%VAR(...)%"
       if (ch == '%') {
         // Found complete variable name, add formatter.
-        formatters.emplace_back(
-            new StreamInfoHeaderFormatter(format.substr(start, pos - start), append, skip_if_present));
+        formatters.emplace_back(new StreamInfoHeaderFormatter(format.substr(start, pos - start),
+                                                              append, skip_if_present));
         start = pos + 1;
         state = ParserState::Literal;
         break;
@@ -179,8 +180,8 @@ parseInternal(const envoy::config::core::v3alpha::HeaderValueOption& header_valu
     case ParserState::ExpectVariableEnd:
       // Search for closing % of a %VAR(...)% expression
       if (ch == '%') {
-        formatters.emplace_back(
-            new StreamInfoHeaderFormatter(format.substr(start, pos - start), append, skip_if_present));
+        formatters.emplace_back(new StreamInfoHeaderFormatter(format.substr(start, pos - start),
+                                                              append, skip_if_present));
         start = pos + 1;
         state = ParserState::Literal;
         break;

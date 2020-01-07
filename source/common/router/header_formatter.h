@@ -27,7 +27,8 @@ public:
   virtual bool append() const PURE;
 
   /**
-   * @return bool indicating whether the formatted header should be skipped if the existing header is already set.
+   * @return bool indicating whether the formatted header should be skipped if the existing header
+   * is already set.
    */
   virtual bool skipIfPresent() const PURE;
 };
@@ -82,7 +83,8 @@ private:
  */
 class CompoundHeaderFormatter : public HeaderFormatter {
 public:
-  CompoundHeaderFormatter(std::vector<HeaderFormatterPtr>&& formatters, bool append, bool skip_if_present)
+  CompoundHeaderFormatter(std::vector<HeaderFormatterPtr>&& formatters, bool append,
+                          bool skip_if_present)
       : formatters_(std::move(formatters)), append_(append), skip_if_present_(skip_if_present) {}
 
   // HeaderFormatter::format
