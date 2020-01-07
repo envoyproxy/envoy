@@ -5,11 +5,11 @@
 #include <string>
 #include <vector>
 
-#include "envoy/config/filter/network/ext_authz/v2/ext_authz.pb.h"
+#include "envoy/extensions/filters/network/ext_authz/v3alpha/ext_authz.pb.h"
 #include "envoy/network/connection.h"
 #include "envoy/network/filter.h"
 #include "envoy/runtime/runtime.h"
-#include "envoy/service/auth/v2/external_auth.pb.h"
+#include "envoy/service/auth/v3alpha/external_auth.pb.h"
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats_macros.h"
 #include "envoy/upstream/cluster_manager.h"
@@ -46,7 +46,8 @@ struct InstanceStats {
  */
 class Config {
 public:
-  Config(const envoy::config::filter::network::ext_authz::v2::ExtAuthz& config, Stats::Scope& scope)
+  Config(const envoy::extensions::filters::network::ext_authz::v3alpha::ExtAuthz& config,
+         Stats::Scope& scope)
       : stats_(generateStats(config.stat_prefix(), scope)),
         failure_mode_allow_(config.failure_mode_allow()),
         include_peer_certificate_(config.include_peer_certificate()) {}
@@ -113,7 +114,7 @@ private:
   FilterReturn filter_return_{FilterReturn::Stop};
   // Used to identify if the callback to onComplete() is synchronous (on the stack) or asynchronous.
   bool calling_check_{};
-  envoy::service::auth::v2::CheckRequest check_request_{};
+  envoy::service::auth::v3alpha::CheckRequest check_request_{};
 };
 } // namespace ExtAuthz
 } // namespace NetworkFilters

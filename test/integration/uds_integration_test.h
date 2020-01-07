@@ -2,7 +2,7 @@
 
 #include <tuple>
 
-#include "envoy/config/bootstrap/v2/bootstrap.pb.h"
+#include "envoy/config/bootstrap/v3alpha/bootstrap.pb.h"
 
 #include "common/common/fmt.h"
 #include "common/http/codec_client.h"
@@ -30,7 +30,7 @@ public:
         FakeHttpConnection::Type::HTTP1, timeSystem()));
 
     config_helper_.addConfigModifier(
-        [&](envoy::config::bootstrap::v2::Bootstrap& bootstrap) -> void {
+        [&](envoy::config::bootstrap::v3alpha::Bootstrap& bootstrap) -> void {
           auto* static_resources = bootstrap.mutable_static_resources();
           for (int i = 0; i < static_resources->clusters_size(); ++i) {
             auto* cluster = static_resources->mutable_clusters(i);

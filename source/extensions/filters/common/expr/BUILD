@@ -32,6 +32,6 @@ envoy_cc_library(
         "//source/common/stream_info:utility_lib",
         "@com_google_cel_cpp//eval/public:cel_value",
         "@com_google_cel_cpp//eval/public:cel_value_producer",
-        "@envoy_api//envoy/api/v2/core:pkg_cc_proto",
+        "@envoy_api//envoy/config/core/v3alpha:pkg_cc_proto",
     ],
 )

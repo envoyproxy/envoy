@@ -1,6 +1,6 @@
 #pragma once
 
-#include "envoy/api/v2/core/health_check.pb.h"
+#include "envoy/config/core/v3alpha/health_check.pb.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/upstream/health_checker.h"
 
@@ -69,7 +69,7 @@ public:
    * @return HealthCheckerSharedPtr the pointer of a health checker instance.
    */
   virtual Upstream::HealthCheckerSharedPtr
-  createCustomHealthChecker(const envoy::api::v2::core::HealthCheck& config,
+  createCustomHealthChecker(const envoy::config::core::v3alpha::HealthCheck& config,
                             HealthCheckerFactoryContext& context) PURE;
 
   /**

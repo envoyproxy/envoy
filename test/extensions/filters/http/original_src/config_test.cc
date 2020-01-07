@@ -1,6 +1,6 @@
 #include <numeric>
 
-#include "envoy/config/filter/http/original_src/v2alpha1/original_src.pb.h"
+#include "envoy/extensions/filters/http/original_src/v3alpha/original_src.pb.h"
 
 #include "extensions/filters/http/original_src/config.h"
 
@@ -17,13 +17,13 @@ namespace {
 class OriginalSrcHttpConfigTest : public testing::Test {
 public:
   Config makeConfigFromProto(
-      const envoy::config::filter::http::original_src::v2alpha1::OriginalSrc& proto_config) {
+      const envoy::extensions::filters::http::original_src::v3alpha::OriginalSrc& proto_config) {
     return Config(proto_config);
   }
 };
 
 TEST_F(OriginalSrcHttpConfigTest, TestUseMark0) {
-  envoy::config::filter::http::original_src::v2alpha1::OriginalSrc config_proto;
+  envoy::extensions::filters::http::original_src::v3alpha::OriginalSrc config_proto;
   config_proto.set_mark(0);
   auto config = makeConfigFromProto(config_proto);
 
@@ -31,7 +31,7 @@ TEST_F(OriginalSrcHttpConfigTest, TestUseMark0) {
 }
 
 TEST_F(OriginalSrcHttpConfigTest, TestUseMark1234) {
-  envoy::config::filter::http::original_src::v2alpha1::OriginalSrc config_proto;
+  envoy::extensions::filters::http::original_src::v3alpha::OriginalSrc config_proto;
   config_proto.set_mark(1234);
   auto config = makeConfigFromProto(config_proto);
 
@@ -39,7 +39,7 @@ TEST_F(OriginalSrcHttpConfigTest, TestUseMark1234) {
 }
 
 TEST_F(OriginalSrcHttpConfigTest, TestUseMarkMax) {
-  envoy::config::filter::http::original_src::v2alpha1::OriginalSrc config_proto;
+  envoy::extensions::filters::http::original_src::v3alpha::OriginalSrc config_proto;
   config_proto.set_mark(std::numeric_limits<uint32_t>::max());
   auto config = makeConfigFromProto(config_proto);
 

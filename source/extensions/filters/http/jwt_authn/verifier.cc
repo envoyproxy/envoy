@@ -1,13 +1,13 @@
 #include "extensions/filters/http/jwt_authn/verifier.h"
 
-#include "envoy/config/filter/http/jwt_authn/v2alpha/config.pb.h"
+#include "envoy/extensions/filters/http/jwt_authn/v3alpha/config.pb.h"
 
 #include "jwt_verify_lib/check_audience.h"
 
-using ::envoy::config::filter::http::jwt_authn::v2alpha::JwtProvider;
-using ::envoy::config::filter::http::jwt_authn::v2alpha::JwtRequirement;
-using ::envoy::config::filter::http::jwt_authn::v2alpha::JwtRequirementAndList;
-using ::envoy::config::filter::http::jwt_authn::v2alpha::JwtRequirementOrList;
+using envoy::extensions::filters::http::jwt_authn::v3alpha::JwtProvider;
+using envoy::extensions::filters::http::jwt_authn::v3alpha::JwtRequirement;
+using envoy::extensions::filters::http::jwt_authn::v3alpha::JwtRequirementAndList;
+using envoy::extensions::filters::http::jwt_authn::v3alpha::JwtRequirementOrList;
 using ::google::jwt_verify::CheckAudience;
 using ::google::jwt_verify::Status;
 

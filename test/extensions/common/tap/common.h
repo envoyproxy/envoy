@@ -1,4 +1,4 @@
-#include "envoy/data/tap/v2alpha/wrapper.pb.h"
+#include "envoy/data/tap/v3alpha/wrapper.pb.h"
 
 #include "common/protobuf/utility.h"
 
@@ -11,13 +11,13 @@
 namespace envoy {
 namespace data {
 namespace tap {
-namespace v2alpha {
+namespace v3alpha {
 
 // TODO(mattklein123): AFAICT gtest has built in printing for proto messages but it doesn't seem
 // to work unless this is here.
 std::ostream& operator<<(std::ostream& os, const TraceWrapper& trace);
 
-} // namespace v2alpha
+} // namespace v3alpha
 } // namespace tap
 } // namespace data
 } // namespace envoy
@@ -28,7 +28,7 @@ namespace Extensions {
 // TODO(mattklein123): Make this a common matcher called ProtoYamlEq and figure out how to
 // correctly templatize it.
 MATCHER_P(TraceEqual, rhs, "") {
-  envoy::data::tap::v2alpha::TraceWrapper expected_trace;
+  envoy::data::tap::v3alpha::TraceWrapper expected_trace;
   TestUtility::loadFromYaml(rhs, expected_trace);
   return TestUtility::protoEqual(expected_trace, arg);
 }
@@ -43,7 +43,7 @@ public:
 
   void submitTrace(TraceWrapperPtr&& trace) override { submitTrace_(*trace); }
 
-  MOCK_METHOD1(submitTrace_, void(const envoy::data::tap::v2alpha::TraceWrapper& trace));
+  MOCK_METHOD1(submitTrace_, void(const envoy::data::tap::v3alpha::TraceWrapper& trace));
 };
 
 class MockMatcher : public Matcher {

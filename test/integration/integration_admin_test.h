@@ -1,7 +1,7 @@
 #pragma once
 
-#include "envoy/config/bootstrap/v2/bootstrap.pb.h"
-#include "envoy/config/metrics/v2/stats.pb.h"
+#include "envoy/config/bootstrap/v3alpha/bootstrap.pb.h"
+#include "envoy/config/metrics/v3alpha/stats.pb.h"
 
 #include "common/json/json_loader.h"
 
@@ -19,9 +19,9 @@ public:
     HttpIntegrationTest::initialize();
   }
 
-  void initialize(envoy::config::metrics::v2::StatsMatcher stats_matcher) {
+  void initialize(envoy::config::metrics::v3alpha::StatsMatcher stats_matcher) {
     config_helper_.addConfigModifier(
-        [stats_matcher](envoy::config::bootstrap::v2::Bootstrap& bootstrap) -> void {
+        [stats_matcher](envoy::config::bootstrap::v3alpha::Bootstrap& bootstrap) -> void {
           *bootstrap.mutable_stats_config()->mutable_stats_matcher() = stats_matcher;
         });
     initialize();

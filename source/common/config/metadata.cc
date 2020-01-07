@@ -1,6 +1,6 @@
 #include "common/config/metadata.h"
 
-#include "envoy/api/v2/core/base.pb.h"
+#include "envoy/config/core/v3alpha/base.pb.h"
 #include "envoy/type/metadata/v2/metadata.pb.h"
 
 #include "common/protobuf/utility.h"
@@ -15,14 +15,15 @@ MetadataKey::MetadataKey(const envoy::type::metadata::v2::MetadataKey& metadata_
   }
 }
 
-const ProtobufWkt::Value& Metadata::metadataValue(const envoy::api::v2::core::Metadata& metadata,
-                                                  const MetadataKey& metadata_key) {
+const ProtobufWkt::Value&
+Metadata::metadataValue(const envoy::config::core::v3alpha::Metadata& metadata,
+                        const MetadataKey& metadata_key) {
   return metadataValue(metadata, metadata_key.key_, metadata_key.path_);
 }
 
-const ProtobufWkt::Value& Metadata::metadataValue(const envoy::api::v2::core::Metadata& metadata,
-                                                  const std::string& filter,
-                                                  const std::vector<std::string>& path) {
+const ProtobufWkt::Value&
+Metadata::metadataValue(const envoy::config::core::v3alpha::Metadata& metadata,
+                        const std::string& filter, const std::vector<std::string>& path) {
   const auto filter_it = metadata.filter_metadata().find(filter);
   if (filter_it == metadata.filter_metadata().end()) {
     return ProtobufWkt::Value::default_instance();
@@ -51,21 +52,21 @@ const ProtobufWkt::Value& Metadata::metadataValue(const envoy::api::v2::core::Me
   return *val;
 }
 
-const ProtobufWkt::Value& Metadata::metadataValue(const envoy::api::v2::core::Metadata& metadata,
-                                                  const std::string& filter,
-                                                  const std::string& key) {
+const ProtobufWkt::Value&
+Metadata::metadataValue(const envoy::config::core::v3alpha::Metadata& metadata,
+                        const std::string& filter, const std::string& key) {
   const std::vector<std::string> path{key};
   return metadataValue(metadata, filter, path);
 }
 
-ProtobufWkt::Value& Metadata::mutableMetadataValue(envoy::api::v2::core::Metadata& metadata,
+ProtobufWkt::Value& Metadata::mutableMetadataValue(envoy::config::core::v3alpha::Metadata& metadata,
                                                    const std::string& filter,
                                                    const std::string& key) {
   return (*(*metadata.mutable_filter_metadata())[filter].mutable_fields())[key];
 }
 
 bool Metadata::metadataLabelMatch(const LabelSet& label_set,
-                                  const envoy::api::v2::core::Metadata& host_metadata,
+                                  const envoy::config::core::v3alpha::Metadata& host_metadata,
                                   const std::string& filter_key, bool list_as_any) {
   const auto filter_it = host_metadata.filter_metadata().find(filter_key);
   if (filter_it == host_metadata.filter_metadata().end()) {

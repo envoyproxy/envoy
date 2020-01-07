@@ -8,7 +8,7 @@
 #include <unordered_map>
 #include <vector>
 
-#include "envoy/config/filter/network/redis_proxy/v2/redis_proxy.pb.h"
+#include "envoy/extensions/filters/network/redis_proxy/v3alpha/redis_proxy.pb.h"
 #include "envoy/stats/stats_macros.h"
 #include "envoy/thread_local/thread_local.h"
 #include "envoy/upstream/cluster_manager.h"
@@ -57,7 +57,8 @@ public:
   InstanceImpl(
       const std::string& cluster_name, Upstream::ClusterManager& cm,
       Common::Redis::Client::ClientFactory& client_factory, ThreadLocal::SlotAllocator& tls,
-      const envoy::config::filter::network::redis_proxy::v2::RedisProxy::ConnPoolSettings& config,
+      const envoy::extensions::filters::network::redis_proxy::v3alpha::RedisProxy::ConnPoolSettings&
+          config,
       Api::Api& api, Stats::ScopePtr&& stats_scope,
       const Common::Redis::RedisCommandStatsSharedPtr& redis_command_stats,
       Extensions::Common::Redis::ClusterRefreshManagerSharedPtr refresh_manager);

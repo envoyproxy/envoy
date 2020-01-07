@@ -3,8 +3,8 @@
 #include <memory>
 #include <string>
 
-#include "envoy/config/filter/accesslog/v2/accesslog.pb.h"
-#include "envoy/config/filter/accesslog/v2/accesslog.pb.validate.h"
+#include "envoy/config/filter/accesslog/v3alpha/accesslog.pb.h"
+#include "envoy/config/filter/accesslog/v3alpha/accesslog.pb.validate.h"
 #include "envoy/upstream/cluster_manager.h"
 #include "envoy/upstream/upstream.h"
 
@@ -36,8 +36,9 @@ namespace Envoy {
 namespace AccessLog {
 namespace {
 
-envoy::config::filter::accesslog::v2::AccessLog parseAccessLogFromV2Yaml(const std::string& yaml) {
-  envoy::config::filter::accesslog::v2::AccessLog access_log;
+envoy::config::filter::accesslog::v3alpha::AccessLog
+parseAccessLogFromV2Yaml(const std::string& yaml) {
+  envoy::config::filter::accesslog::v3alpha::AccessLog access_log;
   TestUtility::loadFromYamlAndValidate(yaml, access_log);
   return access_log;
 }
@@ -635,7 +636,7 @@ duration_filter:
 
   NiceMock<Runtime::MockLoader> runtime;
 
-  envoy::config::filter::accesslog::v2::AccessLogFilter config;
+  envoy::config::filter::accesslog::v3alpha::AccessLogFilter config;
   TestUtility::loadFromYaml(filter_yaml, config);
   DurationFilter filter(config.duration_filter(), runtime);
   Http::TestHeaderMapImpl request_headers{{":method", "GET"}, {":path", "/"}};
@@ -672,7 +673,7 @@ status_code_filter:
 
   NiceMock<Runtime::MockLoader> runtime;
 
-  envoy::config::filter::accesslog::v2::AccessLogFilter config;
+  envoy::config::filter::accesslog::v3alpha::AccessLogFilter config;
   TestUtility::loadFromYaml(filter_yaml, config);
   StatusCodeFilter filter(config.status_code_filter(), runtime);
 
@@ -1050,7 +1051,8 @@ typed_config:
   path: /dev/null
 )EOF";
 
-  const auto desc = envoy::config::filter::accesslog::v2::GrpcStatusFilter::Status_descriptor();
+  const auto desc =
+      envoy::config::filter::accesslog::v3alpha::GrpcStatusFilter::Status_descriptor();
   const int grpcStatuses = static_cast<int>(Grpc::Status::WellKnownGrpcStatus::MaximumKnown) + 1;
   if (desc->value_count() != grpcStatuses) {
     FAIL() << "Mismatch in number of gRPC statuses, GrpcStatus has " << grpcStatuses
@@ -1229,18 +1231,17 @@ class TestHeaderFilterFactory : public ExtensionFilterFactory {
 public:
   ~TestHeaderFilterFactory() override = default;
 
-  FilterPtr createFilter(const envoy::config::filter::accesslog::v2::ExtensionFilter& config,
+  FilterPtr createFilter(const envoy::config::filter::accesslog::v3alpha::ExtensionFilter& config,
                          Runtime::Loader&, Runtime::RandomGenerator&) override {
     auto factory_config = Config::Utility::translateToFactoryConfig(
         config, Envoy::ProtobufMessage::getNullValidationVisitor(), *this);
-    const auto& header_config =
-        TestUtility::downcastAndValidate<const envoy::config::filter::accesslog::v2::HeaderFilter&>(
-            *factory_config);
+    const auto& header_config = TestUtility::downcastAndValidate<
+        const envoy::config::filter::accesslog::v3alpha::HeaderFilter&>(*factory_config);
     return std::make_unique<HeaderFilter>(header_config);
   }
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return std::make_unique<envoy::config::filter::accesslog::v2::HeaderFilter>();
+    return std::make_unique<envoy::config::filter::accesslog::v3alpha::HeaderFilter>();
   }
 
   std::string name() const override { return "test_header_filter"; }
@@ -1304,7 +1305,7 @@ class SampleExtensionFilterFactory : public ExtensionFilterFactory {
 public:
   ~SampleExtensionFilterFactory() override = default;
 
-  FilterPtr createFilter(const envoy::config::filter::accesslog::v2::ExtensionFilter& config,
+  FilterPtr createFilter(const envoy::config::filter::accesslog::v3alpha::ExtensionFilter& config,
                          Runtime::Loader&, Runtime::RandomGenerator&) override {
     auto factory_config = Config::Utility::translateToFactoryConfig(
         config, Envoy::ProtobufMessage::getNullValidationVisitor(), *this);

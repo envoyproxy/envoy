@@ -5,9 +5,9 @@
 #include <string>
 #include <vector>
 
-#include "envoy/api/v2/core/grpc_service.pb.h"
-#include "envoy/api/v2/ratelimit/ratelimit.pb.h"
-#include "envoy/service/ratelimit/v2/rls.pb.h"
+#include "envoy/config/core/v3alpha/grpc_service.pb.h"
+#include "envoy/extensions/common/ratelimit/v3alpha/ratelimit.pb.h"
+#include "envoy/service/ratelimit/v3alpha/rls.pb.h"
 #include "envoy/stats/scope.h"
 
 #include "common/common/assert.h"
@@ -34,14 +34,15 @@ void GrpcClientImpl::cancel() {
   callbacks_ = nullptr;
 }
 
-void GrpcClientImpl::createRequest(envoy::service::ratelimit::v2::RateLimitRequest& request,
+void GrpcClientImpl::createRequest(envoy::service::ratelimit::v3alpha::RateLimitRequest& request,
                                    const std::string& domain,
                                    const std::vector<Envoy::RateLimit::Descriptor>& descriptors) {
   request.set_domain(domain);
   for (const Envoy::RateLimit::Descriptor& descriptor : descriptors) {
-    envoy::api::v2::ratelimit::RateLimitDescriptor* new_descriptor = request.add_descriptors();
+    envoy::extensions::common::ratelimit::v3alpha::RateLimitDescriptor* new_descriptor =
+        request.add_descriptors();
     for (const Envoy::RateLimit::DescriptorEntry& entry : descriptor.entries_) {
-      envoy::api::v2::ratelimit::RateLimitDescriptor::Entry* new_entry =
+      envoy::extensions::common::ratelimit::v3alpha::RateLimitDescriptor::Entry* new_entry =
           new_descriptor->add_entries();
       new_entry->set_key(entry.key_);
       new_entry->set_value(entry.value_);
@@ -55,7 +56,7 @@ void GrpcClientImpl::limit(RequestCallbacks& callbacks, const std::string& domai
   ASSERT(callbacks_ == nullptr);
   callbacks_ = &callbacks;
 
-  envoy::service::ratelimit::v2::RateLimitRequest request;
+  envoy::service::ratelimit::v3alpha::RateLimitRequest request;
   createRequest(request, domain, descriptors);
 
   request_ = async_client_->send(service_method_, request, *this, parent_span,
@@ -63,11 +64,13 @@ void GrpcClientImpl::limit(RequestCallbacks& callbacks, const std::string& domai
 }
 
 void GrpcClientImpl::onSuccess(
-    std::unique_ptr<envoy::service::ratelimit::v2::RateLimitResponse>&& response,
+    std::unique_ptr<envoy::service::ratelimit::v3alpha::RateLimitResponse>&& response,
     Tracing::Span& span) {
   LimitStatus status = LimitStatus::OK;
-  ASSERT(response->overall_code() != envoy::service::ratelimit::v2::RateLimitResponse::UNKNOWN);
-  if (response->overall_code() == envoy::service::ratelimit::v2::RateLimitResponse::OVER_LIMIT) {
+  ASSERT(response->overall_code() !=
+         envoy::service::ratelimit::v3alpha::RateLimitResponse::UNKNOWN);
+  if (response->overall_code() ==
+      envoy::service::ratelimit::v3alpha::RateLimitResponse::OVER_LIMIT) {
     status = LimitStatus::OverLimit;
     span.setTag(Constants::get().TraceStatus, Constants::get().TraceOverLimit);
   } else {
@@ -75,9 +78,9 @@ void GrpcClientImpl::onSuccess(
   }
 
   Http::HeaderMapPtr response_headers_to_add, request_headers_to_add;
-  if (!response->headers().empty()) {
+  if (!response->response_headers_to_add().empty()) {
     response_headers_to_add = std::make_unique<Http::HeaderMapImpl>();
-    for (const auto& h : response->headers()) {
+    for (const auto& h : response->response_headers_to_add()) {
       response_headers_to_add->addCopy(Http::LowerCaseString(h.key()), h.value());
     }
   }
@@ -101,7 +104,7 @@ void GrpcClientImpl::onFailure(Grpc::Status::GrpcStatus status, const std::strin
 }
 
 ClientPtr rateLimitClient(Server::Configuration::FactoryContext& context,
-                          const envoy::api::v2::core::GrpcService& grpc_service,
+                          const envoy::config::core::v3alpha::GrpcService& grpc_service,
                           const std::chrono::milliseconds timeout) {
   // TODO(ramaraochavali): register client to singleton when GrpcClientImpl supports concurrent
   // requests.

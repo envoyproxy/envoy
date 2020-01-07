@@ -1,6 +1,6 @@
 #include "extensions/filters/common/rbac/engine_impl.h"
 
-#include "envoy/config/rbac/v2/rbac.pb.h"
+#include "envoy/config/rbac/v3alpha/rbac.pb.h"
 
 #include "common/http/header_map_impl.h"
 
@@ -11,8 +11,8 @@ namespace Common {
 namespace RBAC {
 
 RoleBasedAccessControlEngineImpl::RoleBasedAccessControlEngineImpl(
-    const envoy::config::rbac::v2::RBAC& rules)
-    : allowed_if_matched_(rules.action() == envoy::config::rbac::v2::RBAC::ALLOW) {
+    const envoy::config::rbac::v3alpha::RBAC& rules)
+    : allowed_if_matched_(rules.action() == envoy::config::rbac::v3alpha::RBAC::ALLOW) {
   // guard expression builder by presence of a condition in policies
   for (const auto& policy : rules.policies()) {
     if (policy.second.has_condition()) {

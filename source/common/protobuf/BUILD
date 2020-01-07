@@ -67,6 +67,6 @@ envoy_cc_library(
         "//source/common/common:utility_lib",
         "//source/common/config:api_type_oracle_lib",
         "//source/common/config:version_converter_lib",
-        "@envoy_api//envoy/type:pkg_cc_proto",
+        "@envoy_api//envoy/type/v3alpha:pkg_cc_proto",
     ],
 )

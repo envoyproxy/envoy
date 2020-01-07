@@ -8,6 +8,7 @@ import "google/api/annotations.proto";
 import "google/protobuf/duration.proto";
 import "google/protobuf/wrappers.proto";
 
+import "envoy/annotations/resource.proto";
 import "udpa/annotations/migrate.proto";
 import "validate/validate.proto";
 
@@ -23,6 +24,8 @@ option (udpa.annotations.file_migrate).move_to_package = "envoy.service.endpoint
 // Endpoint discovery :ref:`architecture overview <arch_overview_service_discovery_types_eds>`
 
 service EndpointDiscoveryService {
+  option (envoy.annotations.resource).type = "envoy.api.v2.ClusterLoadAssignment";
+
   // The resource_names field in DiscoveryRequest specifies a list of clusters
   // to subscribe to updates for.
   rpc StreamEndpoints(stream DiscoveryRequest) returns (stream DiscoveryResponse) {

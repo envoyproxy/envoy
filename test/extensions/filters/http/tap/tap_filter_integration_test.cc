@@ -1,7 +1,7 @@
 #include <fstream>
 
-#include "envoy/api/v2/core/base.pb.h"
-#include "envoy/data/tap/v2alpha/wrapper.pb.h"
+#include "envoy/config/core/v3alpha/base.pb.h"
+#include "envoy/data/tap/v3alpha/wrapper.pb.h"
 
 #include "test/integration/http_integration.h"
 
@@ -30,9 +30,9 @@ public:
     initialize();
   }
 
-  const envoy::api::v2::core::HeaderValue*
+  const envoy::config::core::v3alpha::HeaderValue*
   findHeader(const std::string& key,
-             const Protobuf::RepeatedPtrField<envoy::api::v2::core::HeaderValue>& headers) {
+             const Protobuf::RepeatedPtrField<envoy::config::core::v3alpha::HeaderValue>& headers) {
     for (const auto& header : headers) {
       if (header.key() == key) {
         return &header;
@@ -99,7 +99,7 @@ public:
     return path_prefix;
   }
 
-  std::vector<envoy::data::tap::v2alpha::TraceWrapper>
+  std::vector<envoy::data::tap::v3alpha::TraceWrapper>
   readTracesFromFile(const std::string& path_prefix) {
     // Find the written .pb file and verify it.
     auto files = TestUtility::listFiles(path_prefix, false);
@@ -108,7 +108,7 @@ public:
     });
     EXPECT_NE(pb_file_name, files.end());
 
-    std::vector<envoy::data::tap::v2alpha::TraceWrapper> traces;
+    std::vector<envoy::data::tap::v3alpha::TraceWrapper> traces;
     std::ifstream pb_file(*pb_file_name, std::ios_base::binary);
     Protobuf::io::IstreamInputStream stream(&pb_file);
     Protobuf::io::CodedInputStream coded_stream(&stream);
@@ -196,7 +196,7 @@ typed_config:
                               [](const std::string& s) { return absl::EndsWith(s, ".pb"); });
   ASSERT_NE(pb_file, files.end());
 
-  envoy::data::tap::v2alpha::TraceWrapper trace;
+  envoy::data::tap::v3alpha::TraceWrapper trace;
   TestUtility::loadFromFile(*pb_file, trace, *api_);
   EXPECT_TRUE(trace.has_http_buffered_trace());
 }
@@ -245,7 +245,7 @@ tap_config:
 
   // Wait for the tap message.
   admin_response_->waitForBodyData(1);
-  envoy::data::tap::v2alpha::TraceWrapper trace;
+  envoy::data::tap::v3alpha::TraceWrapper trace;
   TestUtility::loadFromYaml(admin_response_->body(), trace);
   EXPECT_EQ(trace.http_buffered_trace().request().headers().size(), 8);
   EXPECT_EQ(trace.http_buffered_trace().response().headers().size(), 4);
@@ -341,7 +341,7 @@ tap_config:
   makeRequest(request_headers_no_tap_, {}, &request_trailers_, response_headers_no_tap_, {},
               &response_trailers_);
 
-  envoy::data::tap::v2alpha::TraceWrapper trace;
+  envoy::data::tap::v3alpha::TraceWrapper trace;
   admin_response_->waitForBodyData(1);
   TestUtility::loadFromYaml(admin_response_->body(), trace);
   EXPECT_EQ("bar",
@@ -372,7 +372,7 @@ tap_config:
   codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
   makeRequest(request_headers_no_tap_, {{"hello"}}, nullptr, response_headers_no_tap_, {{"world"}},
               nullptr);
-  envoy::data::tap::v2alpha::TraceWrapper trace;
+  envoy::data::tap::v3alpha::TraceWrapper trace;
   admin_response_->waitForBodyData(1);
   TestUtility::loadFromYaml(admin_response_->body(), trace);
   EXPECT_EQ("hello", trace.http_buffered_trace().request().body().as_bytes());
@@ -404,7 +404,7 @@ tap_config:
   codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
   makeRequest(request_headers_no_tap_, {{"hello"}}, nullptr, response_headers_no_tap_, {{"world"}},
               nullptr);
-  envoy::data::tap::v2alpha::TraceWrapper trace;
+  envoy::data::tap::v3alpha::TraceWrapper trace;
   admin_response_->waitForBodyData(1);
   TestUtility::loadFromYaml(admin_response_->body(), trace);
   EXPECT_EQ("hello", trace.http_buffered_trace().request().body().as_string());
@@ -437,7 +437,7 @@ tap_config:
   codec_client_ = makeHttpConnection(makeClientConnection(lookupPort("http")));
   makeRequest(request_headers_no_tap_, {{"hello"}}, nullptr, response_headers_no_tap_, {{"world"}},
               nullptr);
-  envoy::data::tap::v2alpha::TraceWrapper trace;
+  envoy::data::tap::v3alpha::TraceWrapper trace;
   admin_response_->waitForBodyData(1);
   TestUtility::loadFromYaml(admin_response_->body(), trace);
   EXPECT_EQ("hel", trace.http_buffered_trace().request().body().as_bytes());
@@ -481,7 +481,7 @@ typed_config:
   codec_client_->close();
   test_server_->waitForCounterGe("http.config_test.downstream_cx_destroy", 1);
 
-  std::vector<envoy::data::tap::v2alpha::TraceWrapper> traces = readTracesFromFile(path_prefix);
+  std::vector<envoy::data::tap::v3alpha::TraceWrapper> traces = readTracesFromFile(path_prefix);
   ASSERT_EQ(6, traces.size());
   EXPECT_TRUE(traces[0].http_streamed_trace_segment().has_request_headers());
   EXPECT_EQ("hello", traces[1].http_streamed_trace_segment().request_body_chunk().as_bytes());
@@ -526,7 +526,7 @@ typed_config:
   codec_client_->close();
   test_server_->waitForCounterGe("http.config_test.downstream_cx_destroy", 1);
 
-  std::vector<envoy::data::tap::v2alpha::TraceWrapper> traces = readTracesFromFile(path_prefix);
+  std::vector<envoy::data::tap::v3alpha::TraceWrapper> traces = readTracesFromFile(path_prefix);
   ASSERT_EQ(6, traces.size());
   EXPECT_TRUE(traces[0].http_streamed_trace_segment().has_request_headers());
   EXPECT_EQ("hello", traces[1].http_streamed_trace_segment().request_body_chunk().as_bytes());

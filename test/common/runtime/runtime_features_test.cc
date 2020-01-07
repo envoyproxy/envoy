@@ -1,8 +1,8 @@
 #include <string>
 
-#include "envoy/api/v2/core/base.pb.h"
-#include "envoy/api/v2/core/base.pb.validate.h"
-#include "envoy/type/percent.pb.h"
+#include "envoy/config/core/v3alpha/base.pb.h"
+#include "envoy/config/core/v3alpha/base.pb.validate.h"
+#include "envoy/type/v3alpha/percent.pb.h"
 
 #include "common/runtime/runtime_features.h"
 
@@ -25,7 +25,7 @@ protected:
 };
 
 TEST_F(FeatureFlagTest, FeatureFlagBasicTest) {
-  envoy::api::v2::core::RuntimeFeatureFlag feature_flag_proto;
+  envoy::config::core::v3alpha::RuntimeFeatureFlag feature_flag_proto;
   std::string yaml(R"EOF(
 runtime_key: "foo.bar"
 default_value: true
@@ -39,7 +39,7 @@ default_value: true
   EXPECT_CALL(runtime_.snapshot_, getBoolean("foo.bar", true)).WillOnce(Return(false));
   EXPECT_EQ(false, test_feature.enabled());
 
-  envoy::api::v2::core::RuntimeFeatureFlag feature_flag_proto2;
+  envoy::config::core::v3alpha::RuntimeFeatureFlag feature_flag_proto2;
   yaml = R"EOF(
 runtime_key: "bar.foo"
 default_value: false
@@ -55,7 +55,7 @@ default_value: false
 }
 
 TEST_F(FeatureFlagTest, FeatureFlagEmptyProtoTest) {
-  envoy::api::v2::core::RuntimeFeatureFlag empty_proto;
+  envoy::config::core::v3alpha::RuntimeFeatureFlag empty_proto;
   FeatureFlag test(empty_proto, runtime_);
 
   EXPECT_CALL(runtime_.snapshot_, getBoolean("", true));
@@ -63,7 +63,7 @@ TEST_F(FeatureFlagTest, FeatureFlagEmptyProtoTest) {
 }
 
 TEST_F(FeatureFlagTest, FractionalPercentBasicTest) {
-  envoy::api::v2::core::RuntimeFractionalPercent runtime_fractional_percent_proto;
+  envoy::config::core::v3alpha::RuntimeFractionalPercent runtime_fractional_percent_proto;
   std::string yaml(R"EOF(
 runtime_key: "foo.bar"
 default_value:
@@ -74,18 +74,20 @@ default_value:
   FractionalPercent test_fractional_percent(runtime_fractional_percent_proto, runtime_);
 
   EXPECT_CALL(runtime_.snapshot_,
-              featureEnabled("foo.bar",
-                             testing::Matcher<const envoy::type::FractionalPercent&>(Percent(100))))
+              featureEnabled(
+                  "foo.bar",
+                  testing::Matcher<const envoy::type::v3alpha::FractionalPercent&>(Percent(100))))
       .WillOnce(Return(true));
   EXPECT_EQ(true, test_fractional_percent.enabled());
 
   EXPECT_CALL(runtime_.snapshot_,
-              featureEnabled("foo.bar",
-                             testing::Matcher<const envoy::type::FractionalPercent&>(Percent(100))))
+              featureEnabled(
+                  "foo.bar",
+                  testing::Matcher<const envoy::type::v3alpha::FractionalPercent&>(Percent(100))))
       .WillOnce(Return(false));
   EXPECT_EQ(false, test_fractional_percent.enabled());
 
-  envoy::api::v2::core::RuntimeFractionalPercent runtime_fractional_percent_proto2;
+  envoy::config::core::v3alpha::RuntimeFractionalPercent runtime_fractional_percent_proto2;
   yaml = (R"EOF(
 runtime_key: "foo.bar"
 default_value:
@@ -95,15 +97,17 @@ default_value:
   TestUtility::loadFromYamlAndValidate(yaml, runtime_fractional_percent_proto2);
   FractionalPercent test_fractional_percent2(runtime_fractional_percent_proto2, runtime_);
 
-  EXPECT_CALL(runtime_.snapshot_,
-              featureEnabled("foo.bar",
-                             testing::Matcher<const envoy::type::FractionalPercent&>(Percent(0))))
+  EXPECT_CALL(
+      runtime_.snapshot_,
+      featureEnabled("foo.bar",
+                     testing::Matcher<const envoy::type::v3alpha::FractionalPercent&>(Percent(0))))
       .WillOnce(Return(true));
   EXPECT_EQ(true, test_fractional_percent2.enabled());
 
-  EXPECT_CALL(runtime_.snapshot_,
-              featureEnabled("foo.bar",
-                             testing::Matcher<const envoy::type::FractionalPercent&>(Percent(0))))
+  EXPECT_CALL(
+      runtime_.snapshot_,
+      featureEnabled("foo.bar",
+                     testing::Matcher<const envoy::type::v3alpha::FractionalPercent&>(Percent(0))))
       .WillOnce(Return(false));
   EXPECT_EQ(false, test_fractional_percent2.enabled());
 }
