@@ -4,9 +4,12 @@ package envoy.config.listener.v3alpha;
 
 import "envoy/config/core/v3alpha/address.proto";
 import "envoy/config/core/v3alpha/base.proto";
+import "envoy/config/listener/v2/api_listener.proto";
+import "envoy/config/listener/v3alpha/listener_components.proto";
+import "envoy/config/listener/v3alpha/udp_listener_config.proto";
 
-import "google/protobuf/any.proto";
-import "google/protobuf/struct.proto";
+import "google/api/annotations.proto";
+import "google/protobuf/duration.proto";
 import "google/protobuf/wrappers.proto";
 
 import "udpa/annotations/versioning.proto";
@@ -17,211 +20,210 @@ option java_package = "io.envoyproxy.envoy.config.listener.v3alpha";
 option java_outer_classname = "ListenerProto";
 option java_multiple_files = true;
 
-// [#protodoc-title: Listener components]
+// [#protodoc-title: Listener configuration]
 // Listener :ref:`configuration overview <config_listeners>`
 
-message Filter {
-  option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.listener.Filter";
+// [#next-free-field: 22]
+message Listener {
+  option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.Listener";
 
-  reserved 3, 2;
+  enum DrainType {
+    // Drain in response to calling /healthcheck/fail admin endpoint (along with the health check
+    // filter), listener removal/modification, and hot restart.
+    DEFAULT = 0;
 
-  reserved "config";
-
-  // The name of the filter to instantiate. The name must match a
-  // :ref:`supported filter <config_network_filters>`.
-  string name = 1 [(validate.rules).string = {min_bytes: 1}];
-
-  // Filter specific configuration which depends on the filter being
-  // instantiated. See the supported filters for further documentation.
-  oneof config_type {
-    google.protobuf.Any typed_config = 4;
-  }
-}
-
-// Specifies the match criteria for selecting a specific filter chain for a
-// listener.
-//
-// In order for a filter chain to be selected, *ALL* of its criteria must be
-// fulfilled by the incoming connection, properties of which are set by the
-// networking stack and/or listener filters.
-//
-// The following order applies:
-//
-// 1. Destination port.
-// 2. Destination IP address.
-// 3. Server name (e.g. SNI for TLS protocol),
-// 4. Transport protocol.
-// 5. Application protocols (e.g. ALPN for TLS protocol).
-// 6. Source type (e.g. any, local or external network).
-// 7. Source IP address.
-// 8. Source port.
-//
-// For criteria that allow ranges or wildcards, the most specific value in any
-// of the configured filter chains that matches the incoming connection is going
-// to be used (e.g. for SNI ``www.example.com`` the most specific match would be
-// ``www.example.com``, then ``*.example.com``, then ``*.com``, then any filter
-// chain without ``server_names`` requirements).
-//
-// [#comment: Implemented rules are kept in the preference order, with deprecated fields
-// listed at the end, because that's how we want to list them in the docs.
-//
-// [#comment:TODO(PiotrSikora): Add support for configurable precedence of the rules]
-// [#next-free-field: 13]
-message FilterChainMatch {
-  option (udpa.annotations.versioning).previous_message_type =
-      "envoy.api.v2.listener.FilterChainMatch";
-
-  enum ConnectionSourceType {
-    // Any connection source matches.
-    ANY = 0;
-
-    // Match a connection originating from the same host.
-    SAME_IP_OR_LOOPBACK = 1;
-
-    // Match a connection originating from a different host.
-    EXTERNAL = 2;
+    // Drain in response to listener removal/modification and hot restart. This setting does not
+    // include /healthcheck/fail. This setting may be desirable if Envoy is hosting both ingress
+    // and egress listeners.
+    MODIFY_ONLY = 1;
   }
 
-  reserved 1;
-
-  // Optional destination port to consider when use_original_dst is set on the
-  // listener in determining a filter chain match.
-  google.protobuf.UInt32Value destination_port = 8 [(validate.rules).uint32 = {lte: 65535 gte: 1}];
-
-  // If non-empty, an IP address and prefix length to match addresses when the
-  // listener is bound to 0.0.0.0/:: or when use_original_dst is specified.
-  repeated core.v3alpha.CidrRange prefix_ranges = 3;
-
-  // If non-empty, an IP address and suffix length to match addresses when the
-  // listener is bound to 0.0.0.0/:: or when use_original_dst is specified.
   // [#not-implemented-hide:]
-  string address_suffix = 4;
+  message DeprecatedV1 {
+    option (udpa.annotations.versioning).previous_message_type =
+        "envoy.api.v2.Listener.DeprecatedV1";
+
+    // Whether the listener should bind to the port. A listener that doesn't
+    // bind can only receive connections redirected from other listeners that
+    // set use_original_dst parameter to true. Default is true.
+    //
+    // This is deprecated in v2, all Listeners will bind to their port. An
+    // additional filter chain must be created for every original destination
+    // port this listener may redirect to in v2, with the original port
+    // specified in the FilterChainMatch destination_port field.
+    //
+    // [#comment:TODO(PiotrSikora): Remove this once verified that we no longer need it.]
+    google.protobuf.BoolValue bind_to_port = 1;
+  }
+
+  // Configuration for listener connection balancing.
+  message ConnectionBalanceConfig {
+    option (udpa.annotations.versioning).previous_message_type =
+        "envoy.api.v2.Listener.ConnectionBalanceConfig";
+
+    // A connection balancer implementation that does exact balancing. This means that a lock is
+    // held during balancing so that connection counts are nearly exactly balanced between worker
+    // threads. This is "nearly" exact in the sense that a connection might close in parallel thus
+    // making the counts incorrect, but this should be rectified on the next accept. This balancer
+    // sacrifices accept throughput for accuracy and should be used when there are a small number of
+    // connections that rarely cycle (e.g., service mesh gRPC egress).
+    message ExactBalance {
+      option (udpa.annotations.versioning).previous_message_type =
+          "envoy.api.v2.Listener.ConnectionBalanceConfig.ExactBalance";
+    }
+
+    oneof balance_type {
+      option (validate.required) = true;
+
+      // If specified, the listener will use the exact connection balancer.
+      ExactBalance exact_balance = 1;
+    }
+  }
+
+  reserved 14, 4;
+
+  reserved "use_original_dst";
+
+  // The unique name by which this listener is known. If no name is provided,
+  // Envoy will allocate an internal UUID for the listener. If the listener is to be dynamically
+  // updated or removed via :ref:`LDS <config_listeners_lds>` a unique name must be provided.
+  string name = 1;
+
+  // The address that the listener should listen on. In general, the address must be unique, though
+  // that is governed by the bind rules of the OS. E.g., multiple listeners can listen on port 0 on
+  // Linux as the actual port will be allocated by the OS.
+  core.v3alpha.Address address = 2 [(validate.rules).message = {required: true}];
+
+  // A list of filter chains to consider for this listener. The
+  // :ref:`FilterChain <envoy_api_msg_config.listener.v3alpha.FilterChain>` with the most specific
+  // :ref:`FilterChainMatch <envoy_api_msg_config.listener.v3alpha.FilterChainMatch>` criteria is
+  // used on a connection.
+  //
+  // Example using SNI for filter chain selection can be found in the
+  // :ref:`FAQ entry <faq_how_to_setup_sni>`.
+  repeated FilterChain filter_chains = 3;
+
+  // Soft limit on size of the listener’s new connection read and write buffers.
+  // If unspecified, an implementation defined default is applied (1MiB).
+  google.protobuf.UInt32Value per_connection_buffer_limit_bytes = 5;
+
+  // Listener metadata.
+  core.v3alpha.Metadata metadata = 6;
 
   // [#not-implemented-hide:]
-  google.protobuf.UInt32Value suffix_len = 5;
+  DeprecatedV1 deprecated_v1 = 7;
 
-  // Specifies the connection source IP match type. Can be any, local or external network.
-  ConnectionSourceType source_type = 12 [(validate.rules).enum = {defined_only: true}];
+  // The type of draining to perform at a listener-wide level.
+  DrainType drain_type = 8;
 
-  // The criteria is satisfied if the source IP address of the downstream
-  // connection is contained in at least one of the specified subnets. If the
-  // parameter is not specified or the list is empty, the source IP address is
-  // ignored.
-  repeated core.v3alpha.CidrRange source_prefix_ranges = 6;
+  // Listener filters have the opportunity to manipulate and augment the connection metadata that
+  // is used in connection filter chain matching, for example. These filters are run before any in
+  // :ref:`filter_chains <envoy_api_field_config.listener.v3alpha.Listener.filter_chains>`. Order
+  // matters as the filters are processed sequentially right after a socket has been accepted by the
+  // listener, and before a connection is created. UDP Listener filters can be specified when the
+  // protocol in the listener socket address in :ref:`protocol
+  // <envoy_api_field_config.core.v3alpha.SocketAddress.protocol>` is :ref:`UDP
+  // <envoy_api_enum_value_config.core.v3alpha.SocketAddress.Protocol.UDP>`.
+  // UDP listeners currently support a single filter.
+  repeated ListenerFilter listener_filters = 9;
 
-  // The criteria is satisfied if the source port of the downstream connection
-  // is contained in at least one of the specified ports. If the parameter is
-  // not specified, the source port is ignored.
-  repeated uint32 source_ports = 7
-      [(validate.rules).repeated = {items {uint32 {lte: 65535 gte: 1}}}];
+  // The timeout to wait for all listener filters to complete operation. If the timeout is reached,
+  // the accepted socket is closed without a connection being created unless
+  // `continue_on_listener_filters_timeout` is set to true. Specify 0 to disable the
+  // timeout. If not specified, a default timeout of 15s is used.
+  google.protobuf.Duration listener_filters_timeout = 15;
 
-  // If non-empty, a list of server names (e.g. SNI for TLS protocol) to consider when determining
-  // a filter chain match. Those values will be compared against the server names of a new
-  // connection, when detected by one of the listener filters.
-  //
-  // The server name will be matched against all wildcard domains, i.e. ``www.example.com``
-  // will be first matched against ``www.example.com``, then ``*.example.com``, then ``*.com``.
-  //
-  // Note that partial wildcards are not supported, and values like ``*w.example.com`` are invalid.
+  // Whether a connection should be created when listener filters timeout. Default is false.
   //
   // .. attention::
   //
-  //   See the :ref:`FAQ entry <faq_how_to_setup_sni>` on how to configure SNI for more
-  //   information.
-  repeated string server_names = 11;
+  //   Some listener filters, such as :ref:`Proxy Protocol filter
+  //   <config_listener_filters_proxy_protocol>`, should not be used with this option. It will cause
+  //   unexpected behavior when a connection is created.
+  bool continue_on_listener_filters_timeout = 17;
 
-  // If non-empty, a transport protocol to consider when determining a filter chain match.
-  // This value will be compared against the transport protocol of a new connection, when
-  // it's detected by one of the listener filters.
+  // Whether the listener should be set as a transparent socket.
+  // When this flag is set to true, connections can be redirected to the listener using an
+  // *iptables* *TPROXY* target, in which case the original source and destination addresses and
+  // ports are preserved on accepted connections. This flag should be used in combination with
+  // :ref:`an original_dst <config_listener_filters_original_dst>` :ref:`listener filter
+  // <envoy_api_field_config.listener.v3alpha.Listener.listener_filters>` to mark the connections'
+  // local addresses as "restored." This can be used to hand off each redirected connection to
+  // another listener associated with the connection's destination address. Direct connections to
+  // the socket without using *TPROXY* cannot be distinguished from connections redirected using
+  // *TPROXY* and are therefore treated as if they were redirected. When this flag is set to false,
+  // the listener's socket is explicitly reset as non-transparent. Setting this flag requires Envoy
+  // to run with the *CAP_NET_ADMIN* capability. When this flag is not set (default), the socket is
+  // not modified, i.e. the transparent option is neither set nor reset.
+  google.protobuf.BoolValue transparent = 10;
+
+  // Whether the listener should set the *IP_FREEBIND* socket option. When this
+  // flag is set to true, listeners can be bound to an IP address that is not
+  // configured on the system running Envoy. When this flag is set to false, the
+  // option *IP_FREEBIND* is disabled on the socket. When this flag is not set
+  // (default), the socket is not modified, i.e. the option is neither enabled
+  // nor disabled.
+  google.protobuf.BoolValue freebind = 11;
+
+  // Additional socket options that may not be present in Envoy source code or
+  // precompiled binaries.
+  repeated core.v3alpha.SocketOption socket_options = 13;
+
+  // Whether the listener should accept TCP Fast Open (TFO) connections.
+  // When this flag is set to a value greater than 0, the option TCP_FASTOPEN is enabled on
+  // the socket, with a queue length of the specified size
+  // (see `details in RFC7413 <https://tools.ietf.org/html/rfc7413#section-5.1>`_).
+  // When this flag is set to 0, the option TCP_FASTOPEN is disabled on the socket.
+  // When this flag is not set (default), the socket is not modified,
+  // i.e. the option is neither enabled nor disabled.
   //
-  // Suggested values include:
+  // On Linux, the net.ipv4.tcp_fastopen kernel parameter must include flag 0x2 to enable
+  // TCP_FASTOPEN.
+  // See `ip-sysctl.txt <https://www.kernel.org/doc/Documentation/networking/ip-sysctl.txt>`_.
   //
-  // * ``raw_buffer`` - default, used when no transport protocol is detected,
-  // * ``tls`` - set by :ref:`envoy.listener.tls_inspector <config_listener_filters_tls_inspector>`
-  //   when TLS protocol is detected.
-  string transport_protocol = 9;
+  // On macOS, only values of 0, 1, and unset are valid; other values may result in an error.
+  // To set the queue length on macOS, set the net.inet.tcp.fastopen_backlog kernel parameter.
+  google.protobuf.UInt32Value tcp_fast_open_queue_length = 12;
 
-  // If non-empty, a list of application protocols (e.g. ALPN for TLS protocol) to consider when
-  // determining a filter chain match. Those values will be compared against the application
-  // protocols of a new connection, when detected by one of the listener filters.
+  // Specifies the intended direction of the traffic relative to the local Envoy.
+  core.v3alpha.TrafficDirection traffic_direction = 16;
+
+  // If the protocol in the listener socket address in :ref:`protocol
+  // <envoy_api_field_config.core.v3alpha.SocketAddress.protocol>` is :ref:`UDP
+  // <envoy_api_enum_value_config.core.v3alpha.SocketAddress.Protocol.UDP>`, this field specifies
+  // the actual udp listener to create, i.e. :ref:`udp_listener_name
+  // <envoy_api_field_config.listener.v3alpha.UdpListenerConfig.udp_listener_name>` =
+  // "raw_udp_listener" for creating a packet-oriented UDP listener. If not present, treat it as
+  // "raw_udp_listener".
+  UdpListenerConfig udp_listener_config = 18;
+
+  // [#not-implemented-hide:]
+  // Used to represent an API listener, which is used in non-proxy clients. The type of API
+  // exposed to the non-proxy application depends on the type of API listener.
+  // When this field is set, no other field except for
+  // :ref:`name<envoy_api_field_config.listener.v3alpha.Listener.name>` should be set.
+  // [#next-major-version: In the v3 API, instead of this messy approach where the socket
+  // listener fields are directly in the top-level Listener message and the API listener types
+  // are in the ApiListener message, the socket listener messages should be in their own message,
+  // and the top-level Listener should essentially be a oneof that selects between the
+  // socket listener and the various types of API listener. That way, a given Listener message
+  // can structurally only contain the fields of the relevant type.]
+  v2.ApiListener api_listener = 19;
+
+  // The listener's connection balancer configuration, currently only applicable to TCP listeners.
+  // If no configuration is specified, Envoy will not attempt to balance active connections between
+  // worker threads.
+  ConnectionBalanceConfig connection_balance_config = 20;
+
+  // When this flag is set to true, listeners set the *SO_REUSEPORT* socket option and
+  // create one socket for each worker thread. This makes inbound connections
+  // distribute among worker threads roughly evenly in cases where there are a high number
+  // of connections. When this flag is set to false, all worker threads share one socket.
   //
-  // Suggested values include:
-  //
-  // * ``http/1.1`` - set by :ref:`envoy.listener.tls_inspector
-  //   <config_listener_filters_tls_inspector>`,
-  // * ``h2`` - set by :ref:`envoy.listener.tls_inspector <config_listener_filters_tls_inspector>`
-  //
-  // .. attention::
-  //
-  //   Currently, only :ref:`TLS Inspector <config_listener_filters_tls_inspector>` provides
-  //   application protocol detection based on the requested
-  //   `ALPN <https://en.wikipedia.org/wiki/Application-Layer_Protocol_Negotiation>`_ values.
-  //
-  //   However, the use of ALPN is pretty much limited to the HTTP/2 traffic on the Internet,
-  //   and matching on values other than ``h2`` is going to lead to a lot of false negatives,
-  //   unless all connecting clients are known to use ALPN.
-  repeated string application_protocols = 10;
-}
-
-// A filter chain wraps a set of match criteria, an option TLS context, a set of filters, and
-// various other parameters.
-// [#next-free-field: 8]
-message FilterChain {
-  option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.listener.FilterChain";
-
-  reserved 2;
-
-  reserved "tls_context";
-
-  // The criteria to use when matching a connection to this filter chain.
-  FilterChainMatch filter_chain_match = 1;
-
-  // A list of individual network filters that make up the filter chain for
-  // connections established with the listener. Order matters as the filters are
-  // processed sequentially as connection events happen. Note: If the filter
-  // list is empty, the connection will close by default.
-  repeated Filter filters = 3;
-
-  // Whether the listener should expect a PROXY protocol V1 header on new
-  // connections. If this option is enabled, the listener will assume that that
-  // remote address of the connection is the one specified in the header. Some
-  // load balancers including the AWS ELB support this option. If the option is
-  // absent or set to false, Envoy will use the physical peer address of the
-  // connection as the remote address.
-  google.protobuf.BoolValue use_proxy_proto = 4;
-
-  // [#not-implemented-hide:] filter chain metadata.
-  core.v3alpha.Metadata metadata = 5;
-
-  // Optional custom transport socket implementation to use for downstream connections.
-  // To setup TLS, set a transport socket with name `tls` and
-  // :ref:`DownstreamTlsContext
-  // <envoy_api_msg_extensions.transport_sockets.tls.v3alpha.DownstreamTlsContext>` in the
-  // `typed_config`. If no transport socket configuration is specified, new connections will be set
-  // up with plaintext.
-  core.v3alpha.TransportSocket transport_socket = 6;
-
-  // [#not-implemented-hide:] The unique name (or empty) by which this filter chain is known. If no
-  // name is provided, Envoy will allocate an internal UUID for the filter chain. If the filter
-  // chain is to be dynamically updated or removed via FCDS a unique name must be provided.
-  string name = 7;
-}
-
-message ListenerFilter {
-  option (udpa.annotations.versioning).previous_message_type =
-      "envoy.api.v2.listener.ListenerFilter";
-
-  reserved 2;
-
-  reserved "config";
-
-  // The name of the filter to instantiate. The name must match a
-  // :ref:`supported filter <config_listener_filters>`.
-  string name = 1 [(validate.rules).string = {min_bytes: 1}];
-
-  // Filter specific configuration which depends on the filter being instantiated.
-  // See the supported filters for further documentation.
-  oneof config_type {
-    google.protobuf.Any typed_config = 3;
-  }
+  // Before Linux v4.19-rc1, new TCP connections may be rejected during hot restart
+  // (see `3rd paragraph in 'soreuseport' commit message
+  // <https://github.com/torvalds/linux/commit/c617f398edd4db2b8567a28e89>`_).
+  // This issue was fixed by `tcp: Avoid TCP syncookie rejected by SO_REUSEPORT socket
+  // <https://github.com/torvalds/linux/commit/40a1227ea845a37ab197dd1caffb60b047fa36b1>`_.
+  bool reuse_port = 21;
 }

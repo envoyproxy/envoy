@@ -1,6 +1,6 @@
 #pragma once
 
-#include "envoy/api/v2/route/route.pb.h"
+#include "envoy/config/route/v3alpha/route_components.pb.h"
 #include "envoy/router/router.h"
 
 namespace Envoy {
@@ -9,7 +9,7 @@ namespace Router {
 class TlsContextMatchCriteriaImpl : public TlsContextMatchCriteria {
 public:
   TlsContextMatchCriteriaImpl(
-      const ::envoy::api::v2::route::RouteMatch_TlsContextMatchOptions& options);
+      const envoy::config::route::v3alpha::RouteMatch::TlsContextMatchOptions& options);
 
   const absl::optional<bool>& presented() const override { return presented_; }
 

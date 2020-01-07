@@ -1,6 +1,6 @@
 #include "common/config/datasource.h"
 
-#include "envoy/api/v2/core/base.pb.h"
+#include "envoy/config/core/v3alpha/base.pb.h"
 
 #include "fmt/format.h"
 
@@ -8,13 +8,14 @@ namespace Envoy {
 namespace Config {
 namespace DataSource {
 
-std::string read(const envoy::api::v2::core::DataSource& source, bool allow_empty, Api::Api& api) {
+std::string read(const envoy::config::core::v3alpha::DataSource& source, bool allow_empty,
+                 Api::Api& api) {
   switch (source.specifier_case()) {
-  case envoy::api::v2::core::DataSource::kFilename:
+  case envoy::config::core::v3alpha::DataSource::SpecifierCase::kFilename:
     return api.fileSystem().fileReadToEnd(source.filename());
-  case envoy::api::v2::core::DataSource::kInlineBytes:
+  case envoy::config::core::v3alpha::DataSource::SpecifierCase::kInlineBytes:
     return source.inline_bytes();
-  case envoy::api::v2::core::DataSource::kInlineString:
+  case envoy::config::core::v3alpha::DataSource::SpecifierCase::kInlineString:
     return source.inline_string();
   default:
     if (!allow_empty) {
@@ -25,8 +26,9 @@ std::string read(const envoy::api::v2::core::DataSource& source, bool allow_empt
   }
 }
 
-absl::optional<std::string> getPath(const envoy::api::v2::core::DataSource& source) {
-  return source.specifier_case() == envoy::api::v2::core::DataSource::kFilename
+absl::optional<std::string> getPath(const envoy::config::core::v3alpha::DataSource& source) {
+  return source.specifier_case() ==
+                 envoy::config::core::v3alpha::DataSource::SpecifierCase::kFilename
              ? absl::make_optional(source.filename())
              : absl::nullopt;
 }

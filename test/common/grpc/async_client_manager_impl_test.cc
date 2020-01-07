@@ -1,4 +1,4 @@
-#include "envoy/api/v2/core/grpc_service.pb.h"
+#include "envoy/config/core/v3alpha/grpc_service.pb.h"
 
 #include "common/api/api_impl.h"
 #include "common/grpc/async_client_manager_impl.h"
@@ -31,7 +31,7 @@ public:
 
 TEST_F(AsyncClientManagerImplTest, EnvoyGrpcOk) {
   AsyncClientManagerImpl async_client_manager(cm_, tls_, test_time_.timeSystem(), *api_);
-  envoy::api::v2::core::GrpcService grpc_service;
+  envoy::config::core::v3alpha::GrpcService grpc_service;
   grpc_service.mutable_envoy_grpc()->set_cluster_name("foo");
 
   Upstream::ClusterManager::ClusterInfoMap cluster_map;
@@ -46,7 +46,7 @@ TEST_F(AsyncClientManagerImplTest, EnvoyGrpcOk) {
 
 TEST_F(AsyncClientManagerImplTest, EnvoyGrpcUnknown) {
   AsyncClientManagerImpl async_client_manager(cm_, tls_, test_time_.timeSystem(), *api_);
-  envoy::api::v2::core::GrpcService grpc_service;
+  envoy::config::core::v3alpha::GrpcService grpc_service;
   grpc_service.mutable_envoy_grpc()->set_cluster_name("foo");
 
   EXPECT_CALL(cm_, clusters());
@@ -56,7 +56,7 @@ TEST_F(AsyncClientManagerImplTest, EnvoyGrpcUnknown) {
 
 TEST_F(AsyncClientManagerImplTest, EnvoyGrpcDynamicCluster) {
   AsyncClientManagerImpl async_client_manager(cm_, tls_, test_time_.timeSystem(), *api_);
-  envoy::api::v2::core::GrpcService grpc_service;
+  envoy::config::core::v3alpha::GrpcService grpc_service;
   grpc_service.mutable_envoy_grpc()->set_cluster_name("foo");
 
   Upstream::ClusterManager::ClusterInfoMap cluster_map;
@@ -72,7 +72,7 @@ TEST_F(AsyncClientManagerImplTest, EnvoyGrpcDynamicCluster) {
 TEST_F(AsyncClientManagerImplTest, GoogleGrpc) {
   EXPECT_CALL(scope_, createScope_("grpc.foo."));
   AsyncClientManagerImpl async_client_manager(cm_, tls_, test_time_.timeSystem(), *api_);
-  envoy::api::v2::core::GrpcService grpc_service;
+  envoy::config::core::v3alpha::GrpcService grpc_service;
   grpc_service.mutable_google_grpc()->set_stat_prefix("foo");
 
 #ifdef ENVOY_GOOGLE_GRPC
@@ -85,7 +85,7 @@ TEST_F(AsyncClientManagerImplTest, GoogleGrpc) {
 
 TEST_F(AsyncClientManagerImplTest, EnvoyGrpcUnknownOk) {
   AsyncClientManagerImpl async_client_manager(cm_, tls_, test_time_.timeSystem(), *api_);
-  envoy::api::v2::core::GrpcService grpc_service;
+  envoy::config::core::v3alpha::GrpcService grpc_service;
   grpc_service.mutable_envoy_grpc()->set_cluster_name("foo");
 
   EXPECT_CALL(cm_, clusters()).Times(0);

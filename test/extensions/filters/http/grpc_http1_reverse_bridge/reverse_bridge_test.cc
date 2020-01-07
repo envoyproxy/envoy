@@ -1,7 +1,7 @@
 #include <memory>
 #include <string>
 
-#include "envoy/config/filter/http/grpc_http1_reverse_bridge/v2alpha1/config.pb.h"
+#include "envoy/extensions/filters/http/grpc_http1_reverse_bridge/v3alpha/config.pb.h"
 
 #include "common/buffer/buffer_impl.h"
 #include "common/grpc/codec.h"
@@ -555,7 +555,7 @@ TEST_F(ReverseBridgeTest, FilterConfigPerRouteDisabled) {
   initialize();
   decoder_callbacks_.is_grpc_request_ = true;
 
-  envoy::config::filter::http::grpc_http1_reverse_bridge::v2alpha1::FilterConfigPerRoute
+  envoy::extensions::filters::http::grpc_http1_reverse_bridge::v3alpha::FilterConfigPerRoute
       filter_config_per_route;
   filter_config_per_route.set_disabled(true);
   FilterConfigPerRoute filterConfigPerRoute(filter_config_per_route);
@@ -584,7 +584,7 @@ TEST_F(ReverseBridgeTest, FilterConfigPerRouteEnabled) {
   initialize();
   decoder_callbacks_.is_grpc_request_ = true;
 
-  envoy::config::filter::http::grpc_http1_reverse_bridge::v2alpha1::FilterConfigPerRoute
+  envoy::extensions::filters::http::grpc_http1_reverse_bridge::v3alpha::FilterConfigPerRoute
       filter_config_per_route;
   filter_config_per_route.set_disabled(false);
   FilterConfigPerRoute filterConfigPerRoute(filter_config_per_route);
@@ -671,7 +671,7 @@ TEST_F(ReverseBridgeTest, RouteWithTrailers) {
   initialize();
   decoder_callbacks_.is_grpc_request_ = true;
 
-  envoy::config::filter::http::grpc_http1_reverse_bridge::v2alpha1::FilterConfigPerRoute
+  envoy::extensions::filters::http::grpc_http1_reverse_bridge::v3alpha::FilterConfigPerRoute
       filter_config_per_route;
   filter_config_per_route.set_disabled(false);
   FilterConfigPerRoute filterConfigPerRoute(filter_config_per_route);

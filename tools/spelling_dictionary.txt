@@ -48,6 +48,7 @@ CTXs
 CVC
 CVE
 CX
+Cxx
 CYGWIN
 DER
 DESC
@@ -491,6 +492,7 @@ deserialize
 deserialized
 deserializer
 deserializers
+deserializing
 dest
 destructor
 destructors
@@ -643,6 +645,7 @@ iteratively
 javascript
 jitter
 jittered
+kafka
 keepalive
 keepalives
 ketama
