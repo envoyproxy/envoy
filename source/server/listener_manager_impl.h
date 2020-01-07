@@ -147,7 +147,7 @@ public:
   void beginListenerUpdate() override { error_state_tracker_.clear(); }
   void endListenerUpdate(FailureStates&& failure_state) override;
   Http::Context& httpContext() { return server_.httpContext(); }
-  ApiListenerHandle* apiListener() override;
+  ApiListener* apiListener() override { return api_listener_.get(); }
 
   Instance& server_;
   ListenerComponentFactory& factory_;

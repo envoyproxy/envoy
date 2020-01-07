@@ -18,7 +18,6 @@
 #include "common/common/fmt.h"
 #include "common/config/utility.h"
 #include "common/http/conn_manager_utility.h"
-#include "common/http/date_provider_impl.h"
 #include "common/http/default_server_string.h"
 #include "common/http/http1/codec_impl.h"
 #include "common/http/http2/codec_impl.h"
@@ -26,8 +25,6 @@
 #include "common/http/http3/well_known_names.h"
 #include "common/http/utility.h"
 #include "common/protobuf/utility.h"
-#include "common/router/rds_impl.h"
-#include "common/router/scoped_rds.h"
 #include "common/runtime/runtime_impl.h"
 #include "common/tracing/http_tracer_impl.h"
 
@@ -78,11 +75,10 @@ SINGLETON_MANAGER_REGISTRATION(date_provider);
 SINGLETON_MANAGER_REGISTRATION(route_config_provider_manager);
 SINGLETON_MANAGER_REGISTRATION(scoped_routes_config_provider_manager);
 
-Network::FilterFactoryCb
-HttpConnectionManagerFilterConfigFactory::createFilterFactoryFromProtoTyped(
-    const envoy::extensions::filters::network::http_connection_manager::v3alpha::
-        HttpConnectionManager& proto_config,
-    Server::Configuration::FactoryContext& context) {
+std::tuple<std::shared_ptr<Http::TlsCachingDateProviderImpl>,
+           std::shared_ptr<Router::RouteConfigProviderManager>,
+           std::shared_ptr<Router::ScopedRoutesConfigProviderManager>>
+Utility::createSingletons(Server::Configuration::FactoryContext& context) {
   std::shared_ptr<Http::TlsCachingDateProviderImpl> date_provider =
       context.singletonManager().getTyped<Http::TlsCachingDateProviderImpl>(
           SINGLETON_MANAGER_REGISTERED_NAME(date_provider), [&context] {
@@ -104,9 +100,36 @@ HttpConnectionManagerFilterConfigFactory::createFilterFactoryFromProtoTyped(
                 context.admin(), *route_config_provider_manager);
           });
 
-  std::shared_ptr<HttpConnectionManagerConfig> filter_config(new HttpConnectionManagerConfig(
-      proto_config, context, *date_provider, *route_config_provider_manager,
-      *scoped_routes_config_provider_manager));
+  return std::make_tuple(date_provider, route_config_provider_manager,
+                         scoped_routes_config_provider_manager);
+}
+
+std::shared_ptr<HttpConnectionManagerConfig>
+Utility::createConfig(const envoy::extensions::filters::network::http_connection_manager::v3alpha::
+                          HttpConnectionManager& proto_config,
+                      Server::Configuration::FactoryContext& context,
+                      Http::DateProvider& date_provider,
+                      Router::RouteConfigProviderManager& route_config_provider_manager,
+                      Config::ConfigProviderManager& scoped_routes_config_provider_manager) {
+  return std::make_shared<HttpConnectionManagerConfig>(proto_config, context, date_provider,
+                                                       route_config_provider_manager,
+                                                       scoped_routes_config_provider_manager);
+}
+
+Network::FilterFactoryCb
+HttpConnectionManagerFilterConfigFactory::createFilterFactoryFromProtoTyped(
+    const envoy::extensions::filters::network::http_connection_manager::v3alpha::
+        HttpConnectionManager& proto_config,
+    Server::Configuration::FactoryContext& context) {
+  std::shared_ptr<Http::TlsCachingDateProviderImpl> date_provider;
+  std::shared_ptr<Router::RouteConfigProviderManager> route_config_provider_manager;
+  std::shared_ptr<Router::ScopedRoutesConfigProviderManager> scoped_routes_config_provider_manager;
+  std::tie(date_provider, route_config_provider_manager, scoped_routes_config_provider_manager) =
+      Utility::createSingletons(context);
+
+  auto filter_config =
+      Utility::createConfig(proto_config, context, *date_provider, *route_config_provider_manager,
+                            *scoped_routes_config_provider_manager);
 
   // This lambda captures the shared_ptrs created above, thus preserving the
   // reference count.
@@ -498,54 +521,28 @@ const Network::Address::Instance& HttpConnectionManagerConfig::localAddress() {
   return *context_.localInfo().address();
 }
 
-// Singleton registration via macro defined in envoy/singleton/manager.h
-SINGLETON_MANAGER_REGISTRATION(hcm_date_provider);
-SINGLETON_MANAGER_REGISTRATION(hcm_route_config_provider_manager);
-SINGLETON_MANAGER_REGISTRATION(hcm_scoped_routes_config_provider_manager);
-
-// TODO(junr03): some of this code can be shared with the other factory code. Clean up
-// if this factory approach is well received by reviewers.
-std::function<Http::ServerConnectionCallbacksPtr()>
+std::function<Http::ApiListenerPtr()>
 HttpConnectionManagerFactory::createHttpConnectionManagerFactoryFromProto(
-    const ProtobufWkt::Any& proto_config, Server::Configuration::FactoryContext& context,
-    Network::ReadFilterCallbacks& read_callbacks) {
-  auto typed_config = MessageUtil::anyConvert<
-      envoy::extensions::filters::network::http_connection_manager::v3alpha::HttpConnectionManager>(
-      proto_config);
+    const envoy::extensions::filters::network::http_connection_manager::v3alpha::
+        HttpConnectionManager& proto_config,
+    Server::Configuration::FactoryContext& context, Network::ReadFilterCallbacks& read_callbacks) {
 
-  std::shared_ptr<Http::TlsCachingDateProviderImpl> hcm_date_provider =
-      context.singletonManager().getTyped<Http::TlsCachingDateProviderImpl>(
-          SINGLETON_MANAGER_REGISTERED_NAME(hcm_date_provider), [&context] {
-            return std::make_shared<Http::TlsCachingDateProviderImpl>(context.dispatcher(),
-                                                                      context.threadLocal());
-          });
+  std::shared_ptr<Http::TlsCachingDateProviderImpl> date_provider;
+  std::shared_ptr<Router::RouteConfigProviderManager> route_config_provider_manager;
+  std::shared_ptr<Router::ScopedRoutesConfigProviderManager> scoped_routes_config_provider_manager;
+  std::tie(date_provider, route_config_provider_manager, scoped_routes_config_provider_manager) =
+      Utility::createSingletons(context);
 
-  std::shared_ptr<Router::RouteConfigProviderManager> hcm_route_config_provider_manager =
-      context.singletonManager().getTyped<Router::RouteConfigProviderManager>(
-          SINGLETON_MANAGER_REGISTERED_NAME(hcm_route_config_provider_manager), [&context] {
-            return std::make_shared<Router::RouteConfigProviderManagerImpl>(context.admin());
-          });
-
-  std::shared_ptr<Router::ScopedRoutesConfigProviderManager>
-      hcm_scoped_routes_config_provider_manager =
-          context.singletonManager().getTyped<Router::ScopedRoutesConfigProviderManager>(
-              SINGLETON_MANAGER_REGISTERED_NAME(hcm_scoped_routes_config_provider_manager),
-              [&context, hcm_route_config_provider_manager] {
-                return std::make_shared<Router::ScopedRoutesConfigProviderManager>(
-                    context.admin(), *hcm_route_config_provider_manager);
-              });
-
-  std::shared_ptr<HttpConnectionManagerConfig> filter_config(new HttpConnectionManagerConfig(
-      typed_config, context, *hcm_date_provider, *hcm_route_config_provider_manager,
-      *hcm_scoped_routes_config_provider_manager));
+  auto filter_config =
+      Utility::createConfig(proto_config, context, *date_provider, *route_config_provider_manager,
+                            *scoped_routes_config_provider_manager);
 
   // This lambda captures the shared_ptrs created above, thus preserving the
   // reference count.
   // Keep in mind the lambda capture list **doesn't** determine the destruction order, but it's fine
   // as these captured objects are also global singletons.
-  return [hcm_scoped_routes_config_provider_manager, hcm_route_config_provider_manager,
-          hcm_date_provider, filter_config, &context,
-          &read_callbacks]() -> Http::ServerConnectionCallbacksPtr {
+  return [scoped_routes_config_provider_manager, route_config_provider_manager,
+          date_provider, filter_config, &context, &read_callbacks]() -> Http::ApiListenerPtr {
     auto conn_manager = std::make_unique<Http::ConnectionManagerImpl>(
         *filter_config, context.drainDecision(), context.random(), context.httpContext(),
         context.runtime(), context.localInfo(), context.clusterManager(),
@@ -560,7 +557,8 @@ HttpConnectionManagerFactory::createHttpConnectionManagerFactoryFromProto(
 
     // When the connection first calls onData on the ConnectionManager, the ConnectionManager
     // creates a codec. Here we force create a codec as onData will not be called.
-    conn_manager->forceCodecCreation();
+    Buffer::OwnedImpl dummy;
+    conn_manager->createCodec(dummy);
 
     return conn_manager;
   };

@@ -14,7 +14,7 @@ set -e
 declare -r PROTO_TARGETS=$(bazel query "labels(srcs, labels(deps, @envoy_api_canonical//docs:protos))")
 
 # This is for local RBE setup, should be no-op for builds without RBE setting in bazelrc files.
-BAZEL_BUILD_OPTIONS+=" --remote_download_outputs=all"
+BAZEL_BUILD_OPTIONS+=" --remote_download_outputs=all --xcode_version=11.3.0.11C29"
 
 # TODO(htuch): This script started life by cloning docs/build.sh. It depends on
 # the @envoy_api_canonical//docs:protos target in a few places as a result. This is not

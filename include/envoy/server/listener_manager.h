@@ -9,6 +9,7 @@
 #include "envoy/network/filter.h"
 #include "envoy/network/listen_socket.h"
 #include "envoy/network/listener.h"
+#include "envoy/server/api_listener.h"
 #include "envoy/server/drain_manager.h"
 #include "envoy/server/filter_config.h"
 #include "envoy/server/guarddog.h"
@@ -214,13 +215,12 @@ public:
   virtual void endListenerUpdate(FailureStates&& failure_states) PURE;
 
   // TODO(junr03): once ApiListeners support warming and draining, this function should return a
-  // weak_ptr of the ApiListenerHandle to its caller. This would allow the caller to verify if the
-  // ApiListener that backs the handle is available to receive API calls on it.
+  // weak_ptr to its caller. This would allow the caller to verify if the
+  // ApiListener is available to receive API calls on it.
   /**
-   * @return ApiListenerHandle* a handle to the API Listener if it exists, nullptr if
-   * it does not.
+   * @return ApiListener* the server's API Listener if it exists, nullptr if it does not.
    */
-  virtual ApiListenerHandle* apiListener() PURE;
+  virtual ApiListener* apiListener() PURE;
 };
 
 } // namespace Server

@@ -14,8 +14,11 @@
 #include "envoy/router/route_config_provider_manager.h"
 
 #include "common/common/logger.h"
+#include "common/http/date_provider_impl.h"
 #include "common/http/conn_manager_impl.h"
 #include "common/json/json_loader.h"
+#include "common/router/rds_impl.h"
+#include "common/router/scoped_rds.h"
 
 #include "extensions/filters/network/common/factory_base.h"
 #include "extensions/filters/network/well_known_names.h"
@@ -205,10 +208,34 @@ private:
  */
 class HttpConnectionManagerFactory {
 public:
-  static std::function<Http::ServerConnectionCallbacksPtr()>
-  createHttpConnectionManagerFactoryFromProto(const ProtobufWkt::Any& proto_config,
-                                              Server::Configuration::FactoryContext& context,
-                                              Network::ReadFilterCallbacks& read_callbacks);
+  static std::function<Http::ApiListenerPtr()> createHttpConnectionManagerFactoryFromProto(
+      const envoy::extensions::filters::network::http_connection_manager::v3alpha::
+          HttpConnectionManager& proto_config,
+      Server::Configuration::FactoryContext& context, Network::ReadFilterCallbacks& read_callbacks);
+};
+
+/**
+ * Utility class for shared logic between HTTP connection manager factories.
+ */
+class Utility {
+public:
+  /**
+   *
+   */
+  static std::tuple<std::shared_ptr<Http::TlsCachingDateProviderImpl>,
+                    std::shared_ptr<Router::RouteConfigProviderManager>,
+                    std::shared_ptr<Router::ScopedRoutesConfigProviderManager>>
+  createSingletons(Server::Configuration::FactoryContext& context);
+
+  /**
+   *
+   */
+  static std::shared_ptr<HttpConnectionManagerConfig>
+  createConfig(const envoy::extensions::filters::network::http_connection_manager::v3alpha::
+                   HttpConnectionManager& proto_config,
+               Server::Configuration::FactoryContext& context, Http::DateProvider& date_provider,
+               Router::RouteConfigProviderManager& route_config_provider_manager,
+               Config::ConfigProviderManager& scoped_routes_config_provider_manager);
 };
 
 } // namespace HttpConnectionManager

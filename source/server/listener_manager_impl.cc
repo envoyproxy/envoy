@@ -316,7 +316,9 @@ bool ListenerManagerImpl::addOrUpdateListener(
   // future allow multiple ApiListeners, and allow them to be created via LDS as well as bootstrap.
   if (config.has_api_listener()) {
     if (!api_listener_ && !added_via_api) {
-      api_listener_ = std::make_unique<HttpApiListenerImpl>(
+      // TODO(junr03): dispatch to different concrete constructors when there are other
+      // ApiListenerImpl derived classes.
+      api_listener_ = std::make_unique<HttpApiListener>(
           config, *this, config.name(),
           server_.messageValidationContext().staticValidationVisitor());
       return true;
@@ -809,10 +811,6 @@ Network::ListenSocketFactorySharedPtr ListenerManagerImpl::createListenSocketFac
   return std::make_shared<ListenSocketFactoryImpl>(
       factory_, listener.address(), socket_type, listener.listenSocketOptions(),
       listener.bindToPort(), listener.name(), reuse_port);
-}
-
-ApiListenerHandle* ListenerManagerImpl::apiListener() {
-  return api_listener_ ? api_listener_->handle() : nullptr;
 }
 
 } // namespace Server

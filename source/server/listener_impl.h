@@ -4,7 +4,6 @@
 
 #include "envoy/config/core/v3alpha/base.pb.h"
 #include "envoy/config/listener/v3alpha/listener.pb.h"
-#include "envoy/network/connection.h"
 #include "envoy/network/filter.h"
 #include "envoy/server/drain_manager.h"
 #include "envoy/server/filter_config.h"

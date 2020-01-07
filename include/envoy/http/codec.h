@@ -10,7 +10,6 @@
 #include "envoy/http/metadata_interface.h"
 #include "envoy/http/protocol.h"
 #include "envoy/network/address.h"
-#include "envoy/server/api_listener.h"
 
 namespace Envoy {
 namespace Http {
@@ -414,8 +413,7 @@ public:
 /**
  * Callbacks for server connections.
  */
-class ServerConnectionCallbacks : public virtual ConnectionCallbacks,
-                                  public virtual Server::ApiListenerHandle {
+class ServerConnectionCallbacks : public virtual ConnectionCallbacks {
 public:
   /**
    * Invoked when a new request stream is initiated by the remote.
@@ -428,8 +426,6 @@ public:
   virtual StreamDecoder& newStream(StreamEncoder& response_encoder,
                                    bool is_internally_created = false) PURE;
 };
-
-using ServerConnectionCallbacksPtr = std::unique_ptr<ServerConnectionCallbacks>;
 
 /**
  * A server side HTTP connection.
