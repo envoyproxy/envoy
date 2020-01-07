@@ -564,9 +564,7 @@ private:
     InternalRedirectAction internalRedirectAction() const override {
       return parent_->internalRedirectAction();
     }
-    uint32_t maxInternalRedirects() const override {
-      return parent_->maxInternalRedirects();
-    }
+    uint32_t maxInternalRedirects() const override { return parent_->maxInternalRedirects(); }
 
     // Router::Route
     const DirectResponseEntry* directResponseEntry() const override { return nullptr; }
