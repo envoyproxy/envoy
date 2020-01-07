@@ -174,8 +174,9 @@ ListenerImpl::ListenerImpl(const envoy::config::listener::v3alpha::Listener& con
     if (udp_config.udp_listener_name().empty()) {
       udp_config.set_udp_listener_name(UdpListenerNames::get().RawUdp);
     }
-    auto& config_factory = Config::Utility::getAndCheckFactory<ActiveUdpListenerConfigFactory>(
-        udp_config.udp_listener_name());
+    auto& config_factory =
+        Config::Utility::getAndCheckFactoryByName<ActiveUdpListenerConfigFactory>(
+            udp_config.udp_listener_name());
     ProtobufTypes::MessagePtr message =
         Config::Utility::translateToFactoryConfig(udp_config, validation_visitor_, config_factory);
     udp_listener_factory_ = config_factory.createActiveUdpListenerFactory(*message);
@@ -250,7 +251,7 @@ ListenerImpl::ListenerImpl(const envoy::config::listener::v3alpha::Listener& con
   // Add original dst listener filter if 'use_original_dst' flag is set.
   if (PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, hidden_envoy_deprecated_use_original_dst, false)) {
     auto& factory =
-        Config::Utility::getAndCheckFactory<Configuration::NamedListenerFilterConfigFactory>(
+        Config::Utility::getAndCheckFactoryByName<Configuration::NamedListenerFilterConfigFactory>(
             Extensions::ListenerFilters::ListenerFilterNames::get().OriginalDst);
     listener_filter_factories_.push_back(
         factory.createFilterFactoryFromProto(Envoy::ProtobufWkt::Empty(), *this));
@@ -261,7 +262,7 @@ ListenerImpl::ListenerImpl(const envoy::config::listener::v3alpha::Listener& con
   //                   selected.
   if (PROTOBUF_GET_WRAPPED_OR_DEFAULT(config.filter_chains()[0], use_proxy_proto, false)) {
     auto& factory =
-        Config::Utility::getAndCheckFactory<Configuration::NamedListenerFilterConfigFactory>(
+        Config::Utility::getAndCheckFactoryByName<Configuration::NamedListenerFilterConfigFactory>(
             Extensions::ListenerFilters::ListenerFilterNames::get().ProxyProtocol);
     listener_filter_factories_.push_back(
         factory.createFilterFactoryFromProto(Envoy::ProtobufWkt::Empty(), *this));
@@ -291,7 +292,7 @@ ListenerImpl::ListenerImpl(const envoy::config::listener::v3alpha::Listener& con
     ENVOY_LOG(warn, "{}", message);
 
     auto& factory =
-        Config::Utility::getAndCheckFactory<Configuration::NamedListenerFilterConfigFactory>(
+        Config::Utility::getAndCheckFactoryByName<Configuration::NamedListenerFilterConfigFactory>(
             Extensions::ListenerFilters::ListenerFilterNames::get().TlsInspector);
     listener_filter_factories_.push_back(
         factory.createFilterFactoryFromProto(Envoy::ProtobufWkt::Empty(), *this));
