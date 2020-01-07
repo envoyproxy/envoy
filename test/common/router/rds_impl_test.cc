@@ -2,11 +2,11 @@
 #include <memory>
 #include <string>
 
-#include "envoy/admin/v2alpha/config_dump.pb.h"
-#include "envoy/admin/v2alpha/config_dump.pb.validate.h"
-#include "envoy/api/v2/discovery.pb.h"
-#include "envoy/api/v2/rds.pb.h"
-#include "envoy/config/filter/network/http_connection_manager/v2/http_connection_manager.pb.h"
+#include "envoy/admin/v3alpha/config_dump.pb.h"
+#include "envoy/admin/v3alpha/config_dump.pb.validate.h"
+#include "envoy/config/route/v3alpha/route.pb.h"
+#include "envoy/extensions/filters/network/http_connection_manager/v3alpha/http_connection_manager.pb.h"
+#include "envoy/service/discovery/v3alpha/discovery.pb.h"
 #include "envoy/stats/scope.h"
 
 #include "common/config/utility.h"
@@ -38,9 +38,9 @@ namespace Envoy {
 namespace Router {
 namespace {
 
-envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager
+envoy::extensions::filters::network::http_connection_manager::v3alpha::HttpConnectionManager
 parseHttpConnectionManagerFromYaml(const std::string& yaml_string) {
-  envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager
+  envoy::extensions::filters::network::http_connection_manager::v3alpha::HttpConnectionManager
       http_connection_manager;
   TestUtility::loadFromYaml(yaml_string, http_connection_manager);
   return http_connection_manager;
@@ -171,7 +171,8 @@ TEST_F(RdsImplTest, Basic) {
   ]
 }
 )EOF";
-  auto response1 = TestUtility::parseYaml<envoy::api::v2::DiscoveryResponse>(response1_json);
+  auto response1 =
+      TestUtility::parseYaml<envoy::service::discovery::v3alpha::DiscoveryResponse>(response1_json);
 
   EXPECT_CALL(init_watcher_, ready());
   rds_callbacks_->onConfigUpdate(response1.resources(), response1.version_info());
@@ -215,7 +216,8 @@ TEST_F(RdsImplTest, Basic) {
   ]
 }
   )EOF";
-  auto response2 = TestUtility::parseYaml<envoy::api::v2::DiscoveryResponse>(response2_json);
+  auto response2 =
+      TestUtility::parseYaml<envoy::service::discovery::v3alpha::DiscoveryResponse>(response2_json);
 
   // Make sure we don't lookup/verify clusters.
   EXPECT_CALL(mock_factory_context_.cluster_manager_, get(Eq("bar"))).Times(0);
@@ -247,7 +249,8 @@ TEST_F(RdsImplTest, FailureInvalidConfig) {
   ]
 }
 )EOF";
-  auto response1 = TestUtility::parseYaml<envoy::api::v2::DiscoveryResponse>(response1_json);
+  auto response1 =
+      TestUtility::parseYaml<envoy::service::discovery::v3alpha::DiscoveryResponse>(response1_json);
 
   EXPECT_CALL(init_watcher_, ready());
   EXPECT_THROW_WITH_MESSAGE(
@@ -295,9 +298,8 @@ TEST_F(RdsRouteConfigSubscriptionTest, CreatesNoopInitManager) {
           cluster_name: xds_cluster
 )EOF";
   EXPECT_CALL(outer_init_manager_, state()).WillOnce(Return(Init::Manager::State::Initialized));
-  const auto rds =
-      TestUtility::parseYaml<envoy::config::filter::network::http_connection_manager::v2::Rds>(
-          rds_config);
+  const auto rds = TestUtility::parseYaml<
+      envoy::extensions::filters::network::http_connection_manager::v3alpha::Rds>(rds_config);
   const auto route_config_provider = route_config_provider_manager_->createRdsRouteConfigProvider(
       rds, mock_factory_context_, "stat_prefix", outer_init_manager_);
   RdsRouteConfigSubscription& subscription =
@@ -332,13 +334,14 @@ public:
     server_factory_context_.thread_local_.shutdownThread();
   }
 
-  envoy::config::filter::network::http_connection_manager::v2::Rds rds_;
+  envoy::extensions::filters::network::http_connection_manager::v3alpha::Rds rds_;
   std::unique_ptr<RouteConfigProviderManagerImpl> route_config_provider_manager_;
   RouteConfigProviderSharedPtr provider_;
 };
 
-envoy::api::v2::RouteConfiguration parseRouteConfigurationFromV2Yaml(const std::string& yaml) {
-  envoy::api::v2::RouteConfiguration route_config;
+envoy::config::route::v3alpha::RouteConfiguration
+parseRouteConfigurationFromV2Yaml(const std::string& yaml) {
+  envoy::config::route::v3alpha::RouteConfiguration route_config;
   TestUtility::loadFromYaml(yaml, route_config);
   return route_config;
 }
@@ -347,11 +350,11 @@ TEST_F(RouteConfigProviderManagerImplTest, ConfigDump) {
   auto message_ptr =
       server_factory_context_.admin_.config_tracker_.config_tracker_callbacks_["routes"]();
   const auto& route_config_dump =
-      TestUtility::downcastAndValidate<const envoy::admin::v2alpha::RoutesConfigDump&>(
+      TestUtility::downcastAndValidate<const envoy::admin::v3alpha::RoutesConfigDump&>(
           *message_ptr);
 
   // No routes at all, no last_updated timestamp
-  envoy::admin::v2alpha::RoutesConfigDump expected_route_config_dump;
+  envoy::admin::v3alpha::RoutesConfigDump expected_route_config_dump;
   TestUtility::loadFromYaml(R"EOF(
 static_route_configs:
 dynamic_route_configs:
@@ -378,7 +381,7 @@ virtual_hosts:
   message_ptr =
       server_factory_context_.admin_.config_tracker_.config_tracker_callbacks_["routes"]();
   const auto& route_config_dump2 =
-      TestUtility::downcastAndValidate<const envoy::admin::v2alpha::RoutesConfigDump&>(
+      TestUtility::downcastAndValidate<const envoy::admin::v3alpha::RoutesConfigDump&>(
           *message_ptr);
   TestUtility::loadFromYaml(R"EOF(
 static_route_configs:
@@ -416,14 +419,15 @@ dynamic_route_configs:
   ]
 }
 )EOF";
-  auto response1 = TestUtility::parseYaml<envoy::api::v2::DiscoveryResponse>(response1_json);
+  auto response1 =
+      TestUtility::parseYaml<envoy::service::discovery::v3alpha::DiscoveryResponse>(response1_json);
 
   EXPECT_CALL(init_watcher_, ready());
   rds_callbacks_->onConfigUpdate(response1.resources(), response1.version_info());
   message_ptr =
       server_factory_context_.admin_.config_tracker_.config_tracker_callbacks_["routes"]();
   const auto& route_config_dump3 =
-      TestUtility::downcastAndValidate<const envoy::admin::v2alpha::RoutesConfigDump&>(
+      TestUtility::downcastAndValidate<const envoy::admin::v3alpha::RoutesConfigDump&>(
           *message_ptr);
   TestUtility::loadFromYaml(R"EOF(
 static_route_configs:
@@ -487,7 +491,7 @@ virtual_hosts:
             &dynamic_cast<RdsRouteConfigProviderImpl&>(*provider2).subscription());
   EXPECT_EQ(&provider_->configInfo().value().config_, &provider2->configInfo().value().config_);
 
-  envoy::config::filter::network::http_connection_manager::v2::Rds rds2;
+  envoy::extensions::filters::network::http_connection_manager::v3alpha::Rds rds2;
   rds2.set_route_config_name("foo_route_config");
   rds2.mutable_config_source()->set_path("bar_path");
   RouteConfigProviderSharedPtr provider3 =
@@ -564,7 +568,7 @@ virtual_hosts:
 TEST_F(RouteConfigProviderManagerImplTest, ValidateFail) {
   setup();
   Protobuf::RepeatedPtrField<ProtobufWkt::Any> route_configs;
-  envoy::api::v2::RouteConfiguration route_config;
+  envoy::config::route::v3alpha::RouteConfiguration route_config;
   route_config.set_name("foo_route_config");
   route_config.mutable_virtual_hosts()->Add();
   route_configs.Add()->PackFrom(route_config);
@@ -603,11 +607,11 @@ TEST_F(RouteConfigProviderManagerImplTest, ConfigDumpAfterConfigRejected) {
   auto message_ptr =
       server_factory_context_.admin_.config_tracker_.config_tracker_callbacks_["routes"]();
   const auto& route_config_dump =
-      TestUtility::downcastAndValidate<const envoy::admin::v2alpha::RoutesConfigDump&>(
+      TestUtility::downcastAndValidate<const envoy::admin::v3alpha::RoutesConfigDump&>(
           *message_ptr);
 
   // No routes at all, no last_updated timestamp
-  envoy::admin::v2alpha::RoutesConfigDump expected_route_config_dump;
+  envoy::admin::v3alpha::RoutesConfigDump expected_route_config_dump;
   TestUtility::loadFromYaml(R"EOF(
 static_route_configs:
 dynamic_route_configs:
@@ -646,7 +650,8 @@ resources:
       route:
         cluster_header: ":authority"
 )EOF";
-  auto response1 = TestUtility::parseYaml<envoy::api::v2::DiscoveryResponse>(response1_yaml);
+  auto response1 =
+      TestUtility::parseYaml<envoy::service::discovery::v3alpha::DiscoveryResponse>(response1_yaml);
 
   EXPECT_CALL(init_watcher_, ready());
 
@@ -657,7 +662,7 @@ resources:
   message_ptr =
       server_factory_context_.admin_.config_tracker_.config_tracker_callbacks_["routes"]();
   const auto& route_config_dump3 =
-      TestUtility::downcastAndValidate<const envoy::admin::v2alpha::RoutesConfigDump&>(
+      TestUtility::downcastAndValidate<const envoy::admin::v3alpha::RoutesConfigDump&>(
           *message_ptr);
   TestUtility::loadFromYaml(R"EOF(
 static_route_configs:

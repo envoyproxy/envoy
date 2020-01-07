@@ -1,5 +1,5 @@
 #include "envoy/common/exception.h"
-#include "envoy/type/matcher/regex.pb.h"
+#include "envoy/type/matcher/v3alpha/regex.pb.h"
 
 #include "common/common/regex.h"
 
@@ -29,7 +29,7 @@ TEST(Utility, ParseStdRegex) {
 
 TEST(Utility, ParseRegex) {
   {
-    envoy::type::matcher::RegexMatcher matcher;
+    envoy::type::matcher::v3alpha::RegexMatcher matcher;
     matcher.mutable_google_re2();
     matcher.set_regex("(+invalid)");
     EXPECT_THROW_WITH_MESSAGE(Utility::parseRegex(matcher), EnvoyException,
@@ -38,7 +38,7 @@ TEST(Utility, ParseRegex) {
 
   // Regression test for https://github.com/envoyproxy/envoy/issues/7728
   {
-    envoy::type::matcher::RegexMatcher matcher;
+    envoy::type::matcher::v3alpha::RegexMatcher matcher;
     matcher.mutable_google_re2();
     matcher.set_regex("/asdf/.*");
     const auto compiled_matcher = Utility::parseRegex(matcher);
@@ -48,7 +48,7 @@ TEST(Utility, ParseRegex) {
 
   // Verify max program size.
   {
-    envoy::type::matcher::RegexMatcher matcher;
+    envoy::type::matcher::v3alpha::RegexMatcher matcher;
     matcher.mutable_google_re2()->mutable_max_program_size()->set_value(1);
     matcher.set_regex("/asdf/.*");
 #ifndef GTEST_USES_SIMPLE_RE

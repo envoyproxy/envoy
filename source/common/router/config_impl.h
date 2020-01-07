@@ -10,13 +10,13 @@
 #include <unordered_map>
 #include <vector>
 
-#include "envoy/api/v2/core/base.pb.h"
-#include "envoy/api/v2/rds.pb.h"
-#include "envoy/api/v2/route/route.pb.h"
+#include "envoy/config/core/v3alpha/base.pb.h"
+#include "envoy/config/route/v3alpha/route.pb.h"
+#include "envoy/config/route/v3alpha/route_components.pb.h"
 #include "envoy/router/router.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/server/filter_config.h"
-#include "envoy/type/percent.pb.h"
+#include "envoy/type/v3alpha/percent.pb.h"
 #include "envoy/upstream/cluster_manager.h"
 
 #include "common/config/metadata.h"
@@ -107,7 +107,7 @@ private:
  */
 class CorsPolicyImpl : public CorsPolicy {
 public:
-  CorsPolicyImpl(const envoy::api::v2::route::CorsPolicy& config, Runtime::Loader& loader);
+  CorsPolicyImpl(const envoy::config::route::v3alpha::CorsPolicy& config, Runtime::Loader& loader);
 
   // Router::CorsPolicy
   const std::vector<Matchers::StringMatcherPtr>& allowOrigins() const override {
@@ -136,7 +136,7 @@ public:
   };
 
 private:
-  const envoy::api::v2::route::CorsPolicy config_;
+  const envoy::config::route::v3alpha::CorsPolicy config_;
   Runtime::Loader& loader_;
   std::vector<Matchers::StringMatcherPtr> allow_origins_;
   const std::string allow_methods_;
@@ -153,7 +153,7 @@ class ConfigImpl;
  */
 class VirtualHostImpl : public VirtualHost {
 public:
-  VirtualHostImpl(const envoy::api::v2::route::VirtualHost& virtual_host,
+  VirtualHostImpl(const envoy::config::route::v3alpha::VirtualHost& virtual_host,
                   const ConfigImpl& global_route_config,
                   Server::Configuration::ServerFactoryContext& factory_context,
                   ProtobufMessage::ValidationVisitor& validator, bool validate_clusters);
@@ -173,10 +173,10 @@ public:
   const Config& routeConfig() const override;
   const RouteSpecificFilterConfig* perFilterConfig(const std::string&) const override;
   bool includeAttemptCount() const override { return include_attempt_count_; }
-  const absl::optional<envoy::api::v2::route::RetryPolicy>& retryPolicy() const {
+  const absl::optional<envoy::config::route::v3alpha::RetryPolicy>& retryPolicy() const {
     return retry_policy_;
   }
-  const absl::optional<envoy::api::v2::route::HedgePolicy>& hedgePolicy() const {
+  const absl::optional<envoy::config::route::v3alpha::HedgePolicy>& hedgePolicy() const {
     return hedge_policy_;
   }
   uint32_t retryShadowBufferLimit() const override { return retry_shadow_buffer_limit_; }
@@ -185,7 +185,7 @@ private:
   enum class SslRequirements { None, ExternalOnly, All };
 
   struct VirtualClusterEntry : public VirtualCluster {
-    VirtualClusterEntry(const envoy::api::v2::route::VirtualCluster& virtual_cluster,
+    VirtualClusterEntry(const envoy::config::route::v3alpha::VirtualCluster& virtual_cluster,
                         Stats::StatNamePool& pool);
 
     // Router::VirtualCluster
@@ -222,8 +222,8 @@ private:
   PerFilterConfigs per_filter_configs_;
   uint32_t retry_shadow_buffer_limit_{std::numeric_limits<uint32_t>::max()};
   const bool include_attempt_count_;
-  absl::optional<envoy::api::v2::route::RetryPolicy> retry_policy_;
-  absl::optional<envoy::api::v2::route::HedgePolicy> hedge_policy_;
+  absl::optional<envoy::config::route::v3alpha::RetryPolicy> retry_policy_;
+  absl::optional<envoy::config::route::v3alpha::HedgePolicy> hedge_policy_;
   const CatchAllVirtualCluster virtual_cluster_catch_all_;
 };
 
@@ -235,7 +235,7 @@ using VirtualHostSharedPtr = std::shared_ptr<VirtualHostImpl>;
 class RetryPolicyImpl : public RetryPolicy {
 
 public:
-  RetryPolicyImpl(const envoy::api::v2::route::RetryPolicy& retry_policy,
+  RetryPolicyImpl(const envoy::config::route::v3alpha::RetryPolicy& retry_policy,
                   ProtobufMessage::ValidationVisitor& validation_visitor);
   RetryPolicyImpl() = default;
 
@@ -264,11 +264,12 @@ private:
   uint32_t retry_on_{};
   // Each pair contains the name and config proto to be used to create the RetryHostPredicates
   // that should be used when with this policy.
-  std::vector<std::pair<std::string, ProtobufTypes::MessagePtr>> retry_host_predicate_configs_;
+  std::vector<std::pair<Upstream::RetryHostPredicateFactory&, ProtobufTypes::MessagePtr>>
+      retry_host_predicate_configs_;
   Upstream::RetryPrioritySharedPtr retry_priority_;
   // Name and config proto to use to create the RetryPriority to use with this policy. Default
   // initialized when no RetryPriority should be used.
-  std::pair<std::string, ProtobufTypes::MessagePtr> retry_priority_config_;
+  std::pair<Upstream::RetryPriorityFactory*, ProtobufTypes::MessagePtr> retry_priority_config_;
   uint32_t host_selection_attempts_{1};
   std::vector<uint32_t> retriable_status_codes_;
   std::vector<Http::HeaderMatcherSharedPtr> retriable_headers_;
@@ -283,18 +284,20 @@ private:
  */
 class ShadowPolicyImpl : public ShadowPolicy {
 public:
-  using RequestMirrorPolicy = envoy::api::v2::route::RouteAction::RequestMirrorPolicy;
+  using RequestMirrorPolicy = envoy::config::route::v3alpha::RouteAction::RequestMirrorPolicy;
   explicit ShadowPolicyImpl(const RequestMirrorPolicy& config);
 
   // Router::ShadowPolicy
   const std::string& cluster() const override { return cluster_; }
   const std::string& runtimeKey() const override { return runtime_key_; }
-  const envoy::type::FractionalPercent& defaultValue() const override { return default_value_; }
+  const envoy::type::v3alpha::FractionalPercent& defaultValue() const override {
+    return default_value_;
+  }
 
 private:
   std::string cluster_;
   std::string runtime_key_;
-  envoy::type::FractionalPercent default_value_;
+  envoy::type::v3alpha::FractionalPercent default_value_;
 };
 
 /**
@@ -303,19 +306,19 @@ private:
 class HedgePolicyImpl : public HedgePolicy {
 
 public:
-  explicit HedgePolicyImpl(const envoy::api::v2::route::HedgePolicy& hedge_policy);
+  explicit HedgePolicyImpl(const envoy::config::route::v3alpha::HedgePolicy& hedge_policy);
   HedgePolicyImpl();
 
   // Router::HedgePolicy
   uint32_t initialRequests() const override { return initial_requests_; }
-  const envoy::type::FractionalPercent& additionalRequestChance() const override {
+  const envoy::type::v3alpha::FractionalPercent& additionalRequestChance() const override {
     return additional_request_chance_;
   }
   bool hedgeOnPerTryTimeout() const override { return hedge_on_per_try_timeout_; }
 
 private:
   const uint32_t initial_requests_;
-  const envoy::type::FractionalPercent additional_request_chance_;
+  const envoy::type::v3alpha::FractionalPercent additional_request_chance_;
   const bool hedge_on_per_try_timeout_;
 };
 
@@ -324,7 +327,7 @@ private:
  */
 class DecoratorImpl : public Decorator {
 public:
-  explicit DecoratorImpl(const envoy::api::v2::route::Decorator& decorator);
+  explicit DecoratorImpl(const envoy::config::route::v3alpha::Decorator& decorator);
 
   // Decorator::apply
   void apply(Tracing::Span& span) const override;
@@ -341,23 +344,23 @@ private:
  */
 class RouteTracingImpl : public RouteTracing {
 public:
-  explicit RouteTracingImpl(const envoy::api::v2::route::Tracing& tracing);
+  explicit RouteTracingImpl(const envoy::config::route::v3alpha::Tracing& tracing);
 
   // Tracing::getClientSampling
-  const envoy::type::FractionalPercent& getClientSampling() const override;
+  const envoy::type::v3alpha::FractionalPercent& getClientSampling() const override;
 
   // Tracing::getRandomSampling
-  const envoy::type::FractionalPercent& getRandomSampling() const override;
+  const envoy::type::v3alpha::FractionalPercent& getRandomSampling() const override;
 
   // Tracing::getOverallSampling
-  const envoy::type::FractionalPercent& getOverallSampling() const override;
+  const envoy::type::v3alpha::FractionalPercent& getOverallSampling() const override;
 
   const Tracing::CustomTagMap& getCustomTags() const override;
 
 private:
-  envoy::type::FractionalPercent client_sampling_;
-  envoy::type::FractionalPercent random_sampling_;
-  envoy::type::FractionalPercent overall_sampling_;
+  envoy::type::v3alpha::FractionalPercent client_sampling_;
+  envoy::type::v3alpha::FractionalPercent random_sampling_;
+  envoy::type::v3alpha::FractionalPercent overall_sampling_;
   Tracing::CustomTagMap custom_tags_;
 };
 
@@ -375,7 +378,8 @@ public:
   /**
    * @throw EnvoyException with reason if the route configuration contains any errors
    */
-  RouteEntryImplBase(const VirtualHostImpl& vhost, const envoy::api::v2::route::Route& route,
+  RouteEntryImplBase(const VirtualHostImpl& vhost,
+                     const envoy::config::route::v3alpha::Route& route,
                      Server::Configuration::ServerFactoryContext& factory_context,
                      ProtobufMessage::ValidationVisitor& validator);
 
@@ -435,7 +439,7 @@ public:
     return opaque_config_;
   }
   bool includeVirtualHostRateLimits() const override { return include_vh_rate_limits_; }
-  const envoy::api::v2::core::Metadata& metadata() const override { return metadata_; }
+  const envoy::config::core::v3alpha::Metadata& metadata() const override { return metadata_; }
   const Envoy::Config::TypedMetadata& typedMetadata() const override { return typed_metadata_; }
   const PathMatchCriterion& pathMatchCriterion() const override { return *this; }
   bool includeAttemptCount() const override { return vhost_.includeAttemptCount(); }
@@ -480,7 +484,7 @@ protected:
 private:
   struct RuntimeData {
     std::string fractional_runtime_key_{};
-    envoy::type::FractionalPercent fractional_runtime_default_{};
+    envoy::type::v3alpha::FractionalPercent fractional_runtime_default_{};
   };
 
   class DynamicRouteEntry : public RouteEntry, public Route {
@@ -544,7 +548,9 @@ private:
     bool includeVirtualHostRateLimits() const override {
       return parent_->includeVirtualHostRateLimits();
     }
-    const envoy::api::v2::core::Metadata& metadata() const override { return parent_->metadata(); }
+    const envoy::config::core::v3alpha::Metadata& metadata() const override {
+      return parent_->metadata();
+    }
     const Envoy::Config::TypedMetadata& typedMetadata() const override {
       return parent_->typedMetadata();
     }
@@ -581,10 +587,11 @@ private:
    */
   class WeightedClusterEntry : public DynamicRouteEntry {
   public:
-    WeightedClusterEntry(const RouteEntryImplBase* parent, const std::string& rutime_key,
-                         Server::Configuration::ServerFactoryContext& factory_context,
-                         ProtobufMessage::ValidationVisitor& validator,
-                         const envoy::api::v2::route::WeightedCluster_ClusterWeight& cluster);
+    WeightedClusterEntry(
+        const RouteEntryImplBase* parent, const std::string& rutime_key,
+        Server::Configuration::ServerFactoryContext& factory_context,
+        ProtobufMessage::ValidationVisitor& validator,
+        const envoy::config::route::v3alpha::WeightedCluster::ClusterWeight& cluster);
 
     uint64_t clusterWeight() const {
       return loader_.snapshot().getInteger(runtime_key_, cluster_weight_);
@@ -622,27 +629,28 @@ private:
 
   using WeightedClusterEntrySharedPtr = std::shared_ptr<WeightedClusterEntry>;
 
-  absl::optional<RuntimeData> loadRuntimeData(const envoy::api::v2::route::RouteMatch& route);
+  absl::optional<RuntimeData>
+  loadRuntimeData(const envoy::config::route::v3alpha::RouteMatch& route);
 
   static std::multimap<std::string, std::string>
-  parseOpaqueConfig(const envoy::api::v2::route::Route& route);
+  parseOpaqueConfig(const envoy::config::route::v3alpha::Route& route);
 
-  static DecoratorConstPtr parseDecorator(const envoy::api::v2::route::Route& route);
+  static DecoratorConstPtr parseDecorator(const envoy::config::route::v3alpha::Route& route);
 
-  static RouteTracingConstPtr parseRouteTracing(const envoy::api::v2::route::Route& route);
+  static RouteTracingConstPtr parseRouteTracing(const envoy::config::route::v3alpha::Route& route);
 
   bool evaluateRuntimeMatch(const uint64_t random_value) const;
 
   bool evaluateTlsContextMatch(const StreamInfo::StreamInfo& stream_info) const;
 
-  HedgePolicyImpl
-  buildHedgePolicy(const absl::optional<envoy::api::v2::route::HedgePolicy>& vhost_hedge_policy,
-                   const envoy::api::v2::route::RouteAction& route_config) const;
+  HedgePolicyImpl buildHedgePolicy(
+      const absl::optional<envoy::config::route::v3alpha::HedgePolicy>& vhost_hedge_policy,
+      const envoy::config::route::v3alpha::RouteAction& route_config) const;
 
-  RetryPolicyImpl
-  buildRetryPolicy(const absl::optional<envoy::api::v2::route::RetryPolicy>& vhost_retry_policy,
-                   const envoy::api::v2::route::RouteAction& route_config,
-                   ProtobufMessage::ValidationVisitor& validation_visitor) const;
+  RetryPolicyImpl buildRetryPolicy(
+      const absl::optional<envoy::config::route::v3alpha::RetryPolicy>& vhost_retry_policy,
+      const envoy::config::route::v3alpha::RouteAction& route_config,
+      ProtobufMessage::ValidationVisitor& validation_visitor) const;
 
   // Default timeout is 15s if nothing is specified in the route config.
   static const uint64_t DEFAULT_ROUTE_TIMEOUT_MS = 15000;
@@ -685,7 +693,7 @@ private:
   HeaderParserPtr request_headers_parser_;
   HeaderParserPtr response_headers_parser_;
   uint32_t retry_shadow_buffer_limit_{std::numeric_limits<uint32_t>::max()};
-  envoy::api::v2::core::Metadata metadata_;
+  envoy::config::core::v3alpha::Metadata metadata_;
   Envoy::Config::TypedMetadataImpl<HttpRouteTypedMetadataFactory> typed_metadata_;
   const bool match_grpc_;
 
@@ -707,7 +715,8 @@ private:
  */
 class PrefixRouteEntryImpl : public RouteEntryImplBase {
 public:
-  PrefixRouteEntryImpl(const VirtualHostImpl& vhost, const envoy::api::v2::route::Route& route,
+  PrefixRouteEntryImpl(const VirtualHostImpl& vhost,
+                       const envoy::config::route::v3alpha::Route& route,
                        Server::Configuration::ServerFactoryContext& factory_context,
                        ProtobufMessage::ValidationVisitor& validator);
 
@@ -732,7 +741,8 @@ private:
  */
 class PathRouteEntryImpl : public RouteEntryImplBase {
 public:
-  PathRouteEntryImpl(const VirtualHostImpl& vhost, const envoy::api::v2::route::Route& route,
+  PathRouteEntryImpl(const VirtualHostImpl& vhost,
+                     const envoy::config::route::v3alpha::Route& route,
                      Server::Configuration::ServerFactoryContext& factory_context,
                      ProtobufMessage::ValidationVisitor& validator);
 
@@ -757,7 +767,8 @@ private:
  */
 class RegexRouteEntryImpl : public RouteEntryImplBase {
 public:
-  RegexRouteEntryImpl(const VirtualHostImpl& vhost, const envoy::api::v2::route::Route& route,
+  RegexRouteEntryImpl(const VirtualHostImpl& vhost,
+                      const envoy::config::route::v3alpha::Route& route,
                       Server::Configuration::ServerFactoryContext& factory_context,
                       ProtobufMessage::ValidationVisitor& validator);
 
@@ -786,7 +797,7 @@ private:
  */
 class RouteMatcher {
 public:
-  RouteMatcher(const envoy::api::v2::RouteConfiguration& config,
+  RouteMatcher(const envoy::config::route::v3alpha::RouteConfiguration& config,
                const ConfigImpl& global_http_config,
                Server::Configuration::ServerFactoryContext& factory_context,
                ProtobufMessage::ValidationVisitor& validator, bool validate_clusters);
@@ -825,7 +836,7 @@ private:
  */
 class ConfigImpl : public Config {
 public:
-  ConfigImpl(const envoy::api::v2::RouteConfiguration& config,
+  ConfigImpl(const envoy::config::route::v3alpha::RouteConfiguration& config,
              Server::Configuration::ServerFactoryContext& factory_context,
              ProtobufMessage::ValidationVisitor& validator, bool validate_clusters_default);
 

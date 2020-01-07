@@ -1,13 +1,13 @@
 #pragma once
 
-#include "envoy/config/filter/network/local_rate_limit/v2alpha/local_rate_limit.pb.h"
+#include "envoy/config/filter/network/local_rate_limit/v3alpha/local_rate_limit.pb.h"
 #include "envoy/event/timer.h"
 #include "envoy/network/filter.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/stats/stats_macros.h"
 
 #include "common/common/thread_synchronizer.h"
-#include "common/runtime/runtime_features.h"
+#include "common/runtime/runtime_protos.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -32,7 +32,7 @@ struct LocalRateLimitStats {
 class Config : Logger::Loggable<Logger::Id::filter> {
 public:
   Config(
-      const envoy::config::filter::network::local_rate_limit::v2alpha::LocalRateLimit& proto_config,
+      const envoy::config::filter::network::local_rate_limit::v3alpha::LocalRateLimit& proto_config,
       Event::Dispatcher& dispatcher, Stats::Scope& scope, Runtime::Loader& runtime);
 
   bool canCreateConnection();

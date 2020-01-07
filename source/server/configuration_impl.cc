@@ -6,9 +6,9 @@
 #include <string>
 #include <vector>
 
-#include "envoy/config/bootstrap/v2/bootstrap.pb.h"
-#include "envoy/config/metrics/v2/stats.pb.h"
-#include "envoy/config/trace/v2/trace.pb.h"
+#include "envoy/config/bootstrap/v3alpha/bootstrap.pb.h"
+#include "envoy/config/metrics/v3alpha/stats.pb.h"
+#include "envoy/config/trace/v3alpha/trace.pb.h"
 #include "envoy/network/connection.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/server/instance.h"
@@ -55,7 +55,7 @@ void FilterChainUtility::buildUdpFilterChain(
   }
 }
 
-void MainImpl::initialize(const envoy::config::bootstrap::v2::Bootstrap& bootstrap,
+void MainImpl::initialize(const envoy::config::bootstrap::v3alpha::Bootstrap& bootstrap,
                           Instance& server,
                           Upstream::ClusterManagerFactory& cluster_manager_factory) {
   const auto& secrets = bootstrap.static_resources().secrets();
@@ -92,7 +92,7 @@ void MainImpl::initialize(const envoy::config::bootstrap::v2::Bootstrap& bootstr
   initializeStatsSinks(bootstrap, server);
 }
 
-void MainImpl::initializeTracers(const envoy::config::trace::v2::Tracing& configuration,
+void MainImpl::initializeTracers(const envoy::config::trace::v3alpha::Tracing& configuration,
                                  Instance& server) {
   ENVOY_LOG(info, "loading tracing configuration");
 
@@ -102,23 +102,22 @@ void MainImpl::initializeTracers(const envoy::config::trace::v2::Tracing& config
   }
 
   // Initialize tracing driver.
-  std::string type = configuration.http().name();
-  ENVOY_LOG(info, "  loading tracing driver: {}", type);
+  ENVOY_LOG(info, "  loading tracing driver: {}", configuration.http().name());
 
   // Now see if there is a factory that will accept the config.
-  auto& factory = Config::Utility::getAndCheckFactory<TracerFactory>(type);
+  auto& factory = Config::Utility::getAndCheckFactory<TracerFactory>(configuration.http());
   ProtobufTypes::MessagePtr message = Config::Utility::translateToFactoryConfig(
       configuration.http(), server.messageValidationContext().staticValidationVisitor(), factory);
   http_tracer_ = factory.createHttpTracer(*message, server);
 }
 
-void MainImpl::initializeStatsSinks(const envoy::config::bootstrap::v2::Bootstrap& bootstrap,
+void MainImpl::initializeStatsSinks(const envoy::config::bootstrap::v3alpha::Bootstrap& bootstrap,
                                     Instance& server) {
   ENVOY_LOG(info, "loading stats sink configuration");
 
-  for (const envoy::config::metrics::v2::StatsSink& sink_object : bootstrap.stats_sinks()) {
+  for (const envoy::config::metrics::v3alpha::StatsSink& sink_object : bootstrap.stats_sinks()) {
     // Generate factory and translate stats sink custom config
-    auto& factory = Config::Utility::getAndCheckFactory<StatsSinkFactory>(sink_object.name());
+    auto& factory = Config::Utility::getAndCheckFactory<StatsSinkFactory>(sink_object);
     ProtobufTypes::MessagePtr message = Config::Utility::translateToFactoryConfig(
         sink_object, server.messageValidationContext().staticValidationVisitor(), factory);
 
@@ -126,7 +125,7 @@ void MainImpl::initializeStatsSinks(const envoy::config::bootstrap::v2::Bootstra
   }
 }
 
-InitialImpl::InitialImpl(const envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
+InitialImpl::InitialImpl(const envoy::config::bootstrap::v3alpha::Bootstrap& bootstrap) {
   const auto& admin = bootstrap.admin();
   admin_.access_log_path_ = admin.access_log_path();
   admin_.profile_path_ =
@@ -151,7 +150,7 @@ InitialImpl::InitialImpl(const envoy::config::bootstrap::v2::Bootstrap& bootstra
       layered_runtime_.add_layers()->mutable_admin_layer();
     }
   } else {
-    Config::translateRuntime(bootstrap.runtime(), layered_runtime_);
+    Config::translateRuntime(bootstrap.hidden_envoy_deprecated_runtime(), layered_runtime_);
   }
 }
 

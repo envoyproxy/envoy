@@ -20,7 +20,7 @@ envoy_extension_cc_test(
         "//test/mocks/event:event_mocks",
         "//test/mocks/network:network_mocks",
         "//test/mocks/runtime:runtime_mocks",
-        "@envoy_api//envoy/config/filter/network/local_rate_limit/v2alpha:pkg_cc_proto",
+        "@envoy_api//envoy/config/filter/network/local_rate_limit/v3alpha:pkg_cc_proto",
     ],
 )
 

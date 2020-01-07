@@ -1,7 +1,7 @@
 #include "common/ssl/certificate_validation_context_config_impl.h"
 
-#include "envoy/api/v2/auth/cert.pb.h"
 #include "envoy/common/exception.h"
+#include "envoy/extensions/transport_sockets/tls/v3alpha/cert.pb.h"
 
 #include "common/common/empty_string.h"
 #include "common/common/fmt.h"
@@ -13,7 +13,8 @@ namespace Ssl {
 static const std::string INLINE_STRING = "<inline>";
 
 CertificateValidationContextConfigImpl::CertificateValidationContextConfigImpl(
-    const envoy::api::v2::auth::CertificateValidationContext& config, Api::Api& api)
+    const envoy::extensions::transport_sockets::tls::v3alpha::CertificateValidationContext& config,
+    Api::Api& api)
     : ca_cert_(Config::DataSource::read(config.trusted_ca(), true, api)),
       ca_cert_path_(Config::DataSource::getPath(config.trusted_ca())
                         .value_or(ca_cert_.empty() ? EMPTY_STRING : INLINE_STRING)),
@@ -21,8 +22,9 @@ CertificateValidationContextConfigImpl::CertificateValidationContextConfigImpl(
       certificate_revocation_list_path_(
           Config::DataSource::getPath(config.crl())
               .value_or(certificate_revocation_list_.empty() ? EMPTY_STRING : INLINE_STRING)),
-      verify_subject_alt_name_list_(config.verify_subject_alt_name().begin(),
-                                    config.verify_subject_alt_name().end()),
+      verify_subject_alt_name_list_(
+          config.hidden_envoy_deprecated_verify_subject_alt_name().begin(),
+          config.hidden_envoy_deprecated_verify_subject_alt_name().end()),
       subject_alt_name_matchers_(config.match_subject_alt_names().begin(),
                                  config.match_subject_alt_names().end()),
       verify_certificate_hash_list_(config.verify_certificate_hash().begin(),

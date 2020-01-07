@@ -15,9 +15,6 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 #include "mysql_test_utils.h"
-#include "rapidjson/document.h"
-
-using namespace rapidjson;
 
 namespace Envoy {
 namespace Extensions {

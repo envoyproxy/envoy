@@ -1,7 +1,7 @@
-#include "envoy/admin/v2alpha/config_dump.pb.h"
-#include "envoy/api/v2/core/base.pb.h"
-#include "envoy/api/v2/lds.pb.h"
-#include "envoy/api/v2/listener/listener.pb.h"
+#include "envoy/admin/v3alpha/config_dump.pb.h"
+#include "envoy/config/core/v3alpha/base.pb.h"
+#include "envoy/config/listener/v3alpha/listener.pb.h"
+#include "envoy/config/listener/v3alpha/listener_components.pb.h"
 
 #include "common/network/listen_socket_impl.h"
 #include "common/network/socket_option_impl.h"
@@ -49,14 +49,15 @@ protected:
     // Use real filter loading by default.
     ON_CALL(listener_factory_, createNetworkFilterFactoryList(_, _))
         .WillByDefault(Invoke(
-            [](const Protobuf::RepeatedPtrField<envoy::api::v2::listener::Filter>& filters,
+            [](const Protobuf::RepeatedPtrField<envoy::config::listener::v3alpha::Filter>& filters,
                Configuration::FactoryContext& context) -> std::vector<Network::FilterFactoryCb> {
               return ProdListenerComponentFactory::createNetworkFilterFactoryList_(filters,
                                                                                    context);
             }));
     ON_CALL(listener_factory_, createListenerFilterFactoryList(_, _))
         .WillByDefault(Invoke(
-            [](const Protobuf::RepeatedPtrField<envoy::api::v2::listener::ListenerFilter>& filters,
+            [](const Protobuf::RepeatedPtrField<envoy::config::listener::v3alpha::ListenerFilter>&
+                   filters,
                Configuration::ListenerFactoryContext& context)
                 -> std::vector<Network::ListenerFilterFactoryCb> {
               return ProdListenerComponentFactory::createListenerFilterFactoryList_(filters,
@@ -64,7 +65,8 @@ protected:
             }));
     ON_CALL(listener_factory_, createUdpListenerFilterFactoryList(_, _))
         .WillByDefault(Invoke(
-            [](const Protobuf::RepeatedPtrField<envoy::api::v2::listener::ListenerFilter>& filters,
+            [](const Protobuf::RepeatedPtrField<envoy::config::listener::v3alpha::ListenerFilter>&
+                   filters,
                Configuration::ListenerFactoryContext& context)
                 -> std::vector<Network::UdpListenerFilterFactoryCb> {
               return ProdListenerComponentFactory::createUdpListenerFilterFactoryList_(filters,
@@ -87,9 +89,10 @@ protected:
    * 3) Stores the factory context for later use.
    * 4) Creates a mock local drain manager for the listener.
    */
-  ListenerHandle* expectListenerCreate(
-      bool need_init, bool added_via_api,
-      envoy::api::v2::Listener::DrainType drain_type = envoy::api::v2::Listener::DEFAULT) {
+  ListenerHandle*
+  expectListenerCreate(bool need_init, bool added_via_api,
+                       envoy::config::listener::v3alpha::Listener::DrainType drain_type =
+                           envoy::config::listener::v3alpha::Listener::DEFAULT) {
     if (added_via_api) {
       EXPECT_CALL(server_.validation_context_, staticValidationVisitor()).Times(0);
       EXPECT_CALL(server_.validation_context_, dynamicValidationVisitor());
@@ -103,7 +106,7 @@ protected:
     EXPECT_CALL(listener_factory_, createNetworkFilterFactoryList(_, _))
         .WillOnce(Invoke(
             [raw_listener, need_init](
-                const Protobuf::RepeatedPtrField<envoy::api::v2::listener::Filter>&,
+                const Protobuf::RepeatedPtrField<envoy::config::listener::v3alpha::Filter>&,
                 Configuration::FactoryContext& context) -> std::vector<Network::FilterFactoryCb> {
               std::shared_ptr<ListenerHandle> notifier(raw_listener);
               raw_listener->context_ = &context;
@@ -148,10 +151,10 @@ protected:
   /**
    * Validate that createListenSocket is called once with the expected options.
    */
-  void
-  expectCreateListenSocket(const envoy::api::v2::core::SocketOption::SocketState& expected_state,
-                           Network::Socket::Options::size_type expected_num_options,
-                           ListenSocketCreationParams expected_creation_params = {true, true}) {
+  void expectCreateListenSocket(
+      const envoy::config::core::v3alpha::SocketOption::SocketState& expected_state,
+      Network::Socket::Options::size_type expected_num_options,
+      ListenSocketCreationParams expected_creation_params = {true, true}) {
     EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, expected_creation_params))
         .WillOnce(Invoke([this, expected_num_options, &expected_state](
                              const Network::Address::InstanceConstSharedPtr&,
@@ -204,9 +207,9 @@ protected:
   void checkConfigDump(const std::string& expected_dump_yaml) {
     auto message_ptr = server_.admin_.config_tracker_.config_tracker_callbacks_["listeners"]();
     const auto& listeners_config_dump =
-        dynamic_cast<const envoy::admin::v2alpha::ListenersConfigDump&>(*message_ptr);
+        dynamic_cast<const envoy::admin::v3alpha::ListenersConfigDump&>(*message_ptr);
 
-    envoy::admin::v2alpha::ListenersConfigDump expected_listeners_config_dump;
+    envoy::admin::v3alpha::ListenersConfigDump expected_listeners_config_dump;
     TestUtility::loadFromYaml(expected_dump_yaml, expected_listeners_config_dump);
     EXPECT_EQ(expected_listeners_config_dump.DebugString(), listeners_config_dump.DebugString());
   }

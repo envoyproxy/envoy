@@ -1,11 +1,11 @@
 #pragma once
 
 #include "envoy/api/api.h"
-#include "envoy/api/v2/cds.pb.h"
-#include "envoy/api/v2/core/address.pb.h"
-#include "envoy/api/v2/core/config_source.pb.h"
-#include "envoy/api/v2/eds.pb.h"
-#include "envoy/config/bootstrap/v2/bootstrap.pb.h"
+#include "envoy/config/bootstrap/v3alpha/bootstrap.pb.h"
+#include "envoy/config/cluster/v3alpha/cluster.pb.h"
+#include "envoy/config/core/v3alpha/address.pb.h"
+#include "envoy/config/core/v3alpha/config_source.pb.h"
+#include "envoy/config/endpoint/v3alpha/endpoint.pb.h"
 #include "envoy/config/grpc_mux.h"
 #include "envoy/config/subscription.h"
 #include "envoy/json/json_object.h"
@@ -76,16 +76,16 @@ public:
    * Extract refresh_delay as a std::chrono::milliseconds from
    * envoy::api::v2::core::ApiConfigSource.
    */
-  static std::chrono::milliseconds
-  apiConfigSourceRefreshDelay(const envoy::api::v2::core::ApiConfigSource& api_config_source);
+  static std::chrono::milliseconds apiConfigSourceRefreshDelay(
+      const envoy::config::core::v3alpha::ApiConfigSource& api_config_source);
 
   /**
    * Extract request_timeout as a std::chrono::milliseconds from
    * envoy::api::v2::core::ApiConfigSource. If request_timeout isn't set in the config source, a
    * default value of 1s will be returned.
    */
-  static std::chrono::milliseconds
-  apiConfigSourceRequestTimeout(const envoy::api::v2::core::ApiConfigSource& api_config_source);
+  static std::chrono::milliseconds apiConfigSourceRequestTimeout(
+      const envoy::config::core::v3alpha::ApiConfigSource& api_config_source);
 
   /**
    * Extract initial_fetch_timeout as a std::chrono::milliseconds from
@@ -93,7 +93,7 @@ public:
    * default value of 0s will be returned.
    */
   static std::chrono::milliseconds
-  configSourceInitialFetchTimeout(const envoy::api::v2::core::ConfigSource& config_source);
+  configSourceInitialFetchTimeout(const envoy::config::core::v3alpha::ConfigSource& config_source);
 
   /**
    * Populate an envoy::api::v2::core::ApiConfigSource.
@@ -103,9 +103,10 @@ public:
    * @param api_config_source a reference to the envoy::api::v2::core::ApiConfigSource object to
    * populate.
    */
-  static void translateApiConfigSource(const std::string& cluster, uint32_t refresh_delay_ms,
-                                       const std::string& api_type,
-                                       envoy::api::v2::core::ApiConfigSource& api_config_source);
+  static void
+  translateApiConfigSource(const std::string& cluster, uint32_t refresh_delay_ms,
+                           const std::string& api_type,
+                           envoy::config::core::v3alpha::ApiConfigSource& api_config_source);
 
   /**
    * Check cluster info for API config sanity. Throws on error.
@@ -149,7 +150,7 @@ public:
    * services or cluster names, depending on expectations set by its API type.
    */
   static void
-  checkApiConfigSourceNames(const envoy::api::v2::core::ApiConfigSource& api_config_source);
+  checkApiConfigSourceNames(const envoy::config::core::v3alpha::ApiConfigSource& api_config_source);
 
   /**
    * Check the validity of a cluster backing an api config source. Throws on error.
@@ -168,7 +169,7 @@ public:
    */
   static void checkApiConfigSourceSubscriptionBackingCluster(
       const Upstream::ClusterManager::ClusterInfoMap& clusters,
-      const envoy::api::v2::core::ApiConfigSource& api_config_source);
+      const envoy::config::core::v3alpha::ApiConfigSource& api_config_source);
 
   /**
    * Parses RateLimit configuration from envoy::api::v2::core::ApiConfigSource to RateLimitSettings.
@@ -176,7 +177,7 @@ public:
    * @return RateLimitSettings.
    */
   static RateLimitSettings
-  parseRateLimitSettings(const envoy::api::v2::core::ApiConfigSource& api_config_source);
+  parseRateLimitSettings(const envoy::config::core::v3alpha::ApiConfigSource& api_config_source);
 
   /**
    * Generate a SubscriptionStats object from stats scope.
@@ -193,7 +194,7 @@ public:
    * @param name string identifier for the particular implementation. Note: this is a proto string
    * because it is assumed that this value will be pulled directly from the configuration proto.
    */
-  template <class Factory> static Factory& getAndCheckFactory(const std::string& name) {
+  template <class Factory> static Factory& getAndCheckFactoryByName(const std::string& name) {
     if (name.empty()) {
       throw EnvoyException("Provided name for static registration lookup was empty.");
     }
@@ -206,6 +207,16 @@ public:
     }
 
     return *factory;
+  }
+
+  /**
+   * Get a Factory from the registry with error checking to ensure the name and the factory are
+   * valid.
+   * @param message proto that contains fields 'name' and 'typed_config'.
+   */
+  template <class Factory, class ProtoMessage>
+  static Factory& getAndCheckFactory(const ProtoMessage& message) {
+    return Utility::getAndCheckFactoryByName<Factory>(message.name());
   }
 
   /**
@@ -224,13 +235,11 @@ public:
                            ProtobufMessage::ValidationVisitor& validation_visitor,
                            Factory& factory) {
     ProtobufTypes::MessagePtr config = factory.createEmptyConfigProto();
-
     // Fail in an obvious way if a plugin does not return a proto.
     RELEASE_ASSERT(config != nullptr, "");
-
-    translateOpaqueConfig(enclosing_message.typed_config(), enclosing_message.config(),
-                          validation_visitor, *config);
-
+    translateOpaqueConfig(enclosing_message.typed_config(),
+                          enclosing_message.hidden_envoy_deprecated_config(), validation_visitor,
+                          *config);
     return config;
   }
 
@@ -241,13 +250,13 @@ public:
    * @throws EnvoyException when the conflict of tag names is found.
    */
   static Stats::TagProducerPtr
-  createTagProducer(const envoy::config::bootstrap::v2::Bootstrap& bootstrap);
+  createTagProducer(const envoy::config::bootstrap::v3alpha::Bootstrap& bootstrap);
 
   /**
    * Create StatsMatcher instance.
    */
   static Stats::StatsMatcherPtr
-  createStatsMatcher(const envoy::config::bootstrap::v2::Bootstrap& bootstrap);
+  createStatsMatcher(const envoy::config::bootstrap::v3alpha::Bootstrap& bootstrap);
 
   /**
    * Obtain gRPC async client factory from a envoy::api::v2::core::ApiConfigSource.
@@ -255,18 +264,17 @@ public:
    * @param api_config_source envoy::api::v2::core::ApiConfigSource. Must have config type GRPC.
    * @return Grpc::AsyncClientFactoryPtr gRPC async client factory.
    */
-  static Grpc::AsyncClientFactoryPtr
-  factoryForGrpcApiConfigSource(Grpc::AsyncClientManager& async_client_manager,
-                                const envoy::api::v2::core::ApiConfigSource& api_config_source,
-                                Stats::Scope& scope);
+  static Grpc::AsyncClientFactoryPtr factoryForGrpcApiConfigSource(
+      Grpc::AsyncClientManager& async_client_manager,
+      const envoy::config::core::v3alpha::ApiConfigSource& api_config_source, Stats::Scope& scope);
 
   /**
    * Translate a set of cluster's hosts into a load assignment configuration.
    * @param hosts cluster's list of hosts.
    * @return envoy::api::v2::ClusterLoadAssignment a load assignment configuration.
    */
-  static envoy::api::v2::ClusterLoadAssignment
-  translateClusterHosts(const Protobuf::RepeatedPtrField<envoy::api::v2::core::Address>& hosts);
+  static envoy::config::endpoint::v3alpha::ClusterLoadAssignment translateClusterHosts(
+      const Protobuf::RepeatedPtrField<envoy::config::core::v3alpha::Address>& hosts);
 
   /**
    * Translate opaque config from google.protobuf.Any or google.protobuf.Struct to defined proto
@@ -308,9 +316,9 @@ public:
    * @param random the random generator.
    * @return BackOffStrategyPtr for scheduling refreshes.
    */
-  static BackOffStrategyPtr prepareDnsRefreshStrategy(const envoy::api::v2::Cluster& cluster,
-                                                      uint64_t dns_refresh_rate_ms,
-                                                      Runtime::RandomGenerator& random);
+  static BackOffStrategyPtr
+  prepareDnsRefreshStrategy(const envoy::config::cluster::v3alpha::Cluster& cluster,
+                            uint64_t dns_refresh_rate_ms, Runtime::RandomGenerator& random);
 };
 
 } // namespace Config

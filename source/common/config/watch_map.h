@@ -4,8 +4,8 @@
 #include <string>
 #include <utility>
 
-#include "envoy/api/v2/discovery.pb.h"
 #include "envoy/config/subscription.h"
+#include "envoy/service/discovery/v3alpha/discovery.pb.h"
 
 #include "common/common/assert.h"
 #include "common/common/logger.h"
@@ -80,9 +80,11 @@ public:
   // SubscriptionCallbacks
   void onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
                       const std::string& version_info) override;
-  void onConfigUpdate(const Protobuf::RepeatedPtrField<envoy::api::v2::Resource>& added_resources,
-                      const Protobuf::RepeatedPtrField<std::string>& removed_resources,
-                      const std::string& system_version_info) override;
+  void
+  onConfigUpdate(const Protobuf::RepeatedPtrField<envoy::service::discovery::v3alpha::Resource>&
+                     added_resources,
+                 const Protobuf::RepeatedPtrField<std::string>& removed_resources,
+                 const std::string& system_version_info) override;
 
   void onConfigUpdateFailed(ConfigUpdateFailureReason reason, const EnvoyException* e) override;
 

@@ -1,8 +1,8 @@
-#include "envoy/api/v2/core/address.pb.h"
-#include "envoy/api/v2/core/base.pb.h"
-#include "envoy/api/v2/route/route.pb.h"
-#include "envoy/config/rbac/v2/rbac.pb.h"
-#include "envoy/type/matcher/metadata.pb.h"
+#include "envoy/config/core/v3alpha/address.pb.h"
+#include "envoy/config/core/v3alpha/base.pb.h"
+#include "envoy/config/rbac/v3alpha/rbac.pb.h"
+#include "envoy/config/route/v3alpha/route_components.pb.h"
+#include "envoy/type/matcher/v3alpha/metadata.pb.h"
 
 #include "common/network/utility.h"
 
@@ -25,11 +25,11 @@ namespace Common {
 namespace RBAC {
 namespace {
 
-void checkMatcher(
-    const RBAC::Matcher& matcher, bool expected,
-    const Envoy::Network::Connection& connection = Envoy::Network::MockConnection(),
-    const Envoy::Http::HeaderMap& headers = Envoy::Http::HeaderMapImpl(),
-    const envoy::api::v2::core::Metadata& metadata = envoy::api::v2::core::Metadata()) {
+void checkMatcher(const RBAC::Matcher& matcher, bool expected,
+                  const Envoy::Network::Connection& connection = Envoy::Network::MockConnection(),
+                  const Envoy::Http::HeaderMap& headers = Envoy::Http::HeaderMapImpl(),
+                  const envoy::config::core::v3alpha::Metadata& metadata =
+                      envoy::config::core::v3alpha::Metadata()) {
   NiceMock<StreamInfo::MockStreamInfo> info;
   EXPECT_CALL(Const(info), dynamicMetadata()).WillRepeatedly(ReturnRef(metadata));
   EXPECT_EQ(expected, matcher.matches(connection, headers, info));
@@ -38,8 +38,8 @@ void checkMatcher(
 TEST(AlwaysMatcher, AlwaysMatches) { checkMatcher(RBAC::AlwaysMatcher(), true); }
 
 TEST(AndMatcher, Permission_Set) {
-  envoy::config::rbac::v2::Permission_Set set;
-  envoy::config::rbac::v2::Permission* perm = set.add_rules();
+  envoy::config::rbac::v3alpha::Permission::Set set;
+  envoy::config::rbac::v3alpha::Permission* perm = set.add_rules();
   perm->set_any(true);
 
   checkMatcher(RBAC::AndMatcher(set), true);
@@ -61,8 +61,8 @@ TEST(AndMatcher, Permission_Set) {
 }
 
 TEST(AndMatcher, Principal_Set) {
-  envoy::config::rbac::v2::Principal_Set set;
-  envoy::config::rbac::v2::Principal* principal = set.add_ids();
+  envoy::config::rbac::v3alpha::Principal::Set set;
+  envoy::config::rbac::v3alpha::Principal* principal = set.add_ids();
   principal->set_any(true);
 
   checkMatcher(RBAC::AndMatcher(set), true);
@@ -86,8 +86,8 @@ TEST(AndMatcher, Principal_Set) {
 }
 
 TEST(OrMatcher, Permission_Set) {
-  envoy::config::rbac::v2::Permission_Set set;
-  envoy::config::rbac::v2::Permission* perm = set.add_rules();
+  envoy::config::rbac::v3alpha::Permission::Set set;
+  envoy::config::rbac::v3alpha::Permission* perm = set.add_rules();
   perm->set_destination_port(123);
 
   Envoy::Network::MockConnection conn;
@@ -104,8 +104,8 @@ TEST(OrMatcher, Permission_Set) {
 }
 
 TEST(OrMatcher, Principal_Set) {
-  envoy::config::rbac::v2::Principal_Set set;
-  envoy::config::rbac::v2::Principal* id = set.add_ids();
+  envoy::config::rbac::v3alpha::Principal::Set set;
+  envoy::config::rbac::v3alpha::Principal* id = set.add_ids();
   auto* cidr = id->mutable_source_ip();
   cidr->set_address_prefix("1.2.3.0");
   cidr->mutable_prefix_len()->set_value(24);
@@ -124,21 +124,21 @@ TEST(OrMatcher, Principal_Set) {
 }
 
 TEST(NotMatcher, Permission) {
-  envoy::config::rbac::v2::Permission perm;
+  envoy::config::rbac::v3alpha::Permission perm;
   perm.set_any(true);
 
   checkMatcher(RBAC::NotMatcher(perm), false, Envoy::Network::MockConnection());
 }
 
 TEST(NotMatcher, Principal) {
-  envoy::config::rbac::v2::Principal principal;
+  envoy::config::rbac::v3alpha::Principal principal;
   principal.set_any(true);
 
   checkMatcher(RBAC::NotMatcher(principal), false, Envoy::Network::MockConnection());
 }
 
 TEST(HeaderMatcher, HeaderMatcher) {
-  envoy::api::v2::route::HeaderMatcher config;
+  envoy::config::route::v3alpha::HeaderMatcher config;
   config.set_name("foo");
   config.set_exact_match("bar");
 
@@ -167,11 +167,11 @@ TEST(IPMatcher, IPMatcher) {
   EXPECT_CALL(conn, localAddress()).Times(2).WillRepeatedly(ReturnRef(local));
   EXPECT_CALL(conn, remoteAddress()).Times(2).WillRepeatedly(ReturnRef(remote));
 
-  envoy::api::v2::core::CidrRange local_cidr;
+  envoy::config::core::v3alpha::CidrRange local_cidr;
   local_cidr.set_address_prefix("1.2.3.0");
   local_cidr.mutable_prefix_len()->set_value(24);
 
-  envoy::api::v2::core::CidrRange remote_cidr;
+  envoy::config::core::v3alpha::CidrRange remote_cidr;
   remote_cidr.set_address_prefix("4.5.6.7");
   remote_cidr.mutable_prefix_len()->set_value(32);
 
@@ -208,7 +208,7 @@ TEST(AuthenticatedMatcher, uriSanPeerCertificate) {
   EXPECT_CALL(Const(conn), ssl()).WillRepeatedly(Return(ssl));
 
   // We should check if any URI SAN matches.
-  envoy::config::rbac::v2::Principal_Authenticated auth;
+  envoy::config::rbac::v3alpha::Principal::Authenticated auth;
   auth.mutable_principal_name()->set_exact("foo");
   checkMatcher(AuthenticatedMatcher(auth), true, conn);
 
@@ -235,7 +235,7 @@ TEST(AuthenticatedMatcher, dnsSanPeerCertificate) {
   EXPECT_CALL(*ssl, subjectPeerCertificate()).WillRepeatedly(ReturnRef("subject"));
 
   // We should get check if any DNS SAN matches as URI SAN is not available.
-  envoy::config::rbac::v2::Principal_Authenticated auth;
+  envoy::config::rbac::v3alpha::Principal::Authenticated auth;
   auth.mutable_principal_name()->set_exact("foo");
   checkMatcher(AuthenticatedMatcher(auth), true, conn);
 
@@ -257,7 +257,7 @@ TEST(AuthenticatedMatcher, subjectPeerCertificate) {
   EXPECT_CALL(*ssl, subjectPeerCertificate()).WillRepeatedly(ReturnRef(peer_subject));
   EXPECT_CALL(Const(conn), ssl()).WillRepeatedly(Return(ssl));
 
-  envoy::config::rbac::v2::Principal_Authenticated auth;
+  envoy::config::rbac::v3alpha::Principal::Authenticated auth;
   auth.mutable_principal_name()->set_exact("bar");
   checkMatcher(AuthenticatedMatcher(auth), true, conn);
 
@@ -272,10 +272,10 @@ TEST(AuthenticatedMatcher, AnySSLSubject) {
   EXPECT_CALL(*ssl, uriSanPeerCertificate()).WillRepeatedly(Return(sans));
   EXPECT_CALL(Const(conn), ssl()).WillRepeatedly(Return(ssl));
 
-  envoy::config::rbac::v2::Principal_Authenticated auth;
+  envoy::config::rbac::v3alpha::Principal::Authenticated auth;
   checkMatcher(AuthenticatedMatcher(auth), true, conn);
 
-  auth.mutable_principal_name()->set_regex(".*");
+  auth.mutable_principal_name()->set_hidden_envoy_deprecated_regex(".*");
   checkMatcher(AuthenticatedMatcher(auth), true, conn);
 }
 
@@ -290,13 +290,13 @@ TEST(MetadataMatcher, MetadataMatcher) {
   Envoy::Http::HeaderMapImpl header;
 
   auto label = MessageUtil::keyValueStruct("label", "prod");
-  envoy::api::v2::core::Metadata metadata;
+  envoy::config::core::v3alpha::Metadata metadata;
   metadata.mutable_filter_metadata()->insert(
       Protobuf::MapPair<std::string, ProtobufWkt::Struct>("other", label));
   metadata.mutable_filter_metadata()->insert(
       Protobuf::MapPair<std::string, ProtobufWkt::Struct>("rbac", label));
 
-  envoy::type::matcher::MetadataMatcher matcher;
+  envoy::type::matcher::v3alpha::MetadataMatcher matcher;
   matcher.set_filter("rbac");
   matcher.add_path()->set_key("label");
 
@@ -307,7 +307,7 @@ TEST(MetadataMatcher, MetadataMatcher) {
 }
 
 TEST(PolicyMatcher, PolicyMatcher) {
-  envoy::config::rbac::v2::Policy policy;
+  envoy::config::rbac::v3alpha::Policy policy;
   policy.add_permissions()->set_destination_port(123);
   policy.add_permissions()->set_destination_port(456);
   policy.add_principals()->mutable_authenticated()->mutable_principal_name()->set_exact("foo");

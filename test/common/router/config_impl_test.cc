@@ -5,11 +5,11 @@
 #include <memory>
 #include <string>
 
-#include "envoy/api/v2/rds.pb.h"
-#include "envoy/api/v2/rds.pb.validate.h"
-#include "envoy/api/v2/route/route.pb.h"
+#include "envoy/config/route/v3alpha/route.pb.h"
+#include "envoy/config/route/v3alpha/route.pb.validate.h"
+#include "envoy/config/route/v3alpha/route_components.pb.h"
 #include "envoy/server/filter_config.h"
-#include "envoy/type/percent.pb.h"
+#include "envoy/type/v3alpha/percent.pb.h"
 
 #include "common/config/metadata.h"
 #include "common/config/well_known_names.h"
@@ -50,7 +50,7 @@ namespace {
 //     --test_env="ROUTE_CORPUS_PATH=$PWD/test/common/router/route_corpus"
 class TestConfigImpl : public ConfigImpl {
 public:
-  TestConfigImpl(const envoy::api::v2::RouteConfiguration& config,
+  TestConfigImpl(const envoy::config::route::v3alpha::RouteConfiguration& config,
                  Server::Configuration::ServerFactoryContext& factory_context,
                  bool validate_clusters_default)
       : ConfigImpl(config, factory_context, ProtobufMessage::getNullValidationVisitor(),
@@ -83,7 +83,7 @@ public:
     return route(headers, NiceMock<Envoy::StreamInfo::MockStreamInfo>(), random_value);
   }
 
-  const envoy::api::v2::RouteConfiguration config_;
+  const envoy::config::route::v3alpha::RouteConfiguration config_;
 };
 
 Http::TestHeaderMapImpl genHeaders(const std::string& host, const std::string& path,
@@ -94,8 +94,9 @@ Http::TestHeaderMapImpl genHeaders(const std::string& host, const std::string& p
                                  {"x-route-nope", "route"},   {"x-forwarded-proto", "http"}};
 }
 
-envoy::api::v2::RouteConfiguration parseRouteConfigurationFromV2Yaml(const std::string& yaml) {
-  envoy::api::v2::RouteConfiguration route_config;
+envoy::config::route::v3alpha::RouteConfiguration
+parseRouteConfigurationFromV2Yaml(const std::string& yaml) {
+  envoy::config::route::v3alpha::RouteConfiguration route_config;
   TestUtility::loadFromYaml(yaml, route_config);
   TestUtility::validate(route_config);
   return route_config;
@@ -1183,7 +1184,8 @@ TEST_F(RouteMatcherTest, TestRequestHeadersToAddWithAppendFalse) {
   const std::string yaml = requestHeadersConfig(false);
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
 
-  envoy::api::v2::RouteConfiguration route_config = parseRouteConfigurationFromV2Yaml(yaml);
+  envoy::config::route::v3alpha::RouteConfiguration route_config =
+      parseRouteConfigurationFromV2Yaml(yaml);
 
   TestConfigImpl config(route_config, factory_context_, true);
 
@@ -1421,7 +1423,8 @@ virtual_hosts:
 
     NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
 
-    envoy::api::v2::RouteConfiguration route_config = parseRouteConfigurationFromV2Yaml(yaml);
+    envoy::config::route::v3alpha::RouteConfiguration route_config =
+        parseRouteConfigurationFromV2Yaml(yaml);
 
     EXPECT_THROW_WITH_MESSAGE(TestConfigImpl config(route_config, factory_context_, true),
                               EnvoyException, ":-prefixed headers may not be modified");
@@ -1444,7 +1447,8 @@ virtual_hosts:
 
     NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info;
 
-    envoy::api::v2::RouteConfiguration route_config = parseRouteConfigurationFromV2Yaml(yaml);
+    envoy::config::route::v3alpha::RouteConfiguration route_config =
+        parseRouteConfigurationFromV2Yaml(yaml);
 
     EXPECT_THROW_WITH_MESSAGE(TestConfigImpl config(route_config, factory_context_, true),
                               EnvoyException, ":-prefixed or host headers may not be removed");
@@ -1909,7 +1913,7 @@ virtual_hosts:
     route_config_ = parseRouteConfigurationFromV2Yaml(yaml);
   }
 
-  envoy::api::v2::route::RouteAction_HashPolicy* firstRouteHashPolicy() {
+  envoy::config::route::v3alpha::RouteAction::HashPolicy* firstRouteHashPolicy() {
     auto hash_policies = route_config_.mutable_virtual_hosts(0)
                              ->mutable_routes(0)
                              ->mutable_route()
@@ -1928,7 +1932,7 @@ virtual_hosts:
     return *config_;
   }
 
-  envoy::api::v2::RouteConfiguration route_config_;
+  envoy::config::route::v3alpha::RouteConfiguration route_config_;
   Http::HashPolicy::AddCookieCallback add_cookie_nop_;
 
 private:
@@ -2340,7 +2344,8 @@ TEST_F(RouterMatcherHashPolicyTest, HashTerminal) {
 TEST_F(RouterMatcherHashPolicyTest, InvalidHashPolicies) {
   {
     auto hash_policy = firstRouteHashPolicy();
-    EXPECT_EQ(envoy::api::v2::route::RouteAction::HashPolicy::POLICY_SPECIFIER_NOT_SET,
+    EXPECT_EQ(envoy::config::route::v3alpha::RouteAction::HashPolicy::PolicySpecifierCase::
+                  POLICY_SPECIFIER_NOT_SET,
               hash_policy->policy_specifier_case());
     EXPECT_THROW(config(), EnvoyException);
   }
@@ -2349,7 +2354,8 @@ TEST_F(RouterMatcherHashPolicyTest, InvalidHashPolicies) {
     route->add_hash_policy()->mutable_header()->set_header_name("foo_header");
     route->add_hash_policy()->mutable_connection_properties()->set_source_ip(true);
     auto hash_policy = route->add_hash_policy();
-    EXPECT_EQ(envoy::api::v2::route::RouteAction::HashPolicy::POLICY_SPECIFIER_NOT_SET,
+    EXPECT_EQ(envoy::config::route::v3alpha::RouteAction::HashPolicy::PolicySpecifierCase::
+                  POLICY_SPECIFIER_NOT_SET,
               hash_policy->policy_specifier_case());
     EXPECT_THROW(config(), EnvoyException);
   }
@@ -2505,15 +2511,17 @@ virtual_hosts:
 
   TestConfigImpl config(parseRouteConfigurationFromV2Yaml(yaml), factory_context_, false);
 
-  EXPECT_CALL(snapshot,
-              featureEnabled("bogus_key", Matcher<const envoy::type::FractionalPercent&>(_), 41))
+  EXPECT_CALL(
+      snapshot,
+      featureEnabled("bogus_key", Matcher<const envoy::type::v3alpha::FractionalPercent&>(_), 41))
       .WillRepeatedly(Return(true));
   EXPECT_EQ(
       "something_else",
       config.route(genHeaders("www.lyft.com", "/foo", "GET"), 41)->routeEntry()->clusterName());
 
-  EXPECT_CALL(snapshot,
-              featureEnabled("bogus_key", Matcher<const envoy::type::FractionalPercent&>(_), 43))
+  EXPECT_CALL(
+      snapshot,
+      featureEnabled("bogus_key", Matcher<const envoy::type::v3alpha::FractionalPercent&>(_), 43))
       .WillRepeatedly(Return(false));
   EXPECT_EQ(
       "www2",
@@ -2816,7 +2824,7 @@ virtual_hosts:
                                   ->shadowPolicies()[0]
                                   ->defaultValue();
   EXPECT_EQ(20, default_value.numerator());
-  EXPECT_EQ(envoy::type::FractionalPercent::HUNDRED, default_value.denominator());
+  EXPECT_EQ(envoy::type::v3alpha::FractionalPercent::HUNDRED, default_value.denominator());
 }
 
 TEST_F(RouteMatcherTest, Retry) {
@@ -3193,7 +3201,7 @@ virtual_hosts:
                        ->routeEntry()
                        ->hedgePolicy()
                        .hedgeOnPerTryTimeout());
-  envoy::type::FractionalPercent percent =
+  envoy::type::v3alpha::FractionalPercent percent =
       config.route(genHeaders("www.lyft.com", "/foo", "GET"), 0)
           ->routeEntry()
           ->hedgePolicy()
@@ -3262,7 +3270,7 @@ virtual_hosts:
                       ->routeEntry()
                       ->hedgePolicy()
                       .hedgeOnPerTryTimeout());
-  envoy::type::FractionalPercent percent =
+  envoy::type::v3alpha::FractionalPercent percent =
       config.route(genHeaders("www.lyft.com", "/foo", "GET"), 0)
           ->routeEntry()
           ->hedgePolicy()
@@ -4065,7 +4073,7 @@ struct Baz : public Envoy::Config::TypedMetadata::Object {
 };
 class BazFactory : public HttpRouteTypedMetadataFactory {
 public:
-  const std::string name() const override { return "baz"; }
+  std::string name() const override { return "baz"; }
   // Returns nullptr (conversion failure) if d is empty.
   std::unique_ptr<const Envoy::Config::TypedMetadata::Object>
   parse(const ProtobufWkt::Struct& d) const override {
@@ -4793,11 +4801,11 @@ virtual_hosts:
 )EOF";
 
   Runtime::MockSnapshot snapshot;
-  EXPECT_CALL(snapshot,
-              featureEnabled("cors.www.enabled", Matcher<const envoy::type::FractionalPercent&>(_)))
+  EXPECT_CALL(snapshot, featureEnabled("cors.www.enabled",
+                                       Matcher<const envoy::type::v3alpha::FractionalPercent&>(_)))
       .WillOnce(Return(false));
   EXPECT_CALL(snapshot, featureEnabled("cors.www.shadow_enabled",
-                                       Matcher<const envoy::type::FractionalPercent&>(_)))
+                                       Matcher<const envoy::type::v3alpha::FractionalPercent&>(_)))
       .WillOnce(Return(true));
   EXPECT_CALL(factory_context_.runtime_loader_, snapshot()).WillRepeatedly(ReturnRef(snapshot));
 
@@ -4850,11 +4858,11 @@ virtual_hosts:
 )EOF";
 
   Runtime::MockSnapshot snapshot;
-  EXPECT_CALL(snapshot,
-              featureEnabled("cors.www.enabled", Matcher<const envoy::type::FractionalPercent&>(_)))
+  EXPECT_CALL(snapshot, featureEnabled("cors.www.enabled",
+                                       Matcher<const envoy::type::v3alpha::FractionalPercent&>(_)))
       .WillOnce(Return(false));
   EXPECT_CALL(snapshot, featureEnabled("cors.www.shadow_enabled",
-                                       Matcher<const envoy::type::FractionalPercent&>(_)))
+                                       Matcher<const envoy::type::v3alpha::FractionalPercent&>(_)))
       .WillOnce(Return(true));
   EXPECT_CALL(factory_context_.runtime_loader_, snapshot()).WillRepeatedly(ReturnRef(snapshot));
 
@@ -5194,7 +5202,7 @@ TEST(MetadataMatchCriteriaImpl, Filter) {
 class RouteEntryMetadataMatchTest : public testing::Test, public ConfigImplTestBase {};
 
 TEST_F(RouteEntryMetadataMatchTest, ParsesMetadata) {
-  auto route_config = envoy::api::v2::RouteConfiguration();
+  auto route_config = envoy::config::route::v3alpha::RouteConfiguration();
   auto* vhost = route_config.add_virtual_hosts();
   vhost->set_name("vhost");
   vhost->add_domains("www.lyft.com");
@@ -5307,15 +5315,16 @@ class ConfigUtilityTest : public testing::Test, public ConfigImplTestBase {};
 
 TEST_F(ConfigUtilityTest, ParseResponseCode) {
   const std::vector<
-      std::pair<envoy::api::v2::route::RedirectAction::RedirectResponseCode, Http::Code>>
+      std::pair<envoy::config::route::v3alpha::RedirectAction::RedirectResponseCode, Http::Code>>
       test_set = {
-          std::make_pair(envoy::api::v2::route::RedirectAction::MOVED_PERMANENTLY,
+          std::make_pair(envoy::config::route::v3alpha::RedirectAction::MOVED_PERMANENTLY,
                          Http::Code::MovedPermanently),
-          std::make_pair(envoy::api::v2::route::RedirectAction::FOUND, Http::Code::Found),
-          std::make_pair(envoy::api::v2::route::RedirectAction::SEE_OTHER, Http::Code::SeeOther),
-          std::make_pair(envoy::api::v2::route::RedirectAction::TEMPORARY_REDIRECT,
+          std::make_pair(envoy::config::route::v3alpha::RedirectAction::FOUND, Http::Code::Found),
+          std::make_pair(envoy::config::route::v3alpha::RedirectAction::SEE_OTHER,
+                         Http::Code::SeeOther),
+          std::make_pair(envoy::config::route::v3alpha::RedirectAction::TEMPORARY_REDIRECT,
                          Http::Code::TemporaryRedirect),
-          std::make_pair(envoy::api::v2::route::RedirectAction::PERMANENT_REDIRECT,
+          std::make_pair(envoy::config::route::v3alpha::RedirectAction::PERMANENT_REDIRECT,
                          Http::Code::PermanentRedirect)};
   for (const auto& test_case : test_set) {
     EXPECT_EQ(test_case.second, ConfigUtility::parseRedirectResponseCode(test_case.first));
@@ -5323,7 +5332,7 @@ TEST_F(ConfigUtilityTest, ParseResponseCode) {
 }
 
 TEST_F(ConfigUtilityTest, ParseDirectResponseBody) {
-  envoy::api::v2::route::Route route;
+  envoy::config::route::v3alpha::Route route;
   EXPECT_EQ(EMPTY_STRING, ConfigUtility::parseDirectResponseBody(route, *api_));
 
   route.mutable_direct_response()->mutable_body()->set_filename("missing_file");
