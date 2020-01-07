@@ -2,9 +2,9 @@ syntax = "proto3";
 
 package envoy.config.retry.previous_hosts;
 
-option java_outer_classname = "PreviousHostsPredicateProto";
-option java_multiple_files = true;
 option java_package = "io.envoyproxy.envoy.config.retry.previous_hosts";
+option java_outer_classname = "PreviousHostsProto";
+option java_multiple_files = true;
 
 // [#protodoc-title: Previous Hosts Predicate]
 // [#extension: envoy.retry_priorities.previous_hosts]
