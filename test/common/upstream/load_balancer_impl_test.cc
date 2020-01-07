@@ -130,10 +130,8 @@ TEST_P(LoadBalancerBaseTest, PrioritySelection) {
   HealthyAndDegradedLoad priority_load{Upstream::HealthyLoad({100, 0, 0}),
                                        Upstream::DegradedLoad({0, 0, 0})};
   EXPECT_CALL(context, determinePriorityLoad(_, _)).WillRepeatedly(ReturnRef(priority_load));
-  // With both the primary and failover hosts unhealthy, we should select an
-  // unhealthy primary host.
-  // primary and failover are in panic mode. Load distribution is based
-  // on the number of hosts regardless of their heath.
+  // Primary and failover are in panic mode. Load distribution is based
+  // on the number of hosts regardless of their health.
   EXPECT_EQ(50, lb_.percentageLoad(0));
   EXPECT_EQ(50, lb_.percentageLoad(1));
   EXPECT_EQ(&host_set_, &lb_.chooseHostSet(&context).first);

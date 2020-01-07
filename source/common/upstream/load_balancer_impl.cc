@@ -270,13 +270,14 @@ void LoadBalancerBase::recalculatePerPriorityPanic() {
 // of healthy hosts in the priority, but based on number of hosts
 // in each priority regardless of its health.
 void LoadBalancerBase::recalculateLoadInTotalPanic() {
-  // first calculate total number of hosts across all priorities regardless
+  // First calculate total number of hosts across all priorities regardless
   // whether they are healthy or not.
-  uint32_t total_hosts_num = 0;
-  for (size_t i = 0; i < per_priority_panic_.size(); i++) {
-    const HostSet& host_set = *priority_set_.hostSetsPerPriority()[i];
-    total_hosts_num += host_set.hosts().size() - host_set.excludedHosts().size();
-  }
+  const uint32_t total_hosts_num = std::accumulate(
+      priority_set_.hostSetsPerPriority().begin(), priority_set_.hostSetsPerPriority().end(), 0,
+      [](size_t acc, const std::unique_ptr<Envoy::Upstream::HostSet>& host_set) {
+        return acc + (host_set->hosts().size() - host_set->excludedHosts().size());
+      });
+
   if (0 == total_hosts_num) {
     // Backend is empty, but load must be distributed somewhere.
     per_priority_load_.healthy_priority_load_.get()[0] = 100;
@@ -285,7 +286,7 @@ void LoadBalancerBase::recalculateLoadInTotalPanic() {
 
   // Now iterate through all priority levels and calculate how much
   // load is supposed to go to each priority. In panic mode the calculation
-  // is based n ot on the number of healthy hosts but based on the number of
+  // is based not on the number of healthy hosts but based on the number of
   // total hosts in the priority.
   uint32_t total_load = 100;
   for (size_t i = 0; i < per_priority_panic_.size(); i++) {
@@ -297,7 +298,7 @@ void LoadBalancerBase::recalculateLoadInTotalPanic() {
     per_priority_load_.degraded_priority_load_.get()[i] = 0;
     total_load -= priority_load;
   }
-  // add to priority zero whatever if left
+  // Add to priority zero whatever if left.
   per_priority_load_.healthy_priority_load_.get()[0] += total_load;
 }
 
