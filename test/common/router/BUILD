@@ -266,7 +266,7 @@ envoy_cc_test(
         "//test/test_common:simulated_time_system_lib",
         "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",
-        "@envoy_api//envoy/extensions/transport_sockets/tls/v3alpha:pkg_cc_proto",
+        "@envoy_api//envoy/api/v3alpha/auth:pkg_cc_proto",
         "@envoy_api//envoy/config/core/v3alpha:pkg_cc_proto",
         "@envoy_api//envoy/type/v3alpha:pkg_cc_proto",
     ],
