@@ -6,8 +6,8 @@
 #include <string>
 #include <vector>
 
-#include "envoy/api/v2/core/base.pb.h"
 #include "envoy/common/exception.h"
+#include "envoy/config/core/v3alpha/base.pb.h"
 
 #include "common/common/assert.h"
 #include "common/common/fmt.h"
@@ -35,7 +35,7 @@ public:
   virtual std::vector<absl::string_view> registeredNames() const PURE;
   // Return all registered factory names, including disabled factories.
   virtual std::vector<absl::string_view> allRegisteredNames() const PURE;
-  virtual absl::optional<envoy::api::v2::core::BuildVersion>
+  virtual absl::optional<envoy::config::core::v3alpha::BuildVersion>
   getFactoryVersion(absl::string_view name) const PURE;
   virtual bool disableFactory(absl::string_view) PURE;
   virtual bool isFactoryDisabled(absl::string_view) const PURE;
@@ -53,7 +53,7 @@ public:
     return FactoryRegistry::registeredNames(true);
   }
 
-  absl::optional<envoy::api::v2::core::BuildVersion>
+  absl::optional<envoy::config::core::v3alpha::BuildVersion>
   getFactoryVersion(absl::string_view name) const override {
     return FactoryRegistry::getFactoryVersion(name);
   }
@@ -176,10 +176,10 @@ public:
   /**
    * Gets the current map of vendor specific factory versions.
    */
-  static absl::flat_hash_map<std::string, envoy::api::v2::core::BuildVersion>&
+  static absl::flat_hash_map<std::string, envoy::config::core::v3alpha::BuildVersion>&
   versioned_factories() {
     using VersionedFactoryMap =
-        absl::flat_hash_map<std::string, envoy::api::v2::core::BuildVersion>;
+        absl::flat_hash_map<std::string, envoy::config::core::v3alpha::BuildVersion>;
     MUTABLE_CONSTRUCT_ON_FIRST_USE(VersionedFactoryMap);
   }
 
@@ -207,7 +207,7 @@ public:
    * independently of Envoy.
    */
   static void registerFactory(Base& factory, absl::string_view name,
-                              const envoy::api::v2::core::BuildVersion& version,
+                              const envoy::config::core::v3alpha::BuildVersion& version,
                               absl::string_view instead_value = "") {
     auto result = factories().emplace(std::make_pair(name, &factory));
     if (!result.second) {
@@ -290,7 +290,7 @@ public:
   /**
    * @return vendor specific version of a factory.
    */
-  static absl::optional<envoy::api::v2::core::BuildVersion>
+  static absl::optional<envoy::config::core::v3alpha::BuildVersion>
   getFactoryVersion(absl::string_view name) {
     auto it = versioned_factories().find(name);
     if (it == versioned_factories().end()) {
@@ -420,10 +420,10 @@ public:
   }
 
 private:
-  static envoy::api::v2::core::BuildVersion
+  static envoy::config::core::v3alpha::BuildVersion
   makeBuildVersion(uint32_t major, uint32_t minor, uint32_t patch,
                    const std::map<std::string, std::string>& metadata) {
-    envoy::api::v2::core::BuildVersion version;
+    envoy::config::core::v3alpha::BuildVersion version;
     version.mutable_version()->set_major(major);
     version.mutable_version()->set_minor(minor);
     version.mutable_version()->set_patch(patch);

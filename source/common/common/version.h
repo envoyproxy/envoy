@@ -2,7 +2,7 @@
 
 #include <string>
 
-#include "envoy/api/v2/core/base.pb.h"
+#include "envoy/config/core/v3alpha/base.pb.h"
 
 #include "common/common/version_number.h"
 #include "common/singleton/const_singleton.h"
@@ -23,14 +23,14 @@ public:
   // Repository information and build type.
   static const std::string& version();
 
-  static const envoy::api::v2::core::BuildVersion& buildVersion();
+  static const envoy::config::core::v3alpha::BuildVersion& buildVersion();
 
 private:
   friend class Envoy::VersionInfoTestPeer;
   // RELEASE or DEBUG
   static const std::string& buildType();
   static const std::string& sslVersion();
-  static envoy::api::v2::core::BuildVersion makeBuildVersion(const char* version);
+  static envoy::config::core::v3alpha::BuildVersion makeBuildVersion(const char* version);
 };
 
 class BuildVersionMetadata {

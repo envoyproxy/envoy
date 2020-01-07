@@ -8,6 +8,7 @@
 #include "common/common/version.h"
 #include "common/config/protobuf_link_hacks.h"
 #include "common/config/resources.h"
+#include "common/config/version_converter.h"
 #include "common/protobuf/protobuf.h"
 #include "common/protobuf/utility.h"
 
@@ -790,7 +791,9 @@ TEST_P(AdsIntegrationTest, NodeMessage) {
     EXPECT_TRUE(delta_request.has_node());
     node = &delta_request.node();
   }
-  EXPECT_THAT(node->user_agent_build_version(), ProtoEq(VersionInfo::buildVersion()));
+  envoy::config::core::v3alpha::BuildVersion build_version_msg;
+  Config::VersionConverter::upgrade(node->user_agent_build_version(), build_version_msg);
+  EXPECT_THAT(build_version_msg, ProtoEq(VersionInfo::buildVersion()));
   EXPECT_GE(node->extensions().size(), 0);
   EXPECT_EQ(0, node->client_features().size());
   xds_stream_->finishGrpcStream(Grpc::Status::Ok);

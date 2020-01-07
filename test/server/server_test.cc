@@ -217,7 +217,7 @@ protected:
     return server_thread;
   }
 
-  void expectCorrectBuildVersion(const envoy::api::v2::core::BuildVersion& build_version) {
+  void expectCorrectBuildVersion(const envoy::config::core::v3alpha::BuildVersion& build_version) {
     std::string version_string =
         absl::StrCat(build_version.version().major(), ".", build_version.version().minor(), ".",
                      build_version.version().patch());
@@ -575,7 +575,8 @@ TEST_P(ServerInstanceImplTest, DEPRECATED_FEATURE_TEST(BootstrapNodeDeprecated))
   EXPECT_EQ("bootstrap_cluster", server_->localInfo().clusterName());
   EXPECT_EQ("bootstrap_id", server_->localInfo().nodeName());
   EXPECT_EQ("bootstrap_sub_zone", server_->localInfo().node().locality().sub_zone());
-  EXPECT_EQ(VersionInfo::version(), server_->localInfo().node().build_version());
+  EXPECT_EQ(VersionInfo::version(),
+            server_->localInfo().node().hidden_envoy_deprecated_build_version());
   EXPECT_EQ("envoy", server_->localInfo().node().user_agent_name());
   EXPECT_TRUE(server_->localInfo().node().has_user_agent_build_version());
   expectCorrectBuildVersion(server_->localInfo().node().user_agent_build_version());
@@ -622,7 +623,6 @@ TEST_P(ServerInstanceImplTest, BootstrapNodeWithOptionsOverride) {
   EXPECT_EQ("some_cluster_name", server_->localInfo().clusterName());
   EXPECT_EQ("some_node_name", server_->localInfo().nodeName());
   EXPECT_EQ("bootstrap_sub_zone", server_->localInfo().node().locality().sub_zone());
-  EXPECT_EQ(VersionInfo::version(), server_->localInfo().node().build_version());
 }
 
 // Validate server runtime is parsed from bootstrap and that we can read from
