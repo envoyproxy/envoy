@@ -10,7 +10,7 @@ namespace Envoy {
 namespace Server {
 
 /**
- * Handles FilterChainFactoryContext creation. It is used by listener to adding new filter chain
+ * Handles FilterChainFactoryContext creation. It is used by a listener to add a new filter chain
  * without worrying about the lifetime of each factory context.
  */
 class FilterChainFactoryContextCreator {
