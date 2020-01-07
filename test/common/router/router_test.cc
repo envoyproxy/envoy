@@ -1123,7 +1123,7 @@ TEST_F(RouterTest, UpstreamTimeout) {
 }
 
 // Verify the timeout budget histograms are filled out correctly when using a
-// global and per-try timeout.
+// global and per-try timeout in a successful request.
 TEST_F(RouterTest, TimeoutBudgetHistogramStat) {
   NiceMock<Http::MockStreamEncoder> encoder;
   Http::StreamDecoder* response_decoder = nullptr;
@@ -1156,6 +1156,45 @@ TEST_F(RouterTest, TimeoutBudgetHistogramStat) {
                   40ull));
 
   Http::HeaderMapPtr response_headers(new Http::TestHeaderMapImpl{{":status", "200"}});
+  response_decoder->decodeHeaders(std::move(response_headers), false);
+  test_time_.sleep(std::chrono::milliseconds(80));
+  response_decoder->decodeData(data, true);
+}
+
+// Verify the timeout budget histograms are filled out correctly when using a
+// global and per-try timeout in a failed request.
+TEST_F(RouterTest, TimeoutBudgetHistogramStatFailure) {
+  NiceMock<Http::MockStreamEncoder> encoder;
+  Http::StreamDecoder* response_decoder = nullptr;
+  EXPECT_CALL(cm_.conn_pool_, newStream(_, _))
+      .WillOnce(Invoke([&](Http::StreamDecoder& decoder, Http::ConnectionPool::Callbacks& callbacks)
+                           -> Http::ConnectionPool::Cancellable* {
+        response_decoder = &decoder;
+        callbacks.onPoolReady(encoder, cm_.conn_pool_.host_, upstream_stream_info_);
+        return nullptr;
+      }));
+  expectPerTryTimerCreate();
+  expectResponseTimerCreate();
+
+  Http::TestHeaderMapImpl headers{{"x-envoy-upstream-rq-timeout-ms", "400"},
+                                  {"x-envoy-upstream-rq-per-try-timeout-ms", "200"}};
+  HttpTestUtility::addDefaultHeaders(headers);
+  router_.decodeHeaders(headers, false);
+  Buffer::OwnedImpl data;
+  router_.decodeData(data, true);
+
+  // Global timeout budget used.
+  EXPECT_CALL(
+      cm_.thread_local_cluster_.cluster_.info_->timeout_budget_stats_store_,
+      deliverHistogramToSinks(
+          Property(&Stats::Metric::name, "upstream_rq_timeout_budget_percent_used"), 20ull));
+  // Per-try budget used.
+  EXPECT_CALL(cm_.thread_local_cluster_.cluster_.info_->timeout_budget_stats_store_,
+              deliverHistogramToSinks(
+                  Property(&Stats::Metric::name, "upstream_rq_timeout_budget_per_try_percent_used"),
+                  40ull));
+
+  Http::HeaderMapPtr response_headers(new Http::TestHeaderMapImpl{{":status", "500"}});
   response_decoder->decodeHeaders(std::move(response_headers), false);
   test_time_.sleep(std::chrono::milliseconds(80));
   response_decoder->decodeData(data, true);
