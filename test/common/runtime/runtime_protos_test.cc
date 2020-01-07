@@ -4,7 +4,7 @@
 #include "envoy/config/core/v3alpha/base.pb.validate.h"
 #include "envoy/type/v3alpha/percent.pb.h"
 
-#include "common/runtime/runtime_features.h"
+#include "common/runtime/runtime_protos.h"
 
 #include "test/mocks/runtime/mocks.h"
 #include "test/test_common/utility.h"

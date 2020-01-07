@@ -256,7 +256,7 @@ public:
     return ProtobufTypes::MessagePtr{new Envoy::ProtobufWkt::Empty()};
   }
 
-  std::string name() override { return name_; }
+  std::string name() const override { return name_; }
 
 private:
   const std::string name_;
