@@ -2,7 +2,7 @@
 
 #include "envoy/server/filter_config.h"
 
-#include "extensions/filters/http/common/empty_http_filter_config.h"
+#include "extensions/filters/http/common/factory_base.h"
 #include "extensions/filters/http/well_known_names.h"
 
 namespace Envoy {
@@ -13,10 +13,11 @@ namespace GrpcHttp1Bridge {
 /**
  * Config registration for the grpc HTTP1 bridge filter. @see NamedHttpFilterConfigFactory.
  */
-class GrpcHttp1BridgeFilterConfig : public Common::EmptyHttpFilterConfig {
+class GrpcHttp1BridgeFilterConfig
+    : public Common::FactoryBase<envoy::extensions::filters::http::grpc_http1_bridge::v3alpha::Config> {
 public:
   GrpcHttp1BridgeFilterConfig()
-      : Common::EmptyHttpFilterConfig(HttpFilterNames::get().GrpcHttp1Bridge) {}
+      : FactoryBase(HttpFilterNames::get().GrpcHttp1Bridge) {}
 
   Http::FilterFactoryCb createFilter(const std::string&,
                                      Server::Configuration::FactoryContext&) override;

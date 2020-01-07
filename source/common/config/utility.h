@@ -238,6 +238,10 @@ public:
 
     // Fail in an obvious way if a plugin does not return a proto.
     RELEASE_ASSERT(config != nullptr, "");
+
+    // Check that the config type is not google.protobuf.Empty
+    RELEASE_ASSERT(config->GetDescriptor()->full_name() != "google.protobuf.Empty", "");
+
     translateOpaqueConfig(enclosing_message.typed_config(),
                           enclosing_message.hidden_envoy_deprecated_config(), validation_visitor,
                           *config);
