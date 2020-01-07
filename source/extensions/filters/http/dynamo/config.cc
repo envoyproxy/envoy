@@ -14,8 +14,8 @@ namespace HttpFilters {
 namespace Dynamo {
 
 Http::FilterFactoryCb DynamoFilterConfig::createFilterFactoryFromProtoTyped(
-    const envoy::extensions::filters::http::dynamo::v3alpha::Dynamo&, const std::string& stats_prefix,
-    Server::Configuration::FactoryContext& context) {
+    const envoy::extensions::filters::http::dynamo::v3alpha::Dynamo&,
+    const std::string& stats_prefix, Server::Configuration::FactoryContext& context) {
   auto stats = std::make_shared<DynamoStats>(context.scope(), stats_prefix);
   return [&context, stats](Http::FilterChainFactoryCallbacks& callbacks) -> void {
     callbacks.addStreamFilter(std::make_shared<Dynamo::DynamoFilter>(

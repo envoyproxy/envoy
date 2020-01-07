@@ -28,7 +28,8 @@ public:
   }
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return std::make_unique<envoy::extensions::filters::listener::original_dst::v3alpha::OriginalDst>();
+    return std::make_unique<
+        envoy::extensions::filters::listener::original_dst::v3alpha::OriginalDst>();
   }
 
   std::string name() const override { return ListenerFilterNames::get().OriginalDst; }

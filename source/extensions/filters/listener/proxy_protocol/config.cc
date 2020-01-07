@@ -27,7 +27,8 @@ public:
   }
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return std::make_unique<envoy::extensions::filters::listener::proxy_protocol::v3alpha::ProxyProtocol>();
+    return std::make_unique<
+        envoy::extensions::filters::listener::proxy_protocol::v3alpha::ProxyProtocol>();
   }
 
   std::string name() const override { return ListenerFilterNames::get().ProxyProtocol; }

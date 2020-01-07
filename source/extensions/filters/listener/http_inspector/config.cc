@@ -27,7 +27,8 @@ public:
   }
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return std::make_unique<envoy::extensions::filters::listener::http_inspector::v3alpha::HttpInspector>();
+    return std::make_unique<
+        envoy::extensions::filters::listener::http_inspector::v3alpha::HttpInspector>();
   }
 
   std::string name() const override { return ListenerFilterNames::get().HttpInspector; }

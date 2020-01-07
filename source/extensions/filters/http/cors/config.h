@@ -14,14 +14,14 @@ namespace Cors {
 /**
  * Config registration for the cors filter. @see NamedHttpFilterConfigFactory.
  */
-class CorsFilterFactory : public Common::FactoryBase<envoy::extensions::filters::http::cors::v3alpha::Cors> {
+class CorsFilterFactory
+    : public Common::FactoryBase<envoy::extensions::filters::http::cors::v3alpha::Cors> {
 public:
   CorsFilterFactory() : FactoryBase(HttpFilterNames::get().Cors) {}
 
-  Http::FilterFactoryCb
-  createFilterFactoryFromProtoTyped(const envoy::extensions::filters::http::cors::v3alpha::Cors& proto_config,
-                                    const std::string& stats_prefix,
-                                    Server::Configuration::FactoryContext& context) override;
+  Http::FilterFactoryCb createFilterFactoryFromProtoTyped(
+      const envoy::extensions::filters::http::cors::v3alpha::Cors& proto_config,
+      const std::string& stats_prefix, Server::Configuration::FactoryContext& context) override;
 };
 
 } // namespace Cors

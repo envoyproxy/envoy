@@ -29,7 +29,8 @@ public:
   }
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return std::make_unique<envoy::extensions::filters::listener::tls_inspector::v3alpha::TlsInspector>();
+    return std::make_unique<
+        envoy::extensions::filters::listener::tls_inspector::v3alpha::TlsInspector>();
   }
 
   std::string name() const override { return ListenerFilterNames::get().TlsInspector; }
