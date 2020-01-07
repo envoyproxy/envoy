@@ -210,7 +210,8 @@ public:
   void requestVirtualHostsUpdate(
       const std::string& for_domain, Event::Dispatcher& thread_local_dispatcher,
       Http::RouteConfigUpdatedCallbackSharedPtr route_config_updated_cb) override;
-  void validateConfig(const envoy::config::route::v3alpha::RouteConfiguration& config) const override;
+  void
+  validateConfig(const envoy::config::route::v3alpha::RouteConfiguration& config) const override;
 
 private:
   struct ThreadLocalConfig : public ThreadLocal::ThreadLocalObject {

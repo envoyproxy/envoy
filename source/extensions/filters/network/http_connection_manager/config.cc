@@ -363,7 +363,7 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
     NOT_REACHED_GCOVR_EXCL_LINE;
   }
 
-  envoy::config::filter::network::http_connection_manager::v2::HttpFilter message;
+  envoy::extensions::filters::network::http_connection_manager::v3alpha::HttpFilter message;
   message.set_name("envoy.on_demand");
   bool terminal_filter = false;
   processFilter(message, -1, "http", filter_factories_, terminal_filter);

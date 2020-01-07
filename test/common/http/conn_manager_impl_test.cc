@@ -77,10 +77,6 @@ public:
     absl::optional<ConfigInfo> configInfo() const override { return {}; }
     SystemTime lastUpdated() const override { return time_source_.systemTime(); }
     void onConfigUpdate() override {}
-    void requestVirtualHostsUpdate(const std::string&,
-                                   Http::RouteConfigUpdatedCallbackSharedPtr) override {
-      NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
-    }
 
     TimeSource& time_source_;
     std::shared_ptr<Router::MockConfig> route_config_{new NiceMock<Router::MockConfig>()};

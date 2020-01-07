@@ -130,11 +130,11 @@ TEST_F(NewGrpcMuxImplTest, ConfigUpdateWithAliases) {
   EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
   grpc_mux_->start();
 
-  auto response = std::make_unique<envoy::api::v2::DeltaDiscoveryResponse>();
+  auto response = std::make_unique<envoy::service::discovery::v3alpha::DeltaDiscoveryResponse>();
   response->set_type_url(type_url);
   response->set_system_version_info("1");
 
-  envoy::api::v2::route::VirtualHost vhost;
+  envoy::config::route::v3alpha::VirtualHost vhost;
   vhost.set_name("vhost_1");
   vhost.add_domains("domain1.test");
   vhost.add_domains("domain2.test");
@@ -167,7 +167,7 @@ TEST_F(NewGrpcMuxImplTest, ConfigUpdateWithNotFoundResponse) {
   EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
   grpc_mux_->start();
 
-  auto response = std::make_unique<envoy::api::v2::DeltaDiscoveryResponse>();
+  auto response = std::make_unique<envoy::service::discovery::v3alpha::DeltaDiscoveryResponse>();
   response->set_type_url(type_url);
   response->set_system_version_info("1");
 

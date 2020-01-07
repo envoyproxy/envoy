@@ -22,17 +22,19 @@ public:
       : time_source_(time_source), last_config_hash_(0ull), last_vhds_config_hash_(0ul),
         validation_visitor_(validation_visitor), vhds_configuration_changed_(true) {}
 
-  void initializeRdsVhosts(const envoy::config::route::v3alpha::RouteConfiguration& route_configuration);
-  void collectResourceIdsInUpdate(
-      const Protobuf::RepeatedPtrField<envoy::service::discovery::v3alpha::Resource>& added_resources);
-  removeVhosts(std::unordered_map<std::string, envoy::config::route::v3alpha::VirtualHost>& vhosts,
-  const Protobuf::RepeatedPtrField<std::string>& removed_vhost_names);
   void
-  updateVhosts(std::unordered_map<std::string, envoy::config::route::v3alpha::VirtualHost>& vhosts,
-               const Protobuf::RepeatedPtrField<envoy::service::discovery::v3alpha::Resource>&
-               added_resources);
+  initializeRdsVhosts(const envoy::config::route::v3alpha::RouteConfiguration& route_configuration);
+  void collectResourceIdsInUpdate(
+      const Protobuf::RepeatedPtrField<envoy::service::discovery::v3alpha::Resource>&
+          added_resources);
+  bool removeVhosts(std::map<std::string, envoy::config::route::v3alpha::VirtualHost>& vhosts,
+                    const Protobuf::RepeatedPtrField<std::string>& removed_vhost_names);
+  bool updateVhosts(std::map<std::string, envoy::config::route::v3alpha::VirtualHost>& vhosts,
+                    const Protobuf::RepeatedPtrField<envoy::service::discovery::v3alpha::Resource>&
+                        added_resources);
   void rebuildRouteConfig(
-      const std::unordered_map<std::string, envoy::config::route::v3alpha::VirtualHost>& vhosts,
+      const std::map<std::string, envoy::config::route::v3alpha::VirtualHost>& rds_vhosts,
+      const std::map<std::string, envoy::config::route::v3alpha::VirtualHost>& vhds_vhosts,
       envoy::config::route::v3alpha::RouteConfiguration& route_config);
   bool aliasResolutionFailed(const envoy::service::discovery::v3alpha::Resource& resource) const;
   void onUpdateCommon(const envoy::config::route::v3alpha::RouteConfiguration& rc,
@@ -67,8 +69,8 @@ private:
   uint64_t last_vhds_config_hash_;
   std::string last_config_version_;
   SystemTime last_updated_;
-  std::map<std::string, std::string, envoy::config::route::v3alpha::VirtualHost> rds_virtual_hosts_;
-  std::map<std::string, std::string, envoy::config::route::v3alpha::VirtualHost> vhds_virtual_hosts_;
+  std::map<std::string, envoy::config::route::v3alpha::VirtualHost> rds_virtual_hosts_;
+  std::map<std::string, envoy::config::route::v3alpha::VirtualHost> vhds_virtual_hosts_;
   absl::optional<RouteConfigProvider::ConfigInfo> config_info_;
   ProtobufMessage::ValidationVisitor& validation_visitor_;
   std::set<std::string> resource_ids_in_last_update_;

@@ -2,12 +2,8 @@
 
 #include <memory>
 
-<<<<<<< HEAD
-#include "envoy/api/v2/rds.pb.h"
-#include "envoy/http/filter.h"
-=======
 #include "envoy/config/route/v3alpha/route.pb.h"
->>>>>>> upstream/master
+#include "envoy/http/filter.h"
 #include "envoy/router/router.h"
 
 namespace Envoy {
@@ -57,7 +53,8 @@ public:
   /**
    * Validate if the route configuration can be applied to the context of the route config provider.
    */
-  virtual void validateConfig(const envoy::config::route::v3alpha::RouteConfiguration& config) const PURE;
+  virtual void
+  validateConfig(const envoy::config::route::v3alpha::RouteConfiguration& config) const PURE;
 
   /**
    * Callback used to request an update to the route configuration from the management server.

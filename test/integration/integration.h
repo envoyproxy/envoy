@@ -306,7 +306,7 @@ public:
                                const std::vector<std::string>& removed, const std::string& version,
                                const std::vector<std::string>& aliases) {
 
-    API_NO_BOOST(envoy::api::v2::DeltaDiscoveryResponse)
+    API_NO_BOOST(envoy::api::v2::DeltaDiscoveryResponse) response;
     response.set_system_version_info("system_version_info_this_is_a_test");
     response.set_type_url(type_url);
     for (const auto& message : added_or_updated) {

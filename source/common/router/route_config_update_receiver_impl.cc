@@ -31,8 +31,8 @@ bool RouteConfigUpdateReceiverImpl::onRdsUpdate(
   return true;
 }
 
-void RouteConfigUpdateReceiverImpl::onUpdateCommon(const envoy::api::v2::RouteConfiguration& rc,
-                                                   const std::string& version_info) {
+void RouteConfigUpdateReceiverImpl::onUpdateCommon(
+    const envoy::config::route::v3alpha::RouteConfiguration& rc, const std::string& version_info) {
   last_config_version_ = version_info;
   last_updated_ = time_source_.systemTime();
   rebuildRouteConfig(rds_virtual_hosts_, vhds_virtual_hosts_, route_config_proto_);
@@ -51,7 +51,8 @@ bool RouteConfigUpdateReceiverImpl::onVhdsUpdate(
 }
 
 void RouteConfigUpdateReceiverImpl::collectResourceIdsInUpdate(
-    const Protobuf::RepeatedPtrField<envoy::api::v2::Resource>& added_resources) {
+    const Protobuf::RepeatedPtrField<envoy::service::discovery::v3alpha::Resource>&
+        added_resources) {
   resource_ids_in_last_update_.clear();
   for (const auto& resource : added_resources) {
     resource_ids_in_last_update_.emplace(resource.name());
@@ -69,7 +70,7 @@ void RouteConfigUpdateReceiverImpl::initializeRdsVhosts(
 }
 
 bool RouteConfigUpdateReceiverImpl::removeVhosts(
-    std::unordered_map<std::string, envoy::config::route::v3alpha::VirtualHost>& vhosts,
+    std::map<std::string, envoy::config::route::v3alpha::VirtualHost>& vhosts,
     const Protobuf::RepeatedPtrField<std::string>& removed_vhost_names) {
   bool vhosts_removed = false;
   for (const auto& vhost_name : removed_vhost_names) {
@@ -83,8 +84,9 @@ bool RouteConfigUpdateReceiverImpl::removeVhosts(
 }
 
 bool RouteConfigUpdateReceiverImpl::updateVhosts(
-    std::map<std::string, std::string, envoy::config::route::v3alpha::VirtualHost>& vhosts,
-    const Protobuf::RepeatedPtrField<envoy::service::discovery::v3alpha::Resource>& added_resources) {
+    std::map<std::string, envoy::config::route::v3alpha::VirtualHost>& vhosts,
+    const Protobuf::RepeatedPtrField<envoy::service::discovery::v3alpha::Resource>&
+        added_resources) {
   bool vhosts_added = false;
   for (const auto& resource : added_resources) {
     // the management server returns empty resources for aliases that it couldn't resolve.
@@ -105,9 +107,9 @@ bool RouteConfigUpdateReceiverImpl::updateVhosts(
 }
 
 void RouteConfigUpdateReceiverImpl::rebuildRouteConfig(
-    const std::map<std::string, std::string, envoy::config::route::v3alpha::VirtualHost>& rds_vhosts,
-    const std::map<std::string, std::string, envoy::config::route::v3alpha::VirtualHost>& vhds_vhosts,
-    envoy::api::v2::RouteConfiguration& route_config) {
+    const std::map<std::string, envoy::config::route::v3alpha::VirtualHost>& rds_vhosts,
+    const std::map<std::string, envoy::config::route::v3alpha::VirtualHost>& vhds_vhosts,
+    envoy::config::route::v3alpha::RouteConfiguration& route_config) {
   route_config.clear_virtual_hosts();
   for (const auto& vhost : rds_vhosts) {
     route_config.mutable_virtual_hosts()->Add()->CopyFrom(vhost.second);
@@ -118,7 +120,7 @@ void RouteConfigUpdateReceiverImpl::rebuildRouteConfig(
 }
 
 bool RouteConfigUpdateReceiverImpl::aliasResolutionFailed(
-    const envoy::api::v2::Resource& resource) const {
+    const envoy::service::discovery::v3alpha::Resource& resource) const {
   return !resource.has_resource();
 }
 

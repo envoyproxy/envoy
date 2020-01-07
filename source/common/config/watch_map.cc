@@ -97,7 +97,8 @@ void WatchMap::onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>
 
 // For responses to on-demand requests, replace the original watch for an alias
 // with one for the resource's name
-AddedRemoved WatchMap::convertAliasWatchesToNameWatches(const envoy::api::v2::Resource& resource) {
+AddedRemoved WatchMap::convertAliasWatchesToNameWatches(
+    const envoy::service::discovery::v3alpha::Resource& resource) {
   absl::flat_hash_set<Watch*> watches_to_update;
   for (const auto& alias : resource.aliases()) {
     const auto interested_watches = watch_interest_.find(alias);

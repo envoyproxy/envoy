@@ -145,7 +145,8 @@ TEST_F(VhdsTest, VhdsAddsVirtualHosts) {
 
 // verify that an RDS update of virtual hosts leaves VHDS virtual hosts intact
 TEST_F(VhdsTest, RdsUpdatesVirtualHosts) {
-  const auto route_config = TestUtility::parseYaml<envoy::config::route::v3alpha::RouteConfiguration>(R"EOF(
+  const auto route_config =
+      TestUtility::parseYaml<envoy::config::route::v3alpha::RouteConfiguration>(R"EOF(
 name: my_route
 virtual_hosts:
 - name: vhost_rds1
