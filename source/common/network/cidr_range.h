@@ -3,8 +3,7 @@
 #include <string>
 #include <vector>
 
-#include "envoy/api/v2/core/address.pb.h"
-#include "envoy/api/v3alpha/core/address.pb.h"
+#include "envoy/config/core/v3alpha/address.pb.h"
 #include "envoy/json/json_object.h"
 #include "envoy/network/address.h"
 
@@ -99,10 +98,7 @@ public:
    * Constructs a CidrRange from envoy::api::v2::core::CidrRange.
    * TODO(ccaraman): Update CidrRange::create to support only constructing valid ranges.
    */
-  static CidrRange create(const envoy::api::v2::core::CidrRange& cidr);
-  // The ::v2 and ::v3alpha variants will merge once we land API boosting
-  // automation. TODO(htuch): make sure this happens.
-  static CidrRange create(const envoy::api::v3alpha::core::CidrRange& cidr);
+  static CidrRange create(const envoy::config::core::v3alpha::CidrRange& cidr);
 
   /**
    * Given an IP address and a length of high order bits to keep, returns an address
@@ -132,7 +128,7 @@ class IpList {
 public:
   IpList(const std::vector<std::string>& subnets);
   IpList(const Json::Object& config, const std::string& member_name);
-  IpList(const Protobuf::RepeatedPtrField<envoy::api::v2::core::CidrRange>& cidrs);
+  IpList(const Protobuf::RepeatedPtrField<envoy::config::core::v3alpha::CidrRange>& cidrs);
   IpList() = default;
 
   bool contains(const Instance& address) const;

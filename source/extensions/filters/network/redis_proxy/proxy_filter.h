@@ -5,7 +5,7 @@
 #include <memory>
 #include <string>
 
-#include "envoy/config/filter/network/redis_proxy/v2/redis_proxy.pb.h"
+#include "envoy/extensions/filters/network/redis_proxy/v3alpha/redis_proxy.pb.h"
 #include "envoy/network/drain_decision.h"
 #include "envoy/network/filter.h"
 #include "envoy/stats/scope.h"
@@ -48,9 +48,10 @@ struct ProxyStats {
  */
 class ProxyFilterConfig {
 public:
-  ProxyFilterConfig(const envoy::config::filter::network::redis_proxy::v2::RedisProxy& config,
-                    Stats::Scope& scope, const Network::DrainDecision& drain_decision,
-                    Runtime::Loader& runtime, Api::Api& api);
+  ProxyFilterConfig(
+      const envoy::extensions::filters::network::redis_proxy::v3alpha::RedisProxy& config,
+      Stats::Scope& scope, const Network::DrainDecision& drain_decision, Runtime::Loader& runtime,
+      Api::Api& api);
 
   const Network::DrainDecision& drain_decision_;
   Runtime::Loader& runtime_;

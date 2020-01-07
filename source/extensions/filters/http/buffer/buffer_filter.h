@@ -5,7 +5,7 @@
 #include <memory>
 #include <string>
 
-#include "envoy/config/filter/http/buffer/v2/buffer.pb.h"
+#include "envoy/extensions/filters/http/buffer/v3alpha/buffer.pb.h"
 #include "envoy/http/filter.h"
 
 #include "common/buffer/buffer_impl.h"
@@ -17,8 +17,8 @@ namespace BufferFilter {
 
 class BufferFilterSettings : public Router::RouteSpecificFilterConfig {
 public:
-  BufferFilterSettings(const envoy::config::filter::http::buffer::v2::Buffer&);
-  BufferFilterSettings(const envoy::config::filter::http::buffer::v2::BufferPerRoute&);
+  BufferFilterSettings(const envoy::extensions::filters::http::buffer::v3alpha::Buffer&);
+  BufferFilterSettings(const envoy::extensions::filters::http::buffer::v3alpha::BufferPerRoute&);
 
   bool disabled() const { return disabled_; }
   uint64_t maxRequestBytes() const { return max_request_bytes_; }
@@ -33,7 +33,7 @@ private:
  */
 class BufferFilterConfig {
 public:
-  BufferFilterConfig(const envoy::config::filter::http::buffer::v2::Buffer& proto_config);
+  BufferFilterConfig(const envoy::extensions::filters::http::buffer::v3alpha::Buffer& proto_config);
 
   const BufferFilterSettings* settings() const { return &settings_; }
 

@@ -26,7 +26,7 @@ public:
       : api_(Api::createApiForTest()), dispatcher_(api_->allocateDispatcher()),
         connection_helper_(*dispatcher_),
         alarm_factory_(*dispatcher_, *connection_helper_.GetClock()), quic_version_([]() {
-          SetQuicReloadableFlag(quic_enable_version_99, GetParam());
+          SetQuicReloadableFlag(quic_enable_version_q099, GetParam());
           return quic::CurrentSupportedVersions()[0];
         }()),
         peer_addr_(Network::Utility::getAddressWithPort(*Network::Utility::getIpv6LoopbackAddress(),
@@ -138,7 +138,7 @@ TEST_P(EnvoyQuicClientStreamTest, PostRequestAndResponse) {
     std::unique_ptr<char[]> data_buffer;
     quic::QuicByteCount data_frame_header_length =
         quic::HttpEncoder::SerializeDataFrameHeader(response_body_.length(), &data_buffer);
-    quic::QuicStringPiece data_frame_header(data_buffer.get(), data_frame_header_length);
+    quiche::QuicheStringPiece data_frame_header(data_buffer.get(), data_frame_header_length);
     data = absl::StrCat(data_frame_header, response_body_);
   }
   quic::QuicStreamFrame frame(stream_id_, false, 0, data);
@@ -176,7 +176,7 @@ TEST_P(EnvoyQuicClientStreamTest, OutOfOrderTrailers) {
     std::unique_ptr<char[]> data_buffer;
     quic::QuicByteCount data_frame_header_length =
         quic::HttpEncoder::SerializeDataFrameHeader(response_body_.length(), &data_buffer);
-    quic::QuicStringPiece data_frame_header(data_buffer.get(), data_frame_header_length);
+    quiche::QuicheStringPiece data_frame_header(data_buffer.get(), data_frame_header_length);
     data = absl::StrCat(data_frame_header, response_body_);
   }
   quic::QuicStreamFrame frame(stream_id_, false, 0, data);

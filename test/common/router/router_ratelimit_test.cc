@@ -2,9 +2,9 @@
 #include <string>
 #include <vector>
 
-#include "envoy/api/v2/rds.pb.h"
-#include "envoy/api/v2/route/route.pb.h"
-#include "envoy/api/v2/route/route.pb.validate.h"
+#include "envoy/config/route/v3alpha/route.pb.h"
+#include "envoy/config/route/v3alpha/route_components.pb.h"
+#include "envoy/config/route/v3alpha/route_components.pb.validate.h"
 
 #include "common/http/header_map_impl.h"
 #include "common/network/address_impl.h"
@@ -28,8 +28,8 @@ namespace Envoy {
 namespace Router {
 namespace {
 
-envoy::api::v2::route::RateLimit parseRateLimitFromV2Yaml(const std::string& yaml_string) {
-  envoy::api::v2::route::RateLimit rate_limit;
+envoy::config::route::v3alpha::RateLimit parseRateLimitFromV2Yaml(const std::string& yaml_string) {
+  envoy::config::route::v3alpha::RateLimit rate_limit;
   TestUtility::loadFromYaml(yaml_string, rate_limit);
   TestUtility::validate(rate_limit);
   return rate_limit;
@@ -77,7 +77,7 @@ static Http::TestHeaderMapImpl genHeaders(const std::string& host, const std::st
 class RateLimitConfiguration : public testing::Test {
 public:
   void setupTest(const std::string& yaml) {
-    envoy::api::v2::RouteConfiguration route_config;
+    envoy::config::route::v3alpha::RouteConfiguration route_config;
     TestUtility::loadFromYaml(yaml, route_config);
     config_ =
         std::make_unique<ConfigImpl>(route_config, factory_context_, any_validation_visitor_, true);

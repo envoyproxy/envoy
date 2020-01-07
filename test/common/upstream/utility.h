@@ -1,10 +1,10 @@
 #pragma once
 
-#include "envoy/api/v2/cds.pb.h"
-#include "envoy/api/v2/core/base.pb.h"
-#include "envoy/api/v2/core/health_check.pb.h"
-#include "envoy/api/v2/endpoint/endpoint.pb.h"
-#include "envoy/config/bootstrap/v2/bootstrap.pb.h"
+#include "envoy/config/bootstrap/v3alpha/bootstrap.pb.h"
+#include "envoy/config/cluster/v3alpha/cluster.pb.h"
+#include "envoy/config/core/v3alpha/base.pb.h"
+#include "envoy/config/core/v3alpha/health_check.pb.h"
+#include "envoy/config/endpoint/v3alpha/endpoint_components.pb.h"
 #include "envoy/upstream/upstream.h"
 
 #include "common/common/utility.h"
@@ -42,26 +42,27 @@ inline std::string defaultStaticClusterJson(const std::string& name) {
 })EOF");
 }
 
-inline envoy::config::bootstrap::v2::Bootstrap
+inline envoy::config::bootstrap::v3alpha::Bootstrap
 parseBootstrapFromV2Json(const std::string& json_string) {
-  envoy::config::bootstrap::v2::Bootstrap bootstrap;
+  envoy::config::bootstrap::v3alpha::Bootstrap bootstrap;
   TestUtility::loadFromJson(json_string, bootstrap);
   return bootstrap;
 }
 
-inline envoy::api::v2::Cluster parseClusterFromV2Json(const std::string& json_string) {
-  envoy::api::v2::Cluster cluster;
+inline envoy::config::cluster::v3alpha::Cluster
+parseClusterFromV2Json(const std::string& json_string) {
+  envoy::config::cluster::v3alpha::Cluster cluster;
   TestUtility::loadFromJson(json_string, cluster);
   return cluster;
 }
 
-inline envoy::api::v2::Cluster parseClusterFromV2Yaml(const std::string& yaml) {
-  envoy::api::v2::Cluster cluster;
+inline envoy::config::cluster::v3alpha::Cluster parseClusterFromV2Yaml(const std::string& yaml) {
+  envoy::config::cluster::v3alpha::Cluster cluster;
   TestUtility::loadFromYaml(yaml, cluster);
   return cluster;
 }
 
-inline envoy::api::v2::Cluster defaultStaticCluster(const std::string& name) {
+inline envoy::config::cluster::v3alpha::Cluster defaultStaticCluster(const std::string& name) {
   return parseClusterFromV2Json(defaultStaticClusterJson(name));
 }
 
@@ -69,38 +70,39 @@ inline HostSharedPtr makeTestHost(ClusterInfoConstSharedPtr cluster, const std::
                                   uint32_t weight = 1) {
   return HostSharedPtr{new HostImpl(
       cluster, "", Network::Utility::resolveUrl(url),
-      envoy::api::v2::core::Metadata::default_instance(), weight, envoy::api::v2::core::Locality(),
-      envoy::api::v2::endpoint::Endpoint::HealthCheckConfig::default_instance(), 0,
-      envoy::api::v2::core::HealthStatus::UNKNOWN)};
+      envoy::config::core::v3alpha::Metadata::default_instance(), weight,
+      envoy::config::core::v3alpha::Locality(),
+      envoy::config::endpoint::v3alpha::Endpoint::HealthCheckConfig::default_instance(), 0,
+      envoy::config::core::v3alpha::UNKNOWN)};
 }
 
 inline HostSharedPtr makeTestHost(ClusterInfoConstSharedPtr cluster, const std::string& url,
-                                  const envoy::api::v2::core::Metadata& metadata,
+                                  const envoy::config::core::v3alpha::Metadata& metadata,
                                   uint32_t weight = 1) {
-  return HostSharedPtr{
-      new HostImpl(cluster, "", Network::Utility::resolveUrl(url), metadata, weight,
-                   envoy::api::v2::core::Locality(),
-                   envoy::api::v2::endpoint::Endpoint::HealthCheckConfig::default_instance(), 0,
-                   envoy::api::v2::core::HealthStatus::UNKNOWN)};
+  return HostSharedPtr{new HostImpl(
+      cluster, "", Network::Utility::resolveUrl(url), metadata, weight,
+      envoy::config::core::v3alpha::Locality(),
+      envoy::config::endpoint::v3alpha::Endpoint::HealthCheckConfig::default_instance(), 0,
+      envoy::config::core::v3alpha::UNKNOWN)};
 }
 
-inline HostSharedPtr
-makeTestHost(ClusterInfoConstSharedPtr cluster, const std::string& url,
-             const envoy::api::v2::endpoint::Endpoint::HealthCheckConfig& health_check_config,
-             uint32_t weight = 1) {
+inline HostSharedPtr makeTestHost(
+    ClusterInfoConstSharedPtr cluster, const std::string& url,
+    const envoy::config::endpoint::v3alpha::Endpoint::HealthCheckConfig& health_check_config,
+    uint32_t weight = 1) {
   return HostSharedPtr{new HostImpl(cluster, "", Network::Utility::resolveUrl(url),
-                                    envoy::api::v2::core::Metadata::default_instance(), weight,
-                                    envoy::api::v2::core::Locality(), health_check_config, 0,
-                                    envoy::api::v2::core::HealthStatus::UNKNOWN)};
+                                    envoy::config::core::v3alpha::Metadata::default_instance(),
+                                    weight, envoy::config::core::v3alpha::Locality(),
+                                    health_check_config, 0, envoy::config::core::v3alpha::UNKNOWN)};
 }
 
 inline HostDescriptionConstSharedPtr makeTestHostDescription(ClusterInfoConstSharedPtr cluster,
                                                              const std::string& url) {
   return HostDescriptionConstSharedPtr{new HostDescriptionImpl(
       cluster, "", Network::Utility::resolveUrl(url),
-      envoy::api::v2::core::Metadata::default_instance(),
-      envoy::api::v2::core::Locality().default_instance(),
-      envoy::api::v2::endpoint::Endpoint::HealthCheckConfig::default_instance(), 0)};
+      envoy::config::core::v3alpha::Metadata::default_instance(),
+      envoy::config::core::v3alpha::Locality().default_instance(),
+      envoy::config::endpoint::v3alpha::Endpoint::HealthCheckConfig::default_instance(), 0)};
 }
 
 inline HostsPerLocalitySharedPtr makeHostsPerLocality(std::vector<HostVector>&& locality_hosts,
@@ -114,9 +116,9 @@ makeLocalityWeights(std::initializer_list<uint32_t> locality_weights) {
   return std::make_shared<LocalityWeights>(locality_weights);
 }
 
-inline envoy::api::v2::core::HealthCheck
+inline envoy::config::core::v3alpha::HealthCheck
 parseHealthCheckFromV2Yaml(const std::string& yaml_string) {
-  envoy::api::v2::core::HealthCheck health_check;
+  envoy::config::core::v3alpha::HealthCheck health_check;
   TestUtility::loadFromYaml(yaml_string, health_check);
   return health_check;
 }

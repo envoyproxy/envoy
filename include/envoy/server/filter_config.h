@@ -3,7 +3,8 @@
 #include <functional>
 
 #include "envoy/access_log/access_log.h"
-#include "envoy/api/v2/core/base.pb.h"
+#include "envoy/config/core/v3alpha/base.pb.h"
+#include "envoy/config/typed_config.h"
 #include "envoy/grpc/context.h"
 #include "envoy/http/codes.h"
 #include "envoy/http/context.h"
@@ -128,7 +129,7 @@ public:
    * @return envoy::api::v2::core::TrafficDirection the direction of the traffic relative to the
    * local proxy.
    */
-  virtual envoy::api::v2::core::TrafficDirection direction() const PURE;
+  virtual envoy::config::core::v3alpha::TrafficDirection direction() const PURE;
 
   /**
    * @return const Network::DrainDecision& a drain decision that filters can use to determine if
@@ -170,7 +171,7 @@ public:
    * @return const envoy::api::v2::core::Metadata& the config metadata associated with this
    * listener.
    */
-  virtual const envoy::api::v2::core::Metadata& listenerMetadata() const PURE;
+  virtual const envoy::config::core::v3alpha::Metadata& listenerMetadata() const PURE;
 
   /**
    * @return OverloadManager& the overload manager for the server.
@@ -211,21 +212,9 @@ public:
 /**
  * Common interface for listener filters and UDP listener filters
  */
-class ListenerFilterConfigFactoryBase {
+class ListenerFilterConfigFactoryBase : public Config::TypedFactory {
 public:
   virtual ~ListenerFilterConfigFactoryBase() = default;
-
-  /**
-   * @return ProtobufTypes::MessagePtr create empty config proto message. The filter
-   *         config, which arrives in an opaque message, will be parsed into this empty proto.
-   */
-  virtual ProtobufTypes::MessagePtr createEmptyConfigProto() PURE;
-
-  /**
-   * @return std::string the identifying name for a particular implementation of a listener filter
-   * produced by the factory.
-   */
-  virtual std::string name() PURE;
 };
 
 /**
@@ -249,12 +238,7 @@ public:
   createFilterFactoryFromProto(const Protobuf::Message& config,
                                ListenerFactoryContext& context) PURE;
 
-  /**
-   * @return std::string the identifying category name for objects
-   * created by this factory. Used for automatic registration with
-   * FactoryCategoryRegistry.
-   */
-  static std::string category() { return "filters.listener"; }
+  std::string category() const override { return "filters.listener"; }
 };
 
 /**
@@ -277,19 +261,14 @@ public:
   createFilterFactoryFromProto(const Protobuf::Message& config,
                                ListenerFactoryContext& context) PURE;
 
-  /**
-   * @return std::string the identifying category name for objects
-   * created by this factory. Used for automatic registration with
-   * FactoryCategoryRegistry.
-   */
-  static std::string category() { return "filters.udp_listener"; }
+  std::string category() const override { return "filters.udp_listener"; }
 };
 
 /**
  * Implemented by filter factories that require more options to process the protocol used by the
  * upstream cluster.
  */
-class ProtocolOptionsFactory {
+class ProtocolOptionsFactory : public Config::TypedFactory {
 public:
   virtual ~ProtocolOptionsFactory() = default;
 
@@ -335,25 +314,7 @@ public:
   virtual Network::FilterFactoryCb createFilterFactoryFromProto(const Protobuf::Message& config,
                                                                 FactoryContext& context) PURE;
 
-  /**
-   * @return ProtobufTypes::MessagePtr create empty config proto message for v2. The filter
-   *         config, which arrives in an opaque google.protobuf.Struct message, will be converted to
-   *         JSON and then parsed into this empty proto.
-   */
-  virtual ProtobufTypes::MessagePtr createEmptyConfigProto() PURE;
-
-  /**
-   * @return std::string the identifying name for a particular implementation of a network filter
-   * produced by the factory.
-   */
-  virtual std::string name() PURE;
-
-  /**
-   * @return std::string the identifying category name for objects
-   * created by this factory. Used for automatic registration with
-   * FactoryCategoryRegistry.
-   */
-  static std::string category() { return "filters.network"; }
+  std::string category() const override { return "filters.network"; }
 
   /**
    * @return bool true if this filter must be the last filter in a filter chain, false otherwise.
@@ -377,23 +338,7 @@ public:
   virtual Network::FilterFactoryCb createFilterFactoryFromProto(const Protobuf::Message& config,
                                                                 CommonFactoryContext& context) PURE;
 
-  /**
-   * @return ProtobufTypes::MessagePtr create empty config proto message for v2.
-   */
-  virtual ProtobufTypes::MessagePtr createEmptyConfigProto() PURE;
-
-  /**
-   * @return std::string the identifying name for a particular implementation of a network filter
-   * produced by the factory.
-   */
-  virtual std::string name() PURE;
-
-  /**
-   * @return std::string the identifying category name for objects
-   * created by this factory. Used for automatic registration with
-   * FactoryCategoryRegistry.
-   */
-  static std::string category() { return "filters.upstream_network"; }
+  std::string category() const override { return "filters.upstream_network"; }
 };
 
 /**
@@ -419,13 +364,6 @@ public:
                                                              FactoryContext& context) PURE;
 
   /**
-   * @return ProtobufTypes::MessagePtr create empty config proto message for v2. The filter
-   *         config, which arrives in an opaque google.protobuf.Struct message, will be converted to
-   *         JSON and then parsed into this empty proto.
-   */
-  virtual ProtobufTypes::MessagePtr createEmptyConfigProto() PURE;
-
-  /**
    * @return ProtobufTypes::MessagePtr create an empty virtual host, route, or weighted
    *         cluster-local config proto message for v2. The filter config, which arrives in an
    *         opaque message, will be parsed into this empty proto. By default, this method
@@ -446,18 +384,7 @@ public:
     return nullptr;
   }
 
-  /**
-   * @return std::string the identifying name for a particular implementation of an http filter
-   * produced by the factory.
-   */
-  virtual std::string name() PURE;
-
-  /**
-   * @return std::string the identifying category name for objects
-   * created by this factory. Used for automatic registration with
-   * FactoryCategoryRegistry.
-   */
-  static std::string category() { return "filters.http"; }
+  std::string category() const override { return "filters.http"; }
 
   /**
    * @return bool true if this filter must be the last filter in a filter chain, false otherwise.

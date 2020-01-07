@@ -4,9 +4,9 @@
 #include <cstdint>
 #include <string>
 
-#include "envoy/admin/v2alpha/server_info.pb.h"
+#include "envoy/admin/v3alpha/server_info.pb.h"
 #include "envoy/common/pure.h"
-#include "envoy/config/bootstrap/v2/bootstrap.pb.h"
+#include "envoy/config/bootstrap/v3alpha/bootstrap.pb.h"
 #include "envoy/network/address.h"
 
 #include "spdlog/spdlog.h"
@@ -41,7 +41,7 @@ enum class Mode {
   // to be validated in a non-prod environment.
 };
 
-using CommandLineOptionsPtr = std::unique_ptr<envoy::admin::v2alpha::CommandLineOptions>;
+using CommandLineOptionsPtr = std::unique_ptr<envoy::admin::v3alpha::CommandLineOptions>;
 
 /**
  * General options for the server.
@@ -83,7 +83,7 @@ public:
    * @return const envoy::config::bootstrap::v2::Bootstrap& a bootstrap proto object
    * that merges into the config last, after configYaml and configPath.
    */
-  virtual const envoy::config::bootstrap::v2::Bootstrap& configProto() const PURE;
+  virtual const envoy::config::bootstrap::v3alpha::Bootstrap& configProto() const PURE;
 
   /**
    * @return bool allow unknown fields in the static configuration?

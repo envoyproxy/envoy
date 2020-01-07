@@ -1,6 +1,6 @@
 #include "extensions/filters/http/csrf/csrf_filter.h"
 
-#include "envoy/config/filter/http/csrf/v2/csrf.pb.h"
+#include "envoy/extensions/filters/http/csrf/v3alpha/csrf.pb.h"
 #include "envoy/stats/scope.h"
 
 #include "common/common/empty_string.h"
@@ -60,15 +60,16 @@ static CsrfStats generateStats(const std::string& prefix, Stats::Scope& scope) {
   return CsrfStats{ALL_CSRF_STATS(POOL_COUNTER_PREFIX(scope, final_prefix))};
 }
 
-static CsrfPolicyPtr generatePolicy(const envoy::config::filter::http::csrf::v2::CsrfPolicy& policy,
-                                    Runtime::Loader& runtime) {
+static CsrfPolicyPtr
+generatePolicy(const envoy::extensions::filters::http::csrf::v3alpha::CsrfPolicy& policy,
+               Runtime::Loader& runtime) {
   return std::make_unique<CsrfPolicy>(policy, runtime);
 }
 } // namespace
 
-CsrfFilterConfig::CsrfFilterConfig(const envoy::config::filter::http::csrf::v2::CsrfPolicy& policy,
-                                   const std::string& stats_prefix, Stats::Scope& scope,
-                                   Runtime::Loader& runtime)
+CsrfFilterConfig::CsrfFilterConfig(
+    const envoy::extensions::filters::http::csrf::v3alpha::CsrfPolicy& policy,
+    const std::string& stats_prefix, Stats::Scope& scope, Runtime::Loader& runtime)
     : stats_(generateStats(stats_prefix, scope)), policy_(generatePolicy(policy, runtime)) {}
 
 CsrfFilter::CsrfFilter(const CsrfFilterConfigSharedPtr config) : config_(config) {}

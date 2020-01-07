@@ -1,5 +1,10 @@
 #include "common/network/transport_socket_options_impl.h"
 
+#include <memory>
+#include <string>
+#include <utility>
+#include <vector>
+
 #include "common/common/scalar_to_byte_vector.h"
 #include "common/common/utility.h"
 #include "common/network/application_protocol.h"
@@ -40,7 +45,7 @@ TransportSocketOptionsUtility::fromFilterState(const StreamInfo::FilterState& fi
 
   if (needs_transport_socket_options) {
     return std::make_shared<Network::TransportSocketOptionsImpl>(
-        server_name, std::vector<std::string>{}, std::vector<std::string>{application_protocols});
+        server_name, std::vector<std::string>{}, std::move(application_protocols));
   } else {
     return nullptr;
   }

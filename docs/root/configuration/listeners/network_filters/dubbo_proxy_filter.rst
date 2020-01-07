@@ -59,7 +59,8 @@ the second step is to add your configuration, configuration method refer to the 
   filter_chains:
   - filters:
     - name: envoy.filters.network.dubbo_proxy
-      config:
+      typed_config:
+        "@type": type.googleapis.com/envoy.config.filter.network.dubbo_proxy.v2alpha1.DubboProxy
         stat_prefix: dubbo_incomming_stats
         protocol_type: Dubbo
         serialization_type: Hessian2
@@ -75,7 +76,7 @@ the second step is to add your configuration, configuration method refer to the 
               cluster: user_service_dubbo_server
         dubbo_filters:
         - name: envoy.filters.dubbo.testFilter
-          config:
+          typed_config:
             "@type": type.googleapis.com/google.protobuf.Struct
             value:
               name: test_service

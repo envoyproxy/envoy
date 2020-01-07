@@ -85,7 +85,7 @@ In addition, the following conventions should be followed:
 
 ## Package organization
 
-API definitions are layered hierarchically in packages from top-to-bottom:
+API definitions are layered hierarchically in packages from top-to-bottom in v2 as following:
 
 - `envoy.service` contains gRPC definitions of supporting services;
 - `envoy.config` contains definitions for service configuration, filter
@@ -96,6 +96,14 @@ resources such as `Cluster`;
 `envoy.api.v2.listener`, `envoy.api.v2.ratelimit` define sub-messages of the top-level resources;
 - `envoy.api.v2.core` and `envoy.api.v2.auth` hold core definitions consumed
 throughout the API.
+
+In Envoy API v3, API definitions are layered hierarchically in packages from top-to-bottom as following:
+- `envoy.extensions` contains all definitions for the extensions, the package should match the structure of the `source` directory.
+- `envoy.service` contains gRPC definitions of supporting services and top-level messages for the services.
+e.g. `envoy.service.route.v3` contains RDS, `envoy.service.listener.v3` contains LDS.
+- `envoy.config` contains other definitions for service configuration, bootstrap and some legacy core types.
+- `envoy.data` contains data format declaration for data types that Envoy produces.
+- `envoy.type` contains common protobuf types such as percent, range and matchers.
 
 Dependencies are enforced from top-to-bottom using visibility constraints in
 the build system to prevent circular dependency formation. Package group
