@@ -19,7 +19,7 @@
 #include "common/common/matchers.h"
 #include "common/http/codes.h"
 #include "common/http/header_map_impl.h"
-#include "common/runtime/runtime_features.h"
+#include "common/runtime/runtime_protos.h"
 
 #include "extensions/filters/common/ext_authz/ext_authz.h"
 #include "extensions/filters/common/ext_authz/ext_authz_grpc_impl.h"

@@ -39,8 +39,7 @@ Network::TransportSocketFactoryPtr UpstreamTapSocketConfigFactory::createTranspo
       const envoy::extensions::transport_sockets::tap::v3alpha::Tap&>(
       message, context.messageValidationVisitor());
   auto& inner_config_factory = Config::Utility::getAndCheckFactory<
-      Server::Configuration::UpstreamTransportSocketConfigFactory>(
-      outer_config.transport_socket().name());
+      Server::Configuration::UpstreamTransportSocketConfigFactory>(outer_config.transport_socket());
   ProtobufTypes::MessagePtr inner_factory_config = Config::Utility::translateToFactoryConfig(
       outer_config.transport_socket(), context.messageValidationVisitor(), inner_config_factory);
   auto inner_transport_factory =
@@ -59,7 +58,7 @@ Network::TransportSocketFactoryPtr DownstreamTapSocketConfigFactory::createTrans
       message, context.messageValidationVisitor());
   auto& inner_config_factory = Config::Utility::getAndCheckFactory<
       Server::Configuration::DownstreamTransportSocketConfigFactory>(
-      outer_config.transport_socket().name());
+      outer_config.transport_socket());
   ProtobufTypes::MessagePtr inner_factory_config = Config::Utility::translateToFactoryConfig(
       outer_config.transport_socket(), context.messageValidationVisitor(), inner_config_factory);
   auto inner_transport_factory = inner_config_factory.createTransportSocketFactory(
