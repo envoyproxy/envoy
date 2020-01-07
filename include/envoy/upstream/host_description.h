@@ -4,7 +4,7 @@
 #include <memory>
 #include <string>
 
-#include "envoy/api/v2/core/base.pb.h"
+#include "envoy/config/core/v3alpha/base.pb.h"
 #include "envoy/network/address.h"
 #include "envoy/network/transport_socket.h"
 #include "envoy/stats/primitive_stats_macros.h"
@@ -73,12 +73,12 @@ public:
   /**
    * @return the metadata associated with this host
    */
-  virtual const std::shared_ptr<envoy::api::v2::core::Metadata> metadata() const PURE;
+  virtual const std::shared_ptr<envoy::config::core::v3alpha::Metadata> metadata() const PURE;
 
   /**
    * Set the current metadata.
    */
-  virtual void metadata(const envoy::api::v2::core::Metadata& new_metadata) PURE;
+  virtual void metadata(const envoy::config::core::v3alpha::Metadata& new_metadata) PURE;
 
   /**
    * @return the cluster the host is a member of.
@@ -120,7 +120,7 @@ public:
    * @return the locality of the host (deployment specific). This will be the default instance if
    *         unknown.
    */
-  virtual const envoy::api::v2::core::Locality& locality() const PURE;
+  virtual const envoy::config::core::v3alpha::Locality& locality() const PURE;
 
   /**
    * @return the human readable name of the host's locality zone as a StatName.
@@ -174,7 +174,7 @@ public:
    * @param metadata the metadata of the given host.
    * @return the match information of the transport socket selected.
    */
-  virtual MatchData resolve(const envoy::api::v2::core::Metadata& metadata) const PURE;
+  virtual MatchData resolve(const envoy::config::core::v3alpha::Metadata& metadata) const PURE;
 };
 
 using TransportSocketMatcherPtr = std::unique_ptr<TransportSocketMatcher>;

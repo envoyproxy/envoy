@@ -2,9 +2,9 @@
 #include <vector>
 
 #include "envoy/api/api.h"
-#include "envoy/api/v2/cds.pb.h"
-#include "envoy/api/v2/core/base.pb.h"
-#include "envoy/api/v2/core/base.pb.validate.h"
+#include "envoy/config/cluster/v3alpha/cluster.pb.h"
+#include "envoy/config/core/v3alpha/base.pb.h"
+#include "envoy/config/core/v3alpha/base.pb.validate.h"
 #include "envoy/network/transport_socket.h"
 #include "envoy/stats/scope.h"
 
@@ -52,7 +52,7 @@ public:
   Network::TransportSocketFactoryPtr
   createTransportSocketFactory(const Protobuf::Message& proto,
                                Server::Configuration::TransportSocketFactoryContext&) override {
-    const auto& node = dynamic_cast<const envoy::api::v2::core::Node&>(proto);
+    const auto& node = dynamic_cast<const envoy::config::core::v3alpha::Node&>(proto);
     std::string id = "default-foo";
     if (!node.id().empty()) {
       id = node.id();
@@ -61,7 +61,7 @@ public:
   }
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return std::make_unique<envoy::api::v2::core::Node>();
+    return std::make_unique<envoy::config::core::v3alpha::Node>();
   }
 
   std::string name() const override { return "foo"; }
@@ -74,7 +74,8 @@ public:
         stats_scope_(stats_store_.createScope("transport_socket_match.test")) {}
 
   void init(const std::vector<std::string>& match_yaml) {
-    Protobuf::RepeatedPtrField<envoy::api::v2::Cluster_TransportSocketMatch> matches;
+    Protobuf::RepeatedPtrField<envoy::config::cluster::v3alpha::Cluster::TransportSocketMatch>
+        matches;
     for (const auto& yaml : match_yaml) {
       auto transport_socket_match = matches.Add();
       TestUtility::loadFromYaml(yaml, *transport_socket_match);
@@ -83,7 +84,8 @@ public:
                                                             mock_default_factory_, *stats_scope_);
   }
 
-  void validate(const envoy::api::v2::core::Metadata& metadata, const std::string& expected) {
+  void validate(const envoy::config::core::v3alpha::Metadata& metadata,
+                const std::string& expected) {
     auto& factory = matcher_->resolve(metadata).factory_;
     const auto& config_factory = dynamic_cast<const FakeTransportSocketFactory&>(factory);
     EXPECT_EQ(expected, config_factory.id());
@@ -108,7 +110,7 @@ transport_socket:
     id: "abc"
  )EOF"});
 
-  envoy::api::v2::core::Metadata metadata;
+  envoy::config::core::v3alpha::Metadata metadata;
   validate(metadata, "default");
 }
 
@@ -131,7 +133,7 @@ transport_socket:
     id: "http"
  )EOF"});
 
-  envoy::api::v2::core::Metadata metadata;
+  envoy::config::core::v3alpha::Metadata metadata;
   TestUtility::loadFromYaml(R"EOF(
 filter_metadata:
   envoy.transport_socket_match: { sidecar: "true" } 
@@ -167,7 +169,7 @@ transport_socket:
   config:
     id: "sidecar"
  )EOF"});
-  envoy::api::v2::core::Metadata metadata;
+  envoy::config::core::v3alpha::Metadata metadata;
   TestUtility::loadFromYaml(R"EOF(
 filter_metadata:
   envoy.transport_socket_match: { sidecar: "true", protocol: "http" }
@@ -185,7 +187,7 @@ transport_socket:
   config:
     id: "match_all"
  )EOF"});
-  envoy::api::v2::core::Metadata metadata;
+  envoy::config::core::v3alpha::Metadata metadata;
   validate(metadata, "match_all");
   TestUtility::loadFromYaml(R"EOF(
 filter_metadata:

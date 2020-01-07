@@ -5,7 +5,7 @@
 #include <vector>
 
 #include "envoy/api/api.h"
-#include "envoy/api/v2/cds.pb.h"
+#include "envoy/config/cluster/v3alpha/cluster.pb.h"
 #include "envoy/http/codec.h"
 #include "envoy/upstream/cluster_manager.h"
 
@@ -37,7 +37,8 @@ public:
   TestStaticClusterFactory() : ClusterFactoryImplBase("envoy.clusters.test_static") {}
 
   std::pair<ClusterImplBaseSharedPtr, ThreadAwareLoadBalancerPtr>
-  createClusterImpl(const envoy::api::v2::Cluster& cluster, ClusterFactoryContext& context,
+  createClusterImpl(const envoy::config::cluster::v3alpha::Cluster& cluster,
+                    ClusterFactoryContext& context,
                     Server::Configuration::TransportSocketFactoryContext& socket_factory_context,
                     Stats::ScopePtr&& stats_scope) override {
     return std::make_pair(std::make_shared<CustomStaticCluster>(
@@ -89,7 +90,7 @@ TEST_F(TestStaticClusterImplTest, CreateWithoutConfig) {
   TestStaticClusterFactory factory;
   Registry::InjectFactory<ClusterFactory> registered_factory(factory);
 
-  const envoy::api::v2::Cluster cluster_config = parseClusterFromV2Yaml(yaml);
+  const envoy::config::cluster::v3alpha::Cluster cluster_config = parseClusterFromV2Yaml(yaml);
   auto create_result = ClusterFactoryImplBase::create(
       cluster_config, cm_, stats_, tls_, dns_resolver_, ssl_context_manager_, runtime_, random_,
       dispatcher_, log_manager_, local_info_, admin_, singleton_manager_,
@@ -130,7 +131,7 @@ TEST_F(TestStaticClusterImplTest, CreateWithStructConfig) {
               port_value: 80
     )EOF";
 
-  const envoy::api::v2::Cluster cluster_config = parseClusterFromV2Yaml(yaml);
+  const envoy::config::cluster::v3alpha::Cluster cluster_config = parseClusterFromV2Yaml(yaml);
   auto create_result = ClusterFactoryImplBase::create(
       cluster_config, cm_, stats_, tls_, dns_resolver_, ssl_context_manager_, runtime_, random_,
       dispatcher_, log_manager_, local_info_, admin_, singleton_manager_,
@@ -169,7 +170,7 @@ TEST_F(TestStaticClusterImplTest, CreateWithTypedConfig) {
             port_value: 80
     )EOF";
 
-  const envoy::api::v2::Cluster cluster_config = parseClusterFromV2Yaml(yaml);
+  const envoy::config::cluster::v3alpha::Cluster cluster_config = parseClusterFromV2Yaml(yaml);
   auto create_result = ClusterFactoryImplBase::create(
       cluster_config, cm_, stats_, tls_, dns_resolver_, ssl_context_manager_, runtime_, random_,
       dispatcher_, log_manager_, local_info_, admin_, singleton_manager_,
@@ -208,7 +209,8 @@ TEST_F(TestStaticClusterImplTest, UnsupportedClusterType) {
   // the factory is not registered, expect to throw
   EXPECT_THROW_WITH_MESSAGE(
       {
-        const envoy::api::v2::Cluster cluster_config = parseClusterFromV2Yaml(yaml);
+        const envoy::config::cluster::v3alpha::Cluster cluster_config =
+            parseClusterFromV2Yaml(yaml);
         ClusterFactoryImplBase::create(
             cluster_config, cm_, stats_, tls_, dns_resolver_, ssl_context_manager_, runtime_,
             random_, dispatcher_, log_manager_, local_info_, admin_, singleton_manager_,

@@ -23,7 +23,7 @@ envoy_extension_cc_test(
         "//test/mocks/http:http_mocks",
         "//test/mocks/runtime:runtime_mocks",
         "//test/test_common:utility_lib",
-        "@envoy_api//envoy/config/filter/http/gzip/v2:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/http/gzip/v3alpha:pkg_cc_proto",
     ],
 )
 

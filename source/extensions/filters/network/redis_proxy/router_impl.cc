@@ -1,21 +1,22 @@
 #include "extensions/filters/network/redis_proxy/router_impl.h"
 
-#include "envoy/config/filter/network/redis_proxy/v2/redis_proxy.pb.h"
-#include "envoy/type/percent.pb.h"
+#include "envoy/extensions/filters/network/redis_proxy/v3alpha/redis_proxy.pb.h"
+#include "envoy/type/v3alpha/percent.pb.h"
 
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
 namespace RedisProxy {
 
-MirrorPolicyImpl::MirrorPolicyImpl(const envoy::config::filter::network::redis_proxy::v2::
+MirrorPolicyImpl::MirrorPolicyImpl(const envoy::extensions::filters::network::redis_proxy::v3alpha::
                                        RedisProxy::PrefixRoutes::Route::RequestMirrorPolicy& config,
                                    const ConnPool::InstanceSharedPtr upstream,
                                    Runtime::Loader& runtime)
     : runtime_key_(config.runtime_fraction().runtime_key()),
-      default_value_(config.has_runtime_fraction() ? absl::optional<envoy::type::FractionalPercent>(
-                                                         config.runtime_fraction().default_value())
-                                                   : absl::nullopt),
+      default_value_(config.has_runtime_fraction()
+                         ? absl::optional<envoy::type::v3alpha::FractionalPercent>(
+                               config.runtime_fraction().default_value())
+                         : absl::nullopt),
       exclude_read_commands_(config.exclude_read_commands()), upstream_(upstream),
       runtime_(runtime) {}
 
@@ -39,7 +40,8 @@ bool MirrorPolicyImpl::shouldMirror(const std::string& command) const {
 }
 
 Prefix::Prefix(
-    const envoy::config::filter::network::redis_proxy::v2::RedisProxy::PrefixRoutes::Route route,
+    const envoy::extensions::filters::network::redis_proxy::v3alpha::RedisProxy::PrefixRoutes::Route
+        route,
     Upstreams& upstreams, Runtime::Loader& runtime)
     : prefix_(route.prefix()), remove_prefix_(route.remove_prefix()),
       upstream_(upstreams.at(route.cluster())) {
@@ -50,7 +52,8 @@ Prefix::Prefix(
 }
 
 PrefixRoutes::PrefixRoutes(
-    const envoy::config::filter::network::redis_proxy::v2::RedisProxy::PrefixRoutes& config,
+    const envoy::extensions::filters::network::redis_proxy::v3alpha::RedisProxy::PrefixRoutes&
+        config,
     Upstreams&& upstreams, Runtime::Loader& runtime)
     : case_insensitive_(config.case_insensitive()), upstreams_(std::move(upstreams)),
       catch_all_route_(config.has_catch_all_route()

@@ -29,10 +29,10 @@ envoy_cc_test(
         "//test/test_common:logging_lib",
         "//test/test_common:network_utility_lib",
         "//test/test_common:utility_lib",
-        "@envoy_api//envoy/admin/v2alpha:pkg_cc_proto",
-        "@envoy_api//envoy/api/v2/auth:pkg_cc_proto",
-        "@envoy_api//envoy/api/v2/core:pkg_cc_proto",
-        "@envoy_api//envoy/config/filter/network/http_connection_manager/v2:pkg_cc_proto",
+        "@envoy_api//envoy/admin/v3alpha:pkg_cc_proto",
+        "@envoy_api//envoy/config/core/v3alpha:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3alpha:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/transport_sockets/tls/v3alpha:pkg_cc_proto",
     ],
 )
 

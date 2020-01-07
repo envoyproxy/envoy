@@ -1,5 +1,5 @@
-#include "envoy/api/v2/cds.pb.h"
-#include "envoy/service/cluster/v3alpha/cds.pb.h"
+#include "envoy/api/v2/cluster.pb.h"
+#include "envoy/config/cluster/v3alpha/cluster.pb.h"
 
 #include "common/config/api_version.h"
 #include "common/config/version_converter.h"
@@ -17,14 +17,14 @@ namespace {
 TEST(VersionConverterTest, Upgrade) {
   API_NO_BOOST(envoy::api::v2::Cluster) source;
   source.set_drain_connections_on_host_removal(true);
-  API_NO_BOOST(envoy::service::cluster::v3alpha::Cluster) dst;
+  API_NO_BOOST(envoy::config::cluster::v3alpha::Cluster) dst;
   VersionConverter::upgrade(source, dst);
   EXPECT_TRUE(dst.ignore_health_on_host_removal());
 }
 
 // Downgrading to an earlier version (where it exists).
 TEST(VersionConverterTest, DowngradeEarlier) {
-  API_NO_BOOST(envoy::service::cluster::v3alpha::Cluster) source;
+  API_NO_BOOST(envoy::config::cluster::v3alpha::Cluster) source;
   source.set_ignore_health_on_host_removal(true);
   auto downgraded = VersionConverter::downgrade(source);
   const Protobuf::Descriptor* desc = downgraded->msg_->GetDescriptor();

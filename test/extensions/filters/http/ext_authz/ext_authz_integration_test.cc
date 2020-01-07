@@ -1,7 +1,7 @@
-#include "envoy/api/v2/listener/listener.pb.h"
-#include "envoy/config/bootstrap/v2/bootstrap.pb.h"
-#include "envoy/config/filter/http/ext_authz/v2/ext_authz.pb.h"
-#include "envoy/service/auth/v2/external_auth.pb.h"
+#include "envoy/config/bootstrap/v3alpha/bootstrap.pb.h"
+#include "envoy/config/listener/v3alpha/listener_components.pb.h"
+#include "envoy/extensions/filters/http/ext_authz/v3alpha/ext_authz.pb.h"
+#include "envoy/service/auth/v3alpha/external_auth.pb.h"
 
 #include "extensions/filters/http/well_known_names.h"
 
@@ -30,7 +30,8 @@ public:
   }
 
   void initializeWithDownstreamProtocol(Http::CodecClient::Type downstream_protocol) {
-    config_helper_.addConfigModifier([this](envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
+    config_helper_.addConfigModifier([this](
+                                         envoy::config::bootstrap::v3alpha::Bootstrap& bootstrap) {
       auto* ext_authz_cluster = bootstrap.mutable_static_resources()->add_clusters();
       ext_authz_cluster->MergeFrom(bootstrap.static_resources().clusters()[0]);
       ext_authz_cluster->set_name("ext_authz");
@@ -40,7 +41,7 @@ public:
       setGrpcService(*proto_config_.mutable_grpc_service(), "ext_authz",
                      fake_upstreams_.back()->localAddress());
 
-      envoy::api::v2::listener::Filter ext_authz_filter;
+      envoy::config::listener::v3alpha::Filter ext_authz_filter;
       ext_authz_filter.set_name(Extensions::HttpFilters::HttpFilterNames::get().ExtAuthorization);
       ext_authz_filter.mutable_typed_config()->PackFrom(proto_config_);
       config_helper_.addFilter(MessageUtil::getJsonStringFromMessage(ext_authz_filter));
@@ -67,7 +68,7 @@ public:
     RELEASE_ASSERT(result, result.message());
 
     // Check for the validity of the received CheckRequest.
-    envoy::service::auth::v2::CheckRequest check_request;
+    envoy::service::auth::v3alpha::CheckRequest check_request;
     result = ext_authz_request_->waitForGrpcMessage(*dispatcher_, check_request);
     RELEASE_ASSERT(result, result.message());
 
@@ -77,7 +78,7 @@ public:
     EXPECT_EQ("application/grpc",
               ext_authz_request_->headers().ContentType()->value().getStringView());
 
-    envoy::service::auth::v2::CheckRequest expected_check_request;
+    envoy::service::auth::v3alpha::CheckRequest expected_check_request;
     TestUtility::loadFromYaml(expected_check_request_yaml, expected_check_request);
 
     auto* attributes = check_request.mutable_attributes();
@@ -120,7 +121,7 @@ public:
 
   void sendExtAuthzResponse() {
     ext_authz_request_->startGrpcStream();
-    envoy::service::auth::v2::CheckResponse check_response;
+    envoy::service::auth::v3alpha::CheckResponse check_response;
     check_response.mutable_status()->set_code(Grpc::Status::WellKnownGrpcStatus::Ok);
     ext_authz_request_->sendGrpcMessage(check_response);
     ext_authz_request_->finishGrpcStream(Grpc::Status::Ok);
@@ -182,7 +183,7 @@ attributes:
   Buffer::OwnedImpl request_body_;
   const uint64_t response_size_ = 512;
   const uint64_t max_request_bytes_ = 1024;
-  envoy::config::filter::http::ext_authz::v2::ExtAuthz proto_config_{};
+  envoy::extensions::filters::http::ext_authz::v3alpha::ExtAuthz proto_config_{};
   const std::string base_filter_config_ = R"EOF(
     with_request_body:
       max_request_bytes: 1024
