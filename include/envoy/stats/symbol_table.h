@@ -46,7 +46,7 @@ public:
    * into the SymbolTable, which will not be optimal, but in practice appears
    * to be pretty good.
    *
-   * This is exposed in the interface for the benefit of join(), which which is
+   * This is exposed in the interface for the benefit of join(), which is
    * used in the hot-path to append two stat-names into a temp without taking
    * locks. This is used then in thread-local cache lookup, so that once warm,
    * no locks are taken when looking up stats.

@@ -252,7 +252,7 @@ public:
         Endianness == ByteOrder::BigEndian ? displacement : Size - 1;
 
     // If Size == sizeof(T), we need to make sure we don't generate an invalid left shift
-    // (e.g. int32 << 32), even though we know that that branch of the conditional will.
+    // (e.g. int32 << 32), even though we know that branch of the conditional will.
     // not be taken. Size % sizeof(T) gives us the correct left shift when Size < sizeof(T),
     // and generates a left shift of 0 bits when Size == sizeof(T)
     const auto sign_extension_bits =
