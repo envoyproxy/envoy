@@ -6,7 +6,7 @@ import "envoy/config/core/v3alpha/base.proto";
 
 import "udpa/annotations/versioning.proto";
 
-option java_package = "io.envoyproxy.envoy.extensions.retry.omit_host_metadta.v3alpha";
+option java_package = "io.envoyproxy.envoy.extensions.retry.omit_host_metadata.v3alpha";
 option java_outer_classname = "OmitHostMetadataConfigProto";
 option java_multiple_files = true;
 
@@ -14,7 +14,7 @@ option java_multiple_files = true;
 
 // A retry host predicate that can be used to reject a host based on
 // predefined metadata match criteria
-// [#extension: envoy.retry_host_predicates.omit_host_metadta]
+// [#extension: envoy.retry_host_predicates.omit_host_metadata]
 message OmitHostMetadataConfig {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.retry.omit_host_metadata.v2.OmitHostMetadataConfig";
