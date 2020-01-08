@@ -899,8 +899,7 @@ TEST_F(DeprecatedFieldsTest, DEPRECATED_FEATURE_TEST(RuntimeOverrideEnumDefault)
   base.mutable_enum_container();
 
   Runtime::LoaderSingleton::getExisting()->mergeValues(
-      {{"envoy.deprecated_features:envoy.test.deprecation_test.Base.DEPRECATED_"
-        "DEFAULT",
+      {{"envoy.deprecated_features:envoy.test.deprecation_test.Base.DEPRECATED_DEFAULT",
         "false"}});
 
   // Make sure this is set up right.
@@ -917,8 +916,7 @@ TEST_F(DeprecatedFieldsTest, DEPRECATED_FEATURE_TEST(FatalEnum)) {
                           "Using deprecated value DEPRECATED_FATAL");
 
   Runtime::LoaderSingleton::getExisting()->mergeValues(
-      {{"envoy.deprecated_features:envoy.test.deprecation_test.Base.DEPRECATED_"
-        "FATAL",
+      {{"envoy.deprecated_features:envoy.test.deprecation_test.Base.DEPRECATED_FATAL",
         "true"}});
 
   checkForDeprecation(base);

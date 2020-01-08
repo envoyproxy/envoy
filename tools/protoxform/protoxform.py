@@ -438,7 +438,6 @@ def FormatOptions(options):
   """
 
   formatted_options = []
-
   for option_descriptor, option_value in sorted(options.ListFields(), key=lambda x: x[0].number):
     option_name = '({})'.format(
         option_descriptor.full_name) if option_descriptor.is_extension else option_descriptor.name
