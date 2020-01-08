@@ -770,8 +770,7 @@ TEST_F(DeprecatedFieldsTest,
 
   // Now create a new snapshot with this feature allowed.
   Runtime::LoaderSingleton::getExisting()->mergeValues(
-      {{"envoy.deprecated_features:test.deprecation_test.Base.is_deprecated_"
-        "fatal",
+      {{"envoy.deprecated_features:envoy.test.deprecation_test.Base.is_deprecated_fatal",
         "TrUe "}});
 
   // Now the same deprecation check should only trigger a warning.

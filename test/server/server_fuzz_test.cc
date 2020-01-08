@@ -67,7 +67,7 @@ makeHermeticPathsAndPorts(Fuzz::PerTestEnvironment& test_env,
 
 DEFINE_PROTO_FUZZER(const envoy::config::bootstrap::v3alpha::Bootstrap& input) {
   testing::NiceMock<MockOptions> options;
-  AllFeaturesHooks hooks;
+  DefaultListenerHooks hooks;
   testing::NiceMock<MockHotRestart> restart;
   Stats::TestIsolatedStoreImpl stats_store;
   Thread::MutexBasicLockable fakelock;

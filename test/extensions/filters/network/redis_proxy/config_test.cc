@@ -5,6 +5,7 @@
 
 #include "extensions/filters/network/redis_proxy/config.h"
 
+#include "test/test_common/test_runtime.h"
 #include "test/mocks/server/mocks.h"
 
 #include "gmock/gmock.h"
@@ -69,6 +70,10 @@ settings: {}
 
 TEST(RedisProxyFilterConfigFactoryTest,
      DEPRECATED_FEATURE_TEST(RedisProxyCorrectProtoLegacyCluster)) {
+  TestScopedRuntime scoped_runtime;
+  Runtime::LoaderSingleton::getExisting()->mergeValues(
+   {{"envoy.deprecated_features:envoy.extensions.filters.network.redis_proxy.v3alpha.RedisProxy.hidden_envoy_deprecated_cluster", "true"}});
+
   const std::string yaml = R"EOF(
 cluster: fake_cluster
 stat_prefix: foo
