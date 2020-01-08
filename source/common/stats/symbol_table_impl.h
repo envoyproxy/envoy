@@ -634,8 +634,6 @@ public:
       absl::flat_hash_set<StatNameStorage, HeterogeneousStatNameHash, HeterogeneousStatNameEqual>;
   using Iterator = HashSet::iterator;
 
-  StatNameStorageSet() = default;
-  StatNameStorageSet(StatNameStorageSet&& src) : hash_set_(std::move(src.hash_set_)) {}
   ~StatNameStorageSet();
 
   /**
