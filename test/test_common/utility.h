@@ -8,6 +8,7 @@
 
 #include "envoy/api/api.h"
 #include "envoy/buffer/buffer.h"
+#include "envoy/config/core/v3alpha/health_check.pb.validate.h"
 #include "envoy/network/address.h"
 #include "envoy/stats/stats.h"
 #include "envoy/stats/store.h"
