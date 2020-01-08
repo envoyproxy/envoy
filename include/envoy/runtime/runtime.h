@@ -113,7 +113,7 @@ public:
    * @param key supplies the key to lookup.
    * @param default_value supplies the default value that will be used if either the key
    *        does not exist or it is not a boolean.
-  */
+   */
   virtual bool deprecatedFeatureEnabled(const std::string& key, bool default_enabled) const PURE;
 
   // Returns true if a runtime feature is enabled.

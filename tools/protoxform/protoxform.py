@@ -207,7 +207,10 @@ def FormatHeaderFromFile(source_code_info, file_proto):
     if idx in file_proto.public_dependency:
       public_imports.append(d)
       continue
-    elif d in ['envoy/annotations/resource.proto', 'udpa/annotations/migrate.proto']:
+    elif d in [
+        'envoy/annotations/resource.proto', 'envoy/annotations/deprecation.proto',
+        'udpa/annotations/migrate.proto'
+    ]:
       infra_imports.append(d)
     elif d.startswith('envoy/'):
       # We ignore existing envoy/ imports, since these are computed explicitly

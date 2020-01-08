@@ -228,10 +228,8 @@ TEST_F(DiskLoaderImplTest, All) {
   EXPECT_EQ(false, snapshot->runtimeFeatureEnabled("envoy.reloadable_features.test_feature_false"));
 
   // Deprecation
-  EXPECT_EQ(false,
-            snapshot->deprecatedFeatureEnabled(
-                "envoy.deprecated_features.deprecated.proto:is_deprecated_fatal",
-            false));
+  EXPECT_EQ(false, snapshot->deprecatedFeatureEnabled(
+                       "envoy.deprecated_features.deprecated.proto:is_deprecated_fatal", false));
 
   // Feature defaults via helper function.
   EXPECT_EQ(false, runtimeFeatureEnabled("envoy.reloadable_features.test_feature_false"));
