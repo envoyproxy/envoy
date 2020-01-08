@@ -2,8 +2,6 @@
 #include <memory>
 #include <vector>
 
-#include "envoy/config/core/v3alpha/health_check.pb.validate.h"
-
 #include "common/event/dispatcher_impl.h"
 #include "common/http/http2/conn_pool.h"
 #include "common/network/utility.h"

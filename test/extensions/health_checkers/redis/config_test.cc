@@ -1,4 +1,3 @@
-#include "envoy/config/core/v3alpha/health_check.pb.validate.h"
 #include "envoy/extensions/filters/network/redis_proxy/v3alpha/redis_proxy.pb.h"
 #include "envoy/extensions/filters/network/redis_proxy/v3alpha/redis_proxy.pb.validate.h"
 

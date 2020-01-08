@@ -3,7 +3,6 @@
 #include <memory>
 #include <string>
 
-#include "envoy/config/core/v3alpha/health_check.pb.validate.h"
 #include "envoy/config/filter/accesslog/v3alpha/accesslog.pb.h"
 #include "envoy/config/filter/accesslog/v3alpha/accesslog.pb.validate.h"
 #include "envoy/upstream/cluster_manager.h"

@@ -6,7 +6,6 @@
 
 #include "envoy/common/time.h"
 #include "envoy/config/cluster/v3alpha/outlier_detection.pb.h"
-#include "envoy/config/core/v3alpha/health_check.pb.validate.h"
 #include "envoy/data/cluster/v2alpha/outlier_detection_event.pb.h"
 
 #include "common/network/utility.h"

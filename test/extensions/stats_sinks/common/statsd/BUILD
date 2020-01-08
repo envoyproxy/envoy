@@ -24,7 +24,6 @@ envoy_cc_test(
         "//test/mocks/stats:stats_mocks",
         "//test/mocks/thread_local:thread_local_mocks",
         "//test/mocks/upstream:upstream_mocks",
-        "@envoy_api//envoy/config/core/v3alpha:pkg_cc_proto",
     ],
 )
 

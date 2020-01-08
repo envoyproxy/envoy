@@ -2,7 +2,6 @@
 
 #include "envoy/config/cluster/v3alpha/cluster.pb.h"
 #include "envoy/config/core/v3alpha/health_check.pb.h"
-#include "envoy/config/core/v3alpha/health_check.pb.validate.h"
 #include "envoy/config/endpoint/v3alpha/endpoint.pb.h"
 #include "envoy/config/endpoint/v3alpha/endpoint_components.pb.h"
 #include "envoy/service/discovery/v3alpha/discovery.pb.h"

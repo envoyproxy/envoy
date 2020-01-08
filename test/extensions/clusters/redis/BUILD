@@ -43,7 +43,6 @@ envoy_extension_cc_test(
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/cluster/redis:pkg_cc_proto",
         "@envoy_api//envoy/config/cluster/v3alpha:pkg_cc_proto",
-        "@envoy_api//envoy/config/core/v3alpha:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/network/redis_proxy/v3alpha:pkg_cc_proto",
     ],
 )
@@ -81,7 +80,6 @@ envoy_extension_cc_test(
         "//test/mocks/thread_local:thread_local_mocks",
         "//test/mocks/upstream:upstream_mocks",
         "//test/test_common:utility_lib",
-        "@envoy_api//envoy/config/core/v3alpha:pkg_cc_proto",
     ],
 )
 

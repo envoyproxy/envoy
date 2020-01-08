@@ -6,7 +6,6 @@
 #include "envoy/config/cluster/redis/redis_cluster.pb.h"
 #include "envoy/config/cluster/redis/redis_cluster.pb.validate.h"
 #include "envoy/config/cluster/v3alpha/cluster.pb.h"
-#include "envoy/config/core/v3alpha/health_check.pb.validate.h"
 #include "envoy/extensions/filters/network/redis_proxy/v3alpha/redis_proxy.pb.h"
 #include "envoy/extensions/filters/network/redis_proxy/v3alpha/redis_proxy.pb.validate.h"
 #include "envoy/stats/scope.h"

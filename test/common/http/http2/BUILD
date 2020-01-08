@@ -61,7 +61,6 @@ envoy_cc_test(
         "//test/mocks/network:network_mocks",
         "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/upstream:upstream_mocks",
-        "@envoy_api//envoy/config/core/v3alpha:pkg_cc_proto",
     ],
 )
 

@@ -1,7 +1,6 @@
 #include <string>
 #include <vector>
 
-#include "envoy/config/core/v3alpha/health_check.pb.validate.h"
 #include "envoy/extensions/filters/network/ratelimit/v3alpha/rate_limit.pb.h"
 #include "envoy/extensions/filters/network/tcp_proxy/v3alpha/tcp_proxy.pb.h"
 

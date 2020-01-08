@@ -4,7 +4,6 @@
 
 #include "envoy/config/bootstrap/v3alpha/bootstrap.pb.h"
 #include "envoy/config/core/v3alpha/base.pb.h"
-#include "envoy/config/core/v3alpha/health_check.pb.validate.h"
 #include "envoy/config/metrics/v3alpha/stats.pb.h"
 
 #include "common/api/api_impl.h"

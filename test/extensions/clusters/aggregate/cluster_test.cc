@@ -1,5 +1,4 @@
 #include "envoy/config/cluster/v3alpha/cluster.pb.h"
-#include "envoy/config/core/v3alpha/health_check.pb.validate.h"
 #include "envoy/extensions/clusters/aggregate/v3alpha/cluster.pb.h"
 #include "envoy/extensions/clusters/aggregate/v3alpha/cluster.pb.validate.h"
 
