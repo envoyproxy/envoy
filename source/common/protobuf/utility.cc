@@ -343,8 +343,7 @@ void checkForDeprecatedNonRepeatedEnumValue(const Protobuf::Message& message,
 
   if (runtime) {
     warn_only = runtime->snapshot().deprecatedFeatureEnabled(
-        absl::StrCat("envoy.deprecated_features.", filename, ":",
-                     enum_value_descriptor->full_name()),
+        absl::StrCat("envoy.deprecated_features:", enum_value_descriptor->full_name()),
         warn_only);
   }
 
@@ -403,7 +402,7 @@ void MessageUtil::checkForUnexpectedFields(const Protobuf::Message& message,
     // standalone config validation utilities)
     if (runtime && field->options().deprecated()) {
       warn_only = runtime->snapshot().deprecatedFeatureEnabled(
-          absl::StrCat("envoy.deprecated_features.", filename, ":", field->full_name()), warn_only);
+          absl::StrCat("envoy.deprecated_features", field->full_name()), warn_only);
     }
 
     // If this field is deprecated, warn or throw an error.

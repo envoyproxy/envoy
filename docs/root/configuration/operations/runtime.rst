@@ -243,9 +243,9 @@ migrate to the new code path and make sure it is suitable for their use case.
 In the second phase the field will be tagged as disallowed_by_default
 and use of that configuration field will cause the config to be rejected by default.
 This disallowed mode can be overridden in runtime configuration by setting
-envoy.deprecated_features.filename.proto:full_fieldname or envoy.deprecated_features.filename.proto:full_enum_value
+envoy.deprecated_features:full_fieldname or envoy.deprecated_features:full_enum_value
 to true. For example, for a deprecated field
-``Foo.Bar.Eep`` in ``baz.proto`` set ``envoy.deprecated_features.baz.proto:Foo.bar.Eep`` to
+``Foo.Bar.Eep`` set ``envoy.deprecated_features:Foo.bar.Eep`` to
 ``true``. Use of this override is **strongly discouraged**.
 Fatal-by-default configuration indicates that the removal of the old code paths is imminent. It is
 far better for both Envoy users and for Envoy contributors if any bugs or feature gaps with the new

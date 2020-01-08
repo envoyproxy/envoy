@@ -770,7 +770,7 @@ TEST_F(DeprecatedFieldsTest,
 
   // Now create a new snapshot with this feature allowed.
   Runtime::LoaderSingleton::getExisting()->mergeValues(
-      {{"envoy.deprecated_features.deprecated.proto:envoy.test.deprecation_test.Base.is_deprecated_"
+      {{"envoy.deprecated_features:test.deprecation_test.Base.is_deprecated_"
         "fatal",
         "TrUe "}});
 
@@ -792,7 +792,7 @@ TEST_F(DeprecatedFieldsTest, DEPRECATED_FEATURE_TEST(DisallowViaRuntime)) {
 
   // Now create a new snapshot with this feature disallowed.
   Runtime::LoaderSingleton::getExisting()->mergeValues(
-      {{"envoy.deprecated_features.deprecated.proto:envoy.test.deprecation_test.Base.is_deprecated",
+      {{"envoy.deprecated_features:envoy.test.deprecation_test.Base.is_deprecated",
         " false"}});
 
   EXPECT_THROW_WITH_REGEX(
@@ -901,7 +901,7 @@ TEST_F(DeprecatedFieldsTest, DEPRECATED_FEATURE_TEST(RuntimeOverrideEnumDefault)
   base.mutable_enum_container();
 
   Runtime::LoaderSingleton::getExisting()->mergeValues(
-      {{"envoy.deprecated_features.deprecated.proto:envoy.test.deprecation_test.Base.DEPRECATED_"
+      {{"envoy.deprecated_features:envoy.test.deprecation_test.Base.DEPRECATED_"
         "DEFAULT",
         "false"}});
 
@@ -919,7 +919,7 @@ TEST_F(DeprecatedFieldsTest, DEPRECATED_FEATURE_TEST(FatalEnum)) {
                           "Using deprecated value DEPRECATED_FATAL");
 
   Runtime::LoaderSingleton::getExisting()->mergeValues(
-      {{"envoy.deprecated_features.deprecated.proto:envoy.test.deprecation_test.Base.DEPRECATED_"
+      {{"envoy.deprecated_features:envoy.test.deprecation_test.Base.DEPRECATED_"
         "FATAL",
         "true"}});
 
