@@ -238,7 +238,7 @@ public:
   createFilterFactoryFromProto(const Protobuf::Message& config,
                                ListenerFactoryContext& context) PURE;
 
-  std::string category() const override { return "filters.listener"; }
+  std::string category() const override { return "envoy.filters.listener"; }
 };
 
 /**
@@ -261,7 +261,7 @@ public:
   createFilterFactoryFromProto(const Protobuf::Message& config,
                                ListenerFactoryContext& context) PURE;
 
-  std::string category() const override { return "filters.udp_listener"; }
+  std::string category() const override { return "envoy.filters.udp_listener"; }
 };
 
 /**
@@ -314,7 +314,7 @@ public:
   virtual Network::FilterFactoryCb createFilterFactoryFromProto(const Protobuf::Message& config,
                                                                 FactoryContext& context) PURE;
 
-  std::string category() const override { return "filters.network"; }
+  std::string category() const override { return "envoy.filters.network"; }
 
   /**
    * @return bool true if this filter must be the last filter in a filter chain, false otherwise.
@@ -338,7 +338,7 @@ public:
   virtual Network::FilterFactoryCb createFilterFactoryFromProto(const Protobuf::Message& config,
                                                                 CommonFactoryContext& context) PURE;
 
-  std::string category() const override { return "filters.upstream_network"; }
+  std::string category() const override { return "envoy.filters.upstream_network"; }
 };
 
 /**
@@ -384,7 +384,7 @@ public:
     return nullptr;
   }
 
-  std::string category() const override { return "filters.http"; }
+  std::string category() const override { return "envoy.filters.http"; }
 
   /**
    * @return bool true if this filter must be the last filter in a filter chain, false otherwise.
