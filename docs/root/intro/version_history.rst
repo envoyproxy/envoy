@@ -12,6 +12,7 @@ Version history
 * buffer: remove old implementation
 * build: official released binary is now built against libc++.
 * cluster: added :ref:`aggregate cluster <arch_overview_aggregate_cluster>` that allows load balancing between clusters.
+* config: all category names of internal envoy extensions are prefixed with the 'envoy.' prefix to follow the reverse DNS naming notation.
 * decompressor: remove decompressor hard assert failure and replace with an error flag.
 * ext_authz: added :ref:`configurable ability<envoy_api_field_config.filter.http.ext_authz.v2.ExtAuthz.include_peer_certificate>` to send the :ref:`certificate<envoy_api_field_service.auth.v2.AttributeContext.Peer.certificate>` to the `ext_authz` service.
 * health check: gRPC health checker sets the gRPC deadline to the configured timeout duration.
@@ -29,13 +30,13 @@ Version history
 * redis: performance improvement for larger split commands by avoiding string copies.
 * redis: correctly follow MOVE/ASK redirection for mirrored clusters.
 * redis: add :ref:`host_degraded_refresh_threshold <envoy_api_field_config.cluster.redis.RedisClusterConfig.host_degraded_refresh_threshold>` and :ref:`failure_refresh_threshold <envoy_api_field_config.cluster.redis.RedisClusterConfig.failure_refresh_threshold>` to refresh topology when nodes are degraded or when requests fails.
-* router: added support for REQ(header-name) :ref:`header formatter <config_http_conn_man_headers_custom_request_headers>`.
-* router: added :ref:`request_mirror_policies<envoy_api_field_route.RouteAction.request_mirror_policies>` to support sending multiple mirrored requests in one route.
-* router: allow using a :ref:`query parameter
-  <envoy_api_field_route.RouteAction.HashPolicy.query_parameter>` for HTTP consistent hashing.
-* router: skip the Location header when the response code is not a 201 or a 3xx.
-* router: exposed DOWNSTREAM_REMOTE_ADDRESS as custom HTTP request/response headers.
 * router check tool: added support for testing and marking coverage for routes of runtime fraction 0.
+* router: added :ref:`request_mirror_policies<envoy_api_field_route.RouteAction.request_mirror_policies>` to support sending multiple mirrored requests in one route.
+* router: added support for REQ(header-name) :ref:`header formatter <config_http_conn_man_headers_custom_request_headers>`.
+* router: added support for percentage-based :ref:`retry budgets <envoy_api_field_cluster.CircuitBreakers.Thresholds.retry_budget>`
+* router: allow using a :ref:`query parameter <envoy_api_field_route.RouteAction.HashPolicy.query_parameter>` for HTTP consistent hashing.
+* router: exposed DOWNSTREAM_REMOTE_ADDRESS as custom HTTP request/response headers.
+* router: skip the Location header when the response code is not a 201 or a 3xx.
 * server: added the :option:`--disable-extensions` CLI option, to disable extensions at startup.
 * server: fixed a bug in config validation for configs with runtime layers.
 * tcp_proxy: added :ref:`ClusterWeight.metadata_match<envoy_api_field_config.filter.network.tcp_proxy.v2.TcpProxy.WeightedCluster.ClusterWeight.metadata_match>`.

@@ -1,5 +1,5 @@
-#include "envoy/config/filter/network/dubbo_proxy/v2alpha1/dubbo_proxy.pb.h"
-#include "envoy/config/filter/network/dubbo_proxy/v2alpha1/dubbo_proxy.pb.validate.h"
+#include "envoy/extensions/filters/network/dubbo_proxy/v3alpha/dubbo_proxy.pb.h"
+#include "envoy/extensions/filters/network/dubbo_proxy/v3alpha/dubbo_proxy.pb.validate.h"
 
 #include "common/buffer/buffer_impl.h"
 
@@ -30,7 +30,7 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace DubboProxy {
 
-using ConfigDubboProxy = envoy::config::filter::network::dubbo_proxy::v2alpha1::DubboProxy;
+using ConfigDubboProxy = envoy::extensions::filters::network::dubbo_proxy::v3alpha::DubboProxy;
 
 class ConnectionManagerTest;
 class TestConfigImpl : public ConfigImpl {

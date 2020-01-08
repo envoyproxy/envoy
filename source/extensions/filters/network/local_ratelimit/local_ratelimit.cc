@@ -1,5 +1,6 @@
 #include "extensions/filters/network/local_ratelimit/local_ratelimit.h"
 
+#include "envoy/config/filter/network/local_rate_limit/v3alpha/local_rate_limit.pb.h"
 #include "envoy/event/dispatcher.h"
 
 #include "common/protobuf/utility.h"
@@ -10,7 +11,7 @@ namespace NetworkFilters {
 namespace LocalRateLimitFilter {
 
 Config::Config(
-    const envoy::config::filter::network::local_rate_limit::v2alpha::LocalRateLimit& proto_config,
+    const envoy::config::filter::network::local_rate_limit::v3alpha::LocalRateLimit& proto_config,
     Event::Dispatcher& dispatcher, Stats::Scope& scope, Runtime::Loader& runtime)
     : fill_timer_(dispatcher.createTimer([this] { onFillTimer(); })),
       max_tokens_(proto_config.token_bucket().max_tokens()),

@@ -1,7 +1,7 @@
 #include "common/upstream/transport_socket_match_impl.h"
 
-#include "envoy/api/v2/cds.pb.h"
-#include "envoy/api/v2/core/base.pb.h"
+#include "envoy/config/cluster/v3alpha/cluster.pb.h"
+#include "envoy/config/core/v3alpha/base.pb.h"
 #include "envoy/server/transport_socket_config.h"
 
 #include "common/config/utility.h"
@@ -10,7 +10,8 @@ namespace Envoy {
 namespace Upstream {
 
 TransportSocketMatcherImpl::TransportSocketMatcherImpl(
-    const Protobuf::RepeatedPtrField<envoy::api::v2::Cluster_TransportSocketMatch>& socket_matches,
+    const Protobuf::RepeatedPtrField<
+        envoy::config::cluster::v3alpha::Cluster::TransportSocketMatch>& socket_matches,
     Server::Configuration::TransportSocketFactoryContext& factory_context,
     Network::TransportSocketFactoryPtr& default_factory, Stats::Scope& stats_scope)
     : stats_scope_(stats_scope),
@@ -18,7 +19,7 @@ TransportSocketMatcherImpl::TransportSocketMatcherImpl(
   for (const auto& socket_match : socket_matches) {
     const auto& socket_config = socket_match.transport_socket();
     auto& config_factory = Config::Utility::getAndCheckFactory<
-        Server::Configuration::UpstreamTransportSocketConfigFactory>(socket_config.name());
+        Server::Configuration::UpstreamTransportSocketConfigFactory>(socket_config);
     ProtobufTypes::MessagePtr message = Config::Utility::translateToFactoryConfig(
         socket_config, factory_context.messageValidationVisitor(), config_factory);
     FactoryMatch factory_match(
@@ -36,7 +37,7 @@ TransportSocketMatchStats TransportSocketMatcherImpl::generateStats(const std::s
 }
 
 TransportSocketMatcher::MatchData
-TransportSocketMatcherImpl::resolve(const envoy::api::v2::core::Metadata& metadata) const {
+TransportSocketMatcherImpl::resolve(const envoy::config::core::v3alpha::Metadata& metadata) const {
   for (const auto& match : matches_) {
     if (Config::Metadata::metadataLabelMatch(
             match.label_set, metadata,

@@ -1,5 +1,5 @@
-#include "envoy/config/accesslog/v2/file.pb.h"
-#include "envoy/config/filter/accesslog/v2/accesslog.pb.h"
+#include "envoy/config/filter/accesslog/v3alpha/accesslog.pb.h"
+#include "envoy/extensions/access_loggers/grpc/v3alpha/file.pb.h"
 #include "envoy/registry/registry.h"
 
 #include "common/access_log/access_log_impl.h"
@@ -23,18 +23,19 @@ namespace {
 TEST(FileAccessLogConfigTest, ValidateFail) {
   NiceMock<Server::Configuration::MockFactoryContext> context;
 
-  EXPECT_THROW(FileAccessLogFactory().createAccessLogInstance(
-                   envoy::config::accesslog::v2::FileAccessLog(), nullptr, context),
-               ProtoValidationException);
+  EXPECT_THROW(
+      FileAccessLogFactory().createAccessLogInstance(
+          envoy::extensions::access_loggers::grpc::v3alpha::FileAccessLog(), nullptr, context),
+      ProtoValidationException);
 }
 
 TEST(FileAccessLogConfigTest, ConfigureFromProto) {
-  envoy::config::filter::accesslog::v2::AccessLog config;
+  envoy::config::filter::accesslog::v3alpha::AccessLog config;
 
-  envoy::config::accesslog::v2::FileAccessLog fal_config;
+  envoy::extensions::access_loggers::grpc::v3alpha::FileAccessLog fal_config;
   fal_config.set_path("/dev/null");
 
-  TestUtility::jsonConvert(fal_config, *config.mutable_config());
+  config.mutable_typed_config()->PackFrom(fal_config);
 
   NiceMock<Server::Configuration::MockFactoryContext> context;
   EXPECT_THROW_WITH_MESSAGE(AccessLog::AccessLogFactory::fromProto(config, context), EnvoyException,
@@ -62,7 +63,7 @@ TEST(FileAccessLogConfigTest, FileAccessLogTest) {
   ProtobufTypes::MessagePtr message = factory->createEmptyConfigProto();
   ASSERT_NE(nullptr, message);
 
-  envoy::config::accesslog::v2::FileAccessLog file_access_log;
+  envoy::extensions::access_loggers::grpc::v3alpha::FileAccessLog file_access_log;
   file_access_log.set_path("/dev/null");
   file_access_log.set_format("%START_TIME%");
   TestUtility::jsonConvert(file_access_log, *message);
@@ -77,9 +78,9 @@ TEST(FileAccessLogConfigTest, FileAccessLogTest) {
 }
 
 TEST(FileAccessLogConfigTest, FileAccessLogJsonTest) {
-  envoy::config::filter::accesslog::v2::AccessLog config;
+  envoy::config::filter::accesslog::v3alpha::AccessLog config;
 
-  envoy::config::accesslog::v2::FileAccessLog fal_config;
+  envoy::extensions::access_loggers::grpc::v3alpha::FileAccessLog fal_config;
   fal_config.set_path("/dev/null");
 
   ProtobufWkt::Value string_value;
@@ -89,8 +90,9 @@ TEST(FileAccessLogConfigTest, FileAccessLogJsonTest) {
   (*json_format->mutable_fields())["protocol"] = string_value;
 
   EXPECT_EQ(fal_config.access_log_format_case(),
-            envoy::config::accesslog::v2::FileAccessLog::kJsonFormat);
-  TestUtility::jsonConvert(fal_config, *config.mutable_config());
+            envoy::extensions::access_loggers::grpc::v3alpha::FileAccessLog::AccessLogFormatCase::
+                kJsonFormat);
+  config.mutable_typed_config()->PackFrom(fal_config);
 
   NiceMock<Server::Configuration::MockFactoryContext> context;
   EXPECT_THROW_WITH_MESSAGE(AccessLog::AccessLogFactory::fromProto(config, context), EnvoyException,
@@ -110,9 +112,9 @@ TEST(FileAccessLogConfigTest, FileAccessLogJsonTest) {
 }
 
 TEST(FileAccessLogConfigTest, FileAccessLogTypedJsonTest) {
-  envoy::config::filter::accesslog::v2::AccessLog config;
+  envoy::config::filter::accesslog::v3alpha::AccessLog config;
 
-  envoy::config::accesslog::v2::FileAccessLog fal_config;
+  envoy::extensions::access_loggers::grpc::v3alpha::FileAccessLog fal_config;
   fal_config.set_path("/dev/null");
 
   ProtobufWkt::Value string_value;
@@ -122,8 +124,9 @@ TEST(FileAccessLogConfigTest, FileAccessLogTypedJsonTest) {
   (*json_format->mutable_fields())["protocol"] = string_value;
 
   EXPECT_EQ(fal_config.access_log_format_case(),
-            envoy::config::accesslog::v2::FileAccessLog::kTypedJsonFormat);
-  TestUtility::jsonConvert(fal_config, *config.mutable_config());
+            envoy::extensions::access_loggers::grpc::v3alpha::FileAccessLog::AccessLogFormatCase::
+                kTypedJsonFormat);
+  config.mutable_typed_config()->PackFrom(fal_config);
 
   config.set_name(AccessLogNames::get().File);
 
@@ -137,9 +140,9 @@ TEST(FileAccessLogConfigTest, FileAccessLogTypedJsonTest) {
 TEST(FileAccessLogConfigTest, FileAccessLogJsonWithBoolValueTest) {
   {
     // Make sure we fail if you set a bool value in the format dictionary
-    envoy::config::filter::accesslog::v2::AccessLog config;
+    envoy::config::filter::accesslog::v3alpha::AccessLog config;
     config.set_name(AccessLogNames::get().File);
-    envoy::config::accesslog::v2::FileAccessLog fal_config;
+    envoy::extensions::access_loggers::grpc::v3alpha::FileAccessLog fal_config;
     fal_config.set_path("/dev/null");
 
     ProtobufWkt::Value bool_value;
@@ -147,7 +150,7 @@ TEST(FileAccessLogConfigTest, FileAccessLogJsonWithBoolValueTest) {
     auto json_format = fal_config.mutable_json_format();
     (*json_format->mutable_fields())["protocol"] = bool_value;
 
-    TestUtility::jsonConvert(fal_config, *config.mutable_config());
+    config.mutable_typed_config()->PackFrom(fal_config);
     NiceMock<Server::Configuration::MockFactoryContext> context;
 
     EXPECT_THROW_WITH_MESSAGE(AccessLog::AccessLogFactory::fromProto(config, context),
@@ -159,9 +162,9 @@ TEST(FileAccessLogConfigTest, FileAccessLogJsonWithBoolValueTest) {
 TEST(FileAccessLogConfigTest, FileAccessLogJsonWithNestedKeyTest) {
   {
     // Make sure we fail if you set a nested Struct value in the format dictionary
-    envoy::config::filter::accesslog::v2::AccessLog config;
+    envoy::config::filter::accesslog::v3alpha::AccessLog config;
     config.set_name(AccessLogNames::get().File);
-    envoy::config::accesslog::v2::FileAccessLog fal_config;
+    envoy::extensions::access_loggers::grpc::v3alpha::FileAccessLog fal_config;
     fal_config.set_path("/dev/null");
 
     ProtobufWkt::Value string_value;
@@ -173,7 +176,7 @@ TEST(FileAccessLogConfigTest, FileAccessLogJsonWithNestedKeyTest) {
     auto json_format = fal_config.mutable_json_format();
     (*json_format->mutable_fields())["top_level_key"] = struct_value;
 
-    TestUtility::jsonConvert(fal_config, *config.mutable_config());
+    config.mutable_typed_config()->PackFrom(fal_config);
     NiceMock<Server::Configuration::MockFactoryContext> context;
 
     EXPECT_THROW_WITH_MESSAGE(AccessLog::AccessLogFactory::fromProto(config, context),

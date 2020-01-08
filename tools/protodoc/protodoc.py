@@ -558,6 +558,11 @@ class RstFormatVisitor(visitor.Visitor):
     # Find the earliest detached comment, attribute it to file level.
     # Also extract file level titles if any.
     header, comment = FormatHeaderFromFile('=', type_context.source_code_info, file_proto.name)
+    # If there are no messages, we don't include in the doc tree (no support for
+    # service rendering yet). We allow these files to be missing from the
+    # toctrees.
+    if all(len(msg) == 0 for msg in msgs) and all(len(enum) == 0 for enum in enums):
+      header = ':orphan:\n\n' + header
     debug_proto = FormatProtoAsBlockComment(file_proto)
     return header + comment + '\n'.join(msgs) + '\n'.join(enums)  # + debug_proto
 

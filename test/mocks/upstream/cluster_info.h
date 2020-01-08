@@ -5,8 +5,8 @@
 #include <memory>
 #include <string>
 
-#include "envoy/api/v2/cds.pb.h"
-#include "envoy/api/v2/core/base.pb.h"
+#include "envoy/config/cluster/v3alpha/cluster.pb.h"
+#include "envoy/config/core/v3alpha/base.pb.h"
 #include "envoy/config/typed_metadata.h"
 #include "envoy/stats/scope.h"
 #include "envoy/upstream/cluster_manager.h"
@@ -33,8 +33,9 @@ public:
 
   // Upstream::LoadBalancerSubsetInfo
   MOCK_CONST_METHOD0(isEnabled, bool());
-  MOCK_CONST_METHOD0(fallbackPolicy,
-                     envoy::api::v2::Cluster::LbSubsetConfig::LbSubsetFallbackPolicy());
+  MOCK_CONST_METHOD0(
+      fallbackPolicy,
+      envoy::config::cluster::v3alpha::Cluster::LbSubsetConfig::LbSubsetFallbackPolicy());
   MOCK_CONST_METHOD0(defaultSubset, const ProtobufWkt::Struct&());
   MOCK_CONST_METHOD0(subsetSelectors, const std::vector<SubsetSelectorPtr>&());
   MOCK_CONST_METHOD0(localityWeightAware, bool());
@@ -69,7 +70,16 @@ public:
   void resetResourceManager(uint64_t cx, uint64_t rq_pending, uint64_t rq, uint64_t rq_retry,
                             uint64_t conn_pool) {
     resource_manager_ = std::make_unique<ResourceManagerImpl>(
-        runtime_, name_, cx, rq_pending, rq, rq_retry, conn_pool, circuit_breakers_stats_);
+        runtime_, name_, cx, rq_pending, rq, rq_retry, conn_pool, circuit_breakers_stats_,
+        absl::nullopt, absl::nullopt);
+  }
+
+  void resetResourceManagerWithRetryBudget(uint64_t cx, uint64_t rq_pending, uint64_t rq,
+                                           uint64_t rq_retry, uint64_t conn_pool,
+                                           double budget_percent, uint32_t min_retry_concurrency) {
+    resource_manager_ = std::make_unique<ResourceManagerImpl>(
+        runtime_, name_, cx, rq_pending, rq, rq_retry, conn_pool, circuit_breakers_stats_,
+        budget_percent, min_retry_concurrency);
   }
 
   // Upstream::ClusterInfo
@@ -82,17 +92,21 @@ public:
   MOCK_CONST_METHOD0(http2Settings, const Http::Http2Settings&());
   MOCK_CONST_METHOD1(extensionProtocolOptions,
                      ProtocolOptionsConfigConstSharedPtr(const std::string&));
-  MOCK_CONST_METHOD0(lbConfig, const envoy::api::v2::Cluster::CommonLbConfig&());
+  MOCK_CONST_METHOD0(lbConfig, const envoy::config::cluster::v3alpha::Cluster::CommonLbConfig&());
   MOCK_CONST_METHOD0(lbType, LoadBalancerType());
-  MOCK_CONST_METHOD0(type, envoy::api::v2::Cluster::DiscoveryType());
-  MOCK_CONST_METHOD0(clusterType,
-                     const absl::optional<envoy::api::v2::Cluster::CustomClusterType>&());
-  MOCK_CONST_METHOD0(lbRingHashConfig,
-                     const absl::optional<envoy::api::v2::Cluster::RingHashLbConfig>&());
-  MOCK_CONST_METHOD0(lbLeastRequestConfig,
-                     const absl::optional<envoy::api::v2::Cluster::LeastRequestLbConfig>&());
-  MOCK_CONST_METHOD0(lbOriginalDstConfig,
-                     const absl::optional<envoy::api::v2::Cluster::OriginalDstLbConfig>&());
+  MOCK_CONST_METHOD0(type, envoy::config::cluster::v3alpha::Cluster::DiscoveryType());
+  MOCK_CONST_METHOD0(
+      clusterType,
+      const absl::optional<envoy::config::cluster::v3alpha::Cluster::CustomClusterType>&());
+  MOCK_CONST_METHOD0(
+      lbRingHashConfig,
+      const absl::optional<envoy::config::cluster::v3alpha::Cluster::RingHashLbConfig>&());
+  MOCK_CONST_METHOD0(
+      lbLeastRequestConfig,
+      const absl::optional<envoy::config::cluster::v3alpha::Cluster::LeastRequestLbConfig>&());
+  MOCK_CONST_METHOD0(
+      lbOriginalDstConfig,
+      const absl::optional<envoy::config::cluster::v3alpha::Cluster::OriginalDstLbConfig>&());
   MOCK_CONST_METHOD0(maintenanceMode, bool());
   MOCK_CONST_METHOD0(maxResponseHeadersCount, uint32_t());
   MOCK_CONST_METHOD0(maxRequestsPerConnection, uint64_t());
@@ -104,7 +118,7 @@ public:
   MOCK_CONST_METHOD0(loadReportStats, ClusterLoadReportStats&());
   MOCK_CONST_METHOD0(sourceAddress, const Network::Address::InstanceConstSharedPtr&());
   MOCK_CONST_METHOD0(lbSubsetInfo, const LoadBalancerSubsetInfo&());
-  MOCK_CONST_METHOD0(metadata, const envoy::api::v2::core::Metadata&());
+  MOCK_CONST_METHOD0(metadata, const envoy::config::core::v3alpha::Metadata&());
   MOCK_CONST_METHOD0(typedMetadata, const Envoy::Config::TypedMetadata&());
   MOCK_CONST_METHOD0(clusterSocketOptions, const Network::ConnectionSocket::OptionsSharedPtr&());
   MOCK_CONST_METHOD0(drainConnectionsOnHostRemoval, bool());
@@ -130,14 +144,16 @@ public:
   std::unique_ptr<Upstream::ResourceManager> resource_manager_;
   Network::Address::InstanceConstSharedPtr source_address_;
   LoadBalancerType lb_type_{LoadBalancerType::RoundRobin};
-  envoy::api::v2::Cluster::DiscoveryType type_{envoy::api::v2::Cluster::STRICT_DNS};
-  absl::optional<envoy::api::v2::Cluster::CustomClusterType> cluster_type_;
+  envoy::config::cluster::v3alpha::Cluster::DiscoveryType type_{
+      envoy::config::cluster::v3alpha::Cluster::STRICT_DNS};
+  absl::optional<envoy::config::cluster::v3alpha::Cluster::CustomClusterType> cluster_type_;
   NiceMock<MockLoadBalancerSubsetInfo> lb_subset_;
-  absl::optional<envoy::api::v2::Cluster::RingHashLbConfig> lb_ring_hash_config_;
-  absl::optional<envoy::api::v2::Cluster::OriginalDstLbConfig> lb_original_dst_config_;
+  absl::optional<envoy::config::cluster::v3alpha::Cluster::RingHashLbConfig> lb_ring_hash_config_;
+  absl::optional<envoy::config::cluster::v3alpha::Cluster::OriginalDstLbConfig>
+      lb_original_dst_config_;
   Network::ConnectionSocket::OptionsSharedPtr cluster_socket_options_;
-  envoy::api::v2::Cluster::CommonLbConfig lb_config_;
-  envoy::api::v2::core::Metadata metadata_;
+  envoy::config::cluster::v3alpha::Cluster::CommonLbConfig lb_config_;
+  envoy::config::core::v3alpha::Metadata metadata_;
   std::unique_ptr<Envoy::Config::TypedMetadata> typed_metadata_;
 };
 

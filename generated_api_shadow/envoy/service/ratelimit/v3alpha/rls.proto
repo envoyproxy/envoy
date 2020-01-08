@@ -2,8 +2,8 @@ syntax = "proto3";
 
 package envoy.service.ratelimit.v3alpha;
 
-import "envoy/api/v3alpha/core/base.proto";
-import "envoy/config/ratelimit/v3alpha/ratelimit.proto";
+import "envoy/config/core/v3alpha/base.proto";
+import "envoy/extensions/common/ratelimit/v3alpha/ratelimit.proto";
 
 import "udpa/annotations/versioning.proto";
 
@@ -40,7 +40,7 @@ message RateLimitRequest {
   // All rate limit requests must specify at least one RateLimitDescriptor. Each descriptor is
   // processed by the service (see below). If any of the descriptors are over limit, the entire
   // request is considered to be over limit.
-  repeated config.ratelimit.v3alpha.RateLimitDescriptor descriptors = 2;
+  repeated envoy.extensions.common.ratelimit.v3alpha.RateLimitDescriptor descriptors = 2;
 
   // Rate limit requests can optionally specify the number of hits a request adds to the matched
   // limit. If the value is not set in the message, a request increases the matched limit by 1.
@@ -116,8 +116,8 @@ message RateLimitResponse {
   repeated DescriptorStatus statuses = 2;
 
   // A list of headers to add to the response
-  repeated api.v3alpha.core.HeaderValue response_headers_to_add = 3;
+  repeated config.core.v3alpha.HeaderValue response_headers_to_add = 3;
 
   // A list of headers to add to the request when forwarded
-  repeated api.v3alpha.core.HeaderValue request_headers_to_add = 4;
+  repeated config.core.v3alpha.HeaderValue request_headers_to_add = 4;
 }

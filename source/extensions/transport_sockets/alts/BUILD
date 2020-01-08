@@ -42,7 +42,7 @@ envoy_cc_extension(
         "//include/envoy/server:transport_socket_config_interface",
         "//source/common/grpc:google_grpc_context_lib",
         "//source/extensions/transport_sockets:well_known_names",
-        "@envoy_api//envoy/config/transport_socket/alts/v2alpha:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/transport_sockets/alts/v3alpha:pkg_cc_proto",
     ],
 )
 

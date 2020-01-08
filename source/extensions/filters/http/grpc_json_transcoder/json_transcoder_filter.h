@@ -2,7 +2,7 @@
 
 #include "envoy/api/api.h"
 #include "envoy/buffer/buffer.h"
-#include "envoy/config/filter/http/transcoder/v2/transcoder.pb.h"
+#include "envoy/extensions/filters/http/grpc_json_transcoder/v3alpha/transcoder.pb.h"
 #include "envoy/http/filter.h"
 #include "envoy/http/header_map.h"
 #include "envoy/json/json_object.h"
@@ -50,7 +50,8 @@ public:
    * and construct a path matcher for HTTP path bindings.
    */
   JsonTranscoderConfig(
-      const envoy::config::filter::http::transcoder::v2::GrpcJsonTranscoder& proto_config,
+      const envoy::extensions::filters::http::grpc_json_transcoder::v3alpha::GrpcJsonTranscoder&
+          proto_config,
       Api::Api& api);
 
   /**
