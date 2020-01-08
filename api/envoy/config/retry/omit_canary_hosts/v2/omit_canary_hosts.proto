@@ -1,8 +1,8 @@
 syntax = "proto3";
 
-package envoy.config.retry.omit_canary_hosts;
+package envoy.config.retry.omit_canary_hosts.v2;
 
-option java_package = "io.envoyproxy.envoy.config.retry.omit_canary_hosts";
+option java_package = "io.envoyproxy.envoy.config.retry.omit_canary_hosts.v2";
 option java_outer_classname = "OmitCanaryHostsProto";
 option java_multiple_files = true;
 
