@@ -43,14 +43,14 @@ ValidationInstance::ValidationInstance(
     Thread::ThreadFactory& thread_factory, Filesystem::Instance& file_system)
     : options_(options), validation_context_(options_.allowUnknownStaticFields(),
                                              !options.rejectUnknownDynamicFields()),
-      stats_store_(store),
+      stats_store_(store), server_scope_(stats_store_.createScope("")),
       api_(new Api::ValidationImpl(thread_factory, store, time_system, file_system)),
       dispatcher_(api_->allocateDispatcher()),
       singleton_manager_(new Singleton::ManagerImpl(api_->threadFactory())),
       access_log_manager_(options.fileFlushIntervalMsec(), *api_, *dispatcher_, access_log_lock,
                           store),
       mutex_tracer_(nullptr), grpc_context_(stats_store_.symbolTable()),
-      http_context_(stats_store_.symbolTable()), time_system_(time_system), server_context_(*this) {
+      http_context_(stats_store_.symbolTable()), time_system_(time_system) {
   try {
     initialize(options, local_address, component_factory);
   } catch (const EnvoyException& e) {

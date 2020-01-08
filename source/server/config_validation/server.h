@@ -58,7 +58,8 @@ class ValidationInstance final : Logger::Loggable<Logger::Id::main>,
                                  public Instance,
                                  public ListenerComponentFactory,
                                  public ServerLifecycleNotifier,
-                                 public WorkerFactory {
+                                 public WorkerFactory,
+                                 public Configuration::ServerFactoryContext {
 public:
   ValidationInstance(const Options& options, Event::TimeSystem& time_system,
                      const Network::Address::InstanceConstSharedPtr& local_address,
@@ -96,6 +97,7 @@ public:
   time_t startTimeCurrentEpoch() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
   time_t startTimeFirstEpoch() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
   Stats::Store& stats() override { return stats_store_; }
+  Stats::Scope& scope() override { return *server_scope_; }
   Grpc::Context& grpcContext() override { return grpc_context_; }
   Http::Context& httpContext() override { return http_context_; }
   OptProcessContextRef processContext() override { return absl::nullopt; }
@@ -109,7 +111,7 @@ public:
   ProtobufMessage::ValidationContext& messageValidationContext() override {
     return validation_context_;
   }
-  Configuration::ServerFactoryContext& serverFactoryContext() override { return server_context_; }
+  Configuration::ServerFactoryContext& serverFactoryContext() override { return *this; }
 
   // Server::ListenerComponentFactory
   LdsApiPtr createLdsApi(const envoy::config::core::v3alpha::ConfigSource& lds_config) override {
@@ -180,6 +182,7 @@ private:
   const Options& options_;
   ProtobufMessage::ProdValidationContextImpl validation_context_;
   Stats::IsolatedStoreImpl& stats_store_;
+  Stats::ScopePtr server_scope_;
   ThreadLocal::InstanceImpl thread_local_;
   Api::ApiPtr api_;
   Event::DispatcherPtr dispatcher_;
@@ -198,7 +201,6 @@ private:
   Grpc::ContextImpl grpc_context_;
   Http::ContextImpl http_context_;
   Event::TimeSystem& time_system_;
-  ServerFactoryContextImpl server_context_;
 };
 
 } // namespace Server

@@ -58,7 +58,8 @@ InstanceImpl::InstanceImpl(
       options_(options), validation_context_(options_.allowUnknownStaticFields(),
                                              !options.rejectUnknownDynamicFields()),
       time_source_(time_system), restarter_(restarter), start_time_(time(nullptr)),
-      original_start_time_(start_time_), stats_store_(store), thread_local_(tls),
+      original_start_time_(start_time_), stats_store_(store),
+      server_scope_(stats_store_.createScope("")), thread_local_(tls),
       api_(new Api::Impl(thread_factory, store, time_system, file_system,
                          process_context ? OptProcessContextRef(std::ref(*process_context))
                                          : absl::nullopt)),
@@ -73,8 +74,7 @@ InstanceImpl::InstanceImpl(
       mutex_tracer_(options.mutexTracingEnabled() ? &Envoy::MutexTracerImpl::getOrCreateTracer()
                                                   : nullptr),
       grpc_context_(store.symbolTable()), http_context_(store.symbolTable()),
-      process_context_(std::move(process_context)), main_thread_id_(std::this_thread::get_id()),
-      server_context_(*this) {
+      process_context_(std::move(process_context)), main_thread_id_(std::this_thread::get_id()) {
   try {
     if (!options.logPath().empty()) {
       try {
