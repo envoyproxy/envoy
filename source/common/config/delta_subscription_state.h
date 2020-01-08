@@ -1,5 +1,6 @@
 #pragma once
 
+#include "envoy/api/v2/discovery.pb.h"
 #include "envoy/config/subscription.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/grpc/status.h"
@@ -8,6 +9,7 @@
 
 #include "common/common/assert.h"
 #include "common/common/logger.h"
+#include "common/config/api_version.h"
 #include "common/config/pausable_ack_queue.h"
 
 namespace Envoy {

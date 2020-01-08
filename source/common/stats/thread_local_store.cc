@@ -193,6 +193,11 @@ void ThreadLocalStoreImpl::mergeInternal(PostMergeCb merge_complete_cb) {
 }
 
 ThreadLocalStoreImpl::CentralCacheEntry::~CentralCacheEntry() {
+  // Assert that the symbol-table is valid, so we get good test coverage of
+  // the validity of the symbol table at the time this destructor runs. This
+  // is because many tests will not populate rejected_stats_.
+  ASSERT(symbol_table_.toString(StatNameManagedStorage("Hello.world", symbol_table_).statName()) ==
+         "Hello.world");
   rejected_stats_.free(symbol_table_);
 }
 
