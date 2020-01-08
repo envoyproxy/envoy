@@ -268,7 +268,7 @@ TEST_P(ClusterMemoryTestRunner, MemoryLargeClusterSizeWithFakeSymbolTable) {
   // 2019/11/15  9031     43403       44000   upstream: track whether cluster is local
   // 2019/12/10  8779     42919       43500   use var-length coding for name length
   // 2020/01/07  9069     43413       43500   upstream: Implement retry concurrency budgets
-  // 2020/01/07  9227     42983       43500   router: per-cluster histograms w/ timeout budget
+  // 2020/01/07  9227     43477       43650   router: per-cluster histograms w/ timeout budget
 
   // Note: when adjusting this value: EXPECT_MEMORY_EQ is active only in CI
   // 'release' builds, where we control the platform and tool-chain. So you
@@ -282,8 +282,8 @@ TEST_P(ClusterMemoryTestRunner, MemoryLargeClusterSizeWithFakeSymbolTable) {
   // If you encounter a failure here, please see
   // https://github.com/envoyproxy/envoy/blob/master/source/docs/stats.md#stats-memory-tests
   // for details on how to fix.
-  EXPECT_MEMORY_EQ(m_per_cluster, 42983); // 104 bytes higher than a debug build.
-  EXPECT_MEMORY_LE(m_per_cluster, 43500);
+  EXPECT_MEMORY_EQ(m_per_cluster, 43477); // 104 bytes higher than a debug build.
+  EXPECT_MEMORY_LE(m_per_cluster, 43650);
 }
 
 TEST_P(ClusterMemoryTestRunner, MemoryLargeClusterSizeWithRealSymbolTable) {
@@ -318,7 +318,7 @@ TEST_P(ClusterMemoryTestRunner, MemoryLargeClusterSizeWithRealSymbolTable) {
   // 2019/11/15  9031     35061       35500   upstream: track whether cluster is local
   // 2019/12/10  8779     35053       35000   use var-length coding for name lengths
   // 2020/01/07  9069     35548       35700   upstream: Implement retry concurrency budgets
-  // 2019/01/07  9227     35117       35700   router: per-cluster histograms w/ timeout budget
+  // 2019/01/07  9227     35612       35800   router: per-cluster histograms w/ timeout budget
 
   // Note: when adjusting this value: EXPECT_MEMORY_EQ is active only in CI
   // 'release' builds, where we control the platform and tool-chain. So you
@@ -332,8 +332,8 @@ TEST_P(ClusterMemoryTestRunner, MemoryLargeClusterSizeWithRealSymbolTable) {
   // If you encounter a failure here, please see
   // https://github.com/envoyproxy/envoy/blob/master/source/docs/stats.md#stats-memory-tests
   // for details on how to fix.
-  EXPECT_MEMORY_EQ(m_per_cluster, 35117); // 104 bytes higher than a debug build.
-  EXPECT_MEMORY_LE(m_per_cluster, 35700);
+  EXPECT_MEMORY_EQ(m_per_cluster, 35612); // 104 bytes higher than a debug build.
+  EXPECT_MEMORY_LE(m_per_cluster, 35800);
 }
 
 TEST_P(ClusterMemoryTestRunner, MemoryLargeHostSizeWithStats) {
