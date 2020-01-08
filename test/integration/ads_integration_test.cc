@@ -5,8 +5,10 @@
 #include "envoy/config/route/v3alpha/route.pb.h"
 #include "envoy/grpc/status.h"
 
+#include "common/common/version.h"
 #include "common/config/protobuf_link_hacks.h"
 #include "common/config/resources.h"
+#include "common/config/version_converter.h"
 #include "common/protobuf/protobuf.h"
 #include "common/protobuf/utility.h"
 
@@ -772,6 +774,29 @@ TEST_P(AdsIntegrationTest, ListenerDrainBeforeServerStart) {
   sendDiscoveryResponse<envoy::config::listener::v3alpha::Listener>(Config::TypeUrl::get().Listener,
                                                                     {}, {}, {"listener_0"}, "2");
   test_server_->waitForGaugeEq("listener_manager.total_listeners_active", 0);
+}
+
+// Validate that Node message is well formed.
+TEST_P(AdsIntegrationTest, NodeMessage) {
+  initialize();
+  API_NO_BOOST(envoy::api::v2::DiscoveryRequest) sotw_request;
+  API_NO_BOOST(envoy::api::v2::DeltaDiscoveryRequest) delta_request;
+  const envoy::api::v2::core::Node* node = nullptr;
+  if (sotw_or_delta_ == Grpc::SotwOrDelta::Sotw) {
+    EXPECT_TRUE(xds_stream_->waitForGrpcMessage(*dispatcher_, sotw_request));
+    EXPECT_TRUE(sotw_request.has_node());
+    node = &sotw_request.node();
+  } else {
+    EXPECT_TRUE(xds_stream_->waitForGrpcMessage(*dispatcher_, delta_request));
+    EXPECT_TRUE(delta_request.has_node());
+    node = &delta_request.node();
+  }
+  envoy::config::core::v3alpha::BuildVersion build_version_msg;
+  Config::VersionConverter::upgrade(node->user_agent_build_version(), build_version_msg);
+  EXPECT_THAT(build_version_msg, ProtoEq(VersionInfo::buildVersion()));
+  EXPECT_GE(node->extensions().size(), 0);
+  EXPECT_EQ(0, node->client_features().size());
+  xds_stream_->finishGrpcStream(Grpc::Status::Ok);
 }
 
 // Check if EDS cluster defined in file is loaded before ADS request and used as xDS server

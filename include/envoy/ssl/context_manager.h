@@ -58,7 +58,7 @@ public:
 
   // There could be only one factory thus the name is static.
   std::string name() const override { return "ssl_context_manager"; }
-  std::string category() const override { return "ssl_context_manager"; }
+  std::string category() const override { return "envoy.ssl_context_manager"; }
 };
 
 } // namespace Ssl

@@ -79,7 +79,7 @@ public:
   virtual RouteMatcherPtr createRouteMatcher(const RouteConfigurations& route_configs,
                                              Server::Configuration::FactoryContext& context) PURE;
 
-  std::string category() const override { return "dubbo_proxy.route_matchers"; }
+  std::string category() const override { return "envoy.dubbo_proxy.route_matchers"; }
 
   /**
    * Convenience method to lookup a factory by type.

@@ -249,7 +249,7 @@ public:
   createFilter(const envoy::config::filter::accesslog::v3alpha::ExtensionFilter& config,
                Runtime::Loader& runtime, Runtime::RandomGenerator& random) PURE;
 
-  std::string category() const override { return "access_logger.extension_filters"; }
+  std::string category() const override { return "envoy.access_logger.extension_filters"; }
 };
 
 /**
