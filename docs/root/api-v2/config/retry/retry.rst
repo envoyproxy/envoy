@@ -8,3 +8,4 @@ Retry Predicates
   */empty/*
   omit_host_metadata/v2/*
   */*
+  */v2/*
