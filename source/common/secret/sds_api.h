@@ -66,7 +66,7 @@ protected:
                resource)
         .name();
   }
-  std::string loadTypeUrl();
+  static std::string loadTypeUrl(envoy::config::core::v3alpha::ApiVersion resource_api_version);
 
 private:
   void validateUpdateSize(int num_resources);
@@ -84,7 +84,6 @@ private:
   Config::SubscriptionFactory& subscription_factory_;
   TimeSource& time_source_;
   SecretData secret_data_;
-  envoy::config::core::v3alpha::ConfigSource::XdsApiVersion xds_api_version_;
 };
 
 class TlsCertificateSdsApi;

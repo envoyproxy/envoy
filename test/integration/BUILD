@@ -64,6 +64,15 @@ envoy_cc_test(
     ],
 )
 
+envoy_cc_test(
+    name = "api_version_integration_test",
+    srcs = ["api_version_integration_test.cc"],
+    deps = [
+        ":http_integration_lib",
+        "@envoy_api//envoy/api/v2/core:pkg_cc_proto",
+    ],
+)
+
 py_binary(
     name = "capture_fuzz_gen",
     srcs = ["capture_fuzz_gen.py"],
