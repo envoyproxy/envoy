@@ -766,7 +766,7 @@ dynamic_listeners:
   EXPECT_CALL(*worker_, addListener(_, _));
   EXPECT_CALL(*worker_, start(_));
   manager_->startWorkers(guard_dog_);
-  // Validate that workers_started stat is still zero before workers intimate the status via
+  // Validate that workers_started stat is still zero before workers set the status via
   // completion callback.
   EXPECT_EQ(0, server_.stats_store_
                    .gauge("listener_manager.workers_started", Stats::Gauge::ImportMode::NeverImport)
