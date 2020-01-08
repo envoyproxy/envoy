@@ -101,12 +101,24 @@ public:
                ProtobufMessage::ValidationVisitor& validation_visitor, uint32_t concurrency);
   ~ListenerImpl() override;
 
+  // TODO(lambdai): Alternatively, always create ListenerImpl on both filter chain update and full
+  // listener update.
+
   /**
-   * Implement filter chain in place update
+   * Determine if in place filter chain update could be executed at this moment.
    */
   UpdateDecision supportUpdateFilterChain(const envoy::api::v2::Listener& config,
                                           bool worker_started);
+  /**
+   * Execute in place filter chain update. The filter chain update is less expensive than full
+   * listener update.
+   */
   void updateFilterChain(const envoy::api::v2::Listener& config);
+
+  /**
+   * Cancel the in place filter chain update if any. Should be called when full listener update is
+   * triggered.
+   */
   void cancelUpdate();
 
   /**
