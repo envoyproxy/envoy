@@ -99,7 +99,7 @@ message Extension {
 
   // Category of the extension.
   // Extension category names use reverse DNS notation. For instance "envoy.filters.listener"
-  // for envoy's built-in listener filters or "com.acme.filters.http" for HTTP filters from
+  // for Envoy's built-in listener filters or "com.acme.filters.http" for HTTP filters from
   // acme.com vendor.
   // [#comment:TODO(yanavlasov): Link to the doc with existing envoy category names.]
   string category = 2;
