@@ -1,5 +1,6 @@
 #pragma once
 
+#include "envoy/config/retry/previous_hosts/v2/previous_hosts.pb.validate.h"
 #include "envoy/upstream/retry.h"
 
 #include "extensions/retry/host/previous_hosts/previous_hosts.h"
@@ -22,7 +23,7 @@ public:
   }
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return std::make_unique<Envoy::ProtobufWkt::Empty>();
+    return std::make_unique<envoy::config::retry::previous_hosts::v2::PreviousHostsPredicate>();
   }
 };
 

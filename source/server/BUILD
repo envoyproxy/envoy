@@ -506,5 +506,6 @@ envoy_cc_library(
         ":well_known_names_lib",
         "//include/envoy/registry",
         "//include/envoy/server:active_udp_listener_config_interface",
+        "@envoy_api//envoy/api/v2/listener:pkg_cc_proto",
     ],
 )
