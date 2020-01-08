@@ -6,7 +6,7 @@
 #include "envoy/config/cluster/v3alpha/cluster.pb.h"
 #include "envoy/config/core/v3alpha/base.pb.h"
 #include "envoy/config/filter/network/tcp_proxy/v2/tcp_proxy.pb.h"
-#include "envoy/extensions/access_loggers/grpc/v3alpha/file.pb.h"
+#include "envoy/extensions/access_loggers/file/v3alpha/file.pb.h"
 #include "envoy/extensions/filters/network/tcp_proxy/v3alpha/tcp_proxy.pb.h"
 
 #include "common/config/api_version.h"
@@ -250,7 +250,7 @@ TEST_P(TcpProxyIntegrationTest, AccessLog) {
 
     auto* access_log = tcp_proxy_config.add_access_log();
     access_log->set_name("envoy.file_access_log");
-    envoy::extensions::access_loggers::grpc::v3alpha::FileAccessLog access_log_config;
+    envoy::extensions::access_loggers::file::v3alpha::FileAccessLog access_log_config;
     access_log_config.set_path(access_log_path);
     access_log_config.set_format(
         "upstreamlocal=%UPSTREAM_LOCAL_ADDRESS% "

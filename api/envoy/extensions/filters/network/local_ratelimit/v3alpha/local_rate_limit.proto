@@ -1,6 +1,6 @@
 syntax = "proto3";
 
-package envoy.config.filter.network.local_rate_limit.v3alpha;
+package envoy.extensions.filters.network.local_ratelimit.v3alpha;
 
 import "envoy/config/core/v3alpha/base.proto";
 import "envoy/type/v3alpha/token_bucket.proto";
@@ -9,7 +9,7 @@ import "udpa/annotations/versioning.proto";
 
 import "validate/validate.proto";
 
-option java_package = "io.envoyproxy.envoy.config.filter.network.local_rate_limit.v3alpha";
+option java_package = "io.envoyproxy.envoy.extensions.filters.network.local_ratelimit.v3alpha";
 option java_outer_classname = "LocalRateLimitProto";
 option java_multiple_files = true;
 
@@ -41,5 +41,5 @@ message LocalRateLimit {
 
   // Runtime flag that controls whether the filter is enabled or not. If not specified, defaults
   // to enabled.
-  core.v3alpha.RuntimeFeatureFlag runtime_enabled = 3;
+  config.core.v3alpha.RuntimeFeatureFlag runtime_enabled = 3;
 }

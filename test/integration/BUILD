@@ -842,7 +842,7 @@ envoy_cc_test(
         "@envoy_api//envoy/config/cluster/v3alpha:pkg_cc_proto",
         "@envoy_api//envoy/config/core/v3alpha:pkg_cc_proto",
         "@envoy_api//envoy/config/filter/network/tcp_proxy/v2:pkg_cc_proto",
-        "@envoy_api//envoy/extensions/access_loggers/grpc/v3alpha:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/access_loggers/file/v3alpha:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/network/tcp_proxy/v3alpha:pkg_cc_proto",
     ],
 )
