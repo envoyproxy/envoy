@@ -30,7 +30,6 @@ public:
   RouterRetryStateImplTest() : callback_([this]() -> void { callback_ready_.ready(); }) {
     ON_CALL(runtime_.snapshot_, featureEnabled("upstream.use_retry", 100))
         .WillByDefault(Return(true));
-    policy_.num_retries_ = 1;
   }
 
   void setup() {
