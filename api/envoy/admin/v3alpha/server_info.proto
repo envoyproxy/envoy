@@ -6,6 +6,8 @@ import "google/protobuf/duration.proto";
 
 import "udpa/annotations/versioning.proto";
 
+import "envoy/annotations/deprecation.proto";
+
 option java_package = "io.envoyproxy.envoy.admin.v3alpha";
 option java_outer_classname = "ServerInfoProto";
 option java_multiple_files = true;

@@ -16,6 +16,7 @@ import "google/protobuf/wrappers.proto";
 
 import "udpa/annotations/versioning.proto";
 
+import "envoy/annotations/deprecation.proto";
 import "validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.config.route.v3alpha";
@@ -521,7 +522,8 @@ message CorsPolicy {
     //   **This field is deprecated**. Set the
     //   :ref:`filter_enabled<envoy_api_field_config.route.v3alpha.CorsPolicy.filter_enabled>` field
     //   instead.
-    google.protobuf.BoolValue hidden_envoy_deprecated_enabled = 7 [deprecated = true];
+    google.protobuf.BoolValue hidden_envoy_deprecated_enabled = 7
+        [deprecated = true, (envoy.annotations.disallowed_by_default) = true];
 
     // Specifies the % of requests for which the CORS filter is enabled.
     //
@@ -591,7 +593,8 @@ message RouteAction {
     //   :ref:`runtime_fraction
     //   <envoy_api_field_config.route.v3alpha.RouteAction.RequestMirrorPolicy.runtime_fraction>`
     //   field instead.
-    string hidden_envoy_deprecated_runtime_key = 2 [deprecated = true];
+    string hidden_envoy_deprecated_runtime_key = 2
+        [deprecated = true, (envoy.annotations.disallowed_by_default) = true];
 
     // If both :ref:`runtime_key
     // <envoy_api_field_config.route.v3alpha.RouteAction.RequestMirrorPolicy.runtime_key>` and this
