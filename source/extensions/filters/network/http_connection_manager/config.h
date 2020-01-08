@@ -117,7 +117,8 @@ public:
     return scoped_routes_config_provider_.get();
   }
   const std::string& serverName() override { return server_name_; }
-  HttpConnectionManagerProto::ServerHeaderTransformation serverHeaderTransformation() const override {
+  HttpConnectionManagerProto::ServerHeaderTransformation
+  serverHeaderTransformation() const override {
     return server_transformation_;
   }
   Http::ConnectionManagerStats& stats() override { return stats_; }

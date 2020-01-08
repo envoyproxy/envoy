@@ -294,7 +294,8 @@ public:
   /**
    * @return ServerHeaderTransformation the transformation to apply to Server response headers.
    */
-  virtual HttpConnectionManagerProto::ServerHeaderTransformation serverHeaderTransformation() const PURE;
+  virtual HttpConnectionManagerProto::ServerHeaderTransformation
+  serverHeaderTransformation() const PURE;
 
   /**
    * @return ConnectionManagerStats& the stats to write to.

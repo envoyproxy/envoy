@@ -108,7 +108,8 @@ public:
     return nullptr;
   }
   const std::string& serverName() override { return server_name_; }
-  HttpConnectionManagerProto::ServerHeaderTransformation serverHeaderTransformation() const override {
+  HttpConnectionManagerProto::ServerHeaderTransformation
+  serverHeaderTransformation() const override {
     return server_transformation_;
   }
   ConnectionManagerStats& stats() override { return stats_; }
