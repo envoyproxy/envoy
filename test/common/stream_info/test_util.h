@@ -1,6 +1,6 @@
 #pragma once
 
-#include "envoy/api/v2/core/base.pb.h"
+#include "envoy/config/core/v3alpha/base.pb.h"
 #include "envoy/stream_info/stream_info.h"
 
 #include "common/common/assert.h"
@@ -13,11 +13,9 @@ namespace Envoy {
 class TestStreamInfo : public StreamInfo::StreamInfo {
 public:
   TestStreamInfo() : filter_state_(Envoy::StreamInfo::FilterState::LifeSpan::FilterChain) {
-    tm fake_time;
-    memset(&fake_time, 0, sizeof(fake_time));
-    fake_time.tm_year = 99; // tm < 1901-12-13 20:45:52 is not valid on macOS
-    fake_time.tm_mday = 1;
-    start_time_ = std::chrono::system_clock::from_time_t(timegm(&fake_time));
+    // Use 1999-01-01 00:00:00 +0
+    time_t fake_time = 915148800;
+    start_time_ = std::chrono::system_clock::from_time_t(fake_time);
 
     MonotonicTime now = timeSystem().monotonicTime();
     start_time_monotonic_ = now;
@@ -169,8 +167,10 @@ public:
     return duration(end_time_);
   }
 
-  envoy::api::v2::core::Metadata& dynamicMetadata() override { return metadata_; };
-  const envoy::api::v2::core::Metadata& dynamicMetadata() const override { return metadata_; };
+  envoy::config::core::v3alpha::Metadata& dynamicMetadata() override { return metadata_; };
+  const envoy::config::core::v3alpha::Metadata& dynamicMetadata() const override {
+    return metadata_;
+  };
 
   void setDynamicMetadata(const std::string& name, const ProtobufWkt::Struct& value) override {
     (*metadata_.mutable_filter_metadata())[name].MergeFrom(value);
@@ -225,7 +225,7 @@ public:
   Ssl::ConnectionInfoConstSharedPtr downstream_connection_info_;
   Ssl::ConnectionInfoConstSharedPtr upstream_connection_info_;
   const Router::RouteEntry* route_entry_{};
-  envoy::api::v2::core::Metadata metadata_{};
+  envoy::config::core::v3alpha::Metadata metadata_{};
   Envoy::StreamInfo::FilterStateImpl filter_state_;
   Envoy::StreamInfo::UpstreamTiming upstream_timing_;
   std::string requested_server_name_;

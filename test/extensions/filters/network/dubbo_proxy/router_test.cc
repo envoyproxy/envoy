@@ -35,7 +35,7 @@ public:
   TestNamedSerializerConfigFactory(std::function<MockSerializer*()> f) : f_(f) {}
 
   SerializerPtr createSerializer() override { return SerializerPtr{f_()}; }
-  std::string name() override {
+  std::string name() const override {
     return SerializerNames::get().fromType(SerializationType::Hessian2);
   }
 
@@ -51,7 +51,7 @@ public:
     protocol->initSerializer(serialization_type);
     return protocol;
   }
-  std::string name() override { return ProtocolNames::get().fromType(ProtocolType::Dubbo); }
+  std::string name() const override { return ProtocolNames::get().fromType(ProtocolType::Dubbo); }
 
   std::function<MockProtocol*()> f_;
 };

@@ -1,6 +1,6 @@
 #pragma once
 
-#include "envoy/api/v2/listener/quic_config.pb.h"
+#include "envoy/config/listener/v3alpha/quic_config.pb.h"
 #include "envoy/network/connection_handler.h"
 #include "envoy/network/listener.h"
 
@@ -59,7 +59,7 @@ using ActiveQuicListenerPtr = std::unique_ptr<ActiveQuicListener>;
 // A factory to create ActiveQuicListener based on given config.
 class ActiveQuicListenerFactory : public Network::ActiveUdpListenerFactory {
 public:
-  ActiveQuicListenerFactory(const envoy::api::v2::listener::QuicProtocolOptions& config) {
+  ActiveQuicListenerFactory(const envoy::config::listener::v3alpha::QuicProtocolOptions& config) {
     uint64_t idle_network_timeout_ms =
         config.has_idle_timeout() ? DurationUtil::durationToMilliseconds(config.idle_timeout())
                                   : 300000;

@@ -1,5 +1,5 @@
-#include "envoy/config/filter/http/buffer/v2/buffer.pb.h"
-#include "envoy/config/filter/http/buffer/v2/buffer.pb.validate.h"
+#include "envoy/extensions/filters/http/buffer/v3alpha/buffer.pb.h"
+#include "envoy/extensions/filters/http/buffer/v3alpha/buffer.pb.validate.h"
 
 #include "extensions/filters/http/buffer/buffer_filter.h"
 #include "extensions/filters/http/buffer/config.h"
@@ -23,7 +23,7 @@ TEST(BufferFilterFactoryTest, BufferFilterCorrectYaml) {
   max_request_bytes: 1028
   )EOF";
 
-  envoy::config::filter::http::buffer::v2::Buffer proto_config;
+  envoy::extensions::filters::http::buffer::v3alpha::Buffer proto_config;
   TestUtility::loadFromYaml(yaml_string, proto_config);
   NiceMock<Server::Configuration::MockFactoryContext> context;
   BufferFilterFactory factory;
@@ -34,7 +34,7 @@ TEST(BufferFilterFactoryTest, BufferFilterCorrectYaml) {
 }
 
 TEST(BufferFilterFactoryTest, BufferFilterCorrectProto) {
-  envoy::config::filter::http::buffer::v2::Buffer config;
+  envoy::extensions::filters::http::buffer::v3alpha::Buffer config;
   config.mutable_max_request_bytes()->set_value(1028);
 
   NiceMock<Server::Configuration::MockFactoryContext> context;
@@ -47,8 +47,8 @@ TEST(BufferFilterFactoryTest, BufferFilterCorrectProto) {
 
 TEST(BufferFilterFactoryTest, BufferFilterEmptyProto) {
   BufferFilterFactory factory;
-  envoy::config::filter::http::buffer::v2::Buffer config =
-      *dynamic_cast<envoy::config::filter::http::buffer::v2::Buffer*>(
+  envoy::extensions::filters::http::buffer::v3alpha::Buffer config =
+      *dynamic_cast<envoy::extensions::filters::http::buffer::v3alpha::Buffer*>(
           factory.createEmptyConfigProto().get());
 
   config.mutable_max_request_bytes()->set_value(1028);
@@ -62,8 +62,8 @@ TEST(BufferFilterFactoryTest, BufferFilterEmptyProto) {
 
 TEST(BufferFilterFactoryTest, BufferFilterNoMaxRequestBytes) {
   BufferFilterFactory factory;
-  envoy::config::filter::http::buffer::v2::Buffer config =
-      *dynamic_cast<envoy::config::filter::http::buffer::v2::Buffer*>(
+  envoy::extensions::filters::http::buffer::v3alpha::Buffer config =
+      *dynamic_cast<envoy::extensions::filters::http::buffer::v3alpha::Buffer*>(
           factory.createEmptyConfigProto().get());
 
   NiceMock<Server::Configuration::MockFactoryContext> context;
@@ -74,8 +74,8 @@ TEST(BufferFilterFactoryTest, BufferFilterNoMaxRequestBytes) {
 TEST(BufferFilterFactoryTest, BufferFilterEmptyRouteProto) {
   BufferFilterFactory factory;
   EXPECT_NO_THROW({
-    envoy::config::filter::http::buffer::v2::BufferPerRoute* config =
-        dynamic_cast<envoy::config::filter::http::buffer::v2::BufferPerRoute*>(
+    envoy::extensions::filters::http::buffer::v3alpha::BufferPerRoute* config =
+        dynamic_cast<envoy::extensions::filters::http::buffer::v3alpha::BufferPerRoute*>(
             factory.createEmptyRouteConfigProto().get());
     EXPECT_NE(nullptr, config);
   });
@@ -88,8 +88,8 @@ TEST(BufferFilterFactoryTest, BufferFilterRouteSpecificConfig) {
   ProtobufTypes::MessagePtr proto_config = factory.createEmptyRouteConfigProto();
   EXPECT_TRUE(proto_config.get());
 
-  auto& cfg =
-      dynamic_cast<envoy::config::filter::http::buffer::v2::BufferPerRoute&>(*proto_config.get());
+  auto& cfg = dynamic_cast<envoy::extensions::filters::http::buffer::v3alpha::BufferPerRoute&>(
+      *proto_config.get());
   cfg.set_disabled(true);
 
   Router::RouteSpecificFilterConfigConstSharedPtr route_config =

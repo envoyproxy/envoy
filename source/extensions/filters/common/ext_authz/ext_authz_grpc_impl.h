@@ -5,7 +5,7 @@
 #include <string>
 #include <vector>
 
-#include "envoy/api/v2/core/base.pb.h"
+#include "envoy/config/core/v3alpha/base.pb.h"
 #include "envoy/grpc/async_client.h"
 #include "envoy/grpc/async_client_manager.h"
 #include "envoy/http/filter.h"
@@ -14,7 +14,7 @@
 #include "envoy/network/address.h"
 #include "envoy/network/connection.h"
 #include "envoy/network/filter.h"
-#include "envoy/service/auth/v2/external_auth.pb.h"
+#include "envoy/service/auth/v3alpha/external_auth.pb.h"
 #include "envoy/tracing/http_tracer.h"
 #include "envoy/upstream/cluster_manager.h"
 
@@ -29,7 +29,8 @@ namespace Filters {
 namespace Common {
 namespace ExtAuthz {
 
-using ExtAuthzAsyncCallbacks = Grpc::AsyncRequestCallbacks<envoy::service::auth::v2::CheckResponse>;
+using ExtAuthzAsyncCallbacks =
+    Grpc::AsyncRequestCallbacks<envoy::service::auth::v3alpha::CheckResponse>;
 
 /*
  * This client implementation is used when the Ext_Authz filter needs to communicate with an gRPC
@@ -47,12 +48,13 @@ public:
 
   // ExtAuthz::Client
   void cancel() override;
-  void check(RequestCallbacks& callbacks, const envoy::service::auth::v2::CheckRequest& request,
+  void check(RequestCallbacks& callbacks,
+             const envoy::service::auth::v3alpha::CheckRequest& request,
              Tracing::Span& parent_span) override;
 
   // Grpc::AsyncRequestCallbacks
   void onCreateInitialMetadata(Http::HeaderMap&) override {}
-  void onSuccess(std::unique_ptr<envoy::service::auth::v2::CheckResponse>&& response,
+  void onSuccess(std::unique_ptr<envoy::service::auth::v3alpha::CheckResponse>&& response,
                  Tracing::Span& span) override;
   void onFailure(Grpc::Status::GrpcStatus status, const std::string& message,
                  Tracing::Span& span) override;
@@ -61,9 +63,10 @@ private:
   static const Protobuf::MethodDescriptor& getMethodDescriptor(bool use_alpha);
   void toAuthzResponseHeader(
       ResponsePtr& response,
-      const Protobuf::RepeatedPtrField<envoy::api::v2::core::HeaderValueOption>& headers);
+      const Protobuf::RepeatedPtrField<envoy::config::core::v3alpha::HeaderValueOption>& headers);
   const Protobuf::MethodDescriptor& service_method_;
-  Grpc::AsyncClient<envoy::service::auth::v2::CheckRequest, envoy::service::auth::v2::CheckResponse>
+  Grpc::AsyncClient<envoy::service::auth::v3alpha::CheckRequest,
+                    envoy::service::auth::v3alpha::CheckResponse>
       async_client_;
   Grpc::AsyncRequest* request_{};
   absl::optional<std::chrono::milliseconds> timeout_;

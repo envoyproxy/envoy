@@ -1,16 +1,18 @@
 #include <string>
 
-#include "envoy/admin/v2alpha/config_dump.pb.h"
-#include "envoy/admin/v2alpha/config_dump.pb.validate.h"
-#include "envoy/api/v2/core/config_source.pb.h"
-#include "envoy/api/v2/discovery.pb.h"
-#include "envoy/api/v2/rds.pb.h"
-#include "envoy/api/v2/srds.pb.h"
-#include "envoy/config/filter/network/http_connection_manager/v2/http_connection_manager.pb.h"
+#include "envoy/admin/v3alpha/config_dump.pb.h"
+#include "envoy/admin/v3alpha/config_dump.pb.validate.h"
+#include "envoy/api/v2/route.pb.h"
+#include "envoy/config/core/v3alpha/config_source.pb.h"
+#include "envoy/config/route/v3alpha/route.pb.h"
+#include "envoy/config/route/v3alpha/scoped_route.pb.h"
 #include "envoy/config/subscription.h"
+#include "envoy/extensions/filters/network/http_connection_manager/v3alpha/http_connection_manager.pb.h"
 #include "envoy/init/manager.h"
+#include "envoy/service/discovery/v3alpha/discovery.pb.h"
 #include "envoy/stats/scope.h"
 
+#include "common/config/api_version.h"
 #include "common/config/grpc_mux_impl.h"
 #include "common/router/scoped_rds.h"
 
@@ -39,9 +41,9 @@ namespace {
 
 using ::Envoy::Http::TestHeaderMapImpl;
 
-envoy::api::v2::ScopedRouteConfiguration
+envoy::config::route::v3alpha::ScopedRouteConfiguration
 parseScopedRouteConfigurationFromYaml(const std::string& yaml) {
-  envoy::api::v2::ScopedRouteConfiguration scoped_route_config;
+  envoy::config::route::v3alpha::ScopedRouteConfiguration scoped_route_config;
   TestUtility::loadFromYaml(yaml, scoped_route_config);
   return scoped_route_config;
 }
@@ -51,9 +53,9 @@ void parseScopedRouteConfigurationFromYaml(ProtobufWkt::Any& scoped_route_config
   scoped_route_config.PackFrom(parseScopedRouteConfigurationFromYaml(yaml));
 }
 
-envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager
+envoy::extensions::filters::network::http_connection_manager::v3alpha::HttpConnectionManager
 parseHttpConnectionManagerFromYaml(const std::string& config_yaml) {
-  envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager
+  envoy::extensions::filters::network::http_connection_manager::v3alpha::HttpConnectionManager
       http_connection_manager;
   TestUtility::loadFromYaml(config_yaml, http_connection_manager);
   return http_connection_manager;
@@ -78,12 +80,14 @@ protected:
   ~ScopedRoutesTestBase() override { factory_context_.thread_local_.shutdownThread(); }
 
   // The delta style API helper.
-  Protobuf::RepeatedPtrField<envoy::api::v2::Resource>
+  Protobuf::RepeatedPtrField<envoy::service::discovery::v3alpha::Resource>
   anyToResource(Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
                 const std::string& version) {
-    Protobuf::RepeatedPtrField<envoy::api::v2::Resource> added_resources;
+    Protobuf::RepeatedPtrField<envoy::service::discovery::v3alpha::Resource> added_resources;
     for (const auto& resource_any : resources) {
-      auto config = TestUtility::anyConvert<envoy::api::v2::ScopedRouteConfiguration>(resource_any);
+      auto config =
+          TestUtility::anyConvert<envoy::config::route::v3alpha::ScopedRouteConfiguration>(
+              resource_any);
       auto* to_add = added_resources.Add();
       to_add->set_name(config.name());
       to_add->set_version(version);
@@ -122,15 +126,16 @@ protected:
                 subscriptionFromConfigSource(_, _, _, _))
         .Times(AnyNumber());
     // rds subscription
-    EXPECT_CALL(server_factory_context_.cluster_manager_.subscription_factory_,
-                subscriptionFromConfigSource(
-                    _,
-                    Eq(Grpc::Common::typeUrl(
-                        envoy::api::v2::RouteConfiguration().GetDescriptor()->full_name())),
-                    _, _))
+    EXPECT_CALL(
+        server_factory_context_.cluster_manager_.subscription_factory_,
+        subscriptionFromConfigSource(
+            _,
+            Eq(Grpc::Common::typeUrl(
+                API_NO_BOOST(envoy::api::v2::RouteConfiguration)().GetDescriptor()->full_name())),
+            _, _))
         .Times(AnyNumber())
-        .WillRepeatedly(Invoke([this](const envoy::api::v2::core::ConfigSource&, absl::string_view,
-                                      Stats::Scope&,
+        .WillRepeatedly(Invoke([this](const envoy::config::core::v3alpha::ConfigSource&,
+                                      absl::string_view, Stats::Scope&,
                                       Envoy::Config::SubscriptionCallbacks& callbacks) {
           auto ret = std::make_unique<NiceMock<Envoy::Config::MockSubscription>>();
           rds_subscription_by_config_subscription_[ret.get()] = &callbacks;
@@ -165,7 +170,8 @@ scope_key_builder:
           key: x-foo-key
           separator: ;
 )EOF";
-    envoy::config::filter::network::http_connection_manager::v2::ScopedRoutes scoped_routes_config;
+    envoy::extensions::filters::network::http_connection_manager::v3alpha::ScopedRoutes
+        scoped_routes_config;
     TestUtility::loadFromYaml(config_yaml, scoped_routes_config);
     provider_ = config_provider_manager_->createXdsConfigProvider(
         scoped_routes_config.scoped_rds(), factory_context_, "foo.",
@@ -177,7 +183,8 @@ scope_key_builder:
 
   // Helper function which pushes an update to given RDS subscription, the start(_) of the
   // subscription must have been called.
-  void pushRdsConfig(const std::string& route_config_name, const std::string& version) {
+  void pushRdsConfig(const std::vector<std::string>& route_config_names,
+                     const std::string& version) {
     const std::string route_config_tmpl = R"EOF(
       name: {}
       virtual_hosts:
@@ -187,10 +194,13 @@ scope_key_builder:
         - match: {{ prefix: "/" }}
           route: {{ cluster: bluh }}
 )EOF";
-    Protobuf::RepeatedPtrField<ProtobufWkt::Any> resources;
-    resources.Add()->PackFrom(TestUtility::parseYaml<envoy::api::v2::RouteConfiguration>(
-        fmt::format(route_config_tmpl, route_config_name)));
-    rds_subscription_by_name_[route_config_name]->onConfigUpdate(resources, version);
+    for (const std::string& name : route_config_names) {
+      Protobuf::RepeatedPtrField<ProtobufWkt::Any> resources;
+      resources.Add()->PackFrom(
+          TestUtility::parseYaml<envoy::config::route::v3alpha::RouteConfiguration>(
+              fmt::format(route_config_tmpl, name)));
+      rds_subscription_by_name_[name]->onConfigUpdate(resources, version);
+    }
   }
 
   ScopedRdsConfigProvider* getScopedRdsProvider() const {
@@ -304,7 +314,7 @@ key:
                 ->name(),
             "");
   // RDS updates foo_routes.
-  pushRdsConfig("foo_routes", "111");
+  pushRdsConfig({"foo_routes"}, "111");
   EXPECT_EQ(getScopedRdsProvider()
                 ->config<ScopedConfigImpl>()
                 ->getRouteConfig(TestHeaderMapImpl{{"Addr", "x-foo-key;x-foo-key"}})
@@ -381,7 +391,7 @@ key:
                 ->name(),
             "");
   // RDS updates foo_routes.
-  pushRdsConfig("foo_routes", "111");
+  pushRdsConfig({"foo_routes"}, "111");
   EXPECT_EQ(getScopedRdsProvider()
                 ->config<ScopedConfigImpl>()
                 ->getRouteConfig(TestHeaderMapImpl{{"Addr", "x-foo-key;x-foo-key"}})
@@ -414,7 +424,7 @@ key:
             "foo_routes");
 }
 
-// Tests that conflict resources are detected.
+// Tests that conflict resources in the same push are detected.
 TEST_F(ScopedRdsTest, MultipleResourcesWithKeyConflict) {
   setup();
 
@@ -467,9 +477,138 @@ key:
   EXPECT_EQ(getScopedRouteMap().size(), 1UL);
   EXPECT_EQ(getScopedRouteMap().count("foo_scope"), 1);
   // Scope key "x-foo-key" points to foo_routes due to partial rejection.
-  pushRdsConfig("foo_routes", "111"); // Push some real route configuration.
+  pushRdsConfig({"foo_routes"}, "111"); // Push some real route configuration.
   EXPECT_EQ(1UL,
             server_factory_context_.scope_.counter("foo.rds.foo_routes.config_reload").value());
+  EXPECT_EQ(getScopedRdsProvider()
+                ->config<ScopedConfigImpl>()
+                ->getRouteConfig(TestHeaderMapImpl{{"Addr", "x-foo-key;x-foo-key"}})
+                ->name(),
+            "foo_routes");
+}
+
+// Tests that scope-key conflict resources in different config updates are handled correctly.
+TEST_F(ScopedRdsTest, ScopeKeyReuseInDifferentPushes) {
+  setup();
+
+  const std::string config_yaml1 = R"EOF(
+name: foo_scope1
+route_configuration_name: foo_routes
+key:
+  fragments:
+    - string_key: x-foo-key
+)EOF";
+  const std::string config_yaml2 = R"EOF(
+name: foo_scope2
+route_configuration_name: bar_routes
+key:
+  fragments:
+    - string_key: x-bar-key
+)EOF";
+  Protobuf::RepeatedPtrField<ProtobufWkt::Any> resources;
+  parseScopedRouteConfigurationFromYaml(*resources.Add(), config_yaml1);
+  parseScopedRouteConfigurationFromYaml(*resources.Add(), config_yaml2);
+  EXPECT_CALL(context_init_manager_, state()).WillOnce(Return(Init::Manager::State::Uninitialized));
+  EXPECT_NO_THROW(srds_subscription_->onConfigUpdate(resources, "1"));
+  EXPECT_EQ(
+      1UL,
+      factory_context_.scope_.counter("foo.scoped_rds.foo_scoped_routes.config_reload").value());
+  // Scope key "x-foo-key" points to nowhere.
+  EXPECT_NE(getScopedRdsProvider(), nullptr);
+  EXPECT_NE(getScopedRdsProvider()->config<ScopedConfigImpl>(), nullptr);
+  // No RDS "foo_routes" config push happened yet, Router::NullConfig is returned.
+  EXPECT_THAT(getScopedRdsProvider()
+                  ->config<ScopedConfigImpl>()
+                  ->getRouteConfig(TestHeaderMapImpl{{"Addr", "x-foo-key;x-foo-key"}})
+                  ->name(),
+              "");
+  context_init_manager_.initialize(init_watcher_);
+  init_watcher_.expectReady().Times(
+      3); // SRDS "foo_scope1" and RDS "foo/bar_routes"(though no real push).
+  pushRdsConfig({"foo_routes", "bar_routes"}, "111");
+  EXPECT_EQ(server_factory_context_.scope_.counter("foo.rds.foo_routes.config_reload").value(),
+            1UL);
+  EXPECT_EQ(server_factory_context_.scope_.counter("foo.rds.bar_routes.config_reload").value(),
+            1UL);
+  EXPECT_EQ(getScopedRdsProvider()
+                ->config<ScopedConfigImpl>()
+                ->getRouteConfig(TestHeaderMapImpl{{"Addr", "x-foo-key;x-foo-key"}})
+                ->name(),
+            "foo_routes");
+
+  const std::string config_yaml3 = R"EOF(
+name: foo_scope3
+route_configuration_name: foo_routes
+key:
+  fragments:
+    - string_key: x-foo-key
+)EOF";
+  resources.Clear();
+
+  // Remove foo_scope1 and add a new scope3 reuses the same scope_key.
+  parseScopedRouteConfigurationFromYaml(*resources.Add(), config_yaml2);
+  parseScopedRouteConfigurationFromYaml(*resources.Add(), config_yaml3);
+  EXPECT_CALL(context_init_manager_, state())
+      .Times(2)
+      .WillRepeatedly(Return(Init::Manager::State::Initialized));
+  EXPECT_NO_THROW(srds_subscription_->onConfigUpdate(resources, "2"));
+  EXPECT_EQ(
+      2UL,
+      factory_context_.scope_.counter("foo.scoped_rds.foo_scoped_routes.config_reload").value());
+  // foo_scope is deleted, and foo_scope2 is added.
+  EXPECT_EQ(getScopedRouteMap().size(), 2UL);
+  EXPECT_EQ(getScopedRouteMap().count("foo_scope1"), 0);
+  EXPECT_EQ(getScopedRouteMap().count("foo_scope2"), 1);
+  EXPECT_EQ(getScopedRouteMap().count("foo_scope3"), 1);
+  // The same scope-key now points to the same route table.
+  EXPECT_EQ(getScopedRdsProvider()
+                ->config<ScopedConfigImpl>()
+                ->getRouteConfig(TestHeaderMapImpl{{"Addr", "x-foo-key;x-foo-key"}})
+                ->name(),
+            "foo_routes");
+
+  // Push a new scope foo_scope4 with the same key as foo_scope2 but a different route-table, this
+  // ends in an exception.
+  const std::string config_yaml4 = R"EOF(
+name: foo_scope4
+route_configuration_name: foo_routes
+key:
+  fragments:
+    - string_key: x-bar-key
+)EOF";
+  resources.Clear();
+  parseScopedRouteConfigurationFromYaml(*resources.Add(), config_yaml2);
+  parseScopedRouteConfigurationFromYaml(*resources.Add(), config_yaml3);
+  parseScopedRouteConfigurationFromYaml(*resources.Add(), config_yaml4);
+  EXPECT_THROW_WITH_REGEX(
+      srds_subscription_->onConfigUpdate(resources, "3"), EnvoyException,
+      "scope key conflict found, first scope is 'foo_scope2', second scope is 'foo_scope4'");
+  EXPECT_EQ(getScopedRouteMap().size(), 2UL);
+  EXPECT_EQ(getScopedRouteMap().count("foo_scope1"), 0);
+  EXPECT_EQ(getScopedRouteMap().count("foo_scope2"), 1);
+  EXPECT_EQ(getScopedRouteMap().count("foo_scope3"), 1);
+  EXPECT_EQ(getScopedRdsProvider()
+                ->config<ScopedConfigImpl>()
+                ->getRouteConfig(TestHeaderMapImpl{{"Addr", "x-foo-key;x-bar-key"}})
+                ->name(),
+            "bar_routes");
+
+  // Delete foo_scope2, and push a new foo_scope4 with the same scope key but different route-table.
+  resources.Clear();
+  parseScopedRouteConfigurationFromYaml(*resources.Add(), config_yaml3);
+  parseScopedRouteConfigurationFromYaml(*resources.Add(), config_yaml4);
+  EXPECT_NO_THROW(srds_subscription_->onConfigUpdate(resources, "4"));
+  EXPECT_EQ(
+      factory_context_.scope_.counter("foo.scoped_rds.foo_scoped_routes.config_reload").value(),
+      3UL);
+  EXPECT_EQ(getScopedRouteMap().size(), 2UL);
+  EXPECT_EQ(getScopedRouteMap().count("foo_scope3"), 1);
+  EXPECT_EQ(getScopedRouteMap().count("foo_scope4"), 1);
+  EXPECT_EQ(getScopedRdsProvider()
+                ->config<ScopedConfigImpl>()
+                ->getRouteConfig(TestHeaderMapImpl{{"Addr", "x-foo-key;x-bar-key"}})
+                ->name(),
+            "foo_routes");
   EXPECT_EQ(getScopedRdsProvider()
                 ->config<ScopedConfigImpl>()
                 ->getRouteConfig(TestHeaderMapImpl{{"Addr", "x-foo-key;x-foo-key"}})
@@ -558,11 +697,11 @@ TEST_F(ScopedRdsTest, ConfigDump) {
   auto message_ptr =
       factory_context_.admin_.config_tracker_.config_tracker_callbacks_["route_scopes"]();
   const auto& scoped_routes_config_dump =
-      TestUtility::downcastAndValidate<const envoy::admin::v2alpha::ScopedRoutesConfigDump&>(
+      TestUtility::downcastAndValidate<const envoy::admin::v3alpha::ScopedRoutesConfigDump&>(
           *message_ptr);
 
   // No routes at all(no SRDS push yet), no last_updated timestamp
-  envoy::admin::v2alpha::ScopedRoutesConfigDump expected_config_dump;
+  envoy::admin::v3alpha::ScopedRoutesConfigDump expected_config_dump;
   TestUtility::loadFromYaml(R"EOF(
 inline_scoped_route_configs:
 dynamic_scoped_route_configs:
@@ -606,7 +745,7 @@ $1
       factory_context_, "foo.", *config_provider_manager_);
   message_ptr = factory_context_.admin_.config_tracker_.config_tracker_callbacks_["route_scopes"]();
   const auto& scoped_routes_config_dump2 =
-      TestUtility::downcastAndValidate<const envoy::admin::v2alpha::ScopedRoutesConfigDump&>(
+      TestUtility::downcastAndValidate<const envoy::admin::v3alpha::ScopedRoutesConfigDump&>(
           *message_ptr);
   TestUtility::loadFromYaml(R"EOF(
 inline_scoped_route_configs:
@@ -670,7 +809,7 @@ dynamic_scoped_route_configs:
                             expected_config_dump);
   message_ptr = factory_context_.admin_.config_tracker_.config_tracker_callbacks_["route_scopes"]();
   const auto& scoped_routes_config_dump3 =
-      TestUtility::downcastAndValidate<const envoy::admin::v2alpha::ScopedRoutesConfigDump&>(
+      TestUtility::downcastAndValidate<const envoy::admin::v3alpha::ScopedRoutesConfigDump&>(
           *message_ptr);
   EXPECT_TRUE(TestUtility::protoEqual(expected_config_dump, scoped_routes_config_dump3));
 
@@ -701,7 +840,7 @@ dynamic_scoped_route_configs:
                             expected_config_dump);
   message_ptr = factory_context_.admin_.config_tracker_.config_tracker_callbacks_["route_scopes"]();
   const auto& scoped_routes_config_dump4 =
-      TestUtility::downcastAndValidate<const envoy::admin::v2alpha::ScopedRoutesConfigDump&>(
+      TestUtility::downcastAndValidate<const envoy::admin::v3alpha::ScopedRoutesConfigDump&>(
           *message_ptr);
   EXPECT_TRUE(TestUtility::protoEqual(expected_config_dump, scoped_routes_config_dump4));
 }

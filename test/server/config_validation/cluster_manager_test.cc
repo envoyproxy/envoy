@@ -1,4 +1,4 @@
-#include "envoy/config/bootstrap/v2/bootstrap.pb.h"
+#include "envoy/config/bootstrap/v3alpha/bootstrap.pb.h"
 #include "envoy/upstream/resource_manager.h"
 #include "envoy/upstream/upstream.h"
 
@@ -51,7 +51,7 @@ TEST(ValidationClusterManagerTest, MockedMethods) {
                                           secret_manager, validation_context, *api, http_context,
                                           log_manager, singleton_manager, time_system);
 
-  const envoy::config::bootstrap::v2::Bootstrap bootstrap;
+  const envoy::config::bootstrap::v3alpha::Bootstrap bootstrap;
   ClusterManagerPtr cluster_manager = factory.clusterManagerFromProto(bootstrap);
   EXPECT_EQ(nullptr, cluster_manager->httpConnPoolForCluster("cluster", ResourcePriority::Default,
                                                              Http::Protocol::Http11, nullptr));
