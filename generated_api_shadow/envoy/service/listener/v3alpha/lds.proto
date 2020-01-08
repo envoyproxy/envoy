@@ -10,6 +10,7 @@ import "google/protobuf/wrappers.proto";
 
 import "udpa/annotations/versioning.proto";
 
+import "envoy/annotations/resource.proto";
 import "validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.service.listener.v3alpha";
@@ -25,6 +26,8 @@ option java_generic_services = true;
 // consist of a complete update of all listeners. Existing connections will be
 // allowed to drain from listeners that are no longer present.
 service ListenerDiscoveryService {
+  option (envoy.annotations.resource).type = "envoy.config.listener.v3alpha.Listener";
+
   rpc DeltaListeners(stream discovery.v3alpha.DeltaDiscoveryRequest)
       returns (stream discovery.v3alpha.DeltaDiscoveryResponse) {
   }

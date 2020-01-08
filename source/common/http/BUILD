@@ -116,7 +116,9 @@ envoy_cc_library(
     hdrs = ["conn_pool_base.h"],
     deps = [
         "//include/envoy/http:conn_pool_interface",
+        "//include/envoy/stats:timespan_interface",
         "//source/common/common:linked_object",
+        "//source/common/stats:timespan_lib",
     ],
 )
 
@@ -350,6 +352,7 @@ envoy_cc_library(
         "//source/common/common:regex_lib",
         "//source/common/common:utility_lib",
         "//source/common/protobuf:utility_lib",
+        "//source/common/runtime:runtime_lib",
         "@envoy_api//envoy/config/route/v3alpha:pkg_cc_proto",
         "@envoy_api//envoy/type/v3alpha:pkg_cc_proto",
     ],

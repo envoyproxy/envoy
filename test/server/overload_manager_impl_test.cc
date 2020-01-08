@@ -55,20 +55,26 @@ private:
   Event::Dispatcher& dispatcher_;
 };
 
-class FakeResourceMonitorFactory
-    : public Extensions::ResourceMonitors::Common::EmptyConfigFactoryBase {
+class FakeResourceMonitorFactory : public Server::Configuration::ResourceMonitorFactory {
 public:
-  FakeResourceMonitorFactory(const std::string& name)
-      : EmptyConfigFactoryBase(name), monitor_(nullptr) {}
+  FakeResourceMonitorFactory(const std::string& name) : monitor_(nullptr), name_(name) {}
 
-  ResourceMonitorPtr createEmptyConfigResourceMonitor(
-      Server::Configuration::ResourceMonitorFactoryContext& context) override {
+  Server::ResourceMonitorPtr
+  createResourceMonitor(const Protobuf::Message&,
+                        Server::Configuration::ResourceMonitorFactoryContext& context) override {
     auto monitor = std::make_unique<FakeResourceMonitor>(context.dispatcher());
     monitor_ = monitor.get();
     return monitor;
   }
 
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return ProtobufTypes::MessagePtr{new Envoy::ProtobufWkt::Struct()};
+  }
+
+  std::string name() const override { return name_; }
+
   FakeResourceMonitor* monitor_; // not owned
+  const std::string name_;
 };
 
 class OverloadManagerImplTest : public testing::Test {

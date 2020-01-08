@@ -50,8 +50,7 @@ void ZipkinSpan::injectContext(Http::HeaderMap& request_headers) {
 
   // Set the sampled header.
   request_headers.setReferenceKey(ZipkinCoreConstants::get().X_B3_SAMPLED,
-                                  span_.sampled() ? ZipkinCoreConstants::get().SAMPLED
-                                                  : ZipkinCoreConstants::get().NOT_SAMPLED);
+                                  span_.sampled() ? SAMPLED : NOT_SAMPLED);
 }
 
 void ZipkinSpan::setSampled(bool sampled) { span_.setSampled(sampled); }
@@ -87,7 +86,7 @@ Driver::Driver(const envoy::config::trace::v3alpha::ZipkinConfig& zipkin_config,
   const bool trace_id_128bit = zipkin_config.trace_id_128bit();
 
   const bool shared_span_context = PROTOBUF_GET_WRAPPED_OR_DEFAULT(
-      zipkin_config, shared_span_context, ZipkinCoreConstants::get().DEFAULT_SHARED_SPAN_CONTEXT);
+      zipkin_config, shared_span_context, DEFAULT_SHARED_SPAN_CONTEXT);
   collector.shared_span_context_ = shared_span_context;
 
   tls_->set([this, collector, &random_generator, trace_id_128bit, shared_span_context](

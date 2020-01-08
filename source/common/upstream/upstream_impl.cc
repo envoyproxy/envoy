@@ -35,6 +35,7 @@
 #include "common/network/socket_option_factory.h"
 #include "common/protobuf/protobuf.h"
 #include "common/protobuf/utility.h"
+#include "common/router/config_utility.h"
 #include "common/runtime/runtime_impl.h"
 #include "common/upstream/eds.h"
 #include "common/upstream/health_checker_impl.h"
@@ -758,11 +759,10 @@ ClusterInfoImpl::ClusterInfoImpl(
   auto filters = config.filters();
   for (ssize_t i = 0; i < filters.size(); i++) {
     const auto& proto_config = filters[i];
-    const std::string& string_name = proto_config.name();
     ENVOY_LOG(debug, "  upstream filter #{}:", i);
-    ENVOY_LOG(debug, "    name: {}", string_name);
+    ENVOY_LOG(debug, "    name: {}", proto_config.name());
     auto& factory = Config::Utility::getAndCheckFactory<
-        Server::Configuration::NamedUpstreamNetworkFilterConfigFactory>(string_name);
+        Server::Configuration::NamedUpstreamNetworkFilterConfigFactory>(proto_config);
     auto message = factory.createEmptyConfigProto();
     if (!proto_config.typed_config().value().empty()) {
       MessageUtil::unpackTo(proto_config.typed_config(), *message);
@@ -793,8 +793,8 @@ Network::TransportSocketFactoryPtr createTransportSocketFactory(
   if (!config.has_transport_socket()) {
     if (config.has_hidden_envoy_deprecated_tls_context()) {
       transport_socket.set_name(Extensions::TransportSockets::TransportSocketNames::get().Tls);
-      MessageUtil::jsonConvert(config.hidden_envoy_deprecated_tls_context(),
-                               *transport_socket.mutable_hidden_envoy_deprecated_config());
+      transport_socket.mutable_typed_config()->PackFrom(
+          config.hidden_envoy_deprecated_tls_context());
     } else {
       transport_socket.set_name(
           Extensions::TransportSockets::TransportSocketNames::get().RawBuffer);
@@ -802,7 +802,7 @@ Network::TransportSocketFactoryPtr createTransportSocketFactory(
   }
 
   auto& config_factory = Config::Utility::getAndCheckFactory<
-      Server::Configuration::UpstreamTransportSocketConfigFactory>(transport_socket.name());
+      Server::Configuration::UpstreamTransportSocketConfigFactory>(transport_socket);
   ProtobufTypes::MessagePtr message = Config::Utility::translateToFactoryConfig(
       transport_socket, factory_context.messageValidationVisitor(), config_factory);
   return config_factory.createTransportSocketFactory(*message, factory_context);
@@ -1096,6 +1096,9 @@ ResourceManagerImplPtr ClusterInfoImpl::ResourceManagers::load(
       [priority](const envoy::config::cluster::v3alpha::CircuitBreakers::Thresholds& threshold) {
         return threshold.priority() == priority;
       });
+
+  absl::optional<double> budget_percent;
+  absl::optional<uint32_t> min_retry_concurrency;
   if (it != thresholds.cend()) {
     max_connections = PROTOBUF_GET_WRAPPED_OR_DEFAULT(*it, max_connections, max_connections);
     max_pending_requests =
@@ -1105,11 +1108,25 @@ ResourceManagerImplPtr ClusterInfoImpl::ResourceManagers::load(
     track_remaining = it->track_remaining();
     max_connection_pools =
         PROTOBUF_GET_WRAPPED_OR_DEFAULT(*it, max_connection_pools, max_connection_pools);
+    if (it->has_retry_budget()) {
+      // The budget_percent and min_retry_concurrency values do not set defaults like the other
+      // members of the 'threshold' message, because the behavior of the retry circuit breaker
+      // changes depending on whether it has been configured. Therefore, it's necessary to manually
+      // check if the threshold message has a retry budget configured and only set the values if so.
+      budget_percent = it->retry_budget().has_budget_percent()
+                           ? PROTOBUF_GET_WRAPPED_REQUIRED(it->retry_budget(), budget_percent)
+                           : budget_percent;
+      min_retry_concurrency =
+          it->retry_budget().has_min_retry_concurrency()
+              ? PROTOBUF_GET_WRAPPED_REQUIRED(it->retry_budget(), min_retry_concurrency)
+              : min_retry_concurrency;
+    }
   }
   return std::make_unique<ResourceManagerImpl>(
       runtime, runtime_prefix, max_connections, max_pending_requests, max_requests, max_retries,
       max_connection_pools,
-      ClusterInfoImpl::generateCircuitBreakersStats(stats_scope, priority_name, track_remaining));
+      ClusterInfoImpl::generateCircuitBreakersStats(stats_scope, priority_name, track_remaining),
+      budget_percent, min_retry_concurrency);
 }
 
 PriorityStateManager::PriorityStateManager(ClusterImplBase& cluster,
