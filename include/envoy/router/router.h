@@ -173,9 +173,10 @@ public:
   virtual std::chrono::milliseconds perTryTimeout() const PURE;
 
   /**
-   * @return uint32_t the number of retries to allow against the route.
+   * @return absl::optional<uint32_t> the number of retries to allow against the route.
+   *         Returns absl::nullopt if no retry count was specified in the route config.
    */
-  virtual uint32_t numRetries() const PURE;
+  virtual absl::optional<uint32_t> numRetries() const PURE;
 
   /**
    * @return uint32_t a local OR of RETRY_ON values above.

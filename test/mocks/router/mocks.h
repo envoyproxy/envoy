@@ -100,7 +100,7 @@ public:
 
   // Router::RetryPolicy
   std::chrono::milliseconds perTryTimeout() const override { return per_try_timeout_; }
-  uint32_t numRetries() const override { return num_retries_; }
+  absl::optional<uint32_t> numRetries() const override { return num_retries_; }
   uint32_t retryOn() const override { return retry_on_; }
   MOCK_CONST_METHOD0(retryHostPredicates, std::vector<Upstream::RetryHostPredicateSharedPtr>());
   MOCK_CONST_METHOD0(retryPriority, Upstream::RetryPrioritySharedPtr());

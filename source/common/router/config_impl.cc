@@ -135,7 +135,7 @@ std::vector<Upstream::RetryHostPredicateSharedPtr> RetryPolicyImpl::retryHostPre
   for (const auto& config : retry_host_predicate_configs_) {
     auto& factory = Envoy::Config::Utility::getAndCheckFactory<Upstream::RetryHostPredicateFactory>(
         config.first);
-    predicates.emplace_back(factory.createHostPredicate(*config.second, num_retries_));
+    predicates.emplace_back(factory.createHostPredicate(*config.second, num_retries_.value_or(1)));
   }
 
   return predicates;
@@ -150,7 +150,7 @@ Upstream::RetryPrioritySharedPtr RetryPolicyImpl::retryPriority() const {
       retry_priority_config_.first);
 
   return factory.createRetryPriority(*retry_priority_config_.second, *validation_visitor_,
-                                     num_retries_);
+                                     num_retries_.value_or(1));
 }
 
 CorsPolicyImpl::CorsPolicyImpl(const envoy::config::route::v3alpha::CorsPolicy& config,
