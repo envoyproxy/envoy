@@ -131,6 +131,7 @@ envoy_cc_test(
         "//source/common/upstream:upstream_includes",
         "//source/common/upstream:upstream_lib",
         "//test/mocks/upstream:upstream_mocks",
+        "@envoy_api//envoy/config/core/v3alpha:pkg_cc_proto",
     ],
 )
 
@@ -146,6 +147,7 @@ envoy_cc_test(
         "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/upstream:upstream_mocks",
         "@envoy_api//envoy/config/cluster/v3alpha:pkg_cc_proto",
+        "@envoy_api//envoy/config/core/v3alpha:pkg_cc_proto",
     ],
 )
 
@@ -252,6 +254,7 @@ envoy_cc_test(
         "//test/mocks/upstream:upstream_mocks",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/cluster/v3alpha:pkg_cc_proto",
+        "@envoy_api//envoy/config/core/v3alpha:pkg_cc_proto",
     ],
 )
 
@@ -273,6 +276,7 @@ envoy_cc_test(
         "//test/test_common:simulated_time_system_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/cluster/v3alpha:pkg_cc_proto",
+        "@envoy_api//envoy/config/core/v3alpha:pkg_cc_proto",
         "@envoy_api//envoy/data/cluster/v2alpha:pkg_cc_proto",
     ],
 )
@@ -315,6 +319,7 @@ envoy_cc_test(
         "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/upstream:upstream_mocks",
         "@envoy_api//envoy/config/cluster/v3alpha:pkg_cc_proto",
+        "@envoy_api//envoy/config/core/v3alpha:pkg_cc_proto",
     ],
 )
 
@@ -326,6 +331,7 @@ envoy_cc_test(
         "//source/common/upstream:maglev_lb_lib",
         "//test/mocks/upstream:upstream_mocks",
         "@envoy_api//envoy/config/cluster/v3alpha:pkg_cc_proto",
+        "@envoy_api//envoy/config/core/v3alpha:pkg_cc_proto",
     ],
 )
 
@@ -344,6 +350,7 @@ envoy_cc_test_binary(
         "//test/mocks/upstream:upstream_mocks",
         "//test/test_common:printers_lib",
         "@envoy_api//envoy/config/cluster/v3alpha:pkg_cc_proto",
+        "@envoy_api//envoy/config/core/v3alpha:pkg_cc_proto",
     ],
 )
 

@@ -134,6 +134,7 @@ envoy_cc_test(
         "//test/mocks/upstream:host_mocks",
         "//test/mocks/upstream:upstream_mocks",
         "//test/test_common:utility_lib",
+        "@envoy_api//envoy/config/core/v3alpha:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/network/ratelimit/v3alpha:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/network/tcp_proxy/v3alpha:pkg_cc_proto",
     ],

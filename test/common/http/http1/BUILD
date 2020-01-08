@@ -61,5 +61,6 @@ envoy_cc_test(
         "//test/mocks/upstream:upstream_mocks",
         "//test/test_common:simulated_time_system_lib",
         "//test/test_common:utility_lib",
+        "@envoy_api//envoy/config/core/v3alpha:pkg_cc_proto",
     ],
 )
