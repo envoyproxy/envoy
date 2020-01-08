@@ -35,7 +35,7 @@ TEST(FileAccessLogConfigTest, ConfigureFromProto) {
   envoy::extensions::access_loggers::grpc::v3alpha::FileAccessLog fal_config;
   fal_config.set_path("/dev/null");
 
-  TestUtility::jsonConvert(fal_config, *config.mutable_hidden_envoy_deprecated_config());
+  config.mutable_typed_config()->PackFrom(fal_config);
 
   NiceMock<Server::Configuration::MockFactoryContext> context;
   EXPECT_THROW_WITH_MESSAGE(AccessLog::AccessLogFactory::fromProto(config, context), EnvoyException,
@@ -92,7 +92,7 @@ TEST(FileAccessLogConfigTest, FileAccessLogJsonTest) {
   EXPECT_EQ(fal_config.access_log_format_case(),
             envoy::extensions::access_loggers::grpc::v3alpha::FileAccessLog::AccessLogFormatCase::
                 kJsonFormat);
-  TestUtility::jsonConvert(fal_config, *config.mutable_hidden_envoy_deprecated_config());
+  config.mutable_typed_config()->PackFrom(fal_config);
 
   NiceMock<Server::Configuration::MockFactoryContext> context;
   EXPECT_THROW_WITH_MESSAGE(AccessLog::AccessLogFactory::fromProto(config, context), EnvoyException,
@@ -126,7 +126,7 @@ TEST(FileAccessLogConfigTest, FileAccessLogTypedJsonTest) {
   EXPECT_EQ(fal_config.access_log_format_case(),
             envoy::extensions::access_loggers::grpc::v3alpha::FileAccessLog::AccessLogFormatCase::
                 kTypedJsonFormat);
-  TestUtility::jsonConvert(fal_config, *config.mutable_hidden_envoy_deprecated_config());
+  config.mutable_typed_config()->PackFrom(fal_config);
 
   config.set_name(AccessLogNames::get().File);
 
@@ -150,7 +150,7 @@ TEST(FileAccessLogConfigTest, FileAccessLogJsonWithBoolValueTest) {
     auto json_format = fal_config.mutable_json_format();
     (*json_format->mutable_fields())["protocol"] = bool_value;
 
-    TestUtility::jsonConvert(fal_config, *config.mutable_hidden_envoy_deprecated_config());
+    config.mutable_typed_config()->PackFrom(fal_config);
     NiceMock<Server::Configuration::MockFactoryContext> context;
 
     EXPECT_THROW_WITH_MESSAGE(AccessLog::AccessLogFactory::fromProto(config, context),
@@ -176,7 +176,7 @@ TEST(FileAccessLogConfigTest, FileAccessLogJsonWithNestedKeyTest) {
     auto json_format = fal_config.mutable_json_format();
     (*json_format->mutable_fields())["top_level_key"] = struct_value;
 
-    TestUtility::jsonConvert(fal_config, *config.mutable_hidden_envoy_deprecated_config());
+    config.mutable_typed_config()->PackFrom(fal_config);
     NiceMock<Server::Configuration::MockFactoryContext> context;
 
     EXPECT_THROW_WITH_MESSAGE(AccessLog::AccessLogFactory::fromProto(config, context),
