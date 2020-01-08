@@ -2,17 +2,18 @@ syntax = "proto3";
 
 package envoy.service.status.v2;
 
-option java_package = "io.envoyproxy.envoy.service.status.v2";
-option java_outer_classname = "CsdsProto";
-option java_multiple_files = true;
-option java_generic_services = true;
-
 import "envoy/admin/v2alpha/config_dump.proto";
-import "envoy/annotations/resource.proto";
 import "envoy/api/v2/core/base.proto";
 
 import "google/api/annotations.proto";
 import "google/protobuf/struct.proto";
+
+import "envoy/annotations/resource.proto";
+
+option java_package = "io.envoyproxy.envoy.service.status.v2";
+option java_outer_classname = "CsdsProto";
+option java_multiple_files = true;
+option java_generic_services = true;
 
 // CSDS is Client Status Discovery Service. It can be used to get the status of
 // xDS-compliant client from the management server's point of view. It can also

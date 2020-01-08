@@ -9,8 +9,8 @@ api_proto_package(
     deps = [
         "//envoy/admin/v3alpha:pkg",
         "//envoy/annotations:pkg",
-        "//envoy/api/v2:pkg",
         "//envoy/config/core/v3alpha:pkg",
+        "//envoy/service/status/v2:pkg",
         "@com_github_cncf_udpa//udpa/annotations:pkg",
     ],
 )
