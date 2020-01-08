@@ -1,13 +1,11 @@
 #include <chrono>
 #include <memory>
 
-#include "envoy/config/bootstrap/v2/bootstrap.pb.h"
-#include "envoy/config/filter/network/http_connection_manager/v2/http_connection_manager.pb.h"
+#include "envoy/extensions/filters/network/http_connection_manager/v3alpha/http_connection_manager.pb.h"
 
 #include "common/config/utility.h"
 #include "common/protobuf/utility.h"
 
-#include "extensions/filters/http/buffer/buffer_filter.h"
 #include "extensions/filters/http/well_known_names.h"
 
 #include "test/config/utility.h"
@@ -40,6 +38,11 @@ public:
               filter_ = filter;
               filter_->setDecoderFilterCallbacks(callbacks_);
             }));
+    // Ext-authz setup
+    addr_ = std::make_shared<Network::Address::Ipv4Instance>("1.2.3.4", 1111);
+    ON_CALL(connection_, remoteAddress()).WillByDefault(testing::ReturnRef(addr_));
+    ON_CALL(connection_, localAddress()).WillByDefault(testing::ReturnRef(addr_));
+    ON_CALL(callbacks_, connection()).WillByDefault(testing::Return(&connection_));
     callbacks_.stream_info_.protocol_ = Envoy::Http::Protocol::Http2;
   }
 
@@ -75,25 +78,21 @@ public:
     }
   }
 
-  // This creates and mutates the filter config and runs decode.
-  void fuzz(absl::string_view filter_name, const test::fuzz::HttpData& data) {
-    ENVOY_LOG_MISC(info, "Fuzzing filter: {}", filter_name);
-
-    auto& factory =
-        Config::Utility::getAndCheckFactory<Server::Configuration::NamedHttpFilterConfigFactory>(
-            std::string(filter_name));
-    auto proto_config = factory.createEmptyConfigProto();
-
-    protobuf_mutator::Mutator mutator;
+  // This creates the filter config and runs decode.
+  void fuzz(const envoy::extensions::filters::network::http_connection_manager::v3alpha::HttpFilter&
+                proto_config,
+            const test::fuzz::HttpData& data) {
     try {
-      // Mutate and validate the chosen filter protobuf directly.
-      mutator.Mutate(proto_config.get(), 200);
+      // Try to create the filter. Exit early if the config is invalid or violates PGV constraints.
+      auto& factory = Config::Utility::getAndCheckFactoryByName<
+          Server::Configuration::NamedHttpFilterConfigFactory>(proto_config.name());
+      ProtobufTypes::MessagePtr message = Config::Utility::translateToFactoryConfig(
+          proto_config, factory_context_.messageValidationVisitor(), factory);
       Http::FilterFactoryCb cb =
-          factory.createFilterFactoryFromProto(*proto_config, "stats", factory_context_);
-      ENVOY_LOG_MISC(debug, "Mutated created configuration: {}", proto_config->DebugString());
+          factory.createFilterFactoryFromProto(*message, "stats", factory_context_);
       cb(filter_callback_);
     } catch (const EnvoyException& e) {
-      ENVOY_LOG_MISC(debug, "Mutator created an invalid configuration: {}", e.what());
+      ENVOY_LOG_MISC(debug, "Controlled exception {}", e.what());
       return;
     }
 
@@ -104,17 +103,27 @@ public:
   NiceMock<Http::MockStreamDecoderFilterCallbacks> callbacks_;
   NiceMock<Http::MockFilterChainFactoryCallbacks> filter_callback_;
   std::shared_ptr<Http::StreamDecoderFilter> filter_;
+  NiceMock<Envoy::Network::MockConnection> connection_;
+  Network::Address::InstanceConstSharedPtr addr_;
 };
 
 DEFINE_PROTO_FUZZER(const test::extensions::filters::http::FilterFuzzTestCase& input) {
-  // Choose the HTTP filter with the fuzzed input int.
-  const std::vector<absl::string_view> filter_names = Registry::FactoryRegistry<
-      Server::Configuration::NamedHttpFilterConfigFactory>::registeredNames();
-  absl::string_view filter_name = filter_names[input.filter_index() % filter_names.size()];
+  static PostProcessorRegistration reg = {
+      [](test::extensions::filters::http::FilterFuzzTestCase* input, unsigned int seed) {
+        // This ensures that the mutated configs all have valid filter names.
+        static const std::vector<absl::string_view> filter_names = Registry::FactoryRegistry<
+            Server::Configuration::NamedHttpFilterConfigFactory>::registeredNames();
+
+        if (std::find(filter_names.begin(), filter_names.end(), input->config().name()) ==
+            std::end(filter_names)) {
+          absl::string_view filter_name = filter_names[seed % filter_names.size()];
+          input->mutable_config()->set_name(std::string(filter_name));
+        }
+      }};
 
   // Fuzz filter.
   static UberFilterFuzzer fuzzer;
-  fuzzer.fuzz(filter_name, input.data());
+  fuzzer.fuzz(input.config(), input.data());
 }
 
 } // namespace HttpFilters
