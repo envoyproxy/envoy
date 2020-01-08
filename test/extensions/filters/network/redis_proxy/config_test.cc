@@ -5,8 +5,8 @@
 
 #include "extensions/filters/network/redis_proxy/config.h"
 
-#include "test/test_common/test_runtime.h"
 #include "test/mocks/server/mocks.h"
+#include "test/test_common/test_runtime.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -72,7 +72,9 @@ TEST(RedisProxyFilterConfigFactoryTest,
      DEPRECATED_FEATURE_TEST(RedisProxyCorrectProtoLegacyCluster)) {
   TestScopedRuntime scoped_runtime;
   Runtime::LoaderSingleton::getExisting()->mergeValues(
-   {{"envoy.deprecated_features:envoy.extensions.filters.network.redis_proxy.v3alpha.RedisProxy.hidden_envoy_deprecated_cluster", "true"}});
+      {{"envoy.deprecated_features:envoy.extensions.filters.network.redis_proxy.v3alpha.RedisProxy."
+        "hidden_envoy_deprecated_cluster",
+        "true"}});
 
   const std::string yaml = R"EOF(
 cluster: fake_cluster
@@ -94,6 +96,11 @@ settings:
 
 TEST(RedisProxyFilterConfigFactoryTest,
      DEPRECATED_FEATURE_TEST(RedisProxyCorrectProtoLegacyCatchAllCluster)) {
+  TestScopedRuntime scoped_runtime;
+  Runtime::LoaderSingleton::getExisting()->mergeValues(
+      {{"envoy.deprecated_features:envoy.extensions.filters.network.redis_proxy.v3alpha."
+        "RedisProxy.PrefixRoutes.hidden_envoy_deprecated_catch_all_cluster",
+        "true"}});
   const std::string yaml = R"EOF(
 prefix_routes:
   catch_all_cluster: fake_cluster

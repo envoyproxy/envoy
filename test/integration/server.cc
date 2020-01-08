@@ -185,7 +185,8 @@ void IntegrationTestServer::onRuntimeCreated() {
   // TODO(alyssawilk) improve this.
   Runtime::LoaderSingleton::getExisting()->mergeValues(
       {{"envoy.deprecated_features:envoy.config.route.v3alpha.CorsPolicy."
-         "hidden_envoy_deprecated_enabled", "true"}});
+        "hidden_envoy_deprecated_enabled",
+        "true"}});
 }
 
 void IntegrationTestServerImpl::createAndRunEnvoyServer(

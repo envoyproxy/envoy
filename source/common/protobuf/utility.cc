@@ -343,8 +343,7 @@ void checkForDeprecatedNonRepeatedEnumValue(const Protobuf::Message& message,
 
   if (runtime) {
     warn_only = runtime->snapshot().deprecatedFeatureEnabled(
-        absl::StrCat("envoy.deprecated_features:", enum_value_descriptor->full_name()),
-        warn_only);
+        absl::StrCat("envoy.deprecated_features:", enum_value_descriptor->full_name()), warn_only);
   }
 
   if (warn_only) {
