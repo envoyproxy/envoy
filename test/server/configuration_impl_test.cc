@@ -64,6 +64,12 @@ protected:
                                  server_.messageValidationContext(), *api_, server_.httpContext(),
                                  server_.accessLogManager(), server_.singletonManager()) {}
 
+  void addStatsdFakeClusterConfig(envoy::config::metrics::v3alpha::StatsSink& sink) {
+    envoy::config::metrics::v3alpha::StatsdSink statsd_sink;
+    statsd_sink.set_tcp_cluster_name("fake_cluster");
+    sink.mutable_typed_config()->PackFrom(statsd_sink);
+  }
+
   Api::ApiPtr api_;
   NiceMock<Server::MockInstance> server_;
   Upstream::ProdClusterManagerFactory cluster_manager_factory_;
@@ -299,8 +305,7 @@ TEST_F(ConfigurationImplTest, ProtoSpecifiedStatsSink) {
 
   auto& sink = *bootstrap.mutable_stats_sinks()->Add();
   sink.set_name(Extensions::StatSinks::StatsSinkNames::get().Statsd);
-  auto& field_map = *sink.mutable_hidden_envoy_deprecated_config()->mutable_fields();
-  field_map["tcp_cluster_name"].set_string_value("fake_cluster");
+  addStatsdFakeClusterConfig(sink);
 
   MainImpl config;
   config.initialize(bootstrap, server_, cluster_manager_factory_);
@@ -331,8 +336,7 @@ TEST_F(ConfigurationImplTest, StatsSinkWithInvalidName) {
 
   envoy::config::metrics::v3alpha::StatsSink& sink = *bootstrap.mutable_stats_sinks()->Add();
   sink.set_name("envoy.invalid");
-  auto& field_map = *sink.mutable_hidden_envoy_deprecated_config()->mutable_fields();
-  field_map["tcp_cluster_name"].set_string_value("fake_cluster");
+  addStatsdFakeClusterConfig(sink);
 
   MainImpl config;
   EXPECT_THROW_WITH_MESSAGE(config.initialize(bootstrap, server_, cluster_manager_factory_),
@@ -362,8 +366,7 @@ TEST_F(ConfigurationImplTest, StatsSinkWithNoName) {
   auto bootstrap = Upstream::parseBootstrapFromV2Json(json);
 
   auto& sink = *bootstrap.mutable_stats_sinks()->Add();
-  auto& field_map = *sink.mutable_hidden_envoy_deprecated_config()->mutable_fields();
-  field_map["tcp_cluster_name"].set_string_value("fake_cluster");
+  addStatsdFakeClusterConfig(sink);
 
   MainImpl config;
   EXPECT_THROW_WITH_MESSAGE(config.initialize(bootstrap, server_, cluster_manager_factory_),

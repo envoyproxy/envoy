@@ -124,10 +124,10 @@ TEST_F(AllocatorImplTest, RefCountDecAllocRaceSynchronized) {
   });
 
   alloc_.sync().barrierOn(AllocatorImpl::DecrementToZeroSyncPoint);
-  EXPECT_TRUE(alloc_.isMutexLocked());
+  EXPECT_TRUE(alloc_.isMutexLockedForTest());
   alloc_.sync().signal(AllocatorImpl::DecrementToZeroSyncPoint);
   thread->join();
-  EXPECT_FALSE(alloc_.isMutexLocked());
+  EXPECT_FALSE(alloc_.isMutexLockedForTest());
 }
 
 } // namespace

@@ -405,9 +405,13 @@ void HttpConnectionManagerConfig::processFilter(
     bool& is_terminal) {
   ENVOY_LOG(debug, "    {} filter #{}", prefix, i);
   ENVOY_LOG(debug, "      name: {}", proto_config.name());
-  ENVOY_LOG(
-      debug, "    config: {}",
-      MessageUtil::getJsonStringFromMessage(proto_config.hidden_envoy_deprecated_config(), true));
+  ENVOY_LOG(debug, "    config: {}",
+            MessageUtil::getJsonStringFromMessage(
+                proto_config.has_typed_config()
+                    ? static_cast<const Protobuf::Message&>(proto_config.typed_config())
+                    : static_cast<const Protobuf::Message&>(
+                          proto_config.hidden_envoy_deprecated_config()),
+                true));
 
   // Now see if there is a factory that will accept the config.
   auto& factory =

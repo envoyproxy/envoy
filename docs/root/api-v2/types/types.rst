@@ -10,6 +10,7 @@ Types
   ../type/http_status.proto
   ../type/percent.proto
   ../type/range.proto
+  ../type/semantic_version.proto
   ../type/token_bucket.proto
   ../type/matcher/metadata.proto
   ../type/matcher/number.proto

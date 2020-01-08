@@ -2734,7 +2734,9 @@ public:
     };
   }
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return std::make_unique<Envoy::ProtobufWkt::Empty>();
+    // Using Struct instead of a custom per-filter empty config proto
+    // This is only allowed in tests.
+    return std::make_unique<Envoy::ProtobufWkt::Struct>();
   }
   std::string name() const override { return "envoy.test.filter"; }
 };

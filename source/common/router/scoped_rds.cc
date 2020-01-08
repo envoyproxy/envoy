@@ -103,11 +103,11 @@ ScopedRdsConfigSubscription::ScopedRdsConfigSubscription(
       stats_({ALL_SCOPED_RDS_STATS(POOL_COUNTER(*scope_))}),
       rds_config_source_(std::move(rds_config_source)),
       validation_visitor_(factory_context.messageValidationVisitor()), stat_prefix_(stat_prefix),
-      route_config_provider_manager_(route_config_provider_manager),
-      xds_api_version_(rds_config_source_.xds_api_version()) {
+      route_config_provider_manager_(route_config_provider_manager) {
   subscription_ =
       factory_context.clusterManager().subscriptionFactory().subscriptionFromConfigSource(
-          scoped_rds.scoped_rds_config_source(), loadTypeUrl(), *scope_, *this);
+          scoped_rds.scoped_rds_config_source(),
+          loadTypeUrl(rds_config_source_.resource_api_version()), *scope_, *this);
 
   initialize([scope_key_builder]() -> Envoy::Config::ConfigProvider::ConfigConstSharedPtr {
     return std::make_shared<ScopedConfigImpl>(
@@ -349,18 +349,19 @@ void ScopedRdsConfigSubscription::onConfigUpdate(
   onConfigUpdate(to_add_repeated, to_remove_repeated, version_info);
 }
 
-std::string ScopedRdsConfigSubscription::loadTypeUrl() {
-  switch (xds_api_version_) {
+std::string ScopedRdsConfigSubscription::loadTypeUrl(
+    envoy::config::core::v3alpha::ApiVersion resource_api_version) {
+  switch (resource_api_version) {
   // automatically set api version as V2
-  case envoy::config::core::v3alpha::ConfigSource::AUTO:
-  case envoy::config::core::v3alpha::ConfigSource::V2:
+  case envoy::config::core::v3alpha::ApiVersion::AUTO:
+  case envoy::config::core::v3alpha::ApiVersion::V2:
     return Grpc::Common::typeUrl(
         API_NO_BOOST(envoy::api::v2::ScopedRouteConfiguration().GetDescriptor()->full_name()));
-  case envoy::config::core::v3alpha::ConfigSource::V3ALPHA:
+  case envoy::config::core::v3alpha::ApiVersion::V3ALPHA:
     return Grpc::Common::typeUrl(API_NO_BOOST(
         envoy::config::route::v3alpha::ScopedRouteConfiguration().GetDescriptor()->full_name()));
   default:
-    throw EnvoyException(fmt::format("type {} is not supported", xds_api_version_));
+    NOT_REACHED_GCOVR_EXCL_LINE;
   }
 }
 

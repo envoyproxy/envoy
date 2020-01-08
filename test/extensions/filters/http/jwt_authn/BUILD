@@ -119,10 +119,10 @@ envoy_extension_cc_test(
     extension_name = "envoy.filters.http.jwt_authn",
     deps = [
         "//source/common/router:string_accessor_lib",
-        "//source/extensions/filters/http/common:empty_http_filter_config_lib",
         "//source/extensions/filters/http/common:pass_through_filter_lib",
         "//source/extensions/filters/http/jwt_authn:config",
         "//test/config:utility_lib",
+        "//test/extensions/filters/http/common:empty_http_filter_config_lib",
         "//test/extensions/filters/http/jwt_authn:test_common_lib",
         "//test/integration:http_protocol_integration_lib",
         "@envoy_api//envoy/config/bootstrap/v3alpha:pkg_cc_proto",
