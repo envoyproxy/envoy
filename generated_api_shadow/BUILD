@@ -18,6 +18,7 @@ proto_library(
         "//envoy/api/v2/listener:pkg",
         "//envoy/api/v2/ratelimit:pkg",
         "//envoy/api/v2/route:pkg",
+        "//envoy/api/v3alpha/core:pkg",
         "//envoy/config/accesslog/v2:pkg",
         "//envoy/config/bootstrap/v2:pkg",
         "//envoy/config/bootstrap/v3alpha:pkg",

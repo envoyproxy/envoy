@@ -2,6 +2,7 @@ syntax = "proto3";
 
 package envoy.api.v2.core;
 
+import "envoy/api/v2/core/backoff.proto";
 import "envoy/api/v2/core/grpc_service.proto";
 
 import "google/protobuf/duration.proto";
@@ -19,7 +20,7 @@ option (udpa.annotations.file_migrate).move_to_package = "envoy.config.core.v3al
 
 // API configuration source. This identifies the API type and cluster that Envoy
 // will use to fetch an xDS API.
-// [#next-free-field: 8]
+// [#next-free-field: 9]
 message ApiConfigSource {
   // APIs may be fetched via either REST or gRPC.
   enum ApiType {
@@ -73,6 +74,10 @@ message ApiConfigSource {
 
   // Skip the node identifier in subsequent discovery requests for streaming gRPC config types.
   bool set_node_on_first_message_only = 7;
+
+  // For gRPC APIs, the back off settings for re-establishing connections. If not set, a default
+  // jittered exponential back off with an initial interval of 5s and a max of 30s will be used.
+  BackOffStrategy back_off_strategy = 8;
 }
 
 // Aggregated Discovery Service (ADS) options. This is currently empty, but when
