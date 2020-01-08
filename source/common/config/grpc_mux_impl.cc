@@ -5,6 +5,7 @@
 #include "envoy/service/discovery/v3alpha/discovery.pb.h"
 
 #include "common/config/utility.h"
+#include "common/config/version_converter.h"
 #include "common/protobuf/protobuf.h"
 
 namespace Envoy {
@@ -13,12 +14,13 @@ namespace Config {
 GrpcMuxImpl::GrpcMuxImpl(const LocalInfo::LocalInfo& local_info,
                          Grpc::RawAsyncClientPtr async_client, Event::Dispatcher& dispatcher,
                          const Protobuf::MethodDescriptor& service_method,
+                         envoy::config::core::v3alpha::ApiVersion transport_api_version,
                          Runtime::RandomGenerator& random, Stats::Scope& scope,
                          const RateLimitSettings& rate_limit_settings, bool skip_subsequent_node)
     : grpc_stream_(this, std::move(async_client), service_method, random, dispatcher, scope,
                    rate_limit_settings),
       local_info_(local_info), skip_subsequent_node_(skip_subsequent_node),
-      first_stream_request_(true) {
+      first_stream_request_(true), transport_api_version_(transport_api_version) {
   Config::Utility::checkLocalInfo("ads", local_info);
 }
 
@@ -61,6 +63,13 @@ void GrpcMuxImpl::sendDiscoveryRequest(const std::string& type_url) {
 
   if (skip_subsequent_node_ && !first_stream_request_) {
     request.clear_node();
+  }
+  // TODO(htuch): this works as long as there are no new fields in the v3+
+  // DiscoveryRequest. When they are added, we need to do a full v2 conversion
+  // and also discard unknown fields. Tracked at
+  // https://github.com/envoyproxy/envoy/issues/9619.
+  if (transport_api_version_ == envoy::config::core::v3alpha::ApiVersion::V3ALPHA) {
+    VersionUtil::scrubHiddenEnvoyDeprecated(request);
   }
   ENVOY_LOG(trace, "Sending DiscoveryRequest for {}: {}", type_url, request.DebugString());
   grpc_stream_.sendMessage(request);
