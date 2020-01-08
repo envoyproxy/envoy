@@ -543,6 +543,16 @@ ProtobufWkt::Struct MessageUtil::keyValueStruct(const std::string& key, const st
   return struct_obj;
 }
 
+ProtobufWkt::Struct MessageUtil::keyValueStruct(const std::map<std::string, std::string>& fields) {
+  ProtobufWkt::Struct struct_obj;
+  ProtobufWkt::Value val;
+  for (const auto& pair : fields) {
+    val.set_string_value(pair.second);
+    (*struct_obj.mutable_fields())[pair.first] = val;
+  }
+  return struct_obj;
+}
+
 // TODO(alyssawilk) see if we can get proto's CodeEnumToString made accessible
 // to avoid copying it. Otherwise change this to absl::string_view.
 std::string MessageUtil::CodeEnumToString(ProtobufUtil::error::Code code) {

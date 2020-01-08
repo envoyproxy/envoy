@@ -217,6 +217,18 @@ protected:
     return server_thread;
   }
 
+  void expectCorrectBuildVersion(const envoy::config::core::v3alpha::BuildVersion& build_version) {
+    std::string version_string =
+        absl::StrCat(build_version.version().major(), ".", build_version.version().minor(), ".",
+                     build_version.version().patch());
+    const auto& fields = build_version.metadata().fields();
+    if (fields.find(BuildVersionMetadataKeys::get().BuildLabel) != fields.end()) {
+      absl::StrAppend(&version_string, "-",
+                      fields.at(BuildVersionMetadataKeys::get().BuildLabel).string_value());
+    }
+    EXPECT_EQ(BUILD_VERSION_NUMBER, version_string);
+  }
+
   // Returns the server's tracer as a pointer, for use in dynamic_cast tests.
   Tracing::HttpTracer* tracer() { return &server_->httpContext().tracer(); };
 
@@ -558,13 +570,29 @@ TEST_P(ServerInstanceImplTest, ValidationAllowStaticRejectDynamic) {
 }
 
 // Validate server localInfo() from bootstrap Node.
-TEST_P(ServerInstanceImplTest, BootstrapNode) {
+// Deprecated testing of the envoy.api.v2.core.Node.build_version field
+TEST_P(ServerInstanceImplTest, DEPRECATED_FEATURE_TEST(BootstrapNodeDeprecated)) {
   initialize("test/server/node_bootstrap.yaml");
   EXPECT_EQ("bootstrap_zone", server_->localInfo().zoneName());
   EXPECT_EQ("bootstrap_cluster", server_->localInfo().clusterName());
   EXPECT_EQ("bootstrap_id", server_->localInfo().nodeName());
   EXPECT_EQ("bootstrap_sub_zone", server_->localInfo().node().locality().sub_zone());
   EXPECT_EQ(VersionInfo::version(), server_->localInfo().node().build_version());
+  EXPECT_EQ("envoy", server_->localInfo().node().user_agent_name());
+  EXPECT_TRUE(server_->localInfo().node().has_user_agent_build_version());
+  expectCorrectBuildVersion(server_->localInfo().node().user_agent_build_version());
+}
+
+// Validate server localInfo() from bootstrap Node.
+TEST_P(ServerInstanceImplTest, BootstrapNode) {
+  initialize("test/server/node_bootstrap.yaml");
+  EXPECT_EQ("bootstrap_zone", server_->localInfo().zoneName());
+  EXPECT_EQ("bootstrap_cluster", server_->localInfo().clusterName());
+  EXPECT_EQ("bootstrap_id", server_->localInfo().nodeName());
+  EXPECT_EQ("bootstrap_sub_zone", server_->localInfo().node().locality().sub_zone());
+  EXPECT_EQ("envoy", server_->localInfo().node().user_agent_name());
+  EXPECT_TRUE(server_->localInfo().node().has_user_agent_build_version());
+  expectCorrectBuildVersion(server_->localInfo().node().user_agent_build_version());
 }
 
 TEST_P(ServerInstanceImplTest, LoadsBootstrapFromConfigProtoOptions) {
@@ -596,7 +624,6 @@ TEST_P(ServerInstanceImplTest, BootstrapNodeWithOptionsOverride) {
   EXPECT_EQ("some_cluster_name", server_->localInfo().clusterName());
   EXPECT_EQ("some_node_name", server_->localInfo().nodeName());
   EXPECT_EQ("bootstrap_sub_zone", server_->localInfo().node().locality().sub_zone());
-  EXPECT_EQ(VersionInfo::version(), server_->localInfo().node().build_version());
 }
 
 // Validate server runtime is parsed from bootstrap and that we can read from
@@ -1010,6 +1037,22 @@ TEST_P(ServerInstanceImplTest, CallbacksStatsSinkTest) {
   initialize("test/server/callbacks_stats_sink_bootstrap.yaml");
   // Necessary to trigger server lifecycle callbacks, otherwise only terminate() is called.
   server_->shutdown();
+}
+
+// Validate that disabled extension is reflected in the list of Node extensions.
+TEST_P(ServerInstanceImplTest, DisabledExtension) {
+  OptionsImpl::disableExtensions({"envoy.filters.http/envoy.buffer"});
+  initialize("test/server/node_bootstrap.yaml");
+  bool disabled_filter_found = false;
+  for (const auto& extension : server_->localInfo().node().extensions()) {
+    if (extension.category() == "envoy.filters.http" && extension.name() == "envoy.buffer") {
+      ASSERT_TRUE(extension.disabled());
+      disabled_filter_found = true;
+    } else {
+      ASSERT_FALSE(extension.disabled());
+    }
+  }
+  ASSERT_TRUE(disabled_filter_found);
 }
 
 } // namespace
