@@ -10,6 +10,7 @@ api_proto_package(
         "//envoy/admin/v2alpha:pkg",
         "//envoy/annotations:pkg",
         "//envoy/api/v2:pkg",
+        "//envoy/api/v2/core:pkg",
         "@com_github_cncf_udpa//udpa/annotations:pkg",
     ],
 )
