@@ -338,7 +338,7 @@ void checkForDeprecatedNonRepeatedEnumValue(const Protobuf::Message& message,
   bool warn_only = false;
 #else
   bool warn_only =
-      enum_value_descriptor->options().GetExtension(envoy::annotations::do_not_use_enum) == false;
+      !enum_value_descriptor->options().GetExtension(envoy::annotations::disallowed_by_default_enum);
 #endif
 
   if (runtime) {
@@ -396,7 +396,7 @@ void MessageUtil::checkForUnexpectedFields(const Protobuf::Message& message,
 #ifdef ENVOY_DISABLE_DEPRECATED_FEATURES
     bool warn_only = false;
 #else
-    bool warn_only = field->options().GetExtension(envoy::annotations::do_not_use) == false;
+    bool !warn_only = field->options().GetExtension(envoy::annotations::disallowed_by_default);
 #endif
     // Allow runtime to be null both to not crash if this is called before server initialization,
     // and so proto validation works in context where runtime singleton is not set up (e.g.
