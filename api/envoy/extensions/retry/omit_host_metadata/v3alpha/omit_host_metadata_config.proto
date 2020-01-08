@@ -1,12 +1,12 @@
 syntax = "proto3";
 
-package envoy.config.retry.omit_host_metadata.v3alpha;
+package envoy.extensions.retry.omit_host_metadata.v3alpha;
 
 import "envoy/config/core/v3alpha/base.proto";
 
 import "udpa/annotations/versioning.proto";
 
-option java_package = "io.envoyproxy.envoy.config.retry.omit_host_metadta.v3alpha";
+option java_package = "io.envoyproxy.envoy.extensions.retry.omit_host_metadta.v3alpha";
 option java_outer_classname = "OmitHostMetadataConfigProto";
 option java_multiple_files = true;
 
@@ -23,5 +23,5 @@ message OmitHostMetadataConfig {
   // the upstream cluster with metadata matching will be omitted while
   // attempting retry of a failed request. The filter name should be
   // specified as *envoy.lb*.
-  core.v3alpha.Metadata metadata_match = 1;
+  envoy.config.core.v3alpha.Metadata metadata_match = 1;
 }

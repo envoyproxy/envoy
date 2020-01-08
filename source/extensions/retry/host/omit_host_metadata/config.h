@@ -23,7 +23,7 @@ public:
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
     return ProtobufTypes::MessagePtr(
-        new envoy::config::retry::omit_host_metadata::v3alpha::OmitHostMetadataConfig());
+        new envoy::extensions::retry::omit_host_metadata::v3alpha::OmitHostMetadataConfig());
   }
 };
 

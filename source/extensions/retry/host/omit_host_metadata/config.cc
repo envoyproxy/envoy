@@ -15,7 +15,7 @@ Upstream::RetryHostPredicateSharedPtr
 OmitHostsRetryPredicateFactory::createHostPredicate(const Protobuf::Message& config, uint32_t) {
   return std::make_shared<OmitHostsRetryPredicate>(
       MessageUtil::downcastAndValidate<
-          const envoy::config::retry::omit_host_metadata::v3alpha::OmitHostMetadataConfig&>(
+          const envoy::extensions::retry::omit_host_metadata::v3alpha::OmitHostMetadataConfig&>(
           config, ProtobufMessage::getStrictValidationVisitor())
           .metadata_match());
 }
