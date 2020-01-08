@@ -169,6 +169,8 @@ proto_library(
         "//envoy/service/route/v3alpha:pkg",
         "//envoy/service/runtime/v3alpha:pkg",
         "//envoy/service/secret/v3alpha:pkg",
+        "//envoy/service/status/v2:pkg",
+        "//envoy/service/status/v3alpha:pkg",
         "//envoy/service/tap/v2alpha:pkg",
         "//envoy/service/tap/v3alpha:pkg",
         "//envoy/service/trace/v2:pkg",
