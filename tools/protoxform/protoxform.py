@@ -33,6 +33,7 @@ from google.protobuf import text_format
 # this also serves as whitelist of extended options.
 from google.api import annotations_pb2 as _
 from validate import validate_pb2 as _
+from envoy.annotations import deprecation_pb2 as _
 from envoy.annotations import resource_pb2
 from udpa.annotations import migrate_pb2
 
@@ -437,6 +438,7 @@ def FormatOptions(options):
   """
 
   formatted_options = []
+
   for option_descriptor, option_value in sorted(options.ListFields(), key=lambda x: x[0].number):
     option_name = '({})'.format(
         option_descriptor.full_name) if option_descriptor.is_extension else option_descriptor.name
