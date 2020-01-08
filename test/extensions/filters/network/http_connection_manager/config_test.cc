@@ -985,8 +985,8 @@ TEST_F(FilterChainTest, createFilterChain) {
                                      scoped_routes_config_provider_manager_);
 
   Http::MockFilterChainFactoryCallbacks callbacks;
-  EXPECT_CALL(callbacks, addStreamFilter(_));                 // Dynamo
-  EXPECT_CALL(callbacks, addStreamDecoderFilter(_)).Times(2); // Router + OnDemandRouteUpdate
+  EXPECT_CALL(callbacks, addStreamFilter(_));        // Dynamo
+  EXPECT_CALL(callbacks, addStreamDecoderFilter(_)); // Router
   config.createFilterChain(callbacks);
 }
 
@@ -1004,8 +1004,8 @@ TEST_F(FilterChainTest, createUpgradeFilterChain) {
   // config is present. We should create an upgrade filter chain for
   // WebSockets.
   {
-    EXPECT_CALL(callbacks, addStreamFilter(_));                 // Dynamo
-    EXPECT_CALL(callbacks, addStreamDecoderFilter(_)).Times(2); // Router + OnDemandRouteUpdate
+    EXPECT_CALL(callbacks, addStreamFilter(_));        // Dynamo
+    EXPECT_CALL(callbacks, addStreamDecoderFilter(_)); // Router
     EXPECT_TRUE(config.createUpgradeFilterChain("WEBSOCKET", nullptr, callbacks));
   }
 
@@ -1028,8 +1028,8 @@ TEST_F(FilterChainTest, createUpgradeFilterChain) {
   // For paranoia's sake make sure route-specific enabling doesn't break
   // anything.
   {
-    EXPECT_CALL(callbacks, addStreamFilter(_));                 // Dynamo
-    EXPECT_CALL(callbacks, addStreamDecoderFilter(_)).Times(2); // Router + OnDemandRouteUpdate
+    EXPECT_CALL(callbacks, addStreamFilter(_));        // Dynamo
+    EXPECT_CALL(callbacks, addStreamDecoderFilter(_)); // Router
     std::map<std::string, bool> upgrade_map;
     upgrade_map.emplace(std::make_pair("WebSocket", true));
     EXPECT_TRUE(config.createUpgradeFilterChain("WEBSOCKET", &upgrade_map, callbacks));
@@ -1098,8 +1098,8 @@ TEST_F(FilterChainTest, createCustomUpgradeFilterChain) {
 
   {
     Http::MockFilterChainFactoryCallbacks callbacks;
-    EXPECT_CALL(callbacks, addStreamFilter(_));                 // Dynamo
-    EXPECT_CALL(callbacks, addStreamDecoderFilter(_)).Times(2); // Router + OnDemandRouteUpdate
+    EXPECT_CALL(callbacks, addStreamFilter(_));        // Dynamo
+    EXPECT_CALL(callbacks, addStreamDecoderFilter(_)); // Router
     config.createFilterChain(callbacks);
   }
 

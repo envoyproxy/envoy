@@ -12,5 +12,5 @@ or *:authority* header be present.
 Configuration
 -------------
 * :ref:`v2 API reference <envoy_api_msg_config.filter.http.on_demand.v2.OnDemand>`
-* The filter name is *envoy.on_demand*. The On Demand VHDS Updates filter is automatically configured at the
-  head of an HTTP filter chain.
+* This filter should be configured with the name *envoy.on_demand*.
+* The filter should be placed before *envoy.router* filter in the HttpConnectionManager's filter chain.
