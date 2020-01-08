@@ -304,7 +304,6 @@ void InstanceImpl::initialize(const Options& options,
   }
   server_stats_->version_.set(version_int);
 
-  // Set the deprecated build_version field for any v2 xDS servers that expect it
   bootstrap_.mutable_node()->set_build_version(VersionInfo::version());
   bootstrap_.mutable_node()->set_user_agent_name("envoy");
   *bootstrap_.mutable_node()->mutable_user_agent_build_version() = VersionInfo::buildVersion();
