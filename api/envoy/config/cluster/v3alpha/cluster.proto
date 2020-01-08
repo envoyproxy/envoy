@@ -628,7 +628,7 @@ message Cluster {
   CircuitBreakers circuit_breakers = 10;
 
   // HTTP protocol options that are applied only to upstream HTTP connections.
-  // These options apply to all HTTP versions
+  // These options apply to all HTTP versions.
   core.v3alpha.UpstreamHttpProtocolOptions upstream_http_protocol_options = 46;
 
   // Additional options when handling HTTP requests upstream. These options will be applicable to

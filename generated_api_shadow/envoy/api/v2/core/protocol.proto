@@ -20,8 +20,9 @@ message TcpProtocolOptions {
 }
 
 message UpstreamHttpProtocolOptions {
-  // Set transport socket SNI for new upstream connections based on the downstream HTTP
-  // host/authority header, as seen by the router filter
+  // Set transport socket `SNI <https://en.wikipedia.org/wiki/Server_Name_Indication>`_ for new
+  // upstream connections based on the downstream HTTP host/authority header, as seen by the
+  // :ref:`router filter <config_http_filters_router>`.
   bool auto_sni = 1;
 }
 

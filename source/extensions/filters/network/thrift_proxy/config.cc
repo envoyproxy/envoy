@@ -168,7 +168,7 @@ void ConfigImpl::processFilter(
       MessageUtil::getJsonStringFromMessage(proto_config.hidden_envoy_deprecated_config(), true));
   auto& factory =
       Envoy::Config::Utility::getAndCheckFactory<ThriftFilters::NamedThriftFilterConfigFactory>(
-          string_name);
+          proto_config);
 
   ProtobufTypes::MessagePtr message = Envoy::Config::Utility::translateToFactoryConfig(
       proto_config, context_.messageValidationVisitor(), factory);

@@ -49,7 +49,7 @@ private:
   std::string resourceName(const ProtobufWkt::Any& resource) override {
     return MessageUtil::anyConvert<envoy::config::cluster::v3alpha::Cluster>(resource).name();
   }
-  std::string loadTypeUrl();
+  static std::string loadTypeUrl(envoy::config::core::v3alpha::ApiVersion resource_api_version);
   CdsApiImpl(const envoy::config::core::v3alpha::ConfigSource& cds_config, ClusterManager& cm,
              Stats::Scope& scope, ProtobufMessage::ValidationVisitor& validation_visitor);
   void runInitializeCallbackIfAny();
@@ -60,7 +60,6 @@ private:
   std::function<void()> initialize_callback_;
   Stats::ScopePtr scope_;
   ProtobufMessage::ValidationVisitor& validation_visitor_;
-  envoy::config::core::v3alpha::ConfigSource::XdsApiVersion xds_api_version_;
 };
 
 } // namespace Upstream

@@ -46,9 +46,7 @@ TypeUrlToServiceMap* buildTypeUrlToServiceMap() {
     const auto* service_desc =
         Protobuf::DescriptorPool::generated_pool()->FindServiceByName(service_name);
     // TODO(htuch): this should become an ASSERT once all v3 descriptors are linked in.
-    if (service_desc == nullptr) {
-      continue;
-    }
+    ASSERT(service_desc != nullptr, fmt::format("{} missing", service_name));
     ASSERT(service_desc->options().HasExtension(envoy::annotations::resource));
     const std::string resource_type_url = Grpc::Common::typeUrl(
         service_desc->options().GetExtension(envoy::annotations::resource).type());
