@@ -24,7 +24,7 @@ TEST(OmitHostsRetryPredicateTest, PredicateTest) {
 
   ASSERT_NE(nullptr, factory);
 
-  envoy::config::retry::omit_host_metadata::v3alpha::OmitHostMetadataConfig config;
+  envoy::extensions::retry::omit_host_metadata::v3alpha::OmitHostMetadataConfig config;
   auto* metadata_match = config.mutable_metadata_match();
   Envoy::Config::Metadata::mutableMetadataValue(
       *metadata_match, Envoy::Config::MetadataFilters::get().ENVOY_LB, "key")
