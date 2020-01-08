@@ -7,6 +7,7 @@
 
 #include "envoy/config/cluster/v3alpha/cluster.pb.h"
 #include "envoy/config/core/v3alpha/base.pb.h"
+#include "envoy/config/core/v3alpha/health_check.pb.validate.h"
 
 #include "common/common/logger.h"
 #include "common/config/metadata.h"
