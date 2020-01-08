@@ -1,12 +1,12 @@
 syntax = "proto3";
 
-package envoy.extensions.retry.omit_host_metadata.v3alpha;
+package envoy.extensions.retry.host.omit_host_metadata.v3alpha;
 
 import "envoy/config/core/v3alpha/base.proto";
 
 import "udpa/annotations/versioning.proto";
 
-option java_package = "io.envoyproxy.envoy.extensions.retry.omit_host_metadata.v3alpha";
+option java_package = "io.envoyproxy.envoy.extensions.retry.host.omit_host_metadata.v3alpha";
 option java_outer_classname = "OmitHostMetadataConfigProto";
 option java_multiple_files = true;
 
