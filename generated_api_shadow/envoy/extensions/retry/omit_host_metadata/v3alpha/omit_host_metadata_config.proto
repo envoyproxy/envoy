@@ -23,5 +23,5 @@ message OmitHostMetadataConfig {
   // the upstream cluster with metadata matching will be omitted while
   // attempting retry of a failed request. The filter name should be
   // specified as *envoy.lb*.
-  envoy.config.core.v3alpha.Metadata metadata_match = 1;
+  config.core.v3alpha.Metadata metadata_match = 1;
 }
