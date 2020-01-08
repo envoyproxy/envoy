@@ -241,3 +241,37 @@ message ListenerFilter {
     ListenerFilterMatch disabled = 4;
   }
 }
+
+// Listener filter chain  match configuration. This is a recursive structure which allows complex
+// nested match configurations to be built using various logical operators.
+// [#next-free-field: 9]
+message MatchPredicate {
+  // A set of match configurations used for logical operations.
+  message MatchSet {
+    // The list of rules that make up the set.
+    repeated MatchPredicate rules = 1 [(validate.rules).repeated = {min_items: 2}];
+  }
+
+  oneof rule {
+    option (validate.required) = true;
+
+    // A set that describes a logical OR. If any member of the set matches, the match configuration
+    // matches.
+    MatchSet or_match = 1;
+
+    // A set that describes a logical AND. If all members of the set match, the match configuration
+    // matches.
+    MatchSet and_match = 2;
+
+    // A negation match. The match configuration will match if the negated match condition matches.
+    MatchPredicate not_match = 3;
+
+    // The match configuration will always match.
+    bool any_match = 4 [(validate.rules).bool = {const: true}];
+
+    // If it is not empty, the criteria is satisfied if the destination port of the connection is
+    // contained. Port value is natually at most one. Use set to avoid too many or_match.
+    repeated uint32 destination_ports = 5;
+    [(validate.rules).repeated = {items {uint32 {lte: 65535 gte: 0}}}];
+  }
+}
