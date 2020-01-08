@@ -5,14 +5,16 @@
 #include <string>
 #include <vector>
 
-#include "envoy/api/v2/core/base.pb.h"
+#include "envoy/config/core/v3alpha/base.pb.h"
 
 #include "common/common/assert.h"
+#include "common/common/empty_string.h"
 #include "common/common/fmt.h"
 #include "common/common/utility.h"
 #include "common/config/metadata.h"
 #include "common/http/utility.h"
 #include "common/protobuf/message_validator_impl.h"
+#include "common/protobuf/utility.h"
 #include "common/stream_info/utility.h"
 
 #include "absl/strings/str_split.h"
@@ -24,30 +26,10 @@ namespace Envoy {
 namespace AccessLog {
 
 static const std::string UnspecifiedValueString = "-";
-static const std::string EmptyString = "";
 
 namespace {
 
-const ProtobufWkt::Value& unspecifiedValue() {
-  static const auto* v = []() -> ProtobufWkt::Value* {
-    auto* vv = new ProtobufWkt::Value();
-    vv->set_null_value(ProtobufWkt::NULL_VALUE);
-    return vv;
-  }();
-  return *v;
-}
-
-ProtobufWkt::Value stringValue(const std::string& str) {
-  ProtobufWkt::Value val;
-  val.set_string_value(str);
-  return val;
-}
-
-template <typename T> ProtobufWkt::Value numberValue(const T num) {
-  ProtobufWkt::Value val;
-  val.set_number_value(static_cast<double>(num));
-  return val;
-}
+const ProtobufWkt::Value& unspecifiedValue() { return ValueUtil::nullValue(); }
 
 void truncate(std::string& str, absl::optional<uint32_t> max_length) {
   if (!max_length) {
@@ -129,14 +111,15 @@ ProtobufWkt::Struct JsonFormatterImpl::toStruct(const Http::HeaderMap& request_h
   auto* fields = output.mutable_fields();
   for (const auto& pair : json_output_format_) {
     const auto& providers = pair.second;
-    ASSERT(providers.size() >= 1);
+    ASSERT(!providers.empty());
 
     if (providers.size() == 1) {
       const auto& provider = providers.front();
-      auto val = preserve_types_ ? provider->formatValue(request_headers, response_headers,
-                                                         response_trailers, stream_info)
-                                 : stringValue(provider->format(request_headers, response_headers,
-                                                                response_trailers, stream_info));
+      auto val = preserve_types_
+                     ? provider->formatValue(request_headers, response_headers, response_trailers,
+                                             stream_info)
+                     : ValueUtil::stringValue(provider->format(request_headers, response_headers,
+                                                               response_trailers, stream_info));
 
       (*fields)[pair.first] = val;
     } else {
@@ -145,7 +128,7 @@ ProtobufWkt::Struct JsonFormatterImpl::toStruct(const Http::HeaderMap& request_h
       for (const auto& provider : providers) {
         str += provider->format(request_headers, response_headers, response_trailers, stream_info);
       }
-      (*fields)[pair.first] = stringValue(str);
+      (*fields)[pair.first] = ValueUtil::stringValue(str);
     }
   }
   return output;
@@ -333,7 +316,7 @@ public:
     return field_extractor_(stream_info);
   }
   ProtobufWkt::Value extractValue(const StreamInfo::StreamInfo& stream_info) const override {
-    return stringValue(field_extractor_(stream_info));
+    return ValueUtil::stringValue(field_extractor_(stream_info));
   }
 
 private:
@@ -362,7 +345,7 @@ public:
       return unspecifiedValue();
     }
 
-    return stringValue(str.value());
+    return ValueUtil::stringValue(str.value());
   }
 
 private:
@@ -392,7 +375,7 @@ public:
       return unspecifiedValue();
     }
 
-    return numberValue(millis.value());
+    return ValueUtil::numberValue(millis.value());
   }
 
 private:
@@ -419,7 +402,7 @@ public:
     return fmt::format_int(field_extractor_(stream_info)).str();
   }
   ProtobufWkt::Value extractValue(const StreamInfo::StreamInfo& stream_info) const override {
-    return numberValue(field_extractor_(stream_info));
+    return ValueUtil::numberValue(field_extractor_(stream_info));
   }
 
 private:
@@ -458,7 +441,7 @@ public:
       return unspecifiedValue();
     }
 
-    return stringValue(toString(*address));
+    return ValueUtil::stringValue(toString(*address));
   }
 
 private:
@@ -504,7 +487,7 @@ public:
       return unspecifiedValue();
     }
 
-    return stringValue(value);
+    return ValueUtil::stringValue(value);
   }
 
 private:
@@ -691,7 +674,7 @@ StreamInfoFormatter::StreamInfoFormatter(const std::string& field_name) {
         [](const Ssl::ConnectionInfo& connection_info) {
           absl::optional<SystemTime> time = connection_info.validFromPeerCertificate();
           if (!time.has_value()) {
-            return EmptyString;
+            return EMPTY_STRING;
           }
           return AccessLogDateTimeFormatter::fromTime(time.value());
         });
@@ -700,7 +683,7 @@ StreamInfoFormatter::StreamInfoFormatter(const std::string& field_name) {
         [](const Ssl::ConnectionInfo& connection_info) {
           absl::optional<SystemTime> time = connection_info.expirationPeerCertificate();
           if (!time.has_value()) {
-            return EmptyString;
+            return EMPTY_STRING;
           }
           return AccessLogDateTimeFormatter::fromTime(time.value());
         });
@@ -779,7 +762,7 @@ ProtobufWkt::Value HeaderFormatter::formatValue(const Http::HeaderMap& headers) 
 
   std::string val = std::string(header->value().getStringView());
   truncate(val, max_length_);
-  return stringValue(val);
+  return ValueUtil::stringValue(val);
 }
 
 ResponseHeaderFormatter::ResponseHeaderFormatter(const std::string& main_header,
@@ -843,7 +826,7 @@ MetadataFormatter::MetadataFormatter(const std::string& filter_namespace,
     : filter_namespace_(filter_namespace), path_(path), max_length_(max_length) {}
 
 std::string
-MetadataFormatter::formatMetadata(const envoy::api::v2::core::Metadata& metadata) const {
+MetadataFormatter::formatMetadata(const envoy::config::core::v3alpha::Metadata& metadata) const {
   ProtobufWkt::Value value = formatMetadataValue(metadata);
   if (value.kind_case() == ProtobufWkt::Value::kNullValue) {
     return UnspecifiedValueString;
@@ -854,8 +837,8 @@ MetadataFormatter::formatMetadata(const envoy::api::v2::core::Metadata& metadata
   return json;
 }
 
-ProtobufWkt::Value
-MetadataFormatter::formatMetadataValue(const envoy::api::v2::core::Metadata& metadata) const {
+ProtobufWkt::Value MetadataFormatter::formatMetadataValue(
+    const envoy::config::core::v3alpha::Metadata& metadata) const {
   if (path_.empty()) {
     const auto filter_it = metadata.filter_metadata().find(filter_namespace_);
     if (filter_it == metadata.filter_metadata().end()) {
@@ -962,7 +945,8 @@ std::string StartTimeFormatter::format(const Http::HeaderMap&, const Http::Heade
 ProtobufWkt::Value StartTimeFormatter::formatValue(
     const Http::HeaderMap& request_headers, const Http::HeaderMap& response_headers,
     const Http::HeaderMap& response_trailers, const StreamInfo::StreamInfo& stream_info) const {
-  return stringValue(format(request_headers, response_headers, response_trailers, stream_info));
+  return ValueUtil::stringValue(
+      format(request_headers, response_headers, response_trailers, stream_info));
 }
 
 } // namespace AccessLog

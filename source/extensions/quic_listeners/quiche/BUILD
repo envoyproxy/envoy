@@ -232,7 +232,7 @@ envoy_cc_library(
         ":envoy_quic_packet_writer_lib",
         "//include/envoy/event:dispatcher_interface",
         "//source/common/network:socket_option_factory_lib",
-        "@envoy_api//envoy/api/v2/core:pkg_cc_proto",
+        "@envoy_api//envoy/config/core/v3alpha:pkg_cc_proto",
     ],
 )
 
@@ -274,7 +274,7 @@ envoy_cc_library(
         "//source/common/network:listener_lib",
         "//source/common/protobuf:utility_lib",
         "//source/server:connection_handler_lib",
-        "@envoy_api//envoy/api/v2/listener:pkg_cc_proto",
+        "@envoy_api//envoy/config/listener/v3alpha:pkg_cc_proto",
     ],
 )
 
@@ -286,7 +286,7 @@ envoy_cc_library(
     deps = [
         ":active_quic_listener_lib",
         "//include/envoy/registry",
-        "@envoy_api//envoy/api/v2/listener:pkg_cc_proto",
+        "@envoy_api//envoy/config/listener/v3alpha:pkg_cc_proto",
     ],
 )
 
@@ -303,7 +303,7 @@ envoy_cc_library(
         "//source/common/network:listen_socket_lib",
         "//source/common/network:socket_option_factory_lib",
         "@com_googlesource_quiche//:quic_core_http_header_list_lib",
-        "@envoy_api//envoy/api/v2/core:pkg_cc_proto",
+        "@envoy_api//envoy/config/core/v3alpha:pkg_cc_proto",
     ],
 )
 
@@ -319,6 +319,6 @@ envoy_cc_library(
         "//source/common/common:assert_lib",
         "//source/extensions/transport_sockets:well_known_names",
         "//source/extensions/transport_sockets/tls:context_config_lib",
-        "@envoy_api//envoy/api/v2/auth:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/transport_sockets/tls/v3alpha:pkg_cc_proto",
     ],
 )

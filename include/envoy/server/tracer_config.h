@@ -1,6 +1,7 @@
 #pragma once
 
 #include "envoy/common/pure.h"
+#include "envoy/config/typed_config.h"
 #include "envoy/server/instance.h"
 #include "envoy/tracing/http_tracer.h"
 
@@ -14,7 +15,7 @@ namespace Configuration {
  * Implemented by each Tracer and registered via Registry::registerFactory() or the convenience
  * class RegisterFactory.
  */
-class TracerFactory {
+class TracerFactory : public Config::TypedFactory {
 public:
   virtual ~TracerFactory() = default;
 
@@ -29,24 +30,7 @@ public:
   virtual Tracing::HttpTracerPtr createHttpTracer(const Protobuf::Message& config,
                                                   Instance& server) PURE;
 
-  /**
-   * @return ProtobufTypes::MessagePtr create empty config proto message for v2. The tracing
-   *         config, which arrives in an opaque message, will be parsed into this empty proto.
-   */
-  virtual ProtobufTypes::MessagePtr createEmptyConfigProto() PURE;
-
-  /**
-   * Returns the identifying name for a particular implementation of tracer produced by the
-   * factory.
-   */
-  virtual std::string name() PURE;
-
-  /**
-   * @return std::string the identifying category name for objects
-   * created by this factory. Used for automatic registration with
-   * FactoryCategoryRegistry.
-   */
-  static std::string category() { return "tracers"; }
+  std::string category() const override { return "tracers"; }
 };
 
 } // namespace Configuration

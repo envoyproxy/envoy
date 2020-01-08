@@ -5,7 +5,7 @@
 #include <string>
 #include <vector>
 
-#include "envoy/api/v2/cds.pb.h"
+#include "envoy/config/cluster/v3alpha/cluster.pb.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/upstream/upstream.h"
 
@@ -97,9 +97,10 @@ LoadBalancerBase::choosePriority(uint64_t hash, const HealthyLoad& healthy_per_p
   NOT_REACHED_GCOVR_EXCL_LINE;
 }
 
-LoadBalancerBase::LoadBalancerBase(const PrioritySet& priority_set, ClusterStats& stats,
-                                   Runtime::Loader& runtime, Runtime::RandomGenerator& random,
-                                   const envoy::api::v2::Cluster::CommonLbConfig& common_config)
+LoadBalancerBase::LoadBalancerBase(
+    const PrioritySet& priority_set, ClusterStats& stats, Runtime::Loader& runtime,
+    Runtime::RandomGenerator& random,
+    const envoy::config::cluster::v3alpha::Cluster::CommonLbConfig& common_config)
     : stats_(stats), runtime_(runtime), random_(random),
       default_healthy_panic_percent_(PROTOBUF_PERCENT_TO_ROUNDED_INTEGER_OR_DEFAULT(
           common_config, healthy_panic_threshold, 100, 50)),
@@ -277,7 +278,7 @@ LoadBalancerBase::chooseHostSet(LoadBalancerContext* context) {
 ZoneAwareLoadBalancerBase::ZoneAwareLoadBalancerBase(
     const PrioritySet& priority_set, const PrioritySet* local_priority_set, ClusterStats& stats,
     Runtime::Loader& runtime, Runtime::RandomGenerator& random,
-    const envoy::api::v2::Cluster::CommonLbConfig& common_config)
+    const envoy::config::cluster::v3alpha::Cluster::CommonLbConfig& common_config)
     : LoadBalancerBase(priority_set, stats, runtime, random, common_config),
       local_priority_set_(local_priority_set),
       routing_enabled_(PROTOBUF_PERCENT_TO_ROUNDED_INTEGER_OR_DEFAULT(
@@ -629,7 +630,7 @@ const HostVector& ZoneAwareLoadBalancerBase::hostSourceToHosts(HostsSource hosts
 EdfLoadBalancerBase::EdfLoadBalancerBase(
     const PrioritySet& priority_set, const PrioritySet* local_priority_set, ClusterStats& stats,
     Runtime::Loader& runtime, Runtime::RandomGenerator& random,
-    const envoy::api::v2::Cluster::CommonLbConfig& common_config)
+    const envoy::config::cluster::v3alpha::Cluster::CommonLbConfig& common_config)
     : ZoneAwareLoadBalancerBase(priority_set, local_priority_set, stats, runtime, random,
                                 common_config),
       seed_(random_.random()) {
@@ -778,13 +779,14 @@ HostConstSharedPtr RandomLoadBalancer::chooseHostOnce(LoadBalancerContext* conte
 
 SubsetSelectorImpl::SubsetSelectorImpl(
     const Protobuf::RepeatedPtrField<std::string>& selector_keys,
-    envoy::api::v2::Cluster::LbSubsetConfig::LbSubsetSelector::LbSubsetSelectorFallbackPolicy
-        fallback_policy,
+    envoy::config::cluster::v3alpha::Cluster::LbSubsetConfig::LbSubsetSelector::
+        LbSubsetSelectorFallbackPolicy fallback_policy,
     const Protobuf::RepeatedPtrField<std::string>& fallback_keys_subset)
     : selector_keys_(selector_keys.begin(), selector_keys.end()), fallback_policy_(fallback_policy),
       fallback_keys_subset_(fallback_keys_subset.begin(), fallback_keys_subset.end()) {
 
-  if (fallback_policy_ != envoy::api::v2::Cluster::LbSubsetConfig::LbSubsetSelector::KEYS_SUBSET) {
+  if (fallback_policy_ !=
+      envoy::config::cluster::v3alpha::Cluster::LbSubsetConfig::LbSubsetSelector::KEYS_SUBSET) {
     // defining fallback_keys_subset_ for a fallback policy other than KEYS_SUBSET doesn't have
     // any effect and it is probably a user mistake. We should let the user know about it.
     if (!fallback_keys_subset_.empty()) {

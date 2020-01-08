@@ -49,6 +49,15 @@ const tools::type_whisperer::TypeDb& getApiTypeDb() {
 
 } // namespace
 
+absl::optional<TypeInformation>
+ApiTypeDb::getExistingTypeInformation(const std::string& type_name) {
+  auto it = getApiTypeDb().types().find(type_name);
+  if (it == getApiTypeDb().types().end()) {
+    return {};
+  }
+  return absl::make_optional<TypeInformation>(type_name, it->second.proto_path(), false);
+}
+
 absl::optional<TypeInformation> ApiTypeDb::getLatestTypeInformation(const std::string& type_name) {
   std::string latest_type_name;
   const tools::type_whisperer::TypeDbDescription* latest_type_desc{};
@@ -72,8 +81,10 @@ absl::optional<TypeInformation> ApiTypeDb::getLatestTypeInformation(const std::s
     for (int index = 0; index < enum_desc->value_count(); ++index) {
       const auto* value = enum_desc->value(index);
       if (value->options().HasExtension(udpa::annotations::enum_value_migrate)) {
-        result->field_renames_[value->name()] =
+        result->renames_[value->name()] =
             value->options().GetExtension(udpa::annotations::enum_value_migrate).rename();
+      } else if (value->options().deprecated()) {
+        result->renames_[value->name()] = "hidden_envoy_deprecated_" + value->name();
       }
     }
     return result;
@@ -85,8 +96,10 @@ absl::optional<TypeInformation> ApiTypeDb::getLatestTypeInformation(const std::s
     for (int index = 0; index < message_desc->field_count(); ++index) {
       const auto* field = message_desc->field(index);
       if (field->options().HasExtension(udpa::annotations::field_migrate)) {
-        result->field_renames_[field->name()] =
+        result->renames_[field->name()] =
             field->options().GetExtension(udpa::annotations::field_migrate).rename();
+      } else if (field->options().deprecated()) {
+        result->renames_[field->name()] = "hidden_envoy_deprecated_" + field->name();
       }
     }
     return result;

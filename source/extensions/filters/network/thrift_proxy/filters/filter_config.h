@@ -1,5 +1,6 @@
 #pragma once
 
+#include "envoy/config/typed_config.h"
 #include "envoy/server/filter_config.h"
 
 #include "common/common/macros.h"
@@ -17,7 +18,7 @@ namespace ThriftFilters {
  * Implemented by each Thrift filter and registered via Registry::registerFactory or the
  * convenience class RegisterFactory.
  */
-class NamedThriftFilterConfigFactory {
+class NamedThriftFilterConfigFactory : public Envoy::Config::TypedFactory {
 public:
   virtual ~NamedThriftFilterConfigFactory() = default;
 
@@ -34,25 +35,7 @@ public:
   createFilterFactoryFromProto(const Protobuf::Message& config, const std::string& stat_prefix,
                                Server::Configuration::FactoryContext& context) PURE;
 
-  /**
-   * @return ProtobufTypes::MessagePtr create empty config proto message for v2. The filter
-   *         config, which arrives in an opaque google.protobuf.Struct message, will be converted to
-   *         JSON and then parsed into this empty proto.
-   */
-  virtual ProtobufTypes::MessagePtr createEmptyConfigProto() PURE;
-
-  /**
-   * @return std::string the identifying name for a particular implementation of a thrift filter
-   * produced by the factory.
-   */
-  virtual std::string name() PURE;
-
-  /**
-   * @return std::string the identifying category name for objects
-   * created by this factory. Used for automatic registration with
-   * FactoryCategoryRegistry.
-   */
-  static std::string category() { return "thrift_proxy.filters"; }
+  std::string category() const override { return "thrift_proxy.filters"; }
 };
 
 } // namespace ThriftFilters

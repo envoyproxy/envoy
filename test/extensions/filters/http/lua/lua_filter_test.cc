@@ -1,6 +1,6 @@
 #include <memory>
 
-#include "envoy/api/v2/core/base.pb.h"
+#include "envoy/config/core/v3alpha/base.pb.h"
 
 #include "common/buffer/buffer_impl.h"
 #include "common/http/message_impl.h"
@@ -98,7 +98,7 @@ public:
   std::unique_ptr<TestFilter> filter_;
   Http::MockStreamDecoderFilterCallbacks decoder_callbacks_;
   Http::MockStreamEncoderFilterCallbacks encoder_callbacks_;
-  envoy::api::v2::core::Metadata metadata_;
+  envoy::config::core::v3alpha::Metadata metadata_;
   std::shared_ptr<NiceMock<Envoy::Ssl::MockConnectionInfo>> ssl_;
   NiceMock<Envoy::Network::MockConnection> connection_;
   NiceMock<Envoy::StreamInfo::MockStreamInfo> stream_info_;

@@ -9,9 +9,9 @@
 #include <string>
 #include <vector>
 
-#include "envoy/api/v2/core/base.pb.h"
-#include "envoy/api/v2/route/route.pb.h"
 #include "envoy/common/scope_tracker.h"
+#include "envoy/config/core/v3alpha/base.pb.h"
+#include "envoy/config/route/v3alpha/route_components.pb.h"
 #include "envoy/config/typed_metadata.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/http/async_client.h"
@@ -25,7 +25,7 @@
 #include "envoy/server/filter_config.h"
 #include "envoy/ssl/connection.h"
 #include "envoy/tracing/http_tracer.h"
-#include "envoy/type/percent.pb.h"
+#include "envoy/type/v3alpha/percent.pb.h"
 #include "envoy/upstream/load_balancer.h"
 #include "envoy/upstream/upstream.h"
 
@@ -100,12 +100,12 @@ private:
   struct NullHedgePolicy : public Router::HedgePolicy {
     // Router::HedgePolicy
     uint32_t initialRequests() const override { return 1; }
-    const envoy::type::FractionalPercent& additionalRequestChance() const override {
+    const envoy::type::v3alpha::FractionalPercent& additionalRequestChance() const override {
       return additional_request_chance_;
     }
     bool hedgeOnPerTryTimeout() const override { return false; }
 
-    const envoy::type::FractionalPercent additional_request_chance_;
+    const envoy::type::v3alpha::FractionalPercent additional_request_chance_;
   };
 
   struct NullRateLimitPolicy : public Router::RateLimitPolicy {
@@ -152,16 +152,6 @@ private:
     const std::vector<Http::HeaderMatcherSharedPtr> retriable_request_headers_{};
   };
 
-  struct NullShadowPolicy : public Router::ShadowPolicy {
-    // Router::ShadowPolicy
-    const std::string& cluster() const override { return EMPTY_STRING; }
-    const std::string& runtimeKey() const override { return EMPTY_STRING; }
-    const envoy::type::FractionalPercent& defaultValue() const override { return default_value_; }
-
-  private:
-    envoy::type::FractionalPercent default_value_;
-  };
-
   struct NullConfig : public Router::Config {
     Router::RouteConstSharedPtr route(const Http::HeaderMap&, const StreamInfo::StreamInfo&,
                                       uint64_t) const override {
@@ -202,10 +192,10 @@ private:
   };
 
   struct RouteEntryImpl : public Router::RouteEntry {
-    RouteEntryImpl(const std::string& cluster_name,
-                   const absl::optional<std::chrono::milliseconds>& timeout,
-                   const Protobuf::RepeatedPtrField<envoy::api::v2::route::RouteAction::HashPolicy>&
-                       hash_policy)
+    RouteEntryImpl(
+        const std::string& cluster_name, const absl::optional<std::chrono::milliseconds>& timeout,
+        const Protobuf::RepeatedPtrField<envoy::config::route::v3alpha::RouteAction::HashPolicy>&
+            hash_policy)
         : cluster_name_(cluster_name), timeout_(timeout) {
       if (!hash_policy.empty()) {
         hash_policy_ = std::make_unique<HashPolicyImpl>(hash_policy);
@@ -232,7 +222,9 @@ private:
     uint32_t retryShadowBufferLimit() const override {
       return std::numeric_limits<uint32_t>::max();
     }
-    const Router::ShadowPolicy& shadowPolicy() const override { return shadow_policy_; }
+    const std::vector<Router::ShadowPolicyPtr>& shadowPolicies() const override {
+      return shadow_policies_;
+    }
     std::chrono::milliseconds timeout() const override {
       if (timeout_) {
         return timeout_.value();
@@ -259,7 +251,7 @@ private:
     const Router::VirtualHost& virtualHost() const override { return virtual_host_; }
     bool autoHostRewrite() const override { return false; }
     bool includeVirtualHostRateLimits() const override { return true; }
-    const envoy::api::v2::core::Metadata& metadata() const override { return metadata_; }
+    const envoy::config::core::v3alpha::Metadata& metadata() const override { return metadata_; }
     const Config::TypedMetadata& typedMetadata() const override { return typed_metadata_; }
     const Router::PathMatchCriterion& pathMatchCriterion() const override {
       return path_match_criterion_;
@@ -279,10 +271,10 @@ private:
     static const NullHedgePolicy hedge_policy_;
     static const NullRateLimitPolicy rate_limit_policy_;
     static const NullRetryPolicy retry_policy_;
-    static const NullShadowPolicy shadow_policy_;
+    static const std::vector<Router::ShadowPolicyPtr> shadow_policies_;
     static const NullVirtualHost virtual_host_;
     static const std::multimap<std::string, std::string> opaque_config_;
-    static const envoy::api::v2::core::Metadata metadata_;
+    static const envoy::config::core::v3alpha::Metadata metadata_;
     // Async client doesn't require metadata.
     static const Config::TypedMetadataImpl<Config::TypedMetadataFactory> typed_metadata_;
     static const NullPathMatchCriterion path_match_criterion_;
@@ -294,10 +286,10 @@ private:
   };
 
   struct RouteImpl : public Router::Route {
-    RouteImpl(const std::string& cluster_name,
-              const absl::optional<std::chrono::milliseconds>& timeout,
-              const Protobuf::RepeatedPtrField<envoy::api::v2::route::RouteAction::HashPolicy>&
-                  hash_policy)
+    RouteImpl(
+        const std::string& cluster_name, const absl::optional<std::chrono::milliseconds>& timeout,
+        const Protobuf::RepeatedPtrField<envoy::config::route::v3alpha::RouteAction::HashPolicy>&
+            hash_policy)
         : route_entry_(cluster_name, timeout, hash_policy) {}
 
     // Router::Route

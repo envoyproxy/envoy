@@ -2,14 +2,17 @@
 
 #include <string>
 
-#include "envoy/api/v2/cds.pb.h"
-#include "envoy/api/v2/cds.pb.validate.h"
-#include "envoy/api/v2/core/config_source.pb.h"
-#include "envoy/api/v2/discovery.pb.h"
+#include "envoy/api/v2/cluster.pb.h"
+#include "envoy/config/cluster/v3alpha/cluster.pb.h"
+#include "envoy/config/cluster/v3alpha/cluster.pb.validate.h"
+#include "envoy/config/core/v3alpha/config_source.pb.h"
+#include "envoy/service/discovery/v3alpha/discovery.pb.h"
 #include "envoy/stats/scope.h"
 
+#include "common/common/assert.h"
 #include "common/common/cleanup.h"
 #include "common/common/utility.h"
+#include "common/config/api_version.h"
 #include "common/config/resources.h"
 #include "common/config/utility.h"
 #include "common/protobuf/utility.h"
@@ -19,36 +22,37 @@
 namespace Envoy {
 namespace Upstream {
 
-CdsApiPtr CdsApiImpl::create(const envoy::api::v2::core::ConfigSource& cds_config,
+CdsApiPtr CdsApiImpl::create(const envoy::config::core::v3alpha::ConfigSource& cds_config,
                              ClusterManager& cm, Stats::Scope& scope,
                              ProtobufMessage::ValidationVisitor& validation_visitor) {
   return CdsApiPtr{new CdsApiImpl(cds_config, cm, scope, validation_visitor)};
 }
 
-CdsApiImpl::CdsApiImpl(const envoy::api::v2::core::ConfigSource& cds_config, ClusterManager& cm,
-                       Stats::Scope& scope, ProtobufMessage::ValidationVisitor& validation_visitor)
+CdsApiImpl::CdsApiImpl(const envoy::config::core::v3alpha::ConfigSource& cds_config,
+                       ClusterManager& cm, Stats::Scope& scope,
+                       ProtobufMessage::ValidationVisitor& validation_visitor)
     : cm_(cm), scope_(scope.createScope("cluster_manager.cds.")),
       validation_visitor_(validation_visitor) {
   subscription_ = cm_.subscriptionFactory().subscriptionFromConfigSource(
-      cds_config, Grpc::Common::typeUrl(envoy::api::v2::Cluster().GetDescriptor()->full_name()),
-      *scope_, *this);
+      cds_config, loadTypeUrl(cds_config.resource_api_version()), *scope_, *this);
 }
 
 void CdsApiImpl::onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
                                 const std::string& version_info) {
   ClusterManager::ClusterInfoMap clusters_to_remove = cm_.clusters();
-  std::vector<envoy::api::v2::Cluster> clusters;
+  std::vector<envoy::config::cluster::v3alpha::Cluster> clusters;
   for (const auto& cluster_blob : resources) {
-    clusters.push_back(MessageUtil::anyConvert<envoy::api::v2::Cluster>(cluster_blob));
+    clusters.push_back(
+        MessageUtil::anyConvert<envoy::config::cluster::v3alpha::Cluster>(cluster_blob));
     clusters_to_remove.erase(clusters.back().name());
   }
   Protobuf::RepeatedPtrField<std::string> to_remove_repeated;
   for (const auto& cluster : clusters_to_remove) {
     *to_remove_repeated.Add() = cluster.first;
   }
-  Protobuf::RepeatedPtrField<envoy::api::v2::Resource> to_add_repeated;
+  Protobuf::RepeatedPtrField<envoy::service::discovery::v3alpha::Resource> to_add_repeated;
   for (const auto& cluster : clusters) {
-    envoy::api::v2::Resource* to_add = to_add_repeated.Add();
+    envoy::service::discovery::v3alpha::Resource* to_add = to_add_repeated.Add();
     to_add->set_name(cluster.name());
     to_add->set_version(version_info);
     to_add->mutable_resource()->PackFrom(cluster);
@@ -57,7 +61,7 @@ void CdsApiImpl::onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt::An
 }
 
 void CdsApiImpl::onConfigUpdate(
-    const Protobuf::RepeatedPtrField<envoy::api::v2::Resource>& added_resources,
+    const Protobuf::RepeatedPtrField<envoy::service::discovery::v3alpha::Resource>& added_resources,
     const Protobuf::RepeatedPtrField<std::string>& removed_resources,
     const std::string& system_version_info) {
   std::unique_ptr<Cleanup> maybe_eds_resume;
@@ -74,9 +78,10 @@ void CdsApiImpl::onConfigUpdate(
   std::unordered_set<std::string> cluster_names;
   bool any_applied = false;
   for (const auto& resource : added_resources) {
-    envoy::api::v2::Cluster cluster;
+    envoy::config::cluster::v3alpha::Cluster cluster;
     try {
-      cluster = MessageUtil::anyConvert<envoy::api::v2::Cluster>(resource.resource());
+      cluster =
+          MessageUtil::anyConvert<envoy::config::cluster::v3alpha::Cluster>(resource.resource());
       MessageUtil::validate(cluster, validation_visitor_);
       if (!cluster_names.insert(cluster.name()).second) {
         // NOTE: at this point, the first of these duplicates has already been successfully applied.
@@ -121,6 +126,21 @@ void CdsApiImpl::runInitializeCallbackIfAny() {
   if (initialize_callback_) {
     initialize_callback_();
     initialize_callback_ = nullptr;
+  }
+}
+
+std::string CdsApiImpl::loadTypeUrl(envoy::config::core::v3alpha::ApiVersion resource_api_version) {
+  switch (resource_api_version) {
+  // automatically set api version as V2
+  case envoy::config::core::v3alpha::ApiVersion::AUTO:
+  case envoy::config::core::v3alpha::ApiVersion::V2:
+    return Grpc::Common::typeUrl(
+        API_NO_BOOST(envoy::api::v2::Cluster().GetDescriptor()->full_name()));
+  case envoy::config::core::v3alpha::ApiVersion::V3ALPHA:
+    return Grpc::Common::typeUrl(
+        API_NO_BOOST(envoy::config::cluster::v3alpha::Cluster().GetDescriptor()->full_name()));
+  default:
+    NOT_REACHED_GCOVR_EXCL_LINE;
   }
 }
 

@@ -10,7 +10,7 @@
 #include "quiche/quic/test_tools/quic_dispatcher_peer.h"
 #include "quiche/quic/test_tools/crypto_test_utils.h"
 #include "quiche/quic/test_tools/quic_test_utils.h"
-#include "quiche/quic/platform/api/quic_text_utils.h"
+#include "quiche/common/platform/api/quiche_text_utils.h"
 #pragma GCC diagnostic pop
 
 #include <memory>

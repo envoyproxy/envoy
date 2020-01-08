@@ -2,6 +2,9 @@
 
 set -e
 
+# Workaround for argument too long issue in protoc
+ulimit -s 16384
+
 # bazel uses jgit internally and the default circle-ci .gitconfig says to
 # convert https://github.com to ssh://git@github.com, which jgit does not support.
 if [[ -e "~/.gitconfig" ]]; then

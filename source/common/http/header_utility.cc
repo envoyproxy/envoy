@@ -1,17 +1,24 @@
 #include "common/http/header_utility.h"
 
-#include "envoy/api/v2/route/route.pb.h"
+#include "envoy/config/route/v3alpha/route_components.pb.h"
 
 #include "common/common/regex.h"
 #include "common/common/utility.h"
 #include "common/http/header_map_impl.h"
 #include "common/protobuf/utility.h"
+#include "common/runtime/runtime_impl.h"
 
 #include "absl/strings/match.h"
 #include "nghttp2/nghttp2.h"
 
 namespace Envoy {
 namespace Http {
+
+struct SharedResponseCodeDetailsValues {
+  const absl::string_view InvalidAuthority = "http.invalid_authority";
+};
+
+using SharedResponseCodeDetails = ConstSingleton<SharedResponseCodeDetailsValues>;
 
 // HeaderMatcher will consist of:
 //   header_match_specifier which can be any one of exact_match, regex_match, range_match,
@@ -25,38 +32,41 @@ namespace Http {
 //   d.present_match: Match will succeed if the header is present.
 //   f.prefix_match: Match will succeed if header value matches the prefix value specified here.
 //   g.suffix_match: Match will succeed if header value matches the suffix value specified here.
-HeaderUtility::HeaderData::HeaderData(const envoy::api::v2::route::HeaderMatcher& config)
+HeaderUtility::HeaderData::HeaderData(const envoy::config::route::v3alpha::HeaderMatcher& config)
     : name_(config.name()), invert_match_(config.invert_match()) {
   switch (config.header_match_specifier_case()) {
-  case envoy::api::v2::route::HeaderMatcher::kExactMatch:
+  case envoy::config::route::v3alpha::HeaderMatcher::HeaderMatchSpecifierCase::kExactMatch:
     header_match_type_ = HeaderMatchType::Value;
     value_ = config.exact_match();
     break;
-  case envoy::api::v2::route::HeaderMatcher::kRegexMatch:
+  case envoy::config::route::v3alpha::HeaderMatcher::HeaderMatchSpecifierCase::
+      kHiddenEnvoyDeprecatedRegexMatch:
     header_match_type_ = HeaderMatchType::Regex;
-    regex_ = Regex::Utility::parseStdRegexAsCompiledMatcher(config.regex_match());
+    regex_ = Regex::Utility::parseStdRegexAsCompiledMatcher(
+        config.hidden_envoy_deprecated_regex_match());
     break;
-  case envoy::api::v2::route::HeaderMatcher::kSafeRegexMatch:
+  case envoy::config::route::v3alpha::HeaderMatcher::HeaderMatchSpecifierCase::kSafeRegexMatch:
     header_match_type_ = HeaderMatchType::Regex;
     regex_ = Regex::Utility::parseRegex(config.safe_regex_match());
     break;
-  case envoy::api::v2::route::HeaderMatcher::kRangeMatch:
+  case envoy::config::route::v3alpha::HeaderMatcher::HeaderMatchSpecifierCase::kRangeMatch:
     header_match_type_ = HeaderMatchType::Range;
     range_.set_start(config.range_match().start());
     range_.set_end(config.range_match().end());
     break;
-  case envoy::api::v2::route::HeaderMatcher::kPresentMatch:
+  case envoy::config::route::v3alpha::HeaderMatcher::HeaderMatchSpecifierCase::kPresentMatch:
     header_match_type_ = HeaderMatchType::Present;
     break;
-  case envoy::api::v2::route::HeaderMatcher::kPrefixMatch:
+  case envoy::config::route::v3alpha::HeaderMatcher::HeaderMatchSpecifierCase::kPrefixMatch:
     header_match_type_ = HeaderMatchType::Prefix;
     value_ = config.prefix_match();
     break;
-  case envoy::api::v2::route::HeaderMatcher::kSuffixMatch:
+  case envoy::config::route::v3alpha::HeaderMatcher::HeaderMatchSpecifierCase::kSuffixMatch:
     header_match_type_ = HeaderMatchType::Suffix;
     value_ = config.suffix_match();
     break;
-  case envoy::api::v2::route::HeaderMatcher::HEADER_MATCH_SPECIFIER_NOT_SET:
+  case envoy::config::route::v3alpha::HeaderMatcher::HeaderMatchSpecifierCase::
+      HEADER_MATCH_SPECIFIER_NOT_SET:
     FALLTHRU;
   default:
     header_match_type_ = HeaderMatchType::Present;
@@ -133,13 +143,13 @@ bool HeaderUtility::matchHeaders(const HeaderMap& request_headers, const HeaderD
 }
 
 bool HeaderUtility::headerIsValid(const absl::string_view header_value) {
-  return (nghttp2_check_header_value(reinterpret_cast<const uint8_t*>(header_value.data()),
-                                     header_value.size()) != 0);
+  return nghttp2_check_header_value(reinterpret_cast<const uint8_t*>(header_value.data()),
+                                    header_value.size()) != 0;
 }
 
 bool HeaderUtility::authorityIsValid(const absl::string_view header_value) {
-  return (nghttp2_check_authority(reinterpret_cast<const uint8_t*>(header_value.data()),
-                                  header_value.size()) != 0);
+  return nghttp2_check_authority(reinterpret_cast<const uint8_t*>(header_value.data()),
+                                 header_value.size()) != 0;
 }
 
 void HeaderUtility::addHeaders(HeaderMap& headers, const HeaderMap& headers_to_add) {
@@ -159,6 +169,16 @@ bool HeaderUtility::isEnvoyInternalRequest(const HeaderMap& headers) {
   const HeaderEntry* internal_request_header = headers.EnvoyInternalRequest();
   return internal_request_header != nullptr &&
          internal_request_header->value() == Headers::get().EnvoyInternalRequestValues.True;
+}
+
+absl::optional<std::reference_wrapper<const absl::string_view>>
+HeaderUtility::requestHeadersValid(const HeaderMap& headers) {
+  // Make sure the host is valid.
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.strict_authority_validation") &&
+      headers.Host() && !HeaderUtility::authorityIsValid(headers.Host()->value().getStringView())) {
+    return SharedResponseCodeDetails::get().InvalidAuthority;
+  }
+  return absl::nullopt;
 }
 
 } // namespace Http

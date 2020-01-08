@@ -3,7 +3,9 @@
 #include "envoy/api/v2/discovery.pb.h"
 #include "envoy/config/subscription.h"
 #include "envoy/event/dispatcher.h"
+#include "envoy/service/discovery/v3alpha/discovery.pb.h"
 
+#include "common/config/api_version.h"
 #include "common/http/rest_api_fetcher.h"
 
 namespace Envoy {
@@ -24,7 +26,7 @@ public:
                        const std::string& remote_cluster_name, Event::Dispatcher& dispatcher,
                        Runtime::RandomGenerator& random, std::chrono::milliseconds refresh_interval,
                        std::chrono::milliseconds request_timeout,
-                       const Protobuf::MethodDescriptor& service_method,
+                       const Protobuf::MethodDescriptor& service_method, absl::string_view type_url,
                        SubscriptionCallbacks& callbacks, SubscriptionStats stats,
                        std::chrono::milliseconds init_fetch_timeout,
                        ProtobufMessage::ValidationVisitor& validation_visitor);
@@ -45,7 +47,7 @@ private:
 
   std::string path_;
   Protobuf::RepeatedPtrField<std::string> resources_;
-  envoy::api::v2::DiscoveryRequest request_;
+  envoy::service::discovery::v3alpha::DiscoveryRequest request_;
   Config::SubscriptionCallbacks& callbacks_;
   SubscriptionStats stats_;
   Event::Dispatcher& dispatcher_;

@@ -31,7 +31,8 @@ Example filter configuration:
 .. code-block:: yaml
 
   name: envoy.filters.http.tap
-  config:
+  typed_config:
+    "@type": type.googleapis.com/envoy.config.filter.http.tap.v2alpha.Tap
     common_config:
       admin_config:
         config_id: test_config_id
@@ -187,7 +188,8 @@ An static filter configuration to enable streaming output looks like:
 .. code-block:: yaml
 
   name: envoy.filters.http.tap
-  config:
+  typed_config:
+    "@type": type.googleapis.com/envoy.config.filter.http.tap.v2alpha.Tap
     common_config:
       static_config:
         match_config:

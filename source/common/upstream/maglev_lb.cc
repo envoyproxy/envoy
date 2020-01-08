@@ -1,6 +1,6 @@
 #include "common/upstream/maglev_lb.h"
 
-#include "envoy/api/v2/cds.pb.h"
+#include "envoy/config/cluster/v3alpha/cluster.pb.h"
 
 namespace Envoy {
 namespace Upstream {
@@ -88,11 +88,11 @@ uint64_t MaglevTable::permutation(const TableBuildEntry& entry) {
   return (entry.offset_ + (entry.skip_ * entry.next_)) % table_size_;
 }
 
-MaglevLoadBalancer::MaglevLoadBalancer(const PrioritySet& priority_set, ClusterStats& stats,
-                                       Stats::Scope& scope, Runtime::Loader& runtime,
-                                       Runtime::RandomGenerator& random,
-                                       const envoy::api::v2::Cluster::CommonLbConfig& common_config,
-                                       uint64_t table_size)
+MaglevLoadBalancer::MaglevLoadBalancer(
+    const PrioritySet& priority_set, ClusterStats& stats, Stats::Scope& scope,
+    Runtime::Loader& runtime, Runtime::RandomGenerator& random,
+    const envoy::config::cluster::v3alpha::Cluster::CommonLbConfig& common_config,
+    uint64_t table_size)
     : ThreadAwareLoadBalancerBase(priority_set, stats, runtime, random, common_config),
       scope_(scope.createScope("maglev_lb.")), stats_(generateStats(*scope_)),
       table_size_(table_size) {}

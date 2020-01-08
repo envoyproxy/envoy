@@ -1,6 +1,6 @@
 #include "server/overload_manager_impl.h"
 
-#include "envoy/config/overload/v2alpha/overload.pb.h"
+#include "envoy/config/overload/v3alpha/overload.pb.h"
 #include "envoy/stats/scope.h"
 
 #include "common/common/fmt.h"
@@ -19,7 +19,7 @@ namespace {
 
 class ThresholdTriggerImpl : public OverloadAction::Trigger {
 public:
-  ThresholdTriggerImpl(const envoy::config::overload::v2alpha::ThresholdTrigger& config)
+  ThresholdTriggerImpl(const envoy::config::overload::v3alpha::ThresholdTrigger& config)
       : threshold_(config.value()) {}
 
   bool updateValue(double value) override {
@@ -50,7 +50,7 @@ Stats::Gauge& makeGauge(Stats::Scope& scope, absl::string_view a, absl::string_v
 
 } // namespace
 
-OverloadAction::OverloadAction(const envoy::config::overload::v2alpha::OverloadAction& config,
+OverloadAction::OverloadAction(const envoy::config::overload::v3alpha::OverloadAction& config,
                                Stats::Scope& stats_scope)
     : active_gauge_(
           makeGauge(stats_scope, config.name(), "active", Stats::Gauge::ImportMode::Accumulate)) {
@@ -58,7 +58,7 @@ OverloadAction::OverloadAction(const envoy::config::overload::v2alpha::OverloadA
     TriggerPtr trigger;
 
     switch (trigger_config.trigger_oneof_case()) {
-    case envoy::config::overload::v2alpha::Trigger::kThreshold:
+    case envoy::config::overload::v3alpha::Trigger::TriggerOneofCase::kThreshold:
       trigger = std::make_unique<ThresholdTriggerImpl>(trigger_config.threshold());
       break;
     default:
@@ -99,7 +99,7 @@ bool OverloadAction::isActive() const { return !fired_triggers_.empty(); }
 OverloadManagerImpl::OverloadManagerImpl(
     Event::Dispatcher& dispatcher, Stats::Scope& stats_scope,
     ThreadLocal::SlotAllocator& slot_allocator,
-    const envoy::config::overload::v2alpha::OverloadManager& config,
+    const envoy::config::overload::v3alpha::OverloadManager& config,
     ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api)
     : started_(false), dispatcher_(dispatcher), tls_(slot_allocator.allocateSlot()),
       refresh_interval_(
@@ -109,7 +109,7 @@ OverloadManagerImpl::OverloadManagerImpl(
     const auto& name = resource.name();
     ENVOY_LOG(debug, "Adding resource monitor for {}", name);
     auto& factory =
-        Config::Utility::getAndCheckFactory<Configuration::ResourceMonitorFactory>(name);
+        Config::Utility::getAndCheckFactory<Configuration::ResourceMonitorFactory>(resource);
     auto config = Config::Utility::translateToFactoryConfig(resource, validation_visitor, factory);
     auto monitor = factory.createResourceMonitor(*config, context);
 

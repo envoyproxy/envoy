@@ -24,7 +24,7 @@ proto_cc_source = rule(
             doc = "List of all text protos to be included.",
         ),
         "proto_repositories": attr.string_list(
-            default = ["envoy_api"],
+            default = ["envoy_api_canonical"],
             allow_empty = False,
         ),
         "_proto_cc_source_gen": attr.label(

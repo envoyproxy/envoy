@@ -1,11 +1,12 @@
 #pragma once
 
-#include "envoy/config/bootstrap/v2/bootstrap.pb.h"
-#include "envoy/config/metrics/v2/stats.pb.h"
+#include "envoy/config/bootstrap/v3alpha/bootstrap.pb.h"
+#include "envoy/config/metrics/v3alpha/stats.pb.h"
 
 #include "common/json/json_loader.h"
 
 #include "test/integration/http_protocol_integration.h"
+#include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
 
@@ -18,9 +19,9 @@ public:
     HttpIntegrationTest::initialize();
   }
 
-  void initialize(envoy::config::metrics::v2::StatsMatcher stats_matcher) {
+  void initialize(envoy::config::metrics::v3alpha::StatsMatcher stats_matcher) {
     config_helper_.addConfigModifier(
-        [stats_matcher](envoy::config::bootstrap::v2::Bootstrap& bootstrap) -> void {
+        [stats_matcher](envoy::config::bootstrap::v3alpha::Bootstrap& bootstrap) -> void {
           *bootstrap.mutable_stats_config()->mutable_stats_matcher() = stats_matcher;
         });
     initialize();
@@ -45,7 +46,7 @@ public:
   /**
    * Validates that the passed in string conforms to output of stats in JSON format.
    */
-  void validateStatsJson(const std::string stats_json, const uint64_t expected_hist_count) {
+  void validateStatsJson(const std::string& stats_json, const uint64_t expected_hist_count) {
     Json::ObjectSharedPtr statsjson = Json::Factory::loadFromString(stats_json);
     EXPECT_TRUE(statsjson->hasObject("stats"));
     uint64_t histogram_count = 0;

@@ -1,8 +1,8 @@
 #pragma once
 
-#include "envoy/data/tap/v2alpha/transport.pb.h"
+#include "envoy/config/tap/v3alpha/common.pb.h"
+#include "envoy/data/tap/v3alpha/transport.pb.h"
 #include "envoy/event/timer.h"
-#include "envoy/service/tap/v2alpha/common.pb.h"
 
 #include "extensions/common/tap/tap_config_base.h"
 #include "extensions/transport_sockets/tap/tap_config.h"
@@ -22,8 +22,8 @@ public:
   void onWrite(const Buffer::Instance& data, uint32_t bytes_written, bool end_stream) override;
 
 private:
-  void initEvent(envoy::data::tap::v2alpha::SocketEvent&);
-  void fillConnectionInfo(envoy::data::tap::v2alpha::Connection& connection);
+  void initEvent(envoy::data::tap::v3alpha::SocketEvent&);
+  void fillConnectionInfo(envoy::data::tap::v3alpha::Connection& connection);
   void makeBufferedTraceIfNeeded() {
     if (buffered_trace_ == nullptr) {
       buffered_trace_ = Extensions::Common::Tap::makeTraceWrapper();
@@ -50,7 +50,7 @@ class SocketTapConfigImpl : public Extensions::Common::Tap::TapConfigBaseImpl,
                             public SocketTapConfig,
                             public std::enable_shared_from_this<SocketTapConfigImpl> {
 public:
-  SocketTapConfigImpl(envoy::service::tap::v2alpha::TapConfig&& proto_config,
+  SocketTapConfigImpl(envoy::config::tap::v3alpha::TapConfig&& proto_config,
                       Extensions::Common::Tap::Sink* admin_streamer, TimeSource& time_system)
       : Extensions::Common::Tap::TapConfigBaseImpl(std::move(proto_config), admin_streamer),
         time_source_(time_system) {}

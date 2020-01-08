@@ -5,9 +5,11 @@
 #include "envoy/event/dispatcher.h"
 #include "envoy/grpc/status.h"
 #include "envoy/local_info/local_info.h"
+#include "envoy/service/discovery/v3alpha/discovery.pb.h"
 
 #include "common/common/assert.h"
 #include "common/common/logger.h"
+#include "common/config/api_version.h"
 #include "common/config/pausable_ack_queue.h"
 
 namespace Envoy {
@@ -33,21 +35,24 @@ public:
 
   void markStreamFresh() { any_request_sent_yet_in_current_stream_ = false; }
 
-  UpdateAck handleResponse(const envoy::api::v2::DeltaDiscoveryResponse& message);
+  UpdateAck
+  handleResponse(const envoy::service::discovery::v3alpha::DeltaDiscoveryResponse& message);
 
   void handleEstablishmentFailure();
 
   // Returns the next gRPC request proto to be sent off to the server, based on this object's
   // understanding of the current protocol state, and new resources that Envoy wants to request.
-  envoy::api::v2::DeltaDiscoveryRequest getNextRequestAckless();
+  envoy::service::discovery::v3alpha::DeltaDiscoveryRequest getNextRequestAckless();
   // The WithAck version first calls the Ack-less version, then adds in the passed-in ack.
-  envoy::api::v2::DeltaDiscoveryRequest getNextRequestWithAck(const UpdateAck& ack);
+  envoy::service::discovery::v3alpha::DeltaDiscoveryRequest
+  getNextRequestWithAck(const UpdateAck& ack);
 
   DeltaSubscriptionState(const DeltaSubscriptionState&) = delete;
   DeltaSubscriptionState& operator=(const DeltaSubscriptionState&) = delete;
 
 private:
-  void handleGoodResponse(const envoy::api::v2::DeltaDiscoveryResponse& message);
+  void
+  handleGoodResponse(const envoy::service::discovery::v3alpha::DeltaDiscoveryResponse& message);
   void handleBadResponse(const EnvoyException& e, UpdateAck& ack);
   void disableInitFetchTimeoutTimer();
 
