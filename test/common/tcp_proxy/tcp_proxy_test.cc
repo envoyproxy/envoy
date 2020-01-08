@@ -5,6 +5,7 @@
 #include <utility>
 #include <vector>
 
+#include "envoy/config/core/v3alpha/health_check.pb.validate.h"
 #include "envoy/config/filter/accesslog/v3alpha/accesslog.pb.h"
 #include "envoy/extensions/access_loggers/grpc/v3alpha/file.pb.h"
 #include "envoy/extensions/filters/network/tcp_proxy/v3alpha/tcp_proxy.pb.h"

@@ -1,3 +1,5 @@
+#include "envoy/config/core/v3alpha/health_check.pb.validate.h"
+
 #include "common/network/utility.h"
 #include "common/upstream/host_utility.h"
 #include "common/upstream/upstream_impl.h"

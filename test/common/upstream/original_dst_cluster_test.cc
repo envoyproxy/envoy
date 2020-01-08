@@ -5,6 +5,7 @@
 #include <vector>
 
 #include "envoy/config/cluster/v3alpha/cluster.pb.h"
+#include "envoy/config/core/v3alpha/health_check.pb.validate.h"
 #include "envoy/stats/scope.h"
 
 #include "common/network/address_impl.h"

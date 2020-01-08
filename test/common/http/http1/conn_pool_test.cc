@@ -1,6 +1,7 @@
 #include <memory>
 #include <vector>
 
+#include "envoy/config/core/v3alpha/health_check.pb.validate.h"
 #include "envoy/http/codec.h"
 
 #include "common/buffer/buffer_impl.h"

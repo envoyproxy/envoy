@@ -1,5 +1,7 @@
 #include <memory>
 
+#include "envoy/config/core/v3alpha/health_check.pb.validate.h"
+
 #include "source/extensions/clusters/redis/redis_cluster_lb.h"
 
 #include "extensions/filters/network/common/redis/client.h"
