@@ -8,7 +8,7 @@ option java_multiple_files = true;
 option java_generic_services = true;
 
 import "envoy/admin/v3alpha/config_dump.proto";
-import "envoy/envoy/config/core/v3alpha/base.proto";
+import "envoy/config/core/v3alpha/base.proto";
 
 import "google/api/annotations.proto";
 import "google/protobuf/struct.proto";
@@ -86,7 +86,7 @@ message ClientConfig {
       "envoy.service.status.v2.ClientConfig";
 
   // Node identifier for a particular client.
-  api.v3alpha.core.Node node = 1;
+  config.core.v3alpha.Node node = 1;
 
   repeated PerXdsConfig xds_config = 2;
 }
