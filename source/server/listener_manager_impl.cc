@@ -89,9 +89,13 @@ std::vector<Network::FilterFactoryCb> ProdListenerComponentFactory::createNetwor
     const auto& proto_config = filters[i];
     ENVOY_LOG(debug, "  filter #{}:", i);
     ENVOY_LOG(debug, "    name: {}", proto_config.name());
-    ENVOY_LOG(
-        debug, "  config: {}",
-        MessageUtil::getJsonStringFromMessage(proto_config.hidden_envoy_deprecated_config(), true));
+    ENVOY_LOG(debug, "  config: {}",
+              MessageUtil::getJsonStringFromMessage(
+                  proto_config.has_typed_config()
+                      ? static_cast<const Protobuf::Message&>(proto_config.typed_config())
+                      : static_cast<const Protobuf::Message&>(
+                            proto_config.hidden_envoy_deprecated_config()),
+                  true));
 
     // Now see if there is a factory that will accept the config.
     auto& factory =
@@ -118,9 +122,13 @@ ProdListenerComponentFactory::createListenerFilterFactoryList_(
     const auto& proto_config = filters[i];
     ENVOY_LOG(debug, "  filter #{}:", i);
     ENVOY_LOG(debug, "    name: {}", proto_config.name());
-    ENVOY_LOG(
-        debug, "  config: {}",
-        MessageUtil::getJsonStringFromMessage(proto_config.hidden_envoy_deprecated_config(), true));
+    ENVOY_LOG(debug, "  config: {}",
+              MessageUtil::getJsonStringFromMessage(
+                  proto_config.has_typed_config()
+                      ? static_cast<const Protobuf::Message&>(proto_config.typed_config())
+                      : static_cast<const Protobuf::Message&>(
+                            proto_config.hidden_envoy_deprecated_config()),
+                  true));
 
     // Now see if there is a factory that will accept the config.
     auto& factory =
@@ -142,9 +150,13 @@ ProdListenerComponentFactory::createUdpListenerFilterFactoryList_(
     const auto& proto_config = filters[i];
     ENVOY_LOG(debug, "  filter #{}:", i);
     ENVOY_LOG(debug, "    name: {}", proto_config.name());
-    ENVOY_LOG(
-        debug, "  config: {}",
-        MessageUtil::getJsonStringFromMessage(proto_config.hidden_envoy_deprecated_config(), true));
+    ENVOY_LOG(debug, "  config: {}",
+              MessageUtil::getJsonStringFromMessage(
+                  proto_config.has_typed_config()
+                      ? static_cast<const Protobuf::Message&>(proto_config.typed_config())
+                      : static_cast<const Protobuf::Message&>(
+                            proto_config.hidden_envoy_deprecated_config()),
+                  true));
 
     // Now see if there is a factory that will accept the config.
     auto& factory =

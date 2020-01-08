@@ -94,7 +94,9 @@ public:
   }
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return ProtobufTypes::MessagePtr{new Envoy::ProtobufWkt::Empty()};
+    // Using Struct instead of a custom per-filter empty config proto
+    // This is only allowed in tests.
+    return ProtobufTypes::MessagePtr{new Envoy::ProtobufWkt::Struct()};
   }
 
   std::string name() const override { CONSTRUCT_ON_FIRST_USE(std::string, "envoy.test.router"); }

@@ -337,7 +337,9 @@ public:
   }
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return std::make_unique<Envoy::ProtobufWkt::Empty>();
+    // Using Struct instead of a custom per-filter empty config proto
+    // This is only allowed in tests.
+    return std::make_unique<Envoy::ProtobufWkt::Struct>();
   }
 
   std::string name() const override { return "non_terminal"; }
@@ -410,7 +412,9 @@ public:
   }
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return std::make_unique<Envoy::ProtobufWkt::Empty>();
+    // Using Struct instead of a custom per-filter empty config proto
+    // This is only allowed in tests.
+    return std::make_unique<Envoy::ProtobufWkt::Struct>();
   }
 
   std::string name() const override { return "stats_test"; }
@@ -3155,7 +3159,9 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, OriginalDstTestFilter) {
     }
 
     ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-      return std::make_unique<Envoy::ProtobufWkt::Empty>();
+      // Using Struct instead of a custom per-filter empty config proto
+      // This is only allowed in tests.
+      return std::make_unique<Envoy::ProtobufWkt::Struct>();
     }
 
     std::string name() const override { return "test.listener.original_dst"; }
@@ -3229,7 +3235,9 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, OriginalDstTestFilterIPv6) {
     }
 
     ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-      return std::make_unique<Envoy::ProtobufWkt::Empty>();
+      // Using Struct instead of a custom per-filter empty config proto
+      // This is only allowed in tests.
+      return std::make_unique<Envoy::ProtobufWkt::Struct>();
     }
 
     std::string name() const override { return "test.listener.original_dstipv6"; }

@@ -4,6 +4,7 @@
 #include "envoy/config/cluster/v3alpha/cluster.pb.h"
 #include "envoy/config/core/v3alpha/config_source.pb.h"
 #include "envoy/config/core/v3alpha/grpc_service.pb.h"
+#include "envoy/extensions/filters/http/cors/v3alpha/cors.pb.h"
 
 #include "common/common/fmt.h"
 #include "common/config/api_version.h"
@@ -458,6 +459,18 @@ TEST(UtilityTest, TypedStructToInvalidType) {
       Utility::translateOpaqueConfig(typed_config, ProtobufWkt::Struct(),
                                      ProtobufMessage::getStrictValidationVisitor(), out),
       EnvoyException, "Unable to parse JSON as proto");
+}
+
+// Verify that ProtobufWkt::Empty can load into a typed factory with an empty config proto
+TEST(UtilityTest, EmptyToEmptyConfig) {
+  ProtobufWkt::Any typed_config;
+  ProtobufWkt::Empty empty_config;
+  typed_config.PackFrom(empty_config);
+
+  envoy::extensions::filters::http::cors::v3alpha::Cors out;
+  Utility::translateOpaqueConfig(typed_config, ProtobufWkt::Struct(),
+                                 ProtobufMessage::getStrictValidationVisitor(), out);
+  EXPECT_THAT(out, ProtoEq(envoy::extensions::filters::http::cors::v3alpha::Cors()));
 }
 
 TEST(CheckApiConfigSourceSubscriptionBackingClusterTest, GrpcClusterTestAcrossTypes) {
