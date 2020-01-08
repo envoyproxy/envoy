@@ -261,21 +261,17 @@ private:
     StatNameHashSet rejected_stats_;
   };
 
-  struct CentralCacheEntry {
-    // We need to support default-construction and also a move-constructor, which
-    // is used during scope destruction, where we detach the central cache data
-    // from the scope so it can be destroyed after the TLS caches.
-    CentralCacheEntry() = default;
-    CentralCacheEntry(CentralCacheEntry&& src)
-        : counters_(std::move(src.counters_)), gauges_(std::move(src.gauges_)),
-          histograms_(std::move(src.histograms_)), rejected_stats_(std::move(src.rejected_stats_)) {
-    }
+  struct CentralCacheEntry : public RefcountHelper {
+    explicit CentralCacheEntry(SymbolTable& symbol_table) : symbol_table_(symbol_table) {}
+    ~CentralCacheEntry();
 
     StatNameHashMap<CounterSharedPtr> counters_;
     StatNameHashMap<GaugeSharedPtr> gauges_;
     StatNameHashMap<ParentHistogramImplSharedPtr> histograms_;
     StatNameStorageSet rejected_stats_;
+    SymbolTable& symbol_table_;
   };
+  using CentralCacheEntrySharedPtr = RefcountPtr<CentralCacheEntry>;
 
   struct ScopeImpl : public TlsScope {
     ScopeImpl(ThreadLocalStoreImpl& parent, const std::string& prefix);
@@ -359,10 +355,12 @@ private:
     const uint64_t scope_id_;
     ThreadLocalStoreImpl& parent_;
     StatNameStorage prefix_;
-    mutable CentralCacheEntry central_cache_;
+    mutable CentralCacheEntrySharedPtr central_cache_;
   };
 
   struct TlsCache : public ThreadLocal::ThreadLocalObject {
+    void eraseScope(uint64_t scope_id);
+
     // The TLS scope cache is keyed by scope ID. This is used to avoid complex circular references
     // during scope destruction. An ID is required vs. using the address of the scope pointer
     // because it's possible that the memory allocator will recycle the scope pointer immediately
@@ -374,7 +372,7 @@ private:
   };
 
   std::string getTagsForName(const std::string& name, std::vector<Tag>& tags) const;
-  void clearScopeFromCaches(uint64_t scope_id, const Event::PostCb& clean_central_cache);
+  void clearScopeFromCaches(uint64_t scope_id, CentralCacheEntrySharedPtr central_cache);
   void releaseScopeCrossThread(ScopeImpl* scope);
   void mergeInternal(PostMergeCb merge_cb);
   bool rejects(StatName name) const;
@@ -414,7 +412,6 @@ private:
   std::vector<GaugeSharedPtr> deleted_gauges_;
   std::vector<HistogramSharedPtr> deleted_histograms_;
 
-  absl::flat_hash_set<CentralCacheEntry*> central_cache_purgatory_ GUARDED_BY(lock_);
   Thread::ThreadSynchronizer sync_;
 };
 

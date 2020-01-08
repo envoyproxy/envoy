@@ -33,10 +33,6 @@ ThreadLocalStoreImpl::~ThreadLocalStoreImpl() {
   ASSERT(shutting_down_ || !threading_ever_initialized_);
   default_scope_.reset();
   ASSERT(scopes_.empty());
-  for (CentralCacheEntry* central_cache : central_cache_purgatory_) {
-    central_cache->rejected_stats_.free(symbolTable());
-    delete central_cache;
-  }
 }
 
 void ThreadLocalStoreImpl::setStatsMatcher(StatsMatcherPtr&& stats_matcher) {
@@ -51,9 +47,9 @@ void ThreadLocalStoreImpl::setStatsMatcher(StatsMatcherPtr&& stats_matcher) {
   // be no copies in TLS caches.
   Thread::LockGuard lock(lock_);
   for (ScopeImpl* scope : scopes_) {
-    removeRejectedStats(scope->central_cache_.counters_, deleted_counters_);
-    removeRejectedStats(scope->central_cache_.gauges_, deleted_gauges_);
-    removeRejectedStats(scope->central_cache_.histograms_, deleted_histograms_);
+    removeRejectedStats(scope->central_cache_->counters_, deleted_counters_);
+    removeRejectedStats(scope->central_cache_->gauges_, deleted_gauges_);
+    removeRejectedStats(scope->central_cache_->histograms_, deleted_histograms_);
   }
 }
 
@@ -97,7 +93,7 @@ std::vector<CounterSharedPtr> ThreadLocalStoreImpl::counters() const {
   StatNameHashSet names;
   Thread::LockGuard lock(lock_);
   for (ScopeImpl* scope : scopes_) {
-    for (auto& counter : scope->central_cache_.counters_) {
+    for (auto& counter : scope->central_cache_->counters_) {
       if (names.insert(counter.first).second) {
         ret.push_back(counter.second);
       }
@@ -120,7 +116,7 @@ std::vector<GaugeSharedPtr> ThreadLocalStoreImpl::gauges() const {
   StatNameHashSet names;
   Thread::LockGuard lock(lock_);
   for (ScopeImpl* scope : scopes_) {
-    for (auto& gauge_iter : scope->central_cache_.gauges_) {
+    for (auto& gauge_iter : scope->central_cache_->gauges_) {
       const GaugeSharedPtr& gauge = gauge_iter.second;
       if (gauge->importMode() != Gauge::ImportMode::Uninitialized &&
           names.insert(gauge_iter.first).second) {
@@ -141,7 +137,7 @@ std::vector<ParentHistogramSharedPtr> ThreadLocalStoreImpl::histograms() const {
   // in histograms with duplicate names, but until shared storage is implemented it's ultimately
   // less confusing for users who have such configs.
   for (ScopeImpl* scope : scopes_) {
-    for (const auto& name_histogram_pair : scope->central_cache_.histograms_) {
+    for (const auto& name_histogram_pair : scope->central_cache_->histograms_) {
       const ParentHistogramSharedPtr& parent_hist = name_histogram_pair.second;
       ret.push_back(parent_hist);
     }
@@ -196,6 +192,10 @@ void ThreadLocalStoreImpl::mergeInternal(PostMergeCb merge_complete_cb) {
   }
 }
 
+ThreadLocalStoreImpl::CentralCacheEntry::~CentralCacheEntry() {
+  rejected_stats_.free(symbol_table_);
+}
+
 void ThreadLocalStoreImpl::releaseScopeCrossThread(ScopeImpl* scope) {
   Thread::ReleasableLockGuard lock(lock_);
   ASSERT(scopes_.count(scope) == 1);
@@ -204,61 +204,42 @@ void ThreadLocalStoreImpl::releaseScopeCrossThread(ScopeImpl* scope) {
   // This method is called directly from the ScopeImpl destructor, but we can't
   // destroy scope->central_cache_ until all the TLS caches are be destroyed, as
   // the TLS caches reference the Counters and Gauges owned by the central
-  // cache. We don't want the TLS caches to bump the reference-count, as
-  // decrementing the count requires an allocator lock, which would cause a
-  // storm of contention during scope destruction.
+  // cache. We don't want the maps in the TLS caches to bump the
+  // reference-count, as decrementing the count requires an allocator lock,
+  // which would cause a storm of contention during scope destruction.
   //
   // So instead we have a 2-phase destroy:
   //   1. destroy all the TLS caches
   //   2. destroy the central cache.
   //
-  // Since this is called from ScopeImpl's destructor, we must move the central
-  // cache storage out of the ScopeImpl and into an explicitly managed
-  // pointer. We use a raw pointer here as it's easier to capture it in the
-  // lambda.
-  CentralCacheEntry* central_cache = new CentralCacheEntry(std::move(scope->central_cache_));
+  // Since this is called from ScopeImpl's destructor, we must bump the
+  // ref-count of the central-cache by copying to a local scoped pointer, and
+  // keep that reference alive until all the TLS caches are clear.
+  CentralCacheEntrySharedPtr central_cache = scope->central_cache_;
 
   // This can happen from any thread. We post() back to the main thread which will initiate the
   // cache flush operation.
   if (!shutting_down_ && main_thread_dispatcher_) {
     const uint64_t scope_id = scope->scope_id_;
-
-    // The deferred cleanup of the central cache happens by post(), and it's
-    // possible that post() will not run, such as when an exception is thrown
-    // during startup. To avoid leaking memory and thus failing tests when this
-    // occurs, we hold the central cache in 'purgatory', so it can be cleared
-    // out in the ThreadLocalStoreImpl destructor. We'd prefer to release the
-    // memory immediately, however, in which case we remove the central cache
-    // object from purgatory.
-    central_cache_purgatory_.insert(central_cache);
-    auto clean_central_cache = [this, central_cache]() {
-      {
-        Thread::LockGuard lock(lock_);
-        central_cache_purgatory_.erase(central_cache);
-      }
-      central_cache->rejected_stats_.free(symbolTable());
-      delete central_cache;
-    };
     lock.release();
-    main_thread_dispatcher_->post([this, clean_central_cache, scope_id]() {
+    main_thread_dispatcher_->post([this, central_cache, scope_id]() {
       sync_.syncPoint(MainDispatcherCleanupSync);
-      clearScopeFromCaches(scope_id, clean_central_cache);
+      clearScopeFromCaches(scope_id, central_cache);
     });
-  } else {
-    central_cache->rejected_stats_.free(symbolTable());
-    delete central_cache;
   }
 }
 
+void ThreadLocalStoreImpl::TlsCache::eraseScope(uint64_t scope_id) { scope_cache_.erase(scope_id); }
+
 void ThreadLocalStoreImpl::clearScopeFromCaches(uint64_t scope_id,
-                                                const Event::PostCb& clean_central_cache) {
+                                                CentralCacheEntrySharedPtr central_cache) {
   // If we are shutting down we no longer perform cache flushes as workers may be shutting down
   // at the same time.
   if (!shutting_down_) {
     // Perform a cache flush on all threads.
     tls_->runOnAllThreads(
-        [this, scope_id]() -> void { tls_->getTyped<TlsCache>().scope_cache_.erase(scope_id); },
-        clean_central_cache);
+        [this, scope_id]() { tls_->getTyped<TlsCache>().eraseScope(scope_id); },
+        [central_cache]() { /* Holds onto central_cache until all tls caches are clear */ });
   }
 }
 
@@ -266,7 +247,9 @@ std::atomic<uint64_t> ThreadLocalStoreImpl::ScopeImpl::next_scope_id_;
 
 ThreadLocalStoreImpl::ScopeImpl::ScopeImpl(ThreadLocalStoreImpl& parent, const std::string& prefix)
     : scope_id_(next_scope_id_++), parent_(parent),
-      prefix_(Utility::sanitizeStatsName(prefix), parent.symbolTable()) {}
+      prefix_(Utility::sanitizeStatsName(prefix), parent.symbolTable()),
+      // central_cache_(std::make_shared<CentralCacheEntry>(parent.symbolTable())) {}
+      central_cache_(new CentralCacheEntry(parent.symbolTable())) {}
 
 ThreadLocalStoreImpl::ScopeImpl::~ScopeImpl() {
   parent_.releaseScopeCrossThread(this);
@@ -407,7 +390,7 @@ Counter& ThreadLocalStoreImpl::ScopeImpl::counterFromStatName(StatName name) {
   }
 
   return safeMakeStat<Counter>(
-      final_stat_name, central_cache_.counters_, central_cache_.rejected_stats_,
+      final_stat_name, central_cache_->counters_, central_cache_->rejected_stats_,
       [](Allocator& allocator, StatName name, absl::string_view tag_extracted_name,
          const std::vector<Tag>& tags) -> CounterSharedPtr {
         return allocator.makeCounter(name, tag_extracted_name, tags);
@@ -457,7 +440,7 @@ Gauge& ThreadLocalStoreImpl::ScopeImpl::gaugeFromStatName(StatName name,
   }
 
   Gauge& gauge = safeMakeStat<Gauge>(
-      final_stat_name, central_cache_.gauges_, central_cache_.rejected_stats_,
+      final_stat_name, central_cache_->gauges_, central_cache_->rejected_stats_,
       [import_mode](Allocator& allocator, StatName name, absl::string_view tag_extracted_name,
                     const std::vector<Tag>& tags) -> GaugeSharedPtr {
         return allocator.makeGauge(name, tag_extracted_name, tags, import_mode);
@@ -500,11 +483,11 @@ Histogram& ThreadLocalStoreImpl::ScopeImpl::histogramFromStatName(StatName name,
   }
 
   Thread::LockGuard lock(parent_.lock_);
-  auto iter = central_cache_.histograms_.find(final_stat_name);
+  auto iter = central_cache_->histograms_.find(final_stat_name);
   ParentHistogramImplSharedPtr* central_ref = nullptr;
-  if (iter != central_cache_.histograms_.end()) {
+  if (iter != central_cache_->histograms_.end()) {
     central_ref = &iter->second;
-  } else if (parent_.checkAndRememberRejection(final_stat_name, central_cache_.rejected_stats_,
+  } else if (parent_.checkAndRememberRejection(final_stat_name, central_cache_->rejected_stats_,
                                                tls_rejected_stats)) {
     return parent_.null_histogram_;
   } else {
@@ -512,7 +495,7 @@ Histogram& ThreadLocalStoreImpl::ScopeImpl::histogramFromStatName(StatName name,
 
     RefcountPtr<ParentHistogramImpl> stat(new ParentHistogramImpl(
         final_stat_name, unit, parent_, *this, extraction.tagExtractedName(), extraction.tags()));
-    central_ref = &central_cache_.histograms_[stat->statName()];
+    central_ref = &central_cache_->histograms_[stat->statName()];
     *central_ref = stat;
   }
 
@@ -523,16 +506,16 @@ Histogram& ThreadLocalStoreImpl::ScopeImpl::histogramFromStatName(StatName name,
 }
 
 OptionalCounter ThreadLocalStoreImpl::ScopeImpl::findCounter(StatName name) const {
-  return findStatLockHeld<Counter>(name, central_cache_.counters_);
+  return findStatLockHeld<Counter>(name, central_cache_->counters_);
 }
 
 OptionalGauge ThreadLocalStoreImpl::ScopeImpl::findGauge(StatName name) const {
-  return findStatLockHeld<Gauge>(name, central_cache_.gauges_);
+  return findStatLockHeld<Gauge>(name, central_cache_->gauges_);
 }
 
 OptionalHistogram ThreadLocalStoreImpl::ScopeImpl::findHistogram(StatName name) const {
-  auto iter = central_cache_.histograms_.find(name);
-  if (iter == central_cache_.histograms_.end()) {
+  auto iter = central_cache_->histograms_.find(name);
+  if (iter == central_cache_->histograms_.end()) {
     return absl::nullopt;
   }
 
