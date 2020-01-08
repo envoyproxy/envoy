@@ -47,7 +47,6 @@ void OnDemandRouteUpdate::onRouteConfigUpdateCompletion(bool route_exists) {
                                        // VHDS update
       !callbacks_->decodingBuffer() && // Redirects with body not yet supported.
       callbacks_->recreateStream()) {
-    // cluster_->stats().upstream_internal_redirect_succeeded_total_.inc();
     return;
   }
 
