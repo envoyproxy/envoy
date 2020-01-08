@@ -8,6 +8,7 @@ option java_multiple_files = true;
 option java_generic_services = true;
 
 import "envoy/admin/v2alpha/config_dump.proto";
+import "envoy/annotations/resource.proto";
 import "envoy/api/v2/core/base.proto";
 
 import "google/api/annotations.proto";
@@ -17,6 +18,8 @@ import "google/protobuf/struct.proto";
 // xDS-compliant client from the management server's point of view. It can also
 // be used as an interface to get the current state of the client.
 service ClientStatusService {
+  option (envoy.annotations.resource).type = "envoy.service.status.v2.ClientStatus";
+
   rpc StreamClientStatus(stream ClientStatusRequest) returns (stream ClientStatusResponse) {
   }
 
