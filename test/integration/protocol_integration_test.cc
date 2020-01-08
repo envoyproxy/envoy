@@ -1474,7 +1474,7 @@ TEST_P(ProtocolIntegrationTest, ConnDurationTimeoutNoHttpRequest) {
 }
 
 // Make sure that invalid authority headers get blocked at or before the HCM.
-TEST_P(DownstreamProtocolIntegrationTest, InvalidAuth) {
+TEST_P(DownstreamProtocolIntegrationTest, InvalidAuthority) {
   initialize();
   fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
 

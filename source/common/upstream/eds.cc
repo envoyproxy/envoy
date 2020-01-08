@@ -8,6 +8,7 @@
 #include "envoy/config/endpoint/v3alpha/endpoint.pb.validate.h"
 #include "envoy/service/discovery/v3alpha/discovery.pb.h"
 
+#include "common/common/assert.h"
 #include "common/common/utility.h"
 #include "common/config/api_version.h"
 
@@ -24,8 +25,7 @@ EdsClusterImpl::EdsClusterImpl(
       cluster_name_(cluster.eds_cluster_config().service_name().empty()
                         ? cluster.name()
                         : cluster.eds_cluster_config().service_name()),
-      validation_visitor_(factory_context.messageValidationVisitor()),
-      xds_api_version_(cluster.eds_cluster_config().eds_config().xds_api_version()) {
+      validation_visitor_(factory_context.messageValidationVisitor()) {
   Event::Dispatcher& dispatcher = factory_context.dispatcher();
   assignment_timeout_ = dispatcher.createTimer([this]() -> void { onAssignmentTimeout(); });
   const auto& eds_config = cluster.eds_cluster_config().eds_config();
@@ -37,7 +37,8 @@ EdsClusterImpl::EdsClusterImpl(
   }
   subscription_ =
       factory_context.clusterManager().subscriptionFactory().subscriptionFromConfigSource(
-          eds_config, loadTypeUrl(), info_->statsScope(), *this);
+          eds_config, loadTypeUrl(cluster.eds_cluster_config().eds_config().resource_api_version()),
+          info_->statsScope(), *this);
 }
 
 void EdsClusterImpl::startPreInit() { subscription_->start({cluster_name_}); }
@@ -223,18 +224,19 @@ void EdsClusterImpl::reloadHealthyHostsHelper(const HostSharedPtr& host) {
   }
 }
 
-std::string EdsClusterImpl::loadTypeUrl() {
-  switch (xds_api_version_) {
+std::string
+EdsClusterImpl::loadTypeUrl(envoy::config::core::v3alpha::ApiVersion resource_api_version) {
+  switch (resource_api_version) {
   // automatically set api version as V2
-  case envoy::config::core::v3alpha::ConfigSource::AUTO:
-  case envoy::config::core::v3alpha::ConfigSource::V2:
+  case envoy::config::core::v3alpha::ApiVersion::AUTO:
+  case envoy::config::core::v3alpha::ApiVersion::V2:
     return Grpc::Common::typeUrl(
         API_NO_BOOST(envoy::api::v2::ClusterLoadAssignment().GetDescriptor()->full_name()));
-  case envoy::config::core::v3alpha::ConfigSource::V3ALPHA:
+  case envoy::config::core::v3alpha::ApiVersion::V3ALPHA:
     return Grpc::Common::typeUrl(API_NO_BOOST(
         envoy::config::endpoint::v3alpha::ClusterLoadAssignment().GetDescriptor()->full_name()));
   default:
-    throw EnvoyException(fmt::format("type {} is not supported", xds_api_version_));
+    NOT_REACHED_GCOVR_EXCL_LINE;
   }
 }
 

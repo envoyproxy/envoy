@@ -338,8 +338,7 @@ TEST_F(ZipkinDriverTest, PropagateB3NotSampled) {
   EXPECT_EQ(nullptr, request_headers_.get(ZipkinCoreConstants::get().X_B3_TRACE_ID));
 
   // Only context header set is B3 sampled to indicate trace should not be sampled
-  request_headers_.addReferenceKey(ZipkinCoreConstants::get().X_B3_SAMPLED,
-                                   ZipkinCoreConstants::get().NOT_SAMPLED);
+  request_headers_.addReferenceKey(ZipkinCoreConstants::get().X_B3_SAMPLED, NOT_SAMPLED);
   Tracing::SpanPtr span = driver_->startSpan(config_, request_headers_, operation_name_,
                                              start_time_, {Tracing::Reason::Sampling, true});
 
@@ -350,7 +349,7 @@ TEST_F(ZipkinDriverTest, PropagateB3NotSampled) {
   auto sampled_entry = request_headers_.get(ZipkinCoreConstants::get().X_B3_SAMPLED);
 
   // Check B3 sampled flag is set to not sample
-  EXPECT_EQ(ZipkinCoreConstants::get().NOT_SAMPLED, sampled_entry->value().getStringView());
+  EXPECT_EQ(NOT_SAMPLED, sampled_entry->value().getStringView());
 }
 
 TEST_F(ZipkinDriverTest, PropagateB3NotSampledWithFalse) {
@@ -372,7 +371,7 @@ TEST_F(ZipkinDriverTest, PropagateB3NotSampledWithFalse) {
 
   auto sampled_entry = request_headers_.get(ZipkinCoreConstants::get().X_B3_SAMPLED);
   // Check B3 sampled flag is set to not sample
-  EXPECT_EQ(ZipkinCoreConstants::get().NOT_SAMPLED, sampled_entry->value().getStringView());
+  EXPECT_EQ(NOT_SAMPLED, sampled_entry->value().getStringView());
 }
 
 TEST_F(ZipkinDriverTest, PropagateB3SampledWithTrue) {
@@ -394,7 +393,7 @@ TEST_F(ZipkinDriverTest, PropagateB3SampledWithTrue) {
 
   auto sampled_entry = request_headers_.get(ZipkinCoreConstants::get().X_B3_SAMPLED);
   // Check B3 sampled flag is set to sample
-  EXPECT_EQ(ZipkinCoreConstants::get().SAMPLED, sampled_entry->value().getStringView());
+  EXPECT_EQ(SAMPLED, sampled_entry->value().getStringView());
 }
 
 TEST_F(ZipkinDriverTest, PropagateB3SampleFalse) {
@@ -404,8 +403,7 @@ TEST_F(ZipkinDriverTest, PropagateB3SampleFalse) {
                                    Hex::uint64ToHex(generateRandom64()));
   request_headers_.addReferenceKey(ZipkinCoreConstants::get().X_B3_SPAN_ID,
                                    Hex::uint64ToHex(generateRandom64()));
-  request_headers_.addReferenceKey(ZipkinCoreConstants::get().X_B3_SAMPLED,
-                                   ZipkinCoreConstants::get().NOT_SAMPLED);
+  request_headers_.addReferenceKey(ZipkinCoreConstants::get().X_B3_SAMPLED, NOT_SAMPLED);
 
   Tracing::SpanPtr span = driver_->startSpan(config_, request_headers_, operation_name_,
                                              start_time_, {Tracing::Reason::Sampling, true});
@@ -442,8 +440,7 @@ TEST_F(ZipkinDriverTest, ZipkinSpanTest) {
   const std::string trace_id = Hex::uint64ToHex(generateRandom64());
   const std::string span_id = Hex::uint64ToHex(generateRandom64());
   const std::string parent_id = Hex::uint64ToHex(generateRandom64());
-  const std::string context =
-      trace_id + ";" + span_id + ";" + parent_id + ";" + ZipkinCoreConstants::get().CLIENT_SEND;
+  const std::string context = trace_id + ";" + span_id + ";" + parent_id + ";" + CLIENT_SEND;
 
   request_headers_.setOtSpanContext(context);
 
@@ -525,8 +522,7 @@ TEST_F(ZipkinDriverTest, ZipkinSpanContextFromB3HeadersEmptyParentSpanTest) {
   const std::string id = Hex::uint64ToHex(generateRandom64());
   request_headers_.addReferenceKey(ZipkinCoreConstants::get().X_B3_TRACE_ID, id);
   request_headers_.addReferenceKey(ZipkinCoreConstants::get().X_B3_SPAN_ID, id);
-  request_headers_.addReferenceKey(ZipkinCoreConstants::get().X_B3_SAMPLED,
-                                   ZipkinCoreConstants::get().SAMPLED);
+  request_headers_.addReferenceKey(ZipkinCoreConstants::get().X_B3_SAMPLED, SAMPLED);
 
   // Set parent span id to empty string, to ensure it is ignored
   const std::string parent_span_id = "";
@@ -624,7 +620,7 @@ TEST_F(ZipkinDriverTest, ExplicitlySetSampledFalse) {
 
   auto sampled_entry = request_headers_.get(ZipkinCoreConstants::get().X_B3_SAMPLED);
   // Check B3 sampled flag is set to not sample
-  EXPECT_EQ(ZipkinCoreConstants::get().NOT_SAMPLED, sampled_entry->value().getStringView());
+  EXPECT_EQ(NOT_SAMPLED, sampled_entry->value().getStringView());
 }
 
 TEST_F(ZipkinDriverTest, ExplicitlySetSampledTrue) {
@@ -641,7 +637,7 @@ TEST_F(ZipkinDriverTest, ExplicitlySetSampledTrue) {
 
   auto sampled_entry = request_headers_.get(ZipkinCoreConstants::get().X_B3_SAMPLED);
   // Check B3 sampled flag is set to sample
-  EXPECT_EQ(ZipkinCoreConstants::get().SAMPLED, sampled_entry->value().getStringView());
+  EXPECT_EQ(SAMPLED, sampled_entry->value().getStringView());
 }
 
 TEST_F(ZipkinDriverTest, DuplicatedHeader) {
