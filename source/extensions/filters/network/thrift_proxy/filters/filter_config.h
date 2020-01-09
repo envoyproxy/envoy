@@ -35,7 +35,10 @@ public:
   createFilterFactoryFromProto(const Protobuf::Message& config, const std::string& stat_prefix,
                                Server::Configuration::FactoryContext& context) PURE;
 
-  std::string category() const override { return "envoy.thrift_proxy.filters"; }
+  std::string category() const override {
+    static const char FACTORY_CATEGORY[] = {"envoy.thrift_proxy.filters"};
+    return FACTORY_CATEGORY;
+  }
 };
 
 } // namespace ThriftFilters

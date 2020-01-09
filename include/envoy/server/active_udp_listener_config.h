@@ -24,7 +24,10 @@ public:
   virtual Network::ActiveUdpListenerFactoryPtr
   createActiveUdpListenerFactory(const Protobuf::Message& message) PURE;
 
-  std::string category() const override { return "envoy.udp_listeners"; }
+  std::string category() const override {
+    static const char FACTORY_CATEGORY[] = {"envoy.udp_listeners"};
+    return FACTORY_CATEGORY;
+  }
 };
 
 } // namespace Server

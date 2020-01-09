@@ -17,3 +17,5 @@ Configuration reference
   other_protocols/other_protocols
   advanced/advanced
   best_practices/best_practices
+  factory_categories
+  

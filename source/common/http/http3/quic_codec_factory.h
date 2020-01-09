@@ -17,7 +17,10 @@ public:
   virtual std::unique_ptr<ServerConnection>
   createQuicServerConnection(Network::Connection& connection, ConnectionCallbacks& callbacks) PURE;
 
-  std::string category() const override { return "envoy.quic_client_codec"; }
+  std::string category() const override {
+    static const char FACTORY_CATEGORY[] = {"envoy.quic_client_codec"};
+    return FACTORY_CATEGORY;
+  }
 };
 
 // A factory to create Http::ClientConnection instance for QUIC.
@@ -28,7 +31,10 @@ public:
   virtual std::unique_ptr<ClientConnection>
   createQuicClientConnection(Network::Connection& connection, ConnectionCallbacks& callbacks) PURE;
 
-  std::string category() const override { return "envoy.quic_server_codec"; }
+  std::string category() const override {
+    static const char FACTORY_CATEGORY[] = {"envoy.quic_server_codec"};
+    return FACTORY_CATEGORY;
+  }
 };
 
 } // namespace Http

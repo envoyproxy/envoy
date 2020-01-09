@@ -44,7 +44,10 @@ public:
    */
   virtual Stats::SinkPtr createStatsSink(const Protobuf::Message& config, Instance& server) PURE;
 
-  std::string category() const override { return "envoy.stats_sinks"; }
+  std::string category() const override {
+    static const char FACTORY_CATEGORY[] = {"envoy.stats_sinks"};
+    return FACTORY_CATEGORY;
+  }
 };
 
 /**

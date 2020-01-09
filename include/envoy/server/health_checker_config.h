@@ -73,7 +73,10 @@ public:
   createCustomHealthChecker(const envoy::config::core::v3alpha::HealthCheck& config,
                             HealthCheckerFactoryContext& context) PURE;
 
-  std::string category() const override { return "envoy.health_checkers"; }
+  std::string category() const override {
+    static const char FACTORY_CATEGORY[] = {"envoy.health_checkers"};
+    return FACTORY_CATEGORY;
+  }
 };
 
 } // namespace Configuration

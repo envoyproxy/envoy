@@ -249,7 +249,10 @@ public:
   createFilterFactoryFromProto(const Protobuf::Message& config,
                                ListenerFactoryContext& context) PURE;
 
-  std::string category() const override { return "envoy.filters.listener"; }
+  std::string category() const override {
+    static const char FACTORY_CATEGORY[] = {"envoy.filters.listener"};
+    return FACTORY_CATEGORY;
+  }
 };
 
 /**
@@ -272,7 +275,10 @@ public:
   createFilterFactoryFromProto(const Protobuf::Message& config,
                                ListenerFactoryContext& context) PURE;
 
-  std::string category() const override { return "envoy.filters.udp_listener"; }
+  std::string category() const override {
+    static const char FACTORY_CATEGORY[] = {"envoy.filters.udp_listener"};
+    return FACTORY_CATEGORY;
+  }
 };
 
 /**
@@ -326,7 +332,10 @@ public:
   createFilterFactoryFromProto(const Protobuf::Message& config,
                                FactoryContext& filter_chain_factory_context) PURE;
 
-  std::string category() const override { return "envoy.filters.network"; }
+  std::string category() const override {
+    static const char FACTORY_CATEGORY[] = {"envoy.filters.network"};
+    return FACTORY_CATEGORY;
+  }
 
   /**
    * @return bool true if this filter must be the last filter in a filter chain, false otherwise.
@@ -350,7 +359,10 @@ public:
   virtual Network::FilterFactoryCb createFilterFactoryFromProto(const Protobuf::Message& config,
                                                                 CommonFactoryContext& context) PURE;
 
-  std::string category() const override { return "envoy.filters.upstream_network"; }
+  std::string category() const override {
+    static const char FACTORY_CATEGORY[] = {"envoy.filters.upstream_network"};
+    return FACTORY_CATEGORY;
+  }
 };
 
 /**
@@ -396,7 +408,10 @@ public:
     return nullptr;
   }
 
-  std::string category() const override { return "envoy.filters.http"; }
+  std::string category() const override {
+    static const char FACTORY_CATEGORY[] = {"envoy.filters.http"};
+    return FACTORY_CATEGORY;
+  }
 
   /**
    * @return bool true if this filter must be the last filter in a filter chain, false otherwise.

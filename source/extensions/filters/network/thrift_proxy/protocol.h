@@ -509,7 +509,10 @@ public:
    */
   virtual ProtocolPtr createProtocol() PURE;
 
-  std::string category() const override { return "envoy.thrift_proxy.protocols"; }
+  std::string category() const override {
+    static const char FACTORY_CATEGORY[] = {"envoy.thrift_proxy.protocols"};
+    return FACTORY_CATEGORY;
+  }
 
   /**
    * Convenience method to lookup a factory by type.

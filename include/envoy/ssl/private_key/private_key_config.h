@@ -25,7 +25,10 @@ public:
       const envoy::extensions::transport_sockets::tls::v3alpha::PrivateKeyProvider& config,
       Server::Configuration::TransportSocketFactoryContext& factory_context) PURE;
 
-  std::string category() const override { return "envoy.tls.key_providers"; };
+  std::string category() const override {
+    static const char FACTORY_CATEGORY[] = {"envoy.tls.key_providers"};
+    return FACTORY_CATEGORY;
+  };
 };
 
 } // namespace Ssl

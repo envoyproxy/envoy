@@ -35,7 +35,10 @@ public:
   getChannelCredentials(const envoy::config::core::v3alpha::GrpcService& grpc_service_config,
                         Api::Api& api) PURE;
 
-  std::string category() const override { return "envoy.grpc_credentials"; }
+  std::string category() const override {
+    static const char FACTORY_CATEGORY[] = {"envoy.grpc_credentials"};
+    return FACTORY_CATEGORY;
+  }
 };
 
 } // namespace Grpc
