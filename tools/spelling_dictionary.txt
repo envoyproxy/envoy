@@ -92,6 +92,7 @@ FAQ
 FASTOPEN
 FB
 FCDS
+FCM
 FFFF
 FIN
 FIPS
@@ -1160,3 +1161,5 @@ zig
 zipkin
 zlib
 OBQ
+SemVer
+SCM
