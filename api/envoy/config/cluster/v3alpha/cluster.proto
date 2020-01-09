@@ -627,6 +627,10 @@ message Cluster {
   // Optional :ref:`circuit breaking <arch_overview_circuit_break>` for the cluster.
   CircuitBreakers circuit_breakers = 10;
 
+  // HTTP protocol options that are applied only to upstream HTTP connections.
+  // These options apply to all HTTP versions.
+  core.v3alpha.UpstreamHttpProtocolOptions upstream_http_protocol_options = 46;
+
   // Additional options when handling HTTP requests upstream. These options will be applicable to
   // both HTTP1 and HTTP2 requests.
   core.v3alpha.HttpProtocolOptions common_http_protocol_options = 29;

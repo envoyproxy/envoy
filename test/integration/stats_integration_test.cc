@@ -269,7 +269,8 @@ TEST_P(ClusterMemoryTestRunner, MemoryLargeClusterSizeWithFakeSymbolTable) {
   // 2019/12/10  8779     42919       43500   use var-length coding for name length
   // 2020/01/07  9069     43413       43500   upstream: Implement retry concurrency budgets
   // 2020/01/07  9564     43445       44000   use RefcountPtr for CentralCache.
-  // 2020/01/07  9227     43509       44000   router: per-cluster histograms w/ timeout budget
+  // 2020/01/09  8889     43509       44000   api: add UpstreamHttpProtocolOptions message
+  // 2020/01/09  9227     43509       44000   router: per-cluster histograms w/ timeout budget
 
   // Note: when adjusting this value: EXPECT_MEMORY_EQ is active only in CI
   // 'release' builds, where we control the platform and tool-chain. So you
@@ -320,7 +321,8 @@ TEST_P(ClusterMemoryTestRunner, MemoryLargeClusterSizeWithRealSymbolTable) {
   // 2019/12/10  8779     35053       35000   use var-length coding for name lengths
   // 2020/01/07  9069     35548       35700   upstream: Implement retry concurrency budgets
   // 2020/01/07  9564     35580       36000   RefcountPtr for CentralCache.
-  // 2019/01/07  9227     35644       36000   router: per-cluster histograms w/ timeout budget
+  // 2020/01/09  8889     35644       36000   api: add UpstreamHttpProtocolOptions message
+  // 2019/01/09  9227     35644       36000   router: per-cluster histograms w/ timeout budget
 
   // Note: when adjusting this value: EXPECT_MEMORY_EQ is active only in CI
   // 'release' builds, where we control the platform and tool-chain. So you

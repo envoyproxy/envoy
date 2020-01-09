@@ -592,6 +592,10 @@ message Cluster {
   //   set, `transport_socket` takes priority.
   auth.UpstreamTlsContext tls_context = 11 [deprecated = true];
 
+  // HTTP protocol options that are applied only to upstream HTTP connections.
+  // These options apply to all HTTP versions.
+  core.UpstreamHttpProtocolOptions upstream_http_protocol_options = 46;
+
   // Additional options when handling HTTP requests upstream. These options will be applicable to
   // both HTTP1 and HTTP2 requests.
   core.HttpProtocolOptions common_http_protocol_options = 29;
