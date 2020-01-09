@@ -14,6 +14,7 @@
 #include "envoy/config/core/v3alpha/address.pb.h"
 #include "envoy/config/core/v3alpha/base.pb.h"
 #include "envoy/config/core/v3alpha/health_check.pb.h"
+#include "envoy/config/core/v3alpha/protocol.pb.h"
 #include "envoy/config/endpoint/v3alpha/endpoint_components.pb.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/event/timer.h"
@@ -665,6 +666,11 @@ ClusterInfoImpl::ClusterInfoImpl(
       drain_connections_on_host_removal_(config.ignore_health_on_host_removal()),
       warm_hosts_(!config.health_checks().empty() &&
                   common_lb_config_.ignore_new_hosts_until_first_hc()),
+      upstream_http_protocol_options_(
+          config.has_upstream_http_protocol_options()
+              ? absl::make_optional<envoy::config::core::v3alpha::UpstreamHttpProtocolOptions>(
+                    config.upstream_http_protocol_options())
+              : absl::nullopt),
       cluster_type_(
           config.has_cluster_type()
               ? absl::make_optional<envoy::config::cluster::v3alpha::Cluster::CustomClusterType>(

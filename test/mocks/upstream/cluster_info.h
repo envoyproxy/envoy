@@ -7,6 +7,7 @@
 
 #include "envoy/config/cluster/v3alpha/cluster.pb.h"
 #include "envoy/config/core/v3alpha/base.pb.h"
+#include "envoy/config/core/v3alpha/protocol.pb.h"
 #include "envoy/config/typed_metadata.h"
 #include "envoy/stats/scope.h"
 #include "envoy/upstream/cluster_manager.h"
@@ -120,6 +121,8 @@ public:
               (const));
   MOCK_METHOD(bool, drainConnectionsOnHostRemoval, (), (const));
   MOCK_METHOD(bool, warmHosts, (), (const));
+  MOCK_METHOD(const absl::optional<envoy::config::core::v3alpha::UpstreamHttpProtocolOptions>&,
+              upstreamHttpProtocolOptions, (), (const));
   MOCK_METHOD(absl::optional<std::string>, eds_service_name, (), (const));
   MOCK_METHOD(void, createNetworkFilterChain, (Network::Connection&), (const));
   MOCK_METHOD(Http::Protocol, upstreamHttpProtocol, (absl::optional<Http::Protocol>), (const));
@@ -145,6 +148,8 @@ public:
       envoy::config::cluster::v3alpha::Cluster::STRICT_DNS};
   absl::optional<envoy::config::cluster::v3alpha::Cluster::CustomClusterType> cluster_type_;
   NiceMock<MockLoadBalancerSubsetInfo> lb_subset_;
+  absl::optional<envoy::config::core::v3alpha::UpstreamHttpProtocolOptions>
+      upstream_http_protocol_options_;
   absl::optional<envoy::config::cluster::v3alpha::Cluster::RingHashLbConfig> lb_ring_hash_config_;
   absl::optional<envoy::config::cluster::v3alpha::Cluster::OriginalDstLbConfig>
       lb_original_dst_config_;
