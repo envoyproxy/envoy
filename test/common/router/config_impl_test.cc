@@ -2877,9 +2877,9 @@ virtual_hosts:
                 ->retryPolicy()
                 .perTryTimeout());
   EXPECT_EQ(1, config.route(genHeaders("www.lyft.com", "/bar", "GET"), 0)
-                    ->routeEntry()
-                    ->retryPolicy()
-                    .numRetries());
+                   ->routeEntry()
+                   ->retryPolicy()
+                   .numRetries());
   EXPECT_EQ(0U, config.route(genHeaders("www.lyft.com", "/bar", "GET"), 0)
                     ->routeEntry()
                     ->retryPolicy()
@@ -3029,9 +3029,9 @@ virtual_hosts:
                 ->retryPolicy()
                 .perTryTimeout());
   EXPECT_EQ(1, config.route(genHeaders("www.lyft.com", "/bar", "GET"), 0)
-                    ->routeEntry()
-                    ->retryPolicy()
-                    .numRetries());
+                   ->routeEntry()
+                   ->retryPolicy()
+                   .numRetries());
   EXPECT_EQ(0U, config.route(genHeaders("www.lyft.com", "/bar", "GET"), 0)
                     ->routeEntry()
                     ->retryPolicy()
