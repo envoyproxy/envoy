@@ -16,9 +16,9 @@ public:
   ~MockAccessLogFile() override;
 
   // AccessLog::AccessLogFile
-  MOCK_METHOD1(write, void(absl::string_view data));
-  MOCK_METHOD0(reopen, void());
-  MOCK_METHOD0(flush, void());
+  MOCK_METHOD(void, write, (absl::string_view data));
+  MOCK_METHOD(void, reopen, ());
+  MOCK_METHOD(void, flush, ());
 };
 
 class MockFilter : public Filter {
@@ -39,8 +39,8 @@ public:
   ~MockAccessLogManager() override;
 
   // AccessLog::AccessLogManager
-  MOCK_METHOD0(reopen, void());
-  MOCK_METHOD1(createAccessLog, AccessLogFileSharedPtr(const std::string& file_name));
+  MOCK_METHOD(void, reopen, ());
+  MOCK_METHOD(AccessLogFileSharedPtr, createAccessLog, (const std::string& file_name));
 
   std::shared_ptr<MockAccessLogFile> file_{new testing::NiceMock<MockAccessLogFile>()};
 };

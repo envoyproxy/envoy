@@ -25,7 +25,7 @@ namespace {
 
 class MockMatcher : public Matcher {
 public:
-  MOCK_CONST_METHOD1(matches, bool(const Http::HeaderMap& headers));
+  MOCK_METHOD(bool, matches, (const Http::HeaderMap& headers), (const));
 };
 
 class MockFilterConfig : public FilterConfig {

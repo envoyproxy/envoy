@@ -22,7 +22,7 @@ public:
   MockAsyncRequest();
   ~MockAsyncRequest() override;
 
-  MOCK_METHOD0(cancel, void());
+  MOCK_METHOD(void, cancel, ());
 };
 
 class MockAsyncStream : public RawAsyncStream {
@@ -34,8 +34,8 @@ public:
     sendMessageRaw_(request, end_stream);
   }
   MOCK_METHOD2_T(sendMessageRaw_, void(Buffer::InstancePtr& request, bool end_stream));
-  MOCK_METHOD0_T(closeStream, void());
-  MOCK_METHOD0_T(resetStream, void());
+  MOCK_METHOD(void, closeStream, ());
+  MOCK_METHOD(void, resetStream, ());
 };
 
 template <class ResponseType>
@@ -45,7 +45,7 @@ public:
     onSuccess_(*response, span);
   }
 
-  MOCK_METHOD1_T(onCreateInitialMetadata, void(Http::HeaderMap& metadata));
+  MOCK_METHOD(void, onCreateInitialMetadata, (Http::HeaderMap & metadata));
   MOCK_METHOD2_T(onSuccess_, void(const ResponseType& response, Tracing::Span& span));
   MOCK_METHOD3_T(onFailure,
                  void(Status::GrpcStatus status, const std::string& message, Tracing::Span& span));
@@ -64,10 +64,10 @@ public:
     onReceiveTrailingMetadata_(*metadata);
   }
 
-  MOCK_METHOD1_T(onCreateInitialMetadata, void(Http::HeaderMap& metadata));
-  MOCK_METHOD1_T(onReceiveInitialMetadata_, void(const Http::HeaderMap& metadata));
-  MOCK_METHOD1_T(onReceiveMessage_, void(const ResponseType& message));
-  MOCK_METHOD1_T(onReceiveTrailingMetadata_, void(const Http::HeaderMap& metadata));
+  MOCK_METHOD(void, onCreateInitialMetadata, (Http::HeaderMap & metadata));
+  MOCK_METHOD(void, onReceiveInitialMetadata_, (const Http::HeaderMap& metadata));
+  MOCK_METHOD(void, onReceiveMessage_, (const ResponseType& message));
+  MOCK_METHOD(void, onReceiveTrailingMetadata_, (const Http::HeaderMap& metadata));
   MOCK_METHOD2_T(onRemoteClose, void(Status::GrpcStatus status, const std::string& message));
 };
 
@@ -89,7 +89,7 @@ public:
   MockAsyncClientFactory();
   ~MockAsyncClientFactory() override;
 
-  MOCK_METHOD0(create, RawAsyncClientPtr());
+  MOCK_METHOD(RawAsyncClientPtr, create, ());
 };
 
 class MockAsyncClientManager : public AsyncClientManager {

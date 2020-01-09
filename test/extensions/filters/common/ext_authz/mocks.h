@@ -21,7 +21,7 @@ public:
   ~MockClient() override;
 
   // ExtAuthz::Client
-  MOCK_METHOD0(cancel, void());
+  MOCK_METHOD(void, cancel, ());
   MOCK_METHOD3(check, void(RequestCallbacks& callbacks,
                            const envoy::service::auth::v3alpha::CheckRequest& request,
                            Tracing::Span& parent_span));
@@ -34,7 +34,7 @@ public:
 
   void onComplete(ResponsePtr&& response) override { onComplete_(response); }
 
-  MOCK_METHOD1(onComplete_, void(ResponsePtr& response));
+  MOCK_METHOD(void, onComplete_, (ResponsePtr & response));
 };
 
 } // namespace ExtAuthz

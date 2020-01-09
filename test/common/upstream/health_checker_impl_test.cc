@@ -104,7 +104,7 @@ public:
   };
 
   // HttpHealthCheckerImpl
-  MOCK_METHOD1(createCodecClient_, Http::CodecClient*(Upstream::Host::CreateConnectionData&));
+  MOCK_METHOD(Http::CodecClient*, createCodecClient_, (Upstream::Host::CreateConnectionData&));
 
   Http::CodecClient::Type codecClientType() { return codec_client_type_; }
 };
@@ -2941,7 +2941,7 @@ public:
   };
 
   // GrpcHealthCheckerImpl
-  MOCK_METHOD1(createCodecClient_, Http::CodecClient*(Upstream::Host::CreateConnectionData&));
+  MOCK_METHOD(Http::CodecClient*, createCodecClient_, (Upstream::Host::CreateConnectionData&));
 };
 
 class GrpcHealthCheckerImplTestBase {

@@ -65,7 +65,7 @@ public:
                    bool bind_to_port)
       : ListenerImpl(dispatcher, std::move(socket), cb, bind_to_port) {}
 
-  MOCK_METHOD1(getLocalAddress, Address::InstanceConstSharedPtr(int fd));
+  MOCK_METHOD(Address::InstanceConstSharedPtr, getLocalAddress, (int fd));
 };
 
 using ListenerImplTest = ListenerImplTestBase;

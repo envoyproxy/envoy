@@ -12,9 +12,9 @@ public:
   MockIoHandle();
   ~MockIoHandle();
 
-  MOCK_CONST_METHOD0(fd, int());
-  MOCK_METHOD0(close, Api::IoCallUint64Result());
-  MOCK_CONST_METHOD0(isOpen, bool());
+  MOCK_METHOD(int, fd, (), (const));
+  MOCK_METHOD(Api::IoCallUint64Result, close, ());
+  MOCK_METHOD(bool, isOpen, (), (const));
   MOCK_METHOD3(readv, Api::IoCallUint64Result(uint64_t max_length, Buffer::RawSlice* slices,
                                               uint64_t num_slice));
   MOCK_METHOD2(writev, Api::IoCallUint64Result(const Buffer::RawSlice* slices, uint64_t num_slice));

@@ -29,13 +29,13 @@ public:
   }
 
   // From QuicSession.
-  MOCK_METHOD1(CreateIncomingStream, quic::QuicSpdyStream*(quic::QuicStreamId id));
-  MOCK_METHOD1(CreateIncomingStream, quic::QuicSpdyStream*(quic::PendingStream* pending));
-  MOCK_METHOD0(CreateOutgoingBidirectionalStream, quic::QuicSpdyStream*());
-  MOCK_METHOD0(CreateOutgoingUnidirectionalStream, quic::QuicSpdyStream*());
-  MOCK_METHOD1(ShouldCreateIncomingStream, bool(quic::QuicStreamId id));
-  MOCK_METHOD0(ShouldCreateOutgoingBidirectionalStream, bool());
-  MOCK_METHOD0(ShouldCreateOutgoingUnidirectionalStream, bool());
+  MOCK_METHOD(quic::QuicSpdyStream*, CreateIncomingStream, (quic::QuicStreamId id));
+  MOCK_METHOD(quic::QuicSpdyStream*, CreateIncomingStream, (quic::PendingStream * pending));
+  MOCK_METHOD(quic::QuicSpdyStream*, CreateOutgoingBidirectionalStream, ());
+  MOCK_METHOD(quic::QuicSpdyStream*, CreateOutgoingUnidirectionalStream, ());
+  MOCK_METHOD(bool, ShouldCreateIncomingStream, (quic::QuicStreamId id));
+  MOCK_METHOD(bool, ShouldCreateOutgoingBidirectionalStream, ());
+  MOCK_METHOD(bool, ShouldCreateOutgoingUnidirectionalStream, ());
   MOCK_METHOD5(WritevData,
                quic::QuicConsumedData(quic::QuicStream* stream, quic::QuicStreamId id,
                                       size_t write_length, quic::QuicStreamOffset offset,
@@ -72,13 +72,13 @@ public:
         crypto_config_(quic::test::crypto_test_utils::ProofVerifierForTesting()) {}
 
   // From QuicSession.
-  MOCK_METHOD1(CreateIncomingStream, quic::QuicSpdyClientStream*(quic::QuicStreamId id));
-  MOCK_METHOD1(CreateIncomingStream, quic::QuicSpdyClientStream*(quic::PendingStream* pending));
-  MOCK_METHOD0(CreateOutgoingBidirectionalStream, quic::QuicSpdyClientStream*());
-  MOCK_METHOD0(CreateOutgoingUnidirectionalStream, quic::QuicSpdyClientStream*());
-  MOCK_METHOD1(ShouldCreateIncomingStream, bool(quic::QuicStreamId id));
-  MOCK_METHOD0(ShouldCreateOutgoingBidirectionalStream, bool());
-  MOCK_METHOD0(ShouldCreateOutgoingUnidirectionalStream, bool());
+  MOCK_METHOD(quic::QuicSpdyClientStream*, CreateIncomingStream, (quic::QuicStreamId id));
+  MOCK_METHOD(quic::QuicSpdyClientStream*, CreateIncomingStream, (quic::PendingStream * pending));
+  MOCK_METHOD(quic::QuicSpdyClientStream*, CreateOutgoingBidirectionalStream, ());
+  MOCK_METHOD(quic::QuicSpdyClientStream*, CreateOutgoingUnidirectionalStream, ());
+  MOCK_METHOD(bool, ShouldCreateIncomingStream, (quic::QuicStreamId id));
+  MOCK_METHOD(bool, ShouldCreateOutgoingBidirectionalStream, ());
+  MOCK_METHOD(bool, ShouldCreateOutgoingUnidirectionalStream, ());
   MOCK_METHOD5(WritevData,
                quic::QuicConsumedData(quic::QuicStream* stream, quic::QuicStreamId id,
                                       size_t write_length, quic::QuicStreamOffset offset,

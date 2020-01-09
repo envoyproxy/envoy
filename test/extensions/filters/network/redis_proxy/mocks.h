@@ -25,7 +25,7 @@ public:
   MockRouter(RouteSharedPtr route);
   ~MockRouter() override;
 
-  MOCK_METHOD1(upstreamPool, RouteSharedPtr(std::string& key));
+  MOCK_METHOD(RouteSharedPtr, upstreamPool, (std::string & key));
   RouteSharedPtr route_;
 };
 
@@ -34,8 +34,8 @@ public:
   MockRoute(ConnPool::InstanceSharedPtr);
   ~MockRoute() override;
 
-  MOCK_CONST_METHOD0(upstream, ConnPool::InstanceSharedPtr());
-  MOCK_CONST_METHOD0(mirrorPolicies, const MirrorPolicies&());
+  MOCK_METHOD(ConnPool::InstanceSharedPtr, upstream, (), (const));
+  MOCK_METHOD(const MirrorPolicies&, mirrorPolicies, (), (const));
   ConnPool::InstanceSharedPtr conn_pool_;
   MirrorPolicies policies_;
 };
@@ -45,8 +45,8 @@ public:
   MockMirrorPolicy(ConnPool::InstanceSharedPtr);
   ~MockMirrorPolicy() = default;
 
-  MOCK_CONST_METHOD0(upstream, ConnPool::InstanceSharedPtr());
-  MOCK_CONST_METHOD1(shouldMirror, bool(const std::string&));
+  MOCK_METHOD(ConnPool::InstanceSharedPtr, upstream, (), (const));
+  MOCK_METHOD(bool, shouldMirror, (const std::string&), (const));
 
   ConnPool::InstanceSharedPtr conn_pool_;
 };
@@ -61,8 +61,8 @@ public:
   void onResponse(Common::Redis::RespValuePtr&& value) override { onResponse_(value); }
   void onFailure() override { onFailure_(); }
 
-  MOCK_METHOD1(onResponse_, void(Common::Redis::RespValuePtr& value));
-  MOCK_METHOD0(onFailure_, void());
+  MOCK_METHOD(void, onResponse_, (Common::Redis::RespValuePtr & value));
+  MOCK_METHOD(void, onFailure_, ());
 };
 
 class MockInstance : public Instance {
@@ -79,7 +79,7 @@ public:
   MOCK_METHOD3(makeRequest_,
                Common::Redis::Client::PoolRequest*(const std::string& hash_key,
                                                    RespVariant& request, PoolCallbacks& callbacks));
-  MOCK_METHOD0(onRedirection, bool());
+  MOCK_METHOD(bool, onRedirection, ());
 };
 } // namespace ConnPool
 
@@ -90,7 +90,7 @@ public:
   MockSplitRequest();
   ~MockSplitRequest() override;
 
-  MOCK_METHOD0(cancel, void());
+  MOCK_METHOD(void, cancel, ());
 };
 
 class MockSplitCallbacks : public SplitCallbacks {
@@ -100,9 +100,9 @@ public:
 
   void onResponse(Common::Redis::RespValuePtr&& value) override { onResponse_(value); }
 
-  MOCK_METHOD0(connectionAllowed, bool());
-  MOCK_METHOD1(onAuth, void(const std::string& password));
-  MOCK_METHOD1(onResponse_, void(Common::Redis::RespValuePtr& value));
+  MOCK_METHOD(bool, connectionAllowed, ());
+  MOCK_METHOD(void, onAuth, (const std::string& password));
+  MOCK_METHOD(void, onResponse_, (Common::Redis::RespValuePtr & value));
 };
 
 class MockInstance : public Instance {

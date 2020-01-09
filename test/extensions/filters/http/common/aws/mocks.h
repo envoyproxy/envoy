@@ -16,7 +16,7 @@ public:
   MockCredentialsProvider();
   ~MockCredentialsProvider() override;
 
-  MOCK_METHOD0(getCredentials, Credentials());
+  MOCK_METHOD(Credentials, getCredentials, ());
 };
 
 class MockSigner : public Signer {

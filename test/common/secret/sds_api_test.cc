@@ -246,10 +246,9 @@ class MockCvcValidationCallback : public CvcValidationCallback {
 public:
   MockCvcValidationCallback() = default;
   ~MockCvcValidationCallback() override = default;
-  MOCK_METHOD1(
-      validateCvc,
-      void(
-          const envoy::extensions::transport_sockets::tls::v3alpha::CertificateValidationContext&));
+  MOCK_METHOD(
+      void, validateCvc,
+      (const envoy::extensions::transport_sockets::tls::v3alpha::CertificateValidationContext&));
 };
 
 // Validate that CertificateValidationContextSdsApi updates secrets successfully if

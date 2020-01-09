@@ -36,8 +36,8 @@ using envoy::data::accesslog::v3alpha::HTTPAccessLogEntry;
 class MockGrpcAccessLogger : public GrpcCommon::GrpcAccessLogger {
 public:
   // GrpcAccessLogger
-  MOCK_METHOD1(log, void(HTTPAccessLogEntry&& entry));
-  MOCK_METHOD1(log, void(envoy::data::accesslog::v3alpha::TCPAccessLogEntry&& entry));
+  MOCK_METHOD(void, log, (HTTPAccessLogEntry && entry));
+  MOCK_METHOD(void, log, (envoy::data::accesslog::v3alpha::TCPAccessLogEntry && entry));
 };
 
 class MockGrpcAccessLoggerCache : public GrpcCommon::GrpcAccessLoggerCache {

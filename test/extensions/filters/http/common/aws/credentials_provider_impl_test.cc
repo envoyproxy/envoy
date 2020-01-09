@@ -339,7 +339,7 @@ public:
 
   class MockCredentialsProviderChainFactories : public CredentialsProviderChainFactories {
   public:
-    MOCK_CONST_METHOD0(createEnvironmentCredentialsProvider, CredentialsProviderSharedPtr());
+    MOCK_METHOD(CredentialsProviderSharedPtr, createEnvironmentCredentialsProvider, (), (const));
     MOCK_CONST_METHOD4(createTaskRoleCredentialsProvider,
                        CredentialsProviderSharedPtr(
                            Api::Api&, const MetadataCredentialsProviderBase::MetadataFetcher&,

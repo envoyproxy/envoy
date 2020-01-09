@@ -42,13 +42,13 @@ public:
                       const std::string& system_version_info));
   MOCK_METHOD2_T(onConfigUpdateFailed,
                  void(Envoy::Config::ConfigUpdateFailureReason reason, const EnvoyException* e));
-  MOCK_METHOD1_T(resourceName, std::string(const ProtobufWkt::Any& resource));
+  MOCK_METHOD(std::string, resourceName, (const ProtobufWkt::Any& resource));
 };
 
 class MockSubscription : public Subscription {
 public:
-  MOCK_METHOD1(start, void(const std::set<std::string>& resources));
-  MOCK_METHOD1(updateResourceInterest, void(const std::set<std::string>& update_to_these_names));
+  MOCK_METHOD(void, start, (const std::set<std::string>& resources));
+  MOCK_METHOD(void, updateResourceInterest, (const std::set<std::string>& update_to_these_names));
 };
 
 class MockSubscriptionFactory : public SubscriptionFactory {
@@ -60,7 +60,7 @@ public:
                SubscriptionPtr(const envoy::config::core::v3alpha::ConfigSource& config,
                                absl::string_view type_url, Stats::Scope& scope,
                                SubscriptionCallbacks& callbacks));
-  MOCK_METHOD0(messageValidationVisitor, ProtobufMessage::ValidationVisitor&());
+  MOCK_METHOD(ProtobufMessage::ValidationVisitor&, messageValidationVisitor, ());
 
   MockSubscription* subscription_{};
   SubscriptionCallbacks* callbacks_{};
@@ -71,7 +71,7 @@ public:
   MockGrpcMuxWatch();
   ~MockGrpcMuxWatch() override;
 
-  MOCK_METHOD0(cancel, void());
+  MOCK_METHOD(void, cancel, ());
 };
 
 class MockGrpcMux : public GrpcMux {
@@ -79,15 +79,15 @@ public:
   MockGrpcMux();
   ~MockGrpcMux() override;
 
-  MOCK_METHOD0(start, void());
+  MOCK_METHOD(void, start, ());
   MOCK_METHOD3(subscribe_,
                GrpcMuxWatch*(const std::string& type_url, const std::set<std::string>& resources,
                              GrpcMuxCallbacks& callbacks));
   GrpcMuxWatchPtr subscribe(const std::string& type_url, const std::set<std::string>& resources,
                             GrpcMuxCallbacks& callbacks) override;
-  MOCK_METHOD1(pause, void(const std::string& type_url));
-  MOCK_METHOD1(resume, void(const std::string& type_url));
-  MOCK_CONST_METHOD1(paused, bool(const std::string& type_url));
+  MOCK_METHOD(void, pause, (const std::string& type_url));
+  MOCK_METHOD(void, resume, (const std::string& type_url));
+  MOCK_METHOD(bool, paused, (const std::string& type_url), (const));
 
   MOCK_METHOD5(addSubscription,
                void(const std::set<std::string>& resources, const std::string& type_url,
@@ -112,7 +112,7 @@ public:
                                     const std::string& version_info));
   MOCK_METHOD2(onConfigUpdateFailed,
                void(Envoy::Config::ConfigUpdateFailureReason reason, const EnvoyException* e));
-  MOCK_METHOD1(resourceName, std::string(const ProtobufWkt::Any& resource));
+  MOCK_METHOD(std::string, resourceName, (const ProtobufWkt::Any& resource));
 };
 
 class MockGrpcStreamCallbacks
@@ -121,12 +121,11 @@ public:
   MockGrpcStreamCallbacks();
   ~MockGrpcStreamCallbacks() override;
 
-  MOCK_METHOD0(onStreamEstablished, void());
-  MOCK_METHOD0(onEstablishmentFailure, void());
-  MOCK_METHOD1(
-      onDiscoveryResponse,
-      void(std::unique_ptr<envoy::service::discovery::v3alpha::DiscoveryResponse>&& message));
-  MOCK_METHOD0(onWriteable, void());
+  MOCK_METHOD(void, onStreamEstablished, ());
+  MOCK_METHOD(void, onEstablishmentFailure, ());
+  MOCK_METHOD(void, onDiscoveryResponse,
+              (std::unique_ptr<envoy::service::discovery::v3alpha::DiscoveryResponse> && message));
+  MOCK_METHOD(void, onWriteable, ());
 };
 
 class MockConfigProviderManager : public ConfigProviderManager {

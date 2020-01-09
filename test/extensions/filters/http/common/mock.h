@@ -15,7 +15,7 @@ namespace Common {
 
 class MockJwksFetcher : public JwksFetcher {
 public:
-  MOCK_METHOD0(cancel, void());
+  MOCK_METHOD(void, cancel, ());
   MOCK_METHOD3(fetch, void(const envoy::config::core::v3alpha::HttpUri& uri,
                            Tracing::Span& parent_span, JwksReceiver& receiver));
 };
@@ -53,8 +53,8 @@ public:
     ASSERT(jwks);
     onJwksSuccessImpl(*jwks.get());
   }
-  MOCK_METHOD1(onJwksSuccessImpl, void(const google::jwt_verify::Jwks& jwks));
-  MOCK_METHOD1(onJwksError, void(JwksFetcher::JwksReceiver::Failure reason));
+  MOCK_METHOD(void, onJwksSuccessImpl, (const google::jwt_verify::Jwks& jwks));
+  MOCK_METHOD(void, onJwksError, (JwksFetcher::JwksReceiver::Failure reason));
 };
 
 } // namespace Common

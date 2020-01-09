@@ -40,7 +40,7 @@ public:
   MockDecoder();
   ~MockDecoder() override;
 
-  MOCK_METHOD1(decode, void(Buffer::Instance& data));
+  MOCK_METHOD(void, decode, (Buffer::Instance & data));
 };
 
 namespace Client {
@@ -50,7 +50,7 @@ public:
   MockPoolRequest();
   ~MockPoolRequest() override;
 
-  MOCK_METHOD0(cancel, void());
+  MOCK_METHOD(void, cancel, ());
 };
 
 class MockClient : public Client {
@@ -82,12 +82,12 @@ public:
     return makeRequest_(request, callbacks);
   }
 
-  MOCK_METHOD1(addConnectionCallbacks, void(Network::ConnectionCallbacks& callbacks));
-  MOCK_METHOD0(active, bool());
-  MOCK_METHOD0(close, void());
+  MOCK_METHOD(void, addConnectionCallbacks, (Network::ConnectionCallbacks & callbacks));
+  MOCK_METHOD(bool, active, ());
+  MOCK_METHOD(void, close, ());
   MOCK_METHOD2(makeRequest_,
                PoolRequest*(const Common::Redis::RespValue& request, ClientCallbacks& callbacks));
-  MOCK_METHOD1(initialize, void(const std::string& password));
+  MOCK_METHOD(void, initialize, (const std::string& password));
 
   std::list<Network::ConnectionCallbacks*> callbacks_;
   std::list<ClientCallbacks*> client_callbacks_;
@@ -104,8 +104,8 @@ public:
     return onRedirection_(value, host_address, ask_redirection);
   }
 
-  MOCK_METHOD1(onResponse_, void(Common::Redis::RespValuePtr& value));
-  MOCK_METHOD0(onFailure, void());
+  MOCK_METHOD(void, onResponse_, (Common::Redis::RespValuePtr & value));
+  MOCK_METHOD(void, onFailure, ());
   MOCK_METHOD3(onRedirection_, bool(Common::Redis::RespValuePtr& value,
                                     const std::string& host_address, bool ask_redirection));
 };

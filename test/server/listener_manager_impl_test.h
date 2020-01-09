@@ -31,7 +31,7 @@ public:
   ListenerHandle() { EXPECT_CALL(*drain_manager_, startParentShutdownSequence()).Times(0); }
   ~ListenerHandle() { onDestroy(); }
 
-  MOCK_METHOD0(onDestroy, void());
+  MOCK_METHOD(void, onDestroy, ());
 
   Init::ExpectableTargetImpl target_;
   MockDrainManager* drain_manager_ = new MockDrainManager();

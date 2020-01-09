@@ -39,7 +39,7 @@ namespace MongoProxy {
 
 class MockDecoder : public Decoder {
 public:
-  MOCK_METHOD1(onData, void(Buffer::Instance& data));
+  MOCK_METHOD(void, onData, (Buffer::Instance & data));
 };
 
 class TestStatStore : public Stats::IsolatedStoreImpl {
