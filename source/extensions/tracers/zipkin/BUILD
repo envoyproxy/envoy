@@ -35,7 +35,6 @@ envoy_cc_library(
         "zipkin_tracer_impl.h",
     ],
     external_deps = [
-        "rapidjson",
         "abseil_optional",
     ],
     deps = [

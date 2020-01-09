@@ -17,9 +17,24 @@ option (udpa.annotations.file_migrate).move_to_package = "envoy.config.core.v3al
 
 // [#protodoc-title: Configuration sources]
 
+// xDS API version. This is used to describe both resource and transport
+// protocol versions (in distinct configuration fields).
+enum ApiVersion {
+  // When not specified, we assume v2, to ease migration to Envoy's stable API
+  // versioning. If a client does not support v2 (e.g. due to deprecation), this
+  // is an invalid value.
+  AUTO = 0;
+
+  // Use xDS v2 API.
+  V2 = 1;
+
+  // Use xDS v3alpha API.
+  V3ALPHA = 2;
+}
+
 // API configuration source. This identifies the API type and cluster that Envoy
 // will use to fetch an xDS API.
-// [#next-free-field: 8]
+// [#next-free-field: 9]
 message ApiConfigSource {
   // APIs may be fetched via either REST or gRPC.
   enum ApiType {
@@ -45,7 +60,12 @@ message ApiConfigSource {
     DELTA_GRPC = 3;
   }
 
+  // API type (gRPC, REST, delta gRPC)
   ApiType api_type = 1 [(validate.rules).enum = {defined_only: true}];
+
+  // API version for xDS transport protocol. This describes the xDS gRPC/REST
+  // endpoint and version of [Delta]DiscoveryRequest/Response used on the wire.
+  ApiVersion transport_api_version = 8 [(validate.rules).enum = {defined_only: true}];
 
   // Cluster names should be used only with REST. If > 1
   // cluster is defined, clusters will be cycled through if any kind of failure
@@ -107,18 +127,6 @@ message RateLimitSettings {
 // inotify for updates.
 // [#next-free-field: 7]
 message ConfigSource {
-  enum XdsApiVersion {
-    // use for describing explicitly that xDS API version is set automatically. In default, xDS API
-    // version is V2
-    AUTO = 0;
-
-    // use xDS v2 API
-    V2 = 1;
-
-    // use xDS v3alpha API
-    V3ALPHA = 2;
-  }
-
   oneof config_source_specifier {
     option (validate.required) = true;
 
@@ -165,6 +173,8 @@ message ConfigSource {
   // timeout applies). The default is 15s.
   google.protobuf.Duration initial_fetch_timeout = 4;
 
-  // API version for xDS endpoint
-  XdsApiVersion xds_api_version = 6;
+  // API version for xDS resources. This implies the type URLs that the client
+  // will request for resources and the resource type that the client will in
+  // turn expect to be delivered.
+  ApiVersion resource_api_version = 6 [(validate.rules).enum = {defined_only: true}];
 }

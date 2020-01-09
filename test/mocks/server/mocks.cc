@@ -264,6 +264,8 @@ MockHealthCheckerFactoryContext::MockHealthCheckerFactoryContext() {
 
 MockHealthCheckerFactoryContext::~MockHealthCheckerFactoryContext() = default;
 
+MockFilterChainFactoryContext::MockFilterChainFactoryContext() = default;
+MockFilterChainFactoryContext::~MockFilterChainFactoryContext() = default;
 } // namespace Configuration
 } // namespace Server
 } // namespace Envoy

@@ -43,7 +43,7 @@ public:
   TestNamedTransportConfigFactory(std::function<MockTransport*()> f) : f_(f) {}
 
   TransportPtr createTransport() override { return TransportPtr{f_()}; }
-  std::string name() override { return TransportNames::get().FRAMED; }
+  std::string name() const override { return TransportNames::get().FRAMED; }
 
   std::function<MockTransport*()> f_;
 };
@@ -53,7 +53,7 @@ public:
   TestNamedProtocolConfigFactory(std::function<MockProtocol*()> f) : f_(f) {}
 
   ProtocolPtr createProtocol() override { return ProtocolPtr{f_()}; }
-  std::string name() override { return ProtocolNames::get().BINARY; }
+  std::string name() const override { return ProtocolNames::get().BINARY; }
 
   std::function<MockProtocol*()> f_;
 };

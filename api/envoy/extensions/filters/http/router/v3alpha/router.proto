@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package envoy.extensions.filters.http.router.v3alpha;
 
-import "envoy/config/filter/accesslog/v3alpha/accesslog.proto";
+import "envoy/config/accesslog/v3alpha/accesslog.proto";
 
 import "google/protobuf/wrappers.proto";
 
@@ -37,7 +37,7 @@ message Router {
   // are configured in the same way as access logs, but each log entry represents
   // an upstream request. Presuming retries are configured, multiple upstream
   // requests may be made for each downstream (inbound) request.
-  repeated config.filter.accesslog.v3alpha.AccessLog upstream_log = 3;
+  repeated config.accesslog.v3alpha.AccessLog upstream_log = 3;
 
   // Do not add any additional *x-envoy-* headers to requests or responses. This
   // only affects the :ref:`router filter generated *x-envoy-* headers

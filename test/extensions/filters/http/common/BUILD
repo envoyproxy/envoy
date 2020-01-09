@@ -27,6 +27,14 @@ envoy_cc_test_library(
     ],
 )
 
+envoy_cc_test_library(
+    name = "empty_http_filter_config_lib",
+    hdrs = ["empty_http_filter_config.h"],
+    deps = [
+        "//include/envoy/server:filter_config_interface",
+    ],
+)
+
 envoy_extension_cc_test(
     name = "jwks_fetcher_test",
     srcs = [

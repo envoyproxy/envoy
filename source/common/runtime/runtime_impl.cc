@@ -554,7 +554,7 @@ RtdsSubscription::RtdsSubscription(
     : parent_(parent), config_source_(rtds_layer.rtds_config()), store_(store),
       resource_name_(rtds_layer.name()),
       init_target_("RTDS " + resource_name_, [this]() { start(); }),
-      validation_visitor_(validation_visitor), xds_api_version_(config_source_.xds_api_version()) {}
+      validation_visitor_(validation_visitor) {}
 
 void RtdsSubscription::onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
                                       const std::string&) {
@@ -593,7 +593,7 @@ void RtdsSubscription::start() {
   // cluster manager resources are not available in the constructor when
   // instantiated in the server instance.
   subscription_ = parent_.cm_->subscriptionFactory().subscriptionFromConfigSource(
-      config_source_, loadTypeUrl(), store_, *this);
+      config_source_, loadTypeUrl(config_source_.resource_api_version()), store_, *this);
   subscription_->start({resource_name_});
 }
 
@@ -605,18 +605,19 @@ void RtdsSubscription::validateUpdateSize(uint32_t num_resources) {
   }
 }
 
-std::string RtdsSubscription::loadTypeUrl() {
-  switch (xds_api_version_) {
+std::string
+RtdsSubscription::loadTypeUrl(envoy::config::core::v3alpha::ApiVersion resource_api_version) {
+  switch (resource_api_version) {
   // automatically set api version as V2
-  case envoy::config::core::v3alpha::ConfigSource::AUTO:
-  case envoy::config::core::v3alpha::ConfigSource::V2:
+  case envoy::config::core::v3alpha::ApiVersion::AUTO:
+  case envoy::config::core::v3alpha::ApiVersion::V2:
     return Grpc::Common::typeUrl(
         API_NO_BOOST(envoy::service::discovery::v2::Runtime().GetDescriptor()->full_name()));
-  case envoy::config::core::v3alpha::ConfigSource::V3ALPHA:
+  case envoy::config::core::v3alpha::ApiVersion::V3ALPHA:
     return Grpc::Common::typeUrl(
         API_NO_BOOST(envoy::service::runtime::v3alpha::Runtime().GetDescriptor()->full_name()));
   default:
-    throw EnvoyException(fmt::format("type {} is not supported", xds_api_version_));
+    NOT_REACHED_GCOVR_EXCL_LINE;
   }
 }
 

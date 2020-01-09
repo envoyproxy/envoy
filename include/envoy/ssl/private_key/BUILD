@@ -24,6 +24,7 @@ envoy_cc_library(
     hdrs = ["private_key_config.h"],
     deps = [
         ":private_key_interface",
+        "//include/envoy/config:typed_config_interface",
         "//include/envoy/registry",
         "@envoy_api//envoy/extensions/transport_sockets/tls/v3alpha:pkg_cc_proto",
     ],
