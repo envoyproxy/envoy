@@ -858,13 +858,13 @@ message RouteAction {
   // :ref:`internal_redirect_action
   // <envoy_api_field_config.route.v3alpha.RouteAction.internal_redirect_action>` is set to
   // :ref:`HANDLE_INTERNAL_REDIRECT
-  // <envoy_api_enum_value.config.route.v3alpha.RouteAction.InternalRedirectAction.HANDLE_INTERNAL_REDIRECT>`
+  // <envoy_api_enum_value_config.route.v3alpha.RouteAction.InternalRedirectAction.HANDLE_INTERNAL_REDIRECT>`
   // In the case where a downstream request is bounced among multiple routes by internal redirect,
   // the first route that hits this threshold, or has
   // :ref:`internal_redirect_action
-  // <envoy_api_field.config.route.v3alpha.RouteAction.internal_redirect_action>` set to
+  // <envoy_api_field_config.route.v3alpha.RouteAction.internal_redirect_action>` set to
   // :ref:`PASS_THROUGH_INTERNAL_REDIRECT
-  // <envoy_api_enum_value.config.route.v3alpha.RouteAction.InternalRedirectAction.PASS_THROUGH_INTERNAL_REDIRECT>`
+  // <envoy_api_enum_value_config.route.v3alpha.RouteAction.InternalRedirectAction.PASS_THROUGH_INTERNAL_REDIRECT>`
   // will pass the redirect back to downstream.
   //
   // If not specified, at most one redirect will be followed.
