@@ -18,14 +18,12 @@ namespace {
 static const envoy::config::health_checker::redis::v2::Redis
 getRedisHealthCheckConfig(const envoy::config::core::v3alpha::HealthCheck& health_check_config,
                           ProtobufMessage::ValidationVisitor& validation_visitor) {
-
   ProtobufTypes::MessagePtr config =
       ProtobufTypes::MessagePtr{new envoy::config::health_checker::redis::v2::Redis()};
   Envoy::Config::Utility::translateOpaqueConfig(
       health_check_config.custom_health_check().typed_config(),
       health_check_config.custom_health_check().hidden_envoy_deprecated_config(),
       validation_visitor, *config);
-
   return MessageUtil::downcastAndValidate<const envoy::config::health_checker::redis::v2::Redis&>(
       *config, validation_visitor);
 }
