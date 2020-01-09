@@ -61,8 +61,7 @@ RetryStateImpl::RetryStateImpl(const RetryPolicy& route_policy, Http::HeaderMap&
       priority_(priority), retry_host_predicates_(route_policy.retryHostPredicates()),
       retry_priority_(route_policy.retryPriority()),
       retriable_status_codes_(route_policy.retriableStatusCodes()),
-      retriable_headers_(route_policy.retriableHeaders()),
-      retriable_request_headers_(route_policy.retriableRequestHeaders()) {
+      retriable_headers_(route_policy.retriableHeaders()) {
 
   std::chrono::milliseconds base_interval(
       runtime_.snapshot().getInteger("upstream.base_retry_backoff_ms", 25));
@@ -90,10 +89,11 @@ RetryStateImpl::RetryStateImpl(const RetryPolicy& route_policy, Http::HeaderMap&
         parseRetryGrpcOn(request_headers.EnvoyRetryGrpcOn()->value().getStringView()).first;
   }
 
-  if (!retriable_request_headers_.empty()) {
+  const auto& retriable_request_headers = route_policy.retriableRequestHeaders();
+  if (!retriable_request_headers.empty()) {
     // If this route limits retries by request headers, make sure there is a match.
     bool request_header_match = false;
-    for (const auto& retriable_header : retriable_request_headers_) {
+    for (const auto& retriable_header : retriable_request_headers) {
       if (retriable_header->matchesHeaders(request_headers)) {
         request_header_match = true;
         break;
