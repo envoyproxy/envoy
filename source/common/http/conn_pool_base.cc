@@ -43,16 +43,8 @@ void ConnPoolImplBase::attachRequestToClient(ActiveClient& client, StreamDecoder
     ENVOY_CONN_LOG(debug, "creating stream", *client.codec_client_);
     StreamEncoder& new_encoder = client.newStreamEncoder(response_decoder);
 
-    bool drain = false;
-    // remaining_requests_ == 0 means no limit, so handle 0 specially.
-    if (client.remaining_requests_ > 0) {
-      client.remaining_requests_--;
-      if (client.remaining_requests_ == 0) {
-        drain = true;
-      }
-    }
-
-    if (drain) {
+    client.remaining_requests_--;
+    if (client.remaining_requests_ == 0) {
       ENVOY_CONN_LOG(debug, "maximum requests per connection, DRAINING", *client.codec_client_);
       host_->cluster().stats().upstream_cx_max_requests_.inc();
       setActiveClientState(client, ActiveClient::State::DRAINING);
@@ -344,11 +336,19 @@ void ConnPoolImplBase::onPendingRequestCancel(PendingRequest& request) {
   checkForDrained();
 }
 
+namespace {
+// Translate zero to UINT64_MAX so that the zero/unlimited case doesn't
+// have to be handled specially.
+uint64_t translateZeroToUnlimited(uint64_t limit) {
+  return (limit != 0) ? limit : std::numeric_limits<uint64_t>::max();
+}
+} // namespace
+
 ConnPoolImplBase::ActiveClient::ActiveClient(ConnPoolImplBase& parent,
                                              uint64_t lifetime_request_limit,
                                              uint64_t concurrent_request_limit)
-    : parent_(parent), remaining_requests_(lifetime_request_limit),
-      concurrent_request_limit_(concurrent_request_limit),
+    : parent_(parent), remaining_requests_(translateZeroToUnlimited(lifetime_request_limit)),
+      concurrent_request_limit_(translateZeroToUnlimited(concurrent_request_limit)),
       connect_timer_(parent_.dispatcher_.createTimer([this]() -> void { onConnectTimeout(); })) {
   Upstream::Host::CreateConnectionData data = parent_.host_->createConnection(
       parent_.dispatcher_, parent_.socket_options_, parent_.transport_socket_options_);
