@@ -20,6 +20,8 @@
 #include "common/runtime/uuid_util.h"
 #include "common/stream_info/utility.h"
 
+#include "absl/strings/str_cat.h"
+
 namespace Envoy {
 namespace Tracing {
 
@@ -42,8 +44,8 @@ static std::string buildUrl(const Http::HeaderMap& request_headers,
     path = path.substr(0, max_path_length);
   }
 
-  return fmt::format("{}://{}{}", valueOrDefault(request_headers.ForwardedProto(), ""),
-                     valueOrDefault(request_headers.Host(), ""), path);
+  return absl::StrCat(valueOrDefault(request_headers.ForwardedProto(), ""), "://",
+                      valueOrDefault(request_headers.Host(), ""), path);
 }
 
 const std::string HttpTracerUtility::IngressOperation = "ingress";
@@ -321,7 +323,7 @@ void MetadataCustomTag::apply(Span& span, const CustomTagContext& ctx) const {
     span.setTag(tag(), value.bool_value() ? "true" : "false");
     return;
   case ProtobufWkt::Value::kNumberValue:
-    span.setTag(tag(), fmt::format("{}", value.number_value()));
+    span.setTag(tag(), absl::StrCat("", value.number_value()));
     return;
   case ProtobufWkt::Value::kStringValue:
     span.setTag(tag(), value.string_value());

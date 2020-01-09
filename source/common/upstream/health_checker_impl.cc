@@ -23,6 +23,7 @@
 #include "extensions/health_checkers/well_known_names.h"
 
 #include "absl/strings/match.h"
+#include "absl/strings/str_cat.h"
 
 namespace Envoy {
 namespace Upstream {
@@ -768,7 +769,7 @@ void GrpcHealthCheckerImpl::GrpcActiveHealthCheckSession::logHealthCheckStatus(
   if (grpc_status != Grpc::Status::WellKnownGrpcStatus::Ok && !grpc_message.empty()) {
     grpc_status_message = fmt::format("{} ({})", grpc_status, grpc_message);
   } else {
-    grpc_status_message = fmt::format("{}", grpc_status);
+    grpc_status_message = absl::StrCat("", grpc_status);
   }
 
   ENVOY_CONN_LOG(debug, "hc grpc_status={} service_status={} health_flags={}", *client_,

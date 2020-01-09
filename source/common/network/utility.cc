@@ -41,48 +41,48 @@ Address::InstanceConstSharedPtr Utility::resolveUrl(const std::string& url) {
     return Address::InstanceConstSharedPtr{
         new Address::PipeInstance(url.substr(UNIX_SCHEME.size()))};
   } else {
-    throw EnvoyException(fmt::format("unknown protocol scheme: {}", url));
+    throw EnvoyException(absl::StrCat("unknown protocol scheme: ", url));
   }
 }
 
-bool Utility::urlIsTcpScheme(const std::string& url) { return absl::StartsWith(url, TCP_SCHEME); }
+bool Utility::urlIsTcpScheme(absl::string_view url) { return absl::StartsWith(url, TCP_SCHEME); }
 
-bool Utility::urlIsUdpScheme(const std::string& url) { return absl::StartsWith(url, UDP_SCHEME); }
+bool Utility::urlIsUdpScheme(absl::string_view url) { return absl::StartsWith(url, UDP_SCHEME); }
 
-bool Utility::urlIsUnixScheme(const std::string& url) { return absl::StartsWith(url, UNIX_SCHEME); }
+bool Utility::urlIsUnixScheme(absl::string_view url) { return absl::StartsWith(url, UNIX_SCHEME); }
 
 namespace {
 
-std::string hostFromUrl(const std::string& url, const std::string& scheme,
-                        const std::string& scheme_name) {
+std::string hostFromUrl(const std::string& url, absl::string_view scheme,
+                        absl::string_view scheme_name) {
   if (!absl::StartsWith(url, scheme)) {
     throw EnvoyException(fmt::format("expected {} scheme, got: {}", scheme_name, url));
   }
 
-  size_t colon_index = url.find(':', scheme.size());
+  const size_t colon_index = url.find(':', scheme.size());
 
   if (colon_index == std::string::npos) {
-    throw EnvoyException(fmt::format("malformed url: {}", url));
+    throw EnvoyException(absl::StrCat("malformed url: ", url));
   }
 
   return url.substr(scheme.size(), colon_index - scheme.size());
 }
 
-uint32_t portFromUrl(const std::string& url, const std::string& scheme,
-                     const std::string& scheme_name) {
+uint32_t portFromUrl(const std::string& url, absl::string_view scheme,
+                     absl::string_view scheme_name) {
   if (!absl::StartsWith(url, scheme)) {
     throw EnvoyException(fmt::format("expected {} scheme, got: {}", scheme_name, url));
   }
 
-  size_t colon_index = url.find(':', scheme.size());
+  const size_t colon_index = url.find(':', scheme.size());
 
   if (colon_index == std::string::npos) {
-    throw EnvoyException(fmt::format("malformed url: {}", url));
+    throw EnvoyException(absl::StrCat("malformed url: ", url));
   }
 
-  size_t rcolon_index = url.rfind(':');
+  const size_t rcolon_index = url.rfind(':');
   if (colon_index != rcolon_index) {
-    throw EnvoyException(fmt::format("malformed url: {}", url));
+    throw EnvoyException(absl::StrCat("malformed url: ", url));
   }
 
   try {
@@ -184,8 +184,8 @@ Address::InstanceConstSharedPtr Utility::copyInternetAddressAndPort(const Addres
   return std::make_shared<Address::Ipv6Instance>(ip.addressAsString(), ip.port());
 }
 
-void Utility::throwWithMalformedIp(const std::string& ip_address) {
-  throw EnvoyException(fmt::format("malformed IP address: {}", ip_address));
+void Utility::throwWithMalformedIp(absl::string_view ip_address) {
+  throw EnvoyException(absl::StrCat("malformed IP address: ", ip_address));
 }
 
 // TODO(hennna): Currently getLocalAddress does not support choosing between
@@ -197,7 +197,7 @@ Address::InstanceConstSharedPtr Utility::getLocalAddress(const Address::IpVersio
   struct ifaddrs* ifa;
   Address::InstanceConstSharedPtr ret;
 
-  int rc = getifaddrs(&ifaddr);
+  const int rc = getifaddrs(&ifaddr);
   RELEASE_ASSERT(!rc, "");
 
   // man getifaddrs(3)

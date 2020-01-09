@@ -53,7 +53,7 @@ public:
   /**
    * @return std::string& the version of RouteConfiguration.
    */
-  virtual const std::string& configVersion() PURE;
+  virtual const std::string& configVersion() const PURE;
 
   /**
    * @return uint64_t the hash value of RouteConfiguration.

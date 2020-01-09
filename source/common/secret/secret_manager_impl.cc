@@ -28,7 +28,7 @@ void SecretManagerImpl::addStaticSecret(
     if (!static_tls_certificate_providers_.insert(std::make_pair(secret.name(), secret_provider))
              .second) {
       throw EnvoyException(
-          fmt::format("Duplicate static TlsCertificate secret name {}", secret.name()));
+          absl::StrCat("Duplicate static TlsCertificate secret name ", secret.name()));
     }
     break;
   }
@@ -38,8 +38,8 @@ void SecretManagerImpl::addStaticSecret(
     if (!static_certificate_validation_context_providers_
              .insert(std::make_pair(secret.name(), secret_provider))
              .second) {
-      throw EnvoyException(fmt::format(
-          "Duplicate static CertificateValidationContext secret name {}", secret.name()));
+      throw EnvoyException(absl::StrCat(
+          "Duplicate static CertificateValidationContext secret name ", secret.name()));
     }
     break;
   }
@@ -50,7 +50,7 @@ void SecretManagerImpl::addStaticSecret(
              .insert(std::make_pair(secret.name(), secret_provider))
              .second) {
       throw EnvoyException(
-          fmt::format("Duplicate static TlsSessionTicketKeys secret name {}", secret.name()));
+          absl::StrCat("Duplicate static TlsSessionTicketKeys secret name ", secret.name()));
     }
     break;
   }

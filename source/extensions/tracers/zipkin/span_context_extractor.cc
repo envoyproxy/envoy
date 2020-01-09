@@ -96,19 +96,19 @@ std::pair<SpanContext, bool> SpanContextExtractor::extractSpanContext(bool is_sa
             fmt::format("Invalid traceid_high {} or tracid {}", high_tid.c_str(), low_tid.c_str()));
       }
     } else if (!StringUtil::atoull(tid.c_str(), trace_id, 16)) {
-      throw ExtractorException(fmt::format("Invalid trace_id {}", tid.c_str()));
+      throw ExtractorException(absl::StrCat("Invalid trace_id ", tid.c_str()));
     }
 
     const std::string spid(b3_span_id_entry->value().getStringView());
     if (!StringUtil::atoull(spid.c_str(), span_id, 16)) {
-      throw ExtractorException(fmt::format("Invalid span id {}", spid.c_str()));
+      throw ExtractorException(absl::StrCat("Invalid span id ", spid.c_str()));
     }
 
     auto b3_parent_id_entry = request_headers_.get(ZipkinCoreConstants::get().X_B3_PARENT_SPAN_ID);
     if (b3_parent_id_entry && !b3_parent_id_entry->value().empty()) {
       const std::string pspid(b3_parent_id_entry->value().getStringView());
       if (!StringUtil::atoull(pspid.c_str(), parent_id, 16)) {
-        throw ExtractorException(fmt::format("Invalid parent span id {}", pspid.c_str()));
+        throw ExtractorException(absl::StrCat("Invalid parent span id ", pspid.c_str()));
       }
     }
   } else {

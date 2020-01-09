@@ -54,7 +54,7 @@ bool HeaderTransportImpl::decodeFrameStart(Buffer::Instance& buffer, MessageMeta
   // Minimum header frame size is 18 bytes (4 bytes of frame size + 10 bytes of fixed header +
   // minimum 4 bytes of variable header data), so frame_size must be at least 14.
   if (frame_size < MinFrameStartSize || frame_size > MaxFrameSize) {
-    throw EnvoyException(fmt::format("invalid thrift header transport frame size {}", frame_size));
+    throw EnvoyException(absl::StrCat("invalid thrift header transport frame size ", frame_size));
   }
 
   int16_t magic = buffer.peekBEInt<uint16_t>(4);
@@ -110,7 +110,7 @@ bool HeaderTransportImpl::decodeFrameStart(Buffer::Instance& buffer, MessageMeta
 
   int16_t num_xforms = drainVarIntI16(buffer, header_size, "transform count");
   if (num_xforms < 0) {
-    throw EnvoyException(fmt::format("invalid header transport transform count {}", num_xforms));
+    throw EnvoyException(absl::StrCat("invalid header transport transform count ", num_xforms));
   }
 
   while (num_xforms-- > 0) {
@@ -123,7 +123,7 @@ bool HeaderTransportImpl::decodeFrameStart(Buffer::Instance& buffer, MessageMeta
     // 3: snappy compression
     buffer.drain(header_size);
     metadata.setAppException(AppExceptionType::MissingResult,
-                             fmt::format("Unknown transform {}", xform_id));
+                             absl::StrCat("Unknown transform ", xform_id));
     return true;
   }
 
@@ -139,7 +139,7 @@ bool HeaderTransportImpl::decodeFrameStart(Buffer::Instance& buffer, MessageMeta
 
     int32_t num_headers = drainVarIntI32(buffer, header_size, "header count");
     if (num_headers < 0) {
-      throw EnvoyException(fmt::format("invalid header transport header count {}", num_headers));
+      throw EnvoyException(absl::StrCat("invalid header transport header count ", num_headers));
     }
 
     while (num_headers-- > 0) {
@@ -169,14 +169,14 @@ void HeaderTransportImpl::encodeFrame(Buffer::Instance& buffer, const MessageMet
                                       Buffer::Instance& message) {
   uint64_t msg_size = message.length();
   if (msg_size == 0) {
-    throw EnvoyException(fmt::format("invalid thrift header transport message size {}", msg_size));
+    throw EnvoyException(absl::StrCat("invalid thrift header transport message size ", msg_size));
   }
 
   const Http::HeaderMap& headers = metadata.headers();
   if (headers.size() > MaxHeadersSize / 2) {
     // Each header takes a minimum of 2 bytes, yielding this limit.
     throw EnvoyException(
-        fmt::format("invalid thrift header transport too many headers {}", headers.size()));
+        absl::StrCat("invalid thrift header transport too many headers ", headers.size()));
   }
 
   Buffer::OwnedImpl header_buffer;
@@ -218,19 +218,18 @@ void HeaderTransportImpl::encodeFrame(Buffer::Instance& buffer, const MessageMet
   uint64_t header_size = header_buffer.length();
 
   // Always pad (as the Apache implementation does).
-  int padding = 4 - (header_size % 4);
+  const int padding = 4 - (header_size % 4);
   header_buffer.add("\0\0\0\0", padding);
   header_size += padding;
 
   if (header_size > MaxHeadersSize) {
-    throw EnvoyException(
-        fmt::format("invalid thrift header transport header size {}", header_size));
+    throw EnvoyException(absl::StrCat("invalid thrift header transport header size ", header_size));
   }
 
   // Frame size does not include the frame length itself.
   uint64_t size = header_size + msg_size + MinFrameStartSizeNoHeaders;
   if (size > MaxFrameSize) {
-    throw EnvoyException(fmt::format("invalid thrift header transport frame size {}", size));
+    throw EnvoyException(absl::StrCat("invalid thrift header transport frame size ", size));
   }
 
   int32_t seq_id = 0;
@@ -276,7 +275,7 @@ int32_t HeaderTransportImpl::drainVarIntI32(Buffer::Instance& buffer, int32_t& h
 
 std::string HeaderTransportImpl::drainVarString(Buffer::Instance& buffer, int32_t& header_size,
                                                 const char* desc) {
-  int16_t str_len = drainVarIntI16(buffer, header_size, desc);
+  const int16_t str_len = drainVarIntI16(buffer, header_size, desc);
   if (str_len == 0) {
     return "";
   }
@@ -285,16 +284,16 @@ std::string HeaderTransportImpl::drainVarString(Buffer::Instance& buffer, int32_
     throw EnvoyException(fmt::format("unable to read header transport {}: header too small", desc));
   }
 
-  std::string value(static_cast<char*>(buffer.linearize(str_len)), str_len);
+  const std::string value(static_cast<char*>(buffer.linearize(str_len)), str_len);
   buffer.drain(str_len);
   header_size -= str_len;
   return value;
 }
 
 void HeaderTransportImpl::writeVarString(Buffer::Instance& buffer, const absl::string_view str) {
-  std::string::size_type len = str.length();
+  const std::string::size_type len = str.length();
   if (len > static_cast<uint32_t>(std::numeric_limits<int16_t>::max())) {
-    throw EnvoyException(fmt::format("header string too long: {}", len));
+    throw EnvoyException(absl::StrCat("header string too long: ", len));
   }
 
   BufferHelper::writeVarIntI32(buffer, static_cast<int32_t>(len));

@@ -56,9 +56,9 @@ public:
   MOCK_METHOD3(createCodec_, ServerConnection*(Network::Connection&, const Buffer::Instance&,
                                                ServerConnectionCallbacks&));
   MOCK_METHOD0(dateProvider, DateProvider&());
-  MOCK_METHOD0(drainTimeout, std::chrono::milliseconds());
+  MOCK_CONST_METHOD0(drainTimeout, std::chrono::milliseconds());
   MOCK_METHOD0(filterFactory, FilterChainFactory&());
-  MOCK_METHOD0(generateRequestId, bool());
+  MOCK_CONST_METHOD0(generateRequestId, bool());
   MOCK_CONST_METHOD0(preserveExternalRequestId, bool());
   MOCK_CONST_METHOD0(maxRequestHeadersKb, uint32_t());
   MOCK_CONST_METHOD0(maxRequestHeadersCount, uint32_t());
@@ -70,12 +70,12 @@ public:
   MOCK_CONST_METHOD0(delayedCloseTimeout, std::chrono::milliseconds());
   MOCK_METHOD0(routeConfigProvider, Router::RouteConfigProvider*());
   MOCK_METHOD0(scopedRouteConfigProvider, Config::ConfigProvider*());
-  MOCK_METHOD0(serverName, const std::string&());
-  MOCK_METHOD0(serverHeaderTransformation,
-               HttpConnectionManagerProto::ServerHeaderTransformation());
+  MOCK_CONST_METHOD0(serverName, const std::string&());
+  MOCK_CONST_METHOD0(serverHeaderTransformation,
+                     HttpConnectionManagerProto::ServerHeaderTransformation());
   MOCK_METHOD0(stats, ConnectionManagerStats&());
   MOCK_METHOD0(tracingStats, ConnectionManagerTracingStats&());
-  MOCK_METHOD0(useRemoteAddress, bool());
+  MOCK_CONST_METHOD0(useRemoteAddress, bool());
   const Http::InternalAddressConfig& internalAddressConfig() const override {
     return *internal_address_config_;
   }
@@ -83,7 +83,7 @@ public:
   MOCK_CONST_METHOD0(xffNumTrustedHops, uint32_t());
   MOCK_CONST_METHOD0(skipXffAppend, bool());
   MOCK_CONST_METHOD0(via, const std::string&());
-  MOCK_METHOD0(forwardClientCert, Http::ForwardClientCertType());
+  MOCK_CONST_METHOD0(forwardClientCert, Http::ForwardClientCertType());
   MOCK_CONST_METHOD0(setCurrentClientCertDetails,
                      const std::vector<Http::ClientCertDetailsType>&());
   MOCK_METHOD0(localAddress, const Network::Address::Instance&());
