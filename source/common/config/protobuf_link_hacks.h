@@ -50,7 +50,7 @@ const envoy::service::route::v3alpha::SrdsDummy _srds_dummy_v3;
 // With the v2 -> v3 migration there is another, related linking issue.
 // Symbols for v2 protos which headers are not included in any file in the codebase are being
 // dropped by the linker in some circumstances. For example, in the Envoy Mobile iOS build system.
-// Even though all v2 pkgs are included as a dependency in their corresponding v3 package, and
+// Even though all v2 packages are included as a dependency in their corresponding v3 package, and
 // `always_link` is set for all proto bazel targets.
 // Further proof of this can be seen by way of counter example with the envoy.api.v2.Cluster type,
 // which is checked for by proto_descriptors.cc. This type **is** getting linked because its headers
