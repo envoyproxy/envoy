@@ -37,19 +37,18 @@ public:
   MOCK_METHOD(TlsSessionTicketKeysConfigProviderSharedPtr, createInlineTlsSessionTicketKeysProvider,
               (const envoy::extensions::transport_sockets::tls::v3alpha::TlsSessionTicketKeys&
                    tls_session_ticket_keys));
-  MOCK_METHOD3(findOrCreateTlsCertificateProvider,
-               TlsCertificateConfigProviderSharedPtr(
-                   const envoy::config::core::v3alpha::ConfigSource&, const std::string&,
-                   Server::Configuration::TransportSocketFactoryContext&));
-  MOCK_METHOD3(findOrCreateCertificateValidationContextProvider,
-               CertificateValidationContextConfigProviderSharedPtr(
-                   const envoy::config::core::v3alpha::ConfigSource& config_source,
-                   const std::string& config_name,
-                   Server::Configuration::TransportSocketFactoryContext& secret_provider_context));
-  MOCK_METHOD3(findOrCreateTlsSessionTicketKeysContextProvider,
-               TlsSessionTicketKeysConfigProviderSharedPtr(
-                   const envoy::config::core::v3alpha::ConfigSource&, const std::string&,
-                   Server::Configuration::TransportSocketFactoryContext&));
+  MOCK_METHOD(TlsCertificateConfigProviderSharedPtr, findOrCreateTlsCertificateProvider,
+              (const envoy::config::core::v3alpha::ConfigSource&, const std::string&,
+               Server::Configuration::TransportSocketFactoryContext&));
+  MOCK_METHOD(CertificateValidationContextConfigProviderSharedPtr,
+              findOrCreateCertificateValidationContextProvider,
+              (const envoy::config::core::v3alpha::ConfigSource& config_source,
+               const std::string& config_name,
+               Server::Configuration::TransportSocketFactoryContext& secret_provider_context));
+  MOCK_METHOD(TlsSessionTicketKeysConfigProviderSharedPtr,
+              findOrCreateTlsSessionTicketKeysContextProvider,
+              (const envoy::config::core::v3alpha::ConfigSource&, const std::string&,
+               Server::Configuration::TransportSocketFactoryContext&));
 };
 
 class MockSecretCallbacks : public SecretCallbacks {

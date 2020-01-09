@@ -75,9 +75,9 @@ public:
   MOCK_METHOD(const Router::RouteEntry*, routeEntry, (), (const));
   MOCK_METHOD(envoy::config::core::v3alpha::Metadata&, dynamicMetadata, ());
   MOCK_METHOD(const envoy::config::core::v3alpha::Metadata&, dynamicMetadata, (), (const));
-  MOCK_METHOD2(setDynamicMetadata, void(const std::string&, const ProtobufWkt::Struct&));
-  MOCK_METHOD3(setDynamicMetadata,
-               void(const std::string&, const std::string&, const std::string&));
+  MOCK_METHOD(void, setDynamicMetadata, (const std::string&, const ProtobufWkt::Struct&));
+  MOCK_METHOD(void, setDynamicMetadata,
+              (const std::string&, const std::string&, const std::string&));
   MOCK_METHOD(FilterState&, filterState, ());
   MOCK_METHOD(const FilterState&, filterState, (), (const));
   MOCK_METHOD(void, setRequestedServerName, (const absl::string_view));

@@ -42,8 +42,8 @@ public:
   ~MockDnsResolver() override;
 
   // Network::DnsResolver
-  MOCK_METHOD3(resolve, ActiveDnsQuery*(const std::string& dns_name,
-                                        DnsLookupFamily dns_lookup_family, ResolveCb callback));
+  MOCK_METHOD(ActiveDnsQuery*, resolve,
+              (const std::string& dns_name, DnsLookupFamily dns_lookup_family, ResolveCb callback));
 
   testing::NiceMock<MockActiveDnsQuery> active_query_;
 };
@@ -65,7 +65,7 @@ public:
 
   MOCK_METHOD(Connection&, connection, ());
   MOCK_METHOD(void, continueReading, ());
-  MOCK_METHOD2(injectReadDataToFilterChain, void(Buffer::Instance& data, bool end_stream));
+  MOCK_METHOD(void, injectReadDataToFilterChain, (Buffer::Instance & data, bool end_stream));
   MOCK_METHOD(Upstream::HostDescriptionConstSharedPtr, upstreamHost, ());
   MOCK_METHOD(void, upstreamHost, (Upstream::HostDescriptionConstSharedPtr host));
 
@@ -78,7 +78,7 @@ public:
   MockReadFilter();
   ~MockReadFilter() override;
 
-  MOCK_METHOD2(onData, FilterStatus(Buffer::Instance& data, bool end_stream));
+  MOCK_METHOD(FilterStatus, onData, (Buffer::Instance & data, bool end_stream));
   MOCK_METHOD(FilterStatus, onNewConnection, ());
   MOCK_METHOD(void, initializeReadFilterCallbacks, (ReadFilterCallbacks & callbacks));
 
@@ -91,7 +91,7 @@ public:
   ~MockWriteFilterCallbacks() override;
 
   MOCK_METHOD(Connection&, connection, ());
-  MOCK_METHOD2(injectWriteDataToFilterChain, void(Buffer::Instance& data, bool end_stream));
+  MOCK_METHOD(void, injectWriteDataToFilterChain, (Buffer::Instance & data, bool end_stream));
 
   testing::NiceMock<MockConnection> connection_;
 };
@@ -101,7 +101,7 @@ public:
   MockWriteFilter();
   ~MockWriteFilter() override;
 
-  MOCK_METHOD2(onWrite, FilterStatus(Buffer::Instance& data, bool end_stream));
+  MOCK_METHOD(FilterStatus, onWrite, (Buffer::Instance & data, bool end_stream));
   MOCK_METHOD(void, initializeWriteFilterCallbacks, (WriteFilterCallbacks & callbacks));
 
   WriteFilterCallbacks* write_callbacks_{};
@@ -112,9 +112,9 @@ public:
   MockFilter();
   ~MockFilter() override;
 
-  MOCK_METHOD2(onData, FilterStatus(Buffer::Instance& data, bool end_stream));
+  MOCK_METHOD(FilterStatus, onData, (Buffer::Instance & data, bool end_stream));
   MOCK_METHOD(FilterStatus, onNewConnection, ());
-  MOCK_METHOD2(onWrite, FilterStatus(Buffer::Instance& data, bool end_stream));
+  MOCK_METHOD(FilterStatus, onWrite, (Buffer::Instance & data, bool end_stream));
   MOCK_METHOD(void, initializeReadFilterCallbacks, (ReadFilterCallbacks & callbacks));
   MOCK_METHOD(void, initializeWriteFilterCallbacks, (WriteFilterCallbacks & callbacks));
 
@@ -193,12 +193,12 @@ public:
   MockFilterChainFactory();
   ~MockFilterChainFactory() override;
 
-  MOCK_METHOD2(createNetworkFilterChain,
-               bool(Connection& connection,
-                    const std::vector<Network::FilterFactoryCb>& filter_factories));
+  MOCK_METHOD(bool, createNetworkFilterChain,
+              (Connection & connection,
+               const std::vector<Network::FilterFactoryCb>& filter_factories));
   MOCK_METHOD(bool, createListenerFilterChain, (ListenerFilterManager & listener));
-  MOCK_METHOD2(createUdpListenerFilterChain,
-               void(UdpListenerFilterManager& listener, UdpReadFilterCallbacks& callbacks));
+  MOCK_METHOD(void, createUdpListenerFilterChain,
+              (UdpListenerFilterManager & listener, UdpReadFilterCallbacks& callbacks));
 };
 
 class MockListenSocket : public Socket {

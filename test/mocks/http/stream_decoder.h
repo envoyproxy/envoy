@@ -22,9 +22,9 @@ public:
   void decodeMetadata(MetadataMapPtr&& metadata_map) override { decodeMetadata_(metadata_map); }
 
   // Http::StreamDecoder
-  MOCK_METHOD2(decodeHeaders_, void(HeaderMapPtr& headers, bool end_stream));
+  MOCK_METHOD(void, decodeHeaders_, (HeaderMapPtr & headers, bool end_stream));
   MOCK_METHOD(void, decode100ContinueHeaders_, (HeaderMapPtr & headers));
-  MOCK_METHOD2(decodeData, void(Buffer::Instance& data, bool end_stream));
+  MOCK_METHOD(void, decodeData, (Buffer::Instance & data, bool end_stream));
   MOCK_METHOD(void, decodeTrailers_, (HeaderMapPtr & trailers));
   MOCK_METHOD(void, decodeMetadata_, (MetadataMapPtr & metadata_map));
 };

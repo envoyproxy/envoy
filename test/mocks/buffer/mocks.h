@@ -21,7 +21,7 @@ public:
 
   MOCK_METHOD(Api::IoCallUint64Result, write, (Network::IoHandle & io_handle));
   MOCK_METHOD(void, move, (Buffer::Instance & rhs));
-  MOCK_METHOD2(move, void(Buffer::Instance& rhs, uint64_t length));
+  MOCK_METHOD(void, move, (Buffer::Instance & rhs, uint64_t length));
   MOCK_METHOD(void, drain, (uint64_t size));
 
   void baseMove(Buffer::Instance& rhs) { BaseClass::move(rhs); }
@@ -97,8 +97,8 @@ public:
     return Buffer::InstancePtr{create_(below_low, above_high)};
   }
 
-  MOCK_METHOD2(create_, Buffer::Instance*(std::function<void()> below_low,
-                                          std::function<void()> above_high));
+  MOCK_METHOD(Buffer::Instance*, create_,
+              (std::function<void()> below_low, std::function<void()> above_high));
 };
 
 MATCHER_P(BufferEqual, rhs, testing::PrintToString(*rhs)) {

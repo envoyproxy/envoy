@@ -44,7 +44,7 @@ public:
 
 class TestStatStore : public Stats::IsolatedStoreImpl {
 public:
-  MOCK_METHOD2(deliverHistogramToSinks, void(const Stats::Histogram& histogram, uint64_t value));
+  MOCK_METHOD(void, deliverHistogramToSinks, (const Stats::Histogram& histogram, uint64_t value));
 };
 
 class TestProxyFilter : public ProxyFilter {

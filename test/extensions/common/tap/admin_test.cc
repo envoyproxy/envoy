@@ -20,8 +20,8 @@ class MockExtensionConfig : public ExtensionConfig {
 public:
   MOCK_METHOD(const absl::string_view, adminId, ());
   MOCK_METHOD(void, clearTapConfig, ());
-  MOCK_METHOD2(newTapConfig,
-               void(envoy::config::tap::v3alpha::TapConfig&& proto_config, Sink* admin_streamer));
+  MOCK_METHOD(void, newTapConfig,
+              (envoy::config::tap::v3alpha::TapConfig && proto_config, Sink* admin_streamer));
 };
 
 class AdminHandlerTest : public testing::Test {

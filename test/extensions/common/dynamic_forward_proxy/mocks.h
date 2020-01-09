@@ -26,9 +26,9 @@ public:
     MockLoadDnsCacheEntryResult result = loadDnsCacheEntry_(host, default_port, callbacks);
     return {result.status_, LoadDnsCacheEntryHandlePtr{result.handle_}};
   }
-  MOCK_METHOD3(loadDnsCacheEntry_,
-               MockLoadDnsCacheEntryResult(absl::string_view host, uint16_t default_port,
-                                           LoadDnsCacheEntryCallbacks& callbacks));
+  MOCK_METHOD(MockLoadDnsCacheEntryResult, loadDnsCacheEntry_,
+              (absl::string_view host, uint16_t default_port,
+               LoadDnsCacheEntryCallbacks& callbacks));
 
   AddUpdateCallbacksHandlePtr addUpdateCallbacks(UpdateCallbacks& callbacks) override {
     return AddUpdateCallbacksHandlePtr{addUpdateCallbacks_(callbacks)};
@@ -78,8 +78,8 @@ public:
   MockUpdateCallbacks();
   ~MockUpdateCallbacks() override;
 
-  MOCK_METHOD2(onDnsHostAddOrUpdate,
-               void(const std::string& host, const DnsHostInfoSharedPtr& address));
+  MOCK_METHOD(void, onDnsHostAddOrUpdate,
+              (const std::string& host, const DnsHostInfoSharedPtr& address));
   MOCK_METHOD(void, onDnsHostRemove, (const std::string& host));
 };
 

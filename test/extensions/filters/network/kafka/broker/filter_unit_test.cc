@@ -35,7 +35,7 @@ class MockResponseDecoder : public ResponseDecoder {
 public:
   MockResponseDecoder() : ResponseDecoder{{}} {};
   MOCK_METHOD(void, onData, (Buffer::Instance&));
-  MOCK_METHOD3(expectResponse, void(const int32_t, const int16_t, const int16_t));
+  MOCK_METHOD(void, expectResponse, (const int32_t, const int16_t, const int16_t));
   MOCK_METHOD(void, reset, ());
 };
 
@@ -65,7 +65,7 @@ public:
 
 class MockRichResponseMetrics : public RichResponseMetrics {
 public:
-  MOCK_METHOD2(onResponse, void(const int16_t, const long long duration));
+  MOCK_METHOD(void, onResponse, (const int16_t, const long long duration));
   MOCK_METHOD(void, onUnknownResponse, ());
   MOCK_METHOD(void, onBrokenResponse, ());
 };

@@ -23,7 +23,7 @@ public:
   MOCK_METHOD(bool, canFlushClose, ());
   MOCK_METHOD(void, closeSocket, (Network::ConnectionEvent event));
   MOCK_METHOD(IoResult, doRead, (Buffer::Instance & buffer));
-  MOCK_METHOD2(doWrite, IoResult(Buffer::Instance& buffer, bool end_stream));
+  MOCK_METHOD(IoResult, doWrite, (Buffer::Instance & buffer, bool end_stream));
   MOCK_METHOD(void, onConnected, ());
   MOCK_METHOD(Ssl::ConnectionInfoConstSharedPtr, ssl, (), (const));
 

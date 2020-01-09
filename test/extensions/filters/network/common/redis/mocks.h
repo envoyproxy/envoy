@@ -29,7 +29,7 @@ public:
   MockEncoder();
   ~MockEncoder() override;
 
-  MOCK_METHOD2(encode, void(const Common::Redis::RespValue& value, Buffer::Instance& out));
+  MOCK_METHOD(void, encode, (const Common::Redis::RespValue& value, Buffer::Instance& out));
 
 private:
   Common::Redis::EncoderImpl real_encoder_;
@@ -85,8 +85,8 @@ public:
   MOCK_METHOD(void, addConnectionCallbacks, (Network::ConnectionCallbacks & callbacks));
   MOCK_METHOD(bool, active, ());
   MOCK_METHOD(void, close, ());
-  MOCK_METHOD2(makeRequest_,
-               PoolRequest*(const Common::Redis::RespValue& request, ClientCallbacks& callbacks));
+  MOCK_METHOD(PoolRequest*, makeRequest_,
+              (const Common::Redis::RespValue& request, ClientCallbacks& callbacks));
   MOCK_METHOD(void, initialize, (const std::string& password));
 
   std::list<Network::ConnectionCallbacks*> callbacks_;
@@ -106,8 +106,9 @@ public:
 
   MOCK_METHOD(void, onResponse_, (Common::Redis::RespValuePtr & value));
   MOCK_METHOD(void, onFailure, ());
-  MOCK_METHOD3(onRedirection_, bool(Common::Redis::RespValuePtr& value,
-                                    const std::string& host_address, bool ask_redirection));
+  MOCK_METHOD(bool, onRedirection_,
+              (Common::Redis::RespValuePtr & value, const std::string& host_address,
+               bool ask_redirection));
 };
 
 } // namespace Client

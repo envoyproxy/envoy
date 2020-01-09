@@ -60,7 +60,7 @@ public:
   MockWatcher();
   ~MockWatcher() override;
 
-  MOCK_METHOD3(addWatch, void(const std::string&, uint32_t, OnChangedCb));
+  MOCK_METHOD(void, addWatch, (const std::string&, uint32_t, OnChangedCb));
 };
 
 } // namespace Filesystem

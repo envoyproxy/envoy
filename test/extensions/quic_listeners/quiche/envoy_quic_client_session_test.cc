@@ -52,7 +52,7 @@ public:
                  std::make_unique<quic::NullEncrypter>(quic::Perspective::IS_CLIENT));
   }
 
-  MOCK_METHOD2(SendConnectionClosePacket, void(quic::QuicErrorCode, const std::string&));
+  MOCK_METHOD(void, SendConnectionClosePacket, (quic::QuicErrorCode, const std::string&));
   MOCK_METHOD(bool, SendControlFrame, (const quic::QuicFrame& frame));
 
   using EnvoyQuicClientConnection::connectionStats;

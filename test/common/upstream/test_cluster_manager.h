@@ -111,15 +111,13 @@ public:
 
   MOCK_METHOD(ClusterManager*, clusterManagerFromProto_,
               (const envoy::config::bootstrap::v3alpha::Bootstrap& bootstrap));
-  MOCK_METHOD3(allocateConnPool_,
-               Http::ConnectionPool::Instance*(HostConstSharedPtr host,
-                                               Network::ConnectionSocket::OptionsSharedPtr,
-                                               Network::TransportSocketOptionsSharedPtr));
+  MOCK_METHOD(Http::ConnectionPool::Instance*, allocateConnPool_,
+              (HostConstSharedPtr host, Network::ConnectionSocket::OptionsSharedPtr,
+               Network::TransportSocketOptionsSharedPtr));
   MOCK_METHOD(Tcp::ConnectionPool::Instance*, allocateTcpConnPool_, (HostConstSharedPtr host));
-  MOCK_METHOD4(clusterFromProto_,
-               std::pair<ClusterSharedPtr, ThreadAwareLoadBalancer*>(
-                   const envoy::config::cluster::v3alpha::Cluster& cluster, ClusterManager& cm,
-                   Outlier::EventLoggerSharedPtr outlier_event_logger, bool added_via_api));
+  MOCK_METHOD((std::pair<ClusterSharedPtr, ThreadAwareLoadBalancer*>), clusterFromProto_,
+              (const envoy::config::cluster::v3alpha::Cluster& cluster, ClusterManager& cm,
+               Outlier::EventLoggerSharedPtr outlier_event_logger, bool added_via_api));
   MOCK_METHOD(CdsApi*, createCds_, ());
 
   Stats::IsolatedStoreImpl stats_;
@@ -143,8 +141,8 @@ public:
 // Helper to intercept calls to postThreadLocalClusterUpdate.
 class MockLocalClusterUpdate {
 public:
-  MOCK_METHOD3(post, void(uint32_t priority, const HostVector& hosts_added,
-                          const HostVector& hosts_removed));
+  MOCK_METHOD(void, post,
+              (uint32_t priority, const HostVector& hosts_added, const HostVector& hosts_removed));
 };
 
 class MockLocalHostsRemoved {

@@ -136,17 +136,16 @@ public:
   void expectResetRetry();
 
   MOCK_METHOD(bool, enabled, ());
-  MOCK_METHOD2(shouldRetryHeaders,
-               RetryStatus(const Http::HeaderMap& response_headers, DoRetryCallback callback));
+  MOCK_METHOD(RetryStatus, shouldRetryHeaders,
+              (const Http::HeaderMap& response_headers, DoRetryCallback callback));
   MOCK_METHOD(bool, wouldRetryFromHeaders, (const Http::HeaderMap& response_headers));
-  MOCK_METHOD2(shouldRetryReset,
-               RetryStatus(const Http::StreamResetReason reset_reason, DoRetryCallback callback));
+  MOCK_METHOD(RetryStatus, shouldRetryReset,
+              (const Http::StreamResetReason reset_reason, DoRetryCallback callback));
   MOCK_METHOD(RetryStatus, shouldHedgeRetryPerTryTimeout, (DoRetryCallback callback));
   MOCK_METHOD(void, onHostAttempted, (Upstream::HostDescriptionConstSharedPtr));
   MOCK_METHOD(bool, shouldSelectAnotherHost, (const Upstream::Host& host));
-  MOCK_METHOD2(priorityLoadForRetry,
-               const Upstream::HealthyAndDegradedLoad&(const Upstream::PrioritySet&,
-                                                       const Upstream::HealthyAndDegradedLoad&));
+  MOCK_METHOD(const Upstream::HealthyAndDegradedLoad&, priorityLoadForRetry,
+              (const Upstream::PrioritySet&, const Upstream::HealthyAndDegradedLoad&));
   MOCK_METHOD(uint32_t, hostSelectionMaxAttempts, (), (const));
 
   DoRetryCallback callback_;
@@ -211,8 +210,9 @@ public:
     shadow_(cluster, request, timeout);
   }
 
-  MOCK_METHOD3(shadow_, void(const std::string& cluster, Http::MessagePtr& request,
-                             std::chrono::milliseconds timeout));
+  MOCK_METHOD(void, shadow_,
+              (const std::string& cluster, Http::MessagePtr& request,
+               std::chrono::milliseconds timeout));
 };
 
 class TestVirtualCluster : public VirtualCluster {
@@ -440,16 +440,14 @@ public:
   MockRouteConfigProviderManager();
   ~MockRouteConfigProviderManager() override;
 
-  MOCK_METHOD4(
-      createRdsRouteConfigProvider,
-      RouteConfigProviderSharedPtr(
-          const envoy::extensions::filters::network::http_connection_manager::v3alpha::Rds& rds,
-          Server::Configuration::FactoryContext& factory_context, const std::string& stat_prefix,
-          Init::Manager& init_manager));
-  MOCK_METHOD2(
-      createStaticRouteConfigProvider,
-      RouteConfigProviderPtr(const envoy::config::route::v3alpha::RouteConfiguration& route_config,
-                             Server::Configuration::FactoryContext& factory_context));
+  MOCK_METHOD(
+      RouteConfigProviderSharedPtr, createRdsRouteConfigProvider,
+      (const envoy::extensions::filters::network::http_connection_manager::v3alpha::Rds& rds,
+       Server::Configuration::FactoryContext& factory_context, const std::string& stat_prefix,
+       Init::Manager& init_manager));
+  MOCK_METHOD(RouteConfigProviderPtr, createStaticRouteConfigProvider,
+              (const envoy::config::route::v3alpha::RouteConfiguration& route_config,
+               Server::Configuration::FactoryContext& factory_context));
 };
 
 class MockScopedConfig : public ScopedConfig {

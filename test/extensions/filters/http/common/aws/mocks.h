@@ -24,7 +24,7 @@ public:
   MockSigner();
   ~MockSigner() override;
 
-  MOCK_METHOD2(sign, void(Http::Message&, bool));
+  MOCK_METHOD(void, sign, (Http::Message&, bool));
 };
 
 class MockMetadataFetcher {

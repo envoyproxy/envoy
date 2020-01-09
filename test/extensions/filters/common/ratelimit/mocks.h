@@ -22,9 +22,10 @@ public:
 
   // RateLimit::Client
   MOCK_METHOD(void, cancel, ());
-  MOCK_METHOD4(limit, void(RequestCallbacks& callbacks, const std::string& domain,
-                           const std::vector<Envoy::RateLimit::Descriptor>& descriptors,
-                           Tracing::Span& parent_span));
+  MOCK_METHOD(void, limit,
+              (RequestCallbacks & callbacks, const std::string& domain,
+               const std::vector<Envoy::RateLimit::Descriptor>& descriptors,
+               Tracing::Span& parent_span));
 };
 
 } // namespace RateLimit

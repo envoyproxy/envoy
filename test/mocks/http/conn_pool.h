@@ -30,8 +30,8 @@ public:
   MOCK_METHOD(void, addDrainedCallback, (DrainedCb cb));
   MOCK_METHOD(void, drainConnections, ());
   MOCK_METHOD(bool, hasActiveConnections, (), (const));
-  MOCK_METHOD2(newStream, Cancellable*(Http::StreamDecoder& response_decoder,
-                                       Http::ConnectionPool::Callbacks& callbacks));
+  MOCK_METHOD(Cancellable*, newStream,
+              (Http::StreamDecoder & response_decoder, Http::ConnectionPool::Callbacks& callbacks));
   MOCK_METHOD(Upstream::HostDescriptionConstSharedPtr, host, (), (const));
 
   std::shared_ptr<testing::NiceMock<Upstream::MockHostDescription>> host_;

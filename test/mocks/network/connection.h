@@ -74,7 +74,7 @@ public:
   MOCK_METHOD(Ssl::ConnectionInfoConstSharedPtr, ssl, (), (const));
   MOCK_METHOD(absl::string_view, requestedServerName, (), (const));
   MOCK_METHOD(State, state, (), (const));
-  MOCK_METHOD2(write, void(Buffer::Instance& data, bool end_stream));
+  MOCK_METHOD(void, write, (Buffer::Instance & data, bool end_stream));
   MOCK_METHOD(void, setBufferLimits, (uint32_t limit));
   MOCK_METHOD(uint32_t, bufferLimit, (), (const));
   MOCK_METHOD(bool, localAddressRestored, (), (const));
@@ -119,7 +119,7 @@ public:
   MOCK_METHOD(Ssl::ConnectionInfoConstSharedPtr, ssl, (), (const));
   MOCK_METHOD(absl::string_view, requestedServerName, (), (const));
   MOCK_METHOD(State, state, (), (const));
-  MOCK_METHOD2(write, void(Buffer::Instance& data, bool end_stream));
+  MOCK_METHOD(void, write, (Buffer::Instance & data, bool end_stream));
   MOCK_METHOD(void, setBufferLimits, (uint32_t limit));
   MOCK_METHOD(uint32_t, bufferLimit, (), (const));
   MOCK_METHOD(bool, localAddressRestored, (), (const));
@@ -167,7 +167,7 @@ public:
   MOCK_METHOD(Ssl::ConnectionInfoConstSharedPtr, ssl, (), (const));
   MOCK_METHOD(absl::string_view, requestedServerName, (), (const));
   MOCK_METHOD(State, state, (), (const));
-  MOCK_METHOD2(write, void(Buffer::Instance& data, bool end_stream));
+  MOCK_METHOD(void, write, (Buffer::Instance & data, bool end_stream));
   MOCK_METHOD(void, setBufferLimits, (uint32_t limit));
   MOCK_METHOD(uint32_t, bufferLimit, (), (const));
   MOCK_METHOD(bool, localAddressRestored, (), (const));
@@ -181,7 +181,7 @@ public:
   // Network::FilterManagerConnection
   MOCK_METHOD(StreamBuffer, getReadBuffer, ());
   MOCK_METHOD(StreamBuffer, getWriteBuffer, ());
-  MOCK_METHOD2(rawWrite, void(Buffer::Instance& data, bool end_stream));
+  MOCK_METHOD(void, rawWrite, (Buffer::Instance & data, bool end_stream));
 };
 
 } // namespace Network

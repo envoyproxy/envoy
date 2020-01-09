@@ -53,8 +53,8 @@ public:
   }
 
   MOCK_METHOD(const std::list<AccessLog::InstanceSharedPtr>&, accessLogs, ());
-  MOCK_METHOD3(createCodec_, ServerConnection*(Network::Connection&, const Buffer::Instance&,
-                                               ServerConnectionCallbacks&));
+  MOCK_METHOD(ServerConnection*, createCodec_,
+              (Network::Connection&, const Buffer::Instance&, ServerConnectionCallbacks&));
   MOCK_METHOD(DateProvider&, dateProvider, ());
   MOCK_METHOD(std::chrono::milliseconds, drainTimeout, ());
   MOCK_METHOD(FilterChainFactory&, filterFactory, ());

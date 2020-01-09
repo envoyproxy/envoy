@@ -593,7 +593,7 @@ public:
               cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->health());
   }
 
-  MOCK_METHOD2(onHostStatus, void(HostSharedPtr host, HealthTransition changed_state));
+  MOCK_METHOD(void, onHostStatus, (HostSharedPtr host, HealthTransition changed_state));
 
   std::shared_ptr<MockClusterMockPrioritySet> cluster_;
   NiceMock<Event::MockDispatcher> dispatcher_;
@@ -3288,7 +3288,7 @@ public:
     expectHostHealthy(true);
   }
 
-  MOCK_METHOD2(onHostStatus, void(HostSharedPtr host, HealthTransition changed_state));
+  MOCK_METHOD(void, onHostStatus, (HostSharedPtr host, HealthTransition changed_state));
 
   std::shared_ptr<MockClusterMockPrioritySet> cluster_;
   NiceMock<Event::MockDispatcher> dispatcher_;

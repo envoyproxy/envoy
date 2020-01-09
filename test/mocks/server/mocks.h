@@ -125,7 +125,7 @@ public:
 
   struct MockEntryOwner : public EntryOwner {};
 
-  MOCK_METHOD2(add_, EntryOwner*(std::string, Cb));
+  MOCK_METHOD(EntryOwner*, add_, (std::string, Cb));
 
   // Server::ConfigTracker
   MOCK_METHOD(const CbsMap&, getCallbacksMap, (), (const));
@@ -142,18 +142,20 @@ public:
   ~MockAdmin() override;
 
   // Server::Admin
-  MOCK_METHOD5(addHandler, bool(const std::string& prefix, const std::string& help_text,
-                                HandlerCb callback, bool removable, bool mutates_server_state));
+  MOCK_METHOD(bool, addHandler,
+              (const std::string& prefix, const std::string& help_text, HandlerCb callback,
+               bool removable, bool mutates_server_state));
   MOCK_METHOD(bool, removeHandler, (const std::string& prefix));
   MOCK_METHOD(Network::Socket&, socket, ());
   MOCK_METHOD(ConfigTracker&, getConfigTracker, ());
-  MOCK_METHOD5(startHttpListener,
-               void(const std::string& access_log_path, const std::string& address_out_path,
-                    Network::Address::InstanceConstSharedPtr address,
-                    const Network::Socket::OptionsSharedPtr& socket_options,
-                    Stats::ScopePtr&& listener_scope));
-  MOCK_METHOD4(request, Http::Code(absl::string_view path_and_query, absl::string_view method,
-                                   Http::HeaderMap& response_headers, std::string& body));
+  MOCK_METHOD(void, startHttpListener,
+              (const std::string& access_log_path, const std::string& address_out_path,
+               Network::Address::InstanceConstSharedPtr address,
+               const Network::Socket::OptionsSharedPtr& socket_options,
+               Stats::ScopePtr&& listener_scope));
+  MOCK_METHOD(Http::Code, request,
+              (absl::string_view path_and_query, absl::string_view method,
+               Http::HeaderMap& response_headers, std::string& body));
   MOCK_METHOD(void, addListenerToHandler, (Network::ConnectionHandler * handler));
 
   NiceMock<MockConfigTracker> config_tracker_;
@@ -203,8 +205,8 @@ public:
   ~MockGuardDog() override;
 
   // Server::GuardDog
-  MOCK_METHOD2(createWatchDog,
-               WatchDogSharedPtr(Thread::ThreadId thread_id, const std::string& thread_name));
+  MOCK_METHOD(WatchDogSharedPtr, createWatchDog,
+              (Thread::ThreadId thread_id, const std::string& thread_name));
   MOCK_METHOD(void, stopWatching, (WatchDogSharedPtr wd));
 
   std::shared_ptr<MockWatchDog> watch_dog_;
@@ -219,7 +221,7 @@ public:
   MOCK_METHOD(void, drainParentListeners, ());
   MOCK_METHOD(int, duplicateParentListenSocket, (const std::string& address));
   MOCK_METHOD(std::unique_ptr<envoy::HotRestartMessage>, getParentStats, ());
-  MOCK_METHOD2(initialize, void(Event::Dispatcher& dispatcher, Server::Instance& server));
+  MOCK_METHOD(void, initialize, (Event::Dispatcher & dispatcher, Server::Instance& server));
   MOCK_METHOD(void, sendParentAdminShutdownRequest, (time_t & original_start_time));
   MOCK_METHOD(void, sendParentTerminateRequest, ());
   MOCK_METHOD(ServerStatsFromParent, mergeParentStatsIfAny, (Stats::StoreRoot & stats_store));
@@ -251,26 +253,20 @@ public:
 
   MOCK_METHOD(LdsApi*, createLdsApi_,
               (const envoy::config::core::v3alpha::ConfigSource& lds_config));
-  MOCK_METHOD2(
-      createNetworkFilterFactoryList,
-      std::vector<Network::FilterFactoryCb>(
-          const Protobuf::RepeatedPtrField<envoy::config::listener::v3alpha::Filter>& filters,
-          Configuration::FilterChainFactoryContext& filter_chain_factory_context));
-  MOCK_METHOD2(
-      createListenerFilterFactoryList,
-      std::vector<Network::ListenerFilterFactoryCb>(
-          const Protobuf::RepeatedPtrField<envoy::config::listener::v3alpha::ListenerFilter>&,
-          Configuration::ListenerFactoryContext& context));
-  MOCK_METHOD2(
-      createUdpListenerFilterFactoryList,
-      std::vector<Network::UdpListenerFilterFactoryCb>(
-          const Protobuf::RepeatedPtrField<envoy::config::listener::v3alpha::ListenerFilter>&,
-          Configuration::ListenerFactoryContext& context));
-  MOCK_METHOD4(createListenSocket,
-               Network::SocketSharedPtr(Network::Address::InstanceConstSharedPtr address,
-                                        Network::Address::SocketType socket_type,
-                                        const Network::Socket::OptionsSharedPtr& options,
-                                        const ListenSocketCreationParams& params));
+  MOCK_METHOD(std::vector<Network::FilterFactoryCb>, createNetworkFilterFactoryList,
+              (const Protobuf::RepeatedPtrField<envoy::config::listener::v3alpha::Filter>& filters,
+               Configuration::FilterChainFactoryContext& filter_chain_factory_context));
+  MOCK_METHOD(std::vector<Network::ListenerFilterFactoryCb>, createListenerFilterFactoryList,
+              (const Protobuf::RepeatedPtrField<envoy::config::listener::v3alpha::ListenerFilter>&,
+               Configuration::ListenerFactoryContext& context));
+  MOCK_METHOD(std::vector<Network::UdpListenerFilterFactoryCb>, createUdpListenerFilterFactoryList,
+              (const Protobuf::RepeatedPtrField<envoy::config::listener::v3alpha::ListenerFilter>&,
+               Configuration::ListenerFactoryContext& context));
+  MOCK_METHOD(Network::SocketSharedPtr, createListenSocket,
+              (Network::Address::InstanceConstSharedPtr address,
+               Network::Address::SocketType socket_type,
+               const Network::Socket::OptionsSharedPtr& options,
+               const ListenSocketCreationParams& params));
   MOCK_METHOD(DrainManager*, createDrainManager_,
               (envoy::config::listener::v3alpha::Listener::DrainType drain_type));
   MOCK_METHOD(uint64_t, nextListenerTag, ());
@@ -283,8 +279,9 @@ public:
   MockListenerManager();
   ~MockListenerManager() override;
 
-  MOCK_METHOD3(addOrUpdateListener, bool(const envoy::config::listener::v3alpha::Listener& config,
-                                         const std::string& version_info, bool modifiable));
+  MOCK_METHOD(bool, addOrUpdateListener,
+              (const envoy::config::listener::v3alpha::Listener& config,
+               const std::string& version_info, bool modifiable));
   MOCK_METHOD(void, createLdsApi, (const envoy::config::core::v3alpha::ConfigSource& lds_config));
   MOCK_METHOD(std::vector<std::reference_wrapper<Network::ListenerConfig>>, listeners, ());
   MOCK_METHOD(uint64_t, numConnections, ());
@@ -301,9 +298,9 @@ public:
   MockServerLifecycleNotifier();
   ~MockServerLifecycleNotifier() override;
 
-  MOCK_METHOD2(registerCallback, ServerLifecycleNotifier::HandlePtr(Stage, StageCallback));
-  MOCK_METHOD2(registerCallback,
-               ServerLifecycleNotifier::HandlePtr(Stage, StageCallbackWithCompletion));
+  MOCK_METHOD(ServerLifecycleNotifier::HandlePtr, registerCallback, (Stage, StageCallback));
+  MOCK_METHOD(ServerLifecycleNotifier::HandlePtr, registerCallback,
+              (Stage, StageCallbackWithCompletion));
 };
 
 class MockWorkerFactory : public WorkerFactory {
@@ -337,16 +334,16 @@ public:
   }
 
   // Server::Worker
-  MOCK_METHOD2(addListener,
-               void(Network::ListenerConfig& listener, AddListenerCompletion completion));
+  MOCK_METHOD(void, addListener,
+              (Network::ListenerConfig & listener, AddListenerCompletion completion));
   MOCK_METHOD(uint64_t, numConnections, ());
-  MOCK_METHOD2(removeListener,
-               void(Network::ListenerConfig& listener, std::function<void()> completion));
+  MOCK_METHOD(void, removeListener,
+              (Network::ListenerConfig & listener, std::function<void()> completion));
   MOCK_METHOD(void, start, (GuardDog & guard_dog));
-  MOCK_METHOD2(initializeStats, void(Stats::Scope& scope, const std::string& prefix));
+  MOCK_METHOD(void, initializeStats, (Stats::Scope & scope, const std::string& prefix));
   MOCK_METHOD(void, stop, ());
-  MOCK_METHOD2(stopListener,
-               void(Network::ListenerConfig& listener, std::function<void()> completion));
+  MOCK_METHOD(void, stopListener,
+              (Network::ListenerConfig & listener, std::function<void()> completion));
 
   AddListenerCompletion add_listener_completion_;
   std::function<void()> remove_listener_completion_;
@@ -359,8 +356,9 @@ public:
 
   // OverloadManager
   MOCK_METHOD(void, start, ());
-  MOCK_METHOD3(registerForAction, bool(const std::string& action, Event::Dispatcher& dispatcher,
-                                       OverloadActionCb callback));
+  MOCK_METHOD(bool, registerForAction,
+              (const std::string& action, Event::Dispatcher& dispatcher,
+               OverloadActionCb callback));
   MOCK_METHOD(ThreadLocalOverloadState&, getThreadLocalOverloadState, ());
 
   ThreadLocalOverloadState overload_state_;

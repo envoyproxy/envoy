@@ -23,11 +23,11 @@ public:
   MockContextManager();
   ~MockContextManager() override;
 
-  MOCK_METHOD2(createSslClientContext,
-               ClientContextSharedPtr(Stats::Scope& scope, const ClientContextConfig& config));
-  MOCK_METHOD3(createSslServerContext,
-               ServerContextSharedPtr(Stats::Scope& stats, const ServerContextConfig& config,
-                                      const std::vector<std::string>& server_names));
+  MOCK_METHOD(ClientContextSharedPtr, createSslClientContext,
+              (Stats::Scope & scope, const ClientContextConfig& config));
+  MOCK_METHOD(ServerContextSharedPtr, createSslServerContext,
+              (Stats::Scope & stats, const ServerContextConfig& config,
+               const std::vector<std::string>& server_names));
   MOCK_METHOD(size_t, daysUntilFirstCertExpires, (), (const));
   MOCK_METHOD(void, iterateContexts, (std::function<void(const Context&)> callback));
   MOCK_METHOD(Ssl::PrivateKeyMethodManager&, privateKeyMethodManager, ());
@@ -116,11 +116,9 @@ public:
   MockPrivateKeyMethodManager();
   ~MockPrivateKeyMethodManager() override;
 
-  MOCK_METHOD2(
-      createPrivateKeyMethodProvider,
-      PrivateKeyMethodProviderSharedPtr(
-          const envoy::extensions::transport_sockets::tls::v3alpha::PrivateKeyProvider& config,
-          Envoy::Server::Configuration::TransportSocketFactoryContext& factory_context));
+  MOCK_METHOD(PrivateKeyMethodProviderSharedPtr, createPrivateKeyMethodProvider,
+              (const envoy::extensions::transport_sockets::tls::v3alpha::PrivateKeyProvider& config,
+               Envoy::Server::Configuration::TransportSocketFactoryContext& factory_context));
 };
 
 class MockPrivateKeyMethodProvider : public PrivateKeyMethodProvider {
@@ -128,8 +126,8 @@ public:
   MockPrivateKeyMethodProvider();
   ~MockPrivateKeyMethodProvider() override;
 
-  MOCK_METHOD3(registerPrivateKeyMethod,
-               void(SSL* ssl, PrivateKeyConnectionCallbacks& cb, Event::Dispatcher& dispatcher));
+  MOCK_METHOD(void, registerPrivateKeyMethod,
+              (SSL * ssl, PrivateKeyConnectionCallbacks& cb, Event::Dispatcher& dispatcher));
   MOCK_METHOD(void, unregisterPrivateKeyMethod, (SSL * ssl));
   MOCK_METHOD(bool, checkFips, ());
 

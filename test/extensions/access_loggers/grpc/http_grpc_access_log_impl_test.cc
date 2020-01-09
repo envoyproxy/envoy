@@ -43,11 +43,10 @@ public:
 class MockGrpcAccessLoggerCache : public GrpcCommon::GrpcAccessLoggerCache {
 public:
   // GrpcAccessLoggerCache
-  MOCK_METHOD2(
-      getOrCreateLogger,
-      GrpcCommon::GrpcAccessLoggerSharedPtr(
-          const envoy::extensions::access_loggers::grpc::v3alpha::CommonGrpcAccessLogConfig& config,
-          GrpcCommon::GrpcAccessLoggerType logger_type));
+  MOCK_METHOD(
+      GrpcCommon::GrpcAccessLoggerSharedPtr, getOrCreateLogger,
+      (const envoy::extensions::access_loggers::grpc::v3alpha::CommonGrpcAccessLogConfig& config,
+       GrpcCommon::GrpcAccessLoggerType logger_type));
 };
 
 class HttpGrpcAccessLogTest : public testing::Test {

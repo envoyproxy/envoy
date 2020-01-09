@@ -264,7 +264,7 @@ public:
   ~MockSink() override;
 
   MOCK_METHOD(void, flush, (MetricSnapshot & snapshot));
-  MOCK_METHOD2(onHistogramComplete, void(const Histogram& histogram, uint64_t value));
+  MOCK_METHOD(void, onHistogramComplete, (const Histogram& histogram, uint64_t value));
 };
 
 class SymbolTableProvider {
@@ -279,14 +279,14 @@ public:
 
   ScopePtr createScope(const std::string& name) override { return ScopePtr{createScope_(name)}; }
 
-  MOCK_METHOD2(deliverHistogramToSinks, void(const Histogram& histogram, uint64_t value));
+  MOCK_METHOD(void, deliverHistogramToSinks, (const Histogram& histogram, uint64_t value));
   MOCK_METHOD(Counter&, counter, (const std::string&));
   MOCK_METHOD(std::vector<CounterSharedPtr>, counters, (), (const));
   MOCK_METHOD(Scope*, createScope_, (const std::string& name));
-  MOCK_METHOD2(gauge, Gauge&(const std::string&, Gauge::ImportMode));
+  MOCK_METHOD(Gauge&, gauge, (const std::string&, Gauge::ImportMode));
   MOCK_METHOD(NullGaugeImpl&, nullGauge, (const std::string&));
   MOCK_METHOD(std::vector<GaugeSharedPtr>, gauges, (), (const));
-  MOCK_METHOD2(histogram, Histogram&(const std::string&, Histogram::Unit));
+  MOCK_METHOD(Histogram&, histogram, (const std::string&, Histogram::Unit));
   MOCK_METHOD(std::vector<ParentHistogramSharedPtr>, histograms, (), (const));
 
   MOCK_METHOD(OptionalCounter, findCounter, (StatName), (const));
@@ -317,7 +317,7 @@ public:
   MockIsolatedStatsStore();
   ~MockIsolatedStatsStore() override;
 
-  MOCK_METHOD2(deliverHistogramToSinks, void(const Histogram& histogram, uint64_t value));
+  MOCK_METHOD(void, deliverHistogramToSinks, (const Histogram& histogram, uint64_t value));
 };
 
 class MockStatsMatcher : public StatsMatcher {

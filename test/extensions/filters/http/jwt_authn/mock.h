@@ -24,9 +24,10 @@ public:
 
 class MockAuthenticator : public Authenticator {
 public:
-  MOCK_METHOD5(doVerify, void(Http::HeaderMap& headers, Tracing::Span& parent_span,
-                              std::vector<JwtLocationConstPtr>* tokens,
-                              SetPayloadCallback set_payload_cb, AuthenticatorCallback callback));
+  MOCK_METHOD(void, doVerify,
+              (Http::HeaderMap & headers, Tracing::Span& parent_span,
+               std::vector<JwtLocationConstPtr>* tokens, SetPayloadCallback set_payload_cb,
+               AuthenticatorCallback callback));
 
   void verify(Http::HeaderMap& headers, Tracing::Span& parent_span,
               std::vector<JwtLocationConstPtr>&& tokens, SetPayloadCallback set_payload_cb,

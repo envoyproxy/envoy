@@ -37,7 +37,7 @@ class TestFilter : public Filter {
 public:
   using Filter::Filter;
 
-  MOCK_METHOD2(scriptLog, void(spdlog::level::level_enum level, const char* message));
+  MOCK_METHOD(void, scriptLog, (spdlog::level::level_enum level, const char* message));
 };
 
 class LuaHttpFilterTest : public testing::Test {

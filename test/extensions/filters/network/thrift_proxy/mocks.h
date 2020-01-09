@@ -45,9 +45,9 @@ public:
   // ThriftProxy::Transport
   MOCK_METHOD(const std::string&, name, (), (const));
   MOCK_METHOD(TransportType, type, (), (const));
-  MOCK_METHOD2(decodeFrameStart, bool(Buffer::Instance&, MessageMetadata&));
+  MOCK_METHOD(bool, decodeFrameStart, (Buffer::Instance&, MessageMetadata&));
   MOCK_METHOD(bool, decodeFrameEnd, (Buffer::Instance&));
-  MOCK_METHOD3(encodeFrame, void(Buffer::Instance&, const MessageMetadata&, Buffer::Instance&));
+  MOCK_METHOD(void, encodeFrame, (Buffer::Instance&, const MessageMetadata&, Buffer::Instance&));
 
   std::string name_{"mock"};
   TransportType type_{TransportType::Auto};
@@ -62,57 +62,64 @@ public:
   MOCK_METHOD(const std::string&, name, (), (const));
   MOCK_METHOD(ProtocolType, type, (), (const));
   MOCK_METHOD(void, setType, (ProtocolType));
-  MOCK_METHOD2(readMessageBegin, bool(Buffer::Instance& buffer, MessageMetadata& metadata));
+  MOCK_METHOD(bool, readMessageBegin, (Buffer::Instance & buffer, MessageMetadata& metadata));
   MOCK_METHOD(bool, readMessageEnd, (Buffer::Instance & buffer));
-  MOCK_METHOD2(readStructBegin, bool(Buffer::Instance& buffer, std::string& name));
+  MOCK_METHOD(bool, readStructBegin, (Buffer::Instance & buffer, std::string& name));
   MOCK_METHOD(bool, readStructEnd, (Buffer::Instance & buffer));
-  MOCK_METHOD4(readFieldBegin, bool(Buffer::Instance& buffer, std::string& name,
-                                    FieldType& field_type, int16_t& field_id));
+  MOCK_METHOD(bool, readFieldBegin,
+              (Buffer::Instance & buffer, std::string& name, FieldType& field_type,
+               int16_t& field_id));
   MOCK_METHOD(bool, readFieldEnd, (Buffer::Instance & buffer));
-  MOCK_METHOD4(readMapBegin, bool(Buffer::Instance& buffer, FieldType& key_type,
-                                  FieldType& value_type, uint32_t& size));
+  MOCK_METHOD(bool, readMapBegin,
+              (Buffer::Instance & buffer, FieldType& key_type, FieldType& value_type,
+               uint32_t& size));
   MOCK_METHOD(bool, readMapEnd, (Buffer::Instance & buffer));
-  MOCK_METHOD3(readListBegin, bool(Buffer::Instance& buffer, FieldType& elem_type, uint32_t& size));
+  MOCK_METHOD(bool, readListBegin,
+              (Buffer::Instance & buffer, FieldType& elem_type, uint32_t& size));
   MOCK_METHOD(bool, readListEnd, (Buffer::Instance & buffer));
-  MOCK_METHOD3(readSetBegin, bool(Buffer::Instance& buffer, FieldType& elem_type, uint32_t& size));
+  MOCK_METHOD(bool, readSetBegin,
+              (Buffer::Instance & buffer, FieldType& elem_type, uint32_t& size));
   MOCK_METHOD(bool, readSetEnd, (Buffer::Instance & buffer));
-  MOCK_METHOD2(readBool, bool(Buffer::Instance& buffer, bool& value));
-  MOCK_METHOD2(readByte, bool(Buffer::Instance& buffer, uint8_t& value));
-  MOCK_METHOD2(readInt16, bool(Buffer::Instance& buffer, int16_t& value));
-  MOCK_METHOD2(readInt32, bool(Buffer::Instance& buffer, int32_t& value));
-  MOCK_METHOD2(readInt64, bool(Buffer::Instance& buffer, int64_t& value));
-  MOCK_METHOD2(readDouble, bool(Buffer::Instance& buffer, double& value));
-  MOCK_METHOD2(readString, bool(Buffer::Instance& buffer, std::string& value));
-  MOCK_METHOD2(readBinary, bool(Buffer::Instance& buffer, std::string& value));
+  MOCK_METHOD(bool, readBool, (Buffer::Instance & buffer, bool& value));
+  MOCK_METHOD(bool, readByte, (Buffer::Instance & buffer, uint8_t& value));
+  MOCK_METHOD(bool, readInt16, (Buffer::Instance & buffer, int16_t& value));
+  MOCK_METHOD(bool, readInt32, (Buffer::Instance & buffer, int32_t& value));
+  MOCK_METHOD(bool, readInt64, (Buffer::Instance & buffer, int64_t& value));
+  MOCK_METHOD(bool, readDouble, (Buffer::Instance & buffer, double& value));
+  MOCK_METHOD(bool, readString, (Buffer::Instance & buffer, std::string& value));
+  MOCK_METHOD(bool, readBinary, (Buffer::Instance & buffer, std::string& value));
 
-  MOCK_METHOD2(writeMessageBegin, void(Buffer::Instance& buffer, const MessageMetadata& metadata));
+  MOCK_METHOD(void, writeMessageBegin,
+              (Buffer::Instance & buffer, const MessageMetadata& metadata));
   MOCK_METHOD(void, writeMessageEnd, (Buffer::Instance & buffer));
-  MOCK_METHOD2(writeStructBegin, void(Buffer::Instance& buffer, const std::string& name));
+  MOCK_METHOD(void, writeStructBegin, (Buffer::Instance & buffer, const std::string& name));
   MOCK_METHOD(void, writeStructEnd, (Buffer::Instance & buffer));
-  MOCK_METHOD4(writeFieldBegin, void(Buffer::Instance& buffer, const std::string& name,
-                                     FieldType field_type, int16_t field_id));
+  MOCK_METHOD(void, writeFieldBegin,
+              (Buffer::Instance & buffer, const std::string& name, FieldType field_type,
+               int16_t field_id));
   MOCK_METHOD(void, writeFieldEnd, (Buffer::Instance & buffer));
-  MOCK_METHOD4(writeMapBegin, void(Buffer::Instance& buffer, FieldType key_type,
-                                   FieldType value_type, uint32_t size));
+  MOCK_METHOD(void, writeMapBegin,
+              (Buffer::Instance & buffer, FieldType key_type, FieldType value_type, uint32_t size));
   MOCK_METHOD(void, writeMapEnd, (Buffer::Instance & buffer));
-  MOCK_METHOD3(writeListBegin, void(Buffer::Instance& buffer, FieldType elem_type, uint32_t size));
+  MOCK_METHOD(void, writeListBegin,
+              (Buffer::Instance & buffer, FieldType elem_type, uint32_t size));
   MOCK_METHOD(void, writeListEnd, (Buffer::Instance & buffer));
-  MOCK_METHOD3(writeSetBegin, void(Buffer::Instance& buffer, FieldType elem_type, uint32_t size));
+  MOCK_METHOD(void, writeSetBegin, (Buffer::Instance & buffer, FieldType elem_type, uint32_t size));
   MOCK_METHOD(void, writeSetEnd, (Buffer::Instance & buffer));
-  MOCK_METHOD2(writeBool, void(Buffer::Instance& buffer, bool value));
-  MOCK_METHOD2(writeByte, void(Buffer::Instance& buffer, uint8_t value));
-  MOCK_METHOD2(writeInt16, void(Buffer::Instance& buffer, int16_t value));
-  MOCK_METHOD2(writeInt32, void(Buffer::Instance& buffer, int32_t value));
-  MOCK_METHOD2(writeInt64, void(Buffer::Instance& buffer, int64_t value));
-  MOCK_METHOD2(writeDouble, void(Buffer::Instance& buffer, double value));
-  MOCK_METHOD2(writeString, void(Buffer::Instance& buffer, const std::string& value));
-  MOCK_METHOD2(writeBinary, void(Buffer::Instance& buffer, const std::string& value));
+  MOCK_METHOD(void, writeBool, (Buffer::Instance & buffer, bool value));
+  MOCK_METHOD(void, writeByte, (Buffer::Instance & buffer, uint8_t value));
+  MOCK_METHOD(void, writeInt16, (Buffer::Instance & buffer, int16_t value));
+  MOCK_METHOD(void, writeInt32, (Buffer::Instance & buffer, int32_t value));
+  MOCK_METHOD(void, writeInt64, (Buffer::Instance & buffer, int64_t value));
+  MOCK_METHOD(void, writeDouble, (Buffer::Instance & buffer, double value));
+  MOCK_METHOD(void, writeString, (Buffer::Instance & buffer, const std::string& value));
+  MOCK_METHOD(void, writeBinary, (Buffer::Instance & buffer, const std::string& value));
   MOCK_METHOD(bool, supportsUpgrade, ());
   MOCK_METHOD(DecoderEventHandlerSharedPtr, upgradeRequestDecoder, ());
   MOCK_METHOD(DirectResponsePtr, upgradeResponse, (const DecoderEventHandler&));
-  MOCK_METHOD3(attemptUpgrade,
-               ThriftObjectPtr(Transport&, ThriftConnectionState&, Buffer::Instance&));
-  MOCK_METHOD2(completeUpgrade, void(ThriftConnectionState&, ThriftObject&));
+  MOCK_METHOD(ThriftObjectPtr, attemptUpgrade,
+              (Transport&, ThriftConnectionState&, Buffer::Instance&));
+  MOCK_METHOD(void, completeUpgrade, (ThriftConnectionState&, ThriftObject&));
 
   std::string name_{"mock"};
   ProtocolType type_{ProtocolType::Auto};
@@ -139,8 +146,8 @@ public:
   MOCK_METHOD(FilterStatus, messageEnd, ());
   MOCK_METHOD(FilterStatus, structBegin, (const absl::string_view name));
   MOCK_METHOD(FilterStatus, structEnd, ());
-  MOCK_METHOD3(fieldBegin,
-               FilterStatus(const absl::string_view name, FieldType& msg_type, int16_t& field_id));
+  MOCK_METHOD(FilterStatus, fieldBegin,
+              (const absl::string_view name, FieldType& msg_type, int16_t& field_id));
   MOCK_METHOD(FilterStatus, fieldEnd, ());
   MOCK_METHOD(FilterStatus, boolValue, (bool& value));
   MOCK_METHOD(FilterStatus, byteValue, (uint8_t & value));
@@ -149,11 +156,12 @@ public:
   MOCK_METHOD(FilterStatus, int64Value, (int64_t & value));
   MOCK_METHOD(FilterStatus, doubleValue, (double& value));
   MOCK_METHOD(FilterStatus, stringValue, (absl::string_view value));
-  MOCK_METHOD3(mapBegin, FilterStatus(FieldType& key_type, FieldType& value_type, uint32_t& size));
+  MOCK_METHOD(FilterStatus, mapBegin,
+              (FieldType & key_type, FieldType& value_type, uint32_t& size));
   MOCK_METHOD(FilterStatus, mapEnd, ());
-  MOCK_METHOD2(listBegin, FilterStatus(FieldType& elem_type, uint32_t& size));
+  MOCK_METHOD(FilterStatus, listBegin, (FieldType & elem_type, uint32_t& size));
   MOCK_METHOD(FilterStatus, listEnd, ());
-  MOCK_METHOD2(setBegin, FilterStatus(FieldType& elem_type, uint32_t& size));
+  MOCK_METHOD(FilterStatus, setBegin, (FieldType & elem_type, uint32_t& size));
   MOCK_METHOD(FilterStatus, setEnd, ());
 };
 
@@ -207,8 +215,8 @@ public:
   MOCK_METHOD(FilterStatus, messageEnd, ());
   MOCK_METHOD(FilterStatus, structBegin, (absl::string_view name));
   MOCK_METHOD(FilterStatus, structEnd, ());
-  MOCK_METHOD3(fieldBegin,
-               FilterStatus(absl::string_view name, FieldType& msg_type, int16_t& field_id));
+  MOCK_METHOD(FilterStatus, fieldBegin,
+              (absl::string_view name, FieldType& msg_type, int16_t& field_id));
   MOCK_METHOD(FilterStatus, fieldEnd, ());
   MOCK_METHOD(FilterStatus, boolValue, (bool& value));
   MOCK_METHOD(FilterStatus, byteValue, (uint8_t & value));
@@ -217,11 +225,12 @@ public:
   MOCK_METHOD(FilterStatus, int64Value, (int64_t & value));
   MOCK_METHOD(FilterStatus, doubleValue, (double& value));
   MOCK_METHOD(FilterStatus, stringValue, (absl::string_view value));
-  MOCK_METHOD3(mapBegin, FilterStatus(FieldType& key_type, FieldType& value_type, uint32_t& size));
+  MOCK_METHOD(FilterStatus, mapBegin,
+              (FieldType & key_type, FieldType& value_type, uint32_t& size));
   MOCK_METHOD(FilterStatus, mapEnd, ());
-  MOCK_METHOD2(listBegin, FilterStatus(FieldType& elem_type, uint32_t& size));
+  MOCK_METHOD(FilterStatus, listBegin, (FieldType & elem_type, uint32_t& size));
   MOCK_METHOD(FilterStatus, listEnd, ());
-  MOCK_METHOD2(setBegin, FilterStatus(FieldType& elem_type, uint32_t& size));
+  MOCK_METHOD(FilterStatus, setBegin, (FieldType & elem_type, uint32_t& size));
   MOCK_METHOD(FilterStatus, setEnd, ());
 };
 
@@ -237,8 +246,8 @@ public:
   MOCK_METHOD(Router::RouteConstSharedPtr, route, ());
   MOCK_METHOD(TransportType, downstreamTransportType, (), (const));
   MOCK_METHOD(ProtocolType, downstreamProtocolType, (), (const));
-  MOCK_METHOD2(sendLocalReply, void(const DirectResponse&, bool));
-  MOCK_METHOD2(startUpstreamResponse, void(Transport&, Protocol&));
+  MOCK_METHOD(void, sendLocalReply, (const DirectResponse&, bool));
+  MOCK_METHOD(void, startUpstreamResponse, (Transport&, Protocol&));
   MOCK_METHOD(ResponseStatus, upstreamData, (Buffer::Instance&));
   MOCK_METHOD(void, resetDownstreamConnection, ());
   MOCK_METHOD(StreamInfo::StreamInfo&, streamInfo, ());

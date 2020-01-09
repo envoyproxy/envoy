@@ -21,7 +21,7 @@ public:
   MockClusterSlotUpdateCallBack();
   ~MockClusterSlotUpdateCallBack() override = default;
 
-  MOCK_METHOD2(onClusterSlotUpdate, bool(ClusterSlotsPtr&&, Upstream::HostMap));
+  MOCK_METHOD(bool, onClusterSlotUpdate, (ClusterSlotsPtr&&, Upstream::HostMap));
   MOCK_METHOD(void, onHostHealthUpdate, ());
 };
 

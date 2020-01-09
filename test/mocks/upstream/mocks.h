@@ -107,10 +107,10 @@ public:
   MOCK_METHOD(Common::CallbackHandle*, addPriorityUpdateCb, (PriorityUpdateCb callback), (const));
   MOCK_METHOD(const std::vector<HostSetPtr>&, hostSetsPerPriority, (), (const));
   MOCK_METHOD(std::vector<HostSetPtr>&, hostSetsPerPriority, ());
-  MOCK_METHOD6(updateHosts, void(uint32_t priority, UpdateHostsParams&& update_hosts_params,
-                                 LocalityWeightsConstSharedPtr locality_weights,
-                                 const HostVector& hosts_added, const HostVector& hosts_removed,
-                                 absl::optional<uint32_t> overprovisioning_factor));
+  MOCK_METHOD(void, updateHosts,
+              (uint32_t priority, UpdateHostsParams&& update_hosts_params,
+               LocalityWeightsConstSharedPtr locality_weights, const HostVector& hosts_added,
+               const HostVector& hosts_removed, absl::optional<uint32_t> overprovisioning_factor));
   MOCK_METHOD(void, batchHostUpdate, (BatchUpdateCb&));
 
   MockHostSet* getMockHostSet(uint32_t priority) {
@@ -258,26 +258,22 @@ public:
   MOCK_METHOD(ClusterManagerPtr, clusterManagerFromProto,
               (const envoy::config::bootstrap::v3alpha::Bootstrap& bootstrap));
 
-  MOCK_METHOD6(allocateConnPool,
-               Http::ConnectionPool::InstancePtr(
-                   Event::Dispatcher& dispatcher, HostConstSharedPtr host,
-                   ResourcePriority priority, Http::Protocol protocol,
-                   const Network::ConnectionSocket::OptionsSharedPtr& options,
-                   const Network::TransportSocketOptionsSharedPtr& transport_socket_options));
+  MOCK_METHOD(Http::ConnectionPool::InstancePtr, allocateConnPool,
+              (Event::Dispatcher & dispatcher, HostConstSharedPtr host, ResourcePriority priority,
+               Http::Protocol protocol, const Network::ConnectionSocket::OptionsSharedPtr& options,
+               const Network::TransportSocketOptionsSharedPtr& transport_socket_options));
 
-  MOCK_METHOD5(allocateTcpConnPool, Tcp::ConnectionPool::InstancePtr(
-                                        Event::Dispatcher& dispatcher, HostConstSharedPtr host,
-                                        ResourcePriority priority,
-                                        const Network::ConnectionSocket::OptionsSharedPtr& options,
-                                        Network::TransportSocketOptionsSharedPtr));
+  MOCK_METHOD(Tcp::ConnectionPool::InstancePtr, allocateTcpConnPool,
+              (Event::Dispatcher & dispatcher, HostConstSharedPtr host, ResourcePriority priority,
+               const Network::ConnectionSocket::OptionsSharedPtr& options,
+               Network::TransportSocketOptionsSharedPtr));
 
-  MOCK_METHOD4(clusterFromProto,
-               std::pair<ClusterSharedPtr, ThreadAwareLoadBalancerPtr>(
-                   const envoy::config::cluster::v3alpha::Cluster& cluster, ClusterManager& cm,
-                   Outlier::EventLoggerSharedPtr outlier_event_logger, bool added_via_api));
+  MOCK_METHOD((std::pair<ClusterSharedPtr, ThreadAwareLoadBalancerPtr>), clusterFromProto,
+              (const envoy::config::cluster::v3alpha::Cluster& cluster, ClusterManager& cm,
+               Outlier::EventLoggerSharedPtr outlier_event_logger, bool added_via_api));
 
-  MOCK_METHOD2(createCds, CdsApiPtr(const envoy::config::core::v3alpha::ConfigSource& cds_config,
-                                    ClusterManager& cm));
+  MOCK_METHOD(CdsApiPtr, createCds,
+              (const envoy::config::core::v3alpha::ConfigSource& cds_config, ClusterManager& cm));
 
 private:
   NiceMock<Secret::MockSecretManager> secret_manager_;
@@ -309,21 +305,20 @@ public:
   ClusterManagerFactory& clusterManagerFactory() override { return cluster_manager_factory_; }
 
   // Upstream::ClusterManager
-  MOCK_METHOD2(addOrUpdateCluster, bool(const envoy::config::cluster::v3alpha::Cluster& cluster,
-                                        const std::string& version_info));
+  MOCK_METHOD(bool, addOrUpdateCluster,
+              (const envoy::config::cluster::v3alpha::Cluster& cluster,
+               const std::string& version_info));
   MOCK_METHOD(void, setInitializedCb, (std::function<void()>));
   MOCK_METHOD(ClusterInfoMap, clusters, ());
   MOCK_METHOD(ThreadLocalCluster*, get, (absl::string_view cluster));
-  MOCK_METHOD4(httpConnPoolForCluster,
-               Http::ConnectionPool::Instance*(const std::string& cluster,
-                                               ResourcePriority priority, Http::Protocol protocol,
-                                               LoadBalancerContext* context));
-  MOCK_METHOD3(tcpConnPoolForCluster,
-               Tcp::ConnectionPool::Instance*(const std::string& cluster, ResourcePriority priority,
-                                              LoadBalancerContext* context));
-  MOCK_METHOD2(tcpConnForCluster_,
-               MockHost::MockCreateConnectionData(const std::string& cluster,
-                                                  LoadBalancerContext* context));
+  MOCK_METHOD(Http::ConnectionPool::Instance*, httpConnPoolForCluster,
+              (const std::string& cluster, ResourcePriority priority, Http::Protocol protocol,
+               LoadBalancerContext* context));
+  MOCK_METHOD(Tcp::ConnectionPool::Instance*, tcpConnPoolForCluster,
+              (const std::string& cluster, ResourcePriority priority,
+               LoadBalancerContext* context));
+  MOCK_METHOD(MockHost::MockCreateConnectionData, tcpConnForCluster_,
+              (const std::string& cluster, LoadBalancerContext* context));
   MOCK_METHOD(Http::AsyncClient&, httpAsyncClientForCluster, (const std::string& cluster));
   MOCK_METHOD(bool, removeCluster, (const std::string& cluster));
   MOCK_METHOD(void, shutdown, ());
@@ -367,18 +362,21 @@ public:
 
 class MockHealthCheckEventLogger : public HealthCheckEventLogger {
 public:
-  MOCK_METHOD3(logEjectUnhealthy, void(envoy::data::core::v3alpha::HealthCheckerType,
-                                       const HostDescriptionConstSharedPtr&,
-                                       envoy::data::core::v3alpha::HealthCheckFailureType));
-  MOCK_METHOD3(logAddHealthy, void(envoy::data::core::v3alpha::HealthCheckerType,
-                                   const HostDescriptionConstSharedPtr&, bool));
-  MOCK_METHOD4(logUnhealthy, void(envoy::data::core::v3alpha::HealthCheckerType,
-                                  const HostDescriptionConstSharedPtr&,
-                                  envoy::data::core::v3alpha::HealthCheckFailureType, bool));
-  MOCK_METHOD2(logDegraded, void(envoy::data::core::v3alpha::HealthCheckerType,
-                                 const HostDescriptionConstSharedPtr&));
-  MOCK_METHOD2(logNoLongerDegraded, void(envoy::data::core::v3alpha::HealthCheckerType,
-                                         const HostDescriptionConstSharedPtr&));
+  MOCK_METHOD(void, logEjectUnhealthy,
+              (envoy::data::core::v3alpha::HealthCheckerType, const HostDescriptionConstSharedPtr&,
+               envoy::data::core::v3alpha::HealthCheckFailureType));
+  MOCK_METHOD(void, logAddHealthy,
+              (envoy::data::core::v3alpha::HealthCheckerType, const HostDescriptionConstSharedPtr&,
+               bool));
+  MOCK_METHOD(void, logUnhealthy,
+              (envoy::data::core::v3alpha::HealthCheckerType, const HostDescriptionConstSharedPtr&,
+               envoy::data::core::v3alpha::HealthCheckFailureType, bool));
+  MOCK_METHOD(void, logDegraded,
+              (envoy::data::core::v3alpha::HealthCheckerType,
+               const HostDescriptionConstSharedPtr&));
+  MOCK_METHOD(void, logNoLongerDegraded,
+              (envoy::data::core::v3alpha::HealthCheckerType,
+               const HostDescriptionConstSharedPtr&));
 };
 
 class MockCdsApi : public CdsApi {

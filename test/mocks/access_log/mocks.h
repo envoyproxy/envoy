@@ -27,10 +27,9 @@ public:
   ~MockFilter() override;
 
   // AccessLog::Filter
-  MOCK_METHOD4(evaluate,
-               bool(const StreamInfo::StreamInfo& info, const Http::HeaderMap& request_headers,
-                    const Http::HeaderMap& response_headers,
-                    const Http::HeaderMap& response_trailers));
+  MOCK_METHOD(bool, evaluate,
+              (const StreamInfo::StreamInfo& info, const Http::HeaderMap& request_headers,
+               const Http::HeaderMap& response_headers, const Http::HeaderMap& response_trailers));
 };
 
 class MockAccessLogManager : public AccessLogManager {
@@ -51,10 +50,10 @@ public:
   ~MockInstance() override;
 
   // AccessLog::Instance
-  MOCK_METHOD4(log,
-               void(const Http::HeaderMap* request_headers, const Http::HeaderMap* response_headers,
-                    const Http::HeaderMap* response_trailers,
-                    const StreamInfo::StreamInfo& stream_info));
+  MOCK_METHOD(void, log,
+              (const Http::HeaderMap* request_headers, const Http::HeaderMap* response_headers,
+               const Http::HeaderMap* response_trailers,
+               const StreamInfo::StreamInfo& stream_info));
 };
 
 } // namespace AccessLog

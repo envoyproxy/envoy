@@ -43,7 +43,7 @@ public:
 
   MOCK_METHOD(bool, deprecatedFeatureEnabled, (const std::string& key), (const));
   MOCK_METHOD(bool, runtimeFeatureEnabled, (absl::string_view key), (const));
-  MOCK_CONST_METHOD2(featureEnabled, bool(const std::string& key, uint64_t default_value));
+  MOCK_METHOD(bool, featureEnabled, (const std::string& key, uint64_t default_value), (const));
   MOCK_CONST_METHOD3(featureEnabled,
                      bool(const std::string& key, uint64_t default_value, uint64_t random_value));
   MOCK_CONST_METHOD4(featureEnabled, bool(const std::string& key, uint64_t default_value,
@@ -57,9 +57,9 @@ public:
                           uint64_t random_value));
   MOCK_METHOD(const std::string&, get, (const std::string& key), (const));
   MOCK_METHOD(bool, exists, (const std::string& key), (const));
-  MOCK_CONST_METHOD2(getInteger, uint64_t(const std::string& key, uint64_t default_value));
-  MOCK_CONST_METHOD2(getDouble, double(const std::string& key, double default_value));
-  MOCK_CONST_METHOD2(getBoolean, bool(absl::string_view key, bool default_value));
+  MOCK_METHOD(uint64_t, getInteger, (const std::string& key, uint64_t default_value), (const));
+  MOCK_METHOD(double, getDouble, (const std::string& key, double default_value), (const));
+  MOCK_METHOD(bool, getBoolean, (absl::string_view key, bool default_value), (const));
   MOCK_METHOD(const std::vector<OverrideLayerConstPtr>&, getLayers, (), (const));
 };
 

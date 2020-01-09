@@ -89,7 +89,7 @@ inline bool operator==(const StringViewSaver& saver, const char* str) {
 
 class MockScopedTrackedObject : public ScopeTrackedObject {
 public:
-  MOCK_CONST_METHOD2(dumpState, void(std::ostream&, int));
+  MOCK_METHOD(void, dumpState, (std::ostream&, int), (const));
 };
 
 } // namespace Envoy

@@ -110,8 +110,8 @@ public:
       : SdsApi(config_source, "abc.com", subscription_factory, time_source, validation_visitor_,
                server.stats(), init_manager, []() {}) {}
 
-  MOCK_METHOD2(onConfigUpdate,
-               void(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>&, const std::string&));
+  MOCK_METHOD(void, onConfigUpdate,
+              (const Protobuf::RepeatedPtrField<ProtobufWkt::Any>&, const std::string&));
   void onConfigUpdate(
       const Protobuf::RepeatedPtrField<envoy::service::discovery::v3alpha::Resource>& added,
       const Protobuf::RepeatedPtrField<std::string>& removed, const std::string& version) override {

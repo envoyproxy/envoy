@@ -54,8 +54,8 @@ public:
   ~MockServerConnectionCallbacks() override;
 
   // Http::ServerConnectionCallbacks
-  MOCK_METHOD2(newStream,
-               StreamDecoder&(StreamEncoder& response_encoder, bool is_internally_created));
+  MOCK_METHOD(StreamDecoder&, newStream,
+              (StreamEncoder & response_encoder, bool is_internally_created));
 };
 
 class MockStreamCallbacks : public StreamCallbacks {
@@ -64,7 +64,7 @@ public:
   ~MockStreamCallbacks() override;
 
   // Http::StreamCallbacks
-  MOCK_METHOD2(onResetStream, void(StreamResetReason reason, absl::string_view));
+  MOCK_METHOD(void, onResetStream, (StreamResetReason reason, absl::string_view));
   MOCK_METHOD(void, onAboveWriteBufferHighWatermark, ());
   MOCK_METHOD(void, onBelowWriteBufferLowWatermark, ());
 };
@@ -111,9 +111,9 @@ public:
 
   // Http::FilterChainFactory
   MOCK_METHOD(void, createFilterChain, (FilterChainFactoryCallbacks & callbacks));
-  MOCK_METHOD3(createUpgradeFilterChain, bool(absl::string_view upgrade_type,
-                                              const FilterChainFactory::UpgradeMap* upgrade_map,
-                                              FilterChainFactoryCallbacks& callbacks));
+  MOCK_METHOD(bool, createUpgradeFilterChain,
+              (absl::string_view upgrade_type, const FilterChainFactory::UpgradeMap* upgrade_map,
+               FilterChainFactoryCallbacks& callbacks));
 };
 
 class MockStreamFilterCallbacksBase {
@@ -170,21 +170,22 @@ public:
   }
 
   MOCK_METHOD(void, continueDecoding, ());
-  MOCK_METHOD2(addDecodedData, void(Buffer::Instance& data, bool streaming));
-  MOCK_METHOD2(injectDecodedDataToFilterChain, void(Buffer::Instance& data, bool end_stream));
+  MOCK_METHOD(void, addDecodedData, (Buffer::Instance & data, bool streaming));
+  MOCK_METHOD(void, injectDecodedDataToFilterChain, (Buffer::Instance & data, bool end_stream));
   MOCK_METHOD(HeaderMap&, addDecodedTrailers, ());
   MOCK_METHOD(MetadataMapVector&, addDecodedMetadata, ());
   MOCK_METHOD(const Buffer::Instance*, decodingBuffer, ());
   MOCK_METHOD(void, modifyDecodingBuffer, (std::function<void(Buffer::Instance&)>));
   MOCK_METHOD(void, encode100ContinueHeaders_, (HeaderMap & headers));
-  MOCK_METHOD2(encodeHeaders_, void(HeaderMap& headers, bool end_stream));
-  MOCK_METHOD2(encodeData, void(Buffer::Instance& data, bool end_stream));
+  MOCK_METHOD(void, encodeHeaders_, (HeaderMap & headers, bool end_stream));
+  MOCK_METHOD(void, encodeData, (Buffer::Instance & data, bool end_stream));
   MOCK_METHOD(void, encodeTrailers_, (HeaderMap & trailers));
   MOCK_METHOD(void, encodeMetadata_, (MetadataMapPtr metadata_map));
-  MOCK_METHOD5(sendLocalReply, void(Code code, absl::string_view body,
-                                    std::function<void(HeaderMap& headers)> modify_headers,
-                                    const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
-                                    absl::string_view details));
+  MOCK_METHOD(void, sendLocalReply,
+              (Code code, absl::string_view body,
+               std::function<void(HeaderMap& headers)> modify_headers,
+               const absl::optional<Grpc::Status::GrpcStatus> grpc_status,
+               absl::string_view details));
 
   Buffer::InstancePtr buffer_;
   std::list<DownstreamWatermarkCallbacks*> callbacks_{};
@@ -221,8 +222,8 @@ public:
   MOCK_METHOD(uint32_t, encoderBufferLimit, ());
 
   // Http::StreamEncoderFilterCallbacks
-  MOCK_METHOD2(addEncodedData, void(Buffer::Instance& data, bool streaming));
-  MOCK_METHOD2(injectEncodedDataToFilterChain, void(Buffer::Instance& data, bool end_stream));
+  MOCK_METHOD(void, addEncodedData, (Buffer::Instance & data, bool streaming));
+  MOCK_METHOD(void, injectEncodedDataToFilterChain, (Buffer::Instance & data, bool end_stream));
   MOCK_METHOD(HeaderMap&, addEncodedTrailers, ());
   MOCK_METHOD(void, addEncodedMetadata, (Http::MetadataMapPtr &&));
   MOCK_METHOD(void, continueEncoding, ());
@@ -244,8 +245,8 @@ public:
   MOCK_METHOD(void, onDestroy, ());
 
   // Http::StreamDecoderFilter
-  MOCK_METHOD2(decodeHeaders, FilterHeadersStatus(HeaderMap& headers, bool end_stream));
-  MOCK_METHOD2(decodeData, FilterDataStatus(Buffer::Instance& data, bool end_stream));
+  MOCK_METHOD(FilterHeadersStatus, decodeHeaders, (HeaderMap & headers, bool end_stream));
+  MOCK_METHOD(FilterDataStatus, decodeData, (Buffer::Instance & data, bool end_stream));
   MOCK_METHOD(FilterTrailersStatus, decodeTrailers, (HeaderMap & trailers));
   MOCK_METHOD(FilterMetadataStatus, decodeMetadata, (Http::MetadataMap & metadata_map));
   MOCK_METHOD(void, setDecoderFilterCallbacks, (StreamDecoderFilterCallbacks & callbacks));
@@ -264,8 +265,8 @@ public:
 
   // Http::MockStreamEncoderFilter
   MOCK_METHOD(FilterHeadersStatus, encode100ContinueHeaders, (HeaderMap & headers));
-  MOCK_METHOD2(encodeHeaders, FilterHeadersStatus(HeaderMap& headers, bool end_stream));
-  MOCK_METHOD2(encodeData, FilterDataStatus(Buffer::Instance& data, bool end_stream));
+  MOCK_METHOD(FilterHeadersStatus, encodeHeaders, (HeaderMap & headers, bool end_stream));
+  MOCK_METHOD(FilterDataStatus, encodeData, (Buffer::Instance & data, bool end_stream));
   MOCK_METHOD(FilterTrailersStatus, encodeTrailers, (HeaderMap & trailers));
   MOCK_METHOD(FilterMetadataStatus, encodeMetadata, (MetadataMap & metadata_map));
   MOCK_METHOD(void, setEncoderFilterCallbacks, (StreamEncoderFilterCallbacks & callbacks));
@@ -283,16 +284,16 @@ public:
   MOCK_METHOD(void, onDestroy, ());
 
   // Http::StreamDecoderFilter
-  MOCK_METHOD2(decodeHeaders, FilterHeadersStatus(HeaderMap& headers, bool end_stream));
-  MOCK_METHOD2(decodeData, FilterDataStatus(Buffer::Instance& data, bool end_stream));
+  MOCK_METHOD(FilterHeadersStatus, decodeHeaders, (HeaderMap & headers, bool end_stream));
+  MOCK_METHOD(FilterDataStatus, decodeData, (Buffer::Instance & data, bool end_stream));
   MOCK_METHOD(FilterTrailersStatus, decodeTrailers, (HeaderMap & trailers));
   MOCK_METHOD(FilterMetadataStatus, decodeMetadata, (Http::MetadataMap & metadata_map));
   MOCK_METHOD(void, setDecoderFilterCallbacks, (StreamDecoderFilterCallbacks & callbacks));
 
   // Http::MockStreamEncoderFilter
   MOCK_METHOD(FilterHeadersStatus, encode100ContinueHeaders, (HeaderMap & headers));
-  MOCK_METHOD2(encodeHeaders, FilterHeadersStatus(HeaderMap& headers, bool end_stream));
-  MOCK_METHOD2(encodeData, FilterDataStatus(Buffer::Instance& data, bool end_stream));
+  MOCK_METHOD(FilterHeadersStatus, encodeHeaders, (HeaderMap & headers, bool end_stream));
+  MOCK_METHOD(FilterDataStatus, encodeData, (Buffer::Instance & data, bool end_stream));
   MOCK_METHOD(FilterTrailersStatus, encodeTrailers, (HeaderMap & trailers));
   MOCK_METHOD(FilterMetadataStatus, encodeMetadata, (MetadataMap & metadata_map));
   MOCK_METHOD(void, setEncoderFilterCallbacks, (StreamEncoderFilterCallbacks & callbacks));
@@ -313,10 +314,10 @@ public:
     return send_(request, callbacks, args);
   }
 
-  MOCK_METHOD3(send_,
-               Request*(MessagePtr& request, Callbacks& callbacks, const RequestOptions& args));
+  MOCK_METHOD(Request*, send_,
+              (MessagePtr & request, Callbacks& callbacks, const RequestOptions& args));
 
-  MOCK_METHOD2(start, Stream*(StreamCallbacks& callbacks, const StreamOptions& args));
+  MOCK_METHOD(Stream*, start, (StreamCallbacks & callbacks, const StreamOptions& args));
 
   MOCK_METHOD(Event::Dispatcher&, dispatcher, ());
 
@@ -345,8 +346,8 @@ public:
   }
   void onTrailers(HeaderMapPtr&& trailers) override { onTrailers_(*trailers); }
 
-  MOCK_METHOD2(onHeaders_, void(HeaderMap& headers, bool end_stream));
-  MOCK_METHOD2(onData, void(Buffer::Instance& data, bool end_stream));
+  MOCK_METHOD(void, onHeaders_, (HeaderMap & headers, bool end_stream));
+  MOCK_METHOD(void, onData, (Buffer::Instance & data, bool end_stream));
   MOCK_METHOD(void, onTrailers_, (HeaderMap & headers));
   MOCK_METHOD(void, onComplete, ());
   MOCK_METHOD(void, onReset, ());
@@ -367,8 +368,8 @@ public:
   MockAsyncClientStream();
   ~MockAsyncClientStream() override;
 
-  MOCK_METHOD2(sendHeaders, void(HeaderMap& headers, bool end_stream));
-  MOCK_METHOD2(sendData, void(Buffer::Instance& data, bool end_stream));
+  MOCK_METHOD(void, sendHeaders, (HeaderMap & headers, bool end_stream));
+  MOCK_METHOD(void, sendData, (Buffer::Instance & data, bool end_stream));
   MOCK_METHOD(void, sendTrailers, (HeaderMap & trailers));
   MOCK_METHOD(void, reset, ());
 };

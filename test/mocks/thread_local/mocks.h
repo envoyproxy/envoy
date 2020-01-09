@@ -18,11 +18,11 @@ public:
   ~MockInstance() override;
 
   MOCK_METHOD(void, runOnAllThreads, (Event::PostCb cb));
-  MOCK_METHOD2(runOnAllThreads, void(Event::PostCb cb, Event::PostCb main_callback));
+  MOCK_METHOD(void, runOnAllThreads, (Event::PostCb cb, Event::PostCb main_callback));
 
   // Server::ThreadLocal
   MOCK_METHOD(SlotPtr, allocateSlot, ());
-  MOCK_METHOD2(registerThread, void(Event::Dispatcher& dispatcher, bool main_thread));
+  MOCK_METHOD(void, registerThread, (Event::Dispatcher & dispatcher, bool main_thread));
   MOCK_METHOD(void, shutdownGlobalThreading, ());
   MOCK_METHOD(void, shutdownThread, ());
   MOCK_METHOD(Event::Dispatcher&, dispatcher, ());

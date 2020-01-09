@@ -67,7 +67,7 @@ public:
     return EnvoyQuicConnection::connectionStats();
   }
 
-  MOCK_METHOD2(SendConnectionClosePacket, void(quic::QuicErrorCode, const std::string&));
+  MOCK_METHOD(void, SendConnectionClosePacket, (quic::QuicErrorCode, const std::string&));
   MOCK_METHOD(bool, SendControlFrame, (const quic::QuicFrame& frame));
 };
 

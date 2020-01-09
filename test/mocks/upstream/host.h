@@ -28,13 +28,13 @@ public:
 
   MOCK_METHOD(uint32_t, numEjections, ());
   MOCK_METHOD(void, putHttpResponseCode, (uint64_t code));
-  MOCK_METHOD2(putResult, void(Result result, absl::optional<uint64_t> code));
+  MOCK_METHOD(void, putResult, (Result result, absl::optional<uint64_t> code));
   MOCK_METHOD(void, putResponseTime, (std::chrono::milliseconds time));
   MOCK_METHOD(const absl::optional<MonotonicTime>&, lastEjectionTime, ());
   MOCK_METHOD(const absl::optional<MonotonicTime>&, lastUnejectionTime, ());
   MOCK_METHOD(double, successRate, (DetectorHostMonitor::SuccessRateMonitorType type), (const));
-  MOCK_METHOD2(successRate,
-               void(DetectorHostMonitor::SuccessRateMonitorType type, double new_success_rate));
+  MOCK_METHOD(void, successRate,
+              (DetectorHostMonitor::SuccessRateMonitorType type, double new_success_rate));
 };
 
 class MockEventLogger : public EventLogger {
@@ -42,9 +42,9 @@ public:
   MockEventLogger();
   ~MockEventLogger() override;
 
-  MOCK_METHOD4(logEject,
-               void(const HostDescriptionConstSharedPtr& host, Detector& detector,
-                    envoy::data::cluster::v2alpha::OutlierEjectionType type, bool enforced));
+  MOCK_METHOD(void, logEject,
+              (const HostDescriptionConstSharedPtr& host, Detector& detector,
+               envoy::data::cluster::v2alpha::OutlierEjectionType type, bool enforced));
   MOCK_METHOD(void, logUneject, (const HostDescriptionConstSharedPtr& host));
 };
 

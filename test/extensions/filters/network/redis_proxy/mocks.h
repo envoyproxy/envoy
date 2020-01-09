@@ -76,9 +76,8 @@ public:
     return makeRequest_(hash_key, request, callbacks);
   }
 
-  MOCK_METHOD3(makeRequest_,
-               Common::Redis::Client::PoolRequest*(const std::string& hash_key,
-                                                   RespVariant& request, PoolCallbacks& callbacks));
+  MOCK_METHOD(Common::Redis::Client::PoolRequest*, makeRequest_,
+              (const std::string& hash_key, RespVariant& request, PoolCallbacks& callbacks));
   MOCK_METHOD(bool, onRedirection, ());
 };
 } // namespace ConnPool
@@ -115,8 +114,8 @@ public:
     return SplitRequestPtr{makeRequest_(*request, callbacks)};
   }
 
-  MOCK_METHOD2(makeRequest_,
-               SplitRequest*(const Common::Redis::RespValue& request, SplitCallbacks& callbacks));
+  MOCK_METHOD(SplitRequest*, makeRequest_,
+              (const Common::Redis::RespValue& request, SplitCallbacks& callbacks));
 };
 
 } // namespace CommandSplitter
