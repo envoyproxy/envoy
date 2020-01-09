@@ -92,14 +92,17 @@ RetryStateImpl::RetryStateImpl(const RetryPolicy& route_policy, Http::HeaderMap&
 
   if (!retriable_request_headers_.empty()) {
     // If this route limits retries by request headers, make sure there is a match.
-    uint32_t request_header_match = 0;
+    bool request_header_match = false;
     for (const auto& retriable_header : retriable_request_headers_) {
       if (retriable_header->matchesHeaders(request_headers)) {
-        request_header_match = 1;
+        request_header_match = true;
         break;
       }
     }
-    retry_on_ &= request_header_match;
+
+    if (!request_header_match) {
+      retry_on_ = 0;
+    }
   }
   if (retry_on_ != 0 && request_headers.EnvoyMaxRetries()) {
     uint64_t temp;

@@ -705,15 +705,30 @@ TEST_F(RouterRetryStateImplTest, PolicyLimitedByRequestHeaders) {
   }
 
   {
+    Http::TestHeaderMapImpl request_headers{{":method", "GET"}, {"x-envoy-retry-on", "retriable-4xx"}};
+    setup(request_headers);
+    EXPECT_TRUE(state_->enabled());
+    Http::TestHeaderMapImpl response_headers{{":status", "409"}};
+    expectTimerCreateAndEnable();
+    EXPECT_EQ(RetryStatus::Yes, state_->shouldRetryHeaders(response_headers, callback_));
+  }
+
+  {
     Http::TestHeaderMapImpl request_headers{{":method", "GET"}, {"x-envoy-retry-on", "5xx"}};
     setup(request_headers);
     EXPECT_TRUE(state_->enabled());
+    Http::TestHeaderMapImpl response_headers{{":status", "500"}};
+    expectTimerCreateAndEnable();
+    EXPECT_EQ(RetryStatus::Yes, state_->shouldRetryHeaders(response_headers, callback_));
   }
 
   {
     Http::TestHeaderMapImpl request_headers{{":method", "HEAD"}, {"x-envoy-retry-on", "5xx"}};
     setup(request_headers);
     EXPECT_TRUE(state_->enabled());
+    Http::TestHeaderMapImpl response_headers{{":status", "500"}};
+    expectTimerCreateAndEnable();
+    EXPECT_EQ(RetryStatus::Yes, state_->shouldRetryHeaders(response_headers, callback_));
   }
 
   {
