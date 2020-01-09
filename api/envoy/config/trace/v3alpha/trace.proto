@@ -11,6 +11,7 @@ import "google/protobuf/wrappers.proto";
 import "opencensus/proto/trace/v1/trace_config.proto";
 import "udpa/annotations/versioning.proto";
 
+import "envoy/annotations/deprecation.proto";
 import "validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.config.trace.v3alpha";
@@ -94,7 +95,8 @@ message ZipkinConfig {
     // Hence the motivation of adding HTTP_JSON_V1 as the default is to avoid a breaking change when
     // user upgrading Envoy with this change. Furthermore, we also immediately deprecate this field,
     // since in Zipkin realm this v1 version is considered to be not preferable anymore.]
-    DEPRECATED_AND_UNAVAILABLE_DO_NOT_USE = 0 [deprecated = true];
+    DEPRECATED_AND_UNAVAILABLE_DO_NOT_USE = 0
+        [deprecated = true, (envoy.annotations.disallowed_by_default_enum) = true];
 
     // Zipkin API v2, JSON over HTTP.
     HTTP_JSON = 1;

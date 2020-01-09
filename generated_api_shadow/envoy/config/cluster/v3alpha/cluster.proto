@@ -21,6 +21,7 @@ import "google/protobuf/wrappers.proto";
 
 import "udpa/annotations/versioning.proto";
 
+import "envoy/annotations/deprecation.proto";
 import "validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.config.cluster.v3alpha";
@@ -92,7 +93,8 @@ message Cluster {
     //
     //   **This load balancing policy is deprecated**. Use CLUSTER_PROVIDED instead.
     //
-    hidden_envoy_deprecated_ORIGINAL_DST_LB = 4 [deprecated = true];
+    hidden_envoy_deprecated_ORIGINAL_DST_LB = 4
+        [deprecated = true, (envoy.annotations.disallowed_by_default_enum) = true];
 
     // Refer to the :ref:`Maglev load balancing policy<arch_overview_load_balancing_types_maglev>`
     // for an explanation.
@@ -639,7 +641,8 @@ message Cluster {
   //   **This field is deprecated**. Use `transport_socket` with name `tls` instead. If both are
   //   set, `transport_socket` takes priority.
   envoy.extensions.transport_sockets.tls.v3alpha.UpstreamTlsContext
-      hidden_envoy_deprecated_tls_context = 11 [deprecated = true];
+      hidden_envoy_deprecated_tls_context = 11
+      [deprecated = true, (envoy.annotations.disallowed_by_default) = true];
 
   // HTTP protocol options that are applied only to upstream HTTP connections.
   // These options apply to all HTTP versions.
@@ -665,7 +668,7 @@ message Cluster {
   // "envoy.filters.network.thrift_proxy". See the extension's documentation for details on
   // specific options.
   map<string, google.protobuf.Struct> hidden_envoy_deprecated_extension_protocol_options = 35
-      [deprecated = true];
+      [deprecated = true, (envoy.annotations.disallowed_by_default) = true];
 
   // The extension_protocol_options field is used to provide extension-specific protocol options
   // for upstream connections. The key should match the extension filter name, such as

@@ -2787,11 +2787,6 @@ class RouteConfigurationV2 : public testing::Test, public ConfigImplTestBase {};
 
 // When removing runtime_key: this test can be removed.
 TEST_F(RouteConfigurationV2, DEPRECATED_FEATURE_TEST(RequestMirrorPolicy)) {
-  TestScopedRuntime scoped_runtime;
-  Runtime::LoaderSingleton::getExisting()->mergeValues(
-      {{"envoy.deprecated_features:envoy.config.route.v3alpha.RouteAction.RequestMirrorPolicy."
-        "hidden_envoy_deprecated_runtime_key",
-        "true"}});
   const std::string yaml = R"EOF(
 name: foo
 virtual_hosts:

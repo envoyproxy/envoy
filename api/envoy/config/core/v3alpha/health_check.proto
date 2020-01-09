@@ -14,6 +14,7 @@ import "google/protobuf/wrappers.proto";
 
 import "udpa/annotations/versioning.proto";
 
+import "envoy/annotations/deprecation.proto";
 import "validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.config.core.v3alpha";

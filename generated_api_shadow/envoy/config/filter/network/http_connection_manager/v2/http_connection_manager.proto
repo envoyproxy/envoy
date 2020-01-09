@@ -15,6 +15,7 @@ import "google/protobuf/duration.proto";
 import "google/protobuf/struct.proto";
 import "google/protobuf/wrappers.proto";
 
+import "envoy/annotations/deprecation.proto";
 import "udpa/annotations/migrate.proto";
 import "validate/validate.proto";
 
@@ -104,8 +105,11 @@ message HttpConnectionManager {
     //
     // .. attention::
     //  This field has been deprecated in favor of `traffic_direction`.
-    OperationName operation_name = 1
-        [deprecated = true, (validate.rules).enum = {defined_only: true}];
+    OperationName operation_name = 1 [
+      deprecated = true,
+      (validate.rules).enum = {defined_only: true},
+      (envoy.annotations.disallowed_by_default) = true
+    ];
 
     // A list of header names used to create tags for the active span. The header name is used to
     // populate the tag name, and the header value is used to populate the tag value. The tag is
@@ -293,7 +297,8 @@ message HttpConnectionManager {
   // This field is deprecated. Use :ref:`idle_timeout
   // <envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.common_http_protocol_options>`
   // instead.
-  google.protobuf.Duration idle_timeout = 11 [deprecated = true];
+  google.protobuf.Duration idle_timeout = 11
+      [deprecated = true, (envoy.annotations.disallowed_by_default) = true];
 
   // The stream idle timeout for connections managed by the connection manager.
   // If not specified, this defaults to 5 minutes. The default value was selected

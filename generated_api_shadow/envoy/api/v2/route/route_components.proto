@@ -384,7 +384,11 @@ message RouteMatch {
     // .. attention::
     //   This field has been deprecated in favor of `safe_regex` as it is not safe for use with
     //   untrusted input in all cases.
-    string regex = 3 [deprecated = true, (validate.rules).string = {max_bytes: 1024}];
+    string regex = 3 [
+      deprecated = true,
+      (validate.rules).string = {max_bytes: 1024},
+      (envoy.annotations.disallowed_by_default) = true
+    ];
 
     // If specified, the route is a regular expression rule meaning that the
     // regex must match the *:path* header once the query string is removed. The entire path
@@ -457,7 +461,8 @@ message CorsPolicy {
   //
   // .. attention::
   //  This field has been deprecated in favor of `allow_origin_string_match`.
-  repeated string allow_origin = 1 [deprecated = true];
+  repeated string allow_origin = 1
+      [deprecated = true, (envoy.annotations.disallowed_by_default) = true];
 
   // Specifies regex patterns that match allowed origins.
   //
@@ -1177,7 +1182,11 @@ message VirtualCluster {
   // .. attention::
   //   This field has been deprecated in favor of `headers` as it is not safe for use with
   //   untrusted input in all cases.
-  string pattern = 1 [deprecated = true, (validate.rules).string = {max_bytes: 1024}];
+  string pattern = 1 [
+    deprecated = true,
+    (validate.rules).string = {max_bytes: 1024},
+    (envoy.annotations.disallowed_by_default) = true
+  ];
 
   // Specifies a list of header matchers to use for matching requests. Each specified header must
   // match. The pseudo-headers `:path` and `:method` can be used to match the request path and
@@ -1194,7 +1203,8 @@ message VirtualCluster {
   //
   // .. attention::
   //   This field has been deprecated in favor of `headers`.
-  core.RequestMethod method = 3 [deprecated = true];
+  core.RequestMethod method = 3
+      [deprecated = true, (envoy.annotations.disallowed_by_default) = true];
 }
 
 // Global rate limiting :ref:`architecture overview <arch_overview_global_rate_limit>`.
@@ -1382,7 +1392,11 @@ message HeaderMatcher {
     // .. attention::
     //   This field has been deprecated in favor of `safe_regex_match` as it is not safe for use
     //   with untrusted input in all cases.
-    string regex_match = 5 [deprecated = true, (validate.rules).string = {max_bytes: 1024}];
+    string regex_match = 5 [
+      deprecated = true,
+      (validate.rules).string = {max_bytes: 1024},
+      (envoy.annotations.disallowed_by_default) = true
+    ];
 
     // If specified, this regex string is a regular expression rule which implies the entire request
     // header value must match the regex. The rule will not match if only a subsequence of the
@@ -1446,7 +1460,7 @@ message QueryParameterMatcher {
   //
   // ..attention::
   //   This field is deprecated. Use an `exact` match inside the `string_match` field.
-  string value = 3 [deprecated = true];
+  string value = 3 [deprecated = true, (envoy.annotations.disallowed_by_default) = true];
 
   // Specifies whether the query parameter value is a regular expression.
   // Defaults to false. The entire query parameter value (i.e., the part to
@@ -1455,7 +1469,8 @@ message QueryParameterMatcher {
   //
   // ..attention::
   //   This field is deprecated. Use a `safe_regex` match inside the `string_match` field.
-  google.protobuf.BoolValue regex = 4 [deprecated = true];
+  google.protobuf.BoolValue regex = 4
+      [deprecated = true, (envoy.annotations.disallowed_by_default) = true];
 
   oneof query_parameter_match_specifier {
     // Specifies whether a query parameter value should match against a string.
