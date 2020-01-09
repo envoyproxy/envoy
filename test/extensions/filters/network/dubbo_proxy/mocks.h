@@ -91,9 +91,9 @@ public:
   // DubboProxy::Serializer
   MOCK_METHOD(const std::string&, name, (), (const));
   MOCK_METHOD(SerializationType, type, (), (const));
-  MOCK_METHOD(std::pair<RpcInvocationSharedPtr, bool>, deserializeRpcInvocation,
+  MOCK_METHOD((std::pair<RpcInvocationSharedPtr, bool>), deserializeRpcInvocation,
               (Buffer::Instance&, ContextSharedPtr));
-  MOCK_METHOD(std::pair<RpcResultSharedPtr, bool>, deserializeRpcResult,
+  MOCK_METHOD((std::pair<RpcResultSharedPtr, bool>), deserializeRpcResult,
               (Buffer::Instance&, ContextSharedPtr));
   MOCK_METHOD(size_t, serializeRpcResult, (Buffer::Instance&, const std::string&, RpcResponseType));
 
@@ -109,7 +109,7 @@ public:
   MOCK_METHOD(const std::string&, name, (), (const));
   MOCK_METHOD(ProtocolType, type, (), (const));
   MOCK_METHOD(Serializer*, serializer, (), (const));
-  MOCK_METHOD(std::pair<ContextSharedPtr, bool>, decodeHeader,
+  MOCK_METHOD((std::pair<ContextSharedPtr, bool>), decodeHeader,
               (Buffer::Instance&, MessageMetadataSharedPtr));
   MOCK_METHOD(bool, decodeData, (Buffer::Instance&, ContextSharedPtr, MessageMetadataSharedPtr));
   MOCK_METHOD(bool.encode,
