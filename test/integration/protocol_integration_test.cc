@@ -1518,13 +1518,13 @@ TEST_P(DownstreamProtocolIntegrationTest, ConnectIsBlocked) {
 // Make sure that with stream_error_on_invalid_http_messaging true, CONNECT
 // results in stream teardown not connection teardown.
 TEST_P(DownstreamProtocolIntegrationTest, ConnectStreamRejection) {
+  if (downstreamProtocol() == Http::CodecClient::Type::HTTP1) {
+    return;
+  }
   config_helper_.addConfigModifier([](envoy::extensions::filters::network::http_connection_manager::
                                           v3alpha::HttpConnectionManager& hcm) -> void {
     hcm.mutable_http2_protocol_options()->set_stream_error_on_invalid_http_messaging(true);
   });
-  if (downstreamProtocol() == Http::CodecClient::Type::HTTP1) {
-    return;
-  }
 
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
