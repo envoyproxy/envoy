@@ -3,7 +3,6 @@ syntax = "proto3";
 package envoy.service.status.v2;
 
 import "envoy/admin/v2alpha/config_dump.proto";
-import "envoy/api/v2/core/base.proto";
 
 import "google/api/annotations.proto";
 import "google/protobuf/struct.proto";
@@ -52,7 +51,7 @@ enum ConfigStatus {
 // Request for client status for a list of clients identified by Node identifier.
 message ClientStatusRequest {
   // Node identifier for a list of clients.
-  repeated api.v2.core.Node nodes = 1;
+  repeated string node_ids = 1;
 
   // Metadata is used to give extra information to the management server.
   // For example, management server can choose to only send config status if
@@ -79,7 +78,7 @@ message PerXdsConfig {
 // All xds configs for a particular client.
 message ClientConfig {
   // Node identifier for a particular client.
-  api.v2.core.Node node = 1;
+  string node_id = 1;
 
   repeated PerXdsConfig xds_config = 2;
 }
