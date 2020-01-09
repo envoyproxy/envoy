@@ -7,6 +7,7 @@
 #include "envoy/api/v2/srds.pb.h"
 #include "envoy/service/cluster/v3alpha/cds.pb.h"
 #include "envoy/service/discovery/v2/ads.pb.h"
+#include "envoy/service/discovery/v2/hds.pb.h"
 #include "envoy/service/discovery/v2/rtds.pb.h"
 #include "envoy/service/discovery/v2/sds.pb.h"
 #include "envoy/service/discovery/v3alpha/ads.pb.h"
@@ -34,6 +35,7 @@ const envoy::api::v2::RdsDummy _rds_dummy_v2;
 const envoy::api::v2::CdsDummy _cds_dummy_v2;
 const envoy::api::v2::EdsDummy _eds_dummy_v2;
 const envoy::api::v2::SrdsDummy _srds_dummy_v2;
+const envoy::service::discovery::v2::Capability _hds_dummy_v2;
 
 const envoy::service::discovery::v3alpha::AdsDummy _ads_dummy_v3;
 const envoy::service::ratelimit::v3alpha::RateLimitRequest _rls_dummy_v3;
@@ -43,5 +45,8 @@ const envoy::service::listener::v3alpha::LdsDummy _lds_dummy_v3;
 const envoy::service::route::v3alpha::RdsDummy _rds_dummy_v3;
 const envoy::service::cluster::v3alpha::CdsDummy _cds_dummy_v3;
 const envoy::service::endpoint::v3alpha::EdsDummy _eds_dummy_v3;
-const envoy::service::route::v3alpha::SrdsDummy _srds_dummy_v4;
+const envoy::service::route::v3alpha::SrdsDummy _srds_dummy_v3;
+
+// note: hds force linking is not needed because it is still implicitly linked via
+// health_discovery_service.h
 } // namespace Envoy
