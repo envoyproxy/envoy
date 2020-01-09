@@ -391,7 +391,7 @@ void ConnPoolImplBase::ActiveClient::releaseResources() {
 }
 
 void ConnPoolImplBase::ActiveClient::onConnectTimeout() {
-  ENVOY_CONN_ID_LOG(debug, "connect timeout", connectionId());
+  ENVOY_CONN_LOG(debug, "connect timeout", *codec_client_);
   parent_.host_->cluster().stats().upstream_cx_connect_timeout_.inc();
   close();
 }

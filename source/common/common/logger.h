@@ -371,9 +371,6 @@ protected:
 #define ENVOY_CONN_LOG(LEVEL, FORMAT, CONNECTION, ...)                                             \
   ENVOY_CONN_LOG_TO_LOGGER(ENVOY_LOGGER(), LEVEL, FORMAT, CONNECTION, ##__VA_ARGS__)
 
-#define ENVOY_CONN_ID_LOG(LEVEL, FORMAT, CONNECTION_ID, ...)                                       \
-  ENVOY_LOG_TO_LOGGER(ENVOY_LOGGER(), LEVEL, "[C{}] " FORMAT, (CONNECTION_ID), ##__VA_ARGS__)
-
 /**
  * Convenience macros for logging with a stream ID and a connection ID.
  */

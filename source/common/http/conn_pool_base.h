@@ -54,8 +54,6 @@ protected:
     void onConnectTimeout();
     void close() { codec_client_->close(); }
 
-    uint64_t connectionId() const { return codec_client_->id(); }
-
     virtual bool hasActiveRequests() const PURE;
     virtual bool closingWithIncompleteRequest() const PURE;
     virtual StreamEncoder& newStreamEncoder(StreamDecoder& response_decoder) PURE;
