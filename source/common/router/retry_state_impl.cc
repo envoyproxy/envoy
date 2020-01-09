@@ -57,7 +57,7 @@ RetryStateImpl::RetryStateImpl(const RetryPolicy& route_policy, Http::HeaderMap&
                                Runtime::RandomGenerator& random, Event::Dispatcher& dispatcher,
                                Upstream::ResourcePriority priority)
     : cluster_(cluster), runtime_(runtime), random_(random), dispatcher_(dispatcher),
-      retry_on_(route_policy.retryOn()), retries_remaining_(route_policy.numRetries().value_or(1)),
+      retry_on_(route_policy.retryOn()), retries_remaining_(route_policy.numRetries()),
       priority_(priority), retry_host_predicates_(route_policy.retryHostPredicates()),
       retry_priority_(route_policy.retryPriority()),
       retriable_status_codes_(route_policy.retriableStatusCodes()),
