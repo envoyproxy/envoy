@@ -231,7 +231,7 @@ public:
 
   void setNumPreviousRedirect(uint32_t num_previous_redirects) {
     callbacks_.streamInfo().filterState().setData(
-        "num_previous_internal_redirect",
+        "num_internal_redirects",
         std::make_shared<StreamInfo::UInt32AccessorImpl>(num_previous_redirects),
         StreamInfo::FilterState::StateType::Mutable,
         StreamInfo::FilterState::LifeSpan::DownstreamRequest);
@@ -3124,7 +3124,7 @@ TEST_F(RouterTest, RetryRespectsRetryHostPredicate) {
   EXPECT_TRUE(verifyHostUpstreamStats(1, 1));
 }
 
-TEST_F(RouterTest, InternalRedirectRejectedWhenReachingMaxPreviousInternalRedirect) {
+TEST_F(RouterTest, InternalRedirectRejectedWhenReachingMaxInternalRedirect) {
   enableRedirects();
   setMaxInternalRedirects(3);
   setNumPreviousRedirect(3);
@@ -3239,7 +3239,7 @@ TEST_F(RouterTest, HttpInternalRedirectSucceeded) {
   router_.onDestroy();
   EXPECT_EQ(3, callbacks_.streamInfo()
                    .filterState()
-                   .getDataMutable<StreamInfo::UInt32Accessor>("num_previous_internal_redirect")
+                   .getDataMutable<StreamInfo::UInt32Accessor>("num_internal_redirects")
                    .value());
 }
 

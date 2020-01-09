@@ -39,7 +39,7 @@
 namespace Envoy {
 namespace Router {
 namespace {
-constexpr char NumPreviousInternalRedirectFilterStateName[] = "num_previous_internal_redirect";
+constexpr char NumInternalRedirectsFilterStateName[] = "num_internal_redirects";
 
 uint32_t getLength(const Buffer::Instance* instance) { return instance ? instance->length() : 0; }
 
@@ -80,20 +80,19 @@ bool convertRequestHeadersForInternalRedirect(Http::HeaderMap& downstream_header
   // Make sure that performing the redirect won't result in exceeding the configured number of
   // redirects allowed for this route.
   if (!filter_state.hasData<StreamInfo::UInt32Accessor>(
-          NumPreviousInternalRedirectFilterStateName)) {
-    filter_state.setData(NumPreviousInternalRedirectFilterStateName,
+          NumInternalRedirectsFilterStateName)) {
+    filter_state.setData(NumInternalRedirectsFilterStateName,
                          std::make_shared<StreamInfo::UInt32AccessorImpl>(0),
                          StreamInfo::FilterState::StateType::Mutable,
                          StreamInfo::FilterState::LifeSpan::DownstreamRequest);
   }
-  StreamInfo::UInt32Accessor& num_previous_internal_redirect =
-      filter_state.getDataMutable<StreamInfo::UInt32Accessor>(
-          NumPreviousInternalRedirectFilterStateName);
+  StreamInfo::UInt32Accessor& num_internal_redirect =
+      filter_state.getDataMutable<StreamInfo::UInt32Accessor>(NumInternalRedirectsFilterStateName);
 
-  if (num_previous_internal_redirect.value() >= max_internal_redirects) {
+  if (num_internal_redirect.value() >= max_internal_redirects) {
     return false;
   }
-  num_previous_internal_redirect.increment();
+  num_internal_redirect.increment();
 
   // Preserve the original request URL for the second pass.
   downstream_headers.setEnvoyOriginalUrl(
