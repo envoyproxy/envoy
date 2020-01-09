@@ -60,12 +60,15 @@ protected:
     bool closed_with_active_rq_{};
   };
 
-  virtual uint32_t maxTotalStreams() PURE;
   uint64_t maxRequestsPerConnection();
   void movePrimaryClientToDraining();
   void onGoAway(ActiveClient& client);
   void onStreamDestroy(ActiveClient& client);
   void onStreamReset(ActiveClient& client, Http::StreamResetReason reason);
+
+  // All streams are 2^31. Client streams are half that, minus stream 0. Just to be on the safe
+  // side we do 2^29.
+  static const uint64_t DEFAULT_MAX_STREAMS = (1 << 29);
 };
 
 /**
@@ -77,11 +80,6 @@ public:
 
 private:
   CodecClientPtr createCodecClient(Upstream::Host::CreateConnectionData& data) override;
-  uint32_t maxTotalStreams() override;
-
-  // All streams are 2^31. Client streams are half that, minus stream 0. Just to be on the safe
-  // side we do 2^29.
-  static const uint64_t MAX_STREAMS = (1 << 29);
 };
 
 } // namespace Http2

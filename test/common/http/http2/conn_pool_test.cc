@@ -44,10 +44,6 @@ public:
   }
 
   MOCK_METHOD1(createCodecClient_, CodecClient*(Upstream::Host::CreateConnectionData& data));
-
-  uint32_t maxTotalStreams() override { return max_streams_; }
-
-  uint32_t max_streams_{std::numeric_limits<uint32_t>::max()};
 };
 
 class ActiveTestRequest;
@@ -209,7 +205,7 @@ TEST_F(Http2ConnPoolImplTest, DrainConnections) {
   cluster_->resetResourceManager(2, 1024, 1024, 1, 1);
 
   InSequence s;
-  pool_.max_streams_ = 1;
+  cluster_->max_requests_per_connection_ = 1;
 
   // Test drain connections call prior to any connections being created.
   pool_.drainConnections();
@@ -282,7 +278,7 @@ TEST_F(Http2ConnPoolImplTest, PendingRequests) {
 // fails to be established.
 TEST_F(Http2ConnPoolImplTest, PendingRequestsFailure) {
   InSequence s;
-  pool_.max_streams_ = 10;
+  cluster_->max_requests_per_connection_ = 10;
 
   // Create three requests. These should be queued up.
   expectClientCreate();
@@ -494,7 +490,7 @@ TEST_F(Http2ConnPoolImplTest, RemoteReset) {
 
 TEST_F(Http2ConnPoolImplTest, DrainDisconnectWithActiveRequest) {
   InSequence s;
-  pool_.max_streams_ = 1;
+  cluster_->max_requests_per_connection_ = 1;
 
   expectClientCreate();
   ActiveTestRequest r1(*this, 0, false);
@@ -519,7 +515,7 @@ TEST_F(Http2ConnPoolImplTest, DrainDisconnectDrainingWithActiveRequest) {
   cluster_->resetResourceManager(2, 1024, 1024, 1, 1);
 
   InSequence s;
-  pool_.max_streams_ = 1;
+  cluster_->max_requests_per_connection_ = 1;
 
   expectClientCreate();
   ActiveTestRequest r1(*this, 0, false);
@@ -556,7 +552,7 @@ TEST_F(Http2ConnPoolImplTest, DrainPrimary) {
   cluster_->resetResourceManager(2, 1024, 1024, 1, 1);
 
   InSequence s;
-  pool_.max_streams_ = 1;
+  cluster_->max_requests_per_connection_ = 1;
 
   expectClientCreate();
   ActiveTestRequest r1(*this, 0, false);
@@ -592,7 +588,7 @@ TEST_F(Http2ConnPoolImplTest, DrainPrimaryNoActiveRequest) {
   cluster_->resetResourceManager(2, 1024, 1024, 1, 1);
 
   InSequence s;
-  pool_.max_streams_ = 1;
+  cluster_->max_requests_per_connection_ = 1;
 
   expectClientCreate();
   ActiveTestRequest r1(*this, 0, false);
@@ -751,7 +747,7 @@ TEST_F(Http2ConnPoolImplTest, ResponseCompletedConnectionReadyNoActiveConnection
 
 // Show that if connections are draining, they're still considered active.
 TEST_F(Http2ConnPoolImplTest, DrainingConnectionsConsideredActive) {
-  pool_.max_streams_ = 1;
+  cluster_->max_requests_per_connection_ = 1;
   expectClientCreate();
   ActiveTestRequest r1(*this, 0, false);
   expectClientConnect(0, r1);
@@ -765,7 +761,7 @@ TEST_F(Http2ConnPoolImplTest, DrainingConnectionsConsideredActive) {
 
 // Show that once we've drained all connections, there are no longer any active.
 TEST_F(Http2ConnPoolImplTest, DrainedConnectionsNotActive) {
-  pool_.max_streams_ = 1;
+  cluster_->max_requests_per_connection_ = 1;
   expectClientCreate();
   ActiveTestRequest r1(*this, 0, false);
   expectClientConnect(0, r1);

@@ -60,11 +60,8 @@ void ConnPoolImpl::onStreamReset(ActiveClient& client, Http::StreamResetReason r
 }
 
 uint64_t ConnPoolImpl::maxRequestsPerConnection() {
-  uint64_t max_streams = host_->cluster().maxRequestsPerConnection();
-  if (max_streams == 0) {
-    max_streams = maxTotalStreams();
-  }
-  return max_streams;
+  uint64_t max_streams_config = host_->cluster().maxRequestsPerConnection();
+  return (max_streams_config != 0) ? max_streams_config : DEFAULT_MAX_STREAMS;
 }
 
 ConnPoolImpl::ActiveClient::ActiveClient(ConnPoolImpl& parent)
@@ -94,8 +91,6 @@ CodecClientPtr ProdConnPoolImpl::createCodecClient(Upstream::Host::CreateConnect
                                            data.host_description_, dispatcher_)};
   return codec;
 }
-
-uint32_t ProdConnPoolImpl::maxTotalStreams() { return MAX_STREAMS; }
 
 } // namespace Http2
 } // namespace Http
