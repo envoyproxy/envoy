@@ -75,3 +75,12 @@ envoy_cc_library(
         "//source/common/protobuf",
     ],
 )
+
+envoy_cc_library(
+    name = "discovery_service_base_interface",
+    hdrs = ["discovery_service_base.h"],
+    deps = [
+        ":subscription_interface",
+        "//source/common/protobuf",
+    ],
+)

@@ -13,6 +13,7 @@
 #include "common/common/assert.h"
 #include "common/common/cleanup.h"
 #include "common/config/api_version.h"
+#include "common/config/resource_name_loader.h"
 #include "common/config/resources.h"
 #include "common/config/utility.h"
 #include "common/protobuf/utility.h"
@@ -29,8 +30,10 @@ LdsApiImpl::LdsApiImpl(const envoy::config::core::v3alpha::ConfigSource& lds_con
     : listener_manager_(lm), scope_(scope.createScope("listener_manager.lds.")), cm_(cm),
       init_target_("LDS", [this]() { subscription_->start({}); }),
       validation_visitor_(validation_visitor) {
+  const auto resource_name =
+      Envoy::Config::loadResourceName<LdsApiImpl>(lds_config.resource_api_version());
   subscription_ = cm.subscriptionFactory().subscriptionFromConfigSource(
-      lds_config, loadTypeUrl(lds_config.resource_api_version()), *scope_, *this);
+      lds_config, Grpc::Common::typeUrl(API_NO_BOOST(resource_name)), *scope_, *this);
   init_manager.add(init_target_);
 }
 
@@ -133,19 +136,5 @@ void LdsApiImpl::onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason r
   init_target_.ready();
 }
 
-std::string LdsApiImpl::loadTypeUrl(envoy::config::core::v3alpha::ApiVersion resource_api_version) {
-  switch (resource_api_version) {
-  // automatically set api version as V2
-  case envoy::config::core::v3alpha::ApiVersion::AUTO:
-  case envoy::config::core::v3alpha::ApiVersion::V2:
-    return Grpc::Common::typeUrl(
-        API_NO_BOOST(envoy::api::v2::Listener().GetDescriptor()->full_name()));
-  case envoy::config::core::v3alpha::ApiVersion::V3ALPHA:
-    return Grpc::Common::typeUrl(
-        API_NO_BOOST(envoy::config::listener::v3alpha::Listener().GetDescriptor()->full_name()));
-  default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
-  }
-}
 } // namespace Server
 } // namespace Envoy

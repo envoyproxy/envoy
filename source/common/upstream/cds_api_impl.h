@@ -5,6 +5,7 @@
 #include "envoy/api/api.h"
 #include "envoy/config/cluster/v3alpha/cluster.pb.h"
 #include "envoy/config/core/v3alpha/config_source.pb.h"
+#include "envoy/config/discovery_service_base.h"
 #include "envoy/config/subscription.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/local_info/local_info.h"
@@ -20,9 +21,7 @@ namespace Upstream {
 /**
  * CDS API implementation that fetches via Subscription.
  */
-class CdsApiImpl : public CdsApi,
-                   Config::SubscriptionCallbacks,
-                   Logger::Loggable<Logger::Id::upstream> {
+class CdsApiImpl : public CdsApi, Config::CdsApiBase, Logger::Loggable<Logger::Id::upstream> {
 public:
   static CdsApiPtr create(const envoy::config::core::v3alpha::ConfigSource& cds_config,
                           ClusterManager& cm, Stats::Scope& scope,
@@ -49,7 +48,6 @@ private:
   std::string resourceName(const ProtobufWkt::Any& resource) override {
     return MessageUtil::anyConvert<envoy::config::cluster::v3alpha::Cluster>(resource).name();
   }
-  static std::string loadTypeUrl(envoy::config::core::v3alpha::ApiVersion resource_api_version);
   CdsApiImpl(const envoy::config::core::v3alpha::ConfigSource& cds_config, ClusterManager& cm,
              Stats::Scope& scope, ProtobufMessage::ValidationVisitor& validation_visitor);
   void runInitializeCallbackIfAny();

@@ -10,6 +10,7 @@
 
 #include "common/common/assert.h"
 #include "common/config/api_version.h"
+#include "common/config/resource_name_loader.h"
 #include "common/config/resources.h"
 #include "common/protobuf/utility.h"
 
@@ -85,24 +86,11 @@ void SdsApi::validateUpdateSize(int num_resources) {
 }
 
 void SdsApi::initialize() {
+  const auto resource_name =
+      Envoy::Config::loadResourceName<SdsApi>(sds_config_.resource_api_version());
   subscription_ = subscription_factory_.subscriptionFromConfigSource(
-      sds_config_, loadTypeUrl(sds_config_.resource_api_version()), stats_, *this);
+      sds_config_, Grpc::Common::typeUrl(API_NO_BOOST(resource_name)), stats_, *this);
   subscription_->start({sds_config_name_});
-}
-
-std::string SdsApi::loadTypeUrl(envoy::config::core::v3alpha::ApiVersion resource_api_version) {
-  switch (resource_api_version) {
-  // automatically set api version as V2
-  case envoy::config::core::v3alpha::ApiVersion::AUTO:
-  case envoy::config::core::v3alpha::ApiVersion::V2:
-    return Grpc::Common::typeUrl(
-        API_NO_BOOST(envoy::api::v2::auth::Secret().GetDescriptor()->full_name()));
-  case envoy::config::core::v3alpha::ApiVersion::V3ALPHA:
-    return Grpc::Common::typeUrl(API_NO_BOOST(
-        envoy::extensions::transport_sockets::tls::v3alpha::Secret().GetDescriptor()->full_name()));
-  default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
-  }
 }
 
 SdsApi::SecretData SdsApi::secretData() { return secret_data_; }

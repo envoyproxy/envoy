@@ -2,6 +2,7 @@
 
 #include <chrono>
 #include <cstdint>
+#include <iostream>
 #include <memory>
 #include <string>
 
@@ -16,6 +17,7 @@
 #include "common/common/assert.h"
 #include "common/common/fmt.h"
 #include "common/config/api_version.h"
+#include "common/config/resource_name_loader.h"
 #include "common/config/utility.h"
 #include "common/protobuf/utility.h"
 #include "common/router/config_impl.h"
@@ -74,11 +76,11 @@ RdsRouteConfigSubscription::RdsRouteConfigSubscription(
       stat_prefix_(stat_prefix), stats_({ALL_RDS_STATS(POOL_COUNTER(*scope_))}),
       route_config_provider_manager_(route_config_provider_manager),
       manager_identifier_(manager_identifier) {
-
+  const auto resource_name = Envoy::Config::loadResourceName<RdsRouteConfigSubscription>(
+      rds.config_source().resource_api_version());
   subscription_ =
       factory_context.clusterManager().subscriptionFactory().subscriptionFromConfigSource(
-          rds.config_source(), loadTypeUrl(rds.config_source().resource_api_version()), *scope_,
-          *this);
+          rds.config_source(), Grpc::Common::typeUrl(API_NO_BOOST(resource_name)), *scope_, *this);
   config_update_info_ =
       std::make_unique<RouteConfigUpdateReceiverImpl>(factory_context.timeSource(), validator);
 }
@@ -203,22 +205,6 @@ bool RdsRouteConfigSubscription::validateUpdateSize(int num_resources) {
     // (would be a return false here)
   }
   return true;
-}
-
-std::string RdsRouteConfigSubscription::loadTypeUrl(
-    envoy::config::core::v3alpha::ApiVersion resource_api_version) {
-  switch (resource_api_version) {
-  // automatically set api version as V2
-  case envoy::config::core::v3alpha::ApiVersion::AUTO:
-  case envoy::config::core::v3alpha::ApiVersion::V2:
-    return Grpc::Common::typeUrl(
-        API_NO_BOOST(envoy::api::v2::RouteConfiguration().GetDescriptor()->full_name()));
-  case envoy::config::core::v3alpha::ApiVersion::V3ALPHA:
-    return Grpc::Common::typeUrl(API_NO_BOOST(
-        envoy::config::route::v3alpha::RouteConfiguration().GetDescriptor()->full_name()));
-  default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
-  }
 }
 
 RdsRouteConfigProviderImpl::RdsRouteConfigProviderImpl(

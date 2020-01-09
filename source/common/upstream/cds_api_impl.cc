@@ -13,8 +13,10 @@
 #include "common/common/cleanup.h"
 #include "common/common/utility.h"
 #include "common/config/api_version.h"
+#include "common/config/resource_name_loader.h"
 #include "common/config/resources.h"
 #include "common/config/utility.h"
+#include "common/grpc/common.h"
 #include "common/protobuf/utility.h"
 
 #include "absl/strings/str_join.h"
@@ -33,8 +35,10 @@ CdsApiImpl::CdsApiImpl(const envoy::config::core::v3alpha::ConfigSource& cds_con
                        ProtobufMessage::ValidationVisitor& validation_visitor)
     : cm_(cm), scope_(scope.createScope("cluster_manager.cds.")),
       validation_visitor_(validation_visitor) {
+  const auto resource_name =
+      Envoy::Config::loadResourceName<CdsApiImpl>(cds_config.resource_api_version());
   subscription_ = cm_.subscriptionFactory().subscriptionFromConfigSource(
-      cds_config, loadTypeUrl(cds_config.resource_api_version()), *scope_, *this);
+      cds_config, Grpc::Common::typeUrl(API_NO_BOOST(resource_name)), *scope_, *this);
 }
 
 void CdsApiImpl::onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
@@ -126,21 +130,6 @@ void CdsApiImpl::runInitializeCallbackIfAny() {
   if (initialize_callback_) {
     initialize_callback_();
     initialize_callback_ = nullptr;
-  }
-}
-
-std::string CdsApiImpl::loadTypeUrl(envoy::config::core::v3alpha::ApiVersion resource_api_version) {
-  switch (resource_api_version) {
-  // automatically set api version as V2
-  case envoy::config::core::v3alpha::ApiVersion::AUTO:
-  case envoy::config::core::v3alpha::ApiVersion::V2:
-    return Grpc::Common::typeUrl(
-        API_NO_BOOST(envoy::api::v2::Cluster().GetDescriptor()->full_name()));
-  case envoy::config::core::v3alpha::ApiVersion::V3ALPHA:
-    return Grpc::Common::typeUrl(
-        API_NO_BOOST(envoy::config::cluster::v3alpha::Cluster().GetDescriptor()->full_name()));
-  default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
   }
 }
 

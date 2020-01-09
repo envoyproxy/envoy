@@ -7,6 +7,7 @@
 #include <unordered_set>
 
 #include "envoy/config/core/v3alpha/config_source.pb.h"
+#include "envoy/config/discovery_service_base.h"
 #include "envoy/config/route/v3alpha/route_components.pb.h"
 #include "envoy/config/subscription.h"
 #include "envoy/http/codes.h"
@@ -34,8 +35,7 @@ struct VhdsStats {
   ALL_VHDS_STATS(GENERATE_COUNTER_STRUCT)
 };
 
-class VhdsSubscription : Envoy::Config::SubscriptionCallbacks,
-                         Logger::Loggable<Logger::Id::router> {
+class VhdsSubscription : Envoy::Config::VhdsSubscriptionBase, Logger::Loggable<Logger::Id::router> {
 public:
   VhdsSubscription(RouteConfigUpdatePtr& config_update_info,
                    Server::Configuration::ServerFactoryContext& factory_context,
@@ -61,8 +61,6 @@ private:
   std::string resourceName(const ProtobufWkt::Any& resource) override {
     return MessageUtil::anyConvert<envoy::config::route::v3alpha::VirtualHost>(resource).name();
   }
-  static std::string loadTypeUrl(envoy::config::core::v3alpha::ApiVersion resource_api_version);
-
   RouteConfigUpdatePtr& config_update_info_;
   Stats::ScopePtr scope_;
   VhdsStats stats_;

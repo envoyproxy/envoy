@@ -8,6 +8,7 @@
 
 #include "envoy/admin/v3alpha/config_dump.pb.h"
 #include "envoy/config/core/v3alpha/config_source.pb.h"
+#include "envoy/config/discovery_service_base.h"
 #include "envoy/config/route/v3alpha/route.pb.h"
 #include "envoy/config/subscription.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3alpha/http_connection_manager.pb.h"
@@ -104,7 +105,7 @@ class RdsRouteConfigProviderImpl;
  * A class that fetches the route configuration dynamically using the RDS API and updates them to
  * RDS config providers.
  */
-class RdsRouteConfigSubscription : Envoy::Config::SubscriptionCallbacks,
+class RdsRouteConfigSubscription : Envoy::Config::RdsRouteConfigSubscriptionBase,
                                    Logger::Loggable<Logger::Id::router> {
 public:
   ~RdsRouteConfigSubscription() override;
@@ -147,7 +148,6 @@ private:
       RouteConfigProviderManagerImpl& route_config_provider_manager);
 
   bool validateUpdateSize(int num_resources);
-  static std::string loadTypeUrl(envoy::config::core::v3alpha::ApiVersion resource_api_version);
 
   Init::Manager& getRdsConfigInitManager() { return init_manager_; }
 

@@ -20,6 +20,7 @@
 #include "common/common/fmt.h"
 #include "common/common/utility.h"
 #include "common/config/api_version.h"
+#include "common/config/resource_name_loader.h"
 #include "common/filesystem/directory.h"
 #include "common/grpc/common.h"
 #include "common/protobuf/message_validator_impl.h"
@@ -592,8 +593,10 @@ void RtdsSubscription::start() {
   // We have to delay the subscription creation until init-time, since the
   // cluster manager resources are not available in the constructor when
   // instantiated in the server instance.
+  const auto resource_name =
+      Envoy::Config::loadResourceName<RtdsSubscription>(config_source_.resource_api_version());
   subscription_ = parent_.cm_->subscriptionFactory().subscriptionFromConfigSource(
-      config_source_, loadTypeUrl(config_source_.resource_api_version()), store_, *this);
+      config_source_, Grpc::Common::typeUrl(API_NO_BOOST(resource_name)), store_, *this);
   subscription_->start({resource_name_});
 }
 
@@ -602,22 +605,6 @@ void RtdsSubscription::validateUpdateSize(uint32_t num_resources) {
     init_target_.ready();
     throw EnvoyException(fmt::format("Unexpected RTDS resource length: {}", num_resources));
     // (would be a return false here)
-  }
-}
-
-std::string
-RtdsSubscription::loadTypeUrl(envoy::config::core::v3alpha::ApiVersion resource_api_version) {
-  switch (resource_api_version) {
-  // automatically set api version as V2
-  case envoy::config::core::v3alpha::ApiVersion::AUTO:
-  case envoy::config::core::v3alpha::ApiVersion::V2:
-    return Grpc::Common::typeUrl(
-        API_NO_BOOST(envoy::service::discovery::v2::Runtime().GetDescriptor()->full_name()));
-  case envoy::config::core::v3alpha::ApiVersion::V3ALPHA:
-    return Grpc::Common::typeUrl(
-        API_NO_BOOST(envoy::service::runtime::v3alpha::Runtime().GetDescriptor()->full_name()));
-  default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
   }
 }
 
