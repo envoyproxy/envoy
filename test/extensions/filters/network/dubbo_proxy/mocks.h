@@ -112,7 +112,7 @@ public:
   MOCK_METHOD((std::pair<ContextSharedPtr, bool>), decodeHeader,
               (Buffer::Instance&, MessageMetadataSharedPtr));
   MOCK_METHOD(bool, decodeData, (Buffer::Instance&, ContextSharedPtr, MessageMetadataSharedPtr));
-  MOCK_METHOD(bool.encode,
+  MOCK_METHOD(bool, encode,
               (Buffer::Instance&, const MessageMetadata&, const std::string&, RpcResponseType));
 
   std::string name_{"MockProtocol"};
