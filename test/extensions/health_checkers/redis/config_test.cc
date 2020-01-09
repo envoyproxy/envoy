@@ -29,7 +29,8 @@ TEST(HealthCheckerFactoryTest, CreateRedis) {
     healthy_threshold: 1
     custom_health_check:
       name: envoy.health_checkers.redis
-      config:
+      typed_config:
+        "@type": type.googleapis.com/envoy.config.health_checker.redis.v2.Redis
         key: foo
     )EOF";
 
@@ -100,7 +101,8 @@ TEST(HealthCheckerFactoryTest, CreateRedisViaUpstreamHealthCheckerFactory) {
     healthy_threshold: 1
     custom_health_check:
       name: envoy.health_checkers.redis
-      config:
+      typed_config:
+        "@type": type.googleapis.com/envoy.config.health_checker.redis.v2.Redis
         key: foo
     )EOF";
 

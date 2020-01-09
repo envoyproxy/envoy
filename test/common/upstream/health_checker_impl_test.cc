@@ -2457,7 +2457,7 @@ TEST_F(HttpHealthCheckerImplTest, DEPRECATED_FEATURE_TEST(Http2CodecClient)) {
   EXPECT_EQ(Http::CodecClient::Type::HTTP2, health_checker_->codecClientType());
 }
 
-TEST_F(HttpHealthCheckerImplTest, DEPRECATED_FEATURE_TEST(Service_Name_Match)) {
+TEST_F(HttpHealthCheckerImplTest, DEPRECATED_FEATURE_TEST(ServiceNameMatch)) {
   const std::string host = "fake_cluster";
   const std::string path = "/healthcheck";
   setupDeprecatedServiceNameValidationHC("locations");
@@ -2492,7 +2492,7 @@ TEST_F(HttpHealthCheckerImplTest, DEPRECATED_FEATURE_TEST(Service_Name_Match)) {
   EXPECT_EQ(Host::Health::Healthy, cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->health());
 }
 
-TEST_F(HttpHealthCheckerImplTest, DEPRECATED_FEATURE_TEST(Service_Name_Mismatch)) {
+TEST_F(HttpHealthCheckerImplTest, DEPRECATED_FEATURE_TEST(ServiceNameMismatch)) {
   setupDeprecatedServiceNameValidationHC("locations");
   EXPECT_CALL(*event_logger_, logUnhealthy(_, _, _, true));
   EXPECT_CALL(runtime_.snapshot_, featureEnabled("health_check.verify_cluster", 100))
