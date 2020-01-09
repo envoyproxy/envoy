@@ -171,8 +171,8 @@ public:
   ~MockDirectResponse() override;
 
   // ThriftProxy::DirectResponse
-  MOCK_CONST_METHOD3(encode,
-                     DirectResponse::ResponseType(MessageMetadata&, Protocol&, Buffer::Instance&));
+  MOCK_METHOD(DirectResponse::ResponseType, encode,
+              (MessageMetadata&, Protocol&, Buffer::Instance&), (const));
 };
 
 class MockThriftObject : public ThriftObject {
@@ -284,10 +284,10 @@ public:
 
   MOCK_METHOD(uint32_t, stage, (), (const));
   MOCK_METHOD(const std::string&, disableKey, (), (const));
-  MOCK_CONST_METHOD5(populateDescriptors,
-                     void(const RouteEntry&, std::vector<RateLimit::Descriptor>&,
-                          const std::string&, const MessageMetadata&,
-                          const Network::Address::Instance&));
+  MOCK_METHOD(void, populateDescriptors,
+              (const RouteEntry&, std::vector<RateLimit::Descriptor>&, const std::string&,
+               const MessageMetadata&, const Network::Address::Instance&),
+              (const));
 
   std::string disable_key_;
 };

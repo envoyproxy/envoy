@@ -52,14 +52,14 @@ public:
   ~MockMatcher() override;
 
   MOCK_METHOD(void, onNewStream, (MatchStatusVector & statuses), (const));
-  MOCK_CONST_METHOD2(onHttpRequestHeaders,
-                     void(const Http::HeaderMap& request_headers, MatchStatusVector& statuses));
-  MOCK_CONST_METHOD2(onHttpRequestTrailers,
-                     void(const Http::HeaderMap& request_trailers, MatchStatusVector& statuses));
-  MOCK_CONST_METHOD2(onHttpResponseHeaders,
-                     void(const Http::HeaderMap& response_headers, MatchStatusVector& statuses));
-  MOCK_CONST_METHOD2(onHttpResponseTrailers,
-                     void(const Http::HeaderMap& response_trailers, MatchStatusVector& statuses));
+  MOCK_METHOD(void, onHttpRequestHeaders,
+              (const Http::HeaderMap& request_headers, MatchStatusVector& statuses), (const));
+  MOCK_METHOD(void, onHttpRequestTrailers,
+              (const Http::HeaderMap& request_trailers, MatchStatusVector& statuses), (const));
+  MOCK_METHOD(void, onHttpResponseHeaders,
+              (const Http::HeaderMap& response_headers, MatchStatusVector& statuses), (const));
+  MOCK_METHOD(void, onHttpResponseTrailers,
+              (const Http::HeaderMap& response_trailers, MatchStatusVector& statuses), (const));
 };
 
 } // namespace Tap

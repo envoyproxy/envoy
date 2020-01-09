@@ -160,10 +160,10 @@ public:
   MOCK_METHOD(const ClusterInfo&, cluster, (), (const));
   MOCK_METHOD((std::vector<std::pair<absl::string_view, Stats::PrimitiveCounterReference>>),
               counters, (), (const));
-  MOCK_CONST_METHOD2(
-      createConnection_,
-      MockCreateConnectionData(Event::Dispatcher& dispatcher,
-                               const Network::ConnectionSocket::OptionsSharedPtr& options));
+  MOCK_METHOD(MockCreateConnectionData, createConnection_,
+              (Event::Dispatcher & dispatcher,
+               const Network::ConnectionSocket::OptionsSharedPtr& options),
+              (const));
   MOCK_METHOD((std::vector<std::pair<absl::string_view, Stats::PrimitiveGaugeReference>>), gauges,
               (), (const));
   MOCK_METHOD(HealthCheckHostMonitor&, healthChecker, (), (const));

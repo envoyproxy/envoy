@@ -340,14 +340,13 @@ public:
   class MockCredentialsProviderChainFactories : public CredentialsProviderChainFactories {
   public:
     MOCK_METHOD(CredentialsProviderSharedPtr, createEnvironmentCredentialsProvider, (), (const));
-    MOCK_CONST_METHOD4(createTaskRoleCredentialsProvider,
-                       CredentialsProviderSharedPtr(
-                           Api::Api&, const MetadataCredentialsProviderBase::MetadataFetcher&,
-                           absl::string_view, absl::string_view));
-    MOCK_CONST_METHOD2(createInstanceProfileCredentialsProvider,
-                       CredentialsProviderSharedPtr(
-                           Api::Api&,
-                           const MetadataCredentialsProviderBase::MetadataFetcher& fetcher));
+    MOCK_METHOD(CredentialsProviderSharedPtr, createTaskRoleCredentialsProvider,
+                (Api::Api&, const MetadataCredentialsProviderBase::MetadataFetcher&,
+                 absl::string_view, absl::string_view),
+                (const));
+    MOCK_METHOD(CredentialsProviderSharedPtr, createInstanceProfileCredentialsProvider,
+                (Api::Api&, const MetadataCredentialsProviderBase::MetadataFetcher& fetcher),
+                (const));
   };
 
   Event::SimulatedTimeSystem time_system_;

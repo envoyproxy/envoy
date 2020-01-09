@@ -269,8 +269,8 @@ public:
   MockDirectResponse() = default;
   ~MockDirectResponse() override = default;
 
-  MOCK_CONST_METHOD3(encode,
-                     DirectResponse::ResponseType(MessageMetadata&, Protocol&, Buffer::Instance&));
+  MOCK_METHOD(DirectResponse::ResponseType, encode,
+              (MessageMetadata&, Protocol&, Buffer::Instance&), (const));
 };
 
 template <class ConfigProto> class MockFactoryBase : public NamedDubboFilterConfigFactory {

@@ -45,11 +45,11 @@ public:
   ~MockDirectResponseEntry() override;
 
   // DirectResponseEntry
-  MOCK_CONST_METHOD2(finalizeResponseHeaders,
-                     void(Http::HeaderMap& headers, const StreamInfo::StreamInfo& stream_info));
+  MOCK_METHOD(void, finalizeResponseHeaders,
+              (Http::HeaderMap & headers, const StreamInfo::StreamInfo& stream_info), (const));
   MOCK_METHOD(std::string, newPath, (const Http::HeaderMap& headers), (const));
-  MOCK_CONST_METHOD2(rewritePathHeader,
-                     void(Http::HeaderMap& headers, bool insert_envoy_original_path));
+  MOCK_METHOD(void, rewritePathHeader, (Http::HeaderMap & headers, bool insert_envoy_original_path),
+              (const));
   MOCK_METHOD(Http::Code, responseCode, (), (const));
   MOCK_METHOD(const std::string&, responseBody, (), (const));
   MOCK_METHOD(const std::string&, routeName, (), (const));
@@ -159,11 +159,11 @@ public:
   // Router::RateLimitPolicyEntry
   MOCK_METHOD(uint64_t, stage, (), (const));
   MOCK_METHOD(const std::string&, disableKey, (), (const));
-  MOCK_CONST_METHOD5(populateDescriptors,
-                     void(const RouteEntry& route,
-                          std::vector<Envoy::RateLimit::Descriptor>& descriptors,
-                          const std::string& local_service_cluster, const Http::HeaderMap& headers,
-                          const Network::Address::Instance& remote_address));
+  MOCK_METHOD(void, populateDescriptors,
+              (const RouteEntry& route, std::vector<Envoy::RateLimit::Descriptor>& descriptors,
+               const std::string& local_service_cluster, const Http::HeaderMap& headers,
+               const Network::Address::Instance& remote_address),
+              (const));
 
   uint64_t stage_{};
   std::string disable_key_;
@@ -258,10 +258,10 @@ public:
   ~MockHashPolicy() override;
 
   // Http::HashPolicy
-  MOCK_CONST_METHOD3(generateHash,
-                     absl::optional<uint64_t>(const Network::Address::Instance* downstream_address,
-                                              const Http::HeaderMap& headers,
-                                              const AddCookieCallback add_cookie));
+  MOCK_METHOD(absl::optional<uint64_t>, generateHash,
+              (const Network::Address::Instance* downstream_address, const Http::HeaderMap& headers,
+               const AddCookieCallback add_cookie),
+              (const));
 };
 
 class MockMetadataMatchCriteria : public MetadataMatchCriteria {
@@ -308,11 +308,12 @@ public:
   // Router::Config
   MOCK_METHOD(const std::string&, clusterName, (), (const));
   MOCK_METHOD(Http::Code, clusterNotFoundResponseCode, (), (const));
-  MOCK_CONST_METHOD3(finalizeRequestHeaders,
-                     void(Http::HeaderMap& headers, const StreamInfo::StreamInfo& stream_info,
-                          bool insert_envoy_original_path));
-  MOCK_CONST_METHOD2(finalizeResponseHeaders,
-                     void(Http::HeaderMap& headers, const StreamInfo::StreamInfo& stream_info));
+  MOCK_METHOD(void, finalizeRequestHeaders,
+              (Http::HeaderMap & headers, const StreamInfo::StreamInfo& stream_info,
+               bool insert_envoy_original_path),
+              (const));
+  MOCK_METHOD(void, finalizeResponseHeaders,
+              (Http::HeaderMap & headers, const StreamInfo::StreamInfo& stream_info), (const));
   MOCK_METHOD(const Http::HashPolicy*, hashPolicy, (), (const));
   MOCK_METHOD(const HedgePolicy&, hedgePolicy, (), (const));
   MOCK_METHOD(const Router::MetadataMatchCriteria*, metadataMatchCriteria, (), (const));
@@ -407,9 +408,9 @@ public:
   ~MockConfig() override;
 
   // Router::Config
-  MOCK_CONST_METHOD3(route, RouteConstSharedPtr(const Http::HeaderMap&,
-                                                const Envoy::StreamInfo::StreamInfo&,
-                                                uint64_t random_value));
+  MOCK_METHOD(RouteConstSharedPtr, route,
+              (const Http::HeaderMap&, const Envoy::StreamInfo::StreamInfo&, uint64_t random_value),
+              (const));
   MOCK_METHOD(const std::list<Http::LowerCaseString>&, internalOnlyHeaders, (), (const));
   MOCK_METHOD(const std::string&, name, (), (const));
   MOCK_METHOD(bool, usesVhds, (), (const));

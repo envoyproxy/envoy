@@ -44,17 +44,20 @@ public:
   MOCK_METHOD(bool, deprecatedFeatureEnabled, (const std::string& key), (const));
   MOCK_METHOD(bool, runtimeFeatureEnabled, (absl::string_view key), (const));
   MOCK_METHOD(bool, featureEnabled, (const std::string& key, uint64_t default_value), (const));
-  MOCK_CONST_METHOD3(featureEnabled,
-                     bool(const std::string& key, uint64_t default_value, uint64_t random_value));
-  MOCK_CONST_METHOD4(featureEnabled, bool(const std::string& key, uint64_t default_value,
-                                          uint64_t random_value, uint64_t num_buckets));
-  MOCK_CONST_METHOD2(featureEnabled,
-                     bool(const std::string& key,
-                          const envoy::type::v3alpha::FractionalPercent& default_value));
-  MOCK_CONST_METHOD3(featureEnabled,
-                     bool(const std::string& key,
-                          const envoy::type::v3alpha::FractionalPercent& default_value,
-                          uint64_t random_value));
+  MOCK_METHOD(bool, featureEnabled,
+              (const std::string& key, uint64_t default_value, uint64_t random_value), (const));
+  MOCK_METHOD(bool, featureEnabled,
+              (const std::string& key, uint64_t default_value, uint64_t random_value,
+               uint64_t num_buckets),
+              (const));
+  MOCK_METHOD(bool, featureEnabled,
+              (const std::string& key,
+               const envoy::type::v3alpha::FractionalPercent& default_value),
+              (const));
+  MOCK_METHOD(bool, featureEnabled,
+              (const std::string& key, const envoy::type::v3alpha::FractionalPercent& default_value,
+               uint64_t random_value),
+              (const));
   MOCK_METHOD(const std::string&, get, (const std::string& key), (const));
   MOCK_METHOD(bool, exists, (const std::string& key), (const));
   MOCK_METHOD(uint64_t, getInteger, (const std::string& key, uint64_t default_value), (const));

@@ -19,8 +19,8 @@ namespace ResponseCodecUnitTest {
 
 class MockResponseInitialParserFactory : public ResponseInitialParserFactory {
 public:
-  MOCK_CONST_METHOD2(create, ResponseParserSharedPtr(ExpectedResponsesSharedPtr,
-                                                     const ResponseParserResolver&));
+  MOCK_METHOD(ResponseParserSharedPtr, create,
+              (ExpectedResponsesSharedPtr, const ResponseParserResolver&), (const));
 };
 
 class MockParser : public ResponseParser {
