@@ -275,7 +275,7 @@ void LoadBalancerBase::recalculateLoadInTotalPanic() {
   const uint32_t total_hosts_num = std::accumulate(
       priority_set_.hostSetsPerPriority().begin(), priority_set_.hostSetsPerPriority().end(), 0,
       [](size_t acc, const std::unique_ptr<Envoy::Upstream::HostSet>& host_set) {
-        return acc + (host_set->hosts().size() - host_set->excludedHosts().size());
+        return acc + host_set->hosts().size();
       });
 
   if (0 == total_hosts_num) {
