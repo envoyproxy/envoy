@@ -48,7 +48,8 @@ StaticRouteConfigProviderImpl::StaticRouteConfigProviderImpl(
     Server::Configuration::FactoryContext& factory_context,
     RouteConfigProviderManagerImpl& route_config_provider_manager)
     : config_(new ConfigImpl(config, factory_context.getServerFactoryContext(),
-                             factory_context.messageValidationVisitor(), true)),
+                             factory_context.messageValidationContext().staticValidationVisitor(),
+                             true)),
 
       route_config_proto_{config}, last_updated_(factory_context.timeSource().systemTime()),
       route_config_provider_manager_(route_config_provider_manager) {
@@ -63,11 +64,11 @@ StaticRouteConfigProviderImpl::~StaticRouteConfigProviderImpl() {
 RdsRouteConfigSubscription::RdsRouteConfigSubscription(
     const envoy::extensions::filters::network::http_connection_manager::v3alpha::Rds& rds,
     const uint64_t manager_identifier, Server::Configuration::ServerFactoryContext& factory_context,
-    ProtobufMessage::ValidationVisitor& validator, Init::Manager& init_manager,
-    const std::string& stat_prefix,
+    Init::Manager& init_manager, const std::string& stat_prefix,
     Envoy::Router::RouteConfigProviderManagerImpl& route_config_provider_manager)
     : route_config_name_(rds.route_config_name()), factory_context_(factory_context),
-      validator_(validator), init_manager_(init_manager),
+      validator_(factory_context.messageValidationContext().dynamicValidationVisitor()),
+      init_manager_(init_manager),
       init_target_(fmt::format("RdsRouteConfigSubscription {}", route_config_name_),
                    [this]() { subscription_->start({route_config_name_}); }),
       scope_(factory_context.scope().createScope(stat_prefix + "rds." + route_config_name_ + ".")),
@@ -80,7 +81,7 @@ RdsRouteConfigSubscription::RdsRouteConfigSubscription(
           rds.config_source(), loadTypeUrl(rds.config_source().resource_api_version()), *scope_,
           *this);
   config_update_info_ =
-      std::make_unique<RouteConfigUpdateReceiverImpl>(factory_context.timeSource(), validator);
+      std::make_unique<RouteConfigUpdateReceiverImpl>(factory_context.timeSource(), validator_);
 }
 
 RdsRouteConfigSubscription::~RdsRouteConfigSubscription() {
@@ -227,7 +228,7 @@ RdsRouteConfigProviderImpl::RdsRouteConfigProviderImpl(
     : subscription_(std::move(subscription)),
       config_update_info_(subscription_->routeConfigUpdate()),
       factory_context_(factory_context.getServerFactoryContext()),
-      validator_(factory_context.messageValidationVisitor()),
+      validator_(factory_context.messageValidationContext().dynamicValidationVisitor()),
       tls_(factory_context.threadLocal().allocateSlot()) {
   ConfigConstSharedPtr initial_config;
   if (config_update_info_->configInfo().has_value()) {
@@ -293,8 +294,7 @@ Router::RouteConfigProviderSharedPtr RouteConfigProviderManagerImpl::createRdsRo
     // of simplicity.
     RdsRouteConfigSubscriptionSharedPtr subscription(new RdsRouteConfigSubscription(
         rds, manager_identifier, factory_context.getServerFactoryContext(),
-        factory_context.messageValidationVisitor(), factory_context.initManager(), stat_prefix,
-        *this));
+        factory_context.initManager(), stat_prefix, *this));
     init_manager.add(subscription->init_target_);
     std::shared_ptr<RdsRouteConfigProviderImpl> new_provider{
         new RdsRouteConfigProviderImpl(std::move(subscription), factory_context)};

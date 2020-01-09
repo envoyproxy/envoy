@@ -54,6 +54,9 @@ envoy::config::core::v3alpha::TrafficDirection FilterChainFactoryContextImpl::di
   return parent_context_.direction();
 }
 
+ProtobufMessage::ValidationContext& FilterChainFactoryContextImpl::messageValidationContext() {
+  return parent_context_.messageValidationContext();
+}
 ProtobufMessage::ValidationVisitor& FilterChainFactoryContextImpl::messageValidationVisitor() {
   return parent_context_.messageValidationVisitor();
 }

@@ -15,10 +15,12 @@
 #include "common/config/api_version.h"
 #include "common/config/grpc_mux_impl.h"
 #include "common/router/scoped_rds.h"
+#include "common/protobuf/message_validator_impl.h"
 
 #include "test/mocks/config/mocks.h"
 #include "test/mocks/router/mocks.h"
 #include "test/mocks/server/mocks.h"
+#include "test/mocks/protobuf/mocks.h"
 #include "test/test_common/simulated_time_system.h"
 #include "test/test_common/utility.h"
 
@@ -34,6 +36,7 @@ using testing::Invoke;
 using testing::IsNull;
 using testing::NiceMock;
 using testing::Return;
+using testing::ReturnRef;
 
 namespace Envoy {
 namespace Router {
@@ -67,6 +70,12 @@ protected:
     ON_CALL(factory_context_, initManager()).WillByDefault(ReturnRef(context_init_manager_));
     ON_CALL(factory_context_, getServerFactoryContext())
         .WillByDefault(ReturnRef(server_factory_context_));
+    ON_CALL(factory_context_, messageValidationContext())
+        .WillByDefault(ReturnRef(validation_context_));
+    ON_CALL(server_factory_context_, messageValidationContext())
+        .WillByDefault(ReturnRef(validation_context_));
+    EXPECT_CALL(validation_context_, dynamicValidationVisitor())
+        .WillRepeatedly(ReturnRef(ProtobufMessage::getStrictValidationVisitor()));
 
     EXPECT_CALL(factory_context_.admin_.config_tracker_, add_("routes", _));
     route_config_provider_manager_ =
@@ -101,6 +110,7 @@ protected:
   NiceMock<Init::MockManager> context_init_manager_;
   // factory_context_ is used by srds
   NiceMock<Server::Configuration::MockFactoryContext> factory_context_;
+  NiceMock<ProtobufMessage::MockValidationContext> validation_context_;
   // server_factory_context_ is used by rds
   NiceMock<Server::Configuration::MockServerFactoryContext> server_factory_context_;
   std::unique_ptr<RouteConfigProviderManager> route_config_provider_manager_;

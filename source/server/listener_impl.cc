@@ -126,8 +126,7 @@ Network::SocketSharedPtr ListenSocketFactoryImpl::getListenSocket() {
 ListenerImpl::ListenerImpl(const envoy::config::listener::v3alpha::Listener& config,
                            const std::string& version_info, ListenerManagerImpl& parent,
                            const std::string& name, bool added_via_api, bool workers_started,
-                           uint64_t hash, ProtobufMessage::ValidationVisitor& validation_visitor,
-                           uint32_t concurrency)
+                           uint64_t hash, uint32_t concurrency)
     : parent_(parent), address_(Network::Address::resolveProtoAddress(config.address())),
       filter_chain_manager_(address_, *this),
       global_scope_(parent_.server_.stats().createScope("")),
@@ -139,7 +138,10 @@ ListenerImpl::ListenerImpl(const envoy::config::listener::v3alpha::Listener& con
       per_connection_buffer_limit_bytes_(
           PROTOBUF_GET_WRAPPED_OR_DEFAULT(config, per_connection_buffer_limit_bytes, 1024 * 1024)),
       listener_tag_(parent_.factory_.nextListenerTag()), name_(name), added_via_api_(added_via_api),
-      workers_started_(workers_started), hash_(hash), validation_visitor_(validation_visitor),
+      workers_started_(workers_started), hash_(hash),
+      validation_visitor_(
+          added_via_api_ ? parent_.server_.messageValidationContext().dynamicValidationVisitor()
+                         : parent_.server_.messageValidationContext().staticValidationVisitor()),
       dynamic_init_manager_(fmt::format("Listener {}", name)),
       init_watcher_(std::make_unique<Init::WatcherImpl>(
           "ListenerImpl", [this] { parent_.onListenerWarmed(*this); })),
@@ -226,7 +228,7 @@ ListenerImpl::ListenerImpl(const envoy::config::listener::v3alpha::Listener& con
       parent_.server_.admin(), parent_.server_.sslContextManager(), *listener_scope_,
       parent_.server_.clusterManager(), parent_.server_.localInfo(), parent_.server_.dispatcher(),
       parent_.server_.random(), parent_.server_.stats(), parent_.server_.singletonManager(),
-      parent_.server_.threadLocal(), validation_visitor, parent_.server_.api());
+      parent_.server_.threadLocal(), validation_visitor_, parent_.server_.api());
   transport_factory_context.setInitManager(initManager());
   // The init manager is a little messy. Will refactor when filter chain manager could accept
   // network filter chain update.
@@ -342,6 +344,9 @@ envoy::config::core::v3alpha::TrafficDirection ListenerImpl::direction() const {
 TimeSource& ListenerImpl::timeSource() { return api().timeSource(); }
 
 const Network::ListenerConfig& ListenerImpl::listenerConfig() const { return *this; }
+ProtobufMessage::ValidationContext& ListenerImpl::messageValidationContext() {
+  return getServerFactoryContext().messageValidationContext();
+}
 ProtobufMessage::ValidationVisitor& ListenerImpl::messageValidationVisitor() {
   return validation_visitor_;
 }

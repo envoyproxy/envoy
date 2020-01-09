@@ -483,6 +483,7 @@ public:
   MOCK_METHOD0(admin, Server::Admin&());
   MOCK_METHOD0(timeSource, TimeSource&());
   Event::TestTimeSystem& timeSystem() { return time_system_; }
+  MOCK_METHOD0(messageValidationContext, ProtobufMessage::ValidationContext&());
   MOCK_METHOD0(messageValidationVisitor, ProtobufMessage::ValidationVisitor&());
   MOCK_METHOD0(api, Api::Api&());
 
@@ -530,6 +531,7 @@ public:
   Grpc::Context& grpcContext() override { return grpc_context_; }
   Http::Context& httpContext() override { return http_context_; }
   MOCK_METHOD0(processContext, OptProcessContextRef());
+  MOCK_METHOD0(messageValidationContext, ProtobufMessage::ValidationContext&());
   MOCK_METHOD0(messageValidationVisitor, ProtobufMessage::ValidationVisitor&());
   MOCK_METHOD0(api, Api::Api&());
 

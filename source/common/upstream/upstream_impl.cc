@@ -613,6 +613,10 @@ public:
   ThreadLocal::SlotAllocator& threadLocal() override { return tls_; }
   Server::Admin& admin() override { return admin_; }
   TimeSource& timeSource() override { return api().timeSource(); }
+  ProtobufMessage::ValidationContext& messageValidationContext() override {
+    // Not used.
+    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+  }
   Api::Api& api() override { return api_; }
 
 private:

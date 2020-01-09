@@ -96,7 +96,7 @@ public:
   ListenerImpl(const envoy::config::listener::v3alpha::Listener& config,
                const std::string& version_info, ListenerManagerImpl& parent,
                const std::string& name, bool added_via_api, bool workers_started, uint64_t hash,
-               ProtobufMessage::ValidationVisitor& validation_visitor, uint32_t concurrency);
+               uint32_t concurrency);
   ~ListenerImpl() override;
 
   /**
@@ -173,6 +173,7 @@ public:
   envoy::config::core::v3alpha::TrafficDirection direction() const override;
   TimeSource& timeSource() override;
   const Network::ListenerConfig& listenerConfig() const override;
+  ProtobufMessage::ValidationContext& messageValidationContext() override;
   ProtobufMessage::ValidationVisitor& messageValidationVisitor() override;
   Api::Api& api() override;
   ServerLifecycleNotifier& lifecycleNotifier() override;

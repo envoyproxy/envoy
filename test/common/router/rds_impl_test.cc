@@ -18,6 +18,7 @@
 #include "test/mocks/init/mocks.h"
 #include "test/mocks/local_info/mocks.h"
 #include "test/mocks/server/mocks.h"
+#include "test/mocks/protobuf/mocks.h"
 #include "test/mocks/thread_local/mocks.h"
 #include "test/mocks/upstream/mocks.h"
 #include "test/test_common/printers.h"
@@ -54,6 +55,12 @@ public:
         .WillByDefault(ReturnRef(server_factory_context_));
     ON_CALL(server_factory_context_, scope()).WillByDefault(ReturnRef(scope_));
     ON_CALL(mock_factory_context_, scope()).WillByDefault(ReturnRef(scope_));
+    ON_CALL(server_factory_context_, messageValidationContext())
+        .WillByDefault(ReturnRef(validation_context_));
+    ON_CALL(mock_factory_context_, messageValidationContext())
+        .WillByDefault(ReturnRef(validation_context_));
+    EXPECT_CALL(validation_context_, dynamicValidationVisitor())
+        .WillRepeatedly(ReturnRef(ProtobufMessage::getStrictValidationVisitor()));
 
     ON_CALL(mock_factory_context_, initManager()).WillByDefault(ReturnRef(outer_init_manager_));
     ON_CALL(outer_init_manager_, add(_)).WillByDefault(Invoke([this](const Init::Target& target) {
@@ -67,6 +74,7 @@ public:
   Event::SimulatedTimeSystem& timeSystem() { return time_system_; }
 
   Event::SimulatedTimeSystem time_system_;
+  NiceMock<ProtobufMessage::MockValidationContext> validation_context_;
   NiceMock<Server::Configuration::MockFactoryContext> mock_factory_context_;
   NiceMock<Init::MockManager> outer_init_manager_;
   NiceMock<Server::Configuration::MockServerFactoryContext> server_factory_context_;

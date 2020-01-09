@@ -55,6 +55,12 @@ public:
   virtual const LocalInfo::LocalInfo& localInfo() const PURE;
 
   /**
+   * @return ProtobufMessage::ValidationContext& validation visitor for xDS&static configuration
+   *         messages.
+   */
+  virtual ProtobufMessage::ValidationContext& messageValidationContext() PURE;
+
+  /**
    * @return RandomGenerator& the random generator for the server.
    */
   virtual Envoy::Runtime::RandomGenerator& random() PURE;

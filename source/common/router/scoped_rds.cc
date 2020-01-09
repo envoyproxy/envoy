@@ -102,8 +102,8 @@ ScopedRdsConfigSubscription::ScopedRdsConfigSubscription(
       scope_(factory_context.scope().createScope(stat_prefix + "scoped_rds." + name + ".")),
       stats_({ALL_SCOPED_RDS_STATS(POOL_COUNTER(*scope_))}),
       rds_config_source_(std::move(rds_config_source)),
-      validation_visitor_(factory_context.messageValidationVisitor()), stat_prefix_(stat_prefix),
-      route_config_provider_manager_(route_config_provider_manager) {
+      validation_visitor_(factory_context.messageValidationContext().dynamicValidationVisitor()),
+      stat_prefix_(stat_prefix), route_config_provider_manager_(route_config_provider_manager) {
   subscription_ =
       factory_context.clusterManager().subscriptionFactory().subscriptionFromConfigSource(
           scoped_rds.scoped_rds_config_source(),
@@ -290,9 +290,10 @@ void ScopedRdsConfigSubscription::onRdsConfigUpdate(const std::string& scope_nam
          fmt::format("trying to update route config for non-existing scope {}", scope_name));
   auto new_scoped_route_info = std::make_shared<ScopedRouteInfo>(
       envoy::config::route::v3alpha::ScopedRouteConfiguration(iter->second->configProto()),
-      std::make_shared<ConfigImpl>(rds_subscription.routeConfigUpdate()->routeConfiguration(),
-                                   factory_context_.getServerFactoryContext(),
-                                   factory_context_.messageValidationVisitor(), false));
+      std::make_shared<ConfigImpl>(
+          rds_subscription.routeConfigUpdate()->routeConfiguration(),
+          factory_context_.getServerFactoryContext(),
+          factory_context_.messageValidationContext().dynamicValidationVisitor(), false));
   applyConfigUpdate([new_scoped_route_info](ConfigProvider::ConfigConstSharedPtr config)
                         -> ConfigProvider::ConfigConstSharedPtr {
     auto* thread_local_scoped_config =

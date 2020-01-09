@@ -63,6 +63,7 @@ public:
   envoy::config::core::v3alpha::TrafficDirection direction() const override;
   TimeSource& timeSource() override;
   ProtobufMessage::ValidationVisitor& messageValidationVisitor() override;
+  ProtobufMessage::ValidationContext& messageValidationContext() override;
   Api::Api& api() override;
   ServerLifecycleNotifier& lifecycleNotifier() override;
   OptProcessContextRef processContext() override;
