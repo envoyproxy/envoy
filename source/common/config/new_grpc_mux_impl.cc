@@ -75,8 +75,9 @@ void NewGrpcMuxImpl::onDiscoveryResponse(
             message->system_version_info());
   auto sub = subscriptions_.find(message->type_url());
   if (sub == subscriptions_.end()) {
-    ENVOY_LOG(warn, "Dropping received DeltaDiscoveryResponse (with version {}) for non-existent "
-                    "subscription {}.",
+    ENVOY_LOG(warn,
+              "Dropping received DeltaDiscoveryResponse (with version {}) for non-existent "
+              "subscription {}.",
               message->system_version_info(), message->type_url());
     return;
   }
