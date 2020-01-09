@@ -14,13 +14,13 @@
 
 #include "common/config/api_version.h"
 #include "common/config/grpc_mux_impl.h"
-#include "common/router/scoped_rds.h"
 #include "common/protobuf/message_validator_impl.h"
+#include "common/router/scoped_rds.h"
 
 #include "test/mocks/config/mocks.h"
+#include "test/mocks/protobuf/mocks.h"
 #include "test/mocks/router/mocks.h"
 #include "test/mocks/server/mocks.h"
-#include "test/mocks/protobuf/mocks.h"
 #include "test/test_common/simulated_time_system.h"
 #include "test/test_common/utility.h"
 
