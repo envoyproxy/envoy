@@ -93,7 +93,7 @@ public:
    */
   virtual TransportPtr createTransport() PURE;
 
-  std::string category() const override { return "thrift_proxy.transports"; }
+  std::string category() const override { return "envoy.thrift_proxy.transports"; }
 
   /**
    * Convenience method to lookup a factory by type.
