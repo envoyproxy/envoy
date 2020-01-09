@@ -237,6 +237,59 @@ TEST_F(Http2ConnPoolImplTest, DrainConnections) {
   EXPECT_EQ(2U, cluster_->stats_.upstream_cx_destroy_remote_.value());
 }
 
+// Test that cluster.http2_protocol_options.max_concurrent_streams limits
+// concurrent requests and causes additional connections to be created.
+TEST_F(Http2ConnPoolImplTest, MaxConcurrentRequestsPerStream) {
+  cluster_->resetResourceManager(2, 1024, 1024, 1, 1);
+  cluster_->http2_settings_.max_concurrent_streams_ = 1;
+
+  InSequence s;
+
+  {
+    // Create request and complete it
+    expectClientCreate();
+    ActiveTestRequest r(*this, 0, false);
+    expectClientConnect(0, r);
+    completeRequest(r);
+  }
+
+  // Previous request completed, so this one will re-use the connection
+  {
+    ActiveTestRequest r(*this, 0, true);
+    completeRequest(r);
+  }
+
+  // Two concurrent requests causes one additional connection to be created
+  {
+    ActiveTestRequest r1(*this, 0, true);
+    expectClientCreate();
+    ActiveTestRequest r2(*this, 1, false);
+    expectClientConnect(1, r2);
+
+    // Complete one of them, and create another, and it will re-use the connection
+    completeRequest(r2);
+    ActiveTestRequest r3(*this, 1, true);
+
+    completeRequest(r1);
+    completeRequest(r3);
+  }
+
+  // Create two more requests; both should use existing connections
+  {
+    ActiveTestRequest r1(*this, 1, true);
+    ActiveTestRequest r2(*this, 0, true);
+    completeRequest(r1);
+    completeRequest(r2);
+  }
+
+  test_clients_[0].connection_->raiseEvent(Network::ConnectionEvent::RemoteClose);
+  test_clients_[1].connection_->raiseEvent(Network::ConnectionEvent::RemoteClose);
+  EXPECT_CALL(*this, onClientDestroy()).Times(2);
+  dispatcher_.clearDeferredDeleteList();
+
+  EXPECT_EQ(2U, cluster_->stats_.upstream_cx_total_.value());
+}
+
 // Verifies that requests are queued up in the conn pool until the connection becomes ready.
 TEST_F(Http2ConnPoolImplTest, PendingRequests) {
   InSequence s;
