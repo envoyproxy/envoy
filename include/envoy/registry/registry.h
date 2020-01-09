@@ -304,6 +304,7 @@ private:
 
     factories().emplace(factory.name(), &factory);
     RELEASE_ASSERT(getFactory(factory.name()) == &factory, "");
+    factoriesByType().emplace(factory.configType(), &factory);
 
     return displaced;
   }
@@ -312,9 +313,10 @@ private:
    * Remove a factory by name. This method should only be used for testing purposes.
    * @param name is the name of the factory to remove.
    */
-  static void removeFactoryForTest(absl::string_view name) {
+  static void removeFactoryForTest(absl::string_view name, absl::string_view config_type) {
     auto result = factories().erase(name);
     RELEASE_ASSERT(result == 1, "");
+    factoriesByType().erase(config_type);
   }
 };
 
