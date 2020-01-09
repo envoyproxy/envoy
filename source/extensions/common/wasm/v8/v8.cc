@@ -5,7 +5,6 @@
 #include <vector>
 
 #include "common/common/assert.h"
-#include "common/singleton/threadsafe_singleton.h"
 
 #include "extensions/common/wasm/wasm_vm_base.h"
 #include "extensions/common/wasm/well_known_names.h"
@@ -243,7 +242,6 @@ template <typename T, typename U> constexpr T convertValTypesToArgsTuple(const U
 bool V8::load(const std::string& code, bool /* allow_precompiled */) {
   ENVOY_LOG(trace, "load()");
   store_ = wasm::Store::make(engine());
-  RELEASE_ASSERT(store_ != nullptr, "");
 
   source_ = wasm::vec<byte_t>::make_uninitialized(code.size());
   ::memcpy(source_.get(), code.data(), code.size());
@@ -251,7 +249,6 @@ bool V8::load(const std::string& code, bool /* allow_precompiled */) {
   module_ = wasm::Module::make(store_.get(), source_);
   if (module_) {
     shared_module_ = module_->share();
-    RELEASE_ASSERT(shared_module_ != nullptr, "");
   }
 
   return module_ != nullptr;
@@ -263,10 +260,8 @@ WasmVmPtr V8::clone() {
 
   auto clone = std::make_unique<V8>(scope_);
   clone->store_ = wasm::Store::make(engine());
-  RELEASE_ASSERT(clone->store_ != nullptr, "");
 
   clone->module_ = wasm::Module::obtain(clone->store_.get(), shared_module_.get());
-  RELEASE_ASSERT(clone->module_ != nullptr, "");
 
   return clone;
 }
@@ -377,7 +372,6 @@ void V8::link(absl::string_view debug_name) {
   ASSERT(import_types.size() == imports.size());
 
   instance_ = wasm::Instance::make(store_.get(), module_.get(), imports.data());
-  RELEASE_ASSERT(instance_ != nullptr, "");
 
   const auto export_types = module_.get()->exports();
   const auto exports = instance_.get()->exports();

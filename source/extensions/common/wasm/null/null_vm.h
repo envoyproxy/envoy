@@ -7,7 +7,6 @@
 #include "envoy/registry/registry.h"
 
 #include "common/common/assert.h"
-#include "common/singleton/threadsafe_singleton.h"
 
 #include "extensions/common/wasm/null/null_vm_plugin.h"
 #include "extensions/common/wasm/wasm_vm_base.h"
