@@ -59,6 +59,7 @@ public:
   /**
    * Callback used to request an update to the route configuration from the management server.
    * @param for_domain supplies the domain name that virtual hosts must match on
+   * @param thread_local_dispatcher thread-local dispatcher
    * @param route_config_updated_cb callback to be called when the configuration update has been
    * propagated to worker threads
    */
