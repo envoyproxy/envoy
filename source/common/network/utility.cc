@@ -23,6 +23,7 @@
 #include "common/protobuf/protobuf.h"
 
 #include "absl/strings/match.h"
+#include "absl/strings/string_view.h"
 
 namespace Envoy {
 namespace Network {
