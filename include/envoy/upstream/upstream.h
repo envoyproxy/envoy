@@ -11,6 +11,7 @@
 #include "envoy/common/callback.h"
 #include "envoy/config/cluster/v3alpha/cluster.pb.h"
 #include "envoy/config/core/v3alpha/base.pb.h"
+#include "envoy/config/core/v3alpha/protocol.pb.h"
 #include "envoy/config/typed_metadata.h"
 #include "envoy/http/codec.h"
 #include "envoy/network/connection.h"
@@ -869,6 +870,12 @@ public:
    */
   virtual Http::Protocol
   upstreamHttpProtocol(absl::optional<Http::Protocol> downstream_protocol) const PURE;
+
+  /**
+   * @return http protocol options for upstream connection
+   */
+  virtual const absl::optional<envoy::config::core::v3alpha::UpstreamHttpProtocolOptions>&
+  upstreamHttpProtocolOptions() const PURE;
 
 protected:
   /**

@@ -30,7 +30,7 @@ option (udpa.annotations.file_migrate).move_to_package = "envoy.config.cluster.v
 // [#protodoc-title: Cluster configuration]
 
 // Configuration for a single upstream cluster.
-// [#next-free-field: 46]
+// [#next-free-field: 47]
 message Cluster {
   // Refer to :ref:`service discovery type <arch_overview_service_discovery_types>`
   // for an explanation on each type.
@@ -591,6 +591,10 @@ message Cluster {
   //   **This field is deprecated**. Use `transport_socket` with name `tls` instead. If both are
   //   set, `transport_socket` takes priority.
   auth.UpstreamTlsContext tls_context = 11 [deprecated = true];
+
+  // HTTP protocol options that are applied only to upstream HTTP connections.
+  // These options apply to all HTTP versions.
+  core.UpstreamHttpProtocolOptions upstream_http_protocol_options = 46;
 
   // Additional options when handling HTTP requests upstream. These options will be applicable to
   // both HTTP1 and HTTP2 requests.
