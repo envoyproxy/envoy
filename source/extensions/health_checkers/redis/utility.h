@@ -21,15 +21,10 @@ getRedisHealthCheckConfig(const envoy::config::core::v3alpha::HealthCheck& healt
 
   ProtobufTypes::MessagePtr config =
       ProtobufTypes::MessagePtr{new envoy::config::health_checker::redis::v2::Redis()};
-  if (health_check_config.custom_health_check().has_typed_config()) {
-    Envoy::Config::Utility::translateOpaqueConfig(
-        health_check_config.custom_health_check().typed_config(),
-        ProtobufWkt::Struct::default_instance(), validation_visitor, *config);
-  } else {
-    MessageUtil::jsonConvert(
-        health_check_config.custom_health_check().hidden_envoy_deprecated_config(),
-        validation_visitor, *config);
-  }
+  Envoy::Config::Utility::translateOpaqueConfig(
+      health_check_config.custom_health_check().typed_config(),
+      health_check_config.custom_health_check().hidden_envoy_deprecated_config(),
+      validation_visitor, *config);
 
   return MessageUtil::downcastAndValidate<const envoy::config::health_checker::redis::v2::Redis&>(
       *config, validation_visitor);
