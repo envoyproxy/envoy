@@ -899,8 +899,7 @@ TEST_F(DeprecatedFieldsTest, DEPRECATED_FEATURE_TEST(RuntimeOverrideEnumDefault)
   base.mutable_enum_container();
 
   Runtime::LoaderSingleton::getExisting()->mergeValues(
-      {{"envoy.deprecated_features:envoy.test.deprecation_test.Base.DEPRECATED_DEFAULT",
-        "false"}});
+      {{"envoy.deprecated_features:envoy.test.deprecation_test.Base.DEPRECATED_DEFAULT", "false"}});
 
   // Make sure this is set up right.
   EXPECT_THROW_WITH_REGEX(checkForDeprecation(base), ProtoValidationException,
@@ -916,8 +915,7 @@ TEST_F(DeprecatedFieldsTest, DEPRECATED_FEATURE_TEST(FatalEnum)) {
                           "Using deprecated value DEPRECATED_FATAL");
 
   Runtime::LoaderSingleton::getExisting()->mergeValues(
-      {{"envoy.deprecated_features:envoy.test.deprecation_test.Base.DEPRECATED_FATAL",
-        "true"}});
+      {{"envoy.deprecated_features:envoy.test.deprecation_test.Base.DEPRECATED_FATAL", "true"}});
 
   checkForDeprecation(base);
 }
