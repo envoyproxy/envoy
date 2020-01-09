@@ -41,7 +41,7 @@ ProtobufTypes::MessagePtr MetricsServiceSinkFactory::createEmptyConfigProto() {
       std::make_unique<envoy::config::metrics::v3alpha::MetricsServiceConfig>());
 }
 
-std::string MetricsServiceSinkFactory::name() { return StatsSinkNames::get().MetricsService; }
+std::string MetricsServiceSinkFactory::name() const { return StatsSinkNames::get().MetricsService; }
 
 /**
  * Static registration for the this sink factory. @see RegisterFactory.

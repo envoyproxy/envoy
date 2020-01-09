@@ -7,6 +7,7 @@
 
 #include "envoy/config/cluster/v3alpha/cluster.pb.h"
 #include "envoy/config/core/v3alpha/base.pb.h"
+#include "envoy/config/core/v3alpha/protocol.pb.h"
 #include "envoy/config/typed_metadata.h"
 #include "envoy/stats/scope.h"
 #include "envoy/upstream/cluster_manager.h"
@@ -70,7 +71,16 @@ public:
   void resetResourceManager(uint64_t cx, uint64_t rq_pending, uint64_t rq, uint64_t rq_retry,
                             uint64_t conn_pool) {
     resource_manager_ = std::make_unique<ResourceManagerImpl>(
-        runtime_, name_, cx, rq_pending, rq, rq_retry, conn_pool, circuit_breakers_stats_);
+        runtime_, name_, cx, rq_pending, rq, rq_retry, conn_pool, circuit_breakers_stats_,
+        absl::nullopt, absl::nullopt);
+  }
+
+  void resetResourceManagerWithRetryBudget(uint64_t cx, uint64_t rq_pending, uint64_t rq,
+                                           uint64_t rq_retry, uint64_t conn_pool,
+                                           double budget_percent, uint32_t min_retry_concurrency) {
+    resource_manager_ = std::make_unique<ResourceManagerImpl>(
+        runtime_, name_, cx, rq_pending, rq, rq_retry, conn_pool, circuit_breakers_stats_,
+        budget_percent, min_retry_concurrency);
   }
 
   // Upstream::ClusterInfo
@@ -114,6 +124,9 @@ public:
   MOCK_CONST_METHOD0(clusterSocketOptions, const Network::ConnectionSocket::OptionsSharedPtr&());
   MOCK_CONST_METHOD0(drainConnectionsOnHostRemoval, bool());
   MOCK_CONST_METHOD0(warmHosts, bool());
+  MOCK_CONST_METHOD0(
+      upstreamHttpProtocolOptions,
+      const absl::optional<envoy::config::core::v3alpha::UpstreamHttpProtocolOptions>&());
   MOCK_CONST_METHOD0(eds_service_name, absl::optional<std::string>());
   MOCK_CONST_METHOD1(createNetworkFilterChain, void(Network::Connection&));
   MOCK_CONST_METHOD1(upstreamHttpProtocol, Http::Protocol(absl::optional<Http::Protocol>));
@@ -139,6 +152,8 @@ public:
       envoy::config::cluster::v3alpha::Cluster::STRICT_DNS};
   absl::optional<envoy::config::cluster::v3alpha::Cluster::CustomClusterType> cluster_type_;
   NiceMock<MockLoadBalancerSubsetInfo> lb_subset_;
+  absl::optional<envoy::config::core::v3alpha::UpstreamHttpProtocolOptions>
+      upstream_http_protocol_options_;
   absl::optional<envoy::config::cluster::v3alpha::Cluster::RingHashLbConfig> lb_ring_hash_config_;
   absl::optional<envoy::config::cluster::v3alpha::Cluster::OriginalDstLbConfig>
       lb_original_dst_config_;

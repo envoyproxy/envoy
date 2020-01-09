@@ -603,17 +603,6 @@ TEST_P(StatNameTest, SharedStatNameStorageSetInsertAndFind) {
   set.free(*table_);
 }
 
-TEST_P(StatNameTest, SharedStatNameStorageSetSwap) {
-  StatNameStorageSet set1, set2;
-  set1.insert(StatNameStorage("foo", *table_));
-  EXPECT_EQ(1, set1.size());
-  EXPECT_EQ(0, set2.size());
-  set1.swap(set2);
-  EXPECT_EQ(0, set1.size());
-  EXPECT_EQ(1, set2.size());
-  set2.free(*table_);
-}
-
 TEST_P(StatNameTest, StatNameSet) {
   StatNameSetPtr set(table_->makeSet("set"));
 

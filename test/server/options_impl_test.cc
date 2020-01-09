@@ -8,6 +8,7 @@
 #include "envoy/admin/v3alpha/server_info.pb.h"
 #include "envoy/common/exception.h"
 #include "envoy/config/bootstrap/v3alpha/bootstrap.pb.h"
+#include "envoy/config/typed_config.h"
 
 #include "common/common/utility.h"
 
@@ -450,28 +451,26 @@ TEST_F(OptionsImplPlatformLinuxTest, AffinityTest4) {
 
 #endif
 
-class TestFactory {
+class TestFactory : public Config::UntypedFactory {
 public:
   virtual ~TestFactory() = default;
-  virtual std::string name() PURE;
-  static std::string category() { return "test"; }
+  std::string category() const override { return "test"; }
 };
 
 class TestTestFactory : public TestFactory {
 public:
-  std::string name() override { return "test"; }
+  std::string name() const override { return "test"; }
 };
 
-class TestingFactory {
+class TestingFactory : public Config::UntypedFactory {
 public:
   virtual ~TestingFactory() = default;
-  virtual std::string name() PURE;
-  static std::string category() { return "testing"; }
+  std::string category() const override { return "testing"; }
 };
 
 class TestTestingFactory : public TestingFactory {
 public:
-  std::string name() override { return "test"; }
+  std::string name() const override { return "test"; }
 };
 
 REGISTER_FACTORY(TestTestFactory, TestFactory){"test-1", "test-2"};

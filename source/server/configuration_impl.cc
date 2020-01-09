@@ -102,11 +102,10 @@ void MainImpl::initializeTracers(const envoy::config::trace::v3alpha::Tracing& c
   }
 
   // Initialize tracing driver.
-  std::string type = configuration.http().name();
-  ENVOY_LOG(info, "  loading tracing driver: {}", type);
+  ENVOY_LOG(info, "  loading tracing driver: {}", configuration.http().name());
 
   // Now see if there is a factory that will accept the config.
-  auto& factory = Config::Utility::getAndCheckFactory<TracerFactory>(type);
+  auto& factory = Config::Utility::getAndCheckFactory<TracerFactory>(configuration.http());
   ProtobufTypes::MessagePtr message = Config::Utility::translateToFactoryConfig(
       configuration.http(), server.messageValidationContext().staticValidationVisitor(), factory);
   http_tracer_ = factory.createHttpTracer(*message, server);
@@ -118,7 +117,7 @@ void MainImpl::initializeStatsSinks(const envoy::config::bootstrap::v3alpha::Boo
 
   for (const envoy::config::metrics::v3alpha::StatsSink& sink_object : bootstrap.stats_sinks()) {
     // Generate factory and translate stats sink custom config
-    auto& factory = Config::Utility::getAndCheckFactory<StatsSinkFactory>(sink_object.name());
+    auto& factory = Config::Utility::getAndCheckFactory<StatsSinkFactory>(sink_object);
     ProtobufTypes::MessagePtr message = Config::Utility::translateToFactoryConfig(
         sink_object, server.messageValidationContext().staticValidationVisitor(), factory);
 

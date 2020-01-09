@@ -13,8 +13,6 @@ GOOGLEAPIS_SHA = "a45019af4d3290f02eaeb1ce10990166978c807cb33a9692141a076ba46d14
 PROMETHEUS_GIT_SHA = "99fa1f4be8e564e8a6b613da7fa6f46c9edafc6c"  # Nov 17, 2017
 PROMETHEUS_SHA = "783bdaf8ee0464b35ec0c8704871e1e72afa0005c3f3587f65d9d6694bf3911b"
 
-KAFKA_SOURCE_SHA = "ae7a1696c0a0302b43c5b21e515c37e6ecd365941f68a510a7e442eebddf39a1"  # 2.2.0-rc2
-
 UDPA_GIT_SHA = "edbea6a78f6d1ba34edc69c53a396b1d88d59651"  # Dec 30, 2019
 UDPA_SHA256 = "8cabd617b68354fa8b4adab8a031f80c10e2ea43f57d5f6210bc7b3ebb79b684"
 
@@ -59,11 +57,6 @@ REPOSITORY_LOCATIONS = dict(
         sha256 = RULES_PROTO_SHA256,
         strip_prefix = "rules_proto-" + RULES_PROTO_GIT_SHA + "",
         urls = ["https://github.com/bazelbuild/rules_proto/archive/" + RULES_PROTO_GIT_SHA + ".tar.gz"],
-    ),
-    kafka_source = dict(
-        sha256 = KAFKA_SOURCE_SHA,
-        strip_prefix = "kafka-2.2.0-rc2/clients/src/main/resources/common/message",
-        urls = ["https://github.com/apache/kafka/archive/2.2.0-rc2.zip"],
     ),
     com_github_openzipkin_zipkinapi = dict(
         sha256 = ZIPKINAPI_SHA256,

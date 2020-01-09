@@ -3,7 +3,7 @@
 # Main library file containing all the protocol generation logic.
 
 
-def generate_main_code(type, main_header_file, resolver_cc_file, input_files):
+def generate_main_code(type, main_header_file, resolver_cc_file, metrics_header_file, input_files):
   """
   Main code generator.
 
@@ -13,6 +13,7 @@ def generate_main_code(type, main_header_file, resolver_cc_file, input_files):
   These responses are then used to create:
   - main_header_file - contains definitions of Kafka structures and their deserializers
   - resolver_cc_file - contains request api key & version mapping to deserializer (from header file)
+  - metrics_header_file - contains metrics with names corresponding to messages
   """
   # Parse provided input files.
   messages = parse_messages(input_files)
@@ -37,15 +38,21 @@ def generate_main_code(type, main_header_file, resolver_cc_file, input_files):
   with open(main_header_file, 'w') as fd:
     fd.write(contents)
 
+  # Generate ...resolver.cc file.
   template = RenderingHelper.get_template("kafka_%s_resolver_cc.j2" % type)
   contents = template.render(message_types=messages)
-
-  # Generate ...resolver.cc file.
   with open(resolver_cc_file, 'w') as fd:
     fd.write(contents)
 
+  # Generate ...metrics.h file.
+  template = RenderingHelper.get_template("%s_metrics_h.j2" % type)
+  contents = template.render(message_types=messages)
+  with open(metrics_header_file, 'w') as fd:
+    fd.write(contents)
 
-def generate_test_code(type, header_test_cc_file, codec_test_cc_file, input_files):
+
+def generate_test_code(type, header_test_cc_file, codec_test_cc_file, utilities_cc_file,
+                       input_files):
   """
   Test code generator.
 
@@ -53,8 +60,9 @@ def generate_test_code(type, header_test_cc_file, codec_test_cc_file, input_file
   response).
 
   These responses are then used to create:
-  - header_test_cc_file - tests for basic message serialization deserialization
-  - codec_test_cc_file - tests involving codec and Request/ResponseParserResolver
+  - header_test_cc_file - tests for basic message serialization deserialization,
+  - codec_test_cc_file - tests involving codec and Request/ResponseParserResolver,
+  - utilities_cc_file - utilities for creating sample messages.
   """
   # Parse provided input files.
   messages = parse_messages(input_files)
@@ -69,6 +77,12 @@ def generate_test_code(type, header_test_cc_file, codec_test_cc_file, input_file
   template = RenderingHelper.get_template("%s_codec_%s_test_cc.j2" % (type, type))
   contents = template.render(message_types=messages)
   with open(codec_test_cc_file, 'w') as fd:
+    fd.write(contents)
+
+  # Generate utilities file.
+  template = RenderingHelper.get_template("%s_utilities_cc.j2" % type)
+  contents = template.render(message_types=messages)
+  with open(utilities_cc_file, 'w') as fd:
     fd.write(contents)
 
 
@@ -487,6 +501,11 @@ class Complex(TypeSpecification):
 
   def deserializer_name_in_version(self, version):
     return '%sV%dDeserializer' % (self.name, version)
+
+  def name_in_c_case(self):
+    import re
+    s1 = re.sub('(.)([A-Z][a-z]+)', r'\1_\2', self.name)
+    return re.sub('([a-z0-9])([A-Z])', r'\1_\2', s1).lower()
 
   def default_value(self):
     raise NotImplementedError('unable to create default value of complex type')

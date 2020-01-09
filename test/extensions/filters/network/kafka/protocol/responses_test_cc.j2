@@ -40,7 +40,7 @@ template <typename T> std::shared_ptr<T> ResponseTest::serializeAndDeserialize(T
   std::shared_ptr<MockMessageListener> mock_listener = std::make_shared<MockMessageListener>();
   ResponseDecoder testee{ {mock_listener} };
   const ResponseMetadata& metadata = message.metadata_;
-  testee.expectResponse(metadata.api_key_, metadata.api_version_);
+  testee.expectResponse(metadata.correlation_id_, metadata.api_key_, metadata.api_version_);
 
   AbstractResponseSharedPtr received_message;
   EXPECT_CALL(*mock_listener, onMessage(testing::_))
