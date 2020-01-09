@@ -43,7 +43,7 @@ public:
                     const Protobuf::RepeatedPtrField<std::string>& removed_resources,
                     const std::string& version_info) override;
   const std::string& routeConfigName() const override { return route_config_proto_.name(); }
-  const std::string& configVersion() override { return last_config_version_; }
+  const std::string& configVersion() const override { return last_config_version_; }
   uint64_t configHash() const override { return last_config_hash_; }
   absl::optional<RouteConfigProvider::ConfigInfo> configInfo() const override {
     return config_info_;

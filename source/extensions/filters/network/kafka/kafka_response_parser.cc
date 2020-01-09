@@ -1,5 +1,7 @@
 #include "extensions/filters/network/kafka/kafka_response_parser.h"
 
+#include "absl/strings/str_cat.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
@@ -43,7 +45,7 @@ ExpectedResponseSpec ResponseHeaderParser::getResponseSpec(const int32_t correla
   } else {
     // Response data should always be present in expected responses before response is to be parsed.
     throw EnvoyException(
-        fmt::format("no response metadata registered for correlation_id {}", correlation_id));
+        absl::StrCat("no response metadata registered for correlation_id ", correlation_id));
   }
 };
 

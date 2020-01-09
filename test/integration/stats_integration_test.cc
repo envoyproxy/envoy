@@ -187,7 +187,7 @@ private:
       }
       for (int i = 1; i < num_clusters; ++i) {
         auto* cluster = bootstrap.mutable_static_resources()->add_clusters();
-        cluster->set_name(fmt::format("cluster_{}", i));
+        cluster->set_name(absl::StrCat("cluster_", i));
       }
 
       for (int i = 0; i < num_clusters; ++i) {

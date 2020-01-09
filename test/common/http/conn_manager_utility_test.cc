@@ -70,7 +70,7 @@ public:
   MOCK_CONST_METHOD0(delayedCloseTimeout, std::chrono::milliseconds());
   MOCK_METHOD0(routeConfigProvider, Router::RouteConfigProvider*());
   MOCK_METHOD0(scopedRouteConfigProvider, Config::ConfigProvider*());
-  MOCK_METHOD0(serverName, const std::string&());
+  MOCK_CONST_METHOD0(serverName, const std::string&());
   MOCK_CONST_METHOD0(serverHeaderTransformation,
                      HttpConnectionManagerProto::ServerHeaderTransformation());
   MOCK_METHOD0(stats, ConnectionManagerStats&());

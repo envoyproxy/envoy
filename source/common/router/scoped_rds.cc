@@ -182,7 +182,7 @@ bool ScopedRdsConfigSubscription::addOrUpdateScopes(
       ENVOY_LOG(debug, "srds: add/update scoped_route '{}', version: {}",
                 scoped_route_info->scopeName(), version_info);
     } catch (const EnvoyException& e) {
-      exception_msgs.emplace_back(fmt::format("{}", e.what()));
+      exception_msgs.emplace_back(absl::StrCat("", e.what()));
     }
   }
   return any_applied;

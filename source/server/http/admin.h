@@ -127,7 +127,7 @@ public:
   Config::ConfigProvider* scopedRouteConfigProvider() override {
     return &scoped_route_config_provider_;
   }
-  const std::string& serverName() override { return Http::DefaultServerString::get(); }
+  const std::string& serverName() const override { return Http::DefaultServerString::get(); }
   HttpConnectionManagerProto::ServerHeaderTransformation
   serverHeaderTransformation() const override {
     return HttpConnectionManagerProto::OVERWRITE;

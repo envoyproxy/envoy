@@ -287,7 +287,7 @@ public:
                                          const std::string& version_info, bool modifiable));
   MOCK_METHOD1(createLdsApi, void(const envoy::config::core::v3alpha::ConfigSource& lds_config));
   MOCK_METHOD0(listeners, std::vector<std::reference_wrapper<Network::ListenerConfig>>());
-  MOCK_METHOD0(numConnections, uint64_t());
+  MOCK_CONST_METHOD0(numConnections, uint64_t());
   MOCK_METHOD1(removeListener, bool(const std::string& listener_name));
   MOCK_METHOD1(startWorkers, void(GuardDog& guard_dog));
   MOCK_METHOD1(stopListeners, void(StopListenersType listeners_type));
@@ -339,7 +339,7 @@ public:
   // Server::Worker
   MOCK_METHOD2(addListener,
                void(Network::ListenerConfig& listener, AddListenerCompletion completion));
-  MOCK_METHOD0(numConnections, uint64_t());
+  MOCK_CONST_METHOD0(numConnections, uint64_t());
   MOCK_METHOD2(removeListener,
                void(Network::ListenerConfig& listener, std::function<void()> completion));
   MOCK_METHOD1(start, void(GuardDog& guard_dog));

@@ -289,7 +289,7 @@ public:
   /**
    * @return const std::string& the server name to write into responses.
    */
-  virtual const std::string& serverName() PURE;
+  virtual const std::string& serverName() const PURE;
 
   /**
    * @return ServerHeaderTransformation the transformation to apply to Server response headers.

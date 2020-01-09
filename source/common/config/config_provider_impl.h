@@ -204,7 +204,7 @@ protected:
                                ConfigProviderManagerImplBase& config_provider_manager,
                                Server::Configuration::FactoryContext& factory_context)
       : name_(name), tls_(factory_context.threadLocal().allocateSlot()),
-        init_target_(fmt::format("ConfigSubscriptionCommonBase {}", name_), [this]() { start(); }),
+        init_target_(absl::StrCat("ConfigSubscriptionCommonBase ", name_), [this]() { start(); }),
         manager_identifier_(manager_identifier), config_provider_manager_(config_provider_manager),
         time_source_(factory_context.timeSource()),
         last_updated_(factory_context.timeSource().systemTime()) {
