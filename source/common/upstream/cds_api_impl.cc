@@ -9,6 +9,7 @@
 #include "envoy/service/discovery/v3alpha/discovery.pb.h"
 #include "envoy/stats/scope.h"
 
+#include "common/common/assert.h"
 #include "common/common/cleanup.h"
 #include "common/common/utility.h"
 #include "common/config/api_version.h"
@@ -31,9 +32,9 @@ CdsApiImpl::CdsApiImpl(const envoy::config::core::v3alpha::ConfigSource& cds_con
                        ClusterManager& cm, Stats::Scope& scope,
                        ProtobufMessage::ValidationVisitor& validation_visitor)
     : cm_(cm), scope_(scope.createScope("cluster_manager.cds.")),
-      validation_visitor_(validation_visitor), xds_api_version_(cds_config.xds_api_version()) {
-  subscription_ = cm_.subscriptionFactory().subscriptionFromConfigSource(cds_config, loadTypeUrl(),
-                                                                         *scope_, *this);
+      validation_visitor_(validation_visitor) {
+  subscription_ = cm_.subscriptionFactory().subscriptionFromConfigSource(
+      cds_config, loadTypeUrl(cds_config.resource_api_version()), *scope_, *this);
 }
 
 void CdsApiImpl::onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
@@ -128,18 +129,18 @@ void CdsApiImpl::runInitializeCallbackIfAny() {
   }
 }
 
-std::string CdsApiImpl::loadTypeUrl() {
-  switch (xds_api_version_) {
+std::string CdsApiImpl::loadTypeUrl(envoy::config::core::v3alpha::ApiVersion resource_api_version) {
+  switch (resource_api_version) {
   // automatically set api version as V2
-  case envoy::config::core::v3alpha::ConfigSource::AUTO:
-  case envoy::config::core::v3alpha::ConfigSource::V2:
+  case envoy::config::core::v3alpha::ApiVersion::AUTO:
+  case envoy::config::core::v3alpha::ApiVersion::V2:
     return Grpc::Common::typeUrl(
         API_NO_BOOST(envoy::api::v2::Cluster().GetDescriptor()->full_name()));
-  case envoy::config::core::v3alpha::ConfigSource::V3ALPHA:
+  case envoy::config::core::v3alpha::ApiVersion::V3ALPHA:
     return Grpc::Common::typeUrl(
         API_NO_BOOST(envoy::config::cluster::v3alpha::Cluster().GetDescriptor()->full_name()));
   default:
-    throw EnvoyException(fmt::format("type {} is not supported", xds_api_version_));
+    NOT_REACHED_GCOVR_EXCL_LINE;
   }
 }
 

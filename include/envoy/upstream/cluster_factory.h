@@ -140,10 +140,7 @@ public:
   create(const envoy::config::cluster::v3alpha::Cluster& cluster,
          ClusterFactoryContext& context) PURE;
 
-  std::string category() const override {
-    static const char FACTORY_CATEGORY[] = "clusters";
-    return FACTORY_CATEGORY;
-  }
+  std::string category() const override { return "envoy.clusters"; }
 };
 
 } // namespace Upstream

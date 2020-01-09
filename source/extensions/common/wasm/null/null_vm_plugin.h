@@ -32,10 +32,7 @@ class NullVmPluginFactory : public Config::UntypedFactory {
 public:
   virtual ~NullVmPluginFactory() = default;
 
-  std::string category() const override {
-    static const char FACTORY_CATEGORY[] = "wasm.null_vms";
-    return FACTORY_CATEGORY;
-  }
+  std::string category() const override { return "envoy.wasm.null_vms"; }
 
   /**
    * Create an instance of the plugin.

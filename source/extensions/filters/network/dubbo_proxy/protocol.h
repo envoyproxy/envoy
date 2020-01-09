@@ -109,10 +109,7 @@ public:
    */
   virtual ProtocolPtr createProtocol(SerializationType serialization_type) PURE;
 
-  std::string category() const override {
-    static const char FACTORY_CATEGORY[] = "dubbo_proxy.protocols";
-    return FACTORY_CATEGORY;
-  }
+  std::string category() const override { return "envoy.dubbo_proxy.protocols"; }
 
   /**
    * Convenience method to lookup a factory by type.

@@ -55,10 +55,7 @@ public:
   virtual ResourceMonitorPtr createResourceMonitor(const Protobuf::Message& config,
                                                    ResourceMonitorFactoryContext& context) PURE;
 
-  std::string category() const override {
-    static const char FACTORY_CATEGORY[] = "resource_monitors";
-    return FACTORY_CATEGORY;
-  }
+  std::string category() const override { return "envoy.resource_monitors"; }
 };
 
 } // namespace Configuration

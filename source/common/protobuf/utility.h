@@ -350,6 +350,13 @@ public:
   static ProtobufWkt::Struct keyValueStruct(const std::string& key, const std::string& value);
 
   /**
+   * Utility method to create a Struct containing the passed in key/value map.
+   *
+   * @param fields the key/value pairs to initialize the Struct proto
+   */
+  static ProtobufWkt::Struct keyValueStruct(const std::map<std::string, std::string>& fields);
+
+  /**
    * Utility method to print a human readable string of the code passed in.
    *
    * @param code the protobuf error code

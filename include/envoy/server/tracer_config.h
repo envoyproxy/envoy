@@ -30,10 +30,7 @@ public:
   virtual Tracing::HttpTracerPtr createHttpTracer(const Protobuf::Message& config,
                                                   Instance& server) PURE;
 
-  std::string category() const override {
-    static const char FACTORY_CATEGORY[] = "tracers";
-    return FACTORY_CATEGORY;
-  }
+  std::string category() const override { return "envoy.tracers"; }
 };
 
 } // namespace Configuration

@@ -33,10 +33,7 @@ public:
                                                                AccessLog::FilterPtr&& filter,
                                                                FactoryContext& context) PURE;
 
-  std::string category() const override {
-    static const char FACTORY_CATEGORY[] = "access_loggers";
-    return FACTORY_CATEGORY;
-  }
+  std::string category() const override { return "envoy.access_loggers"; }
 };
 
 } // namespace Configuration

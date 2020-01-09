@@ -38,10 +38,7 @@ public:
   createFilterFactoryFromProto(const Protobuf::Message& config, const std::string& stat_prefix,
                                Server::Configuration::FactoryContext& context) PURE;
 
-  std::string category() const override {
-    static const char FACTORY_CATEGORY[] = "dubbo_proxy.filters";
-    return FACTORY_CATEGORY;
-  }
+  std::string category() const override { return "envoy.dubbo_proxy.filters"; }
 };
 
 } // namespace DubboFilters

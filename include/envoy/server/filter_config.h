@@ -126,8 +126,8 @@ public:
   virtual AccessLog::AccessLogManager& accessLogManager() PURE;
 
   /**
-   * @return envoy::api::v2::core::TrafficDirection the direction of the traffic relative to the
-   * local proxy.
+   * @return envoy::config::core::v3alpha::TrafficDirection the direction of the traffic relative to
+   * the local proxy.
    */
   virtual envoy::config::core::v3alpha::TrafficDirection direction() const PURE;
 
@@ -168,7 +168,7 @@ public:
   virtual Stats::Scope& listenerScope() PURE;
 
   /**
-   * @return const envoy::api::v2::core::Metadata& the config metadata associated with this
+   * @return const envoy::config::core::v3alpha::Metadata& the config metadata associated with this
    * listener.
    */
   virtual const envoy::config::core::v3alpha::Metadata& listenerMetadata() const PURE;
@@ -201,6 +201,17 @@ public:
   virtual ProtobufMessage::ValidationVisitor& messageValidationVisitor() PURE;
 };
 
+/**
+ * An implementation of FactoryContext. The life time is no shorter than the created filter chains.
+ * The life time is no longer than the owning listener. It should be used to create
+ * NetworkFilterChain.
+ */
+class FilterChainFactoryContext : public virtual FactoryContext {};
+
+/**
+ * An implementation of FactoryContext. The life time should cover the lifetime of the filter chains
+ * and connections. It can be used to create ListenerFilterChain.
+ */
 class ListenerFactoryContext : public virtual FactoryContext {
 public:
   /**
@@ -238,10 +249,7 @@ public:
   createFilterFactoryFromProto(const Protobuf::Message& config,
                                ListenerFactoryContext& context) PURE;
 
-  std::string category() const override {
-    static const char FACTORY_CATEGORY[] = "filters.listener";
-    return FACTORY_CATEGORY;
-  }
+  std::string category() const override { return "envoy.filters.listener"; }
 };
 
 /**
@@ -264,10 +272,7 @@ public:
   createFilterFactoryFromProto(const Protobuf::Message& config,
                                ListenerFactoryContext& context) PURE;
 
-  std::string category() const override {
-    static const char FACTORY_CATEGORY[] = "filters.udp_listener";
-    return FACTORY_CATEGORY;
-  }
+  std::string category() const override { return "envoy.filters.udp_listener"; }
 };
 
 /**
@@ -314,16 +319,14 @@ public:
    * produce a factory with the provided parameters, it should throw an EnvoyException. The returned
    * callback should always be initialized.
    * @param config supplies the general json configuration for the filter
-   * @param context supplies the filter's context.
+   * @param filter_chain_factory_context supplies the filter's context.
    * @return Network::FilterFactoryCb the factory creation function.
    */
-  virtual Network::FilterFactoryCb createFilterFactoryFromProto(const Protobuf::Message& config,
-                                                                FactoryContext& context) PURE;
+  virtual Network::FilterFactoryCb
+  createFilterFactoryFromProto(const Protobuf::Message& config,
+                               FactoryContext& filter_chain_factory_context) PURE;
 
-  std::string category() const override {
-    static const char FACTORY_CATEGORY[] = "filters.network";
-    return FACTORY_CATEGORY;
-  }
+  std::string category() const override { return "envoy.filters.network"; }
 
   /**
    * @return bool true if this filter must be the last filter in a filter chain, false otherwise.
@@ -347,10 +350,7 @@ public:
   virtual Network::FilterFactoryCb createFilterFactoryFromProto(const Protobuf::Message& config,
                                                                 CommonFactoryContext& context) PURE;
 
-  std::string category() const override {
-    static const char FACTORY_CATEGORY[] = "filters.upstream_network";
-    return FACTORY_CATEGORY;
-  }
+  std::string category() const override { return "envoy.filters.upstream_network"; }
 };
 
 /**
@@ -396,10 +396,7 @@ public:
     return nullptr;
   }
 
-  std::string category() const override {
-    static const char FACTORY_CATEGORY[] = "filters.http";
-    return FACTORY_CATEGORY;
-  }
+  std::string category() const override { return "envoy.filters.http"; }
 
   /**
    * @return bool true if this filter must be the last filter in a filter chain, false otherwise.
