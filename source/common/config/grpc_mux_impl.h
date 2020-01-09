@@ -3,6 +3,7 @@
 #include <queue>
 #include <unordered_map>
 
+#include "envoy/api/v2/discovery.pb.h"
 #include "envoy/common/time.h"
 #include "envoy/config/grpc_mux.h"
 #include "envoy/config/subscription.h"
@@ -13,6 +14,7 @@
 
 #include "common/common/cleanup.h"
 #include "common/common/logger.h"
+#include "common/config/api_version.h"
 #include "common/config/grpc_stream.h"
 #include "common/config/utility.h"
 

@@ -18,8 +18,8 @@ option java_multiple_files = true;
 // [#protodoc-title: gRPC Access Log Service (ALS)]
 
 // Configuration for the built-in *envoy.http_grpc_access_log*
-// :ref:`AccessLog <envoy_api_msg_config.filter.accesslog.v3alpha.AccessLog>`. This configuration
-// will populate :ref:`StreamAccessLogsMessage.http_logs
+// :ref:`AccessLog <envoy_api_msg_config.accesslog.v3alpha.AccessLog>`. This configuration will
+// populate :ref:`StreamAccessLogsMessage.http_logs
 // <envoy_api_field_service.accesslog.v3alpha.StreamAccessLogsMessage.http_logs>`.
 // [#extension: envoy.access_loggers.http_grpc]
 message HttpGrpcAccessLogConfig {

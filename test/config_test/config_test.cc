@@ -103,7 +103,7 @@ public:
     ON_CALL(component_factory_, createNetworkFilterFactoryList(_, _))
         .WillByDefault(Invoke(
             [&](const Protobuf::RepeatedPtrField<envoy::config::listener::v3alpha::Filter>& filters,
-                Server::Configuration::FactoryContext& context)
+                Server::Configuration::FilterChainFactoryContext& context)
                 -> std::vector<Network::FilterFactoryCb> {
               return Server::ProdListenerComponentFactory::createNetworkFilterFactoryList_(filters,
                                                                                            context);

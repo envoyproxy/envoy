@@ -18,6 +18,7 @@
 #include "envoy/server/worker.h"
 #include "envoy/stats/scope.h"
 
+#include "server/filter_chain_factory_context_callback.h"
 #include "server/filter_chain_manager_impl.h"
 #include "server/lds_api.h"
 #include "server/listener_impl.h"
@@ -46,7 +47,8 @@ public:
    */
   static std::vector<Network::FilterFactoryCb> createNetworkFilterFactoryList_(
       const Protobuf::RepeatedPtrField<envoy::config::listener::v3alpha::Filter>& filters,
-      Configuration::FactoryContext& context);
+      Configuration::FilterChainFactoryContext& filter_chain_factory_context);
+
   /**
    * Static worker for createListenerFilterFactoryList() that can be used directly in tests.
    */
@@ -69,8 +71,8 @@ public:
   }
   std::vector<Network::FilterFactoryCb> createNetworkFilterFactoryList(
       const Protobuf::RepeatedPtrField<envoy::config::listener::v3alpha::Filter>& filters,
-      Configuration::FactoryContext& context) override {
-    return createNetworkFilterFactoryList_(filters, context);
+      Server::Configuration::FilterChainFactoryContext& filter_chain_factory_context) override {
+    return createNetworkFilterFactoryList_(filters, filter_chain_factory_context);
   }
   std::vector<Network::ListenerFilterFactoryCb> createListenerFilterFactoryList(
       const Protobuf::RepeatedPtrField<envoy::config::listener::v3alpha::ListenerFilter>& filters,
@@ -246,11 +248,23 @@ class ListenerFilterChainFactoryBuilder : public FilterChainFactoryBuilder {
 public:
   ListenerFilterChainFactoryBuilder(
       ListenerImpl& listener, Configuration::TransportSocketFactoryContextImpl& factory_context);
-  std::unique_ptr<Network::FilterChain> buildFilterChain(
-      const envoy::config::listener::v3alpha::FilterChain& filter_chain) const override;
+
+  ListenerFilterChainFactoryBuilder(
+      ProtobufMessage::ValidationVisitor& validator,
+      ListenerComponentFactory& listener_component_factory,
+      Server::Configuration::TransportSocketFactoryContextImpl& factory_context);
+
+  std::unique_ptr<Network::FilterChain>
+  buildFilterChain(const envoy::config::listener::v3alpha::FilterChain& filter_chain,
+                   FilterChainFactoryContextCreator& context_creator) const override;
 
 private:
-  ListenerImpl& parent_;
+  std::unique_ptr<Network::FilterChain> buildFilterChainInternal(
+      const envoy::config::listener::v3alpha::FilterChain& filter_chain,
+      Configuration::FilterChainFactoryContext& filter_chain_factory_context) const;
+
+  ProtobufMessage::ValidationVisitor& validator_;
+  ListenerComponentFactory& listener_component_factory_;
   Configuration::TransportSocketFactoryContextImpl& factory_context_;
 };
 

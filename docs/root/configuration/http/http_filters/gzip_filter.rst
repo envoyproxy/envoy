@@ -34,7 +34,7 @@ How it works
 ------------
 When gzip filter is enabled, request and response headers are inspected to
 determine whether or not the content should be compressed. The content is
-compressed and then sent to the client with the appropriate headers if either
+compressed and then sent to the client with the appropriate headers, if
 response and request allow.
 
 By *default* compression will be *skipped* when:

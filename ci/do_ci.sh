@@ -234,6 +234,8 @@ elif [[ "$CI_TARGET" == "bazel.compile_time_options" ]]; then
   exit 0
 elif [[ "$CI_TARGET" == "bazel.api" ]]; then
   setup_clang_toolchain
+  echo "Validating API structure..."
+  ./tools/api/validate_structure.py
   echo "Building API..."
   bazel build ${BAZEL_BUILD_OPTIONS} -c fastbuild @envoy_api_canonical//envoy/...
   echo "Testing API..."

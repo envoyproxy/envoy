@@ -8,9 +8,9 @@
 
 #include "common/buffer/buffer_impl.h"
 
-#include "extensions/filters/http/common/empty_http_filter_config.h"
 #include "extensions/filters/http/common/pass_through_filter.h"
 
+#include "test/extensions/filters/http/common/empty_http_filter_config.h"
 #include "test/integration/filters/common.h"
 
 #include "gtest/gtest.h"
