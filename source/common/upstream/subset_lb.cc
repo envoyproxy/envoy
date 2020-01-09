@@ -42,29 +42,24 @@ SubsetLoadBalancer::SubsetLoadBalancer(
     HostPredicate predicate;
     if (fallback_policy_ ==
         envoy::config::cluster::v3alpha::Cluster::LbSubsetConfig::ANY_ENDPOINT) {
-      predicate = [](const Host&) -> bool { return true; };
-
       ENVOY_LOG(debug, "subset lb: creating any-endpoint fallback load balancer");
+      initSubsetAnyIfNeed();
+      fallback_subset_ = subset_any_;
     } else {
       predicate = [this](const Host& host) -> bool {
         return hostMatches(default_subset_metadata_, host);
       };
-
       ENVOY_LOG(debug, "subset lb: creating fallback load balancer for {}",
                 describeMetadata(default_subset_metadata_));
+      fallback_subset_ = std::make_shared<LbSubsetEntry>();
+      fallback_subset_->priority_subset_ = std::make_shared<PrioritySubsetImpl>(
+          *this, predicate, locality_weight_aware_, scale_locality_weight_);
     }
-
-    fallback_subset_ = std::make_shared<LbSubsetEntry>();
-    fallback_subset_->priority_subset_ = std::make_shared<PrioritySubsetImpl>(
-        *this, predicate, locality_weight_aware_, scale_locality_weight_);
   }
 
   if (subsets.panicModeAny()) {
-    HostPredicate predicate = [](const Host&) -> bool { return true; };
-
-    panic_mode_subset_ = std::make_shared<LbSubsetEntry>();
-    panic_mode_subset_->priority_subset_ = std::make_shared<PrioritySubsetImpl>(
-        *this, predicate, locality_weight_aware_, scale_locality_weight_);
+    initSubsetAnyIfNeed();
+    panic_mode_subset_ = subset_any_;
   }
 
   // Create filtered default subset (if necessary) and other subsets based on current hosts.
@@ -116,6 +111,15 @@ void SubsetLoadBalancer::refreshSubsets(uint32_t priority) {
   update(priority, host_sets[priority]->hosts(), {});
 }
 
+void SubsetLoadBalancer::initSubsetAnyIfNeed() {
+  if (!subset_any_) {
+    HostPredicate predicate = [](const Host&) -> bool { return true; };
+    subset_any_ = std::make_shared<LbSubsetEntry>();
+    subset_any_->priority_subset_ = std::make_shared<PrioritySubsetImpl>(
+        *this, predicate, locality_weight_aware_, scale_locality_weight_);
+  }
+}
+
 void SubsetLoadBalancer::initSubsetSelectorMap() {
   selectors_ = std::make_shared<SubsetSelectorMap>();
   SubsetSelectorMapPtr selectors;
@@ -158,10 +162,8 @@ void SubsetLoadBalancer::initSelectorFallbackSubset(
                              LbSubsetSelector::ANY_ENDPOINT &&
       selector_fallback_subset_any_ == nullptr) {
     ENVOY_LOG(debug, "subset lb: creating any-endpoint fallback load balancer for selector");
-    HostPredicate predicate = [](const Host&) -> bool { return true; };
-    selector_fallback_subset_any_ = std::make_shared<LbSubsetEntry>();
-    selector_fallback_subset_any_->priority_subset_.reset(
-        new PrioritySubsetImpl(*this, predicate, locality_weight_aware_, scale_locality_weight_));
+    initSubsetAnyIfNeed();
+    selector_fallback_subset_any_ = subset_any_;
   } else if (fallback_policy == envoy::config::cluster::v3alpha::Cluster::LbSubsetConfig::
                                     LbSubsetSelector::DEFAULT_SUBSET &&
              selector_fallback_subset_default_ == nullptr) {
@@ -332,8 +334,12 @@ SubsetLoadBalancer::LbSubsetEntryPtr SubsetLoadBalancer::findSubset(
 void SubsetLoadBalancer::updateFallbackSubset(uint32_t priority, const HostVector& hosts_added,
                                               const HostVector& hosts_removed) {
 
+  if (subset_any_ != nullptr) {
+    subset_any_->priority_subset_->update(priority, hosts_added, hosts_removed);
+  }
+
   if (selector_fallback_subset_any_ != nullptr) {
-    selector_fallback_subset_any_->priority_subset_->update(priority, hosts_added, hosts_removed);
+    ASSERT(selector_fallback_subset_any_ == subset_any_);
   }
 
   if (selector_fallback_subset_default_ != nullptr) {
@@ -346,12 +352,14 @@ void SubsetLoadBalancer::updateFallbackSubset(uint32_t priority, const HostVecto
     return;
   }
 
-  // Add/remove hosts.
-  fallback_subset_->priority_subset_->update(priority, hosts_added, hosts_removed);
+  if (fallback_subset_ != subset_any_) {
+    // Add/remove hosts.
+    fallback_subset_->priority_subset_->update(priority, hosts_added, hosts_removed);
+  }
 
   // Same thing for the panic mode subset.
   if (panic_mode_subset_ != nullptr) {
-    panic_mode_subset_->priority_subset_->update(priority, hosts_added, hosts_removed);
+    ASSERT(panic_mode_subset_ == subset_any_);
   }
 }
 
