@@ -13,5 +13,6 @@ envoy_cc_library(
     hdrs = ["registry.h"],
     deps = [
         "//source/common/common:assert_lib",
+        "//source/common/config:api_type_oracle_lib",
     ],
 )

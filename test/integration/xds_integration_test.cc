@@ -120,6 +120,7 @@ TEST_P(LdsIntegrationTest, FailConfigLoad) {
       [&](envoy::config::bootstrap::v3alpha::Bootstrap& bootstrap) -> void {
         auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
         auto* filter_chain = listener->mutable_filter_chains(0);
+        filter_chain->mutable_filters(0)->clear_typed_config();
         filter_chain->mutable_filters(0)->set_name("grewgragra");
       });
   EXPECT_DEATH_LOG_TO_STDERR(initialize(),

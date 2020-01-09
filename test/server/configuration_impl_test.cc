@@ -277,9 +277,9 @@ TEST_F(ConfigurationImplTest, ConfigurationFailsWhenInvalidTracerSpecified) {
 
   auto bootstrap = Upstream::parseBootstrapFromV2Json(json);
   MainImpl config;
-  EXPECT_THROW_WITH_MESSAGE(config.initialize(bootstrap, server_, cluster_manager_factory_),
-                            EnvoyException,
-                            "Didn't find a registered implementation for name: 'invalid'");
+  EXPECT_THROW_WITH_MESSAGE(
+      config.initialize(bootstrap, server_, cluster_manager_factory_), EnvoyException,
+      "Didn't find a registered implementation for type: 'envoy.config.trace.v2.LightstepConfig'");
 }
 
 TEST_F(ConfigurationImplTest, ProtoSpecifiedStatsSink) {
@@ -336,7 +336,6 @@ TEST_F(ConfigurationImplTest, StatsSinkWithInvalidName) {
 
   envoy::config::metrics::v3alpha::StatsSink& sink = *bootstrap.mutable_stats_sinks()->Add();
   sink.set_name("envoy.invalid");
-  addStatsdFakeClusterConfig(sink);
 
   MainImpl config;
   EXPECT_THROW_WITH_MESSAGE(config.initialize(bootstrap, server_, cluster_manager_factory_),
@@ -365,8 +364,7 @@ TEST_F(ConfigurationImplTest, StatsSinkWithNoName) {
 
   auto bootstrap = Upstream::parseBootstrapFromV2Json(json);
 
-  auto& sink = *bootstrap.mutable_stats_sinks()->Add();
-  addStatsdFakeClusterConfig(sink);
+  bootstrap.mutable_stats_sinks()->Add();
 
   MainImpl config;
   EXPECT_THROW_WITH_MESSAGE(config.initialize(bootstrap, server_, cluster_manager_factory_),

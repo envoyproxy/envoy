@@ -26,6 +26,8 @@
 #include "common/protobuf/utility.h"
 #include "common/singleton/const_singleton.h"
 
+#include "udpa/type/v1/typed_struct.pb.h"
+
 namespace Envoy {
 namespace Config {
 
@@ -209,6 +211,21 @@ public:
     return *factory;
   }
 
+  template <class Factory> static Factory& getAndCheckFactoryByType(absl::string_view type) {
+    if (type.empty()) {
+      throw EnvoyException("Provided type for static registration lookup was empty.");
+    }
+
+    Factory* factory = Registry::FactoryRegistry<Factory>::getFactoryByType(type);
+
+    if (factory == nullptr) {
+      throw EnvoyException(
+          fmt::format("Didn't find a registered implementation for type: '{}'", type));
+    }
+
+    return *factory;
+  }
+
   /**
    * Get a Factory from the registry with error checking to ensure the name and the factory are
    * valid.
@@ -216,6 +233,28 @@ public:
    */
   template <class Factory, class ProtoMessage>
   static Factory& getAndCheckFactory(const ProtoMessage& message) {
+    const ProtobufWkt::Any& typed_config = message.typed_config();
+    static const std::string struct_type =
+        ProtobufWkt::Struct::default_instance().GetDescriptor()->full_name();
+    static const std::string typed_struct_type =
+        udpa::type::v1::TypedStruct::default_instance().GetDescriptor()->full_name();
+
+    if (!typed_config.value().empty()) {
+      // Unpack methods will only use the fully qualified type name after the last '/'.
+      // https://github.com/protocolbuffers/protobuf/blob/3.6.x/src/google/protobuf/any.proto#L87
+      absl::string_view type = TypeUtil::typeUrlToDescriptorFullName(typed_config.type_url());
+
+      if (type == typed_struct_type) {
+        udpa::type::v1::TypedStruct typed_struct;
+        MessageUtil::unpackTo(typed_config, typed_struct);
+        // Not handling nested structs or typed structs in typed structs
+        return Utility::getAndCheckFactoryByType<Factory>(
+            TypeUtil::typeUrlToDescriptorFullName(typed_struct.type_url()));
+      } else if (type != struct_type) {
+        return Utility::getAndCheckFactoryByType<Factory>(type);
+      }
+    }
+
     return Utility::getAndCheckFactoryByName<Factory>(message.name());
   }
 

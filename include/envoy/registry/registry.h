@@ -10,6 +10,7 @@
 #include "common/common/assert.h"
 #include "common/common/fmt.h"
 #include "common/common/logger.h"
+#include "common/config/api_type_oracle.h"
 
 #include "absl/base/attributes.h"
 #include "absl/container/flat_hash_map.h"
@@ -159,6 +160,50 @@ public:
   }
 
   /**
+   * Lazily constructs a mapping from the configuration message type to a factory,
+   * including the deprecated configuration message types.
+   * Must be invoked after factory registration is completed.
+   */
+  static absl::flat_hash_map<std::string, Base*>& factoriesByType() {
+    static absl::flat_hash_map<std::string, Base*>* factoriesByType = [] {
+      auto* mapping = new absl::flat_hash_map<std::string, Base*>();
+
+      for (const auto& factory : factories()) {
+        if (factory.second == nullptr) {
+          continue;
+        }
+
+        // skip untyped factories and factories that consume Struct
+        std::string config_type = factory.second->configType();
+        if (config_type.empty() || config_type == "google.protobuf.Struct") {
+          continue;
+        }
+
+        // traverse the deprecated message type chain
+        while (true) {
+          auto it = mapping->find(config_type);
+          if (it != mapping->end() && it->second != factory.second) {
+            throw EnvoyException(fmt::format("Double registration for type: '{}' by '{}' and '{}'",
+                                             config_type, factory.second->name(),
+                                             it->second->name()));
+          }
+          mapping->emplace(std::make_pair(config_type, factory.second));
+
+          const Protobuf::Descriptor* previous =
+              Config::ApiTypeOracle::getEarlierVersionDescriptor(config_type);
+          if (previous == nullptr) {
+            break;
+          }
+          config_type = previous->full_name();
+        }
+      }
+      return mapping;
+    }();
+
+    return *factoriesByType;
+  }
+
+  /**
    * instead_value are used when passed name was deprecated.
    */
   static void registerFactory(Base& factory, absl::string_view name,
@@ -212,6 +257,14 @@ public:
     }
 
     checkDeprecated(name);
+    return it->second;
+  }
+
+  static Base* getFactoryByType(absl::string_view type) {
+    auto it = factoriesByType().find(type);
+    if (it == factoriesByType().end()) {
+      return nullptr;
+    }
     return it->second;
   }
 

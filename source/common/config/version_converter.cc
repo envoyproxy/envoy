@@ -23,7 +23,8 @@ void VersionConverter::upgrade(const Protobuf::Message& prev_message,
 
 DowngradedMessagePtr VersionConverter::downgrade(const Protobuf::Message& message) {
   auto downgraded_message = std::make_unique<DowngradedMessage>();
-  const Protobuf::Descriptor* prev_desc = ApiTypeOracle::getEarlierVersionDescriptor(message);
+  const Protobuf::Descriptor* prev_desc =
+      ApiTypeOracle::getEarlierVersionDescriptor(message.GetDescriptor()->full_name());
   if (prev_desc != nullptr) {
     downgraded_message->msg_.reset(
         downgraded_message->dynamic_msg_factory_.GetPrototype(prev_desc)->New());
