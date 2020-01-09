@@ -57,7 +57,7 @@ message ClientStatusRequest {
       "envoy.service.status.v2.ClientStatusRequest";
 
   // Node identifier for a list of clients.
-  repeated config.core.v3alpha.Node nodes = 1;
+  repeated string node_ids = 1;
 
   // Metadata is used to give extra information to the management server.
   // For example, management server can choose to only send config status if
@@ -90,7 +90,7 @@ message ClientConfig {
       "envoy.service.status.v2.ClientConfig";
 
   // Node identifier for a particular client.
-  config.core.v3alpha.Node node = 1;
+  string node_id = 1;
 
   repeated PerXdsConfig xds_config = 2;
 }
