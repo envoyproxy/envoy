@@ -220,7 +220,7 @@ void ThreadLocalStoreImpl::releaseScopeCrossThread(ScopeImpl* scope) {
   // Since this is called from ScopeImpl's destructor, we must bump the
   // ref-count of the central-cache by copying to a local scoped pointer, and
   // keep that reference alive until all the TLS caches are clear.
-  CentralCacheEntrySharedPtr& central_cache = scope->central_cache_;
+  CentralCacheEntrySharedPtr central_cache = scope->central_cache_;
 
   // This can happen from any thread. We post() back to the main thread which will initiate the
   // cache flush operation.
