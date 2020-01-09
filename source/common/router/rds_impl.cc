@@ -17,6 +17,7 @@
 #include "common/common/fmt.h"
 #include "common/config/api_version.h"
 #include "common/config/utility.h"
+#include "common/config/version_converter.h"
 #include "common/http/header_map_impl.h"
 #include "common/protobuf/utility.h"
 #include "common/router/config_impl.h"
@@ -392,8 +393,8 @@ RouteConfigProviderManagerImpl::dumpRouteConfigs() const {
     if (subscription->routeConfigUpdate()->configInfo()) {
       auto* dynamic_config = config_dump->mutable_dynamic_route_configs()->Add();
       dynamic_config->set_version_info(subscription->routeConfigUpdate()->configVersion());
-      dynamic_config->mutable_route_config()->MergeFrom(
-          subscription->routeConfigUpdate()->routeConfiguration());
+      dynamic_config->mutable_route_config()->PackFrom(
+          API_RECOVER_ORIGINAL(subscription->routeConfigUpdate()->routeConfiguration()));
       TimestampUtil::systemClockToTimestamp(subscription->routeConfigUpdate()->lastUpdated(),
                                             *dynamic_config->mutable_last_updated());
     }
@@ -402,7 +403,8 @@ RouteConfigProviderManagerImpl::dumpRouteConfigs() const {
   for (const auto& provider : static_route_config_providers_) {
     ASSERT(provider->configInfo());
     auto* static_config = config_dump->mutable_static_route_configs()->Add();
-    static_config->mutable_route_config()->MergeFrom(provider->configInfo().value().config_);
+    static_config->mutable_route_config()->PackFrom(
+        API_RECOVER_ORIGINAL(provider->configInfo().value().config_));
     TimestampUtil::systemClockToTimestamp(provider->lastUpdated(),
                                           *static_config->mutable_last_updated());
   }

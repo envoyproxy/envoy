@@ -18,6 +18,7 @@
 #include "common/buffer/buffer_impl.h"
 #include "common/common/c_smart_ptr.h"
 #include "common/common/thread.h"
+#include "common/config/version_converter.h"
 #include "common/http/header_map_impl.h"
 #include "common/protobuf/message_validator_impl.h"
 #include "common/protobuf/utility.h"
@@ -510,20 +511,32 @@ public:
       const std::vector<std::pair<absl::string_view, Stats::PrimitiveGaugeReference>>& gauges);
 
   // Strict variants of Protobuf::MessageUtil
-  static void loadFromJson(const std::string& json, Protobuf::Message& message) {
+  static void loadFromJson(const std::string& json, Protobuf::Message& message,
+                           bool preserve_original_type = false) {
     MessageUtil::loadFromJson(json, message, ProtobufMessage::getStrictValidationVisitor());
+    if (!preserve_original_type) {
+      Config::VersionConverter::eraseOriginalTypeInformation(message);
+    }
   }
 
   static void loadFromJson(const std::string& json, ProtobufWkt::Struct& message) {
     MessageUtil::loadFromJson(json, message);
   }
 
-  static void loadFromYaml(const std::string& yaml, Protobuf::Message& message) {
+  static void loadFromYaml(const std::string& yaml, Protobuf::Message& message,
+                           bool preserve_original_type = false) {
     MessageUtil::loadFromYaml(yaml, message, ProtobufMessage::getStrictValidationVisitor());
+    if (!preserve_original_type) {
+      Config::VersionConverter::eraseOriginalTypeInformation(message);
+    }
   }
 
-  static void loadFromFile(const std::string& path, Protobuf::Message& message, Api::Api& api) {
+  static void loadFromFile(const std::string& path, Protobuf::Message& message, Api::Api& api,
+                           bool preserve_original_type = false) {
     MessageUtil::loadFromFile(path, message, ProtobufMessage::getStrictValidationVisitor(), api);
+    if (!preserve_original_type) {
+      Config::VersionConverter::eraseOriginalTypeInformation(message);
+    }
   }
 
   template <class MessageType>
@@ -535,6 +548,7 @@ public:
   static void loadFromYamlAndValidate(const std::string& yaml, MessageType& message) {
     MessageUtil::loadFromYamlAndValidate(yaml, message,
                                          ProtobufMessage::getStrictValidationVisitor());
+    Config::VersionConverter::eraseOriginalTypeInformation(message);
   }
 
   template <class MessageType> static void validate(const MessageType& message) {

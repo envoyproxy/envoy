@@ -5,7 +5,10 @@
 #include "common/protobuf/protobuf.h"
 
 // Convenience macro for downgrading a message and obtaining a reference.
-#define API_DOWNGRADE(msg) (*Config::VersionConverter::downgrade(msg)->msg_)
+#define API_DOWNGRADE(msg) (*Envoy::Config::VersionConverter::downgrade(msg)->msg_)
+
+// Convenience macro for recovering original message and obtaining a reference.
+#define API_RECOVER_ORIGINAL(msg) (*Envoy::Config::VersionConverter::recoverOriginal(msg)->msg_)
 
 namespace Envoy {
 namespace Config {
@@ -16,7 +19,7 @@ struct DynamicMessage {
   Protobuf::DynamicMessageFactory dynamic_msg_factory_;
 
   // Dynamic message.
-  std::unique_ptr<Protobuf::Message> msg_;
+  ProtobufTypes::MessagePtr msg_;
 };
 
 using DynamicMessagePtr = std::unique_ptr<DynamicMessage>;
@@ -73,12 +76,28 @@ public:
    */
   static DynamicMessagePtr reinterpret(const Protobuf::Message& message,
                                        envoy::config::core::v3alpha::ApiVersion api_version);
+
+  /**
+   * For a message that may have been upgraded, recover the original message.
+   * This is useful for config dump, debug output etc.
+   *
+   * @param upgraded_message upgraded message input.
+   *
+   * @return DynamicMessagePtr original message (as a dynamic message).
+   */
+  static DynamicMessagePtr recoverOriginal(const Protobuf::Message& upgraded_message);
+
+  /**
+   * Remove original type information, when it's not needed, e.g. in tests.
+   *
+   * @param message upgraded message to scrub.
+   */
+  static void eraseOriginalTypeInformation(Protobuf::Message& message);
 };
 
 class VersionUtil {
 public:
   // Some helpers for working with earlier message version deprecated fields.
-  static bool hasHiddenEnvoyDeprecated(const Protobuf::Message& message);
   static void scrubHiddenEnvoyDeprecated(Protobuf::Message& message);
 };
 

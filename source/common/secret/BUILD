@@ -19,6 +19,7 @@ envoy_cc_library(
         "//include/envoy/server:transport_socket_config_interface",
         "//source/common/common:assert_lib",
         "//source/common/common:minimal_logger_lib",
+        "//source/common/config:version_converter_lib",
         "@envoy_api//envoy/admin/v3alpha:pkg_cc_proto",
         "@envoy_api//envoy/config/core/v3alpha:pkg_cc_proto",
         "@envoy_api//envoy/extensions/transport_sockets/tls/v3alpha:pkg_cc_proto",

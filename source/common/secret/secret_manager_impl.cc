@@ -8,6 +8,7 @@
 
 #include "common/common/assert.h"
 #include "common/common/logger.h"
+#include "common/config/version_converter.h"
 #include "common/secret/sds_api.h"
 #include "common/secret/secret_provider_impl.h"
 #include "common/ssl/certificate_validation_context_config_impl.h"
@@ -155,6 +156,11 @@ void redactSecret(envoy::extensions::transport_sockets::tls::v3alpha::Secret* se
 }
 
 ProtobufTypes::MessagePtr SecretManagerImpl::dumpSecretConfigs() {
+  // TODO(htuch): unlike other config providers, we're recreating the original
+  // Secrets below. This makes it hard to support API_RECOVER_ORIGINAL()-style
+  // recovery of the original config message. As a result, for now we're
+  // providing v3 config dumps. For Secrets, the main deprecation of interest
+  // are the use of v2 Struct config() and verify_subject_alt_name.
   auto config_dump = std::make_unique<envoy::admin::v3alpha::SecretsConfigDump>();
   // Handle static tls key/cert providers.
   for (const auto& cert_iter : static_tls_certificate_providers_) {
@@ -162,10 +168,11 @@ ProtobufTypes::MessagePtr SecretManagerImpl::dumpSecretConfigs() {
     auto static_secret = config_dump->mutable_static_secrets()->Add();
     static_secret->set_name(cert_iter.first);
     ASSERT(tls_cert != nullptr);
-    auto dump_secret = static_secret->mutable_secret();
-    dump_secret->set_name(cert_iter.first);
-    dump_secret->mutable_tls_certificate()->MergeFrom(*tls_cert->secret());
-    redactSecret(dump_secret);
+    envoy::extensions::transport_sockets::tls::v3alpha::Secret dump_secret;
+    dump_secret.set_name(cert_iter.first);
+    dump_secret.mutable_tls_certificate()->MergeFrom(*tls_cert->secret());
+    redactSecret(&dump_secret);
+    static_secret->mutable_secret()->PackFrom(dump_secret);
   }
 
   // Handle static certificate validation context providers.
@@ -174,9 +181,10 @@ ProtobufTypes::MessagePtr SecretManagerImpl::dumpSecretConfigs() {
     auto static_secret = config_dump->mutable_static_secrets()->Add();
     static_secret->set_name(context_iter.first);
     ASSERT(validation_context != nullptr);
-    auto dump_secret = static_secret->mutable_secret();
-    dump_secret->set_name(context_iter.first);
-    dump_secret->mutable_validation_context()->MergeFrom(*validation_context->secret());
+    envoy::extensions::transport_sockets::tls::v3alpha::Secret dump_secret;
+    dump_secret.set_name(context_iter.first);
+    dump_secret.mutable_validation_context()->MergeFrom(*validation_context->secret());
+    static_secret->mutable_secret()->PackFrom(dump_secret);
   }
 
   // Handle static session keys providers.
@@ -185,12 +193,13 @@ ProtobufTypes::MessagePtr SecretManagerImpl::dumpSecretConfigs() {
     auto static_secret = config_dump->mutable_static_secrets()->Add();
     static_secret->set_name(context_iter.first);
     ASSERT(session_ticket_keys != nullptr);
-    auto dump_secret = static_secret->mutable_secret();
-    dump_secret->set_name(context_iter.first);
+    envoy::extensions::transport_sockets::tls::v3alpha::Secret dump_secret;
+    dump_secret.set_name(context_iter.first);
     for (const auto& key : session_ticket_keys->secret()->keys()) {
-      dump_secret->mutable_session_ticket_keys()->add_keys()->MergeFrom(key);
+      dump_secret.mutable_session_ticket_keys()->add_keys()->MergeFrom(key);
     }
-    redactSecret(dump_secret);
+    redactSecret(&dump_secret);
+    static_secret->mutable_secret()->PackFrom(dump_secret);
   }
 
   // Handle dynamic tls_certificate providers.
@@ -206,17 +215,18 @@ ProtobufTypes::MessagePtr SecretManagerImpl::dumpSecretConfigs() {
       dump_secret = config_dump->mutable_dynamic_warming_secrets()->Add();
     }
     dump_secret->set_name(secret_data.resource_name_);
-    auto secret = dump_secret->mutable_secret();
-    secret->set_name(secret_data.resource_name_);
+    envoy::extensions::transport_sockets::tls::v3alpha::Secret secret;
+    secret.set_name(secret_data.resource_name_);
     ProtobufWkt::Timestamp last_updated_ts;
     TimestampUtil::systemClockToTimestamp(secret_data.last_updated_, last_updated_ts);
     dump_secret->set_version_info(secret_data.version_info_);
     *dump_secret->mutable_last_updated() = last_updated_ts;
-    secret->set_name(secret_data.resource_name_);
+    secret.set_name(secret_data.resource_name_);
     if (secret_ready) {
-      secret->mutable_tls_certificate()->MergeFrom(*tls_cert);
+      secret.mutable_tls_certificate()->MergeFrom(*tls_cert);
     }
-    redactSecret(secret);
+    redactSecret(&secret);
+    dump_secret->mutable_secret()->PackFrom(secret);
   }
 
   // Handling dynamic cert validation context providers.
@@ -232,15 +242,16 @@ ProtobufTypes::MessagePtr SecretManagerImpl::dumpSecretConfigs() {
       dump_secret = config_dump->mutable_dynamic_warming_secrets()->Add();
     }
     dump_secret->set_name(secret_data.resource_name_);
-    auto secret = dump_secret->mutable_secret();
-    secret->set_name(secret_data.resource_name_);
+    envoy::extensions::transport_sockets::tls::v3alpha::Secret secret;
+    secret.set_name(secret_data.resource_name_);
     ProtobufWkt::Timestamp last_updated_ts;
     TimestampUtil::systemClockToTimestamp(secret_data.last_updated_, last_updated_ts);
     dump_secret->set_version_info(secret_data.version_info_);
     *dump_secret->mutable_last_updated() = last_updated_ts;
     if (secret_ready) {
-      secret->mutable_validation_context()->MergeFrom(*validation_context);
+      secret.mutable_validation_context()->MergeFrom(*validation_context);
     }
+    dump_secret->mutable_secret()->PackFrom(secret);
   }
 
   // Handle dynamic session keys providers providers.
@@ -256,17 +267,17 @@ ProtobufTypes::MessagePtr SecretManagerImpl::dumpSecretConfigs() {
       dump_secret = config_dump->mutable_dynamic_warming_secrets()->Add();
     }
     dump_secret->set_name(secret_data.resource_name_);
-    auto secret = dump_secret->mutable_secret();
-    secret->set_name(secret_data.resource_name_);
+    envoy::extensions::transport_sockets::tls::v3alpha::Secret secret;
+    secret.set_name(secret_data.resource_name_);
     ProtobufWkt::Timestamp last_updated_ts;
     TimestampUtil::systemClockToTimestamp(secret_data.last_updated_, last_updated_ts);
     dump_secret->set_version_info(secret_data.version_info_);
     *dump_secret->mutable_last_updated() = last_updated_ts;
-    secret->set_name(secret_data.resource_name_);
     if (secret_ready) {
-      secret->mutable_session_ticket_keys()->MergeFrom(*tls_stek);
+      secret.mutable_session_ticket_keys()->MergeFrom(*tls_stek);
     }
-    redactSecret(secret);
+    redactSecret(&secret);
+    dump_secret->mutable_secret()->PackFrom(secret);
   }
   return config_dump;
 }

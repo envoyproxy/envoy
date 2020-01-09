@@ -394,6 +394,7 @@ envoy_cc_test(
         "@envoy_api//envoy/config/bootstrap/v3alpha:pkg_cc_proto",
         "@envoy_api//envoy/config/core/v3alpha:pkg_cc_proto",
         "@envoy_api//envoy/config/metrics/v3alpha:pkg_cc_proto",
+        "@envoy_api//envoy/config/route/v3alpha:pkg_cc_proto",
     ],
 )
 
