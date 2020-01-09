@@ -26,3 +26,6 @@ As of this writing there is no high level extension developer documentation. The
 
 An example of how to add a network filter and structure the repository and build dependencies can
 be found at `envoy-filter-example <https://github.com/envoyproxy/envoy-filter-example>`_.
+
+`Doxygen <http://www.doxygen.nl/>`_ documentation is `also available <../doxygen/html/index.html>`_
+for the Envoy source code.
