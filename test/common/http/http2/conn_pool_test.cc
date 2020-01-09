@@ -224,10 +224,10 @@ TEST_F(Http2ConnPoolImplTest, DrainConnections) {
   EXPECT_CALL(r2.inner_encoder_, encodeHeaders(_, true));
   r2.callbacks_.outer_encoder_->encodeHeaders(HeaderMapImpl{}, true);
 
-  // This will move second connection to draining.
+  // This will move the second connection to draining.
   pool_.drainConnections();
 
-  // This will destroy  the 2 draining connections.
+  // This will destroy the 2 draining connections.
   test_clients_[0].connection_->raiseEvent(Network::ConnectionEvent::RemoteClose);
   test_clients_[1].connection_->raiseEvent(Network::ConnectionEvent::RemoteClose);
   EXPECT_CALL(*this, onClientDestroy()).Times(2);
