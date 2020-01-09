@@ -36,7 +36,7 @@ public:
   MOCK_METHOD(DnsCache::AddUpdateCallbacksHandle*, addUpdateCallbacks_,
               (UpdateCallbacks & callbacks));
 
-  MOCK_METHOD(absl::flat_hash_map<std::string, DnsHostInfoSharedPtr>, hosts, ());
+  MOCK_METHOD((absl::flat_hash_map<std::string, DnsHostInfoSharedPtr>), hosts, ());
 };
 
 class MockLoadDnsCacheEntryHandle : public DnsCache::LoadDnsCacheEntryHandle {
