@@ -89,7 +89,7 @@ Decision HttpTracerUtility::isTracing(const StreamInfo::StreamInfo& stream_info,
 }
 
 static void addTagIfNotNull(Span& span, const std::string& tag, const Http::HeaderEntry* entry) {
-  if (entry) {
+  if (entry != nullptr) {
     span.setTag(tag, entry->value().getStringView());
   }
 }
