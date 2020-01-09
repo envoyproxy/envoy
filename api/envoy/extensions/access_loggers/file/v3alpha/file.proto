@@ -1,6 +1,6 @@
 syntax = "proto3";
 
-package envoy.extensions.access_loggers.grpc.v3alpha;
+package envoy.extensions.access_loggers.file.v3alpha;
 
 import "google/protobuf/struct.proto";
 
@@ -8,16 +8,16 @@ import "udpa/annotations/versioning.proto";
 
 import "validate/validate.proto";
 
-option java_package = "io.envoyproxy.envoy.extensions.access_loggers.grpc.v3alpha";
+option java_package = "io.envoyproxy.envoy.extensions.access_loggers.file.v3alpha";
 option java_outer_classname = "FileProto";
 option java_multiple_files = true;
 
 // [#protodoc-title: File access log]
 // [#extension: envoy.access_loggers.file]
 
-// Custom configuration for an :ref:`AccessLog
-// <envoy_api_msg_config.filter.accesslog.v3alpha.AccessLog>` that writes log entries directly to a
-// file. Configures the built-in *envoy.file_access_log* AccessLog.
+// Custom configuration for an :ref:`AccessLog <envoy_api_msg_config.accesslog.v3alpha.AccessLog>`
+// that writes log entries directly to a file. Configures the built-in *envoy.file_access_log*
+// AccessLog.
 message FileAccessLog {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.accesslog.v2.FileAccessLog";

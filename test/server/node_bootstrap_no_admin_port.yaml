@@ -4,6 +4,5 @@ node:
   locality:
     zone: bootstrap_zone
     sub_zone: bootstrap_sub_zone
-  build_version: should_be_ignored
 admin:
   access_log_path: /dev/null

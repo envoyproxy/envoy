@@ -30,3 +30,5 @@ TAGS
 .vscode
 clang.bazelrc
 user.bazelrc
+CMakeLists.txt
+cmake-build-debug

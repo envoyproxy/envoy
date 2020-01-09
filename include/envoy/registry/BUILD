@@ -14,5 +14,7 @@ envoy_cc_library(
     deps = [
         "//source/common/common:assert_lib",
         "//source/common/config:api_type_oracle_lib",
+        "//source/common/protobuf:utility_lib",
+        "@envoy_api//envoy/config/core/v3alpha:pkg_cc_proto",
     ],
 )

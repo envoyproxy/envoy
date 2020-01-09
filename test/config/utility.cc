@@ -7,7 +7,7 @@
 #include "envoy/config/listener/v3alpha/listener_components.pb.h"
 #include "envoy/config/route/v3alpha/route_components.pb.h"
 #include "envoy/config/tap/v3alpha/common.pb.h"
-#include "envoy/extensions/access_loggers/grpc/v3alpha/file.pb.h"
+#include "envoy/extensions/access_loggers/file/v3alpha/file.pb.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3alpha/http_connection_manager.pb.h"
 #include "envoy/extensions/transport_sockets/tap/v3alpha/tap.pb.h"
 #include "envoy/extensions/transport_sockets/tls/v3alpha/cert.pb.h"
@@ -658,7 +658,7 @@ bool ConfigHelper::setAccessLog(const std::string& filename, absl::string_view f
   envoy::extensions::filters::network::http_connection_manager::v3alpha::HttpConnectionManager
       hcm_config;
   loadHttpConnectionManager(hcm_config);
-  envoy::extensions::access_loggers::grpc::v3alpha::FileAccessLog access_log_config;
+  envoy::extensions::access_loggers::file::v3alpha::FileAccessLog access_log_config;
   if (!format.empty()) {
     access_log_config.set_format(std::string(format));
   }

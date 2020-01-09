@@ -1,6 +1,6 @@
 syntax = "proto3";
 
-package envoy.config.filter.accesslog.v3alpha;
+package envoy.config.accesslog.v3alpha;
 
 import "envoy/config/core/v3alpha/base.proto";
 import "envoy/config/route/v3alpha/route_components.proto";
@@ -13,7 +13,7 @@ import "udpa/annotations/versioning.proto";
 
 import "validate/validate.proto";
 
-option java_package = "io.envoyproxy.envoy.config.filter.accesslog.v3alpha";
+option java_package = "io.envoyproxy.envoy.config.accesslog.v3alpha";
 option java_outer_classname = "AccesslogProto";
 option java_multiple_files = true;
 
@@ -42,7 +42,7 @@ message AccessLog {
   // configurations include:
   //
   // #. "envoy.file_access_log": :ref:`FileAccessLog
-  //    <envoy_api_msg_extensions.access_loggers.grpc.v3alpha.FileAccessLog>`
+  //    <envoy_api_msg_extensions.access_loggers.file.v3alpha.FileAccessLog>`
   // #. "envoy.http_grpc_access_log": :ref:`HttpGrpcAccessLogConfig
   //    <envoy_api_msg_extensions.access_loggers.grpc.v3alpha.HttpGrpcAccessLogConfig>`
   // #. "envoy.tcp_grpc_access_log": :ref:`TcpGrpcAccessLogConfig
@@ -170,10 +170,10 @@ message RuntimeFilter {
   // missing, or *use_independent_randomness* is set to true, the filter will randomly sample based
   // on the runtime key value alone. *use_independent_randomness* can be used for logging kill
   // switches within complex nested :ref:`AndFilter
-  // <envoy_api_msg_config.filter.accesslog.v3alpha.AndFilter>` and :ref:`OrFilter
-  // <envoy_api_msg_config.filter.accesslog.v3alpha.OrFilter>` blocks that are easier to reason
-  // about from a probability perspective (i.e., setting to true will cause the filter to behave
-  // like an independent random variable when composed within logical operator filters).
+  // <envoy_api_msg_config.accesslog.v3alpha.AndFilter>` and :ref:`OrFilter
+  // <envoy_api_msg_config.accesslog.v3alpha.OrFilter>` blocks that are easier to reason about
+  // from a probability perspective (i.e., setting to true will cause the filter to behave like
+  // an independent random variable when composed within logical operator filters).
   bool use_independent_randomness = 3;
 }
 

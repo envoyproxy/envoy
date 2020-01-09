@@ -85,7 +85,7 @@ public:
                       ProtobufMessage::ValidationVisitor& validation_visitor,
                       uint32_t retry_count) PURE;
 
-  std::string category() const override { return "retry_priorities"; }
+  std::string category() const override { return "envoy.retry_priorities"; }
 };
 
 /**
@@ -98,7 +98,7 @@ public:
   virtual RetryHostPredicateSharedPtr createHostPredicate(const Protobuf::Message& config,
                                                           uint32_t retry_count) PURE;
 
-  std::string category() const override { return "retry_host_predicates"; }
+  std::string category() const override { return "envoy.retry_host_predicates"; }
 };
 
 } // namespace Upstream

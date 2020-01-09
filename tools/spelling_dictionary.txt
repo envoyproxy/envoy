@@ -1161,3 +1161,5 @@ zig
 zipkin
 zlib
 OBQ
+SemVer
+SCM
