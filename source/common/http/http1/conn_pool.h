@@ -35,13 +35,13 @@ public:
                const Http::Http1Settings& settings,
                const Network::TransportSocketOptionsSharedPtr& transport_socket_options);
 
-  ~ConnPoolImpl() override;
+  ~ConnPoolImpl() override = default;
 
   // ConnectionPool::Instance
   Http::Protocol protocol() const override { return Http::Protocol::Http11; }
-  ConnectionPool::Cancellable* newStream(StreamDecoder& response_decoder,
-                                         ConnectionPool::Callbacks& callbacks) override;
-  Upstream::HostDescriptionConstSharedPtr host() const override { return host_; };
+
+  // ConnPoolImplBase
+  ActiveClientPtr instantiateActiveClient() override;
 
 protected:
   struct ActiveClient;
@@ -62,7 +62,7 @@ protected:
 
     // Http::StreamCallbacks
     void onResetStream(StreamResetReason, absl::string_view) override {
-      parent_.parent_.onDownstreamReset(parent_);
+      parent_.parent().onDownstreamReset(parent_);
     }
     void onAboveWriteBufferHighWatermark() override {}
     void onBelowWriteBufferLowWatermark() override {}
@@ -77,32 +77,23 @@ protected:
 
   struct ActiveClient : public ConnPoolImplBase::ActiveClient {
     ActiveClient(ConnPoolImpl& parent);
-    ~ActiveClient() override;
+    ~ActiveClient() override = default;
+
+    ConnPoolImpl& parent() { return static_cast<ConnPoolImpl&>(parent_); }
 
     // ConnPoolImplBase::ActiveClient
-    bool hasActiveRequests() const override { return stream_wrapper_ != nullptr; }
-    bool closingWithIncompleteRequest() const override {
-      return (stream_wrapper_ != nullptr) && (!stream_wrapper_->decode_complete_);
-    }
+    bool hasActiveRequests() const override;
+    bool closingWithIncompleteRequest() const override;
+    StreamEncoder& newStreamEncoder(StreamDecoder& response_decoder) override;
 
-    ConnPoolImpl& parent_;
     StreamWrapperPtr stream_wrapper_;
-    uint64_t remaining_requests_;
   };
 
-  void attachRequestToClient(ActiveClient& client, StreamDecoder& response_decoder,
-                             ConnectionPool::Callbacks& callbacks);
-  virtual CodecClientPtr createCodecClient(Upstream::Host::CreateConnectionData& data) PURE;
-  void createNewConnection();
   void onDownstreamReset(ActiveClient& client);
   void onResponseComplete(ActiveClient& client);
-  void onUpstreamReady();
-  void processIdleClient(ActiveClient& client, bool delay);
   ActiveClient& firstReady() const { return static_cast<ActiveClient&>(*ready_clients_.front()); }
   ActiveClient& firstBusy() const { return static_cast<ActiveClient&>(*busy_clients_.front()); }
 
-  const Network::ConnectionSocket::OptionsSharedPtr socket_options_;
-  const Network::TransportSocketOptionsSharedPtr transport_socket_options_;
   Event::TimerPtr upstream_ready_timer_;
   bool upstream_ready_enabled_{false};
   const Http1Settings settings_;

@@ -98,10 +98,10 @@ public:
           }
         },
         Upstream::makeTestHost(cluster, "tcp://127.0.0.1:9000"), *test_client.client_dispatcher_);
-    EXPECT_CALL(*test_client.connect_timer_, enableTimer(_, _));
     EXPECT_CALL(mock_dispatcher_, createClientConnection_(_, _, _, _))
         .WillOnce(Return(test_client.connection_));
     EXPECT_CALL(*this, createCodecClient_()).WillOnce(Return(test_client.codec_client_));
+    EXPECT_CALL(*test_client.connect_timer_, enableTimer(_, _));
     ON_CALL(*test_client.codec_, protocol()).WillByDefault(Return(protocol));
   }
 
@@ -132,7 +132,7 @@ public:
         conn_pool_(dispatcher_, cluster_, upstream_ready_timer_) {}
 
   ~Http1ConnPoolImplTest() override {
-    EXPECT_TRUE(TestUtility::gaugesZeroed(cluster_->stats_store_.gauges()));
+    EXPECT_EQ("", TestUtility::nonZeroedGauges(cluster_->stats_store_.gauges()));
   }
 
   NiceMock<Event::MockDispatcher> dispatcher_;
@@ -170,8 +170,8 @@ struct ActiveTestRequest {
     }
 
     if (type == Type::CreateConnection) {
-      EXPECT_CALL(*parent_.conn_pool_.test_clients_[client_index_].connect_timer_, disableTimer());
       expectNewStream();
+      EXPECT_CALL(*parent_.conn_pool_.test_clients_[client_index_].connect_timer_, disableTimer());
       parent.conn_pool_.test_clients_[client_index_].connection_->raiseEvent(
           Network::ConnectionEvent::Connected);
     }
@@ -417,34 +417,34 @@ TEST_F(Http1ConnPoolImplTest, MeasureConnectTime) {
   // Move time forward, signal that the first connect completed and verify the time to connect.
   uint64_t upstream_cx_connect_ms1 = 0;
   simulated_time.sleep(std::chrono::milliseconds(sleep2_ms));
-  EXPECT_CALL(*conn_pool_.test_clients_[0].connect_timer_, disableTimer());
   EXPECT_CALL(cluster_->stats_store_,
               deliverHistogramToSinks(Property(&Stats::Metric::name, "upstream_cx_connect_ms"), _))
       .WillOnce(SaveArg<1>(&upstream_cx_connect_ms1));
   r1.expectNewStream();
+  EXPECT_CALL(*conn_pool_.test_clients_[0].connect_timer_, disableTimer());
   conn_pool_.test_clients_[0].connection_->raiseEvent(Network::ConnectionEvent::Connected);
   EXPECT_EQ(sleep1_ms + sleep2_ms, upstream_cx_connect_ms1);
 
   // Move time forward, signal that the second connect completed and verify the time to connect.
   uint64_t upstream_cx_connect_ms2 = 0;
   simulated_time.sleep(std::chrono::milliseconds(sleep3_ms));
-  EXPECT_CALL(*conn_pool_.test_clients_[1].connect_timer_, disableTimer());
   EXPECT_CALL(cluster_->stats_store_,
               deliverHistogramToSinks(Property(&Stats::Metric::name, "upstream_cx_connect_ms"), _))
       .WillOnce(SaveArg<1>(&upstream_cx_connect_ms2));
   r2.expectNewStream();
+  EXPECT_CALL(*conn_pool_.test_clients_[1].connect_timer_, disableTimer());
   conn_pool_.test_clients_[1].connection_->raiseEvent(Network::ConnectionEvent::Connected);
   EXPECT_EQ(sleep2_ms + sleep3_ms, upstream_cx_connect_ms2);
 
   // Cleanup, cause the connections to go away.
   for (auto& test_client : conn_pool_.test_clients_) {
-    EXPECT_CALL(conn_pool_, onClientDestroy());
     EXPECT_CALL(
         cluster_->stats_store_,
         deliverHistogramToSinks(Property(&Stats::Metric::name, "upstream_cx_length_ms"), _));
+    EXPECT_CALL(conn_pool_, onClientDestroy());
     test_client.connection_->raiseEvent(Network::ConnectionEvent::RemoteClose);
+    dispatcher_.clearDeferredDeleteList();
   }
-  dispatcher_.clearDeferredDeleteList();
 }
 
 /**
@@ -874,10 +874,10 @@ TEST_F(Http1ConnPoolImplTest, RemoteCloseToCompleteResponse) {
 
   NiceMock<Http::MockStreamEncoder> request_encoder;
   Http::StreamDecoder* inner_decoder;
-  EXPECT_CALL(*conn_pool_.test_clients_[0].connect_timer_, disableTimer());
   EXPECT_CALL(*conn_pool_.test_clients_[0].codec_, newStream(_))
       .WillOnce(DoAll(SaveArgAddress(&inner_decoder), ReturnRef(request_encoder)));
   EXPECT_CALL(callbacks.pool_ready_, ready());
+  EXPECT_CALL(*conn_pool_.test_clients_[0].connect_timer_, disableTimer());
   conn_pool_.test_clients_[0].connection_->raiseEvent(Network::ConnectionEvent::Connected);
 
   callbacks.outer_encoder_->encodeHeaders(TestHeaderMapImpl{}, true);

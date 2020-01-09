@@ -18,14 +18,18 @@ class ConnPoolImplBase : public ConnectionPool::Instance,
                          protected Logger::Loggable<Logger::Id::pool> {
 public:
   // ConnectionPool::Instance
+  ConnectionPool::Cancellable* newStream(StreamDecoder& response_decoder,
+                                         ConnectionPool::Callbacks& callbacks) override;
   void addDrainedCallback(DrainedCb cb) override;
   bool hasActiveConnections() const override;
   void drainConnections() override;
+  Upstream::HostDescriptionConstSharedPtr host() const override { return host_; };
 
 protected:
   ConnPoolImplBase(Upstream::HostConstSharedPtr host, Upstream::ResourcePriority priority,
-                   Event::Dispatcher& dispatcher)
-      : host_(host), priority_(priority), dispatcher_(dispatcher) {}
+                   Event::Dispatcher& dispatcher,
+                   const Network::ConnectionSocket::OptionsSharedPtr& options,
+                   const Network::TransportSocketOptionsSharedPtr& transport_socket_options);
   virtual ~ConnPoolImplBase();
 
   // ActiveClient provides a base class for connection pool clients that handles connection timings
@@ -34,12 +38,15 @@ protected:
                        public Network::ConnectionCallbacks,
                        public Event::DeferredDeletable {
   public:
-    ActiveClient(ConnPoolImplBase& parent);
-    virtual ~ActiveClient() { conn_length_->complete(); }
+    ActiveClient(ConnPoolImplBase& parent, uint64_t lifetime_request_limit,
+                 uint64_t concurrent_request_limit);
+    virtual ~ActiveClient();
+
+    void releaseResources();
 
     // Network::ConnectionCallbacks
     void onEvent(Network::ConnectionEvent event) override {
-      base_parent_.onConnectionEvent(*this, event);
+      parent_.onConnectionEvent(*this, event);
     }
     void onAboveWriteBufferHighWatermark() override {}
     void onBelowWriteBufferLowWatermark() override {}
@@ -51,15 +58,20 @@ protected:
 
     virtual bool hasActiveRequests() const PURE;
     virtual bool closingWithIncompleteRequest() const PURE;
+    virtual StreamEncoder& newStreamEncoder(StreamDecoder& response_decoder) PURE;
 
     enum class State { CONNECTING, READY, BUSY, DRAINING, CLOSED };
+
+    ConnPoolImplBase& parent_;
+    uint64_t remaining_requests_;
+    const uint64_t concurrent_request_limit_;
     State state_{State::CONNECTING};
-    ConnPoolImplBase& base_parent_; // TODO: combine this and child parent_
     CodecClientPtr codec_client_;
     Upstream::HostDescriptionConstSharedPtr real_host_description_;
     Stats::TimespanPtr conn_connect_ms_;
     Stats::TimespanPtr conn_length_;
     Event::TimerPtr connect_timer_;
+    bool resources_released_{false};
   };
 
   using ActiveClientPtr = std::unique_ptr<ActiveClient>;
@@ -79,8 +91,14 @@ protected:
 
   using PendingRequestPtr = std::unique_ptr<PendingRequest>;
 
+  // Create a new CodecClient
+  virtual CodecClientPtr createCodecClient(Upstream::Host::CreateConnectionData& data) PURE;
+
+  // Returns a new instance of ActiveClient.
+  virtual ActiveClientPtr instantiateActiveClient() PURE;
+
   // Gets a pointer to the list that currently owns this client.
-  std::list<ActiveClientPtr>* owningList(ActiveClient& client);
+  std::list<ActiveClientPtr>& owningList(ActiveClient::State state);
 
   // Creates a new PendingRequest and enqueues it into the request queue.
   ConnectionPool::Cancellable* newPendingRequest(StreamDecoder& decoder,
@@ -96,15 +114,27 @@ protected:
   // Closes any idle connections.
   void closeIdleConnections();
 
+  // Called by derived classes anytime a request is completed or destroyed for any reason.
+  void onRequestClosed(ActiveClient& client, bool delay_attaching_request);
+
+  // Changes the state_ of an ActiveClient and moves to the appropriate list.
+  void setActiveClientState(ActiveClient& client, ActiveClient::State new_state);
+
   void onConnectionEvent(ActiveClient& client, Network::ConnectionEvent event);
-
-  // Must be implemented by sub class. Attempts to drain inactive clients.
   void checkForDrained();
-  virtual void onUpstreamReady() PURE;
+  void onUpstreamReady();
+  void attachRequestToClient(ActiveClient& client, StreamDecoder& response_decoder,
+                             ConnectionPool::Callbacks& callbacks);
+  void createNewConnection();
 
+public:
   const Upstream::HostConstSharedPtr host_;
   const Upstream::ResourcePriority priority_;
+
+protected:
   Event::Dispatcher& dispatcher_;
+  const Network::ConnectionSocket::OptionsSharedPtr socket_options_;
+  const Network::TransportSocketOptionsSharedPtr transport_socket_options_;
 
   std::list<DrainedCb> drained_callbacks_;
   std::list<PendingRequestPtr> pending_requests_;
@@ -118,9 +148,6 @@ protected:
 
   // Clients that are not ready to handle additional requests.
   std::list<ActiveClientPtr> busy_clients_;
-
-  // Clients that are draining but have not completed all outstanding requests yet.
-  std::list<ActiveClientPtr> draining_clients_;
 };
 } // namespace Http
 } // namespace Envoy

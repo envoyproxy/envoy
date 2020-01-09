@@ -30,62 +30,42 @@ public:
 
   // Http::ConnectionPool::Instance
   Http::Protocol protocol() const override { return Http::Protocol::Http2; }
-  ConnectionPool::Cancellable* newStream(Http::StreamDecoder& response_decoder,
-                                         ConnectionPool::Callbacks& callbacks) override;
-  Upstream::HostDescriptionConstSharedPtr host() const override { return host_; };
+
+  // ConnPoolImplBase
+  ActiveClientPtr instantiateActiveClient() override;
 
 protected:
   struct ActiveClient : public CodecClientCallbacks,
                         public Http::ConnectionCallbacks,
                         public ConnPoolImplBase::ActiveClient {
     ActiveClient(ConnPoolImpl& parent);
-    ~ActiveClient() override;
+    ~ActiveClient() override = default;
+
+    ConnPoolImpl& parent() { return static_cast<ConnPoolImpl&>(parent_); }
 
     // ConnPoolImpl::ActiveClient
-    bool hasActiveRequests() const override { return codec_client_->numActiveRequests() > 0; }
-    bool closingWithIncompleteRequest() const override { return closed_with_active_rq_; }
+    bool hasActiveRequests() const override;
+    bool closingWithIncompleteRequest() const override;
+    StreamEncoder& newStreamEncoder(StreamDecoder& response_decoder) override;
 
     // CodecClientCallbacks
-    void onStreamDestroy() override { parent_.onStreamDestroy(*this); }
+    void onStreamDestroy() override { parent().onStreamDestroy(*this); }
     void onStreamReset(Http::StreamResetReason reason) override {
-      parent_.onStreamReset(*this, reason);
+      parent().onStreamReset(*this, reason);
     }
 
     // Http::ConnectionCallbacks
-    void onGoAway() override { parent_.onGoAway(*this); }
+    void onGoAway() override { parent().onGoAway(*this); }
 
-    ConnPoolImpl& parent_;
-    uint64_t total_streams_{};
     bool closed_with_active_rq_{};
   };
 
-  using ActiveClientPtr = std::unique_ptr<ActiveClient>;
-
-  // TODO: delete me when no longer needed
-  ActiveClient* primaryClient() {
-    if (!ready_clients_.empty()) {
-      return static_cast<ActiveClient*>(ready_clients_.front().get());
-    }
-
-    if (!busy_clients_.empty()) {
-      return static_cast<ActiveClient*>(busy_clients_.front().get());
-    }
-
-    return nullptr;
-  }
-
-  virtual CodecClientPtr createCodecClient(Upstream::Host::CreateConnectionData& data) PURE;
   virtual uint32_t maxTotalStreams() PURE;
+  uint64_t maxRequestsPerConnection();
   void movePrimaryClientToDraining();
   void onGoAway(ActiveClient& client);
   void onStreamDestroy(ActiveClient& client);
   void onStreamReset(ActiveClient& client, Http::StreamResetReason reason);
-  void newClientStream(ActiveClient& client, Http::StreamDecoder& response_decoder,
-                       ConnectionPool::Callbacks& callbacks);
-  void onUpstreamReady();
-
-  const Network::ConnectionSocket::OptionsSharedPtr socket_options_;
-  const Network::TransportSocketOptionsSharedPtr transport_socket_options_;
 };
 
 /**
