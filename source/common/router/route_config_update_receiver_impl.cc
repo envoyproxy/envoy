@@ -89,7 +89,8 @@ bool RouteConfigUpdateReceiverImpl::updateVhosts(
         added_resources) {
   bool vhosts_added = false;
   for (const auto& resource : added_resources) {
-    // the management server returns empty resources for aliases that it couldn't resolve.
+    // the management server returns empty resources (they contain no virtual hosts in this case)
+    // for aliases that it couldn't resolve.
     if (onDemandFetchFailed(resource)) {
       continue;
     }
