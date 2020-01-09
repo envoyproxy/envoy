@@ -1,8 +1,7 @@
 #include "common/http/conn_pool_base.h"
-#include "common/stats/timespan_impl.h"
-#include "common/upstream/upstream_impl.h"
 
 #include "common/stats/timespan_impl.h"
+#include "common/upstream/upstream_impl.h"
 
 namespace Envoy {
 namespace Http {

@@ -2,13 +2,13 @@
 
 #include "envoy/event/dispatcher.h"
 #include "envoy/http/conn_pool.h"
+#include "envoy/network/connection.h"
 #include "envoy/stats/timespan.h"
 
 #include "common/common/linked_object.h"
 #include "common/http/codec_client.h"
 
 #include "absl/strings/string_view.h"
-#include "envoy/network/connection.h"
 
 namespace Envoy {
 namespace Http {
