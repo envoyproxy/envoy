@@ -11,11 +11,11 @@ build --features=swift.cacheable_swiftmodules
 build --host_force_python=PY3
 build --ios_minimum_os=10.0
 build --ios_simulator_device="iPhone 11"
-build --ios_simulator_version=13.2
+build --ios_simulator_version=13.3
 build --spawn_strategy=local
 build --verbose_failures
 build --workspace_status_command=envoy/bazel/get_workspace_status
-build --xcode_version=11.2.1
+build --xcode_version=11.3
 build --incompatible_bzl_disallow_load_after_statement=false
 build --javabase=@bazel_tools//tools/jdk:jdk
 
