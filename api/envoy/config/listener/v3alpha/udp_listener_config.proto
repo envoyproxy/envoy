@@ -33,3 +33,8 @@ message UdpListenerConfig {
     google.protobuf.Any typed_config = 3;
   }
 }
+
+message ActiveRawUdpListenerConfig {
+  option (udpa.annotations.versioning).previous_message_type =
+      "envoy.api.v2.listener.ActiveRawUdpListenerConfig";
+}

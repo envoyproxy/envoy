@@ -4,10 +4,10 @@
 
 #include "common/router/string_accessor_impl.h"
 
-#include "extensions/filters/http/common/empty_http_filter_config.h"
 #include "extensions/filters/http/common/pass_through_filter.h"
 #include "extensions/filters/http/well_known_names.h"
 
+#include "test/extensions/filters/http/common/empty_http_filter_config.h"
 #include "test/extensions/filters/http/jwt_authn/test_common.h"
 #include "test/integration/http_protocol_integration.h"
 
