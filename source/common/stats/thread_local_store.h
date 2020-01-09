@@ -359,7 +359,6 @@ private:
   };
 
   struct TlsCache : public ThreadLocal::ThreadLocalObject {
-    TlsCacheEntry& insertScope(uint64_t scope_id);
     void eraseScope(uint64_t scope_id);
 
     // The TLS scope cache is keyed by scope ID. This is used to avoid complex circular references
@@ -414,7 +413,6 @@ private:
   std::vector<HistogramSharedPtr> deleted_histograms_;
 
   Thread::ThreadSynchronizer sync_;
-  std::atomic<uint64_t> next_scope_id_;
 };
 
 } // namespace Stats
