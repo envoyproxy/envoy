@@ -41,7 +41,7 @@ TEST(FileAccessLogConfigTest, ConfigureFromProto) {
   EXPECT_THROW_WITH_MESSAGE(AccessLog::AccessLogFactory::fromProto(config, context), EnvoyException,
                             "Didn't find a registered implementation for name: 'INVALID'");
 
-  envoy::extensions::access_loggers::grpc::v3alpha::FileAccessLog fal_config;
+  envoy::extensions::access_loggers::file::v3alpha::FileAccessLog fal_config;
   fal_config.set_path("/dev/null");
 
   config.mutable_typed_config()->PackFrom(fal_config);
