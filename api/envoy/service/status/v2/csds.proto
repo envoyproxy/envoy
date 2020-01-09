@@ -3,7 +3,6 @@ syntax = "proto3";
 package envoy.service.status.v2;
 
 import "envoy/admin/v2alpha/config_dump.proto";
-import "envoy/api/v2/core/base.proto";
 
 import "google/api/annotations.proto";
 import "google/protobuf/struct.proto";
