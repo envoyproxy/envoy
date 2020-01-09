@@ -19,6 +19,30 @@ namespace {
 
 using CustomRedisHealthChecker = Extensions::HealthCheckers::RedisHealthChecker::RedisHealthChecker;
 
+TEST(HealthCheckerFactoryTest, DEPRECATED_FEATURE_TEST(CreateRedisDeprecated)) {
+  const std::string yaml = R"EOF(
+    timeout: 1s
+    interval: 1s
+    no_traffic_interval: 5s
+    interval_jitter: 1s
+    unhealthy_threshold: 1
+    healthy_threshold: 1
+    custom_health_check:
+      name: envoy.health_checkers.redis
+      config:
+        key: foo
+    )EOF";
+
+  NiceMock<Server::Configuration::MockHealthCheckerFactoryContext> context;
+
+  RedisHealthCheckerFactory factory;
+  EXPECT_NE(
+      nullptr,
+      dynamic_cast<CustomRedisHealthChecker*>(
+          factory.createCustomHealthChecker(Upstream::parseHealthCheckFromV2Yaml(yaml), context)
+              .get()));
+}
+
 TEST(HealthCheckerFactoryTest, CreateRedis) {
   const std::string yaml = R"EOF(
     timeout: 1s
@@ -44,7 +68,7 @@ TEST(HealthCheckerFactoryTest, CreateRedis) {
               .get()));
 }
 
-TEST(HealthCheckerFactoryTest, CreateRedisWithoutKey) {
+TEST(HealthCheckerFactoryTest, DEPRECATED_FEATURE_TEST(CreateRedisWithoutKeyDeprecated)) {
   const std::string yaml = R"EOF(
     timeout: 1s
     interval: 1s
@@ -67,6 +91,30 @@ TEST(HealthCheckerFactoryTest, CreateRedisWithoutKey) {
               .get()));
 }
 
+TEST(HealthCheckerFactoryTest, CreateRedisWithoutKey) {
+  const std::string yaml = R"EOF(
+    timeout: 1s
+    interval: 1s
+    no_traffic_interval: 5s
+    interval_jitter: 1s
+    unhealthy_threshold: 1
+    healthy_threshold: 1
+    custom_health_check:
+      name: envoy.health_checkers.redis
+      typed_config:
+        "@type": type.googleapis.com/envoy.config.health_checker.redis.v2.Redis
+    )EOF";
+
+  NiceMock<Server::Configuration::MockHealthCheckerFactoryContext> context;
+
+  RedisHealthCheckerFactory factory;
+  EXPECT_NE(
+      nullptr,
+      dynamic_cast<CustomRedisHealthChecker*>(
+          factory.createCustomHealthChecker(Upstream::parseHealthCheckFromV2Yaml(yaml), context)
+              .get()));
+}
+
 TEST(HealthCheckerFactoryTest, CreateRedisWithLogHCFailure) {
   const std::string yaml = R"EOF(
     timeout: 1s
@@ -77,7 +125,8 @@ TEST(HealthCheckerFactoryTest, CreateRedisWithLogHCFailure) {
     healthy_threshold: 1
     custom_health_check:
       name: envoy.health_checkers.redis
-      config:
+      typed_config:
+        "@type": type.googleapis.com/envoy.config.health_checker.redis.v2.Redis
     always_log_health_check_failures: true
     )EOF";
 

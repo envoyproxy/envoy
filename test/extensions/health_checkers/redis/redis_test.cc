@@ -45,7 +45,8 @@ public:
     healthy_threshold: 1
     custom_health_check:
       name: envoy.health_checkers.redis
-      config:
+      typed_config:
+        "@type": type.googleapis.com/envoy.config.health_checker.redis.v2.Redis
     )EOF";
 
     const auto& health_check_config = Upstream::parseHealthCheckFromV2Yaml(yaml);
@@ -68,7 +69,8 @@ public:
     always_log_health_check_failures: true
     custom_health_check:
       name: envoy.health_checkers.redis
-      config:
+      typed_config:
+        "@type": type.googleapis.com/envoy.config.health_checker.redis.v2.Redis
     )EOF";
 
     const auto& health_check_config = Upstream::parseHealthCheckFromV2Yaml(yaml);
@@ -90,7 +92,8 @@ public:
     healthy_threshold: 1
     custom_health_check:
       name: envoy.health_checkers.redis
-      config:
+      typed_config:
+        "@type": type.googleapis.com/envoy.config.health_checker.redis.v2.Redis
         key: foo
     )EOF";
 
@@ -114,7 +117,8 @@ public:
     reuse_connection: false
     custom_health_check:
       name: envoy.health_checkers.redis
-      config:
+      typed_config:
+        "@type": type.googleapis.com/envoy.config.health_checker.redis.v2.Redis
     )EOF";
 
     const auto& health_check_config = Upstream::parseHealthCheckFromV2Yaml(yaml);
