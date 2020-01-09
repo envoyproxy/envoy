@@ -289,13 +289,16 @@ void RdsRouteConfigProviderImpl::onConfigUpdate() {
   for (auto it = config_update_callbacks_.begin(); it != config_update_callbacks_.end();) {
     auto found = aliases.find(it->alias_);
     if (found != aliases.end()) {
-      if (auto cb = it->cb_.lock()) {
-        // TODO(dmitri-d) HeaderMapImpl is expensive, need to profile this
-        Http::HeaderMapImpl host_header;
-        host_header.setHost(VhdsSubscription::aliasToDomainName(it->alias_));
-        const bool host_exists = config->virtualHostExists(host_header);
-        it->thread_local_dispatcher_.post([cb, host_exists] { (*cb)(host_exists); });
-      }
+      // TODO(dmitri-d) HeaderMapImpl is expensive, need to profile this
+      Http::HeaderMapImpl host_header;
+      host_header.setHost(VhdsSubscription::aliasToDomainName(it->alias_));
+      const bool host_exists = config->virtualHostExists(host_header);
+      auto current_cb = it->cb_;
+      it->thread_local_dispatcher_.post([current_cb, host_exists] {
+        if (auto cb = current_cb.lock()) {
+          (*cb)(host_exists);
+        }
+      });
       it = config_update_callbacks_.erase(it);
     } else {
       it++;
@@ -313,7 +316,7 @@ void RdsRouteConfigProviderImpl::validateConfig(
 // response has been propagated to the worker thread that was the request origin.
 void RdsRouteConfigProviderImpl::requestVirtualHostsUpdate(
     const std::string& for_domain, Event::Dispatcher& thread_local_dispatcher,
-    Http::RouteConfigUpdatedCallbackSharedPtr route_config_updated_cb) {
+    std::weak_ptr<Http::RouteConfigUpdatedCallback> route_config_updated_cb) {
   auto alias =
       VhdsSubscription::domainNameToAlias(config_update_info_->routeConfigName(), for_domain);
   factory_context_.dispatcher().post([this, alias, &thread_local_dispatcher,

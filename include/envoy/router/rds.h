@@ -62,10 +62,9 @@ public:
    * @param route_config_updated_cb callback to be called when the configuration update has been
    * propagated to worker threads
    */
-  virtual void
-  requestVirtualHostsUpdate(const std::string& for_domain,
-                            Event::Dispatcher& thread_local_dispatcher,
-                            Http::RouteConfigUpdatedCallbackSharedPtr route_config_updated_cb) PURE;
+  virtual void requestVirtualHostsUpdate(
+      const std::string& for_domain, Event::Dispatcher& thread_local_dispatcher,
+      std::weak_ptr<Http::RouteConfigUpdatedCallback> route_config_updated_cb) PURE;
 };
 
 using RouteConfigProviderPtr = std::unique_ptr<RouteConfigProvider>;

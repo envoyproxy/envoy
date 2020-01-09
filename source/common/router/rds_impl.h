@@ -78,7 +78,7 @@ public:
   void onConfigUpdate() override {}
   void validateConfig(const envoy::config::route::v3alpha::RouteConfiguration&) const override {}
   void requestVirtualHostsUpdate(const std::string&, Event::Dispatcher&,
-                                 Http::RouteConfigUpdatedCallbackSharedPtr) override {
+                                 std::weak_ptr<Http::RouteConfigUpdatedCallback>) override {
     NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
   }
 
@@ -207,7 +207,7 @@ public:
   void onConfigUpdate() override;
   void requestVirtualHostsUpdate(
       const std::string& for_domain, Event::Dispatcher& thread_local_dispatcher,
-      Http::RouteConfigUpdatedCallbackSharedPtr route_config_updated_cb) override;
+      std::weak_ptr<Http::RouteConfigUpdatedCallback> route_config_updated_cb) override;
   void
   validateConfig(const envoy::config::route::v3alpha::RouteConfiguration& config) const override;
 
