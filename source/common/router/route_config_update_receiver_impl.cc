@@ -44,8 +44,8 @@ bool RouteConfigUpdateReceiverImpl::onVhdsUpdate(
     const Protobuf::RepeatedPtrField<std::string>& removed_resources,
     const std::string& version_info) {
   collectResourceIdsInUpdate(added_resources);
-  bool removed = removeVhosts(vhds_virtual_hosts_, removed_resources);
-  bool updated = updateVhosts(vhds_virtual_hosts_, added_resources);
+  const bool removed = removeVhosts(vhds_virtual_hosts_, removed_resources);
+  const bool updated = updateVhosts(vhds_virtual_hosts_, added_resources);
   onUpdateCommon(route_config_proto_, version_info);
   return removed || updated || !resource_ids_in_last_update_.empty();
 }

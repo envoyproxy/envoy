@@ -149,9 +149,9 @@ TEST_F(NewGrpcMuxImplTest, ConfigUpdateWithAliases) {
   const auto& subscriptions = grpc_mux_->subscriptions();
   auto sub = subscriptions.find(type_url);
 
-  ASSERT_TRUE(sub != subscriptions.end());
+  EXPECT_TRUE(sub != subscriptions.end());
   const auto found_resource_names = sub->second->watch_map_.updateWatchInterest(watch, {});
-  ASSERT_TRUE(found_resource_names.removed_.find("vhost_1") != found_resource_names.removed_.end());
+  EXPECT_TRUE(found_resource_names.removed_.find("vhost_1") != found_resource_names.removed_.end());
 }
 
 // DeltaDiscoveryResponse that comes in response to an on-demand request that couldn't be resolved
@@ -180,9 +180,9 @@ TEST_F(NewGrpcMuxImplTest, ConfigUpdateWithNotFoundResponse) {
   const auto& subscriptions = grpc_mux_->subscriptions();
   auto sub = subscriptions.find(type_url);
 
-  ASSERT_TRUE(sub != subscriptions.end());
+  EXPECT_TRUE(sub != subscriptions.end());
   const auto found_resource_names = sub->second->watch_map_.updateWatchInterest(watch, {});
-  ASSERT_TRUE(found_resource_names.removed_.find("not-found") !=
+  EXPECT_TRUE(found_resource_names.removed_.find("not-found") !=
               found_resource_names.removed_.end());
 }
 
