@@ -48,8 +48,7 @@ StaticRouteConfigProviderImpl::StaticRouteConfigProviderImpl(
     Server::Configuration::FactoryContext& factory_context,
     RouteConfigProviderManagerImpl& route_config_provider_manager)
     : config_(new ConfigImpl(config, factory_context.getServerFactoryContext(),
-                             factory_context.messageValidationContext().staticValidationVisitor(),
-                             true)),
+                             factory_context.messageValidationVisitor(), true)),
 
       route_config_proto_{config}, last_updated_(factory_context.timeSource().systemTime()),
       route_config_provider_manager_(route_config_provider_manager) {
