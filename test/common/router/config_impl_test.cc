@@ -18,9 +18,8 @@
 #include "common/network/address_impl.h"
 #include "common/router/config_impl.h"
 
-#include "extensions/filters/http/common/empty_http_filter_config.h"
-
 #include "test/common/router/route_fuzz.pb.h"
+#include "test/extensions/filters/http/common/empty_http_filter_config.h"
 #include "test/fuzz/utility.h"
 #include "test/mocks/server/mocks.h"
 #include "test/test_common/environment.h"

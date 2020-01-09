@@ -20,18 +20,18 @@ namespace Envoy {
 namespace Router {
 
 // Implements callbacks to handle DeltaDiscovery protocol for VirtualHostDiscoveryService
-VhdsSubscription::VhdsSubscription(
-    RouteConfigUpdatePtr& config_update_info,
-    Server::Configuration::ServerFactoryContext& factory_context, const std::string& stat_prefix,
-    std::unordered_set<RouteConfigProvider*>& route_config_providers,
-    envoy::config::core::v3alpha::ConfigSource::XdsApiVersion xds_api_version)
+VhdsSubscription::VhdsSubscription(RouteConfigUpdatePtr& config_update_info,
+                                   Server::Configuration::ServerFactoryContext& factory_context,
+                                   const std::string& stat_prefix,
+                                   std::unordered_set<RouteConfigProvider*>& route_config_providers,
+                                   envoy::config::core::v3alpha::ApiVersion resource_api_version)
     : config_update_info_(config_update_info),
       scope_(factory_context.scope().createScope(stat_prefix + "vhds." +
                                                  config_update_info_->routeConfigName() + ".")),
       stats_({ALL_VHDS_STATS(POOL_COUNTER(*scope_))}),
       init_target_(fmt::format("VhdsConfigSubscription {}", config_update_info_->routeConfigName()),
                    [this]() { subscription_->start({}); }),
-      route_config_providers_(route_config_providers), xds_api_version_(xds_api_version) {
+      route_config_providers_(route_config_providers) {
   const auto& config_source = config_update_info_->routeConfiguration()
                                   .vhds()
                                   .config_source()
@@ -43,8 +43,8 @@ VhdsSubscription::VhdsSubscription(
 
   subscription_ =
       factory_context.clusterManager().subscriptionFactory().subscriptionFromConfigSource(
-          config_update_info_->routeConfiguration().vhds().config_source(), loadTypeUrl(), *scope_,
-          *this);
+          config_update_info_->routeConfiguration().vhds().config_source(),
+          loadTypeUrl(resource_api_version), *scope_, *this);
 }
 
 void VhdsSubscription::onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason reason,
@@ -71,18 +71,19 @@ void VhdsSubscription::onConfigUpdate(
   init_target_.ready();
 }
 
-std::string VhdsSubscription::loadTypeUrl() {
-  switch (xds_api_version_) {
+std::string
+VhdsSubscription::loadTypeUrl(envoy::config::core::v3alpha::ApiVersion resource_api_version) {
+  switch (resource_api_version) {
   // automatically set api version as V2
-  case envoy::config::core::v3alpha::ConfigSource::AUTO:
-  case envoy::config::core::v3alpha::ConfigSource::V2:
+  case envoy::config::core::v3alpha::ApiVersion::AUTO:
+  case envoy::config::core::v3alpha::ApiVersion::V2:
     return Grpc::Common::typeUrl(
         API_NO_BOOST(envoy::api::v2::route::VirtualHost().GetDescriptor()->full_name()));
-  case envoy::config::core::v3alpha::ConfigSource::V3ALPHA:
+  case envoy::config::core::v3alpha::ApiVersion::V3ALPHA:
     return Grpc::Common::typeUrl(
         API_NO_BOOST(envoy::api::v2::route::VirtualHost().GetDescriptor()->full_name()));
   default:
-    throw EnvoyException(fmt::format("type {} is not supported", xds_api_version_));
+    NOT_REACHED_GCOVR_EXCL_LINE;
   }
 }
 } // namespace Router

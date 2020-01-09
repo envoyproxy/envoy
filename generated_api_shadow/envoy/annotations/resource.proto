@@ -10,7 +10,7 @@ extend google.protobuf.ServiceOptions {
 }
 
 message ResourceAnnotation {
-  // Annotatation for xDS services that indicates the fully-qualified Protobuf type for the resource
+  // Annotation for xDS services that indicates the fully-qualified Protobuf type for the resource
   // type.
   string type = 1;
 }

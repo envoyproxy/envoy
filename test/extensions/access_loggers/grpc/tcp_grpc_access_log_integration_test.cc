@@ -105,6 +105,11 @@ public:
     log_entry->mutable_common_properties()->clear_time_to_last_rx_byte();
     log_entry->mutable_common_properties()->clear_time_to_first_downstream_tx_byte();
     log_entry->mutable_common_properties()->clear_time_to_last_downstream_tx_byte();
+    if (request_msg.has_identifier()) {
+      auto* node = request_msg.mutable_identifier()->mutable_node();
+      node->clear_extensions();
+      node->clear_user_agent_build_version();
+    }
     EXPECT_EQ(request_msg.DebugString(), expected_request_msg.DebugString());
 
     return AssertionSuccess();
@@ -158,6 +163,7 @@ identifier:
     locality:
       zone: zone_name
     build_version: {}
+    user_agent_name: "envoy"
   log_name: foo
 tcp_logs:
   log_entry:
