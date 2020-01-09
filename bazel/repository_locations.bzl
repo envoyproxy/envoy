@@ -174,10 +174,10 @@ REPOSITORY_LOCATIONS = dict(
         urls = ["https://github.com/msgpack/msgpack-c/releases/download/cpp-3.2.0/msgpack-3.2.0.tar.gz"],
     ),
     com_github_google_jwt_verify = dict(
-        sha256 = "7c937f61b4dbe7881bc3a03327150ec44b30b310c65a21ee621f083e665056f3",
-        strip_prefix = "jwt_verify_lib-14fbfce0ba1b05b6aeb2908b3ce825a52ccb6450",
-        # 2019-12-20
-        urls = ["https://github.com/google/jwt_verify_lib/archive/14fbfce0ba1b05b6aeb2908b3ce825a52ccb6450.tar.gz"],
+        sha256 = "b6e04123e801dc8204d9bcab5716ec92a510a770546fca823e6f399dc920479d",
+        strip_prefix = "jwt_verify_lib-2d8dfd2dd5b715536af2531e107bde995796f749",
+        # 2020-01-08
+        urls = ["https://github.com/google/jwt_verify_lib/archive/2d8dfd2dd5b715536af2531e107bde995796f749.tar.gz"],
     ),
     com_github_nodejs_http_parser = dict(
         sha256 = "ef26268c54c8084d17654ba2ed5140bffeffd2a040a895ffb22a6cca3f6c613f",
@@ -243,15 +243,6 @@ REPOSITORY_LOCATIONS = dict(
         # 2019-09-26
         urls = ["https://github.com/bazelbuild/rules_foreign_cc/archive/7bc4be735b0560289f6b86ab6136ee25d20b65b7.tar.gz"],
     ),
-    rules_proto = dict(
-        sha256 = "296ffd3e7992bd83fa75151255f7c7f27d22d6e52e2fd3c3d3d10c292317fbed",
-        strip_prefix = "rules_proto-f6c112fa4eb2b8f934feb938a6fce41425e41587",
-        # 2019-11-07
-        urls = [
-            "https://mirror.bazel.build/github.com/bazelbuild/rules_proto/archive/f6c112fa4eb2b8f934feb938a6fce41425e41587.tar.gz",
-            "https://github.com/bazelbuild/rules_proto/archive/f6c112fa4eb2b8f934feb938a6fce41425e41587.tar.gz",
-        ],
-    ),
     rules_python = dict(
         sha256 = "aa96a691d3a8177f3215b14b0edc9641787abaaa30363a080165d06ab65e1161",
         urls = ["https://github.com/bazelbuild/rules_python/releases/download/0.0.1/rules_python-0.0.1.tar.gz"],
@@ -278,9 +269,9 @@ REPOSITORY_LOCATIONS = dict(
         urls = ["https://storage.googleapis.com/envoyproxy-wee8/wee8-7.9.317.14.tar.gz"],
     ),
     com_googlesource_quiche = dict(
-        # Static snapshot of https://quiche.googlesource.com/quiche/+archive/0ce303d8f1a774c821f4370d4b84d02e488ce332.tar.gz
-        sha256 = "7648f75631623bd98859b9be068cb857b3e83ce67ebcdf8123ad5667eb00da02",
-        urls = ["https://storage.googleapis.com/quiche-envoy-integration/0ce303d8f1a774c821f4370d4b84d02e488ce332.tar.gz"],
+        # Static snapshot of https://quiche.googlesource.com/quiche/+archive/85240a12ed2b9ccb08ae449bca1bbf9eb93c8a12.tar.gz
+        sha256 = "63ca7aa58511beb8cd6e6b93dbb25154bd14c8c8a316a1b20430e830060fa7db",
+        urls = ["https://storage.googleapis.com/quiche-envoy-integration/85240a12ed2b9ccb08ae449bca1bbf9eb93c8a12.tar.gz"],
     ),
     com_google_cel_cpp = dict(
         sha256 = "b4eaf871d4910c599bb70eaef2eec852747989f15f26885353b7c5188a940ca8",
@@ -311,5 +302,20 @@ REPOSITORY_LOCATIONS = dict(
         strip_prefix = "upb-8a3ae1ef3e3e3f26b45dec735c5776737fc7247f",
         # 2019-11-19
         urls = ["https://github.com/protocolbuffers/upb/archive/8a3ae1ef3e3e3f26b45dec735c5776737fc7247f.tar.gz"],
+    ),
+    kafka_source = dict(
+        sha256 = "ae7a1696c0a0302b43c5b21e515c37e6ecd365941f68a510a7e442eebddf39a1",  # 2.2.0-rc2
+        strip_prefix = "kafka-2.2.0-rc2/clients/src/main/resources/common/message",
+        urls = ["https://github.com/apache/kafka/archive/2.2.0-rc2.zip"],
+    ),
+    kafka_server_binary = dict(
+        sha256 = "a009624fae678fa35968f945e18e45fbea9a30fa8080d5dcce7fdea726120027",
+        strip_prefix = "kafka_2.12-2.2.0",
+        urls = ["http://us.mirrors.quenda.co/apache/kafka/2.2.0/kafka_2.12-2.2.0.tgz"],
+    ),
+    kafka_python_client = dict(
+        sha256 = "81f24a5d297531495e0ccb931fbd6c4d1ec96583cf5a730579a3726e63f59c47",
+        strip_prefix = "kafka-python-1.4.7",
+        urls = ["https://github.com/dpkp/kafka-python/archive/1.4.7.tar.gz"],
     ),
 )

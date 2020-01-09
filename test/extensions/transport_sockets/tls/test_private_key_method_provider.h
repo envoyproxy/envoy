@@ -1,7 +1,7 @@
 #pragma once
 
-#include "envoy/api/v2/auth/cert.pb.h"
 #include "envoy/event/dispatcher.h"
+#include "envoy/extensions/transport_sockets/tls/v3alpha/cert.pb.h"
 #include "envoy/server/transport_socket_config.h"
 #include "envoy/ssl/private_key/private_key.h"
 #include "envoy/ssl/private_key/private_key_config.h"
@@ -84,12 +84,12 @@ class TestPrivateKeyMethodFactory : public Ssl::PrivateKeyMethodProviderInstance
 public:
   // Ssl::PrivateKeyMethodProviderInstanceFactory
   Ssl::PrivateKeyMethodProviderSharedPtr createPrivateKeyMethodProviderInstance(
-      const envoy::api::v2::auth::PrivateKeyProvider& config,
+      const envoy::extensions::transport_sockets::tls::v3alpha::PrivateKeyProvider& config,
       Server::Configuration::TransportSocketFactoryContext& factory_context) override {
     return std::make_shared<TestPrivateKeyMethodProvider>(config.typed_config(), factory_context);
   }
 
-  std::string name() const override { return std::string("test"); };
+  std::string name() const override { return "test"; };
 };
 
 } // namespace PrivateKeyMethodProvider

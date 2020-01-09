@@ -9,15 +9,15 @@
 
 #include "envoy/buffer/buffer.h"
 #include "envoy/common/time.h"
-#include "envoy/config/filter/network/http_connection_manager/v2/http_connection_manager.pb.h"
 #include "envoy/event/dispatcher.h"
+#include "envoy/extensions/filters/network/http_connection_manager/v3alpha/http_connection_manager.pb.h"
 #include "envoy/network/drain_decision.h"
 #include "envoy/router/router.h"
 #include "envoy/ssl/connection.h"
 #include "envoy/stats/scope.h"
 #include "envoy/stream_info/filter_state.h"
 #include "envoy/tracing/http_tracer.h"
-#include "envoy/type/percent.pb.h"
+#include "envoy/type/v3alpha/percent.pb.h"
 
 #include "common/buffer/buffer_impl.h"
 #include "common/common/assert.h"
@@ -311,7 +311,7 @@ Network::FilterStatus ConnectionManagerImpl::onData(Buffer::Instance& data, bool
       // level logging in the HCM, similar to what we have in tcp_proxy. This will allow abuse
       // indicators to be stored in the connection level stream info, and then matched, sampled,
       // etc. when logged.
-      const envoy::type::FractionalPercent default_value; // 0
+      const envoy::type::v3alpha::FractionalPercent default_value; // 0
       if (runtime_.snapshot().featureEnabled("http.connection_manager.log_flood_exception",
                                              default_value)) {
         ENVOY_CONN_LOG(warn, "downstream HTTP flood from IP '{}': {}",
@@ -774,14 +774,8 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(HeaderMapPtr&& headers, 
     }
   }
 
-  // Make sure the host is valid.
-  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.strict_authority_validation") &&
-      !HeaderUtility::authorityIsValid(request_headers_->Host()->value().getStringView())) {
-    sendLocalReply(Grpc::Common::hasGrpcContentType(*request_headers_), Code::BadRequest, "",
-                   nullptr, is_head_request_, absl::nullopt,
-                   StreamInfo::ResponseCodeDetails::get().InvalidAuthority);
-    return;
-  }
+  // Verify header sanity checks which should have been performed by the codec.
+  ASSERT(HeaderUtility::requestHeadersValid(*request_headers_).has_value() == false);
 
   // Currently we only support relative paths at the application layer. We expect the codec to have
   // broken the path into pieces if applicable. NOTE: Currently the HTTP/1.1 codec only does this

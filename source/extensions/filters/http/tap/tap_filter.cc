@@ -1,6 +1,6 @@
 #include "extensions/filters/http/tap/tap_filter.h"
 
-#include "envoy/config/filter/http/tap/v2alpha/tap.pb.h"
+#include "envoy/extensions/filters/http/tap/v3alpha/tap.pb.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -8,7 +8,7 @@ namespace HttpFilters {
 namespace TapFilter {
 
 FilterConfigImpl::FilterConfigImpl(
-    const envoy::config::filter::http::tap::v2alpha::Tap& proto_config,
+    const envoy::extensions::filters::http::tap::v3alpha::Tap& proto_config,
     const std::string& stats_prefix, Common::Tap::TapConfigFactoryPtr&& config_factory,
     Stats::Scope& scope, Server::Admin& admin, Singleton::Manager& singleton_manager,
     ThreadLocal::SlotAllocator& tls, Event::Dispatcher& main_thread_dispatcher)

@@ -5,7 +5,7 @@
 #include <unordered_map>
 
 #include "envoy/runtime/runtime.h"
-#include "envoy/type/percent.pb.h"
+#include "envoy/type/v3alpha/percent.pb.h"
 #include "envoy/upstream/cluster_manager.h"
 
 #include "gmock/gmock.h"
@@ -48,12 +48,15 @@ public:
                      bool(const std::string& key, uint64_t default_value, uint64_t random_value));
   MOCK_CONST_METHOD4(featureEnabled, bool(const std::string& key, uint64_t default_value,
                                           uint64_t random_value, uint64_t num_buckets));
-  MOCK_CONST_METHOD2(featureEnabled, bool(const std::string& key,
-                                          const envoy::type::FractionalPercent& default_value));
-  MOCK_CONST_METHOD3(featureEnabled, bool(const std::string& key,
-                                          const envoy::type::FractionalPercent& default_value,
-                                          uint64_t random_value));
+  MOCK_CONST_METHOD2(featureEnabled,
+                     bool(const std::string& key,
+                          const envoy::type::v3alpha::FractionalPercent& default_value));
+  MOCK_CONST_METHOD3(featureEnabled,
+                     bool(const std::string& key,
+                          const envoy::type::v3alpha::FractionalPercent& default_value,
+                          uint64_t random_value));
   MOCK_CONST_METHOD1(get, const std::string&(const std::string& key));
+  MOCK_CONST_METHOD1(exists, bool(const std::string& key));
   MOCK_CONST_METHOD2(getInteger, uint64_t(const std::string& key, uint64_t default_value));
   MOCK_CONST_METHOD2(getDouble, double(const std::string& key, double default_value));
   MOCK_CONST_METHOD2(getBoolean, bool(absl::string_view key, bool default_value));

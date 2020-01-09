@@ -8,7 +8,7 @@
 #include <vector>
 
 #include "envoy/common/pure.h"
-#include "envoy/type/percent.pb.h"
+#include "envoy/type/v3alpha/percent.pb.h"
 
 #include "common/common/assert.h"
 #include "common/singleton/threadsafe_singleton.h"
@@ -76,7 +76,7 @@ public:
     std::string raw_string_value_;
     absl::optional<uint64_t> uint_value_;
     absl::optional<double> double_value_;
-    absl::optional<envoy::type::FractionalPercent> fractional_percent_value_;
+    absl::optional<envoy::type::v3alpha::FractionalPercent> fractional_percent_value_;
     absl::optional<bool> bool_value_;
   };
 
@@ -179,8 +179,9 @@ public:
    *        does not exist or it is not a fractional percent.
    * @return true if the feature is enabled.
    */
-  virtual bool featureEnabled(const std::string& key,
-                              const envoy::type::FractionalPercent& default_value) const PURE;
+  virtual bool
+  featureEnabled(const std::string& key,
+                 const envoy::type::v3alpha::FractionalPercent& default_value) const PURE;
 
   /**
    * Test if a feature is enabled using a supplied stable random value. This variant is used if
@@ -197,7 +198,7 @@ public:
    * @return true if the feature is enabled.
    */
   virtual bool featureEnabled(const std::string& key,
-                              const envoy::type::FractionalPercent& default_value,
+                              const envoy::type::v3alpha::FractionalPercent& default_value,
                               uint64_t random_value) const PURE;
 
   /**
@@ -206,6 +207,13 @@ public:
    * @return const std::string& the value or empty string if the key does not exist.
    */
   virtual const std::string& get(const std::string& key) const PURE;
+
+  /**
+   * Returns whether the key has any value set.
+   * @param key supplies the key to check.
+   * @return bool if the key exists.
+   */
+  virtual bool exists(const std::string& key) const PURE;
 
   /**
    * Fetch an integer runtime key. Runtime keys larger than ~2^53 may not be accurately converted

@@ -8,7 +8,7 @@ and if it is HTTP, it detects the HTTP protocol (HTTP/1.x or HTTP/2) further. Th
 :ref:`FilterChain <envoy_api_msg_listener.FilterChain>` via the :ref:`application_protocols <envoy_api_field_listener.FilterChainMatch.application_protocols>`
 of a :ref:`FilterChainMatch <envoy_api_msg_listener.FilterChainMatch>`.
 
-* :ref:`v2 API reference <envoy_api_field_listener.ListenerFilter.name>`
+* :ref:`Listener filter v2 API reference <envoy_api_msg_config.filter.listener.http_inspector.v2.HttpInspector>`
 * This filter should be configured with the name *envoy.listener.http_inspector*.
 
 Example

@@ -32,7 +32,8 @@ The following is a YAML example of the above recommendation.
     refresh_interval: 0.25s
     resource_monitors:
     - name: "envoy.resource_monitors.fixed_heap"
-      config:
+      typed_config:
+        "@type": type.googleapis.com/envoy.config.resource_monitor.fixed_heap.v2alpha.FixedHeapConfig
         # TODO: Tune for your system.
         max_heap_size_bytes: 2147483648 # 2 GiB
     actions:

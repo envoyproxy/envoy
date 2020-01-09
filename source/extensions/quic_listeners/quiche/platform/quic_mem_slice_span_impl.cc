@@ -10,7 +10,7 @@
 
 namespace quic {
 
-QuicStringPiece QuicMemSliceSpanImpl::GetData(size_t index) {
+quiche::QuicheStringPiece QuicMemSliceSpanImpl::GetData(size_t index) {
   uint64_t num_slices = buffer_->getRawSlices(nullptr, 0);
   ASSERT(num_slices > index);
   Envoy::STACK_ARRAY(slices, Envoy::Buffer::RawSlice, num_slices);

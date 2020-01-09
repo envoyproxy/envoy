@@ -6,10 +6,10 @@
 #include <vector>
 
 #include "envoy/api/api.h"
-#include "envoy/api/v2/cds.pb.h"
-#include "envoy/api/v2/core/base.pb.h"
-#include "envoy/api/v2/core/health_check.pb.h"
-#include "envoy/api/v2/endpoint/endpoint.pb.h"
+#include "envoy/config/cluster/v3alpha/cluster.pb.h"
+#include "envoy/config/core/v3alpha/base.pb.h"
+#include "envoy/config/core/v3alpha/health_check.pb.h"
+#include "envoy/config/endpoint/v3alpha/endpoint_components.pb.h"
 #include "envoy/http/codec.h"
 #include "envoy/stats/scope.h"
 #include "envoy/upstream/cluster_manager.h"
@@ -171,7 +171,7 @@ TEST_P(StrictDnsParamTest, ImmediateResolve) {
         cb(TestUtility::makeDnsResponse(std::get<2>(GetParam())));
         return nullptr;
       }));
-  envoy::api::v2::Cluster cluster_config = parseClusterFromV2Yaml(yaml);
+  envoy::config::cluster::v3alpha::Cluster cluster_config = parseClusterFromV2Yaml(yaml);
   Envoy::Stats::ScopePtr scope = stats_.createScope(fmt::format(
       "cluster.{}.", cluster_config.alt_stat_name().empty() ? cluster_config.name()
                                                             : cluster_config.alt_stat_name()));
@@ -205,7 +205,7 @@ TEST_F(StrictDnsClusterImplTest, ZeroHostsHealthChecker) {
   )EOF";
 
   ResolverData resolver(*dns_resolver_, dispatcher_);
-  envoy::api::v2::Cluster cluster_config = parseClusterFromV2Yaml(yaml);
+  envoy::config::cluster::v3alpha::Cluster cluster_config = parseClusterFromV2Yaml(yaml);
   Envoy::Stats::ScopePtr scope = stats_.createScope(fmt::format(
       "cluster.{}.", cluster_config.alt_stat_name().empty() ? cluster_config.name()
                                                             : cluster_config.alt_stat_name()));
@@ -266,7 +266,7 @@ TEST_F(StrictDnsClusterImplTest, Basic) {
     - { socket_address: { address: localhost2, port_value: 11002 }}
   )EOF";
 
-  envoy::api::v2::Cluster cluster_config = parseClusterFromV2Yaml(yaml);
+  envoy::config::cluster::v3alpha::Cluster cluster_config = parseClusterFromV2Yaml(yaml);
   Envoy::Stats::ScopePtr scope = stats_.createScope(fmt::format(
       "cluster.{}.", cluster_config.alt_stat_name().empty() ? cluster_config.name()
                                                             : cluster_config.alt_stat_name()));
@@ -404,7 +404,7 @@ TEST_F(StrictDnsClusterImplTest, HostRemovalActiveHealthSkipped) {
   )EOF";
 
   ResolverData resolver(*dns_resolver_, dispatcher_);
-  envoy::api::v2::Cluster cluster_config = parseClusterFromV2Yaml(yaml);
+  envoy::config::cluster::v3alpha::Cluster cluster_config = parseClusterFromV2Yaml(yaml);
   Envoy::Stats::ScopePtr scope = stats_.createScope(fmt::format(
       "cluster.{}.", cluster_config.alt_stat_name().empty() ? cluster_config.name()
                                                             : cluster_config.alt_stat_name()));
@@ -456,7 +456,7 @@ TEST_F(StrictDnsClusterImplTest, HostRemovalAfterHcFail) {
   )EOF";
 
   ResolverData resolver(*dns_resolver_, dispatcher_);
-  envoy::api::v2::Cluster cluster_config = parseClusterFromV2Yaml(yaml);
+  envoy::config::cluster::v3alpha::Cluster cluster_config = parseClusterFromV2Yaml(yaml);
   Envoy::Stats::ScopePtr scope = stats_.createScope(fmt::format(
       "cluster.{}.", cluster_config.alt_stat_name().empty() ? cluster_config.name()
                                                             : cluster_config.alt_stat_name()));
@@ -581,7 +581,7 @@ TEST_F(StrictDnsClusterImplTest, LoadAssignmentBasic) {
               port_value: 8000
   )EOF";
 
-  envoy::api::v2::Cluster cluster_config = parseClusterFromV2Yaml(yaml);
+  envoy::config::cluster::v3alpha::Cluster cluster_config = parseClusterFromV2Yaml(yaml);
   Envoy::Stats::ScopePtr scope = stats_.createScope(fmt::format(
       "cluster.{}.", cluster_config.alt_stat_name().empty() ? cluster_config.name()
                                                             : cluster_config.alt_stat_name()));
@@ -807,7 +807,7 @@ TEST_F(StrictDnsClusterImplTest, LoadAssignmentBasicMultiplePriorities) {
               port_value: 8000
   )EOF";
 
-  envoy::api::v2::Cluster cluster_config = parseClusterFromV2Yaml(yaml);
+  envoy::config::cluster::v3alpha::Cluster cluster_config = parseClusterFromV2Yaml(yaml);
   Envoy::Stats::ScopePtr scope = stats_.createScope(fmt::format(
       "cluster.{}.", cluster_config.alt_stat_name().empty() ? cluster_config.name()
                                                             : cluster_config.alt_stat_name()));
@@ -906,7 +906,7 @@ TEST_F(StrictDnsClusterImplTest, CustomResolverFails) {
     hosts: [{ socket_address: { address: foo.bar.com, port_value: 443, resolver_name: customresolver }}]
   )EOF";
 
-  envoy::api::v2::Cluster cluster_config = parseClusterFromV2Yaml(yaml);
+  envoy::config::cluster::v3alpha::Cluster cluster_config = parseClusterFromV2Yaml(yaml);
   Envoy::Stats::ScopePtr scope =
       stats_.createScope(fmt::format("cluster.{}.", cluster_config.name()));
   Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
@@ -932,7 +932,7 @@ TEST_F(StrictDnsClusterImplTest, RecordTtlAsDnsRefreshRate) {
     hosts: [{ socket_address: { address: localhost1, port_value: 11001 }}]
   )EOF";
 
-  envoy::api::v2::Cluster cluster_config = parseClusterFromV2Yaml(yaml);
+  envoy::config::cluster::v3alpha::Cluster cluster_config = parseClusterFromV2Yaml(yaml);
   Envoy::Stats::ScopePtr scope = stats_.createScope(fmt::format(
       "cluster.{}.", cluster_config.alt_stat_name().empty() ? cluster_config.name()
                                                             : cluster_config.alt_stat_name()));
@@ -967,7 +967,7 @@ TEST_F(StrictDnsClusterImplTest, DefaultTtlAsDnsRefreshRateWhenResponseEmpty) {
     hosts: [{ socket_address: { address: localhost1, port_value: 11001 }}]
   )EOF";
 
-  envoy::api::v2::Cluster cluster_config = parseClusterFromV2Yaml(yaml);
+  envoy::config::cluster::v3alpha::Cluster cluster_config = parseClusterFromV2Yaml(yaml);
   Envoy::Stats::ScopePtr scope = stats_.createScope(fmt::format(
       "cluster.{}.", cluster_config.alt_stat_name().empty() ? cluster_config.name()
                                                             : cluster_config.alt_stat_name()));
@@ -1012,18 +1012,18 @@ TEST(HostImplTest, Weight) {
 
 TEST(HostImplTest, HostnameCanaryAndLocality) {
   MockClusterMockPrioritySet cluster;
-  envoy::api::v2::core::Metadata metadata;
+  envoy::config::core::v3alpha::Metadata metadata;
   Config::Metadata::mutableMetadataValue(metadata, Config::MetadataFilters::get().ENVOY_LB,
                                          Config::MetadataEnvoyLbKeys::get().CANARY)
       .set_bool_value(true);
-  envoy::api::v2::core::Locality locality;
+  envoy::config::core::v3alpha::Locality locality;
   locality.set_region("oceania");
   locality.set_zone("hello");
   locality.set_sub_zone("world");
   HostImpl host(cluster.info_, "lyft.com", Network::Utility::resolveUrl("tcp://10.0.0.1:1234"),
                 metadata, 1, locality,
-                envoy::api::v2::endpoint::Endpoint::HealthCheckConfig::default_instance(), 1,
-                envoy::api::v2::core::HealthStatus::UNKNOWN);
+                envoy::config::endpoint::v3alpha::Endpoint::HealthCheckConfig::default_instance(),
+                1, envoy::config::core::v3alpha::UNKNOWN);
   EXPECT_EQ(cluster.info_.get(), &host.cluster());
   EXPECT_EQ("lyft.com", host.hostname());
   EXPECT_TRUE(host.canary());
@@ -1073,11 +1073,12 @@ TEST(HostImplTest, HealthPipeAddress) {
   EXPECT_THROW_WITH_MESSAGE(
       {
         std::shared_ptr<MockClusterInfo> info{new NiceMock<MockClusterInfo>()};
-        envoy::api::v2::endpoint::Endpoint::HealthCheckConfig config;
+        envoy::config::endpoint::v3alpha::Endpoint::HealthCheckConfig config;
         config.set_port_value(8000);
         HostDescriptionImpl descr(info, "", Network::Utility::resolveUrl("unix://foo"),
-                                  envoy::api::v2::core::Metadata::default_instance(),
-                                  envoy::api::v2::core::Locality().default_instance(), config, 1);
+                                  envoy::config::core::v3alpha::Metadata::default_instance(),
+                                  envoy::config::core::v3alpha::Locality().default_instance(),
+                                  config, 1);
       },
       EnvoyException, "Invalid host configuration: non-zero port for non-IP address");
 }
@@ -1096,7 +1097,7 @@ TEST_F(StaticClusterImplTest, InitialHosts) {
         port_value: 443
   )EOF";
 
-  envoy::api::v2::Cluster cluster_config = parseClusterFromV2Yaml(yaml);
+  envoy::config::cluster::v3alpha::Cluster cluster_config = parseClusterFromV2Yaml(yaml);
   Envoy::Stats::ScopePtr scope = stats_.createScope(fmt::format(
       "cluster.{}.", cluster_config.alt_stat_name().empty() ? cluster_config.name()
                                                             : cluster_config.alt_stat_name()));
@@ -1131,7 +1132,7 @@ TEST_F(StaticClusterImplTest, LoadAssignmentEmptyHostname) {
               port_value: 8000
   )EOF";
 
-  envoy::api::v2::Cluster cluster_config = parseClusterFromV2Yaml(yaml);
+  envoy::config::cluster::v3alpha::Cluster cluster_config = parseClusterFromV2Yaml(yaml);
   Envoy::Stats::ScopePtr scope = stats_.createScope(fmt::format(
       "cluster.{}.", cluster_config.alt_stat_name().empty() ? cluster_config.name()
                                                             : cluster_config.alt_stat_name()));
@@ -1183,7 +1184,7 @@ TEST_F(StaticClusterImplTest, LoadAssignmentMultiplePriorities) {
               port_value: 8000
   )EOF";
 
-  envoy::api::v2::Cluster cluster_config = parseClusterFromV2Yaml(yaml);
+  envoy::config::cluster::v3alpha::Cluster cluster_config = parseClusterFromV2Yaml(yaml);
   Envoy::Stats::ScopePtr scope = stats_.createScope(fmt::format(
       "cluster.{}.", cluster_config.alt_stat_name().empty() ? cluster_config.name()
                                                             : cluster_config.alt_stat_name()));
@@ -1228,7 +1229,7 @@ TEST_F(StaticClusterImplTest, LoadAssignmentLocality) {
               port_value: 8000
   )EOF";
 
-  envoy::api::v2::Cluster cluster_config = parseClusterFromV2Yaml(yaml);
+  envoy::config::cluster::v3alpha::Cluster cluster_config = parseClusterFromV2Yaml(yaml);
   Envoy::Stats::ScopePtr scope = stats_.createScope(fmt::format(
       "cluster.{}.", cluster_config.alt_stat_name().empty() ? cluster_config.name()
                                                             : cluster_config.alt_stat_name()));
@@ -1273,7 +1274,7 @@ TEST_F(StaticClusterImplTest, LoadAssignmentEdsHealth) {
   )EOF";
 
   NiceMock<MockClusterManager> cm;
-  envoy::api::v2::Cluster cluster_config = parseClusterFromV2Yaml(yaml);
+  envoy::config::cluster::v3alpha::Cluster cluster_config = parseClusterFromV2Yaml(yaml);
   Envoy::Stats::ScopePtr scope = stats_.createScope(fmt::format(
       "cluster.{}.", cluster_config.alt_stat_name().empty() ? cluster_config.name()
                                                             : cluster_config.alt_stat_name()));
@@ -1298,7 +1299,7 @@ TEST_F(StaticClusterImplTest, AltStatName) {
     hosts: [{ socket_address: { address: 10.0.0.1, port_value: 443 }}]
   )EOF";
 
-  envoy::api::v2::Cluster cluster_config = parseClusterFromV2Yaml(yaml);
+  envoy::config::cluster::v3alpha::Cluster cluster_config = parseClusterFromV2Yaml(yaml);
   Envoy::Stats::ScopePtr scope = stats_.createScope(fmt::format(
       "cluster.{}.", cluster_config.alt_stat_name().empty() ? cluster_config.name()
                                                             : cluster_config.alt_stat_name()));
@@ -1321,7 +1322,7 @@ TEST_F(StaticClusterImplTest, RingHash) {
     hosts: [{ socket_address: { address: 10.0.0.1, port_value: 11001 }}]
   )EOF";
 
-  envoy::api::v2::Cluster cluster_config = parseClusterFromV2Yaml(yaml);
+  envoy::config::cluster::v3alpha::Cluster cluster_config = parseClusterFromV2Yaml(yaml);
   Envoy::Stats::ScopePtr scope = stats_.createScope(fmt::format(
       "cluster.{}.", cluster_config.alt_stat_name().empty() ? cluster_config.name()
                                                             : cluster_config.alt_stat_name()));
@@ -1347,7 +1348,7 @@ TEST_F(StaticClusterImplTest, OutlierDetector) {
     - { socket_address: { address: 10.0.0.1, port_value: 11002 }}
   )EOF";
 
-  envoy::api::v2::Cluster cluster_config = parseClusterFromV2Yaml(yaml);
+  envoy::config::cluster::v3alpha::Cluster cluster_config = parseClusterFromV2Yaml(yaml);
   Envoy::Stats::ScopePtr scope = stats_.createScope(fmt::format(
       "cluster.{}.", cluster_config.alt_stat_name().empty() ? cluster_config.name()
                                                             : cluster_config.alt_stat_name()));
@@ -1395,7 +1396,7 @@ TEST_F(StaticClusterImplTest, HealthyStat) {
     - { socket_address: { address: 10.0.0.1, port_value: 11002 }}
   )EOF";
 
-  envoy::api::v2::Cluster cluster_config = parseClusterFromV2Yaml(yaml);
+  envoy::config::cluster::v3alpha::Cluster cluster_config = parseClusterFromV2Yaml(yaml);
   Envoy::Stats::ScopePtr scope = stats_.createScope(fmt::format(
       "cluster.{}.", cluster_config.alt_stat_name().empty() ? cluster_config.name()
                                                             : cluster_config.alt_stat_name()));
@@ -1526,7 +1527,7 @@ TEST_F(StaticClusterImplTest, UrlConfig) {
     - { socket_address: { address: 10.0.0.2, port_value: 11002 }}
   )EOF";
 
-  envoy::api::v2::Cluster cluster_config = parseClusterFromV2Yaml(yaml);
+  envoy::config::cluster::v3alpha::Cluster cluster_config = parseClusterFromV2Yaml(yaml);
   Envoy::Stats::ScopePtr scope = stats_.createScope(fmt::format(
       "cluster.{}.", cluster_config.alt_stat_name().empty() ? cluster_config.name()
                                                             : cluster_config.alt_stat_name()));
@@ -1572,7 +1573,7 @@ TEST_F(StaticClusterImplTest, UnsupportedLBType) {
 
   EXPECT_THROW_WITH_MESSAGE(
       {
-        envoy::api::v2::Cluster cluster_config = parseClusterFromV2Yaml(yaml);
+        envoy::config::cluster::v3alpha::Cluster cluster_config = parseClusterFromV2Yaml(yaml);
         Envoy::Stats::ScopePtr scope =
             stats_.createScope(fmt::format("cluster.{}.", cluster_config.alt_stat_name().empty()
                                                               ? cluster_config.name()
@@ -1584,7 +1585,8 @@ TEST_F(StaticClusterImplTest, UnsupportedLBType) {
                                   false);
       },
       EnvoyException,
-      "Protobuf message (type envoy.api.v2.Cluster reason INVALID_ARGUMENT:(lb_policy): invalid "
+      "Protobuf message (type envoy.config.cluster.v3alpha.Cluster reason "
+      "INVALID_ARGUMENT:(lb_policy): invalid "
       "value \"fakelbtype\" for type TYPE_ENUM) has unknown fields");
 }
 
@@ -1597,7 +1599,7 @@ TEST_F(StaticClusterImplTest, MalformedHostIP) {
     hosts: [{ socket_address: { address: foo.bar.com }}]
   )EOF";
 
-  envoy::api::v2::Cluster cluster_config = parseClusterFromV2Yaml(yaml);
+  envoy::config::cluster::v3alpha::Cluster cluster_config = parseClusterFromV2Yaml(yaml);
   Envoy::Stats::ScopePtr scope = stats_.createScope(fmt::format(
       "cluster.{}.", cluster_config.alt_stat_name().empty() ? cluster_config.name()
                                                             : cluster_config.alt_stat_name()));
@@ -1625,7 +1627,7 @@ TEST_F(StaticClusterImplTest, NoHostsTest) {
       - priority: 1
   )EOF";
 
-  envoy::api::v2::Cluster cluster_config = parseClusterFromV2Yaml(yaml);
+  envoy::config::cluster::v3alpha::Cluster cluster_config = parseClusterFromV2Yaml(yaml);
   Envoy::Stats::ScopePtr scope =
       stats_.createScope(fmt::format("cluster.{}.", cluster_config.name()));
   Envoy::Server::Configuration::TransportSocketFactoryContextImpl factory_context(
@@ -1638,7 +1640,7 @@ TEST_F(StaticClusterImplTest, NoHostsTest) {
 }
 
 TEST_F(StaticClusterImplTest, SourceAddressPriority) {
-  envoy::api::v2::Cluster config;
+  envoy::config::cluster::v3alpha::Cluster config;
   config.set_name("staticcluster");
   config.mutable_connect_timeout();
 
@@ -1696,7 +1698,7 @@ TEST_F(ClusterImplTest, CloseConnectionsOnHostHealthFailure) {
     close_connections_on_host_health_failure: true
     hosts: [{ socket_address: { address: foo.bar.com, port_value: 443 }}]
   )EOF";
-  envoy::api::v2::Cluster cluster_config = parseClusterFromV2Yaml(yaml);
+  envoy::config::cluster::v3alpha::Cluster cluster_config = parseClusterFromV2Yaml(yaml);
   Envoy::Stats::ScopePtr scope = stats_.createScope(fmt::format(
       "cluster.{}.", cluster_config.alt_stat_name().empty() ? cluster_config.name()
                                                             : cluster_config.alt_stat_name()));
@@ -1851,7 +1853,7 @@ public:
   Singleton::ManagerImpl singleton_manager_{Thread::threadFactoryForTest()};
   NiceMock<ThreadLocal::MockInstance> tls_;
   ReadyWatcher initialized_;
-  envoy::api::v2::Cluster cluster_config_;
+  envoy::config::cluster::v3alpha::Cluster cluster_config_;
   Envoy::Stats::ScopePtr scope_;
   std::unique_ptr<Server::Configuration::TransportSocketFactoryContextImpl> factory_context_;
   NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor_;
@@ -1867,7 +1869,7 @@ struct Baz : public Envoy::Config::TypedMetadata::Object {
 
 class BazFactory : public ClusterTypedMetadataFactory {
 public:
-  const std::string name() const override { return "baz"; }
+  std::string name() const override { return "baz"; }
   // Returns nullptr (conversion failure) if d is empty.
   std::unique_ptr<const Envoy::Config::TypedMetadata::Object>
   parse(const ProtobufWkt::Struct& d) const override {
@@ -2133,7 +2135,8 @@ public:
                               ProtobufMessage::ValidationVisitor&) override {
     return parent_.createProtocolOptionsConfig(msg);
   }
-  std::string name() override { CONSTRUCT_ON_FIRST_USE(std::string, "envoy.test.filter"); }
+  std::string name() const override { CONSTRUCT_ON_FIRST_USE(std::string, "envoy.test.filter"); }
+  std::string configType() override { return ""; };
 
   TestFilterConfigFactoryBase& parent_;
 };
@@ -2167,7 +2170,8 @@ public:
                               ProtobufMessage::ValidationVisitor&) override {
     return parent_.createProtocolOptionsConfig(msg);
   }
-  std::string name() override { CONSTRUCT_ON_FIRST_USE(std::string, "envoy.test.filter"); }
+  std::string name() const override { CONSTRUCT_ON_FIRST_USE(std::string, "envoy.test.filter"); }
+  std::string configType() override { return ""; };
 
   TestFilterConfigFactoryBase& parent_;
 };

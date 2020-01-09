@@ -1,4 +1,4 @@
-#include "envoy/api/v2/core/base.pb.h"
+#include "envoy/config/core/v3alpha/base.pb.h"
 #include "envoy/network/address.h"
 
 #include "common/network/utility.h"
@@ -37,21 +37,24 @@ TEST_F(OriginalSrcSocketOptionTest, TestSetOptionPreBindSetsAddress) {
   const auto address = Network::Utility::parseInternetAddress("127.0.0.2");
   auto option = makeOptionByAddress(address);
   EXPECT_CALL(socket_, setLocalAddress(PointeesEq(address)));
-  EXPECT_EQ(option->setOption(socket_, envoy::api::v2::core::SocketOption::STATE_PREBIND), true);
+  EXPECT_EQ(option->setOption(socket_, envoy::config::core::v3alpha::SocketOption::STATE_PREBIND),
+            true);
 }
 
 TEST_F(OriginalSrcSocketOptionTest, TestSetOptionPreBindSetsAddressSecond) {
   const auto address = Network::Utility::parseInternetAddress("1.2.3.4");
   auto option = makeOptionByAddress(address);
   EXPECT_CALL(socket_, setLocalAddress(PointeesEq(address)));
-  EXPECT_EQ(option->setOption(socket_, envoy::api::v2::core::SocketOption::STATE_PREBIND), true);
+  EXPECT_EQ(option->setOption(socket_, envoy::config::core::v3alpha::SocketOption::STATE_PREBIND),
+            true);
 }
 
 TEST_F(OriginalSrcSocketOptionTest, TestSetOptionNotPrebindDoesNotSetAddress) {
   const auto address = Network::Utility::parseInternetAddress("1.2.3.4");
   auto option = makeOptionByAddress(address);
   EXPECT_CALL(socket_, setLocalAddress(_)).Times(0);
-  EXPECT_EQ(option->setOption(socket_, envoy::api::v2::core::SocketOption::STATE_LISTENING), true);
+  EXPECT_EQ(option->setOption(socket_, envoy::config::core::v3alpha::SocketOption::STATE_LISTENING),
+            true);
 }
 
 TEST_F(OriginalSrcSocketOptionTest, TestIpv4HashKey) {
@@ -99,7 +102,7 @@ TEST_F(OriginalSrcSocketOptionTest, TestOptionDetailsNotSupported) {
   auto option = makeOptionByAddress(address);
 
   auto details =
-      option->getOptionDetails(socket_, envoy::api::v2::core::SocketOption::STATE_PREBIND);
+      option->getOptionDetails(socket_, envoy::config::core::v3alpha::SocketOption::STATE_PREBIND);
 
   EXPECT_FALSE(details.has_value());
 }
