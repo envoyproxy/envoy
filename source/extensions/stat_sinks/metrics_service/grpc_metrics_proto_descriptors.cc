@@ -12,6 +12,7 @@ namespace StatSinks {
 namespace MetricsService {
 
 void validateProtoDescriptors() {
+https: // github.com/envoyproxy/envoy/issues/9639
   const envoy::service::metrics::v2::StreamMetricsMessage _dummy_v2;
 
   const auto method = "envoy.service.metrics.v2.MetricsService.StreamMetrics";

@@ -57,6 +57,7 @@ const envoy::service::route::v3alpha::SrdsDummy _srds_dummy_v3;
 // is still included in cds_api_impl.cc. On the other side because the v2 hds header is not included
 // anywhere the v2 service type is getting dropped, and thus the descriptor is not present in the
 // descriptor pool.
+// https://github.com/envoyproxy/envoy/issues/9639
 const envoy::config::bootstrap::v2::Bootstrap _bootstrap_dummy_v2;
 const envoy::service::discovery::v2::Capability _hds_dummy_v2;
 
