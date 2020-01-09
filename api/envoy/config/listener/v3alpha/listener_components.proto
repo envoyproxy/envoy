@@ -268,9 +268,7 @@ message ListenerFilterChainMatchPredicate {
     // The match configuration will always match.
     bool any_match = 4 [(validate.rules).bool = {const: true}];
 
-    // If it is not empty, the criteria is satisfied if the destination port of the connection is
-    // contained. Port value is natually at most one. Use set to avoid too many or_match.
-    repeated uint32 destination_ports = 5
-        [(validate.rules).repeated = {items {uint32 {lte: 65535 gte: 0}}}];
+    // Match destination port. Note that the port might be before recovering address or after.
+    uint32 destination_port = 5 [(validate.rules).uint32 = {lte: 65535 gte: 0}];
   }
 }
