@@ -215,14 +215,11 @@ public:
     if (type.empty()) {
       throw EnvoyException("Provided type for static registration lookup was empty.");
     }
-
     Factory* factory = Registry::FactoryRegistry<Factory>::getFactoryByType(type);
-
     if (factory == nullptr) {
       throw EnvoyException(
           fmt::format("Didn't find a registered implementation for type: '{}'", type));
     }
-
     return *factory;
   }
 
@@ -234,15 +231,15 @@ public:
   template <class Factory, class ProtoMessage>
   static Factory& getAndCheckFactory(const ProtoMessage& message) {
     const ProtobufWkt::Any& typed_config = message.typed_config();
-    static const std::string struct_type =
+    static const std::string& struct_type =
         ProtobufWkt::Struct::default_instance().GetDescriptor()->full_name();
-    static const std::string typed_struct_type =
+    static const std::string& typed_struct_type =
         udpa::type::v1::TypedStruct::default_instance().GetDescriptor()->full_name();
 
     if (!typed_config.value().empty()) {
       // Unpack methods will only use the fully qualified type name after the last '/'.
       // https://github.com/protocolbuffers/protobuf/blob/3.6.x/src/google/protobuf/any.proto#L87
-      absl::string_view type = TypeUtil::typeUrlToDescriptorFullName(typed_config.type_url());
+      const absl::string_view type = TypeUtil::typeUrlToDescriptorFullName(typed_config.type_url());
 
       if (type == typed_struct_type) {
         udpa::type::v1::TypedStruct typed_struct;
