@@ -76,6 +76,7 @@ REPOSITORY_LOCATIONS = dict(
     com_github_envoyproxy_sqlparser = dict(
         sha256 = "8ccd2fe9087d96a91eda0929f3a0bdb5d9f877dd9cdc91f9fcf85385fe70cc14",
         strip_prefix = "sql-parser-85904962d8723bbd3ae280dfb13cf4cc563faabc",
+        # 2020-01-08
         urls = ["https://github.com/envoyproxy/sql-parser/archive/85904962d8723bbd3ae280dfb13cf4cc563faabc.tar.gz"],
     ),
     com_github_mirror_tclap = dict(
