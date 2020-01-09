@@ -366,9 +366,10 @@ public:
   /**
    * Modifies a message such that all sensitive data (that is, fields annotated as
    * `udpa.annotations.sensitive`) is redacted for display. String-typed fields annotated as
-   * `sensitive` will be replaced with the string "[redacted]", primitive-typed fields (including
-   * enums) will be cleared, and message-typed fields will be traversed recursively to redact
-   * their contents.
+   * `sensitive` will be replaced with the string "[redacted]", bytes-typed fields will be replaced
+   * with the bytes `5B72656461637465645D` (the ASCII / UTF-8 encoding of the string "[redacted]"),
+   * primitive-typed fields (including enums) will be cleared, and message-typed fields will be
+   * traversed recursively to redact their contents.
    *
    * LIMITATION: This works properly for strongly-typed messages, as well as for messages packed in
    * a `ProtobufWkt::Any` with a `type_url` corresponding to a proto that was compiled into the

@@ -70,7 +70,6 @@ envoy_cc_library(
         "//source/common/config:version_converter_lib",
         "@com_github_cncf_udpa//udpa/annotations:pkg_cc_proto",
         "@com_github_cncf_udpa//udpa/type/v1:pkg_cc_proto",
-        "@envoy_api//envoy/config/core/v3alpha:pkg_cc_proto",
         "@envoy_api//envoy/type/v3alpha:pkg_cc_proto",
     ],
 )

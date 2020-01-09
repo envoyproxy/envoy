@@ -299,9 +299,42 @@ insensitive_repeated_string:
   EXPECT_TRUE(TestUtility::protoEqual(expected, actual));
 }
 
+// Bytes fields annotated as sensitive should be converted to the ASCII / UTF-8 encoding of the
+// string "[redacted]". Bytes fields that are neither annotated as sensitive nor contained in a
+// sensitive message should be left alone.
+TEST_F(ProtobufUtilityTest, RedactBytes) {
+  envoy::test::Sensitive actual, expected;
+  TestUtility::loadFromYaml(R"EOF(
+sensitive_bytes: VGhlc2UgYnl0ZXMgc2hvdWxkIGJlIHJlZGFjdGVkLg==
+sensitive_repeated_bytes:
+  - VGhlc2UgYnl0ZXMgc2hvdWxkIGJlIHJlZGFjdGVkICgxIG9mIDIpLg==
+  - VGhlc2UgYnl0ZXMgc2hvdWxkIGJlIHJlZGFjdGVkICgyIG9mIDIpLg==
+insensitive_bytes: VGhlc2UgYnl0ZXMgc2hvdWxkIG5vdCBiZSByZWRhY3RlZC4=
+insensitive_repeated_bytes:
+  - VGhlc2UgYnl0ZXMgc2hvdWxkIG5vdCBiZSByZWRhY3RlZCAoMSBvZiAyKS4=
+  - VGhlc2UgYnl0ZXMgc2hvdWxkIG5vdCBiZSByZWRhY3RlZCAoMiBvZiAyKS4=
+)EOF",
+                            actual);
+
+  TestUtility::loadFromYaml(R"EOF(
+sensitive_bytes: W3JlZGFjdGVkXQ==
+sensitive_repeated_bytes:
+  - W3JlZGFjdGVkXQ==
+  - W3JlZGFjdGVkXQ==
+insensitive_bytes: VGhlc2UgYnl0ZXMgc2hvdWxkIG5vdCBiZSByZWRhY3RlZC4=
+insensitive_repeated_bytes:
+  - VGhlc2UgYnl0ZXMgc2hvdWxkIG5vdCBiZSByZWRhY3RlZCAoMSBvZiAyKS4=
+  - VGhlc2UgYnl0ZXMgc2hvdWxkIG5vdCBiZSByZWRhY3RlZCAoMiBvZiAyKS4=
+)EOF",
+                            expected);
+
+  MessageUtil::redact(actual);
+  EXPECT_TRUE(TestUtility::protoEqual(expected, actual));
+}
+
 // Ints annotated as sensitive should be cleared. Ints that are neither annotated as sensitive nor
 // contained in a sensitive message should be left alone. Note that the same logic should apply to
-// any primitive type (including `bytes`), although we omit tests for that here.
+// any primitive type other than strings and bytes, although we omit tests for that here.
 TEST_F(ProtobufUtilityTest, RedactInts) {
   envoy::test::Sensitive actual, expected;
   TestUtility::loadFromYaml(R"EOF(
@@ -787,41 +820,6 @@ value:
                             actual);
 
   udpa::type::v1::TypedStruct expected = actual;
-  MessageUtil::redact(actual);
-  EXPECT_TRUE(TestUtility::protoEqual(expected, actual));
-}
-
-// `DataSource` gets special handling for its uses in `TlsCertificate` and `TlsSessionTicketKeys`.
-TEST_F(ProtobufUtilityTest, RedactDataSource) {
-  envoy::test::Sensitive actual, expected;
-  TestUtility::loadFromYaml(R"EOF(
-sensitive_data_source:
-  - {}
-  - filename: This filename should not be redacted despite its parent.
-  - inline_bytes: 8EDAC7ED
-  - inline_string: This inline string should be redacted because of its parent.
-insensitive_data_source:
-  - {}
-  - filename: This filename should not be redacted.
-  - inline_bytes: 1234ABCD
-  - inline_string: This inline string should not be redacted.
-)EOF",
-                            actual);
-
-  TestUtility::loadFromYaml(R"EOF(
-sensitive_data_source:
-  - {}
-  - filename: This filename should not be redacted despite its parent.
-  - inline_string: '[redacted]'
-  - inline_string: '[redacted]'
-insensitive_data_source:
-  - {}
-  - filename: This filename should not be redacted.
-  - inline_bytes: 1234ABCD
-  - inline_string: This inline string should not be redacted.
-)EOF",
-                            expected);
-
   MessageUtil::redact(actual);
   EXPECT_TRUE(TestUtility::protoEqual(expected, actual));
 }

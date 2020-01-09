@@ -3,7 +3,6 @@
 #include <limits>
 #include <numeric>
 
-#include "envoy/config/core/v3alpha/base.pb.h"
 #include "envoy/protobuf/message_validator.h"
 #include "envoy/type/v3alpha/percent.pb.h"
 
@@ -662,41 +661,10 @@ bool redactTypedStruct(Protobuf::Message* message, bool ancestor_is_sensitive) {
   return false;
 }
 
-// `DataSource`, which is annotated as `sensitive` in `TlsCertificate` and `TlsSessionTicketKeys`
-// requires special handling.
-bool redactDataSource(Protobuf::Message* message, bool ancestor_is_sensitive) {
-  auto* data_source = dynamic_cast<envoy::config::core::v3alpha::DataSource*>(message);
-  if (data_source != nullptr) {
-    if (ancestor_is_sensitive) {
-      switch (data_source->specifier_case()) {
-      case envoy::config::core::v3alpha::DataSource::SPECIFIER_NOT_SET:
-        // If the data source is empty, no work is needed.
-        break;
-      case envoy::config::core::v3alpha::DataSource::kFilename:
-        // Don't redact filenames (SecretManagerImplTest::ConfigDumpNotRedactFilenamePrivateKey).
-        break;
-      case envoy::config::core::v3alpha::DataSource::kInlineBytes:
-        // Clear inline bytes and treat it as a string (fall through).
-        data_source->clear_inline_bytes();
-        FALLTHRU;
-      case envoy::config::core::v3alpha::DataSource::kInlineString:
-        // Redact strings the usual way.
-        data_source->set_inline_string("[redacted]");
-        break;
-      }
-    }
-    return true;
-  }
-  return false;
-}
-
-// Recursive helper method for MessageUtil::redact() below. Note that we have to keep track of
-// whether an ancestor was marked as `sensitive`, not just the field, to handle cases similar to
-// `DataSource` in a more general way.
+// Recursive helper method for MessageUtil::redact() below.
 void redact(Protobuf::Message* message, bool ancestor_is_sensitive) {
   if (redactAny(message, ancestor_is_sensitive) ||
-      redactTypedStruct(message, ancestor_is_sensitive) ||
-      redactDataSource(message, ancestor_is_sensitive)) {
+      redactTypedStruct(message, ancestor_is_sensitive)) {
     return;
   }
 
@@ -719,8 +687,9 @@ void redact(Protobuf::Message* message, bool ancestor_is_sensitive) {
         redact(reflection->MutableMessage(message, field_descriptor), sensitive);
       }
     } else if (sensitive) {
-      // Base case: replace strings with "[redacted]" and clear all others.
-      if (field_descriptor->type() == Protobuf::FieldDescriptor::TYPE_STRING) {
+      // Base case: replace strings and bytes with "[redacted]" and clear all others.
+      if (field_descriptor->type() == Protobuf::FieldDescriptor::TYPE_STRING ||
+          field_descriptor->type() == Protobuf::FieldDescriptor::TYPE_BYTES) {
         if (field_descriptor->is_repeated()) {
           const int field_size = reflection->FieldSize(*message, field_descriptor);
           for (int i = 0; i < field_size; ++i) {
