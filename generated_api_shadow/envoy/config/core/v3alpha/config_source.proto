@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package envoy.config.core.v3alpha;
 
-import "envoy/api/v3alpha/core/backoff.proto";
+import "envoy/config/core/v3alpha/backoff.proto";
 import "envoy/config/core/v3alpha/grpc_service.proto";
 
 import "google/protobuf/duration.proto";
@@ -79,7 +79,7 @@ message ApiConfigSource {
 
   // For gRPC APIs, the back off settings for re-establishing connections. If not set, a default
   // jittered exponential back off with an initial interval of 5s and a max of 30s will be used.
-  api.v3alpha.core.BackOffStrategy back_off_strategy = 8;
+  BackOffStrategy back_off_strategy = 8;
 }
 
 // Aggregated Discovery Service (ADS) options. This is currently empty, but when
