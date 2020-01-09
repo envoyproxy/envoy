@@ -255,7 +255,7 @@ public:
       createNetworkFilterFactoryList,
       std::vector<Network::FilterFactoryCb>(
           const Protobuf::RepeatedPtrField<envoy::config::listener::v3alpha::Filter>& filters,
-          Configuration::FactoryContext& context));
+          Configuration::FilterChainFactoryContext& filter_chain_factory_context));
   MOCK_METHOD2(
       createListenerFilterFactoryList,
       std::vector<Network::ListenerFilterFactoryCb>(
@@ -616,6 +616,12 @@ public:
   testing::NiceMock<Envoy::Runtime::MockLoader> runtime_;
   testing::NiceMock<Envoy::Upstream::MockHealthCheckEventLogger>* event_logger_{};
   testing::NiceMock<Envoy::Api::MockApi> api_{};
+};
+
+class MockFilterChainFactoryContext : public MockFactoryContext, public FilterChainFactoryContext {
+public:
+  MockFilterChainFactoryContext();
+  ~MockFilterChainFactoryContext() override;
 };
 
 } // namespace Configuration

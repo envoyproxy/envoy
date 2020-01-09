@@ -42,7 +42,7 @@ public:
   /**
    * @return whether the allocator's mutex is locked, exposed for testing purposes.
    */
-  bool isMutexLocked();
+  bool isMutexLockedForTest();
 
 private:
   template <class BaseClass> friend class StatsSharedImpl;

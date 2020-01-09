@@ -260,3 +260,14 @@ envoy_cc_test(
         "//source/common/common:stl_helpers",
     ],
 )
+
+envoy_cc_test(
+    name = "version_test",
+    srcs = ["version_test.cc"],
+    external_deps = [
+        "abseil_strings",
+    ],
+    deps = [
+        "//source/common/common:version_lib",
+    ],
+)

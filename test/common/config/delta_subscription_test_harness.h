@@ -88,8 +88,8 @@ public:
                          const std::set<std::string>& unsubscribe, const Protobuf::int32 error_code,
                          const std::string& error_message,
                          std::map<std::string, std::string> initial_resource_versions) {
-    envoy::service::discovery::v3alpha::DeltaDiscoveryRequest expected_request;
-    expected_request.mutable_node()->CopyFrom(node_);
+    API_NO_BOOST(envoy::api::v2::DeltaDiscoveryRequest) expected_request;
+    expected_request.mutable_node()->CopyFrom(API_DOWNGRADE(node_));
     std::copy(
         subscribe.begin(), subscribe.end(),
         Protobuf::RepeatedFieldBackInserter(expected_request.mutable_resource_names_subscribe()));
@@ -115,7 +115,7 @@ public:
                 sendMessageRaw_(
                     Grpc::ProtoBufferEqIgnoringField(expected_request, "response_nonce"), false))
         .WillOnce([this](Buffer::InstancePtr& buffer, bool) {
-          envoy::service::discovery::v3alpha::DeltaDiscoveryRequest message;
+          API_NO_BOOST(envoy::api::v2::DeltaDiscoveryRequest) message;
           EXPECT_TRUE(Grpc::Common::parseBufferInstance(std::move(buffer), message));
           const std::string nonce = message.response_nonce();
           if (!nonce.empty()) {
