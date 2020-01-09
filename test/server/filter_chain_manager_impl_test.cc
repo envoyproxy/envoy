@@ -45,11 +45,11 @@ namespace Envoy {
 namespace Server {
 
 class MockFilterChainFactoryBuilder : public FilterChainFactoryBuilder {
-  std::unique_ptr<Network::FilterChain>
+  std::shared_ptr<Network::FilterChain>
   buildFilterChain(const envoy::config::listener::v3alpha::FilterChain&,
                    FilterChainFactoryContextCreator&) const override {
     // Won't dereference but requires not nullptr.
-    return std::make_unique<Network::MockFilterChain>();
+    return std::make_shared<Network::MockFilterChain>();
   }
 };
 

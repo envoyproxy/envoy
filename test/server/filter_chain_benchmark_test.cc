@@ -28,11 +28,11 @@ namespace Server {
 
 namespace {
 class MockFilterChainFactoryBuilder : public FilterChainFactoryBuilder {
-  std::unique_ptr<Network::FilterChain>
+  std::shared_ptr<Network::FilterChain>
   buildFilterChain(const envoy::config::listener::v3alpha::FilterChain&,
                    FilterChainFactoryContextCreator&) const override {
     // A place holder to be found
-    return std::make_unique<Network::MockFilterChain>();
+    return std::make_shared<Network::MockFilterChain>();
   }
 };
 

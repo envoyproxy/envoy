@@ -24,7 +24,12 @@ namespace Server {
 class FilterChainFactoryBuilder {
 public:
   virtual ~FilterChainFactoryBuilder() = default;
-  virtual std::unique_ptr<Network::FilterChain>
+
+  /**
+   * @return Shared filter chain where builder is allowed to determine and reuse duplicated filter
+   * chain. Throw exception if failed.
+   */
+  virtual std::shared_ptr<Network::FilterChain>
   buildFilterChain(const envoy::config::listener::v3alpha::FilterChain& filter_chain,
                    FilterChainFactoryContextCreator& context_creator) const PURE;
 };
@@ -83,6 +88,14 @@ public:
   FilterChainManagerImpl(const Network::Address::InstanceConstSharedPtr& address,
                          Configuration::FactoryContext& factory_context)
       : address_(address), parent_context_(factory_context) {}
+
+  FilterChainManagerImpl(const Network::Address::InstanceConstSharedPtr& address,
+                         Configuration::FactoryContext& factory_context,
+                         FilterChainManagerImpl& parent_manager)
+      : address_(address), parent_context_(factory_context), filter_chain_init_manager_("fcm_init"),
+        filter_chain_watcher_("fcm_watcher", []() { ENVOY_LOG("TODO_trigger_listener_add"); }) {
+    UNREFERENCED_PARAMETER(parent_manager);
+  }
 
   // FilterChainFactoryContextCreator
   Configuration::FilterChainFactoryContext& createFilterChainFactoryContext(
@@ -191,7 +204,9 @@ private:
   DestinationPortsMap destination_ports_map_;
   const Network::Address::InstanceConstSharedPtr address_;
   Configuration::FactoryContext& parent_context_;
-  std::list<std::unique_ptr<Configuration::FilterChainFactoryContext>> factory_contexts_;
+  std::list<std::shared_ptr<Configuration::FilterChainFactoryContext>> factory_contexts_;
+  Init::ManagerImpl filter_chain_init_manager_;
+  Init::WatcherImpl filter_chain_watcher_;
 };
 
 class FilterChainImpl : public Network::FilterChain {
