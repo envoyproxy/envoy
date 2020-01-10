@@ -248,6 +248,7 @@ envoy_cc_library(
     hdrs = ["protobuf_link_hacks.h"],
     deps = [
         "@envoy_api//envoy/api/v2:pkg_cc_proto",
+        "@envoy_api//envoy/config/bootstrap/v2:pkg_cc_proto",
         "@envoy_api//envoy/service/cluster/v3alpha:pkg_cc_proto",
         "@envoy_api//envoy/service/discovery/v2:pkg_cc_proto",
         "@envoy_api//envoy/service/discovery/v3alpha:pkg_cc_proto",
