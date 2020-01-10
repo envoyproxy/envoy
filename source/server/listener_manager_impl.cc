@@ -13,6 +13,7 @@
 #include "envoy/stats/scope.h"
 
 #include "common/common/assert.h"
+#include "common/common/cleanup.h"
 #include "common/common/fmt.h"
 #include "common/config/utility.h"
 #include "common/network/io_socket_handle_impl.h"
@@ -690,17 +691,13 @@ void ListenerManagerImpl::startWorkers(GuardDog& guard_dog) {
   ASSERT(!workers_started_);
   workers_started_ = true;
   uint32_t i = 0;
-  const auto listeners_pending_init =
-      std::make_shared<std::atomic<uint64_t>>(workers_.size() * active_listeners_.size());
+
+  std::shared_ptr<void> workers_started(new Cleanup([this]() { stats_.workers_started_.set(1); }));
   for (const auto& worker : workers_) {
     ENVOY_LOG(info, "starting worker {}", i);
     ASSERT(warming_listeners_.empty());
     for (const auto& listener : active_listeners_) {
-      addListenerToWorker(*worker, *listener, [this, listeners_pending_init]() {
-        if (--(*listeners_pending_init) == 0) {
-          stats_.workers_started_.set(1);
-        }
-      });
+      addListenerToWorker(*worker, *listener, [workers_started]() {});
     }
     worker->start(guard_dog);
     if (enable_dispatcher_stats_) {
