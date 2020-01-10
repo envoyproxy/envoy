@@ -237,9 +237,18 @@ TEST_P(StatNameTest, TestSuccessfulDecode) {
   EXPECT_EQ(table_->toString(stat_name_1), stat_name);
 }
 
-class StatNameDeathTest : public StatNameTest {};
+class StatNameDeathTest : public StatNameTest {
+public:
+  void decodeSymbolVec(const SymbolVec& symbol_vec) {
+    Thread::LockGuard lock(real_symbol_table_->lock_);
+    for (Symbol symbol : symbol_vec) {
+      real_symbol_table_->fromSymbol(symbol);
+    }
+  }
+};
+INSTANTIATE_TEST_SUITE_P(StatNameDeathTest, StatNameDeathTest,
+                         testing::ValuesIn({SymbolTableType::Real}));
 
-#if 0
 TEST_P(StatNameDeathTest, TestBadDecodes) {
   if (GetParam() == SymbolTableType::Fake) {
     return;
@@ -261,7 +270,6 @@ TEST_P(StatNameDeathTest, TestBadDecodes) {
     EXPECT_DEATH(decodeSymbolVec(vec_1), "");
   }
 }
-#endif
 
 TEST_P(StatNameTest, TestDifferentStats) {
   StatName stat_name_1(makeStat("foo.bar"));

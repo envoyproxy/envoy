@@ -88,7 +88,7 @@ public:
      *
      * @param symbol the symbol to encode.
      */
-    void addSymbols(const std::vector<Symbol>& symbols);
+    void addSymbols(const SymbolVec& symbols);
 
     /**
      * Decodes a uint8_t array into a SymbolVec.
@@ -202,6 +202,7 @@ public:
 private:
   friend class StatName;
   friend class StatNameTest;
+  friend class StatNameDeathTest;
 
   struct SharedSymbol {
     SharedSymbol(Symbol symbol) : symbol_(symbol), ref_count_(1) {}

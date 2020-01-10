@@ -51,7 +51,7 @@ IpTaggingFilterConfig::IpTaggingFilterConfig(
     tag_data.emplace_back(ip_tag.ip_tag_name(), cidr_set);
   }
   trie_ = std::make_unique<Network::LcTrie::LcTrie<std::string>>(tag_data);
-  // TODO(jmarantz): save stat-names for each remote address as stat_name_set builtins.
+  // TODO(jmarantz): save stat-names for each tag as stat_name_set builtins.
 }
 
 void IpTaggingFilterConfig::incCounter(Stats::StatName name, absl::string_view tag) {

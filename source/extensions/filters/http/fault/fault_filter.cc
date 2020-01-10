@@ -139,9 +139,7 @@ Http::FilterHeadersStatus FaultFilter::decodeHeaders(Http::HeaderMap& headers, b
   if (headers.EnvoyDownstreamServiceCluster()) {
     downstream_cluster_ =
         std::string(headers.EnvoyDownstreamServiceCluster()->value().getStringView());
-    if (downstream_cluster_.empty()) {
-      downstream_cluster_storage_.reset();
-    } else {
+    if (!downstream_cluster_.empty()) {
       downstream_cluster_storage_ = std::make_unique<Stats::StatNameDynamicStorage>(
           downstream_cluster_, config_->scope().symbolTable());
     }

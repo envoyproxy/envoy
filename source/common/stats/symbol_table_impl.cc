@@ -23,7 +23,7 @@ static constexpr uint32_t Low7Bits = 0x7f;
 
 // When storing Symbol arrays, we disallow Symbol 0, which is the only Symbol
 // that will decode into uint8_t array starting (and ending) with {0}. Thus we
-// can use a leading 0 in in the first byte to indicate that what follows is
+// can use a leading 0 in the first byte to indicate that what follows is
 // literal char data, rather than symbol-table entries. Literal char data is
 // used for dynamically discovered stat-name tokens where you don't want to take
 // a symbol table lock, and would rather pay extra memory overhead to store the
@@ -376,7 +376,7 @@ bool SymbolTableImpl::lessThan(const StatName& a, const StatName& b) const {
 
   for (uint64_t i = 0, n = std::min(av.size(), bv.size()); i < n; ++i) {
     if (av[i] != bv[i]) {
-      bool ret = av[i] < bv[i];
+      const bool ret = av[i] < bv[i];
       return ret;
     }
   }
@@ -428,16 +428,16 @@ SymbolTable::StoragePtr SymbolTableImpl::makeDynamicStorage(absl::string_view na
   // joined with others, we'll know much space it consumes until the next token.
   // So the layout is
   //   [ length-of-whole-StatName, LiteralStringIndicator, length-of-name, name ]
-  // So we need to figure out how many bytes we need to represent length-of-name and
-  // bytes
+  // So we need to figure out how many bytes we need to represent length-of-name
+  // and name.
 
-  // payload_bytes is the total number of bytes needed to represent the characters
-  // in name, plus their encoded size, plus the literal indicator.
-  uint64_t payload_bytes = SymbolTableImpl::Encoding::totalSizeBytes(name.size()) + 1;
+  // payload_bytes is the total number of bytes needed to represent the
+  // characters in name, plus their encoded size, plus the literal indicator.
+  const uint64_t payload_bytes = SymbolTableImpl::Encoding::totalSizeBytes(name.size()) + 1;
 
   // total_bytes includes the payload_bytes, plus the LiteralStringIndicator, and
   // the length of those.
-  uint64_t total_bytes = SymbolTableImpl::Encoding::totalSizeBytes(payload_bytes);
+  const uint64_t total_bytes = SymbolTableImpl::Encoding::totalSizeBytes(payload_bytes);
   MemBlockBuilder<uint8_t> mem_block(total_bytes);
 
   SymbolTableImpl::Encoding::appendEncoding(payload_bytes, mem_block);

@@ -181,6 +181,9 @@ void DynamoFilter::chargeStatsPerEntity(const std::string& entity, const std::st
   const Stats::StatName entity_type_name =
       stats_->getBuiltin(entity_type, stats_->unknown_entity_type_);
   const Stats::StatName entity_name = dynamic.add(entity);
+
+  // TODO(jmarantz): Consider using a similar mechanism to common/http/codes.cc
+  // to avoid creating dynamic stat-names for common statuses.
   const Stats::StatName total_name = dynamic.add(absl::StrCat("upstream_rq_total_", status));
   const Stats::StatName time_name = dynamic.add(absl::StrCat("upstream_rq_time_", status));
 

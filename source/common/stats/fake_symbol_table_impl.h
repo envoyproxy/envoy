@@ -75,8 +75,8 @@ public:
     MemBlockBuilder<uint8_t> mem_block(total_size_bytes);
     mem_block.appendOne(num_names);
     for (uint32_t i = 0; i < num_names; ++i) {
-      auto& name = names[i];
-      size_t sz = name.size();
+      absl::string_view name = names[i];
+      const size_t sz = name.size();
       SymbolTableImpl::Encoding::appendEncoding(sz, mem_block);
       if (!name.empty()) {
         mem_block.appendData(absl::MakeSpan(reinterpret_cast<const uint8_t*>(name.data()), sz));
