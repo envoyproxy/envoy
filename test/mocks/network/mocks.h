@@ -137,9 +137,16 @@ public:
   MockUdpListenerCallbacks();
   ~MockUdpListenerCallbacks() override;
 
+<<<<<<< HEAD
   MOCK_METHOD(void, onData, (UdpRecvData & data));
   MOCK_METHOD(void, onWriteReady, (const Socket& socket));
   MOCK_METHOD(void, onReceiveError, (Api::IoError::IoErrorCode err));
+=======
+  MOCK_METHOD1(onData, void(UdpRecvData& data));
+  MOCK_METHOD0(onReadReady, void());
+  MOCK_METHOD1(onWriteReady, void(const Socket& socket));
+  MOCK_METHOD1(onReceiveError, void(Api::IoError::IoErrorCode err));
+>>>>>>> master
 };
 
 class MockDrainDecision : public DrainDecision {
@@ -341,7 +348,7 @@ public:
   MockConnectionHandler();
   ~MockConnectionHandler() override;
 
-  MOCK_METHOD(uint64_t, numConnections, ());
+  MOCK_METHOD(uint64_t, numConnections, (), (const));
   MOCK_METHOD(void, incNumConnections, ());
   MOCK_METHOD(void, decNumConnections, ());
   MOCK_METHOD(void, addListener, (ListenerConfig & config));
@@ -350,7 +357,7 @@ public:
   MOCK_METHOD(void, stopListeners, ());
   MOCK_METHOD(void, disableListeners, ());
   MOCK_METHOD(void, enableListeners, ());
-  MOCK_METHOD(const std::string&, statPrefix, ());
+  MOCK_METHOD(const std::string&, statPrefix, (), (const));
 };
 
 class MockIp : public Address::Ip {

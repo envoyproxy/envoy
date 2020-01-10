@@ -70,12 +70,12 @@ public:
   MOCK_METHOD(std::chrono::milliseconds, delayedCloseTimeout, (), (const));
   MOCK_METHOD(Router::RouteConfigProvider*, routeConfigProvider, ());
   MOCK_METHOD(Config::ConfigProvider*, scopedRouteConfigProvider, ());
-  MOCK_METHOD(const std::string&, serverName, ());
+  MOCK_METHOD(const std::string&, serverName, (), (const));
   MOCK_METHOD(HttpConnectionManagerProto::ServerHeaderTransformation, serverHeaderTransformation,
-              ());
+              (), (const));
   MOCK_METHOD(ConnectionManagerStats&, stats, ());
   MOCK_METHOD(ConnectionManagerTracingStats&, tracingStats, ());
-  MOCK_METHOD(bool, useRemoteAddress, ());
+  MOCK_METHOD(bool, useRemoteAddress, (), (const));
   const Http::InternalAddressConfig& internalAddressConfig() const override {
     return *internal_address_config_;
   }

@@ -723,6 +723,16 @@ TEST_F(RouterRetryStateImplTest, PolicyLimitedByRequestHeaders) {
   }
 }
 
+TEST_F(RouterRetryStateImplTest, RouteConfigNoRetriesAllowed) {
+  policy_.num_retries_ = 0;
+  policy_.retry_on_ = RetryPolicy::RETRY_ON_CONNECT_FAILURE;
+  setup();
+
+  EXPECT_TRUE(state_->enabled());
+  EXPECT_EQ(RetryStatus::NoRetryLimitExceeded,
+            state_->shouldRetryReset(connect_failure_, callback_));
+}
+
 TEST_F(RouterRetryStateImplTest, RouteConfigNoHeaderConfig) {
   policy_.num_retries_ = 1;
   policy_.retry_on_ = RetryPolicy::RETRY_ON_CONNECT_FAILURE;

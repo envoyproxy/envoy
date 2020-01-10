@@ -209,7 +209,7 @@ public:
    * @return the time in milliseconds the connection manager will wait between issuing a "shutdown
    *         notice" to the time it will issue a full GOAWAY and not accept any new streams.
    */
-  virtual std::chrono::milliseconds drainTimeout() PURE;
+  virtual std::chrono::milliseconds drainTimeout() const PURE;
 
   /**
    * @return FilterChainFactory& the HTTP level filter factory to build the connection's filter
@@ -221,7 +221,7 @@ public:
    * @return whether the connection manager will generate a fresh x-request-id if the request does
    *         not have one.
    */
-  virtual bool generateRequestId() PURE;
+  virtual bool generateRequestId() const PURE;
 
   /**
    * @return whether the x-request-id should not be reset on edge entry inside mesh
@@ -289,12 +289,13 @@ public:
   /**
    * @return const std::string& the server name to write into responses.
    */
-  virtual const std::string& serverName() PURE;
+  virtual const std::string& serverName() const PURE;
 
   /**
    * @return ServerHeaderTransformation the transformation to apply to Server response headers.
    */
-  virtual HttpConnectionManagerProto::ServerHeaderTransformation serverHeaderTransformation() PURE;
+  virtual HttpConnectionManagerProto::ServerHeaderTransformation
+  serverHeaderTransformation() const PURE;
 
   /**
    * @return ConnectionManagerStats& the stats to write to.
@@ -310,7 +311,7 @@ public:
    * @return bool whether to use the remote address for populating XFF, determining internal request
    *         status, etc. or to assume that XFF will already be populated with the remote address.
    */
-  virtual bool useRemoteAddress() PURE;
+  virtual bool useRemoteAddress() const PURE;
 
   /**
    * @return InternalAddressConfig configuration for user defined internal addresses.
@@ -339,7 +340,7 @@ public:
   /**
    * @return ForwardClientCertType the configuration of how to forward the client cert information.
    */
-  virtual ForwardClientCertType forwardClientCert() PURE;
+  virtual ForwardClientCertType forwardClientCert() const PURE;
 
   /**
    * @return vector of ClientCertDetailsType the configuration of the current client cert's details

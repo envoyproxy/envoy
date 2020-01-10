@@ -16,6 +16,7 @@ namespace Http {
 
 struct SharedResponseCodeDetailsValues {
   const absl::string_view InvalidAuthority = "http.invalid_authority";
+  const absl::string_view ConnectUnsupported = "http.connect_not_supported";
 };
 
 using SharedResponseCodeDetails = ConstSingleton<SharedResponseCodeDetailsValues>;
@@ -177,6 +178,11 @@ HeaderUtility::requestHeadersValid(const HeaderMap& headers) {
   if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.strict_authority_validation") &&
       headers.Host() && !HeaderUtility::authorityIsValid(headers.Host()->value().getStringView())) {
     return SharedResponseCodeDetails::get().InvalidAuthority;
+  }
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.strict_method_validation") &&
+      headers.Method() &&
+      Http::Headers::get().MethodValues.Connect == headers.Method()->value().getStringView()) {
+    return SharedResponseCodeDetails::get().ConnectUnsupported;
   }
   return absl::nullopt;
 }

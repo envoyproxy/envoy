@@ -115,11 +115,11 @@ private:
     case envoy::config::core::v3alpha::SocketAddress::PortSpecifierCase::kPortValue:
     // default to port 0 if no port value is specified
     case envoy::config::core::v3alpha::SocketAddress::PortSpecifierCase::PORT_SPECIFIER_NOT_SET:
-      return fmt::format("{}", socket_address.port_value());
+      return absl::StrCat("", socket_address.port_value());
 
     default:
       throw EnvoyException(
-          fmt::format("Unknown port specifier type {}", socket_address.port_specifier_case()));
+          absl::StrCat("Unknown port specifier type ", socket_address.port_specifier_case()));
     }
   }
 
