@@ -6,14 +6,15 @@
 #include <unordered_map>
 #include <unordered_set>
 
-#include "envoy/api/v2/discovery.pb.h"
-#include "envoy/api/v2/route/route.pb.h"
+#include "envoy/config/core/v3alpha/config_source.pb.h"
+#include "envoy/config/route/v3alpha/route_components.pb.h"
 #include "envoy/config/subscription.h"
 #include "envoy/http/codes.h"
 #include "envoy/local_info/local_info.h"
 #include "envoy/router/rds.h"
 #include "envoy/router/route_config_update_receiver.h"
 #include "envoy/server/filter_config.h"
+#include "envoy/service/discovery/v3alpha/discovery.pb.h"
 #include "envoy/singleton/instance.h"
 #include "envoy/stats/scope.h"
 #include "envoy/thread_local/thread_local.h"
@@ -39,7 +40,9 @@ public:
   VhdsSubscription(RouteConfigUpdatePtr& config_update_info,
                    Server::Configuration::ServerFactoryContext& factory_context,
                    const std::string& stat_prefix,
-                   std::unordered_set<RouteConfigProvider*>& route_config_providers);
+                   std::unordered_set<RouteConfigProvider*>& route_config_providers,
+                   const envoy::config::core::v3alpha::ApiVersion resource_api_version =
+                       envoy::config::core::v3alpha::ApiVersion::AUTO);
   ~VhdsSubscription() override { init_target_.ready(); }
 
   void registerInitTargetWithInitManager(Init::Manager& m) { m.add(init_target_); }
@@ -50,13 +53,15 @@ private:
                       const std::string&) override {
     NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
   }
-  void onConfigUpdate(const Protobuf::RepeatedPtrField<envoy::api::v2::Resource>&,
-                      const Protobuf::RepeatedPtrField<std::string>&, const std::string&) override;
+  void
+  onConfigUpdate(const Protobuf::RepeatedPtrField<envoy::service::discovery::v3alpha::Resource>&,
+                 const Protobuf::RepeatedPtrField<std::string>&, const std::string&) override;
   void onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason reason,
                             const EnvoyException* e) override;
   std::string resourceName(const ProtobufWkt::Any& resource) override {
-    return MessageUtil::anyConvert<envoy::api::v2::route::VirtualHost>(resource).name();
+    return MessageUtil::anyConvert<envoy::config::route::v3alpha::VirtualHost>(resource).name();
   }
+  static std::string loadTypeUrl(envoy::config::core::v3alpha::ApiVersion resource_api_version);
 
   RouteConfigUpdatePtr& config_update_info_;
   Stats::ScopePtr scope_;

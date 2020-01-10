@@ -83,7 +83,8 @@ EXTENSIONS = {
     "envoy.filters.network.ext_authz":                  "//source/extensions/filters/network/ext_authz:config",
     "envoy.filters.network.http_connection_manager":    "//source/extensions/filters/network/http_connection_manager:config",
     # WiP
-    "envoy.filters.network.kafka":                      "//source/extensions/filters/network/kafka:kafka_request_codec_lib",
+    "envoy.filters.network.kafka_broker":               "//source/extensions/filters/network/kafka:kafka_broker_config_lib",
+    "envoy.filters.network.local_ratelimit":            "//source/extensions/filters/network/local_ratelimit:config",
     "envoy.filters.network.mongo_proxy":                "//source/extensions/filters/network/mongo_proxy:config",
     "envoy.filters.network.mysql_proxy":                "//source/extensions/filters/network/mysql_proxy:config",
     "envoy.filters.network.ratelimit":                  "//source/extensions/filters/network/ratelimit:config",
@@ -140,6 +141,7 @@ EXTENSIONS = {
     #
 
     "envoy.transport_sockets.alts":                     "//source/extensions/transport_sockets/alts:config",
+    "envoy.transport_sockets.raw_buffer":               "//source/extensions/transport_sockets/raw_buffer:config",
     "envoy.transport_sockets.tap":                      "//source/extensions/transport_sockets/tap:config",
 
     #

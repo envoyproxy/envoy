@@ -2,7 +2,7 @@
 
 #include <memory>
 
-#include "envoy/api/v2/discovery.pb.h"
+#include "envoy/service/discovery/v3alpha/discovery.pb.h"
 
 #include "common/buffer/buffer_impl.h"
 #include "common/common/assert.h"
@@ -22,7 +22,7 @@ HttpSubscriptionImpl::HttpSubscriptionImpl(
     const std::string& remote_cluster_name, Event::Dispatcher& dispatcher,
     Runtime::RandomGenerator& random, std::chrono::milliseconds refresh_interval,
     std::chrono::milliseconds request_timeout, const Protobuf::MethodDescriptor& service_method,
-    SubscriptionCallbacks& callbacks, SubscriptionStats stats,
+    absl::string_view type_url, SubscriptionCallbacks& callbacks, SubscriptionStats stats,
     std::chrono::milliseconds init_fetch_timeout,
     ProtobufMessage::ValidationVisitor& validation_visitor)
     : Http::RestApiFetcher(cm, remote_cluster_name, dispatcher, random, refresh_interval,
@@ -30,6 +30,7 @@ HttpSubscriptionImpl::HttpSubscriptionImpl(
       callbacks_(callbacks), stats_(stats), dispatcher_(dispatcher),
       init_fetch_timeout_(init_fetch_timeout), validation_visitor_(validation_visitor) {
   request_.mutable_node()->CopyFrom(local_info.node());
+  request_.set_type_url(std::string(type_url));
   ASSERT(service_method.options().HasExtension(google::api::http));
   const auto& http_rule = service_method.options().GetExtension(google::api::http);
   path_ = http_rule.post();
@@ -72,7 +73,7 @@ void HttpSubscriptionImpl::createRequest(Http::Message& request) {
 
 void HttpSubscriptionImpl::parseResponse(const Http::Message& response) {
   disableInitFetchTimeoutTimer();
-  envoy::api::v2::DiscoveryResponse message;
+  envoy::service::discovery::v3alpha::DiscoveryResponse message;
   try {
     MessageUtil::loadFromJson(response.bodyAsString(), message, validation_visitor_);
   } catch (const EnvoyException& e) {

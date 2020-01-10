@@ -1,4 +1,4 @@
-#include "envoy/config/bootstrap/v2/bootstrap.pb.h"
+#include "envoy/config/bootstrap/v3alpha/bootstrap.pb.h"
 
 #include "test/integration/integration.h"
 
@@ -56,13 +56,14 @@ public:
     if (upstream_count > 1) {
       setDeterministic();
       setUpstreamCount(upstream_count);
-      config_helper_.addConfigModifier([upstream_count](
-                                           envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
-        for (uint32_t i = 1; i < upstream_count; i++) {
-          auto* new_host = bootstrap.mutable_static_resources()->mutable_clusters(0)->add_hosts();
-          new_host->MergeFrom(bootstrap.static_resources().clusters(0).hosts(0));
-        }
-      });
+      config_helper_.addConfigModifier(
+          [upstream_count](envoy::config::bootstrap::v3alpha::Bootstrap& bootstrap) {
+            for (uint32_t i = 1; i < upstream_count; i++) {
+              auto* new_host =
+                  bootstrap.mutable_static_resources()->mutable_clusters(0)->add_hosts();
+              new_host->MergeFrom(bootstrap.static_resources().clusters(0).hosts(0));
+            }
+          });
     }
     BaseIntegrationTest::initialize();
   }

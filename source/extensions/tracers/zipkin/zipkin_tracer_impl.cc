@@ -1,6 +1,6 @@
 #include "extensions/tracers/zipkin/zipkin_tracer_impl.h"
 
-#include "envoy/config/trace/v2/trace.pb.h"
+#include "envoy/config/trace/v3alpha/trace.pb.h"
 
 #include "common/common/enum_to_int.h"
 #include "common/common/fmt.h"
@@ -50,8 +50,7 @@ void ZipkinSpan::injectContext(Http::HeaderMap& request_headers) {
 
   // Set the sampled header.
   request_headers.setReferenceKey(ZipkinCoreConstants::get().X_B3_SAMPLED,
-                                  span_.sampled() ? ZipkinCoreConstants::get().SAMPLED
-                                                  : ZipkinCoreConstants::get().NOT_SAMPLED);
+                                  span_.sampled() ? SAMPLED : NOT_SAMPLED);
 }
 
 void ZipkinSpan::setSampled(bool sampled) { span_.setSampled(sampled); }
@@ -66,7 +65,7 @@ Tracing::SpanPtr ZipkinSpan::spawnChild(const Tracing::Config& config, const std
 Driver::TlsTracer::TlsTracer(TracerPtr&& tracer, Driver& driver)
     : tracer_(std::move(tracer)), driver_(driver) {}
 
-Driver::Driver(const envoy::config::trace::v2::ZipkinConfig& zipkin_config,
+Driver::Driver(const envoy::config::trace::v3alpha::ZipkinConfig& zipkin_config,
                Upstream::ClusterManager& cluster_manager, Stats::Store& stats,
                ThreadLocal::SlotAllocator& tls, Runtime::Loader& runtime,
                const LocalInfo::LocalInfo& local_info, Runtime::RandomGenerator& random_generator,
@@ -87,7 +86,7 @@ Driver::Driver(const envoy::config::trace::v2::ZipkinConfig& zipkin_config,
   const bool trace_id_128bit = zipkin_config.trace_id_128bit();
 
   const bool shared_span_context = PROTOBUF_GET_WRAPPED_OR_DEFAULT(
-      zipkin_config, shared_span_context, ZipkinCoreConstants::get().DEFAULT_SHARED_SPAN_CONTEXT);
+      zipkin_config, shared_span_context, DEFAULT_SHARED_SPAN_CONTEXT);
   collector.shared_span_context_ = shared_span_context;
 
   tls_->set([this, collector, &random_generator, trace_id_128bit, shared_span_context](
@@ -178,7 +177,7 @@ void ReporterImpl::flushSpans() {
     message->headers().setPath(collector_.endpoint_);
     message->headers().setHost(driver_.cluster()->name());
     message->headers().setReferenceContentType(
-        collector_.version_ == envoy::config::trace::v2::ZipkinConfig::HTTP_PROTO
+        collector_.version_ == envoy::config::trace::v3alpha::ZipkinConfig::HTTP_PROTO
             ? Http::Headers::get().ContentTypeValues.Protobuf
             : Http::Headers::get().ContentTypeValues.Json);
 

@@ -15,7 +15,7 @@ RedisCommandStats::RedisCommandStats(Stats::SymbolTable& symbol_table, const std
       prefix_(stat_name_set_->add(prefix)),
       upstream_rq_time_(stat_name_set_->add("upstream_rq_time")),
       latency_(stat_name_set_->add("latency")), total_(stat_name_set_->add("total")),
-      success_(stat_name_set_->add("success")), error_(stat_name_set_->add("error")),
+      success_(stat_name_set_->add("success")), failure_(stat_name_set_->add("failure")),
       unused_metric_(stat_name_set_->add("unused")), null_metric_(stat_name_set_->add("null")),
       unknown_metric_(stat_name_set_->add("unknown")) {
   // Note: Even if this is disabled, we track the upstream_rq_time.
@@ -87,7 +87,7 @@ void RedisCommandStats::updateStats(Stats::Scope& scope, Stats::StatName command
   if (success) {
     counter(scope, {prefix_, command, success_}).inc();
   } else {
-    counter(scope, {prefix_, command, success_}).inc();
+    counter(scope, {prefix_, command, failure_}).inc();
   }
 }
 

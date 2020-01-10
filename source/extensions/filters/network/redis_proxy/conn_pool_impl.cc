@@ -5,11 +5,11 @@
 #include <string>
 #include <vector>
 
-#include "envoy/api/v2/core/base.pb.h"
-#include "envoy/api/v2/core/health_check.pb.h"
-#include "envoy/api/v2/endpoint/endpoint.pb.h"
-#include "envoy/config/filter/network/redis_proxy/v2/redis_proxy.pb.h"
-#include "envoy/config/filter/network/redis_proxy/v2/redis_proxy.pb.validate.h"
+#include "envoy/config/core/v3alpha/base.pb.h"
+#include "envoy/config/core/v3alpha/health_check.pb.h"
+#include "envoy/config/endpoint/v3alpha/endpoint_components.pb.h"
+#include "envoy/extensions/filters/network/redis_proxy/v3alpha/redis_proxy.pb.h"
+#include "envoy/extensions/filters/network/redis_proxy/v3alpha/redis_proxy.pb.validate.h"
 
 #include "common/common/assert.h"
 #include "common/stats/utility.h"
@@ -38,15 +38,16 @@ const Common::Redis::RespValue& getRequest(const RespVariant& request) {
 InstanceImpl::InstanceImpl(
     const std::string& cluster_name, Upstream::ClusterManager& cm,
     Common::Redis::Client::ClientFactory& client_factory, ThreadLocal::SlotAllocator& tls,
-    const envoy::config::filter::network::redis_proxy::v2::RedisProxy::ConnPoolSettings& config,
+    const envoy::extensions::filters::network::redis_proxy::v3alpha::RedisProxy::ConnPoolSettings&
+        config,
     Api::Api& api, Stats::ScopePtr&& stats_scope,
     const Common::Redis::RedisCommandStatsSharedPtr& redis_command_stats,
-    Extensions::Common::Redis::RedirectionManagerSharedPtr redirection_manager)
+    Extensions::Common::Redis::ClusterRefreshManagerSharedPtr refresh_manager)
     : cluster_name_(cluster_name), cm_(cm), client_factory_(client_factory),
       tls_(tls.allocateSlot()), config_(config), api_(api), stats_scope_(std::move(stats_scope)),
       redis_command_stats_(redis_command_stats), redis_cluster_stats_{REDIS_CLUSTER_STATS(
                                                      POOL_COUNTER(*stats_scope_))},
-      redirection_manager_(std::move(redirection_manager)) {
+      refresh_manager_(std::move(refresh_manager)) {
   tls_->set([this, cluster_name](
                 Event::Dispatcher& dispatcher) -> ThreadLocal::ThreadLocalObjectSharedPtr {
     return std::make_shared<ThreadLocalPool>(*this, dispatcher, cluster_name);
@@ -307,10 +308,11 @@ Common::Redis::Client::PoolRequest* InstanceImpl::ThreadLocalPool::makeRequestTo
       }
     }
     Upstream::HostSharedPtr new_host{new Upstream::HostImpl(
-        cluster_->info(), "", address_ptr, envoy::api::v2::core::Metadata::default_instance(), 1,
-        envoy::api::v2::core::Locality(),
-        envoy::api::v2::endpoint::Endpoint::HealthCheckConfig::default_instance(), 0,
-        envoy::api::v2::core::HealthStatus::UNKNOWN)};
+        cluster_->info(), "", address_ptr,
+        envoy::config::core::v3alpha::Metadata::default_instance(), 1,
+        envoy::config::core::v3alpha::Locality(),
+        envoy::config::endpoint::v3alpha::Endpoint::HealthCheckConfig::default_instance(), 0,
+        envoy::config::core::v3alpha::UNKNOWN)};
     host_address_map_[host_address_map_key] = new_host;
     created_via_redirect_hosts_.push_back(new_host);
     it = host_address_map_.find(host_address_map_key);
@@ -379,6 +381,7 @@ void InstanceImpl::PendingRequest::onResponse(Common::Redis::RespValuePtr&& resp
 void InstanceImpl::PendingRequest::onFailure() {
   request_handler_ = nullptr;
   pool_callbacks_.onFailure();
+  parent_.parent_.onFailure();
   parent_.onRequestCompleted();
 }
 

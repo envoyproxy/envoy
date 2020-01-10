@@ -2,9 +2,9 @@ licenses(["notice"])  # Apache 2
 
 load(
     "//bazel:envoy_build_system.bzl",
-    "envoy_cc_binary",
     "envoy_cc_fuzz_test",
     "envoy_cc_test",
+    "envoy_cc_test_binary",
     "envoy_package",
 )
 
@@ -137,8 +137,8 @@ envoy_cc_test(
         "//source/common/common:matchers_lib",
         "//source/common/config:metadata_lib",
         "//source/common/protobuf:utility_lib",
-        "@envoy_api//envoy/api/v2/core:pkg_cc_proto",
-        "@envoy_api//envoy/type/matcher:pkg_cc_proto",
+        "@envoy_api//envoy/config/core/v3alpha:pkg_cc_proto",
+        "@envoy_api//envoy/type/matcher/v3alpha:pkg_cc_proto",
     ],
 )
 
@@ -171,7 +171,7 @@ envoy_cc_test(
     deps = [
         "//source/common/common:regex_lib",
         "//test/test_common:utility_lib",
-        "@envoy_api//envoy/type/matcher:pkg_cc_proto",
+        "@envoy_api//envoy/type/matcher/v3alpha:pkg_cc_proto",
     ],
 )
 
@@ -221,7 +221,7 @@ envoy_cc_test(
     deps = ["//source/common/common:callback_impl_lib"],
 )
 
-envoy_cc_binary(
+envoy_cc_test_binary(
     name = "utility_speed_test",
     srcs = ["utility_speed_test.cc"],
     external_deps = [
@@ -258,5 +258,16 @@ envoy_cc_test(
     srcs = ["stl_helpers_test.cc"],
     deps = [
         "//source/common/common:stl_helpers",
+    ],
+)
+
+envoy_cc_test(
+    name = "version_test",
+    srcs = ["version_test.cc"],
+    external_deps = [
+        "abseil_strings",
+    ],
+    deps = [
+        "//source/common/common:version_lib",
     ],
 )

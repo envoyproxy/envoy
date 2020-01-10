@@ -5,16 +5,23 @@
 #include "envoy/common/exception.h"
 #include "envoy/common/platform.h"
 
+#include "common/api/os_sys_calls_impl.h"
 #include "common/common/fmt.h"
 #include "common/common/utility.h"
 #include "common/network/address_impl.h"
 #include "common/network/utility.h"
 
+#include "test/mocks/api/mocks.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/network_utility.h"
+#include "test/test_common/threadsafe_singleton_injector.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
+
+using testing::_;
+using testing::NiceMock;
+using testing::Return;
 
 namespace Envoy {
 namespace Network {
@@ -312,6 +319,63 @@ TEST(PipeInstanceTest, Basic) {
   EXPECT_EQ(nullptr, address.ip());
 }
 
+TEST(PipeInstanceTest, BasicPermission) {
+  std::string path = TestEnvironment::unixDomainSocketPath("foo.sock");
+
+  const mode_t mode = 0777;
+  PipeInstance address(path, mode);
+
+  IoHandlePtr io_handle = address.socket(SocketType::Stream);
+  ASSERT_GE(io_handle->fd(), 0) << address.asString();
+
+  Api::SysCallIntResult result = address.bind(io_handle->fd());
+  ASSERT_EQ(result.rc_, 0) << address.asString() << "\nerror: " << strerror(result.errno_)
+                           << "\terrno: " << result.errno_;
+
+  Api::OsSysCalls& os_sys_calls = Api::OsSysCallsSingleton::get();
+  struct stat stat_buf;
+  result = os_sys_calls.stat(path.c_str(), &stat_buf);
+  EXPECT_EQ(result.rc_, 0);
+  // Get file permissions bits
+  ASSERT_EQ(stat_buf.st_mode & 07777, mode)
+      << path << std::oct << "\t" << (stat_buf.st_mode & 07777) << std::dec << "\t"
+      << (stat_buf.st_mode) << strerror(result.errno_);
+}
+
+TEST(PipeInstanceTest, PermissionFail) {
+  NiceMock<Api::MockOsSysCalls> os_sys_calls;
+  TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
+  std::string path = TestEnvironment::unixDomainSocketPath("foo.sock");
+
+  const mode_t mode = 0777;
+  PipeInstance address(path, mode);
+
+  IoHandlePtr io_handle = address.socket(SocketType::Stream);
+  ASSERT_GE(io_handle->fd(), 0) << address.asString();
+  EXPECT_CALL(os_sys_calls, bind(_, _, _)).WillOnce(Return(Api::SysCallIntResult{0, 0}));
+  EXPECT_CALL(os_sys_calls, chmod(_, _)).WillOnce(Return(Api::SysCallIntResult{-1, 0}));
+  EXPECT_THROW_WITH_REGEX(address.bind(io_handle->fd()), EnvoyException,
+                          "Failed to create socket with mode");
+}
+
+TEST(PipeInstanceTest, AbstractNamespacePermission) {
+#if defined(__linux__)
+  std::string path = "@/foo";
+  const mode_t mode = 0777;
+  EXPECT_THROW_WITH_REGEX(PipeInstance address(path, mode), EnvoyException,
+                          "Cannot set mode for Abstract AF_UNIX sockets");
+
+  sockaddr_un sun;
+  sun.sun_family = AF_UNIX;
+  StringUtil::strlcpy(&sun.sun_path[1], path.data(), path.size());
+  sun.sun_path[0] = '\0';
+  socklen_t ss_len = offsetof(struct sockaddr_un, sun_path) + 1 + strlen(sun.sun_path);
+
+  EXPECT_THROW_WITH_REGEX(PipeInstance address(&sun, ss_len, mode), EnvoyException,
+                          "Cannot set mode for Abstract AF_UNIX sockets");
+#endif
+}
+
 TEST(PipeInstanceTest, AbstractNamespace) {
 #if defined(__linux__)
   PipeInstance address("@/foo");
@@ -499,7 +563,6 @@ struct TestCase test_cases[] = {
 INSTANTIATE_TEST_SUITE_P(AddressCrossProduct, MixedAddressTest,
                          ::testing::Combine(::testing::ValuesIn(test_cases),
                                             ::testing::ValuesIn(test_cases)));
-
 } // namespace Address
 } // namespace Network
 } // namespace Envoy

@@ -2,9 +2,9 @@
 #include <memory>
 #include <string>
 
-#include "envoy/api/v2/auth/cert.pb.h"
-#include "envoy/api/v2/lds.pb.h"
-#include "envoy/api/v2/listener/listener.pb.h"
+#include "envoy/config/listener/v3alpha/listener.pb.h"
+#include "envoy/config/listener/v3alpha/listener_components.pb.h"
+#include "envoy/extensions/transport_sockets/tls/v3alpha/cert.pb.h"
 #include "envoy/network/transport_socket.h"
 
 #include "common/buffer/buffer_impl.h"
@@ -270,7 +270,7 @@ void testUtil(const TestUtilOptions& options) {
         .WillRepeatedly(ReturnRef(private_key_method_manager));
   }
 
-  envoy::api::v2::auth::DownstreamTlsContext server_tls_context;
+  envoy::extensions::transport_sockets::tls::v3alpha::DownstreamTlsContext server_tls_context;
   TestUtility::loadFromYaml(TestEnvironment::substitute(options.serverCtxYaml()),
                             server_tls_context);
   auto server_cfg =
@@ -286,7 +286,7 @@ void testUtil(const TestUtilOptions& options) {
   Network::MockConnectionHandler connection_handler;
   Network::ListenerPtr listener = dispatcher->createListener(socket, callbacks, true);
 
-  envoy::api::v2::auth::UpstreamTlsContext client_tls_context;
+  envoy::extensions::transport_sockets::tls::v3alpha::UpstreamTlsContext client_tls_context;
   TestUtility::loadFromYaml(TestEnvironment::substitute(options.clientCtxYaml()),
                             client_tls_context);
 
@@ -426,8 +426,9 @@ void testUtil(const TestUtilOptions& options) {
  */
 class TestUtilOptionsV2 : public TestUtilOptionsBase {
 public:
-  TestUtilOptionsV2(const envoy::api::v2::Listener& listener,
-                    const envoy::api::v2::auth::UpstreamTlsContext& client_ctx_proto,
+  TestUtilOptionsV2(const envoy::config::listener::v3alpha::Listener& listener,
+                    const envoy::extensions::transport_sockets::tls::v3alpha::UpstreamTlsContext&
+                        client_ctx_proto,
                     bool expect_success, Network::Address::IpVersion version)
       : TestUtilOptionsBase(expect_success, version), listener_(listener),
         client_ctx_proto_(client_ctx_proto), transport_socket_options_(nullptr) {
@@ -439,8 +440,9 @@ public:
     }
   }
 
-  const envoy::api::v2::Listener& listener() const { return listener_; }
-  const envoy::api::v2::auth::UpstreamTlsContext& clientCtxProto() const {
+  const envoy::config::listener::v3alpha::Listener& listener() const { return listener_; }
+  const envoy::extensions::transport_sockets::tls::v3alpha::UpstreamTlsContext&
+  clientCtxProto() const {
     return client_ctx_proto_;
   }
   const std::string& expectedClientStats() const { return expected_client_stats_; }
@@ -524,8 +526,8 @@ public:
   }
 
 private:
-  const envoy::api::v2::Listener& listener_;
-  const envoy::api::v2::auth::UpstreamTlsContext& client_ctx_proto_;
+  const envoy::config::listener::v3alpha::Listener& listener_;
+  const envoy::extensions::transport_sockets::tls::v3alpha::UpstreamTlsContext& client_ctx_proto_;
   std::string expected_client_stats_;
 
   std::string client_session_;
@@ -554,8 +556,8 @@ const std::string testUtilV2(const TestUtilOptionsV2& options) {
       server_factory_context;
   ON_CALL(server_factory_context, api()).WillByDefault(ReturnRef(*server_api));
 
-  auto server_cfg =
-      std::make_unique<ServerContextConfigImpl>(filter_chain.tls_context(), server_factory_context);
+  auto server_cfg = std::make_unique<ServerContextConfigImpl>(
+      filter_chain.hidden_envoy_deprecated_tls_context(), server_factory_context);
   ServerSslSocketFactory server_ssl_socket_factory(std::move(server_cfg), manager,
                                                    server_stats_store, server_names);
 
@@ -716,23 +718,26 @@ const std::string testUtilV2(const TestUtilOptionsV2& options) {
 
 // Configure the listener with unittest{cert,key}.pem and ca_cert.pem.
 // Configure the client with expired_san_uri_{cert,key}.pem
-void configureServerAndExpiredClientCertificate(envoy::api::v2::Listener& listener,
-                                                envoy::api::v2::auth::UpstreamTlsContext& client) {
-  envoy::api::v2::listener::FilterChain* filter_chain = listener.add_filter_chains();
-  envoy::api::v2::auth::TlsCertificate* server_cert =
-      filter_chain->mutable_tls_context()->mutable_common_tls_context()->add_tls_certificates();
+void configureServerAndExpiredClientCertificate(
+    envoy::config::listener::v3alpha::Listener& listener,
+    envoy::extensions::transport_sockets::tls::v3alpha::UpstreamTlsContext& client) {
+  envoy::config::listener::v3alpha::FilterChain* filter_chain = listener.add_filter_chains();
+  envoy::extensions::transport_sockets::tls::v3alpha::TlsCertificate* server_cert =
+      filter_chain->mutable_hidden_envoy_deprecated_tls_context()
+          ->mutable_common_tls_context()
+          ->add_tls_certificates();
   server_cert->mutable_certificate_chain()->set_filename(
       TestEnvironment::substitute("{{ test_tmpdir }}/unittestcert.pem"));
   server_cert->mutable_private_key()->set_filename(
       TestEnvironment::substitute("{{ test_tmpdir }}/unittestkey.pem"));
-  envoy::api::v2::auth::CertificateValidationContext* server_validation_ctx =
-      filter_chain->mutable_tls_context()
-          ->mutable_common_tls_context()
-          ->mutable_validation_context();
+  envoy::extensions::transport_sockets::tls::v3alpha::CertificateValidationContext*
+      server_validation_ctx = filter_chain->mutable_hidden_envoy_deprecated_tls_context()
+                                  ->mutable_common_tls_context()
+                                  ->mutable_validation_context();
   server_validation_ctx->mutable_trusted_ca()->set_filename(TestEnvironment::substitute(
       "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"));
 
-  envoy::api::v2::auth::TlsCertificate* client_cert =
+  envoy::extensions::transport_sockets::tls::v3alpha::TlsCertificate* client_cert =
       client.mutable_common_tls_context()->add_tls_certificates();
   client_cert->mutable_certificate_chain()->set_filename(TestEnvironment::substitute(
       "{{ test_rundir "
@@ -787,10 +792,12 @@ TEST_P(SslSocketTest, GetCertDigest) {
 }
 
 TEST_P(SslSocketTest, GetCertDigestInline) {
-  envoy::api::v2::Listener listener;
-  envoy::api::v2::listener::FilterChain* filter_chain = listener.add_filter_chains();
-  envoy::api::v2::auth::TlsCertificate* server_cert =
-      filter_chain->mutable_tls_context()->mutable_common_tls_context()->add_tls_certificates();
+  envoy::config::listener::v3alpha::Listener listener;
+  envoy::config::listener::v3alpha::FilterChain* filter_chain = listener.add_filter_chains();
+  envoy::extensions::transport_sockets::tls::v3alpha::TlsCertificate* server_cert =
+      filter_chain->mutable_hidden_envoy_deprecated_tls_context()
+          ->mutable_common_tls_context()
+          ->add_tls_certificates();
 
   // From test/extensions/transport_sockets/tls/test_data/san_dns_cert.pem.
   server_cert->mutable_certificate_chain()->set_inline_bytes(
@@ -803,7 +810,7 @@ TEST_P(SslSocketTest, GetCertDigestInline) {
           "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_key.pem")));
 
   // From test/extensions/transport_sockets/tls/test_data/ca_certificates.pem.
-  filter_chain->mutable_tls_context()
+  filter_chain->mutable_hidden_envoy_deprecated_tls_context()
       ->mutable_common_tls_context()
       ->mutable_validation_context()
       ->mutable_trusted_ca()
@@ -811,8 +818,8 @@ TEST_P(SslSocketTest, GetCertDigestInline) {
           "{{ test_rundir "
           "}}/test/extensions/transport_sockets/tls/test_data/ca_certificates.pem")));
 
-  envoy::api::v2::auth::UpstreamTlsContext client_ctx;
-  envoy::api::v2::auth::TlsCertificate* client_cert =
+  envoy::extensions::transport_sockets::tls::v3alpha::UpstreamTlsContext client_ctx;
+  envoy::extensions::transport_sockets::tls::v3alpha::TlsCertificate* client_cert =
       client_ctx.mutable_common_tls_context()->add_tls_certificates();
 
   // From test/extensions/transport_sockets/tls/test_data/san_uri_cert.pem.
@@ -1294,8 +1301,8 @@ TEST_P(SslSocketTest, FailedClientAuthSanVerification) {
 
 // By default, expired certificates are not permitted.
 TEST_P(SslSocketTest, FailedClientCertificateDefaultExpirationVerification) {
-  envoy::api::v2::Listener listener;
-  envoy::api::v2::auth::UpstreamTlsContext client;
+  envoy::config::listener::v3alpha::Listener listener;
+  envoy::extensions::transport_sockets::tls::v3alpha::UpstreamTlsContext client;
 
   configureServerAndExpiredClientCertificate(listener, client);
 
@@ -1307,13 +1314,13 @@ TEST_P(SslSocketTest, FailedClientCertificateDefaultExpirationVerification) {
 // Expired certificates will not be accepted when explicitly disallowed via
 // allow_expired_certificate.
 TEST_P(SslSocketTest, FailedClientCertificateExpirationVerification) {
-  envoy::api::v2::Listener listener;
-  envoy::api::v2::auth::UpstreamTlsContext client;
+  envoy::config::listener::v3alpha::Listener listener;
+  envoy::extensions::transport_sockets::tls::v3alpha::UpstreamTlsContext client;
 
   configureServerAndExpiredClientCertificate(listener, client);
 
   listener.mutable_filter_chains(0)
-      ->mutable_tls_context()
+      ->mutable_hidden_envoy_deprecated_tls_context()
       ->mutable_common_tls_context()
       ->mutable_validation_context()
       ->set_allow_expired_certificate(false);
@@ -1325,13 +1332,13 @@ TEST_P(SslSocketTest, FailedClientCertificateExpirationVerification) {
 
 // Expired certificates will be accepted when explicitly allowed via allow_expired_certificate.
 TEST_P(SslSocketTest, ClientCertificateExpirationAllowedVerification) {
-  envoy::api::v2::Listener listener;
-  envoy::api::v2::auth::UpstreamTlsContext client;
+  envoy::config::listener::v3alpha::Listener listener;
+  envoy::extensions::transport_sockets::tls::v3alpha::UpstreamTlsContext client;
 
   configureServerAndExpiredClientCertificate(listener, client);
 
   listener.mutable_filter_chains(0)
-      ->mutable_tls_context()
+      ->mutable_hidden_envoy_deprecated_tls_context()
       ->mutable_common_tls_context()
       ->mutable_validation_context()
       ->set_allow_expired_certificate(true);
@@ -1343,16 +1350,16 @@ TEST_P(SslSocketTest, ClientCertificateExpirationAllowedVerification) {
 
 // Allow expired certificates, but add a certificate hash requirement so it still fails.
 TEST_P(SslSocketTest, FailedClientCertAllowExpiredBadHashVerification) {
-  envoy::api::v2::Listener listener;
-  envoy::api::v2::auth::UpstreamTlsContext client;
+  envoy::config::listener::v3alpha::Listener listener;
+  envoy::extensions::transport_sockets::tls::v3alpha::UpstreamTlsContext client;
 
   configureServerAndExpiredClientCertificate(listener, client);
 
-  envoy::api::v2::auth::CertificateValidationContext* server_validation_ctx =
-      listener.mutable_filter_chains(0)
-          ->mutable_tls_context()
-          ->mutable_common_tls_context()
-          ->mutable_validation_context();
+  envoy::extensions::transport_sockets::tls::v3alpha::CertificateValidationContext*
+      server_validation_ctx = listener.mutable_filter_chains(0)
+                                  ->mutable_hidden_envoy_deprecated_tls_context()
+                                  ->mutable_common_tls_context()
+                                  ->mutable_validation_context();
 
   server_validation_ctx->set_allow_expired_certificate(true);
   server_validation_ctx->add_verify_certificate_hash(
@@ -1366,16 +1373,16 @@ TEST_P(SslSocketTest, FailedClientCertAllowExpiredBadHashVerification) {
 
 // Allow expired certificates, but use the wrong CA so it should fail still.
 TEST_P(SslSocketTest, FailedClientCertAllowServerExpiredWrongCAVerification) {
-  envoy::api::v2::Listener listener;
-  envoy::api::v2::auth::UpstreamTlsContext client;
+  envoy::config::listener::v3alpha::Listener listener;
+  envoy::extensions::transport_sockets::tls::v3alpha::UpstreamTlsContext client;
 
   configureServerAndExpiredClientCertificate(listener, client);
 
-  envoy::api::v2::auth::CertificateValidationContext* server_validation_ctx =
-      listener.mutable_filter_chains(0)
-          ->mutable_tls_context()
-          ->mutable_common_tls_context()
-          ->mutable_validation_context();
+  envoy::extensions::transport_sockets::tls::v3alpha::CertificateValidationContext*
+      server_validation_ctx = listener.mutable_filter_chains(0)
+                                  ->mutable_hidden_envoy_deprecated_tls_context()
+                                  ->mutable_common_tls_context()
+                                  ->mutable_validation_context();
 
   server_validation_ctx->set_allow_expired_certificate(true);
 
@@ -1443,26 +1450,28 @@ TEST_P(SslSocketTest, ClientCertificateHashVerificationNoCA) {
 }
 
 TEST_P(SslSocketTest, ClientCertificateHashListVerification) {
-  envoy::api::v2::Listener listener;
-  envoy::api::v2::listener::FilterChain* filter_chain = listener.add_filter_chains();
-  envoy::api::v2::auth::TlsCertificate* server_cert =
-      filter_chain->mutable_tls_context()->mutable_common_tls_context()->add_tls_certificates();
+  envoy::config::listener::v3alpha::Listener listener;
+  envoy::config::listener::v3alpha::FilterChain* filter_chain = listener.add_filter_chains();
+  envoy::extensions::transport_sockets::tls::v3alpha::TlsCertificate* server_cert =
+      filter_chain->mutable_hidden_envoy_deprecated_tls_context()
+          ->mutable_common_tls_context()
+          ->add_tls_certificates();
   server_cert->mutable_certificate_chain()->set_filename(TestEnvironment::substitute(
       "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_cert.pem"));
   server_cert->mutable_private_key()->set_filename(TestEnvironment::substitute(
       "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_key.pem"));
-  envoy::api::v2::auth::CertificateValidationContext* server_validation_ctx =
-      filter_chain->mutable_tls_context()
-          ->mutable_common_tls_context()
-          ->mutable_validation_context();
+  envoy::extensions::transport_sockets::tls::v3alpha::CertificateValidationContext*
+      server_validation_ctx = filter_chain->mutable_hidden_envoy_deprecated_tls_context()
+                                  ->mutable_common_tls_context()
+                                  ->mutable_validation_context();
   server_validation_ctx->mutable_trusted_ca()->set_filename(TestEnvironment::substitute(
       "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"));
   server_validation_ctx->add_verify_certificate_hash(
       "0000000000000000000000000000000000000000000000000000000000000000");
   server_validation_ctx->add_verify_certificate_hash(TEST_SAN_URI_CERT_HASH);
 
-  envoy::api::v2::auth::UpstreamTlsContext client;
-  envoy::api::v2::auth::TlsCertificate* client_cert =
+  envoy::extensions::transport_sockets::tls::v3alpha::UpstreamTlsContext client;
+  envoy::extensions::transport_sockets::tls::v3alpha::TlsCertificate* client_cert =
       client.mutable_common_tls_context()->add_tls_certificates();
   client_cert->mutable_certificate_chain()->set_filename(TestEnvironment::substitute(
       "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_uri_cert.pem"));
@@ -1479,24 +1488,26 @@ TEST_P(SslSocketTest, ClientCertificateHashListVerification) {
 }
 
 TEST_P(SslSocketTest, ClientCertificateHashListVerificationNoCA) {
-  envoy::api::v2::Listener listener;
-  envoy::api::v2::listener::FilterChain* filter_chain = listener.add_filter_chains();
-  envoy::api::v2::auth::TlsCertificate* server_cert =
-      filter_chain->mutable_tls_context()->mutable_common_tls_context()->add_tls_certificates();
+  envoy::config::listener::v3alpha::Listener listener;
+  envoy::config::listener::v3alpha::FilterChain* filter_chain = listener.add_filter_chains();
+  envoy::extensions::transport_sockets::tls::v3alpha::TlsCertificate* server_cert =
+      filter_chain->mutable_hidden_envoy_deprecated_tls_context()
+          ->mutable_common_tls_context()
+          ->add_tls_certificates();
   server_cert->mutable_certificate_chain()->set_filename(TestEnvironment::substitute(
       "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_cert.pem"));
   server_cert->mutable_private_key()->set_filename(TestEnvironment::substitute(
       "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_key.pem"));
-  envoy::api::v2::auth::CertificateValidationContext* server_validation_ctx =
-      filter_chain->mutable_tls_context()
-          ->mutable_common_tls_context()
-          ->mutable_validation_context();
+  envoy::extensions::transport_sockets::tls::v3alpha::CertificateValidationContext*
+      server_validation_ctx = filter_chain->mutable_hidden_envoy_deprecated_tls_context()
+                                  ->mutable_common_tls_context()
+                                  ->mutable_validation_context();
   server_validation_ctx->add_verify_certificate_hash(
       "0000000000000000000000000000000000000000000000000000000000000000");
   server_validation_ctx->add_verify_certificate_hash(TEST_SAN_URI_CERT_HASH);
 
-  envoy::api::v2::auth::UpstreamTlsContext client;
-  envoy::api::v2::auth::TlsCertificate* client_cert =
+  envoy::extensions::transport_sockets::tls::v3alpha::UpstreamTlsContext client;
+  envoy::extensions::transport_sockets::tls::v3alpha::TlsCertificate* client_cert =
       client.mutable_common_tls_context()->add_tls_certificates();
   client_cert->mutable_certificate_chain()->set_filename(TestEnvironment::substitute(
       "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_uri_cert.pem"));
@@ -1634,10 +1645,12 @@ TEST_P(SslSocketTest, FailedClientCertificateHashVerificationWrongCA) {
 }
 
 TEST_P(SslSocketTest, CertificatesWithPassword) {
-  envoy::api::v2::Listener listener;
-  envoy::api::v2::listener::FilterChain* filter_chain = listener.add_filter_chains();
-  envoy::api::v2::auth::TlsCertificate* server_cert =
-      filter_chain->mutable_tls_context()->mutable_common_tls_context()->add_tls_certificates();
+  envoy::config::listener::v3alpha::Listener listener;
+  envoy::config::listener::v3alpha::FilterChain* filter_chain = listener.add_filter_chains();
+  envoy::extensions::transport_sockets::tls::v3alpha::TlsCertificate* server_cert =
+      filter_chain->mutable_hidden_envoy_deprecated_tls_context()
+          ->mutable_common_tls_context()
+          ->add_tls_certificates();
   server_cert->mutable_certificate_chain()->set_filename(TestEnvironment::substitute(
       "{{ test_rundir "
       "}}/test/extensions/transport_sockets/tls/test_data/password_protected_cert.pem"));
@@ -1647,18 +1660,18 @@ TEST_P(SslSocketTest, CertificatesWithPassword) {
   server_cert->mutable_password()->set_filename(TestEnvironment::substitute(
       "{{ test_rundir "
       "}}/test/extensions/transport_sockets/tls/test_data/password_protected_password.txt"));
-  envoy::api::v2::auth::CertificateValidationContext* server_validation_ctx =
-      filter_chain->mutable_tls_context()
-          ->mutable_common_tls_context()
-          ->mutable_validation_context();
+  envoy::extensions::transport_sockets::tls::v3alpha::CertificateValidationContext*
+      server_validation_ctx = filter_chain->mutable_hidden_envoy_deprecated_tls_context()
+                                  ->mutable_common_tls_context()
+                                  ->mutable_validation_context();
   server_validation_ctx->mutable_trusted_ca()->set_filename(TestEnvironment::substitute(
       "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"));
   server_validation_ctx->add_verify_certificate_hash(
       "0000000000000000000000000000000000000000000000000000000000000000");
   server_validation_ctx->add_verify_certificate_hash(TEST_PASSWORD_PROTECTED_CERT_HASH);
 
-  envoy::api::v2::auth::UpstreamTlsContext client;
-  envoy::api::v2::auth::TlsCertificate* client_cert =
+  envoy::extensions::transport_sockets::tls::v3alpha::UpstreamTlsContext client;
+  envoy::extensions::transport_sockets::tls::v3alpha::TlsCertificate* client_cert =
       client.mutable_common_tls_context()->add_tls_certificates();
   client_cert->mutable_certificate_chain()->set_filename(TestEnvironment::substitute(
       "{{ test_rundir "
@@ -1674,7 +1687,6 @@ TEST_P(SslSocketTest, CertificatesWithPassword) {
   TestUtilOptionsV2 test_options(listener, client, true, GetParam());
   testUtilV2(test_options.setExpectedClientCertUri("spiffe://lyft.com/test-team")
                  .setExpectedServerCertDigest(TEST_PASSWORD_PROTECTED_CERT_HASH));
-  testUtilV2(test_options);
 
   // Works even with client renegotiation.
   client.set_allow_renegotiation(true);
@@ -1682,25 +1694,27 @@ TEST_P(SslSocketTest, CertificatesWithPassword) {
 }
 
 TEST_P(SslSocketTest, ClientCertificateSpkiVerification) {
-  envoy::api::v2::Listener listener;
-  envoy::api::v2::listener::FilterChain* filter_chain = listener.add_filter_chains();
-  envoy::api::v2::auth::TlsCertificate* server_cert =
-      filter_chain->mutable_tls_context()->mutable_common_tls_context()->add_tls_certificates();
+  envoy::config::listener::v3alpha::Listener listener;
+  envoy::config::listener::v3alpha::FilterChain* filter_chain = listener.add_filter_chains();
+  envoy::extensions::transport_sockets::tls::v3alpha::TlsCertificate* server_cert =
+      filter_chain->mutable_hidden_envoy_deprecated_tls_context()
+          ->mutable_common_tls_context()
+          ->add_tls_certificates();
   server_cert->mutable_certificate_chain()->set_filename(TestEnvironment::substitute(
       "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_cert.pem"));
   server_cert->mutable_private_key()->set_filename(TestEnvironment::substitute(
       "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_key.pem"));
-  envoy::api::v2::auth::CertificateValidationContext* server_validation_ctx =
-      filter_chain->mutable_tls_context()
-          ->mutable_common_tls_context()
-          ->mutable_validation_context();
+  envoy::extensions::transport_sockets::tls::v3alpha::CertificateValidationContext*
+      server_validation_ctx = filter_chain->mutable_hidden_envoy_deprecated_tls_context()
+                                  ->mutable_common_tls_context()
+                                  ->mutable_validation_context();
   server_validation_ctx->mutable_trusted_ca()->set_filename(TestEnvironment::substitute(
       "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"));
   server_validation_ctx->add_verify_certificate_spki(TEST_SAN_DNS_CERT_SPKI);
   server_validation_ctx->add_verify_certificate_spki(TEST_SAN_URI_CERT_SPKI);
 
-  envoy::api::v2::auth::UpstreamTlsContext client;
-  envoy::api::v2::auth::TlsCertificate* client_cert =
+  envoy::extensions::transport_sockets::tls::v3alpha::UpstreamTlsContext client;
+  envoy::extensions::transport_sockets::tls::v3alpha::TlsCertificate* client_cert =
       client.mutable_common_tls_context()->add_tls_certificates();
   client_cert->mutable_certificate_chain()->set_filename(TestEnvironment::substitute(
       "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_uri_cert.pem"));
@@ -1717,23 +1731,25 @@ TEST_P(SslSocketTest, ClientCertificateSpkiVerification) {
 }
 
 TEST_P(SslSocketTest, ClientCertificateSpkiVerificationNoCA) {
-  envoy::api::v2::Listener listener;
-  envoy::api::v2::listener::FilterChain* filter_chain = listener.add_filter_chains();
-  envoy::api::v2::auth::TlsCertificate* server_cert =
-      filter_chain->mutable_tls_context()->mutable_common_tls_context()->add_tls_certificates();
+  envoy::config::listener::v3alpha::Listener listener;
+  envoy::config::listener::v3alpha::FilterChain* filter_chain = listener.add_filter_chains();
+  envoy::extensions::transport_sockets::tls::v3alpha::TlsCertificate* server_cert =
+      filter_chain->mutable_hidden_envoy_deprecated_tls_context()
+          ->mutable_common_tls_context()
+          ->add_tls_certificates();
   server_cert->mutable_certificate_chain()->set_filename(TestEnvironment::substitute(
       "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_cert.pem"));
   server_cert->mutable_private_key()->set_filename(TestEnvironment::substitute(
       "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_key.pem"));
-  envoy::api::v2::auth::CertificateValidationContext* server_validation_ctx =
-      filter_chain->mutable_tls_context()
-          ->mutable_common_tls_context()
-          ->mutable_validation_context();
+  envoy::extensions::transport_sockets::tls::v3alpha::CertificateValidationContext*
+      server_validation_ctx = filter_chain->mutable_hidden_envoy_deprecated_tls_context()
+                                  ->mutable_common_tls_context()
+                                  ->mutable_validation_context();
   server_validation_ctx->add_verify_certificate_spki(TEST_SAN_DNS_CERT_SPKI);
   server_validation_ctx->add_verify_certificate_spki(TEST_SAN_URI_CERT_SPKI);
 
-  envoy::api::v2::auth::UpstreamTlsContext client;
-  envoy::api::v2::auth::TlsCertificate* client_cert =
+  envoy::extensions::transport_sockets::tls::v3alpha::UpstreamTlsContext client;
+  envoy::extensions::transport_sockets::tls::v3alpha::TlsCertificate* client_cert =
       client.mutable_common_tls_context()->add_tls_certificates();
   client_cert->mutable_certificate_chain()->set_filename(TestEnvironment::substitute(
       "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_uri_cert.pem"));
@@ -1750,24 +1766,26 @@ TEST_P(SslSocketTest, ClientCertificateSpkiVerificationNoCA) {
 }
 
 TEST_P(SslSocketTest, FailedClientCertificateSpkiVerificationNoClientCertificate) {
-  envoy::api::v2::Listener listener;
-  envoy::api::v2::listener::FilterChain* filter_chain = listener.add_filter_chains();
-  envoy::api::v2::auth::TlsCertificate* server_cert =
-      filter_chain->mutable_tls_context()->mutable_common_tls_context()->add_tls_certificates();
+  envoy::config::listener::v3alpha::Listener listener;
+  envoy::config::listener::v3alpha::FilterChain* filter_chain = listener.add_filter_chains();
+  envoy::extensions::transport_sockets::tls::v3alpha::TlsCertificate* server_cert =
+      filter_chain->mutable_hidden_envoy_deprecated_tls_context()
+          ->mutable_common_tls_context()
+          ->add_tls_certificates();
   server_cert->mutable_certificate_chain()->set_filename(TestEnvironment::substitute(
       "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_cert.pem"));
   server_cert->mutable_private_key()->set_filename(TestEnvironment::substitute(
       "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_key.pem"));
-  envoy::api::v2::auth::CertificateValidationContext* server_validation_ctx =
-      filter_chain->mutable_tls_context()
-          ->mutable_common_tls_context()
-          ->mutable_validation_context();
+  envoy::extensions::transport_sockets::tls::v3alpha::CertificateValidationContext*
+      server_validation_ctx = filter_chain->mutable_hidden_envoy_deprecated_tls_context()
+                                  ->mutable_common_tls_context()
+                                  ->mutable_validation_context();
   server_validation_ctx->mutable_trusted_ca()->set_filename(TestEnvironment::substitute(
       "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"));
   server_validation_ctx->add_verify_certificate_spki(TEST_SAN_DNS_CERT_SPKI);
   server_validation_ctx->add_verify_certificate_spki(TEST_SAN_URI_CERT_SPKI);
 
-  envoy::api::v2::auth::UpstreamTlsContext client;
+  envoy::extensions::transport_sockets::tls::v3alpha::UpstreamTlsContext client;
   TestUtilOptionsV2 test_options(listener, client, false, GetParam());
   testUtilV2(test_options.setExpectedServerStats("ssl.fail_verify_no_cert")
                  .setExpectedTransportFailureReasonContains("SSLV3_ALERT_HANDSHAKE_FAILURE"));
@@ -1778,22 +1796,24 @@ TEST_P(SslSocketTest, FailedClientCertificateSpkiVerificationNoClientCertificate
 }
 
 TEST_P(SslSocketTest, FailedClientCertificateSpkiVerificationNoCANoClientCertificate) {
-  envoy::api::v2::Listener listener;
-  envoy::api::v2::listener::FilterChain* filter_chain = listener.add_filter_chains();
-  envoy::api::v2::auth::TlsCertificate* server_cert =
-      filter_chain->mutable_tls_context()->mutable_common_tls_context()->add_tls_certificates();
+  envoy::config::listener::v3alpha::Listener listener;
+  envoy::config::listener::v3alpha::FilterChain* filter_chain = listener.add_filter_chains();
+  envoy::extensions::transport_sockets::tls::v3alpha::TlsCertificate* server_cert =
+      filter_chain->mutable_hidden_envoy_deprecated_tls_context()
+          ->mutable_common_tls_context()
+          ->add_tls_certificates();
   server_cert->mutable_certificate_chain()->set_filename(TestEnvironment::substitute(
       "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_cert.pem"));
   server_cert->mutable_private_key()->set_filename(TestEnvironment::substitute(
       "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_key.pem"));
-  envoy::api::v2::auth::CertificateValidationContext* server_validation_ctx =
-      filter_chain->mutable_tls_context()
-          ->mutable_common_tls_context()
-          ->mutable_validation_context();
+  envoy::extensions::transport_sockets::tls::v3alpha::CertificateValidationContext*
+      server_validation_ctx = filter_chain->mutable_hidden_envoy_deprecated_tls_context()
+                                  ->mutable_common_tls_context()
+                                  ->mutable_validation_context();
   server_validation_ctx->add_verify_certificate_spki(TEST_SAN_DNS_CERT_SPKI);
   server_validation_ctx->add_verify_certificate_spki(TEST_SAN_URI_CERT_SPKI);
 
-  envoy::api::v2::auth::UpstreamTlsContext client;
+  envoy::extensions::transport_sockets::tls::v3alpha::UpstreamTlsContext client;
 
   TestUtilOptionsV2 test_options(listener, client, false, GetParam());
   testUtilV2(test_options.setExpectedServerStats("ssl.fail_verify_no_cert")
@@ -1805,25 +1825,27 @@ TEST_P(SslSocketTest, FailedClientCertificateSpkiVerificationNoCANoClientCertifi
 }
 
 TEST_P(SslSocketTest, FailedClientCertificateSpkiVerificationWrongClientCertificate) {
-  envoy::api::v2::Listener listener;
-  envoy::api::v2::listener::FilterChain* filter_chain = listener.add_filter_chains();
-  envoy::api::v2::auth::TlsCertificate* server_cert =
-      filter_chain->mutable_tls_context()->mutable_common_tls_context()->add_tls_certificates();
+  envoy::config::listener::v3alpha::Listener listener;
+  envoy::config::listener::v3alpha::FilterChain* filter_chain = listener.add_filter_chains();
+  envoy::extensions::transport_sockets::tls::v3alpha::TlsCertificate* server_cert =
+      filter_chain->mutable_hidden_envoy_deprecated_tls_context()
+          ->mutable_common_tls_context()
+          ->add_tls_certificates();
   server_cert->mutable_certificate_chain()->set_filename(TestEnvironment::substitute(
       "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_cert.pem"));
   server_cert->mutable_private_key()->set_filename(TestEnvironment::substitute(
       "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_key.pem"));
-  envoy::api::v2::auth::CertificateValidationContext* server_validation_ctx =
-      filter_chain->mutable_tls_context()
-          ->mutable_common_tls_context()
-          ->mutable_validation_context();
+  envoy::extensions::transport_sockets::tls::v3alpha::CertificateValidationContext*
+      server_validation_ctx = filter_chain->mutable_hidden_envoy_deprecated_tls_context()
+                                  ->mutable_common_tls_context()
+                                  ->mutable_validation_context();
   server_validation_ctx->mutable_trusted_ca()->set_filename(TestEnvironment::substitute(
       "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"));
   server_validation_ctx->add_verify_certificate_spki(TEST_SAN_DNS_CERT_SPKI);
   server_validation_ctx->add_verify_certificate_spki(TEST_SAN_URI_CERT_SPKI);
 
-  envoy::api::v2::auth::UpstreamTlsContext client;
-  envoy::api::v2::auth::TlsCertificate* client_cert =
+  envoy::extensions::transport_sockets::tls::v3alpha::UpstreamTlsContext client;
+  envoy::extensions::transport_sockets::tls::v3alpha::TlsCertificate* client_cert =
       client.mutable_common_tls_context()->add_tls_certificates();
   client_cert->mutable_certificate_chain()->set_filename(TestEnvironment::substitute(
       "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/no_san_cert.pem"));
@@ -1840,23 +1862,25 @@ TEST_P(SslSocketTest, FailedClientCertificateSpkiVerificationWrongClientCertific
 }
 
 TEST_P(SslSocketTest, FailedClientCertificateSpkiVerificationNoCAWrongClientCertificate) {
-  envoy::api::v2::Listener listener;
-  envoy::api::v2::listener::FilterChain* filter_chain = listener.add_filter_chains();
-  envoy::api::v2::auth::TlsCertificate* server_cert =
-      filter_chain->mutable_tls_context()->mutable_common_tls_context()->add_tls_certificates();
+  envoy::config::listener::v3alpha::Listener listener;
+  envoy::config::listener::v3alpha::FilterChain* filter_chain = listener.add_filter_chains();
+  envoy::extensions::transport_sockets::tls::v3alpha::TlsCertificate* server_cert =
+      filter_chain->mutable_hidden_envoy_deprecated_tls_context()
+          ->mutable_common_tls_context()
+          ->add_tls_certificates();
   server_cert->mutable_certificate_chain()->set_filename(TestEnvironment::substitute(
       "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_cert.pem"));
   server_cert->mutable_private_key()->set_filename(TestEnvironment::substitute(
       "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_key.pem"));
-  envoy::api::v2::auth::CertificateValidationContext* server_validation_ctx =
-      filter_chain->mutable_tls_context()
-          ->mutable_common_tls_context()
-          ->mutable_validation_context();
+  envoy::extensions::transport_sockets::tls::v3alpha::CertificateValidationContext*
+      server_validation_ctx = filter_chain->mutable_hidden_envoy_deprecated_tls_context()
+                                  ->mutable_common_tls_context()
+                                  ->mutable_validation_context();
   server_validation_ctx->add_verify_certificate_spki(TEST_SAN_DNS_CERT_SPKI);
   server_validation_ctx->add_verify_certificate_spki(TEST_SAN_URI_CERT_SPKI);
 
-  envoy::api::v2::auth::UpstreamTlsContext client;
-  envoy::api::v2::auth::TlsCertificate* client_cert =
+  envoy::extensions::transport_sockets::tls::v3alpha::UpstreamTlsContext client;
+  envoy::extensions::transport_sockets::tls::v3alpha::TlsCertificate* client_cert =
       client.mutable_common_tls_context()->add_tls_certificates();
   client_cert->mutable_certificate_chain()->set_filename(TestEnvironment::substitute(
       "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/no_san_cert.pem"));
@@ -1873,25 +1897,27 @@ TEST_P(SslSocketTest, FailedClientCertificateSpkiVerificationNoCAWrongClientCert
 }
 
 TEST_P(SslSocketTest, FailedClientCertificateSpkiVerificationWrongCA) {
-  envoy::api::v2::Listener listener;
-  envoy::api::v2::listener::FilterChain* filter_chain = listener.add_filter_chains();
-  envoy::api::v2::auth::TlsCertificate* server_cert =
-      filter_chain->mutable_tls_context()->mutable_common_tls_context()->add_tls_certificates();
+  envoy::config::listener::v3alpha::Listener listener;
+  envoy::config::listener::v3alpha::FilterChain* filter_chain = listener.add_filter_chains();
+  envoy::extensions::transport_sockets::tls::v3alpha::TlsCertificate* server_cert =
+      filter_chain->mutable_hidden_envoy_deprecated_tls_context()
+          ->mutable_common_tls_context()
+          ->add_tls_certificates();
   server_cert->mutable_certificate_chain()->set_filename(TestEnvironment::substitute(
       "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_cert.pem"));
   server_cert->mutable_private_key()->set_filename(TestEnvironment::substitute(
       "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_key.pem"));
-  envoy::api::v2::auth::CertificateValidationContext* server_validation_ctx =
-      filter_chain->mutable_tls_context()
-          ->mutable_common_tls_context()
-          ->mutable_validation_context();
+  envoy::extensions::transport_sockets::tls::v3alpha::CertificateValidationContext*
+      server_validation_ctx = filter_chain->mutable_hidden_envoy_deprecated_tls_context()
+                                  ->mutable_common_tls_context()
+                                  ->mutable_validation_context();
   server_validation_ctx->mutable_trusted_ca()->set_filename(TestEnvironment::substitute(
       "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/fake_ca_cert.pem"));
   server_validation_ctx->add_verify_certificate_spki(TEST_SAN_DNS_CERT_SPKI);
   server_validation_ctx->add_verify_certificate_spki(TEST_SAN_URI_CERT_SPKI);
 
-  envoy::api::v2::auth::UpstreamTlsContext client;
-  envoy::api::v2::auth::TlsCertificate* client_cert =
+  envoy::extensions::transport_sockets::tls::v3alpha::UpstreamTlsContext client;
+  envoy::extensions::transport_sockets::tls::v3alpha::TlsCertificate* client_cert =
       client.mutable_common_tls_context()->add_tls_certificates();
   client_cert->mutable_certificate_chain()->set_filename(TestEnvironment::substitute(
       "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_uri_cert.pem"));
@@ -1907,18 +1933,20 @@ TEST_P(SslSocketTest, FailedClientCertificateSpkiVerificationWrongCA) {
 }
 
 TEST_P(SslSocketTest, ClientCertificateHashAndSpkiVerification) {
-  envoy::api::v2::Listener listener;
-  envoy::api::v2::listener::FilterChain* filter_chain = listener.add_filter_chains();
-  envoy::api::v2::auth::TlsCertificate* server_cert =
-      filter_chain->mutable_tls_context()->mutable_common_tls_context()->add_tls_certificates();
+  envoy::config::listener::v3alpha::Listener listener;
+  envoy::config::listener::v3alpha::FilterChain* filter_chain = listener.add_filter_chains();
+  envoy::extensions::transport_sockets::tls::v3alpha::TlsCertificate* server_cert =
+      filter_chain->mutable_hidden_envoy_deprecated_tls_context()
+          ->mutable_common_tls_context()
+          ->add_tls_certificates();
   server_cert->mutable_certificate_chain()->set_filename(TestEnvironment::substitute(
       "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_cert.pem"));
   server_cert->mutable_private_key()->set_filename(TestEnvironment::substitute(
       "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_key.pem"));
-  envoy::api::v2::auth::CertificateValidationContext* server_validation_ctx =
-      filter_chain->mutable_tls_context()
-          ->mutable_common_tls_context()
-          ->mutable_validation_context();
+  envoy::extensions::transport_sockets::tls::v3alpha::CertificateValidationContext*
+      server_validation_ctx = filter_chain->mutable_hidden_envoy_deprecated_tls_context()
+                                  ->mutable_common_tls_context()
+                                  ->mutable_validation_context();
   server_validation_ctx->mutable_trusted_ca()->set_filename(TestEnvironment::substitute(
       "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"));
   server_validation_ctx->add_verify_certificate_hash(
@@ -1926,8 +1954,8 @@ TEST_P(SslSocketTest, ClientCertificateHashAndSpkiVerification) {
   server_validation_ctx->add_verify_certificate_spki(TEST_SAN_DNS_CERT_SPKI);
   server_validation_ctx->add_verify_certificate_spki(TEST_SAN_URI_CERT_SPKI);
 
-  envoy::api::v2::auth::UpstreamTlsContext client;
-  envoy::api::v2::auth::TlsCertificate* client_cert =
+  envoy::extensions::transport_sockets::tls::v3alpha::UpstreamTlsContext client;
+  envoy::extensions::transport_sockets::tls::v3alpha::TlsCertificate* client_cert =
       client.mutable_common_tls_context()->add_tls_certificates();
   client_cert->mutable_certificate_chain()->set_filename(TestEnvironment::substitute(
       "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_uri_cert.pem"));
@@ -1944,25 +1972,27 @@ TEST_P(SslSocketTest, ClientCertificateHashAndSpkiVerification) {
 }
 
 TEST_P(SslSocketTest, ClientCertificateHashAndSpkiVerificationNoCA) {
-  envoy::api::v2::Listener listener;
-  envoy::api::v2::listener::FilterChain* filter_chain = listener.add_filter_chains();
-  envoy::api::v2::auth::TlsCertificate* server_cert =
-      filter_chain->mutable_tls_context()->mutable_common_tls_context()->add_tls_certificates();
+  envoy::config::listener::v3alpha::Listener listener;
+  envoy::config::listener::v3alpha::FilterChain* filter_chain = listener.add_filter_chains();
+  envoy::extensions::transport_sockets::tls::v3alpha::TlsCertificate* server_cert =
+      filter_chain->mutable_hidden_envoy_deprecated_tls_context()
+          ->mutable_common_tls_context()
+          ->add_tls_certificates();
   server_cert->mutable_certificate_chain()->set_filename(TestEnvironment::substitute(
       "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_cert.pem"));
   server_cert->mutable_private_key()->set_filename(TestEnvironment::substitute(
       "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_key.pem"));
-  envoy::api::v2::auth::CertificateValidationContext* server_validation_ctx =
-      filter_chain->mutable_tls_context()
-          ->mutable_common_tls_context()
-          ->mutable_validation_context();
+  envoy::extensions::transport_sockets::tls::v3alpha::CertificateValidationContext*
+      server_validation_ctx = filter_chain->mutable_hidden_envoy_deprecated_tls_context()
+                                  ->mutable_common_tls_context()
+                                  ->mutable_validation_context();
   server_validation_ctx->add_verify_certificate_hash(
       "0000000000000000000000000000000000000000000000000000000000000000");
   server_validation_ctx->add_verify_certificate_spki(TEST_SAN_DNS_CERT_SPKI);
   server_validation_ctx->add_verify_certificate_spki(TEST_SAN_URI_CERT_SPKI);
 
-  envoy::api::v2::auth::UpstreamTlsContext client;
-  envoy::api::v2::auth::TlsCertificate* client_cert =
+  envoy::extensions::transport_sockets::tls::v3alpha::UpstreamTlsContext client;
+  envoy::extensions::transport_sockets::tls::v3alpha::TlsCertificate* client_cert =
       client.mutable_common_tls_context()->add_tls_certificates();
   client_cert->mutable_certificate_chain()->set_filename(TestEnvironment::substitute(
       "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_uri_cert.pem"));
@@ -1979,25 +2009,27 @@ TEST_P(SslSocketTest, ClientCertificateHashAndSpkiVerificationNoCA) {
 }
 
 TEST_P(SslSocketTest, FailedClientCertificateHashAndSpkiVerificationNoClientCertificate) {
-  envoy::api::v2::Listener listener;
-  envoy::api::v2::listener::FilterChain* filter_chain = listener.add_filter_chains();
-  envoy::api::v2::auth::TlsCertificate* server_cert =
-      filter_chain->mutable_tls_context()->mutable_common_tls_context()->add_tls_certificates();
+  envoy::config::listener::v3alpha::Listener listener;
+  envoy::config::listener::v3alpha::FilterChain* filter_chain = listener.add_filter_chains();
+  envoy::extensions::transport_sockets::tls::v3alpha::TlsCertificate* server_cert =
+      filter_chain->mutable_hidden_envoy_deprecated_tls_context()
+          ->mutable_common_tls_context()
+          ->add_tls_certificates();
   server_cert->mutable_certificate_chain()->set_filename(TestEnvironment::substitute(
       "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_cert.pem"));
   server_cert->mutable_private_key()->set_filename(TestEnvironment::substitute(
       "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_key.pem"));
-  envoy::api::v2::auth::CertificateValidationContext* server_validation_ctx =
-      filter_chain->mutable_tls_context()
-          ->mutable_common_tls_context()
-          ->mutable_validation_context();
+  envoy::extensions::transport_sockets::tls::v3alpha::CertificateValidationContext*
+      server_validation_ctx = filter_chain->mutable_hidden_envoy_deprecated_tls_context()
+                                  ->mutable_common_tls_context()
+                                  ->mutable_validation_context();
   server_validation_ctx->mutable_trusted_ca()->set_filename(TestEnvironment::substitute(
       "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"));
   server_validation_ctx->add_verify_certificate_hash(
       "0000000000000000000000000000000000000000000000000000000000000000");
   server_validation_ctx->add_verify_certificate_spki(TEST_SAN_URI_CERT_SPKI);
 
-  envoy::api::v2::auth::UpstreamTlsContext client;
+  envoy::extensions::transport_sockets::tls::v3alpha::UpstreamTlsContext client;
 
   TestUtilOptionsV2 test_options(listener, client, false, GetParam());
   testUtilV2(test_options.setExpectedServerStats("ssl.fail_verify_no_cert")
@@ -2009,23 +2041,25 @@ TEST_P(SslSocketTest, FailedClientCertificateHashAndSpkiVerificationNoClientCert
 }
 
 TEST_P(SslSocketTest, FailedClientCertificateHashAndSpkiVerificationNoCANoClientCertificate) {
-  envoy::api::v2::Listener listener;
-  envoy::api::v2::listener::FilterChain* filter_chain = listener.add_filter_chains();
-  envoy::api::v2::auth::TlsCertificate* server_cert =
-      filter_chain->mutable_tls_context()->mutable_common_tls_context()->add_tls_certificates();
+  envoy::config::listener::v3alpha::Listener listener;
+  envoy::config::listener::v3alpha::FilterChain* filter_chain = listener.add_filter_chains();
+  envoy::extensions::transport_sockets::tls::v3alpha::TlsCertificate* server_cert =
+      filter_chain->mutable_hidden_envoy_deprecated_tls_context()
+          ->mutable_common_tls_context()
+          ->add_tls_certificates();
   server_cert->mutable_certificate_chain()->set_filename(TestEnvironment::substitute(
       "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_cert.pem"));
   server_cert->mutable_private_key()->set_filename(TestEnvironment::substitute(
       "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_key.pem"));
-  envoy::api::v2::auth::CertificateValidationContext* server_validation_ctx =
-      filter_chain->mutable_tls_context()
-          ->mutable_common_tls_context()
-          ->mutable_validation_context();
+  envoy::extensions::transport_sockets::tls::v3alpha::CertificateValidationContext*
+      server_validation_ctx = filter_chain->mutable_hidden_envoy_deprecated_tls_context()
+                                  ->mutable_common_tls_context()
+                                  ->mutable_validation_context();
   server_validation_ctx->add_verify_certificate_hash(
       "0000000000000000000000000000000000000000000000000000000000000000");
   server_validation_ctx->add_verify_certificate_spki(TEST_SAN_URI_CERT_SPKI);
 
-  envoy::api::v2::auth::UpstreamTlsContext client;
+  envoy::extensions::transport_sockets::tls::v3alpha::UpstreamTlsContext client;
 
   TestUtilOptionsV2 test_options(listener, client, false, GetParam());
   testUtilV2(test_options.setExpectedServerStats("ssl.fail_verify_no_cert")
@@ -2037,26 +2071,28 @@ TEST_P(SslSocketTest, FailedClientCertificateHashAndSpkiVerificationNoCANoClient
 }
 
 TEST_P(SslSocketTest, FailedClientCertificateHashAndSpkiVerificationWrongClientCertificate) {
-  envoy::api::v2::Listener listener;
-  envoy::api::v2::listener::FilterChain* filter_chain = listener.add_filter_chains();
-  envoy::api::v2::auth::TlsCertificate* server_cert =
-      filter_chain->mutable_tls_context()->mutable_common_tls_context()->add_tls_certificates();
+  envoy::config::listener::v3alpha::Listener listener;
+  envoy::config::listener::v3alpha::FilterChain* filter_chain = listener.add_filter_chains();
+  envoy::extensions::transport_sockets::tls::v3alpha::TlsCertificate* server_cert =
+      filter_chain->mutable_hidden_envoy_deprecated_tls_context()
+          ->mutable_common_tls_context()
+          ->add_tls_certificates();
   server_cert->mutable_certificate_chain()->set_filename(TestEnvironment::substitute(
       "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_cert.pem"));
   server_cert->mutable_private_key()->set_filename(TestEnvironment::substitute(
       "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_key.pem"));
-  envoy::api::v2::auth::CertificateValidationContext* server_validation_ctx =
-      filter_chain->mutable_tls_context()
-          ->mutable_common_tls_context()
-          ->mutable_validation_context();
+  envoy::extensions::transport_sockets::tls::v3alpha::CertificateValidationContext*
+      server_validation_ctx = filter_chain->mutable_hidden_envoy_deprecated_tls_context()
+                                  ->mutable_common_tls_context()
+                                  ->mutable_validation_context();
   server_validation_ctx->mutable_trusted_ca()->set_filename(TestEnvironment::substitute(
       "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"));
   server_validation_ctx->add_verify_certificate_hash(
       "0000000000000000000000000000000000000000000000000000000000000000");
   server_validation_ctx->add_verify_certificate_spki(TEST_SAN_URI_CERT_SPKI);
 
-  envoy::api::v2::auth::UpstreamTlsContext client;
-  envoy::api::v2::auth::TlsCertificate* client_cert =
+  envoy::extensions::transport_sockets::tls::v3alpha::UpstreamTlsContext client;
+  envoy::extensions::transport_sockets::tls::v3alpha::TlsCertificate* client_cert =
       client.mutable_common_tls_context()->add_tls_certificates();
   client_cert->mutable_certificate_chain()->set_filename(TestEnvironment::substitute(
       "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/no_san_cert.pem"));
@@ -2073,24 +2109,26 @@ TEST_P(SslSocketTest, FailedClientCertificateHashAndSpkiVerificationWrongClientC
 }
 
 TEST_P(SslSocketTest, FailedClientCertificateHashAndSpkiVerificationNoCAWrongClientCertificate) {
-  envoy::api::v2::Listener listener;
-  envoy::api::v2::listener::FilterChain* filter_chain = listener.add_filter_chains();
-  envoy::api::v2::auth::TlsCertificate* server_cert =
-      filter_chain->mutable_tls_context()->mutable_common_tls_context()->add_tls_certificates();
+  envoy::config::listener::v3alpha::Listener listener;
+  envoy::config::listener::v3alpha::FilterChain* filter_chain = listener.add_filter_chains();
+  envoy::extensions::transport_sockets::tls::v3alpha::TlsCertificate* server_cert =
+      filter_chain->mutable_hidden_envoy_deprecated_tls_context()
+          ->mutable_common_tls_context()
+          ->add_tls_certificates();
   server_cert->mutable_certificate_chain()->set_filename(TestEnvironment::substitute(
       "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_cert.pem"));
   server_cert->mutable_private_key()->set_filename(TestEnvironment::substitute(
       "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_key.pem"));
-  envoy::api::v2::auth::CertificateValidationContext* server_validation_ctx =
-      filter_chain->mutable_tls_context()
-          ->mutable_common_tls_context()
-          ->mutable_validation_context();
+  envoy::extensions::transport_sockets::tls::v3alpha::CertificateValidationContext*
+      server_validation_ctx = filter_chain->mutable_hidden_envoy_deprecated_tls_context()
+                                  ->mutable_common_tls_context()
+                                  ->mutable_validation_context();
   server_validation_ctx->add_verify_certificate_hash(
       "0000000000000000000000000000000000000000000000000000000000000000");
   server_validation_ctx->add_verify_certificate_spki(TEST_SAN_URI_CERT_SPKI);
 
-  envoy::api::v2::auth::UpstreamTlsContext client;
-  envoy::api::v2::auth::TlsCertificate* client_cert =
+  envoy::extensions::transport_sockets::tls::v3alpha::UpstreamTlsContext client;
+  envoy::extensions::transport_sockets::tls::v3alpha::TlsCertificate* client_cert =
       client.mutable_common_tls_context()->add_tls_certificates();
   client_cert->mutable_certificate_chain()->set_filename(TestEnvironment::substitute(
       "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/no_san_cert.pem"));
@@ -2107,26 +2145,28 @@ TEST_P(SslSocketTest, FailedClientCertificateHashAndSpkiVerificationNoCAWrongCli
 }
 
 TEST_P(SslSocketTest, FailedClientCertificateHashAndSpkiVerificationWrongCA) {
-  envoy::api::v2::Listener listener;
-  envoy::api::v2::listener::FilterChain* filter_chain = listener.add_filter_chains();
-  envoy::api::v2::auth::TlsCertificate* server_cert =
-      filter_chain->mutable_tls_context()->mutable_common_tls_context()->add_tls_certificates();
+  envoy::config::listener::v3alpha::Listener listener;
+  envoy::config::listener::v3alpha::FilterChain* filter_chain = listener.add_filter_chains();
+  envoy::extensions::transport_sockets::tls::v3alpha::TlsCertificate* server_cert =
+      filter_chain->mutable_hidden_envoy_deprecated_tls_context()
+          ->mutable_common_tls_context()
+          ->add_tls_certificates();
   server_cert->mutable_certificate_chain()->set_filename(TestEnvironment::substitute(
       "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_cert.pem"));
   server_cert->mutable_private_key()->set_filename(TestEnvironment::substitute(
       "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_key.pem"));
-  envoy::api::v2::auth::CertificateValidationContext* server_validation_ctx =
-      filter_chain->mutable_tls_context()
-          ->mutable_common_tls_context()
-          ->mutable_validation_context();
+  envoy::extensions::transport_sockets::tls::v3alpha::CertificateValidationContext*
+      server_validation_ctx = filter_chain->mutable_hidden_envoy_deprecated_tls_context()
+                                  ->mutable_common_tls_context()
+                                  ->mutable_validation_context();
   server_validation_ctx->mutable_trusted_ca()->set_filename(TestEnvironment::substitute(
       "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/fake_ca_cert.pem"));
   server_validation_ctx->add_verify_certificate_hash(
       "0000000000000000000000000000000000000000000000000000000000000000");
   server_validation_ctx->add_verify_certificate_spki(TEST_SAN_URI_CERT_SPKI);
 
-  envoy::api::v2::auth::UpstreamTlsContext client;
-  envoy::api::v2::auth::TlsCertificate* client_cert =
+  envoy::extensions::transport_sockets::tls::v3alpha::UpstreamTlsContext client;
+  envoy::extensions::transport_sockets::tls::v3alpha::TlsCertificate* client_cert =
       client.mutable_common_tls_context()->add_tls_certificates();
   client_cert->mutable_certificate_chain()->set_filename(TestEnvironment::substitute(
       "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_uri_cert.pem"));
@@ -2156,7 +2196,7 @@ TEST_P(SslSocketTest, FlushCloseDuringHandshake) {
         filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_certificates.pem"
 )EOF";
 
-  envoy::api::v2::auth::DownstreamTlsContext tls_context;
+  envoy::extensions::transport_sockets::tls::v3alpha::DownstreamTlsContext tls_context;
   TestUtility::loadFromYaml(TestEnvironment::substitute(server_ctx_yaml), tls_context);
   auto server_cfg = std::make_unique<ServerContextConfigImpl>(tls_context, factory_context_);
   ContextManagerImpl manager(time_system_);
@@ -2211,7 +2251,7 @@ TEST_P(SslSocketTest, HalfClose) {
         filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_certificates.pem"
 )EOF";
 
-  envoy::api::v2::auth::DownstreamTlsContext server_tls_context;
+  envoy::extensions::transport_sockets::tls::v3alpha::DownstreamTlsContext server_tls_context;
   TestUtility::loadFromYaml(TestEnvironment::substitute(server_ctx_yaml), server_tls_context);
   auto server_cfg = std::make_unique<ServerContextConfigImpl>(server_tls_context, factory_context_);
   ContextManagerImpl manager(time_system_);
@@ -2231,7 +2271,7 @@ TEST_P(SslSocketTest, HalfClose) {
     common_tls_context:
   )EOF";
 
-  envoy::api::v2::auth::UpstreamTlsContext tls_context;
+  envoy::extensions::transport_sockets::tls::v3alpha::UpstreamTlsContext tls_context;
   TestUtility::loadFromYaml(TestEnvironment::substitute(client_ctx_yaml), tls_context);
   auto client_cfg = std::make_unique<ClientContextConfigImpl>(tls_context, factory_context_);
   Stats::IsolatedStoreImpl client_stats_store;
@@ -2292,7 +2332,7 @@ TEST_P(SslSocketTest, ClientAuthMultipleCAs) {
         filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_certificates.pem"
 )EOF";
 
-  envoy::api::v2::auth::DownstreamTlsContext server_tls_context;
+  envoy::extensions::transport_sockets::tls::v3alpha::DownstreamTlsContext server_tls_context;
   TestUtility::loadFromYaml(TestEnvironment::substitute(server_ctx_yaml), server_tls_context);
   auto server_cfg = std::make_unique<ServerContextConfigImpl>(server_tls_context, factory_context_);
   ContextManagerImpl manager(time_system_);
@@ -2315,7 +2355,7 @@ TEST_P(SslSocketTest, ClientAuthMultipleCAs) {
         filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/no_san_key.pem"
 )EOF";
 
-  envoy::api::v2::auth::UpstreamTlsContext tls_context;
+  envoy::extensions::transport_sockets::tls::v3alpha::UpstreamTlsContext tls_context;
   TestUtility::loadFromYaml(TestEnvironment::substitute(client_ctx_yaml), tls_context);
   auto client_cfg = std::make_unique<ClientContextConfigImpl>(tls_context, factory_context_);
   Stats::IsolatedStoreImpl client_stats_store;
@@ -2369,7 +2409,8 @@ void testTicketSessionResumption(const std::string& server_ctx_yaml1,
                                  const std::string& server_ctx_yaml2,
                                  const std::vector<std::string>& server_names2,
                                  const std::string& client_ctx_yaml, bool expect_reuse,
-                                 const Network::Address::IpVersion ip_version) {
+                                 const Network::Address::IpVersion ip_version,
+                                 const uint32_t expected_lifetime_hint = 0) {
   Event::SimulatedTimeSystem time_system;
   ContextManagerImpl manager(*time_system);
 
@@ -2379,12 +2420,12 @@ void testTicketSessionResumption(const std::string& server_ctx_yaml1,
       server_factory_context;
   ON_CALL(server_factory_context, api()).WillByDefault(ReturnRef(*server_api));
 
-  envoy::api::v2::auth::DownstreamTlsContext server_tls_context1;
+  envoy::extensions::transport_sockets::tls::v3alpha::DownstreamTlsContext server_tls_context1;
   TestUtility::loadFromYaml(TestEnvironment::substitute(server_ctx_yaml1), server_tls_context1);
   auto server_cfg1 =
       std::make_unique<ServerContextConfigImpl>(server_tls_context1, server_factory_context);
 
-  envoy::api::v2::auth::DownstreamTlsContext server_tls_context2;
+  envoy::extensions::transport_sockets::tls::v3alpha::DownstreamTlsContext server_tls_context2;
   TestUtility::loadFromYaml(TestEnvironment::substitute(server_ctx_yaml2), server_tls_context2);
   auto server_cfg2 =
       std::make_unique<ServerContextConfigImpl>(server_tls_context2, server_factory_context);
@@ -2403,7 +2444,7 @@ void testTicketSessionResumption(const std::string& server_ctx_yaml1,
   Network::ListenerPtr listener1 = dispatcher->createListener(socket1, callbacks, true);
   Network::ListenerPtr listener2 = dispatcher->createListener(socket2, callbacks, true);
 
-  envoy::api::v2::auth::UpstreamTlsContext client_tls_context;
+  envoy::extensions::transport_sockets::tls::v3alpha::UpstreamTlsContext client_tls_context;
   TestUtility::loadFromYaml(TestEnvironment::substitute(client_ctx_yaml), client_tls_context);
 
   Stats::IsolatedStoreImpl client_stats_store;
@@ -2440,6 +2481,10 @@ void testTicketSessionResumption(const std::string& server_ctx_yaml1,
             dynamic_cast<const SslSocketInfo*>(client_connection->ssl().get());
         ssl_session = SSL_get1_session(ssl_socket->rawSslForTest());
         EXPECT_TRUE(SSL_SESSION_is_resumable(ssl_session));
+        if (expected_lifetime_hint) {
+          auto lifetime_hint = SSL_SESSION_get_ticket_lifetime_hint(ssl_session);
+          EXPECT_TRUE(lifetime_hint <= expected_lifetime_hint);
+        }
         client_connection->close(Network::ConnectionCloseType::NoFlush);
         server_connection->close(Network::ConnectionCloseType::NoFlush);
         dispatcher->exit();
@@ -2526,6 +2571,31 @@ TEST_P(SslSocketTest, TicketSessionResumption) {
 
   testTicketSessionResumption(server_ctx_yaml, {}, server_ctx_yaml, {}, client_ctx_yaml, true,
                               GetParam());
+}
+
+TEST_P(SslSocketTest, TicketSessionResumptionCustomTimeout) {
+  const std::string server_ctx_yaml = R"EOF(
+  common_tls_context:
+    tls_params:
+      tls_minimum_protocol_version: TLSv1_0
+      tls_maximum_protocol_version: TLSv1_2
+    tls_certificates:
+      certificate_chain:
+        filename: "{{ test_tmpdir }}/unittestcert.pem"
+      private_key:
+        filename: "{{ test_tmpdir }}/unittestkey.pem"
+  session_ticket_keys:
+    keys:
+      filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ticket_key_a"
+  session_timeout: 2307s
+)EOF";
+
+  const std::string client_ctx_yaml = R"EOF(
+    common_tls_context:
+  )EOF";
+
+  testTicketSessionResumption(server_ctx_yaml, {}, server_ctx_yaml, {}, client_ctx_yaml, true,
+                              GetParam(), 2307);
 }
 
 TEST_P(SslSocketTest, TicketSessionResumptionWithClientCA) {
@@ -2798,10 +2868,10 @@ TEST_P(SslSocketTest, ClientAuthCrossListenerSessionResumption) {
       filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ticket_key_a"
 )EOF";
 
-  envoy::api::v2::auth::DownstreamTlsContext tls_context1;
+  envoy::extensions::transport_sockets::tls::v3alpha::DownstreamTlsContext tls_context1;
   TestUtility::loadFromYaml(TestEnvironment::substitute(server_ctx_yaml), tls_context1);
   auto server_cfg = std::make_unique<ServerContextConfigImpl>(tls_context1, factory_context_);
-  envoy::api::v2::auth::DownstreamTlsContext tls_context2;
+  envoy::extensions::transport_sockets::tls::v3alpha::DownstreamTlsContext tls_context2;
   TestUtility::loadFromYaml(TestEnvironment::substitute(server2_ctx_yaml), tls_context2);
   auto server2_cfg = std::make_unique<ServerContextConfigImpl>(tls_context2, factory_context_);
   ContextManagerImpl manager(time_system_);
@@ -2828,7 +2898,7 @@ TEST_P(SslSocketTest, ClientAuthCrossListenerSessionResumption) {
         filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/no_san_key.pem"
 )EOF";
 
-  envoy::api::v2::auth::UpstreamTlsContext tls_context;
+  envoy::extensions::transport_sockets::tls::v3alpha::UpstreamTlsContext tls_context;
   TestUtility::loadFromYaml(TestEnvironment::substitute(client_ctx_yaml), tls_context);
 
   auto client_cfg = std::make_unique<ClientContextConfigImpl>(tls_context, factory_context_);
@@ -2919,7 +2989,7 @@ void SslSocketTest::testClientSessionResumption(const std::string& server_ctx_ya
       server_factory_context;
   ON_CALL(server_factory_context, api()).WillByDefault(ReturnRef(*server_api));
 
-  envoy::api::v2::auth::DownstreamTlsContext server_ctx_proto;
+  envoy::extensions::transport_sockets::tls::v3alpha::DownstreamTlsContext server_ctx_proto;
   TestUtility::loadFromYaml(TestEnvironment::substitute(server_ctx_yaml), server_ctx_proto);
   auto server_cfg =
       std::make_unique<ServerContextConfigImpl>(server_ctx_proto, server_factory_context);
@@ -2937,7 +3007,7 @@ void SslSocketTest::testClientSessionResumption(const std::string& server_ctx_ya
   Network::ConnectionPtr server_connection;
   Network::MockConnectionCallbacks server_connection_callbacks;
 
-  envoy::api::v2::auth::UpstreamTlsContext client_ctx_proto;
+  envoy::extensions::transport_sockets::tls::v3alpha::UpstreamTlsContext client_ctx_proto;
   TestUtility::loadFromYaml(TestEnvironment::substitute(client_ctx_yaml), client_ctx_proto);
 
   Stats::IsolatedStoreImpl client_stats_store;
@@ -2982,9 +3052,9 @@ void SslSocketTest::testClientSessionResumption(const std::string& server_ctx_ya
 
   const bool expect_tls13 =
       client_ctx_proto.common_tls_context().tls_params().tls_maximum_protocol_version() ==
-          envoy::api::v2::auth::TlsParameters::TLSv1_3 &&
+          envoy::extensions::transport_sockets::tls::v3alpha::TlsParameters::TLSv1_3 &&
       server_ctx_proto.common_tls_context().tls_params().tls_maximum_protocol_version() ==
-          envoy::api::v2::auth::TlsParameters::TLSv1_3;
+          envoy::extensions::transport_sockets::tls::v3alpha::TlsParameters::TLSv1_3;
 
   // The order of "Connected" events depends on the version of the TLS protocol (1.3 or older).
   if (expect_tls13) {
@@ -3178,7 +3248,7 @@ TEST_P(SslSocketTest, SslError) {
       verify_certificate_hash: "7B:0C:3F:0D:97:0E:FC:16:70:11:7A:0C:35:75:54:6B:17:AB:CF:20:D8:AA:A0:ED:87:08:0F:FB:60:4C:40:77"
 )EOF";
 
-  envoy::api::v2::auth::DownstreamTlsContext tls_context;
+  envoy::extensions::transport_sockets::tls::v3alpha::DownstreamTlsContext tls_context;
   TestUtility::loadFromYaml(TestEnvironment::substitute(server_ctx_yaml), tls_context);
   auto server_cfg = std::make_unique<ServerContextConfigImpl>(tls_context, factory_context_);
   ContextManagerImpl manager(time_system_);
@@ -3219,10 +3289,10 @@ TEST_P(SslSocketTest, SslError) {
   EXPECT_EQ(1UL, server_stats_store.counter("ssl.connection_error").value());
 }
 
-static TestUtilOptionsV2
-createProtocolTestOptions(const envoy::api::v2::Listener& listener,
-                          const envoy::api::v2::auth::UpstreamTlsContext& client_ctx,
-                          Network::Address::IpVersion version, std::string protocol) {
+static TestUtilOptionsV2 createProtocolTestOptions(
+    const envoy::config::listener::v3alpha::Listener& listener,
+    const envoy::extensions::transport_sockets::tls::v3alpha::UpstreamTlsContext& client_ctx,
+    Network::Address::IpVersion version, std::string protocol) {
   std::string stats = "ssl.versions." + protocol;
   TestUtilOptionsV2 options(listener, client_ctx, true, version);
   options.setExpectedServerStats(stats).setExpectedClientStats(stats);
@@ -3230,19 +3300,23 @@ createProtocolTestOptions(const envoy::api::v2::Listener& listener,
 }
 
 TEST_P(SslSocketTest, ProtocolVersions) {
-  envoy::api::v2::Listener listener;
-  envoy::api::v2::listener::FilterChain* filter_chain = listener.add_filter_chains();
-  envoy::api::v2::auth::TlsCertificate* server_cert =
-      filter_chain->mutable_tls_context()->mutable_common_tls_context()->add_tls_certificates();
+  envoy::config::listener::v3alpha::Listener listener;
+  envoy::config::listener::v3alpha::FilterChain* filter_chain = listener.add_filter_chains();
+  envoy::extensions::transport_sockets::tls::v3alpha::TlsCertificate* server_cert =
+      filter_chain->mutable_hidden_envoy_deprecated_tls_context()
+          ->mutable_common_tls_context()
+          ->add_tls_certificates();
   server_cert->mutable_certificate_chain()->set_filename(TestEnvironment::substitute(
       "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_cert.pem"));
   server_cert->mutable_private_key()->set_filename(TestEnvironment::substitute(
       "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_key.pem"));
-  envoy::api::v2::auth::TlsParameters* server_params =
-      filter_chain->mutable_tls_context()->mutable_common_tls_context()->mutable_tls_params();
+  envoy::extensions::transport_sockets::tls::v3alpha::TlsParameters* server_params =
+      filter_chain->mutable_hidden_envoy_deprecated_tls_context()
+          ->mutable_common_tls_context()
+          ->mutable_tls_params();
 
-  envoy::api::v2::auth::UpstreamTlsContext client;
-  envoy::api::v2::auth::TlsParameters* client_params =
+  envoy::extensions::transport_sockets::tls::v3alpha::UpstreamTlsContext client;
+  envoy::extensions::transport_sockets::tls::v3alpha::TlsParameters* client_params =
       client.mutable_common_tls_context()->mutable_tls_params();
 
   // Connection using defaults (client & server) succeeds, negotiating TLSv1.2.
@@ -3257,8 +3331,10 @@ TEST_P(SslSocketTest, ProtocolVersions) {
   client.set_allow_renegotiation(false);
 
   // Connection using TLSv1.0 (client) and defaults (server) succeeds.
-  client_params->set_tls_minimum_protocol_version(envoy::api::v2::auth::TlsParameters::TLSv1_0);
-  client_params->set_tls_maximum_protocol_version(envoy::api::v2::auth::TlsParameters::TLSv1_0);
+  client_params->set_tls_minimum_protocol_version(
+      envoy::extensions::transport_sockets::tls::v3alpha::TlsParameters::TLSv1_0);
+  client_params->set_tls_maximum_protocol_version(
+      envoy::extensions::transport_sockets::tls::v3alpha::TlsParameters::TLSv1_0);
   TestUtilOptionsV2 tls_v1_test_options =
       createProtocolTestOptions(listener, client, GetParam(), "TLSv1");
   testUtilV2(tls_v1_test_options);
@@ -3266,8 +3342,10 @@ TEST_P(SslSocketTest, ProtocolVersions) {
   client_params->clear_tls_maximum_protocol_version();
 
   // Connection using TLSv1.1 (client) and defaults (server) succeeds.
-  client_params->set_tls_minimum_protocol_version(envoy::api::v2::auth::TlsParameters::TLSv1_1);
-  client_params->set_tls_maximum_protocol_version(envoy::api::v2::auth::TlsParameters::TLSv1_1);
+  client_params->set_tls_minimum_protocol_version(
+      envoy::extensions::transport_sockets::tls::v3alpha::TlsParameters::TLSv1_1);
+  client_params->set_tls_maximum_protocol_version(
+      envoy::extensions::transport_sockets::tls::v3alpha::TlsParameters::TLSv1_1);
   TestUtilOptionsV2 tls_v1_1_test_options =
       createProtocolTestOptions(listener, client, GetParam(), "TLSv1.1");
   testUtilV2(tls_v1_1_test_options);
@@ -3275,15 +3353,19 @@ TEST_P(SslSocketTest, ProtocolVersions) {
   client_params->clear_tls_maximum_protocol_version();
 
   // Connection using TLSv1.2 (client) and defaults (server) succeeds.
-  client_params->set_tls_minimum_protocol_version(envoy::api::v2::auth::TlsParameters::TLSv1_2);
-  client_params->set_tls_maximum_protocol_version(envoy::api::v2::auth::TlsParameters::TLSv1_2);
+  client_params->set_tls_minimum_protocol_version(
+      envoy::extensions::transport_sockets::tls::v3alpha::TlsParameters::TLSv1_2);
+  client_params->set_tls_maximum_protocol_version(
+      envoy::extensions::transport_sockets::tls::v3alpha::TlsParameters::TLSv1_2);
   testUtilV2(tls_v1_2_test_options);
   client_params->clear_tls_minimum_protocol_version();
   client_params->clear_tls_maximum_protocol_version();
 
   // Connection using TLSv1.3 (client) and defaults (server) succeeds (non-FIPS) or fails (FIPS).
-  client_params->set_tls_minimum_protocol_version(envoy::api::v2::auth::TlsParameters::TLSv1_3);
-  client_params->set_tls_maximum_protocol_version(envoy::api::v2::auth::TlsParameters::TLSv1_3);
+  client_params->set_tls_minimum_protocol_version(
+      envoy::extensions::transport_sockets::tls::v3alpha::TlsParameters::TLSv1_3);
+  client_params->set_tls_maximum_protocol_version(
+      envoy::extensions::transport_sockets::tls::v3alpha::TlsParameters::TLSv1_3);
   TestUtilOptionsV2 tls_v1_3_test_options =
       createProtocolTestOptions(listener, client, GetParam(), "TLSv1.3");
   TestUtilOptionsV2 error_test_options(listener, client, false, GetParam());
@@ -3298,8 +3380,10 @@ TEST_P(SslSocketTest, ProtocolVersions) {
   client_params->clear_tls_maximum_protocol_version();
 
   // Connection using TLSv1.0-1.3 (client) and defaults (server) succeeds.
-  client_params->set_tls_minimum_protocol_version(envoy::api::v2::auth::TlsParameters::TLSv1_0);
-  client_params->set_tls_maximum_protocol_version(envoy::api::v2::auth::TlsParameters::TLSv1_3);
+  client_params->set_tls_minimum_protocol_version(
+      envoy::extensions::transport_sockets::tls::v3alpha::TlsParameters::TLSv1_0);
+  client_params->set_tls_maximum_protocol_version(
+      envoy::extensions::transport_sockets::tls::v3alpha::TlsParameters::TLSv1_3);
 #ifndef BORINGSSL_FIPS
   testUtilV2(tls_v1_3_test_options);
 #else // BoringSSL FIPS
@@ -3309,10 +3393,14 @@ TEST_P(SslSocketTest, ProtocolVersions) {
   client_params->clear_tls_maximum_protocol_version();
 
   // Connection using TLSv1.0 (client) and TLSv1.0-1.3 (server) succeeds.
-  client_params->set_tls_minimum_protocol_version(envoy::api::v2::auth::TlsParameters::TLSv1_0);
-  client_params->set_tls_maximum_protocol_version(envoy::api::v2::auth::TlsParameters::TLSv1_0);
-  server_params->set_tls_minimum_protocol_version(envoy::api::v2::auth::TlsParameters::TLSv1_0);
-  server_params->set_tls_maximum_protocol_version(envoy::api::v2::auth::TlsParameters::TLSv1_3);
+  client_params->set_tls_minimum_protocol_version(
+      envoy::extensions::transport_sockets::tls::v3alpha::TlsParameters::TLSv1_0);
+  client_params->set_tls_maximum_protocol_version(
+      envoy::extensions::transport_sockets::tls::v3alpha::TlsParameters::TLSv1_0);
+  server_params->set_tls_minimum_protocol_version(
+      envoy::extensions::transport_sockets::tls::v3alpha::TlsParameters::TLSv1_0);
+  server_params->set_tls_maximum_protocol_version(
+      envoy::extensions::transport_sockets::tls::v3alpha::TlsParameters::TLSv1_3);
   testUtilV2(tls_v1_test_options);
   client_params->clear_tls_minimum_protocol_version();
   client_params->clear_tls_maximum_protocol_version();
@@ -3320,10 +3408,14 @@ TEST_P(SslSocketTest, ProtocolVersions) {
   server_params->clear_tls_maximum_protocol_version();
 
   // Connection using TLSv1.3 (client) and TLSv1.0-1.3 (server) succeeds.
-  client_params->set_tls_minimum_protocol_version(envoy::api::v2::auth::TlsParameters::TLSv1_3);
-  client_params->set_tls_maximum_protocol_version(envoy::api::v2::auth::TlsParameters::TLSv1_3);
-  server_params->set_tls_minimum_protocol_version(envoy::api::v2::auth::TlsParameters::TLSv1_0);
-  server_params->set_tls_maximum_protocol_version(envoy::api::v2::auth::TlsParameters::TLSv1_3);
+  client_params->set_tls_minimum_protocol_version(
+      envoy::extensions::transport_sockets::tls::v3alpha::TlsParameters::TLSv1_3);
+  client_params->set_tls_maximum_protocol_version(
+      envoy::extensions::transport_sockets::tls::v3alpha::TlsParameters::TLSv1_3);
+  server_params->set_tls_minimum_protocol_version(
+      envoy::extensions::transport_sockets::tls::v3alpha::TlsParameters::TLSv1_0);
+  server_params->set_tls_maximum_protocol_version(
+      envoy::extensions::transport_sockets::tls::v3alpha::TlsParameters::TLSv1_3);
   testUtilV2(tls_v1_3_test_options);
   client_params->clear_tls_minimum_protocol_version();
   client_params->clear_tls_maximum_protocol_version();
@@ -3335,45 +3427,59 @@ TEST_P(SslSocketTest, ProtocolVersions) {
       .setExpectedTransportFailureReasonContains("UNSUPPORTED_PROTOCOL");
 
   // Connection using defaults (client) and TLSv1.0 (server) fails.
-  server_params->set_tls_minimum_protocol_version(envoy::api::v2::auth::TlsParameters::TLSv1_0);
-  server_params->set_tls_maximum_protocol_version(envoy::api::v2::auth::TlsParameters::TLSv1_0);
+  server_params->set_tls_minimum_protocol_version(
+      envoy::extensions::transport_sockets::tls::v3alpha::TlsParameters::TLSv1_0);
+  server_params->set_tls_maximum_protocol_version(
+      envoy::extensions::transport_sockets::tls::v3alpha::TlsParameters::TLSv1_0);
   testUtilV2(unsupported_protocol_test_options);
   server_params->clear_tls_minimum_protocol_version();
   server_params->clear_tls_maximum_protocol_version();
 
   // Connection using defaults (client) and TLSv1.1 (server) fails.
-  server_params->set_tls_minimum_protocol_version(envoy::api::v2::auth::TlsParameters::TLSv1_1);
-  server_params->set_tls_maximum_protocol_version(envoy::api::v2::auth::TlsParameters::TLSv1_1);
+  server_params->set_tls_minimum_protocol_version(
+      envoy::extensions::transport_sockets::tls::v3alpha::TlsParameters::TLSv1_1);
+  server_params->set_tls_maximum_protocol_version(
+      envoy::extensions::transport_sockets::tls::v3alpha::TlsParameters::TLSv1_1);
   testUtilV2(unsupported_protocol_test_options);
   server_params->clear_tls_minimum_protocol_version();
   server_params->clear_tls_maximum_protocol_version();
 
   // Connection using defaults (client) and TLSv1.2 (server) succeeds.
-  server_params->set_tls_minimum_protocol_version(envoy::api::v2::auth::TlsParameters::TLSv1_2);
-  server_params->set_tls_maximum_protocol_version(envoy::api::v2::auth::TlsParameters::TLSv1_2);
+  server_params->set_tls_minimum_protocol_version(
+      envoy::extensions::transport_sockets::tls::v3alpha::TlsParameters::TLSv1_2);
+  server_params->set_tls_maximum_protocol_version(
+      envoy::extensions::transport_sockets::tls::v3alpha::TlsParameters::TLSv1_2);
   testUtilV2(tls_v1_2_test_options);
   server_params->clear_tls_minimum_protocol_version();
   server_params->clear_tls_maximum_protocol_version();
 
   // Connection using defaults (client) and TLSv1.3 (server) fails.
-  server_params->set_tls_minimum_protocol_version(envoy::api::v2::auth::TlsParameters::TLSv1_3);
-  server_params->set_tls_maximum_protocol_version(envoy::api::v2::auth::TlsParameters::TLSv1_3);
+  server_params->set_tls_minimum_protocol_version(
+      envoy::extensions::transport_sockets::tls::v3alpha::TlsParameters::TLSv1_3);
+  server_params->set_tls_maximum_protocol_version(
+      envoy::extensions::transport_sockets::tls::v3alpha::TlsParameters::TLSv1_3);
   testUtilV2(error_test_options);
   server_params->clear_tls_minimum_protocol_version();
   server_params->clear_tls_maximum_protocol_version();
 
   // Connection using defaults (client) and TLSv1.0-1.3 (server) succeeds.
-  server_params->set_tls_minimum_protocol_version(envoy::api::v2::auth::TlsParameters::TLSv1_0);
-  server_params->set_tls_maximum_protocol_version(envoy::api::v2::auth::TlsParameters::TLSv1_3);
+  server_params->set_tls_minimum_protocol_version(
+      envoy::extensions::transport_sockets::tls::v3alpha::TlsParameters::TLSv1_0);
+  server_params->set_tls_maximum_protocol_version(
+      envoy::extensions::transport_sockets::tls::v3alpha::TlsParameters::TLSv1_3);
   testUtilV2(tls_v1_2_test_options);
   server_params->clear_tls_minimum_protocol_version();
   server_params->clear_tls_maximum_protocol_version();
 
   // Connection using TLSv1.0-TLSv1.3 (client) and TLSv1.0 (server) succeeds.
-  client_params->set_tls_minimum_protocol_version(envoy::api::v2::auth::TlsParameters::TLSv1_0);
-  client_params->set_tls_maximum_protocol_version(envoy::api::v2::auth::TlsParameters::TLSv1_3);
-  server_params->set_tls_minimum_protocol_version(envoy::api::v2::auth::TlsParameters::TLSv1_0);
-  server_params->set_tls_maximum_protocol_version(envoy::api::v2::auth::TlsParameters::TLSv1_0);
+  client_params->set_tls_minimum_protocol_version(
+      envoy::extensions::transport_sockets::tls::v3alpha::TlsParameters::TLSv1_0);
+  client_params->set_tls_maximum_protocol_version(
+      envoy::extensions::transport_sockets::tls::v3alpha::TlsParameters::TLSv1_3);
+  server_params->set_tls_minimum_protocol_version(
+      envoy::extensions::transport_sockets::tls::v3alpha::TlsParameters::TLSv1_0);
+  server_params->set_tls_maximum_protocol_version(
+      envoy::extensions::transport_sockets::tls::v3alpha::TlsParameters::TLSv1_0);
   testUtilV2(tls_v1_test_options);
   client_params->clear_tls_minimum_protocol_version();
   client_params->clear_tls_maximum_protocol_version();
@@ -3381,10 +3487,14 @@ TEST_P(SslSocketTest, ProtocolVersions) {
   server_params->clear_tls_maximum_protocol_version();
 
   // Connection using TLSv1.0-TLSv1.3 (client) and TLSv1.3 (server) succeeds.
-  client_params->set_tls_minimum_protocol_version(envoy::api::v2::auth::TlsParameters::TLSv1_0);
-  client_params->set_tls_maximum_protocol_version(envoy::api::v2::auth::TlsParameters::TLSv1_3);
-  server_params->set_tls_minimum_protocol_version(envoy::api::v2::auth::TlsParameters::TLSv1_3);
-  server_params->set_tls_maximum_protocol_version(envoy::api::v2::auth::TlsParameters::TLSv1_3);
+  client_params->set_tls_minimum_protocol_version(
+      envoy::extensions::transport_sockets::tls::v3alpha::TlsParameters::TLSv1_0);
+  client_params->set_tls_maximum_protocol_version(
+      envoy::extensions::transport_sockets::tls::v3alpha::TlsParameters::TLSv1_3);
+  server_params->set_tls_minimum_protocol_version(
+      envoy::extensions::transport_sockets::tls::v3alpha::TlsParameters::TLSv1_3);
+  server_params->set_tls_maximum_protocol_version(
+      envoy::extensions::transport_sockets::tls::v3alpha::TlsParameters::TLSv1_3);
   testUtilV2(tls_v1_3_test_options);
   client_params->clear_tls_minimum_protocol_version();
   client_params->clear_tls_maximum_protocol_version();
@@ -3393,19 +3503,22 @@ TEST_P(SslSocketTest, ProtocolVersions) {
 }
 
 TEST_P(SslSocketTest, ALPN) {
-  envoy::api::v2::Listener listener;
-  envoy::api::v2::listener::FilterChain* filter_chain = listener.add_filter_chains();
-  envoy::api::v2::auth::TlsCertificate* server_cert =
-      filter_chain->mutable_tls_context()->mutable_common_tls_context()->add_tls_certificates();
+  envoy::config::listener::v3alpha::Listener listener;
+  envoy::config::listener::v3alpha::FilterChain* filter_chain = listener.add_filter_chains();
+  envoy::extensions::transport_sockets::tls::v3alpha::TlsCertificate* server_cert =
+      filter_chain->mutable_hidden_envoy_deprecated_tls_context()
+          ->mutable_common_tls_context()
+          ->add_tls_certificates();
   server_cert->mutable_certificate_chain()->set_filename(TestEnvironment::substitute(
       "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_cert.pem"));
   server_cert->mutable_private_key()->set_filename(TestEnvironment::substitute(
       "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_key.pem"));
-  envoy::api::v2::auth::CommonTlsContext* server_ctx =
-      filter_chain->mutable_tls_context()->mutable_common_tls_context();
+  envoy::extensions::transport_sockets::tls::v3alpha::CommonTlsContext* server_ctx =
+      filter_chain->mutable_hidden_envoy_deprecated_tls_context()->mutable_common_tls_context();
 
-  envoy::api::v2::auth::UpstreamTlsContext client;
-  envoy::api::v2::auth::CommonTlsContext* client_ctx = client.mutable_common_tls_context();
+  envoy::extensions::transport_sockets::tls::v3alpha::UpstreamTlsContext client;
+  envoy::extensions::transport_sockets::tls::v3alpha::CommonTlsContext* client_ctx =
+      client.mutable_common_tls_context();
 
   // Connection using defaults (client & server) succeeds, no ALPN is negotiated.
   TestUtilOptionsV2 test_options(listener, client, true, GetParam());
@@ -3458,19 +3571,23 @@ TEST_P(SslSocketTest, ALPN) {
 }
 
 TEST_P(SslSocketTest, CipherSuites) {
-  envoy::api::v2::Listener listener;
-  envoy::api::v2::listener::FilterChain* filter_chain = listener.add_filter_chains();
-  envoy::api::v2::auth::TlsCertificate* server_cert =
-      filter_chain->mutable_tls_context()->mutable_common_tls_context()->add_tls_certificates();
+  envoy::config::listener::v3alpha::Listener listener;
+  envoy::config::listener::v3alpha::FilterChain* filter_chain = listener.add_filter_chains();
+  envoy::extensions::transport_sockets::tls::v3alpha::TlsCertificate* server_cert =
+      filter_chain->mutable_hidden_envoy_deprecated_tls_context()
+          ->mutable_common_tls_context()
+          ->add_tls_certificates();
   server_cert->mutable_certificate_chain()->set_filename(TestEnvironment::substitute(
       "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_cert.pem"));
   server_cert->mutable_private_key()->set_filename(TestEnvironment::substitute(
       "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_key.pem"));
-  envoy::api::v2::auth::TlsParameters* server_params =
-      filter_chain->mutable_tls_context()->mutable_common_tls_context()->mutable_tls_params();
+  envoy::extensions::transport_sockets::tls::v3alpha::TlsParameters* server_params =
+      filter_chain->mutable_hidden_envoy_deprecated_tls_context()
+          ->mutable_common_tls_context()
+          ->mutable_tls_params();
 
-  envoy::api::v2::auth::UpstreamTlsContext client;
-  envoy::api::v2::auth::TlsParameters* client_params =
+  envoy::extensions::transport_sockets::tls::v3alpha::UpstreamTlsContext client;
+  envoy::extensions::transport_sockets::tls::v3alpha::TlsParameters* client_params =
       client.mutable_common_tls_context()->mutable_tls_params();
 
   // Connection using defaults (client & server) succeeds.
@@ -3515,19 +3632,23 @@ TEST_P(SslSocketTest, CipherSuites) {
 }
 
 TEST_P(SslSocketTest, EcdhCurves) {
-  envoy::api::v2::Listener listener;
-  envoy::api::v2::listener::FilterChain* filter_chain = listener.add_filter_chains();
-  envoy::api::v2::auth::TlsCertificate* server_cert =
-      filter_chain->mutable_tls_context()->mutable_common_tls_context()->add_tls_certificates();
+  envoy::config::listener::v3alpha::Listener listener;
+  envoy::config::listener::v3alpha::FilterChain* filter_chain = listener.add_filter_chains();
+  envoy::extensions::transport_sockets::tls::v3alpha::TlsCertificate* server_cert =
+      filter_chain->mutable_hidden_envoy_deprecated_tls_context()
+          ->mutable_common_tls_context()
+          ->add_tls_certificates();
   server_cert->mutable_certificate_chain()->set_filename(TestEnvironment::substitute(
       "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_cert.pem"));
   server_cert->mutable_private_key()->set_filename(TestEnvironment::substitute(
       "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_key.pem"));
-  envoy::api::v2::auth::TlsParameters* server_params =
-      filter_chain->mutable_tls_context()->mutable_common_tls_context()->mutable_tls_params();
+  envoy::extensions::transport_sockets::tls::v3alpha::TlsParameters* server_params =
+      filter_chain->mutable_hidden_envoy_deprecated_tls_context()
+          ->mutable_common_tls_context()
+          ->mutable_tls_params();
 
-  envoy::api::v2::auth::UpstreamTlsContext client;
-  envoy::api::v2::auth::TlsParameters* client_params =
+  envoy::extensions::transport_sockets::tls::v3alpha::UpstreamTlsContext client;
+  envoy::extensions::transport_sockets::tls::v3alpha::TlsParameters* client_params =
       client.mutable_common_tls_context()->mutable_tls_params();
 
   // Connection using defaults (client & server) succeeds.
@@ -3578,17 +3699,19 @@ TEST_P(SslSocketTest, EcdhCurves) {
 }
 
 TEST_P(SslSocketTest, SignatureAlgorithms) {
-  envoy::api::v2::Listener listener;
-  envoy::api::v2::listener::FilterChain* filter_chain = listener.add_filter_chains();
-  envoy::api::v2::auth::CertificateValidationContext* server_validation_ctx =
-      filter_chain->mutable_tls_context()
-          ->mutable_common_tls_context()
-          ->mutable_validation_context();
+  envoy::config::listener::v3alpha::Listener listener;
+  envoy::config::listener::v3alpha::FilterChain* filter_chain = listener.add_filter_chains();
+  envoy::extensions::transport_sockets::tls::v3alpha::CertificateValidationContext*
+      server_validation_ctx = filter_chain->mutable_hidden_envoy_deprecated_tls_context()
+                                  ->mutable_common_tls_context()
+                                  ->mutable_validation_context();
   server_validation_ctx->mutable_trusted_ca()->set_filename(TestEnvironment::substitute(
       "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"));
   // Server ECDSA certificate.
-  envoy::api::v2::auth::TlsCertificate* server_cert =
-      filter_chain->mutable_tls_context()->mutable_common_tls_context()->add_tls_certificates();
+  envoy::extensions::transport_sockets::tls::v3alpha::TlsCertificate* server_cert =
+      filter_chain->mutable_hidden_envoy_deprecated_tls_context()
+          ->mutable_common_tls_context()
+          ->add_tls_certificates();
   server_cert->mutable_certificate_chain()->set_filename(TestEnvironment::substitute(
       "{{ test_rundir "
       "}}/test/extensions/transport_sockets/tls/test_data/selfsigned_ecdsa_p256_cert.pem"));
@@ -3596,9 +3719,9 @@ TEST_P(SslSocketTest, SignatureAlgorithms) {
       "{{ test_rundir "
       "}}/test/extensions/transport_sockets/tls/test_data/selfsigned_ecdsa_p256_key.pem"));
 
-  envoy::api::v2::auth::UpstreamTlsContext client;
+  envoy::extensions::transport_sockets::tls::v3alpha::UpstreamTlsContext client;
   // Client RSA certificate.
-  envoy::api::v2::auth::TlsCertificate* client_cert =
+  envoy::extensions::transport_sockets::tls::v3alpha::TlsCertificate* client_cert =
       client.mutable_common_tls_context()->add_tls_certificates();
   client_cert->mutable_certificate_chain()->set_filename(TestEnvironment::substitute(
       "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_uri_cert.pem"));
@@ -3607,7 +3730,9 @@ TEST_P(SslSocketTest, SignatureAlgorithms) {
 
   // Connection using defaults (client & server) succeeds.
   TestUtilOptionsV2 algorithm_test_options(listener, client, true, GetParam());
-  algorithm_test_options.setExpectedClientCertUri("spiffe://lyft.com/test-team");
+  algorithm_test_options.setExpectedClientCertUri("spiffe://lyft.com/test-team")
+      .setExpectedServerStats("ssl.sigalgs.rsa_pss_rsae_sha256")
+      .setExpectedClientStats("ssl.sigalgs.ecdsa_secp256r1_sha256");
   testUtilV2(algorithm_test_options);
 
   // Connection using defaults (client & server) succeeds, even with client renegotiation.
@@ -3702,16 +3827,18 @@ TEST_P(SslSocketTest, RevokedCertificateCRLInTrustedCA) {
 }
 
 TEST_P(SslSocketTest, GetRequestedServerName) {
-  envoy::api::v2::Listener listener;
-  envoy::api::v2::listener::FilterChain* filter_chain = listener.add_filter_chains();
-  envoy::api::v2::auth::TlsCertificate* server_cert =
-      filter_chain->mutable_tls_context()->mutable_common_tls_context()->add_tls_certificates();
+  envoy::config::listener::v3alpha::Listener listener;
+  envoy::config::listener::v3alpha::FilterChain* filter_chain = listener.add_filter_chains();
+  envoy::extensions::transport_sockets::tls::v3alpha::TlsCertificate* server_cert =
+      filter_chain->mutable_hidden_envoy_deprecated_tls_context()
+          ->mutable_common_tls_context()
+          ->add_tls_certificates();
   server_cert->mutable_certificate_chain()->set_filename(TestEnvironment::substitute(
       "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_cert.pem"));
   server_cert->mutable_private_key()->set_filename(TestEnvironment::substitute(
       "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_key.pem"));
 
-  envoy::api::v2::auth::UpstreamTlsContext client;
+  envoy::extensions::transport_sockets::tls::v3alpha::UpstreamTlsContext client;
   client.set_sni("lyft.com");
 
   TestUtilOptionsV2 test_options(listener, client, true, GetParam());
@@ -3719,16 +3846,18 @@ TEST_P(SslSocketTest, GetRequestedServerName) {
 }
 
 TEST_P(SslSocketTest, OverrideRequestedServerName) {
-  envoy::api::v2::Listener listener;
-  envoy::api::v2::listener::FilterChain* filter_chain = listener.add_filter_chains();
-  envoy::api::v2::auth::TlsCertificate* server_cert =
-      filter_chain->mutable_tls_context()->mutable_common_tls_context()->add_tls_certificates();
+  envoy::config::listener::v3alpha::Listener listener;
+  envoy::config::listener::v3alpha::FilterChain* filter_chain = listener.add_filter_chains();
+  envoy::extensions::transport_sockets::tls::v3alpha::TlsCertificate* server_cert =
+      filter_chain->mutable_hidden_envoy_deprecated_tls_context()
+          ->mutable_common_tls_context()
+          ->add_tls_certificates();
   server_cert->mutable_certificate_chain()->set_filename(TestEnvironment::substitute(
       "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_cert.pem"));
   server_cert->mutable_private_key()->set_filename(TestEnvironment::substitute(
       "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_key.pem"));
 
-  envoy::api::v2::auth::UpstreamTlsContext client;
+  envoy::extensions::transport_sockets::tls::v3alpha::UpstreamTlsContext client;
   client.set_sni("lyft.com");
 
   Network::TransportSocketOptionsSharedPtr transport_socket_options(
@@ -3740,16 +3869,18 @@ TEST_P(SslSocketTest, OverrideRequestedServerName) {
 }
 
 TEST_P(SslSocketTest, OverrideRequestedServerNameWithoutSniInUpstreamTlsContext) {
-  envoy::api::v2::Listener listener;
-  envoy::api::v2::listener::FilterChain* filter_chain = listener.add_filter_chains();
-  envoy::api::v2::auth::TlsCertificate* server_cert =
-      filter_chain->mutable_tls_context()->mutable_common_tls_context()->add_tls_certificates();
+  envoy::config::listener::v3alpha::Listener listener;
+  envoy::config::listener::v3alpha::FilterChain* filter_chain = listener.add_filter_chains();
+  envoy::extensions::transport_sockets::tls::v3alpha::TlsCertificate* server_cert =
+      filter_chain->mutable_hidden_envoy_deprecated_tls_context()
+          ->mutable_common_tls_context()
+          ->add_tls_certificates();
   server_cert->mutable_certificate_chain()->set_filename(TestEnvironment::substitute(
       "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_cert.pem"));
   server_cert->mutable_private_key()->set_filename(TestEnvironment::substitute(
       "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_key.pem"));
 
-  envoy::api::v2::auth::UpstreamTlsContext client;
+  envoy::extensions::transport_sockets::tls::v3alpha::UpstreamTlsContext client;
 
   Network::TransportSocketOptionsSharedPtr transport_socket_options(
       new Network::TransportSocketOptionsImpl("example.com"));
@@ -3759,18 +3890,20 @@ TEST_P(SslSocketTest, OverrideRequestedServerNameWithoutSniInUpstreamTlsContext)
 }
 
 TEST_P(SslSocketTest, OverrideApplicationProtocols) {
-  envoy::api::v2::Listener listener;
-  envoy::api::v2::listener::FilterChain* filter_chain = listener.add_filter_chains();
-  envoy::api::v2::auth::TlsCertificate* server_cert =
-      filter_chain->mutable_tls_context()->mutable_common_tls_context()->add_tls_certificates();
+  envoy::config::listener::v3alpha::Listener listener;
+  envoy::config::listener::v3alpha::FilterChain* filter_chain = listener.add_filter_chains();
+  envoy::extensions::transport_sockets::tls::v3alpha::TlsCertificate* server_cert =
+      filter_chain->mutable_hidden_envoy_deprecated_tls_context()
+          ->mutable_common_tls_context()
+          ->add_tls_certificates();
   server_cert->mutable_certificate_chain()->set_filename(TestEnvironment::substitute(
       "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_cert.pem"));
   server_cert->mutable_private_key()->set_filename(TestEnvironment::substitute(
       "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_key.pem"));
-  envoy::api::v2::auth::CommonTlsContext* server_ctx =
-      filter_chain->mutable_tls_context()->mutable_common_tls_context();
+  envoy::extensions::transport_sockets::tls::v3alpha::CommonTlsContext* server_ctx =
+      filter_chain->mutable_hidden_envoy_deprecated_tls_context()->mutable_common_tls_context();
 
-  envoy::api::v2::auth::UpstreamTlsContext client;
+  envoy::extensions::transport_sockets::tls::v3alpha::UpstreamTlsContext client;
   TestUtilOptionsV2 test_options(listener, client, true, GetParam());
 
   // Client connects without ALPN to a server with "test" ALPN, no ALPN is negotiated.
@@ -3801,7 +3934,7 @@ TEST_P(SslSocketTest, DownstreamNotReadySslSocket) {
   EXPECT_CALL(factory_context, stats()).WillOnce(ReturnRef(stats_store));
   EXPECT_CALL(factory_context, initManager()).WillRepeatedly(Return(&init_manager));
 
-  envoy::api::v2::auth::DownstreamTlsContext tls_context;
+  envoy::extensions::transport_sockets::tls::v3alpha::DownstreamTlsContext tls_context;
   auto sds_secret_configs =
       tls_context.mutable_common_tls_context()->mutable_tls_certificate_sds_secret_configs()->Add();
   sds_secret_configs->set_name("abc.com");
@@ -3837,7 +3970,7 @@ TEST_P(SslSocketTest, UpstreamNotReadySslSocket) {
   EXPECT_CALL(factory_context, initManager()).WillRepeatedly(Return(&init_manager));
   EXPECT_CALL(factory_context, dispatcher()).WillOnce(ReturnRef(dispatcher));
 
-  envoy::api::v2::auth::UpstreamTlsContext tls_context;
+  envoy::extensions::transport_sockets::tls::v3alpha::UpstreamTlsContext tls_context;
   auto sds_secret_configs =
       tls_context.mutable_common_tls_context()->mutable_tls_certificate_sds_secret_configs()->Add();
   sds_secret_configs->set_name("abc.com");
@@ -4040,11 +4173,11 @@ protected:
         filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/no_san_key.pem"
 )EOF";
 
-  envoy::api::v2::auth::DownstreamTlsContext downstream_tls_context_;
+  envoy::extensions::transport_sockets::tls::v3alpha::DownstreamTlsContext downstream_tls_context_;
   std::unique_ptr<ContextManagerImpl> manager_;
   Network::TransportSocketFactoryPtr server_ssl_socket_factory_;
   Network::ListenerPtr listener_;
-  envoy::api::v2::auth::UpstreamTlsContext upstream_tls_context_;
+  envoy::extensions::transport_sockets::tls::v3alpha::UpstreamTlsContext upstream_tls_context_;
   Envoy::Ssl::ClientContextSharedPtr client_ctx_;
   Network::TransportSocketFactoryPtr client_ssl_socket_factory_;
   Network::ClientConnectionPtr client_connection_;

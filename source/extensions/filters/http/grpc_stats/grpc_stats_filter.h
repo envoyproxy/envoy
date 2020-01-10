@@ -1,7 +1,7 @@
 #pragma once
 
-#include "envoy/config/filter/http/grpc_stats/v2alpha/config.pb.h"
-#include "envoy/config/filter/http/grpc_stats/v2alpha/config.pb.validate.h"
+#include "envoy/extensions/filters/http/grpc_stats/v3alpha/config.pb.h"
+#include "envoy/extensions/filters/http/grpc_stats/v3alpha/config.pb.validate.h"
 #include "envoy/server/filter_config.h"
 #include "envoy/stream_info/filter_state.h"
 
@@ -19,7 +19,8 @@ struct GrpcStatsObject : public StreamInfo::FilterState::Object {
   uint64_t response_message_count = 0;
 
   ProtobufTypes::MessagePtr serializeAsProto() const override {
-    auto msg = std::make_unique<envoy::config::filter::http::grpc_stats::v2alpha::FilterObject>();
+    auto msg =
+        std::make_unique<envoy::extensions::filters::http::grpc_stats::v3alpha::FilterObject>();
     msg->set_request_message_count(request_message_count);
     msg->set_response_message_count(response_message_count);
     return msg;
@@ -27,13 +28,14 @@ struct GrpcStatsObject : public StreamInfo::FilterState::Object {
 };
 
 class GrpcStatsFilterConfig
-    : public Common::FactoryBase<envoy::config::filter::http::grpc_stats::v2alpha::FilterConfig> {
+    : public Common::FactoryBase<
+          envoy::extensions::filters::http::grpc_stats::v3alpha::FilterConfig> {
 public:
   GrpcStatsFilterConfig() : FactoryBase(HttpFilterNames::get().GrpcStats) {}
 
 private:
   Http::FilterFactoryCb createFilterFactoryFromProtoTyped(
-      const envoy::config::filter::http::grpc_stats::v2alpha::FilterConfig& config,
+      const envoy::extensions::filters::http::grpc_stats::v3alpha::FilterConfig& config,
       const std::string&, Server::Configuration::FactoryContext&) override;
 };
 

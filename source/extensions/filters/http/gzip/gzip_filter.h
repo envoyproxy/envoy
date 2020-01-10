@@ -1,6 +1,6 @@
 #pragma once
 
-#include "envoy/config/filter/http/gzip/v2/gzip.pb.h"
+#include "envoy/extensions/filters/http/gzip/v3alpha/gzip.pb.h"
 #include "envoy/http/filter.h"
 #include "envoy/http/header_map.h"
 #include "envoy/json/json_object.h"
@@ -54,7 +54,7 @@ struct GzipStats {
 class GzipFilterConfig {
 
 public:
-  GzipFilterConfig(const envoy::config::filter::http::gzip::v2::Gzip& gzip,
+  GzipFilterConfig(const envoy::extensions::filters::http::gzip::v3alpha::Gzip& gzip,
                    const std::string& stats_prefix, Stats::Scope& scope, Runtime::Loader& runtime);
 
   Compressor::ZlibCompressorImpl::CompressionLevel compressionLevel() const {
@@ -74,10 +74,12 @@ public:
   uint64_t windowBits() const { return window_bits_; }
 
 private:
-  static Compressor::ZlibCompressorImpl::CompressionLevel compressionLevelEnum(
-      envoy::config::filter::http::gzip::v2::Gzip_CompressionLevel_Enum compression_level);
-  static Compressor::ZlibCompressorImpl::CompressionStrategy compressionStrategyEnum(
-      envoy::config::filter::http::gzip::v2::Gzip_CompressionStrategy compression_strategy);
+  static Compressor::ZlibCompressorImpl::CompressionLevel
+  compressionLevelEnum(envoy::extensions::filters::http::gzip::v3alpha::Gzip::CompressionLevel::Enum
+                           compression_level);
+  static Compressor::ZlibCompressorImpl::CompressionStrategy
+  compressionStrategyEnum(envoy::extensions::filters::http::gzip::v3alpha::Gzip::CompressionStrategy
+                              compression_strategy);
   static StringUtil::CaseUnorderedSet
   contentTypeSet(const Protobuf::RepeatedPtrField<std::string>& types);
 

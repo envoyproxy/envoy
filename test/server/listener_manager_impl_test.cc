@@ -6,11 +6,11 @@
 #include <utility>
 #include <vector>
 
-#include "envoy/admin/v2alpha/config_dump.pb.h"
-#include "envoy/api/v2/core/address.pb.h"
-#include "envoy/api/v2/core/base.pb.h"
-#include "envoy/api/v2/core/config_source.pb.h"
-#include "envoy/api/v2/lds.pb.h"
+#include "envoy/admin/v3alpha/config_dump.pb.h"
+#include "envoy/config/core/v3alpha/address.pb.h"
+#include "envoy/config/core/v3alpha/base.pb.h"
+#include "envoy/config/core/v3alpha/config_source.pb.h"
+#include "envoy/config/listener/v3alpha/listener.pb.h"
 #include "envoy/registry/registry.h"
 #include "envoy/server/filter_config.h"
 #include "envoy/server/listener_manager.h"
@@ -46,8 +46,8 @@ public:
   /**
    * Create an IPv4 listener with a given name.
    */
-  envoy::api::v2::Listener createIPv4Listener(const std::string& name) {
-    envoy::api::v2::Listener listener = parseListenerFromV2Yaml(R"EOF(
+  envoy::config::listener::v3alpha::Listener createIPv4Listener(const std::string& name) {
+    envoy::config::listener::v3alpha::Listener listener = parseListenerFromV2Yaml(R"EOF(
       address:
         socket_address: { address: 127.0.0.1, port_value: 1111 }
       filter_chains:
@@ -62,11 +62,12 @@ public:
    * and set in the Listener, it should result in a call to setsockopt() with the appropriate
    * values.
    */
-  void testSocketOption(const envoy::api::v2::Listener& listener,
-                        const envoy::api::v2::core::SocketOption::SocketState& expected_state,
-                        const Network::SocketOptionName& expected_option, int expected_value,
-                        uint32_t expected_num_options = 1,
-                        ListenSocketCreationParams expected_creation_params = {true, true}) {
+  void
+  testSocketOption(const envoy::config::listener::v3alpha::Listener& listener,
+                   const envoy::config::core::v3alpha::SocketOption::SocketState& expected_state,
+                   const Network::SocketOptionName& expected_option, int expected_value,
+                   uint32_t expected_num_options = 1,
+                   ListenSocketCreationParams expected_creation_params = {true, true}) {
     if (expected_option.has_value()) {
       expectCreateListenSocket(expected_state, expected_num_options, expected_creation_params);
       expectSetsockopt(os_sys_calls_, expected_option.level(), expected_option.option(),
@@ -156,9 +157,46 @@ filter_chains:
         validation_context:
           trusted_ca:
             filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"
+          match_subject_alt_names:
+            exact: localhost
+            exact: 127.0.0.1
+  )EOF",
+                                                       Network::Address::IpVersion::v4);
+
+  EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, {true}));
+  manager_->addOrUpdateListener(parseListenerFromV2Yaml(yaml), "", true);
+  EXPECT_EQ(1U, manager_->listeners().size());
+
+  auto filter_chain = findFilterChain(1234, "127.0.0.1", "", "tls", {}, "8.8.8.8", 111);
+  ASSERT_NE(filter_chain, nullptr);
+  EXPECT_TRUE(filter_chain->transportSocketFactory().implementsSecureTransport());
+}
+
+TEST_F(ListenerManagerImplWithRealFiltersTest,
+       DEPRECATED_FEATURE_TEST(TlsTransportSocketLegacyConfig)) {
+  const std::string yaml = TestEnvironment::substitute(R"EOF(
+address:
+  socket_address:
+    address: 127.0.0.1
+    port_value: 1234
+filter_chains:
+- filters: []
+  transport_socket:
+    name: envoy.transport_sockets.tls
+    typed_config:
+      "@type": type.googleapis.com/envoy.api.v2.auth.DownstreamTlsContext
+      common_tls_context:
+        tls_certificates:
+        - certificate_chain:
+            filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_uri_cert.pem"
+          private_key:
+            filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_uri_key.pem"
+        validation_context:
+          trusted_ca:
+            filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"
           verify_subject_alt_name:
-          - localhost
-          - 127.0.0.1
+            - localhost
+            - 127.0.0.1
   )EOF",
                                                        Network::Address::IpVersion::v4);
 
@@ -218,7 +256,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, UdpAddress) {
     }
     filter_chains: {}
   )EOF";
-  envoy::api::v2::Listener listener_proto;
+  envoy::config::listener::v3alpha::Listener listener_proto;
   EXPECT_TRUE(Protobuf::TextFormat::ParseFromString(proto_text, &listener_proto));
 
   EXPECT_CALL(server_.random_, uuid());
@@ -284,7 +322,7 @@ filter_chains:
 - filters:
   - foo: type
     name: name
-    config: {}
+    typed_config: {}
   )EOF";
 
   EXPECT_THROW_WITH_REGEX(manager_->addOrUpdateListener(parseListenerFromV2Yaml(yaml), "", true),
@@ -293,16 +331,19 @@ filter_chains:
 class NonTerminalFilterFactory : public Configuration::NamedNetworkFilterConfigFactory {
 public:
   // Configuration::NamedNetworkFilterConfigFactory
-  Network::FilterFactoryCb createFilterFactoryFromProto(const Protobuf::Message&,
-                                                        Configuration::FactoryContext&) override {
+  Network::FilterFactoryCb
+  createFilterFactoryFromProto(const Protobuf::Message&,
+                               Server::Configuration::FactoryContext&) override {
     return [](Network::FilterManager&) -> void {};
   }
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return std::make_unique<Envoy::ProtobufWkt::Empty>();
+    // Using Struct instead of a custom per-filter empty config proto
+    // This is only allowed in tests.
+    return std::make_unique<Envoy::ProtobufWkt::Struct>();
   }
 
-  std::string name() override { return "non_terminal"; }
+  std::string name() const override { return "non_terminal"; }
 };
 
 TEST_F(ListenerManagerImplWithRealFiltersTest, TerminalNotLast) {
@@ -365,17 +406,19 @@ filter_chains:
 class TestStatsConfigFactory : public Configuration::NamedNetworkFilterConfigFactory {
 public:
   // Configuration::NamedNetworkFilterConfigFactory
-  Network::FilterFactoryCb
-  createFilterFactoryFromProto(const Protobuf::Message&,
-                               Configuration::FactoryContext& context) override {
-    return commonFilterFactory(context);
+  Network::FilterFactoryCb createFilterFactoryFromProto(
+      const Protobuf::Message&,
+      Configuration::FactoryContext& filter_chain_factory_context) override {
+    return commonFilterFactory(filter_chain_factory_context);
   }
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return std::make_unique<Envoy::ProtobufWkt::Empty>();
+    // Using Struct instead of a custom per-filter empty config proto
+    // This is only allowed in tests.
+    return std::make_unique<Envoy::ProtobufWkt::Struct>();
   }
 
-  std::string name() override { return "stats_test"; }
+  std::string name() const override { return "stats_test"; }
   bool isTerminalFilter() override { return true; }
 
 private:
@@ -440,7 +483,7 @@ TEST_F(ListenerManagerImplTest, ModifyOnlyDrainType) {
   )EOF";
 
   ListenerHandle* listener_foo =
-      expectListenerCreate(false, true, envoy::api::v2::Listener_DrainType_MODIFY_ONLY);
+      expectListenerCreate(false, true, envoy::config::listener::v3alpha::Listener::MODIFY_ONLY);
   EXPECT_CALL(listener_factory_, createListenSocket(_, _, _, {true}));
   EXPECT_TRUE(manager_->addOrUpdateListener(parseListenerFromV2Yaml(listener_foo_yaml), "", true));
   checkStats(1, 0, 0, 0, 1, 0);
@@ -482,7 +525,7 @@ drain_type: modify_only
   )EOF";
 
   ListenerHandle* listener_foo_different_address =
-      expectListenerCreate(false, true, envoy::api::v2::Listener_DrainType_MODIFY_ONLY);
+      expectListenerCreate(false, true, envoy::config::listener::v3alpha::Listener::MODIFY_ONLY);
   EXPECT_CALL(*listener_foo_different_address, onDestroy());
   EXPECT_THROW_WITH_MESSAGE(
       manager_->addOrUpdateListener(parseListenerFromV2Yaml(listener_foo_different_address_yaml),
@@ -626,7 +669,7 @@ TEST_F(ListenerManagerImplTest, AddOrUpdateListener) {
 
   auto* lds_api = new MockLdsApi();
   EXPECT_CALL(listener_factory_, createLdsApi_(_)).WillOnce(Return(lds_api));
-  envoy::api::v2::core::ConfigSource lds_config;
+  envoy::config::core::v3alpha::ConfigSource lds_config;
   manager_->createLdsApi(lds_config);
 
   EXPECT_CALL(*lds_api, versionInfo()).WillOnce(Return(""));
@@ -1129,7 +1172,7 @@ dynamic_listeners:
   - name: foo
     error_state:
       failed_configuration:
-        "@type": type.googleapis.com/envoy.api.v2.Listener
+        "@type": type.googleapis.com/envoy.config.listener.v3alpha.Listener
         name: foo
         address:
           socket_address:
@@ -1171,7 +1214,7 @@ dynamic_listeners:
 
   // Now have an external update with errors and make sure it gets dumped.
   ListenerManager::FailureStates non_empty_failure_state;
-  non_empty_failure_state.push_back(std::make_unique<envoy::admin::v2alpha::UpdateFailureState>());
+  non_empty_failure_state.push_back(std::make_unique<envoy::admin::v3alpha::UpdateFailureState>());
   auto& state = non_empty_failure_state.back();
   state->set_details("foo");
   manager_->beginListenerUpdate();
@@ -3054,7 +3097,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, Metadata) {
   EXPECT_EQ("test_value",
             Config::Metadata::metadataValue(context->listenerMetadata(), "com.bar.foo", "baz")
                 .string_value());
-  EXPECT_EQ(envoy::api::v2::core::TrafficDirection::INBOUND, context->direction());
+  EXPECT_EQ(envoy::config::core::v3alpha::INBOUND, context->direction());
 }
 
 TEST_F(ListenerManagerImplWithRealFiltersTest, OriginalDstFilter) {
@@ -3117,10 +3160,12 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, OriginalDstTestFilter) {
     }
 
     ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-      return std::make_unique<Envoy::ProtobufWkt::Empty>();
+      // Using Struct instead of a custom per-filter empty config proto
+      // This is only allowed in tests.
+      return std::make_unique<Envoy::ProtobufWkt::Struct>();
     }
 
-    std::string name() override { return "test.listener.original_dst"; }
+    std::string name() const override { return "test.listener.original_dst"; }
   };
 
   /**
@@ -3191,10 +3236,12 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, OriginalDstTestFilterIPv6) {
     }
 
     ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-      return std::make_unique<Envoy::ProtobufWkt::Empty>();
+      // Using Struct instead of a custom per-filter empty config proto
+      // This is only allowed in tests.
+      return std::make_unique<Envoy::ProtobufWkt::Struct>();
     }
 
-    std::string name() override { return "test.listener.original_dstipv6"; }
+    std::string name() const override { return "test.listener.original_dstipv6"; }
   };
 
   /**
@@ -3277,7 +3324,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, TransparentFreebindListenerDisabl
 TEST_F(ListenerManagerImplWithRealFiltersTest, TransparentListenerEnabled) {
   auto listener = createIPv4Listener("TransparentListener");
   listener.mutable_transparent()->set_value(true);
-  testSocketOption(listener, envoy::api::v2::core::SocketOption::STATE_PREBIND,
+  testSocketOption(listener, envoy::config::core::v3alpha::SocketOption::STATE_PREBIND,
                    ENVOY_SOCKET_IP_TRANSPARENT, /* expected_value */ 1,
                    /* expected_num_options */ 2);
 }
@@ -3292,7 +3339,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, FreebindListenerEnabled) {
   auto listener = createIPv4Listener("FreebindListener");
   listener.mutable_freebind()->set_value(true);
 
-  testSocketOption(listener, envoy::api::v2::core::SocketOption::STATE_PREBIND,
+  testSocketOption(listener, envoy::config::core::v3alpha::SocketOption::STATE_PREBIND,
                    ENVOY_SOCKET_IP_FREEBIND, /* expected_value */ 1);
 }
 
@@ -3306,7 +3353,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, FastOpenListenerEnabled) {
   auto listener = createIPv4Listener("FastOpenListener");
   listener.mutable_tcp_fast_open_queue_length()->set_value(1);
 
-  testSocketOption(listener, envoy::api::v2::core::SocketOption::STATE_LISTENING,
+  testSocketOption(listener, envoy::config::core::v3alpha::SocketOption::STATE_LISTENING,
                    ENVOY_SOCKET_TCP_FASTOPEN, /* expected_value */ 1);
 }
 
@@ -3318,17 +3365,17 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, ReusePortListenerEnabledForTcp) {
   // when reuse_port is true, port should be 0 for creating the shared socket,
   // otherwise socket creation will be done on worker thread.
   listener.mutable_address()->mutable_socket_address()->set_port_value(0);
-  testSocketOption(listener, envoy::api::v2::core::SocketOption::STATE_PREBIND,
+  testSocketOption(listener, envoy::config::core::v3alpha::SocketOption::STATE_PREBIND,
                    ENVOY_SOCKET_SO_REUSEPORT, /* expected_value */ 1,
                    /* expected_num_options */ 1,
                    /* expected_creation_params */ {true, false});
 }
 
-TEST_F(ListenerManagerImplWithRealFiltersTest, ReusePortListenerEnabledForUdp) {
+TEST_F(ListenerManagerImplWithRealFiltersTest, ReusePortListenerDisabled) {
 
   auto listener = createIPv4Listener("UdpListener");
   listener.mutable_address()->mutable_socket_address()->set_protocol(
-      envoy::api::v2::core::SocketAddress::UDP);
+      envoy::config::core::v3alpha::SocketAddress::UDP);
   // For UDP, reuse_port is set to true forcibly, even it's set to false explicitly in config
   listener.set_reuse_port(false);
 
@@ -3337,11 +3384,11 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, ReusePortListenerEnabledForUdp) {
   listener.mutable_address()->mutable_socket_address()->set_port_value(0);
 
   // IpPacketInfo and RxQueueOverFlow are always set if supported
-  expectCreateListenSocket(envoy::api::v2::core::SocketOption::STATE_PREBIND,
+  expectCreateListenSocket(envoy::config::core::v3alpha::SocketOption::STATE_PREBIND,
 #ifdef SO_RXQ_OVFL
-                           /* expected_num_options */ 3,
-#else
                            /* expected_num_options */ 2,
+#else
+                           /* expected_num_options */ 1,
 #endif
                            /* expected_creation_params */ {true, false});
 
@@ -3358,18 +3405,13 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, ReusePortListenerEnabledForUdp) {
                    /* expected_num_calls */ 1);
 #endif
 
-  expectSetsockopt(os_sys_calls_,
-                   /* expected_sockopt_level */ SOL_SOCKET,
-                   /* expected_sockopt_name */ SO_REUSEPORT,
-                   /* expected_value */ 1,
-                   /* expected_num_calls */ 1);
-
+  server_.options_.concurrency_ = 2;
   manager_->addOrUpdateListener(listener, "", true);
   EXPECT_EQ(1U, manager_->listeners().size());
 }
 
 TEST_F(ListenerManagerImplWithRealFiltersTest, LiteralSockoptListenerEnabled) {
-  const envoy::api::v2::Listener listener = parseListenerFromV2Yaml(R"EOF(
+  const envoy::config::listener::v3alpha::Listener listener = parseListenerFromV2Yaml(R"EOF(
     name: SockoptsListener
     address:
       socket_address: { address: 127.0.0.1, port_value: 1111 }
@@ -3384,7 +3426,7 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, LiteralSockoptListenerEnabled) {
     ]
   )EOF");
 
-  expectCreateListenSocket(envoy::api::v2::core::SocketOption::STATE_PREBIND,
+  expectCreateListenSocket(envoy::config::core::v3alpha::SocketOption::STATE_PREBIND,
                            /* expected_num_options */ 3);
   expectSetsockopt(os_sys_calls_,
                    /* expected_sockopt_level */ 1,
@@ -3533,7 +3575,8 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, VerifySanWithNoCA) {
               - certificate_chain: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_cert.pem" }
                 private_key: { filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/san_dns_key.pem" }
             validation_context:
-              verify_subject_alt_name: "spiffe://lyft.com/testclient"
+              match_subject_alt_names: 
+                 exact: "spiffe://lyft.com/testclient"
   )EOF",
                                                        Network::Address::IpVersion::v4);
 

@@ -1,9 +1,9 @@
 #include <ctime>
 #include <regex>
 
-#include "envoy/api/v2/core/base.pb.h"
-#include "envoy/config/filter/accesslog/v2/accesslog.pb.h"
-#include "envoy/config/filter/http/router/v2/router.pb.h"
+#include "envoy/config/accesslog/v3alpha/accesslog.pb.h"
+#include "envoy/config/core/v3alpha/base.pb.h"
+#include "envoy/extensions/filters/http/router/v3alpha/router.pb.h"
 
 #include "common/network/utility.h"
 #include "common/router/router.h"
@@ -35,7 +35,7 @@ namespace Envoy {
 namespace Router {
 namespace {
 
-absl::optional<envoy::config::filter::accesslog::v2::AccessLog> testUpstreamLog() {
+absl::optional<envoy::config::accesslog::v3alpha::AccessLog> testUpstreamLog() {
   // Custom format without timestamps or durations.
   const std::string yaml = R"EOF(
 name: envoy.file_access_log
@@ -43,14 +43,14 @@ typed_config:
   "@type": type.googleapis.com/envoy.config.accesslog.v2.FileAccessLog
   format: "%REQ(:METHOD)% %REQ(X-ENVOY-ORIGINAL-PATH?:PATH)% %PROTOCOL% %RESPONSE_CODE%
     %RESPONSE_FLAGS% %BYTES_RECEIVED% %BYTES_SENT% %REQ(:AUTHORITY)% %UPSTREAM_HOST%
-    %RESP(X-UPSTREAM-HEADER)% %TRAILER(X-TRAILER)%\n"
+    %UPSTREAM_LOCAL_ADDRESS% %RESP(X-UPSTREAM-HEADER)% %TRAILER(X-TRAILER)%\n"
   path: "/dev/null"
   )EOF";
 
-  envoy::config::filter::accesslog::v2::AccessLog upstream_log;
+  envoy::config::accesslog::v3alpha::AccessLog upstream_log;
   TestUtility::loadFromYaml(yaml, upstream_log);
 
-  return absl::optional<envoy::config::filter::accesslog::v2::AccessLog>(upstream_log);
+  return absl::optional<envoy::config::accesslog::v3alpha::AccessLog>(upstream_log);
 }
 
 } // namespace
@@ -78,15 +78,15 @@ public:
 
 class RouterUpstreamLogTest : public testing::Test {
 public:
-  void init(absl::optional<envoy::config::filter::accesslog::v2::AccessLog> upstream_log) {
-    envoy::config::filter::http::router::v2::Router router_proto;
+  void init(absl::optional<envoy::config::accesslog::v3alpha::AccessLog> upstream_log) {
+    envoy::extensions::filters::http::router::v3alpha::Router router_proto;
 
     if (upstream_log) {
       ON_CALL(*context_.access_log_manager_.file_, write(_))
           .WillByDefault(
               Invoke([&](absl::string_view data) { output_.push_back(std::string(data)); }));
 
-      envoy::config::filter::accesslog::v2::AccessLog* current_upstream_log =
+      envoy::config::accesslog::v3alpha::AccessLog* current_upstream_log =
           router_proto.add_upstream_log();
       current_upstream_log->CopyFrom(upstream_log.value());
     }
@@ -133,6 +133,8 @@ public:
             [&](Http::StreamDecoder& decoder,
                 Http::ConnectionPool::Callbacks& callbacks) -> Http::ConnectionPool::Cancellable* {
               response_decoder = &decoder;
+              EXPECT_CALL(encoder.stream_, connectionLocalAddress())
+                  .WillRepeatedly(ReturnRef(upstream_local_address1_));
               callbacks.onPoolReady(encoder, context_.cluster_manager_.conn_pool_.host_,
                                     stream_info_);
               return nullptr;
@@ -161,11 +163,14 @@ public:
   void runWithRetry() {
     NiceMock<Http::MockStreamEncoder> encoder1;
     Http::StreamDecoder* response_decoder = nullptr;
+
     EXPECT_CALL(context_.cluster_manager_.conn_pool_, newStream(_, _))
         .WillOnce(Invoke(
             [&](Http::StreamDecoder& decoder,
                 Http::ConnectionPool::Callbacks& callbacks) -> Http::ConnectionPool::Cancellable* {
               response_decoder = &decoder;
+              EXPECT_CALL(encoder1.stream_, connectionLocalAddress())
+                  .WillRepeatedly(ReturnRef(upstream_local_address1_));
               callbacks.onPoolReady(encoder1, context_.cluster_manager_.conn_pool_.host_,
                                     stream_info_);
               return nullptr;
@@ -193,6 +198,8 @@ public:
               response_decoder = &decoder;
               EXPECT_CALL(context_.cluster_manager_.conn_pool_.host_->outlier_detector_,
                           putResult(Upstream::Outlier::Result::LocalOriginConnectSuccess, _));
+              EXPECT_CALL(encoder2.stream_, connectionLocalAddress())
+                  .WillRepeatedly(ReturnRef(upstream_local_address2_));
               callbacks.onPoolReady(encoder2, context_.cluster_manager_.conn_pool_.host_,
                                     stream_info_);
               return nullptr;
@@ -212,9 +219,13 @@ public:
 
   NiceMock<Server::Configuration::MockFactoryContext> context_;
 
-  envoy::api::v2::core::Locality upstream_locality_;
+  envoy::config::core::v3alpha::Locality upstream_locality_;
   Network::Address::InstanceConstSharedPtr host_address_{
       Network::Utility::resolveUrl("tcp://10.0.0.5:9211")};
+  Network::Address::InstanceConstSharedPtr upstream_local_address1_{
+      Network::Utility::resolveUrl("tcp://10.0.0.5:10211")};
+  Network::Address::InstanceConstSharedPtr upstream_local_address2_{
+      Network::Utility::resolveUrl("tcp://10.0.0.5:10212")};
   Event::MockTimer* response_timeout_{};
   Event::MockTimer* per_try_timeout_{};
 
@@ -236,7 +247,7 @@ TEST_F(RouterUpstreamLogTest, LogSingleTry) {
   run();
 
   EXPECT_EQ(output_.size(), 1U);
-  EXPECT_EQ(output_.front(), "GET / HTTP/1.0 200 - 0 0 host 10.0.0.5:9211 - -\n");
+  EXPECT_EQ(output_.front(), "GET / HTTP/1.0 200 - 0 0 host 10.0.0.5:9211 10.0.0.5:10211 - -\n");
 }
 
 TEST_F(RouterUpstreamLogTest, LogRetries) {
@@ -244,8 +255,8 @@ TEST_F(RouterUpstreamLogTest, LogRetries) {
   runWithRetry();
 
   EXPECT_EQ(output_.size(), 2U);
-  EXPECT_EQ(output_.front(), "GET / HTTP/1.0 0 UT 0 0 host 10.0.0.5:9211 - -\n");
-  EXPECT_EQ(output_.back(), "GET / HTTP/1.0 200 - 0 0 host 10.0.0.5:9211 - -\n");
+  EXPECT_EQ(output_.front(), "GET / HTTP/1.0 0 UT 0 0 host 10.0.0.5:9211 10.0.0.5:10211 - -\n");
+  EXPECT_EQ(output_.back(), "GET / HTTP/1.0 200 - 0 0 host 10.0.0.5:9211 10.0.0.5:10212 - -\n");
 }
 
 TEST_F(RouterUpstreamLogTest, LogFailure) {
@@ -253,7 +264,7 @@ TEST_F(RouterUpstreamLogTest, LogFailure) {
   run(503, {}, {}, {});
 
   EXPECT_EQ(output_.size(), 1U);
-  EXPECT_EQ(output_.front(), "GET / HTTP/1.0 503 - 0 0 host 10.0.0.5:9211 - -\n");
+  EXPECT_EQ(output_.front(), "GET / HTTP/1.0 503 - 0 0 host 10.0.0.5:9211 10.0.0.5:10211 - -\n");
 }
 
 TEST_F(RouterUpstreamLogTest, LogHeaders) {
@@ -262,7 +273,8 @@ TEST_F(RouterUpstreamLogTest, LogHeaders) {
       {{"x-trailer", "value"}});
 
   EXPECT_EQ(output_.size(), 1U);
-  EXPECT_EQ(output_.front(), "GET /foo HTTP/1.0 200 - 0 0 host 10.0.0.5:9211 abcdef value\n");
+  EXPECT_EQ(output_.front(),
+            "GET /foo HTTP/1.0 200 - 0 0 host 10.0.0.5:9211 10.0.0.5:10211 abcdef value\n");
 }
 
 // Test timestamps and durations are emitted.
@@ -276,10 +288,10 @@ typed_config:
   path: "/dev/null"
   )EOF";
 
-  envoy::config::filter::accesslog::v2::AccessLog upstream_log;
+  envoy::config::accesslog::v3alpha::AccessLog upstream_log;
   TestUtility::loadFromYaml(yaml, upstream_log);
 
-  init(absl::optional<envoy::config::filter::accesslog::v2::AccessLog>(upstream_log));
+  init(absl::optional<envoy::config::accesslog::v3alpha::AccessLog>(upstream_log));
   run(200, {{"x-envoy-original-path", "/foo"}}, {}, {});
 
   EXPECT_EQ(output_.size(), 1U);

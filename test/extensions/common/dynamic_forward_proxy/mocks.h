@@ -1,6 +1,6 @@
 #pragma once
 
-#include "envoy/config/common/dynamic_forward_proxy/v2alpha/dns_cache.pb.h"
+#include "envoy/extensions/common/dynamic_forward_proxy/v3alpha/dns_cache.pb.h"
 
 #include "extensions/common/dynamic_forward_proxy/dns_cache.h"
 
@@ -55,7 +55,7 @@ public:
   MOCK_METHOD1(
       getCache,
       DnsCacheSharedPtr(
-          const envoy::config::common::dynamic_forward_proxy::v2alpha::DnsCacheConfig& config));
+          const envoy::extensions::common::dynamic_forward_proxy::v3alpha::DnsCacheConfig& config));
 
   std::shared_ptr<MockDnsCache> dns_cache_{new MockDnsCache()};
 };
@@ -66,8 +66,8 @@ public:
   ~MockDnsHostInfo() override;
 
   MOCK_METHOD0(address, Network::Address::InstanceConstSharedPtr());
-  MOCK_METHOD0(resolvedHost, const std::string&());
-  MOCK_METHOD0(isIpAddress, bool());
+  MOCK_CONST_METHOD0(resolvedHost, const std::string&());
+  MOCK_CONST_METHOD0(isIpAddress, bool());
   MOCK_METHOD0(touch, void());
 
   Network::Address::InstanceConstSharedPtr address_;

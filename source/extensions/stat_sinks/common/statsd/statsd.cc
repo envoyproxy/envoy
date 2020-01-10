@@ -57,15 +57,15 @@ void UdpStatsdSink::flush(Stats::MetricSnapshot& snapshot) {
   Writer& writer = tls_->getTyped<Writer>();
   for (const auto& counter : snapshot.counters()) {
     if (counter.counter_.get().used()) {
-      writer.write(fmt::format("{}.{}:{}|c{}", prefix_, getName(counter.counter_.get()),
-                               counter.delta_, buildTagStr(counter.counter_.get().tags())));
+      writer.write(absl::StrCat(prefix_, ".", getName(counter.counter_.get()), ":", counter.delta_,
+                                "|c", buildTagStr(counter.counter_.get().tags())));
     }
   }
 
   for (const auto& gauge : snapshot.gauges()) {
     if (gauge.get().used()) {
-      writer.write(fmt::format("{}.{}:{}|g{}", prefix_, getName(gauge.get()), gauge.get().value(),
-                               buildTagStr(gauge.get().tags())));
+      writer.write(absl::StrCat(prefix_, ".", getName(gauge.get()), ":", gauge.get().value(), "|g",
+                                buildTagStr(gauge.get().tags())));
     }
   }
 }
@@ -77,13 +77,13 @@ void UdpStatsdSink::onHistogramComplete(const Stats::Histogram& histogram, uint6
   // are timers but record in units other than milliseconds, it may make sense to scale the value to
   // milliseconds here and potentially suffix the names accordingly (minus the pre-existing ones for
   // backwards compatibility).
-  const std::string message(fmt::format("{}.{}:{}|ms{}", prefix_, getName(histogram),
-                                        std::chrono::milliseconds(value).count(),
-                                        buildTagStr(histogram.tags())));
+  const std::string message(absl::StrCat(prefix_, ".", getName(histogram), ":",
+                                         std::chrono::milliseconds(value).count(), "|ms",
+                                         buildTagStr(histogram.tags())));
   tls_->getTyped<Writer>().write(message);
 }
 
-const std::string UdpStatsdSink::getName(const Stats::Metric& metric) {
+const std::string UdpStatsdSink::getName(const Stats::Metric& metric) const {
   if (use_tag_) {
     return metric.tagExtractedName();
   } else {
@@ -91,7 +91,7 @@ const std::string UdpStatsdSink::getName(const Stats::Metric& metric) {
   }
 }
 
-const std::string UdpStatsdSink::buildTagStr(const std::vector<Stats::Tag>& tags) {
+const std::string UdpStatsdSink::buildTagStr(const std::vector<Stats::Tag>& tags) const {
   if (!use_tag_ || tags.empty()) {
     return "";
   }
@@ -264,7 +264,7 @@ void TcpStatsdSink::TlsSink::write(Buffer::Instance& buffer) {
   connection_->write(buffer, false);
 }
 
-uint64_t TcpStatsdSink::TlsSink::usedBuffer() {
+uint64_t TcpStatsdSink::TlsSink::usedBuffer() const {
   ASSERT(current_slice_mem_ != nullptr);
   return current_slice_mem_ - reinterpret_cast<char*>(current_buffer_slice_.mem_);
 }

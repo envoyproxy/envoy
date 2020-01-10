@@ -180,8 +180,8 @@ envoy_cc_library(
         "//source/common/common:regex_lib",
         "//source/common/config:metadata_lib",
         "//source/common/protobuf",
-        "@envoy_api//envoy/api/v2/core:pkg_cc_proto",
-        "@envoy_api//envoy/type/matcher:pkg_cc_proto",
+        "@envoy_api//envoy/config/core/v3alpha:pkg_cc_proto",
+        "@envoy_api//envoy/type/matcher/v3alpha:pkg_cc_proto",
     ],
 )
 
@@ -194,7 +194,7 @@ envoy_cc_library(
         "//include/envoy/common:regex_interface",
         "//source/common/protobuf:utility_lib",
         "@com_googlesource_code_re2//:re2",
-        "@envoy_api//envoy/type/matcher:pkg_cc_proto",
+        "@envoy_api//envoy/type/matcher/v3alpha:pkg_cc_proto",
     ],
 )
 
@@ -234,6 +234,16 @@ envoy_cc_library(
     name = "thread_annotations",
     hdrs = ["thread_annotations.h"],
     external_deps = ["abseil_base"],
+)
+
+envoy_cc_library(
+    name = "thread_synchronizer_lib",
+    srcs = ["thread_synchronizer.cc"],
+    hdrs = ["thread_synchronizer.h"],
+    external_deps = ["abseil_synchronization"],
+    deps = [
+        ":assert_lib",
+    ],
 )
 
 envoy_cc_library(
@@ -318,6 +328,10 @@ envoy_cc_library(
         "version.h",
         ":generate_version_number",
     ],
+    deps = [
+        "//source/common/singleton:const_singleton",
+        "@envoy_api//envoy/config/core/v3alpha:pkg_cc_proto",
+    ],
 )
 
 envoy_cc_library(
@@ -341,6 +355,7 @@ envoy_cc_library(
     deps = [
         ":version_includes",
         "//source/common/common:macros",
+        "//source/common/protobuf:utility_lib",
     ],
 )
 

@@ -6,7 +6,7 @@
 #include "envoy/common/exception.h"
 #include "envoy/protobuf/message_validator.h"
 #include "envoy/runtime/runtime.h"
-#include "envoy/type/percent.pb.h"
+#include "envoy/type/v3alpha/percent.pb.h"
 
 #include "common/common/hash.h"
 #include "common/common/utility.h"
@@ -71,7 +71,8 @@ uint64_t convertPercent(double percent, uint64_t max_value);
  * @param random_value supplies a numerical value to use to evaluate the event.
  * @return bool decision about whether the event should occur.
  */
-bool evaluateFractionalPercent(envoy::type::FractionalPercent percent, uint64_t random_value);
+bool evaluateFractionalPercent(envoy::type::v3alpha::FractionalPercent percent,
+                               uint64_t random_value);
 
 /**
  * Convert a fractional percent denominator enum into an integer.
@@ -79,7 +80,7 @@ bool evaluateFractionalPercent(envoy::type::FractionalPercent percent, uint64_t 
  * @return the converted denominator.
  */
 uint64_t fractionalPercentDenominatorToInt(
-    const envoy::type::FractionalPercent::DenominatorType& denominator);
+    const envoy::type::v3alpha::FractionalPercent::DenominatorType& denominator);
 
 } // namespace ProtobufPercentHelper
 } // namespace Envoy
@@ -255,13 +256,6 @@ public:
   }
 
   template <class MessageType>
-  static void loadFromFileAndValidate(const std::string& path, MessageType& message,
-                                      ProtobufMessage::ValidationVisitor& validation_visitor) {
-    loadFromFile(path, message, validation_visitor);
-    validate(message, validation_visitor);
-  }
-
-  template <class MessageType>
   static void loadFromYamlAndValidate(const std::string& yaml, MessageType& message,
                                       ProtobufMessage::ValidationVisitor& validation_visitor) {
     loadFromYaml(yaml, message, validation_visitor);
@@ -356,6 +350,13 @@ public:
   static ProtobufWkt::Struct keyValueStruct(const std::string& key, const std::string& value);
 
   /**
+   * Utility method to create a Struct containing the passed in key/value map.
+   *
+   * @param fields the key/value pairs to initialize the Struct proto
+   */
+  static ProtobufWkt::Struct keyValueStruct(const std::map<std::string, std::string>& fields);
+
+  /**
    * Utility method to print a human readable string of the code passed in.
    *
    * @param code the protobuf error code
@@ -379,6 +380,50 @@ public:
    * @return true if v1 and v2 are identical
    */
   static bool equal(const ProtobufWkt::Value& v1, const ProtobufWkt::Value& v2);
+
+  /**
+   * @return wrapped ProtobufWkt::NULL_VALUE.
+   */
+  static const ProtobufWkt::Value& nullValue();
+
+  /**
+   * Wrap std::string into ProtobufWkt::Value string value.
+   * @param str string to be wrapped.
+   * @return wrapped string.
+   */
+  static ProtobufWkt::Value stringValue(const std::string& str);
+
+  /**
+   * Wrap boolean into ProtobufWkt::Value boolean value.
+   * @param str boolean to be wrapped.
+   * @return wrapped boolean.
+   */
+  static ProtobufWkt::Value boolValue(bool b);
+
+  /**
+   * Wrap ProtobufWkt::Struct into ProtobufWkt::Value struct value.
+   * @param obj struct to be wrapped.
+   * @return wrapped struct.
+   */
+  static ProtobufWkt::Value structValue(const ProtobufWkt::Struct& obj);
+
+  /**
+   * Wrap number into ProtobufWkt::Value double value.
+   * @param num number to be wrapped.
+   * @return wrapped number.
+   */
+  template <typename T> static ProtobufWkt::Value numberValue(const T num) {
+    ProtobufWkt::Value val;
+    val.set_number_value(static_cast<double>(num));
+    return val;
+  }
+
+  /**
+   * Wrap a collection of ProtobufWkt::Values into ProtobufWkt::Value list value.
+   * @param values collection of ProtobufWkt::Values to be wrapped.
+   * @return wrapped list value.
+   */
+  static ProtobufWkt::Value listValue(const std::vector<ProtobufWkt::Value>& values);
 };
 
 /**

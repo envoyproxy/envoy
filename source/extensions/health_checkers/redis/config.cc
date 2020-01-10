@@ -1,8 +1,8 @@
 #include "extensions/health_checkers/redis/config.h"
 
-#include "envoy/api/v2/core/health_check.pb.h"
-#include "envoy/config/filter/network/redis_proxy/v2/redis_proxy.pb.validate.h"
-#include "envoy/config/health_checker/redis/v2/redis.pb.validate.h"
+#include "envoy/config/core/v3alpha/health_check.pb.h"
+#include "envoy/extensions/filters/network/redis_proxy/v3alpha/redis_proxy.pb.h"
+#include "envoy/extensions/filters/network/redis_proxy/v3alpha/redis_proxy.pb.validate.h"
 #include "envoy/registry/registry.h"
 
 #include "common/config/utility.h"
@@ -15,7 +15,7 @@ namespace HealthCheckers {
 namespace RedisHealthChecker {
 
 Upstream::HealthCheckerSharedPtr RedisHealthCheckerFactory::createCustomHealthChecker(
-    const envoy::api::v2::core::HealthCheck& config,
+    const envoy::config::core::v3alpha::HealthCheck& config,
     Server::Configuration::HealthCheckerFactoryContext& context) {
   return std::make_shared<RedisHealthChecker>(
       context.cluster(), config,

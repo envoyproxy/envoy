@@ -4,8 +4,10 @@
 #include "envoy/common/token_bucket.h"
 #include "envoy/config/grpc_mux.h"
 #include "envoy/config/subscription.h"
+#include "envoy/service/discovery/v3alpha/discovery.pb.h"
 
 #include "common/common/logger.h"
+#include "common/config/api_version.h"
 #include "common/config/delta_subscription_state.h"
 #include "common/config/grpc_stream.h"
 #include "common/config/pausable_ack_queue.h"
@@ -20,9 +22,10 @@ namespace Config {
 // This class owns the GrpcStream used to talk to the server, maintains queuing
 // logic to properly order the subscription(s)' various messages, and allows
 // starting/stopping/pausing of the subscriptions.
-class NewGrpcMuxImpl : public GrpcMux,
-                       public GrpcStreamCallbacks<envoy::api::v2::DeltaDiscoveryResponse>,
-                       Logger::Loggable<Logger::Id::config> {
+class NewGrpcMuxImpl
+    : public GrpcMux,
+      public GrpcStreamCallbacks<envoy::service::discovery::v3alpha::DeltaDiscoveryResponse>,
+      Logger::Loggable<Logger::Id::config> {
 public:
   NewGrpcMuxImpl(Grpc::RawAsyncClientPtr&& async_client, Event::Dispatcher& dispatcher,
                  const Protobuf::MethodDescriptor& service_method, Runtime::RandomGenerator& random,
@@ -40,8 +43,9 @@ public:
   void pause(const std::string& type_url) override;
   void resume(const std::string& type_url) override;
   bool paused(const std::string& type_url) const override;
-  void
-  onDiscoveryResponse(std::unique_ptr<envoy::api::v2::DeltaDiscoveryResponse>&& message) override;
+  void onDiscoveryResponse(
+      std::unique_ptr<envoy::service::discovery::v3alpha::DeltaDiscoveryResponse>&& message)
+      override;
 
   void onStreamEstablished() override;
 
@@ -110,7 +114,8 @@ private:
   // the order of Envoy's dependency ordering).
   std::list<std::string> subscription_ordering_;
 
-  GrpcStream<envoy::api::v2::DeltaDiscoveryRequest, envoy::api::v2::DeltaDiscoveryResponse>
+  GrpcStream<envoy::service::discovery::v3alpha::DeltaDiscoveryRequest,
+             envoy::service::discovery::v3alpha::DeltaDiscoveryResponse>
       grpc_stream_;
 };
 

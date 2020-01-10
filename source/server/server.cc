@@ -7,9 +7,9 @@
 #include <string>
 #include <unordered_set>
 
-#include "envoy/admin/v2alpha/config_dump.pb.h"
-#include "envoy/config/bootstrap/v2/bootstrap.pb.h"
-#include "envoy/config/bootstrap/v2/bootstrap.pb.validate.h"
+#include "envoy/admin/v3alpha/config_dump.pb.h"
+#include "envoy/config/bootstrap/v3alpha/bootstrap.pb.h"
+#include "envoy/config/bootstrap/v3alpha/bootstrap.pb.validate.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/event/signal.h"
 #include "envoy/event/timer.h"
@@ -217,11 +217,11 @@ void InstanceImpl::flushStatsInternal() {
 bool InstanceImpl::healthCheckFailed() { return !live_.load(); }
 
 InstanceUtil::BootstrapVersion InstanceUtil::loadBootstrapConfig(
-    envoy::config::bootstrap::v2::Bootstrap& bootstrap, const Options& options,
+    envoy::config::bootstrap::v3alpha::Bootstrap& bootstrap, const Options& options,
     ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api) {
   const std::string& config_path = options.configPath();
   const std::string& config_yaml = options.configYaml();
-  const envoy::config::bootstrap::v2::Bootstrap& config_proto = options.configProto();
+  const envoy::config::bootstrap::v3alpha::Bootstrap& config_proto = options.configProto();
 
   // Exactly one of config_path and config_yaml should be specified.
   if (config_path.empty() && config_yaml.empty() && config_proto.ByteSize() == 0) {
@@ -233,7 +233,7 @@ InstanceUtil::BootstrapVersion InstanceUtil::loadBootstrapConfig(
     MessageUtil::loadFromFile(config_path, bootstrap, validation_visitor, api);
   }
   if (!config_yaml.empty()) {
-    envoy::config::bootstrap::v2::Bootstrap bootstrap_override;
+    envoy::config::bootstrap::v3alpha::Bootstrap bootstrap_override;
     MessageUtil::loadFromYaml(config_yaml, bootstrap_override, validation_visitor);
     bootstrap.MergeFrom(bootstrap_override);
   }
@@ -305,6 +305,20 @@ void InstanceImpl::initialize(const Options& options,
   server_stats_->version_.set(version_int);
 
   bootstrap_.mutable_node()->set_build_version(VersionInfo::version());
+  bootstrap_.mutable_node()->set_user_agent_name("envoy");
+  *bootstrap_.mutable_node()->mutable_user_agent_build_version() = VersionInfo::buildVersion();
+  for (const auto& ext : Envoy::Registry::FactoryCategoryRegistry::registeredFactories()) {
+    for (const auto& name : ext.second->allRegisteredNames()) {
+      auto* extension = bootstrap_.mutable_node()->add_extensions();
+      extension->set_name(std::string(name));
+      extension->set_category(ext.first);
+      auto const version = ext.second->getFactoryVersion(name);
+      if (version) {
+        *extension->mutable_version() = version.value();
+      }
+      extension->set_disabled(ext.second->isFactoryDisabled(name));
+    }
+  }
 
   local_info_ = std::make_unique<LocalInfo::LocalInfoImpl>(
       bootstrap_.node(), local_address, options.serviceZone(), options.serviceClusterName(),
@@ -368,7 +382,7 @@ void InstanceImpl::initialize(const Options& options,
   hooks.onRuntimeCreated();
 
   // Once we have runtime we can initialize the SSL context manager.
-  ssl_context_manager_ = createContextManager(Ssl::ContextManagerFactory::name(), time_source_);
+  ssl_context_manager_ = createContextManager("ssl_context_manager", time_source_);
 
   const bool use_tcp_for_dns_lookups = bootstrap_.use_tcp_for_dns_lookups();
   dns_resolver_ = dispatcher_->createDnsResolver({}, use_tcp_for_dns_lookups);
@@ -468,6 +482,9 @@ RunHelper::RunHelper(Instance& instance, const Options& options, Event::Dispatch
       }) {
   // Setup signals.
   if (options.signalHandlingEnabled()) {
+// TODO(Pivotal): Figure out solution to graceful shutdown on Windows. None of these signals exist
+// on Windows.
+#ifndef WIN32
     sigterm_ = dispatcher.listenForSignal(SIGTERM, [&instance]() {
       ENVOY_LOG(warn, "caught SIGTERM");
       instance.shutdown();
@@ -486,6 +503,7 @@ RunHelper::RunHelper(Instance& instance, const Options& options, Event::Dispatch
     sig_hup_ = dispatcher.listenForSignal(SIGHUP, []() {
       ENVOY_LOG(warn, "caught and eating SIGHUP. See documentation for how to hot restart.");
     });
+#endif
   }
 
   // Start overload manager before workers.
@@ -623,12 +641,8 @@ void InstanceImpl::notifyCallbacksForStage(Stage stage, Event::PostCb completion
 
   // Wrap completion_cb so that it only gets invoked when all callbacks for this stage
   // have finished their work.
-  std::shared_ptr<Event::PostCb> cb_guard(new Event::PostCb([] {}),
-                                          [this, completion_cb](Event::PostCb* cb) {
-                                            ASSERT(std::this_thread::get_id() == main_thread_id_);
-                                            completion_cb();
-                                            delete cb;
-                                          });
+  std::shared_ptr<void> cb_guard(
+      new Cleanup([this, completion_cb]() { dispatcher_->post(completion_cb); }));
 
   // Registrations which take a completion callback are typically implemented by executing a
   // callback on all worker threads using Slot::runOnAllThreads which will hang indefinitely if
@@ -639,14 +653,14 @@ void InstanceImpl::notifyCallbacksForStage(Stage stage, Event::PostCb completion
     if (it2 != stage_completable_callbacks_.end()) {
       ENVOY_LOG(info, "Notifying {} callback(s) with completion.", it2->second.size());
       for (const StageCallbackWithCompletion& callback : it2->second) {
-        callback([cb_guard] { (*cb_guard)(); });
+        callback([cb_guard] {});
       }
     }
   }
 }
 
 ProtobufTypes::MessagePtr InstanceImpl::dumpBootstrapConfig() {
-  auto config_dump = std::make_unique<envoy::admin::v2alpha::BootstrapConfigDump>();
+  auto config_dump = std::make_unique<envoy::admin::v3alpha::BootstrapConfigDump>();
   config_dump->mutable_bootstrap()->MergeFrom(bootstrap_);
   TimestampUtil::systemClockToTimestamp(bootstrap_config_update_time_,
                                         *(config_dump->mutable_last_updated()));

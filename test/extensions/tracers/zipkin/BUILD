@@ -17,7 +17,6 @@ envoy_extension_cc_test(
         "span_buffer_test.cc",
         "span_context_extractor_test.cc",
         "tracer_test.cc",
-        "util_test.cc",
         "zipkin_core_types_test.cc",
         "zipkin_tracer_impl_test.cc",
     ],
@@ -44,7 +43,7 @@ envoy_extension_cc_test(
         "//test/test_common:simulated_time_system_lib",
         "//test/test_common:test_time_lib",
         "//test/test_common:utility_lib",
-        "@envoy_api//envoy/config/trace/v2:pkg_cc_proto",
+        "@envoy_api//envoy/config/trace/v3alpha:pkg_cc_proto",
     ],
 )
 
@@ -56,6 +55,6 @@ envoy_extension_cc_test(
         "//source/extensions/tracers/zipkin:config",
         "//test/mocks/server:server_mocks",
         "//test/test_common:utility_lib",
-        "@envoy_api//envoy/config/trace/v2:pkg_cc_proto",
+        "@envoy_api//envoy/config/trace/v3alpha:pkg_cc_proto",
     ],
 )
