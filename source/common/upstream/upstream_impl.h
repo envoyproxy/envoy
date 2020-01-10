@@ -15,6 +15,7 @@
 #include "envoy/config/core/v3alpha/address.pb.h"
 #include "envoy/config/core/v3alpha/base.pb.h"
 #include "envoy/config/core/v3alpha/health_check.pb.h"
+#include "envoy/config/core/v3alpha/protocol.pb.h"
 #include "envoy/config/endpoint/v3alpha/endpoint_components.pb.h"
 #include "envoy/config/typed_metadata.h"
 #include "envoy/event/timer.h"
@@ -575,6 +576,10 @@ public:
 
   bool drainConnectionsOnHostRemoval() const override { return drain_connections_on_host_removal_; }
   bool warmHosts() const override { return warm_hosts_; }
+  const absl::optional<envoy::config::core::v3alpha::UpstreamHttpProtocolOptions>&
+  upstreamHttpProtocolOptions() const override {
+    return upstream_http_protocol_options_;
+  }
 
   absl::optional<std::string> eds_service_name() const override { return eds_service_name_; }
 
@@ -631,6 +636,8 @@ private:
   const Network::ConnectionSocket::OptionsSharedPtr cluster_socket_options_;
   const bool drain_connections_on_host_removal_;
   const bool warm_hosts_;
+  const absl::optional<envoy::config::core::v3alpha::UpstreamHttpProtocolOptions>
+      upstream_http_protocol_options_;
   absl::optional<std::string> eds_service_name_;
   const absl::optional<envoy::config::cluster::v3alpha::Cluster::CustomClusterType> cluster_type_;
   const std::unique_ptr<Server::Configuration::CommonFactoryContext> factory_context_;

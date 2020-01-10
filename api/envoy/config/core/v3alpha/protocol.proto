@@ -21,6 +21,16 @@ message TcpProtocolOptions {
       "envoy.api.v2.core.TcpProtocolOptions";
 }
 
+message UpstreamHttpProtocolOptions {
+  option (udpa.annotations.versioning).previous_message_type =
+      "envoy.api.v2.core.UpstreamHttpProtocolOptions";
+
+  // Set transport socket `SNI <https://en.wikipedia.org/wiki/Server_Name_Indication>`_ for new
+  // upstream connections based on the downstream HTTP host/authority header, as seen by the
+  // :ref:`router filter <config_http_filters_router>`.
+  bool auto_sni = 1;
+}
+
 message HttpProtocolOptions {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.api.v2.core.HttpProtocolOptions";

@@ -260,7 +260,10 @@ public:
 
 private:
   std::chrono::milliseconds per_try_timeout_{0};
-  uint32_t num_retries_{};
+  // We set the number of retries to 1 by default (i.e. when no route or vhost level retry policy is
+  // set) so that when retries get enabled through the x-envoy-retry-on header we default to 1
+  // retry.
+  uint32_t num_retries_{1};
   uint32_t retry_on_{};
   // Each pair contains the name and config proto to be used to create the RetryHostPredicates
   // that should be used when with this policy.

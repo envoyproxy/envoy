@@ -203,7 +203,7 @@ Ipv4Instance::Ipv4Instance(const std::string& address, uint32_t port) : Instance
     throw EnvoyException(fmt::format("invalid ipv4 address '{}'", address));
   }
 
-  friendly_name_ = fmt::format("{}:{}", address, port);
+  friendly_name_ = absl::StrCat(address, ":", port);
   validateIpv4Supported(friendly_name_);
   ip_.friendly_address_ = address;
 }
@@ -213,7 +213,7 @@ Ipv4Instance::Ipv4Instance(uint32_t port) : InstanceBase(Type::Ip) {
   ip_.ipv4_.address_.sin_family = AF_INET;
   ip_.ipv4_.address_.sin_port = htons(port);
   ip_.ipv4_.address_.sin_addr.s_addr = INADDR_ANY;
-  friendly_name_ = fmt::format("0.0.0.0:{}", port);
+  friendly_name_ = absl::StrCat("0.0.0.0:", port);
   validateIpv4Supported(friendly_name_);
   ip_.friendly_address_ = "0.0.0.0";
 }
@@ -409,7 +409,7 @@ Api::SysCallIntResult PipeInstance::bind(int fd) const {
   if (mode != 0 && !abstract_namespace_ && bind_result.rc_ == 0) {
     auto set_permissions = os_syscalls.chmod(address_.sun_path, mode);
     if (set_permissions.rc_ != 0) {
-      throw EnvoyException(fmt::format("Failed to create socket with mode {}", mode));
+      throw EnvoyException(absl::StrCat("Failed to create socket with mode ", mode));
     }
   }
   return bind_result;

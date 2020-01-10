@@ -5,8 +5,8 @@
 #include <utility>
 #include <vector>
 
-#include "envoy/config/filter/accesslog/v3alpha/accesslog.pb.h"
-#include "envoy/extensions/access_loggers/grpc/v3alpha/file.pb.h"
+#include "envoy/config/accesslog/v3alpha/accesslog.pb.h"
+#include "envoy/extensions/access_loggers/file/v3alpha/file.pb.h"
 #include "envoy/extensions/filters/network/tcp_proxy/v3alpha/tcp_proxy.pb.h"
 #include "envoy/extensions/filters/network/tcp_proxy/v3alpha/tcp_proxy.pb.validate.h"
 
@@ -799,10 +799,10 @@ TEST(ConfigTest, HashWithSourceIpDefaultConfig) {
 
 TEST(ConfigTest, AccessLogConfig) {
   envoy::extensions::filters::network::tcp_proxy::v3alpha::TcpProxy config;
-  envoy::config::filter::accesslog::v3alpha::AccessLog* log = config.mutable_access_log()->Add();
+  envoy::config::accesslog::v3alpha::AccessLog* log = config.mutable_access_log()->Add();
   log->set_name(Extensions::AccessLoggers::AccessLogNames::get().File);
   {
-    envoy::extensions::access_loggers::grpc::v3alpha::FileAccessLog file_access_log;
+    envoy::extensions::access_loggers::file::v3alpha::FileAccessLog file_access_log;
     file_access_log.set_path("some_path");
     file_access_log.set_format("the format specifier");
     log->mutable_typed_config()->PackFrom(file_access_log);
@@ -811,7 +811,7 @@ TEST(ConfigTest, AccessLogConfig) {
   log = config.mutable_access_log()->Add();
   log->set_name(Extensions::AccessLoggers::AccessLogNames::get().File);
   {
-    envoy::extensions::access_loggers::grpc::v3alpha::FileAccessLog file_access_log;
+    envoy::extensions::access_loggers::file::v3alpha::FileAccessLog file_access_log;
     file_access_log.set_path("another path");
     log->mutable_typed_config()->PackFrom(file_access_log);
   }
@@ -852,10 +852,9 @@ public:
   envoy::extensions::filters::network::tcp_proxy::v3alpha::TcpProxy
   accessLogConfig(const std::string& access_log_format) {
     envoy::extensions::filters::network::tcp_proxy::v3alpha::TcpProxy config = defaultConfig();
-    envoy::config::filter::accesslog::v3alpha::AccessLog* access_log =
-        config.mutable_access_log()->Add();
+    envoy::config::accesslog::v3alpha::AccessLog* access_log = config.mutable_access_log()->Add();
     access_log->set_name(Extensions::AccessLoggers::AccessLogNames::get().File);
-    envoy::extensions::access_loggers::grpc::v3alpha::FileAccessLog file_access_log;
+    envoy::extensions::access_loggers::file::v3alpha::FileAccessLog file_access_log;
     file_access_log.set_path("unused");
     file_access_log.set_format(access_log_format);
     access_log->mutable_typed_config()->PackFrom(file_access_log);

@@ -413,11 +413,11 @@ void DiskLayer::walkDirectory(const std::string& path, const std::string& prefix
 
   ENVOY_LOG(debug, "walking directory: {}", path);
   if (depth > MaxWalkDepth) {
-    throw EnvoyException(fmt::format("Walk recursion depth exceeded {}", MaxWalkDepth));
+    throw EnvoyException(absl::StrCat("Walk recursion depth exceeded ", MaxWalkDepth));
   }
   // Check if this is an obviously bad path.
   if (api.fileSystem().illegalPath(path)) {
-    throw EnvoyException(fmt::format("Invalid path: {}", path));
+    throw EnvoyException(absl::StrCat("Invalid path: ", path));
   }
 
   Filesystem::Directory directory(path);
@@ -475,7 +475,7 @@ void ProtoLayer::walkProtoValue(const ProtobufWkt::Value& v, const std::string& 
   case ProtobufWkt::Value::KIND_NOT_SET:
   case ProtobufWkt::Value::kListValue:
   case ProtobufWkt::Value::kNullValue:
-    throw EnvoyException(fmt::format("Invalid runtime entry value for {}", prefix));
+    throw EnvoyException(absl::StrCat("Invalid runtime entry value for ", prefix));
     break;
   case ProtobufWkt::Value::kStringValue:
     values_.emplace(prefix, SnapshotImpl::createEntry(v.string_value()));

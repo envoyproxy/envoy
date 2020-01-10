@@ -3,6 +3,7 @@
 #include <string>
 
 #include "envoy/config/core/v3alpha/base.pb.h"
+#include "envoy/extensions/transport_sockets/tls/v3alpha/cert.pb.h"
 #include "envoy/type/v3alpha/percent.pb.h"
 
 #include "common/buffer/buffer_impl.h"
@@ -12,6 +13,7 @@
 #include "common/http/context_impl.h"
 #include "common/network/application_protocol.h"
 #include "common/network/socket_option_factory.h"
+#include "common/network/upstream_server_name.h"
 #include "common/network/utility.h"
 #include "common/router/config_impl.h"
 #include "common/router/debug_config.h"
@@ -278,6 +280,34 @@ public:
       : RouterTestBase(false, true, Protobuf::RepeatedPtrField<std::string>{}) {}
 };
 
+TEST_F(RouterTest, UpdateFilterState) {
+  NiceMock<StreamInfo::MockStreamInfo> stream_info;
+  auto dummy_option =
+      absl::make_optional<envoy::config::core::v3alpha::UpstreamHttpProtocolOptions>();
+  dummy_option.value().set_auto_sni(true);
+  ON_CALL(*cm_.thread_local_cluster_.cluster_.info_, upstreamHttpProtocolOptions())
+      .WillByDefault(ReturnRef(dummy_option));
+  ON_CALL(callbacks_.stream_info_, filterState())
+      .WillByDefault(ReturnRef(stream_info.filterState()));
+  EXPECT_CALL(cm_.conn_pool_, newStream(_, _)).WillOnce(Return(&cancellable_));
+  stream_info.filterState().setData(Network::UpstreamServerName::key(),
+                                    std::make_unique<Network::UpstreamServerName>("dummy"),
+                                    StreamInfo::FilterState::StateType::Mutable);
+  expectResponseTimerCreate();
+
+  Http::TestHeaderMapImpl headers;
+
+  HttpTestUtility::addDefaultHeaders(headers);
+  router_.decodeHeaders(headers, true);
+  EXPECT_EQ("host",
+            stream_info.filterState()
+                .getDataReadOnly<Network::UpstreamServerName>(Network::UpstreamServerName::key())
+                .value());
+  EXPECT_CALL(cancellable_, cancel());
+  router_.onDestroy();
+  EXPECT_TRUE(verifyHostUpstreamStats(0, 0));
+}
+
 TEST_F(RouterTest, RouteNotFound) {
   EXPECT_CALL(callbacks_.stream_info_, setResponseFlag(StreamInfo::ResponseFlag::NoRouteFound));
 
@@ -297,7 +327,6 @@ TEST_F(RouterTest, ClusterNotFound) {
   Http::TestHeaderMapImpl headers;
   HttpTestUtility::addDefaultHeaders(headers);
   ON_CALL(cm_, get(_)).WillByDefault(Return(nullptr));
-
   router_.decodeHeaders(headers, true);
   EXPECT_EQ(1UL, stats_store_.counter("test.no_cluster").value());
   EXPECT_TRUE(verifyHostUpstreamStats(0, 0));

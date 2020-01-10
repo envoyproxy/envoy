@@ -1,6 +1,6 @@
 syntax = "proto3";
 
-package envoy.config.filter.thrift.rate_limit.v3alpha;
+package envoy.extensions.filters.network.thrift_proxy.filters.ratelimit.v3alpha;
 
 import "envoy/config/ratelimit/v3alpha/rls.proto";
 
@@ -10,7 +10,7 @@ import "udpa/annotations/versioning.proto";
 
 import "validate/validate.proto";
 
-option java_package = "io.envoyproxy.envoy.config.filter.thrift.rate_limit.v3alpha";
+option java_package = "io.envoyproxy.envoy.extensions.filters.network.thrift_proxy.filters.ratelimit.v3alpha";
 option java_outer_classname = "RateLimitProto";
 option java_multiple_files = true;
 
@@ -50,6 +50,6 @@ message RateLimit {
   // Configuration for an external rate limit service provider. If not
   // specified, any calls to the rate limit service will immediately return
   // success.
-  ratelimit.v3alpha.RateLimitServiceConfig rate_limit_service = 5
+  config.ratelimit.v3alpha.RateLimitServiceConfig rate_limit_service = 5
       [(validate.rules).message = {required: true}];
 }

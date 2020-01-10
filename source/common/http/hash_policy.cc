@@ -4,6 +4,8 @@
 
 #include "common/http/utility.h"
 
+#include "absl/strings/str_cat.h"
+
 namespace Envoy {
 namespace Http {
 
@@ -112,9 +114,8 @@ private:
 
 HashPolicyImpl::HashPolicyImpl(
     absl::Span<const envoy::config::route::v3alpha::RouteAction::HashPolicy* const> hash_policies) {
-  // TODO(htuch): Add support for cookie hash policies, #1295
-  hash_impls_.reserve(hash_policies.size());
 
+  hash_impls_.reserve(hash_policies.size());
   for (auto* hash_policy : hash_policies) {
     switch (hash_policy->policy_specifier_case()) {
     case envoy::config::route::v3alpha::RouteAction::HashPolicy::PolicySpecifierCase::kHeader:
@@ -144,7 +145,7 @@ HashPolicyImpl::HashPolicyImpl(
       break;
     default:
       throw EnvoyException(
-          fmt::format("Unsupported hash policy {}", hash_policy->policy_specifier_case()));
+          absl::StrCat("Unsupported hash policy ", hash_policy->policy_specifier_case()));
     }
   }
 }

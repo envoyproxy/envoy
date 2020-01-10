@@ -67,7 +67,7 @@ OverloadAction::OverloadAction(const envoy::config::overload::v3alpha::OverloadA
 
     if (!triggers_.insert(std::make_pair(trigger_config.name(), std::move(trigger))).second) {
       throw EnvoyException(
-          fmt::format("Duplicate trigger resource for overload action {}", config.name()));
+          absl::StrCat("Duplicate trigger resource for overload action ", config.name()));
     }
   }
 
@@ -117,7 +117,7 @@ OverloadManagerImpl::OverloadManagerImpl(
         resources_.emplace(std::piecewise_construct, std::forward_as_tuple(name),
                            std::forward_as_tuple(name, std::move(monitor), *this, stats_scope));
     if (!result.second) {
-      throw EnvoyException(fmt::format("Duplicate resource monitor {}", name));
+      throw EnvoyException(absl::StrCat("Duplicate resource monitor ", name));
     }
   }
 
@@ -127,7 +127,7 @@ OverloadManagerImpl::OverloadManagerImpl(
     auto result = actions_.emplace(std::piecewise_construct, std::forward_as_tuple(name),
                                    std::forward_as_tuple(action, stats_scope));
     if (!result.second) {
-      throw EnvoyException(fmt::format("Duplicate overload action {}", name));
+      throw EnvoyException(absl::StrCat("Duplicate overload action ", name));
     }
 
     for (const auto& trigger : action.triggers()) {

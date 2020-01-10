@@ -63,7 +63,7 @@ public:
   ConnectionHandlerImpl(Event::Dispatcher& dispatcher, const std::string& per_handler_stat_prefix);
 
   // Network::ConnectionHandler
-  uint64_t numConnections() override { return num_handler_connections_; }
+  uint64_t numConnections() const override { return num_handler_connections_; }
   void incNumConnections() override;
   void decNumConnections() override;
   void addListener(Network::ListenerConfig& config) override;
@@ -72,7 +72,7 @@ public:
   void stopListeners() override;
   void disableListeners() override;
   void enableListeners() override;
-  const std::string& statPrefix() override { return per_handler_stat_prefix_; }
+  const std::string& statPrefix() const override { return per_handler_stat_prefix_; }
 
   /**
    * Wrapper for an active listener owned by this handler.

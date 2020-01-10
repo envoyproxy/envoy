@@ -169,7 +169,7 @@ public:
   /**
    * @return uint64_t the total number of connections owned by all listeners across all workers.
    */
-  virtual uint64_t numConnections() PURE;
+  virtual uint64_t numConnections() const PURE;
 
   /**
    * Remove a listener by name.
