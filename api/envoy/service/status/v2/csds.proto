@@ -3,6 +3,7 @@ syntax = "proto3";
 package envoy.service.status.v2;
 
 import "envoy/admin/v2alpha/config_dump.proto";
+import "envoy/api/v2/core/base.proto";
 
 import "google/api/annotations.proto";
 import "google/protobuf/struct.proto";
@@ -77,8 +78,8 @@ message PerXdsConfig {
 
 // All xds configs for a particular client.
 message ClientConfig {
-  // Node identifier for a particular client.
-  string node_id = 1;
+  // Node for a particular client.
+  api.v2.core.Node node = 1;
 
   repeated PerXdsConfig xds_config = 2;
 }

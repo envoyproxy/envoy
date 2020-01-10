@@ -3,6 +3,7 @@ syntax = "proto3";
 package envoy.service.status.v3alpha;
 
 import "envoy/admin/v3alpha/config_dump.proto";
+import "envoy/config/core/v3alpha/base.proto";
 
 import "google/api/annotations.proto";
 import "google/protobuf/struct.proto";
@@ -88,8 +89,8 @@ message ClientConfig {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.service.status.v2.ClientConfig";
 
-  // Node identifier for a particular client.
-  string node_id = 1;
+  // Node for a particular client.
+  config.core.v3alpha.Node node = 1;
 
   repeated PerXdsConfig xds_config = 2;
 }

@@ -9,5 +9,6 @@ api_proto_package(
     deps = [
         "//envoy/admin/v2alpha:pkg",
         "//envoy/annotations:pkg",
+        "//envoy/api/v2/core:pkg",
     ],
 )
