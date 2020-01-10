@@ -29,6 +29,10 @@ public:
    * shadow protos, earlier deprecated fields such as foo are materialized as
    * hidden_envoy_deprecated_foo.
    *
+   * This should be used when you have wire input (e.g. bootstrap, xDS, some
+   * opaque config) that might be at any supported version and want to upgrade
+   * to Envoy's internal latest API usage.
+   *
    * @param prev_message previous version message input.
    * @param next_message next version message to generate.
    */
@@ -40,6 +44,9 @@ public:
    * efficient, most uses are expected to be tests and performance agnostic
    * code.
    *
+   * This is used primarily in tests, to allow tests to internally use the
+   * latest supported API but ensure that earlier versions are used on the wire.
+   *
    * @param message message input.
    * @return DynamicMessagePtr with the downgraded message (and associated
    *         factory state).
@@ -47,9 +54,17 @@ public:
   static DynamicMessagePtr downgrade(const Protobuf::Message& message);
 
   /**
-   * Reinterpret an Envoy internal API message at v3 based on a given API
+   * Reinterpret an Envoy internal API message at v3 based on a given transport API
    * version. This will downgrade() to an earlier version or scrub the shadow
    * deprecated fields in the existing one.
+   *
+   * This is typically used when Envoy is generating a wire message from some
+   * internally generated message, e.g. DiscoveryRequest, and we want to ensure
+   * it matches a specific API version. For example, a v3 DiscoveryRequest must
+   * have any deprecated v2 fields removed (they only exist because of
+   * shadowing) and a v2 DiscoveryRequest needs to have type
+   * envoy.api.v2.DiscoveryRequest to ensure JSON representations have the
+   * correct field names (after renames/deprecations are reversed).
    *
    * @param message message input.
    * @param api_version target API version.
