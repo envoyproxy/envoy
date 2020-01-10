@@ -136,7 +136,7 @@ should be created before the set is used for requests, via
 derived from data in a request, but there are limited set of known tokens, such
 as SSL ciphers or Redis commands.
 
-### Dynamic stat tokens
+### Dynnamic stat tokens
 
 While stats are usually composed of tokens that are known at compile-time, there
 are scenarios where the names are newly discovered from data in requests. To
@@ -147,10 +147,12 @@ be combined with symbolized tokens from `StatNameSet` or `StatNamePool` using
 `SymbolTable::join()`.
 
 Relative to using symbolized tokens, The cost of using dynamic tokens is:
+
  * the StatName must be allocated and populated from the string data every time
    `StatNameDynamicPool::add()` is called or `StatNameDynamicStorage` is constructed.
  * the resulting `StatName`s are as long as the string, rather than benefiting from
    a symbolized representation, which is typically 4 bytes or less per token.
+
 However, the cost of using dynamic tokens is on par with the cost of not using
 a StatName system at all, only adding one re-encoding. And it is hard to quantify
 the benefit of avoiding mutex contention when there are large numbers of threads.
