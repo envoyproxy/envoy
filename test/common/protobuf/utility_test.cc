@@ -824,6 +824,58 @@ value:
   EXPECT_TRUE(TestUtility::protoEqual(expected, actual));
 }
 
+// Deeply-nested opaque protos (`Any` and `TypedStruct`), which are reified using the
+// `DynamicMessageFactory`, should be redacted correctly.
+TEST_F(ProtobufUtilityTest, RedactDeeplyNestedOpaqueProtos) {
+  envoy::test::Sensitive actual, expected;
+  TestUtility::loadFromYaml(R"EOF(
+insensitive_any:
+  '@type': type.googleapis.com/envoy.test.Sensitive
+  insensitive_any:
+    '@type': type.googleapis.com/envoy.test.Sensitive
+    sensitive_string: This field should be redacted (1 of 4).
+  insensitive_typed_struct:
+    type_url: type.googleapis.com/envoy.test.Sensitive
+    value:
+      sensitive_string: This field should be redacted (2 of 4).
+insensitive_typed_struct:
+  type_url: type.googleapis.com/envoy.test.Sensitive
+  value:
+    insensitive_any:
+      '@type': type.googleapis.com/envoy.test.Sensitive
+      sensitive_string: This field should be redacted (3 of 4).
+    insensitive_typed_struct:
+      type_url: type.googleapis.com/envoy.test.Sensitive
+      value:
+        sensitive_string: This field should be redacted (4 of 4).
+)EOF",
+                            actual);
+  TestUtility::loadFromYaml(R"EOF(
+insensitive_any:
+  '@type': type.googleapis.com/envoy.test.Sensitive
+  insensitive_any:
+    '@type': type.googleapis.com/envoy.test.Sensitive
+    sensitive_string: '[redacted]'
+  insensitive_typed_struct:
+    type_url: type.googleapis.com/envoy.test.Sensitive
+    value:
+      sensitive_string: '[redacted]'
+insensitive_typed_struct:
+  type_url: type.googleapis.com/envoy.test.Sensitive
+  value:
+    insensitive_any:
+      '@type': type.googleapis.com/envoy.test.Sensitive
+      sensitive_string: '[redacted]'
+    insensitive_typed_struct:
+      type_url: type.googleapis.com/envoy.test.Sensitive
+      value:
+        sensitive_string: '[redacted]'
+)EOF",
+                            expected);
+  MessageUtil::redact(actual);
+  EXPECT_TRUE(TestUtility::protoEqual(expected, actual));
+}
+
 TEST_F(ProtobufUtilityTest, KeyValueStruct) {
   const ProtobufWkt::Struct obj = MessageUtil::keyValueStruct("test_key", "test_value");
   EXPECT_EQ(obj.fields_size(), 1);
