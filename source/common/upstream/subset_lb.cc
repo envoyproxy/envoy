@@ -43,7 +43,7 @@ SubsetLoadBalancer::SubsetLoadBalancer(
     if (fallback_policy_ ==
         envoy::config::cluster::v3alpha::Cluster::LbSubsetConfig::ANY_ENDPOINT) {
       ENVOY_LOG(debug, "subset lb: creating any-endpoint fallback load balancer");
-      initSubsetAnyIfNeed();
+      initSubsetAnyOnce();
       fallback_subset_ = subset_any_;
     } else {
       predicate = [this](const Host& host) -> bool {
@@ -58,7 +58,7 @@ SubsetLoadBalancer::SubsetLoadBalancer(
   }
 
   if (subsets.panicModeAny()) {
-    initSubsetAnyIfNeed();
+    initSubsetAnyOnce();
     panic_mode_subset_ = subset_any_;
   }
 
@@ -111,7 +111,7 @@ void SubsetLoadBalancer::refreshSubsets(uint32_t priority) {
   update(priority, host_sets[priority]->hosts(), {});
 }
 
-void SubsetLoadBalancer::initSubsetAnyIfNeed() {
+void SubsetLoadBalancer::initSubsetAnyOnce() {
   if (!subset_any_) {
     HostPredicate predicate = [](const Host&) -> bool { return true; };
     subset_any_ = std::make_shared<LbSubsetEntry>();
@@ -162,7 +162,7 @@ void SubsetLoadBalancer::initSelectorFallbackSubset(
                              LbSubsetSelector::ANY_ENDPOINT &&
       selector_fallback_subset_any_ == nullptr) {
     ENVOY_LOG(debug, "subset lb: creating any-endpoint fallback load balancer for selector");
-    initSubsetAnyIfNeed();
+    initSubsetAnyOnce();
     selector_fallback_subset_any_ = subset_any_;
   } else if (fallback_policy == envoy::config::cluster::v3alpha::Cluster::LbSubsetConfig::
                                     LbSubsetSelector::DEFAULT_SUBSET &&
@@ -338,9 +338,7 @@ void SubsetLoadBalancer::updateFallbackSubset(uint32_t priority, const HostVecto
     subset_any_->priority_subset_->update(priority, hosts_added, hosts_removed);
   }
 
-  if (selector_fallback_subset_any_ != nullptr) {
-    ASSERT(selector_fallback_subset_any_ == subset_any_);
-  }
+  ASSERT(selector_fallback_subset_any_ == nullptr || selector_fallback_subset_any_ == subset_any_);
 
   if (selector_fallback_subset_default_ != nullptr) {
     selector_fallback_subset_default_->priority_subset_->update(priority, hosts_added,
@@ -358,9 +356,7 @@ void SubsetLoadBalancer::updateFallbackSubset(uint32_t priority, const HostVecto
   }
 
   // Same thing for the panic mode subset.
-  if (panic_mode_subset_ != nullptr) {
-    ASSERT(panic_mode_subset_ == subset_any_);
-  }
+  ASSERT(panic_mode_subset_ == nullptr || panic_mode_subset_ == subset_any_);
 }
 
 // Iterates over the added and removed hosts, looking up an LbSubsetEntryPtr for each. For every

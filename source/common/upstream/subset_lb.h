@@ -41,7 +41,7 @@ private:
   using HostPredicate = std::function<bool(const Host&)>;
   struct SubsetSelectorFallbackParams;
 
-  void initSubsetAnyIfNeed();
+  void initSubsetAnyOnce();
   void initSubsetSelectorMap();
   void initSelectorFallbackSubset(const envoy::config::cluster::v3alpha::Cluster::LbSubsetConfig::
                                       LbSubsetSelector::LbSubsetSelectorFallbackPolicy&);
