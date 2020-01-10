@@ -525,31 +525,7 @@ TEST(DisableExtensions, IsDisabled) {
       nullptr);
 }
 
-class TypeFactory : public TestFactory {
-public:
-  virtual ~TypeFactory() = default;
-};
-
-class FirstTypeFactory : public TypeFactory {
-public:
-  std::string name() const override { return "first"; }
-};
-
-class SecondTypeFactory : public TypeFactory {
-public:
-  std::string name() const override { return "second"; }
-};
-
-REGISTER_FACTORY(FirstTypeFactory, TypeFactory);
-REGISTER_FACTORY(SecondTypeFactory, TypeFactory);
-
-TEST(FactoryByType, DoubleRegistrationByType) {
-  EXPECT_THROW_WITH_REGEX(
-      (Registry::FactoryRegistry<TypeFactory>::getFactoryByType("google.protobuf.StringValue")),
-      EnvoyException, "Double registration for type: 'google\\.protobuf\\.StringValue'");
-}
-
-TEST(FactoryByType, EarlierVersionConfigType) {
+TEST(FactoryByTypeTest, EarlierVersionConfigType) {
   envoy::config::filter::http::ip_tagging::v2::IPTagging v2_config;
   auto factory = Registry::FactoryRegistry<Server::Configuration::NamedHttpFilterConfigFactory>::
       getFactoryByType(v2_config.GetDescriptor()->full_name());
