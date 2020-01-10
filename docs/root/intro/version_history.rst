@@ -51,6 +51,7 @@ Version history
 * tracing: added the ability to set custom tags on both the :ref:`HTTP connection manager<envoy_api_field_config.filter.network.http_connection_manager.v2.HttpConnectionManager.tracing>` and the :ref:`HTTP route <envoy_api_field_route.Route.tracing>`.
 * tracing: added upstream_address tag.
 * tracing: added initial support for AWS X-Ray (local sampling rules only) :ref:`X-Ray Tracing <envoy_api_msg_config.trace.v2alpha.XRayConfig>`.
+* tracing: added tags for gRPC request path, authority, content-type and timeout.
 * udp: added initial support for :ref:`UDP proxy <config_udp_listener_filters_udp_proxy>`
 
 1.12.2 (December 10, 2019)
