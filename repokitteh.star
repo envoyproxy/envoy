@@ -16,3 +16,9 @@ use(
 )
 
 alias('retest', 'retry-circle')
+
+def test():
+  store_put('test', 'meow)
+  github.issue_create_comment(store_get('test'))
+  
+handlers.command(name='test', func=test)
