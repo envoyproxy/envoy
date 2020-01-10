@@ -159,6 +159,9 @@ the benefit of avoiding mutex contention when there are large numbers of threads
 
 ### Symbol Table Memory Layout
 
+Below is a diagram showing the memory layout for a few scenarios of constructing
+and joining symbolized`StatName`s and dynamic `StatName`s.
+
 ![Symbol Table Memory Diagram](symtab.png)
 
 ### Current State and Strategy To Deploy Symbol Tables
