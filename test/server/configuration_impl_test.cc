@@ -281,9 +281,9 @@ TEST_F(ConfigurationImplTest, ConfigurationFailsWhenInvalidTracerSpecified) {
 
   auto bootstrap = Upstream::parseBootstrapFromV2Json(json);
   MainImpl config;
-  EXPECT_THROW_WITH_MESSAGE(
-      config.initialize(bootstrap, server_, cluster_manager_factory_), EnvoyException,
-      "Didn't find a registered implementation for type: 'envoy.config.trace.v2.BlackHoleConfig'");
+  EXPECT_THROW_WITH_MESSAGE(config.initialize(bootstrap, server_, cluster_manager_factory_),
+                            EnvoyException,
+                            "Didn't find a registered implementation for name: 'invalid'");
 }
 
 TEST_F(ConfigurationImplTest, ProtoSpecifiedStatsSink) {
@@ -406,41 +406,7 @@ TEST_F(ConfigurationImplTest, StatsSinkWithNoType) {
   MainImpl config;
   EXPECT_THROW_WITH_MESSAGE(config.initialize(bootstrap, server_, cluster_manager_factory_),
                             EnvoyException,
-                            "Provided type for static registration lookup was empty.");
-}
-
-TEST_F(ConfigurationImplTest, StatsSinkWithUnknownType) {
-  std::string json = R"EOF(
-  {
-    "static_resources": {
-      "listeners": [],
-      "clusters": []
-    },
-    "admin": {
-      "access_log_path": "/dev/null",
-      "address": {
-        "socket_address": {
-          "address": "1.2.3.4",
-          "port_value": 5678
-        }
-      }
-    }
-  }
-  )EOF";
-
-  auto bootstrap = Upstream::parseBootstrapFromV2Json(json);
-
-  auto& sink = *bootstrap.mutable_stats_sinks()->Add();
-  udpa::type::v1::TypedStruct typed_struct;
-  typed_struct.set_type_url("test.envoy.Config");
-  auto untyped_struct = typed_struct.mutable_value();
-  (*untyped_struct->mutable_fields())["foo"].set_string_value("bar");
-  sink.mutable_typed_config()->PackFrom(typed_struct);
-
-  MainImpl config;
-  EXPECT_THROW_WITH_MESSAGE(
-      config.initialize(bootstrap, server_, cluster_manager_factory_), EnvoyException,
-      "Didn't find a registered implementation for type: 'test.envoy.Config'");
+                            "Provided name for static registration lookup was empty.");
 }
 
 // An explicit non-empty LayeredRuntime is available to the server with no

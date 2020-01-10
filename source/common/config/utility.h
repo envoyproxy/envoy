@@ -211,18 +211,6 @@ public:
     return *factory;
   }
 
-  template <class Factory> static Factory& getAndCheckFactoryByType(absl::string_view type) {
-    if (type.empty()) {
-      throw EnvoyException("Provided type for static registration lookup was empty.");
-    }
-    Factory* factory = Registry::FactoryRegistry<Factory>::getFactoryByType(type);
-    if (factory == nullptr) {
-      throw EnvoyException(
-          fmt::format("Didn't find a registered implementation for type: '{}'", type));
-    }
-    return *factory;
-  }
-
   /**
    * Get a Factory from the registry with error checking to ensure the name and the factory are
    * valid.
@@ -237,16 +225,16 @@ public:
     if (!typed_config.value().empty()) {
       // Unpack methods will only use the fully qualified type name after the last '/'.
       // https://github.com/protocolbuffers/protobuf/blob/3.6.x/src/google/protobuf/any.proto#L87
-      const absl::string_view type = TypeUtil::typeUrlToDescriptorFullName(typed_config.type_url());
-
+      absl::string_view type = TypeUtil::typeUrlToDescriptorFullName(typed_config.type_url());
       if (type == typed_struct_type) {
         udpa::type::v1::TypedStruct typed_struct;
         MessageUtil::unpackTo(typed_config, typed_struct);
         // Not handling nested structs or typed structs in typed structs
-        return Utility::getAndCheckFactoryByType<Factory>(
-            TypeUtil::typeUrlToDescriptorFullName(typed_struct.type_url()));
-      } else {
-        return Utility::getAndCheckFactoryByType<Factory>(type);
+        type = typed_struct.type_url();
+      }
+      Factory* factory = Registry::FactoryRegistry<Factory>::getFactoryByType(type);
+      if (factory != nullptr) {
+        return *factory;
       }
     }
 
