@@ -204,10 +204,9 @@ public:
               continue;
             }
 
-            // Skip untyped factories and factories that use google.protobuf.Struct
-            // as the config type. See issue https://github.com/envoyproxy/envoy/issues/9643.
+            // Skip untyped factories.
             std::string config_type = factory.second->configType();
-            if (config_type.empty() || config_type == "google.protobuf.Struct") {
+            if (config_type.empty()) {
               continue;
             }
 
@@ -215,11 +214,14 @@ public:
             while (true) {
               auto it = mapping->find(config_type);
               if (it != mapping->end() && it->second != factory.second) {
-                throw EnvoyException(
-                    fmt::format("Double registration for type: '{}' by '{}' and '{}'", config_type,
-                                factory.second->name(), it->second->name()));
+                // Mark double-registered types with a nullptr.
+                // See issue https://github.com/envoyproxy/envoy/issues/9643.
+                ENVOY_LOG(warn, "Double registration for type: '{}' by '{}' and '{}'", config_type,
+                          factory.second->name(), it->second ? it->second->name() : "");
+                it->second = nullptr;
+              } else {
+                mapping->emplace(std::make_pair(config_type, factory.second));
               }
-              mapping->emplace(std::make_pair(config_type, factory.second));
 
               const Protobuf::Descriptor* previous =
                   Config::ApiTypeOracle::getEarlierVersionDescriptor(config_type);
