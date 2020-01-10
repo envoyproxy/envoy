@@ -2,14 +2,17 @@
 
 #include <algorithm>
 #include <functional>
+#include <map>
 #include <string>
 #include <vector>
 
 #include "envoy/common/exception.h"
+#include "envoy/config/core/v3alpha/base.pb.h"
 
 #include "common/common/assert.h"
 #include "common/common/fmt.h"
 #include "common/common/logger.h"
+#include "common/protobuf/utility.h"
 
 #include "absl/base/attributes.h"
 #include "absl/container/flat_hash_map.h"
@@ -30,7 +33,12 @@ class FactoryRegistryProxy {
 public:
   virtual ~FactoryRegistryProxy() = default;
   virtual std::vector<absl::string_view> registeredNames() const PURE;
+  // Return all registered factory names, including disabled factories.
+  virtual std::vector<absl::string_view> allRegisteredNames() const PURE;
+  virtual absl::optional<envoy::config::core::v3alpha::BuildVersion>
+  getFactoryVersion(absl::string_view name) const PURE;
   virtual bool disableFactory(absl::string_view) PURE;
+  virtual bool isFactoryDisabled(absl::string_view) const PURE;
 };
 
 template <class Base> class FactoryRegistryProxyImpl : public FactoryRegistryProxy {
@@ -41,8 +49,21 @@ public:
     return FactoryRegistry::registeredNames();
   }
 
+  std::vector<absl::string_view> allRegisteredNames() const override {
+    return FactoryRegistry::registeredNames(true);
+  }
+
+  absl::optional<envoy::config::core::v3alpha::BuildVersion>
+  getFactoryVersion(absl::string_view name) const override {
+    return FactoryRegistry::getFactoryVersion(name);
+  }
+
   bool disableFactory(absl::string_view name) override {
     return FactoryRegistry::disableFactory(name);
+  }
+
+  bool isFactoryDisabled(absl::string_view name) const override {
+    return FactoryRegistry::isFactoryDisabled(name);
   }
 };
 
@@ -128,14 +149,13 @@ public:
   /**
    * Return a sorted vector of registered factory names.
    */
-  static std::vector<absl::string_view> registeredNames() {
+  static std::vector<absl::string_view> registeredNames(bool include_disabled = false) {
     std::vector<absl::string_view> ret;
 
     ret.reserve(factories().size());
 
     for (const auto& factory : factories()) {
-      // Only publish the name of factories that have not been disabled.
-      if (factory.second) {
+      if (factory.second || include_disabled) {
         ret.push_back(factory.first);
       }
     }
@@ -153,6 +173,16 @@ public:
     return *factories;
   }
 
+  /**
+   * Gets the current map of vendor specific factory versions.
+   */
+  static absl::flat_hash_map<std::string, envoy::config::core::v3alpha::BuildVersion>&
+  versioned_factories() {
+    using VersionedFactoryMap =
+        absl::flat_hash_map<std::string, envoy::config::core::v3alpha::BuildVersion>;
+    MUTABLE_CONSTRUCT_ON_FIRST_USE(VersionedFactoryMap);
+  }
+
   static absl::flat_hash_map<std::string, std::string>& deprecatedFactoryNames() {
     static auto* deprecated_factory_names = new absl::flat_hash_map<std::string, std::string>;
     return *deprecated_factory_names;
@@ -168,6 +198,23 @@ public:
       throw EnvoyException(fmt::format("Double registration for name: '{}'", factory.name()));
     }
 
+    if (!instead_value.empty()) {
+      deprecatedFactoryNames().emplace(std::make_pair(name, instead_value));
+    }
+  }
+
+  /**
+   * version is used for registering vendor specific factories that are versioned
+   * independently of Envoy.
+   */
+  static void registerFactory(Base& factory, absl::string_view name,
+                              const envoy::config::core::v3alpha::BuildVersion& version,
+                              absl::string_view instead_value = "") {
+    auto result = factories().emplace(std::make_pair(name, &factory));
+    if (!result.second) {
+      throw EnvoyException(fmt::format("Double registration for name: '{}'", factory.name()));
+    }
+    versioned_factories().emplace(std::make_pair(name, version));
     if (!instead_value.empty()) {
       deprecatedFactoryNames().emplace(std::make_pair(name, instead_value));
     }
@@ -230,6 +277,27 @@ public:
     if (status) {
       ENVOY_LOG(warn, "{} is deprecated, use {} instead.", it->first, it->second);
     }
+  }
+
+  /**
+   * @return true if the named factory was disabled.
+   */
+  static bool isFactoryDisabled(absl::string_view name) {
+    auto it = factories().find(name);
+    ASSERT(it != factories().end());
+    return it->second == nullptr;
+  }
+
+  /**
+   * @return vendor specific version of a factory.
+   */
+  static absl::optional<envoy::config::core::v3alpha::BuildVersion>
+  getFactoryVersion(absl::string_view name) {
+    auto it = versioned_factories().find(name);
+    if (it == versioned_factories().end()) {
+      return absl::nullopt;
+    }
+    return it->second;
   }
 
 private:
@@ -320,7 +388,51 @@ public:
     }
   }
 
+  /**
+   * Constructor that registers an instance of the factory with the FactoryRegistry along with
+   * vendor specific version.
+   */
+  RegisterFactory(uint32_t major, uint32_t minor, uint32_t patch,
+                  const std::map<std::string, std::string>& version_metadata)
+      : RegisterFactory(major, minor, patch, version_metadata, {}) {}
+
+  /**
+   * Constructor that registers an instance of the factory with the FactoryRegistry along with
+   * vendor specific version and deprecated names.
+   */
+  RegisterFactory(uint32_t major, uint32_t minor, uint32_t patch,
+                  const std::map<std::string, std::string>& version_metadata,
+                  std::initializer_list<absl::string_view> deprecated_names) {
+    auto version = makeBuildVersion(major, minor, patch, version_metadata);
+    if (instance_.name().empty()) {
+      ASSERT(deprecated_names.size() != 0);
+    } else {
+      FactoryRegistry<Base>::registerFactory(instance_, instance_.name(), version);
+    }
+
+    for (auto deprecated_name : deprecated_names) {
+      ASSERT(!deprecated_name.empty());
+      FactoryRegistry<Base>::registerFactory(instance_, deprecated_name, version, instance_.name());
+    }
+
+    if (!FactoryCategoryRegistry::isRegistered(instance_.category())) {
+      FactoryCategoryRegistry::registerCategory(instance_.category(),
+                                                new FactoryRegistryProxyImpl<Base>());
+    }
+  }
+
 private:
+  static envoy::config::core::v3alpha::BuildVersion
+  makeBuildVersion(uint32_t major, uint32_t minor, uint32_t patch,
+                   const std::map<std::string, std::string>& metadata) {
+    envoy::config::core::v3alpha::BuildVersion version;
+    version.mutable_version()->set_major(major);
+    version.mutable_version()->set_minor(minor);
+    version.mutable_version()->set_patch(patch);
+    *version.mutable_metadata() = MessageUtil::keyValueStruct(metadata);
+    return version;
+  }
+
   T instance_{};
 };
 
@@ -351,6 +463,8 @@ private:
   static Envoy::Registry::RegisterFactory</* NOLINT(fuchsia-statically-constructed-objects) */     \
                                           FACTORY, BASE>                                           \
       FACTORY##_registered
+
+#define FACTORY_VERSION(major, minor, patch, ...) major, minor, patch, __VA_ARGS__
 
 /**
  * Macro used for static registration declaration.

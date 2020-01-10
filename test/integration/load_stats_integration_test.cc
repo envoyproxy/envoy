@@ -270,9 +270,6 @@ public:
         cluster_stats.mutable_load_report_interval()->Clear();
       }
       mergeLoadStats(loadstats_request, local_loadstats_request);
-      if (!loadstats_request.cluster_stats().empty()) {
-        ENVOY_LOG_MISC(debug, "HTD {}", loadstats_request.cluster_stats()[0].DebugString());
-      }
 
       EXPECT_EQ("POST", loadstats_stream_->headers().Method()->value().getStringView());
       EXPECT_EQ("/envoy.service.load_stats.v2.LoadReportingService/StreamLoadStats",

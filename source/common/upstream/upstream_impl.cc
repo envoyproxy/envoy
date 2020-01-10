@@ -14,6 +14,7 @@
 #include "envoy/config/core/v3alpha/address.pb.h"
 #include "envoy/config/core/v3alpha/base.pb.h"
 #include "envoy/config/core/v3alpha/health_check.pb.h"
+#include "envoy/config/core/v3alpha/protocol.pb.h"
 #include "envoy/config/endpoint/v3alpha/endpoint_components.pb.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/event/timer.h"
@@ -665,6 +666,11 @@ ClusterInfoImpl::ClusterInfoImpl(
       drain_connections_on_host_removal_(config.ignore_health_on_host_removal()),
       warm_hosts_(!config.health_checks().empty() &&
                   common_lb_config_.ignore_new_hosts_until_first_hc()),
+      upstream_http_protocol_options_(
+          config.has_upstream_http_protocol_options()
+              ? absl::make_optional<envoy::config::core::v3alpha::UpstreamHttpProtocolOptions>(
+                    config.upstream_http_protocol_options())
+              : absl::nullopt),
       cluster_type_(
           config.has_cluster_type()
               ? absl::make_optional<envoy::config::cluster::v3alpha::Cluster::CustomClusterType>(
@@ -793,8 +799,8 @@ Network::TransportSocketFactoryPtr createTransportSocketFactory(
   if (!config.has_transport_socket()) {
     if (config.has_hidden_envoy_deprecated_tls_context()) {
       transport_socket.set_name(Extensions::TransportSockets::TransportSocketNames::get().Tls);
-      MessageUtil::jsonConvert(config.hidden_envoy_deprecated_tls_context(),
-                               *transport_socket.mutable_hidden_envoy_deprecated_config());
+      transport_socket.mutable_typed_config()->PackFrom(
+          config.hidden_envoy_deprecated_tls_context());
     } else {
       transport_socket.set_name(
           Extensions::TransportSockets::TransportSocketNames::get().RawBuffer);

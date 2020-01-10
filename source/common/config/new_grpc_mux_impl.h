@@ -1,11 +1,13 @@
 #pragma once
 
+#include "envoy/api/v2/discovery.pb.h"
 #include "envoy/common/token_bucket.h"
 #include "envoy/config/grpc_mux.h"
 #include "envoy/config/subscription.h"
 #include "envoy/service/discovery/v3alpha/discovery.pb.h"
 
 #include "common/common/logger.h"
+#include "common/config/api_version.h"
 #include "common/config/delta_subscription_state.h"
 #include "common/config/grpc_stream.h"
 #include "common/config/pausable_ack_queue.h"

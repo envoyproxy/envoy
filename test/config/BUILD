@@ -33,7 +33,7 @@ envoy_cc_test_library(
         "@envoy_api//envoy/config/listener/v3alpha:pkg_cc_proto",
         "@envoy_api//envoy/config/route/v3alpha:pkg_cc_proto",
         "@envoy_api//envoy/config/tap/v3alpha:pkg_cc_proto",
-        "@envoy_api//envoy/extensions/access_loggers/grpc/v3alpha:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/access_loggers/file/v3alpha:pkg_cc_proto",
         "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3alpha:pkg_cc_proto",
         "@envoy_api//envoy/extensions/transport_sockets/tap/v3alpha:pkg_cc_proto",
         "@envoy_api//envoy/extensions/transport_sockets/tls/v3alpha:pkg_cc_proto",

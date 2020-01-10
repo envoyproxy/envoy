@@ -7,7 +7,7 @@
 #include "envoy/config/listener/v3alpha/listener_components.pb.h"
 #include "envoy/config/route/v3alpha/route_components.pb.h"
 #include "envoy/config/tap/v3alpha/common.pb.h"
-#include "envoy/extensions/access_loggers/grpc/v3alpha/file.pb.h"
+#include "envoy/extensions/access_loggers/file/v3alpha/file.pb.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3alpha/http_connection_manager.pb.h"
 #include "envoy/extensions/transport_sockets/tap/v3alpha/tap.pb.h"
 #include "envoy/extensions/transport_sockets/tls/v3alpha/cert.pb.h"
@@ -398,11 +398,9 @@ void ConfigHelper::finalize(const std::vector<uint32_t>& ports) {
       if (tap_path) {
         auto* filter_chain = listener->mutable_filter_chains(j);
         const bool has_tls = filter_chain->has_hidden_envoy_deprecated_tls_context();
-        absl::optional<ProtobufWkt::Struct> tls_config;
+        const Protobuf::Message* tls_config = nullptr;
         if (has_tls) {
-          tls_config = ProtobufWkt::Struct();
-          TestUtility::jsonConvert(filter_chain->hidden_envoy_deprecated_tls_context(),
-                                   tls_config.value());
+          tls_config = &filter_chain->hidden_envoy_deprecated_tls_context();
           filter_chain->clear_hidden_envoy_deprecated_tls_context();
         }
         setTapTransportSocket(tap_path.value(), fmt::format("listener_{}_{}", i, j),
@@ -445,11 +443,9 @@ void ConfigHelper::finalize(const std::vector<uint32_t>& ports) {
 
     if (tap_path) {
       const bool has_tls = cluster->has_hidden_envoy_deprecated_tls_context();
-      absl::optional<ProtobufWkt::Struct> tls_config;
+      const Protobuf::Message* tls_config = nullptr;
       if (has_tls) {
-        tls_config = ProtobufWkt::Struct();
-        TestUtility::jsonConvert(cluster->hidden_envoy_deprecated_tls_context(),
-                                 tls_config.value());
+        tls_config = &cluster->hidden_envoy_deprecated_tls_context();
         cluster->clear_hidden_envoy_deprecated_tls_context();
       }
       setTapTransportSocket(tap_path.value(), fmt::format("cluster_{}", i),
@@ -476,15 +472,15 @@ void ConfigHelper::finalize(const std::vector<uint32_t>& ports) {
 void ConfigHelper::setTapTransportSocket(
     const std::string& tap_path, const std::string& type,
     envoy::config::core::v3alpha::TransportSocket& transport_socket,
-    const absl::optional<ProtobufWkt::Struct>& tls_config) {
+    const Protobuf::Message* tls_config) {
   // Determine inner transport socket.
   envoy::config::core::v3alpha::TransportSocket inner_transport_socket;
   if (!transport_socket.name().empty()) {
     RELEASE_ASSERT(!tls_config, "");
     inner_transport_socket.MergeFrom(transport_socket);
-  } else if (tls_config.has_value()) {
+  } else if (tls_config) {
     inner_transport_socket.set_name("envoy.transport_sockets.tls");
-    inner_transport_socket.mutable_hidden_envoy_deprecated_config()->MergeFrom(tls_config.value());
+    inner_transport_socket.mutable_typed_config()->PackFrom(*tls_config);
   } else {
     inner_transport_socket.set_name("envoy.transport_sockets.raw_buffer");
   }
@@ -662,7 +658,7 @@ bool ConfigHelper::setAccessLog(const std::string& filename, absl::string_view f
   envoy::extensions::filters::network::http_connection_manager::v3alpha::HttpConnectionManager
       hcm_config;
   loadHttpConnectionManager(hcm_config);
-  envoy::extensions::access_loggers::grpc::v3alpha::FileAccessLog access_log_config;
+  envoy::extensions::access_loggers::file::v3alpha::FileAccessLog access_log_config;
   if (!format.empty()) {
     access_log_config.set_format(std::string(format));
   }

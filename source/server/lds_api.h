@@ -45,7 +45,7 @@ private:
   std::string resourceName(const ProtobufWkt::Any& resource) override {
     return MessageUtil::anyConvert<envoy::config::listener::v3alpha::Listener>(resource).name();
   }
-  std::string loadTypeUrl();
+  static std::string loadTypeUrl(envoy::config::core::v3alpha::ApiVersion resource_api_version);
 
   std::unique_ptr<Config::Subscription> subscription_;
   std::string system_version_info_;
@@ -54,7 +54,6 @@ private:
   Upstream::ClusterManager& cm_;
   Init::TargetImpl init_target_;
   ProtobufMessage::ValidationVisitor& validation_visitor_;
-  envoy::config::core::v3alpha::ConfigSource::XdsApiVersion xds_api_version_;
 };
 
 } // namespace Server

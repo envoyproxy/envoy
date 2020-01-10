@@ -6,12 +6,19 @@
 #include "common/common/utility.h"
 #include "common/http/header_map_impl.h"
 #include "common/protobuf/utility.h"
+#include "common/runtime/runtime_impl.h"
 
 #include "absl/strings/match.h"
 #include "nghttp2/nghttp2.h"
 
 namespace Envoy {
 namespace Http {
+
+struct SharedResponseCodeDetailsValues {
+  const absl::string_view InvalidAuthority = "http.invalid_authority";
+};
+
+using SharedResponseCodeDetails = ConstSingleton<SharedResponseCodeDetailsValues>;
 
 // HeaderMatcher will consist of:
 //   header_match_specifier which can be any one of exact_match, regex_match, range_match,
@@ -136,13 +143,13 @@ bool HeaderUtility::matchHeaders(const HeaderMap& request_headers, const HeaderD
 }
 
 bool HeaderUtility::headerIsValid(const absl::string_view header_value) {
-  return (nghttp2_check_header_value(reinterpret_cast<const uint8_t*>(header_value.data()),
-                                     header_value.size()) != 0);
+  return nghttp2_check_header_value(reinterpret_cast<const uint8_t*>(header_value.data()),
+                                    header_value.size()) != 0;
 }
 
 bool HeaderUtility::authorityIsValid(const absl::string_view header_value) {
-  return (nghttp2_check_authority(reinterpret_cast<const uint8_t*>(header_value.data()),
-                                  header_value.size()) != 0);
+  return nghttp2_check_authority(reinterpret_cast<const uint8_t*>(header_value.data()),
+                                 header_value.size()) != 0;
 }
 
 void HeaderUtility::addHeaders(HeaderMap& headers, const HeaderMap& headers_to_add) {
@@ -162,6 +169,16 @@ bool HeaderUtility::isEnvoyInternalRequest(const HeaderMap& headers) {
   const HeaderEntry* internal_request_header = headers.EnvoyInternalRequest();
   return internal_request_header != nullptr &&
          internal_request_header->value() == Headers::get().EnvoyInternalRequestValues.True;
+}
+
+absl::optional<std::reference_wrapper<const absl::string_view>>
+HeaderUtility::requestHeadersValid(const HeaderMap& headers) {
+  // Make sure the host is valid.
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.strict_authority_validation") &&
+      headers.Host() && !HeaderUtility::authorityIsValid(headers.Host()->value().getStringView())) {
+    return SharedResponseCodeDetails::get().InvalidAuthority;
+  }
+  return absl::nullopt;
 }
 
 } // namespace Http
