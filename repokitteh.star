@@ -17,7 +17,7 @@ use(
 
 alias('retest', 'retry-circle')
 
-def test():
+def _test():
     store_put('pinged', 'x')
     print(store_get('pinged'))
 
