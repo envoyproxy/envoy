@@ -16,3 +16,9 @@ use(
 )
 
 alias('retest', 'retry-circle')
+
+def test():
+    store_put('pinged', 'x')
+    print(store_get('pinged'))
+
+handlers.command(name='test', func=_test)
