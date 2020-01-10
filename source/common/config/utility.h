@@ -225,7 +225,7 @@ public:
     if (!typed_config.value().empty()) {
       // Unpack methods will only use the fully qualified type name after the last '/'.
       // https://github.com/protocolbuffers/protobuf/blob/3.6.x/src/google/protobuf/any.proto#L87
-      absl::string_view type = TypeUtil::typeUrlToDescriptorFullName(typed_config.type_url());
+      auto type = std::string(TypeUtil::typeUrlToDescriptorFullName(typed_config.type_url()));
       if (type == typed_struct_type) {
         udpa::type::v1::TypedStruct typed_struct;
         MessageUtil::unpackTo(typed_config, typed_struct);
