@@ -8,6 +8,8 @@ namespace Http {
 /**
  * ApiListener that allows consumers to interact with HTTP streams via API calls.
  */
+// TODO(junr03): this is a replica of the functions in ServerConnectionCallbacks. It would be nice
+// to not duplicate this interface layout.
 class ApiListener {
 public:
   virtual ~ApiListener() = default;

@@ -71,8 +71,8 @@ public:
   // Currently the ConnectionManager creates a codec lazily when either:
   //   a) onConnection for H3.
   //   b) onData for H1 and H2.
-  // With the introduction of ApiListeners, neither event occurs. This function allows us to force
-  // create a codec.
+  // With the introduction of ApiListeners, neither event occurs. This function allows consumer code
+  // to manually create a codec.
   // TODO(junr03): consider passing a synthetic codec instead of creating once. The codec in the
   // ApiListener case is solely used to determine the protocol version.
   void createCodec(Buffer::Instance& data);

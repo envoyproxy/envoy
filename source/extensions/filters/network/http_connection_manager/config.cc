@@ -75,10 +75,7 @@ SINGLETON_MANAGER_REGISTRATION(date_provider);
 SINGLETON_MANAGER_REGISTRATION(route_config_provider_manager);
 SINGLETON_MANAGER_REGISTRATION(scoped_routes_config_provider_manager);
 
-std::tuple<std::shared_ptr<Http::TlsCachingDateProviderImpl>,
-           std::shared_ptr<Router::RouteConfigProviderManager>,
-           std::shared_ptr<Router::ScopedRoutesConfigProviderManager>>
-Utility::createSingletons(Server::Configuration::FactoryContext& context) {
+Utility::Singletons Utility::createSingletons(Server::Configuration::FactoryContext& context) {
   std::shared_ptr<Http::TlsCachingDateProviderImpl> date_provider =
       context.singletonManager().getTyped<Http::TlsCachingDateProviderImpl>(
           SINGLETON_MANAGER_REGISTERED_NAME(date_provider), [&context] {
@@ -100,8 +97,7 @@ Utility::createSingletons(Server::Configuration::FactoryContext& context) {
                 context.admin(), *route_config_provider_manager);
           });
 
-  return std::make_tuple(date_provider, route_config_provider_manager,
-                         scoped_routes_config_provider_manager);
+  return {date_provider, route_config_provider_manager, scoped_routes_config_provider_manager};
 }
 
 std::shared_ptr<HttpConnectionManagerConfig>
@@ -121,22 +117,17 @@ HttpConnectionManagerFilterConfigFactory::createFilterFactoryFromProtoTyped(
     const envoy::extensions::filters::network::http_connection_manager::v3alpha::
         HttpConnectionManager& proto_config,
     Server::Configuration::FactoryContext& context) {
-  std::shared_ptr<Http::TlsCachingDateProviderImpl> date_provider;
-  std::shared_ptr<Router::RouteConfigProviderManager> route_config_provider_manager;
-  std::shared_ptr<Router::ScopedRoutesConfigProviderManager> scoped_routes_config_provider_manager;
-  std::tie(date_provider, route_config_provider_manager, scoped_routes_config_provider_manager) =
-      Utility::createSingletons(context);
+  Utility::Singletons singletons = Utility::createSingletons(context);
 
-  auto filter_config =
-      Utility::createConfig(proto_config, context, *date_provider, *route_config_provider_manager,
-                            *scoped_routes_config_provider_manager);
+  auto filter_config = Utility::createConfig(proto_config, context, *singletons.date_provider_,
+                                             *singletons.route_config_provider_manager_,
+                                             *singletons.scoped_routes_config_provider_manager_);
 
   // This lambda captures the shared_ptrs created above, thus preserving the
   // reference count.
   // Keep in mind the lambda capture list **doesn't** determine the destruction order, but it's fine
   // as these captured objects are also global singletons.
-  return [scoped_routes_config_provider_manager, route_config_provider_manager, date_provider,
-          filter_config, &context](Network::FilterManager& filter_manager) -> void {
+  return [singletons, filter_config, &context](Network::FilterManager& filter_manager) -> void {
     filter_manager.addReadFilter(Network::ReadFilterSharedPtr{new Http::ConnectionManagerImpl(
         *filter_config, context.drainDecision(), context.random(), context.httpContext(),
         context.runtime(), context.localInfo(), context.clusterManager(),
@@ -529,22 +520,17 @@ HttpConnectionManagerFactory::createHttpConnectionManagerFactoryFromProto(
         HttpConnectionManager& proto_config,
     Server::Configuration::FactoryContext& context, Network::ReadFilterCallbacks& read_callbacks) {
 
-  std::shared_ptr<Http::TlsCachingDateProviderImpl> date_provider;
-  std::shared_ptr<Router::RouteConfigProviderManager> route_config_provider_manager;
-  std::shared_ptr<Router::ScopedRoutesConfigProviderManager> scoped_routes_config_provider_manager;
-  std::tie(date_provider, route_config_provider_manager, scoped_routes_config_provider_manager) =
-      Utility::createSingletons(context);
+  Utility::Singletons singletons = Utility::createSingletons(context);
 
-  auto filter_config =
-      Utility::createConfig(proto_config, context, *date_provider, *route_config_provider_manager,
-                            *scoped_routes_config_provider_manager);
+  auto filter_config = Utility::createConfig(proto_config, context, *singletons.date_provider_,
+                                             *singletons.route_config_provider_manager_,
+                                             *singletons.scoped_routes_config_provider_manager_);
 
   // This lambda captures the shared_ptrs created above, thus preserving the
   // reference count.
   // Keep in mind the lambda capture list **doesn't** determine the destruction order, but it's fine
   // as these captured objects are also global singletons.
-  return [scoped_routes_config_provider_manager, route_config_provider_manager, date_provider,
-          filter_config, &context, &read_callbacks]() -> Http::ApiListenerPtr {
+  return [singletons, filter_config, &context, &read_callbacks]() -> Http::ApiListenerPtr {
     auto conn_manager = std::make_unique<Http::ConnectionManagerImpl>(
         *filter_config, context.drainDecision(), context.random(), context.httpContext(),
         context.runtime(), context.localInfo(), context.clusterManager(),

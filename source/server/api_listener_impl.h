@@ -39,8 +39,10 @@ public:
   // ApiListener
   absl::string_view name() const override { return name_; }
 
-  // TODO(junr03): the majority of this surface could be moved out of the listener via some sort of
-  // base class context.
+  // TODO(junr03): move these functions into a concrete Server:Configuration::FactoryContext that
+  // takes the server's context, and the listener config in the constructor. The only challenging
+  // part is implementing the initManager() call. The function depends on the Listener's state for
+  // ListenerImpl, and will do so once ApiListeners are dynamic.
   // Server::Configuration::FactoryContext
   AccessLog::AccessLogManager& accessLogManager() override;
   Upstream::ClusterManager& clusterManager() override;

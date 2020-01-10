@@ -219,16 +219,20 @@ public:
  */
 class Utility {
 public:
+  struct Singletons {
+    std::shared_ptr<Http::TlsCachingDateProviderImpl> date_provider_;
+    std::shared_ptr<Router::RouteConfigProviderManager> route_config_provider_manager_;
+    std::shared_ptr<Router::ScopedRoutesConfigProviderManager>
+        scoped_routes_config_provider_manager_;
+  };
+
   /**
    * Create/get singletons needed for config creation.
    *
    * @param context supplies the context used to create the singletons.
-   * @return a tuple containing all the singletons.
+   * @return Singletons struct containing all the singletons.
    */
-  static std::tuple<std::shared_ptr<Http::TlsCachingDateProviderImpl>,
-                    std::shared_ptr<Router::RouteConfigProviderManager>,
-                    std::shared_ptr<Router::ScopedRoutesConfigProviderManager>>
-  createSingletons(Server::Configuration::FactoryContext& context);
+  static Singletons createSingletons(Server::Configuration::FactoryContext& context);
 
   /**
    * Create the HttpConnectionManagerConfig.

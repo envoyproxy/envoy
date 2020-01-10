@@ -17,6 +17,19 @@ load(
 envoy_package()
 
 envoy_cc_test(
+    name = "api_listener_test",
+    srcs = ["api_listener_test.cc"],
+    deps = [
+        ":utility_lib",
+        "//source/server:api_listener_lib",
+        "//source/server:listener_lib",
+        "//test/mocks/server:server_mocks",
+        "//test/test_common:utility_lib",
+        "@envoy_api//envoy/config/listener/v3alpha:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_test(
     name = "backtrace_test",
     srcs = ["backtrace_test.cc"],
     tags = ["backtrace"],
