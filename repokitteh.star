@@ -13,6 +13,8 @@ use(
   ],
 )
 
+print("hi")
+
 def _test():
   github.issue_create_comment('test')
 
