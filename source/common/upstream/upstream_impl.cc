@@ -47,6 +47,8 @@
 
 #include "extensions/transport_sockets/well_known_names.h"
 
+#include "absl/strings/str_cat.h"
+
 namespace Envoy {
 namespace Upstream {
 namespace {
@@ -654,7 +656,7 @@ ClusterInfoImpl::ClusterInfoImpl(
       http2_settings_(Http::Utility::parseHttp2Settings(config.http2_protocol_options())),
       extension_protocol_options_(parseExtensionProtocolOptions(config, validation_visitor)),
       resource_managers_(config, runtime, name_, *stats_scope_),
-      maintenance_mode_runtime_key_(fmt::format("upstream.maintenance_mode.{}", name_)),
+      maintenance_mode_runtime_key_(absl::StrCat("upstream.maintenance_mode.", name_)),
       source_address_(getSourceAddress(config, bind_config)),
       lb_least_request_config_(config.least_request_lb_config()),
       lb_ring_hash_config_(config.ring_hash_lb_config()),

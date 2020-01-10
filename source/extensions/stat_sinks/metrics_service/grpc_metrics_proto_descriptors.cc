@@ -1,5 +1,7 @@
 #include "extensions/stat_sinks/metrics_service/grpc_metrics_proto_descriptors.h"
 
+#include "envoy/service/metrics/v2/metrics_service.pb.h"
+
 #include "common/common/assert.h"
 #include "common/common/fmt.h"
 #include "common/protobuf/protobuf.h"
@@ -10,6 +12,9 @@ namespace StatSinks {
 namespace MetricsService {
 
 void validateProtoDescriptors() {
+  // https://github.com/envoyproxy/envoy/issues/9639
+  const envoy::service::metrics::v2::StreamMetricsMessage _dummy_v2;
+
   const auto method = "envoy.service.metrics.v2.MetricsService.StreamMetrics";
 
   RELEASE_ASSERT(Protobuf::DescriptorPool::generated_pool()->FindMethodByName(method) != nullptr,

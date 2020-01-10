@@ -81,9 +81,9 @@ public:
     return ServerConnectionPtr{codec_};
   }
   DateProvider& dateProvider() override { return date_provider_; }
-  std::chrono::milliseconds drainTimeout() override { return std::chrono::milliseconds(100); }
+  std::chrono::milliseconds drainTimeout() const override { return std::chrono::milliseconds(100); }
   FilterChainFactory& filterFactory() override { return filter_factory_; }
-  bool generateRequestId() override { return true; }
+  bool generateRequestId() const override { return true; }
   bool preserveExternalRequestId() const override { return false; }
   uint32_t maxRequestHeadersKb() const override { return max_request_headers_kb_; }
   uint32_t maxRequestHeadersCount() const override { return max_request_headers_count_; }
@@ -107,20 +107,21 @@ public:
     }
     return nullptr;
   }
-  const std::string& serverName() override { return server_name_; }
-  HttpConnectionManagerProto::ServerHeaderTransformation serverHeaderTransformation() override {
+  const std::string& serverName() const override { return server_name_; }
+  HttpConnectionManagerProto::ServerHeaderTransformation
+  serverHeaderTransformation() const override {
     return server_transformation_;
   }
   ConnectionManagerStats& stats() override { return stats_; }
   ConnectionManagerTracingStats& tracingStats() override { return tracing_stats_; }
-  bool useRemoteAddress() override { return use_remote_address_; }
+  bool useRemoteAddress() const override { return use_remote_address_; }
   const Http::InternalAddressConfig& internalAddressConfig() const override {
     return internal_address_config_;
   }
   uint32_t xffNumTrustedHops() const override { return 0; }
   bool skipXffAppend() const override { return false; }
   const std::string& via() const override { return EMPTY_STRING; }
-  Http::ForwardClientCertType forwardClientCert() override { return forward_client_cert_; }
+  Http::ForwardClientCertType forwardClientCert() const override { return forward_client_cert_; }
   const std::vector<Http::ClientCertDetailsType>& setCurrentClientCertDetails() const override {
     return set_current_client_cert_details_;
   }

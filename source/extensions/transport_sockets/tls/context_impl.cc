@@ -93,7 +93,7 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& c
     }
 
     if (!SSL_CTX_set1_curves_list(ctx.ssl_ctx_.get(), config.ecdhCurves().c_str())) {
-      throw EnvoyException(fmt::format("Failed to initialize ECDH curves {}", config.ecdhCurves()));
+      throw EnvoyException(absl::StrCat("Failed to initialize ECDH curves ", config.ecdhCurves()));
     }
   }
 
@@ -109,8 +109,8 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& c
     bssl::UniquePtr<STACK_OF(X509_INFO)> list(
         PEM_X509_INFO_read_bio(bio.get(), nullptr, nullptr, nullptr));
     if (list == nullptr) {
-      throw EnvoyException(fmt::format("Failed to load trusted CA certificates from {}",
-                                       config.certificateValidationContext()->caCertPath()));
+      throw EnvoyException(absl::StrCat("Failed to load trusted CA certificates from ",
+                                        config.certificateValidationContext()->caCertPath()));
     }
 
     for (auto& ctx : tls_contexts_) {
@@ -130,8 +130,8 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& c
         }
       }
       if (ca_cert_ == nullptr) {
-        throw EnvoyException(fmt::format("Failed to load trusted CA certificates from {}",
-                                         config.certificateValidationContext()->caCertPath()));
+        throw EnvoyException(absl::StrCat("Failed to load trusted CA certificates from ",
+                                          config.certificateValidationContext()->caCertPath()));
       }
       if (has_crl) {
         X509_STORE_set_flags(store, X509_V_FLAG_CRL_CHECK | X509_V_FLAG_CRL_CHECK_ALL);
@@ -162,8 +162,8 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& c
         PEM_X509_INFO_read_bio(bio.get(), nullptr, nullptr, nullptr));
     if (list == nullptr) {
       throw EnvoyException(
-          fmt::format("Failed to load CRL from {}",
-                      config.certificateValidationContext()->certificateRevocationListPath()));
+          absl::StrCat("Failed to load CRL from ",
+                       config.certificateValidationContext()->certificateRevocationListPath()));
     }
 
     for (auto& ctx : tls_contexts_) {
@@ -203,7 +203,7 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& c
         }
         const auto& decoded = Hex::decode(hash);
         if (decoded.size() != SHA256_DIGEST_LENGTH) {
-          throw EnvoyException(fmt::format("Invalid hex-encoded SHA-256 {}", hash));
+          throw EnvoyException(absl::StrCat("Invalid hex-encoded SHA-256 ", hash));
         }
         verify_certificate_hash_list_.push_back(decoded);
       }
@@ -214,7 +214,7 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& c
       for (const auto& hash : cert_validation_config->verifyCertificateSpkiList()) {
         const auto decoded = Base64::decode(hash);
         if (decoded.size() != SHA256_DIGEST_LENGTH) {
-          throw EnvoyException(fmt::format("Invalid base64-encoded SHA-256 {}", hash));
+          throw EnvoyException(absl::StrCat("Invalid base64-encoded SHA-256 ", hash));
         }
         verify_certificate_spki_list_.emplace_back(decoded.begin(), decoded.end());
       }
@@ -248,7 +248,7 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& c
                        ERR_reason_error_string(err));
       }
       throw EnvoyException(
-          fmt::format("Failed to load certificate chain from {}", ctx.cert_chain_file_path_));
+          absl::StrCat("Failed to load certificate chain from ", ctx.cert_chain_file_path_));
     }
     // Read rest of the certificate chain.
     while (true) {
@@ -258,18 +258,18 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& c
       }
       if (!SSL_CTX_add_extra_chain_cert(ctx.ssl_ctx_.get(), cert.get())) {
         throw EnvoyException(
-            fmt::format("Failed to load certificate chain from {}", ctx.cert_chain_file_path_));
+            absl::StrCat("Failed to load certificate chain from ", ctx.cert_chain_file_path_));
       }
       // SSL_CTX_add_extra_chain_cert() takes ownership.
       cert.release();
     }
     // Check for EOF.
-    uint32_t err = ERR_peek_last_error();
+    const uint32_t err = ERR_peek_last_error();
     if (ERR_GET_LIB(err) == ERR_LIB_PEM && ERR_GET_REASON(err) == PEM_R_NO_START_LINE) {
       ERR_clear_error();
     } else {
       throw EnvoyException(
-          fmt::format("Failed to load certificate chain from {}", ctx.cert_chain_file_path_));
+          absl::StrCat("Failed to load certificate chain from ", ctx.cert_chain_file_path_));
     }
 
     bssl::UniquePtr<EVP_PKEY> public_key(X509_get_pubkey(ctx.cert_chain_.get()));
@@ -354,7 +354,7 @@ ContextImpl::ContextImpl(Stats::Scope& scope, const Envoy::Ssl::ContextConfig& c
                                       : nullptr));
       if (pkey == nullptr || !SSL_CTX_use_PrivateKey(ctx.ssl_ctx_.get(), pkey.get())) {
         throw EnvoyException(
-            fmt::format("Failed to load private key from {}", tls_certificate.privateKeyPath()));
+            absl::StrCat("Failed to load private key from ", tls_certificate.privateKeyPath()));
       }
 
 #ifdef BORINGSSL_FIPS
@@ -590,12 +590,12 @@ void ContextImpl::logHandshake(SSL* ssl) const {
   incCounter(ssl_ciphers_, SSL_get_cipher_name(ssl), unknown_ssl_cipher_);
   incCounter(ssl_versions_, SSL_get_version(ssl), unknown_ssl_version_);
 
-  uint16_t curve_id = SSL_get_curve_id(ssl);
+  const uint16_t curve_id = SSL_get_curve_id(ssl);
   if (curve_id) {
     incCounter(ssl_curves_, SSL_get_curve_name(curve_id), unknown_ssl_curve_);
   }
 
-  uint16_t sigalg_id = SSL_get_peer_signature_algorithm(ssl);
+  const uint16_t sigalg_id = SSL_get_peer_signature_algorithm(ssl);
   if (sigalg_id) {
     const char* sigalg = SSL_get_signature_algorithm_name(sigalg_id, 1 /* include curve */);
     incCounter(ssl_sigalgs_, sigalg, unknown_ssl_algorithm_);
@@ -665,7 +665,7 @@ bool ContextImpl::dnsNameMatch(const std::string& dns_name, const char* pattern)
   size_t pattern_len = strlen(pattern);
   if (pattern_len > 1 && pattern[0] == '*' && pattern[1] == '.') {
     if (dns_name.length() > pattern_len - 1) {
-      size_t off = dns_name.length() - pattern_len + 1;
+      const size_t off = dns_name.length() - pattern_len + 1;
       return dns_name.compare(off, pattern_len - 1, pattern + 1) == 0;
     }
   }
@@ -786,8 +786,8 @@ ClientContextImpl::ClientContextImpl(Stats::Scope& scope,
   ASSERT(tls_contexts_.size() == 1);
   if (!parsed_alpn_protocols_.empty()) {
     for (auto& ctx : tls_contexts_) {
-      int rc = SSL_CTX_set_alpn_protos(ctx.ssl_ctx_.get(), &parsed_alpn_protocols_[0],
-                                       parsed_alpn_protocols_.size());
+      const int rc = SSL_CTX_set_alpn_protos(ctx.ssl_ctx_.get(), &parsed_alpn_protocols_[0],
+                                             parsed_alpn_protocols_.size());
       RELEASE_ASSERT(rc == 0, Utility::getLastCryptoError().value_or(""));
     }
   }
@@ -798,7 +798,7 @@ ClientContextImpl::ClientContextImpl(Stats::Scope& scope,
                                              config.signingAlgorithmsForTest()));
 
     for (auto& ctx : tls_contexts_) {
-      int rc = SSL_CTX_set_verify_algorithm_prefs(ctx.ssl_ctx_.get(), &sigalgs, 1);
+      const int rc = SSL_CTX_set_verify_algorithm_prefs(ctx.ssl_ctx_.get(), &sigalgs, 1);
       RELEASE_ASSERT(rc == 1, Utility::getLastCryptoError().value_or(""));
     }
   }
@@ -824,7 +824,7 @@ bssl::UniquePtr<SSL> ClientContextImpl::newSsl(const Network::TransportSocketOpt
                                                  : server_name_indication_;
 
   if (!server_name_indication.empty()) {
-    int rc = SSL_set_tlsext_host_name(ssl_con.get(), server_name_indication.c_str());
+    const int rc = SSL_set_tlsext_host_name(ssl_con.get(), server_name_indication.c_str());
     RELEASE_ASSERT(rc, Utility::getLastCryptoError().value_or(""));
   }
 
@@ -837,8 +837,8 @@ bssl::UniquePtr<SSL> ClientContextImpl::newSsl(const Network::TransportSocketOpt
     std::vector<uint8_t> parsed_override_alpn =
         parseAlpnProtocols(absl::StrJoin(options->applicationProtocolListOverride(), ","));
     if (!parsed_override_alpn.empty()) {
-      int rc = SSL_set_alpn_protos(ssl_con.get(), parsed_override_alpn.data(),
-                                   parsed_override_alpn.size());
+      const int rc = SSL_set_alpn_protos(ssl_con.get(), parsed_override_alpn.data(),
+                                         parsed_override_alpn.size());
       RELEASE_ASSERT(rc == 0, Utility::getLastCryptoError().value_or(""));
     }
   }
@@ -986,7 +986,7 @@ void ServerContextImpl::generateHashForSessionContexId(const std::vector<std::st
     RELEASE_ASSERT(cert != nullptr, "TLS context should have an active certificate");
     X509_NAME* cert_subject = X509_get_subject_name(cert);
     RELEASE_ASSERT(cert_subject != nullptr, "TLS certificate should have a subject");
-    int cn_index = X509_NAME_get_index_by_NID(cert_subject, NID_commonName, -1);
+    const int cn_index = X509_NAME_get_index_by_NID(cert_subject, NID_commonName, -1);
     // It's possible that the certificate doesn't have CommonName, but has SANs.
     if (cn_index >= 0) {
       X509_NAME_ENTRY* cn_entry = X509_NAME_get_entry(cert_subject, cn_index);
@@ -1079,7 +1079,7 @@ int ServerContextImpl::sessionTicketProcess(SSL*, uint8_t* key_name, uint8_t* iv
                   "Expected key.name length");
     std::copy_n(key.name_.begin(), SSL_TICKET_KEY_NAME_LEN, key_name);
 
-    int rc = RAND_bytes(iv, EVP_CIPHER_iv_length(cipher));
+    const int rc = RAND_bytes(iv, EVP_CIPHER_iv_length(cipher));
     ASSERT(rc);
 
     // This RELEASE_ASSERT is logically a static_assert, but we can't actually get
@@ -1223,8 +1223,8 @@ void ServerContextImpl::TlsContext::addClientValidationContext(
     }
     X509_NAME* name = X509_get_subject_name(cert.get());
     if (name == nullptr) {
-      throw EnvoyException(fmt::format("Failed to load trusted client CA certificates from {}",
-                                       config.caCertPath()));
+      throw EnvoyException(
+          absl::StrCat("Failed to load trusted client CA certificates from ", config.caCertPath()));
     }
     // Check for duplicates.
     if (sk_X509_NAME_find(list.get(), nullptr, name)) {
@@ -1232,17 +1232,17 @@ void ServerContextImpl::TlsContext::addClientValidationContext(
     }
     bssl::UniquePtr<X509_NAME> name_dup(X509_NAME_dup(name));
     if (name_dup == nullptr || !sk_X509_NAME_push(list.get(), name_dup.release())) {
-      throw EnvoyException(fmt::format("Failed to load trusted client CA certificates from {}",
-                                       config.caCertPath()));
+      throw EnvoyException(
+          absl::StrCat("Failed to load trusted client CA certificates from ", config.caCertPath()));
     }
   }
   // Check for EOF.
-  uint32_t err = ERR_peek_last_error();
+  const uint32_t err = ERR_peek_last_error();
   if (ERR_GET_LIB(err) == ERR_LIB_PEM && ERR_GET_REASON(err) == PEM_R_NO_START_LINE) {
     ERR_clear_error();
   } else {
     throw EnvoyException(
-        fmt::format("Failed to load trusted client CA certificates from {}", config.caCertPath()));
+        absl::StrCat("Failed to load trusted client CA certificates from ", config.caCertPath()));
   }
   SSL_CTX_set_client_CA_list(ssl_ctx_.get(), list.release());
 

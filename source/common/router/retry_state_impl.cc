@@ -57,14 +57,12 @@ RetryStateImpl::RetryStateImpl(const RetryPolicy& route_policy, Http::HeaderMap&
                                Runtime::RandomGenerator& random, Event::Dispatcher& dispatcher,
                                Upstream::ResourcePriority priority)
     : cluster_(cluster), runtime_(runtime), random_(random), dispatcher_(dispatcher),
+      retry_on_(route_policy.retryOn()), retries_remaining_(route_policy.numRetries()),
       priority_(priority), retry_host_predicates_(route_policy.retryHostPredicates()),
       retry_priority_(route_policy.retryPriority()),
       retriable_status_codes_(route_policy.retriableStatusCodes()),
       retriable_headers_(route_policy.retriableHeaders()),
       retriable_request_headers_(route_policy.retriableRequestHeaders()) {
-
-  retry_on_ = route_policy.retryOn();
-  retries_remaining_ = std::max(retries_remaining_, route_policy.numRetries());
 
   std::chrono::milliseconds base_interval(
       runtime_.snapshot().getInteger("upstream.base_retry_backoff_ms", 25));

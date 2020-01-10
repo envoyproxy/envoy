@@ -43,10 +43,10 @@ REPOSITORY_LOCATIONS = dict(
         urls = ["https://commondatastorage.googleapis.com/chromium-boringssl-docs/fips/boringssl-66005f41fbc3529ffe8d007708756720529da20d.tar.xz"],
     ),
     com_google_absl = dict(
-        sha256 = "3df5970908ed9a09ba51388d04661803a6af18c373866f442cede7f381e0b94a",
-        strip_prefix = "abseil-cpp-14550beb3b7b97195e483fb74b5efb906395c31e",
-        # 2019-07-31
-        urls = ["https://github.com/abseil/abseil-cpp/archive/14550beb3b7b97195e483fb74b5efb906395c31e.tar.gz"],
+        sha256 = "190b0c9e65ef0866b44c54b517b5a3e15b67a1001b34547f03f8f4d8553c2851",
+        strip_prefix = "abseil-cpp-63ee2f8877915a3565c29707dba8fe4d7822596a",
+        # 2020-01-08
+        urls = ["https://github.com/abseil/abseil-cpp/archive/63ee2f8877915a3565c29707dba8fe4d7822596a.tar.gz"],
     ),
     com_github_apache_thrift = dict(
         sha256 = "7d59ac4fdcb2c58037ebd4a9da5f9a49e3e034bf75b3f26d9fe48ba3d8806e6b",
@@ -74,9 +74,10 @@ REPOSITORY_LOCATIONS = dict(
         urls = ["https://github.com/Cyan4973/xxHash/archive/v0.7.2.tar.gz"],
     ),
     com_github_envoyproxy_sqlparser = dict(
-        sha256 = "425dfee0c4fe9aff8acf2365cde3dd2ba7fb878d2ba37562d33920e34c40c05e",
-        strip_prefix = "sql-parser-5f50c68bdf5f107692bb027d1c568f67597f4d7f",
-        urls = ["https://github.com/envoyproxy/sql-parser/archive/5f50c68bdf5f107692bb027d1c568f67597f4d7f.tar.gz"],
+        sha256 = "8ccd2fe9087d96a91eda0929f3a0bdb5d9f877dd9cdc91f9fcf85385fe70cc14",
+        strip_prefix = "sql-parser-85904962d8723bbd3ae280dfb13cf4cc563faabc",
+        # 2020-01-08
+        urls = ["https://github.com/envoyproxy/sql-parser/archive/85904962d8723bbd3ae280dfb13cf4cc563faabc.tar.gz"],
     ),
     com_github_mirror_tclap = dict(
         sha256 = "f0ede0721dddbb5eba3a47385a6e8681b14f155e1129dd39d1a959411935098f",
