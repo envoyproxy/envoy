@@ -32,6 +32,12 @@ protected:
                    const Network::TransportSocketOptionsSharedPtr& transport_socket_options);
   virtual ~ConnPoolImplBase();
 
+  // Closes and destroys all connections. This must be called in the destructor of
+  // derived classes because the derived ActiveClient will downcast parent_ to a more
+  // specific type of ConnPoolImplBase, but if the more specific part is already destructed
+  // (due to bottom-up destructor ordering in c++) that access will be invalid.
+  void destructAllConnections();
+
   // ActiveClient provides a base class for connection pool clients that handles connection timings
   // as well as managing the connection timeout.
   class ActiveClient : public LinkedObject<ActiveClient>,

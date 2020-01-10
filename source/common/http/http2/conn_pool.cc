@@ -21,6 +21,8 @@ ConnPoolImpl::ConnPoolImpl(Event::Dispatcher& dispatcher, Upstream::HostConstSha
     : ConnPoolImplBase(std::move(host), std::move(priority), dispatcher, options,
                        transport_socket_options) {}
 
+ConnPoolImpl::~ConnPoolImpl() { destructAllConnections(); }
+
 ConnPoolImplBase::ActiveClientPtr ConnPoolImpl::instantiateActiveClient() {
   return std::make_unique<ActiveClient>(*this);
 }

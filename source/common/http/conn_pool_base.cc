@@ -13,6 +13,11 @@ ConnPoolImplBase::ConnPoolImplBase(
       transport_socket_options_(transport_socket_options) {}
 
 ConnPoolImplBase::~ConnPoolImplBase() {
+  ASSERT(ready_clients_.empty());
+  ASSERT(busy_clients_.empty());
+}
+
+void ConnPoolImplBase::destructAllConnections() {
   for (auto* list : {&ready_clients_, &busy_clients_}) {
     while (!list->empty()) {
       list->front()->close();

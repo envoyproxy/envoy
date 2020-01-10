@@ -35,7 +35,7 @@ public:
                const Http::Http1Settings& settings,
                const Network::TransportSocketOptionsSharedPtr& transport_socket_options);
 
-  ~ConnPoolImpl() override = default;
+  ~ConnPoolImpl() override;
 
   // ConnectionPool::Instance
   Http::Protocol protocol() const override { return Http::Protocol::Http11; }

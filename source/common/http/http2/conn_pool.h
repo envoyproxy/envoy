@@ -28,6 +28,8 @@ public:
                const Network::ConnectionSocket::OptionsSharedPtr& options,
                const Network::TransportSocketOptionsSharedPtr& transport_socket_options);
 
+  ~ConnPoolImpl() override;
+
   // Http::ConnectionPool::Instance
   Http::Protocol protocol() const override { return Http::Protocol::Http2; }
 
