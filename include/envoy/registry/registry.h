@@ -214,6 +214,7 @@ public:
           auto it = mapping->find(config_type);
           if (it != mapping->end() && it->second != factory.second) {
             delete mapping;
+            mapping = nullptr;
             throw EnvoyException(fmt::format("Double registration for type: '{}' by '{}' and '{}'",
                                              config_type, factory.second->name(),
                                              it->second->name()));
