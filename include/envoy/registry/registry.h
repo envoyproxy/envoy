@@ -195,7 +195,7 @@ public:
    * Must be invoked after factory registration is completed.
    */
   static absl::flat_hash_map<std::string, Base*>& factoriesByType() {
-    static absl::flat_hash_map<std::string, Base*>* factoriesByType = [] {
+    static absl::flat_hash_map<std::string, Base*>* factories_by_type = [] {
       auto* mapping = new absl::flat_hash_map<std::string, Base*>();
 
       for (const auto& factory : factories()) {
@@ -203,13 +203,14 @@ public:
           continue;
         }
 
-        // skip untyped factories and factories that consume Struct
+        // Skip untyped factories and factories that use google.protobuf.Struct
+        // as the config type. See issue https://github.com/envoyproxy/envoy/issues/9643.
         std::string config_type = factory.second->configType();
         if (config_type.empty() || config_type == "google.protobuf.Struct") {
           continue;
         }
 
-        // traverse the deprecated message type chain
+        // Register config types in the mapping and traverse the deprecated message type chain.
         while (true) {
           auto it = mapping->find(config_type);
           if (it != mapping->end() && it->second != factory.second) {
@@ -232,7 +233,7 @@ public:
       return mapping;
     }();
 
-    return *factoriesByType;
+    return *factories_by_type;
   }
 
   /**
