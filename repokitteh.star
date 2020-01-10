@@ -18,8 +18,9 @@ use(
 alias('retest', 'retry-circle')
 
 def _test():
+    print("called")
     store_put('pinged', 'x')
     print(store_get('pinged'))
     github.issue_create_comment("test")
 
-handlers.command(name='xtest', func=_test)
+handlers.command(name='test', func=_test)
