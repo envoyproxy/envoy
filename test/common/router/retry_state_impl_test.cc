@@ -705,7 +705,8 @@ TEST_F(RouterRetryStateImplTest, PolicyLimitedByRequestHeaders) {
   }
 
   {
-    Http::TestHeaderMapImpl request_headers{{":method", "GET"}, {"x-envoy-retry-on", "retriable-4xx"}};
+    Http::TestHeaderMapImpl request_headers{{":method", "GET"},
+                                            {"x-envoy-retry-on", "retriable-4xx"}};
     setup(request_headers);
     EXPECT_TRUE(state_->enabled());
     Http::TestHeaderMapImpl response_headers{{":status", "409"}};
