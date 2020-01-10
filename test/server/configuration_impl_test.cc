@@ -258,9 +258,12 @@ TEST_F(ConfigurationImplTest, ConfigurationFailsWhenInvalidTracerSpecified) {
       "http": {
         "name": "invalid",
         "typed_config": {
-          "@type": "type.googleapis.com/envoy.config.trace.v2.LightstepConfig",
-          "collector_cluster": "cluster_0",
-          "access_token_file": "/etc/envoy/envoy.cfg"
+          "@type": "type.googleapis.com/udpa.type.v1.TypedStruct",
+          "type_url": "type.googleapis.com/envoy.config.trace.v2.BlackHoleConfig",
+          "value": {
+            "collector_cluster": "cluster_0",
+            "access_token_file": "/etc/envoy/envoy.cfg"
+          }
         }
       }
     },
@@ -280,7 +283,7 @@ TEST_F(ConfigurationImplTest, ConfigurationFailsWhenInvalidTracerSpecified) {
   MainImpl config;
   EXPECT_THROW_WITH_MESSAGE(
       config.initialize(bootstrap, server_, cluster_manager_factory_), EnvoyException,
-      "Didn't find a registered implementation for type: 'envoy.config.trace.v2.LightstepConfig'");
+      "Didn't find a registered implementation for type: 'envoy.config.trace.v2.BlackHoleConfig'");
 }
 
 TEST_F(ConfigurationImplTest, ProtoSpecifiedStatsSink) {
