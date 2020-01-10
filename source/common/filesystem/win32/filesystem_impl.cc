@@ -84,7 +84,7 @@ ssize_t InstanceImplWin32::fileSize(const std::string& path) {
 
 std::string InstanceImplWin32::fileReadToEnd(const std::string& path) {
   if (illegalPath(path)) {
-    throw EnvoyException(fmt::format("Invalid path: {}", path));
+    throw EnvoyException(absl::StrCat("Invalid path: ", path));
   }
 
   std::ios::sync_with_stdio(false);
@@ -93,7 +93,7 @@ std::string InstanceImplWin32::fileReadToEnd(const std::string& path) {
   // 0x1a will be treated as EOF
   std::ifstream file(path, std::ios_base::binary);
   if (file.fail()) {
-    throw EnvoyException(fmt::format("unable to read file: {}", path));
+    throw EnvoyException(absl::StrCat("unable to read file: ", path));
   }
 
   std::stringstream file_string;

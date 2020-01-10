@@ -140,7 +140,7 @@ public:
 
   // Server::Configuration::Initial
   Admin& admin() override { return admin_; }
-  absl::optional<std::string> flagsPath() override { return flags_path_; }
+  absl::optional<std::string> flagsPath() const override { return flags_path_; }
   const envoy::config::bootstrap::v3alpha::LayeredRuntime& runtime() override {
     return layered_runtime_;
   }
@@ -148,8 +148,8 @@ public:
 private:
   struct AdminImpl : public Admin {
     // Server::Configuration::Initial::Admin
-    const std::string& accessLogPath() override { return access_log_path_; }
-    const std::string& profilePath() override { return profile_path_; }
+    const std::string& accessLogPath() const override { return access_log_path_; }
+    const std::string& profilePath() const override { return profile_path_; }
     Network::Address::InstanceConstSharedPtr address() override { return address_; }
     Network::Socket::OptionsSharedPtr socketOptions() override { return socket_options_; }
 

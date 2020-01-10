@@ -4,6 +4,7 @@ package envoy.api.v2.core;
 
 import "envoy/api/v2/core/base.proto";
 import "envoy/type/http.proto";
+import "envoy/type/matcher/string.proto";
 import "envoy/type/range.proto";
 
 import "google/protobuf/any.proto";
@@ -65,7 +66,7 @@ message HealthCheck {
     }
   }
 
-  // [#next-free-field: 11]
+  // [#next-free-field: 12]
   message HttpHealthCheck {
     // The value of the host header in the HTTP health check request. If
     // left empty (default value), the name of the cluster this health check is associated
@@ -85,7 +86,12 @@ message HealthCheck {
     // An optional service name parameter which is used to validate the identity of
     // the health checked cluster. See the :ref:`architecture overview
     // <arch_overview_health_checking_identity>` for more information.
-    string service_name = 5;
+    //
+    // .. attention::
+    //
+    //   This field has been deprecated in favor of `service_name_matcher` for better flexibility
+    //   over matching with service-cluster name.
+    string service_name = 5 [deprecated = true];
 
     // Specifies a list of HTTP headers that should be added to each request that is sent to the
     // health checked cluster. For more information, including details on header value syntax, see
@@ -114,6 +120,12 @@ message HealthCheck {
     // <envoy_api_field_core.HealthCheck.HttpHealthCheck.use_http2>` in light of
     // HTTP3.
     type.CodecClientType codec_client_type = 10 [(validate.rules).enum = {defined_only: true}];
+
+    // An optional service name parameter which is used to validate the identity of
+    // the health checked cluster using a :ref:`StringMatcher
+    // <envoy_api_msg_type.matcher.StringMatcher>`. See the :ref:`architecture overview
+    // <arch_overview_health_checking_identity>` for more information.
+    type.matcher.StringMatcher service_name_matcher = 11;
   }
 
   message TcpHealthCheck {

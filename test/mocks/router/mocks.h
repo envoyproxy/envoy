@@ -95,6 +95,9 @@ public:
 
 class TestRetryPolicy : public RetryPolicy {
 public:
+  TestRetryPolicy();
+  ~TestRetryPolicy() override;
+
   // Router::RetryPolicy
   std::chrono::milliseconds perTryTimeout() const override { return per_try_timeout_; }
   uint32_t numRetries() const override { return num_retries_; }

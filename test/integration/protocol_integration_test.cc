@@ -1499,6 +1499,42 @@ TEST_P(DownstreamProtocolIntegrationTest, InvalidAuthority) {
   }
 }
 
+TEST_P(DownstreamProtocolIntegrationTest, ConnectIsBlocked) {
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response = codec_client_->makeHeaderOnlyRequest(
+      Http::TestHeaderMapImpl{{":method", "CONNECT"}, {":path", "/"}, {":authority", "host"}});
+
+  if (downstreamProtocol() == Http::CodecClient::Type::HTTP1) {
+    response->waitForEndStream();
+    EXPECT_EQ("400", response->headers().Status()->value().getStringView());
+    EXPECT_TRUE(response->complete());
+  } else {
+    response->waitForReset();
+    codec_client_->waitForDisconnect();
+  }
+}
+
+// Make sure that with stream_error_on_invalid_http_messaging true, CONNECT
+// results in stream teardown not connection teardown.
+TEST_P(DownstreamProtocolIntegrationTest, ConnectStreamRejection) {
+  if (downstreamProtocol() == Http::CodecClient::Type::HTTP1) {
+    return;
+  }
+  config_helper_.addConfigModifier([](envoy::extensions::filters::network::http_connection_manager::
+                                          v3alpha::HttpConnectionManager& hcm) -> void {
+    hcm.mutable_http2_protocol_options()->set_stream_error_on_invalid_http_messaging(true);
+  });
+
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response = codec_client_->makeHeaderOnlyRequest(
+      Http::TestHeaderMapImpl{{":method", "CONNECT"}, {":path", "/"}, {":authority", "host"}});
+
+  response->waitForReset();
+  EXPECT_FALSE(codec_client_->disconnected());
+}
+
 // For tests which focus on downstream-to-Envoy behavior, and don't need to be
 // run with both HTTP/1 and HTTP/2 upstreams.
 INSTANTIATE_TEST_SUITE_P(Protocols, DownstreamProtocolIntegrationTest,

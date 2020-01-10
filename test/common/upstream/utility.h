@@ -4,6 +4,7 @@
 #include "envoy/config/cluster/v3alpha/cluster.pb.h"
 #include "envoy/config/core/v3alpha/base.pb.h"
 #include "envoy/config/core/v3alpha/health_check.pb.h"
+#include "envoy/config/core/v3alpha/health_check.pb.validate.h"
 #include "envoy/config/endpoint/v3alpha/endpoint_components.pb.h"
 #include "envoy/upstream/upstream.h"
 
@@ -119,7 +120,7 @@ makeLocalityWeights(std::initializer_list<uint32_t> locality_weights) {
 inline envoy::config::core::v3alpha::HealthCheck
 parseHealthCheckFromV2Yaml(const std::string& yaml_string) {
   envoy::config::core::v3alpha::HealthCheck health_check;
-  TestUtility::loadFromYaml(yaml_string, health_check);
+  TestUtility::loadFromYamlAndValidate(yaml_string, health_check);
   return health_check;
 }
 

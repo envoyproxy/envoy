@@ -19,6 +19,9 @@ class ActiveQuicListener : public Network::UdpListenerCallbacks,
                            public Server::ConnectionHandlerImpl::ActiveListenerImplBase,
                            Logger::Loggable<Logger::Id::quic> {
 public:
+  // TODO(bencebeky): Tune this value.
+  static const size_t kNumSessionsToCreatePerLoop = 16;
+
   ActiveQuicListener(Event::Dispatcher& dispatcher, Network::ConnectionHandler& parent,
                      Network::ListenerConfig& listener_config, const quic::QuicConfig& quic_config);
 
@@ -33,6 +36,7 @@ public:
 
   // Network::UdpListenerCallbacks
   void onData(Network::UdpRecvData& data) override;
+  void onReadReady() override;
   void onWriteReady(const Network::Socket& socket) override;
   void onReceiveError(Api::IoError::IoErrorCode /*error_code*/) override {
     // No-op. Quic can't do anything upon listener error.
