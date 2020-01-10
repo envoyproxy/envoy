@@ -22,4 +22,4 @@ def _test():
     print(store_get('pinged'))
     github.issue_create_comment("test")
 
-handlers.command(name='test', func=_test)
+handlers.command(name='xtest', func=_test)
