@@ -334,10 +334,9 @@ public:
   }
 
   // Server::Worker
-<<<<<<< HEAD
   MOCK_METHOD(void, addListener,
               (Network::ListenerConfig & listener, AddListenerCompletion completion));
-  MOCK_METHOD(uint64_t, numConnections, ());
+  MOCK_METHOD(uint64_t, numConnections, (), (const));
   MOCK_METHOD(void, removeListener,
               (Network::ListenerConfig & listener, std::function<void()> completion));
   MOCK_METHOD(void, start, (GuardDog & guard_dog));
@@ -345,18 +344,6 @@ public:
   MOCK_METHOD(void, stop, ());
   MOCK_METHOD(void, stopListener,
               (Network::ListenerConfig & listener, std::function<void()> completion));
-=======
-  MOCK_METHOD2(addListener,
-               void(Network::ListenerConfig& listener, AddListenerCompletion completion));
-  MOCK_CONST_METHOD0(numConnections, uint64_t());
-  MOCK_METHOD2(removeListener,
-               void(Network::ListenerConfig& listener, std::function<void()> completion));
-  MOCK_METHOD1(start, void(GuardDog& guard_dog));
-  MOCK_METHOD2(initializeStats, void(Stats::Scope& scope, const std::string& prefix));
-  MOCK_METHOD0(stop, void());
-  MOCK_METHOD2(stopListener,
-               void(Network::ListenerConfig& listener, std::function<void()> completion));
->>>>>>> master
 
   AddListenerCompletion add_listener_completion_;
   std::function<void()> remove_listener_completion_;

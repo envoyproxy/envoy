@@ -137,16 +137,10 @@ public:
   MockUdpListenerCallbacks();
   ~MockUdpListenerCallbacks() override;
 
-<<<<<<< HEAD
   MOCK_METHOD(void, onData, (UdpRecvData & data));
+  MOCK_METHOD(void, onReadReady, ());
   MOCK_METHOD(void, onWriteReady, (const Socket& socket));
   MOCK_METHOD(void, onReceiveError, (Api::IoError::IoErrorCode err));
-=======
-  MOCK_METHOD1(onData, void(UdpRecvData& data));
-  MOCK_METHOD0(onReadReady, void());
-  MOCK_METHOD1(onWriteReady, void(const Socket& socket));
-  MOCK_METHOD1(onReceiveError, void(Api::IoError::IoErrorCode err));
->>>>>>> master
 };
 
 class MockDrainDecision : public DrainDecision {
