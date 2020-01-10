@@ -2,8 +2,8 @@
 
 #include "envoy/config/listener/v3alpha/listener.pb.h"
 
-#include "server/listener_manager_impl.h"
 #include "server/api_listener_impl.h"
+#include "server/listener_manager_impl.h"
 
 #include "test/mocks/server/mocks.h"
 #include "test/server/utility.h"
