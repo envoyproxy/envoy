@@ -236,7 +236,7 @@ public:
     static const std::string& typed_struct_type =
         udpa::type::v1::TypedStruct::default_instance().GetDescriptor()->full_name();
 
-    if (!typed_config.type_url().empty()) {
+    if (!typed_config.value().empty()) {
       // Unpack methods will only use the fully qualified type name after the last '/'.
       // https://github.com/protocolbuffers/protobuf/blob/3.6.x/src/google/protobuf/any.proto#L87
       const absl::string_view type = TypeUtil::typeUrlToDescriptorFullName(typed_config.type_url());

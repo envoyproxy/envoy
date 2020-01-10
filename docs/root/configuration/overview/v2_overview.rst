@@ -364,6 +364,7 @@ filter configuration snippet is permitted:
     - name: front-router
       typed_config:
         "@type": type.googleapis.com/envoy.config.filter.http.router.v2.Router
+        dynamic_stats: true
 
 In case the control plane lacks the schema definitions for an extension,
 `udpa.type.v1.TypedStruct` should be used as a generic container. The type URL
