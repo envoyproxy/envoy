@@ -86,6 +86,10 @@ TEST_P(StatNameTest, SerializeBytes) {
   EXPECT_EQ((std::vector<uint8_t>{128, 1}), serializeDeserialize(128));
   EXPECT_EQ((std::vector<uint8_t>{129, 1}), serializeDeserialize(129));
   EXPECT_EQ((std::vector<uint8_t>{255, 1}), serializeDeserialize(255));
+
+  // This is the example from the image in stats.md.
+  EXPECT_EQ((std::vector<uint8_t>{0x80 + 5, 2}), serializeDeserialize(261));
+
   EXPECT_EQ((std::vector<uint8_t>{255, 127}), serializeDeserialize(16383));
   EXPECT_EQ((std::vector<uint8_t>{128, 128, 1}), serializeDeserialize(16384));
   EXPECT_EQ((std::vector<uint8_t>{129, 128, 1}), serializeDeserialize(16385));

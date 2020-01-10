@@ -157,6 +157,9 @@ However, the cost of using dynamic tokens is on par with the cost of not using
 a StatName system at all, only adding one re-encoding. And it is hard to quantify
 the benefit of avoiding mutex contention when there are large numbers of threads.
 
+### Symbol Table Memory Layout
+
+![Symbol Table Memory Diagram](symtab.png)
 
 ### Current State and Strategy To Deploy Symbol Tables
 
