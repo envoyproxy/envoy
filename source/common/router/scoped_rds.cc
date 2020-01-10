@@ -17,7 +17,6 @@
 #include "common/config/api_version.h"
 #include "common/config/resource_name_loader.h"
 #include "common/config/resources.h"
-#include "common/grpc/common.h"
 #include "common/init/manager_impl.h"
 #include "common/init/watcher_impl.h"
 #include "common/router/rds_impl.h"

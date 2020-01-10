@@ -16,7 +16,6 @@
 #include "common/config/resource_name_loader.h"
 #include "common/config/resources.h"
 #include "common/config/utility.h"
-#include "common/grpc/common.h"
 #include "common/protobuf/utility.h"
 
 #include "absl/strings/str_join.h"
