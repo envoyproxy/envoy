@@ -342,7 +342,7 @@ public:
   MockConnectionHandler();
   ~MockConnectionHandler() override;
 
-  MOCK_METHOD0(numConnections, uint64_t());
+  MOCK_CONST_METHOD0(numConnections, uint64_t());
   MOCK_METHOD0(incNumConnections, void());
   MOCK_METHOD0(decNumConnections, void());
   MOCK_METHOD1(addListener, void(ListenerConfig& config));
@@ -351,7 +351,7 @@ public:
   MOCK_METHOD0(stopListeners, void());
   MOCK_METHOD0(disableListeners, void());
   MOCK_METHOD0(enableListeners, void());
-  MOCK_METHOD0(statPrefix, const std::string&());
+  MOCK_CONST_METHOD0(statPrefix, const std::string&());
 };
 
 class MockIp : public Address::Ip {

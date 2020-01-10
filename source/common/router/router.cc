@@ -27,6 +27,7 @@
 #include "common/http/utility.h"
 #include "common/network/application_protocol.h"
 #include "common/network/transport_socket_options_impl.h"
+#include "common/network/upstream_server_name.h"
 #include "common/router/config_impl.h"
 #include "common/router/debug_config.h"
 #include "common/router/retry_state_impl.h"
@@ -488,7 +489,25 @@ Http::FilterHeadersStatus Filter::decodeHeaders(Http::HeaderMap& headers, bool e
   }
 
   // Fetch a connection pool for the upstream cluster.
-  Http::ConnectionPool::Instance* conn_pool = getConnPool();
+  const auto& upstream_http_protocol_options = cluster_->upstreamHttpProtocolOptions();
+
+  if (upstream_http_protocol_options.has_value() &&
+      upstream_http_protocol_options.value().auto_sni()) {
+    const auto host_str = headers.Host()->value().getStringView();
+    const auto parsed_authority = Http::Utility::parseAuthority(host_str);
+    if (!parsed_authority.is_ip_address_) {
+      // TODO: Add SAN verification here and use it from dynamic_forward_proxy
+      // Update filter state with the host/authority to use for setting SNI in the transport
+      // socket options. This is referenced during the getConnPool() call below.
+      callbacks_->streamInfo().filterState().setData(
+          Network::UpstreamServerName::key(),
+          std::make_unique<Network::UpstreamServerName>(host_str),
+          StreamInfo::FilterState::StateType::Mutable);
+    }
+  }
+
+  auto conn_pool = getConnPool();
+
   if (!conn_pool) {
     sendNoHealthyUpstreamResponse();
     return Http::FilterHeadersStatus::StopIteration;

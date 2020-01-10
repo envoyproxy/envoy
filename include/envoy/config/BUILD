@@ -59,9 +59,19 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "typed_config_interface",
+    hdrs = ["typed_config.h"],
+    deps = [
+        "//source/common/common:assert_lib",
+        "//source/common/protobuf",
+    ],
+)
+
+envoy_cc_library(
     name = "typed_metadata_interface",
     hdrs = ["typed_metadata.h"],
     deps = [
+        ":typed_config_interface",
         "//source/common/protobuf",
     ],
 )

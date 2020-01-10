@@ -6,6 +6,7 @@ import "envoy/api/v2/discovery.proto";
 
 import "google/api/annotations.proto";
 
+import "envoy/annotations/resource.proto";
 import "udpa/annotations/migrate.proto";
 
 import public "envoy/api/v2/cluster.proto";
@@ -20,6 +21,8 @@ option (udpa.annotations.file_migrate).move_to_package = "envoy.service.cluster.
 
 // Return list of all clusters this proxy will load balance to.
 service ClusterDiscoveryService {
+  option (envoy.annotations.resource).type = "envoy.api.v2.Cluster";
+
   rpc StreamClusters(stream DiscoveryRequest) returns (stream DiscoveryResponse) {
   }
 

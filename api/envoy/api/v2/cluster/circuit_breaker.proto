@@ -3,6 +3,7 @@ syntax = "proto3";
 package envoy.api.v2.cluster;
 
 import "envoy/api/v2/core/base.proto";
+import "envoy/type/percent.proto";
 
 import "google/protobuf/wrappers.proto";
 
@@ -23,8 +24,23 @@ option (udpa.annotations.file_migrate).move_to_package = "envoy.config.cluster.v
 message CircuitBreakers {
   // A Thresholds defines CircuitBreaker settings for a
   // :ref:`RoutingPriority<envoy_api_enum_core.RoutingPriority>`.
-  // [#next-free-field: 8]
+  // [#next-free-field: 9]
   message Thresholds {
+    message RetryBudget {
+      // Specifies the limit on concurrent retries as a percentage of the sum of active requests and
+      // active pending requests. For example, if there are 100 active requests and the
+      // budget_percent is set to 25, there may be 25 active retries.
+      //
+      // This parameter is optional. Defaults to 20%.
+      type.Percent budget_percent = 1;
+
+      // Specifies the minimum retry concurrency allowed for the retry budget. The limit on the
+      // number of active retries may never go below this number.
+      //
+      // This parameter is optional. Defaults to 3.
+      google.protobuf.UInt32Value min_retry_concurrency = 2;
+    }
+
     // The :ref:`RoutingPriority<envoy_api_enum_core.RoutingPriority>`
     // the specified CircuitBreaker settings apply to.
     core.RoutingPriority priority = 1 [(validate.rules).enum = {defined_only: true}];
@@ -45,9 +61,23 @@ message CircuitBreakers {
     // upstream cluster. If not specified, the default is 3.
     google.protobuf.UInt32Value max_retries = 5;
 
+    // Specifies a limit on concurrent retries in relation to the number of active requests. This
+    // parameter is optional.
+    //
+    // .. note::
+    //
+    //    If this field is set, the retry budget will override any configured retry circuit
+    //    breaker.
+    RetryBudget retry_budget = 8;
+
     // If track_remaining is true, then stats will be published that expose
     // the number of resources remaining until the circuit breakers open. If
     // not specified, the default is false.
+    //
+    // .. note::
+    //
+    //    If a retry budget is used in lieu of the max_retries circuit breaker,
+    //    the remaining retry resources remaining will not be tracked.
     bool track_remaining = 6;
 
     // The maximum number of connection pools per cluster that Envoy will concurrently support at

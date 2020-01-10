@@ -305,6 +305,20 @@ void InstanceImpl::initialize(const Options& options,
   server_stats_->version_.set(version_int);
 
   bootstrap_.mutable_node()->set_build_version(VersionInfo::version());
+  bootstrap_.mutable_node()->set_user_agent_name("envoy");
+  *bootstrap_.mutable_node()->mutable_user_agent_build_version() = VersionInfo::buildVersion();
+  for (const auto& ext : Envoy::Registry::FactoryCategoryRegistry::registeredFactories()) {
+    for (const auto& name : ext.second->allRegisteredNames()) {
+      auto* extension = bootstrap_.mutable_node()->add_extensions();
+      extension->set_name(std::string(name));
+      extension->set_category(ext.first);
+      auto const version = ext.second->getFactoryVersion(name);
+      if (version) {
+        *extension->mutable_version() = version.value();
+      }
+      extension->set_disabled(ext.second->isFactoryDisabled(name));
+    }
+  }
 
   local_info_ = std::make_unique<LocalInfo::LocalInfoImpl>(
       bootstrap_.node(), local_address, options.serviceZone(), options.serviceClusterName(),
@@ -368,7 +382,7 @@ void InstanceImpl::initialize(const Options& options,
   hooks.onRuntimeCreated();
 
   // Once we have runtime we can initialize the SSL context manager.
-  ssl_context_manager_ = createContextManager(Ssl::ContextManagerFactory::name(), time_source_);
+  ssl_context_manager_ = createContextManager("ssl_context_manager", time_source_);
 
   const bool use_tcp_for_dns_lookups = bootstrap_.use_tcp_for_dns_lookups();
   dns_resolver_ = dispatcher_->createDnsResolver({}, use_tcp_for_dns_lookups);
@@ -627,10 +641,8 @@ void InstanceImpl::notifyCallbacksForStage(Stage stage, Event::PostCb completion
 
   // Wrap completion_cb so that it only gets invoked when all callbacks for this stage
   // have finished their work.
-  std::shared_ptr<void> cb_guard(new int(0), [this, completion_cb](int* sentinel) {
-    dispatcher_->post(completion_cb);
-    delete sentinel;
-  });
+  std::shared_ptr<void> cb_guard(
+      new Cleanup([this, completion_cb]() { dispatcher_->post(completion_cb); }));
 
   // Registrations which take a completion callback are typically implemented by executing a
   // callback on all worker threads using Slot::runOnAllThreads which will hang indefinitely if

@@ -6,7 +6,8 @@
 #include <vector>
 
 #include "envoy/access_log/access_log.h"
-#include "envoy/config/filter/accesslog/v3alpha/accesslog.pb.h"
+#include "envoy/config/accesslog/v3alpha/accesslog.pb.h"
+#include "envoy/config/typed_config.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/server/access_log_config.h"
 #include "envoy/type/v3alpha/percent.pb.h"
@@ -28,10 +29,9 @@ public:
   /**
    * Read a filter definition from proto and instantiate a concrete filter class.
    */
-  static FilterPtr
-  fromProto(const envoy::config::filter::accesslog::v3alpha::AccessLogFilter& config,
-            Runtime::Loader& runtime, Runtime::RandomGenerator& random,
-            ProtobufMessage::ValidationVisitor& validation_visitor);
+  static FilterPtr fromProto(const envoy::config::accesslog::v3alpha::AccessLogFilter& config,
+                             Runtime::Loader& runtime, Runtime::RandomGenerator& random,
+                             ProtobufMessage::ValidationVisitor& validation_visitor);
 };
 
 /**
@@ -39,12 +39,12 @@ public:
  */
 class ComparisonFilter : public Filter {
 protected:
-  ComparisonFilter(const envoy::config::filter::accesslog::v3alpha::ComparisonFilter& config,
+  ComparisonFilter(const envoy::config::accesslog::v3alpha::ComparisonFilter& config,
                    Runtime::Loader& runtime);
 
   bool compareAgainstValue(uint64_t lhs);
 
-  envoy::config::filter::accesslog::v3alpha::ComparisonFilter config_;
+  envoy::config::accesslog::v3alpha::ComparisonFilter config_;
   Runtime::Loader& runtime_;
 };
 
@@ -53,7 +53,7 @@ protected:
  */
 class StatusCodeFilter : public ComparisonFilter {
 public:
-  StatusCodeFilter(const envoy::config::filter::accesslog::v3alpha::StatusCodeFilter& config,
+  StatusCodeFilter(const envoy::config::accesslog::v3alpha::StatusCodeFilter& config,
                    Runtime::Loader& runtime)
       : ComparisonFilter(config.comparison(), runtime) {}
 
@@ -68,7 +68,7 @@ public:
  */
 class DurationFilter : public ComparisonFilter {
 public:
-  DurationFilter(const envoy::config::filter::accesslog::v3alpha::DurationFilter& config,
+  DurationFilter(const envoy::config::accesslog::v3alpha::DurationFilter& config,
                  Runtime::Loader& runtime)
       : ComparisonFilter(config.comparison(), runtime) {}
 
@@ -83,10 +83,10 @@ public:
  */
 class OperatorFilter : public Filter {
 public:
-  OperatorFilter(const Protobuf::RepeatedPtrField<
-                     envoy::config::filter::accesslog::v3alpha::AccessLogFilter>& configs,
-                 Runtime::Loader& runtime, Runtime::RandomGenerator& random,
-                 ProtobufMessage::ValidationVisitor& validation_visitor);
+  OperatorFilter(
+      const Protobuf::RepeatedPtrField<envoy::config::accesslog::v3alpha::AccessLogFilter>& configs,
+      Runtime::Loader& runtime, Runtime::RandomGenerator& random,
+      ProtobufMessage::ValidationVisitor& validation_visitor);
 
 protected:
   std::vector<FilterPtr> filters_;
@@ -97,8 +97,8 @@ protected:
  */
 class AndFilter : public OperatorFilter {
 public:
-  AndFilter(const envoy::config::filter::accesslog::v3alpha::AndFilter& config,
-            Runtime::Loader& runtime, Runtime::RandomGenerator& random,
+  AndFilter(const envoy::config::accesslog::v3alpha::AndFilter& config, Runtime::Loader& runtime,
+            Runtime::RandomGenerator& random,
             ProtobufMessage::ValidationVisitor& validation_visitor);
 
   // AccessLog::Filter
@@ -112,8 +112,8 @@ public:
  */
 class OrFilter : public OperatorFilter {
 public:
-  OrFilter(const envoy::config::filter::accesslog::v3alpha::OrFilter& config,
-           Runtime::Loader& runtime, Runtime::RandomGenerator& random,
+  OrFilter(const envoy::config::accesslog::v3alpha::OrFilter& config, Runtime::Loader& runtime,
+           Runtime::RandomGenerator& random,
            ProtobufMessage::ValidationVisitor& validation_visitor);
 
   // AccessLog::Filter
@@ -151,7 +151,7 @@ public:
  */
 class RuntimeFilter : public Filter {
 public:
-  RuntimeFilter(const envoy::config::filter::accesslog::v3alpha::RuntimeFilter& config,
+  RuntimeFilter(const envoy::config::accesslog::v3alpha::RuntimeFilter& config,
                 Runtime::Loader& runtime, Runtime::RandomGenerator& random);
 
   // AccessLog::Filter
@@ -172,7 +172,7 @@ private:
  */
 class HeaderFilter : public Filter {
 public:
-  HeaderFilter(const envoy::config::filter::accesslog::v3alpha::HeaderFilter& config);
+  HeaderFilter(const envoy::config::accesslog::v3alpha::HeaderFilter& config);
 
   // AccessLog::Filter
   bool evaluate(const StreamInfo::StreamInfo& info, const Http::HeaderMap& request_headers,
@@ -188,7 +188,7 @@ private:
  */
 class ResponseFlagFilter : public Filter {
 public:
-  ResponseFlagFilter(const envoy::config::filter::accesslog::v3alpha::ResponseFlagFilter& config);
+  ResponseFlagFilter(const envoy::config::accesslog::v3alpha::ResponseFlagFilter& config);
 
   // AccessLog::Filter
   bool evaluate(const StreamInfo::StreamInfo& info, const Http::HeaderMap& request_headers,
@@ -209,7 +209,7 @@ public:
   using GrpcStatusHashSet =
       std::unordered_set<Grpc::Status::GrpcStatus, absl::Hash<Grpc::Status::GrpcStatus>>;
 
-  GrpcStatusFilter(const envoy::config::filter::accesslog::v3alpha::GrpcStatusFilter& config);
+  GrpcStatusFilter(const envoy::config::accesslog::v3alpha::GrpcStatusFilter& config);
 
   // AccessLog::Filter
   bool evaluate(const StreamInfo::StreamInfo& info, const Http::HeaderMap& request_headers,
@@ -224,14 +224,14 @@ private:
    * Converts a Protobuf representation of a gRPC status into the equivalent code version of a gRPC
    * status.
    */
-  Grpc::Status::GrpcStatus protoToGrpcStatus(
-      envoy::config::filter::accesslog::v3alpha::GrpcStatusFilter::Status status) const;
+  Grpc::Status::GrpcStatus
+  protoToGrpcStatus(envoy::config::accesslog::v3alpha::GrpcStatusFilter::Status status) const;
 };
 
 /**
  * Extension filter factory that reads from ExtensionFilter proto.
  */
-class ExtensionFilterFactory {
+class ExtensionFilterFactory : public Config::TypedFactory {
 public:
   virtual ~ExtensionFilterFactory() = default;
 
@@ -244,29 +244,10 @@ public:
    * @param random supplies the random generator.
    * @return an instance of extension filter implementation from a config proto.
    */
-  virtual FilterPtr
-  createFilter(const envoy::config::filter::accesslog::v3alpha::ExtensionFilter& config,
-               Runtime::Loader& runtime, Runtime::RandomGenerator& random) PURE;
+  virtual FilterPtr createFilter(const envoy::config::accesslog::v3alpha::ExtensionFilter& config,
+                                 Runtime::Loader& runtime, Runtime::RandomGenerator& random) PURE;
 
-  /**
-   * @return ProtobufTypes::MessagePtr create empty config proto message for v2. The config, which
-   * arrives in an opaque google.protobuf.Struct message, will be converted to JSON and then parsed
-   * into this empty proto.
-   */
-  virtual ProtobufTypes::MessagePtr createEmptyConfigProto() PURE;
-
-  /**
-   * @return std::string the identifying name for a particular Filter implementation
-   * produced by the factory.
-   */
-  virtual std::string name() const PURE;
-
-  /**
-   * @return std::string the identifying category name for objects
-   * created by this factory. Used for automatic registration with
-   * FactoryCategoryRegistry.
-   */
-  static std::string category() { return "access_logger.extension_filters"; }
+  std::string category() const override { return "envoy.access_logger.extension_filters"; }
 };
 
 /**
@@ -277,9 +258,8 @@ public:
   /**
    * Read a filter definition from proto and instantiate an Instance.
    */
-  static InstanceSharedPtr
-  fromProto(const envoy::config::filter::accesslog::v3alpha::AccessLog& config,
-            Server::Configuration::FactoryContext& context);
+  static InstanceSharedPtr fromProto(const envoy::config::accesslog::v3alpha::AccessLog& config,
+                                     Server::Configuration::FactoryContext& context);
 };
 
 } // namespace AccessLog

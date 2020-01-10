@@ -328,6 +328,10 @@ envoy_cc_library(
         "version.h",
         ":generate_version_number",
     ],
+    deps = [
+        "//source/common/singleton:const_singleton",
+        "@envoy_api//envoy/config/core/v3alpha:pkg_cc_proto",
+    ],
 )
 
 envoy_cc_library(
@@ -351,6 +355,7 @@ envoy_cc_library(
     deps = [
         ":version_includes",
         "//source/common/common:macros",
+        "//source/common/protobuf:utility_lib",
     ],
 )
 

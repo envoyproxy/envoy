@@ -4,7 +4,7 @@
 #include <string>
 
 #include "envoy/buffer/buffer.h"
-#include "envoy/config/filter/accesslog/v3alpha/accesslog.pb.h"
+#include "envoy/config/accesslog/v3alpha/accesslog.pb.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/event/timer.h"
 #include "envoy/extensions/filters/network/tcp_proxy/v3alpha/tcp_proxy.pb.h"
@@ -157,8 +157,7 @@ Config::Config(const envoy::extensions::filters::network::tcp_proxy::v3alpha::Tc
     }
   }
 
-  for (const envoy::config::filter::accesslog::v3alpha::AccessLog& log_config :
-       config.access_log()) {
+  for (const envoy::config::accesslog::v3alpha::AccessLog& log_config : config.access_log()) {
     access_logs_.emplace_back(AccessLog::AccessLogFactory::fromProto(log_config, context));
   }
 

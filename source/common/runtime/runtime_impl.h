@@ -98,6 +98,7 @@ public:
   double getDouble(const std::string& key, double default_value) const override;
   bool getBoolean(absl::string_view key, bool value) const override;
   const std::vector<OverrideLayerConstPtr>& getLayers() const override;
+  bool exists(const std::string& key) const override { return values_.contains(key); }
 
   static Entry createEntry(const std::string& value);
   static Entry createEntry(const ProtobufWkt::Value& value);
@@ -222,7 +223,7 @@ struct RtdsSubscription : Config::SubscriptionCallbacks, Logger::Loggable<Logger
 
   void start();
   void validateUpdateSize(uint32_t num_resources);
-  std::string loadTypeUrl();
+  static std::string loadTypeUrl(envoy::config::core::v3alpha::ApiVersion resource_api_version);
 
   LoaderImpl& parent_;
   const envoy::config::core::v3alpha::ConfigSource config_source_;
@@ -232,7 +233,6 @@ struct RtdsSubscription : Config::SubscriptionCallbacks, Logger::Loggable<Logger
   Init::TargetImpl init_target_;
   ProtobufWkt::Struct proto_;
   ProtobufMessage::ValidationVisitor& validation_visitor_;
-  envoy::config::core::v3alpha::ConfigSource::XdsApiVersion xds_api_version_;
 };
 
 using RtdsSubscriptionPtr = std::unique_ptr<RtdsSubscription>;

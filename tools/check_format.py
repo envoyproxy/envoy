@@ -72,7 +72,8 @@ STD_REGEX_WHITELIST = ("./source/common/common/utility.cc", "./source/common/com
                        "./source/extensions/filters/http/squash/squash_filter.cc",
                        "./source/server/http/admin.h", "./source/server/http/admin.cc",
                        "./tools/clang_tools/api_booster/main.cc",
-                       "./tools/clang_tools/api_booster/proto_cxx_utils.cc")
+                       "./tools/clang_tools/api_booster/proto_cxx_utils.cc",
+                       "./source/common/common/version.cc")
 
 # Only one C++ file should instantiate grpc_init
 GRPC_INIT_WHITELIST = ("./source/common/grpc/google_grpc_context.cc")
@@ -151,6 +152,7 @@ UNOWNED_EXTENSIONS = {
   "extensions/filters/network/ext_authz",
   "extensions/filters/network/redis_proxy",
   "extensions/filters/network/kafka",
+  "extensions/filters/network/kafka/broker",
   "extensions/filters/network/kafka/protocol",
   "extensions/filters/network/kafka/serialization",
   "extensions/filters/network/mongo_proxy",
@@ -893,8 +895,8 @@ if __name__ == "__main__":
   def ownedDirectories(error_messages):
     owned = []
     maintainers = [
-        '@mattklein123', '@htuch', '@alyssawilk', '@zuercher', '@lizan', '@snowp', '@junr03',
-        '@dnoe', '@dio', '@jmarantz'
+        '@mattklein123', '@htuch', '@alyssawilk', '@zuercher', '@lizan', '@snowp', '@asraa',
+        '@junr03', '@dio', '@jmarantz'
     ]
 
     try:
