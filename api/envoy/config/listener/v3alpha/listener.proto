@@ -4,7 +4,7 @@ package envoy.config.listener.v3alpha;
 
 import "envoy/config/core/v3alpha/address.proto";
 import "envoy/config/core/v3alpha/base.proto";
-import "envoy/config/listener/v2/api_listener.proto";
+import "envoy/config/listener/v3alpha/api_listener.proto";
 import "envoy/config/listener/v3alpha/listener_components.proto";
 import "envoy/config/listener/v3alpha/udp_listener_config.proto";
 
@@ -208,7 +208,7 @@ message Listener {
   // and the top-level Listener should essentially be a oneof that selects between the
   // socket listener and the various types of API listener. That way, a given Listener message
   // can structurally only contain the fields of the relevant type.]
-  v2.ApiListener api_listener = 19;
+  ApiListener api_listener = 19;
 
   // The listener's connection balancer configuration, currently only applicable to TCP listeners.
   // If no configuration is specified, Envoy will not attempt to balance active connections between

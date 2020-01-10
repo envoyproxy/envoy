@@ -934,7 +934,7 @@ std::string PrometheusStatsFormatter::sanitizeName(const std::string& name) {
   // prometheus. Refer to https://prometheus.io/docs/concepts/data_model/.
   std::string stats_name = std::regex_replace(name, PromRegex, "_");
   if (stats_name[0] >= '0' && stats_name[0] <= '9') {
-    return fmt::format("_{}", stats_name);
+    return absl::StrCat("_", stats_name);
   } else {
     return stats_name;
   }

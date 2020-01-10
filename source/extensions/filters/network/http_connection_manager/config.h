@@ -97,9 +97,9 @@ public:
                                         const Buffer::Instance& data,
                                         Http::ServerConnectionCallbacks& callbacks) override;
   Http::DateProvider& dateProvider() override { return date_provider_; }
-  std::chrono::milliseconds drainTimeout() override { return drain_timeout_; }
+  std::chrono::milliseconds drainTimeout() const override { return drain_timeout_; }
   FilterChainFactory& filterFactory() override { return *this; }
-  bool generateRequestId() override { return generate_request_id_; }
+  bool generateRequestId() const override { return generate_request_id_; }
   bool preserveExternalRequestId() const override { return preserve_external_request_id_; }
   uint32_t maxRequestHeadersKb() const override { return max_request_headers_kb_; }
   uint32_t maxRequestHeadersCount() const override { return max_request_headers_count_; }
@@ -116,20 +116,21 @@ public:
   Config::ConfigProvider* scopedRouteConfigProvider() override {
     return scoped_routes_config_provider_.get();
   }
-  const std::string& serverName() override { return server_name_; }
-  HttpConnectionManagerProto::ServerHeaderTransformation serverHeaderTransformation() override {
+  const std::string& serverName() const override { return server_name_; }
+  HttpConnectionManagerProto::ServerHeaderTransformation
+  serverHeaderTransformation() const override {
     return server_transformation_;
   }
   Http::ConnectionManagerStats& stats() override { return stats_; }
   Http::ConnectionManagerTracingStats& tracingStats() override { return tracing_stats_; }
-  bool useRemoteAddress() override { return use_remote_address_; }
+  bool useRemoteAddress() const override { return use_remote_address_; }
   const Http::InternalAddressConfig& internalAddressConfig() const override {
     return *internal_address_config_;
   }
   uint32_t xffNumTrustedHops() const override { return xff_num_trusted_hops_; }
   bool skipXffAppend() const override { return skip_xff_append_; }
   const std::string& via() const override { return via_; }
-  Http::ForwardClientCertType forwardClientCert() override { return forward_client_cert_; }
+  Http::ForwardClientCertType forwardClientCert() const override { return forward_client_cert_; }
   const std::vector<Http::ClientCertDetailsType>& setCurrentClientCertDetails() const override {
     return set_current_client_cert_details_;
   }

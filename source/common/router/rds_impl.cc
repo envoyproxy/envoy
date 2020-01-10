@@ -65,8 +65,7 @@ RdsRouteConfigSubscription::RdsRouteConfigSubscription(
     const uint64_t manager_identifier, Server::Configuration::ServerFactoryContext& factory_context,
     ProtobufMessage::ValidationVisitor& validator, Init::Manager& init_manager,
     const std::string& stat_prefix,
-    Envoy::Router::RouteConfigProviderManagerImpl& route_config_provider_manager,
-    envoy::config::core::v3alpha::ConfigSource::XdsApiVersion xds_api_version)
+    Envoy::Router::RouteConfigProviderManagerImpl& route_config_provider_manager)
     : route_config_name_(rds.route_config_name()), factory_context_(factory_context),
       validator_(validator), init_manager_(init_manager),
       init_target_(fmt::format("RdsRouteConfigSubscription {}", route_config_name_),
@@ -74,11 +73,12 @@ RdsRouteConfigSubscription::RdsRouteConfigSubscription(
       scope_(factory_context.scope().createScope(stat_prefix + "rds." + route_config_name_ + ".")),
       stat_prefix_(stat_prefix), stats_({ALL_RDS_STATS(POOL_COUNTER(*scope_))}),
       route_config_provider_manager_(route_config_provider_manager),
-      manager_identifier_(manager_identifier), xds_api_version_(xds_api_version) {
+      manager_identifier_(manager_identifier) {
 
   subscription_ =
       factory_context.clusterManager().subscriptionFactory().subscriptionFromConfigSource(
-          rds.config_source(), loadTypeUrl(), *scope_, *this);
+          rds.config_source(), loadTypeUrl(rds.config_source().resource_api_version()), *scope_,
+          *this);
   config_update_info_ =
       std::make_unique<RouteConfigUpdateReceiverImpl>(factory_context.timeSource(), validator);
 }
@@ -126,7 +126,7 @@ void RdsRouteConfigSubscription::onConfigUpdate(
       // the listener might have been torn down, need to remove this.
       vhds_subscription_ = std::make_unique<VhdsSubscription>(
           config_update_info_, factory_context_, stat_prefix_, route_config_providers_,
-          config_update_info_->routeConfiguration().vhds().config_source().xds_api_version());
+          config_update_info_->routeConfiguration().vhds().config_source().resource_api_version());
       vhds_subscription_->registerInitTargetWithInitManager(
           noop_init_manager == nullptr ? getRdsConfigInitManager() : *noop_init_manager);
     } else {
@@ -205,18 +205,19 @@ bool RdsRouteConfigSubscription::validateUpdateSize(int num_resources) {
   return true;
 }
 
-std::string RdsRouteConfigSubscription::loadTypeUrl() {
-  switch (xds_api_version_) {
+std::string RdsRouteConfigSubscription::loadTypeUrl(
+    envoy::config::core::v3alpha::ApiVersion resource_api_version) {
+  switch (resource_api_version) {
   // automatically set api version as V2
-  case envoy::config::core::v3alpha::ConfigSource::AUTO:
-  case envoy::config::core::v3alpha::ConfigSource::V2:
+  case envoy::config::core::v3alpha::ApiVersion::AUTO:
+  case envoy::config::core::v3alpha::ApiVersion::V2:
     return Grpc::Common::typeUrl(
         API_NO_BOOST(envoy::api::v2::RouteConfiguration().GetDescriptor()->full_name()));
-  case envoy::config::core::v3alpha::ConfigSource::V3ALPHA:
+  case envoy::config::core::v3alpha::ApiVersion::V3ALPHA:
     return Grpc::Common::typeUrl(API_NO_BOOST(
         envoy::config::route::v3alpha::RouteConfiguration().GetDescriptor()->full_name()));
   default:
-    throw EnvoyException(fmt::format("type {} is not supported", xds_api_version_));
+    NOT_REACHED_GCOVR_EXCL_LINE;
   }
 }
 
@@ -293,7 +294,7 @@ Router::RouteConfigProviderSharedPtr RouteConfigProviderManagerImpl::createRdsRo
     RdsRouteConfigSubscriptionSharedPtr subscription(new RdsRouteConfigSubscription(
         rds, manager_identifier, factory_context.getServerFactoryContext(),
         factory_context.messageValidationVisitor(), factory_context.initManager(), stat_prefix,
-        *this, rds.config_source().xds_api_version()));
+        *this));
     init_manager.add(subscription->init_target_);
     std::shared_ptr<RdsRouteConfigProviderImpl> new_provider{
         new RdsRouteConfigProviderImpl(std::move(subscription), factory_context)};

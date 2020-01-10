@@ -133,7 +133,7 @@ public:
   createTransportSocketFactory(const Protobuf::Message& config,
                                TransportSocketFactoryContext& context) PURE;
 
-  std::string category() const override { return "transport_sockets.upstream"; }
+  std::string category() const override { return "envoy.transport_sockets.upstream"; }
 };
 
 /**
@@ -160,7 +160,7 @@ public:
                                TransportSocketFactoryContext& context,
                                const std::vector<std::string>& server_names) PURE;
 
-  std::string category() const override { return "transport_sockets.downstream"; }
+  std::string category() const override { return "envoy.transport_sockets.downstream"; }
 };
 
 } // namespace Configuration

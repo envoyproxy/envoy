@@ -2,9 +2,9 @@ syntax = "proto3";
 
 package envoy.extensions.filters.network.http_connection_manager.v3alpha;
 
+import "envoy/config/accesslog/v3alpha/accesslog.proto";
 import "envoy/config/core/v3alpha/config_source.proto";
 import "envoy/config/core/v3alpha/protocol.proto";
-import "envoy/config/filter/accesslog/v3alpha/accesslog.proto";
 import "envoy/config/route/v3alpha/route.proto";
 import "envoy/config/route/v3alpha/scoped_route.proto";
 import "envoy/type/tracing/v2/custom_tag.proto";
@@ -368,7 +368,7 @@ message HttpConnectionManager {
 
   // Configuration for :ref:`HTTP access logs <arch_overview_access_logs>`
   // emitted by the connection manager.
-  repeated config.filter.accesslog.v3alpha.AccessLog access_log = 13;
+  repeated config.accesslog.v3alpha.AccessLog access_log = 13;
 
   // If set to true, the connection manager will use the real remote address
   // of the client connection when determining internal versus external origin and manipulating

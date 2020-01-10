@@ -93,6 +93,7 @@ FAQ
 FASTOPEN
 FB
 FCDS
+FCM
 FFFF
 FIN
 FIPS
@@ -396,6 +397,7 @@ builtin
 builtins
 bulkstrings
 bursty
+bytecode
 callee
 callsite
 callsites
@@ -421,6 +423,7 @@ ciphersuites
 circllhist
 CITT
 cloneable
+cloneability
 cmd
 cmsghdr
 codebase
@@ -1161,3 +1164,5 @@ zig
 zipkin
 zlib
 OBQ
+SemVer
+SCM

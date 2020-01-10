@@ -166,8 +166,8 @@ getGoogleGrpcChannelCredentials(const envoy::config::core::v3alpha::GrpcService&
         google_grpc_credentials_factory_name);
   }
   if (credentials_factory == nullptr) {
-    throw EnvoyException(fmt::format("Unknown google grpc credentials factory: {}",
-                                     google_grpc_credentials_factory_name));
+    throw EnvoyException(absl::StrCat("Unknown google grpc credentials factory: ",
+                                      google_grpc_credentials_factory_name));
   }
   return credentials_factory->getChannelCredentials(grpc_service, api);
 }

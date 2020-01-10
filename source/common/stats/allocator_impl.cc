@@ -104,9 +104,14 @@ protected:
   // adds another field, pending_increment_, that is not used in Gauge.
   std::atomic<uint64_t> value_{0};
 
-  // ref_count_ can be incremented as an atomic, without holding a
-  // lock. However, we must hold alloc_.mutex_ when decrementing ref_count_ so
-  // that when it hits zero we can atomically remove it from alloc_.counters_ or
+  // ref_count_ can be incremented as an atomic, without taking a new lock, as
+  // the critical 0->1 transition occurs in makeCounter and makeGauge, which
+  // already hold the lock. Increment also occurs when copying shared pointers,
+  // but these are always in transition to ref-count 2 or higher, and thus
+  // cannot race with a decrement to zero.
+  //
+  // However, we must hold alloc_.mutex_ when decrementing ref_count_ so that
+  // when it hits zero we can atomically remove it from alloc_.counters_ or
   // alloc_.gauges_. We leave it atomic to avoid taking the lock on increment.
   std::atomic<uint32_t> ref_count_{0};
 
@@ -249,7 +254,7 @@ GaugeSharedPtr AllocatorImpl::makeGauge(StatName name, absl::string_view tag_ext
   return gauge;
 }
 
-bool AllocatorImpl::isMutexLocked() {
+bool AllocatorImpl::isMutexLockedForTest() {
   bool locked = mutex_.tryLock();
   if (locked) {
     mutex_.unlock();

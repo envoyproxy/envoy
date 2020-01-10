@@ -396,6 +396,7 @@ envoy_cc_test_binary(
         "//source/server:filter_chain_manager_lib",
         "//test/test_common:environment_lib",
         "//test/mocks/network:network_mocks",
+        "//test/mocks/server:server_mocks",
         # tranport socket config registration
         "//source/extensions/transport_sockets/tls:config",
     ],
