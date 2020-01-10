@@ -146,6 +146,16 @@ substring sharing but we avoid taking locks. Dynamically generaeted tokens can
 be combined with symbolized tokens from `StatNameSet` or `StatNamePool` using
 `SymbolTable::join()`.
 
+Relative to using symbolized tokens, The cost of using dynamic tokens is:
+ * the StatName must be allocated and populated from the string data every time
+   `StatNameDynamicPool::add()` is called or `StatNameDynamicStorage` is constructed.
+ * the resulting `StatName`s are as long as the string, rather than benefiting from
+   a symbolized representation, which is typically 4 bytes or less per token.
+However, the cost of using dynamic tokens is on par with the cost of not using
+a StatName system at all, only adding one re-encoding. And it is hard to quantify
+the benefit of avoiding mutex contention when there are large numbers of threads.
+
+
 ### Current State and Strategy To Deploy Symbol Tables
 
 As of September 5, 2019, the symbol table API has been integrated into the
