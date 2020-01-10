@@ -365,6 +365,34 @@ filter configuration snippet is permitted:
       typed_config:
         "@type": type.googleapis.com/envoy.config.filter.http.router.v2.Router
 
+In case the control plane lacks the schema definitions for an extension,
+`udpa.type.v1.TypedStruct` should be used a generic container. The type URL
+inside it is then used by a client to convert the contents to a typed
+configuration resource. For example, the above example could be written as
+follows:
+
+.. code-block:: yaml
+
+  name: front-http-proxy
+  typed_config:
+    "@type": type.googleapis.com/udpa.type.v1.TypedStruct
+    type_url: type.googleapis.com/envoy.config.filter.network.http_connection_manager.v2.HttpConnectionManager
+    value:
+      stat_prefix: ingress_http
+      codec_type: AUTO
+      rds:
+        route_config_name: local_route
+        config_source:
+          api_config_source:
+            api_type: GRPC
+            grpc_services:
+              envoy_grpc:
+                cluster_name: xds_cluster
+      http_filters:
+      - name: front-router
+        typed_config:
+          "@type": type.googleapis.com/udpa.type.v1.TypedStruct
+          type_url: type.googleapis.com/envoy.config.filter.http.router.v2.Router
 
 .. _config_overview_v2_management_server:
 
