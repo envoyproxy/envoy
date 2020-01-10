@@ -10,6 +10,8 @@ namespace Config {
 
 namespace {
 
+const char DeprecatedFieldShadowPrefix[] = "hidden_envoy_deprecated_";
+
 // TODO(htuch): refactor these message visitor patterns into utility.cc and share with
 // MessageUtil::checkForUnexpectedFields.
 void messageFieldVisitor(std::function<void(Protobuf::Message&, const Protobuf::FieldDescriptor&,
@@ -123,7 +125,7 @@ bool VersionUtil::hasHiddenEnvoyDeprecated(const Protobuf::Message& message) {
   constMessageFieldVisitor(
       [&has_hidden](const Protobuf::Message& message, const Protobuf::FieldDescriptor& field,
                     const Protobuf::Reflection& reflection) {
-        if (absl::StartsWith(field.name(), "hidden_envoy_deprecated_")) {
+        if (absl::StartsWith(field.name(), DeprecatedFieldShadowPrefix)) {
           if (field.is_repeated()) {
             has_hidden |= reflection.FieldSize(message, &field) > 0;
           } else {
@@ -139,7 +141,7 @@ void VersionUtil::scrubHiddenEnvoyDeprecated(Protobuf::Message& message) {
   messageFieldVisitor(
       [](Protobuf::Message& message, const Protobuf::FieldDescriptor& field,
          const Protobuf::Reflection& reflection) {
-        if (absl::StartsWith(field.name(), "hidden_envoy_deprecated_")) {
+        if (absl::StartsWith(field.name(), DeprecatedFieldShadowPrefix)) {
           reflection.ClearField(&message, &field);
         }
       },
