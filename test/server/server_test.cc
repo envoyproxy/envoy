@@ -219,8 +219,8 @@ protected:
 
   void expectCorrectBuildVersion(const envoy::config::core::v3alpha::BuildVersion& build_version) {
     std::string version_string =
-        absl::StrCat(build_version.version().major(), ".", build_version.version().minor(), ".",
-                     build_version.version().patch());
+        absl::StrCat(build_version.version().major_number(), ".",
+                     build_version.version().minor_number(), ".", build_version.version().patch());
     const auto& fields = build_version.metadata().fields();
     if (fields.find(BuildVersionMetadataKeys::get().BuildLabel) != fields.end()) {
       absl::StrAppend(&version_string, "-",
