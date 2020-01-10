@@ -332,6 +332,40 @@ The management server could respond to EDS requests with:
               address: 127.0.0.2
               port_value: 1234
 
+.. _config_overview_v2_extension_configuration:
+
+Extension configuration
+-----------------------
+
+Each configuration resource in Envoy has a type URL in the `typed_config`. This
+type corresponds to a versioned schema. If the type URL uniquely identifies an
+extension capable of interpreting the configuration, then the extension is
+selected regardless of the `name` field. In this case the `name` field becomes
+optional and can be used as an identifier or as an annotation for the
+particular instance of the extension configuration. For example, the following
+filter configuration snippet is permitted:
+
+.. code-block:: yaml
+
+  name: front-http-proxy
+  typed_config:
+    "@type": type.googleapis.com/envoy.config.filter.network.http_connection_manager.v2.HttpConnectionManager
+    stat_prefix: ingress_http
+    codec_type: AUTO
+    rds:
+      route_config_name: local_route
+      config_source:
+        api_config_source:
+          api_type: GRPC
+          grpc_services:
+            envoy_grpc:
+              cluster_name: xds_cluster
+    http_filters:
+    - name: front-router
+      typed_config:
+        "@type": type.googleapis.com/envoy.config.filter.http.router.v2.Router
+
+
 .. _config_overview_v2_management_server:
 
 xDS API endpoints
