@@ -9,20 +9,22 @@ option java_outer_classname = "CacheProto";
 option java_multiple_files = true;
 
 // [#protodoc-title: HTTP Cache Filter]
-// Pluggable HTTP Cache :ref:`configuration overview <config_http_filters_cache>`.
+// Pluggable HTTP Cache :ref:`overview <config_http_filters_cache>`.
 // [#extension: envoy.filters.http.cache]
-
-// bqDesign<https://docs.google.com/document/d/1WPuim_GzhfdsnIj_tf-fIeutK0jO4aVQfVrLJFoLN3g/view>bq_
 message Cache {
+  // List of query params.
   message QueryParams {
     repeated string query_string_keys = 1;
   }
 
+  // Modifies cache key creation by restricting which parts of the URL are included.
   message KeyCreatorParams {
-    // If true, exclude the URL scheme from the cache key.
+    // If true, exclude the URL scheme from the cache key. Set to true if your origins always
+    // produce the same response for http and https requests.
     bool exclude_scheme = 1;
 
-    // If true, exclude the host from the cache key.
+    // If true, exclude the host from the cache key. Set to true if your origins' responses don't
+    // ever depend on host.
     bool exclude_host = 2;
 
     oneof query_string_keys {
@@ -50,7 +52,9 @@ message Cache {
   // repeated string allowed_vary_headers = 2;
 
   // TODO(toddmgreer) implement key customization
-  // KeyCreatorParams key_creator_params = 3;
+  //
+  // Modifies cache key creation by restricting which parts of the URL are included.
+  KeyCreatorParams key_creator_params = 3;
 
   // TODO(toddmgreer) add size limit
 }
