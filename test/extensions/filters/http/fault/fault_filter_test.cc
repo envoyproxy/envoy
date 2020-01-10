@@ -383,10 +383,6 @@ TEST_F(FaultFilterTest, DelayForDownstreamCluster) {
 
   // Delay related calls.
   EXPECT_CALL(runtime_.snapshot_,
-              featureEnabled("fault.http.delay.fixed_delay_percent",
-                             Matcher<const envoy::type::v3alpha::FractionalPercent&>(Percent(100))))
-      .WillOnce(Return(false));
-  EXPECT_CALL(runtime_.snapshot_,
               featureEnabled("fault.http.cluster.delay.fixed_delay_percent",
                              Matcher<const envoy::type::v3alpha::FractionalPercent&>(Percent(100))))
       .WillOnce(Return(true));
@@ -403,10 +399,6 @@ TEST_F(FaultFilterTest, DelayForDownstreamCluster) {
             filter_->decodeHeaders(request_headers_, false));
 
   // Abort related calls.
-  EXPECT_CALL(runtime_.snapshot_,
-              featureEnabled("fault.http.abort.abort_percent",
-                             Matcher<const envoy::type::v3alpha::FractionalPercent&>(Percent(0))))
-      .WillOnce(Return(false));
   EXPECT_CALL(runtime_.snapshot_,
               featureEnabled("fault.http.cluster.abort.abort_percent",
                              Matcher<const envoy::type::v3alpha::FractionalPercent&>(Percent(0))))
@@ -444,10 +436,6 @@ TEST_F(FaultFilterTest, FixedDelayAndAbortDownstream) {
 
   // Delay related calls.
   EXPECT_CALL(runtime_.snapshot_,
-              featureEnabled("fault.http.delay.fixed_delay_percent",
-                             Matcher<const envoy::type::v3alpha::FractionalPercent&>(Percent(100))))
-      .WillOnce(Return(false));
-  EXPECT_CALL(runtime_.snapshot_,
               featureEnabled("fault.http.cluster.delay.fixed_delay_percent",
                              Matcher<const envoy::type::v3alpha::FractionalPercent&>(Percent(100))))
       .WillOnce(Return(true));
@@ -467,10 +455,6 @@ TEST_F(FaultFilterTest, FixedDelayAndAbortDownstream) {
   EXPECT_EQ(1UL, config_->stats().active_faults_.value());
 
   // Abort related calls
-  EXPECT_CALL(runtime_.snapshot_,
-              featureEnabled("fault.http.abort.abort_percent",
-                             Matcher<const envoy::type::v3alpha::FractionalPercent&>(Percent(100))))
-      .WillOnce(Return(false));
   EXPECT_CALL(runtime_.snapshot_,
               featureEnabled("fault.http.cluster.abort.abort_percent",
                              Matcher<const envoy::type::v3alpha::FractionalPercent&>(Percent(100))))
