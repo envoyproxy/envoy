@@ -136,7 +136,7 @@ should be created before the set is used for requests, via
 derived from data in a request, but there are limited set of known tokens, such
 as SSL ciphers or Redis commands.
 
-### Dynnamic stat tokens
+### Dynamic stat tokens
 
 While stats are usually composed of tokens that are known at compile-time, there
 are scenarios where the names are newly discovered from data in requests. To
