@@ -64,7 +64,5 @@ using TlsSessionTicketKeysConfigProvider =
 using TlsSessionTicketKeysConfigProviderSharedPtr =
     std::shared_ptr<TlsSessionTicketKeysConfigProvider>;
 
-class SdsApi;
-
 } // namespace Secret
 } // namespace Envoy

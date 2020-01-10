@@ -59,8 +59,5 @@ public:
 using RouteConfigProviderPtr = std::unique_ptr<RouteConfigProvider>;
 using RouteConfigProviderSharedPtr = std::shared_ptr<RouteConfigProvider>;
 
-class RdsRouteConfigSubscription;
-class VhdsSubscription;
-class ScopedRdsConfigSubscription;
 } // namespace Router
 } // namespace Envoy

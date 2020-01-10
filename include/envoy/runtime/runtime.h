@@ -301,6 +301,5 @@ using LoaderPtr = std::unique_ptr<Loader>;
 using LoaderSingleton = InjectableSingleton<Loader>;
 using ScopedLoaderSingleton = ScopedInjectableLoader<Loader>;
 
-struct RtdsSubscription;
 } // namespace Runtime
 } // namespace Envoy
