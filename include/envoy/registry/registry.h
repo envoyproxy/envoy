@@ -195,43 +195,43 @@ public:
    * Must be invoked after factory registration is completed.
    */
   static absl::flat_hash_map<std::string, Base*>& factoriesByType() {
-    static absl::flat_hash_map<std::string, Base*>* factories_by_type = [] {
-      auto* mapping = new absl::flat_hash_map<std::string, Base*>();
+    static absl::flat_hash_map<std::string, Base*>* factories_by_type =
+        [] {
+          auto mapping = std::make_unique<absl::flat_hash_map<std::string, Base*>>();
 
-      for (const auto& factory : factories()) {
-        if (factory.second == nullptr) {
-          continue;
-        }
+          for (const auto& factory : factories()) {
+            if (factory.second == nullptr) {
+              continue;
+            }
 
-        // Skip untyped factories and factories that use google.protobuf.Struct
-        // as the config type. See issue https://github.com/envoyproxy/envoy/issues/9643.
-        std::string config_type = factory.second->configType();
-        if (config_type.empty() || config_type == "google.protobuf.Struct") {
-          continue;
-        }
+            // Skip untyped factories and factories that use google.protobuf.Struct
+            // as the config type. See issue https://github.com/envoyproxy/envoy/issues/9643.
+            std::string config_type = factory.second->configType();
+            if (config_type.empty() || config_type == "google.protobuf.Struct") {
+              continue;
+            }
 
-        // Register config types in the mapping and traverse the deprecated message type chain.
-        while (true) {
-          auto it = mapping->find(config_type);
-          if (it != mapping->end() && it->second != factory.second) {
-            delete mapping;
-            mapping = nullptr;
-            throw EnvoyException(fmt::format("Double registration for type: '{}' by '{}' and '{}'",
-                                             config_type, factory.second->name(),
-                                             it->second->name()));
+            // Register config types in the mapping and traverse the deprecated message type chain.
+            while (true) {
+              auto it = mapping->find(config_type);
+              if (it != mapping->end() && it->second != factory.second) {
+                throw EnvoyException(
+                    fmt::format("Double registration for type: '{}' by '{}' and '{}'", config_type,
+                                factory.second->name(), it->second->name()));
+              }
+              mapping->emplace(std::make_pair(config_type, factory.second));
+
+              const Protobuf::Descriptor* previous =
+                  Config::ApiTypeOracle::getEarlierVersionDescriptor(config_type);
+              if (previous == nullptr) {
+                break;
+              }
+              config_type = previous->full_name();
+            }
           }
-          mapping->emplace(std::make_pair(config_type, factory.second));
-
-          const Protobuf::Descriptor* previous =
-              Config::ApiTypeOracle::getEarlierVersionDescriptor(config_type);
-          if (previous == nullptr) {
-            break;
-          }
-          config_type = previous->full_name();
-        }
-      }
-      return mapping;
-    }();
+          return mapping;
+        }()
+            .release();
 
     return *factories_by_type;
   }
