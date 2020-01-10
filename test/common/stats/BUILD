@@ -18,6 +18,7 @@ envoy_cc_test(
         "//source/common/stats:allocator_lib",
         "//source/common/stats:symbol_table_creator_lib",
         "//test/test_common:logging_lib",
+        "//test/test_common:thread_factory_for_test_lib",
     ],
 )
 
@@ -185,11 +186,13 @@ envoy_cc_test(
         "//source/common/stats:stats_matcher_lib",
         "//source/common/stats:symbol_table_lib",
         "//source/common/stats:thread_local_store_lib",
+        "//source/common/thread_local:thread_local_lib",
         "//test/mocks/event:event_mocks",
         "//test/mocks/server:server_mocks",
         "//test/mocks/stats:stats_mocks",
         "//test/mocks/thread_local:thread_local_mocks",
         "//test/test_common:logging_lib",
+        "//test/test_common:test_time_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/metrics/v3alpha:pkg_cc_proto",
     ],

@@ -46,7 +46,7 @@ private:
                resource)
         .cluster_name();
   }
-  std::string loadTypeUrl();
+  static std::string loadTypeUrl(envoy::config::core::v3alpha::ApiVersion resource_api_version);
   using LocalityWeightsMap = std::unordered_map<envoy::config::core::v3alpha::Locality, uint32_t,
                                                 LocalityHash, LocalityEqualTo>;
   bool updateHostsPerLocality(const uint32_t priority, const uint32_t overprovisioning_factor,
@@ -84,7 +84,6 @@ private:
   Event::TimerPtr assignment_timeout_;
   ProtobufMessage::ValidationVisitor& validation_visitor_;
   InitializePhase initialize_phase_;
-  envoy::config::core::v3alpha::ConfigSource::XdsApiVersion xds_api_version_;
 };
 
 class EdsClusterFactory : public ClusterFactoryImplBase {

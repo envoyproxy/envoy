@@ -6,9 +6,11 @@
 #include "envoy/event/timer.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/stats/scope.h"
+#include "envoy/type/matcher/string.pb.h"
 #include "envoy/upstream/health_checker.h"
 
 #include "common/common/logger.h"
+#include "common/common/matchers.h"
 #include "common/network/transport_socket_options_impl.h"
 
 namespace Envoy {

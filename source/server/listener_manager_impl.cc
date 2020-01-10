@@ -83,28 +83,32 @@ bool ListenSocketCreationParams::operator!=(const ListenSocketCreationParams& rh
 
 std::vector<Network::FilterFactoryCb> ProdListenerComponentFactory::createNetworkFilterFactoryList_(
     const Protobuf::RepeatedPtrField<envoy::config::listener::v3alpha::Filter>& filters,
-    Configuration::FactoryContext& context) {
+    Server::Configuration::FilterChainFactoryContext& filter_chain_factory_context) {
   std::vector<Network::FilterFactoryCb> ret;
   for (ssize_t i = 0; i < filters.size(); i++) {
     const auto& proto_config = filters[i];
-    const std::string& string_name = proto_config.name();
     ENVOY_LOG(debug, "  filter #{}:", i);
-    ENVOY_LOG(debug, "    name: {}", string_name);
-    ENVOY_LOG(
-        debug, "  config: {}",
-        MessageUtil::getJsonStringFromMessage(proto_config.hidden_envoy_deprecated_config(), true));
+    ENVOY_LOG(debug, "    name: {}", proto_config.name());
+    ENVOY_LOG(debug, "  config: {}",
+              MessageUtil::getJsonStringFromMessage(
+                  proto_config.has_typed_config()
+                      ? static_cast<const Protobuf::Message&>(proto_config.typed_config())
+                      : static_cast<const Protobuf::Message&>(
+                            proto_config.hidden_envoy_deprecated_config()),
+                  true));
 
     // Now see if there is a factory that will accept the config.
     auto& factory =
         Config::Utility::getAndCheckFactory<Configuration::NamedNetworkFilterConfigFactory>(
-            string_name);
+            proto_config);
 
     Config::Utility::validateTerminalFilters(filters[i].name(), "network",
                                              factory.isTerminalFilter(), i == filters.size() - 1);
 
     auto message = Config::Utility::translateToFactoryConfig(
-        proto_config, context.messageValidationVisitor(), factory);
-    Network::FilterFactoryCb callback = factory.createFilterFactoryFromProto(*message, context);
+        proto_config, filter_chain_factory_context.messageValidationVisitor(), factory);
+    Network::FilterFactoryCb callback =
+        factory.createFilterFactoryFromProto(*message, filter_chain_factory_context);
     ret.push_back(callback);
   }
   return ret;
@@ -117,17 +121,20 @@ ProdListenerComponentFactory::createListenerFilterFactoryList_(
   std::vector<Network::ListenerFilterFactoryCb> ret;
   for (ssize_t i = 0; i < filters.size(); i++) {
     const auto& proto_config = filters[i];
-    const std::string& string_name = proto_config.name();
     ENVOY_LOG(debug, "  filter #{}:", i);
-    ENVOY_LOG(debug, "    name: {}", string_name);
-    ENVOY_LOG(
-        debug, "  config: {}",
-        MessageUtil::getJsonStringFromMessage(proto_config.hidden_envoy_deprecated_config(), true));
+    ENVOY_LOG(debug, "    name: {}", proto_config.name());
+    ENVOY_LOG(debug, "  config: {}",
+              MessageUtil::getJsonStringFromMessage(
+                  proto_config.has_typed_config()
+                      ? static_cast<const Protobuf::Message&>(proto_config.typed_config())
+                      : static_cast<const Protobuf::Message&>(
+                            proto_config.hidden_envoy_deprecated_config()),
+                  true));
 
     // Now see if there is a factory that will accept the config.
     auto& factory =
         Config::Utility::getAndCheckFactory<Configuration::NamedListenerFilterConfigFactory>(
-            string_name);
+            proto_config);
     auto message = Config::Utility::translateToFactoryConfig(
         proto_config, context.messageValidationVisitor(), factory);
     ret.push_back(factory.createFilterFactoryFromProto(*message, context));
@@ -142,17 +149,20 @@ ProdListenerComponentFactory::createUdpListenerFilterFactoryList_(
   std::vector<Network::UdpListenerFilterFactoryCb> ret;
   for (ssize_t i = 0; i < filters.size(); i++) {
     const auto& proto_config = filters[i];
-    const std::string& string_name = proto_config.name();
     ENVOY_LOG(debug, "  filter #{}:", i);
-    ENVOY_LOG(debug, "    name: {}", string_name);
-    ENVOY_LOG(
-        debug, "  config: {}",
-        MessageUtil::getJsonStringFromMessage(proto_config.hidden_envoy_deprecated_config(), true));
+    ENVOY_LOG(debug, "    name: {}", proto_config.name());
+    ENVOY_LOG(debug, "  config: {}",
+              MessageUtil::getJsonStringFromMessage(
+                  proto_config.has_typed_config()
+                      ? static_cast<const Protobuf::Message&>(proto_config.typed_config())
+                      : static_cast<const Protobuf::Message&>(
+                            proto_config.hidden_envoy_deprecated_config()),
+                  true));
 
     // Now see if there is a factory that will accept the config.
     auto& factory =
         Config::Utility::getAndCheckFactory<Configuration::NamedUdpListenerFilterConfigFactory>(
-            string_name);
+            proto_config);
 
     auto message = Config::Utility::translateToFactoryConfig(
         proto_config, context.messageValidationVisitor(), factory);
@@ -235,7 +245,7 @@ ListenerManagerImpl::ListenerManagerImpl(Instance& server,
       enable_dispatcher_stats_(enable_dispatcher_stats) {
   for (uint32_t i = 0; i < server.options().concurrency(); i++) {
     workers_.emplace_back(
-        worker_factory.createWorker(server.overloadManager(), fmt::format("worker_{}", i)));
+        worker_factory.createWorker(server.overloadManager(), absl::StrCat("worker_", i)));
   }
 }
 
@@ -624,7 +634,7 @@ void ListenerManagerImpl::onListenerWarmed(ListenerImpl& listener) {
   updateWarmingActiveGauges();
 }
 
-uint64_t ListenerManagerImpl::numConnections() {
+uint64_t ListenerManagerImpl::numConnections() const {
   uint64_t num_connections = 0;
   for (const auto& worker : workers_) {
     num_connections += worker->numConnections();
@@ -677,6 +687,7 @@ void ListenerManagerImpl::startWorkers(GuardDog& guard_dog) {
   workers_started_ = true;
   uint32_t i = 0;
   for (const auto& worker : workers_) {
+    ENVOY_LOG(info, "starting worker {}", i);
     ASSERT(warming_listeners_.empty());
     for (const auto& listener : active_listeners_) {
       addListenerToWorker(*worker, *listener);
@@ -750,10 +761,26 @@ void ListenerManagerImpl::endListenerUpdate(FailureStates&& failure_states) {
 ListenerFilterChainFactoryBuilder::ListenerFilterChainFactoryBuilder(
     ListenerImpl& listener,
     Server::Configuration::TransportSocketFactoryContextImpl& factory_context)
-    : parent_(listener), factory_context_(factory_context) {}
+    : ListenerFilterChainFactoryBuilder(listener.messageValidationVisitor(),
+                                        listener.parent_.factory_, factory_context) {}
+
+ListenerFilterChainFactoryBuilder::ListenerFilterChainFactoryBuilder(
+    ProtobufMessage::ValidationVisitor& validator,
+    ListenerComponentFactory& listener_component_factory,
+    Server::Configuration::TransportSocketFactoryContextImpl& factory_context)
+    : validator_(validator), listener_component_factory_(listener_component_factory),
+      factory_context_(factory_context) {}
 
 std::unique_ptr<Network::FilterChain> ListenerFilterChainFactoryBuilder::buildFilterChain(
-    const envoy::config::listener::v3alpha::FilterChain& filter_chain) const {
+    const envoy::config::listener::v3alpha::FilterChain& filter_chain,
+    FilterChainFactoryContextCreator& context_creator) const {
+  return buildFilterChainInternal(filter_chain,
+                                  context_creator.createFilterChainFactoryContext(&filter_chain));
+}
+
+std::unique_ptr<Network::FilterChain> ListenerFilterChainFactoryBuilder::buildFilterChainInternal(
+    const envoy::config::listener::v3alpha::FilterChain& filter_chain,
+    Configuration::FilterChainFactoryContext& filter_chain_factory_context) const {
   // If the cluster doesn't have transport socket configured, then use the default "raw_buffer"
   // transport socket or BoringSSL-based "tls" transport socket if TLS settings are configured.
   // We copy by value first then override if necessary.
@@ -770,17 +797,17 @@ std::unique_ptr<Network::FilterChain> ListenerFilterChainFactoryBuilder::buildFi
   }
 
   auto& config_factory = Config::Utility::getAndCheckFactory<
-      Server::Configuration::DownstreamTransportSocketConfigFactory>(transport_socket.name());
-  ProtobufTypes::MessagePtr message = Config::Utility::translateToFactoryConfig(
-      transport_socket, parent_.messageValidationVisitor(), config_factory);
+      Server::Configuration::DownstreamTransportSocketConfigFactory>(transport_socket);
+  ProtobufTypes::MessagePtr message =
+      Config::Utility::translateToFactoryConfig(transport_socket, validator_, config_factory);
 
   std::vector<std::string> server_names(filter_chain.filter_chain_match().server_names().begin(),
                                         filter_chain.filter_chain_match().server_names().end());
-
   return std::make_unique<FilterChainImpl>(
       config_factory.createTransportSocketFactory(*message, factory_context_,
                                                   std::move(server_names)),
-      parent_.parent_.factory_.createNetworkFilterFactoryList(filter_chain.filters(), parent_));
+      listener_component_factory_.createNetworkFilterFactoryList(filter_chain.filters(),
+                                                                 filter_chain_factory_context));
 }
 
 Network::ListenSocketFactorySharedPtr ListenerManagerImpl::createListenSocketFactory(

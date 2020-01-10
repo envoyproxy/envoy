@@ -3,6 +3,7 @@ syntax = "proto3";
 package envoy.config.core.v3alpha;
 
 import "envoy/config/core/v3alpha/base.proto";
+import "envoy/type/matcher/v3alpha/string.proto";
 import "envoy/type/v3alpha/http.proto";
 import "envoy/type/v3alpha/range.proto";
 
@@ -70,14 +71,14 @@ message HealthCheck {
     }
   }
 
-  // [#next-free-field: 11]
+  // [#next-free-field: 12]
   message HttpHealthCheck {
     option (udpa.annotations.versioning).previous_message_type =
         "envoy.api.v2.core.HealthCheck.HttpHealthCheck";
 
-    reserved 7;
+    reserved 5, 7;
 
-    reserved "use_http2";
+    reserved "service_name", "use_http2";
 
     // The value of the host header in the HTTP health check request. If
     // left empty (default value), the name of the cluster this health check is associated
@@ -93,11 +94,6 @@ message HealthCheck {
 
     // [#not-implemented-hide:] HTTP specific response.
     Payload receive = 4;
-
-    // An optional service name parameter which is used to validate the identity of
-    // the health checked cluster. See the :ref:`architecture overview
-    // <arch_overview_health_checking_identity>` for more information.
-    string service_name = 5;
 
     // Specifies a list of HTTP headers that should be added to each request that is sent to the
     // health checked cluster. For more information, including details on header value syntax, see
@@ -122,6 +118,12 @@ message HealthCheck {
     // HTTP3.
     type.v3alpha.CodecClientType codec_client_type = 10
         [(validate.rules).enum = {defined_only: true}];
+
+    // An optional service name parameter which is used to validate the identity of
+    // the health checked cluster using a :ref:`StringMatcher
+    // <envoy_api_msg_type.matcher.v3alpha.StringMatcher>`. See the :ref:`architecture overview
+    // <arch_overview_health_checking_identity>` for more information.
+    type.matcher.v3alpha.StringMatcher service_name_matcher = 11;
   }
 
   message TcpHealthCheck {

@@ -67,8 +67,8 @@ public:
   const std::string& getPrefix() { return prefix_; }
 
 private:
-  const std::string getName(const Stats::Metric& metric);
-  const std::string buildTagStr(const std::vector<Stats::Tag>& tags);
+  const std::string getName(const Stats::Metric& metric) const;
+  const std::string buildTagStr(const std::vector<Stats::Tag>& tags) const;
 
   ThreadLocal::SlotPtr tls_;
   Network::Address::InstanceConstSharedPtr server_address_;
@@ -108,7 +108,7 @@ private:
     void flushGauge(const std::string& name, uint64_t value);
     void endFlush(bool do_write);
     void onTimespanComplete(const std::string& name, std::chrono::milliseconds ms);
-    uint64_t usedBuffer();
+    uint64_t usedBuffer() const;
     void write(Buffer::Instance& buffer);
 
     // Network::ConnectionCallbacks

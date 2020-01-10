@@ -281,7 +281,12 @@ ClusterManagerImpl::ClusterManagerImpl(
               ->create(),
           main_thread_dispatcher,
           *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
-              "envoy.service.discovery.v2.AggregatedDiscoveryService.StreamAggregatedResources"),
+              dyn_resources.ads_config().transport_api_version() ==
+                      envoy::config::core::v3alpha::ApiVersion::V3ALPHA
+                  ? "envoy.service.discovery.v3alpha.AggregatedDiscoveryService."
+                    "StreamAggregatedResources"
+                  : "envoy.service.discovery.v2.AggregatedDiscoveryService."
+                    "StreamAggregatedResources"),
           random_, stats_,
           Envoy::Config::Utility::parseRateLimitSettings(dyn_resources.ads_config()),
           bootstrap.dynamic_resources().ads_config().set_node_on_first_message_only());

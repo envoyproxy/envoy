@@ -109,9 +109,9 @@ public:
                                         const Buffer::Instance& data,
                                         Http::ServerConnectionCallbacks& callbacks) override;
   Http::DateProvider& dateProvider() override { return date_provider_; }
-  std::chrono::milliseconds drainTimeout() override { return std::chrono::milliseconds(100); }
+  std::chrono::milliseconds drainTimeout() const override { return std::chrono::milliseconds(100); }
   Http::FilterChainFactory& filterFactory() override { return *this; }
-  bool generateRequestId() override { return false; }
+  bool generateRequestId() const override { return false; }
   bool preserveExternalRequestId() const override { return false; }
   absl::optional<std::chrono::milliseconds> idleTimeout() const override { return idle_timeout_; }
   bool isRoutable() const override { return false; }
@@ -127,20 +127,21 @@ public:
   Config::ConfigProvider* scopedRouteConfigProvider() override {
     return &scoped_route_config_provider_;
   }
-  const std::string& serverName() override { return Http::DefaultServerString::get(); }
-  HttpConnectionManagerProto::ServerHeaderTransformation serverHeaderTransformation() override {
+  const std::string& serverName() const override { return Http::DefaultServerString::get(); }
+  HttpConnectionManagerProto::ServerHeaderTransformation
+  serverHeaderTransformation() const override {
     return HttpConnectionManagerProto::OVERWRITE;
   }
   Http::ConnectionManagerStats& stats() override { return stats_; }
   Http::ConnectionManagerTracingStats& tracingStats() override { return tracing_stats_; }
-  bool useRemoteAddress() override { return true; }
+  bool useRemoteAddress() const override { return true; }
   const Http::InternalAddressConfig& internalAddressConfig() const override {
     return internal_address_config_;
   }
   uint32_t xffNumTrustedHops() const override { return 0; }
   bool skipXffAppend() const override { return false; }
   const std::string& via() const override { return EMPTY_STRING; }
-  Http::ForwardClientCertType forwardClientCert() override {
+  Http::ForwardClientCertType forwardClientCert() const override {
     return Http::ForwardClientCertType::Sanitize;
   }
   const std::vector<Http::ClientCertDetailsType>& setCurrentClientCertDetails() const override {

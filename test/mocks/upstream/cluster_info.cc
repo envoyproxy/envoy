@@ -42,9 +42,9 @@ MockClusterInfo::MockClusterInfo()
       load_report_stats_(ClusterInfoImpl::generateLoadReportStats(load_report_stats_store_)),
       circuit_breakers_stats_(
           ClusterInfoImpl::generateCircuitBreakersStats(stats_store_, "default", true)),
-      resource_manager_(new Upstream::ResourceManagerImpl(runtime_, "fake_key", 1, 1024, 1024, 1,
-                                                          std::numeric_limits<uint64_t>::max(),
-                                                          circuit_breakers_stats_)) {
+      resource_manager_(new Upstream::ResourceManagerImpl(
+          runtime_, "fake_key", 1, 1024, 1024, 1, std::numeric_limits<uint64_t>::max(),
+          circuit_breakers_stats_, absl::nullopt, absl::nullopt)) {
   ON_CALL(*this, connectTimeout()).WillByDefault(Return(std::chrono::milliseconds(1)));
   ON_CALL(*this, idleTimeout()).WillByDefault(Return(absl::optional<std::chrono::milliseconds>()));
   ON_CALL(*this, name()).WillByDefault(ReturnRef(name_));
@@ -77,6 +77,8 @@ MockClusterInfo::MockClusterInfo()
   ON_CALL(*this, lbConfig()).WillByDefault(ReturnRef(lb_config_));
   ON_CALL(*this, clusterSocketOptions()).WillByDefault(ReturnRef(cluster_socket_options_));
   ON_CALL(*this, metadata()).WillByDefault(ReturnRef(metadata_));
+  ON_CALL(*this, upstreamHttpProtocolOptions())
+      .WillByDefault(ReturnRef(upstream_http_protocol_options_));
   // Delayed construction of typed_metadata_, to allow for injection of metadata
   ON_CALL(*this, typedMetadata())
       .WillByDefault(Invoke([this]() -> const Envoy::Config::TypedMetadata& {

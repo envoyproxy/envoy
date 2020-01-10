@@ -127,6 +127,7 @@ envoy_cc_test(
     name = "options_impl_test",
     srcs = ["options_impl_test.cc"],
     deps = [
+        "//include/envoy/config:typed_config_interface",
         "//source/common/common:utility_lib",
         "//source/common/stats:stats_lib",
         "//source/server:options_lib",
@@ -395,6 +396,7 @@ envoy_cc_test_binary(
         "//source/server:filter_chain_manager_lib",
         "//test/test_common:environment_lib",
         "//test/mocks/network:network_mocks",
+        "//test/mocks/server:server_mocks",
         # tranport socket config registration
         "//source/extensions/transport_sockets/tls:config",
     ],

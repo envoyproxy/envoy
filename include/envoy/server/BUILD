@@ -73,6 +73,7 @@ envoy_cc_library(
     name = "health_checker_config_interface",
     hdrs = ["health_checker_config.h"],
     deps = [
+        "//include/envoy/config:typed_config_interface",
         "//include/envoy/upstream:health_checker_interface",
         "@envoy_api//envoy/config/core/v3alpha:pkg_cc_proto",
     ],
@@ -155,6 +156,7 @@ envoy_cc_library(
         ":process_context_interface",
         "//include/envoy/access_log:access_log_interface",
         "//include/envoy/api:api_interface",
+        "//include/envoy/config:typed_config_interface",
         "//include/envoy/grpc:context_interface",
         "//include/envoy/http:codes_interface",
         "//include/envoy/http:context_interface",
@@ -209,6 +211,7 @@ envoy_cc_library(
     name = "transport_socket_config_interface",
     hdrs = ["transport_socket_config.h"],
     deps = [
+        "//include/envoy/config:typed_config_interface",
         "//include/envoy/event:dispatcher_interface",
         "//include/envoy/init:manager_interface",
         "//include/envoy/local_info:local_info_interface",
@@ -228,6 +231,7 @@ envoy_cc_library(
     name = "resource_monitor_interface",
     hdrs = ["resource_monitor.h"],
     deps = [
+        "//include/envoy/config:typed_config_interface",
         "//source/common/protobuf",
     ],
 )
@@ -257,6 +261,7 @@ envoy_cc_library(
     hdrs = ["tracer_config.h"],
     deps = [
         ":instance_interface",
+        "//include/envoy/config:typed_config_interface",
         "//source/common/protobuf",
     ],
 )
@@ -264,5 +269,8 @@ envoy_cc_library(
 envoy_cc_library(
     name = "active_udp_listener_config_interface",
     hdrs = ["active_udp_listener_config.h"],
-    deps = ["//include/envoy/network:connection_handler_interface"],
+    deps = [
+        "//include/envoy/config:typed_config_interface",
+        "//include/envoy/network:connection_handler_interface",
+    ],
 )

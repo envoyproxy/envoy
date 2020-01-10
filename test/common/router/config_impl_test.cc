@@ -18,9 +18,8 @@
 #include "common/network/address_impl.h"
 #include "common/router/config_impl.h"
 
-#include "extensions/filters/http/common/empty_http_filter_config.h"
-
 #include "test/common/router/route_fuzz.pb.h"
+#include "test/extensions/filters/http/common/empty_http_filter_config.h"
 #include "test/fuzz/utility.h"
 #include "test/mocks/server/mocks.h"
 #include "test/test_common/environment.h"
@@ -2876,10 +2875,10 @@ virtual_hosts:
                 ->routeEntry()
                 ->retryPolicy()
                 .perTryTimeout());
-  EXPECT_EQ(0U, config.route(genHeaders("www.lyft.com", "/bar", "GET"), 0)
-                    ->routeEntry()
-                    ->retryPolicy()
-                    .numRetries());
+  EXPECT_EQ(1, config.route(genHeaders("www.lyft.com", "/bar", "GET"), 0)
+                   ->routeEntry()
+                   ->retryPolicy()
+                   .numRetries());
   EXPECT_EQ(0U, config.route(genHeaders("www.lyft.com", "/bar", "GET"), 0)
                     ->routeEntry()
                     ->retryPolicy()
@@ -3028,10 +3027,10 @@ virtual_hosts:
                 ->routeEntry()
                 ->retryPolicy()
                 .perTryTimeout());
-  EXPECT_EQ(0U, config.route(genHeaders("www.lyft.com", "/bar", "GET"), 0)
-                    ->routeEntry()
-                    ->retryPolicy()
-                    .numRetries());
+  EXPECT_EQ(1, config.route(genHeaders("www.lyft.com", "/bar", "GET"), 0)
+                   ->routeEntry()
+                   ->retryPolicy()
+                   .numRetries());
   EXPECT_EQ(0U, config.route(genHeaders("www.lyft.com", "/bar", "GET"), 0)
                     ->routeEntry()
                     ->retryPolicy()
@@ -4073,7 +4072,7 @@ struct Baz : public Envoy::Config::TypedMetadata::Object {
 };
 class BazFactory : public HttpRouteTypedMetadataFactory {
 public:
-  const std::string name() const override { return "baz"; }
+  std::string name() const override { return "baz"; }
   // Returns nullptr (conversion failure) if d is empty.
   std::unique_ptr<const Envoy::Config::TypedMetadata::Object>
   parse(const ProtobufWkt::Struct& d) const override {
