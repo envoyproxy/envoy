@@ -366,7 +366,7 @@ filter configuration snippet is permitted:
         "@type": type.googleapis.com/envoy.config.filter.http.router.v2.Router
 
 In case the control plane lacks the schema definitions for an extension,
-`udpa.type.v1.TypedStruct` should be used a generic container. The type URL
+`udpa.type.v1.TypedStruct` should be used as a generic container. The type URL
 inside it is then used by a client to convert the contents to a typed
 configuration resource. For example, the above example could be written as
 follows:
