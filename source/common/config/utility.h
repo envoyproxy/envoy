@@ -231,8 +231,6 @@ public:
   template <class Factory, class ProtoMessage>
   static Factory& getAndCheckFactory(const ProtoMessage& message) {
     const ProtobufWkt::Any& typed_config = message.typed_config();
-    static const std::string& struct_type =
-        ProtobufWkt::Struct::default_instance().GetDescriptor()->full_name();
     static const std::string& typed_struct_type =
         udpa::type::v1::TypedStruct::default_instance().GetDescriptor()->full_name();
 
@@ -247,7 +245,7 @@ public:
         // Not handling nested structs or typed structs in typed structs
         return Utility::getAndCheckFactoryByType<Factory>(
             TypeUtil::typeUrlToDescriptorFullName(typed_struct.type_url()));
-      } else if (type != struct_type) {
+      } else {
         return Utility::getAndCheckFactoryByType<Factory>(type);
       }
     }
