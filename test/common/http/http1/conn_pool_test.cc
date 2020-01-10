@@ -437,12 +437,12 @@ TEST_F(Http1ConnPoolImplTest, MeasureConnectTime) {
   EXPECT_EQ(sleep2_ms + sleep3_ms, upstream_cx_connect_ms2);
 
   // Cleanup, cause the connections to go away.
-  for (auto& test_client : conn_pool_.test_clients_) {
+  while (!conn_pool_.test_clients_.empty()) {
     EXPECT_CALL(
         cluster_->stats_store_,
         deliverHistogramToSinks(Property(&Stats::Metric::name, "upstream_cx_length_ms"), _));
     EXPECT_CALL(conn_pool_, onClientDestroy());
-    test_client.connection_->raiseEvent(Network::ConnectionEvent::RemoteClose);
+    conn_pool_.test_clients_.front().connection_->raiseEvent(Network::ConnectionEvent::RemoteClose);
     dispatcher_.clearDeferredDeleteList();
   }
 }
