@@ -138,6 +138,7 @@ public:
   ~MockUdpListenerCallbacks() override;
 
   MOCK_METHOD1(onData, void(UdpRecvData& data));
+  MOCK_METHOD0(onReadReady, void());
   MOCK_METHOD1(onWriteReady, void(const Socket& socket));
   MOCK_METHOD1(onReceiveError, void(Api::IoError::IoErrorCode err));
 };
