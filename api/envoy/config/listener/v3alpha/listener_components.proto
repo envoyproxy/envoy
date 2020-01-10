@@ -207,45 +207,19 @@ message FilterChain {
   string name = 7;
 }
 
-// Specifies the match criteria. All of the criteria needs to be satisfied.
-message ListenerFilterMatch {
-  option (udpa.annotations.versioning).previous_message_type =
-      "envoy.api.v2.listener.ListenerFilterMatch";
-
-  // If it is not empty, the criteria is satisfied if the destination port of the connection is
-  // contained.
-  repeated uint32 destination_ports = 1
-      [(validate.rules).repeated = {items {uint32 {lte: 65535 gte: 1}}}];
-}
-
-// [#next-free-field: 6]
-message ListenerFilter {
-  option (udpa.annotations.versioning).previous_message_type =
-      "envoy.api.v2.listener.ListenerFilter";
-
-  reserved "config";
-
-  // The name of the filter to instantiate. The name must match a
-  // :ref:`supported filter <config_listener_filters>`.
-  string name = 1 [(validate.rules).string = {min_bytes: 1}];
-
-  // Filter specific configuration which depends on the filter being instantiated.
-  // See the supported filters for further documentation.
-  oneof config_type {
-    google.protobuf.Any typed_config = 3;
-  }
-
-  // [#not-implemented-hide:]
-  // Decide when to enable/disable this listener filter on incoming traffic.
-  ListenerFilterChainMatchPredicate predicate = 4;
-}
-
 // [#not-implemented-hide:]
 // Listener filter chain match configuration. This is a recursive structure which allows complex
 // nested match configurations to be built using various logical operators.
+// [#next-free-field: 6]
 message ListenerFilterChainMatchPredicate {
+  option (udpa.annotations.versioning).previous_message_type =
+      "envoy.api.v2.listener.ListenerFilterChainMatchPredicate";
+
   // A set of match configurations used for logical operations.
   message MatchSet {
+    option (udpa.annotations.versioning).previous_message_type =
+        "envoy.api.v2.listener.ListenerFilterChainMatchPredicate.MatchSet";
+
     // The list of rules that make up the set.
     repeated ListenerFilterChainMatchPredicate rules = 1
         [(validate.rules).repeated = {min_items: 2}];
@@ -271,4 +245,27 @@ message ListenerFilterChainMatchPredicate {
     // Match destination port. Note that the port might be before recovering address or after.
     uint32 destination_port = 5 [(validate.rules).uint32 = {lte: 65535 gte: 0}];
   }
+}
+
+message ListenerFilter {
+  option (udpa.annotations.versioning).previous_message_type =
+      "envoy.api.v2.listener.ListenerFilter";
+
+  reserved 2;
+
+  reserved "config";
+
+  // The name of the filter to instantiate. The name must match a
+  // :ref:`supported filter <config_listener_filters>`.
+  string name = 1 [(validate.rules).string = {min_bytes: 1}];
+
+  // Filter specific configuration which depends on the filter being instantiated.
+  // See the supported filters for further documentation.
+  oneof config_type {
+    google.protobuf.Any typed_config = 3;
+  }
+
+  // [#not-implemented-hide:]
+  // Decide when to enable/disable this listener filter on incoming traffic.
+  ListenerFilterChainMatchPredicate predicate = 4;
 }

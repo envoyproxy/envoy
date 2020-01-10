@@ -206,6 +206,40 @@ message FilterChain {
   string name = 7;
 }
 
+// [#not-implemented-hide:]
+// Listener filter chain match configuration. This is a recursive structure which allows complex
+// nested match configurations to be built using various logical operators.
+// [#next-free-field: 6]
+message ListenerFilterChainMatchPredicate {
+  // A set of match configurations used for logical operations.
+  message MatchSet {
+    // The list of rules that make up the set.
+    repeated ListenerFilterChainMatchPredicate rules = 1
+        [(validate.rules).repeated = {min_items: 2}];
+  }
+
+  oneof rule {
+    option (validate.required) = true;
+
+    // A set that describes a logical OR. If any member of the set matches, the match configuration
+    // matches.
+    MatchSet or_match = 1;
+
+    // A set that describes a logical AND. If all members of the set match, the match configuration
+    // matches.
+    MatchSet and_match = 2;
+
+    // A negation match. The match configuration will match if the negated match condition matches.
+    ListenerFilterChainMatchPredicate not_match = 3;
+
+    // The match configuration will always match.
+    bool any_match = 4 [(validate.rules).bool = {const: true}];
+
+    // Match destination port. Note that the port might be before recovering address or after.
+    uint32 destination_port = 5 [(validate.rules).uint32 = {lte: 65535 gte: 0}];
+  }
+}
+
 message ListenerFilter {
   // The name of the filter to instantiate. The name must match a
   // :ref:`supported filter <config_listener_filters>`.
@@ -218,4 +252,8 @@ message ListenerFilter {
 
     google.protobuf.Any typed_config = 3;
   }
+
+  // [#not-implemented-hide:]
+  // Decide when to enable/disable this listener filter on incoming traffic.
+  ListenerFilterChainMatchPredicate predicate = 4;
 }
