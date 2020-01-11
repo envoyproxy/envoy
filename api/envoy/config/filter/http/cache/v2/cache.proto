@@ -43,18 +43,21 @@ message Cache {
   // Name of cache implementation to use.
   string name = 1 [(validate.rules).string = {min_bytes: 1}];
 
+  // TODO(toddmgreer) implement vary headers
+  //
   // List of allowed Vary headers. These headers will be provided to caches in lookups, and the
   // cache filter will only insert responses whose Vary headers (if any) are all in this list. For
   // example, if an origin supplies "vary:user-agent" in a response, the response will only be
   // inserted if "user-agent" is in this list.
-  //
-  // TODO(toddmgreer) implement vary headers
-  // repeated string allowed_vary_headers = 2;
+  repeated string allowed_vary_headers = 2;
 
   // TODO(toddmgreer) implement key customization
   //
   // Modifies cache key creation by restricting which parts of the URL are included.
   KeyCreatorParams key_creator_params = 3;
 
-  // TODO(toddmgreer) add size limit
+  // TODO(toddmgreer) implement size limit
+  //
+  // Max body size the cache filter will insert into a cache.
+  uint32 max_body_bytes = 4;
 }
