@@ -59,7 +59,7 @@ api_listener:
 
   ASSERT_EQ("test_api_listener", http_api_listener.name());
   ASSERT_EQ(ApiListener::Type::HttpApiListener, http_api_listener.type());
-  // FIXME: fix stats
+  // fix me: fix stats
   // ASSERT_NE(nullptr, http_api_listener.http());
 }
 
