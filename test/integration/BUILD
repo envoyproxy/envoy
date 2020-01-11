@@ -71,7 +71,9 @@ envoy_cc_test(
     srcs = ["api_version_integration_test.cc"],
     deps = [
         ":http_integration_lib",
+        "@envoy_api//envoy/api/v2:pkg_cc_proto",
         "@envoy_api//envoy/api/v2/core:pkg_cc_proto",
+        "@envoy_api//envoy/service/discovery/v3alpha:pkg_cc_proto",
     ],
 )
 

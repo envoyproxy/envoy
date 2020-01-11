@@ -28,8 +28,10 @@ class NewGrpcMuxImpl
       Logger::Loggable<Logger::Id::config> {
 public:
   NewGrpcMuxImpl(Grpc::RawAsyncClientPtr&& async_client, Event::Dispatcher& dispatcher,
-                 const Protobuf::MethodDescriptor& service_method, Runtime::RandomGenerator& random,
-                 Stats::Scope& scope, const RateLimitSettings& rate_limit_settings,
+                 const Protobuf::MethodDescriptor& service_method,
+                 envoy::config::core::v3alpha::ApiVersion transport_api_version,
+                 Runtime::RandomGenerator& random, Stats::Scope& scope,
+                 const RateLimitSettings& rate_limit_settings,
                  const LocalInfo::LocalInfo& local_info);
 
   Watch* addOrUpdateWatch(const std::string& type_url, Watch* watch,
@@ -123,6 +125,7 @@ private:
   GrpcStream<envoy::service::discovery::v3alpha::DeltaDiscoveryRequest,
              envoy::service::discovery::v3alpha::DeltaDiscoveryResponse>
       grpc_stream_;
+  const envoy::config::core::v3alpha::ApiVersion transport_api_version_;
 };
 
 using NewGrpcMuxImplSharedPtr = std::shared_ptr<NewGrpcMuxImpl>;
