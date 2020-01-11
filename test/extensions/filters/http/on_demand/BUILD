@@ -16,8 +16,8 @@ envoy_extension_cc_test(
     srcs = ["on_demand_filter_test.cc"],
     extension_name = "envoy.filters.http.on_demand",
     deps = [
-        "//source/common/protobuf:utility_lib",
         "//source/common/http:header_map_lib",
+        "//source/common/protobuf:utility_lib",
         "//source/extensions/filters/http/on_demand:on_demand_update_lib",
         "//test/mocks/http:http_mocks",
         "//test/mocks/runtime:runtime_mocks",
