@@ -92,6 +92,21 @@ bool convertRequestHeadersForInternalRedirect(Http::HeaderMap& downstream_header
   return true;
 }
 
+constexpr uint64_t TimeoutPrecisionFactor = 100;
+
+// Express percentage as [0, TimeoutPrecisionFactor] because stats do not accept floating point
+// values, and getting multiple significant figures on the histogram would be nice.
+uint64_t percentageOfTimeout(const std::chrono::milliseconds response_time,
+                             const std::chrono::milliseconds timeout) {
+  // Timeouts of 0 are considered infinite. Any portion of an infinite timeout used is still
+  // none of it.
+  if (timeout.count() == 0) {
+    return 0;
+  }
+
+  return static_cast<uint64_t>(response_time.count() * TimeoutPrecisionFactor / timeout.count());
+}
+
 } // namespace
 
 void FilterUtility::setUpstreamScheme(Http::HeaderMap& headers, bool use_secure_transport) {
@@ -766,10 +781,16 @@ void Filter::onResponseTimeout() {
     UpstreamRequestPtr upstream_request =
         upstream_requests_.back()->removeFromList(upstream_requests_);
 
-    // Don't record a timeout for upstream requests we've already seen headers
-    // for.
+    // Don't do work for upstream requests we've already seen headers for.
     if (upstream_request->awaiting_headers_) {
       cluster_->stats().upstream_rq_timeout_.inc();
+
+      if (cluster_->timeoutBudgetStats().has_value()) {
+        // Cancel firing per-try timeout information, because the per-try timeout did not come into
+        // play when the global timeout was hit.
+        upstream_request->record_timeout_budget_ = false;
+      }
+
       if (upstream_request->upstream_host_) {
         upstream_request->upstream_host_->stats().rq_timeout_.inc();
       }
@@ -878,6 +899,15 @@ void Filter::chargeUpstreamAbort(Http::Code code, bool dropped, UpstreamRequest&
 
 void Filter::onUpstreamTimeoutAbort(StreamInfo::ResponseFlag response_flags,
                                     absl::string_view details) {
+  if (cluster_->timeoutBudgetStats().has_value()) {
+    Event::Dispatcher& dispatcher = callbacks_->dispatcher();
+    std::chrono::milliseconds response_time = std::chrono::duration_cast<std::chrono::milliseconds>(
+        dispatcher.timeSource().monotonicTime() - downstream_request_complete_time_);
+
+    cluster_->timeoutBudgetStats()->upstream_rq_timeout_budget_percent_used_.recordValue(
+        percentageOfTimeout(response_time, timeout_.global_timeout_));
+  }
+
   const absl::string_view body =
       timeout_response_code_ == Http::Code::GatewayTimeout ? "upstream request timeout" : "";
   onUpstreamAbort(timeout_response_code_, response_flags, body, false, details);
@@ -1246,11 +1276,17 @@ void Filter::onUpstreamComplete(UpstreamRequest& upstream_request) {
   }
   callbacks_->streamInfo().setUpstreamTiming(final_upstream_request_->upstream_timing_);
 
+  Event::Dispatcher& dispatcher = callbacks_->dispatcher();
+  std::chrono::milliseconds response_time = std::chrono::duration_cast<std::chrono::milliseconds>(
+      dispatcher.timeSource().monotonicTime() - downstream_request_complete_time_);
+
+  if (cluster_->timeoutBudgetStats().has_value()) {
+    cluster_->timeoutBudgetStats()->upstream_rq_timeout_budget_percent_used_.recordValue(
+        percentageOfTimeout(response_time, timeout_.global_timeout_));
+  }
+
   if (config_.emit_dynamic_stats_ && !callbacks_->streamInfo().healthCheck() &&
       DateUtil::timePointValid(downstream_request_complete_time_)) {
-    Event::Dispatcher& dispatcher = callbacks_->dispatcher();
-    std::chrono::milliseconds response_time = std::chrono::duration_cast<std::chrono::milliseconds>(
-        dispatcher.timeSource().monotonicTime() - downstream_request_complete_time_);
     upstream_request.upstream_host_->outlierDetector().putResponseTime(response_time);
     const bool internal_request = Http::HeaderUtility::isEnvoyInternalRequest(*downstream_headers_);
 
@@ -1386,10 +1422,12 @@ uint32_t Filter::numRequestsAwaitingHeaders() {
 Filter::UpstreamRequest::UpstreamRequest(Filter& parent, Http::ConnectionPool::Instance& pool)
     : parent_(parent), conn_pool_(pool), grpc_rq_success_deferred_(false),
       stream_info_(pool.protocol(), parent_.callbacks_->dispatcher().timeSource()),
+      start_time_(parent_.callbacks_->dispatcher().timeSource().monotonicTime()),
       calling_encode_headers_(false), upstream_canary_(false), decode_complete_(false),
       encode_complete_(false), encode_trailers_(false), retried_(false), awaiting_headers_(true),
       outlier_detection_timeout_recorded_(false),
-      create_per_try_timeout_on_request_complete_(false) {
+      create_per_try_timeout_on_request_complete_(false),
+      record_timeout_budget_(parent_.cluster_->timeoutBudgetStats().has_value()) {
   if (parent_.config_.start_child_span_) {
     span_ = parent_.callbacks_->activeSpan().spawnChild(
         parent_.callbacks_->tracingConfig(), "router " + parent.cluster_->name() + " egress",
@@ -1415,6 +1453,18 @@ Filter::UpstreamRequest::~UpstreamRequest() {
     per_try_timeout_->disableTimer();
   }
   clearRequestEncoder();
+
+  // If desired, fire the per-try histogram when the UpstreamRequest
+  // completes.
+  if (record_timeout_budget_) {
+    Event::Dispatcher& dispatcher = parent_.callbacks_->dispatcher();
+    const MonotonicTime end_time = dispatcher.timeSource().monotonicTime();
+    const std::chrono::milliseconds response_time =
+        std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time_);
+    parent_.cluster_->timeoutBudgetStats()
+        ->upstream_rq_timeout_budget_per_try_percent_used_.recordValue(
+            percentageOfTimeout(response_time, parent_.timeout_.per_try_timeout_));
+  }
 
   stream_info_.setUpstreamTiming(upstream_timing_);
   stream_info_.onRequestComplete();
