@@ -692,7 +692,11 @@ void ListenerManagerImpl::startWorkers(GuardDog& guard_dog) {
   workers_started_ = true;
   uint32_t i = 0;
 
-  auto workers_started = std::make_shared<Cleanup>([this] { stats_.workers_started_.set(1); });
+  auto workers_started = std::make_shared<Cleanup>([this] {
+    if (stats_ != nullptr) {
+      stats_.workers_started_.set(1);
+    }
+  });
   for (const auto& worker : workers_) {
     ENVOY_LOG(info, "starting worker {}", i);
     ASSERT(warming_listeners_.empty());
