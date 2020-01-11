@@ -58,7 +58,7 @@ The :ref:`v2 API Overview <config_overview_v2>` describes this.
 
     static_resources:
 
-The specification of the :ref:`listeners <envoy_api_file_envoy/api/v2/listener/listener.proto>`.
+The specification of the :ref:`listeners <envoy_api_file_envoy/api/v2/listener.proto>`.
 
 .. code-block:: yaml
 

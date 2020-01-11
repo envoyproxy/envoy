@@ -23,6 +23,7 @@ option java_outer_classname = "RouteComponentsProto";
 option java_multiple_files = true;
 
 // [#protodoc-title: HTTP route components]
+
 // * Routing :ref:`architecture overview <arch_overview_http_routing>`
 // * HTTP :ref:`router filter <config_http_filters_router>`
 

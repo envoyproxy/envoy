@@ -18,7 +18,8 @@ option java_multiple_files = true;
 option (udpa.annotations.file_migrate).move_to_package =
     "envoy.extensions.filters.http.jwt_authn.v3alpha";
 
-// [#protodoc-title: JWT Authentication]
+// [#protodoc-title: JWT authentication]
+
 // JWT Authentication :ref:`configuration overview <config_http_filters_jwt_authn>`.
 // [#extension: envoy.filters.http.jwt_authn]
 

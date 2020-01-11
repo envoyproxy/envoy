@@ -10,7 +10,7 @@ option java_package = "io.envoyproxy.envoy.extensions.filters.http.header_to_met
 option java_outer_classname = "HeaderToMetadataProto";
 option java_multiple_files = true;
 
-// [#protodoc-title: Header-To-Metadata Filter]
+// [#protodoc-title: Header-To-Metadata filter]
 //
 // The configuration for transforming headers into metadata. This is useful
 // for matching load balancer subsets, logging, etc.

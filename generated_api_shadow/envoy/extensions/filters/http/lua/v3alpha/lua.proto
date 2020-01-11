@@ -11,6 +11,7 @@ option java_outer_classname = "LuaProto";
 option java_multiple_files = true;
 
 // [#protodoc-title: Lua]
+
 // Lua :ref:`configuration overview <config_http_filters_lua>`.
 // [#extension: envoy.filters.http.lua]
 

@@ -15,7 +15,8 @@ option java_package = "io.envoyproxy.envoy.extensions.filters.network.thrift_pro
 option java_outer_classname = "ThriftProxyProto";
 option java_multiple_files = true;
 
-// [#protodoc-title: Thrift Proxy]
+// [#protodoc-title: Thrift proxy]
+
 // Thrift Proxy :ref:`configuration overview <config_network_filters_thrift_proxy>`.
 // [#extension: envoy.filters.network.thrift_proxy]
 

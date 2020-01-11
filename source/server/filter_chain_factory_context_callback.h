@@ -2,7 +2,7 @@
 
 #include <memory>
 
-#include "envoy/api/v2/listener/listener.pb.h"
+#include "envoy/api/v2/listener.pb.h"
 #include "envoy/common/pure.h"
 #include "envoy/server/filter_config.h"
 

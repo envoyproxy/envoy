@@ -13,6 +13,7 @@ option java_outer_classname = "RbacProto";
 option java_multiple_files = true;
 
 // [#protodoc-title: RBAC]
+
 // Role-Based Access Control :ref:`configuration overview <config_network_filters_rbac>`.
 // [#extension: envoy.filters.network.rbac]
 

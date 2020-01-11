@@ -11,7 +11,8 @@ option java_multiple_files = true;
 option (udpa.annotations.file_migrate).move_to_package =
     "envoy.extensions.filters.http.original_src.v3alpha";
 
-// [#protodoc-title: Original Src Filter]
+// [#protodoc-title: Original source filter]
+
 // Use the Original source address on upstream connections.
 
 // The Original Src filter binds upstream connections to the original source address determined

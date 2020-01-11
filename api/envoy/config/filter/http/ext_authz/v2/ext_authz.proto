@@ -17,7 +17,8 @@ option java_multiple_files = true;
 option (udpa.annotations.file_migrate).move_to_package =
     "envoy.extensions.filters.http.ext_authz.v3alpha";
 
-// [#protodoc-title: External Authorization]
+// [#protodoc-title: External authorization]
+
 // External Authorization :ref:`configuration overview <config_http_filters_ext_authz>`.
 // [#extension: envoy.filters.http.ext_authz]
 

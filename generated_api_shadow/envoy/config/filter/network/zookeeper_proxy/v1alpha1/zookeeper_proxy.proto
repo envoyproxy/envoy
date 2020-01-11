@@ -14,6 +14,7 @@ option (udpa.annotations.file_migrate).move_to_package =
     "envoy.extensions.filters.network.zookeeper_proxy.v3alpha";
 
 // [#protodoc-title: ZooKeeper proxy]
+
 // ZooKeeper Proxy :ref:`configuration overview <config_network_filters_zookeeper_proxy>`.
 // [#extension: envoy.filters.network.zookeeper_proxy]
 message ZooKeeperProxy {

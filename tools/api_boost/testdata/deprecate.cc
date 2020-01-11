@@ -1,5 +1,5 @@
 #include "envoy/api/v2/cds.pb.h"
-#include "envoy/api/v2/route/route.pb.h"
+#include "envoy/api/v2/route.pb.h"
 #include "envoy/type/matcher/string.pb.h"
 
 void test() {

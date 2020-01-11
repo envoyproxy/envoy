@@ -14,7 +14,8 @@ option java_package = "io.envoyproxy.envoy.extensions.filters.network.dubbo_prox
 option java_outer_classname = "DubboProxyProto";
 option java_multiple_files = true;
 
-// [#protodoc-title: Dubbo Proxy]
+// [#protodoc-title: Dubbo proxy]
+
 // Dubbo Proxy :ref:`configuration overview <config_network_filters_dubbo_proxy>`.
 // [#extension: envoy.filters.network.dubbo_proxy]
 

@@ -14,6 +14,7 @@ option (udpa.annotations.file_migrate).move_to_package =
     "envoy.extensions.filters.http.buffer.v3alpha";
 
 // [#protodoc-title: Buffer]
+
 // Buffer :ref:`configuration overview <config_http_filters_buffer>`.
 // [#extension: envoy.filters.http.buffer]
 

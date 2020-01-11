@@ -11,7 +11,8 @@ option java_multiple_files = true;
 option (udpa.annotations.file_migrate).move_to_package =
     "envoy.extensions.filters.http.grpc_http1_reverse_bridge.v3alpha";
 
-// [#protodoc-title: gRPC HTTP/1.1 Reverse Bridge]
+// [#protodoc-title: gRPC HTTP/1.1 reverse bridge]
+
 // gRPC HTTP/1.1 Reverse Bridge :ref:`configuration overview
 // <config_http_filters_grpc_http1_reverse_bridge>`.
 // [#extension: envoy.filters.http.grpc_http1_reverse_bridge]

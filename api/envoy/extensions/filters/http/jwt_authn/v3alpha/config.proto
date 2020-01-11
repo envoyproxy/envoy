@@ -17,7 +17,8 @@ option java_package = "io.envoyproxy.envoy.extensions.filters.http.jwt_authn.v3a
 option java_outer_classname = "ConfigProto";
 option java_multiple_files = true;
 
-// [#protodoc-title: JWT Authentication]
+// [#protodoc-title: JWT authentication]
+
 // JWT Authentication :ref:`configuration overview <config_http_filters_jwt_authn>`.
 // [#extension: envoy.filters.http.jwt_authn]
 

@@ -15,7 +15,7 @@ option java_outer_classname = "ExternalAuthProto";
 option java_multiple_files = true;
 option java_generic_services = true;
 
-// [#protodoc-title: Authorization Service ]
+// [#protodoc-title: Authorization service ]
 
 // The authorization service request messages used by external authorization :ref:`network filter
 // <config_network_filters_ext_authz>` and :ref:`HTTP filter <config_http_filters_ext_authz>`.

@@ -25,8 +25,7 @@
 #include "envoy/config/filter/network/mongo_proxy/v2/mongo_proxy.pb.validate.h"
 #include "envoy/config/filter/network/redis_proxy/v2/redis_proxy.pb.validate.h"
 #include "envoy/config/filter/network/tcp_proxy/v2/tcp_proxy.pb.validate.h"
-#include "envoy/api/v2/listener/listener.pb.validate.h"
-#include "envoy/api/v2/route/route.pb.validate.h"
+#include "envoy/api/v2/listener.pb.validate.h"
 #include "envoy/config/bootstrap/v2/bootstrap.pb.validate.h"
 
 #include "google/protobuf/text_format.h"

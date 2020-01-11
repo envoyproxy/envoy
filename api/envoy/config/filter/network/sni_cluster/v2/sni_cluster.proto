@@ -10,7 +10,8 @@ option java_multiple_files = true;
 option (udpa.annotations.file_migrate).move_to_package =
     "envoy.extensions.filters.network.sni_cluster.v3alpha";
 
-// [#protodoc-title: SNI Cluster Filter]
+// [#protodoc-title: SNI cluster filter]
+
 // Set the upstream cluster name from the SNI field in the TLS connection.
 // [#extension: envoy.filters.network.sni_cluster]
 

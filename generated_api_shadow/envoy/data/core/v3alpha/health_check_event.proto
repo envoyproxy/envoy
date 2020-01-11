@@ -15,6 +15,7 @@ option java_outer_classname = "HealthCheckEventProto";
 option java_multiple_files = true;
 
 // [#protodoc-title: Health check logging events]
+
 // :ref:`Health check logging <arch_overview_health_check_logging>`.
 
 enum HealthCheckFailureType {

@@ -15,7 +15,8 @@ option java_multiple_files = true;
 option (udpa.annotations.file_migrate).move_to_package =
     "envoy.extensions.filters.network.dubbo_proxy.v3alpha";
 
-// [#protodoc-title: Dubbo Proxy]
+// [#protodoc-title: Dubbo proxy]
+
 // Dubbo Proxy :ref:`configuration overview <config_network_filters_dubbo_proxy>`.
 // [#extension: envoy.filters.network.dubbo_proxy]
 

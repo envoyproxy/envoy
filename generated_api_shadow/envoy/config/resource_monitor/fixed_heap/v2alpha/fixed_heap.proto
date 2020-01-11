@@ -9,6 +9,7 @@ option java_outer_classname = "FixedHeapProto";
 option java_multiple_files = true;
 
 // [#protodoc-title: Fixed heap]
+
 // [#extension: envoy.resource_monitors.fixed_heap]
 
 // The fixed heap resource monitor reports the Envoy process memory pressure, computed as a

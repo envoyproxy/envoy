@@ -10,7 +10,7 @@ option java_package = "io.envoyproxy.envoy.type.v3alpha";
 option java_outer_classname = "HashPolicyProto";
 option java_multiple_files = true;
 
-// [#protodoc-title: Hash Policy]
+// [#protodoc-title: Hash policy]
 
 // Specifies the hash policy
 message HashPolicy {

@@ -11,7 +11,8 @@ option java_multiple_files = true;
 option (udpa.annotations.file_migrate).move_to_package =
     "envoy.extensions.filters.network.kafka_broker.v3alpha";
 
-// [#protodoc-title: Kafka Broker]
+// [#protodoc-title: Kafka broker]
+
 // Kafka Broker :ref:`configuration overview <config_network_filters_kafka_broker>`.
 // [#extension: envoy.filters.network.kafka_broker]
 

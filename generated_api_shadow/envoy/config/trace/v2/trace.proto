@@ -17,6 +17,7 @@ option java_outer_classname = "TraceProto";
 option java_multiple_files = true;
 
 // [#protodoc-title: Tracing]
+
 // Tracing :ref:`architecture overview <arch_overview_tracing>`.
 
 // The tracing configuration specifies global

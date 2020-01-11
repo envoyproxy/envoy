@@ -8,7 +8,7 @@ option java_package = "io.envoyproxy.envoy.type.v3alpha";
 option java_outer_classname = "SemanticVersionProto";
 option java_multiple_files = true;
 
-// [#protodoc-title: Semantic Version]
+// [#protodoc-title: Semantic version]
 
 // Envoy uses SemVer (https://semver.org/). Major/minor versions indicate
 // expected behaviors and APIs, the patch version field is used only

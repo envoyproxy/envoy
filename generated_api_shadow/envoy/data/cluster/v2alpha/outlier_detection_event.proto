@@ -12,6 +12,7 @@ option java_outer_classname = "OutlierDetectionEventProto";
 option java_multiple_files = true;
 
 // [#protodoc-title: Outlier detection logging events]
+
 // :ref:`Outlier detection logging <arch_overview_outlier_detection_logging>`.
 
 // Type of ejection that took place

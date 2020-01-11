@@ -16,7 +16,8 @@ option java_multiple_files = true;
 option (udpa.annotations.file_migrate).move_to_package =
     "envoy.extensions.filters.network.thrift_proxy.v3alpha";
 
-// [#protodoc-title: Thrift Proxy Route Configuration]
+// [#protodoc-title: Thrift proxy route configuration]
+
 // Thrift Proxy :ref:`configuration overview <config_network_filters_thrift_proxy>`.
 
 message RouteConfiguration {

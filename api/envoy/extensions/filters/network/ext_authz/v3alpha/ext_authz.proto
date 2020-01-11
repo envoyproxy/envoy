@@ -12,7 +12,8 @@ option java_package = "io.envoyproxy.envoy.extensions.filters.network.ext_authz.
 option java_outer_classname = "ExtAuthzProto";
 option java_multiple_files = true;
 
-// [#protodoc-title: Network External Authorization ]
+// [#protodoc-title: Network external authorization ]
+
 // The network layer external authorization service configuration
 // :ref:`configuration overview <config_network_filters_ext_authz>`.
 // [#extension: envoy.filters.network.ext_authz]

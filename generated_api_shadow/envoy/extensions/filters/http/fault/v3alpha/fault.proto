@@ -16,7 +16,8 @@ option java_package = "io.envoyproxy.envoy.extensions.filters.http.fault.v3alpha
 option java_outer_classname = "FaultProto";
 option java_multiple_files = true;
 
-// [#protodoc-title: Fault Injection]
+// [#protodoc-title: Fault injection]
+
 // Fault Injection :ref:`configuration overview <config_http_filters_fault_injection>`.
 // [#extension: envoy.filters.http.fault]
 

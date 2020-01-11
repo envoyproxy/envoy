@@ -19,6 +19,7 @@ option java_outer_classname = "AccesslogProto";
 option java_multiple_files = true;
 
 // [#protodoc-title: gRPC access logs]
+
 // Envoy access logs describe incoming interaction with Envoy over a fixed
 // period of time, and typically cover a single request/response exchange,
 // (e.g. HTTP), stream (e.g. over HTTP/gRPC), or proxied connection (e.g. TCP).

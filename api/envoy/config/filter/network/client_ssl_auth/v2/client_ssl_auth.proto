@@ -16,6 +16,7 @@ option (udpa.annotations.file_migrate).move_to_package =
     "envoy.extensions.filters.network.client_ssl_auth.v3alpha";
 
 // [#protodoc-title: Client TLS authentication]
+
 // Client TLS authentication
 // :ref:`configuration overview <config_network_filters_client_ssl_auth>`.
 // [#extension: envoy.filters.network.client_ssl_auth]

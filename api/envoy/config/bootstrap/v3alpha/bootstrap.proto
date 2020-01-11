@@ -25,6 +25,7 @@ option java_outer_classname = "BootstrapProto";
 option java_multiple_files = true;
 
 // [#protodoc-title: Bootstrap]
+
 // This proto is supplied via the :option:`-c` CLI flag and acts as the root
 // of the Envoy v2 configuration. See the :ref:`v2 configuration overview
 // <config_overview_v2_bootstrap>` for more detail.

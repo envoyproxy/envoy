@@ -15,6 +15,7 @@ option java_outer_classname = "RouterProto";
 option java_multiple_files = true;
 
 // [#protodoc-title: Router]
+
 // Router :ref:`configuration overview <config_http_filters_router>`.
 // [#extension: envoy.filters.http.router]
 

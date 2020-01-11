@@ -11,7 +11,8 @@ option java_package = "io.envoyproxy.envoy.config.trace.v2alpha";
 option java_outer_classname = "XrayProto";
 option java_multiple_files = true;
 
-// [#protodoc-title: AWS X-Ray Tracer Configuration]
+// [#protodoc-title: AWS X-Ray tracer configuration]
+
 // Configuration for AWS X-Ray tracer
 
 message XRayConfig {

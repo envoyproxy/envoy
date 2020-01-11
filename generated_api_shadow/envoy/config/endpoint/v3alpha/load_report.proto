@@ -16,6 +16,8 @@ option java_package = "io.envoyproxy.envoy.config.endpoint.v3alpha";
 option java_outer_classname = "LoadReportProto";
 option java_multiple_files = true;
 
+// [#protodoc-title: Load report]
+
 // These are stats Envoy reports to GLB every so often. Report frequency is
 // defined by
 // :ref:`LoadStatsResponse.load_reporting_interval<envoy_api_field_service.load_stats.v3alpha.LoadStatsResponse.load_reporting_interval>`.

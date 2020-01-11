@@ -11,7 +11,7 @@ option java_package = "io.envoyproxy.envoy.service.auth.v2";
 option java_outer_classname = "AttributeContextProto";
 option java_multiple_files = true;
 
-// [#protodoc-title: Attribute Context ]
+// [#protodoc-title: Attribute context ]
 
 // See :ref:`network filter configuration overview <config_network_filters_ext_authz>`
 // and :ref:`HTTP filter configuration overview <config_http_filters_ext_authz>`.

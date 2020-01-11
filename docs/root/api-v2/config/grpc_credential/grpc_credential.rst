@@ -1,4 +1,4 @@
-Grpc Credentials
+gRPC credentials
 ================
 
 .. toctree::

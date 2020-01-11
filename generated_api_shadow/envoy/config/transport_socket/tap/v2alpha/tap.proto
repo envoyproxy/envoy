@@ -15,6 +15,7 @@ option (udpa.annotations.file_migrate).move_to_package =
     "envoy.extensions.transport_sockets.tap.v3alpha";
 
 // [#protodoc-title: Tap]
+
 // [#extension: envoy.transport_sockets.tap]
 
 // Configuration for tap transport socket. This wraps another transport socket, providing the

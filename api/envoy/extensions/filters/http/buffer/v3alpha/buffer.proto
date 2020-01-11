@@ -13,6 +13,7 @@ option java_outer_classname = "BufferProto";
 option java_multiple_files = true;
 
 // [#protodoc-title: Buffer]
+
 // Buffer :ref:`configuration overview <config_http_filters_buffer>`.
 // [#extension: envoy.filters.http.buffer]
 

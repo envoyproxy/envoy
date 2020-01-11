@@ -12,7 +12,7 @@ option java_outer_classname = "HttpUriProto";
 option java_multiple_files = true;
 option (udpa.annotations.file_migrate).move_to_package = "envoy.config.core.v3alpha";
 
-// [#protodoc-title: HTTP Service URI ]
+// [#protodoc-title: HTTP service URI ]
 
 // Envoy external URI descriptor
 message HttpUri {

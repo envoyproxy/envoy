@@ -10,7 +10,8 @@ option java_multiple_files = true;
 option (udpa.annotations.file_migrate).move_to_package =
     "envoy.extensions.filters.listener.original_dst.v3alpha";
 
-// [#protodoc-title: Original Dst Filter]
+// [#protodoc-title: Original destination filter]
+
 // Use the Original destination address on downstream connections.
 // [#extension: envoy.filters.listener.original_dst]
 

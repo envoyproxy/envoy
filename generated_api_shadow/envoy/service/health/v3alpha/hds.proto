@@ -16,6 +16,8 @@ option java_outer_classname = "HdsProto";
 option java_multiple_files = true;
 option java_generic_services = true;
 
+// [#protodoc-title: Health Discovery Service (HDS)]
+
 // HDS is Health Discovery Service. It compliments Envoy’s health checking
 // service by designating this Envoy to be a healthchecker for a subset of hosts
 // in the cluster. The status of these health checks will be reported to the

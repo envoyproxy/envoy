@@ -10,7 +10,8 @@ option java_multiple_files = true;
 option (udpa.annotations.file_migrate).move_to_package =
     "envoy.extensions.filters.listener.proxy_protocol.v3alpha";
 
-// [#protodoc-title: Proxy Protocol Filter]
+// [#protodoc-title: Proxy protocol filter]
+
 // PROXY protocol listener filter.
 // [#extension: envoy.filters.listener.proxy_protocol]
 

@@ -8,7 +8,8 @@ option java_package = "io.envoyproxy.envoy.extensions.filters.listener.original_
 option java_outer_classname = "OriginalDstProto";
 option java_multiple_files = true;
 
-// [#protodoc-title: Original Dst Filter]
+// [#protodoc-title: Original destination filter]
+
 // Use the Original destination address on downstream connections.
 // [#extension: envoy.filters.listener.original_dst]
 

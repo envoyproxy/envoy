@@ -10,7 +10,7 @@ option java_package = "io.envoyproxy.envoy.admin.v3alpha";
 option java_outer_classname = "ServerInfoProto";
 option java_multiple_files = true;
 
-// [#protodoc-title: Server State]
+// [#protodoc-title: Server state]
 
 // Proto representation of the value returned by /server_info, containing
 // server version/server status information.

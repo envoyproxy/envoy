@@ -10,7 +10,8 @@ option java_multiple_files = true;
 option (udpa.annotations.file_migrate).move_to_package =
     "envoy.extensions.filters.http.grpc_web.v3alpha";
 
-// [#protodoc-title: gRPC Web]
+// [#protodoc-title: gRPC web]
+
 // gRPC Web :ref:`configuration overview <config_http_filters_grpc_web>`.
 // [#extension: envoy.filters.http.grpc_web]
 

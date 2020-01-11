@@ -8,7 +8,8 @@ option java_package = "io.envoyproxy.envoy.config.grpc_credential.v2alpha";
 option java_outer_classname = "FileBasedMetadataProto";
 option java_multiple_files = true;
 
-// [#protodoc-title: Grpc Credentials File Based Metadata]
+// [#protodoc-title: gRPC credentials file based metadata]
+
 // Configuration for File Based Metadata Grpc Credentials Plugin
 // [#extension: envoy.grpc_credentials.file_based_metadata]
 

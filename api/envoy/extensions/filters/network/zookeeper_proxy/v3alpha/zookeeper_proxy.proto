@@ -13,6 +13,7 @@ option java_outer_classname = "ZookeeperProxyProto";
 option java_multiple_files = true;
 
 // [#protodoc-title: ZooKeeper proxy]
+
 // ZooKeeper Proxy :ref:`configuration overview <config_network_filters_zookeeper_proxy>`.
 // [#extension: envoy.filters.network.zookeeper_proxy]
 message ZooKeeperProxy {

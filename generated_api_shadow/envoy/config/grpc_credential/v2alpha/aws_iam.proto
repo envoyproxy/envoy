@@ -8,7 +8,8 @@ option java_package = "io.envoyproxy.envoy.config.grpc_credential.v2alpha";
 option java_outer_classname = "AwsIamProto";
 option java_multiple_files = true;
 
-// [#protodoc-title: Grpc Credentials AWS IAM]
+// [#protodoc-title: gRPC credentials AWS IAM]
+
 // Configuration for AWS IAM Grpc Credentials Plugin
 // [#extension: envoy.grpc_credentials.aws_iam]
 

@@ -14,6 +14,7 @@ option (udpa.annotations.file_migrate).move_to_package =
     "envoy.extensions.filters.network.mongo_proxy.v3alpha";
 
 // [#protodoc-title: Mongo proxy]
+
 // MongoDB :ref:`configuration overview <config_network_filters_mongo_proxy>`.
 // [#extension: envoy.filters.network.mongo_proxy]
 

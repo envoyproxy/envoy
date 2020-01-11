@@ -25,6 +25,7 @@ option (udpa.annotations.file_migrate).move_to_package =
     "envoy.extensions.filters.network.http_connection_manager.v3alpha";
 
 // [#protodoc-title: HTTP connection manager]
+
 // HTTP connection manager :ref:`configuration overview <config_http_conn_man>`.
 // [#extension: envoy.filters.network.http_connection_manager]
 

@@ -13,6 +13,7 @@ option java_outer_classname = "GzipProto";
 option java_multiple_files = true;
 
 // [#protodoc-title: Gzip]
+
 // Gzip :ref:`configuration overview <config_http_filters_gzip>`.
 // [#extension: envoy.filters.http.gzip]
 

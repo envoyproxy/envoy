@@ -18,6 +18,7 @@ option java_multiple_files = true;
 option (udpa.annotations.file_migrate).move_to_package = "envoy.config.endpoint.v3alpha";
 
 // [#protodoc-title: Endpoint configuration]
+
 // Endpoint discovery :ref:`architecture overview <arch_overview_service_discovery_types_eds>`
 
 // Each route from RDS will map to a single cluster or traffic split across

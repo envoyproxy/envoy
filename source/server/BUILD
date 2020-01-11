@@ -510,7 +510,7 @@ envoy_cc_library(
         ":well_known_names_lib",
         "//include/envoy/registry",
         "//include/envoy/server:active_udp_listener_config_interface",
-        "@envoy_api//envoy/api/v2/listener:pkg_cc_proto",
+        "@envoy_api//envoy/api/v2:pkg_cc_proto",
     ],
 )
 
@@ -519,6 +519,6 @@ envoy_cc_library(
     hdrs = ["filter_chain_factory_context_callback.h"],
     deps = [
         "//include/envoy/server:filter_config_interface",
-        "@envoy_api//envoy/api/v2/listener:pkg_cc_proto",
+        "@envoy_api//envoy/api/v2:pkg_cc_proto",
     ],
 )

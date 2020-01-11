@@ -7,6 +7,7 @@ option java_outer_classname = "RouterProto";
 option java_multiple_files = true;
 
 // [#protodoc-title: Router]
+
 // Thrift router :ref:`configuration overview <config_thrift_filters_router>`.
 // [#extension: envoy.filters.thrift.router]
 

@@ -202,6 +202,9 @@ def FormatHeaderFromFile(style, source_code_info, proto_name):
   if annotations.EXTENSION_ANNOTATION in source_code_info.file_level_annotations:
     extension = source_code_info.file_level_annotations[annotations.EXTENSION_ANNOTATION]
     formatted_extension = FormatExtension(extension)
+  if not annotations.DOC_TITLE_ANNOTATION in source_code_info.file_level_annotations and proto_name.startswith(
+      'envoy'):
+    raise ProtodocError('envoy API proto file missing title annotation: {}'.format(proto_name))
   if annotations.DOC_TITLE_ANNOTATION in source_code_info.file_level_annotations:
     return anchor + FormatHeader(
         style, source_code_info.file_level_annotations[

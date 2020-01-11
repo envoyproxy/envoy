@@ -13,6 +13,7 @@ option java_outer_classname = "FileProto";
 option java_multiple_files = true;
 
 // [#protodoc-title: File access log]
+
 // [#extension: envoy.access_loggers.file]
 
 // Custom configuration for an :ref:`AccessLog <envoy_api_msg_config.accesslog.v3alpha.AccessLog>`

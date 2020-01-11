@@ -14,7 +14,7 @@ option java_package = "io.envoyproxy.envoy.config.overload.v3alpha";
 option java_outer_classname = "OverloadProto";
 option java_multiple_files = true;
 
-// [#protodoc-title: Overload Manager]
+// [#protodoc-title: Overload manager]
 
 // The Overload Manager provides an extensible framework to protect Envoy instances
 // from overload of various resources (memory, cpu, file descriptors, etc).

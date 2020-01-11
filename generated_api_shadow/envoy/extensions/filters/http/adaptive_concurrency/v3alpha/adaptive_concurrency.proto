@@ -17,7 +17,8 @@ option java_package = "io.envoyproxy.envoy.extensions.filters.http.adaptive_conc
 option java_outer_classname = "AdaptiveConcurrencyProto";
 option java_multiple_files = true;
 
-// [#protodoc-title: Adaptive Concurrency]
+// [#protodoc-title: Adaptive concurrency]
+
 // Adaptive Concurrency Control :ref:`configuration overview
 // <config_http_filters_adaptive_concurrency>`.
 // [#extension: envoy.filters.http.adaptive_concurrency]

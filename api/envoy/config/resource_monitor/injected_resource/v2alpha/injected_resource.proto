@@ -9,6 +9,7 @@ option java_outer_classname = "InjectedResourceProto";
 option java_multiple_files = true;
 
 // [#protodoc-title: Injected resource]
+
 // [#extension: envoy.resource_monitors.injected_resource]
 
 // The injected resource monitor allows injecting a synthetic resource pressure into Envoy

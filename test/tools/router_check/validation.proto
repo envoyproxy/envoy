@@ -6,7 +6,7 @@ import "envoy/config/core/v3alpha/base.proto";
 import "google/protobuf/wrappers.proto";
 import "validate/validate.proto";
 
-// [#protodoc-title: RouterCheckTool Validation]
+// [#protodoc-title: RouterCheckTool validation]
 
 // The Validation Schema of the envoy router check test files.
 // The accepted input formats for the test are json and yaml.

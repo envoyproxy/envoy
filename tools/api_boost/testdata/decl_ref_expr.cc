@@ -1,5 +1,5 @@
 #include "envoy/api/v2/cds.pb.h"
-#include "envoy/api/v2/route/route.pb.h"
+#include "envoy/api/v2/route.pb.h"
 #include "envoy/config/overload/v2alpha/overload.pb.h"
 
 #define API_NO_BOOST(x) x
