@@ -294,7 +294,7 @@ void ConnectionManagerImpl::createCodec(Buffer::Instance& data) {
 Network::FilterStatus ConnectionManagerImpl::onData(Buffer::Instance& data, bool) {
   if (!codec_) {
     // Http3 codec should have been instantiated by now.
-    codec_ = createCodec(data);
+    createCodec(data);
     if (codec_->protocol() == Protocol::Http2) {
       stats_.named_.downstream_cx_http2_total_.inc();
       stats_.named_.downstream_cx_http2_active_.inc();
@@ -362,7 +362,7 @@ Network::FilterStatus ConnectionManagerImpl::onNewConnection() {
   }
   // Only QUIC connection's stream_info_ specifies protocol.
   Buffer::OwnedImpl dummy;
-  codec_ = createCodec(dummy);
+  createCodec(dummy);
   ASSERT(codec_->protocol() == Protocol::Http3);
   stats_.named_.downstream_cx_http3_total_.inc();
   stats_.named_.downstream_cx_http3_active_.inc();
