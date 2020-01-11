@@ -195,6 +195,25 @@ Once we are confident we've removed all hot-path symbol-table lookups, ideally
 through usage of real symbol tables in production, examining that endpoint, we
 can enable real symbol tables by default.
 
+### Symbol Table Class Overview
+
+Class | Superclass | Description
+-----| ---------- | ---------
+SymbolTable | | Abstract class providing an interface for symbol tables
+FakeSymbolTableImpl | SymbolTable | Implementation of SymbolTable API where StatName is represented as a flat string
+SymbolTableImpl | SymbolTable | Implementation of SymbolTable API where StatName share symbols held in a table
+SymbolTableImpl::Encoding | | Helper class for incrementally encoding strings into symbols
+StatName | | Provides an API and a view into a StatName (dynamic or symbolized). Like absl::string_view, the backing store must be separately maintained.
+StatNameStorageBase | | Holds storage (an array of bytes) for a dynamic or symbolized StatName
+Holds storage for a symbolized StatName  | StatNameStorageBase | Holds storage for a symbolized StatName. Must be explicitly freed (not just destructed).
+StatNameManagedStorage | StatNameStorage | Like StatNameStorage, but is 8 bytes larger, and can be destructed without free(). 
+StatNameDynamicStorage | StatNameStorageBase | Holds StatName storage for a dynamic (not symbolized) StatName.
+StatNamePool | | Holds backing store for any number of symbolized StatNames.
+StatNameDynamicPool | | Holds backing store for any number of dynamic StatNames.
+StatNameList | | Provides packed backing store for an ordered collection of StatNames, that are only accessed sequentially. Used for MetricImpl.
+StatNameStorageSet | | Implements a set of StatName with lookup via StatName. Used for rejected stats.
+StatNameSet | | Implements a set of StatName with lookup via string_view. Used to remember well-known names during startup, e.g. Redis commands.
+
 ## Tags and Tag Extraction
 
 TBD
