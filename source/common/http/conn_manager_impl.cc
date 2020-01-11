@@ -42,7 +42,6 @@
 
 #include "absl/strings/escaping.h"
 #include "absl/strings/match.h"
-#include "absl/strings/str_cat.h"
 
 namespace Envoy {
 namespace Http {
@@ -289,24 +288,20 @@ void ConnectionManagerImpl::handleCodecException(const char* error) {
 void ConnectionManagerImpl::createCodec(Buffer::Instance& data) {
   ASSERT(!codec_);
   codec_ = config_.createCodec(read_callbacks_->connection(), data, *this);
-
-  if (codec_->protocol() == Protocol::Http2) {
-    stats_.named_.downstream_cx_http2_total_.inc();
-    stats_.named_.downstream_cx_http2_active_.inc();
-  } else if (codec_->protocol() == Protocol::Http3) {
-    stats_.named_.downstream_cx_http3_total_.inc();
-    stats_.named_.downstream_cx_http3_active_.inc();
-  } else {
-    stats_.named_.downstream_cx_http1_total_.inc();
-    stats_.named_.downstream_cx_http1_active_.inc();
-  }
 }
 
 Network::FilterStatus ConnectionManagerImpl::onData(Buffer::Instance& data, bool) {
   if (!codec_) {
     // Http3 codec should have been instantiated by now.
-    ASSERT(codec_->protocol() != Protocol::Http3);
     createCodec(data);
+    if (codec_->protocol() == Protocol::Http2) {
+      stats_.named_.downstream_cx_http2_total_.inc();
+      stats_.named_.downstream_cx_http2_active_.inc();
+    } else {
+      ASSERT(codec_->protocol() != Protocol::Http3);
+      stats_.named_.downstream_cx_http1_total_.inc();
+      stats_.named_.downstream_cx_http1_active_.inc();
+    }
   }
 
   bool redispatch;
@@ -368,6 +363,8 @@ Network::FilterStatus ConnectionManagerImpl::onNewConnection() {
   Buffer::OwnedImpl dummy;
   createCodec(dummy);
   ASSERT(codec_->protocol() == Protocol::Http3);
+  stats_.named_.downstream_cx_http3_total_.inc();
+  stats_.named_.downstream_cx_http3_active_.inc();
   // Stop iterating through each filters for QUIC. Currently a QUIC connection
   // only supports one filter, HCM, and bypasses the onData() interface. Because
   // QUICHE already handles de-multiplexing.
@@ -491,7 +488,7 @@ void ConnectionManagerImpl::chargeTracingStats(const Tracing::Reason& tracing_re
     break;
   default:
     throw std::invalid_argument(
-        absl::StrCat("invalid tracing reason, value: ", static_cast<int32_t>(tracing_reason)));
+        fmt::format("invalid tracing reason, value: {}", static_cast<int32_t>(tracing_reason)));
   }
 }
 
@@ -557,8 +554,8 @@ ConnectionManagerImpl::ActiveStream::ActiveStream(ConnectionManagerImpl& connect
 ConnectionManagerImpl::ActiveStream::~ActiveStream() {
   stream_info_.onRequestComplete();
 
-  // A downstream disconnect can be identified for HTTP requests when the upstream returns with a
-  // 0 response code and when no other response flags are set.
+  // A downstream disconnect can be identified for HTTP requests when the upstream returns with a 0
+  // response code and when no other response flags are set.
   if (!stream_info_.hasAnyResponseFlag() && !stream_info_.responseCode()) {
     stream_info_.setResponseFlag(StreamInfo::ResponseFlag::DownstreamConnectionTermination);
   }
@@ -782,12 +779,18 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(HeaderMapPtr&& headers, 
     }
   }
 
-  // Verify header sanity checks which should have been performed by the codec.
-  ASSERT(HeaderUtility::requestHeadersValid(*request_headers_).has_value() == false);
+  // Make sure the host is valid.
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.strict_authority_validation") &&
+      !HeaderUtility::authorityIsValid(request_headers_->Host()->value().getStringView())) {
+    sendLocalReply(Grpc::Common::hasGrpcContentType(*request_headers_), Code::BadRequest, "",
+                   nullptr, is_head_request_, absl::nullopt,
+                   StreamInfo::ResponseCodeDetails::get().InvalidAuthority);
+    return;
+  }
 
-  // Currently we only support relative paths at the application layer. We expect the codec to
-  // have broken the path into pieces if applicable. NOTE: Currently the HTTP/1.1 codec only does
-  // this when the allow_absolute_url flag is enabled on the HCM.
+  // Currently we only support relative paths at the application layer. We expect the codec to have
+  // broken the path into pieces if applicable. NOTE: Currently the HTTP/1.1 codec only does this
+  // when the allow_absolute_url flag is enabled on the HCM.
   // https://tools.ietf.org/html/rfc7230#section-5.3 We also need to check for the existence of
   // :path because CONNECT does not have a path, and we don't support that currently.
   if (!request_headers_->Path() || request_headers_->Path()->value().getStringView().empty() ||
@@ -867,8 +870,7 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(HeaderMapPtr&& headers, 
     if (route_entry != nullptr && route_entry->idleTimeout()) {
       idle_timeout_ms_ = route_entry->idleTimeout().value();
       if (idle_timeout_ms_.count()) {
-        // If we have a route-level idle timeout but no global stream idle timeout, create a
-        // timer.
+        // If we have a route-level idle timeout but no global stream idle timeout, create a timer.
         if (stream_idle_timer_ == nullptr) {
           stream_idle_timer_ =
               connection_manager_.read_callbacks_->connection().dispatcher().createTimer(
@@ -966,9 +968,9 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(ActiveStreamDecoderFilte
                      static_cast<const void*>((*entry).get()), static_cast<uint64_t>(status));
 
     const bool new_metadata_added = processNewlyAddedMetadata();
-    // If end_stream is set in headers, and a filter adds new metadata, we need to delay
-    // end_stream in headers by inserting an empty data frame with end_stream set. The empty data
-    // frame is sent after the new metadata.
+    // If end_stream is set in headers, and a filter adds new metadata, we need to delay end_stream
+    // in headers by inserting an empty data frame with end_stream set. The empty data frame is sent
+    // after the new metadata.
     if ((*entry)->end_stream_ && new_metadata_added && !buffered_request_data_) {
       Buffer::OwnedImpl empty_data("");
       ENVOY_STREAM_LOG(
@@ -1083,8 +1085,8 @@ void ConnectionManagerImpl::ActiveStream::decodeData(
     ASSERT(!(state_.filter_call_state_ & FilterCallState::DecodeData));
 
     // We check the request_trailers_ pointer here in case addDecodedTrailers
-    // is called in decodeData during a previous filter invocation, at which point we communicate
-    // to the current and future filters that the stream has not yet ended.
+    // is called in decodeData during a previous filter invocation, at which point we communicate to
+    // the current and future filters that the stream has not yet ended.
     if (end_stream) {
       state_.filter_call_state_ |= FilterCallState::LastDataFrame;
     }
@@ -1489,8 +1491,7 @@ void ConnectionManagerImpl::ActiveStream::encodeHeaders(ActiveStreamEncoderFilte
 
   // Base headers.
   connection_manager_.config_.dateProvider().setDateHeader(headers);
-  // Following setReference() is safe because serverName() is constant for the life of the
-  // listener.
+  // Following setReference() is safe because serverName() is constant for the life of the listener.
   const auto transformation = connection_manager_.config_.serverHeaderTransformation();
   if (transformation == ConnectionManagerConfig::HttpConnectionManagerProto::OVERWRITE ||
       (transformation == ConnectionManagerConfig::HttpConnectionManagerProto::APPEND_IF_ABSENT &&
@@ -1692,8 +1693,8 @@ void ConnectionManagerImpl::ActiveStream::encodeData(
     ASSERT(!(state_.filter_call_state_ & FilterCallState::EncodeData));
 
     // We check the response_trailers_ pointer here in case addEncodedTrailers
-    // is called in encodeData during a previous filter invocation, at which point we communicate
-    // to the current and future filters that the stream has not yet ended.
+    // is called in encodeData during a previous filter invocation, at which point we communicate to
+    // the current and future filters that the stream has not yet ended.
     state_.filter_call_state_ |= FilterCallState::EncodeData;
     if (end_stream) {
       state_.filter_call_state_ |= FilterCallState::LastDataFrame;
@@ -1882,8 +1883,8 @@ bool ConnectionManagerImpl::ActiveStream::createFilterChain() {
   if (upgrade != nullptr) {
     const Router::RouteEntry::UpgradeMap* upgrade_map = nullptr;
 
-    // We must check if the 'cached_route_' optional is populated since this function can be
-    // called early via sendLocalReply(), before the cached route is populated.
+    // We must check if the 'cached_route_' optional is populated since this function can be called
+    // early via sendLocalReply(), before the cached route is populated.
     if (hasCachedRoute() && cached_route_.value()->routeEntry()) {
       upgrade_map = &cached_route_.value()->routeEntry()->upgradeMap();
     }
