@@ -17,6 +17,7 @@
 #include "common/common/fmt.h"
 #include "common/config/api_version.h"
 #include "common/config/utility.h"
+#include "common/http/header_map_impl.h"
 #include "common/protobuf/utility.h"
 #include "common/router/config_impl.h"
 
@@ -118,12 +119,13 @@ void RdsRouteConfigSubscription::onConfigUpdate(
   if (config_update_info_->onRdsUpdate(route_config, version_info)) {
     stats_.config_reload_.inc();
 
-    if (config_update_info_->routeConfiguration().has_vhds()) {
-      ENVOY_LOG(debug, "rds: vhds configuration present, starting vhds: config_name={} hash={}",
-                route_config_name_, config_update_info_->configHash());
+    if (config_update_info_->routeConfiguration().has_vhds() &&
+        config_update_info_->vhdsConfigurationChanged()) {
+      ENVOY_LOG(
+          debug,
+          "rds: vhds configuration present/changed, (re)starting vhds: config_name={} hash={}",
+          route_config_name_, config_update_info_->configHash());
       maybeCreateInitManager(version_info, noop_init_manager, resume_rds);
-      // TODO(dmitri-d): It's unsafe to depend directly on factory context here,
-      // the listener might have been torn down, need to remove this.
       vhds_subscription_ = std::make_unique<VhdsSubscription>(
           config_update_info_, factory_context_, stat_prefix_, route_config_providers_,
           config_update_info_->routeConfiguration().vhds().config_source().resource_api_version());
@@ -136,7 +138,10 @@ void RdsRouteConfigSubscription::onConfigUpdate(
       for (auto* provider : route_config_providers_) {
         provider->onConfigUpdate();
       }
-      vhds_subscription_.release();
+      // RDS update removed VHDS configuration
+      if (!config_update_info_->routeConfiguration().has_vhds()) {
+        vhds_subscription_.release();
+      }
     }
     update_callback_manager_.runCallbacks();
   }
@@ -189,6 +194,13 @@ void RdsRouteConfigSubscription::onConfigUpdateFailed(
   // We need to allow server startup to continue, even if we have a bad
   // config.
   init_target_.ready();
+}
+
+void RdsRouteConfigSubscription::updateOnDemand(const std::string& aliases) {
+  if (vhds_subscription_.get() == nullptr) {
+    return;
+  }
+  vhds_subscription_->updateOnDemand(aliases);
 }
 
 bool RdsRouteConfigSubscription::validateUpdateSize(int num_resources) {
@@ -263,12 +275,55 @@ void RdsRouteConfigProviderImpl::onConfigUpdate() {
     prev_config->config_ = new_config;
     return previous;
   });
+
+  const auto aliases = config_update_info_->resourceIdsInLastVhdsUpdate();
+  // Regular (non-VHDS) RDS updates don't populate aliases fields in resources.
+  if (aliases.empty()) {
+    return;
+  }
+
+  const auto config = std::static_pointer_cast<const ConfigImpl>(new_config);
+  // Notifies connections that RouteConfiguration update has been propagated.
+  // Callbacks processing is performed in FIFO order. The callback is skipped if alias used in
+  // the VHDS update request do not match the aliases in the update response
+  for (auto it = config_update_callbacks_.begin(); it != config_update_callbacks_.end();) {
+    auto found = aliases.find(it->alias_);
+    if (found != aliases.end()) {
+      // TODO(dmitri-d) HeaderMapImpl is expensive, need to profile this
+      Http::HeaderMapImpl host_header;
+      host_header.setHost(VhdsSubscription::aliasToDomainName(it->alias_));
+      const bool host_exists = config->virtualHostExists(host_header);
+      auto current_cb = it->cb_;
+      it->thread_local_dispatcher_.post([current_cb, host_exists] {
+        if (auto cb = current_cb.lock()) {
+          (*cb)(host_exists);
+        }
+      });
+      it = config_update_callbacks_.erase(it);
+    } else {
+      it++;
+    }
+  }
 }
 
 void RdsRouteConfigProviderImpl::validateConfig(
     const envoy::config::route::v3alpha::RouteConfiguration& config) const {
   // TODO(lizan): consider cache the config here until onConfigUpdate.
   ConfigImpl validation_config(config, factory_context_, validator_, false);
+}
+
+// Schedules a VHDS request on the main thread and queues up the callback to use when the VHDS
+// response has been propagated to the worker thread that was the request origin.
+void RdsRouteConfigProviderImpl::requestVirtualHostsUpdate(
+    const std::string& for_domain, Event::Dispatcher& thread_local_dispatcher,
+    std::weak_ptr<Http::RouteConfigUpdatedCallback> route_config_updated_cb) {
+  auto alias =
+      VhdsSubscription::domainNameToAlias(config_update_info_->routeConfigName(), for_domain);
+  factory_context_.dispatcher().post([this, alias, &thread_local_dispatcher,
+                                      route_config_updated_cb]() -> void {
+    subscription_->updateOnDemand(alias);
+    config_update_callbacks_.push_back({alias, thread_local_dispatcher, route_config_updated_cb});
+  });
 }
 
 RouteConfigProviderManagerImpl::RouteConfigProviderManagerImpl(Server::Admin& admin) {

@@ -56,6 +56,14 @@ public:
   virtual const std::string& configVersion() const PURE;
 
   /**
+   * @return bool return whether VHDS configuration has been changed in the last RDS update.
+   */
+  // TODO(dmitri-d): Consider splitting RouteConfigUpdateReceiver into a RouteConfig state and a
+  // last update state. The latter could be passed to callbacks as a parameter, which would make the
+  // intent and the lifecycle of the "last update state" less muddled.
+  virtual bool vhdsConfigurationChanged() const PURE;
+
+  /**
    * @return uint64_t the hash value of RouteConfiguration.
    */
   virtual uint64_t configHash() const PURE;
@@ -76,6 +84,12 @@ public:
    * @return SystemTime the time of the last update.
    */
   virtual SystemTime lastUpdated() const PURE;
+
+  /**
+   * @return the union of all resource names and aliases (if any) received with the last VHDS
+   * update.
+   */
+  virtual const std::set<std::string>& resourceIdsInLastVhdsUpdate() PURE;
 };
 
 using RouteConfigUpdatePtr = std::unique_ptr<RouteConfigUpdateReceiver>;

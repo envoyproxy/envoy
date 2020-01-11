@@ -60,6 +60,25 @@ public:
                             GrpcMuxCallbacks&) override;
   void start() override;
 
+  struct SubscriptionStuff {
+    SubscriptionStuff(const std::string& type_url, std::chrono::milliseconds init_fetch_timeout,
+                      Event::Dispatcher& dispatcher, const LocalInfo::LocalInfo& local_info)
+        : sub_state_(type_url, watch_map_, local_info, init_fetch_timeout, dispatcher),
+          init_fetch_timeout_(init_fetch_timeout) {}
+
+    WatchMap watch_map_;
+    DeltaSubscriptionState sub_state_;
+    const std::chrono::milliseconds init_fetch_timeout_;
+
+    SubscriptionStuff(const SubscriptionStuff&) = delete;
+    SubscriptionStuff& operator=(const SubscriptionStuff&) = delete;
+  };
+
+  // for use in tests only
+  const absl::flat_hash_map<std::string, std::unique_ptr<SubscriptionStuff>>& subscriptions() {
+    return subscriptions_;
+  }
+
 private:
   Watch* addWatch(const std::string& type_url, const std::set<std::string>& resources,
                   SubscriptionCallbacks& callbacks, std::chrono::milliseconds init_fetch_timeout);
@@ -94,19 +113,6 @@ private:
   // description of how it interacts with pause() and resume().
   PausableAckQueue pausable_ack_queue_;
 
-  struct SubscriptionStuff {
-    SubscriptionStuff(const std::string& type_url, std::chrono::milliseconds init_fetch_timeout,
-                      Event::Dispatcher& dispatcher, const LocalInfo::LocalInfo& local_info)
-        : sub_state_(type_url, watch_map_, local_info, init_fetch_timeout, dispatcher),
-          init_fetch_timeout_(init_fetch_timeout) {}
-
-    WatchMap watch_map_;
-    DeltaSubscriptionState sub_state_;
-    const std::chrono::milliseconds init_fetch_timeout_;
-
-    SubscriptionStuff(const SubscriptionStuff&) = delete;
-    SubscriptionStuff& operator=(const SubscriptionStuff&) = delete;
-  };
   // Map key is type_url.
   absl::flat_hash_map<std::string, std::unique_ptr<SubscriptionStuff>> subscriptions_;
 

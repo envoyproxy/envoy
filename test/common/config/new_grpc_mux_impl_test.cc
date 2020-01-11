@@ -118,6 +118,74 @@ TEST_F(NewGrpcMuxImplTest, DiscoveryResponseNonexistentSub) {
   }
 }
 
+// DeltaDiscoveryResponse that comes in response to an on-demand request updates the watch with
+// resource's name. The watch is initially created with an alias used in the on-demand request.
+TEST_F(NewGrpcMuxImplTest, ConfigUpdateWithAliases) {
+  setup();
+
+  const std::string& type_url = Config::TypeUrl::get().VirtualHost;
+  auto* watch = grpc_mux_->addOrUpdateWatch(type_url, nullptr, {"domain1.test"}, callbacks_,
+                                            std::chrono::milliseconds(0));
+
+  EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
+  grpc_mux_->start();
+
+  auto response = std::make_unique<envoy::service::discovery::v3alpha::DeltaDiscoveryResponse>();
+  response->set_type_url(type_url);
+  response->set_system_version_info("1");
+
+  envoy::config::route::v3alpha::VirtualHost vhost;
+  vhost.set_name("vhost_1");
+  vhost.add_domains("domain1.test");
+  vhost.add_domains("domain2.test");
+
+  response->add_resources()->mutable_resource()->PackFrom(vhost);
+  response->mutable_resources()->at(0).set_name("vhost_1");
+  response->mutable_resources()->at(0).add_aliases("domain1.test");
+  response->mutable_resources()->at(0).add_aliases("domain2.test");
+
+  grpc_mux_->onDiscoveryResponse(std::move(response));
+
+  const auto& subscriptions = grpc_mux_->subscriptions();
+  auto sub = subscriptions.find(type_url);
+
+  EXPECT_TRUE(sub != subscriptions.end());
+  const auto found_resource_names = sub->second->watch_map_.updateWatchInterest(watch, {});
+  EXPECT_TRUE(found_resource_names.removed_.find("vhost_1") != found_resource_names.removed_.end());
+}
+
+// DeltaDiscoveryResponse that comes in response to an on-demand request that couldn't be resolved
+// will contain an empty Resource. The Resource's aliases field will be populated with the alias
+// originally used in the request.
+TEST_F(NewGrpcMuxImplTest, ConfigUpdateWithNotFoundResponse) {
+  setup();
+
+  const std::string& type_url = Config::TypeUrl::get().VirtualHost;
+  auto* watch = grpc_mux_->addOrUpdateWatch(type_url, nullptr, {"domain1.test"}, callbacks_,
+                                            std::chrono::milliseconds(0));
+
+  EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
+  grpc_mux_->start();
+
+  auto response = std::make_unique<envoy::service::discovery::v3alpha::DeltaDiscoveryResponse>();
+  response->set_type_url(type_url);
+  response->set_system_version_info("1");
+
+  response->add_resources();
+  response->mutable_resources()->at(0).set_name("not-found");
+  response->mutable_resources()->at(0).add_aliases("domain1.test");
+
+  grpc_mux_->onDiscoveryResponse(std::move(response));
+
+  const auto& subscriptions = grpc_mux_->subscriptions();
+  auto sub = subscriptions.find(type_url);
+
+  EXPECT_TRUE(sub != subscriptions.end());
+  const auto found_resource_names = sub->second->watch_map_.updateWatchInterest(watch, {});
+  EXPECT_TRUE(found_resource_names.removed_.find("not-found") !=
+              found_resource_names.removed_.end());
+}
+
 } // namespace
 } // namespace Config
 } // namespace Envoy
