@@ -448,7 +448,7 @@ void ConfigHelper::finalize(const std::vector<uint32_t>& ports) {
         tls_config = &cluster->hidden_envoy_deprecated_tls_context();
         cluster->clear_hidden_envoy_deprecated_tls_context();
       }
-      setTapTransportSocket(tap_path.value(), fmt::format("cluster_{}", i),
+      setTapTransportSocket(tap_path.value(), absl::StrCat("cluster_", i),
                             *cluster->mutable_transport_socket(), tls_config);
     }
   }

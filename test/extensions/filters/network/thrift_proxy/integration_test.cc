@@ -115,7 +115,7 @@ public:
       for (int i = 1; i < 4; i++) {
         auto* c = bootstrap.mutable_static_resources()->add_clusters();
         c->MergeFrom(bootstrap.static_resources().clusters()[0]);
-        c->set_name(fmt::format("cluster_{}", i));
+        c->set_name(absl::StrCat("cluster_", i));
       }
     });
 

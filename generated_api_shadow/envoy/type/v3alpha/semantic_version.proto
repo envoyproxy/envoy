@@ -16,9 +16,9 @@ option java_multiple_files = true;
 message SemanticVersion {
   option (udpa.annotations.versioning).previous_message_type = "envoy.type.SemanticVersion";
 
-  uint32 major = 1;
+  uint32 major_number = 1;
 
-  uint32 minor = 2;
+  uint32 minor_number = 2;
 
   uint32 patch = 3;
 }

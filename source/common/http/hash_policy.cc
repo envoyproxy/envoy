@@ -4,6 +4,8 @@
 
 #include "common/http/utility.h"
 
+#include "absl/strings/str_cat.h"
+
 namespace Envoy {
 namespace Http {
 
@@ -143,7 +145,7 @@ HashPolicyImpl::HashPolicyImpl(
       break;
     default:
       throw EnvoyException(
-          fmt::format("Unsupported hash policy {}", hash_policy->policy_specifier_case()));
+          absl::StrCat("Unsupported hash policy ", hash_policy->policy_specifier_case()));
     }
   }
 }

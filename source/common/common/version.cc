@@ -68,10 +68,10 @@ envoy::config::core::v3alpha::BuildVersion VersionInfo::makeBuildVersion(const c
   if (std::regex_match(version, match, ver_regex)) {
     int value = 0;
     if (absl::SimpleAtoi(match.str(major), &value)) {
-      result.mutable_version()->set_major(value);
+      result.mutable_version()->set_major_number(value);
     }
     if (absl::SimpleAtoi(match.str(minor), &value)) {
-      result.mutable_version()->set_minor(value);
+      result.mutable_version()->set_minor_number(value);
     }
     if (absl::SimpleAtoi(match.str(patch), &value)) {
       result.mutable_version()->set_patch(value);

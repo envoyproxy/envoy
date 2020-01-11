@@ -245,7 +245,7 @@ ListenerManagerImpl::ListenerManagerImpl(Instance& server,
       enable_dispatcher_stats_(enable_dispatcher_stats) {
   for (uint32_t i = 0; i < server.options().concurrency(); i++) {
     workers_.emplace_back(
-        worker_factory.createWorker(server.overloadManager(), fmt::format("worker_{}", i)));
+        worker_factory.createWorker(server.overloadManager(), absl::StrCat("worker_", i)));
   }
 }
 
@@ -634,7 +634,7 @@ void ListenerManagerImpl::onListenerWarmed(ListenerImpl& listener) {
   updateWarmingActiveGauges();
 }
 
-uint64_t ListenerManagerImpl::numConnections() {
+uint64_t ListenerManagerImpl::numConnections() const {
   uint64_t num_connections = 0;
   for (const auto& worker : workers_) {
     num_connections += worker->numConnections();
