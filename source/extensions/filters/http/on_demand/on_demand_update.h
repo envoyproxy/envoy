@@ -13,6 +13,10 @@ public:
 
   void onRouteConfigUpdateCompletion(bool route_exists);
 
+  void setFilterIterationState(Envoy::Http::FilterHeadersStatus status) {
+    filter_iteration_state_ = status;
+  }
+
   // Http::StreamDecoderFilter
   Http::FilterHeadersStatus decodeHeaders(Http::HeaderMap& headers, bool end_stream) override;
 
