@@ -42,6 +42,7 @@
 
 #include "absl/strings/escaping.h"
 #include "absl/strings/match.h"
+#include "absl/strings/str_cat.h"
 
 namespace Envoy {
 namespace Http {
@@ -293,7 +294,7 @@ void ConnectionManagerImpl::createCodec(Buffer::Instance& data) {
 Network::FilterStatus ConnectionManagerImpl::onData(Buffer::Instance& data, bool) {
   if (!codec_) {
     // Http3 codec should have been instantiated by now.
-    createCodec(data);
+    codec_ = createCodec(data);
     if (codec_->protocol() == Protocol::Http2) {
       stats_.named_.downstream_cx_http2_total_.inc();
       stats_.named_.downstream_cx_http2_active_.inc();
@@ -361,7 +362,7 @@ Network::FilterStatus ConnectionManagerImpl::onNewConnection() {
   }
   // Only QUIC connection's stream_info_ specifies protocol.
   Buffer::OwnedImpl dummy;
-  createCodec(dummy);
+  codec_ = createCodec(dummy);
   ASSERT(codec_->protocol() == Protocol::Http3);
   stats_.named_.downstream_cx_http3_total_.inc();
   stats_.named_.downstream_cx_http3_active_.inc();
@@ -488,7 +489,7 @@ void ConnectionManagerImpl::chargeTracingStats(const Tracing::Reason& tracing_re
     break;
   default:
     throw std::invalid_argument(
-        fmt::format("invalid tracing reason, value: {}", static_cast<int32_t>(tracing_reason)));
+        absl::StrCat("invalid tracing reason, value: ", static_cast<int32_t>(tracing_reason)));
   }
 }
 
@@ -779,14 +780,8 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(HeaderMapPtr&& headers, 
     }
   }
 
-  // Make sure the host is valid.
-  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.strict_authority_validation") &&
-      !HeaderUtility::authorityIsValid(request_headers_->Host()->value().getStringView())) {
-    sendLocalReply(Grpc::Common::hasGrpcContentType(*request_headers_), Code::BadRequest, "",
-                   nullptr, is_head_request_, absl::nullopt,
-                   StreamInfo::ResponseCodeDetails::get().InvalidAuthority);
-    return;
-  }
+  // Verify header sanity checks which should have been performed by the codec.
+  ASSERT(HeaderUtility::requestHeadersValid(*request_headers_).has_value() == false);
 
   // Currently we only support relative paths at the application layer. We expect the codec to have
   // broken the path into pieces if applicable. NOTE: Currently the HTTP/1.1 codec only does this
@@ -1387,23 +1382,23 @@ void ConnectionManagerImpl::ActiveStream::sendLocalReply(
     createFilterChain();
   }
   stream_info_.setResponseCodeDetails(details);
-  Utility::sendLocalReply(
-      is_grpc_request,
-      [this, modify_headers](HeaderMapPtr&& headers, bool end_stream) -> void {
-        if (modify_headers != nullptr) {
-          modify_headers(*headers);
-        }
-        response_headers_ = std::move(headers);
-        // TODO: Start encoding from the last decoder filter that saw the
-        // request instead.
-        encodeHeaders(nullptr, *response_headers_, end_stream);
-      },
-      [this](Buffer::Instance& data, bool end_stream) -> void {
-        // TODO: Start encoding from the last decoder filter that saw the
-        // request instead.
-        encodeData(nullptr, data, end_stream, FilterIterationStartState::CanStartFromCurrent);
-      },
-      state_.destroyed_, code, body, grpc_status, is_head_request);
+  Utility::sendLocalReply(is_grpc_request,
+                          [this, modify_headers](HeaderMapPtr&& headers, bool end_stream) -> void {
+                            if (modify_headers != nullptr) {
+                              modify_headers(*headers);
+                            }
+                            response_headers_ = std::move(headers);
+                            // TODO: Start encoding from the last decoder filter that saw the
+                            // request instead.
+                            encodeHeaders(nullptr, *response_headers_, end_stream);
+                          },
+                          [this](Buffer::Instance& data, bool end_stream) -> void {
+                            // TODO: Start encoding from the last decoder filter that saw the
+                            // request instead.
+                            encodeData(nullptr, data, end_stream,
+                                       FilterIterationStartState::CanStartFromCurrent);
+                          },
+                          state_.destroyed_, code, body, grpc_status, is_head_request);
 }
 
 void ConnectionManagerImpl::ActiveStream::encode100ContinueHeaders(
