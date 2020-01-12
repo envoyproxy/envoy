@@ -692,10 +692,13 @@ void ListenerManagerImpl::startWorkers(GuardDog& guard_dog) {
   workers_started_ = true;
   uint32_t i = 0;
 
+  // We can not use "Cleanup" to simplify this logic here, because it results in a issue if Envoy is
+  // killed before workers are actually started. Specifically the AdminRequestGetStatsAndKill test
+  // case in main_common_test fails with ASAN error if we use "Cleanup" here.
   const auto listeners_pending_init =
       std::make_shared<std::atomic<uint64_t>>(workers_.size() * active_listeners_.size());
   for (const auto& worker : workers_) {
-    ENVOY_LOG(info, "starting worker {}", i);
+    ENVOY_LOG(info, "starting worker {}", i++);
     ASSERT(warming_listeners_.empty());
     for (const auto& listener : active_listeners_) {
       addListenerToWorker(*worker, *listener, [this, listeners_pending_init]() {
@@ -706,7 +709,7 @@ void ListenerManagerImpl::startWorkers(GuardDog& guard_dog) {
     }
     worker->start(guard_dog);
     if (enable_dispatcher_stats_) {
-      worker->initializeStats(*scope_, fmt::format("worker_{}.", i++));
+      worker->initializeStats(*scope_, fmt::format("worker_{}.", i));
     }
   }
   if (active_listeners_.size() == 0) {
