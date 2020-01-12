@@ -205,8 +205,8 @@ VersionConverter::reinterpret(const Protobuf::Message& message,
 void VersionUtil::scrubHiddenEnvoyDeprecated(Protobuf::Message& message) {
   class HiddenFieldScrubbingProtoVisitor : public ProtoVisitor {
   public:
-    void* onField(Protobuf::Message& message, const Protobuf::FieldDescriptor& field,
-                  const void*) override {
+    const void* onField(Protobuf::Message& message, const Protobuf::FieldDescriptor& field,
+                        const void*) override {
       const Protobuf::Reflection* reflection = message.GetReflection();
       if (absl::StartsWith(field.name(), DeprecatedFieldShadowPrefix)) {
         reflection->ClearField(&message, &field);
