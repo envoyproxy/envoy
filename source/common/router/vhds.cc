@@ -12,7 +12,7 @@
 #include "common/common/assert.h"
 #include "common/common/fmt.h"
 #include "common/config/api_version.h"
-#include "common/config/resource_name_loader.h"
+#include "common/config/type_url_loader.h"
 #include "common/config/utility.h"
 #include "common/protobuf/utility.h"
 #include "common/router/config_impl.h"
@@ -41,8 +41,7 @@ VhdsSubscription::VhdsSubscription(RouteConfigUpdatePtr& config_update_info,
   if (config_source != envoy::config::core::v3alpha::ApiConfigSource::DELTA_GRPC) {
     throw EnvoyException("vhds: only 'DELTA_GRPC' is supported as an api_type.");
   }
-  const auto resource_name =
-      Envoy::Config::loadResourceName<VhdsSubscription>(resource_api_version);
+  const auto type_url = Envoy::Config::loadTypeUrl<VhdsSubscription>(resource_api_version);
   subscription_ =
       factory_context.clusterManager().subscriptionFactory().subscriptionFromConfigSource(
           config_update_info_->routeConfiguration().vhds().config_source(),

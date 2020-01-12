@@ -386,8 +386,8 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "resource_name_loader_lib",
-    hdrs = ["resource_name_loader.h"],
+    name = "type_url_loader_lib",
+    hdrs = ["type_url_loader.h"],
     deps = [
         "//include/envoy/config:discovery_service_base_interface",
         "@envoy_api//envoy/api/v2:pkg_cc_proto",

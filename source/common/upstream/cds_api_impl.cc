@@ -13,8 +13,8 @@
 #include "common/common/cleanup.h"
 #include "common/common/utility.h"
 #include "common/config/api_version.h"
-#include "common/config/resource_name_loader.h"
 #include "common/config/resources.h"
+#include "common/config/type_url_loader.h"
 #include "common/config/utility.h"
 #include "common/protobuf/utility.h"
 
@@ -34,8 +34,7 @@ CdsApiImpl::CdsApiImpl(const envoy::config::core::v3alpha::ConfigSource& cds_con
                        ProtobufMessage::ValidationVisitor& validation_visitor)
     : cm_(cm), scope_(scope.createScope("cluster_manager.cds.")),
       validation_visitor_(validation_visitor) {
-  const auto resource_name =
-      Envoy::Config::loadResourceName<CdsApiImpl>(cds_config.resource_api_version());
+  const auto type_url = Envoy::Config::loadTypeUrl<CdsApiImpl>(cds_config.resource_api_version());
   subscription_ = cm_.subscriptionFactory().subscriptionFromConfigSource(
       cds_config, Grpc::Common::typeUrl(API_NO_BOOST(resource_name)), *scope_, *this);
 }

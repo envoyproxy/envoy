@@ -48,7 +48,7 @@ envoy_cc_library(
         "//source/common/common:thread_lib",
         "//source/common/common:utility_lib",
         "//source/common/config:api_version_lib",
-        "//source/common/config:resource_name_loader_lib",
+        "//source/common/config:type_url_loader_lib",
         "//source/common/filesystem:directory_lib",
         "//source/common/grpc:common_lib",
         "//source/common/init:target_lib",

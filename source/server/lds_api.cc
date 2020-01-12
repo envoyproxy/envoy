@@ -13,8 +13,8 @@
 #include "common/common/assert.h"
 #include "common/common/cleanup.h"
 #include "common/config/api_version.h"
-#include "common/config/resource_name_loader.h"
 #include "common/config/resources.h"
+#include "common/config/type_url_loader.h"
 #include "common/config/utility.h"
 #include "common/protobuf/utility.h"
 
@@ -30,8 +30,7 @@ LdsApiImpl::LdsApiImpl(const envoy::config::core::v3alpha::ConfigSource& lds_con
     : listener_manager_(lm), scope_(scope.createScope("listener_manager.lds.")), cm_(cm),
       init_target_("LDS", [this]() { subscription_->start({}); }),
       validation_visitor_(validation_visitor) {
-  const auto resource_name =
-      Envoy::Config::loadResourceName<LdsApiImpl>(lds_config.resource_api_version());
+  const auto type_url = Envoy::Config::loadTypeUrl<LdsApiImpl>(lds_config.resource_api_version());
   subscription_ = cm.subscriptionFactory().subscriptionFromConfigSource(
       lds_config, Grpc::Common::typeUrl(API_NO_BOOST(resource_name)), *scope_, *this);
   init_manager.add(init_target_);

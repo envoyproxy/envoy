@@ -16,7 +16,7 @@
 #include "common/common/assert.h"
 #include "common/common/fmt.h"
 #include "common/config/api_version.h"
-#include "common/config/resource_name_loader.h"
+#include "common/config/type_url_loader.h"
 #include "common/config/utility.h"
 #include "common/protobuf/utility.h"
 #include "common/router/config_impl.h"
@@ -75,7 +75,7 @@ RdsRouteConfigSubscription::RdsRouteConfigSubscription(
       stat_prefix_(stat_prefix), stats_({ALL_RDS_STATS(POOL_COUNTER(*scope_))}),
       route_config_provider_manager_(route_config_provider_manager),
       manager_identifier_(manager_identifier) {
-  const auto resource_name = Envoy::Config::loadResourceName<RdsRouteConfigSubscription>(
+  const auto type_url = Envoy::Config::loadTypeUrl<RdsRouteConfigSubscription>(
       rds.config_source().resource_api_version());
   subscription_ =
       factory_context.clusterManager().subscriptionFactory().subscriptionFromConfigSource(

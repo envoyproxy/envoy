@@ -71,7 +71,7 @@ template <typename DiscoveryServiceSubscription> std::string v3alphaResourceName
 }
 
 template <typename DiscoveryServiceSubscription>
-std::string loadResourceName(envoy::config::core::v3alpha::ApiVersion resource_api_version) {
+std::string loadTypeUrl(envoy::config::core::v3alpha::ApiVersion resource_api_version) {
   switch (resource_api_version) {
   // automatically set api version as V2
   case envoy::config::core::v3alpha::ApiVersion::AUTO:

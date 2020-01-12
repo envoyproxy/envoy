@@ -15,8 +15,8 @@
 #include "common/common/logger.h"
 #include "common/common/utility.h"
 #include "common/config/api_version.h"
-#include "common/config/resource_name_loader.h"
 #include "common/config/resources.h"
+#include "common/config/type_url_loader.h"
 #include "common/init/manager_impl.h"
 #include "common/init/watcher_impl.h"
 #include "common/router/rds_impl.h"
@@ -106,7 +106,7 @@ ScopedRdsConfigSubscription::ScopedRdsConfigSubscription(
       rds_config_source_(std::move(rds_config_source)),
       validation_visitor_(factory_context.messageValidationVisitor()), stat_prefix_(stat_prefix),
       route_config_provider_manager_(route_config_provider_manager) {
-  const auto resource_name = Envoy::Config::loadResourceName<ScopedRdsConfigSubscription>(
+  const auto type_url = Envoy::Config::loadTypeUrl<ScopedRdsConfigSubscription>(
       rds_config_source_.resource_api_version());
   subscription_ =
       factory_context.clusterManager().subscriptionFactory().subscriptionFromConfigSource(

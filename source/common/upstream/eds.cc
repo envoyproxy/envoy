@@ -11,7 +11,7 @@
 #include "common/common/assert.h"
 #include "common/common/utility.h"
 #include "common/config/api_version.h"
-#include "common/config/resource_name_loader.h"
+#include "common/config/type_url_loader.h"
 
 namespace Envoy {
 namespace Upstream {
@@ -36,7 +36,7 @@ EdsClusterImpl::EdsClusterImpl(
   } else {
     initialize_phase_ = InitializePhase::Secondary;
   }
-  const auto resource_name = Envoy::Config::loadResourceName<EdsClusterImpl>(
+  const auto type_url = Envoy::Config::loadTypeUrl<EdsClusterImpl>(
       cluster.eds_cluster_config().eds_config().resource_api_version());
   subscription_ =
       factory_context.clusterManager().subscriptionFactory().subscriptionFromConfigSource(
