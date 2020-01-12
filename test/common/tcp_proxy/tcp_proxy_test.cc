@@ -869,6 +869,10 @@ public:
   void setup(uint32_t connections,
              const envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy& config) {
     configure(config);
+    filter_callbacks_.connection_.local_address_ =
+        Network::Utility::resolveUrl("tcp://2.2.2.2:50001");
+    filter_callbacks_.connection_.remote_address_ =
+        Network::Utility::resolveUrl("tcp://127.0.0.1:8080");
     upstream_local_address_ = Network::Utility::resolveUrl("tcp://2.2.2.2:50000");
     upstream_remote_address_ = Network::Utility::resolveUrl("tcp://127.0.0.1:80");
     for (uint32_t i = 0; i < connections; i++) {
@@ -1576,14 +1580,10 @@ TEST_F(TcpProxyTest, DEPRECATED_FEATURE_TEST(AccessLogTlsSessionId)) {
 // Test that access log fields %DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT% and
 // %DOWNSTREAM_LOCAL_ADDRESS% are correctly logged.
 TEST_F(TcpProxyTest, DEPRECATED_FEATURE_TEST(AccessLogDownstreamAddress)) {
-  filter_callbacks_.connection_.local_address_ =
-      Network::Utility::resolveUrl("tcp://1.1.1.2:20000");
-  filter_callbacks_.connection_.remote_address_ =
-      Network::Utility::resolveUrl("tcp://1.1.1.1:40000");
   setup(1, accessLogConfig("%DOWNSTREAM_REMOTE_ADDRESS_WITHOUT_PORT% %DOWNSTREAM_LOCAL_ADDRESS%"));
   filter_callbacks_.connection_.raiseEvent(Network::ConnectionEvent::RemoteClose);
   filter_.reset();
-  EXPECT_EQ(access_log_data_, "1.1.1.1 1.1.1.2:20000");
+  EXPECT_EQ(access_log_data_, "127.0.0.1 2.2.2.2:50001");
 }
 
 // Test that access log fields %BYTES_RECEIVED%, %BYTES_SENT%, %START_TIME%, %DURATION% are
@@ -1750,6 +1750,21 @@ TEST_F(TcpProxyTest, ShareFilterState) {
                 .upstreamFilterState()
                 ->getDataReadOnly<PerConnectionCluster>("envoy.tcp_proxy.cluster")
                 .value());
+}
+
+// Tests that downstream address info is set on upstream filter state.
+TEST_F(TcpProxyTest, SetDownstreamAddressesOnUpstreamFilterState) {
+  setup(1);
+  raiseEventUpstreamConnected(0);
+
+  const auto down_addrs = filter_callbacks_.connection_.streamInfo()
+                              .upstreamFilterState()
+                              ->getDataReadOnly<DownstreamAddrs>(DownstreamAddrs::key());
+  EXPECT_EQ("127.0.0.1", down_addrs.srcAddress());
+  EXPECT_EQ(8080, down_addrs.srcPort());
+  EXPECT_EQ("2.2.2.2", down_addrs.dstAddress());
+  EXPECT_EQ(50001, down_addrs.dstPort());
+  EXPECT_EQ(Network::Address::IpVersion::v4, down_addrs.version());
 }
 
 // Tests that filter callback can access downstream and upstream address and ssl properties.

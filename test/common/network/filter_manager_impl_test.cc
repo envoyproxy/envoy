@@ -32,6 +32,7 @@ using testing::InSequence;
 using testing::Invoke;
 using testing::NiceMock;
 using testing::Return;
+using testing::ReturnRef;
 using testing::WithArgs;
 
 namespace Envoy {
@@ -364,6 +365,8 @@ TEST_F(NetworkFilterManagerTest, RateLimitAndTcpProxy) {
   NiceMock<MockClientConnection> upstream_connection;
   NiceMock<Tcp::ConnectionPool::MockInstance> conn_pool;
   FilterManagerImpl manager(connection_);
+  const auto remote_addr = Network::Utility::resolveUrl("tcp://127.0.0.1:50001");
+  const auto local_addr = Network::Utility::resolveUrl("tcp://127.0.0.1:8080");
 
   std::string rl_yaml = R"EOF(
 domain: foo
@@ -374,6 +377,8 @@ descriptors:
 stat_prefix: name
     )EOF";
 
+  ON_CALL(connection_, remoteAddress()).WillByDefault(ReturnRef(remote_addr));
+  ON_CALL(connection_, localAddress()).WillByDefault(ReturnRef(local_addr));
   ON_CALL(factory_context.runtime_loader_.snapshot_,
           featureEnabled("ratelimit.tcp_filter_enabled", 100))
       .WillByDefault(Return(true));

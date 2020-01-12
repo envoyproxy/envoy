@@ -219,6 +219,27 @@ private:
   const std::string cluster_;
 };
 
+class DownstreamAddrs : public StreamInfo::FilterState::Object {
+public:
+  DownstreamAddrs(absl::string_view src_addr, absl::string_view dst_addr, uint32_t src_port,
+                  uint32_t dst_port, Network::Address::IpVersion version)
+      : src_addr_(src_addr), dst_addr_(dst_addr), src_port_(src_port), dst_port_(dst_port),
+        version_(version) {}
+  const std::string& srcAddress() const { return src_addr_; }
+  const std::string& dstAddress() const { return dst_addr_; }
+  uint32_t srcPort() const { return src_port_; }
+  uint32_t dstPort() const { return dst_port_; }
+  Network::Address::IpVersion version() const { return version_; }
+  static const std::string& key();
+
+private:
+  const std::string src_addr_;
+  const std::string dst_addr_;
+  const uint32_t src_port_;
+  const uint32_t dst_port_;
+  const Network::Address::IpVersion version_;
+};
+
 /**
  * An implementation of a TCP (L3/L4) proxy. This filter will instantiate a new outgoing TCP
  * connection using the defined load balancing proxy for the configured cluster. All data will

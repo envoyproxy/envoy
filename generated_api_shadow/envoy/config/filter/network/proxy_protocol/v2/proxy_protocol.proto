@@ -1,0 +1,28 @@
+syntax = "proto3";
+
+package envoy.config.filter.network.proxy_protocol.v2;
+
+import "udpa/annotations/migrate.proto";
+
+option java_package = "io.envoyproxy.envoy.config.filter.network.proxy_protocol.v2";
+option java_outer_classname = "ProxyProtocolProto";
+option java_multiple_files = true;
+option (udpa.annotations.file_migrate).move_to_package =
+    "envoy.extensions.filters.network.proxy_protocol.v3";
+
+// [#protodoc-title: Proxy Protocol]
+// PROXY protocol network filter.
+// [#extension: envoy.filters.network.proxy_protocol]
+
+message ProxyProtocol {
+  enum Version {
+    // PROXY protocol version 1. Human readable format.
+    V1 = 0;
+
+    // PROXY protocol version 2. Binary format.
+    V2 = 1;
+  }
+
+  // The PROXY protocol version to use. See https://www.haproxy.org/download/2.1/doc/proxy-protocol.txt for details
+  Version version = 1;
+}

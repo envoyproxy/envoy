@@ -32,6 +32,10 @@ const std::string& PerConnectionCluster::key() {
   CONSTRUCT_ON_FIRST_USE(std::string, "envoy.tcp_proxy.cluster");
 }
 
+const std::string& DownstreamAddrs::key() {
+  CONSTRUCT_ON_FIRST_USE(std::string, "envoy.downstream.addresses");
+}
+
 Config::RouteImpl::RouteImpl(
     const Config& parent,
     const envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy::DeprecatedV1::TCPRoute&
@@ -471,6 +475,13 @@ void Filter::onPoolReady(Tcp::ConnectionPool::ConnectionDataPtr&& conn_data,
       conn_data->connection().streamInfo().downstreamSslConnection());
   read_callbacks_->connection().streamInfo().setUpstreamFilterState(
       conn_data->connection().streamInfo().filterState());
+  auto down_remote_addr = read_callbacks_->connection().remoteAddress()->ip();
+  auto down_local_addr = read_callbacks_->connection().localAddress()->ip();
+  auto down_addrs = std::make_unique<DownstreamAddrs>(
+      down_remote_addr->addressAsString(), down_local_addr->addressAsString(),
+      down_remote_addr->port(), down_local_addr->port(), down_remote_addr->version());
+  conn_data->connection().streamInfo().filterState()->setData(
+      down_addrs->key(), std::move(down_addrs), StreamInfo::FilterState::StateType::ReadOnly);
 
   upstream_.reset(new TcpUpstream(std::move(conn_data), *upstream_callbacks_));
   read_callbacks_->upstreamHost(host);

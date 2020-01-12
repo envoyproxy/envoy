@@ -30,6 +30,7 @@ public:
   // ConnectionPool::Instance
   void addDrainedCallback(DrainedCb cb) override;
   void drainConnections() override;
+
   ConnectionPool::Cancellable* newConnection(ConnectionPool::Callbacks& callbacks) override;
 
 protected:
