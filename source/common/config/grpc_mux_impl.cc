@@ -2,8 +2,11 @@
 
 #include <unordered_set>
 
+#include "envoy/config/core/v3alpha/config_source.pb.h"
+#include "envoy/config/grpc_mux.h"
 #include "envoy/service/discovery/v3alpha/discovery.pb.h"
 
+#include "common/config/resources.h"
 #include "common/config/utility.h"
 #include "common/config/version_converter.h"
 #include "common/protobuf/protobuf.h"
@@ -83,7 +86,8 @@ void GrpcMuxImpl::sendDiscoveryRequest(const std::string& type_url) {
 
 GrpcMuxWatchPtr GrpcMuxImpl::subscribe(const std::string& type_url,
                                        const std::set<std::string>& resources,
-                                       GrpcMuxCallbacks& callbacks) {
+                                       GrpcMuxCallbacks& callbacks, bool fallbacked) {
+  std::cout << type_url << std::endl;
   auto watch =
       std::unique_ptr<GrpcMuxWatch>(new GrpcMuxWatchImpl(resources, callbacks, type_url, *this));
   ENVOY_LOG(debug, "gRPC mux subscribe for " + type_url);
@@ -96,6 +100,7 @@ GrpcMuxWatchPtr GrpcMuxImpl::subscribe(const std::string& type_url,
     api_state_[type_url].request_.set_type_url(type_url);
     api_state_[type_url].request_.mutable_node()->MergeFrom(local_info_.node());
     api_state_[type_url].subscribed_ = true;
+    api_state_[type_url].fallbacked_ = fallbacked;
     subscriptions_.emplace_back(type_url);
   }
 
@@ -228,11 +233,25 @@ void GrpcMuxImpl::onStreamEstablished() {
   }
 }
 
-void GrpcMuxImpl::onEstablishmentFailure() {
-  for (const auto& api_state : api_state_) {
+void GrpcMuxImpl::onEstablishmentFailure(bool remote_close) {
+  for (auto& api_state : api_state_) {
+    // check whether attempted type url is alpha version
+    bool is_alpha = false;
+    const auto current_type_url = api_state.second.request_.type_url();
+    if (current_type_url.find(TypeUrl::get().apiVersionString(
+            envoy::config::core::v3alpha::V3ALPHA)) != std::string::npos) {
+      is_alpha = true;
+    }
+
+    // Try to execute fallback to downgrade xDS api version if specified API version is not
+    // supported on management server. It attempts once.
+    bool is_fallback = !api_state.second.fallbacked_ && !remote_close && is_alpha;
     for (auto watch : api_state.second.watches_) {
       watch->callbacks_.onConfigUpdateFailed(
-          Envoy::Config::ConfigUpdateFailureReason::ConnectionFailure, nullptr);
+          Envoy::Config::ConfigUpdateFailureReason::ConnectionFailure, nullptr, is_fallback);
+    }
+    if (is_fallback) {
+      api_state_[current_type_url].paused_ = true;
     }
   }
 }

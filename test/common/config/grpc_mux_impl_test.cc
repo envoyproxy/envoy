@@ -240,6 +240,19 @@ TEST_F(GrpcMuxImplTest, TypeUrlMismatch) {
   expectSendMessage("foo", {}, "");
 }
 
+TEST_F(GrpcMuxImplTest, TypeUrlMismatchOnlyApiVersion) {
+  setup();
+
+  const std::string type_url = "type.googleapis.com/envoy.config.route.v3alpha.RouteConfiguration";
+
+  InSequence s;
+  auto foo_sub = grpc_mux_->subscribe(type_url, {}, callbacks_);
+
+  EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
+  expectSendMessage(type_url, {}, "", true);
+  grpc_mux_->start();
+}
+
 // Validate behavior when watches has an unknown resource name.
 TEST_F(GrpcMuxImplTest, WildcardWatch) {
   setup();

@@ -59,9 +59,11 @@ public:
 
   GrpcMuxSharedPtr getContextForTest() { return context_; }
 
+  void fallback(const std::set<std::string>& resources) override;
+
 private:
   GrpcMuxSharedPtr context_;
-  const std::string type_url_;
+  std::string type_url_;
   SubscriptionCallbacks& callbacks_;
   SubscriptionStats stats_;
   // NOTE: if another subscription of the same type_url has already been started, this value will be

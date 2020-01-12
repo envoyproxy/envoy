@@ -38,7 +38,7 @@ public:
 
   void start() override;
   GrpcMuxWatchPtr subscribe(const std::string& type_url, const std::set<std::string>& resources,
-                            GrpcMuxCallbacks& callbacks) override;
+                            GrpcMuxCallbacks& callbacks, bool fallbacked = false) override;
 
   // GrpcMux
   // TODO(fredlas) PR #8478 will remove this.
@@ -60,7 +60,7 @@ public:
 
   // Config::GrpcStreamCallbacks
   void onStreamEstablished() override;
-  void onEstablishmentFailure() override;
+  void onEstablishmentFailure(bool) override;
   void onDiscoveryResponse(
       std::unique_ptr<envoy::service::discovery::v3alpha::DiscoveryResponse>&& message) override;
   void onWriteable() override;
@@ -116,6 +116,8 @@ private:
     bool pending_{};
     // Has this API been tracked in subscriptions_?
     bool subscribed_{};
+    // Has this api ever downgraded api version?
+    bool fallbacked_{};
   };
 
   // Request queue management logic.
@@ -143,8 +145,8 @@ class NullGrpcMuxImpl : public GrpcMux,
                         GrpcStreamCallbacks<envoy::service::discovery::v3alpha::DiscoveryResponse> {
 public:
   void start() override {}
-  GrpcMuxWatchPtr subscribe(const std::string&, const std::set<std::string>&,
-                            GrpcMuxCallbacks&) override {
+  GrpcMuxWatchPtr subscribe(const std::string&, const std::set<std::string>&, GrpcMuxCallbacks&,
+                            bool) override {
     throw EnvoyException("ADS must be configured to support an ADS config source");
   }
   // TODO(fredlas) PR #8478 will remove this.
@@ -163,7 +165,7 @@ public:
 
   void onWriteable() override {}
   void onStreamEstablished() override {}
-  void onEstablishmentFailure() override {}
+  void onEstablishmentFailure(bool) override {}
   void onDiscoveryResponse(
       std::unique_ptr<envoy::service::discovery::v3alpha::DiscoveryResponse>&&) override {}
 };

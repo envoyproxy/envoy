@@ -29,8 +29,9 @@ public:
   void onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
                       const std::string& version_info) override;
   void onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason reason,
-                            const EnvoyException* e) override;
+                            const EnvoyException* e, bool is_fallback = false) override;
   std::string resourceName(const ProtobufWkt::Any& resource) override;
+  void fallback(const std::set<std::string>& resources) override;
 
 private:
   void disableInitFetchTimeoutTimer();
@@ -38,7 +39,7 @@ private:
   GrpcMuxSharedPtr grpc_mux_;
   SubscriptionCallbacks& callbacks_;
   SubscriptionStats stats_;
-  const std::string type_url_;
+  std::string type_url_;
   GrpcMuxWatchPtr watch_{};
   Event::Dispatcher& dispatcher_;
   std::chrono::milliseconds init_fetch_timeout_;

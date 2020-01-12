@@ -25,6 +25,7 @@
 #include "gtest/gtest.h"
 
 using testing::_;
+using testing::AtLeast;
 using testing::Invoke;
 using testing::Mock;
 using testing::NiceMock;
@@ -35,23 +36,42 @@ namespace Config {
 
 class GrpcSubscriptionTestHarness : public SubscriptionTestHarness {
 public:
-  GrpcSubscriptionTestHarness() : GrpcSubscriptionTestHarness(std::chrono::milliseconds(0)) {}
+  GrpcSubscriptionTestHarness()
+      : GrpcSubscriptionTestHarness(std::chrono::milliseconds(0),
+                                    envoy::config::core::v3alpha::ApiVersion::V2) {}
 
-  GrpcSubscriptionTestHarness(std::chrono::milliseconds init_fetch_timeout)
+  GrpcSubscriptionTestHarness(const envoy::config::core::v3alpha::ApiVersion api_version)
+      : GrpcSubscriptionTestHarness(std::chrono::milliseconds(0), api_version) {}
+
+  GrpcSubscriptionTestHarness(std::chrono::milliseconds init_fetch_timeout,
+                              const envoy::config::core::v3alpha::ApiVersion api_version)
       : method_descriptor_(Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
             "envoy.api.v2.EndpointDiscoveryService.StreamEndpoints")),
         async_client_(new NiceMock<Grpc::MockAsyncClient>()), timer_(new Event::MockTimer()) {
     node_.set_id("fo0");
-    EXPECT_CALL(local_info_, node()).WillOnce(testing::ReturnRef(node_));
+    EXPECT_CALL(local_info_, node()).Times(AtLeast(1)).WillRepeatedly(testing::ReturnRef(node_));
     EXPECT_CALL(dispatcher_, createTimer_(_)).WillOnce(Invoke([this](Event::TimerCb timer_cb) {
       timer_cb_ = timer_cb;
       return timer_;
     }));
-    subscription_ = std::make_unique<GrpcSubscriptionImpl>(
-        local_info_, std::unique_ptr<Grpc::MockAsyncClient>(async_client_), dispatcher_, random_,
-        *method_descriptor_, Config::TypeUrl::get().ClusterLoadAssignment,
-        envoy::config::core::v3alpha::ApiVersion::AUTO, callbacks_, stats_, stats_store_,
-        rate_limit_settings_, init_fetch_timeout, true);
+    switch (api_version) {
+    case envoy::config::core::v3alpha::ApiVersion::V2:
+      subscription_ = std::make_unique<GrpcSubscriptionImpl>(
+          local_info_, std::unique_ptr<Grpc::MockAsyncClient>(async_client_), dispatcher_, random_,
+          *method_descriptor_, Config::TypeUrl::get().ClusterLoadAssignment,
+          envoy::config::core::v3alpha::ApiVersion::AUTO, callbacks_, stats_, stats_store_,
+          rate_limit_settings_, init_fetch_timeout, true);
+      break;
+    case envoy::config::core::v3alpha::ApiVersion::V3ALPHA:
+      subscription_ = std::make_unique<GrpcSubscriptionImpl>(
+          local_info_, std::unique_ptr<Grpc::MockAsyncClient>(async_client_), dispatcher_, random_,
+          *method_descriptor_, Config::TypeUrl::get().ClusterLoadAssignmentV3Alpha,
+          envoy::config::core::v3alpha::ApiVersion::AUTO, callbacks_, stats_, stats_store_,
+          rate_limit_settings_, init_fetch_timeout, true);
+      break;
+    default:
+      NOT_REACHED_GCOVR_EXCL_LINE;
+    }
   }
 
   ~GrpcSubscriptionTestHarness() override { EXPECT_CALL(async_stream_, sendMessageRaw_(_, false)); }

@@ -62,6 +62,8 @@ void HttpSubscriptionImpl::updateResourceInterest(
   request_.mutable_resource_names()->Swap(&resources_vector);
 }
 
+void HttpSubscriptionImpl::fallback(const std::set<std::string>&) {}
+
 // Http::RestApiFetcher
 void HttpSubscriptionImpl::createRequest(Http::Message& request) {
   ENVOY_LOG(debug, "Sending REST request for {}", path_);

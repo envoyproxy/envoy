@@ -41,6 +41,11 @@ void DeltaSubscriptionImpl::updateResourceInterest(
   stats_.update_attempt_.inc();
 }
 
+void DeltaSubscriptionImpl::fallback(const std::set<std::string>& resources) {
+  for (auto a : resources)
+    std::cout << a << std::endl;
+}
+
 // Config::SubscriptionCallbacks
 void DeltaSubscriptionImpl::onConfigUpdate(
     const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,

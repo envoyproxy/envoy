@@ -280,6 +280,7 @@ envoy_cc_test_library(
     deps = [
         "//source/common/config:utility_lib",
         "//test/mocks/stats:stats_mocks",
+        "@envoy_api//envoy/config/core/v3alpha:pkg_cc_proto",
     ],
 )
 

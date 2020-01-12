@@ -89,7 +89,7 @@ void NewGrpcMuxImpl::onStreamEstablished() {
   trySendDiscoveryRequests();
 }
 
-void NewGrpcMuxImpl::onEstablishmentFailure() {
+void NewGrpcMuxImpl::onEstablishmentFailure(bool) {
   // If this happens while Envoy is still initializing, the onConfigUpdateFailed() we ultimately
   // call on CDS will cause LDS to start up, which adds to subscriptions_ here. So, to avoid a
   // crash, the iteration needs to dance around a little: collect pointers to all
@@ -118,7 +118,7 @@ void NewGrpcMuxImpl::kickOffAck(UpdateAck ack) {
 
 // TODO(fredlas) to be removed from the GrpcMux interface very soon.
 GrpcMuxWatchPtr NewGrpcMuxImpl::subscribe(const std::string&, const std::set<std::string>&,
-                                          GrpcMuxCallbacks&) {
+                                          GrpcMuxCallbacks&, bool) {
   NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
 }
 

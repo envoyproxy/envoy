@@ -1,7 +1,10 @@
 #include "common/config/grpc_mux_subscription_impl.h"
 
+#include <iostream>
+
 #include "common/common/assert.h"
 #include "common/common/logger.h"
+#include "common/config/resources.h"
 #include "common/grpc/common.h"
 #include "common/protobuf/protobuf.h"
 #include "common/protobuf/utility.h"
@@ -63,7 +66,7 @@ void GrpcMuxSubscriptionImpl::onConfigUpdate(
 }
 
 void GrpcMuxSubscriptionImpl::onConfigUpdateFailed(ConfigUpdateFailureReason reason,
-                                                   const EnvoyException* e) {
+                                                   const EnvoyException* e, bool is_fallback) {
   switch (reason) {
   case Envoy::Config::ConfigUpdateFailureReason::ConnectionFailure:
     stats_.update_failure_.inc();
@@ -84,6 +87,8 @@ void GrpcMuxSubscriptionImpl::onConfigUpdateFailed(ConfigUpdateFailureReason rea
   }
 
   stats_.update_attempt_.inc();
+  if (is_fallback)
+    std::cout << "fallback flag" << std::endl;
   if (reason == Envoy::Config::ConfigUpdateFailureReason::ConnectionFailure) {
     // New gRPC stream will be established and send requests again.
     // If init_fetch_timeout is non-zero, server will continue startup after it timeout
@@ -91,6 +96,13 @@ void GrpcMuxSubscriptionImpl::onConfigUpdateFailed(ConfigUpdateFailureReason rea
   }
 
   callbacks_.onConfigUpdateFailed(reason, e);
+}
+
+void GrpcMuxSubscriptionImpl::fallback(const std::set<std::string>& resources) {
+  type_url_ = TypeUrl::get().fallback(type_url_);
+  watch_.reset();
+  watch_ = grpc_mux_->subscribe(type_url_, resources, *this, true);
+  stats_.update_attempt_.inc();
 }
 
 std::string GrpcMuxSubscriptionImpl::resourceName(const ProtobufWkt::Any& resource) {

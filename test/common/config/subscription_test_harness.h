@@ -1,5 +1,7 @@
 #pragma once
 
+#include "envoy/config/core/v3alpha/config_source.pb.h"
+
 #include "common/config/utility.h"
 
 #include "test/mocks/stats/mocks.h"

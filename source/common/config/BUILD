@@ -148,6 +148,7 @@ envoy_cc_library(
         "//source/common/common:minimal_logger_lib",
         "//source/common/protobuf",
         "@envoy_api//envoy/api/v2:pkg_cc_proto",
+        "@envoy_api//envoy/config/core/v3alpha:pkg_cc_proto",
         "@envoy_api//envoy/service/discovery/v3alpha:pkg_cc_proto",
     ],
 )
@@ -157,6 +158,7 @@ envoy_cc_library(
     srcs = ["grpc_mux_subscription_impl.cc"],
     hdrs = ["grpc_mux_subscription_impl.h"],
     deps = [
+        ":resources_lib",
         "//include/envoy/config:grpc_mux_interface",
         "//include/envoy/config:subscription_interface",
         "//include/envoy/event:dispatcher_interface",
@@ -280,7 +282,11 @@ envoy_cc_library(
 envoy_cc_library(
     name = "resources_lib",
     hdrs = ["resources.h"],
-    deps = ["//source/common/singleton:const_singleton"],
+    deps = [
+        "//source/common/common:assert_lib",
+        "//source/common/singleton:const_singleton",
+        "@envoy_api//envoy/config/core/v3alpha:pkg_cc_proto",
+    ],
 )
 
 envoy_cc_library(

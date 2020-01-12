@@ -49,6 +49,7 @@ class MockSubscription : public Subscription {
 public:
   MOCK_METHOD1(start, void(const std::set<std::string>& resources));
   MOCK_METHOD1(updateResourceInterest, void(const std::set<std::string>& update_to_these_names));
+  MOCK_METHOD1(fallback, void(const std::set<std::string>& resource_names));
 };
 
 class MockSubscriptionFactory : public SubscriptionFactory {
@@ -80,11 +81,11 @@ public:
   ~MockGrpcMux() override;
 
   MOCK_METHOD0(start, void());
-  MOCK_METHOD3(subscribe_,
+  MOCK_METHOD4(subscribe_,
                GrpcMuxWatch*(const std::string& type_url, const std::set<std::string>& resources,
-                             GrpcMuxCallbacks& callbacks));
+                             GrpcMuxCallbacks& callbacks, bool fallbacked));
   GrpcMuxWatchPtr subscribe(const std::string& type_url, const std::set<std::string>& resources,
-                            GrpcMuxCallbacks& callbacks) override;
+                            GrpcMuxCallbacks& callbacks, bool fallbacked = false) override;
   MOCK_METHOD1(pause, void(const std::string& type_url));
   MOCK_METHOD1(resume, void(const std::string& type_url));
   MOCK_CONST_METHOD1(paused, bool(const std::string& type_url));
@@ -110,8 +111,8 @@ public:
 
   MOCK_METHOD2(onConfigUpdate, void(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
                                     const std::string& version_info));
-  MOCK_METHOD2(onConfigUpdateFailed,
-               void(Envoy::Config::ConfigUpdateFailureReason reason, const EnvoyException* e));
+  MOCK_METHOD3(onConfigUpdateFailed, void(Envoy::Config::ConfigUpdateFailureReason reason,
+                                          const EnvoyException* e, bool is_fallbacked));
   MOCK_METHOD1(resourceName, std::string(const ProtobufWkt::Any& resource));
 };
 
@@ -122,7 +123,7 @@ public:
   ~MockGrpcStreamCallbacks() override;
 
   MOCK_METHOD0(onStreamEstablished, void());
-  MOCK_METHOD0(onEstablishmentFailure, void());
+  MOCK_METHOD1(onEstablishmentFailure, void(bool));
   MOCK_METHOD1(
       onDiscoveryResponse,
       void(std::unique_ptr<envoy::service::discovery::v3alpha::DiscoveryResponse>&& message));

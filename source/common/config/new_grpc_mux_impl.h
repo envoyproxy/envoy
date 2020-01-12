@@ -51,15 +51,15 @@ public:
 
   void onStreamEstablished() override;
 
-  void onEstablishmentFailure() override;
+  void onEstablishmentFailure(bool) override;
 
   void onWriteable() override;
 
   void kickOffAck(UpdateAck ack);
 
   // TODO(fredlas) remove these two from the GrpcMux interface.
-  GrpcMuxWatchPtr subscribe(const std::string&, const std::set<std::string>&,
-                            GrpcMuxCallbacks&) override;
+  GrpcMuxWatchPtr subscribe(const std::string&, const std::set<std::string>&, GrpcMuxCallbacks&,
+                            bool) override;
   void start() override;
 
   struct SubscriptionStuff {

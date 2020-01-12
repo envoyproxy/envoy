@@ -48,7 +48,7 @@ public:
    * @param e supplies any exception data on why the fetch failed. May be nullptr.
    */
   virtual void onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason reason,
-                                    const EnvoyException* e) PURE;
+                                    const EnvoyException* e, bool is_fallback = false) PURE;
 
   /**
    * Obtain the "name" of a v2 API resource in a google.protobuf.Any, e.g. the route config name for
@@ -95,7 +95,7 @@ public:
    */
   virtual GrpcMuxWatchPtr subscribe(const std::string& type_url,
                                     const std::set<std::string>& resources,
-                                    GrpcMuxCallbacks& callbacks) PURE;
+                                    GrpcMuxCallbacks& callbacks, bool fallbacked = false) PURE;
 
   /**
    * Pause discovery requests for a given API type. This is useful when we're processing an update
@@ -156,7 +156,7 @@ public:
    * For the GrpcStream to prompt the context to take appropriate action in response to
    * failure to establish the gRPC stream.
    */
-  virtual void onEstablishmentFailure() PURE;
+  virtual void onEstablishmentFailure(bool remote_close = true) PURE;
 
   /**
    * For the GrpcStream to pass received protos to the context.

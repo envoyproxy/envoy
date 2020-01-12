@@ -80,6 +80,37 @@ TEST_F(GrpcSubscriptionImplTest, RepeatedNonce) {
   EXPECT_TRUE(statsAre(7, 2, 2, 0, 0, 13237225503670494420U));
 }
 
+class GrpcSubscriptionImplTestAlphaVersion : public testing::Test,
+                                             public GrpcSubscriptionTestHarness {
+protected:
+  GrpcSubscriptionImplTestAlphaVersion()
+      : GrpcSubscriptionTestHarness(envoy::config::core::v3alpha::ApiVersion::V3ALPHA) {}
+};
+
+TEST_F(GrpcSubscriptionImplTestAlphaVersion, FallbackSuccess) {
+  InSequence s;
+  EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(nullptr));
+
+  // onConfigUpdateFailed() should not be called for gRPC stream connection failure
+  EXPECT_CALL(callbacks_,
+              onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason::ConnectionFailure, _))
+      .Times(0);
+  EXPECT_CALL(random_, random());
+  EXPECT_CALL(*timer_, enableTimer(_, _));
+  subscription_->start({"cluster0"});
+  EXPECT_TRUE(statsAre(2, 0, 0, 1, 0, 0));
+
+  subscription_->fallback({"cluster0"});
+
+  // Retry and succeed.
+  EXPECT_CALL(*async_client_, startRaw(_, _, _, _)).WillOnce(Return(&async_stream_));
+
+  expectSendMessage({"cluster0"}, "", true);
+  timer_cb_();
+  EXPECT_TRUE(statsAre(3, 0, 0, 1, 0, 0));
+  verifyControlPlaneStats(1);
+}
+
 } // namespace
 } // namespace Config
 } // namespace Envoy

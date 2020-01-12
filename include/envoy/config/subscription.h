@@ -91,6 +91,8 @@ public:
    * be passed to std::set_difference, which must be given sorted collections.
    */
   virtual void updateResourceInterest(const std::set<std::string>& update_to_these_names) PURE;
+
+  virtual void fallback(const std::set<std::string>& resources) PURE;
 };
 
 using SubscriptionPtr = std::unique_ptr<Subscription>;

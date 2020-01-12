@@ -52,7 +52,7 @@ public:
     stream_ = async_client_->start(service_method_, *this, Http::AsyncClient::StreamOptions());
     if (stream_ == nullptr) {
       ENVOY_LOG(warn, "Unable to establish new stream");
-      callbacks_->onEstablishmentFailure();
+      callbacks_->onEstablishmentFailure(false);
       setRetryTimer();
       return;
     }

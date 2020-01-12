@@ -38,6 +38,10 @@ public:
     grpc_mux_subscription_.updateResourceInterest(update_to_these_names);
   }
 
+  void fallback(const std::set<std::string>& resources) override {
+    grpc_mux_subscription_.fallback(resources);
+  }
+
   std::shared_ptr<Config::GrpcMuxImpl> grpcMux() { return grpc_mux_; }
 
 private:
