@@ -160,7 +160,7 @@ the benefit of avoiding mutex contention when there are large numbers of threads
 ### Symbol Table Memory Layout
 
 Below is a diagram
-([source](https://docs.google.com/drawings/d/1eG6CHSUFQ5zkk-j-kcFCUay2-D_ktF39Tbzql5ypUDc/edit))
+[(source)](https://docs.google.com/drawings/d/1eG6CHSUFQ5zkk-j-kcFCUay2-D_ktF39Tbzql5ypUDc/edit)
 showing the memory layout for a few scenarios of constructing and joining symbolized
 `StatName` and dynamic `StatName`.
 
