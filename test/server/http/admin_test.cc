@@ -1004,15 +1004,19 @@ TEST_P(AdminInstanceTest, ConfigDumpFiltersByMask) {
 
 ProtobufTypes::MessagePtr testDumpClustersConfig() {
   auto msg = std::make_unique<envoy::admin::v3alpha::ClustersConfigDump>();
-  auto static_cluster = msg->add_static_clusters();
+  auto* static_cluster = msg->add_static_clusters();
   envoy::config::cluster::v3alpha::Cluster inner_cluster;
   inner_cluster.set_name("foo");
   inner_cluster.set_ignore_health_on_host_removal(true);
   static_cluster->mutable_cluster()->PackFrom(inner_cluster);
 
-  auto dyn_cluster = msg->add_dynamic_active_clusters();
+  auto* dyn_cluster = msg->add_dynamic_active_clusters();
+  dyn_cluster->set_version_info("baz");
+  dyn_cluster->mutable_last_updated()->set_seconds(5);
   envoy::config::cluster::v3alpha::Cluster inner_dyn_cluster;
   inner_dyn_cluster.set_name("bar");
+  inner_dyn_cluster.set_ignore_health_on_host_removal(true);
+  inner_dyn_cluster.mutable_http2_protocol_options()->set_allow_connect(true);
   dyn_cluster->mutable_cluster()->PackFrom(inner_dyn_cluster);
   return msg;
 }
@@ -1026,16 +1030,21 @@ TEST_P(AdminInstanceTest, ConfigDumpFiltersByResourceAndMask) {
   const std::string expected_json = R"EOF({
  "configs": [
   {
-   "@type": "type.googleapis.com/envoy.admin.v3alpha.ClustersConfigDump.StaticCluster",
+   "@type": "type.googleapis.com/envoy.admin.v3alpha.ClustersConfigDump.DynamicCluster",
+   "version_info": "baz",
    "cluster": {
     "@type": "type.googleapis.com/envoy.config.cluster.v3alpha.Cluster",
-    "name": "foo"
+    "name": "bar",
+    "http2_protocol_options": {
+     "allow_connect": true
+    }
    }
   }
  ]
 }
 )EOF";
-  EXPECT_EQ(Http::Code::OK, getCallback("/config_dump?resource=static_clusters&mask=cluster.name",
+  EXPECT_EQ(Http::Code::OK, getCallback("/config_dump?resource=dynamic_active_clusters&mask="
+                                        "cluster.name,version_info,cluster.http2_protocol_options",
                                         header_map, response));
   std::string output = response.toString();
   EXPECT_EQ(expected_json, output);
