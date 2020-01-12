@@ -45,7 +45,7 @@ VhdsSubscription::VhdsSubscription(RouteConfigUpdatePtr& config_update_info,
   subscription_ =
       factory_context.clusterManager().subscriptionFactory().subscriptionFromConfigSource(
           config_update_info_->routeConfiguration().vhds().config_source(),
-          Grpc::Common::typeUrl(API_NO_BOOST(resource_name)), *scope_, *this);
+          Grpc::Common::typeUrl(API_NO_BOOST(type_url)), *scope_, *this);
 }
 
 void VhdsSubscription::onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason reason,

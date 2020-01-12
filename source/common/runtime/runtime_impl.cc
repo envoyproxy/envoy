@@ -596,7 +596,7 @@ void RtdsSubscription::start() {
   const auto type_url =
       Envoy::Config::loadTypeUrl<RtdsSubscription>(config_source_.resource_api_version());
   subscription_ = parent_.cm_->subscriptionFactory().subscriptionFromConfigSource(
-      config_source_, Grpc::Common::typeUrl(API_NO_BOOST(resource_name)), store_, *this);
+      config_source_, Grpc::Common::typeUrl(API_NO_BOOST(type_url)), store_, *this);
   subscription_->start({resource_name_});
 }
 

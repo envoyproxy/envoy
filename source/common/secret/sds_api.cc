@@ -88,7 +88,7 @@ void SdsApi::validateUpdateSize(int num_resources) {
 void SdsApi::initialize() {
   const auto type_url = Envoy::Config::loadTypeUrl<SdsApi>(sds_config_.resource_api_version());
   subscription_ = subscription_factory_.subscriptionFromConfigSource(
-      sds_config_, Grpc::Common::typeUrl(API_NO_BOOST(resource_name)), stats_, *this);
+      sds_config_, Grpc::Common::typeUrl(API_NO_BOOST(type_url)), stats_, *this);
   subscription_->start({sds_config_name_});
 }
 

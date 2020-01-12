@@ -36,7 +36,7 @@ CdsApiImpl::CdsApiImpl(const envoy::config::core::v3alpha::ConfigSource& cds_con
       validation_visitor_(validation_visitor) {
   const auto type_url = Envoy::Config::loadTypeUrl<CdsApiImpl>(cds_config.resource_api_version());
   subscription_ = cm_.subscriptionFactory().subscriptionFromConfigSource(
-      cds_config, Grpc::Common::typeUrl(API_NO_BOOST(resource_name)), *scope_, *this);
+      cds_config, Grpc::Common::typeUrl(API_NO_BOOST(type_url)), *scope_, *this);
 }
 
 void CdsApiImpl::onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,

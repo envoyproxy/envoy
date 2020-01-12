@@ -40,8 +40,7 @@ EdsClusterImpl::EdsClusterImpl(
       cluster.eds_cluster_config().eds_config().resource_api_version());
   subscription_ =
       factory_context.clusterManager().subscriptionFactory().subscriptionFromConfigSource(
-          eds_config, Grpc::Common::typeUrl(API_NO_BOOST(resource_name)), info_->statsScope(),
-          *this);
+          eds_config, Grpc::Common::typeUrl(API_NO_BOOST(type_url)), info_->statsScope(), *this);
 }
 
 void EdsClusterImpl::startPreInit() { subscription_->start({cluster_name_}); }

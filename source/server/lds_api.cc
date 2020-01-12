@@ -32,7 +32,7 @@ LdsApiImpl::LdsApiImpl(const envoy::config::core::v3alpha::ConfigSource& lds_con
       validation_visitor_(validation_visitor) {
   const auto type_url = Envoy::Config::loadTypeUrl<LdsApiImpl>(lds_config.resource_api_version());
   subscription_ = cm.subscriptionFactory().subscriptionFromConfigSource(
-      lds_config, Grpc::Common::typeUrl(API_NO_BOOST(resource_name)), *scope_, *this);
+      lds_config, Grpc::Common::typeUrl(API_NO_BOOST(type_url)), *scope_, *this);
   init_manager.add(init_target_);
 }
 
