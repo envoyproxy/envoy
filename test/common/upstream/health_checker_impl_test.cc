@@ -1080,7 +1080,8 @@ TEST_F(HttpHealthCheckerImplTest, TlsOptions) {
     unhealthy_threshold: 2
     healthy_threshold: 2
     http_health_check:
-      service_name: locations
+      service_name_matcher:
+        prefix: locations
       path: /healthcheck
     tls_options:
       alpn_protocols:
