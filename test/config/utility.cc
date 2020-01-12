@@ -348,10 +348,11 @@ ConfigHelper::ConfigHelper(const Network::Address::IpVersion version, Api::Api& 
 
   for (int i = 0; i < static_resources->clusters_size(); ++i) {
     auto* cluster = static_resources->mutable_clusters(i);
-    if (!cluster->hosts().empty()) {
-      for (int j = 0; j < cluster->hosts().size(); j++) {
-        if (cluster->mutable_hosts(j)->has_socket_address()) {
-          auto host_socket_addr = cluster->mutable_hosts(j)->mutable_socket_address();
+    if (!cluster->hidden_envoy_deprecated_hosts().empty()) {
+      for (int j = 0; j < cluster->hidden_envoy_deprecated_hosts().size(); j++) {
+        if (cluster->mutable_hidden_envoy_deprecated_hosts(j)->has_socket_address()) {
+          auto host_socket_addr =
+              cluster->mutable_hidden_envoy_deprecated_hosts(j)->mutable_socket_address();
           host_socket_addr->set_address(Network::Test::getLoopbackAddressString(version));
         }
       }
@@ -417,9 +418,10 @@ void ConfigHelper::finalize(const std::vector<uint32_t>& ports) {
     } else if (cluster->has_cluster_type()) {
       custom_cluster = true;
     } else {
-      for (int j = 0; j < cluster->hosts_size(); ++j) {
-        if (cluster->mutable_hosts(j)->has_socket_address()) {
-          auto* host_socket_addr = cluster->mutable_hosts(j)->mutable_socket_address();
+      for (int j = 0; j < cluster->hidden_envoy_deprecated_hosts_size(); ++j) {
+        if (cluster->mutable_hidden_envoy_deprecated_hosts(j)->has_socket_address()) {
+          auto* host_socket_addr =
+              cluster->mutable_hidden_envoy_deprecated_hosts(j)->mutable_socket_address();
           RELEASE_ASSERT(ports.size() > port_idx, "");
           host_socket_addr->set_port_value(ports[port_idx++]);
         }

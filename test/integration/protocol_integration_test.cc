@@ -345,7 +345,7 @@ TEST_P(DownstreamProtocolIntegrationTest, RetryPriority) {
     auto cluster = bootstrap.mutable_static_resources()->mutable_clusters(0);
     auto load_assignment = cluster->mutable_load_assignment();
     load_assignment->set_cluster_name(cluster->name());
-    const auto& host_address = cluster->hosts(0).socket_address().address();
+    const auto& host_address = cluster->hidden_envoy_deprecated_hosts(0).socket_address().address();
 
     for (int i = 0; i < 2; ++i) {
       auto locality = load_assignment->add_endpoints();
@@ -360,7 +360,7 @@ TEST_P(DownstreamProtocolIntegrationTest, RetryPriority) {
           0);
     }
 
-    cluster->clear_hosts();
+    cluster->clear_hidden_envoy_deprecated_hosts();
   });
 
   fake_upstreams_count_ = 2;
@@ -417,8 +417,10 @@ TEST_P(DownstreamProtocolIntegrationTest, RetryHostPredicateFilter) {
 
   // We want to work with a cluster with two hosts.
   config_helper_.addConfigModifier([](envoy::config::bootstrap::v3alpha::Bootstrap& bootstrap) {
-    auto* new_host = bootstrap.mutable_static_resources()->mutable_clusters(0)->add_hosts();
-    new_host->MergeFrom(bootstrap.static_resources().clusters(0).hosts(0));
+    auto* new_host = bootstrap.mutable_static_resources()
+                         ->mutable_clusters(0)
+                         ->add_hidden_envoy_deprecated_hosts();
+    new_host->MergeFrom(bootstrap.static_resources().clusters(0).hidden_envoy_deprecated_hosts(0));
   });
   fake_upstreams_count_ = 2;
   initialize();

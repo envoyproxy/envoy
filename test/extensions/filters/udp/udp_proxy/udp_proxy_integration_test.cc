@@ -59,9 +59,11 @@ public:
       config_helper_.addConfigModifier(
           [upstream_count](envoy::config::bootstrap::v3alpha::Bootstrap& bootstrap) {
             for (uint32_t i = 1; i < upstream_count; i++) {
-              auto* new_host =
-                  bootstrap.mutable_static_resources()->mutable_clusters(0)->add_hosts();
-              new_host->MergeFrom(bootstrap.static_resources().clusters(0).hosts(0));
+              auto* new_host = bootstrap.mutable_static_resources()
+                                   ->mutable_clusters(0)
+                                   ->add_hidden_envoy_deprecated_hosts();
+              new_host->MergeFrom(
+                  bootstrap.static_resources().clusters(0).hidden_envoy_deprecated_hosts(0));
             }
           });
     }

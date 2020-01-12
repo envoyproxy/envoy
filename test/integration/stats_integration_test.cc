@@ -193,7 +193,7 @@ private:
       for (int i = 0; i < num_clusters; ++i) {
         auto* cluster = bootstrap.mutable_static_resources()->mutable_clusters(i);
         for (int j = 0; j < num_hosts; ++j) {
-          auto* host = cluster->add_hosts();
+          auto* host = cluster->add_hidden_envoy_deprecated_hosts();
           auto* socket_address = host->mutable_socket_address();
           socket_address->set_protocol(envoy::config::core::v3alpha::SocketAddress::TCP);
           socket_address->set_address("0.0.0.0");

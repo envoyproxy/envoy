@@ -551,7 +551,7 @@ message Cluster {
   //   **This field is deprecated**. Set the
   //   :ref:`load_assignment<envoy_api_field_Cluster.load_assignment>` field instead.
   //
-  repeated core.Address hosts = 7;
+  repeated core.Address hosts = 7 [deprecated = true];
 
   // Setting this is required for specifying members of
   // :ref:`STATIC<envoy_api_enum_value_Cluster.DiscoveryType.STATIC>`,

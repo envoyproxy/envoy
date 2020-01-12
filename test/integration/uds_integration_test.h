@@ -34,9 +34,9 @@ public:
           auto* static_resources = bootstrap.mutable_static_resources();
           for (int i = 0; i < static_resources->clusters_size(); ++i) {
             auto* cluster = static_resources->mutable_clusters(i);
-            for (int j = 0; j < cluster->hosts_size(); ++j) {
-              cluster->mutable_hosts(j)->clear_socket_address();
-              cluster->mutable_hosts(j)->mutable_pipe()->set_path(
+            for (int j = 0; j < cluster->hidden_envoy_deprecated_hosts_size(); ++j) {
+              cluster->mutable_hidden_envoy_deprecated_hosts(j)->clear_socket_address();
+              cluster->mutable_hidden_envoy_deprecated_hosts(j)->mutable_pipe()->set_path(
                   TestEnvironment::unixDomainSocketPath("udstest.1.sock", abstract_namespace_));
             }
           }

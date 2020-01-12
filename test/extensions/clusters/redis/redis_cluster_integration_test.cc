@@ -149,9 +149,10 @@ public:
           uint32_t upstream_idx = 0;
           auto* cluster_0 = bootstrap.mutable_static_resources()->mutable_clusters(0);
 
-          for (int j = 0; j < cluster_0->hosts_size(); ++j) {
-            if (cluster_0->mutable_hosts(j)->has_socket_address()) {
-              auto* host_socket_addr = cluster_0->mutable_hosts(j)->mutable_socket_address();
+          for (int j = 0; j < cluster_0->hidden_envoy_deprecated_hosts_size(); ++j) {
+            if (cluster_0->mutable_hidden_envoy_deprecated_hosts(j)->has_socket_address()) {
+              auto* host_socket_addr =
+                  cluster_0->mutable_hidden_envoy_deprecated_hosts(j)->mutable_socket_address();
               RELEASE_ASSERT(fake_upstreams_.size() > upstream_idx, "");
               host_socket_addr->set_address(
                   fake_upstreams_[upstream_idx]->localAddress()->ip()->addressAsString());

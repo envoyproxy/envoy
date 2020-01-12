@@ -154,7 +154,7 @@ void HdsDelegate::processMessage(
     // Add endpoints to cluster
     for (const auto& locality_endpoints : cluster_health_check.locality_endpoints()) {
       for (const auto& endpoint : locality_endpoints.endpoints()) {
-        cluster_config.add_hosts()->MergeFrom(endpoint.address());
+        cluster_config.add_hidden_envoy_deprecated_hosts()->MergeFrom(endpoint.address());
       }
     }
 
@@ -231,7 +231,7 @@ HdsCluster::HdsCluster(Server::Admin& admin, Runtime::Loader& runtime,
       {admin, runtime_, cluster_, bind_config_, stats_, ssl_context_manager_, added_via_api_, cm,
        local_info, dispatcher, random, singleton_manager, tls, validation_visitor, api});
 
-  for (const auto& host : cluster.hosts()) {
+  for (const auto& host : cluster.hidden_envoy_deprecated_hosts()) {
     initial_hosts_->emplace_back(new HostImpl(
         info_, "", Network::Address::resolveProtoAddress(host),
         envoy::config::core::v3alpha::Metadata::default_instance(), 1,

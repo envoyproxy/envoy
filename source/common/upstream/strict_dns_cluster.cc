@@ -24,8 +24,9 @@ StrictDnsClusterImpl::StrictDnsClusterImpl(
 
   std::list<ResolveTargetPtr> resolve_targets;
   const envoy::config::endpoint::v3alpha::ClusterLoadAssignment load_assignment(
-      cluster.has_load_assignment() ? cluster.load_assignment()
-                                    : Config::Utility::translateClusterHosts(cluster.hosts()));
+      cluster.has_load_assignment()
+          ? cluster.load_assignment()
+          : Config::Utility::translateClusterHosts(cluster.hidden_envoy_deprecated_hosts()));
   const auto& locality_lb_endpoints = load_assignment.endpoints();
   for (const auto& locality_lb_endpoint : locality_lb_endpoints) {
     validateEndpointsForZoneAwareRouting(locality_lb_endpoint);
