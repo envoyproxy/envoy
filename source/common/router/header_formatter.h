@@ -56,9 +56,9 @@ public:
 
 private:
   FieldExtractor field_extractor_;
+  const bool append_;
   std::unordered_map<std::string, std::vector<Envoy::AccessLog::FormatterProviderPtr>>
       start_time_formatters_;
-  const bool append_ : 1;
 };
 
 /**
@@ -77,7 +77,7 @@ public:
 
 private:
   const std::string static_value_;
-  const bool append_ : 1;
+  const bool append_;
 };
 
 /**
@@ -101,7 +101,7 @@ public:
 
 private:
   const std::vector<HeaderFormatterPtr> formatters_;
-  const bool append_ : 1;
+  const bool append_;
 };
 
 } // namespace Router
