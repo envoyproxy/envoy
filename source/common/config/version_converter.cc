@@ -203,7 +203,8 @@ VersionConverter::getJsonStringFromMessage(const Protobuf::Message& message,
   std::string json;
   Protobuf::util::JsonPrintOptions json_options;
   json_options.preserve_proto_field_names = true;
-  const auto status = Protobuf::util::MessageToJsonString(*dynamic_message->msg_, &json, json_options);
+  const auto status =
+      Protobuf::util::MessageToJsonString(*dynamic_message->msg_, &json, json_options);
   // This should always succeed unless something crash-worthy such as out-of-memory.
   RELEASE_ASSERT(status.ok(), "");
   return json;

@@ -80,7 +80,8 @@ void HdsDelegate::establishNewStream() {
     return;
   }
 
-  Config::VersionConverter::prepareMessageForGrpcWire(health_check_request_, transport_api_version_);
+  Config::VersionConverter::prepareMessageForGrpcWire(health_check_request_,
+                                                      transport_api_version_);
   ENVOY_LOG(debug, "Sending HealthCheckRequest {} ", health_check_request_.DebugString());
   stream_->sendMessage(health_check_request_, false);
   stats_.responses_.inc();
