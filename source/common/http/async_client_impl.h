@@ -83,6 +83,12 @@ public:
   AsyncStreamImpl(AsyncClientImpl& parent, AsyncClient::StreamCallbacks& callbacks,
                   const AsyncClient::StreamOptions& options);
 
+  // Http::StreamDecoderFilterCallbacks
+  void requestRouteConfigUpdate(Http::RouteConfigUpdatedCallbackSharedPtr) override {
+    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+  }
+  absl::optional<Router::ConfigConstSharedPtr> routeConfig() override { return {}; }
+
   // Http::AsyncClient::Stream
   void sendHeaders(HeaderMap& headers, bool end_stream) override;
   void sendData(Buffer::Instance& data, bool end_stream) override;
@@ -266,6 +272,7 @@ private:
     Router::InternalRedirectAction internalRedirectAction() const override {
       return Router::InternalRedirectAction::PassThrough;
     }
+    uint32_t maxInternalRedirects() const override { return 1; }
     const std::string& routeName() const override { return route_name_; }
     std::unique_ptr<const HashPolicyImpl> hash_policy_;
     static const NullHedgePolicy hedge_policy_;

@@ -71,7 +71,9 @@ envoy_cc_test(
     srcs = ["api_version_integration_test.cc"],
     deps = [
         ":http_integration_lib",
+        "@envoy_api//envoy/api/v2:pkg_cc_proto",
         "@envoy_api//envoy/api/v2/core:pkg_cc_proto",
+        "@envoy_api//envoy/service/discovery/v3alpha:pkg_cc_proto",
     ],
 )
 
@@ -419,6 +421,7 @@ envoy_cc_test_library(
         ":test_host_predicate_lib",
         "//include/envoy/event:timer_interface",
         "//source/common/common:thread_annotations",
+        "//source/extensions/filters/http/on_demand:config",
         "//source/extensions/filters/http/router:config",
         "//source/extensions/filters/network/http_connection_manager:config",
         "//test/common/upstream:utility_lib",

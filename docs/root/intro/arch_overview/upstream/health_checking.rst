@@ -146,12 +146,12 @@ then come back with the same IP address, but as a different host type. One solut
 is having a different HTTP health checking URL for every service type. The downside of that approach
 is that overall configuration becomes more complicated as every health check URL is fully custom.
 
-The Envoy HTTP health checker supports the :ref:`service_name
-<envoy_api_field_core.HealthCheck.HttpHealthCheck.service_name>` option. If this option is set, the health checker
-additionally compares the value of the *x-envoy-upstream-healthchecked-cluster* response header to
-*service_name*. If the values do not match, the health check does not pass. The upstream health
-check filter appends *x-envoy-upstream-healthchecked-cluster* to the response headers. The appended
-value is determined by the :option:`--service-cluster` command line option.
+The Envoy HTTP health checker supports the :ref:`service_name_matcher
+<envoy_api_field_core.HealthCheck.HttpHealthCheck.service_name_matcher>` option. If this option is set,
+the health checker additionally compares the value of the *x-envoy-upstream-healthchecked-cluster* 
+response header to *service_name_matcher*. If the values do not match, the health check does not pass.
+The upstream health check filter appends *x-envoy-upstream-healthchecked-cluster* to the response headers.
+The appended value is determined by the :option:`--service-cluster` command line option.
 
 .. _arch_overview_health_checking_degraded:
 

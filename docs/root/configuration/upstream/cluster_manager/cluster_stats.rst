@@ -169,6 +169,21 @@ Circuit breakers statistics will be rooted at *cluster.<name>.circuit_breakers.<
   remaining_rq, Gauge, Number of remaining requests until the circuit breaker opens
   remaining_retries, Gauge, Number of remaining retries until the circuit breaker opens
 
+.. _config_cluster_manager_cluster_stats_timeout_budgets:
+
+Timeout budget statistics
+-------------------------
+
+If :ref:`timeout budget statistic tracking <envoy_api_field_Cluster.track_timeout_budgets>` is
+turned on, statistics will be added to *cluster.<name>* and contain the following:
+
+.. csv-table::
+   :header: Name, Type, Description
+   :widths: 1, 1, 2
+
+   upstream_rq_timeout_budget_percent_used, Histogram, What percentage of the global timeout was used waiting for a response
+   upstream_rq_timeout_budget_per_try_percent_used, Histogram, What percentage of the per try timeout was used waiting for a response
+
 .. _config_cluster_manager_cluster_stats_dynamic_http:
 
 Dynamic HTTP statistics

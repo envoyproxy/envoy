@@ -74,6 +74,10 @@ void ActiveQuicListener::onData(Network::UdpRecvData& data) {
   quic_dispatcher_->ProcessPacket(self_address, peer_address, packet);
 }
 
+void ActiveQuicListener::onReadReady() {
+  quic_dispatcher_->ProcessBufferedChlos(kNumSessionsToCreatePerLoop);
+}
+
 void ActiveQuicListener::onWriteReady(const Network::Socket& /*socket*/) {
   quic_dispatcher_->OnCanWrite();
 }

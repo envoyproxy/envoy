@@ -73,8 +73,8 @@ SubscriptionPtr SubscriptionFactoryImpl::subscriptionFromConfigSource(
               Config::Utility::factoryForGrpcApiConfigSource(cm_.grpcAsyncClientManager(),
                                                              api_config_source, scope)
                   ->create(),
-              dispatcher_, deltaGrpcMethod(type_url), random_, scope,
-              Utility::parseRateLimitSettings(api_config_source), local_info_),
+              dispatcher_, deltaGrpcMethod(type_url), api_config_source.transport_api_version(),
+              random_, scope, Utility::parseRateLimitSettings(api_config_source), local_info_),
           type_url, callbacks, stats, Utility::configSourceInitialFetchTimeout(config), false);
     }
     default:

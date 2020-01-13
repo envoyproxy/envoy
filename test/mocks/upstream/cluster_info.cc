@@ -40,6 +40,8 @@ MockClusterInfo::MockClusterInfo()
     : stats_(ClusterInfoImpl::generateStats(stats_store_)),
       transport_socket_matcher_(new NiceMock<Upstream::MockTransportSocketMatcher>()),
       load_report_stats_(ClusterInfoImpl::generateLoadReportStats(load_report_stats_store_)),
+      timeout_budget_stats_(absl::make_optional<ClusterTimeoutBudgetStats>(
+          ClusterInfoImpl::generateTimeoutBudgetStats(timeout_budget_stats_store_))),
       circuit_breakers_stats_(
           ClusterInfoImpl::generateCircuitBreakersStats(stats_store_, "default", true)),
       resource_manager_(new Upstream::ResourceManagerImpl(
@@ -65,6 +67,7 @@ MockClusterInfo::MockClusterInfo()
       .WillByDefault(
           Invoke([this]() -> TransportSocketMatcher& { return *transport_socket_matcher_; }));
   ON_CALL(*this, loadReportStats()).WillByDefault(ReturnRef(load_report_stats_));
+  ON_CALL(*this, timeoutBudgetStats()).WillByDefault(ReturnRef(timeout_budget_stats_));
   ON_CALL(*this, sourceAddress()).WillByDefault(ReturnRef(source_address_));
   ON_CALL(*this, resourceManager(_))
       .WillByDefault(Invoke(

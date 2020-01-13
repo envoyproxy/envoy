@@ -113,8 +113,15 @@ HttpHealthCheckerImpl::HttpHealthCheckerImpl(
           codecClientType(config.http_health_check().hidden_envoy_deprecated_use_http2()
                               ? envoy::type::v3alpha::HTTP2
                               : config.http_health_check().codec_client_type())) {
-  if (!config.http_health_check().service_name().empty()) {
-    service_name_ = config.http_health_check().service_name();
+  // The deprecated service_name field was previously being used to compare with the health checked
+  // cluster name using a StartsWith comparison. Since StartsWith is essentially a prefix
+  // comparison, representing the intent by using a StringMatcher prefix is a more natural way.
+  if (!config.http_health_check().hidden_envoy_deprecated_service_name().empty()) {
+    envoy::type::matcher::v3alpha::StringMatcher matcher;
+    matcher.set_prefix(config.http_health_check().hidden_envoy_deprecated_service_name());
+    service_name_matcher_.emplace(matcher);
+  } else if (config.http_health_check().has_service_name_matcher()) {
+    service_name_matcher_.emplace(config.http_health_check().service_name_matcher());
   }
 }
 
@@ -263,7 +270,7 @@ HttpHealthCheckerImpl::HttpActiveHealthCheckSession::healthCheckResult() {
 
   const auto degraded = response_headers_->EnvoyDegraded() != nullptr;
 
-  if (parent_.service_name_ &&
+  if (parent_.service_name_matcher_.has_value() &&
       parent_.runtime_.snapshot().featureEnabled("health_check.verify_cluster", 100UL)) {
     parent_.stats_.verify_cluster_.inc();
     std::string service_cluster_healthchecked =
@@ -271,8 +278,7 @@ HttpHealthCheckerImpl::HttpActiveHealthCheckSession::healthCheckResult() {
             ? std::string(
                   response_headers_->EnvoyUpstreamHealthCheckedCluster()->value().getStringView())
             : EMPTY_STRING;
-
-    if (absl::StartsWith(service_cluster_healthchecked, parent_.service_name_.value())) {
+    if (parent_.service_name_matcher_->match(service_cluster_healthchecked)) {
       return degraded ? HealthCheckResult::Degraded : HealthCheckResult::Succeeded;
     } else {
       return HealthCheckResult::Failed;

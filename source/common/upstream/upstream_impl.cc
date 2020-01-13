@@ -594,6 +594,10 @@ ClusterLoadReportStats ClusterInfoImpl::generateLoadReportStats(Stats::Scope& sc
   return {ALL_CLUSTER_LOAD_REPORT_STATS(POOL_COUNTER(scope))};
 }
 
+ClusterTimeoutBudgetStats ClusterInfoImpl::generateTimeoutBudgetStats(Stats::Scope& scope) {
+  return {ALL_CLUSTER_TIMEOUT_BUDGET_STATS(POOL_HISTOGRAM(scope))};
+}
+
 // Implements the FactoryContext interface required by network filters.
 class FactoryContextImpl : public Server::Configuration::CommonFactoryContext {
 public:
@@ -651,6 +655,10 @@ ClusterInfoImpl::ClusterInfoImpl(
       socket_matcher_(std::move(socket_matcher)), stats_scope_(std::move(stats_scope)),
       stats_(generateStats(*stats_scope_)), load_report_stats_store_(stats_scope_->symbolTable()),
       load_report_stats_(generateLoadReportStats(load_report_stats_store_)),
+      timeout_budget_stats_(config.track_timeout_budgets()
+                                ? absl::make_optional<ClusterTimeoutBudgetStats>(
+                                      generateTimeoutBudgetStats(*stats_scope_))
+                                : absl::nullopt),
       features_(parseFeatures(config)),
       http1_settings_(Http::Utility::parseHttp1Settings(config.http_protocol_options())),
       http2_settings_(Http::Utility::parseHttp2Settings(config.http2_protocol_options())),

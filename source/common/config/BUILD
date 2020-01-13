@@ -172,6 +172,7 @@ envoy_cc_library(
         ":delta_subscription_state_lib",
         ":grpc_stream_lib",
         ":pausable_ack_queue_lib",
+        ":version_converter_lib",
         ":watch_map_lib",
         "//include/envoy/event:dispatcher_interface",
         "//include/envoy/grpc:async_client_interface",
@@ -189,6 +190,7 @@ envoy_cc_library(
     ],
     deps = [
         ":api_version_lib",
+        ":version_converter_lib",
         "//include/envoy/config:subscription_interface",
         "//include/envoy/event:dispatcher_interface",
         "//source/common/buffer:buffer_lib",
@@ -350,6 +352,7 @@ envoy_cc_library(
     deps = [
         ":api_type_oracle_lib",
         "//source/common/protobuf",
+        "@envoy_api//envoy/config/core/v3alpha:pkg_cc_proto",
     ],
 )
 

@@ -1,4 +1,6 @@
 #include "envoy/api/v2/core/config_source.pb.h"
+#include "envoy/api/v2/discovery.pb.validate.h"
+#include "envoy/service/discovery/v3alpha/discovery.pb.validate.h"
 
 #include "common/common/assert.h"
 
@@ -117,6 +119,7 @@ public:
       case envoy::config::core::v3alpha::ApiConfigSource::GRPC: {
         API_NO_BOOST(envoy::api::v2::DiscoveryRequest) discovery_request;
         VERIFY_ASSERTION(xds_stream_->waitForGrpcMessage(*dispatcher_, discovery_request));
+        EXPECT_TRUE(!Config::VersionUtil::hasHiddenEnvoyDeprecated(discovery_request));
         xds_stream_->startGrpcStream();
         actual_type_url = discovery_request.type_url();
         expected_endpoint = ads() ? ads_v2_sotw_endpoint : expected_v2_sotw_endpoint;
@@ -125,6 +128,7 @@ public:
       case envoy::config::core::v3alpha::ApiConfigSource::DELTA_GRPC: {
         API_NO_BOOST(envoy::api::v2::DeltaDiscoveryRequest) delta_discovery_request;
         VERIFY_ASSERTION(xds_stream_->waitForGrpcMessage(*dispatcher_, delta_discovery_request));
+        EXPECT_TRUE(!Config::VersionUtil::hasHiddenEnvoyDeprecated(delta_discovery_request));
         xds_stream_->startGrpcStream();
         actual_type_url = delta_discovery_request.type_url();
         expected_endpoint = expected_v2_delta_endpoint;
@@ -148,21 +152,24 @@ public:
     case envoy::config::core::v3alpha::ApiVersion::V3ALPHA: {
       switch (apiType()) {
       case envoy::config::core::v3alpha::ApiConfigSource::GRPC: {
-        API_NO_BOOST(envoy::api::v2::DiscoveryRequest) discovery_request;
+        API_NO_BOOST(envoy::service::discovery::v3alpha::DiscoveryRequest) discovery_request;
         VERIFY_ASSERTION(xds_stream_->waitForGrpcMessage(*dispatcher_, discovery_request));
+        EXPECT_TRUE(!Config::VersionUtil::hasHiddenEnvoyDeprecated(discovery_request));
         actual_type_url = discovery_request.type_url();
         expected_endpoint = ads() ? ads_v3alpha_delta_endpoint : expected_v3alpha_sotw_endpoint;
         break;
       }
       case envoy::config::core::v3alpha::ApiConfigSource::DELTA_GRPC: {
-        API_NO_BOOST(envoy::api::v2::DeltaDiscoveryRequest) delta_discovery_request;
+        API_NO_BOOST(envoy::service::discovery::v3alpha::DeltaDiscoveryRequest)
+        delta_discovery_request;
         VERIFY_ASSERTION(xds_stream_->waitForGrpcMessage(*dispatcher_, delta_discovery_request));
+        EXPECT_TRUE(!Config::VersionUtil::hasHiddenEnvoyDeprecated(delta_discovery_request));
         actual_type_url = delta_discovery_request.type_url();
         expected_endpoint = expected_v3alpha_delta_endpoint;
         break;
       }
       case envoy::config::core::v3alpha::ApiConfigSource::REST: {
-        API_NO_BOOST(envoy::api::v2::DiscoveryRequest) discovery_request;
+        API_NO_BOOST(envoy::service::discovery::v3alpha::DiscoveryRequest) discovery_request;
         VERIFY_ASSERTION(xds_stream_->waitForEndStream(*dispatcher_));
         MessageUtil::loadFromJson(xds_stream_->body().toString(), discovery_request,
                                   ProtobufMessage::getStrictValidationVisitor());

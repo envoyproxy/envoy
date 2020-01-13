@@ -27,6 +27,7 @@ public:
                        Runtime::RandomGenerator& random, std::chrono::milliseconds refresh_interval,
                        std::chrono::milliseconds request_timeout,
                        const Protobuf::MethodDescriptor& service_method, absl::string_view type_url,
+                       envoy::config::core::v3alpha::ApiVersion transport_api_version,
                        SubscriptionCallbacks& callbacks, SubscriptionStats stats,
                        std::chrono::milliseconds init_fetch_timeout,
                        ProtobufMessage::ValidationVisitor& validation_visitor);
@@ -54,6 +55,7 @@ private:
   std::chrono::milliseconds init_fetch_timeout_;
   Event::TimerPtr init_fetch_timeout_timer_;
   ProtobufMessage::ValidationVisitor& validation_visitor_;
+  const envoy::config::core::v3alpha::ApiVersion transport_api_version_;
 };
 
 } // namespace Config
