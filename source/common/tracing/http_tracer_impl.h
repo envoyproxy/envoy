@@ -46,8 +46,12 @@ public:
   // Non-standard tag names.
   const std::string DownstreamCluster = "downstream_cluster";
   const std::string ErrorReason = "error.reason";
-  const std::string GrpcStatusCode = "grpc.status_code";
+  const std::string GrpcAuthority = "grpc.authority";
+  const std::string GrpcContentType = "grpc.content_type";
   const std::string GrpcMessage = "grpc.message";
+  const std::string GrpcPath = "grpc.path";
+  const std::string GrpcStatusCode = "grpc.status_code";
+  const std::string GrpcTimeout = "grpc.timeout";
   const std::string GuidXClientTraceId = "guid:x-client-trace-id";
   const std::string GuidXRequestId = "guid:x-request-id";
   const std::string HttpProtocol = "http.protocol";

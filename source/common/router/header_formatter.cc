@@ -27,20 +27,20 @@ std::string formatUpstreamMetadataParseException(absl::string_view params,
                                                  const EnvoyException* cause = nullptr) {
   std::string reason;
   if (cause != nullptr) {
-    reason = fmt::format(", because {}", cause->what());
+    reason = absl::StrCat(", because ", cause->what());
   }
 
-  return fmt::format("Invalid header configuration. Expected format "
-                     "UPSTREAM_METADATA([\"namespace\", \"k\", ...]), actual format "
-                     "UPSTREAM_METADATA{}{}",
-                     params, reason);
+  return absl::StrCat("Invalid header configuration. Expected format "
+                      "UPSTREAM_METADATA([\"namespace\", \"k\", ...]), actual format "
+                      "UPSTREAM_METADATA",
+                      params, reason);
 }
 
 std::string formatPerRequestStateParseException(absl::string_view params) {
-  return fmt::format("Invalid header configuration. Expected format "
-                     "PER_REQUEST_STATE(<data_name>), actual format "
-                     "PER_REQUEST_STATE{}",
-                     params);
+  return absl::StrCat("Invalid header configuration. Expected format "
+                      "PER_REQUEST_STATE(<data_name>), actual format "
+                      "PER_REQUEST_STATE",
+                      params);
 }
 
 // Parses the parameters for UPSTREAM_METADATA and returns a function suitable for accessing the

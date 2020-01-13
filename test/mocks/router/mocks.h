@@ -95,6 +95,9 @@ public:
 
 class TestRetryPolicy : public RetryPolicy {
 public:
+  TestRetryPolicy();
+  ~TestRetryPolicy() override;
+
   // Router::RetryPolicy
   std::chrono::milliseconds perTryTimeout() const override { return per_try_timeout_; }
   uint32_t numRetries() const override { return num_retries_; }
@@ -431,6 +434,9 @@ public:
   MOCK_METHOD0(onConfigUpdate, void());
   MOCK_CONST_METHOD1(validateConfig,
                      void(const envoy::config::route::v3alpha::RouteConfiguration&));
+  MOCK_METHOD3(requestVirtualHostsUpdate,
+               void(const std::string&, Event::Dispatcher&,
+                    std::weak_ptr<Http::RouteConfigUpdatedCallback> route_config_updated_cb));
 
   std::shared_ptr<NiceMock<MockConfig>> route_config_{new NiceMock<MockConfig>()};
 };

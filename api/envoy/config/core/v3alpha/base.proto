@@ -132,6 +132,10 @@ message Extension {
 message Node {
   option (udpa.annotations.versioning).previous_message_type = "envoy.api.v2.core.Node";
 
+  reserved 5;
+
+  reserved "build_version";
+
   // An opaque node identifier for the Envoy node. This also provides the local
   // service node name. It should be set if any of the following features are
   // used: :ref:`statsd <arch_overview_statistics>`, :ref:`CDS
@@ -159,13 +163,6 @@ message Node {
 
   // Locality specifying where the Envoy instance is running.
   Locality locality = 4;
-
-  // This is motivated by informing a management server during canary which
-  // version of Envoy is being tested in a heterogeneous fleet. This will be set
-  // by Envoy in management server RPCs.
-  // This field will be deprecated in favor of the user_agent_name and user_agent_version values.
-  // [#comment:TODO(yanavlasov): Deprecate once issue #9604 is fixed.]
-  string build_version = 5;
 
   // Free-form string that identifies the entity requesting config.
   // E.g. "envoy" or "grpc"

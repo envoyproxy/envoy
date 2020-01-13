@@ -15,6 +15,7 @@
 #include "envoy/config/core/v3alpha/address.pb.h"
 #include "envoy/config/core/v3alpha/base.pb.h"
 #include "envoy/config/core/v3alpha/health_check.pb.h"
+#include "envoy/config/core/v3alpha/protocol.pb.h"
 #include "envoy/config/endpoint/v3alpha/endpoint_components.pb.h"
 #include "envoy/config/typed_metadata.h"
 #include "envoy/event/timer.h"
@@ -517,6 +518,7 @@ public:
   static ClusterCircuitBreakersStats generateCircuitBreakersStats(Stats::Scope& scope,
                                                                   const std::string& stat_prefix,
                                                                   bool track_remaining);
+  static ClusterTimeoutBudgetStats generateTimeoutBudgetStats(Stats::Scope&);
 
   // Upstream::ClusterInfo
   bool addedViaApi() const override { return added_via_api_; }
@@ -562,6 +564,9 @@ public:
   ClusterStats& stats() const override { return stats_; }
   Stats::Scope& statsScope() const override { return *stats_scope_; }
   ClusterLoadReportStats& loadReportStats() const override { return load_report_stats_; }
+  const absl::optional<ClusterTimeoutBudgetStats>& timeoutBudgetStats() const override {
+    return timeout_budget_stats_;
+  }
   const Network::Address::InstanceConstSharedPtr& sourceAddress() const override {
     return source_address_;
   };
@@ -575,6 +580,10 @@ public:
 
   bool drainConnectionsOnHostRemoval() const override { return drain_connections_on_host_removal_; }
   bool warmHosts() const override { return warm_hosts_; }
+  const absl::optional<envoy::config::core::v3alpha::UpstreamHttpProtocolOptions>&
+  upstreamHttpProtocolOptions() const override {
+    return upstream_http_protocol_options_;
+  }
 
   absl::optional<std::string> eds_service_name() const override { return eds_service_name_; }
 
@@ -610,6 +619,7 @@ private:
   mutable ClusterStats stats_;
   Stats::IsolatedStoreImpl load_report_stats_store_;
   mutable ClusterLoadReportStats load_report_stats_;
+  const absl::optional<ClusterTimeoutBudgetStats> timeout_budget_stats_;
   const uint64_t features_;
   const Http::Http1Settings http1_settings_;
   const Http::Http2Settings http2_settings_;
@@ -631,6 +641,8 @@ private:
   const Network::ConnectionSocket::OptionsSharedPtr cluster_socket_options_;
   const bool drain_connections_on_host_removal_;
   const bool warm_hosts_;
+  const absl::optional<envoy::config::core::v3alpha::UpstreamHttpProtocolOptions>
+      upstream_http_protocol_options_;
   absl::optional<std::string> eds_service_name_;
   const absl::optional<envoy::config::cluster::v3alpha::Cluster::CustomClusterType> cluster_type_;
   const std::unique_ptr<Server::Configuration::CommonFactoryContext> factory_context_;

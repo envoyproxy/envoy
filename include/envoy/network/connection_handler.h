@@ -22,7 +22,7 @@ public:
   /**
    * @return uint64_t the number of active connections owned by the handler.
    */
-  virtual uint64_t numConnections() PURE;
+  virtual uint64_t numConnections() const PURE;
 
   /**
    * Increment the return value of numConnections() by one.
@@ -77,7 +77,7 @@ public:
   /**
    * @return the stat prefix used for per-handler stats.
    */
-  virtual const std::string& statPrefix() PURE;
+  virtual const std::string& statPrefix() const PURE;
 
   /**
    * Used by ConnectionHandler to manage listeners.

@@ -11,6 +11,7 @@
 #include "envoy/common/callback.h"
 #include "envoy/config/cluster/v3alpha/cluster.pb.h"
 #include "envoy/config/core/v3alpha/base.pb.h"
+#include "envoy/config/core/v3alpha/protocol.pb.h"
 #include "envoy/config/typed_metadata.h"
 #include "envoy/http/codec.h"
 #include "envoy/network/connection.h"
@@ -614,6 +615,13 @@ public:
   REMAINING_GAUGE(remaining_rq, Accumulate)
 
 /**
+ * All stats around timeout budgets. Not used by default.
+ */
+#define ALL_CLUSTER_TIMEOUT_BUDGET_STATS(HISTOGRAM)                                                \
+  HISTOGRAM(upstream_rq_timeout_budget_percent_used, Unspecified)                                  \
+  HISTOGRAM(upstream_rq_timeout_budget_per_try_percent_used, Unspecified)
+
+/**
  * Struct definition for all cluster stats. @see stats_macros.h
  */
 struct ClusterStats {
@@ -632,6 +640,13 @@ struct ClusterLoadReportStats {
  */
 struct ClusterCircuitBreakersStats {
   ALL_CLUSTER_CIRCUIT_BREAKERS_STATS(GENERATE_GAUGE_STRUCT, GENERATE_GAUGE_STRUCT)
+};
+
+/**
+ * Struct definition for cluster timeout budget stats. @see stats_macros.h
+ */
+struct ClusterTimeoutBudgetStats {
+  ALL_CLUSTER_TIMEOUT_BUDGET_STATS(GENERATE_HISTOGRAM_STRUCT)
 };
 
 /**
@@ -814,6 +829,11 @@ public:
   virtual ClusterLoadReportStats& loadReportStats() const PURE;
 
   /**
+   * @return absl::optional<ClusterTimeoutBudgetStats>& stats on timeout budgets for this cluster.
+   */
+  virtual const absl::optional<ClusterTimeoutBudgetStats>& timeoutBudgetStats() const PURE;
+
+  /**
    * Returns an optional source address for upstream connections to bind to.
    *
    * @return a source address to bind to or nullptr if no bind need occur.
@@ -869,6 +889,12 @@ public:
    */
   virtual Http::Protocol
   upstreamHttpProtocol(absl::optional<Http::Protocol> downstream_protocol) const PURE;
+
+  /**
+   * @return http protocol options for upstream connection
+   */
+  virtual const absl::optional<envoy::config::core::v3alpha::UpstreamHttpProtocolOptions>&
+  upstreamHttpProtocolOptions() const PURE;
 
 protected:
   /**

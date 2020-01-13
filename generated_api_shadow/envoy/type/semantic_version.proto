@@ -12,9 +12,9 @@ option java_multiple_files = true;
 // expected behaviors and APIs, the patch version field is used only
 // for security fixes and can be generally ignored.
 message SemanticVersion {
-  uint32 major = 1;
+  uint32 major_number = 1;
 
-  uint32 minor = 2;
+  uint32 minor_number = 2;
 
   uint32 patch = 3;
 }
