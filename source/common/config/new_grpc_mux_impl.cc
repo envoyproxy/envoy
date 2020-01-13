@@ -188,8 +188,6 @@ void NewGrpcMuxImpl::trySendDiscoveryRequests() {
     if (!pausable_ack_queue_.empty()) {
       // Because ACKs take precedence over plain requests, if there is anything in the queue, it's
       // safe to assume it's of the type_url that we're wanting to send.
-      grpc_stream_.sendMessage(
-          sub->second->sub_state_.getNextRequestWithAck(pausable_ack_queue_.popFront()));
       request = sub->second->sub_state_.getNextRequestWithAck(pausable_ack_queue_.popFront());
     } else {
       request = sub->second->sub_state_.getNextRequestAckless();
