@@ -211,6 +211,7 @@ envoy_cc_library(
         "//source/common/common:backoff_lib",
         "//source/common/common:minimal_logger_lib",
         "//source/common/config:utility_lib",
+        "//source/common/config:version_converter_lib",
         "//source/common/grpc:async_client_lib",
         "//source/common/network:resolver_lib",
         "//source/extensions/transport_sockets:well_known_names",

@@ -350,6 +350,7 @@ ClusterManagerImpl::ClusterManagerImpl(
                                             Config::Utility::factoryForGrpcApiConfigSource(
                                                 *async_client_manager_, load_stats_config, stats)
                                                 ->create(),
+                                            load_stats_config.transport_api_version(),
                                             main_thread_dispatcher);
   }
 }

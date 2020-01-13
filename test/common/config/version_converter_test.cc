@@ -77,26 +77,70 @@ TEST(VersionConverterTest, ScrubHiddenEnvoyDeprecated) {
   EXPECT_FALSE(msg.load_balancing_policy().policies(0).has_hidden_envoy_deprecated_config());
 }
 
-// Validate that we can sensible reinterpret messages such as DiscoveryRequest
-// based on transport API version.
-TEST(VersionConverter, Reinterpret) {
+// Validate that we can sensibly provide a JSON wire interpretation of messages
+// such as DiscoveryRequest based on transport API version.
+TEST(VersionConverter, GetJsonStringFromMessage) {
   API_NO_BOOST(envoy::service::discovery::v3alpha::DiscoveryRequest) discovery_request;
   discovery_request.mutable_node()->set_hidden_envoy_deprecated_build_version("foo");
   discovery_request.mutable_node()->set_user_agent_name("bar");
-  auto v2_discovery_request = VersionConverter::reinterpret(
+  const std::string v2_discovery_request = VersionConverter::getJsonStringFromMessage(
       discovery_request, envoy::config::core::v3alpha::ApiVersion::V2);
-  API_NO_BOOST(envoy::api::v2::DiscoveryRequest) expected_v2_discovery_request;
-  expected_v2_discovery_request.mutable_node()->set_build_version("foo");
-  expected_v2_discovery_request.mutable_node()->set_user_agent_name("bar");
-  EXPECT_THAT(*v2_discovery_request->msg_, ProtoEq(expected_v2_discovery_request));
-  auto auto_discovery_request = VersionConverter::reinterpret(
+  EXPECT_EQ("{\"node\":{\"build_version\":\"foo\",\"user_agent_name\":\"bar\"}}",
+            v2_discovery_request);
+  const std::string auto_discovery_request = VersionConverter::getJsonStringFromMessage(
       discovery_request, envoy::config::core::v3alpha::ApiVersion::AUTO);
-  EXPECT_THAT(*auto_discovery_request->msg_, ProtoEq(expected_v2_discovery_request));
-  auto v3_discovery_request = VersionConverter::reinterpret(
+  EXPECT_EQ("{\"node\":{\"build_version\":\"foo\",\"user_agent_name\":\"bar\"}}",
+            auto_discovery_request);
+  const std::string v3_discovery_request = VersionConverter::getJsonStringFromMessage(
       discovery_request, envoy::config::core::v3alpha::ApiVersion::V3ALPHA);
-  API_NO_BOOST(envoy::service::discovery::v3alpha::DiscoveryRequest) expected_v3_discovery_request;
-  expected_v3_discovery_request.mutable_node()->set_user_agent_name("bar");
-  EXPECT_THAT(*v3_discovery_request->msg_, ProtoEq(expected_v3_discovery_request));
+  EXPECT_EQ("{\"node\":{\"user_agent_name\":\"bar\"}}", v3_discovery_request);
+}
+
+bool hasUnknownFields(const Protobuf::Message& message) {
+  const Protobuf::Reflection* reflection = message.GetReflection();
+  const auto& unknown_field_set = reflection->GetUnknownFields(message);
+  return !unknown_field_set.empty();
+}
+
+// Validate that we can sensibly provide a gRPC wire interpretation of messages
+// such as DiscoveryRequest based on transport API version.
+TEST(VersionConverter, PrepareMessageForGrpcWire) {
+  API_NO_BOOST(envoy::api::v2::core::Node) v2_node;
+  v2_node.set_build_version("foo");
+  v2_node.set_user_agent_name("bar");
+  API_NO_BOOST(envoy::service::discovery::v3alpha::DiscoveryRequest) discovery_request;
+  discovery_request.mutable_node()->set_hidden_envoy_deprecated_build_version("foo");
+  VersionConverter::upgrade(v2_node, *discovery_request.mutable_node());
+  {
+    API_NO_BOOST(envoy::service::discovery::v3alpha::DiscoveryRequest) discovery_request_copy;
+    discovery_request_copy.MergeFrom(discovery_request);
+    VersionConverter::prepareMessageForGrpcWire(discovery_request_copy,
+                                                envoy::config::core::v3alpha::ApiVersion::V2);
+    API_NO_BOOST(envoy::api::v2::DiscoveryRequest) v2_discovery_request;
+    EXPECT_TRUE(v2_discovery_request.ParseFromString(discovery_request_copy.SerializeAsString()));
+    EXPECT_EQ("foo", v2_discovery_request.node().build_version());
+    EXPECT_FALSE(hasUnknownFields(v2_discovery_request.node()));
+  }
+  {
+    API_NO_BOOST(envoy::service::discovery::v3alpha::DiscoveryRequest) discovery_request_copy;
+    discovery_request_copy.MergeFrom(discovery_request);
+    VersionConverter::prepareMessageForGrpcWire(discovery_request_copy,
+                                                envoy::config::core::v3alpha::ApiVersion::AUTO);
+    API_NO_BOOST(envoy::api::v2::DiscoveryRequest) auto_discovery_request;
+    EXPECT_TRUE(auto_discovery_request.ParseFromString(discovery_request_copy.SerializeAsString()));
+    EXPECT_EQ("foo", auto_discovery_request.node().build_version());
+    EXPECT_FALSE(hasUnknownFields(auto_discovery_request.node()));
+  }
+  {
+    API_NO_BOOST(envoy::service::discovery::v3alpha::DiscoveryRequest) discovery_request_copy;
+    discovery_request_copy.MergeFrom(discovery_request);
+    VersionConverter::prepareMessageForGrpcWire(discovery_request_copy,
+                                                envoy::config::core::v3alpha::ApiVersion::V3ALPHA);
+    API_NO_BOOST(envoy::service::discovery::v3alpha::DiscoveryRequest) v3_discovery_request;
+    EXPECT_TRUE(v3_discovery_request.ParseFromString(discovery_request_copy.SerializeAsString()));
+    EXPECT_EQ("", v3_discovery_request.node().hidden_envoy_deprecated_build_version());
+    EXPECT_FALSE(hasUnknownFields(v3_discovery_request.node()));
+  }
 }
 
 // Downgrading to an earlier version (where it exists).

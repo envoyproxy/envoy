@@ -192,13 +192,7 @@ void NewGrpcMuxImpl::trySendDiscoveryRequests() {
     } else {
       request = sub->second->sub_state_.getNextRequestAckless();
     }
-    // TODO(htuch): this works as long as there are no new fields in the v3+
-    // DiscoveryRequest. When they are added, we need to do a full v2 conversion
-    // and also discard unknown fields. Tracked at
-    // https://github.com/envoyproxy/envoy/issues/9619.
-    if (transport_api_version_ == envoy::config::core::v3alpha::ApiVersion::V3ALPHA) {
-      VersionUtil::scrubHiddenEnvoyDeprecated(request);
-    }
+    VersionConverter::prepareMessageForGrpcWire(request, transport_api_version_);
     grpc_stream_.sendMessage(request);
   }
   grpc_stream_.maybeUpdateQueueSizeStat(pausable_ack_queue_.size());

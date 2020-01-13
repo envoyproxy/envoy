@@ -174,9 +174,10 @@ DynamicMessagePtr VersionConverter::downgrade(const Protobuf::Message& message) 
   return createForDescriptorWithCast(message, prev_desc);
 }
 
-DynamicMessagePtr
-VersionConverter::reinterpret(const Protobuf::Message& message,
-                              envoy::config::core::v3alpha::ApiVersion api_version) {
+std::string
+VersionConverter::getJsonStringFromMessage(const Protobuf::Message& message,
+                                           envoy::config::core::v3alpha::ApiVersion api_version) {
+  DynamicMessagePtr dynamic_message;
   switch (api_version) {
   case envoy::config::core::v3alpha::ApiVersion::AUTO:
   case envoy::config::core::v3alpha::ApiVersion::V2: {
@@ -184,22 +185,40 @@ VersionConverter::reinterpret(const Protobuf::Message& message,
     // DiscoveryRequest. When they are added, we need to do a full v2 conversion
     // and also discard unknown fields. Tracked at
     // https://github.com/envoyproxy/envoy/issues/9619.
-    auto dynamic_message = downgrade(message);
-    eraseOriginalTypeInformation(*dynamic_message->msg_);
-    return dynamic_message;
+    dynamic_message = downgrade(message);
+    break;
   }
   case envoy::config::core::v3alpha::ApiVersion::V3ALPHA: {
     // We need to scrub the hidden fields.
-    auto non_shadowed_message = std::make_unique<DynamicMessage>();
-    non_shadowed_message->msg_.reset(message.New());
-    non_shadowed_message->msg_->MergeFrom(message);
-    VersionUtil::scrubHiddenEnvoyDeprecated(*non_shadowed_message->msg_);
-    eraseOriginalTypeInformation(*non_shadowed_message->msg_);
-    return non_shadowed_message;
+    dynamic_message = std::make_unique<DynamicMessage>();
+    dynamic_message->msg_.reset(message.New());
+    dynamic_message->msg_->MergeFrom(message);
+    VersionUtil::scrubHiddenEnvoyDeprecated(*dynamic_message->msg_);
+    break;
   }
   default:
     NOT_REACHED_GCOVR_EXCL_LINE;
   }
+  eraseOriginalTypeInformation(*dynamic_message->msg_);
+  std::string json;
+  Protobuf::util::JsonPrintOptions json_options;
+  json_options.preserve_proto_field_names = true;
+  const auto status = Protobuf::util::MessageToJsonString(*dynamic_message->msg_, &json, json_options);
+  // This should always succeed unless something crash-worthy such as out-of-memory.
+  RELEASE_ASSERT(status.ok(), "");
+  return json;
+}
+
+void VersionConverter::prepareMessageForGrpcWire(
+    Protobuf::Message& message, envoy::config::core::v3alpha::ApiVersion api_version) {
+  // TODO(htuch): this works as long as there are no new fields in the v3+
+  // DiscoveryRequest. When they are added, we need to do a full v2 conversion
+  // and also discard unknown fields. Tracked at
+  // https://github.com/envoyproxy/envoy/issues/9619.
+  if (api_version == envoy::config::core::v3alpha::ApiVersion::V3ALPHA) {
+    VersionUtil::scrubHiddenEnvoyDeprecated(message);
+  }
+  eraseOriginalTypeInformation(message);
 }
 
 void VersionUtil::scrubHiddenEnvoyDeprecated(Protobuf::Message& message) {
