@@ -51,7 +51,7 @@ public:
 
     mux_ = std::make_shared<Config::GrpcMuxImpl>(
         local_info_, std::unique_ptr<Grpc::MockAsyncClient>(async_client_), dispatcher_,
-        *method_descriptor_, envoy::config::core::v3alpha::ApiVersion::AUTO, random_, 
+        *method_descriptor_, envoy::config::core::v3alpha::ApiVersion::AUTO, random_,
         rate_limit_settings_, true);
     subscription_ = std::make_unique<GrpcSubscriptionImpl>(
         mux_, callbacks_, stats_, Config::TypeUrl::get().ClusterLoadAssignment, dispatcher_,
