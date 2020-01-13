@@ -1,0 +1,51 @@
+syntax = "proto3";
+
+package envoy.config.filter.http.admission_control.v3alpha;
+
+import "envoy/config/core/v3alpha/base.proto";
+import "envoy/type/percent.proto";
+
+import "google/api/annotations.proto";
+import "google/protobuf/duration.proto";
+import "google/protobuf/wrappers.proto";
+
+import "udpa/annotations/migrate.proto";
+import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.config.filter.http.admission_control.v3alpha";
+option java_outer_classname = "AdmissionControlProto";
+option java_multiple_files = true;
+option (udpa.annotations.file_migrate).move_to_package =
+    "envoy.extensions.filters.http.admission_control.v3alpha";
+
+// [#protodoc-title: Admission Control]
+// Admission Control :ref:`configuration overview
+// <config_http_filters_admission_control>`.
+// [#extension: envoy.filters.http.admission_control]
+
+message AdmissionControl {
+  option (udpa.annotations.versioning).previous_message_type =
+    "envoy.config.filter.http.adaptive_concurrency.v2alpha.AdmissionControl";
+
+  // If set to false, the admission control filter will operate as a pass-through filter. If the
+  // message is unspecified, the filter will be enabled.
+  config.core.v3alpha.RuntimeFeatureFlag enabled = 1;
+
+  // The time window over which the success rate is calculated. The window is rounded to the nearest
+  // second. Defaults to 120s.
+  google.protobuf.Duration sampling_window = 2;
+
+  // Rejection probability is defined by the formula::
+  //
+  //     max(0, (rq_count - aggression_coefficient * rq_success_count) / (rq_count + 1))
+  // 
+  // The coefficient dictates how aggressively the admission controller will throttle requests as
+  // the success rate drops. Lower values will cause throttling to kick in at higher success rates
+  // and result in more aggressive throttling. Defaults to 2.0.
+  type.protobuf.Double aggression_coefficient = 3 [(validate.rules).double = {gte: 1.0}];
+
+  // The minimum number of requests to sample for a valid success rate calculation. If the request
+  // count over the sampling window is any lower, admission control will not be enforced. Defaults
+  // to 100.
+  google.protobuf.UInt32Value min_request_samples = 4 [(validate.rules).uint32 = {gt: 0}];
+}
