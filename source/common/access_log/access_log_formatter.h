@@ -74,6 +74,7 @@ class AccessLogFormatUtils {
 public:
   static FormatterPtr defaultAccessLogFormatter();
   static const std::string& protocolToString(const absl::optional<Http::Protocol>& protocol);
+  static const std::string getHostname();
 
 private:
   AccessLogFormatUtils();

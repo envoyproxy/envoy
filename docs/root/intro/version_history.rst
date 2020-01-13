@@ -43,6 +43,8 @@ Version history
 * router: added support for :ref:`max_internal_redirects <envoy_api_field_route.RouteAction.max_internal_redirects>` for configurable maximum internal redirect hops.
 * router: skip the Location header when the response code is not a 201 or a 3xx.
 * router: added :ref:`auto_sni <envoy_api_field_core.UpstreamHttpProtocolOptions.auto_sni>` to support setting SNI to transport socket for new upstream connections based on the downstream HTTP host/authority header.
+* router: added support for HOSTNAME :ref:`header formatter
+  <config_http_conn_man_headers_custom_request_headers>`.
 * server: added the :option:`--disable-extensions` CLI option, to disable extensions at startup.
 * server: fixed a bug in config validation for configs with runtime layers.
 * tcp_proxy: added :ref:`ClusterWeight.metadata_match<envoy_api_field_config.filter.network.tcp_proxy.v2.TcpProxy.WeightedCluster.ClusterWeight.metadata_match>`.

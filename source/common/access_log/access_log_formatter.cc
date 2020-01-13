@@ -69,6 +69,25 @@ AccessLogFormatUtils::protocolToString(const absl::optional<Http::Protocol>& pro
   return UnspecifiedValueString;
 }
 
+const std::string AccessLogFormatUtils::getHostname() {
+#ifdef HOST_NAME_MAX
+  const size_t len = HOST_NAME_MAX;
+#else
+  // This is notably the case in OSX.
+  const size_t len = 255;
+#endif
+  char name[len];
+  Api::OsSysCalls& os_sys_calls = Api::OsSysCallsSingleton::get();
+  const Api::SysCallIntResult result = os_sys_calls.gethostname(name, len);
+
+  std::string hostname = "-";
+  if (result.rc_ == 0) {
+    hostname.assign(name);
+  }
+
+  return hostname;
+}
+
 FormatterImpl::FormatterImpl(const std::string& format) {
   providers_ = AccessLogFormatParser::parse(format);
 }
@@ -700,21 +719,7 @@ StreamInfoFormatter::StreamInfoFormatter(const std::string& field_name) {
           return result;
         });
   } else if (field_name == "HOSTNAME") {
-#ifdef HOST_NAME_MAX
-    const size_t len = HOST_NAME_MAX;
-#else
-    // This is notably the case in OSX.
-    const size_t len = 255;
-#endif
-    char name[len];
-    Api::OsSysCalls& os_sys_calls = Api::OsSysCallsSingleton::get();
-    const Api::SysCallIntResult result = os_sys_calls.gethostname(name, len);
-
-    std::string hostname = "-";
-    if (result.rc_ == 0) {
-      hostname.assign(name);
-    }
-
+    std::string hostname = AccessLogFormatUtils::getHostname();
     field_extractor_ = std::make_unique<StreamInfoOptionalStringFieldExtractor>(
         [hostname](const StreamInfo::StreamInfo&) { return hostname; });
   } else {
