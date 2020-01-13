@@ -344,6 +344,7 @@ public:
   MOCK_METHOD(bool, includeAttemptCount, (), (const));
   MOCK_METHOD(const UpgradeMap&, upgradeMap, (), (const));
   MOCK_METHOD(InternalRedirectAction, internalRedirectAction, (), (const));
+  MOCK_METHOD(uint32_t, maxInternalRedirects, (), (const));
   MOCK_METHOD(const std::string&, routeName, (), (const));
 
   std::string cluster_name_{"fake_cluster"};
