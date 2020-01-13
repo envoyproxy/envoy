@@ -54,18 +54,6 @@ Http::FilterHeadersStatus AdmissionControlFilter::decodeHeaders(Http::HeaderMap&
   return Http::FilterHeadersStatus::Continue;
 }
 
-bool AdmissionControlFilter::shouldRejectRequest() const {
-  const double rq_count = total_rq_count_.load();
-  const double rq_success_count = total_success_count_.load();
-  
-
-  // TODO @tallen: cleanup types and random thing
-  const double rejection_pct = 100 * std::max<double>(0,
-    (rq_count - config_->aggression() * rq_success_count) / (rq_count + 1));
-
-  return config_->runtime().snapshot().featureEnabled("", rejection_probability);
-}
-
 void AdmissionControlFilter::encodeComplete() { deferred_sample_task_.reset(); }
 
 void AdmissionControlFilter::onDestroy() {
@@ -74,6 +62,41 @@ void AdmissionControlFilter::onDestroy() {
     // Let's stop the sampling from happening.
     deferred_sample_task_->cancel();
   }
+}
+
+AdmissionControlState::AdmissionControlState(TimeSource& time_source,
+    AdmissionControlFilterConfigSharedPtr config, Runtime::RandomGenerator& random) :
+  time_source_(time_source), random_(random) {}
+
+void AdmissionControlState::maybeUpdateHistoricalData() {
+  const MonotonicTime now = time_source_.monotonicTime();
+
+  while (!historical_data_.empty() && (now - historical_data_.front().first) >= config_->samplingWindow()) {
+    // Remove stale data.
+    global_data_.successes -= historical_data_.front().second.successes;
+    global_data_.requests -= historical_data_.front().second.requests;
+    historical_data_.pop_front();
+  }
+
+  if ((now - historical_data_.back().first) > std::chrono:seconds(1)) {
+    // Reset the local data.
+    historical_data_.emplace_back(now, local_data_);
+    local_data_ = {};
+  }
+}
+
+void AdmissionControlState::recordRequest(const bool success) {
+  maybeUpdatHistoricalData();
+  ++local_data_.requests;
+  ++global_data_.requests;
+  if (success) {
+    ++local_data_.successes;
+    ++global_data_.successes;
+  }
+}
+
+bool AdmissionControlState::shouldRejectRequest() {
+
 }
 
 } // namespace AdmissionControl

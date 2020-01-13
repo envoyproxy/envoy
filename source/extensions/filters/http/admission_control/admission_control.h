@@ -49,7 +49,7 @@ public:
   Runtime::Loader& runtime() { return runtime_; }
   bool filterEnabled() const { return admission_control_feature_.enabled(); }
   TimeSource& timeSource() const { return time_source_; }
-  uint32_t samplingWindowSeconds() const { return sampling_window_seconds_; }
+  std::chrono::duration samplingWindow() const { return sampling_window_; }
   double aggression() const { return aggression_; }
   uint32_t minRequestSamples() const { return min_request_samples_; }
 
@@ -58,13 +58,48 @@ private:
   const std::string stats_prefix_;
   TimeSource& time_source_;
   Runtime::FeatureFlag admission_control_feature_;
-  uint32_t sampling_window_seconds_;
+  std::chrono::duration sampling_window_;
   double aggression_;
   uint32_t min_request_samples_;
 };
 
 using AdmissionControlFilterConfigSharedPtr =
     std::shared_ptr<const AdmissionControlFilterConfig>;
+
+/**
+ * Thread-local object to request counts and successes over a rolling time window. Request data for
+ * the time window is kept recent via a circular buffer that phases out old request/success counts
+ * when recording new samples.
+ *
+ * The lookback window for request samples is accurate up to a hard-coded 1-second granularity.
+ * TODO (tonya11en): Allow the granularity to be configurable.
+ */
+class AdmissionControlState {
+public:
+  AdmissionControlState(TimeSource& time_source,
+                        AdmissionControlFilterConfigSharedPtr config,
+                        Runtime::RandomGenerator& random);
+  void recordRequest(const bool success);
+  bool shouldRejectRequest();
+
+private:
+  struct RequestData {
+    uint32_t requests;
+    uint32_t successes;
+  };
+
+  void maybeUpdateHistoricalData();
+
+  TimeSource& time_source_;
+  Runtime::RandomGenerator& random_;
+  std::deque<std::pair<MonotonicTime, RequestData>> historical_data_;
+
+  // Request data for the current time range.
+  RequestData local_data_;
+  
+  // Request data aggregated for the whole lookback window.
+  RequestData global_data_;
+};
 
 /**
  * A filter that probabilistically rejects requests based on upstream success-rate.
@@ -84,16 +119,8 @@ public:
   bool shouldRejectRequest() const;
 
 private:
-  struct SuccessRateAggregate {
-    uint32_t total_rq;
-    uint32_t total_success;
-  }
-
   AdmissionControlFilterConfigSharedPtr config_;
   std::unique_ptr<Cleanup> deferred_sample_task_;
-  std::queue<std::pair<std::chrono::seconds, SuccessRateAggregate>> sr_aggregates_;
-  std::atomic<uint32_t> current_total_rq;
-  std::atomic<uint32_t> current_total_success;
 
 
 };
