@@ -6,6 +6,7 @@
 #include "common/common/backoff_strategy.h"
 #include "common/common/token_bucket_impl.h"
 #include "common/config/utility.h"
+#include "common/config/version_converter.h"
 #include "common/protobuf/protobuf.h"
 #include "common/protobuf/utility.h"
 
@@ -15,12 +16,14 @@ namespace Config {
 NewGrpcMuxImpl::NewGrpcMuxImpl(Grpc::RawAsyncClientPtr&& async_client,
                                Event::Dispatcher& dispatcher,
                                const Protobuf::MethodDescriptor& service_method,
+                               envoy::config::core::v3alpha::ApiVersion transport_api_version,
                                Runtime::RandomGenerator& random, Stats::Scope& scope,
                                const RateLimitSettings& rate_limit_settings,
                                const LocalInfo::LocalInfo& local_info)
     : dispatcher_(dispatcher), local_info_(local_info),
       grpc_stream_(this, std::move(async_client), service_method, random, dispatcher, scope,
-                   rate_limit_settings) {}
+                   rate_limit_settings),
+      transport_api_version_(transport_api_version) {}
 
 Watch* NewGrpcMuxImpl::addOrUpdateWatch(const std::string& type_url, Watch* watch,
                                         const std::set<std::string>& resources,
@@ -65,6 +68,17 @@ void NewGrpcMuxImpl::onDiscoveryResponse(
               message->system_version_info(), message->type_url());
     return;
   }
+
+  // When an on-demand request is made a Watch is created using an alias, as the resource name isn't
+  // known at that point. When an update containing aliases comes back, we update Watches with
+  // resource names.
+  for (const auto& r : message->resources()) {
+    if (r.aliases_size() > 0) {
+      AddedRemoved converted = sub->second->watch_map_.convertAliasWatchesToNameWatches(r);
+      sub->second->sub_state_.updateSubscriptionInterest(converted.added_, converted.removed_);
+    }
+  }
+
   kickOffAck(sub->second->sub_state_.handleResponse(*message));
 }
 
@@ -169,15 +183,23 @@ void NewGrpcMuxImpl::trySendDiscoveryRequests() {
     if (!canSendDiscoveryRequest(next_request_type_url)) {
       break;
     }
+    envoy::service::discovery::v3alpha::DeltaDiscoveryRequest request;
     // Get our subscription state to generate the appropriate DeltaDiscoveryRequest, and send.
     if (!pausable_ack_queue_.empty()) {
       // Because ACKs take precedence over plain requests, if there is anything in the queue, it's
       // safe to assume it's of the type_url that we're wanting to send.
-      grpc_stream_.sendMessage(
-          sub->second->sub_state_.getNextRequestWithAck(pausable_ack_queue_.popFront()));
+      request = sub->second->sub_state_.getNextRequestWithAck(pausable_ack_queue_.popFront());
     } else {
-      grpc_stream_.sendMessage(sub->second->sub_state_.getNextRequestAckless());
+      request = sub->second->sub_state_.getNextRequestAckless();
     }
+    // TODO(htuch): this works as long as there are no new fields in the v3+
+    // DiscoveryRequest. When they are added, we need to do a full v2 conversion
+    // and also discard unknown fields. Tracked at
+    // https://github.com/envoyproxy/envoy/issues/9619.
+    if (transport_api_version_ == envoy::config::core::v3alpha::ApiVersion::V3ALPHA) {
+      VersionUtil::scrubHiddenEnvoyDeprecated(request);
+    }
+    grpc_stream_.sendMessage(request);
   }
   grpc_stream_.maybeUpdateQueueSizeStat(pausable_ack_queue_.size());
 }

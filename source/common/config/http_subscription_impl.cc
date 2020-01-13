@@ -8,6 +8,7 @@
 #include "common/common/assert.h"
 #include "common/common/macros.h"
 #include "common/config/utility.h"
+#include "common/config/version_converter.h"
 #include "common/http/headers.h"
 #include "common/protobuf/protobuf.h"
 #include "common/protobuf/utility.h"
@@ -22,13 +23,15 @@ HttpSubscriptionImpl::HttpSubscriptionImpl(
     const std::string& remote_cluster_name, Event::Dispatcher& dispatcher,
     Runtime::RandomGenerator& random, std::chrono::milliseconds refresh_interval,
     std::chrono::milliseconds request_timeout, const Protobuf::MethodDescriptor& service_method,
-    absl::string_view type_url, SubscriptionCallbacks& callbacks, SubscriptionStats stats,
+    absl::string_view type_url, envoy::config::core::v3alpha::ApiVersion transport_api_version,
+    SubscriptionCallbacks& callbacks, SubscriptionStats stats,
     std::chrono::milliseconds init_fetch_timeout,
     ProtobufMessage::ValidationVisitor& validation_visitor)
     : Http::RestApiFetcher(cm, remote_cluster_name, dispatcher, random, refresh_interval,
                            request_timeout),
       callbacks_(callbacks), stats_(stats), dispatcher_(dispatcher),
-      init_fetch_timeout_(init_fetch_timeout), validation_visitor_(validation_visitor) {
+      init_fetch_timeout_(init_fetch_timeout), validation_visitor_(validation_visitor),
+      transport_api_version_(transport_api_version) {
   request_.mutable_node()->CopyFrom(local_info.node());
   request_.set_type_url(std::string(type_url));
   ASSERT(service_method.options().HasExtension(google::api::http));
@@ -65,8 +68,8 @@ void HttpSubscriptionImpl::createRequest(Http::Message& request) {
   stats_.update_attempt_.inc();
   request.headers().setReferenceMethod(Http::Headers::get().MethodValues.Post);
   request.headers().setPath(path_);
-  request.body() =
-      std::make_unique<Buffer::OwnedImpl>(MessageUtil::getJsonStringFromMessage(request_));
+  request.body() = std::make_unique<Buffer::OwnedImpl>(MessageUtil::getJsonStringFromMessage(
+      *VersionConverter::reinterpret(request_, transport_api_version_)->msg_));
   request.headers().setReferenceContentType(Http::Headers::get().ContentTypeValues.Json);
   request.headers().setContentLength(request.body()->length());
 }

@@ -75,6 +75,10 @@ void DeltaSubscriptionState::handleGoodResponse(
       throw EnvoyException(
           fmt::format("duplicate name {} found among added/updated resources", resource.name()));
     }
+    // DeltaDiscoveryResponses for unresolved aliases don't contain an actual resource
+    if (!resource.has_resource() && resource.aliases_size() > 0) {
+      continue;
+    }
     if (message.type_url() != resource.resource().type_url()) {
       throw EnvoyException(fmt::format("type URL {} embedded in an individual Any does not match "
                                        "the message-wide type URL {} in DeltaDiscoveryResponse {}",
