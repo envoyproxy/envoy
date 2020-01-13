@@ -271,7 +271,7 @@ TEST_P(ClusterMemoryTestRunner, MemoryLargeClusterSizeWithFakeSymbolTable) {
   // 2020/01/07  9564     43445       44000   use RefcountPtr for CentralCache.
   // 2020/01/09  8889     43509       44000   api: add UpstreamHttpProtocolOptions message
   // 2020/01/09  9227     43637       44000   router: per-cluster histograms w/ timeout budget
-  // 2020/01/12  9633     43797       44104   config: support recovery of original message when 
+  // 2020/01/12  9633     43797       44104   config: support recovery of original message when
   //                                          upgrading.
 
   // Note: when adjusting this value: EXPECT_MEMORY_EQ is active only in CI
@@ -325,7 +325,7 @@ TEST_P(ClusterMemoryTestRunner, MemoryLargeClusterSizeWithRealSymbolTable) {
   // 2020/01/07  9564     35580       36000   RefcountPtr for CentralCache.
   // 2020/01/09  8889     35644       36000   api: add UpstreamHttpProtocolOptions message
   // 2019/01/09  9227     35772       36500   router: per-cluster histograms w/ timeout budget
-  // 2020/01/12  9633     35932       36500   config: support recovery of original message when 
+  // 2020/01/12  9633     35932       36500   config: support recovery of original message when
   //                                          upgrading.
 
   // Note: when adjusting this value: EXPECT_MEMORY_EQ is active only in CI
