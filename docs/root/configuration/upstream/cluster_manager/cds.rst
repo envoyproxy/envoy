@@ -20,7 +20,7 @@ Statistics
 CDS has a :ref:`statistics <subscription_statistics>` tree rooted at *cluster_manager.cds.*
 
 On-demand CDS
------------------------------------
+-------------
 
 Similar to VHDS on-demand feature in terms of hosts, the on-demand CDS API is an additional API
 that Envoy will call to dynamically fetch upstream clusters which Envoy interested in spontaneously.
