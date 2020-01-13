@@ -614,48 +614,38 @@ using Transform = std::function<void(Protobuf::Message*, const Protobuf::Reflect
 bool redactOpaque(Protobuf::Message* message, bool ancestor_is_sensitive,
                   absl::string_view opaque_type_name, Transform unpack, Transform repack) {
   // Ensure this message has the opaque type we're expecting.
-  if (message->GetDescriptor()->full_name() != opaque_type_name) {
+  const auto* opaque_descriptor = message->GetDescriptor();
+  if (opaque_descriptor->full_name() != opaque_type_name) {
     return false;
   }
 
-  // Enumerate the fields of this opaque type. We expect to find exactly two: `type_url` and
-  // `value`, but not necessarily in that order.
-  const auto* reflection = message->GetReflection();
-  std::vector<const Protobuf::FieldDescriptor*> field_descriptors;
-  reflection->ListFields(*message, &field_descriptors);
-
-  Protobuf::DynamicMessageFactory message_factory;
-  std::unique_ptr<Protobuf::Message> typed_message;
-  const Protobuf::FieldDescriptor* value_field_descriptor{};
-  for (const auto* field_descriptor : field_descriptors) {
-    if (field_descriptor->name() == "type_url") {
-      // If we encounter the `type_url` field, try to find a descriptor for that type in the pool,
-      // and instantiate a new message using the `DynamicMessageFactory`.
-      std::string type_url(reflection->GetString(*message, field_descriptor));
-      std::string concrete_type_name(TypeUtil::typeUrlToDescriptorFullName(type_url));
-      const auto* descriptor =
-          Protobuf::DescriptorPool::generated_pool()->FindMessageTypeByName(concrete_type_name);
-      if (descriptor == nullptr) {
-        // If the type URL doesn't correspond to a known proto, give up redacting and treat this
-        // message the same as a `ProtobufWkt::Struct`. See the documented limitation on
-        // `MessageUtil::redact()` for more context.
-        ENVOY_LOG_MISC(warn, "Could not reify {} with unknown type URL {}", opaque_type_name,
-                       type_url);
-        return false;
-      }
-      typed_message.reset(message_factory.GetPrototype(descriptor)->New());
-    } else if (field_descriptor->name() == "value") {
-      // If we encounter the `value` field, hang on to its descriptor so that `unpack` and `pack`
-      // can use it to read and write.
-      value_field_descriptor = field_descriptor;
-    }
-  }
-
-  // Make sure we saw the two fields we expected.
-  if (typed_message == nullptr || value_field_descriptor == nullptr) {
+  // Find descriptors for the `type_url` and `value` fields.
+  const auto* type_url_field_descriptor = opaque_descriptor->FindFieldByName("type_url");
+  const auto* value_field_descriptor = opaque_descriptor->FindFieldByName("value");
+  if (type_url_field_descriptor == nullptr || value_field_descriptor == nullptr) {
+    // In the unlikely event that the opaque type is malformed, don't try to reify it, just treat
+    // it like any other message.
     ENVOY_LOG_MISC(warn, "Could not reify malformed {}", opaque_type_name);
     return false;
   }
+
+  // Try to find a descriptor for `type_url` in the pool and instantiate a new message of the
+  // correct concrete type.
+  const auto* reflection = message->GetReflection();
+  std::string type_url(reflection->GetString(*message, type_url_field_descriptor));
+  std::string concrete_type_name(TypeUtil::typeUrlToDescriptorFullName(type_url));
+  const auto* concrete_descriptor =
+      Protobuf::DescriptorPool::generated_pool()->FindMessageTypeByName(concrete_type_name);
+  if (concrete_descriptor == nullptr) {
+    // If the type URL doesn't correspond to a known proto, don't try to reify it, just treat it
+    // like any other message. See the documented limitation on `MessageUtil::redact()` for more
+    // context.
+    ENVOY_LOG_MISC(warn, "Could not reify {} with unknown type URL {}", opaque_type_name, type_url);
+    return false;
+  }
+  Protobuf::DynamicMessageFactory message_factory;
+  std::unique_ptr<Protobuf::Message> typed_message(
+      message_factory.GetPrototype(concrete_descriptor)->New());
 
   // Finally we can unpack, redact, and repack the opaque message using the provided callbacks.
   unpack(typed_message.get(), reflection, value_field_descriptor);
@@ -704,10 +694,11 @@ void redact(Protobuf::Message* message, bool ancestor_is_sensitive) {
     return;
   }
 
+  const auto* descriptor = message->GetDescriptor();
   const auto* reflection = message->GetReflection();
-  std::vector<const Protobuf::FieldDescriptor*> field_descriptors;
-  reflection->ListFields(*message, &field_descriptors);
-  for (const auto* field_descriptor : field_descriptors) {
+  for (int i = 0; i < descriptor->field_count(); ++i) {
+    const auto* field_descriptor = descriptor->field(i);
+
     // Redact if this field or any of its ancestors have the `sensitive` option set.
     const bool sensitive = ancestor_is_sensitive ||
                            field_descriptor->options().GetExtension(udpa::annotations::sensitive);
@@ -719,7 +710,7 @@ void redact(Protobuf::Message* message, bool ancestor_is_sensitive) {
         for (int i = 0; i < field_size; ++i) {
           redact(reflection->MutableRepeatedMessage(message, field_descriptor, i), sensitive);
         }
-      } else {
+      } else if (reflection->HasField(*message, field_descriptor)) {
         redact(reflection->MutableMessage(message, field_descriptor), sensitive);
       }
     } else if (sensitive) {
@@ -731,7 +722,7 @@ void redact(Protobuf::Message* message, bool ancestor_is_sensitive) {
           for (int i = 0; i < field_size; ++i) {
             reflection->SetRepeatedString(message, field_descriptor, i, "[redacted]");
           }
-        } else {
+        } else if (reflection->HasField(*message, field_descriptor)) {
           reflection->SetString(message, field_descriptor, "[redacted]");
         }
       } else {
