@@ -895,8 +895,8 @@ if __name__ == "__main__":
   def ownedDirectories(error_messages):
     owned = []
     maintainers = [
-        '@mattklein123', '@htuch', '@alyssawilk', '@zuercher', '@lizan', '@snowp', '@junr03',
-        '@dnoe', '@dio', '@jmarantz'
+        '@mattklein123', '@htuch', '@alyssawilk', '@zuercher', '@lizan', '@snowp', '@asraa',
+        '@junr03', '@dio', '@jmarantz'
     ]
 
     try:

@@ -112,7 +112,7 @@ RateLimitPolicyEntryImpl::RateLimitPolicyEntryImpl(
       break;
     default:
       throw EnvoyException(
-          fmt::format("unsupported RateLimit Action {}", action.action_specifier_case()));
+          absl::StrCat("unsupported RateLimit Action ", action.action_specifier_case()));
     }
   }
 }

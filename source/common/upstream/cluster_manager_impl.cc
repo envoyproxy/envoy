@@ -271,7 +271,7 @@ ClusterManagerImpl::ClusterManagerImpl(
           main_thread_dispatcher,
           *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
               "envoy.service.discovery.v2.AggregatedDiscoveryService.DeltaAggregatedResources"),
-          random_, stats_,
+          dyn_resources.ads_config().transport_api_version(), random_, stats_,
           Envoy::Config::Utility::parseRateLimitSettings(dyn_resources.ads_config()), local_info);
     } else {
       ads_mux_ = std::make_shared<Config::GrpcMuxImpl>(
@@ -287,7 +287,7 @@ ClusterManagerImpl::ClusterManagerImpl(
                     "StreamAggregatedResources"
                   : "envoy.service.discovery.v2.AggregatedDiscoveryService."
                     "StreamAggregatedResources"),
-          random_, stats_,
+          dyn_resources.ads_config().transport_api_version(), random_, stats_,
           Envoy::Config::Utility::parseRateLimitSettings(dyn_resources.ads_config()),
           bootstrap.dynamic_resources().ads_config().set_node_on_first_message_only());
     }

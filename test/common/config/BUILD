@@ -294,6 +294,14 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "pausable_ack_queue_test",
+    srcs = ["pausable_ack_queue_test.cc"],
+    deps = [
+        "//source/common/config:pausable_ack_queue_lib",
+    ],
+)
+
+envoy_cc_test(
     name = "metadata_test",
     srcs = ["metadata_test.cc"],
     deps = [

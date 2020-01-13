@@ -187,6 +187,7 @@ envoy_cc_library(
         ":delta_subscription_state_lib",
         ":grpc_stream_lib",
         ":pausable_ack_queue_lib",
+        ":version_converter_lib",
         ":watch_map_lib",
         "//include/envoy/event:dispatcher_interface",
         "//include/envoy/grpc:async_client_interface",
@@ -204,6 +205,7 @@ envoy_cc_library(
     ],
     deps = [
         ":api_version_lib",
+        ":version_converter_lib",
         "//include/envoy/config:subscription_interface",
         "//include/envoy/event:dispatcher_interface",
         "//source/common/buffer:buffer_lib",
@@ -238,8 +240,8 @@ envoy_cc_library(
     srcs = ["pausable_ack_queue.cc"],
     hdrs = ["pausable_ack_queue.h"],
     deps = [
+        ":update_ack_lib",
         "//source/common/common:assert_lib",
-        "@com_google_googleapis//google/rpc:status_cc_proto",
     ],
 )
 
@@ -248,6 +250,7 @@ envoy_cc_library(
     hdrs = ["protobuf_link_hacks.h"],
     deps = [
         "@envoy_api//envoy/api/v2:pkg_cc_proto",
+        "@envoy_api//envoy/config/bootstrap/v2:pkg_cc_proto",
         "@envoy_api//envoy/service/cluster/v3alpha:pkg_cc_proto",
         "@envoy_api//envoy/service/discovery/v2:pkg_cc_proto",
         "@envoy_api//envoy/service/discovery/v3alpha:pkg_cc_proto",
@@ -320,6 +323,12 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "update_ack_lib",
+    hdrs = ["update_ack.h"],
+    deps = ["@com_google_googleapis//google/rpc:status_cc_proto"],
+)
+
+envoy_cc_library(
     name = "utility_lib",
     srcs = ["utility.cc"],
     hdrs = ["utility.h"],
@@ -359,6 +368,7 @@ envoy_cc_library(
     deps = [
         ":api_type_oracle_lib",
         "//source/common/protobuf",
+        "@envoy_api//envoy/config/core/v3alpha:pkg_cc_proto",
     ],
 )
 

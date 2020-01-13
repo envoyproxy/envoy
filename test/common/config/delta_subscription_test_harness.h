@@ -41,7 +41,8 @@ public:
     EXPECT_CALL(dispatcher_, createTimer_(_));
     xds_context_ = std::make_shared<NewGrpcMuxImpl>(
         std::unique_ptr<Grpc::MockAsyncClient>(async_client_), dispatcher_, *method_descriptor_,
-        random_, stats_store_, rate_limit_settings_, local_info_);
+        envoy::config::core::v3alpha::ApiVersion::AUTO, random_, stats_store_, rate_limit_settings_,
+        local_info_);
     subscription_ = std::make_unique<DeltaSubscriptionImpl>(
         xds_context_, Config::TypeUrl::get().ClusterLoadAssignment, callbacks_, stats_,
         init_fetch_timeout, false);

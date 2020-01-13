@@ -427,6 +427,47 @@ TEST(WatchMapTest, OnConfigUpdateFailed) {
   watch_map.onConfigUpdateFailed(ConfigUpdateFailureReason::UpdateRejected, nullptr);
 }
 
+// verifies that a watch is updated with the resource name
+TEST(WatchMapTest, ConvertAliasWatchesToNameWatches) {
+  NamedMockSubscriptionCallbacks callbacks;
+  WatchMap watch_map;
+  Watch* watch = watch_map.addWatch(callbacks);
+  watch_map.updateWatchInterest(watch, {"alias"});
+
+  envoy::service::discovery::v3alpha::Resource resource;
+  resource.set_name("resource");
+  resource.set_version("version");
+  for (const auto alias : {"alias", "alias1", "alias2"}) {
+    resource.add_aliases(alias);
+  }
+
+  AddedRemoved converted = watch_map.convertAliasWatchesToNameWatches(resource);
+
+  EXPECT_EQ(std::set<std::string>{"resource"}, converted.added_);
+  EXPECT_EQ(std::set<std::string>{"alias"}, converted.removed_);
+}
+
+// verifies that if a resource contains an alias the same as its name, and the watch has been set
+// with that alias, the watch won't be updated
+TEST(WatchMapTest, ConvertAliasWatchesToNameWatchesAliasIsSameAsName) {
+  NamedMockSubscriptionCallbacks callbacks;
+  WatchMap watch_map;
+  Watch* watch = watch_map.addWatch(callbacks);
+  watch_map.updateWatchInterest(watch, {"name-and-alias"});
+
+  envoy::service::discovery::v3alpha::Resource resource;
+  resource.set_name("name-and-alias");
+  resource.set_version("version");
+  for (const auto alias : {"name-and-alias", "alias1", "alias2"}) {
+    resource.add_aliases(alias);
+  }
+
+  AddedRemoved converted = watch_map.convertAliasWatchesToNameWatches(resource);
+
+  EXPECT_TRUE(converted.added_.empty());
+  EXPECT_TRUE(converted.removed_.empty());
+}
+
 } // namespace
 } // namespace Config
 } // namespace Envoy

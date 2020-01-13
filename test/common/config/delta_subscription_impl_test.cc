@@ -144,8 +144,9 @@ TEST(DeltaSubscriptionImplFixturelessTest, NoGrpcStream) {
       Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
           "envoy.api.v2.EndpointDiscoveryService.StreamEndpoints");
   std::shared_ptr<NewGrpcMuxImpl> xds_context = std::make_shared<NewGrpcMuxImpl>(
-      std::unique_ptr<Grpc::MockAsyncClient>(async_client), dispatcher, *method_descriptor, random,
-      stats_store, rate_limit_settings, local_info);
+      std::unique_ptr<Grpc::MockAsyncClient>(async_client), dispatcher, *method_descriptor,
+      envoy::config::core::v3alpha::ApiVersion::AUTO, random, stats_store, rate_limit_settings,
+      local_info);
 
   std::unique_ptr<DeltaSubscriptionImpl> subscription = std::make_unique<DeltaSubscriptionImpl>(
       xds_context, Config::TypeUrl::get().ClusterLoadAssignment, callbacks, stats,
