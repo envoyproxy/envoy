@@ -575,6 +575,7 @@ gcov
 genrule
 getaddrinfo
 getaffinity
+gethostname
 getifaddrs
 getpeername
 getsockname
