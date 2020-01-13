@@ -25,8 +25,8 @@ namespace AdmissionControl {
  * All stats for the admission control filter.
  */
 #define ALL_ADMISSION_CONTROL_STATS(COUNTER, GAUGE)
-  COUNTER(rq_rejected) \
-  GAUGE(success_rate_pct, Accumulate)
+COUNTER(rq_rejected)
+GAUGE(success_rate_pct, Accumulate)
 
 /**
  * Wrapper struct for admission control filter stats. @see stats_macros.h
@@ -63,8 +63,7 @@ private:
   uint32_t min_request_samples_;
 };
 
-using AdmissionControlFilterConfigSharedPtr =
-    std::shared_ptr<const AdmissionControlFilterConfig>;
+using AdmissionControlFilterConfigSharedPtr = std::shared_ptr<const AdmissionControlFilterConfig>;
 
 /**
  * Thread-local object to request counts and successes over a rolling time window. Request data for
@@ -76,8 +75,7 @@ using AdmissionControlFilterConfigSharedPtr =
  */
 class AdmissionControlState {
 public:
-  AdmissionControlState(TimeSource& time_source,
-                        AdmissionControlFilterConfigSharedPtr config,
+  AdmissionControlState(TimeSource& time_source, AdmissionControlFilterConfigSharedPtr config,
                         Runtime::RandomGenerator& random);
   void recordRequest(const bool success);
   bool shouldRejectRequest();
@@ -96,7 +94,7 @@ private:
 
   // Request data for the current time range.
   RequestData local_data_;
-  
+
   // Request data aggregated for the whole lookback window.
   RequestData global_data_;
 };
@@ -105,7 +103,7 @@ private:
  * A filter that probabilistically rejects requests based on upstream success-rate.
  */
 class AdmissionControlFilter : public Http::PassThroughFilter,
-                                  Logger::Loggable<Logger::Id::filter> {
+                               Logger::Loggable<Logger::Id::filter> {
 public:
   AdmissionControlFilter(AdmissionControlFilterConfigSharedPtr config);
 
@@ -113,16 +111,14 @@ public:
   Http::FilterHeadersStatus decodeHeaders(Http::HeaderMap&, bool) override;
 
   // Http::StreamEncoderFilter
-  void encodeComplete() override;
-  void onDestroy() override;
+  Http::FilterHeadersStatus encodeHeaders(HeaderMap& headers, bool end_stream) override;
 
   bool shouldRejectRequest() const;
 
 private:
   AdmissionControlFilterConfigSharedPtr config_;
-  std::unique_ptr<Cleanup> deferred_sample_task_;
-
-
+  // TODO @tallen thread local
+  AdmissionControlState state_;
 };
 
 } // namespace AdmissionControl

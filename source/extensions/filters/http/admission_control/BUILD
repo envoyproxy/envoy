@@ -33,7 +33,6 @@ envoy_cc_extension(
         "//include/envoy/registry",
         "//source/extensions/filters/http:well_known_names",
         "//source/extensions/filters/http/admission_control:admission_control_filter_lib",
-        "//source/extensions/filters/http/admission_control/concurrency_controller:concurrency_controller_lib",
         "//source/extensions/filters/http/common:factory_base_lib",
         "@envoy_api//envoy/extensions/filters/http/admission_control/v3alpha:pkg_cc_proto",
     ],
