@@ -7,6 +7,7 @@ Version history
 * admin: added the ability to filter :ref:`/config_dump <operations_admin_interface_config_dump>`.
 * access log: added a :ref:`typed JSON logging mode <config_access_log_format_dictionaries>` to output access logs in JSON format with non-string values
 * access log: fixed UPSTREAM_LOCAL_ADDRESS :ref:`access log formatters <config_access_log_format>` to work for http requests
+* access log: added HOSTNAME.
 * api: remove all support for v1
 * api: added ability to specify `mode` for :ref:`Pipe <envoy_api_field_core.Pipe.mode>`.
 * buffer: remove old implementation

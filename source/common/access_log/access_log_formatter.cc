@@ -1,12 +1,14 @@
 #include "common/access_log/access_log_formatter.h"
 
 #include <cstdint>
+#include <limits.h>
 #include <regex>
 #include <string>
 #include <vector>
 
 #include "envoy/config/core/v3alpha/base.pb.h"
 
+#include "common/api/os_sys_calls_impl.h"
 #include "common/common/assert.h"
 #include "common/common/empty_string.h"
 #include "common/common/fmt.h"
@@ -696,6 +698,24 @@ StreamInfoFormatter::StreamInfoFormatter(const std::string& field_name) {
           }
           return result;
         });
+  } else if (field_name == "HOSTNAME") {
+#ifdef HOST_NAME_MAX
+    const size_t len = HOST_NAME_MAX;
+#else
+    // This is notably the case in OSX.
+    const size_t len = 255;
+#endif
+    char name[len];
+    Api::OsSysCalls& os_sys_calls = Api::OsSysCallsSingleton::get();
+    const Api::SysCallIntResult result = os_sys_calls.gethostname(name, len);
+
+    std::string hostname = "-";
+    if (result.rc_ == 0) {
+      hostname.assign(name);
+    }
+
+    field_extractor_ = std::make_unique<StreamInfoOptionalStringFieldExtractor>(
+        [hostname](const StreamInfo::StreamInfo&) { return hostname; });
   } else {
     throw EnvoyException(fmt::format("Not supported field in StreamInfo: {}", field_name));
   }
