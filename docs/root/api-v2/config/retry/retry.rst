@@ -7,3 +7,4 @@ Retry Predicates
 
   */empty/*
   */*
+  */v2/*

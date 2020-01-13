@@ -1,7 +1,7 @@
 #include "extensions/filters/network/rbac/rbac_filter.h"
 
 #include "envoy/buffer/buffer.h"
-#include "envoy/config/filter/network/rbac/v2/rbac.pb.h"
+#include "envoy/extensions/filters/network/rbac/v3alpha/rbac.pb.h"
 #include "envoy/network/connection.h"
 
 #include "extensions/filters/network/well_known_names.h"
@@ -14,7 +14,8 @@ namespace NetworkFilters {
 namespace RBACFilter {
 
 RoleBasedAccessControlFilterConfig::RoleBasedAccessControlFilterConfig(
-    const envoy::config::filter::network::rbac::v2::RBAC& proto_config, Stats::Scope& scope)
+    const envoy::extensions::filters::network::rbac::v3alpha::RBAC& proto_config,
+    Stats::Scope& scope)
     : stats_(Filters::Common::RBAC::generateStats(proto_config.stat_prefix(), scope)),
       engine_(Filters::Common::RBAC::createEngine(proto_config)),
       shadow_engine_(Filters::Common::RBAC::createShadowEngine(proto_config)),
@@ -38,7 +39,8 @@ Network::FilterStatus RoleBasedAccessControlFilter::onData(Buffer::Instance&, bo
 
   // When the enforcement type is continuous always do the RBAC checks. If it is a one time check,
   // run the check once and skip it for subsequent onData calls.
-  if (config_->enforcementType() == envoy::config::filter::network::rbac::v2::RBAC::CONTINUOUS) {
+  if (config_->enforcementType() ==
+      envoy::extensions::filters::network::rbac::v3alpha::RBAC::CONTINUOUS) {
     shadow_engine_result_ = checkEngine(Filters::Common::RBAC::EnforcementMode::Shadow);
     engine_result_ = checkEngine(Filters::Common::RBAC::EnforcementMode::Enforced);
   } else {

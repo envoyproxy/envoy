@@ -2,9 +2,9 @@
 
 #include <memory>
 
-#include "envoy/api/v2/core/base.pb.h"
-#include "envoy/service/auth/v2/external_auth.pb.h"
-#include "envoy/type/http_status.pb.h"
+#include "envoy/config/core/v3alpha/base.pb.h"
+#include "envoy/service/auth/v3alpha/external_auth.pb.h"
+#include "envoy/type/v3alpha/http_status.pb.h"
 
 #include "test/mocks/upstream/mocks.h"
 
@@ -15,10 +15,10 @@ namespace Common {
 namespace ExtAuthz {
 
 CheckResponsePtr TestCommon::makeCheckResponse(Grpc::Status::GrpcStatus response_status,
-                                               envoy::type::StatusCode http_status_code,
+                                               envoy::type::v3alpha::StatusCode http_status_code,
                                                const std::string& body,
                                                const HeaderValueOptionVector& headers) {
-  auto response = std::make_unique<envoy::service::auth::v2::CheckResponse>();
+  auto response = std::make_unique<envoy::service::auth::v3alpha::CheckResponse>();
   auto status = response->mutable_status();
   status->set_code(response_status);
 
@@ -76,7 +76,7 @@ Response TestCommon::makeAuthzResponse(CheckStatus status, Http::Code status_cod
 HeaderValueOptionVector TestCommon::makeHeaderValueOption(KeyValueOptionVector&& headers) {
   HeaderValueOptionVector header_option_vector{};
   for (const auto& header : headers) {
-    envoy::api::v2::core::HeaderValueOption header_value_option;
+    envoy::config::core::v3alpha::HeaderValueOption header_value_option;
     auto* mutable_header = header_value_option.mutable_header();
     mutable_header->set_key(header.key);
     mutable_header->set_value(header.value);

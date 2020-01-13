@@ -1,6 +1,6 @@
 #include <vector>
 
-#include "envoy/config/filter/network/redis_proxy/v2/redis_proxy.pb.h"
+#include "envoy/extensions/filters/network/redis_proxy/v3alpha/redis_proxy.pb.h"
 
 #include "common/buffer/buffer_impl.h"
 #include "common/network/utility.h"
@@ -13,6 +13,7 @@
 #include "test/extensions/filters/network/common/redis/test_utils.h"
 #include "test/mocks/network/mocks.h"
 #include "test/mocks/upstream/mocks.h"
+#include "test/test_common/simulated_time_system.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -21,8 +22,10 @@ using testing::_;
 using testing::Eq;
 using testing::InSequence;
 using testing::Invoke;
+using testing::Property;
 using testing::Ref;
 using testing::Return;
+using testing::ReturnRef;
 using testing::SaveArg;
 
 namespace Envoy {
@@ -32,7 +35,9 @@ namespace Common {
 namespace Redis {
 namespace Client {
 
-class RedisClientImplTest : public testing::Test, public Common::Redis::DecoderFactory {
+class RedisClientImplTest : public testing::Test,
+                            public Event::TestUsingSimulatedTime,
+                            public Common::Redis::DecoderFactory {
 public:
   // Common::Redis::DecoderFactory
   Common::Redis::DecoderPtr create(Common::Redis::DecoderCallbacks& callbacks) override {
@@ -102,9 +107,8 @@ public:
     client_impl->onRespValue(std::move(response1));
   }
 
-  void testInitializeReadPolicy(
-      envoy::config::filter::network::redis_proxy::v2::RedisProxy::ConnPoolSettings::ReadPolicy
-          read_policy) {
+  void testInitializeReadPolicy(envoy::extensions::filters::network::redis_proxy::v3alpha::
+                                    RedisProxy::ConnPoolSettings::ReadPolicy read_policy) {
     InSequence s;
 
     setup(std::make_unique<ConfigImpl>(createConnPoolSettings(20, true, true, 100, read_policy)));
@@ -136,7 +140,7 @@ public:
   Network::ReadFilterSharedPtr upstream_read_filter_;
   std::unique_ptr<Config> config_;
   ClientPtr client_;
-  Stats::IsolatedStoreImpl stats_;
+  NiceMock<Stats::MockIsolatedStatsStore> stats_;
   Stats::ScopePtr stats_scope_;
   Common::Redis::RedisCommandStatsSharedPtr redis_command_stats_;
   std::string auth_password_;
@@ -333,6 +337,171 @@ TEST_F(RedisClientImplTest, Basic) {
   client_->close();
 }
 
+class ConfigEnableCommandStats : public Config {
+  bool disableOutlierEvents() const override { return false; }
+  std::chrono::milliseconds opTimeout() const override { return std::chrono::milliseconds(25); }
+  bool enableHashtagging() const override { return false; }
+  bool enableRedirection() const override { return false; }
+  unsigned int maxBufferSizeBeforeFlush() const override { return 0; }
+  std::chrono::milliseconds bufferFlushTimeoutInMs() const override {
+    return std::chrono::milliseconds(0);
+  }
+  ReadPolicy readPolicy() const override { return ReadPolicy::Master; }
+  uint32_t maxUpstreamUnknownConnections() const override { return 0; }
+  bool enableCommandStats() const override { return true; }
+};
+
+void initializeRedisSimpleCommand(Common::Redis::RespValue* request, std::string command_name,
+                                  std::string key) {
+  std::vector<Common::Redis::RespValue> command(2);
+  command[0].type(Common::Redis::RespType::BulkString);
+  command[0].asString() = command_name;
+  command[1].type(Common::Redis::RespType::BulkString);
+  command[1].asString() = key;
+
+  request->type(Common::Redis::RespType::Array);
+  request->asArray().swap(command);
+}
+
+TEST_F(RedisClientImplTest, CommandStatsDisabledSingleRequest) {
+  // Single successful GET request. The upstream command timer works even with stats disabled;
+  // however the per command timers and counts will not be recorded.
+  InSequence s;
+
+  setup();
+
+  client_->initialize(auth_password_);
+
+  std::string get_command = "get";
+
+  Common::Redis::RespValue request1;
+  initializeRedisSimpleCommand(&request1, get_command, "foo");
+  MockClientCallbacks callbacks1;
+  EXPECT_CALL(*encoder_, encode(Ref(request1), _));
+  EXPECT_CALL(*flush_timer_, enabled()).WillOnce(Return(false));
+  PoolRequest* handle1 = client_->makeRequest(request1, callbacks1);
+  EXPECT_NE(nullptr, handle1);
+
+  onConnected();
+
+  // Regular Envoy stats function as normal
+  EXPECT_EQ(1UL, host_->cluster_.stats_.upstream_rq_total_.value());
+  EXPECT_EQ(1UL, host_->cluster_.stats_.upstream_rq_active_.value());
+  EXPECT_EQ(1UL, host_->stats_.rq_total_.value());
+  EXPECT_EQ(1UL, host_->stats_.rq_active_.value());
+
+  Buffer::OwnedImpl fake_data;
+  EXPECT_CALL(*decoder_, decode(Ref(fake_data))).WillOnce(Invoke([&](Buffer::Instance&) -> void {
+    InSequence s;
+
+    simTime().setMonotonicTime(std::chrono::microseconds(10));
+
+    EXPECT_CALL(stats_,
+                deliverHistogramToSinks(
+                    Property(&Stats::Metric::name, "upstream_commands.upstream_rq_time"), 10));
+
+    Common::Redis::RespValuePtr response1(new Common::Redis::RespValue());
+    EXPECT_CALL(callbacks1, onResponse_(Ref(response1)));
+    EXPECT_CALL(*connect_or_op_timer_, disableTimer());
+    EXPECT_CALL(host_->outlier_detector_,
+                putResult(Upstream::Outlier::Result::ExtOriginRequestSuccess, _));
+
+    callbacks_->onRespValue(std::move(response1));
+  }));
+
+  upstream_read_filter_->onData(fake_data, false);
+  EXPECT_CALL(*upstream_connection_, close(Network::ConnectionCloseType::NoFlush));
+  EXPECT_CALL(*connect_or_op_timer_, disableTimer());
+  client_->close();
+
+  // The redis command stats should not show any requests
+  EXPECT_EQ(0UL, stats_.counter("upstream_commands.get.success").value());
+  EXPECT_EQ(0UL, stats_.counter("upstream_commands.get.failure").value());
+  EXPECT_EQ(0UL, stats_.counter("upstream_commands.get.total").value());
+}
+
+TEST_F(RedisClientImplTest, CommandStatsEnabledTwoRequests) {
+  // Make two GET requests (one success, one failure) and verify command stats are recorded
+  InSequence s;
+
+  setup(std::make_unique<ConfigEnableCommandStats>());
+
+  client_->initialize(auth_password_);
+
+  std::string get_command = "get";
+
+  Common::Redis::RespValue request1;
+  initializeRedisSimpleCommand(&request1, get_command, "foo");
+  MockClientCallbacks callbacks1;
+  EXPECT_CALL(*encoder_, encode(Ref(request1), _));
+  EXPECT_CALL(*flush_timer_, enabled()).WillOnce(Return(false));
+  PoolRequest* handle1 = client_->makeRequest(request1, callbacks1);
+  EXPECT_NE(nullptr, handle1);
+
+  onConnected();
+
+  Common::Redis::RespValue request2;
+  initializeRedisSimpleCommand(&request2, get_command, "bar");
+  MockClientCallbacks callbacks2;
+  EXPECT_CALL(*encoder_, encode(Ref(request2), _));
+  EXPECT_CALL(*flush_timer_, enabled()).WillOnce(Return(false));
+  PoolRequest* handle2 = client_->makeRequest(request2, callbacks2);
+  EXPECT_NE(nullptr, handle2);
+
+  // Regular Envoy stats function as normal
+  EXPECT_EQ(2UL, host_->cluster_.stats_.upstream_rq_total_.value());
+  EXPECT_EQ(2UL, host_->cluster_.stats_.upstream_rq_active_.value());
+  EXPECT_EQ(2UL, host_->stats_.rq_total_.value());
+  EXPECT_EQ(2UL, host_->stats_.rq_active_.value());
+
+  Buffer::OwnedImpl fake_data;
+  EXPECT_CALL(*decoder_, decode(Ref(fake_data))).WillOnce(Invoke([&](Buffer::Instance&) -> void {
+    InSequence s;
+
+    simTime().setMonotonicTime(std::chrono::microseconds(10));
+
+    EXPECT_CALL(stats_, deliverHistogramToSinks(
+                            Property(&Stats::Metric::name, "upstream_commands.get.latency"), 10));
+    EXPECT_CALL(stats_,
+                deliverHistogramToSinks(
+                    Property(&Stats::Metric::name, "upstream_commands.upstream_rq_time"), 10));
+
+    // First request is successful
+    Common::Redis::RespValuePtr response1(new Common::Redis::RespValue());
+    EXPECT_CALL(callbacks1, onResponse_(Ref(response1)));
+    EXPECT_CALL(*connect_or_op_timer_, enableTimer(_, _));
+    EXPECT_CALL(host_->outlier_detector_,
+                putResult(Upstream::Outlier::Result::ExtOriginRequestSuccess, _));
+    callbacks_->onRespValue(std::move(response1));
+
+    EXPECT_CALL(stats_, deliverHistogramToSinks(
+                            Property(&Stats::Metric::name, "upstream_commands.get.latency"), 10));
+    EXPECT_CALL(stats_,
+                deliverHistogramToSinks(
+                    Property(&Stats::Metric::name, "upstream_commands.upstream_rq_time"), 10));
+
+    // Second request errors out
+    Common::Redis::RespValuePtr response2(new Common::Redis::RespValue());
+    response2->type(Common::Redis::RespType::Error);
+    EXPECT_CALL(callbacks2, onResponse_(Ref(response2)));
+    EXPECT_CALL(*connect_or_op_timer_, disableTimer());
+    EXPECT_CALL(host_->outlier_detector_,
+                putResult(Upstream::Outlier::Result::ExtOriginRequestSuccess, _));
+    callbacks_->onRespValue(std::move(response2));
+
+    // Redis command stats reflect one successful and one failed request
+    EXPECT_EQ(1UL, stats_.counter("upstream_commands.get.success").value());
+    EXPECT_EQ(1UL, stats_.counter("upstream_commands.get.failure").value());
+    EXPECT_EQ(2UL, stats_.counter("upstream_commands.get.total").value());
+  }));
+
+  upstream_read_filter_->onData(fake_data, false);
+
+  EXPECT_CALL(*upstream_connection_, close(Network::ConnectionCloseType::NoFlush));
+  EXPECT_CALL(*connect_or_op_timer_, disableTimer());
+  client_->close();
+}
+
 TEST_F(RedisClientImplTest, InitializedWithAuthPassword) {
   InSequence s;
 
@@ -355,23 +524,23 @@ TEST_F(RedisClientImplTest, InitializedWithAuthPassword) {
 }
 
 TEST_F(RedisClientImplTest, InitializedWithPreferMasterReadPolicy) {
-  testInitializeReadPolicy(
-      envoy::config::filter::network::redis_proxy::v2::RedisProxy::ConnPoolSettings::PREFER_MASTER);
+  testInitializeReadPolicy(envoy::extensions::filters::network::redis_proxy::v3alpha::RedisProxy::
+                               ConnPoolSettings::PREFER_MASTER);
 }
 
 TEST_F(RedisClientImplTest, InitializedWithReplicaReadPolicy) {
-  testInitializeReadPolicy(
-      envoy::config::filter::network::redis_proxy::v2::RedisProxy::ConnPoolSettings::REPLICA);
+  testInitializeReadPolicy(envoy::extensions::filters::network::redis_proxy::v3alpha::RedisProxy::
+                               ConnPoolSettings::REPLICA);
 }
 
 TEST_F(RedisClientImplTest, InitializedWithPreferReplicaReadPolicy) {
-  testInitializeReadPolicy(envoy::config::filter::network::redis_proxy::v2::RedisProxy::
+  testInitializeReadPolicy(envoy::extensions::filters::network::redis_proxy::v3alpha::RedisProxy::
                                ConnPoolSettings::PREFER_REPLICA);
 }
 
 TEST_F(RedisClientImplTest, InitializedWithAnyReadPolicy) {
   testInitializeReadPolicy(
-      envoy::config::filter::network::redis_proxy::v2::RedisProxy::ConnPoolSettings::ANY);
+      envoy::extensions::filters::network::redis_proxy::v3alpha::RedisProxy::ConnPoolSettings::ANY);
 }
 
 TEST_F(RedisClientImplTest, Cancel) {

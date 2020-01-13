@@ -370,3 +370,8 @@ alias(
         },
     ),
 )
+
+alias(
+    name = "remote_jdk11",
+    actual = "@bazel_tools//tools/jdk:remote_jdk11",
+)

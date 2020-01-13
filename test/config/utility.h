@@ -6,14 +6,14 @@
 #include <vector>
 
 #include "envoy/api/api.h"
-#include "envoy/api/v2/auth/cert.pb.h"
-#include "envoy/api/v2/cds.pb.h"
-#include "envoy/api/v2/core/base.pb.h"
-#include "envoy/api/v2/eds.pb.h"
-#include "envoy/api/v2/listener/listener.pb.h"
-#include "envoy/api/v2/route/route.pb.h"
-#include "envoy/config/bootstrap/v2/bootstrap.pb.h"
-#include "envoy/config/filter/network/http_connection_manager/v2/http_connection_manager.pb.h"
+#include "envoy/config/bootstrap/v3alpha/bootstrap.pb.h"
+#include "envoy/config/cluster/v3alpha/cluster.pb.h"
+#include "envoy/config/core/v3alpha/base.pb.h"
+#include "envoy/config/endpoint/v3alpha/endpoint.pb.h"
+#include "envoy/config/listener/v3alpha/listener_components.pb.h"
+#include "envoy/config/route/v3alpha/route_components.pb.h"
+#include "envoy/extensions/filters/network/http_connection_manager/v3alpha/http_connection_manager.pb.h"
+#include "envoy/extensions/transport_sockets/tls/v3alpha/cert.pb.h"
 #include "envoy/http/codes.h"
 
 #include "common/network/address_impl.h"
@@ -62,12 +62,14 @@ public:
   ConfigHelper(const Network::Address::IpVersion version, Api::Api& api,
                const std::string& config = HTTP_PROXY_CONFIG);
 
-  static void initializeTls(const ServerSslOptions& options,
-                            envoy::api::v2::auth::CommonTlsContext& common_context);
+  static void initializeTls(
+      const ServerSslOptions& options,
+      envoy::extensions::transport_sockets::tls::v3alpha::CommonTlsContext& common_context);
 
-  using ConfigModifierFunction = std::function<void(envoy::config::bootstrap::v2::Bootstrap&)>;
-  using HttpModifierFunction = std::function<void(
-      envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager&)>;
+  using ConfigModifierFunction = std::function<void(envoy::config::bootstrap::v3alpha::Bootstrap&)>;
+  using HttpModifierFunction =
+      std::function<void(envoy::extensions::filters::network::http_connection_manager::v3alpha::
+                             HttpConnectionManager&)>;
 
   // A basic configuration (admin port, cluster_0, one listener) with no network filters.
   static const std::string BASE_CONFIG;
@@ -95,8 +97,8 @@ public:
   static std::string discoveredClustersBootstrap(const std::string& api_type);
   static std::string adsBootstrap(const std::string& api_type);
   // Builds a standard Cluster config fragment, with a single endpoint (at loopback:port).
-  static envoy::api::v2::Cluster buildCluster(const std::string& name, int port,
-                                              const std::string& ip_version);
+  static envoy::config::cluster::v3alpha::Cluster buildCluster(const std::string& name, int port,
+                                                               const std::string& ip_version);
 
   // Run the final config modifiers, and then set the upstream ports based on upstream connections.
   // This is the last operation run on |bootstrap_| before it is handed to Envoy.
@@ -122,10 +124,10 @@ public:
   // Set the connect timeout on upstream connections.
   void setConnectTimeout(std::chrono::milliseconds timeout);
 
-  envoy::api::v2::route::VirtualHost createVirtualHost(const char* host, const char* route = "/",
-                                                       const char* cluster = "cluster_0");
+  envoy::config::route::v3alpha::VirtualHost
+  createVirtualHost(const char* host, const char* route = "/", const char* cluster = "cluster_0");
 
-  void addVirtualHost(const envoy::api::v2::route::VirtualHost& vhost);
+  void addVirtualHost(const envoy::config::route::v3alpha::VirtualHost& vhost);
 
   // Add an HTTP filter prior to existing filters.
   void addFilter(const std::string& filter_yaml);
@@ -134,9 +136,8 @@ public:
   void addNetworkFilter(const std::string& filter_yaml);
 
   // Sets the client codec to the specified type.
-  void setClientCodec(
-      envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager::CodecType
-          type);
+  void setClientCodec(envoy::extensions::filters::network::http_connection_manager::v3alpha::
+                          HttpConnectionManager::CodecType type);
 
   // Add the default SSL configuration.
   void addSslConfig(const ServerSslOptions& options);
@@ -165,7 +166,7 @@ public:
   void setOutboundFramesLimits(uint32_t max_all_frames, uint32_t max_control_frames);
 
   // Return the bootstrap configuration for hand-off to Envoy.
-  const envoy::config::bootstrap::v2::Bootstrap& bootstrap() { return bootstrap_; }
+  const envoy::config::bootstrap::v3alpha::Bootstrap& bootstrap() { return bootstrap_; }
 
   // Allow a finalized configuration to be edited for generating xDS responses
   void applyConfigModifiers();
@@ -177,23 +178,23 @@ public:
 private:
   // Load the first HCM struct from the first listener into a parsed proto.
   bool loadHttpConnectionManager(
-      envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager& hcm);
+      envoy::extensions::filters::network::http_connection_manager::v3alpha::HttpConnectionManager&
+          hcm);
   // Take the contents of the provided HCM proto and stuff them into the first HCM
   // struct of the first listener.
-  void storeHttpConnectionManager(
-      const envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager&
-          hcm);
+  void storeHttpConnectionManager(const envoy::extensions::filters::network::
+                                      http_connection_manager::v3alpha::HttpConnectionManager& hcm);
 
   // Finds the filter named 'name' from the first filter chain from the first listener.
-  envoy::api::v2::listener::Filter* getFilterFromListener(const std::string& name);
+  envoy::config::listener::v3alpha::Filter* getFilterFromListener(const std::string& name);
 
   // Configure a tap transport socket for a cluster/filter chain.
   void setTapTransportSocket(const std::string& tap_path, const std::string& type,
-                             envoy::api::v2::core::TransportSocket& transport_socket,
-                             const absl::optional<ProtobufWkt::Struct>& tls_config);
+                             envoy::config::core::v3alpha::TransportSocket& transport_socket,
+                             const Protobuf::Message* tls_config);
 
   // The bootstrap proto Envoy will start up with.
-  envoy::config::bootstrap::v2::Bootstrap bootstrap_;
+  envoy::config::bootstrap::v3alpha::Bootstrap bootstrap_;
 
   // The config modifiers added via addConfigModifier() which will be applied in finalize()
   std::vector<ConfigModifierFunction> config_modifiers_;
@@ -216,7 +217,7 @@ public:
   CdsHelper();
 
   // Set CDS contents on filesystem.
-  void setCds(const std::vector<envoy::api::v2::Cluster>& cluster);
+  void setCds(const std::vector<envoy::config::cluster::v3alpha::Cluster>& cluster);
   const std::string& cds_path() const { return cds_path_; }
 
 private:
@@ -230,10 +231,11 @@ public:
   EdsHelper();
 
   // Set EDS contents on filesystem and wait for Envoy to pick this up.
-  void setEds(const std::vector<envoy::api::v2::ClusterLoadAssignment>& cluster_load_assignments);
-  void
-  setEdsAndWait(const std::vector<envoy::api::v2::ClusterLoadAssignment>& cluster_load_assignments,
-                IntegrationTestServerStats& server_stats);
+  void setEds(const std::vector<envoy::config::endpoint::v3alpha::ClusterLoadAssignment>&
+                  cluster_load_assignments);
+  void setEdsAndWait(const std::vector<envoy::config::endpoint::v3alpha::ClusterLoadAssignment>&
+                         cluster_load_assignments,
+                     IntegrationTestServerStats& server_stats);
   const std::string& eds_path() const { return eds_path_; }
 
 private:

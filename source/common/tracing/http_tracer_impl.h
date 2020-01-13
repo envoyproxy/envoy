@@ -2,8 +2,8 @@
 
 #include <string>
 
-#include "envoy/api/v2/core/base.pb.h"
 #include "envoy/common/platform.h"
+#include "envoy/config/core/v3alpha/base.pb.h"
 #include "envoy/local_info/local_info.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/thread_local/thread_local.h"
@@ -46,8 +46,12 @@ public:
   // Non-standard tag names.
   const std::string DownstreamCluster = "downstream_cluster";
   const std::string ErrorReason = "error.reason";
-  const std::string GrpcStatusCode = "grpc.status_code";
+  const std::string GrpcAuthority = "grpc.authority";
+  const std::string GrpcContentType = "grpc.content_type";
   const std::string GrpcMessage = "grpc.message";
+  const std::string GrpcPath = "grpc.path";
+  const std::string GrpcStatusCode = "grpc.status_code";
+  const std::string GrpcTimeout = "grpc.timeout";
   const std::string GuidXClientTraceId = "guid:x-client-trace-id";
   const std::string GuidXRequestId = "guid:x-request-id";
   const std::string HttpProtocol = "http.protocol";
@@ -245,7 +249,7 @@ public:
                     const envoy::type::tracing::v2::CustomTag::Metadata& metadata);
   void apply(Span& span, const CustomTagContext& ctx) const override;
   absl::string_view value(const CustomTagContext&) const override { return default_value_; }
-  const envoy::api::v2::core::Metadata* metadata(const CustomTagContext& ctx) const;
+  const envoy::config::core::v3alpha::Metadata* metadata(const CustomTagContext& ctx) const;
 
 protected:
   const envoy::type::metadata::v2::MetadataKind::KindCase kind_;

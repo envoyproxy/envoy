@@ -4,6 +4,8 @@
 #include <memory>
 #include <new>
 
+#include "envoy/config/listener/v3alpha/listener.pb.h"
+
 #include "common/common/compiler_requirements.h"
 #include "common/common/perf_annotation.h"
 #include "common/network/utility.h"
@@ -29,7 +31,8 @@ Server::DrainManagerPtr ProdComponentFactory::createDrainManager(Server::Instanc
   // The global drain manager only triggers on listener modification, which effectively is
   // hot restart at the global level. The per-listener drain managers decide whether to
   // to include /healthcheck/fail status.
-  return std::make_unique<Server::DrainManagerImpl>(server, envoy::api::v2::Listener::MODIFY_ONLY);
+  return std::make_unique<Server::DrainManagerImpl>(
+      server, envoy::config::listener::v3alpha::Listener::MODIFY_ONLY);
 }
 
 Runtime::LoaderPtr ProdComponentFactory::createRuntime(Server::Instance& server,

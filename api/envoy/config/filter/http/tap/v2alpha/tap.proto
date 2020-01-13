@@ -4,11 +4,14 @@ package envoy.config.filter.http.tap.v2alpha;
 
 import "envoy/config/common/tap/v2alpha/common.proto";
 
+import "udpa/annotations/migrate.proto";
 import "validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.config.filter.http.tap.v2alpha";
 option java_outer_classname = "TapProto";
 option java_multiple_files = true;
+option (udpa.annotations.file_migrate).move_to_package =
+    "envoy.extensions.filters.http.tap.v3alpha";
 
 // [#protodoc-title: Tap]
 // Tap :ref:`configuration overview <config_http_filters_tap>`.

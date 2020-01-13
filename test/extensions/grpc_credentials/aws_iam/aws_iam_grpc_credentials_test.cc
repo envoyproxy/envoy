@@ -1,5 +1,5 @@
-#include "envoy/api/v2/core/grpc_service.pb.h"
-#include "envoy/config/grpc_credential/v2alpha/aws_iam.pb.h"
+#include "envoy/config/core/v3alpha/grpc_service.pb.h"
+#include "envoy/config/grpc_credential/v3alpha/aws_iam.pb.h"
 
 #include "common/common/fmt.h"
 #include "common/common/utility.h"
@@ -49,7 +49,7 @@ public:
     EXPECT_TRUE(absl::StartsWith(auth_parts[3], "Signature="));
   }
 
-  envoy::api::v2::core::GrpcService createGoogleGrpcConfig() override {
+  envoy::config::core::v3alpha::GrpcService createGoogleGrpcConfig() override {
     auto config = GrpcSslClientIntegrationTest::createGoogleGrpcConfig();
     auto* google_grpc = config.mutable_google_grpc();
     google_grpc->set_credentials_factory_name(credentials_factory_name_);
@@ -61,11 +61,13 @@ public:
     if (region_in_env_) {
       TestEnvironment::setEnvVar("AWS_REGION", region_name_, 1);
       config_yaml = fmt::format(R"EOF(
+"@type": type.googleapis.com/envoy.config.grpc_credential.v2alpha.AwsIamConfig        
 service_name: {}
 )EOF",
                                 service_name_);
     } else {
       config_yaml = fmt::format(R"EOF(
+"@type": type.googleapis.com/envoy.config.grpc_credential.v2alpha.AwsIamConfig        
 service_name: {}
 region: {}
 )EOF",
@@ -74,9 +76,8 @@ region: {}
 
     auto* plugin_config = google_grpc->add_call_credentials()->mutable_from_plugin();
     plugin_config->set_name(credentials_factory_name_);
-    envoy::config::grpc_credential::v2alpha::AwsIamConfig metadata_config;
-    Envoy::TestUtility::loadFromYaml(config_yaml, *plugin_config->mutable_config());
-
+    envoy::config::grpc_credential::v3alpha::AwsIamConfig metadata_config;
+    Envoy::TestUtility::loadFromYaml(config_yaml, *plugin_config->mutable_typed_config());
     return config;
   }
 

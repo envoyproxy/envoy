@@ -6,11 +6,14 @@ import "envoy/config/filter/accesslog/v2/accesslog.proto";
 
 import "google/protobuf/wrappers.proto";
 
+import "udpa/annotations/migrate.proto";
 import "validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.config.filter.http.router.v2";
 option java_outer_classname = "RouterProto";
 option java_multiple_files = true;
+option (udpa.annotations.file_migrate).move_to_package =
+    "envoy.extensions.filters.http.router.v3alpha";
 
 // [#protodoc-title: Router]
 // Router :ref:`configuration overview <config_http_filters_router>`.

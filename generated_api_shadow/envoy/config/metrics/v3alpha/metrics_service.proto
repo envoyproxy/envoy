@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package envoy.config.metrics.v3alpha;
 
-import "envoy/api/v3alpha/core/grpc_service.proto";
+import "envoy/config/core/v3alpha/grpc_service.proto";
 
 import "udpa/annotations/versioning.proto";
 
@@ -23,5 +23,5 @@ message MetricsServiceConfig {
       "envoy.config.metrics.v2.MetricsServiceConfig";
 
   // The upstream gRPC cluster that hosts the metrics service.
-  api.v3alpha.core.GrpcService grpc_service = 1 [(validate.rules).message = {required: true}];
+  core.v3alpha.GrpcService grpc_service = 1 [(validate.rules).message = {required: true}];
 }

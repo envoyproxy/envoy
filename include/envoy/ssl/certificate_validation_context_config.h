@@ -5,7 +5,7 @@
 #include <vector>
 
 #include "envoy/common/pure.h"
-#include "envoy/type/matcher/string.pb.h"
+#include "envoy/type/matcher/v3alpha/string.pb.h"
 
 namespace Envoy {
 namespace Ssl {
@@ -44,7 +44,7 @@ public:
   /**
    * @return The subject alt name matchers to be verified, if enabled.
    */
-  virtual const std::vector<::envoy::type::matcher::StringMatcher>&
+  virtual const std::vector<envoy::type::matcher::v3alpha::StringMatcher>&
   subjectAltNameMatchers() const PURE;
 
   /**

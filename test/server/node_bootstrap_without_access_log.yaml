@@ -4,7 +4,6 @@ node:
   locality:
     zone: bootstrap_zone
     sub_zone: bootstrap_sub_zone
-  build_version: should_be_ignored
 admin:
   address:
     socket_address:

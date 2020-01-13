@@ -2,11 +2,14 @@ syntax = "proto3";
 
 package envoy.config.filter.http.transcoder.v2;
 
+import "udpa/annotations/migrate.proto";
 import "validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.config.filter.http.transcoder.v2";
 option java_outer_classname = "TranscoderProto";
 option java_multiple_files = true;
+option (udpa.annotations.file_migrate).move_to_package =
+    "envoy.extensions.filters.http.grpc_json_transcoder.v3alpha";
 
 // [#protodoc-title: gRPC-JSON transcoder]
 // gRPC-JSON transcoder :ref:`configuration overview <config_http_filters_grpc_json_transcoder>`.
