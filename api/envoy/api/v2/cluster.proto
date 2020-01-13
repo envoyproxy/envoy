@@ -30,7 +30,7 @@ option (udpa.annotations.file_migrate).move_to_package = "envoy.config.cluster.v
 // [#protodoc-title: Cluster configuration]
 
 // Configuration for a single upstream cluster.
-// [#next-free-field: 47]
+// [#next-free-field: 48]
 message Cluster {
   // Refer to :ref:`service discovery type <arch_overview_service_discovery_types>`
   // for an explanation on each type.
@@ -789,6 +789,13 @@ message Cluster {
   // maybe by allowing LRS to go on the ADS stream, or maybe by moving some of the negotiation
   // from the LRS stream here.]
   core.ConfigSource lrs_server = 42;
+
+  // If track_timeout_budgets is true, the :ref:`timeout budget histograms
+  // <config_cluster_manager_cluster_stats_timeout_budgets>` will be published for each
+  // request. These show what percentage of a request's per try and global timeout was used. A value
+  // of 0 would indicate that none of the timeout was used or that the timeout was infinite. A value
+  // of 100 would indicate that the request took the entirety of the timeout given to it.
+  bool track_timeout_budgets = 47;
 }
 
 // [#not-implemented-hide:] Extensible load balancing policy configuration.

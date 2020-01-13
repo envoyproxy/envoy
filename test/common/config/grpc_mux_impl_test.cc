@@ -55,7 +55,8 @@ public:
         local_info_, std::unique_ptr<Grpc::MockAsyncClient>(async_client_), dispatcher_,
         *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
             "envoy.service.discovery.v2.AggregatedDiscoveryService.StreamAggregatedResources"),
-        random_, stats_, rate_limit_settings_, true);
+        envoy::config::core::v3alpha::ApiVersion::AUTO, random_, stats_, rate_limit_settings_,
+        true);
   }
 
   void setup(const RateLimitSettings& custom_rate_limit_settings) {
@@ -63,7 +64,8 @@ public:
         local_info_, std::unique_ptr<Grpc::MockAsyncClient>(async_client_), dispatcher_,
         *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
             "envoy.service.discovery.v2.AggregatedDiscoveryService.StreamAggregatedResources"),
-        random_, stats_, custom_rate_limit_settings, true);
+        envoy::config::core::v3alpha::ApiVersion::AUTO, random_, stats_, custom_rate_limit_settings,
+        true);
   }
 
   void expectSendMessage(const std::string& type_url,
@@ -654,7 +656,8 @@ TEST_F(GrpcMuxImplTest, BadLocalInfoEmptyClusterName) {
           local_info_, std::unique_ptr<Grpc::MockAsyncClient>(async_client_), dispatcher_,
           *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
               "envoy.service.discovery.v2.AggregatedDiscoveryService.StreamAggregatedResources"),
-          random_, stats_, rate_limit_settings_, true),
+          envoy::config::core::v3alpha::ApiVersion::AUTO, random_, stats_, rate_limit_settings_,
+          true),
       EnvoyException,
       "ads: node 'id' and 'cluster' are required. Set it either in 'node' config or via "
       "--service-node and --service-cluster options.");
@@ -667,7 +670,8 @@ TEST_F(GrpcMuxImplTest, BadLocalInfoEmptyNodeName) {
           local_info_, std::unique_ptr<Grpc::MockAsyncClient>(async_client_), dispatcher_,
           *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
               "envoy.service.discovery.v2.AggregatedDiscoveryService.StreamAggregatedResources"),
-          random_, stats_, rate_limit_settings_, true),
+          envoy::config::core::v3alpha::ApiVersion::AUTO, random_, stats_, rate_limit_settings_,
+          true),
       EnvoyException,
       "ads: node 'id' and 'cluster' are required. Set it either in 'node' config or via "
       "--service-node and --service-cluster options.");
