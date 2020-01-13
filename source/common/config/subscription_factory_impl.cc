@@ -55,14 +55,17 @@ SubscriptionPtr SubscriptionFactoryImpl::subscriptionFromConfigSource(
           callbacks, stats, Utility::configSourceInitialFetchTimeout(config), validation_visitor_);
     case envoy::config::core::v3alpha::ApiConfigSource::GRPC:
       return std::make_unique<GrpcSubscriptionImpl>(
-          local_info_,
-          Config::Utility::factoryForGrpcApiConfigSource(cm_.grpcAsyncClientManager(),
-                                                         api_config_source, scope)
-              ->create(),
-          dispatcher_, random_, sotwGrpcMethod(type_url), type_url, callbacks, stats, scope,
-          Utility::parseRateLimitSettings(api_config_source),
-          Utility::configSourceInitialFetchTimeout(config),
-          api_config_source.set_node_on_first_message_only());
+          std::make_shared<Config::GrpcMuxImpl>(
+              local_info_,
+              Utility::factoryForGrpcApiConfigSource(cm_.grpcAsyncClientManager(),
+                                                     api_config_source, scope)
+                  ->create(),
+              dispatcher_, sotwGrpcMethod(type_url), random_, scope,
+              // type_url, callbacks, stats, scope,
+              Utility::parseRateLimitSettings(api_config_source),
+              api_config_source.set_node_on_first_message_only()),
+          callbacks, stats, type_url, dispatcher_, Utility::configSourceInitialFetchTimeout(config),
+          /*is_aggregated*/ false);
     case envoy::config::core::v3alpha::ApiConfigSource::DELTA_GRPC: {
       Utility::checkApiConfigSourceSubscriptionBackingCluster(cm_.clusters(), api_config_source);
       return std::make_unique<DeltaSubscriptionImpl>(

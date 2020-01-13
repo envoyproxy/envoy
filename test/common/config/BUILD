@@ -174,8 +174,8 @@ envoy_cc_test_library(
     deps = [
         ":subscription_test_harness",
         "//source/common/common:hash_lib",
-        "//source/common/config:grpc_mux_lib",
         "//source/common/config:api_version_lib",
+        "//source/common/config:grpc_mux_lib",
         "//source/common/config:grpc_subscription_lib",
         "//source/common/config:resources_lib",
         "//source/common/config:version_converter_lib",

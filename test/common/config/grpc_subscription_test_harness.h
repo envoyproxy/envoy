@@ -8,8 +8,8 @@
 #include "envoy/service/discovery/v3alpha/discovery.pb.h"
 
 #include "common/common/hash.h"
-#include "common/config/grpc_mux_impl.h"
 #include "common/config/api_version.h"
+#include "common/config/grpc_mux_impl.h"
 #include "common/config/grpc_subscription_impl.h"
 #include "common/config/resources.h"
 #include "common/config/version_converter.h"
