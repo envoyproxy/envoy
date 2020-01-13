@@ -56,9 +56,9 @@ public:
   MOCK_METHOD(ServerConnection*, createCodec_,
               (Network::Connection&, const Buffer::Instance&, ServerConnectionCallbacks&));
   MOCK_METHOD(DateProvider&, dateProvider, ());
-  MOCK_METHOD(std::chrono::milliseconds, drainTimeout, ());
+  MOCK_METHOD(std::chrono::milliseconds, drainTimeout, (), (const));
   MOCK_METHOD(FilterChainFactory&, filterFactory, ());
-  MOCK_METHOD(bool, generateRequestId, ());
+  MOCK_METHOD(bool, generateRequestId, (), (const));
   MOCK_METHOD(bool, preserveExternalRequestId, (), (const));
   MOCK_METHOD(uint32_t, maxRequestHeadersKb, (), (const));
   MOCK_METHOD(uint32_t, maxRequestHeadersCount, (), (const));
@@ -83,7 +83,7 @@ public:
   MOCK_METHOD(uint32_t, xffNumTrustedHops, (), (const));
   MOCK_METHOD(bool, skipXffAppend, (), (const));
   MOCK_METHOD(const std::string&, via, (), (const));
-  MOCK_METHOD(Http::ForwardClientCertType, forwardClientCert, ());
+  MOCK_METHOD(Http::ForwardClientCertType, forwardClientCert, (), (const));
   MOCK_METHOD(const std::vector<Http::ClientCertDetailsType>&, setCurrentClientCertDetails, (),
               (const));
   MOCK_METHOD(const Network::Address::Instance&, localAddress, ());
