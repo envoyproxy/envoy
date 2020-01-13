@@ -620,20 +620,17 @@ bool redactOpaque(Protobuf::Message* message, bool ancestor_is_sensitive,
   }
 
   // Find descriptors for the `type_url` and `value` fields.
+  const auto* reflection = message->GetReflection();
   const auto* type_url_field_descriptor = opaque_descriptor->FindFieldByName("type_url");
   const auto* value_field_descriptor = opaque_descriptor->FindFieldByName("value");
-  if (type_url_field_descriptor == nullptr || value_field_descriptor == nullptr) {
-    // In the unlikely event that the opaque type is malformed, don't try to reify it, just treat
-    // it like any other message.
-    ENVOY_LOG_MISC(warn, "Could not reify malformed {}", opaque_type_name);
-    return false;
-  }
+  ASSERT(type_url_field_descriptor != nullptr && value_field_descriptor != nullptr &&
+         reflection->HasField(*message, type_url_field_descriptor) &&
+         reflection->HasField(*message, value_field_descriptor));
 
   // Try to find a descriptor for `type_url` in the pool and instantiate a new message of the
   // correct concrete type.
-  const auto* reflection = message->GetReflection();
-  std::string type_url(reflection->GetString(*message, type_url_field_descriptor));
-  std::string concrete_type_name(TypeUtil::typeUrlToDescriptorFullName(type_url));
+  const std::string type_url(reflection->GetString(*message, type_url_field_descriptor));
+  const std::string concrete_type_name(TypeUtil::typeUrlToDescriptorFullName(type_url));
   const auto* concrete_descriptor =
       Protobuf::DescriptorPool::generated_pool()->FindMessageTypeByName(concrete_type_name);
   if (concrete_descriptor == nullptr) {
