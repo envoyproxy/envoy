@@ -61,8 +61,8 @@ SubscriptionPtr SubscriptionFactoryImpl::subscriptionFromConfigSource(
               Utility::factoryForGrpcApiConfigSource(cm_.grpcAsyncClientManager(),
                                                      api_config_source, scope)
                   ->create(),
-              dispatcher_, sotwGrpcMethod(type_url), random_, scope,
-              Utility::parseRateLimitSettings(api_config_source),
+              dispatcher_, sotwGrpcMethod(type_url), api_config_source.transport_api_version(),
+              random_, scope, Utility::parseRateLimitSettings(api_config_source),
               api_config_source.set_node_on_first_message_only()),
           callbacks, stats, type_url, dispatcher_, Utility::configSourceInitialFetchTimeout(config),
           /*is_aggregated*/ false);
