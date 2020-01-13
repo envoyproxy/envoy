@@ -229,11 +229,21 @@ void setHealthFlag(Upstream::Host::HealthFlag flag, const Upstream::Host& host,
   }
 }
 
-// Apply a field mask to a resource message. These have a single Any field to
-// hold the resource, and other fields with items such as name, time stamp,
-// etc. We need to provide a way to trim with field masks that makes use of Any
-// transparent, since native field masks don't work with Any. We simplify and
-// assume at most one Any message in a resource.
+// Apply a field mask to a resource message. A simple field mask might look
+// like "cluster.name,cluster.alt_stat_name,last_updated" for a StaticCluster
+// resource. Unfortunately, since the "cluster" field is Any and the in-built
+// FieldMask utils can't mask inside an Any field, we need to do additional work
+// below.
+//
+// We take advantage of the fact that for the most part (with the exception of
+// DynamicListener) that ConfigDump resources have a single Any field where the
+// embedded resources lives. This allows us to construct an inner field mask for
+// the Any resource and an outer field mask for the enclosing message. In the
+// above example, the inner field mask would be "name,alt_stat_name" and the
+// outer field mask "cluster,last_updated". The masks are applied to their
+// respective messages, with the Any resource requiring an unpack/mask/pack
+// series of operations.
+//
 // TODO(htuch): we could make field masks more powerful in future and generalize
 // this to allow arbitrary indexing through Any fields. This is pretty
 // complicated, we would need to build a FieldMask tree similar to how the C++
@@ -256,7 +266,8 @@ void trimResourceMessage(const Protobuf::FieldMask& field_mask, Protobuf::Messag
     // Only a single Any field supported, repeated fields don't support further
     // indexing.
     // TODO(htuch): should add support for DynamicListener for multiple Any
-    // fields in the future.
+    // fields in the future, see
+    // https://github.com/envoyproxy/envoy/issues/9669.
     if (field != nullptr && field->message_type() != nullptr && !field->is_repeated() &&
         field->message_type()->full_name() == "google.protobuf.Any") {
       if (any_field_name.empty()) {
