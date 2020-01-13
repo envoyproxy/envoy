@@ -775,6 +775,12 @@ public:
   virtual InternalRedirectAction internalRedirectAction() const PURE;
 
   /**
+   * @returns the threshold of number of previously handled internal redirects, for this route to
+   * stop handle internal redirects.
+   */
+  virtual uint32_t maxInternalRedirects() const PURE;
+
+  /**
    * @return std::string& the name of the route.
    */
   virtual const std::string& routeName() const PURE;

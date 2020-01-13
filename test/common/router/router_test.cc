@@ -18,6 +18,7 @@
 #include "common/router/config_impl.h"
 #include "common/router/debug_config.h"
 #include "common/router/router.h"
+#include "common/stream_info/uint32_accessor_impl.h"
 #include "common/tracing/http_tracer_impl.h"
 #include "common/upstream/upstream_impl.h"
 
@@ -223,6 +224,20 @@ public:
     ON_CALL(callbacks_.route_->route_entry_, internalRedirectAction())
         .WillByDefault(Return(InternalRedirectAction::Handle));
     ON_CALL(callbacks_, connection()).WillByDefault(Return(&connection_));
+    setMaxInternalRedirects(1);
+  }
+
+  void setMaxInternalRedirects(uint32_t max_internal_redirects) {
+    ON_CALL(callbacks_.route_->route_entry_, maxInternalRedirects())
+        .WillByDefault(Return(max_internal_redirects));
+  }
+
+  void setNumPreviousRedirect(uint32_t num_previous_redirects) {
+    callbacks_.streamInfo().filterState().setData(
+        "num_internal_redirects",
+        std::make_shared<StreamInfo::UInt32AccessorImpl>(num_previous_redirects),
+        StreamInfo::FilterState::StateType::Mutable,
+        StreamInfo::FilterState::LifeSpan::DownstreamRequest);
   }
 
   void enableHedgeOnPerTryTimeout() {
@@ -3428,9 +3443,10 @@ TEST_F(RouterTest, RetryRespectsRetryHostPredicate) {
   EXPECT_TRUE(verifyHostUpstreamStats(1, 1));
 }
 
-TEST_F(RouterTest, InternalRedirectRejectedOnSecondPass) {
+TEST_F(RouterTest, InternalRedirectRejectedWhenReachingMaxInternalRedirect) {
   enableRedirects();
-  default_request_headers_.setEnvoyOriginalUrl("http://www.foo.com");
+  setMaxInternalRedirects(3);
+  setNumPreviousRedirect(3);
   sendRequest();
 
   response_decoder_->decodeHeaders(std::move(redirect_headers_), false);
@@ -3526,6 +3542,8 @@ TEST_F(RouterTest, InternalRedirectRejectedWithCrossSchemeRedirect) {
 
 TEST_F(RouterTest, HttpInternalRedirectSucceeded) {
   enableRedirects();
+  setMaxInternalRedirects(3);
+  setNumPreviousRedirect(2);
   default_request_headers_.setForwardedProto("http");
   sendRequest();
 
@@ -3538,11 +3556,17 @@ TEST_F(RouterTest, HttpInternalRedirectSucceeded) {
 
   // In production, the HCM recreateStream would have called this.
   router_.onDestroy();
+  EXPECT_EQ(3, callbacks_.streamInfo()
+                   .filterState()
+                   .getDataMutable<StreamInfo::UInt32Accessor>("num_internal_redirects")
+                   .value());
 }
 
 TEST_F(RouterTest, HttpsInternalRedirectSucceeded) {
   auto ssl_connection = std::make_shared<Ssl::MockConnectionInfo>();
   enableRedirects();
+  setMaxInternalRedirects(3);
+  setNumPreviousRedirect(1);
 
   sendRequest();
 

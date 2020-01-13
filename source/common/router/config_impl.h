@@ -450,6 +450,7 @@ public:
   InternalRedirectAction internalRedirectAction() const override {
     return internal_redirect_action_;
   }
+  uint32_t maxInternalRedirects() const override { return max_internal_redirects_; }
 
   // Router::DirectResponseEntry
   std::string newPath(const Http::HeaderMap& headers) const override;
@@ -566,6 +567,7 @@ private:
     InternalRedirectAction internalRedirectAction() const override {
       return parent_->internalRedirectAction();
     }
+    uint32_t maxInternalRedirects() const override { return parent_->maxInternalRedirects(); }
 
     // Router::Route
     const DirectResponseEntry* directResponseEntry() const override { return nullptr; }
@@ -711,6 +713,7 @@ private:
   const std::string route_name_;
   TimeSource& time_source_;
   InternalRedirectAction internal_redirect_action_;
+  uint32_t max_internal_redirects_{1};
 };
 
 /**
