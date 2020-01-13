@@ -16,6 +16,7 @@ Version history
 * decompressor: remove decompressor hard assert failure and replace with an error flag.
 * ext_authz: added :ref:`configurable ability<envoy_api_field_config.filter.http.ext_authz.v2.ExtAuthz.include_peer_certificate>` to send the :ref:`certificate<envoy_api_field_service.auth.v2.AttributeContext.Peer.certificate>` to the `ext_authz` service.
 * health check: gRPC health checker sets the gRPC deadline to the configured timeout duration.
+* health check: added :ref:`TlsOptions <envoy_api_msg_core.HealthCheck.TlsOptions>` to allow TLS configuration overrides.
 * health check: added :ref:`service_name_matcher <envoy_api_field_core.HealthCheck.HttpHealthCheck.service_name_matcher>` to better compare the service name patterns for health check identity.
 * http: added strict validation that CONNECT is refused as it is not yet implemented. This can be reversed temporarily by setting the runtime feature `envoy.reloadable_features.strict_method_validation` to false.
 * http: added support for http1 trailers. To enable use :ref:`enable_trailers <envoy_api_field_core.Http1ProtocolOptions.enable_trailers>`.
