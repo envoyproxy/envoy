@@ -436,8 +436,8 @@ public:
   MOCK_METHOD(void, validateConfig, (const envoy::config::route::v3alpha::RouteConfiguration&),
               (const));
   MOCK_METHOD(void, requestVirtualHostsUpdate,
-               (const std::string&, Event::Dispatcher&,
-                    std::weak_ptr<Http::RouteConfigUpdatedCallback> route_config_updated_cb));
+              (const std::string&, Event::Dispatcher&,
+               std::weak_ptr<Http::RouteConfigUpdatedCallback> route_config_updated_cb));
 
   std::shared_ptr<NiceMock<MockConfig>> route_config_{new NiceMock<MockConfig>()};
 };
