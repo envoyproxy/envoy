@@ -45,8 +45,8 @@ message PluginConfig {
 
   // A unique ID for a set of filters/services in a VM which will share a RootContext and Contexts
   // if applicable (e.g. an Wasm HttpFilter and an Wasm AccessLog). If left blank, all
-  // filters/services with a blank root_id with the same vm_id will share Context(s).
-  string root_id = 2;
+  // filters/services with a blank group_name with the same vm_id will share Context(s).
+  string group_name = 2;
 
   // Configuration for finding or starting VM.
   VmConfig vm_config = 3;

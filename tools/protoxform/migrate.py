@@ -8,6 +8,7 @@ from tools.api_proto_plugin import visitor
 from tools.protoxform import options
 from tools.protoxform import utils
 
+from envoy.annotations import resource_pb2
 from udpa.annotations import migrate_pb2
 from google.api import annotations_pb2
 
@@ -53,13 +54,20 @@ class UpgradeVisitor(visitor.Visitor):
   def _UpgradedPostMethod(self, m):
     return re.sub(r'^/v2/', '/v3alpha/', m)
 
+  # Upgraded type using canonical type naming, e.g. foo.bar.
+  def _UpgradedTypeCanonical(self, t):
+    if not t.startswith('envoy'):
+      return t
+    type_desc = self._typedb.types[t]
+    if type_desc.next_version_type_name:
+      return type_desc.next_version_type_name
+    return t
+
+  # Upgraded type using internal type naming, e.g. .foo.bar.
   def _UpgradedType(self, t):
     if not t.startswith('.envoy'):
       return t
-    type_desc = self._typedb.types[t[1:]]
-    if type_desc.next_version_type_name:
-      return '.' + type_desc.next_version_type_name
-    return t
+    return '.' + self._UpgradedTypeCanonical(t[1:])
 
   def _Deprecate(self, proto, field_or_value):
     """Deprecate a field or value in a message/enum proto.
@@ -88,6 +96,26 @@ class UpgradeVisitor(visitor.Visitor):
       proto.name = migrate_annotation.rename
       migrate_annotation.rename = ""
 
+  def _OneofPromotion(self, msg_proto, field_proto, migrate_annotation):
+    """Promote a field to a oneof.
+
+    Args:
+      msg_proto: DescriptorProto for message containing field.
+      field_proto: FieldDescriptorProto for field.
+      migrate_annotation: udpa.annotations.FieldMigrateAnnotation message
+    """
+    if migrate_annotation.oneof_promotion:
+      oneof_index = -1
+      for n, oneof_decl in enumerate(msg_proto.oneof_decl):
+        if oneof_decl.name == migrate_annotation.oneof_promotion:
+          oneof_index = n
+      if oneof_index == -1:
+        oneof_index = len(msg_proto.oneof_decl)
+        oneof_decl = msg_proto.oneof_decl.add()
+        oneof_decl.name = migrate_annotation.oneof_promotion
+      field_proto.oneof_index = oneof_index
+      migrate_annotation.oneof_promotion = ""
+
   def VisitService(self, service_proto, type_context):
     upgraded_proto = copy.deepcopy(service_proto)
     for m in upgraded_proto.method:
@@ -98,6 +126,9 @@ class UpgradeVisitor(visitor.Visitor):
         http_options.post = self._UpgradedPostMethod(http_options.post)
       m.input_type = self._UpgradedType(m.input_type)
       m.output_type = self._UpgradedType(m.output_type)
+    if service_proto.options.HasExtension(resource_pb2.resource):
+      upgraded_proto.options.Extensions[resource_pb2.resource].type = self._UpgradedTypeCanonical(
+          service_proto.options.Extensions[resource_pb2.resource].type)
     return upgraded_proto
 
   def VisitMessage(self, msg_proto, type_context, nested_msgs, nested_enums):
@@ -122,7 +153,9 @@ class UpgradeVisitor(visitor.Visitor):
       else:
         f.type_name = self._UpgradedType(f.type_name)
       if f.options.HasExtension(migrate_pb2.field_migrate):
-        self._Rename(f, f.options.Extensions[migrate_pb2.field_migrate])
+        field_migrate = f.options.Extensions[migrate_pb2.field_migrate]
+        self._Rename(f, field_migrate)
+        self._OneofPromotion(upgraded_proto, f, field_migrate)
     # Upgrade nested messages.
     del upgraded_proto.nested_type[:]
     upgraded_proto.nested_type.extend(nested_msgs)

@@ -8,7 +8,7 @@
 #include <unordered_map>
 #include <vector>
 
-#include "envoy/api/v2/core/address.pb.h"
+#include "envoy/config/core/v3alpha/address.pb.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/network/address.h"
 #include "envoy/network/dns.h"
@@ -394,7 +394,7 @@ TEST_F(DnsImplConstructor, SupportCustomAddressInstances) {
 }
 
 TEST_F(DnsImplConstructor, BadCustomResolvers) {
-  envoy::api::v2::core::Address pipe_address;
+  envoy::config::core::v3alpha::Address pipe_address;
   pipe_address.mutable_pipe()->set_path("foo");
   auto pipe_instance = Network::Utility::protobufAddressToAddress(pipe_address);
   EXPECT_THROW_WITH_MESSAGE(dispatcher_->createDnsResolver({pipe_instance}, false), EnvoyException,

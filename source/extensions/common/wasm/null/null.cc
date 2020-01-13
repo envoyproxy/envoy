@@ -18,7 +18,7 @@ namespace Common {
 namespace Wasm {
 namespace Null {
 
-WasmVmPtr createVm() { return std::make_unique<NullVm>(); }
+WasmVmPtr createVm(const Stats::ScopeSharedPtr& scope) { return std::make_unique<NullVm>(scope); }
 
 } // namespace Null
 } // namespace Wasm

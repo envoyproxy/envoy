@@ -29,9 +29,9 @@ constexpr const char* runtime_features[] = {
     "envoy.reloadable_features.buffer_filter_populate_content_length",
     "envoy.reloadable_features.outlier_detection_support_for_grpc_status",
     "envoy.reloadable_features.connection_header_sanitization",
-    "envoy.reloadable_features.strict_header_validation",
     "envoy.reloadable_features.strict_authority_validation",
     "envoy.reloadable_features.reject_unsupported_transfer_encodings",
+    "envoy.reloadable_features.strict_method_validation",
 };
 
 // This is a section for officially sanctioned runtime features which are too

@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package envoy.RouterCheckToolSchema;
 
-import "envoy/api/v2/core/base.proto";
+import "envoy/config/core/v3alpha/base.proto";
 import "google/protobuf/wrappers.proto";
 import "validate/validate.proto";
 
@@ -65,7 +65,7 @@ message ValidationInput {
   // Additional headers to be added as input for route determination.
   // The “:authority”, “:path”, “:method”, “x-forwarded-proto”, and “x-envoy-internal” fields are
   // specified by the other config options and should not be set here.
-  repeated envoy.api.v2.core.HeaderValue additional_headers = 8;
+  repeated envoy.config.core.v3alpha.HeaderValue additional_headers = 8;
 
   // Runtime setting key to enable for the test case.
   // If a route depends on the runtime, the route will be enabled based on the random_value defined
@@ -101,6 +101,6 @@ message ValidationAssert {
   // The header fields are checked after all other test cases.
   // Thus, the header fields checked will be those of the redirected or rewritten routes when
   // applicable.
-  repeated envoy.api.v2.core.HeaderValue header_fields = 7;
-  repeated envoy.api.v2.core.HeaderValue custom_header_fields = 8;
+  repeated envoy.config.core.v3alpha.HeaderValue header_fields = 7;
+  repeated envoy.config.core.v3alpha.HeaderValue custom_header_fields = 8;
 }

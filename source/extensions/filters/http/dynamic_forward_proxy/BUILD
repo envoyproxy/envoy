@@ -18,8 +18,8 @@ envoy_cc_library(
         "//source/extensions/common/dynamic_forward_proxy:dns_cache_interface",
         "//source/extensions/filters/http:well_known_names",
         "//source/extensions/filters/http/common:pass_through_filter_lib",
-        "@envoy_api//envoy/api/v2/core:pkg_cc_proto",
-        "@envoy_api//envoy/config/filter/http/dynamic_forward_proxy/v2alpha:pkg_cc_proto",
+        "@envoy_api//envoy/config/core/v3alpha:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/http/dynamic_forward_proxy/v3alpha:pkg_cc_proto",
     ],
 )
 
@@ -36,6 +36,6 @@ envoy_cc_extension(
         "//source/extensions/filters/http:well_known_names",
         "//source/extensions/filters/http/common:factory_base_lib",
         "//source/extensions/filters/http/dynamic_forward_proxy:proxy_filter_lib",
-        "@envoy_api//envoy/config/filter/http/dynamic_forward_proxy/v2alpha:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/http/dynamic_forward_proxy/v3alpha:pkg_cc_proto",
     ],
 )

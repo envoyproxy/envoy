@@ -1,9 +1,9 @@
 #pragma once
 
-#include "envoy/data/tap/v2alpha/common.pb.h"
-#include "envoy/data/tap/v2alpha/http.pb.h"
+#include "envoy/config/tap/v3alpha/common.pb.h"
+#include "envoy/data/tap/v3alpha/common.pb.h"
+#include "envoy/data/tap/v3alpha/http.pb.h"
 #include "envoy/http/header_map.h"
-#include "envoy/service/tap/v2alpha/common.pb.h"
 
 #include "common/common/logger.h"
 
@@ -19,7 +19,7 @@ class HttpTapConfigImpl : public Extensions::Common::Tap::TapConfigBaseImpl,
                           public HttpTapConfig,
                           public std::enable_shared_from_this<HttpTapConfigImpl> {
 public:
-  HttpTapConfigImpl(envoy::service::tap::v2alpha::TapConfig&& proto_config,
+  HttpTapConfigImpl(envoy::config::tap::v3alpha::TapConfig&& proto_config,
                     Extensions::Common::Tap::Sink* admin_streamer);
 
   // TapFilter::HttpTapConfig
@@ -45,11 +45,11 @@ public:
   bool onDestroyLog() override;
 
 private:
-  using HttpStreamedTraceSegment = envoy::data::tap::v2alpha::HttpStreamedTraceSegment;
-  using MutableBodyChunk = envoy::data::tap::v2alpha::Body* (HttpStreamedTraceSegment::*)();
-  using HttpBufferedTrace = envoy::data::tap::v2alpha::HttpBufferedTrace;
+  using HttpStreamedTraceSegment = envoy::data::tap::v3alpha::HttpStreamedTraceSegment;
+  using MutableBodyChunk = envoy::data::tap::v3alpha::Body* (HttpStreamedTraceSegment::*)();
+  using HttpBufferedTrace = envoy::data::tap::v3alpha::HttpBufferedTrace;
   using MutableMessage =
-      envoy::data::tap::v2alpha::HttpBufferedTrace::Message* (HttpBufferedTrace::*)();
+      envoy::data::tap::v3alpha::HttpBufferedTrace::Message* (HttpBufferedTrace::*)();
 
   void onBody(const Buffer::Instance& data,
               Extensions::Common::Tap::TraceWrapperPtr& buffered_streamed_body,

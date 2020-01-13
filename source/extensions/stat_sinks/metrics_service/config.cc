@@ -1,7 +1,7 @@
 #include "extensions/stat_sinks/metrics_service/config.h"
 
-#include "envoy/config/metrics/v2/metrics_service.pb.h"
-#include "envoy/config/metrics/v2/metrics_service.pb.validate.h"
+#include "envoy/config/metrics/v3alpha/metrics_service.pb.h"
+#include "envoy/config/metrics/v3alpha/metrics_service.pb.validate.h"
 #include "envoy/registry/registry.h"
 
 #include "common/common/assert.h"
@@ -21,9 +21,9 @@ Stats::SinkPtr MetricsServiceSinkFactory::createStatsSink(const Protobuf::Messag
                                                           Server::Instance& server) {
   validateProtoDescriptors();
 
-  const auto& sink_config =
-      MessageUtil::downcastAndValidate<const envoy::config::metrics::v2::MetricsServiceConfig&>(
-          config, server.messageValidationContext().staticValidationVisitor());
+  const auto& sink_config = MessageUtil::downcastAndValidate<
+      const envoy::config::metrics::v3alpha::MetricsServiceConfig&>(
+      config, server.messageValidationContext().staticValidationVisitor());
   const auto& grpc_service = sink_config.grpc_service();
   ENVOY_LOG(debug, "Metrics Service gRPC service configuration: {}", grpc_service.DebugString());
 
@@ -37,11 +37,11 @@ Stats::SinkPtr MetricsServiceSinkFactory::createStatsSink(const Protobuf::Messag
 }
 
 ProtobufTypes::MessagePtr MetricsServiceSinkFactory::createEmptyConfigProto() {
-  return std::unique_ptr<envoy::config::metrics::v2::MetricsServiceConfig>(
-      std::make_unique<envoy::config::metrics::v2::MetricsServiceConfig>());
+  return std::unique_ptr<envoy::config::metrics::v3alpha::MetricsServiceConfig>(
+      std::make_unique<envoy::config::metrics::v3alpha::MetricsServiceConfig>());
 }
 
-std::string MetricsServiceSinkFactory::name() { return StatsSinkNames::get().MetricsService; }
+std::string MetricsServiceSinkFactory::name() const { return StatsSinkNames::get().MetricsService; }
 
 /**
  * Static registration for the this sink factory. @see RegisterFactory.

@@ -19,6 +19,7 @@ envoy_cc_library(
         "//source/common/common:hash_lib",
         "//source/common/common:thread_annotations",
         "//source/common/common:thread_lib",
+        "//source/common/common:thread_synchronizer_lib",
         "//source/common/common:utility_lib",
     ],
 )
@@ -204,7 +205,7 @@ envoy_cc_library(
         "//source/common/common:perf_annotation_lib",
         "//source/common/config:well_known_names",
         "//source/common/protobuf",
-        "@envoy_api//envoy/config/metrics/v2:pkg_cc_proto",
+        "@envoy_api//envoy/config/metrics/v3alpha:pkg_cc_proto",
     ],
 )
 
@@ -216,7 +217,7 @@ envoy_cc_library(
         "//include/envoy/stats:stats_interface",
         "//source/common/common:matchers_lib",
         "//source/common/protobuf",
-        "@envoy_api//envoy/config/metrics/v2:pkg_cc_proto",
+        "@envoy_api//envoy/config/metrics/v3alpha:pkg_cc_proto",
     ],
 )
 

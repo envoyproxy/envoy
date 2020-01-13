@@ -3,9 +3,9 @@
 #include <memory>
 #include <string>
 
-#include "envoy/config/filter/fault/v2/fault.pb.h"
+#include "envoy/extensions/filters/common/fault/v3alpha/fault.pb.h"
 #include "envoy/stats/stats.h"
-#include "envoy/type/percent.pb.h"
+#include "envoy/type/v3alpha/percent.pb.h"
 
 #include "extensions/filters/network/mongo_proxy/bson_impl.h"
 #include "extensions/filters/network/mongo_proxy/codec_impl.h"
@@ -95,16 +95,17 @@ public:
   }
 
   void setupDelayFault(bool enable_fault) {
-    envoy::config::filter::fault::v2::FaultDelay fault;
+    envoy::extensions::filters::common::fault::v3alpha::FaultDelay fault;
     fault.mutable_percentage()->set_numerator(50);
-    fault.mutable_percentage()->set_denominator(envoy::type::FractionalPercent::HUNDRED);
+    fault.mutable_percentage()->set_denominator(envoy::type::v3alpha::FractionalPercent::HUNDRED);
     fault.mutable_fixed_delay()->CopyFrom(Protobuf::util::TimeUtil::MillisecondsToDuration(10));
 
     fault_config_.reset(new Filters::Common::Fault::FaultDelayConfig(fault));
 
-    EXPECT_CALL(runtime_.snapshot_,
-                featureEnabled("mongo.fault.fixed_delay.percent",
-                               Matcher<const envoy::type::FractionalPercent&>(Percent(50))))
+    EXPECT_CALL(
+        runtime_.snapshot_,
+        featureEnabled("mongo.fault.fixed_delay.percent",
+                       Matcher<const envoy::type::v3alpha::FractionalPercent&>(Percent(50))))
         .WillOnce(Return(enable_fault));
 
     if (enable_fault) {

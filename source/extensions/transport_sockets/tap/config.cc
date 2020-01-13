@@ -1,9 +1,9 @@
 #include "extensions/transport_sockets/tap/config.h"
 
-#include "envoy/config/transport_socket/tap/v2alpha/tap.pb.h"
-#include "envoy/config/transport_socket/tap/v2alpha/tap.pb.validate.h"
+#include "envoy/config/tap/v3alpha/common.pb.h"
+#include "envoy/extensions/transport_sockets/tap/v3alpha/tap.pb.h"
+#include "envoy/extensions/transport_sockets/tap/v3alpha/tap.pb.validate.h"
 #include "envoy/registry/registry.h"
-#include "envoy/service/tap/v2alpha/common.pb.h"
 
 #include "common/config/utility.h"
 #include "common/protobuf/utility.h"
@@ -22,7 +22,7 @@ public:
 
   // TapConfigFactory
   Extensions::Common::Tap::TapConfigSharedPtr
-  createConfigFromProto(envoy::service::tap::v2alpha::TapConfig&& proto_config,
+  createConfigFromProto(envoy::config::tap::v3alpha::TapConfig&& proto_config,
                         Extensions::Common::Tap::Sink* admin_streamer) override {
     return std::make_shared<SocketTapConfigImpl>(std::move(proto_config), admin_streamer,
                                                  time_source_);
@@ -35,12 +35,11 @@ private:
 Network::TransportSocketFactoryPtr UpstreamTapSocketConfigFactory::createTransportSocketFactory(
     const Protobuf::Message& message,
     Server::Configuration::TransportSocketFactoryContext& context) {
-  const auto& outer_config =
-      MessageUtil::downcastAndValidate<const envoy::config::transport_socket::tap::v2alpha::Tap&>(
-          message, context.messageValidationVisitor());
+  const auto& outer_config = MessageUtil::downcastAndValidate<
+      const envoy::extensions::transport_sockets::tap::v3alpha::Tap&>(
+      message, context.messageValidationVisitor());
   auto& inner_config_factory = Config::Utility::getAndCheckFactory<
-      Server::Configuration::UpstreamTransportSocketConfigFactory>(
-      outer_config.transport_socket().name());
+      Server::Configuration::UpstreamTransportSocketConfigFactory>(outer_config.transport_socket());
   ProtobufTypes::MessagePtr inner_factory_config = Config::Utility::translateToFactoryConfig(
       outer_config.transport_socket(), context.messageValidationVisitor(), inner_config_factory);
   auto inner_transport_factory =
@@ -54,12 +53,12 @@ Network::TransportSocketFactoryPtr UpstreamTapSocketConfigFactory::createTranspo
 Network::TransportSocketFactoryPtr DownstreamTapSocketConfigFactory::createTransportSocketFactory(
     const Protobuf::Message& message, Server::Configuration::TransportSocketFactoryContext& context,
     const std::vector<std::string>& server_names) {
-  const auto& outer_config =
-      MessageUtil::downcastAndValidate<const envoy::config::transport_socket::tap::v2alpha::Tap&>(
-          message, context.messageValidationVisitor());
+  const auto& outer_config = MessageUtil::downcastAndValidate<
+      const envoy::extensions::transport_sockets::tap::v3alpha::Tap&>(
+      message, context.messageValidationVisitor());
   auto& inner_config_factory = Config::Utility::getAndCheckFactory<
       Server::Configuration::DownstreamTransportSocketConfigFactory>(
-      outer_config.transport_socket().name());
+      outer_config.transport_socket());
   ProtobufTypes::MessagePtr inner_factory_config = Config::Utility::translateToFactoryConfig(
       outer_config.transport_socket(), context.messageValidationVisitor(), inner_config_factory);
   auto inner_transport_factory = inner_config_factory.createTransportSocketFactory(
@@ -71,7 +70,7 @@ Network::TransportSocketFactoryPtr DownstreamTapSocketConfigFactory::createTrans
 }
 
 ProtobufTypes::MessagePtr TapSocketConfigFactory::createEmptyConfigProto() {
-  return std::make_unique<envoy::config::transport_socket::tap::v2alpha::Tap>();
+  return std::make_unique<envoy::extensions::transport_sockets::tap::v3alpha::Tap>();
 }
 
 REGISTER_FACTORY(UpstreamTapSocketConfigFactory,

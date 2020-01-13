@@ -4,7 +4,7 @@
 #include <utility>
 #include <vector>
 
-#include "envoy/api/v2/cds.pb.h"
+#include "envoy/config/cluster/v3alpha/cluster.pb.h"
 
 #include "common/network/utility.h"
 #include "common/upstream/load_balancer_impl.h"
@@ -44,15 +44,15 @@ protected:
   MockHostSet& host_set_ = *priority_set_.getMockHostSet(0);
   MockHostSet& failover_host_set_ = *priority_set_.getMockHostSet(1);
   std::shared_ptr<MockClusterInfo> info_{new NiceMock<MockClusterInfo>()};
-  envoy::api::v2::Cluster::CommonLbConfig common_config_;
-  envoy::api::v2::Cluster::LeastRequestLbConfig least_request_lb_config_;
+  envoy::config::cluster::v3alpha::Cluster::CommonLbConfig common_config_;
+  envoy::config::cluster::v3alpha::Cluster::LeastRequestLbConfig least_request_lb_config_;
 };
 
 class TestLb : public LoadBalancerBase {
 public:
   TestLb(const PrioritySet& priority_set, ClusterStats& stats, Runtime::Loader& runtime,
          Runtime::RandomGenerator& random,
-         const envoy::api::v2::Cluster::CommonLbConfig& common_config)
+         const envoy::config::cluster::v3alpha::Cluster::CommonLbConfig& common_config)
       : LoadBalancerBase(priority_set, stats, runtime, random, common_config) {}
   using LoadBalancerBase::chooseHostSet;
   using LoadBalancerBase::isInPanic;
@@ -115,7 +115,7 @@ public:
     return aggregatePrioritySetsValues<bool>(lb_, &TestLb::isInPanic);
   }
 
-  envoy::api::v2::Cluster::CommonLbConfig common_config_;
+  envoy::config::cluster::v3alpha::Cluster::CommonLbConfig common_config_;
   TestLb lb_{priority_set_, stats_, runtime_, random_, common_config_};
 };
 
@@ -1380,7 +1380,7 @@ TEST_P(LeastRequestLoadBalancerTest, PNC) {
   hostSet().healthy_hosts_[3]->stats().rq_active_.set(1);
 
   // Creating various load balancer objects with different choice configs.
-  envoy::api::v2::Cluster::LeastRequestLbConfig lr_lb_config;
+  envoy::config::cluster::v3alpha::Cluster::LeastRequestLbConfig lr_lb_config;
   lr_lb_config.mutable_choice_count()->set_value(2);
   LeastRequestLoadBalancer lb_2{priority_set_, nullptr,        stats_,      runtime_,
                                 random_,       common_config_, lr_lb_config};
@@ -1523,11 +1523,12 @@ TEST_P(RandomLoadBalancerTest, FailClusterOnPanic) {
 INSTANTIATE_TEST_SUITE_P(PrimaryOrFailover, RandomLoadBalancerTest, ::testing::Values(true, false));
 
 TEST(LoadBalancerSubsetInfoImplTest, DefaultConfigIsDiabled) {
-  auto subset_info =
-      LoadBalancerSubsetInfoImpl(envoy::api::v2::Cluster::LbSubsetConfig::default_instance());
+  auto subset_info = LoadBalancerSubsetInfoImpl(
+      envoy::config::cluster::v3alpha::Cluster::LbSubsetConfig::default_instance());
 
   EXPECT_FALSE(subset_info.isEnabled());
-  EXPECT_TRUE(subset_info.fallbackPolicy() == envoy::api::v2::Cluster::LbSubsetConfig::NO_FALLBACK);
+  EXPECT_TRUE(subset_info.fallbackPolicy() ==
+              envoy::config::cluster::v3alpha::Cluster::LbSubsetConfig::NO_FALLBACK);
   EXPECT_EQ(subset_info.defaultSubset().fields_size(), 0);
   EXPECT_EQ(subset_info.subsetSelectors().size(), 0);
 }
@@ -1536,43 +1537,46 @@ TEST(LoadBalancerSubsetInfoImplTest, SubsetConfig) {
   auto subset_value = ProtobufWkt::Value();
   subset_value.set_string_value("the value");
 
-  auto subset_config = envoy::api::v2::Cluster::LbSubsetConfig::default_instance();
-  subset_config.set_fallback_policy(envoy::api::v2::Cluster::LbSubsetConfig::DEFAULT_SUBSET);
+  auto subset_config = envoy::config::cluster::v3alpha::Cluster::LbSubsetConfig::default_instance();
+  subset_config.set_fallback_policy(
+      envoy::config::cluster::v3alpha::Cluster::LbSubsetConfig::DEFAULT_SUBSET);
   subset_config.mutable_default_subset()->mutable_fields()->insert({"key", subset_value});
   auto subset_selector1 = subset_config.mutable_subset_selectors()->Add();
   subset_selector1->add_keys("selector_key1");
   auto subset_selector2 = subset_config.mutable_subset_selectors()->Add();
   subset_selector2->add_keys("selector_key2");
   subset_selector2->set_fallback_policy(
-      envoy::api::v2::Cluster::LbSubsetConfig::LbSubsetSelector::ANY_ENDPOINT);
+      envoy::config::cluster::v3alpha::Cluster::LbSubsetConfig::LbSubsetSelector::ANY_ENDPOINT);
 
   auto subset_info = LoadBalancerSubsetInfoImpl(subset_config);
 
   EXPECT_TRUE(subset_info.isEnabled());
   EXPECT_TRUE(subset_info.fallbackPolicy() ==
-              envoy::api::v2::Cluster::LbSubsetConfig::DEFAULT_SUBSET);
+              envoy::config::cluster::v3alpha::Cluster::LbSubsetConfig::DEFAULT_SUBSET);
   EXPECT_EQ(subset_info.defaultSubset().fields_size(), 1);
   EXPECT_EQ(subset_info.defaultSubset().fields().at("key").string_value(),
             std::string("the value"));
   EXPECT_EQ(subset_info.subsetSelectors().size(), 2);
   EXPECT_EQ(subset_info.subsetSelectors()[0]->selectorKeys(),
             std::set<std::string>({"selector_key1"}));
-  EXPECT_EQ(subset_info.subsetSelectors()[0]->fallbackPolicy(),
-            envoy::api::v2::Cluster::LbSubsetConfig::LbSubsetSelector::NOT_DEFINED);
+  EXPECT_EQ(
+      subset_info.subsetSelectors()[0]->fallbackPolicy(),
+      envoy::config::cluster::v3alpha::Cluster::LbSubsetConfig::LbSubsetSelector::NOT_DEFINED);
   EXPECT_EQ(subset_info.subsetSelectors()[1]->selectorKeys(),
             std::set<std::string>({"selector_key2"}));
-  EXPECT_EQ(subset_info.subsetSelectors()[1]->fallbackPolicy(),
-            envoy::api::v2::Cluster::LbSubsetConfig::LbSubsetSelector::ANY_ENDPOINT);
+  EXPECT_EQ(
+      subset_info.subsetSelectors()[1]->fallbackPolicy(),
+      envoy::config::cluster::v3alpha::Cluster::LbSubsetConfig::LbSubsetSelector::ANY_ENDPOINT);
 }
 
 TEST(LoadBalancerSubsetInfoImplTest, KeysSubsetFallbackValid) {
-  auto subset_config = envoy::api::v2::Cluster::LbSubsetConfig::default_instance();
+  auto subset_config = envoy::config::cluster::v3alpha::Cluster::LbSubsetConfig::default_instance();
   auto selector1 = subset_config.mutable_subset_selectors()->Add();
   selector1->add_keys("key1");
   selector1->add_keys("key2");
   selector1->add_keys("key3");
   selector1->set_fallback_policy(
-      envoy::api::v2::Cluster::LbSubsetConfig::LbSubsetSelector::KEYS_SUBSET);
+      envoy::config::cluster::v3alpha::Cluster::LbSubsetConfig::LbSubsetSelector::KEYS_SUBSET);
   selector1->add_fallback_keys_subset("key1");
   selector1->add_fallback_keys_subset("key3");
 
@@ -1581,20 +1585,22 @@ TEST(LoadBalancerSubsetInfoImplTest, KeysSubsetFallbackValid) {
   selector2->add_keys("key3");
   selector2->add_keys("key4");
   selector2->set_fallback_policy(
-      envoy::api::v2::Cluster::LbSubsetConfig::LbSubsetSelector::KEYS_SUBSET);
+      envoy::config::cluster::v3alpha::Cluster::LbSubsetConfig::LbSubsetSelector::KEYS_SUBSET);
   selector2->add_fallback_keys_subset("key4");
 
   auto subset_info = LoadBalancerSubsetInfoImpl(subset_config);
 
-  EXPECT_EQ(subset_info.subsetSelectors()[0]->fallbackPolicy(),
-            envoy::api::v2::Cluster::LbSubsetConfig::LbSubsetSelector::KEYS_SUBSET);
+  EXPECT_EQ(
+      subset_info.subsetSelectors()[0]->fallbackPolicy(),
+      envoy::config::cluster::v3alpha::Cluster::LbSubsetConfig::LbSubsetSelector::KEYS_SUBSET);
   EXPECT_EQ(subset_info.subsetSelectors()[0]->selectorKeys(),
             std::set<std::string>({"key1", "key2", "key3"}));
   EXPECT_EQ(subset_info.subsetSelectors()[0]->fallbackKeysSubset(),
             std::set<std::string>({"key1", "key3"}));
 
-  EXPECT_EQ(subset_info.subsetSelectors()[1]->fallbackPolicy(),
-            envoy::api::v2::Cluster::LbSubsetConfig::LbSubsetSelector::KEYS_SUBSET);
+  EXPECT_EQ(
+      subset_info.subsetSelectors()[1]->fallbackPolicy(),
+      envoy::config::cluster::v3alpha::Cluster::LbSubsetConfig::LbSubsetSelector::KEYS_SUBSET);
   EXPECT_EQ(subset_info.subsetSelectors()[1]->selectorKeys(),
             std::set<std::string>({"key1", "key3", "key4"}));
   EXPECT_EQ(subset_info.subsetSelectors()[1]->fallbackKeysSubset(),
@@ -1602,13 +1608,13 @@ TEST(LoadBalancerSubsetInfoImplTest, KeysSubsetFallbackValid) {
 }
 
 TEST(LoadBalancerSubsetInfoImplTest, KeysSubsetForOtherPolicyInvalid) {
-  auto subset_config = envoy::api::v2::Cluster::LbSubsetConfig::default_instance();
+  auto subset_config = envoy::config::cluster::v3alpha::Cluster::LbSubsetConfig::default_instance();
   auto selector = subset_config.mutable_subset_selectors()->Add();
 
   selector->add_keys("key1");
   selector->add_keys("key2");
   selector->set_fallback_policy(
-      envoy::api::v2::Cluster::LbSubsetConfig::LbSubsetSelector::ANY_ENDPOINT);
+      envoy::config::cluster::v3alpha::Cluster::LbSubsetConfig::LbSubsetSelector::ANY_ENDPOINT);
   selector->add_fallback_keys_subset("key1");
 
   EXPECT_THROW_WITH_MESSAGE(LoadBalancerSubsetInfoImpl{subset_config}, EnvoyException,
@@ -1616,13 +1622,13 @@ TEST(LoadBalancerSubsetInfoImplTest, KeysSubsetForOtherPolicyInvalid) {
 }
 
 TEST(LoadBalancerSubsetInfoImplTest, KeysSubsetNotASubsetInvalid) {
-  auto subset_config = envoy::api::v2::Cluster::LbSubsetConfig::default_instance();
+  auto subset_config = envoy::config::cluster::v3alpha::Cluster::LbSubsetConfig::default_instance();
   auto selector = subset_config.mutable_subset_selectors()->Add();
 
   selector->add_keys("key1");
   selector->add_keys("key2");
   selector->set_fallback_policy(
-      envoy::api::v2::Cluster::LbSubsetConfig::LbSubsetSelector::KEYS_SUBSET);
+      envoy::config::cluster::v3alpha::Cluster::LbSubsetConfig::LbSubsetSelector::KEYS_SUBSET);
   selector->add_fallback_keys_subset("key3");
 
   EXPECT_THROW_WITH_MESSAGE(LoadBalancerSubsetInfoImpl{subset_config}, EnvoyException,
@@ -1630,26 +1636,26 @@ TEST(LoadBalancerSubsetInfoImplTest, KeysSubsetNotASubsetInvalid) {
 }
 
 TEST(LoadBalancerSubsetInfoImplTest, KeysSubsetEmptyInvalid) {
-  auto subset_config = envoy::api::v2::Cluster::LbSubsetConfig::default_instance();
+  auto subset_config = envoy::config::cluster::v3alpha::Cluster::LbSubsetConfig::default_instance();
   auto selector = subset_config.mutable_subset_selectors()->Add();
 
   selector->add_keys("key1");
   selector->add_keys("key2");
   selector->set_fallback_policy(
-      envoy::api::v2::Cluster::LbSubsetConfig::LbSubsetSelector::KEYS_SUBSET);
+      envoy::config::cluster::v3alpha::Cluster::LbSubsetConfig::LbSubsetSelector::KEYS_SUBSET);
 
   EXPECT_THROW_WITH_MESSAGE(LoadBalancerSubsetInfoImpl{subset_config}, EnvoyException,
                             "fallback_keys_subset cannot be empty");
 }
 
 TEST(LoadBalancerSubsetInfoImplTest, KeysSubsetEqualKeysInvalid) {
-  auto subset_config = envoy::api::v2::Cluster::LbSubsetConfig::default_instance();
+  auto subset_config = envoy::config::cluster::v3alpha::Cluster::LbSubsetConfig::default_instance();
   auto selector = subset_config.mutable_subset_selectors()->Add();
 
   selector->add_keys("key1");
   selector->add_keys("key2");
   selector->set_fallback_policy(
-      envoy::api::v2::Cluster::LbSubsetConfig::LbSubsetSelector::KEYS_SUBSET);
+      envoy::config::cluster::v3alpha::Cluster::LbSubsetConfig::LbSubsetSelector::KEYS_SUBSET);
   selector->add_fallback_keys_subset("key2");
   selector->add_fallback_keys_subset("key1");
 

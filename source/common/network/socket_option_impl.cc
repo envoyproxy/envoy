@@ -1,7 +1,7 @@
 #include "common/network/socket_option_impl.h"
 
-#include "envoy/api/v2/core/base.pb.h"
 #include "envoy/common/exception.h"
+#include "envoy/config/core/v3alpha/base.pb.h"
 
 #include "common/api/os_sys_calls_impl.h"
 #include "common/common/assert.h"
@@ -11,8 +11,8 @@ namespace Envoy {
 namespace Network {
 
 // Socket::Option
-bool SocketOptionImpl::setOption(Socket& socket,
-                                 envoy::api::v2::core::SocketOption::SocketState state) const {
+bool SocketOptionImpl::setOption(
+    Socket& socket, envoy::config::core::v3alpha::SocketOption::SocketState state) const {
   if (in_state_ == state) {
     if (!optname_.has_value()) {
       ENVOY_LOG(warn, "Failed to set unsupported option on socket");
@@ -31,9 +31,8 @@ bool SocketOptionImpl::setOption(Socket& socket,
   return true;
 }
 
-absl::optional<Socket::Option::Details>
-SocketOptionImpl::getOptionDetails(const Socket&,
-                                   envoy::api::v2::core::SocketOption::SocketState state) const {
+absl::optional<Socket::Option::Details> SocketOptionImpl::getOptionDetails(
+    const Socket&, envoy::config::core::v3alpha::SocketOption::SocketState state) const {
   if (state != in_state_ || !isSupported()) {
     return absl::nullopt;
   }

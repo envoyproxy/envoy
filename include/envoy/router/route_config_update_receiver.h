@@ -2,11 +2,11 @@
 
 #include <memory>
 
-#include "envoy/api/v2/discovery.pb.h"
-#include "envoy/api/v2/rds.pb.h"
 #include "envoy/common/pure.h"
 #include "envoy/common/time.h"
+#include "envoy/config/route/v3alpha/route.pb.h"
 #include "envoy/router/rds.h"
+#include "envoy/service/discovery/v3alpha/discovery.pb.h"
 
 #include "common/protobuf/protobuf.h"
 
@@ -28,7 +28,7 @@ public:
    * @param version_info supplies RouteConfiguration version.
    * @return bool whether RouteConfiguration has been updated.
    */
-  virtual bool onRdsUpdate(const envoy::api::v2::RouteConfiguration& rc,
+  virtual bool onRdsUpdate(const envoy::config::route::v3alpha::RouteConfiguration& rc,
                            const std::string& version_info) PURE;
 
   /**
@@ -40,7 +40,8 @@ public:
    * @return bool whether RouteConfiguration has been updated.
    */
   virtual bool
-  onVhdsUpdate(const Protobuf::RepeatedPtrField<envoy::api::v2::Resource>& added_resources,
+  onVhdsUpdate(const Protobuf::RepeatedPtrField<envoy::service::discovery::v3alpha::Resource>&
+                   added_resources,
                const Protobuf::RepeatedPtrField<std::string>& removed_resources,
                const std::string& version_info) PURE;
 
@@ -52,7 +53,15 @@ public:
   /**
    * @return std::string& the version of RouteConfiguration.
    */
-  virtual const std::string& configVersion() PURE;
+  virtual const std::string& configVersion() const PURE;
+
+  /**
+   * @return bool return whether VHDS configuration has been changed in the last RDS update.
+   */
+  // TODO(dmitri-d): Consider splitting RouteConfigUpdateReceiver into a RouteConfig state and a
+  // last update state. The latter could be passed to callbacks as a parameter, which would make the
+  // intent and the lifecycle of the "last update state" less muddled.
+  virtual bool vhdsConfigurationChanged() const PURE;
 
   /**
    * @return uint64_t the hash value of RouteConfiguration.
@@ -69,12 +78,18 @@ public:
   /**
    * @return envoy::api::v2::RouteConfiguration& current RouteConfiguration.
    */
-  virtual const envoy::api::v2::RouteConfiguration& routeConfiguration() PURE;
+  virtual const envoy::config::route::v3alpha::RouteConfiguration& routeConfiguration() PURE;
 
   /**
    * @return SystemTime the time of the last update.
    */
   virtual SystemTime lastUpdated() const PURE;
+
+  /**
+   * @return the union of all resource names and aliases (if any) received with the last VHDS
+   * update.
+   */
+  virtual const std::set<std::string>& resourceIdsInLastVhdsUpdate() PURE;
 };
 
 using RouteConfigUpdatePtr = std::unique_ptr<RouteConfigUpdateReceiver>;

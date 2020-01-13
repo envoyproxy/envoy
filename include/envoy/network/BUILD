@@ -88,7 +88,7 @@ envoy_cc_library(
     deps = [
         ":address_interface",
         ":io_handle_interface",
-        "@envoy_api//envoy/api/v2/core:pkg_cc_proto",
+        "@envoy_api//envoy/config/core/v3alpha:pkg_cc_proto",
     ],
 )
 
@@ -118,7 +118,7 @@ envoy_cc_library(
         ":connection_interface",
         ":listen_socket_interface",
         "//include/envoy/stats:stats_interface",
-        "@envoy_api//envoy/api/v2/core:pkg_cc_proto",
+        "@envoy_api//envoy/config/core/v3alpha:pkg_cc_proto",
     ],
 )
 
@@ -127,6 +127,7 @@ envoy_cc_library(
     hdrs = ["resolver.h"],
     deps = [
         ":address_interface",
-        "@envoy_api//envoy/api/v2/core:pkg_cc_proto",
+        "//include/envoy/config:typed_config_interface",
+        "@envoy_api//envoy/config/core/v3alpha:pkg_cc_proto",
     ],
 )

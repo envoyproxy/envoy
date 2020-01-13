@@ -253,7 +253,7 @@ TEST_F(RetryPriorityTest, DefaultFrequencyUnhealthyPrioritiesDegradedLoadSpillov
 
 // Tests that we can override the frequency at which we update the priority load with the
 // update_frequency parameter.
-TEST_F(RetryPriorityTest, OverridenFrequency) {
+TEST_F(RetryPriorityTest, OverriddenFrequency) {
   update_frequency_ = 2;
 
   const Upstream::HealthyLoad original_priority_load({100, 0});
@@ -284,7 +284,7 @@ TEST_F(RetryPriorityTest, OverridenFrequency) {
 }
 
 // Tests that an invalid frequency results into a config error.
-TEST_F(RetryPriorityTest, OverridenFrequencyInvalidValue) {
+TEST_F(RetryPriorityTest, OverriddenFrequencyInvalidValue) {
   update_frequency_ = 0;
 
   const Upstream::HealthyLoad original_priority_load({100, 0});

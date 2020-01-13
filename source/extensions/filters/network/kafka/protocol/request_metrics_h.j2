@@ -1,0 +1,98 @@
+{#
+  Template for 'request_metrics.h'.
+
+  Generates the request metric names from Kafka message types.
+  The metrics structure (KAFKA_REQUEST_METRICS) is wrapped by RichRequestMetrics instance, allowing
+  for easier access to metrics using message's api_key.
+
+  There is one metric for each of request types (e.g. produce) - number of responses received.
+  There is also a metric for counting requests that could not be recognised, and one for requests
+  that could caused deserialization errors.
+#}
+
+#pragma once
+
+#include <array>
+#include <functional>
+
+#include "envoy/stats/scope.h"
+#include "envoy/stats/stats_macros.h"
+
+namespace Envoy {
+namespace Extensions {
+namespace NetworkFilters {
+namespace Kafka {
+
+/**
+ * Generated metrics, we have a counter for each request type.
+ */
+#define KAFKA_REQUEST_METRICS(COUNTER)                                                             \
+{% for message_type in message_types %}                                                            \
+  COUNTER({{ message_type.name_in_c_case() }})                                                     \
+{% endfor %}                                                                                       \
+  COUNTER(unknown)                                                                                 \
+  COUNTER(failure)
+
+struct KafkaRequestMetrics {
+  KAFKA_REQUEST_METRICS(GENERATE_COUNTER_STRUCT)
+};
+
+/**
+ * Abstraction layer over request-related metrics.
+ * Pure interface so that it can be mocked easily.
+ */
+class RichRequestMetrics {
+public:
+  virtual ~RichRequestMetrics() = default;
+
+  /**
+   * Invoked when properly-parsed message is received.
+   */
+  virtual void onRequest(const int16_t api_key) PURE;
+
+  /**
+   * Invoked when an unknown message is received.
+   */
+  virtual void onUnknownRequest() PURE;
+
+  /**
+   * Invoked when a deserialization error occurs.
+   */
+  virtual void onBrokenRequest() PURE;
+};
+
+using RichRequestMetricsSharedPtr = std::shared_ptr<RichRequestMetrics>;
+
+/**
+ * Metrics implementation that uses Envoy Scope to store metrics.
+ */
+class RichRequestMetricsImpl: public RichRequestMetrics {
+public:
+  RichRequestMetricsImpl(Stats::Scope& scope, std::string stat_prefix): metrics_({
+    KAFKA_REQUEST_METRICS(POOL_COUNTER_PREFIX(scope, fmt::format("kafka.{}.request.",
+      stat_prefix)))}) {};
+
+  void onRequest(const int16_t api_key) override {
+    // Both successful message parsing & metrics list depend on protocol-generated code, what means
+    // both do support the same api keys.
+    switch (api_key) {
+    {% for message_type in message_types %}
+    case {{ message_type.get_extra('api_key') }} :
+      metrics_.{{ message_type.name_in_c_case() }}_.inc();
+      return;
+    {% endfor %}
+    }
+  }
+
+  void onUnknownRequest() override { metrics_.unknown_.inc(); }
+
+  void onBrokenRequest() override { metrics_.failure_.inc(); }
+
+private:
+  KafkaRequestMetrics metrics_;
+};
+
+} // namespace Kafka
+} // namespace NetworkFilters
+} // namespace Extensions
+} // namespace Envoy

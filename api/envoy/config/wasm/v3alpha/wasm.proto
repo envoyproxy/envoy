@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package envoy.config.wasm.v3alpha;
 
-import "envoy/api/v3alpha/core/base.proto";
+import "envoy/config/core/v3alpha/base.proto";
 
 import "google/protobuf/any.proto";
 
@@ -32,7 +32,7 @@ message VmConfig {
   string runtime = 2 [(validate.rules).string = {min_bytes: 1}];
 
   // The Wasm code that Envoy will execute.
-  api.v3alpha.core.AsyncDataSource code = 3;
+  core.v3alpha.AsyncDataSource code = 3;
 
   // The Wasm configuration used in initialization of a new VM (proxy_on_start).
   google.protobuf.Any configuration = 4;
@@ -52,8 +52,8 @@ message PluginConfig {
 
   // A unique ID for a set of filters/services in a VM which will share a RootContext and Contexts
   // if applicable (e.g. an Wasm HttpFilter and an Wasm AccessLog). If left blank, all
-  // filters/services with a blank root_id with the same vm_id will share Context(s).
-  string root_id = 2;
+  // filters/services with a blank group_name with the same vm_id will share Context(s).
+  string group_name = 2;
 
   // Configuration for finding or starting VM.
   VmConfig vm_config = 3;

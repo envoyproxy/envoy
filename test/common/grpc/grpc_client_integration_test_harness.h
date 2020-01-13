@@ -1,8 +1,8 @@
 #pragma once
 
-#include "envoy/api/v2/auth/cert.pb.h"
-#include "envoy/api/v2/core/base.pb.h"
-#include "envoy/api/v2/core/grpc_service.pb.h"
+#include "envoy/config/core/v3alpha/base.pb.h"
+#include "envoy/config/core/v3alpha/grpc_service.pb.h"
+#include "envoy/extensions/transport_sockets/tls/v3alpha/cert.pb.h"
 #include "envoy/stats/scope.h"
 
 #include "common/api/api_impl.h"
@@ -261,7 +261,7 @@ public:
     }
   }
 
-  void fillServiceWideInitialMetadata(envoy::api::v2::core::GrpcService& config) {
+  void fillServiceWideInitialMetadata(envoy::config::core::v3alpha::GrpcService& config) {
     for (const auto& item : service_wide_initial_metadata_) {
       auto* header_value = config.add_initial_metadata();
       header_value->set_key(item.first.get());
@@ -295,14 +295,14 @@ public:
     EXPECT_CALL(cm_, httpAsyncClientForCluster(fake_cluster_name_))
         .WillRepeatedly(ReturnRef(*http_async_client_));
     EXPECT_CALL(cm_, get(Eq(fake_cluster_name_))).WillRepeatedly(Return(&thread_local_cluster_));
-    envoy::api::v2::core::GrpcService config;
+    envoy::config::core::v3alpha::GrpcService config;
     config.mutable_envoy_grpc()->set_cluster_name(fake_cluster_name_);
     fillServiceWideInitialMetadata(config);
     return std::make_unique<AsyncClientImpl>(cm_, config, dispatcher_->timeSource());
   }
 
-  virtual envoy::api::v2::core::GrpcService createGoogleGrpcConfig() {
-    envoy::api::v2::core::GrpcService config;
+  virtual envoy::config::core::v3alpha::GrpcService createGoogleGrpcConfig() {
+    envoy::config::core::v3alpha::GrpcService config;
     auto* google_grpc = config.mutable_google_grpc();
     google_grpc->set_target_uri(fake_upstream_->localAddress()->asString());
     google_grpc->set_stat_prefix("fake_cluster");
@@ -448,7 +448,7 @@ public:
   Http::AsyncClientPtr http_async_client_;
   Http::ConnectionPool::InstancePtr http_conn_pool_;
   Http::ContextImpl http_context_;
-  envoy::api::v2::core::Locality host_locality_;
+  envoy::config::core::v3alpha::Locality host_locality_;
   Upstream::MockHost* mock_host_ = new NiceMock<Upstream::MockHost>();
   Upstream::MockHostDescription* mock_host_description_ =
       new NiceMock<Upstream::MockHostDescription>();
@@ -474,14 +474,14 @@ public:
     client_connection_.reset();
   }
 
-  envoy::api::v2::core::GrpcService createGoogleGrpcConfig() override {
+  envoy::config::core::v3alpha::GrpcService createGoogleGrpcConfig() override {
     auto config = GrpcClientIntegrationTest::createGoogleGrpcConfig();
     TestUtility::setTestSslGoogleGrpcConfig(config, use_client_cert_);
     return config;
   }
 
   void initialize() override {
-    envoy::api::v2::auth::UpstreamTlsContext tls_context;
+    envoy::extensions::transport_sockets::tls::v3alpha::UpstreamTlsContext tls_context;
     auto* common_tls_context = tls_context.mutable_common_tls_context();
     auto* validation_context = common_tls_context->mutable_validation_context();
     validation_context->mutable_trusted_ca()->set_filename(
@@ -509,7 +509,7 @@ public:
   }
 
   Network::TransportSocketFactoryPtr createUpstreamSslContext() {
-    envoy::api::v2::auth::DownstreamTlsContext tls_context;
+    envoy::extensions::transport_sockets::tls::v3alpha::DownstreamTlsContext tls_context;
     auto* common_tls_context = tls_context.mutable_common_tls_context();
     common_tls_context->add_alpn_protocols("h2");
     auto* tls_cert = common_tls_context->add_tls_certificates();

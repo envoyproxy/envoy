@@ -3,12 +3,12 @@
 #include <functional>
 
 #include "envoy/api/api.h"
-#include "envoy/api/v2/cds.pb.h"
-#include "envoy/api/v2/core/config_source.pb.h"
-#include "envoy/api/v2/discovery.pb.h"
+#include "envoy/config/cluster/v3alpha/cluster.pb.h"
+#include "envoy/config/core/v3alpha/config_source.pb.h"
 #include "envoy/config/subscription.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/local_info/local_info.h"
+#include "envoy/service/discovery/v3alpha/discovery.pb.h"
 #include "envoy/stats/scope.h"
 #include "envoy/upstream/cluster_manager.h"
 
@@ -24,8 +24,8 @@ class CdsApiImpl : public CdsApi,
                    Config::SubscriptionCallbacks,
                    Logger::Loggable<Logger::Id::upstream> {
 public:
-  static CdsApiPtr create(const envoy::api::v2::core::ConfigSource& cds_config, ClusterManager& cm,
-                          Stats::Scope& scope,
+  static CdsApiPtr create(const envoy::config::core::v3alpha::ConfigSource& cds_config,
+                          ClusterManager& cm, Stats::Scope& scope,
                           ProtobufMessage::ValidationVisitor& validation_visitor);
 
   // Upstream::CdsApi
@@ -39,16 +39,18 @@ private:
   // Config::SubscriptionCallbacks
   void onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
                       const std::string& version_info) override;
-  void onConfigUpdate(const Protobuf::RepeatedPtrField<envoy::api::v2::Resource>& added_resources,
-                      const Protobuf::RepeatedPtrField<std::string>& removed_resources,
-                      const std::string& system_version_info) override;
+  void
+  onConfigUpdate(const Protobuf::RepeatedPtrField<envoy::service::discovery::v3alpha::Resource>&
+                     added_resources,
+                 const Protobuf::RepeatedPtrField<std::string>& removed_resources,
+                 const std::string& system_version_info) override;
   void onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason reason,
                             const EnvoyException* e) override;
   std::string resourceName(const ProtobufWkt::Any& resource) override {
-    return MessageUtil::anyConvert<envoy::api::v2::Cluster>(resource).name();
+    return MessageUtil::anyConvert<envoy::config::cluster::v3alpha::Cluster>(resource).name();
   }
-  std::string loadTypeUrl();
-  CdsApiImpl(const envoy::api::v2::core::ConfigSource& cds_config, ClusterManager& cm,
+  static std::string loadTypeUrl(envoy::config::core::v3alpha::ApiVersion resource_api_version);
+  CdsApiImpl(const envoy::config::core::v3alpha::ConfigSource& cds_config, ClusterManager& cm,
              Stats::Scope& scope, ProtobufMessage::ValidationVisitor& validation_visitor);
   void runInitializeCallbackIfAny();
 
@@ -58,7 +60,6 @@ private:
   std::function<void()> initialize_callback_;
   Stats::ScopePtr scope_;
   ProtobufMessage::ValidationVisitor& validation_visitor_;
-  envoy::api::v2::core::ConfigSource::XdsApiVersion xds_api_version_;
 };
 
 } // namespace Upstream

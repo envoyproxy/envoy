@@ -48,7 +48,7 @@ private:
   const Stats::StatName latency_;
   const Stats::StatName total_;
   const Stats::StatName success_;
-  const Stats::StatName error_;
+  const Stats::StatName failure_;
   const Stats::StatName unused_metric_;
   const Stats::StatName null_metric_;
   const Stats::StatName unknown_metric_;
