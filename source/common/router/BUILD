@@ -291,6 +291,7 @@ envoy_cc_library(
         "//source/common/network:application_protocol_lib",
         "//source/common/network:transport_socket_options_lib",
         "//source/common/stream_info:stream_info_lib",
+        "//source/common/stream_info:uint32_accessor_lib",
         "//source/common/tracing:http_tracer_lib",
         "//source/common/upstream:load_balancer_lib",
         "@envoy_api//envoy/extensions/filters/http/router/v3alpha:pkg_cc_proto",

@@ -1063,6 +1063,52 @@ TEST_F(HttpHealthCheckerImplTest, ZeroRetryInterval) {
   EXPECT_EQ(Host::Health::Healthy, cluster_->prioritySet().getMockHostSet(0)->hosts_[0]->health());
 }
 
+MATCHER_P(ApplicationProtocolListEq, expected, "") {
+  const Network::TransportSocketOptionsSharedPtr& options = arg;
+  EXPECT_EQ(options->applicationProtocolListOverride(), std::vector<std::string>{expected});
+  return true;
+}
+
+TEST_F(HttpHealthCheckerImplTest, TlsOptions) {
+  const std::string host = "fake_cluster";
+  const std::string path = "/healthcheck";
+  const std::string yaml = R"EOF(
+    timeout: 1s
+    interval: 1s
+    no_traffic_interval: 1s
+    interval_jitter_percent: 40
+    unhealthy_threshold: 2
+    healthy_threshold: 2
+    http_health_check:
+      service_name_matcher:
+        prefix: locations
+      path: /healthcheck
+    tls_options:
+      alpn_protocols:
+      - http1
+    )EOF";
+
+  auto socket_factory = new Network::MockTransportSocketFactory();
+  EXPECT_CALL(*socket_factory, implementsSecureTransport()).WillOnce(Return(true));
+  auto transport_socket_match = new NiceMock<Upstream::MockTransportSocketMatcher>(
+      Network::TransportSocketFactoryPtr(socket_factory));
+  cluster_->info_->transport_socket_matcher_.reset(transport_socket_match);
+
+  EXPECT_CALL(*socket_factory, createTransportSocket(ApplicationProtocolListEq("http1")));
+
+  health_checker_.reset(new TestHttpHealthCheckerImpl(*cluster_, parseHealthCheckFromV2Yaml(yaml),
+                                                      dispatcher_, runtime_, random_,
+                                                      HealthCheckEventLoggerPtr(event_logger_)));
+
+  cluster_->prioritySet().getMockHostSet(0)->hosts_ = {
+      makeTestHost(cluster_->info_, "tcp://127.0.0.1:80")};
+  cluster_->info_->stats().upstream_cx_total_.inc();
+  expectSessionCreate();
+  expectStreamCreate(0);
+  EXPECT_CALL(*test_sessions_[0]->timeout_timer_, enableTimer(_, _));
+  health_checker_->start();
+}
+
 TEST_F(HttpHealthCheckerImplTest, SuccessServiceCheck) {
   const std::string host = "fake_cluster";
   const std::string path = "/healthcheck";

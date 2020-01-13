@@ -343,6 +343,7 @@ public:
   MOCK_CONST_METHOD0(includeAttemptCount, bool());
   MOCK_CONST_METHOD0(upgradeMap, const UpgradeMap&());
   MOCK_CONST_METHOD0(internalRedirectAction, InternalRedirectAction());
+  MOCK_CONST_METHOD0(maxInternalRedirects, uint32_t());
   MOCK_CONST_METHOD0(routeName, const std::string&());
 
   std::string cluster_name_{"fake_cluster"};
@@ -434,6 +435,9 @@ public:
   MOCK_METHOD0(onConfigUpdate, void());
   MOCK_CONST_METHOD1(validateConfig,
                      void(const envoy::config::route::v3alpha::RouteConfiguration&));
+  MOCK_METHOD3(requestVirtualHostsUpdate,
+               void(const std::string&, Event::Dispatcher&,
+                    std::weak_ptr<Http::RouteConfigUpdatedCallback> route_config_updated_cb));
 
   std::shared_ptr<NiceMock<MockConfig>> route_config_{new NiceMock<MockConfig>()};
 };

@@ -63,9 +63,9 @@ public:
   /**
    * Creates a particular custom health checker factory implementation.
    *
-   * @param config supplies the configuration as a full envoy::api::v2::core::HealthCheck config.
-   *        The implementation of this method can get the specific configuration for a custom health
-   *        check from custom_health_check().config().
+   * @param config supplies the configuration as a full envoy::config::core::v3alpha::HealthCheck
+   * config. The implementation of this method can get the specific configuration for a custom
+   * health check from custom_health_check().config().
    * @param context supplies the custom health checker's context.
    * @return HealthCheckerSharedPtr the pointer of a health checker instance.
    */
