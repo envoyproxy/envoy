@@ -16,17 +16,18 @@ static_resources:
             - endpoint:
                 address:
                   socket_address: {address: {{ domain }}, port_value: 443}
-    tls_context: &base_tls_context
-      common_tls_context:
-        validation_context:
-          trusted_ca:
-            inline_string: |
+    transport_socket: &base_transport_socket
+      name: envoy.transport_sockets.tls
+      typed_config:
+        "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3alpha.UpstreamTlsContext
+        common_tls_context:
+          validation_context:
+            trusted_ca:
+              inline_string: |
 )"
 #include "certificates.inc"
-R"(
-          verify_subject_alt_name:
-            - {{ domain }}
-      sni: {{ domain }}
+                              R"(
+        sni: {{ domain }}
     type: LOGICAL_DNS
     upstream_connection_options: &upstream_opts
       tcp_keepalive:
@@ -41,7 +42,7 @@ R"(
     load_assignment:
       cluster_name: base_wlan
       endpoints: *base_endpoints
-    tls_context: *base_tls_context
+    transport_socket: *base_transport_socket
     type: LOGICAL_DNS
     upstream_connection_options: *upstream_opts
   - name: base_wwan # Note: the direct API depends on the existence of a cluster with this name.
@@ -52,7 +53,7 @@ R"(
     load_assignment:
       cluster_name: base_wwan
       endpoints: *base_endpoints
-    tls_context: *base_tls_context
+    transport_socket: *base_transport_socket
     type: LOGICAL_DNS
     upstream_connection_options: *upstream_opts
   - name: stats
@@ -67,12 +68,13 @@ R"(
             - endpoint:
                 address:
                   socket_address: {address: {{ stats_domain }}, port_value: 443}
-    tls_context: *base_tls_context
+    transport_socket: *base_transport_socket
     type: LOGICAL_DNS
 stats_flush_interval: {{ stats_flush_interval_seconds }}s
 stats_sinks:
   - name: envoy.metrics_service
-    config:
+    typed_config:
+      "@type": type.googleapis.com/envoy.config.metrics.v3alpha.MetricsServiceConfig
       grpc_service:
         envoy_grpc:
           cluster_name: stats

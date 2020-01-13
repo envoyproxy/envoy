@@ -11,7 +11,6 @@
 #include "extensions/filters/http/router/config.h"
 #include "extensions/filters/network/http_connection_manager/config.h"
 #include "extensions/stat_sinks/metrics_service/config.h"
-#include "extensions/transport_sockets/raw_buffer/config.h"
 #include "extensions/transport_sockets/tls/config.h"
 
 #include "absl/base/call_once.h"
