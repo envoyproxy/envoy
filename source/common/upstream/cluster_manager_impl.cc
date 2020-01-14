@@ -24,6 +24,7 @@
 #include "common/config/new_grpc_mux_impl.h"
 #include "common/config/resources.h"
 #include "common/config/utility.h"
+#include "common/config/version_converter.h"
 #include "common/grpc/async_client_manager_impl.h"
 #include "common/http/async_client_impl.h"
 #include "common/http/http1/conn_pool.h"
@@ -271,7 +272,7 @@ ClusterManagerImpl::ClusterManagerImpl(
           main_thread_dispatcher,
           *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
               "envoy.service.discovery.v2.AggregatedDiscoveryService.DeltaAggregatedResources"),
-          random_, stats_,
+          dyn_resources.ads_config().transport_api_version(), random_, stats_,
           Envoy::Config::Utility::parseRateLimitSettings(dyn_resources.ads_config()), local_info);
     } else {
       ads_mux_ = std::make_shared<Config::GrpcMuxImpl>(
@@ -281,8 +282,13 @@ ClusterManagerImpl::ClusterManagerImpl(
               ->create(),
           main_thread_dispatcher,
           *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
-              "envoy.service.discovery.v2.AggregatedDiscoveryService.StreamAggregatedResources"),
-          random_, stats_,
+              dyn_resources.ads_config().transport_api_version() ==
+                      envoy::config::core::v3alpha::ApiVersion::V3ALPHA
+                  ? "envoy.service.discovery.v3alpha.AggregatedDiscoveryService."
+                    "StreamAggregatedResources"
+                  : "envoy.service.discovery.v2.AggregatedDiscoveryService."
+                    "StreamAggregatedResources"),
+          dyn_resources.ads_config().transport_api_version(), random_, stats_,
           Envoy::Config::Utility::parseRateLimitSettings(dyn_resources.ads_config()),
           bootstrap.dynamic_resources().ads_config().set_node_on_first_message_only());
     }
@@ -339,12 +345,12 @@ ClusterManagerImpl::ClusterManagerImpl(
 
   if (cm_config.has_load_stats_config()) {
     const auto& load_stats_config = cm_config.load_stats_config();
-    load_stats_reporter_ =
-        std::make_unique<LoadStatsReporter>(local_info, *this, stats,
-                                            Config::Utility::factoryForGrpcApiConfigSource(
-                                                *async_client_manager_, load_stats_config, stats)
-                                                ->create(),
-                                            main_thread_dispatcher);
+    load_stats_reporter_ = std::make_unique<LoadStatsReporter>(
+        local_info, *this, stats,
+        Config::Utility::factoryForGrpcApiConfigSource(*async_client_manager_, load_stats_config,
+                                                       stats)
+            ->create(),
+        load_stats_config.transport_api_version(), main_thread_dispatcher);
   }
 }
 
@@ -870,13 +876,13 @@ ProtobufTypes::MessagePtr ClusterManagerImpl::dumpClusterConfigs() {
     const auto& cluster = *active_cluster_pair.second;
     if (!cluster.added_via_api_) {
       auto& static_cluster = *config_dump->mutable_static_clusters()->Add();
-      static_cluster.mutable_cluster()->MergeFrom(cluster.cluster_config_);
+      static_cluster.mutable_cluster()->PackFrom(API_RECOVER_ORIGINAL(cluster.cluster_config_));
       TimestampUtil::systemClockToTimestamp(cluster.last_updated_,
                                             *(static_cluster.mutable_last_updated()));
     } else {
       auto& dynamic_cluster = *config_dump->mutable_dynamic_active_clusters()->Add();
       dynamic_cluster.set_version_info(cluster.version_info_);
-      dynamic_cluster.mutable_cluster()->MergeFrom(cluster.cluster_config_);
+      dynamic_cluster.mutable_cluster()->PackFrom(API_RECOVER_ORIGINAL(cluster.cluster_config_));
       TimestampUtil::systemClockToTimestamp(cluster.last_updated_,
                                             *(dynamic_cluster.mutable_last_updated()));
     }
@@ -886,7 +892,7 @@ ProtobufTypes::MessagePtr ClusterManagerImpl::dumpClusterConfigs() {
     const auto& cluster = *warming_cluster_pair.second;
     auto& dynamic_cluster = *config_dump->mutable_dynamic_warming_clusters()->Add();
     dynamic_cluster.set_version_info(cluster.version_info_);
-    dynamic_cluster.mutable_cluster()->MergeFrom(cluster.cluster_config_);
+    dynamic_cluster.mutable_cluster()->PackFrom(API_RECOVER_ORIGINAL(cluster.cluster_config_));
     TimestampUtil::systemClockToTimestamp(cluster.last_updated_,
                                           *(dynamic_cluster.mutable_last_updated()));
   }

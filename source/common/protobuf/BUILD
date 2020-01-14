@@ -59,6 +59,7 @@ envoy_cc_library(
     deps = [
         ":message_validator_lib",
         ":protobuf",
+        ":well_known_lib",
         "//include/envoy/api:api_interface",
         "//include/envoy/protobuf:message_validator_interface",
         "//include/envoy/runtime:runtime_interface",
@@ -70,4 +71,9 @@ envoy_cc_library(
         "@envoy_api//envoy/annotations:pkg_cc_proto",
         "@envoy_api//envoy/type/v3alpha:pkg_cc_proto",
     ],
+)
+
+envoy_cc_library(
+    name = "well_known_lib",
+    hdrs = ["well_known.h"],
 )

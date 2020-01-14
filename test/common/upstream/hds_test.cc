@@ -69,7 +69,8 @@ protected:
           return server_response_timer_;
         }));
     hds_delegate_ = std::make_unique<HdsDelegate>(
-        stats_store_, Grpc::RawAsyncClientPtr(async_client_), dispatcher_, runtime_, stats_store_,
+        stats_store_, Grpc::RawAsyncClientPtr(async_client_),
+        envoy::config::core::v3alpha::ApiVersion::AUTO, dispatcher_, runtime_, stats_store_,
         ssl_context_manager_, random_, test_factory_, log_manager_, cm_, local_info_, admin_,
         singleton_manager_, tls_, validation_visitor_, *api_);
   }

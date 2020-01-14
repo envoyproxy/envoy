@@ -10,6 +10,7 @@
 
 #include "common/common/hash.h"
 #include "common/common/utility.h"
+#include "common/config/version_converter.h"
 #include "common/protobuf/protobuf.h"
 #include "common/singleton/const_singleton.h"
 
@@ -251,7 +252,7 @@ public:
 
     std::string err;
     if (!Validate(message, &err)) {
-      throw ProtoValidationException(err, message);
+      throw ProtoValidationException(err, API_RECOVER_ORIGINAL(message));
     }
   }
 
@@ -348,6 +349,13 @@ public:
    * @param value the string value to associate with the key
    */
   static ProtobufWkt::Struct keyValueStruct(const std::string& key, const std::string& value);
+
+  /**
+   * Utility method to create a Struct containing the passed in key/value map.
+   *
+   * @param fields the key/value pairs to initialize the Struct proto
+   */
+  static ProtobufWkt::Struct keyValueStruct(const std::map<std::string, std::string>& fields);
 
   /**
    * Utility method to print a human readable string of the code passed in.

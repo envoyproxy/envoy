@@ -80,21 +80,21 @@ public:
    * @param url supplies the URL to match.
    * @return bool true if the URL matches the TCP scheme, false otherwise.
    */
-  static bool urlIsTcpScheme(const std::string& url);
+  static bool urlIsTcpScheme(absl::string_view url);
 
   /**
    * Match a URL to the UDP scheme
    * @param url supplies the URL to match.
    * @return bool true if the URL matches the UDP scheme, false otherwise.
    */
-  static bool urlIsUdpScheme(const std::string& url);
+  static bool urlIsUdpScheme(absl::string_view url);
 
   /**
    * Match a URL to the Unix scheme
    * @param url supplies the Unix to match.
    * @return bool true if the URL matches the Unix scheme, false otherwise.
    */
-  static bool urlIsUnixScheme(const std::string& url);
+  static bool urlIsUnixScheme(absl::string_view url);
 
   /**
    * Parses the host from a TCP URL
@@ -342,7 +342,7 @@ public:
                                                TimeSource& time_source, uint32_t& packets_dropped);
 
 private:
-  static void throwWithMalformedIp(const std::string& ip_address);
+  static void throwWithMalformedIp(absl::string_view ip_address);
 
   /**
    * Takes a number and flips the order in byte chunks. The last byte of the input will be the

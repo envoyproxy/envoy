@@ -4,6 +4,7 @@
 #include "envoy/config/cluster/v3alpha/cluster.pb.h"
 #include "envoy/config/core/v3alpha/base.pb.h"
 #include "envoy/config/core/v3alpha/health_check.pb.h"
+#include "envoy/config/core/v3alpha/health_check.pb.validate.h"
 #include "envoy/config/endpoint/v3alpha/endpoint_components.pb.h"
 #include "envoy/upstream/upstream.h"
 
@@ -45,20 +46,20 @@ inline std::string defaultStaticClusterJson(const std::string& name) {
 inline envoy::config::bootstrap::v3alpha::Bootstrap
 parseBootstrapFromV2Json(const std::string& json_string) {
   envoy::config::bootstrap::v3alpha::Bootstrap bootstrap;
-  TestUtility::loadFromJson(json_string, bootstrap);
+  TestUtility::loadFromJson(json_string, bootstrap, true);
   return bootstrap;
 }
 
 inline envoy::config::cluster::v3alpha::Cluster
 parseClusterFromV2Json(const std::string& json_string) {
   envoy::config::cluster::v3alpha::Cluster cluster;
-  TestUtility::loadFromJson(json_string, cluster);
+  TestUtility::loadFromJson(json_string, cluster, true);
   return cluster;
 }
 
 inline envoy::config::cluster::v3alpha::Cluster parseClusterFromV2Yaml(const std::string& yaml) {
   envoy::config::cluster::v3alpha::Cluster cluster;
-  TestUtility::loadFromYaml(yaml, cluster);
+  TestUtility::loadFromYaml(yaml, cluster, true);
   return cluster;
 }
 
@@ -119,7 +120,7 @@ makeLocalityWeights(std::initializer_list<uint32_t> locality_weights) {
 inline envoy::config::core::v3alpha::HealthCheck
 parseHealthCheckFromV2Yaml(const std::string& yaml_string) {
   envoy::config::core::v3alpha::HealthCheck health_check;
-  TestUtility::loadFromYaml(yaml_string, health_check);
+  TestUtility::loadFromYamlAndValidate(yaml_string, health_check);
   return health_check;
 }
 

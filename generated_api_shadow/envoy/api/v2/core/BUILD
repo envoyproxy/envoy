@@ -8,6 +8,7 @@ api_proto_package(
     deps = [
         "//envoy/annotations:pkg",
         "//envoy/type:pkg",
+        "//envoy/type/matcher:pkg",
         "@com_github_cncf_udpa//udpa/annotations:pkg",
     ],
 )

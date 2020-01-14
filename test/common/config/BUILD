@@ -294,6 +294,14 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "pausable_ack_queue_test",
+    srcs = ["pausable_ack_queue_test.cc"],
+    deps = [
+        "//source/common/config:pausable_ack_queue_lib",
+    ],
+)
+
+envoy_cc_test(
     name = "metadata_test",
     srcs = ["metadata_test.cc"],
     deps = [
@@ -337,6 +345,7 @@ envoy_cc_test(
         "@envoy_api//envoy/config/bootstrap/v3alpha:pkg_cc_proto",
         "@envoy_api//envoy/config/cluster/v3alpha:pkg_cc_proto",
         "@envoy_api//envoy/config/core/v3alpha:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/http/cors/v3alpha:pkg_cc_proto",
     ],
 )
 
@@ -408,9 +417,11 @@ envoy_cc_test(
         ":version_converter_proto_cc_proto",
         "//source/common/config:api_version_lib",
         "//source/common/config:version_converter_lib",
+        "//source/common/protobuf:well_known_lib",
         "//test/test_common:test_time_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/api/v2:pkg_cc_proto",
         "@envoy_api//envoy/config/cluster/v3alpha:pkg_cc_proto",
+        "@envoy_api//envoy/service/discovery/v3alpha:pkg_cc_proto",
     ],
 )
