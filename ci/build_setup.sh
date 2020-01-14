@@ -59,7 +59,6 @@ then
   echo "${BUILD_DIR} mount missing - did you forget -v <something>:${BUILD_DIR}? Creating."
   mkdir -p "${BUILD_DIR}"
 fi
-export ENVOY_FILTER_EXAMPLE_SRCDIR="${BUILD_DIR}/envoy-filter-example"
 
 # Environment setup.
 export USER=bazel
@@ -95,18 +94,6 @@ export BAZEL_BUILD_OPTIONS="--verbose_failures ${BAZEL_OPTIONS} --action_env=HOM
 
 [[ "${BAZEL_EXPUNGE}" == "1" ]] && "${BAZEL}" clean --expunge
 
-if [ "$1" != "-nofetch" ]; then
-  # Setup Envoy consuming project.
-  if [[ ! -d "${ENVOY_FILTER_EXAMPLE_SRCDIR}/.git" ]]; then
-    rm -rf "${ENVOY_FILTER_EXAMPLE_SRCDIR}"
-    git clone https://github.com/envoyproxy/envoy-filter-example.git "${ENVOY_FILTER_EXAMPLE_SRCDIR}"
-  fi
-
-  # This is the hash on https://github.com/envoyproxy/envoy-filter-example.git we pin to.
-  (cd "${ENVOY_FILTER_EXAMPLE_SRCDIR}" && git fetch origin && git checkout -f 25eac570dd2bf3256dff01a04a9ce2a308e61f60)
-  sed -e "s|{ENVOY_SRCDIR}|${ENVOY_SRCDIR}|" "${ENVOY_SRCDIR}"/ci/WORKSPACE.filter.example > "${ENVOY_FILTER_EXAMPLE_SRCDIR}"/WORKSPACE
-fi
-
 # Also setup some space for building Envoy standalone.
 export ENVOY_BUILD_DIR="${BUILD_DIR}"/envoy
 mkdir -p "${ENVOY_BUILD_DIR}"
@@ -127,10 +114,17 @@ mkdir -p "${ENVOY_FAILED_TEST_LOGS}"
 export ENVOY_BUILD_PROFILE="${ENVOY_BUILD_DIR}"/generated/build-profile
 mkdir -p "${ENVOY_BUILD_PROFILE}"
 
-mkdir -p "${ENVOY_FILTER_EXAMPLE_SRCDIR}"/bazel
-ln -sf "${ENVOY_SRCDIR}"/bazel/get_workspace_status "${ENVOY_FILTER_EXAMPLE_SRCDIR}"/bazel/
-cp -f "${ENVOY_SRCDIR}"/.bazelrc "${ENVOY_FILTER_EXAMPLE_SRCDIR}"/
-cp -f "$(bazel info workspace)"/*.bazelrc "${ENVOY_FILTER_EXAMPLE_SRCDIR}"/
-
 export BUILDIFIER_BIN="/usr/local/bin/buildifier"
 export BUILDOZER_BIN="/usr/local/bin/buildozer"
+
+# We set up an Envoy consuming project for test builds only if '-nofetch'
+# is not set AND this is an Envoy build. For derivative builds where Envoy
+# source tree is different than the current workspace, the setup step is
+# skipped.
+if [[ "$1" != "-nofetch" && "${ENVOY_SRCDIR}" == "$(bazel info workspace)" ]]; then
+  . "$(dirname "$0")"/filter_example_setup.sh
+else
+  echo "Skip setting up Envoy Filter Example."
+fi
+
+export ENVOY_BUILD_FILTER_EXAMPLE="${FILTER_WORKSPACE_SET:-0}"
