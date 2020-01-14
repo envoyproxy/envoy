@@ -7,8 +7,8 @@
 #include "envoy/common/time.h"
 #include "envoy/extensions/filters/http/admission_control/v3alpha/admission_control.pb.h"
 #include "envoy/http/filter.h"
-#include "envoy/server/filter_config.h"
 #include "envoy/runtime/runtime.h"
+#include "envoy/server/filter_config.h"
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats_macros.h"
 
@@ -78,9 +78,9 @@ private:
 class AdmissionControlFilterConfig {
 public:
   using AdmissionControlProto =
-    envoy::extensions::filters::http::admission_control::v3alpha::AdmissionControl;
-  AdmissionControlFilterConfig(
-      const AdmissionControlProto& proto_config, Server::Configuration::FactoryContext& context);
+      envoy::extensions::filters::http::admission_control::v3alpha::AdmissionControl;
+  AdmissionControlFilterConfig(const AdmissionControlProto& proto_config,
+                               Server::Configuration::FactoryContext& context);
 
   // Get the per-thread admission controller.
   ThreadLocalController& getController() const { return tls_->getTyped<ThreadLocalController>(); }

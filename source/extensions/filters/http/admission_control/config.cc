@@ -20,8 +20,7 @@ Http::FilterFactoryCb AdmissionControlFilterFactory::createFilterFactoryFromProt
       std::make_shared<AdmissionControlFilterConfig>(config, context);
 
   return [filter_config, prefix](Http::FilterChainFactoryCallbacks& callbacks) -> void {
-    callbacks.addStreamFilter(
-        std::make_shared<AdmissionControlFilter>(filter_config, prefix));
+    callbacks.addStreamFilter(std::make_shared<AdmissionControlFilter>(filter_config, prefix));
   };
 }
 

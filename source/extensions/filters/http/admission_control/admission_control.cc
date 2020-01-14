@@ -6,8 +6,8 @@
 #include <vector>
 
 #include "envoy/extensions/filters/http/admission_control/v3alpha/admission_control.pb.h"
-#include "envoy/server/filter_config.h"
 #include "envoy/runtime/runtime.h"
+#include "envoy/server/filter_config.h"
 
 #include "common/common/assert.h"
 #include "common/common/enum_to_int.h"
@@ -26,8 +26,7 @@ static constexpr std::chrono::seconds defaultSamplingWindow{120};
 static constexpr uint32_t defaultMinRequestSamples = 100;
 
 AdmissionControlFilterConfig::AdmissionControlFilterConfig(
-    const AdmissionControlProto& proto_config,
-    Server::Configuration::FactoryContext& context)
+    const AdmissionControlProto& proto_config, Server::Configuration::FactoryContext& context)
     : runtime_(context.runtime()), time_source_(context.timeSource()), random_(context.random()),
       scope_(context.scope()), tls_(context.threadLocal().allocateSlot()),
       admission_control_feature_(proto_config.enabled(), runtime_),
@@ -38,10 +37,10 @@ AdmissionControlFilterConfig::AdmissionControlFilterConfig(
                                                         defaultAggression)),
       min_request_samples_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(proto_config, min_request_samples,
                                                            defaultMinRequestSamples)) {
-     tls_->set([this](Event::Dispatcher&) -> ThreadLocal::ThreadLocalObjectSharedPtr {
-  return std::make_shared<ThreadLocalController>(time_source_, sampling_window_);
-         }); 
-      }
+  tls_->set([this](Event::Dispatcher&) -> ThreadLocal::ThreadLocalObjectSharedPtr {
+    return std::make_shared<ThreadLocalController>(time_source_, sampling_window_);
+  });
+}
 
 AdmissionControlFilter::AdmissionControlFilter(AdmissionControlFilterConfigSharedPtr config,
                                                const std::string& stats_prefix)
@@ -89,8 +88,7 @@ bool AdmissionControlFilter::shouldRejectRequest() const {
 void ThreadLocalController::maybeUpdateHistoricalData() {
   const MonotonicTime now = time_source_.monotonicTime();
 
-  while (!historical_data_.empty() &&
-         (now - historical_data_.front().first) >= sampling_window_) {
+  while (!historical_data_.empty() && (now - historical_data_.front().first) >= sampling_window_) {
     // Remove stale data.
     global_data_.successes -= historical_data_.front().second.successes;
     global_data_.requests -= historical_data_.front().second.requests;
