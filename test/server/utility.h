@@ -14,7 +14,7 @@ namespace {
 
 inline envoy::config::listener::v3alpha::Listener parseListenerFromV2Yaml(const std::string& yaml) {
   envoy::config::listener::v3alpha::Listener listener;
-  TestUtility::loadFromYaml(yaml, listener);
+  TestUtility::loadFromYaml(yaml, listener, true);
   return listener;
 }
 

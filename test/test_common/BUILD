@@ -105,6 +105,7 @@ envoy_cc_test_library(
         "//source/common/common:thread_lib",
         "//source/common/common:utility_lib",
         "//source/common/config:resources_lib",
+        "//source/common/config:version_converter_lib",
         "//source/common/filesystem:directory_lib",
         "//source/common/filesystem:filesystem_lib",
         "//source/common/http:header_map_lib",

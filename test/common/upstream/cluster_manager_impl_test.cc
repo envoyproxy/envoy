@@ -22,7 +22,7 @@ namespace {
 
 envoy::config::bootstrap::v3alpha::Bootstrap parseBootstrapFromV2Yaml(const std::string& yaml) {
   envoy::config::bootstrap::v3alpha::Bootstrap bootstrap;
-  TestUtility::loadFromYaml(yaml, bootstrap);
+  TestUtility::loadFromYaml(yaml, bootstrap, true);
   return bootstrap;
 }
 
@@ -189,6 +189,7 @@ TEST_F(ClusterManagerImplTest, MultipleProtocolCluster) {
   checkConfigDump(R"EOF(
 static_clusters:
   - cluster:
+      "@type": type.googleapis.com/envoy.api.v2.Cluster
       name: http12_cluster
       connect_timeout: 0.250s
       lb_policy: ROUND_ROBIN
@@ -934,6 +935,7 @@ TEST_F(ClusterManagerImplTest, InitializeOrder) {
  version_info: version3
  static_clusters:
   - cluster:
+      "@type": type.googleapis.com/envoy.api.v2.Cluster
       name: "cds_cluster"
       type: "STATIC"
       connect_timeout: 0.25s
@@ -945,6 +947,7 @@ TEST_F(ClusterManagerImplTest, InitializeOrder) {
       seconds: 1234567891
       nanos: 234000000
   - cluster:
+      "@type": type.googleapis.com/envoy.api.v2.Cluster
       name: "fake_cluster"
       type: "STATIC"
       connect_timeout: 0.25s
@@ -956,6 +959,7 @@ TEST_F(ClusterManagerImplTest, InitializeOrder) {
       seconds: 1234567891
       nanos: 234000000
   - cluster:
+      "@type": type.googleapis.com/envoy.api.v2.Cluster
       name: "fake_cluster2"
       type: "STATIC"
       connect_timeout: 0.25s
@@ -969,6 +973,7 @@ TEST_F(ClusterManagerImplTest, InitializeOrder) {
  dynamic_active_clusters:
   - version_info: "version1"
     cluster:
+      "@type": type.googleapis.com/envoy.api.v2.Cluster
       name: "cluster3"
       type: "STATIC"
       connect_timeout: 0.25s
@@ -981,6 +986,7 @@ TEST_F(ClusterManagerImplTest, InitializeOrder) {
       nanos: 234000000
   - version_info: "version2"
     cluster:
+      "@type": type.googleapis.com/envoy.api.v2.Cluster
       name: "cluster4"
       type: "STATIC"
       connect_timeout: 0.25s
@@ -993,6 +999,7 @@ TEST_F(ClusterManagerImplTest, InitializeOrder) {
       nanos: 234000000
   - version_info: "version3"
     cluster:
+      "@type": type.googleapis.com/envoy.api.v2.Cluster
       name: "cluster5"
       type: "STATIC"
       connect_timeout: 0.25s
@@ -1106,6 +1113,7 @@ TEST_F(ClusterManagerImplTest, RemoveWarmingCluster) {
 dynamic_warming_clusters:
   - version_info: "version1"
     cluster:
+      "@type": type.googleapis.com/envoy.api.v2.Cluster
       name: "fake_cluster"
       type: STATIC
       connect_timeout: 0.25s
@@ -1148,6 +1156,7 @@ TEST_F(ClusterManagerImplTest, ModifyWarmingCluster) {
  dynamic_warming_clusters:
    - version_info: "version1"
      cluster:
+       "@type": type.googleapis.com/envoy.api.v2.Cluster
        name: "fake_cluster"
        type: STATIC
        connect_timeout: 0.25s
@@ -1180,6 +1189,7 @@ TEST_F(ClusterManagerImplTest, ModifyWarmingCluster) {
  dynamic_warming_clusters:
    - version_info: "version2"
      cluster:
+       "@type": type.googleapis.com/envoy.api.v2.Cluster
        name: "fake_cluster"
        type: STATIC
        connect_timeout: 0.25s
