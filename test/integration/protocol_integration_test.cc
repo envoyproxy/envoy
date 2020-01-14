@@ -414,6 +414,7 @@ TEST_P(DownstreamProtocolIntegrationTest, RetryHostPredicateFilter) {
         ->mutable_load_assignment()
         ->mutable_endpoints(0)
         ->add_lb_endpoints()
+        ->mutable_endpoint()
         ->MergeFrom(ConfigHelper::buildEndpoint(Network::Test::getLoopbackAddressString(version_)));
   });
   fake_upstreams_count_ = 2;
