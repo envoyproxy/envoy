@@ -11,6 +11,7 @@
 #include "common/common/assert.h"
 #include "common/common/utility.h"
 #include "common/config/api_version.h"
+#include "common/config/version_converter.h"
 
 namespace Envoy {
 namespace Upstream {
@@ -121,6 +122,9 @@ void EdsClusterImpl::onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt
     throw EnvoyException(fmt::format("Unexpected EDS cluster (expecting {}): {}", cluster_name_,
                                      cluster_load_assignment.cluster_name()));
   }
+  // Scrub original type information; we don't config dump endpoints today and
+  // this is significant memory overhead.
+  Config::VersionConverter::eraseOriginalTypeInformation(cluster_load_assignment);
 
   // Disable timer (if enabled) as we have received new assignment.
   if (assignment_timeout_->enabled()) {

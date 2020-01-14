@@ -49,6 +49,7 @@
 #include "common/network/listen_socket_impl.h"
 #include "common/network/utility.h"
 #include "common/profiler/profiler.h"
+#include "common/protobuf/protobuf.h"
 #include "common/protobuf/utility.h"
 #include "common/router/config_impl.h"
 #include "common/stats/histogram_impl.h"
@@ -227,6 +228,91 @@ void setHealthFlag(Upstream::Host::HealthFlag flag, const Upstream::Host& host,
     break;
   }
 }
+
+// Apply a field mask to a resource message. A simple field mask might look
+// like "cluster.name,cluster.alt_stat_name,last_updated" for a StaticCluster
+// resource. Unfortunately, since the "cluster" field is Any and the in-built
+// FieldMask utils can't mask inside an Any field, we need to do additional work
+// below.
+//
+// We take advantage of the fact that for the most part (with the exception of
+// DynamicListener) that ConfigDump resources have a single Any field where the
+// embedded resources lives. This allows us to construct an inner field mask for
+// the Any resource and an outer field mask for the enclosing message. In the
+// above example, the inner field mask would be "name,alt_stat_name" and the
+// outer field mask "cluster,last_updated". The masks are applied to their
+// respective messages, with the Any resource requiring an unpack/mask/pack
+// series of operations.
+//
+// TODO(htuch): we could make field masks more powerful in future and generalize
+// this to allow arbitrary indexing through Any fields. This is pretty
+// complicated, we would need to build a FieldMask tree similar to how the C++
+// Protobuf library does this internally.
+void trimResourceMessage(const Protobuf::FieldMask& field_mask, Protobuf::Message& message) {
+  const Protobuf::Descriptor* descriptor = message.GetDescriptor();
+  const Protobuf::Reflection* reflection = message.GetReflection();
+  // Figure out which paths cover Any fields. For each field, gather the paths to
+  // an inner mask, switch the outer mask to cover only the original field.
+  Protobuf::FieldMask outer_field_mask;
+  Protobuf::FieldMask inner_field_mask;
+  std::string any_field_name;
+  for (int i = 0; i < field_mask.paths().size(); ++i) {
+    const std::string& path = field_mask.paths(i);
+    std::vector<std::string> frags = absl::StrSplit(path, ".");
+    if (frags.empty()) {
+      continue;
+    }
+    const Protobuf::FieldDescriptor* field = descriptor->FindFieldByName(frags[0]);
+    // Only a single Any field supported, repeated fields don't support further
+    // indexing.
+    // TODO(htuch): should add support for DynamicListener for multiple Any
+    // fields in the future, see
+    // https://github.com/envoyproxy/envoy/issues/9669.
+    if (field != nullptr && field->message_type() != nullptr && !field->is_repeated() &&
+        field->message_type()->full_name() == "google.protobuf.Any") {
+      if (any_field_name.empty()) {
+        any_field_name = frags[0];
+      } else {
+        // This should be structurally true due to the ConfigDump proto
+        // definition (but not for DynamicListener today).
+        ASSERT(any_field_name == frags[0],
+               "Only a single Any field in a config dump resource is supported.");
+      }
+      outer_field_mask.add_paths(frags[0]);
+      frags.erase(frags.begin());
+      inner_field_mask.add_paths(absl::StrJoin(frags, "."));
+    } else {
+      outer_field_mask.add_paths(path);
+    }
+  }
+
+  if (!any_field_name.empty()) {
+    const Protobuf::FieldDescriptor* any_field = descriptor->FindFieldByName(any_field_name);
+    if (reflection->HasField(message, any_field)) {
+      ASSERT(any_field != nullptr);
+      // Unpack to a DynamicMessage.
+      ProtobufWkt::Any any_message;
+      any_message.MergeFrom(reflection->GetMessage(message, any_field));
+      Protobuf::DynamicMessageFactory dmf;
+      const absl::string_view inner_type_name =
+          TypeUtil::typeUrlToDescriptorFullName(any_message.type_url());
+      const Protobuf::Descriptor* inner_descriptor =
+          Protobuf::DescriptorPool::generated_pool()->FindMessageTypeByName(
+              static_cast<std::string>(inner_type_name));
+      ASSERT(inner_descriptor != nullptr);
+      std::unique_ptr<Protobuf::Message> inner_message;
+      inner_message.reset(dmf.GetPrototype(inner_descriptor)->New());
+      MessageUtil::unpackTo(any_message, *inner_message);
+      // Trim message.
+      ProtobufUtil::FieldMaskUtil::TrimMessage(inner_field_mask, inner_message.get());
+      // Pack it back into the Any resource.
+      any_message.PackFrom(*inner_message);
+      reflection->MutableMessage(&message, any_field)->CopyFrom(any_message);
+    }
+  }
+  ProtobufUtil::FieldMaskUtil::TrimMessage(outer_field_mask, &message);
+}
+
 } // namespace
 
 AdminFilter::AdminFilter(AdminImpl& parent) : parent_(parent) {}
@@ -546,6 +632,8 @@ void AdminImpl::addAllConfigToDump(envoy::admin::v3alpha::ConfigDump& dump,
     if (mask.has_value()) {
       Protobuf::FieldMask field_mask;
       ProtobufUtil::FieldMaskUtil::FromString(mask.value(), &field_mask);
+      // We don't use trimMessage() above here since masks don't support
+      // indexing through repeated fields.
       ProtobufUtil::FieldMaskUtil::TrimMessage(field_mask, message.get());
     }
 
@@ -578,7 +666,7 @@ AdminImpl::addResourceToDump(envoy::admin::v3alpha::ConfigDump& dump,
       if (mask.has_value()) {
         Protobuf::FieldMask field_mask;
         ProtobufUtil::FieldMaskUtil::FromString(mask.value(), &field_mask);
-        ProtobufUtil::FieldMaskUtil::TrimMessage(field_mask, &msg);
+        trimResourceMessage(field_mask, msg);
       }
       auto* config = dump.add_configs();
       config->PackFrom(msg);

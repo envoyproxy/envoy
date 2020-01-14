@@ -69,6 +69,19 @@ namespace Http {
 
 class HttpConnectionManagerImplTest : public testing::Test, public ConnectionManagerConfig {
 public:
+  struct RouteConfigProvider : public Router::RouteConfigProvider {
+    RouteConfigProvider(TimeSource& time_source) : time_source_(time_source) {}
+
+    // Router::RouteConfigProvider
+    Router::ConfigConstSharedPtr config() override { return route_config_; }
+    absl::optional<ConfigInfo> configInfo() const override { return {}; }
+    SystemTime lastUpdated() const override { return time_source_.systemTime(); }
+    void onConfigUpdate() override {}
+
+    TimeSource& time_source_;
+    std::shared_ptr<Router::MockConfig> route_config_{new NiceMock<Router::MockConfig>()};
+  };
+
   HttpConnectionManagerImplTest()
       : http_context_(fake_stats_.symbolTable()), access_log_path_("dummy_path"),
         access_logs_{

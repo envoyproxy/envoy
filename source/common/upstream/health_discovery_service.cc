@@ -8,6 +8,7 @@
 #include "envoy/service/health/v3alpha/hds.pb.h"
 #include "envoy/stats/scope.h"
 
+#include "common/config/version_converter.h"
 #include "common/protobuf/protobuf.h"
 
 namespace Envoy {
@@ -24,6 +25,7 @@ static constexpr uint32_t RetryInitialDelayMilliseconds = 1000;
 static constexpr uint32_t RetryMaxDelayMilliseconds = 30000;
 
 HdsDelegate::HdsDelegate(Stats::Scope& scope, Grpc::RawAsyncClientPtr async_client,
+                         envoy::config::core::v3alpha::ApiVersion transport_api_version,
                          Event::Dispatcher& dispatcher, Runtime::Loader& runtime,
                          Envoy::Stats::Store& stats, Ssl::ContextManager& ssl_context_manager,
                          Runtime::RandomGenerator& random, ClusterInfoFactory& info_factory,
@@ -34,11 +36,12 @@ HdsDelegate::HdsDelegate(Stats::Scope& scope, Grpc::RawAsyncClientPtr async_clie
     : stats_{ALL_HDS_STATS(POOL_COUNTER_PREFIX(scope, "hds_delegate."))},
       service_method_(*Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
           "envoy.service.discovery.v2.HealthDiscoveryService.StreamHealthCheck")),
-      async_client_(std::move(async_client)), dispatcher_(dispatcher), runtime_(runtime),
-      store_stats_(stats), ssl_context_manager_(ssl_context_manager), random_(random),
-      info_factory_(info_factory), access_log_manager_(access_log_manager), cm_(cm),
-      local_info_(local_info), admin_(admin), singleton_manager_(singleton_manager), tls_(tls),
-      validation_visitor_(validation_visitor), api_(api) {
+      async_client_(std::move(async_client)), transport_api_version_(transport_api_version),
+      dispatcher_(dispatcher), runtime_(runtime), store_stats_(stats),
+      ssl_context_manager_(ssl_context_manager), random_(random), info_factory_(info_factory),
+      access_log_manager_(access_log_manager), cm_(cm), local_info_(local_info), admin_(admin),
+      singleton_manager_(singleton_manager), tls_(tls), validation_visitor_(validation_visitor),
+      api_(api) {
   health_check_request_.mutable_health_check_request()->mutable_node()->MergeFrom(
       local_info_.node());
   backoff_strategy_ = std::make_unique<JitteredBackOffStrategy>(RetryInitialDelayMilliseconds,
@@ -77,6 +80,8 @@ void HdsDelegate::establishNewStream() {
     return;
   }
 
+  Config::VersionConverter::prepareMessageForGrpcWire(health_check_request_,
+                                                      transport_api_version_);
   ENVOY_LOG(debug, "Sending HealthCheckRequest {} ", health_check_request_.DebugString());
   stream_->sendMessage(health_check_request_, false);
   stats_.responses_.inc();

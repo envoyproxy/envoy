@@ -7,24 +7,29 @@
 namespace Envoy {
 namespace Upstream {
 
-// TODO(htuch): should these be templated in protobuf/utility.h?
+// We use a tuple representation for hashing/equality/comparison, since this
+// ensures we are not subject to proto nuances like unknown fields (e.g. from
+// original type information annotations).
+using LocalityTuple = std::tuple<const std::string&, const std::string&, const std::string&>;
+
 struct LocalityHash {
   size_t operator()(const envoy::config::core::v3alpha::Locality& locality) const {
-    return MessageUtil::hash(locality);
+    return absl::Hash<LocalityTuple>()({locality.region(), locality.zone(), locality.sub_zone()});
   }
 };
 
 struct LocalityEqualTo {
   bool operator()(const envoy::config::core::v3alpha::Locality& lhs,
                   const envoy::config::core::v3alpha::Locality& rhs) const {
-    return Protobuf::util::MessageDifferencer::Equivalent(lhs, rhs);
+    const LocalityTuple lhs_tuple = LocalityTuple(lhs.region(), lhs.zone(), lhs.sub_zone());
+    const LocalityTuple rhs_tuple = LocalityTuple(rhs.region(), rhs.zone(), rhs.sub_zone());
+    return lhs_tuple == rhs_tuple;
   }
 };
 
 struct LocalityLess {
   bool operator()(const envoy::config::core::v3alpha::Locality& lhs,
                   const envoy::config::core::v3alpha::Locality& rhs) const {
-    using LocalityTuple = std::tuple<const std::string&, const std::string&, const std::string&>;
     const LocalityTuple lhs_tuple = LocalityTuple(lhs.region(), lhs.zone(), lhs.sub_zone());
     const LocalityTuple rhs_tuple = LocalityTuple(rhs.region(), rhs.zone(), rhs.sub_zone());
     return lhs_tuple < rhs_tuple;

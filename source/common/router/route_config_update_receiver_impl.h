@@ -19,21 +19,26 @@ class RouteConfigUpdateReceiverImpl : public RouteConfigUpdateReceiver {
 public:
   RouteConfigUpdateReceiverImpl(TimeSource& time_source,
                                 ProtobufMessage::ValidationVisitor& validation_visitor)
-      : time_source_(time_source), last_config_hash_(0ull),
-        validation_visitor_(validation_visitor) {}
+      : time_source_(time_source), last_config_hash_(0ull), last_vhds_config_hash_(0ul),
+        validation_visitor_(validation_visitor), vhds_configuration_changed_(true) {}
 
   void
-  initializeVhosts(const envoy::config::route::v3alpha::RouteConfiguration& route_configuration);
-  void
-  removeVhosts(std::unordered_map<std::string, envoy::config::route::v3alpha::VirtualHost>& vhosts,
-               const Protobuf::RepeatedPtrField<std::string>& removed_vhost_names);
-  void
-  updateVhosts(std::unordered_map<std::string, envoy::config::route::v3alpha::VirtualHost>& vhosts,
-               const Protobuf::RepeatedPtrField<envoy::service::discovery::v3alpha::Resource>&
-                   added_resources);
+  initializeRdsVhosts(const envoy::config::route::v3alpha::RouteConfiguration& route_configuration);
+  void collectResourceIdsInUpdate(
+      const Protobuf::RepeatedPtrField<envoy::service::discovery::v3alpha::Resource>&
+          added_resources);
+  bool removeVhosts(std::map<std::string, envoy::config::route::v3alpha::VirtualHost>& vhosts,
+                    const Protobuf::RepeatedPtrField<std::string>& removed_vhost_names);
+  bool updateVhosts(std::map<std::string, envoy::config::route::v3alpha::VirtualHost>& vhosts,
+                    const Protobuf::RepeatedPtrField<envoy::service::discovery::v3alpha::Resource>&
+                        added_resources);
   void rebuildRouteConfig(
-      const std::unordered_map<std::string, envoy::config::route::v3alpha::VirtualHost>& vhosts,
+      const std::map<std::string, envoy::config::route::v3alpha::VirtualHost>& rds_vhosts,
+      const std::map<std::string, envoy::config::route::v3alpha::VirtualHost>& vhds_vhosts,
       envoy::config::route::v3alpha::RouteConfiguration& route_config);
+  bool onDemandFetchFailed(const envoy::service::discovery::v3alpha::Resource& resource) const;
+  void onUpdateCommon(const envoy::config::route::v3alpha::RouteConfiguration& rc,
+                      const std::string& version_info);
 
   // Router::RouteConfigUpdateReceiver
   bool onRdsUpdate(const envoy::config::route::v3alpha::RouteConfiguration& rc,
@@ -48,20 +53,28 @@ public:
   absl::optional<RouteConfigProvider::ConfigInfo> configInfo() const override {
     return config_info_;
   }
+  bool vhdsConfigurationChanged() const override { return vhds_configuration_changed_; }
   const envoy::config::route::v3alpha::RouteConfiguration& routeConfiguration() override {
     return route_config_proto_;
   }
   SystemTime lastUpdated() const override { return last_updated_; }
+  const std::set<std::string>& resourceIdsInLastVhdsUpdate() override {
+    return resource_ids_in_last_update_;
+  }
 
 private:
   TimeSource& time_source_;
   envoy::config::route::v3alpha::RouteConfiguration route_config_proto_;
   uint64_t last_config_hash_;
+  uint64_t last_vhds_config_hash_;
   std::string last_config_version_;
   SystemTime last_updated_;
-  std::unordered_map<std::string, envoy::config::route::v3alpha::VirtualHost> virtual_hosts_;
+  std::map<std::string, envoy::config::route::v3alpha::VirtualHost> rds_virtual_hosts_;
+  std::map<std::string, envoy::config::route::v3alpha::VirtualHost> vhds_virtual_hosts_;
   absl::optional<RouteConfigProvider::ConfigInfo> config_info_;
   ProtobufMessage::ValidationVisitor& validation_visitor_;
+  std::set<std::string> resource_ids_in_last_update_;
+  bool vhds_configuration_changed_;
 };
 
 } // namespace Router

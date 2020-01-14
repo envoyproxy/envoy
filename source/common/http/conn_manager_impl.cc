@@ -488,6 +488,13 @@ void ConnectionManagerImpl::chargeTracingStats(const Tracing::Reason& tracing_re
   }
 }
 
+void ConnectionManagerImpl::RdsRouteConfigUpdateRequester::requestRouteConfigUpdate(
+    const std::string host_header, Event::Dispatcher& thread_local_dispatcher,
+    Http::RouteConfigUpdatedCallbackSharedPtr route_config_updated_cb) {
+  route_config_provider_->requestVirtualHostsUpdate(host_header, thread_local_dispatcher,
+                                                    std::move(route_config_updated_cb));
+}
+
 ConnectionManagerImpl::ActiveStream::ActiveStream(ConnectionManagerImpl& connection_manager)
     : connection_manager_(connection_manager),
       stream_id_(connection_manager.random_generator_.random()),
@@ -503,7 +510,16 @@ ConnectionManagerImpl::ActiveStream::ActiveStream(ConnectionManagerImpl& connect
                connection_manager.config_.scopedRouteConfigProvider() == nullptr)),
          "Either routeConfigProvider or scopedRouteConfigProvider should be set in "
          "ConnectionManagerImpl.");
-
+  if (connection_manager_.config_.isRoutable() &&
+      connection_manager.config_.routeConfigProvider() != nullptr) {
+    route_config_update_requester_ =
+        std::make_unique<ConnectionManagerImpl::RdsRouteConfigUpdateRequester>(
+            connection_manager.config_.routeConfigProvider());
+  } else if (connection_manager_.config_.isRoutable() &&
+             connection_manager.config_.scopedRouteConfigProvider() != nullptr) {
+    route_config_update_requester_ =
+        std::make_unique<ConnectionManagerImpl::NullRouteConfigUpdateRequester>();
+  }
   ScopeTrackerScopeState scope(this,
                                connection_manager_.read_callbacks_->connection().dispatcher());
 
@@ -1363,6 +1379,24 @@ void ConnectionManagerImpl::ActiveStream::refreshCachedTracingCustomTags() {
   if (configured_in_conn) {
     custom_tag_map.insert(conn_manager_tags.begin(), conn_manager_tags.end());
   }
+}
+
+void ConnectionManagerImpl::ActiveStream::requestRouteConfigUpdate(
+    Event::Dispatcher& thread_local_dispatcher,
+    Http::RouteConfigUpdatedCallbackSharedPtr route_config_updated_cb) {
+  ASSERT(!request_headers_->Host()->value().empty());
+  const auto& host_header =
+      absl::AsciiStrToLower(request_headers_->Host()->value().getStringView());
+  route_config_update_requester_->requestRouteConfigUpdate(host_header, thread_local_dispatcher,
+                                                           std::move(route_config_updated_cb));
+}
+
+absl::optional<Router::ConfigConstSharedPtr> ConnectionManagerImpl::ActiveStream::routeConfig() {
+  if (connection_manager_.config_.routeConfigProvider() == nullptr) {
+    return {};
+  }
+  return absl::optional<Router::ConfigConstSharedPtr>(
+      connection_manager_.config_.routeConfigProvider()->config());
 }
 
 void ConnectionManagerImpl::ActiveStream::sendLocalReply(
@@ -2260,6 +2294,16 @@ bool ConnectionManagerImpl::ActiveStreamDecoderFilter::recreateStream() {
 
   new_stream.decodeHeaders(std::move(request_headers), true);
   return true;
+}
+
+void ConnectionManagerImpl::ActiveStreamDecoderFilter::requestRouteConfigUpdate(
+    Http::RouteConfigUpdatedCallbackSharedPtr route_config_updated_cb) {
+  parent_.requestRouteConfigUpdate(dispatcher(), std::move(route_config_updated_cb));
+}
+
+absl::optional<Router::ConfigConstSharedPtr>
+ConnectionManagerImpl::ActiveStreamDecoderFilter::routeConfig() {
+  return parent_.routeConfig();
 }
 
 Buffer::WatermarkBufferPtr ConnectionManagerImpl::ActiveStreamEncoderFilter::createBuffer() {

@@ -39,3 +39,11 @@ envoy_cc_library(
         "//include/envoy/stream_info:stream_info_interface",
     ],
 )
+
+envoy_cc_library(
+    name = "uint32_accessor_lib",
+    hdrs = ["uint32_accessor_impl.h"],
+    deps = [
+        "//include/envoy/stream_info:uint32_accessor_interface",
+    ],
+)

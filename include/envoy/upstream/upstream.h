@@ -87,6 +87,8 @@ public:
    * Create a connection for this host.
    * @param dispatcher supplies the owning dispatcher.
    * @param options supplies the socket options that will be set on the new connection.
+   * @param transport_socket_options supplies the transport options that will be set on the new
+   * connection.
    * @return the connection data which includes the raw network connection as well as the *real*
    *         host that backs it. The reason why a 2nd host is returned is that some hosts are
    *         logical and wrap multiple real network destinations. In this case, a different host
@@ -101,10 +103,13 @@ public:
   /**
    * Create a health check connection for this host.
    * @param dispatcher supplies the owning dispatcher.
+   * @param transport_socket_options supplies the transport options that will be set on the new
+   * connection.
    * @return the connection data.
    */
-  virtual CreateConnectionData
-  createHealthCheckConnection(Event::Dispatcher& dispatcher) const PURE;
+  virtual CreateConnectionData createHealthCheckConnection(
+      Event::Dispatcher& dispatcher,
+      Network::TransportSocketOptionsSharedPtr transport_socket_options) const PURE;
 
   /**
    * @return host specific gauges.
@@ -615,6 +620,13 @@ public:
   REMAINING_GAUGE(remaining_rq, Accumulate)
 
 /**
+ * All stats around timeout budgets. Not used by default.
+ */
+#define ALL_CLUSTER_TIMEOUT_BUDGET_STATS(HISTOGRAM)                                                \
+  HISTOGRAM(upstream_rq_timeout_budget_percent_used, Unspecified)                                  \
+  HISTOGRAM(upstream_rq_timeout_budget_per_try_percent_used, Unspecified)
+
+/**
  * Struct definition for all cluster stats. @see stats_macros.h
  */
 struct ClusterStats {
@@ -633,6 +645,13 @@ struct ClusterLoadReportStats {
  */
 struct ClusterCircuitBreakersStats {
   ALL_CLUSTER_CIRCUIT_BREAKERS_STATS(GENERATE_GAUGE_STRUCT, GENERATE_GAUGE_STRUCT)
+};
+
+/**
+ * Struct definition for cluster timeout budget stats. @see stats_macros.h
+ */
+struct ClusterTimeoutBudgetStats {
+  ALL_CLUSTER_TIMEOUT_BUDGET_STATS(GENERATE_HISTOGRAM_STRUCT)
 };
 
 /**
@@ -813,6 +832,11 @@ public:
    * @return ClusterLoadReportStats& strongly named load report stats for this cluster.
    */
   virtual ClusterLoadReportStats& loadReportStats() const PURE;
+
+  /**
+   * @return absl::optional<ClusterTimeoutBudgetStats>& stats on timeout budgets for this cluster.
+   */
+  virtual const absl::optional<ClusterTimeoutBudgetStats>& timeoutBudgetStats() const PURE;
 
   /**
    * Returns an optional source address for upstream connections to bind to.
