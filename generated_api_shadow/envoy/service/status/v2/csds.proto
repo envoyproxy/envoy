@@ -4,6 +4,8 @@ package envoy.service.status.v2;
 
 import "envoy/admin/v2alpha/config_dump.proto";
 import "envoy/api/v2/core/base.proto";
+import "envoy/type/matcher/metadata.proto";
+import "envoy/type/matcher/string.proto";
 
 import "google/api/annotations.proto";
 import "google/protobuf/struct.proto";
@@ -16,8 +18,9 @@ option java_multiple_files = true;
 option java_generic_services = true;
 
 // CSDS is Client Status Discovery Service. It can be used to get the status of
-// xDS-compliant client from the management server's point of view. It can also
-// be used as an interface to get the current state of the client.
+// xDS-compliant client from the management server's point of view. In the
+// future, it can also potentially be used as an interface to get the current
+// state directly from the client.
 service ClientStatusService {
   option (envoy.annotations.resource).type = "envoy.service.status.v2.ClientStatus";
 
@@ -49,15 +52,19 @@ enum ConfigStatus {
   ERROR = 4;
 }
 
-// Request for client status for a list of clients identified by Node identifier.
+// Request for client status of clients identified by a list of NodeMatchers.
 message ClientStatusRequest {
-  // Node identifier for a list of clients.
-  repeated string node_ids = 1;
+  message NodeMatcher {
+    // Specifies match criteria on the client node id.
+    type.matcher.StringMatcher node_id_matcher = 1;
 
-  // Metadata is used to give extra information to the management server.
-  // For example, management server can choose to only send config status if
-  // there is a metadata CONFIG_STATUS_ONLY: true.
-  google.protobuf.Struct metadata = 2;
+    // Specifies match criteria for the client node metadata.
+    type.matcher.MetadataMatcher node_metadata_matcher = 2;
+  }
+
+  // Management server can use these match criteria to identify clients and
+  // respond.
+  repeated NodeMatcher node_matchers = 1;
 }
 
 // Detailed config (per xDS) with status.
