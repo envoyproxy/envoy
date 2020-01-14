@@ -20,8 +20,8 @@ message OmitHostMetadataConfig {
       "envoy.config.retry.omit_host_metadata.v2.OmitHostMetadataConfig";
 
   // Retry host predicate metadata match criteria. The hosts in
-  // the upstream cluster with metadata matching will be omitted while
-  // attempting retry of a failed request. The filter name should be
-  // specified as *envoy.lb*.
+  // the upstream cluster with matching metadata will be omitted while
+  // attempting a retry of a failed request. The metadata should be specified
+  // under the *envoy.lb* key.
   config.core.v3alpha.Metadata metadata_match = 1;
 }

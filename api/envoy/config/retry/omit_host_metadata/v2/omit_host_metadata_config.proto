@@ -19,8 +19,22 @@ option (udpa.annotations.file_migrate).move_to_package =
 // [#extension: envoy.retry_host_predicates.omit_host_metadata]
 message OmitHostMetadataConfig {
   // Retry host predicate metadata match criteria. The hosts in
-  // the upstream cluster with metadata matching will be omitted while
-  // attempting retry of a failed request. The filter name should be
-  // specified as *envoy.lb*.
+  // the upstream cluster with matching metadata will be omitted while
+  // attempting a retry of a failed request. The metadata should be specified
+  // under the *envoy.lb* key.
+  //
+  // Example:
+  //
+  // .. code-block:: yaml
+  //
+  //     retry_host_predicate:
+  //     - name: envoy.retry_host_predicates.omit_host_metadata
+  //       typed_config:
+  //         "@type":
+  //         type.googleapis.com/envoy.config.retry.omit_host_metadata.v2.OmitHostMetadataConfig
+  //         metadata_match:
+  //           filter_metadata:
+  //             envoy.lb:
+  //               key: value
   api.v2.core.Metadata metadata_match = 1;
 }

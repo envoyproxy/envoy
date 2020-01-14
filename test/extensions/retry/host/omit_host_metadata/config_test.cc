@@ -33,18 +33,16 @@ TEST(OmitHostsRetryPredicateTest, PredicateTest) {
   empty->MergeFrom(config);
   auto predicate = factory->createHostPredicate(*empty, 3);
 
-  auto host1 = std::make_shared<NiceMock<Upstream::MockHost>>();
-  auto host2 = std::make_shared<NiceMock<Upstream::MockHost>>();
-  auto host3 = std::make_shared<NiceMock<Upstream::MockHost>>();
+  auto host = std::make_shared<NiceMock<Upstream::MockHost>>();
 
   // Test: if the host doesn't have metadata, it should not be rejected.
-  ON_CALL(*host1, metadata())
+  ON_CALL(*host, metadata())
       .WillByDefault(Return(std::make_shared<envoy::config::core::v3alpha::Metadata>()));
 
-  ASSERT_FALSE(predicate->shouldSelectAnotherHost(*host1));
+  ASSERT_FALSE(predicate->shouldSelectAnotherHost(*host));
 
   // Test: if host has matching metadata criteria, it should be rejected.
-  ON_CALL(*host1, metadata())
+  ON_CALL(*host, metadata())
       .WillByDefault(Return(std::make_shared<envoy::config::core::v3alpha::Metadata>(
           TestUtility::parseYaml<envoy::config::core::v3alpha::Metadata>(
               R"EOF(
@@ -53,10 +51,10 @@ TEST(OmitHostsRetryPredicateTest, PredicateTest) {
             key: "value"
       )EOF"))));
 
-  ASSERT_TRUE(predicate->shouldSelectAnotherHost(*host1));
+  ASSERT_TRUE(predicate->shouldSelectAnotherHost(*host));
 
   // Test: if host doesn't have matching metadata criteria, it should not be rejected.
-  ON_CALL(*host2, metadata())
+  ON_CALL(*host, metadata())
       .WillByDefault(Return(std::make_shared<envoy::config::core::v3alpha::Metadata>(
           TestUtility::parseYaml<envoy::config::core::v3alpha::Metadata>(
               R"EOF(
@@ -65,10 +63,10 @@ TEST(OmitHostsRetryPredicateTest, PredicateTest) {
             key1: "value1"
       )EOF"))));
 
-  ASSERT_FALSE(predicate->shouldSelectAnotherHost(*host2));
+  ASSERT_FALSE(predicate->shouldSelectAnotherHost(*host));
 
   // Test: if host metadata has matching key but not the value, it should not be rejected.
-  ON_CALL(*host3, metadata())
+  ON_CALL(*host, metadata())
       .WillByDefault(Return(std::make_shared<envoy::config::core::v3alpha::Metadata>(
           TestUtility::parseYaml<envoy::config::core::v3alpha::Metadata>(
               R"EOF(
@@ -77,7 +75,7 @@ TEST(OmitHostsRetryPredicateTest, PredicateTest) {
             key: "value1"
       )EOF"))));
 
-  ASSERT_FALSE(predicate->shouldSelectAnotherHost(*host2));
+  ASSERT_FALSE(predicate->shouldSelectAnotherHost(*host));
 }
 } // namespace
 } // namespace Host

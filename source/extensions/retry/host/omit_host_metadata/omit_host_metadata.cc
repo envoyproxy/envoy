@@ -15,20 +15,8 @@ bool OmitHostsRetryPredicate::shouldSelectAnotherHost(const Upstream::Host& host
     return false;
   }
 
-  // Check if there's no metadata match criteria configured.
-  const auto& filter_it = metadata_match_criteria_.filter_metadata().find(
-      Envoy::Config::MetadataFilters::get().ENVOY_LB);
-  if (filter_it == metadata_match_criteria_.filter_metadata().end()) {
-    return false;
-  }
-
-  std::vector<std::pair<std::string, ProtobufWkt::Value>> kv;
-  for (auto const& it : filter_it->second.fields()) {
-    kv.push_back(std::make_pair(it.first, it.second));
-  }
-
   return Envoy::Config::Metadata::metadataLabelMatch(
-      kv, *host.metadata(), Envoy::Config::MetadataFilters::get().ENVOY_LB, true);
+      labelSet, *host.metadata(), Envoy::Config::MetadataFilters::get().ENVOY_LB, true);
 }
 
 } // namespace Host

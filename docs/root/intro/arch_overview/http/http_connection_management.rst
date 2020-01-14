@@ -100,7 +100,7 @@ on attempts is necessary in order to deal with scenarios in which finding an acc
 impossible (no hosts satisfy the predicate) or very unlikely (the only suitable host has a very low
 relative weight).
 
-To reject a host based on its metadata match, ``envoy.retry_host_predicates.omit_host_metadata`` can be used:
+To reject a host based on its metadata, ``envoy.retry_host_predicates.omit_host_metadata`` can be used:
 
 .. code-block:: yaml
 
