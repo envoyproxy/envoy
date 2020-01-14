@@ -41,6 +41,7 @@ private:
   using HostPredicate = std::function<bool(const Host&)>;
   struct SubsetSelectorFallbackParams;
 
+  void initSubsetAnyOnce();
   void initSubsetSelectorMap();
   void initSelectorFallbackSubset(const envoy::config::cluster::v3alpha::Cluster::LbSubsetConfig::
                                       LbSubsetSelector::LbSubsetSelectorFallbackPolicy&);
@@ -246,10 +247,10 @@ private:
   const PrioritySet* original_local_priority_set_;
   Common::CallbackHandle* original_priority_set_callback_handle_;
 
+  LbSubsetEntryPtr subset_any_;
   LbSubsetEntryPtr fallback_subset_;
   LbSubsetEntryPtr panic_mode_subset_;
 
-  LbSubsetEntryPtr selector_fallback_subset_any_;
   LbSubsetEntryPtr selector_fallback_subset_default_;
 
   // Forms a trie-like structure. Requires lexically sorted Host and Route metadata.
