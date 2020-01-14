@@ -12,6 +12,7 @@
 #include "common/config/version_converter.h"
 #include "common/protobuf/message_validator_impl.h"
 #include "common/protobuf/protobuf.h"
+#include "common/protobuf/well_known.h"
 
 #include "absl/strings/match.h"
 #include "yaml-cpp/yaml.h"
@@ -311,6 +312,8 @@ void MessageUtil::loadFromFile(const std::string& path, Protobuf::Message& messa
   }
 }
 
+namespace {
+
 void checkForDeprecatedNonRepeatedEnumValue(const Protobuf::Message& message,
                                             absl::string_view filename,
                                             const Protobuf::FieldDescriptor* field,
@@ -356,21 +359,26 @@ void checkForDeprecatedNonRepeatedEnumValue(const Protobuf::Message& message,
   }
 }
 
-void MessageUtil::checkForUnexpectedFields(const Protobuf::Message& message,
-                                           ProtobufMessage::ValidationVisitor& validation_visitor,
-                                           Runtime::Loader* runtime) {
+void checkForUnexpectedFields(const Protobuf::Message& message,
+                              ProtobufMessage::ValidationVisitor& validation_visitor,
+                              Runtime::Loader* runtime) {
   // Reject unknown fields.
   const auto& unknown_fields = message.GetReflection()->GetUnknownFields(message);
   if (!unknown_fields.empty()) {
     std::string error_msg;
     for (int n = 0; n < unknown_fields.field_count(); ++n) {
+      if (unknown_fields.field(n).number() == ProtobufWellKnown::OriginalTypeFieldNumber) {
+        continue;
+      }
       error_msg += absl::StrCat(n > 0 ? ", " : "", unknown_fields.field(n).number());
     }
     // We use the validation visitor but have hard coded behavior below for deprecated fields.
     // TODO(htuch): Unify the deprecated and unknown visitor handling behind the validation
     // visitor pattern. https://github.com/envoyproxy/envoy/issues/8092.
-    validation_visitor.onUnknownField("type " + message.GetTypeName() +
-                                      " with unknown field set {" + error_msg + "}");
+    if (!error_msg.empty()) {
+      validation_visitor.onUnknownField("type " + message.GetTypeName() +
+                                        " with unknown field set {" + error_msg + "}");
+    }
   }
 
   const Protobuf::Descriptor* descriptor = message.GetDescriptor();
@@ -436,6 +444,14 @@ void MessageUtil::checkForUnexpectedFields(const Protobuf::Message& message,
       }
     }
   }
+}
+
+} // namespace
+
+void MessageUtil::checkForUnexpectedFields(const Protobuf::Message& message,
+                                           ProtobufMessage::ValidationVisitor& validation_visitor,
+                                           Runtime::Loader* runtime) {
+  ::Envoy::checkForUnexpectedFields(API_RECOVER_ORIGINAL(message), validation_visitor, runtime);
 }
 
 std::string MessageUtil::getYamlStringFromMessage(const Protobuf::Message& message,

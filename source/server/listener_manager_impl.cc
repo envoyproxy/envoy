@@ -15,6 +15,7 @@
 #include "common/common/assert.h"
 #include "common/common/fmt.h"
 #include "common/config/utility.h"
+#include "common/config/version_converter.h"
 #include "common/network/io_socket_handle_impl.h"
 #include "common/network/listen_socket_impl.h"
 #include "common/network/socket_option_factory.h"
@@ -66,7 +67,7 @@ envoy::admin::v3alpha::ListenersConfigDump::DynamicListener* getOrCreateDynamicL
 void fillState(envoy::admin::v3alpha::ListenersConfigDump::DynamicListenerState& state,
                const ListenerImpl& listener) {
   state.set_version_info(listener.versionInfo());
-  state.mutable_listener()->MergeFrom(listener.config());
+  state.mutable_listener()->PackFrom(API_RECOVER_ORIGINAL(listener.config()));
   TimestampUtil::systemClockToTimestamp(listener.last_updated_, *(state.mutable_last_updated()));
 }
 
@@ -260,7 +261,7 @@ ProtobufTypes::MessagePtr ListenerManagerImpl::dumpListenerConfigs() {
   for (const auto& listener : active_listeners_) {
     if (listener->blockRemove()) {
       auto& static_listener = *config_dump->mutable_static_listeners()->Add();
-      static_listener.mutable_listener()->MergeFrom(listener->config());
+      static_listener.mutable_listener()->PackFrom(API_RECOVER_ORIGINAL(listener->config()));
       TimestampUtil::systemClockToTimestamp(listener->last_updated_,
                                             *(static_listener.mutable_last_updated()));
       continue;
@@ -336,7 +337,7 @@ bool ListenerManagerImpl::addOrUpdateListener(
     TimestampUtil::systemClockToTimestamp(server_.api().timeSource().systemTime(),
                                           *(it->second->mutable_last_update_attempt()));
     it->second->set_details(e.what());
-    it->second->mutable_failed_configuration()->PackFrom(config);
+    it->second->mutable_failed_configuration()->PackFrom(API_RECOVER_ORIGINAL(config));
     throw e;
   }
   error_state_tracker_.erase(it);
