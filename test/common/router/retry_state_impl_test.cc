@@ -734,7 +734,8 @@ TEST_F(RouterRetryStateImplTest, PolicyLimitedByRequestHeaders) {
 
   // Sanity check that we're only enabling retries for the configured retry-on.
   {
-    Http::TestHeaderMapImpl request_headers{{":method", "HEAD"}, {"x-envoy-retry-on", "retriable-4xx"}};
+    Http::TestHeaderMapImpl request_headers{{":method", "HEAD"},
+                                            {"x-envoy-retry-on", "retriable-4xx"}};
     setup(request_headers);
     EXPECT_TRUE(state_->enabled());
     Http::TestHeaderMapImpl response_headers{{":status", "500"}};
