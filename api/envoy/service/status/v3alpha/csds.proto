@@ -66,7 +66,7 @@ message ClientStatusRequest {
     // Specifies match criteria on the client node id.
     type.matcher.v3alpha.StringMatcher node_id_matcher = 1;
 
-    // Specifies match criteria for the client node metadata.
+    // Specifies match criteria on the client node metadata.
     type.matcher.v3alpha.MetadataMatcher node_metadata_matcher = 2;
   }
 
