@@ -627,6 +627,7 @@ filter_chains:
   checkConfigDump(R"EOF(
 static_listeners:
   listener:
+    "@type": type.googleapis.com/envoy.api.v2.Listener
     name: "foo"
     address:
       socket_address:
@@ -701,6 +702,7 @@ dynamic_listeners:
     warming_state:
       version_info: version1
       listener:
+        "@type": type.googleapis.com/envoy.api.v2.Listener
         name: foo
         address:
           socket_address:
@@ -743,6 +745,7 @@ dynamic_listeners:
     warming_state:
       version_info: version2
       listener:
+        "@type": type.googleapis.com/envoy.api.v2.Listener
         name: foo
         address:
           socket_address:
@@ -787,6 +790,7 @@ dynamic_listeners:
     active_state:
       version_info: version3
       listener:
+        "@type": type.googleapis.com/envoy.api.v2.Listener
         name: foo
         address:
           socket_address:
@@ -799,6 +803,7 @@ dynamic_listeners:
     draining_state:
       version_info: version2
       listener:
+        "@type": type.googleapis.com/envoy.api.v2.Listener
         name: foo
         address:
           socket_address:
@@ -866,6 +871,7 @@ dynamic_listeners:
     active_state:
       version_info: version3
       listener:
+        "@type": type.googleapis.com/envoy.api.v2.Listener
         name: foo
         address:
           socket_address:
@@ -879,6 +885,7 @@ dynamic_listeners:
     active_state:
       version_info: version4
       listener:
+        "@type": type.googleapis.com/envoy.api.v2.Listener
         name: bar
         address:
           socket_address:
@@ -892,6 +899,7 @@ dynamic_listeners:
     warming_state:
       version_info: version5
       listener:
+        "@type": type.googleapis.com/envoy.api.v2.Listener
         name: baz
         address:
           socket_address:
@@ -1172,7 +1180,7 @@ dynamic_listeners:
   - name: foo
     error_state:
       failed_configuration:
-        "@type": type.googleapis.com/envoy.config.listener.v3alpha.Listener
+        "@type": type.googleapis.com/envoy.api.v2.Listener
         name: foo
         address:
           socket_address:

@@ -47,7 +47,7 @@ using ::Envoy::Http::TestHeaderMapImpl;
 envoy::config::route::v3alpha::ScopedRouteConfiguration
 parseScopedRouteConfigurationFromYaml(const std::string& yaml) {
   envoy::config::route::v3alpha::ScopedRouteConfiguration scoped_route_config;
-  TestUtility::loadFromYaml(yaml, scoped_route_config);
+  TestUtility::loadFromYaml(yaml, scoped_route_config, true);
   return scoped_route_config;
 }
 
@@ -60,7 +60,7 @@ envoy::extensions::filters::network::http_connection_manager::v3alpha::HttpConne
 parseHttpConnectionManagerFromYaml(const std::string& config_yaml) {
   envoy::extensions::filters::network::http_connection_manager::v3alpha::HttpConnectionManager
       http_connection_manager;
-  TestUtility::loadFromYaml(config_yaml, http_connection_manager);
+  TestUtility::loadFromYaml(config_yaml, http_connection_manager, true);
   return http_connection_manager;
 }
 
@@ -762,10 +762,12 @@ inline_scoped_route_configs:
   - name: foo-scoped-routes
     scoped_route_configs:
      - name: foo
+       "@type": type.googleapis.com/envoy.api.v2.ScopedRouteConfiguration
        route_configuration_name: foo-route-config
        key:
          fragments: { string_key: "172.10.10.10" }
      - name: foo2
+       "@type": type.googleapis.com/envoy.api.v2.ScopedRouteConfiguration
        route_configuration_name: foo-route-config2
        key:
          fragments: { string_key: "172.10.10.20" }
@@ -775,7 +777,7 @@ inline_scoped_route_configs:
 dynamic_scoped_route_configs:
 )EOF",
                             expected_config_dump);
-  EXPECT_TRUE(TestUtility::protoEqual(expected_config_dump, scoped_routes_config_dump2));
+  EXPECT_THAT(expected_config_dump, ProtoEq(scoped_routes_config_dump2));
 
   // Now SRDS kicks off.
   Protobuf::RepeatedPtrField<ProtobufWkt::Any> resources;
@@ -794,10 +796,12 @@ inline_scoped_route_configs:
   - name: foo-scoped-routes
     scoped_route_configs:
      - name: foo
+       "@type": type.googleapis.com/envoy.api.v2.ScopedRouteConfiguration
        route_configuration_name: foo-route-config
        key:
          fragments: { string_key: "172.10.10.10" }
      - name: foo2
+       "@type": type.googleapis.com/envoy.api.v2.ScopedRouteConfiguration
        route_configuration_name: foo-route-config2
        key:
          fragments: { string_key: "172.10.10.20" }
@@ -808,6 +812,7 @@ dynamic_scoped_route_configs:
   - name: foo_scoped_routes
     scoped_route_configs:
       - name: dynamic-foo
+        "@type": type.googleapis.com/envoy.api.v2.ScopedRouteConfiguration
         route_configuration_name: dynamic-foo-route-config
         key:
           fragments: { string_key: "172.30.30.10" }
@@ -821,7 +826,7 @@ dynamic_scoped_route_configs:
   const auto& scoped_routes_config_dump3 =
       TestUtility::downcastAndValidate<const envoy::admin::v3alpha::ScopedRoutesConfigDump&>(
           *message_ptr);
-  EXPECT_TRUE(TestUtility::protoEqual(expected_config_dump, scoped_routes_config_dump3));
+  EXPECT_THAT(expected_config_dump, ProtoEq(scoped_routes_config_dump3));
 
   resources.Clear();
   srds_subscription_->onConfigUpdate(resources, "2");
@@ -830,10 +835,12 @@ inline_scoped_route_configs:
   - name: foo-scoped-routes
     scoped_route_configs:
      - name: foo
+       "@type": type.googleapis.com/envoy.api.v2.ScopedRouteConfiguration
        route_configuration_name: foo-route-config
        key:
          fragments: { string_key: "172.10.10.10" }
      - name: foo2
+       "@type": type.googleapis.com/envoy.api.v2.ScopedRouteConfiguration
        route_configuration_name: foo-route-config2
        key:
          fragments: { string_key: "172.10.10.20" }
@@ -852,7 +859,7 @@ dynamic_scoped_route_configs:
   const auto& scoped_routes_config_dump4 =
       TestUtility::downcastAndValidate<const envoy::admin::v3alpha::ScopedRoutesConfigDump&>(
           *message_ptr);
-  EXPECT_TRUE(TestUtility::protoEqual(expected_config_dump, scoped_routes_config_dump4));
+  EXPECT_THAT(expected_config_dump, ProtoEq(scoped_routes_config_dump4));
 }
 
 // Tests that SRDS only allows creation of delta static config providers.

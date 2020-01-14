@@ -25,6 +25,7 @@ CHACHA
 CHLO
 CHMOD
 CHLOS
+CHLOs
 CIDR
 CLA
 CLI
@@ -396,6 +397,7 @@ builtin
 builtins
 bulkstrings
 bursty
+bytecode
 callee
 callsite
 callsites
@@ -421,6 +423,7 @@ ciphersuites
 circllhist
 CITT
 cloneable
+cloneability
 cmd
 cmsghdr
 codebase
@@ -1161,3 +1164,5 @@ zig
 zipkin
 zlib
 OBQ
+SemVer
+SCM

@@ -304,7 +304,21 @@ void InstanceImpl::initialize(const Options& options,
   }
   server_stats_->version_.set(version_int);
 
-  bootstrap_.mutable_node()->set_build_version(VersionInfo::version());
+  bootstrap_.mutable_node()->set_hidden_envoy_deprecated_build_version(VersionInfo::version());
+  bootstrap_.mutable_node()->set_user_agent_name("envoy");
+  *bootstrap_.mutable_node()->mutable_user_agent_build_version() = VersionInfo::buildVersion();
+  for (const auto& ext : Envoy::Registry::FactoryCategoryRegistry::registeredFactories()) {
+    for (const auto& name : ext.second->allRegisteredNames()) {
+      auto* extension = bootstrap_.mutable_node()->add_extensions();
+      extension->set_name(std::string(name));
+      extension->set_category(ext.first);
+      auto const version = ext.second->getFactoryVersion(name);
+      if (version) {
+        *extension->mutable_version() = version.value();
+      }
+      extension->set_disabled(ext.second->isFactoryDisabled(name));
+    }
+  }
 
   local_info_ = std::make_unique<LocalInfo::LocalInfoImpl>(
       bootstrap_.node(), local_address, options.serviceZone(), options.serviceClusterName(),
@@ -404,9 +418,9 @@ void InstanceImpl::initialize(const Options& options,
         Config::Utility::factoryForGrpcApiConfigSource(*async_client_manager_, hds_config,
                                                        stats_store_)
             ->create(),
-        *dispatcher_, Runtime::LoaderSingleton::get(), stats_store_, *ssl_context_manager_,
-        *random_generator_, info_factory_, access_log_manager_, *config_.clusterManager(),
-        *local_info_, *admin_, *singleton_manager_, thread_local_,
+        hds_config.transport_api_version(), *dispatcher_, Runtime::LoaderSingleton::get(),
+        stats_store_, *ssl_context_manager_, *random_generator_, info_factory_, access_log_manager_,
+        *config_.clusterManager(), *local_info_, *admin_, *singleton_manager_, thread_local_,
         messageValidationContext().dynamicValidationVisitor(), *api_);
   }
 

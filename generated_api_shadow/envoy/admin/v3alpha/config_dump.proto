@@ -3,11 +3,6 @@ syntax = "proto3";
 package envoy.admin.v3alpha;
 
 import "envoy/config/bootstrap/v3alpha/bootstrap.proto";
-import "envoy/config/cluster/v3alpha/cluster.proto";
-import "envoy/config/listener/v3alpha/listener.proto";
-import "envoy/config/route/v3alpha/route.proto";
-import "envoy/config/route/v3alpha/scoped_route.proto";
-import "envoy/extensions/transport_sockets/tls/v3alpha/cert.proto";
 
 import "google/protobuf/any.proto";
 import "google/protobuf/timestamp.proto";
@@ -85,7 +80,7 @@ message ListenersConfigDump {
         "envoy.admin.v2alpha.ListenersConfigDump.StaticListener";
 
     // The listener config.
-    config.listener.v3alpha.Listener listener = 1;
+    google.protobuf.Any listener = 1;
 
     // The timestamp when the Listener was last successfully updated.
     google.protobuf.Timestamp last_updated = 2;
@@ -103,7 +98,7 @@ message ListenersConfigDump {
     string version_info = 1;
 
     // The listener config.
-    config.listener.v3alpha.Listener listener = 2;
+    google.protobuf.Any listener = 2;
 
     // The timestamp when the Listener was last successfully updated.
     google.protobuf.Timestamp last_updated = 3;
@@ -164,7 +159,7 @@ message ClustersConfigDump {
         "envoy.admin.v2alpha.ClustersConfigDump.StaticCluster";
 
     // The cluster config.
-    config.cluster.v3alpha.Cluster cluster = 1;
+    google.protobuf.Any cluster = 1;
 
     // The timestamp when the Cluster was last updated.
     google.protobuf.Timestamp last_updated = 2;
@@ -183,7 +178,7 @@ message ClustersConfigDump {
     string version_info = 1;
 
     // The cluster config.
-    config.cluster.v3alpha.Cluster cluster = 2;
+    google.protobuf.Any cluster = 2;
 
     // The timestamp when the Cluster was last updated.
     google.protobuf.Timestamp last_updated = 3;
@@ -223,7 +218,7 @@ message RoutesConfigDump {
         "envoy.admin.v2alpha.RoutesConfigDump.StaticRouteConfig";
 
     // The route config.
-    config.route.v3alpha.RouteConfiguration route_config = 1;
+    google.protobuf.Any route_config = 1;
 
     // The timestamp when the Route was last updated.
     google.protobuf.Timestamp last_updated = 2;
@@ -240,7 +235,7 @@ message RoutesConfigDump {
     string version_info = 1;
 
     // The route config.
-    config.route.v3alpha.RouteConfiguration route_config = 2;
+    google.protobuf.Any route_config = 2;
 
     // The timestamp when the Route was last updated.
     google.protobuf.Timestamp last_updated = 3;
@@ -269,7 +264,7 @@ message ScopedRoutesConfigDump {
     string name = 1;
 
     // The scoped route configurations.
-    repeated config.route.v3alpha.ScopedRouteConfiguration scoped_route_configs = 2;
+    repeated google.protobuf.Any scoped_route_configs = 2;
 
     // The timestamp when the scoped route config set was last updated.
     google.protobuf.Timestamp last_updated = 3;
@@ -289,7 +284,7 @@ message ScopedRoutesConfigDump {
     string version_info = 2;
 
     // The scoped route configurations.
-    repeated config.route.v3alpha.ScopedRouteConfiguration scoped_route_configs = 3;
+    repeated google.protobuf.Any scoped_route_configs = 3;
 
     // The timestamp when the scoped route config set was last updated.
     google.protobuf.Timestamp last_updated = 4;
@@ -324,7 +319,7 @@ message SecretsConfigDump {
     // The actual secret information.
     // Security sensitive information is redacted (replaced with "[redacted]") for
     // private keys and passwords in TLS certificates.
-    envoy.extensions.transport_sockets.tls.v3alpha.Secret secret = 4;
+    google.protobuf.Any secret = 4;
   }
 
   // StaticSecret specifies statically loaded secret in bootstrap.
@@ -341,7 +336,7 @@ message SecretsConfigDump {
     // The actual secret information.
     // Security sensitive information is redacted (replaced with "[redacted]") for
     // private keys and passwords in TLS certificates.
-    envoy.extensions.transport_sockets.tls.v3alpha.Secret secret = 3;
+    google.protobuf.Any secret = 3;
   }
 
   // The statically loaded secrets.

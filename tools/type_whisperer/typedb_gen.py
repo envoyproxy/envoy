@@ -18,6 +18,9 @@ TYPE_UPGRADE_REGEXES = [
     # These are special cases, e.g. upgrading versionless packages.
     ('envoy\.type\.matcher', 'envoy.type.matcher.v3alpha'),
     ('envoy\.type', 'envoy.type.v3alpha'),
+    ('envoy\.config\.cluster\.redis', 'envoy.extensions.clusters.redis.v3alpha'),
+    ('envoy\.config\.retry\.previous_priorities',
+     'envoy.extensions.retry.priority.previous_priorities.v3alpha'),
 ]
 
 # These packages must be upgraded to v3alpha, even if there are no protos
@@ -48,7 +51,7 @@ def UpgradedPackage(type_desc):
     s = re.sub(pattern, repl, type_desc.qualified_package)
     if s != type_desc.qualified_package:
       return s
-  raise ValueError("{} is not upgradable".format(type_desc.qualified_package))
+  raise ValueError('{} is not upgradable'.format(type_desc.qualified_package))
 
 
 def UpgradedType(type_name, type_desc):
@@ -94,7 +97,8 @@ def NextVersionUpgrade(type_name, type_map, next_version_upgrade_memo, visited=N
   Args:
     type_name: fully qualified type name.
     type_map: map from type name to tools.type_whisperer.TypeDescription.
-    next_version_upgrade_memo: a memo dictionary to avoid revisiting nodes across invocations.
+    next_version_upgrade_memo: a memo dictionary to avoid revisiting nodes
+      across invocations.
     visited: a set of visited nodes in the current search, used to detect loops.
 
   Returns:
@@ -143,7 +147,7 @@ if __name__ == '__main__':
       type_desc.qualified_package
       for type_name, type_desc in type_map.items()
       if NextVersionUpgrade(type_name, type_map, next_version_upgrade_memo)
-  ])
+  ]).union(set(['envoy.config.retry.previous_priorities', 'envoy.config.cluster.redis']))
 
   # Generate type map entries for upgraded types.
   type_map.update([

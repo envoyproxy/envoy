@@ -396,6 +396,7 @@ dynamic_active_secrets:
     seconds: 1234567891
     nanos: 234000000
   secret:
+    "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3alpha.Secret
     name: "abc.com"
     tls_certificate:
       certificate_chain:
@@ -435,6 +436,7 @@ dynamic_active_secrets:
     seconds: 1234567891
     nanos: 234000000
   secret:
+    "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3alpha.Secret
     name: "abc.com"
     tls_certificate:
       certificate_chain:
@@ -448,6 +450,7 @@ dynamic_active_secrets:
   last_updated:
     seconds: 1234567899
   secret:
+    "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3alpha.Secret
     name: "abc.com.validation"
     validation_context:
       trusted_ca:
@@ -484,6 +487,7 @@ dynamic_active_secrets:
     seconds: 1234567891
     nanos: 234000000
   secret:
+    "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3alpha.Secret
     name: "abc.com"
     tls_certificate:
       certificate_chain:
@@ -497,6 +501,7 @@ dynamic_active_secrets:
   last_updated:
     seconds: 1234567899
   secret:
+    "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3alpha.Secret
     name: "abc.com.validation"
     validation_context:
       trusted_ca:
@@ -506,6 +511,7 @@ dynamic_active_secrets:
   last_updated:
     seconds: 1234567899
   secret:
+    "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3alpha.Secret
     name: "abc.com.stek"
     session_ticket_keys:
       keys:
@@ -550,6 +556,7 @@ dynamic_warming_secrets:
     seconds: 1234567891
     nanos: 234000000
   secret:
+    "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3alpha.Secret
     name: "abc.com"
   )EOF";
   checkConfigDump(expected_secrets_config_dump);
@@ -566,12 +573,14 @@ dynamic_warming_secrets:
     seconds: 1234567891
     nanos: 234000000
   secret:
+    "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3alpha.Secret
     name: "abc.com"
 - name: "abc.com.validation"
   version_info: "uninitialized"
   last_updated:
     seconds: 1234567899
   secret:
+    "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3alpha.Secret
     name: "abc.com.validation"
 )EOF";
   checkConfigDump(updated_config_dump);
@@ -588,18 +597,21 @@ dynamic_warming_secrets:
     seconds: 1234567891
     nanos: 234000000
   secret:
+    "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3alpha.Secret
     name: "abc.com"
 - name: "abc.com.validation"
   version_info: "uninitialized"
   last_updated:
     seconds: 1234567899
   secret:
+    "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3alpha.Secret
     name: "abc.com.validation"
 - name: "abc.com.stek"
   version_info: "uninitialized"
   last_updated:
     seconds: 1234567899
   secret:
+    "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3alpha.Secret
     name: "abc.com.stek"
 )EOF";
   checkConfigDump(updated_once_more_config_dump);
@@ -657,6 +669,7 @@ tls_certificate:
 static_secrets:
 - name: "abc.com.nopassword"
   secret:
+    "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3alpha.Secret
     name: "abc.com.nopassword"
     tls_certificate:
       certificate_chain:
@@ -665,6 +678,7 @@ static_secrets:
         inline_string: "[redacted]"
 - name: "abc.com" 
   secret:
+    "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3alpha.Secret
     name: "abc.com"
     tls_certificate:
       certificate_chain:
@@ -716,6 +730,7 @@ tls_certificate:
 static_secrets:
 - name: "abc.com" 
   secret:
+    "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3alpha.Secret
     name: "abc.com"
     tls_certificate:
       certificate_chain:
@@ -764,6 +779,7 @@ validation_context:
 static_secrets:
 - name: "abc.com.validation"
   secret:
+    "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3alpha.Secret
     name: "abc.com.validation"
     validation_context:
       trusted_ca:
@@ -810,6 +826,7 @@ session_ticket_keys:
 static_secrets:
 - name: "abc.com.stek"
   secret:
+    "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3alpha.Secret
     name: "abc.com.stek"
     session_ticket_keys:
       keys:
