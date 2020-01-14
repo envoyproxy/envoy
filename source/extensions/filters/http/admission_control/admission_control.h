@@ -24,9 +24,9 @@ namespace AdmissionControl {
 /**
  * All stats for the admission control filter.
  */
-#define ALL_ADMISSION_CONTROL_STATS(COUNTER, GAUGE)
-COUNTER(rq_rejected)
-GAUGE(success_rate_pct, Accumulate)
+#define ALL_ADMISSION_CONTROL_STATS(COUNTER, GAUGE)                                                \
+  COUNTER(rq_rejected)                                                                             \
+  GAUGE(success_rate_pct, Accumulate)
 
 /**
  * Wrapper struct for admission control filter stats. @see stats_macros.h
@@ -49,7 +49,7 @@ public:
   Runtime::Loader& runtime() { return runtime_; }
   bool filterEnabled() const { return admission_control_feature_.enabled(); }
   TimeSource& timeSource() const { return time_source_; }
-  std::chrono::duration samplingWindow() const { return sampling_window_; }
+  std::chrono::seconds samplingWindow() const { return sampling_window_; }
   double aggression() const { return aggression_; }
   uint32_t minRequestSamples() const { return min_request_samples_; }
 
@@ -58,7 +58,7 @@ private:
   const std::string stats_prefix_;
   TimeSource& time_source_;
   Runtime::FeatureFlag admission_control_feature_;
-  std::chrono::duration sampling_window_;
+  std::chrono::seconds sampling_window_;
   double aggression_;
   uint32_t min_request_samples_;
 };
@@ -90,6 +90,7 @@ private:
 
   TimeSource& time_source_;
   Runtime::RandomGenerator& random_;
+  AdmissionControlFilterConfigSharedPtr config_;
   std::deque<std::pair<MonotonicTime, RequestData>> historical_data_;
 
   // Request data for the current time range.
@@ -99,26 +100,27 @@ private:
   RequestData global_data_;
 };
 
+using AdmissionControlStateSharedPtr = std::shared_ptr<AdmissionControlState>;
+
 /**
  * A filter that probabilistically rejects requests based on upstream success-rate.
  */
 class AdmissionControlFilter : public Http::PassThroughFilter,
                                Logger::Loggable<Logger::Id::filter> {
 public:
-  AdmissionControlFilter(AdmissionControlFilterConfigSharedPtr config);
+  AdmissionControlFilter(AdmissionControlFilterConfigSharedPtr config,
+                         AdmissionControlStateSharedPtr state);
 
   // Http::StreamDecoderFilter
   Http::FilterHeadersStatus decodeHeaders(Http::HeaderMap&, bool) override;
 
   // Http::StreamEncoderFilter
-  Http::FilterHeadersStatus encodeHeaders(HeaderMap& headers, bool end_stream) override;
-
-  bool shouldRejectRequest() const;
+  Http::FilterHeadersStatus encodeHeaders(Http::HeaderMap& headers, bool end_stream) override;
 
 private:
   AdmissionControlFilterConfigSharedPtr config_;
   // TODO @tallen thread local
-  AdmissionControlState state_;
+  AdmissionControlStateSharedPtr state_;
 };
 
 } // namespace AdmissionControl

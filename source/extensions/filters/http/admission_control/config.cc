@@ -15,13 +15,18 @@ Http::FilterFactoryCb AdmissionControlFilterFactory::createFilterFactoryFromProt
     const envoy::extensions::filters::http::admission_control::v3alpha::AdmissionControl& config,
     const std::string& stats_prefix, Server::Configuration::FactoryContext& context) {
 
-  // TODO @tallen
-  AdmissionControlFilterConfigSharedPtr filter_config(
-      new AdmissionControlFilterConfig(config, context.runtime(), std::move(admctl_stats_prefix),
-                                       context.scope(), context.timeSource()));
+  std::string admctl_stats_prefix = stats_prefix + "admission_control.";
+  AdmissionControlFilterConfigSharedPtr filter_config =
+      std::make_shared<AdmissionControlFilterConfig>(config, context.runtime(),
+                                                     std::move(admctl_stats_prefix),
+                                                     context.scope(), context.timeSource());
 
-  return [filter_config](Http::FilterChainFactoryCallbacks& callbacks) -> void {
-    callbacks.addStreamFilter(std::make_shared<AdmissionControlFilter>(filter_config));
+  // TODO @tallen thread local
+  auto state = std::make_shared<AdmissionControlState>(context.timeSource(), filter_config,
+                                                       context.random());
+
+  return [filter_config, state](Http::FilterChainFactoryCallbacks& callbacks) -> void {
+    callbacks.addStreamFilter(std::make_shared<AdmissionControlFilter>(filter_config, state));
   };
 }
 

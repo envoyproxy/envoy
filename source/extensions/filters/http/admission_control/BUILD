@@ -17,6 +17,9 @@ envoy_cc_library(
     hdrs = ["admission_control.h"],
     deps = [
         "//include/envoy/http:filter_interface",
+        "//include/envoy/runtime:runtime_interface",
+        "//source/common/common:cleanup_lib",
+        "//source/common/runtime:runtime_lib",
         "//source/extensions/filters/http:well_known_names",
         "//source/extensions/filters/http/common:pass_through_filter_lib",
         "@envoy_api//envoy/extensions/filters/http/admission_control/v3alpha:pkg_cc_proto",

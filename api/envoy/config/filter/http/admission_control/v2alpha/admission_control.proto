@@ -3,7 +3,6 @@ syntax = "proto3";
 package envoy.config.filter.http.admission_control.v2alpha;
 
 import "envoy/api/v2/core/base.proto";
-import "envoy/type/percent.proto";
 
 import "google/api/annotations.proto";
 import "google/protobuf/duration.proto";
@@ -35,11 +34,11 @@ message AdmissionControl {
   // Rejection probability is defined by the formula::
   //
   //     max(0, (rq_count - aggression_coefficient * rq_success_count) / (rq_count + 1))
-  // 
+  //
   // The coefficient dictates how aggressively the admission controller will throttle requests as
   // the success rate drops. Lower values will cause throttling to kick in at higher success rates
   // and result in more aggressive throttling. Defaults to 2.0.
-  type.protobuf.Double aggression_coefficient = 3 [(validate.rules).double = {gte: 1.0}];
+  google.protobuf.DoubleValue aggression_coefficient = 3 [(validate.rules).double = {gte: 1.0}];
 
   // The minimum number of requests to sample for a valid success rate calculation. If the request
   // count over the sampling window is any lower, admission control will not be enforced. Defaults
