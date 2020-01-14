@@ -70,8 +70,10 @@ private:
   static void setAttrContextPeer(envoy::service::auth::v3alpha::AttributeContext::Peer& peer,
                                  const Network::Connection& connection, const std::string& service,
                                  const bool local, bool include_certificate);
+  static void setRequestTime(envoy::service::auth::v3alpha::AttributeContext::Request& req,
+                             Envoy::Http::StreamDecoderFilterCallbacks* callbacks);
   static void setHttpRequest(envoy::service::auth::v3alpha::AttributeContext::HttpRequest& httpreq,
-                             const Envoy::Http::StreamDecoderFilterCallbacks* callbacks,
+                             Envoy::Http::StreamDecoderFilterCallbacks* callbacks,
                              const Envoy::Http::HeaderMap& headers, uint64_t max_request_bytes);
   static void setAttrContextRequest(envoy::service::auth::v3alpha::AttributeContext::Request& req,
                                     const Envoy::Http::StreamDecoderFilterCallbacks* callbacks,

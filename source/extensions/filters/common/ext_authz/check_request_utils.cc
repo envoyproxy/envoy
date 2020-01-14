@@ -89,16 +89,24 @@ std::string CheckRequestUtils::getHeaderStr(const Envoy::Http::HeaderEntry* entr
   return "";
 }
 
+void CheckRequestUtils::setRequestTime(
+    envoy::service::auth::v3alpha::AttributeContext::Request& req,
+    Envoy::Http::StreamDecoderFilterCallbacks* callbacks) {
+  // Set the timestamp when the proxy receives the first byte of the request.
+  req.mutable_time()->MergeFrom(Protobuf::util::TimeUtil::NanosecondsToTimestamp(
+      std::chrono::duration_cast<std::chrono::nanoseconds>(
+          callbacks->streamInfo().startTime().time_since_epoch())
+          .count()));
+}
+
 void CheckRequestUtils::setHttpRequest(
     envoy::service::auth::v3alpha::AttributeContext::HttpRequest& httpreq,
-    const Envoy::Http::StreamDecoderFilterCallbacks* callbacks,
-    const Envoy::Http::HeaderMap& headers, uint64_t max_request_bytes) {
+    Envoy::Http::StreamDecoderFilterCallbacks* callbacks, const Envoy::Http::HeaderMap& headers,
+    uint64_t max_request_bytes) {
 
   // Set id
   // The streamId is not qualified as a const. Although it is as it does not modify the object.
-  Envoy::Http::StreamDecoderFilterCallbacks* sdfc =
-      const_cast<Envoy::Http::StreamDecoderFilterCallbacks*>(callbacks);
-  httpreq.set_id(std::to_string(sdfc->streamId()));
+  httpreq.set_id(std::to_string(callbacks->streamId()));
 
   // Set method
   httpreq.set_method(getHeaderStr(headers.Method()));
@@ -111,12 +119,12 @@ void CheckRequestUtils::setHttpRequest(
 
   // Set size
   // need to convert to google buffer 64t;
-  httpreq.set_size(sdfc->streamInfo().bytesReceived());
+  httpreq.set_size(callbacks->streamInfo().bytesReceived());
 
   // Set protocol
-  if (sdfc->streamInfo().protocol()) {
+  if (callbacks->streamInfo().protocol()) {
     httpreq.set_protocol(
-        Envoy::Http::Utility::getProtocolString(sdfc->streamInfo().protocol().value()));
+        Envoy::Http::Utility::getProtocolString(callbacks->streamInfo().protocol().value()));
   }
 
   // Fill in the headers
@@ -125,8 +133,7 @@ void CheckRequestUtils::setHttpRequest(
       [](const Envoy::Http::HeaderEntry& e, void* ctx) {
         // Skip any client EnvoyAuthPartialBody header, which could interfere with internal use.
         if (e.key().getStringView() != Http::Headers::get().EnvoyAuthPartialBody.get()) {
-          Envoy::Protobuf::Map<std::string, std::string>* mutable_headers =
-              static_cast<Envoy::Protobuf::Map<std::string, std::string>*>(ctx);
+          auto* mutable_headers = static_cast<Envoy::Protobuf::Map<std::string, std::string>*>(ctx);
           (*mutable_headers)[std::string(e.key().getStringView())] =
               std::string(e.value().getStringView());
         }
@@ -135,7 +142,7 @@ void CheckRequestUtils::setHttpRequest(
       mutable_headers);
 
   // Set request body.
-  const Buffer::Instance* buffer = sdfc->decodingBuffer();
+  const Buffer::Instance* buffer = callbacks->decodingBuffer();
   if (max_request_bytes > 0 && buffer != nullptr) {
     const uint64_t length = std::min(buffer->length(), max_request_bytes);
     std::string data(length, 0);
@@ -152,7 +159,9 @@ void CheckRequestUtils::setAttrContextRequest(
     envoy::service::auth::v3alpha::AttributeContext::Request& req,
     const Envoy::Http::StreamDecoderFilterCallbacks* callbacks,
     const Envoy::Http::HeaderMap& headers, uint64_t max_request_bytes) {
-  setHttpRequest(*req.mutable_http(), callbacks, headers, max_request_bytes);
+  auto* cb = const_cast<Envoy::Http::StreamDecoderFilterCallbacks*>(callbacks);
+  setRequestTime(req, cb);
+  setHttpRequest(*req.mutable_http(), cb, headers, max_request_bytes);
 }
 
 void CheckRequestUtils::createHttpCheck(
