@@ -291,8 +291,6 @@ public:
 
     upstream_request_->encodeHeaders(
         Http::TestHeaderMapImpl{{":status", std::to_string(response_code)}}, false);
-    upstream_request_->encodeData(response_size_, true);
-    response_->waitForEndStream();
 
     ASSERT_TRUE(upstream_request_->complete());
     EXPECT_EQ(request_size_, upstream_request_->bodyLength());
