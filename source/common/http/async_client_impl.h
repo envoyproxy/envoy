@@ -272,6 +272,7 @@ private:
     Router::InternalRedirectAction internalRedirectAction() const override {
       return Router::InternalRedirectAction::PassThrough;
     }
+    uint32_t maxInternalRedirects() const override { return 1; }
     const std::string& routeName() const override { return route_name_; }
     std::unique_ptr<const HashPolicyImpl> hash_policy_;
     static const NullHedgePolicy hedge_policy_;

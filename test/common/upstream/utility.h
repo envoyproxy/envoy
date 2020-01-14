@@ -46,20 +46,20 @@ inline std::string defaultStaticClusterJson(const std::string& name) {
 inline envoy::config::bootstrap::v3alpha::Bootstrap
 parseBootstrapFromV2Json(const std::string& json_string) {
   envoy::config::bootstrap::v3alpha::Bootstrap bootstrap;
-  TestUtility::loadFromJson(json_string, bootstrap);
+  TestUtility::loadFromJson(json_string, bootstrap, true);
   return bootstrap;
 }
 
 inline envoy::config::cluster::v3alpha::Cluster
 parseClusterFromV2Json(const std::string& json_string) {
   envoy::config::cluster::v3alpha::Cluster cluster;
-  TestUtility::loadFromJson(json_string, cluster);
+  TestUtility::loadFromJson(json_string, cluster, true);
   return cluster;
 }
 
 inline envoy::config::cluster::v3alpha::Cluster parseClusterFromV2Yaml(const std::string& yaml) {
   envoy::config::cluster::v3alpha::Cluster cluster;
-  TestUtility::loadFromYaml(yaml, cluster);
+  TestUtility::loadFromYaml(yaml, cluster, true);
   return cluster;
 }
 

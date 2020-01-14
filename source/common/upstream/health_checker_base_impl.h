@@ -11,6 +11,7 @@
 
 #include "common/common/logger.h"
 #include "common/common/matchers.h"
+#include "common/network/transport_socket_options_impl.h"
 
 namespace Envoy {
 namespace Upstream {
@@ -45,6 +46,9 @@ public:
   // Upstream::HealthChecker
   void addHostCheckCompleteCb(HostStatusCb callback) override { callbacks_.push_back(callback); }
   void start() override;
+  std::shared_ptr<const Network::TransportSocketOptionsImpl> transportSocketOptions() const {
+    return transport_socket_options_;
+  }
 
 protected:
   class ActiveHealthCheckSession : public Event::DeferredDeletable {
@@ -132,6 +136,8 @@ private:
   void refreshHealthyStat();
   void runCallbacks(HostSharedPtr host, HealthTransition changed_state);
   void setUnhealthyCrossThread(const HostSharedPtr& host);
+  static std::shared_ptr<const Network::TransportSocketOptionsImpl>
+  initTransportSocketOptions(const envoy::config::core::v3alpha::HealthCheck& config);
 
   static const std::chrono::milliseconds NO_TRAFFIC_INTERVAL;
 
@@ -147,6 +153,7 @@ private:
   std::unordered_map<HostSharedPtr, ActiveHealthCheckSessionPtr> active_sessions_;
   uint64_t local_process_healthy_{};
   uint64_t local_process_degraded_{};
+  const std::shared_ptr<const Network::TransportSocketOptionsImpl> transport_socket_options_;
 };
 
 class HealthCheckEventLoggerImpl : public HealthCheckEventLogger {

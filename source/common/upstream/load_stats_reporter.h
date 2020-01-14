@@ -31,6 +31,7 @@ class LoadStatsReporter
 public:
   LoadStatsReporter(const LocalInfo::LocalInfo& local_info, ClusterManager& cluster_manager,
                     Stats::Scope& scope, Grpc::RawAsyncClientPtr async_client,
+                    envoy::config::core::v3alpha::ApiVersion transport_api_version,
                     Event::Dispatcher& dispatcher);
 
   // Grpc::AsyncStreamCallbacks
@@ -56,6 +57,7 @@ private:
   Grpc::AsyncClient<envoy::service::load_stats::v3alpha::LoadStatsRequest,
                     envoy::service::load_stats::v3alpha::LoadStatsResponse>
       async_client_;
+  const envoy::config::core::v3alpha::ApiVersion transport_api_version_;
   Grpc::AsyncStream<envoy::service::load_stats::v3alpha::LoadStatsRequest> stream_{};
   const Protobuf::MethodDescriptor& service_method_;
   Event::TimerPtr retry_timer_;

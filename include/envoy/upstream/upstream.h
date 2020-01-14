@@ -87,6 +87,8 @@ public:
    * Create a connection for this host.
    * @param dispatcher supplies the owning dispatcher.
    * @param options supplies the socket options that will be set on the new connection.
+   * @param transport_socket_options supplies the transport options that will be set on the new
+   * connection.
    * @return the connection data which includes the raw network connection as well as the *real*
    *         host that backs it. The reason why a 2nd host is returned is that some hosts are
    *         logical and wrap multiple real network destinations. In this case, a different host
@@ -101,10 +103,13 @@ public:
   /**
    * Create a health check connection for this host.
    * @param dispatcher supplies the owning dispatcher.
+   * @param transport_socket_options supplies the transport options that will be set on the new
+   * connection.
    * @return the connection data.
    */
-  virtual CreateConnectionData
-  createHealthCheckConnection(Event::Dispatcher& dispatcher) const PURE;
+  virtual CreateConnectionData createHealthCheckConnection(
+      Event::Dispatcher& dispatcher,
+      Network::TransportSocketOptionsSharedPtr transport_socket_options) const PURE;
 
   /**
    * @return host specific gauges.

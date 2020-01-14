@@ -368,6 +368,7 @@ envoy_cc_library(
     deps = [
         ":api_type_oracle_lib",
         "//source/common/protobuf",
+        "//source/common/protobuf:well_known_lib",
         "@envoy_api//envoy/config/core/v3alpha:pkg_cc_proto",
     ],
 )

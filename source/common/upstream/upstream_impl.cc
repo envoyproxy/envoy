@@ -291,10 +291,11 @@ void HostImpl::setEdsHealthFlag(envoy::config::core::v3alpha::HealthStatus healt
   }
 }
 
-Host::CreateConnectionData
-HostImpl::createHealthCheckConnection(Event::Dispatcher& dispatcher) const {
+Host::CreateConnectionData HostImpl::createHealthCheckConnection(
+    Event::Dispatcher& dispatcher,
+    Network::TransportSocketOptionsSharedPtr transport_socket_options) const {
   return {createConnection(dispatcher, *cluster_, healthCheckAddress(), socket_factory_, nullptr,
-                           nullptr),
+                           transport_socket_options),
           shared_from_this()};
 }
 
