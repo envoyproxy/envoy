@@ -33,7 +33,7 @@ void ConnPoolImpl::onGoAway(ActiveClient& client) {
     if (client.codec_client_->numActiveRequests() == 0) {
       client.codec_client_->close();
     } else {
-      setActiveClientState(client, ActiveClient::State::DRAINING);
+      transitionActiveClientState(client, ActiveClient::State::DRAINING);
     }
   }
 }

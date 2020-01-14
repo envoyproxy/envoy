@@ -31,7 +31,7 @@ void ConnPoolImplBase::destructAllConnections() {
 void ConnPoolImplBase::createNewConnection() {
   ENVOY_LOG(debug, "creating a new connection");
   ActiveClientPtr client = instantiateActiveClient();
-  client->state_ = ActiveClient::State::CONNECTING;
+  ASSERT(client->state_ == ActiveClient::State::CONNECTING);
   client->moveIntoList(std::move(client), owningList(client->state_));
 }
 
@@ -52,9 +52,9 @@ void ConnPoolImplBase::attachRequestToClient(ActiveClient& client, StreamDecoder
     if (client.remaining_requests_ == 0) {
       ENVOY_CONN_LOG(debug, "maximum requests per connection, DRAINING", *client.codec_client_);
       host_->cluster().stats().upstream_cx_max_requests_.inc();
-      setActiveClientState(client, ActiveClient::State::DRAINING);
+      transitionActiveClientState(client, ActiveClient::State::DRAINING);
     } else if (client.codec_client_->numActiveRequests() >= client.concurrent_request_limit_) {
-      setActiveClientState(client, ActiveClient::State::BUSY);
+      transitionActiveClientState(client, ActiveClient::State::BUSY);
     }
 
     host_->stats().rq_total_.inc();
@@ -75,13 +75,13 @@ void ConnPoolImplBase::onRequestClosed(ActiveClient& client, bool delay_attachin
   host_->cluster().resourceManager(priority_).requests().dec();
   if (client.state_ == ActiveClient::State::DRAINING &&
       client.codec_client_->numActiveRequests() == 0) {
-    // Close out the draining client if we no long have active requests.
+    // Close out the draining client if we no longer have active requests.
     client.codec_client_->close();
   } else if (client.state_ == ActiveClient::State::BUSY) {
     // A request was just ended, so we should be below the limit now.
     ASSERT(client.codec_client_->numActiveRequests() < client.concurrent_request_limit_);
 
-    setActiveClientState(client, ActiveClient::State::READY);
+    transitionActiveClientState(client, ActiveClient::State::READY);
     if (!delay_attaching_request) {
       onUpstreamReady();
     }
@@ -98,7 +98,7 @@ ConnectionPool::Cancellable* ConnPoolImplBase::newStream(Http::StreamDecoder& re
   }
 
   if (host_->cluster().resourceManager(priority_).pendingRequests().canCreate()) {
-    bool can_create_connection =
+    const bool can_create_connection =
         host_->cluster().resourceManager(priority_).connections().canCreate();
     if (!can_create_connection) {
       host_->cluster().stats().upstream_cx_overflow_.inc();
@@ -166,7 +166,8 @@ ConnPoolImplBase::owningList(ActiveClient::State state) {
   NOT_REACHED_GCOVR_EXCL_LINE;
 }
 
-void ConnPoolImplBase::setActiveClientState(ActiveClient& client, ActiveClient::State new_state) {
+void ConnPoolImplBase::transitionActiveClientState(ActiveClient& client,
+                                                   ActiveClient::State new_state) {
   auto& old_list = owningList(client.state_);
   auto& new_list = owningList(new_state);
   client.state_ = new_state;
@@ -198,14 +199,14 @@ void ConnPoolImplBase::drainConnections() {
   // so all remaining entries in ready_clients_ are serving requests. Move them and all entries
   // in busy_clients_ to draining.
   while (!ready_clients_.empty()) {
-    setActiveClientState(*ready_clients_.front(), ActiveClient::State::DRAINING);
+    transitionActiveClientState(*ready_clients_.front(), ActiveClient::State::DRAINING);
   }
 
   // Changing busy_clients_ to DRAINING does not move them between lists,
   // so use a for-loop since the list is not mutated.
   ASSERT(&owningList(ActiveClient::State::DRAINING) == &busy_clients_);
   for (auto& busy_client : busy_clients_) {
-    setActiveClientState(*busy_client, ActiveClient::State::DRAINING);
+    transitionActiveClientState(*busy_client, ActiveClient::State::DRAINING);
   }
 }
 
@@ -233,11 +234,10 @@ void ConnPoolImplBase::onConnectionEvent(ConnPoolImplBase::ActiveClient& client,
                    client.codec_client_->connectionFailureReason());
 
     Envoy::Upstream::reportUpstreamCxDestroy(host_, event);
-    if (client.closingWithIncompleteRequest()) {
+    const bool incomplete_request = client.closingWithIncompleteRequest();
+    if (incomplete_request) {
       Envoy::Upstream::reportUpstreamCxDestroyActiveRequest(host_, event);
     }
-
-    const bool check_for_drained = client.closingWithIncompleteRequest();
 
     if (client.state_ == ActiveClient::State::CONNECTING) {
       host_->cluster().stats().upstream_cx_connect_fail_.inc();
@@ -256,11 +256,11 @@ void ConnPoolImplBase::onConnectionEvent(ConnPoolImplBase::ActiveClient& client,
     // We need to release our resourceManager() resources before checking below for
     // whether we can create a new connection. Normally this would happen when
     // client's destructor runs, but this object needs to be deferredDelete'd(), so
-    // this forces part of it's cleanup to happen now.
+    // this forces part of its cleanup to happen now.
     client.releaseResources();
 
     dispatcher_.deferredDelete(client.removeFromList(owningList(client.state_)));
-    if (check_for_drained) {
+    if (incomplete_request) {
       checkForDrained();
     }
 
@@ -277,7 +277,7 @@ void ConnPoolImplBase::onConnectionEvent(ConnPoolImplBase::ActiveClient& client,
     client.conn_connect_ms_.reset();
 
     ASSERT(client.state_ == ActiveClient::State::CONNECTING);
-    setActiveClientState(client, ActiveClient::State::READY);
+    transitionActiveClientState(client, ActiveClient::State::READY);
 
     onUpstreamReady();
     checkForDrained();

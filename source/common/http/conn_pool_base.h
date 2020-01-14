@@ -122,7 +122,7 @@ protected:
   void onRequestClosed(ActiveClient& client, bool delay_attaching_request);
 
   // Changes the state_ of an ActiveClient and moves to the appropriate list.
-  void setActiveClientState(ActiveClient& client, ActiveClient::State new_state);
+  void transitionActiveClientState(ActiveClient& client, ActiveClient::State new_state);
 
   void onConnectionEvent(ActiveClient& client, Network::ConnectionEvent event);
   void checkForDrained();
