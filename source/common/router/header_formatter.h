@@ -31,9 +31,7 @@ public:
    * @return bool indicating whether the formatted header should be skipped if the existing header
    * is already set.
    */
-  virtual bool skipIfPresent() const {
-    return skip_if_present_;
-  };
+  virtual bool skipIfPresent() const { return skip_if_present_; };
 
 private:
   bool skip_if_present_;
