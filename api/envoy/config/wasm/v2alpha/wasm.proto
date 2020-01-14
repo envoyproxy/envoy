@@ -66,7 +66,4 @@ message WasmService {
   // If true, create a single VM rather than creating one VM per silo. Such a singleton can
   // not be used with filters.
   bool singleton = 2;
-
-  // If set add 'stat_prefix' as a prefix to all stats. May be left blank.
-  string stat_prefix = 3;
 }
