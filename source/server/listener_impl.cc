@@ -129,7 +129,8 @@ ListenerImpl::ListenerImpl(const envoy::config::listener::v3alpha::Listener& con
                            uint64_t hash, ProtobufMessage::ValidationVisitor& validation_visitor,
                            uint32_t concurrency)
     : parent_(parent), address_(Network::Address::resolveProtoAddress(config.address())),
-      filter_chain_manager_(address_), global_scope_(parent_.server_.stats().createScope("")),
+      filter_chain_manager_(address_, *this),
+      global_scope_(parent_.server_.stats().createScope("")),
       listener_scope_(
           parent_.server_.stats().createScope(fmt::format("listener.{}.", address_->asString()))),
       bind_to_port_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(config.deprecated_v1(), bind_to_port, true)),
@@ -221,14 +222,17 @@ ListenerImpl::ListenerImpl(const envoy::config::listener::v3alpha::Listener& con
     }
   }
 
-  Server::Configuration::TransportSocketFactoryContextImpl factory_context(
+  Server::Configuration::TransportSocketFactoryContextImpl transport_factory_context(
       parent_.server_.admin(), parent_.server_.sslContextManager(), *listener_scope_,
       parent_.server_.clusterManager(), parent_.server_.localInfo(), parent_.server_.dispatcher(),
       parent_.server_.random(), parent_.server_.stats(), parent_.server_.singletonManager(),
       parent_.server_.threadLocal(), validation_visitor, parent_.server_.api());
-  factory_context.setInitManager(initManager());
-  ListenerFilterChainFactoryBuilder builder(*this, factory_context);
-  filter_chain_manager_.addFilterChain(config.filter_chains(), builder);
+  transport_factory_context.setInitManager(initManager());
+  // The init manager is a little messy. Will refactor when filter chain manager could accept
+  // network filter chain update.
+  // TODO(lambdai): create builder from filter_chain_manager to obtain the init manager
+  ListenerFilterChainFactoryBuilder builder(*this, transport_factory_context);
+  filter_chain_manager_.addFilterChain(config.filter_chains(), builder, filter_chain_manager_);
 
   if (socket_type == Network::Address::SocketType::Datagram) {
     return;

@@ -19,6 +19,13 @@ option (udpa.annotations.file_migrate).move_to_package = "envoy.config.core.v3al
 message TcpProtocolOptions {
 }
 
+message UpstreamHttpProtocolOptions {
+  // Set transport socket `SNI <https://en.wikipedia.org/wiki/Server_Name_Indication>`_ for new
+  // upstream connections based on the downstream HTTP host/authority header, as seen by the
+  // :ref:`router filter <config_http_filters_router>`.
+  bool auto_sni = 1;
+}
+
 message HttpProtocolOptions {
   // The idle timeout for connections. The idle timeout is defined as the
   // period in which there are no active requests. If not set, there is no idle timeout. When the

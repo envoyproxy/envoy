@@ -6,9 +6,11 @@
 #include "envoy/config/bootstrap/v3alpha/bootstrap.pb.h"
 #include "envoy/config/core/v3alpha/base.pb.h"
 #include "envoy/config/metrics/v3alpha/stats.pb.h"
+#include "envoy/config/route/v3alpha/route.pb.h"
 #include "envoy/http/header_map.h"
 
 #include "common/common/fmt.h"
+#include "common/config/api_version.h"
 #include "common/profiler/profiler.h"
 #include "common/stats/stats_matcher_impl.h"
 
@@ -363,7 +365,9 @@ TEST_P(IntegrationAdminTest, Admin) {
   // .. and that we can unpack one of the entries.
   envoy::admin::v3alpha::RoutesConfigDump route_config_dump;
   config_dump.configs(4).UnpackTo(&route_config_dump);
-  EXPECT_EQ("route_config_0", route_config_dump.static_route_configs(0).route_config().name());
+  envoy::config::route::v3alpha::RouteConfiguration route_config;
+  EXPECT_TRUE(route_config_dump.static_route_configs(0).route_config().UnpackTo(&route_config));
+  EXPECT_EQ("route_config_0", route_config.name());
 
   envoy::admin::v3alpha::SecretsConfigDump secret_config_dump;
   config_dump.configs(5).UnpackTo(&secret_config_dump);

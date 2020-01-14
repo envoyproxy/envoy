@@ -63,7 +63,7 @@ public:
   ConnectionHandlerImpl(Event::Dispatcher& dispatcher, const std::string& per_handler_stat_prefix);
 
   // Network::ConnectionHandler
-  uint64_t numConnections() override { return num_handler_connections_; }
+  uint64_t numConnections() const override { return num_handler_connections_; }
   void incNumConnections() override;
   void decNumConnections() override;
   void addListener(Network::ListenerConfig& config) override;
@@ -72,7 +72,7 @@ public:
   void stopListeners() override;
   void disableListeners() override;
   void enableListeners() override;
-  const std::string& statPrefix() override { return per_handler_stat_prefix_; }
+  const std::string& statPrefix() const override { return per_handler_stat_prefix_; }
 
   /**
    * Wrapper for an active listener owned by this handler.
@@ -94,6 +94,8 @@ private:
   using ActiveTcpConnectionPtr = std::unique_ptr<ActiveTcpConnection>;
   struct ActiveTcpSocket;
   using ActiveTcpSocketPtr = std::unique_ptr<ActiveTcpSocket>;
+  class ActiveConnections;
+  using ActiveConnectionsPtr = std::unique_ptr<ActiveConnections>;
 
   /**
    * Wrapper for an active tcp listener owned by this handler.
@@ -136,16 +138,34 @@ private:
      */
     void newConnection(Network::ConnectionSocketPtr&& socket);
 
+    ActiveConnections& getOrCreateActiveConnections(const Network::FilterChain& filter_chain);
+
     ConnectionHandlerImpl& parent_;
     Network::ListenerPtr listener_;
     const std::chrono::milliseconds listener_filters_timeout_;
     const bool continue_on_listener_filters_timeout_;
     std::list<ActiveTcpSocketPtr> sockets_;
-    std::list<ActiveTcpConnectionPtr> connections_;
+    std::unordered_map<const Network::FilterChain*, ActiveConnectionsPtr> connections_by_context_;
 
     // The number of connections currently active on this listener. This is typically used for
     // connection balancing across per-handler listeners.
     std::atomic<uint64_t> num_listener_connections_{};
+    bool is_deleting_{false};
+  };
+
+  /**
+   * Wrapper for a group of active connections which are attached to the same filter chain context.
+   */
+  class ActiveConnections : public Event::DeferredDeletable {
+  public:
+    ActiveConnections(ActiveTcpListener& listener, const Network::FilterChain& filter_chain);
+    ~ActiveConnections();
+
+    // listener filter chain pair is the owner of the connections
+    ActiveTcpListener& listener_;
+    const Network::FilterChain& filter_chain_;
+    // Owned connections
+    std::list<ActiveTcpConnectionPtr> connections_;
   };
 
   /**
@@ -154,8 +174,8 @@ private:
   struct ActiveTcpConnection : LinkedObject<ActiveTcpConnection>,
                                public Event::DeferredDeletable,
                                public Network::ConnectionCallbacks {
-    ActiveTcpConnection(ActiveTcpListener& listener, Network::ConnectionPtr&& new_connection,
-                        TimeSource& time_system);
+    ActiveTcpConnection(ActiveConnections& active_connections,
+                        Network::ConnectionPtr&& new_connection, TimeSource& time_system);
     ~ActiveTcpConnection() override;
 
     // Network::ConnectionCallbacks
@@ -163,13 +183,13 @@ private:
       // Any event leads to destruction of the connection.
       if (event == Network::ConnectionEvent::LocalClose ||
           event == Network::ConnectionEvent::RemoteClose) {
-        listener_.removeConnection(*this);
+        active_connections_.listener_.removeConnection(*this);
       }
     }
     void onAboveWriteBufferHighWatermark() override {}
     void onBelowWriteBufferLowWatermark() override {}
 
-    ActiveTcpListener& listener_;
+    ActiveConnections& active_connections_;
     Network::ConnectionPtr connection_;
     Stats::TimespanPtr conn_length_;
   };
@@ -261,6 +281,7 @@ public:
 
   // Network::UdpListenerCallbacks
   void onData(Network::UdpRecvData& data) override;
+  void onReadReady() override;
   void onWriteReady(const Network::Socket& socket) override;
   void onReceiveError(Api::IoError::IoErrorCode error_code) override;
 

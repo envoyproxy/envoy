@@ -331,13 +331,16 @@ filter_chains:
 class NonTerminalFilterFactory : public Configuration::NamedNetworkFilterConfigFactory {
 public:
   // Configuration::NamedNetworkFilterConfigFactory
-  Network::FilterFactoryCb createFilterFactoryFromProto(const Protobuf::Message&,
-                                                        Configuration::FactoryContext&) override {
+  Network::FilterFactoryCb
+  createFilterFactoryFromProto(const Protobuf::Message&,
+                               Server::Configuration::FactoryContext&) override {
     return [](Network::FilterManager&) -> void {};
   }
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return std::make_unique<Envoy::ProtobufWkt::Empty>();
+    // Using Struct instead of a custom per-filter empty config proto
+    // This is only allowed in tests.
+    return std::make_unique<Envoy::ProtobufWkt::Struct>();
   }
 
   std::string name() const override { return "non_terminal"; }
@@ -403,14 +406,16 @@ filter_chains:
 class TestStatsConfigFactory : public Configuration::NamedNetworkFilterConfigFactory {
 public:
   // Configuration::NamedNetworkFilterConfigFactory
-  Network::FilterFactoryCb
-  createFilterFactoryFromProto(const Protobuf::Message&,
-                               Configuration::FactoryContext& context) override {
-    return commonFilterFactory(context);
+  Network::FilterFactoryCb createFilterFactoryFromProto(
+      const Protobuf::Message&,
+      Configuration::FactoryContext& filter_chain_factory_context) override {
+    return commonFilterFactory(filter_chain_factory_context);
   }
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return std::make_unique<Envoy::ProtobufWkt::Empty>();
+    // Using Struct instead of a custom per-filter empty config proto
+    // This is only allowed in tests.
+    return std::make_unique<Envoy::ProtobufWkt::Struct>();
   }
 
   std::string name() const override { return "stats_test"; }
@@ -622,6 +627,7 @@ filter_chains:
   checkConfigDump(R"EOF(
 static_listeners:
   listener:
+    "@type": type.googleapis.com/envoy.api.v2.Listener
     name: "foo"
     address:
       socket_address:
@@ -696,6 +702,7 @@ dynamic_listeners:
     warming_state:
       version_info: version1
       listener:
+        "@type": type.googleapis.com/envoy.api.v2.Listener
         name: foo
         address:
           socket_address:
@@ -738,6 +745,7 @@ dynamic_listeners:
     warming_state:
       version_info: version2
       listener:
+        "@type": type.googleapis.com/envoy.api.v2.Listener
         name: foo
         address:
           socket_address:
@@ -782,6 +790,7 @@ dynamic_listeners:
     active_state:
       version_info: version3
       listener:
+        "@type": type.googleapis.com/envoy.api.v2.Listener
         name: foo
         address:
           socket_address:
@@ -794,6 +803,7 @@ dynamic_listeners:
     draining_state:
       version_info: version2
       listener:
+        "@type": type.googleapis.com/envoy.api.v2.Listener
         name: foo
         address:
           socket_address:
@@ -861,6 +871,7 @@ dynamic_listeners:
     active_state:
       version_info: version3
       listener:
+        "@type": type.googleapis.com/envoy.api.v2.Listener
         name: foo
         address:
           socket_address:
@@ -874,6 +885,7 @@ dynamic_listeners:
     active_state:
       version_info: version4
       listener:
+        "@type": type.googleapis.com/envoy.api.v2.Listener
         name: bar
         address:
           socket_address:
@@ -887,6 +899,7 @@ dynamic_listeners:
     warming_state:
       version_info: version5
       listener:
+        "@type": type.googleapis.com/envoy.api.v2.Listener
         name: baz
         address:
           socket_address:
@@ -1167,7 +1180,7 @@ dynamic_listeners:
   - name: foo
     error_state:
       failed_configuration:
-        "@type": type.googleapis.com/envoy.config.listener.v3alpha.Listener
+        "@type": type.googleapis.com/envoy.api.v2.Listener
         name: foo
         address:
           socket_address:
@@ -3155,7 +3168,9 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, OriginalDstTestFilter) {
     }
 
     ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-      return std::make_unique<Envoy::ProtobufWkt::Empty>();
+      // Using Struct instead of a custom per-filter empty config proto
+      // This is only allowed in tests.
+      return std::make_unique<Envoy::ProtobufWkt::Struct>();
     }
 
     std::string name() const override { return "test.listener.original_dst"; }
@@ -3229,7 +3244,9 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, OriginalDstTestFilterIPv6) {
     }
 
     ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-      return std::make_unique<Envoy::ProtobufWkt::Empty>();
+      // Using Struct instead of a custom per-filter empty config proto
+      // This is only allowed in tests.
+      return std::make_unique<Envoy::ProtobufWkt::Struct>();
     }
 
     std::string name() const override { return "test.listener.original_dstipv6"; }

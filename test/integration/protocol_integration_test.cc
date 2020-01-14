@@ -1474,7 +1474,7 @@ TEST_P(ProtocolIntegrationTest, ConnDurationTimeoutNoHttpRequest) {
 }
 
 // Make sure that invalid authority headers get blocked at or before the HCM.
-TEST_P(DownstreamProtocolIntegrationTest, InvalidAuth) {
+TEST_P(DownstreamProtocolIntegrationTest, InvalidAuthority) {
   initialize();
   fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
 
@@ -1497,6 +1497,42 @@ TEST_P(DownstreamProtocolIntegrationTest, InvalidAuth) {
     codec_client_->waitForDisconnect();
     ASSERT_FALSE(response->complete());
   }
+}
+
+TEST_P(DownstreamProtocolIntegrationTest, ConnectIsBlocked) {
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response = codec_client_->makeHeaderOnlyRequest(
+      Http::TestHeaderMapImpl{{":method", "CONNECT"}, {":path", "/"}, {":authority", "host"}});
+
+  if (downstreamProtocol() == Http::CodecClient::Type::HTTP1) {
+    response->waitForEndStream();
+    EXPECT_EQ("400", response->headers().Status()->value().getStringView());
+    EXPECT_TRUE(response->complete());
+  } else {
+    response->waitForReset();
+    codec_client_->waitForDisconnect();
+  }
+}
+
+// Make sure that with stream_error_on_invalid_http_messaging true, CONNECT
+// results in stream teardown not connection teardown.
+TEST_P(DownstreamProtocolIntegrationTest, ConnectStreamRejection) {
+  if (downstreamProtocol() == Http::CodecClient::Type::HTTP1) {
+    return;
+  }
+  config_helper_.addConfigModifier([](envoy::extensions::filters::network::http_connection_manager::
+                                          v3alpha::HttpConnectionManager& hcm) -> void {
+    hcm.mutable_http2_protocol_options()->set_stream_error_on_invalid_http_messaging(true);
+  });
+
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response = codec_client_->makeHeaderOnlyRequest(
+      Http::TestHeaderMapImpl{{":method", "CONNECT"}, {":path", "/"}, {":authority", "host"}});
+
+  response->waitForReset();
+  EXPECT_FALSE(codec_client_->disconnected());
 }
 
 // For tests which focus on downstream-to-Envoy behavior, and don't need to be

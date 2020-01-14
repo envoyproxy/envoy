@@ -41,7 +41,8 @@ public:
     EXPECT_CALL(dispatcher_, createTimer_(_));
     xds_context_ = std::make_shared<NewGrpcMuxImpl>(
         std::unique_ptr<Grpc::MockAsyncClient>(async_client_), dispatcher_, *method_descriptor_,
-        random_, stats_store_, rate_limit_settings_, local_info_);
+        envoy::config::core::v3alpha::ApiVersion::AUTO, random_, stats_store_, rate_limit_settings_,
+        local_info_);
     subscription_ = std::make_unique<DeltaSubscriptionImpl>(
         xds_context_, Config::TypeUrl::get().ClusterLoadAssignment, callbacks_, stats_,
         init_fetch_timeout, false);
@@ -88,8 +89,8 @@ public:
                          const std::set<std::string>& unsubscribe, const Protobuf::int32 error_code,
                          const std::string& error_message,
                          std::map<std::string, std::string> initial_resource_versions) {
-    envoy::service::discovery::v3alpha::DeltaDiscoveryRequest expected_request;
-    expected_request.mutable_node()->CopyFrom(node_);
+    API_NO_BOOST(envoy::api::v2::DeltaDiscoveryRequest) expected_request;
+    expected_request.mutable_node()->CopyFrom(API_DOWNGRADE(node_));
     std::copy(
         subscribe.begin(), subscribe.end(),
         Protobuf::RepeatedFieldBackInserter(expected_request.mutable_resource_names_subscribe()));
@@ -115,7 +116,7 @@ public:
                 sendMessageRaw_(
                     Grpc::ProtoBufferEqIgnoringField(expected_request, "response_nonce"), false))
         .WillOnce([this](Buffer::InstancePtr& buffer, bool) {
-          envoy::service::discovery::v3alpha::DeltaDiscoveryRequest message;
+          API_NO_BOOST(envoy::api::v2::DeltaDiscoveryRequest) message;
           EXPECT_TRUE(Grpc::Common::parseBufferInstance(std::move(buffer), message));
           const std::string nonce = message.response_nonce();
           if (!nonce.empty()) {

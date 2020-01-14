@@ -662,11 +662,6 @@ public:
   Iterator end() { return hash_set_.end(); }
 
   /**
-   * @param set the storage set to swap with.
-   */
-  void swap(StatNameStorageSet& set) { hash_set_.swap(set.hash_set_); }
-
-  /**
    * @return the number of elements in the set.
    */
   size_t size() const { return hash_set_.size(); }

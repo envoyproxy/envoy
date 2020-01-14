@@ -16,13 +16,14 @@ public:
   GrpcSubscriptionImpl(const LocalInfo::LocalInfo& local_info, Grpc::RawAsyncClientPtr async_client,
                        Event::Dispatcher& dispatcher, Runtime::RandomGenerator& random,
                        const Protobuf::MethodDescriptor& service_method, absl::string_view type_url,
+                       envoy::config::core::v3alpha::ApiVersion transport_api_version,
                        SubscriptionCallbacks& callbacks, SubscriptionStats stats,
                        Stats::Scope& scope, const RateLimitSettings& rate_limit_settings,
                        std::chrono::milliseconds init_fetch_timeout, bool skip_subsequent_node)
       : callbacks_(callbacks),
-        grpc_mux_(std::make_shared<Config::GrpcMuxImpl>(local_info, std::move(async_client),
-                                                        dispatcher, service_method, random, scope,
-                                                        rate_limit_settings, skip_subsequent_node)),
+        grpc_mux_(std::make_shared<Config::GrpcMuxImpl>(
+            local_info, std::move(async_client), dispatcher, service_method, transport_api_version,
+            random, scope, rate_limit_settings, skip_subsequent_node)),
         grpc_mux_subscription_(grpc_mux_, callbacks_, stats, type_url, dispatcher,
                                init_fetch_timeout) {}
 

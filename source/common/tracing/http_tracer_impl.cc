@@ -20,6 +20,8 @@
 #include "common/runtime/uuid_util.h"
 #include "common/stream_info/utility.h"
 
+#include "absl/strings/str_cat.h"
+
 namespace Envoy {
 namespace Tracing {
 
@@ -42,8 +44,8 @@ static std::string buildUrl(const Http::HeaderMap& request_headers,
     path = path.substr(0, max_path_length);
   }
 
-  return fmt::format("{}://{}{}", valueOrDefault(request_headers.ForwardedProto(), ""),
-                     valueOrDefault(request_headers.Host(), ""), path);
+  return absl::StrCat(valueOrDefault(request_headers.ForwardedProto(), ""), "://",
+                      valueOrDefault(request_headers.Host(), ""), path);
 }
 
 const std::string HttpTracerUtility::IngressOperation = "ingress";
@@ -88,17 +90,24 @@ Decision HttpTracerUtility::isTracing(const StreamInfo::StreamInfo& stream_info,
   NOT_REACHED_GCOVR_EXCL_LINE;
 }
 
-static void addGrpcTags(Span& span, const Http::HeaderMap& headers) {
-  const Http::HeaderEntry* grpc_status_header = headers.GrpcStatus();
-  if (grpc_status_header) {
-    span.setTag(Tracing::Tags::get().GrpcStatusCode, grpc_status_header->value().getStringView());
+static void addTagIfNotNull(Span& span, const std::string& tag, const Http::HeaderEntry* entry) {
+  if (entry != nullptr) {
+    span.setTag(tag, entry->value().getStringView());
   }
-  const Http::HeaderEntry* grpc_message_header = headers.GrpcMessage();
-  if (grpc_message_header) {
-    span.setTag(Tracing::Tags::get().GrpcMessage, grpc_message_header->value().getStringView());
-  }
-  absl::optional<Grpc::Status::GrpcStatus> grpc_status_code = Grpc::Common::getGrpcStatus(headers);
+}
+
+static void addGrpcRequestTags(Span& span, const Http::HeaderMap& headers) {
+  addTagIfNotNull(span, Tracing::Tags::get().GrpcPath, headers.Path());
+  addTagIfNotNull(span, Tracing::Tags::get().GrpcAuthority, headers.Host());
+  addTagIfNotNull(span, Tracing::Tags::get().GrpcContentType, headers.ContentType());
+  addTagIfNotNull(span, Tracing::Tags::get().GrpcTimeout, headers.GrpcTimeout());
+}
+
+static void addGrpcResponseTags(Span& span, const Http::HeaderMap& headers) {
+  addTagIfNotNull(span, Tracing::Tags::get().GrpcStatusCode, headers.GrpcStatus());
+  addTagIfNotNull(span, Tracing::Tags::get().GrpcMessage, headers.GrpcMessage());
   // Set error tag when status is not OK.
+  absl::optional<Grpc::Status::GrpcStatus> grpc_status_code = Grpc::Common::getGrpcStatus(headers);
   if (grpc_status_code && grpc_status_code.value() != Grpc::Status::WellKnownGrpcStatus::Ok) {
     span.setTag(Tracing::Tags::get().Error, Tracing::Tags::get().True);
   }
@@ -168,6 +177,10 @@ void HttpTracerUtility::finalizeDownstreamSpan(Span& span, const Http::HeaderMap
       span.setTag(Tracing::Tags::get().GuidXClientTraceId,
                   std::string(request_headers->ClientTraceId()->value().getStringView()));
     }
+
+    if (Grpc::Common::hasGrpcContentType(*request_headers)) {
+      addGrpcRequestTags(span, *request_headers);
+    }
   }
   CustomTagContext ctx{request_headers, stream_info};
 
@@ -220,9 +233,9 @@ void HttpTracerUtility::setCommonTags(Span& span, const Http::HeaderMap* respons
 
   // GRPC data.
   if (response_trailers && response_trailers->GrpcStatus() != nullptr) {
-    addGrpcTags(span, *response_trailers);
+    addGrpcResponseTags(span, *response_trailers);
   } else if (response_headers && response_headers->GrpcStatus() != nullptr) {
-    addGrpcTags(span, *response_headers);
+    addGrpcResponseTags(span, *response_headers);
   }
 
   if (tracing_config.verbose()) {
@@ -321,7 +334,7 @@ void MetadataCustomTag::apply(Span& span, const CustomTagContext& ctx) const {
     span.setTag(tag(), value.bool_value() ? "true" : "false");
     return;
   case ProtobufWkt::Value::kNumberValue:
-    span.setTag(tag(), fmt::format("{}", value.number_value()));
+    span.setTag(tag(), absl::StrCat("", value.number_value()));
     return;
   case ProtobufWkt::Value::kStringValue:
     span.setTag(tag(), value.string_value());

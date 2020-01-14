@@ -235,8 +235,13 @@ public:
                            ProtobufMessage::ValidationVisitor& validation_visitor,
                            Factory& factory) {
     ProtobufTypes::MessagePtr config = factory.createEmptyConfigProto();
+
     // Fail in an obvious way if a plugin does not return a proto.
     RELEASE_ASSERT(config != nullptr, "");
+
+    // Check that the config type is not google.protobuf.Empty
+    RELEASE_ASSERT(config->GetDescriptor()->full_name() != "google.protobuf.Empty", "");
+
     translateOpaqueConfig(enclosing_message.typed_config(),
                           enclosing_message.hidden_envoy_deprecated_config(), validation_visitor,
                           *config);
@@ -290,7 +295,7 @@ public:
                                     Protobuf::Message& out_proto);
 
   /**
-   * Verify any any filter designed to be terminal is configured to be terminal, and vice versa.
+   * Verify that any filter designed to be terminal is configured to be terminal, and vice versa.
    * @param name the name of the filter.
    * @param name the type of filter.
    * @param is_terminal_filter true if the filter is designed to be terminal.

@@ -7,6 +7,8 @@
 
 #include "extensions/filters/network/dubbo_proxy/buffer_helper.h"
 
+#include "absl/strings/str_cat.h"
+
 namespace Envoy {
 namespace Extensions {
 namespace NetworkFilters {
@@ -44,8 +46,8 @@ size_t doWriteString(Buffer::Instance& instance, absl::string_view str_view) {
   }
 
   if (length < two_octet_max_lenth) {
-    uint8_t code = length >> 8; // 0x30 + length / 0x100 must less than 0x34
-    uint8_t remain = length & 0xff;
+    const uint8_t code = length >> 8; // 0x30 + length / 0x100 must less than 0x34
+    const uint8_t remain = length & 0xff;
     std::initializer_list<uint8_t> values{static_cast<uint8_t>(0x30 + code), remain};
     addSeq(instance, values);
     instance.add(str_view.data(), str_view.length());
@@ -53,8 +55,8 @@ size_t doWriteString(Buffer::Instance& instance, absl::string_view str_view) {
   }
 
   if (length <= str_max_length) {
-    uint8_t code = length >> 8;
-    uint8_t remain = length & 0xff;
+    const uint8_t code = length >> 8;
+    const uint8_t remain = length & 0xff;
     std::initializer_list<uint8_t> values{'S', code, remain};
     addSeq(instance, values);
     instance.add(str_view.data(), str_view.length());
@@ -64,10 +66,10 @@ size_t doWriteString(Buffer::Instance& instance, absl::string_view str_view) {
   std::initializer_list<uint8_t> values{0x52, 0xff, 0xff};
   addSeq(instance, values);
   instance.add(str_view.data(), str_max_length);
-  size_t size = str_max_length + values.size();
+  const size_t size = str_max_length + values.size();
   ASSERT(size == (str_max_length + values.size()));
 
-  size_t child_size =
+  const size_t child_size =
       doWriteString(instance, str_view.substr(str_max_length, length - str_max_length));
   return child_size + size;
 }
@@ -86,7 +88,7 @@ char* allocStringBuffer(std::string* str, size_t length) {
 
 std::string HessianUtils::peekString(Buffer::Instance& buffer, size_t* size, uint64_t offset) {
   ASSERT(buffer.length() > offset);
-  uint8_t code = buffer.peekInt<uint8_t>(offset);
+  const uint8_t code = buffer.peekInt<uint8_t>(offset);
   size_t delta_length = 0;
   std::string result;
   switch (code) {
@@ -174,7 +176,7 @@ std::string HessianUtils::peekString(Buffer::Instance& buffer, size_t* size, uin
     *size = next_size + delta_length + 3;
     return result;
   }
-  throw EnvoyException(fmt::format("hessian type is not string {}", code));
+  throw EnvoyException(absl::StrCat("hessian type is not string ", code));
 }
 
 std::string HessianUtils::readString(Buffer::Instance& buffer) {
@@ -277,12 +279,12 @@ long HessianUtils::peekLong(Buffer::Instance& buffer, size_t* size, uint64_t off
     return result;
   }
 
-  throw EnvoyException(fmt::format("hessian type is not long {}", code));
+  throw EnvoyException(absl::StrCat("hessian type is not long ", code));
 }
 
 long HessianUtils::readLong(Buffer::Instance& buffer) {
   size_t size;
-  long result = peekLong(buffer, &size);
+  const long result = peekLong(buffer, &size);
   buffer.drain(size);
   return result;
 }
@@ -290,7 +292,7 @@ long HessianUtils::readLong(Buffer::Instance& buffer) {
 bool HessianUtils::peekBool(Buffer::Instance& buffer, size_t* size, uint64_t offset) {
   ASSERT(buffer.length() > offset);
   bool result;
-  uint8_t code = buffer.peekInt<uint8_t>(offset);
+  const uint8_t code = buffer.peekInt<uint8_t>(offset);
   if (code == 0x46) {
     result = false;
     *size = 1;
@@ -303,7 +305,7 @@ bool HessianUtils::peekBool(Buffer::Instance& buffer, size_t* size, uint64_t off
     return result;
   }
 
-  throw EnvoyException(fmt::format("hessian type is not bool {}", code));
+  throw EnvoyException(absl::StrCat("hessian type is not bool ", code));
 }
 
 bool HessianUtils::readBool(Buffer::Instance& buffer) {
@@ -315,7 +317,7 @@ bool HessianUtils::readBool(Buffer::Instance& buffer) {
 
 int HessianUtils::peekInt(Buffer::Instance& buffer, size_t* size, uint64_t offset) {
   ASSERT(buffer.length() > offset);
-  uint8_t code = buffer.peekInt<uint8_t>(offset);
+  const uint8_t code = buffer.peekInt<uint8_t>(offset);
   int result;
 
   // Compact int
@@ -374,7 +376,7 @@ int HessianUtils::peekInt(Buffer::Instance& buffer, size_t* size, uint64_t offse
     return result;
   }
 
-  throw EnvoyException(fmt::format("hessian type is not int {}", code));
+  throw EnvoyException(absl::StrCat("hessian type is not int ", code));
 }
 
 int HessianUtils::readInt(Buffer::Instance& buffer) {
@@ -433,7 +435,7 @@ double HessianUtils::peekDouble(Buffer::Instance& buffer, size_t* size, uint64_t
     return result;
   }
 
-  throw EnvoyException(fmt::format("hessian type is not double {}", code));
+  throw EnvoyException(absl::StrCat("hessian type is not double ", code));
 }
 
 double HessianUtils::readDouble(Buffer::Instance& buffer) {
@@ -451,7 +453,7 @@ void HessianUtils::peekNull(Buffer::Instance& buffer, size_t* size, uint64_t off
     return;
   }
 
-  throw EnvoyException(fmt::format("hessian type is not null {}", code));
+  throw EnvoyException(absl::StrCat("hessian type is not null ", code));
 }
 
 void HessianUtils::readNull(Buffer::Instance& buffer) {
@@ -484,7 +486,7 @@ std::chrono::milliseconds HessianUtils::peekDate(Buffer::Instance& buffer, size_
     return result;
   }
 
-  throw EnvoyException(fmt::format("hessian type is not date {}", code));
+  throw EnvoyException(absl::StrCat("hessian type is not date ", code));
 }
 
 std::chrono::milliseconds HessianUtils::readDate(Buffer::Instance& buffer) {
@@ -553,7 +555,7 @@ std::string HessianUtils::peekByte(Buffer::Instance& buffer, size_t* size, uint6
     return result;
   }
 
-  throw EnvoyException(fmt::format("hessian type is not byte {}", code));
+  throw EnvoyException(absl::StrCat("hessian type is not byte ", code));
 }
 
 std::string HessianUtils::readByte(Buffer::Instance& buffer) {
