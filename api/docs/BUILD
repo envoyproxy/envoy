@@ -51,6 +51,7 @@ proto_library(
         "//envoy/config/filter/http/ip_tagging/v2:pkg",
         "//envoy/config/filter/http/jwt_authn/v2alpha:pkg",
         "//envoy/config/filter/http/lua/v2:pkg",
+        "//envoy/config/filter/http/on_demand/v2:pkg",
         "//envoy/config/filter/http/original_src/v2alpha1:pkg",
         "//envoy/config/filter/http/rate_limit/v2:pkg",
         "//envoy/config/filter/http/rbac/v2:pkg",

@@ -38,12 +38,11 @@ CertificateValidationContextConfigImpl::CertificateValidationContextConfigImpl(
                                        certificateRevocationListPath()));
     }
     if (!subject_alt_name_matchers_.empty() || !verify_subject_alt_name_list_.empty()) {
-      throw EnvoyException(fmt::format("SAN-based verification of peer certificates without "
-                                       "trusted CA is insecure and not allowed"));
+      throw EnvoyException("SAN-based verification of peer certificates without "
+                           "trusted CA is insecure and not allowed");
     }
     if (allow_expired_certificate_) {
-      throw EnvoyException(
-          fmt::format("Certificate validity period is always ignored without trusted CA"));
+      throw EnvoyException("Certificate validity period is always ignored without trusted CA");
     }
   }
 }

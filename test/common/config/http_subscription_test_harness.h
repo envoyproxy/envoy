@@ -50,7 +50,8 @@ public:
     subscription_ = std::make_unique<HttpSubscriptionImpl>(
         local_info_, cm_, "eds_cluster", dispatcher_, random_gen_, std::chrono::milliseconds(1),
         std::chrono::milliseconds(1000), *method_descriptor_,
-        Config::TypeUrl::get().ClusterLoadAssignment, callbacks_, stats_, init_fetch_timeout,
+        Config::TypeUrl::get().ClusterLoadAssignment,
+        envoy::config::core::v3alpha::ApiVersion::AUTO, callbacks_, stats_, init_fetch_timeout,
         validation_visitor_);
   }
 
