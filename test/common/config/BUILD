@@ -417,9 +417,11 @@ envoy_cc_test(
         ":version_converter_proto_cc_proto",
         "//source/common/config:api_version_lib",
         "//source/common/config:version_converter_lib",
+        "//source/common/protobuf:well_known_lib",
         "//test/test_common:test_time_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/api/v2:pkg_cc_proto",
         "@envoy_api//envoy/config/cluster/v3alpha:pkg_cc_proto",
+        "@envoy_api//envoy/service/discovery/v3alpha:pkg_cc_proto",
     ],
 )

@@ -113,7 +113,8 @@ using ListenerImplPtr = std::unique_ptr<ListenerImpl>;
   COUNTER(listener_stopped)                                                                        \
   GAUGE(total_listeners_active, NeverImport)                                                       \
   GAUGE(total_listeners_draining, NeverImport)                                                     \
-  GAUGE(total_listeners_warming, NeverImport)
+  GAUGE(total_listeners_warming, NeverImport)                                                      \
+  GAUGE(workers_started, NeverImport)
 
 /**
  * Struct definition for all listener manager stats. @see stats_macros.h
@@ -154,6 +155,10 @@ public:
 
 private:
   using ListenerList = std::list<ListenerImplPtr>;
+  /**
+   * Callback invoked when a listener initialization is completed on worker.
+   */
+  using ListenerCompletionCallback = std::function<void()>;
 
   bool addOrUpdateListenerInternal(const envoy::config::listener::v3alpha::Listener& config,
                                    const std::string& version_info, bool added_via_api,
@@ -166,7 +171,8 @@ private:
     uint64_t workers_pending_removal_;
   };
 
-  void addListenerToWorker(Worker& worker, ListenerImpl& listener);
+  void addListenerToWorker(Worker& worker, ListenerImpl& listener,
+                           ListenerCompletionCallback completion_callback);
   ProtobufTypes::MessagePtr dumpListenerConfigs();
   static ListenerManagerStats generateStats(Stats::Scope& scope);
   static bool hasListenerWithAddress(const ListenerList& list,

@@ -44,7 +44,8 @@ public:
       return response_timer_;
     }));
     load_stats_reporter_ = std::make_unique<LoadStatsReporter>(
-        local_info_, cm_, stats_store_, Grpc::RawAsyncClientPtr(async_client_), dispatcher_);
+        local_info_, cm_, stats_store_, Grpc::RawAsyncClientPtr(async_client_),
+        envoy::config::core::v3alpha::ApiVersion::AUTO, dispatcher_);
   }
 
   void expectSendMessage(
