@@ -7,6 +7,7 @@
 #include "envoy/common/time.h"
 #include "envoy/extensions/filters/http/admission_control/v3alpha/admission_control.pb.h"
 #include "envoy/http/filter.h"
+#include "envoy/server/filter_config.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats_macros.h"
@@ -34,49 +35,20 @@ struct AdmissionControlStats {
 };
 
 /**
- * Configuration for the admission control filter.
- */
-class AdmissionControlFilterConfig {
-public:
-  AdmissionControlFilterConfig(
-      const envoy::extensions::filters::http::admission_control::v3alpha::AdmissionControl&
-          proto_config,
-      Runtime::Loader& runtime, Stats::Scope& scope, TimeSource& time_source);
-
-  Runtime::Loader& runtime() { return runtime_; }
-  bool filterEnabled() const { return admission_control_feature_.enabled(); }
-  TimeSource& timeSource() const { return time_source_; }
-  Stats::Scope& scope() const { return scope_; }
-  std::chrono::seconds samplingWindow() const { return sampling_window_; }
-  double aggression() const { return aggression_; }
-  uint32_t minRequestSamples() const { return min_request_samples_; }
-
-private:
-  Runtime::Loader& runtime_;
-  TimeSource& time_source_;
-  Stats::Scope& scope_;
-  Runtime::FeatureFlag admission_control_feature_;
-  std::chrono::seconds sampling_window_;
-  double aggression_;
-  uint32_t min_request_samples_;
-};
-
-using AdmissionControlFilterConfigSharedPtr = std::shared_ptr<const AdmissionControlFilterConfig>;
-
-/**
- * Thread-local object to request counts and successes over a rolling time window. Request data for
- * the time window is kept recent via a circular buffer that phases out old request/success counts
- * when recording new samples.
+ * Thread-local object to track request counts and successes over a rolling time window. Request
+ * data for the time window is kept recent via a circular buffer that phases out old request/success
+ * counts when recording new samples.
  *
  * The lookback window for request samples is accurate up to a hard-coded 1-second granularity.
  * TODO (tonya11en): Allow the granularity to be configurable.
  */
-class AdmissionControlState {
+class ThreadLocalController : public ThreadLocal::ThreadLocalObject {
 public:
-  AdmissionControlState(TimeSource& time_source, AdmissionControlFilterConfigSharedPtr config,
-                        Runtime::RandomGenerator& random);
+  ThreadLocalController(TimeSource& time_source, std::chrono::seconds sampling_window);
   void recordRequest(const bool success);
-  bool shouldRejectRequest();
+
+  uint32_t requestTotal() const { return global_data_.requests; }
+  uint32_t requestSuccessCount() const { return global_data_.successes; }
 
 private:
   struct RequestData {
@@ -88,8 +60,6 @@ private:
   void maybeUpdateHistoricalData();
 
   TimeSource& time_source_;
-  Runtime::RandomGenerator& random_;
-  AdmissionControlFilterConfigSharedPtr config_;
   std::deque<std::pair<MonotonicTime, RequestData>> historical_data_;
 
   // Request data for the current time range.
@@ -97,9 +67,46 @@ private:
 
   // Request data aggregated for the whole lookback window.
   RequestData global_data_;
+
+  // The rolling time window.
+  std::chrono::seconds sampling_window_;
 };
 
-using AdmissionControlStateSharedPtr = std::shared_ptr<AdmissionControlState>;
+/**
+ * Configuration for the admission control filter.
+ */
+class AdmissionControlFilterConfig {
+public:
+  using AdmissionControlProto =
+    envoy::extensions::filters::http::admission_control::v3alpha::AdmissionControl;
+  AdmissionControlFilterConfig(
+      const AdmissionControlProto& proto_config, Server::Configuration::FactoryContext& context);
+
+  // Get the per-thread admission controller.
+  ThreadLocalController& getController() const { return tls_->getTyped<ThreadLocalController>(); }
+
+  Runtime::Loader& runtime() const { return runtime_; }
+  Runtime::RandomGenerator& random() const { return random_; }
+  bool filterEnabled() const { return admission_control_feature_.enabled(); }
+  TimeSource& timeSource() const { return time_source_; }
+  Stats::Scope& scope() const { return scope_; }
+  std::chrono::seconds samplingWindow() const { return sampling_window_; }
+  double aggression() const { return aggression_; }
+  uint32_t minRequestSamples() const { return min_request_samples_; }
+
+private:
+  Runtime::Loader& runtime_;
+  TimeSource& time_source_;
+  Runtime::RandomGenerator& random_;
+  Stats::Scope& scope_;
+  ThreadLocal::SlotPtr tls_;
+  Runtime::FeatureFlag admission_control_feature_;
+  std::chrono::seconds sampling_window_;
+  double aggression_;
+  uint32_t min_request_samples_;
+};
+
+using AdmissionControlFilterConfigSharedPtr = std::shared_ptr<const AdmissionControlFilterConfig>;
 
 /**
  * A filter that probabilistically rejects requests based on upstream success-rate.
@@ -108,7 +115,7 @@ class AdmissionControlFilter : public Http::PassThroughFilter,
                                Logger::Loggable<Logger::Id::filter> {
 public:
   AdmissionControlFilter(AdmissionControlFilterConfigSharedPtr config,
-                         AdmissionControlStateSharedPtr state, const std::string& stats_prefix);
+                         const std::string& stats_prefix);
 
   // Http::StreamDecoderFilter
   Http::FilterHeadersStatus decodeHeaders(Http::HeaderMap&, bool) override;
@@ -121,9 +128,9 @@ private:
     return {ALL_ADMISSION_CONTROL_STATS(POOL_COUNTER_PREFIX(scope, prefix))};
   }
 
+  bool shouldRejectRequest() const;
+
   AdmissionControlFilterConfigSharedPtr config_;
-  // TODO @tallen thread local
-  AdmissionControlStateSharedPtr state_;
   AdmissionControlStats stats_;
 };
 

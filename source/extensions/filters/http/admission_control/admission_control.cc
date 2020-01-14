@@ -6,6 +6,7 @@
 #include <vector>
 
 #include "envoy/extensions/filters/http/admission_control/v3alpha/admission_control.pb.h"
+#include "envoy/server/filter_config.h"
 #include "envoy/runtime/runtime.h"
 
 #include "common/common/assert.h"
@@ -20,36 +21,38 @@ namespace Extensions {
 namespace HttpFilters {
 namespace AdmissionControl {
 
-static constexpr double defaultAggression = 1.5;
+static constexpr double defaultAggression = 2.0;
 static constexpr std::chrono::seconds defaultSamplingWindow{120};
 static constexpr uint32_t defaultMinRequestSamples = 100;
 
 AdmissionControlFilterConfig::AdmissionControlFilterConfig(
-    const envoy::extensions::filters::http::admission_control::v3alpha::AdmissionControl&
-        proto_config,
-    Runtime::Loader& runtime, Stats::Scope& scope, TimeSource& time_source)
-    : runtime_(runtime), time_source_(time_source), scope_(scope),
-      admission_control_feature_(proto_config.enabled(), runtime),
+    const AdmissionControlProto& proto_config,
+    Server::Configuration::FactoryContext& context)
+    : runtime_(context.runtime()), time_source_(context.timeSource()), random_(context.random()),
+      scope_(context.scope()), tls_(context.threadLocal().allocateSlot()),
+      admission_control_feature_(proto_config.enabled(), runtime_),
       sampling_window_(proto_config.has_sampling_window()
                            ? DurationUtil::durationToSeconds(proto_config.sampling_window())
                            : defaultSamplingWindow.count()),
       aggression_(PROTOBUF_PERCENT_TO_DOUBLE_OR_DEFAULT(proto_config, aggression_coefficient,
                                                         defaultAggression)),
       min_request_samples_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(proto_config, min_request_samples,
-                                                           defaultMinRequestSamples)) {}
+                                                           defaultMinRequestSamples)) {
+     tls_->set([this](Event::Dispatcher&) -> ThreadLocal::ThreadLocalObjectSharedPtr {
+  return std::make_shared<ThreadLocalController>(time_source_, sampling_window_);
+         }); 
+      }
 
 AdmissionControlFilter::AdmissionControlFilter(AdmissionControlFilterConfigSharedPtr config,
-                                               AdmissionControlStateSharedPtr state,
                                                const std::string& stats_prefix)
-    : config_(std::move(config)), state_(state),
-      stats_(generateStats(config_->scope(), stats_prefix)) {}
+    : config_(std::move(config)), stats_(generateStats(config_->scope(), stats_prefix)) {}
 
 Http::FilterHeadersStatus AdmissionControlFilter::decodeHeaders(Http::HeaderMap&, bool) {
   if (!config_->filterEnabled() || decoder_callbacks_->streamInfo().healthCheck()) {
     return Http::FilterHeadersStatus::Continue;
   }
 
-  if (state_->shouldRejectRequest()) {
+  if (shouldRejectRequest()) {
     decoder_callbacks_->sendLocalReply(Http::Code::ServiceUnavailable, "", nullptr, absl::nullopt,
                                        "throttling request");
     stats_.rq_rejected_.inc();
@@ -64,21 +67,30 @@ Http::FilterHeadersStatus AdmissionControlFilter::encodeHeaders(Http::HeaderMap&
   if (end_stream) {
     // TODO @tallen make this match on config
     const uint64_t status_code = Http::Utility::getResponseStatus(headers);
-    state_->recordRequest(status_code == enumToInt(Http::Code::OK));
+    config_->getController().recordRequest(status_code == enumToInt(Http::Code::OK));
   }
   return Http::FilterHeadersStatus::Continue;
 }
 
-AdmissionControlState::AdmissionControlState(TimeSource& time_source,
-                                             AdmissionControlFilterConfigSharedPtr config,
-                                             Runtime::RandomGenerator& random)
-    : time_source_(time_source), random_(random), config_(std::move(config)) {}
+ThreadLocalController::ThreadLocalController(TimeSource& time_source,
+                                             std::chrono::seconds sampling_window)
+    : time_source_(time_source), sampling_window_(sampling_window) {}
 
-void AdmissionControlState::maybeUpdateHistoricalData() {
+bool AdmissionControlFilter::shouldRejectRequest() const {
+  const double total = config_->getController().requestTotal();
+  const double success = config_->getController().requestSuccessCount();
+  const double probability = (total - config_->aggression() * success) / (total + 1);
+
+  // Choosing an accuracy of 4 significant figures for the probability.
+  static constexpr uint64_t accuracy = 1e4;
+  return (accuracy * std::max(probability, 0.0)) > (config_->random().random() % accuracy);
+}
+
+void ThreadLocalController::maybeUpdateHistoricalData() {
   const MonotonicTime now = time_source_.monotonicTime();
 
   while (!historical_data_.empty() &&
-         (now - historical_data_.front().first) >= config_->samplingWindow()) {
+         (now - historical_data_.front().first) >= sampling_window_) {
     // Remove stale data.
     global_data_.successes -= historical_data_.front().second.successes;
     global_data_.requests -= historical_data_.front().second.requests;
@@ -92,7 +104,7 @@ void AdmissionControlState::maybeUpdateHistoricalData() {
   }
 }
 
-void AdmissionControlState::recordRequest(const bool success) {
+void ThreadLocalController::recordRequest(const bool success) {
   maybeUpdateHistoricalData();
   ++local_data_.requests;
   ++global_data_.requests;
@@ -100,15 +112,6 @@ void AdmissionControlState::recordRequest(const bool success) {
     ++local_data_.successes;
     ++global_data_.successes;
   }
-}
-
-bool AdmissionControlState::shouldRejectRequest() {
-  const double probability =
-      (global_data_.requests - config_->aggression() * global_data_.successes) /
-      (global_data_.requests + 1);
-
-  static constexpr uint64_t accuracy = 1e4;
-  return (accuracy * std::max(probability, 0.0)) > (random_.random() % accuracy);
 }
 
 } // namespace AdmissionControl
