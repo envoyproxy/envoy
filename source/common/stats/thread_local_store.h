@@ -350,8 +350,6 @@ private:
                                 std::unique_ptr<StatNameManagedStorage>& truncated_name_storage,
                                 std::vector<Tag>& tags, std::string& tag_extracted_name);
 
-    static std::atomic<uint64_t> next_scope_id_;
-
     const uint64_t scope_id_;
     ThreadLocalStoreImpl& parent_;
     StatNameStorage prefix_;
@@ -414,7 +412,7 @@ private:
   std::vector<HistogramSharedPtr> deleted_histograms_;
 
   Thread::ThreadSynchronizer sync_;
-  std::atomic<uint64_t> next_scope_id_;
+  std::atomic<uint64_t> next_scope_id_{};
 };
 
 } // namespace Stats
