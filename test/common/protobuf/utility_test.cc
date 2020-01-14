@@ -624,6 +624,19 @@ insensitive_repeated_any:
   EXPECT_TRUE(TestUtility::protoEqual(expected, actual));
 }
 
+// Empty `Any` can be trivially redacted.
+TEST_F(ProtobufUtilityTest, RedactEmptyAny) {
+  ProtobufWkt::Any actual;
+  TestUtility::loadFromYaml(R"EOF(
+'@type': type.googleapis.com/envoy.test.Sensitive
+)EOF",
+                            actual);
+
+  ProtobufWkt::Any expected = actual;
+  MessageUtil::redact(actual);
+  EXPECT_TRUE(TestUtility::protoEqual(expected, actual));
+}
+
 // Messages packed into `Any` with unknown type URLs are skipped.
 TEST_F(ProtobufUtilityTest, RedactAnyWithUnknownTypeUrl) {
   ProtobufWkt::Any actual;
@@ -805,6 +818,19 @@ insensitive_repeated_typed_struct:
 )EOF",
                             expected);
 
+  MessageUtil::redact(actual);
+  EXPECT_TRUE(TestUtility::protoEqual(expected, actual));
+}
+
+// Empty `TypedStruct` can be trivially redacted.
+TEST_F(ProtobufUtilityTest, RedactEmptyTypedStruct) {
+  udpa::type::v1::TypedStruct actual;
+  TestUtility::loadFromYaml(R"EOF(
+type_url: type.googleapis.com/envoy.test.Sensitive
+)EOF",
+                            actual);
+
+  udpa::type::v1::TypedStruct expected = actual;
   MessageUtil::redact(actual);
   EXPECT_TRUE(TestUtility::protoEqual(expected, actual));
 }
