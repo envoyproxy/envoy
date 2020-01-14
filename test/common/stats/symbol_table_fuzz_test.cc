@@ -19,8 +19,11 @@ DEFINE_FUZZER(const uint8_t* buf, size_t len) {
   SymbolTableImpl symbol_table;
   StatNamePool pool(symbol_table);
   StatNamePool fake_pool(fake_symbol_table);
+<<<<<<< HEAD
   StatNameDynamicPool dynamic_pool(symbol_table);
   StatNameDynamicPool fake_dynamic_pool(fake_symbol_table);
+=======
+>>>>>>> master
 
   while (provider.remaining_bytes() != 0) {
     std::string next_data = provider.ConsumeRandomLengthString(provider.remaining_bytes());

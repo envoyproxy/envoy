@@ -426,8 +426,8 @@ private:
   makeBuildVersion(uint32_t major, uint32_t minor, uint32_t patch,
                    const std::map<std::string, std::string>& metadata) {
     envoy::config::core::v3alpha::BuildVersion version;
-    version.mutable_version()->set_major(major);
-    version.mutable_version()->set_minor(minor);
+    version.mutable_version()->set_major_number(major);
+    version.mutable_version()->set_minor_number(minor);
     version.mutable_version()->set_patch(patch);
     *version.mutable_metadata() = MessageUtil::keyValueStruct(metadata);
     return version;

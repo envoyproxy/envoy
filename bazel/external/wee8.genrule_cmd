@@ -72,7 +72,11 @@ WEE8_BUILD_ARGS+=" v8_use_external_startup_data=false"
 WEE8_BUILD_ARGS+=" v8_enable_shared_ro_heap=false"
 
 # Build wee8.
-third_party/depot_tools/gn gen out/wee8 --args="$$WEE8_BUILD_ARGS"
+if [[ `uname` == "Darwin" ]]; then
+  buildtools/mac/gn gen out/wee8 --args="$$WEE8_BUILD_ARGS"
+else
+  buildtools/linux64/gn gen out/wee8 --args="$$WEE8_BUILD_ARGS"
+fi
 third_party/depot_tools/ninja -C out/wee8 wee8
 
 # Move compiled library to the expected destinations.

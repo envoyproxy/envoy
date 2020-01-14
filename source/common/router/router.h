@@ -20,6 +20,7 @@
 
 #include "common/access_log/access_log_impl.h"
 #include "common/buffer/watermark_buffer.h"
+#include "common/common/cleanup.h"
 #include "common/common/hash.h"
 #include "common/common/hex.h"
 #include "common/common/linked_object.h"
@@ -470,6 +471,7 @@ private:
     Tracing::SpanPtr span_;
     StreamInfo::StreamInfoImpl stream_info_;
     StreamInfo::UpstreamTiming upstream_timing_;
+    const MonotonicTime start_time_;
     // Copies of upstream headers/trailers. These are only set if upstream
     // access logging is configured.
     Http::HeaderMapPtr upstream_headers_;
@@ -487,6 +489,10 @@ private:
     // Tracks whether we deferred a per try timeout because the downstream request
     // had not been completed yet.
     bool create_per_try_timeout_on_request_complete_ : 1;
+
+    // Sentinel to indicate if timeout budget tracking is configured for the cluster,
+    // and if so, if the per-try histogram should record a value.
+    bool record_timeout_budget_ : 1;
   };
 
   using UpstreamRequestPtr = std::unique_ptr<UpstreamRequest>;

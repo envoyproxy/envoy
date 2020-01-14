@@ -1003,7 +1003,7 @@ TEST_F(ClientContextConfigImplTest, PasswordNotSuppliedTlsCertificates) {
   Stats::IsolatedStoreImpl store;
   EXPECT_THROW_WITH_REGEX(manager.createSslClientContext(store, client_context_config),
                           EnvoyException,
-                          fmt::format("Failed to load private key from {}", private_key_path));
+                          absl::StrCat("Failed to load private key from ", private_key_path));
 }
 
 // Validate that client context config with static certificate validation context is created

@@ -252,6 +252,7 @@ envoy_cc_test(
         "//source/common/network:application_protocol_lib",
         "//source/common/network:utility_lib",
         "//source/common/router:router_lib",
+        "//source/common/stream_info:uint32_accessor_lib",
         "//source/common/upstream:upstream_includes",
         "//source/common/upstream:upstream_lib",
         "//test/common/http:common_lib",
@@ -267,6 +268,7 @@ envoy_cc_test(
         "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/core/v3alpha:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/transport_sockets/tls/v3alpha:pkg_cc_proto",
         "@envoy_api//envoy/type/v3alpha:pkg_cc_proto",
     ],
 )

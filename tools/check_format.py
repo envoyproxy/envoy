@@ -48,6 +48,7 @@ SERIALIZE_AS_STRING_WHITELIST = (
     "./source/common/config/version_converter.cc",
     "./source/extensions/filters/http/grpc_json_transcoder/json_transcoder_filter.cc",
     "./test/common/protobuf/utility_test.cc",
+    "./test/common/config/version_converter_test.cc",
     "./test/common/grpc/codec_test.cc",
     "./test/common/grpc/codec_fuzz_test.cc",
 )
@@ -895,8 +896,8 @@ if __name__ == "__main__":
   def ownedDirectories(error_messages):
     owned = []
     maintainers = [
-        '@mattklein123', '@htuch', '@alyssawilk', '@zuercher', '@lizan', '@snowp', '@junr03',
-        '@dnoe', '@dio', '@jmarantz'
+        '@mattklein123', '@htuch', '@alyssawilk', '@zuercher', '@lizan', '@snowp', '@asraa',
+        '@junr03', '@dio', '@jmarantz'
     ]
 
     try:

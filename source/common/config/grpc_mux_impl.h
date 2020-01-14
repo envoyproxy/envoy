@@ -31,6 +31,7 @@ class GrpcMuxImpl
 public:
   GrpcMuxImpl(const LocalInfo::LocalInfo& local_info, Grpc::RawAsyncClientPtr async_client,
               Event::Dispatcher& dispatcher, const Protobuf::MethodDescriptor& service_method,
+              envoy::config::core::v3alpha::ApiVersion transport_api_version,
               Runtime::RandomGenerator& random, Stats::Scope& scope,
               const RateLimitSettings& rate_limit_settings, bool skip_subsequent_node);
   ~GrpcMuxImpl() override;
@@ -135,6 +136,7 @@ private:
   // gRPC stream being down, this queue does not store them; rather, they are simply dropped.
   // This string is a type URL.
   std::queue<std::string> request_queue_;
+  const envoy::config::core::v3alpha::ApiVersion transport_api_version_;
 };
 
 class NullGrpcMuxImpl : public GrpcMux,
