@@ -340,18 +340,10 @@ TEST_P(DownstreamProtocolIntegrationTest, RetryPriority) {
   retry_policy->mutable_retry_priority()->set_name(factory.name());
   config_helper_.addVirtualHost(host);
   // We want to work with a cluster with two hosts.
-  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3alpha::Bootstrap& bootstrap) {
+  config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3alpha::Bootstrap& bootstrap) {
     auto* cluster = bootstrap.mutable_static_resources()->mutable_clusters(0);
-    const std::string host_address = cluster->load_assignment()
-                                         .endpoints(0)
-                                         .lb_endpoints(0)
-                                         .endpoint()
-                                         .address()
-                                         .socket_address()
-                                         .address();
-    cluster->clear_load_assignment();
     auto* load_assignment = cluster->mutable_load_assignment();
-    load_assignment->set_cluster_name(cluster->name());
+    load_assignment->clear_endpoints();
 
     for (int i = 0; i < 2; ++i) {
       auto locality = load_assignment->add_endpoints();
@@ -359,11 +351,8 @@ TEST_P(DownstreamProtocolIntegrationTest, RetryPriority) {
       locality->mutable_locality()->set_region("region");
       locality->mutable_locality()->set_zone("zone");
       locality->mutable_locality()->set_sub_zone("sub_zone" + std::to_string(i));
-      auto* lb_endpoint = locality->add_lb_endpoints();
-      lb_endpoint->mutable_endpoint()->mutable_address()->mutable_socket_address()->set_address(
-          host_address);
-      lb_endpoint->mutable_endpoint()->mutable_address()->mutable_socket_address()->set_port_value(
-          0);
+      locality->add_lb_endpoints()->mutable_endpoint()->MergeFrom(
+          ConfigHelper::buildEndpoint(Network::Test::getLoopbackAddressString(version_)));
     }
   });
   fake_upstreams_count_ = 2;
@@ -419,14 +408,13 @@ TEST_P(DownstreamProtocolIntegrationTest, RetryHostPredicateFilter) {
   config_helper_.addVirtualHost(host);
 
   // We want to work with a cluster with two hosts.
-  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3alpha::Bootstrap& bootstrap) {
-    auto* new_host = bootstrap.mutable_static_resources()
-                         ->mutable_clusters(0)
-                         ->mutable_load_assignment()
-                         ->mutable_endpoints(0)
-                         ->add_lb_endpoints();
-    new_host->MergeFrom(
-        bootstrap.static_resources().clusters(0).load_assignment().endpoints(0).lb_endpoints(0));
+  config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3alpha::Bootstrap& bootstrap) {
+    bootstrap.mutable_static_resources()
+        ->mutable_clusters(0)
+        ->mutable_load_assignment()
+        ->mutable_endpoints(0)
+        ->add_lb_endpoints()
+        ->MergeFrom(ConfigHelper::buildEndpoint(Network::Test::getLoopbackAddressString(version_)));
   });
   fake_upstreams_count_ = 2;
   initialize();
