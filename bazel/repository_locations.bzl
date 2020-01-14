@@ -85,14 +85,14 @@ REPOSITORY_LOCATIONS = dict(
         urls = ["https://github.com/mirror/tclap/archive/tclap-1-2-1-release-final.tar.gz"],
     ),
     com_github_fmtlib_fmt = dict(
-        sha256 = "4c0741e10183f75d7d6f730b8708a99b329b2f942dad5a9da3385ab92bb4a15c",
-        strip_prefix = "fmt-5.3.0",
-        urls = ["https://github.com/fmtlib/fmt/releases/download/5.3.0/fmt-5.3.0.zip"],
+        sha256 = "63650f3c39a96371f5810c4e41d6f9b0bb10305064e6faf201cbafe297ea30e8",
+        strip_prefix = "fmt-6.1.2",
+        urls = ["https://github.com/fmtlib/fmt/releases/download/6.1.2/fmt-6.1.2.zip"],
     ),
     com_github_gabime_spdlog = dict(
-        sha256 = "160845266e94db1d4922ef755637f6901266731c4cb3b30b45bf41efa0e6ab70",
-        strip_prefix = "spdlog-1.3.1",
-        urls = ["https://github.com/gabime/spdlog/archive/v1.3.1.tar.gz"],
+        sha256 = "b38e0bbef7faac2b82fed550a0c19b0d4e7f6737d5321d4fd8f216b80f8aee8a",
+        strip_prefix = "spdlog-1.5.0",
+        urls = ["https://github.com/gabime/spdlog/archive/v1.5.0.tar.gz"],
     ),
     com_github_google_libprotobuf_mutator = dict(
         sha256 = "54597f640c0ab5e5d783d2f3d3cfe8ad6da999ef1a194d89c2c5ab89a1fd8e13",

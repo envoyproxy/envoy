@@ -106,9 +106,17 @@ parseUpstreamMetadataField(absl::string_view params_str) {
       return std::string();
     }
 
+    double number_value, integral;
     switch (value->kind_case()) {
     case ProtobufWkt::Value::kNumberValue:
-      return fmt::format("{}", value->number_value());
+      // Decompress the number value into integral and fractional. Check if the
+      // number value contains an integer value by checking the fractional part.
+      // If it contains an integer value, format it as an integer.
+      number_value = value->number_value();
+      if (std::modf(number_value, &integral) == 0.0) {
+        return fmt::format("{:d}", integral);
+      }
+      return fmt::format("{}", number_value);
 
     case ProtobufWkt::Value::kStringValue:
       return value->string_value();
