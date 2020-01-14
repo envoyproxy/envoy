@@ -70,8 +70,7 @@ message ClientStatusRequest {
     type.matcher.v3alpha.MetadataMatcher node_metadata_matcher = 2;
   }
 
-  // Management server can use these match criteria to identify clients and
-  // respond.
+  // Management server can use these match criteria to identify clients.
   repeated NodeMatcher node_matchers = 1;
 }
 
