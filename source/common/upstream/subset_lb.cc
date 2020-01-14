@@ -160,10 +160,9 @@ void SubsetLoadBalancer::initSelectorFallbackSubset(
         LbSubsetSelectorFallbackPolicy& fallback_policy) {
   if (fallback_policy == envoy::config::cluster::v3alpha::Cluster::LbSubsetConfig::
                              LbSubsetSelector::ANY_ENDPOINT &&
-      selector_fallback_subset_any_ == nullptr) {
+      subset_any_ == nullptr) {
     ENVOY_LOG(debug, "subset lb: creating any-endpoint fallback load balancer for selector");
     initSubsetAnyOnce();
-    selector_fallback_subset_any_ = subset_any_;
   } else if (fallback_policy == envoy::config::cluster::v3alpha::Cluster::LbSubsetConfig::
                                     LbSubsetSelector::DEFAULT_SUBSET &&
              selector_fallback_subset_default_ == nullptr) {
@@ -250,8 +249,8 @@ HostConstSharedPtr SubsetLoadBalancer::chooseHostForSelectorFallbackPolicy(
   const auto& fallback_policy = fallback_params.fallback_policy_;
   if (fallback_policy == envoy::config::cluster::v3alpha::Cluster::LbSubsetConfig::
                              LbSubsetSelector::ANY_ENDPOINT &&
-      selector_fallback_subset_any_ != nullptr) {
-    return selector_fallback_subset_any_->priority_subset_->lb_->chooseHost(context);
+      subset_any_ != nullptr) {
+    return subset_any_->priority_subset_->lb_->chooseHost(context);
   } else if (fallback_policy == envoy::config::cluster::v3alpha::Cluster::LbSubsetConfig::
                                     LbSubsetSelector::DEFAULT_SUBSET &&
              selector_fallback_subset_default_ != nullptr) {
@@ -337,8 +336,6 @@ void SubsetLoadBalancer::updateFallbackSubset(uint32_t priority, const HostVecto
   if (subset_any_ != nullptr) {
     subset_any_->priority_subset_->update(priority, hosts_added, hosts_removed);
   }
-
-  ASSERT(selector_fallback_subset_any_ == nullptr || selector_fallback_subset_any_ == subset_any_);
 
   if (selector_fallback_subset_default_ != nullptr) {
     selector_fallback_subset_default_->priority_subset_->update(priority, hosts_added,
