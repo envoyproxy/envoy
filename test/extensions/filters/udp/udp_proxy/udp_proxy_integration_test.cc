@@ -61,9 +61,14 @@ public:
             for (uint32_t i = 1; i < upstream_count; i++) {
               auto* new_host = bootstrap.mutable_static_resources()
                                    ->mutable_clusters(0)
-                                   ->add_hidden_envoy_deprecated_hosts();
-              new_host->MergeFrom(
-                  bootstrap.static_resources().clusters(0).hidden_envoy_deprecated_hosts(0));
+                                   ->mutable_load_assignment()
+                                   ->mutable_endpoints(0)
+                                   ->add_lb_endpoints();
+              new_host->MergeFrom(bootstrap.static_resources()
+                                      .clusters(0)
+                                      .load_assignment()
+                                      .endpoints(0)
+                                      .lb_endpoints(0));
             }
           });
     }
