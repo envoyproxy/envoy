@@ -102,10 +102,9 @@ TEST(RedisProxyFilterConfigFactoryTest,
   Runtime::LoaderSingleton::getExisting()->mergeValues(
       {{"envoy.deprecated_features:envoy.config.filter.network.redis_proxy.v2.RedisProxy."
         "PrefixRoutes.catch_all_cluster",
-        "true"}});
-  Runtime::LoaderSingleton::getExisting()->mergeValues(
-      {{"envoy.deprecated_features:envoy.extensions.filters.network.redis_proxy.v3alpha.RedisProxy."
-        "PrefixRoutes.hidden_envoy_deprecated_cluster",
+        "true"},
+       {"envoy.deprecated_features:envoy.extensions.filters.network.redis_proxy.v3alpha.RedisProxy."
+        "PrefixRoutes.hidden_envoy_deprecated_catch_all_cluster",
         "true"}});
   const std::string yaml = R"EOF(
 prefix_routes:
