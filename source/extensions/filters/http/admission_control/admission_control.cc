@@ -27,8 +27,8 @@ static constexpr uint32_t defaultMinRequestSamples = 100;
 AdmissionControlFilterConfig::AdmissionControlFilterConfig(
     const envoy::extensions::filters::http::admission_control::v3alpha::AdmissionControl&
         proto_config,
-    Runtime::Loader& runtime, std::string stats_prefix, Stats::Scope&, TimeSource& time_source)
-    : runtime_(runtime), stats_prefix_(std::move(stats_prefix)), time_source_(time_source),
+    Runtime::Loader& runtime, Stats::Scope& scope, TimeSource& time_source)
+    : runtime_(runtime), time_source_(time_source), scope_(scope),
       admission_control_feature_(proto_config.enabled(), runtime),
       sampling_window_(proto_config.has_sampling_window()
                            ? DurationUtil::durationToSeconds(proto_config.sampling_window())
@@ -39,8 +39,10 @@ AdmissionControlFilterConfig::AdmissionControlFilterConfig(
                                                            defaultMinRequestSamples)) {}
 
 AdmissionControlFilter::AdmissionControlFilter(AdmissionControlFilterConfigSharedPtr config,
-                                               AdmissionControlStateSharedPtr state)
-    : config_(std::move(config)), state_(state) {}
+                                               AdmissionControlStateSharedPtr state,
+                                               const std::string& stats_prefix)
+    : config_(std::move(config)), state_(state),
+      stats_(generateStats(config_->scope(), stats_prefix)) {}
 
 Http::FilterHeadersStatus AdmissionControlFilter::decodeHeaders(Http::HeaderMap&, bool) {
   if (!config_->filterEnabled() || decoder_callbacks_->streamInfo().healthCheck()) {
@@ -50,6 +52,7 @@ Http::FilterHeadersStatus AdmissionControlFilter::decodeHeaders(Http::HeaderMap&
   if (state_->shouldRejectRequest()) {
     decoder_callbacks_->sendLocalReply(Http::Code::ServiceUnavailable, "", nullptr, absl::nullopt,
                                        "throttling request");
+    stats_.rq_rejected_.inc();
     return Http::FilterHeadersStatus::StopIteration;
   }
 
