@@ -12,8 +12,6 @@ import "google/protobuf/struct.proto";
 
 import "udpa/annotations/versioning.proto";
 
-import "envoy/annotations/resource.proto";
-
 option java_package = "io.envoyproxy.envoy.service.status.v3alpha";
 option java_outer_classname = "CsdsProto";
 option java_multiple_files = true;
@@ -24,8 +22,6 @@ option java_generic_services = true;
 // future, it can also potentially be used as an interface to get the current
 // state directly from the client.
 service ClientStatusService {
-  option (envoy.annotations.resource).type = "envoy.service.status.v2.ClientStatus";
-
   rpc StreamClientStatus(stream ClientStatusRequest) returns (stream ClientStatusResponse) {
   }
 
@@ -64,10 +60,10 @@ message ClientStatusRequest {
         "envoy.service.status.v2.ClientStatusRequest.NodeMatcher";
 
     // Specifies match criteria on the client node id.
-    type.matcher.v3alpha.StringMatcher node_id_matcher = 1;
+    type.matcher.v3alpha.StringMatcher node_id = 1;
 
     // Specifies match criteria on the client node metadata.
-    type.matcher.v3alpha.MetadataMatcher node_metadata_matcher = 2;
+    type.matcher.v3alpha.MetadataMatcher node_metadata = 2;
   }
 
   // Management server can use these match criteria to identify clients.

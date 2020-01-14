@@ -8,7 +8,6 @@ api_proto_package(
     has_services = True,
     deps = [
         "//envoy/admin/v2alpha:pkg",
-        "//envoy/annotations:pkg",
         "//envoy/api/v2/core:pkg",
         "//envoy/type/matcher:pkg",
     ],
