@@ -175,6 +175,9 @@ public:
   // configuration generated in ConfigHelper::finalize.
   void skipPortUsageValidation() { skip_port_usage_validation_ = true; }
 
+  // Add this key value pair to the static runtime.
+  void addRuntimeOverride(absl::string_view key, absl::string_view value);
+
 private:
   // Load the first HCM struct from the first listener into a parsed proto.
   bool loadHttpConnectionManager(

@@ -70,9 +70,7 @@ config, and then change the first `HttpConnectionManager` to be different from t
 An example of modifying the bootstrap proto to overwrite runtime defaults:
 
 ```c++
-TestEnvironment::writeStringToFileForTest("runtime/ratelimit.tcp_filter_enabled", "100");
-config_helper_.addConfigModifier([&](envoy::config::bootstrap::v2::Bootstrap& bootstrap) -> void {
-  bootstrap.mutable_runtime()->set_symlink_root(TestEnvironment::temporaryPath("runtime");
+config_helper_.addRuntimeOverride("Foo", "bar");
 });
 ```
 

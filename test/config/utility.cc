@@ -39,6 +39,13 @@ admin:
 dynamic_resources:
   lds_config:
     path: /dev/null
+layered_runtime:
+  layers:
+    - name: some_static_layer
+      static_layer:
+        foo: bar
+    - name: admin
+      admin_layer: {}
 static_resources:
   secrets:
   - name: "secret_static_0"
@@ -374,6 +381,11 @@ void ConfigHelper::applyConfigModifiers() {
     config_modifier(bootstrap_);
   }
   config_modifiers_.clear();
+}
+
+void ConfigHelper::addRuntimeOverride(absl::string_view key, absl::string_view value) {
+  ProtobufWkt::Struct base = TestUtility::parseYaml<ProtobufWkt::Struct>(StrCat(key, ": ", value));
+  bootstrap_.mutable_layered_runtime()->mutable_layers(0)->mutable_static_layer()->MergeFrom(base);
 }
 
 void ConfigHelper::finalize(const std::vector<uint32_t>& ports) {
