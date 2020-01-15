@@ -257,11 +257,6 @@ public:
   virtual const std::string versionInfo() const PURE;
 
   /**
-   * Update watch set of cluster resources interested.
-   */
-  virtual void updateClusterInterest(const std::set<std::string>& update_to_these_names) PURE;
-
-  /**
    * Add watch set of cluster resources interested.
    */
   virtual void addToClusterInterest(const std::set<std::string>& add_these_names) PURE;
