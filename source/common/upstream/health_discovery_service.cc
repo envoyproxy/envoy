@@ -152,9 +152,11 @@ void HdsDelegate::processMessage(
         ClusterConnectionBufferLimitBytes);
 
     // Add endpoints to cluster
+    auto* endpoints = cluster_config.mutable_load_assignment()->add_endpoints();
     for (const auto& locality_endpoints : cluster_health_check.locality_endpoints()) {
       for (const auto& endpoint : locality_endpoints.endpoints()) {
-        cluster_config.add_hosts()->MergeFrom(endpoint.address());
+        endpoints->add_lb_endpoints()->mutable_endpoint()->mutable_address()->MergeFrom(
+            endpoint.address());
       }
     }
 
@@ -231,9 +233,9 @@ HdsCluster::HdsCluster(Server::Admin& admin, Runtime::Loader& runtime,
       {admin, runtime_, cluster_, bind_config_, stats_, ssl_context_manager_, added_via_api_, cm,
        local_info, dispatcher, random, singleton_manager, tls, validation_visitor, api});
 
-  for (const auto& host : cluster.hosts()) {
+  for (const auto& host : cluster.load_assignment().endpoints(0).lb_endpoints()) {
     initial_hosts_->emplace_back(new HostImpl(
-        info_, "", Network::Address::resolveProtoAddress(host),
+        info_, "", Network::Address::resolveProtoAddress(host.endpoint().address()),
         envoy::config::core::v3alpha::Metadata::default_instance(), 1,
         envoy::config::core::v3alpha::Locality().default_instance(),
         envoy::config::endpoint::v3alpha::Endpoint::HealthCheckConfig().default_instance(), 0,

@@ -1566,9 +1566,14 @@ TEST_F(StaticClusterImplTest, UnsupportedLBType) {
     connect_timeout: 0.25s
     type: static
     lb_policy: fakelbtype
-    hosts:
-    - { socket_address: { address: 192.168.1.1, port_value: 22 }}
-    - { socket_address: { address: 192.168.1.2, port_value: 44 }}
+    load_assignment:
+      cluster_name: addressportconfig
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address: { address: 192.168.1.1, port_value: 22 }
+              socket_address: { address: 192.168.1.2, port_value: 44 }
   )EOF";
 
   EXPECT_THROW_WITH_MESSAGE(

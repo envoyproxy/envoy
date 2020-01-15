@@ -193,7 +193,11 @@ private:
       for (int i = 0; i < num_clusters; ++i) {
         auto* cluster = bootstrap.mutable_static_resources()->mutable_clusters(i);
         for (int j = 0; j < num_hosts; ++j) {
-          auto* host = cluster->add_hosts();
+          auto* host = cluster->mutable_load_assignment()
+                           ->mutable_endpoints(0)
+                           ->add_lb_endpoints()
+                           ->mutable_endpoint()
+                           ->mutable_address();
           auto* socket_address = host->mutable_socket_address();
           socket_address->set_protocol(envoy::config::core::v3alpha::SocketAddress::TCP);
           socket_address->set_address("0.0.0.0");
@@ -369,6 +373,7 @@ TEST_P(ClusterMemoryTestRunner, MemoryLargeHostSizeWithStats) {
   // 2019/11/01  8859     1299         1315   build: switch to libc++ by default
   // 2019/11/12  8998     1299         1350   test: adjust memory limit for macOS
   // 2019/11/15  9040     1283         1350   build: update protobuf to 3.10.1
+  // 2020/01/13  9663     1619         1655   api: deprecate hosts in Cluster.
 
   // Note: when adjusting this value: EXPECT_MEMORY_EQ is active only in CI
   // 'release' builds, where we control the platform and tool-chain. So you
@@ -378,8 +383,8 @@ TEST_P(ClusterMemoryTestRunner, MemoryLargeHostSizeWithStats) {
   // If you encounter a failure here, please see
   // https://github.com/envoyproxy/envoy/blob/master/source/docs/stats.md#stats-memory-tests
   // for details on how to fix.
-  EXPECT_MEMORY_EQ(m_per_host, 1283);
-  EXPECT_MEMORY_LE(m_per_host, 1350);
+  EXPECT_MEMORY_EQ(m_per_host, 1619);
+  EXPECT_MEMORY_LE(m_per_host, 1655);
 }
 
 } // namespace

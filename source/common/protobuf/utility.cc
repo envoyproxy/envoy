@@ -16,6 +16,7 @@
 #include "common/protobuf/well_known.h"
 
 #include "absl/strings/match.h"
+#include "udpa/annotations/sensitive.pb.h"
 #include "yaml-cpp/yaml.h"
 
 namespace Envoy {
@@ -611,6 +612,147 @@ std::string MessageUtil::CodeEnumToString(ProtobufUtil::error::Code code) {
   default:
     return "";
   }
+}
+
+namespace {
+
+// Forward declaration for mutually-recursive helper functions.
+void redact(Protobuf::Message* message, bool ancestor_is_sensitive);
+
+using Transform = std::function<void(Protobuf::Message*, const Protobuf::Reflection*,
+                                     const Protobuf::FieldDescriptor*)>;
+
+// To redact opaque types, namely `Any` and `TypedStruct`, we have to reify them to the concrete
+// message types specified by their `type_url` before we can redact their contents. This is mostly
+// identical between `Any` and `TypedStruct`, the only difference being how they are packed and
+// unpacked. Note that we have to use reflection on the opaque type here, rather than downcasting
+// to `Any` or `TypedStruct`, because any message we might be handling could have originated from
+// a `DynamicMessageFactory`.
+bool redactOpaque(Protobuf::Message* message, bool ancestor_is_sensitive,
+                  absl::string_view opaque_type_name, Transform unpack, Transform repack) {
+  // Ensure this message has the opaque type we're expecting.
+  const auto* opaque_descriptor = message->GetDescriptor();
+  if (opaque_descriptor->full_name() != opaque_type_name) {
+    return false;
+  }
+
+  // Find descriptors for the `type_url` and `value` fields. The `type_url` field must not be
+  // empty, but `value` may be (in which case our work is done).
+  const auto* reflection = message->GetReflection();
+  const auto* type_url_field_descriptor = opaque_descriptor->FindFieldByName("type_url");
+  const auto* value_field_descriptor = opaque_descriptor->FindFieldByName("value");
+  ASSERT(type_url_field_descriptor != nullptr && value_field_descriptor != nullptr &&
+         reflection->HasField(*message, type_url_field_descriptor));
+  if (!reflection->HasField(*message, value_field_descriptor)) {
+    return true;
+  }
+
+  // Try to find a descriptor for `type_url` in the pool and instantiate a new message of the
+  // correct concrete type.
+  const std::string type_url(reflection->GetString(*message, type_url_field_descriptor));
+  const std::string concrete_type_name(TypeUtil::typeUrlToDescriptorFullName(type_url));
+  const auto* concrete_descriptor =
+      Protobuf::DescriptorPool::generated_pool()->FindMessageTypeByName(concrete_type_name);
+  if (concrete_descriptor == nullptr) {
+    // If the type URL doesn't correspond to a known proto, don't try to reify it, just treat it
+    // like any other message. See the documented limitation on `MessageUtil::redact()` for more
+    // context.
+    ENVOY_LOG_MISC(warn, "Could not reify {} with unknown type URL {}", opaque_type_name, type_url);
+    return false;
+  }
+  Protobuf::DynamicMessageFactory message_factory;
+  std::unique_ptr<Protobuf::Message> typed_message(
+      message_factory.GetPrototype(concrete_descriptor)->New());
+
+  // Finally we can unpack, redact, and repack the opaque message using the provided callbacks.
+  unpack(typed_message.get(), reflection, value_field_descriptor);
+  redact(typed_message.get(), ancestor_is_sensitive);
+  repack(typed_message.get(), reflection, value_field_descriptor);
+  return true;
+}
+
+bool redactAny(Protobuf::Message* message, bool ancestor_is_sensitive) {
+  return redactOpaque(
+      message, ancestor_is_sensitive, "google.protobuf.Any",
+      [message](Protobuf::Message* typed_message, const Protobuf::Reflection* reflection,
+                const Protobuf::FieldDescriptor* field_descriptor) {
+        // To unpack an `Any`, parse the serialized proto.
+        typed_message->ParseFromString(reflection->GetString(*message, field_descriptor));
+      },
+      [message](Protobuf::Message* typed_message, const Protobuf::Reflection* reflection,
+                const Protobuf::FieldDescriptor* field_descriptor) {
+        // To repack an `Any`, reserialize its proto.
+        reflection->SetString(message, field_descriptor, typed_message->SerializeAsString());
+      });
+}
+
+// To redact a `TypedStruct`, we have to reify it based on its `type_url` to redact it.
+bool redactTypedStruct(Protobuf::Message* message, bool ancestor_is_sensitive) {
+  return redactOpaque(
+      message, ancestor_is_sensitive, "udpa.type.v1.TypedStruct",
+      [message](Protobuf::Message* typed_message, const Protobuf::Reflection* reflection,
+                const Protobuf::FieldDescriptor* field_descriptor) {
+        // To unpack a `TypedStruct`, convert the struct from JSON.
+        jsonConvertInternal(reflection->GetMessage(*message, field_descriptor),
+                            ProtobufMessage::getNullValidationVisitor(), *typed_message);
+      },
+      [message](Protobuf::Message* typed_message, const Protobuf::Reflection* reflection,
+                const Protobuf::FieldDescriptor* field_descriptor) {
+        // To repack a `TypedStruct`, convert the message back to JSON.
+        jsonConvertInternal(*typed_message, ProtobufMessage::getNullValidationVisitor(),
+                            *(reflection->MutableMessage(message, field_descriptor)));
+      });
+}
+
+// Recursive helper method for MessageUtil::redact() below.
+void redact(Protobuf::Message* message, bool ancestor_is_sensitive) {
+  if (redactAny(message, ancestor_is_sensitive) ||
+      redactTypedStruct(message, ancestor_is_sensitive)) {
+    return;
+  }
+
+  const auto* descriptor = message->GetDescriptor();
+  const auto* reflection = message->GetReflection();
+  for (int i = 0; i < descriptor->field_count(); ++i) {
+    const auto* field_descriptor = descriptor->field(i);
+
+    // Redact if this field or any of its ancestors have the `sensitive` option set.
+    const bool sensitive = ancestor_is_sensitive ||
+                           field_descriptor->options().GetExtension(udpa::annotations::sensitive);
+
+    if (field_descriptor->type() == Protobuf::FieldDescriptor::TYPE_MESSAGE) {
+      // Recursive case: traverse message fields.
+      if (field_descriptor->is_repeated()) {
+        const int field_size = reflection->FieldSize(*message, field_descriptor);
+        for (int i = 0; i < field_size; ++i) {
+          redact(reflection->MutableRepeatedMessage(message, field_descriptor, i), sensitive);
+        }
+      } else if (reflection->HasField(*message, field_descriptor)) {
+        redact(reflection->MutableMessage(message, field_descriptor), sensitive);
+      }
+    } else if (sensitive) {
+      // Base case: replace strings and bytes with "[redacted]" and clear all others.
+      if (field_descriptor->type() == Protobuf::FieldDescriptor::TYPE_STRING ||
+          field_descriptor->type() == Protobuf::FieldDescriptor::TYPE_BYTES) {
+        if (field_descriptor->is_repeated()) {
+          const int field_size = reflection->FieldSize(*message, field_descriptor);
+          for (int i = 0; i < field_size; ++i) {
+            reflection->SetRepeatedString(message, field_descriptor, i, "[redacted]");
+          }
+        } else if (reflection->HasField(*message, field_descriptor)) {
+          reflection->SetString(message, field_descriptor, "[redacted]");
+        }
+      } else {
+        reflection->ClearField(message, field_descriptor);
+      }
+    }
+  }
+}
+
+} // namespace
+
+void MessageUtil::redact(Protobuf::Message& message) {
+  ::Envoy::redact(&message, /* ancestor_is_sensitive = */ false);
 }
 
 ProtobufWkt::Value ValueUtil::loadFromYaml(const std::string& yaml) {

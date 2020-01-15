@@ -55,9 +55,10 @@ LogicalDnsCluster::LogicalDnsCluster(
       resolve_timer_(
           factory_context.dispatcher().createTimer([this]() -> void { startResolve(); })),
       local_info_(factory_context.localInfo()),
-      load_assignment_(cluster.has_load_assignment()
-                           ? convertPriority(cluster.load_assignment())
-                           : Config::Utility::translateClusterHosts(cluster.hosts())) {
+      load_assignment_(
+          cluster.has_load_assignment()
+              ? convertPriority(cluster.load_assignment())
+              : Config::Utility::translateClusterHosts(cluster.hidden_envoy_deprecated_hosts())) {
   failure_backoff_strategy_ = Config::Utility::prepareDnsRefreshStrategy(
       cluster, dns_refresh_rate_ms_.count(), factory_context.random());
 

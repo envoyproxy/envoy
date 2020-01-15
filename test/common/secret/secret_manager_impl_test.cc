@@ -515,9 +515,9 @@ dynamic_active_secrets:
     name: "abc.com.stek"
     session_ticket_keys:
       keys:
-        - filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ticket_key_a"
+        - filename: "[redacted]"
         - inline_string: "[redacted]"
-        - inline_string: "[redacted]"
+        - inline_bytes: "W3JlZGFjdGVkXQ=="
 )EOF";
   checkConfigDump(TestEnvironment::substitute(updated_once_more_config_dump));
 }
@@ -691,58 +691,6 @@ static_secrets:
   checkConfigDump(expected_config_dump);
 }
 
-TEST_F(SecretManagerImplTest, ConfigDumpNotRedactFilenamePrivateKey) {
-  Server::MockInstance server;
-  auto secret_manager = std::make_unique<SecretManagerImpl>(config_tracker_);
-  time_system_.setSystemTime(std::chrono::milliseconds(1234567891234));
-  NiceMock<Server::Configuration::MockTransportSocketFactoryContext> secret_context;
-  envoy::config::core::v3alpha::ConfigSource config_source;
-  NiceMock<LocalInfo::MockLocalInfo> local_info;
-  NiceMock<Event::MockDispatcher> dispatcher;
-  NiceMock<Runtime::MockRandomGenerator> random;
-  Stats::IsolatedStoreImpl stats;
-  NiceMock<Init::MockManager> init_manager;
-  NiceMock<Init::ExpectableWatcherImpl> init_watcher;
-  Init::TargetHandlePtr init_target_handle;
-  EXPECT_CALL(init_manager, add(_))
-      .WillRepeatedly(Invoke([&init_target_handle](const Init::Target& target) {
-        init_target_handle = target.createHandle("test");
-      }));
-  EXPECT_CALL(secret_context, stats()).WillRepeatedly(ReturnRef(stats));
-  EXPECT_CALL(secret_context, initManager()).WillRepeatedly(Return(&init_manager));
-  EXPECT_CALL(secret_context, dispatcher()).WillRepeatedly(ReturnRef(dispatcher));
-  EXPECT_CALL(secret_context, localInfo()).WillRepeatedly(ReturnRef(local_info));
-
-  const std::string tls_certificate = R"EOF(
-name: "abc.com"
-tls_certificate:
-  certificate_chain:
-    inline_string: "DUMMY_INLINE_BYTES_FOR_CERT_CHAIN"
-  private_key:
-    inline_string: "DUMMY_INLINE_BYTES_FOR_PRIVATE_KEY"
-  password:
-    filename: "/etc/certs/password"
-)EOF";
-  envoy::extensions::transport_sockets::tls::v3alpha::Secret tls_cert_secret;
-  TestUtility::loadFromYaml(TestEnvironment::substitute(tls_certificate), tls_cert_secret);
-  secret_manager->addStaticSecret(tls_cert_secret);
-  const std::string expected_config_dump = R"EOF(
-static_secrets:
-- name: "abc.com" 
-  secret:
-    "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3alpha.Secret
-    name: "abc.com"
-    tls_certificate:
-      certificate_chain:
-        inline_string: "DUMMY_INLINE_BYTES_FOR_CERT_CHAIN"
-      private_key:
-        inline_string: "[redacted]"
-      password:
-        filename: "/etc/certs/password"
-)EOF";
-  checkConfigDump(expected_config_dump);
-}
-
 TEST_F(SecretManagerImplTest, ConfigDumpHandlerStaticValidationContext) {
   Server::MockInstance server;
   auto secret_manager = std::make_unique<SecretManagerImpl>(config_tracker_);
@@ -830,9 +778,9 @@ static_secrets:
     name: "abc.com.stek"
     session_ticket_keys:
       keys:
-        - filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ticket_key_a"
+        - filename: "[redacted]"
         - inline_string: "[redacted]"
-        - inline_string: "[redacted]"
+        - inline_bytes: "W3JlZGFjdGVkXQ=="
 )EOF";
   checkConfigDump(TestEnvironment::substitute(expected_config_dump));
 }
