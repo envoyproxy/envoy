@@ -103,10 +103,8 @@ void CheckRequestUtils::setHttpRequest(
     envoy::service::auth::v3alpha::AttributeContext::HttpRequest& httpreq, uint64_t stream_id,
     const StreamInfo::StreamInfo& stream_info, const Buffer::Instance* decoding_buffer,
     const Envoy::Http::HeaderMap& headers, uint64_t max_request_bytes) {
-
   // Set id
   httpreq.set_id(std::to_string(stream_id));
-
   // Set method
   httpreq.set_method(getHeaderStr(headers.Method()));
   // Set path
@@ -173,7 +171,7 @@ void CheckRequestUtils::createHttpCheck(
   const std::string service = getHeaderStr(headers.EnvoyDownstreamServiceCluster());
 
   // *cb->connection(), callbacks->streamInfo() and callbacks->decodingBuffer() are not qualified as
-  // consts.
+  // const.
   auto* cb = const_cast<Envoy::Http::StreamDecoderFilterCallbacks*>(callbacks);
   setAttrContextPeer(*attrs->mutable_source(), *cb->connection(), service, false,
                      include_peer_certificate);
