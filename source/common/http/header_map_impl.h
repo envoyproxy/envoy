@@ -3,7 +3,7 @@
 #define HEADER_MAP_USE_MULTI_MAP false
 #define HEADER_MAP_USE_FLAT_HASH_MAP true
 #define HEADER_MAP_USE_BTREE false
-#define HEADER_MAP_USE_SLIST true
+#define HEADER_MAP_USE_SLIST false
 
 #include <array>
 #include <cstdint>

@@ -139,7 +139,6 @@ envoy_cc_library(
     external_deps = [
         "abseil_base",
         "abseil_hash",
-        "abseil_inlined_vector",
         "abseil_memory",
         "abseil_node_hash_map",
         "abseil_node_hash_set",
@@ -296,7 +295,6 @@ envoy_cc_library(
     external_deps = [
         "abseil_base",
         "abseil_hash",
-        "abseil_inlined_vector",
         "abseil_memory",
         "abseil_str_format",
     ],
