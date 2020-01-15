@@ -9,6 +9,7 @@ import "google/protobuf/wrappers.proto";
 
 import "udpa/annotations/versioning.proto";
 
+import "envoy/annotations/deprecation.proto";
 import "validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.extensions.filters.network.redis_proxy.v3alpha";
@@ -177,7 +178,8 @@ message RedisProxy {
     //   This field is deprecated. Use a :ref:`catch_all
     //   route<envoy_api_field_extensions.filters.network.redis_proxy.v3alpha.RedisProxy.PrefixRoutes.catch_all_route>`
     //   instead.
-    string hidden_envoy_deprecated_catch_all_cluster = 3 [deprecated = true];
+    string hidden_envoy_deprecated_catch_all_cluster = 3
+        [deprecated = true, (envoy.annotations.disallowed_by_default) = true];
 
     // Optional catch-all route to forward commands that doesn't match any of the routes. The
     // catch-all route becomes required when no routes are specified.
@@ -196,7 +198,8 @@ message RedisProxy {
   //   This field is deprecated. Use a :ref:`catch_all
   //   route<envoy_api_field_extensions.filters.network.redis_proxy.v3alpha.RedisProxy.PrefixRoutes.catch_all_route>`
   //   instead.
-  string hidden_envoy_deprecated_cluster = 2 [deprecated = true];
+  string hidden_envoy_deprecated_cluster = 2
+      [deprecated = true, (envoy.annotations.disallowed_by_default) = true];
 
   // Network settings for the connection pool to the upstream clusters.
   ConnPoolSettings settings = 3 [(validate.rules).message = {required: true}];

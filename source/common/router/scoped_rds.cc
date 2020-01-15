@@ -16,6 +16,7 @@
 #include "common/common/utility.h"
 #include "common/config/api_version.h"
 #include "common/config/resources.h"
+#include "common/config/version_converter.h"
 #include "common/init/manager_impl.h"
 #include "common/init/watcher_impl.h"
 
@@ -383,7 +384,8 @@ ProtobufTypes::MessagePtr ScopedRoutesConfigProviderManager::dumpConfigs() const
       dynamic_config->set_name(typed_subscription->name());
       const ScopedRouteMap& scoped_route_map = typed_subscription->scopedRouteMap();
       for (const auto& it : scoped_route_map) {
-        dynamic_config->mutable_scoped_route_configs()->Add()->MergeFrom(it.second->configProto());
+        dynamic_config->mutable_scoped_route_configs()->Add()->PackFrom(
+            API_RECOVER_ORIGINAL(it.second->configProto()));
       }
       TimestampUtil::systemClockToTimestamp(subscription->lastUpdated(),
                                             *dynamic_config->mutable_last_updated());
@@ -397,7 +399,8 @@ ProtobufTypes::MessagePtr ScopedRoutesConfigProviderManager::dumpConfigs() const
     auto* inline_config = config_dump->mutable_inline_scoped_route_configs()->Add();
     inline_config->set_name(static_cast<InlineScopedRoutesConfigProvider*>(provider)->name());
     for (const auto& config_proto : protos_info.value().config_protos_) {
-      inline_config->mutable_scoped_route_configs()->Add()->MergeFrom(*config_proto);
+      inline_config->mutable_scoped_route_configs()->Add()->PackFrom(
+          API_RECOVER_ORIGINAL(*config_proto));
     }
     TimestampUtil::systemClockToTimestamp(provider->lastUpdated(),
                                           *inline_config->mutable_last_updated());

@@ -510,6 +510,7 @@ dir
 dirname
 djb
 downcasted
+downcasting
 downstreams
 dtor
 dubbo
@@ -882,6 +883,8 @@ referer
 refetch
 regex
 regexes
+reified
+reify
 reimplements
 rele
 releasor
@@ -893,6 +896,7 @@ repicked
 repo
 requirepass
 reselecting
+reserialize
 reservable
 resize
 resized

@@ -99,7 +99,7 @@ TEST_P(ProxyProtoIntegrationTest, DEPRECATED_FEATURE_TEST(OriginalDst)) {
   config_helper_.addConfigModifier(
       [&](envoy::config::bootstrap::v3alpha::Bootstrap& bootstrap) -> void {
         auto* cluster = bootstrap.mutable_static_resources()->mutable_clusters(0);
-        cluster->mutable_hosts()->Clear();
+        cluster->clear_load_assignment();
         cluster->set_type(envoy::config::cluster::v3alpha::Cluster::ORIGINAL_DST);
         cluster->set_lb_policy(
             envoy::config::cluster::v3alpha::Cluster::hidden_envoy_deprecated_ORIGINAL_DST_LB);
@@ -131,7 +131,7 @@ TEST_P(ProxyProtoIntegrationTest, ClusterProvided) {
   config_helper_.addConfigModifier(
       [&](envoy::config::bootstrap::v3alpha::Bootstrap& bootstrap) -> void {
         auto* cluster = bootstrap.mutable_static_resources()->mutable_clusters(0);
-        cluster->mutable_hosts()->Clear();
+        cluster->clear_load_assignment();
         cluster->set_type(envoy::config::cluster::v3alpha::Cluster::ORIGINAL_DST);
         cluster->set_lb_policy(envoy::config::cluster::v3alpha::Cluster::CLUSTER_PROVIDED);
       });

@@ -81,7 +81,7 @@ public:
                std::vector<OverrideLayerConstPtr>&& layers);
 
   // Runtime::Snapshot
-  bool deprecatedFeatureEnabled(const std::string& key) const override;
+  bool deprecatedFeatureEnabled(const std::string& key, bool default_value) const override;
   bool runtimeFeatureEnabled(absl::string_view key) const override;
   bool featureEnabled(const std::string& key, uint64_t default_value, uint64_t random_value,
                       uint64_t num_buckets) const override;

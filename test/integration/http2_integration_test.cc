@@ -1201,10 +1201,17 @@ Http2RingHashIntegrationTest::Http2RingHashIntegrationTest() {
   config_helper_.addConfigModifier(
       [&](envoy::config::bootstrap::v3alpha::Bootstrap& bootstrap) -> void {
         auto* cluster = bootstrap.mutable_static_resources()->mutable_clusters(0);
-        cluster->clear_hosts();
+        cluster->clear_load_assignment();
+        cluster->mutable_load_assignment()->add_endpoints();
+        cluster->mutable_load_assignment()->set_cluster_name(cluster->name());
         cluster->set_lb_policy(envoy::config::cluster::v3alpha::Cluster::RING_HASH);
         for (int i = 0; i < num_upstreams_; i++) {
-          auto* socket = cluster->add_hosts()->mutable_socket_address();
+          auto* socket = cluster->mutable_load_assignment()
+                             ->mutable_endpoints(0)
+                             ->add_lb_endpoints()
+                             ->mutable_endpoint()
+                             ->mutable_address()
+                             ->mutable_socket_address();
           socket->set_address(Network::Test::getLoopbackAddressString(version_));
         }
       });

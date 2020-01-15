@@ -9,6 +9,7 @@ import "google/protobuf/wrappers.proto";
 
 import "udpa/annotations/versioning.proto";
 
+import "envoy/annotations/deprecation.proto";
 import "validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.config.core.v3alpha";
@@ -42,7 +43,8 @@ message ApiConfigSource {
   enum ApiType {
     // Ideally this would be 'reserved 0' but one can't reserve the default
     // value. Instead we throw an exception if this is ever used.
-    DEPRECATED_AND_UNAVAILABLE_DO_NOT_USE = 0 [deprecated = true];
+    DEPRECATED_AND_UNAVAILABLE_DO_NOT_USE = 0
+        [deprecated = true, (envoy.annotations.disallowed_by_default_enum) = true];
 
     // REST-JSON v2 API. The `canonical JSON encoding
     // <https://developers.google.com/protocol-buffers/docs/proto3#json>`_ for

@@ -358,6 +358,7 @@ envoy_cc_library(
         "//include/envoy/server:transport_socket_config_interface",
         "//include/envoy/server:worker_interface",
         "//source/common/config:utility_lib",
+        "//source/common/config:version_converter_lib",
         "//source/common/http:conn_manager_lib",
         "//source/common/init:manager_lib",
         "//source/common/network:listen_socket_lib",

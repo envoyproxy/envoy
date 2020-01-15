@@ -5,7 +5,10 @@
 #include "common/protobuf/protobuf.h"
 
 // Convenience macro for downgrading a message and obtaining a reference.
-#define API_DOWNGRADE(msg) (*Config::VersionConverter::downgrade(msg)->msg_)
+#define API_DOWNGRADE(msg) (*Envoy::Config::VersionConverter::downgrade(msg)->msg_)
+
+// Convenience macro for recovering original message and obtaining a reference.
+#define API_RECOVER_ORIGINAL(msg) (*Envoy::Config::VersionConverter::recoverOriginal(msg)->msg_)
 
 namespace Envoy {
 namespace Config {
@@ -16,7 +19,7 @@ struct DynamicMessage {
   Protobuf::DynamicMessageFactory dynamic_msg_factory_;
 
   // Dynamic message.
-  std::unique_ptr<Protobuf::Message> msg_;
+  ProtobufTypes::MessagePtr msg_;
 };
 
 using DynamicMessagePtr = std::unique_ptr<DynamicMessage>;
@@ -54,31 +57,57 @@ public:
   static DynamicMessagePtr downgrade(const Protobuf::Message& message);
 
   /**
-   * Reinterpret an Envoy internal API message at v3 based on a given transport API
-   * version. This will downgrade() to an earlier version or scrub the shadow
-   * deprecated fields in the existing one.
+   * Obtain JSON wire representation for an Envoy internal API message at v3
+   * based on a given transport API version. This will downgrade() to an earlier
+   * version or scrub the shadow deprecated fields in the existing one.
    *
-   * This is typically used when Envoy is generating a wire message from some
-   * internally generated message, e.g. DiscoveryRequest, and we want to ensure
-   * it matches a specific API version. For example, a v3 DiscoveryRequest must
-   * have any deprecated v2 fields removed (they only exist because of
-   * shadowing) and a v2 DiscoveryRequest needs to have type
+   * This is typically used when Envoy is generating a JSON wire message from
+   * some internally generated message, e.g. DiscoveryRequest, and we want to
+   * ensure it matches a specific API version. For example, a v3
+   * DiscoveryRequest must have any deprecated v2 fields removed (they only
+   * exist because of shadowing) and a v2 DiscoveryRequest needs to have type
    * envoy.api.v2.DiscoveryRequest to ensure JSON representations have the
    * correct field names (after renames/deprecations are reversed).
    *
    * @param message message input.
    * @param api_version target API version.
-   * @return DynamicMessagePtr with the reinterpreted message (and associated
-   *         factory state).
+   * @return std::string JSON representation.
    */
-  static DynamicMessagePtr reinterpret(const Protobuf::Message& message,
-                                       envoy::config::core::v3alpha::ApiVersion api_version);
+  static std::string getJsonStringFromMessage(const Protobuf::Message& message,
+                                              envoy::config::core::v3alpha::ApiVersion api_version);
+
+  /**
+   * Modify a v3 message to make it suitable for sending as a gRPC message. This
+   * requires that a v3 message has hidden_envoy_deprecated_* fields removed,
+   * and that for all versions that original type information is removed.
+   *
+   * @param message message to modify.
+   * @param api_version target API version.
+   */
+  static void prepareMessageForGrpcWire(Protobuf::Message& message,
+                                        envoy::config::core::v3alpha::ApiVersion api_version);
+
+  /**
+   * For a message that may have been upgraded, recover the original message.
+   * This is useful for config dump, debug output etc.
+   *
+   * @param upgraded_message upgraded message input.
+   *
+   * @return DynamicMessagePtr original message (as a dynamic message).
+   */
+  static DynamicMessagePtr recoverOriginal(const Protobuf::Message& upgraded_message);
+
+  /**
+   * Remove original type information, when it's not needed, e.g. in tests.
+   *
+   * @param message upgraded message to scrub.
+   */
+  static void eraseOriginalTypeInformation(Protobuf::Message& message);
 };
 
 class VersionUtil {
 public:
   // Some helpers for working with earlier message version deprecated fields.
-  static bool hasHiddenEnvoyDeprecated(const Protobuf::Message& message);
   static void scrubHiddenEnvoyDeprecated(Protobuf::Message& message);
 };
 

@@ -69,7 +69,7 @@ public:
       // Create subsets based on type value of the "type" metadata.
       cluster->mutable_lb_subset_config()->add_subset_selectors()->add_keys(type_key_);
 
-      cluster->clear_hosts();
+      cluster->clear_load_assignment();
 
       // Create a load assignment with num_hosts_ entries with metadata split evenly between
       // type=a and type=b.

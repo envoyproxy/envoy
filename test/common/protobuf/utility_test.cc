@@ -20,11 +20,13 @@
 #include "test/mocks/protobuf/mocks.h"
 #include "test/mocks/server/mocks.h"
 #include "test/proto/deprecated.pb.h"
+#include "test/proto/sensitive.pb.h"
 #include "test/test_common/environment.h"
 #include "test/test_common/logging.h"
 #include "test/test_common/utility.h"
 
 #include "gtest/gtest.h"
+#include "udpa/type/v1/typed_struct.pb.h"
 
 namespace Envoy {
 
@@ -262,6 +264,642 @@ TEST_F(ProtobufUtilityTest, LoadTextProtoFromFile_Failure) {
       TestUtility::loadFromFile(filename, proto_from_file, *api_), EnvoyException,
       "Unable to parse file \"" + filename +
           "\" as a text protobuf (type envoy.config.bootstrap.v3alpha.Bootstrap)");
+}
+
+// String fields annotated as sensitive should be converted to the string "[redacted]". String
+// fields that are neither annotated as sensitive nor contained in a sensitive message should be
+// left alone.
+TEST_F(ProtobufUtilityTest, RedactString) {
+  envoy::test::Sensitive actual, expected;
+  TestUtility::loadFromYaml(R"EOF(
+sensitive_string: This field should be redacted.
+sensitive_repeated_string:
+  - This field should be redacted (1 of 2).
+  - This field should be redacted (2 of 2).
+insensitive_string: This field should not be redacted.
+insensitive_repeated_string:
+  - This field should not be redacted (1 of 2).
+  - This field should not be redacted (2 of 2).
+)EOF",
+                            actual);
+
+  TestUtility::loadFromYaml(R"EOF(
+sensitive_string: '[redacted]'
+sensitive_repeated_string:
+  - '[redacted]'
+  - '[redacted]'
+insensitive_string: This field should not be redacted.
+insensitive_repeated_string:
+  - This field should not be redacted (1 of 2).
+  - This field should not be redacted (2 of 2).
+)EOF",
+                            expected);
+
+  MessageUtil::redact(actual);
+  EXPECT_TRUE(TestUtility::protoEqual(expected, actual));
+}
+
+// Bytes fields annotated as sensitive should be converted to the ASCII / UTF-8 encoding of the
+// string "[redacted]". Bytes fields that are neither annotated as sensitive nor contained in a
+// sensitive message should be left alone.
+TEST_F(ProtobufUtilityTest, RedactBytes) {
+  envoy::test::Sensitive actual, expected;
+  TestUtility::loadFromYaml(R"EOF(
+sensitive_bytes: VGhlc2UgYnl0ZXMgc2hvdWxkIGJlIHJlZGFjdGVkLg==
+sensitive_repeated_bytes:
+  - VGhlc2UgYnl0ZXMgc2hvdWxkIGJlIHJlZGFjdGVkICgxIG9mIDIpLg==
+  - VGhlc2UgYnl0ZXMgc2hvdWxkIGJlIHJlZGFjdGVkICgyIG9mIDIpLg==
+insensitive_bytes: VGhlc2UgYnl0ZXMgc2hvdWxkIG5vdCBiZSByZWRhY3RlZC4=
+insensitive_repeated_bytes:
+  - VGhlc2UgYnl0ZXMgc2hvdWxkIG5vdCBiZSByZWRhY3RlZCAoMSBvZiAyKS4=
+  - VGhlc2UgYnl0ZXMgc2hvdWxkIG5vdCBiZSByZWRhY3RlZCAoMiBvZiAyKS4=
+)EOF",
+                            actual);
+
+  TestUtility::loadFromYaml(R"EOF(
+sensitive_bytes: W3JlZGFjdGVkXQ==
+sensitive_repeated_bytes:
+  - W3JlZGFjdGVkXQ==
+  - W3JlZGFjdGVkXQ==
+insensitive_bytes: VGhlc2UgYnl0ZXMgc2hvdWxkIG5vdCBiZSByZWRhY3RlZC4=
+insensitive_repeated_bytes:
+  - VGhlc2UgYnl0ZXMgc2hvdWxkIG5vdCBiZSByZWRhY3RlZCAoMSBvZiAyKS4=
+  - VGhlc2UgYnl0ZXMgc2hvdWxkIG5vdCBiZSByZWRhY3RlZCAoMiBvZiAyKS4=
+)EOF",
+                            expected);
+
+  MessageUtil::redact(actual);
+  EXPECT_TRUE(TestUtility::protoEqual(expected, actual));
+}
+
+// Ints annotated as sensitive should be cleared. Ints that are neither annotated as sensitive nor
+// contained in a sensitive message should be left alone. Note that the same logic should apply to
+// any primitive type other than strings and bytes, although we omit tests for that here.
+TEST_F(ProtobufUtilityTest, RedactInts) {
+  envoy::test::Sensitive actual, expected;
+  TestUtility::loadFromYaml(R"EOF(
+sensitive_int: 1
+sensitive_repeated_int:
+  - 1
+  - 2
+insensitive_int: 1
+insensitive_repeated_int:
+  - 1
+  - 2
+)EOF",
+                            actual);
+
+  TestUtility::loadFromYaml(R"EOF(
+insensitive_int: 1
+insensitive_repeated_int:
+  - 1
+  - 2
+)EOF",
+                            expected);
+
+  MessageUtil::redact(actual);
+  EXPECT_TRUE(TestUtility::protoEqual(expected, actual));
+}
+
+// Messages annotated as sensitive should have all their fields redacted recursively. Messages that
+// are neither annotated as sensitive nor contained in a sensitive message should be left alone.
+TEST_F(ProtobufUtilityTest, RedactMessage) {
+  envoy::test::Sensitive actual, expected;
+  TestUtility::loadFromYaml(R"EOF(
+sensitive_message:
+  insensitive_string: This field should be redacted because of its parent.
+  insensitive_repeated_string:
+    - This field should be redacted because of its parent (1 of 2).
+    - This field should be redacted because of its parent (2 of 2).
+  insensitive_int: 1
+  insensitive_repeated_int:
+    - 1
+    - 2
+sensitive_repeated_message:
+  - insensitive_string: This field should be redacted because of its parent (1 of 2).
+    insensitive_repeated_string:
+      - This field should be redacted because of its parent (1 of 4).
+      - This field should be redacted because of its parent (2 of 4).
+    insensitive_int: 1
+    insensitive_repeated_int:
+      - 1
+      - 2
+  - insensitive_string: This field should be redacted because of its parent (2 of 2).
+    insensitive_repeated_string:
+      - This field should be redacted because of its parent (3 of 4).
+      - This field should be redacted because of its parent (4 of 4).
+    insensitive_int: 2
+    insensitive_repeated_int:
+      - 3
+      - 4
+insensitive_message:
+  insensitive_string: This field should not be redacted.
+  insensitive_repeated_string:
+    - This field should not be redacted (1 of 2).
+    - This field should not be redacted (2 of 2).
+  insensitive_int: 1
+  insensitive_repeated_int:
+    - 1
+    - 2
+insensitive_repeated_message:
+  - insensitive_string: This field should not be redacted (1 of 2).
+    insensitive_repeated_string:
+      - This field should not be redacted (1 of 4).
+      - This field should not be redacted (2 of 4).
+    insensitive_int: 1
+    insensitive_repeated_int:
+      - 1
+      - 2
+  - insensitive_string: This field should not be redacted (2 of 2).
+    insensitive_repeated_string:
+      - This field should not be redacted (3 of 4).
+      - This field should not be redacted (4 of 4).
+    insensitive_int: 2
+    insensitive_repeated_int:
+      - 3
+      - 4
+)EOF",
+                            actual);
+
+  TestUtility::loadFromYaml(R"EOF(
+sensitive_message:
+  insensitive_string: '[redacted]'
+  insensitive_repeated_string:
+    - '[redacted]'
+    - '[redacted]'
+sensitive_repeated_message:
+  - insensitive_string: '[redacted]'
+    insensitive_repeated_string:
+      - '[redacted]'
+      - '[redacted]'
+  - insensitive_string: '[redacted]'
+    insensitive_repeated_string:
+      - '[redacted]'
+      - '[redacted]'
+insensitive_message:
+  insensitive_string: This field should not be redacted.
+  insensitive_repeated_string:
+    - This field should not be redacted (1 of 2).
+    - This field should not be redacted (2 of 2).
+  insensitive_int: 1
+  insensitive_repeated_int:
+    - 1
+    - 2
+insensitive_repeated_message:
+  - insensitive_string: This field should not be redacted (1 of 2).
+    insensitive_repeated_string:
+      - This field should not be redacted (1 of 4).
+      - This field should not be redacted (2 of 4).
+    insensitive_int: 1
+    insensitive_repeated_int:
+      - 1
+      - 2
+  - insensitive_string: This field should not be redacted (2 of 2).
+    insensitive_repeated_string:
+      - This field should not be redacted (3 of 4).
+      - This field should not be redacted (4 of 4).
+    insensitive_int: 2
+    insensitive_repeated_int:
+      - 3
+      - 4
+)EOF",
+                            expected);
+
+  MessageUtil::redact(actual);
+  EXPECT_TRUE(TestUtility::protoEqual(expected, actual));
+}
+
+// Messages packed into `Any` should be treated the same as normal messages.
+TEST_F(ProtobufUtilityTest, RedactAny) {
+  envoy::test::Sensitive actual, expected;
+  TestUtility::loadFromYaml(R"EOF(
+sensitive_any:
+  '@type': type.googleapis.com/envoy.test.Sensitive
+  insensitive_string: This field should be redacted because of its parent.
+  insensitive_repeated_string:
+    - This field should be redacted because of its parent (1 of 2).
+    - This field should be redacted because of its parent (2 of 2).
+  insensitive_int: 1
+  insensitive_repeated_int:
+    - 1
+    - 2
+sensitive_repeated_any:
+  - '@type': type.googleapis.com/envoy.test.Sensitive
+    insensitive_string: This field should be redacted because of its parent (1 of 2).
+    insensitive_repeated_string:
+      - This field should be redacted because of its parent (1 of 4).
+      - This field should be redacted because of its parent (2 of 4).
+    insensitive_int: 1
+    insensitive_repeated_int:
+      - 1
+      - 2
+  - '@type': type.googleapis.com/envoy.test.Sensitive
+    insensitive_string: This field should be redacted because of its parent (2 of 2).
+    insensitive_repeated_string:
+      - This field should be redacted because of its parent (3 of 4).
+      - This field should be redacted because of its parent (4 of 4).
+    insensitive_int: 2
+    insensitive_repeated_int:
+      - 3
+      - 4
+insensitive_any:
+  '@type': type.googleapis.com/envoy.test.Sensitive
+  sensitive_string: This field should be redacted.
+  sensitive_repeated_string:
+    - This field should be redacted (1 of 2).
+    - This field should be redacted (2 of 2).
+  sensitive_int: 1
+  sensitive_repeated_int:
+    - 1
+    - 2
+  insensitive_string: This field should not be redacted.
+  insensitive_repeated_string:
+    - This field should not be redacted (1 of 2).
+    - This field should not be redacted (2 of 2).
+  insensitive_int: 1
+  insensitive_repeated_int:
+    - 1
+    - 2
+insensitive_repeated_any:
+  - '@type': type.googleapis.com/envoy.test.Sensitive
+    sensitive_string: This field should be redacted (1 of 2).
+    sensitive_repeated_string:
+      - This field should be redacted (1 of 4).
+      - This field should be redacted (2 of 4).
+    sensitive_int: 1
+    sensitive_repeated_int:
+      - 1
+      - 2
+    insensitive_string: This field should not be redacted.
+    insensitive_repeated_string:
+      - This field should not be redacted (1 of 4).
+      - This field should not be redacted (2 of 4).
+    insensitive_int: 1
+    insensitive_repeated_int:
+      - 1
+      - 2
+  - '@type': type.googleapis.com/envoy.test.Sensitive
+    sensitive_string: This field should be redacted (2 of 2).
+    sensitive_repeated_string:
+      - This field should be redacted (3 of 4).
+      - This field should be redacted (4 of 4).
+    sensitive_int: 2
+    sensitive_repeated_int:
+      - 3
+      - 4
+    insensitive_string: This field should not be redacted.
+    insensitive_repeated_string:
+      - This field should not be redacted (3 of 4).
+      - This field should not be redacted (4 of 4).
+    insensitive_int: 2
+    insensitive_repeated_int:
+      - 3
+      - 4
+)EOF",
+                            actual);
+
+  TestUtility::loadFromYaml(R"EOF(
+sensitive_any:
+  '@type': type.googleapis.com/envoy.test.Sensitive
+  insensitive_string: '[redacted]'
+  insensitive_repeated_string:
+    - '[redacted]'
+    - '[redacted]'
+sensitive_repeated_any:
+  - '@type': type.googleapis.com/envoy.test.Sensitive
+    insensitive_string: '[redacted]'
+    insensitive_repeated_string:
+      - '[redacted]'
+      - '[redacted]'
+  - '@type': type.googleapis.com/envoy.test.Sensitive
+    insensitive_string: '[redacted]'
+    insensitive_repeated_string:
+      - '[redacted]'
+      - '[redacted]'
+insensitive_any:
+  '@type': type.googleapis.com/envoy.test.Sensitive
+  sensitive_string: '[redacted]'
+  sensitive_repeated_string:
+    - '[redacted]'
+    - '[redacted]'
+  insensitive_string: This field should not be redacted.
+  insensitive_repeated_string:
+    - This field should not be redacted (1 of 2).
+    - This field should not be redacted (2 of 2).
+  insensitive_int: 1
+  insensitive_repeated_int:
+    - 1
+    - 2
+insensitive_repeated_any:
+  - '@type': type.googleapis.com/envoy.test.Sensitive
+    sensitive_string: '[redacted]'
+    sensitive_repeated_string:
+      - '[redacted]'
+      - '[redacted]'
+    insensitive_string: This field should not be redacted.
+    insensitive_repeated_string:
+      - This field should not be redacted (1 of 4).
+      - This field should not be redacted (2 of 4).
+    insensitive_int: 1
+    insensitive_repeated_int:
+      - 1
+      - 2
+  - '@type': type.googleapis.com/envoy.test.Sensitive
+    sensitive_string: '[redacted]'
+    sensitive_repeated_string:
+      - '[redacted]'
+      - '[redacted]'
+    insensitive_string: This field should not be redacted.
+    insensitive_repeated_string:
+      - This field should not be redacted (3 of 4).
+      - This field should not be redacted (4 of 4).
+    insensitive_int: 2
+    insensitive_repeated_int:
+      - 3
+      - 4
+)EOF",
+                            expected);
+
+  MessageUtil::redact(actual);
+  EXPECT_TRUE(TestUtility::protoEqual(expected, actual));
+}
+
+// Empty `Any` can be trivially redacted.
+TEST_F(ProtobufUtilityTest, RedactEmptyAny) {
+  ProtobufWkt::Any actual;
+  TestUtility::loadFromYaml(R"EOF(
+'@type': type.googleapis.com/envoy.test.Sensitive
+)EOF",
+                            actual);
+
+  ProtobufWkt::Any expected = actual;
+  MessageUtil::redact(actual);
+  EXPECT_TRUE(TestUtility::protoEqual(expected, actual));
+}
+
+// Messages packed into `Any` with unknown type URLs are skipped.
+TEST_F(ProtobufUtilityTest, RedactAnyWithUnknownTypeUrl) {
+  ProtobufWkt::Any actual;
+  // Note, `loadFromYaml` validates the type when populating `Any`, so we have to pass the real type
+  // first and substitute an unknown message type after loading.
+  TestUtility::loadFromYaml(R"EOF(
+'@type': type.googleapis.com/envoy.test.Sensitive
+sensitive_string: This field is sensitive, but we have no way of knowing.
+)EOF",
+                            actual);
+  actual.set_type_url("type.googleapis.com/envoy.unknown.Message");
+
+  ProtobufWkt::Any expected = actual;
+  MessageUtil::redact(actual);
+  EXPECT_TRUE(TestUtility::protoEqual(expected, actual));
+}
+
+// Messages packed into `TypedStruct` should be treated the same as normal messages. Note that
+// ints are quoted as strings here because that's what happens in the JSON conversion.
+TEST_F(ProtobufUtilityTest, RedactTypedStruct) {
+  envoy::test::Sensitive actual, expected;
+  TestUtility::loadFromYaml(R"EOF(
+sensitive_typed_struct:
+  type_url: type.googleapis.com/envoy.test.Sensitive
+  value:
+    insensitive_string: This field should be redacted because of its parent.
+    insensitive_repeated_string:
+      - This field should be redacted because of its parent (1 of 2).
+      - This field should be redacted because of its parent (2 of 2).
+    insensitive_int: '1'
+    insensitive_repeated_int:
+      - '1'
+      - '2'
+sensitive_repeated_typed_struct:
+  - type_url: type.googleapis.com/envoy.test.Sensitive
+    value:
+      insensitive_string: This field should be redacted because of its parent (1 of 2).
+      insensitive_repeated_string:
+        - This field should be redacted because of its parent (1 of 4).
+        - This field should be redacted because of its parent (2 of 4).
+      insensitive_int: '1'
+      insensitive_repeated_int:
+        - '1'
+        - '2'
+  - type_url: type.googleapis.com/envoy.test.Sensitive
+    value:
+      insensitive_string: This field should be redacted because of its parent (2 of 2).
+      insensitive_repeated_string:
+        - This field should be redacted because of its parent (3 of 4).
+        - This field should be redacted because of its parent (4 of 4).
+      insensitive_int: '2'
+      insensitive_repeated_int:
+        - '3'
+        - '4'
+insensitive_typed_struct:
+  type_url: type.googleapis.com/envoy.test.Sensitive
+  value:
+    sensitive_string: This field should be redacted.
+    sensitive_repeated_string:
+      - This field should be redacted (1 of 2).
+      - This field should be redacted (2 of 2).
+    sensitive_int: '1'
+    sensitive_repeated_int:
+      - '1'
+      - '2'
+    insensitive_string: This field should not be redacted.
+    insensitive_repeated_string:
+      - This field should not be redacted (1 of 2).
+      - This field should not be redacted (2 of 2).
+    insensitive_int: '1'
+    insensitive_repeated_int:
+      - '1'
+      - '2'
+insensitive_repeated_typed_struct:
+  - type_url: type.googleapis.com/envoy.test.Sensitive
+    value:
+      sensitive_string: This field should be redacted (1 of 2).
+      sensitive_repeated_string:
+        - This field should be redacted (1 of 4).
+        - This field should be redacted (2 of 4).
+      sensitive_int: '1'
+      sensitive_repeated_int:
+        - '1'
+        - '2'
+      insensitive_string: This field should not be redacted.
+      insensitive_repeated_string:
+        - This field should not be redacted (1 of 4).
+        - This field should not be redacted (2 of 4).
+      insensitive_int: '1'
+      insensitive_repeated_int:
+        - '1'
+        - '2'
+  - type_url: type.googleapis.com/envoy.test.Sensitive
+    value:
+      sensitive_string: This field should be redacted (2 of 2).
+      sensitive_repeated_string:
+        - This field should be redacted (3 of 4).
+        - This field should be redacted (4 of 4).
+      sensitive_int: '2'
+      sensitive_repeated_int:
+        - '3'
+        - '4'
+      insensitive_string: This field should not be redacted.
+      insensitive_repeated_string:
+        - This field should not be redacted (3 of 4).
+        - This field should not be redacted (4 of 4).
+      insensitive_int: '2'
+      insensitive_repeated_int:
+        - '3'
+        - '4'
+)EOF",
+                            actual);
+
+  TestUtility::loadFromYaml(R"EOF(
+sensitive_typed_struct:
+  type_url: type.googleapis.com/envoy.test.Sensitive
+  value:
+    insensitive_string: '[redacted]'
+    insensitive_repeated_string:
+      - '[redacted]'
+      - '[redacted]'
+sensitive_repeated_typed_struct:
+  - type_url: type.googleapis.com/envoy.test.Sensitive
+    value:
+      insensitive_string: '[redacted]'
+      insensitive_repeated_string:
+        - '[redacted]'
+        - '[redacted]'
+  - type_url: type.googleapis.com/envoy.test.Sensitive
+    value:
+      insensitive_string: '[redacted]'
+      insensitive_repeated_string:
+        - '[redacted]'
+        - '[redacted]'
+insensitive_typed_struct:
+  type_url: type.googleapis.com/envoy.test.Sensitive
+  value:
+    sensitive_string: '[redacted]'
+    sensitive_repeated_string:
+      - '[redacted]'
+      - '[redacted]'
+    insensitive_string: This field should not be redacted.
+    insensitive_repeated_string:
+      - This field should not be redacted (1 of 2).
+      - This field should not be redacted (2 of 2).
+    insensitive_int: '1'
+    insensitive_repeated_int:
+      - '1'
+      - '2'
+insensitive_repeated_typed_struct:
+  - type_url: type.googleapis.com/envoy.test.Sensitive
+    value:
+      sensitive_string: '[redacted]'
+      sensitive_repeated_string:
+        - '[redacted]'
+        - '[redacted]'
+      insensitive_string: This field should not be redacted.
+      insensitive_repeated_string:
+        - This field should not be redacted (1 of 4).
+        - This field should not be redacted (2 of 4).
+      insensitive_int: '1'
+      insensitive_repeated_int:
+        - '1'
+        - '2'
+  - type_url: type.googleapis.com/envoy.test.Sensitive
+    value:
+      sensitive_string: '[redacted]'
+      sensitive_repeated_string:
+        - '[redacted]'
+        - '[redacted]'
+      insensitive_string: This field should not be redacted.
+      insensitive_repeated_string:
+        - This field should not be redacted (3 of 4).
+        - This field should not be redacted (4 of 4).
+      insensitive_int: '2'
+      insensitive_repeated_int:
+        - '3'
+        - '4'
+)EOF",
+                            expected);
+
+  MessageUtil::redact(actual);
+  EXPECT_TRUE(TestUtility::protoEqual(expected, actual));
+}
+
+// Empty `TypedStruct` can be trivially redacted.
+TEST_F(ProtobufUtilityTest, RedactEmptyTypedStruct) {
+  udpa::type::v1::TypedStruct actual;
+  TestUtility::loadFromYaml(R"EOF(
+type_url: type.googleapis.com/envoy.test.Sensitive
+)EOF",
+                            actual);
+
+  udpa::type::v1::TypedStruct expected = actual;
+  MessageUtil::redact(actual);
+  EXPECT_TRUE(TestUtility::protoEqual(expected, actual));
+}
+
+// Messages packed into `TypedStruct` with unknown type URLs are skipped.
+TEST_F(ProtobufUtilityTest, RedactTypedStructWithUnknownTypeUrl) {
+  udpa::type::v1::TypedStruct actual;
+  TestUtility::loadFromYaml(R"EOF(
+type_url: type.googleapis.com/envoy.unknown.Message
+value:
+  sensitive_string: This field is sensitive, but we have no way of knowing.
+)EOF",
+                            actual);
+
+  udpa::type::v1::TypedStruct expected = actual;
+  MessageUtil::redact(actual);
+  EXPECT_TRUE(TestUtility::protoEqual(expected, actual));
+}
+
+// Deeply-nested opaque protos (`Any` and `TypedStruct`), which are reified using the
+// `DynamicMessageFactory`, should be redacted correctly.
+TEST_F(ProtobufUtilityTest, RedactDeeplyNestedOpaqueProtos) {
+  envoy::test::Sensitive actual, expected;
+  TestUtility::loadFromYaml(R"EOF(
+insensitive_any:
+  '@type': type.googleapis.com/envoy.test.Sensitive
+  insensitive_any:
+    '@type': type.googleapis.com/envoy.test.Sensitive
+    sensitive_string: This field should be redacted (1 of 4).
+  insensitive_typed_struct:
+    type_url: type.googleapis.com/envoy.test.Sensitive
+    value:
+      sensitive_string: This field should be redacted (2 of 4).
+insensitive_typed_struct:
+  type_url: type.googleapis.com/envoy.test.Sensitive
+  value:
+    insensitive_any:
+      '@type': type.googleapis.com/envoy.test.Sensitive
+      sensitive_string: This field should be redacted (3 of 4).
+    insensitive_typed_struct:
+      type_url: type.googleapis.com/envoy.test.Sensitive
+      value:
+        sensitive_string: This field should be redacted (4 of 4).
+)EOF",
+                            actual);
+  TestUtility::loadFromYaml(R"EOF(
+insensitive_any:
+  '@type': type.googleapis.com/envoy.test.Sensitive
+  insensitive_any:
+    '@type': type.googleapis.com/envoy.test.Sensitive
+    sensitive_string: '[redacted]'
+  insensitive_typed_struct:
+    type_url: type.googleapis.com/envoy.test.Sensitive
+    value:
+      sensitive_string: '[redacted]'
+insensitive_typed_struct:
+  type_url: type.googleapis.com/envoy.test.Sensitive
+  value:
+    insensitive_any:
+      '@type': type.googleapis.com/envoy.test.Sensitive
+      sensitive_string: '[redacted]'
+    insensitive_typed_struct:
+      type_url: type.googleapis.com/envoy.test.Sensitive
+      value:
+        sensitive_string: '[redacted]'
+)EOF",
+                            expected);
+  MessageUtil::redact(actual);
+  EXPECT_TRUE(TestUtility::protoEqual(expected, actual));
 }
 
 TEST_F(ProtobufUtilityTest, KeyValueStruct) {
@@ -702,10 +1340,10 @@ TEST(DurationUtilTest, OutOfRange) {
   }
 }
 
-class DeprecatedFieldsTest : public testing::Test {
+class DeprecatedFieldsTest : public testing::TestWithParam<bool> {
 protected:
   DeprecatedFieldsTest()
-      : api_(Api::createApiForTest(store_)),
+      : with_upgrade_(GetParam()), api_(Api::createApiForTest(store_)),
         runtime_deprecated_feature_use_(store_.counter("runtime.deprecated_feature_use")) {
     envoy::config::bootstrap::v3alpha::LayeredRuntime config;
     config.add_layers()->mutable_admin_layer();
@@ -714,6 +1352,18 @@ protected:
                                 generator_, validation_visitor_, *api_)});
   }
 
+  void checkForDeprecation(const Protobuf::Message& message) {
+    if (with_upgrade_) {
+      envoy::test::deprecation_test::UpgradedBase upgraded_message;
+      Config::VersionConverter::upgrade(message, upgraded_message);
+      MessageUtil::checkForUnexpectedFields(upgraded_message,
+                                            ProtobufMessage::getStrictValidationVisitor());
+    } else {
+      MessageUtil::checkForUnexpectedFields(message, ProtobufMessage::getStrictValidationVisitor());
+    }
+  }
+
+  const bool with_upgrade_;
   Event::MockDispatcher dispatcher_;
   NiceMock<ThreadLocal::MockInstance> tls_;
   Stats::IsolatedStoreImpl store_;
@@ -727,11 +1377,9 @@ protected:
   NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor_;
 };
 
-void checkForDeprecation(const Protobuf::Message& message) {
-  MessageUtil::checkForUnexpectedFields(message, ProtobufMessage::getStrictValidationVisitor());
-}
+INSTANTIATE_TEST_SUITE_P(Versions, DeprecatedFieldsTest, testing::Values(false, true));
 
-TEST_F(DeprecatedFieldsTest, NoCrashIfRuntimeMissing) {
+TEST_P(DeprecatedFieldsTest, NoCrashIfRuntimeMissing) {
   loader_.reset();
 
   envoy::test::deprecation_test::Base base;
@@ -740,7 +1388,7 @@ TEST_F(DeprecatedFieldsTest, NoCrashIfRuntimeMissing) {
   checkForDeprecation(base);
 }
 
-TEST_F(DeprecatedFieldsTest, NoErrorWhenDeprecatedFieldsUnused) {
+TEST_P(DeprecatedFieldsTest, NoErrorWhenDeprecatedFieldsUnused) {
   envoy::test::deprecation_test::Base base;
   base.set_not_deprecated("foo");
   // Fatal checks for a non-deprecated field should cause no problem.
@@ -748,7 +1396,7 @@ TEST_F(DeprecatedFieldsTest, NoErrorWhenDeprecatedFieldsUnused) {
   EXPECT_EQ(0, runtime_deprecated_feature_use_.value());
 }
 
-TEST_F(DeprecatedFieldsTest, DEPRECATED_FEATURE_TEST(IndividualFieldDeprecated)) {
+TEST_P(DeprecatedFieldsTest, DEPRECATED_FEATURE_TEST(IndividualFieldDeprecated)) {
   envoy::test::deprecation_test::Base base;
   base.set_is_deprecated("foo");
   // Non-fatal checks for a deprecated field should log rather than throw an exception.
@@ -759,7 +1407,7 @@ TEST_F(DeprecatedFieldsTest, DEPRECATED_FEATURE_TEST(IndividualFieldDeprecated))
 }
 
 // Use of a deprecated and disallowed field should result in an exception.
-TEST_F(DeprecatedFieldsTest, DEPRECATED_FEATURE_TEST(IndividualFieldDisallowed)) {
+TEST_P(DeprecatedFieldsTest, DEPRECATED_FEATURE_TEST(IndividualFieldDisallowed)) {
   envoy::test::deprecation_test::Base base;
   base.set_is_deprecated_fatal("foo");
   EXPECT_THROW_WITH_REGEX(
@@ -767,7 +1415,7 @@ TEST_F(DeprecatedFieldsTest, DEPRECATED_FEATURE_TEST(IndividualFieldDisallowed))
       "Using deprecated option 'envoy.test.deprecation_test.Base.is_deprecated_fatal'");
 }
 
-TEST_F(DeprecatedFieldsTest,
+TEST_P(DeprecatedFieldsTest,
        DEPRECATED_FEATURE_TEST(IndividualFieldDisallowedWithRuntimeOverride)) {
   envoy::test::deprecation_test::Base base;
   base.set_is_deprecated_fatal("foo");
@@ -781,7 +1429,8 @@ TEST_F(DeprecatedFieldsTest,
 
   // Now create a new snapshot with this feature allowed.
   Runtime::LoaderSingleton::getExisting()->mergeValues(
-      {{"envoy.deprecated_features.deprecated.proto:is_deprecated_fatal", "TrUe "}});
+      {{"envoy.deprecated_features:envoy.test.deprecation_test.Base.is_deprecated_fatal",
+        "TrUe "}});
 
   // Now the same deprecation check should only trigger a warning.
   EXPECT_LOG_CONTAINS(
@@ -790,7 +1439,7 @@ TEST_F(DeprecatedFieldsTest,
   EXPECT_EQ(1, runtime_deprecated_feature_use_.value());
 }
 
-TEST_F(DeprecatedFieldsTest, DEPRECATED_FEATURE_TEST(DisallowViaRuntime)) {
+TEST_P(DeprecatedFieldsTest, DEPRECATED_FEATURE_TEST(DisallowViaRuntime)) {
   envoy::test::deprecation_test::Base base;
   base.set_is_deprecated("foo");
 
@@ -801,7 +1450,7 @@ TEST_F(DeprecatedFieldsTest, DEPRECATED_FEATURE_TEST(DisallowViaRuntime)) {
 
   // Now create a new snapshot with this feature disallowed.
   Runtime::LoaderSingleton::getExisting()->mergeValues(
-      {{"envoy.deprecated_features.deprecated.proto:is_deprecated", " false"}});
+      {{"envoy.deprecated_features:envoy.test.deprecation_test.Base.is_deprecated", " false"}});
 
   EXPECT_THROW_WITH_REGEX(
       checkForDeprecation(base), ProtoValidationException,
@@ -812,7 +1461,7 @@ TEST_F(DeprecatedFieldsTest, DEPRECATED_FEATURE_TEST(DisallowViaRuntime)) {
 // Note that given how Envoy config parsing works, the first time we hit a
 // 'fatal' error and throw, we won't log future warnings. That said, this tests
 // the case of the warning occurring before the fatal error.
-TEST_F(DeprecatedFieldsTest, DEPRECATED_FEATURE_TEST(MixOfFatalAndWarnings)) {
+TEST_P(DeprecatedFieldsTest, DEPRECATED_FEATURE_TEST(MixOfFatalAndWarnings)) {
   envoy::test::deprecation_test::Base base;
   base.set_is_deprecated("foo");
   base.set_is_deprecated_fatal("foo");
@@ -825,7 +1474,7 @@ TEST_F(DeprecatedFieldsTest, DEPRECATED_FEATURE_TEST(MixOfFatalAndWarnings)) {
 }
 
 // Present (unused) deprecated messages should be detected as deprecated.
-TEST_F(DeprecatedFieldsTest, DEPRECATED_FEATURE_TEST(MessageDeprecated)) {
+TEST_P(DeprecatedFieldsTest, DEPRECATED_FEATURE_TEST(MessageDeprecated)) {
   envoy::test::deprecation_test::Base base;
   base.mutable_deprecated_message();
   EXPECT_LOG_CONTAINS(
@@ -834,7 +1483,7 @@ TEST_F(DeprecatedFieldsTest, DEPRECATED_FEATURE_TEST(MessageDeprecated)) {
   EXPECT_EQ(1, runtime_deprecated_feature_use_.value());
 }
 
-TEST_F(DeprecatedFieldsTest, DEPRECATED_FEATURE_TEST(InnerMessageDeprecated)) {
+TEST_P(DeprecatedFieldsTest, DEPRECATED_FEATURE_TEST(InnerMessageDeprecated)) {
   envoy::test::deprecation_test::Base base;
   base.mutable_not_deprecated_message()->set_inner_not_deprecated("foo");
   // Checks for a non-deprecated field shouldn't trigger warnings
@@ -849,7 +1498,7 @@ TEST_F(DeprecatedFieldsTest, DEPRECATED_FEATURE_TEST(InnerMessageDeprecated)) {
 }
 
 // Check that repeated sub-messages get validated.
-TEST_F(DeprecatedFieldsTest, DEPRECATED_FEATURE_TEST(SubMessageDeprecated)) {
+TEST_P(DeprecatedFieldsTest, DEPRECATED_FEATURE_TEST(SubMessageDeprecated)) {
   envoy::test::deprecation_test::Base base;
   base.add_repeated_message();
   base.add_repeated_message()->set_inner_deprecated("foo");
@@ -863,7 +1512,7 @@ TEST_F(DeprecatedFieldsTest, DEPRECATED_FEATURE_TEST(SubMessageDeprecated)) {
 }
 
 // Check that deprecated repeated messages trigger
-TEST_F(DeprecatedFieldsTest, DEPRECATED_FEATURE_TEST(RepeatedMessageDeprecated)) {
+TEST_P(DeprecatedFieldsTest, DEPRECATED_FEATURE_TEST(RepeatedMessageDeprecated)) {
   envoy::test::deprecation_test::Base base;
   base.add_deprecated_repeated_message();
 
@@ -875,7 +1524,7 @@ TEST_F(DeprecatedFieldsTest, DEPRECATED_FEATURE_TEST(RepeatedMessageDeprecated))
 }
 
 // Check that deprecated enum values trigger for default values
-TEST_F(DeprecatedFieldsTest, DEPRECATED_FEATURE_TEST(EnumValuesDeprecatedDefault)) {
+TEST_P(DeprecatedFieldsTest, DEPRECATED_FEATURE_TEST(EnumValuesDeprecatedDefault)) {
   envoy::test::deprecation_test::Base base;
   base.mutable_enum_container();
 
@@ -889,7 +1538,7 @@ TEST_F(DeprecatedFieldsTest, DEPRECATED_FEATURE_TEST(EnumValuesDeprecatedDefault
 }
 
 // Check that deprecated enum values trigger for non-default values
-TEST_F(DeprecatedFieldsTest, DEPRECATED_FEATURE_TEST(EnumValuesDeprecated)) {
+TEST_P(DeprecatedFieldsTest, DEPRECATED_FEATURE_TEST(EnumValuesDeprecated)) {
   envoy::test::deprecation_test::Base base;
   base.mutable_enum_container()->set_deprecated_enum(
       envoy::test::deprecation_test::Base::DEPRECATED_NOT_DEFAULT);
@@ -904,16 +1553,30 @@ TEST_F(DeprecatedFieldsTest, DEPRECATED_FEATURE_TEST(EnumValuesDeprecated)) {
 
 // Make sure the runtime overrides for protos work, by checking the non-fatal to
 // fatal option.
-TEST_F(DeprecatedFieldsTest, DEPRECATED_FEATURE_TEST(RuntimeOverrideEnumDefault)) {
+TEST_P(DeprecatedFieldsTest, DEPRECATED_FEATURE_TEST(RuntimeOverrideEnumDefault)) {
   envoy::test::deprecation_test::Base base;
   base.mutable_enum_container();
 
   Runtime::LoaderSingleton::getExisting()->mergeValues(
-      {{"envoy.deprecated_features.deprecated.proto:DEPRECATED_DEFAULT", "false"}});
+      {{"envoy.deprecated_features:envoy.test.deprecation_test.Base.DEPRECATED_DEFAULT", "false"}});
 
   // Make sure this is set up right.
   EXPECT_THROW_WITH_REGEX(checkForDeprecation(base), ProtoValidationException,
                           "Using the default now-deprecated value DEPRECATED_DEFAULT");
+}
+
+// Make sure the runtime overrides for allowing fatal enums work.
+TEST_P(DeprecatedFieldsTest, DEPRECATED_FEATURE_TEST(FatalEnum)) {
+  envoy::test::deprecation_test::Base base;
+  base.mutable_enum_container()->set_deprecated_enum(
+      envoy::test::deprecation_test::Base::DEPRECATED_FATAL);
+  EXPECT_THROW_WITH_REGEX(checkForDeprecation(base), ProtoValidationException,
+                          "Using deprecated value DEPRECATED_FATAL");
+
+  Runtime::LoaderSingleton::getExisting()->mergeValues(
+      {{"envoy.deprecated_features:envoy.test.deprecation_test.Base.DEPRECATED_FATAL", "true"}});
+
+  checkForDeprecation(base);
 }
 
 class TimestampUtilTest : public testing::Test, public ::testing::WithParamInterface<int64_t> {};

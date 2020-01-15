@@ -25,6 +25,16 @@ public:
     skipPortUsageValidation();
   }
 
+  static bool hasHiddenEnvoyDeprecated(const Protobuf::Message& message) {
+    // Do this the slow copy-based way, since this is just for test validation.
+    ProtobufTypes::MessagePtr mutable_clone;
+    mutable_clone.reset(message.New());
+    mutable_clone->MergeFrom(message);
+    Config::VersionUtil::scrubHiddenEnvoyDeprecated(*mutable_clone);
+    return !TestUtility::protoEqual(message, *mutable_clone,
+                                    /*ignore_repeated_field_ordering=*/false);
+  }
+
   static std::string paramsToString(const testing::TestParamInfo<Params>& p) {
     return fmt::format(
         "{}_{}_{}_Resource_{}_Transport_{}",
@@ -119,7 +129,7 @@ public:
       case envoy::config::core::v3alpha::ApiConfigSource::GRPC: {
         API_NO_BOOST(envoy::api::v2::DiscoveryRequest) discovery_request;
         VERIFY_ASSERTION(xds_stream_->waitForGrpcMessage(*dispatcher_, discovery_request));
-        EXPECT_TRUE(!Config::VersionUtil::hasHiddenEnvoyDeprecated(discovery_request));
+        EXPECT_TRUE(!hasHiddenEnvoyDeprecated(discovery_request));
         xds_stream_->startGrpcStream();
         actual_type_url = discovery_request.type_url();
         expected_endpoint = ads() ? ads_v2_sotw_endpoint : expected_v2_sotw_endpoint;
@@ -128,7 +138,7 @@ public:
       case envoy::config::core::v3alpha::ApiConfigSource::DELTA_GRPC: {
         API_NO_BOOST(envoy::api::v2::DeltaDiscoveryRequest) delta_discovery_request;
         VERIFY_ASSERTION(xds_stream_->waitForGrpcMessage(*dispatcher_, delta_discovery_request));
-        EXPECT_TRUE(!Config::VersionUtil::hasHiddenEnvoyDeprecated(delta_discovery_request));
+        EXPECT_TRUE(!hasHiddenEnvoyDeprecated(delta_discovery_request));
         xds_stream_->startGrpcStream();
         actual_type_url = delta_discovery_request.type_url();
         expected_endpoint = expected_v2_delta_endpoint;
@@ -154,7 +164,7 @@ public:
       case envoy::config::core::v3alpha::ApiConfigSource::GRPC: {
         API_NO_BOOST(envoy::service::discovery::v3alpha::DiscoveryRequest) discovery_request;
         VERIFY_ASSERTION(xds_stream_->waitForGrpcMessage(*dispatcher_, discovery_request));
-        EXPECT_TRUE(!Config::VersionUtil::hasHiddenEnvoyDeprecated(discovery_request));
+        EXPECT_TRUE(!hasHiddenEnvoyDeprecated(discovery_request));
         actual_type_url = discovery_request.type_url();
         expected_endpoint = ads() ? ads_v3alpha_delta_endpoint : expected_v3alpha_sotw_endpoint;
         break;
@@ -163,7 +173,7 @@ public:
         API_NO_BOOST(envoy::service::discovery::v3alpha::DeltaDiscoveryRequest)
         delta_discovery_request;
         VERIFY_ASSERTION(xds_stream_->waitForGrpcMessage(*dispatcher_, delta_discovery_request));
-        EXPECT_TRUE(!Config::VersionUtil::hasHiddenEnvoyDeprecated(delta_discovery_request));
+        EXPECT_TRUE(!hasHiddenEnvoyDeprecated(delta_discovery_request));
         actual_type_url = delta_discovery_request.type_url();
         expected_endpoint = expected_v3alpha_delta_endpoint;
         break;
