@@ -71,12 +71,15 @@ private:
                                  const Network::Connection& connection, const std::string& service,
                                  const bool local, bool include_certificate);
   static void setRequestTime(envoy::service::auth::v3alpha::AttributeContext::Request& req,
-                             Envoy::Http::StreamDecoderFilterCallbacks* callbacks);
+                             const StreamInfo::StreamInfo& stream_info);
   static void setHttpRequest(envoy::service::auth::v3alpha::AttributeContext::HttpRequest& httpreq,
-                             Envoy::Http::StreamDecoderFilterCallbacks* callbacks,
+                             const uint64_t stream_id, const StreamInfo::StreamInfo& stream_info,
+                             const Buffer::Instance* decoding_buffer,
                              const Envoy::Http::HeaderMap& headers, uint64_t max_request_bytes);
   static void setAttrContextRequest(envoy::service::auth::v3alpha::AttributeContext::Request& req,
-                                    const Envoy::Http::StreamDecoderFilterCallbacks* callbacks,
+                                    const uint64_t stream_id,
+                                    const StreamInfo::StreamInfo& stream_info,
+                                    const Buffer::Instance* decoding_buffer,
                                     const Envoy::Http::HeaderMap& headers,
                                     uint64_t max_request_bytes);
   static std::string getHeaderStr(const Envoy::Http::HeaderEntry* entry);
