@@ -126,7 +126,7 @@ void CacheFilter::onHeadersAsync(const CacheFilterSharedPtr& self, LookupResult&
   case CacheEntryStatus::FoundNotModified:
   case CacheEntryStatus::UnsatisfiableRange:
     ASSERT(false); // We don't yet return or support these codes.
-    // FALLTHROUGH
+    FALLTHRU;
   case CacheEntryStatus::Unusable: {
     self->post([self] { self->onUnusableHeaders(); });
     return;
