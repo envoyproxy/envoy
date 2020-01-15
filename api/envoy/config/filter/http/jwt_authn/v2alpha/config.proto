@@ -9,6 +9,8 @@ import "envoy/api/v2/route/route_components.proto";
 import "google/protobuf/duration.proto";
 import "google/protobuf/empty.proto";
 
+import "udpa/annotations/sensitive.proto";
+
 import "udpa/annotations/migrate.proto";
 import "validate/validate.proto";
 
@@ -113,7 +115,7 @@ message JwtProvider {
     //    local_jwks:
     //      inline_string: ACADADADADA
     //
-    api.v2.core.DataSource local_jwks = 4;
+    api.v2.core.DataSource local_jwks = 4 [(udpa.annotations.sensitive) = true];
   }
 
   // If false, the JWT is removed in the request after a success verification. If true, the JWT is
@@ -199,7 +201,7 @@ message RemoteJwks {
   //      uri: https://www.googleapis.com/oauth2/v1/certs
   //      cluster: jwt.www.googleapis.com|443
   //
-  api.v2.core.HttpUri http_uri = 1;
+  api.v2.core.HttpUri http_uri = 1 [(udpa.annotations.sensitive) = true];
 
   // Duration after which the cached JWKS should be expired. If not specified, default cache
   // duration is 5 minutes.

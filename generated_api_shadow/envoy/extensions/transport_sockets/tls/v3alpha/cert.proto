@@ -121,9 +121,10 @@ message PrivateKeyProvider {
 
   // Private key method provider specific configuration.
   oneof config_type {
-    google.protobuf.Struct hidden_envoy_deprecated_config = 2 [deprecated = true];
+    google.protobuf.Struct hidden_envoy_deprecated_config = 2
+        [deprecated = true, (udpa.annotations.sensitive) = true];
 
-    google.protobuf.Any typed_config = 3;
+    google.protobuf.Any typed_config = 3 [(udpa.annotations.sensitive) = true];
   }
 }
 
