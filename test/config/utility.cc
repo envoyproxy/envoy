@@ -378,9 +378,9 @@ ConfigHelper::ConfigHelper(const Network::Address::IpVersion version, Api::Api& 
         cluster->hidden_envoy_deprecated_hosts().empty(),
         "Hosts should be specified via load_assignment() in the integration test framework.");
     for (int j = 0; j < cluster->load_assignment().endpoints_size(); ++j) {
-      auto locality_lb = cluster->mutable_load_assignment()->mutable_endpoints(j);
+      auto* locality_lb = cluster->mutable_load_assignment()->mutable_endpoints(j);
       for (int k = 0; k < locality_lb->lb_endpoints_size(); ++k) {
-        auto lb_endpoint = locality_lb->mutable_lb_endpoints(k);
+        auto* lb_endpoint = locality_lb->mutable_lb_endpoints(k);
         if (lb_endpoint->endpoint().address().has_socket_address()) {
           lb_endpoint->mutable_endpoint()->mutable_address()->mutable_socket_address()->set_address(
               Network::Test::getLoopbackAddressString(version));
