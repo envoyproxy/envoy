@@ -17,8 +17,6 @@
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/server/mocks.h"
 
-#include "libprotobuf_mutator/src/mutator.h"
-
 namespace Envoy {
 namespace Extensions {
 namespace HttpFilters {
