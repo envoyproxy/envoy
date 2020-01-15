@@ -13,15 +13,14 @@ namespace HttpFilters {
 namespace Cache {
 
 class CacheFilterFactory
-    : public Common::FactoryBase<envoy::config::filter::http::cache::v2::Cache> {
+    : public Common::FactoryBase<envoy::config::filter::http::cache::v2::CacheConfig> {
 public:
   CacheFilterFactory() : FactoryBase(HttpFilterNames::get().Cache) {}
 
 private:
-  Http::FilterFactoryCb
-  createFilterFactoryFromProtoTyped(const envoy::config::filter::http::cache::v2::Cache& config,
-                                    const std::string& stats_prefix,
-                                    Server::Configuration::FactoryContext& context) override;
+  Http::FilterFactoryCb createFilterFactoryFromProtoTyped(
+      const envoy::config::filter::http::cache::v2::CacheConfig& config,
+      const std::string& stats_prefix, Server::Configuration::FactoryContext& context) override;
 };
 
 } // namespace Cache

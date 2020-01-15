@@ -14,7 +14,7 @@ option (udpa.annotations.file_migrate).move_to_package =
 // [#protodoc-title: HTTP Cache Filter]
 // Pluggable HTTP Cache :ref:`overview <config_http_filters_cache>`.
 // [#extension: envoy.filters.http.cache]
-message Cache {
+message CacheConfig {
   // List of query params.
   message QueryParams {
     repeated string query_string_keys = 1;
