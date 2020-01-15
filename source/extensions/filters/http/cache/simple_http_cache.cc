@@ -31,7 +31,7 @@ public:
   }
 
   void getTrailers(LookupTrailersCallback&& cb) override {
-    // TODO(toddmgreer) Support trailers.
+    // TODO(toddmgreer): Support trailers.
     ASSERT(false, "We didn't say there were trailers.");
     cb(nullptr);
   }
@@ -71,7 +71,7 @@ public:
   }
 
   void insertTrailers(const Http::HeaderMap&) override {
-    ASSERT(false); // TODO(toddmgreer) support trailers
+    ASSERT(false); // TODO(toddmgreer): support trailers
   }
 
 private:
@@ -96,7 +96,7 @@ void SimpleHttpCache::updateHeaders(LookupContextPtr&& lookup_context,
                                     Http::HeaderMapPtr&& response_headers) {
   ASSERT(lookup_context);
   ASSERT(response_headers);
-  // TODO(toddmgreer) Support updating headers.
+  // TODO(toddmgreer): Support updating headers.
   ASSERT(false);
 }
 

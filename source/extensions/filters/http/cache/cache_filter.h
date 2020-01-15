@@ -77,7 +77,7 @@ private:
   std::vector<AdjustedByteRange> remaining_body_;
 
   // True if the response has trailers.
-  // TODO(toddmgreer) cache trailers.
+  // TODO(toddmgreer): cache trailers.
   bool response_has_trailers_;
 };
 

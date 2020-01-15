@@ -100,7 +100,7 @@ std::ostream& operator<<(std::ostream& os, const AdjustedByteRange& range);
 // Adjusts request_range_spec to fit a cached response of size content_length, putting the results
 // in response_ranges. Returns true if response_ranges is satisfiable (empty is considered
 // satisfiable, as it denotes the entire body).
-// TODO(toddmgreer) Merge/reorder ranges where appropriate.
+// TODO(toddmgreer): Merge/reorder ranges where appropriate.
 bool adjustByteRangeSet(std::vector<AdjustedByteRange>& response_ranges,
                         const std::vector<RawByteRange>& request_range_spec,
                         uint64_t content_length);
@@ -130,7 +130,7 @@ struct LookupResult {
   // reorder ranges as appropriate, or may clear() response_ranges entirely.
   std::vector<AdjustedByteRange> response_ranges;
 
-  // TODO(toddmgreer) Implement trailer support.
+  // TODO(toddmgreer): Implement trailer support.
   // True if the cached response has trailers.
   bool has_trailers = false;
 };
@@ -147,7 +147,7 @@ struct LookupResult {
 // When providing a cached response, Caches must ensure that the keys (and not
 // just their hashes) match.
 //
-// TODO(toddmgreer) Ensure that stability guarantees above are accurate.
+// TODO(toddmgreer): Ensure that stability guarantees above are accurate.
 size_t stableHashKey(const Key& key);
 
 // LookupRequest holds everything about a request that's needed to look for a

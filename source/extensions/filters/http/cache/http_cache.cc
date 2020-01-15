@@ -50,10 +50,10 @@ LookupRequest::LookupRequest(const Http::HeaderMap& request_headers, SystemTime 
   const Http::HeaderString& forwarded_proto = request_headers.ForwardedProto()->value();
   const auto& scheme_values = Http::Headers::get().SchemeValues;
   ASSERT(forwarded_proto == scheme_values.Http || forwarded_proto == scheme_values.Https);
-  // TODO(toddmgreer) Let config determine whether to include forwarded_proto, host, and
+  // TODO(toddmgreer): Let config determine whether to include forwarded_proto, host, and
   // query params.
-  // TODO(toddmgreer) get cluster name.
-  // TODO(toddmgreer) Parse Range header into request_range_spec_, and handle the resultant
+  // TODO(toddmgreer): get cluster name.
+  // TODO(toddmgreer): Parse Range header into request_range_spec_, and handle the resultant
   // vector<AdjustedByteRange> in CacheFilter::onOkHeaders.
   key_.set_cluster_name("cluster_name_goes_here");
   key_.set_host(std::string(request_headers.Host()->value().getStringView()));
@@ -85,7 +85,7 @@ bool LookupRequest::isFresh(const Http::HeaderMap& response_headers) const {
 
 LookupResult LookupRequest::makeLookupResult(Http::HeaderMapPtr&& response_headers,
                                              uint64_t content_length) const {
-  // TODO(toddmgreer) Implement all HTTP caching semantics.
+  // TODO(toddmgreer): Implement all HTTP caching semantics.
   ASSERT(response_headers);
   LookupResult result;
   result.cache_entry_status =

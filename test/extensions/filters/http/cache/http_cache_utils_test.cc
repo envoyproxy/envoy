@@ -14,8 +14,8 @@ namespace HttpFilters {
 namespace Cache {
 namespace {
 
-// TODO(toddmgreer) Add tests for eat* functions
-// TODO(toddmgreer) More tests for httpTime, effectiveMaxAge
+// TODO(toddmgreer): Add tests for eat* functions
+// TODO(toddmgreer): More tests for httpTime, effectiveMaxAge
 
 class HttpTimeTest : public testing::TestWithParam<const char*> {
 protected:
@@ -57,11 +57,11 @@ EffectiveMaxAgeParams params[] = {
     {"max-age=0", 0},
     {"no-cache", 0},
     {"public", 0},
-    // TODO(toddmgreer) parse quoted forms
+    // TODO(toddmgreer): parse quoted forms
     // {"max-age=20, s-maxage=\"25\"",25},
     // {"public,max-age=\"8\",foo=11",8},
     // {"public,max-age=\"8\",bar=\"11\"",8},
-    // TODO(toddmgreer) parse public/private
+    // TODO(toddmgreer): parse public/private
     // {"private,max-age=10",0}
     // {"private",0},
     // {"private,s-maxage=8",0},

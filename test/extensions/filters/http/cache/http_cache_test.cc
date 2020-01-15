@@ -215,7 +215,7 @@ AdjustByteRangeParams satisfiable_ranges[] =
         {{{1, 3}}, {{1, 4}}, 4},           // to the end
         {{{2, 21}}, {{2, 4}}, 4},          // overlong
         {{{1, UINT64_MAX}}, {{1, 4}}, 4}}; // overlong
-// TODO(toddmgreer) Before enabling support for multi-range requests, test it.
+// TODO(toddmgreer): Before enabling support for multi-range requests, test it.
 
 class AdjustByteRangeTest : public TestWithParam<AdjustByteRangeParams> {};
 
