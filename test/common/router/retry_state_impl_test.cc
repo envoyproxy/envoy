@@ -739,7 +739,6 @@ TEST_F(RouterRetryStateImplTest, PolicyLimitedByRequestHeaders) {
     setup(request_headers);
     EXPECT_TRUE(state_->enabled());
     Http::TestHeaderMapImpl response_headers{{":status", "500"}};
-    expectTimerCreateAndEnable();
     EXPECT_EQ(RetryStatus::No, state_->shouldRetryHeaders(response_headers, callback_));
   }
 
