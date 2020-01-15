@@ -58,7 +58,7 @@ makeHermeticPathsAndPorts(Fuzz::PerTestEnvironment& test_env,
       // Tracked at https://github.com/envoyproxy/envoy/issues/9513.
       health_check.mutable_http_health_check()->clear_codec_client_type();
     }
-    // We may have both deprecatred hosts() or load_assignment().
+    // We may have both deprecated hosts() or load_assignment().
     for (auto& host : *cluster.mutable_hidden_envoy_deprecated_hosts()) {
       makePortHermetic(test_env, host);
     }
