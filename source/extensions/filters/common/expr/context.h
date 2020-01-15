@@ -38,7 +38,7 @@ constexpr absl::string_view Response = "response";
 constexpr absl::string_view Code = "code";
 constexpr absl::string_view Trailers = "trailers";
 constexpr absl::string_view Flags = "flags";
-constexpr absl::string_view GrpcStatus = "grpc-status";
+constexpr absl::string_view GrpcStatus = "grpc_status";
 
 // Per-request or per-connection metadata
 constexpr absl::string_view Metadata = "metadata";

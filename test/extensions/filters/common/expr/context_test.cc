@@ -267,7 +267,7 @@ TEST(Context, ResponseAttributes) {
     EXPECT_EQ(0x1, value.value().Int64OrDie());
   }
   {
-    auto value = response[CelValue::CreateStringView(grpc_status)];
+    auto value = response[CelValue::CreateStringView(GrpcStatus)];
     EXPECT_TRUE(value.has_value());
     ASSERT_TRUE(value.value().IsInt64());
     EXPECT_EQ(0x8, value.value().Int64OrDie());
