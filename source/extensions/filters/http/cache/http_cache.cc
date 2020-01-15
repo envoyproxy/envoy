@@ -53,7 +53,8 @@ LookupRequest::LookupRequest(const Http::HeaderMap& request_headers, SystemTime 
   // TODO(toddmgreer) Let config determine whether to include forwarded_proto, host, and
   // query params.
   // TODO(toddmgreer) get cluster name.
-  // TODO(toddmgreer) Parse Range header into request_range_spec_.
+  // TODO(toddmgreer) Parse Range header into request_range_spec_, and handle the resultant
+  // vector<AdjustedByteRange> in CacheFilter::onOkHeaders.
   key_.set_cluster_name("cluster_name_goes_here");
   key_.set_host(std::string(request_headers.Host()->value().getStringView()));
   key_.set_path(std::string(request_headers.Path()->value().getStringView()));

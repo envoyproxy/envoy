@@ -105,20 +105,7 @@ void CacheFilter::onOkHeaders(Http::HeaderMapPtr&& headers,
     return;
   }
   if (content_length > 0) {
-    // TODO(toddmgreer) Once we actually parse range headers,
-    // uncomment the following to handle their parsed form.
-    //
-    // Http::HeaderEntry& status = *headers->Status();
-    // if (response_ranges.empty() || status.value() != std::to_string(Envoy::enumToInt(
-    //         Envoy::Http::Code::OK))) {
-    //   // Get the full body from cache.
     remaining_body_.emplace_back(0, content_length);
-    // } else {
-    //   // TODO(toddmgreer) handle multi-range requests.
-    //   ASSERT(response_ranges.size() == 1);
-    //   remaining_body_ = std::move(response_ranges);
-    //   status.value((std::to_string(Envoy::enumToInt(Envoy::Http::Code::PartialContent))));
-    // }
     getBody();
   } else {
     lookup_->getTrailers([self = shared_from_this()](Http::HeaderMapPtr&& trailers) {
