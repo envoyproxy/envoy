@@ -341,11 +341,15 @@ void checkForDeprecatedNonRepeatedEnumValue(const Protobuf::Message& message,
 #ifdef ENVOY_DISABLE_DEPRECATED_FEATURES
   bool warn_only = false;
 #else
-  bool warn_only = !enum_value_descriptor->options().GetExtension(
-      envoy::annotations::disallowed_by_default_enum);
+  bool warn_only = true;
 #endif
 
   if (runtime) {
+    // This is set here, rather than above, so that in the absence of a
+    // registry (i.e. unit tests) the default for if a feature is allowed or not is
+    // based on ENVOY_DISABLE_DEPRECATED_FEATURES.
+    warn_only &= !enum_value_descriptor->options().GetExtension(
+        envoy::annotations::disallowed_by_default_enum);
     warn_only = runtime->snapshot().deprecatedFeatureEnabled(
         absl::StrCat("envoy.deprecated_features:", enum_value_descriptor->full_name()), warn_only);
   }
@@ -403,12 +407,16 @@ void checkForUnexpectedFields(const Protobuf::Message& message,
 #ifdef ENVOY_DISABLE_DEPRECATED_FEATURES
     bool warn_only = false;
 #else
-    bool warn_only = !field->options().GetExtension(envoy::annotations::disallowed_by_default);
+    bool warn_only = true;
 #endif
     // Allow runtime to be null both to not crash if this is called before server initialization,
     // and so proto validation works in context where runtime singleton is not set up (e.g.
     // standalone config validation utilities)
     if (runtime && field->options().deprecated()) {
+      // This is set here, rather than above, so that in the absence of a
+      // registry (i.e. test) the default for if a feature is allowed or not is
+      // based on ENVOY_DISABLE_DEPRECATED_FEATURES.
+      warn_only &= !field->options().GetExtension(envoy::annotations::disallowed_by_default);
       warn_only = runtime->snapshot().deprecatedFeatureEnabled(
           absl::StrCat("envoy.deprecated_features:", field->full_name()), warn_only);
     }
