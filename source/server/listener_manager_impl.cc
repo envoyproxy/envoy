@@ -328,9 +328,7 @@ bool ListenerManagerImpl::addOrUpdateListener(
     if (!api_listener_ && !added_via_api) {
       // TODO(junr03): dispatch to different concrete constructors when there are other
       // ApiListenerImpl derived classes.
-      api_listener_ = std::make_unique<HttpApiListener>(
-          config, *this, config.name(),
-          server_.messageValidationContext().staticValidationVisitor());
+      api_listener_ = std::make_unique<HttpApiListener>(config, *this, config.name());
       return true;
     } else {
       ENVOY_LOG(warn, "listener {} can not be added because currently only one ApiListener is "

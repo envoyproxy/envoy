@@ -280,6 +280,7 @@ envoy_cc_library(
     ],
     deps = [
         ":drain_manager_lib",
+        ":filter_chain_manager_lib",
         ":listener_manager_impl",
         "//include/envoy/network:connection_interface",
         "//include/envoy/server:api_listener_interface",
@@ -378,6 +379,7 @@ envoy_cc_library(
     hdrs = ["filter_chain_manager_impl.h"],
     deps = [
         ":filter_chain_factory_context_callback",
+        "//include/envoy/server:instance_interface",
         "//include/envoy/server:listener_manager_interface",
         "//include/envoy/server:transport_socket_config_interface",
         "//source/common/common:empty_string",

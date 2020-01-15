@@ -25,7 +25,6 @@ protected:
   NiceMock<MockListenerComponentFactory> listener_factory_;
   NiceMock<MockWorkerFactory> worker_factory_;
   std::unique_ptr<ListenerManagerImpl> listener_manager_;
-  NiceMock<ProtobufMessage::MockValidationVisitor> validation_visitor_;
 };
 
 TEST_F(ApiListenerTest, HttpApiListener) {
@@ -54,8 +53,7 @@ api_listener:
 
   const envoy::config::listener::v3alpha::Listener config = parseListenerFromV2Yaml(yaml);
 
-  auto http_api_listener =
-      HttpApiListener(config, *listener_manager_, config.name(), validation_visitor_);
+  auto http_api_listener = HttpApiListener(config, *listener_manager_, config.name());
 
   ASSERT_EQ("test_api_listener", http_api_listener.name());
   ASSERT_EQ(ApiListener::Type::HttpApiListener, http_api_listener.type());
@@ -82,8 +80,7 @@ api_listener:
   const envoy::config::listener::v3alpha::Listener config = parseListenerFromV2Yaml(yaml);
 
   EXPECT_THROW_WITH_MESSAGE(
-      HttpApiListener(config, *listener_manager_, config.name(), validation_visitor_),
-      EnvoyException,
+      HttpApiListener(config, *listener_manager_, config.name()), EnvoyException,
       "Unable to unpack as "
       "envoy.extensions.filters.network.http_connection_manager.v3alpha.HttpConnectionManager: "
       "[type.googleapis.com/envoy.api.v2.Cluster] {\n  name: \"cluster1\"\n  type: EDS\n  "

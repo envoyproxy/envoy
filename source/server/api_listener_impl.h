@@ -18,6 +18,8 @@
 #include "common/init/manager_impl.h"
 #include "common/stream_info/stream_info_impl.h"
 
+#include "server/filter_chain_manager_impl.h"
+
 namespace Envoy {
 namespace Server {
 
@@ -28,7 +30,6 @@ class ListenerManagerImpl;
  * Thus it provides full access to Envoy's L7 features, e.g HTTP filters.
  */
 class ApiListenerImpl : public ApiListener,
-                        public Configuration::FactoryContext,
                         public Network::DrainDecision,
                         Logger::Loggable<Logger::Id::http> {
 public:
@@ -39,46 +40,13 @@ public:
   // ApiListener
   absl::string_view name() const override { return name_; }
 
-  // TODO(junr03): move these functions into a concrete Server:Configuration::FactoryContext that
-  // takes the server's context, and the listener config in the constructor. The only challenging
-  // part is implementing the initManager() call. The function depends on the Listener's state for
-  // ListenerImpl, and will do so once ApiListeners are dynamic.
-  // Server::Configuration::FactoryContext
-  AccessLog::AccessLogManager& accessLogManager() override;
-  Upstream::ClusterManager& clusterManager() override;
-  Event::Dispatcher& dispatcher() override;
-  Network::DrainDecision& drainDecision() override;
-  Grpc::Context& grpcContext() override;
-  bool healthCheckFailed() override;
-  Tracing::HttpTracer& httpTracer() override;
-  Http::Context& httpContext() override;
-  Init::Manager& initManager() override;
-  const LocalInfo::LocalInfo& localInfo() const override;
-  Envoy::Runtime::RandomGenerator& random() override;
-  Envoy::Runtime::Loader& runtime() override;
-  Stats::Scope& scope() override;
-  Singleton::Manager& singletonManager() override;
-  OverloadManager& overloadManager() override;
-  ThreadLocal::Instance& threadLocal() override;
-  Admin& admin() override;
-  const envoy::config::core::v3alpha::Metadata& listenerMetadata() const override;
-  envoy::config::core::v3alpha::TrafficDirection direction() const override;
-  TimeSource& timeSource() override;
-  ProtobufMessage::ValidationVisitor& messageValidationVisitor() override;
-  Api::Api& api() override;
-  ServerLifecycleNotifier& lifecycleNotifier() override;
-  OptProcessContextRef processContext() override;
-  Configuration::ServerFactoryContext& getServerFactoryContext() const override;
-  Stats::Scope& listenerScope() override;
-
   // Network::DrainDecision
   // TODO(junr03): hook up draining to listener state management.
   bool drainClose() const override { return false; }
 
 protected:
   ApiListenerImpl(const envoy::config::listener::v3alpha::Listener& config,
-                  ListenerManagerImpl& parent, const std::string& name,
-                  ProtobufMessage::ValidationVisitor& validation_visitor);
+                  ListenerManagerImpl& parent, const std::string& name);
 
   // Synthetic class that acts as a stub Network::ReadFilterCallbacks.
   // TODO(junr03): if we are able to separate the Network Filter aspects of the
@@ -105,7 +73,7 @@ protected:
     class SyntheticConnection : public Network::Connection {
     public:
       SyntheticConnection(SyntheticReadCallbacks& parent)
-          : parent_(parent), stream_info_(parent_.parent_.timeSource()),
+          : parent_(parent), stream_info_(parent_.parent_.factory_context_.timeSource()),
             options_(std::make_shared<std::vector<Network::Socket::OptionConstSharedPtr>>()) {}
 
       // Network::FilterManager
@@ -123,7 +91,9 @@ protected:
       }
       void enableHalfClose(bool) override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
       void close(Network::ConnectionCloseType) override {}
-      Event::Dispatcher& dispatcher() override { return parent_.parent_.dispatcher(); }
+      Event::Dispatcher& dispatcher() override {
+        return parent_.parent_.factory_context_.dispatcher();
+      }
       uint64_t id() const override { return 12345; }
       std::string nextProtocol() const override { return EMPTY_STRING; }
       void noDelay(bool) override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
@@ -170,17 +140,16 @@ protected:
   ListenerManagerImpl& parent_;
   const std::string name_;
   Network::Address::InstanceConstSharedPtr address_;
-  ProtobufMessage::ValidationVisitor& validation_visitor_;
   Stats::ScopePtr global_scope_;
   Stats::ScopePtr listener_scope_;
+  FactoryContextImpl factory_context_;
   SyntheticReadCallbacks read_callbacks_;
 };
 
 class HttpApiListener : public ApiListenerImpl {
 public:
   HttpApiListener(const envoy::config::listener::v3alpha::Listener& config,
-                  ListenerManagerImpl& parent, const std::string& name,
-                  ProtobufMessage::ValidationVisitor& validation_visitor);
+                  ListenerManagerImpl& parent, const std::string& name);
 
   // ApiListener
   ApiListener::Type type() const override { return ApiListener::Type::HttpApiListener; }
