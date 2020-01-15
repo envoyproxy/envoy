@@ -197,8 +197,9 @@ TEST(Context, ResponseAttributes) {
   NiceMock<StreamInfo::MockStreamInfo> info;
   const std::string header_name = "test-header";
   const std::string trailer_name = "test-trailer";
+  const std::string grpc_status = "grpc-status";
   Http::TestHeaderMapImpl header_map{{header_name, "a"}};
-  Http::TestHeaderMapImpl trailer_map{{trailer_name, "b"}};
+  Http::TestHeaderMapImpl trailer_map{{trailer_name, "b"}, {grpc_status, "8"}};
   ResponseWrapper response(&header_map, &trailer_map, info);
 
   EXPECT_CALL(info, responseCode()).WillRepeatedly(Return(404));
@@ -252,7 +253,7 @@ TEST(Context, ResponseAttributes) {
     ASSERT_TRUE(value.value().IsMap());
     auto& map = *value.value().MapOrDie();
     EXPECT_FALSE(map.empty());
-    EXPECT_EQ(1, map.size());
+    EXPECT_EQ(2, map.size());
 
     auto header = map[CelValue::CreateString(&trailer_name)];
     EXPECT_TRUE(header.has_value());
@@ -264,6 +265,12 @@ TEST(Context, ResponseAttributes) {
     EXPECT_TRUE(value.has_value());
     ASSERT_TRUE(value.value().IsInt64());
     EXPECT_EQ(0x1, value.value().Int64OrDie());
+  }
+  {
+    auto value = response[CelValue::CreateStringView(grpc_status)];
+    EXPECT_TRUE(value.has_value());
+    ASSERT_TRUE(value.value().IsInt64());
+    EXPECT_EQ(0x8, value.value().Int64OrDie());
   }
 }
 
