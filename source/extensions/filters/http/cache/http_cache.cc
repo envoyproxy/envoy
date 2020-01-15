@@ -88,14 +88,14 @@ LookupResult LookupRequest::makeLookupResult(Http::HeaderMapPtr&& response_heade
   // TODO(toddmgreer): Implement all HTTP caching semantics.
   ASSERT(response_headers);
   LookupResult result;
-  result.cache_entry_status =
+  result.cache_entry_status_ =
       isFresh(*response_headers) ? CacheEntryStatus::Ok : CacheEntryStatus::RequiresValidation;
-  result.headers = std::move(response_headers);
-  result.content_length = content_length;
-  if (!adjustByteRangeSet(result.response_ranges, request_range_spec_, content_length)) {
-    result.headers->setStatus(416); // Range Not Satisfiable
+  result.headers_ = std::move(response_headers);
+  result.content_length_ = content_length;
+  if (!adjustByteRangeSet(result.response_ranges_, request_range_spec_, content_length)) {
+    result.headers_->setStatus(416); // Range Not Satisfiable
   }
-  result.has_trailers = false;
+  result.has_trailers_ = false;
   return result;
 }
 

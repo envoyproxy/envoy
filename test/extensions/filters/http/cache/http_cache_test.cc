@@ -82,12 +82,12 @@ TEST_F(LookupRequestTest, MakeLookupResultNoBody) {
   const Http::TestHeaderMapImpl response_headers(
       {{"date", formatter_.fromTime(current_time_)}, {"cache-control", "public, max-age=3600"}});
   const LookupResult lookup_response = makeLookupResult(lookup_request, response_headers);
-  ASSERT_EQ(CacheEntryStatus::Ok, lookup_response.cache_entry_status);
-  ASSERT_TRUE(lookup_response.headers);
-  EXPECT_THAT(*lookup_response.headers, Http::IsSupersetOfHeaders(response_headers));
-  EXPECT_EQ(lookup_response.content_length, 0);
-  EXPECT_TRUE(lookup_response.response_ranges.empty());
-  EXPECT_FALSE(lookup_response.has_trailers);
+  ASSERT_EQ(CacheEntryStatus::Ok, lookup_response.cache_entry_status_);
+  ASSERT_TRUE(lookup_response.headers_);
+  EXPECT_THAT(*lookup_response.headers_, Http::IsSupersetOfHeaders(response_headers));
+  EXPECT_EQ(lookup_response.content_length_, 0);
+  EXPECT_TRUE(lookup_response.response_ranges_.empty());
+  EXPECT_FALSE(lookup_response.has_trailers_);
 }
 
 TEST_F(LookupRequestTest, MakeLookupResultBody) {
@@ -97,24 +97,24 @@ TEST_F(LookupRequestTest, MakeLookupResultBody) {
   const uint64_t content_length = 5;
   const LookupResult lookup_response =
       makeLookupResult(lookup_request, response_headers, content_length);
-  ASSERT_EQ(CacheEntryStatus::Ok, lookup_response.cache_entry_status);
-  ASSERT_TRUE(lookup_response.headers);
-  EXPECT_THAT(*lookup_response.headers, Http::IsSupersetOfHeaders(response_headers));
-  EXPECT_EQ(lookup_response.content_length, content_length);
-  EXPECT_TRUE(lookup_response.response_ranges.empty());
-  EXPECT_FALSE(lookup_response.has_trailers);
+  ASSERT_EQ(CacheEntryStatus::Ok, lookup_response.cache_entry_status_);
+  ASSERT_TRUE(lookup_response.headers_);
+  EXPECT_THAT(*lookup_response.headers_, Http::IsSupersetOfHeaders(response_headers));
+  EXPECT_EQ(lookup_response.content_length_, content_length);
+  EXPECT_TRUE(lookup_response.response_ranges_.empty());
+  EXPECT_FALSE(lookup_response.has_trailers_);
 }
 
 TEST_F(LookupRequestTest, MakeLookupResultNoDate) {
   const LookupRequest lookup_request(request_headers_, current_time_);
   const Http::TestHeaderMapImpl response_headers({{"cache-control", "public, max-age=3600"}});
   const LookupResult lookup_response = makeLookupResult(lookup_request, response_headers);
-  EXPECT_EQ(CacheEntryStatus::RequiresValidation, lookup_response.cache_entry_status);
-  ASSERT_TRUE(lookup_response.headers);
-  EXPECT_THAT(*lookup_response.headers, Http::IsSupersetOfHeaders(response_headers));
-  EXPECT_EQ(lookup_response.content_length, 0);
-  EXPECT_TRUE(lookup_response.response_ranges.empty());
-  EXPECT_FALSE(lookup_response.has_trailers);
+  EXPECT_EQ(CacheEntryStatus::RequiresValidation, lookup_response.cache_entry_status_);
+  ASSERT_TRUE(lookup_response.headers_);
+  EXPECT_THAT(*lookup_response.headers_, Http::IsSupersetOfHeaders(response_headers));
+  EXPECT_EQ(lookup_response.content_length_, 0);
+  EXPECT_TRUE(lookup_response.response_ranges_.empty());
+  EXPECT_FALSE(lookup_response.has_trailers_);
 }
 
 TEST_F(LookupRequestTest, PrivateResponse) {
@@ -127,12 +127,12 @@ TEST_F(LookupRequestTest, PrivateResponse) {
   // We must make sure at cache insertion time, private responses must not be
   // inserted. However, if the insertion did happen, it would be served at the
   // time of lookup. (Nothing should rely on this.)
-  ASSERT_EQ(CacheEntryStatus::Ok, lookup_response.cache_entry_status);
-  ASSERT_TRUE(lookup_response.headers);
-  EXPECT_THAT(*lookup_response.headers, Http::IsSupersetOfHeaders(response_headers));
-  EXPECT_EQ(lookup_response.content_length, 0);
-  EXPECT_TRUE(lookup_response.response_ranges.empty());
-  EXPECT_FALSE(lookup_response.has_trailers);
+  ASSERT_EQ(CacheEntryStatus::Ok, lookup_response.cache_entry_status_);
+  ASSERT_TRUE(lookup_response.headers_);
+  EXPECT_THAT(*lookup_response.headers_, Http::IsSupersetOfHeaders(response_headers));
+  EXPECT_EQ(lookup_response.content_length_, 0);
+  EXPECT_TRUE(lookup_response.response_ranges_.empty());
+  EXPECT_FALSE(lookup_response.has_trailers_);
 }
 
 TEST_F(LookupRequestTest, Expired) {
@@ -141,12 +141,12 @@ TEST_F(LookupRequestTest, Expired) {
       {{"cache-control", "public, max-age=3600"}, {"date", "Thu, 01 Jan 2019 00:00:00 GMT"}});
   const LookupResult lookup_response = makeLookupResult(lookup_request, response_headers);
 
-  EXPECT_EQ(CacheEntryStatus::RequiresValidation, lookup_response.cache_entry_status);
-  ASSERT_TRUE(lookup_response.headers);
-  EXPECT_THAT(*lookup_response.headers, Http::IsSupersetOfHeaders(response_headers));
-  EXPECT_EQ(lookup_response.content_length, 0);
-  EXPECT_TRUE(lookup_response.response_ranges.empty());
-  EXPECT_FALSE(lookup_response.has_trailers);
+  EXPECT_EQ(CacheEntryStatus::RequiresValidation, lookup_response.cache_entry_status_);
+  ASSERT_TRUE(lookup_response.headers_);
+  EXPECT_THAT(*lookup_response.headers_, Http::IsSupersetOfHeaders(response_headers));
+  EXPECT_EQ(lookup_response.content_length_, 0);
+  EXPECT_TRUE(lookup_response.response_ranges_.empty());
+  EXPECT_FALSE(lookup_response.has_trailers_);
 }
 
 TEST_F(LookupRequestTest, ExpiredViaFallbackheader) {
@@ -156,7 +156,7 @@ TEST_F(LookupRequestTest, ExpiredViaFallbackheader) {
        {"date", formatter_.fromTime(current_time_)}});
   const LookupResult lookup_response = makeLookupResult(lookup_request, response_headers);
 
-  EXPECT_EQ(CacheEntryStatus::RequiresValidation, lookup_response.cache_entry_status);
+  EXPECT_EQ(CacheEntryStatus::RequiresValidation, lookup_response.cache_entry_status_);
 }
 
 TEST_F(LookupRequestTest, NotExpiredViaFallbackheader) {
@@ -165,7 +165,7 @@ TEST_F(LookupRequestTest, NotExpiredViaFallbackheader) {
       {{"expires", formatter_.fromTime(current_time_ + std::chrono::seconds(5))},
        {"date", formatter_.fromTime(current_time_)}});
   const LookupResult lookup_response = makeLookupResult(lookup_request, response_headers);
-  EXPECT_EQ(CacheEntryStatus::Ok, lookup_response.cache_entry_status);
+  EXPECT_EQ(CacheEntryStatus::Ok, lookup_response.cache_entry_status_);
 }
 
 TEST_F(LookupRequestTest, FullRange) {
@@ -177,12 +177,12 @@ TEST_F(LookupRequestTest, FullRange) {
   const uint64_t content_length = 4;
   const LookupResult lookup_response =
       makeLookupResult(lookup_request, response_headers, content_length);
-  ASSERT_EQ(CacheEntryStatus::Ok, lookup_response.cache_entry_status);
-  ASSERT_TRUE(lookup_response.headers);
-  EXPECT_THAT(*lookup_response.headers, Http::IsSupersetOfHeaders(response_headers));
-  EXPECT_EQ(lookup_response.content_length, 4);
-  EXPECT_TRUE(lookup_response.response_ranges.empty());
-  EXPECT_FALSE(lookup_response.has_trailers);
+  ASSERT_EQ(CacheEntryStatus::Ok, lookup_response.cache_entry_status_);
+  ASSERT_TRUE(lookup_response.headers_);
+  EXPECT_THAT(*lookup_response.headers_, Http::IsSupersetOfHeaders(response_headers));
+  EXPECT_EQ(lookup_response.content_length_, 4);
+  EXPECT_TRUE(lookup_response.response_ranges_.empty());
+  EXPECT_FALSE(lookup_response.has_trailers_);
 }
 
 struct AdjustByteRangeParams {

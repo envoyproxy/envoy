@@ -19,9 +19,9 @@ public:
 
   void getHeaders(LookupHeadersCallback&& cb) override {
     auto entry = cache_.lookup(request_);
-    body_ = std::move(entry.body);
-    cb(entry.response_headers
-           ? request_.makeLookupResult(std::move(entry.response_headers), body_.size())
+    body_ = std::move(entry.body_);
+    cb(entry.response_headers_
+           ? request_.makeLookupResult(std::move(entry.response_headers_), body_.size())
            : LookupResult{});
   }
 
@@ -106,9 +106,9 @@ SimpleHttpCache::Entry SimpleHttpCache::lookup(const LookupRequest& request) {
   if (iter == map_.end()) {
     return Entry{};
   }
-  ASSERT(iter->second.response_headers);
+  ASSERT(iter->second.response_headers_);
   return SimpleHttpCache::Entry{
-      std::make_unique<Http::HeaderMapImpl>(*iter->second.response_headers), iter->second.body};
+      std::make_unique<Http::HeaderMapImpl>(*iter->second.response_headers_), iter->second.body_};
 }
 
 void SimpleHttpCache::insert(const Key& key, Http::HeaderMapPtr&& response_headers,

@@ -121,7 +121,7 @@ void CacheFilter::onUnusableHeaders() {
 }
 
 void CacheFilter::onHeadersAsync(const CacheFilterSharedPtr& self, LookupResult&& result) {
-  switch (result.cache_entry_status) {
+  switch (result.cache_entry_status_) {
   case CacheEntryStatus::RequiresValidation:
   case CacheEntryStatus::FoundNotModified:
   case CacheEntryStatus::UnsatisfiableRange:
@@ -132,10 +132,10 @@ void CacheFilter::onHeadersAsync(const CacheFilterSharedPtr& self, LookupResult&
     return;
   }
   case CacheEntryStatus::Ok:
-    self->post([self, headers = result.headers.release(),
-                response_ranges = std::move(result.response_ranges),
-                content_length = result.content_length,
-                has_trailers = result.has_trailers]() mutable {
+    self->post([self, headers = result.headers_.release(),
+                response_ranges = std::move(result.response_ranges_),
+                content_length = result.content_length_,
+                has_trailers = result.has_trailers_]() mutable {
       self->onOkHeaders(absl::WrapUnique(headers), std::move(response_ranges), content_length,
                         has_trailers);
     });

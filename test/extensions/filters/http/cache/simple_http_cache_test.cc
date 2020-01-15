@@ -67,12 +67,12 @@ protected:
 
   AssertionResult expectLookupSuccessWithBody(LookupContext* lookup_context,
                                               absl::string_view body) {
-    if (lookup_result_.cache_entry_status != CacheEntryStatus::Ok) {
+    if (lookup_result_.cache_entry_status_ != CacheEntryStatus::Ok) {
       return AssertionFailure() << "Expected: lookup_result_.cache_entry_status == "
                                    "CacheEntryStatus::Ok\n  Actual: "
-                                << lookup_result_.cache_entry_status;
+                                << lookup_result_.cache_entry_status_;
     }
-    if (!lookup_result_.headers) {
+    if (!lookup_result_.headers_) {
       return AssertionFailure() << "Expected nonnull lookup_result_.headers";
     }
     if (!lookup_context) {
@@ -97,7 +97,7 @@ protected:
 TEST_F(SimpleHttpCacheTest, PutGet) {
   const std::string RequestPath1("Name");
   LookupContextPtr name_lookup_context = lookup(RequestPath1);
-  EXPECT_EQ(CacheEntryStatus::Unusable, lookup_result_.cache_entry_status);
+  EXPECT_EQ(CacheEntryStatus::Unusable, lookup_result_.cache_entry_status_);
 
   Http::TestHeaderMapImpl response_headers{{"date", formatter_.fromTime(current_time_)},
                                            {"cache-control", "public,max-age=3600"}};
@@ -109,7 +109,7 @@ TEST_F(SimpleHttpCacheTest, PutGet) {
 
   const std::string& RequestPath2("Another Name");
   LookupContextPtr another_name_lookup_context = lookup(RequestPath2);
-  EXPECT_EQ(CacheEntryStatus::Unusable, lookup_result_.cache_entry_status);
+  EXPECT_EQ(CacheEntryStatus::Unusable, lookup_result_.cache_entry_status_);
 
   const std::string NewBody1("NewValue");
   insert(move(name_lookup_context), response_headers, NewBody1);
@@ -123,7 +123,7 @@ TEST_F(SimpleHttpCacheTest, PrivateResponse) {
   const std::string request_path("Name");
 
   LookupContextPtr name_lookup_context = lookup(request_path);
-  EXPECT_EQ(CacheEntryStatus::Unusable, lookup_result_.cache_entry_status);
+  EXPECT_EQ(CacheEntryStatus::Unusable, lookup_result_.cache_entry_status_);
 
   const std::string Body("Value");
   // We must make sure at cache insertion time, private responses must not be
@@ -135,7 +135,7 @@ TEST_F(SimpleHttpCacheTest, PrivateResponse) {
 
 TEST_F(SimpleHttpCacheTest, Miss) {
   LookupContextPtr name_lookup_context = lookup("Name");
-  EXPECT_EQ(CacheEntryStatus::Unusable, lookup_result_.cache_entry_status);
+  EXPECT_EQ(CacheEntryStatus::Unusable, lookup_result_.cache_entry_status_);
 }
 
 TEST_F(SimpleHttpCacheTest, Fresh) {
@@ -145,7 +145,7 @@ TEST_F(SimpleHttpCacheTest, Fresh) {
   insert("/", response_headers, "");
   time_source_.sleep(std::chrono::seconds(3600));
   lookup("/");
-  EXPECT_EQ(CacheEntryStatus::Ok, lookup_result_.cache_entry_status);
+  EXPECT_EQ(CacheEntryStatus::Ok, lookup_result_.cache_entry_status_);
 }
 
 TEST_F(SimpleHttpCacheTest, Stale) {
@@ -155,14 +155,14 @@ TEST_F(SimpleHttpCacheTest, Stale) {
   insert("/", response_headers, "");
   time_source_.sleep(std::chrono::seconds(3601));
   lookup("/");
-  EXPECT_EQ(CacheEntryStatus::Ok, lookup_result_.cache_entry_status);
+  EXPECT_EQ(CacheEntryStatus::Ok, lookup_result_.cache_entry_status_);
 }
 
 TEST_F(SimpleHttpCacheTest, RequestSmallMinFresh) {
   request_headers_.setReferenceKey(Http::Headers::get().CacheControl, "min-fresh=1000");
   const std::string request_path("Name");
   LookupContextPtr name_lookup_context = lookup(request_path);
-  EXPECT_EQ(CacheEntryStatus::Unusable, lookup_result_.cache_entry_status);
+  EXPECT_EQ(CacheEntryStatus::Unusable, lookup_result_.cache_entry_status_);
 
   Http::TestHeaderMapImpl response_headers{{"date", formatter_.fromTime(current_time_)},
                                            {"age", "6000"},
@@ -177,7 +177,7 @@ TEST_F(SimpleHttpCacheTest, ResponseStaleWithRequestLargeMaxStale) {
 
   const std::string request_path("Name");
   LookupContextPtr name_lookup_context = lookup(request_path);
-  EXPECT_EQ(CacheEntryStatus::Unusable, lookup_result_.cache_entry_status);
+  EXPECT_EQ(CacheEntryStatus::Unusable, lookup_result_.cache_entry_status_);
 
   Http::TestHeaderMapImpl response_headers{{"date", formatter_.fromTime(current_time_)},
                                            {"age", "7200"},
@@ -198,9 +198,9 @@ TEST_F(SimpleHttpCacheTest, StreamingPut) {
       Buffer::OwnedImpl("Hello, "), [](bool ready) { EXPECT_TRUE(ready); }, false);
   inserter->insertBody(Buffer::OwnedImpl("World!"), nullptr, true);
   LookupContextPtr name_lookup_context = lookup("request_path");
-  EXPECT_EQ(CacheEntryStatus::Ok, lookup_result_.cache_entry_status);
-  EXPECT_NE(nullptr, lookup_result_.headers);
-  ASSERT_EQ(13, lookup_result_.content_length);
+  EXPECT_EQ(CacheEntryStatus::Ok, lookup_result_.cache_entry_status_);
+  EXPECT_NE(nullptr, lookup_result_.headers_);
+  ASSERT_EQ(13, lookup_result_.content_length_);
   EXPECT_EQ("Hello, World!", getBody(*name_lookup_context, 0, 13));
 }
 

@@ -108,18 +108,18 @@ bool adjustByteRangeSet(std::vector<AdjustedByteRange>& response_ranges,
 // Result of a lookup operation, including cached headers and information needed
 // to serve a response based on it, or to attempt to validate.
 struct LookupResult {
-  // If cache_entry_status == Unusable, none of the other members are
+  // If cache_entry_status_ == Unusable, none of the other members are
   // meaningful.
-  CacheEntryStatus cache_entry_status = CacheEntryStatus::Unusable;
+  CacheEntryStatus cache_entry_status_ = CacheEntryStatus::Unusable;
 
   // Headers of the cached response.
-  Http::HeaderMapPtr headers;
+  Http::HeaderMapPtr headers_;
 
   // Size of the full response body. Cache filter will generate a content-length
   // header with this value, replacing any preexisting content-length header.
   // (This lets us dechunk responses as we insert them, then later serve them
   // with a content-length header.)
-  uint64_t content_length;
+  uint64_t content_length_;
 
   // Represents the subset of the cached response body that should be served to
   // the client. If response_ranges.empty(), the entire body should be served.
@@ -128,11 +128,11 @@ struct LookupResult {
   // response_ranges must be in the range [0,content_length). Caches should
   // ensure that they can efficiently serve these ranges, and may merge and/or
   // reorder ranges as appropriate, or may clear() response_ranges entirely.
-  std::vector<AdjustedByteRange> response_ranges;
+  std::vector<AdjustedByteRange> response_ranges_;
 
   // TODO(toddmgreer): Implement trailer support.
   // True if the cached response has trailers.
-  bool has_trailers = false;
+  bool has_trailers_ = false;
 };
 
 // Produces a hash of key that is consistent across restarts, architectures,
@@ -177,7 +177,7 @@ public:
   // WARNING: Incomplete--do not use in production (yet).
   // Returns a LookupResult suitable for sending to the cache filter's
   // LookupHeadersCallback. Specifically,
-  // - LookupResult::cache_entry_status is set according to HTTP cache
+  // - LookupResult::cache_entry_status_ is set according to HTTP cache
   // validation logic.
   // - LookupResult::headers takes ownership of response_headers.
   // - LookupResult::content_length == content_length.

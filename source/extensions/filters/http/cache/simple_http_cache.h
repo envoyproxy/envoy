@@ -17,8 +17,8 @@ namespace Cache {
 class SimpleHttpCache : public HttpCache {
 private:
   struct Entry {
-    Http::HeaderMapPtr response_headers;
-    std::string body;
+    Http::HeaderMapPtr response_headers_;
+    std::string body_;
   };
 
 public:
