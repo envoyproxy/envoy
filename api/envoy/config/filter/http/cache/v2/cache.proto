@@ -2,11 +2,14 @@ syntax = "proto3";
 
 package envoy.config.filter.http.cache.v2;
 
+import "udpa/annotations/migrate.proto";
 import "validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.config.filter.http.cache.v2";
 option java_outer_classname = "CacheProto";
 option java_multiple_files = true;
+option (udpa.annotations.file_migrate).move_to_package =
+    "envoy.extensions.filters.http.cache.v3alpha";
 
 // [#protodoc-title: HTTP Cache Filter]
 // Pluggable HTTP Cache :ref:`overview <config_http_filters_cache>`.
