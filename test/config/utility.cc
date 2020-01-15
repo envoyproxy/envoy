@@ -39,13 +39,6 @@ admin:
 dynamic_resources:
   lds_config:
     path: /dev/null
-layered_runtime:
-  layers:
-    - name: some_static_layer
-      static_layer:
-        foo: bar
-    - name: admin
-      admin_layer: {}
 static_resources:
   secrets:
   - name: "secret_static_0"
@@ -384,6 +377,16 @@ void ConfigHelper::applyConfigModifiers() {
 }
 
 void ConfigHelper::addRuntimeOverride(absl::string_view key, absl::string_view value) {
+  if (bootstrap_.mutable_layered_runtime()->layers_size() == 0) {
+    bootstrap_.mutable_layered_runtime()->MergeFrom(
+        TestUtility::parseYaml<envoy::config::bootstrap::v3alpha::LayeredRuntime>(R"EOF( 
+layers:
+  - name: some_static_layer
+    static_layer:
+  - name: admin
+    admin_layer: {}
+)EOF"));
+  }
   ProtobufWkt::Struct base = TestUtility::parseYaml<ProtobufWkt::Struct>(StrCat(key, ": ", value));
   bootstrap_.mutable_layered_runtime()->mutable_layers(0)->mutable_static_layer()->MergeFrom(base);
 }
