@@ -1,6 +1,6 @@
 syntax = "proto3";
 
-package envoy.config.wasm.v3alpha;
+package envoy.extensions.wasm.v3alpha;
 
 import "envoy/config/core/v3alpha/base.proto";
 
@@ -10,7 +10,7 @@ import "udpa/annotations/versioning.proto";
 
 import "validate/validate.proto";
 
-option java_package = "io.envoyproxy.envoy.config.wasm.v3alpha";
+option java_package = "io.envoyproxy.envoy.extensions.wasm.v3alpha";
 option java_outer_classname = "WasmProto";
 option java_multiple_files = true;
 
@@ -32,7 +32,7 @@ message VmConfig {
   string runtime = 2 [(validate.rules).string = {min_bytes: 1}];
 
   // The Wasm code that Envoy will execute.
-  core.v3alpha.AsyncDataSource code = 3;
+  config.core.v3alpha.AsyncDataSource code = 3;
 
   // The Wasm configuration used in initialization of a new VM (proxy_on_start).
   google.protobuf.Any configuration = 4;
@@ -64,7 +64,7 @@ message PluginConfig {
 }
 
 // WasmService is configured as a built-in *envoy.wasm_service* :ref:`ServiceConfig
-// <envoy_api_msg_config.wasm.v3alpha.WasmService>`. This opaque configuration will be used to
+// <envoy_api_msg_extensions.wasm.v3alpha.WasmService>`. This opaque configuration will be used to
 // create a Wasm Service.
 message WasmService {
   option (udpa.annotations.versioning).previous_message_type =
