@@ -612,7 +612,7 @@ void HeaderMapImpl::clear() {
 
 bool HeaderMapImpl::HeaderList::maybeMakeMap() const {
   if (lazy_map_.empty()) {
-    if (headers_.size() < MapSizeThreshold) {
+    if (MapSizeThreshold == 0 || headers_.size() < MapSizeThreshold) {
       return false;
     }
     for (auto node = headers_.begin(); node != headers_.end(); ++node) {
