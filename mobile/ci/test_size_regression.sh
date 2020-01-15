@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Checks the absolute size, and the relative increase of a file.
-MAX_SIZE=4000000
+MAX_SIZE=5000000
 MAX_PERC=1
 
 if [ `uname` == "Darwin" ]
