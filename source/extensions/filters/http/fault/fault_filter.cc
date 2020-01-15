@@ -225,23 +225,21 @@ bool FaultFilter::isDelayEnabled() {
     return false;
   }
 
-  bool enabled = config_->runtime().snapshot().featureEnabled(
-      fault_settings_->delayPercentRuntime(), fault_settings_->requestDelay()->percentage());
   if (!downstream_cluster_delay_percent_key_.empty()) {
-    enabled |= config_->runtime().snapshot().featureEnabled(
+    return config_->runtime().snapshot().featureEnabled(
         downstream_cluster_delay_percent_key_, fault_settings_->requestDelay()->percentage());
   }
-  return enabled;
+  return config_->runtime().snapshot().featureEnabled(
+      fault_settings_->delayPercentRuntime(), fault_settings_->requestDelay()->percentage());
 }
 
 bool FaultFilter::isAbortEnabled() {
-  bool enabled = config_->runtime().snapshot().featureEnabled(
-      fault_settings_->abortPercentRuntime(), fault_settings_->abortPercentage());
   if (!downstream_cluster_abort_percent_key_.empty()) {
-    enabled |= config_->runtime().snapshot().featureEnabled(downstream_cluster_abort_percent_key_,
-                                                            fault_settings_->abortPercentage());
+    return config_->runtime().snapshot().featureEnabled(downstream_cluster_abort_percent_key_,
+                                                        fault_settings_->abortPercentage());
   }
-  return enabled;
+  return config_->runtime().snapshot().featureEnabled(fault_settings_->abortPercentRuntime(),
+                                                      fault_settings_->abortPercentage());
 }
 
 absl::optional<std::chrono::milliseconds>

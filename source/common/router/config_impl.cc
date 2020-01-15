@@ -83,19 +83,19 @@ RetryPolicyImpl::RetryPolicyImpl(const envoy::config::route::v3alpha::RetryPolic
 
   for (const auto& host_predicate : retry_policy.retry_host_predicate()) {
     auto& factory = Envoy::Config::Utility::getAndCheckFactory<Upstream::RetryHostPredicateFactory>(
-        host_predicate.name());
+        host_predicate);
     auto config = Envoy::Config::Utility::translateToFactoryConfig(host_predicate,
                                                                    validation_visitor, factory);
-    retry_host_predicate_configs_.emplace_back(host_predicate.name(), std::move(config));
+    retry_host_predicate_configs_.emplace_back(factory, std::move(config));
   }
 
   const auto& retry_priority = retry_policy.retry_priority();
   if (!retry_priority.name().empty()) {
-    auto& factory = Envoy::Config::Utility::getAndCheckFactory<Upstream::RetryPriorityFactory>(
-        retry_priority.name());
+    auto& factory =
+        Envoy::Config::Utility::getAndCheckFactory<Upstream::RetryPriorityFactory>(retry_priority);
     retry_priority_config_ =
-        std::make_pair(retry_priority.name(), Envoy::Config::Utility::translateToFactoryConfig(
-                                                  retry_priority, validation_visitor, factory));
+        std::make_pair(&factory, Envoy::Config::Utility::translateToFactoryConfig(
+                                     retry_priority, validation_visitor, factory));
   }
 
   auto host_selection_attempts = retry_policy.host_selection_retry_max_attempts();
@@ -133,24 +133,19 @@ std::vector<Upstream::RetryHostPredicateSharedPtr> RetryPolicyImpl::retryHostPre
   std::vector<Upstream::RetryHostPredicateSharedPtr> predicates;
 
   for (const auto& config : retry_host_predicate_configs_) {
-    auto& factory = Envoy::Config::Utility::getAndCheckFactory<Upstream::RetryHostPredicateFactory>(
-        config.first);
-    predicates.emplace_back(factory.createHostPredicate(*config.second, num_retries_));
+    predicates.emplace_back(config.first.createHostPredicate(*config.second, num_retries_));
   }
 
   return predicates;
 }
 
 Upstream::RetryPrioritySharedPtr RetryPolicyImpl::retryPriority() const {
-  if (retry_priority_config_.first.empty()) {
+  if (retry_priority_config_.first == nullptr) {
     return nullptr;
   }
 
-  auto& factory = Envoy::Config::Utility::getAndCheckFactory<Upstream::RetryPriorityFactory>(
-      retry_priority_config_.first);
-
-  return factory.createRetryPriority(*retry_priority_config_.second, *validation_visitor_,
-                                     num_retries_);
+  return retry_priority_config_.first->createRetryPriority(*retry_priority_config_.second,
+                                                           *validation_visitor_, num_retries_);
 }
 
 CorsPolicyImpl::CorsPolicyImpl(const envoy::config::route::v3alpha::CorsPolicy& config,
@@ -291,7 +286,9 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
                           route.hidden_envoy_deprecated_per_filter_config(), factory_context,
                           validator),
       route_name_(route.name()), time_source_(factory_context.dispatcher().timeSource()),
-      internal_redirect_action_(convertInternalRedirectAction(route.route())) {
+      internal_redirect_action_(convertInternalRedirectAction(route.route())),
+      max_internal_redirects_(
+          PROTOBUF_GET_WRAPPED_OR_DEFAULT(route.route(), max_internal_redirects, 1)) {
   if (route.route().has_metadata_match()) {
     const auto filter_it = route.route().metadata_match().filter_metadata().find(
         Envoy::Config::MetadataFilters::get().ENVOY_LB);
@@ -375,7 +372,7 @@ RouteEntryImplBase::RouteEntryImplBase(const VirtualHostImpl& vhost,
                 Envoy::Http::LowerCaseString(upgrade_config.upgrade_type()).get(), enabled))
             .second;
     if (!success) {
-      throw EnvoyException(fmt::format("Duplicate upgrade {}", upgrade_config.upgrade_type()));
+      throw EnvoyException(absl::StrCat("Duplicate upgrade ", upgrade_config.upgrade_type()));
     }
   }
 }
@@ -1198,7 +1195,7 @@ createRouteSpecificFilterConfig(const std::string& name, const ProtobufWkt::Any&
                                 const ProtobufWkt::Struct& config,
                                 Server::Configuration::ServerFactoryContext& factory_context,
                                 ProtobufMessage::ValidationVisitor& validator) {
-  auto& factory = Envoy::Config::Utility::getAndCheckFactory<
+  auto& factory = Envoy::Config::Utility::getAndCheckFactoryByName<
       Server::Configuration::NamedHttpFilterConfigFactory>(name);
   ProtobufTypes::MessagePtr proto_config = factory.createEmptyRouteConfigProto();
   Envoy::Config::Utility::translateOpaqueConfig(typed_config, config, validator, *proto_config);

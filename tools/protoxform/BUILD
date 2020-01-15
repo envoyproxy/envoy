@@ -18,5 +18,6 @@ py_binary(
         "@com_github_cncf_udpa//udpa/annotations:pkg_py_proto",
         "@com_google_googleapis//google/api:annotations_py_proto",
         "@com_google_protobuf//:protobuf_python",
+        "@envoy_api_canonical//envoy/annotations:pkg_py_proto",
     ],
 )

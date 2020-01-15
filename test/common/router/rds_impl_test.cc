@@ -342,7 +342,7 @@ public:
 envoy::config::route::v3alpha::RouteConfiguration
 parseRouteConfigurationFromV2Yaml(const std::string& yaml) {
   envoy::config::route::v3alpha::RouteConfiguration route_config;
-  TestUtility::loadFromYaml(yaml, route_config);
+  TestUtility::loadFromYaml(yaml, route_config, true);
   return route_config;
 }
 
@@ -386,6 +386,7 @@ virtual_hosts:
   TestUtility::loadFromYaml(R"EOF(
 static_route_configs:
   - route_config:
+      "@type": type.googleapis.com/envoy.api.v2.RouteConfiguration
       name: foo
       virtual_hosts:
         - name: bar
@@ -432,6 +433,7 @@ dynamic_route_configs:
   TestUtility::loadFromYaml(R"EOF(
 static_route_configs:
   - route_config:
+      "@type": type.googleapis.com/envoy.api.v2.RouteConfiguration
       name: foo
       virtual_hosts:
         - name: bar
@@ -445,6 +447,7 @@ static_route_configs:
 dynamic_route_configs:
   - version_info: "1"
     route_config:
+      "@type": type.googleapis.com/envoy.api.v2.RouteConfiguration
       name: foo_route_config
       virtual_hosts:
     last_updated:

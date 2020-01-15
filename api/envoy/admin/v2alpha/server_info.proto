@@ -4,6 +4,8 @@ package envoy.admin.v2alpha;
 
 import "google/protobuf/duration.proto";
 
+import "envoy/annotations/deprecation.proto";
+
 option java_package = "io.envoyproxy.envoy.admin.v2alpha";
 option java_outer_classname = "ServerInfoProto";
 option java_multiple_files = true;
@@ -128,9 +130,10 @@ message CommandLineOptions {
   Mode mode = 19;
 
   // max_stats and max_obj_name_len are now unused and have no effect.
-  uint64 max_stats = 20 [deprecated = true];
+  uint64 max_stats = 20 [deprecated = true, (envoy.annotations.disallowed_by_default) = true];
 
-  uint64 max_obj_name_len = 21 [deprecated = true];
+  uint64 max_obj_name_len = 21
+      [deprecated = true, (envoy.annotations.disallowed_by_default) = true];
 
   // See :option:`--disable-hot-restart` for details.
   bool disable_hot_restart = 22;

@@ -186,6 +186,11 @@ TEST_F(DiskLoaderImplTest, All) {
   EXPECT_EQ("hello\nworld", loader_->snapshot().get("subdir.file3"));
   EXPECT_EQ("", loader_->snapshot().get("invalid"));
 
+  // Existence checking.
+  EXPECT_EQ(true, loader_->snapshot().exists("file2"));
+  EXPECT_EQ(true, loader_->snapshot().exists("subdir.file3"));
+  EXPECT_EQ(false, loader_->snapshot().exists("invalid"));
+
   // Integer getting.
   EXPECT_EQ(1UL, loader_->snapshot().getInteger("file1", 1));
   EXPECT_EQ(2UL, loader_->snapshot().getInteger("file3", 1));
@@ -228,13 +233,8 @@ TEST_F(DiskLoaderImplTest, All) {
   EXPECT_EQ(false, snapshot->runtimeFeatureEnabled("envoy.reloadable_features.test_feature_false"));
 
   // Deprecation
-#ifdef ENVOY_DISABLE_DEPRECATED_FEATURES
-  EXPECT_EQ(false, snapshot->deprecatedFeatureEnabled("random_string_should_be_enabled"));
-#else
-  EXPECT_EQ(true, snapshot->deprecatedFeatureEnabled("random_string_should_be_enabled"));
-#endif
   EXPECT_EQ(false, snapshot->deprecatedFeatureEnabled(
-                       "envoy.deprecated_features.deprecated.proto:is_deprecated_fatal"));
+                       "envoy.deprecated_features.deprecated.proto:is_deprecated_fatal", false));
 
   // Feature defaults via helper function.
   EXPECT_EQ(false, runtimeFeatureEnabled("envoy.reloadable_features.test_feature_false"));

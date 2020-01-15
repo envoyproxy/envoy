@@ -19,12 +19,12 @@ TransportSocketMatcherImpl::TransportSocketMatcherImpl(
   for (const auto& socket_match : socket_matches) {
     const auto& socket_config = socket_match.transport_socket();
     auto& config_factory = Config::Utility::getAndCheckFactory<
-        Server::Configuration::UpstreamTransportSocketConfigFactory>(socket_config.name());
+        Server::Configuration::UpstreamTransportSocketConfigFactory>(socket_config);
     ProtobufTypes::MessagePtr message = Config::Utility::translateToFactoryConfig(
         socket_config, factory_context.messageValidationVisitor(), config_factory);
     FactoryMatch factory_match(
         socket_match.name(), config_factory.createTransportSocketFactory(*message, factory_context),
-        generateStats(socket_match.name() + "."));
+        generateStats(absl::StrCat(socket_match.name(), ".")));
     for (const auto& kv : socket_match.match().fields()) {
       factory_match.label_set.emplace_back(kv.first, kv.second);
     }

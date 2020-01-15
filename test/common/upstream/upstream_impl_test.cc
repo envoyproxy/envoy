@@ -1566,9 +1566,14 @@ TEST_F(StaticClusterImplTest, UnsupportedLBType) {
     connect_timeout: 0.25s
     type: static
     lb_policy: fakelbtype
-    hosts:
-    - { socket_address: { address: 192.168.1.1, port_value: 22 }}
-    - { socket_address: { address: 192.168.1.2, port_value: 44 }}
+    load_assignment:
+      cluster_name: addressportconfig
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address: { address: 192.168.1.1, port_value: 22 }
+              socket_address: { address: 192.168.1.2, port_value: 44 }
   )EOF";
 
   EXPECT_THROW_WITH_MESSAGE(
@@ -1869,7 +1874,7 @@ struct Baz : public Envoy::Config::TypedMetadata::Object {
 
 class BazFactory : public ClusterTypedMetadataFactory {
 public:
-  const std::string name() const override { return "baz"; }
+  std::string name() const override { return "baz"; }
   // Returns nullptr (conversion failure) if d is empty.
   std::unique_ptr<const Envoy::Config::TypedMetadata::Object>
   parse(const ProtobufWkt::Struct& d) const override {
@@ -2098,6 +2103,35 @@ TEST_F(ClusterInfoImplTest, Timeouts) {
   EXPECT_FALSE(cluster3->info()->idleTimeout().has_value());
 }
 
+TEST_F(ClusterInfoImplTest, TestTrackTimeoutBudgets) {
+  // Check that without the flag specified, the histogram is null.
+  const std::string yaml_disabled = R"EOF(
+    name: name
+    connect_timeout: 0.25s
+    type: STRICT_DNS
+    lb_policy: ROUND_ROBIN
+  )EOF";
+
+  auto cluster = makeCluster(yaml_disabled);
+  // The stats will be null if they have not been explicitly turned on.
+  EXPECT_FALSE(cluster->info()->timeoutBudgetStats().has_value());
+
+  // Check that with the flag, the histogram is created.
+  const std::string yaml = R"EOF(
+    name: name
+    connect_timeout: 0.25s
+    type: STRICT_DNS
+    lb_policy: ROUND_ROBIN
+    track_timeout_budgets: true
+  )EOF";
+
+  cluster = makeCluster(yaml);
+  // The stats should be created.
+  EXPECT_TRUE(cluster->info()->timeoutBudgetStats().has_value());
+  EXPECT_EQ(Stats::Histogram::Unit::Unspecified,
+            cluster->info()->timeoutBudgetStats()->upstream_rq_timeout_budget_percent_used_.unit());
+}
+
 class TestFilterConfigFactoryBase {
 public:
   TestFilterConfigFactoryBase(
@@ -2135,7 +2169,8 @@ public:
                               ProtobufMessage::ValidationVisitor&) override {
     return parent_.createProtocolOptionsConfig(msg);
   }
-  std::string name() override { CONSTRUCT_ON_FIRST_USE(std::string, "envoy.test.filter"); }
+  std::string name() const override { CONSTRUCT_ON_FIRST_USE(std::string, "envoy.test.filter"); }
+  std::string configType() override { return ""; };
 
   TestFilterConfigFactoryBase& parent_;
 };
@@ -2169,7 +2204,8 @@ public:
                               ProtobufMessage::ValidationVisitor&) override {
     return parent_.createProtocolOptionsConfig(msg);
   }
-  std::string name() override { CONSTRUCT_ON_FIRST_USE(std::string, "envoy.test.filter"); }
+  std::string name() const override { CONSTRUCT_ON_FIRST_USE(std::string, "envoy.test.filter"); }
+  std::string configType() override { return ""; };
 
   TestFilterConfigFactoryBase& parent_;
 };

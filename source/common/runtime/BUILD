@@ -9,17 +9,31 @@ load(
 envoy_package()
 
 envoy_cc_library(
-    name = "runtime_lib",
+    name = "runtime_features_lib",
     srcs = [
         "runtime_features.cc",
-        "runtime_impl.cc",
     ],
     hdrs = [
         "runtime_features.h",
+    ],
+    deps = [
+        "//source/common/common:hash_lib",
+        "//source/common/singleton:const_singleton",
+    ],
+)
+
+envoy_cc_library(
+    name = "runtime_lib",
+    srcs = [
+        "runtime_impl.cc",
+    ],
+    hdrs = [
         "runtime_impl.h",
+        "runtime_protos.h",
     ],
     external_deps = ["ssl"],
     deps = [
+        ":runtime_features_lib",
         "//include/envoy/config:subscription_interface",
         "//include/envoy/event:dispatcher_interface",
         "//include/envoy/init:manager_interface",

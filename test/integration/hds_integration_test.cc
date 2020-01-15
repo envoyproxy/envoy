@@ -52,7 +52,7 @@ public:
       hds_cluster->set_name("hds_cluster");
       hds_cluster->mutable_http2_protocol_options();
       auto* cluster_0 = bootstrap.mutable_static_resources()->mutable_clusters(0);
-      cluster_0->mutable_hosts()->Clear();
+      cluster_0->clear_load_assignment();
     });
 
     HttpIntegrationTest::initialize();

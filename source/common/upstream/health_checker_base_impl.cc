@@ -32,11 +32,25 @@ HealthCheckerImplBase::HealthCheckerImplBase(
       unhealthy_edge_interval_(
           PROTOBUF_GET_MS_OR_DEFAULT(config, unhealthy_edge_interval, unhealthy_interval_.count())),
       healthy_edge_interval_(
-          PROTOBUF_GET_MS_OR_DEFAULT(config, healthy_edge_interval, interval_.count())) {
+          PROTOBUF_GET_MS_OR_DEFAULT(config, healthy_edge_interval, interval_.count())),
+      transport_socket_options_(initTransportSocketOptions(config)) {
   cluster_.prioritySet().addMemberUpdateCb(
       [this](const HostVector& hosts_added, const HostVector& hosts_removed) -> void {
         onClusterMemberUpdate(hosts_added, hosts_removed);
       });
+}
+
+std::shared_ptr<const Network::TransportSocketOptionsImpl>
+HealthCheckerImplBase::initTransportSocketOptions(
+    const envoy::config::core::v3alpha::HealthCheck& config) {
+  if (config.has_tls_options()) {
+    std::vector<std::string> protocols{config.tls_options().alpn_protocols().begin(),
+                                       config.tls_options().alpn_protocols().end()};
+    return std::make_shared<const Network::TransportSocketOptionsImpl>(
+        "", std::vector<std::string>{}, std::move(protocols));
+  }
+
+  return std::make_shared<const Network::TransportSocketOptionsImpl>();
 }
 
 HealthCheckerImplBase::~HealthCheckerImplBase() {

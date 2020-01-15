@@ -66,8 +66,8 @@ public:
   ~MockDnsHostInfo() override;
 
   MOCK_METHOD0(address, Network::Address::InstanceConstSharedPtr());
-  MOCK_METHOD0(resolvedHost, const std::string&());
-  MOCK_METHOD0(isIpAddress, bool());
+  MOCK_CONST_METHOD0(resolvedHost, const std::string&());
+  MOCK_CONST_METHOD0(isIpAddress, bool());
   MOCK_METHOD0(touch, void());
 
   Network::Address::InstanceConstSharedPtr address_;

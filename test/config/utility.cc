@@ -7,7 +7,7 @@
 #include "envoy/config/listener/v3alpha/listener_components.pb.h"
 #include "envoy/config/route/v3alpha/route_components.pb.h"
 #include "envoy/config/tap/v3alpha/common.pb.h"
-#include "envoy/extensions/access_loggers/grpc/v3alpha/file.pb.h"
+#include "envoy/extensions/access_loggers/file/v3alpha/file.pb.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3alpha/http_connection_manager.pb.h"
 #include "envoy/extensions/transport_sockets/tap/v3alpha/tap.pb.h"
 #include "envoy/extensions/transport_sockets/tls/v3alpha/cert.pb.h"
@@ -51,10 +51,15 @@ static_resources:
         inline_string: "DUMMY_INLINE_BYTES"
   clusters:
     name: cluster_0
-    hosts:
-      socket_address:
-        address: 127.0.0.1
-        port_value: 0
+    load_assignment:
+      cluster_name: cluster_0
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: 127.0.0.1
+                port_value: 0
   listeners:
     name: listener_0
     address:
@@ -73,10 +78,15 @@ admin:
 static_resources:
   clusters:
     name: cluster_0
-    hosts:
-      socket_address:
-        address: 127.0.0.1
-        port_value: 0
+    load_assignment:
+      cluster_name: cluster_0
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: 127.0.0.1
+                port_value: 0
   listeners:
     name: listener_0
     address:
@@ -231,10 +241,15 @@ static_resources:
   clusters:
   - name: my_cds_cluster
     http2_protocol_options: {{}}
-    hosts:
-      socket_address:
-        address: 127.0.0.1
-        port_value: 0
+    load_assignment:
+      cluster_name: my_cds_cluster
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: 127.0.0.1
+                port_value: 0
   listeners:
     name: http
     address:
@@ -286,10 +301,15 @@ static_resources:
     connect_timeout:
       seconds: 5
     type: STATIC
-    hosts:
-      socket_address:
-        address: 127.0.0.1
-        port_value: 0
+    load_assignment:
+      cluster_name: dummy_cluster
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: 127.0.0.1
+                port_value: 0
     lb_policy: ROUND_ROBIN
     http2_protocol_options: {{}}
 admin:
@@ -324,6 +344,12 @@ ConfigHelper::buildCluster(const std::string& name, int port, const std::string&
                   name, name, ip_version, port));
 }
 
+envoy::config::endpoint::v3alpha::Endpoint ConfigHelper::buildEndpoint(const std::string& address) {
+  envoy::config::endpoint::v3alpha::Endpoint endpoint;
+  endpoint.mutable_address()->mutable_socket_address()->set_address(address);
+  return endpoint;
+}
+
 ConfigHelper::ConfigHelper(const Network::Address::IpVersion version, Api::Api& api,
                            const std::string& config) {
   RELEASE_ASSERT(!finalized_, "");
@@ -348,18 +374,13 @@ ConfigHelper::ConfigHelper(const Network::Address::IpVersion version, Api::Api& 
 
   for (int i = 0; i < static_resources->clusters_size(); ++i) {
     auto* cluster = static_resources->mutable_clusters(i);
-    if (!cluster->hosts().empty()) {
-      for (int j = 0; j < cluster->hosts().size(); j++) {
-        if (cluster->mutable_hosts(j)->has_socket_address()) {
-          auto host_socket_addr = cluster->mutable_hosts(j)->mutable_socket_address();
-          host_socket_addr->set_address(Network::Test::getLoopbackAddressString(version));
-        }
-      }
-    }
+    RELEASE_ASSERT(
+        cluster->hidden_envoy_deprecated_hosts().empty(),
+        "Hosts should be specified via load_assignment() in the integration test framework.");
     for (int j = 0; j < cluster->load_assignment().endpoints_size(); ++j) {
-      auto locality_lb = cluster->mutable_load_assignment()->mutable_endpoints(j);
+      auto* locality_lb = cluster->mutable_load_assignment()->mutable_endpoints(j);
       for (int k = 0; k < locality_lb->lb_endpoints_size(); ++k) {
-        auto lb_endpoint = locality_lb->mutable_lb_endpoints(k);
+        auto* lb_endpoint = locality_lb->mutable_lb_endpoints(k);
         if (lb_endpoint->endpoint().address().has_socket_address()) {
           lb_endpoint->mutable_endpoint()->mutable_address()->mutable_socket_address()->set_address(
               Network::Test::getLoopbackAddressString(version));
@@ -398,11 +419,9 @@ void ConfigHelper::finalize(const std::vector<uint32_t>& ports) {
       if (tap_path) {
         auto* filter_chain = listener->mutable_filter_chains(j);
         const bool has_tls = filter_chain->has_hidden_envoy_deprecated_tls_context();
-        absl::optional<ProtobufWkt::Struct> tls_config;
+        const Protobuf::Message* tls_config = nullptr;
         if (has_tls) {
-          tls_config = ProtobufWkt::Struct();
-          TestUtility::jsonConvert(filter_chain->hidden_envoy_deprecated_tls_context(),
-                                   tls_config.value());
+          tls_config = &filter_chain->hidden_envoy_deprecated_tls_context();
           filter_chain->clear_hidden_envoy_deprecated_tls_context();
         }
         setTapTransportSocket(tap_path.value(), fmt::format("listener_{}_{}", i, j),
@@ -419,15 +438,10 @@ void ConfigHelper::finalize(const std::vector<uint32_t>& ports) {
     } else if (cluster->has_cluster_type()) {
       custom_cluster = true;
     } else {
-      for (int j = 0; j < cluster->hosts_size(); ++j) {
-        if (cluster->mutable_hosts(j)->has_socket_address()) {
-          auto* host_socket_addr = cluster->mutable_hosts(j)->mutable_socket_address();
-          RELEASE_ASSERT(ports.size() > port_idx, "");
-          host_socket_addr->set_port_value(ports[port_idx++]);
-        }
-      }
-
       // Assign ports to statically defined load_assignment hosts.
+      RELEASE_ASSERT(
+          cluster->hidden_envoy_deprecated_hosts().empty(),
+          "Hosts should be specified via load_assignment() in the integration test framework.");
       for (int j = 0; j < cluster->load_assignment().endpoints_size(); ++j) {
         auto locality_lb = cluster->mutable_load_assignment()->mutable_endpoints(j);
         for (int k = 0; k < locality_lb->lb_endpoints_size(); ++k) {
@@ -445,14 +459,12 @@ void ConfigHelper::finalize(const std::vector<uint32_t>& ports) {
 
     if (tap_path) {
       const bool has_tls = cluster->has_hidden_envoy_deprecated_tls_context();
-      absl::optional<ProtobufWkt::Struct> tls_config;
+      const Protobuf::Message* tls_config = nullptr;
       if (has_tls) {
-        tls_config = ProtobufWkt::Struct();
-        TestUtility::jsonConvert(cluster->hidden_envoy_deprecated_tls_context(),
-                                 tls_config.value());
+        tls_config = &cluster->hidden_envoy_deprecated_tls_context();
         cluster->clear_hidden_envoy_deprecated_tls_context();
       }
-      setTapTransportSocket(tap_path.value(), fmt::format("cluster_{}", i),
+      setTapTransportSocket(tap_path.value(), absl::StrCat("cluster_", i),
                             *cluster->mutable_transport_socket(), tls_config);
     }
   }
@@ -476,15 +488,15 @@ void ConfigHelper::finalize(const std::vector<uint32_t>& ports) {
 void ConfigHelper::setTapTransportSocket(
     const std::string& tap_path, const std::string& type,
     envoy::config::core::v3alpha::TransportSocket& transport_socket,
-    const absl::optional<ProtobufWkt::Struct>& tls_config) {
+    const Protobuf::Message* tls_config) {
   // Determine inner transport socket.
   envoy::config::core::v3alpha::TransportSocket inner_transport_socket;
   if (!transport_socket.name().empty()) {
     RELEASE_ASSERT(!tls_config, "");
     inner_transport_socket.MergeFrom(transport_socket);
-  } else if (tls_config.has_value()) {
+  } else if (tls_config) {
     inner_transport_socket.set_name("envoy.transport_sockets.tls");
-    inner_transport_socket.mutable_hidden_envoy_deprecated_config()->MergeFrom(tls_config.value());
+    inner_transport_socket.mutable_typed_config()->PackFrom(*tls_config);
   } else {
     inner_transport_socket.set_name("envoy.transport_sockets.raw_buffer");
   }
@@ -662,7 +674,7 @@ bool ConfigHelper::setAccessLog(const std::string& filename, absl::string_view f
   envoy::extensions::filters::network::http_connection_manager::v3alpha::HttpConnectionManager
       hcm_config;
   loadHttpConnectionManager(hcm_config);
-  envoy::extensions::access_loggers::grpc::v3alpha::FileAccessLog access_log_config;
+  envoy::extensions::access_loggers::file::v3alpha::FileAccessLog access_log_config;
   if (!format.empty()) {
     access_log_config.set_format(std::string(format));
   }

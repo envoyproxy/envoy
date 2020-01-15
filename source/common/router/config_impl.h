@@ -260,15 +260,19 @@ public:
 
 private:
   std::chrono::milliseconds per_try_timeout_{0};
-  uint32_t num_retries_{};
+  // We set the number of retries to 1 by default (i.e. when no route or vhost level retry policy is
+  // set) so that when retries get enabled through the x-envoy-retry-on header we default to 1
+  // retry.
+  uint32_t num_retries_{1};
   uint32_t retry_on_{};
   // Each pair contains the name and config proto to be used to create the RetryHostPredicates
   // that should be used when with this policy.
-  std::vector<std::pair<std::string, ProtobufTypes::MessagePtr>> retry_host_predicate_configs_;
+  std::vector<std::pair<Upstream::RetryHostPredicateFactory&, ProtobufTypes::MessagePtr>>
+      retry_host_predicate_configs_;
   Upstream::RetryPrioritySharedPtr retry_priority_;
   // Name and config proto to use to create the RetryPriority to use with this policy. Default
   // initialized when no RetryPriority should be used.
-  std::pair<std::string, ProtobufTypes::MessagePtr> retry_priority_config_;
+  std::pair<Upstream::RetryPriorityFactory*, ProtobufTypes::MessagePtr> retry_priority_config_;
   uint32_t host_selection_attempts_{1};
   std::vector<uint32_t> retriable_status_codes_;
   std::vector<Http::HeaderMatcherSharedPtr> retriable_headers_;
@@ -446,6 +450,7 @@ public:
   InternalRedirectAction internalRedirectAction() const override {
     return internal_redirect_action_;
   }
+  uint32_t maxInternalRedirects() const override { return max_internal_redirects_; }
 
   // Router::DirectResponseEntry
   std::string newPath(const Http::HeaderMap& headers) const override;
@@ -562,6 +567,7 @@ private:
     InternalRedirectAction internalRedirectAction() const override {
       return parent_->internalRedirectAction();
     }
+    uint32_t maxInternalRedirects() const override { return parent_->maxInternalRedirects(); }
 
     // Router::Route
     const DirectResponseEntry* directResponseEntry() const override { return nullptr; }
@@ -707,6 +713,7 @@ private:
   const std::string route_name_;
   TimeSource& time_source_;
   InternalRedirectAction internal_redirect_action_;
+  uint32_t max_internal_redirects_{1};
 };
 
 /**
@@ -804,9 +811,9 @@ public:
   RouteConstSharedPtr route(const Http::HeaderMap& headers,
                             const StreamInfo::StreamInfo& stream_info, uint64_t random_value) const;
 
-private:
   const VirtualHostImpl* findVirtualHost(const Http::HeaderMap& headers) const;
 
+private:
   using WildcardVirtualHosts =
       std::map<int64_t, std::unordered_map<std::string, VirtualHostSharedPtr>, std::greater<>>;
   using SubstringFunction = std::function<std::string(const std::string&, int)>;
@@ -841,6 +848,10 @@ public:
 
   const HeaderParser& requestHeaderParser() const { return *request_headers_parser_; };
   const HeaderParser& responseHeaderParser() const { return *response_headers_parser_; };
+
+  bool virtualHostExists(const Http::HeaderMap& headers) const {
+    return route_matcher_->findVirtualHost(headers) != nullptr;
+  }
 
   // Router::Config
   RouteConstSharedPtr route(const Http::HeaderMap& headers,

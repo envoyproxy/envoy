@@ -103,13 +103,18 @@ public:
 
   using OverrideLayerConstPtr = std::unique_ptr<const OverrideLayer>;
 
-  // Returns true if a deprecated feature is allowed.
-  //
-  // Fundamentally, deprecated features are boolean values.
-  // They are allowed by default or with explicit configuration to "true" via runtime configuration.
-  // They can be disallowed either by inclusion in the hard-coded disallowed_features[] list, or by
-  // configuration of "false" in runtime config.
-  virtual bool deprecatedFeatureEnabled(const std::string& key) const PURE;
+  /**
+   * Returns true if a deprecated feature is allowed.
+   *
+   * Fundamentally, deprecated features are boolean values.
+   * They are allowed by default or with explicit configuration to "true" via runtime configuration.
+   * They can be disallowed either by inclusion in the hard-coded disallowed_features[] list, or by
+   * configuration of "false" in runtime config.
+   * @param key supplies the key to lookup.
+   * @param default_value supplies the default value that will be used if either the key
+   *        does not exist or it is not a boolean.
+   */
+  virtual bool deprecatedFeatureEnabled(const std::string& key, bool default_enabled) const PURE;
 
   // Returns true if a runtime feature is enabled.
   //
@@ -207,6 +212,13 @@ public:
    * @return const std::string& the value or empty string if the key does not exist.
    */
   virtual const std::string& get(const std::string& key) const PURE;
+
+  /**
+   * Returns whether the key has any value set.
+   * @param key supplies the key to check.
+   * @return bool if the key exists.
+   */
+  virtual bool exists(const std::string& key) const PURE;
 
   /**
    * Fetch an integer runtime key. Runtime keys larger than ~2^53 may not be accurately converted

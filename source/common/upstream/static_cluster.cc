@@ -16,8 +16,9 @@ StaticClusterImpl::StaticClusterImpl(
           new PriorityStateManager(*this, factory_context.localInfo(), nullptr)) {
   // TODO(dio): Use by-reference when cluster.hosts() is removed.
   const envoy::config::endpoint::v3alpha::ClusterLoadAssignment cluster_load_assignment(
-      cluster.has_load_assignment() ? cluster.load_assignment()
-                                    : Config::Utility::translateClusterHosts(cluster.hosts()));
+      cluster.has_load_assignment()
+          ? cluster.load_assignment()
+          : Config::Utility::translateClusterHosts(cluster.hidden_envoy_deprecated_hosts()));
 
   overprovisioning_factor_ = PROTOBUF_GET_WRAPPED_OR_DEFAULT(
       cluster_load_assignment.policy(), overprovisioning_factor, kDefaultOverProvisioningFactor);

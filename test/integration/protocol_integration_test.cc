@@ -339,13 +339,11 @@ TEST_P(DownstreamProtocolIntegrationTest, RetryPriority) {
   auto retry_policy = host.mutable_routes(0)->mutable_route()->mutable_retry_policy();
   retry_policy->mutable_retry_priority()->set_name(factory.name());
   config_helper_.addVirtualHost(host);
-
-  // Use load assignments instead of static hosts. Necessary in order to use priorities.
-  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3alpha::Bootstrap& bootstrap) {
-    auto cluster = bootstrap.mutable_static_resources()->mutable_clusters(0);
-    auto load_assignment = cluster->mutable_load_assignment();
-    load_assignment->set_cluster_name(cluster->name());
-    const auto& host_address = cluster->hosts(0).socket_address().address();
+  // We want to work with a cluster with two hosts.
+  config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3alpha::Bootstrap& bootstrap) {
+    auto* cluster = bootstrap.mutable_static_resources()->mutable_clusters(0);
+    auto* load_assignment = cluster->mutable_load_assignment();
+    load_assignment->clear_endpoints();
 
     for (int i = 0; i < 2; ++i) {
       auto locality = load_assignment->add_endpoints();
@@ -353,16 +351,10 @@ TEST_P(DownstreamProtocolIntegrationTest, RetryPriority) {
       locality->mutable_locality()->set_region("region");
       locality->mutable_locality()->set_zone("zone");
       locality->mutable_locality()->set_sub_zone("sub_zone" + std::to_string(i));
-      auto lb_endpoint = locality->add_lb_endpoints();
-      lb_endpoint->mutable_endpoint()->mutable_address()->mutable_socket_address()->set_address(
-          host_address);
-      lb_endpoint->mutable_endpoint()->mutable_address()->mutable_socket_address()->set_port_value(
-          0);
+      locality->add_lb_endpoints()->mutable_endpoint()->MergeFrom(
+          ConfigHelper::buildEndpoint(Network::Test::getLoopbackAddressString(version_)));
     }
-
-    cluster->clear_hosts();
   });
-
   fake_upstreams_count_ = 2;
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
@@ -416,9 +408,14 @@ TEST_P(DownstreamProtocolIntegrationTest, RetryHostPredicateFilter) {
   config_helper_.addVirtualHost(host);
 
   // We want to work with a cluster with two hosts.
-  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3alpha::Bootstrap& bootstrap) {
-    auto* new_host = bootstrap.mutable_static_resources()->mutable_clusters(0)->add_hosts();
-    new_host->MergeFrom(bootstrap.static_resources().clusters(0).hosts(0));
+  config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3alpha::Bootstrap& bootstrap) {
+    bootstrap.mutable_static_resources()
+        ->mutable_clusters(0)
+        ->mutable_load_assignment()
+        ->mutable_endpoints(0)
+        ->add_lb_endpoints()
+        ->mutable_endpoint()
+        ->MergeFrom(ConfigHelper::buildEndpoint(Network::Test::getLoopbackAddressString(version_)));
   });
   fake_upstreams_count_ = 2;
   initialize();
@@ -1474,7 +1471,7 @@ TEST_P(ProtocolIntegrationTest, ConnDurationTimeoutNoHttpRequest) {
 }
 
 // Make sure that invalid authority headers get blocked at or before the HCM.
-TEST_P(DownstreamProtocolIntegrationTest, InvalidAuth) {
+TEST_P(DownstreamProtocolIntegrationTest, InvalidAuthority) {
   initialize();
   fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
 
@@ -1497,6 +1494,42 @@ TEST_P(DownstreamProtocolIntegrationTest, InvalidAuth) {
     codec_client_->waitForDisconnect();
     ASSERT_FALSE(response->complete());
   }
+}
+
+TEST_P(DownstreamProtocolIntegrationTest, ConnectIsBlocked) {
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response = codec_client_->makeHeaderOnlyRequest(
+      Http::TestHeaderMapImpl{{":method", "CONNECT"}, {":path", "/"}, {":authority", "host"}});
+
+  if (downstreamProtocol() == Http::CodecClient::Type::HTTP1) {
+    response->waitForEndStream();
+    EXPECT_EQ("400", response->headers().Status()->value().getStringView());
+    EXPECT_TRUE(response->complete());
+  } else {
+    response->waitForReset();
+    codec_client_->waitForDisconnect();
+  }
+}
+
+// Make sure that with stream_error_on_invalid_http_messaging true, CONNECT
+// results in stream teardown not connection teardown.
+TEST_P(DownstreamProtocolIntegrationTest, ConnectStreamRejection) {
+  if (downstreamProtocol() == Http::CodecClient::Type::HTTP1) {
+    return;
+  }
+  config_helper_.addConfigModifier([](envoy::extensions::filters::network::http_connection_manager::
+                                          v3alpha::HttpConnectionManager& hcm) -> void {
+    hcm.mutable_http2_protocol_options()->set_stream_error_on_invalid_http_messaging(true);
+  });
+
+  initialize();
+  codec_client_ = makeHttpConnection(lookupPort("http"));
+  auto response = codec_client_->makeHeaderOnlyRequest(
+      Http::TestHeaderMapImpl{{":method", "CONNECT"}, {":path", "/"}, {":authority", "host"}});
+
+  response->waitForReset();
+  EXPECT_FALSE(codec_client_->disconnected());
 }
 
 // For tests which focus on downstream-to-Envoy behavior, and don't need to be

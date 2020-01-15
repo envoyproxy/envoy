@@ -10,6 +10,7 @@
 
 #include "common/common/hash.h"
 #include "common/common/utility.h"
+#include "common/config/version_converter.h"
 #include "common/protobuf/protobuf.h"
 #include "common/singleton/const_singleton.h"
 
@@ -251,7 +252,7 @@ public:
 
     std::string err;
     if (!Validate(message, &err)) {
-      throw ProtoValidationException(err, message);
+      throw ProtoValidationException(err, API_RECOVER_ORIGINAL(message));
     }
   }
 
@@ -350,11 +351,39 @@ public:
   static ProtobufWkt::Struct keyValueStruct(const std::string& key, const std::string& value);
 
   /**
+   * Utility method to create a Struct containing the passed in key/value map.
+   *
+   * @param fields the key/value pairs to initialize the Struct proto
+   */
+  static ProtobufWkt::Struct keyValueStruct(const std::map<std::string, std::string>& fields);
+
+  /**
    * Utility method to print a human readable string of the code passed in.
    *
    * @param code the protobuf error code
    */
   static std::string CodeEnumToString(ProtobufUtil::error::Code code);
+
+  /**
+   * Modifies a message such that all sensitive data (that is, fields annotated as
+   * `udpa.annotations.sensitive`) is redacted for display. String-typed fields annotated as
+   * `sensitive` will be replaced with the string "[redacted]", bytes-typed fields will be replaced
+   * with the bytes `5B72656461637465645D` (the ASCII / UTF-8 encoding of the string "[redacted]"),
+   * primitive-typed fields (including enums) will be cleared, and message-typed fields will be
+   * traversed recursively to redact their contents.
+   *
+   * LIMITATION: This works properly for strongly-typed messages, as well as for messages packed in
+   * a `ProtobufWkt::Any` with a `type_url` corresponding to a proto that was compiled into the
+   * Envoy binary. However it does not work for messages encoded as `ProtobufWkt::Struct`, since
+   * structs are missing the "sensitive" annotations that this function expects. Similarly, it fails
+   * for messages encoded as `ProtobufWkt::Any` with a `type_url` that isn't registered with the
+   * binary. If you're working with struct-typed messages, including those that might be hiding
+   * within strongly-typed messages, please reify them to strongly-typed messages using
+   * `MessageUtil::jsonConvert()` before calling `MessageUtil::redact()`.
+   *
+   * @param message message to redact.
+   */
+  static void redact(Protobuf::Message& message);
 };
 
 class ValueUtil {

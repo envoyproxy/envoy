@@ -223,7 +223,7 @@ std::string TestUtility::xdsResourceName(const ProtobufWkt::Any& resource) {
     return TestUtility::anyConvert<envoy::service::runtime::v3alpha::Runtime>(resource).name();
   }
   throw EnvoyException(
-      fmt::format("xdsResourceName does not know about type URL {}", resource.type_url()));
+      absl::StrCat("xdsResourceName does not know about type URL ", resource.type_url()));
 }
 
 std::string TestUtility::addLeftAndRightPadding(absl::string_view to_pad, int desired_length) {

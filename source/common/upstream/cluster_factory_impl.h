@@ -137,7 +137,7 @@ public:
   std::pair<ClusterSharedPtr, ThreadAwareLoadBalancerPtr>
   create(const envoy::config::cluster::v3alpha::Cluster& cluster,
          ClusterFactoryContext& context) override;
-  std::string name() override { return name_; }
+  std::string name() const override { return name_; }
 
 protected:
   ClusterFactoryImplBase(const std::string& name) : name_(name) {}

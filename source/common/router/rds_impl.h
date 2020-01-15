@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <functional>
+#include <queue>
 #include <string>
 #include <unordered_map>
 #include <unordered_set>
@@ -76,6 +77,10 @@ public:
   SystemTime lastUpdated() const override { return last_updated_; }
   void onConfigUpdate() override {}
   void validateConfig(const envoy::config::route::v3alpha::RouteConfiguration&) const override {}
+  void requestVirtualHostsUpdate(const std::string&, Event::Dispatcher&,
+                                 std::weak_ptr<Http::RouteConfigUpdatedCallback>) override {
+    NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+  }
 
 private:
   ConfigConstSharedPtr config_;
@@ -114,6 +119,7 @@ public:
     return route_config_providers_;
   }
   RouteConfigUpdatePtr& routeConfigUpdate() { return config_update_info_; }
+  void updateOnDemand(const std::string& aliases);
   void maybeCreateInitManager(const std::string& version_info,
                               std::unique_ptr<Init::ManagerImpl>& init_manager,
                               std::unique_ptr<Cleanup>& resume_rds);
@@ -143,12 +149,11 @@ private:
       const uint64_t manager_identifier,
       Server::Configuration::ServerFactoryContext& factory_context,
       ProtobufMessage::ValidationVisitor& validator, Init::Manager& init_manager,
-      const std::string& stat_prefix, RouteConfigProviderManagerImpl& route_config_provider_manager,
-      const envoy::config::core::v3alpha::ConfigSource::XdsApiVersion xds_api_version =
-          envoy::config::core::v3alpha::ConfigSource::AUTO);
+      const std::string& stat_prefix,
+      RouteConfigProviderManagerImpl& route_config_provider_manager);
 
   bool validateUpdateSize(int num_resources);
-  std::string loadTypeUrl();
+  static std::string loadTypeUrl(envoy::config::core::v3alpha::ApiVersion resource_api_version);
 
   Init::Manager& getRdsConfigInitManager() { return init_manager_; }
 
@@ -168,7 +173,6 @@ private:
   VhdsSubscriptionPtr vhds_subscription_;
   RouteConfigUpdatePtr config_update_info_;
   Common::CallbackManager<> update_callback_manager_;
-  envoy::config::core::v3alpha::ConfigSource::XdsApiVersion xds_api_version_;
 
   friend class RouteConfigProviderManagerImpl;
   // Access to addUpdateCallback
@@ -176,6 +180,12 @@ private:
 };
 
 using RdsRouteConfigSubscriptionSharedPtr = std::shared_ptr<RdsRouteConfigSubscription>;
+
+struct UpdateOnDemandCallback {
+  const std::string alias_;
+  Event::Dispatcher& thread_local_dispatcher_;
+  std::weak_ptr<Http::RouteConfigUpdatedCallback> cb_;
+};
 
 /**
  * Implementation of RouteConfigProvider that fetches the route configuration dynamically using
@@ -195,6 +205,9 @@ public:
   }
   SystemTime lastUpdated() const override { return config_update_info_->lastUpdated(); }
   void onConfigUpdate() override;
+  void requestVirtualHostsUpdate(
+      const std::string& for_domain, Event::Dispatcher& thread_local_dispatcher,
+      std::weak_ptr<Http::RouteConfigUpdatedCallback> route_config_updated_cb) override;
   void
   validateConfig(const envoy::config::route::v3alpha::RouteConfiguration& config) const override;
 
@@ -212,6 +225,7 @@ private:
   Server::Configuration::ServerFactoryContext& factory_context_;
   ProtobufMessage::ValidationVisitor& validator_;
   ThreadLocal::SlotPtr tls_;
+  std::list<UpdateOnDemandCallback> config_update_callbacks_;
 
   friend class RouteConfigProviderManagerImpl;
 };

@@ -132,7 +132,7 @@ ConfigUtility::parseDirectResponseBody(const envoy::config::route::v3alpha::Rout
     }
     const ssize_t size = api.fileSystem().fileSize(filename);
     if (size < 0) {
-      throw EnvoyException(fmt::format("cannot determine size of response body file {}", filename));
+      throw EnvoyException(absl::StrCat("cannot determine size of response body file ", filename));
     }
     if (size > MaxBodySize) {
       throw EnvoyException(fmt::format("response body file {} size is {} bytes; maximum is {}",

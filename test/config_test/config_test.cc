@@ -74,14 +74,9 @@ public:
     // in production runtime is not setup until after the bootstrap config is loaded. This seems
     // better for configuration tests.
     ScopedRuntimeInjector scoped_runtime(server_.runtime());
-    ON_CALL(server_.runtime_loader_.snapshot_, deprecatedFeatureEnabled(_))
-        .WillByDefault(Invoke([](const std::string& key) {
-          if (Runtime::RuntimeFeaturesDefaults::get().disallowedByDefault(key)) {
-            return false;
-          } else {
-            return true;
-          }
-        }));
+    ON_CALL(server_.runtime_loader_.snapshot_, deprecatedFeatureEnabled(_, _))
+        .WillByDefault(
+            Invoke([](const std::string&, bool default_value) { return default_value; }));
 
     envoy::config::bootstrap::v3alpha::Bootstrap bootstrap;
     Server::InstanceUtil::loadBootstrapConfig(
@@ -103,7 +98,7 @@ public:
     ON_CALL(component_factory_, createNetworkFilterFactoryList(_, _))
         .WillByDefault(Invoke(
             [&](const Protobuf::RepeatedPtrField<envoy::config::listener::v3alpha::Filter>& filters,
-                Server::Configuration::FactoryContext& context)
+                Server::Configuration::FilterChainFactoryContext& context)
                 -> std::vector<Network::FilterFactoryCb> {
               return Server::ProdListenerComponentFactory::createNetworkFilterFactoryList_(filters,
                                                                                            context);

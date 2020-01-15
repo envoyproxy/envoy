@@ -40,19 +40,22 @@ public:
 
 class ListenerManagerImplTest : public testing::Test {
 protected:
-  ListenerManagerImplTest() : api_(Api::createApiForTest()) {
+  ListenerManagerImplTest() : api_(Api::createApiForTest()) {}
+
+  void SetUp() override {
     ON_CALL(server_, api()).WillByDefault(ReturnRef(*api_));
     EXPECT_CALL(worker_factory_, createWorker_()).WillOnce(Return(worker_));
-    manager_ =
-        std::make_unique<ListenerManagerImpl>(server_, listener_factory_, worker_factory_, false);
+    manager_ = std::make_unique<ListenerManagerImpl>(server_, listener_factory_, worker_factory_,
+                                                     enable_dispatcher_stats_);
 
     // Use real filter loading by default.
     ON_CALL(listener_factory_, createNetworkFilterFactoryList(_, _))
         .WillByDefault(Invoke(
             [](const Protobuf::RepeatedPtrField<envoy::config::listener::v3alpha::Filter>& filters,
-               Configuration::FactoryContext& context) -> std::vector<Network::FilterFactoryCb> {
-              return ProdListenerComponentFactory::createNetworkFilterFactoryList_(filters,
-                                                                                   context);
+               Server::Configuration::FilterChainFactoryContext& filter_chain_factory_context)
+                -> std::vector<Network::FilterFactoryCb> {
+              return ProdListenerComponentFactory::createNetworkFilterFactoryList_(
+                  filters, filter_chain_factory_context);
             }));
     ON_CALL(listener_factory_, createListenerFilterFactoryList(_, _))
         .WillByDefault(Invoke(
@@ -107,11 +110,12 @@ protected:
         .WillOnce(Invoke(
             [raw_listener, need_init](
                 const Protobuf::RepeatedPtrField<envoy::config::listener::v3alpha::Filter>&,
-                Configuration::FactoryContext& context) -> std::vector<Network::FilterFactoryCb> {
+                Server::Configuration::FilterChainFactoryContext& filter_chain_factory_context)
+                -> std::vector<Network::FilterFactoryCb> {
               std::shared_ptr<ListenerHandle> notifier(raw_listener);
-              raw_listener->context_ = &context;
+              raw_listener->context_ = &filter_chain_factory_context;
               if (need_init) {
-                context.initManager().add(notifier->target_);
+                filter_chain_factory_context.initManager().add(notifier->target_);
               }
               return {[notifier](Network::FilterManager&) -> void {}};
             }));
@@ -228,6 +232,7 @@ protected:
   Network::Address::InstanceConstSharedPtr remote_address_;
   std::unique_ptr<Network::MockConnectionSocket> socket_;
   uint64_t listener_tag_{1};
+  bool enable_dispatcher_stats_{false};
 };
 
 } // namespace Server

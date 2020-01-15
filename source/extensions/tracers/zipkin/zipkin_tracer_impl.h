@@ -145,7 +145,7 @@ private:
 struct CollectorInfo {
   // The Zipkin collector endpoint/path to receive the collected trace data. e.g. /api/v1/spans if
   // HTTP_JSON_V1 or /api/v2/spans otherwise.
-  std::string endpoint_{ZipkinCoreConstants::get().DEFAULT_COLLECTOR_ENDPOINT};
+  std::string endpoint_{DEFAULT_COLLECTOR_ENDPOINT};
 
   // The version of the collector. This is related to endpoint's supported payload specification and
   // transport. Currently it defaults to envoy::config::trace::v2::ZipkinConfig::HTTP_JSON_V1. In
@@ -153,7 +153,7 @@ struct CollectorInfo {
   envoy::config::trace::v3alpha::ZipkinConfig::CollectorEndpointVersion version_{
       envoy::config::trace::v3alpha::ZipkinConfig::hidden_envoy_deprecated_HTTP_JSON_V1};
 
-  bool shared_span_context_{ZipkinCoreConstants::get().DEFAULT_SHARED_SPAN_CONTEXT};
+  bool shared_span_context_{DEFAULT_SHARED_SPAN_CONTEXT};
 };
 
 /**

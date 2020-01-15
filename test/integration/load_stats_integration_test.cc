@@ -127,7 +127,6 @@ public:
       locality->set_sub_zone(sub_zone_);
       // Switch predefined cluster_0 to EDS filesystem sourcing.
       auto* cluster_0 = bootstrap.mutable_static_resources()->mutable_clusters(0);
-      cluster_0->mutable_hosts()->Clear();
       cluster_0->set_type(envoy::config::cluster::v3alpha::Cluster::EDS);
       auto* eds_cluster_config = cluster_0->mutable_eds_cluster_config();
       eds_cluster_config->mutable_eds_config()->set_path(eds_helper_.eds_path());
@@ -270,9 +269,6 @@ public:
         cluster_stats.mutable_load_report_interval()->Clear();
       }
       mergeLoadStats(loadstats_request, local_loadstats_request);
-      if (!loadstats_request.cluster_stats().empty()) {
-        ENVOY_LOG_MISC(debug, "HTD {}", loadstats_request.cluster_stats()[0].DebugString());
-      }
 
       EXPECT_EQ("POST", loadstats_stream_->headers().Method()->value().getStringView());
       EXPECT_EQ("/envoy.service.load_stats.v2.LoadReportingService/StreamLoadStats",

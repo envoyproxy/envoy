@@ -96,9 +96,12 @@ public:
   // api_type should be REST, GRPC, or DELTA_GRPC.
   static std::string discoveredClustersBootstrap(const std::string& api_type);
   static std::string adsBootstrap(const std::string& api_type);
-  // Builds a standard Cluster config fragment, with a single endpoint (at loopback:port).
+  // Builds a standard Cluster config fragment, with a single endpoint (at address:port).
   static envoy::config::cluster::v3alpha::Cluster buildCluster(const std::string& name, int port,
-                                                               const std::string& ip_version);
+                                                               const std::string& address);
+
+  // Builds a standard Endpoint suitable for population by finalize().
+  static envoy::config::endpoint::v3alpha::Endpoint buildEndpoint(const std::string& address);
 
   // Run the final config modifiers, and then set the upstream ports based on upstream connections.
   // This is the last operation run on |bootstrap_| before it is handed to Envoy.
@@ -191,7 +194,7 @@ private:
   // Configure a tap transport socket for a cluster/filter chain.
   void setTapTransportSocket(const std::string& tap_path, const std::string& type,
                              envoy::config::core::v3alpha::TransportSocket& transport_socket,
-                             const absl::optional<ProtobufWkt::Struct>& tls_config);
+                             const Protobuf::Message* tls_config);
 
   // The bootstrap proto Envoy will start up with.
   envoy::config::bootstrap::v3alpha::Bootstrap bootstrap_;

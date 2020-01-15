@@ -1,6 +1,6 @@
 #include "envoy/config/core/v3alpha/grpc_service.pb.h"
-#include "envoy/config/filter/thrift/rate_limit/v3alpha/rate_limit.pb.h"
-#include "envoy/config/filter/thrift/rate_limit/v3alpha/rate_limit.pb.validate.h"
+#include "envoy/extensions/filters/network/thrift_proxy/filters/ratelimit/v3alpha/rate_limit.pb.h"
+#include "envoy/extensions/filters/network/thrift_proxy/filters/ratelimit/v3alpha/rate_limit.pb.validate.h"
 
 #include "extensions/filters/network/thrift_proxy/filters/ratelimit/config.h"
 
@@ -18,9 +18,10 @@ namespace ThriftFilters {
 namespace RateLimitFilter {
 namespace {
 
-envoy::config::filter::thrift::rate_limit::v3alpha::RateLimit
+envoy::extensions::filters::network::thrift_proxy::filters::ratelimit::v3alpha::RateLimit
 parseRateLimitFromV2Yaml(const std::string& yaml) {
-  envoy::config::filter::thrift::rate_limit::v3alpha::RateLimit rate_limit;
+  envoy::extensions::filters::network::thrift_proxy::filters::ratelimit::v3alpha::RateLimit
+      rate_limit;
   TestUtility::loadFromYaml(yaml, rate_limit);
   return rate_limit;
 }
@@ -29,10 +30,11 @@ parseRateLimitFromV2Yaml(const std::string& yaml) {
 
 TEST(RateLimitFilterConfigTest, ValidateFail) {
   NiceMock<Server::Configuration::MockFactoryContext> context;
-  EXPECT_THROW(
-      RateLimitFilterConfig().createFilterFactoryFromProto(
-          envoy::config::filter::thrift::rate_limit::v3alpha::RateLimit(), "stats", context),
-      ProtoValidationException);
+  EXPECT_THROW(RateLimitFilterConfig().createFilterFactoryFromProto(
+                   envoy::extensions::filters::network::thrift_proxy::filters::ratelimit::v3alpha::
+                       RateLimit(),
+                   "stats", context),
+               ProtoValidationException);
 }
 
 TEST(RateLimitFilterConfigTest, RateLimitFilterCorrectProto) {

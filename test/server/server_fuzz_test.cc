@@ -58,20 +58,26 @@ makeHermeticPathsAndPorts(Fuzz::PerTestEnvironment& test_env,
       // Tracked at https://github.com/envoyproxy/envoy/issues/9513.
       health_check.mutable_http_health_check()->clear_codec_client_type();
     }
-    for (auto& host : *cluster.mutable_hosts()) {
+    // We may have both deprecated hosts() or load_assignment().
+    for (auto& host : *cluster.mutable_hidden_envoy_deprecated_hosts()) {
       makePortHermetic(test_env, host);
+    }
+    for (int j = 0; j < cluster.load_assignment().endpoints_size(); ++j) {
+      auto* locality_lb = cluster.mutable_load_assignment()->mutable_endpoints(j);
+      for (int k = 0; k < locality_lb->lb_endpoints_size(); ++k) {
+        auto* lb_endpoint = locality_lb->mutable_lb_endpoints(k);
+        if (lb_endpoint->endpoint().address().has_socket_address()) {
+          makePortHermetic(test_env, *lb_endpoint->mutable_endpoint()->mutable_address());
+        }
+      }
     }
   }
   return output;
 }
 
-class AllFeaturesHooks : public DefaultListenerHooks {
-  void onRuntimeCreated() override { Runtime::RuntimeFeaturesPeer::setAllFeaturesAllowed(); }
-};
-
 DEFINE_PROTO_FUZZER(const envoy::config::bootstrap::v3alpha::Bootstrap& input) {
   testing::NiceMock<MockOptions> options;
-  AllFeaturesHooks hooks;
+  DefaultListenerHooks hooks;
   testing::NiceMock<MockHotRestart> restart;
   Stats::TestIsolatedStoreImpl stats_store;
   Thread::MutexBasicLockable fakelock;
