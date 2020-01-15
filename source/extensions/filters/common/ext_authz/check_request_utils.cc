@@ -12,6 +12,7 @@
 
 #include "common/buffer/buffer_impl.h"
 #include "common/common/assert.h"
+#include "common/common/empty_string.h"
 #include "common/common/enum_to_int.h"
 #include "common/grpc/async_client_impl.h"
 #include "common/http/codes.h"
@@ -86,7 +87,7 @@ std::string CheckRequestUtils::getHeaderStr(const Envoy::Http::HeaderEntry* entr
     // to allocate a temp string in the local uses.
     return std::string(entry->value().getStringView());
   }
-  return "";
+  return EMPTY_STRING;
 }
 
 void CheckRequestUtils::setRequestTime(
@@ -103,27 +104,18 @@ void CheckRequestUtils::setHttpRequest(
     envoy::service::auth::v3alpha::AttributeContext::HttpRequest& httpreq, uint64_t stream_id,
     const StreamInfo::StreamInfo& stream_info, const Buffer::Instance* decoding_buffer,
     const Envoy::Http::HeaderMap& headers, uint64_t max_request_bytes) {
-  // Set id
   httpreq.set_id(std::to_string(stream_id));
-  // Set method
   httpreq.set_method(getHeaderStr(headers.Method()));
-  // Set path
   httpreq.set_path(getHeaderStr(headers.Path()));
-  // Set host
   httpreq.set_host(getHeaderStr(headers.Host()));
-  // Set scheme
   httpreq.set_scheme(getHeaderStr(headers.Scheme()));
-
-  // Set size
-  // need to convert to google buffer 64t;
   httpreq.set_size(stream_info.bytesReceived());
 
-  // Set protocol
   if (stream_info.protocol()) {
     httpreq.set_protocol(Envoy::Http::Utility::getProtocolString(stream_info.protocol().value()));
   }
 
-  // Fill in the headers
+  // Fill in the headers.
   auto mutable_headers = httpreq.mutable_headers();
   headers.iterate(
       [](const Envoy::Http::HeaderEntry& e, void* ctx) {
