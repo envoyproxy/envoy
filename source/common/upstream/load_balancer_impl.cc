@@ -291,15 +291,22 @@ void LoadBalancerBase::recalculateLoadInTotalPanic() {
   uint32_t total_load = 100;
   for (size_t i = 0; i < per_priority_panic_.size(); i++) {
     const HostSet& host_set = *priority_set_.hostSetsPerPriority()[i];
-    auto hosts_num = host_set.hosts().size() - host_set.excludedHosts().size();
+    const auto hosts_num = host_set.hosts().size();
 
-    uint32_t priority_load = 100 * hosts_num / total_hosts_num;
+    const uint32_t priority_load = 100 * hosts_num / total_hosts_num;
     per_priority_load_.healthy_priority_load_.get()[i] = priority_load;
     per_priority_load_.degraded_priority_load_.get()[i] = 0;
     total_load -= priority_load;
   }
-  // Add to priority zero whatever if left.
-  per_priority_load_.healthy_priority_load_.get()[0] += total_load;
+
+  // Find the first priority which is not empty and add remaining load.
+  for (size_t i = 0; i < per_priority_panic_.size(); i++) {
+    const HostSet& host_set = *priority_set_.hostSetsPerPriority()[i];
+    if (0 != host_set.hosts().size()) {
+      per_priority_load_.healthy_priority_load_.get()[i] += total_load;
+      break;
+    }
+  }
 }
 
 std::pair<HostSet&, LoadBalancerBase::HostAvailability>

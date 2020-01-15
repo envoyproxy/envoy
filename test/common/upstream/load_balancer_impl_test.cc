@@ -86,7 +86,6 @@ public:
     }
 
     for (; i < (num_healthy_hosts + num_degraded_hosts + num_excluded_hosts); ++i) {
-      host_set.degraded_hosts_.push_back(host_set.hosts_[i]);
       host_set.excluded_hosts_.push_back(host_set.hosts_[i]);
     }
     host_set.runCallbacks({}, {});
@@ -310,7 +309,6 @@ TEST_P(LoadBalancerBaseTest, GentleFailover) {
   ASSERT_THAT(getPanic(), ElementsAre(false, false));
 
   // Health P=0 == 100*1.4 == 35 P=1 == 35
-  // Since 4 hosts are excluded and are unhealthy, P=0 should be considered fully unavailable.
   // Total health = 35% is less than 100%.
   // All priorities are in panic mode (situation called TotalPanic)
   // Load is distributed based on number of hosts regardless of their health status.
@@ -319,6 +317,19 @@ TEST_P(LoadBalancerBaseTest, GentleFailover) {
                 4 /* num_excluded_hosts */);
   updateHostSet(failover_host_set_, 4 /* num_hosts */, 1 /* num_healthy_hosts */);
   ASSERT_THAT(getLoadPercentage(), ElementsAre(50, 50));
+  ASSERT_THAT(getPanic(), ElementsAre(true, true));
+
+  // Make sure that in TotalPanic mode (all levels are in Panic),
+  // load distribution depends only on number of hosts.
+  // excluded_hosts should not be taken into account.
+  // P=0 has 4 hosts with 1 excluded, P=1 has 6 hosts with 2 excluded.
+  // P=0 should receive 4/(4+6)=40% of traffic
+  // P=1 should receive 6/(4+6)=60% of traffic
+  updateHostSet(host_set_, 4 /* num_hosts */, 0 /* num_healthy_hosts */, 0 /* num_degraded_hosts */,
+                1 /* num_excluded_hosts */);
+  updateHostSet(failover_host_set_, 6 /* num_hosts */, 1 /* num_healthy_hosts */,
+                0 /* num_degraded_hosts */, 2 /* num_excluded_hosts */);
+  ASSERT_THAT(getLoadPercentage(), ElementsAre(40, 60));
   ASSERT_THAT(getPanic(), ElementsAre(true, true));
 }
 
