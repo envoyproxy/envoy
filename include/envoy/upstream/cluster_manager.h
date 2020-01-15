@@ -228,8 +228,6 @@ public:
    */
   virtual Config::SubscriptionFactory& subscriptionFactory() PURE;
 
-  virtual void updateClusterInterest(const std::set<std::string>& update_to_these_names) PURE;
-
   virtual void addToClusterInterest(const std::set<std::string>& add_these_names) PURE;
 };
 

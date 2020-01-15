@@ -243,10 +243,6 @@ public:
 
   Config::SubscriptionFactory& subscriptionFactory() override { return subscription_factory_; }
 
-  void updateClusterInterest(const std::set<std::string>& update_to_these_names) override {
-    cds_api_->updateClusterInterest(update_to_these_names);
-  }
-
   void addToClusterInterest(const std::set<std::string>& add_these_names) override {
     cds_api_->addToClusterInterest(add_these_names);
   }
