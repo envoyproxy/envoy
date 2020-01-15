@@ -17,10 +17,7 @@ namespace {
 // TODO(toddmgreer): Add tests for eat* functions
 // TODO(toddmgreer): More tests for httpTime, effectiveMaxAge
 
-class HttpTimeTest : public testing::TestWithParam<const char*> {
-protected:
-  Http::TestHeaderMapImpl response_headers_{{"date", GetParam()}};
-};
+class HttpTimeTest : public testing::TestWithParam<const char*> {};
 
 const char* const ok_times[] = {
     "Sun, 06 Nov 1994 08:49:37 GMT",  // IMF-fixdate
@@ -31,8 +28,9 @@ const char* const ok_times[] = {
 INSTANTIATE_TEST_SUITE_P(Ok, HttpTimeTest, testing::ValuesIn(ok_times));
 
 TEST_P(HttpTimeTest, Ok) {
-  const std::time_t time = SystemTime::clock::to_time_t(Utils::httpTime(response_headers_.Date()));
-  EXPECT_STREQ(ctime(&time), "Sun Nov  6 08:49:37 1994\n");
+  Http::TestHeaderMapImpl response_headers{{"date", GetParam()}};
+  // Manually confirmed that 784111777 is 11/6/94, 8:46:37.
+  EXPECT_EQ(784111777, SystemTime::clock::to_time_t(Utils::httpTime(response_headers.Date())));
 }
 
 TEST(HttpTime, Null) { EXPECT_EQ(Utils::httpTime(nullptr), SystemTime()); }
