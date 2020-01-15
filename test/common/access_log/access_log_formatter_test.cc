@@ -11,17 +11,20 @@
 #include "common/protobuf/utility.h"
 #include "common/router/string_accessor_impl.h"
 
+#include "test/mocks/api/mocks.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/ssl/mocks.h"
 #include "test/mocks/stream_info/mocks.h"
 #include "test/mocks/upstream/mocks.h"
 #include "test/test_common/printers.h"
+#include "test/test_common/threadsafe_singleton_injector.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
 using testing::Const;
+using testing::Invoke;
 using testing::NiceMock;
 using testing::Return;
 using testing::ReturnRef;
@@ -259,6 +262,35 @@ TEST(AccessLogFormatterTest, streamInfoFormatter) {
     EXPECT_EQ("-", upstream_format.format(header, header, header, stream_info));
     EXPECT_THAT(upstream_format.formatValue(header, header, header, stream_info),
                 ProtoEq(ValueUtil::nullValue()));
+  }
+
+  {
+    NiceMock<Api::MockOsSysCalls> os_sys_calls;
+    TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
+    EXPECT_CALL(os_sys_calls, gethostname(_, _))
+        .WillOnce(Invoke([](char*, size_t) -> Api::SysCallIntResult {
+          return {-1, ENAMETOOLONG};
+        }));
+
+    StreamInfoFormatter upstream_format("HOSTNAME");
+    EXPECT_EQ("-", upstream_format.format(header, header, header, stream_info));
+    EXPECT_THAT(upstream_format.formatValue(header, header, header, stream_info),
+                ProtoEq(ValueUtil::stringValue("-")));
+  }
+
+  {
+    NiceMock<Api::MockOsSysCalls> os_sys_calls;
+    TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
+    EXPECT_CALL(os_sys_calls, gethostname(_, _))
+        .WillOnce(Invoke([](char* name, size_t) -> Api::SysCallIntResult {
+          StringUtil::strlcpy(name, "myhostname", 11);
+          return {0, 0};
+        }));
+
+    StreamInfoFormatter upstream_format("HOSTNAME");
+    EXPECT_EQ("myhostname", upstream_format.format(header, header, header, stream_info));
+    EXPECT_THAT(upstream_format.formatValue(header, header, header, stream_info),
+                ProtoEq(ValueUtil::stringValue("myhostname")));
   }
 
   {
