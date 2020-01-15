@@ -37,10 +37,15 @@ admin:
 static_resources:
   clusters:
     name: cluster_0
-    hosts:
-      socket_address:
-        address: 127.0.0.1
-        port_value: 0
+    load_assignment:
+      cluster_name: my_cds_cluster
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: 127.0.0.1
+                port_value: 0
   listeners:
   - name: default_listener
     address:
@@ -86,9 +91,10 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, ApiListenerIntegrationTest,
 TEST_P(ApiListenerIntegrationTest, Basic) {
   ConditionalInitializer test_ran;
   test_server_->server().dispatcher().post([this, &test_ran]() -> void {
-    ASSERT_EQ("api_listener", test_server_->server().listenerManager().apiListener()->name());
-    ASSERT_NE(nullptr, test_server_->server().listenerManager().apiListener()->http());
-    auto* http_api_listener = test_server_->server().listenerManager().apiListener()->http();
+    ASSERT_TRUE(test_server_->server().listenerManager().apiListener().has_value());
+    ASSERT_EQ("api_listener", test_server_->server().listenerManager().apiListener()->get().name());
+    ASSERT_NE(nullptr, test_server_->server().listenerManager().apiListener()->get().http());
+    auto* http_api_listener = test_server_->server().listenerManager().apiListener()->get().http();
 
     ON_CALL(stream_encoder_, getStream()).WillByDefault(ReturnRef(stream_encoder_.stream_));
     auto& stream_decoder = http_api_listener->newStream(stream_encoder_);

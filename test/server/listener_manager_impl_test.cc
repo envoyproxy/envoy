@@ -3704,7 +3704,7 @@ api_listener:
 
   ASSERT_TRUE(manager_->addOrUpdateListener(parseListenerFromV2Yaml(yaml), "", false));
   EXPECT_EQ(0U, manager_->listeners().size());
-  EXPECT_NE(nullptr, manager_->apiListener());
+  ASSERT_TRUE(manager_->apiListener().has_value());
 }
 
 TEST_F(ListenerManagerImplWithRealFiltersTest, ApiListenerNotAllowedAddedViaApi) {
@@ -3733,7 +3733,7 @@ api_listener:
 
   ASSERT_FALSE(manager_->addOrUpdateListener(parseListenerFromV2Yaml(yaml), "", true));
   EXPECT_EQ(0U, manager_->listeners().size());
-  EXPECT_EQ(nullptr, manager_->apiListener());
+  ASSERT_FALSE(manager_->apiListener().has_value());
 }
 
 TEST_F(ListenerManagerImplWithRealFiltersTest, ApiListenerOnlyOneApiListener) {
@@ -3785,15 +3785,15 @@ api_listener:
 
   ASSERT_TRUE(manager_->addOrUpdateListener(parseListenerFromV2Yaml(yaml), "", false));
   EXPECT_EQ(0U, manager_->listeners().size());
-  EXPECT_NE(nullptr, manager_->apiListener());
-  EXPECT_EQ("test_api_listener", manager_->apiListener()->name());
+  ASSERT_TRUE(manager_->apiListener().has_value());
+  EXPECT_EQ("test_api_listener", manager_->apiListener()->get().name());
 
   // Only one ApiListener is added.
   ASSERT_FALSE(manager_->addOrUpdateListener(parseListenerFromV2Yaml(yaml), "", false));
   EXPECT_EQ(0U, manager_->listeners().size());
   // The original ApiListener is there.
-  EXPECT_NE(nullptr, manager_->apiListener());
-  EXPECT_EQ("test_api_listener", manager_->apiListener()->name());
+  ASSERT_TRUE(manager_->apiListener().has_value());
+  EXPECT_EQ("test_api_listener", manager_->apiListener()->get().name());
 }
 
 } // namespace

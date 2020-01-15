@@ -220,7 +220,7 @@ public:
   /**
    * @return ApiListener* the server's API Listener if it exists, nullptr if it does not.
    */
-  virtual ApiListener* apiListener() PURE;
+  virtual ApiListenerOptRef apiListener() PURE;
 };
 
 } // namespace Server

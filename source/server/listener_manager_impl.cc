@@ -857,5 +857,9 @@ Network::ListenSocketFactorySharedPtr ListenerManagerImpl::createListenSocketFac
       listener.bindToPort(), listener.name(), reuse_port);
 }
 
+ApiListenerOptRef ListenerManagerImpl::apiListener() {
+  return api_listener_ ? ApiListenerOptRef(std::ref(*api_listener_)) : absl::nullopt;
+}
+
 } // namespace Server
 } // namespace Envoy
