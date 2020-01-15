@@ -103,13 +103,18 @@ public:
 
   using OverrideLayerConstPtr = std::unique_ptr<const OverrideLayer>;
 
-  // Returns true if a deprecated feature is allowed.
-  //
-  // Fundamentally, deprecated features are boolean values.
-  // They are allowed by default or with explicit configuration to "true" via runtime configuration.
-  // They can be disallowed either by inclusion in the hard-coded disallowed_features[] list, or by
-  // configuration of "false" in runtime config.
-  virtual bool deprecatedFeatureEnabled(const std::string& key) const PURE;
+  /**
+   * Returns true if a deprecated feature is allowed.
+   *
+   * Fundamentally, deprecated features are boolean values.
+   * They are allowed by default or with explicit configuration to "true" via runtime configuration.
+   * They can be disallowed either by inclusion in the hard-coded disallowed_features[] list, or by
+   * configuration of "false" in runtime config.
+   * @param key supplies the key to lookup.
+   * @param default_value supplies the default value that will be used if either the key
+   *        does not exist or it is not a boolean.
+   */
+  virtual bool deprecatedFeatureEnabled(const std::string& key, bool default_enabled) const PURE;
 
   // Returns true if a runtime feature is enabled.
   //

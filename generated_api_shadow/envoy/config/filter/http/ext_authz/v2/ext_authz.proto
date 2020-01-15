@@ -8,6 +8,7 @@ import "envoy/api/v2/core/http_uri.proto";
 import "envoy/type/http_status.proto";
 import "envoy/type/matcher/string.proto";
 
+import "envoy/annotations/deprecation.proto";
 import "udpa/annotations/migrate.proto";
 import "validate/validate.proto";
 
@@ -50,7 +51,7 @@ message ExtAuthz {
   // useful when transitioning from alpha to release versions assuming that both definitions are
   // semantically compatible. Deprecation note: This field is deprecated and should only be used for
   // version upgrade. See release notes for more details.
-  bool use_alpha = 4 [deprecated = true];
+  bool use_alpha = 4 [deprecated = true, (envoy.annotations.disallowed_by_default) = true];
 
   // Enables filter to buffer the client request body and send it within the authorization request.
   // A ``x-envoy-auth-partial-body: false|true`` metadata header will be added to the authorization

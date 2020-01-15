@@ -65,13 +65,9 @@ makeHermeticPathsAndPorts(Fuzz::PerTestEnvironment& test_env,
   return output;
 }
 
-class AllFeaturesHooks : public DefaultListenerHooks {
-  void onRuntimeCreated() override { Runtime::RuntimeFeaturesPeer::setAllFeaturesAllowed(); }
-};
-
 DEFINE_PROTO_FUZZER(const envoy::config::bootstrap::v3alpha::Bootstrap& input) {
   testing::NiceMock<MockOptions> options;
-  AllFeaturesHooks hooks;
+  DefaultListenerHooks hooks;
   testing::NiceMock<MockHotRestart> restart;
   Stats::TestIsolatedStoreImpl stats_store;
   Thread::MutexBasicLockable fakelock;

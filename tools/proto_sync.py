@@ -280,7 +280,10 @@ def Sync(api_root, mode, labels, shadow):
     GenerateCurrentApiDir(api_root_path, current_api_dir)
 
     # These support files are handled manually.
-    for f in ['envoy/annotations/resource.proto', 'envoy/annotations/BUILD']:
+    for f in [
+        'envoy/annotations/resource.proto', 'envoy/annotations/deprecation.proto',
+        'envoy/annotations/BUILD'
+    ]:
       copy_dst_dir = pathlib.Path(dst_dir, os.path.dirname(f))
       copy_dst_dir.mkdir(exist_ok=True)
       shutil.copy(str(pathlib.Path(api_root, f)), str(copy_dst_dir))
