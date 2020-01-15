@@ -698,7 +698,7 @@ void ListenerManagerImpl::startWorkers(GuardDog& guard_dog) {
   const auto listeners_pending_init =
       std::make_shared<std::atomic<uint64_t>>(workers_.size() * active_listeners_.size());
   for (const auto& worker : workers_) {
-    ENVOY_LOG(info, "starting worker {}", i);
+    ENVOY_LOG(debug, "starting worker {}", i);
     ASSERT(warming_listeners_.empty());
     for (const auto& listener : active_listeners_) {
       addListenerToWorker(*worker, *listener, [this, listeners_pending_init]() {
@@ -709,8 +709,9 @@ void ListenerManagerImpl::startWorkers(GuardDog& guard_dog) {
     }
     worker->start(guard_dog);
     if (enable_dispatcher_stats_) {
-      worker->initializeStats(*scope_, fmt::format("worker_{}.", i++));
+      worker->initializeStats(*scope_, fmt::format("worker_{}.", i));
     }
+    i++;
   }
   if (active_listeners_.size() == 0) {
     stats_.workers_started_.set(1);
