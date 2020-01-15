@@ -199,12 +199,10 @@ std::string RandomGeneratorImpl::uuid() {
   return std::string(uuid, UUID_LENGTH);
 }
 
-bool SnapshotImpl::deprecatedFeatureEnabled(const std::string& key) const {
-  const bool default_allowed = !RuntimeFeaturesDefaults::get().disallowedByDefault(key);
-
-  // If the value is not explicitly set as a runtime boolean, the default value is based on
-  // disallowedByDefault.
-  if (!getBoolean(key, default_allowed)) {
+bool SnapshotImpl::deprecatedFeatureEnabled(const std::string& key, bool default_value) const {
+  // If the value is not explicitly set as a runtime boolean, trust the proto annotations passed as
+  // default_value.
+  if (!getBoolean(key, default_value)) {
     // If either disallowed by default or configured off, the feature is not enabled.
     return false;
   }

@@ -7,6 +7,7 @@ import "envoy/api/v2/core/base.proto";
 import "google/protobuf/duration.proto";
 import "google/protobuf/wrappers.proto";
 
+import "envoy/annotations/deprecation.proto";
 import "udpa/annotations/migrate.proto";
 import "validate/validate.proto";
 
@@ -162,7 +163,8 @@ message RedisProxy {
     //   This field is deprecated. Use a :ref:`catch_all
     //   route<envoy_api_field_config.filter.network.redis_proxy.v2.RedisProxy.PrefixRoutes.catch_all_route>`
     //   instead.
-    string catch_all_cluster = 3 [deprecated = true];
+    string catch_all_cluster = 3
+        [deprecated = true, (envoy.annotations.disallowed_by_default) = true];
 
     // Optional catch-all route to forward commands that doesn't match any of the routes. The
     // catch-all route becomes required when no routes are specified.
@@ -181,7 +183,7 @@ message RedisProxy {
   //   This field is deprecated. Use a :ref:`catch_all
   //   route<envoy_api_field_config.filter.network.redis_proxy.v2.RedisProxy.PrefixRoutes.catch_all_route>`
   //   instead.
-  string cluster = 2 [deprecated = true];
+  string cluster = 2 [deprecated = true, (envoy.annotations.disallowed_by_default) = true];
 
   // Network settings for the connection pool to the upstream clusters.
   ConnPoolSettings settings = 3 [(validate.rules).message = {required: true}];

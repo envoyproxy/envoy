@@ -34,6 +34,7 @@ from google.protobuf import text_format
 from google.api import annotations_pb2 as _
 from udpa.annotations import sensitive_pb2 as _
 from validate import validate_pb2 as _
+from envoy.annotations import deprecation_pb2 as _
 from envoy.annotations import resource_pb2
 from udpa.annotations import migrate_pb2
 
@@ -208,7 +209,10 @@ def FormatHeaderFromFile(source_code_info, file_proto):
     if idx in file_proto.public_dependency:
       public_imports.append(d)
       continue
-    elif d in ['envoy/annotations/resource.proto', 'udpa/annotations/migrate.proto']:
+    elif d in [
+        'envoy/annotations/resource.proto', 'envoy/annotations/deprecation.proto',
+        'udpa/annotations/migrate.proto'
+    ]:
       infra_imports.append(d)
     elif d.startswith('envoy/'):
       # We ignore existing envoy/ imports, since these are computed explicitly

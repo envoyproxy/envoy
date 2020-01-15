@@ -14,6 +14,7 @@ exports_files(["bookstore.proto"])
 envoy_proto_library(
     name = "deprecated_proto",
     srcs = [":deprecated.proto"],
+    deps = ["@envoy_api//envoy/annotations:pkg"],
 )
 
 envoy_proto_library(

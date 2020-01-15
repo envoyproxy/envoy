@@ -245,6 +245,14 @@ filter_chains:
 TEST_F(ListenerManagerImplWithRealFiltersTest, UdpAddress) {
   EXPECT_CALL(*worker_, start(_));
   manager_->startWorkers(guard_dog_);
+  // Validate that there are no active listeners and workers are started.
+  EXPECT_EQ(0, server_.stats_store_
+                   .gauge("listener_manager.total_active_listeners",
+                          Stats::Gauge::ImportMode::NeverImport)
+                   .value());
+  EXPECT_EQ(1, server_.stats_store_
+                   .gauge("listener_manager.workers_started", Stats::Gauge::ImportMode::NeverImport)
+                   .value());
 
   const std::string proto_text = R"EOF(
     address: {
@@ -758,11 +766,27 @@ dynamic_listeners:
         nanos: 2000000
 )EOF");
 
+  // Validate that workers_started stat is zero before calling startWorkers.
+  EXPECT_EQ(0, server_.stats_store_
+                   .gauge("listener_manager.workers_started", Stats::Gauge::ImportMode::NeverImport)
+                   .value());
+
   // Start workers.
   EXPECT_CALL(*worker_, addListener(_, _));
   EXPECT_CALL(*worker_, start(_));
   manager_->startWorkers(guard_dog_);
+  // Validate that workers_started stat is still zero before workers set the status via
+  // completion callback.
+  EXPECT_EQ(0, server_.stats_store_
+                   .gauge("listener_manager.workers_started", Stats::Gauge::ImportMode::NeverImport)
+                   .value());
   worker_->callAddCompletion(true);
+
+  // Validate that workers_started stat is set to 1 after workers have responded with initialization
+  // status.
+  EXPECT_EQ(1, server_.stats_store_
+                   .gauge("listener_manager.workers_started", Stats::Gauge::ImportMode::NeverImport)
+                   .value());
 
   // Update duplicate should be a NOP.
   EXPECT_FALSE(

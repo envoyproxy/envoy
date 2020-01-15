@@ -14,6 +14,7 @@ import "google/protobuf/duration.proto";
 import "google/protobuf/struct.proto";
 import "google/protobuf/wrappers.proto";
 
+import "envoy/annotations/deprecation.proto";
 import "udpa/annotations/migrate.proto";
 import "validate/validate.proto";
 
@@ -494,7 +495,8 @@ message CorsPolicy {
     //
     //   **This field is deprecated**. Set the
     //   :ref:`filter_enabled<envoy_api_field_route.CorsPolicy.filter_enabled>` field instead.
-    google.protobuf.BoolValue enabled = 7 [deprecated = true];
+    google.protobuf.BoolValue enabled = 7
+        [deprecated = true, (envoy.annotations.disallowed_by_default) = true];
 
     // Specifies the % of requests for which the CORS filter is enabled.
     //
@@ -558,7 +560,7 @@ message RouteAction {
     //   **This field is deprecated**. Set the
     //   :ref:`runtime_fraction
     //   <envoy_api_field_route.RouteAction.RequestMirrorPolicy.runtime_fraction>` field instead.
-    string runtime_key = 2 [deprecated = true];
+    string runtime_key = 2 [deprecated = true, (envoy.annotations.disallowed_by_default) = true];
 
     // If both :ref:`runtime_key
     // <envoy_api_field_route.RouteAction.RequestMirrorPolicy.runtime_key>` and this field are not
