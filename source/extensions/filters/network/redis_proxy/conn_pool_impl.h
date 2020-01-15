@@ -8,7 +8,7 @@
 #include <unordered_map>
 #include <vector>
 
-#include "envoy/config/filter/network/redis_proxy/v2/redis_proxy.pb.h"
+#include "envoy/extensions/filters/network/redis_proxy/v3alpha/redis_proxy.pb.h"
 #include "envoy/stats/stats_macros.h"
 #include "envoy/thread_local/thread_local.h"
 #include "envoy/upstream/cluster_manager.h"
@@ -23,7 +23,7 @@
 
 #include "source/extensions/clusters/redis/redis_cluster_lb.h"
 
-#include "extensions/common/redis/redirection_mgr.h"
+#include "extensions/common/redis/cluster_refresh_manager.h"
 #include "extensions/filters/network/common/redis/client_impl.h"
 #include "extensions/filters/network/common/redis/codec_impl.h"
 #include "extensions/filters/network/common/redis/utility.h"
@@ -57,10 +57,11 @@ public:
   InstanceImpl(
       const std::string& cluster_name, Upstream::ClusterManager& cm,
       Common::Redis::Client::ClientFactory& client_factory, ThreadLocal::SlotAllocator& tls,
-      const envoy::config::filter::network::redis_proxy::v2::RedisProxy::ConnPoolSettings& config,
+      const envoy::extensions::filters::network::redis_proxy::v3alpha::RedisProxy::ConnPoolSettings&
+          config,
       Api::Api& api, Stats::ScopePtr&& stats_scope,
       const Common::Redis::RedisCommandStatsSharedPtr& redis_command_stats,
-      Extensions::Common::Redis::RedirectionManagerSharedPtr redirection_manager);
+      Extensions::Common::Redis::ClusterRefreshManagerSharedPtr refresh_manager);
   // RedisProxy::ConnPool::Instance
   Common::Redis::Client::PoolRequest* makeRequest(const std::string& key, RespVariant&& request,
                                                   PoolCallbacks& callbacks) override;
@@ -78,7 +79,9 @@ public:
   makeRequestToHost(const std::string& host_address, const Common::Redis::RespValue& request,
                     Common::Redis::Client::ClientCallbacks& callbacks);
 
-  bool onRedirection() override { return redirection_manager_->onRedirection(cluster_name_); }
+  bool onRedirection() override { return refresh_manager_->onRedirection(cluster_name_); }
+  bool onFailure() { return refresh_manager_->onFailure(cluster_name_); }
+  bool onHostDegraded() { return refresh_manager_->onHostDegraded(cluster_name_); }
 
   // Allow the unit test to have access to private members.
   friend class RedisConnPoolImplTest;
@@ -178,7 +181,7 @@ private:
   Stats::ScopePtr stats_scope_;
   Common::Redis::RedisCommandStatsSharedPtr redis_command_stats_;
   RedisClusterStats redis_cluster_stats_;
-  const Extensions::Common::Redis::RedirectionManagerSharedPtr redirection_manager_;
+  const Extensions::Common::Redis::ClusterRefreshManagerSharedPtr refresh_manager_;
 };
 
 } // namespace ConnPool

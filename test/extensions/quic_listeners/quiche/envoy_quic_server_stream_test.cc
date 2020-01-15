@@ -31,7 +31,7 @@ public:
       : api_(Api::createApiForTest()), dispatcher_(api_->allocateDispatcher()),
         connection_helper_(*dispatcher_),
         alarm_factory_(*dispatcher_, *connection_helper_.GetClock()), quic_version_([]() {
-          SetQuicReloadableFlag(quic_enable_version_99, GetParam());
+          SetQuicReloadableFlag(quic_enable_version_q099, GetParam());
           return quic::CurrentSupportedVersions()[0];
         }()),
         listener_stats_({ALL_LISTENER_STATS(POOL_COUNTER(listener_config_.listenerScope()),
@@ -92,7 +92,7 @@ public:
       std::unique_ptr<char[]> data_buffer;
       quic::QuicByteCount data_frame_header_length =
           quic::HttpEncoder::SerializeDataFrameHeader(body.length(), &data_buffer);
-      quic::QuicStringPiece data_frame_header(data_buffer.get(), data_frame_header_length);
+      quiche::QuicheStringPiece data_frame_header(data_buffer.get(), data_frame_header_length);
       data = absl::StrCat(data_frame_header, body);
     }
     return data;
@@ -106,12 +106,8 @@ public:
           EXPECT_EQ(Http::Headers::get().MethodValues.Post,
                     headers->Method()->value().getStringView());
         }));
-    if (quic::VersionUsesHttp3(quic_version_.transport_version)) {
-      quic_stream_->OnHeadersDecoded(request_headers_);
-    } else {
-      quic_stream_->OnStreamHeaderList(/*fin=*/false, request_headers_.uncompressed_header_bytes(),
-                                       request_headers_);
-    }
+    quic_stream_->OnStreamHeaderList(/*fin=*/false, request_headers_.uncompressed_header_bytes(),
+                                     request_headers_);
     EXPECT_TRUE(quic_stream_->FinishedReadingHeaders());
 
     EXPECT_CALL(stream_decoder_, decodeData(_, _))
@@ -279,12 +275,8 @@ TEST_P(EnvoyQuicServerStreamTest, ReadDisableAndReEnableImmediately) {
         EXPECT_EQ(Http::Headers::get().MethodValues.Post,
                   headers->Method()->value().getStringView());
       }));
-  if (quic::VersionUsesHttp3(quic_version_.transport_version)) {
-    quic_stream_->OnHeadersDecoded(request_headers_);
-  } else {
-    quic_stream_->OnStreamHeaderList(/*fin=*/false, request_headers_.uncompressed_header_bytes(),
-                                     request_headers_);
-  }
+  quic_stream_->OnStreamHeaderList(/*fin=*/false, request_headers_.uncompressed_header_bytes(),
+                                   request_headers_);
   EXPECT_TRUE(quic_stream_->FinishedReadingHeaders());
 
   std::string payload(1024, 'a');

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "envoy/http/conn_pool.h"
+#include "envoy/stats/timespan.h"
 
 #include "common/common/linked_object.h"
 
@@ -15,6 +16,27 @@ protected:
   ConnPoolImplBase(Upstream::HostConstSharedPtr host, Upstream::ResourcePriority priority)
       : host_(host), priority_(priority) {}
   virtual ~ConnPoolImplBase() = default;
+
+  // ActiveClient provides a base class for connection pool clients that handles connection timings
+  // as well as managing the connection timeout.
+  class ActiveClient {
+  public:
+    ActiveClient(Event::Dispatcher& dispatcher, const Upstream::ClusterInfo& cluster);
+    virtual ~ActiveClient() { conn_length_->complete(); }
+
+    virtual void onConnectTimeout() PURE;
+
+    void recordConnectionSetup();
+    void disarmConnectTimeout();
+
+    enum ConnectionState { Connecting, Connected };
+    ConnectionState connectionState();
+
+  private:
+    Event::TimerPtr connect_timer_;
+    Stats::TimespanPtr conn_connect_ms_;
+    Stats::TimespanPtr conn_length_;
+  };
 
   struct PendingRequest : LinkedObject<PendingRequest>, public ConnectionPool::Cancellable {
     PendingRequest(ConnPoolImplBase& parent, StreamDecoder& decoder,

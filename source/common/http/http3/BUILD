@@ -11,7 +11,11 @@ envoy_package()
 envoy_cc_library(
     name = "quic_codec_factory_lib",
     hdrs = ["quic_codec_factory.h"],
-    deps = ["//include/envoy/http:codec_interface"],
+    deps = [
+        "//include/envoy/config:typed_config_interface",
+        "//include/envoy/http:codec_interface",
+        "//include/envoy/network:connection_interface",
+    ],
 )
 
 envoy_cc_library(

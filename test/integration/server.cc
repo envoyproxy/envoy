@@ -182,13 +182,11 @@ void IntegrationTestServer::threadRoutine(
 }
 
 void IntegrationTestServer::onRuntimeCreated() {
-  // Override runtime values to by default allow all disallowed features.
-  //
-  // Per #6288 we explicitly want to allow end to end testing of disallowed features until the code
-  // is removed from Envoy.
-  //
-  // This will revert as the runtime is torn down with the test Envoy server.
-  Runtime::RuntimeFeaturesPeer::setAllFeaturesAllowed();
+  // TODO(alyssawilk) improve this.
+  Runtime::LoaderSingleton::getExisting()->mergeValues(
+      {{"envoy.deprecated_features:envoy.config.route.v3alpha.CorsPolicy."
+        "hidden_envoy_deprecated_enabled",
+        "true"}});
 }
 
 void IntegrationTestServerImpl::createAndRunEnvoyServer(

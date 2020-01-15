@@ -48,6 +48,7 @@ SERIALIZE_AS_STRING_WHITELIST = (
     "./source/common/config/version_converter.cc",
     "./source/extensions/filters/http/grpc_json_transcoder/json_transcoder_filter.cc",
     "./test/common/protobuf/utility_test.cc",
+    "./test/common/config/version_converter_test.cc",
     "./test/common/grpc/codec_test.cc",
     "./test/common/grpc/codec_fuzz_test.cc",
 )
@@ -70,7 +71,10 @@ STD_REGEX_WHITELIST = ("./source/common/common/utility.cc", "./source/common/com
                        "./source/common/access_log/access_log_formatter.cc",
                        "./source/extensions/filters/http/squash/squash_filter.h",
                        "./source/extensions/filters/http/squash/squash_filter.cc",
-                       "./source/server/http/admin.h", "./source/server/http/admin.cc")
+                       "./source/server/http/admin.h", "./source/server/http/admin.cc",
+                       "./tools/clang_tools/api_booster/main.cc",
+                       "./tools/clang_tools/api_booster/proto_cxx_utils.cc",
+                       "./source/common/common/version.cc")
 
 # Only one C++ file should instantiate grpc_init
 GRPC_INIT_WHITELIST = ("./source/common/grpc/google_grpc_context.cc")
@@ -149,6 +153,7 @@ UNOWNED_EXTENSIONS = {
   "extensions/filters/network/ext_authz",
   "extensions/filters/network/redis_proxy",
   "extensions/filters/network/kafka",
+  "extensions/filters/network/kafka/broker",
   "extensions/filters/network/kafka/protocol",
   "extensions/filters/network/kafka/serialization",
   "extensions/filters/network/mongo_proxy",
@@ -329,7 +334,7 @@ def errorIfNoSubstringFound(pattern, file_path, error_message):
 
 
 def isApiFile(file_path):
-  return file_path.startswith(args.api_prefix)
+  return file_path.startswith(args.api_prefix) or file_path.startswith(args.api_shadow_prefix)
 
 
 def isBuildFile(file_path):
@@ -340,7 +345,8 @@ def isBuildFile(file_path):
 
 
 def isExternalBuildFile(file_path):
-  return isBuildFile(file_path) and file_path.startswith("./bazel/external/")
+  return isBuildFile(file_path) and (file_path.startswith("./bazel/external/") or
+                                     file_path.startswith("./tools/clang_tools"))
 
 
 def isSkylarkFile(file_path):
@@ -562,6 +568,9 @@ def checkSourceLine(line, file_path, reportError):
      ('.counter(' in line or '.gauge(' in line or '.histogram(' in line):
     reportError("Don't lookup stats by name at runtime; use StatName saved during construction")
 
+  if re.search("envoy::[a-z0-9_:]+::[A-Z][a-z]\w*_\w*_[A-Z]{2}", line):
+    reportError("Don't use mangled Protobuf names for enum constants")
+
   hist_m = re.search("(?<=HISTOGRAM\()[a-zA-Z0-9_]+_(b|kb|mb|ns|us|ms|s)(?=,)", line)
   if hist_m and not whitelistedForHistogramSiSuffix(hist_m.group(0)):
     reportError(
@@ -627,7 +636,8 @@ def checkBuildPath(file_path):
     command = "%s %s | diff %s -" % (ENVOY_BUILD_FIXER_PATH, file_path, file_path)
     error_messages += executeCommand(command, "envoy_build_fixer check failed", file_path)
 
-  if isBuildFile(file_path) and file_path.startswith(args.api_prefix + "envoy"):
+  if isBuildFile(file_path) and (file_path.startswith(args.api_prefix + "envoy") or
+                                 file_path.startswith(args.api_shadow_prefix + "envoy")):
     found = False
     for line in readLines(file_path):
       if "api_proto_package(" in line:
@@ -830,6 +840,10 @@ if __name__ == "__main__":
                       default=multiprocessing.cpu_count(),
                       help="number of worker processes to use; defaults to one per core.")
   parser.add_argument("--api-prefix", type=str, default="./api/", help="path of the API tree.")
+  parser.add_argument("--api-shadow-prefix",
+                      type=str,
+                      default="./generated_api_shadow/",
+                      help="path of the shadow API tree.")
   parser.add_argument("--skip_envoy_build_rule_check",
                       action="store_true",
                       help="skip checking for '@envoy//' prefix in build rules.")
@@ -858,7 +872,10 @@ if __name__ == "__main__":
   target_path = args.target_path
   envoy_build_rule_check = not args.skip_envoy_build_rule_check
   namespace_check = args.namespace_check
-  namespace_check_excluded_paths = args.namespace_check_excluded_paths
+  namespace_check_excluded_paths = args.namespace_check_excluded_paths + [
+      "./tools/api_boost/testdata/",
+      "./tools/clang_tools/",
+  ]
   build_fixer_check_excluded_paths = args.build_fixer_check_excluded_paths + [
       "./bazel/external/",
       "./bazel/toolchains/",
@@ -878,6 +895,11 @@ if __name__ == "__main__":
   # error_messages.
   def ownedDirectories(error_messages):
     owned = []
+    maintainers = [
+        '@mattklein123', '@htuch', '@alyssawilk', '@zuercher', '@lizan', '@snowp', '@asraa',
+        '@junr03', '@dio', '@jmarantz'
+    ]
+
     try:
       with open('./CODEOWNERS') as f:
         for line in f:
@@ -890,6 +912,11 @@ if __name__ == "__main__":
             if len(owners) < 2:
               error_messages.append("Extensions require at least 2 owners in CODEOWNERS:\n"
                                     "    {}".format(line))
+            maintainer = len(set(owners).intersection(set(maintainers))) > 0
+            if not maintainer:
+              error_messages.append("Extensions require at least one maintainer OWNER:\n"
+                                    "    {}".format(line))
+
       return owned
     except IOError:
       return []  # for the check format tests.

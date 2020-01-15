@@ -3,6 +3,8 @@
 #include <string>
 
 #include "envoy/common/platform.h"
+#include "envoy/config/bootstrap/v3alpha/bootstrap.pb.h"
+#include "envoy/config/listener/v3alpha/listener_components.pb.h"
 
 #include "common/common/fmt.h"
 #include "common/protobuf/utility.h"
@@ -72,16 +74,11 @@ public:
     // in production runtime is not setup until after the bootstrap config is loaded. This seems
     // better for configuration tests.
     ScopedRuntimeInjector scoped_runtime(server_.runtime());
-    ON_CALL(server_.runtime_loader_.snapshot_, deprecatedFeatureEnabled(_))
-        .WillByDefault(Invoke([](const std::string& key) {
-          if (Runtime::RuntimeFeaturesDefaults::get().disallowedByDefault(key)) {
-            return false;
-          } else {
-            return true;
-          }
-        }));
+    ON_CALL(server_.runtime_loader_.snapshot_, deprecatedFeatureEnabled(_, _))
+        .WillByDefault(
+            Invoke([](const std::string&, bool default_value) { return default_value; }));
 
-    envoy::config::bootstrap::v2::Bootstrap bootstrap;
+    envoy::config::bootstrap::v3alpha::Bootstrap bootstrap;
     Server::InstanceUtil::loadBootstrapConfig(
         bootstrap, options_, server_.messageValidationContext().staticValidationVisitor(), *api_);
     Server::Configuration::InitialImpl initial_config(bootstrap);
@@ -99,16 +96,17 @@ public:
     }));
     ON_CALL(server_, listenerManager()).WillByDefault(ReturnRef(listener_manager_));
     ON_CALL(component_factory_, createNetworkFilterFactoryList(_, _))
-        .WillByDefault(
-            Invoke([&](const Protobuf::RepeatedPtrField<envoy::api::v2::listener::Filter>& filters,
-                       Server::Configuration::FactoryContext& context)
-                       -> std::vector<Network::FilterFactoryCb> {
+        .WillByDefault(Invoke(
+            [&](const Protobuf::RepeatedPtrField<envoy::config::listener::v3alpha::Filter>& filters,
+                Server::Configuration::FilterChainFactoryContext& context)
+                -> std::vector<Network::FilterFactoryCb> {
               return Server::ProdListenerComponentFactory::createNetworkFilterFactoryList_(filters,
                                                                                            context);
             }));
     ON_CALL(component_factory_, createListenerFilterFactoryList(_, _))
         .WillByDefault(Invoke(
-            [&](const Protobuf::RepeatedPtrField<envoy::api::v2::listener::ListenerFilter>& filters,
+            [&](const Protobuf::RepeatedPtrField<envoy::config::listener::v3alpha::ListenerFilter>&
+                    filters,
                 Server::Configuration::ListenerFactoryContext& context)
                 -> std::vector<Network::ListenerFilterFactoryCb> {
               return Server::ProdListenerComponentFactory::createListenerFilterFactoryList_(
@@ -116,7 +114,8 @@ public:
             }));
     ON_CALL(component_factory_, createUdpListenerFilterFactoryList(_, _))
         .WillByDefault(Invoke(
-            [&](const Protobuf::RepeatedPtrField<envoy::api::v2::listener::ListenerFilter>& filters,
+            [&](const Protobuf::RepeatedPtrField<envoy::config::listener::v3alpha::ListenerFilter>&
+                    filters,
                 Server::Configuration::ListenerFactoryContext& context)
                 -> std::vector<Network::UdpListenerFilterFactoryCb> {
               return Server::ProdListenerComponentFactory::createUdpListenerFilterFactoryList_(
@@ -155,7 +154,7 @@ void testMerge() {
   const std::string overlay = "static_resources: { clusters: [{name: 'foo'}]}";
   OptionsImpl options(Server::createTestOptionsImpl("google_com_proxy.v2.yaml", overlay,
                                                     Network::Address::IpVersion::v6));
-  envoy::config::bootstrap::v2::Bootstrap bootstrap;
+  envoy::config::bootstrap::v3alpha::Bootstrap bootstrap;
   Server::InstanceUtil::loadBootstrapConfig(bootstrap, options,
                                             ProtobufMessage::getStrictValidationVisitor(), *api);
   EXPECT_EQ(2, bootstrap.static_resources().clusters_size());
@@ -169,7 +168,7 @@ uint32_t run(const std::string& directory) {
     OptionsImpl options(
         Envoy::Server::createTestOptionsImpl(filename, "", Network::Address::IpVersion::v6));
     ConfigTest test1(options);
-    envoy::config::bootstrap::v2::Bootstrap bootstrap;
+    envoy::config::bootstrap::v3alpha::Bootstrap bootstrap;
     if (Server::InstanceUtil::loadBootstrapConfig(
             bootstrap, options, ProtobufMessage::getStrictValidationVisitor(), *api) ==
         Server::InstanceUtil::BootstrapVersion::V2) {

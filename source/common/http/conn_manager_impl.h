@@ -90,6 +90,9 @@ public:
 
   TimeSource& timeSource() { return time_source_; }
 
+  // Return a reference to the shared_ptr so that it can be lazy created on demand.
+  std::shared_ptr<StreamInfo::FilterState>& filterState() { return filter_state_; }
+
 private:
   struct ActiveStream;
 
@@ -309,6 +312,10 @@ private:
     void requestDataTooLarge();
     void requestDataDrained();
 
+    void requestRouteConfigUpdate(
+        Http::RouteConfigUpdatedCallbackSharedPtr route_config_updated_cb) override;
+    absl::optional<Router::ConfigConstSharedPtr> routeConfig() override;
+
     StreamDecoderFilterSharedPtr handle_;
     bool is_grpc_request_{};
   };
@@ -382,6 +389,36 @@ private:
   };
 
   using ActiveStreamEncoderFilterPtr = std::unique_ptr<ActiveStreamEncoderFilter>;
+
+  // Used to abstract making of RouteConfig update request.
+  // RdsRouteConfigUpdateRequester is used when an RdsRouteConfigProvider is configured,
+  // NullRouteConfigUpdateRequester is used in all other cases (specifically when
+  // ScopedRdsConfigProvider/InlineScopedRoutesConfigProvider is configured)
+  class RouteConfigUpdateRequester {
+  public:
+    virtual ~RouteConfigUpdateRequester() = default;
+    virtual void requestRouteConfigUpdate(const std::string, Event::Dispatcher&,
+                                          Http::RouteConfigUpdatedCallbackSharedPtr) {
+      NOT_IMPLEMENTED_GCOVR_EXCL_LINE;
+    };
+  };
+
+  class RdsRouteConfigUpdateRequester : public RouteConfigUpdateRequester {
+  public:
+    RdsRouteConfigUpdateRequester(Router::RouteConfigProvider* route_config_provider)
+        : route_config_provider_(route_config_provider) {}
+    void requestRouteConfigUpdate(
+        const std::string host_header, Event::Dispatcher& thread_local_dispatcher,
+        Http::RouteConfigUpdatedCallbackSharedPtr route_config_updated_cb) override;
+
+  private:
+    Router::RouteConfigProvider* route_config_provider_;
+  };
+
+  class NullRouteConfigUpdateRequester : public RouteConfigUpdateRequester {
+  public:
+    NullRouteConfigUpdateRequester() = default;
+  };
 
   /**
    * Wraps a single active stream on the connection. These are either full request/response pairs
@@ -502,6 +539,10 @@ private:
     void snapScopedRouteConfig();
 
     void refreshCachedRoute();
+    void
+    requestRouteConfigUpdate(Event::Dispatcher& thread_local_dispatcher,
+                             Http::RouteConfigUpdatedCallbackSharedPtr route_config_updated_cb);
+    absl::optional<Router::ConfigConstSharedPtr> routeConfig();
 
     void refreshCachedTracingCustomTags();
 
@@ -641,6 +682,7 @@ private:
     // response.
     bool encoding_headers_only_{};
     Network::Socket::OptionsSharedPtr upstream_options_;
+    std::unique_ptr<RouteConfigUpdateRequester> route_config_update_requester_;
     std::unique_ptr<Tracing::CustomTagMap> tracing_custom_tags_{nullptr};
   };
 
@@ -701,6 +743,7 @@ private:
   const Server::OverloadActionState& overload_stop_accepting_requests_ref_;
   const Server::OverloadActionState& overload_disable_keepalive_ref_;
   TimeSource& time_source_;
+  std::shared_ptr<StreamInfo::FilterState> filter_state_;
 };
 
 } // namespace Http

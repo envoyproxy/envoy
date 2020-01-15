@@ -124,7 +124,7 @@ protected:
 #if HEADER_MAP_USE_FLAT_HASH_MAP
 # if HEADER_MAP_USE_SLIST
   struct HeaderCell { HeaderNode node; HeaderCell* next; };
-  using HeaderLazyMap = absl::flat_hash_map<absl::string_view, HeaderCell>;
+  using HeaderLazyMap = absl::flat_hash_map<absl::string_view, HeaderCell*>;
 # else
   using HeaderNodeVector = absl::InlinedVector<HeaderNode, 1>;
   using HeaderLazyMap = absl::flat_hash_map<absl::string_view, HeaderNodeVector>;
@@ -191,6 +191,8 @@ protected:
    */
   class HeaderList : NonCopyable {
   public:
+    friend HeaderMapImpl;
+
     HeaderList() : pseudo_headers_end_(headers_.end()) {}
 
     template <class Key> bool isPseudoHeader(const Key& key) {
@@ -205,10 +207,13 @@ protected:
       if (!lazy_map_.empty()) {
 #if HEADER_MAP_USE_FLAT_HASH_MAP
 # if HEADER_MAP_USE_SLIST
-        lazy_map_[i->key().getStringView()].push_back(i);
+        HeaderCell*& cellref = lazy_map_[i->key().getStringView()];
+        HeaderCell* cell = new HeaderCell;
+        cell->node = i;
+        cell->next = cellref;
+        cellref = cell;
 # else
-        HeaderCell& cell = lazy_map_[i->key().getStringView()];
-        cell.node = i;
+        lazy_map_[i->key().getStringView()].push_back(i);
 # endif
 #endif
 #if HEADER_MAP_USE_MULTI_MAP
@@ -243,8 +248,8 @@ protected:
     // Makes a map.
     bool maybeMakeMap() const;
 
-    HeaderLazyMap::iterator find(absl::string_view key) const;
-    HeaderLazyMap::iterator findEnd() const { return lazy_map_.end(); }
+    //HeaderLazyMap::iterator find(absl::string_view key) const;
+    //HeaderLazyMap::iterator findEnd() const { return lazy_map_.end(); }
 
     std::list<HeaderEntryImpl>::const_iterator begin() const { return headers_.begin(); }
     std::list<HeaderEntryImpl>::const_iterator end() const { return headers_.end(); }

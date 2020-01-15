@@ -1,5 +1,7 @@
 #include <memory>
 
+#include "envoy/config/core/v3alpha/base.pb.h"
+
 #include "common/common/assert.h"
 #include "common/common/version.h"
 #include "common/network/address_impl.h"
@@ -215,6 +217,18 @@ protected:
     return server_thread;
   }
 
+  void expectCorrectBuildVersion(const envoy::config::core::v3alpha::BuildVersion& build_version) {
+    std::string version_string =
+        absl::StrCat(build_version.version().major_number(), ".",
+                     build_version.version().minor_number(), ".", build_version.version().patch());
+    const auto& fields = build_version.metadata().fields();
+    if (fields.find(BuildVersionMetadataKeys::get().BuildLabel) != fields.end()) {
+      absl::StrAppend(&version_string, "-",
+                      fields.at(BuildVersionMetadataKeys::get().BuildLabel).string_value());
+    }
+    EXPECT_EQ(BUILD_VERSION_NUMBER, version_string);
+  }
+
   // Returns the server's tracer as a pointer, for use in dynamic_cast tests.
   Tracing::HttpTracer* tracer() { return &server_->httpContext().tracer(); };
 
@@ -254,7 +268,7 @@ private:
   Stats::Counter& stats_flushed_;
 };
 
-// Custom StatsSinFactory that creates CustomStatsSink.
+// Custom StatsSinkFactory that creates CustomStatsSink.
 class CustomStatsSinkFactory : public Server::Configuration::StatsSinkFactory {
 public:
   // StatsSinkFactory
@@ -263,10 +277,12 @@ public:
   }
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
-    return ProtobufTypes::MessagePtr{new Envoy::ProtobufWkt::Empty()};
+    // Using Struct instead of a custom per-filter empty config proto
+    // This is only allowed in tests.
+    return ProtobufTypes::MessagePtr{new Envoy::ProtobufWkt::Struct()};
   }
 
-  std::string name() override { return "envoy.custom_stats_sink"; }
+  std::string name() const override { return "envoy.custom_stats_sink"; }
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, ServerInstanceImplTest,
@@ -554,13 +570,30 @@ TEST_P(ServerInstanceImplTest, ValidationAllowStaticRejectDynamic) {
 }
 
 // Validate server localInfo() from bootstrap Node.
+// Deprecated testing of the envoy.api.v2.core.Node.build_version field
+TEST_P(ServerInstanceImplTest, DEPRECATED_FEATURE_TEST(BootstrapNodeDeprecated)) {
+  initialize("test/server/node_bootstrap.yaml");
+  EXPECT_EQ("bootstrap_zone", server_->localInfo().zoneName());
+  EXPECT_EQ("bootstrap_cluster", server_->localInfo().clusterName());
+  EXPECT_EQ("bootstrap_id", server_->localInfo().nodeName());
+  EXPECT_EQ("bootstrap_sub_zone", server_->localInfo().node().locality().sub_zone());
+  EXPECT_EQ(VersionInfo::version(),
+            server_->localInfo().node().hidden_envoy_deprecated_build_version());
+  EXPECT_EQ("envoy", server_->localInfo().node().user_agent_name());
+  EXPECT_TRUE(server_->localInfo().node().has_user_agent_build_version());
+  expectCorrectBuildVersion(server_->localInfo().node().user_agent_build_version());
+}
+
+// Validate server localInfo() from bootstrap Node.
 TEST_P(ServerInstanceImplTest, BootstrapNode) {
   initialize("test/server/node_bootstrap.yaml");
   EXPECT_EQ("bootstrap_zone", server_->localInfo().zoneName());
   EXPECT_EQ("bootstrap_cluster", server_->localInfo().clusterName());
   EXPECT_EQ("bootstrap_id", server_->localInfo().nodeName());
   EXPECT_EQ("bootstrap_sub_zone", server_->localInfo().node().locality().sub_zone());
-  EXPECT_EQ(VersionInfo::version(), server_->localInfo().node().build_version());
+  EXPECT_EQ("envoy", server_->localInfo().node().user_agent_name());
+  EXPECT_TRUE(server_->localInfo().node().has_user_agent_build_version());
+  expectCorrectBuildVersion(server_->localInfo().node().user_agent_build_version());
 }
 
 TEST_P(ServerInstanceImplTest, LoadsBootstrapFromConfigProtoOptions) {
@@ -592,7 +625,6 @@ TEST_P(ServerInstanceImplTest, BootstrapNodeWithOptionsOverride) {
   EXPECT_EQ("some_cluster_name", server_->localInfo().clusterName());
   EXPECT_EQ("some_node_name", server_->localInfo().nodeName());
   EXPECT_EQ("bootstrap_sub_zone", server_->localInfo().node().locality().sub_zone());
-  EXPECT_EQ(VersionInfo::version(), server_->localInfo().node().build_version());
 }
 
 // Validate server runtime is parsed from bootstrap and that we can read from
@@ -735,7 +767,7 @@ TEST_P(ServerInstanceImplTest, BootstrapNodeWithSocketOptions) {
   // both of them use SO_REUSEPORT socket option.
   auto options = std::make_shared<Network::Socket::Options>();
   options->emplace_back(std::make_shared<Network::SocketOptionImpl>(
-      envoy::api::v2::core::SocketOption::STATE_PREBIND,
+      envoy::config::core::v3alpha::SocketOption::STATE_PREBIND,
       ENVOY_MAKE_SOCKET_OPTION_NAME(SOL_SOCKET, SO_REUSEPORT), 1));
   EXPECT_NO_THROW(bindAndListenTcpSocket(address, options));
 }
@@ -955,6 +987,73 @@ TEST_P(StaticValidationTest, NetworkFilterUnknownField) {
 
 TEST_P(StaticValidationTest, ClusterUnknownField) {
   EXPECT_TRUE(validate("cluster_unknown_field.yaml"));
+}
+
+// Custom StatsSink that registers both a Cluster update callback and Server lifecycle callback.
+class CallbacksStatsSink : public Stats::Sink, public Upstream::ClusterUpdateCallbacks {
+public:
+  CallbacksStatsSink(Server::Instance& server)
+      : cluster_removal_cb_handle_(
+            server.clusterManager().addThreadLocalClusterUpdateCallbacks(*this)),
+        lifecycle_cb_handle_(server.lifecycleNotifier().registerCallback(
+            ServerLifecycleNotifier::Stage::ShutdownExit,
+            [this]() { cluster_removal_cb_handle_.reset(); })) {}
+
+  // Stats::Sink
+  void flush(Stats::MetricSnapshot&) override {}
+  void onHistogramComplete(const Stats::Histogram&, uint64_t) override {}
+
+  // Upstream::ClusterUpdateCallbacks
+  void onClusterAddOrUpdate(Upstream::ThreadLocalCluster&) override {}
+  void onClusterRemoval(const std::string&) override {}
+
+private:
+  Upstream::ClusterUpdateCallbacksHandlePtr cluster_removal_cb_handle_;
+  ServerLifecycleNotifier::HandlePtr lifecycle_cb_handle_;
+};
+
+class CallbacksStatsSinkFactory : public Server::Configuration::StatsSinkFactory {
+public:
+  // StatsSinkFactory
+  Stats::SinkPtr createStatsSink(const Protobuf::Message&, Server::Instance& server) override {
+    return std::make_unique<CallbacksStatsSink>(server);
+  }
+
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    // Using Struct instead of a custom per-filter empty config proto
+    // This is only allowed in tests.
+    return ProtobufTypes::MessagePtr{new Envoy::ProtobufWkt::Struct()};
+  }
+
+  std::string name() const override { return "envoy.callbacks_stats_sink"; }
+};
+
+REGISTER_FACTORY(CallbacksStatsSinkFactory, Server::Configuration::StatsSinkFactory);
+
+// This test ensures that a stats sink can use cluster update callbacks properly. Using only a
+// cluster update callback is insufficient to protect against double-free bugs, so a server
+// lifecycle callback is also used to ensure that the cluster update callback is freed during
+// Server::Instance's destruction. See issue #9292 for more details.
+TEST_P(ServerInstanceImplTest, CallbacksStatsSinkTest) {
+  initialize("test/server/callbacks_stats_sink_bootstrap.yaml");
+  // Necessary to trigger server lifecycle callbacks, otherwise only terminate() is called.
+  server_->shutdown();
+}
+
+// Validate that disabled extension is reflected in the list of Node extensions.
+TEST_P(ServerInstanceImplTest, DisabledExtension) {
+  OptionsImpl::disableExtensions({"envoy.filters.http/envoy.buffer"});
+  initialize("test/server/node_bootstrap.yaml");
+  bool disabled_filter_found = false;
+  for (const auto& extension : server_->localInfo().node().extensions()) {
+    if (extension.category() == "envoy.filters.http" && extension.name() == "envoy.buffer") {
+      ASSERT_TRUE(extension.disabled());
+      disabled_filter_found = true;
+    } else {
+      ASSERT_FALSE(extension.disabled());
+    }
+  }
+  ASSERT_TRUE(disabled_filter_found);
 }
 
 } // namespace

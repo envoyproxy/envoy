@@ -34,7 +34,7 @@ WatcherImpl::~WatcherImpl() {
 void WatcherImpl::addWatch(const std::string& path, uint32_t events, Watcher::OnChangedCb cb) {
   FileWatchPtr watch = addWatch(path, events, cb, false);
   if (watch == nullptr) {
-    throw EnvoyException(fmt::format("invalid watch path {}", path));
+    throw EnvoyException(absl::StrCat("invalid watch path ", path));
   }
 }
 

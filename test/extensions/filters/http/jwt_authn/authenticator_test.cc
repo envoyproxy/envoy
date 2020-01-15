@@ -1,3 +1,6 @@
+#include "envoy/config/core/v3alpha/http_uri.pb.h"
+#include "envoy/extensions/filters/http/jwt_authn/v3alpha/config.pb.h"
+
 #include "common/http/message_impl.h"
 #include "common/protobuf/utility.h"
 
@@ -13,7 +16,7 @@
 
 #include "gtest/gtest.h"
 
-using ::envoy::config::filter::http::jwt_authn::v2alpha::JwtAuthentication;
+using envoy::extensions::filters::http::jwt_authn::v3alpha::JwtAuthentication;
 using Envoy::Extensions::HttpFilters::Common::JwksFetcher;
 using Envoy::Extensions::HttpFilters::Common::JwksFetcherPtr;
 using Envoy::Extensions::HttpFilters::Common::MockJwksFetcher;
@@ -43,7 +46,7 @@ public:
     raw_fetcher_ = new MockJwksFetcher;
     fetcher_.reset(raw_fetcher_);
     auth_ = Authenticator::create(
-        check_audience, provider, !provider, filter_config_->getCache().getJwksCache(),
+        check_audience, provider, !provider, !provider, filter_config_->getCache().getJwksCache(),
         filter_config_->cm(), [this](Upstream::ClusterManager&) { return std::move(fetcher_); },
         filter_config_->timeSource());
     jwks_ = Jwks::createFrom(PublicKey, Jwks::JWKS);
@@ -58,12 +61,22 @@ public:
       out_name_ = name;
       out_payload_ = payload;
     };
-    auto tokens = filter_config_->getExtractor().extract(headers);
+    initTokenExtractor();
+    auto tokens = extractor_->extract(headers);
     auth_->verify(headers, parent_span_, std::move(tokens), std::move(set_payload_cb),
                   std::move(on_complete_cb));
   }
 
+  void initTokenExtractor() {
+    JwtProviderList providers;
+    for (const auto& it : proto_config_.providers()) {
+      providers.emplace_back(&it.second);
+    }
+    extractor_ = Extractor::create(providers);
+  }
+
   JwtAuthentication proto_config_;
+  ExtractorConstPtr extractor_;
   FilterConfigSharedPtr filter_config_;
   MockJwksFetcher* raw_fetcher_;
   JwksFetcherPtr fetcher_;
@@ -79,7 +92,7 @@ public:
 // It also verifies Jwks cache with 10 JWT authentications, but only one Jwks fetch.
 TEST_F(AuthenticatorTest, TestOkJWTandCache) {
   EXPECT_CALL(*raw_fetcher_, fetch(_, _, _))
-      .WillOnce(Invoke([this](const ::envoy::api::v2::core::HttpUri&, Tracing::Span&,
+      .WillOnce(Invoke([this](const envoy::config::core::v3alpha::HttpUri&, Tracing::Span&,
                               JwksFetcher::JwksReceiver& receiver) {
         receiver.onJwksSuccess(std::move(jwks_));
       }));
@@ -102,7 +115,7 @@ TEST_F(AuthenticatorTest, TestForwardJwt) {
   (*proto_config_.mutable_providers())[std::string(ProviderName)].set_forward(true);
   CreateAuthenticator();
   EXPECT_CALL(*raw_fetcher_, fetch(_, _, _))
-      .WillOnce(Invoke([this](const ::envoy::api::v2::core::HttpUri&, Tracing::Span&,
+      .WillOnce(Invoke([this](const envoy::config::core::v3alpha::HttpUri&, Tracing::Span&,
                               JwksFetcher::JwksReceiver& receiver) {
         receiver.onJwksSuccess(std::move(jwks_));
       }));
@@ -126,7 +139,7 @@ TEST_F(AuthenticatorTest, TestSetPayload) {
       "my_payload");
   CreateAuthenticator();
   EXPECT_CALL(*raw_fetcher_, fetch(_, _, _))
-      .WillOnce(Invoke([this](const ::envoy::api::v2::core::HttpUri&, Tracing::Span&,
+      .WillOnce(Invoke([this](const envoy::config::core::v3alpha::HttpUri&, Tracing::Span&,
                               JwksFetcher::JwksReceiver& receiver) {
         receiver.onJwksSuccess(std::move(jwks_));
       }));
@@ -147,7 +160,7 @@ TEST_F(AuthenticatorTest, TestSetPayload) {
 // This test verifies the Jwt with non existing kid
 TEST_F(AuthenticatorTest, TestJwtWithNonExistKid) {
   EXPECT_CALL(*raw_fetcher_, fetch(_, _, _))
-      .WillOnce(Invoke([this](const ::envoy::api::v2::core::HttpUri&, Tracing::Span&,
+      .WillOnce(Invoke([this](const envoy::config::core::v3alpha::HttpUri&, Tracing::Span&,
                               JwksFetcher::JwksReceiver& receiver) {
         receiver.onJwksSuccess(std::move(jwks_));
       }));
@@ -250,7 +263,7 @@ TEST_F(AuthenticatorTest, TestIssuerNotFound) {
 // This test verifies that when Jwks fetching fails, JwksFetchFail status is returned.
 TEST_F(AuthenticatorTest, TestPubkeyFetchFail) {
   EXPECT_CALL(*raw_fetcher_, fetch(_, _, _))
-      .WillOnce(Invoke([](const ::envoy::api::v2::core::HttpUri&, Tracing::Span&,
+      .WillOnce(Invoke([](const envoy::config::core::v3alpha::HttpUri&, Tracing::Span&,
                           JwksFetcher::JwksReceiver& receiver) {
         receiver.onJwksError(JwksFetcher::JwksReceiver::Failure::InvalidJwks);
       }));
@@ -272,7 +285,8 @@ TEST_F(AuthenticatorTest, TestOnDestroy) {
   EXPECT_CALL(*raw_fetcher_, cancel()).Times(1);
 
   auto headers = Http::TestHeaderMapImpl{{"Authorization", "Bearer " + std::string(GoodToken)}};
-  auto tokens = filter_config_->getExtractor().extract(headers);
+  initTokenExtractor();
+  auto tokens = extractor_->extract(headers);
   // callback should not be called.
   std::function<void(const Status&)> on_complete_cb = [](const Status&) { FAIL(); };
   auth_->verify(headers, parent_span_, std::move(tokens), nullptr, std::move(on_complete_cb));
@@ -288,7 +302,7 @@ TEST_F(AuthenticatorTest, TestNoForwardPayloadHeader) {
   provider0.clear_forward_payload_header();
   CreateAuthenticator();
   EXPECT_CALL(*raw_fetcher_, fetch(_, _, _))
-      .WillOnce(Invoke([this](const ::envoy::api::v2::core::HttpUri&, Tracing::Span&,
+      .WillOnce(Invoke([this](const envoy::config::core::v3alpha::HttpUri&, Tracing::Span&,
                               JwksFetcher::JwksReceiver& receiver) {
         receiver.onJwksSuccess(std::move(jwks_));
       }));
@@ -313,7 +327,7 @@ TEST_F(AuthenticatorTest, TestAllowFailedMultipleTokens) {
 
   CreateAuthenticator(nullptr, absl::nullopt);
   EXPECT_CALL(*raw_fetcher_, fetch(_, _, _))
-      .WillOnce(Invoke([this](const ::envoy::api::v2::core::HttpUri&, Tracing::Span&,
+      .WillOnce(Invoke([this](const envoy::config::core::v3alpha::HttpUri&, Tracing::Span&,
                               JwksFetcher::JwksReceiver& receiver) {
         receiver.onJwksSuccess(std::move(jwks_));
       }));
@@ -361,7 +375,7 @@ TEST_F(AuthenticatorTest, TestAllowFailedMultipleIssuers) {
   CreateAuthenticator(nullptr, absl::nullopt);
   EXPECT_CALL(*raw_fetcher_, fetch(_, _, _))
       .Times(2)
-      .WillRepeatedly(Invoke([](const ::envoy::api::v2::core::HttpUri&, Tracing::Span&,
+      .WillRepeatedly(Invoke([](const envoy::config::core::v3alpha::HttpUri&, Tracing::Span&,
                                 JwksFetcher::JwksReceiver& receiver) {
         ::google::jwt_verify::JwksPtr jwks = Jwks::createFrom(PublicKey, Jwks::JWKS);
         EXPECT_TRUE(jwks->getStatus() == Status::Ok);
@@ -387,7 +401,7 @@ TEST_F(AuthenticatorTest, TestCustomCheckAudience) {
       std::vector<std::string>{"invalid_service"});
   CreateAuthenticator(check_audience.get());
   EXPECT_CALL(*raw_fetcher_, fetch(_, _, _))
-      .WillOnce(Invoke([this](const ::envoy::api::v2::core::HttpUri&, Tracing::Span&,
+      .WillOnce(Invoke([this](const envoy::config::core::v3alpha::HttpUri&, Tracing::Span&,
                               JwksFetcher::JwksReceiver& receiver) {
         receiver.onJwksSuccess(std::move(jwks_));
       }));
@@ -403,7 +417,7 @@ TEST_F(AuthenticatorTest, TestCustomCheckAudience) {
 // This test verifies that when invalid JWKS is fetched, an JWKS error status is returned.
 TEST_F(AuthenticatorTest, TestInvalidPubkeyKey) {
   EXPECT_CALL(*raw_fetcher_, fetch(_, _, _))
-      .WillOnce(Invoke([](const ::envoy::api::v2::core::HttpUri&, Tracing::Span&,
+      .WillOnce(Invoke([](const envoy::config::core::v3alpha::HttpUri&, Tracing::Span&,
                           JwksFetcher::JwksReceiver& receiver) {
         auto jwks = Jwks::createFrom(PublicKey, Jwks::PEM);
         receiver.onJwksSuccess(std::move(jwks));

@@ -4,8 +4,10 @@
 #include "envoy/common/token_bucket.h"
 #include "envoy/config/grpc_mux.h"
 #include "envoy/config/subscription.h"
+#include "envoy/service/discovery/v3alpha/discovery.pb.h"
 
 #include "common/common/logger.h"
+#include "common/config/api_version.h"
 #include "common/config/delta_subscription_state.h"
 #include "common/config/grpc_stream.h"
 #include "common/config/pausable_ack_queue.h"
@@ -20,13 +22,16 @@ namespace Config {
 // This class owns the GrpcStream used to talk to the server, maintains queuing
 // logic to properly order the subscription(s)' various messages, and allows
 // starting/stopping/pausing of the subscriptions.
-class NewGrpcMuxImpl : public GrpcMux,
-                       public GrpcStreamCallbacks<envoy::api::v2::DeltaDiscoveryResponse>,
-                       Logger::Loggable<Logger::Id::config> {
+class NewGrpcMuxImpl
+    : public GrpcMux,
+      public GrpcStreamCallbacks<envoy::service::discovery::v3alpha::DeltaDiscoveryResponse>,
+      Logger::Loggable<Logger::Id::config> {
 public:
   NewGrpcMuxImpl(Grpc::RawAsyncClientPtr&& async_client, Event::Dispatcher& dispatcher,
-                 const Protobuf::MethodDescriptor& service_method, Runtime::RandomGenerator& random,
-                 Stats::Scope& scope, const RateLimitSettings& rate_limit_settings,
+                 const Protobuf::MethodDescriptor& service_method,
+                 envoy::config::core::v3alpha::ApiVersion transport_api_version,
+                 Runtime::RandomGenerator& random, Stats::Scope& scope,
+                 const RateLimitSettings& rate_limit_settings,
                  const LocalInfo::LocalInfo& local_info);
 
   Watch* addOrUpdateWatch(const std::string& type_url, Watch* watch,
@@ -40,8 +45,9 @@ public:
   void pause(const std::string& type_url) override;
   void resume(const std::string& type_url) override;
   bool paused(const std::string& type_url) const override;
-  void
-  onDiscoveryResponse(std::unique_ptr<envoy::api::v2::DeltaDiscoveryResponse>&& message) override;
+  void onDiscoveryResponse(
+      std::unique_ptr<envoy::service::discovery::v3alpha::DeltaDiscoveryResponse>&& message)
+      override;
 
   void onStreamEstablished() override;
 
@@ -55,6 +61,25 @@ public:
   GrpcMuxWatchPtr subscribe(const std::string&, const std::set<std::string>&,
                             GrpcMuxCallbacks&) override;
   void start() override;
+
+  struct SubscriptionStuff {
+    SubscriptionStuff(const std::string& type_url, std::chrono::milliseconds init_fetch_timeout,
+                      Event::Dispatcher& dispatcher, const LocalInfo::LocalInfo& local_info)
+        : sub_state_(type_url, watch_map_, local_info, init_fetch_timeout, dispatcher),
+          init_fetch_timeout_(init_fetch_timeout) {}
+
+    WatchMap watch_map_;
+    DeltaSubscriptionState sub_state_;
+    const std::chrono::milliseconds init_fetch_timeout_;
+
+    SubscriptionStuff(const SubscriptionStuff&) = delete;
+    SubscriptionStuff& operator=(const SubscriptionStuff&) = delete;
+  };
+
+  // for use in tests only
+  const absl::flat_hash_map<std::string, std::unique_ptr<SubscriptionStuff>>& subscriptions() {
+    return subscriptions_;
+  }
 
 private:
   Watch* addWatch(const std::string& type_url, const std::set<std::string>& resources,
@@ -90,19 +115,6 @@ private:
   // description of how it interacts with pause() and resume().
   PausableAckQueue pausable_ack_queue_;
 
-  struct SubscriptionStuff {
-    SubscriptionStuff(const std::string& type_url, std::chrono::milliseconds init_fetch_timeout,
-                      Event::Dispatcher& dispatcher, const LocalInfo::LocalInfo& local_info)
-        : sub_state_(type_url, watch_map_, local_info, init_fetch_timeout, dispatcher),
-          init_fetch_timeout_(init_fetch_timeout) {}
-
-    WatchMap watch_map_;
-    DeltaSubscriptionState sub_state_;
-    const std::chrono::milliseconds init_fetch_timeout_;
-
-    SubscriptionStuff(const SubscriptionStuff&) = delete;
-    SubscriptionStuff& operator=(const SubscriptionStuff&) = delete;
-  };
   // Map key is type_url.
   absl::flat_hash_map<std::string, std::unique_ptr<SubscriptionStuff>> subscriptions_;
 
@@ -110,8 +122,10 @@ private:
   // the order of Envoy's dependency ordering).
   std::list<std::string> subscription_ordering_;
 
-  GrpcStream<envoy::api::v2::DeltaDiscoveryRequest, envoy::api::v2::DeltaDiscoveryResponse>
+  GrpcStream<envoy::service::discovery::v3alpha::DeltaDiscoveryRequest,
+             envoy::service::discovery::v3alpha::DeltaDiscoveryResponse>
       grpc_stream_;
+  const envoy::config::core::v3alpha::ApiVersion transport_api_version_;
 };
 
 using NewGrpcMuxImplSharedPtr = std::shared_ptr<NewGrpcMuxImpl>;

@@ -1,5 +1,7 @@
 #include <memory>
 
+#include "envoy/extensions/filters/http/gzip/v3alpha/gzip.pb.h"
+
 #include "common/common/hex.h"
 #include "common/common/stack_array.h"
 #include "common/compressor/zlib_compressor_impl.h"
@@ -64,7 +66,7 @@ protected:
   // GzipFilterTest Helpers
   void setUpFilter(std::string&& json) {
     Json::ObjectSharedPtr config = Json::Factory::loadFromString(json);
-    envoy::config::filter::http::gzip::v2::Gzip gzip;
+    envoy::extensions::filters::http::gzip::v3alpha::Gzip gzip;
     TestUtility::loadFromJson(json, gzip);
     config_.reset(new GzipFilterConfig(gzip, "test.", stats_, runtime_));
     filter_ = std::make_unique<GzipFilter>(config_);

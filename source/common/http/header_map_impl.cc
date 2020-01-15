@@ -534,17 +534,18 @@ uint64_t HeaderMapImpl::HeaderList::byteSizeInternal() const {
 
 const HeaderEntry* HeaderMapImpl::get(const LowerCaseString& key) const {
   if (headers_.maybeMakeMap()) {
-    HeaderLazyMap::iterator iter = headers_.find(key.get());
-    if (iter != headers_.findEnd()) {
+    HeaderLazyMap::iterator iter = headers_.lazy_map_.find(key.get());
+    if (iter != headers_.lazy_map_.end()) {
 #if HEADER_MAP_USE_FLAT_HASH_MAP
 # if HEADER_MAP_USE_SLIST
-      const HeaderMapCell& cell = iter->second;
-      HeaderEntryImpl& header_entry = *cell.node;
+      const HeaderCell* cell = iter->second;
+      ASSERT(cell != nullptr); // It's impossible to have a map entry with a null cell.
+      HeaderEntryImpl& header_entry = *cell->node;
 # else
       const HeaderNodeVector& v = iter->second;
       ASSERT(!v.empty()); // It's impossible to have a map entry with an empty vector as its value.
       HeaderEntryImpl& header_entry = *v[0];
- endif
+# endif
 #endif
 #if HEADER_MAP_USE_MULTI_MAP
       HeaderEntryImpl& header_entry = *(iter->second);
@@ -617,8 +618,16 @@ bool HeaderMapImpl::HeaderList::maybeMakeMap() const {
     for (auto node = headers_.begin(); node != headers_.end(); ++node) {
       absl::string_view key = node->key().getStringView();
 #if HEADER_MAP_USE_FLAT_HASH_MAP
+# if HEADER_MAP_USE_SLIST
+      HeaderCell* cell = new HeaderCell;
+      cell->node = node;
+      HeaderCell*& cellref = lazy_map_[key];
+      cell->next = cellref;
+      cellref = cell;
+# else
       HeaderNodeVector& v = lazy_map_[key];
       v.push_back(node);
+# endif
 #endif
 #if HEADER_MAP_USE_MULTI_MAP
       lazy_map_.insert(std::make_pair(key, node));
@@ -628,14 +637,24 @@ bool HeaderMapImpl::HeaderList::maybeMakeMap() const {
   return true;
 }
 
+#if 0
 HeaderMapImpl::HeaderLazyMap::iterator
 HeaderMapImpl::HeaderList::find(absl::string_view key) const {
+  if (maybeMakeMap()) {
+    return lazy_map_.find(key);
+  }
+  // If there were too few entries for a map, do a linear search.
+
   if (lazy_map_.empty()) {
     for (auto node = headers_.begin(); node != headers_.end(); ++node) {
-      absl::string_view key = node->key().getStringView();
 #if HEADER_MAP_USE_FLAT_HASH_MAP
+# if HEADER_MAP_USE_SLIST
+      // ????
+# else
+      absl::string_view key = node->key().getStringView();
       HeaderNodeVector& v = lazy_map_[key];
       v.push_back(node);
+# endif
 #endif
 #if HEADER_MAP_USE_MULTI_MAP
       lazy_map_.insert(std::make_pair(key, node));
@@ -644,6 +663,7 @@ HeaderMapImpl::HeaderList::find(absl::string_view key) const {
   }
   return lazy_map_.find(key);
 }
+#endif
 
 void HeaderMapImpl::remove(const LowerCaseString& key) {
   EntryCb cb = ConstSingleton<StaticLookupTable>::get().find(key.get());
@@ -657,16 +677,18 @@ void HeaderMapImpl::remove(const LowerCaseString& key) {
 
 void HeaderMapImpl::HeaderList::remove(absl::string_view key) {
   if (maybeMakeMap()) {
-    auto iter = find(key);
+    auto iter = lazy_map_.find(key);
     if (iter != lazy_map_.end()) {
 #if HEADER_MAP_USE_FLAT_HASH_MAP
 # if HEADER_MAP_USE_SLIST
-      HeaderCell* cell = &iter->second;
+      HeaderCell* cell = iter->second;
       do {
         const HeaderNode& node = cell->node;
         ASSERT(node->key() == key);
         erase(node, false /* clear_from_map */);
-        cell = cell->next;
+        HeaderCell* next = cell->next;
+        delete cell;
+        cell = next;
       } while (cell != nullptr);
       lazy_map_.erase(iter);
 # else

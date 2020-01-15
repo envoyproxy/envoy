@@ -38,7 +38,7 @@ The following application status codes in gRPC are considered safe for automatic
 
 * *CANCELLED* - Return this code if there is an error that can be retried in the service.
 * *RESOURCE_EXHAUSTED* - Return this code if some of the resources that service depends on are exhausted in that instance so that retrying 
-  to another instance would help. Please note that for shared resource exhaustion, returning this will not help. Instead :ref:`rate limiting <arch_overview_rate_limit>`
+  to another instance would help. Please note that for shared resource exhaustion, returning this will not help. Instead :ref:`rate limiting <arch_overview_global_rate_limit>`
   should be used to handle such cases.
 
 The HTTP Status codes *502 (Bad Gateway)*, *503 (Service Unavailable)* and *504 (Gateway Timeout)* are all mapped to gRPC status code *UNAVAILABLE*. 
