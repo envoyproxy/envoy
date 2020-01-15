@@ -537,15 +537,15 @@ const HeaderEntry* HeaderMapImpl::get(const LowerCaseString& key) const {
     HeaderLazyMap::iterator iter = headers_.lazy_map_.find(key.get());
     if (iter != headers_.lazy_map_.end()) {
 #if HEADER_MAP_USE_FLAT_HASH_MAP
-# if HEADER_MAP_USE_SLIST
-      const HeaderCell* cell = iter->second;
+#if HEADER_MAP_USE_SLIST
+      const HeaderCellPtr& cell = iter->second;
       ASSERT(cell != nullptr); // It's impossible to have a map entry with a null cell.
-      HeaderEntryImpl& header_entry = *cell->node;
-# else
+      HeaderEntryImpl& header_entry = *cell->node_;
+#else
       const HeaderNodeVector& v = iter->second;
       ASSERT(!v.empty()); // It's impossible to have a map entry with an empty vector as its value.
       HeaderEntryImpl& header_entry = *v[0];
-# endif
+#endif
 #endif
 #if HEADER_MAP_USE_MULTI_MAP
       HeaderEntryImpl& header_entry = *(iter->second);
@@ -618,16 +618,16 @@ bool HeaderMapImpl::HeaderList::maybeMakeMap() const {
     for (auto node = headers_.begin(); node != headers_.end(); ++node) {
       absl::string_view key = node->key().getStringView();
 #if HEADER_MAP_USE_FLAT_HASH_MAP
-# if HEADER_MAP_USE_SLIST
-      HeaderCell* cell = new HeaderCell;
-      cell->node = node;
-      HeaderCell*& cellref = lazy_map_[key];
-      cell->next = cellref;
-      cellref = cell;
-# else
+#if HEADER_MAP_USE_SLIST
+      HeaderCellPtr cell = std::make_unique<HeaderCell>();
+      cell->node_ = node;
+      HeaderCellPtr& cellref = lazy_map_[key];
+      cell->next_ = std::move(cellref);
+      cellref = std::move(cell);
+#else
       HeaderNodeVector& v = lazy_map_[key];
       v.push_back(node);
-# endif
+#endif
 #endif
 #if HEADER_MAP_USE_MULTI_MAP
       lazy_map_.insert(std::make_pair(key, node));
@@ -648,13 +648,13 @@ HeaderMapImpl::HeaderList::find(absl::string_view key) const {
   if (lazy_map_.empty()) {
     for (auto node = headers_.begin(); node != headers_.end(); ++node) {
 #if HEADER_MAP_USE_FLAT_HASH_MAP
-# if HEADER_MAP_USE_SLIST
+#if HEADER_MAP_USE_SLIST
       // ????
-# else
+#else
       absl::string_view key = node->key().getStringView();
       HeaderNodeVector& v = lazy_map_[key];
       v.push_back(node);
-# endif
+#endif
 #endif
 #if HEADER_MAP_USE_MULTI_MAP
       lazy_map_.insert(std::make_pair(key, node));
@@ -680,25 +680,23 @@ void HeaderMapImpl::HeaderList::remove(absl::string_view key) {
     auto iter = lazy_map_.find(key);
     if (iter != lazy_map_.end()) {
 #if HEADER_MAP_USE_FLAT_HASH_MAP
-# if HEADER_MAP_USE_SLIST
-      HeaderCell* cell = iter->second;
+#if HEADER_MAP_USE_SLIST
+      HeaderCellPtr cell = std::move(iter->second);
       do {
-        const HeaderNode& node = cell->node;
+        const HeaderNode& node = cell->node_;
         ASSERT(node->key() == key);
         erase(node, false /* clear_from_map */);
-        HeaderCell* next = cell->next;
-        delete cell;
-        cell = next;
+        cell = std::move(cell->next_);
       } while (cell != nullptr);
       lazy_map_.erase(iter);
-# else
+#else
       HeaderNodeVector header_nodes = std::move(iter->second);
       lazy_map_.erase(iter);
       for (const HeaderNode& node : header_nodes) {
         ASSERT(node->key() == key);
         erase(node, false /* clear_from_map */);
       }
-# endif
+#endif
 #endif
 #if HEADER_MAP_USE_MULTI_MAP
       ASSERT(iter->second->key() == key);

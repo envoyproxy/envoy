@@ -10,11 +10,11 @@
 #include <list>
 
 #if HEADER_MAP_USE_MULTI_MAP
-# if HEADER_MAP_USE_BTREE
-#  include "absl/container/btree_map.h"
-# else
-#  include <map>
-# endif
+#if HEADER_MAP_USE_BTREE
+#include "absl/container/btree_map.h"
+#else
+#include <map>
+#endif
 #endif
 #include <memory>
 #include <string>
@@ -25,10 +25,10 @@
 #include "common/http/headers.h"
 
 #if HEADER_MAP_USE_FLAT_HASH_MAP
-# include "absl/container/flat_hash_map.h"
-# if !HEADER_MAP_USE_SLIST
-#  include "absl/container/inlined_vector.h"
-# endif
+#include "absl/container/flat_hash_map.h"
+#if !HEADER_MAP_USE_SLIST
+#include "absl/container/inlined_vector.h"
+#endif
 #endif
 
 namespace Envoy {
@@ -122,20 +122,25 @@ protected:
   struct HeaderEntryImpl;
   using HeaderNode = std::list<HeaderEntryImpl>::iterator;
 #if HEADER_MAP_USE_FLAT_HASH_MAP
-# if HEADER_MAP_USE_SLIST
-  struct HeaderCell { HeaderNode node; HeaderCell* next; };
-  using HeaderLazyMap = absl::flat_hash_map<absl::string_view, HeaderCell*>;
-# else
+#if HEADER_MAP_USE_SLIST
+  struct HeaderCell;
+  using HeaderCellPtr = std::unique_ptr<HeaderCell>;
+  struct HeaderCell {
+    HeaderNode node_;
+    HeaderCellPtr next_;
+  };
+  using HeaderLazyMap = absl::flat_hash_map<absl::string_view, HeaderCellPtr>;
+#else
   using HeaderNodeVector = absl::InlinedVector<HeaderNode, 1>;
   using HeaderLazyMap = absl::flat_hash_map<absl::string_view, HeaderNodeVector>;
-# endif
+#endif
 #endif
 #if HEADER_MAP_USE_MULTI_MAP
-# if HEADER_MAP_USE_BTREE
+#if HEADER_MAP_USE_BTREE
   using HeaderLazyMap = std::multimap<absl::string_view, HeaderNode>;
-# else
+#else
   using HeaderLazyMap = absl::btree_multimap<absl::string_view, HeaderNode>;
-# endif
+#endif
 #endif
 
   // For tests only, unoptimized, they aren't intended for regular HeaderMapImpl users.
@@ -206,15 +211,15 @@ protected:
       addSize(i->key().size() + i->value().size());
       if (!lazy_map_.empty()) {
 #if HEADER_MAP_USE_FLAT_HASH_MAP
-# if HEADER_MAP_USE_SLIST
-        HeaderCell*& cellref = lazy_map_[i->key().getStringView()];
-        HeaderCell* cell = new HeaderCell;
-        cell->node = i;
-        cell->next = cellref;
-        cellref = cell;
-# else
+#if HEADER_MAP_USE_SLIST
+        HeaderCellPtr& cellref = lazy_map_[i->key().getStringView()];
+        HeaderCellPtr cell = std::make_unique<HeaderCell>();
+        cell->node_ = i;
+        cell->next_ = std::move(cellref);
+        cellref = std::move(cell);
+#else
         lazy_map_[i->key().getStringView()].push_back(i);
-# endif
+#endif
 #endif
 #if HEADER_MAP_USE_MULTI_MAP
         lazy_map_.insert(std::make_pair(i->key().getStringView(), i));
@@ -248,8 +253,8 @@ protected:
     // Makes a map.
     bool maybeMakeMap() const;
 
-    //HeaderLazyMap::iterator find(absl::string_view key) const;
-    //HeaderLazyMap::iterator findEnd() const { return lazy_map_.end(); }
+    // HeaderLazyMap::iterator find(absl::string_view key) const;
+    // HeaderLazyMap::iterator findEnd() const { return lazy_map_.end(); }
 
     std::list<HeaderEntryImpl>::const_iterator begin() const { return headers_.begin(); }
     std::list<HeaderEntryImpl>::const_iterator end() const { return headers_.end(); }
