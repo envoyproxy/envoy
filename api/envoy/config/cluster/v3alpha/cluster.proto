@@ -491,9 +491,9 @@ message Cluster {
     google.protobuf.Duration max_interval = 2 [(validate.rules).duration = {gt {nanos: 1000000}}];
   }
 
-  reserved 12, 15, 11, 35;
+  reserved 12, 15, 7, 11, 35;
 
-  reserved "tls_context", "extension_protocol_options";
+  reserved "hosts", "tls_context", "extension_protocol_options";
 
   // Configuration to use different transport sockets for different endpoints.
   // The entry of *envoy.transport_socket* in the
@@ -577,21 +577,6 @@ message Cluster {
   // The :ref:`load balancer type <arch_overview_load_balancing_types>` to use
   // when picking a host in the cluster.
   LbPolicy lb_policy = 6 [(validate.rules).enum = {defined_only: true}];
-
-  // If the service discovery type is
-  // :ref:`STATIC<envoy_api_enum_value_config.cluster.v3alpha.Cluster.DiscoveryType.STATIC>`,
-  // :ref:`STRICT_DNS<envoy_api_enum_value_config.cluster.v3alpha.Cluster.DiscoveryType.STRICT_DNS>`
-  // or
-  // :ref:`LOGICAL_DNS<envoy_api_enum_value_config.cluster.v3alpha.Cluster.DiscoveryType.LOGICAL_DNS>`,
-  // then hosts is required.
-  //
-  // .. attention::
-  //
-  //   **This field is deprecated**. Set the
-  //   :ref:`load_assignment<envoy_api_field_config.cluster.v3alpha.Cluster.load_assignment>` field
-  //   instead.
-  //
-  repeated core.v3alpha.Address hosts = 7;
 
   // Setting this is required for specifying members of
   // :ref:`STATIC<envoy_api_enum_value_config.cluster.v3alpha.Cluster.DiscoveryType.STATIC>`,

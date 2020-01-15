@@ -49,10 +49,15 @@ static_resources:
   clusters:
   - name: my_cds_cluster
     http2_protocol_options: {}
-    hosts:
-      socket_address:
-        address: 127.0.0.1
-        port_value: 0
+    load_assignment:
+      cluster_name: my_cds_cluster
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: 127.0.0.1
+                port_value: 0
   - name: aggregate_cluster
     connect_timeout: 0.25s
     lb_policy: CLUSTER_PROVIDED

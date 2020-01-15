@@ -52,7 +52,7 @@ transport_socket:
         TestUtility::loadFromYaml(match_yaml, *transport_socket_match);
       }
       // Setup the client Envoy TLS config.
-      cluster->clear_hosts();
+      cluster->clear_load_assignment();
       auto* load_assignment = cluster->mutable_load_assignment();
       load_assignment->set_cluster_name(cluster->name());
       auto* endpoints = load_assignment->add_endpoints();

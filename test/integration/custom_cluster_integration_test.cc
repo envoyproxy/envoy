@@ -28,8 +28,6 @@ public:
         [this](envoy::config::bootstrap::v3alpha::Bootstrap& bootstrap) {
           auto* cluster_0 = bootstrap.mutable_static_resources()->mutable_clusters(0);
 
-          cluster_0->clear_hosts();
-
           if (cluster_provided_lb_) {
             cluster_0->set_lb_policy(envoy::config::cluster::v3alpha::Cluster::CLUSTER_PROVIDED);
           }

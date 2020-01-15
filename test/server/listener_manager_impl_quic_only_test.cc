@@ -36,9 +36,9 @@ filter_chains:
         validation_context:
           trusted_ca:
             filename: "{{ test_rundir }}/test/extensions/transport_sockets/tls/test_data/ca_cert.pem"
-          verify_subject_alt_name:
-          - localhost
-          - 127.0.0.1
+          match_subject_alt_names:
+          - exact: localhost
+          - exact: 127.0.0.1
 reuse_port: true
 udp_listener_config:
   udp_listener_name: "quiche_quic_listener"

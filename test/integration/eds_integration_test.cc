@@ -113,7 +113,6 @@ public:
     cluster_.mutable_connect_timeout()->CopyFrom(
         Protobuf::util::TimeUtil::MillisecondsToDuration(100));
     cluster_.set_name("cluster_0");
-    cluster_.mutable_hosts()->Clear();
     cluster_.set_type(envoy::config::cluster::v3alpha::Cluster::EDS);
     auto* eds_cluster_config = cluster_.mutable_eds_cluster_config();
     eds_cluster_config->mutable_eds_config()->set_path(eds_helper_.eds_path());
