@@ -6,6 +6,11 @@ namespace Extensions {
 namespace HttpFilters {
 namespace Cache {
 
+// TODO(toddmgreer): Expand integration test to include age header values,
+// expiration, range headers, HEAD requests, trailers, config customizations,
+// cache-control headers, and conditional header fields, as they are
+// implemented.
+
 class CacheIntegrationTest : public Event::TestUsingSimulatedTime,
                              public HttpProtocolIntegrationTest {
 public:
