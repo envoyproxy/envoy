@@ -45,25 +45,30 @@ struct AdmissionControlStats {
 class ThreadLocalController : public ThreadLocal::ThreadLocalObject {
 public:
   ThreadLocalController(TimeSource& time_source, std::chrono::seconds sampling_window);
-  void recordRequest(const bool success);
+  void recordSuccess() {
+    recordRequest(true);
+  }
+  void recordFailure() {
+    recordRequest(false);
+  }
 
-  uint32_t requestTotal() const { return global_data_.requests; }
+  uint32_t requestTotalCount() const { return global_data_.requests; }
   uint32_t requestSuccessCount() const { return global_data_.successes; }
 
 private:
   struct RequestData {
+    RequestData() : requests(0), successes(0) {}
     uint32_t requests;
     uint32_t successes;
   };
+
+  void recordRequest(const bool success);
 
   // Potentially remove any stale samples and record sample aggregates to the historical data.
   void maybeUpdateHistoricalData();
 
   TimeSource& time_source_;
   std::deque<std::pair<MonotonicTime, RequestData>> historical_data_;
-
-  // Request data for the current time range.
-  RequestData local_data_;
 
   // Request data aggregated for the whole lookback window.
   RequestData global_data_;

@@ -66,7 +66,11 @@ Http::FilterHeadersStatus AdmissionControlFilter::encodeHeaders(Http::HeaderMap&
   if (end_stream) {
     // TODO @tallen make this match on config
     const uint64_t status_code = Http::Utility::getResponseStatus(headers);
-    config_->getController().recordRequest(status_code == enumToInt(Http::Code::OK));
+    if (status_code == enumToInt(Http::Code::OK)) {
+      config_->getController().recordSuccess();
+    } else {
+      config_->getController().recordFailure();
+    }
   }
   return Http::FilterHeadersStatus::Continue;
 }
@@ -76,7 +80,7 @@ ThreadLocalController::ThreadLocalController(TimeSource& time_source,
     : time_source_(time_source), sampling_window_(sampling_window) {}
 
 bool AdmissionControlFilter::shouldRejectRequest() const {
-  const double total = config_->getController().requestTotal();
+  const double total = config_->getController().requestTotalCount();
   const double success = config_->getController().requestSuccessCount();
   const double probability = (total - config_->aggression() * success) / (total + 1);
 
@@ -94,20 +98,21 @@ void ThreadLocalController::maybeUpdateHistoricalData() {
     global_data_.requests -= historical_data_.front().second.requests;
     historical_data_.pop_front();
   }
-
-  if ((now - historical_data_.back().first) > std::chrono::seconds(1)) {
-    // Reset the local data.
-    historical_data_.emplace_back(now, local_data_);
-    local_data_ = {};
-  }
 }
 
 void ThreadLocalController::recordRequest(const bool success) {
   maybeUpdateHistoricalData();
-  ++local_data_.requests;
+
+  // It's possible we purged stale samples from the history and are left with nothing.
+  if (historical_data_.empty()) {
+    historical_data_.emplace_back(time_source_.monotonicTime(), RequestData());
+  }
+
+  // The back of the deque will be the most recent samples.
+  ++historical_data_.back().second.requests; 
   ++global_data_.requests;
   if (success) {
-    ++local_data_.successes;
+    ++historical_data_.back().second.successes;
     ++global_data_.successes;
   }
 }
