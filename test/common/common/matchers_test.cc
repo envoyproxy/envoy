@@ -1,7 +1,7 @@
-#include "envoy/config/core/v3alpha/base.pb.h"
-#include "envoy/type/matcher/v3alpha/metadata.pb.h"
-#include "envoy/type/matcher/v3alpha/string.pb.h"
-#include "envoy/type/matcher/v3alpha/value.pb.h"
+#include "envoy/config/core/v3/base.pb.h"
+#include "envoy/type/matcher/v3/metadata.pb.h"
+#include "envoy/type/matcher/v3/string.pb.h"
+#include "envoy/type/matcher/v3/value.pb.h"
 
 #include "common/common/matchers.h"
 #include "common/config/metadata.h"
@@ -14,13 +14,13 @@ namespace Matcher {
 namespace {
 
 TEST(MetadataTest, MatchNullValue) {
-  envoy::config::core::v3alpha::Metadata metadata;
+  envoy::config::core::v3::Metadata metadata;
   Envoy::Config::Metadata::mutableMetadataValue(metadata, "envoy.filter.a", "label")
       .set_string_value("test");
   Envoy::Config::Metadata::mutableMetadataValue(metadata, "envoy.filter.b", "label")
       .set_null_value(ProtobufWkt::NullValue::NULL_VALUE);
 
-  envoy::type::matcher::v3alpha::MetadataMatcher matcher;
+  envoy::type::matcher::v3::MetadataMatcher matcher;
   matcher.set_filter("envoy.filter.b");
   matcher.add_path()->set_key("label");
 
@@ -31,13 +31,13 @@ TEST(MetadataTest, MatchNullValue) {
 }
 
 TEST(MetadataTest, MatchDoubleValue) {
-  envoy::config::core::v3alpha::Metadata metadata;
+  envoy::config::core::v3::Metadata metadata;
   Envoy::Config::Metadata::mutableMetadataValue(metadata, "envoy.filter.a", "label")
       .set_string_value("test");
   Envoy::Config::Metadata::mutableMetadataValue(metadata, "envoy.filter.b", "label")
       .set_number_value(9);
 
-  envoy::type::matcher::v3alpha::MetadataMatcher matcher;
+  envoy::type::matcher::v3::MetadataMatcher matcher;
   matcher.set_filter("envoy.filter.b");
   matcher.add_path()->set_key("label");
 
@@ -65,13 +65,13 @@ TEST(MetadataTest, MatchDoubleValue) {
 }
 
 TEST(MetadataTest, MatchStringExactValue) {
-  envoy::config::core::v3alpha::Metadata metadata;
+  envoy::config::core::v3::Metadata metadata;
   Envoy::Config::Metadata::mutableMetadataValue(metadata, "envoy.filter.a", "label")
       .set_string_value("test");
   Envoy::Config::Metadata::mutableMetadataValue(metadata, "envoy.filter.b", "label")
       .set_string_value("prod");
 
-  envoy::type::matcher::v3alpha::MetadataMatcher matcher;
+  envoy::type::matcher::v3::MetadataMatcher matcher;
   matcher.set_filter("envoy.filter.b");
   matcher.add_path()->set_key("label");
 
@@ -82,13 +82,13 @@ TEST(MetadataTest, MatchStringExactValue) {
 }
 
 TEST(MetadataTest, MatchStringPrefixValue) {
-  envoy::config::core::v3alpha::Metadata metadata;
+  envoy::config::core::v3::Metadata metadata;
   Envoy::Config::Metadata::mutableMetadataValue(metadata, "envoy.filter.a", "label")
       .set_string_value("test");
   Envoy::Config::Metadata::mutableMetadataValue(metadata, "envoy.filter.b", "label")
       .set_string_value("prodabc");
 
-  envoy::type::matcher::v3alpha::MetadataMatcher matcher;
+  envoy::type::matcher::v3::MetadataMatcher matcher;
   matcher.set_filter("envoy.filter.b");
   matcher.add_path()->set_key("label");
 
@@ -101,13 +101,13 @@ TEST(MetadataTest, MatchStringPrefixValue) {
 }
 
 TEST(MetadataTest, MatchStringSuffixValue) {
-  envoy::config::core::v3alpha::Metadata metadata;
+  envoy::config::core::v3::Metadata metadata;
   Envoy::Config::Metadata::mutableMetadataValue(metadata, "envoy.filter.a", "label")
       .set_string_value("test");
   Envoy::Config::Metadata::mutableMetadataValue(metadata, "envoy.filter.b", "label")
       .set_string_value("abcprod");
 
-  envoy::type::matcher::v3alpha::MetadataMatcher matcher;
+  envoy::type::matcher::v3::MetadataMatcher matcher;
   matcher.set_filter("envoy.filter.b");
   matcher.add_path()->set_key("label");
 
@@ -120,13 +120,13 @@ TEST(MetadataTest, MatchStringSuffixValue) {
 }
 
 TEST(MetadataTest, MatchBoolValue) {
-  envoy::config::core::v3alpha::Metadata metadata;
+  envoy::config::core::v3::Metadata metadata;
   Envoy::Config::Metadata::mutableMetadataValue(metadata, "envoy.filter.a", "label")
       .set_string_value("test");
   Envoy::Config::Metadata::mutableMetadataValue(metadata, "envoy.filter.b", "label")
       .set_bool_value(true);
 
-  envoy::type::matcher::v3alpha::MetadataMatcher matcher;
+  envoy::type::matcher::v3::MetadataMatcher matcher;
   matcher.set_filter("envoy.filter.b");
   matcher.add_path()->set_key("label");
 
@@ -139,13 +139,13 @@ TEST(MetadataTest, MatchBoolValue) {
 }
 
 TEST(MetadataTest, MatchPresentValue) {
-  envoy::config::core::v3alpha::Metadata metadata;
+  envoy::config::core::v3::Metadata metadata;
   Envoy::Config::Metadata::mutableMetadataValue(metadata, "envoy.filter.a", "label")
       .set_string_value("test");
   Envoy::Config::Metadata::mutableMetadataValue(metadata, "envoy.filter.b", "label")
       .set_number_value(1);
 
-  envoy::type::matcher::v3alpha::MetadataMatcher matcher;
+  envoy::type::matcher::v3::MetadataMatcher matcher;
   matcher.set_filter("envoy.filter.b");
   matcher.add_path()->set_key("label");
 
@@ -162,13 +162,13 @@ TEST(MetadataTest, MatchPresentValue) {
 }
 
 // Helper function to retrieve the reference of an entry in a ListMatcher from a MetadataMatcher.
-envoy::type::matcher::v3alpha::ValueMatcher*
-listMatchEntry(envoy::type::matcher::v3alpha::MetadataMatcher* matcher) {
+envoy::type::matcher::v3::ValueMatcher*
+listMatchEntry(envoy::type::matcher::v3::MetadataMatcher* matcher) {
   return matcher->mutable_value()->mutable_list_match()->mutable_one_of();
 }
 
 TEST(MetadataTest, MatchStringListValue) {
-  envoy::config::core::v3alpha::Metadata metadata;
+  envoy::config::core::v3::Metadata metadata;
   ProtobufWkt::Value& metadataValue =
       Envoy::Config::Metadata::mutableMetadataValue(metadata, "envoy.filter.a", "groups");
   ProtobufWkt::ListValue* values = metadataValue.mutable_list_value();
@@ -176,7 +176,7 @@ TEST(MetadataTest, MatchStringListValue) {
   values->add_values()->set_string_value("second");
   values->add_values()->set_string_value("third");
 
-  envoy::type::matcher::v3alpha::MetadataMatcher matcher;
+  envoy::type::matcher::v3::MetadataMatcher matcher;
   matcher.set_filter("envoy.filter.a");
   matcher.add_path()->set_key("groups");
 
@@ -196,14 +196,14 @@ TEST(MetadataTest, MatchStringListValue) {
 }
 
 TEST(MetadataTest, MatchBoolListValue) {
-  envoy::config::core::v3alpha::Metadata metadata;
+  envoy::config::core::v3::Metadata metadata;
   ProtobufWkt::Value& metadataValue =
       Envoy::Config::Metadata::mutableMetadataValue(metadata, "envoy.filter.a", "groups");
   ProtobufWkt::ListValue* values = metadataValue.mutable_list_value();
   values->add_values()->set_bool_value(false);
   values->add_values()->set_bool_value(false);
 
-  envoy::type::matcher::v3alpha::MetadataMatcher matcher;
+  envoy::type::matcher::v3::MetadataMatcher matcher;
   matcher.set_filter("envoy.filter.a");
   matcher.add_path()->set_key("groups");
 
@@ -219,14 +219,14 @@ TEST(MetadataTest, MatchBoolListValue) {
 }
 
 TEST(MetadataTest, MatchDoubleListValue) {
-  envoy::config::core::v3alpha::Metadata metadata;
+  envoy::config::core::v3::Metadata metadata;
   ProtobufWkt::Value& metadataValue =
       Envoy::Config::Metadata::mutableMetadataValue(metadata, "envoy.filter.a", "groups");
   ProtobufWkt::ListValue* values = metadataValue.mutable_list_value();
   values->add_values()->set_number_value(10);
   values->add_values()->set_number_value(23);
 
-  envoy::type::matcher::v3alpha::MetadataMatcher matcher;
+  envoy::type::matcher::v3::MetadataMatcher matcher;
   matcher.set_filter("envoy.filter.a");
   matcher.add_path()->set_key("groups");
 
@@ -259,7 +259,7 @@ TEST(MetadataTest, MatchDoubleListValue) {
 }
 
 TEST(StringMatcher, SafeRegexValue) {
-  envoy::type::matcher::v3alpha::StringMatcher matcher;
+  envoy::type::matcher::v3::StringMatcher matcher;
   matcher.mutable_safe_regex()->mutable_google_re2();
   matcher.mutable_safe_regex()->set_regex("foo.*");
   EXPECT_TRUE(Matchers::StringMatcherImpl(matcher).match("foo"));
@@ -268,7 +268,7 @@ TEST(StringMatcher, SafeRegexValue) {
 }
 
 TEST(LowerCaseStringMatcher, MatchExactValue) {
-  envoy::type::matcher::v3alpha::StringMatcher matcher;
+  envoy::type::matcher::v3::StringMatcher matcher;
   matcher.set_exact("Foo");
 
   EXPECT_FALSE(Envoy::Matchers::LowerCaseStringMatcher(matcher).match("Foo"));
@@ -276,7 +276,7 @@ TEST(LowerCaseStringMatcher, MatchExactValue) {
 }
 
 TEST(LowerCaseStringMatcher, MatchPrefixValue) {
-  envoy::type::matcher::v3alpha::StringMatcher matcher;
+  envoy::type::matcher::v3::StringMatcher matcher;
   matcher.set_prefix("Foo.");
 
   EXPECT_TRUE(Envoy::Matchers::LowerCaseStringMatcher(matcher).match("foo.bar"));
@@ -284,7 +284,7 @@ TEST(LowerCaseStringMatcher, MatchPrefixValue) {
 }
 
 TEST(LowerCaseStringMatcher, MatchSuffixValue) {
-  envoy::type::matcher::v3alpha::StringMatcher matcher;
+  envoy::type::matcher::v3::StringMatcher matcher;
   matcher.set_suffix(".Bar");
 
   EXPECT_TRUE(Envoy::Matchers::LowerCaseStringMatcher(matcher).match("foo.bar"));
@@ -292,7 +292,7 @@ TEST(LowerCaseStringMatcher, MatchSuffixValue) {
 }
 
 TEST(LowerCaseStringMatcher, MatchRegexValue) {
-  envoy::type::matcher::v3alpha::StringMatcher matcher;
+  envoy::type::matcher::v3::StringMatcher matcher;
   matcher.set_hidden_envoy_deprecated_regex("Foo.*");
 
   EXPECT_TRUE(Envoy::Matchers::LowerCaseStringMatcher(matcher).match("foo.bar"));

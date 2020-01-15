@@ -6,10 +6,10 @@
 #include <vector>
 
 #include "envoy/buffer/buffer.h"
-#include "envoy/config/bootstrap/v3alpha/bootstrap.pb.h"
-#include "envoy/config/route/v3alpha/route_components.pb.h"
+#include "envoy/config/bootstrap/v3/bootstrap.pb.h"
+#include "envoy/config/route/v3/route_components.pb.h"
 #include "envoy/event/dispatcher.h"
-#include "envoy/extensions/filters/network/http_connection_manager/v3alpha/http_connection_manager.pb.h"
+#include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 #include "envoy/http/header_map.h"
 #include "envoy/registry/registry.h"
 
@@ -42,8 +42,7 @@ using testing::HasSubstr;
 namespace Envoy {
 
 void setDoNotValidateRouteConfig(
-    envoy::extensions::filters::network::http_connection_manager::v3alpha::HttpConnectionManager&
-        hcm) {
+    envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager& hcm) {
   auto* route_config = hcm.mutable_route_config();
   route_config->mutable_validate_clusters()->set_value(false);
 };
@@ -114,7 +113,7 @@ TEST_P(DownstreamProtocolIntegrationTest, RouterClusterNotFound404) {
   config_helper_.addConfigModifier(&setDoNotValidateRouteConfig);
   auto host = config_helper_.createVirtualHost("foo.com", "/unknown", "unknown_cluster");
   host.mutable_routes(0)->mutable_route()->set_cluster_not_found_response_code(
-      envoy::config::route::v3alpha::RouteAction::NOT_FOUND);
+      envoy::config::route::v3::RouteAction::NOT_FOUND);
   config_helper_.addVirtualHost(host);
   initialize();
 
@@ -129,7 +128,7 @@ TEST_P(DownstreamProtocolIntegrationTest, RouterClusterNotFound503) {
   config_helper_.addConfigModifier(&setDoNotValidateRouteConfig);
   auto host = config_helper_.createVirtualHost("foo.com", "/unknown", "unknown_cluster");
   host.mutable_routes(0)->mutable_route()->set_cluster_not_found_response_code(
-      envoy::config::route::v3alpha::RouteAction::SERVICE_UNAVAILABLE);
+      envoy::config::route::v3::RouteAction::SERVICE_UNAVAILABLE);
   config_helper_.addVirtualHost(host);
   initialize();
 
@@ -142,7 +141,7 @@ TEST_P(DownstreamProtocolIntegrationTest, RouterClusterNotFound503) {
 // Add a route which redirects HTTP to HTTPS, and verify Envoy sends a 301
 TEST_P(ProtocolIntegrationTest, RouterRedirect) {
   auto host = config_helper_.createVirtualHost("www.redirect.com", "/");
-  host.set_require_tls(envoy::config::route::v3alpha::VirtualHost::ALL);
+  host.set_require_tls(envoy::config::route::v3::VirtualHost::ALL);
   config_helper_.addVirtualHost(host);
   initialize();
 
@@ -340,7 +339,7 @@ TEST_P(DownstreamProtocolIntegrationTest, RetryPriority) {
   retry_policy->mutable_retry_priority()->set_name(factory.name());
   config_helper_.addVirtualHost(host);
   // We want to work with a cluster with two hosts.
-  config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3alpha::Bootstrap& bootstrap) {
+  config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
     auto* cluster = bootstrap.mutable_static_resources()->mutable_clusters(0);
     auto* load_assignment = cluster->mutable_load_assignment();
     load_assignment->clear_endpoints();
@@ -408,7 +407,7 @@ TEST_P(DownstreamProtocolIntegrationTest, RetryHostPredicateFilter) {
   config_helper_.addVirtualHost(host);
 
   // We want to work with a cluster with two hosts.
-  config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3alpha::Bootstrap& bootstrap) {
+  config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
     bootstrap.mutable_static_resources()
         ->mutable_clusters(0)
         ->mutable_load_assignment()
@@ -646,8 +645,8 @@ TEST_P(DownstreamProtocolIntegrationTest, LargeCookieParsingMany) {
   // Set header count limit to 2010.
   uint32_t max_count = 2010;
   config_helper_.addConfigModifier(
-      [&](envoy::extensions::filters::network::http_connection_manager::v3alpha::
-              HttpConnectionManager& hcm) -> void {
+      [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+              hcm) -> void {
         hcm.mutable_common_http_protocol_options()->mutable_max_headers_count()->set_value(
             max_count);
       });
@@ -695,10 +694,11 @@ TEST_P(DownstreamProtocolIntegrationTest, InvalidContentLength) {
 
 // TODO(PiotrSikora): move this HTTP/2 only variant to http2_integration_test.cc.
 TEST_P(DownstreamProtocolIntegrationTest, InvalidContentLengthAllowed) {
-  config_helper_.addConfigModifier([](envoy::extensions::filters::network::http_connection_manager::
-                                          v3alpha::HttpConnectionManager& hcm) -> void {
-    hcm.mutable_http2_protocol_options()->set_stream_error_on_invalid_http_messaging(true);
-  });
+  config_helper_.addConfigModifier(
+      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+             hcm) -> void {
+        hcm.mutable_http2_protocol_options()->set_stream_error_on_invalid_http_messaging(true);
+      });
 
   initialize();
 
@@ -750,10 +750,11 @@ TEST_P(DownstreamProtocolIntegrationTest, MultipleContentLengths) {
 
 // TODO(PiotrSikora): move this HTTP/2 only variant to http2_integration_test.cc.
 TEST_P(DownstreamProtocolIntegrationTest, MultipleContentLengthsAllowed) {
-  config_helper_.addConfigModifier([](envoy::extensions::filters::network::http_connection_manager::
-                                          v3alpha::HttpConnectionManager& hcm) -> void {
-    hcm.mutable_http2_protocol_options()->set_stream_error_on_invalid_http_messaging(true);
-  });
+  config_helper_.addConfigModifier(
+      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+             hcm) -> void {
+        hcm.mutable_http2_protocol_options()->set_stream_error_on_invalid_http_messaging(true);
+      });
 
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
@@ -985,8 +986,8 @@ TEST_P(DownstreamProtocolIntegrationTest, ManyRequestTrailersAccepted) {
   // Set header (and trailer) count limit to 200.
   uint32_t max_count = 200;
   config_helper_.addConfigModifier(
-      [&](envoy::extensions::filters::network::http_connection_manager::v3alpha::
-              HttpConnectionManager& hcm) -> void {
+      [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+              hcm) -> void {
         hcm.mutable_common_http_protocol_options()->mutable_max_headers_count()->set_value(
             max_count);
       });
@@ -1036,8 +1037,8 @@ TEST_P(DownstreamProtocolIntegrationTest, ManyTrailerHeaders) {
 
   config_helper_.addConfigModifier(setEnableDownstreamTrailersHttp1());
   config_helper_.addConfigModifier(
-      [&](envoy::extensions::filters::network::http_connection_manager::v3alpha::
-              HttpConnectionManager& hcm) -> void {
+      [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+              hcm) -> void {
         hcm.mutable_max_request_headers_kb()->set_value(max_request_headers_kb_);
         hcm.mutable_common_http_protocol_options()->mutable_max_headers_count()->set_value(
             max_request_headers_count_);
@@ -1179,8 +1180,8 @@ name: passthrough-filter
 
   // Sets initial stream window to min value to make the client sensitive to a low watermark.
   config_helper_.addConfigModifier(
-      [&](envoy::extensions::filters::network::http_connection_manager::v3alpha::
-              HttpConnectionManager& hcm) -> void {
+      [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+              hcm) -> void {
         hcm.mutable_http2_protocol_options()->mutable_initial_stream_window_size()->set_value(
             Http::Http2Settings::MIN_INITIAL_STREAM_WINDOW_SIZE);
       });
@@ -1280,10 +1281,8 @@ TEST_P(DownstreamProtocolIntegrationTest, testEncodeHeadersReturnsStopAll) {
 name: encode-headers-return-stop-all-filter
 )EOF");
   config_helper_.addConfigModifier(
-      [&](envoy::extensions::filters::network::http_connection_manager::v3alpha::
-              HttpConnectionManager& hcm) -> void {
-        hcm.mutable_http2_protocol_options()->set_allow_metadata(true);
-      });
+      [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+              hcm) -> void { hcm.mutable_http2_protocol_options()->set_allow_metadata(true); });
 
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
@@ -1314,15 +1313,13 @@ TEST_P(DownstreamProtocolIntegrationTest, testEncodeHeadersReturnsStopAllWaterma
 name: encode-headers-return-stop-all-filter
 )EOF");
   config_helper_.addConfigModifier(
-      [&](envoy::extensions::filters::network::http_connection_manager::v3alpha::
-              HttpConnectionManager& hcm) -> void {
-        hcm.mutable_http2_protocol_options()->set_allow_metadata(true);
-      });
+      [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+              hcm) -> void { hcm.mutable_http2_protocol_options()->set_allow_metadata(true); });
 
   // Sets initial stream window to min value to make the upstream sensitive to a low watermark.
   config_helper_.addConfigModifier(
-      [&](envoy::extensions::filters::network::http_connection_manager::v3alpha::
-              HttpConnectionManager& hcm) -> void {
+      [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+              hcm) -> void {
         hcm.mutable_http2_protocol_options()->mutable_initial_stream_window_size()->set_value(
             Http::Http2Settings::MIN_INITIAL_STREAM_WINDOW_SIZE);
       });
@@ -1408,8 +1405,8 @@ TEST_P(ProtocolIntegrationTest, TestDownstreamResetIdleTimeout) {
 TEST_P(ProtocolIntegrationTest, ConnDurationTimeoutBasic) {
   config_helper_.setDownstreamMaxConnectionDuration(std::chrono::milliseconds(500));
   config_helper_.addConfigModifier(
-      [](envoy::extensions::filters::network::http_connection_manager::v3alpha::
-             HttpConnectionManager& hcm) { hcm.mutable_drain_timeout()->set_seconds(1); });
+      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+             hcm) { hcm.mutable_drain_timeout()->set_seconds(1); });
   initialize();
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
@@ -1433,8 +1430,8 @@ TEST_P(ProtocolIntegrationTest, ConnDurationTimeoutBasic) {
 TEST_P(ProtocolIntegrationTest, ConnDurationInflightRequest) {
   config_helper_.setDownstreamMaxConnectionDuration(std::chrono::milliseconds(500));
   config_helper_.addConfigModifier(
-      [](envoy::extensions::filters::network::http_connection_manager::v3alpha::
-             HttpConnectionManager& hcm) { hcm.mutable_drain_timeout()->set_seconds(1); });
+      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+             hcm) { hcm.mutable_drain_timeout()->set_seconds(1); });
   initialize();
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
@@ -1461,8 +1458,8 @@ TEST_P(ProtocolIntegrationTest, ConnDurationInflightRequest) {
 TEST_P(ProtocolIntegrationTest, ConnDurationTimeoutNoHttpRequest) {
   config_helper_.setDownstreamMaxConnectionDuration(std::chrono::milliseconds(500));
   config_helper_.addConfigModifier(
-      [](envoy::extensions::filters::network::http_connection_manager::v3alpha::
-             HttpConnectionManager& hcm) { hcm.mutable_drain_timeout()->set_seconds(1); });
+      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+             hcm) { hcm.mutable_drain_timeout()->set_seconds(1); });
   initialize();
 
   codec_client_ = makeHttpConnection(lookupPort("http"));
@@ -1518,10 +1515,11 @@ TEST_P(DownstreamProtocolIntegrationTest, ConnectStreamRejection) {
   if (downstreamProtocol() == Http::CodecClient::Type::HTTP1) {
     return;
   }
-  config_helper_.addConfigModifier([](envoy::extensions::filters::network::http_connection_manager::
-                                          v3alpha::HttpConnectionManager& hcm) -> void {
-    hcm.mutable_http2_protocol_options()->set_stream_error_on_invalid_http_messaging(true);
-  });
+  config_helper_.addConfigModifier(
+      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+             hcm) -> void {
+        hcm.mutable_http2_protocol_options()->set_stream_error_on_invalid_http_messaging(true);
+      });
 
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));

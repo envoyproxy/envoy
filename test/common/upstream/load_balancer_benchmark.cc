@@ -2,7 +2,7 @@
 
 #include <memory>
 
-#include "envoy/config/cluster/v3alpha/cluster.pb.h"
+#include "envoy/config/cluster/v3/cluster.pb.h"
 
 #include "common/memory/stats.h"
 #include "common/runtime/runtime_impl.h"
@@ -46,7 +46,7 @@ public:
   ClusterStats stats_{ClusterInfoImpl::generateStats(stats_store_)};
   NiceMock<Runtime::MockLoader> runtime_;
   Runtime::RandomGeneratorImpl random_;
-  envoy::config::cluster::v3alpha::Cluster::CommonLbConfig common_config_;
+  envoy::config::cluster::v3::Cluster::CommonLbConfig common_config_;
   std::shared_ptr<MockClusterInfo> info_{new NiceMock<MockClusterInfo>()};
 };
 
@@ -66,7 +66,7 @@ public:
 class LeastRequestTester : public BaseTester {
 public:
   LeastRequestTester(uint64_t num_hosts, uint32_t choice_count) : BaseTester(num_hosts) {
-    envoy::config::cluster::v3alpha::Cluster::LeastRequestLbConfig lr_lb_config;
+    envoy::config::cluster::v3::Cluster::LeastRequestLbConfig lr_lb_config;
     lr_lb_config.mutable_choice_count()->set_value(choice_count);
     lb_ =
         std::make_unique<LeastRequestLoadBalancer>(priority_set_, &local_priority_set_, stats_,
@@ -121,13 +121,13 @@ BENCHMARK(BM_RoundRobinLoadBalancerBuild)
 class RingHashTester : public BaseTester {
 public:
   RingHashTester(uint64_t num_hosts, uint64_t min_ring_size) : BaseTester(num_hosts) {
-    config_ = envoy::config::cluster::v3alpha::Cluster::RingHashLbConfig();
+    config_ = envoy::config::cluster::v3::Cluster::RingHashLbConfig();
     config_.value().mutable_minimum_ring_size()->set_value(min_ring_size);
     ring_hash_lb_ = std::make_unique<RingHashLoadBalancer>(
         priority_set_, stats_, stats_store_, runtime_, random_, config_, common_config_);
   }
 
-  absl::optional<envoy::config::cluster::v3alpha::Cluster::RingHashLbConfig> config_;
+  absl::optional<envoy::config::cluster::v3::Cluster::RingHashLbConfig> config_;
   std::unique_ptr<RingHashLoadBalancer> ring_hash_lb_;
 };
 

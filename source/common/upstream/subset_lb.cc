@@ -3,8 +3,8 @@
 #include <memory>
 #include <unordered_set>
 
-#include "envoy/config/cluster/v3alpha/cluster.pb.h"
-#include "envoy/config/core/v3alpha/base.pb.h"
+#include "envoy/config/cluster/v3/cluster.pb.h"
+#include "envoy/config/core/v3/base.pb.h"
 #include "envoy/runtime/runtime.h"
 
 #include "common/common/assert.h"
@@ -22,11 +22,11 @@ SubsetLoadBalancer::SubsetLoadBalancer(
     LoadBalancerType lb_type, PrioritySet& priority_set, const PrioritySet* local_priority_set,
     ClusterStats& stats, Stats::Scope& scope, Runtime::Loader& runtime,
     Runtime::RandomGenerator& random, const LoadBalancerSubsetInfo& subsets,
-    const absl::optional<envoy::config::cluster::v3alpha::Cluster::RingHashLbConfig>&
+    const absl::optional<envoy::config::cluster::v3::Cluster::RingHashLbConfig>&
         lb_ring_hash_config,
-    const absl::optional<envoy::config::cluster::v3alpha::Cluster::LeastRequestLbConfig>&
+    const absl::optional<envoy::config::cluster::v3::Cluster::LeastRequestLbConfig>&
         least_request_config,
-    const envoy::config::cluster::v3alpha::Cluster::CommonLbConfig& common_config)
+    const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config)
     : lb_type_(lb_type), lb_ring_hash_config_(lb_ring_hash_config),
       least_request_config_(least_request_config), common_config_(common_config), stats_(stats),
       scope_(scope), runtime_(runtime), random_(random), fallback_policy_(subsets.fallbackPolicy()),
@@ -38,10 +38,9 @@ SubsetLoadBalancer::SubsetLoadBalancer(
       scale_locality_weight_(subsets.scaleLocalityWeight()), list_as_any_(subsets.listAsAny()) {
   ASSERT(subsets.isEnabled());
 
-  if (fallback_policy_ != envoy::config::cluster::v3alpha::Cluster::LbSubsetConfig::NO_FALLBACK) {
+  if (fallback_policy_ != envoy::config::cluster::v3::Cluster::LbSubsetConfig::NO_FALLBACK) {
     HostPredicate predicate;
-    if (fallback_policy_ ==
-        envoy::config::cluster::v3alpha::Cluster::LbSubsetConfig::ANY_ENDPOINT) {
+    if (fallback_policy_ == envoy::config::cluster::v3::Cluster::LbSubsetConfig::ANY_ENDPOINT) {
       ENVOY_LOG(debug, "subset lb: creating any-endpoint fallback load balancer");
       initSubsetAnyOnce();
       fallback_subset_ = subset_any_;
@@ -128,7 +127,7 @@ void SubsetLoadBalancer::initSubsetSelectorMap() {
     const auto& selector_fallback_policy = subset_selector->fallbackPolicy();
     const auto& selector_fallback_keys_subset = subset_selector->fallbackKeysSubset();
     if (selector_fallback_policy ==
-        envoy::config::cluster::v3alpha::Cluster::LbSubsetConfig::LbSubsetSelector::NOT_DEFINED) {
+        envoy::config::cluster::v3::Cluster::LbSubsetConfig::LbSubsetSelector::NOT_DEFINED) {
       continue;
     }
     uint32_t pos = 0;
@@ -156,14 +155,14 @@ void SubsetLoadBalancer::initSubsetSelectorMap() {
 }
 
 void SubsetLoadBalancer::initSelectorFallbackSubset(
-    const envoy::config::cluster::v3alpha::Cluster::LbSubsetConfig::LbSubsetSelector::
+    const envoy::config::cluster::v3::Cluster::LbSubsetConfig::LbSubsetSelector::
         LbSubsetSelectorFallbackPolicy& fallback_policy) {
-  if (fallback_policy == envoy::config::cluster::v3alpha::Cluster::LbSubsetConfig::
-                             LbSubsetSelector::ANY_ENDPOINT &&
+  if (fallback_policy ==
+          envoy::config::cluster::v3::Cluster::LbSubsetConfig::LbSubsetSelector::ANY_ENDPOINT &&
       subset_any_ == nullptr) {
     ENVOY_LOG(debug, "subset lb: creating any-endpoint fallback load balancer for selector");
     initSubsetAnyOnce();
-  } else if (fallback_policy == envoy::config::cluster::v3alpha::Cluster::LbSubsetConfig::
+  } else if (fallback_policy == envoy::config::cluster::v3::Cluster::LbSubsetConfig::
                                     LbSubsetSelector::DEFAULT_SUBSET &&
              selector_fallback_subset_default_ == nullptr) {
     ENVOY_LOG(debug, "subset lb: creating default subset fallback load balancer for selector");
@@ -186,9 +185,9 @@ HostConstSharedPtr SubsetLoadBalancer::chooseHost(LoadBalancerContext* context) 
     // otherwise check if there is fallback policy configured for given route metadata
     absl::optional<SubsetSelectorFallbackParamsRef> selector_fallback_params =
         tryFindSelectorFallbackParams(context);
-    if (selector_fallback_params && selector_fallback_params->get().fallback_policy_ !=
-                                        envoy::config::cluster::v3alpha::Cluster::LbSubsetConfig::
-                                            LbSubsetSelector::NOT_DEFINED) {
+    if (selector_fallback_params &&
+        selector_fallback_params->get().fallback_policy_ !=
+            envoy::config::cluster::v3::Cluster::LbSubsetConfig::LbSubsetSelector::NOT_DEFINED) {
       // return result according to configured fallback policy
       return chooseHostForSelectorFallbackPolicy(*selector_fallback_params, context);
     }
@@ -247,16 +246,16 @@ SubsetLoadBalancer::tryFindSelectorFallbackParams(LoadBalancerContext* context) 
 HostConstSharedPtr SubsetLoadBalancer::chooseHostForSelectorFallbackPolicy(
     const SubsetSelectorFallbackParams& fallback_params, LoadBalancerContext* context) {
   const auto& fallback_policy = fallback_params.fallback_policy_;
-  if (fallback_policy == envoy::config::cluster::v3alpha::Cluster::LbSubsetConfig::
-                             LbSubsetSelector::ANY_ENDPOINT &&
+  if (fallback_policy ==
+          envoy::config::cluster::v3::Cluster::LbSubsetConfig::LbSubsetSelector::ANY_ENDPOINT &&
       subset_any_ != nullptr) {
     return subset_any_->priority_subset_->lb_->chooseHost(context);
-  } else if (fallback_policy == envoy::config::cluster::v3alpha::Cluster::LbSubsetConfig::
+  } else if (fallback_policy == envoy::config::cluster::v3::Cluster::LbSubsetConfig::
                                     LbSubsetSelector::DEFAULT_SUBSET &&
              selector_fallback_subset_default_ != nullptr) {
     return selector_fallback_subset_default_->priority_subset_->lb_->chooseHost(context);
-  } else if (fallback_policy == envoy::config::cluster::v3alpha::Cluster::LbSubsetConfig::
-                                    LbSubsetSelector::KEYS_SUBSET) {
+  } else if (fallback_policy ==
+             envoy::config::cluster::v3::Cluster::LbSubsetConfig::LbSubsetSelector::KEYS_SUBSET) {
     ASSERT(fallback_params.fallback_keys_subset_);
     auto filtered_context = std::make_unique<LoadBalancerContextWrapper>(
         context, *fallback_params.fallback_keys_subset_);
@@ -462,7 +461,7 @@ SubsetLoadBalancer::extractSubsetMetadata(const std::set<std::string>& subset_ke
                                           const Host& host) {
   std::vector<SubsetMetadata> all_kvs;
 
-  const envoy::config::core::v3alpha::Metadata& metadata = *host.metadata();
+  const envoy::config::core::v3::Metadata& metadata = *host.metadata();
   const auto& filter_it = metadata.filter_metadata().find(Config::MetadataFilters::get().ENVOY_LB);
   if (filter_it == metadata.filter_metadata().end()) {
     return all_kvs;

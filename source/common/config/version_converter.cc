@@ -176,11 +176,11 @@ DynamicMessagePtr VersionConverter::downgrade(const Protobuf::Message& message) 
 
 std::string
 VersionConverter::getJsonStringFromMessage(const Protobuf::Message& message,
-                                           envoy::config::core::v3alpha::ApiVersion api_version) {
+                                           envoy::config::core::v3::ApiVersion api_version) {
   DynamicMessagePtr dynamic_message;
   switch (api_version) {
-  case envoy::config::core::v3alpha::ApiVersion::AUTO:
-  case envoy::config::core::v3alpha::ApiVersion::V2: {
+  case envoy::config::core::v3::ApiVersion::AUTO:
+  case envoy::config::core::v3::ApiVersion::V2: {
     // TODO(htuch): this works as long as there are no new fields in the v3+
     // DiscoveryRequest. When they are added, we need to do a full v2 conversion
     // and also discard unknown fields. Tracked at
@@ -188,7 +188,7 @@ VersionConverter::getJsonStringFromMessage(const Protobuf::Message& message,
     dynamic_message = downgrade(message);
     break;
   }
-  case envoy::config::core::v3alpha::ApiVersion::V3ALPHA: {
+  case envoy::config::core::v3::ApiVersion::V3: {
     // We need to scrub the hidden fields.
     dynamic_message = std::make_unique<DynamicMessage>();
     dynamic_message->msg_.reset(message.New());
@@ -210,13 +210,13 @@ VersionConverter::getJsonStringFromMessage(const Protobuf::Message& message,
   return json;
 }
 
-void VersionConverter::prepareMessageForGrpcWire(
-    Protobuf::Message& message, envoy::config::core::v3alpha::ApiVersion api_version) {
+void VersionConverter::prepareMessageForGrpcWire(Protobuf::Message& message,
+                                                 envoy::config::core::v3::ApiVersion api_version) {
   // TODO(htuch): this works as long as there are no new fields in the v3+
   // DiscoveryRequest. When they are added, we need to do a full v2 conversion
   // and also discard unknown fields. Tracked at
   // https://github.com/envoyproxy/envoy/issues/9619.
-  if (api_version == envoy::config::core::v3alpha::ApiVersion::V3ALPHA) {
+  if (api_version == envoy::config::core::v3::ApiVersion::V3) {
     VersionUtil::scrubHiddenEnvoyDeprecated(message);
   }
   eraseOriginalTypeInformation(message);

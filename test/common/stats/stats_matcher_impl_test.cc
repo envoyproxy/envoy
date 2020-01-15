@@ -1,5 +1,5 @@
-#include "envoy/config/metrics/v3alpha/stats.pb.h"
-#include "envoy/type/matcher/v3alpha/string.pb.h"
+#include "envoy/config/metrics/v3/stats.pb.h"
+#include "envoy/type/matcher/v3/string.pb.h"
 
 #include "common/stats/stats_matcher_impl.h"
 
@@ -12,10 +12,10 @@ namespace Stats {
 
 class StatsMatcherTest : public testing::Test {
 protected:
-  envoy::type::matcher::v3alpha::StringMatcher* inclusionList() {
+  envoy::type::matcher::v3::StringMatcher* inclusionList() {
     return stats_config_.mutable_stats_matcher()->mutable_inclusion_list()->add_patterns();
   }
-  envoy::type::matcher::v3alpha::StringMatcher* exclusionList() {
+  envoy::type::matcher::v3::StringMatcher* exclusionList() {
     return stats_config_.mutable_stats_matcher()->mutable_exclusion_list()->add_patterns();
   }
   void rejectAll(const bool should_reject) {
@@ -36,7 +36,7 @@ protected:
   std::unique_ptr<StatsMatcherImpl> stats_matcher_impl_;
 
 private:
-  envoy::config::metrics::v3alpha::StatsConfig stats_config_;
+  envoy::config::metrics::v3::StatsConfig stats_config_;
 };
 
 TEST_F(StatsMatcherTest, CheckDefault) {

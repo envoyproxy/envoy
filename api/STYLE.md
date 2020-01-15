@@ -132,7 +132,7 @@ To add an extension config to the API, the steps below should be followed:
        )
    ```
 1. Add to the v2 extension config proto `import "udpa/annotations/migrate.proto";`
-2. Add to the v2 extension config proto a package level `option (udpa.annotations.file_migrate).move_to_package = "envoy.extensions.filters.http.foobar.v3alpha";`.
+2. Add to the v2 extension config proto a package level `option (udpa.annotations.file_migrate).move_to_package = "envoy.extensions.filters.http.foobar.v3";`.
    This places the filter in the correct [v3 package hierarchy](#package-organization).
 3. Add a reference to the v2 extension config in (1) in [api/docs/BUILD](docs/BUILD).
 4. Run `./tools/proto_format fix`. This should regenerate the `BUILD` file,

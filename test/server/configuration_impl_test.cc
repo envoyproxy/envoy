@@ -2,9 +2,9 @@
 #include <list>
 #include <string>
 
-#include "envoy/config/bootstrap/v3alpha/bootstrap.pb.h"
-#include "envoy/config/core/v3alpha/base.pb.h"
-#include "envoy/config/metrics/v3alpha/stats.pb.h"
+#include "envoy/config/bootstrap/v3/bootstrap.pb.h"
+#include "envoy/config/core/v3/base.pb.h"
+#include "envoy/config/metrics/v3/stats.pb.h"
 
 #include "common/api/api_impl.h"
 #include "common/config/well_known_names.h"
@@ -64,8 +64,8 @@ protected:
                                  server_.messageValidationContext(), *api_, server_.httpContext(),
                                  server_.accessLogManager(), server_.singletonManager()) {}
 
-  void addStatsdFakeClusterConfig(envoy::config::metrics::v3alpha::StatsSink& sink) {
-    envoy::config::metrics::v3alpha::StatsdSink statsd_sink;
+  void addStatsdFakeClusterConfig(envoy::config::metrics::v3::StatsSink& sink) {
+    envoy::config::metrics::v3::StatsdSink statsd_sink;
     statsd_sink.set_tcp_cluster_name("fake_cluster");
     sink.mutable_typed_config()->PackFrom(statsd_sink);
   }
@@ -76,7 +76,7 @@ protected:
 };
 
 TEST_F(ConfigurationImplTest, DefaultStatsFlushInterval) {
-  envoy::config::bootstrap::v3alpha::Bootstrap bootstrap;
+  envoy::config::bootstrap::v3::Bootstrap bootstrap;
 
   MainImpl config;
   config.initialize(bootstrap, server_, cluster_manager_factory_);
@@ -334,7 +334,7 @@ TEST_F(ConfigurationImplTest, StatsSinkWithInvalidName) {
 
   auto bootstrap = Upstream::parseBootstrapFromV2Json(json);
 
-  envoy::config::metrics::v3alpha::StatsSink& sink = *bootstrap.mutable_stats_sinks()->Add();
+  envoy::config::metrics::v3::StatsSink& sink = *bootstrap.mutable_stats_sinks()->Add();
   sink.set_name("envoy.invalid");
   addStatsdFakeClusterConfig(sink);
 
@@ -391,7 +391,7 @@ TEST(InitialImplTest, LayeredRuntime) {
     - name: admin
       admin_layer: {}
   )EOF";
-  const auto bootstrap = TestUtility::parseYaml<envoy::config::bootstrap::v3alpha::Bootstrap>(yaml);
+  const auto bootstrap = TestUtility::parseYaml<envoy::config::bootstrap::v3::Bootstrap>(yaml);
   InitialImpl config(bootstrap);
   EXPECT_THAT(config.runtime(), ProtoEq(bootstrap.layered_runtime()));
 }
@@ -402,7 +402,7 @@ TEST(InitialImplTest, EmptyLayeredRuntime) {
   layered_runtime: {}
   )EOF";
   const auto bootstrap =
-      TestUtility::parseYaml<envoy::config::bootstrap::v3alpha::Bootstrap>(bootstrap_yaml);
+      TestUtility::parseYaml<envoy::config::bootstrap::v3::Bootstrap>(bootstrap_yaml);
   InitialImpl config(bootstrap);
 
   const std::string expected_yaml = R"EOF(
@@ -410,13 +410,13 @@ TEST(InitialImplTest, EmptyLayeredRuntime) {
   - admin_layer: {}
   )EOF";
   const auto expected_runtime =
-      TestUtility::parseYaml<envoy::config::bootstrap::v3alpha::LayeredRuntime>(expected_yaml);
+      TestUtility::parseYaml<envoy::config::bootstrap::v3::LayeredRuntime>(expected_yaml);
   EXPECT_THAT(config.runtime(), ProtoEq(expected_runtime));
 }
 
 // An empty deprecated Runtime has an empty static and admin layer injected.
 TEST(InitialImplTest, EmptyDeprecatedRuntime) {
-  const auto bootstrap = TestUtility::parseYaml<envoy::config::bootstrap::v3alpha::Bootstrap>("{}");
+  const auto bootstrap = TestUtility::parseYaml<envoy::config::bootstrap::v3::Bootstrap>("{}");
   InitialImpl config(bootstrap);
 
   const std::string expected_yaml = R"EOF(
@@ -427,7 +427,7 @@ TEST(InitialImplTest, EmptyDeprecatedRuntime) {
     admin_layer: {}
   )EOF";
   const auto expected_runtime =
-      TestUtility::parseYaml<envoy::config::bootstrap::v3alpha::LayeredRuntime>(expected_yaml);
+      TestUtility::parseYaml<envoy::config::bootstrap::v3::LayeredRuntime>(expected_yaml);
   EXPECT_THAT(config.runtime(), ProtoEq(expected_runtime));
 }
 
@@ -443,7 +443,7 @@ TEST(InitialImplTest, DeprecatedRuntimeTranslation) {
         min_interval: 5
   )EOF";
   const auto bootstrap =
-      TestUtility::parseYaml<envoy::config::bootstrap::v3alpha::Bootstrap>(bootstrap_yaml);
+      TestUtility::parseYaml<envoy::config::bootstrap::v3::Bootstrap>(bootstrap_yaml);
   InitialImpl config(bootstrap);
 
   const std::string expected_yaml = R"EOF(
@@ -460,7 +460,7 @@ TEST(InitialImplTest, DeprecatedRuntimeTranslation) {
     admin_layer: {}
   )EOF";
   const auto expected_runtime =
-      TestUtility::parseYaml<envoy::config::bootstrap::v3alpha::LayeredRuntime>(expected_yaml);
+      TestUtility::parseYaml<envoy::config::bootstrap::v3::LayeredRuntime>(expected_yaml);
   EXPECT_THAT(config.runtime(), ProtoEq(expected_runtime));
 }
 
@@ -499,11 +499,11 @@ TEST_F(ConfigurationImplTest, AdminSocketOptions) {
 
   ASSERT_EQ(config.admin().socketOptions()->size(), 2);
   auto detail = config.admin().socketOptions()->at(0)->getOptionDetails(
-      socket_mock, envoy::config::core::v3alpha::SocketOption::STATE_PREBIND);
+      socket_mock, envoy::config::core::v3::SocketOption::STATE_PREBIND);
   ASSERT_NE(detail, absl::nullopt);
   EXPECT_EQ(detail->name_, Envoy::Network::SocketOptionName(1, 2, "1/2"));
   detail = config.admin().socketOptions()->at(1)->getOptionDetails(
-      socket_mock, envoy::config::core::v3alpha::SocketOption::STATE_BOUND);
+      socket_mock, envoy::config::core::v3::SocketOption::STATE_BOUND);
   ASSERT_NE(detail, absl::nullopt);
   EXPECT_EQ(detail->name_, Envoy::Network::SocketOptionName(4, 5, "4/5"));
 }

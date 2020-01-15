@@ -3,10 +3,10 @@
 #include <vector>
 
 #include "envoy/common/regex.h"
-#include "envoy/config/route/v3alpha/route_components.pb.h"
+#include "envoy/config/route/v3/route_components.pb.h"
 #include "envoy/http/header_map.h"
 #include "envoy/json/json_object.h"
-#include "envoy/type/v3alpha/range.pb.h"
+#include "envoy/type/v3/range.pb.h"
 
 #include "common/protobuf/protobuf.h"
 
@@ -36,13 +36,13 @@ public:
   // to match in a request's header, specified in the header_match_type_ member.
   // It is the runtime equivalent of the HeaderMatchSpecifier proto in RDS API.
   struct HeaderData : public HeaderMatcher {
-    HeaderData(const envoy::config::route::v3alpha::HeaderMatcher& config);
+    HeaderData(const envoy::config::route::v3::HeaderMatcher& config);
 
     const LowerCaseString name_;
     HeaderMatchType header_match_type_;
     std::string value_;
     Regex::CompiledMatcherPtr regex_;
-    envoy::type::v3alpha::Int64Range range_;
+    envoy::type::v3::Int64Range range_;
     const bool invert_match_;
 
     // HeaderMatcher
@@ -57,8 +57,7 @@ public:
    * Build a vector of HeaderDataPtr given input config.
    */
   static std::vector<HeaderUtility::HeaderDataPtr> buildHeaderDataVector(
-      const Protobuf::RepeatedPtrField<envoy::config::route::v3alpha::HeaderMatcher>&
-          header_matchers) {
+      const Protobuf::RepeatedPtrField<envoy::config::route::v3::HeaderMatcher>& header_matchers) {
     std::vector<HeaderUtility::HeaderDataPtr> ret;
     for (const auto& header_matcher : header_matchers) {
       ret.emplace_back(std::make_unique<HeaderUtility::HeaderData>(header_matcher));
@@ -70,8 +69,7 @@ public:
    * Build a vector of HeaderMatcherSharedPtr given input config.
    */
   static std::vector<Http::HeaderMatcherSharedPtr> buildHeaderMatcherVector(
-      const Protobuf::RepeatedPtrField<envoy::config::route::v3alpha::HeaderMatcher>&
-          header_matchers) {
+      const Protobuf::RepeatedPtrField<envoy::config::route::v3::HeaderMatcher>& header_matchers) {
     std::vector<Http::HeaderMatcherSharedPtr> ret;
     for (const auto& header_matcher : header_matchers) {
       ret.emplace_back(std::make_shared<HeaderUtility::HeaderData>(header_matcher));

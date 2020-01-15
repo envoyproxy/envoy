@@ -1,5 +1,5 @@
-#include "envoy/extensions/filters/listener/http_inspector/v3alpha/http_inspector.pb.h"
-#include "envoy/extensions/filters/listener/http_inspector/v3alpha/http_inspector.pb.validate.h"
+#include "envoy/extensions/filters/listener/http_inspector/v3/http_inspector.pb.h"
+#include "envoy/extensions/filters/listener/http_inspector/v3/http_inspector.pb.validate.h"
 #include "envoy/registry/registry.h"
 #include "envoy/server/filter_config.h"
 
@@ -28,7 +28,7 @@ public:
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
     return std::make_unique<
-        envoy::extensions::filters::listener::http_inspector::v3alpha::HttpInspector>();
+        envoy::extensions::filters::listener::http_inspector::v3::HttpInspector>();
   }
 
   std::string name() const override { return ListenerFilterNames::get().HttpInspector; }

@@ -2,7 +2,7 @@
 
 #include <memory>
 
-#include "envoy/service/discovery/v3alpha/discovery.pb.h"
+#include "envoy/service/discovery/v3/discovery.pb.h"
 
 #include "common/buffer/buffer_impl.h"
 #include "common/common/assert.h"
@@ -23,7 +23,7 @@ HttpSubscriptionImpl::HttpSubscriptionImpl(
     const std::string& remote_cluster_name, Event::Dispatcher& dispatcher,
     Runtime::RandomGenerator& random, std::chrono::milliseconds refresh_interval,
     std::chrono::milliseconds request_timeout, const Protobuf::MethodDescriptor& service_method,
-    absl::string_view type_url, envoy::config::core::v3alpha::ApiVersion transport_api_version,
+    absl::string_view type_url, envoy::config::core::v3::ApiVersion transport_api_version,
     SubscriptionCallbacks& callbacks, SubscriptionStats stats,
     std::chrono::milliseconds init_fetch_timeout,
     ProtobufMessage::ValidationVisitor& validation_visitor)
@@ -76,7 +76,7 @@ void HttpSubscriptionImpl::createRequest(Http::Message& request) {
 
 void HttpSubscriptionImpl::parseResponse(const Http::Message& response) {
   disableInitFetchTimeoutTimer();
-  envoy::service::discovery::v3alpha::DiscoveryResponse message;
+  envoy::service::discovery::v3::DiscoveryResponse message;
   try {
     MessageUtil::loadFromJson(response.bodyAsString(), message, validation_visitor_);
   } catch (const EnvoyException& e) {

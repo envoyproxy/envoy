@@ -3,11 +3,11 @@
 #include <string>
 #include <vector>
 
-#include "envoy/config/core/v3alpha/base.pb.h"
-#include "envoy/config/core/v3alpha/health_check.pb.h"
-#include "envoy/config/core/v3alpha/health_check.pb.validate.h"
-#include "envoy/config/endpoint/v3alpha/endpoint_components.pb.h"
-#include "envoy/data/core/v3alpha/health_check_event.pb.h"
+#include "envoy/config/core/v3/base.pb.h"
+#include "envoy/config/core/v3/health_check.pb.h"
+#include "envoy/config/core/v3/health_check.pb.validate.h"
+#include "envoy/config/endpoint/v3/endpoint_components.pb.h"
+#include "envoy/data/core/v3/health_check_event.pb.h"
 
 #include "common/buffer/buffer_impl.h"
 #include "common/buffer/zero_copy_input_stream_impl.h"
@@ -48,8 +48,8 @@ namespace Envoy {
 namespace Upstream {
 namespace {
 
-envoy::config::core::v3alpha::HealthCheck createGrpcHealthCheckConfig() {
-  envoy::config::core::v3alpha::HealthCheck health_check;
+envoy::config::core::v3::HealthCheck createGrpcHealthCheckConfig() {
+  envoy::config::core::v3::HealthCheck health_check;
   health_check.mutable_timeout()->set_seconds(1);
   health_check.mutable_interval()->set_seconds(1);
   health_check.mutable_unhealthy_threshold()->set_value(2);
@@ -124,7 +124,7 @@ public:
   using TestSessionPtr = std::unique_ptr<TestSession>;
   using HostWithHealthCheckMap =
       std::unordered_map<std::string,
-                         const envoy::config::endpoint::v3alpha::Endpoint::HealthCheckConfig>;
+                         const envoy::config::endpoint::v3::Endpoint::HealthCheckConfig>;
 
   HttpHealthCheckerImplTest()
       : cluster_(new NiceMock<MockClusterMockPrioritySet>()),
@@ -455,9 +455,9 @@ public:
         });
   }
 
-  const envoy::config::endpoint::v3alpha::Endpoint::HealthCheckConfig
+  const envoy::config::endpoint::v3::Endpoint::HealthCheckConfig
   makeHealthCheckConfig(const uint32_t port_value) {
-    envoy::config::endpoint::v3alpha::Endpoint::HealthCheckConfig config;
+    envoy::config::endpoint::v3::Endpoint::HealthCheckConfig config;
     config.set_port_value(port_value);
     return config;
   }
@@ -1315,7 +1315,7 @@ TEST_F(HttpHealthCheckerImplTest, SuccessServiceCheckWithAdditionalHeaders) {
       .WillOnce(Return(true));
 
   EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Unchanged)).Times(1);
-  auto metadata = TestUtility::parseYaml<envoy::config::core::v3alpha::Metadata>(
+  auto metadata = TestUtility::parseYaml<envoy::config::core::v3::Metadata>(
       R"EOF(
         filter_metadata:
           namespace:
@@ -1375,7 +1375,7 @@ TEST_F(HttpHealthCheckerImplTest, SuccessServiceCheckWithoutUserAgent) {
       .WillOnce(Return(true));
 
   EXPECT_CALL(*this, onHostStatus(_, HealthTransition::Unchanged)).Times(1);
-  auto metadata = TestUtility::parseYaml<envoy::config::core::v3alpha::Metadata>(
+  auto metadata = TestUtility::parseYaml<envoy::config::core::v3::Metadata>(
       R"EOF(
         filter_metadata:
           namespace:
@@ -2762,7 +2762,7 @@ TEST(HttpStatusChecker, InvalidRange2) {
 
 TEST(TcpHealthCheckMatcher, loadJsonBytes) {
   {
-    Protobuf::RepeatedPtrField<envoy::config::core::v3alpha::HealthCheck::Payload> repeated_payload;
+    Protobuf::RepeatedPtrField<envoy::config::core::v3::HealthCheck::Payload> repeated_payload;
     repeated_payload.Add()->set_text("39000000");
     repeated_payload.Add()->set_text("EEEEEEEE");
 
@@ -2772,14 +2772,14 @@ TEST(TcpHealthCheckMatcher, loadJsonBytes) {
   }
 
   {
-    Protobuf::RepeatedPtrField<envoy::config::core::v3alpha::HealthCheck::Payload> repeated_payload;
+    Protobuf::RepeatedPtrField<envoy::config::core::v3::HealthCheck::Payload> repeated_payload;
     repeated_payload.Add()->set_text("4");
 
     EXPECT_THROW(TcpHealthCheckMatcher::loadProtoBytes(repeated_payload), EnvoyException);
   }
 
   {
-    Protobuf::RepeatedPtrField<envoy::config::core::v3alpha::HealthCheck::Payload> repeated_payload;
+    Protobuf::RepeatedPtrField<envoy::config::core::v3::HealthCheck::Payload> repeated_payload;
     repeated_payload.Add()->set_text("gg");
 
     EXPECT_THROW(TcpHealthCheckMatcher::loadProtoBytes(repeated_payload), EnvoyException);
@@ -2791,7 +2791,7 @@ static void add_uint8(Buffer::Instance& buffer, uint8_t addend) {
 }
 
 TEST(TcpHealthCheckMatcher, match) {
-  Protobuf::RepeatedPtrField<envoy::config::core::v3alpha::HealthCheck::Payload> repeated_payload;
+  Protobuf::RepeatedPtrField<envoy::config::core::v3::HealthCheck::Payload> repeated_payload;
   repeated_payload.Add()->set_text("01");
   repeated_payload.Add()->set_text("02");
 
@@ -4524,8 +4524,7 @@ TEST(HealthCheckEventLoggerImplTest, All) {
                          "\"ipv4_compat\":false,\"port_value\":443}},\"cluster_name\":\"fake_"
                          "cluster\",\"eject_unhealthy_event\":{\"failure_type\":\"ACTIVE\"},"
                          "\"timestamp\":\"2009-02-13T23:31:31.234Z\"}\n"}));
-  event_logger.logEjectUnhealthy(envoy::data::core::v3alpha::HTTP, host,
-                                 envoy::data::core::v3alpha::ACTIVE);
+  event_logger.logEjectUnhealthy(envoy::data::core::v3::HTTP, host, envoy::data::core::v3::ACTIVE);
 
   EXPECT_CALL(*file, write(absl::string_view{
                          "{\"health_checker_type\":\"HTTP\",\"host\":{\"socket_address\":{"
@@ -4533,7 +4532,7 @@ TEST(HealthCheckEventLoggerImplTest, All) {
                          "\"ipv4_compat\":false,\"port_value\":443}},\"cluster_name\":\"fake_"
                          "cluster\",\"add_healthy_event\":{\"first_check\":false},\"timestamp\":"
                          "\"2009-02-13T23:31:31.234Z\"}\n"}));
-  event_logger.logAddHealthy(envoy::data::core::v3alpha::HTTP, host, false);
+  event_logger.logAddHealthy(envoy::data::core::v3::HTTP, host, false);
 
   EXPECT_CALL(*file, write(absl::string_view{
                          "{\"health_checker_type\":\"HTTP\",\"host\":{\"socket_address\":{"
@@ -4542,8 +4541,8 @@ TEST(HealthCheckEventLoggerImplTest, All) {
                          "cluster\",\"health_check_failure_event\":{\"failure_type\":\"ACTIVE\","
                          "\"first_check\":false},"
                          "\"timestamp\":\"2009-02-13T23:31:31.234Z\"}\n"}));
-  event_logger.logUnhealthy(envoy::data::core::v3alpha::HTTP, host,
-                            envoy::data::core::v3alpha::ACTIVE, false);
+  event_logger.logUnhealthy(envoy::data::core::v3::HTTP, host, envoy::data::core::v3::ACTIVE,
+                            false);
 
   EXPECT_CALL(*file, write(absl::string_view{
                          "{\"health_checker_type\":\"HTTP\",\"host\":{\"socket_address\":{"
@@ -4551,7 +4550,7 @@ TEST(HealthCheckEventLoggerImplTest, All) {
                          "\"ipv4_compat\":false,\"port_value\":443}},\"cluster_name\":\"fake_"
                          "cluster\",\"degraded_healthy_host\":{},"
                          "\"timestamp\":\"2009-02-13T23:31:31.234Z\"}\n"}));
-  event_logger.logDegraded(envoy::data::core::v3alpha::HTTP, host);
+  event_logger.logDegraded(envoy::data::core::v3::HTTP, host);
 
   EXPECT_CALL(*file, write(absl::string_view{
                          "{\"health_checker_type\":\"HTTP\",\"host\":{\"socket_address\":{"
@@ -4559,7 +4558,7 @@ TEST(HealthCheckEventLoggerImplTest, All) {
                          "\"ipv4_compat\":false,\"port_value\":443}},\"cluster_name\":\"fake_"
                          "cluster\",\"no_longer_degraded_host\":{},"
                          "\"timestamp\":\"2009-02-13T23:31:31.234Z\"}\n"}));
-  event_logger.logNoLongerDegraded(envoy::data::core::v3alpha::HTTP, host);
+  event_logger.logNoLongerDegraded(envoy::data::core::v3::HTTP, host);
 }
 
 // Validate that the proto constraints don't allow zero length edge durations.
@@ -4576,7 +4575,7 @@ TEST(HealthCheckProto, Validation) {
         prefix: locations
       path: /healthcheck
     )EOF";
-    envoy::config::core::v3alpha::HealthCheck health_check_proto;
+    envoy::config::core::v3::HealthCheck health_check_proto;
     EXPECT_THROW_WITH_REGEX(TestUtility::validate(parseHealthCheckFromV2Yaml(yaml)), EnvoyException,
                             "Proto constraint validation failed.*value must be greater than.*");
   }
@@ -4592,7 +4591,7 @@ TEST(HealthCheckProto, Validation) {
         prefix: locations
       path: /healthcheck
     )EOF";
-    envoy::config::core::v3alpha::HealthCheck health_check_proto;
+    envoy::config::core::v3::HealthCheck health_check_proto;
     EXPECT_THROW_WITH_REGEX(TestUtility::validate(parseHealthCheckFromV2Yaml(yaml)), EnvoyException,
                             "Proto constraint validation failed.*value must be greater than.*");
   }
@@ -4608,7 +4607,7 @@ TEST(HealthCheckProto, Validation) {
         prefix: locations
       path: /healthcheck
     )EOF";
-    envoy::config::core::v3alpha::HealthCheck health_check_proto;
+    envoy::config::core::v3::HealthCheck health_check_proto;
     EXPECT_THROW_WITH_REGEX(TestUtility::validate(parseHealthCheckFromV2Yaml(yaml)), EnvoyException,
                             "Proto constraint validation failed.*value must be greater than.*");
   }
@@ -4624,7 +4623,7 @@ TEST(HealthCheckProto, Validation) {
         prefix: locations
       path: /healthcheck
     )EOF";
-    envoy::config::core::v3alpha::HealthCheck health_check_proto;
+    envoy::config::core::v3::HealthCheck health_check_proto;
     EXPECT_THROW_WITH_REGEX(TestUtility::validate(parseHealthCheckFromV2Yaml(yaml)), EnvoyException,
                             "Proto constraint validation failed.*value must be greater than.*");
   }
@@ -4638,7 +4637,7 @@ TEST(HealthCheckProto, Validation) {
         prefix: locations
       path: /healthcheck
     )EOF";
-    envoy::config::core::v3alpha::HealthCheck health_check_proto;
+    envoy::config::core::v3::HealthCheck health_check_proto;
     EXPECT_THROW_WITH_REGEX(TestUtility::validate(parseHealthCheckFromV2Yaml(yaml)), EnvoyException,
                             "Proto constraint validation failed.*value is required.*");
   }
@@ -4652,7 +4651,7 @@ TEST(HealthCheckProto, Validation) {
         prefix: locations
       path: /healthcheck
     )EOF";
-    envoy::config::core::v3alpha::HealthCheck health_check_proto;
+    envoy::config::core::v3::HealthCheck health_check_proto;
     EXPECT_THROW_WITH_REGEX(TestUtility::validate(parseHealthCheckFromV2Yaml(yaml)), EnvoyException,
                             "Proto constraint validation failed.*value is required.*");
   }

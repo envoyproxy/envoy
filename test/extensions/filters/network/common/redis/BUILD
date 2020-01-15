@@ -26,7 +26,7 @@ envoy_cc_test_library(
     hdrs = ["test_utils.h"],
     deps = [
         "//source/common/protobuf:utility_lib",
-        "@envoy_api//envoy/extensions/filters/network/redis_proxy/v3alpha:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/network/redis_proxy/v3:pkg_cc_proto",
     ],
 )
 
@@ -57,6 +57,6 @@ envoy_cc_test(
         "//test/mocks/thread_local:thread_local_mocks",
         "//test/mocks/upstream:upstream_mocks",
         "//test/test_common:simulated_time_system_lib",
-        "@envoy_api//envoy/extensions/filters/network/redis_proxy/v3alpha:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/network/redis_proxy/v3:pkg_cc_proto",
     ],
 )

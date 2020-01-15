@@ -1,6 +1,6 @@
 #include "extensions/grpc_credentials/example/config.h"
 
-#include "envoy/config/core/v3alpha/grpc_service.pb.h"
+#include "envoy/config/core/v3/grpc_service.pb.h"
 #include "envoy/grpc/google_grpc_creds.h"
 #include "envoy/registry/registry.h"
 
@@ -13,14 +13,14 @@ namespace Example {
 
 std::shared_ptr<grpc::ChannelCredentials>
 AccessTokenExampleGrpcCredentialsFactory::getChannelCredentials(
-    const envoy::config::core::v3alpha::GrpcService& grpc_service_config, Api::Api& api) {
+    const envoy::config::core::v3::GrpcService& grpc_service_config, Api::Api& api) {
   const auto& google_grpc = grpc_service_config.google_grpc();
   std::shared_ptr<grpc::ChannelCredentials> creds =
       Grpc::CredsUtility::defaultSslChannelCredentials(grpc_service_config, api);
   std::shared_ptr<grpc::CallCredentials> call_creds = nullptr;
   for (const auto& credential : google_grpc.call_credentials()) {
     switch (credential.credential_specifier_case()) {
-    case envoy::config::core::v3alpha::GrpcService::GoogleGrpc::CallCredentials::
+    case envoy::config::core::v3::GrpcService::GoogleGrpc::CallCredentials::
         CredentialSpecifierCase::kAccessToken: {
       if (!credential.access_token().empty()) {
         std::shared_ptr<grpc::CallCredentials> new_call_creds = grpc::MetadataCredentialsFromPlugin(

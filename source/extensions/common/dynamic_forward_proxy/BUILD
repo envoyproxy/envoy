@@ -15,7 +15,7 @@ envoy_cc_library(
         "//include/envoy/event:dispatcher_interface",
         "//include/envoy/singleton:manager_interface",
         "//include/envoy/thread_local:thread_local_interface",
-        "@envoy_api//envoy/extensions/common/dynamic_forward_proxy/v3alpha:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/common/dynamic_forward_proxy/v3:pkg_cc_proto",
     ],
 )
 
@@ -26,7 +26,7 @@ envoy_cc_library(
     deps = [
         ":dns_cache_impl",
         "//source/common/protobuf",
-        "@envoy_api//envoy/extensions/common/dynamic_forward_proxy/v3alpha:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/common/dynamic_forward_proxy/v3:pkg_cc_proto",
     ],
 )
 
@@ -41,6 +41,6 @@ envoy_cc_library(
         "//source/common/common:cleanup_lib",
         "//source/common/network:utility_lib",
         "//source/common/upstream:upstream_lib",
-        "@envoy_api//envoy/extensions/common/dynamic_forward_proxy/v3alpha:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/common/dynamic_forward_proxy/v3:pkg_cc_proto",
     ],
 )
