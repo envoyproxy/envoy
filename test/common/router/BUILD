@@ -32,6 +32,7 @@ envoy_cc_test_library(
         "//test/mocks/server:server_mocks",
         "//test/test_common:environment_lib",
         "//test/test_common:registry_lib",
+        "//test/test_common:test_runtime_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/config/route/v3alpha:pkg_cc_proto",
         "@envoy_api//envoy/type/v3alpha:pkg_cc_proto",

@@ -41,7 +41,7 @@ public:
     }
   }
 
-  MOCK_CONST_METHOD1(deprecatedFeatureEnabled, bool(const std::string& key));
+  MOCK_CONST_METHOD2(deprecatedFeatureEnabled, bool(const std::string& key, bool default_value));
   MOCK_CONST_METHOD1(runtimeFeatureEnabled, bool(absl::string_view key));
   MOCK_CONST_METHOD2(featureEnabled, bool(const std::string& key, uint64_t default_value));
   MOCK_CONST_METHOD3(featureEnabled,

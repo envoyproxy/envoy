@@ -57,6 +57,7 @@ Version history
 * tracing: added initial support for AWS X-Ray (local sampling rules only) :ref:`X-Ray Tracing <envoy_api_msg_config.trace.v2alpha.XRayConfig>`.
 * tracing: added tags for gRPC request path, authority, content-type and timeout.
 * udp: added initial support for :ref:`UDP proxy <config_udp_listener_filters_udp_proxy>`
+* fault: fixed an issue where the http fault filter would repeatedly check the percentage of abort/delay when the `x-envoy-downstream-service-cluster` header was included in the request to ensure that the actual percentage of abort/delay matches the configuration of the filter.
 
 1.12.2 (December 10, 2019)
 ==========================

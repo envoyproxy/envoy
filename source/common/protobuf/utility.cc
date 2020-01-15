@@ -3,6 +3,7 @@
 #include <limits>
 #include <numeric>
 
+#include "envoy/annotations/deprecation.pb.h"
 #include "envoy/protobuf/message_validator.h"
 #include "envoy/type/v3alpha/percent.pb.h"
 
@@ -339,12 +340,13 @@ void checkForDeprecatedNonRepeatedEnumValue(const Protobuf::Message& message,
 #ifdef ENVOY_DISABLE_DEPRECATED_FEATURES
   bool warn_only = false;
 #else
-  bool warn_only = true;
+  bool warn_only = !enum_value_descriptor->options().GetExtension(
+      envoy::annotations::disallowed_by_default_enum);
 #endif
 
-  if (runtime && !runtime->snapshot().deprecatedFeatureEnabled(absl::StrCat(
-                     "envoy.deprecated_features.", filename, ":", enum_value_descriptor->name()))) {
-    warn_only = false;
+  if (runtime) {
+    warn_only = runtime->snapshot().deprecatedFeatureEnabled(
+        absl::StrCat("envoy.deprecated_features:", enum_value_descriptor->full_name()), warn_only);
   }
 
   if (warn_only) {
@@ -400,15 +402,14 @@ void checkForUnexpectedFields(const Protobuf::Message& message,
 #ifdef ENVOY_DISABLE_DEPRECATED_FEATURES
     bool warn_only = false;
 #else
-    bool warn_only = true;
+    bool warn_only = !field->options().GetExtension(envoy::annotations::disallowed_by_default);
 #endif
     // Allow runtime to be null both to not crash if this is called before server initialization,
     // and so proto validation works in context where runtime singleton is not set up (e.g.
     // standalone config validation utilities)
-    if (runtime && field->options().deprecated() &&
-        !runtime->snapshot().deprecatedFeatureEnabled(
-            absl::StrCat("envoy.deprecated_features.", filename, ":", field->name()))) {
-      warn_only = false;
+    if (runtime && field->options().deprecated()) {
+      warn_only = runtime->snapshot().deprecatedFeatureEnabled(
+          absl::StrCat("envoy.deprecated_features:", field->full_name()), warn_only);
     }
 
     // If this field is deprecated, warn or throw an error.
