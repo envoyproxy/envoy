@@ -41,6 +41,11 @@ namespace Envoy {
 namespace Server {
 namespace {
 
+class ListenerManagerImplWithDispatcherStatsTest : public ListenerManagerImplTest {
+protected:
+  ListenerManagerImplWithDispatcherStatsTest() { enable_dispatcher_stats_ = true; }
+};
+
 class ListenerManagerImplWithRealFiltersTest : public ListenerManagerImplTest {
 public:
   /**
@@ -3664,6 +3669,13 @@ TEST_F(ListenerManagerImplWithRealFiltersTest, VerifyIgnoreExpirationWithCA) {
                                                        Network::Address::IpVersion::v4);
 
   EXPECT_NO_THROW(manager_->addOrUpdateListener(parseListenerFromV2Yaml(yaml), "", true));
+}
+
+// Validate that dispatcher stats prefix is set correctly when enabled.
+TEST_F(ListenerManagerImplWithDispatcherStatsTest, DispatherStatsWithCorrectPrefix) {
+  EXPECT_CALL(*worker_, start(_));
+  EXPECT_CALL(*worker_, initializeStats(_, "worker_0."));
+  manager_->startWorkers(guard_dog_);
 }
 
 } // namespace
