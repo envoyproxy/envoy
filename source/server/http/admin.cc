@@ -698,6 +698,7 @@ Http::Code AdminImpl::handlerConfigDump(absl::string_view url, Http::HeaderMap& 
   } else {
     addAllConfigToDump(dump, mask);
   }
+  MessageUtil::redact(dump);
 
   response_headers.setReferenceContentType(Http::Headers::get().ContentTypeValues.Json);
   response.add(MessageUtil::getJsonStringFromMessage(dump, true)); // pretty-print

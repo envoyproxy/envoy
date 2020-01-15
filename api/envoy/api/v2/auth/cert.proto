@@ -11,6 +11,8 @@ import "google/protobuf/duration.proto";
 import "google/protobuf/struct.proto";
 import "google/protobuf/wrappers.proto";
 
+import "udpa/annotations/sensitive.proto";
+
 import "udpa/annotations/migrate.proto";
 import "validate/validate.proto";
 
@@ -128,7 +130,7 @@ message TlsCertificate {
   core.DataSource certificate_chain = 1;
 
   // The TLS private key.
-  core.DataSource private_key = 2;
+  core.DataSource private_key = 2 [(udpa.annotations.sensitive) = true];
 
   // BoringSSL private key method provider. This is an alternative to :ref:`private_key
   // <envoy_api_field_auth.TlsCertificate.private_key>` field. This can't be
@@ -141,7 +143,7 @@ message TlsCertificate {
 
   // The password to decrypt the TLS private key. If this field is not set, it is assumed that the
   // TLS private key is not password encrypted.
-  core.DataSource password = 3;
+  core.DataSource password = 3 [(udpa.annotations.sensitive) = true];
 
   // [#not-implemented-hide:]
   core.DataSource ocsp_staple = 4;
@@ -174,7 +176,8 @@ message TlsSessionTicketKeys {
   //   * Keep the session ticket keys at least as secure as your TLS certificate private keys
   //   * Rotate session ticket keys at least daily, and preferably hourly
   //   * Always generate keys using a cryptographically-secure random data source
-  repeated core.DataSource keys = 1 [(validate.rules).repeated = {min_items: 1}];
+  repeated core.DataSource keys = 1
+      [(validate.rules).repeated = {min_items: 1}, (udpa.annotations.sensitive) = true];
 }
 
 // [#next-free-field: 10]
