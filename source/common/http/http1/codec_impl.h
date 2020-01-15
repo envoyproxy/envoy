@@ -285,13 +285,20 @@ private:
    * @param data supplies the start address.
    * @param length supplies the length.
    */
-  virtual void onBody(const char* data, size_t length) PURE;
+  void bufferBody(const char* data, size_t length);
+  void dispatchBody();
+  virtual void onBody(Buffer::Instance& data) PURE;
 
   /**
    * Called when the request/response is complete.
    */
   void onMessageCompleteBase();
   virtual void onMessageComplete() PURE;
+
+  /**
+   * Called when accepting a chunk header.
+   */
+  void onChunkHeader(bool is_final_chunk);
 
   /**
    * @see onResetStreamBase().
@@ -320,6 +327,7 @@ private:
   HeaderParsingState header_parsing_state_{HeaderParsingState::Field};
   HeaderString current_header_field_;
   HeaderString current_header_value_;
+  Buffer::OwnedImpl pending_body_buffer_;
   Buffer::WatermarkBuffer output_buffer_;
   Protocol protocol_{Protocol::Http11};
   const uint32_t max_headers_kb_;
@@ -368,7 +376,7 @@ private:
   void onMessageBegin() override;
   void onUrl(const char* data, size_t length) override;
   int onHeadersComplete() override;
-  void onBody(const char* data, size_t length) override;
+  void onBody(Buffer::Instance& data) override;
   void onMessageComplete() override;
   void onResetStream(StreamResetReason reason) override;
   void sendProtocolError(absl::string_view details) override;
@@ -447,7 +455,7 @@ private:
   void onMessageBegin() override {}
   void onUrl(const char*, size_t) override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
   int onHeadersComplete() override;
-  void onBody(const char* data, size_t length) override;
+  void onBody(Buffer::Instance& data) override;
   void onMessageComplete() override;
   void onResetStream(StreamResetReason reason) override;
   void sendProtocolError(absl::string_view details) override;
