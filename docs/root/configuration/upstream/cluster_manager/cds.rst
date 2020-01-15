@@ -26,9 +26,9 @@ Similar to VHDS on-demand feature in terms of hosts, the on-demand CDS API is an
 that Envoy will call to dynamically fetch upstream clusters which Envoy interested in spontaneously.
 
 By default in CDS, all cluster configurations are sent to every Envoy instance in the mesh. The
-delta CDS provides the ability that the control panel can send incremental CDS to the Envoy instance,
-but Envoy instance can not feedback upstream clusters it interested in spontaneously, in other
-words, Envoy instance only can receive the CDS passively.
+delta CDS provides the ability that the xDS management server can send incremental CDS to the Envoy
+instance, but Envoy instance can not feedback upstream clusters it interested in spontaneously, in
+other words, Envoy instance only can receive the CDS passively.
 
 In order to fix this issue, on-demand CDS uses the delta xDS protocol to allow a cluster configuration
 to be subscribed to and the necessary cluster configuration to be requested as needed. Instead
@@ -54,4 +54,4 @@ Typical use case
 Sometimes, there will be a large amount of broker instances provided for
 `Apache RocketMQ <http://rocketmq.apache.org/>`_ to produce/consume messages. Perhaps the size of
 SToW CDS configurations will be more than 1GB, so it is not practical to deliver the SToW CDS from the
-control panel every time, which will cause huge overhead. In this case, on-demand CDS is essential.
+management server every time, which will cause huge overhead. In this case, on-demand CDS is essential.
