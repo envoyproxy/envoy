@@ -333,8 +333,8 @@ bool ListenerManagerImpl::addOrUpdateListener(
           server_.messageValidationContext().staticValidationVisitor());
       return true;
     } else {
-      ENVOY_LOG(debug, "listener {} can not be added because currently only one ApiListener is "
-                       "allowed, and it can only be added via bootstrap configuration");
+      ENVOY_LOG(warn, "listener {} can not be added because currently only one ApiListener is "
+                      "allowed, and it can only be added via bootstrap configuration");
       return false;
     }
   }

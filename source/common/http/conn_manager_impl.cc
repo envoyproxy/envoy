@@ -290,15 +290,21 @@ void ConnectionManagerImpl::createCodec(Buffer::Instance& data) {
   ASSERT(!codec_);
   codec_ = config_.createCodec(read_callbacks_->connection(), data, *this);
 
-  if (codec_->protocol() == Protocol::Http3) {
+  switch (codec_->protocol()) {
+  case Protocol::Http3:
     stats_.named_.downstream_cx_http3_total_.inc();
     stats_.named_.downstream_cx_http3_active_.inc();
-  } else if (codec_->protocol() == Protocol::Http2) {
+    break;
+  case Protocol::Http2:
     stats_.named_.downstream_cx_http2_total_.inc();
     stats_.named_.downstream_cx_http2_active_.inc();
-  } else {
+  case Protocol::Http11:
+  case Protocol::Http10:
     stats_.named_.downstream_cx_http1_total_.inc();
     stats_.named_.downstream_cx_http1_active_.inc();
+    break;
+  default:
+    NOT_REACHED_GCOVR_EXCL_LINE;
   }
 }
 
