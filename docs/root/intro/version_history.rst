@@ -7,6 +7,7 @@ Version history
 * admin: added the ability to filter :ref:`/config_dump <operations_admin_interface_config_dump>`.
 * access log: added a :ref:`typed JSON logging mode <config_access_log_format_dictionaries>` to output access logs in JSON format with non-string values
 * access log: fixed UPSTREAM_LOCAL_ADDRESS :ref:`access log formatters <config_access_log_format>` to work for http requests
+* access log: added HOSTNAME.
 * api: remove all support for v1
 * api: added ability to specify `mode` for :ref:`Pipe <envoy_api_field_core.Pipe.mode>`.
 * buffer: remove old implementation
@@ -43,6 +44,8 @@ Version history
 * router: added support for :ref:`max_internal_redirects <envoy_api_field_route.RouteAction.max_internal_redirects>` for configurable maximum internal redirect hops.
 * router: skip the Location header when the response code is not a 201 or a 3xx.
 * router: added :ref:`auto_sni <envoy_api_field_core.UpstreamHttpProtocolOptions.auto_sni>` to support setting SNI to transport socket for new upstream connections based on the downstream HTTP host/authority header.
+* router: added support for HOSTNAME :ref:`header formatter
+  <config_http_conn_man_headers_custom_request_headers>`.
 * server: added the :option:`--disable-extensions` CLI option, to disable extensions at startup.
 * server: fixed a bug in config validation for configs with runtime layers.
 * server: added :ref:`workers_started <config_listener_manager_stats>` that indicates whether listeners have been fully initialized on workers.

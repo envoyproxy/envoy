@@ -93,5 +93,10 @@ SysCallIntResult OsSysCallsImpl::getsockname(int sockfd, sockaddr* addr, socklen
   return {rc, errno};
 }
 
+SysCallIntResult OsSysCallsImpl::gethostname(char* name, size_t length) {
+  const int rc = ::gethostname(name, length);
+  return {rc, errno};
+}
+
 } // namespace Api
 } // namespace Envoy

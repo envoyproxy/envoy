@@ -153,26 +153,11 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "grpc_mux_subscription_lib",
-    srcs = ["grpc_mux_subscription_impl.cc"],
-    hdrs = ["grpc_mux_subscription_impl.h"],
-    deps = [
-        "//include/envoy/config:grpc_mux_interface",
-        "//include/envoy/config:subscription_interface",
-        "//include/envoy/event:dispatcher_interface",
-        "//source/common/common:assert_lib",
-        "//source/common/common:minimal_logger_lib",
-        "//source/common/grpc:common_lib",
-        "//source/common/protobuf",
-    ],
-)
-
-envoy_cc_library(
     name = "grpc_subscription_lib",
+    srcs = ["grpc_subscription_impl.cc"],
     hdrs = ["grpc_subscription_impl.h"],
     deps = [
         ":grpc_mux_lib",
-        ":grpc_mux_subscription_lib",
         "//include/envoy/config:subscription_interface",
         "//include/envoy/event:dispatcher_interface",
         "//include/envoy/grpc:async_client_interface",
@@ -297,7 +282,6 @@ envoy_cc_library(
     deps = [
         ":delta_subscription_lib",
         ":filesystem_subscription_lib",
-        ":grpc_mux_subscription_lib",
         ":grpc_subscription_lib",
         ":http_subscription_lib",
         ":type_to_endpoint_lib",

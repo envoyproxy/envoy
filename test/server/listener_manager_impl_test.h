@@ -40,11 +40,13 @@ public:
 
 class ListenerManagerImplTest : public testing::Test {
 protected:
-  ListenerManagerImplTest() : api_(Api::createApiForTest()) {
+  ListenerManagerImplTest() : api_(Api::createApiForTest()) {}
+
+  void SetUp() override {
     ON_CALL(server_, api()).WillByDefault(ReturnRef(*api_));
     EXPECT_CALL(worker_factory_, createWorker_()).WillOnce(Return(worker_));
-    manager_ =
-        std::make_unique<ListenerManagerImpl>(server_, listener_factory_, worker_factory_, false);
+    manager_ = std::make_unique<ListenerManagerImpl>(server_, listener_factory_, worker_factory_,
+                                                     enable_dispatcher_stats_);
 
     // Use real filter loading by default.
     ON_CALL(listener_factory_, createNetworkFilterFactoryList(_, _))
@@ -230,6 +232,7 @@ protected:
   Network::Address::InstanceConstSharedPtr remote_address_;
   std::unique_ptr<Network::MockConnectionSocket> socket_;
   uint64_t listener_tag_{1};
+  bool enable_dispatcher_stats_{false};
 };
 
 } // namespace Server
