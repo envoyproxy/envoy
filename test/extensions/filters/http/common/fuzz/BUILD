@@ -29,6 +29,7 @@ envoy_cc_fuzz_test(
     deps = [
         ":filter_fuzz_proto_cc_proto",
         "//source/common/config:utility_lib",
+        "//source/common/config:version_converter_lib",
         "//source/common/protobuf:utility_lib",
         "//test/config:utility_lib",
         "//test/fuzz:utility_lib",

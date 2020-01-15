@@ -73,6 +73,9 @@ public:
 
 class MockAsyncClient : public RawAsyncClient {
 public:
+  MockAsyncClient();
+  ~MockAsyncClient();
+
   MOCK_METHOD6_T(sendRaw,
                  AsyncRequest*(absl::string_view service_full_name, absl::string_view method_name,
                                Buffer::InstancePtr&& request, RawAsyncRequestCallbacks& callbacks,
@@ -82,6 +85,8 @@ public:
                  RawAsyncStream*(absl::string_view service_full_name, absl::string_view method_name,
                                  RawAsyncStreamCallbacks& callbacks,
                                  const Http::AsyncClient::StreamOptions& options));
+
+  std::unique_ptr<testing::NiceMock<Grpc::MockAsyncRequest>> async_request_;
 };
 
 class MockAsyncClientFactory : public AsyncClientFactory {
