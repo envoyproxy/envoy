@@ -18,6 +18,7 @@ option java_multiple_files = true;
 
 // Configuration for a Wasm VM.
 // [#next-free-field: 6]
+// [#not-implemented-hide:] pending implementation.
 message VmConfig {
   option (udpa.annotations.versioning).previous_message_type = "envoy.config.wasm.v2alpha.VmConfig";
 
@@ -43,6 +44,7 @@ message VmConfig {
 
 // Base Configuration for Wasm Plugins e.g. filters and services.
 // [#next-free-field: 6]
+// [#not-implemented-hide:] pending implementation.
 message PluginConfig {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.wasm.v2alpha.PluginConfig";
@@ -70,6 +72,7 @@ message PluginConfig {
 // WasmService is configured as a built-in *envoy.wasm_service* :ref:`ServiceConfig
 // <envoy_api_msg_extensions.wasm.v3alpha.WasmService>`. This opaque configuration will be used to
 // create a Wasm Service.
+// [#not-implemented-hide:] pending implementation.
 message WasmService {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.wasm.v2alpha.WasmService";
