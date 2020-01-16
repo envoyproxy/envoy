@@ -146,6 +146,7 @@ envoy_cc_fuzz_test(
     corpus = "conn_manager_impl_corpus",
     deps = [
         ":conn_manager_impl_fuzz_proto_cc_proto",
+        "//include/envoy/request_id_utils:request_id_utils_interface",
         "//source/common/common:empty_string",
         "//source/common/http:conn_manager_lib",
         "//source/common/http:context_lib",
@@ -176,6 +177,7 @@ envoy_cc_test(
         "//include/envoy/access_log:access_log_interface",
         "//include/envoy/buffer:buffer_interface",
         "//include/envoy/event:dispatcher_interface",
+        "//include/envoy/request_id_utils:request_id_utils_interface",
         "//include/envoy/tracing:http_tracer_interface",
         "//source/common/access_log:access_log_formatter_lib",
         "//source/common/access_log:access_log_lib",
@@ -193,6 +195,7 @@ envoy_cc_test(
         "//source/common/upstream:upstream_includes",
         "//source/common/upstream:upstream_lib",
         "//source/extensions/access_loggers/file:file_access_log_lib",
+        "//source/extensions/request_id_utils/uuid:uuid_lib",
         "//source/server:drain_manager_lib",
         "//test/mocks:common_lib",
         "//test/mocks/access_log:access_log_mocks",
@@ -218,6 +221,7 @@ envoy_cc_test(
     name = "conn_manager_utility_test",
     srcs = ["conn_manager_utility_test.cc"],
     deps = [
+        "//include/envoy/request_id_utils:request_id_utils_interface",
         "//source/common/event:dispatcher_lib",
         "//source/common/http:conn_manager_lib",
         "//source/common/http:headers_lib",

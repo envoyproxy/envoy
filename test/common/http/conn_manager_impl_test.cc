@@ -8,6 +8,7 @@
 #include "envoy/buffer/buffer.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
+#include "envoy/request_id_utils/request_id_utils.h"
 #include "envoy/tracing/http_tracer.h"
 #include "envoy/type/tracing/v3/custom_tag.pb.h"
 #include "envoy/type/v3/percent.pb.h"
@@ -28,6 +29,7 @@
 #include "common/upstream/upstream_impl.h"
 
 #include "extensions/access_loggers/file/file_access_log_impl.h"
+#include "extensions/request_id_utils/uuid/uuid_impl.h"
 
 #include "test/mocks/access_log/mocks.h"
 #include "test/mocks/buffer/mocks.h"
@@ -94,7 +96,9 @@ public:
                "",
                fake_stats_},
         tracing_stats_{CONN_MAN_TRACING_STATS(POOL_COUNTER(fake_stats_))},
-        listener_stats_{CONN_MAN_LISTENER_STATS(POOL_COUNTER(fake_listener_stats_))} {
+        listener_stats_{CONN_MAN_LISTENER_STATS(POOL_COUNTER(fake_listener_stats_))},
+        request_id_utils_(RequestIDUtils::UtilitiesSharedPtr{
+            new Extensions::RequestIDUtils::UUIDUtils(random_)}) {
 
     http_context_.setTracer(tracer_);
 
@@ -343,6 +347,7 @@ public:
   const Http::Http1Settings& http1Settings() const override { return http1_settings_; }
   bool shouldNormalizePath() const override { return normalize_path_; }
   bool shouldMergeSlashes() const override { return merge_slashes_; }
+  RequestIDUtils::UtilitiesSharedPtr requestIDUtils() override { return request_id_utils_; }
 
   Envoy::Event::SimulatedTimeSystem test_time_;
   NiceMock<Router::MockRouteConfigProvider> route_config_provider_;
@@ -399,6 +404,7 @@ public:
   bool merge_slashes_ = false;
   NiceMock<Network::MockClientConnection> upstream_conn_; // for websocket tests
   NiceMock<Tcp::ConnectionPool::MockInstance> conn_pool_; // for websocket tests
+  RequestIDUtils::UtilitiesSharedPtr request_id_utils_;
 
   // TODO(mattklein123): Not all tests have been converted over to better setup. Convert the rest.
   MockResponseEncoder response_encoder_;

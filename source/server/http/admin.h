@@ -15,6 +15,7 @@
 #include "envoy/http/filter.h"
 #include "envoy/network/filter.h"
 #include "envoy/network/listen_socket.h"
+#include "envoy/request_id_utils/request_id_utils.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/server/admin.h"
 #include "envoy/server/instance.h"
@@ -104,6 +105,7 @@ public:
   }
 
   // Http::ConnectionManagerConfig
+  RequestIDUtils::UtilitiesSharedPtr requestIDUtils() override { return nullptr; }
   const std::list<AccessLog::InstanceSharedPtr>& accessLogs() override { return access_logs_; }
   Http::ServerConnectionPtr createCodec(Network::Connection& connection,
                                         const Buffer::Instance& data,

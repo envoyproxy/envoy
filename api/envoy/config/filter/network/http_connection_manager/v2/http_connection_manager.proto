@@ -29,7 +29,7 @@ option (udpa.annotations.file_migrate).move_to_package =
 // HTTP connection manager :ref:`configuration overview <config_http_conn_man>`.
 // [#extension: envoy.filters.network.http_connection_manager]
 
-// [#next-free-field: 36]
+// [#next-free-field: 37]
 message HttpConnectionManager {
   enum CodecType {
     // For every new connection, the connection manager will determine which
@@ -484,6 +484,10 @@ message HttpConnectionManager {
   // with `prefix` match set to `/dir`. Defaults to `false`. Note that slash merging is not part of
   // `HTTP spec <https://tools.ietf.org/html/rfc3986>` and is provided for convenience.
   bool merge_slashes = 33;
+
+  // The Name of the extension to use for request ID utilities. This includes operations such as
+  // generation, validation, and associated tracing operations.
+  string request_id_utils_name = 36;
 }
 
 message Rds {

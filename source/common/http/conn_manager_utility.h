@@ -53,7 +53,7 @@ public:
   static Network::Address::InstanceConstSharedPtr
   mutateRequestHeaders(HeaderMap& request_headers, Network::Connection& connection,
                        ConnectionManagerConfig& config, const Router::Config& route_config,
-                       Runtime::RandomGenerator& random, const LocalInfo::LocalInfo& local_info);
+                       const LocalInfo::LocalInfo& local_info);
 
   static void mutateResponseHeaders(HeaderMap& response_headers, const HeaderMap* request_headers,
                                     const std::string& via);

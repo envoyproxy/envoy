@@ -25,6 +25,9 @@
 #include "common/http/http3/well_known_names.h"
 #include "common/http/utility.h"
 #include "common/protobuf/utility.h"
+#include "common/request_id_utils/request_id_utils_impl.h"
+#include "common/router/rds_impl.h"
+#include "common/router/scoped_rds.h"
 #include "common/runtime/runtime_impl.h"
 #include "common/tracing/http_tracer_impl.h"
 
@@ -152,7 +155,8 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
     Server::Configuration::FactoryContext& context, Http::DateProvider& date_provider,
     Router::RouteConfigProviderManager& route_config_provider_manager,
     Config::ConfigProviderManager& scoped_routes_config_provider_manager)
-    : context_(context), stats_prefix_(fmt::format("http.{}.", config.stat_prefix())),
+    : request_id_utils(RequestIDUtils::RequestIDUtilsFactory::defaultInstance(context)),
+      context_(context), stats_prefix_(fmt::format("http.{}.", config.stat_prefix())),
       stats_(Http::ConnectionManagerImpl::generateStats(stats_prefix_, context_.scope())),
       tracing_stats_(
           Http::ConnectionManagerImpl::generateTracingStats(stats_prefix_, context_.scope())),
@@ -208,6 +212,13 @@ HttpConnectionManagerConfig::HttpConnectionManagerConfig(
     idle_timeout_ = std::chrono::hours(1);
   } else if (idle_timeout_.value().count() == 0) {
     idle_timeout_ = absl::nullopt;
+  }
+
+  // If we are provided a different request_id_utils implementation to use try and create a new
+  // instance of it.
+  if (!config.request_id_utils_name().empty()) {
+    request_id_utils =
+        RequestIDUtils::RequestIDUtilsFactory::byName(config.request_id_utils_name(), context);
   }
 
   // If scoped RDS is enabled, avoid creating a route config provider. Route config providers will

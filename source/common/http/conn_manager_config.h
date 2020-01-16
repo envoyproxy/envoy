@@ -3,6 +3,7 @@
 #include "envoy/config/config_provider.h"
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 #include "envoy/http/filter.h"
+#include "envoy/request_id_utils/request_id_utils.h"
 #include "envoy/router/rds.h"
 #include "envoy/stats/scope.h"
 #include "envoy/type/v3/percent.pb.h"
@@ -181,6 +182,11 @@ public:
       envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager;
 
   virtual ~ConnectionManagerConfig() = default;
+
+  /**
+   * @return RequestIDUtils::UtilitiesSharedPtr The request id utilities instance to use
+   */
+  virtual RequestIDUtils::UtilitiesSharedPtr requestIDUtils() PURE;
 
   /**
    *  @return const std::list<AccessLog::InstanceSharedPtr>& the access logs to write to.

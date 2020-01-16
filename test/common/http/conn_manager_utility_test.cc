@@ -1,6 +1,7 @@
 #include <string>
 
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
+#include "envoy/request_id_utils/request_id_utils.h"
 #include "envoy/type/v3/percent.pb.h"
 
 #include "common/http/conn_manager_utility.h"
@@ -52,6 +53,7 @@ public:
     return ServerConnectionPtr{createCodec_(connection, instance, callbacks)};
   }
 
+  MOCK_METHOD(RequestIDUtils::UtilitiesSharedPtr, requestIDUtils, ());
   MOCK_METHOD(const std::list<AccessLog::InstanceSharedPtr>&, accessLogs, ());
   MOCK_METHOD(ServerConnection*, createCodec_,
               (Network::Connection&, const Buffer::Instance&, ServerConnectionCallbacks&));

@@ -9,6 +9,7 @@
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/http/header_map.h"
 #include "envoy/http/protocol.h"
+#include "envoy/request_id_utils/request_id_utils.h"
 #include "envoy/ssl/connection.h"
 #include "envoy/stream_info/filter_state.h"
 #include "envoy/upstream/host_description.h"
@@ -520,6 +521,16 @@ public:
    * @return request headers.
    */
   virtual const Http::HeaderMap* getRequestHeaders() const PURE;
+
+  /**
+   * @param utils The requestID utils implementation this stream uses
+   */
+  virtual void setRequestIDUtils(RequestIDUtils::UtilitiesSharedPtr utils) PURE;
+
+  /**
+   * @return A shared pointer to the request ID utils for this stream
+   */
+  virtual RequestIDUtils::UtilitiesSharedPtr getRequestIDUtils() const PURE;
 };
 
 } // namespace StreamInfo

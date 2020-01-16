@@ -18,6 +18,7 @@ envoy_cc_library(
         "//include/envoy/http:filter_interface",
         "//include/envoy/network:filter_interface",
         "//include/envoy/network:listen_socket_interface",
+        "//include/envoy/request_id_utils:request_id_utils_interface",
         "//include/envoy/runtime:runtime_interface",
         "//include/envoy/server:admin_interface",
         "//include/envoy/server:hot_restart_interface",

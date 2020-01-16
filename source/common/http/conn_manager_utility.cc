@@ -58,8 +58,7 @@ ServerConnectionPtr ConnectionManagerUtility::autoCreateCodec(
 
 Network::Address::InstanceConstSharedPtr ConnectionManagerUtility::mutateRequestHeaders(
     HeaderMap& request_headers, Network::Connection& connection, ConnectionManagerConfig& config,
-    const Router::Config& route_config, Runtime::RandomGenerator& random,
-    const LocalInfo::LocalInfo& local_info) {
+    const Router::Config& route_config, const LocalInfo::LocalInfo& local_info) {
   // If this is a Upgrade request, do not remove the Connection and Upgrade headers,
   // as we forward them verbatim to the upstream hosts.
   if (Utility::isUpgrade(request_headers)) {
@@ -215,13 +214,15 @@ Network::Address::InstanceConstSharedPtr ConnectionManagerUtility::mutateRequest
     request_headers.setEnvoyExternalAddress(final_remote_address->ip()->addressAsString());
   }
 
+  auto rid_utils = config.requestIDUtils();
   // Generate x-request-id for all edge requests, or if there is none.
-  if (config.generateRequestId()) {
-    // TODO(PiotrSikora) PERF: Write UUID directly to the header map.
-    if ((!config.preserveExternalRequestId() && edge_request) || !request_headers.RequestId()) {
-      const std::string uuid = random.uuid();
-      ASSERT(!uuid.empty());
-      request_headers.setRequestId(uuid);
+  if (config.generateRequestId() && rid_utils != nullptr) {
+    // Unconditionally set a request ID if we are allowed to override it from
+    // the edge. Otherwise just ensure it is set.
+    if (!config.preserveExternalRequestId() && edge_request) {
+      config.requestIDUtils()->setRequestID(request_headers);
+    } else {
+      config.requestIDUtils()->ensureRequestID(request_headers);
     }
   }
 
@@ -234,15 +235,14 @@ void ConnectionManagerUtility::mutateTracingRequestHeader(HeaderMap& request_hea
                                                           Runtime::Loader& runtime,
                                                           ConnectionManagerConfig& config,
                                                           const Router::Route* route) {
-  if (!config.tracingConfig() || !request_headers.RequestId()) {
+  if (!config.tracingConfig()) {
     return;
   }
 
-  // TODO(dnoe): Migrate uuidModBy and others below to take string_view (#6580)
-  std::string x_request_id(request_headers.RequestId()->value().getStringView());
+  auto rid_utils = config.requestIDUtils();
   uint64_t result;
-  // Skip if x-request-id is corrupted.
-  if (!UuidUtils::uuidModBy(x_request_id, result, 10000)) {
+  // Skip if request-id is corrupted, or non-existent
+  if (rid_utils == nullptr || !rid_utils->modRequestIDBy(request_headers, result, 10000)) {
     return;
   }
 
@@ -260,23 +260,23 @@ void ConnectionManagerUtility::mutateTracingRequestHeader(HeaderMap& request_hea
   }
 
   // Do not apply tracing transformations if we are currently tracing.
-  if (UuidTraceStatus::NoTrace == UuidUtils::isTraceableUuid(x_request_id)) {
+  if (RequestIDUtils::TraceStatus::NoTrace ==
+      config.requestIDUtils()->getTraceStatus(request_headers)) {
     if (request_headers.ClientTraceId() &&
         runtime.snapshot().featureEnabled("tracing.client_enabled", *client_sampling)) {
-      UuidUtils::setTraceableUuid(x_request_id, UuidTraceStatus::Client);
+      config.requestIDUtils()->setTraceStatus(request_headers, RequestIDUtils::TraceStatus::Client);
     } else if (request_headers.EnvoyForceTrace()) {
-      UuidUtils::setTraceableUuid(x_request_id, UuidTraceStatus::Forced);
+      config.requestIDUtils()->setTraceStatus(request_headers, RequestIDUtils::TraceStatus::Forced);
     } else if (runtime.snapshot().featureEnabled("tracing.random_sampling", *random_sampling,
                                                  result)) {
-      UuidUtils::setTraceableUuid(x_request_id, UuidTraceStatus::Sampled);
+      config.requestIDUtils()->setTraceStatus(request_headers,
+                                              RequestIDUtils::TraceStatus::Sampled);
     }
   }
 
   if (!runtime.snapshot().featureEnabled("tracing.global_enabled", *overall_sampling, result)) {
-    UuidUtils::setTraceableUuid(x_request_id, UuidTraceStatus::NoTrace);
+    config.requestIDUtils()->setTraceStatus(request_headers, RequestIDUtils::TraceStatus::NoTrace);
   }
-
-  request_headers.setRequestId(x_request_id);
 }
 
 void ConnectionManagerUtility::mutateXfccRequestHeader(HeaderMap& request_headers,
@@ -384,6 +384,7 @@ void ConnectionManagerUtility::mutateResponseHeaders(HeaderMap& response_headers
   }
   response_headers.removeTransferEncoding();
 
+  // TODO(rossdylan): How we do implement this generically with RequestIDUtils?
   if (request_headers != nullptr && request_headers->EnvoyForceTrace() &&
       request_headers->RequestId()) {
     response_headers.setRequestId(request_headers->RequestId()->value().getStringView());

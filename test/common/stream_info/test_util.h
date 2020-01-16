@@ -205,6 +205,13 @@ public:
 
   const Http::HeaderMap* getRequestHeaders() const override { return request_headers_; }
 
+  void setRequestIDUtils(RequestIDUtils::UtilitiesSharedPtr utils) override {
+    request_id_utils_ = utils;
+  }
+  RequestIDUtils::UtilitiesSharedPtr getRequestIDUtils() const override {
+    return request_id_utils_;
+  }
+
   Event::TimeSystem& timeSystem() { return test_time_.timeSystem(); }
 
   SystemTime start_time_;
@@ -243,6 +250,7 @@ public:
   std::string upstream_transport_failure_reason_;
   const Http::HeaderMap* request_headers_{};
   Envoy::Event::SimulatedTimeSystem test_time_;
+  RequestIDUtils::UtilitiesSharedPtr request_id_utils_;
 };
 
 } // namespace Envoy

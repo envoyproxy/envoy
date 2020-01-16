@@ -1,6 +1,7 @@
 #pragma once
 
 #include "envoy/config/core/v3/base.pb.h"
+#include "envoy/request_id_utils/request_id_utils.h"
 #include "envoy/stream_info/stream_info.h"
 
 #include "common/stream_info/filter_state_impl.h"
@@ -89,6 +90,8 @@ public:
   MOCK_METHOD(const std::string&, upstreamTransportFailureReason, (), (const));
   MOCK_METHOD(void, setRequestHeaders, (const Http::HeaderMap&));
   MOCK_METHOD(const Http::HeaderMap*, getRequestHeaders, (), (const));
+  MOCK_METHOD(const RequestIDUtils::UtilitiesSharedPtr, getRequestIDUtils, ());
+  MOCK_METHOD(void, setRequestIDUtils, (RequestIDUtils::UtilitiesSharedPtr));
 
   std::shared_ptr<testing::NiceMock<Upstream::MockHostDescription>> host_{
       new testing::NiceMock<Upstream::MockHostDescription>()};

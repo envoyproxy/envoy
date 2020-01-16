@@ -531,6 +531,9 @@ ConnectionManagerImpl::ActiveStream::ActiveStream(ConnectionManagerImpl& connect
                connection_manager.config_.scopedRouteConfigProvider() == nullptr)),
          "Either routeConfigProvider or scopedRouteConfigProvider should be set in "
          "ConnectionManagerImpl.");
+
+  stream_info_.setRequestIDUtils(connection_manager.config_.requestIDUtils());
+
   if (connection_manager_.config_.isRoutable() &&
       connection_manager.config_.routeConfigProvider() != nullptr) {
     route_config_update_requester_ =
@@ -862,8 +865,7 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(RequestHeaderMapPtr&& he
     // Modify the downstream remote address depending on configuration and headers.
     stream_info_.setDownstreamRemoteAddress(ConnectionManagerUtility::mutateRequestHeaders(
         *request_headers_, connection_manager_.read_callbacks_->connection(),
-        connection_manager_.config_, *snapped_route_config_, connection_manager_.random_generator_,
-        connection_manager_.local_info_));
+        connection_manager_.config_, *snapped_route_config_, connection_manager_.local_info_));
   }
   ASSERT(stream_info_.downstreamRemoteAddress() != nullptr);
 

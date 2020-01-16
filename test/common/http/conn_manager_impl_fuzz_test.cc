@@ -13,6 +13,7 @@
 // * HTTP 1.0 special cases
 // * Fuzz config settings
 #include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
+#include "envoy/request_id_utils/request_id_utils.h"
 
 #include "common/common/empty_string.h"
 #include "common/http/conn_manager_impl.h"
@@ -88,6 +89,9 @@ public:
   }
 
   // Http::ConnectionManagerConfig
+
+  // TODO(rossdylan): Replace this nullptr with the uuid impl or mock impl
+  RequestIDUtils::UtilitiesSharedPtr requestIDUtils() override { return nullptr; }
   const std::list<AccessLog::InstanceSharedPtr>& accessLogs() override { return access_logs_; }
   ServerConnectionPtr createCodec(Network::Connection&, const Buffer::Instance&,
                                   ServerConnectionCallbacks&) override {
