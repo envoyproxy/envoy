@@ -10,12 +10,6 @@
 #include "v8-version.h"
 #include "wasm-api/wasm.hh"
 
-namespace v8 {
-namespace internal {
-extern bool FLAG_wasm_opt;
-} // namespace internal
-} // namespace v8
-
 uint32_t parseVarint(const byte_t*& pos, const byte_t* end) {
   uint32_t n = 0;
   uint32_t shift = 0;
@@ -142,9 +136,6 @@ wasm::vec<byte_t> stripWasmModule(const wasm::vec<byte_t>& module) {
 }
 
 wasm::vec<byte_t> serializeWasmModule(const char* path, const wasm::vec<byte_t>& content) {
-  // Enable Wasm optimizations.
-  v8::internal::FLAG_wasm_opt = true;
-
   const auto engine = wasm::Engine::make();
   if (engine == nullptr) {
     std::cerr << "ERROR: Failed to start V8." << std::endl;
