@@ -1,6 +1,6 @@
 #include "common/config/subscription_factory_impl.h"
 
-#include "envoy/config/core/v3alpha/config_source.pb.h"
+#include "envoy/config/core/v3/config_source.pb.h"
 
 #include "common/config/delta_subscription_impl.h"
 #include "common/config/filesystem_subscription_impl.h"
@@ -23,38 +23,36 @@ SubscriptionFactoryImpl::SubscriptionFactoryImpl(
       validation_visitor_(validation_visitor), api_(api) {}
 
 SubscriptionPtr SubscriptionFactoryImpl::subscriptionFromConfigSource(
-    const envoy::config::core::v3alpha::ConfigSource& config, absl::string_view type_url,
+    const envoy::config::core::v3::ConfigSource& config, absl::string_view type_url,
     Stats::Scope& scope, SubscriptionCallbacks& callbacks) {
   Config::Utility::checkLocalInfo(type_url, local_info_);
   std::unique_ptr<Subscription> result;
   SubscriptionStats stats = Utility::generateStats(scope);
 
   switch (config.config_source_specifier_case()) {
-  case envoy::config::core::v3alpha::ConfigSource::ConfigSourceSpecifierCase::kPath: {
+  case envoy::config::core::v3::ConfigSource::ConfigSourceSpecifierCase::kPath: {
     Utility::checkFilesystemSubscriptionBackingPath(config.path(), api_);
     return std::make_unique<Config::FilesystemSubscriptionImpl>(
         dispatcher_, config.path(), callbacks, stats, validation_visitor_, api_);
   }
-  case envoy::config::core::v3alpha::ConfigSource::ConfigSourceSpecifierCase::kApiConfigSource: {
-    const envoy::config::core::v3alpha::ApiConfigSource& api_config_source =
-        config.api_config_source();
+  case envoy::config::core::v3::ConfigSource::ConfigSourceSpecifierCase::kApiConfigSource: {
+    const envoy::config::core::v3::ApiConfigSource& api_config_source = config.api_config_source();
     Utility::checkApiConfigSourceSubscriptionBackingCluster(cm_.clusters(), api_config_source);
 
     switch (api_config_source.api_type()) {
-    case envoy::config::core::v3alpha::ApiConfigSource::
-        hidden_envoy_deprecated_UNSUPPORTED_REST_LEGACY:
+    case envoy::config::core::v3::ApiConfigSource::hidden_envoy_deprecated_UNSUPPORTED_REST_LEGACY:
       throw EnvoyException(
           "REST_LEGACY no longer a supported ApiConfigSource. "
           "Please specify an explicit supported api_type in the following config:\n" +
           config.DebugString());
-    case envoy::config::core::v3alpha::ApiConfigSource::REST:
+    case envoy::config::core::v3::ApiConfigSource::REST:
       return std::make_unique<HttpSubscriptionImpl>(
           local_info_, cm_, api_config_source.cluster_names()[0], dispatcher_, random_,
           Utility::apiConfigSourceRefreshDelay(api_config_source),
           Utility::apiConfigSourceRequestTimeout(api_config_source), restMethod(type_url), type_url,
           api_config_source.transport_api_version(), callbacks, stats,
           Utility::configSourceInitialFetchTimeout(config), validation_visitor_);
-    case envoy::config::core::v3alpha::ApiConfigSource::GRPC:
+    case envoy::config::core::v3::ApiConfigSource::GRPC:
       return std::make_unique<GrpcSubscriptionImpl>(
           std::make_shared<Config::GrpcMuxImpl>(
               local_info_,
@@ -66,7 +64,7 @@ SubscriptionPtr SubscriptionFactoryImpl::subscriptionFromConfigSource(
               api_config_source.set_node_on_first_message_only()),
           callbacks, stats, type_url, dispatcher_, Utility::configSourceInitialFetchTimeout(config),
           /*is_aggregated*/ false);
-    case envoy::config::core::v3alpha::ApiConfigSource::DELTA_GRPC: {
+    case envoy::config::core::v3::ApiConfigSource::DELTA_GRPC: {
       Utility::checkApiConfigSourceSubscriptionBackingCluster(cm_.clusters(), api_config_source);
       return std::make_unique<DeltaSubscriptionImpl>(
           std::make_shared<Config::NewGrpcMuxImpl>(
@@ -81,7 +79,7 @@ SubscriptionPtr SubscriptionFactoryImpl::subscriptionFromConfigSource(
       NOT_REACHED_GCOVR_EXCL_LINE;
     }
   }
-  case envoy::config::core::v3alpha::ConfigSource::ConfigSourceSpecifierCase::kAds: {
+  case envoy::config::core::v3::ConfigSource::ConfigSourceSpecifierCase::kAds: {
     if (cm_.adsMux()->isDelta()) {
       return std::make_unique<DeltaSubscriptionImpl>(
           cm_.adsMux(), type_url, callbacks, stats,

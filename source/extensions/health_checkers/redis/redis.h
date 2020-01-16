@@ -3,11 +3,11 @@
 #include <chrono>
 
 #include "envoy/api/api.h"
-#include "envoy/config/core/v3alpha/health_check.pb.h"
+#include "envoy/config/core/v3/health_check.pb.h"
 #include "envoy/config/health_checker/redis/v2/redis.pb.h"
-#include "envoy/data/core/v3alpha/health_check_event.pb.h"
-#include "envoy/extensions/filters/network/redis_proxy/v3alpha/redis_proxy.pb.h"
-#include "envoy/extensions/filters/network/redis_proxy/v3alpha/redis_proxy.pb.validate.h"
+#include "envoy/data/core/v3/health_check_event.pb.h"
+#include "envoy/extensions/filters/network/redis_proxy/v3/redis_proxy.pb.h"
+#include "envoy/extensions/filters/network/redis_proxy/v3/redis_proxy.pb.validate.h"
 
 #include "common/upstream/health_checker_base_impl.h"
 
@@ -26,7 +26,7 @@ namespace RedisHealthChecker {
 class RedisHealthChecker : public Upstream::HealthCheckerImplBase {
 public:
   RedisHealthChecker(
-      const Upstream::Cluster& cluster, const envoy::config::core::v3alpha::HealthCheck& config,
+      const Upstream::Cluster& cluster, const envoy::config::core::v3::HealthCheck& config,
       const envoy::config::health_checker::redis::v2::Redis& redis_config,
       Event::Dispatcher& dispatcher, Runtime::Loader& runtime, Runtime::RandomGenerator& random,
       Upstream::HealthCheckEventLoggerPtr&& event_logger, Api::Api& api,
@@ -44,8 +44,8 @@ public:
   }
 
 protected:
-  envoy::data::core::v3alpha::HealthCheckerType healthCheckerType() const override {
-    return envoy::data::core::v3alpha::REDIS;
+  envoy::data::core::v3::HealthCheckerType healthCheckerType() const override {
+    return envoy::data::core::v3::REDIS;
   }
 
 private:

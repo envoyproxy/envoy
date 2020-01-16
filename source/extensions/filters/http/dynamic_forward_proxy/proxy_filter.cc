@@ -1,7 +1,7 @@
 #include "extensions/filters/http/dynamic_forward_proxy/proxy_filter.h"
 
-#include "envoy/config/core/v3alpha/base.pb.h"
-#include "envoy/extensions/filters/http/dynamic_forward_proxy/v3alpha/dynamic_forward_proxy.pb.h"
+#include "envoy/config/core/v3/base.pb.h"
+#include "envoy/extensions/filters/http/dynamic_forward_proxy/v3/dynamic_forward_proxy.pb.h"
 
 #include "extensions/common/dynamic_forward_proxy/dns_cache.h"
 #include "extensions/filters/http/well_known_names.h"
@@ -21,8 +21,7 @@ using ResponseStrings = ConstSingleton<ResponseStringValues>;
 using LoadDnsCacheEntryStatus = Common::DynamicForwardProxy::DnsCache::LoadDnsCacheEntryStatus;
 
 ProxyFilterConfig::ProxyFilterConfig(
-    const envoy::extensions::filters::http::dynamic_forward_proxy::v3alpha::FilterConfig&
-        proto_config,
+    const envoy::extensions::filters::http::dynamic_forward_proxy::v3::FilterConfig& proto_config,
     Extensions::Common::DynamicForwardProxy::DnsCacheManagerFactory& cache_manager_factory,
     Upstream::ClusterManager& cluster_manager)
     : dns_cache_manager_(cache_manager_factory.get()),
@@ -30,7 +29,7 @@ ProxyFilterConfig::ProxyFilterConfig(
       cluster_manager_(cluster_manager) {}
 
 ProxyPerRouteConfig::ProxyPerRouteConfig(
-    const envoy::extensions::filters::http::dynamic_forward_proxy::v3alpha::PerRouteConfig& config)
+    const envoy::extensions::filters::http::dynamic_forward_proxy::v3::PerRouteConfig& config)
     : host_rewrite_(config.host_rewrite_literal()),
       host_rewrite_header_(Http::LowerCaseString(config.host_rewrite_header())) {}
 
@@ -67,7 +66,7 @@ Http::FilterHeadersStatus ProxyFilter::decodeHeaders(Http::HeaderMap& headers, b
 
   uint16_t default_port = 80;
   if (cluster_info_->transportSocketMatcher()
-          .resolve(envoy::config::core::v3alpha::Metadata())
+          .resolve(envoy::config::core::v3::Metadata())
           .factory_.implementsSecureTransport()) {
     default_port = 443;
   }

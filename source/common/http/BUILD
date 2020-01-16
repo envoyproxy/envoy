@@ -29,9 +29,9 @@ envoy_cc_library(
         "//source/common/router:router_lib",
         "//source/common/stream_info:stream_info_lib",
         "//source/common/tracing:http_tracer_lib",
-        "@envoy_api//envoy/config/core/v3alpha:pkg_cc_proto",
-        "@envoy_api//envoy/config/route/v3alpha:pkg_cc_proto",
-        "@envoy_api//envoy/type/v3alpha:pkg_cc_proto",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
+        "@envoy_api//envoy/type/v3:pkg_cc_proto",
     ],
 )
 
@@ -131,8 +131,8 @@ envoy_cc_library(
         "//include/envoy/http:filter_interface",
         "//include/envoy/router:rds_interface",
         "//source/common/network:utility_lib",
-        "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3alpha:pkg_cc_proto",
-        "@envoy_api//envoy/type/v3alpha:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
+        "@envoy_api//envoy/type/v3:pkg_cc_proto",
     ],
 )
 
@@ -200,8 +200,8 @@ envoy_cc_library(
         "//source/common/stats:timespan_lib",
         "//source/common/stream_info:stream_info_lib",
         "//source/common/tracing:http_tracer_lib",
-        "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3alpha:pkg_cc_proto",
-        "@envoy_api//envoy/type/v3alpha:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
+        "@envoy_api//envoy/type/v3:pkg_cc_proto",
     ],
 )
 
@@ -234,7 +234,7 @@ envoy_cc_library(
     deps = [
         ":utility_lib",
         "//include/envoy/http:hash_policy_interface",
-        "@envoy_api//envoy/config/route/v3alpha:pkg_cc_proto",
+        "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
     ],
 )
 
@@ -333,7 +333,7 @@ envoy_cc_library(
         "//source/common/json:json_loader_lib",
         "//source/common/network:utility_lib",
         "//source/common/protobuf:utility_lib",
-        "@envoy_api//envoy/config/core/v3alpha:pkg_cc_proto",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )
 
@@ -353,8 +353,8 @@ envoy_cc_library(
         "//source/common/common:utility_lib",
         "//source/common/protobuf:utility_lib",
         "//source/common/runtime:runtime_lib",
-        "@envoy_api//envoy/config/route/v3alpha:pkg_cc_proto",
-        "@envoy_api//envoy/type/v3alpha:pkg_cc_proto",
+        "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
+        "@envoy_api//envoy/type/v3:pkg_cc_proto",
     ],
 )
 

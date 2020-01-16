@@ -2,7 +2,7 @@
 
 #include <functional>
 
-#include "envoy/extensions/transport_sockets/tls/v3alpha/cert.pb.h"
+#include "envoy/extensions/transport_sockets/tls/v3/cert.pb.h"
 #include "envoy/secret/secret_provider.h"
 #include "envoy/ssl/certificate_validation_context_config.h"
 #include "envoy/ssl/tls_certificate_config.h"
@@ -13,16 +13,15 @@ namespace Secret {
 class TlsCertificateConfigProviderImpl : public TlsCertificateConfigProvider {
 public:
   TlsCertificateConfigProviderImpl(
-      const envoy::extensions::transport_sockets::tls::v3alpha::TlsCertificate& tls_certificate);
+      const envoy::extensions::transport_sockets::tls::v3::TlsCertificate& tls_certificate);
 
-  const envoy::extensions::transport_sockets::tls::v3alpha::TlsCertificate*
-  secret() const override {
+  const envoy::extensions::transport_sockets::tls::v3::TlsCertificate* secret() const override {
     return tls_certificate_.get();
   }
 
   Common::CallbackHandle* addValidationCallback(
-      std::function<void(
-          const envoy::extensions::transport_sockets::tls::v3alpha::TlsCertificate&)>) override {
+      std::function<void(const envoy::extensions::transport_sockets::tls::v3::TlsCertificate&)>)
+      override {
     return nullptr;
   }
 
@@ -36,17 +35,17 @@ class CertificateValidationContextConfigProviderImpl
     : public CertificateValidationContextConfigProvider {
 public:
   CertificateValidationContextConfigProviderImpl(
-      const envoy::extensions::transport_sockets::tls::v3alpha::CertificateValidationContext&
+      const envoy::extensions::transport_sockets::tls::v3::CertificateValidationContext&
           certificate_validation_context);
 
-  const envoy::extensions::transport_sockets::tls::v3alpha::CertificateValidationContext*
+  const envoy::extensions::transport_sockets::tls::v3::CertificateValidationContext*
   secret() const override {
     return certificate_validation_context_.get();
   }
 
   Common::CallbackHandle* addValidationCallback(
-      std::function<void(
-          const envoy::extensions::transport_sockets::tls::v3alpha::CertificateValidationContext&)>)
+      std::function<
+          void(const envoy::extensions::transport_sockets::tls::v3::CertificateValidationContext&)>)
       override {
     return nullptr;
   }
@@ -60,18 +59,17 @@ private:
 class TlsSessionTicketKeysConfigProviderImpl : public TlsSessionTicketKeysConfigProvider {
 public:
   TlsSessionTicketKeysConfigProviderImpl(
-      const envoy::extensions::transport_sockets::tls::v3alpha::TlsSessionTicketKeys&
+      const envoy::extensions::transport_sockets::tls::v3::TlsSessionTicketKeys&
           tls_session_ticket_keys);
 
-  const envoy::extensions::transport_sockets::tls::v3alpha::TlsSessionTicketKeys*
+  const envoy::extensions::transport_sockets::tls::v3::TlsSessionTicketKeys*
   secret() const override {
     return tls_session_ticket_keys_.get();
   }
 
   Common::CallbackHandle* addValidationCallback(
-      std::function<
-          void(const envoy::extensions::transport_sockets::tls::v3alpha::TlsSessionTicketKeys&)>)
-      override {
+      std::function<void(
+          const envoy::extensions::transport_sockets::tls::v3::TlsSessionTicketKeys&)>) override {
     return nullptr;
   }
 

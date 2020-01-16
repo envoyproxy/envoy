@@ -1,4 +1,4 @@
-#include "envoy/config/trace/v3alpha/trace.pb.h"
+#include "envoy/config/trace/v3/trace.pb.h"
 
 #include "common/network/utility.h"
 
@@ -158,19 +158,19 @@ TEST(ZipkinSpanBufferTest, ConstructBuffer) {
   const bool shared = true;
   const bool delay_allocation = true;
 
-  SpanBuffer buffer1(
-      envoy::config::trace::v3alpha::ZipkinConfig::hidden_envoy_deprecated_HTTP_JSON_V1, shared);
+  SpanBuffer buffer1(envoy::config::trace::v3::ZipkinConfig::hidden_envoy_deprecated_HTTP_JSON_V1,
+                     shared);
   expectSerializedBuffer(buffer1, delay_allocation, {expected1, expected2});
 
   // Prepare 3 slots, since we will add one more inside the `expectSerializedBuffer` function.
-  SpanBuffer buffer2(
-      envoy::config::trace::v3alpha::ZipkinConfig::hidden_envoy_deprecated_HTTP_JSON_V1, shared, 3);
+  SpanBuffer buffer2(envoy::config::trace::v3::ZipkinConfig::hidden_envoy_deprecated_HTTP_JSON_V1,
+                     shared, 3);
   expectSerializedBuffer(buffer2, !delay_allocation, {expected1, expected2});
 }
 
 TEST(ZipkinSpanBufferTest, SerializeSpan) {
   const bool shared = true;
-  SpanBuffer buffer1(envoy::config::trace::v3alpha::ZipkinConfig::HTTP_JSON, shared, 2);
+  SpanBuffer buffer1(envoy::config::trace::v3::ZipkinConfig::HTTP_JSON, shared, 2);
   buffer1.addSpan(createSpan({"cs"}, IpType::V4));
   EXPECT_THAT(wrapAsObject("[{"
                            R"("traceId":"0000000000000001",)"
@@ -187,7 +187,7 @@ TEST(ZipkinSpanBufferTest, SerializeSpan) {
                            "}]"),
               JsonStringEq(wrapAsObject(buffer1.serialize())));
 
-  SpanBuffer buffer1_v6(envoy::config::trace::v3alpha::ZipkinConfig::HTTP_JSON, shared, 2);
+  SpanBuffer buffer1_v6(envoy::config::trace::v3::ZipkinConfig::HTTP_JSON, shared, 2);
   buffer1_v6.addSpan(createSpan({"cs"}, IpType::V6));
   EXPECT_THAT(wrapAsObject("[{"
                            R"("traceId":"0000000000000001",)"
@@ -204,7 +204,7 @@ TEST(ZipkinSpanBufferTest, SerializeSpan) {
                            "}]"),
               JsonStringEq(wrapAsObject(buffer1_v6.serialize())));
 
-  SpanBuffer buffer2(envoy::config::trace::v3alpha::ZipkinConfig::HTTP_JSON, shared, 2);
+  SpanBuffer buffer2(envoy::config::trace::v3::ZipkinConfig::HTTP_JSON, shared, 2);
   buffer2.addSpan(createSpan({"cs", "sr"}, IpType::V4));
   EXPECT_THAT(wrapAsObject("[{"
                            R"("traceId":"0000000000000001",)"
@@ -234,7 +234,7 @@ TEST(ZipkinSpanBufferTest, SerializeSpan) {
                            "}]"),
               JsonStringEq(wrapAsObject(buffer2.serialize())));
 
-  SpanBuffer buffer3(envoy::config::trace::v3alpha::ZipkinConfig::HTTP_JSON, !shared, 2);
+  SpanBuffer buffer3(envoy::config::trace::v3::ZipkinConfig::HTTP_JSON, !shared, 2);
   buffer3.addSpan(createSpan({"cs", "sr"}, IpType::V4));
   EXPECT_THAT(wrapAsObject("[{"
                            R"("traceId":"0000000000000001",)"
@@ -263,7 +263,7 @@ TEST(ZipkinSpanBufferTest, SerializeSpan) {
                            "}]"),
               JsonStringEq(wrapAsObject(buffer3.serialize())));
 
-  SpanBuffer buffer4(envoy::config::trace::v3alpha::ZipkinConfig::HTTP_PROTO, shared, 2);
+  SpanBuffer buffer4(envoy::config::trace::v3::ZipkinConfig::HTTP_PROTO, shared, 2);
   buffer4.addSpan(createSpan({"cs"}, IpType::V4));
   EXPECT_EQ("{"
             R"("spans":[{)"
@@ -281,7 +281,7 @@ TEST(ZipkinSpanBufferTest, SerializeSpan) {
             "}]}",
             serializedMessageToJson<zipkin::proto3::ListOfSpans>(buffer4.serialize()));
 
-  SpanBuffer buffer4_v6(envoy::config::trace::v3alpha::ZipkinConfig::HTTP_PROTO, shared, 2);
+  SpanBuffer buffer4_v6(envoy::config::trace::v3::ZipkinConfig::HTTP_PROTO, shared, 2);
   buffer4_v6.addSpan(createSpan({"cs"}, IpType::V6));
   EXPECT_EQ("{"
             R"("spans":[{)"
@@ -299,7 +299,7 @@ TEST(ZipkinSpanBufferTest, SerializeSpan) {
             "}]}",
             serializedMessageToJson<zipkin::proto3::ListOfSpans>(buffer4_v6.serialize()));
 
-  SpanBuffer buffer5(envoy::config::trace::v3alpha::ZipkinConfig::HTTP_PROTO, shared, 2);
+  SpanBuffer buffer5(envoy::config::trace::v3::ZipkinConfig::HTTP_PROTO, shared, 2);
   buffer5.addSpan(createSpan({"cs", "sr"}, IpType::V4));
   EXPECT_EQ("{"
             R"("spans":[{)"
@@ -330,7 +330,7 @@ TEST(ZipkinSpanBufferTest, SerializeSpan) {
             "}]}",
             serializedMessageToJson<zipkin::proto3::ListOfSpans>(buffer5.serialize()));
 
-  SpanBuffer buffer6(envoy::config::trace::v3alpha::ZipkinConfig::HTTP_PROTO, !shared, 2);
+  SpanBuffer buffer6(envoy::config::trace::v3::ZipkinConfig::HTTP_PROTO, !shared, 2);
   buffer6.addSpan(createSpan({"cs", "sr"}, IpType::V4));
   EXPECT_EQ("{"
             R"("spans":[{)"

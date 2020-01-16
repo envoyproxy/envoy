@@ -184,10 +184,10 @@ void IntegrationTestServer::threadRoutine(
 void IntegrationTestServer::onRuntimeCreated() {
   // TODO(alyssawilk) improve this.
   Runtime::LoaderSingleton::getExisting()->mergeValues(
-      {{"envoy.deprecated_features:envoy.config.route.v3alpha.CorsPolicy."
+      {{"envoy.deprecated_features:envoy.config.route.v3.CorsPolicy."
         "hidden_envoy_deprecated_enabled",
         "true"},
-       {"envoy.deprecated_features:envoy.config.route.v3alpha.CorsPolicy.hidden_envoy_deprecated_"
+       {"envoy.deprecated_features:envoy.config.route.v3.CorsPolicy.hidden_envoy_deprecated_"
         "allow_origin",
         "true"}});
 }

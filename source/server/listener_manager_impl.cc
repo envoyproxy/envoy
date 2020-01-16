@@ -2,11 +2,11 @@
 
 #include <algorithm>
 
-#include "envoy/admin/v3alpha/config_dump.pb.h"
-#include "envoy/config/core/v3alpha/address.pb.h"
-#include "envoy/config/core/v3alpha/base.pb.h"
-#include "envoy/config/listener/v3alpha/listener.pb.h"
-#include "envoy/config/listener/v3alpha/listener_components.pb.h"
+#include "envoy/admin/v3/config_dump.pb.h"
+#include "envoy/config/core/v3/address.pb.h"
+#include "envoy/config/core/v3/base.pb.h"
+#include "envoy/config/listener/v3/listener.pb.h"
+#include "envoy/config/listener/v3/listener_components.pb.h"
 #include "envoy/registry/registry.h"
 #include "envoy/server/active_udp_listener_config.h"
 #include "envoy/server/transport_socket_config.h"
@@ -47,9 +47,9 @@ std::string toString(Network::Address::SocketType socket_type) {
 
 // Finds and returns the DynamicListener for the name provided from listener_map, creating and
 // inserting one if necessary.
-envoy::admin::v3alpha::ListenersConfigDump::DynamicListener* getOrCreateDynamicListener(
-    const std::string& name, envoy::admin::v3alpha::ListenersConfigDump& dump,
-    absl::flat_hash_map<std::string, envoy::admin::v3alpha::ListenersConfigDump::DynamicListener*>&
+envoy::admin::v3::ListenersConfigDump::DynamicListener* getOrCreateDynamicListener(
+    const std::string& name, envoy::admin::v3::ListenersConfigDump& dump,
+    absl::flat_hash_map<std::string, envoy::admin::v3::ListenersConfigDump::DynamicListener*>&
         listener_map) {
 
   auto it = listener_map.find(name);
@@ -64,7 +64,7 @@ envoy::admin::v3alpha::ListenersConfigDump::DynamicListener* getOrCreateDynamicL
 
 // Given a listener, dumps the version info, update time and configuration into the
 // DynamicListenerState provided.
-void fillState(envoy::admin::v3alpha::ListenersConfigDump::DynamicListenerState& state,
+void fillState(envoy::admin::v3::ListenersConfigDump::DynamicListenerState& state,
                const ListenerImpl& listener) {
   state.set_version_info(listener.versionInfo());
   state.mutable_listener()->PackFrom(API_RECOVER_ORIGINAL(listener.config()));
@@ -83,7 +83,7 @@ bool ListenSocketCreationParams::operator!=(const ListenSocketCreationParams& rh
 }
 
 std::vector<Network::FilterFactoryCb> ProdListenerComponentFactory::createNetworkFilterFactoryList_(
-    const Protobuf::RepeatedPtrField<envoy::config::listener::v3alpha::Filter>& filters,
+    const Protobuf::RepeatedPtrField<envoy::config::listener::v3::Filter>& filters,
     Server::Configuration::FilterChainFactoryContext& filter_chain_factory_context) {
   std::vector<Network::FilterFactoryCb> ret;
   for (ssize_t i = 0; i < filters.size(); i++) {
@@ -117,7 +117,7 @@ std::vector<Network::FilterFactoryCb> ProdListenerComponentFactory::createNetwor
 
 std::vector<Network::ListenerFilterFactoryCb>
 ProdListenerComponentFactory::createListenerFilterFactoryList_(
-    const Protobuf::RepeatedPtrField<envoy::config::listener::v3alpha::ListenerFilter>& filters,
+    const Protobuf::RepeatedPtrField<envoy::config::listener::v3::ListenerFilter>& filters,
     Configuration::ListenerFactoryContext& context) {
   std::vector<Network::ListenerFilterFactoryCb> ret;
   for (ssize_t i = 0; i < filters.size(); i++) {
@@ -145,7 +145,7 @@ ProdListenerComponentFactory::createListenerFilterFactoryList_(
 
 std::vector<Network::UdpListenerFilterFactoryCb>
 ProdListenerComponentFactory::createUdpListenerFilterFactoryList_(
-    const Protobuf::RepeatedPtrField<envoy::config::listener::v3alpha::ListenerFilter>& filters,
+    const Protobuf::RepeatedPtrField<envoy::config::listener::v3::ListenerFilter>& filters,
     Configuration::ListenerFactoryContext& context) {
   std::vector<Network::UdpListenerFilterFactoryCb> ret;
   for (ssize_t i = 0; i < filters.size(); i++) {
@@ -231,7 +231,7 @@ Network::SocketSharedPtr ProdListenerComponentFactory::createListenSocket(
 }
 
 DrainManagerPtr ProdListenerComponentFactory::createDrainManager(
-    envoy::config::listener::v3alpha::Listener::DrainType drain_type) {
+    envoy::config::listener::v3::Listener::DrainType drain_type) {
   return DrainManagerPtr{new DrainManagerImpl(server_, drain_type)};
 }
 
@@ -251,11 +251,11 @@ ListenerManagerImpl::ListenerManagerImpl(Instance& server,
 }
 
 ProtobufTypes::MessagePtr ListenerManagerImpl::dumpListenerConfigs() {
-  auto config_dump = std::make_unique<envoy::admin::v3alpha::ListenersConfigDump>();
+  auto config_dump = std::make_unique<envoy::admin::v3::ListenersConfigDump>();
   config_dump->set_version_info(lds_api_ != nullptr ? lds_api_->versionInfo() : "");
 
-  using DynamicListener = envoy::admin::v3alpha::ListenersConfigDump::DynamicListener;
-  using DynamicListenerState = envoy::admin::v3alpha::ListenersConfigDump::DynamicListenerState;
+  using DynamicListener = envoy::admin::v3::ListenersConfigDump::DynamicListener;
+  using DynamicListenerState = envoy::admin::v3::ListenersConfigDump::DynamicListenerState;
   absl::flat_hash_map<std::string, DynamicListener*> listener_map;
 
   for (const auto& listener : active_listeners_) {
@@ -301,7 +301,7 @@ ProtobufTypes::MessagePtr ListenerManagerImpl::dumpListenerConfigs() {
     DynamicListener* dynamic_listener =
         getOrCreateDynamicListener(state_and_name.first, *config_dump, listener_map);
 
-    const envoy::admin::v3alpha::UpdateFailureState& state = *state_and_name.second;
+    const envoy::admin::v3::UpdateFailureState& state = *state_and_name.second;
     dynamic_listener->mutable_error_state()->CopyFrom(state);
   }
 
@@ -317,9 +317,8 @@ ListenerManagerStats ListenerManagerImpl::generateStats(Stats::Scope& scope) {
   return {ALL_LISTENER_MANAGER_STATS(POOL_COUNTER(scope), POOL_GAUGE(scope))};
 }
 
-bool ListenerManagerImpl::addOrUpdateListener(
-    const envoy::config::listener::v3alpha::Listener& config, const std::string& version_info,
-    bool added_via_api) {
+bool ListenerManagerImpl::addOrUpdateListener(const envoy::config::listener::v3::Listener& config,
+                                              const std::string& version_info, bool added_via_api) {
   std::string name;
   if (!config.name().empty()) {
     name = config.name();
@@ -345,14 +344,14 @@ bool ListenerManagerImpl::addOrUpdateListener(
 }
 
 bool ListenerManagerImpl::addOrUpdateListenerInternal(
-    const envoy::config::listener::v3alpha::Listener& config, const std::string& version_info,
+    const envoy::config::listener::v3::Listener& config, const std::string& version_info,
     bool added_via_api, const std::string& name) {
 
   if (listenersStopped(config)) {
     ENVOY_LOG(
         debug,
         "listener {} can not be added because listeners in the traffic direction {} are stopped",
-        name, envoy::config::core::v3alpha::TrafficDirection_Name(config.traffic_direction()));
+        name, envoy::config::core::v3::TrafficDirection_Name(config.traffic_direction()));
     return false;
   }
 
@@ -734,7 +733,7 @@ void ListenerManagerImpl::stopListeners(StopListenersType stop_listeners_type) {
   stop_listeners_type_ = stop_listeners_type;
   for (Network::ListenerConfig& listener : listeners()) {
     if (stop_listeners_type != StopListenersType::InboundOnly ||
-        listener.direction() == envoy::config::core::v3alpha::INBOUND) {
+        listener.direction() == envoy::config::core::v3::INBOUND) {
       ENVOY_LOG(debug, "begin stop listener: name={}", listener.name());
       auto existing_warming_listener = getListenerByName(warming_listeners_, listener.name());
       // Destroy a warming listener directly.
@@ -791,14 +790,14 @@ ListenerFilterChainFactoryBuilder::ListenerFilterChainFactoryBuilder(
       factory_context_(factory_context) {}
 
 std::unique_ptr<Network::FilterChain> ListenerFilterChainFactoryBuilder::buildFilterChain(
-    const envoy::config::listener::v3alpha::FilterChain& filter_chain,
+    const envoy::config::listener::v3::FilterChain& filter_chain,
     FilterChainFactoryContextCreator& context_creator) const {
   return buildFilterChainInternal(filter_chain,
                                   context_creator.createFilterChainFactoryContext(&filter_chain));
 }
 
 std::unique_ptr<Network::FilterChain> ListenerFilterChainFactoryBuilder::buildFilterChainInternal(
-    const envoy::config::listener::v3alpha::FilterChain& filter_chain,
+    const envoy::config::listener::v3::FilterChain& filter_chain,
     Configuration::FilterChainFactoryContext& filter_chain_factory_context) const {
   // If the cluster doesn't have transport socket configured, then use the default "raw_buffer"
   // transport socket or BoringSSL-based "tls" transport socket if TLS settings are configured.
@@ -830,7 +829,7 @@ std::unique_ptr<Network::FilterChain> ListenerFilterChainFactoryBuilder::buildFi
 }
 
 Network::ListenSocketFactorySharedPtr ListenerManagerImpl::createListenSocketFactory(
-    const envoy::config::core::v3alpha::Address& proto_address, ListenerImpl& listener,
+    const envoy::config::core::v3::Address& proto_address, ListenerImpl& listener,
     bool reuse_port) {
   Network::Address::SocketType socket_type =
       Network::Utility::protobufAddressSocketType(proto_address);

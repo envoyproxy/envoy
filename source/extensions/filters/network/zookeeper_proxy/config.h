@@ -1,7 +1,7 @@
 #pragma once
 
-#include "envoy/extensions/filters/network/zookeeper_proxy/v3alpha/zookeeper_proxy.pb.h"
-#include "envoy/extensions/filters/network/zookeeper_proxy/v3alpha/zookeeper_proxy.pb.validate.h"
+#include "envoy/extensions/filters/network/zookeeper_proxy/v3/zookeeper_proxy.pb.h"
+#include "envoy/extensions/filters/network/zookeeper_proxy/v3/zookeeper_proxy.pb.validate.h"
 
 #include "extensions/filters/network/common/factory_base.h"
 #include "extensions/filters/network/well_known_names.h"
@@ -17,14 +17,13 @@ namespace ZooKeeperProxy {
  */
 class ZooKeeperConfigFactory
     : public Common::FactoryBase<
-          envoy::extensions::filters::network::zookeeper_proxy::v3alpha::ZooKeeperProxy> {
+          envoy::extensions::filters::network::zookeeper_proxy::v3::ZooKeeperProxy> {
 public:
   ZooKeeperConfigFactory() : FactoryBase(NetworkFilterNames::get().ZooKeeperProxy) {}
 
 private:
   Network::FilterFactoryCb createFilterFactoryFromProtoTyped(
-      const envoy::extensions::filters::network::zookeeper_proxy::v3alpha::ZooKeeperProxy&
-          proto_config,
+      const envoy::extensions::filters::network::zookeeper_proxy::v3::ZooKeeperProxy& proto_config,
       Server::Configuration::FactoryContext& context) override;
 };
 

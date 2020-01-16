@@ -1,7 +1,7 @@
 #include "extensions/filters/network/client_ssl_auth/config.h"
 
-#include "envoy/extensions/filters/network/client_ssl_auth/v3alpha/client_ssl_auth.pb.h"
-#include "envoy/extensions/filters/network/client_ssl_auth/v3alpha/client_ssl_auth.pb.validate.h"
+#include "envoy/extensions/filters/network/client_ssl_auth/v3/client_ssl_auth.pb.h"
+#include "envoy/extensions/filters/network/client_ssl_auth/v3/client_ssl_auth.pb.validate.h"
 #include "envoy/network/connection.h"
 #include "envoy/registry/registry.h"
 
@@ -13,8 +13,7 @@ namespace NetworkFilters {
 namespace ClientSslAuth {
 
 Network::FilterFactoryCb ClientSslAuthConfigFactory::createFilterFactoryFromProtoTyped(
-    const envoy::extensions::filters::network::client_ssl_auth::v3alpha::ClientSSLAuth&
-        proto_config,
+    const envoy::extensions::filters::network::client_ssl_auth::v3::ClientSSLAuth& proto_config,
     Server::Configuration::FactoryContext& context) {
   ASSERT(!proto_config.auth_api_cluster().empty());
   ASSERT(!proto_config.stat_prefix().empty());

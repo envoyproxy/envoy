@@ -1,4 +1,4 @@
-#include "envoy/extensions/filters/network/http_connection_manager/v3alpha/http_connection_manager.pb.h"
+#include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 
 #include "test/integration/h1_fuzz.h"
 
@@ -10,8 +10,9 @@ void H1FuzzIntegrationTest::initialize() {
   const std::string prefix("/");
   const Http::Code status(Http::Code::OK);
   config_helper_.addConfigModifier(
-      [&file_path, &prefix](envoy::extensions::filters::network::http_connection_manager::v3alpha::
-                                HttpConnectionManager& hcm) -> void {
+      [&file_path, &prefix](
+          envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+              hcm) -> void {
         auto* route_config = hcm.mutable_route_config();
         // adding direct response mode to the default route
         auto* default_route =

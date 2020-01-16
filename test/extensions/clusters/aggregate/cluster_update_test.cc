@@ -1,6 +1,6 @@
-#include "envoy/config/bootstrap/v3alpha/bootstrap.pb.h"
-#include "envoy/extensions/clusters/aggregate/v3alpha/cluster.pb.h"
-#include "envoy/extensions/clusters/aggregate/v3alpha/cluster.pb.validate.h"
+#include "envoy/config/bootstrap/v3/bootstrap.pb.h"
+#include "envoy/extensions/clusters/aggregate/v3/cluster.pb.h"
+#include "envoy/extensions/clusters/aggregate/v3/cluster.pb.validate.h"
 
 #include "common/singleton/manager_impl.h"
 #include "common/upstream/cluster_factory_impl.h"
@@ -23,8 +23,8 @@ namespace Extensions {
 namespace Clusters {
 namespace Aggregate {
 
-envoy::config::bootstrap::v3alpha::Bootstrap parseBootstrapFromV2Yaml(const std::string& yaml) {
-  envoy::config::bootstrap::v3alpha::Bootstrap bootstrap;
+envoy::config::bootstrap::v3::Bootstrap parseBootstrapFromV2Yaml(const std::string& yaml) {
+  envoy::config::bootstrap::v3::Bootstrap bootstrap;
   TestUtility::loadFromYaml(yaml, bootstrap);
   return bootstrap;
 }

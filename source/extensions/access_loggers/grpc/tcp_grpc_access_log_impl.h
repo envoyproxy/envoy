@@ -3,7 +3,7 @@
 #include <unordered_map>
 #include <vector>
 
-#include "envoy/extensions/access_loggers/grpc/v3alpha/als.pb.h"
+#include "envoy/extensions/access_loggers/grpc/v3/als.pb.h"
 #include "envoy/grpc/async_client.h"
 #include "envoy/grpc/async_client_manager.h"
 #include "envoy/local_info/local_info.h"
@@ -28,7 +28,7 @@ namespace TcpGrpc {
 class TcpGrpcAccessLog : public Common::ImplBase {
 public:
   TcpGrpcAccessLog(AccessLog::FilterPtr&& filter,
-                   envoy::extensions::access_loggers::grpc::v3alpha::TcpGrpcAccessLogConfig config,
+                   envoy::extensions::access_loggers::grpc::v3::TcpGrpcAccessLogConfig config,
                    ThreadLocal::SlotAllocator& tls,
                    GrpcCommon::GrpcAccessLoggerCacheSharedPtr access_logger_cache);
 
@@ -47,7 +47,7 @@ private:
                const Http::HeaderMap& response_trailers,
                const StreamInfo::StreamInfo& stream_info) override;
 
-  const envoy::extensions::access_loggers::grpc::v3alpha::TcpGrpcAccessLogConfig config_;
+  const envoy::extensions::access_loggers::grpc::v3::TcpGrpcAccessLogConfig config_;
   const ThreadLocal::SlotPtr tls_slot_;
   const GrpcCommon::GrpcAccessLoggerCacheSharedPtr access_logger_cache_;
 };

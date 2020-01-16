@@ -1,7 +1,7 @@
 #include "extensions/filters/http/fault/config.h"
 
-#include "envoy/extensions/filters/http/fault/v3alpha/fault.pb.h"
-#include "envoy/extensions/filters/http/fault/v3alpha/fault.pb.validate.h"
+#include "envoy/extensions/filters/http/fault/v3/fault.pb.h"
+#include "envoy/extensions/filters/http/fault/v3/fault.pb.validate.h"
 #include "envoy/registry/registry.h"
 
 #include "extensions/filters/http/fault/fault_filter.h"
@@ -12,7 +12,7 @@ namespace HttpFilters {
 namespace Fault {
 
 Http::FilterFactoryCb FaultFilterFactory::createFilterFactoryFromProtoTyped(
-    const envoy::extensions::filters::http::fault::v3alpha::HTTPFault& config,
+    const envoy::extensions::filters::http::fault::v3::HTTPFault& config,
     const std::string& stats_prefix, Server::Configuration::FactoryContext& context) {
   FaultFilterConfigSharedPtr filter_config(new FaultFilterConfig(
       config, context.runtime(), stats_prefix, context.scope(), context.timeSource()));
@@ -23,7 +23,7 @@ Http::FilterFactoryCb FaultFilterFactory::createFilterFactoryFromProtoTyped(
 
 Router::RouteSpecificFilterConfigConstSharedPtr
 FaultFilterFactory::createRouteSpecificFilterConfigTyped(
-    const envoy::extensions::filters::http::fault::v3alpha::HTTPFault& config,
+    const envoy::extensions::filters::http::fault::v3::HTTPFault& config,
     Server::Configuration::ServerFactoryContext&, ProtobufMessage::ValidationVisitor&) {
   return std::make_shared<const Fault::FaultSettings>(config);
 }

@@ -2,9 +2,9 @@
 #include <memory>
 #include <string>
 
-#include "envoy/config/route/v3alpha/route.pb.h"
-#include "envoy/config/route/v3alpha/route_components.pb.h"
-#include "envoy/service/discovery/v3alpha/discovery.pb.h"
+#include "envoy/config/route/v3/route.pb.h"
+#include "envoy/config/route/v3/route_components.pb.h"
+#include "envoy/service/discovery/v3/discovery.pb.h"
 #include "envoy/stats/scope.h"
 
 #include "common/config/utility.h"
@@ -44,22 +44,21 @@ vhds:
 )EOF";
   }
 
-  envoy::config::route::v3alpha::VirtualHost buildVirtualHost(const std::string& name,
-                                                              const std::string& domain) {
-    return TestUtility::parseYaml<envoy::config::route::v3alpha::VirtualHost>(fmt::format(R"EOF(
+  envoy::config::route::v3::VirtualHost buildVirtualHost(const std::string& name,
+                                                         const std::string& domain) {
+    return TestUtility::parseYaml<envoy::config::route::v3::VirtualHost>(fmt::format(R"EOF(
       name: {}
       domains: [{}]
       routes:
       - match: {{ prefix: "/" }}
         route: {{ cluster: "my_service" }}
     )EOF",
-                                                                                          name,
-                                                                                          domain));
+                                                                                     name, domain));
   }
 
-  Protobuf::RepeatedPtrField<envoy::service::discovery::v3alpha::Resource> buildAddedResources(
-      const std::vector<envoy::config::route::v3alpha::VirtualHost>& added_or_updated) {
-    Protobuf::RepeatedPtrField<envoy::service::discovery::v3alpha::Resource> to_ret;
+  Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource>
+  buildAddedResources(const std::vector<envoy::config::route::v3::VirtualHost>& added_or_updated) {
+    Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource> to_ret;
 
     for (const auto& vhost : added_or_updated) {
       auto* resource = to_ret.Add();
@@ -76,7 +75,7 @@ vhds:
     return Protobuf::RepeatedPtrField<std::string>{removed.begin(), removed.end()};
   }
   RouteConfigUpdatePtr
-  makeRouteConfigUpdate(const envoy::config::route::v3alpha::RouteConfiguration& rc) {
+  makeRouteConfigUpdate(const envoy::config::route::v3::RouteConfiguration& rc) {
     RouteConfigUpdatePtr config_update_info = std::make_unique<RouteConfigUpdateReceiverImpl>(
         factory_context_.timeSource(), factory_context_.messageValidationVisitor());
     config_update_info->onRdsUpdate(rc, "1");
@@ -96,8 +95,7 @@ vhds:
 // verify that api_type: DELTA_GRPC passes validation
 TEST_F(VhdsTest, VhdsInstantiationShouldSucceedWithDELTA_GRPC) {
   const auto route_config =
-      TestUtility::parseYaml<envoy::config::route::v3alpha::RouteConfiguration>(
-          default_vhds_config_);
+      TestUtility::parseYaml<envoy::config::route::v3::RouteConfiguration>(default_vhds_config_);
   RouteConfigUpdatePtr config_update_info = makeRouteConfigUpdate(route_config);
 
   EXPECT_NO_THROW(VhdsSubscription(config_update_info, factory_context_, context_, providers_));
@@ -106,7 +104,7 @@ TEST_F(VhdsTest, VhdsInstantiationShouldSucceedWithDELTA_GRPC) {
 // verify that api_type: GRPC fails validation
 TEST_F(VhdsTest, VhdsInstantiationShouldFailWithoutDELTA_GRPC) {
   const auto route_config =
-      TestUtility::parseYaml<envoy::config::route::v3alpha::RouteConfiguration>(R"EOF(
+      TestUtility::parseYaml<envoy::config::route::v3::RouteConfiguration>(R"EOF(
 name: my_route
 vhds:
   config_source:
@@ -125,8 +123,7 @@ vhds:
 // verify addition/updating of virtual hosts
 TEST_F(VhdsTest, VhdsAddsVirtualHosts) {
   const auto route_config =
-      TestUtility::parseYaml<envoy::config::route::v3alpha::RouteConfiguration>(
-          default_vhds_config_);
+      TestUtility::parseYaml<envoy::config::route::v3::RouteConfiguration>(default_vhds_config_);
   RouteConfigUpdatePtr config_update_info = makeRouteConfigUpdate(route_config);
 
   VhdsSubscription subscription(config_update_info, factory_context_, context_, providers_);
@@ -146,7 +143,7 @@ TEST_F(VhdsTest, VhdsAddsVirtualHosts) {
 // verify that an RDS update of virtual hosts leaves VHDS virtual hosts intact
 TEST_F(VhdsTest, RdsUpdatesVirtualHosts) {
   const auto route_config =
-      TestUtility::parseYaml<envoy::config::route::v3alpha::RouteConfiguration>(R"EOF(
+      TestUtility::parseYaml<envoy::config::route::v3::RouteConfiguration>(R"EOF(
 name: my_route
 virtual_hosts:
 - name: vhost_rds1
@@ -163,7 +160,7 @@ vhds:
           cluster_name: xds_cluster
   )EOF");
   const auto updated_route_config =
-      TestUtility::parseYaml<envoy::config::route::v3alpha::RouteConfiguration>(R"EOF(
+      TestUtility::parseYaml<envoy::config::route::v3::RouteConfiguration>(R"EOF(
 name: my_route
 virtual_hosts:
 - name: vhost_rds1
@@ -214,13 +211,12 @@ vhds:
 // verify vhds validates VirtualHosts in added_resources
 TEST_F(VhdsTest, VhdsValidatesAddedVirtualHosts) {
   const auto route_config =
-      TestUtility::parseYaml<envoy::config::route::v3alpha::RouteConfiguration>(
-          default_vhds_config_);
+      TestUtility::parseYaml<envoy::config::route::v3::RouteConfiguration>(default_vhds_config_);
   RouteConfigUpdatePtr config_update_info = makeRouteConfigUpdate(route_config);
 
   VhdsSubscription subscription(config_update_info, factory_context_, context_, providers_);
 
-  auto vhost = TestUtility::parseYaml<envoy::config::route::v3alpha::VirtualHost>(R"EOF(
+  auto vhost = TestUtility::parseYaml<envoy::config::route::v3::VirtualHost>(R"EOF(
         name: invalid_vhost
         domains: []
         routes:

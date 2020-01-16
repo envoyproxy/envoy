@@ -6,7 +6,7 @@
 #include "envoy/common/exception.h"
 #include "envoy/protobuf/message_validator.h"
 #include "envoy/runtime/runtime.h"
-#include "envoy/type/v3alpha/percent.pb.h"
+#include "envoy/type/v3/percent.pb.h"
 
 #include "common/common/hash.h"
 #include "common/common/utility.h"
@@ -72,8 +72,7 @@ uint64_t convertPercent(double percent, uint64_t max_value);
  * @param random_value supplies a numerical value to use to evaluate the event.
  * @return bool decision about whether the event should occur.
  */
-bool evaluateFractionalPercent(envoy::type::v3alpha::FractionalPercent percent,
-                               uint64_t random_value);
+bool evaluateFractionalPercent(envoy::type::v3::FractionalPercent percent, uint64_t random_value);
 
 /**
  * Convert a fractional percent denominator enum into an integer.
@@ -81,7 +80,7 @@ bool evaluateFractionalPercent(envoy::type::v3alpha::FractionalPercent percent,
  * @return the converted denominator.
  */
 uint64_t fractionalPercentDenominatorToInt(
-    const envoy::type::v3alpha::FractionalPercent::DenominatorType& denominator);
+    const envoy::type::v3::FractionalPercent::DenominatorType& denominator);
 
 } // namespace ProtobufPercentHelper
 } // namespace Envoy

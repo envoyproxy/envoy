@@ -271,7 +271,7 @@ def Sync(api_root, mode, labels, shadow):
       pkg_deps += SyncProtoFile(
           mode,
           utils.BazelBinPathForOutputArtifact(
-              label, '.v3alpha.envoy_internal.proto' if shadow else '.v3alpha.proto'), dst_dir)
+              label, '.v3.envoy_internal.proto' if shadow else '.v3.proto'), dst_dir)
     SyncBuildFiles(mode, dst_dir)
 
     current_api_dir = pathlib.Path(tmp).joinpath("a")

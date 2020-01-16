@@ -1,8 +1,8 @@
 #include <iostream>
 #include <unordered_map>
 
-#include "envoy/config/listener/v3alpha/listener.pb.h"
-#include "envoy/config/listener/v3alpha/listener_components.pb.h"
+#include "envoy/config/listener/v3/listener.pb.h"
+#include "envoy/config/listener/v3/listener_components.pb.h"
 #include "envoy/network/connection.h"
 #include "envoy/network/listen_socket.h"
 #include "envoy/protobuf/message_validator.h"
@@ -29,7 +29,7 @@ namespace Server {
 namespace {
 class MockFilterChainFactoryBuilder : public FilterChainFactoryBuilder {
   std::unique_ptr<Network::FilterChain>
-  buildFilterChain(const envoy::config::listener::v3alpha::FilterChain&,
+  buildFilterChain(const envoy::config::listener::v3::FilterChain&,
                    FilterChainFactoryContextCreator&) const override {
     // A place holder to be found
     return std::make_unique<Network::MockFilterChain>();
@@ -176,9 +176,9 @@ public:
     TestUtility::loadFromYaml(listener_yaml_config_, listener_config_);
     filter_chains_ = listener_config_.filter_chains();
   }
-  absl::Span<const envoy::config::listener::v3alpha::FilterChain* const> filter_chains_;
+  absl::Span<const envoy::config::listener::v3::FilterChain* const> filter_chains_;
   std::string listener_yaml_config_;
-  envoy::config::listener::v3alpha::Listener listener_config_;
+  envoy::config::listener::v3::Listener listener_config_;
   MockFilterChainFactoryBuilder dummy_builder_;
   NiceMock<Server::Configuration::MockFactoryContext> factory_context;
   FilterChainManagerImpl filter_chain_manager_{

@@ -1,5 +1,5 @@
-#include "envoy/config/route/v3alpha/route_components.pb.h"
-#include "envoy/extensions/filters/network/http_connection_manager/v3alpha/http_connection_manager.pb.h"
+#include "envoy/config/route/v3/route_components.pb.h"
+#include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 
 #include "test/integration/http_protocol_integration.h"
 
@@ -13,20 +13,20 @@ constexpr char HandleThreeHopLocationFormat[] =
 class RedirectIntegrationTest : public HttpProtocolIntegrationTest {
 public:
   void initialize() override {
-    envoy::config::route::v3alpha::RetryPolicy retry_policy;
+    envoy::config::route::v3::RetryPolicy retry_policy;
 
     auto pass_through = config_helper_.createVirtualHost("pass.through.internal.redirect");
     config_helper_.addVirtualHost(pass_through);
 
     auto handle = config_helper_.createVirtualHost("handle.internal.redirect");
     handle.mutable_routes(0)->mutable_route()->set_internal_redirect_action(
-        envoy::config::route::v3alpha::RouteAction::HANDLE_INTERNAL_REDIRECT);
+        envoy::config::route::v3::RouteAction::HANDLE_INTERNAL_REDIRECT);
     config_helper_.addVirtualHost(handle);
 
     auto handle_max_3_hop =
         config_helper_.createVirtualHost("handle.internal.redirect.max.three.hop");
     handle_max_3_hop.mutable_routes(0)->mutable_route()->set_internal_redirect_action(
-        envoy::config::route::v3alpha::RouteAction::HANDLE_INTERNAL_REDIRECT);
+        envoy::config::route::v3::RouteAction::HANDLE_INTERNAL_REDIRECT);
     handle_max_3_hop.mutable_routes(0)
         ->mutable_route()
         ->mutable_max_internal_redirects()
@@ -108,8 +108,8 @@ TEST_P(RedirectIntegrationTest, InternalRedirectPassedThrough) {
 TEST_P(RedirectIntegrationTest, BasicInternalRedirect) {
   // Validate that header sanitization is only called once.
   config_helper_.addConfigModifier(
-      [](envoy::extensions::filters::network::http_connection_manager::v3alpha::
-             HttpConnectionManager& hcm) { hcm.set_via("via_value"); });
+      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+             hcm) { hcm.set_via("via_value"); });
   initialize();
   fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
 
@@ -142,8 +142,8 @@ TEST_P(RedirectIntegrationTest, BasicInternalRedirect) {
 TEST_P(RedirectIntegrationTest, InternalRedirectWithThreeHopLimit) {
   // Validate that header sanitization is only called once.
   config_helper_.addConfigModifier(
-      [](envoy::extensions::filters::network::http_connection_manager::v3alpha::
-             HttpConnectionManager& hcm) { hcm.set_via("via_value"); });
+      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+             hcm) { hcm.set_via("via_value"); });
   initialize();
   fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
 
@@ -181,8 +181,8 @@ TEST_P(RedirectIntegrationTest, InternalRedirectWithThreeHopLimit) {
 TEST_P(RedirectIntegrationTest, InternalRedirectToDestinationWithBody) {
   // Validate that header sanitization is only called once.
   config_helper_.addConfigModifier(
-      [](envoy::extensions::filters::network::http_connection_manager::v3alpha::
-             HttpConnectionManager& hcm) { hcm.set_via("via_value"); });
+      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+             hcm) { hcm.set_via("via_value"); });
   config_helper_.addFilter(R"EOF(
   name: pause-filter
   typed_config:

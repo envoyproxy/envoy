@@ -1,7 +1,7 @@
 #include "extensions/tracers/lightstep/config.h"
 
-#include "envoy/config/trace/v3alpha/trace.pb.h"
-#include "envoy/config/trace/v3alpha/trace.pb.validate.h"
+#include "envoy/config/trace/v3/trace.pb.h"
+#include "envoy/config/trace/v3/trace.pb.validate.h"
 #include "envoy/registry/registry.h"
 
 #include "common/common/utility.h"
@@ -20,7 +20,7 @@ namespace Lightstep {
 LightstepTracerFactory::LightstepTracerFactory() : FactoryBase(TracerNames::get().Lightstep) {}
 
 Tracing::HttpTracerPtr LightstepTracerFactory::createHttpTracerTyped(
-    const envoy::config::trace::v3alpha::LightstepConfig& proto_config, Server::Instance& server) {
+    const envoy::config::trace::v3::LightstepConfig& proto_config, Server::Instance& server) {
   auto opts = std::make_unique<lightstep::LightStepTracerOptions>();
   const auto access_token_file =
       server.api().fileSystem().fileReadToEnd(proto_config.access_token_file());
