@@ -1,6 +1,6 @@
 #include "common/upstream/load_stats_reporter.h"
 
-#include "envoy/service/load_stats/v3alpha/lrs.pb.h"
+#include "envoy/service/load_stats/v3/lrs.pb.h"
 #include "envoy/stats/scope.h"
 
 #include "common/config/version_converter.h"
@@ -12,7 +12,7 @@ namespace Upstream {
 LoadStatsReporter::LoadStatsReporter(const LocalInfo::LocalInfo& local_info,
                                      ClusterManager& cluster_manager, Stats::Scope& scope,
                                      Grpc::RawAsyncClientPtr async_client,
-                                     envoy::config::core::v3alpha::ApiVersion transport_api_version,
+                                     envoy::config::core::v3::ApiVersion transport_api_version,
                                      Event::Dispatcher& dispatcher)
     : cm_(cluster_manager), stats_{ALL_LOAD_REPORTER_STATS(
                                 POOL_COUNTER_PREFIX(scope, "load_reporter."))},
@@ -121,7 +121,7 @@ void LoadStatsReporter::onReceiveInitialMetadata(Http::HeaderMapPtr&& metadata) 
 }
 
 void LoadStatsReporter::onReceiveMessage(
-    std::unique_ptr<envoy::service::load_stats::v3alpha::LoadStatsResponse>&& message) {
+    std::unique_ptr<envoy::service::load_stats::v3::LoadStatsResponse>&& message) {
   ENVOY_LOG(debug, "New load report epoch: {}", message->DebugString());
   stats_.requests_.inc();
   message_ = std::move(message);

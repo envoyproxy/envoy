@@ -2,8 +2,8 @@
 
 #include <memory>
 
-#include "envoy/config/core/v3alpha/base.pb.h"
-#include "envoy/config/listener/v3alpha/listener.pb.h"
+#include "envoy/config/core/v3/base.pb.h"
+#include "envoy/config/listener/v3/listener.pb.h"
 #include "envoy/network/connection.h"
 #include "envoy/network/filter.h"
 #include "envoy/server/api_listener.h"
@@ -45,8 +45,8 @@ public:
   bool drainClose() const override { return false; }
 
 protected:
-  ApiListenerImpl(const envoy::config::listener::v3alpha::Listener& config,
-                  ListenerManagerImpl& parent, const std::string& name);
+  ApiListenerImpl(const envoy::config::listener::v3::Listener& config, ListenerManagerImpl& parent,
+                  const std::string& name);
 
   // Synthetic class that acts as a stub Network::ReadFilterCallbacks.
   // TODO(junr03): if we are able to separate the Network Filter aspects of the
@@ -136,7 +136,7 @@ protected:
     SyntheticConnection connection_;
   };
 
-  const envoy::config::listener::v3alpha::Listener& config_;
+  const envoy::config::listener::v3::Listener& config_;
   ListenerManagerImpl& parent_;
   const std::string name_;
   Network::Address::InstanceConstSharedPtr address_;
@@ -148,8 +148,8 @@ protected:
 
 class HttpApiListener : public ApiListenerImpl {
 public:
-  HttpApiListener(const envoy::config::listener::v3alpha::Listener& config,
-                  ListenerManagerImpl& parent, const std::string& name);
+  HttpApiListener(const envoy::config::listener::v3::Listener& config, ListenerManagerImpl& parent,
+                  const std::string& name);
 
   // ApiListener
   ApiListener::Type type() const override { return ApiListener::Type::HttpApiListener; }

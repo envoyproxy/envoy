@@ -6,7 +6,7 @@
 #include <vector>
 
 #include "envoy/api/v2/discovery.pb.h"
-#include "envoy/config/endpoint/v3alpha/endpoint_components.pb.h"
+#include "envoy/config/endpoint/v3/endpoint_components.pb.h"
 #include "envoy/server/process_context.h"
 
 #include "common/config/api_version.h"
@@ -193,7 +193,7 @@ public:
 
   // Set the endpoint's socket address to point at upstream at given index.
   void setUpstreamAddress(uint32_t upstream_index,
-                          envoy::config::endpoint::v3alpha::LbEndpoint& endpoint) const;
+                          envoy::config::endpoint::v3::LbEndpoint& endpoint) const;
 
   virtual Network::ClientConnectionPtr makeClientConnection(uint32_t port);
 

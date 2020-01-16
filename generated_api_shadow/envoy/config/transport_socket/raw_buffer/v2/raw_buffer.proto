@@ -8,7 +8,7 @@ option java_package = "io.envoyproxy.envoy.config.transport_socket.raw_buffer.v2
 option java_outer_classname = "RawBufferProto";
 option java_multiple_files = true;
 option (udpa.annotations.file_migrate).move_to_package =
-    "envoy.extensions.transport_sockets.raw_buffer.v3alpha";
+    "envoy.extensions.transport_sockets.raw_buffer.v3";
 
 // [#protodoc-title: Raw Buffer]
 // [#extension: envoy.transport_sockets.raw_buffer]

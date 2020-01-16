@@ -5,13 +5,13 @@
 #include <memory>
 #include <string>
 
-#include "envoy/admin/v3alpha/config_dump.pb.h"
+#include "envoy/admin/v3/config_dump.pb.h"
 #include "envoy/api/v2/route.pb.h"
-#include "envoy/config/core/v3alpha/config_source.pb.h"
-#include "envoy/config/route/v3alpha/route.pb.h"
-#include "envoy/config/route/v3alpha/route.pb.validate.h"
-#include "envoy/extensions/filters/network/http_connection_manager/v3alpha/http_connection_manager.pb.h"
-#include "envoy/service/discovery/v3alpha/discovery.pb.h"
+#include "envoy/config/core/v3/config_source.pb.h"
+#include "envoy/config/route/v3/route.pb.h"
+#include "envoy/config/route/v3/route.pb.validate.h"
+#include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
+#include "envoy/service/discovery/v3/discovery.pb.h"
 
 #include "common/common/assert.h"
 #include "common/common/fmt.h"
@@ -25,19 +25,18 @@
 namespace Envoy {
 namespace Router {
 
-RouteConfigProviderSharedPtr
-RouteConfigProviderUtil::create(const envoy::extensions::filters::network::http_connection_manager::
-                                    v3alpha::HttpConnectionManager& config,
-                                Server::Configuration::FactoryContext& factory_context,
-                                const std::string& stat_prefix,
-                                RouteConfigProviderManager& route_config_provider_manager) {
+RouteConfigProviderSharedPtr RouteConfigProviderUtil::create(
+    const envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+        config,
+    Server::Configuration::FactoryContext& factory_context, const std::string& stat_prefix,
+    RouteConfigProviderManager& route_config_provider_manager) {
   switch (config.route_specifier_case()) {
-  case envoy::extensions::filters::network::http_connection_manager::v3alpha::
-      HttpConnectionManager::RouteSpecifierCase::kRouteConfig:
+  case envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
+      RouteSpecifierCase::kRouteConfig:
     return route_config_provider_manager.createStaticRouteConfigProvider(config.route_config(),
                                                                          factory_context);
-  case envoy::extensions::filters::network::http_connection_manager::v3alpha::
-      HttpConnectionManager::RouteSpecifierCase::kRds:
+  case envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
+      RouteSpecifierCase::kRds:
     return route_config_provider_manager.createRdsRouteConfigProvider(
         config.rds(), factory_context, stat_prefix, factory_context.initManager());
   default:
@@ -46,7 +45,7 @@ RouteConfigProviderUtil::create(const envoy::extensions::filters::network::http_
 }
 
 StaticRouteConfigProviderImpl::StaticRouteConfigProviderImpl(
-    const envoy::config::route::v3alpha::RouteConfiguration& config,
+    const envoy::config::route::v3::RouteConfiguration& config,
     Server::Configuration::FactoryContext& factory_context,
     RouteConfigProviderManagerImpl& route_config_provider_manager)
     : config_(new ConfigImpl(config, factory_context.getServerFactoryContext(),
@@ -63,7 +62,7 @@ StaticRouteConfigProviderImpl::~StaticRouteConfigProviderImpl() {
 
 // TODO(htuch): If support for multiple clusters is added per #1170 cluster_name_
 RdsRouteConfigSubscription::RdsRouteConfigSubscription(
-    const envoy::extensions::filters::network::http_connection_manager::v3alpha::Rds& rds,
+    const envoy::extensions::filters::network::http_connection_manager::v3::Rds& rds,
     const uint64_t manager_identifier, Server::Configuration::ServerFactoryContext& factory_context,
     ProtobufMessage::ValidationVisitor& validator, Init::Manager& init_manager,
     const std::string& stat_prefix,
@@ -103,7 +102,7 @@ void RdsRouteConfigSubscription::onConfigUpdate(
     return;
   }
   auto route_config =
-      MessageUtil::anyConvert<envoy::config::route::v3alpha::RouteConfiguration>(resources[0]);
+      MessageUtil::anyConvert<envoy::config::route::v3::RouteConfiguration>(resources[0]);
   MessageUtil::validate(route_config, validator_);
   if (route_config.name() != route_config_name_) {
     throw EnvoyException(fmt::format("Unexpected RDS configuration (expecting {}): {}",
@@ -172,7 +171,7 @@ void RdsRouteConfigSubscription::maybeCreateInitManager(
 }
 
 void RdsRouteConfigSubscription::onConfigUpdate(
-    const Protobuf::RepeatedPtrField<envoy::service::discovery::v3alpha::Resource>& added_resources,
+    const Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource>& added_resources,
     const Protobuf::RepeatedPtrField<std::string>& removed_resources, const std::string&) {
   if (!removed_resources.empty()) {
     // TODO(#2500) when on-demand resource loading is supported, an RDS removal may make sense (see
@@ -218,17 +217,17 @@ bool RdsRouteConfigSubscription::validateUpdateSize(int num_resources) {
   return true;
 }
 
-std::string RdsRouteConfigSubscription::loadTypeUrl(
-    envoy::config::core::v3alpha::ApiVersion resource_api_version) {
+std::string
+RdsRouteConfigSubscription::loadTypeUrl(envoy::config::core::v3::ApiVersion resource_api_version) {
   switch (resource_api_version) {
   // automatically set api version as V2
-  case envoy::config::core::v3alpha::ApiVersion::AUTO:
-  case envoy::config::core::v3alpha::ApiVersion::V2:
+  case envoy::config::core::v3::ApiVersion::AUTO:
+  case envoy::config::core::v3::ApiVersion::V2:
     return Grpc::Common::typeUrl(
         API_NO_BOOST(envoy::api::v2::RouteConfiguration().GetDescriptor()->full_name()));
-  case envoy::config::core::v3alpha::ApiVersion::V3ALPHA:
-    return Grpc::Common::typeUrl(API_NO_BOOST(
-        envoy::config::route::v3alpha::RouteConfiguration().GetDescriptor()->full_name()));
+  case envoy::config::core::v3::ApiVersion::V3:
+    return Grpc::Common::typeUrl(
+        API_NO_BOOST(envoy::config::route::v3::RouteConfiguration().GetDescriptor()->full_name()));
   default:
     NOT_REACHED_GCOVR_EXCL_LINE;
   }
@@ -308,7 +307,7 @@ void RdsRouteConfigProviderImpl::onConfigUpdate() {
 }
 
 void RdsRouteConfigProviderImpl::validateConfig(
-    const envoy::config::route::v3alpha::RouteConfiguration& config) const {
+    const envoy::config::route::v3::RouteConfiguration& config) const {
   // TODO(lizan): consider cache the config here until onConfigUpdate.
   ConfigImpl validation_config(config, factory_context_, validator_, false);
 }
@@ -336,7 +335,7 @@ RouteConfigProviderManagerImpl::RouteConfigProviderManagerImpl(Server::Admin& ad
 }
 
 Router::RouteConfigProviderSharedPtr RouteConfigProviderManagerImpl::createRdsRouteConfigProvider(
-    const envoy::extensions::filters::network::http_connection_manager::v3alpha::Rds& rds,
+    const envoy::extensions::filters::network::http_connection_manager::v3::Rds& rds,
     Server::Configuration::FactoryContext& factory_context, const std::string& stat_prefix,
     Init::Manager& init_manager) {
   // RdsRouteConfigSubscriptions are unique based on their serialized RDS config.
@@ -370,7 +369,7 @@ Router::RouteConfigProviderSharedPtr RouteConfigProviderManagerImpl::createRdsRo
 }
 
 RouteConfigProviderPtr RouteConfigProviderManagerImpl::createStaticRouteConfigProvider(
-    const envoy::config::route::v3alpha::RouteConfiguration& route_config,
+    const envoy::config::route::v3::RouteConfiguration& route_config,
     Server::Configuration::FactoryContext& factory_context) {
   auto provider =
       std::make_unique<StaticRouteConfigProviderImpl>(route_config, factory_context, *this);
@@ -378,9 +377,9 @@ RouteConfigProviderPtr RouteConfigProviderManagerImpl::createStaticRouteConfigPr
   return provider;
 }
 
-std::unique_ptr<envoy::admin::v3alpha::RoutesConfigDump>
+std::unique_ptr<envoy::admin::v3::RoutesConfigDump>
 RouteConfigProviderManagerImpl::dumpRouteConfigs() const {
-  auto config_dump = std::make_unique<envoy::admin::v3alpha::RoutesConfigDump>();
+  auto config_dump = std::make_unique<envoy::admin::v3::RoutesConfigDump>();
 
   for (const auto& element : dynamic_route_config_providers_) {
     const auto& subscription = element.second.lock()->subscription_;

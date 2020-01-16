@@ -17,7 +17,7 @@ option java_package = "io.envoyproxy.envoy.api.v2";
 option java_outer_classname = "RdsProto";
 option java_multiple_files = true;
 option java_generic_services = true;
-option (udpa.annotations.file_migrate).move_to_package = "envoy.service.route.v3alpha";
+option (udpa.annotations.file_migrate).move_to_package = "envoy.service.route.v3";
 
 // [#protodoc-title: RDS]
 

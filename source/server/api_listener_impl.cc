@@ -16,7 +16,7 @@
 namespace Envoy {
 namespace Server {
 
-ApiListenerImpl::ApiListenerImpl(const envoy::config::listener::v3alpha::Listener& config,
+ApiListenerImpl::ApiListenerImpl(const envoy::config::listener::v3::Listener& config,
                                  ListenerManagerImpl& parent, const std::string& name)
     : config_(config), parent_(parent), name_(name),
       address_(Network::Address::resolveProtoAddress(config.address())),
@@ -25,11 +25,11 @@ ApiListenerImpl::ApiListenerImpl(const envoy::config::listener::v3alpha::Listene
       factory_context_(parent_.server_, config_, *this, *global_scope_, *listener_scope_),
       read_callbacks_(SyntheticReadCallbacks(*this)) {}
 
-HttpApiListener::HttpApiListener(const envoy::config::listener::v3alpha::Listener& config,
+HttpApiListener::HttpApiListener(const envoy::config::listener::v3::Listener& config,
                                  ListenerManagerImpl& parent, const std::string& name)
     : ApiListenerImpl(config, parent, name) {
   auto typed_config = MessageUtil::anyConvert<
-      envoy::extensions::filters::network::http_connection_manager::v3alpha::HttpConnectionManager>(
+      envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager>(
       config.api_listener().api_listener());
 
   http_connection_manager_factory_ = Envoy::Extensions::NetworkFilters::HttpConnectionManager::

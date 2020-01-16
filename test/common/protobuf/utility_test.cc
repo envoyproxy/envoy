@@ -1,11 +1,11 @@
 #include <unordered_set>
 
 #include "envoy/api/v2/cluster.pb.h"
-#include "envoy/config/bootstrap/v3alpha/bootstrap.pb.h"
-#include "envoy/config/bootstrap/v3alpha/bootstrap.pb.validate.h"
-#include "envoy/config/cluster/v3alpha/cluster.pb.h"
-#include "envoy/config/cluster/v3alpha/cluster.pb.validate.h"
-#include "envoy/type/v3alpha/percent.pb.h"
+#include "envoy/config/bootstrap/v3/bootstrap.pb.h"
+#include "envoy/config/bootstrap/v3/bootstrap.pb.validate.h"
+#include "envoy/config/cluster/v3/cluster.pb.h"
+#include "envoy/config/cluster/v3/cluster.pb.validate.h"
+#include "envoy/type/v3/percent.pb.h"
 
 #include "common/common/base64.h"
 #include "common/config/api_version.h"
@@ -38,7 +38,7 @@ protected:
 };
 
 TEST_F(ProtobufUtilityTest, convertPercentNaNDouble) {
-  envoy::config::cluster::v3alpha::Cluster::CommonLbConfig common_config_;
+  envoy::config::cluster::v3::Cluster::CommonLbConfig common_config_;
   common_config_.mutable_healthy_panic_threshold()->set_value(
       std::numeric_limits<double>::quiet_NaN());
   EXPECT_THROW(PROTOBUF_PERCENT_TO_DOUBLE_OR_DEFAULT(common_config_, healthy_panic_threshold, 0.5),
@@ -46,7 +46,7 @@ TEST_F(ProtobufUtilityTest, convertPercentNaNDouble) {
 }
 
 TEST_F(ProtobufUtilityTest, convertPercentNaN) {
-  envoy::config::cluster::v3alpha::Cluster::CommonLbConfig common_config_;
+  envoy::config::cluster::v3::Cluster::CommonLbConfig common_config_;
   common_config_.mutable_healthy_panic_threshold()->set_value(
       std::numeric_limits<double>::quiet_NaN());
   EXPECT_THROW(PROTOBUF_PERCENT_TO_ROUNDED_INTEGER_OR_DEFAULT(common_config_,
@@ -58,14 +58,14 @@ namespace ProtobufPercentHelper {
 
 TEST_F(ProtobufUtilityTest, evaluateFractionalPercent) {
   { // 0/100 (default)
-    envoy::type::v3alpha::FractionalPercent percent;
+    envoy::type::v3::FractionalPercent percent;
     EXPECT_FALSE(evaluateFractionalPercent(percent, 0));
     EXPECT_FALSE(evaluateFractionalPercent(percent, 50));
     EXPECT_FALSE(evaluateFractionalPercent(percent, 100));
     EXPECT_FALSE(evaluateFractionalPercent(percent, 1000));
   }
   { // 5/100
-    envoy::type::v3alpha::FractionalPercent percent;
+    envoy::type::v3::FractionalPercent percent;
     percent.set_numerator(5);
     EXPECT_TRUE(evaluateFractionalPercent(percent, 0));
     EXPECT_TRUE(evaluateFractionalPercent(percent, 4));
@@ -78,7 +78,7 @@ TEST_F(ProtobufUtilityTest, evaluateFractionalPercent) {
     EXPECT_TRUE(evaluateFractionalPercent(percent, 1000));
   }
   { // 75/100
-    envoy::type::v3alpha::FractionalPercent percent;
+    envoy::type::v3::FractionalPercent percent;
     percent.set_numerator(75);
     EXPECT_TRUE(evaluateFractionalPercent(percent, 0));
     EXPECT_TRUE(evaluateFractionalPercent(percent, 4));
@@ -93,8 +93,8 @@ TEST_F(ProtobufUtilityTest, evaluateFractionalPercent) {
     EXPECT_FALSE(evaluateFractionalPercent(percent, 280));
   }
   { // 5/10000
-    envoy::type::v3alpha::FractionalPercent percent;
-    percent.set_denominator(envoy::type::v3alpha::FractionalPercent::TEN_THOUSAND);
+    envoy::type::v3::FractionalPercent percent;
+    percent.set_denominator(envoy::type::v3::FractionalPercent::TEN_THOUSAND);
     percent.set_numerator(5);
     EXPECT_TRUE(evaluateFractionalPercent(percent, 0));
     EXPECT_TRUE(evaluateFractionalPercent(percent, 4));
@@ -108,8 +108,8 @@ TEST_F(ProtobufUtilityTest, evaluateFractionalPercent) {
     EXPECT_TRUE(evaluateFractionalPercent(percent, 20004));
   }
   { // 5/MILLION
-    envoy::type::v3alpha::FractionalPercent percent;
-    percent.set_denominator(envoy::type::v3alpha::FractionalPercent::MILLION);
+    envoy::type::v3::FractionalPercent percent;
+    percent.set_denominator(envoy::type::v3::FractionalPercent::MILLION);
     percent.set_numerator(5);
     EXPECT_TRUE(evaluateFractionalPercent(percent, 0));
     EXPECT_TRUE(evaluateFractionalPercent(percent, 4));
@@ -162,42 +162,41 @@ TEST_F(ProtobufUtilityTest, RepeatedPtrUtilDebugString) {
 
 // Validated exception thrown when downcastAndValidate observes a PGV failures.
 TEST_F(ProtobufUtilityTest, DowncastAndValidateFailedValidation) {
-  envoy::config::bootstrap::v3alpha::Bootstrap bootstrap;
+  envoy::config::bootstrap::v3::Bootstrap bootstrap;
   bootstrap.mutable_static_resources()->add_clusters();
   EXPECT_THROW(TestUtility::validate(bootstrap), ProtoValidationException);
   EXPECT_THROW(
-      TestUtility::downcastAndValidate<const envoy::config::bootstrap::v3alpha::Bootstrap&>(
-          bootstrap),
+      TestUtility::downcastAndValidate<const envoy::config::bootstrap::v3::Bootstrap&>(bootstrap),
       ProtoValidationException);
 }
 
 // Validated exception thrown when downcastAndValidate observes a unknown field.
 TEST_F(ProtobufUtilityTest, DowncastAndValidateUnknownFields) {
-  envoy::config::bootstrap::v3alpha::Bootstrap bootstrap;
+  envoy::config::bootstrap::v3::Bootstrap bootstrap;
   bootstrap.GetReflection()->MutableUnknownFields(&bootstrap)->AddVarint(1, 0);
   EXPECT_THROW_WITH_MESSAGE(TestUtility::validate(bootstrap), EnvoyException,
-                            "Protobuf message (type envoy.config.bootstrap.v3alpha.Bootstrap with "
+                            "Protobuf message (type envoy.config.bootstrap.v3.Bootstrap with "
                             "unknown field set {1}) has unknown fields");
   EXPECT_THROW_WITH_MESSAGE(TestUtility::validate(bootstrap), EnvoyException,
-                            "Protobuf message (type envoy.config.bootstrap.v3alpha.Bootstrap with "
+                            "Protobuf message (type envoy.config.bootstrap.v3.Bootstrap with "
                             "unknown field set {1}) has unknown fields");
 }
 
 // Validated exception thrown when downcastAndValidate observes a nested unknown field.
 TEST_F(ProtobufUtilityTest, DowncastAndValidateUnknownFieldsNested) {
-  envoy::config::bootstrap::v3alpha::Bootstrap bootstrap;
+  envoy::config::bootstrap::v3::Bootstrap bootstrap;
   auto* cluster = bootstrap.mutable_static_resources()->add_clusters();
   cluster->GetReflection()->MutableUnknownFields(cluster)->AddVarint(1, 0);
   EXPECT_THROW_WITH_MESSAGE(TestUtility::validate(*cluster), EnvoyException,
-                            "Protobuf message (type envoy.config.cluster.v3alpha.Cluster with "
+                            "Protobuf message (type envoy.config.cluster.v3.Cluster with "
                             "unknown field set {1}) has unknown fields");
   EXPECT_THROW_WITH_MESSAGE(TestUtility::validate(bootstrap), EnvoyException,
-                            "Protobuf message (type envoy.config.cluster.v3alpha.Cluster with "
+                            "Protobuf message (type envoy.config.cluster.v3.Cluster with "
                             "unknown field set {1}) has unknown fields");
 }
 
 TEST_F(ProtobufUtilityTest, LoadBinaryProtoFromFile) {
-  envoy::config::bootstrap::v3alpha::Bootstrap bootstrap;
+  envoy::config::bootstrap::v3::Bootstrap bootstrap;
   bootstrap.mutable_cluster_manager()
       ->mutable_upstream_bind_config()
       ->mutable_source_address()
@@ -206,7 +205,7 @@ TEST_F(ProtobufUtilityTest, LoadBinaryProtoFromFile) {
   const std::string filename =
       TestEnvironment::writeStringToFileForTest("proto.pb", bootstrap.SerializeAsString());
 
-  envoy::config::bootstrap::v3alpha::Bootstrap proto_from_file;
+  envoy::config::bootstrap::v3::Bootstrap proto_from_file;
   TestUtility::loadFromFile(filename, proto_from_file, *api_);
   EXPECT_TRUE(TestUtility::protoEqual(bootstrap, proto_from_file));
 }
@@ -217,10 +216,10 @@ TEST_F(ProtobufUtilityTest, LoadBinaryProtoUnknownFieldFromFile) {
   source_duration.set_seconds(42);
   const std::string filename =
       TestEnvironment::writeStringToFileForTest("proto.pb", source_duration.SerializeAsString());
-  envoy::config::bootstrap::v3alpha::Bootstrap proto_from_file;
+  envoy::config::bootstrap::v3::Bootstrap proto_from_file;
   EXPECT_THROW_WITH_MESSAGE(TestUtility::loadFromFile(filename, proto_from_file, *api_),
                             EnvoyException,
-                            "Protobuf message (type envoy.config.bootstrap.v3alpha.Bootstrap with "
+                            "Protobuf message (type envoy.config.bootstrap.v3.Bootstrap with "
                             "unknown field set {1}) has unknown fields");
 }
 
@@ -231,15 +230,15 @@ TEST_F(ProtobufUtilityTest, LoadBinaryProtoUnknownMultipleFieldsFromFile) {
   source_duration.set_nanos(42);
   const std::string filename =
       TestEnvironment::writeStringToFileForTest("proto.pb", source_duration.SerializeAsString());
-  envoy::config::bootstrap::v3alpha::Bootstrap proto_from_file;
+  envoy::config::bootstrap::v3::Bootstrap proto_from_file;
   EXPECT_THROW_WITH_MESSAGE(TestUtility::loadFromFile(filename, proto_from_file, *api_),
                             EnvoyException,
-                            "Protobuf message (type envoy.config.bootstrap.v3alpha.Bootstrap with "
+                            "Protobuf message (type envoy.config.bootstrap.v3.Bootstrap with "
                             "unknown field set {1, 2}) has unknown fields");
 }
 
 TEST_F(ProtobufUtilityTest, LoadTextProtoFromFile) {
-  envoy::config::bootstrap::v3alpha::Bootstrap bootstrap;
+  envoy::config::bootstrap::v3::Bootstrap bootstrap;
   bootstrap.mutable_cluster_manager()
       ->mutable_upstream_bind_config()
       ->mutable_source_address()
@@ -250,7 +249,7 @@ TEST_F(ProtobufUtilityTest, LoadTextProtoFromFile) {
   const std::string filename =
       TestEnvironment::writeStringToFileForTest("proto.pb_text", bootstrap_text);
 
-  envoy::config::bootstrap::v3alpha::Bootstrap proto_from_file;
+  envoy::config::bootstrap::v3::Bootstrap proto_from_file;
   TestUtility::loadFromFile(filename, proto_from_file, *api_);
   EXPECT_TRUE(TestUtility::protoEqual(bootstrap, proto_from_file));
 }
@@ -259,11 +258,11 @@ TEST_F(ProtobufUtilityTest, LoadTextProtoFromFile_Failure) {
   const std::string filename =
       TestEnvironment::writeStringToFileForTest("proto.pb_text", "invalid {");
 
-  envoy::config::bootstrap::v3alpha::Bootstrap proto_from_file;
-  EXPECT_THROW_WITH_MESSAGE(
-      TestUtility::loadFromFile(filename, proto_from_file, *api_), EnvoyException,
-      "Unable to parse file \"" + filename +
-          "\" as a text protobuf (type envoy.config.bootstrap.v3alpha.Bootstrap)");
+  envoy::config::bootstrap::v3::Bootstrap proto_from_file;
+  EXPECT_THROW_WITH_MESSAGE(TestUtility::loadFromFile(filename, proto_from_file, *api_),
+                            EnvoyException,
+                            "Unable to parse file \"" + filename +
+                                "\" as a text protobuf (type envoy.config.bootstrap.v3.Bootstrap)");
 }
 
 // String fields annotated as sensitive should be converted to the string "[redacted]". String
@@ -1117,11 +1116,11 @@ TEST_F(ProtobufUtilityTest, UnpackToSameVersion) {
     EXPECT_TRUE(dst.drain_connections_on_host_removal());
   }
   {
-    API_NO_BOOST(envoy::config::cluster::v3alpha::Cluster) source;
+    API_NO_BOOST(envoy::config::cluster::v3::Cluster) source;
     source.set_ignore_health_on_host_removal(true);
     ProtobufWkt::Any source_any;
     source_any.PackFrom(source);
-    API_NO_BOOST(envoy::config::cluster::v3alpha::Cluster) dst;
+    API_NO_BOOST(envoy::config::cluster::v3::Cluster) dst;
     MessageUtil::unpackTo(source_any, dst);
     EXPECT_TRUE(dst.ignore_health_on_host_removal());
   }
@@ -1133,14 +1132,14 @@ TEST_F(ProtobufUtilityTest, UnpackToNextVersion) {
   source.set_drain_connections_on_host_removal(true);
   ProtobufWkt::Any source_any;
   source_any.PackFrom(source);
-  API_NO_BOOST(envoy::config::cluster::v3alpha::Cluster) dst;
+  API_NO_BOOST(envoy::config::cluster::v3::Cluster) dst;
   MessageUtil::unpackTo(source_any, dst);
   EXPECT_TRUE(dst.ignore_health_on_host_removal());
 }
 
 // MessageUtility::loadFromJson() throws on garbage JSON.
 TEST_F(ProtobufUtilityTest, LoadFromJsonGarbage) {
-  envoy::config::cluster::v3alpha::Cluster dst;
+  envoy::config::cluster::v3::Cluster dst;
   EXPECT_THROW_WITH_REGEX(MessageUtil::loadFromJson("{drain_connections_on_host_removal: true", dst,
                                                     ProtobufMessage::getNullValidationVisitor()),
                           EnvoyException, "Unable to parse JSON as proto.*after key:value pair.");
@@ -1161,13 +1160,13 @@ TEST_F(ProtobufUtilityTest, LoadFromJsonSameVersion) {
     EXPECT_TRUE(dst.drain_connections_on_host_removal());
   }
   {
-    API_NO_BOOST(envoy::config::cluster::v3alpha::Cluster) dst;
+    API_NO_BOOST(envoy::config::cluster::v3::Cluster) dst;
     MessageUtil::loadFromJson("{ignore_health_on_host_removal: true}", dst,
                               ProtobufMessage::getNullValidationVisitor());
     EXPECT_TRUE(dst.ignore_health_on_host_removal());
   }
   {
-    API_NO_BOOST(envoy::config::cluster::v3alpha::Cluster) dst;
+    API_NO_BOOST(envoy::config::cluster::v3::Cluster) dst;
     MessageUtil::loadFromJson("{ignore_health_on_host_removal: true}", dst,
                               ProtobufMessage::getStrictValidationVisitor());
     EXPECT_TRUE(dst.ignore_health_on_host_removal());
@@ -1177,25 +1176,25 @@ TEST_F(ProtobufUtilityTest, LoadFromJsonSameVersion) {
 // MessageUtility::loadFromJson() with API message works across version.
 TEST_F(ProtobufUtilityTest, LoadFromJsonNextVersion) {
   {
-    API_NO_BOOST(envoy::config::cluster::v3alpha::Cluster) dst;
+    API_NO_BOOST(envoy::config::cluster::v3::Cluster) dst;
     MessageUtil::loadFromJson("{use_tcp_for_dns_lookups: true}", dst,
                               ProtobufMessage::getNullValidationVisitor());
     EXPECT_TRUE(dst.use_tcp_for_dns_lookups());
   }
   {
-    API_NO_BOOST(envoy::config::cluster::v3alpha::Cluster) dst;
+    API_NO_BOOST(envoy::config::cluster::v3::Cluster) dst;
     MessageUtil::loadFromJson("{use_tcp_for_dns_lookups: true}", dst,
                               ProtobufMessage::getStrictValidationVisitor());
     EXPECT_TRUE(dst.use_tcp_for_dns_lookups());
   }
   {
-    API_NO_BOOST(envoy::config::cluster::v3alpha::Cluster) dst;
+    API_NO_BOOST(envoy::config::cluster::v3::Cluster) dst;
     MessageUtil::loadFromJson("{drain_connections_on_host_removal: true}", dst,
                               ProtobufMessage::getNullValidationVisitor());
     EXPECT_TRUE(dst.ignore_health_on_host_removal());
   }
   {
-    API_NO_BOOST(envoy::config::cluster::v3alpha::Cluster) dst;
+    API_NO_BOOST(envoy::config::cluster::v3::Cluster) dst;
     MessageUtil::loadFromJson("{drain_connections_on_host_removal: true}", dst,
                               ProtobufMessage::getStrictValidationVisitor());
     EXPECT_TRUE(dst.ignore_health_on_host_removal());
@@ -1203,10 +1202,10 @@ TEST_F(ProtobufUtilityTest, LoadFromJsonNextVersion) {
 }
 
 TEST_F(ProtobufUtilityTest, JsonConvertSuccess) {
-  envoy::config::bootstrap::v3alpha::Bootstrap source;
+  envoy::config::bootstrap::v3::Bootstrap source;
   source.set_flags_path("foo");
   ProtobufWkt::Struct tmp;
-  envoy::config::bootstrap::v3alpha::Bootstrap dest;
+  envoy::config::bootstrap::v3::Bootstrap dest;
   TestUtility::jsonConvert(source, tmp);
   TestUtility::jsonConvert(tmp, dest);
   EXPECT_EQ("foo", dest.flags_path());
@@ -1214,7 +1213,7 @@ TEST_F(ProtobufUtilityTest, JsonConvertSuccess) {
 
 TEST_F(ProtobufUtilityTest, JsonConvertUnknownFieldSuccess) {
   const ProtobufWkt::Struct obj = MessageUtil::keyValueStruct("test_key", "test_value");
-  envoy::config::bootstrap::v3alpha::Bootstrap bootstrap;
+  envoy::config::bootstrap::v3::Bootstrap bootstrap;
   EXPECT_NO_THROW(
       MessageUtil::jsonConvert(obj, ProtobufMessage::getNullValidationVisitor(), bootstrap));
 }
@@ -1230,7 +1229,7 @@ TEST_F(ProtobufUtilityTest, JsonConvertFail) {
 
 // Regression test for https://github.com/envoyproxy/envoy/issues/3665.
 TEST_F(ProtobufUtilityTest, JsonConvertCamelSnake) {
-  envoy::config::bootstrap::v3alpha::Bootstrap bootstrap;
+  envoy::config::bootstrap::v3::Bootstrap bootstrap;
   // Make sure we use a field eligible for snake/camel case translation.
   bootstrap.mutable_cluster_manager()->set_local_cluster_name("foo");
   ProtobufWkt::Struct json;
@@ -1249,10 +1248,10 @@ TEST_F(ProtobufUtilityTest, JsonConvertCamelSnake) {
 // Test the jsonConvertValue happy path. Failure modes are converted by jsonConvert tests.
 TEST_F(ProtobufUtilityTest, JsonConvertValueSuccess) {
   {
-    envoy::config::bootstrap::v3alpha::Bootstrap source;
+    envoy::config::bootstrap::v3::Bootstrap source;
     source.set_flags_path("foo");
     ProtobufWkt::Value tmp;
-    envoy::config::bootstrap::v3alpha::Bootstrap dest;
+    envoy::config::bootstrap::v3::Bootstrap dest;
     MessageUtil::jsonConvertValue(source, tmp);
     TestUtility::jsonConvert(tmp, dest);
     EXPECT_EQ("foo", dest.flags_path());
@@ -1271,7 +1270,7 @@ TEST_F(ProtobufUtilityTest, JsonConvertValueSuccess) {
 }
 
 TEST_F(ProtobufUtilityTest, YamlLoadFromStringFail) {
-  envoy::config::bootstrap::v3alpha::Bootstrap bootstrap;
+  envoy::config::bootstrap::v3::Bootstrap bootstrap;
   // Verify loadFromYaml can parse valid YAML string.
   TestUtility::loadFromYaml("node: { id: node1 }", bootstrap);
   // Verify loadFromYaml throws error when the input is an invalid YAML string.
@@ -1290,19 +1289,19 @@ TEST_F(ProtobufUtilityTest, YamlLoadFromStringFail) {
 }
 
 TEST_F(ProtobufUtilityTest, GetFlowYamlStringFromMessage) {
-  envoy::config::bootstrap::v3alpha::Bootstrap bootstrap;
+  envoy::config::bootstrap::v3::Bootstrap bootstrap;
   bootstrap.set_flags_path("foo");
   EXPECT_EQ("{flags_path: foo}", MessageUtil::getYamlStringFromMessage(bootstrap, false, false));
 }
 
 TEST_F(ProtobufUtilityTest, GetBlockYamlStringFromMessage) {
-  envoy::config::bootstrap::v3alpha::Bootstrap bootstrap;
+  envoy::config::bootstrap::v3::Bootstrap bootstrap;
   bootstrap.set_flags_path("foo");
   EXPECT_EQ("flags_path: foo", MessageUtil::getYamlStringFromMessage(bootstrap, true, false));
 }
 
 TEST_F(ProtobufUtilityTest, GetBlockYamlStringFromRecursiveMessage) {
-  envoy::config::bootstrap::v3alpha::Bootstrap bootstrap;
+  envoy::config::bootstrap::v3::Bootstrap bootstrap;
   bootstrap.set_flags_path("foo");
   bootstrap.mutable_node();
   bootstrap.mutable_static_resources()->add_listeners()->set_name("http");
@@ -1345,7 +1344,7 @@ protected:
   DeprecatedFieldsTest()
       : with_upgrade_(GetParam()), api_(Api::createApiForTest(store_)),
         runtime_deprecated_feature_use_(store_.counter("runtime.deprecated_feature_use")) {
-    envoy::config::bootstrap::v3alpha::LayeredRuntime config;
+    envoy::config::bootstrap::v3::LayeredRuntime config;
     config.add_layers()->mutable_admin_layer();
     loader_ = std::make_unique<Runtime::ScopedLoaderSingleton>(Runtime::LoaderPtr{
         new Runtime::LoaderImpl(dispatcher_, tls_, config, local_info_, init_manager_, store_,

@@ -1,7 +1,7 @@
 #include "extensions/transport_sockets/alts/config.h"
 
-#include "envoy/extensions/transport_sockets/alts/v3alpha/alts.pb.h"
-#include "envoy/extensions/transport_sockets/alts/v3alpha/alts.pb.validate.h"
+#include "envoy/extensions/transport_sockets/alts/v3/alts.pb.h"
+#include "envoy/extensions/transport_sockets/alts/v3/alts.pb.validate.h"
 #include "envoy/registry/registry.h"
 #include "envoy/server/transport_socket_config.h"
 
@@ -46,7 +46,7 @@ bool doValidate(const tsi_peer& peer, const std::unordered_set<std::string>& pee
 }
 
 HandshakeValidator
-createHandshakeValidator(const envoy::extensions::transport_sockets::alts::v3alpha::Alts& config) {
+createHandshakeValidator(const envoy::extensions::transport_sockets::alts::v3::Alts& config) {
   const auto& peer_service_accounts = config.peer_service_accounts();
   const std::unordered_set<std::string> peers(peer_service_accounts.cbegin(),
                                               peer_service_accounts.cend());
@@ -89,9 +89,9 @@ Network::TransportSocketFactoryPtr createTransportSocketFactoryHelper(
   auto alts_shared_state = factory_ctxt.singletonManager().getTyped<AltsSharedState>(
       SINGLETON_MANAGER_REGISTERED_NAME(alts_shared_state),
       [] { return std::make_shared<AltsSharedState>(); });
-  auto config = MessageUtil::downcastAndValidate<
-      const envoy::extensions::transport_sockets::alts::v3alpha::Alts&>(
-      message, factory_ctxt.messageValidationVisitor());
+  auto config =
+      MessageUtil::downcastAndValidate<const envoy::extensions::transport_sockets::alts::v3::Alts&>(
+          message, factory_ctxt.messageValidationVisitor());
   HandshakeValidator validator = createHandshakeValidator(config);
 
   const std::string& handshaker_service = config.handshaker_service();
@@ -132,7 +132,7 @@ Network::TransportSocketFactoryPtr createTransportSocketFactoryHelper(
 } // namespace
 
 ProtobufTypes::MessagePtr AltsTransportSocketConfigFactory::createEmptyConfigProto() {
-  return std::make_unique<envoy::extensions::transport_sockets::alts::v3alpha::Alts>();
+  return std::make_unique<envoy::extensions::transport_sockets::alts::v3::Alts>();
 }
 
 Network::TransportSocketFactoryPtr

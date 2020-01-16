@@ -1,4 +1,4 @@
-#include "envoy/config/overload/v3alpha/overload.pb.h"
+#include "envoy/config/overload/v3/overload.pb.h"
 #include "envoy/server/resource_monitor.h"
 #include "envoy/server/resource_monitor_config.h"
 
@@ -92,8 +92,8 @@ protected:
     }));
   }
 
-  envoy::config::overload::v3alpha::OverloadManager parseConfig(const std::string& config) {
-    envoy::config::overload::v3alpha::OverloadManager proto;
+  envoy::config::overload::v3::OverloadManager parseConfig(const std::string& config) {
+    envoy::config::overload::v3::OverloadManager proto;
     bool success = Protobuf::TextFormat::ParseFromString(config, &proto);
     ASSERT(success);
     return proto;

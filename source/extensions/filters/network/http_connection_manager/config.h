@@ -8,8 +8,8 @@
 #include <string>
 
 #include "envoy/config/config_provider_manager.h"
-#include "envoy/extensions/filters/network/http_connection_manager/v3alpha/http_connection_manager.pb.h"
-#include "envoy/extensions/filters/network/http_connection_manager/v3alpha/http_connection_manager.pb.validate.h"
+#include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
+#include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.validate.h"
 #include "envoy/http/filter.h"
 #include "envoy/router/route_config_provider_manager.h"
 
@@ -33,16 +33,16 @@ namespace HttpConnectionManager {
  */
 class HttpConnectionManagerFilterConfigFactory
     : Logger::Loggable<Logger::Id::config>,
-      public Common::FactoryBase<envoy::extensions::filters::network::http_connection_manager::
-                                     v3alpha::HttpConnectionManager> {
+      public Common::FactoryBase<
+          envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager> {
 public:
   HttpConnectionManagerFilterConfigFactory()
       : FactoryBase(NetworkFilterNames::get().HttpConnectionManager, true) {}
 
 private:
   Network::FilterFactoryCb createFilterFactoryFromProtoTyped(
-      const envoy::extensions::filters::network::http_connection_manager::v3alpha::
-          HttpConnectionManager& proto_config,
+      const envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+          proto_config,
       Server::Configuration::FactoryContext& context) override;
 };
 
@@ -53,8 +53,8 @@ DECLARE_FACTORY(HttpConnectionManagerFilterConfigFactory);
  */
 class InternalAddressConfig : public Http::InternalAddressConfig {
 public:
-  InternalAddressConfig(const envoy::extensions::filters::network::http_connection_manager::
-                            v3alpha::HttpConnectionManager::InternalAddressConfig& config);
+  InternalAddressConfig(const envoy::extensions::filters::network::http_connection_manager::v3::
+                            HttpConnectionManager::InternalAddressConfig& config);
 
   bool isInternalAddress(const Network::Address::Instance& address) const override {
     if (address.type() == Network::Address::Type::Pipe) {
@@ -76,12 +76,12 @@ class HttpConnectionManagerConfig : Logger::Loggable<Logger::Id::config>,
                                     public Http::FilterChainFactory,
                                     public Http::ConnectionManagerConfig {
 public:
-  HttpConnectionManagerConfig(const envoy::extensions::filters::network::http_connection_manager::
-                                  v3alpha::HttpConnectionManager& config,
-                              Server::Configuration::FactoryContext& context,
-                              Http::DateProvider& date_provider,
-                              Router::RouteConfigProviderManager& route_config_provider_manager,
-                              Config::ConfigProviderManager& scoped_routes_config_provider_manager);
+  HttpConnectionManagerConfig(
+      const envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+          config,
+      Server::Configuration::FactoryContext& context, Http::DateProvider& date_provider,
+      Router::RouteConfigProviderManager& route_config_provider_manager,
+      Config::ConfigProviderManager& scoped_routes_config_provider_manager);
 
   // Http::FilterChainFactory
   void createFilterChain(Http::FilterChainFactoryCallbacks& callbacks) override;
@@ -151,10 +151,11 @@ public:
 
 private:
   enum class CodecType { HTTP1, HTTP2, HTTP3, AUTO };
-  void processFilter(
-      const envoy::extensions::filters::network::http_connection_manager::v3alpha::HttpFilter&
-          proto_config,
-      int i, absl::string_view prefix, FilterFactoriesList& filter_factories, bool& is_terminal);
+  void
+  processFilter(const envoy::extensions::filters::network::http_connection_manager::v3::HttpFilter&
+                    proto_config,
+                int i, absl::string_view prefix, FilterFactoriesList& filter_factories,
+                bool& is_terminal);
 
   Server::Configuration::FactoryContext& context_;
   FilterFactoriesList filter_factories_;
@@ -210,8 +211,8 @@ private:
 class HttpConnectionManagerFactory {
 public:
   static std::function<Http::ApiListenerPtr()> createHttpConnectionManagerFactoryFromProto(
-      const envoy::extensions::filters::network::http_connection_manager::v3alpha::
-          HttpConnectionManager& proto_config,
+      const envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+          proto_config,
       Server::Configuration::FactoryContext& context, Network::ReadFilterCallbacks& read_callbacks);
 };
 
@@ -245,12 +246,12 @@ public:
    * @param scoped_routes_config_provider_manager the singleton used in config creation.
    * @return a shared_ptr to the created config object.
    */
-  static std::shared_ptr<HttpConnectionManagerConfig>
-  createConfig(const envoy::extensions::filters::network::http_connection_manager::v3alpha::
-                   HttpConnectionManager& proto_config,
-               Server::Configuration::FactoryContext& context, Http::DateProvider& date_provider,
-               Router::RouteConfigProviderManager& route_config_provider_manager,
-               Config::ConfigProviderManager& scoped_routes_config_provider_manager);
+  static std::shared_ptr<HttpConnectionManagerConfig> createConfig(
+      const envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+          proto_config,
+      Server::Configuration::FactoryContext& context, Http::DateProvider& date_provider,
+      Router::RouteConfigProviderManager& route_config_provider_manager,
+      Config::ConfigProviderManager& scoped_routes_config_provider_manager);
 };
 
 } // namespace HttpConnectionManager

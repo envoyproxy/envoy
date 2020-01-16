@@ -1,6 +1,6 @@
 #pragma once
 
-#include "envoy/config/core/v3alpha/base.pb.h"
+#include "envoy/config/core/v3/base.pb.h"
 #include "envoy/stream_info/stream_info.h"
 
 #include "common/stream_info/filter_state_impl.h"
@@ -72,8 +72,8 @@ public:
   MOCK_METHOD1(setUpstreamSslConnection, void(const Ssl::ConnectionInfoConstSharedPtr&));
   MOCK_CONST_METHOD0(upstreamSslConnection, Ssl::ConnectionInfoConstSharedPtr());
   MOCK_CONST_METHOD0(routeEntry, const Router::RouteEntry*());
-  MOCK_METHOD0(dynamicMetadata, envoy::config::core::v3alpha::Metadata&());
-  MOCK_CONST_METHOD0(dynamicMetadata, const envoy::config::core::v3alpha::Metadata&());
+  MOCK_METHOD0(dynamicMetadata, envoy::config::core::v3::Metadata&());
+  MOCK_CONST_METHOD0(dynamicMetadata, const envoy::config::core::v3::Metadata&());
   MOCK_METHOD2(setDynamicMetadata, void(const std::string&, const ProtobufWkt::Struct&));
   MOCK_METHOD3(setDynamicMetadata,
                void(const std::string&, const std::string&, const std::string&));
@@ -101,7 +101,7 @@ public:
   absl::optional<Http::Protocol> protocol_;
   absl::optional<uint32_t> response_code_;
   absl::optional<std::string> response_code_details_;
-  envoy::config::core::v3alpha::Metadata metadata_;
+  envoy::config::core::v3::Metadata metadata_;
   FilterStateImpl filter_state_;
   uint64_t bytes_received_{};
   uint64_t bytes_sent_{};

@@ -1,4 +1,4 @@
-#include "envoy/extensions/filters/http/jwt_authn/v3alpha/config.pb.h"
+#include "envoy/extensions/filters/http/jwt_authn/v3/config.pb.h"
 
 #include "common/protobuf/utility.h"
 
@@ -8,7 +8,7 @@
 #include "test/extensions/filters/http/jwt_authn/test_common.h"
 #include "test/test_common/utility.h"
 
-using envoy::extensions::filters::http::jwt_authn::v3alpha::RequirementRule;
+using envoy::extensions::filters::http::jwt_authn::v3::RequirementRule;
 using Envoy::Http::TestHeaderMapImpl;
 
 namespace Envoy {

@@ -1,6 +1,6 @@
 #include <string>
 
-#include "envoy/config/listener/v3alpha/listener.pb.h"
+#include "envoy/config/listener/v3/listener.pb.h"
 
 #include "server/api_listener_impl.h"
 #include "server/listener_manager_impl.h"
@@ -51,7 +51,7 @@ api_listener:
                 cluster: dynamic_forward_proxy_cluster
   )EOF";
 
-  const envoy::config::listener::v3alpha::Listener config = parseListenerFromV2Yaml(yaml);
+  const envoy::config::listener::v3::Listener config = parseListenerFromV2Yaml(yaml);
 
   auto http_api_listener = HttpApiListener(config, *listener_manager_, config.name());
 
@@ -77,12 +77,12 @@ api_listener:
         path: eds path
   )EOF";
 
-  const envoy::config::listener::v3alpha::Listener config = parseListenerFromV2Yaml(yaml);
+  const envoy::config::listener::v3::Listener config = parseListenerFromV2Yaml(yaml);
 
   EXPECT_THROW_WITH_MESSAGE(
       HttpApiListener(config, *listener_manager_, config.name()), EnvoyException,
       "Unable to unpack as "
-      "envoy.extensions.filters.network.http_connection_manager.v3alpha.HttpConnectionManager: "
+      "envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager: "
       "[type.googleapis.com/envoy.api.v2.Cluster] {\n  name: \"cluster1\"\n  type: EDS\n  "
       "eds_cluster_config {\n    eds_config {\n      path: \"eds path\"\n    }\n  }\n}\n");
 }

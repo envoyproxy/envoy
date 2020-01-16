@@ -3,9 +3,9 @@
 #include <memory>
 
 #include "envoy/api/v2/discovery.pb.h"
-#include "envoy/config/core/v3alpha/base.pb.h"
-#include "envoy/config/endpoint/v3alpha/endpoint.pb.h"
-#include "envoy/service/discovery/v3alpha/discovery.pb.h"
+#include "envoy/config/core/v3/base.pb.h"
+#include "envoy/config/endpoint/v3/endpoint.pb.h"
+#include "envoy/service/discovery/v3/discovery.pb.h"
 
 #include "common/common/hash.h"
 #include "common/config/api_version.h"
@@ -51,7 +51,7 @@ public:
 
     mux_ = std::make_shared<Config::GrpcMuxImpl>(
         local_info_, std::unique_ptr<Grpc::MockAsyncClient>(async_client_), dispatcher_,
-        *method_descriptor_, envoy::config::core::v3alpha::ApiVersion::AUTO, random_, stats_store_,
+        *method_descriptor_, envoy::config::core::v3::ApiVersion::AUTO, random_, stats_store_,
         rate_limit_settings_, true);
     subscription_ = std::make_unique<GrpcSubscriptionImpl>(
         mux_, callbacks_, stats_, Config::TypeUrl::get().ClusterLoadAssignment, dispatcher_,
@@ -99,19 +99,17 @@ public:
 
   void deliverConfigUpdate(const std::vector<std::string>& cluster_names,
                            const std::string& version, bool accept) override {
-    std::unique_ptr<envoy::service::discovery::v3alpha::DiscoveryResponse> response(
-        new envoy::service::discovery::v3alpha::DiscoveryResponse());
+    std::unique_ptr<envoy::service::discovery::v3::DiscoveryResponse> response(
+        new envoy::service::discovery::v3::DiscoveryResponse());
     response->set_version_info(version);
     last_response_nonce_ = std::to_string(HashUtil::xxHash64(version));
     response->set_nonce(last_response_nonce_);
     response->set_type_url(Config::TypeUrl::get().ClusterLoadAssignment);
-    Protobuf::RepeatedPtrField<envoy::config::endpoint::v3alpha::ClusterLoadAssignment>
-        typed_resources;
+    Protobuf::RepeatedPtrField<envoy::config::endpoint::v3::ClusterLoadAssignment> typed_resources;
     for (const auto& cluster : cluster_names) {
       if (std::find(last_cluster_names_.begin(), last_cluster_names_.end(), cluster) !=
           last_cluster_names_.end()) {
-        envoy::config::endpoint::v3alpha::ClusterLoadAssignment* load_assignment =
-            typed_resources.Add();
+        envoy::config::endpoint::v3::ClusterLoadAssignment* load_assignment = typed_resources.Add();
         load_assignment->set_cluster_name(cluster);
         response->add_resources()->PackFrom(API_DOWNGRADE(*load_assignment));
       }
@@ -177,9 +175,8 @@ public:
   Runtime::MockRandomGenerator random_;
   Event::MockTimer* timer_;
   Event::TimerCb timer_cb_;
-  envoy::config::core::v3alpha::Node node_;
-  NiceMock<
-      Config::MockSubscriptionCallbacks<envoy::config::endpoint::v3alpha::ClusterLoadAssignment>>
+  envoy::config::core::v3::Node node_;
+  NiceMock<Config::MockSubscriptionCallbacks<envoy::config::endpoint::v3::ClusterLoadAssignment>>
       callbacks_;
   NiceMock<Grpc::MockAsyncStream> async_stream_;
   std::shared_ptr<GrpcMuxImpl> mux_;

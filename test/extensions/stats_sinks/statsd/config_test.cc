@@ -1,5 +1,5 @@
-#include "envoy/config/core/v3alpha/address.pb.h"
-#include "envoy/config/metrics/v3alpha/stats.pb.h"
+#include "envoy/config/core/v3/address.pb.h"
+#include "envoy/config/metrics/v3/stats.pb.h"
 #include "envoy/network/address.h"
 #include "envoy/registry/registry.h"
 
@@ -29,7 +29,7 @@ namespace {
 TEST(StatsConfigTest, ValidTcpStatsd) {
   const std::string name = StatsSinkNames::get().Statsd;
 
-  envoy::config::metrics::v3alpha::StatsdSink sink_config;
+  envoy::config::metrics::v3::StatsdSink sink_config;
   sink_config.set_tcp_cluster_name("fake_cluster");
 
   Server::Configuration::StatsSinkFactory* factory =
@@ -55,10 +55,10 @@ TEST_P(StatsConfigParameterizedTest, UdpSinkDefaultPrefix) {
   const std::string name = StatsSinkNames::get().Statsd;
   const auto& defaultPrefix = Common::Statsd::getDefaultPrefix();
 
-  envoy::config::metrics::v3alpha::StatsdSink sink_config;
-  envoy::config::core::v3alpha::Address& address = *sink_config.mutable_address();
-  envoy::config::core::v3alpha::SocketAddress& socket_address = *address.mutable_socket_address();
-  socket_address.set_protocol(envoy::config::core::v3alpha::SocketAddress::UDP);
+  envoy::config::metrics::v3::StatsdSink sink_config;
+  envoy::config::core::v3::Address& address = *sink_config.mutable_address();
+  envoy::config::core::v3::SocketAddress& socket_address = *address.mutable_socket_address();
+  socket_address.set_protocol(envoy::config::core::v3::SocketAddress::UDP);
   if (GetParam() == Network::Address::IpVersion::v4) {
     socket_address.set_address("127.0.0.1");
   } else {
@@ -86,10 +86,10 @@ TEST_P(StatsConfigParameterizedTest, UdpSinkCustomPrefix) {
   const std::string name = StatsSinkNames::get().Statsd;
   const std::string customPrefix = "prefix.test";
 
-  envoy::config::metrics::v3alpha::StatsdSink sink_config;
-  envoy::config::core::v3alpha::Address& address = *sink_config.mutable_address();
-  envoy::config::core::v3alpha::SocketAddress& socket_address = *address.mutable_socket_address();
-  socket_address.set_protocol(envoy::config::core::v3alpha::SocketAddress::UDP);
+  envoy::config::metrics::v3::StatsdSink sink_config;
+  envoy::config::core::v3::Address& address = *sink_config.mutable_address();
+  envoy::config::core::v3::SocketAddress& socket_address = *address.mutable_socket_address();
+  socket_address.set_protocol(envoy::config::core::v3::SocketAddress::UDP);
   if (GetParam() == Network::Address::IpVersion::v4) {
     socket_address.set_address("127.0.0.1");
   } else {
@@ -117,7 +117,7 @@ TEST_P(StatsConfigParameterizedTest, UdpSinkCustomPrefix) {
 TEST(StatsConfigTest, TcpSinkDefaultPrefix) {
   const std::string name = StatsSinkNames::get().Statsd;
 
-  envoy::config::metrics::v3alpha::StatsdSink sink_config;
+  envoy::config::metrics::v3::StatsdSink sink_config;
   const auto& defaultPrefix = Common::Statsd::getDefaultPrefix();
   sink_config.set_tcp_cluster_name("fake_cluster");
 
@@ -140,7 +140,7 @@ TEST(StatsConfigTest, TcpSinkDefaultPrefix) {
 TEST(StatsConfigTest, TcpSinkCustomPrefix) {
   const std::string name = StatsSinkNames::get().Statsd;
 
-  envoy::config::metrics::v3alpha::StatsdSink sink_config;
+  envoy::config::metrics::v3::StatsdSink sink_config;
   std::string prefix = "prefixTest";
   sink_config.set_tcp_cluster_name("fake_cluster");
   ASSERT_NE(sink_config.prefix(), prefix);
@@ -170,10 +170,10 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, StatsConfigLoopbackTest,
 TEST_P(StatsConfigLoopbackTest, ValidUdpIpStatsd) {
   const std::string name = StatsSinkNames::get().Statsd;
 
-  envoy::config::metrics::v3alpha::StatsdSink sink_config;
-  envoy::config::core::v3alpha::Address& address = *sink_config.mutable_address();
-  envoy::config::core::v3alpha::SocketAddress& socket_address = *address.mutable_socket_address();
-  socket_address.set_protocol(envoy::config::core::v3alpha::SocketAddress::UDP);
+  envoy::config::metrics::v3::StatsdSink sink_config;
+  envoy::config::core::v3::Address& address = *sink_config.mutable_address();
+  envoy::config::core::v3::SocketAddress& socket_address = *address.mutable_socket_address();
+  socket_address.set_protocol(envoy::config::core::v3::SocketAddress::UDP);
   auto loopback_flavor = Network::Test::getCanonicalLoopbackAddress(GetParam());
   socket_address.set_address(loopback_flavor->ip()->addressAsString());
   socket_address.set_port_value(8125);
@@ -196,7 +196,7 @@ TEST_P(StatsConfigLoopbackTest, ValidUdpIpStatsd) {
 TEST(StatsdConfigTest, ValidateFail) {
   NiceMock<Server::MockInstance> server;
   EXPECT_THROW(
-      StatsdSinkFactory().createStatsSink(envoy::config::metrics::v3alpha::StatsdSink(), server),
+      StatsdSinkFactory().createStatsSink(envoy::config::metrics::v3::StatsdSink(), server),
       ProtoValidationException);
 }
 

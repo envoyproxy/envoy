@@ -8,7 +8,7 @@ option java_package = "io.envoyproxy.envoy.config.filter.listener.original_dst.v
 option java_outer_classname = "OriginalDstProto";
 option java_multiple_files = true;
 option (udpa.annotations.file_migrate).move_to_package =
-    "envoy.extensions.filters.listener.original_dst.v3alpha";
+    "envoy.extensions.filters.listener.original_dst.v3";
 
 // [#protodoc-title: Original Dst Filter]
 // Use the Original destination address on downstream connections.

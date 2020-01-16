@@ -61,7 +61,7 @@ static_resources:
         port_value: 1
     api_listener:
       api_listener:
-        "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3alpha.HttpConnectionManager
+        "@type": type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager
         stat_prefix: hcm
         route_config:
           virtual_hosts:
@@ -76,7 +76,7 @@ static_resources:
         http_filters:
           - name: envoy.router
             typed_config:
-              "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3alpha.Router
+              "@type": type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
 
       )EOF";
   }

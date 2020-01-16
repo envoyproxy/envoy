@@ -1,7 +1,7 @@
 #include "extensions/filters/http/squash/config.h"
 
-#include "envoy/extensions/filters/http/squash/v3alpha/squash.pb.h"
-#include "envoy/extensions/filters/http/squash/v3alpha/squash.pb.validate.h"
+#include "envoy/extensions/filters/http/squash/v3/squash.pb.h"
+#include "envoy/extensions/filters/http/squash/v3/squash.pb.validate.h"
 #include "envoy/registry/registry.h"
 
 #include "common/protobuf/protobuf.h"
@@ -15,8 +15,8 @@ namespace HttpFilters {
 namespace Squash {
 
 Http::FilterFactoryCb SquashFilterConfigFactory::createFilterFactoryFromProtoTyped(
-    const envoy::extensions::filters::http::squash::v3alpha::Squash& proto_config,
-    const std::string&, Server::Configuration::FactoryContext& context) {
+    const envoy::extensions::filters::http::squash::v3::Squash& proto_config, const std::string&,
+    Server::Configuration::FactoryContext& context) {
 
   SquashFilterConfigSharedPtr config = std::make_shared<SquashFilterConfig>(
       SquashFilterConfig(proto_config, context.clusterManager()));

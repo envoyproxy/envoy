@@ -8,7 +8,7 @@ option java_package = "io.envoyproxy.envoy.config.filter.listener.proxy_protocol
 option java_outer_classname = "ProxyProtocolProto";
 option java_multiple_files = true;
 option (udpa.annotations.file_migrate).move_to_package =
-    "envoy.extensions.filters.listener.proxy_protocol.v3alpha";
+    "envoy.extensions.filters.listener.proxy_protocol.v3";
 
 // [#protodoc-title: Proxy Protocol Filter]
 // PROXY protocol listener filter.
