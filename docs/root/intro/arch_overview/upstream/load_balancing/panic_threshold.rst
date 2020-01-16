@@ -79,7 +79,7 @@ priority.
 
 Panic mode can be disabled by setting the panic threshold to 0%.
 
-Load distribution is calculated as describe above as long as there are priority levels not in panic mode.
+Load distribution is calculated as described above as long as there are priority levels not in panic mode.
 When all priority levels enter the panic mode, load calculation algorithm changes.
 In this case each priority level receives traffic relative to the number of hosts in that priority level
 in relation to the number of hosts in all priority levels.
