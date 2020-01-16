@@ -39,7 +39,7 @@ from envoy.annotations import resource_pb2
 from udpa.annotations import migrate_pb2
 
 CLANG_FORMAT_STYLE = ('{ColumnLimit: 100, SpacesInContainerLiterals: false, '
-                      'AllowShortFunctionsOnASingleLine: false}')
+                      'AllowShortFunctionsOnASingleLine: false, ReflowComments: false}')
 
 NEXT_FREE_FIELD_MIN = 5
 

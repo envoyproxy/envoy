@@ -15,7 +15,7 @@ option java_multiple_files = true;
 
 // Specifies a routing scope, which associates a
 // :ref:`Key<envoy_api_msg_config.route.v3.ScopedRouteConfiguration.Key>` to a
-// :ref:`envoy_api_msg_RouteConfiguration` (identified by its resource name).
+// :ref:`envoy_api_msg_config.route.v3.RouteConfiguration` (identified by its resource name).
 //
 // The HTTP connection manager builds up a table consisting of these Key to
 // RouteConfiguration mappings, and looks up the RouteConfiguration to use per
@@ -106,8 +106,8 @@ message ScopedRouteConfiguration {
   // The name assigned to the routing scope.
   string name = 1 [(validate.rules).string = {min_bytes: 1}];
 
-  // The resource name to use for a :ref:`envoy_api_msg_DiscoveryRequest` to an
-  // RDS server to fetch the :ref:`envoy_api_msg_RouteConfiguration` associated
+  // The resource name to use for a :ref:`envoy_api_msg_service.discovery.v3.DiscoveryRequest` to an
+  // RDS server to fetch the :ref:`envoy_api_msg_config.route.v3.RouteConfiguration` associated
   // with this scope.
   string route_configuration_name = 2 [(validate.rules).string = {min_bytes: 1}];
 
