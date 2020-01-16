@@ -19,10 +19,8 @@
 // Non-stream calls.
 
 /**
- * Called when the VM starts for each plugin.
- * @param root_context_id is an identifier for one or more related plugins and their corresponding
- * proxy_on_configure(), proxy_on_done() and proxy_on_delete() calls. It is also provided during
- * creation of stream context for those plugins.
+ * Called when the VM starts by the first plugin to use the VM.
+ * @param root_context_id is an identifier for one or more related plugins.
  * @param vm_configuration_size is the size of any configuration available via
  * proxy_get_configuration during the lifetime of this call.
  * @return non-zero on success and zero on failure (e.g. bad configuration).
@@ -54,7 +52,7 @@ extern "C" uint32_t proxy_on_configure(uint32_t root_context_id,
 
 /**
  * Called when a request, stream or other ephemeral context is created.
- * @param context_id is an identifier the ephemeral context.
+ * @param context_id is an identifier of the ephemeral context.
  * @param configuration_size is the size of any configuration available via
  * proxy_get_configuration().
  */
@@ -72,6 +70,7 @@ extern "C" void proxy_on_context_create(uint32_t context_id, uint32_t root_conte
  * future proxy_done() call by the root context.
  */
 extern "C" uint32_t proxy_on_done(uint32_t context_id);
+
 /**
  * Called when the context is being deleted and will no longer receive any more calls.
  * @param context_id is an identifier the context.
