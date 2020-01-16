@@ -682,15 +682,8 @@ TEST(HeaderMapImplTest, SetCopy) {
   MockCb cb;
 
   InSequence seq;
-#if HEADER_MAP_USE_SLIST
-  // With a singly linked list, we actually overwrite the last header, rather
-  // than the first. Does this matter?
-  EXPECT_CALL(cb, Call("hello", "monde"));
-  EXPECT_CALL(cb, Call("hello", "override-monde"));
-#else
   EXPECT_CALL(cb, Call("hello", "override-monde"));
   EXPECT_CALL(cb, Call("hello", "monde2"));
-#endif
   headers.iterate(
       [](const Http::HeaderEntry& header, void* cb_v) -> HeaderMap::Iterate {
         static_cast<MockCb*>(cb_v)->Call(std::string(header.key().getStringView()),

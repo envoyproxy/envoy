@@ -3,7 +3,7 @@
 #define HEADER_MAP_USE_MULTI_MAP false
 #define HEADER_MAP_USE_FLAT_HASH_MAP true
 #define HEADER_MAP_USE_BTREE false
-#define HEADER_MAP_USE_SLIST false
+#define HEADER_MAP_USE_SLIST true
 
 #include <array>
 #include <cstdint>
@@ -93,8 +93,8 @@ public:
    * For testing. Equality is based on equality of the backing list. This is an exact match
    * comparison (order matters).
    */
-  bool operator==(const HeaderMapImpl& rhs) const;
-  bool operator!=(const HeaderMapImpl& rhs) const;
+  bool operator==(const HeaderMapImpl& rhs) const { return headers_ == rhs.headers_; }
+  bool operator!=(const HeaderMapImpl& rhs) const { return !(headers_ == rhs.headers_); }
 
   // Http::HeaderMap
   void addReference(const LowerCaseString& key, absl::string_view value) override;
@@ -129,7 +129,23 @@ protected:
     HeaderNode node_;
     HeaderCellPtr next_;
   };
-  using HeaderLazyMap = absl::flat_hash_map<absl::string_view, HeaderCellPtr>;
+  // The mechanics of the single-linked list implementation result in the
+  // elements reversing in order as they are inserted. HeaderMap::get()
+  // requires we retrieve the first item. To avoid having to walk down
+  // the entire list on get(), we store a pointer to the first element as
+  // our map value, giving us instant access. We need access to the remaining
+  // occurrences of a key only for HeaderMap::remove(), which removes all
+  // the instances.
+  //
+  // We could simplify this code if it was feasible to change the semantics
+  // of get(), e.g. maybe we want get() to return all the elements too, or
+  // for setCopy() to leave only one element behind, instead of replacing
+  // only the first occurrence (which seems non-obvious).
+  struct HeaderSlistEntry {
+    HeaderCell* first_{nullptr};
+    HeaderCellPtr list_;
+  };
+  using HeaderLazyMap = absl::flat_hash_map<absl::string_view, HeaderSlistEntry>;
 #else
   using HeaderNodeVector = absl::InlinedVector<HeaderNode, 1>;
   using HeaderLazyMap = absl::flat_hash_map<absl::string_view, HeaderNodeVector>;
@@ -204,6 +220,10 @@ protected:
       return !key.getStringView().empty() && key.getStringView()[0] == ':';
     }
 
+#if HEADER_MAP_USE_SLIST
+    void addSlistEntry(HeaderNode node) const;
+#endif
+
     template <class Key, class... Value> HeaderNode insert(Key&& key, Value&&... value) {
       const bool is_pseudo_header = isPseudoHeader(key);
       HeaderNode i = headers_.emplace(is_pseudo_header ? pseudo_headers_end_ : headers_.end(),
@@ -212,11 +232,7 @@ protected:
       if (!lazy_map_.empty()) {
 #if HEADER_MAP_USE_FLAT_HASH_MAP
 #if HEADER_MAP_USE_SLIST
-        HeaderCellPtr& cellref = lazy_map_[i->key().getStringView()];
-        HeaderCellPtr cell = std::make_unique<HeaderCell>();
-        cell->node_ = i;
-        cell->next_ = std::move(cellref);
-        cellref = std::move(cell);
+        addSlistEntry(i);
 #else
         lazy_map_[i->key().getStringView()].push_back(i);
 #endif
@@ -253,13 +269,7 @@ protected:
     // Makes a map.
     bool maybeMakeMap() const;
 
-    // HeaderLazyMap::iterator find(absl::string_view key) const;
-    // HeaderLazyMap::iterator findEnd() const { return lazy_map_.end(); }
-
-    std::list<HeaderEntryImpl>::const_iterator begin() const { return headers_.begin(); }
-    std::list<HeaderEntryImpl>::const_iterator end() const { return headers_.end(); }
-    std::list<HeaderEntryImpl>::const_reverse_iterator rbegin() const { return headers_.rbegin(); }
-    std::list<HeaderEntryImpl>::const_reverse_iterator rend() const { return headers_.rend(); }
+    bool operator==(const HeaderList& rhs) const;
     size_t size() const { return headers_.size(); }
     bool empty() const { return headers_.empty(); }
     void clear() {
