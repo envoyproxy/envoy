@@ -491,6 +491,28 @@ TEST_P(LoadBalancerBaseTest, GentleFailoverWithExtraLevels) {
                 1 /* num_degraded_hosts */);
   ASSERT_THAT(getLoadPercentage(), ElementsAre(34, 33, 33));
   ASSERT_THAT(getDegradedLoadPercentage(), ElementsAre(0, 0, 0));
+
+  // Rounding error should be allocated to the first non-empty priority
+  // In this test P=0 is not empty.
+  updateHostSet(host_set_, 3 /* num_hosts */, 0 /* num_healthy_hosts */);
+  updateHostSet(failover_host_set_, 3 /* num_hosts */, 0 /* num_healthy_hosts */);
+  updateHostSet(tertiary_host_set_, 3 /* num_hosts */, 0 /* num_healthy_hosts */);
+  ASSERT_THAT(getPanic(), ElementsAre(true, true, true));
+  ASSERT_THAT(getLoadPercentage(), ElementsAre(34, 33, 33));
+
+  // Rounding error should be allocated to the first non-empty priority
+  // In this test P=0 is empty and P=1 is not empty.
+  updateHostSet(host_set_, 0 /* num_hosts */, 0 /* num_healthy_hosts */);
+  updateHostSet(failover_host_set_, 6 /* num_hosts */, 0 /* num_healthy_hosts */);
+  updateHostSet(tertiary_host_set_, 3 /* num_hosts */, 0 /* num_healthy_hosts */);
+  ASSERT_THAT(getPanic(), ElementsAre(true, true, true));
+  ASSERT_THAT(getLoadPercentage(), ElementsAre(0, 67, 33));
+  // In this test P=1 is not empty.
+  updateHostSet(host_set_, 3 /* num_hosts */, 0 /* num_healthy_hosts */);
+  updateHostSet(failover_host_set_, 3 /* num_hosts */, 0 /* num_healthy_hosts */);
+  updateHostSet(tertiary_host_set_, 3 /* num_hosts */, 0 /* num_healthy_hosts */);
+  ASSERT_THAT(getPanic(), ElementsAre(true, true, true));
+  ASSERT_THAT(getLoadPercentage(), ElementsAre(34, 33, 33));
 }
 
 TEST_P(LoadBalancerBaseTest, BoundaryConditions) {

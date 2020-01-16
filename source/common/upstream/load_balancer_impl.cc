@@ -289,24 +289,26 @@ void LoadBalancerBase::recalculateLoadInTotalPanic() {
   // is based not on the number of healthy hosts but based on the number of
   // total hosts in the priority.
   uint32_t total_load = 100;
+  int32_t first_noempty = -1;
   for (size_t i = 0; i < per_priority_panic_.size(); i++) {
     const HostSet& host_set = *priority_set_.hostSetsPerPriority()[i];
     const auto hosts_num = host_set.hosts().size();
 
+    if ((-1 == first_noempty) && (0 != hosts_num)) {
+      first_noempty = i;
+    }
     const uint32_t priority_load = 100 * hosts_num / total_hosts_count;
     per_priority_load_.healthy_priority_load_.get()[i] = priority_load;
     per_priority_load_.degraded_priority_load_.get()[i] = 0;
     total_load -= priority_load;
   }
 
-  // Find the first priority which is not empty and add remaining load.
-  for (size_t i = 0; i < per_priority_panic_.size(); i++) {
-    const HostSet& host_set = *priority_set_.hostSetsPerPriority()[i];
-    if (0 != host_set.hosts().size()) {
-      per_priority_load_.healthy_priority_load_.get()[i] += total_load;
-      break;
-    }
-  }
+  // Add the remaining load to the first not empty load.
+  per_priority_load_.healthy_priority_load_.get()[first_noempty] += total_load;
+
+  // The total load should come up to 100%.
+  ASSERT(100 == std::accumulate(per_priority_load_.healthy_priority_load_.get().begin(),
+                                per_priority_load_.healthy_priority_load_.get().end(), 0));
 }
 
 std::pair<HostSet&, LoadBalancerBase::HostAvailability>
