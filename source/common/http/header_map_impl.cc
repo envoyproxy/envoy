@@ -20,7 +20,7 @@ namespace {
 constexpr size_t MinDynamicCapacity{32};
 // This includes the NULL (StringUtil::itoa technically only needs 21).
 constexpr size_t MaxIntegerLength{32};
-constexpr size_t MapSizeThreshold{0};
+#define MAP_SIZE_THRESHOLD 0
 
 uint64_t newCapacity(uint32_t existing_capacity, uint32_t size_to_append) {
   return (static_cast<uint64_t>(existing_capacity) + size_to_append) * 2;
@@ -612,9 +612,11 @@ void HeaderMapImpl::clear() {
 
 bool HeaderMapImpl::HeaderList::maybeMakeMap() const {
   if (lazy_map_.empty()) {
-    if (MapSizeThreshold == 0 || headers_.size() < MapSizeThreshold) {
+#if MAP_SIZE_THRESHOLD != 0
+    if (headers_.size() < MAP_SIZE_THRESHOLD) {
       return false;
     }
+#endif
     for (auto node = headers_.begin(); node != headers_.end(); ++node) {
       absl::string_view key = node->key().getStringView();
 #if HEADER_MAP_USE_FLAT_HASH_MAP
