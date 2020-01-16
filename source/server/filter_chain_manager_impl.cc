@@ -1,6 +1,6 @@
 #include "server/filter_chain_manager_impl.h"
 
-#include "envoy/config/listener/v3alpha/listener_components.pb.h"
+#include "envoy/config/listener/v3/listener_components.pb.h"
 
 #include "common/common/empty_string.h"
 #include "common/common/fmt.h"
@@ -45,12 +45,11 @@ ThreadLocal::SlotAllocator& FilterChainFactoryContextImpl::threadLocal() {
   return parent_context_.threadLocal();
 }
 
-const envoy::config::core::v3alpha::Metadata&
-FilterChainFactoryContextImpl::listenerMetadata() const {
+const envoy::config::core::v3::Metadata& FilterChainFactoryContextImpl::listenerMetadata() const {
   return parent_context_.listenerMetadata();
 }
 
-envoy::config::core::v3alpha::TrafficDirection FilterChainFactoryContextImpl::direction() const {
+envoy::config::core::v3::TrafficDirection FilterChainFactoryContextImpl::direction() const {
   return parent_context_.direction();
 }
 
@@ -134,10 +133,10 @@ bool FilterChainManagerImpl::isWildcardServerName(const std::string& name) {
 }
 
 void FilterChainManagerImpl::addFilterChain(
-    absl::Span<const envoy::config::listener::v3alpha::FilterChain* const> filter_chain_span,
+    absl::Span<const envoy::config::listener::v3::FilterChain* const> filter_chain_span,
     FilterChainFactoryBuilder& filter_chain_factory_builder,
     FilterChainFactoryContextCreator& context_creator) {
-  std::unordered_set<envoy::config::listener::v3alpha::FilterChainMatch, MessageUtil, MessageUtil>
+  std::unordered_set<envoy::config::listener::v3::FilterChainMatch, MessageUtil, MessageUtil>
       filter_chains;
   for (const auto& filter_chain : filter_chain_span) {
     const auto& filter_chain_match = filter_chain->filter_chain_match();
@@ -196,7 +195,7 @@ void FilterChainManagerImpl::addFilterChainForDestinationPorts(
     const std::vector<std::string>& destination_ips,
     const absl::Span<const std::string* const> server_names, const std::string& transport_protocol,
     const absl::Span<const std::string* const> application_protocols,
-    const envoy::config::listener::v3alpha::FilterChainMatch::ConnectionSourceType source_type,
+    const envoy::config::listener::v3::FilterChainMatch::ConnectionSourceType source_type,
     const std::vector<std::string>& source_ips,
     const absl::Span<const Protobuf::uint32> source_ports,
     const Network::FilterChainSharedPtr& filter_chain) {
@@ -213,7 +212,7 @@ void FilterChainManagerImpl::addFilterChainForDestinationIPs(
     DestinationIPsMap& destination_ips_map, const std::vector<std::string>& destination_ips,
     const absl::Span<const std::string* const> server_names, const std::string& transport_protocol,
     const absl::Span<const std::string* const> application_protocols,
-    const envoy::config::listener::v3alpha::FilterChainMatch::ConnectionSourceType source_type,
+    const envoy::config::listener::v3::FilterChainMatch::ConnectionSourceType source_type,
     const std::vector<std::string>& source_ips,
     const absl::Span<const Protobuf::uint32> source_ports,
     const Network::FilterChainSharedPtr& filter_chain) {
@@ -234,7 +233,7 @@ void FilterChainManagerImpl::addFilterChainForServerNames(
     ServerNamesMapSharedPtr& server_names_map_ptr,
     const absl::Span<const std::string* const> server_names, const std::string& transport_protocol,
     const absl::Span<const std::string* const> application_protocols,
-    const envoy::config::listener::v3alpha::FilterChainMatch::ConnectionSourceType source_type,
+    const envoy::config::listener::v3::FilterChainMatch::ConnectionSourceType source_type,
     const std::vector<std::string>& source_ips,
     const absl::Span<const Protobuf::uint32> source_ports,
     const Network::FilterChainSharedPtr& filter_chain) {
@@ -266,7 +265,7 @@ void FilterChainManagerImpl::addFilterChainForServerNames(
 void FilterChainManagerImpl::addFilterChainForApplicationProtocols(
     ApplicationProtocolsMap& application_protocols_map,
     const absl::Span<const std::string* const> application_protocols,
-    const envoy::config::listener::v3alpha::FilterChainMatch::ConnectionSourceType source_type,
+    const envoy::config::listener::v3::FilterChainMatch::ConnectionSourceType source_type,
     const std::vector<std::string>& source_ips,
     const absl::Span<const Protobuf::uint32> source_ports,
     const Network::FilterChainSharedPtr& filter_chain) {
@@ -283,7 +282,7 @@ void FilterChainManagerImpl::addFilterChainForApplicationProtocols(
 
 void FilterChainManagerImpl::addFilterChainForSourceTypes(
     SourceTypesArray& source_types_array,
-    const envoy::config::listener::v3alpha::FilterChainMatch::ConnectionSourceType source_type,
+    const envoy::config::listener::v3::FilterChainMatch::ConnectionSourceType source_type,
     const std::vector<std::string>& source_ips,
     const absl::Span<const Protobuf::uint32> source_ports,
     const Network::FilterChainSharedPtr& filter_chain) {
@@ -465,10 +464,10 @@ const Network::FilterChain* FilterChainManagerImpl::findFilterChainForSourceType
     const SourceTypesArray& source_types, const Network::ConnectionSocket& socket) const {
 
   const auto& filter_chain_local =
-      source_types[envoy::config::listener::v3alpha::FilterChainMatch::SAME_IP_OR_LOOPBACK];
+      source_types[envoy::config::listener::v3::FilterChainMatch::SAME_IP_OR_LOOPBACK];
 
   const auto& filter_chain_external =
-      source_types[envoy::config::listener::v3alpha::FilterChainMatch::EXTERNAL];
+      source_types[envoy::config::listener::v3::FilterChainMatch::EXTERNAL];
 
   // isSameIpOrLoopback can be expensive. Call it only if LOCAL or EXTERNAL have entries.
   const bool is_local_connection =
@@ -486,8 +485,7 @@ const Network::FilterChain* FilterChainManagerImpl::findFilterChainForSourceType
     }
   }
 
-  const auto& filter_chain_any =
-      source_types[envoy::config::listener::v3alpha::FilterChainMatch::ANY];
+  const auto& filter_chain_any = source_types[envoy::config::listener::v3::FilterChainMatch::ANY];
 
   if (!filter_chain_any.first.empty()) {
     return findFilterChainForSourceIpAndPort(*filter_chain_any.second, socket);
@@ -571,7 +569,7 @@ void FilterChainManagerImpl::convertIPsToTries() {
 }
 
 Configuration::FilterChainFactoryContext& FilterChainManagerImpl::createFilterChainFactoryContext(
-    const ::envoy::config::listener::v3alpha::FilterChain* const filter_chain) {
+    const ::envoy::config::listener::v3::FilterChain* const filter_chain) {
   // TODO(lambdai): drain close should be saved in per filter chain context
   UNREFERENCED_PARAMETER(filter_chain);
   factory_contexts_.push_back(std::make_unique<FilterChainFactoryContextImpl>(parent_context_));

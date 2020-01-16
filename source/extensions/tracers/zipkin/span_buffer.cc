@@ -1,6 +1,6 @@
 #include "extensions/tracers/zipkin/span_buffer.h"
 
-#include "envoy/config/trace/v3alpha/trace.pb.h"
+#include "envoy/config/trace/v3/trace.pb.h"
 
 #include "common/protobuf/utility.h"
 
@@ -16,12 +16,12 @@ namespace Tracers {
 namespace Zipkin {
 
 SpanBuffer::SpanBuffer(
-    const envoy::config::trace::v3alpha::ZipkinConfig::CollectorEndpointVersion& version,
+    const envoy::config::trace::v3::ZipkinConfig::CollectorEndpointVersion& version,
     const bool shared_span_context)
     : serializer_{makeSerializer(version, shared_span_context)} {}
 
 SpanBuffer::SpanBuffer(
-    const envoy::config::trace::v3alpha::ZipkinConfig::CollectorEndpointVersion& version,
+    const envoy::config::trace::v3::ZipkinConfig::CollectorEndpointVersion& version,
     const bool shared_span_context, uint64_t size)
     : serializer_{makeSerializer(version, shared_span_context)} {
   allocateBuffer(size);
@@ -45,14 +45,14 @@ bool SpanBuffer::addSpan(Span&& span) {
 }
 
 SerializerPtr SpanBuffer::makeSerializer(
-    const envoy::config::trace::v3alpha::ZipkinConfig::CollectorEndpointVersion& version,
+    const envoy::config::trace::v3::ZipkinConfig::CollectorEndpointVersion& version,
     const bool shared_span_context) {
   switch (version) {
-  case envoy::config::trace::v3alpha::ZipkinConfig::hidden_envoy_deprecated_HTTP_JSON_V1:
+  case envoy::config::trace::v3::ZipkinConfig::hidden_envoy_deprecated_HTTP_JSON_V1:
     return std::make_unique<JsonV1Serializer>();
-  case envoy::config::trace::v3alpha::ZipkinConfig::HTTP_JSON:
+  case envoy::config::trace::v3::ZipkinConfig::HTTP_JSON:
     return std::make_unique<JsonV2Serializer>(shared_span_context);
-  case envoy::config::trace::v3alpha::ZipkinConfig::HTTP_PROTO:
+  case envoy::config::trace::v3::ZipkinConfig::HTTP_PROTO:
     return std::make_unique<ProtobufSerializer>(shared_span_context);
   default:
     NOT_REACHED_GCOVR_EXCL_LINE;

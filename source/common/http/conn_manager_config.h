@@ -1,11 +1,11 @@
 #pragma once
 
 #include "envoy/config/config_provider.h"
-#include "envoy/extensions/filters/network/http_connection_manager/v3alpha/http_connection_manager.pb.h"
+#include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 #include "envoy/http/filter.h"
 #include "envoy/router/rds.h"
 #include "envoy/stats/scope.h"
-#include "envoy/type/v3alpha/percent.pb.h"
+#include "envoy/type/v3/percent.pb.h"
 
 #include "common/http/date_provider.h"
 #include "common/network/utility.h"
@@ -109,9 +109,9 @@ struct ConnectionManagerTracingStats {
 struct TracingConnectionManagerConfig {
   Tracing::OperationName operation_name_;
   Tracing::CustomTagMap custom_tags_;
-  envoy::type::v3alpha::FractionalPercent client_sampling_;
-  envoy::type::v3alpha::FractionalPercent random_sampling_;
-  envoy::type::v3alpha::FractionalPercent overall_sampling_;
+  envoy::type::v3::FractionalPercent client_sampling_;
+  envoy::type::v3::FractionalPercent random_sampling_;
+  envoy::type::v3::FractionalPercent overall_sampling_;
   bool verbose_;
   uint32_t max_path_tag_length_;
 };
@@ -178,7 +178,7 @@ public:
 class ConnectionManagerConfig {
 public:
   using HttpConnectionManagerProto =
-      envoy::extensions::filters::network::http_connection_manager::v3alpha::HttpConnectionManager;
+      envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager;
 
   virtual ~ConnectionManagerConfig() = default;
 

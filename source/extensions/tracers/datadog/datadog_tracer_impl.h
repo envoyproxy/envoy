@@ -2,7 +2,7 @@
 
 #include <datadog/opentracing.h>
 
-#include "envoy/config/trace/v3alpha/trace.pb.h"
+#include "envoy/config/trace/v3/trace.pb.h"
 #include "envoy/local_info/local_info.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/thread_local/thread_local.h"
@@ -42,7 +42,7 @@ public:
   /**
    * Constructor. It adds itself and a newly-created Datadog::Tracer object to a thread-local store.
    */
-  Driver(const envoy::config::trace::v3alpha::DatadogConfig& datadog_config,
+  Driver(const envoy::config::trace::v3::DatadogConfig& datadog_config,
          Upstream::ClusterManager& cluster_manager, Stats::Store& stats,
          ThreadLocal::SlotAllocator& tls, Runtime::Loader& runtime);
 

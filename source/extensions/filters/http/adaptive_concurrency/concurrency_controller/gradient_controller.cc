@@ -4,7 +4,7 @@
 #include <chrono>
 
 #include "envoy/event/dispatcher.h"
-#include "envoy/extensions/filters/http/adaptive_concurrency/v3alpha/adaptive_concurrency.pb.h"
+#include "envoy/extensions/filters/http/adaptive_concurrency/v3/adaptive_concurrency.pb.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/stats/stats.h"
 
@@ -23,7 +23,7 @@ namespace AdaptiveConcurrency {
 namespace ConcurrencyController {
 
 GradientControllerConfig::GradientControllerConfig(
-    const envoy::extensions::filters::http::adaptive_concurrency::v3alpha::GradientControllerConfig&
+    const envoy::extensions::filters::http::adaptive_concurrency::v3::GradientControllerConfig&
         proto_config,
     Runtime::Loader& runtime)
     : runtime_(runtime),

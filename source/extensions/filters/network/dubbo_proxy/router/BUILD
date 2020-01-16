@@ -27,7 +27,7 @@ envoy_cc_library(
         "//source/common/config:utility_lib",
         "//source/common/singleton:const_singleton",
         "//source/extensions/filters/network/dubbo_proxy:metadata_lib",
-        "@envoy_api//envoy/extensions/filters/network/dubbo_proxy/v3alpha:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/network/dubbo_proxy/v3:pkg_cc_proto",
     ],
 )
 
@@ -45,9 +45,9 @@ envoy_cc_library(
         "//source/common/protobuf:utility_lib",
         "//source/extensions/filters/network/dubbo_proxy:metadata_lib",
         "//source/extensions/filters/network/dubbo_proxy:serializer_interface",
-        "@envoy_api//envoy/config/route/v3alpha:pkg_cc_proto",
-        "@envoy_api//envoy/extensions/filters/network/dubbo_proxy/v3alpha:pkg_cc_proto",
-        "@envoy_api//envoy/type/v3alpha:pkg_cc_proto",
+        "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/network/dubbo_proxy/v3:pkg_cc_proto",
+        "@envoy_api//envoy/type/v3:pkg_cc_proto",
     ],
 )
 
@@ -61,7 +61,7 @@ envoy_cc_library(
         "//source/extensions/filters/network/dubbo_proxy/filters:factory_base_lib",
         "//source/extensions/filters/network/dubbo_proxy/filters:filter_config_interface",
         "//source/extensions/filters/network/dubbo_proxy/filters:well_known_names",
-        "@envoy_api//envoy/extensions/filters/network/dubbo_proxy/router/v3alpha:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/network/dubbo_proxy/router/v3:pkg_cc_proto",
     ],
 )
 

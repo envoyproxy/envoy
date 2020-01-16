@@ -4,9 +4,9 @@
 
 #include "envoy/common/pure.h"
 #include "envoy/common/time.h"
-#include "envoy/config/route/v3alpha/route.pb.h"
+#include "envoy/config/route/v3/route.pb.h"
 #include "envoy/router/rds.h"
-#include "envoy/service/discovery/v3alpha/discovery.pb.h"
+#include "envoy/service/discovery/v3/discovery.pb.h"
 
 #include "common/protobuf/protobuf.h"
 
@@ -28,7 +28,7 @@ public:
    * @param version_info supplies RouteConfiguration version.
    * @return bool whether RouteConfiguration has been updated.
    */
-  virtual bool onRdsUpdate(const envoy::config::route::v3alpha::RouteConfiguration& rc,
+  virtual bool onRdsUpdate(const envoy::config::route::v3::RouteConfiguration& rc,
                            const std::string& version_info) PURE;
 
   /**
@@ -39,11 +39,10 @@ public:
    * @param version_info supplies RouteConfiguration version.
    * @return bool whether RouteConfiguration has been updated.
    */
-  virtual bool
-  onVhdsUpdate(const Protobuf::RepeatedPtrField<envoy::service::discovery::v3alpha::Resource>&
-                   added_resources,
-               const Protobuf::RepeatedPtrField<std::string>& removed_resources,
-               const std::string& version_info) PURE;
+  virtual bool onVhdsUpdate(
+      const Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource>& added_resources,
+      const Protobuf::RepeatedPtrField<std::string>& removed_resources,
+      const std::string& version_info) PURE;
 
   /**
    * @return std::string& the name of RouteConfiguration.
@@ -78,7 +77,7 @@ public:
   /**
    * @return envoy::api::v2::RouteConfiguration& current RouteConfiguration.
    */
-  virtual const envoy::config::route::v3alpha::RouteConfiguration& routeConfiguration() PURE;
+  virtual const envoy::config::route::v3::RouteConfiguration& routeConfiguration() PURE;
 
   /**
    * @return SystemTime the time of the last update.

@@ -1,7 +1,7 @@
 #pragma once
 
 #include "envoy/event/dispatcher.h"
-#include "envoy/extensions/common/dynamic_forward_proxy/v3alpha/dns_cache.pb.h"
+#include "envoy/extensions/common/dynamic_forward_proxy/v3/dns_cache.pb.h"
 #include "envoy/singleton/manager.h"
 #include "envoy/thread_local/thread_local.h"
 
@@ -164,8 +164,8 @@ public:
    * @param config supplies the cache parameters. If a cache exists with the same parameters it
    *               will be returned, otherwise a new one will be created.
    */
-  virtual DnsCacheSharedPtr getCache(
-      const envoy::extensions::common::dynamic_forward_proxy::v3alpha::DnsCacheConfig& config) PURE;
+  virtual DnsCacheSharedPtr
+  getCache(const envoy::extensions::common::dynamic_forward_proxy::v3::DnsCacheConfig& config) PURE;
 };
 
 using DnsCacheManagerSharedPtr = std::shared_ptr<DnsCacheManager>;

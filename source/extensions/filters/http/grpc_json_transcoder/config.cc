@@ -1,7 +1,7 @@
 #include "extensions/filters/http/grpc_json_transcoder/config.h"
 
-#include "envoy/extensions/filters/http/grpc_json_transcoder/v3alpha/transcoder.pb.h"
-#include "envoy/extensions/filters/http/grpc_json_transcoder/v3alpha/transcoder.pb.validate.h"
+#include "envoy/extensions/filters/http/grpc_json_transcoder/v3/transcoder.pb.h"
+#include "envoy/extensions/filters/http/grpc_json_transcoder/v3/transcoder.pb.validate.h"
 #include "envoy/registry/registry.h"
 
 #include "extensions/filters/http/grpc_json_transcoder/json_transcoder_filter.h"
@@ -12,7 +12,7 @@ namespace HttpFilters {
 namespace GrpcJsonTranscoder {
 
 Http::FilterFactoryCb GrpcJsonTranscoderFilterConfig::createFilterFactoryFromProtoTyped(
-    const envoy::extensions::filters::http::grpc_json_transcoder::v3alpha::GrpcJsonTranscoder&
+    const envoy::extensions::filters::http::grpc_json_transcoder::v3::GrpcJsonTranscoder&
         proto_config,
     const std::string&, Server::Configuration::FactoryContext& context) {
   JsonTranscoderConfigSharedPtr filter_config =

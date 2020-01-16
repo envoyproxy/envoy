@@ -2,7 +2,7 @@
 
 #include <memory>
 
-#include "envoy/extensions/filters/http/rbac/v3alpha/rbac.pb.h"
+#include "envoy/extensions/filters/http/rbac/v3/rbac.pb.h"
 #include "envoy/http/filter.h"
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats_macros.h"
@@ -20,7 +20,7 @@ namespace RBACFilter {
 class RoleBasedAccessControlRouteSpecificFilterConfig : public Router::RouteSpecificFilterConfig {
 public:
   RoleBasedAccessControlRouteSpecificFilterConfig(
-      const envoy::extensions::filters::http::rbac::v3alpha::RBACPerRoute& per_route_config);
+      const envoy::extensions::filters::http::rbac::v3::RBACPerRoute& per_route_config);
 
   const Filters::Common::RBAC::RoleBasedAccessControlEngineImpl*
   engine(Filters::Common::RBAC::EnforcementMode mode) const {
@@ -39,7 +39,7 @@ private:
 class RoleBasedAccessControlFilterConfig {
 public:
   RoleBasedAccessControlFilterConfig(
-      const envoy::extensions::filters::http::rbac::v3alpha::RBAC& proto_config,
+      const envoy::extensions::filters::http::rbac::v3::RBAC& proto_config,
       const std::string& stats_prefix, Stats::Scope& scope);
 
   Filters::Common::RBAC::RoleBasedAccessControlFilterStats& stats() { return stats_; }

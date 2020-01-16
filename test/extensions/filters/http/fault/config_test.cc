@@ -1,6 +1,6 @@
-#include "envoy/extensions/filters/http/fault/v3alpha/fault.pb.h"
-#include "envoy/extensions/filters/http/fault/v3alpha/fault.pb.validate.h"
-#include "envoy/type/v3alpha/percent.pb.h"
+#include "envoy/extensions/filters/http/fault/v3/fault.pb.h"
+#include "envoy/extensions/filters/http/fault/v3/fault.pb.validate.h"
+#include "envoy/type/v3/percent.pb.h"
 
 #include "extensions/filters/http/fault/config.h"
 
@@ -20,7 +20,7 @@ namespace {
 
 TEST(FaultFilterConfigTest, ValidateFail) {
   NiceMock<Server::Configuration::MockFactoryContext> context;
-  envoy::extensions::filters::http::fault::v3alpha::HTTPFault fault;
+  envoy::extensions::filters::http::fault::v3::HTTPFault fault;
   fault.mutable_abort();
   EXPECT_THROW(FaultFilterFactory().createFilterFactoryFromProto(fault, "stats", context),
                ProtoValidationException);
@@ -45,10 +45,10 @@ TEST(FaultFilterConfigTest, FaultFilterCorrectJson) {
 }
 
 TEST(FaultFilterConfigTest, FaultFilterCorrectProto) {
-  envoy::extensions::filters::http::fault::v3alpha::HTTPFault config;
+  envoy::extensions::filters::http::fault::v3::HTTPFault config;
   config.mutable_delay()->mutable_percentage()->set_numerator(100);
   config.mutable_delay()->mutable_percentage()->set_denominator(
-      envoy::type::v3alpha::FractionalPercent::HUNDRED);
+      envoy::type::v3::FractionalPercent::HUNDRED);
   config.mutable_delay()->mutable_fixed_delay()->set_seconds(5);
 
   NiceMock<Server::Configuration::MockFactoryContext> context;

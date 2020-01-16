@@ -71,8 +71,8 @@ envoy_cc_extension(
         "//source/extensions/transport_sockets/raw_buffer:config",
         "//source/server:transport_socket_config_lib",
         "@envoy_api//envoy/config/cluster/redis:pkg_cc_proto",
-        "@envoy_api//envoy/config/cluster/v3alpha:pkg_cc_proto",
-        "@envoy_api//envoy/config/endpoint/v3alpha:pkg_cc_proto",
-        "@envoy_api//envoy/extensions/filters/network/redis_proxy/v3alpha:pkg_cc_proto",
+        "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/endpoint/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/network/redis_proxy/v3:pkg_cc_proto",
     ],
 )

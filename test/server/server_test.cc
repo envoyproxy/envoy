@@ -1,6 +1,6 @@
 #include <memory>
 
-#include "envoy/config/core/v3alpha/base.pb.h"
+#include "envoy/config/core/v3/base.pb.h"
 
 #include "common/common/assert.h"
 #include "common/common/version.h"
@@ -217,7 +217,7 @@ protected:
     return server_thread;
   }
 
-  void expectCorrectBuildVersion(const envoy::config::core::v3alpha::BuildVersion& build_version) {
+  void expectCorrectBuildVersion(const envoy::config::core::v3::BuildVersion& build_version) {
     std::string version_string =
         absl::StrCat(build_version.version().major_number(), ".",
                      build_version.version().minor_number(), ".", build_version.version().patch());
@@ -767,7 +767,7 @@ TEST_P(ServerInstanceImplTest, BootstrapNodeWithSocketOptions) {
   // both of them use SO_REUSEPORT socket option.
   auto options = std::make_shared<Network::Socket::Options>();
   options->emplace_back(std::make_shared<Network::SocketOptionImpl>(
-      envoy::config::core::v3alpha::SocketOption::STATE_PREBIND,
+      envoy::config::core::v3::SocketOption::STATE_PREBIND,
       ENVOY_MAKE_SOCKET_OPTION_NAME(SOL_SOCKET, SO_REUSEPORT), 1));
   EXPECT_NO_THROW(bindAndListenTcpSocket(address, options));
 }

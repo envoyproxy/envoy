@@ -1,5 +1,5 @@
-#include "envoy/extensions/filters/http/csrf/v3alpha/csrf.pb.h"
-#include "envoy/type/v3alpha/percent.pb.h"
+#include "envoy/extensions/filters/http/csrf/v3/csrf.pb.h"
+#include "envoy/type/v3/percent.pb.h"
 
 #include "common/http/header_map_impl.h"
 
@@ -25,17 +25,17 @@ namespace Csrf {
 class CsrfFilterTest : public testing::Test {
 public:
   CsrfFilterConfigSharedPtr setupConfig() {
-    envoy::extensions::filters::http::csrf::v3alpha::CsrfPolicy policy;
+    envoy::extensions::filters::http::csrf::v3::CsrfPolicy policy;
     const auto& filter_enabled = policy.mutable_filter_enabled();
     filter_enabled->mutable_default_value()->set_numerator(100);
     filter_enabled->mutable_default_value()->set_denominator(
-        envoy::type::v3alpha::FractionalPercent::HUNDRED);
+        envoy::type::v3::FractionalPercent::HUNDRED);
     filter_enabled->set_runtime_key("csrf.enabled");
 
     const auto& shadow_enabled = policy.mutable_shadow_enabled();
     shadow_enabled->mutable_default_value()->set_numerator(0);
     shadow_enabled->mutable_default_value()->set_denominator(
-        envoy::type::v3alpha::FractionalPercent::HUNDRED);
+        envoy::type::v3::FractionalPercent::HUNDRED);
     shadow_enabled->set_runtime_key("csrf.shadow_enabled");
 
     const auto& add_exact_origin = policy.mutable_additional_origins()->Add();
@@ -72,14 +72,14 @@ public:
   void setFilterEnabled(bool enabled) {
     ON_CALL(runtime_.snapshot_,
             featureEnabled("csrf.enabled",
-                           testing::Matcher<const envoy::type::v3alpha::FractionalPercent&>(_)))
+                           testing::Matcher<const envoy::type::v3::FractionalPercent&>(_)))
         .WillByDefault(Return(enabled));
   }
 
   void setShadowEnabled(bool enabled) {
     ON_CALL(runtime_.snapshot_,
             featureEnabled("csrf.shadow_enabled",
-                           testing::Matcher<const envoy::type::v3alpha::FractionalPercent&>(_)))
+                           testing::Matcher<const envoy::type::v3::FractionalPercent&>(_)))
         .WillByDefault(Return(enabled));
   }
 
