@@ -1,6 +1,6 @@
 #include "extensions/transport_sockets/tap/tap.h"
 
-#include "envoy/extensions/transport_sockets/tap/v3alpha/tap.pb.h"
+#include "envoy/extensions/transport_sockets/tap/v3/tap.pb.h"
 
 #include "common/buffer/buffer_impl.h"
 
@@ -56,7 +56,7 @@ void TapSocket::onConnected() { transport_socket_->onConnected(); }
 Ssl::ConnectionInfoConstSharedPtr TapSocket::ssl() const { return transport_socket_->ssl(); }
 
 TapSocketFactory::TapSocketFactory(
-    const envoy::extensions::transport_sockets::tap::v3alpha::Tap& proto_config,
+    const envoy::extensions::transport_sockets::tap::v3::Tap& proto_config,
     Common::Tap::TapConfigFactoryPtr&& config_factory, Server::Admin& admin,
     Singleton::Manager& singleton_manager, ThreadLocal::SlotAllocator& tls,
     Event::Dispatcher& main_thread_dispatcher,

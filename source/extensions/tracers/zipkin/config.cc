@@ -1,7 +1,7 @@
 #include "extensions/tracers/zipkin/config.h"
 
-#include "envoy/config/trace/v3alpha/trace.pb.h"
-#include "envoy/config/trace/v3alpha/trace.pb.validate.h"
+#include "envoy/config/trace/v3/trace.pb.h"
+#include "envoy/config/trace/v3/trace.pb.validate.h"
 #include "envoy/registry/registry.h"
 
 #include "common/common/utility.h"
@@ -18,7 +18,7 @@ namespace Zipkin {
 ZipkinTracerFactory::ZipkinTracerFactory() : FactoryBase(TracerNames::get().Zipkin) {}
 
 Tracing::HttpTracerPtr ZipkinTracerFactory::createHttpTracerTyped(
-    const envoy::config::trace::v3alpha::ZipkinConfig& proto_config, Server::Instance& server) {
+    const envoy::config::trace::v3::ZipkinConfig& proto_config, Server::Instance& server) {
   Tracing::DriverPtr zipkin_driver = std::make_unique<Zipkin::Driver>(
       proto_config, server.clusterManager(), server.stats(), server.threadLocal(), server.runtime(),
       server.localInfo(), server.random(), server.timeSource());

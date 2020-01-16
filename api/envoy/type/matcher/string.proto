@@ -4,6 +4,7 @@ package envoy.type.matcher;
 
 import "envoy/type/matcher/regex.proto";
 
+import "envoy/annotations/deprecation.proto";
 import "validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.type.matcher";
@@ -54,7 +55,11 @@ message StringMatcher {
     // .. attention::
     //   This field has been deprecated in favor of `safe_regex` as it is not safe for use with
     //   untrusted input in all cases.
-    string regex = 4 [deprecated = true, (validate.rules).string = {max_bytes: 1024}];
+    string regex = 4 [
+      deprecated = true,
+      (validate.rules).string = {max_bytes: 1024},
+      (envoy.annotations.disallowed_by_default) = true
+    ];
 
     // The input string must match the regular expression specified here.
     RegexMatcher safe_regex = 5 [(validate.rules).message = {required: true}];

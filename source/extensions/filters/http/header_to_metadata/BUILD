@@ -20,7 +20,7 @@ envoy_cc_library(
         "//include/envoy/server:filter_config_interface",
         "//source/common/common:base64_lib",
         "//source/extensions/filters/http:well_known_names",
-        "@envoy_api//envoy/extensions/filters/http/header_to_metadata/v3alpha:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/http/header_to_metadata/v3:pkg_cc_proto",
     ],
 )
 
@@ -35,6 +35,6 @@ envoy_cc_extension(
         "//source/extensions/filters/http:well_known_names",
         "//source/extensions/filters/http/common:factory_base_lib",
         "//source/extensions/filters/http/header_to_metadata:header_to_metadata_filter_lib",
-        "@envoy_api//envoy/extensions/filters/http/header_to_metadata/v3alpha:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/http/header_to_metadata/v3:pkg_cc_proto",
     ],
 )

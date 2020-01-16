@@ -2,7 +2,7 @@
 
 #include <memory>
 
-#include "envoy/extensions/filters/http/jwt_authn/v3alpha/config.pb.h"
+#include "envoy/extensions/filters/http/jwt_authn/v3/config.pb.h"
 
 #include "common/common/utility.h"
 #include "common/http/headers.h"
@@ -11,8 +11,8 @@
 
 #include "absl/strings/match.h"
 
-using envoy::extensions::filters::http::jwt_authn::v3alpha::JwtAuthentication;
-using envoy::extensions::filters::http::jwt_authn::v3alpha::JwtProvider;
+using envoy::extensions::filters::http::jwt_authn::v3::JwtAuthentication;
+using envoy::extensions::filters::http::jwt_authn::v3::JwtProvider;
 using Envoy::Http::LowerCaseString;
 
 namespace Envoy {
@@ -89,7 +89,7 @@ public:
   ExtractorImpl(const JwtProvider& provider);
 
   ExtractorImpl(
-      const std::vector<const envoy::extensions::filters::http::jwt_authn::v3alpha::JwtProvider*>&
+      const std::vector<const envoy::extensions::filters::http::jwt_authn::v3::JwtProvider*>&
           providers);
 
   std::vector<JwtLocationConstPtr> extract(const Http::HeaderMap& headers) const override;

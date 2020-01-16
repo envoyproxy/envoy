@@ -77,7 +77,7 @@ config_helper_.addRuntimeOverride("Foo", "bar");
 An example of modifying `HttpConnectionManager` to change Envoy’s HTTP/1.1 processing:
 
 ```c++
-config_helper_.addConfigModifier([&](envoy::extensions::filters::network::http_connection_manager::v3alpha::HttpConnectionManager& hcm) -> void {
+config_helper_.addConfigModifier([&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager& hcm) -> void {
   envoy::api::v2::core::Http1ProtocolOptions options;
   options.mutable_allow_absolute_url()->set_value(true);
   hcm.mutable_http_protocol_options()->CopyFrom(options);

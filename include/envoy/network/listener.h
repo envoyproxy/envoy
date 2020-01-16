@@ -6,7 +6,7 @@
 
 #include "envoy/api/io_error.h"
 #include "envoy/common/exception.h"
-#include "envoy/config/core/v3alpha/base.pb.h"
+#include "envoy/config/core/v3/base.pb.h"
 #include "envoy/network/connection.h"
 #include "envoy/network/connection_balancer.h"
 #include "envoy/network/listen_socket.h"
@@ -135,7 +135,7 @@ public:
   /**
    * @return traffic direction of the listener.
    */
-  virtual envoy::config::core::v3alpha::TrafficDirection direction() const PURE;
+  virtual envoy::config::core::v3::TrafficDirection direction() const PURE;
 
   /**
    * @return the connection balancer for this listener. All listeners have a connection balancer,

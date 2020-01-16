@@ -3,7 +3,7 @@
 #include <sstream>
 #include <string>
 
-#include "envoy/config/trace/v3alpha/trace.pb.h"
+#include "envoy/config/trace/v3/trace.pb.h"
 
 #include "common/common/base64.h"
 #include "common/grpc/common.h"
@@ -49,7 +49,7 @@ class LightStepDriverTest : public testing::Test {
 public:
   LightStepDriverTest() : grpc_context_(*symbol_table_) {}
 
-  void setup(envoy::config::trace::v3alpha::LightstepConfig& lightstep_config, bool init_timer,
+  void setup(envoy::config::trace::v3::LightstepConfig& lightstep_config, bool init_timer,
              Common::Ot::OpenTracingDriver::PropagationMode propagation_mode =
                  Common::Ot::OpenTracingDriver::PropagationMode::TracerNative) {
     std::unique_ptr<lightstep::LightStepTracerOptions> opts(
@@ -78,7 +78,7 @@ public:
     const std::string yaml_string = R"EOF(
     collector_cluster: fake_cluster
     )EOF";
-    envoy::config::trace::v3alpha::LightstepConfig lightstep_config;
+    envoy::config::trace::v3::LightstepConfig lightstep_config;
     TestUtility::loadFromYaml(yaml_string, lightstep_config);
 
     setup(lightstep_config, true, propagation_mode);
@@ -116,7 +116,7 @@ TEST_F(LightStepDriverTest, LightStepLogger) {
 
 TEST_F(LightStepDriverTest, InitializeDriver) {
   {
-    envoy::config::trace::v3alpha::LightstepConfig lightstep_config;
+    envoy::config::trace::v3::LightstepConfig lightstep_config;
 
     EXPECT_THROW(setup(lightstep_config, false), EnvoyException);
   }
@@ -128,7 +128,7 @@ TEST_F(LightStepDriverTest, InitializeDriver) {
     const std::string yaml_string = R"EOF(
     collector_cluster: fake_cluster
     )EOF";
-    envoy::config::trace::v3alpha::LightstepConfig lightstep_config;
+    envoy::config::trace::v3::LightstepConfig lightstep_config;
     TestUtility::loadFromYaml(yaml_string, lightstep_config);
 
     EXPECT_THROW(setup(lightstep_config, false), EnvoyException);
@@ -142,7 +142,7 @@ TEST_F(LightStepDriverTest, InitializeDriver) {
     const std::string yaml_string = R"EOF(
     collector_cluster: fake_cluster
     )EOF";
-    envoy::config::trace::v3alpha::LightstepConfig lightstep_config;
+    envoy::config::trace::v3::LightstepConfig lightstep_config;
     TestUtility::loadFromYaml(yaml_string, lightstep_config);
 
     EXPECT_THROW(setup(lightstep_config, false), EnvoyException);
@@ -156,7 +156,7 @@ TEST_F(LightStepDriverTest, InitializeDriver) {
     const std::string yaml_string = R"EOF(
     collector_cluster: fake_cluster
     )EOF";
-    envoy::config::trace::v3alpha::LightstepConfig lightstep_config;
+    envoy::config::trace::v3::LightstepConfig lightstep_config;
     TestUtility::loadFromYaml(yaml_string, lightstep_config);
 
     setup(lightstep_config, true);

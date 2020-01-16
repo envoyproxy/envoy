@@ -5,11 +5,11 @@
 #include <string>
 #include <vector>
 
-#include "envoy/extensions/filters/http/ext_authz/v3alpha/ext_authz.pb.h"
+#include "envoy/extensions/filters/http/ext_authz/v3/ext_authz.pb.h"
 #include "envoy/http/filter.h"
 #include "envoy/local_info/local_info.h"
 #include "envoy/runtime/runtime.h"
-#include "envoy/service/auth/v3alpha/external_auth.pb.h"
+#include "envoy/service/auth/v3/external_auth.pb.h"
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats_macros.h"
 #include "envoy/upstream/cluster_manager.h"
@@ -57,7 +57,7 @@ struct ExtAuthzFilterStats {
  */
 class FilterConfig {
 public:
-  FilterConfig(const envoy::extensions::filters::http::ext_authz::v3alpha::ExtAuthz& config,
+  FilterConfig(const envoy::extensions::filters::http::ext_authz::v3::ExtAuthz& config,
                const LocalInfo::LocalInfo& local_info, Stats::Scope& scope,
                Runtime::Loader& runtime, Http::Context& http_context,
                const std::string& stats_prefix)
@@ -170,7 +170,7 @@ public:
   using ContextExtensionsMap = Protobuf::Map<std::string, std::string>;
 
   FilterConfigPerRoute(
-      const envoy::extensions::filters::http::ext_authz::v3alpha::ExtAuthzPerRoute& config)
+      const envoy::extensions::filters::http::ext_authz::v3::ExtAuthzPerRoute& config)
       : context_extensions_(config.has_check_settings()
                                 ? config.check_settings().context_extensions()
                                 : ContextExtensionsMap()),
@@ -247,7 +247,7 @@ private:
   // Used to identify if the callback to onComplete() is synchronous (on the stack) or asynchronous.
   bool initiating_call_{};
   bool buffer_data_{};
-  envoy::service::auth::v3alpha::CheckRequest check_request_{};
+  envoy::service::auth::v3::CheckRequest check_request_{};
 };
 
 } // namespace ExtAuthz

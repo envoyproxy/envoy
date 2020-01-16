@@ -2,7 +2,7 @@
 
 #include <string>
 
-#include "envoy/extensions/filters/http/dynamo/v3alpha/dynamo.pb.validate.h"
+#include "envoy/extensions/filters/http/dynamo/v3/dynamo.pb.validate.h"
 #include "envoy/registry/registry.h"
 
 #include "extensions/filters/http/dynamo/dynamo_filter.h"
@@ -14,8 +14,8 @@ namespace HttpFilters {
 namespace Dynamo {
 
 Http::FilterFactoryCb DynamoFilterConfig::createFilterFactoryFromProtoTyped(
-    const envoy::extensions::filters::http::dynamo::v3alpha::Dynamo&,
-    const std::string& stats_prefix, Server::Configuration::FactoryContext& context) {
+    const envoy::extensions::filters::http::dynamo::v3::Dynamo&, const std::string& stats_prefix,
+    Server::Configuration::FactoryContext& context) {
   auto stats = std::make_shared<DynamoStats>(context.scope(), stats_prefix);
   return [&context, stats](Http::FilterChainFactoryCallbacks& callbacks) -> void {
     callbacks.addStreamFilter(std::make_shared<Dynamo::DynamoFilter>(

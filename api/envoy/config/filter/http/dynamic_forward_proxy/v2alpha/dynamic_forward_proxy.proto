@@ -11,7 +11,7 @@ option java_package = "io.envoyproxy.envoy.config.filter.http.dynamic_forward_pr
 option java_outer_classname = "DynamicForwardProxyProto";
 option java_multiple_files = true;
 option (udpa.annotations.file_migrate).move_to_package =
-    "envoy.extensions.filters.http.dynamic_forward_proxy.v3alpha";
+    "envoy.extensions.filters.http.dynamic_forward_proxy.v3";
 
 // [#protodoc-title: Dynamic forward proxy]
 

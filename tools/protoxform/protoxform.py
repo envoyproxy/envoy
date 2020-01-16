@@ -32,6 +32,7 @@ from google.protobuf import text_format
 # Note: we have to include those proto definitions to make FormatOptions work,
 # this also serves as whitelist of extended options.
 from google.api import annotations_pb2 as _
+from udpa.annotations import sensitive_pb2 as _
 from validate import validate_pb2 as _
 from envoy.annotations import deprecation_pb2 as _
 from envoy.annotations import resource_pb2
@@ -560,9 +561,9 @@ def ParameterCallback(parameter):
 def Main():
   plugin.Plugin([
       plugin.DirectOutputDescriptor('.v2.proto', ProtoFormatVisitor),
-      plugin.OutputDescriptor('.v3alpha.proto', ProtoFormatVisitor,
+      plugin.OutputDescriptor('.v3.proto', ProtoFormatVisitor,
                               functools.partial(migrate.V3MigrationXform, False)),
-      plugin.OutputDescriptor('.v3alpha.envoy_internal.proto', ProtoFormatVisitor,
+      plugin.OutputDescriptor('.v3.envoy_internal.proto', ProtoFormatVisitor,
                               functools.partial(migrate.V3MigrationXform, True))
   ], ParameterCallback)
 

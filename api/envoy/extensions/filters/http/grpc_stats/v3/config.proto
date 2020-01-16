@@ -1,0 +1,37 @@
+syntax = "proto3";
+
+package envoy.extensions.filters.http.grpc_stats.v3;
+
+import "udpa/annotations/versioning.proto";
+
+import "validate/validate.proto";
+
+option java_package = "io.envoyproxy.envoy.extensions.filters.http.grpc_stats.v3";
+option java_outer_classname = "ConfigProto";
+option java_multiple_files = true;
+
+// [#protodoc-title: gRPC statistics] gRPC statistics filter
+// :ref:`configuration overview <config_http_filters_grpc_stats>`.
+// [#extension: envoy.filters.http.grpc_stats]
+
+// gRPC statistics filter configuration
+message FilterConfig {
+  option (udpa.annotations.versioning).previous_message_type =
+      "envoy.config.filter.http.grpc_stats.v2alpha.FilterConfig";
+
+  // If true, the filter maintains a filter state object with the request and response message
+  // counts.
+  bool emit_filter_state = 1;
+}
+
+// gRPC statistics filter state object in protobuf form.
+message FilterObject {
+  option (udpa.annotations.versioning).previous_message_type =
+      "envoy.config.filter.http.grpc_stats.v2alpha.FilterObject";
+
+  // Count of request messages in the request stream.
+  uint64 request_message_count = 1;
+
+  // Count of response messages in the response stream.
+  uint64 response_message_count = 2;
+}

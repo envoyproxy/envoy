@@ -2,8 +2,8 @@
 
 #include <unordered_map>
 
-#include "envoy/config/core/v3alpha/config_source.pb.h"
-#include "envoy/extensions/transport_sockets/tls/v3alpha/cert.pb.h"
+#include "envoy/config/core/v3/config_source.pb.h"
+#include "envoy/extensions/transport_sockets/tls/v3/cert.pb.h"
 #include "envoy/secret/secret_manager.h"
 #include "envoy/secret/secret_provider.h"
 #include "envoy/server/transport_socket_config.h"
@@ -19,8 +19,8 @@ namespace Secret {
 class SecretManagerImpl : public SecretManager {
 public:
   SecretManagerImpl(Server::ConfigTracker& config_tracker);
-  void addStaticSecret(
-      const envoy::extensions::transport_sockets::tls::v3alpha::Secret& secret) override;
+  void
+  addStaticSecret(const envoy::extensions::transport_sockets::tls::v3::Secret& secret) override;
 
   TlsCertificateConfigProviderSharedPtr
   findStaticTlsCertificateProvider(const std::string& name) const override;
@@ -32,32 +32,29 @@ public:
   findStaticTlsSessionTicketKeysContextProvider(const std::string& name) const override;
 
   TlsCertificateConfigProviderSharedPtr createInlineTlsCertificateProvider(
-      const envoy::extensions::transport_sockets::tls::v3alpha::TlsCertificate& tls_certificate)
+      const envoy::extensions::transport_sockets::tls::v3::TlsCertificate& tls_certificate)
       override;
 
   CertificateValidationContextConfigProviderSharedPtr
   createInlineCertificateValidationContextProvider(
-      const envoy::extensions::transport_sockets::tls::v3alpha::CertificateValidationContext&
+      const envoy::extensions::transport_sockets::tls::v3::CertificateValidationContext&
           certificate_validation_context) override;
 
   TlsSessionTicketKeysConfigProviderSharedPtr createInlineTlsSessionTicketKeysProvider(
-      const envoy::extensions::transport_sockets::tls::v3alpha::TlsSessionTicketKeys&
+      const envoy::extensions::transport_sockets::tls::v3::TlsSessionTicketKeys&
           tls_session_ticket_keys) override;
 
   TlsCertificateConfigProviderSharedPtr findOrCreateTlsCertificateProvider(
-      const envoy::config::core::v3alpha::ConfigSource& config_source,
-      const std::string& config_name,
+      const envoy::config::core::v3::ConfigSource& config_source, const std::string& config_name,
       Server::Configuration::TransportSocketFactoryContext& secret_provider_context) override;
 
   CertificateValidationContextConfigProviderSharedPtr
   findOrCreateCertificateValidationContextProvider(
-      const envoy::config::core::v3alpha::ConfigSource& config_source,
-      const std::string& config_name,
+      const envoy::config::core::v3::ConfigSource& config_source, const std::string& config_name,
       Server::Configuration::TransportSocketFactoryContext& secret_provider_context) override;
 
   TlsSessionTicketKeysConfigProviderSharedPtr findOrCreateTlsSessionTicketKeysContextProvider(
-      const envoy::config::core::v3alpha::ConfigSource& config_source,
-      const std::string& config_name,
+      const envoy::config::core::v3::ConfigSource& config_source, const std::string& config_name,
       Server::Configuration::TransportSocketFactoryContext& secret_provider_context) override;
 
 private:
@@ -68,7 +65,7 @@ private:
   public:
     // Finds or creates SdsApi object.
     std::shared_ptr<SecretType>
-    findOrCreate(const envoy::config::core::v3alpha::ConfigSource& sds_config_source,
+    findOrCreate(const envoy::config::core::v3::ConfigSource& sds_config_source,
                  const std::string& config_name,
                  Server::Configuration::TransportSocketFactoryContext& secret_provider_context) {
       const std::string map_key =

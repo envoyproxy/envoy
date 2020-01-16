@@ -2,7 +2,7 @@
 
 #include <regex>
 
-#include "envoy/config/bootstrap/v3alpha/bootstrap.pb.h"
+#include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 
 #include "test/integration/http_integration.h"
 #include "test/integration/integration.h"
@@ -75,11 +75,10 @@ protected:
                                                 auxiliary_filter_name_) +
                                         filterConfig(auxiliary_filter_name_));
     // double-check the filter was actually added
-    config_helper.addConfigModifier(
-        [this](envoy::config::bootstrap::v3alpha::Bootstrap& bootstrap) {
-          ASSERT_EQ(auxiliary_filter_name_,
-                    bootstrap.static_resources().listeners(0).filter_chains(0).filters(0).name());
-        });
+    config_helper.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+      ASSERT_EQ(auxiliary_filter_name_,
+                bootstrap.static_resources().listeners(0).filter_chains(0).filters(0).name());
+    });
   }
 
   /**
@@ -89,7 +88,7 @@ protected:
    */
   void addNetworkFilter(ConfigHelper& config_helper, const std::string& filter_yaml) {
     config_helper.addConfigModifier(
-        [filter_yaml](envoy::config::bootstrap::v3alpha::Bootstrap& bootstrap) {
+        [filter_yaml](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
           ASSERT_GT(bootstrap.mutable_static_resources()->listeners_size(), 0);
           auto l = bootstrap.mutable_static_resources()->mutable_listeners(0);
           ASSERT_GT(l->filter_chains_size(), 0);

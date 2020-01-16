@@ -1,7 +1,7 @@
 #include "extensions/filters/http/jwt_authn/filter_factory.h"
 
-#include "envoy/extensions/filters/http/jwt_authn/v3alpha/config.pb.h"
-#include "envoy/extensions/filters/http/jwt_authn/v3alpha/config.pb.validate.h"
+#include "envoy/extensions/filters/http/jwt_authn/v3/config.pb.h"
+#include "envoy/extensions/filters/http/jwt_authn/v3/config.pb.validate.h"
 #include "envoy/registry/registry.h"
 
 #include "common/config/datasource.h"
@@ -10,7 +10,7 @@
 
 #include "jwt_verify_lib/jwks.h"
 
-using envoy::extensions::filters::http::jwt_authn::v3alpha::JwtAuthentication;
+using envoy::extensions::filters::http::jwt_authn::v3::JwtAuthentication;
 using ::google::jwt_verify::Jwks;
 using ::google::jwt_verify::Status;
 
