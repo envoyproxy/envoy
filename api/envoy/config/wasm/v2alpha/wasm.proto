@@ -22,9 +22,9 @@ option (udpa.annotations.file_migrate).move_to_package = "envoy.extensions.wasm.
 message VmConfig {
   // An ID which will be used along with a hash of the wasm code (or the name of the registered Null
   // VM plugin) to determine which VM will be used for the plugin. All plugins which use the same
-  // vm_id and code will use the same VM. May be left blank. Sharing a VM between plugins can reduce
-  // memory utilization and make sharing of data easier which may have security implications. See
-  // ref: "TODO: add ref" for details.
+  // *vm_id* and code will use the same VM. May be left blank. Sharing a VM between plugins can
+  // reduce memory utilization and make sharing of data easier which may have security implications.
+  // See ref: "TODO: add ref" for details.
   string vm_id = 1;
 
   // The Wasm runtime type (either "v8" or "null" for code compiled into Envoy).
@@ -45,12 +45,13 @@ message VmConfig {
 // [#not-implemented-hide:] pending implementation.
 message PluginConfig {
   // A unique name for a filters/services in a VM for use in identifying the filter/service if
-  // multiple filters/services are handled by the same vm_id and root_id and for logging/debugging.
+  // multiple filters/services are handled by the same *vm_id* and *group_name* and for
+  // logging/debugging.
   string name = 1;
 
   // A unique ID for a set of filters/services in a VM which will share a RootContext and Contexts
   // if applicable (e.g. an Wasm HttpFilter and an Wasm AccessLog). If left blank, all
-  // filters/services with a blank group_name with the same vm_id will share Context(s).
+  // filters/services with a blank group_name with the same *vm_id* will share Context(s).
   string group_name = 2;
 
   // Configuration for finding or starting VM.
