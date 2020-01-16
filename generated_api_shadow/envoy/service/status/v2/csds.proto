@@ -16,8 +16,8 @@ option java_multiple_files = true;
 option java_generic_services = true;
 
 // CSDS is Client Status Discovery Service. It can be used to get the status of
-// xDS-compliant client from the management server's point of view. In the
-// future, it can also potentially be used as an interface to get the current
+// an xDS-compliant client from the management server's point of view. In the
+// future, it can potentially be used as an interface to get the current
 // state directly from the client.
 service ClientStatusService {
   rpc StreamClientStatus(stream ClientStatusRequest) returns (stream ClientStatusResponse) {
