@@ -397,19 +397,18 @@ void ConfigHelper::applyConfigModifiers() {
   config_modifiers_.clear();
 }
 
-void ConfigHelper::addRuntimeOverride(absl::string_view key, absl::string_view value) {
+void ConfigHelper::addRuntimeOverride(const std::string& key, const std::string& value) {
   if (bootstrap_.mutable_layered_runtime()->layers_size() == 0) {
-    bootstrap_.mutable_layered_runtime()->MergeFrom(
-        TestUtility::parseYaml<envoy::config::bootstrap::v3alpha::LayeredRuntime>(R"EOF( 
-layers:
-  - name: some_static_layer
-    static_layer:
-  - name: admin
-    admin_layer: {}
-)EOF"));
+    auto* static_layer = bootstrap_.mutable_layered_runtime()->add_layers();
+    static_layer->set_name("static_layer");
+    static_layer->mutable_static_layer();
+    auto* admin_layer = bootstrap_.mutable_layered_runtime()->add_layers();
+    admin_layer->set_name("admin");
+    admin_layer->mutable_admin_layer();
   }
-  ProtobufWkt::Struct base = TestUtility::parseYaml<ProtobufWkt::Struct>(StrCat(key, ": ", value));
-  bootstrap_.mutable_layered_runtime()->mutable_layers(0)->mutable_static_layer()->MergeFrom(base);
+  auto* static_layer =
+      bootstrap_.mutable_layered_runtime()->mutable_layers(0)->mutable_static_layer();
+  (*static_layer->mutable_fields())[std::string(key)] = ValueUtil::stringValue(std::string(value));
 }
 
 void ConfigHelper::finalize(const std::vector<uint32_t>& ports) {

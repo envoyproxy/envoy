@@ -126,7 +126,7 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, CorsFilterIntegrationTest,
                          TestUtility::ipTestParamsToString);
 
 TEST_P(CorsFilterIntegrationTest, DEPRECATED_FEATURE_TEST(TestVHostConfigSuccess)) {
-  config_helper_.addRuntimeOverride("envoy.deprecated_features:envoy.config.route.v3alpha."
+  config_helper_.addRuntimeOverride("envoy.deprecated_features:envoy.config.route.v3."
                                     "CorsPolicy.hidden_envoy_deprecated_enabled",
                                     "true");
   testPreflight(
@@ -170,7 +170,7 @@ TEST_P(CorsFilterIntegrationTest, DEPRECATED_FEATURE_TEST(TestRouteConfigSuccess
 }
 
 TEST_P(CorsFilterIntegrationTest, DEPRECATED_FEATURE_TEST(TestRouteConfigBadOrigin)) {
-  config_helper_.addRuntimeOverride("envoy.deprecated_features:envoy.config.route.v3alpha."
+  config_helper_.addRuntimeOverride("envoy.deprecated_features:envoy.config.route.v3."
                                     "CorsPolicy.hidden_envoy_deprecated_enabled",
                                     "true");
   testNormalRequest(
@@ -207,7 +207,7 @@ TEST_P(CorsFilterIntegrationTest, DEPRECATED_FEATURE_TEST(TestCorsDisabled)) {
 }
 
 TEST_P(CorsFilterIntegrationTest, DEPRECATED_FEATURE_TEST(TestLegacyCorsDisabled)) {
-  config_helper_.addRuntimeOverride("envoy.deprecated_features:envoy.config.route.v3alpha."
+  config_helper_.addRuntimeOverride("envoy.deprecated_features:envoy.config.route.v3."
                                     "CorsPolicy.hidden_envoy_deprecated_enabled",
                                     "true");
 
