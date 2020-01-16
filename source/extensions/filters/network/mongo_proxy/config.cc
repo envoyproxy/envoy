@@ -1,7 +1,7 @@
 #include "extensions/filters/network/mongo_proxy/config.h"
 
-#include "envoy/extensions/filters/network/mongo_proxy/v3alpha/mongo_proxy.pb.h"
-#include "envoy/extensions/filters/network/mongo_proxy/v3alpha/mongo_proxy.pb.validate.h"
+#include "envoy/extensions/filters/network/mongo_proxy/v3/mongo_proxy.pb.h"
+#include "envoy/extensions/filters/network/mongo_proxy/v3/mongo_proxy.pb.validate.h"
 #include "envoy/network/connection.h"
 #include "envoy/registry/registry.h"
 
@@ -15,7 +15,7 @@ namespace NetworkFilters {
 namespace MongoProxy {
 
 Network::FilterFactoryCb MongoProxyFilterConfigFactory::createFilterFactoryFromProtoTyped(
-    const envoy::extensions::filters::network::mongo_proxy::v3alpha::MongoProxy& proto_config,
+    const envoy::extensions::filters::network::mongo_proxy::v3::MongoProxy& proto_config,
     Server::Configuration::FactoryContext& context) {
 
   ASSERT(!proto_config.stat_prefix().empty());

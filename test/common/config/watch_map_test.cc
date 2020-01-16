@@ -1,8 +1,8 @@
 #include <memory>
 
 #include "envoy/common/exception.h"
-#include "envoy/config/endpoint/v3alpha/endpoint.pb.h"
-#include "envoy/service/discovery/v3alpha/discovery.pb.h"
+#include "envoy/config/endpoint/v3/endpoint.pb.h"
+#include "envoy/service/discovery/v3/discovery.pb.h"
 #include "envoy/stats/scope.h"
 
 #include "common/config/watch_map.h"
@@ -21,11 +21,10 @@ namespace Config {
 namespace {
 
 class NamedMockSubscriptionCallbacks
-    : public MockSubscriptionCallbacks<envoy::config::endpoint::v3alpha::ClusterLoadAssignment> {
+    : public MockSubscriptionCallbacks<envoy::config::endpoint::v3::ClusterLoadAssignment> {
 public:
   std::string resourceName(const ProtobufWkt::Any& resource) override {
-    return TestUtility::anyConvert<envoy::config::endpoint::v3alpha::ClusterLoadAssignment>(
-               resource)
+    return TestUtility::anyConvert<envoy::config::endpoint::v3::ClusterLoadAssignment>(resource)
         .cluster_name();
   }
 };
@@ -37,7 +36,7 @@ public:
 // update. We can therefore use the same expected_resources for both.
 void expectDeltaAndSotwUpdate(
     NamedMockSubscriptionCallbacks& callbacks,
-    const std::vector<envoy::config::endpoint::v3alpha::ClusterLoadAssignment>& expected_resources,
+    const std::vector<envoy::config::endpoint::v3::ClusterLoadAssignment>& expected_resources,
     const std::vector<std::string>& expected_removals, const std::string& version) {
   EXPECT_CALL(callbacks, onConfigUpdate(_, version))
       .WillOnce(Invoke(
@@ -45,7 +44,7 @@ void expectDeltaAndSotwUpdate(
                                const std::string&) {
             EXPECT_EQ(expected_resources.size(), gotten_resources.size());
             for (size_t i = 0; i < expected_resources.size(); i++) {
-              envoy::config::endpoint::v3alpha::ClusterLoadAssignment cur_gotten_resource;
+              envoy::config::endpoint::v3::ClusterLoadAssignment cur_gotten_resource;
               gotten_resources[i].UnpackTo(&cur_gotten_resource);
               EXPECT_TRUE(TestUtility::protoEqual(cur_gotten_resource, expected_resources[i]));
             }
@@ -53,14 +52,14 @@ void expectDeltaAndSotwUpdate(
   EXPECT_CALL(callbacks, onConfigUpdate(_, _, _))
       .WillOnce(
           Invoke([expected_resources, expected_removals, version](
-                     const Protobuf::RepeatedPtrField<envoy::service::discovery::v3alpha::Resource>&
+                     const Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource>&
                          gotten_resources,
                      const Protobuf::RepeatedPtrField<std::string>& removed_resources,
                      const std::string&) {
             EXPECT_EQ(expected_resources.size(), gotten_resources.size());
             for (size_t i = 0; i < expected_resources.size(); i++) {
               EXPECT_EQ(gotten_resources[i].version(), version);
-              envoy::config::endpoint::v3alpha::ClusterLoadAssignment cur_gotten_resource;
+              envoy::config::endpoint::v3::ClusterLoadAssignment cur_gotten_resource;
               gotten_resources[i].resource().UnpackTo(&cur_gotten_resource);
               EXPECT_TRUE(TestUtility::protoEqual(cur_gotten_resource, expected_resources[i]));
             }
@@ -84,12 +83,12 @@ void expectEmptySotwNoDeltaUpdate(NamedMockSubscriptionCallbacks& callbacks,
   EXPECT_CALL(callbacks, onConfigUpdate(_, _, version)).Times(0);
 }
 
-Protobuf::RepeatedPtrField<envoy::service::discovery::v3alpha::Resource>
+Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource>
 wrapInResource(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& anys,
                const std::string& version) {
-  Protobuf::RepeatedPtrField<envoy::service::discovery::v3alpha::Resource> ret;
+  Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource> ret;
   for (const auto& a : anys) {
-    envoy::config::endpoint::v3alpha::ClusterLoadAssignment cur_endpoint;
+    envoy::config::endpoint::v3::ClusterLoadAssignment cur_endpoint;
     a.UnpackTo(&cur_endpoint);
     auto* cur_resource = ret.Add();
     cur_resource->set_name(cur_endpoint.cluster_name());
@@ -107,7 +106,7 @@ void doDeltaAndSotwUpdate(SubscriptionCallbacks& watch_map,
                           const std::string& version) {
   watch_map.onConfigUpdate(sotw_resources, version);
 
-  Protobuf::RepeatedPtrField<envoy::service::discovery::v3alpha::Resource> delta_resources =
+  Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource> delta_resources =
       wrapInResource(sotw_resources, version);
   Protobuf::RepeatedPtrField<std::string> removed_names_proto;
   for (const auto& n : removed_names) {
@@ -133,15 +132,15 @@ TEST(WatchMapTest, Basic) {
 
     // ...the update is going to contain Bob and Carol...
     Protobuf::RepeatedPtrField<ProtobufWkt::Any> updated_resources;
-    envoy::config::endpoint::v3alpha::ClusterLoadAssignment bob;
+    envoy::config::endpoint::v3::ClusterLoadAssignment bob;
     bob.set_cluster_name("bob");
     updated_resources.Add()->PackFrom(bob);
-    envoy::config::endpoint::v3alpha::ClusterLoadAssignment carol;
+    envoy::config::endpoint::v3::ClusterLoadAssignment carol;
     carol.set_cluster_name("carol");
     updated_resources.Add()->PackFrom(carol);
 
     // ...so the watch should receive only Bob.
-    std::vector<envoy::config::endpoint::v3alpha::ClusterLoadAssignment> expected_resources;
+    std::vector<envoy::config::endpoint::v3::ClusterLoadAssignment> expected_resources;
     expected_resources.push_back(bob);
 
     expectDeltaAndSotwUpdate(callbacks, expected_resources, {}, "version1");
@@ -156,18 +155,18 @@ TEST(WatchMapTest, Basic) {
 
     // ...the update is going to contain Alice, Carol, Dave...
     Protobuf::RepeatedPtrField<ProtobufWkt::Any> updated_resources;
-    envoy::config::endpoint::v3alpha::ClusterLoadAssignment alice;
+    envoy::config::endpoint::v3::ClusterLoadAssignment alice;
     alice.set_cluster_name("alice");
     updated_resources.Add()->PackFrom(alice);
-    envoy::config::endpoint::v3alpha::ClusterLoadAssignment carol;
+    envoy::config::endpoint::v3::ClusterLoadAssignment carol;
     carol.set_cluster_name("carol");
     updated_resources.Add()->PackFrom(carol);
-    envoy::config::endpoint::v3alpha::ClusterLoadAssignment dave;
+    envoy::config::endpoint::v3::ClusterLoadAssignment dave;
     dave.set_cluster_name("dave");
     updated_resources.Add()->PackFrom(dave);
 
     // ...so the watch should receive only Carol and Dave.
-    std::vector<envoy::config::endpoint::v3alpha::ClusterLoadAssignment> expected_resources;
+    std::vector<envoy::config::endpoint::v3::ClusterLoadAssignment> expected_resources;
     expected_resources.push_back(carol);
     expected_resources.push_back(dave);
 
@@ -191,7 +190,7 @@ TEST(WatchMapTest, Overlap) {
   Watch* watch2 = watch_map.addWatch(callbacks2);
 
   Protobuf::RepeatedPtrField<ProtobufWkt::Any> updated_resources;
-  envoy::config::endpoint::v3alpha::ClusterLoadAssignment alice;
+  envoy::config::endpoint::v3::ClusterLoadAssignment alice;
   alice.set_cluster_name("alice");
   updated_resources.Add()->PackFrom(alice);
 
@@ -257,7 +256,7 @@ TEST(WatchMapTest, AddRemoveAdd) {
   Watch* watch2 = watch_map.addWatch(callbacks2);
 
   Protobuf::RepeatedPtrField<ProtobufWkt::Any> updated_resources;
-  envoy::config::endpoint::v3alpha::ClusterLoadAssignment alice;
+  envoy::config::endpoint::v3::ClusterLoadAssignment alice;
   alice.set_cluster_name("alice");
   updated_resources.Add()->PackFrom(alice);
 
@@ -309,12 +308,12 @@ TEST(WatchMapTest, UninterestingUpdate) {
   watch_map.updateWatchInterest(watch, {"alice"});
 
   Protobuf::RepeatedPtrField<ProtobufWkt::Any> alice_update;
-  envoy::config::endpoint::v3alpha::ClusterLoadAssignment alice;
+  envoy::config::endpoint::v3::ClusterLoadAssignment alice;
   alice.set_cluster_name("alice");
   alice_update.Add()->PackFrom(alice);
 
   Protobuf::RepeatedPtrField<ProtobufWkt::Any> bob_update;
-  envoy::config::endpoint::v3alpha::ClusterLoadAssignment bob;
+  envoy::config::endpoint::v3::ClusterLoadAssignment bob;
   bob.set_cluster_name("bob");
   bob_update.Add()->PackFrom(bob);
 
@@ -353,17 +352,17 @@ TEST(WatchMapTest, WatchingEverything) {
   watch_map.updateWatchInterest(watch2, {"alice"});
 
   Protobuf::RepeatedPtrField<ProtobufWkt::Any> updated_resources;
-  envoy::config::endpoint::v3alpha::ClusterLoadAssignment alice;
+  envoy::config::endpoint::v3::ClusterLoadAssignment alice;
   alice.set_cluster_name("alice");
   updated_resources.Add()->PackFrom(alice);
-  envoy::config::endpoint::v3alpha::ClusterLoadAssignment bob;
+  envoy::config::endpoint::v3::ClusterLoadAssignment bob;
   bob.set_cluster_name("bob");
   updated_resources.Add()->PackFrom(bob);
 
-  std::vector<envoy::config::endpoint::v3alpha::ClusterLoadAssignment> expected_resources1;
+  std::vector<envoy::config::endpoint::v3::ClusterLoadAssignment> expected_resources1;
   expected_resources1.push_back(alice);
   expected_resources1.push_back(bob);
-  std::vector<envoy::config::endpoint::v3alpha::ClusterLoadAssignment> expected_resources2;
+  std::vector<envoy::config::endpoint::v3::ClusterLoadAssignment> expected_resources2;
   expected_resources2.push_back(alice);
 
   expectDeltaAndSotwUpdate(callbacks1, expected_resources1, {}, "version1");
@@ -393,7 +392,7 @@ TEST(WatchMapTest, DeltaOnConfigUpdate) {
   // will just not trigger any onConfigUpdate at all.
   {
     Protobuf::RepeatedPtrField<ProtobufWkt::Any> prepare_removed;
-    envoy::config::endpoint::v3alpha::ClusterLoadAssignment will_be_removed_later;
+    envoy::config::endpoint::v3::ClusterLoadAssignment will_be_removed_later;
     will_be_removed_later.set_cluster_name("removed");
     prepare_removed.Add()->PackFrom(will_be_removed_later);
     expectDeltaAndSotwUpdate(callbacks2, {will_be_removed_later}, {}, "version0");
@@ -402,7 +401,7 @@ TEST(WatchMapTest, DeltaOnConfigUpdate) {
   }
 
   Protobuf::RepeatedPtrField<ProtobufWkt::Any> update;
-  envoy::config::endpoint::v3alpha::ClusterLoadAssignment updated;
+  envoy::config::endpoint::v3::ClusterLoadAssignment updated;
   updated.set_cluster_name("updated");
   update.Add()->PackFrom(updated);
 
@@ -434,7 +433,7 @@ TEST(WatchMapTest, ConvertAliasWatchesToNameWatches) {
   Watch* watch = watch_map.addWatch(callbacks);
   watch_map.updateWatchInterest(watch, {"alias"});
 
-  envoy::service::discovery::v3alpha::Resource resource;
+  envoy::service::discovery::v3::Resource resource;
   resource.set_name("resource");
   resource.set_version("version");
   for (const auto alias : {"alias", "alias1", "alias2"}) {
@@ -455,7 +454,7 @@ TEST(WatchMapTest, ConvertAliasWatchesToNameWatchesAliasIsSameAsName) {
   Watch* watch = watch_map.addWatch(callbacks);
   watch_map.updateWatchInterest(watch, {"name-and-alias"});
 
-  envoy::service::discovery::v3alpha::Resource resource;
+  envoy::service::discovery::v3::Resource resource;
   resource.set_name("name-and-alias");
   resource.set_version("version");
   for (const auto alias : {"name-and-alias", "alias1", "alias2"}) {

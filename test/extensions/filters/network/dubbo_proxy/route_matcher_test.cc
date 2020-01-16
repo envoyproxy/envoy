@@ -1,7 +1,7 @@
-#include "envoy/extensions/filters/network/dubbo_proxy/v3alpha/dubbo_proxy.pb.h"
-#include "envoy/extensions/filters/network/dubbo_proxy/v3alpha/dubbo_proxy.pb.validate.h"
-#include "envoy/extensions/filters/network/dubbo_proxy/v3alpha/route.pb.h"
-#include "envoy/extensions/filters/network/dubbo_proxy/v3alpha/route.pb.validate.h"
+#include "envoy/extensions/filters/network/dubbo_proxy/v3/dubbo_proxy.pb.h"
+#include "envoy/extensions/filters/network/dubbo_proxy/v3/dubbo_proxy.pb.validate.h"
+#include "envoy/extensions/filters/network/dubbo_proxy/v3/route.pb.h"
+#include "envoy/extensions/filters/network/dubbo_proxy/v3/route.pb.validate.h"
 
 #include "common/protobuf/protobuf.h"
 
@@ -20,17 +20,17 @@ namespace DubboProxy {
 namespace Router {
 namespace {
 
-envoy::extensions::filters::network::dubbo_proxy::v3alpha::RouteConfiguration
+envoy::extensions::filters::network::dubbo_proxy::v3::RouteConfiguration
 parseRouteConfigurationFromV2Yaml(const std::string& yaml) {
-  envoy::extensions::filters::network::dubbo_proxy::v3alpha::RouteConfiguration route_config;
+  envoy::extensions::filters::network::dubbo_proxy::v3::RouteConfiguration route_config;
   TestUtility::loadFromYaml(yaml, route_config);
   TestUtility::validate(route_config);
   return route_config;
 }
 
-envoy::extensions::filters::network::dubbo_proxy::v3alpha::DubboProxy
+envoy::extensions::filters::network::dubbo_proxy::v3::DubboProxy
 parseDubboProxyFromV2Yaml(const std::string& yaml) {
-  envoy::extensions::filters::network::dubbo_proxy::v3alpha::DubboProxy config;
+  envoy::extensions::filters::network::dubbo_proxy::v3::DubboProxy config;
   TestUtility::loadFromYaml(yaml, config);
   TestUtility::validate(config);
   return config;
@@ -54,7 +54,7 @@ routes:
         cluster: user_service_dubbo_server
 )EOF";
 
-    envoy::extensions::filters::network::dubbo_proxy::v3alpha::RouteConfiguration config =
+    envoy::extensions::filters::network::dubbo_proxy::v3::RouteConfiguration config =
         parseRouteConfigurationFromV2Yaml(yaml);
 
     NiceMock<Server::Configuration::MockFactoryContext> context;
@@ -103,7 +103,7 @@ routes:
         cluster: user_service_dubbo_server
 )EOF";
 
-    envoy::extensions::filters::network::dubbo_proxy::v3alpha::RouteConfiguration config =
+    envoy::extensions::filters::network::dubbo_proxy::v3::RouteConfiguration config =
         parseRouteConfigurationFromV2Yaml(yaml);
 
     NiceMock<Server::Configuration::MockFactoryContext> context;
@@ -139,7 +139,7 @@ routes:
         cluster: user_service_dubbo_server
 )EOF";
 
-    envoy::extensions::filters::network::dubbo_proxy::v3alpha::RouteConfiguration config =
+    envoy::extensions::filters::network::dubbo_proxy::v3::RouteConfiguration config =
         parseRouteConfigurationFromV2Yaml(yaml);
 
     NiceMock<Server::Configuration::MockFactoryContext> context;
@@ -180,7 +180,7 @@ routes:
         cluster: user_service_dubbo_server
 )EOF";
 
-    envoy::extensions::filters::network::dubbo_proxy::v3alpha::RouteConfiguration config =
+    envoy::extensions::filters::network::dubbo_proxy::v3::RouteConfiguration config =
         parseRouteConfigurationFromV2Yaml(yaml);
 
     NiceMock<Server::Configuration::MockFactoryContext> context;
@@ -216,7 +216,7 @@ routes:
         cluster: user_service_dubbo_server
 )EOF";
 
-  envoy::extensions::filters::network::dubbo_proxy::v3alpha::RouteConfiguration config =
+  envoy::extensions::filters::network::dubbo_proxy::v3::RouteConfiguration config =
       parseRouteConfigurationFromV2Yaml(yaml);
   auto invo = std::make_shared<RpcInvocationImpl>();
   MessageMetadata metadata;
@@ -247,7 +247,7 @@ routes:
         cluster: user_service_dubbo_server
 )EOF";
 
-  envoy::extensions::filters::network::dubbo_proxy::v3alpha::RouteConfiguration config =
+  envoy::extensions::filters::network::dubbo_proxy::v3::RouteConfiguration config =
       parseRouteConfigurationFromV2Yaml(yaml);
   auto invo = std::make_shared<RpcInvocationImpl>();
   MessageMetadata metadata;
@@ -278,7 +278,7 @@ routes:
         cluster: user_service_dubbo_server
 )EOF";
 
-  envoy::extensions::filters::network::dubbo_proxy::v3alpha::RouteConfiguration config =
+  envoy::extensions::filters::network::dubbo_proxy::v3::RouteConfiguration config =
       parseRouteConfigurationFromV2Yaml(yaml);
   auto invo = std::make_shared<RpcInvocationImpl>();
   MessageMetadata metadata;
@@ -314,7 +314,7 @@ routes:
         cluster: user_service_dubbo_server
 )EOF";
 
-  envoy::extensions::filters::network::dubbo_proxy::v3alpha::RouteConfiguration config =
+  envoy::extensions::filters::network::dubbo_proxy::v3::RouteConfiguration config =
       parseRouteConfigurationFromV2Yaml(yaml);
   auto invo = std::make_shared<RpcInvocationImpl>();
   MessageMetadata metadata;
@@ -353,7 +353,7 @@ routes:
         cluster: user_service_dubbo_server
 )EOF";
 
-  envoy::extensions::filters::network::dubbo_proxy::v3alpha::RouteConfiguration config =
+  envoy::extensions::filters::network::dubbo_proxy::v3::RouteConfiguration config =
       parseRouteConfigurationFromV2Yaml(yaml);
   auto invo = std::make_shared<RpcInvocationImpl>();
   MessageMetadata metadata;
@@ -383,7 +383,7 @@ routes:
         cluster: user_service_dubbo_server
 )EOF";
 
-  envoy::extensions::filters::network::dubbo_proxy::v3alpha::RouteConfiguration config =
+  envoy::extensions::filters::network::dubbo_proxy::v3::RouteConfiguration config =
       parseRouteConfigurationFromV2Yaml(yaml);
   auto invo = std::make_shared<RpcInvocationImpl>();
   MessageMetadata metadata;
@@ -416,7 +416,7 @@ routes:
         cluster: user_service_dubbo_server
 )EOF";
 
-  envoy::extensions::filters::network::dubbo_proxy::v3alpha::RouteConfiguration config =
+  envoy::extensions::filters::network::dubbo_proxy::v3::RouteConfiguration config =
       parseRouteConfigurationFromV2Yaml(yaml);
   auto invo = std::make_shared<RpcInvocationImpl>();
   MessageMetadata metadata;
@@ -470,7 +470,7 @@ route_config:
             cluster: format_service
 )EOF";
 
-  envoy::extensions::filters::network::dubbo_proxy::v3alpha::DubboProxy config =
+  envoy::extensions::filters::network::dubbo_proxy::v3::DubboProxy config =
       parseDubboProxyFromV2Yaml(yaml);
   auto invo = std::make_shared<RpcInvocationImpl>();
   MessageMetadata metadata;
@@ -484,7 +484,7 @@ route_config:
   EXPECT_EQ("user_service_dubbo_server", matcher.route(metadata, 0)->routeEntry()->clusterName());
 
   {
-    envoy::extensions::filters::network::dubbo_proxy::v3alpha::DubboProxy invalid_config;
+    envoy::extensions::filters::network::dubbo_proxy::v3::DubboProxy invalid_config;
     MultiRouteMatcher matcher(invalid_config.route_config(), context);
     EXPECT_EQ(nullptr, matcher.route(metadata, 0));
   }
@@ -506,7 +506,7 @@ routes:
         cluster: user_service_dubbo_server
 )EOF";
 
-  envoy::extensions::filters::network::dubbo_proxy::v3alpha::RouteConfiguration config =
+  envoy::extensions::filters::network::dubbo_proxy::v3::RouteConfiguration config =
       parseRouteConfigurationFromV2Yaml(yaml);
   auto invo = std::make_shared<RpcInvocationImpl>();
   MessageMetadata metadata;
@@ -567,7 +567,7 @@ routes:
             weight: 5000
 )EOF";
 
-  envoy::extensions::filters::network::dubbo_proxy::v3alpha::RouteConfiguration config =
+  envoy::extensions::filters::network::dubbo_proxy::v3::RouteConfiguration config =
       parseRouteConfigurationFromV2Yaml(yaml);
   auto invo = std::make_shared<RpcInvocationImpl>();
   MessageMetadata metadata;
@@ -620,7 +620,7 @@ routes:
             weight: 5000
 )EOF";
 
-  envoy::extensions::filters::network::dubbo_proxy::v3alpha::RouteConfiguration config =
+  envoy::extensions::filters::network::dubbo_proxy::v3::RouteConfiguration config =
       parseRouteConfigurationFromV2Yaml(yaml);
   NiceMock<Server::Configuration::MockFactoryContext> context;
   EXPECT_THROW(SingleRouteMatcherImpl m(config, context), EnvoyException);

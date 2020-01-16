@@ -3,9 +3,9 @@
 #include <algorithm>
 #include <string>
 
-#include "envoy/config/bootstrap/v3alpha/bootstrap.pb.h"
-#include "envoy/config/cluster/v3alpha/cluster.pb.h"
-#include "envoy/extensions/filters/network/http_connection_manager/v3alpha/http_connection_manager.pb.h"
+#include "envoy/config/bootstrap/v3/bootstrap.pb.h"
+#include "envoy/config/cluster/v3/cluster.pb.h"
+#include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 
 #include "common/buffer/buffer_impl.h"
 #include "common/http/header_map_impl.h"
@@ -275,8 +275,8 @@ void verifyExpectedMetadata(Http::MetadataMap metadata_map, std::set<std::string
 TEST_P(Http2MetadataIntegrationTest, TestResponseMetadata) {
   addFilters({response_metadata_filter});
   config_helper_.addConfigModifier(
-      [&](envoy::extensions::filters::network::http_connection_manager::v3alpha::
-              HttpConnectionManager& hcm) -> void { hcm.set_proxy_100_continue(true); });
+      [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+              hcm) -> void { hcm.set_proxy_100_continue(true); });
 
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
@@ -495,8 +495,8 @@ typed_config:
 TEST_P(Http2MetadataIntegrationTest, ConsumeAndInsertRequestMetadata) {
   addFilters({request_metadata_filter});
   config_helper_.addConfigModifier(
-      [&](envoy::extensions::filters::network::http_connection_manager::v3alpha::
-              HttpConnectionManager& hcm) -> void { hcm.set_proxy_100_continue(true); });
+      [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+              hcm) -> void { hcm.set_proxy_100_continue(true); });
 
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
@@ -604,8 +604,8 @@ typed_config:
 
 void Http2MetadataIntegrationTest::runHeaderOnlyTest(bool send_request_body, size_t body_size) {
   config_helper_.addConfigModifier(
-      [&](envoy::extensions::filters::network::http_connection_manager::v3alpha::
-              HttpConnectionManager& hcm) -> void { hcm.set_proxy_100_continue(true); });
+      [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+              hcm) -> void { hcm.set_proxy_100_continue(true); });
 
   initialize();
   codec_client_ = makeHttpConnection(lookupPort("http"));
@@ -849,8 +849,8 @@ TEST_P(Http2IntegrationTest, TrailersGiantBody) {
 
 TEST_P(Http2IntegrationTest, GrpcRequestTimeout) {
   config_helper_.addConfigModifier(
-      [&](envoy::extensions::filters::network::http_connection_manager::v3alpha::
-              HttpConnectionManager& hcm) -> void {
+      [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+              hcm) -> void {
         auto* route_config = hcm.mutable_route_config();
         auto* virtual_host = route_config->mutable_virtual_hosts(0);
         auto* route = virtual_host->mutable_routes(0);
@@ -891,7 +891,7 @@ TEST_P(Http2IntegrationTest, IdleTimeoutWithSimultaneousRequests) {
   int32_t request1_bytes = 1024;
   int32_t request2_bytes = 512;
 
-  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3alpha::Bootstrap& bootstrap) {
+  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
     auto* static_resources = bootstrap.mutable_static_resources();
     auto* cluster = static_resources->mutable_clusters(0);
     auto* http_protocol_options = cluster->mutable_common_http_protocol_options();
@@ -969,8 +969,8 @@ TEST_P(Http2IntegrationTest, IdleTimeoutWithSimultaneousRequests) {
 // Test request mirroring / shadowing with an HTTP/2 downstream and a request with a body.
 TEST_P(Http2IntegrationTest, RequestMirrorWithBody) {
   config_helper_.addConfigModifier(
-      [&](envoy::extensions::filters::network::http_connection_manager::v3alpha::
-              HttpConnectionManager& hcm) -> void {
+      [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+              hcm) -> void {
         auto* mirror_policy = hcm.mutable_route_config()
                                   ->mutable_virtual_hosts(0)
                                   ->mutable_routes(0)
@@ -1121,8 +1121,8 @@ TEST_P(Http2IntegrationTest, DelayedCloseAfterBadFrame) {
 // Test disablement of delayed close processing on downstream connections.
 TEST_P(Http2IntegrationTest, DelayedCloseDisabled) {
   config_helper_.addConfigModifier(
-      [](envoy::extensions::filters::network::http_connection_manager::v3alpha::
-             HttpConnectionManager& hcm) { hcm.mutable_delayed_close_timeout()->set_seconds(0); });
+      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+             hcm) { hcm.mutable_delayed_close_timeout()->set_seconds(0); });
   initialize();
   Buffer::OwnedImpl buffer("PRI * HTTP/2.0\r\n\r\nSM\r\n\r\nhelloworldcauseanerror");
   std::string response;
@@ -1198,16 +1198,22 @@ TEST_P(Http2IntegrationTest, PauseAndResumeHeadersOnly) {
 }
 
 Http2RingHashIntegrationTest::Http2RingHashIntegrationTest() {
-  config_helper_.addConfigModifier(
-      [&](envoy::config::bootstrap::v3alpha::Bootstrap& bootstrap) -> void {
-        auto* cluster = bootstrap.mutable_static_resources()->mutable_clusters(0);
-        cluster->clear_hosts();
-        cluster->set_lb_policy(envoy::config::cluster::v3alpha::Cluster::RING_HASH);
-        for (int i = 0; i < num_upstreams_; i++) {
-          auto* socket = cluster->add_hosts()->mutable_socket_address();
-          socket->set_address(Network::Test::getLoopbackAddressString(version_));
-        }
-      });
+  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+    auto* cluster = bootstrap.mutable_static_resources()->mutable_clusters(0);
+    cluster->clear_load_assignment();
+    cluster->mutable_load_assignment()->add_endpoints();
+    cluster->mutable_load_assignment()->set_cluster_name(cluster->name());
+    cluster->set_lb_policy(envoy::config::cluster::v3::Cluster::RING_HASH);
+    for (int i = 0; i < num_upstreams_; i++) {
+      auto* socket = cluster->mutable_load_assignment()
+                         ->mutable_endpoints(0)
+                         ->add_lb_endpoints()
+                         ->mutable_endpoint()
+                         ->mutable_address()
+                         ->mutable_socket_address();
+      socket->set_address(Network::Test::getLoopbackAddressString(version_));
+    }
+  });
 }
 
 Http2RingHashIntegrationTest::~Http2RingHashIntegrationTest() {
@@ -1288,8 +1294,8 @@ void Http2RingHashIntegrationTest::sendMultipleRequests(
 
 TEST_P(Http2RingHashIntegrationTest, CookieRoutingNoCookieNoTtl) {
   config_helper_.addConfigModifier(
-      [&](envoy::extensions::filters::network::http_connection_manager::v3alpha::
-              HttpConnectionManager& hcm) -> void {
+      [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+              hcm) -> void {
         auto* hash_policy = hcm.mutable_route_config()
                                 ->mutable_virtual_hosts(0)
                                 ->mutable_routes(0)
@@ -1320,8 +1326,8 @@ TEST_P(Http2RingHashIntegrationTest, CookieRoutingNoCookieNoTtl) {
 
 TEST_P(Http2RingHashIntegrationTest, CookieRoutingNoCookieWithNonzeroTtlSet) {
   config_helper_.addConfigModifier(
-      [&](envoy::extensions::filters::network::http_connection_manager::v3alpha::
-              HttpConnectionManager& hcm) -> void {
+      [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+              hcm) -> void {
         auto* hash_policy = hcm.mutable_route_config()
                                 ->mutable_virtual_hosts(0)
                                 ->mutable_routes(0)
@@ -1351,8 +1357,8 @@ TEST_P(Http2RingHashIntegrationTest, CookieRoutingNoCookieWithNonzeroTtlSet) {
 
 TEST_P(Http2RingHashIntegrationTest, CookieRoutingNoCookieWithZeroTtlSet) {
   config_helper_.addConfigModifier(
-      [&](envoy::extensions::filters::network::http_connection_manager::v3alpha::
-              HttpConnectionManager& hcm) -> void {
+      [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+              hcm) -> void {
         auto* hash_policy = hcm.mutable_route_config()
                                 ->mutable_virtual_hosts(0)
                                 ->mutable_routes(0)
@@ -1382,8 +1388,8 @@ TEST_P(Http2RingHashIntegrationTest, CookieRoutingNoCookieWithZeroTtlSet) {
 
 TEST_P(Http2RingHashIntegrationTest, CookieRoutingWithCookieNoTtl) {
   config_helper_.addConfigModifier(
-      [&](envoy::extensions::filters::network::http_connection_manager::v3alpha::
-              HttpConnectionManager& hcm) -> void {
+      [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+              hcm) -> void {
         auto* hash_policy = hcm.mutable_route_config()
                                 ->mutable_virtual_hosts(0)
                                 ->mutable_routes(0)
@@ -1412,8 +1418,8 @@ TEST_P(Http2RingHashIntegrationTest, CookieRoutingWithCookieNoTtl) {
 
 TEST_P(Http2RingHashIntegrationTest, CookieRoutingWithCookieWithTtlSet) {
   config_helper_.addConfigModifier(
-      [&](envoy::extensions::filters::network::http_connection_manager::v3alpha::
-              HttpConnectionManager& hcm) -> void {
+      [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+              hcm) -> void {
         auto* hash_policy = hcm.mutable_route_config()
                                 ->mutable_virtual_hosts(0)
                                 ->mutable_routes(0)
@@ -1455,13 +1461,12 @@ void Http2FloodMitigationTest::setNetworkConnectionBufferSize() {
   // SETTINGS frames is dispatched to the nghttp2 library. To prevent this from happening the
   // network connection receive buffer needs to be smaller than 90Kb (which is 10K SETTINGS frames).
   // Set it to the arbitrarily chosen value of 32K. Note that this buffer has 16K lower bound.
-  config_helper_.addConfigModifier(
-      [](envoy::config::bootstrap::v3alpha::Bootstrap& bootstrap) -> void {
-        RELEASE_ASSERT(bootstrap.mutable_static_resources()->listeners_size() >= 1, "");
-        auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
+  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+    RELEASE_ASSERT(bootstrap.mutable_static_resources()->listeners_size() >= 1, "");
+    auto* listener = bootstrap.mutable_static_resources()->mutable_listeners(0);
 
-        listener->mutable_per_connection_buffer_limit_bytes()->set_value(32 * 1024);
-      });
+    listener->mutable_per_connection_buffer_limit_bytes()->set_value(32 * 1024);
+  });
 }
 
 void Http2FloodMitigationTest::beginSession() {
@@ -1603,10 +1608,11 @@ TEST_P(Http2FloodMitigationTest, Data) {
 // Verify that the server can detect flood of RST_STREAM frames.
 TEST_P(Http2FloodMitigationTest, RST_STREAM) {
   // Use invalid HTTP headers to trigger sending RST_STREAM frames.
-  config_helper_.addConfigModifier([](envoy::extensions::filters::network::http_connection_manager::
-                                          v3alpha::HttpConnectionManager& hcm) -> void {
-    hcm.mutable_http2_protocol_options()->set_stream_error_on_invalid_http_messaging(true);
-  });
+  config_helper_.addConfigModifier(
+      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+             hcm) -> void {
+        hcm.mutable_http2_protocol_options()->set_stream_error_on_invalid_http_messaging(true);
+      });
   beginSession();
 
   int i = 0;
@@ -1629,10 +1635,11 @@ TEST_P(Http2FloodMitigationTest, RST_STREAM) {
 
 // Verify that the server stop reading downstream connection on protocol error.
 TEST_P(Http2FloodMitigationTest, TooManyStreams) {
-  config_helper_.addConfigModifier([](envoy::extensions::filters::network::http_connection_manager::
-                                          v3alpha::HttpConnectionManager& hcm) -> void {
-    hcm.mutable_http2_protocol_options()->mutable_max_concurrent_streams()->set_value(2);
-  });
+  config_helper_.addConfigModifier(
+      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+             hcm) -> void {
+        hcm.mutable_http2_protocol_options()->mutable_max_concurrent_streams()->set_value(2);
+      });
   autonomous_upstream_ = true;
   beginSession();
   fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
@@ -1644,8 +1651,8 @@ TEST_P(Http2FloodMitigationTest, TooManyStreams) {
 
 TEST_P(Http2FloodMitigationTest, EmptyHeaders) {
   config_helper_.addConfigModifier(
-      [&](envoy::extensions::filters::network::http_connection_manager::v3alpha::
-              HttpConnectionManager& hcm) -> void {
+      [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+              hcm) -> void {
         hcm.mutable_http2_protocol_options()
             ->mutable_max_consecutive_inbound_frames_with_empty_payload()
             ->set_value(0);
@@ -1769,10 +1776,11 @@ TEST_P(Http2FloodMitigationTest, ZerolenHeader) {
 
 // Verify that only the offending stream is terminated upon receiving invalid HEADERS frame.
 TEST_P(Http2FloodMitigationTest, ZerolenHeaderAllowed) {
-  config_helper_.addConfigModifier([](envoy::extensions::filters::network::http_connection_manager::
-                                          v3alpha::HttpConnectionManager& hcm) -> void {
-    hcm.mutable_http2_protocol_options()->set_stream_error_on_invalid_http_messaging(true);
-  });
+  config_helper_.addConfigModifier(
+      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+             hcm) -> void {
+        hcm.mutable_http2_protocol_options()->set_stream_error_on_invalid_http_messaging(true);
+      });
   autonomous_upstream_ = true;
   beginSession();
   fake_upstreams_[0]->set_allow_unexpected_disconnects(true);

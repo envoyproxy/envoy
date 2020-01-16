@@ -1,9 +1,9 @@
 #include "extensions/grpc_credentials/aws_iam/config.h"
 
 #include "envoy/common/exception.h"
-#include "envoy/config/core/v3alpha/grpc_service.pb.h"
-#include "envoy/config/grpc_credential/v3alpha/aws_iam.pb.h"
-#include "envoy/config/grpc_credential/v3alpha/aws_iam.pb.validate.h"
+#include "envoy/config/core/v3/grpc_service.pb.h"
+#include "envoy/config/grpc_credential/v3/aws_iam.pb.h"
+#include "envoy/config/grpc_credential/v3/aws_iam.pb.validate.h"
 #include "envoy/grpc/google_grpc_creds.h"
 #include "envoy/registry/registry.h"
 
@@ -23,7 +23,7 @@ namespace GrpcCredentials {
 namespace AwsIam {
 
 std::shared_ptr<grpc::ChannelCredentials> AwsIamGrpcCredentialsFactory::getChannelCredentials(
-    const envoy::config::core::v3alpha::GrpcService& grpc_service_config, Api::Api& api) {
+    const envoy::config::core::v3::GrpcService& grpc_service_config, Api::Api& api) {
 
   const auto& google_grpc = grpc_service_config.google_grpc();
   std::shared_ptr<grpc::ChannelCredentials> creds =
@@ -32,7 +32,7 @@ std::shared_ptr<grpc::ChannelCredentials> AwsIamGrpcCredentialsFactory::getChann
   std::shared_ptr<grpc::CallCredentials> call_creds;
   for (const auto& credential : google_grpc.call_credentials()) {
     switch (credential.credential_specifier_case()) {
-    case envoy::config::core::v3alpha::GrpcService::GoogleGrpc::CallCredentials::
+    case envoy::config::core::v3::GrpcService::GoogleGrpc::CallCredentials::
         CredentialSpecifierCase::kFromPlugin: {
       if (credential.from_plugin().name() == GrpcCredentialsNames::get().AwsIam) {
         AwsIamGrpcCredentialsFactory credentials_factory;
@@ -43,7 +43,7 @@ std::shared_ptr<grpc::ChannelCredentials> AwsIamGrpcCredentialsFactory::getChann
                 credential.from_plugin(), ProtobufMessage::getNullValidationVisitor(),
                 credentials_factory);
         const auto& config = Envoy::MessageUtil::downcastAndValidate<
-            const envoy::config::grpc_credential::v3alpha::AwsIamConfig&>(
+            const envoy::config::grpc_credential::v3::AwsIamConfig&>(
             *config_message, ProtobufMessage::getNullValidationVisitor());
         auto credentials_provider =
             std::make_shared<HttpFilters::Common::Aws::DefaultCredentialsProviderChain>(
@@ -74,7 +74,7 @@ std::shared_ptr<grpc::ChannelCredentials> AwsIamGrpcCredentialsFactory::getChann
 }
 
 std::string AwsIamGrpcCredentialsFactory::getRegion(
-    const envoy::config::grpc_credential::v3alpha::AwsIamConfig& config) {
+    const envoy::config::grpc_credential::v3::AwsIamConfig& config) {
   std::unique_ptr<HttpFilters::Common::Aws::RegionProvider> region_provider;
   if (!config.region().empty()) {
     region_provider =

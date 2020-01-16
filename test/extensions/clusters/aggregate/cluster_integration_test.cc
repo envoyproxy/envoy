@@ -1,4 +1,4 @@
-#include "envoy/config/cluster/v3alpha/cluster.pb.h"
+#include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/grpc/status.h"
 #include "envoy/stats/scope.h"
 
@@ -49,10 +49,15 @@ static_resources:
   clusters:
   - name: my_cds_cluster
     http2_protocol_options: {}
-    hosts:
-      socket_address:
-        address: 127.0.0.1
-        port_value: 0
+    load_assignment:
+      cluster_name: my_cds_cluster
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: 127.0.0.1
+                port_value: 0
   - name: aggregate_cluster
     connect_timeout: 0.25s
     lb_policy: CLUSTER_PROVIDED
@@ -140,8 +145,8 @@ public:
 
     // Do the initial compareDiscoveryRequest / sendDiscoveryResponse for cluster_1.
     EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "", {}, {}, {}, true));
-    sendDiscoveryResponse<envoy::config::cluster::v3alpha::Cluster>(
-        Config::TypeUrl::get().Cluster, {cluster1_}, {cluster1_}, {}, "55");
+    sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(Config::TypeUrl::get().Cluster,
+                                                               {cluster1_}, {cluster1_}, {}, "55");
 
     test_server_->waitForGaugeGe("cluster_manager.active_clusters", 3);
 
@@ -161,8 +166,8 @@ public:
     fake_upstreams_[0]->set_allow_unexpected_disconnects(true);
   }
 
-  envoy::config::cluster::v3alpha::Cluster cluster1_;
-  envoy::config::cluster::v3alpha::Cluster cluster2_;
+  envoy::config::cluster::v3::Cluster cluster1_;
+  envoy::config::cluster::v3::Cluster cluster2_;
 };
 
 INSTANTIATE_TEST_SUITE_P(IpVersions, AggregateIntegrationTest,
@@ -174,8 +179,8 @@ TEST_P(AggregateIntegrationTest, ClusterUpDownUp) {
 
   // Tell Envoy that cluster_1 is gone.
   EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "55", {}, {}, {}));
-  sendDiscoveryResponse<envoy::config::cluster::v3alpha::Cluster>(Config::TypeUrl::get().Cluster,
-                                                                  {}, {}, {FirstClusterName}, "42");
+  sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(Config::TypeUrl::get().Cluster, {}, {},
+                                                             {FirstClusterName}, "42");
   // We can continue the test once we're sure that Envoy's ClusterManager has made use of
   // the DiscoveryResponse that says cluster_1 is gone.
   test_server_->waitForCounterGe("cluster_manager.cluster_removed", 1);
@@ -192,8 +197,8 @@ TEST_P(AggregateIntegrationTest, ClusterUpDownUp) {
 
   // Tell Envoy that cluster_1 is back.
   EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "42", {}, {}, {}));
-  sendDiscoveryResponse<envoy::config::cluster::v3alpha::Cluster>(
-      Config::TypeUrl::get().Cluster, {cluster1_}, {cluster1_}, {}, "413");
+  sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(Config::TypeUrl::get().Cluster,
+                                                             {cluster1_}, {cluster1_}, {}, "413");
 
   test_server_->waitForGaugeGe("cluster_manager.active_clusters", 3);
   testRouterHeaderOnlyRequestAndResponse(nullptr, FirstUpstreamIndex, "/aggregatecluster");
@@ -211,7 +216,7 @@ TEST_P(AggregateIntegrationTest, TwoClusters) {
 
   // Tell Envoy that cluster_2 is here.
   EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "55", {}, {}, {}));
-  sendDiscoveryResponse<envoy::config::cluster::v3alpha::Cluster>(
+  sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(
       Config::TypeUrl::get().Cluster, {cluster1_, cluster2_}, {cluster2_}, {}, "42");
   // The '4' includes the fake CDS server and aggregate cluster.
   test_server_->waitForGaugeGe("cluster_manager.active_clusters", 4);
@@ -223,7 +228,7 @@ TEST_P(AggregateIntegrationTest, TwoClusters) {
 
   // Tell Envoy that cluster_1 is gone.
   EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "42", {}, {}, {}));
-  sendDiscoveryResponse<envoy::config::cluster::v3alpha::Cluster>(
+  sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(
       Config::TypeUrl::get().Cluster, {cluster2_}, {}, {FirstClusterName}, "42");
   // We can continue the test once we're sure that Envoy's ClusterManager has made use of
   // the DiscoveryResponse that says cluster_1 is gone.
@@ -235,7 +240,7 @@ TEST_P(AggregateIntegrationTest, TwoClusters) {
 
   // Tell Envoy that cluster_1 is back.
   EXPECT_TRUE(compareDiscoveryRequest(Config::TypeUrl::get().Cluster, "42", {}, {}, {}));
-  sendDiscoveryResponse<envoy::config::cluster::v3alpha::Cluster>(
+  sendDiscoveryResponse<envoy::config::cluster::v3::Cluster>(
       Config::TypeUrl::get().Cluster, {cluster1_, cluster2_}, {cluster1_}, {}, "413");
 
   test_server_->waitForGaugeGe("cluster_manager.active_clusters", 4);

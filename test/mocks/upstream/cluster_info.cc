@@ -2,7 +2,7 @@
 
 #include <limits>
 
-#include "envoy/config/cluster/v3alpha/cluster.pb.h"
+#include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/upstream/host_description.h"
 #include "envoy/upstream/upstream.h"
 
@@ -22,8 +22,7 @@ namespace Upstream {
 MockLoadBalancerSubsetInfo::MockLoadBalancerSubsetInfo() {
   ON_CALL(*this, isEnabled()).WillByDefault(Return(false));
   ON_CALL(*this, fallbackPolicy())
-      .WillByDefault(
-          Return(envoy::config::cluster::v3alpha::Cluster::LbSubsetConfig::ANY_ENDPOINT));
+      .WillByDefault(Return(envoy::config::cluster::v3::Cluster::LbSubsetConfig::ANY_ENDPOINT));
   ON_CALL(*this, defaultSubset()).WillByDefault(ReturnRef(ProtobufWkt::Struct::default_instance()));
   ON_CALL(*this, subsetSelectors()).WillByDefault(ReturnRef(subset_selectors_));
 }

@@ -1,6 +1,6 @@
 #include "extensions/filters/network/mysql_proxy/mysql_filter.h"
 
-#include "envoy/config/core/v3alpha/base.pb.h"
+#include "envoy/config/core/v3/base.pb.h"
 
 #include "common/buffer/buffer_impl.h"
 #include "common/common/assert.h"
@@ -46,7 +46,7 @@ Network::FilterStatus MySQLFilter::onWrite(Buffer::Instance& data, bool) {
 
 void MySQLFilter::doDecode(Buffer::Instance& buffer) {
   // Clear dynamic metadata.
-  envoy::config::core::v3alpha::Metadata& dynamic_metadata =
+  envoy::config::core::v3::Metadata& dynamic_metadata =
       read_callbacks_->connection().streamInfo().dynamicMetadata();
   auto& metadata =
       (*dynamic_metadata.mutable_filter_metadata())[NetworkFilterNames::get().MySQLProxy];
@@ -118,7 +118,7 @@ void MySQLFilter::onCommand(Command& command) {
   config_->stats_.queries_parsed_.inc();
 
   // Set dynamic metadata
-  envoy::config::core::v3alpha::Metadata& dynamic_metadata =
+  envoy::config::core::v3::Metadata& dynamic_metadata =
       read_callbacks_->connection().streamInfo().dynamicMetadata();
   ProtobufWkt::Struct metadata(
       (*dynamic_metadata.mutable_filter_metadata())[NetworkFilterNames::get().MySQLProxy]);
