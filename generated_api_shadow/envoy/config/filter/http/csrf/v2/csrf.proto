@@ -11,8 +11,7 @@ import "validate/validate.proto";
 option java_package = "io.envoyproxy.envoy.config.filter.http.csrf.v2";
 option java_outer_classname = "CsrfProto";
 option java_multiple_files = true;
-option (udpa.annotations.file_migrate).move_to_package =
-    "envoy.extensions.filters.http.csrf.v3alpha";
+option (udpa.annotations.file_migrate).move_to_package = "envoy.extensions.filters.http.csrf.v3";
 
 // [#protodoc-title: CSRF]
 // Cross-Site Request Forgery :ref:`configuration overview <config_http_filters_csrf>`.

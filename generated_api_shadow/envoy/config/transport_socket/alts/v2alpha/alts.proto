@@ -9,7 +9,7 @@ option java_package = "io.envoyproxy.envoy.config.transport_socket.alts.v2alpha"
 option java_outer_classname = "AltsProto";
 option java_multiple_files = true;
 option (udpa.annotations.file_migrate).move_to_package =
-    "envoy.extensions.transport_sockets.alts.v3alpha";
+    "envoy.extensions.transport_sockets.alts.v3";
 
 // [#protodoc-title: ALTS]
 // [#extension: envoy.transport_sockets.alts]

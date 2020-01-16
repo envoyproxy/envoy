@@ -1,6 +1,6 @@
 #pragma once
 
-#include "envoy/config/core/v3alpha/health_check.pb.h"
+#include "envoy/config/core/v3/health_check.pb.h"
 #include "envoy/config/health_checker/redis/v2/redis.pb.h"
 #include "envoy/config/health_checker/redis/v2/redis.pb.validate.h"
 
@@ -16,7 +16,7 @@ namespace RedisHealthChecker {
 namespace {
 
 static const envoy::config::health_checker::redis::v2::Redis
-getRedisHealthCheckConfig(const envoy::config::core::v3alpha::HealthCheck& health_check_config,
+getRedisHealthCheckConfig(const envoy::config::core::v3::HealthCheck& health_check_config,
                           ProtobufMessage::ValidationVisitor& validation_visitor) {
   ProtobufTypes::MessagePtr config =
       ProtobufTypes::MessagePtr{new envoy::config::health_checker::redis::v2::Redis()};

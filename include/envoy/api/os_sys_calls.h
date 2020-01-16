@@ -99,6 +99,11 @@ public:
    * @see man 2 getsockname
    */
   virtual SysCallIntResult getsockname(int sockfd, sockaddr* addr, socklen_t* addrlen) PURE;
+
+  /**
+   * @see man 2 gethostname
+   */
+  virtual SysCallIntResult gethostname(char* name, size_t length) PURE;
 };
 
 using OsSysCallsPtr = std::unique_ptr<OsSysCalls>;

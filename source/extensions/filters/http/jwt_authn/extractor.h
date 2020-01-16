@@ -4,7 +4,7 @@
 #include <string>
 #include <unordered_set>
 
-#include "envoy/extensions/filters/http/jwt_authn/v3alpha/config.pb.h"
+#include "envoy/extensions/filters/http/jwt_authn/v3/config.pb.h"
 #include "envoy/http/header_map.h"
 
 #include "common/common/logger.h"
@@ -38,7 +38,7 @@ public:
 
 using JwtLocationConstPtr = std::unique_ptr<const JwtLocation>;
 using JwtProviderList =
-    std::vector<const envoy::extensions::filters::http::jwt_authn::v3alpha::JwtProvider*>;
+    std::vector<const envoy::extensions::filters::http::jwt_authn::v3::JwtProvider*>;
 
 class Extractor;
 using ExtractorConstPtr = std::unique_ptr<const Extractor>;
@@ -90,7 +90,7 @@ public:
    * @return the extractor object.
    */
   static ExtractorConstPtr
-  create(const envoy::extensions::filters::http::jwt_authn::v3alpha::JwtProvider& provider);
+  create(const envoy::extensions::filters::http::jwt_authn::v3::JwtProvider& provider);
 
   /**
    * Create an instance of Extractor for a list of provider config.

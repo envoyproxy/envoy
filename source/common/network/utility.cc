@@ -8,7 +8,7 @@
 
 #include "envoy/common/exception.h"
 #include "envoy/common/platform.h"
-#include "envoy/config/core/v3alpha/address.pb.h"
+#include "envoy/config/core/v3/address.pb.h"
 #include "envoy/network/connection.h"
 
 #include "common/api/os_sys_calls_impl.h"
@@ -449,13 +449,13 @@ absl::uint128 Utility::flipOrder(const absl::uint128& input) {
 }
 
 Address::InstanceConstSharedPtr
-Utility::protobufAddressToAddress(const envoy::config::core::v3alpha::Address& proto_address) {
+Utility::protobufAddressToAddress(const envoy::config::core::v3::Address& proto_address) {
   switch (proto_address.address_case()) {
-  case envoy::config::core::v3alpha::Address::AddressCase::kSocketAddress:
+  case envoy::config::core::v3::Address::AddressCase::kSocketAddress:
     return Utility::parseInternetAddress(proto_address.socket_address().address(),
                                          proto_address.socket_address().port_value(),
                                          !proto_address.socket_address().ipv4_compat());
-  case envoy::config::core::v3alpha::Address::AddressCase::kPipe:
+  case envoy::config::core::v3::Address::AddressCase::kPipe:
     return std::make_shared<Address::PipeInstance>(proto_address.pipe().path(),
                                                    proto_address.pipe().mode());
   default:
@@ -464,7 +464,7 @@ Utility::protobufAddressToAddress(const envoy::config::core::v3alpha::Address& p
 }
 
 void Utility::addressToProtobufAddress(const Address::Instance& address,
-                                       envoy::config::core::v3alpha::Address& proto_address) {
+                                       envoy::config::core::v3::Address& proto_address) {
   if (address.type() == Address::Type::Pipe) {
     proto_address.mutable_pipe()->set_path(address.asString());
   } else {
@@ -476,20 +476,20 @@ void Utility::addressToProtobufAddress(const Address::Instance& address,
 }
 
 Address::SocketType
-Utility::protobufAddressSocketType(const envoy::config::core::v3alpha::Address& proto_address) {
+Utility::protobufAddressSocketType(const envoy::config::core::v3::Address& proto_address) {
   switch (proto_address.address_case()) {
-  case envoy::config::core::v3alpha::Address::AddressCase::kSocketAddress: {
+  case envoy::config::core::v3::Address::AddressCase::kSocketAddress: {
     const auto protocol = proto_address.socket_address().protocol();
     switch (protocol) {
-    case envoy::config::core::v3alpha::SocketAddress::TCP:
+    case envoy::config::core::v3::SocketAddress::TCP:
       return Address::SocketType::Stream;
-    case envoy::config::core::v3alpha::SocketAddress::UDP:
+    case envoy::config::core::v3::SocketAddress::UDP:
       return Address::SocketType::Datagram;
     default:
       NOT_REACHED_GCOVR_EXCL_LINE;
     }
   }
-  case envoy::config::core::v3alpha::Address::AddressCase::kPipe:
+  case envoy::config::core::v3::Address::AddressCase::kPipe:
     return Address::SocketType::Stream;
   default:
     NOT_REACHED_GCOVR_EXCL_LINE;

@@ -12,8 +12,8 @@
 #include "envoy/stats/stats.h"
 #include "envoy/stats/store.h"
 #include "envoy/thread/thread.h"
-#include "envoy/type/matcher/v3alpha/string.pb.h"
-#include "envoy/type/v3alpha/percent.pb.h"
+#include "envoy/type/matcher/v3/string.pb.h"
+#include "envoy/type/v3/percent.pb.h"
 
 #include "common/buffer/buffer_impl.h"
 #include "common/common/c_smart_ptr.h"
@@ -470,8 +470,8 @@ public:
    * @param string prefix.
    * @return Object StringMatcher.
    */
-  static const envoy::type::matcher::v3alpha::StringMatcher createPrefixMatcher(std::string str) {
-    envoy::type::matcher::v3alpha::StringMatcher matcher;
+  static const envoy::type::matcher::v3::StringMatcher createPrefixMatcher(std::string str) {
+    envoy::type::matcher::v3::StringMatcher matcher;
     matcher.set_prefix(str);
     return matcher;
   }
@@ -481,8 +481,8 @@ public:
    * @param string exact.
    * @return Object StringMatcher.
    */
-  static const envoy::type::matcher::v3alpha::StringMatcher createExactMatcher(std::string str) {
-    envoy::type::matcher::v3alpha::StringMatcher matcher;
+  static const envoy::type::matcher::v3::StringMatcher createExactMatcher(std::string str) {
+    envoy::type::matcher::v3::StringMatcher matcher;
     matcher.set_exact(str);
     return matcher;
   }
@@ -492,8 +492,8 @@ public:
    * @param string exact.
    * @return Object StringMatcher.
    */
-  static const envoy::type::matcher::v3alpha::StringMatcher createRegexMatcher(std::string str) {
-    envoy::type::matcher::v3alpha::StringMatcher matcher;
+  static const envoy::type::matcher::v3::StringMatcher createRegexMatcher(std::string str) {
+    envoy::type::matcher::v3::StringMatcher matcher;
     matcher.set_hidden_envoy_deprecated_regex(str);
     return matcher;
   }
@@ -768,9 +768,9 @@ MATCHER_P(RepeatedProtoEq, expected, "") {
 }
 
 MATCHER_P(Percent, rhs, "") {
-  envoy::type::v3alpha::FractionalPercent expected;
+  envoy::type::v3::FractionalPercent expected;
   expected.set_numerator(rhs);
-  expected.set_denominator(envoy::type::v3alpha::FractionalPercent::HUNDRED);
+  expected.set_denominator(envoy::type::v3::FractionalPercent::HUNDRED);
   return TestUtility::protoEqual(expected, arg, /*ignore_repeated_field_ordering=*/false);
 }
 
