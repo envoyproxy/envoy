@@ -1,7 +1,7 @@
 #pragma once
 
-#include "envoy/extensions/filters/http/ratelimit/v3alpha/rate_limit.pb.h"
-#include "envoy/extensions/filters/http/ratelimit/v3alpha/rate_limit.pb.validate.h"
+#include "envoy/extensions/filters/http/ratelimit/v3/rate_limit.pb.h"
+#include "envoy/extensions/filters/http/ratelimit/v3/rate_limit.pb.validate.h"
 
 #include "extensions/filters/common/ratelimit/ratelimit.h"
 #include "extensions/filters/http/common/factory_base.h"
@@ -16,13 +16,13 @@ namespace RateLimitFilter {
  * Config registration for the rate limit filter. @see NamedHttpFilterConfigFactory.
  */
 class RateLimitFilterConfig
-    : public Common::FactoryBase<envoy::extensions::filters::http::ratelimit::v3alpha::RateLimit> {
+    : public Common::FactoryBase<envoy::extensions::filters::http::ratelimit::v3::RateLimit> {
 public:
   RateLimitFilterConfig() : FactoryBase(HttpFilterNames::get().RateLimit) {}
 
 private:
   Http::FilterFactoryCb createFilterFactoryFromProtoTyped(
-      const envoy::extensions::filters::http::ratelimit::v3alpha::RateLimit& proto_config,
+      const envoy::extensions::filters::http::ratelimit::v3::RateLimit& proto_config,
       const std::string& stats_prefix, Server::Configuration::FactoryContext& context) override;
 };
 

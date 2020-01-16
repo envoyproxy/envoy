@@ -334,6 +334,9 @@ StreamInfoHeaderFormatter::StreamInfoHeaderFormatter(absl::string_view field_nam
         parsePerRequestStateField(field_name.substr(STATIC_STRLEN("PER_REQUEST_STATE")));
   } else if (absl::StartsWith(field_name, "REQ")) {
     field_extractor_ = parseRequestHeader(field_name.substr(STATIC_STRLEN("REQ")));
+  } else if (field_name == "HOSTNAME") {
+    std::string hostname = Envoy::AccessLog::AccessLogFormatUtils::getHostname();
+    field_extractor_ = [hostname](const StreamInfo::StreamInfo&) { return hostname; };
   } else {
     throw EnvoyException(fmt::format("field '{}' not supported as custom header", field_name));
   }

@@ -1,7 +1,7 @@
 #include "extensions/common/tap/extension_config_base.h"
 
-#include "envoy/config/tap/v3alpha/common.pb.h"
-#include "envoy/extensions/common/tap/v3alpha/common.pb.h"
+#include "envoy/config/tap/v3/common.pb.h"
+#include "envoy/extensions/common/tap/v3/common.pb.h"
 
 namespace Envoy {
 namespace Extensions {
@@ -9,7 +9,7 @@ namespace Common {
 namespace Tap {
 
 ExtensionConfigBase::ExtensionConfigBase(
-    const envoy::extensions::common::tap::v3alpha::CommonExtensionConfig proto_config,
+    const envoy::extensions::common::tap::v3::CommonExtensionConfig proto_config,
     TapConfigFactoryPtr&& config_factory, Server::Admin& admin,
     Singleton::Manager& singleton_manager, ThreadLocal::SlotAllocator& tls,
     Event::Dispatcher& main_thread_dispatcher)
@@ -20,17 +20,15 @@ ExtensionConfigBase::ExtensionConfigBase(
   });
 
   switch (proto_config_.config_type_case()) {
-  case envoy::extensions::common::tap::v3alpha::CommonExtensionConfig::ConfigTypeCase::
-      kAdminConfig: {
+  case envoy::extensions::common::tap::v3::CommonExtensionConfig::ConfigTypeCase::kAdminConfig: {
     admin_handler_ = AdminHandler::getSingleton(admin, singleton_manager, main_thread_dispatcher);
     admin_handler_->registerConfig(*this, proto_config_.admin_config().config_id());
     ENVOY_LOG(debug, "initializing tap extension with admin endpoint (config_id={})",
               proto_config_.admin_config().config_id());
     break;
   }
-  case envoy::extensions::common::tap::v3alpha::CommonExtensionConfig::ConfigTypeCase::
-      kStaticConfig: {
-    newTapConfig(envoy::config::tap::v3alpha::TapConfig(proto_config_.static_config()), nullptr);
+  case envoy::extensions::common::tap::v3::CommonExtensionConfig::ConfigTypeCase::kStaticConfig: {
+    newTapConfig(envoy::config::tap::v3::TapConfig(proto_config_.static_config()), nullptr);
     ENVOY_LOG(debug, "initializing tap extension with static config");
     break;
   }
@@ -57,7 +55,7 @@ void ExtensionConfigBase::clearTapConfig() {
   tls_slot_->runOnAllThreads([this] { tls_slot_->getTyped<TlsFilterConfig>().config_ = nullptr; });
 }
 
-void ExtensionConfigBase::newTapConfig(envoy::config::tap::v3alpha::TapConfig&& proto_config,
+void ExtensionConfigBase::newTapConfig(envoy::config::tap::v3::TapConfig&& proto_config,
                                        Sink* admin_streamer) {
   TapConfigSharedPtr new_config =
       config_factory_->createConfigFromProto(std::move(proto_config), admin_streamer);

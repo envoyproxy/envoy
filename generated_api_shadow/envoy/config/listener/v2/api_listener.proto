@@ -9,7 +9,7 @@ import "udpa/annotations/migrate.proto";
 option java_package = "io.envoyproxy.envoy.config.listener.v2";
 option java_outer_classname = "ApiListenerProto";
 option java_multiple_files = true;
-option (udpa.annotations.file_migrate).move_to_package = "envoy.config.listener.v3alpha";
+option (udpa.annotations.file_migrate).move_to_package = "envoy.config.listener.v3";
 
 // [#not-implemented-hide:]
 // Describes a type of API listener, which is used in non-proxy clients. The type of API

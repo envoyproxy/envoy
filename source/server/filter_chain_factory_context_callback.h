@@ -22,7 +22,7 @@ public:
    * chain context.
    */
   virtual Configuration::FilterChainFactoryContext& createFilterChainFactoryContext(
-      const ::envoy::config::listener::v3alpha::FilterChain* const filter_chain) PURE;
+      const ::envoy::config::listener::v3::FilterChain* const filter_chain) PURE;
 };
 
 } // namespace Server

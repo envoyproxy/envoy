@@ -3,7 +3,7 @@
 #include <cstdint>
 #include <memory>
 
-#include "envoy/config/listener/v3alpha/listener_components.pb.h"
+#include "envoy/config/listener/v3/listener_components.pb.h"
 #include "envoy/network/drain_decision.h"
 #include "envoy/server/filter_config.h"
 #include "envoy/server/transport_socket_config.h"
@@ -25,7 +25,7 @@ class FilterChainFactoryBuilder {
 public:
   virtual ~FilterChainFactoryBuilder() = default;
   virtual std::unique_ptr<Network::FilterChain>
-  buildFilterChain(const envoy::config::listener::v3alpha::FilterChain& filter_chain,
+  buildFilterChain(const envoy::config::listener::v3::FilterChain& filter_chain,
                    FilterChainFactoryContextCreator& context_creator) const PURE;
 };
 
@@ -59,8 +59,8 @@ public:
   OverloadManager& overloadManager() override;
   ThreadLocal::SlotAllocator& threadLocal() override;
   Admin& admin() override;
-  const envoy::config::core::v3alpha::Metadata& listenerMetadata() const override;
-  envoy::config::core::v3alpha::TrafficDirection direction() const override;
+  const envoy::config::core::v3::Metadata& listenerMetadata() const override;
+  envoy::config::core::v3::TrafficDirection direction() const override;
   TimeSource& timeSource() override;
   ProtobufMessage::ValidationVisitor& messageValidationVisitor() override;
   Api::Api& api() override;
@@ -86,14 +86,14 @@ public:
 
   // FilterChainFactoryContextCreator
   Configuration::FilterChainFactoryContext& createFilterChainFactoryContext(
-      const ::envoy::config::listener::v3alpha::FilterChain* const filter_chain) override;
+      const ::envoy::config::listener::v3::FilterChain* const filter_chain) override;
 
   // Network::FilterChainManager
   const Network::FilterChain*
   findFilterChain(const Network::ConnectionSocket& socket) const override;
 
   void addFilterChain(
-      absl::Span<const envoy::config::listener::v3alpha::FilterChain* const> filter_chain_span,
+      absl::Span<const envoy::config::listener::v3::FilterChain* const> filter_chain_span,
       FilterChainFactoryBuilder& b, FilterChainFactoryContextCreator& context_creator);
   static bool isWildcardServerName(const std::string& name);
 
@@ -124,7 +124,7 @@ private:
       const absl::Span<const std::string* const> server_names,
       const std::string& transport_protocol,
       const absl::Span<const std::string* const> application_protocols,
-      const envoy::config::listener::v3alpha::FilterChainMatch::ConnectionSourceType source_type,
+      const envoy::config::listener::v3::FilterChainMatch::ConnectionSourceType source_type,
       const std::vector<std::string>& source_ips,
       const absl::Span<const Protobuf::uint32> source_ports,
       const Network::FilterChainSharedPtr& filter_chain);
@@ -133,7 +133,7 @@ private:
       const absl::Span<const std::string* const> server_names,
       const std::string& transport_protocol,
       const absl::Span<const std::string* const> application_protocols,
-      const envoy::config::listener::v3alpha::FilterChainMatch::ConnectionSourceType source_type,
+      const envoy::config::listener::v3::FilterChainMatch::ConnectionSourceType source_type,
       const std::vector<std::string>& source_ips,
       const absl::Span<const Protobuf::uint32> source_ports,
       const Network::FilterChainSharedPtr& filter_chain);
@@ -142,20 +142,20 @@ private:
       const absl::Span<const std::string* const> server_names,
       const std::string& transport_protocol,
       const absl::Span<const std::string* const> application_protocols,
-      const envoy::config::listener::v3alpha::FilterChainMatch::ConnectionSourceType source_type,
+      const envoy::config::listener::v3::FilterChainMatch::ConnectionSourceType source_type,
       const std::vector<std::string>& source_ips,
       const absl::Span<const Protobuf::uint32> source_ports,
       const Network::FilterChainSharedPtr& filter_chain);
   void addFilterChainForApplicationProtocols(
       ApplicationProtocolsMap& application_protocol_map,
       const absl::Span<const std::string* const> application_protocols,
-      const envoy::config::listener::v3alpha::FilterChainMatch::ConnectionSourceType source_type,
+      const envoy::config::listener::v3::FilterChainMatch::ConnectionSourceType source_type,
       const std::vector<std::string>& source_ips,
       const absl::Span<const Protobuf::uint32> source_ports,
       const Network::FilterChainSharedPtr& filter_chain);
   void addFilterChainForSourceTypes(
       SourceTypesArray& source_types_array,
-      const envoy::config::listener::v3alpha::FilterChainMatch::ConnectionSourceType source_type,
+      const envoy::config::listener::v3::FilterChainMatch::ConnectionSourceType source_type,
       const std::vector<std::string>& source_ips,
       const absl::Span<const Protobuf::uint32> source_ports,
       const Network::FilterChainSharedPtr& filter_chain);

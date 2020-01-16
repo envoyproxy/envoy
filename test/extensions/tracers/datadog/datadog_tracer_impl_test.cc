@@ -3,7 +3,7 @@
 #include <sstream>
 #include <string>
 
-#include "envoy/config/trace/v3alpha/trace.pb.h"
+#include "envoy/config/trace/v3/trace.pb.h"
 
 #include "common/common/base64.h"
 #include "common/http/header_map_impl.h"
@@ -43,7 +43,7 @@ namespace {
 
 class DatadogDriverTest : public testing::Test {
 public:
-  void setup(envoy::config::trace::v3alpha::DatadogConfig& datadog_config, bool init_timer) {
+  void setup(envoy::config::trace::v3::DatadogConfig& datadog_config, bool init_timer) {
     ON_CALL(cm_, httpAsyncClientForCluster("fake_cluster"))
         .WillByDefault(ReturnRef(cm_.async_client_));
 
@@ -63,7 +63,7 @@ public:
     const std::string yaml_string = R"EOF(
     collector_cluster: fake_cluster
     )EOF";
-    envoy::config::trace::v3alpha::DatadogConfig datadog_config;
+    envoy::config::trace::v3::DatadogConfig datadog_config;
     TestUtility::loadFromYaml(yaml_string, datadog_config);
 
     setup(datadog_config, true);
@@ -89,7 +89,7 @@ public:
 
 TEST_F(DatadogDriverTest, InitializeDriver) {
   {
-    envoy::config::trace::v3alpha::DatadogConfig datadog_config;
+    envoy::config::trace::v3::DatadogConfig datadog_config;
 
     EXPECT_THROW(setup(datadog_config, false), EnvoyException);
   }
@@ -101,7 +101,7 @@ TEST_F(DatadogDriverTest, InitializeDriver) {
     const std::string yaml_string = R"EOF(
     collector_cluster: fake_cluster
     )EOF";
-    envoy::config::trace::v3alpha::DatadogConfig datadog_config;
+    envoy::config::trace::v3::DatadogConfig datadog_config;
     TestUtility::loadFromYaml(yaml_string, datadog_config);
 
     EXPECT_THROW(setup(datadog_config, false), EnvoyException);
@@ -115,7 +115,7 @@ TEST_F(DatadogDriverTest, InitializeDriver) {
     const std::string yaml_string = R"EOF(
     collector_cluster: fake_cluster
     )EOF";
-    envoy::config::trace::v3alpha::DatadogConfig datadog_config;
+    envoy::config::trace::v3::DatadogConfig datadog_config;
     TestUtility::loadFromYaml(yaml_string, datadog_config);
 
     setup(datadog_config, true);

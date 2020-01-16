@@ -8,10 +8,10 @@
 #include <string>
 #include <vector>
 
-#include "envoy/admin/v3alpha/config_dump.pb.h"
-#include "envoy/config/bootstrap/v3alpha/bootstrap.pb.h"
-#include "envoy/config/cluster/v3alpha/cluster.pb.h"
-#include "envoy/config/core/v3alpha/config_source.pb.h"
+#include "envoy/admin/v3/config_dump.pb.h"
+#include "envoy/config/bootstrap/v3/bootstrap.pb.h"
+#include "envoy/config/cluster/v3/cluster.pb.h"
+#include "envoy/config/core/v3/config_source.pb.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/network/dns.h"
 #include "envoy/runtime/runtime.h"
@@ -203,7 +203,7 @@ void ClusterManagerInitHelper::setInitializedCb(std::function<void()> callback) 
 }
 
 ClusterManagerImpl::ClusterManagerImpl(
-    const envoy::config::bootstrap::v3alpha::Bootstrap& bootstrap, ClusterManagerFactory& factory,
+    const envoy::config::bootstrap::v3::Bootstrap& bootstrap, ClusterManagerFactory& factory,
     Stats::Store& stats, ThreadLocal::Instance& tls, Runtime::Loader& runtime,
     Runtime::RandomGenerator& random, const LocalInfo::LocalInfo& local_info,
     AccessLog::AccessLogManager& log_manager, Event::Dispatcher& main_thread_dispatcher,
@@ -247,10 +247,10 @@ ClusterManagerImpl::ClusterManagerImpl(
   // cluster, so the non-EDS clusters must be loaded first.
   for (const auto& cluster : bootstrap.static_resources().clusters()) {
     // First load all the primary clusters.
-    if (cluster.type() != envoy::config::cluster::v3alpha::Cluster::EDS ||
-        (cluster.type() == envoy::config::cluster::v3alpha::Cluster::EDS &&
+    if (cluster.type() != envoy::config::cluster::v3::Cluster::EDS ||
+        (cluster.type() == envoy::config::cluster::v3::Cluster::EDS &&
          cluster.eds_cluster_config().eds_config().config_source_specifier_case() ==
-             envoy::config::core::v3alpha::ConfigSource::ConfigSourceSpecifierCase::kPath)) {
+             envoy::config::core::v3::ConfigSource::ConfigSourceSpecifierCase::kPath)) {
       loadCluster(cluster, "", false, active_clusters_);
     }
   }
@@ -261,7 +261,7 @@ ClusterManagerImpl::ClusterManagerImpl(
   // whether the backing implementation is delta or SotW.
   if (dyn_resources.has_ads_config()) {
     if (dyn_resources.ads_config().api_type() ==
-        envoy::config::core::v3alpha::ApiConfigSource::DELTA_GRPC) {
+        envoy::config::core::v3::ApiConfigSource::DELTA_GRPC) {
       auto& api_config_source = dyn_resources.has_ads_config()
                                     ? dyn_resources.ads_config()
                                     : dyn_resources.cds_config().api_config_source();
@@ -283,8 +283,8 @@ ClusterManagerImpl::ClusterManagerImpl(
           main_thread_dispatcher,
           *Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
               dyn_resources.ads_config().transport_api_version() ==
-                      envoy::config::core::v3alpha::ApiVersion::V3ALPHA
-                  ? "envoy.service.discovery.v3alpha.AggregatedDiscoveryService."
+                      envoy::config::core::v3::ApiVersion::V3
+                  ? "envoy.service.discovery.v3.AggregatedDiscoveryService."
                     "StreamAggregatedResources"
                   : "envoy.service.discovery.v2.AggregatedDiscoveryService."
                     "StreamAggregatedResources"),
@@ -299,9 +299,9 @@ ClusterManagerImpl::ClusterManagerImpl(
   // After ADS is initialized, load EDS static clusters as EDS config may potentially need ADS.
   for (const auto& cluster : bootstrap.static_resources().clusters()) {
     // Now load all the secondary clusters.
-    if (cluster.type() == envoy::config::cluster::v3alpha::Cluster::EDS &&
+    if (cluster.type() == envoy::config::cluster::v3::Cluster::EDS &&
         cluster.eds_cluster_config().eds_config().config_source_specifier_case() !=
-            envoy::config::core::v3alpha::ConfigSource::ConfigSourceSpecifierCase::kPath) {
+            envoy::config::core::v3::ConfigSource::ConfigSourceSpecifierCase::kPath) {
       loadCluster(cluster, "", false, active_clusters_);
     }
   }
@@ -512,7 +512,7 @@ void ClusterManagerImpl::applyUpdates(const Cluster& cluster, uint32_t priority,
   updates.last_updated_ = time_source_.monotonicTime();
 }
 
-bool ClusterManagerImpl::addOrUpdateCluster(const envoy::config::cluster::v3alpha::Cluster& cluster,
+bool ClusterManagerImpl::addOrUpdateCluster(const envoy::config::cluster::v3::Cluster& cluster,
                                             const std::string& version_info) {
   // First we need to see if this new config is new or an update to an existing dynamic cluster.
   // We don't allow updates to statically configured clusters in the main configuration. We check
@@ -658,7 +658,7 @@ bool ClusterManagerImpl::removeCluster(const std::string& cluster_name) {
   return removed;
 }
 
-void ClusterManagerImpl::loadCluster(const envoy::config::cluster::v3alpha::Cluster& cluster,
+void ClusterManagerImpl::loadCluster(const envoy::config::cluster::v3::Cluster& cluster,
                                      const std::string& version_info, bool added_via_api,
                                      ClusterMap& cluster_map) {
   std::pair<ClusterSharedPtr, ThreadAwareLoadBalancerPtr> new_cluster_pair =
@@ -870,7 +870,7 @@ ClusterManagerImpl::addThreadLocalClusterUpdateCallbacks(ClusterUpdateCallbacks&
 }
 
 ProtobufTypes::MessagePtr ClusterManagerImpl::dumpClusterConfigs() {
-  auto config_dump = std::make_unique<envoy::admin::v3alpha::ClustersConfigDump>();
+  auto config_dump = std::make_unique<envoy::admin::v3::ClustersConfigDump>();
   config_dump->set_version_info(cds_api_ != nullptr ? cds_api_->versionInfo() : "");
   for (const auto& active_cluster_pair : active_clusters_) {
     const auto& cluster = *active_cluster_pair.second;
@@ -1321,7 +1321,7 @@ ClusterManagerImpl::ThreadLocalClusterManagerImpl::ClusterEntry::tcpConnPool(
 }
 
 ClusterManagerPtr ProdClusterManagerFactory::clusterManagerFromProto(
-    const envoy::config::bootstrap::v3alpha::Bootstrap& bootstrap) {
+    const envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
   return ClusterManagerPtr{new ClusterManagerImpl(
       bootstrap, *this, stats_, tls_, runtime_, random_, local_info_, log_manager_,
       main_thread_dispatcher_, admin_, validation_context_, api_, http_context_)};
@@ -1354,7 +1354,7 @@ Tcp::ConnectionPool::InstancePtr ProdClusterManagerFactory::allocateTcpConnPool(
 }
 
 std::pair<ClusterSharedPtr, ThreadAwareLoadBalancerPtr> ProdClusterManagerFactory::clusterFromProto(
-    const envoy::config::cluster::v3alpha::Cluster& cluster, ClusterManager& cm,
+    const envoy::config::cluster::v3::Cluster& cluster, ClusterManager& cm,
     Outlier::EventLoggerSharedPtr outlier_event_logger, bool added_via_api) {
   return ClusterFactoryImplBase::create(
       cluster, cm, stats_, tls_, dns_resolver_, ssl_context_manager_, runtime_, random_,
@@ -1366,7 +1366,7 @@ std::pair<ClusterSharedPtr, ThreadAwareLoadBalancerPtr> ProdClusterManagerFactor
 }
 
 CdsApiPtr
-ProdClusterManagerFactory::createCds(const envoy::config::core::v3alpha::ConfigSource& cds_config,
+ProdClusterManagerFactory::createCds(const envoy::config::core::v3::ConfigSource& cds_config,
                                      ClusterManager& cm) {
   // TODO(htuch): Differentiate static vs. dynamic validation visitors.
   return CdsApiImpl::create(cds_config, cm, stats_, validation_context_.dynamicValidationVisitor());

@@ -47,13 +47,13 @@ typed_config:
   initialize();
 }
 
-// envoy.ip_tagging from v3alpha TypedStruct config.
-TEST_P(VersionIntegrationTest, IpTaggingV3AlphaStaticTypedStructConfig) {
+// envoy.ip_tagging from v3 TypedStruct config.
+TEST_P(VersionIntegrationTest, IpTaggingV3StaticTypedStructConfig) {
   config_helper_.addFilter(absl::StrCat(R"EOF(
 name: envoy.ip_tagging
 typed_config:
   "@type": type.googleapis.com/udpa.type.v1.TypedStruct
-  type_url: type.googleapis.com/envoy.extensions.filters.http.ip_tagging.v3alpha.IPTagging
+  type_url: type.googleapis.com/envoy.extensions.filters.http.ip_tagging.v3.IPTagging
   value:
   )EOF",
                                         ExampleIpTaggingConfig));
@@ -71,12 +71,12 @@ TEST_P(VersionIntegrationTest, IpTaggingV2StaticTypedConfig) {
   initialize();
 }
 
-// envoy.ip_tagging from v3alpha typed Any config.
-TEST_P(VersionIntegrationTest, IpTaggingV3AlphaStaticTypedConfig) {
+// envoy.ip_tagging from v3 typed Any config.
+TEST_P(VersionIntegrationTest, IpTaggingV3StaticTypedConfig) {
   config_helper_.addFilter(absl::StrCat(R"EOF(
   name: envoy.ip_tagging
   typed_config:
-    "@type": type.googleapis.com/envoy.extensions.filters.http.ip_tagging.v3alpha.IPTagging
+    "@type": type.googleapis.com/envoy.extensions.filters.http.ip_tagging.v3.IPTagging
   )EOF",
                                         ExampleIpTaggingConfig));
   initialize();

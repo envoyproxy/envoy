@@ -3,7 +3,7 @@
 #include <string>
 #include <vector>
 
-#include "envoy/config/core/v3alpha/base.pb.h"
+#include "envoy/config/core/v3/base.pb.h"
 
 #include "common/access_log/access_log_formatter.h"
 #include "common/common/utility.h"
@@ -11,17 +11,20 @@
 #include "common/protobuf/utility.h"
 #include "common/router/string_accessor_impl.h"
 
+#include "test/mocks/api/mocks.h"
 #include "test/mocks/http/mocks.h"
 #include "test/mocks/ssl/mocks.h"
 #include "test/mocks/stream_info/mocks.h"
 #include "test/mocks/upstream/mocks.h"
 #include "test/test_common/printers.h"
+#include "test/test_common/threadsafe_singleton_injector.h"
 #include "test/test_common/utility.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
 using testing::Const;
+using testing::Invoke;
 using testing::NiceMock;
 using testing::Return;
 using testing::ReturnRef;
@@ -259,6 +262,35 @@ TEST(AccessLogFormatterTest, streamInfoFormatter) {
     EXPECT_EQ("-", upstream_format.format(header, header, header, stream_info));
     EXPECT_THAT(upstream_format.formatValue(header, header, header, stream_info),
                 ProtoEq(ValueUtil::nullValue()));
+  }
+
+  {
+    NiceMock<Api::MockOsSysCalls> os_sys_calls;
+    TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
+    EXPECT_CALL(os_sys_calls, gethostname(_, _))
+        .WillOnce(Invoke([](char*, size_t) -> Api::SysCallIntResult {
+          return {-1, ENAMETOOLONG};
+        }));
+
+    StreamInfoFormatter upstream_format("HOSTNAME");
+    EXPECT_EQ("-", upstream_format.format(header, header, header, stream_info));
+    EXPECT_THAT(upstream_format.formatValue(header, header, header, stream_info),
+                ProtoEq(ValueUtil::stringValue("-")));
+  }
+
+  {
+    NiceMock<Api::MockOsSysCalls> os_sys_calls;
+    TestThreadsafeSingletonInjector<Api::OsSysCallsImpl> os_calls(&os_sys_calls);
+    EXPECT_CALL(os_sys_calls, gethostname(_, _))
+        .WillOnce(Invoke([](char* name, size_t) -> Api::SysCallIntResult {
+          StringUtil::strlcpy(name, "myhostname", 11);
+          return {0, 0};
+        }));
+
+    StreamInfoFormatter upstream_format("HOSTNAME");
+    EXPECT_EQ("myhostname", upstream_format.format(header, header, header, stream_info));
+    EXPECT_THAT(upstream_format.formatValue(header, header, header, stream_info),
+                ProtoEq(ValueUtil::stringValue("myhostname")));
   }
 
   {
@@ -906,7 +938,7 @@ TEST(AccessLogFormatterTest, responseTrailerFormatter) {
  * Populate a metadata object with the following test data:
  * "com.test": {"test_key":"test_value","test_obj":{"inner_key":"inner_value"}}
  */
-void populateMetadataTestData(envoy::config::core::v3alpha::Metadata& metadata) {
+void populateMetadataTestData(envoy::config::core::v3::Metadata& metadata) {
   ProtobufWkt::Struct struct_obj;
   auto& fields_map = *struct_obj.mutable_fields();
   fields_map["test_key"] = ValueUtil::stringValue("test_value");
@@ -919,7 +951,7 @@ void populateMetadataTestData(envoy::config::core::v3alpha::Metadata& metadata) 
 }
 
 TEST(AccessLogFormatterTest, DynamicMetadataFormatter) {
-  envoy::config::core::v3alpha::Metadata metadata;
+  envoy::config::core::v3::Metadata metadata;
   populateMetadataTestData(metadata);
   NiceMock<StreamInfo::MockStreamInfo> stream_info;
   EXPECT_CALL(stream_info, dynamicMetadata()).WillRepeatedly(ReturnRef(metadata));
@@ -1115,7 +1147,7 @@ TEST(AccessLogFormatterTest, JsonFormatterPlainStringTest) {
   Http::TestHeaderMapImpl response_header;
   Http::TestHeaderMapImpl response_trailer;
 
-  envoy::config::core::v3alpha::Metadata metadata;
+  envoy::config::core::v3::Metadata metadata;
   populateMetadataTestData(metadata);
   absl::optional<Http::Protocol> protocol = Http::Protocol::Http11;
   EXPECT_CALL(stream_info, protocol()).WillRepeatedly(Return(protocol));
@@ -1137,7 +1169,7 @@ TEST(AccessLogFormatterTest, JsonFormatterSingleOperatorTest) {
   Http::TestHeaderMapImpl response_header;
   Http::TestHeaderMapImpl response_trailer;
 
-  envoy::config::core::v3alpha::Metadata metadata;
+  envoy::config::core::v3::Metadata metadata;
   populateMetadataTestData(metadata);
   absl::optional<Http::Protocol> protocol = Http::Protocol::Http11;
   EXPECT_CALL(stream_info, protocol()).WillRepeatedly(Return(protocol));
@@ -1213,7 +1245,7 @@ TEST(AccessLogFormatterTest, JsonFormatterDynamicMetadataTest) {
   Http::TestHeaderMapImpl response_header{{"second", "PUT"}, {"test", "test"}};
   Http::TestHeaderMapImpl response_trailer{{"third", "POST"}, {"test-2", "test-2"}};
 
-  envoy::config::core::v3alpha::Metadata metadata;
+  envoy::config::core::v3::Metadata metadata;
   populateMetadataTestData(metadata);
   EXPECT_CALL(stream_info, dynamicMetadata()).WillRepeatedly(ReturnRef(metadata));
   EXPECT_CALL(Const(stream_info), dynamicMetadata()).WillRepeatedly(ReturnRef(metadata));
@@ -1240,7 +1272,7 @@ TEST(AccessLogFormatterTest, JsonFormatterTypedDynamicMetadataTest) {
   Http::TestHeaderMapImpl response_header{{"second", "PUT"}, {"test", "test"}};
   Http::TestHeaderMapImpl response_trailer{{"third", "POST"}, {"test-2", "test-2"}};
 
-  envoy::config::core::v3alpha::Metadata metadata;
+  envoy::config::core::v3::Metadata metadata;
   populateMetadataTestData(metadata);
   EXPECT_CALL(stream_info, dynamicMetadata()).WillRepeatedly(ReturnRef(metadata));
   EXPECT_CALL(Const(stream_info), dynamicMetadata()).WillRepeatedly(ReturnRef(metadata));
@@ -1445,7 +1477,7 @@ TEST(AccessLogFormatterTest, CompositeFormatterSuccess) {
   }
 
   {
-    envoy::config::core::v3alpha::Metadata metadata;
+    envoy::config::core::v3::Metadata metadata;
     populateMetadataTestData(metadata);
     EXPECT_CALL(stream_info, dynamicMetadata()).WillRepeatedly(ReturnRef(metadata));
     EXPECT_CALL(Const(stream_info), dynamicMetadata()).WillRepeatedly(ReturnRef(metadata));
