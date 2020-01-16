@@ -35,9 +35,15 @@ namespace Config {
 
 class HttpSubscriptionTestHarness : public SubscriptionTestHarness {
 public:
-  HttpSubscriptionTestHarness() : HttpSubscriptionTestHarness(std::chrono::milliseconds(0)) {}
+  HttpSubscriptionTestHarness()
+      : HttpSubscriptionTestHarness(std::chrono::milliseconds(0),
+                                    envoy::config::core::v3alpha::ApiVersion::V2) {}
 
-  HttpSubscriptionTestHarness(std::chrono::milliseconds init_fetch_timeout)
+  HttpSubscriptionTestHarness(const envoy::config::core::v3alpha::ApiVersion api_version)
+      : HttpSubscriptionTestHarness(std::chrono::milliseconds(0), api_version) {}
+
+  HttpSubscriptionTestHarness(std::chrono::milliseconds init_fetch_timeout,
+                              const envoy::config::core::v3alpha::ApiVersion api_version)
       : method_descriptor_(Protobuf::DescriptorPool::generated_pool()->FindMethodByName(
             "envoy.api.v2.EndpointDiscoveryService.FetchEndpoints")),
         timer_(new Event::MockTimer()), http_request_(&cm_.async_client_) {
@@ -47,12 +53,26 @@ public:
       timer_cb_ = timer_cb;
       return timer_;
     }));
-    subscription_ = std::make_unique<HttpSubscriptionImpl>(
-        local_info_, cm_, "eds_cluster", dispatcher_, random_gen_, std::chrono::milliseconds(1),
-        std::chrono::milliseconds(1000), *method_descriptor_,
-        Config::TypeUrl::get().ClusterLoadAssignment,
-        envoy::config::core::v3alpha::ApiVersion::AUTO, callbacks_, stats_, init_fetch_timeout,
-        validation_visitor_);
+    switch (api_version) {
+    case envoy::config::core::v3alpha::ApiVersion::V2:
+      subscription_ = std::make_unique<HttpSubscriptionImpl>(
+          local_info_, cm_, "eds_cluster", dispatcher_, random_gen_, std::chrono::milliseconds(1),
+          std::chrono::milliseconds(1000), *method_descriptor_,
+          Config::TypeUrl::get().ClusterLoadAssignment,
+          envoy::config::core::v3alpha::ApiVersion::AUTO, callbacks_, stats_, init_fetch_timeout,
+          validation_visitor_);
+      break;
+    case envoy::config::core::v3alpha::ApiVersion::V3ALPHA:
+      subscription_ = std::make_unique<HttpSubscriptionImpl>(
+          local_info_, cm_, "eds_cluster", dispatcher_, random_gen_, std::chrono::milliseconds(1),
+          std::chrono::milliseconds(1000), *method_descriptor_,
+          Config::TypeUrl::get().ClusterLoadAssignmentV3Alpha,
+          envoy::config::core::v3alpha::ApiVersion::AUTO, callbacks_, stats_, init_fetch_timeout,
+          validation_visitor_);
+      break;
+    default:
+      NOT_REACHED_GCOVR_EXCL_LINE;
+    }
   }
 
   ~HttpSubscriptionTestHarness() override {

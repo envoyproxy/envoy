@@ -4,6 +4,7 @@
 #include "envoy/service/discovery/v3alpha/discovery.pb.h"
 
 #include "common/config/new_grpc_mux_impl.h"
+#include "common/config/resources.h"
 #include "common/config/utility.h"
 
 namespace Envoy {
@@ -45,6 +46,7 @@ public:
   void start(const std::set<std::string>& resource_names) override;
 
   void updateResourceInterest(const std::set<std::string>& update_to_these_names) override;
+  void fallback(const std::set<std::string>& resources) override;
 
   // Config::SubscriptionCallbacks (all pass through to callbacks_!)
   void onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
@@ -55,11 +57,10 @@ public:
                  const Protobuf::RepeatedPtrField<std::string>& removed_resources,
                  const std::string& system_version_info) override;
   void onConfigUpdateFailed(ConfigUpdateFailureReason reason, const EnvoyException* e) override;
+  void kickFallback() override;
   std::string resourceName(const ProtobufWkt::Any& resource) override;
 
   GrpcMuxSharedPtr getContextForTest() { return context_; }
-
-  void fallback(const std::set<std::string>& resources) override;
 
 private:
   GrpcMuxSharedPtr context_;

@@ -29,7 +29,7 @@ public:
   void onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
                       const std::string& version_info) override;
   void onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason reason,
-                            const EnvoyException* e, bool is_fallback = false) override;
+                            const EnvoyException* e, bool try_fallback = false) override;
   std::string resourceName(const ProtobufWkt::Any& resource) override;
   void fallback(const std::set<std::string>& resources) override;
 

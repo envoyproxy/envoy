@@ -139,6 +139,7 @@ private:
     return MessageUtil::anyConvert<envoy::config::route::v3alpha::RouteConfiguration>(resource)
         .name();
   }
+  void kickFallback() override { subscription_->fallback({route_config_name_}); }
 
   Common::CallbackHandle* addUpdateCallback(std::function<void()> callback) {
     return update_callback_manager_.add(callback);

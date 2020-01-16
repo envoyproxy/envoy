@@ -67,6 +67,7 @@ envoy_cc_library(
         ":api_version_lib",
         ":grpc_stream_lib",
         ":new_grpc_mux_lib",
+        ":resources_lib",
         ":utility_lib",
         "//include/envoy/config:subscription_interface",
         "//include/envoy/grpc:async_client_interface",
@@ -207,6 +208,7 @@ envoy_cc_library(
     ],
     deps = [
         ":api_version_lib",
+        ":resources_lib",
         ":version_converter_lib",
         "//include/envoy/config:subscription_interface",
         "//include/envoy/event:dispatcher_interface",

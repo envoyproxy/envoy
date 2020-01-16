@@ -42,6 +42,7 @@ public:
   void parseResponse(const Http::Message& response) override;
   void onFetchComplete() override;
   void onFetchFailure(Config::ConfigUpdateFailureReason reason, const EnvoyException* e) override;
+  void retry() override;
 
 private:
   void handleFailure(Config::ConfigUpdateFailureReason reason, const EnvoyException* e);

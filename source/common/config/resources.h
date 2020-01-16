@@ -26,6 +26,15 @@ public:
   const std::string Runtime{"type.googleapis.com/envoy.service.discovery.v2.Runtime"};
 
   // TODO(shikugawa): integrate with resource name loader
+  const std::string ListenerV3Alpha{"type.googleapis.com/envoy.config.listener.v3alpha.Listener"};
+  const std::string ClusterV3Alpha{"type.googleapis.com/envoy.config.cluster.v3alpha.Cluster"};
+  const std::string RouteConfigurationV3Alpha{
+      "type.googleapis.com/envoy.config.route.v3alpha.RouteConfiguration"};
+  const std::string VirtualHostV3Alpha{
+      "type.googleapis.com/envoy.config.route.v3alpha.VirtualHost"};
+  const std::string ScopedRouteConfigurationV3Alpha{
+      "type.googleapis.com/envoy.config.route.v3alpha.ScopedRouteConfiguration"};
+  const std::string RuntimeV3Alpha{"type.googleapis.com/envoy.service.runtime.v3alpha.Runtime"};
   const std::string SecretV3Alpha{
       "type.googleapis.com/envoy.extensions.transport_sockets.tls.v3alpha.Secret"};
   const std::string ClusterLoadAssignmentV3Alpha{
@@ -37,6 +46,18 @@ public:
       return Secret;
     } else if (type_url == ClusterLoadAssignmentV3Alpha) {
       return ClusterLoadAssignment;
+    } else if (type_url == ListenerV3Alpha) {
+      return Listener;
+    } else if (type_url == ClusterV3Alpha) {
+      return Cluster;
+    } else if (type_url == RouteConfigurationV3Alpha) {
+      return RouteConfiguration;
+    } else if (type_url == VirtualHostV3Alpha) {
+      return VirtualHost;
+    } else if (type_url == ScopedRouteConfigurationV3Alpha) {
+      return ScopedRouteConfiguration;
+    } else if (type_url == RuntimeV3Alpha) {
+      return Runtime;
     }
     NOT_REACHED_GCOVR_EXCL_LINE;
   }

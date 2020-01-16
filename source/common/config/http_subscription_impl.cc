@@ -2,11 +2,13 @@
 
 #include <memory>
 
+#include "envoy/config/subscription.h"
 #include "envoy/service/discovery/v3alpha/discovery.pb.h"
 
 #include "common/buffer/buffer_impl.h"
 #include "common/common/assert.h"
 #include "common/common/macros.h"
+#include "common/config/resources.h"
 #include "common/config/utility.h"
 #include "common/config/version_converter.h"
 #include "common/http/headers.h"
@@ -62,7 +64,11 @@ void HttpSubscriptionImpl::updateResourceInterest(
   request_.mutable_resource_names()->Swap(&resources_vector);
 }
 
-void HttpSubscriptionImpl::fallback(const std::set<std::string>&) {}
+void HttpSubscriptionImpl::fallback(const std::set<std::string>& resources) {
+  const auto new_type_url = TypeUrl::get().fallback(request_.type_url());
+  request_.set_type_url(new_type_url);
+  updateResourceInterest(resources);
+}
 
 // Http::RestApiFetcher
 void HttpSubscriptionImpl::createRequest(Http::Message& request) {
@@ -101,6 +107,8 @@ void HttpSubscriptionImpl::onFetchFailure(Config::ConfigUpdateFailureReason reas
                                           const EnvoyException* e) {
   handleFailure(reason, e);
 }
+
+void HttpSubscriptionImpl::retry() { callbacks_.kickFallback(); }
 
 void HttpSubscriptionImpl::handleFailure(Config::ConfigUpdateFailureReason reason,
                                          const EnvoyException* e) {

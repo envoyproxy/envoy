@@ -61,6 +61,28 @@ TEST_F(HttpSubscriptionImplTest, ConfigNotModified) {
   EXPECT_TRUE(statsAre(4, 1, 0, 0, 0, 7148434200721666028));
 }
 
+class HttpSubscriptionImplTestV3Alpha : public testing::Test, public HttpSubscriptionTestHarness {
+protected:
+  HttpSubscriptionImplTestV3Alpha()
+      : HttpSubscriptionTestHarness(envoy::config::core::v3alpha::ApiVersion::V3ALPHA) {}
+};
+
+// TEST_F(HttpSubscriptionImplTestV3Alpha, FallbackSuccess) {
+//   startSubscription({"cluster0"});
+//   EXPECT_CALL(random_gen_, random()).WillOnce(Return(0));
+//   EXPECT_CALL(*timer_, enableTimer(_, _));
+//   EXPECT_CALL(callbacks_,
+//               onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason::ConnectionFailure,
+//               _))
+//       .Times(0);
+//   http_callbacks_->onFailure(Http::AsyncClient::FailureReason::Reset);
+//   // EXPECT_TRUE(statsAre(1, 0, 0, 1, 0, 0));
+//   // timerTick();
+//   // EXPECT_TRUE(statsAre(2, 0, 0, 1, 0, 0));
+//   // deliverConfigUpdate({"cluster0", "cluster1"}, "0", true);
+//   // EXPECT_TRUE(statsAre(3, 1, 0, 1, 0, 7148434200721666028));
+// }
+
 } // namespace
 } // namespace Config
 } // namespace Envoy

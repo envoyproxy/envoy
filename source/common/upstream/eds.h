@@ -46,6 +46,7 @@ private:
                resource)
         .cluster_name();
   }
+  void kickFallback() override { subscription_->fallback({cluster_name_}); }
   static std::string loadTypeUrl(envoy::config::core::v3alpha::ApiVersion resource_api_version);
   using LocalityWeightsMap = std::unordered_map<envoy::config::core::v3alpha::Locality, uint32_t,
                                                 LocalityHash, LocalityEqualTo>;

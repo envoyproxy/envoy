@@ -94,6 +94,8 @@ public:
 
   std::string resourceName(const ProtobufWkt::Any&) override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
 
+  void kickFallback() override { NOT_IMPLEMENTED_GCOVR_EXCL_LINE; }
+
   WatchMap(const WatchMap&) = delete;
   WatchMap& operator=(const WatchMap&) = delete;
 

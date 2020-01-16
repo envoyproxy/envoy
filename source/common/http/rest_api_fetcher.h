@@ -1,6 +1,7 @@
 #pragma once
 
 #include <chrono>
+#include <functional>
 #include <string>
 
 #include "envoy/config/subscription.h"
@@ -52,6 +53,8 @@ protected:
    */
   virtual void onFetchFailure(Config::ConfigUpdateFailureReason reason,
                               const EnvoyException* e) PURE;
+
+  virtual void retry() PURE;
 
 protected:
   const std::string remote_cluster_name_;
