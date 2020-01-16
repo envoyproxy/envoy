@@ -296,7 +296,18 @@ def Sync(api_root, mode, labels, shadow):
         print(diff.decode(), file=sys.stderr)
         sys.exit(1)
       if mode == "fix":
-        subprocess.run(['patch', '-p1'], input=diff, cwd=str(api_root_path.resolve()))
+        src_files = set(str(p.relative_to(current_api_dir)) for p in current_api_dir.rglob('*'))
+        dst_files = set(str(p.relative_to(dst_dir)) for p in dst_dir.rglob('*'))
+        deleted_files = src_files.difference(dst_files)
+        if deleted_files:
+          print('The following files will be deleted: %s' % sorted(deleted_files))
+          print(
+              'If this is not intended, please see https://github.com/envoyproxy/envoy/blob/master/api/STYLE.md#adding-an-extension-configuration-to-the-api.'
+          )
+          if input('Delete files? [yN] ').strip().lower() == 'y':
+            subprocess.run(['patch', '-p1'], input=diff, cwd=str(api_root_path.resolve()))
+          else:
+            sys.exit(1)
 
   with open(os.path.join(api_root, 'BUILD'), 'w') as f:
     formatted_deps = '\n'.join(
