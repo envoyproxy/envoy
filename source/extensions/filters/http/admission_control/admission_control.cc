@@ -24,7 +24,6 @@ namespace AdmissionControl {
 static constexpr double defaultAggression = 2.0;
 static constexpr std::chrono::seconds defaultSamplingWindow{120};
 static constexpr std::chrono::seconds defaultHistoryGranularity{1};
-static constexpr uint32_t defaultMinRequestSamples = 100;
 
 AdmissionControlFilterConfig::AdmissionControlFilterConfig(
     const AdmissionControlProto& proto_config, Server::Configuration::FactoryContext& context)
@@ -34,12 +33,17 @@ AdmissionControlFilterConfig::AdmissionControlFilterConfig(
       sampling_window_(proto_config.has_sampling_window()
                            ? DurationUtil::durationToSeconds(proto_config.sampling_window())
                            : defaultSamplingWindow.count()),
-      // TODO @tallen make runtime configurable
-      aggression_(PROTOBUF_PERCENT_TO_DOUBLE_OR_DEFAULT(proto_config, aggression_coefficient,
-                                                        defaultAggression)) {
+      aggression_(
+          proto_config.has_aggression_coefficient()
+              ? std::make_shared<Runtime::Double>(proto_config.aggression_coefficient(), runtime_)
+              : nullptr) {
   tls_->set([this](Event::Dispatcher&) -> ThreadLocal::ThreadLocalObjectSharedPtr {
     return std::make_shared<ThreadLocalController>(time_source_, sampling_window_);
   });
+}
+
+double AdmissionControlFilterConfig::aggression() const {
+  return aggression_ ? aggression_->value() : defaultAggression;
 }
 
 AdmissionControlFilter::AdmissionControlFilter(AdmissionControlFilterConfigSharedPtr config,

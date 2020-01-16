@@ -32,8 +32,8 @@ private:
 class Double {
 public:
   Double(const envoy::config::core::v3alpha::RuntimeDouble& double_proto, Runtime::Loader& runtime)
-      : runtime_key_(double_proto.runtime_key()),
-        default_value_(double_proto.default_value()), runtime_(runtime) {}
+      : runtime_key_(double_proto.runtime_key()), default_value_(double_proto.default_value()),
+        runtime_(runtime) {}
 
   double value() const { return runtime_.snapshot().getDouble(runtime_key_, default_value_); }
 

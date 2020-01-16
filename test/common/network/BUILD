@@ -257,7 +257,6 @@ envoy_cc_test(
         "//test/mocks/network:network_mocks",
         "//test/test_common:environment_lib",
         "//test/test_common:threadsafe_singleton_injector_lib",
-        "@envoy_api//envoy/config/core/v3alpha:pkg_cc_proto",
     ],
 )
 
