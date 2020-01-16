@@ -147,9 +147,8 @@ void ConnPoolImpl::onConnectionEvent(ActiveClient& client, Network::ConnectionEv
       // already have "reset" the stream to fire the reset callback. All we do here is just
       // destroy the client.
       removed = client.removeFromList(busy_clients_);
-    } else if (!client.connect_timer_) {
-      // The connect timer is destroyed on connect. The lack of a connect timer means that this
-      // client is idle and in the ready pool.
+    } else if (client.connectionState() ==
+               ConnPoolImplBase::ActiveClient::ConnectionState::Connected) {
       removed = client.removeFromList(ready_clients_);
       check_for_drained = false;
     } else {
@@ -181,18 +180,14 @@ void ConnPoolImpl::onConnectionEvent(ActiveClient& client, Network::ConnectionEv
     }
   }
 
-  if (client.connect_timer_) {
-    client.connect_timer_->disableTimer();
-    client.connect_timer_.reset();
-  }
+  client.disarmConnectTimeout();
 
   // Note that the order in this function is important. Concretely, we must destroy the connect
   // timer before we process a connected idle client, because if this results in an immediate
   // drain/destruction event, we key off of the existence of the connect timer above to determine
   // whether the client is in the ready list (connected) or the busy list (failed to connect).
   if (event == Network::ConnectionEvent::Connected) {
-    client.conn_connect_ms_->complete();
-    client.conn_connect_ms_.reset();
+    client.recordConnectionSetup();
     processIdleClient(client, false);
   }
 }
@@ -267,11 +262,20 @@ ConnPoolImpl::StreamWrapper::StreamWrapper(StreamDecoder& response_decoder, Acti
   StreamEncoderWrapper::inner_.getStream().addCallbacks(*this);
   parent_.parent_.host_->cluster().stats().upstream_rq_active_.inc();
   parent_.parent_.host_->stats().rq_active_.inc();
+
+  // TODO (tonya11en): At the time of writing, there is no way to mix different versions of HTTP
+  // traffic in the same cluster, so incrementing the request count in the per-cluster resource
+  // manager will not affect circuit breaking in any unexpected ways. Ideally, outstanding requests
+  // counts would be tracked the same way in all HTTP versions.
+  //
+  // See: https://github.com/envoyproxy/envoy/issues/9215
+  parent_.parent_.host_->cluster().resourceManager(parent_.parent_.priority_).requests().inc();
 }
 
 ConnPoolImpl::StreamWrapper::~StreamWrapper() {
   parent_.parent_.host_->cluster().stats().upstream_rq_active_.dec();
   parent_.parent_.host_->stats().rq_active_.dec();
+  parent_.parent_.host_->cluster().resourceManager(parent_.parent_.priority_).requests().dec();
 }
 
 void ConnPoolImpl::StreamWrapper::onEncodeComplete() { encode_complete_ = true; }
@@ -303,12 +307,9 @@ void ConnPoolImpl::StreamWrapper::onDecodeComplete() {
 }
 
 ConnPoolImpl::ActiveClient::ActiveClient(ConnPoolImpl& parent)
-    : parent_(parent),
-      connect_timer_(parent_.dispatcher_.createTimer([this]() -> void { onConnectTimeout(); })),
+    : ConnPoolImplBase::ActiveClient(parent.dispatcher_, parent.host_->cluster()), parent_(parent),
       remaining_requests_(parent_.host_->cluster().maxRequestsPerConnection()) {
 
-  conn_connect_ms_ = std::make_unique<Stats::HistogramCompletableTimespanImpl>(
-      parent_.host_->cluster().stats().upstream_cx_connect_ms_, parent_.dispatcher_.timeSource());
   Upstream::Host::CreateConnectionData data = parent_.host_->createConnection(
       parent_.dispatcher_, parent_.socket_options_, parent_.transport_socket_options_);
   real_host_description_ = data.host_description_;
@@ -320,9 +321,6 @@ ConnPoolImpl::ActiveClient::ActiveClient(ConnPoolImpl& parent)
   parent_.host_->cluster().stats().upstream_cx_http1_total_.inc();
   parent_.host_->stats().cx_total_.inc();
   parent_.host_->stats().cx_active_.inc();
-  conn_length_ = std::make_unique<Stats::HistogramCompletableTimespanImpl>(
-      parent_.host_->cluster().stats().upstream_cx_length_ms_, parent_.dispatcher_.timeSource());
-  connect_timer_->enableTimer(parent_.host_->cluster().connectTimeout());
   parent_.host_->cluster().resourceManager(parent_.priority_).connections().inc();
 
   codec_client_->setConnectionStats(
@@ -336,7 +334,6 @@ ConnPoolImpl::ActiveClient::ActiveClient(ConnPoolImpl& parent)
 ConnPoolImpl::ActiveClient::~ActiveClient() {
   parent_.host_->cluster().stats().upstream_cx_active_.dec();
   parent_.host_->stats().cx_active_.dec();
-  conn_length_->complete();
   parent_.host_->cluster().resourceManager(parent_.priority_).connections().dec();
 }
 

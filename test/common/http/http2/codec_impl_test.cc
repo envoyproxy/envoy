@@ -481,7 +481,7 @@ TEST_P(Http2CodecImplTest, InvalidHeadersFrameAllowed) {
   server_wrapper_.dispatch(Buffer::OwnedImpl(), *server_);
 }
 
-TEST_P(Http2CodecImplTest, InvalidHeadersFrameOverriden) {
+TEST_P(Http2CodecImplTest, InvalidHeadersFrameOverridden) {
   Runtime::LoaderSingleton::getExisting()->mergeValues(
       {{"envoy.reloadable_features.http2_protocol_options.stream_error_on_invalid_http_messaging",
         "true"}});
@@ -1220,7 +1220,7 @@ TEST_P(Http2CodecImplTest, ManyLargeRequestHeadersUnderPerHeaderLimit) {
   HttpTestUtility::addDefaultHeaders(request_headers);
   std::string long_string = std::string(1024, 'q');
   for (int i = 0; i < 80; i++) {
-    request_headers.addCopy(fmt::format("{}", i), long_string);
+    request_headers.addCopy(std::to_string(i), long_string);
   }
 
   EXPECT_CALL(request_decoder_, decodeHeaders_(_, _)).Times(1);
@@ -1238,7 +1238,7 @@ TEST_P(Http2CodecImplTest, LargeRequestHeadersAtMaxConfigurable) {
   HttpTestUtility::addDefaultHeaders(request_headers);
   std::string long_string = std::string(1024, 'q');
   for (int i = 0; i < 95; i++) {
-    request_headers.addCopy(fmt::format("{}", i), long_string);
+    request_headers.addCopy(std::to_string(i), long_string);
   }
 
   EXPECT_CALL(request_decoder_, decodeHeaders_(_, _)).Times(1);

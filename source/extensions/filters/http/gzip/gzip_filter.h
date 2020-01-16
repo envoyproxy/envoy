@@ -1,6 +1,6 @@
 #pragma once
 
-#include "envoy/config/filter/http/gzip/v2/gzip.pb.h"
+#include "envoy/extensions/filters/http/gzip/v3/gzip.pb.h"
 
 #include "common/compressor/zlib_compressor_impl.h"
 
@@ -17,7 +17,7 @@ namespace Gzip {
 class GzipFilterConfig : public Common::Compressors::CompressorFilterConfig {
 
 public:
-  GzipFilterConfig(const envoy::config::filter::http::gzip::v2::Gzip& gzip,
+  GzipFilterConfig(const envoy::extensions::filters::http::gzip::v3::Gzip& gzip,
                    const std::string& stats_prefix, Stats::Scope& scope, Runtime::Loader& runtime);
 
   const std::string featureName() const override { return "gzip.filter_enabled"; };
@@ -35,9 +35,9 @@ public:
 
 private:
   static Compressor::ZlibCompressorImpl::CompressionLevel compressionLevelEnum(
-      envoy::config::filter::http::gzip::v2::Gzip_CompressionLevel_Enum compression_level);
+      envoy::extensions::filters::http::gzip::v3::Gzip::CompressionLevel::Enum compression_level);
   static Compressor::ZlibCompressorImpl::CompressionStrategy compressionStrategyEnum(
-      envoy::config::filter::http::gzip::v2::Gzip_CompressionStrategy compression_strategy);
+      envoy::extensions::filters::http::gzip::v3::Gzip::CompressionStrategy compression_strategy);
 
   static uint64_t memoryLevelUint(Protobuf::uint32 level);
   static uint64_t windowBitsUint(Protobuf::uint32 window_bits);

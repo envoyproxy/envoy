@@ -27,17 +27,22 @@ envoy_cc_test_library(
     ],
     deps = [
         ":http_integration_lib",
+        "//source/common/common:version_lib",
         "//source/common/config:protobuf_link_hacks",
         "//source/common/config:resources_lib",
+        "//source/common/config:version_converter_lib",
         "//source/common/protobuf:utility_lib",
         "//source/extensions/filters/network/redis_proxy:config",
         "//test/common/grpc:grpc_client_integration_lib",
         "//test/test_common:network_utility_lib",
         "//test/test_common:utility_lib",
-        "@envoy_api//envoy/admin/v2alpha:pkg_cc_proto",
-        "@envoy_api//envoy/api/v2:pkg_cc_proto",
-        "@envoy_api//envoy/api/v2/auth:pkg_cc_proto",
-        "@envoy_api//envoy/config/bootstrap/v2:pkg_cc_proto",
+        "@envoy_api//envoy/admin/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/endpoint/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/transport_sockets/tls/v3:pkg_cc_proto",
     ],
 )
 
@@ -53,8 +58,22 @@ envoy_cc_test(
         "//test/common/grpc:grpc_client_integration_lib",
         "//test/test_common:network_utility_lib",
         "//test/test_common:utility_lib",
+        "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/endpoint/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_test(
+    name = "api_version_integration_test",
+    srcs = ["api_version_integration_test.cc"],
+    deps = [
+        ":http_integration_lib",
         "@envoy_api//envoy/api/v2:pkg_cc_proto",
-        "@envoy_api//envoy/config/bootstrap/v2:pkg_cc_proto",
+        "@envoy_api//envoy/api/v2/core:pkg_cc_proto",
+        "@envoy_api//envoy/service/discovery/v3:pkg_cc_proto",
     ],
 )
 
@@ -91,7 +110,8 @@ envoy_cc_test(
         "//test/mocks/server:server_mocks",
         "//test/test_common:network_utility_lib",
         "//test/test_common:utility_lib",
-        "@envoy_api//envoy/api/v2:pkg_cc_proto",
+        "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
+        "@envoy_api//envoy/service/discovery/v3:pkg_cc_proto",
     ],
 )
 
@@ -104,11 +124,12 @@ envoy_cc_test(
         "//test/config:utility_lib",
         "//test/integration/filters:eds_ready_filter_config_lib",
         "//test/test_common:network_utility_lib",
-        "@envoy_api//envoy/api/v2:pkg_cc_proto",
-        "@envoy_api//envoy/api/v2/core:pkg_cc_proto",
-        "@envoy_api//envoy/config/bootstrap/v2:pkg_cc_proto",
-        "@envoy_api//envoy/config/filter/network/http_connection_manager/v2:pkg_cc_proto",
-        "@envoy_api//envoy/type:pkg_cc_proto",
+        "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/endpoint/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
+        "@envoy_api//envoy/type/v3:pkg_cc_proto",
     ],
 )
 
@@ -133,7 +154,7 @@ envoy_cc_test(
         "//test/server:utility_lib",
         "//test/test_common:registry_lib",
         "//test/test_common:utility_lib",
-        "@envoy_api//envoy/config/bootstrap/v2:pkg_cc_proto",
+        "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
     ],
 )
 
@@ -146,7 +167,7 @@ envoy_cc_test(
         "//include/envoy/registry",
         "//source/extensions/filters/network/tcp_proxy:config",
         "//test/config:utility_lib",
-        "@envoy_api//envoy/config/bootstrap/v2:pkg_cc_proto",
+        "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
     ],
 )
 
@@ -159,8 +180,8 @@ envoy_cc_test(
         "//test/config:utility_lib",
         "//test/integration/clusters:custom_static_cluster",
         "//test/test_common:network_utility_lib",
-        "@envoy_api//envoy/api/v2:pkg_cc_proto",
-        "@envoy_api//envoy/config/bootstrap/v2:pkg_cc_proto",
+        "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
     ],
 )
 
@@ -180,8 +201,7 @@ envoy_cc_test(
         "//test/mocks/server:server_mocks",
         "//test/test_common:network_utility_lib",
         "//test/test_common:utility_lib",
-        "@envoy_api//envoy/api/v2:pkg_cc_proto",
-        "@envoy_api//envoy/api/v2/route:pkg_cc_proto",
+        "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
     ],
 )
 
@@ -217,13 +237,15 @@ envoy_cc_test(
     ],
     deps = [
         ":http_integration_lib",
+        "//source/common/config:api_version_lib",
         "//source/common/protobuf",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/api/v2:pkg_cc_proto",
-        "@envoy_api//envoy/api/v2/core:pkg_cc_proto",
-        "@envoy_api//envoy/config/bootstrap/v2:pkg_cc_proto",
-        "@envoy_api//envoy/config/filter/http/router/v2:pkg_cc_proto",
-        "@envoy_api//envoy/config/filter/network/http_connection_manager/v2:pkg_cc_proto",
+        "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/http/router/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
     ],
 )
 
@@ -248,8 +270,9 @@ envoy_cc_test(
         "//test/mocks/http:http_mocks",
         "//test/mocks/upstream:upstream_mocks",
         "//test/test_common:utility_lib",
-        "@envoy_api//envoy/config/bootstrap/v2:pkg_cc_proto",
-        "@envoy_api//envoy/config/filter/network/http_connection_manager/v2:pkg_cc_proto",
+        "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
     ],
 )
 
@@ -261,10 +284,10 @@ envoy_cc_test(
     deps = [
         ":http_integration_lib",
         "//test/common/upstream:utility_lib",
-        "@envoy_api//envoy/api/v2:pkg_cc_proto",
-        "@envoy_api//envoy/api/v2/route:pkg_cc_proto",
-        "@envoy_api//envoy/config/bootstrap/v2:pkg_cc_proto",
-        "@envoy_api//envoy/config/filter/network/http_connection_manager/v2:pkg_cc_proto",
+        "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
     ],
 )
 
@@ -280,10 +303,10 @@ envoy_cc_test(
         ":http_integration_lib",
         "//source/extensions/transport_sockets/tls:context_lib",
         "//test/common/upstream:utility_lib",
-        "@envoy_api//envoy/api/v2/auth:pkg_cc_proto",
-        "@envoy_api//envoy/api/v2/route:pkg_cc_proto",
-        "@envoy_api//envoy/config/bootstrap/v2:pkg_cc_proto",
-        "@envoy_api//envoy/config/filter/network/http_connection_manager/v2:pkg_cc_proto",
+        "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/transport_sockets/tls/v3:pkg_cc_proto",
     ],
 )
 
@@ -294,8 +317,8 @@ envoy_cc_test(
     ],
     deps = [
         ":http_integration_lib",
-        "@envoy_api//envoy/config/bootstrap/v2:pkg_cc_proto",
-        "@envoy_api//envoy/config/filter/network/http_connection_manager/v2:pkg_cc_proto",
+        "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
     ],
 )
 
@@ -307,8 +330,8 @@ envoy_cc_test(
     ],
     deps = [
         ":http_integration_lib",
-        "@envoy_api//envoy/config/filter/http/router/v2:pkg_cc_proto",
-        "@envoy_api//envoy/config/filter/network/http_connection_manager/v2:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/http/router/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
     ],
 )
 
@@ -319,7 +342,7 @@ envoy_cc_test(
     ],
     # As this test has many H1/H2/v4/v6 tests it takes a while to run.
     # Shard it enough to bring the run time in line with other integration tests.
-    shard_count = 3,
+    shard_count = 5,
     deps = [
         ":http_protocol_integration_lib",
         "//source/common/http:header_map_lib",
@@ -328,9 +351,9 @@ envoy_cc_test(
         "//source/extensions/filters/http/health_check:config",
         "//test/integration/filters:random_pause_filter_lib",
         "//test/test_common:utility_lib",
-        "@envoy_api//envoy/api/v2/route:pkg_cc_proto",
-        "@envoy_api//envoy/config/bootstrap/v2:pkg_cc_proto",
-        "@envoy_api//envoy/config/filter/network/http_connection_manager/v2:pkg_cc_proto",
+        "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
     ],
 )
 
@@ -349,8 +372,8 @@ envoy_cc_test(
         "//source/extensions/filters/http/health_check:config",
         "//test/integration/filters:random_pause_filter_lib",
         "//test/test_common:utility_lib",
-        "@envoy_api//envoy/config/bootstrap/v2:pkg_cc_proto",
-        "@envoy_api//envoy/config/filter/network/http_connection_manager/v2:pkg_cc_proto",
+        "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
     ],
 )
 
@@ -367,10 +390,11 @@ envoy_cc_test(
         "//source/extensions/filters/http/buffer:config",
         "//source/extensions/filters/http/health_check:config",
         "//test/common/stats:stat_test_utility_lib",
-        "@envoy_api//envoy/admin/v2alpha:pkg_cc_proto",
-        "@envoy_api//envoy/api/v2/core:pkg_cc_proto",
-        "@envoy_api//envoy/config/bootstrap/v2:pkg_cc_proto",
-        "@envoy_api//envoy/config/metrics/v2:pkg_cc_proto",
+        "@envoy_api//envoy/admin/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/metrics/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
     ],
 )
 
@@ -398,6 +422,7 @@ envoy_cc_test_library(
         ":test_host_predicate_lib",
         "//include/envoy/event:timer_interface",
         "//source/common/common:thread_annotations",
+        "//source/extensions/filters/http/on_demand:config",
         "//source/extensions/filters/http/router:config",
         "//source/extensions/filters/network/http_connection_manager:config",
         "//test/common/upstream:utility_lib",
@@ -410,7 +435,8 @@ envoy_cc_test_library(
         "//test/integration/filters:passthrough_filter_config_lib",
         "//test/integration/filters:pause_filter_lib",
         "//test/test_common:registry_lib",
-        "@envoy_api//envoy/config/filter/network/http_connection_manager/v2:pkg_cc_proto",
+        "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
     ],
 )
 
@@ -437,8 +463,8 @@ envoy_cc_test(
     deps = [
         ":http_protocol_integration_lib",
         "//test/test_common:test_time_lib",
-        "@envoy_api//envoy/config/bootstrap/v2:pkg_cc_proto",
-        "@envoy_api//envoy/config/filter/network/http_connection_manager/v2:pkg_cc_proto",
+        "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
     ],
 )
 
@@ -482,6 +508,8 @@ envoy_cc_test_library(
         "//source/common/buffer:zero_copy_input_stream_lib",
         "//source/common/common:assert_lib",
         "//source/common/common:minimal_logger_lib",
+        "//source/common/config:api_version_lib",
+        "//source/common/config:version_converter_lib",
         "//source/common/event:dispatcher_lib",
         "//source/common/grpc:codec_lib",
         "//source/common/grpc:common_lib",
@@ -525,12 +553,12 @@ envoy_cc_test_library(
         "//test/test_common:test_time_lib",
         "//test/test_common:test_time_system_interface",
         "//test/test_common:utility_lib",
-        "@envoy_api//envoy/admin/v2alpha:pkg_cc_proto",
+        "@envoy_api//envoy/admin/v3:pkg_cc_proto",
         "@envoy_api//envoy/api/v2:pkg_cc_proto",
-        "@envoy_api//envoy/api/v2/auth:pkg_cc_proto",
-        "@envoy_api//envoy/api/v2/core:pkg_cc_proto",
-        "@envoy_api//envoy/api/v2/endpoint:pkg_cc_proto",
-        "@envoy_api//envoy/config/bootstrap/v2:pkg_cc_proto",
+        "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/endpoint/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/transport_sockets/tls/v3:pkg_cc_proto",
     ],
 )
 
@@ -552,9 +580,9 @@ envoy_cc_test(
         "//test/integration/filters:process_context_lib",
         "//test/mocks/http:http_mocks",
         "//test/test_common:utility_lib",
-        "@envoy_api//envoy/api/v2/route:pkg_cc_proto",
-        "@envoy_api//envoy/config/bootstrap/v2:pkg_cc_proto",
-        "@envoy_api//envoy/config/filter/network/http_connection_manager/v2:pkg_cc_proto",
+        "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
     ],
 )
 
@@ -567,8 +595,8 @@ envoy_cc_test(
         ":http_protocol_integration_lib",
         "//source/common/http:header_map_lib",
         "//test/test_common:utility_lib",
-        "@envoy_api//envoy/api/v2/route:pkg_cc_proto",
-        "@envoy_api//envoy/config/filter/network/http_connection_manager/v2:pkg_cc_proto",
+        "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
     ],
 )
 
@@ -584,8 +612,8 @@ envoy_cc_test(
         "//source/extensions/access_loggers/file:config",
         "//source/extensions/filters/http/buffer:config",
         "//test/test_common:utility_lib",
-        "@envoy_api//envoy/config/bootstrap/v2:pkg_cc_proto",
-        "@envoy_api//envoy/config/filter/network/http_connection_manager/v2:pkg_cc_proto",
+        "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
     ],
 )
 
@@ -619,8 +647,8 @@ envoy_cc_test(
         "//test/common/stats:stat_test_utility_lib",
         "//test/test_common:network_utility_lib",
         "//test/test_common:utility_lib",
-        "@envoy_api//envoy/api/v2/core:pkg_cc_proto",
-        "@envoy_api//envoy/config/bootstrap/v2:pkg_cc_proto",
+        "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )
 
@@ -633,11 +661,11 @@ envoy_cc_test(
         "//test/config:utility_lib",
         "//test/test_common:network_utility_lib",
         "//test/test_common:utility_lib",
-        "@envoy_api//envoy/api/v2:pkg_cc_proto",
-        "@envoy_api//envoy/api/v2/core:pkg_cc_proto",
-        "@envoy_api//envoy/api/v2/endpoint:pkg_cc_proto",
-        "@envoy_api//envoy/config/bootstrap/v2:pkg_cc_proto",
-        "@envoy_api//envoy/service/load_stats/v2:pkg_cc_proto",
+        "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/endpoint/v3:pkg_cc_proto",
+        "@envoy_api//envoy/service/load_stats/v3:pkg_cc_proto",
     ],
 )
 
@@ -657,9 +685,9 @@ envoy_cc_test(
         "//test/common/upstream:utility_lib",
         "//test/config:utility_lib",
         "//test/test_common:network_utility_lib",
-        "@envoy_api//envoy/api/v2/core:pkg_cc_proto",
-        "@envoy_api//envoy/config/bootstrap/v2:pkg_cc_proto",
-        "@envoy_api//envoy/service/discovery/v2:pkg_cc_proto",
+        "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+        "@envoy_api//envoy/service/health/v3:pkg_cc_proto",
     ],
 )
 
@@ -669,7 +697,7 @@ envoy_cc_test(
     coverage = False,
     deps = [
         ":http_protocol_integration_lib",
-        "@envoy_api//envoy/config/bootstrap/v2:pkg_cc_proto",
+        "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
     ],
 )
 
@@ -679,8 +707,8 @@ envoy_cc_test(
     deps = [
         ":http_protocol_integration_lib",
         "//source/extensions/resource_monitors/injected_resource:config",
-        "@envoy_api//envoy/config/bootstrap/v2:pkg_cc_proto",
-        "@envoy_api//envoy/config/overload/v2alpha:pkg_cc_proto",
+        "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/overload/v3:pkg_cc_proto",
     ],
 )
 
@@ -696,8 +724,8 @@ envoy_cc_test(
         "//source/common/http:codec_client_lib",
         "//source/extensions/filters/listener/proxy_protocol:config",
         "//test/test_common:utility_lib",
-        "@envoy_api//envoy/api/v2:pkg_cc_proto",
-        "@envoy_api//envoy/config/bootstrap/v2:pkg_cc_proto",
+        "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
     ],
 )
 
@@ -711,11 +739,11 @@ envoy_cc_test(
         "//source/common/grpc:common_lib",
         "//source/extensions/filters/http/ratelimit:config",
         "//test/common/grpc:grpc_client_integration_lib",
-        "@envoy_api//envoy/api/v2/listener:pkg_cc_proto",
-        "@envoy_api//envoy/config/bootstrap/v2:pkg_cc_proto",
-        "@envoy_api//envoy/config/filter/http/rate_limit/v2:pkg_cc_proto",
-        "@envoy_api//envoy/config/filter/network/http_connection_manager/v2:pkg_cc_proto",
-        "@envoy_api//envoy/service/ratelimit/v2:pkg_cc_proto",
+        "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/http/ratelimit/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
+        "@envoy_api//envoy/service/ratelimit/v3:pkg_cc_proto",
     ],
 )
 
@@ -725,7 +753,7 @@ envoy_cc_test(
     deps = [
         ":http_integration_lib",
         "//test/common/grpc:grpc_client_integration_lib",
-        "@envoy_api//envoy/service/discovery/v2:pkg_cc_proto",
+        "@envoy_api//envoy/service/runtime/v3:pkg_cc_proto",
     ],
 )
 
@@ -754,8 +782,8 @@ envoy_cc_test(
         "//source/extensions/transport_sockets/tls:context_lib",
         "//test/mocks/secret:secret_mocks",
         "//test/test_common:utility_lib",
-        "@envoy_api//envoy/api/v2/auth:pkg_cc_proto",
-        "@envoy_api//envoy/config/bootstrap/v2:pkg_cc_proto",
+        "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/transport_sockets/tls/v3:pkg_cc_proto",
     ],
 )
 
@@ -769,6 +797,7 @@ envoy_cc_test(
     ],
     deps = [
         ":http_integration_lib",
+        "//source/common/config:api_version_lib",
         "//source/common/config:protobuf_link_hacks",
         "//source/common/config:resources_lib",
         "//source/common/event:dispatcher_includes",
@@ -783,10 +812,10 @@ envoy_cc_test(
         "//test/mocks/secret:secret_mocks",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/api/v2:pkg_cc_proto",
-        "@envoy_api//envoy/api/v2/auth:pkg_cc_proto",
-        "@envoy_api//envoy/api/v2/core:pkg_cc_proto",
-        "@envoy_api//envoy/config/bootstrap/v2:pkg_cc_proto",
-        "@envoy_api//envoy/service/discovery/v2:pkg_cc_proto",
+        "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/transport_sockets/tls/v3:pkg_cc_proto",
+        "@envoy_api//envoy/service/secret/v3:pkg_cc_proto",
     ],
 )
 
@@ -801,6 +830,7 @@ envoy_cc_test(
     ],
     deps = [
         ":integration_lib",
+        "//source/common/config:api_version_lib",
         "//source/common/event:dispatcher_includes",
         "//source/common/event:dispatcher_lib",
         "//source/common/network:utility_lib",
@@ -812,11 +842,12 @@ envoy_cc_test(
         "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/secret:secret_mocks",
         "//test/test_common:utility_lib",
-        "@envoy_api//envoy/api/v2:pkg_cc_proto",
-        "@envoy_api//envoy/api/v2/core:pkg_cc_proto",
-        "@envoy_api//envoy/config/accesslog/v2:pkg_cc_proto",
-        "@envoy_api//envoy/config/bootstrap/v2:pkg_cc_proto",
+        "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/config/filter/network/tcp_proxy/v2:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/access_loggers/file/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/network/tcp_proxy/v3:pkg_cc_proto",
     ],
 )
 
@@ -858,7 +889,7 @@ envoy_cc_test(
         "//source/common/http:codec_client_lib",
         "//source/common/stats:stats_lib",
         "//test/test_common:environment_lib",
-        "@envoy_api//envoy/config/bootstrap/v2:pkg_cc_proto",
+        "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
     ],
 )
 
@@ -878,7 +909,7 @@ envoy_cc_test(
     deps = [
         ":http_integration_lib",
         "//source/common/stats:stats_lib",
-        "@envoy_api//envoy/config/filter/network/tcp_proxy/v2:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/network/tcp_proxy/v3:pkg_cc_proto",
     ],
 )
 
@@ -891,8 +922,8 @@ envoy_cc_test(
         ":http_protocol_integration_lib",
         "//test/test_common:environment_lib",
         "//test/test_common:utility_lib",
-        "@envoy_api//envoy/config/bootstrap/v2:pkg_cc_proto",
-        "@envoy_api//envoy/config/filter/network/http_connection_manager/v2:pkg_cc_proto",
+        "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
     ],
 )
 
@@ -911,9 +942,9 @@ envoy_cc_test(
         "//source/extensions/transport_sockets/tls:config",
         "//test/mocks/server:server_mocks",
         "//test/test_common:utility_lib",
-        "@envoy_api//envoy/api/v2/auth:pkg_cc_proto",
-        "@envoy_api//envoy/config/bootstrap/v2:pkg_cc_proto",
-        "@envoy_api//envoy/config/filter/network/http_connection_manager/v2:pkg_cc_proto",
+        "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/transport_sockets/tls/v3:pkg_cc_proto",
     ],
 )
 
@@ -945,7 +976,7 @@ envoy_cc_fuzz_test(
     corpus = "h1_corpus",
     deps = [
         ":h1_fuzz_lib",
-        "@envoy_api//envoy/config/filter/network/http_connection_manager/v2:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
     ],
 )
 
@@ -956,6 +987,7 @@ envoy_cc_test(
     ],
     deps = [
         ":http_integration_lib",
+        "//source/common/config:api_version_lib",
         "//source/common/config:resources_lib",
         "//source/common/event:dispatcher_includes",
         "//source/common/event:dispatcher_lib",
@@ -964,9 +996,10 @@ envoy_cc_test(
         "//test/common/grpc:grpc_client_integration_lib",
         "//test/test_common:utility_lib",
         "@envoy_api//envoy/api/v2:pkg_cc_proto",
-        "@envoy_api//envoy/api/v2/core:pkg_cc_proto",
-        "@envoy_api//envoy/config/bootstrap/v2:pkg_cc_proto",
-        "@envoy_api//envoy/config/filter/network/http_connection_manager/v2:pkg_cc_proto",
+        "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
     ],
 )
 

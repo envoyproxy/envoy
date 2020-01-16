@@ -20,7 +20,7 @@ const uint64_t GzipHeaderValue = 16;
 
 } // namespace
 
-GzipFilterConfig::GzipFilterConfig(const envoy::config::filter::http::gzip::v2::Gzip& gzip,
+GzipFilterConfig::GzipFilterConfig(const envoy::extensions::filters::http::gzip::v3::Gzip& gzip,
                                    const std::string& stats_prefix, Stats::Scope& scope,
                                    Runtime::Loader& runtime)
     : CompressorFilterConfig(compressorConfig(gzip), stats_prefix + "gzip.", scope, runtime,
@@ -37,11 +37,11 @@ std::unique_ptr<Compressor::Compressor> GzipFilterConfig::makeCompressor() {
 }
 
 Compressor::ZlibCompressorImpl::CompressionLevel GzipFilterConfig::compressionLevelEnum(
-    envoy::config::filter::http::gzip::v2::Gzip_CompressionLevel_Enum compression_level) {
+    envoy::extensions::filters::http::gzip::v3::Gzip::CompressionLevel::Enum compression_level) {
   switch (compression_level) {
-  case envoy::config::filter::http::gzip::v2::Gzip::CompressionLevel::BEST:
+  case envoy::extensions::filters::http::gzip::v3::Gzip::CompressionLevel::BEST:
     return Compressor::ZlibCompressorImpl::CompressionLevel::Best;
-  case envoy::config::filter::http::gzip::v2::Gzip::CompressionLevel::SPEED:
+  case envoy::extensions::filters::http::gzip::v3::Gzip::CompressionLevel::SPEED:
     return Compressor::ZlibCompressorImpl::CompressionLevel::Speed;
   default:
     return Compressor::ZlibCompressorImpl::CompressionLevel::Standard;
@@ -49,13 +49,13 @@ Compressor::ZlibCompressorImpl::CompressionLevel GzipFilterConfig::compressionLe
 }
 
 Compressor::ZlibCompressorImpl::CompressionStrategy GzipFilterConfig::compressionStrategyEnum(
-    envoy::config::filter::http::gzip::v2::Gzip_CompressionStrategy compression_strategy) {
+    envoy::extensions::filters::http::gzip::v3::Gzip::CompressionStrategy compression_strategy) {
   switch (compression_strategy) {
-  case envoy::config::filter::http::gzip::v2::Gzip::RLE:
+  case envoy::extensions::filters::http::gzip::v3::Gzip::RLE:
     return Compressor::ZlibCompressorImpl::CompressionStrategy::Rle;
-  case envoy::config::filter::http::gzip::v2::Gzip::FILTERED:
+  case envoy::extensions::filters::http::gzip::v3::Gzip::FILTERED:
     return Compressor::ZlibCompressorImpl::CompressionStrategy::Filtered;
-  case envoy::config::filter::http::gzip::v2::Gzip::HUFFMAN:
+  case envoy::extensions::filters::http::gzip::v3::Gzip::HUFFMAN:
     return Compressor::ZlibCompressorImpl::CompressionStrategy::Huffman;
   default:
     return Compressor::ZlibCompressorImpl::CompressionStrategy::Standard;
@@ -71,7 +71,7 @@ uint64_t GzipFilterConfig::windowBitsUint(Protobuf::uint32 window_bits) {
 }
 
 const envoy::config::filter::http::compressor::v2::Compressor
-GzipFilterConfig::compressorConfig(const envoy::config::filter::http::gzip::v2::Gzip& gzip) {
+GzipFilterConfig::compressorConfig(const envoy::extensions::filters::http::gzip::v3::Gzip& gzip) {
   if (gzip.has_compressor()) {
     return gzip.compressor();
   }

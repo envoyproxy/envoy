@@ -46,8 +46,10 @@ REAL_TIME_WHITELIST = ("./source/common/common/utility.h",
 # Files in these paths can use MessageLite::SerializeAsString
 SERIALIZE_AS_STRING_WHITELIST = (
     "./source/common/config/version_converter.cc",
+    "./source/common/protobuf/utility.cc",
     "./source/extensions/filters/http/grpc_json_transcoder/json_transcoder_filter.cc",
     "./test/common/protobuf/utility_test.cc",
+    "./test/common/config/version_converter_test.cc",
     "./test/common/grpc/codec_test.cc",
     "./test/common/grpc/codec_fuzz_test.cc",
 )
@@ -72,7 +74,8 @@ STD_REGEX_WHITELIST = ("./source/common/common/utility.cc", "./source/common/com
                        "./source/extensions/filters/http/squash/squash_filter.cc",
                        "./source/server/http/admin.h", "./source/server/http/admin.cc",
                        "./tools/clang_tools/api_booster/main.cc",
-                       "./tools/clang_tools/api_booster/proto_cxx_utils.h")
+                       "./tools/clang_tools/api_booster/proto_cxx_utils.cc",
+                       "./source/common/common/version.cc")
 
 # Only one C++ file should instantiate grpc_init
 GRPC_INIT_WHITELIST = ("./source/common/grpc/google_grpc_context.cc")
@@ -151,6 +154,7 @@ UNOWNED_EXTENSIONS = {
   "extensions/filters/network/ext_authz",
   "extensions/filters/network/redis_proxy",
   "extensions/filters/network/kafka",
+  "extensions/filters/network/kafka/broker",
   "extensions/filters/network/kafka/protocol",
   "extensions/filters/network/kafka/serialization",
   "extensions/filters/network/mongo_proxy",
@@ -331,7 +335,7 @@ def errorIfNoSubstringFound(pattern, file_path, error_message):
 
 
 def isApiFile(file_path):
-  return file_path.startswith(args.api_prefix)
+  return file_path.startswith(args.api_prefix) or file_path.startswith(args.api_shadow_prefix)
 
 
 def isBuildFile(file_path):
@@ -565,7 +569,7 @@ def checkSourceLine(line, file_path, reportError):
      ('.counter(' in line or '.gauge(' in line or '.histogram(' in line):
     reportError("Don't lookup stats by name at runtime; use StatName saved during construction")
 
-  if re.search("envoy::[a-z0-9_:]+::[A-Z]\w*_\w*_[A-Z]{2}", line):
+  if re.search("envoy::[a-z0-9_:]+::[A-Z][a-z]\w*_\w*_[A-Z]{2}", line):
     reportError("Don't use mangled Protobuf names for enum constants")
 
   hist_m = re.search("(?<=HISTOGRAM\()[a-zA-Z0-9_]+_(b|kb|mb|ns|us|ms|s)(?=,)", line)
@@ -633,7 +637,8 @@ def checkBuildPath(file_path):
     command = "%s %s | diff %s -" % (ENVOY_BUILD_FIXER_PATH, file_path, file_path)
     error_messages += executeCommand(command, "envoy_build_fixer check failed", file_path)
 
-  if isBuildFile(file_path) and file_path.startswith(args.api_prefix + "envoy"):
+  if isBuildFile(file_path) and (file_path.startswith(args.api_prefix + "envoy") or
+                                 file_path.startswith(args.api_shadow_prefix + "envoy")):
     found = False
     for line in readLines(file_path):
       if "api_proto_package(" in line:
@@ -836,6 +841,10 @@ if __name__ == "__main__":
                       default=multiprocessing.cpu_count(),
                       help="number of worker processes to use; defaults to one per core.")
   parser.add_argument("--api-prefix", type=str, default="./api/", help="path of the API tree.")
+  parser.add_argument("--api-shadow-prefix",
+                      type=str,
+                      default="./generated_api_shadow/",
+                      help="path of the shadow API tree.")
   parser.add_argument("--skip_envoy_build_rule_check",
                       action="store_true",
                       help="skip checking for '@envoy//' prefix in build rules.")
@@ -888,8 +897,8 @@ if __name__ == "__main__":
   def ownedDirectories(error_messages):
     owned = []
     maintainers = [
-        '@mattklein123', '@htuch', '@alyssawilk', '@zuercher', '@lizan', '@snowp', '@junr03',
-        '@dnoe', '@dio', '@jmarantz'
+        '@mattklein123', '@htuch', '@alyssawilk', '@zuercher', '@lizan', '@snowp', '@asraa',
+        '@junr03', '@dio', '@jmarantz'
     ]
 
     try:

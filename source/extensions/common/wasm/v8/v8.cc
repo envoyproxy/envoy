@@ -6,6 +6,7 @@
 
 #include "common/common/assert.h"
 
+#include "extensions/common/wasm/wasm_vm_base.h"
 #include "extensions/common/wasm/well_known_names.h"
 
 #include "absl/container/flat_hash_map.h"
@@ -33,9 +34,9 @@ struct FuncData {
 
 using FuncDataPtr = std::unique_ptr<FuncData>;
 
-class V8 : public WasmVm {
+class V8 : public WasmVmBase {
 public:
-  V8() = default;
+  V8(const Stats::ScopeSharedPtr& scope) : WasmVmBase(scope, WasmRuntimeNames::get().V8) {}
 
   // Extensions::Common::Wasm::WasmVm
   absl::string_view runtime() override { return WasmRuntimeNames::get().V8; }
@@ -44,9 +45,8 @@ public:
   absl::string_view getCustomSection(absl::string_view name) override;
   void link(absl::string_view debug_name) override;
 
-  // V8 is currently not cloneable.
-  bool cloneable() override { return false; }
-  WasmVmPtr clone() override { return nullptr; }
+  Cloneable cloneable() override { return Cloneable::CompiledBytecode; }
+  WasmVmPtr clone() override;
 
   uint64_t getMemorySize() override;
   absl::optional<absl::string_view> getMemory(uint64_t pointer, uint64_t size) override;
@@ -89,6 +89,7 @@ private:
   wasm::vec<byte_t> source_ = wasm::vec<byte_t>::invalid();
   wasm::own<wasm::Store> store_;
   wasm::own<wasm::Module> module_;
+  wasm::own<wasm::Shared<wasm::Module>> shared_module_;
   wasm::own<wasm::Instance> instance_;
   wasm::own<wasm::Memory> memory_;
   wasm::own<wasm::Table> table_;
@@ -241,13 +242,28 @@ template <typename T, typename U> constexpr T convertValTypesToArgsTuple(const U
 bool V8::load(const std::string& code, bool /* allow_precompiled */) {
   ENVOY_LOG(trace, "load()");
   store_ = wasm::Store::make(engine());
-  RELEASE_ASSERT(store_ != nullptr, "");
 
   source_ = wasm::vec<byte_t>::make_uninitialized(code.size());
   ::memcpy(source_.get(), code.data(), code.size());
 
   module_ = wasm::Module::make(store_.get(), source_);
+  if (module_) {
+    shared_module_ = module_->share();
+  }
+
   return module_ != nullptr;
+}
+
+WasmVmPtr V8::clone() {
+  ENVOY_LOG(trace, "clone()");
+  ASSERT(shared_module_ != nullptr);
+
+  auto clone = std::make_unique<V8>(scope_);
+  clone->store_ = wasm::Store::make(engine());
+
+  clone->module_ = wasm::Module::obtain(clone->store_.get(), shared_module_.get());
+
+  return clone;
 }
 
 absl::string_view V8::getCustomSection(absl::string_view name) {
@@ -356,7 +372,6 @@ void V8::link(absl::string_view debug_name) {
   ASSERT(import_types.size() == imports.size());
 
   instance_ = wasm::Instance::make(store_.get(), module_.get(), imports.data());
-  RELEASE_ASSERT(instance_ != nullptr, "");
 
   const auto export_types = module_.get()->exports();
   const auto exports = instance_.get()->exports();
@@ -562,7 +577,7 @@ void V8::getModuleFunctionImpl(absl::string_view function_name,
   };
 }
 
-WasmVmPtr createVm() { return std::make_unique<V8>(); }
+WasmVmPtr createVm(const Stats::ScopeSharedPtr& scope) { return std::make_unique<V8>(scope); }
 
 } // namespace V8
 } // namespace Wasm

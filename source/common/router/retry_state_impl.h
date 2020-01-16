@@ -100,7 +100,7 @@ private:
   Runtime::RandomGenerator& random_;
   Event::Dispatcher& dispatcher_;
   uint32_t retry_on_{};
-  uint32_t retries_remaining_{1};
+  uint32_t retries_remaining_{};
   DoRetryCallback callback_;
   Event::TimerPtr retry_timer_;
   Upstream::ResourcePriority priority_;

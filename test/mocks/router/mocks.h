@@ -8,13 +8,13 @@
 #include <string>
 #include <vector>
 
-#include "envoy/api/v2/core/base.pb.h"
-#include "envoy/api/v2/rds.pb.h"
 #include "envoy/common/time.h"
 #include "envoy/config/config_provider.h"
-#include "envoy/config/filter/network/http_connection_manager/v2/http_connection_manager.pb.h"
+#include "envoy/config/core/v3/base.pb.h"
+#include "envoy/config/route/v3/route.pb.h"
 #include "envoy/config/typed_metadata.h"
 #include "envoy/event/dispatcher.h"
+#include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 #include "envoy/http/hash_policy.h"
 #include "envoy/local_info/local_info.h"
 #include "envoy/router/rds.h"
@@ -25,7 +25,7 @@
 #include "envoy/router/shadow_writer.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/thread_local/thread_local.h"
-#include "envoy/type/percent.pb.h"
+#include "envoy/type/v3/percent.pb.h"
 #include "envoy/upstream/cluster_manager.h"
 
 #include "common/stats/fake_symbol_table_impl.h"
@@ -83,18 +83,21 @@ class TestHedgePolicy : public HedgePolicy {
 public:
   // Router::HedgePolicy
   uint32_t initialRequests() const override { return initial_requests_; }
-  const envoy::type::FractionalPercent& additionalRequestChance() const override {
+  const envoy::type::v3::FractionalPercent& additionalRequestChance() const override {
     return additional_request_chance_;
   }
   bool hedgeOnPerTryTimeout() const override { return hedge_on_per_try_timeout_; }
 
   uint32_t initial_requests_{};
-  envoy::type::FractionalPercent additional_request_chance_{};
+  envoy::type::v3::FractionalPercent additional_request_chance_{};
   bool hedge_on_per_try_timeout_{};
 };
 
 class TestRetryPolicy : public RetryPolicy {
 public:
+  TestRetryPolicy();
+  ~TestRetryPolicy() override;
+
   // Router::RetryPolicy
   std::chrono::milliseconds perTryTimeout() const override { return per_try_timeout_; }
   uint32_t numRetries() const override { return num_retries_; }
@@ -186,14 +189,17 @@ public:
 
 class TestShadowPolicy : public ShadowPolicy {
 public:
+  TestShadowPolicy(absl::string_view cluster = "", absl::string_view runtime_key = "",
+                   envoy::type::v3::FractionalPercent default_value = {})
+      : cluster_(cluster), runtime_key_(runtime_key), default_value_(default_value) {}
   // Router::ShadowPolicy
   const std::string& cluster() const override { return cluster_; }
   const std::string& runtimeKey() const override { return runtime_key_; }
-  const envoy::type::FractionalPercent& defaultValue() const override { return default_value_; }
+  const envoy::type::v3::FractionalPercent& defaultValue() const override { return default_value_; }
 
   std::string cluster_;
   std::string runtime_key_;
-  envoy::type::FractionalPercent default_value_;
+  envoy::type::v3::FractionalPercent default_value_;
 };
 
 class MockShadowWriter : public ShadowWriter {
@@ -316,7 +322,7 @@ public:
   MOCK_CONST_METHOD0(rateLimitPolicy, const RateLimitPolicy&());
   MOCK_CONST_METHOD0(retryPolicy, const RetryPolicy&());
   MOCK_CONST_METHOD0(retryShadowBufferLimit, uint32_t());
-  MOCK_CONST_METHOD0(shadowPolicy, const ShadowPolicy&());
+  MOCK_CONST_METHOD0(shadowPolicies, const std::vector<ShadowPolicyPtr>&());
   MOCK_CONST_METHOD0(timeout, std::chrono::milliseconds());
   MOCK_CONST_METHOD0(idleTimeout, absl::optional<std::chrono::milliseconds>());
   MOCK_CONST_METHOD0(maxGrpcTimeout, absl::optional<std::chrono::milliseconds>());
@@ -328,13 +334,14 @@ public:
   MOCK_CONST_METHOD0(opaqueConfig, const std::multimap<std::string, std::string>&());
   MOCK_CONST_METHOD0(includeVirtualHostRateLimits, bool());
   MOCK_CONST_METHOD0(corsPolicy, const CorsPolicy*());
-  MOCK_CONST_METHOD0(metadata, const envoy::api::v2::core::Metadata&());
+  MOCK_CONST_METHOD0(metadata, const envoy::config::core::v3::Metadata&());
   MOCK_CONST_METHOD0(typedMetadata, const Envoy::Config::TypedMetadata&());
   MOCK_CONST_METHOD0(pathMatchCriterion, const PathMatchCriterion&());
   MOCK_CONST_METHOD1(perFilterConfig, const RouteSpecificFilterConfig*(const std::string&));
   MOCK_CONST_METHOD0(includeAttemptCount, bool());
   MOCK_CONST_METHOD0(upgradeMap, const UpgradeMap&());
   MOCK_CONST_METHOD0(internalRedirectAction, InternalRedirectAction());
+  MOCK_CONST_METHOD0(maxInternalRedirects, uint32_t());
   MOCK_CONST_METHOD0(routeName, const std::string&());
 
   std::string cluster_name_{"fake_cluster"};
@@ -344,14 +351,14 @@ public:
   TestRetryPolicy retry_policy_;
   TestHedgePolicy hedge_policy_;
   testing::NiceMock<MockRateLimitPolicy> rate_limit_policy_;
-  TestShadowPolicy shadow_policy_;
+  std::vector<ShadowPolicyPtr> shadow_policies_;
   testing::NiceMock<MockVirtualHost> virtual_host_;
   MockHashPolicy hash_policy_;
   MockMetadataMatchCriteria metadata_matches_criteria_;
   MockTlsContextMatchCriteria tls_context_matches_criteria_;
   TestCorsPolicy cors_policy_;
   testing::NiceMock<MockPathMatchCriterion> path_match_criterion_;
-  envoy::api::v2::core::Metadata metadata_;
+  envoy::config::core::v3::Metadata metadata_;
   UpgradeMap upgrade_map_;
 };
 
@@ -373,9 +380,9 @@ public:
   ~MockRouteTracing() override;
 
   // Router::RouteTracing
-  MOCK_CONST_METHOD0(getClientSampling, const envoy::type::FractionalPercent&());
-  MOCK_CONST_METHOD0(getRandomSampling, const envoy::type::FractionalPercent&());
-  MOCK_CONST_METHOD0(getOverallSampling, const envoy::type::FractionalPercent&());
+  MOCK_CONST_METHOD0(getClientSampling, const envoy::type::v3::FractionalPercent&());
+  MOCK_CONST_METHOD0(getRandomSampling, const envoy::type::v3::FractionalPercent&());
+  MOCK_CONST_METHOD0(getOverallSampling, const envoy::type::v3::FractionalPercent&());
   MOCK_CONST_METHOD0(getCustomTags, const Tracing::CustomTagMap&());
 };
 
@@ -424,7 +431,10 @@ public:
   MOCK_CONST_METHOD0(configInfo, absl::optional<ConfigInfo>());
   MOCK_CONST_METHOD0(lastUpdated, SystemTime());
   MOCK_METHOD0(onConfigUpdate, void());
-  MOCK_CONST_METHOD1(validateConfig, void(const envoy::api::v2::RouteConfiguration&));
+  MOCK_CONST_METHOD1(validateConfig, void(const envoy::config::route::v3::RouteConfiguration&));
+  MOCK_METHOD3(requestVirtualHostsUpdate,
+               void(const std::string&, Event::Dispatcher&,
+                    std::weak_ptr<Http::RouteConfigUpdatedCallback> route_config_updated_cb));
 
   std::shared_ptr<NiceMock<MockConfig>> route_config_{new NiceMock<MockConfig>()};
 };
@@ -436,12 +446,13 @@ public:
 
   MOCK_METHOD4(createRdsRouteConfigProvider,
                RouteConfigProviderSharedPtr(
-                   const envoy::config::filter::network::http_connection_manager::v2::Rds& rds,
+                   const envoy::extensions::filters::network::http_connection_manager::v3::Rds& rds,
                    Server::Configuration::FactoryContext& factory_context,
                    const std::string& stat_prefix, Init::Manager& init_manager));
-  MOCK_METHOD2(createStaticRouteConfigProvider,
-               RouteConfigProviderPtr(const envoy::api::v2::RouteConfiguration& route_config,
-                                      Server::Configuration::FactoryContext& factory_context));
+  MOCK_METHOD2(
+      createStaticRouteConfigProvider,
+      RouteConfigProviderPtr(const envoy::config::route::v3::RouteConfiguration& route_config,
+                             Server::Configuration::FactoryContext& factory_context));
 };
 
 class MockScopedConfig : public ScopedConfig {

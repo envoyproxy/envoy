@@ -126,6 +126,14 @@ modify different aspects of the server:
   information.
 
 .. warning::
+  Configuration may include :ref:`TLS certificates <envoy_api_msg_auth.TlsCertificate>`. Before
+  dumping the configuration, Envoy will attempt to redact the ``private_key`` and ``password``
+  fields from any certificates it finds. This relies on the configuration being a strongly-typed
+  protobuf message. If your Envoy configuration uses deprecated ``config`` fields (of type
+  ``google.protobuf.Struct``), please update to the recommended ``typed_config`` fields (of type
+  ``google.protobuf.Any``) to ensure sensitive data is redacted properly.
+
+.. warning::
   The underlying proto is marked v2alpha and hence its contents, including the JSON representation,
   are not guaranteed to be stable.
 
@@ -155,14 +163,14 @@ modify different aspects of the server:
 
 .. _operations_admin_interface_config_dump_by_resource_and_mask:
 
-.. http:get:: /config_dump?resource={},mask={}
+.. http:get:: /config_dump?resource={}&mask={}
 
   When both resource and mask query parameters are specified, the mask is applied to every element
   in the desired repeated field so that only a subset of fields are returned. The mask is parsed
   as a ``ProtobufWkt::FieldMask``.
 
   For example, get the names of all active dynamic clusters with
-  ``/config_dump?resource=dynamic_active_clusters,mask=cluster.name``
+  ``/config_dump?resource=dynamic_active_clusters&mask=cluster.name``
 
 .. http:get:: /contention
 

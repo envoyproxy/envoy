@@ -6,10 +6,11 @@
 #include "envoy/common/exception.h"
 #include "envoy/protobuf/message_validator.h"
 #include "envoy/runtime/runtime.h"
-#include "envoy/type/percent.pb.h"
+#include "envoy/type/v3/percent.pb.h"
 
 #include "common/common/hash.h"
 #include "common/common/utility.h"
+#include "common/config/version_converter.h"
 #include "common/protobuf/protobuf.h"
 #include "common/singleton/const_singleton.h"
 
@@ -71,7 +72,7 @@ uint64_t convertPercent(double percent, uint64_t max_value);
  * @param random_value supplies a numerical value to use to evaluate the event.
  * @return bool decision about whether the event should occur.
  */
-bool evaluateFractionalPercent(envoy::type::FractionalPercent percent, uint64_t random_value);
+bool evaluateFractionalPercent(envoy::type::v3::FractionalPercent percent, uint64_t random_value);
 
 /**
  * Convert a fractional percent denominator enum into an integer.
@@ -79,7 +80,7 @@ bool evaluateFractionalPercent(envoy::type::FractionalPercent percent, uint64_t 
  * @return the converted denominator.
  */
 uint64_t fractionalPercentDenominatorToInt(
-    const envoy::type::FractionalPercent::DenominatorType& denominator);
+    const envoy::type::v3::FractionalPercent::DenominatorType& denominator);
 
 } // namespace ProtobufPercentHelper
 } // namespace Envoy
@@ -250,15 +251,8 @@ public:
 
     std::string err;
     if (!Validate(message, &err)) {
-      throw ProtoValidationException(err, message);
+      throw ProtoValidationException(err, API_RECOVER_ORIGINAL(message));
     }
-  }
-
-  template <class MessageType>
-  static void loadFromFileAndValidate(const std::string& path, MessageType& message,
-                                      ProtobufMessage::ValidationVisitor& validation_visitor) {
-    loadFromFile(path, message, validation_visitor);
-    validate(message, validation_visitor);
   }
 
   template <class MessageType>
@@ -356,11 +350,39 @@ public:
   static ProtobufWkt::Struct keyValueStruct(const std::string& key, const std::string& value);
 
   /**
+   * Utility method to create a Struct containing the passed in key/value map.
+   *
+   * @param fields the key/value pairs to initialize the Struct proto
+   */
+  static ProtobufWkt::Struct keyValueStruct(const std::map<std::string, std::string>& fields);
+
+  /**
    * Utility method to print a human readable string of the code passed in.
    *
    * @param code the protobuf error code
    */
   static std::string CodeEnumToString(ProtobufUtil::error::Code code);
+
+  /**
+   * Modifies a message such that all sensitive data (that is, fields annotated as
+   * `udpa.annotations.sensitive`) is redacted for display. String-typed fields annotated as
+   * `sensitive` will be replaced with the string "[redacted]", bytes-typed fields will be replaced
+   * with the bytes `5B72656461637465645D` (the ASCII / UTF-8 encoding of the string "[redacted]"),
+   * primitive-typed fields (including enums) will be cleared, and message-typed fields will be
+   * traversed recursively to redact their contents.
+   *
+   * LIMITATION: This works properly for strongly-typed messages, as well as for messages packed in
+   * a `ProtobufWkt::Any` with a `type_url` corresponding to a proto that was compiled into the
+   * Envoy binary. However it does not work for messages encoded as `ProtobufWkt::Struct`, since
+   * structs are missing the "sensitive" annotations that this function expects. Similarly, it fails
+   * for messages encoded as `ProtobufWkt::Any` with a `type_url` that isn't registered with the
+   * binary. If you're working with struct-typed messages, including those that might be hiding
+   * within strongly-typed messages, please reify them to strongly-typed messages using
+   * `MessageUtil::jsonConvert()` before calling `MessageUtil::redact()`.
+   *
+   * @param message message to redact.
+   */
+  static void redact(Protobuf::Message& message);
 };
 
 class ValueUtil {
@@ -379,6 +401,50 @@ public:
    * @return true if v1 and v2 are identical
    */
   static bool equal(const ProtobufWkt::Value& v1, const ProtobufWkt::Value& v2);
+
+  /**
+   * @return wrapped ProtobufWkt::NULL_VALUE.
+   */
+  static const ProtobufWkt::Value& nullValue();
+
+  /**
+   * Wrap std::string into ProtobufWkt::Value string value.
+   * @param str string to be wrapped.
+   * @return wrapped string.
+   */
+  static ProtobufWkt::Value stringValue(const std::string& str);
+
+  /**
+   * Wrap boolean into ProtobufWkt::Value boolean value.
+   * @param str boolean to be wrapped.
+   * @return wrapped boolean.
+   */
+  static ProtobufWkt::Value boolValue(bool b);
+
+  /**
+   * Wrap ProtobufWkt::Struct into ProtobufWkt::Value struct value.
+   * @param obj struct to be wrapped.
+   * @return wrapped struct.
+   */
+  static ProtobufWkt::Value structValue(const ProtobufWkt::Struct& obj);
+
+  /**
+   * Wrap number into ProtobufWkt::Value double value.
+   * @param num number to be wrapped.
+   * @return wrapped number.
+   */
+  template <typename T> static ProtobufWkt::Value numberValue(const T num) {
+    ProtobufWkt::Value val;
+    val.set_number_value(static_cast<double>(num));
+    return val;
+  }
+
+  /**
+   * Wrap a collection of ProtobufWkt::Values into ProtobufWkt::Value list value.
+   * @param values collection of ProtobufWkt::Values to be wrapped.
+   * @return wrapped list value.
+   */
+  static ProtobufWkt::Value listValue(const std::vector<ProtobufWkt::Value>& values);
 };
 
 /**

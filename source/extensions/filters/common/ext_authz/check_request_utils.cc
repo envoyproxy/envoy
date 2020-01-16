@@ -5,9 +5,9 @@
 #include <string>
 #include <vector>
 
-#include "envoy/api/v2/core/base.pb.h"
-#include "envoy/service/auth/v2/attribute_context.pb.h"
-#include "envoy/service/auth/v2/external_auth.pb.h"
+#include "envoy/config/core/v3/base.pb.h"
+#include "envoy/service/auth/v3/attribute_context.pb.h"
+#include "envoy/service/auth/v3/external_auth.pb.h"
 #include "envoy/ssl/connection.h"
 
 #include "common/buffer/buffer_impl.h"
@@ -28,7 +28,7 @@ namespace Filters {
 namespace Common {
 namespace ExtAuthz {
 
-void CheckRequestUtils::setAttrContextPeer(envoy::service::auth::v2::AttributeContext_Peer& peer,
+void CheckRequestUtils::setAttrContextPeer(envoy::service::auth::v3::AttributeContext::Peer& peer,
                                            const Network::Connection& connection,
                                            const std::string& service, const bool local,
                                            bool include_certificate) {
@@ -90,7 +90,7 @@ std::string CheckRequestUtils::getHeaderStr(const Envoy::Http::HeaderEntry* entr
 }
 
 void CheckRequestUtils::setHttpRequest(
-    ::envoy::service::auth::v2::AttributeContext_HttpRequest& httpreq,
+    envoy::service::auth::v3::AttributeContext::HttpRequest& httpreq,
     const Envoy::Http::StreamDecoderFilterCallbacks* callbacks,
     const Envoy::Http::HeaderMap& headers, uint64_t max_request_bytes) {
 
@@ -149,7 +149,7 @@ void CheckRequestUtils::setHttpRequest(
 }
 
 void CheckRequestUtils::setAttrContextRequest(
-    ::envoy::service::auth::v2::AttributeContext_Request& req,
+    envoy::service::auth::v3::AttributeContext::Request& req,
     const Envoy::Http::StreamDecoderFilterCallbacks* callbacks,
     const Envoy::Http::HeaderMap& headers, uint64_t max_request_bytes) {
   setHttpRequest(*req.mutable_http(), callbacks, headers, max_request_bytes);
@@ -159,8 +159,8 @@ void CheckRequestUtils::createHttpCheck(
     const Envoy::Http::StreamDecoderFilterCallbacks* callbacks,
     const Envoy::Http::HeaderMap& headers,
     Protobuf::Map<std::string, std::string>&& context_extensions,
-    envoy::api::v2::core::Metadata&& metadata_context,
-    envoy::service::auth::v2::CheckRequest& request, uint64_t max_request_bytes,
+    envoy::config::core::v3::Metadata&& metadata_context,
+    envoy::service::auth::v3::CheckRequest& request, uint64_t max_request_bytes,
     bool include_peer_certificate) {
 
   auto attrs = request.mutable_attributes();
@@ -182,7 +182,7 @@ void CheckRequestUtils::createHttpCheck(
 }
 
 void CheckRequestUtils::createTcpCheck(const Network::ReadFilterCallbacks* callbacks,
-                                       envoy::service::auth::v2::CheckRequest& request,
+                                       envoy::service::auth::v3::CheckRequest& request,
                                        bool include_peer_certificate) {
 
   auto attrs = request.mutable_attributes();

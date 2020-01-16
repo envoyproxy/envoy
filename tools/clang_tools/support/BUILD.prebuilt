@@ -378,7 +378,6 @@ cc_library(
     linkopts = [
         "-lcurses",
         "-lpthread",
-        "-lz",
     ],
     deps = [
         ":llvm_demangle",

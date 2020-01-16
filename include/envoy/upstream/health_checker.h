@@ -3,7 +3,7 @@
 #include <functional>
 #include <memory>
 
-#include "envoy/data/core/v2alpha/health_check_event.pb.h"
+#include "envoy/data/core/v3/health_check_event.pb.h"
 #include "envoy/upstream/upstream.h"
 
 namespace Envoy {
@@ -74,10 +74,9 @@ public:
    * @param host supplies the host that generated the event.
    * @param failure_type supplies the type of health check failure.
    */
-  virtual void
-  logEjectUnhealthy(envoy::data::core::v2alpha::HealthCheckerType health_checker_type,
-                    const HostDescriptionConstSharedPtr& host,
-                    envoy::data::core::v2alpha::HealthCheckFailureType failure_type) PURE;
+  virtual void logEjectUnhealthy(envoy::data::core::v3::HealthCheckerType health_checker_type,
+                                 const HostDescriptionConstSharedPtr& host,
+                                 envoy::data::core::v3::HealthCheckFailureType failure_type) PURE;
 
   /**
    * Log an unhealthy host event.
@@ -86,9 +85,9 @@ public:
    * @param failure_type supplies the type of health check failure.
    * @param first_check whether this is a failure on the first health check for this host.
    */
-  virtual void logUnhealthy(envoy::data::core::v2alpha::HealthCheckerType health_checker_type,
+  virtual void logUnhealthy(envoy::data::core::v3::HealthCheckerType health_checker_type,
                             const HostDescriptionConstSharedPtr& host,
-                            envoy::data::core::v2alpha::HealthCheckFailureType failure_type,
+                            envoy::data::core::v3::HealthCheckFailureType failure_type,
                             bool first_check) PURE;
 
   /**
@@ -98,7 +97,7 @@ public:
    * @param healthy_threshold supplied the configured healthy threshold for this health check.
    * @param first_check whether this is a fast path success on the first health check for this host.
    */
-  virtual void logAddHealthy(envoy::data::core::v2alpha::HealthCheckerType health_checker_type,
+  virtual void logAddHealthy(envoy::data::core::v3::HealthCheckerType health_checker_type,
                              const HostDescriptionConstSharedPtr& host, bool first_check) PURE;
 
   /**
@@ -106,16 +105,15 @@ public:
    * @param health_checker_type supplies the type of health checker that generated the event.
    * @param host supplies the host that generated the event.
    */
-  virtual void logDegraded(envoy::data::core::v2alpha::HealthCheckerType health_checker_type,
+  virtual void logDegraded(envoy::data::core::v3::HealthCheckerType health_checker_type,
                            const HostDescriptionConstSharedPtr& host) PURE;
   /**
    * Log a no degraded healthy host event.
    * @param health_checker_type supplies the type of health checker that generated the event.
    * @param host supplies the host that generated the event.
    */
-  virtual void
-  logNoLongerDegraded(envoy::data::core::v2alpha::HealthCheckerType health_checker_type,
-                      const HostDescriptionConstSharedPtr& host) PURE;
+  virtual void logNoLongerDegraded(envoy::data::core::v3::HealthCheckerType health_checker_type,
+                                   const HostDescriptionConstSharedPtr& host) PURE;
 };
 
 using HealthCheckEventLoggerPtr = std::unique_ptr<HealthCheckEventLogger>;
