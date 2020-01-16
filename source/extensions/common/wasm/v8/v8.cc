@@ -14,12 +14,6 @@
 #include "v8-version.h"
 #include "wasm-api/wasm.hh"
 
-namespace v8 {
-namespace internal {
-extern bool FLAG_wasm_opt;
-} // namespace internal
-} // namespace v8
-
 namespace Envoy {
 namespace Extensions {
 namespace Common {
@@ -27,9 +21,6 @@ namespace Wasm {
 namespace V8 {
 
 wasm::Engine* engine() {
-  // Enable Wasm optimizations.
-  v8::internal::FLAG_wasm_opt = true;
-
   static const auto engine = wasm::Engine::make();
   return engine.get();
 }
