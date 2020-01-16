@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package envoy.extensions.wasm.v3alpha;
 
-import "envoy/config/core/v3alpha/base.proto";
+import "envoy/config/core/v3/base.proto";
 
 import "google/protobuf/any.proto";
 
@@ -32,7 +32,7 @@ message VmConfig {
   string runtime = 2 [(validate.rules).string = {min_bytes: 1}];
 
   // The Wasm code that Envoy will execute.
-  config.core.v3alpha.AsyncDataSource code = 3;
+  config.core.v3.AsyncDataSource code = 3;
 
   // The Wasm configuration used in initialization of a new VM (proxy_on_start).
   google.protobuf.Any configuration = 4;
