@@ -11,7 +11,7 @@ option java_outer_classname = "CacheProto";
 option java_multiple_files = true;
 
 // [#protodoc-title: HTTP Cache Filter]
-// Pluggable HTTP Cache :ref:`overview <config_http_filters_cache>`.
+// HTTP Cache Filter :ref:`overview <config_http_filters_cache>`.
 // [#extension: envoy.filters.http.cache]
 message CacheConfig {
   option (udpa.annotations.versioning).previous_message_type =

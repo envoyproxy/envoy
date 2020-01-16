@@ -12,7 +12,7 @@ option (udpa.annotations.file_migrate).move_to_package =
     "envoy.extensions.filters.http.cache.v3alpha";
 
 // [#protodoc-title: HTTP Cache Filter]
-// Pluggable HTTP Cache :ref:`overview <config_http_filters_cache>`.
+// HTTP Cache Filter :ref:`overview <config_http_filters_cache>`.
 // [#extension: envoy.filters.http.cache]
 message CacheConfig {
   // List of query params.
