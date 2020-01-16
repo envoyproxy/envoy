@@ -44,7 +44,7 @@ private:
 
   // TODO(rojkov): this is going to be deprecated when the old configuration fields are dropped.
   static const envoy::config::filter::http::compressor::v2::Compressor
-  compressorConfig(const envoy::config::filter::http::gzip::v2::Gzip& gzip);
+  compressorConfig(const envoy::extensions::filters::http::gzip::v3::Gzip& gzip);
 
   Compressor::ZlibCompressorImpl::CompressionLevel compression_level_;
   Compressor::ZlibCompressorImpl::CompressionStrategy compression_strategy_;
