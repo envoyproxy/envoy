@@ -8,8 +8,7 @@ import "validate/validate.proto";
 option java_package = "io.envoyproxy.envoy.config.filter.http.cache.v2";
 option java_outer_classname = "CacheProto";
 option java_multiple_files = true;
-option (udpa.annotations.file_migrate).move_to_package =
-    "envoy.extensions.filters.http.cache.v3alpha";
+option (udpa.annotations.file_migrate).move_to_package = "envoy.extensions.filters.http.cache.v3";
 
 // [#protodoc-title: HTTP Cache Filter]
 // HTTP Cache Filter :ref:`overview <config_http_filters_cache>`.
