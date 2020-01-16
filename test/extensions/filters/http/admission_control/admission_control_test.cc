@@ -135,6 +135,8 @@ TEST_F(ThreadLocalControllerTest, VerifyMemoryUsage) {
   EXPECT_EQ(3, tlc_.requestSuccessCount());
 }
 
+TEST_F(AdmissionControlConfigTest, BasicTest) {}
+
 } // namespace
 } // namespace AdmissionControl
 } // namespace HttpFilters

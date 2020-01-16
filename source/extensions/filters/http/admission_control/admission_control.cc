@@ -34,10 +34,9 @@ AdmissionControlFilterConfig::AdmissionControlFilterConfig(
       sampling_window_(proto_config.has_sampling_window()
                            ? DurationUtil::durationToSeconds(proto_config.sampling_window())
                            : defaultSamplingWindow.count()),
+      // TODO @tallen make runtime configurable
       aggression_(PROTOBUF_PERCENT_TO_DOUBLE_OR_DEFAULT(proto_config, aggression_coefficient,
-                                                        defaultAggression)),
-      min_request_samples_(PROTOBUF_GET_WRAPPED_OR_DEFAULT(proto_config, min_request_samples,
-                                                           defaultMinRequestSamples)) {
+                                                        defaultAggression)) {
   tls_->set([this](Event::Dispatcher&) -> ThreadLocal::ThreadLocalObjectSharedPtr {
     return std::make_shared<ThreadLocalController>(time_source_, sampling_window_);
   });

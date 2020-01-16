@@ -99,7 +99,6 @@ public:
   Stats::Scope& scope() const { return scope_; }
   std::chrono::seconds samplingWindow() const { return sampling_window_; }
   double aggression() const { return aggression_; }
-  uint32_t minRequestSamples() const { return min_request_samples_; }
 
 private:
   Runtime::Loader& runtime_;
@@ -110,7 +109,6 @@ private:
   Runtime::FeatureFlag admission_control_feature_;
   std::chrono::seconds sampling_window_;
   double aggression_;
-  uint32_t min_request_samples_;
 };
 
 using AdmissionControlFilterConfigSharedPtr = std::shared_ptr<const AdmissionControlFilterConfig>;
