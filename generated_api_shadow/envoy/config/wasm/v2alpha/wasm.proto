@@ -72,7 +72,7 @@ message WasmService {
   // General plugin configuration.
   PluginConfig config = 1;
 
-  // If true, create a single VM rather than creating one VM per silo. Such a singleton can
+  // If true, create a single VM rather than creating one VM per worker. Such a singleton can
   // not be used with filters.
   bool singleton = 2;
 }
