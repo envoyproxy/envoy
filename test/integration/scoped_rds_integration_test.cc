@@ -1,10 +1,10 @@
 #include "envoy/api/v2/discovery.pb.h"
-#include "envoy/config/bootstrap/v3alpha/bootstrap.pb.h"
-#include "envoy/config/core/v3alpha/config_source.pb.h"
-#include "envoy/config/core/v3alpha/grpc_service.pb.h"
-#include "envoy/config/route/v3alpha/route.pb.h"
-#include "envoy/config/route/v3alpha/scoped_route.pb.h"
-#include "envoy/extensions/filters/network/http_connection_manager/v3alpha/http_connection_manager.pb.h"
+#include "envoy/config/bootstrap/v3/bootstrap.pb.h"
+#include "envoy/config/core/v3/config_source.pb.h"
+#include "envoy/config/core/v3/grpc_service.pb.h"
+#include "envoy/config/route/v3/route.pb.h"
+#include "envoy/config/route/v3/scoped_route.pb.h"
+#include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 
 #include "common/config/api_version.h"
 #include "common/config/resources.h"
@@ -41,7 +41,7 @@ protected:
     // Setup two upstream hosts, one for each cluster.
     setUpstreamCount(2);
 
-    config_helper_.addConfigModifier([](envoy::config::bootstrap::v3alpha::Bootstrap& bootstrap) {
+    config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       // Add the static cluster to serve SRDS.
       auto* cluster_1 = bootstrap.mutable_static_resources()->add_clusters();
       cluster_1->MergeFrom(bootstrap.static_resources().clusters()[0]);
@@ -61,8 +61,9 @@ protected:
     });
 
     config_helper_.addConfigModifier(
-        [this](envoy::extensions::filters::network::http_connection_manager::v3alpha::
-                   HttpConnectionManager& http_connection_manager) {
+        [this](
+            envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+                http_connection_manager) {
           const std::string& scope_key_builder_config_yaml = R"EOF(
 fragments:
   - header_value_extractor:
@@ -72,30 +73,29 @@ fragments:
         key: x-foo-key
         separator: =
 )EOF";
-          envoy::extensions::filters::network::http_connection_manager::v3alpha::ScopedRoutes::
+          envoy::extensions::filters::network::http_connection_manager::v3::ScopedRoutes::
               ScopeKeyBuilder scope_key_builder;
           TestUtility::loadFromYaml(scope_key_builder_config_yaml, scope_key_builder);
           auto* scoped_routes = http_connection_manager.mutable_scoped_routes();
           scoped_routes->set_name(srds_config_name_);
           *scoped_routes->mutable_scope_key_builder() = scope_key_builder;
 
-          envoy::config::core::v3alpha::ApiConfigSource* rds_api_config_source =
+          envoy::config::core::v3::ApiConfigSource* rds_api_config_source =
               scoped_routes->mutable_rds_config_source()->mutable_api_config_source();
-          rds_api_config_source->set_api_type(envoy::config::core::v3alpha::ApiConfigSource::GRPC);
-          envoy::config::core::v3alpha::GrpcService* grpc_service =
+          rds_api_config_source->set_api_type(envoy::config::core::v3::ApiConfigSource::GRPC);
+          envoy::config::core::v3::GrpcService* grpc_service =
               rds_api_config_source->add_grpc_services();
           setGrpcService(*grpc_service, "rds_cluster", getRdsFakeUpstream().localAddress());
 
-          envoy::config::core::v3alpha::ApiConfigSource* srds_api_config_source =
+          envoy::config::core::v3::ApiConfigSource* srds_api_config_source =
               scoped_routes->mutable_scoped_rds()
                   ->mutable_scoped_rds_config_source()
                   ->mutable_api_config_source();
           if (isDelta()) {
             srds_api_config_source->set_api_type(
-                envoy::config::core::v3alpha::ApiConfigSource::DELTA_GRPC);
+                envoy::config::core::v3::ApiConfigSource::DELTA_GRPC);
           } else {
-            srds_api_config_source->set_api_type(
-                envoy::config::core::v3alpha::ApiConfigSource::GRPC);
+            srds_api_config_source->set_api_type(envoy::config::core::v3::ApiConfigSource::GRPC);
           }
           grpc_service = srds_api_config_source->add_grpc_services();
           setGrpcService(*grpc_service, "srds_cluster", getScopedRdsFakeUpstream().localAddress());
@@ -168,7 +168,7 @@ fragments:
     response.set_version_info(version);
     response.set_type_url(Config::TypeUrl::get().RouteConfiguration);
     auto route_configuration =
-        TestUtility::parseYaml<envoy::config::route::v3alpha::RouteConfiguration>(route_config);
+        TestUtility::parseYaml<envoy::config::route::v3::RouteConfiguration>(route_config);
     response.add_resources()->PackFrom(API_DOWNGRADE(route_configuration));
     ASSERT(rds_upstream_info_.stream_by_resource_name_[route_configuration.name()] != nullptr);
     rds_upstream_info_.stream_by_resource_name_[route_configuration.name()]->sendGrpcMessage(
@@ -199,7 +199,7 @@ fragments:
       *response.add_removed_resources() = scope_name;
     }
     for (const auto& resource_proto : to_add_list) {
-      envoy::config::route::v3alpha::ScopedRouteConfiguration scoped_route_proto;
+      envoy::config::route::v3::ScopedRouteConfiguration scoped_route_proto;
       TestUtility::loadFromYaml(resource_proto, scoped_route_proto);
       auto resource = response.add_resources();
       resource->set_name(scoped_route_proto.name());
@@ -219,7 +219,7 @@ fragments:
     response.set_type_url(Config::TypeUrl::get().ScopedRouteConfiguration);
 
     for (const auto& resource_proto : resource_protos) {
-      envoy::config::route::v3alpha::ScopedRouteConfiguration scoped_route_proto;
+      envoy::config::route::v3::ScopedRouteConfiguration scoped_route_proto;
       TestUtility::loadFromYaml(resource_proto, scoped_route_proto);
       response.add_resources()->PackFrom(API_DOWNGRADE(scoped_route_proto));
     }

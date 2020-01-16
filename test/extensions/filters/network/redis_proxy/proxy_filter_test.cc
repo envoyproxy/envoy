@@ -1,7 +1,7 @@
 #include <memory>
 #include <string>
 
-#include "envoy/extensions/filters/network/redis_proxy/v3alpha/redis_proxy.pb.h"
+#include "envoy/extensions/filters/network/redis_proxy/v3/redis_proxy.pb.h"
 
 #include "extensions/filters/network/redis_proxy/proxy_filter.h"
 
@@ -33,9 +33,9 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace RedisProxy {
 
-envoy::extensions::filters::network::redis_proxy::v3alpha::RedisProxy
+envoy::extensions::filters::network::redis_proxy::v3::RedisProxy
 parseProtoFromYaml(const std::string& yaml_string) {
-  envoy::extensions::filters::network::redis_proxy::v3alpha::RedisProxy config;
+  envoy::extensions::filters::network::redis_proxy::v3::RedisProxy config;
   TestUtility::loadFromYaml(yaml_string, config);
   return config;
 }
@@ -58,7 +58,7 @@ TEST_F(RedisProxyFilterConfigTest, Normal) {
     op_timeout: 0.01s
   )EOF";
 
-  envoy::extensions::filters::network::redis_proxy::v3alpha::RedisProxy proto_config =
+  envoy::extensions::filters::network::redis_proxy::v3::RedisProxy proto_config =
       parseProtoFromYaml(yaml_string);
   ProxyFilterConfig config(proto_config, store_, drain_decision_, runtime_, api_);
   EXPECT_EQ("redis.foo.", config.stat_prefix_);
@@ -86,7 +86,7 @@ TEST_F(RedisProxyFilterConfigTest, DownstreamAuthPasswordSet) {
     inline_string: somepassword
   )EOF";
 
-  envoy::extensions::filters::network::redis_proxy::v3alpha::RedisProxy proto_config =
+  envoy::extensions::filters::network::redis_proxy::v3::RedisProxy proto_config =
       parseProtoFromYaml(yaml_string);
   ProxyFilterConfig config(proto_config, store_, drain_decision_, runtime_, api_);
   EXPECT_EQ(config.downstream_auth_password_, "somepassword");
@@ -104,7 +104,7 @@ public:
   )EOF";
 
   RedisProxyFilterTest(const std::string& yaml_string) {
-    envoy::extensions::filters::network::redis_proxy::v3alpha::RedisProxy proto_config =
+    envoy::extensions::filters::network::redis_proxy::v3::RedisProxy proto_config =
         parseProtoFromYaml(yaml_string);
     config_.reset(new ProxyFilterConfig(proto_config, store_, drain_decision_, runtime_, api_));
     filter_ = std::make_unique<ProxyFilter>(*this, Common::Redis::EncoderPtr{encoder_}, splitter_,

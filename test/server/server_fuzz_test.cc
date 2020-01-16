@@ -1,7 +1,7 @@
 #include <fstream>
 
-#include "envoy/config/bootstrap/v3alpha/bootstrap.pb.h"
-#include "envoy/config/core/v3alpha/address.pb.h"
+#include "envoy/config/bootstrap/v3/bootstrap.pb.h"
+#include "envoy/config/core/v3/address.pb.h"
 
 #include "common/network/address_impl.h"
 #include "common/thread_local/thread_local_impl.h"
@@ -23,7 +23,7 @@ namespace Server {
 namespace {
 
 void makePortHermetic(Fuzz::PerTestEnvironment& test_env,
-                      envoy::config::core::v3alpha::Address& address) {
+                      envoy::config::core::v3::Address& address) {
   if (address.has_socket_address()) {
     address.mutable_socket_address()->set_port_value(0);
   } else if (address.has_pipe()) {
@@ -31,10 +31,10 @@ void makePortHermetic(Fuzz::PerTestEnvironment& test_env,
   }
 }
 
-envoy::config::bootstrap::v3alpha::Bootstrap
+envoy::config::bootstrap::v3::Bootstrap
 makeHermeticPathsAndPorts(Fuzz::PerTestEnvironment& test_env,
-                          const envoy::config::bootstrap::v3alpha::Bootstrap& input) {
-  envoy::config::bootstrap::v3alpha::Bootstrap output(input);
+                          const envoy::config::bootstrap::v3::Bootstrap& input) {
+  envoy::config::bootstrap::v3::Bootstrap output(input);
   // This is not a complete list of places where we need to zero out ports or sanitize paths, so we
   // should adapt it as we go and encounter places that we need to stabilize server test flakes.
   // config_validation_fuzz_test doesn't need to do this sanitization, so should pickup the coverage
@@ -75,7 +75,7 @@ makeHermeticPathsAndPorts(Fuzz::PerTestEnvironment& test_env,
   return output;
 }
 
-DEFINE_PROTO_FUZZER(const envoy::config::bootstrap::v3alpha::Bootstrap& input) {
+DEFINE_PROTO_FUZZER(const envoy::config::bootstrap::v3::Bootstrap& input) {
   testing::NiceMock<MockOptions> options;
   DefaultListenerHooks hooks;
   testing::NiceMock<MockHotRestart> restart;

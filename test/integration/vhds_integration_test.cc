@@ -1,5 +1,5 @@
-#include "envoy/config/route/v3alpha/route.pb.h"
-#include "envoy/config/route/v3alpha/route_components.pb.h"
+#include "envoy/config/route/v3/route.pb.h"
+#include "envoy/config/route/v3/route_components.pb.h"
 #include "envoy/grpc/status.h"
 #include "envoy/stats/scope.h"
 
@@ -180,9 +180,9 @@ public:
 
     EXPECT_TRUE(compareSotwDiscoveryRequest(Config::TypeUrl::get().RouteConfiguration, "",
                                             {"my_route"}, true));
-    sendSotwDiscoveryResponse<envoy::config::route::v3alpha::RouteConfiguration>(
+    sendSotwDiscoveryResponse<envoy::config::route::v3::RouteConfiguration>(
         Config::TypeUrl::get().RouteConfiguration,
-        {TestUtility::parseYaml<envoy::config::route::v3alpha::RouteConfiguration>(
+        {TestUtility::parseYaml<envoy::config::route::v3::RouteConfiguration>(
             RdsWithoutVhdsConfig)},
         "1");
 
@@ -209,10 +209,9 @@ TEST_P(VhdsInitializationTest, InitializeVhdsAfterRdsHasBeenInitialized) {
   codec_client_->waitForDisconnect();
 
   // Update RouteConfig, this time include VHDS config
-  sendSotwDiscoveryResponse<envoy::config::route::v3alpha::RouteConfiguration>(
+  sendSotwDiscoveryResponse<envoy::config::route::v3::RouteConfiguration>(
       Config::TypeUrl::get().RouteConfiguration,
-      {TestUtility::parseYaml<envoy::config::route::v3alpha::RouteConfiguration>(
-          RdsConfigWithVhosts)},
+      {TestUtility::parseYaml<envoy::config::route::v3::RouteConfiguration>(RdsConfigWithVhosts)},
       "2");
 
   auto result = xds_connection_->waitForNewStream(*dispatcher_, vhds_stream_, true);
@@ -221,9 +220,9 @@ TEST_P(VhdsInitializationTest, InitializeVhdsAfterRdsHasBeenInitialized) {
 
   EXPECT_TRUE(
       compareDeltaDiscoveryRequest(Config::TypeUrl::get().VirtualHost, {}, {}, vhds_stream_));
-  sendDeltaDiscoveryResponse<envoy::config::route::v3alpha::VirtualHost>(
+  sendDeltaDiscoveryResponse<envoy::config::route::v3::VirtualHost>(
       Config::TypeUrl::get().VirtualHost,
-      {TestUtility::parseYaml<envoy::config::route::v3alpha::VirtualHost>(
+      {TestUtility::parseYaml<envoy::config::route::v3::VirtualHost>(
           fmt::format(VhostTemplate, "vhost_0", "vhost.first"))},
       {}, "1", vhds_stream_);
   EXPECT_TRUE(
@@ -257,20 +256,20 @@ public:
     return RouteConfigName + "/" + host_header;
   }
 
-  envoy::config::route::v3alpha::VirtualHost buildVirtualHost() {
-    return TestUtility::parseYaml<envoy::config::route::v3alpha::VirtualHost>(
+  envoy::config::route::v3::VirtualHost buildVirtualHost() {
+    return TestUtility::parseYaml<envoy::config::route::v3::VirtualHost>(
         virtualHostYaml("vhost_0", "host"));
   }
 
-  std::vector<envoy::config::route::v3alpha::VirtualHost> buildVirtualHost1() {
-    return {TestUtility::parseYaml<envoy::config::route::v3alpha::VirtualHost>(
+  std::vector<envoy::config::route::v3::VirtualHost> buildVirtualHost1() {
+    return {TestUtility::parseYaml<envoy::config::route::v3::VirtualHost>(
                 virtualHostYaml("vhost_1", "vhost.first")),
-            TestUtility::parseYaml<envoy::config::route::v3alpha::VirtualHost>(
+            TestUtility::parseYaml<envoy::config::route::v3::VirtualHost>(
                 virtualHostYaml("vhost_2", "vhost.second"))};
   }
 
-  envoy::config::route::v3alpha::VirtualHost buildVirtualHost2() {
-    return TestUtility::parseYaml<envoy::config::route::v3alpha::VirtualHost>(
+  envoy::config::route::v3::VirtualHost buildVirtualHost2() {
+    return TestUtility::parseYaml<envoy::config::route::v3::VirtualHost>(
         virtualHostYaml("vhost_1", "vhost.first"));
   }
 
@@ -308,7 +307,7 @@ public:
 
     EXPECT_TRUE(compareSotwDiscoveryRequest(Config::TypeUrl::get().RouteConfiguration, "",
                                             {"my_route"}, true));
-    sendSotwDiscoveryResponse<envoy::config::route::v3alpha::RouteConfiguration>(
+    sendSotwDiscoveryResponse<envoy::config::route::v3::RouteConfiguration>(
         Config::TypeUrl::get().RouteConfiguration, {rdsConfig()}, "1");
 
     result = xds_connection_->waitForNewStream(*dispatcher_, vhds_stream_, true);
@@ -317,7 +316,7 @@ public:
 
     EXPECT_TRUE(
         compareDeltaDiscoveryRequest(Config::TypeUrl::get().VirtualHost, {}, {}, vhds_stream_));
-    sendDeltaDiscoveryResponse<envoy::config::route::v3alpha::VirtualHost>(
+    sendDeltaDiscoveryResponse<envoy::config::route::v3::VirtualHost>(
         Config::TypeUrl::get().VirtualHost, {buildVirtualHost()}, {}, "1", vhds_stream_);
     EXPECT_TRUE(
         compareDeltaDiscoveryRequest(Config::TypeUrl::get().VirtualHost, {}, {}, vhds_stream_));
@@ -329,8 +328,8 @@ public:
   }
 
   void useRdsWithVhosts() { use_rds_with_vhosts = true; }
-  const envoy::config::route::v3alpha::RouteConfiguration rdsConfig() const {
-    return TestUtility::parseYaml<envoy::config::route::v3alpha::RouteConfiguration>(
+  const envoy::config::route::v3::RouteConfiguration rdsConfig() const {
+    return TestUtility::parseYaml<envoy::config::route::v3::RouteConfiguration>(
         use_rds_with_vhosts ? RdsConfigWithVhosts : RdsConfig);
   }
 
@@ -350,10 +349,10 @@ public:
   }
 
   void sendDeltaDiscoveryResponseWithUnresolvedAliases(
-      const std::vector<envoy::config::route::v3alpha::VirtualHost>& added_or_updated,
+      const std::vector<envoy::config::route::v3::VirtualHost>& added_or_updated,
       const std::vector<std::string>& removed, const std::string& version, FakeStreamPtr& stream,
       const std::vector<std::string>& aliases, const std::vector<std::string>& unresolved_aliases) {
-    auto response = createDeltaDiscoveryResponse<envoy::config::route::v3alpha::VirtualHost>(
+    auto response = createDeltaDiscoveryResponse<envoy::config::route::v3::VirtualHost>(
         Config::TypeUrl::get().VirtualHost, added_or_updated, removed, version, aliases);
     for (const auto& unresolved_alias : unresolved_aliases) {
       auto* resource = response.add_resources();
@@ -376,7 +375,7 @@ public:
     resource->set_name("my_route/vhost_1");
     resource->set_version("4");
     resource->mutable_resource()->PackFrom(
-        API_DOWNGRADE(TestUtility::parseYaml<envoy::config::route::v3alpha::VirtualHost>(
+        API_DOWNGRADE(TestUtility::parseYaml<envoy::config::route::v3::VirtualHost>(
             virtualHostYaml("vhost_1", "vhost_1, vhost.first"))));
     resource->add_aliases("my_route/vhost.first");
     ret.set_nonce("test-nonce-0");
@@ -396,10 +395,9 @@ TEST_P(VhdsIntegrationTest, RdsUpdateWithoutVHDSChangesDoesNotRestartVHDS) {
   codec_client_->waitForDisconnect();
 
   // Update RouteConfig, but don't change VHDS config
-  sendSotwDiscoveryResponse<envoy::config::route::v3alpha::RouteConfiguration>(
+  sendSotwDiscoveryResponse<envoy::config::route::v3::RouteConfiguration>(
       Config::TypeUrl::get().RouteConfiguration,
-      {TestUtility::parseYaml<envoy::config::route::v3alpha::RouteConfiguration>(
-          RdsConfigWithVhosts)},
+      {TestUtility::parseYaml<envoy::config::route::v3::RouteConfiguration>(RdsConfigWithVhosts)},
       "2");
 
   // Confirm vhost_0 that was originally configured via VHDS is reachable
@@ -421,7 +419,7 @@ TEST_P(VhdsIntegrationTest, VhdsVirtualHostAddUpdateRemove) {
   codec_client_->waitForDisconnect();
 
   // A spontaneous VHDS DiscoveryResponse adds two virtual hosts
-  sendDeltaDiscoveryResponse<envoy::config::route::v3alpha::VirtualHost>(
+  sendDeltaDiscoveryResponse<envoy::config::route::v3::VirtualHost>(
       Config::TypeUrl::get().VirtualHost, buildVirtualHost1(), {}, "2", vhds_stream_);
   EXPECT_TRUE(
       compareDeltaDiscoveryRequest(Config::TypeUrl::get().VirtualHost, {}, {}, vhds_stream_));
@@ -434,7 +432,7 @@ TEST_P(VhdsIntegrationTest, VhdsVirtualHostAddUpdateRemove) {
   codec_client_->waitForDisconnect();
 
   // A spontaneous VHDS DiscoveryResponse removes newly added virtual hosts
-  sendDeltaDiscoveryResponse<envoy::config::route::v3alpha::VirtualHost>(
+  sendDeltaDiscoveryResponse<envoy::config::route::v3::VirtualHost>(
       Config::TypeUrl::get().VirtualHost, {}, {"vhost_1", "vhost_2"}, "3", vhds_stream_);
   EXPECT_TRUE(
       compareDeltaDiscoveryRequest(Config::TypeUrl::get().VirtualHost, {}, {}, vhds_stream_));
@@ -450,7 +448,7 @@ TEST_P(VhdsIntegrationTest, VhdsVirtualHostAddUpdateRemove) {
   EXPECT_TRUE(compareDeltaDiscoveryRequest(Config::TypeUrl::get().VirtualHost,
                                            {vhdsRequestResourceName("vhost.first")}, {},
                                            vhds_stream_));
-  sendDeltaDiscoveryResponse<envoy::config::route::v3alpha::VirtualHost>(
+  sendDeltaDiscoveryResponse<envoy::config::route::v3::VirtualHost>(
       Config::TypeUrl::get().VirtualHost, {buildVirtualHost2()}, {}, "4", vhds_stream_,
       {"my_route/vhost.first"});
 
@@ -480,7 +478,7 @@ TEST_P(VhdsIntegrationTest, RdsWithVirtualHostsVhdsVirtualHostAddUpdateRemove) {
   codec_client_->waitForDisconnect();
 
   // A spontaneous VHDS DiscoveryResponse adds two virtual hosts
-  sendDeltaDiscoveryResponse<envoy::config::route::v3alpha::VirtualHost>(
+  sendDeltaDiscoveryResponse<envoy::config::route::v3::VirtualHost>(
       Config::TypeUrl::get().VirtualHost, buildVirtualHost1(), {}, "2", vhds_stream_);
   EXPECT_TRUE(
       compareDeltaDiscoveryRequest(Config::TypeUrl::get().VirtualHost, {}, {}, vhds_stream_));
@@ -497,7 +495,7 @@ TEST_P(VhdsIntegrationTest, RdsWithVirtualHostsVhdsVirtualHostAddUpdateRemove) {
   codec_client_->waitForDisconnect();
 
   // A spontaneous VHDS DiscoveryResponse removes virtual hosts added via vhds
-  sendDeltaDiscoveryResponse<envoy::config::route::v3alpha::VirtualHost>(
+  sendDeltaDiscoveryResponse<envoy::config::route::v3::VirtualHost>(
       Config::TypeUrl::get().VirtualHost, {}, {"vhost_1", "vhost_2"}, "3", vhds_stream_);
   EXPECT_TRUE(
       compareDeltaDiscoveryRequest(Config::TypeUrl::get().VirtualHost, {}, {}, vhds_stream_));
@@ -517,7 +515,7 @@ TEST_P(VhdsIntegrationTest, RdsWithVirtualHostsVhdsVirtualHostAddUpdateRemove) {
   EXPECT_TRUE(compareDeltaDiscoveryRequest(Config::TypeUrl::get().VirtualHost,
                                            {vhdsRequestResourceName("vhost.first")}, {},
                                            vhds_stream_));
-  sendDeltaDiscoveryResponse<envoy::config::route::v3alpha::VirtualHost>(
+  sendDeltaDiscoveryResponse<envoy::config::route::v3::VirtualHost>(
       Config::TypeUrl::get().VirtualHost, {buildVirtualHost2()}, {}, "4", vhds_stream_,
       {"my_route/vhost.first"});
 

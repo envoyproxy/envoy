@@ -4,7 +4,7 @@
 #include <tuple>
 #include <vector>
 
-#include "envoy/config/cluster/v3alpha/cluster.pb.h"
+#include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/stats/scope.h"
 
 #include "common/network/address_impl.h"
@@ -68,7 +68,7 @@ public:
 
   void setupFromYaml(const std::string& yaml) { setup(parseClusterFromV2Yaml(yaml)); }
 
-  void setup(const envoy::config::cluster::v3alpha::Cluster& cluster_config) {
+  void setup(const envoy::config::cluster::v3::Cluster& cluster_config) {
     NiceMock<MockClusterManager> cm;
     Envoy::Stats::ScopePtr scope = stats_store_.createScope(fmt::format(
         "cluster.{}.", cluster_config.alt_stat_name().empty() ? cluster_config.name()

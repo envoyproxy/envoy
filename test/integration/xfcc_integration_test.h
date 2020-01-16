@@ -3,7 +3,7 @@
 #include <memory>
 #include <string>
 
-#include "envoy/extensions/filters/network/http_connection_manager/v3alpha/http_connection_manager.pb.h"
+#include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 
 #include "test/config/integration/certs/clientcert_hash.h"
 #include "test/integration/http_integration.h"
@@ -52,9 +52,9 @@ public:
   Network::ClientConnectionPtr makeTlsClientConnection();
   Network::ClientConnectionPtr makeMtlsClientConnection();
   void testRequestAndResponseWithXfccHeader(std::string privous_xfcc, std::string expected_xfcc);
-  envoy::extensions::filters::network::http_connection_manager::v3alpha::HttpConnectionManager::
+  envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
       ForwardClientCertDetails fcc_;
-  envoy::extensions::filters::network::http_connection_manager::v3alpha::HttpConnectionManager::
+  envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager::
       SetCurrentClientCertDetails sccd_;
   bool tls_ = true;
 

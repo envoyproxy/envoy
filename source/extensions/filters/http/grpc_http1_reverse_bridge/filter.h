@@ -2,7 +2,7 @@
 
 #include <string>
 
-#include "envoy/extensions/filters/http/grpc_http1_reverse_bridge/v3alpha/config.pb.h"
+#include "envoy/extensions/filters/http/grpc_http1_reverse_bridge/v3/config.pb.h"
 #include "envoy/http/filter.h"
 
 #include "common/buffer/buffer_impl.h"
@@ -48,8 +48,9 @@ private:
 
 class FilterConfigPerRoute : public Router::RouteSpecificFilterConfig {
 public:
-  FilterConfigPerRoute(const envoy::extensions::filters::http::grpc_http1_reverse_bridge::v3alpha::
-                           FilterConfigPerRoute& config)
+  FilterConfigPerRoute(
+      const envoy::extensions::filters::http::grpc_http1_reverse_bridge::v3::FilterConfigPerRoute&
+          config)
       : disabled_(config.disabled()) {}
   bool disabled() const { return disabled_; }
 

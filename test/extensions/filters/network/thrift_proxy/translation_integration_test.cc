@@ -1,5 +1,5 @@
-#include "envoy/config/bootstrap/v3alpha/bootstrap.pb.h"
-#include "envoy/extensions/filters/network/thrift_proxy/v3alpha/thrift_proxy.pb.h"
+#include "envoy/config/bootstrap/v3/bootstrap.pb.h"
+#include "envoy/extensions/filters/network/thrift_proxy/v3/thrift_proxy.pb.h"
 
 #include "extensions/filters/network/well_known_names.h"
 
@@ -50,11 +50,11 @@ public:
     auto upstream_transport_proto = transportTypeToProto(upstream_transport);
     auto upstream_protocol_proto = protocolTypeToProto(upstream_protocol);
 
-    envoy::extensions::filters::network::thrift_proxy::v3alpha::ThriftProtocolOptions proto_opts;
+    envoy::extensions::filters::network::thrift_proxy::v3::ThriftProtocolOptions proto_opts;
     proto_opts.set_transport(upstream_transport_proto);
     proto_opts.set_protocol(upstream_protocol_proto);
 
-    config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3alpha::Bootstrap& bootstrap) {
+    config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       auto* opts = bootstrap.mutable_static_resources()
                        ->mutable_clusters(0)
                        ->mutable_typed_extension_protocol_options();

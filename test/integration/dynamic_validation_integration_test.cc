@@ -1,7 +1,7 @@
 #include <fstream>
 
-#include "envoy/extensions/filters/network/tcp_proxy/v3alpha/tcp_proxy.pb.h"
-#include "envoy/extensions/filters/network/tcp_proxy/v3alpha/tcp_proxy.pb.validate.h"
+#include "envoy/extensions/filters/network/tcp_proxy/v3/tcp_proxy.pb.h"
+#include "envoy/extensions/filters/network/tcp_proxy/v3/tcp_proxy.pb.validate.h"
 
 #include "extensions/filters/network/common/factory_base.h"
 
@@ -23,22 +23,22 @@ public:
 
 class TestDynamicValidationNetworkFilterConfigFactory
     : public Extensions::NetworkFilters::Common::FactoryBase<
-          envoy::extensions::filters::network::tcp_proxy::v3alpha::TcpProxy> {
+          envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy> {
 public:
   TestDynamicValidationNetworkFilterConfigFactory()
       : Extensions::NetworkFilters::Common::FactoryBase<
-            envoy::extensions::filters::network::tcp_proxy::v3alpha::TcpProxy>(
+            envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy>(
             "envoy.test.dynamic_validation") {}
 
 private:
   Network::FilterFactoryCb createFilterFactoryFromProtoTyped(
-      const envoy::extensions::filters::network::tcp_proxy::v3alpha::TcpProxy& /*proto_config*/,
+      const envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy& /*proto_config*/,
       Server::Configuration::FactoryContext& /*context*/) override {
     return Network::FilterFactoryCb();
   }
 
   Upstream::ProtocolOptionsConfigConstSharedPtr createProtocolOptionsTyped(
-      const envoy::extensions::filters::network::tcp_proxy::v3alpha::TcpProxy&) override {
+      const envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy&) override {
     return nullptr;
   }
 };

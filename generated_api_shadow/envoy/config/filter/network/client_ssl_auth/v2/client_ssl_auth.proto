@@ -13,7 +13,7 @@ option java_package = "io.envoyproxy.envoy.config.filter.network.client_ssl_auth
 option java_outer_classname = "ClientSslAuthProto";
 option java_multiple_files = true;
 option (udpa.annotations.file_migrate).move_to_package =
-    "envoy.extensions.filters.network.client_ssl_auth.v3alpha";
+    "envoy.extensions.filters.network.client_ssl_auth.v3";
 
 // [#protodoc-title: Client TLS authentication]
 // Client TLS authentication

@@ -1,5 +1,5 @@
-#include "envoy/config/bootstrap/v3alpha/bootstrap.pb.h"
-#include "envoy/extensions/filters/network/http_connection_manager/v3alpha/http_connection_manager.pb.h"
+#include "envoy/config/bootstrap/v3/bootstrap.pb.h"
+#include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 
 #include "test/integration/http_protocol_integration.h"
 #include "test/test_common/test_time.h"
@@ -14,8 +14,8 @@ public:
   void initialize() override {
     useAccessLog("%RESPONSE_CODE_DETAILS%");
     config_helper_.addConfigModifier(
-        [&](envoy::extensions::filters::network::http_connection_manager::v3alpha::
-                HttpConnectionManager& hcm) -> void {
+        [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+                hcm) -> void {
           if (enable_global_idle_timeout_) {
             hcm.mutable_stream_idle_timeout()->set_seconds(0);
             hcm.mutable_stream_idle_timeout()->set_nanos(IdleTimeoutMs * 1000 * 1000);
@@ -91,7 +91,7 @@ INSTANTIATE_TEST_SUITE_P(Protocols, IdleTimeoutIntegrationTest,
 // Tests idle timeout behaviour with single request and validates that idle timer kicks in
 // after given timeout.
 TEST_P(IdleTimeoutIntegrationTest, TimeoutBasic) {
-  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3alpha::Bootstrap& bootstrap) {
+  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
     auto* static_resources = bootstrap.mutable_static_resources();
     auto* cluster = static_resources->mutable_clusters(0);
     auto* http_protocol_options = cluster->mutable_common_http_protocol_options();
@@ -123,7 +123,7 @@ TEST_P(IdleTimeoutIntegrationTest, TimeoutBasic) {
 // Tests idle timeout behaviour with multiple requests and validates that idle timer kicks in
 // after both the requests are done.
 TEST_P(IdleTimeoutIntegrationTest, IdleTimeoutWithTwoRequests) {
-  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3alpha::Bootstrap& bootstrap) {
+  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
     auto* static_resources = bootstrap.mutable_static_resources();
     auto* cluster = static_resources->mutable_clusters(0);
     auto* http_protocol_options = cluster->mutable_common_http_protocol_options();

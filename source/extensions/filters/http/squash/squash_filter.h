@@ -2,7 +2,7 @@
 
 #include <regex>
 
-#include "envoy/extensions/filters/http/squash/v3alpha/squash.pb.h"
+#include "envoy/extensions/filters/http/squash/v3/squash.pb.h"
 #include "envoy/http/async_client.h"
 #include "envoy/http/filter.h"
 #include "envoy/json/json_object.h"
@@ -20,7 +20,7 @@ namespace Squash {
 
 class SquashFilterConfig : protected Logger::Loggable<Logger::Id::config> {
 public:
-  SquashFilterConfig(const envoy::extensions::filters::http::squash::v3alpha::Squash& proto_config,
+  SquashFilterConfig(const envoy::extensions::filters::http::squash::v3::Squash& proto_config,
                      Upstream::ClusterManager& cluster_manager);
   const std::string& clusterName() const { return cluster_name_; }
   const std::string& attachmentJson() const { return attachment_json_; }

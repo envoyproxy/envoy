@@ -1,8 +1,8 @@
 #include <memory>
 
-#include "envoy/config/core/v3alpha/config_source.pb.h"
-#include "envoy/config/listener/v3alpha/listener.pb.h"
-#include "envoy/service/discovery/v3alpha/discovery.pb.h"
+#include "envoy/config/core/v3/config_source.pb.h"
+#include "envoy/config/listener/v3/listener.pb.h"
+#include "envoy/service/discovery/v3/discovery.pb.h"
 
 #include "common/protobuf/utility.h"
 
@@ -35,7 +35,7 @@ public:
   }
 
   void setup() {
-    envoy::config::core::v3alpha::ConfigSource lds_config;
+    envoy::config::core::v3::ConfigSource lds_config;
     EXPECT_CALL(init_manager_, add(_));
     lds_ = std::make_unique<LdsApiImpl>(lds_config, cluster_manager_, init_manager_, store_,
                                         listener_manager_, validation_visitor_);
@@ -48,17 +48,17 @@ public:
                  bool updated) {
     if (!version) {
       EXPECT_CALL(listener_manager_, addOrUpdateListener(_, _, true))
-          .WillOnce(Invoke(
-              [listener_name, updated](const envoy::config::listener::v3alpha::Listener& config,
-                                       const std::string&, bool) -> bool {
+          .WillOnce(
+              Invoke([listener_name, updated](const envoy::config::listener::v3::Listener& config,
+                                              const std::string&, bool) -> bool {
                 EXPECT_EQ(listener_name, config.name());
                 return updated;
               }));
     } else {
       EXPECT_CALL(listener_manager_, addOrUpdateListener(_, version.value(), true))
-          .WillOnce(Invoke(
-              [listener_name, updated](const envoy::config::listener::v3alpha::Listener& config,
-                                       const std::string&, bool) -> bool {
+          .WillOnce(
+              Invoke([listener_name, updated](const envoy::config::listener::v3::Listener& config,
+                                              const std::string&, bool) -> bool {
                 EXPECT_EQ(listener_name, config.name());
                 return updated;
               }));
@@ -79,7 +79,7 @@ public:
 
   void addListener(Protobuf::RepeatedPtrField<ProtobufWkt::Any>& listeners,
                    const std::string& listener_name) {
-    envoy::config::listener::v3alpha::Listener listener;
+    envoy::config::listener::v3::Listener listener;
     listener.set_name(listener_name);
     auto socket_address = listener.mutable_address()->mutable_socket_address();
     socket_address->set_address(listener_name);
@@ -110,7 +110,7 @@ TEST_F(LdsApiTest, ValidateFail) {
   setup();
 
   Protobuf::RepeatedPtrField<ProtobufWkt::Any> listeners;
-  envoy::config::listener::v3alpha::Listener listener;
+  envoy::config::listener::v3::Listener listener;
   listeners.Add()->PackFrom(listener);
   std::vector<std::reference_wrapper<Network::ListenerConfig>> existing_listeners;
   EXPECT_CALL(listener_manager_, listeners()).WillOnce(Return(existing_listeners));
@@ -138,7 +138,7 @@ TEST_F(LdsApiTest, MisconfiguredListenerNameIsPresentInException) {
   std::vector<std::reference_wrapper<Network::ListenerConfig>> existing_listeners;
 
   // Construct a minimal listener that would pass proto validation.
-  envoy::config::listener::v3alpha::Listener listener;
+  envoy::config::listener::v3::Listener listener;
   listener.set_name("invalid-listener");
   auto socket_address = listener.mutable_address()->mutable_socket_address();
   socket_address->set_address("invalid-address");
@@ -257,7 +257,7 @@ TEST_F(LdsApiTest, Basic) {
 }
 )EOF";
   auto response1 =
-      TestUtility::parseYaml<envoy::service::discovery::v3alpha::DiscoveryResponse>(response1_json);
+      TestUtility::parseYaml<envoy::service::discovery::v3::DiscoveryResponse>(response1_json);
 
   makeListenersAndExpectCall({});
   expectAdd("listener1", "0", true);
@@ -288,7 +288,7 @@ TEST_F(LdsApiTest, Basic) {
 }
   )EOF";
   auto response2 =
-      TestUtility::parseYaml<envoy::service::discovery::v3alpha::DiscoveryResponse>(response2_json);
+      TestUtility::parseYaml<envoy::service::discovery::v3::DiscoveryResponse>(response2_json);
 
   makeListenersAndExpectCall({"listener1", "listener2"});
   EXPECT_CALL(listener_manager_, removeListener("listener2")).WillOnce(Return(true));
@@ -320,7 +320,7 @@ TEST_F(LdsApiTest, UpdateVersionOnListenerRemove) {
 }
 )EOF";
   auto response1 =
-      TestUtility::parseYaml<envoy::service::discovery::v3alpha::DiscoveryResponse>(response1_json);
+      TestUtility::parseYaml<envoy::service::discovery::v3::DiscoveryResponse>(response1_json);
 
   makeListenersAndExpectCall({});
   expectAdd("listener1", "0", true);
@@ -337,7 +337,7 @@ TEST_F(LdsApiTest, UpdateVersionOnListenerRemove) {
 }
   )EOF";
   auto response2 =
-      TestUtility::parseYaml<envoy::service::discovery::v3alpha::DiscoveryResponse>(response2_json);
+      TestUtility::parseYaml<envoy::service::discovery::v3::DiscoveryResponse>(response2_json);
 
   makeListenersAndExpectCall({"listener1"});
   EXPECT_CALL(listener_manager_, removeListener("listener1")).WillOnce(Return(true));
@@ -366,7 +366,7 @@ resources:
   - filters: 
   )EOF";
   auto response1 =
-      TestUtility::parseYaml<envoy::service::discovery::v3alpha::DiscoveryResponse>(response1_yaml);
+      TestUtility::parseYaml<envoy::service::discovery::v3::DiscoveryResponse>(response1_yaml);
 
   makeListenersAndExpectCall({"listener0"});
   expectAdd("listener0", {}, true);
@@ -401,7 +401,7 @@ resources:
                   TestEnvironment::runfilesPath("test/config/integration/certs/servercert.pem"),
                   TestEnvironment::runfilesPath("test/config/integration/certs/serverkey.pem"));
   auto response2 =
-      TestUtility::parseYaml<envoy::service::discovery::v3alpha::DiscoveryResponse>(response2_json);
+      TestUtility::parseYaml<envoy::service::discovery::v3::DiscoveryResponse>(response2_json);
 
   makeListenersAndExpectCall({
       "listener-8080",
@@ -432,7 +432,7 @@ TEST_F(LdsApiTest, FailureInvalidConfig) {
 }
   )EOF";
   auto response1 =
-      TestUtility::parseYaml<envoy::service::discovery::v3alpha::DiscoveryResponse>(response1_json);
+      TestUtility::parseYaml<envoy::service::discovery::v3::DiscoveryResponse>(response1_json);
 
   std::vector<std::reference_wrapper<Network::ListenerConfig>> existing_listeners;
   EXPECT_CALL(listener_manager_, listeners()).WillOnce(Return(existing_listeners));
@@ -480,7 +480,7 @@ TEST_F(LdsApiTest, ReplacingListenerWithSameAddress) {
 }
 )EOF";
   auto response1 =
-      TestUtility::parseYaml<envoy::service::discovery::v3alpha::DiscoveryResponse>(response1_json);
+      TestUtility::parseYaml<envoy::service::discovery::v3::DiscoveryResponse>(response1_json);
 
   makeListenersAndExpectCall({});
   expectAdd("listener1", "0", true);
@@ -511,7 +511,7 @@ TEST_F(LdsApiTest, ReplacingListenerWithSameAddress) {
 }
 )EOF";
   auto response2 =
-      TestUtility::parseYaml<envoy::service::discovery::v3alpha::DiscoveryResponse>(response2_json);
+      TestUtility::parseYaml<envoy::service::discovery::v3::DiscoveryResponse>(response2_json);
 
   makeListenersAndExpectCall({"listener1", "listener2"});
   EXPECT_CALL(listener_manager_, removeListener("listener2")).WillOnce(Return(true));

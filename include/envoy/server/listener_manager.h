@@ -2,10 +2,10 @@
 
 #include <vector>
 
-#include "envoy/admin/v3alpha/config_dump.pb.h"
-#include "envoy/config/core/v3alpha/config_source.pb.h"
-#include "envoy/config/listener/v3alpha/listener.pb.h"
-#include "envoy/config/listener/v3alpha/listener_components.pb.h"
+#include "envoy/admin/v3/config_dump.pb.h"
+#include "envoy/config/core/v3/config_source.pb.h"
+#include "envoy/config/listener/v3/listener.pb.h"
+#include "envoy/config/listener/v3/listener_components.pb.h"
 #include "envoy/network/filter.h"
 #include "envoy/network/listen_socket.h"
 #include "envoy/network/listener.h"
@@ -58,7 +58,7 @@ public:
    * @return an LDS API provider.
    * @param lds_config supplies the management server configuration.
    */
-  virtual LdsApiPtr createLdsApi(const envoy::config::core::v3alpha::ConfigSource& lds_config) PURE;
+  virtual LdsApiPtr createLdsApi(const envoy::config::core::v3::ConfigSource& lds_config) PURE;
 
   /**
    * Creates a socket.
@@ -81,7 +81,7 @@ public:
    * @return std::vector<Network::FilterFactoryCb> the list of filter factories.
    */
   virtual std::vector<Network::FilterFactoryCb> createNetworkFilterFactoryList(
-      const Protobuf::RepeatedPtrField<envoy::config::listener::v3alpha::Filter>& filters,
+      const Protobuf::RepeatedPtrField<envoy::config::listener::v3::Filter>& filters,
       Server::Configuration::FilterChainFactoryContext& filter_chain_factory_context) PURE;
 
   /**
@@ -91,7 +91,7 @@ public:
    * @return std::vector<Network::ListenerFilterFactoryCb> the list of filter factories.
    */
   virtual std::vector<Network::ListenerFilterFactoryCb> createListenerFilterFactoryList(
-      const Protobuf::RepeatedPtrField<envoy::config::listener::v3alpha::ListenerFilter>& filters,
+      const Protobuf::RepeatedPtrField<envoy::config::listener::v3::ListenerFilter>& filters,
       Configuration::ListenerFactoryContext& context) PURE;
 
   /**
@@ -101,7 +101,7 @@ public:
    * @return std::vector<Network::UdpListenerFilterFactoryCb> the list of filter factories.
    */
   virtual std::vector<Network::UdpListenerFilterFactoryCb> createUdpListenerFilterFactoryList(
-      const Protobuf::RepeatedPtrField<envoy::config::listener::v3alpha::ListenerFilter>& filters,
+      const Protobuf::RepeatedPtrField<envoy::config::listener::v3::ListenerFilter>& filters,
       Configuration::ListenerFactoryContext& context) PURE;
 
   /**
@@ -109,7 +109,7 @@ public:
    * @param drain_type supplies the type of draining to do for the owning listener.
    */
   virtual DrainManagerPtr
-  createDrainManager(envoy::config::listener::v3alpha::Listener::DrainType drain_type) PURE;
+  createDrainManager(envoy::config::listener::v3::Listener::DrainType drain_type) PURE;
 
   /**
    * @return uint64_t a listener tag usable for connection handler tracking.
@@ -148,7 +148,7 @@ public:
    *         a duplicate of the existing listener. This routine will throw an EnvoyException if
    *         there is a fundamental error preventing the listener from being added or updated.
    */
-  virtual bool addOrUpdateListener(const envoy::config::listener::v3alpha::Listener& config,
+  virtual bool addOrUpdateListener(const envoy::config::listener::v3::Listener& config,
                                    const std::string& version_info, bool modifiable) PURE;
 
   /**
@@ -157,7 +157,7 @@ public:
    * pieces of the server existing.
    * @param lds_config supplies the management server configuration.
    */
-  virtual void createLdsApi(const envoy::config::core::v3alpha::ConfigSource& lds_config) PURE;
+  virtual void createLdsApi(const envoy::config::core::v3::ConfigSource& lds_config) PURE;
 
   /**
    * @return std::vector<std::reference_wrapper<Network::ListenerConfig>> a list of the currently
@@ -210,7 +210,7 @@ public:
    * Inform the listener manager that the update has completed, and informs the listener of any
    * errors handled by the reload source.
    */
-  using FailureStates = std::vector<std::unique_ptr<envoy::admin::v3alpha::UpdateFailureState>>;
+  using FailureStates = std::vector<std::unique_ptr<envoy::admin::v3::UpdateFailureState>>;
   virtual void endListenerUpdate(FailureStates&& failure_states) PURE;
 };
 

@@ -4,7 +4,7 @@
 #include <unordered_set>
 
 #include "envoy/common/exception.h"
-#include "envoy/extensions/filters/http/grpc_json_transcoder/v3alpha/transcoder.pb.h"
+#include "envoy/extensions/filters/http/grpc_json_transcoder/v3/transcoder.pb.h"
 #include "envoy/http/filter.h"
 
 #include "common/buffer/buffer_impl.h"
@@ -94,20 +94,20 @@ private:
 } // namespace
 
 JsonTranscoderConfig::JsonTranscoderConfig(
-    const envoy::extensions::filters::http::grpc_json_transcoder::v3alpha::GrpcJsonTranscoder&
+    const envoy::extensions::filters::http::grpc_json_transcoder::v3::GrpcJsonTranscoder&
         proto_config,
     Api::Api& api) {
   FileDescriptorSet descriptor_set;
 
   switch (proto_config.descriptor_set_case()) {
-  case envoy::extensions::filters::http::grpc_json_transcoder::v3alpha::GrpcJsonTranscoder::
+  case envoy::extensions::filters::http::grpc_json_transcoder::v3::GrpcJsonTranscoder::
       DescriptorSetCase::kProtoDescriptor:
     if (!descriptor_set.ParseFromString(
             api.fileSystem().fileReadToEnd(proto_config.proto_descriptor()))) {
       throw EnvoyException("transcoding_filter: Unable to parse proto descriptor");
     }
     break;
-  case envoy::extensions::filters::http::grpc_json_transcoder::v3alpha::GrpcJsonTranscoder::
+  case envoy::extensions::filters::http::grpc_json_transcoder::v3::GrpcJsonTranscoder::
       DescriptorSetCase::kProtoDescriptorBin:
     if (!descriptor_set.ParseFromString(proto_config.proto_descriptor_bin())) {
       throw EnvoyException("transcoding_filter: Unable to parse proto descriptor");

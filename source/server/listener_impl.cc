@@ -1,8 +1,8 @@
 #include "server/listener_impl.h"
 
-#include "envoy/config/core/v3alpha/base.pb.h"
-#include "envoy/config/listener/v3alpha/listener.pb.h"
-#include "envoy/config/listener/v3alpha/listener_components.pb.h"
+#include "envoy/config/core/v3/base.pb.h"
+#include "envoy/config/listener/v3/listener.pb.h"
+#include "envoy/config/listener/v3/listener_components.pb.h"
 #include "envoy/registry/registry.h"
 #include "envoy/server/active_udp_listener_config.h"
 #include "envoy/server/transport_socket_config.h"
@@ -80,7 +80,7 @@ Network::SocketSharedPtr ListenSocketFactoryImpl::createListenSocketAndApplyOpti
             local_address_->asString());
   if (socket != nullptr && options_ != nullptr) {
     const bool ok = Network::Socket::applyOptions(
-        options_, *socket, envoy::config::core::v3alpha::SocketOption::STATE_BOUND);
+        options_, *socket, envoy::config::core::v3::SocketOption::STATE_BOUND);
     const std::string message =
         fmt::format("{}: Setting socket options {}", listener_name_, ok ? "succeeded" : "failed");
     if (!ok) {
@@ -123,7 +123,7 @@ Network::SocketSharedPtr ListenSocketFactoryImpl::getListenSocket() {
   return createListenSocketAndApplyOptions();
 }
 
-ListenerImpl::ListenerImpl(const envoy::config::listener::v3alpha::Listener& config,
+ListenerImpl::ListenerImpl(const envoy::config::listener::v3::Listener& config,
                            const std::string& version_info, ListenerManagerImpl& parent,
                            const std::string& name, bool added_via_api, bool workers_started,
                            uint64_t hash, ProtobufMessage::ValidationVisitor& validation_visitor,
@@ -333,10 +333,10 @@ Singleton::Manager& ListenerImpl::singletonManager() { return parent_.server_.si
 OverloadManager& ListenerImpl::overloadManager() { return parent_.server_.overloadManager(); }
 ThreadLocal::Instance& ListenerImpl::threadLocal() { return parent_.server_.threadLocal(); }
 Admin& ListenerImpl::admin() { return parent_.server_.admin(); }
-const envoy::config::core::v3alpha::Metadata& ListenerImpl::listenerMetadata() const {
+const envoy::config::core::v3::Metadata& ListenerImpl::listenerMetadata() const {
   return config_.metadata();
 };
-envoy::config::core::v3alpha::TrafficDirection ListenerImpl::direction() const {
+envoy::config::core::v3::TrafficDirection ListenerImpl::direction() const {
   return config_.traffic_direction();
 };
 TimeSource& ListenerImpl::timeSource() { return api().timeSource(); }

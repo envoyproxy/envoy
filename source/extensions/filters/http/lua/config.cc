@@ -1,7 +1,7 @@
 #include "extensions/filters/http/lua/config.h"
 
-#include "envoy/extensions/filters/http/lua/v3alpha/lua.pb.h"
-#include "envoy/extensions/filters/http/lua/v3alpha/lua.pb.validate.h"
+#include "envoy/extensions/filters/http/lua/v3/lua.pb.h"
+#include "envoy/extensions/filters/http/lua/v3/lua.pb.validate.h"
 #include "envoy/registry/registry.h"
 
 #include "extensions/filters/http/lua/lua_filter.h"
@@ -12,7 +12,7 @@ namespace HttpFilters {
 namespace Lua {
 
 Http::FilterFactoryCb LuaFilterConfig::createFilterFactoryFromProtoTyped(
-    const envoy::extensions::filters::http::lua::v3alpha::Lua& proto_config, const std::string&,
+    const envoy::extensions::filters::http::lua::v3::Lua& proto_config, const std::string&,
     Server::Configuration::FactoryContext& context) {
   FilterConfigConstSharedPtr filter_config(new FilterConfig{
       proto_config.inline_code(), context.threadLocal(), context.clusterManager()});

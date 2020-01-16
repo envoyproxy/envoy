@@ -1,7 +1,7 @@
 #include <sstream>
 #include <vector>
 
-#include "envoy/config/bootstrap/v3alpha/bootstrap.pb.h"
+#include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 
 #include "common/common/macros.h"
 
@@ -154,26 +154,25 @@ public:
     config_helper_.renameListener("redis_proxy");
 
     // Change the port for each of the discovery host in cluster_0.
-    config_helper_.addConfigModifier(
-        [this](envoy::config::bootstrap::v3alpha::Bootstrap& bootstrap) {
-          uint32_t upstream_idx = 0;
-          auto* cluster_0 = bootstrap.mutable_static_resources()->mutable_clusters(0);
-          for (int j = 0; j < cluster_0->load_assignment().endpoints_size(); ++j) {
-            auto locality_lb = cluster_0->mutable_load_assignment()->mutable_endpoints(j);
-            for (int k = 0; k < locality_lb->lb_endpoints_size(); ++k) {
-              auto lb_endpoint = locality_lb->mutable_lb_endpoints(k);
-              if (lb_endpoint->endpoint().address().has_socket_address()) {
-                auto* host_socket_addr =
-                    lb_endpoint->mutable_endpoint()->mutable_address()->mutable_socket_address();
-                RELEASE_ASSERT(fake_upstreams_.size() > upstream_idx, "");
-                host_socket_addr->set_address(
-                    fake_upstreams_[upstream_idx]->localAddress()->ip()->addressAsString());
-                host_socket_addr->set_port_value(
-                    fake_upstreams_[upstream_idx++]->localAddress()->ip()->port());
-              }
-            }
+    config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+      uint32_t upstream_idx = 0;
+      auto* cluster_0 = bootstrap.mutable_static_resources()->mutable_clusters(0);
+      for (int j = 0; j < cluster_0->load_assignment().endpoints_size(); ++j) {
+        auto locality_lb = cluster_0->mutable_load_assignment()->mutable_endpoints(j);
+        for (int k = 0; k < locality_lb->lb_endpoints_size(); ++k) {
+          auto lb_endpoint = locality_lb->mutable_lb_endpoints(k);
+          if (lb_endpoint->endpoint().address().has_socket_address()) {
+            auto* host_socket_addr =
+                lb_endpoint->mutable_endpoint()->mutable_address()->mutable_socket_address();
+            RELEASE_ASSERT(fake_upstreams_.size() > upstream_idx, "");
+            host_socket_addr->set_address(
+                fake_upstreams_[upstream_idx]->localAddress()->ip()->addressAsString());
+            host_socket_addr->set_port_value(
+                fake_upstreams_[upstream_idx++]->localAddress()->ip()->port());
           }
-        });
+        }
+      }
+    });
 
     on_server_ready_function_ = [this](Envoy::IntegrationTestServer& test_server) {
       mock_rng_ = dynamic_cast<Runtime::MockRandomGenerator*>(&(test_server.server().random()));

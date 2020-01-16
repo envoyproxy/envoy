@@ -52,12 +52,12 @@ envoy_cc_library(
         "//source/common/init:target_lib",
         "//source/common/protobuf:message_validator_lib",
         "//source/common/protobuf:utility_lib",
-        "@envoy_api//envoy/config/bootstrap/v3alpha:pkg_cc_proto",
-        "@envoy_api//envoy/config/core/v3alpha:pkg_cc_proto",
+        "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
         "@envoy_api//envoy/service/discovery/v2:pkg_cc_proto",
-        "@envoy_api//envoy/service/discovery/v3alpha:pkg_cc_proto",
-        "@envoy_api//envoy/service/runtime/v3alpha:pkg_cc_proto",
-        "@envoy_api//envoy/type/v3alpha:pkg_cc_proto",
+        "@envoy_api//envoy/service/discovery/v3:pkg_cc_proto",
+        "@envoy_api//envoy/service/runtime/v3:pkg_cc_proto",
+        "@envoy_api//envoy/type/v3:pkg_cc_proto",
     ],
 )
 

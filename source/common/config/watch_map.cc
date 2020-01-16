@@ -1,6 +1,6 @@
 #include "common/config/watch_map.h"
 
-#include "envoy/service/discovery/v3alpha/discovery.pb.h"
+#include "envoy/service/discovery/v3/discovery.pb.h"
 
 namespace Envoy {
 namespace Config {
@@ -98,7 +98,7 @@ void WatchMap::onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>
 // For responses to on-demand requests, replace the original watch for an alias
 // with one for the resource's name
 AddedRemoved WatchMap::convertAliasWatchesToNameWatches(
-    const envoy::service::discovery::v3alpha::Resource& resource) {
+    const envoy::service::discovery::v3::Resource& resource) {
   absl::flat_hash_set<Watch*> watches_to_update;
   for (const auto& alias : resource.aliases()) {
     const auto interested_watches = watch_interest_.find(alias);
@@ -122,14 +122,13 @@ AddedRemoved WatchMap::convertAliasWatchesToNameWatches(
 }
 
 void WatchMap::onConfigUpdate(
-    const Protobuf::RepeatedPtrField<envoy::service::discovery::v3alpha::Resource>& added_resources,
+    const Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource>& added_resources,
     const Protobuf::RepeatedPtrField<std::string>& removed_resources,
     const std::string& system_version_info) {
   // Build a pair of maps: from watches, to the set of resources {added,removed} that each watch
   // cares about. Each entry in the map-pair is then a nice little bundle that can be fed directly
   // into the individual onConfigUpdate()s.
-  absl::flat_hash_map<Watch*,
-                      Protobuf::RepeatedPtrField<envoy::service::discovery::v3alpha::Resource>>
+  absl::flat_hash_map<Watch*, Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource>>
       per_watch_added;
   for (const auto& r : added_resources) {
     const absl::flat_hash_set<Watch*>& interested_in_r = watchesInterestedIn(r.name());

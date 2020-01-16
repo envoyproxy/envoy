@@ -1,5 +1,5 @@
-#include "envoy/extensions/filters/network/echo/v3alpha/echo.pb.h"
-#include "envoy/extensions/filters/network/echo/v3alpha/echo.pb.validate.h"
+#include "envoy/extensions/filters/network/echo/v3/echo.pb.h"
+#include "envoy/extensions/filters/network/echo/v3/echo.pb.validate.h"
 #include "envoy/registry/registry.h"
 #include "envoy/server/filter_config.h"
 
@@ -16,13 +16,13 @@ namespace Echo {
  * Config registration for the echo filter. @see NamedNetworkFilterConfigFactory.
  */
 class EchoConfigFactory
-    : public Common::FactoryBase<envoy::extensions::filters::network::echo::v3alpha::Echo> {
+    : public Common::FactoryBase<envoy::extensions::filters::network::echo::v3::Echo> {
 public:
   EchoConfigFactory() : FactoryBase(NetworkFilterNames::get().Echo) {}
 
 private:
   Network::FilterFactoryCb
-  createFilterFactoryFromProtoTyped(const envoy::extensions::filters::network::echo::v3alpha::Echo&,
+  createFilterFactoryFromProtoTyped(const envoy::extensions::filters::network::echo::v3::Echo&,
                                     Server::Configuration::FactoryContext&) override {
     return [](Network::FilterManager& filter_manager) -> void {
       filter_manager.addReadFilter(std::make_shared<EchoFilter>());

@@ -8,8 +8,7 @@ import "validate/validate.proto";
 option java_package = "io.envoyproxy.envoy.api.v2.ratelimit";
 option java_outer_classname = "RatelimitProto";
 option java_multiple_files = true;
-option (udpa.annotations.file_migrate).move_to_package =
-    "envoy.extensions.common.ratelimit.v3alpha";
+option (udpa.annotations.file_migrate).move_to_package = "envoy.extensions.common.ratelimit.v3";
 
 // [#protodoc-title: Common rate limit components]
 

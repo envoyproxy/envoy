@@ -1,5 +1,5 @@
-#include "envoy/config/core/v3alpha/address.pb.h"
-#include "envoy/config/metrics/v3alpha/stats.pb.h"
+#include "envoy/config/core/v3/address.pb.h"
+#include "envoy/config/metrics/v3/stats.pb.h"
 #include "envoy/registry/registry.h"
 
 #include "common/config/well_known_names.h"
@@ -33,10 +33,10 @@ INSTANTIATE_TEST_SUITE_P(IpVersions, DogStatsdConfigLoopbackTest,
 TEST_P(DogStatsdConfigLoopbackTest, ValidUdpIp) {
   const std::string name = StatsSinkNames::get().DogStatsd;
 
-  envoy::config::metrics::v3alpha::DogStatsdSink sink_config;
-  envoy::config::core::v3alpha::Address& address = *sink_config.mutable_address();
-  envoy::config::core::v3alpha::SocketAddress& socket_address = *address.mutable_socket_address();
-  socket_address.set_protocol(envoy::config::core::v3alpha::SocketAddress::UDP);
+  envoy::config::metrics::v3::DogStatsdSink sink_config;
+  envoy::config::core::v3::Address& address = *sink_config.mutable_address();
+  envoy::config::core::v3::SocketAddress& socket_address = *address.mutable_socket_address();
+  socket_address.set_protocol(envoy::config::core::v3::SocketAddress::UDP);
   auto loopback_flavor = Network::Test::getCanonicalLoopbackAddress(GetParam());
   socket_address.set_address(loopback_flavor->ip()->addressAsString());
   socket_address.set_port_value(8125);
@@ -60,18 +60,18 @@ TEST_P(DogStatsdConfigLoopbackTest, ValidUdpIp) {
 // Negative test for protoc-gen-validate constraints for dog_statsd.
 TEST(DogStatsdConfigTest, ValidateFail) {
   NiceMock<Server::MockInstance> server;
-  EXPECT_THROW(DogStatsdSinkFactory().createStatsSink(
-                   envoy::config::metrics::v3alpha::DogStatsdSink(), server),
-               ProtoValidationException);
+  EXPECT_THROW(
+      DogStatsdSinkFactory().createStatsSink(envoy::config::metrics::v3::DogStatsdSink(), server),
+      ProtoValidationException);
 }
 
 TEST_P(DogStatsdConfigLoopbackTest, WithCustomPrefix) {
   const std::string name = StatsSinkNames::get().DogStatsd;
 
-  envoy::config::metrics::v3alpha::DogStatsdSink sink_config;
-  envoy::config::core::v3alpha::Address& address = *sink_config.mutable_address();
-  envoy::config::core::v3alpha::SocketAddress& socket_address = *address.mutable_socket_address();
-  socket_address.set_protocol(envoy::config::core::v3alpha::SocketAddress::UDP);
+  envoy::config::metrics::v3::DogStatsdSink sink_config;
+  envoy::config::core::v3::Address& address = *sink_config.mutable_address();
+  envoy::config::core::v3::SocketAddress& socket_address = *address.mutable_socket_address();
+  socket_address.set_protocol(envoy::config::core::v3::SocketAddress::UDP);
   auto loopback_flavor = Network::Test::getCanonicalLoopbackAddress(GetParam());
   socket_address.set_address(loopback_flavor->ip()->addressAsString());
   socket_address.set_port_value(8125);

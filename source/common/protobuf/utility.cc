@@ -5,7 +5,7 @@
 
 #include "envoy/annotations/deprecation.pb.h"
 #include "envoy/protobuf/message_validator.h"
-#include "envoy/type/v3alpha/percent.pb.h"
+#include "envoy/type/v3/percent.pb.h"
 
 #include "common/common/assert.h"
 #include "common/common/fmt.h"
@@ -173,20 +173,19 @@ uint64_t convertPercent(double percent, uint64_t max_value) {
   return max_value * (percent / 100.0);
 }
 
-bool evaluateFractionalPercent(envoy::type::v3alpha::FractionalPercent percent,
-                               uint64_t random_value) {
+bool evaluateFractionalPercent(envoy::type::v3::FractionalPercent percent, uint64_t random_value) {
   return random_value % fractionalPercentDenominatorToInt(percent.denominator()) <
          percent.numerator();
 }
 
 uint64_t fractionalPercentDenominatorToInt(
-    const envoy::type::v3alpha::FractionalPercent::DenominatorType& denominator) {
+    const envoy::type::v3::FractionalPercent::DenominatorType& denominator) {
   switch (denominator) {
-  case envoy::type::v3alpha::FractionalPercent::HUNDRED:
+  case envoy::type::v3::FractionalPercent::HUNDRED:
     return 100;
-  case envoy::type::v3alpha::FractionalPercent::TEN_THOUSAND:
+  case envoy::type::v3::FractionalPercent::TEN_THOUSAND:
     return 10000;
-  case envoy::type::v3alpha::FractionalPercent::MILLION:
+  case envoy::type::v3::FractionalPercent::MILLION:
     return 1000000;
   default:
     // Checked by schema.
