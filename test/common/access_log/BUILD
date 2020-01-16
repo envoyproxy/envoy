@@ -21,6 +21,7 @@ envoy_cc_fuzz_test(
     name = "access_log_formatter_fuzz_test",
     srcs = ["access_log_formatter_fuzz_test.cc"],
     corpus = "access_log_formatter_corpus",
+    dictionary = "access_log_formatter_fuzz_test.dict",
     deps = [
         ":access_log_formatter_fuzz_proto_cc_proto",
         "//source/common/access_log:access_log_formatter_lib",
