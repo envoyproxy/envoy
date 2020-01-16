@@ -513,7 +513,9 @@ message RouteAction {
   // During shadowing, the host/authority header is altered such that *-shadow* is appended. This is
   // useful for logging. For example, *cluster1* becomes *cluster1-shadow*.
   //
-  // Note that shadowing will not be triggered if the primary cluster does not exist.
+  // .. note::
+  //
+  //   Shadowing will not be triggered if the primary cluster does not exist.
   message RequestMirrorPolicy {
     option (udpa.annotations.versioning).previous_message_type =
         "envoy.api.v2.route.RouteAction.RequestMirrorPolicy";
