@@ -59,8 +59,7 @@ message PluginConfig {
   // Configuration for finding or starting VM.
   oneof vm_config {
     VmConfig inline_vm_config = 3;
-
-    string vm_id = 4;
+    // In the future add referential VM configurations.
   }
 
   // Filter/service configuration used to configure or reconfigure a plugin
