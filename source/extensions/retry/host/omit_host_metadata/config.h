@@ -1,7 +1,7 @@
 #pragma once
 
-#include "envoy/extensions/retry/host/omit_host_metadata/v3alpha/omit_host_metadata_config.pb.h"
-#include "envoy/extensions/retry/host/omit_host_metadata/v3alpha/omit_host_metadata_config.pb.validate.h"
+#include "envoy/extensions/retry/host/omit_host_metadata/v3/omit_host_metadata_config.pb.h"
+#include "envoy/extensions/retry/host/omit_host_metadata/v3/omit_host_metadata_config.pb.validate.h"
 #include "envoy/upstream/retry.h"
 
 #include "extensions/retry/host/omit_host_metadata/omit_host_metadata.h"
@@ -23,7 +23,7 @@ public:
 
   ProtobufTypes::MessagePtr createEmptyConfigProto() override {
     return ProtobufTypes::MessagePtr(
-        new envoy::extensions::retry::host::omit_host_metadata::v3alpha::OmitHostMetadataConfig());
+        new envoy::extensions::retry::host::omit_host_metadata::v3::OmitHostMetadataConfig());
   }
 };
 

@@ -12,17 +12,14 @@ namespace Host {
 
 class OmitHostsRetryPredicate : public Upstream::RetryHostPredicate {
 public:
-  explicit OmitHostsRetryPredicate(
-      const envoy::config::core::v3alpha::Metadata metadata_match_criteria)
+  explicit OmitHostsRetryPredicate(const envoy::config::core::v3::Metadata& metadata_match_criteria)
       : metadata_match_criteria_(metadata_match_criteria) {
     const auto& filter_it = metadata_match_criteria_.filter_metadata().find(
         Envoy::Config::MetadataFilters::get().ENVOY_LB);
-    if (filter_it == metadata_match_criteria_.filter_metadata().end()) {
-      throw EnvoyException("No metadata match criteria defined.");
-    }
-
-    for (auto const& it : filter_it->second.fields()) {
-      labelSet.push_back(std::make_pair(it.first, it.second));
+    if (filter_it != metadata_match_criteria_.filter_metadata().end()) {
+      for (auto const& it : filter_it->second.fields()) {
+        labelSet.push_back(it);
+      }
     }
   }
 
@@ -31,7 +28,7 @@ public:
   void onHostAttempted(Upstream::HostDescriptionConstSharedPtr) override {}
 
 private:
-  const envoy::config::core::v3alpha::Metadata metadata_match_criteria_;
+  const envoy::config::core::v3::Metadata metadata_match_criteria_;
   std::vector<std::pair<std::string, ProtobufWkt::Value>> labelSet;
 };
 

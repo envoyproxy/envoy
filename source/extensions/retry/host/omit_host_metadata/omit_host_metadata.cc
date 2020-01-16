@@ -9,12 +9,6 @@ namespace Retry {
 namespace Host {
 
 bool OmitHostsRetryPredicate::shouldSelectAnotherHost(const Upstream::Host& host) {
-  // Check if host doesn't have any metadata.
-  if (host.metadata()->filter_metadata().find(Envoy::Config::MetadataFilters::get().ENVOY_LB) ==
-      host.metadata()->filter_metadata().end()) {
-    return false;
-  }
-
   return Envoy::Config::Metadata::metadataLabelMatch(
       labelSet, *host.metadata(), Envoy::Config::MetadataFilters::get().ENVOY_LB, true);
 }

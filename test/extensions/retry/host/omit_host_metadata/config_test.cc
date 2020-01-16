@@ -1,4 +1,4 @@
-#include "envoy/extensions/retry/host/omit_host_metadata/v3alpha/omit_host_metadata_config.pb.h"
+#include "envoy/extensions/retry/host/omit_host_metadata/v3/omit_host_metadata_config.pb.h"
 #include "envoy/registry/registry.h"
 #include "envoy/upstream/retry.h"
 
@@ -24,7 +24,7 @@ TEST(OmitHostsRetryPredicateTest, PredicateTest) {
 
   ASSERT_NE(nullptr, factory);
 
-  envoy::extensions::retry::host::omit_host_metadata::v3alpha::OmitHostMetadataConfig config;
+  envoy::extensions::retry::host::omit_host_metadata::v3::OmitHostMetadataConfig config;
   auto* metadata_match = config.mutable_metadata_match();
   Envoy::Config::Metadata::mutableMetadataValue(
       *metadata_match, Envoy::Config::MetadataFilters::get().ENVOY_LB, "key")
@@ -37,14 +37,14 @@ TEST(OmitHostsRetryPredicateTest, PredicateTest) {
 
   // Test: if the host doesn't have metadata, it should not be rejected.
   ON_CALL(*host, metadata())
-      .WillByDefault(Return(std::make_shared<envoy::config::core::v3alpha::Metadata>()));
+      .WillByDefault(Return(std::make_shared<envoy::config::core::v3::Metadata>()));
 
   ASSERT_FALSE(predicate->shouldSelectAnotherHost(*host));
 
   // Test: if host has matching metadata criteria, it should be rejected.
   ON_CALL(*host, metadata())
-      .WillByDefault(Return(std::make_shared<envoy::config::core::v3alpha::Metadata>(
-          TestUtility::parseYaml<envoy::config::core::v3alpha::Metadata>(
+      .WillByDefault(Return(std::make_shared<envoy::config::core::v3::Metadata>(
+          TestUtility::parseYaml<envoy::config::core::v3::Metadata>(
               R"EOF(
         filter_metadata:
           envoy.lb:
@@ -55,8 +55,8 @@ TEST(OmitHostsRetryPredicateTest, PredicateTest) {
 
   // Test: if host doesn't have matching metadata criteria, it should not be rejected.
   ON_CALL(*host, metadata())
-      .WillByDefault(Return(std::make_shared<envoy::config::core::v3alpha::Metadata>(
-          TestUtility::parseYaml<envoy::config::core::v3alpha::Metadata>(
+      .WillByDefault(Return(std::make_shared<envoy::config::core::v3::Metadata>(
+          TestUtility::parseYaml<envoy::config::core::v3::Metadata>(
               R"EOF(
         filter_metadata:
           envoy.lb:
@@ -67,8 +67,8 @@ TEST(OmitHostsRetryPredicateTest, PredicateTest) {
 
   // Test: if host metadata has matching key but not the value, it should not be rejected.
   ON_CALL(*host, metadata())
-      .WillByDefault(Return(std::make_shared<envoy::config::core::v3alpha::Metadata>(
-          TestUtility::parseYaml<envoy::config::core::v3alpha::Metadata>(
+      .WillByDefault(Return(std::make_shared<envoy::config::core::v3::Metadata>(
+          TestUtility::parseYaml<envoy::config::core::v3::Metadata>(
               R"EOF(
         filter_metadata:
           envoy.lb:

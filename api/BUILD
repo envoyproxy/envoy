@@ -175,7 +175,7 @@ proto_library(
         "//envoy/extensions/filters/network/thrift_proxy/filters/ratelimit/v3:pkg",
         "//envoy/extensions/filters/network/thrift_proxy/v3:pkg",
         "//envoy/extensions/filters/network/zookeeper_proxy/v3:pkg",
-        "//envoy/extensions/retry/host/omit_host_metadata/v3alpha:pkg",
+        "//envoy/extensions/retry/host/omit_host_metadata/v3:pkg",
         "//envoy/extensions/retry/priority/previous_priorities/v3:pkg",
         "//envoy/extensions/transport_sockets/alts/v3:pkg",
         "//envoy/extensions/transport_sockets/raw_buffer/v3:pkg",
