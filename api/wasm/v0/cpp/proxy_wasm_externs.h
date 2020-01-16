@@ -15,6 +15,11 @@
 //  of this ABI e.g. the C++ SDK provides a proxy_wasm_api.h implementation of the API on top of
 //  this ABI.
 //
+// The Wasm VM can only access memory in the VM. Consequently, all data must be passed as integral
+// call parameters or by malloc()ing data in the VM. For consistency and to enable diverse Wasm
+// languages (e.g. languages with GC), the ABI uses a single mechanism for allocating memory in the
+// VM and requires that all memory allocations be explicitly requested by calls from the VM.
+//
 
 // Non-stream calls.
 
@@ -25,7 +30,8 @@
  * proxy_get_configuration during the lifetime of this call.
  * @return non-zero on success and zero on failure (e.g. bad configuration).
  */
-extern "C" uint32_t proxy_on_vm_start(uint32_t root_context_id, uint32_t vm_configuration_size);
+extern "C" OnVmStartResult proxy_on_vm_start(uint32_t root_context_id,
+                                             uint32_t vm_configuration_size);
 
 /**
  * Can be called to validate a configuration (e.g. from bootstrap or xDS) both before
@@ -36,8 +42,8 @@ extern "C" uint32_t proxy_on_vm_start(uint32_t root_context_id, uint32_t vm_conf
  * proxy_get_configuration().
  * @return non-zero on success and zero on failure (i.e. bad configuration).
  */
-extern "C" uint32_t proxy_validate_configuration(uint32_t root_context_id,
-                                                 uint32_t configuration_size);
+extern "C" OnValidateConfigurationResult proxy_validate_configuration(uint32_t root_context_id,
+                                                                      uint32_t configuration_size);
 /**
  * Called when a plugin loads or when plugin configuration changes dynamically.
  * @param root_context_id is an identifier for one or more related plugins.
@@ -45,8 +51,8 @@ extern "C" uint32_t proxy_validate_configuration(uint32_t root_context_id,
  * proxy_get_configuration().
  * @return non-zero on success and zero on failure (e.g. bad configuration).
  */
-extern "C" uint32_t proxy_on_configure(uint32_t root_context_id,
-                                       uint32_t plugin_configuration_size);
+extern "C" OnConfigureResult proxy_on_configure(uint32_t root_context_id,
+                                                uint32_t plugin_configuration_size);
 
 // Stream calls.
 
@@ -69,7 +75,7 @@ extern "C" void proxy_on_context_create(uint32_t context_id, uint32_t root_conte
  * Root contexts may return zero to defer the VM shutdown and the proxy_on_delete call until after a
  * future proxy_done() call by the root context.
  */
-extern "C" uint32_t proxy_on_done(uint32_t context_id);
+extern "C" OnDoneResult proxy_on_done(uint32_t context_id);
 
 /**
  * Called when the context is being deleted and will no longer receive any more calls.
