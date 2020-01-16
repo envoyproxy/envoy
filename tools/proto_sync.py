@@ -308,6 +308,8 @@ def Sync(api_root, mode, labels, shadow):
             subprocess.run(['patch', '-p1'], input=diff, cwd=str(api_root_path.resolve()))
           else:
             sys.exit(1)
+        else:
+          subprocess.run(['patch', '-p1'], input=diff, cwd=str(api_root_path.resolve()))
 
   with open(os.path.join(api_root, 'BUILD'), 'w') as f:
     formatted_deps = '\n'.join(
