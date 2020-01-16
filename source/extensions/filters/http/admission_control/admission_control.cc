@@ -23,6 +23,7 @@ namespace AdmissionControl {
 
 static constexpr double defaultAggression = 2.0;
 static constexpr std::chrono::seconds defaultSamplingWindow{120};
+static constexpr std::chrono::seconds defaultHistoryGranularity{1};
 static constexpr uint32_t defaultMinRequestSamples = 100;
 
 AdmissionControlFilterConfig::AdmissionControlFilterConfig(
@@ -92,24 +93,27 @@ bool AdmissionControlFilter::shouldRejectRequest() const {
 void ThreadLocalController::maybeUpdateHistoricalData() {
   const MonotonicTime now = time_source_.monotonicTime();
 
+  // Purge stale samples.
   while (!historical_data_.empty() && (now - historical_data_.front().first) >= sampling_window_) {
-    // Remove stale data.
     global_data_.successes -= historical_data_.front().second.successes;
     global_data_.requests -= historical_data_.front().second.requests;
     historical_data_.pop_front();
+  }
+
+  // It's possible we purged stale samples from the history and are left with nothing, so it's
+  // necessary to add an empty entry. We will also need to roll over into a new entry in the
+  // historical data if we've exceeded the time specified by the granularity.
+  if (historical_data_.empty() ||
+      (now - historical_data_.back().first) >= defaultHistoryGranularity) {
+    historical_data_.emplace_back(time_source_.monotonicTime(), RequestData());
   }
 }
 
 void ThreadLocalController::recordRequest(const bool success) {
   maybeUpdateHistoricalData();
 
-  // It's possible we purged stale samples from the history and are left with nothing.
-  if (historical_data_.empty()) {
-    historical_data_.emplace_back(time_source_.monotonicTime(), RequestData());
-  }
-
   // The back of the deque will be the most recent samples.
-  ++historical_data_.back().second.requests; 
+  ++historical_data_.back().second.requests;
   ++global_data_.requests;
   if (success) {
     ++historical_data_.back().second.successes;

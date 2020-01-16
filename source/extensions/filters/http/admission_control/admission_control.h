@@ -45,15 +45,17 @@ struct AdmissionControlStats {
 class ThreadLocalController : public ThreadLocal::ThreadLocalObject {
 public:
   ThreadLocalController(TimeSource& time_source, std::chrono::seconds sampling_window);
-  void recordSuccess() {
-    recordRequest(true);
-  }
-  void recordFailure() {
-    recordRequest(false);
-  }
+  void recordSuccess() { recordRequest(true); }
+  void recordFailure() { recordRequest(false); }
 
-  uint32_t requestTotalCount() const { return global_data_.requests; }
-  uint32_t requestSuccessCount() const { return global_data_.successes; }
+  uint32_t requestTotalCount() {
+    maybeUpdateHistoricalData();
+    return global_data_.requests;
+  }
+  uint32_t requestSuccessCount() {
+    maybeUpdateHistoricalData();
+    return global_data_.successes;
+  }
 
 private:
   struct RequestData {
@@ -73,7 +75,7 @@ private:
   // Request data aggregated for the whole lookback window.
   RequestData global_data_;
 
-  // The rolling time window.
+  // The rolling time window size.
   std::chrono::seconds sampling_window_;
 };
 
