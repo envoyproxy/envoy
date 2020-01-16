@@ -105,6 +105,7 @@ envoy_cc_test_library(
         "//source/common/common:thread_lib",
         "//source/common/common:utility_lib",
         "//source/common/config:resources_lib",
+        "//source/common/config:version_converter_lib",
         "//source/common/filesystem:directory_lib",
         "//source/common/filesystem:filesystem_lib",
         "//source/common/http:header_map_lib",
@@ -115,13 +116,13 @@ envoy_cc_test_library(
         "//source/common/stats:fake_symbol_table_lib",
         "//source/common/stats:stats_lib",
         "//test/mocks/stats:stats_mocks",
-        "@envoy_api//envoy/config/cluster/v3alpha:pkg_cc_proto",
-        "@envoy_api//envoy/config/endpoint/v3alpha:pkg_cc_proto",
-        "@envoy_api//envoy/config/listener/v3alpha:pkg_cc_proto",
-        "@envoy_api//envoy/config/route/v3alpha:pkg_cc_proto",
-        "@envoy_api//envoy/service/runtime/v3alpha:pkg_cc_proto",
-        "@envoy_api//envoy/type/matcher/v3alpha:pkg_cc_proto",
-        "@envoy_api//envoy/type/v3alpha:pkg_cc_proto",
+        "@envoy_api//envoy/config/cluster/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/endpoint/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
+        "@envoy_api//envoy/service/runtime/v3:pkg_cc_proto",
+        "@envoy_api//envoy/type/matcher/v3:pkg_cc_proto",
+        "@envoy_api//envoy/type/v3:pkg_cc_proto",
     ],
 )
 
@@ -137,7 +138,7 @@ envoy_cc_test_library(
         "//test/mocks/protobuf:protobuf_mocks",
         "//test/mocks/runtime:runtime_mocks",
         "//test/mocks/thread_local:thread_local_mocks",
-        "@envoy_api//envoy/config/bootstrap/v3alpha:pkg_cc_proto",
+        "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
     ],
 )
 
@@ -166,7 +167,7 @@ envoy_cc_test(
     srcs = ["utility_test.cc"],
     deps = [
         ":utility_lib",
-        "@envoy_api//envoy/service/discovery/v3alpha:pkg_cc_proto",
+        "@envoy_api//envoy/service/discovery/v3:pkg_cc_proto",
     ],
 )
 

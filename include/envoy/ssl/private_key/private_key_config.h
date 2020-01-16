@@ -1,7 +1,7 @@
 #pragma once
 
 #include "envoy/config/typed_config.h"
-#include "envoy/extensions/transport_sockets/tls/v3alpha/cert.pb.h"
+#include "envoy/extensions/transport_sockets/tls/v3/cert.pb.h"
 #include "envoy/registry/registry.h"
 #include "envoy/ssl/private_key/private_key.h"
 
@@ -22,10 +22,10 @@ public:
    * @param context supplies the factory context
    */
   virtual PrivateKeyMethodProviderSharedPtr createPrivateKeyMethodProviderInstance(
-      const envoy::extensions::transport_sockets::tls::v3alpha::PrivateKeyProvider& config,
+      const envoy::extensions::transport_sockets::tls::v3::PrivateKeyProvider& config,
       Server::Configuration::TransportSocketFactoryContext& factory_context) PURE;
 
-  std::string category() const override { return "tls.key_providers"; };
+  std::string category() const override { return "envoy.tls.key_providers"; };
 };
 
 } // namespace Ssl

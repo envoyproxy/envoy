@@ -4,7 +4,7 @@
 #include <string>
 #include <vector>
 
-#include "envoy/config/filter/thrift/rate_limit/v3alpha/rate_limit.pb.h"
+#include "envoy/extensions/filters/network/thrift_proxy/filters/ratelimit/v3/rate_limit.pb.h"
 #include "envoy/ratelimit/ratelimit.h"
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats_macros.h"
@@ -27,7 +27,8 @@ using namespace Envoy::Extensions::NetworkFilters;
  */
 class Config {
 public:
-  Config(const envoy::config::filter::thrift::rate_limit::v3alpha::RateLimit& config,
+  Config(const envoy::extensions::filters::network::thrift_proxy::filters::ratelimit::v3::RateLimit&
+             config,
          const LocalInfo::LocalInfo& local_info, Stats::Scope& scope, Runtime::Loader& runtime,
          Upstream::ClusterManager& cm)
       : domain_(config.domain()), stage_(config.stage()), local_info_(local_info), scope_(scope),

@@ -50,7 +50,7 @@ void WorkerImpl::addListener(Network::ListenerConfig& listener, AddListenerCompl
   });
 }
 
-uint64_t WorkerImpl::numConnections() {
+uint64_t WorkerImpl::numConnections() const {
   uint64_t ret = 0;
   if (handler_) {
     ret = handler_->numConnections();

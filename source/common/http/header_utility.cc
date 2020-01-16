@@ -1,6 +1,6 @@
 #include "common/http/header_utility.h"
 
-#include "envoy/config/route/v3alpha/route_components.pb.h"
+#include "envoy/config/route/v3/route_components.pb.h"
 
 #include "common/common/regex.h"
 #include "common/common/utility.h"
@@ -16,6 +16,7 @@ namespace Http {
 
 struct SharedResponseCodeDetailsValues {
   const absl::string_view InvalidAuthority = "http.invalid_authority";
+  const absl::string_view ConnectUnsupported = "http.connect_not_supported";
 };
 
 using SharedResponseCodeDetails = ConstSingleton<SharedResponseCodeDetailsValues>;
@@ -32,40 +33,40 @@ using SharedResponseCodeDetails = ConstSingleton<SharedResponseCodeDetailsValues
 //   d.present_match: Match will succeed if the header is present.
 //   f.prefix_match: Match will succeed if header value matches the prefix value specified here.
 //   g.suffix_match: Match will succeed if header value matches the suffix value specified here.
-HeaderUtility::HeaderData::HeaderData(const envoy::config::route::v3alpha::HeaderMatcher& config)
+HeaderUtility::HeaderData::HeaderData(const envoy::config::route::v3::HeaderMatcher& config)
     : name_(config.name()), invert_match_(config.invert_match()) {
   switch (config.header_match_specifier_case()) {
-  case envoy::config::route::v3alpha::HeaderMatcher::HeaderMatchSpecifierCase::kExactMatch:
+  case envoy::config::route::v3::HeaderMatcher::HeaderMatchSpecifierCase::kExactMatch:
     header_match_type_ = HeaderMatchType::Value;
     value_ = config.exact_match();
     break;
-  case envoy::config::route::v3alpha::HeaderMatcher::HeaderMatchSpecifierCase::
+  case envoy::config::route::v3::HeaderMatcher::HeaderMatchSpecifierCase::
       kHiddenEnvoyDeprecatedRegexMatch:
     header_match_type_ = HeaderMatchType::Regex;
     regex_ = Regex::Utility::parseStdRegexAsCompiledMatcher(
         config.hidden_envoy_deprecated_regex_match());
     break;
-  case envoy::config::route::v3alpha::HeaderMatcher::HeaderMatchSpecifierCase::kSafeRegexMatch:
+  case envoy::config::route::v3::HeaderMatcher::HeaderMatchSpecifierCase::kSafeRegexMatch:
     header_match_type_ = HeaderMatchType::Regex;
     regex_ = Regex::Utility::parseRegex(config.safe_regex_match());
     break;
-  case envoy::config::route::v3alpha::HeaderMatcher::HeaderMatchSpecifierCase::kRangeMatch:
+  case envoy::config::route::v3::HeaderMatcher::HeaderMatchSpecifierCase::kRangeMatch:
     header_match_type_ = HeaderMatchType::Range;
     range_.set_start(config.range_match().start());
     range_.set_end(config.range_match().end());
     break;
-  case envoy::config::route::v3alpha::HeaderMatcher::HeaderMatchSpecifierCase::kPresentMatch:
+  case envoy::config::route::v3::HeaderMatcher::HeaderMatchSpecifierCase::kPresentMatch:
     header_match_type_ = HeaderMatchType::Present;
     break;
-  case envoy::config::route::v3alpha::HeaderMatcher::HeaderMatchSpecifierCase::kPrefixMatch:
+  case envoy::config::route::v3::HeaderMatcher::HeaderMatchSpecifierCase::kPrefixMatch:
     header_match_type_ = HeaderMatchType::Prefix;
     value_ = config.prefix_match();
     break;
-  case envoy::config::route::v3alpha::HeaderMatcher::HeaderMatchSpecifierCase::kSuffixMatch:
+  case envoy::config::route::v3::HeaderMatcher::HeaderMatchSpecifierCase::kSuffixMatch:
     header_match_type_ = HeaderMatchType::Suffix;
     value_ = config.suffix_match();
     break;
-  case envoy::config::route::v3alpha::HeaderMatcher::HeaderMatchSpecifierCase::
+  case envoy::config::route::v3::HeaderMatcher::HeaderMatchSpecifierCase::
       HEADER_MATCH_SPECIFIER_NOT_SET:
     FALLTHRU;
   default:
@@ -177,6 +178,11 @@ HeaderUtility::requestHeadersValid(const HeaderMap& headers) {
   if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.strict_authority_validation") &&
       headers.Host() && !HeaderUtility::authorityIsValid(headers.Host()->value().getStringView())) {
     return SharedResponseCodeDetails::get().InvalidAuthority;
+  }
+  if (Runtime::runtimeFeatureEnabled("envoy.reloadable_features.strict_method_validation") &&
+      headers.Method() &&
+      Http::Headers::get().MethodValues.Connect == headers.Method()->value().getStringView()) {
+    return SharedResponseCodeDetails::get().ConnectUnsupported;
   }
   return absl::nullopt;
 }

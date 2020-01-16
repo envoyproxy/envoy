@@ -13,7 +13,7 @@ option java_package = "io.envoyproxy.envoy.service.discovery.v2";
 option java_outer_classname = "SdsProto";
 option java_multiple_files = true;
 option java_generic_services = true;
-option (udpa.annotations.file_migrate).move_to_package = "envoy.service.secret.v3alpha";
+option (udpa.annotations.file_migrate).move_to_package = "envoy.service.secret.v3";
 
 service SecretDiscoveryService {
   option (envoy.annotations.resource).type = "envoy.api.v2.auth.Secret";

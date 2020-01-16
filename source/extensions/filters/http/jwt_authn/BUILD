@@ -15,7 +15,7 @@ envoy_cc_library(
     hdrs = ["extractor.h"],
     deps = [
         "//source/common/http:utility_lib",
-        "@envoy_api//envoy/extensions/filters/http/jwt_authn/v3alpha:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/http/jwt_authn/v3:pkg_cc_proto",
     ],
 )
 
@@ -30,7 +30,7 @@ envoy_cc_library(
         "//source/common/common:minimal_logger_lib",
         "//source/common/config:datasource_lib",
         "//source/common/protobuf:utility_lib",
-        "@envoy_api//envoy/extensions/filters/http/jwt_authn/v3alpha:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/http/jwt_authn/v3:pkg_cc_proto",
     ],
 )
 
@@ -76,7 +76,7 @@ envoy_cc_extension(
         "//include/envoy/registry",
         "//source/extensions/filters/http:well_known_names",
         "//source/extensions/filters/http/common:factory_base_lib",
-        "@envoy_api//envoy/extensions/filters/http/jwt_authn/v3alpha:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/http/jwt_authn/v3:pkg_cc_proto",
     ],
 )
 
@@ -88,8 +88,8 @@ envoy_cc_library(
         ":verifier_lib",
         "//source/common/http:header_utility_lib",
         "//source/common/router:config_lib",
-        "@envoy_api//envoy/config/route/v3alpha:pkg_cc_proto",
-        "@envoy_api//envoy/extensions/filters/http/jwt_authn/v3alpha:pkg_cc_proto",
+        "@envoy_api//envoy/config/route/v3:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/http/jwt_authn/v3:pkg_cc_proto",
     ],
 )
 
@@ -101,7 +101,7 @@ envoy_cc_library(
         ":authenticator_lib",
         ":extractor_lib",
         "//include/envoy/http:header_map_interface",
-        "@envoy_api//envoy/extensions/filters/http/jwt_authn/v3alpha:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/http/jwt_authn/v3:pkg_cc_proto",
     ],
 )
 
@@ -115,6 +115,6 @@ envoy_cc_library(
         "//include/envoy/server:filter_config_interface",
         "//include/envoy/stats:stats_macros",
         "//include/envoy/thread_local:thread_local_interface",
-        "@envoy_api//envoy/extensions/filters/http/jwt_authn/v3alpha:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/http/jwt_authn/v3:pkg_cc_proto",
     ],
 )

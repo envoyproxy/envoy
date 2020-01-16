@@ -10,7 +10,7 @@ import "validate/validate.proto";
 option java_package = "io.envoyproxy.envoy.api.v2.core";
 option java_outer_classname = "HttpUriProto";
 option java_multiple_files = true;
-option (udpa.annotations.file_migrate).move_to_package = "envoy.config.core.v3alpha";
+option (udpa.annotations.file_migrate).move_to_package = "envoy.config.core.v3";
 
 // [#protodoc-title: HTTP Service URI ]
 

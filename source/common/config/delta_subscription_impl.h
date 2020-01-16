@@ -1,7 +1,7 @@
 #pragma once
 
 #include "envoy/config/subscription.h"
-#include "envoy/service/discovery/v3alpha/discovery.pb.h"
+#include "envoy/service/discovery/v3/discovery.pb.h"
 
 #include "common/config/new_grpc_mux_impl.h"
 #include "common/config/utility.h"
@@ -43,16 +43,16 @@ public:
 
   // Config::Subscription
   void start(const std::set<std::string>& resource_names) override;
+
   void updateResourceInterest(const std::set<std::string>& update_to_these_names) override;
 
   // Config::SubscriptionCallbacks (all pass through to callbacks_!)
   void onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
                       const std::string& version_info) override;
-  void
-  onConfigUpdate(const Protobuf::RepeatedPtrField<envoy::service::discovery::v3alpha::Resource>&
-                     added_resources,
-                 const Protobuf::RepeatedPtrField<std::string>& removed_resources,
-                 const std::string& system_version_info) override;
+  void onConfigUpdate(
+      const Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource>& added_resources,
+      const Protobuf::RepeatedPtrField<std::string>& removed_resources,
+      const std::string& system_version_info) override;
   void onConfigUpdateFailed(ConfigUpdateFailureReason reason, const EnvoyException* e) override;
   std::string resourceName(const ProtobufWkt::Any& resource) override;
 

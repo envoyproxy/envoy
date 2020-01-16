@@ -1,5 +1,5 @@
-#include "envoy/extensions/filters/network/dubbo_proxy/v3alpha/dubbo_proxy.pb.h"
-#include "envoy/extensions/filters/network/dubbo_proxy/v3alpha/dubbo_proxy.pb.validate.h"
+#include "envoy/extensions/filters/network/dubbo_proxy/v3/dubbo_proxy.pb.h"
+#include "envoy/extensions/filters/network/dubbo_proxy/v3/dubbo_proxy.pb.validate.h"
 
 #include "extensions/filters/network/dubbo_proxy/config.h"
 #include "extensions/filters/network/dubbo_proxy/filters/filter_config.h"
@@ -18,7 +18,7 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace DubboProxy {
 
-using DubboProxyProto = envoy::extensions::filters::network::dubbo_proxy::v3alpha::DubboProxy;
+using DubboProxyProto = envoy::extensions::filters::network::dubbo_proxy::v3::DubboProxy;
 
 namespace {
 
@@ -49,14 +49,13 @@ class DubboFilterConfigTest : public DubboFilterConfigTestBase, public testing::
 
 TEST_F(DubboFilterConfigTest, ValidateFail) {
   NiceMock<Server::Configuration::MockFactoryContext> context;
-  EXPECT_THROW(
-      DubboProxyFilterConfigFactory().createFilterFactoryFromProto(
-          envoy::extensions::filters::network::dubbo_proxy::v3alpha::DubboProxy(), context),
-      ProtoValidationException);
+  EXPECT_THROW(DubboProxyFilterConfigFactory().createFilterFactoryFromProto(
+                   envoy::extensions::filters::network::dubbo_proxy::v3::DubboProxy(), context),
+               ProtoValidationException);
 }
 
 TEST_F(DubboFilterConfigTest, ValidProtoConfiguration) {
-  envoy::extensions::filters::network::dubbo_proxy::v3alpha::DubboProxy config{};
+  envoy::extensions::filters::network::dubbo_proxy::v3::DubboProxy config{};
 
   config.set_stat_prefix("my_stat_prefix");
 
@@ -72,8 +71,8 @@ TEST_F(DubboFilterConfigTest, ValidProtoConfiguration) {
 TEST_F(DubboFilterConfigTest, DubboProxyWithEmptyProto) {
   NiceMock<Server::Configuration::MockFactoryContext> context;
   DubboProxyFilterConfigFactory factory;
-  envoy::extensions::filters::network::dubbo_proxy::v3alpha::DubboProxy config =
-      *dynamic_cast<envoy::extensions::filters::network::dubbo_proxy::v3alpha::DubboProxy*>(
+  envoy::extensions::filters::network::dubbo_proxy::v3::DubboProxy config =
+      *dynamic_cast<envoy::extensions::filters::network::dubbo_proxy::v3::DubboProxy*>(
           factory.createEmptyConfigProto().get());
   config.set_stat_prefix("my_stat_prefix");
 

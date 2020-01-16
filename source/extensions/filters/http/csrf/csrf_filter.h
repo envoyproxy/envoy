@@ -1,7 +1,7 @@
 #pragma once
 
-#include "envoy/config/core/v3alpha/base.pb.h"
-#include "envoy/extensions/filters/http/csrf/v3alpha/csrf.pb.h"
+#include "envoy/config/core/v3/base.pb.h"
+#include "envoy/extensions/filters/http/csrf/v3/csrf.pb.h"
 #include "envoy/http/filter.h"
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats_macros.h"
@@ -34,7 +34,7 @@ struct CsrfStats {
  */
 class CsrfPolicy : public Router::RouteSpecificFilterConfig {
 public:
-  CsrfPolicy(const envoy::extensions::filters::http::csrf::v3alpha::CsrfPolicy& policy,
+  CsrfPolicy(const envoy::extensions::filters::http::csrf::v3::CsrfPolicy& policy,
              Runtime::Loader& runtime)
       : policy_(policy), runtime_(runtime) {
     for (const auto& additional_origin : policy.additional_origins()) {
@@ -44,7 +44,7 @@ public:
   }
 
   bool enabled() const {
-    const envoy::config::core::v3alpha::RuntimeFractionalPercent& filter_enabled =
+    const envoy::config::core::v3::RuntimeFractionalPercent& filter_enabled =
         policy_.filter_enabled();
     return runtime_.snapshot().featureEnabled(filter_enabled.runtime_key(),
                                               filter_enabled.default_value());
@@ -54,7 +54,7 @@ public:
     if (!policy_.has_shadow_enabled()) {
       return false;
     }
-    const envoy::config::core::v3alpha::RuntimeFractionalPercent& shadow_enabled =
+    const envoy::config::core::v3::RuntimeFractionalPercent& shadow_enabled =
         policy_.shadow_enabled();
     return runtime_.snapshot().featureEnabled(shadow_enabled.runtime_key(),
                                               shadow_enabled.default_value());
@@ -65,7 +65,7 @@ public:
   };
 
 private:
-  const envoy::extensions::filters::http::csrf::v3alpha::CsrfPolicy policy_;
+  const envoy::extensions::filters::http::csrf::v3::CsrfPolicy policy_;
   std::vector<Matchers::StringMatcherPtr> additional_origins_;
   Runtime::Loader& runtime_;
 };
@@ -76,7 +76,7 @@ using CsrfPolicyPtr = std::unique_ptr<CsrfPolicy>;
  */
 class CsrfFilterConfig {
 public:
-  CsrfFilterConfig(const envoy::extensions::filters::http::csrf::v3alpha::CsrfPolicy& policy,
+  CsrfFilterConfig(const envoy::extensions::filters::http::csrf::v3::CsrfPolicy& policy,
                    const std::string& stats_prefix, Stats::Scope& scope, Runtime::Loader& runtime);
 
   CsrfStats& stats() { return stats_; }

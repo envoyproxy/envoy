@@ -6,7 +6,7 @@
 #include <vector>
 
 #include "envoy/api/v2/discovery.pb.h"
-#include "envoy/config/endpoint/v3alpha/endpoint_components.pb.h"
+#include "envoy/config/endpoint/v3/endpoint_components.pb.h"
 #include "envoy/server/process_context.h"
 
 #include "common/config/api_version.h"
@@ -193,7 +193,7 @@ public:
 
   // Set the endpoint's socket address to point at upstream at given index.
   void setUpstreamAddress(uint32_t upstream_index,
-                          envoy::config::endpoint::v3alpha::LbEndpoint& endpoint) const;
+                          envoy::config::endpoint::v3::LbEndpoint& endpoint) const;
 
   virtual Network::ClientConnectionPtr makeClientConnection(uint32_t port);
 
@@ -291,10 +291,21 @@ public:
     sendDeltaDiscoveryResponse(type_url, added_or_updated, removed, version, xds_stream_);
   }
   template <class T>
-  void sendDeltaDiscoveryResponse(const std::string& type_url,
-                                  const std::vector<T>& added_or_updated,
-                                  const std::vector<std::string>& removed,
-                                  const std::string& version, FakeStreamPtr& stream) {
+  void
+  sendDeltaDiscoveryResponse(const std::string& type_url, const std::vector<T>& added_or_updated,
+                             const std::vector<std::string>& removed, const std::string& version,
+                             FakeStreamPtr& stream, const std::vector<std::string>& aliases = {}) {
+    auto response =
+        createDeltaDiscoveryResponse<T>(type_url, added_or_updated, removed, version, aliases);
+    stream->sendGrpcMessage(response);
+  }
+
+  template <class T>
+  envoy::api::v2::DeltaDiscoveryResponse
+  createDeltaDiscoveryResponse(const std::string& type_url, const std::vector<T>& added_or_updated,
+                               const std::vector<std::string>& removed, const std::string& version,
+                               const std::vector<std::string>& aliases) {
+
     API_NO_BOOST(envoy::api::v2::DeltaDiscoveryResponse) response;
     response.set_system_version_info("system_version_info_this_is_a_test");
     response.set_type_url(type_url);
@@ -305,11 +316,14 @@ public:
       resource->set_name(TestUtility::xdsResourceName(temp_any));
       resource->set_version(version);
       resource->mutable_resource()->PackFrom(API_DOWNGRADE(message));
+      for (const auto alias : aliases) {
+        resource->add_aliases(alias);
+      }
     }
     *response.mutable_removed_resources() = {removed.begin(), removed.end()};
     static int next_nonce_counter = 0;
     response.set_nonce(absl::StrCat("nonce", next_nonce_counter++));
-    stream->sendGrpcMessage(response);
+    return response;
   }
 
 private:

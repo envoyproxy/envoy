@@ -13,6 +13,7 @@ envoy_cc_library(
     hdrs = ["local_info_impl.h"],
     deps = [
         "//include/envoy/local_info:local_info_interface",
-        "@envoy_api//envoy/config/core/v3alpha:pkg_cc_proto",
+        "//source/common/config:version_converter_lib",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )

@@ -3,8 +3,8 @@
 #include <memory>
 #include <unordered_map>
 
-#include "envoy/extensions/access_loggers/grpc/v3alpha/file.pb.h"
-#include "envoy/extensions/access_loggers/grpc/v3alpha/file.pb.validate.h"
+#include "envoy/extensions/access_loggers/file/v3/file.pb.h"
+#include "envoy/extensions/access_loggers/file/v3/file.pb.validate.h"
 #include "envoy/registry/registry.h"
 #include "envoy/server/filter_config.h"
 
@@ -25,14 +25,14 @@ FileAccessLogFactory::createAccessLogInstance(const Protobuf::Message& config,
                                               AccessLog::FilterPtr&& filter,
                                               Server::Configuration::FactoryContext& context) {
   const auto& fal_config = MessageUtil::downcastAndValidate<
-      const envoy::extensions::access_loggers::grpc::v3alpha::FileAccessLog&>(
+      const envoy::extensions::access_loggers::file::v3::FileAccessLog&>(
       config, context.messageValidationVisitor());
   AccessLog::FormatterPtr formatter;
 
-  if (fal_config.access_log_format_case() == envoy::extensions::access_loggers::grpc::v3alpha::
+  if (fal_config.access_log_format_case() == envoy::extensions::access_loggers::file::v3::
                                                  FileAccessLog::AccessLogFormatCase::kFormat ||
       fal_config.access_log_format_case() ==
-          envoy::extensions::access_loggers::grpc::v3alpha::FileAccessLog::AccessLogFormatCase::
+          envoy::extensions::access_loggers::file::v3::FileAccessLog::AccessLogFormatCase::
               ACCESS_LOG_FORMAT_NOT_SET) {
     if (fal_config.format().empty()) {
       formatter = AccessLog::AccessLogFormatUtils::defaultAccessLogFormatter();
@@ -40,12 +40,12 @@ FileAccessLogFactory::createAccessLogInstance(const Protobuf::Message& config,
       formatter = std::make_unique<AccessLog::FormatterImpl>(fal_config.format());
     }
   } else if (fal_config.access_log_format_case() ==
-             envoy::extensions::access_loggers::grpc::v3alpha::FileAccessLog::AccessLogFormatCase::
+             envoy::extensions::access_loggers::file::v3::FileAccessLog::AccessLogFormatCase::
                  kJsonFormat) {
     auto json_format_map = this->convertJsonFormatToMap(fal_config.json_format());
     formatter = std::make_unique<AccessLog::JsonFormatterImpl>(json_format_map, false);
   } else if (fal_config.access_log_format_case() ==
-             envoy::extensions::access_loggers::grpc::v3alpha::FileAccessLog::AccessLogFormatCase::
+             envoy::extensions::access_loggers::file::v3::FileAccessLog::AccessLogFormatCase::
                  kTypedJsonFormat) {
     auto json_format_map = this->convertJsonFormatToMap(fal_config.typed_json_format());
     formatter = std::make_unique<AccessLog::JsonFormatterImpl>(json_format_map, true);
@@ -61,7 +61,7 @@ FileAccessLogFactory::createAccessLogInstance(const Protobuf::Message& config,
 
 ProtobufTypes::MessagePtr FileAccessLogFactory::createEmptyConfigProto() {
   return ProtobufTypes::MessagePtr{
-      new envoy::extensions::access_loggers::grpc::v3alpha::FileAccessLog()};
+      new envoy::extensions::access_loggers::file::v3::FileAccessLog()};
 }
 
 std::string FileAccessLogFactory::name() const { return AccessLogNames::get().File; }

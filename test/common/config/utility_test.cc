@@ -1,9 +1,10 @@
 #include "envoy/api/v2/cluster.pb.h"
 #include "envoy/common/exception.h"
-#include "envoy/config/bootstrap/v3alpha/bootstrap.pb.h"
-#include "envoy/config/cluster/v3alpha/cluster.pb.h"
-#include "envoy/config/core/v3alpha/config_source.pb.h"
-#include "envoy/config/core/v3alpha/grpc_service.pb.h"
+#include "envoy/config/bootstrap/v3/bootstrap.pb.h"
+#include "envoy/config/cluster/v3/cluster.pb.h"
+#include "envoy/config/core/v3/config_source.pb.h"
+#include "envoy/config/core/v3/grpc_service.pb.h"
+#include "envoy/extensions/filters/http/cors/v3/cors.pb.h"
 
 #include "common/common/fmt.h"
 #include "common/config/api_version.h"
@@ -37,66 +38,66 @@ TEST(UtilityTest, ComputeHashedVersion) {
 }
 
 TEST(UtilityTest, ApiConfigSourceRefreshDelay) {
-  envoy::config::core::v3alpha::ApiConfigSource api_config_source;
+  envoy::config::core::v3::ApiConfigSource api_config_source;
   api_config_source.mutable_refresh_delay()->CopyFrom(
       Protobuf::util::TimeUtil::MillisecondsToDuration(1234));
   EXPECT_EQ(1234, Utility::apiConfigSourceRefreshDelay(api_config_source).count());
 }
 
 TEST(UtilityTest, ApiConfigSourceDefaultRequestTimeout) {
-  envoy::config::core::v3alpha::ApiConfigSource api_config_source;
+  envoy::config::core::v3::ApiConfigSource api_config_source;
   EXPECT_EQ(1000, Utility::apiConfigSourceRequestTimeout(api_config_source).count());
 }
 
 TEST(UtilityTest, ApiConfigSourceRequestTimeout) {
-  envoy::config::core::v3alpha::ApiConfigSource api_config_source;
+  envoy::config::core::v3::ApiConfigSource api_config_source;
   api_config_source.mutable_request_timeout()->CopyFrom(
       Protobuf::util::TimeUtil::MillisecondsToDuration(1234));
   EXPECT_EQ(1234, Utility::apiConfigSourceRequestTimeout(api_config_source).count());
 }
 
 TEST(UtilityTest, ConfigSourceDefaultInitFetchTimeout) {
-  envoy::config::core::v3alpha::ConfigSource config_source;
+  envoy::config::core::v3::ConfigSource config_source;
   EXPECT_EQ(15000, Utility::configSourceInitialFetchTimeout(config_source).count());
 }
 
 TEST(UtilityTest, ConfigSourceInitFetchTimeout) {
-  envoy::config::core::v3alpha::ConfigSource config_source;
+  envoy::config::core::v3::ConfigSource config_source;
   config_source.mutable_initial_fetch_timeout()->CopyFrom(
       Protobuf::util::TimeUtil::MillisecondsToDuration(654));
   EXPECT_EQ(654, Utility::configSourceInitialFetchTimeout(config_source).count());
 }
 
 TEST(UtilityTest, TranslateApiConfigSource) {
-  envoy::config::core::v3alpha::ApiConfigSource api_config_source_rest_legacy;
+  envoy::config::core::v3::ApiConfigSource api_config_source_rest_legacy;
   Utility::translateApiConfigSource("test_rest_legacy_cluster", 10000,
                                     ApiType::get().UnsupportedRestLegacy,
                                     api_config_source_rest_legacy);
-  EXPECT_EQ(envoy::config::core::v3alpha::ApiConfigSource::
-                hidden_envoy_deprecated_UNSUPPORTED_REST_LEGACY,
-            api_config_source_rest_legacy.api_type());
+  EXPECT_EQ(
+      envoy::config::core::v3::ApiConfigSource::hidden_envoy_deprecated_UNSUPPORTED_REST_LEGACY,
+      api_config_source_rest_legacy.api_type());
   EXPECT_EQ(10000,
             DurationUtil::durationToMilliseconds(api_config_source_rest_legacy.refresh_delay()));
   EXPECT_EQ("test_rest_legacy_cluster", api_config_source_rest_legacy.cluster_names(0));
 
-  envoy::config::core::v3alpha::ApiConfigSource api_config_source_rest;
+  envoy::config::core::v3::ApiConfigSource api_config_source_rest;
   Utility::translateApiConfigSource("test_rest_cluster", 20000, ApiType::get().Rest,
                                     api_config_source_rest);
-  EXPECT_EQ(envoy::config::core::v3alpha::ApiConfigSource::REST, api_config_source_rest.api_type());
+  EXPECT_EQ(envoy::config::core::v3::ApiConfigSource::REST, api_config_source_rest.api_type());
   EXPECT_EQ(20000, DurationUtil::durationToMilliseconds(api_config_source_rest.refresh_delay()));
   EXPECT_EQ("test_rest_cluster", api_config_source_rest.cluster_names(0));
 
-  envoy::config::core::v3alpha::ApiConfigSource api_config_source_grpc;
+  envoy::config::core::v3::ApiConfigSource api_config_source_grpc;
   Utility::translateApiConfigSource("test_grpc_cluster", 30000, ApiType::get().Grpc,
                                     api_config_source_grpc);
-  EXPECT_EQ(envoy::config::core::v3alpha::ApiConfigSource::GRPC, api_config_source_grpc.api_type());
+  EXPECT_EQ(envoy::config::core::v3::ApiConfigSource::GRPC, api_config_source_grpc.api_type());
   EXPECT_EQ(30000, DurationUtil::durationToMilliseconds(api_config_source_grpc.refresh_delay()));
   EXPECT_EQ("test_grpc_cluster",
             api_config_source_grpc.grpc_services(0).envoy_grpc().cluster_name());
 }
 
 TEST(UtilityTest, createTagProducer) {
-  envoy::config::bootstrap::v3alpha::Bootstrap bootstrap;
+  envoy::config::bootstrap::v3::Bootstrap bootstrap;
   auto producer = Utility::createTagProducer(bootstrap);
   ASSERT(producer != nullptr);
   std::vector<Stats::Tag> tags;
@@ -116,7 +117,7 @@ TEST(UtilityTest, CheckFilesystemSubscriptionBackingPath) {
 }
 
 TEST(UtilityTest, ParseDefaultRateLimitSettings) {
-  envoy::config::core::v3alpha::ApiConfigSource api_config_source;
+  envoy::config::core::v3::ApiConfigSource api_config_source;
   const RateLimitSettings& rate_limit_settings = Utility::parseRateLimitSettings(api_config_source);
   EXPECT_EQ(false, rate_limit_settings.enabled_);
   EXPECT_EQ(100, rate_limit_settings.max_tokens_);
@@ -124,7 +125,7 @@ TEST(UtilityTest, ParseDefaultRateLimitSettings) {
 }
 
 TEST(UtilityTest, ParseEmptyRateLimitSettings) {
-  envoy::config::core::v3alpha::ApiConfigSource api_config_source;
+  envoy::config::core::v3::ApiConfigSource api_config_source;
   api_config_source.mutable_rate_limit_settings();
   const RateLimitSettings& rate_limit_settings = Utility::parseRateLimitSettings(api_config_source);
   EXPECT_EQ(true, rate_limit_settings.enabled_);
@@ -133,8 +134,8 @@ TEST(UtilityTest, ParseEmptyRateLimitSettings) {
 }
 
 TEST(UtilityTest, ParseRateLimitSettings) {
-  envoy::config::core::v3alpha::ApiConfigSource api_config_source;
-  envoy::config::core::v3alpha::RateLimitSettings* rate_limits =
+  envoy::config::core::v3::ApiConfigSource api_config_source;
+  envoy::config::core::v3::RateLimitSettings* rate_limits =
       api_config_source.mutable_rate_limit_settings();
   rate_limits->mutable_max_tokens()->set_value(500);
   rate_limits->mutable_fill_rate()->set_value(4);
@@ -151,16 +152,16 @@ TEST(UtilityTest, FactoryForGrpcApiConfigSource) {
   Stats::MockStore scope;
 
   {
-    envoy::config::core::v3alpha::ApiConfigSource api_config_source;
-    api_config_source.set_api_type(envoy::config::core::v3alpha::ApiConfigSource::GRPC);
+    envoy::config::core::v3::ApiConfigSource api_config_source;
+    api_config_source.set_api_type(envoy::config::core::v3::ApiConfigSource::GRPC);
     EXPECT_THROW_WITH_REGEX(
         Utility::factoryForGrpcApiConfigSource(async_client_manager, api_config_source, scope),
         EnvoyException, "API configs must have either a gRPC service or a cluster name defined:");
   }
 
   {
-    envoy::config::core::v3alpha::ApiConfigSource api_config_source;
-    api_config_source.set_api_type(envoy::config::core::v3alpha::ApiConfigSource::GRPC);
+    envoy::config::core::v3::ApiConfigSource api_config_source;
+    api_config_source.set_api_type(envoy::config::core::v3::ApiConfigSource::GRPC);
     api_config_source.add_grpc_services();
     api_config_source.add_grpc_services();
     EXPECT_THROW_WITH_REGEX(
@@ -171,8 +172,8 @@ TEST(UtilityTest, FactoryForGrpcApiConfigSource) {
   }
 
   {
-    envoy::config::core::v3alpha::ApiConfigSource api_config_source;
-    api_config_source.set_api_type(envoy::config::core::v3alpha::ApiConfigSource::GRPC);
+    envoy::config::core::v3::ApiConfigSource api_config_source;
+    api_config_source.set_api_type(envoy::config::core::v3::ApiConfigSource::GRPC);
     api_config_source.add_cluster_names();
     // this also logs a warning for setting REST cluster names for a gRPC API config.
     EXPECT_THROW_WITH_REGEX(
@@ -183,8 +184,8 @@ TEST(UtilityTest, FactoryForGrpcApiConfigSource) {
   }
 
   {
-    envoy::config::core::v3alpha::ApiConfigSource api_config_source;
-    api_config_source.set_api_type(envoy::config::core::v3alpha::ApiConfigSource::GRPC);
+    envoy::config::core::v3::ApiConfigSource api_config_source;
+    api_config_source.set_api_type(envoy::config::core::v3::ApiConfigSource::GRPC);
     api_config_source.add_cluster_names();
     api_config_source.add_cluster_names();
     EXPECT_THROW_WITH_REGEX(
@@ -195,8 +196,8 @@ TEST(UtilityTest, FactoryForGrpcApiConfigSource) {
   }
 
   {
-    envoy::config::core::v3alpha::ApiConfigSource api_config_source;
-    api_config_source.set_api_type(envoy::config::core::v3alpha::ApiConfigSource::REST);
+    envoy::config::core::v3::ApiConfigSource api_config_source;
+    api_config_source.set_api_type(envoy::config::core::v3::ApiConfigSource::REST);
     api_config_source.add_grpc_services()->mutable_envoy_grpc()->set_cluster_name("foo");
     // this also logs a warning for configuring gRPC clusters for a REST API config.
     EXPECT_THROW_WITH_REGEX(
@@ -207,8 +208,8 @@ TEST(UtilityTest, FactoryForGrpcApiConfigSource) {
   }
 
   {
-    envoy::config::core::v3alpha::ApiConfigSource api_config_source;
-    api_config_source.set_api_type(envoy::config::core::v3alpha::ApiConfigSource::REST);
+    envoy::config::core::v3::ApiConfigSource api_config_source;
+    api_config_source.set_api_type(envoy::config::core::v3::ApiConfigSource::REST);
     api_config_source.add_cluster_names("foo");
     EXPECT_THROW_WITH_REGEX(
         Utility::factoryForGrpcApiConfigSource(async_client_manager, api_config_source, scope),
@@ -216,10 +217,10 @@ TEST(UtilityTest, FactoryForGrpcApiConfigSource) {
   }
 
   {
-    envoy::config::core::v3alpha::ApiConfigSource api_config_source;
-    api_config_source.set_api_type(envoy::config::core::v3alpha::ApiConfigSource::GRPC);
+    envoy::config::core::v3::ApiConfigSource api_config_source;
+    api_config_source.set_api_type(envoy::config::core::v3::ApiConfigSource::GRPC);
     api_config_source.add_grpc_services()->mutable_envoy_grpc()->set_cluster_name("foo");
-    envoy::config::core::v3alpha::GrpcService expected_grpc_service;
+    envoy::config::core::v3::GrpcService expected_grpc_service;
     expected_grpc_service.mutable_envoy_grpc()->set_cluster_name("foo");
     EXPECT_CALL(async_client_manager,
                 factoryForGrpcService(ProtoEq(expected_grpc_service), Ref(scope), _));
@@ -227,8 +228,8 @@ TEST(UtilityTest, FactoryForGrpcApiConfigSource) {
   }
 
   {
-    envoy::config::core::v3alpha::ApiConfigSource api_config_source;
-    api_config_source.set_api_type(envoy::config::core::v3alpha::ApiConfigSource::GRPC);
+    envoy::config::core::v3::ApiConfigSource api_config_source;
+    api_config_source.set_api_type(envoy::config::core::v3::ApiConfigSource::GRPC);
     api_config_source.add_grpc_services()->mutable_envoy_grpc()->set_cluster_name("foo");
     EXPECT_CALL(async_client_manager,
                 factoryForGrpcService(ProtoEq(api_config_source.grpc_services(0)), Ref(scope), _));
@@ -241,14 +242,14 @@ TEST(UtilityTest, PrepareDnsRefreshStrategy) {
 
   {
     // dns_failure_refresh_rate not set.
-    envoy::config::cluster::v3alpha::Cluster cluster;
+    envoy::config::cluster::v3::Cluster cluster;
     BackOffStrategyPtr strategy = Utility::prepareDnsRefreshStrategy(cluster, 5000, random);
     EXPECT_NE(nullptr, dynamic_cast<FixedBackOffStrategy*>(strategy.get()));
   }
 
   {
     // dns_failure_refresh_rate set.
-    envoy::config::cluster::v3alpha::Cluster cluster;
+    envoy::config::cluster::v3::Cluster cluster;
     cluster.mutable_dns_failure_refresh_rate()->mutable_base_interval()->set_seconds(7);
     cluster.mutable_dns_failure_refresh_rate()->mutable_max_interval()->set_seconds(10);
     BackOffStrategyPtr strategy = Utility::prepareDnsRefreshStrategy(cluster, 5000, random);
@@ -257,7 +258,7 @@ TEST(UtilityTest, PrepareDnsRefreshStrategy) {
 
   {
     // dns_failure_refresh_rate set with invalid max_interval.
-    envoy::config::cluster::v3alpha::Cluster cluster;
+    envoy::config::cluster::v3::Cluster cluster;
     cluster.mutable_dns_failure_refresh_rate()->mutable_base_interval()->set_seconds(7);
     cluster.mutable_dns_failure_refresh_rate()->mutable_max_interval()->set_seconds(2);
     EXPECT_THROW_WITH_REGEX(Utility::prepareDnsRefreshStrategy(cluster, 5000, random),
@@ -333,7 +334,7 @@ TEST(UtilityTest, StructToClusterV2) {
 // (v3 API, upgrading).
 TEST(UtilityTest, StructToClusterV3) {
   ProtobufWkt::Any typed_config;
-  API_NO_BOOST(envoy::config::cluster::v3alpha::Cluster) cluster;
+  API_NO_BOOST(envoy::config::cluster::v3::Cluster) cluster;
   ProtobufWkt::Struct cluster_struct;
   const std::string cluster_config_yaml = R"EOF(
     ignore_health_on_host_removal: true
@@ -342,13 +343,13 @@ TEST(UtilityTest, StructToClusterV3) {
   TestUtility::loadFromYaml(cluster_config_yaml, cluster_struct);
 
   {
-    API_NO_BOOST(envoy::config::cluster::v3alpha::Cluster) out;
+    API_NO_BOOST(envoy::config::cluster::v3::Cluster) out;
     Utility::translateOpaqueConfig({}, cluster_struct, ProtobufMessage::getNullValidationVisitor(),
                                    out);
     EXPECT_THAT(out, ProtoEq(cluster));
   }
   {
-    API_NO_BOOST(envoy::config::cluster::v3alpha::Cluster) out;
+    API_NO_BOOST(envoy::config::cluster::v3::Cluster) out;
     Utility::translateOpaqueConfig({}, cluster_struct,
                                    ProtobufMessage::getStrictValidationVisitor(), out);
     EXPECT_THAT(out, ProtoEq(cluster));
@@ -384,7 +385,7 @@ TEST(UtilityTest, TypedStructToClusterV2) {
 // (v3 API, upgrading).
 TEST(UtilityTest, TypedStructToClusterV3) {
   ProtobufWkt::Any typed_config;
-  API_NO_BOOST(envoy::config::cluster::v3alpha::Cluster) cluster;
+  API_NO_BOOST(envoy::config::cluster::v3::Cluster) cluster;
   const std::string cluster_config_yaml = R"EOF(
     ignore_health_on_host_removal: true
   )EOF";
@@ -392,13 +393,13 @@ TEST(UtilityTest, TypedStructToClusterV3) {
   packTypedStructIntoAny(typed_config, cluster);
 
   {
-    API_NO_BOOST(envoy::config::cluster::v3alpha::Cluster) out;
+    API_NO_BOOST(envoy::config::cluster::v3::Cluster) out;
     Utility::translateOpaqueConfig(typed_config, ProtobufWkt::Struct(),
                                    ProtobufMessage::getNullValidationVisitor(), out);
     EXPECT_THAT(out, ProtoEq(cluster));
   }
   {
-    API_NO_BOOST(envoy::config::cluster::v3alpha::Cluster) out;
+    API_NO_BOOST(envoy::config::cluster::v3::Cluster) out;
     Utility::translateOpaqueConfig(typed_config, ProtobufWkt::Struct(),
                                    ProtobufMessage::getStrictValidationVisitor(), out);
     EXPECT_THAT(out, ProtoEq(cluster));
@@ -426,14 +427,14 @@ TEST(UtilityTest, AnyToClusterV2) {
 // (v3 API, upgrading).
 TEST(UtilityTest, AnyToClusterV3) {
   ProtobufWkt::Any typed_config;
-  API_NO_BOOST(envoy::config::cluster::v3alpha::Cluster) cluster;
+  API_NO_BOOST(envoy::config::cluster::v3::Cluster) cluster;
   const std::string cluster_config_yaml = R"EOF(
     ignore_health_on_host_removal: true
   )EOF";
   TestUtility::loadFromYaml(cluster_config_yaml, cluster);
   typed_config.PackFrom(cluster);
 
-  API_NO_BOOST(envoy::config::cluster::v3alpha::Cluster) out;
+  API_NO_BOOST(envoy::config::cluster::v3::Cluster) out;
   Utility::translateOpaqueConfig(typed_config, ProtobufWkt::Struct(),
                                  ProtobufMessage::getStrictValidationVisitor(), out);
   EXPECT_THAT(out, ProtoEq(cluster));
@@ -442,7 +443,7 @@ TEST(UtilityTest, AnyToClusterV3) {
 // Verify that translation from udpa.type.v1.TypedStruct into message of incorrect type fails
 TEST(UtilityTest, TypedStructToInvalidType) {
   ProtobufWkt::Any typed_config;
-  envoy::config::bootstrap::v3alpha::Bootstrap bootstrap;
+  envoy::config::bootstrap::v3::Bootstrap bootstrap;
   const std::string bootstrap_config_yaml = R"EOF(
     admin:
       access_log_path: /dev/null
@@ -460,13 +461,25 @@ TEST(UtilityTest, TypedStructToInvalidType) {
       EnvoyException, "Unable to parse JSON as proto");
 }
 
+// Verify that ProtobufWkt::Empty can load into a typed factory with an empty config proto
+TEST(UtilityTest, EmptyToEmptyConfig) {
+  ProtobufWkt::Any typed_config;
+  ProtobufWkt::Empty empty_config;
+  typed_config.PackFrom(empty_config);
+
+  envoy::extensions::filters::http::cors::v3::Cors out;
+  Utility::translateOpaqueConfig(typed_config, ProtobufWkt::Struct(),
+                                 ProtobufMessage::getStrictValidationVisitor(), out);
+  EXPECT_THAT(out, ProtoEq(envoy::extensions::filters::http::cors::v3::Cors()));
+}
+
 TEST(CheckApiConfigSourceSubscriptionBackingClusterTest, GrpcClusterTestAcrossTypes) {
-  envoy::config::core::v3alpha::ConfigSource config;
+  envoy::config::core::v3::ConfigSource config;
   auto* api_config_source = config.mutable_api_config_source();
   Upstream::ClusterManager::ClusterInfoMap cluster_map;
 
   // API of type GRPC
-  api_config_source->set_api_type(envoy::config::core::v3alpha::ApiConfigSource::GRPC);
+  api_config_source->set_api_type(envoy::config::core::v3::ApiConfigSource::GRPC);
 
   // GRPC cluster without GRPC services.
   EXPECT_THROW_WITH_REGEX(
@@ -495,8 +508,7 @@ TEST(CheckApiConfigSourceSubscriptionBackingClusterTest, GrpcClusterTestAcrossTy
   // EDS Cluster backing EDS Cluster.
   EXPECT_CALL(cluster, info()).Times(2);
   EXPECT_CALL(*cluster.info_, addedViaApi());
-  EXPECT_CALL(*cluster.info_, type())
-      .WillOnce(Return(envoy::config::cluster::v3alpha::Cluster::EDS));
+  EXPECT_CALL(*cluster.info_, type()).WillOnce(Return(envoy::config::cluster::v3::Cluster::EDS));
   EXPECT_THROW_WITH_MESSAGE(
       Utility::checkApiConfigSourceSubscriptionBackingCluster(cluster_map, *api_config_source),
       EnvoyException,
@@ -519,10 +531,10 @@ TEST(CheckApiConfigSourceSubscriptionBackingClusterTest, GrpcClusterTestAcrossTy
 }
 
 TEST(CheckApiConfigSourceSubscriptionBackingClusterTest, RestClusterTestAcrossTypes) {
-  envoy::config::core::v3alpha::ConfigSource config;
+  envoy::config::core::v3::ConfigSource config;
   auto* api_config_source = config.mutable_api_config_source();
   Upstream::ClusterManager::ClusterInfoMap cluster_map;
-  api_config_source->set_api_type(envoy::config::core::v3alpha::ApiConfigSource::REST);
+  api_config_source->set_api_type(envoy::config::core::v3::ApiConfigSource::REST);
 
   // Non-existent cluster.
   api_config_source->add_cluster_names("foo_cluster");
@@ -546,8 +558,7 @@ TEST(CheckApiConfigSourceSubscriptionBackingClusterTest, RestClusterTestAcrossTy
   // EDS Cluster backing EDS Cluster.
   EXPECT_CALL(cluster, info()).Times(2);
   EXPECT_CALL(*cluster.info_, addedViaApi());
-  EXPECT_CALL(*cluster.info_, type())
-      .WillOnce(Return(envoy::config::cluster::v3alpha::Cluster::EDS));
+  EXPECT_CALL(*cluster.info_, type()).WillOnce(Return(envoy::config::cluster::v3::Cluster::EDS));
   EXPECT_THROW_WITH_MESSAGE(
       Utility::checkApiConfigSourceSubscriptionBackingCluster(cluster_map, *api_config_source),
       EnvoyException,

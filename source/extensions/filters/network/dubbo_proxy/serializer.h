@@ -89,7 +89,7 @@ public:
    */
   virtual SerializerPtr createSerializer() PURE;
 
-  std::string category() const override { return "dubbo_proxy.serializers"; }
+  std::string category() const override { return "envoy.dubbo_proxy.serializers"; }
 
   /**
    * Convenience method to lookup a factory by type.

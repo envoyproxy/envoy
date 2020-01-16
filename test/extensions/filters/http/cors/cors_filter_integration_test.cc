@@ -1,4 +1,4 @@
-#include "envoy/extensions/filters/network/http_connection_manager/v3alpha/http_connection_manager.pb.h"
+#include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 
 #include "test/integration/http_integration.h"
 #include "test/mocks/http/mocks.h"
@@ -16,8 +16,8 @@ public:
   void initialize() override {
     config_helper_.addFilter("name: envoy.cors");
     config_helper_.addConfigModifier(
-        [&](envoy::extensions::filters::network::http_connection_manager::v3alpha::
-                HttpConnectionManager& hcm) -> void {
+        [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+                hcm) -> void {
           auto* route_config = hcm.mutable_route_config();
           auto* virtual_host = route_config->mutable_virtual_hosts(0);
           {
@@ -198,17 +198,19 @@ TEST_P(CorsFilterIntegrationTest, DEPRECATED_FEATURE_TEST(TestCorsDisabled)) {
 }
 
 TEST_P(CorsFilterIntegrationTest, DEPRECATED_FEATURE_TEST(TestLegacyCorsDisabled)) {
-  config_helper_.addConfigModifier([&](envoy::extensions::filters::network::
-                                           http_connection_manager::v3alpha::HttpConnectionManager&
-                                               hcm) -> void {
-    auto* route_config = hcm.mutable_route_config();
-    auto* virtual_host = route_config->mutable_virtual_hosts(0);
-    auto* route = virtual_host->add_routes();
-    route->mutable_match()->set_prefix("/legacy-no-cors");
-    route->mutable_route()->set_cluster("cluster_0");
-    route->mutable_route()->mutable_cors()->mutable_hidden_envoy_deprecated_enabled()->set_value(
-        false);
-  });
+  config_helper_.addConfigModifier(
+      [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+              hcm) -> void {
+        auto* route_config = hcm.mutable_route_config();
+        auto* virtual_host = route_config->mutable_virtual_hosts(0);
+        auto* route = virtual_host->add_routes();
+        route->mutable_match()->set_prefix("/legacy-no-cors");
+        route->mutable_route()->set_cluster("cluster_0");
+        route->mutable_route()
+            ->mutable_cors()
+            ->mutable_hidden_envoy_deprecated_enabled()
+            ->set_value(false);
+      });
   testNormalRequest(
       Http::TestHeaderMapImpl{
           {":method", "OPTIONS"},

@@ -1,7 +1,7 @@
 #include "extensions/access_loggers/grpc/tcp_config.h"
 
-#include "envoy/extensions/access_loggers/grpc/v3alpha/als.pb.h"
-#include "envoy/extensions/access_loggers/grpc/v3alpha/als.pb.validate.h"
+#include "envoy/extensions/access_loggers/grpc/v3/als.pb.h"
+#include "envoy/extensions/access_loggers/grpc/v3/als.pb.validate.h"
 #include "envoy/registry/registry.h"
 #include "envoy/server/filter_config.h"
 
@@ -27,7 +27,7 @@ TcpGrpcAccessLogFactory::createAccessLogInstance(const Protobuf::Message& config
   GrpcCommon::validateProtoDescriptors();
 
   const auto& proto_config = MessageUtil::downcastAndValidate<
-      const envoy::extensions::access_loggers::grpc::v3alpha::TcpGrpcAccessLogConfig&>(
+      const envoy::extensions::access_loggers::grpc::v3::TcpGrpcAccessLogConfig&>(
       config, context.messageValidationVisitor());
 
   return std::make_shared<TcpGrpcAccessLog>(std::move(filter), proto_config, context.threadLocal(),
@@ -35,8 +35,7 @@ TcpGrpcAccessLogFactory::createAccessLogInstance(const Protobuf::Message& config
 }
 
 ProtobufTypes::MessagePtr TcpGrpcAccessLogFactory::createEmptyConfigProto() {
-  return std::make_unique<
-      envoy::extensions::access_loggers::grpc::v3alpha::TcpGrpcAccessLogConfig>();
+  return std::make_unique<envoy::extensions::access_loggers::grpc::v3::TcpGrpcAccessLogConfig>();
 }
 
 std::string TcpGrpcAccessLogFactory::name() const { return AccessLogNames::get().TcpGrpc; }

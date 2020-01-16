@@ -17,14 +17,6 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
-    name = "empty_http_filter_config_lib",
-    hdrs = ["empty_http_filter_config.h"],
-    deps = [
-        "//include/envoy/server:filter_config_interface",
-    ],
-)
-
-envoy_cc_library(
     name = "factory_base_lib",
     hdrs = ["factory_base.h"],
     deps = [
@@ -42,6 +34,6 @@ envoy_cc_library(
     deps = [
         "//include/envoy/upstream:cluster_manager_interface",
         "//source/common/http:utility_lib",
-        "@envoy_api//envoy/config/core/v3alpha:pkg_cc_proto",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
     ],
 )

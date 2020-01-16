@@ -3,14 +3,14 @@
 #include <memory>
 #include <string>
 
-#include "envoy/config/bootstrap/v3alpha/bootstrap.pb.h"
-#include "envoy/config/core/v3alpha/address.pb.h"
-#include "envoy/config/core/v3alpha/base.pb.h"
-#include "envoy/config/tap/v3alpha/common.pb.h"
-#include "envoy/data/tap/v3alpha/wrapper.pb.h"
-#include "envoy/extensions/filters/network/http_connection_manager/v3alpha/http_connection_manager.pb.h"
-#include "envoy/extensions/transport_sockets/tap/v3alpha/tap.pb.h"
-#include "envoy/extensions/transport_sockets/tls/v3alpha/cert.pb.h"
+#include "envoy/config/bootstrap/v3/bootstrap.pb.h"
+#include "envoy/config/core/v3/address.pb.h"
+#include "envoy/config/core/v3/base.pb.h"
+#include "envoy/config/tap/v3/common.pb.h"
+#include "envoy/data/tap/v3/wrapper.pb.h"
+#include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
+#include "envoy/extensions/transport_sockets/tap/v3/tap.pb.h"
+#include "envoy/extensions/transport_sockets/tls/v3/cert.pb.h"
 
 #include "common/event/dispatcher_impl.h"
 #include "common/network/connection_impl.h"
@@ -103,8 +103,8 @@ TEST_P(SslIntegrationTest, RouterRequestAndResponseWithBodyNoBuffer) {
 
 TEST_P(SslIntegrationTest, RouterRequestAndResponseWithBodyNoBufferHttp2) {
   setDownstreamProtocol(Http::CodecClient::Type::HTTP2);
-  config_helper_.setClientCodec(envoy::extensions::filters::network::http_connection_manager::
-                                    v3alpha::HttpConnectionManager::AUTO);
+  config_helper_.setClientCodec(envoy::extensions::filters::network::http_connection_manager::v3::
+                                    HttpConnectionManager::AUTO);
   ConnectionCreationFunction creator = [&]() -> Network::ClientConnectionPtr {
     return makeSslClientConnection(ClientSslTransportOptions().setAlpn(true));
   };
@@ -179,9 +179,9 @@ TEST_P(SslIntegrationTest, AdminCertEndpoint) {
 
 // Validate certificate selection across different certificate types and client TLS versions.
 class SslCertficateIntegrationTest
-    : public testing::TestWithParam<std::tuple<
-          Network::Address::IpVersion,
-          envoy::extensions::transport_sockets::tls::v3alpha::TlsParameters::TlsProtocol>>,
+    : public testing::TestWithParam<
+          std::tuple<Network::Address::IpVersion,
+                     envoy::extensions::transport_sockets::tls::v3::TlsParameters::TlsProtocol>>,
       public SslIntegrationTestBase {
 public:
   SslCertficateIntegrationTest() : SslIntegrationTestBase(std::get<0>(GetParam())) {
@@ -198,8 +198,7 @@ public:
   void TearDown() override { SslIntegrationTestBase::TearDown(); };
 
   ClientSslTransportOptions rsaOnlyClientOptions() {
-    if (tls_version_ ==
-        envoy::extensions::transport_sockets::tls::v3alpha::TlsParameters::TLSv1_3) {
+    if (tls_version_ == envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_3) {
       return ClientSslTransportOptions().setSigningAlgorithmsForTest("rsa_pss_rsae_sha256");
     } else {
       return ClientSslTransportOptions().setCipherSuites({"ECDHE-RSA-AES128-GCM-SHA256"});
@@ -208,8 +207,7 @@ public:
 
   ClientSslTransportOptions ecdsaOnlyClientOptions() {
     auto options = ClientSslTransportOptions().setClientEcdsaCert(true);
-    if (tls_version_ ==
-        envoy::extensions::transport_sockets::tls::v3alpha::TlsParameters::TLSv1_3) {
+    if (tls_version_ == envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_3) {
       return options.setSigningAlgorithmsForTest("ecdsa_secp256r1_sha256");
     } else {
       return options.setCipherSuites({"ECDHE-ECDSA-AES128-GCM-SHA256"});
@@ -217,9 +215,9 @@ public:
   }
 
   static std::string ipClientVersionTestParamsToString(
-      const ::testing::TestParamInfo<std::tuple<
-          Network::Address::IpVersion,
-          envoy::extensions::transport_sockets::tls::v3alpha::TlsParameters::TlsProtocol>>&
+      const ::testing::TestParamInfo<
+          std::tuple<Network::Address::IpVersion,
+                     envoy::extensions::transport_sockets::tls::v3::TlsParameters::TlsProtocol>>&
           params) {
     return fmt::format("{}_TLSv1_{}",
                        std::get<0>(params.param) == Network::Address::IpVersion::v4 ? "IPv4"
@@ -227,7 +225,7 @@ public:
                        std::get<1>(params.param) - 1);
   }
 
-  const envoy::extensions::transport_sockets::tls::v3alpha::TlsParameters::TlsProtocol tls_version_{
+  const envoy::extensions::transport_sockets::tls::v3::TlsParameters::TlsProtocol tls_version_{
       std::get<1>(GetParam())};
 };
 
@@ -235,9 +233,8 @@ INSTANTIATE_TEST_SUITE_P(
     IpVersionsClientVersions, SslCertficateIntegrationTest,
     testing::Combine(
         testing::ValuesIn(TestEnvironment::getIpVersionsForTest()),
-        testing::Values(
-            envoy::extensions::transport_sockets::tls::v3alpha::TlsParameters::TLSv1_2,
-            envoy::extensions::transport_sockets::tls::v3alpha::TlsParameters::TLSv1_3)),
+        testing::Values(envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_2,
+                        envoy::extensions::transport_sockets::tls::v3::TlsParameters::TLSv1_3)),
     SslCertficateIntegrationTest::ipClientVersionTestParamsToString);
 
 // Server with an RSA certificate and a client with RSA/ECDSA cipher suites works.
@@ -354,50 +351,49 @@ class SslTapIntegrationTest : public SslIntegrationTest {
 public:
   void initialize() override {
     // TODO(mattklein123): Merge/use the code in ConfigHelper::setTapTransportSocket().
-    config_helper_.addConfigModifier(
-        [this](envoy::config::bootstrap::v3alpha::Bootstrap& bootstrap) {
-          // The test supports tapping either the downstream or upstream connection, but not both.
-          if (upstream_tap_) {
-            setupUpstreamTap(bootstrap);
-          } else {
-            setupDownstreamTap(bootstrap);
-          }
-        });
+    config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
+      // The test supports tapping either the downstream or upstream connection, but not both.
+      if (upstream_tap_) {
+        setupUpstreamTap(bootstrap);
+      } else {
+        setupDownstreamTap(bootstrap);
+      }
+    });
     SslIntegrationTest::initialize();
     // This confuses our socket counting.
     debug_with_s_client_ = false;
   }
 
-  void setupUpstreamTap(envoy::config::bootstrap::v3alpha::Bootstrap& bootstrap) {
+  void setupUpstreamTap(envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
     auto* transport_socket =
         bootstrap.mutable_static_resources()->mutable_clusters(0)->mutable_transport_socket();
     transport_socket->set_name("envoy.transport_sockets.tap");
-    envoy::config::core::v3alpha::TransportSocket raw_transport_socket;
+    envoy::config::core::v3::TransportSocket raw_transport_socket;
     raw_transport_socket.set_name("raw_buffer");
-    envoy::extensions::transport_sockets::tap::v3alpha::Tap tap_config =
+    envoy::extensions::transport_sockets::tap::v3::Tap tap_config =
         createTapConfig(raw_transport_socket);
     tap_config.mutable_transport_socket()->MergeFrom(raw_transport_socket);
     transport_socket->mutable_typed_config()->PackFrom(tap_config);
   }
 
-  void setupDownstreamTap(envoy::config::bootstrap::v3alpha::Bootstrap& bootstrap) {
+  void setupDownstreamTap(envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
     auto* filter_chain =
         bootstrap.mutable_static_resources()->mutable_listeners(0)->mutable_filter_chains(0);
     // Configure inner SSL transport socket based on existing config.
-    envoy::config::core::v3alpha::TransportSocket ssl_transport_socket;
+    envoy::config::core::v3::TransportSocket ssl_transport_socket;
     auto* transport_socket = filter_chain->mutable_transport_socket();
     ssl_transport_socket.Swap(transport_socket);
     // Configure outer tap transport socket.
     transport_socket->set_name("envoy.transport_sockets.tap");
-    envoy::extensions::transport_sockets::tap::v3alpha::Tap tap_config =
+    envoy::extensions::transport_sockets::tap::v3::Tap tap_config =
         createTapConfig(ssl_transport_socket);
     tap_config.mutable_transport_socket()->MergeFrom(ssl_transport_socket);
     transport_socket->mutable_typed_config()->PackFrom(tap_config);
   }
 
-  envoy::extensions::transport_sockets::tap::v3alpha::Tap
-  createTapConfig(const envoy::config::core::v3alpha::TransportSocket& inner_transport) {
-    envoy::extensions::transport_sockets::tap::v3alpha::Tap tap_config;
+  envoy::extensions::transport_sockets::tap::v3::Tap
+  createTapConfig(const envoy::config::core::v3::TransportSocket& inner_transport) {
+    envoy::extensions::transport_sockets::tap::v3::Tap tap_config;
     tap_config.mutable_common_config()
         ->mutable_static_config()
         ->mutable_match_config()
@@ -419,8 +415,8 @@ public:
   }
 
   std::string path_prefix_ = TestEnvironment::temporaryPath("ssl_trace");
-  envoy::config::tap::v3alpha::OutputSink::Format format_{
-      envoy::config::tap::v3alpha::OutputSink::PROTO_BINARY};
+  envoy::config::tap::v3::OutputSink::Format format_{
+      envoy::config::tap::v3::OutputSink::PROTO_BINARY};
   absl::optional<uint64_t> max_rx_bytes_;
   absl::optional<uint64_t> max_tx_bytes_;
   bool upstream_tap_{};
@@ -451,15 +447,15 @@ TEST_P(SslTapIntegrationTest, TwoRequestsWithBinaryProto) {
   EXPECT_EQ("200", response->headers().Status()->value().getStringView());
   EXPECT_EQ(256, response->body().size());
   checkStats();
-  envoy::config::core::v3alpha::Address expected_local_address;
+  envoy::config::core::v3::Address expected_local_address;
   Network::Utility::addressToProtobufAddress(*codec_client_->connection()->remoteAddress(),
                                              expected_local_address);
-  envoy::config::core::v3alpha::Address expected_remote_address;
+  envoy::config::core::v3::Address expected_remote_address;
   Network::Utility::addressToProtobufAddress(*codec_client_->connection()->localAddress(),
                                              expected_remote_address);
   codec_client_->close();
   test_server_->waitForCounterGe("http.config_test.downstream_cx_destroy", 1);
-  envoy::data::tap::v3alpha::TraceWrapper trace;
+  envoy::data::tap::v3::TraceWrapper trace;
   TestUtility::loadFromFile(fmt::format("{}_{}.pb", path_prefix_, first_id), trace, *api_);
   // Validate general expected properties in the trace.
   EXPECT_EQ(first_id, trace.socket_buffered_trace().trace_id());
@@ -537,7 +533,7 @@ TEST_P(SslTapIntegrationTest, TruncationWithMultipleDataFrames) {
   codec_client_->close();
   test_server_->waitForCounterGe("http.config_test.downstream_cx_destroy", 1);
 
-  envoy::data::tap::v3alpha::TraceWrapper trace;
+  envoy::data::tap::v3::TraceWrapper trace;
   TestUtility::loadFromFile(fmt::format("{}_{}.pb", path_prefix_, id), trace, *api_);
 
   ASSERT_EQ(trace.socket_buffered_trace().events().size(), 2);
@@ -549,7 +545,7 @@ TEST_P(SslTapIntegrationTest, TruncationWithMultipleDataFrames) {
 
 // Validate a single request with text proto output.
 TEST_P(SslTapIntegrationTest, RequestWithTextProto) {
-  format_ = envoy::config::tap::v3alpha::OutputSink::PROTO_TEXT;
+  format_ = envoy::config::tap::v3::OutputSink::PROTO_TEXT;
   ConnectionCreationFunction creator = [&]() -> Network::ClientConnectionPtr {
     return makeSslClientConnection({});
   };
@@ -558,7 +554,7 @@ TEST_P(SslTapIntegrationTest, RequestWithTextProto) {
   checkStats();
   codec_client_->close();
   test_server_->waitForCounterGe("http.config_test.downstream_cx_destroy", 1);
-  envoy::data::tap::v3alpha::TraceWrapper trace;
+  envoy::data::tap::v3::TraceWrapper trace;
   TestUtility::loadFromFile(fmt::format("{}_{}.pb_text", path_prefix_, id), trace, *api_);
   // Test some obvious properties.
   EXPECT_TRUE(absl::StartsWith(trace.socket_buffered_trace().events(0).read().data().as_bytes(),
@@ -575,7 +571,7 @@ TEST_P(SslTapIntegrationTest, RequestWithJsonBodyAsStringUpstreamTap) {
   max_rx_bytes_ = 5;
   max_tx_bytes_ = 4;
 
-  format_ = envoy::config::tap::v3alpha::OutputSink::JSON_BODY_AS_STRING;
+  format_ = envoy::config::tap::v3::OutputSink::JSON_BODY_AS_STRING;
   ConnectionCreationFunction creator = [&]() -> Network::ClientConnectionPtr {
     return makeSslClientConnection({});
   };
@@ -588,7 +584,7 @@ TEST_P(SslTapIntegrationTest, RequestWithJsonBodyAsStringUpstreamTap) {
 
   // This must be done after server shutdown so that connection pool connections are closed and
   // the tap written.
-  envoy::data::tap::v3alpha::TraceWrapper trace;
+  envoy::data::tap::v3::TraceWrapper trace;
   TestUtility::loadFromFile(fmt::format("{}_{}.json", path_prefix_, id), trace, *api_);
 
   // Test some obvious properties.

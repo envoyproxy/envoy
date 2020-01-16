@@ -17,6 +17,7 @@
 #include "common/filesystem/filesystem_impl.h"
 
 #include "absl/strings/match.h"
+#include "absl/strings/str_cat.h"
 
 namespace Envoy {
 namespace Filesystem {
@@ -91,14 +92,14 @@ ssize_t InstanceImplPosix::fileSize(const std::string& path) {
 
 std::string InstanceImplPosix::fileReadToEnd(const std::string& path) {
   if (illegalPath(path)) {
-    throw EnvoyException(fmt::format("Invalid path: {}", path));
+    throw EnvoyException(absl::StrCat("Invalid path: ", path));
   }
 
   std::ios::sync_with_stdio(false);
 
   std::ifstream file(path);
   if (file.fail()) {
-    throw EnvoyException(fmt::format("unable to read file: {}", path));
+    throw EnvoyException(absl::StrCat("unable to read file: ", path));
   }
 
   std::stringstream file_string;

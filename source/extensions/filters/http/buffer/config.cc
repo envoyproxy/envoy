@@ -4,8 +4,8 @@
 #include <cstdint>
 #include <string>
 
-#include "envoy/extensions/filters/http/buffer/v3alpha/buffer.pb.h"
-#include "envoy/extensions/filters/http/buffer/v3alpha/buffer.pb.validate.h"
+#include "envoy/extensions/filters/http/buffer/v3/buffer.pb.h"
+#include "envoy/extensions/filters/http/buffer/v3/buffer.pb.validate.h"
 #include "envoy/registry/registry.h"
 
 #include "extensions/filters/http/buffer/buffer_filter.h"
@@ -16,8 +16,8 @@ namespace HttpFilters {
 namespace BufferFilter {
 
 Http::FilterFactoryCb BufferFilterFactory::createFilterFactoryFromProtoTyped(
-    const envoy::extensions::filters::http::buffer::v3alpha::Buffer& proto_config,
-    const std::string&, Server::Configuration::FactoryContext&) {
+    const envoy::extensions::filters::http::buffer::v3::Buffer& proto_config, const std::string&,
+    Server::Configuration::FactoryContext&) {
   ASSERT(proto_config.has_max_request_bytes());
 
   BufferFilterConfigSharedPtr filter_config(new BufferFilterConfig(proto_config));
@@ -28,7 +28,7 @@ Http::FilterFactoryCb BufferFilterFactory::createFilterFactoryFromProtoTyped(
 
 Router::RouteSpecificFilterConfigConstSharedPtr
 BufferFilterFactory::createRouteSpecificFilterConfigTyped(
-    const envoy::extensions::filters::http::buffer::v3alpha::BufferPerRoute& proto_config,
+    const envoy::extensions::filters::http::buffer::v3::BufferPerRoute& proto_config,
     Server::Configuration::ServerFactoryContext&, ProtobufMessage::ValidationVisitor&) {
   return std::make_shared<const BufferFilterSettings>(proto_config);
 }

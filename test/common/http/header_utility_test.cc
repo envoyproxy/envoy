@@ -1,7 +1,7 @@
 #include <regex>
 #include <vector>
 
-#include "envoy/config/route/v3alpha/route_components.pb.h"
+#include "envoy/config/route/v3/route_components.pb.h"
 #include "envoy/json/json_object.h"
 
 #include "common/http/header_utility.h"
@@ -14,8 +14,8 @@
 namespace Envoy {
 namespace Http {
 
-envoy::config::route::v3alpha::HeaderMatcher parseHeaderMatcherFromYaml(const std::string& yaml) {
-  envoy::config::route::v3alpha::HeaderMatcher header_matcher;
+envoy::config::route::v3::HeaderMatcher parseHeaderMatcherFromYaml(const std::string& yaml) {
+  envoy::config::route::v3::HeaderMatcher header_matcher;
   TestUtility::loadFromYaml(yaml, header_matcher);
   return header_matcher;
 }

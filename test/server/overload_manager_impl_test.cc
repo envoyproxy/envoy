@@ -1,4 +1,4 @@
-#include "envoy/config/overload/v3alpha/overload.pb.h"
+#include "envoy/config/overload/v3/overload.pb.h"
 #include "envoy/server/resource_monitor.h"
 #include "envoy/server/resource_monitor_config.h"
 
@@ -55,20 +55,26 @@ private:
   Event::Dispatcher& dispatcher_;
 };
 
-class FakeResourceMonitorFactory
-    : public Extensions::ResourceMonitors::Common::EmptyConfigFactoryBase {
+class FakeResourceMonitorFactory : public Server::Configuration::ResourceMonitorFactory {
 public:
-  FakeResourceMonitorFactory(const std::string& name)
-      : EmptyConfigFactoryBase(name), monitor_(nullptr) {}
+  FakeResourceMonitorFactory(const std::string& name) : monitor_(nullptr), name_(name) {}
 
-  ResourceMonitorPtr createEmptyConfigResourceMonitor(
-      Server::Configuration::ResourceMonitorFactoryContext& context) override {
+  Server::ResourceMonitorPtr
+  createResourceMonitor(const Protobuf::Message&,
+                        Server::Configuration::ResourceMonitorFactoryContext& context) override {
     auto monitor = std::make_unique<FakeResourceMonitor>(context.dispatcher());
     monitor_ = monitor.get();
     return monitor;
   }
 
+  ProtobufTypes::MessagePtr createEmptyConfigProto() override {
+    return ProtobufTypes::MessagePtr{new Envoy::ProtobufWkt::Struct()};
+  }
+
+  std::string name() const override { return name_; }
+
   FakeResourceMonitor* monitor_; // not owned
+  const std::string name_;
 };
 
 class OverloadManagerImplTest : public testing::Test {
@@ -86,8 +92,8 @@ protected:
     }));
   }
 
-  envoy::config::overload::v3alpha::OverloadManager parseConfig(const std::string& config) {
-    envoy::config::overload::v3alpha::OverloadManager proto;
+  envoy::config::overload::v3::OverloadManager parseConfig(const std::string& config) {
+    envoy::config::overload::v3::OverloadManager proto;
     bool success = Protobuf::TextFormat::ParseFromString(config, &proto);
     ASSERT(success);
     return proto;
