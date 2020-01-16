@@ -311,7 +311,7 @@ TEST(HeaderTransportTest, TransformErrors) {
     EXPECT_THAT(metadata, HasFrameSize(86U));
     EXPECT_THAT(metadata, HasProtocol(ProtocolType::Binary));
     EXPECT_THAT(metadata, HasAppException(AppExceptionType::MissingResult,
-                                          fmt::format("Unknown transform {}", xform_id)));
+                                          absl::StrCat("Unknown transform ", xform_id)));
   }
 
   // Only the first of multiple errors is reported

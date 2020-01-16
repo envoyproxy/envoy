@@ -25,6 +25,7 @@ CHACHA
 CHLO
 CHMOD
 CHLOS
+CHLOs
 CIDR
 CLA
 CLI
@@ -48,6 +49,7 @@ CTXs
 CVC
 CVE
 CX
+Cxx
 CYGWIN
 DER
 DESC
@@ -91,6 +93,7 @@ FAQ
 FASTOPEN
 FB
 FCDS
+FCM
 FFFF
 FIN
 FIPS
@@ -136,6 +139,7 @@ IPs
 IPv
 ITOA
 Isode
+Iters
 JSON
 JSONs
 JWKS
@@ -393,6 +397,7 @@ builtin
 builtins
 bulkstrings
 bursty
+bytecode
 callee
 callsite
 callsites
@@ -418,6 +423,7 @@ ciphersuites
 circllhist
 CITT
 cloneable
+cloneability
 cmd
 cmsghdr
 codebase
@@ -491,6 +497,7 @@ deserialize
 deserialized
 deserializer
 deserializers
+deserializing
 dest
 destructor
 destructors
@@ -503,6 +510,7 @@ dir
 dirname
 djb
 downcasted
+downcasting
 downstreams
 dtor
 dubbo
@@ -541,6 +549,7 @@ faceplant
 facto
 failover
 fallbacks
+fastbuild
 favicon
 fd
 fds
@@ -567,6 +576,7 @@ gcov
 genrule
 getaddrinfo
 getaffinity
+gethostname
 getifaddrs
 getpeername
 getsockname
@@ -643,6 +653,7 @@ iteratively
 javascript
 jitter
 jittered
+kafka
 keepalive
 keepalives
 ketama
@@ -838,6 +849,7 @@ qps
 quantile
 quantiles
 queueing
+quiesce
 quitquitquit
 qvalue
 rapidjson
@@ -872,6 +884,8 @@ referer
 refetch
 regex
 regexes
+reified
+reify
 reimplements
 rele
 releasor
@@ -883,6 +897,7 @@ repicked
 repo
 requirepass
 reselecting
+reserialize
 reservable
 resize
 resized
@@ -1125,6 +1140,7 @@ vhost
 viewable
 vip
 virtualhost
+virtualize
 vptr
 wakeup
 wakeups
@@ -1153,3 +1169,5 @@ zig
 zipkin
 zlib
 OBQ
+SemVer
+SCM

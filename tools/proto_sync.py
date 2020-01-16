@@ -271,13 +271,22 @@ def Sync(api_root, mode, labels, shadow):
       pkg_deps += SyncProtoFile(
           mode,
           utils.BazelBinPathForOutputArtifact(
-              label, '.v3alpha.envoy_internal.proto' if shadow else '.v3alpha.proto'), dst_dir)
+              label, '.v3.envoy_internal.proto' if shadow else '.v3.proto'), dst_dir)
     SyncBuildFiles(mode, dst_dir)
 
     current_api_dir = pathlib.Path(tmp).joinpath("a")
     current_api_dir.mkdir(0o755, True, True)
     api_root_path = pathlib.Path(api_root)
     GenerateCurrentApiDir(api_root_path, current_api_dir)
+
+    # These support files are handled manually.
+    for f in [
+        'envoy/annotations/resource.proto', 'envoy/annotations/deprecation.proto',
+        'envoy/annotations/BUILD'
+    ]:
+      copy_dst_dir = pathlib.Path(dst_dir, os.path.dirname(f))
+      copy_dst_dir.mkdir(exist_ok=True)
+      shutil.copy(str(pathlib.Path(api_root, f)), str(copy_dst_dir))
 
     diff = subprocess.run(['diff', '-Npur', "a", "b"], cwd=tmp, stdout=subprocess.PIPE).stdout
 
@@ -287,7 +296,20 @@ def Sync(api_root, mode, labels, shadow):
         print(diff.decode(), file=sys.stderr)
         sys.exit(1)
       if mode == "fix":
-        subprocess.run(['patch', '-p1'], input=diff, cwd=str(api_root_path.resolve()))
+        src_files = set(str(p.relative_to(current_api_dir)) for p in current_api_dir.rglob('*'))
+        dst_files = set(str(p.relative_to(dst_dir)) for p in dst_dir.rglob('*'))
+        deleted_files = src_files.difference(dst_files)
+        if deleted_files:
+          print('The following files will be deleted: %s' % sorted(deleted_files))
+          print(
+              'If this is not intended, please see https://github.com/envoyproxy/envoy/blob/master/api/STYLE.md#adding-an-extension-configuration-to-the-api.'
+          )
+          if input('Delete files? [yN] ').strip().lower() == 'y':
+            subprocess.run(['patch', '-p1'], input=diff, cwd=str(api_root_path.resolve()))
+          else:
+            sys.exit(1)
+        else:
+          subprocess.run(['patch', '-p1'], input=diff, cwd=str(api_root_path.resolve()))
 
   with open(os.path.join(api_root, 'BUILD'), 'w') as f:
     formatted_deps = '\n'.join(

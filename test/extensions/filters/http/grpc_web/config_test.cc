@@ -16,7 +16,8 @@ namespace {
 TEST(GrpcWebFilterConfigTest, GrpcWebFilter) {
   NiceMock<Server::Configuration::MockFactoryContext> context;
   GrpcWebFilterConfig factory;
-  Http::FilterFactoryCb cb = factory.createFilter("stats", context);
+  envoy::extensions::filters::http::grpc_web::v3::GrpcWeb config;
+  Http::FilterFactoryCb cb = factory.createFilterFactoryFromProto(config, "stats", context);
   Http::MockFilterChainFactoryCallbacks filter_callback;
   EXPECT_CALL(filter_callback, addStreamFilter(_));
   cb(filter_callback);

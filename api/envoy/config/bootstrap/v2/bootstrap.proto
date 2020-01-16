@@ -3,11 +3,11 @@ syntax = "proto3";
 package envoy.config.bootstrap.v2;
 
 import "envoy/api/v2/auth/cert.proto";
-import "envoy/api/v2/cds.proto";
+import "envoy/api/v2/cluster.proto";
 import "envoy/api/v2/core/address.proto";
 import "envoy/api/v2/core/base.proto";
 import "envoy/api/v2/core/config_source.proto";
-import "envoy/api/v2/lds.proto";
+import "envoy/api/v2/listener.proto";
 import "envoy/config/metrics/v2/stats.proto";
 import "envoy/config/overload/v2alpha/overload.proto";
 import "envoy/config/trace/v2/trace.proto";
@@ -16,6 +16,7 @@ import "google/protobuf/duration.proto";
 import "google/protobuf/struct.proto";
 import "google/protobuf/wrappers.proto";
 
+import "envoy/annotations/deprecation.proto";
 import "validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.config.bootstrap.v2";
@@ -119,7 +120,7 @@ message Bootstrap {
   // Configuration for the runtime configuration provider (deprecated). If not
   // specified, a “null” provider will be used which will result in all defaults
   // being used.
-  Runtime runtime = 11 [deprecated = true];
+  Runtime runtime = 11 [deprecated = true, (envoy.annotations.disallowed_by_default) = true];
 
   // Configuration for the runtime configuration provider. If not
   // specified, a “null” provider will be used which will result in all defaults

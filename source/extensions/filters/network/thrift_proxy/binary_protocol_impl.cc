@@ -90,7 +90,7 @@ bool BinaryProtocolImpl::readFieldBegin(Buffer::Instance& buffer, std::string& n
     }
     int16_t id = buffer.peekBEInt<int16_t>(1);
     if (id < 0) {
-      throw EnvoyException(fmt::format("invalid binary protocol field id {}", id));
+      throw EnvoyException(absl::StrCat("invalid binary protocol field id ", id));
     }
     field_id = id;
     buffer.drain(3);
@@ -121,7 +121,7 @@ bool BinaryProtocolImpl::readMapBegin(Buffer::Instance& buffer, FieldType& key_t
   FieldType vtype = static_cast<FieldType>(buffer.peekInt<int8_t>(1));
   int32_t s = buffer.peekBEInt<int32_t>(2);
   if (s < 0) {
-    throw EnvoyException(fmt::format("negative binary protocol map size {}", s));
+    throw EnvoyException(absl::StrCat("negative binary protocol map size ", s));
   }
 
   buffer.drain(6);
@@ -293,7 +293,7 @@ void BinaryProtocolImpl::writeFieldEnd(Buffer::Instance& buffer) { UNREFERENCED_
 void BinaryProtocolImpl::writeMapBegin(Buffer::Instance& buffer, FieldType key_type,
                                        FieldType value_type, uint32_t size) {
   if (size > static_cast<uint32_t>(std::numeric_limits<int32_t>::max())) {
-    throw EnvoyException(fmt::format("illegal binary protocol map size {}", size));
+    throw EnvoyException(absl::StrCat("illegal binary protocol map size ", size));
   }
 
   buffer.writeByte(static_cast<int8_t>(key_type));

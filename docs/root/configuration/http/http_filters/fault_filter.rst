@@ -54,7 +54,8 @@ options:
 .. code-block:: yaml
 
   name: envoy.fault
-  config:
+  typed_config:
+    "@type": type.googleapis.com/envoy.config.filter.http.fault.v2.HTTPFault
     max_active_faults: 100
     delay:
       header_delay: {}

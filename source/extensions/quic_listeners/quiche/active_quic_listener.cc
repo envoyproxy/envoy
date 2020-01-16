@@ -30,7 +30,7 @@ ActiveQuicListener::ActiveQuicListener(Event::Dispatcher& dispatcher,
   quic::QuicRandom* const random = quic::QuicRandom::GetInstance();
   random->RandBytes(random_seed_, sizeof(random_seed_));
   crypto_config_ = std::make_unique<quic::QuicCryptoServerConfig>(
-      quic::QuicStringPiece(reinterpret_cast<char*>(random_seed_), sizeof(random_seed_)),
+      quiche::QuicheStringPiece(reinterpret_cast<char*>(random_seed_), sizeof(random_seed_)),
       quic::QuicRandom::GetInstance(), std::make_unique<EnvoyQuicFakeProofSource>(),
       quic::KeyExchangeSource::Default());
   auto connection_helper = std::make_unique<EnvoyQuicConnectionHelper>(dispatcher_);
@@ -72,6 +72,10 @@ void ActiveQuicListener::onData(Network::UdpRecvData& data) {
                                   /*packet_headers=*/nullptr, /*headers_length=*/0,
                                   /*owns_header_buffer*/ false);
   quic_dispatcher_->ProcessPacket(self_address, peer_address, packet);
+}
+
+void ActiveQuicListener::onReadReady() {
+  quic_dispatcher_->ProcessBufferedChlos(kNumSessionsToCreatePerLoop);
 }
 
 void ActiveQuicListener::onWriteReady(const Network::Socket& /*socket*/) {

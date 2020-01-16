@@ -825,7 +825,7 @@ void ConnectionImpl::sendPendingFrames() {
     return;
   }
 
-  int rc = nghttp2_session_send(session_);
+  const int rc = nghttp2_session_send(session_);
   if (rc != 0) {
     ASSERT(rc == NGHTTP2_ERR_CALLBACK_FAILURE);
     // For errors caused by the pending outbound frame flood the FrameFloodException has
@@ -837,7 +837,7 @@ void ConnectionImpl::sendPendingFrames() {
       throw FrameFloodException("Too many frames in the outbound queue.");
     }
 
-    throw CodecProtocolException(fmt::format("{}", nghttp2_strerror(rc)));
+    throw CodecProtocolException(std::string(nghttp2_strerror(rc)));
   }
 
   // See ConnectionImpl::StreamImpl::resetStream() for why we do this. This is an uncommon event,

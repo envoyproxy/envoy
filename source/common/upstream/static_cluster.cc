@@ -1,23 +1,24 @@
 #include "common/upstream/static_cluster.h"
 
-#include "envoy/api/v2/cds.pb.h"
-#include "envoy/api/v2/eds.pb.h"
 #include "envoy/common/exception.h"
+#include "envoy/config/cluster/v3/cluster.pb.h"
+#include "envoy/config/endpoint/v3/endpoint.pb.h"
 
 namespace Envoy {
 namespace Upstream {
 
 StaticClusterImpl::StaticClusterImpl(
-    const envoy::api::v2::Cluster& cluster, Runtime::Loader& runtime,
+    const envoy::config::cluster::v3::Cluster& cluster, Runtime::Loader& runtime,
     Server::Configuration::TransportSocketFactoryContext& factory_context,
     Stats::ScopePtr&& stats_scope, bool added_via_api)
     : ClusterImplBase(cluster, runtime, factory_context, std::move(stats_scope), added_via_api),
       priority_state_manager_(
           new PriorityStateManager(*this, factory_context.localInfo(), nullptr)) {
   // TODO(dio): Use by-reference when cluster.hosts() is removed.
-  const envoy::api::v2::ClusterLoadAssignment cluster_load_assignment(
-      cluster.has_load_assignment() ? cluster.load_assignment()
-                                    : Config::Utility::translateClusterHosts(cluster.hosts()));
+  const envoy::config::endpoint::v3::ClusterLoadAssignment cluster_load_assignment(
+      cluster.has_load_assignment()
+          ? cluster.load_assignment()
+          : Config::Utility::translateClusterHosts(cluster.hidden_envoy_deprecated_hosts()));
 
   overprovisioning_factor_ = PROTOBUF_GET_WRAPPED_OR_DEFAULT(
       cluster_load_assignment.policy(), overprovisioning_factor, kDefaultOverProvisioningFactor);
@@ -57,7 +58,7 @@ void StaticClusterImpl::startPreInit() {
 
 std::pair<ClusterImplBaseSharedPtr, ThreadAwareLoadBalancerPtr>
 StaticClusterFactory::createClusterImpl(
-    const envoy::api::v2::Cluster& cluster, ClusterFactoryContext& context,
+    const envoy::config::cluster::v3::Cluster& cluster, ClusterFactoryContext& context,
     Server::Configuration::TransportSocketFactoryContext& socket_factory_context,
     Stats::ScopePtr&& stats_scope) {
   return std::make_pair(

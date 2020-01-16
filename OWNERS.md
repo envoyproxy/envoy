@@ -20,13 +20,15 @@ routing PRs, questions, etc. to the right place.
 * Lizan Zhou ([lizan](https://github.com/lizan)) (lizan@tetrate.io)
   * gRPC, gRPC/JSON transcoding, and core networking (transport socket abstractions), Bazel, build
     issues, and CI in general.
-* Snow Pettersen ([snowp](https://github.com/snowp)) (snowp@squareup.com)
+* Snow Pettersen ([snowp](https://github.com/snowp)) (aickck@gmail.com)
   * Upstream, host/priority sets, load balancing, and retry plugins.
 
 # Maintainers
 
 * Asra Ali ([asraa](https://github.com/asraa)) (asraa@google.com)
   * Fuzzing, security, headers, HTTP/gRPC, router, access log, tests.
+* Yan Avlasov ([yanavlasov](https://github.com/yanavlasov)) (yavlasov@google.com)
+  * Data plane, codecs, security, configuration.
 * Jose Nino ([junr03](https://github.com/junr03)) (jnino@lyft.com)
   * Outlier detection, HTTP routing, xDS, configuration/operational questions.
 * Dhi Aurrahman ([dio](https://github.com/dio)) (dio@tetrate.io)
@@ -38,7 +40,6 @@ routing PRs, questions, etc. to the right place.
 
 * All maintainers
 * Piotr Sikora ([PiotrSikora](https://github.com/PiotrSikora)) (piotrsikora@google.com)
-* Yan Avlasov ([yanavlasov](https://github.com/yanavlasov)) (yavlasov@google.com)
 
 # Emeritus maintainers
 
