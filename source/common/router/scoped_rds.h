@@ -166,6 +166,7 @@ private:
                resource)
         .name();
   }
+  void kickFallback() override { subscription_->fallback({}); }
   static std::string loadTypeUrl(envoy::config::core::v3alpha::ApiVersion resource_api_version);
   // Propagate RDS updates to ScopeConfigImpl in workers.
   void onRdsConfigUpdate(const std::string& scope_name,

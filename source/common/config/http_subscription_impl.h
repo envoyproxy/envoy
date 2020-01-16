@@ -42,6 +42,7 @@ public:
   void parseResponse(const Http::Message& response) override;
   void onFetchComplete() override;
   void onFetchFailure(Config::ConfigUpdateFailureReason reason, const EnvoyException* e) override;
+  void retry() override;
 
 private:
   void handleFailure(Config::ConfigUpdateFailureReason reason, const EnvoyException* e);
@@ -57,6 +58,7 @@ private:
   Event::TimerPtr init_fetch_timeout_timer_;
   ProtobufMessage::ValidationVisitor& validation_visitor_;
   const envoy::config::core::v3alpha::ApiVersion transport_api_version_;
+  bool tried_fallback_;
 };
 
 } // namespace Config

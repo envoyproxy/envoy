@@ -48,7 +48,7 @@ public:
    * @param e supplies any exception data on why the fetch failed. May be nullptr.
    */
   virtual void onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason reason,
-                                    const EnvoyException* e, bool is_fallback = false) PURE;
+                                    const EnvoyException* e, bool try_fallback = false) PURE;
 
   /**
    * Obtain the "name" of a v2 API resource in a google.protobuf.Any, e.g. the route config name for

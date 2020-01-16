@@ -61,6 +61,25 @@ TEST_F(HttpSubscriptionImplTest, ConfigNotModified) {
   EXPECT_TRUE(statsAre(4, 1, 0, 0, 0, 7148434200721666028));
 }
 
+class HttpSubscriptionImplTestV3Alpha : public testing::Test, public HttpSubscriptionTestHarness {
+protected:
+  HttpSubscriptionImplTestV3Alpha()
+      : HttpSubscriptionTestHarness(envoy::config::core::v3alpha::ApiVersion::V3ALPHA) {}
+};
+
+TEST_F(HttpSubscriptionImplTestV3Alpha, FallbackSuccess) {
+  EXPECT_CALL(callbacks_, kickFallback()).Times(1);
+  EXPECT_CALL(callbacks_,
+              onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason::ConnectionFailure, _))
+      .Times(0);
+  Http::HeaderMapPtr response_headers{new Http::TestHeaderMapImpl{{":status", "404"}}};
+  Http::MessagePtr message{new Http::ResponseMessageImpl(std::move(response_headers))};
+  http_callbacks_->onSuccess(std::move(message));
+  subscription_->fallback({"cluster0"});
+  startSubscription({"cluster0"});
+  EXPECT_TRUE(statsAre(1, 0, 0, 0, 0, 0));
+}
+
 } // namespace
 } // namespace Config
 } // namespace Envoy

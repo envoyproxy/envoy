@@ -42,8 +42,8 @@ void DeltaSubscriptionImpl::updateResourceInterest(
 }
 
 void DeltaSubscriptionImpl::fallback(const std::set<std::string>& resources) {
-  for (auto a : resources)
-    std::cout << a << std::endl;
+  type_url_ = TypeUrl::get().fallback(type_url_);
+  updateResourceInterest(resources);
 }
 
 // Config::SubscriptionCallbacks
@@ -93,6 +93,8 @@ void DeltaSubscriptionImpl::onConfigUpdateFailed(ConfigUpdateFailureReason reaso
     break;
   }
 }
+
+void DeltaSubscriptionImpl::kickFallback() {}
 
 std::string DeltaSubscriptionImpl::resourceName(const ProtobufWkt::Any& resource) {
   return callbacks_.resourceName(resource);

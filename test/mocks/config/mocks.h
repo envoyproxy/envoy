@@ -43,6 +43,7 @@ public:
   MOCK_METHOD2_T(onConfigUpdateFailed,
                  void(Envoy::Config::ConfigUpdateFailureReason reason, const EnvoyException* e));
   MOCK_METHOD1_T(resourceName, std::string(const ProtobufWkt::Any& resource));
+  MOCK_METHOD0(kickFallback, void());
 };
 
 class MockSubscription : public Subscription {
@@ -112,7 +113,7 @@ public:
   MOCK_METHOD2(onConfigUpdate, void(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
                                     const std::string& version_info));
   MOCK_METHOD3(onConfigUpdateFailed, void(Envoy::Config::ConfigUpdateFailureReason reason,
-                                          const EnvoyException* e, bool is_fallbacked));
+                                          const EnvoyException* e, bool try_fallbacked));
   MOCK_METHOD1(resourceName, std::string(const ProtobufWkt::Any& resource));
 };
 

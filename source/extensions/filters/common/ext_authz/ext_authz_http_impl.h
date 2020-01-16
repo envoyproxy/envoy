@@ -151,7 +151,7 @@ public:
 
   // Http::AsyncClient::Callbacks
   void onSuccess(Http::MessagePtr&& message) override;
-  void onFailure(Http::AsyncClient::FailureReason reason) override;
+  void onFailure(Http::AsyncClient::FailureReason reason = nullptr) override;
 
 private:
   ResponsePtr toResponse(Http::MessagePtr message);

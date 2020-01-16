@@ -336,7 +336,7 @@ public:
 
   // Http::AsyncClient::Callbacks
   MOCK_METHOD1(onSuccess_, void(Message* response));
-  MOCK_METHOD1(onFailure, void(Http::AsyncClient::FailureReason reason));
+  MOCK_METHOD1(onFailure, void(Http::AsyncClient::FailureReason));
 };
 
 class MockAsyncClientStreamCallbacks : public AsyncClient::StreamCallbacks {

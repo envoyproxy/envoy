@@ -53,6 +53,8 @@ protected:
   virtual void onFetchFailure(Config::ConfigUpdateFailureReason reason,
                               const EnvoyException* e) PURE;
 
+  virtual void retry() PURE;
+
 protected:
   const std::string remote_cluster_name_;
   Upstream::ClusterManager& cm_;

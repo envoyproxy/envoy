@@ -87,7 +87,6 @@ void GrpcMuxImpl::sendDiscoveryRequest(const std::string& type_url) {
 GrpcMuxWatchPtr GrpcMuxImpl::subscribe(const std::string& type_url,
                                        const std::set<std::string>& resources,
                                        GrpcMuxCallbacks& callbacks, bool fallbacked) {
-  std::cout << type_url << std::endl;
   auto watch =
       std::unique_ptr<GrpcMuxWatch>(new GrpcMuxWatchImpl(resources, callbacks, type_url, *this));
   ENVOY_LOG(debug, "gRPC mux subscribe for " + type_url);
@@ -245,13 +244,13 @@ void GrpcMuxImpl::onEstablishmentFailure(bool remote_close) {
 
     // Try to execute fallback to downgrade xDS api version if specified API version is not
     // supported on management server. It attempts once.
-    bool is_fallback = !api_state.second.fallbacked_ && !remote_close && is_alpha;
+    bool try_fallback = !api_state.second.fallbacked_ && !remote_close && is_alpha;
     for (auto watch : api_state.second.watches_) {
       watch->callbacks_.onConfigUpdateFailed(
-          Envoy::Config::ConfigUpdateFailureReason::ConnectionFailure, nullptr, is_fallback);
+          Envoy::Config::ConfigUpdateFailureReason::ConnectionFailure, nullptr, try_fallback);
     }
-    if (is_fallback) {
-      api_state_[current_type_url].paused_ = true;
+    if (try_fallback) {
+      pause(current_type_url);
     }
   }
 }

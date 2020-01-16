@@ -68,6 +68,12 @@ public:
    * a RouteConfiguration, based on the underlying resource type.
    */
   virtual std::string resourceName(const ProtobufWkt::Any& resource) PURE;
+
+  /**
+   * Call fallback operation if envoy can't open connection or can't reach valid xDS resource
+   * endpoint.
+   */
+  virtual void kickFallback() PURE;
 };
 
 /**

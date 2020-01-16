@@ -33,6 +33,9 @@ void RestApiFetcher::onSuccess(Http::MessagePtr&& response) {
   if (response_code == enumToInt(Http::Code::NotModified)) {
     requestComplete();
     return;
+  } else if (response_code == enumToInt(Http::Code::NotFound)) {
+    retry();
+    return;
   } else if (response_code != enumToInt(Http::Code::OK)) {
     onFailure(Http::AsyncClient::FailureReason::Reset);
     return;

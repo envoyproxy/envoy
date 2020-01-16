@@ -66,6 +66,7 @@ protected:
                resource)
         .name();
   }
+  void kickFallback() override { subscription_->fallback({sds_config_name_}); }
   static std::string loadTypeUrl(envoy::config::core::v3alpha::ApiVersion resource_api_version);
 
 private:

@@ -83,7 +83,7 @@ private:
 
     // Http::AsyncClient::Callbacks
     void onSuccess(Http::MessagePtr&& response) override;
-    void onFailure(Http::AsyncClient::FailureReason) override;
+    void onFailure(Http::AsyncClient::FailureReason = nullptr) override;
 
   private:
     Http::AsyncClient::Request* active_request_ = nullptr;
