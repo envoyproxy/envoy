@@ -1,18 +1,18 @@
 syntax = "proto3";
 
-package envoy.service.status.v3alpha;
+package envoy.service.status.v3;
 
-import "envoy/admin/v3alpha/config_dump.proto";
-import "envoy/config/core/v3alpha/base.proto";
-import "envoy/type/matcher/v3alpha/metadata.proto";
-import "envoy/type/matcher/v3alpha/string.proto";
+import "envoy/admin/v3/config_dump.proto";
+import "envoy/config/core/v3/base.proto";
+import "envoy/type/matcher/v3/metadata.proto";
+import "envoy/type/matcher/v3/string.proto";
 
 import "google/api/annotations.proto";
 import "google/protobuf/struct.proto";
 
 import "udpa/annotations/versioning.proto";
 
-option java_package = "io.envoyproxy.envoy.service.status.v3alpha";
+option java_package = "io.envoyproxy.envoy.service.status.v3";
 option java_outer_classname = "CsdsProto";
 option java_multiple_files = true;
 option java_generic_services = true;
@@ -26,7 +26,7 @@ service ClientStatusService {
   }
 
   rpc FetchClientStatus(ClientStatusRequest) returns (ClientStatusResponse) {
-    option (google.api.http).post = "/v3alpha/discovery:client_status";
+    option (google.api.http).post = "/v3/discovery:client_status";
     option (google.api.http).body = "*";
   }
 }
@@ -60,10 +60,10 @@ message ClientStatusRequest {
         "envoy.service.status.v2.ClientStatusRequest.NodeMatcher";
 
     // Specifies match criteria on the client node id.
-    type.matcher.v3alpha.StringMatcher node_id = 1;
+    type.matcher.v3.StringMatcher node_id = 1;
 
     // Specifies match criteria on the client node metadata.
-    type.matcher.v3alpha.MetadataMatcher node_metadata = 2;
+    type.matcher.v3.MetadataMatcher node_metadata = 2;
   }
 
   // Management server can use these match criteria to identify clients.
@@ -79,13 +79,13 @@ message PerXdsConfig {
   ConfigStatus status = 1;
 
   oneof per_xds_config {
-    admin.v3alpha.ListenersConfigDump listener_config = 2;
+    admin.v3.ListenersConfigDump listener_config = 2;
 
-    admin.v3alpha.ClustersConfigDump cluster_config = 3;
+    admin.v3.ClustersConfigDump cluster_config = 3;
 
-    admin.v3alpha.RoutesConfigDump route_config = 4;
+    admin.v3.RoutesConfigDump route_config = 4;
 
-    admin.v3alpha.ScopedRoutesConfigDump scoped_route_config = 5;
+    admin.v3.ScopedRoutesConfigDump scoped_route_config = 5;
   }
 }
 
@@ -95,7 +95,7 @@ message ClientConfig {
       "envoy.service.status.v2.ClientConfig";
 
   // Node for a particular client.
-  config.core.v3alpha.Node node = 1;
+  config.core.v3.Node node = 1;
 
   repeated PerXdsConfig xds_config = 2;
 }

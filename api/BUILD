@@ -199,7 +199,7 @@ proto_library(
         "//envoy/service/runtime/v3:pkg",
         "//envoy/service/secret/v3:pkg",
         "//envoy/service/status/v2:pkg",
-        "//envoy/service/status/v3alpha:pkg",
+        "//envoy/service/status/v3:pkg",
         "//envoy/service/tap/v2alpha:pkg",
         "//envoy/service/tap/v3:pkg",
         "//envoy/service/trace/v2:pkg",
