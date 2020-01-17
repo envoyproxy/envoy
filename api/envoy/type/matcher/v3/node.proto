@@ -18,5 +18,3 @@ message NodeMatcher {
   // Specifies match criteria on the node metadata.
   MetadataMatcher node_metadata = 2;
 }
-
-
