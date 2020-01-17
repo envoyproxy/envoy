@@ -57,6 +57,7 @@ void ConnPoolImplBase::attachRequestToClient(ActiveClient& client, StreamDecoder
       transitionActiveClientState(client, ActiveClient::State::BUSY);
     }
 
+    num_active_requests_++;
     host_->stats().rq_total_.inc();
     host_->stats().rq_active_.inc();
     host_->cluster().stats().upstream_rq_total_.inc();
@@ -70,6 +71,8 @@ void ConnPoolImplBase::attachRequestToClient(ActiveClient& client, StreamDecoder
 void ConnPoolImplBase::onRequestClosed(ActiveClient& client, bool delay_attaching_request) {
   ENVOY_CONN_LOG(debug, "destroying stream: {} remaining", *client.codec_client_,
                  client.codec_client_->numActiveRequests());
+  ASSERT(num_active_requests_ > 0);
+  num_active_requests_--;
   host_->stats().rq_active_.dec();
   host_->cluster().stats().upstream_rq_active_.dec();
   host_->cluster().resourceManager(priority_).requests().dec();
@@ -136,17 +139,7 @@ void ConnPoolImplBase::addDrainedCallback(DrainedCb cb) {
 }
 
 bool ConnPoolImplBase::hasActiveConnections() const {
-  if (!pending_requests_.empty() || !busy_clients_.empty()) {
-    return true;
-  }
-
-  for (const auto& ready_client : ready_clients_) {
-    if (ready_client->hasActiveRequests()) {
-      return true;
-    }
-  }
-
-  return false;
+  return (!pending_requests_.empty() || (num_active_requests_ > 0));
 }
 
 std::list<ConnPoolImplBase::ActiveClientPtr>&

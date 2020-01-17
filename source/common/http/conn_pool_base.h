@@ -152,6 +152,9 @@ protected:
 
   // Clients that are not ready to handle additional requests.
   std::list<ActiveClientPtr> busy_clients_;
+
+  // The number of requests currently attached to clients.
+  uint64_t num_active_requests_{0};
 };
 } // namespace Http
 } // namespace Envoy
