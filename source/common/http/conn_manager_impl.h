@@ -154,7 +154,7 @@ private:
     Router::RouteConstSharedPtr route() override;
     Upstream::ClusterInfoConstSharedPtr clusterInfo() override;
     void clearRouteCache() override;
-    uint64_t streamId() override;
+    uint64_t streamId() const override;
     StreamInfo::StreamInfo& streamInfo() override;
     Tracing::Span& activeSpan() override;
     Tracing::Config& tracingConfig() override;
