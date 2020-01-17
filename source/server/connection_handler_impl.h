@@ -67,6 +67,8 @@ public:
   void incNumConnections() override;
   void decNumConnections() override;
   void addListener(Network::ListenerConfig& config) override;
+  void addIntelligentListener(uint64_t overrided_listener,
+                              Network::ListenerConfig& config) override;
   void removeListeners(uint64_t listener_tag) override;
   void stopListeners(uint64_t listener_tag) override;
   void stopListeners() override;
@@ -79,14 +81,14 @@ public:
    */
   class ActiveListenerImplBase : public Network::ConnectionHandler::ActiveListener {
   public:
-    ActiveListenerImplBase(Network::ConnectionHandler& parent, Network::ListenerConfig& config);
+    ActiveListenerImplBase(Network::ConnectionHandler& parent, Network::ListenerConfig* config);
 
     // Network::ConnectionHandler::ActiveListener.
-    uint64_t listenerTag() override { return config_.listenerTag(); }
+    uint64_t listenerTag() override { return config_->listenerTag(); }
 
     ListenerStats stats_;
     PerHandlerListenerStats per_worker_stats_;
-    Network::ListenerConfig& config_;
+    Network::ListenerConfig* config_{};
   };
 
 private:
@@ -138,7 +140,16 @@ private:
      */
     void newConnection(Network::ConnectionSocketPtr&& socket);
 
+    /**
+     * Return the active connections container attached with the given filter chain.
+     */
     ActiveConnections& getOrCreateActiveConnections(const Network::FilterChain& filter_chain);
+
+    /**
+     * Update the listener config. The follow up connections will see the new config. The existing
+     * connections are not impacted.
+     */
+    void updateListenerConfig(Network::ListenerConfig& config);
 
     ConnectionHandlerImpl& parent_;
     Network::ListenerPtr listener_;

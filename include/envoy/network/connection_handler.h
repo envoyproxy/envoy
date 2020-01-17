@@ -44,6 +44,13 @@ public:
   virtual void addListener(ListenerConfig& config) PURE;
 
   /**
+   * Adds a listener to the handler and replace the existing listener.
+   * @param overrided_listener supplies the tag of the existing listener.
+   * @param config listener configuration options.
+   */
+  virtual void addIntelligentListener(uint64_t overrided_listener, ListenerConfig& config) PURE;
+
+  /**
    * Remove listeners using the listener tag as a key. All connections owned by the removed
    * listeners will be closed.
    * @param listener_tag supplies the tag passed to addListener().
