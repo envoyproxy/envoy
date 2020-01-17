@@ -4,8 +4,7 @@ package envoy.service.status.v3;
 
 import "envoy/admin/v3/config_dump.proto";
 import "envoy/config/core/v3/base.proto";
-import "envoy/type/matcher/v3/metadata.proto";
-import "envoy/type/matcher/v3/string.proto";
+import "envoy/type/matcher/v3/node.proto";
 
 import "google/api/annotations.proto";
 import "google/protobuf/struct.proto";
@@ -55,19 +54,8 @@ message ClientStatusRequest {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.service.status.v2.ClientStatusRequest";
 
-  message NodeMatcher {
-    option (udpa.annotations.versioning).previous_message_type =
-        "envoy.service.status.v2.ClientStatusRequest.NodeMatcher";
-
-    // Specifies match criteria on the client node id.
-    type.matcher.v3.StringMatcher node_id = 1;
-
-    // Specifies match criteria on the client node metadata.
-    type.matcher.v3.MetadataMatcher node_metadata = 2;
-  }
-
   // Management server can use these match criteria to identify clients.
-  repeated NodeMatcher node_matchers = 1;
+  repeated type.matcher.v3.NodeMatcher node_matchers = 1;
 }
 
 // Detailed config (per xDS) with status.
