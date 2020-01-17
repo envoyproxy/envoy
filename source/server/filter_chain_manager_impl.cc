@@ -609,7 +609,7 @@ Api::Api& FactoryContextImpl::api() { return server_.api(); }
 ServerLifecycleNotifier& FactoryContextImpl::lifecycleNotifier() {
   return server_.lifecycleNotifier();
 }
-OptProcessContextRef FactoryContextImpl::processContext() { return server_.processContext(); }
+ProcessContextOptRef FactoryContextImpl::processContext() { return server_.processContext(); }
 Configuration::ServerFactoryContext& FactoryContextImpl::getServerFactoryContext() const {
   return server_.serverFactoryContext();
 }
