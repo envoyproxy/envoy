@@ -20,7 +20,9 @@ The only required configuration field is :ref:`name
 specify a valid cache storage implementation linked into your Envoy
 binary. Specifying 'SimpleHttpCache' will select a proof-of-concept
 implementation included in the Envoy source. More implementations can (and will)
-be provided by implementing Envoy::Extensions::HttpFilters::Cache::HttpCache.
+be provided by implementing Envoy::Extensions::HttpFilters::Cache::HttpCache. To
+write a cache storage implementation, see `Writing Cache Filter
+Implementations <https://github.com/envoyproxy/envoy/blob/master/source/docs/cache_filter_plugins.md>`_
 
 The remaining configuration options control caching behavior and limits. By
 default, this filter will cache almost all responses that are considered
@@ -33,6 +35,7 @@ if-none-match, if-modified-since, if-unmodified-since, if-range, authorization,
 date, age, expires, and vary. Responses with a 'vary' header will only be cached
 if the named headers are listed in :ref:`allowed_vary_headers
 <envoy_api_field_config.filter.http.cache.v2.CacheConfig.allowed_vary_headers>`
+
 
 Status
 ------
