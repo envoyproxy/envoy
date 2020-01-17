@@ -1,3 +1,14 @@
+/*
+ * A tool to precompile Wasm modules.
+ *
+ * This is accomplished by loading and instantiating the Wasm module, serializing
+ * the V8 Isolate containing compiled code, and saving it in Wasm module's Custom
+ * Section under the "precompiled_wee8_v<version>_<platform>" name.
+ *
+ * Such precompiled Wasm module can be deserialized and loaded by V8, without the
+ * need to compile Wasm bytecode each time it's loaded.
+ */
+
 // NOLINT(namespace-envoy)
 
 #include <unistd.h>
