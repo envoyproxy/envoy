@@ -273,12 +273,6 @@ TEST(Context, ResponseAttributes) {
     EXPECT_EQ(0x8, value.value().Int64OrDie());
   }
   {
-    auto value = response[CelValue::CreateStringView(GrpcStatus)];
-    EXPECT_TRUE(value.has_value());
-    ASSERT_TRUE(value.value().IsInt64());
-    EXPECT_EQ(0x8, value.value().Int64OrDie());
-  }
-  {
     Http::TestHeaderMapImpl header_map{{header_name, "a"}, {grpc_status, "7"}};
     Http::TestHeaderMapImpl trailer_map{{trailer_name, "b"}};
     ResponseWrapper response_header_status(&header_map, &trailer_map, info);
