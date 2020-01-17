@@ -21,7 +21,7 @@ option java_generic_services = true;
 // an xDS-compliant client from the management server's point of view. In the
 // future, it can potentially be used as an interface to get the current
 // state directly from the client.
-service ClientStatusService {
+service ClientStatusDiscoveryService {
   rpc StreamClientStatus(stream ClientStatusRequest) returns (stream ClientStatusResponse) {
   }
 
