@@ -4,8 +4,7 @@ package envoy.service.status.v2;
 
 import "envoy/admin/v2alpha/config_dump.proto";
 import "envoy/api/v2/core/base.proto";
-import "envoy/type/matcher/metadata.proto";
-import "envoy/type/matcher/string.proto";
+import "envoy/type/matcher/node.proto";
 
 import "google/api/annotations.proto";
 import "google/protobuf/struct.proto";
@@ -50,16 +49,8 @@ enum ConfigStatus {
 
 // Request for client status of clients identified by a list of NodeMatchers.
 message ClientStatusRequest {
-  message NodeMatcher {
-    // Specifies match criteria on the client node id.
-    type.matcher.StringMatcher node_id = 1;
-
-    // Specifies match criteria on the client node metadata.
-    type.matcher.MetadataMatcher node_metadata = 2;
-  }
-
   // Management server can use these match criteria to identify clients.
-  repeated NodeMatcher node_matchers = 1;
+  repeated type.matcher.NodeMatcher node_matchers = 1;
 }
 
 // Detailed config (per xDS) with status.
