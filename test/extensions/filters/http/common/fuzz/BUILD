@@ -16,6 +16,7 @@ envoy_package()
 envoy_proto_library(
     name = "filter_fuzz_proto",
     srcs = ["filter_fuzz.proto"],
+    generate_python = 0,
     deps = [
         "//test/fuzz:common_proto",
         "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3alpha:pkg",
