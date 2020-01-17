@@ -3,6 +3,7 @@ syntax = "proto3";
 package envoy.config.filter.http.cache.v2;
 
 import "envoy/api/v2/route/route_components.proto";
+import "envoy/type/matcher/string.proto";
 
 import "udpa/annotations/migrate.proto";
 import "validate/validate.proto";
@@ -42,11 +43,12 @@ message CacheConfig {
 
   // TODO(toddmgreer) implement vary headers
   //
-  // List of allowed Vary headers. These headers will be provided to caches in lookups, and the
-  // cache filter will only insert responses whose Vary headers (if any) are all in this list. For
-  // example, if an origin supplies "vary:user-agent" in a response, the response will only be
-  // inserted if "user-agent" is in this list.
-  repeated string allowed_vary_headers = 2;
+  // List of allowed Vary headers. Headers matched by allowed_vary_headers will
+  // be provided to caches in lookups, and the cache filter will only insert
+  // responses whose Vary headers (if any) are matched my a matcher in this
+  // list. If allowed_vary_headers is empty, responses with 'vary' headers will
+  // not be cached.
+  repeated type.matcher.StringMatcher allowed_vary_headers = 2;
 
   // TODO(toddmgreer) implement key customization
   //
