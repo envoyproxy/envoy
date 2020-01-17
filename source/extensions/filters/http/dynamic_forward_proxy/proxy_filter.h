@@ -1,6 +1,6 @@
 #pragma once
 
-#include "envoy/extensions/filters/http/dynamic_forward_proxy/v3alpha/dynamic_forward_proxy.pb.h"
+#include "envoy/extensions/filters/http/dynamic_forward_proxy/v3/dynamic_forward_proxy.pb.h"
 #include "envoy/upstream/cluster_manager.h"
 
 #include "extensions/common/dynamic_forward_proxy/dns_cache.h"
@@ -14,8 +14,7 @@ namespace DynamicForwardProxy {
 class ProxyFilterConfig {
 public:
   ProxyFilterConfig(
-      const envoy::extensions::filters::http::dynamic_forward_proxy::v3alpha::FilterConfig&
-          proto_config,
+      const envoy::extensions::filters::http::dynamic_forward_proxy::v3::FilterConfig& proto_config,
       Extensions::Common::DynamicForwardProxy::DnsCacheManagerFactory& cache_manager_factory,
       Upstream::ClusterManager& cluster_manager);
 
@@ -33,8 +32,7 @@ using ProxyFilterConfigSharedPtr = std::shared_ptr<ProxyFilterConfig>;
 class ProxyPerRouteConfig : public ::Envoy::Router::RouteSpecificFilterConfig {
 public:
   ProxyPerRouteConfig(
-      const envoy::extensions::filters::http::dynamic_forward_proxy::v3alpha::PerRouteConfig&
-          config);
+      const envoy::extensions::filters::http::dynamic_forward_proxy::v3::PerRouteConfig& config);
 
   const std::string& hostRewrite() const { return host_rewrite_; }
   const Http::LowerCaseString& hostRewriteHeader() const { return host_rewrite_header_; }

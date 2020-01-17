@@ -4,8 +4,8 @@
 
 #include "envoy/api/api.h"
 #include "envoy/common/platform.h"
-#include "envoy/config/core/v3alpha/base.pb.h"
-#include "envoy/config/core/v3alpha/grpc_service.pb.h"
+#include "envoy/config/core/v3/base.pb.h"
+#include "envoy/config/core/v3/grpc_service.pb.h"
 #include "envoy/grpc/async_client.h"
 #include "envoy/stats/scope.h"
 #include "envoy/thread/thread.h"
@@ -169,7 +169,7 @@ class GoogleAsyncClientImpl final : public RawAsyncClient, Logger::Loggable<Logg
 public:
   GoogleAsyncClientImpl(Event::Dispatcher& dispatcher, GoogleAsyncClientThreadLocal& tls,
                         GoogleStubFactory& stub_factory, Stats::ScopeSharedPtr scope,
-                        const envoy::config::core::v3alpha::GrpcService& config, Api::Api& api);
+                        const envoy::config::core::v3::GrpcService& config, Api::Api& api);
   ~GoogleAsyncClientImpl() override;
 
   // Grpc::AsyncClient
@@ -185,7 +185,7 @@ public:
 
 private:
   static std::shared_ptr<grpc::Channel>
-  createChannel(const envoy::config::core::v3alpha::GrpcService::GoogleGrpc& config);
+  createChannel(const envoy::config::core::v3::GrpcService::GoogleGrpc& config);
 
   Event::Dispatcher& dispatcher_;
   GoogleAsyncClientThreadLocal& tls_;
@@ -195,7 +195,7 @@ private:
   std::shared_ptr<GoogleStub> stub_;
   std::list<std::unique_ptr<GoogleAsyncStreamImpl>> active_streams_;
   const std::string stat_prefix_;
-  const Protobuf::RepeatedPtrField<envoy::config::core::v3alpha::HeaderValue> initial_metadata_;
+  const Protobuf::RepeatedPtrField<envoy::config::core::v3::HeaderValue> initial_metadata_;
   Stats::ScopeSharedPtr scope_;
   GoogleAsyncClientStats stats_;
 

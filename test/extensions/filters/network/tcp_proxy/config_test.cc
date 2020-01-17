@@ -1,7 +1,7 @@
 #include <string>
 
-#include "envoy/extensions/filters/network/tcp_proxy/v3alpha/tcp_proxy.pb.h"
-#include "envoy/extensions/filters/network/tcp_proxy/v3alpha/tcp_proxy.pb.validate.h"
+#include "envoy/extensions/filters/network/tcp_proxy/v3/tcp_proxy.pb.h"
+#include "envoy/extensions/filters/network/tcp_proxy/v3/tcp_proxy.pb.validate.h"
 
 #include "extensions/filters/network/tcp_proxy/config.h"
 
@@ -90,7 +90,7 @@ TEST_P(RouteIpListConfigTest, DEPRECATED_FEATURE_TEST(TcpProxy)) {
   }
   )EOF";
 
-  envoy::extensions::filters::network::tcp_proxy::v3alpha::TcpProxy proto_config;
+  envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy proto_config;
   TestUtility::loadFromJson(json_string, proto_config);
 
   NiceMock<Server::Configuration::MockFactoryContext> context;
@@ -104,7 +104,7 @@ TEST_P(RouteIpListConfigTest, DEPRECATED_FEATURE_TEST(TcpProxy)) {
 TEST(ConfigTest, ValidateFail) {
   NiceMock<Server::Configuration::MockFactoryContext> context;
   EXPECT_THROW(ConfigFactory().createFilterFactoryFromProto(
-                   envoy::extensions::filters::network::tcp_proxy::v3alpha::TcpProxy(), context),
+                   envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy(), context),
                ProtoValidationException);
 }
 
@@ -112,8 +112,8 @@ TEST(ConfigTest, ValidateFail) {
 TEST(ConfigTest, ConfigTest) {
   NiceMock<Server::Configuration::MockFactoryContext> context;
   ConfigFactory factory;
-  envoy::extensions::filters::network::tcp_proxy::v3alpha::TcpProxy config =
-      *dynamic_cast<envoy::extensions::filters::network::tcp_proxy::v3alpha::TcpProxy*>(
+  envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy config =
+      *dynamic_cast<envoy::extensions::filters::network::tcp_proxy::v3::TcpProxy*>(
           factory.createEmptyConfigProto().get());
   config.set_stat_prefix("prefix");
   config.set_cluster("cluster");

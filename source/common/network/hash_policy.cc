@@ -1,7 +1,7 @@
 #include "common/network/hash_policy.h"
 
 #include "envoy/common/exception.h"
-#include "envoy/type/v3alpha/hash_policy.pb.h"
+#include "envoy/type/v3/hash_policy.pb.h"
 
 #include "common/common/assert.h"
 
@@ -22,10 +22,10 @@ public:
 };
 
 HashPolicyImpl::HashPolicyImpl(
-    const absl::Span<const envoy::type::v3alpha::HashPolicy* const>& hash_policies) {
+    const absl::Span<const envoy::type::v3::HashPolicy* const>& hash_policies) {
   ASSERT(hash_policies.size() == 1);
   switch (hash_policies[0]->policy_specifier_case()) {
-  case envoy::type::v3alpha::HashPolicy::PolicySpecifierCase::kSourceIp:
+  case envoy::type::v3::HashPolicy::PolicySpecifierCase::kSourceIp:
     hash_impl_ = std::make_unique<SourceIpHashMethod>();
     break;
   default:

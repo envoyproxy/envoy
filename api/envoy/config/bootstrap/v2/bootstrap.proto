@@ -16,6 +16,7 @@ import "google/protobuf/duration.proto";
 import "google/protobuf/struct.proto";
 import "google/protobuf/wrappers.proto";
 
+import "envoy/annotations/deprecation.proto";
 import "validate/validate.proto";
 
 option java_package = "io.envoyproxy.envoy.config.bootstrap.v2";
@@ -119,7 +120,7 @@ message Bootstrap {
   // Configuration for the runtime configuration provider (deprecated). If not
   // specified, a “null” provider will be used which will result in all defaults
   // being used.
-  Runtime runtime = 11 [deprecated = true];
+  Runtime runtime = 11 [deprecated = true, (envoy.annotations.disallowed_by_default) = true];
 
   // Configuration for the runtime configuration provider. If not
   // specified, a “null” provider will be used which will result in all defaults

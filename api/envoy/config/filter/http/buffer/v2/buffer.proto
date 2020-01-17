@@ -10,8 +10,7 @@ import "validate/validate.proto";
 option java_package = "io.envoyproxy.envoy.config.filter.http.buffer.v2";
 option java_outer_classname = "BufferProto";
 option java_multiple_files = true;
-option (udpa.annotations.file_migrate).move_to_package =
-    "envoy.extensions.filters.http.buffer.v3alpha";
+option (udpa.annotations.file_migrate).move_to_package = "envoy.extensions.filters.http.buffer.v3";
 
 // [#protodoc-title: Buffer]
 // Buffer :ref:`configuration overview <config_http_filters_buffer>`.

@@ -31,6 +31,7 @@ public:
   SysCallIntResult socket(int domain, int type, int protocol) override;
   SysCallSizeResult sendmsg(int fd, const msghdr* message, int flags) override;
   SysCallIntResult getsockname(int sockfd, sockaddr* addr, socklen_t* addrlen) override;
+  SysCallIntResult gethostname(char* name, size_t length) override;
 };
 
 using OsSysCallsSingleton = ThreadSafeSingleton<OsSysCallsImpl>;

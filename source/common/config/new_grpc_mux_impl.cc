@@ -1,6 +1,6 @@
 #include "common/config/new_grpc_mux_impl.h"
 
-#include "envoy/service/discovery/v3alpha/discovery.pb.h"
+#include "envoy/service/discovery/v3/discovery.pb.h"
 
 #include "common/common/assert.h"
 #include "common/common/backoff_strategy.h"
@@ -16,7 +16,7 @@ namespace Config {
 NewGrpcMuxImpl::NewGrpcMuxImpl(Grpc::RawAsyncClientPtr&& async_client,
                                Event::Dispatcher& dispatcher,
                                const Protobuf::MethodDescriptor& service_method,
-                               envoy::config::core::v3alpha::ApiVersion transport_api_version,
+                               envoy::config::core::v3::ApiVersion transport_api_version,
                                Runtime::RandomGenerator& random, Stats::Scope& scope,
                                const RateLimitSettings& rate_limit_settings,
                                const LocalInfo::LocalInfo& local_info)
@@ -57,7 +57,7 @@ bool NewGrpcMuxImpl::paused(const std::string& type_url) const {
 }
 
 void NewGrpcMuxImpl::onDiscoveryResponse(
-    std::unique_ptr<envoy::service::discovery::v3alpha::DeltaDiscoveryResponse>&& message) {
+    std::unique_ptr<envoy::service::discovery::v3::DeltaDiscoveryResponse>&& message) {
   ENVOY_LOG(debug, "Received DeltaDiscoveryResponse for {} at version {}", message->type_url(),
             message->system_version_info());
   auto sub = subscriptions_.find(message->type_url());
@@ -183,7 +183,7 @@ void NewGrpcMuxImpl::trySendDiscoveryRequests() {
     if (!canSendDiscoveryRequest(next_request_type_url)) {
       break;
     }
-    envoy::service::discovery::v3alpha::DeltaDiscoveryRequest request;
+    envoy::service::discovery::v3::DeltaDiscoveryRequest request;
     // Get our subscription state to generate the appropriate DeltaDiscoveryRequest, and send.
     if (!pausable_ack_queue_.empty()) {
       // Because ACKs take precedence over plain requests, if there is anything in the queue, it's

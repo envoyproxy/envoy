@@ -1,6 +1,6 @@
 #pragma once
 
-#include "envoy/config/tap/v3alpha/common.pb.h"
+#include "envoy/config/tap/v3/common.pb.h"
 
 #include "common/http/header_utility.h"
 
@@ -119,7 +119,7 @@ protected:
  * up recursively building many matchers, which will all be added to the passed in vector
  * of matchers. See the comments in tap.h for the general structure of how tap matchers work.
  */
-void buildMatcher(const envoy::config::tap::v3alpha::MatchPredicate& match_config,
+void buildMatcher(const envoy::config::tap::v3::MatchPredicate& match_config,
                   std::vector<MatcherPtr>& matchers);
 
 /**
@@ -172,7 +172,7 @@ class SetLogicMatcher : public LogicMatcherBase {
 public:
   enum class Type { And, Or };
 
-  SetLogicMatcher(const envoy::config::tap::v3alpha::MatchPredicate::MatchSet& configs,
+  SetLogicMatcher(const envoy::config::tap::v3::MatchPredicate::MatchSet& configs,
                   std::vector<MatcherPtr>& matchers, Type type);
 
 private:
@@ -188,7 +188,7 @@ private:
  */
 class NotMatcher : public LogicMatcherBase {
 public:
-  NotMatcher(const envoy::config::tap::v3alpha::MatchPredicate& config,
+  NotMatcher(const envoy::config::tap::v3::MatchPredicate& config,
              std::vector<MatcherPtr>& matchers);
 
 private:
@@ -233,7 +233,7 @@ public:
  */
 class HttpHeaderMatcherBase : public SimpleMatcher {
 public:
-  HttpHeaderMatcherBase(const envoy::config::tap::v3alpha::HttpHeadersMatch& config,
+  HttpHeaderMatcherBase(const envoy::config::tap::v3::HttpHeadersMatch& config,
                         const std::vector<MatcherPtr>& matchers);
 
 protected:

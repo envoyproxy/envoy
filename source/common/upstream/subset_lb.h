@@ -6,7 +6,7 @@
 #include <string>
 #include <unordered_map>
 
-#include "envoy/config/cluster/v3alpha/cluster.pb.h"
+#include "envoy/config/cluster/v3/cluster.pb.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/stats/scope.h"
 #include "envoy/upstream/load_balancer.h"
@@ -27,11 +27,11 @@ public:
       LoadBalancerType lb_type, PrioritySet& priority_set, const PrioritySet* local_priority_set,
       ClusterStats& stats, Stats::Scope& scope, Runtime::Loader& runtime,
       Runtime::RandomGenerator& random, const LoadBalancerSubsetInfo& subsets,
-      const absl::optional<envoy::config::cluster::v3alpha::Cluster::RingHashLbConfig>&
+      const absl::optional<envoy::config::cluster::v3::Cluster::RingHashLbConfig>&
           lb_ring_hash_config,
-      const absl::optional<envoy::config::cluster::v3alpha::Cluster::LeastRequestLbConfig>&
+      const absl::optional<envoy::config::cluster::v3::Cluster::LeastRequestLbConfig>&
           least_request_config,
-      const envoy::config::cluster::v3alpha::Cluster::CommonLbConfig& common_config);
+      const envoy::config::cluster::v3::Cluster::CommonLbConfig& common_config);
   ~SubsetLoadBalancer() override;
 
   // Upstream::LoadBalancer
@@ -41,8 +41,9 @@ private:
   using HostPredicate = std::function<bool(const Host&)>;
   struct SubsetSelectorFallbackParams;
 
+  void initSubsetAnyOnce();
   void initSubsetSelectorMap();
-  void initSelectorFallbackSubset(const envoy::config::cluster::v3alpha::Cluster::LbSubsetConfig::
+  void initSelectorFallbackSubset(const envoy::config::cluster::v3::Cluster::LbSubsetConfig::
                                       LbSubsetSelector::LbSubsetSelectorFallbackPolicy&);
   HostConstSharedPtr
   chooseHostForSelectorFallbackPolicy(const SubsetSelectorFallbackParams& fallback_params,
@@ -170,7 +171,7 @@ private:
   };
 
   struct SubsetSelectorFallbackParams {
-    envoy::config::cluster::v3alpha::Cluster::LbSubsetConfig::LbSubsetSelector::
+    envoy::config::cluster::v3::Cluster::LbSubsetConfig::LbSubsetSelector::
         LbSubsetSelectorFallbackPolicy fallback_policy_;
     const std::set<std::string>* fallback_keys_subset_ = nullptr;
   };
@@ -227,17 +228,16 @@ private:
   std::string describeMetadata(const SubsetMetadata& kvs);
 
   const LoadBalancerType lb_type_;
-  const absl::optional<envoy::config::cluster::v3alpha::Cluster::RingHashLbConfig>
-      lb_ring_hash_config_;
-  const absl::optional<envoy::config::cluster::v3alpha::Cluster::LeastRequestLbConfig>
+  const absl::optional<envoy::config::cluster::v3::Cluster::RingHashLbConfig> lb_ring_hash_config_;
+  const absl::optional<envoy::config::cluster::v3::Cluster::LeastRequestLbConfig>
       least_request_config_;
-  const envoy::config::cluster::v3alpha::Cluster::CommonLbConfig common_config_;
+  const envoy::config::cluster::v3::Cluster::CommonLbConfig common_config_;
   ClusterStats& stats_;
   Stats::Scope& scope_;
   Runtime::Loader& runtime_;
   Runtime::RandomGenerator& random_;
 
-  const envoy::config::cluster::v3alpha::Cluster::LbSubsetConfig::LbSubsetFallbackPolicy
+  const envoy::config::cluster::v3::Cluster::LbSubsetConfig::LbSubsetFallbackPolicy
       fallback_policy_;
   const SubsetMetadata default_subset_metadata_;
   const std::vector<SubsetSelectorPtr> subset_selectors_;
@@ -246,10 +246,10 @@ private:
   const PrioritySet* original_local_priority_set_;
   Common::CallbackHandle* original_priority_set_callback_handle_;
 
+  LbSubsetEntryPtr subset_any_;
   LbSubsetEntryPtr fallback_subset_;
   LbSubsetEntryPtr panic_mode_subset_;
 
-  LbSubsetEntryPtr selector_fallback_subset_any_;
   LbSubsetEntryPtr selector_fallback_subset_default_;
 
   // Forms a trie-like structure. Requires lexically sorted Host and Route metadata.

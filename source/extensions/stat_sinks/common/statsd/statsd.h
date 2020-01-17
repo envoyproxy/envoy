@@ -102,7 +102,6 @@ private:
     ~TlsSink() override;
 
     void beginFlush(bool expect_empty_buffer);
-    void checkSize();
     void commonFlush(const std::string& name, uint64_t value, char stat_type);
     void flushCounter(const std::string& name, uint64_t delta);
     void flushGauge(const std::string& name, uint64_t value);

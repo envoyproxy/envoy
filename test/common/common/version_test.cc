@@ -11,7 +11,7 @@ class VersionInfoTestPeer {
 public:
   static const std::string& buildType() { return VersionInfo::buildType(); }
   static const std::string& sslVersion() { return VersionInfo::sslVersion(); }
-  static envoy::config::core::v3alpha::BuildVersion makeBuildVersion(const char* version) {
+  static envoy::config::core::v3::BuildVersion makeBuildVersion(const char* version) {
     return VersionInfo::makeBuildVersion(version);
   }
 };
