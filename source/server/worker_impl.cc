@@ -50,6 +50,24 @@ void WorkerImpl::addListener(Network::ListenerConfig& listener, AddListenerCompl
   });
 }
 
+void WorkerImpl::addIntelligentListener(uint64_t overrided_listener,
+                                        Network::ListenerConfig& listener,
+                                        AddListenerCompletion completion) {
+  // All listener additions happen via post. However, we must deal with the case where the listener
+  // can not be created on the worker. There is a race condition where 2 processes can successfully
+  // bind to an address, but then fail to listen() with EADDRINUSE. During initial startup, we want
+  // to surface this.
+  dispatcher_->post([this, overrided_listener, &listener, completion]() -> void {
+    try {
+      handler_->addIntelligentListener(overrided_listener, listener);
+      hooks_.onWorkerListenerAdded();
+      completion(true);
+    } catch (const Network::CreateListenerException& e) {
+      completion(false);
+    }
+  });
+}
+
 uint64_t WorkerImpl::numConnections() {
   uint64_t ret = 0;
   if (handler_) {

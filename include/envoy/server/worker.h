@@ -32,6 +32,15 @@ public:
   virtual void addListener(Network::ListenerConfig& listener,
                            AddListenerCompletion completion) PURE;
 
+  // TODO: deprecate addListener?
+  /**
+   * Replace the existing listener if any. If the previous listener doesn't exist, e.g. failed to
+   * start, the behavior should be equivalent to add a new listener.
+   */
+  virtual void addIntelligentListener(uint64_t overrided_listener,
+                                      Network::ListenerConfig& listener,
+                                      AddListenerCompletion completion) PURE;
+
   /**
    * @return uint64_t the number of connections across all listeners that the worker owns.
    */
