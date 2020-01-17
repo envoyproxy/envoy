@@ -177,7 +177,7 @@ message AuthorizationRequest {
   // 2. *Content-Length* will be set to 0 and the request to the authorization service will not have
   // a message body.
   //
-  // .. note::
+  // .. attention::
   //
   //   Since header keys are lowercase strings, please make sure the supplied :ref:`patterns
   //   <envoy_api_field_type.matcher.v3.ListStringMatcher.patterns>` are intended to match lowercase
