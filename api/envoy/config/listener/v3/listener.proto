@@ -199,8 +199,8 @@ message Listener {
 
   // Used to represent an API listener, which is used in non-proxy clients. The type of API
   // exposed to the non-proxy application depends on the type of API listener.
-  // When this field is set, no other field except for
-  // :ref:`name<envoy_api_field_config.listener.v3.Listener.name>` should be set.
+  // When this field is set, no other field except for :ref:`name<envoy_api_field_config.listener.v3.Listener.name>`
+  // should be set.
   //
   // .. note::
   //
