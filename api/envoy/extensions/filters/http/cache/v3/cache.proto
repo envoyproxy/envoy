@@ -2,6 +2,8 @@ syntax = "proto3";
 
 package envoy.extensions.filters.http.cache.v3;
 
+import "envoy/config/route/v3alpha/route_components.proto";
+
 import "udpa/annotations/versioning.proto";
 
 import "validate/validate.proto";
@@ -17,14 +19,6 @@ message CacheConfig {
   option (udpa.annotations.versioning).previous_message_type =
       "envoy.config.filter.http.cache.v2.CacheConfig";
 
-  // List of query params.
-  message QueryParams {
-    option (udpa.annotations.versioning).previous_message_type =
-        "envoy.config.filter.http.cache.v2.CacheConfig.QueryParams";
-
-    repeated string query_string_keys = 1;
-  }
-
   // Modifies cache key creation by restricting which parts of the URL are included.
   message KeyCreatorParams {
     option (udpa.annotations.versioning).previous_message_type =
@@ -38,17 +32,15 @@ message CacheConfig {
     // ever depend on host.
     bool exclude_host = 2;
 
-    oneof query_string_keys {
-      // If set, only query params in this list are included in the cache
-      // key. Any other query params will not affect cache lookup. If set to an
-      // empty list, the query string will be entirely ignored in cache lookups.
-      QueryParams query_string_keys_included = 3;
+    // If query_parameters_included is nonempty, only query parameters matched
+    // by one or more of its matchers are included in the cache key. Any other
+    // query params will not affect cache lookup.
+    repeated config.route.v3alpha.QueryParameterMatcher query_parameters_included = 3;
 
-      // If set, query params in this list are excluded from the cache key, and
-      // will not affect cache lookup. Setting this to an empty list is
-      // equivalent to not setting it (but is less efficient).
-      QueryParams query_string_keys_excluded = 4;
-    }
+    // If query_parameters_excluded is nonempty, query parameters matched by one
+    // or more of its matchers are excluded from the cache key (even if also
+    // matched by query_parameters_included), and will not affect cache lookup.
+    repeated config.route.v3alpha.QueryParameterMatcher query_parameters_excluded = 4;
   }
 
   // Name of cache implementation to use.
