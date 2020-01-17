@@ -37,7 +37,7 @@ message AdmissionControl {
   //
   // The coefficient dictates how aggressively the admission controller will throttle requests as
   // the success rate drops. Lower values will cause throttling to kick in at higher success rates
-  // and result in more aggressive throttling. If the message is unspecified, the coefficient
-  // is 2.0.
+  // and result in more aggressive throttling. Any values less than 1.0, will be set to 1.0. If the
+  // message is unspecified, the coefficient is 2.0.
   api.v2.core.RuntimeDouble aggression_coefficient = 3;
 }

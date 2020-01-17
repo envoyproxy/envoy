@@ -8,6 +8,7 @@
 #include "extensions/filters/http/admission_control/admission_control.h"
 
 #include "test/mocks/runtime/mocks.h"
+#include "test/mocks/server/mocks.h"
 #include "test/mocks/thread_local/mocks.h"
 #include "test/test_common/simulated_time_system.h"
 #include "test/test_common/utility.h"
@@ -33,7 +34,7 @@ public:
 
 protected:
   NiceMock<Runtime::MockLoader> runtime_;
-  Event::SimulatedTimeSystem time_system_;
+  NiceMock<Server::Configuration::MockFactoryContext> context_;
 };
 
 class AdmissionControlTest : public testing::Test {
@@ -74,6 +75,7 @@ protected:
   ThreadLocalController tlc_;
 };
 
+// Test the basic functionality of the admission controller.
 TEST_F(ThreadLocalControllerTest, BasicRecord) {
   EXPECT_EQ(0, tlc_.requestTotalCount());
   EXPECT_EQ(0, tlc_.requestSuccessCount());
@@ -87,6 +89,7 @@ TEST_F(ThreadLocalControllerTest, BasicRecord) {
   EXPECT_EQ(1, tlc_.requestSuccessCount());
 }
 
+// Verify that stale historical samples are removed when they grow stale.
 TEST_F(ThreadLocalControllerTest, RemoveStaleSamples) {
   fillHistorySlots();
 
@@ -108,6 +111,7 @@ TEST_F(ThreadLocalControllerTest, RemoveStaleSamples) {
   EXPECT_EQ(0, tlc_.requestSuccessCount());
 }
 
+// Verify that stale historical samples are removed when they grow stale.
 TEST_F(ThreadLocalControllerTest, RemoveStaleSamples2) {
   fillHistorySlots();
 
@@ -122,6 +126,7 @@ TEST_F(ThreadLocalControllerTest, RemoveStaleSamples2) {
   EXPECT_EQ(0, tlc_.requestSuccessCount());
 }
 
+// Verify that historical samples are made only when there is data to record.
 TEST_F(ThreadLocalControllerTest, VerifyMemoryUsage) {
   // Make sure we don't add any null data to the history if there are sparse requests.
   tlc_.recordSuccess();
@@ -135,7 +140,63 @@ TEST_F(ThreadLocalControllerTest, VerifyMemoryUsage) {
   EXPECT_EQ(3, tlc_.requestSuccessCount());
 }
 
-TEST_F(AdmissionControlConfigTest, BasicTest) {}
+// Verify the configuration when all fields are set.
+TEST_F(AdmissionControlConfigTest, BasicTestAllConfigured) {
+  const std::string yaml = R"EOF(
+enabled:
+  default_value: false
+  runtime_key: "foo.enabled"
+sampling_window: 1337s
+aggression_coefficient:
+  default_value: 4.2
+  runtime_key: "foo.aggression"
+)EOF";
+
+  AdmissionControlFilterConfig::AdmissionControlProto proto;
+  TestUtility::loadFromYamlAndValidate(yaml, proto);
+
+  AdmissionControlFilterConfig config(proto, context_);
+
+  EXPECT_FALSE(config.filterEnabled());
+  EXPECT_EQ(std::chrono::seconds(1337), config.samplingWindow());
+  EXPECT_EQ(4.2, config.aggression());
+}
+
+// Verify the config defaults when not specified.
+TEST_F(AdmissionControlConfigTest, BasicTestMinimumConfigured) {
+  // Empty config. No fields are required.
+  AdmissionControlFilterConfig::AdmissionControlProto proto;
+
+  AdmissionControlFilterConfig config(proto, context_);
+
+  EXPECT_TRUE(config.filterEnabled());
+  EXPECT_EQ(std::chrono::seconds(120), config.samplingWindow());
+  EXPECT_EQ(2.0, config.aggression());
+}
+
+// Ensure runtime fields are honored.
+TEST_F(AdmissionControlConfigTest, VerifyRuntime) {
+  const std::string yaml = R"EOF(
+enabled:
+  default_value: false
+  runtime_key: "foo.enabled"
+sampling_window: 1337s
+aggression_coefficient:
+  default_value: 4.2
+  runtime_key: "foo.aggression"
+)EOF";
+
+  AdmissionControlFilterConfig::AdmissionControlProto proto;
+  TestUtility::loadFromYamlAndValidate(yaml, proto);
+  AdmissionControlFilterConfig config(proto, context_);
+
+  EXPECT_CALL(context_.runtime_loader_.snapshot_, getBoolean("foo.enabled", false))
+      .WillOnce(Return(true));
+  EXPECT_TRUE(config.filterEnabled());
+  EXPECT_CALL(context_.runtime_loader_.snapshot_, getDouble("foo.aggression", 4.2))
+      .WillOnce(Return(1.3));
+  EXPECT_EQ(1.3, config.aggression());
+}
 
 } // namespace
 } // namespace AdmissionControl

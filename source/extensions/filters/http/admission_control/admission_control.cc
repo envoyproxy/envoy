@@ -30,9 +30,9 @@ AdmissionControlFilterConfig::AdmissionControlFilterConfig(
     : runtime_(context.runtime()), time_source_(context.timeSource()), random_(context.random()),
       scope_(context.scope()), tls_(context.threadLocal().allocateSlot()),
       admission_control_feature_(proto_config.enabled(), runtime_),
-      sampling_window_(proto_config.has_sampling_window()
-                           ? DurationUtil::durationToSeconds(proto_config.sampling_window())
-                           : defaultSamplingWindow.count()),
+      sampling_window_(PROTOBUF_GET_MS_OR_DEFAULT(proto_config, sampling_window,
+                                                  1000 * defaultSamplingWindow.count()) /
+                       1000),
       aggression_(
           proto_config.has_aggression_coefficient()
               ? std::make_shared<Runtime::Double>(proto_config.aggression_coefficient(), runtime_)
@@ -43,7 +43,7 @@ AdmissionControlFilterConfig::AdmissionControlFilterConfig(
 }
 
 double AdmissionControlFilterConfig::aggression() const {
-  return aggression_ ? aggression_->value() : defaultAggression;
+  return std::max<double>(1.0, aggression_ ? aggression_->value() : defaultAggression);
 }
 
 AdmissionControlFilter::AdmissionControlFilter(AdmissionControlFilterConfigSharedPtr config,
