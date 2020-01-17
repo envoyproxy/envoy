@@ -1,7 +1,7 @@
 #pragma once
 
 #include "envoy/compressor/compressor.h"
-#include "envoy/config/filter/http/compressor/v2/compressor.pb.h"
+#include "envoy/extensions/filters/http/compressor/v3/compressor.pb.h"
 #include "envoy/http/filter.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/stats/scope.h"
@@ -70,9 +70,10 @@ public:
   const std::map<std::string, uint32_t> registeredCompressors() const;
 
 protected:
-  CompressorFilterConfig(const envoy::config::filter::http::compressor::v2::Compressor& compressor,
-                         const std::string& stats_prefix, Stats::Scope& scope,
-                         Runtime::Loader& runtime, const std::string& content_encoding);
+  CompressorFilterConfig(
+      const envoy::extensions::filters::http::compressor::v3::Compressor& compressor,
+      const std::string& stats_prefix, Stats::Scope& scope, Runtime::Loader& runtime,
+      const std::string& content_encoding);
 
 private:
   static StringUtil::CaseUnorderedSet

@@ -33,7 +33,7 @@ const std::string& compressorRegistryKey() { CONSTRUCT_ON_FIRST_USE(std::string,
 } // namespace
 
 CompressorFilterConfig::CompressorFilterConfig(
-    const envoy::config::filter::http::compressor::v2::Compressor& compressor,
+    const envoy::extensions::filters::http::compressor::v3::Compressor& compressor,
     const std::string& stats_prefix, Stats::Scope& scope, Runtime::Loader& runtime,
     const std::string& content_encoding)
     : content_length_(contentLengthUint(compressor.content_length().value())),

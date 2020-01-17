@@ -128,6 +128,7 @@ proto_library(
         "//envoy/extensions/filters/common/fault/v3:pkg",
         "//envoy/extensions/filters/http/adaptive_concurrency/v3:pkg",
         "//envoy/extensions/filters/http/buffer/v3:pkg",
+        "//envoy/extensions/filters/http/compressor/v3:pkg",
         "//envoy/extensions/filters/http/cors/v3:pkg",
         "//envoy/extensions/filters/http/csrf/v3:pkg",
         "//envoy/extensions/filters/http/dynamic_forward_proxy/v3:pkg",

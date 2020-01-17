@@ -1,4 +1,4 @@
-#include "envoy/config/filter/http/compressor/v2/compressor.pb.h"
+#include "envoy/extensions/filters/http/compressor/v3/compressor.pb.h"
 
 #include "common/protobuf/utility.h"
 
@@ -27,7 +27,7 @@ class MockCompressor : public Compressor::Compressor {
 class MockCompressorFilterConfig : public CompressorFilterConfig {
 public:
   MockCompressorFilterConfig(
-      const envoy::config::filter::http::compressor::v2::Compressor& compressor,
+      const envoy::extensions::filters::http::compressor::v3::Compressor& compressor,
       const std::string& stats_prefix, Stats::Scope& scope, Runtime::Loader& runtime,
       const std::string& compressor_name)
       : CompressorFilterConfig(compressor, stats_prefix + compressor_name + ".", scope, runtime,
@@ -84,7 +84,7 @@ protected:
 
   // CompressorFilterTest Helpers
   void setUpFilter(std::string&& json) {
-    envoy::config::filter::http::compressor::v2::Compressor compressor;
+    envoy::extensions::filters::http::compressor::v3::Compressor compressor;
     TestUtility::loadFromJson(json, compressor);
     config_.reset(new MockCompressorFilterConfig(compressor, "test.", stats_, runtime_, "test"));
     filter_ = std::make_unique<CompressorFilter>(config_);
@@ -351,7 +351,7 @@ TEST_F(CompressorFilterTest, isAcceptEncodingAllowed) {
     // The independence is simulated with a new instance DecoderFilterCallbacks set for "test2".
     Stats::IsolatedStoreImpl stats;
     NiceMock<Runtime::MockLoader> runtime;
-    envoy::config::filter::http::compressor::v2::Compressor compressor;
+    envoy::extensions::filters::http::compressor::v3::Compressor compressor;
     TestUtility::loadFromJson("{}", compressor);
     CompressorFilterConfigSharedPtr config2;
     config2.reset(new MockCompressorFilterConfig(compressor, "test2.", stats, runtime, "test2"));
@@ -375,7 +375,7 @@ TEST_F(CompressorFilterTest, isAcceptEncodingAllowed) {
     // check if the legacy "header_gzip" counter is incremented for gzip compression filter
     Stats::IsolatedStoreImpl stats;
     NiceMock<Runtime::MockLoader> runtime;
-    envoy::config::filter::http::compressor::v2::Compressor compressor;
+    envoy::extensions::filters::http::compressor::v3::Compressor compressor;
     TestUtility::loadFromJson("{}", compressor);
     CompressorFilterConfigSharedPtr config2;
     config2.reset(new MockCompressorFilterConfig(compressor, "test2.", stats, runtime, "gzip"));
@@ -391,7 +391,7 @@ TEST_F(CompressorFilterTest, isAcceptEncodingAllowed) {
     // Test that encoding decision is cached when used by multiple filters.
     Stats::IsolatedStoreImpl stats;
     NiceMock<Runtime::MockLoader> runtime;
-    envoy::config::filter::http::compressor::v2::Compressor compressor;
+    envoy::extensions::filters::http::compressor::v3::Compressor compressor;
     TestUtility::loadFromJson("{}", compressor);
     CompressorFilterConfigSharedPtr config1;
     config1.reset(new MockCompressorFilterConfig(compressor, "test1.", stats, runtime, "test1"));

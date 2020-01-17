@@ -70,12 +70,12 @@ uint64_t GzipFilterConfig::windowBitsUint(Protobuf::uint32 window_bits) {
   return (window_bits > 0 ? window_bits : DefaultWindowBits) | GzipHeaderValue;
 }
 
-const envoy::config::filter::http::compressor::v2::Compressor
+const envoy::extensions::filters::http::compressor::v3::Compressor
 GzipFilterConfig::compressorConfig(const envoy::extensions::filters::http::gzip::v3::Gzip& gzip) {
   if (gzip.has_compressor()) {
     return gzip.compressor();
   }
-  envoy::config::filter::http::compressor::v2::Compressor compressor = {};
+  envoy::extensions::filters::http::compressor::v3::Compressor compressor = {};
   if (gzip.has_content_length()) {
     compressor.set_allocated_content_length(new Protobuf::UInt32Value(gzip.content_length()));
   }

@@ -43,7 +43,7 @@ private:
   static uint64_t windowBitsUint(Protobuf::uint32 window_bits);
 
   // TODO(rojkov): this is going to be deprecated when the old configuration fields are dropped.
-  static const envoy::config::filter::http::compressor::v2::Compressor
+  static const envoy::extensions::filters::http::compressor::v3::Compressor
   compressorConfig(const envoy::extensions::filters::http::gzip::v3::Gzip& gzip);
 
   Compressor::ZlibCompressorImpl::CompressionLevel compression_level_;
