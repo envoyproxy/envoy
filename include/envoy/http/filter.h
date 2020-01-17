@@ -168,7 +168,7 @@ public:
   /**
    * @return uint64_t the ID of the originating stream for logging purposes.
    */
-  virtual uint64_t streamId() PURE;
+  virtual uint64_t streamId() const PURE;
 
   /**
    * @return streamInfo for logging purposes. Individual filter may add specific information to be

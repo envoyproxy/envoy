@@ -548,6 +548,10 @@ message RouteAction {
   //
   // During shadowing, the host/authority header is altered such that *-shadow* is appended. This is
   // useful for logging. For example, *cluster1* becomes *cluster1-shadow*.
+  //
+  // .. note::
+  //
+  //   Shadowing will not be triggered if the primary cluster does not exist.
   message RequestMirrorPolicy {
     // Specifies the cluster that requests will be mirrored to. The cluster must
     // exist in the cluster manager configuration.
