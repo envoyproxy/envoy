@@ -199,6 +199,62 @@ void Http2ConnPoolImplTest::completeRequestCloseUpstream(size_t index, ActiveTes
 TEST_F(Http2ConnPoolImplTest, Host) { EXPECT_EQ(host_, pool_.host()); }
 
 /**
+ * Verify that idle connections are closed immediately when draining.
+ */
+TEST_F(Http2ConnPoolImplTest, DrainConnectionIdle) {
+  InSequence s;
+
+  expectClientCreate();
+  ActiveTestRequest r(*this, 0, false);
+  expectClientConnect(0, r);
+  completeRequest(r);
+
+  EXPECT_CALL(*this, onClientDestroy());
+  pool_.drainConnections();
+}
+
+/**
+ * Verify that a ready connection with a request in progress is moved to
+ * draining and closes when the request completes.
+ */
+TEST_F(Http2ConnPoolImplTest, DrainConnectionReadyWithRequest) {
+  InSequence s;
+
+  expectClientCreate();
+  ActiveTestRequest r(*this, 0, false);
+  expectClientConnect(0, r);
+  EXPECT_CALL(r.inner_encoder_, encodeHeaders(_, true));
+  r.callbacks_.outer_encoder_->encodeHeaders(HeaderMapImpl{}, true);
+
+  pool_.drainConnections();
+
+  EXPECT_CALL(r.decoder_, decodeHeaders_(_, true));
+  EXPECT_CALL(*this, onClientDestroy());
+  r.inner_decoder_->decodeHeaders(HeaderMapPtr{new HeaderMapImpl{}}, true);
+}
+
+/**
+ * Verify that a busy connection is moved to draining and closes when all requests
+ * complete.
+ */
+TEST_F(Http2ConnPoolImplTest, DrainConnectionBusy) {
+  cluster_->http2_settings_.max_concurrent_streams_ = 1;
+  InSequence s;
+
+  expectClientCreate();
+  ActiveTestRequest r(*this, 0, false);
+  expectClientConnect(0, r);
+  EXPECT_CALL(r.inner_encoder_, encodeHeaders(_, true));
+  r.callbacks_.outer_encoder_->encodeHeaders(HeaderMapImpl{}, true);
+
+  pool_.drainConnections();
+
+  EXPECT_CALL(r.decoder_, decodeHeaders_(_, true));
+  EXPECT_CALL(*this, onClientDestroy());
+  r.inner_decoder_->decodeHeaders(HeaderMapPtr{new HeaderMapImpl{}}, true);
+}
+
+/**
  * Verify that connections are drained when requested.
  */
 TEST_F(Http2ConnPoolImplTest, DrainConnections) {
