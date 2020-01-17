@@ -1,6 +1,7 @@
 #include "extensions/filters/common/expr/context.h"
 
 #include "common/http/utility.h"
+#include "common/grpc/common.h"
 
 #include "absl/strings/numbers.h"
 #include "absl/time/time.h"
@@ -140,19 +141,19 @@ absl::optional<CelValue> ResponseWrapper::operator[](CelValue key) const {
   } else if (value == Flags) {
     return CelValue::CreateInt64(info_.responseFlags());
   } else if (value == GrpcStatus) {
-    if (trailers_.value_ != nullptr && trailers_.value_->GrpcStatus() != nullptr) {
-      int64_t status;
-      if (absl::SimpleAtoi(trailers_.value_->GrpcStatus()->value().getStringView(), &status)) {
-        return CelValue::CreateInt64(status);
+    for (const auto wrapper : ((HeadersWrapper []){trailers_, headers_})) {
+      if (wrapper.value_ != nullptr) {
+        const auto& optional_status = Grpc::Common::getGrpcStatus(*(wrapper.value_));
+        if (optional_status.has_value()) {
+          return CelValue::CreateInt64(optional_status.value());
+        }
       }
     }
-    if (headers_.value_ != nullptr && headers_.value_->GrpcStatus() != nullptr) {
-      int64_t status;
-      if (absl::SimpleAtoi(headers_.value_->GrpcStatus()->value().getStringView(), &status)) {
-        return CelValue::CreateInt64(status);
-      }
+    auto code = info_.responseCode();
+    if (code.has_value()) {
+      return CelValue::CreateInt64(Grpc::Utility::httpToGrpcStatus(code.value()));
     }
-    return {};
+    return CelValue::CreateInt64(Grpc::Status::WellKnownGrpcStatus::Unknown);
   }
   return {};
 }

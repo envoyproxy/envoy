@@ -272,6 +272,40 @@ TEST(Context, ResponseAttributes) {
     ASSERT_TRUE(value.value().IsInt64());
     EXPECT_EQ(0x8, value.value().Int64OrDie());
   }
+  {
+    auto value = response[CelValue::CreateStringView(GrpcStatus)];
+    EXPECT_TRUE(value.has_value());
+    ASSERT_TRUE(value.value().IsInt64());
+    EXPECT_EQ(0x8, value.value().Int64OrDie());
+  }
+  {
+    Http::TestHeaderMapImpl header_map{{header_name, "a"}, {grpc_status, "7"}};
+    Http::TestHeaderMapImpl trailer_map{{trailer_name, "b"}};
+    ResponseWrapper response_header_status(&header_map, &trailer_map, info);
+    auto value = response_header_status[CelValue::CreateStringView(GrpcStatus)];
+    EXPECT_TRUE(value.has_value());
+    ASSERT_TRUE(value.value().IsInt64());
+    EXPECT_EQ(0x7, value.value().Int64OrDie());
+  }
+  {
+    Http::TestHeaderMapImpl header_map{{header_name, "a"}};
+    Http::TestHeaderMapImpl trailer_map{{trailer_name, "b"}};
+    ResponseWrapper response_no_status(&header_map, &trailer_map, info);
+    auto value = response_no_status[CelValue::CreateStringView(GrpcStatus)];
+    EXPECT_TRUE(value.has_value());
+    ASSERT_TRUE(value.value().IsInt64());
+    EXPECT_EQ(0xc, value.value().Int64OrDie()); // http:404 -> grcp:12
+  }
+  {
+    NiceMock<StreamInfo::MockStreamInfo> info_without_code;
+    Http::TestHeaderMapImpl header_map{{header_name, "a"}};
+    Http::TestHeaderMapImpl trailer_map{{trailer_name, "b"}};
+    ResponseWrapper response_no_status(&header_map, &trailer_map, info_without_code);
+    auto value = response_no_status[CelValue::CreateStringView(GrpcStatus)];
+    EXPECT_TRUE(value.has_value());
+    ASSERT_TRUE(value.value().IsInt64());
+    EXPECT_EQ(0x2, value.value().Int64OrDie()); // unknown when not in trailers, headers, or http code
+  }
 }
 
 TEST(Context, ConnectionAttributes) {
