@@ -188,16 +188,24 @@ public:
   static void createPath(const std::string& path);
 
   /**
-   * Create a parent path on the filesystem (mkdir -p $(dirname ...) equivalent).
-   * @param path.
-   */
-  static void createParentPath(const std::string& path);
-
-  /**
    * Remove a path on the filesystem (rm -rf ... equivalent).
    * @param path.
    */
   static void removePath(const std::string& path);
+
+  /**
+   * Rename a file
+   * @param old_name
+   * @param new_name
+   */
+  static void renameFile(const std::string& old_name, const std::string& new_name);
+
+  /**
+   * Create a symlink
+   * @param target
+   * @param link
+   */
+  static void createSymlink(const std::string& target, const std::string& link);
 
   /**
    * Set environment variable. Same args as setenv(2).
@@ -216,6 +224,23 @@ public:
 
 private:
   static bazel::tools::cpp::runfiles::Runfiles* runfiles_;
+};
+
+/**
+ * A utility class for atomically updating a file using symbolic link swap.
+ */
+class AtomicFileUpdater {
+public:
+  AtomicFileUpdater(const std::string& filename);
+
+  void update(const std::string& contents);
+
+private:
+  const std::string link_;
+  const std::string new_link_;
+  const std::string target1_;
+  const std::string target2_;
+  bool use_target1_;
 };
 
 } // namespace Envoy

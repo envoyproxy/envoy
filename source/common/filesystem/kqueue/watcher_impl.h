@@ -9,6 +9,7 @@
 
 #include "common/common/linked_object.h"
 #include "common/common/logger.h"
+#include "common/filesystem/filesystem_impl.h"
 
 namespace Envoy {
 namespace Filesystem {
@@ -47,6 +48,7 @@ private:
   int queue_;
   std::unordered_map<int, FileWatchPtr> watches_;
   Event::FileEventPtr kqueue_event_;
+  InstanceImplPosix file_system_;
 };
 
 } // namespace Filesystem

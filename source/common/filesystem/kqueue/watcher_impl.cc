@@ -47,12 +47,10 @@ WatcherImpl::FileWatchPtr WatcherImpl::addWatch(const std::string& path, uint32_
       return nullptr;
     }
 
-    size_t last_slash = path.rfind('/');
-    if (last_slash == std::string::npos) {
-      return nullptr;
-    }
+    std::string directory(path);
+    std::string name;
+    file_system_.splitFileName(directory, name);
 
-    std::string directory = path.substr(0, last_slash);
     watch_fd = open(directory.c_str(), 0);
     if (watch_fd == -1) {
       return nullptr;

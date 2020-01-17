@@ -9,6 +9,7 @@
 #include "envoy/filesystem/watcher.h"
 
 #include "common/common/logger.h"
+#include "common/filesystem/filesystem_impl.h"
 
 namespace Envoy {
 namespace Filesystem {
@@ -42,6 +43,7 @@ private:
   int inotify_fd_;
   Event::FileEventPtr inotify_event_;
   std::unordered_map<int, DirectoryWatch> callback_map_;
+  InstanceImplPosix file_system_;
 };
 
 } // namespace Filesystem

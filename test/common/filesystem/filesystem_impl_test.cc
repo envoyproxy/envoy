@@ -121,6 +121,49 @@ TEST_F(FileSystemImplTest, CanonicalPathFail) {
 }
 #endif
 
+TEST_F(FileSystemImplTest, splitFileName) {
+  std::string name;
+  name.reserve(255);
+  std::string path = "/foo/bar/baz";
+  file_system_.splitFileName(path, name);
+  EXPECT_EQ(path, "/foo/bar");
+  EXPECT_EQ(name, "baz");
+  file_system_.splitFileName(path, name);
+  EXPECT_EQ(path, "/foo");
+  EXPECT_EQ(name, "bar");
+  file_system_.splitFileName(path, name);
+  EXPECT_EQ(path, "/");
+  EXPECT_EQ(name, "foo");
+  file_system_.splitFileName(path, name);
+  EXPECT_EQ(path, "/");
+  EXPECT_EQ(name, "");
+  std::string invalid_path = "nopathdelimeter";
+  EXPECT_THROW(file_system_.splitFileName(invalid_path, name), EnvoyException);
+#ifdef WIN32
+  std::string win32_path = "C:\\foo/bar/baz";
+  file_system_.splitFileName(win32_path, name);
+  EXPECT_EQ(win32_path, "C:\\foo/bar");
+  EXPECT_EQ(name, "baz");
+  file_system_.splitFileName(win32_path, name);
+  EXPECT_EQ(win32_path, "C:\\foo");
+  EXPECT_EQ(name, "bar");
+  file_system_.splitFileName(win32_path, name);
+  EXPECT_EQ(win32_path, "C:\\");
+  EXPECT_EQ(name, "foo");
+  file_system_.splitFileName(win32_path, name);
+  EXPECT_EQ(win32_path, "C:\\");
+  EXPECT_EQ(name, "");
+  win32_path.pop_back();
+  file_system_.splitFileName(win32_path, name);
+  EXPECT_EQ(win32_path, "C:");
+  EXPECT_EQ(name, "");
+  std::string unc_path = "\\\\?\\C:\\";
+  file_system_.splitFileName(unc_path, name);
+  EXPECT_EQ(unc_path, "\\\\?\\C:\\");
+  EXPECT_EQ(name, "");
+#endif
+}
+
 TEST_F(FileSystemImplTest, IllegalPath) {
   EXPECT_FALSE(file_system_.illegalPath("/"));
   EXPECT_FALSE(file_system_.illegalPath("//"));
@@ -132,6 +175,40 @@ TEST_F(FileSystemImplTest, IllegalPath) {
   EXPECT_FALSE(file_system_.illegalPath("/sys"));
   EXPECT_FALSE(file_system_.illegalPath("/sys/"));
   EXPECT_FALSE(file_system_.illegalPath("/_some_non_existent_file"));
+  EXPECT_TRUE(file_system_.illegalPath(R"EOF(\\.\foo)EOF"));
+  EXPECT_TRUE(file_system_.illegalPath(R"EOF(\\z\foo)EOF"));
+  EXPECT_TRUE(file_system_.illegalPath(R"EOF(\\?\nul)EOF"));
+  EXPECT_FALSE(file_system_.illegalPath(R"EOF(\\?\C:\foo)EOF"));
+  EXPECT_FALSE(file_system_.illegalPath(R"EOF(C:\foo)EOF"));
+  EXPECT_FALSE(file_system_.illegalPath(R"EOF(C:\foo/bar\baz)EOF"));
+  EXPECT_FALSE(file_system_.illegalPath("C:/foo"));
+  EXPECT_FALSE(file_system_.illegalPath("C:zfoo"));
+  EXPECT_FALSE(file_system_.illegalPath("C:/foo/bar/baz"));
+  EXPECT_TRUE(file_system_.illegalPath("C:/foo/b*ar/baz"));
+  EXPECT_TRUE(file_system_.illegalPath("C:/foo/b?ar/baz"));
+  EXPECT_TRUE(file_system_.illegalPath(R"EOF(C:/i/x"x)EOF"));
+  EXPECT_TRUE(file_system_.illegalPath(std::string("C:/i\0j", 6)));
+  EXPECT_TRUE(file_system_.illegalPath("C:/i/\177"));
+  EXPECT_TRUE(file_system_.illegalPath("C:/i/\alarm"));
+  EXPECT_FALSE(file_system_.illegalPath("C:/i/../j"));
+  EXPECT_FALSE(file_system_.illegalPath("C:/i/./j"));
+  EXPECT_FALSE(file_system_.illegalPath("C:/i/.j"));
+  EXPECT_TRUE(file_system_.illegalPath("C:/i/j."));
+  EXPECT_TRUE(file_system_.illegalPath("C:/i/j "));
+  EXPECT_FALSE(file_system_.illegalPath("C:/i///"));
+  EXPECT_TRUE(file_system_.illegalPath("C:/i/NUL"));
+  EXPECT_TRUE(file_system_.illegalPath("C:/i/nul"));
+  EXPECT_TRUE(file_system_.illegalPath("C:/i/nul.ext"));
+  EXPECT_TRUE(file_system_.illegalPath("C:/i/nul.ext.ext2"));
+  EXPECT_TRUE(file_system_.illegalPath("C:/i/nul .ext"));
+  EXPECT_TRUE(file_system_.illegalPath("C:/i/COM1"));
+  EXPECT_TRUE(file_system_.illegalPath("C:/i/COM1/whoops"));
+  EXPECT_TRUE(file_system_.illegalPath("C:/i/COM1.ext"));
+  EXPECT_TRUE(file_system_.illegalPath("C:/i/COM1  .ext"));
+  EXPECT_FALSE(file_system_.illegalPath("C:/i/COM1  ext"));
+  EXPECT_FALSE(file_system_.illegalPath("C:/i/COM1foo"));
+  EXPECT_FALSE(file_system_.illegalPath("C:/i/COM0"));
+  EXPECT_FALSE(file_system_.illegalPath("C:/i/COM"));
 #else
   EXPECT_TRUE(file_system_.illegalPath("/dev"));
   EXPECT_TRUE(file_system_.illegalPath("/dev/"));

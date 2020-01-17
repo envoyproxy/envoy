@@ -1,14 +1,5 @@
 #include "test/test_common/environment.h"
 
-// TODO(asraa): Remove <experimental/filesystem> and rely only on <filesystem> when Envoy requires
-// Clang >= 9.
-#if defined(_LIBCPP_VERSION) && !defined(__APPLE__)
-#include <filesystem>
-#elif defined __has_include
-#if __has_include(<experimental/filesystem>) && !defined(__APPLE__)
-#include <experimental/filesystem>
-#endif
-#endif
 #include <fstream>
 #include <iostream>
 #include <regex>
@@ -17,15 +8,18 @@
 #include <unordered_map>
 #include <vector>
 
+#include "envoy/common/platform.h"
+
 #include "common/common/assert.h"
 #include "common/common/compiler_requirements.h"
 #include "common/common/logger.h"
 #include "common/common/macros.h"
 #include "common/common/utility.h"
-#include "envoy/common/platform.h"
+#include "common/filesystem/directory.h"
 
 #include "server/options_impl.h"
 
+#include "test/test_common/file_system_for_test.h"
 #include "test/test_common/network_utility.h"
 
 #include "absl/strings/match.h"
@@ -33,6 +27,8 @@
 #include "spdlog/spdlog.h"
 
 using bazel::tools::cpp::runfiles::Runfiles;
+using Envoy::Filesystem::Directory;
+using Envoy::Filesystem::DirectoryEntry;
 
 namespace Envoy {
 namespace {
@@ -43,11 +39,7 @@ std::string makeTempDir(std::string basename_template) {
   char* dirname = ::_mktemp(&name_template[0]);
   RELEASE_ASSERT(dirname != nullptr, fmt::format("failed to create tempdir from template: {} {}",
                                                  name_template, strerror(errno)));
-#if defined(_LIBCPP_VERSION) && _LIBCPP_VERSION >= 9000 && !defined(__APPLE__)
-  std::__fs::filesystem::create_directories(dirname);
-#elif defined __cpp_lib_experimental_filesystem && !defined(__APPLE__)
-  std::experimental::filesystem::create_directories(dirname);
-#endif
+  TestEnvironment::createPath(dirname);
 #else
   std::string name_template = "/tmp/" + basename_template;
   char* dirname = ::mkdtemp(&name_template[0]);
@@ -69,13 +61,16 @@ std::string getOrCreateUnixDomainSocketDirectory() {
 }
 
 std::string getTemporaryDirectory() {
+  std::string temp_dir;
   if (std::getenv("TEST_TMPDIR")) {
-    return TestEnvironment::getCheckedEnvVar("TEST_TMPDIR");
+    temp_dir = TestEnvironment::getCheckedEnvVar("TEST_TMPDIR");
+  } else if (std::getenv("TMPDIR")) {
+    temp_dir = TestEnvironment::getCheckedEnvVar("TMPDIR");
+  } else {
+    return makeTempDir("envoy_test_tmp.XXXXXX");
   }
-  if (std::getenv("TMPDIR")) {
-    return TestEnvironment::getCheckedEnvVar("TMPDIR");
-  }
-  return makeTempDir("envoy_test_tmp.XXXXXX");
+  TestEnvironment::createPath(temp_dir);
+  return temp_dir;
 }
 
 // Allow initializeOptions() to remember CLI args for getOptions().
@@ -85,49 +80,88 @@ char** argv_;
 } // namespace
 
 void TestEnvironment::createPath(const std::string& path) {
-#if defined(_LIBCPP_VERSION) && _LIBCPP_VERSION >= 9000 && !defined(__APPLE__)
-  // We don't want to rely on mkdir etc. if we can avoid it, since it might not
-  // exist in some environments such as ClusterFuzz.
-  std::__fs::filesystem::create_directories(std::__fs::filesystem::path(path));
-#elif defined __cpp_lib_experimental_filesystem
-  std::experimental::filesystem::create_directories(std::experimental::filesystem::path(path));
+  if (Filesystem::fileSystemForTest().directoryExists(path))
+    return;
+#ifndef WIN32
+  RELEASE_ASSERT(::mkdir(path.c_str(), S_IRWXU | S_IRWXG | S_IRWXO) == 0,
+                 absl::StrCat("failed to create path: ", path));
 #else
-  // No support on this system for std::filesystem or std::experimental::filesystem.
-  RELEASE_ASSERT(::system(("mkdir -p " + path).c_str()) == 0, "");
+  RELEASE_ASSERT(::CreateDirectory(path.c_str(), NULL),
+                 absl::StrCat("failed to create path: ", path));
 #endif
 }
 
-void TestEnvironment::createParentPath(const std::string& path) {
-#if defined(_LIBCPP_VERSION) && _LIBCPP_VERSION >= 9000 && !defined(__APPLE__)
-  // We don't want to rely on mkdir etc. if we can avoid it, since it might not
-  // exist in some environments such as ClusterFuzz.
-  std::__fs::filesystem::create_directories(std::__fs::filesystem::path(path).parent_path());
-#elif defined __cpp_lib_experimental_filesystem && !defined(__APPLE__)
-  std::experimental::filesystem::create_directories(
-      std::experimental::filesystem::path(path).parent_path());
-#else
-  // No support on this system for std::filesystem or std::experimental::filesystem.
-  RELEASE_ASSERT(::system(("mkdir -p $(dirname " + path + ")").c_str()) == 0, "");
-#endif
-}
-
+// On linux, attempt to unlink any file that exists at path,
+// ignoring the result code, to avoid traversing a symlink,
+// On windows, also attempt to remove the directory in case
+// it is actually a symlink/junction, ignoring the result code.
+// Proceed to iteratively recurse the directory if it still remains
 void TestEnvironment::removePath(const std::string& path) {
-  RELEASE_ASSERT(absl::StartsWith(path, TestEnvironment::temporaryDirectory()), "");
-#if defined(_LIBCPP_VERSION) && _LIBCPP_VERSION >= 9000 && !defined(__APPLE__)
-  // We don't want to rely on mkdir etc. if we can avoid it, since it might not
-  // exist in some environments such as ClusterFuzz.
-  if (!std::__fs::filesystem::exists(path)) {
-    return;
-  }
-  std::__fs::filesystem::remove_all(std::__fs::filesystem::path(path));
-#elif defined __cpp_lib_experimental_filesystem && !defined(__APPLE__)
-  if (!std::experimental::filesystem::exists(path)) {
-    return;
-  }
-  std::experimental::filesystem::remove_all(std::experimental::filesystem::path(path));
+  RELEASE_ASSERT(absl::StartsWith(path, TestEnvironment::temporaryDirectory()),
+                 "cowardly refusing to remove test directory not in temp path");
+#ifndef WIN32
+  (void)::unlink(path.c_str());
 #else
-  // No support on this system for std::filesystem or std::experimental::filesystem.
-  RELEASE_ASSERT(::system(("rm -rf " + path).c_str()) == 0, "");
+  (void)::DeleteFile(path.c_str());
+  (void)::RemoveDirectory(path.c_str());
+#endif
+  if (!Filesystem::fileSystemForTest().directoryExists(path))
+    return;
+  Directory directory(path);
+  std::string entry_name;
+  entry_name.reserve(path.size() + 256);
+  entry_name.append(path);
+  entry_name.append("/");
+  size_t fileidx = entry_name.size();
+  for (const DirectoryEntry& entry : directory) {
+    entry_name.resize(fileidx);
+    entry_name.append(entry.name_);
+    if (entry.type_ == Envoy::Filesystem::FileType::Regular)
+#ifndef WIN32
+      RELEASE_ASSERT(::unlink(entry_name.c_str()) == 0,
+                     absl::StrCat("failed to remove file: ", entry_name));
+#else
+      RELEASE_ASSERT(::DeleteFile(entry_name.c_str()),
+                     absl::StrCat("failed to remove file: ", entry_name));
+#endif
+    else if (entry.type_ == Envoy::Filesystem::FileType::Directory)
+      if (entry.name_ != "." && entry.name_ != "..")
+        removePath(entry_name);
+  }
+#ifndef WIN32
+  RELEASE_ASSERT(::rmdir(path.c_str()) == 0,
+                 absl::StrCat("failed to remove path: ", path, " (rmdir failed)"));
+#else
+  RELEASE_ASSERT(::RemoveDirectory(path.c_str()), absl::StrCat("failed to remove path: ", path));
+#endif
+}
+
+void TestEnvironment::renameFile(const std::string& old_name, const std::string& new_name) {
+#ifdef WIN32
+  // use MoveFileEx, since ::rename will not overwrite an existing file. See
+  // https://docs.microsoft.com/en-us/cpp/c-runtime-library/reference/rename-wrename?view=vs-2017
+  const BOOL rc = ::MoveFileEx(old_name.c_str(), new_name.c_str(), MOVEFILE_REPLACE_EXISTING);
+  ASSERT_NE(0, rc);
+#else
+  const int rc = ::rename(old_name.c_str(), new_name.c_str());
+  ASSERT_EQ(0, rc);
+#endif
+};
+
+void TestEnvironment::createSymlink(const std::string& target, const std::string& link) {
+#ifdef WIN32
+  const DWORD attributes = ::GetFileAttributes(target.c_str());
+  ASSERT_NE(attributes, INVALID_FILE_ATTRIBUTES);
+  int flags = SYMBOLIC_LINK_FLAG_ALLOW_UNPRIVILEGED_CREATE;
+  if (attributes & FILE_ATTRIBUTE_DIRECTORY) {
+    flags |= SYMBOLIC_LINK_FLAG_DIRECTORY;
+  }
+
+  const BOOLEAN rc = ::CreateSymbolicLink(link.c_str(), target.c_str(), flags);
+  ASSERT_NE(rc, 0);
+#else
+  const int rc = ::symlink(target.c_str(), link.c_str());
+  ASSERT_EQ(rc, 0);
 #endif
 }
 
@@ -299,9 +333,12 @@ std::string TestEnvironment::temporaryFileSubstitute(const std::string& path,
   const std::string extension = absl::EndsWith(path, ".yaml")
                                     ? ".yaml"
                                     : absl::EndsWith(path, ".pb_text") ? ".pb_text" : ".json";
+  std::string parent(path);
+  std::string name;
+  Filesystem::fileSystemForTest().splitFileName(parent, name);
+
   const std::string out_json_path =
-      TestEnvironment::temporaryPath(path + ".with.ports" + extension);
-  createParentPath(out_json_path);
+      TestEnvironment::temporaryPath(name + ".with.ports" + extension);
   {
     std::ofstream out_json_file(out_json_path);
     out_json_file << out_json_string;
@@ -334,7 +371,6 @@ std::string TestEnvironment::writeStringToFileForTest(const std::string& filenam
                                                       bool fully_qualified_path) {
   const std::string out_path =
       fully_qualified_path ? filename : TestEnvironment::temporaryPath(filename);
-  createParentPath(out_path);
   unlink(out_path.c_str());
   {
     std::ofstream out_file(out_path, std::ios_base::binary);
@@ -361,6 +397,7 @@ void TestEnvironment::setEnvVar(const std::string& name, const std::string& valu
   ASSERT_EQ(0, rc);
 #endif
 }
+
 void TestEnvironment::unsetEnvVar(const std::string& name) {
 #ifdef WIN32
   const int rc = ::_putenv_s(name.c_str(), "");
@@ -374,5 +411,26 @@ void TestEnvironment::unsetEnvVar(const std::string& name) {
 void TestEnvironment::setRunfiles(Runfiles* runfiles) { runfiles_ = runfiles; }
 
 Runfiles* TestEnvironment::runfiles_{};
+
+AtomicFileUpdater::AtomicFileUpdater(const std::string& filename)
+    : link_(filename), new_link_(absl::StrCat(filename, ".new")),
+      target1_(absl::StrCat(filename, ".target1")), target2_(absl::StrCat(filename, ".target2")),
+      use_target1_(true) {
+  unlink(link_.c_str());
+  unlink(new_link_.c_str());
+  unlink(target1_.c_str());
+  unlink(target2_.c_str());
+}
+
+void AtomicFileUpdater::update(const std::string& contents) {
+  const std::string target = use_target1_ ? target1_ : target2_;
+  use_target1_ = !use_target1_;
+  {
+    std::ofstream file(target, std::ios_base::binary);
+    file << contents;
+  }
+  TestEnvironment::createSymlink(target, new_link_);
+  TestEnvironment::renameFile(new_link_, link_);
+}
 
 } // namespace Envoy

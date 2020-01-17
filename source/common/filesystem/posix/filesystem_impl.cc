@@ -108,6 +108,20 @@ std::string InstanceImplPosix::fileReadToEnd(const std::string& path) {
   return file_string.str();
 }
 
+void InstanceImplPosix::splitFileName(std::string& path, std::string& name) {
+  size_t last_slash = path.rfind('/');
+  if (last_slash == std::string::npos) {
+    throw EnvoyException(fmt::format("invalid file path {}", path));
+  }
+
+  name.clear();
+  name.append(path.substr(last_slash + 1, std::string::npos));
+
+  // Retain entire single '/' root path
+  // truncate all other trailing slashes
+  path.resize(last_slash + (last_slash == 0));
+}
+
 bool InstanceImplPosix::illegalPath(const std::string& path) {
   // Special case, allow /dev/fd/* access here so that config can be passed in a
   // file descriptor from a bootstrap script via exec. The reason we do this
@@ -141,7 +155,6 @@ bool InstanceImplPosix::illegalPath(const std::string& path) {
 }
 
 Api::SysCallStringResult InstanceImplPosix::canonicalPath(const std::string& path) {
-  // TODO(htuch): When we are using C++17, switch to std::filesystem::canonical.
   char* resolved_path = ::realpath(path.c_str(), nullptr);
   if (resolved_path == nullptr) {
     return {std::string(), errno};

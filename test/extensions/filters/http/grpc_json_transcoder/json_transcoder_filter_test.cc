@@ -72,7 +72,7 @@ protected:
 
     process(descriptor_set);
 
-    TestUtility::createDirectory(TestEnvironment::temporaryPath("envoy_test"));
+    TestEnvironment::createPath(TestEnvironment::temporaryPath("envoy_test"));
     std::string path = TestEnvironment::temporaryPath("envoy_test/proto.descriptor");
     std::ofstream file(path, std::ios::binary);
     descriptor_set.SerializeToOstream(&file);

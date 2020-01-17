@@ -14,10 +14,6 @@
 namespace Envoy {
 namespace Filesystem {
 
-// we are using this class to clean up all the files we create,
-// as it looks like some versions of libstdc++ have a bug in
-// std::experimental::filesystem::remove_all where it fails with nested directories:
-// https://gcc.gnu.org/bugzilla/show_bug.cgi?id=71313
 class DirectoryTest : public testing::Test {
 public:
   DirectoryTest() : dir_path_(TestEnvironment::temporaryPath("envoy_test")) {
@@ -25,7 +21,7 @@ public:
   }
 
 protected:
-  void SetUp() override { TestUtility::createDirectory(dir_path_); }
+  void SetUp() override { TestEnvironment::createPath(dir_path_); }
 
   void TearDown() override {
     while (!files_to_remove_.empty()) {
@@ -38,7 +34,7 @@ protected:
   void addSubDirs(std::list<std::string> sub_dirs) {
     for (const std::string& dir_name : sub_dirs) {
       const std::string full_path = dir_path_ + "/" + dir_name;
-      TestUtility::createDirectory(full_path);
+      TestEnvironment::createPath(full_path);
       files_to_remove_.push(full_path);
     }
   }
@@ -55,7 +51,7 @@ protected:
     for (const auto& link : symlinks) {
       const std::string target_path = dir_path_ + "/" + link.first;
       const std::string link_path = dir_path_ + "/" + link.second;
-      TestUtility::createSymlink(target_path, link_path);
+      TestEnvironment::createSymlink(target_path, link_path);
       files_to_remove_.push(link_path);
     }
   }
@@ -216,7 +212,7 @@ TEST(Directory, DirectoryHasTrailingPathSeparator) {
 #else
   const std::string dir_path(TestEnvironment::temporaryPath("envoy_test") + "/");
 #endif
-  TestUtility::createDirectory(dir_path);
+  TestEnvironment::createPath(dir_path);
 
   const EntrySet expected = {
       {".", FileType::Directory},

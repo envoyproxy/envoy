@@ -33,13 +33,9 @@ WatcherImpl::~WatcherImpl() { close(inotify_fd_); }
 void WatcherImpl::addWatch(const std::string& path, uint32_t events, OnChangedCb callback) {
   // Because of general inotify pain, we always watch the directory that the file lives in,
   // and then synthetically raise per file events.
-  size_t last_slash = path.rfind('/');
-  if (last_slash == std::string::npos) {
-    throw EnvoyException(absl::StrCat("invalid watch path ", path));
-  }
-
-  std::string directory = last_slash != 0 ? path.substr(0, last_slash) : "/";
-  std::string file = StringUtil::subspan(path, last_slash + 1, path.size());
+  std::string directory(path);
+  std::string file;
+  file_system_.splitFileName(directory, file);
 
   const uint32_t watch_mask = IN_MODIFY | IN_MOVED_TO;
   int watch_fd = inotify_add_watch(inotify_fd_, directory.c_str(), watch_mask);

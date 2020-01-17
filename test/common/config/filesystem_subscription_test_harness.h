@@ -32,11 +32,7 @@ public:
         api_(Api::createApiForTest(stats_store_)), dispatcher_(api_->allocateDispatcher()),
         subscription_(*dispatcher_, path_, callbacks_, stats_, validation_visitor_, *api_) {}
 
-  ~FilesystemSubscriptionTestHarness() override {
-    if (::access(path_.c_str(), F_OK) != -1) {
-      EXPECT_EQ(0, ::unlink(path_.c_str()));
-    }
-  }
+  ~FilesystemSubscriptionTestHarness() override { TestEnvironment::removePath(path_); }
 
   void startSubscription(const std::set<std::string>& cluster_names) override {
     std::ifstream config_file(path_);
@@ -52,7 +48,7 @@ public:
     // Write JSON contents to file, rename to path_ and run dispatcher to catch
     // inotify.
     const std::string temp_path = TestEnvironment::writeStringToFileForTest("eds.json.tmp", json);
-    TestUtility::renameFile(temp_path, path_);
+    TestEnvironment::renameFile(temp_path, path_);
     if (run_dispatcher) {
       dispatcher_->run(Event::Dispatcher::RunType::NonBlock);
     }
