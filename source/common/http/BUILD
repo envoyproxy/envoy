@@ -162,6 +162,7 @@ envoy_cc_library(
         "//include/envoy/common:time_interface",
         "//include/envoy/event:deferred_deletable",
         "//include/envoy/event:dispatcher_interface",
+        "//include/envoy/http:api_listener_interface",
         "//include/envoy/http:codec_interface",
         "//include/envoy/http:context_interface",
         "//include/envoy/http:filter_interface",

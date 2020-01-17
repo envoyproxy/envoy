@@ -6,6 +6,7 @@
 #include "envoy/config/listener/v3/listener_components.pb.h"
 #include "envoy/network/drain_decision.h"
 #include "envoy/server/filter_config.h"
+#include "envoy/server/instance.h"
 #include "envoy/server/transport_socket_config.h"
 #include "envoy/thread_local/thread_local.h"
 
@@ -71,6 +72,51 @@ public:
 
 private:
   Configuration::FactoryContext& parent_context_;
+};
+
+/**
+ * Implementation of FactoryContext wrapping a Server::Instance and some listener components.
+ */
+class FactoryContextImpl : public Configuration::FactoryContext {
+public:
+  FactoryContextImpl(Server::Instance& server, const envoy::config::listener::v3::Listener& config,
+                     Network::DrainDecision& drain_decision, Stats::Scope& global_scope,
+                     Stats::Scope& listener_scope);
+
+  // Configuration::FactoryContext
+  AccessLog::AccessLogManager& accessLogManager() override;
+  Upstream::ClusterManager& clusterManager() override;
+  Event::Dispatcher& dispatcher() override;
+  Grpc::Context& grpcContext() override;
+  bool healthCheckFailed() override;
+  Tracing::HttpTracer& httpTracer() override;
+  Http::Context& httpContext() override;
+  Init::Manager& initManager() override;
+  const LocalInfo::LocalInfo& localInfo() const override;
+  Envoy::Runtime::RandomGenerator& random() override;
+  Envoy::Runtime::Loader& runtime() override;
+  Stats::Scope& scope() override;
+  Singleton::Manager& singletonManager() override;
+  OverloadManager& overloadManager() override;
+  ThreadLocal::SlotAllocator& threadLocal() override;
+  Admin& admin() override;
+  TimeSource& timeSource() override;
+  ProtobufMessage::ValidationVisitor& messageValidationVisitor() override;
+  Api::Api& api() override;
+  ServerLifecycleNotifier& lifecycleNotifier() override;
+  OptProcessContextRef processContext() override;
+  Configuration::ServerFactoryContext& getServerFactoryContext() const override;
+  const envoy::config::core::v3::Metadata& listenerMetadata() const override;
+  envoy::config::core::v3::TrafficDirection direction() const override;
+  Network::DrainDecision& drainDecision() override;
+  Stats::Scope& listenerScope() override;
+
+private:
+  Server::Instance& server_;
+  const envoy::config::listener::v3::Listener& config_;
+  Network::DrainDecision& drain_decision_;
+  Stats::Scope& global_scope_;
+  Stats::Scope& listener_scope_;
 };
 
 /**
