@@ -107,7 +107,9 @@ ConnectionPool::Cancellable* ConnPoolImplBase::newStream(Http::StreamDecoder& re
       host_->cluster().stats().upstream_cx_overflow_.inc();
     }
 
-    // If we have no connections at all, make one no matter what so we don't starve.
+    // If we are at the connection circuit-breaker limit due to other upstreams having
+    // too many open connections, and this upstream has no connections, always create one, to
+    // prevent pending requests being queued to this upstream with no way to be processed.
     if ((ready_clients_.empty() && busy_clients_.empty()) || can_create_connection) {
       createNewConnection();
     }
