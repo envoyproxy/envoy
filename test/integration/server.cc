@@ -183,17 +183,6 @@ void IntegrationTestServer::threadRoutine(const Network::Address::IpVersion vers
                           lock, *this, std::move(random_generator), process_object);
 }
 
-void IntegrationTestServer::onRuntimeCreated() {
-  // TODO(alyssawilk) improve this.
-  Runtime::LoaderSingleton::getExisting()->mergeValues(
-      {{"envoy.deprecated_features:envoy.config.route.v3.CorsPolicy."
-        "hidden_envoy_deprecated_enabled",
-        "true"},
-       {"envoy.deprecated_features:envoy.config.route.v3.CorsPolicy.hidden_envoy_deprecated_"
-        "allow_origin",
-        "true"}});
-}
-
 void IntegrationTestServerImpl::createAndRunEnvoyServer(
     OptionsImpl& options, Event::TimeSystem& time_system,
     Network::Address::InstanceConstSharedPtr local_address, ListenerHooks& hooks,

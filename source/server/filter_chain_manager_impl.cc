@@ -575,5 +575,51 @@ Configuration::FilterChainFactoryContext& FilterChainManagerImpl::createFilterCh
   factory_contexts_.push_back(std::make_unique<FilterChainFactoryContextImpl>(parent_context_));
   return *factory_contexts_.back();
 }
+
+FactoryContextImpl::FactoryContextImpl(Server::Instance& server,
+                                       const envoy::config::listener::v3::Listener& config,
+                                       Network::DrainDecision& drain_decision,
+                                       Stats::Scope& global_scope, Stats::Scope& listener_scope)
+    : server_(server), config_(config), drain_decision_(drain_decision),
+      global_scope_(global_scope), listener_scope_(listener_scope) {}
+
+AccessLog::AccessLogManager& FactoryContextImpl::accessLogManager() {
+  return server_.accessLogManager();
+}
+Upstream::ClusterManager& FactoryContextImpl::clusterManager() { return server_.clusterManager(); }
+Event::Dispatcher& FactoryContextImpl::dispatcher() { return server_.dispatcher(); }
+Grpc::Context& FactoryContextImpl::grpcContext() { return server_.grpcContext(); }
+bool FactoryContextImpl::healthCheckFailed() { return server_.healthCheckFailed(); }
+Tracing::HttpTracer& FactoryContextImpl::httpTracer() { return server_.httpContext().tracer(); }
+Http::Context& FactoryContextImpl::httpContext() { return server_.httpContext(); }
+Init::Manager& FactoryContextImpl::initManager() { return server_.initManager(); }
+const LocalInfo::LocalInfo& FactoryContextImpl::localInfo() const { return server_.localInfo(); }
+Envoy::Runtime::RandomGenerator& FactoryContextImpl::random() { return server_.random(); }
+Envoy::Runtime::Loader& FactoryContextImpl::runtime() { return server_.runtime(); }
+Stats::Scope& FactoryContextImpl::scope() { return global_scope_; }
+Singleton::Manager& FactoryContextImpl::singletonManager() { return server_.singletonManager(); }
+OverloadManager& FactoryContextImpl::overloadManager() { return server_.overloadManager(); }
+ThreadLocal::SlotAllocator& FactoryContextImpl::threadLocal() { return server_.threadLocal(); }
+Admin& FactoryContextImpl::admin() { return server_.admin(); }
+TimeSource& FactoryContextImpl::timeSource() { return server_.timeSource(); }
+ProtobufMessage::ValidationVisitor& FactoryContextImpl::messageValidationVisitor() {
+  return server_.messageValidationContext().staticValidationVisitor();
+}
+Api::Api& FactoryContextImpl::api() { return server_.api(); }
+ServerLifecycleNotifier& FactoryContextImpl::lifecycleNotifier() {
+  return server_.lifecycleNotifier();
+}
+OptProcessContextRef FactoryContextImpl::processContext() { return server_.processContext(); }
+Configuration::ServerFactoryContext& FactoryContextImpl::getServerFactoryContext() const {
+  return server_.serverFactoryContext();
+}
+const envoy::config::core::v3::Metadata& FactoryContextImpl::listenerMetadata() const {
+  return config_.metadata();
+}
+envoy::config::core::v3::TrafficDirection FactoryContextImpl::direction() const {
+  return config_.traffic_direction();
+}
+Network::DrainDecision& FactoryContextImpl::drainDecision() { return drain_decision_; }
+Stats::Scope& FactoryContextImpl::listenerScope() { return listener_scope_; }
 } // namespace Server
 } // namespace Envoy

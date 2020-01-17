@@ -10,6 +10,15 @@ load(
 envoy_package()
 
 envoy_cc_mock(
+    name = "api_listener_mocks",
+    srcs = ["api_listener.cc"],
+    hdrs = ["api_listener.h"],
+    deps = [
+        "//include/envoy/http:api_listener_interface",
+    ],
+)
+
+envoy_cc_mock(
     name = "conn_pool_mocks",
     srcs = ["conn_pool.cc"],
     hdrs = ["conn_pool.h"],
