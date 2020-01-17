@@ -177,16 +177,16 @@ void ConnPoolImplBase::transitionActiveClientState(ActiveClient& client,
 
 void ConnPoolImplBase::closeIdleConnections() {
   // Create a separate list of elements to close to avoid mutate-while-iterating problems.
-  std::list<ActiveClient*> toClose;
+  std::list<ActiveClient*> to_close;
 
   // Possibly-idle connections are always in the ready_clients_ list
   for (auto& client : ready_clients_) {
     if (!client->hasActiveRequests()) {
-      toClose.push_back(client.get());
+      to_close.push_back(client.get());
     }
   }
 
-  for (auto& entry : toClose) {
+  for (auto& entry : to_close) {
     entry->close();
   }
 }
