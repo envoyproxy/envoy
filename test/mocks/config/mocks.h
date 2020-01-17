@@ -18,31 +18,21 @@
 namespace Envoy {
 namespace Config {
 
-template <class ResourceType> class MockSubscriptionCallbacks : public SubscriptionCallbacks {
+class MockSubscriptionCallbacks : public SubscriptionCallbacks {
 public:
-  MockSubscriptionCallbacks() {
-    ON_CALL(*this, resourceName(testing::_))
-        .WillByDefault(testing::Invoke([](const ProtobufWkt::Any& resource) -> std::string {
-          return resourceName_(TestUtility::anyConvert<ResourceType>(resource));
-        }));
-  }
-  ~MockSubscriptionCallbacks() override = default;
-  static std::string
-  resourceName_(const envoy::config::endpoint::v3::ClusterLoadAssignment& resource) {
-    return resource.cluster_name();
-  }
-  template <class T> static std::string resourceName_(const T& resource) { return resource.name(); }
+  MockSubscriptionCallbacks();
+  ~MockSubscriptionCallbacks() override;
 
-  MOCK_METHOD2_T(onConfigUpdate, void(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
-                                      const std::string& version_info));
-  MOCK_METHOD3_T(onConfigUpdate,
-                 void(const Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource>&
-                          added_resources,
-                      const Protobuf::RepeatedPtrField<std::string>& removed_resources,
-                      const std::string& system_version_info));
-  MOCK_METHOD2_T(onConfigUpdateFailed,
-                 void(Envoy::Config::ConfigUpdateFailureReason reason, const EnvoyException* e));
-  MOCK_METHOD1_T(resourceName, std::string(const ProtobufWkt::Any& resource));
+  MOCK_METHOD2(onConfigUpdate, void(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
+                                    const std::string& version_info));
+  MOCK_METHOD3(onConfigUpdate,
+               void(const Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource>&
+                        added_resources,
+                    const Protobuf::RepeatedPtrField<std::string>& removed_resources,
+                    const std::string& system_version_info));
+  MOCK_METHOD2(onConfigUpdateFailed,
+               void(Envoy::Config::ConfigUpdateFailureReason reason, const EnvoyException* e));
+  MOCK_METHOD1(resourceName, std::string(const ProtobufWkt::Any& resource));
 };
 
 class MockSubscription : public Subscription {
@@ -82,9 +72,9 @@ public:
   MOCK_METHOD0(start, void());
   MOCK_METHOD3(subscribe_,
                GrpcMuxWatch*(const std::string& type_url, const std::set<std::string>& resources,
-                             GrpcMuxCallbacks& callbacks));
+                             SubscriptionCallbacks& callbacks));
   GrpcMuxWatchPtr subscribe(const std::string& type_url, const std::set<std::string>& resources,
-                            GrpcMuxCallbacks& callbacks) override;
+                            SubscriptionCallbacks& callbacks) override;
   MOCK_METHOD1(pause, void(const std::string& type_url));
   MOCK_METHOD1(resume, void(const std::string& type_url));
   MOCK_CONST_METHOD1(paused, bool(const std::string& type_url));
@@ -101,18 +91,6 @@ public:
                       const std::set<std::string>& resources, SubscriptionCallbacks& callbacks,
                       std::chrono::milliseconds init_fetch_timeout));
   MOCK_METHOD2(removeWatch, void(const std::string& type_url, Watch* watch));
-};
-
-class MockGrpcMuxCallbacks : public GrpcMuxCallbacks {
-public:
-  MockGrpcMuxCallbacks();
-  ~MockGrpcMuxCallbacks() override;
-
-  MOCK_METHOD2(onConfigUpdate, void(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
-                                    const std::string& version_info));
-  MOCK_METHOD2(onConfigUpdateFailed,
-               void(Envoy::Config::ConfigUpdateFailureReason reason, const EnvoyException* e));
-  MOCK_METHOD1(resourceName, std::string(const ProtobufWkt::Any& resource));
 };
 
 class MockGrpcStreamCallbacks

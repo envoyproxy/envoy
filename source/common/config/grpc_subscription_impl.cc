@@ -50,7 +50,7 @@ void GrpcSubscriptionImpl::updateResourceInterest(
   stats_.update_attempt_.inc();
 }
 
-// Config::GrpcMuxCallbacks
+// Config::SubscriptionCallbacks
 void GrpcSubscriptionImpl::onConfigUpdate(
     const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
     const std::string& version_info) {
