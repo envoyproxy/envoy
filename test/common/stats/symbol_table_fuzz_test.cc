@@ -33,7 +33,8 @@ DEFINE_FUZZER(const uint8_t* buf, size_t len) {
     FUZZ_ASSERT(trimmed_fuzz_data == fake_symbol_table.toString(fake_stat_name));
 
     // Test all combinations of joins within each symbol table.
-    std::string joined = absl::StrCat(trimmed_fuzz_data, ".", trimmed_fuzz_data);
+    std::string joined =
+        trimmed_fuzz_data.empty() ? "" : absl::StrCat(trimmed_fuzz_data, ".", trimmed_fuzz_data);
     auto join = [](SymbolTable& table, StatName name1, StatName name2) -> std::string {
       SymbolTable::StoragePtr storage = table.join({name1, name2});
       StatName stat_name(storage.get());
