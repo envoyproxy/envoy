@@ -245,12 +245,17 @@ void GrpcMuxImpl::onEstablishmentFailure(bool remote_close) {
     // Try to execute fallback to downgrade xDS api version if specified API version is not
     // supported on management server. It attempts once.
     bool try_fallback = !api_state.second.fallbacked_ && !remote_close && is_alpha;
-    for (auto watch : api_state.second.watches_) {
-      watch->callbacks_.onConfigUpdateFailed(
-          Envoy::Config::ConfigUpdateFailureReason::ConnectionFailure, nullptr, try_fallback);
-    }
     if (try_fallback) {
+      for (auto watch : api_state.second.watches_) {
+        watch->callbacks_.onTryFallback(
+            Envoy::Config::ConfigUpdateFailureReason::ConnectionFailure);
+      }
       pause(current_type_url);
+    } else {
+      for (auto watch : api_state.second.watches_) {
+        watch->callbacks_.onConfigUpdateFailed(
+            Envoy::Config::ConfigUpdateFailureReason::ConnectionFailure, nullptr);
+      }
     }
   }
 }

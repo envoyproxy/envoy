@@ -98,6 +98,10 @@ public:
    */
   virtual void updateResourceInterest(const std::set<std::string>& update_to_these_names) PURE;
 
+  /**
+   * Update current type_url to lower version (e.g. v3alpha -> v2).
+   * @param resources vector of resource names to fetch.
+   */
   virtual void fallback(const std::set<std::string>& resources) PURE;
 };
 

@@ -112,8 +112,9 @@ public:
 
   MOCK_METHOD2(onConfigUpdate, void(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
                                     const std::string& version_info));
-  MOCK_METHOD3(onConfigUpdateFailed, void(Envoy::Config::ConfigUpdateFailureReason reason,
-                                          const EnvoyException* e, bool try_fallbacked));
+  MOCK_METHOD2(onConfigUpdateFailed,
+               void(Envoy::Config::ConfigUpdateFailureReason reason, const EnvoyException* e));
+  MOCK_METHOD1(onTryFallback, void(Envoy::Config::ConfigUpdateFailureReason reason));
   MOCK_METHOD1(resourceName, std::string(const ProtobufWkt::Any& resource));
 };
 

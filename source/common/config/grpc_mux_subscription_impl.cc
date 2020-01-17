@@ -64,7 +64,7 @@ void GrpcMuxSubscriptionImpl::onConfigUpdate(
 }
 
 void GrpcMuxSubscriptionImpl::onConfigUpdateFailed(ConfigUpdateFailureReason reason,
-                                                   const EnvoyException* e, bool try_fallback) {
+                                                   const EnvoyException* e) {
   switch (reason) {
   case Envoy::Config::ConfigUpdateFailureReason::ConnectionFailure:
     stats_.update_failure_.inc();
@@ -86,15 +86,20 @@ void GrpcMuxSubscriptionImpl::onConfigUpdateFailed(ConfigUpdateFailureReason rea
 
   stats_.update_attempt_.inc();
   if (reason == Envoy::Config::ConfigUpdateFailureReason::ConnectionFailure) {
-    if (try_fallback) {
-      callbacks_.kickFallback();
-    }
     // New gRPC stream will be established and send requests again.
     // If init_fetch_timeout is non-zero, server will continue startup after it timeout
     return;
   }
 
   callbacks_.onConfigUpdateFailed(reason, e);
+}
+
+void GrpcMuxSubscriptionImpl::onTryFallback(ConfigUpdateFailureReason reason) {
+  assert(reason == Envoy::Config::ConfigUpdateFailureReason::ConnectionFailure);
+  stats_.update_failure_.inc();
+  ENVOY_LOG(debug, "gRPC update for {} failed", type_url_);
+  stats_.update_attempt_.inc();
+  callbacks_.kickFallback();
 }
 
 void GrpcMuxSubscriptionImpl::fallback(const std::set<std::string>& resources) {

@@ -48,7 +48,14 @@ public:
    * @param e supplies any exception data on why the fetch failed. May be nullptr.
    */
   virtual void onConfigUpdateFailed(Envoy::Config::ConfigUpdateFailureReason reason,
-                                    const EnvoyException* e, bool try_fallback = false) PURE;
+                                    const EnvoyException* e) PURE;
+
+  /**
+   * Called when gRPC stream can't established and fallback had not executed yet.
+   * @param reason supplies the update failure reason. It takes only
+   * ConfigUpdateFailureReason::ConnectionFailure.
+   */
+  virtual void onTryFallback(Envoy::Config::ConfigUpdateFailureReason reason) PURE;
 
   /**
    * Obtain the "name" of a v2 API resource in a google.protobuf.Any, e.g. the route config name for
