@@ -25,19 +25,19 @@ QuicMemSliceImpl::QuicMemSliceImpl(QuicUniqueBufferPtr buffer, size_t length)
 QuicMemSliceImpl::QuicMemSliceImpl(Envoy::Buffer::Instance& buffer, size_t length) {
   ASSERT(firstSliceLength(buffer) == length);
   single_slice_buffer_.move(buffer, length);
-  ASSERT(single_slice_buffer_.getRawSlices(nullptr, 0) == 1);
+  ASSERT(single_slice_buffer_.getRawSlices().size() == 1);
 }
 
 const char* QuicMemSliceImpl::data() const {
   Envoy::Buffer::RawSlice out;
-  uint64_t num_slices = single_slice_buffer_.getRawSlices(&out, 1);
+  uint64_t num_slices = single_slice_buffer_.getAtMostNRawSlices(&out, 1);
   ASSERT(num_slices <= 1);
   return static_cast<const char*>(out.mem_);
 }
 
 size_t QuicMemSliceImpl::firstSliceLength(Envoy::Buffer::Instance& buffer) {
   Envoy::Buffer::RawSlice slice;
-  uint64_t total_num = buffer.getRawSlices(&slice, 1);
+  uint64_t total_num = buffer.getAtMostNRawSlices(&slice, 1);
   ASSERT(total_num != 0);
   return slice.len_;
 }

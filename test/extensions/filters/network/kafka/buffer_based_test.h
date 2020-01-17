@@ -20,9 +20,9 @@ namespace Kafka {
 class BufferBasedTest {
 protected:
   const char* getBytes() {
-    uint64_t num_slices = buffer_.getRawSlices(nullptr, 0);
-    absl::FixedArray<Buffer::RawSlice> slices(num_slices);
-    buffer_.getRawSlices(slices.begin(), num_slices);
+    absl::FixedArray<Envoy::Buffer::RawSlice> slices(1);
+    uint64_t num_slices = buffer_.getAtMostNRawSlices(slices.begin(), 1);
+    ASSERT(num_slices == 1);
     return reinterpret_cast<const char*>((slices[0]).mem_);
   }
 

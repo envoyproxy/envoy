@@ -44,10 +44,7 @@ void OwnedImpl::add(absl::string_view data) { add(data.data(), data.size()); }
 
 void OwnedImpl::add(const Instance& data) {
   ASSERT(&data != this);
-  uint64_t num_slices = data.getRawSlices(nullptr, 0);
-  absl::FixedArray<RawSlice> slices(num_slices);
-  data.getRawSlices(slices.begin(), num_slices);
-  for (const RawSlice& slice : slices) {
+  for (const RawSlice& slice : data.getRawSlices()) {
     add(slice.mem_, slice.len_);
   }
 }
@@ -169,9 +166,13 @@ void OwnedImpl::drain(uint64_t size) {
   }
 }
 
-uint64_t OwnedImpl::getRawSlices(RawSlice* out, uint64_t out_size) const {
+uint64_t OwnedImpl::getAtMostNRawSlices(RawSlice* out, uint64_t out_size) const {
   uint64_t num_slices = 0;
   for (const auto& slice : slices_) {
+    if (num_slices >= out_size) {
+      break;
+    }
+
     if (slice->dataSize() == 0) {
       continue;
     }
@@ -179,13 +180,22 @@ uint64_t OwnedImpl::getRawSlices(RawSlice* out, uint64_t out_size) const {
       out[num_slices].mem_ = slice->data();
       out[num_slices].len_ = slice->dataSize();
     }
-    // Per the definition of getRawSlices in include/envoy/buffer/buffer.h, we need to return
-    // the total number of slices needed to access all the data in the buffer, which can be
-    // larger than out_size. So we keep iterating and counting non-empty slices here, even
-    // if all the caller-supplied slices have been filled.
     num_slices++;
   }
   return num_slices;
+}
+
+std::vector<RawSlice> OwnedImpl::getRawSlices() const {
+  std::vector<RawSlice> raw_slices;
+  raw_slices.reserve(slices_.size());
+  for (const auto& slice : slices_) {
+    if (slice->dataSize() == 0) {
+      continue;
+    }
+
+    raw_slices.emplace_back(RawSlice{slice->data(), slice->dataSize()});
+  }
+  return raw_slices;
 }
 
 uint64_t OwnedImpl::length() const {
@@ -471,7 +481,7 @@ bool OwnedImpl::startsWith(absl::string_view data) const {
 Api::IoCallUint64Result OwnedImpl::write(Network::IoHandle& io_handle) {
   constexpr uint64_t MaxSlices = 16;
   RawSlice slices[MaxSlices];
-  const uint64_t num_slices = std::min(getRawSlices(slices, MaxSlices), MaxSlices);
+  const uint64_t num_slices = getAtMostNRawSlices(slices, MaxSlices);
   Api::IoCallUint64Result result = io_handle.writev(slices, num_slices);
   if (result.ok() && result.rc_ > 0) {
     drain(static_cast<uint64_t>(result.rc_));
@@ -488,16 +498,9 @@ OwnedImpl::OwnedImpl(const Instance& data) : OwnedImpl() { add(data); }
 OwnedImpl::OwnedImpl(const void* data, uint64_t size) : OwnedImpl() { add(data, size); }
 
 std::string OwnedImpl::toString() const {
-  uint64_t num_slices = getRawSlices(nullptr, 0);
-  absl::FixedArray<RawSlice> slices(num_slices);
-  getRawSlices(slices.begin(), num_slices);
-  size_t len = 0;
-  for (const RawSlice& slice : slices) {
-    len += slice.len_;
-  }
   std::string output;
-  output.reserve(len);
-  for (const RawSlice& slice : slices) {
+  output.reserve(length());
+  for (const RawSlice& slice : getRawSlices()) {
     output.append(static_cast<const char*>(slice.mem_), slice.len_);
   }
 

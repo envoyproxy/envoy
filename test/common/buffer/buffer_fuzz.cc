@@ -114,14 +114,17 @@ public:
     size_ -= size;
   }
 
-  uint64_t getRawSlices(Buffer::RawSlice* out, uint64_t out_size) const override {
-    if (out_size == 0) {
-      return 1;
-    }
+  uint64_t getAtMostNRawSlices(Buffer::RawSlice* out, uint64_t out_size) const override {
+    ASSERT(out != nullptr);
+    ASSERT(out_size > 0);
     // Sketchy, but probably will work for test purposes.
     out->mem_ = const_cast<char*>(start());
     out->len_ = size_;
     return 1;
+  }
+
+  std::vector<Buffer::RawSlice> getRawSlices() const override {
+    return {{const_cast<char*>(start()), size_}};
   }
 
   uint64_t length() const override { return size_; }
@@ -382,14 +385,15 @@ uint32_t bufferAction(Context& ctxt, char insert_value, uint32_t max_alloc, Buff
     break;
   }
   case test::common::buffer::Action::kGetRawSlices: {
-    const uint64_t slices_needed = target_buffer.getRawSlices(nullptr, 0);
+    const uint64_t slices_needed = target_buffer.getRawSlices().size();
     const uint64_t slices_tested =
         std::min(slices_needed, static_cast<uint64_t>(action.get_raw_slices()));
     if (slices_tested == 0) {
       break;
     }
     std::vector<Buffer::RawSlice> raw_slices{slices_tested};
-    const uint64_t slices_obtained = target_buffer.getRawSlices(raw_slices.data(), slices_tested);
+    const uint64_t slices_obtained =
+        target_buffer.getAtMostNRawSlices(raw_slices.data(), slices_tested);
     FUZZ_ASSERT(slices_obtained <= slices_needed);
     uint64_t offset = 0;
     const std::string data = target_buffer.toString();

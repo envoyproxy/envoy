@@ -125,13 +125,17 @@ public:
 
   /**
    * Fetch the raw buffer slices. This routine is optimized for performance.
-   * @param out supplies an array of RawSlice objects to fill.
-   * @param out_size supplies the size of out.
-   * @return the actual number of slices needed, which may be greater than out_size. Passing
-   *         nullptr for out and 0 for out_size will just return the size of the array needed
-   *         to capture all of the slice data.
+   * @param out supplies an array of RawSlice objects to fill. Must not be nullptr.
+   * @param out_size supplies the size of out. Must be greater than 0.
+   * @return the number of slices written to |out|.
    */
-  virtual uint64_t getRawSlices(RawSlice* out, uint64_t out_size) const PURE;
+  virtual uint64_t getAtMostNRawSlices(RawSlice* out, uint64_t out_size) const PURE;
+
+  /**
+   * Get the contents of the buffer as a vector of raw buffer slices.
+   * @return std::vector with RawSlice for every non-empty slice in the buffer.
+   */
+  virtual std::vector<RawSlice> getRawSlices() const PURE;
 
   /**
    * @return uint64_t the total length of the buffer (not necessarily contiguous in memory).
