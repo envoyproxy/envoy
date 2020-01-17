@@ -8,6 +8,7 @@
 #include "envoy/upstream/upstream.h"
 
 #include "common/http/http2/codec_impl.h"
+#include "common/http/http2/conn_pool_legacy.h"
 #include "common/network/utility.h"
 
 namespace Envoy {
@@ -92,6 +93,21 @@ CodecClientPtr ProdConnPoolImpl::createCodecClient(Upstream::Host::CreateConnect
   CodecClientPtr codec{new CodecClientProd(CodecClient::Type::HTTP2, std::move(data.connection_),
                                            data.host_description_, dispatcher_)};
   return codec;
+}
+
+ConnectionPool::InstancePtr
+allocateConnPool(Event::Dispatcher& dispatcher, Upstream::HostConstSharedPtr host,
+                 Upstream::ResourcePriority priority,
+                 const Network::ConnectionSocket::OptionsSharedPtr& options,
+                 const Network::TransportSocketOptionsSharedPtr& transport_socket_options) {
+  if (Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.new_http2_connection_pool_behavior")) {
+    return std::make_unique<Http::Http2::ProdConnPoolImpl>(dispatcher, host, priority, options,
+                                                           transport_socket_options);
+  } else {
+    return std::make_unique<Http::Legacy::Http2::ProdConnPoolImpl>(
+        dispatcher, host, priority, options, transport_socket_options);
+  }
 }
 
 } // namespace Http2

@@ -84,6 +84,12 @@ private:
   CodecClientPtr createCodecClient(Upstream::Host::CreateConnectionData& data) override;
 };
 
+ConnectionPool::InstancePtr
+allocateConnPool(Event::Dispatcher& dispatcher, Upstream::HostConstSharedPtr host,
+                 Upstream::ResourcePriority priority,
+                 const Network::ConnectionSocket::OptionsSharedPtr& options,
+                 const Network::TransportSocketOptionsSharedPtr& transport_socket_options);
+
 } // namespace Http2
 } // namespace Http
 } // namespace Envoy

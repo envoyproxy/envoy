@@ -14,6 +14,7 @@
 #include "common/http/codec_client.h"
 #include "common/http/codes.h"
 #include "common/http/headers.h"
+#include "common/http/http1/conn_pool_legacy.h"
 #include "common/network/utility.h"
 #include "common/runtime/runtime_impl.h"
 
@@ -139,6 +140,21 @@ CodecClientPtr ProdConnPoolImpl::createCodecClient(Upstream::Host::CreateConnect
   CodecClientPtr codec{new CodecClientProd(CodecClient::Type::HTTP1, std::move(data.connection_),
                                            data.host_description_, dispatcher_)};
   return codec;
+}
+
+ConnectionPool::InstancePtr
+allocateConnPool(Event::Dispatcher& dispatcher, Upstream::HostConstSharedPtr host,
+                 Upstream::ResourcePriority priority,
+                 const Network::ConnectionSocket::OptionsSharedPtr& options,
+                 const Network::TransportSocketOptionsSharedPtr& transport_socket_options) {
+  if (Runtime::runtimeFeatureEnabled(
+          "envoy.reloadable_features.new_http1_connection_pool_behavior")) {
+    return std::make_unique<Http::Http1::ProdConnPoolImpl>(dispatcher, host, priority, options,
+                                                           transport_socket_options);
+  } else {
+    return std::make_unique<Http::Legacy::Http1::ProdConnPoolImpl>(
+        dispatcher, host, priority, options, transport_socket_options);
+  }
 }
 
 } // namespace Http1
