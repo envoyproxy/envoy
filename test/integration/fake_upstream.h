@@ -629,9 +629,7 @@ private:
     }
 
     Network::SocketSharedPtr getListenSocket() override { return socket_; }
-    Network::SocketOptRef sharedSocket() const override {
-      return *socket_;
-    }
+    Network::SocketOptRef sharedSocket() const override { return *socket_; }
 
   private:
     Network::SocketSharedPtr socket_;
