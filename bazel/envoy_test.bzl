@@ -70,7 +70,7 @@ def _envoy_test_linkopts():
 def envoy_cc_fuzz_test(
         name,
         corpus,
-	dictionary = "",
+        dictionary = "",
         repository = "",
         size = "medium",
         deps = [],
@@ -87,7 +87,7 @@ def envoy_cc_fuzz_test(
         corpus_name = corpus
     tar_src = [corpus_name]
     if dictionary:
-       tar_src.append(dictionary)
+        tar_src.append(dictionary)
     pkg_tar(
         name = name + "_corpus_tar",
         srcs = tar_src,
