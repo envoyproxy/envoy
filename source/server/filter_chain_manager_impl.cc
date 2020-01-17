@@ -129,6 +129,11 @@ Stats::Scope& FilterChainFactoryContextImpl::listenerScope() {
   return parent_context_.listenerScope();
 }
 
+FilterChainManagerImpl::FilterChainManagerImpl(
+    const Network::Address::InstanceConstSharedPtr& address,
+    Configuration::FactoryContext& factory_context, FilterChainManagerImpl& parent_manager)
+    : address_(address), parent_context_(factory_context), origin_(&parent_manager) {}
+
 bool FilterChainManagerImpl::isWildcardServerName(const std::string& name) {
   return absl::StartsWith(name, "*.");
 }
@@ -179,14 +184,22 @@ void FilterChainManagerImpl::addFilterChain(
       }
     }
 
+    // Reuse created filter chain if possible.
+    // FilterChainManager maintains the lifetime of FilterChainFactoryContext
+    // ListenerImpl maintains the dependencies of FilterChainFactoryContext
+    auto filter_chain_impl = findExistingFilterChain(*filter_chain);
+    if (filter_chain_impl == nullptr) {
+      // TODO(lambdai): remove static_pointer_cast
+      filter_chain_impl = std::static_pointer_cast<FilterChainImpl>(
+          filter_chain_factory_builder.buildFilterChain(*filter_chain, context_creator));
+    }
+
     addFilterChainForDestinationPorts(
         destination_ports_map_,
         PROTOBUF_GET_WRAPPED_OR_DEFAULT(filter_chain_match, destination_port, 0), destination_ips,
         filter_chain_match.server_names(), filter_chain_match.transport_protocol(),
         filter_chain_match.application_protocols(), filter_chain_match.source_type(), source_ips,
-        filter_chain_match.source_ports(),
-        std::shared_ptr<Network::FilterChain>(
-            filter_chain_factory_builder.buildFilterChain(*filter_chain, context_creator)));
+        filter_chain_match.source_ports(), filter_chain_impl);
   }
   convertIPsToTries();
 }
@@ -570,12 +583,27 @@ void FilterChainManagerImpl::convertIPsToTries() {
   }
 }
 
-Configuration::FilterChainFactoryContext& FilterChainManagerImpl::createFilterChainFactoryContext(
+std::shared_ptr<FilterChainImpl> FilterChainManagerImpl::findExistingFilterChain(
+    const envoy::config::listener::v3alpha::FilterChain& filter_chain_message) {
+  // origin filter chain manager is empty. *this is the ancestor.
+  if (origin_ == nullptr) {
+    return nullptr;
+  }
+  auto iter = origin_->fc_contexts_.find(filter_chain_message);
+  if (iter != origin_->fc_contexts_.end()) {
+    // copy the context to this filter chain manager.
+    fc_contexts_.emplace(filter_chain_message, iter->second);
+    return iter->second;
+  }
+  return nullptr;
+}
+
+std::unique_ptr<Configuration::FilterChainFactoryContext>
+FilterChainManagerImpl::createFilterChainFactoryContext(
     const ::envoy::config::listener::v3alpha::FilterChain* const filter_chain) {
   // TODO(lambdai): drain close should be saved in per filter chain context
   UNREFERENCED_PARAMETER(filter_chain);
-  factory_contexts_.push_back(std::make_unique<FilterChainFactoryContextImpl>(parent_context_));
-  return *factory_contexts_.back();
+  return std::make_unique<FilterChainFactoryContextImpl>(parent_context_);
 }
 } // namespace Server
 } // namespace Envoy

@@ -78,6 +78,29 @@ private:
   Configuration::FactoryContext& parent_context_;
 };
 
+class FilterChainImpl : public Network::FilterChain {
+public:
+  FilterChainImpl(Network::TransportSocketFactoryPtr&& transport_socket_factory,
+                  std::vector<Network::FilterFactoryCb>&& filters_factory)
+      : transport_socket_factory_(std::move(transport_socket_factory)),
+        filters_factory_(std::move(filters_factory)) {}
+
+  // Network::FilterChain
+  const Network::TransportSocketFactory& transportSocketFactory() const override {
+    return *transport_socket_factory_;
+  }
+
+  const std::vector<Network::FilterFactoryCb>& networkFilterFactories() const override {
+    return filters_factory_;
+  }
+  // TODO(lambdai): reconsider the ownership of `factory_context_`
+  std::unique_ptr<FilterChainFactoryContextImpl> factory_context_;
+
+private:
+  const Network::TransportSocketFactoryPtr transport_socket_factory_;
+  const std::vector<Network::FilterFactoryCb> filters_factory_;
+};
+
 /**
  * Implementation of FilterChainManager.
  */
@@ -85,20 +108,19 @@ class FilterChainManagerImpl : public Network::FilterChainManager,
                                public FilterChainFactoryContextCreator,
                                Logger::Loggable<Logger::Id::config> {
 public:
+  using FcContextMap =
+      std::unordered_map<envoy::config::listener::v3alpha::FilterChain,
+                         std::shared_ptr<FilterChainImpl>, MessageUtil, MessageUtil>;
   FilterChainManagerImpl(const Network::Address::InstanceConstSharedPtr& address,
                          Configuration::FactoryContext& factory_context)
       : address_(address), parent_context_(factory_context) {}
 
   FilterChainManagerImpl(const Network::Address::InstanceConstSharedPtr& address,
                          Configuration::FactoryContext& factory_context,
-                         FilterChainManagerImpl& parent_manager)
-      : address_(address), parent_context_(factory_context), filter_chain_init_manager_("fcm_init"),
-        filter_chain_watcher_("fcm_watcher", []() { ENVOY_LOG("TODO_trigger_listener_add"); }) {
-    UNREFERENCED_PARAMETER(parent_manager);
-  }
+                         FilterChainManagerImpl& parent_manager);
 
   // FilterChainFactoryContextCreator
-  Configuration::FilterChainFactoryContext& createFilterChainFactoryContext(
+  std::unique_ptr<Configuration::FilterChainFactoryContext> createFilterChainFactoryContext(
       const ::envoy::config::listener::v3alpha::FilterChain* const filter_chain) override;
 
   // Network::FilterChainManager
@@ -199,36 +221,24 @@ private:
   findFilterChainForSourceIpAndPort(const SourceIPsTrie& source_ips_trie,
                                     const Network::ConnectionSocket& socket) const;
 
+  // Duplicate the inheritent factory context if any.
+  std::shared_ptr<FilterChainImpl> findExistingFilterChain(
+      const envoy::config::listener::v3alpha::FilterChain& filter_chain_message);
+
   // Mapping of FilterChain's configured destination ports, IPs, server names, transport protocols
   // and application protocols, using structures defined above.
   DestinationPortsMap destination_ports_map_;
   const Network::Address::InstanceConstSharedPtr address_;
+  // This is the reference to a factory context where all the generations of listener share.
   Configuration::FactoryContext& parent_context_;
   std::list<std::shared_ptr<Configuration::FilterChainFactoryContext>> factory_contexts_;
-  Init::ManagerImpl filter_chain_init_manager_;
-  Init::WatcherImpl filter_chain_watcher_;
+  // Mapping from filter chain message to filter chain. This is used by LDS response handler to
+  // detect the filter chains in the intersection of existing listener and new listener.
+  FcContextMap fc_contexts_;
+  // Reference to the previous generation of filter chain manager. *this need to copy a subset from
+  // the origin fc_contexts_ Caution: origin_ is not legit all the time.
+  // TODO(lambdai): safer usage
+  FilterChainManagerImpl* origin_{};
 };
-
-class FilterChainImpl : public Network::FilterChain {
-public:
-  FilterChainImpl(Network::TransportSocketFactoryPtr&& transport_socket_factory,
-                  std::vector<Network::FilterFactoryCb>&& filters_factory)
-      : transport_socket_factory_(std::move(transport_socket_factory)),
-        filters_factory_(std::move(filters_factory)) {}
-
-  // Network::FilterChain
-  const Network::TransportSocketFactory& transportSocketFactory() const override {
-    return *transport_socket_factory_;
-  }
-
-  const std::vector<Network::FilterFactoryCb>& networkFilterFactories() const override {
-    return filters_factory_;
-  }
-
-private:
-  const Network::TransportSocketFactoryPtr transport_socket_factory_;
-  const std::vector<Network::FilterFactoryCb> filters_factory_;
-};
-
 } // namespace Server
 } // namespace Envoy
