@@ -26,12 +26,11 @@ namespace Server {
 class ListenerManagerImpl;
 
 /**
- * Listener that provides a handle to inject HTTP calls into envoy via an Http::ConnectionManager.
- * Thus it provides full access to Envoy's L7 features, e.g HTTP filters.
+ * Base class all ApiListeners.
  */
-class ApiListenerImpl : public ApiListener,
-                        public Network::DrainDecision,
-                        Logger::Loggable<Logger::Id::http> {
+class ApiListenerImplBase : public ApiListener,
+                            public Network::DrainDecision,
+                            Logger::Loggable<Logger::Id::http> {
 public:
   // TODO(junr03): consider moving Envoy Mobile's SyntheticAddressImpl to Envoy in order to return
   // that rather than this semi-real one.
@@ -45,8 +44,8 @@ public:
   bool drainClose() const override { return false; }
 
 protected:
-  ApiListenerImpl(const envoy::config::listener::v3::Listener& config, ListenerManagerImpl& parent,
-                  const std::string& name);
+  ApiListenerImplBase(const envoy::config::listener::v3::Listener& config,
+                      ListenerManagerImpl& parent, const std::string& name);
 
   // Synthetic class that acts as a stub Network::ReadFilterCallbacks.
   // TODO(junr03): if we are able to separate the Network Filter aspects of the
@@ -54,7 +53,7 @@ protected:
   // need this and the SyntheticConnection stub anymore.
   class SyntheticReadCallbacks : public Network::ReadFilterCallbacks {
   public:
-    SyntheticReadCallbacks(ApiListenerImpl& parent)
+    SyntheticReadCallbacks(ApiListenerImplBase& parent)
         : parent_(parent), connection_(SyntheticConnection(*this)) {}
 
     // Network::ReadFilterCallbacks
@@ -132,7 +131,7 @@ protected:
       Network::ConnectionSocket::OptionsSharedPtr options_;
     };
 
-    ApiListenerImpl& parent_;
+    ApiListenerImplBase& parent_;
     SyntheticConnection connection_;
   };
 
@@ -146,7 +145,11 @@ protected:
   SyntheticReadCallbacks read_callbacks_;
 };
 
-class HttpApiListener : public ApiListenerImpl {
+/**
+ * ApiListener that provides a handle to inject HTTP calls into Envoy via an
+ * Http::ConnectionManager. Thus, it provides full access to Envoy's L7 features, e.g HTTP filters.
+ */
+class HttpApiListener : public ApiListenerImplBase {
 public:
   HttpApiListener(const envoy::config::listener::v3::Listener& config, ListenerManagerImpl& parent,
                   const std::string& name);

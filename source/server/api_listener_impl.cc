@@ -16,8 +16,8 @@
 namespace Envoy {
 namespace Server {
 
-ApiListenerImpl::ApiListenerImpl(const envoy::config::listener::v3::Listener& config,
-                                 ListenerManagerImpl& parent, const std::string& name)
+ApiListenerImplBase::ApiListenerImplBase(const envoy::config::listener::v3::Listener& config,
+                                         ListenerManagerImpl& parent, const std::string& name)
     : config_(config), parent_(parent), name_(name),
       address_(Network::Address::resolveProtoAddress(config.address())),
       global_scope_(parent_.server_.stats().createScope("")),
@@ -27,7 +27,7 @@ ApiListenerImpl::ApiListenerImpl(const envoy::config::listener::v3::Listener& co
 
 HttpApiListener::HttpApiListener(const envoy::config::listener::v3::Listener& config,
                                  ListenerManagerImpl& parent, const std::string& name)
-    : ApiListenerImpl(config, parent, name) {
+    : ApiListenerImplBase(config, parent, name) {
   auto typed_config = MessageUtil::anyConvertAndValidate<
       envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager>(
       config.api_listener().api_listener(), factory_context_.messageValidationVisitor());

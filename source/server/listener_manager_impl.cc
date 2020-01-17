@@ -327,7 +327,7 @@ bool ListenerManagerImpl::addOrUpdateListener(const envoy::config::listener::v3:
   if (config.has_api_listener()) {
     if (!api_listener_ && !added_via_api) {
       // TODO(junr03): dispatch to different concrete constructors when there are other
-      // ApiListenerImpl derived classes.
+      // ApiListenerImplBase derived classes.
       api_listener_ = std::make_unique<HttpApiListener>(config, *this, config.name());
       return true;
     } else {
