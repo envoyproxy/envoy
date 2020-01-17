@@ -112,7 +112,9 @@ LowerCaseStringMatcher::toLowerCase(const envoy::type::matcher::v3::StringMatche
   envoy::type::matcher::v3::StringMatcher lowercase;
   switch (matcher.match_pattern_case()) {
   case envoy::type::matcher::v3::StringMatcher::MatchPatternCase::kHiddenEnvoyDeprecatedRegex:
-    FALLTHRU;
+    lowercase.set_hidden_envoy_deprecated_regex(
+        StringUtil::toLower(matcher.hidden_envoy_deprecated_regex()));
+    break;
   case envoy::type::matcher::v3::StringMatcher::MatchPatternCase::kSafeRegex:
     return matcher;
   case envoy::type::matcher::v3::StringMatcher::MatchPatternCase::kExact:
