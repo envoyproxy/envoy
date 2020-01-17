@@ -18,7 +18,7 @@ public:
         Envoy::Config::MetadataFilters::get().ENVOY_LB);
     if (filter_it != metadata_match_criteria_.filter_metadata().end()) {
       for (auto const& it : filter_it->second.fields()) {
-        labelSet.push_back(it);
+        labelSet_.push_back(it);
       }
     }
   }
@@ -29,7 +29,7 @@ public:
 
 private:
   const envoy::config::core::v3::Metadata metadata_match_criteria_;
-  std::vector<std::pair<std::string, ProtobufWkt::Value>> labelSet;
+  std::vector<std::pair<std::string, ProtobufWkt::Value>> labelSet_;
 };
 
 } // namespace Host

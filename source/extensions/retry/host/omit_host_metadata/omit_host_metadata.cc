@@ -9,8 +9,9 @@ namespace Retry {
 namespace Host {
 
 bool OmitHostsRetryPredicate::shouldSelectAnotherHost(const Upstream::Host& host) {
-  return Envoy::Config::Metadata::metadataLabelMatch(
-      labelSet, *host.metadata(), Envoy::Config::MetadataFilters::get().ENVOY_LB, true);
+  return labelSet_.size() &&
+         Envoy::Config::Metadata::metadataLabelMatch(
+             labelSet_, *host.metadata(), Envoy::Config::MetadataFilters::get().ENVOY_LB, true);
 }
 
 } // namespace Host
