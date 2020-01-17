@@ -6,6 +6,7 @@
 #include "envoy/type/matcher/v3/string.pb.h"
 #include "envoy/type/matcher/v3/value.pb.h"
 
+#include "common/common/macros.h"
 #include "common/common/regex.h"
 #include "common/config/metadata.h"
 
@@ -90,6 +91,7 @@ bool StringMatcherImpl::match(const absl::string_view value) const {
   case envoy::type::matcher::v3::StringMatcher::MatchPatternCase::kSuffix:
     return absl::EndsWith(value, matcher_.suffix());
   case envoy::type::matcher::v3::StringMatcher::MatchPatternCase::kHiddenEnvoyDeprecatedRegex:
+    FALLTHRU;
   case envoy::type::matcher::v3::StringMatcher::MatchPatternCase::kSafeRegex:
     return regex_->match(value);
   default:
@@ -110,9 +112,9 @@ LowerCaseStringMatcher::toLowerCase(const envoy::type::matcher::v3::StringMatche
   envoy::type::matcher::v3::StringMatcher lowercase;
   switch (matcher.match_pattern_case()) {
   case envoy::type::matcher::v3::StringMatcher::MatchPatternCase::kHiddenEnvoyDeprecatedRegex:
-    lowercase.set_hidden_envoy_deprecated_regex(
-        StringUtil::toLower(matcher.hidden_envoy_deprecated_regex()));
-    break;
+    FALLTHRU;
+  case envoy::type::matcher::v3::StringMatcher::MatchPatternCase::kSafeRegex:
+    return matcher;
   case envoy::type::matcher::v3::StringMatcher::MatchPatternCase::kExact:
     lowercase.set_exact(StringUtil::toLower(matcher.exact()));
     break;
