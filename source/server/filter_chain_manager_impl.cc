@@ -115,7 +115,7 @@ ServerLifecycleNotifier& FilterChainFactoryContextImpl::lifecycleNotifier() {
   return parent_context_.lifecycleNotifier();
 }
 
-OptProcessContextRef FilterChainFactoryContextImpl::processContext() {
+ProcessContextOptRef FilterChainFactoryContextImpl::processContext() {
   return parent_context_.processContext();
 }
 

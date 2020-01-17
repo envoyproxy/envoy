@@ -19,9 +19,9 @@ class Histogram;
 class Scope;
 class NullGaugeImpl;
 
-using OptionalCounter = absl::optional<std::reference_wrapper<const Counter>>;
-using OptionalGauge = absl::optional<std::reference_wrapper<const Gauge>>;
-using OptionalHistogram = absl::optional<std::reference_wrapper<const Histogram>>;
+using CounterOptRef = absl::optional<std::reference_wrapper<const Counter>>;
+using GaugeOptRef = absl::optional<std::reference_wrapper<const Gauge>>;
+using HistogramOptRef = absl::optional<std::reference_wrapper<const Histogram>>;
 using ScopePtr = std::unique_ptr<Scope>;
 using ScopeSharedPtr = std::shared_ptr<Scope>;
 
@@ -98,20 +98,20 @@ public:
    * @param The name of the stat, obtained from the SymbolTable.
    * @return a reference to a counter within the scope's namespace, if it exists.
    */
-  virtual OptionalCounter findCounter(StatName name) const PURE;
+  virtual CounterOptRef findCounter(StatName name) const PURE;
 
   /**
    * @param The name of the stat, obtained from the SymbolTable.
    * @return a reference to a gauge within the scope's namespace, if it exists.
    */
-  virtual OptionalGauge findGauge(StatName name) const PURE;
+  virtual GaugeOptRef findGauge(StatName name) const PURE;
 
   /**
    * @param The name of the stat, obtained from the SymbolTable.
    * @return a reference to a histogram within the scope's namespace, if it
    * exists.
    */
-  virtual OptionalHistogram findHistogram(StatName name) const PURE;
+  virtual HistogramOptRef findHistogram(StatName name) const PURE;
 
   /**
    * @return a reference to the symbol table.

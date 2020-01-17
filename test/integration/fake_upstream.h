@@ -629,7 +629,7 @@ private:
     }
 
     Network::SocketSharedPtr getListenSocket() override { return socket_; }
-    absl::optional<std::reference_wrapper<Network::Socket>> sharedSocket() const override {
+    Network::SocketOptRef sharedSocket() const override {
       return *socket_;
     }
 

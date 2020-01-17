@@ -55,7 +55,7 @@ IntegrationTestServerPtr IntegrationTestServer::create(
     std::function<void(IntegrationTestServer&)> server_ready_function,
     std::function<void()> on_server_init_function, bool deterministic,
     Event::TestTimeSystem& time_system, Api::Api& api, bool defer_listener_finalization,
-    absl::optional<std::reference_wrapper<ProcessObject>> process_object,
+    ProcessObjectOptRef process_object,
     bool allow_unknown_static_fields, bool reject_unknown_dynamic_fields, uint32_t concurrency) {
   IntegrationTestServerPtr server{
       std::make_unique<IntegrationTestServerImpl>(time_system, api, config_path)};
@@ -81,7 +81,7 @@ void IntegrationTestServer::waitUntilListenersReady() {
 void IntegrationTestServer::start(
     const Network::Address::IpVersion version, std::function<void()> on_server_init_function,
     bool deterministic, bool defer_listener_finalization,
-    absl::optional<std::reference_wrapper<ProcessObject>> process_object,
+    ProcessObjectOptRef process_object,
     bool allow_unknown_static_fields, bool reject_unknown_dynamic_fields, uint32_t concurrency) {
   ENVOY_LOG(info, "starting integration test server");
   ASSERT(!thread_);
@@ -164,7 +164,7 @@ void IntegrationTestServer::serverReady() {
 
 void IntegrationTestServer::threadRoutine(
     const Network::Address::IpVersion version, bool deterministic,
-    absl::optional<std::reference_wrapper<ProcessObject>> process_object,
+    ProcessObjectOptRef process_object,
     bool allow_unknown_static_fields, bool reject_unknown_dynamic_fields, uint32_t concurrency) {
   OptionsImpl options(Server::createTestOptionsImpl(config_path_, "", version,
                                                     allow_unknown_static_fields,
@@ -197,7 +197,7 @@ void IntegrationTestServerImpl::createAndRunEnvoyServer(
     Network::Address::InstanceConstSharedPtr local_address, ListenerHooks& hooks,
     Thread::BasicLockable& access_log_lock, Server::ComponentFactory& component_factory,
     Runtime::RandomGeneratorPtr&& random_generator,
-    absl::optional<std::reference_wrapper<ProcessObject>> process_object) {
+    ProcessObjectOptRef process_object) {
   {
     Init::ManagerImpl init_manager{"Server"};
     Stats::SymbolTablePtr symbol_table = Stats::SymbolTableCreator::makeSymbolTable();

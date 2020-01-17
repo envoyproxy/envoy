@@ -112,15 +112,15 @@ public:
     return histogramFromStatName(storage.statName(), unit);
   }
 
-  OptionalCounter findCounter(StatName name) const override {
+  CounterOptRef findCounter(StatName name) const override {
     Thread::LockGuard lock(lock_);
     return wrapped_scope_->findCounter(name);
   }
-  OptionalGauge findGauge(StatName name) const override {
+  GaugeOptRef findGauge(StatName name) const override {
     Thread::LockGuard lock(lock_);
     return wrapped_scope_->findGauge(name);
   }
-  OptionalHistogram findHistogram(StatName name) const override {
+  HistogramOptRef findHistogram(StatName name) const override {
     Thread::LockGuard lock(lock_);
     return wrapped_scope_->findHistogram(name);
   }
@@ -172,15 +172,15 @@ public:
     Thread::LockGuard lock(lock_);
     return store_.histogram(name, unit);
   }
-  OptionalCounter findCounter(StatName name) const override {
+  CounterOptRef findCounter(StatName name) const override {
     Thread::LockGuard lock(lock_);
     return store_.findCounter(name);
   }
-  OptionalGauge findGauge(StatName name) const override {
+  GaugeOptRef findGauge(StatName name) const override {
     Thread::LockGuard lock(lock_);
     return store_.findGauge(name);
   }
-  OptionalHistogram findHistogram(StatName name) const override {
+  HistogramOptRef findHistogram(StatName name) const override {
     Thread::LockGuard lock(lock_);
     return store_.findHistogram(name);
   }
@@ -237,7 +237,7 @@ public:
          std::function<void()> on_server_init_function, bool deterministic,
          Event::TestTimeSystem& time_system, Api::Api& api,
          bool defer_listener_finalization = false,
-         absl::optional<std::reference_wrapper<ProcessObject>> process_object = absl::nullopt,
+         ProcessObjectOptRef process_object = absl::nullopt,
          bool allow_unknown_static_fields = false, bool reject_unknown_dynamic_fields = false,
          uint32_t concurrency = 1);
   // Note that the derived class is responsible for tearing down the server in its
@@ -261,7 +261,7 @@ public:
   void start(const Network::Address::IpVersion version,
              std::function<void()> on_server_init_function, bool deterministic,
              bool defer_listener_finalization,
-             absl::optional<std::reference_wrapper<ProcessObject>> process_object,
+             ProcessObjectOptRef process_object,
              bool allow_unknown_static_fields, bool reject_unknown_dynamic_fields,
              uint32_t concurrency);
 
@@ -330,7 +330,7 @@ protected:
       Network::Address::InstanceConstSharedPtr local_address, ListenerHooks& hooks,
       Thread::BasicLockable& access_log_lock, Server::ComponentFactory& component_factory,
       Runtime::RandomGeneratorPtr&& random_generator,
-      absl::optional<std::reference_wrapper<ProcessObject>> process_object) PURE;
+      ProcessObjectOptRef process_object) PURE;
 
   // Will be called by subclass on server thread when the server is ready to be accessed. The
   // server may not have been run yet, but all server access methods (server(), stat_store(),
@@ -342,7 +342,7 @@ private:
    * Runs the real server on a thread.
    */
   void threadRoutine(const Network::Address::IpVersion version, bool deterministic,
-                     absl::optional<std::reference_wrapper<ProcessObject>> process_object,
+                     ProcessObjectOptRef process_object,
                      bool allow_unknown_static_fields, bool reject_unknown_dynamic_fields,
                      uint32_t concurrency);
 
@@ -386,7 +386,7 @@ private:
       Network::Address::InstanceConstSharedPtr local_address, ListenerHooks& hooks,
       Thread::BasicLockable& access_log_lock, Server::ComponentFactory& component_factory,
       Runtime::RandomGeneratorPtr&& random_generator,
-      absl::optional<std::reference_wrapper<ProcessObject>> process_object) override;
+      ProcessObjectOptRef process_object) override;
 
   // Owned by this class. An owning pointer is not used because the actual allocation is done
   // on a stack in a non-main thread.

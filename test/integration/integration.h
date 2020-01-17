@@ -366,7 +366,7 @@ protected:
   // The config for envoy start-up.
   ConfigHelper config_helper_;
   // The ProcessObject to use when constructing the envoy server.
-  absl::optional<std::reference_wrapper<ProcessObject>> process_object_{absl::nullopt};
+  ProcessObjectOptRef process_object_{absl::nullopt};
 
   // Steps that should be done before the envoy server starting.
   std::function<void(IntegrationTestServer&)> on_server_ready_function_;
