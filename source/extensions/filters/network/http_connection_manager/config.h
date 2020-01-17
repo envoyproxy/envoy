@@ -15,7 +15,10 @@
 
 #include "common/common/logger.h"
 #include "common/http/conn_manager_impl.h"
+#include "common/http/date_provider_impl.h"
 #include "common/json/json_loader.h"
+#include "common/router/rds_impl.h"
+#include "common/router/scoped_rds.h"
 
 #include "extensions/filters/network/common/factory_base.h"
 #include "extensions/filters/network/well_known_names.h"
@@ -200,6 +203,55 @@ private:
   static const uint64_t StreamIdleTimeoutMs = 5 * 60 * 1000;
   // request timeout is disabled by default
   static const uint64_t RequestTimeoutMs = 0;
+};
+
+/**
+ * Factory to create an HttpConnectionManager outside of a Network Filter Chain.
+ */
+class HttpConnectionManagerFactory {
+public:
+  static std::function<Http::ApiListenerPtr()> createHttpConnectionManagerFactoryFromProto(
+      const envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+          proto_config,
+      Server::Configuration::FactoryContext& context, Network::ReadFilterCallbacks& read_callbacks);
+};
+
+/**
+ * Utility class for shared logic between HTTP connection manager factories.
+ */
+class Utility {
+public:
+  struct Singletons {
+    std::shared_ptr<Http::TlsCachingDateProviderImpl> date_provider_;
+    std::shared_ptr<Router::RouteConfigProviderManager> route_config_provider_manager_;
+    std::shared_ptr<Router::ScopedRoutesConfigProviderManager>
+        scoped_routes_config_provider_manager_;
+  };
+
+  /**
+   * Create/get singletons needed for config creation.
+   *
+   * @param context supplies the context used to create the singletons.
+   * @return Singletons struct containing all the singletons.
+   */
+  static Singletons createSingletons(Server::Configuration::FactoryContext& context);
+
+  /**
+   * Create the HttpConnectionManagerConfig.
+   *
+   * @param proto_config supplies the config to install.
+   * @param context supplies the context used to create the config.
+   * @param date_provider the singleton used in config creation.
+   * @param route_config_provider_manager the singleton used in config creation.
+   * @param scoped_routes_config_provider_manager the singleton used in config creation.
+   * @return a shared_ptr to the created config object.
+   */
+  static std::shared_ptr<HttpConnectionManagerConfig> createConfig(
+      const envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+          proto_config,
+      Server::Configuration::FactoryContext& context, Http::DateProvider& date_provider,
+      Router::RouteConfigProviderManager& route_config_provider_manager,
+      Config::ConfigProviderManager& scoped_routes_config_provider_manager);
 };
 
 } // namespace HttpConnectionManager

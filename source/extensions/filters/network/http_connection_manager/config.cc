@@ -18,7 +18,6 @@
 #include "common/common/fmt.h"
 #include "common/config/utility.h"
 #include "common/http/conn_manager_utility.h"
-#include "common/http/date_provider_impl.h"
 #include "common/http/default_server_string.h"
 #include "common/http/http1/codec_impl.h"
 #include "common/http/http2/codec_impl.h"
@@ -26,8 +25,6 @@
 #include "common/http/http3/well_known_names.h"
 #include "common/http/utility.h"
 #include "common/protobuf/utility.h"
-#include "common/router/rds_impl.h"
-#include "common/router/scoped_rds.h"
 #include "common/runtime/runtime_impl.h"
 #include "common/tracing/http_tracer_impl.h"
 
@@ -78,11 +75,7 @@ SINGLETON_MANAGER_REGISTRATION(date_provider);
 SINGLETON_MANAGER_REGISTRATION(route_config_provider_manager);
 SINGLETON_MANAGER_REGISTRATION(scoped_routes_config_provider_manager);
 
-Network::FilterFactoryCb
-HttpConnectionManagerFilterConfigFactory::createFilterFactoryFromProtoTyped(
-    const envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
-        proto_config,
-    Server::Configuration::FactoryContext& context) {
+Utility::Singletons Utility::createSingletons(Server::Configuration::FactoryContext& context) {
   std::shared_ptr<Http::TlsCachingDateProviderImpl> date_provider =
       context.singletonManager().getTyped<Http::TlsCachingDateProviderImpl>(
           SINGLETON_MANAGER_REGISTERED_NAME(date_provider), [&context] {
@@ -104,16 +97,36 @@ HttpConnectionManagerFilterConfigFactory::createFilterFactoryFromProtoTyped(
                 context.admin(), *route_config_provider_manager);
           });
 
-  std::shared_ptr<HttpConnectionManagerConfig> filter_config(new HttpConnectionManagerConfig(
-      proto_config, context, *date_provider, *route_config_provider_manager,
-      *scoped_routes_config_provider_manager));
+  return {date_provider, route_config_provider_manager, scoped_routes_config_provider_manager};
+}
+
+std::shared_ptr<HttpConnectionManagerConfig> Utility::createConfig(
+    const envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+        proto_config,
+    Server::Configuration::FactoryContext& context, Http::DateProvider& date_provider,
+    Router::RouteConfigProviderManager& route_config_provider_manager,
+    Config::ConfigProviderManager& scoped_routes_config_provider_manager) {
+  return std::make_shared<HttpConnectionManagerConfig>(proto_config, context, date_provider,
+                                                       route_config_provider_manager,
+                                                       scoped_routes_config_provider_manager);
+}
+
+Network::FilterFactoryCb
+HttpConnectionManagerFilterConfigFactory::createFilterFactoryFromProtoTyped(
+    const envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+        proto_config,
+    Server::Configuration::FactoryContext& context) {
+  Utility::Singletons singletons = Utility::createSingletons(context);
+
+  auto filter_config = Utility::createConfig(proto_config, context, *singletons.date_provider_,
+                                             *singletons.route_config_provider_manager_,
+                                             *singletons.scoped_routes_config_provider_manager_);
 
   // This lambda captures the shared_ptrs created above, thus preserving the
   // reference count.
   // Keep in mind the lambda capture list **doesn't** determine the destruction order, but it's fine
   // as these captured objects are also global singletons.
-  return [scoped_routes_config_provider_manager, route_config_provider_manager, date_provider,
-          filter_config, &context](Network::FilterManager& filter_manager) -> void {
+  return [singletons, filter_config, &context](Network::FilterManager& filter_manager) -> void {
     filter_manager.addReadFilter(Network::ReadFilterSharedPtr{new Http::ConnectionManagerImpl(
         *filter_config, context.drainDecision(), context.random(), context.httpContext(),
         context.runtime(), context.localInfo(), context.clusterManager(),
@@ -498,6 +511,44 @@ bool HttpConnectionManagerConfig::createUpgradeFilterChain(
 
 const Network::Address::Instance& HttpConnectionManagerConfig::localAddress() {
   return *context_.localInfo().address();
+}
+
+std::function<Http::ApiListenerPtr()>
+HttpConnectionManagerFactory::createHttpConnectionManagerFactoryFromProto(
+    const envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+        proto_config,
+    Server::Configuration::FactoryContext& context, Network::ReadFilterCallbacks& read_callbacks) {
+
+  Utility::Singletons singletons = Utility::createSingletons(context);
+
+  auto filter_config = Utility::createConfig(proto_config, context, *singletons.date_provider_,
+                                             *singletons.route_config_provider_manager_,
+                                             *singletons.scoped_routes_config_provider_manager_);
+
+  // This lambda captures the shared_ptrs created above, thus preserving the
+  // reference count.
+  // Keep in mind the lambda capture list **doesn't** determine the destruction order, but it's fine
+  // as these captured objects are also global singletons.
+  return [singletons, filter_config, &context, &read_callbacks]() -> Http::ApiListenerPtr {
+    auto conn_manager = std::make_unique<Http::ConnectionManagerImpl>(
+        *filter_config, context.drainDecision(), context.random(), context.httpContext(),
+        context.runtime(), context.localInfo(), context.clusterManager(),
+        &context.overloadManager(), context.dispatcher().timeSource());
+
+    // This factory creates a new ConnectionManagerImpl in the absence of its usual environment as
+    // an L4 filter, so this factory needs to take a few actions.
+
+    // When a new connection is creating its filter chain it hydrates the factory with a filter
+    // manager which provides the ConnectionManager with its "read_callbacks".
+    conn_manager->initializeReadFilterCallbacks(read_callbacks);
+
+    // When the connection first calls onData on the ConnectionManager, the ConnectionManager
+    // creates a codec. Here we force create a codec as onData will not be called.
+    Buffer::OwnedImpl dummy;
+    conn_manager->createCodec(dummy);
+
+    return conn_manager;
+  };
 }
 
 } // namespace HttpConnectionManager
