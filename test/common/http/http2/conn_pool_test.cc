@@ -542,6 +542,7 @@ TEST_F(Http2ConnPoolImplTest, RequestAndResponse) {
   expectClientConnect(0, r1);
   EXPECT_CALL(r1.inner_encoder_, encodeHeaders(_, true));
   r1.callbacks_.outer_encoder_->encodeHeaders(HeaderMapImpl{}, true);
+  EXPECT_EQ(1U, cluster_->stats_.upstream_cx_active_.value());
   EXPECT_CALL(r1.decoder_, decodeHeaders_(_, true));
   r1.inner_decoder_->decodeHeaders(HeaderMapPtr{new HeaderMapImpl{}}, true);
 
@@ -555,6 +556,7 @@ TEST_F(Http2ConnPoolImplTest, RequestAndResponse) {
   EXPECT_CALL(*this, onClientDestroy());
   dispatcher_.clearDeferredDeleteList();
 
+  EXPECT_EQ(0U, cluster_->stats_.upstream_cx_active_.value());
   EXPECT_EQ(1U, cluster_->stats_.upstream_cx_destroy_.value());
   EXPECT_EQ(1U, cluster_->stats_.upstream_cx_destroy_remote_.value());
 }
@@ -576,6 +578,7 @@ TEST_F(Http2ConnPoolImplTest, LocalReset) {
   EXPECT_EQ(1U, cluster_->stats_.upstream_cx_destroy_remote_.value());
   EXPECT_EQ(1U, cluster_->stats_.upstream_rq_tx_reset_.value());
   EXPECT_EQ(0U, cluster_->circuit_breakers_stats_.rq_open_.value());
+  EXPECT_EQ(0U, cluster_->stats_.upstream_cx_active_.value());
 }
 
 TEST_F(Http2ConnPoolImplTest, RemoteReset) {
@@ -595,6 +598,7 @@ TEST_F(Http2ConnPoolImplTest, RemoteReset) {
   EXPECT_EQ(1U, cluster_->stats_.upstream_cx_destroy_remote_.value());
   EXPECT_EQ(1U, cluster_->stats_.upstream_rq_rx_reset_.value());
   EXPECT_EQ(0U, cluster_->circuit_breakers_stats_.rq_open_.value());
+  EXPECT_EQ(0U, cluster_->stats_.upstream_cx_active_.value());
 }
 
 TEST_F(Http2ConnPoolImplTest, DrainDisconnectWithActiveRequest) {
