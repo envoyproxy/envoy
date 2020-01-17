@@ -118,7 +118,7 @@ protected:
   // Closes any idle connections.
   void closeIdleConnections();
 
-  // Called by derived classes anytime a request is completed or destroyed for any reason.
+  // Called by derived classes any time a request is completed or destroyed for any reason.
   void onRequestClosed(ActiveClient& client, bool delay_attaching_request);
 
   // Changes the state_ of an ActiveClient and moves to the appropriate list.
