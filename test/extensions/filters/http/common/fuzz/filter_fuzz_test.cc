@@ -1,7 +1,7 @@
 #include <chrono>
 #include <memory>
 
-#include "envoy/extensions/filters/network/http_connection_manager/v3alpha/http_connection_manager.pb.h"
+#include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 
 #include "common/config/utility.h"
 #include "common/config/version_converter.h"
@@ -89,7 +89,7 @@ public:
   }
 
   // This creates the filter config and runs decode.
-  void fuzz(const envoy::extensions::filters::network::http_connection_manager::v3alpha::HttpFilter&
+  void fuzz(const envoy::extensions::filters::network::http_connection_manager::v3::HttpFilter&
                 proto_config,
             const test::fuzz::HttpData& data) {
     try {

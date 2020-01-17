@@ -18,7 +18,7 @@ envoy_proto_library(
     srcs = ["filter_fuzz.proto"],
     deps = [
         "//test/fuzz:common_proto",
-        "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3alpha:pkg",
+        "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg",
     ],
 )
 
@@ -36,6 +36,6 @@ envoy_cc_fuzz_test(
         "//test/mocks/buffer:buffer_mocks",
         "//test/mocks/http:http_mocks",
         "//test/mocks/server:server_mocks",
-        "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3alpha:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/network/http_connection_manager/v3:pkg_cc_proto",
     ] + envoy_all_extensions(),
 )
