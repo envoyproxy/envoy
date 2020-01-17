@@ -28,8 +28,8 @@ envoy_cc_library(
     srcs = ["context.cc"],
     hdrs = ["context.h"],
     deps = [
-        "//source/common/http:utility_lib",
         "//source/common/grpc:common_lib",
+        "//source/common/http:utility_lib",
         "//source/common/stream_info:utility_lib",
         "@com_google_cel_cpp//eval/public:cel_value",
         "@com_google_cel_cpp//eval/public:cel_value_producer",

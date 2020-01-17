@@ -298,7 +298,8 @@ TEST(Context, ResponseAttributes) {
     auto value = response_no_status[CelValue::CreateStringView(GrpcStatus)];
     EXPECT_TRUE(value.has_value());
     ASSERT_TRUE(value.value().IsInt64());
-    EXPECT_EQ(0x2, value.value().Int64OrDie()); // unknown when not in trailers, headers, or http code
+    EXPECT_EQ(0x2,
+              value.value().Int64OrDie()); // unknown when not in trailers, headers, or http code
   }
 }
 

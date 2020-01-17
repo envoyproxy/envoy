@@ -1,7 +1,7 @@
 #include "extensions/filters/common/expr/context.h"
 
-#include "common/http/utility.h"
 #include "common/grpc/common.h"
+#include "common/http/utility.h"
 
 #include "absl/strings/numbers.h"
 #include "absl/time/time.h"
@@ -141,7 +141,7 @@ absl::optional<CelValue> ResponseWrapper::operator[](CelValue key) const {
   } else if (value == Flags) {
     return CelValue::CreateInt64(info_.responseFlags());
   } else if (value == GrpcStatus) {
-    for (const auto wrapper : ((HeadersWrapper []){trailers_, headers_})) {
+    for (const auto wrapper : ((HeadersWrapper[]){trailers_, headers_})) {
       if (wrapper.value_ != nullptr) {
         const auto& optional_status = Grpc::Common::getGrpcStatus(*(wrapper.value_));
         if (optional_status.has_value()) {
