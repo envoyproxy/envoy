@@ -171,6 +171,12 @@ void ConnPoolImplBase::transitionActiveClientState(ActiveClient& client,
   auto& old_list = owningList(client.state_);
   auto& new_list = owningList(new_state);
   client.state_ = new_state;
+
+  // old_list and new_list can be equal when transitioning from BUSY to DRAINING.
+  //
+  // The documentation for list.splice() (which is what moveBetweenLists() calls) is
+  // unclear whether it is allowed for src and dst to be the same, so check here
+  // since it is a no-op anyways.
   if (&old_list != &new_list) {
     client.moveBetweenLists(old_list, new_list);
   }
