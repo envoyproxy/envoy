@@ -2408,7 +2408,9 @@ void ConnectionManagerImpl::ActiveStreamFilterBase::resetStream() {
   parent_.connection_manager_.doEndStream(this->parent_);
 }
 
-uint64_t ConnectionManagerImpl::ActiveStreamFilterBase::streamId() { return parent_.stream_id_; }
+uint64_t ConnectionManagerImpl::ActiveStreamFilterBase::streamId() const {
+  return parent_.stream_id_;
+}
 
 } // namespace Http
 } // namespace Envoy

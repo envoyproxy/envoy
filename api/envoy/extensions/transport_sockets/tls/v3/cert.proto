@@ -125,7 +125,7 @@ message PrivateKeyProvider {
 
   // Private key method provider specific configuration.
   oneof config_type {
-    google.protobuf.Any typed_config = 3;
+    google.protobuf.Any typed_config = 3 [(udpa.annotations.sensitive) = true];
   }
 }
 

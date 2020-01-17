@@ -120,8 +120,8 @@ Extensions must currently be added as v2 APIs following the [package
 organization](#package-organization) above.
 To add an extension config to the API, the steps below should be followed:
 
-1. Place the v2 extension configuration `.proto` in `api/config`, e.g.
-   `api/config/filter/http/foobar/v2/foobar.proto` together with an initial BUILD file:
+1. Place the v2 extension configuration `.proto` in `api/envoy/config`, e.g.
+   `api/envoy/config/filter/http/foobar/v2/foobar.proto` together with an initial BUILD file:
    ```
    load("@envoy_api//bazel:api_build_system.bzl", "api_proto_package")
 
