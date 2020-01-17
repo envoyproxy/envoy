@@ -29,7 +29,7 @@ Logger::Logger(const std::string& name) {
   logger_->flush_on(spdlog::level::critical);
 }
 
-SinkDelegate::SinkDelegate(DelegatingLogSinkPtr log_sink)
+SinkDelegate::SinkDelegate(DelegatingLogSinkSharedPtr log_sink)
     : previous_delegate_(log_sink->delegate()), log_sink_(log_sink) {
   log_sink->setDelegate(this);
 }
@@ -39,7 +39,8 @@ SinkDelegate::~SinkDelegate() {
   log_sink_->setDelegate(previous_delegate_);
 }
 
-StderrSinkDelegate::StderrSinkDelegate(DelegatingLogSinkPtr log_sink) : SinkDelegate(log_sink) {}
+StderrSinkDelegate::StderrSinkDelegate(DelegatingLogSinkSharedPtr log_sink)
+    : SinkDelegate(log_sink) {}
 
 void StderrSinkDelegate::log(absl::string_view msg) {
   Thread::OptionalLockGuard guard(lock_);
@@ -87,8 +88,8 @@ std::string DelegatingLogSink::escapeLogLine(absl::string_view msg_view) {
   return absl::StrCat(absl::CEscape(msg_leading), msg_trailing_whitespace);
 }
 
-DelegatingLogSinkPtr DelegatingLogSink::init() {
-  DelegatingLogSinkPtr delegating_sink(new DelegatingLogSink);
+DelegatingLogSinkSharedPtr DelegatingLogSink::init() {
+  DelegatingLogSinkSharedPtr delegating_sink(new DelegatingLogSink);
   delegating_sink->stderr_sink_ = std::make_unique<StderrSinkDelegate>(delegating_sink);
   return delegating_sink;
 }

@@ -1,7 +1,7 @@
 #pragma once
 
-#include "envoy/extensions/filters/http/ext_authz/v3alpha/ext_authz.pb.h"
-#include "envoy/extensions/filters/http/ext_authz/v3alpha/ext_authz.pb.validate.h"
+#include "envoy/extensions/filters/http/ext_authz/v3/ext_authz.pb.h"
+#include "envoy/extensions/filters/http/ext_authz/v3/ext_authz.pb.validate.h"
 
 #include "extensions/filters/http/common/factory_base.h"
 #include "extensions/filters/http/well_known_names.h"
@@ -16,19 +16,19 @@ namespace ExtAuthz {
  */
 class ExtAuthzFilterConfig
     : public Common::FactoryBase<
-          envoy::extensions::filters::http::ext_authz::v3alpha::ExtAuthz,
-          envoy::extensions::filters::http::ext_authz::v3alpha::ExtAuthzPerRoute> {
+          envoy::extensions::filters::http::ext_authz::v3::ExtAuthz,
+          envoy::extensions::filters::http::ext_authz::v3::ExtAuthzPerRoute> {
 public:
   ExtAuthzFilterConfig() : FactoryBase(HttpFilterNames::get().ExtAuthorization) {}
 
 private:
   static constexpr uint64_t DefaultTimeout = 200;
   Http::FilterFactoryCb createFilterFactoryFromProtoTyped(
-      const envoy::extensions::filters::http::ext_authz::v3alpha::ExtAuthz& proto_config,
+      const envoy::extensions::filters::http::ext_authz::v3::ExtAuthz& proto_config,
       const std::string& stats_prefix, Server::Configuration::FactoryContext& context) override;
 
   Router::RouteSpecificFilterConfigConstSharedPtr createRouteSpecificFilterConfigTyped(
-      const envoy::extensions::filters::http::ext_authz::v3alpha::ExtAuthzPerRoute& proto_config,
+      const envoy::extensions::filters::http::ext_authz::v3::ExtAuthzPerRoute& proto_config,
       Server::Configuration::ServerFactoryContext& context,
       ProtobufMessage::ValidationVisitor& validator) override;
 };

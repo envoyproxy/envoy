@@ -4,11 +4,11 @@
 
 #include "envoy/common/matchers.h"
 #include "envoy/common/regex.h"
-#include "envoy/config/core/v3alpha/base.pb.h"
-#include "envoy/type/matcher/v3alpha/metadata.pb.h"
-#include "envoy/type/matcher/v3alpha/number.pb.h"
-#include "envoy/type/matcher/v3alpha/string.pb.h"
-#include "envoy/type/matcher/v3alpha/value.pb.h"
+#include "envoy/config/core/v3/base.pb.h"
+#include "envoy/type/matcher/v3/metadata.pb.h"
+#include "envoy/type/matcher/v3/number.pb.h"
+#include "envoy/type/matcher/v3/string.pb.h"
+#include "envoy/type/matcher/v3/value.pb.h"
 
 #include "common/common/utility.h"
 #include "common/protobuf/protobuf.h"
@@ -31,8 +31,7 @@ public:
   /**
    * Create the matcher object.
    */
-  static ValueMatcherConstSharedPtr
-  create(const envoy::type::matcher::v3alpha::ValueMatcher& value);
+  static ValueMatcherConstSharedPtr create(const envoy::type::matcher::v3::ValueMatcher& value);
 };
 
 class NullMatcher : public ValueMatcher {
@@ -65,29 +64,29 @@ private:
 
 class DoubleMatcher : public ValueMatcher {
 public:
-  DoubleMatcher(const envoy::type::matcher::v3alpha::DoubleMatcher& matcher) : matcher_(matcher) {}
+  DoubleMatcher(const envoy::type::matcher::v3::DoubleMatcher& matcher) : matcher_(matcher) {}
 
   bool match(const ProtobufWkt::Value& value) const override;
 
 private:
-  const envoy::type::matcher::v3alpha::DoubleMatcher matcher_;
+  const envoy::type::matcher::v3::DoubleMatcher matcher_;
 };
 
 class StringMatcherImpl : public ValueMatcher, public StringMatcher {
 public:
-  explicit StringMatcherImpl(const envoy::type::matcher::v3alpha::StringMatcher& matcher);
+  explicit StringMatcherImpl(const envoy::type::matcher::v3::StringMatcher& matcher);
 
   bool match(const absl::string_view value) const override;
   bool match(const ProtobufWkt::Value& value) const override;
 
 private:
-  const envoy::type::matcher::v3alpha::StringMatcher matcher_;
+  const envoy::type::matcher::v3::StringMatcher matcher_;
   Regex::CompiledMatcherPtr regex_;
 };
 
 class LowerCaseStringMatcher : public ValueMatcher {
 public:
-  LowerCaseStringMatcher(const envoy::type::matcher::v3alpha::StringMatcher& matcher)
+  LowerCaseStringMatcher(const envoy::type::matcher::v3::StringMatcher& matcher)
       : matcher_(toLowerCase(matcher)) {}
 
   bool match(const absl::string_view value) const;
@@ -95,8 +94,8 @@ public:
   bool match(const ProtobufWkt::Value& value) const override;
 
 private:
-  envoy::type::matcher::v3alpha::StringMatcher
-  toLowerCase(const envoy::type::matcher::v3alpha::StringMatcher& matcher);
+  envoy::type::matcher::v3::StringMatcher
+  toLowerCase(const envoy::type::matcher::v3::StringMatcher& matcher);
 
   const StringMatcherImpl matcher_;
 };
@@ -105,29 +104,29 @@ using LowerCaseStringMatcherPtr = std::unique_ptr<LowerCaseStringMatcher>;
 
 class ListMatcher : public ValueMatcher {
 public:
-  ListMatcher(const envoy::type::matcher::v3alpha::ListMatcher& matcher);
+  ListMatcher(const envoy::type::matcher::v3::ListMatcher& matcher);
 
   bool match(const ProtobufWkt::Value& value) const override;
 
 private:
-  const envoy::type::matcher::v3alpha::ListMatcher matcher_;
+  const envoy::type::matcher::v3::ListMatcher matcher_;
 
   ValueMatcherConstSharedPtr oneof_value_matcher_;
 };
 
 class MetadataMatcher {
 public:
-  MetadataMatcher(const envoy::type::matcher::v3alpha::MetadataMatcher& matcher);
+  MetadataMatcher(const envoy::type::matcher::v3::MetadataMatcher& matcher);
 
   /**
    * Check whether the metadata is matched to the matcher.
    * @param metadata the metadata to check.
    * @return true if it's matched otherwise false.
    */
-  bool match(const envoy::config::core::v3alpha::Metadata& metadata) const;
+  bool match(const envoy::config::core::v3::Metadata& metadata) const;
 
 private:
-  const envoy::type::matcher::v3alpha::MetadataMatcher matcher_;
+  const envoy::type::matcher::v3::MetadataMatcher matcher_;
   std::vector<std::string> path_;
 
   ValueMatcherConstSharedPtr value_matcher_;

@@ -3,11 +3,11 @@
 #include <memory>
 #include <string>
 
-#include "envoy/admin/v3alpha/config_dump.pb.h"
-#include "envoy/config/cluster/v3alpha/cluster.pb.h"
-#include "envoy/config/endpoint/v3alpha/endpoint.pb.h"
-#include "envoy/config/listener/v3alpha/listener.pb.h"
-#include "envoy/config/route/v3alpha/route.pb.h"
+#include "envoy/admin/v3/config_dump.pb.h"
+#include "envoy/config/cluster/v3/cluster.pb.h"
+#include "envoy/config/endpoint/v3/endpoint.pb.h"
+#include "envoy/config/listener/v3/listener.pb.h"
+#include "envoy/config/route/v3/route.pb.h"
 
 #include "test/common/grpc/grpc_client_integration.h"
 #include "test/integration/http_integration.h"
@@ -32,10 +32,15 @@ static_resources:
     connect_timeout:
       seconds: 5
     type: STATIC
-    hosts:
-      socket_address:
-        address: 127.0.0.1
-        port_value: 0
+    load_assignment:
+      cluster_name: dummy_cluster
+      endpoints:
+      - lb_endpoints:
+        - endpoint:
+            address:
+              socket_address:
+                address: 127.0.0.1
+                port_value: 0
     lb_policy: ROUND_ROBIN
     http2_protocol_options: {{}}
 admin:
@@ -54,22 +59,22 @@ public:
 
   void TearDown() override;
 
-  envoy::config::cluster::v3alpha::Cluster buildCluster(const std::string& name);
+  envoy::config::cluster::v3::Cluster buildCluster(const std::string& name);
 
-  envoy::config::cluster::v3alpha::Cluster buildRedisCluster(const std::string& name);
+  envoy::config::cluster::v3::Cluster buildRedisCluster(const std::string& name);
 
-  envoy::config::endpoint::v3alpha::ClusterLoadAssignment
+  envoy::config::endpoint::v3::ClusterLoadAssignment
   buildClusterLoadAssignment(const std::string& name);
 
-  envoy::config::listener::v3alpha::Listener
-  buildListener(const std::string& name, const std::string& route_config,
-                const std::string& stat_prefix = "ads_test");
+  envoy::config::listener::v3::Listener buildListener(const std::string& name,
+                                                      const std::string& route_config,
+                                                      const std::string& stat_prefix = "ads_test");
 
-  envoy::config::listener::v3alpha::Listener buildRedisListener(const std::string& name,
+  envoy::config::listener::v3::Listener buildRedisListener(const std::string& name,
+                                                           const std::string& cluster);
+
+  envoy::config::route::v3::RouteConfiguration buildRouteConfig(const std::string& name,
                                                                 const std::string& cluster);
-
-  envoy::config::route::v3alpha::RouteConfiguration buildRouteConfig(const std::string& name,
-                                                                     const std::string& cluster);
 
   void makeSingleRequest();
 
@@ -78,9 +83,9 @@ public:
 
   void testBasicFlow();
 
-  envoy::admin::v3alpha::ClustersConfigDump getClustersConfigDump();
-  envoy::admin::v3alpha::ListenersConfigDump getListenersConfigDump();
-  envoy::admin::v3alpha::RoutesConfigDump getRoutesConfigDump();
+  envoy::admin::v3::ClustersConfigDump getClustersConfigDump();
+  envoy::admin::v3::ListenersConfigDump getListenersConfigDump();
+  envoy::admin::v3::RoutesConfigDump getRoutesConfigDump();
 };
 
 } // namespace Envoy

@@ -19,7 +19,7 @@ envoy_cc_extension(
         "//source/extensions/filters/http:well_known_names",
         "//source/extensions/filters/http/common:factory_base_lib",
         "//source/extensions/filters/http/rbac:rbac_filter_lib",
-        "@envoy_api//envoy/extensions/filters/http/rbac/v3alpha:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/http/rbac/v3:pkg_cc_proto",
     ],
 )
 
@@ -34,6 +34,6 @@ envoy_cc_library(
         "//source/extensions/filters/common/rbac:engine_lib",
         "//source/extensions/filters/common/rbac:utility_lib",
         "//source/extensions/filters/http:well_known_names",
-        "@envoy_api//envoy/extensions/filters/http/rbac/v3alpha:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/http/rbac/v3:pkg_cc_proto",
     ],
 )

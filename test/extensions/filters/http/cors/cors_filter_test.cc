@@ -1,4 +1,4 @@
-#include "envoy/type/matcher/v3alpha/string.pb.h"
+#include "envoy/type/matcher/v3/string.pb.h"
 
 #include "common/common/matchers.h"
 #include "common/http/header_map_impl.h"
@@ -24,13 +24,13 @@ namespace Cors {
 namespace {
 
 Matchers::StringMatcherPtr makeExactStringMatcher(const std::string& exact_match) {
-  envoy::type::matcher::v3alpha::StringMatcher config;
+  envoy::type::matcher::v3::StringMatcher config;
   config.set_exact(exact_match);
   return std::make_unique<Matchers::StringMatcherImpl>(config);
 }
 
 Matchers::StringMatcherPtr makeStdRegexStringMatcher(const std::string& regex) {
-  envoy::type::matcher::v3alpha::StringMatcher config;
+  envoy::type::matcher::v3::StringMatcher config;
   config.set_hidden_envoy_deprecated_regex(regex);
   return std::make_unique<Matchers::StringMatcherImpl>(config);
 }

@@ -2,7 +2,7 @@
 #include <string>
 #include <vector>
 
-#include "envoy/extensions/filters/network/thrift_proxy/filters/ratelimit/v3alpha/rate_limit.pb.h"
+#include "envoy/extensions/filters/network/thrift_proxy/filters/ratelimit/v3/rate_limit.pb.h"
 
 #include "common/buffer/buffer_impl.h"
 #include "common/common/empty_string.h"
@@ -51,7 +51,7 @@ public:
   }
 
   void SetUpTest(const std::string& yaml) {
-    envoy::extensions::filters::network::thrift_proxy::filters::ratelimit::v3alpha::RateLimit
+    envoy::extensions::filters::network::thrift_proxy::filters::ratelimit::v3::RateLimit
         proto_config{};
     TestUtility::loadFromYaml(yaml, proto_config);
 

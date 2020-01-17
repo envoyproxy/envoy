@@ -1,5 +1,5 @@
-#include "envoy/extensions/filters/http/rbac/v3alpha/rbac.pb.h"
-#include "envoy/extensions/filters/network/http_connection_manager/v3alpha/http_connection_manager.pb.h"
+#include "envoy/extensions/filters/http/rbac/v3/rbac.pb.h"
+#include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 
 #include "common/protobuf/utility.h"
 
@@ -87,8 +87,8 @@ TEST_P(RBACIntegrationTest, Denied) {
 
 TEST_P(RBACIntegrationTest, DeniedWithPrefixRule) {
   config_helper_.addConfigModifier(
-      [](envoy::extensions::filters::network::http_connection_manager::v3alpha::
-             HttpConnectionManager& cfg) { cfg.mutable_normalize_path()->set_value(false); });
+      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+             cfg) { cfg.mutable_normalize_path()->set_value(false); });
   config_helper_.addFilter(RBAC_CONFIG_WITH_PREFIX_MATCH);
   initialize();
 
@@ -113,8 +113,8 @@ TEST_P(RBACIntegrationTest, DeniedWithPrefixRule) {
 
 TEST_P(RBACIntegrationTest, RbacPrefixRuleUseNormalizePath) {
   config_helper_.addConfigModifier(
-      [](envoy::extensions::filters::network::http_connection_manager::v3alpha::
-             HttpConnectionManager& cfg) { cfg.mutable_normalize_path()->set_value(true); });
+      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+             cfg) { cfg.mutable_normalize_path()->set_value(true); });
   config_helper_.addFilter(RBAC_CONFIG_WITH_PREFIX_MATCH);
   initialize();
 
@@ -159,18 +159,19 @@ TEST_P(RBACIntegrationTest, DeniedHeadReply) {
 }
 
 TEST_P(RBACIntegrationTest, RouteOverride) {
-  config_helper_.addConfigModifier([](envoy::extensions::filters::network::http_connection_manager::
-                                          v3alpha::HttpConnectionManager& cfg) {
-    envoy::extensions::filters::http::rbac::v3alpha::RBACPerRoute per_route_config;
-    TestUtility::loadFromJson("{}", per_route_config);
+  config_helper_.addConfigModifier(
+      [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+             cfg) {
+        envoy::extensions::filters::http::rbac::v3::RBACPerRoute per_route_config;
+        TestUtility::loadFromJson("{}", per_route_config);
 
-    auto* config = cfg.mutable_route_config()
-                       ->mutable_virtual_hosts()
-                       ->Mutable(0)
-                       ->mutable_typed_per_filter_config();
+        auto* config = cfg.mutable_route_config()
+                           ->mutable_virtual_hosts()
+                           ->Mutable(0)
+                           ->mutable_typed_per_filter_config();
 
-    (*config)[Extensions::HttpFilters::HttpFilterNames::get().Rbac].PackFrom(per_route_config);
-  });
+        (*config)[Extensions::HttpFilters::HttpFilterNames::get().Rbac].PackFrom(per_route_config);
+      });
   config_helper_.addFilter(RBAC_CONFIG);
 
   initialize();

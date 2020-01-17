@@ -3,9 +3,9 @@
 #include <chrono>
 #include <string>
 
-#include "envoy/config/core/v3alpha/grpc_service.pb.h"
-#include "envoy/extensions/filters/network/ext_authz/v3alpha/ext_authz.pb.h"
-#include "envoy/extensions/filters/network/ext_authz/v3alpha/ext_authz.pb.validate.h"
+#include "envoy/config/core/v3/grpc_service.pb.h"
+#include "envoy/extensions/filters/network/ext_authz/v3/ext_authz.pb.h"
+#include "envoy/extensions/filters/network/ext_authz/v3/ext_authz.pb.validate.h"
 #include "envoy/network/connection.h"
 #include "envoy/registry/registry.h"
 
@@ -21,7 +21,7 @@ namespace NetworkFilters {
 namespace ExtAuthz {
 
 Network::FilterFactoryCb ExtAuthzConfigFactory::createFilterFactoryFromProtoTyped(
-    const envoy::extensions::filters::network::ext_authz::v3alpha::ExtAuthz& proto_config,
+    const envoy::extensions::filters::network::ext_authz::v3::ExtAuthz& proto_config,
     Server::Configuration::FactoryContext& context) {
   ConfigSharedPtr ext_authz_config(new Config(proto_config, context.scope()));
   const uint32_t timeout_ms = PROTOBUF_GET_MS_OR_DEFAULT(proto_config.grpc_service(), timeout, 200);

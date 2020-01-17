@@ -1,5 +1,5 @@
-#include "envoy/config/rbac/v3alpha/rbac.pb.h"
-#include "envoy/extensions/filters/http/rbac/v3alpha/rbac.pb.h"
+#include "envoy/config/rbac/v3/rbac.pb.h"
+#include "envoy/extensions/filters/http/rbac/v3/rbac.pb.h"
 
 #include "common/config/metadata.h"
 #include "common/network/utility.h"
@@ -27,23 +27,23 @@ namespace {
 class RoleBasedAccessControlFilterTest : public testing::Test {
 public:
   RoleBasedAccessControlFilterConfigSharedPtr setupConfig() {
-    envoy::extensions::filters::http::rbac::v3alpha::RBAC config;
+    envoy::extensions::filters::http::rbac::v3::RBAC config;
 
-    envoy::config::rbac::v3alpha::Policy policy;
+    envoy::config::rbac::v3::Policy policy;
     auto policy_rules = policy.add_permissions()->mutable_or_rules();
     policy_rules->add_rules()->mutable_requested_server_name()->set_hidden_envoy_deprecated_regex(
         ".*cncf.io");
     policy_rules->add_rules()->set_destination_port(123);
     policy.add_principals()->set_any(true);
-    config.mutable_rules()->set_action(envoy::config::rbac::v3alpha::RBAC::ALLOW);
+    config.mutable_rules()->set_action(envoy::config::rbac::v3::RBAC::ALLOW);
     (*config.mutable_rules()->mutable_policies())["foo"] = policy;
 
-    envoy::config::rbac::v3alpha::Policy shadow_policy;
+    envoy::config::rbac::v3::Policy shadow_policy;
     auto shadow_policy_rules = shadow_policy.add_permissions()->mutable_or_rules();
     shadow_policy_rules->add_rules()->mutable_requested_server_name()->set_exact("xyz.cncf.io");
     shadow_policy_rules->add_rules()->set_destination_port(456);
     shadow_policy.add_principals()->set_any(true);
-    config.mutable_shadow_rules()->set_action(envoy::config::rbac::v3alpha::RBAC::ALLOW);
+    config.mutable_shadow_rules()->set_action(envoy::config::rbac::v3::RBAC::ALLOW);
     (*config.mutable_shadow_rules()->mutable_policies())["bar"] = shadow_policy;
 
     return std::make_shared<RoleBasedAccessControlFilterConfig>(config, "test", store_);
@@ -142,9 +142,8 @@ TEST_F(RoleBasedAccessControlFilterTest, Denied) {
 TEST_F(RoleBasedAccessControlFilterTest, RouteLocalOverride) {
   setDestinationPort(456);
 
-  envoy::extensions::filters::http::rbac::v3alpha::RBACPerRoute route_config;
-  route_config.mutable_rbac()->mutable_rules()->set_action(
-      envoy::config::rbac::v3alpha::RBAC::DENY);
+  envoy::extensions::filters::http::rbac::v3::RBACPerRoute route_config;
+  route_config.mutable_rbac()->mutable_rules()->set_action(envoy::config::rbac::v3::RBAC::DENY);
   NiceMock<Filters::Common::RBAC::MockEngine> engine{route_config.rbac().rules()};
   NiceMock<MockRoleBasedAccessControlRouteSpecificFilterConfig> per_route_config_{route_config};
 

@@ -4,7 +4,7 @@
 #include <string>
 #include <vector>
 
-#include "envoy/extensions/filters/network/thrift_proxy/v3alpha/route.pb.h"
+#include "envoy/extensions/filters/network/thrift_proxy/v3/route.pb.h"
 #include "envoy/router/router.h"
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats_macros.h"
@@ -33,8 +33,7 @@ class RouteEntryImplBase : public RouteEntry,
                            public Route,
                            public std::enable_shared_from_this<RouteEntryImplBase> {
 public:
-  RouteEntryImplBase(
-      const envoy::extensions::filters::network::thrift_proxy::v3alpha::Route& route);
+  RouteEntryImplBase(const envoy::extensions::filters::network::thrift_proxy::v3::Route& route);
 
   // Router::RouteEntry
   const std::string& clusterName() const override;
@@ -58,9 +57,10 @@ protected:
 private:
   class WeightedClusterEntry : public RouteEntry, public Route {
   public:
-    WeightedClusterEntry(const RouteEntryImplBase& parent,
-                         const envoy::extensions::filters::network::thrift_proxy::v3alpha::
-                             WeightedCluster::ClusterWeight& cluster);
+    WeightedClusterEntry(
+        const RouteEntryImplBase& parent,
+        const envoy::extensions::filters::network::thrift_proxy::v3::WeightedCluster::ClusterWeight&
+            cluster);
 
     uint64_t clusterWeight() const { return cluster_weight_; }
 
@@ -125,7 +125,7 @@ using RouteEntryImplBaseConstSharedPtr = std::shared_ptr<const RouteEntryImplBas
 class MethodNameRouteEntryImpl : public RouteEntryImplBase {
 public:
   MethodNameRouteEntryImpl(
-      const envoy::extensions::filters::network::thrift_proxy::v3alpha::Route& route);
+      const envoy::extensions::filters::network::thrift_proxy::v3::Route& route);
 
   const std::string& methodName() const { return method_name_; }
 
@@ -141,7 +141,7 @@ private:
 class ServiceNameRouteEntryImpl : public RouteEntryImplBase {
 public:
   ServiceNameRouteEntryImpl(
-      const envoy::extensions::filters::network::thrift_proxy::v3alpha::Route& route);
+      const envoy::extensions::filters::network::thrift_proxy::v3::Route& route);
 
   const std::string& serviceName() const { return service_name_; }
 
@@ -156,8 +156,7 @@ private:
 
 class RouteMatcher {
 public:
-  RouteMatcher(
-      const envoy::extensions::filters::network::thrift_proxy::v3alpha::RouteConfiguration&);
+  RouteMatcher(const envoy::extensions::filters::network::thrift_proxy::v3::RouteConfiguration&);
 
   RouteConstSharedPtr route(const MessageMetadata& metadata, uint64_t random_value) const;
 

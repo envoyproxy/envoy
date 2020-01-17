@@ -1,4 +1,4 @@
-#include "envoy/config/tap/v3alpha/common.pb.h"
+#include "envoy/config/tap/v3/common.pb.h"
 
 #include "common/protobuf/utility.h"
 
@@ -18,7 +18,7 @@ class TapMatcherTest : public testing::Test {
 public:
   std::vector<MatcherPtr> matchers_;
   Matcher::MatchStatusVector statuses_;
-  envoy::config::tap::v3alpha::MatchPredicate config_;
+  envoy::config::tap::v3::MatchPredicate config_;
   Http::TestHeaderMapImpl headers_;
 };
 

@@ -10,20 +10,20 @@ from google.protobuf import text_format
 from tools.type_whisperer.api_type_db_pb2 import TypeDb
 from tools.type_whisperer.types_pb2 import Types, TypeDescription
 
-# Regexes governing v3alpha upgrades. TODO(htuch): The regex approach will have
-# to be rethought as we go beyond v3alpha, this is WiP.
+# Regexes governing v3upgrades. TODO(htuch): The regex approach will have
+# to be rethought as we go beyond v3, this is WiP.
 TYPE_UPGRADE_REGEXES = [
-    (r'(envoy[\w\.]*\.)(v1alpha\d?|v1)', r'\1v3alpha'),
-    (r'(envoy[\w\.]*\.)(v2alpha\d?|v2)', r'\1v3alpha'),
+    (r'(envoy[\w\.]*\.)(v1alpha\d?|v1)', r'\1v3'),
+    (r'(envoy[\w\.]*\.)(v2alpha\d?|v2)', r'\1v3'),
     # These are special cases, e.g. upgrading versionless packages.
-    ('envoy\.type\.matcher', 'envoy.type.matcher.v3alpha'),
-    ('envoy\.type', 'envoy.type.v3alpha'),
-    ('envoy\.config\.cluster\.redis', 'envoy.extensions.clusters.redis.v3alpha'),
+    ('envoy\.type\.matcher', 'envoy.type.matcher.v3'),
+    ('envoy\.type', 'envoy.type.v3'),
+    ('envoy\.config\.cluster\.redis', 'envoy.extensions.clusters.redis.v3'),
     ('envoy\.config\.retry\.previous_priorities',
-     'envoy.extensions.retry.priority.previous_priorities.v3alpha'),
+     'envoy.extensions.retry.priority.previous_priorities.v3'),
 ]
 
-# These packages must be upgraded to v3alpha, even if there are no protos
+# These packages must be upgraded to v3, even if there are no protos
 # modified. This is largely for situations where we know we want to be doing
 # structural change to have the APIs follow the x/y//vN/z.proto structure of
 # organization.

@@ -3,7 +3,7 @@
 #include <string>
 
 #include "envoy/common/platform.h"
-#include "envoy/config/core/v3alpha/base.pb.h"
+#include "envoy/config/core/v3/base.pb.h"
 
 #include "common/buffer/buffer_impl.h"
 #include "common/common/empty_string.h"
@@ -313,7 +313,7 @@ TEST_P(ConnectionImplTest, SocketOptions) {
 
   auto option = std::make_shared<MockSocketOption>();
 
-  EXPECT_CALL(*option, setOption(_, envoy::config::core::v3alpha::SocketOption::STATE_PREBIND))
+  EXPECT_CALL(*option, setOption(_, envoy::config::core::v3::SocketOption::STATE_PREBIND))
       .WillOnce(Return(true));
   EXPECT_CALL(listener_callbacks_, onAccept_(_))
       .WillOnce(Invoke([&](Network::ConnectionSocketPtr& socket) -> void {
@@ -362,7 +362,7 @@ TEST_P(ConnectionImplTest, SocketOptionsFailureTest) {
 
   auto option = std::make_shared<MockSocketOption>();
 
-  EXPECT_CALL(*option, setOption(_, envoy::config::core::v3alpha::SocketOption::STATE_PREBIND))
+  EXPECT_CALL(*option, setOption(_, envoy::config::core::v3::SocketOption::STATE_PREBIND))
       .WillOnce(Return(false));
   EXPECT_CALL(listener_callbacks_, onAccept_(_))
       .WillOnce(Invoke([&](Network::ConnectionSocketPtr& socket) -> void {
@@ -956,12 +956,11 @@ TEST_P(ConnectionImplTest, BindFromSocketTest) {
         new Network::Address::Ipv6Instance(address_string, 0)};
   }
   auto option = std::make_shared<NiceMock<MockSocketOption>>();
-  EXPECT_CALL(*option, setOption(_, Eq(envoy::config::core::v3alpha::SocketOption::STATE_PREBIND)))
-      .WillOnce(
-          Invoke([&](Socket& socket, envoy::config::core::v3alpha::SocketOption::SocketState) {
-            socket.setLocalAddress(new_source_address);
-            return true;
-          }));
+  EXPECT_CALL(*option, setOption(_, Eq(envoy::config::core::v3::SocketOption::STATE_PREBIND)))
+      .WillOnce(Invoke([&](Socket& socket, envoy::config::core::v3::SocketOption::SocketState) {
+        socket.setLocalAddress(new_source_address);
+        return true;
+      }));
 
   socket_options_ = std::make_shared<Socket::Options>();
   socket_options_->emplace_back(std::move(option));
