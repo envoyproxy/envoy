@@ -27,14 +27,14 @@ message CacheConfig {
     // ever depend on host.
     bool exclude_host = 2;
 
-    // If query_parameters_included is nonempty, only query parameters matched
+    // If *query_parameters_included* is nonempty, only query parameters matched
     // by one or more of its matchers are included in the cache key. Any other
     // query params will not affect cache lookup.
     repeated api.v2.route.QueryParameterMatcher query_parameters_included = 3;
 
-    // If query_parameters_excluded is nonempty, query parameters matched by one
+    // If *query_parameters_excluded* is nonempty, query parameters matched by one
     // or more of its matchers are excluded from the cache key (even if also
-    // matched by query_parameters_included), and will not affect cache lookup.
+    // matched by *query_parameters_included*), and will not affect cache lookup.
     repeated api.v2.route.QueryParameterMatcher query_parameters_excluded = 4;
   }
 
