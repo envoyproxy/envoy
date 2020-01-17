@@ -812,6 +812,7 @@ preallocate
 preallocating
 preallocation
 precalculated
+precompile
 precompiled
 precompute
 precomputed
