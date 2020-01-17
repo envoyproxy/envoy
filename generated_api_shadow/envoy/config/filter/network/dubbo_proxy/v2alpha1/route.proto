@@ -13,7 +13,7 @@ option java_package = "io.envoyproxy.envoy.config.filter.network.dubbo_proxy.v2a
 option java_outer_classname = "RouteProto";
 option java_multiple_files = true;
 option (udpa.annotations.file_migrate).move_to_package =
-    "envoy.extensions.filters.network.dubbo_proxy.v3alpha";
+    "envoy.extensions.filters.network.dubbo_proxy.v3";
 
 // [#protodoc-title: Dubbo Proxy Route Configuration]
 // Dubbo Proxy :ref:`configuration overview <config_network_filters_dubbo_proxy>`.

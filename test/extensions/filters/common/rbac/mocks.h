@@ -1,6 +1,6 @@
 #pragma once
 
-#include "envoy/config/rbac/v3alpha/rbac.pb.h"
+#include "envoy/config/rbac/v3/rbac.pb.h"
 
 #include "extensions/filters/common/rbac/engine_impl.h"
 
@@ -14,7 +14,7 @@ namespace RBAC {
 
 class MockEngine : public RoleBasedAccessControlEngineImpl {
 public:
-  MockEngine(const envoy::config::rbac::v3alpha::RBAC& rules)
+  MockEngine(const envoy::config::rbac::v3::RBAC& rules)
       : RoleBasedAccessControlEngineImpl(rules){};
 
   MOCK_CONST_METHOD4(allowed,

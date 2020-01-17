@@ -1,7 +1,7 @@
 #include "envoy/config/filter/thrift/router/v2alpha1/router.pb.h"
 #include "envoy/config/filter/thrift/router/v2alpha1/router.pb.validate.h"
-#include "envoy/extensions/filters/network/thrift_proxy/v3alpha/route.pb.h"
-#include "envoy/extensions/filters/network/thrift_proxy/v3alpha/route.pb.validate.h"
+#include "envoy/extensions/filters/network/thrift_proxy/v3/route.pb.h"
+#include "envoy/extensions/filters/network/thrift_proxy/v3/route.pb.validate.h"
 
 #include "extensions/filters/network/thrift_proxy/router/config.h"
 #include "extensions/filters/network/thrift_proxy/router/router_impl.h"
@@ -18,9 +18,9 @@ namespace ThriftProxy {
 namespace Router {
 namespace {
 
-envoy::extensions::filters::network::thrift_proxy::v3alpha::RouteConfiguration
+envoy::extensions::filters::network::thrift_proxy::v3::RouteConfiguration
 parseRouteConfigurationFromV2Yaml(const std::string& yaml) {
-  envoy::extensions::filters::network::thrift_proxy::v3alpha::RouteConfiguration route_config;
+  envoy::extensions::filters::network::thrift_proxy::v3::RouteConfiguration route_config;
   TestUtility::loadFromYaml(yaml, route_config);
   TestUtility::validate(route_config);
   return route_config;
@@ -40,7 +40,7 @@ routes:
       cluster: "cluster2"
 )EOF";
 
-  envoy::extensions::filters::network::thrift_proxy::v3alpha::RouteConfiguration config =
+  envoy::extensions::filters::network::thrift_proxy::v3::RouteConfiguration config =
       parseRouteConfigurationFromV2Yaml(yaml);
 
   RouteMatcher matcher(config);
@@ -77,7 +77,7 @@ routes:
       cluster: "cluster2"
 )EOF";
 
-  envoy::extensions::filters::network::thrift_proxy::v3alpha::RouteConfiguration config =
+  envoy::extensions::filters::network::thrift_proxy::v3::RouteConfiguration config =
       parseRouteConfigurationFromV2Yaml(yaml);
 
   RouteMatcher matcher(config);
@@ -120,7 +120,7 @@ routes:
       cluster: "cluster2"
 )EOF";
 
-  envoy::extensions::filters::network::thrift_proxy::v3alpha::RouteConfiguration config =
+  envoy::extensions::filters::network::thrift_proxy::v3::RouteConfiguration config =
       parseRouteConfigurationFromV2Yaml(yaml);
 
   RouteMatcher matcher(config);
@@ -157,7 +157,7 @@ routes:
       cluster: "cluster2"
 )EOF";
 
-  envoy::extensions::filters::network::thrift_proxy::v3alpha::RouteConfiguration config =
+  envoy::extensions::filters::network::thrift_proxy::v3::RouteConfiguration config =
       parseRouteConfigurationFromV2Yaml(yaml);
 
   EXPECT_THROW(new RouteMatcher(config), EnvoyException);
@@ -177,7 +177,7 @@ routes:
       cluster: "cluster2"
 )EOF";
 
-  envoy::extensions::filters::network::thrift_proxy::v3alpha::RouteConfiguration config =
+  envoy::extensions::filters::network::thrift_proxy::v3::RouteConfiguration config =
       parseRouteConfigurationFromV2Yaml(yaml);
 
   RouteMatcher matcher(config);
@@ -214,7 +214,7 @@ routes:
       cluster: "cluster2"
 )EOF";
 
-  envoy::extensions::filters::network::thrift_proxy::v3alpha::RouteConfiguration config =
+  envoy::extensions::filters::network::thrift_proxy::v3::RouteConfiguration config =
       parseRouteConfigurationFromV2Yaml(yaml);
 
   RouteMatcher matcher(config);
@@ -257,7 +257,7 @@ routes:
       cluster: "cluster2"
 )EOF";
 
-  envoy::extensions::filters::network::thrift_proxy::v3alpha::RouteConfiguration config =
+  envoy::extensions::filters::network::thrift_proxy::v3::RouteConfiguration config =
       parseRouteConfigurationFromV2Yaml(yaml);
 
   RouteMatcher matcher(config);
@@ -294,7 +294,7 @@ routes:
       cluster: "cluster2"
 )EOF";
 
-  envoy::extensions::filters::network::thrift_proxy::v3alpha::RouteConfiguration config =
+  envoy::extensions::filters::network::thrift_proxy::v3::RouteConfiguration config =
       parseRouteConfigurationFromV2Yaml(yaml);
 
   EXPECT_THROW(new RouteMatcher(config), EnvoyException);
@@ -313,7 +313,7 @@ routes:
       cluster: "cluster1"
 )EOF";
 
-  envoy::extensions::filters::network::thrift_proxy::v3alpha::RouteConfiguration config =
+  envoy::extensions::filters::network::thrift_proxy::v3::RouteConfiguration config =
       parseRouteConfigurationFromV2Yaml(yaml);
 
   RouteMatcher matcher(config);
@@ -346,7 +346,7 @@ routes:
       cluster: "cluster1"
 )EOF";
 
-  envoy::extensions::filters::network::thrift_proxy::v3alpha::RouteConfiguration config =
+  envoy::extensions::filters::network::thrift_proxy::v3::RouteConfiguration config =
       parseRouteConfigurationFromV2Yaml(yaml);
 
   RouteMatcher matcher(config);
@@ -384,7 +384,7 @@ routes:
       cluster: "cluster1"
 )EOF";
 
-  envoy::extensions::filters::network::thrift_proxy::v3alpha::RouteConfiguration config =
+  envoy::extensions::filters::network::thrift_proxy::v3::RouteConfiguration config =
       parseRouteConfigurationFromV2Yaml(yaml);
 
   RouteMatcher matcher(config);
@@ -420,7 +420,7 @@ routes:
       cluster: "cluster1"
 )EOF";
 
-  envoy::extensions::filters::network::thrift_proxy::v3alpha::RouteConfiguration config =
+  envoy::extensions::filters::network::thrift_proxy::v3::RouteConfiguration config =
       parseRouteConfigurationFromV2Yaml(yaml);
 
   RouteMatcher matcher(config);
@@ -457,7 +457,7 @@ routes:
       cluster: "cluster1"
 )EOF";
 
-  envoy::extensions::filters::network::thrift_proxy::v3alpha::RouteConfiguration config =
+  envoy::extensions::filters::network::thrift_proxy::v3::RouteConfiguration config =
       parseRouteConfigurationFromV2Yaml(yaml);
 
   RouteMatcher matcher(config);
@@ -493,7 +493,7 @@ routes:
       cluster: "cluster1"
 )EOF";
 
-  envoy::extensions::filters::network::thrift_proxy::v3alpha::RouteConfiguration config =
+  envoy::extensions::filters::network::thrift_proxy::v3::RouteConfiguration config =
       parseRouteConfigurationFromV2Yaml(yaml);
 
   RouteMatcher matcher(config);
@@ -531,7 +531,7 @@ routes:
       cluster_header: "x-cluster"
 )EOF";
 
-  envoy::extensions::filters::network::thrift_proxy::v3alpha::RouteConfiguration config =
+  envoy::extensions::filters::network::thrift_proxy::v3::RouteConfiguration config =
       parseRouteConfigurationFromV2Yaml(yaml);
 
   RouteMatcher matcher(config);
@@ -587,7 +587,7 @@ routes:
             weight: 5000
 )EOF";
 
-  envoy::extensions::filters::network::thrift_proxy::v3alpha::RouteConfiguration config =
+  envoy::extensions::filters::network::thrift_proxy::v3::RouteConfiguration config =
       parseRouteConfigurationFromV2Yaml(yaml);
   RouteMatcher matcher(config);
   MessageMetadata metadata;
@@ -631,7 +631,7 @@ routes:
             weight: 5000
 )EOF";
 
-  const envoy::extensions::filters::network::thrift_proxy::v3alpha::RouteConfiguration config =
+  const envoy::extensions::filters::network::thrift_proxy::v3::RouteConfiguration config =
       parseRouteConfigurationFromV2Yaml(yaml);
   EXPECT_THROW(RouteMatcher m(config), EnvoyException);
 }
@@ -655,7 +655,7 @@ routes:
       cluster: cluster2
 )EOF";
 
-  const envoy::extensions::filters::network::thrift_proxy::v3alpha::RouteConfiguration config =
+  const envoy::extensions::filters::network::thrift_proxy::v3::RouteConfiguration config =
       parseRouteConfigurationFromV2Yaml(yaml);
   RouteMatcher matcher(config);
   MessageMetadata metadata;
@@ -727,7 +727,7 @@ routes:
                   k3: v3
 )EOF";
 
-  const envoy::extensions::filters::network::thrift_proxy::v3alpha::RouteConfiguration config =
+  const envoy::extensions::filters::network::thrift_proxy::v3::RouteConfiguration config =
       parseRouteConfigurationFromV2Yaml(yaml);
   RouteMatcher matcher(config);
   MessageMetadata metadata;
@@ -814,7 +814,7 @@ routes:
                   k2: v3
 )EOF";
 
-  const envoy::extensions::filters::network::thrift_proxy::v3alpha::RouteConfiguration config =
+  const envoy::extensions::filters::network::thrift_proxy::v3::RouteConfiguration config =
       parseRouteConfigurationFromV2Yaml(yaml);
   RouteMatcher matcher(config);
   MessageMetadata metadata;

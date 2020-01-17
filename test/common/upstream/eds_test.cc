@@ -1,10 +1,10 @@
 #include <memory>
 
-#include "envoy/config/cluster/v3alpha/cluster.pb.h"
-#include "envoy/config/core/v3alpha/health_check.pb.h"
-#include "envoy/config/endpoint/v3alpha/endpoint.pb.h"
-#include "envoy/config/endpoint/v3alpha/endpoint_components.pb.h"
-#include "envoy/service/discovery/v3alpha/discovery.pb.h"
+#include "envoy/config/cluster/v3/cluster.pb.h"
+#include "envoy/config/core/v3/health_check.pb.h"
+#include "envoy/config/endpoint/v3/endpoint.pb.h"
+#include "envoy/config/endpoint/v3/endpoint_components.pb.h"
+#include "envoy/service/discovery/v3/discovery.pb.h"
 #include "envoy/stats/scope.h"
 
 #include "common/config/utility.h"
@@ -106,7 +106,7 @@ protected:
   }
 
   void doOnConfigUpdateVerifyNoThrow(
-      const envoy::config::endpoint::v3alpha::ClusterLoadAssignment& cluster_load_assignment) {
+      const envoy::config::endpoint::v3::ClusterLoadAssignment& cluster_load_assignment) {
     Protobuf::RepeatedPtrField<ProtobufWkt::Any> resources;
     resources.Add()->PackFrom(cluster_load_assignment);
     VERBOSE_EXPECT_NO_THROW(eds_callbacks_->onConfigUpdate(resources, ""));
@@ -115,7 +115,7 @@ protected:
   bool initialized_{};
   Stats::IsolatedStoreImpl stats_;
   Ssl::MockContextManager ssl_context_manager_;
-  envoy::config::cluster::v3alpha::Cluster eds_cluster_;
+  envoy::config::cluster::v3::Cluster eds_cluster_;
   NiceMock<MockClusterManager> cm_;
   NiceMock<Event::MockDispatcher> dispatcher_;
   std::shared_ptr<EdsClusterImpl> cluster_;
@@ -214,13 +214,13 @@ protected:
     EXPECT_EQ(0UL, stats_.counter("cluster.name.update_no_rebuild").value());
   }
 
-  envoy::config::endpoint::v3alpha::ClusterLoadAssignment cluster_load_assignment_;
+  envoy::config::endpoint::v3::ClusterLoadAssignment cluster_load_assignment_;
 };
 
 // Negative test for protoc-gen-validate constraints.
 TEST_F(EdsTest, ValidateFail) {
   initialize();
-  envoy::config::endpoint::v3alpha::ClusterLoadAssignment resource;
+  envoy::config::endpoint::v3::ClusterLoadAssignment resource;
   Protobuf::RepeatedPtrField<ProtobufWkt::Any> resources;
   resources.Add()->PackFrom(resource);
   EXPECT_THROW(eds_callbacks_->onConfigUpdate(resources, ""), ProtoValidationException);
@@ -229,7 +229,7 @@ TEST_F(EdsTest, ValidateFail) {
 
 // Validate that onConfigUpdate() with unexpected cluster names rejects config.
 TEST_F(EdsTest, OnConfigUpdateWrongName) {
-  envoy::config::endpoint::v3alpha::ClusterLoadAssignment cluster_load_assignment;
+  envoy::config::endpoint::v3::ClusterLoadAssignment cluster_load_assignment;
   cluster_load_assignment.set_cluster_name("wrong name");
   Protobuf::RepeatedPtrField<ProtobufWkt::Any> resources;
   resources.Add()->PackFrom(cluster_load_assignment);
@@ -247,7 +247,7 @@ TEST_F(EdsTest, OnConfigUpdateWrongName) {
 TEST_F(EdsTest, OnConfigUpdateEmpty) {
   initialize();
   eds_callbacks_->onConfigUpdate({}, "");
-  Protobuf::RepeatedPtrField<envoy::service::discovery::v3alpha::Resource> resources;
+  Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource> resources;
   Protobuf::RepeatedPtrField<std::string> removed_resources;
   eds_callbacks_->onConfigUpdate(resources, removed_resources, "");
   EXPECT_EQ(2UL, stats_.counter("cluster.name.update_empty").value());
@@ -257,7 +257,7 @@ TEST_F(EdsTest, OnConfigUpdateEmpty) {
 // Validate that onConfigUpdate() with unexpected cluster vector size rejects config.
 TEST_F(EdsTest, OnConfigUpdateWrongSize) {
   initialize();
-  envoy::config::endpoint::v3alpha::ClusterLoadAssignment cluster_load_assignment;
+  envoy::config::endpoint::v3::ClusterLoadAssignment cluster_load_assignment;
   cluster_load_assignment.set_cluster_name("fare");
   Protobuf::RepeatedPtrField<ProtobufWkt::Any> resources;
   resources.Add()->PackFrom(cluster_load_assignment);
@@ -273,7 +273,7 @@ TEST_F(EdsTest, OnConfigUpdateWrongSize) {
 
 // Validate that onConfigUpdate() with the expected cluster accepts config.
 TEST_F(EdsTest, OnConfigUpdateSuccess) {
-  envoy::config::endpoint::v3alpha::ClusterLoadAssignment cluster_load_assignment;
+  envoy::config::endpoint::v3::ClusterLoadAssignment cluster_load_assignment;
   cluster_load_assignment.set_cluster_name("fare");
   initialize();
   doOnConfigUpdateVerifyNoThrow(cluster_load_assignment);
@@ -283,11 +283,11 @@ TEST_F(EdsTest, OnConfigUpdateSuccess) {
 
 // Validate that delta-style onConfigUpdate() with the expected cluster accepts config.
 TEST_F(EdsTest, DeltaOnConfigUpdateSuccess) {
-  envoy::config::endpoint::v3alpha::ClusterLoadAssignment cluster_load_assignment;
+  envoy::config::endpoint::v3::ClusterLoadAssignment cluster_load_assignment;
   cluster_load_assignment.set_cluster_name("fare");
   initialize();
 
-  Protobuf::RepeatedPtrField<envoy::service::discovery::v3alpha::Resource> resources;
+  Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource> resources;
   auto* resource = resources.Add();
   resource->mutable_resource()->PackFrom(cluster_load_assignment);
   resource->set_version("v1");
@@ -313,7 +313,7 @@ TEST_F(EdsTest, NoServiceNameOnSuccessConfigUpdate) {
             refresh_delay: 1s
     )EOF",
                Cluster::InitializePhase::Secondary);
-  envoy::config::endpoint::v3alpha::ClusterLoadAssignment cluster_load_assignment;
+  envoy::config::endpoint::v3::ClusterLoadAssignment cluster_load_assignment;
   cluster_load_assignment.set_cluster_name("name");
   initialize();
   doOnConfigUpdateVerifyNoThrow(cluster_load_assignment);
@@ -323,7 +323,7 @@ TEST_F(EdsTest, NoServiceNameOnSuccessConfigUpdate) {
 // Validate that EDS cluster loaded from file as primary cluster
 TEST_F(EdsTest, EdsClusterFromFileIsPrimaryCluster) {
   resetClusterLoadedFromFile();
-  envoy::config::endpoint::v3alpha::ClusterLoadAssignment cluster_load_assignment;
+  envoy::config::endpoint::v3::ClusterLoadAssignment cluster_load_assignment;
   cluster_load_assignment.set_cluster_name("name");
   initialize();
   doOnConfigUpdateVerifyNoThrow(cluster_load_assignment);
@@ -332,7 +332,7 @@ TEST_F(EdsTest, EdsClusterFromFileIsPrimaryCluster) {
 
 // Validate that onConfigUpdate() updates the endpoint metadata.
 TEST_F(EdsTest, EndpointMetadata) {
-  envoy::config::endpoint::v3alpha::ClusterLoadAssignment cluster_load_assignment;
+  envoy::config::endpoint::v3::ClusterLoadAssignment cluster_load_assignment;
   cluster_load_assignment.set_cluster_name("fare");
   auto* endpoints = cluster_load_assignment.add_endpoints();
   auto* endpoint = endpoints->add_lb_endpoints();
@@ -408,20 +408,20 @@ TEST_F(EdsTest, EndpointMetadata) {
 
 // Validate that onConfigUpdate() updates endpoint health status.
 TEST_F(EdsTest, EndpointHealthStatus) {
-  envoy::config::endpoint::v3alpha::ClusterLoadAssignment cluster_load_assignment;
+  envoy::config::endpoint::v3::ClusterLoadAssignment cluster_load_assignment;
   cluster_load_assignment.set_cluster_name("fare");
   auto* endpoints = cluster_load_assignment.add_endpoints();
 
   // First check that EDS is correctly mapping
   // envoy::api::v2::core::HealthStatus values to the expected health() status.
-  const std::vector<std::pair<envoy::config::core::v3alpha::HealthStatus, Host::Health>>
+  const std::vector<std::pair<envoy::config::core::v3::HealthStatus, Host::Health>>
       health_status_expected = {
-          {envoy::config::core::v3alpha::UNKNOWN, Host::Health::Healthy},
-          {envoy::config::core::v3alpha::HEALTHY, Host::Health::Healthy},
-          {envoy::config::core::v3alpha::UNHEALTHY, Host::Health::Unhealthy},
-          {envoy::config::core::v3alpha::DRAINING, Host::Health::Unhealthy},
-          {envoy::config::core::v3alpha::TIMEOUT, Host::Health::Unhealthy},
-          {envoy::config::core::v3alpha::DEGRADED, Host::Health::Degraded},
+          {envoy::config::core::v3::UNKNOWN, Host::Health::Healthy},
+          {envoy::config::core::v3::HEALTHY, Host::Health::Healthy},
+          {envoy::config::core::v3::UNHEALTHY, Host::Health::Unhealthy},
+          {envoy::config::core::v3::DRAINING, Host::Health::Unhealthy},
+          {envoy::config::core::v3::TIMEOUT, Host::Health::Unhealthy},
+          {envoy::config::core::v3::DEGRADED, Host::Health::Degraded},
       };
 
   int port = 80;
@@ -448,7 +448,7 @@ TEST_F(EdsTest, EndpointHealthStatus) {
 
   // Perform an update in which we don't change the host set, but flip some host
   // to unhealthy, check we have the expected change in status.
-  endpoints->mutable_lb_endpoints(0)->set_health_status(envoy::config::core::v3alpha::UNHEALTHY);
+  endpoints->mutable_lb_endpoints(0)->set_health_status(envoy::config::core::v3::UNHEALTHY);
   doOnConfigUpdateVerifyNoThrow(cluster_load_assignment);
   {
     auto& hosts = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts();
@@ -463,7 +463,7 @@ TEST_F(EdsTest, EndpointHealthStatus) {
   // Perform an update in which we don't change the host set, but flip some host
   // to healthy, check we have the expected change in status.
   endpoints->mutable_lb_endpoints(health_status_expected.size() - 1)
-      ->set_health_status(envoy::config::core::v3alpha::HEALTHY);
+      ->set_health_status(envoy::config::core::v3::HEALTHY);
   doOnConfigUpdateVerifyNoThrow(cluster_load_assignment);
   {
     auto& hosts = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts();
@@ -489,7 +489,7 @@ TEST_F(EdsTest, EndpointHealthStatus) {
 
   // Now mark host 0 healthy via EDS, it should still be unhealthy due to the
   // active health check failure.
-  endpoints->mutable_lb_endpoints(0)->set_health_status(envoy::config::core::v3alpha::HEALTHY);
+  endpoints->mutable_lb_endpoints(0)->set_health_status(envoy::config::core::v3::HEALTHY);
   doOnConfigUpdateVerifyNoThrow(cluster_load_assignment);
   {
     auto& hosts = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts();
@@ -506,7 +506,7 @@ TEST_F(EdsTest, EndpointHealthStatus) {
 
   const auto rebuild_container = stats_.counter("cluster.name.update_no_rebuild").value();
   // Now mark host 0 degraded via EDS, it should be degraded.
-  endpoints->mutable_lb_endpoints(0)->set_health_status(envoy::config::core::v3alpha::DEGRADED);
+  endpoints->mutable_lb_endpoints(0)->set_health_status(envoy::config::core::v3::DEGRADED);
   doOnConfigUpdateVerifyNoThrow(cluster_load_assignment);
   {
     auto& hosts = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts();
@@ -521,7 +521,7 @@ TEST_F(EdsTest, EndpointHealthStatus) {
       Host::HealthFlag::DEGRADED_ACTIVE_HC);
 
   // Now mark host 0 healthy via EDS, it should still be degraded.
-  endpoints->mutable_lb_endpoints(0)->set_health_status(envoy::config::core::v3alpha::HEALTHY);
+  endpoints->mutable_lb_endpoints(0)->set_health_status(envoy::config::core::v3::HEALTHY);
   doOnConfigUpdateVerifyNoThrow(cluster_load_assignment);
   {
     auto& hosts = cluster_->prioritySet().hostSetsPerPriority()[0]->hosts();
@@ -535,7 +535,7 @@ TEST_F(EdsTest, EndpointHealthStatus) {
 // Verify that a host is removed if it is removed from discovery, stabilized, and then later
 // fails active HC.
 TEST_F(EdsTest, EndpointRemovalAfterHcFail) {
-  envoy::config::endpoint::v3alpha::ClusterLoadAssignment cluster_load_assignment;
+  envoy::config::endpoint::v3::ClusterLoadAssignment cluster_load_assignment;
   cluster_load_assignment.set_cluster_name("fare");
 
   auto health_checker = std::make_shared<MockHealthChecker>();
@@ -645,7 +645,7 @@ TEST_F(EdsTest, EndpointRemovalAfterHcFail) {
 // Verify that a host is removed when it is still passing active HC, but has been previously
 // told by the EDS server to fail health check.
 TEST_F(EdsTest, EndpointRemovalEdsFailButActiveHcSuccess) {
-  envoy::config::endpoint::v3alpha::ClusterLoadAssignment cluster_load_assignment;
+  envoy::config::endpoint::v3::ClusterLoadAssignment cluster_load_assignment;
   cluster_load_assignment.set_cluster_name("fare");
   auto* endpoints = cluster_load_assignment.add_endpoints();
 
@@ -681,7 +681,7 @@ TEST_F(EdsTest, EndpointRemovalEdsFailButActiveHcSuccess) {
   }
 
   // Mark the first endpoint as unhealthy from EDS.
-  endpoints->mutable_lb_endpoints(0)->set_health_status(envoy::config::core::v3alpha::UNHEALTHY);
+  endpoints->mutable_lb_endpoints(0)->set_health_status(envoy::config::core::v3::UNHEALTHY);
   doOnConfigUpdateVerifyNoThrow(cluster_load_assignment);
 
   {
@@ -708,7 +708,7 @@ TEST_F(EdsTest, EndpointRemovalEdsFailButActiveHcSuccess) {
 // Validate that onConfigUpdate() removes endpoints that are marked as healthy
 // when configured to drain on host removal.
 TEST_F(EdsTest, EndpointRemovalClusterDrainOnHostRemoval) {
-  envoy::config::endpoint::v3alpha::ClusterLoadAssignment cluster_load_assignment;
+  envoy::config::endpoint::v3::ClusterLoadAssignment cluster_load_assignment;
   cluster_load_assignment.set_cluster_name("fare");
   resetClusterDrainOnHostRemoval();
 
@@ -761,7 +761,7 @@ TEST_F(EdsTest, EndpointRemovalClusterDrainOnHostRemoval) {
 
 // Verifies that if an endpoint is moved to a new priority, the active hc status is preserved.
 TEST_F(EdsTest, EndpointMovedToNewPriority) {
-  envoy::config::endpoint::v3alpha::ClusterLoadAssignment cluster_load_assignment;
+  envoy::config::endpoint::v3::ClusterLoadAssignment cluster_load_assignment;
   cluster_load_assignment.set_cluster_name("fare");
   resetClusterDrainOnHostRemoval();
 
@@ -862,7 +862,7 @@ TEST_F(EdsTest, EndpointMovedToNewPriority) {
 // Verifies that if an endpoint is moved between priorities, the health check value
 // of the host is preserved
 TEST_F(EdsTest, EndpointMoved) {
-  envoy::config::endpoint::v3alpha::ClusterLoadAssignment cluster_load_assignment;
+  envoy::config::endpoint::v3::ClusterLoadAssignment cluster_load_assignment;
   cluster_load_assignment.set_cluster_name("fare");
   resetClusterDrainOnHostRemoval();
 
@@ -949,7 +949,7 @@ TEST_F(EdsTest, EndpointMoved) {
 
 // Validates that we correctly update the host list when a new overprovisioning factor is set.
 TEST_F(EdsTest, EndpointAddedWithNewOverprovisioningFactor) {
-  envoy::config::endpoint::v3alpha::ClusterLoadAssignment cluster_load_assignment;
+  envoy::config::endpoint::v3::ClusterLoadAssignment cluster_load_assignment;
   cluster_load_assignment.set_cluster_name("fare");
   cluster_load_assignment.mutable_policy()->mutable_overprovisioning_factor()->set_value(1000);
 
@@ -980,7 +980,7 @@ TEST_F(EdsTest, EndpointAddedWithNewOverprovisioningFactor) {
 
 // Validate that onConfigUpdate() updates the endpoint locality.
 TEST_F(EdsTest, EndpointLocality) {
-  envoy::config::endpoint::v3alpha::ClusterLoadAssignment cluster_load_assignment;
+  envoy::config::endpoint::v3::ClusterLoadAssignment cluster_load_assignment;
   cluster_load_assignment.set_cluster_name("fare");
   auto* endpoints = cluster_load_assignment.add_endpoints();
   auto* locality = endpoints->mutable_locality();
@@ -1024,7 +1024,7 @@ TEST_F(EdsTest, EndpointLocality) {
 // Validate that onConfigUpdate() does not propagate locality weights to the host set when
 // locality weighted balancing isn't configured.
 TEST_F(EdsTest, EndpointLocalityWeightsIgnored) {
-  envoy::config::endpoint::v3alpha::ClusterLoadAssignment cluster_load_assignment;
+  envoy::config::endpoint::v3::ClusterLoadAssignment cluster_load_assignment;
   cluster_load_assignment.set_cluster_name("fare");
 
   {
@@ -1053,7 +1053,7 @@ TEST_F(EdsTest, EndpointLocalityWeightsIgnored) {
 // Validate that onConfigUpdate() propagates locality weights to the host set when locality
 // weighted balancing is configured.
 TEST_F(EdsTest, EndpointLocalityWeights) {
-  envoy::config::endpoint::v3alpha::ClusterLoadAssignment cluster_load_assignment;
+  envoy::config::endpoint::v3::ClusterLoadAssignment cluster_load_assignment;
   cluster_load_assignment.set_cluster_name("fare");
   resetCluster(R"EOF(
       name: name
@@ -1135,7 +1135,7 @@ TEST_F(EdsTest, EndpointLocalityWeights) {
 // Validate that onConfigUpdate() removes any locality not referenced in the
 // config update in each priority.
 TEST_F(EdsTest, RemoveUnreferencedLocalities) {
-  envoy::config::endpoint::v3alpha::ClusterLoadAssignment cluster_load_assignment;
+  envoy::config::endpoint::v3::ClusterLoadAssignment cluster_load_assignment;
   cluster_load_assignment.set_cluster_name("fare");
   uint32_t port = 1000;
   auto add_hosts_to_locality = [&cluster_load_assignment,
@@ -1219,7 +1219,7 @@ TEST_F(EdsTest, RemoveUnreferencedLocalities) {
 
 // Validate that onConfigUpdate() updates bins hosts per locality as expected.
 TEST_F(EdsTest, EndpointHostsPerLocality) {
-  envoy::config::endpoint::v3alpha::ClusterLoadAssignment cluster_load_assignment;
+  envoy::config::endpoint::v3::ClusterLoadAssignment cluster_load_assignment;
   cluster_load_assignment.set_cluster_name("fare");
   uint32_t port = 1000;
   auto add_hosts_to_locality = [&cluster_load_assignment,
@@ -1285,7 +1285,7 @@ TEST_F(EdsTest, EndpointHostsPerLocality) {
 
 // Validate that onConfigUpdate() updates all priorities in the prioritySet
 TEST_F(EdsTest, EndpointHostPerPriority) {
-  envoy::config::endpoint::v3alpha::ClusterLoadAssignment cluster_load_assignment;
+  envoy::config::endpoint::v3::ClusterLoadAssignment cluster_load_assignment;
   cluster_load_assignment.set_cluster_name("fare");
   uint32_t port = 1000;
   auto add_hosts_to_locality = [&cluster_load_assignment,
@@ -1343,7 +1343,7 @@ TEST_F(EdsTest, EndpointHostPerPriority) {
 
 // Validate that onConfigUpdate() updates bins hosts per priority as expected.
 TEST_F(EdsTest, EndpointHostsPerPriority) {
-  envoy::config::endpoint::v3alpha::ClusterLoadAssignment cluster_load_assignment;
+  envoy::config::endpoint::v3::ClusterLoadAssignment cluster_load_assignment;
   cluster_load_assignment.set_cluster_name("fare");
   uint32_t port = 1000;
   auto add_hosts_to_priority = [&cluster_load_assignment, &port](uint32_t priority, uint32_t n) {
@@ -1402,7 +1402,7 @@ TEST_F(EdsTest, NoPriorityForLocalCluster) {
   cm_.local_cluster_name_ = "name";
   resetCluster();
 
-  envoy::config::endpoint::v3alpha::ClusterLoadAssignment cluster_load_assignment;
+  envoy::config::endpoint::v3::ClusterLoadAssignment cluster_load_assignment;
   cluster_load_assignment.set_cluster_name("fare");
   uint32_t port = 1000;
   auto add_hosts_to_priority = [&cluster_load_assignment, &port](uint32_t priority, uint32_t n) {
@@ -1438,7 +1438,7 @@ TEST_F(EdsTest, NoPriorityForLocalCluster) {
 // Set up an EDS config with multiple priorities and localities and make sure
 // they are loaded and reloaded as expected.
 TEST_F(EdsTest, PriorityAndLocality) {
-  envoy::config::endpoint::v3alpha::ClusterLoadAssignment cluster_load_assignment;
+  envoy::config::endpoint::v3::ClusterLoadAssignment cluster_load_assignment;
   cluster_load_assignment.set_cluster_name("fare");
   uint32_t port = 1000;
   auto add_hosts_to_locality_and_priority =
@@ -1529,7 +1529,7 @@ TEST_F(EdsTest, PriorityAndLocality) {
 // Set up an EDS config with multiple priorities, localities, weights and make sure
 // they are loaded and reloaded as expected.
 TEST_F(EdsTest, PriorityAndLocalityWeighted) {
-  envoy::config::endpoint::v3alpha::ClusterLoadAssignment cluster_load_assignment;
+  envoy::config::endpoint::v3::ClusterLoadAssignment cluster_load_assignment;
   cluster_load_assignment.set_cluster_name("fare");
   resetCluster(R"EOF(
       name: name
@@ -1703,7 +1703,7 @@ TEST_F(EdsWithHealthCheckUpdateTest, EndpointUpdateHealthCheckConfigWithDrainCon
 
 // Throw on adding a new resource with an invalid endpoint (since the given address is invalid).
 TEST_F(EdsTest, MalformedIP) {
-  envoy::config::endpoint::v3alpha::ClusterLoadAssignment cluster_load_assignment;
+  envoy::config::endpoint::v3::ClusterLoadAssignment cluster_load_assignment;
   cluster_load_assignment.set_cluster_name("fare");
   auto* endpoints = cluster_load_assignment.add_endpoints();
 
@@ -1741,7 +1741,7 @@ public:
 
 // Test that assignment timeout is enabled and disabled correctly.
 TEST_F(EdsAssignmentTimeoutTest, AssignmentTimeoutEnableDisable) {
-  envoy::config::endpoint::v3alpha::ClusterLoadAssignment cluster_load_assignment;
+  envoy::config::endpoint::v3::ClusterLoadAssignment cluster_load_assignment;
   cluster_load_assignment.set_cluster_name("fare");
   auto* endpoints = cluster_load_assignment.add_endpoints();
 
@@ -1757,7 +1757,7 @@ TEST_F(EdsAssignmentTimeoutTest, AssignmentTimeoutEnableDisable) {
   socket_address->set_address("1.2.3.4");
   socket_address->set_port_value(80);
 
-  envoy::config::endpoint::v3alpha::ClusterLoadAssignment cluster_load_assignment_lease =
+  envoy::config::endpoint::v3::ClusterLoadAssignment cluster_load_assignment_lease =
       cluster_load_assignment;
   cluster_load_assignment_lease.mutable_policy()->mutable_endpoint_stale_after()->MergeFrom(
       Protobuf::util::TimeUtil::SecondsToDuration(1));
@@ -1778,7 +1778,7 @@ TEST_F(EdsAssignmentTimeoutTest, AssignmentTimeoutEnableDisable) {
 
 // Test that assignment timeout is called and removes all the endpoints.
 TEST_F(EdsAssignmentTimeoutTest, AssignmentLeaseExpired) {
-  envoy::config::endpoint::v3alpha::ClusterLoadAssignment cluster_load_assignment;
+  envoy::config::endpoint::v3::ClusterLoadAssignment cluster_load_assignment;
   cluster_load_assignment.set_cluster_name("fare");
   cluster_load_assignment.mutable_policy()->mutable_endpoint_stale_after()->MergeFrom(
       Protobuf::util::TimeUtil::SecondsToDuration(1));

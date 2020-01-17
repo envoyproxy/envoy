@@ -1,6 +1,6 @@
 #pragma once
 
-#include "envoy/config/core/v3alpha/base.pb.h"
+#include "envoy/config/core/v3/base.pb.h"
 #include "envoy/network/address.h"
 #include "envoy/network/listen_socket.h"
 
@@ -26,7 +26,7 @@ public:
    * Adds socket options to the socket to allow this to work.
    */
   bool setOption(Network::Socket& socket,
-                 envoy::config::core::v3alpha::SocketOption::SocketState state) const override;
+                 envoy::config::core::v3::SocketOption::SocketState state) const override;
 
   /**
    * Appends a key which uniquely identifies the address being tracked.
@@ -35,7 +35,7 @@ public:
 
   absl::optional<Details>
   getOptionDetails(const Network::Socket& socket,
-                   envoy::config::core::v3alpha::SocketOption::SocketState state) const override;
+                   envoy::config::core::v3::SocketOption::SocketState state) const override;
 
 private:
   Network::Address::InstanceConstSharedPtr src_address_;

@@ -49,9 +49,9 @@ envoy_cc_library(
         "//source/common/network:utility_lib",
         "//source/common/protobuf:utility_lib",
         "//source/common/tracing:http_tracer_lib",
-        "@envoy_api//envoy/config/bootstrap/v3alpha:pkg_cc_proto",
-        "@envoy_api//envoy/config/metrics/v3alpha:pkg_cc_proto",
-        "@envoy_api//envoy/config/trace/v3alpha:pkg_cc_proto",
+        "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/metrics/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/trace/v3:pkg_cc_proto",
     ],
 )
 
@@ -94,7 +94,7 @@ envoy_cc_library(
         "//include/envoy/server:instance_interface",
         "//source/common/common:assert_lib",
         "//source/common/common:minimal_logger_lib",
-        "@envoy_api//envoy/config/listener/v3alpha:pkg_cc_proto",
+        "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",
     ],
 )
 
@@ -242,7 +242,7 @@ envoy_cc_library(
         "//source/common/config:utility_lib",
         "//source/common/stats:symbol_table_lib",
         "//source/server:resource_monitor_config_lib",
-        "@envoy_api//envoy/config/overload/v3alpha:pkg_cc_proto",
+        "@envoy_api//envoy/config/overload/v3:pkg_cc_proto",
     ],
 )
 
@@ -261,11 +261,11 @@ envoy_cc_library(
         "//source/common/config:utility_lib",
         "//source/common/init:target_lib",
         "//source/common/protobuf:utility_lib",
-        "@envoy_api//envoy/admin/v3alpha:pkg_cc_proto",
+        "@envoy_api//envoy/admin/v3:pkg_cc_proto",
         "@envoy_api//envoy/api/v2:pkg_cc_proto",
-        "@envoy_api//envoy/config/core/v3alpha:pkg_cc_proto",
-        "@envoy_api//envoy/config/listener/v3alpha:pkg_cc_proto",
-        "@envoy_api//envoy/service/discovery/v3alpha:pkg_cc_proto",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",
+        "@envoy_api//envoy/service/discovery/v3:pkg_cc_proto",
     ],
 )
 
@@ -297,8 +297,8 @@ envoy_cc_library(
         "//source/common/protobuf:utility_lib",
         "//source/extensions/filters/listener:well_known_names",
         "//source/extensions/transport_sockets:well_known_names",
-        "@envoy_api//envoy/config/core/v3alpha:pkg_cc_proto",
-        "@envoy_api//envoy/config/listener/v3alpha:pkg_cc_proto",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",
     ],
 )
 
@@ -332,9 +332,9 @@ envoy_cc_library(
         "//source/common/protobuf:utility_lib",
         "//source/extensions/filters/listener:well_known_names",
         "//source/extensions/transport_sockets:well_known_names",
-        "@envoy_api//envoy/admin/v3alpha:pkg_cc_proto",
-        "@envoy_api//envoy/config/core/v3alpha:pkg_cc_proto",
-        "@envoy_api//envoy/config/listener/v3alpha:pkg_cc_proto",
+        "@envoy_api//envoy/admin/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",
     ],
 )
 
@@ -352,7 +352,7 @@ envoy_cc_library(
         "//source/common/network:cidr_range_lib",
         "//source/common/network:lc_trie_lib",
         "//source/server:configuration_lib",
-        "@envoy_api//envoy/config/listener/v3alpha:pkg_cc_proto",
+        "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",
     ],
 )
 
@@ -437,8 +437,8 @@ envoy_cc_library(
         "//source/common/upstream:health_discovery_service_lib",
         "//source/server:overload_manager_lib",
         "//source/server/http:admin_lib",
-        "@envoy_api//envoy/admin/v3alpha:pkg_cc_proto",
-        "@envoy_api//envoy/config/bootstrap/v3alpha:pkg_cc_proto",
+        "@envoy_api//envoy/admin/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
     ],
 )
 

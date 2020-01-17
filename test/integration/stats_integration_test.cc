@@ -1,7 +1,7 @@
 #include <memory>
 
-#include "envoy/config/bootstrap/v3alpha/bootstrap.pb.h"
-#include "envoy/config/core/v3alpha/address.pb.h"
+#include "envoy/config/bootstrap/v3/bootstrap.pb.h"
+#include "envoy/config/core/v3/address.pb.h"
 #include "envoy/stats/scope.h"
 #include "envoy/stats/stats.h"
 
@@ -51,10 +51,9 @@ TEST_P(StatsIntegrationTest, WithDefaultConfig) {
 }
 
 TEST_P(StatsIntegrationTest, WithoutDefaultTagExtractors) {
-  config_helper_.addConfigModifier(
-      [&](envoy::config::bootstrap::v3alpha::Bootstrap& bootstrap) -> void {
-        bootstrap.mutable_stats_config()->mutable_use_all_default_tags()->set_value(false);
-      });
+  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+    bootstrap.mutable_stats_config()->mutable_use_all_default_tags()->set_value(false);
+  });
   initialize();
 
   auto counter = test_server_->counter("http.config_test.rq_total");
@@ -62,10 +61,9 @@ TEST_P(StatsIntegrationTest, WithoutDefaultTagExtractors) {
 }
 
 TEST_P(StatsIntegrationTest, WithDefaultTagExtractors) {
-  config_helper_.addConfigModifier(
-      [&](envoy::config::bootstrap::v3alpha::Bootstrap& bootstrap) -> void {
-        bootstrap.mutable_stats_config()->mutable_use_all_default_tags()->set_value(true);
-      });
+  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+    bootstrap.mutable_stats_config()->mutable_use_all_default_tags()->set_value(true);
+  });
   initialize();
 
   auto counter = test_server_->counter("http.config_test.rq_total");
@@ -81,13 +79,12 @@ TEST_P(StatsIntegrationTest, WithDefaultTagExtractors) {
 // specifier having use defined regex.
 TEST_P(StatsIntegrationTest, WithDefaultTagExtractorNameWithUserDefinedRegex) {
   std::string tag_name = Config::TagNames::get().HTTP_CONN_MANAGER_PREFIX;
-  config_helper_.addConfigModifier(
-      [&](envoy::config::bootstrap::v3alpha::Bootstrap& bootstrap) -> void {
-        bootstrap.mutable_stats_config()->mutable_use_all_default_tags()->set_value(false);
-        auto tag_specifier = bootstrap.mutable_stats_config()->mutable_stats_tags()->Add();
-        tag_specifier->set_tag_name(tag_name);
-        tag_specifier->set_regex("((.*))");
-      });
+  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+    bootstrap.mutable_stats_config()->mutable_use_all_default_tags()->set_value(false);
+    auto tag_specifier = bootstrap.mutable_stats_config()->mutable_stats_tags()->Add();
+    tag_specifier->set_tag_name(tag_name);
+    tag_specifier->set_regex("((.*))");
+  });
   initialize();
 
   auto counter = test_server_->counter("http.config_test.rq_total");
@@ -97,12 +94,11 @@ TEST_P(StatsIntegrationTest, WithDefaultTagExtractorNameWithUserDefinedRegex) {
 }
 
 TEST_P(StatsIntegrationTest, WithTagSpecifierMissingTagValue) {
-  config_helper_.addConfigModifier(
-      [&](envoy::config::bootstrap::v3alpha::Bootstrap& bootstrap) -> void {
-        bootstrap.mutable_stats_config()->mutable_use_all_default_tags()->set_value(false);
-        auto tag_specifier = bootstrap.mutable_stats_config()->mutable_stats_tags()->Add();
-        tag_specifier->set_tag_name("envoy.http_conn_manager_prefix");
-      });
+  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+    bootstrap.mutable_stats_config()->mutable_use_all_default_tags()->set_value(false);
+    auto tag_specifier = bootstrap.mutable_stats_config()->mutable_stats_tags()->Add();
+    tag_specifier->set_tag_name("envoy.http_conn_manager_prefix");
+  });
   initialize();
 
   auto counter = test_server_->counter("http.config_test.rq_total");
@@ -112,13 +108,12 @@ TEST_P(StatsIntegrationTest, WithTagSpecifierMissingTagValue) {
 }
 
 TEST_P(StatsIntegrationTest, WithTagSpecifierWithRegex) {
-  config_helper_.addConfigModifier(
-      [&](envoy::config::bootstrap::v3alpha::Bootstrap& bootstrap) -> void {
-        bootstrap.mutable_stats_config()->mutable_use_all_default_tags()->set_value(false);
-        auto tag_specifier = bootstrap.mutable_stats_config()->mutable_stats_tags()->Add();
-        tag_specifier->set_tag_name("my.http_conn_manager_prefix");
-        tag_specifier->set_regex(R"(^(?:|listener(?=\.).*?\.)http\.((.*?)\.))");
-      });
+  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+    bootstrap.mutable_stats_config()->mutable_use_all_default_tags()->set_value(false);
+    auto tag_specifier = bootstrap.mutable_stats_config()->mutable_stats_tags()->Add();
+    tag_specifier->set_tag_name("my.http_conn_manager_prefix");
+    tag_specifier->set_regex(R"(^(?:|listener(?=\.).*?\.)http\.((.*?)\.))");
+  });
   initialize();
 
   auto counter = test_server_->counter("http.config_test.rq_total");
@@ -128,12 +123,11 @@ TEST_P(StatsIntegrationTest, WithTagSpecifierWithRegex) {
 }
 
 TEST_P(StatsIntegrationTest, WithTagSpecifierWithFixedValue) {
-  config_helper_.addConfigModifier(
-      [&](envoy::config::bootstrap::v3alpha::Bootstrap& bootstrap) -> void {
-        auto tag_specifier = bootstrap.mutable_stats_config()->mutable_stats_tags()->Add();
-        tag_specifier->set_tag_name("test.x");
-        tag_specifier->set_fixed_value("xxx");
-      });
+  config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) -> void {
+    auto tag_specifier = bootstrap.mutable_stats_config()->mutable_stats_tags()->Add();
+    tag_specifier->set_tag_name("test.x");
+    tag_specifier->set_fixed_value("xxx");
+  });
   initialize();
 
   auto live = test_server_->gauge("server.live");
@@ -181,7 +175,7 @@ private:
    */
   size_t clusterMemoryHelper(int num_clusters, int num_hosts, bool allow_stats) {
     Stats::TestUtil::MemoryTest memory_test;
-    config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3alpha::Bootstrap& bootstrap) {
+    config_helper_.addConfigModifier([&](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       if (!allow_stats) {
         bootstrap.mutable_stats_config()->mutable_stats_matcher()->set_reject_all(true);
       }
@@ -199,7 +193,7 @@ private:
                            ->mutable_endpoint()
                            ->mutable_address();
           auto* socket_address = host->mutable_socket_address();
-          socket_address->set_protocol(envoy::config::core::v3alpha::SocketAddress::TCP);
+          socket_address->set_protocol(envoy::config::core::v3::SocketAddress::TCP);
           socket_address->set_address("0.0.0.0");
           socket_address->set_port_value(80);
         }

@@ -1,9 +1,9 @@
 #include <memory>
 
 #include "envoy/common/exception.h"
-#include "envoy/config/route/v3alpha/route_components.pb.h"
-#include "envoy/extensions/filters/network/thrift_proxy/v3alpha/thrift_proxy.pb.h"
-#include "envoy/extensions/filters/network/thrift_proxy/v3alpha/thrift_proxy.pb.validate.h"
+#include "envoy/config/route/v3/route_components.pb.h"
+#include "envoy/extensions/filters/network/thrift_proxy/v3/thrift_proxy.pb.h"
+#include "envoy/extensions/filters/network/thrift_proxy/v3/thrift_proxy.pb.validate.h"
 #include "envoy/ratelimit/ratelimit.h"
 
 #include "common/protobuf/utility.h"
@@ -32,7 +32,7 @@ namespace {
 class ThriftRateLimitConfigurationTest : public testing::Test {
 public:
   void initialize(const std::string& yaml) {
-    envoy::extensions::filters::network::thrift_proxy::v3alpha::ThriftProxy config;
+    envoy::extensions::filters::network::thrift_proxy::v3::ThriftProxy config;
     TestUtility::loadFromYaml(yaml, config);
     config_ = std::make_unique<ThriftProxy::ConfigImpl>(config, factory_context_);
   }
@@ -173,7 +173,7 @@ route_config:
 class ThriftRateLimitPolicyEntryTest : public testing::Test {
 public:
   void initialize(const std::string& yaml) {
-    envoy::config::route::v3alpha::RateLimit rate_limit;
+    envoy::config::route::v3::RateLimit rate_limit;
     TestUtility::loadFromYaml(yaml, rate_limit);
 
     rate_limit_entry_ = std::make_unique<RateLimitPolicyEntryImpl>(rate_limit);

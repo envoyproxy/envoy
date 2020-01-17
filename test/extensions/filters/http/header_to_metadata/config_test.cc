@@ -1,7 +1,7 @@
 #include <string>
 
-#include "envoy/extensions/filters/http/header_to_metadata/v3alpha/header_to_metadata.pb.h"
-#include "envoy/extensions/filters/http/header_to_metadata/v3alpha/header_to_metadata.pb.validate.h"
+#include "envoy/extensions/filters/http/header_to_metadata/v3/header_to_metadata.pb.h"
+#include "envoy/extensions/filters/http/header_to_metadata/v3/header_to_metadata.pb.validate.h"
 
 #include "extensions/filters/http/header_to_metadata/config.h"
 
@@ -17,7 +17,7 @@ namespace HttpFilters {
 namespace HeaderToMetadataFilter {
 
 using HeaderToMetadataProtoConfig =
-    envoy::extensions::filters::http::header_to_metadata::v3alpha::Config;
+    envoy::extensions::filters::http::header_to_metadata::v3::Config;
 
 TEST(HeaderToMetadataFilterConfigTest, InvalidEmptyHeader) {
   const std::string yaml = R"EOF(

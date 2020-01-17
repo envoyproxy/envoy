@@ -57,7 +57,7 @@ envoy_cc_extension(
         "//source/extensions/filters/network/thrift_proxy/filters:filter_config_interface",
         "//source/extensions/filters/network/thrift_proxy/filters:well_known_names",
         "//source/extensions/filters/network/thrift_proxy/router:router_lib",
-        "@envoy_api//envoy/extensions/filters/network/thrift_proxy/v3alpha:pkg_cc_proto",
+        "@envoy_api//envoy/extensions/filters/network/thrift_proxy/v3:pkg_cc_proto",
     ],
 )
 

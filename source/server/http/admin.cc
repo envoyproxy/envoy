@@ -10,15 +10,15 @@
 #include <utility>
 #include <vector>
 
-#include "envoy/admin/v3alpha/certs.pb.h"
-#include "envoy/admin/v3alpha/clusters.pb.h"
-#include "envoy/admin/v3alpha/config_dump.pb.h"
-#include "envoy/admin/v3alpha/listeners.pb.h"
-#include "envoy/admin/v3alpha/memory.pb.h"
-#include "envoy/admin/v3alpha/metrics.pb.h"
-#include "envoy/admin/v3alpha/mutex_stats.pb.h"
-#include "envoy/admin/v3alpha/server_info.pb.h"
-#include "envoy/config/core/v3alpha/health_check.pb.h"
+#include "envoy/admin/v3/certs.pb.h"
+#include "envoy/admin/v3/clusters.pb.h"
+#include "envoy/admin/v3/config_dump.pb.h"
+#include "envoy/admin/v3/listeners.pb.h"
+#include "envoy/admin/v3/memory.pb.h"
+#include "envoy/admin/v3/metrics.pb.h"
+#include "envoy/admin/v3/mutex_stats.pb.h"
+#include "envoy/admin/v3/server_info.pb.h"
+#include "envoy/config/core/v3/health_check.pb.h"
 #include "envoy/filesystem/filesystem.h"
 #include "envoy/runtime/runtime.h"
 #include "envoy/server/hot_restart.h"
@@ -194,7 +194,7 @@ absl::optional<std::string> maskParam(const Http::Utility::QueryParams& params) 
 // Helper method that ensures that we've setting flags based on all the health flag values on the
 // host.
 void setHealthFlag(Upstream::Host::HealthFlag flag, const Upstream::Host& host,
-                   envoy::admin::v3alpha::HostHealthStatus& health_status) {
+                   envoy::admin::v3::HostHealthStatus& health_status) {
   switch (flag) {
   case Upstream::Host::HealthFlag::FAILED_ACTIVE_HC:
     health_status.set_failed_active_health_check(
@@ -207,11 +207,11 @@ void setHealthFlag(Upstream::Host::HealthFlag flag, const Upstream::Host& host,
   case Upstream::Host::HealthFlag::FAILED_EDS_HEALTH:
   case Upstream::Host::HealthFlag::DEGRADED_EDS_HEALTH:
     if (host.healthFlagGet(Upstream::Host::HealthFlag::FAILED_EDS_HEALTH)) {
-      health_status.set_eds_health_status(envoy::config::core::v3alpha::UNHEALTHY);
+      health_status.set_eds_health_status(envoy::config::core::v3::UNHEALTHY);
     } else if (host.healthFlagGet(Upstream::Host::HealthFlag::DEGRADED_EDS_HEALTH)) {
-      health_status.set_eds_health_status(envoy::config::core::v3alpha::DEGRADED);
+      health_status.set_eds_health_status(envoy::config::core::v3::DEGRADED);
     } else {
-      health_status.set_eds_health_status(envoy::config::core::v3alpha::HEALTHY);
+      health_status.set_eds_health_status(envoy::config::core::v3::HEALTHY);
     }
     break;
   case Upstream::Host::HealthFlag::DEGRADED_ACTIVE_HC:
@@ -451,12 +451,12 @@ void AdminImpl::addCircuitSettings(const std::string& cluster_name, const std::s
 }
 
 void AdminImpl::writeClustersAsJson(Buffer::Instance& response) {
-  envoy::admin::v3alpha::Clusters clusters;
+  envoy::admin::v3::Clusters clusters;
   for (auto& cluster_pair : server_.clusterManager().clusters()) {
     const Upstream::Cluster& cluster = cluster_pair.second.get();
     Upstream::ClusterInfoConstSharedPtr cluster_info = cluster.info();
 
-    envoy::admin::v3alpha::ClusterStatus& cluster_status = *clusters.add_cluster_statuses();
+    envoy::admin::v3::ClusterStatus& cluster_status = *clusters.add_cluster_statuses();
     cluster_status.set_name(cluster_info->name());
 
     const Upstream::Outlier::Detector* outlier_detector = cluster.outlierDetector();
@@ -479,7 +479,7 @@ void AdminImpl::writeClustersAsJson(Buffer::Instance& response) {
 
     for (auto& host_set : cluster.prioritySet().hostSetsPerPriority()) {
       for (auto& host : host_set->hosts()) {
-        envoy::admin::v3alpha::HostStatus& host_status = *cluster_status.add_host_statuses();
+        envoy::admin::v3::HostStatus& host_status = *cluster_status.add_host_statuses();
         Network::Utility::addressToProtobufAddress(*host->address(),
                                                    *host_status.mutable_address());
         host_status.set_hostname(host->hostname());
@@ -488,18 +488,17 @@ void AdminImpl::writeClustersAsJson(Buffer::Instance& response) {
           auto& metric = *host_status.add_stats();
           metric.set_name(std::string(named_counter.first));
           metric.set_value(named_counter.second.get().value());
-          metric.set_type(envoy::admin::v3alpha::SimpleMetric::COUNTER);
+          metric.set_type(envoy::admin::v3::SimpleMetric::COUNTER);
         }
 
         for (const auto& named_gauge : host->gauges()) {
           auto& metric = *host_status.add_stats();
           metric.set_name(std::string(named_gauge.first));
           metric.set_value(named_gauge.second.get().value());
-          metric.set_type(envoy::admin::v3alpha::SimpleMetric::GAUGE);
+          metric.set_type(envoy::admin::v3::SimpleMetric::GAUGE);
         }
 
-        envoy::admin::v3alpha::HostHealthStatus& health_status =
-            *host_status.mutable_health_status();
+        envoy::admin::v3::HostHealthStatus& health_status = *host_status.mutable_health_status();
 
 // Invokes setHealthFlag for each health flag.
 #define SET_HEALTH_FLAG(name, notused)                                                             \
@@ -591,9 +590,9 @@ void AdminImpl::writeClustersAsText(Buffer::Instance& response) {
 }
 
 void AdminImpl::writeListenersAsJson(Buffer::Instance& response) {
-  envoy::admin::v3alpha::Listeners listeners;
+  envoy::admin::v3::Listeners listeners;
   for (const auto& listener : server_.listenerManager().listeners()) {
-    envoy::admin::v3alpha::ListenerStatus& listener_status = *listeners.add_listener_statuses();
+    envoy::admin::v3::ListenerStatus& listener_status = *listeners.add_listener_statuses();
     listener_status.set_name(listener.get().name());
     Network::Utility::addressToProtobufAddress(*listener.get().listenSocketFactory().localAddress(),
                                                *listener_status.mutable_local_address());
@@ -623,7 +622,7 @@ Http::Code AdminImpl::handlerClusters(absl::string_view url, Http::HeaderMap& re
   return Http::Code::OK;
 }
 
-void AdminImpl::addAllConfigToDump(envoy::admin::v3alpha::ConfigDump& dump,
+void AdminImpl::addAllConfigToDump(envoy::admin::v3::ConfigDump& dump,
                                    const absl::optional<std::string>& mask) const {
   for (const auto& key_callback_pair : config_tracker_.getCallbacksMap()) {
     ProtobufTypes::MessagePtr message = key_callback_pair.second();
@@ -643,7 +642,7 @@ void AdminImpl::addAllConfigToDump(envoy::admin::v3alpha::ConfigDump& dump,
 }
 
 absl::optional<std::pair<Http::Code, std::string>>
-AdminImpl::addResourceToDump(envoy::admin::v3alpha::ConfigDump& dump,
+AdminImpl::addResourceToDump(envoy::admin::v3::ConfigDump& dump,
                              const absl::optional<std::string>& mask,
                              const std::string& resource) const {
   for (const auto& key_callback_pair : config_tracker_.getCallbacksMap()) {
@@ -687,7 +686,7 @@ Http::Code AdminImpl::handlerConfigDump(absl::string_view url, Http::HeaderMap& 
   const auto resource = resourceParam(query_params);
   const auto mask = maskParam(query_params);
 
-  envoy::admin::v3alpha::ConfigDump dump;
+  envoy::admin::v3::ConfigDump dump;
 
   if (resource.has_value()) {
     auto err = addResourceToDump(dump, mask, resource.value());
@@ -712,7 +711,7 @@ Http::Code AdminImpl::handlerContention(absl::string_view, Http::HeaderMap& resp
   if (server_.options().mutexTracingEnabled() && server_.mutexTracer() != nullptr) {
     response_headers.setReferenceContentType(Http::Headers::get().ContentTypeValues.Json);
 
-    envoy::admin::v3alpha::MutexStats mutex_stats;
+    envoy::admin::v3::MutexStats mutex_stats;
     mutex_stats.set_num_contentions(server_.mutexTracer()->numContentions());
     mutex_stats.set_current_wait_cycles(server_.mutexTracer()->currentWaitCycles());
     mutex_stats.set_lifetime_wait_cycles(server_.mutexTracer()->lifetimeWaitCycles());
@@ -845,7 +844,7 @@ Http::Code AdminImpl::handlerLogging(absl::string_view url, Http::HeaderMap&,
 Http::Code AdminImpl::handlerMemory(absl::string_view, Http::HeaderMap& response_headers,
                                     Buffer::Instance& response, AdminStream&) {
   response_headers.setReferenceContentType(Http::Headers::get().ContentTypeValues.Json);
-  envoy::admin::v3alpha::Memory memory;
+  envoy::admin::v3::Memory memory;
   memory.set_allocated(Memory::Stats::totalCurrentlyAllocated());
   memory.set_heap_size(Memory::Stats::totalCurrentlyReserved());
   memory.set_total_thread_cache(Memory::Stats::totalThreadCacheBytes());
@@ -917,7 +916,7 @@ Http::Code AdminImpl::handlerStatsRecentLookupsEnable(absl::string_view, Http::H
 Http::Code AdminImpl::handlerServerInfo(absl::string_view, Http::HeaderMap& headers,
                                         Buffer::Instance& response, AdminStream&) {
   time_t current_time = time(nullptr);
-  envoy::admin::v3alpha::ServerInfo server_info;
+  envoy::admin::v3::ServerInfo server_info;
   server_info.set_version(VersionInfo::version());
   server_info.set_hot_restart_version(server_.hotRestart().version());
   server_info.set_state(
@@ -927,7 +926,7 @@ Http::Code AdminImpl::handlerServerInfo(absl::string_view, Http::HeaderMap& head
                                                           server_.startTimeCurrentEpoch());
   server_info.mutable_uptime_all_epochs()->set_seconds(current_time -
                                                        server_.startTimeFirstEpoch());
-  envoy::admin::v3alpha::CommandLineOptions* command_line_options =
+  envoy::admin::v3::CommandLineOptions* command_line_options =
       server_info.mutable_command_line_options();
   *command_line_options = *server_.options().toCommandLineOptions();
   response.add(MessageUtil::getJsonStringFromMessage(server_info, true, true));
@@ -937,13 +936,12 @@ Http::Code AdminImpl::handlerServerInfo(absl::string_view, Http::HeaderMap& head
 
 Http::Code AdminImpl::handlerReady(absl::string_view, Http::HeaderMap&, Buffer::Instance& response,
                                    AdminStream&) {
-  const envoy::admin::v3alpha::ServerInfo::State state =
+  const envoy::admin::v3::ServerInfo::State state =
       Utility::serverState(server_.initManager().state(), server_.healthCheckFailed());
 
-  response.add(envoy::admin::v3alpha::ServerInfo::State_Name(state) + "\n");
-  Http::Code code = state == envoy::admin::v3alpha::ServerInfo::LIVE
-                        ? Http::Code::OK
-                        : Http::Code::ServiceUnavailable;
+  response.add(envoy::admin::v3::ServerInfo::State_Name(state) + "\n");
+  Http::Code code =
+      state == envoy::admin::v3::ServerInfo::LIVE ? Http::Code::OK : Http::Code::ServiceUnavailable;
   return code;
 }
 
@@ -1216,15 +1214,15 @@ Http::Code AdminImpl::handlerCerts(absl::string_view, Http::HeaderMap& response_
   // This set is used to track distinct certificates. We may have multiple listeners, upstreams, etc
   // using the same cert.
   response_headers.setReferenceContentType(Http::Headers::get().ContentTypeValues.Json);
-  envoy::admin::v3alpha::Certificates certificates;
+  envoy::admin::v3::Certificates certificates;
   server_.sslContextManager().iterateContexts([&](const Ssl::Context& context) -> void {
-    envoy::admin::v3alpha::Certificate& certificate = *certificates.add_certificates();
+    envoy::admin::v3::Certificate& certificate = *certificates.add_certificates();
     if (context.getCaCertInformation() != nullptr) {
-      envoy::admin::v3alpha::CertificateDetails* ca_certificate = certificate.add_ca_cert();
+      envoy::admin::v3::CertificateDetails* ca_certificate = certificate.add_ca_cert();
       *ca_certificate = *context.getCaCertInformation();
     }
     for (const auto& cert_details : context.getCertChainInformation()) {
-      envoy::admin::v3alpha::CertificateDetails* cert_chain = certificate.add_cert_chain();
+      envoy::admin::v3::CertificateDetails* cert_chain = certificate.add_cert_chain();
       *cert_chain = *cert_details;
     }
   });
@@ -1636,16 +1634,16 @@ void AdminImpl::addListenerToHandler(Network::ConnectionHandler* handler) {
   }
 }
 
-envoy::admin::v3alpha::ServerInfo::State Utility::serverState(Init::Manager::State state,
-                                                              bool health_check_failed) {
+envoy::admin::v3::ServerInfo::State Utility::serverState(Init::Manager::State state,
+                                                         bool health_check_failed) {
   switch (state) {
   case Init::Manager::State::Uninitialized:
-    return envoy::admin::v3alpha::ServerInfo::PRE_INITIALIZING;
+    return envoy::admin::v3::ServerInfo::PRE_INITIALIZING;
   case Init::Manager::State::Initializing:
-    return envoy::admin::v3alpha::ServerInfo::INITIALIZING;
+    return envoy::admin::v3::ServerInfo::INITIALIZING;
   case Init::Manager::State::Initialized:
-    return health_check_failed ? envoy::admin::v3alpha::ServerInfo::DRAINING
-                               : envoy::admin::v3alpha::ServerInfo::LIVE;
+    return health_check_failed ? envoy::admin::v3::ServerInfo::DRAINING
+                               : envoy::admin::v3::ServerInfo::LIVE;
   }
   NOT_REACHED_GCOVR_EXCL_LINE;
 }

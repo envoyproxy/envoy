@@ -3,7 +3,7 @@
 #include <chrono>
 #include <functional>
 
-#include "envoy/config/listener/v3alpha/listener.pb.h"
+#include "envoy/config/listener/v3/listener.pb.h"
 #include "envoy/server/drain_manager.h"
 #include "envoy/server/instance.h"
 
@@ -20,8 +20,7 @@ namespace Server {
  */
 class DrainManagerImpl : Logger::Loggable<Logger::Id::main>, public DrainManager {
 public:
-  DrainManagerImpl(Instance& server,
-                   envoy::config::listener::v3alpha::Listener::DrainType drain_type);
+  DrainManagerImpl(Instance& server, envoy::config::listener::v3::Listener::DrainType drain_type);
 
   // Server::DrainManager
   bool drainClose() const override;
@@ -32,7 +31,7 @@ private:
   void drainSequenceTick();
 
   Instance& server_;
-  const envoy::config::listener::v3alpha::Listener::DrainType drain_type_;
+  const envoy::config::listener::v3::Listener::DrainType drain_type_;
   Event::TimerPtr drain_tick_timer_;
   std::atomic<bool> draining_{false};
   std::atomic<uint32_t> drain_time_completed_{};

@@ -1,6 +1,6 @@
 #include "extensions/filters/http/rbac/rbac_filter.h"
 
-#include "envoy/extensions/filters/http/rbac/v3alpha/rbac.pb.h"
+#include "envoy/extensions/filters/http/rbac/v3/rbac.pb.h"
 #include "envoy/stats/scope.h"
 
 #include "common/http/utility.h"
@@ -21,7 +21,7 @@ struct RcDetailsValues {
 using RcDetails = ConstSingleton<RcDetailsValues>;
 
 RoleBasedAccessControlFilterConfig::RoleBasedAccessControlFilterConfig(
-    const envoy::extensions::filters::http::rbac::v3alpha::RBAC& proto_config,
+    const envoy::extensions::filters::http::rbac::v3::RBAC& proto_config,
     const std::string& stats_prefix, Stats::Scope& scope)
     : stats_(Filters::Common::RBAC::generateStats(stats_prefix, scope)),
       engine_(Filters::Common::RBAC::createEngine(proto_config)),
@@ -48,7 +48,7 @@ RoleBasedAccessControlFilterConfig::engine(const Router::RouteConstSharedPtr rou
 }
 
 RoleBasedAccessControlRouteSpecificFilterConfig::RoleBasedAccessControlRouteSpecificFilterConfig(
-    const envoy::extensions::filters::http::rbac::v3alpha::RBACPerRoute& per_route_config)
+    const envoy::extensions::filters::http::rbac::v3::RBACPerRoute& per_route_config)
     : engine_(Filters::Common::RBAC::createEngine(per_route_config.rbac())),
       shadow_engine_(Filters::Common::RBAC::createShadowEngine(per_route_config.rbac())) {}
 

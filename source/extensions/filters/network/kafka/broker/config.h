@@ -1,7 +1,7 @@
 #pragma once
 
-#include "envoy/extensions/filters/network/kafka_broker/v3alpha/kafka_broker.pb.h"
-#include "envoy/extensions/filters/network/kafka_broker/v3alpha/kafka_broker.pb.validate.h"
+#include "envoy/extensions/filters/network/kafka_broker/v3/kafka_broker.pb.h"
+#include "envoy/extensions/filters/network/kafka_broker/v3/kafka_broker.pb.validate.h"
 
 #include "extensions/filters/network/common/factory_base.h"
 #include "extensions/filters/network/well_known_names.h"
@@ -12,8 +12,7 @@ namespace NetworkFilters {
 namespace Kafka {
 namespace Broker {
 
-using KafkaBrokerProtoConfig =
-    envoy::extensions::filters::network::kafka_broker::v3alpha::KafkaBroker;
+using KafkaBrokerProtoConfig = envoy::extensions::filters::network::kafka_broker::v3::KafkaBroker;
 
 /**
  * Config registration for the Kafka filter.

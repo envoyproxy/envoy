@@ -1,4 +1,4 @@
-#include "envoy/config/bootstrap/v3alpha/bootstrap.pb.h"
+#include "envoy/config/bootstrap/v3/bootstrap.pb.h"
 
 #include "test/integration/integration.h"
 
@@ -57,7 +57,7 @@ public:
       setDeterministic();
       setUpstreamCount(upstream_count);
       config_helper_.addConfigModifier(
-          [upstream_count](envoy::config::bootstrap::v3alpha::Bootstrap& bootstrap) {
+          [upstream_count](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
             for (uint32_t i = 1; i < upstream_count; i++) {
               bootstrap.mutable_static_resources()
                   ->mutable_clusters(0)

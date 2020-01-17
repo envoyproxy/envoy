@@ -14,7 +14,7 @@ import "validate/validate.proto";
 option java_package = "io.envoyproxy.envoy.api.v2.core";
 option java_outer_classname = "ConfigSourceProto";
 option java_multiple_files = true;
-option (udpa.annotations.file_migrate).move_to_package = "envoy.config.core.v3alpha";
+option (udpa.annotations.file_migrate).move_to_package = "envoy.config.core.v3";
 
 // [#protodoc-title: Configuration sources]
 
@@ -29,8 +29,8 @@ enum ApiVersion {
   // Use xDS v2 API.
   V2 = 1;
 
-  // Use xDS v3alpha API.
-  V3ALPHA = 2;
+  // Use xDS v3 API.
+  V3 = 2;
 }
 
 // API configuration source. This identifies the API type and cluster that Envoy

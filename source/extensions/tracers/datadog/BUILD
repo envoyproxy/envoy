@@ -25,7 +25,7 @@ envoy_cc_library(
         "//source/common/tracing:http_tracer_lib",
         "//source/extensions/tracers:well_known_names",
         "//source/extensions/tracers/common/ot:opentracing_driver_lib",
-        "@envoy_api//envoy/config/trace/v3alpha:pkg_cc_proto",
+        "@envoy_api//envoy/config/trace/v3:pkg_cc_proto",
     ],
 )
 
@@ -38,6 +38,6 @@ envoy_cc_extension(
         ":datadog_tracer_lib",
         "//source/extensions/tracers:well_known_names",
         "//source/extensions/tracers/common:factory_base_lib",
-        "@envoy_api//envoy/config/trace/v3alpha:pkg_cc_proto",
+        "@envoy_api//envoy/config/trace/v3:pkg_cc_proto",
     ],
 )
