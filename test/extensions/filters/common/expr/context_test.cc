@@ -294,7 +294,7 @@ TEST(Context, ResponseAttributes) {
     auto value = response_no_status[CelValue::CreateStringView(GrpcStatus)];
     EXPECT_TRUE(value.has_value());
     ASSERT_TRUE(value.value().IsInt64());
-    EXPECT_EQ(0xc, value.value().Int64OrDie()); // http:404 -> grcp:12
+    EXPECT_EQ(0xc, value.value().Int64OrDie()); // http:404 -> grpc:12
   }
   {
     NiceMock<StreamInfo::MockStreamInfo> info_without_code;
