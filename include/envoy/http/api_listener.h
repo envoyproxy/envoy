@@ -27,6 +27,7 @@ public:
 };
 
 using ApiListenerPtr = std::unique_ptr<ApiListener>;
+using ApiListenerOptRef = absl::optional<std::reference_wrapper<ApiListener>>;
 
 } // namespace Http
 } // namespace Envoy

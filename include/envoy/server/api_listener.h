@@ -27,9 +27,9 @@ public:
   virtual Type type() const PURE;
 
   /**
-   * @return Http::ApiListener IFF type() == Type::HttpApiListener, otherwise nullptr.
+   * @return valid ref IFF type() == Type::HttpApiListener, otherwise nullopt.
    */
-  virtual Http::ApiListener* http() PURE;
+  virtual Http::ApiListenerOptRef http() PURE;
 };
 
 using ApiListenerPtr = std::unique_ptr<ApiListener>;

@@ -72,6 +72,7 @@ envoy_cc_test(
     deps = [
         ":http_integration_lib",
         "//test/mocks/http:stream_encoder_mock",
+        "//test/server:utility_lib",
     ],
 )
 

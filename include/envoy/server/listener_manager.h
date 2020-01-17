@@ -218,7 +218,7 @@ public:
   // weak_ptr to its caller. This would allow the caller to verify if the
   // ApiListener is available to receive API calls on it.
   /**
-   * @return ApiListener* the server's API Listener if it exists, nullptr if it does not.
+   * @return the server's API Listener if it exists, nullopt if it does not.
    */
   virtual ApiListenerOptRef apiListener() PURE;
 };

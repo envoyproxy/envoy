@@ -304,8 +304,6 @@ void ConnectionManagerImpl::createCodec(Buffer::Instance& data) {
     stats_.named_.downstream_cx_http1_total_.inc();
     stats_.named_.downstream_cx_http1_active_.inc();
     break;
-  default:
-    NOT_REACHED_GCOVR_EXCL_LINE;
   }
 }
 

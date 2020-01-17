@@ -28,20 +28,20 @@ ApiListenerImpl::ApiListenerImpl(const envoy::config::listener::v3::Listener& co
 HttpApiListener::HttpApiListener(const envoy::config::listener::v3::Listener& config,
                                  ListenerManagerImpl& parent, const std::string& name)
     : ApiListenerImpl(config, parent, name) {
-  auto typed_config = MessageUtil::anyConvert<
+  auto typed_config = MessageUtil::anyConvertAndValidate<
       envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager>(
-      config.api_listener().api_listener());
+      config.api_listener().api_listener(), factory_context_.messageValidationVisitor());
 
   http_connection_manager_factory_ = Envoy::Extensions::NetworkFilters::HttpConnectionManager::
       HttpConnectionManagerFactory::createHttpConnectionManagerFactoryFromProto(
           typed_config, factory_context_, read_callbacks_);
 }
 
-Http::ApiListener* HttpApiListener::http() {
+Http::ApiListenerOptRef HttpApiListener::http() {
   if (!http_connection_manager_) {
     http_connection_manager_ = http_connection_manager_factory_();
   }
-  return http_connection_manager_.get();
+  return Http::ApiListenerOptRef(std::ref(*http_connection_manager_));
 }
 
 } // namespace Server

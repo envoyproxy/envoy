@@ -57,7 +57,7 @@ api_listener:
 
   ASSERT_EQ("test_api_listener", http_api_listener.name());
   ASSERT_EQ(ApiListener::Type::HttpApiListener, http_api_listener.type());
-  ASSERT_NE(nullptr, http_api_listener.http());
+  ASSERT_TRUE(http_api_listener.http().has_value());
 }
 
 TEST_F(ApiListenerTest, HttpApiListenerThrowsWithBadConfig) {

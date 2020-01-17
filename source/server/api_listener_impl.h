@@ -153,7 +153,7 @@ public:
 
   // ApiListener
   ApiListener::Type type() const override { return ApiListener::Type::HttpApiListener; }
-  Http::ApiListener* http() override;
+  Http::ApiListenerOptRef http() override;
 
 private:
   // Need to store the factory due to the shared_ptrs that need to be kept alive: date provider,
