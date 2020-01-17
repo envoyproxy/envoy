@@ -37,7 +37,7 @@ public:
                 Router::ShadowWriterPtr{new NiceMock<Router::MockShadowWriter>()}, http_context_) {
     http_dispatcher_.ready(event_dispatcher_, cm_);
     ON_CALL(*cm_.conn_pool_.host_, locality())
-        .WillByDefault(ReturnRef(envoy::config::core::v3alpha::Locality().default_instance()));
+        .WillByDefault(ReturnRef(envoy::config::core::v3::Locality().default_instance()));
   }
 
   typedef struct {
