@@ -82,6 +82,7 @@ jobs:
            fingerprints:
              - "44:c7:a1:9e:f4:9e:a5:33:11:f1:0e:79:e1:55:c9:04"
        - run: docs/publish.sh
+       - run: docs/archive.sh
        - store_artifacts:
            path: generated/docs
 
