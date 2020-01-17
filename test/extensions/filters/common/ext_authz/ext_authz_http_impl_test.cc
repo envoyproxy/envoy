@@ -54,7 +54,7 @@ public:
           authorization_request:
             allowed_headers:
               patterns:
-              - exact: Baz
+              - exact: baz
               - prefix: "x-"
               - safe_regex:
                   google_re2: {}
@@ -68,11 +68,11 @@ public:
           authorization_response:
             allowed_upstream_headers:
               patterns:
-              - exact: Bar
+              - exact: bar
               - prefix: "x-"
             allowed_client_headers:
               patterns:
-              - exact: Foo
+              - exact: foo
               - prefix: "x-"
         )EOF";
       TestUtility::loadFromYaml(default_yaml, proto_config);
