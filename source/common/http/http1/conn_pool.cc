@@ -26,15 +26,13 @@ namespace Http1 {
 ConnPoolImpl::ConnPoolImpl(Event::Dispatcher& dispatcher, Upstream::HostConstSharedPtr host,
                            Upstream::ResourcePriority priority,
                            const Network::ConnectionSocket::OptionsSharedPtr& options,
-                           const Http::Http1Settings& settings,
                            const Network::TransportSocketOptionsSharedPtr& transport_socket_options)
     : ConnPoolImplBase(std::move(host), std::move(priority), dispatcher, options,
                        transport_socket_options),
       upstream_ready_timer_(dispatcher_.createTimer([this]() {
         upstream_ready_enabled_ = false;
         onUpstreamReady();
-      })),
-      settings_(settings) {}
+      })) {}
 
 ConnPoolImpl::~ConnPoolImpl() { destructAllConnections(); }
 

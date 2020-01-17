@@ -32,7 +32,6 @@ public:
   ConnPoolImpl(Event::Dispatcher& dispatcher, Upstream::HostConstSharedPtr host,
                Upstream::ResourcePriority priority,
                const Network::ConnectionSocket::OptionsSharedPtr& options,
-               const Http::Http1Settings& settings,
                const Network::TransportSocketOptionsSharedPtr& transport_socket_options);
 
   ~ConnPoolImpl() override;
@@ -96,7 +95,6 @@ protected:
 
   Event::TimerPtr upstream_ready_timer_;
   bool upstream_ready_enabled_{false};
-  const Http1Settings settings_;
 };
 
 /**
@@ -107,9 +105,8 @@ public:
   ProdConnPoolImpl(Event::Dispatcher& dispatcher, Upstream::HostConstSharedPtr host,
                    Upstream::ResourcePriority priority,
                    const Network::ConnectionSocket::OptionsSharedPtr& options,
-                   const Http::Http1Settings& settings,
                    const Network::TransportSocketOptionsSharedPtr& transport_socket_options)
-      : ConnPoolImpl(dispatcher, host, priority, options, settings, transport_socket_options) {}
+      : ConnPoolImpl(dispatcher, host, priority, options, transport_socket_options) {}
 
   // ConnPoolImpl
   CodecClientPtr createCodecClient(Upstream::Host::CreateConnectionData& data) override;
