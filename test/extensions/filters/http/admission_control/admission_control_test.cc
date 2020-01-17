@@ -28,24 +28,50 @@ namespace HttpFilters {
 namespace AdmissionControl {
 namespace {
 
+class MockThreadLocalController : public ThreadLocalController {
+public:
+  MOCK_METHOD0(requestTotalCount, uint32_t());
+  MOCK_METHOD0(requestSuccessCount, uint32_t());
+};
+
 class AdmissionControlConfigTest : public testing::Test {
 public:
   AdmissionControlConfigTest() = default;
 
+  std::shared_ptr<AdmissionControlFilterConfig> makeConfig(const std::string& yaml) {
+    AdmissionControlFilterConfig::AdmissionControlProto proto;
+    TestUtility::loadFromYamlAndValidate(yaml, proto);
+    return std::make_shared<AdmissionControlFilterConfig>(proto, runtime_, time_source_, random_, scope_, context.threadLocal());
+  }
+
 protected:
   NiceMock<Runtime::MockLoader> runtime_;
   NiceMock<Server::Configuration::MockFactoryContext> context_;
+  Stats::IsolatedStoreImpl scope_;
+  NiceMock<Runtime::MockRandomGenerator> random_;
 };
 
 class AdmissionControlTest : public testing::Test {
 public:
   AdmissionControlTest() = default;
 
+  AdmissionControlFilterConfig makeConfig(const std::string& yaml) {
+    AdmissionControlFilterConfig::AdmissionControlProto proto;
+    TestUtility::loadFromYamlAndValidate(yaml, proto);
+    return AdmissionControlFilterConfig(proto, runtime_, time_source_, random_, scope_, context.threadLocal());
+  }
+
+  void generateFilter(std::string yaml) {
+    auto config = makeConfig(yaml);
+  }
+
 protected:
-  Event::SimulatedTimeSystem time_system_;
-  Stats::IsolatedStoreImpl stats_;
+  std::string stats_prefix_{""};
   NiceMock<Runtime::MockLoader> runtime_;
+  NiceMock<Server::Configuration::MockFactoryContext> context_;
+  Stats::IsolatedStoreImpl scope_;
   NiceMock<Runtime::MockRandomGenerator> random_;
+  std::shared_ptr<AdmissionControlFilter> filter_;
 };
 
 class ThreadLocalControllerTest : public testing::Test {
@@ -152,14 +178,12 @@ aggression_coefficient:
   runtime_key: "foo.aggression"
 )EOF";
 
-  AdmissionControlFilterConfig::AdmissionControlProto proto;
-  TestUtility::loadFromYamlAndValidate(yaml, proto);
 
-  AdmissionControlFilterConfig config(proto, context_);
+  auto config = makeConfig(yaml);
 
-  EXPECT_FALSE(config.filterEnabled());
-  EXPECT_EQ(std::chrono::seconds(1337), config.samplingWindow());
-  EXPECT_EQ(4.2, config.aggression());
+  EXPECT_FALSE(config->filterEnabled());
+  EXPECT_EQ(std::chrono::seconds(1337), config->samplingWindow());
+  EXPECT_EQ(4.2, config->aggression());
 }
 
 // Verify the config defaults when not specified.
@@ -167,11 +191,11 @@ TEST_F(AdmissionControlConfigTest, BasicTestMinimumConfigured) {
   // Empty config. No fields are required.
   AdmissionControlFilterConfig::AdmissionControlProto proto;
 
-  AdmissionControlFilterConfig config(proto, context_);
+  auto config = makeConfig(yaml);
 
-  EXPECT_TRUE(config.filterEnabled());
-  EXPECT_EQ(std::chrono::seconds(120), config.samplingWindow());
-  EXPECT_EQ(2.0, config.aggression());
+  EXPECT_TRUE(config->filterEnabled());
+  EXPECT_EQ(std::chrono::seconds(120), config->samplingWindow());
+  EXPECT_EQ(2.0, config->aggression());
 }
 
 // Ensure runtime fields are honored.
@@ -186,16 +210,39 @@ aggression_coefficient:
   runtime_key: "foo.aggression"
 )EOF";
 
-  AdmissionControlFilterConfig::AdmissionControlProto proto;
-  TestUtility::loadFromYamlAndValidate(yaml, proto);
-  AdmissionControlFilterConfig config(proto, context_);
+  auto config = makeConfig(yaml);
 
   EXPECT_CALL(context_.runtime_loader_.snapshot_, getBoolean("foo.enabled", false))
       .WillOnce(Return(true));
-  EXPECT_TRUE(config.filterEnabled());
+  EXPECT_TRUE(config->filterEnabled());
   EXPECT_CALL(context_.runtime_loader_.snapshot_, getDouble("foo.aggression", 4.2))
       .WillOnce(Return(1.3));
-  EXPECT_EQ(1.3, config.aggression());
+  EXPECT_EQ(1.3, config->aggression());
+}
+
+TEST_F(AdmissionControlTest, FilterDisabled) {
+#if 0
+  const std::string yaml = R"EOF(
+enabled:
+  default_value: false
+  runtime_key: "foo.enabled"
+sampling_window: 10s
+aggression_coefficient:
+  default_value: 1.0
+  runtime_key: "foo.aggression"
+)EOF";
+  
+  auto config = makeConfig(yaml);
+
+  // Fail lots of requests so that we'd expect a ~100% rejection rate.
+  for (int i = 0; i < 1000; ++i) {
+    config_->getController().recordFailure();
+  }
+
+  // We expect no rejection.
+  Http::TestHeaderMapImpl request_headers;
+  EXPECT_EQ(Http::FilterHeadersStatus::Continue, filter_->decodeHeaders(request_headers, false));
+#endif
 }
 
 } // namespace

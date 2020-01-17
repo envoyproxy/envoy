@@ -26,16 +26,16 @@ static constexpr std::chrono::seconds defaultSamplingWindow{120};
 static constexpr std::chrono::seconds defaultHistoryGranularity{1};
 
 AdmissionControlFilterConfig::AdmissionControlFilterConfig(
-    const AdmissionControlProto& proto_config, Server::Configuration::FactoryContext& context)
-    : runtime_(context.runtime()), time_source_(context.timeSource()), random_(context.random()),
-      scope_(context.scope()), tls_(context.threadLocal().allocateSlot()),
+    const AdmissionControlProto& proto_config, Runtime::Loader& runtime, TimeSource& time_source, Runtime::RandomGenerator& random, Stats::Scope& scope, ThreadLocal::SlotAllocator& tls)
+    : runtime_(runtime), time_source_(time_source), random_(random),
+      scope_(scope),
       admission_control_feature_(proto_config.enabled(), runtime_),
       sampling_window_(PROTOBUF_GET_MS_OR_DEFAULT(proto_config, sampling_window,
                                                   1000 * defaultSamplingWindow.count()) /
                        1000),
       aggression_(
           proto_config.has_aggression_coefficient()
-              ? std::make_shared<Runtime::Double>(proto_config.aggression_coefficient(), runtime_)
+              ? std::make_unique<Runtime::Double>(proto_config.aggression_coefficient(), runtime_)
               : nullptr) {
   tls_->set([this](Event::Dispatcher&) -> ThreadLocal::ThreadLocalObjectSharedPtr {
     return std::make_shared<ThreadLocalController>(time_source_, sampling_window_);
@@ -57,7 +57,7 @@ Http::FilterHeadersStatus AdmissionControlFilter::decodeHeaders(Http::HeaderMap&
 
   if (shouldRejectRequest()) {
     decoder_callbacks_->sendLocalReply(Http::Code::ServiceUnavailable, "", nullptr, absl::nullopt,
-                                       "throttling request");
+                                       "denied by admission control");
     stats_.rq_rejected_.inc();
     return Http::FilterHeadersStatus::StopIteration;
   }
@@ -68,9 +68,8 @@ Http::FilterHeadersStatus AdmissionControlFilter::decodeHeaders(Http::HeaderMap&
 Http::FilterHeadersStatus AdmissionControlFilter::encodeHeaders(Http::HeaderMap& headers,
                                                                 bool end_stream) {
   if (end_stream) {
-    // TODO @tallen make this match on config
     const uint64_t status_code = Http::Utility::getResponseStatus(headers);
-    if (status_code == enumToInt(Http::Code::OK)) {
+    if (status_code < 500) {
       config_->getController().recordSuccess();
     } else {
       config_->getController().recordFailure();

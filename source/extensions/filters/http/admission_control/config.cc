@@ -16,8 +16,13 @@ Http::FilterFactoryCb AdmissionControlFilterFactory::createFilterFactoryFromProt
     const std::string& stats_prefix, Server::Configuration::FactoryContext& context) {
 
   std::string prefix = stats_prefix + "admission_control.";
+
+  context.threadLocal()->set([this](Event::Dispatcher&) -> ThreadLocal::ThreadLocalObjectSharedPtr {
+    return std::make_shared<ThreadLocalController>(time_source_, sampling_window_);
+  });
+
   AdmissionControlFilterConfigSharedPtr filter_config =
-      std::make_shared<AdmissionControlFilterConfig>(config, context);
+      std::make_shared<AdmissionControlFilterConfig>(config, context.runtime(), context.timeSource(), context.random(), context.scope());
 
   return [filter_config, prefix](Http::FilterChainFactoryCallbacks& callbacks) -> void {
     callbacks.addStreamFilter(std::make_shared<AdmissionControlFilter>(filter_config, prefix));

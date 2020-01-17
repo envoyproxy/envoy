@@ -48,11 +48,11 @@ public:
   void recordSuccess() { recordRequest(true); }
   void recordFailure() { recordRequest(false); }
 
-  uint32_t requestTotalCount() {
+  virtual uint32_t requestTotalCount() {
     maybeUpdateHistoricalData();
     return global_data_.requests;
   }
-  uint32_t requestSuccessCount() {
+  virtual uint32_t requestSuccessCount() {
     maybeUpdateHistoricalData();
     return global_data_.successes;
   }
@@ -86,8 +86,8 @@ class AdmissionControlFilterConfig {
 public:
   using AdmissionControlProto =
       envoy::extensions::filters::http::admission_control::v3alpha::AdmissionControl;
-  AdmissionControlFilterConfig(const AdmissionControlProto& proto_config,
-                               Server::Configuration::FactoryContext& context);
+  AdmissionControlFilterConfig(
+    const AdmissionControlProto& proto_config, TimeSource& time_source, Runtime::RandomGenerator& random, Stats::Scope& scope(), ThreadLocal::SlotAllocator& threadLocal);
 
   // Get the per-thread admission controller.
   ThreadLocalController& getController() const { return tls_->getTyped<ThreadLocalController>(); }
@@ -105,10 +105,10 @@ private:
   TimeSource& time_source_;
   Runtime::RandomGenerator& random_;
   Stats::Scope& scope_;
-  ThreadLocal::SlotPtr tls_;
+  ThreadLocalController controller_;
   Runtime::FeatureFlag admission_control_feature_;
   std::chrono::seconds sampling_window_;
-  std::shared_ptr<Runtime::Double> aggression_;
+  std::unique_ptr<Runtime::Double> aggression_;
 };
 
 using AdmissionControlFilterConfigSharedPtr = std::shared_ptr<const AdmissionControlFilterConfig>;
