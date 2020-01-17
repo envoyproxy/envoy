@@ -9,7 +9,7 @@ jobs:
   master_android_dist:
     name: master_android_dist
     runs-on: ubuntu-18.04
-    timeout-minutes: 90
+    timeout-minutes: 120
     steps:
       - uses: actions/checkout@v1
         with:
