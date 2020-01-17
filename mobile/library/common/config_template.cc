@@ -19,7 +19,7 @@ static_resources:
     transport_socket: &base_transport_socket
       name: envoy.transport_sockets.tls
       typed_config:
-        "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3alpha.UpstreamTlsContext
+        "@type": type.googleapis.com/envoy.extensions.transport_sockets.tls.v3.UpstreamTlsContext
         common_tls_context:
           validation_context:
             trusted_ca:
@@ -74,7 +74,7 @@ stats_flush_interval: {{ stats_flush_interval_seconds }}s
 stats_sinks:
   - name: envoy.metrics_service
     typed_config:
-      "@type": type.googleapis.com/envoy.config.metrics.v3alpha.MetricsServiceConfig
+      "@type": type.googleapis.com/envoy.config.metrics.v3.MetricsServiceConfig
       grpc_service:
         envoy_grpc:
           cluster_name: stats
