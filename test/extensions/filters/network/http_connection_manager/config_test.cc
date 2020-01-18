@@ -1,4 +1,7 @@
-#include "envoy/config/filter/network/http_connection_manager/v2/http_connection_manager.pb.validate.h"
+#include "envoy/config/core/v3/base.pb.h"
+#include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
+#include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.validate.h"
+#include "envoy/type/v3/percent.pb.h"
 
 #include "common/buffer/buffer_impl.h"
 #include "common/http/date_provider_impl.h"
@@ -17,7 +20,6 @@
 
 using testing::_;
 using testing::An;
-using testing::ContainerEq;
 using testing::Return;
 using testing::ReturnRef;
 
@@ -26,11 +28,11 @@ namespace Extensions {
 namespace NetworkFilters {
 namespace HttpConnectionManager {
 
-envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager
+envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager
 parseHttpConnectionManagerFromV2Yaml(const std::string& yaml) {
-  envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager
+  envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager
       http_connection_manager;
-  TestUtility::loadFromYaml(yaml, http_connection_manager);
+  TestUtility::loadFromYamlAndValidate(yaml, http_connection_manager);
   return http_connection_manager;
 }
 
@@ -49,7 +51,7 @@ public:
 TEST_F(HttpConnectionManagerConfigTest, ValidateFail) {
   EXPECT_THROW(
       HttpConnectionManagerFilterConfigFactory().createFilterFactoryFromProto(
-          envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager(),
+          envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager(),
           context_),
       ProtoValidationException);
 }
@@ -70,7 +72,6 @@ route_config:
         cluster: cluster
 http_filters:
 - name: foo
-  config: {}
   )EOF";
 
   EXPECT_THROW_WITH_MESSAGE(
@@ -97,10 +98,10 @@ route_config:
         cluster: cluster
 http_filters:
 - name: envoy.router
-  config: {}
 - name: envoy.health_check
-  config:
-      pass_through_mode: false
+  typed_config:
+    "@type": type.googleapis.com/envoy.config.filter.http.health_check.v2.HealthCheck
+    pass_through_mode: false
   )EOF";
 
   EXPECT_THROW_WITH_MESSAGE(
@@ -127,8 +128,9 @@ route_config:
         cluster: cluster
 http_filters:
 - name: envoy.health_check
-  config:
-      pass_through_mode: false
+  typed_config:
+    "@type": type.googleapis.com/envoy.config.filter.http.health_check.v2.HealthCheck
+    pass_through_mode: false
   )EOF";
 
   EXPECT_THROW_WITH_MESSAGE(
@@ -156,20 +158,15 @@ route_config:
         cluster: cluster
 tracing:
   operation_name: ingress
-  request_headers_for_tags:
-  - foo
   max_path_tag_length: 128
 http_filters:
 - name: envoy.router
-  config: {}
   )EOF";
 
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromV2Yaml(yaml_string), context_,
                                      date_provider_, route_config_provider_manager_,
                                      scoped_routes_config_provider_manager_);
 
-  EXPECT_THAT(std::vector<Http::LowerCaseString>({Http::LowerCaseString("foo")}),
-              ContainerEq(config.tracingConfig()->request_headers_for_tags_));
   EXPECT_EQ(128, config.tracingConfig()->max_path_tag_length_);
   EXPECT_EQ(*context_.local_info_.address_, config.localAddress());
   EXPECT_EQ("foo", config.serverName());
@@ -178,7 +175,62 @@ http_filters:
   EXPECT_EQ(5 * 60 * 1000, config.streamIdleTimeout().count());
 }
 
-TEST_F(HttpConnectionManagerConfigTest, ListenerDirectionOutboundOverride) {
+TEST_F(HttpConnectionManagerConfigTest, TracingCustomTagsConfig) {
+  const std::string yaml_string = R"EOF(
+stat_prefix: router
+route_config:
+  name: local_route
+tracing:
+  custom_tags:
+  - tag: ltag
+    literal:
+      value: lvalue
+  - tag: etag
+    environment:
+      name: E_TAG
+  - tag: rtag
+    request_header:
+      name: X-Tag
+  - tag: mtag
+    metadata:
+      kind: { request: {} }
+      metadata_key:
+        key: com.bar.foo
+        path: [ { key: xx }, { key: yy } ]
+  )EOF";
+  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromV2Yaml(yaml_string), context_,
+                                     date_provider_, route_config_provider_manager_,
+                                     scoped_routes_config_provider_manager_);
+
+  std::vector<std::string> custom_tags{"ltag", "etag", "rtag", "mtag"};
+  const Tracing::CustomTagMap& custom_tag_map = config.tracingConfig()->custom_tags_;
+  for (const std::string& custom_tag : custom_tags) {
+    EXPECT_NE(custom_tag_map.find(custom_tag), custom_tag_map.end());
+  }
+}
+
+TEST_F(HttpConnectionManagerConfigTest, DEPRECATED_FEATURE_TEST(RequestHeaderForTagsConfig)) {
+  const std::string yaml_string = R"EOF(
+stat_prefix: router
+route_config:
+  name: local_route
+tracing:
+  request_headers_for_tags:
+  - foo
+  )EOF";
+  HttpConnectionManagerConfig config(parseHttpConnectionManagerFromV2Yaml(yaml_string), context_,
+                                     date_provider_, route_config_provider_manager_,
+                                     scoped_routes_config_provider_manager_);
+
+  const Tracing::CustomTagMap& custom_tag_map = config.tracingConfig()->custom_tags_;
+  const Tracing::RequestHeaderCustomTag* foo = dynamic_cast<const Tracing::RequestHeaderCustomTag*>(
+      custom_tag_map.find("foo")->second.get());
+  EXPECT_NE(foo, nullptr);
+  EXPECT_EQ(foo->tag(), "foo");
+}
+
+TEST_F(HttpConnectionManagerConfigTest,
+       DEPRECATED_FEATURE_TEST(ListenerDirectionOutboundOverride)) {
   const std::string yaml_string = R"EOF(
 stat_prefix: router
 route_config:
@@ -195,18 +247,16 @@ tracing:
   operation_name: ingress
 http_filters:
 - name: envoy.router
-  config: {}
   )EOF";
 
-  ON_CALL(context_, direction())
-      .WillByDefault(Return(envoy::api::v2::core::TrafficDirection::OUTBOUND));
+  ON_CALL(context_, direction()).WillByDefault(Return(envoy::config::core::v3::OUTBOUND));
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromV2Yaml(yaml_string), context_,
                                      date_provider_, route_config_provider_manager_,
                                      scoped_routes_config_provider_manager_);
   EXPECT_EQ(Tracing::OperationName::Egress, config.tracingConfig()->operation_name_);
 }
 
-TEST_F(HttpConnectionManagerConfigTest, ListenerDirectionInboundOverride) {
+TEST_F(HttpConnectionManagerConfigTest, DEPRECATED_FEATURE_TEST(ListenerDirectionInboundOverride)) {
   const std::string yaml_string = R"EOF(
 stat_prefix: router
 route_config:
@@ -223,11 +273,9 @@ tracing:
   operation_name: egress
 http_filters:
 - name: envoy.router
-  config: {}
   )EOF";
 
-  ON_CALL(context_, direction())
-      .WillByDefault(Return(envoy::api::v2::core::TrafficDirection::INBOUND));
+  ON_CALL(context_, direction()).WillByDefault(Return(envoy::config::core::v3::INBOUND));
   HttpConnectionManagerConfig config(parseHttpConnectionManagerFromV2Yaml(yaml_string), context_,
                                      date_provider_, route_config_provider_manager_,
                                      scoped_routes_config_provider_manager_);
@@ -253,13 +301,13 @@ TEST_F(HttpConnectionManagerConfigTest, SamplingDefault) {
 
   EXPECT_EQ(100, config.tracingConfig()->client_sampling_.numerator());
   EXPECT_EQ(Tracing::DefaultMaxPathTagLength, config.tracingConfig()->max_path_tag_length_);
-  EXPECT_EQ(envoy::type::FractionalPercent::HUNDRED,
+  EXPECT_EQ(envoy::type::v3::FractionalPercent::HUNDRED,
             config.tracingConfig()->client_sampling_.denominator());
   EXPECT_EQ(10000, config.tracingConfig()->random_sampling_.numerator());
-  EXPECT_EQ(envoy::type::FractionalPercent::TEN_THOUSAND,
+  EXPECT_EQ(envoy::type::v3::FractionalPercent::TEN_THOUSAND,
             config.tracingConfig()->random_sampling_.denominator());
   EXPECT_EQ(100, config.tracingConfig()->overall_sampling_.numerator());
-  EXPECT_EQ(envoy::type::FractionalPercent::HUNDRED,
+  EXPECT_EQ(envoy::type::v3::FractionalPercent::HUNDRED,
             config.tracingConfig()->overall_sampling_.denominator());
 }
 
@@ -287,13 +335,13 @@ TEST_F(HttpConnectionManagerConfigTest, SamplingConfigured) {
                                      scoped_routes_config_provider_manager_);
 
   EXPECT_EQ(1, config.tracingConfig()->client_sampling_.numerator());
-  EXPECT_EQ(envoy::type::FractionalPercent::HUNDRED,
+  EXPECT_EQ(envoy::type::v3::FractionalPercent::HUNDRED,
             config.tracingConfig()->client_sampling_.denominator());
   EXPECT_EQ(200, config.tracingConfig()->random_sampling_.numerator());
-  EXPECT_EQ(envoy::type::FractionalPercent::TEN_THOUSAND,
+  EXPECT_EQ(envoy::type::v3::FractionalPercent::TEN_THOUSAND,
             config.tracingConfig()->random_sampling_.denominator());
   EXPECT_EQ(3, config.tracingConfig()->overall_sampling_.numerator());
-  EXPECT_EQ(envoy::type::FractionalPercent::HUNDRED,
+  EXPECT_EQ(envoy::type::v3::FractionalPercent::HUNDRED,
             config.tracingConfig()->overall_sampling_.denominator());
 }
 
@@ -321,13 +369,13 @@ TEST_F(HttpConnectionManagerConfigTest, FractionalSamplingConfigured) {
                                      scoped_routes_config_provider_manager_);
 
   EXPECT_EQ(0, config.tracingConfig()->client_sampling_.numerator());
-  EXPECT_EQ(envoy::type::FractionalPercent::HUNDRED,
+  EXPECT_EQ(envoy::type::v3::FractionalPercent::HUNDRED,
             config.tracingConfig()->client_sampling_.denominator());
   EXPECT_EQ(20, config.tracingConfig()->random_sampling_.numerator());
-  EXPECT_EQ(envoy::type::FractionalPercent::TEN_THOUSAND,
+  EXPECT_EQ(envoy::type::v3::FractionalPercent::TEN_THOUSAND,
             config.tracingConfig()->random_sampling_.denominator());
   EXPECT_EQ(0, config.tracingConfig()->overall_sampling_.numerator());
-  EXPECT_EQ(envoy::type::FractionalPercent::HUNDRED,
+  EXPECT_EQ(envoy::type::v3::FractionalPercent::HUNDRED,
             config.tracingConfig()->overall_sampling_.denominator());
 }
 
@@ -418,7 +466,7 @@ TEST_F(HttpConnectionManagerConfigTest, DisabledStreamIdleTimeout) {
 }
 
 // Validate that deprecated idle_timeout is still ingested.
-TEST_F(HttpConnectionManagerConfigTest, DeprecatedIdleTimeout) {
+TEST_F(HttpConnectionManagerConfigTest, DEPRECATED_FEATURE_TEST(IdleTimeout)) {
   const std::string yaml_string = R"EOF(
   stat_prefix: ingress_http
   idle_timeout: 1s
@@ -856,7 +904,7 @@ route_config:
         cluster: fake_cluster
 http_filters:
 - name: envoy.http_dynamo_filter
-  config: {}
+  typed_config: {}
 access_log:
 - name: envoy.file_access_log
   typed_config:
@@ -886,7 +934,7 @@ route_config:
         cluster: fake_cluster
 http_filters:
 - name: envoy.http_dynamo_filter
-  config: {}
+  typed_config: {}
 access_log:
 - name: envoy.file_access_log
   typed_config:
@@ -926,9 +974,7 @@ route_config:
         cluster: cluster
 http_filters:
 - name: envoy.http_dynamo_filter
-  config: {}
 - name: envoy.router
-  config: {}
 
   )EOF";
 };
@@ -1059,13 +1105,13 @@ TEST_F(FilterChainTest, createCustomUpgradeFilterChain) {
 
   {
     Http::MockFilterChainFactoryCallbacks callbacks;
-    EXPECT_CALL(callbacks, addStreamDecoderFilter(_)); // Router
+    EXPECT_CALL(callbacks, addStreamDecoderFilter(_)).Times(1);
     EXPECT_TRUE(config.createUpgradeFilterChain("websocket", nullptr, callbacks));
   }
 
   {
     Http::MockFilterChainFactoryCallbacks callbacks;
-    EXPECT_CALL(callbacks, addStreamDecoderFilter(_));   // Router
+    EXPECT_CALL(callbacks, addStreamDecoderFilter(_)).Times(1);
     EXPECT_CALL(callbacks, addStreamFilter(_)).Times(2); // Dynamo
     EXPECT_TRUE(config.createUpgradeFilterChain("Foo", nullptr, callbacks));
   }

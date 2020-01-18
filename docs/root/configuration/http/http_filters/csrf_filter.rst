@@ -82,7 +82,7 @@ The fraction of requests for which the filter is enabled can be configured via t
 The fraction of requests for which the filter is enabled in shadow-only mode can be configured via
 the :ref:`runtime_key <envoy_api_field_core.runtimefractionalpercent.runtime_key>` value of the
 :ref:`shadow_enabled <envoy_api_field_config.filter.http.csrf.v2.CsrfPolicy.shadow_enabled>` field.
-When enabled in shadow-only node, the filter will evaluate the request's *Origin* and *Destination*
+When enabled in shadow-only mode, the filter will evaluate the request's *Origin* and *Destination*
 to determine if it's valid but will not enforce any policies.
 
 .. note::

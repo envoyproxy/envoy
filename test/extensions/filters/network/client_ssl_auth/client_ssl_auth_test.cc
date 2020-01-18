@@ -2,6 +2,8 @@
 #include <memory>
 #include <string>
 
+#include "envoy/extensions/filters/network/client_ssl_auth/v3/client_ssl_auth.pb.h"
+
 #include "common/http/message_impl.h"
 #include "common/network/address_impl.h"
 
@@ -47,7 +49,7 @@ ip_white_list:
 test: a
   )EOF";
 
-  envoy::config::filter::network::client_ssl_auth::v2::ClientSSLAuth proto_config{};
+  envoy::extensions::filters::network::client_ssl_auth::v3::ClientSSLAuth proto_config{};
   EXPECT_THROW(TestUtility::loadFromYaml(yaml, proto_config), EnvoyException);
 }
 
@@ -70,7 +72,7 @@ ip_white_list:
   prefix_len: 64
     )EOF";
 
-    envoy::config::filter::network::client_ssl_auth::v2::ClientSSLAuth proto_config{};
+    envoy::extensions::filters::network::client_ssl_auth::v3::ClientSSLAuth proto_config{};
     TestUtility::loadFromYaml(yaml, proto_config);
     EXPECT_CALL(cm_, get(Eq("vpn")));
     setupRequest();
@@ -122,7 +124,7 @@ auth_api_cluster: bad_cluster
 stat_prefix: bad_cluster
   )EOF";
 
-  envoy::config::filter::network::client_ssl_auth::v2::ClientSSLAuth proto_config{};
+  envoy::extensions::filters::network::client_ssl_auth::v3::ClientSSLAuth proto_config{};
   TestUtility::loadFromYaml(yaml, proto_config);
   EXPECT_CALL(cm_, get(Eq("bad_cluster"))).WillOnce(Return(nullptr));
   EXPECT_THROW(

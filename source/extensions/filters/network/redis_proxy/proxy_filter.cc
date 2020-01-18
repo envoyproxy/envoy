@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <string>
 
+#include "envoy/extensions/filters/network/redis_proxy/v3/redis_proxy.pb.h"
 #include "envoy/stats/scope.h"
 
 #include "common/common/assert.h"
@@ -16,8 +17,9 @@ namespace NetworkFilters {
 namespace RedisProxy {
 
 ProxyFilterConfig::ProxyFilterConfig(
-    const envoy::config::filter::network::redis_proxy::v2::RedisProxy& config, Stats::Scope& scope,
-    const Network::DrainDecision& drain_decision, Runtime::Loader& runtime, Api::Api& api)
+    const envoy::extensions::filters::network::redis_proxy::v3::RedisProxy& config,
+    Stats::Scope& scope, const Network::DrainDecision& drain_decision, Runtime::Loader& runtime,
+    Api::Api& api)
     : drain_decision_(drain_decision), runtime_(runtime),
       stat_prefix_(fmt::format("redis.{}.", config.stat_prefix())),
       stats_(generateStats(stat_prefix_, scope)),

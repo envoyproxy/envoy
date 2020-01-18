@@ -5,7 +5,8 @@
 #include <string>
 
 #include "envoy/common/exception.h"
-#include "envoy/config/bootstrap/v2/bootstrap.pb.h"
+#include "envoy/config/bootstrap/v3/bootstrap.pb.h"
+#include "envoy/registry/registry.h"
 #include "envoy/server/options.h"
 
 #include "common/common/logger.h"
@@ -24,13 +25,23 @@ public:
   using HotRestartVersionCb = std::function<std::string(bool)>;
 
   /**
-   * @throw NoServingException if Envoy has already done everything specified by the argv (e.g.
+   * @throw NoServingException if Envoy has already done everything specified by the args (e.g.
    *        print the hot restart version) and it's time to exit without serving HTTP traffic. The
    *        caller should exit(0) after any necessary cleanup.
    * @throw MalformedArgvException if something is wrong with the arguments (invalid flag or flag
    *        value). The caller should call exit(1) after any necessary cleanup.
    */
   OptionsImpl(int argc, const char* const* argv, const HotRestartVersionCb& hot_restart_version_cb,
+              spdlog::level::level_enum default_log_level);
+
+  /**
+   * @throw NoServingException if Envoy has already done everything specified by the args (e.g.
+   *        print the hot restart version) and it's time to exit without serving HTTP traffic. The
+   *        caller should exit(0) after any necessary cleanup.
+   * @throw MalformedArgvException if something is wrong with the arguments (invalid flag or flag
+   *        value). The caller should call exit(1) after any necessary cleanup.
+   */
+  OptionsImpl(std::vector<std::string> args, const HotRestartVersionCb& hot_restart_version_cb,
               spdlog::level::level_enum default_log_level);
 
   // Test constructor; creates "reasonable" defaults, but desired values should be set explicitly.
@@ -41,7 +52,7 @@ public:
   void setBaseId(uint64_t base_id) { base_id_ = base_id; };
   void setConcurrency(uint32_t concurrency) { concurrency_ = concurrency; }
   void setConfigPath(const std::string& config_path) { config_path_ = config_path; }
-  void setConfigProto(const envoy::config::bootstrap::v2::Bootstrap& config_proto) {
+  void setConfigProto(const envoy::config::bootstrap::v3::Bootstrap& config_proto) {
     config_proto_ = config_proto;
   }
   void setConfigYaml(const std::string& config_yaml) { config_yaml_ = config_yaml; }
@@ -89,7 +100,7 @@ public:
   uint64_t baseId() const override { return base_id_; }
   uint32_t concurrency() const override { return concurrency_; }
   const std::string& configPath() const override { return config_path_; }
-  const envoy::config::bootstrap::v2::Bootstrap& configProto() const override {
+  const envoy::config::bootstrap::v3::Bootstrap& configProto() const override {
     return config_proto_;
   }
   const std::string& configYaml() const override { return config_yaml_; }
@@ -124,7 +135,17 @@ public:
   Server::CommandLineOptionsPtr toCommandLineOptions() const override;
   void parseComponentLogLevels(const std::string& component_log_levels);
   bool cpusetThreadsEnabled() const override { return cpuset_threads_; }
+  const std::vector<std::string>& disabledExtensions() const override {
+    return disabled_extensions_;
+  }
   uint32_t count() const;
+
+  /**
+   * disableExtensions parses the given set of extension names of
+   * the form $CATEGORY/$NAME, and disables the corresponding extension
+   * factories.
+   */
+  static void disableExtensions(const std::vector<std::string>&);
 
 private:
   void logError(const std::string& error) const;
@@ -132,7 +153,7 @@ private:
   uint64_t base_id_;
   uint32_t concurrency_;
   std::string config_path_;
-  envoy::config::bootstrap::v2::Bootstrap config_proto_;
+  envoy::config::bootstrap::v3::Bootstrap config_proto_;
   std::string config_yaml_;
   bool allow_unknown_static_fields_{false};
   bool reject_unknown_dynamic_fields_{false};
@@ -157,6 +178,7 @@ private:
   bool mutex_tracing_enabled_;
   bool cpuset_threads_;
   bool fake_symbol_table_enabled_;
+  std::vector<std::string> disabled_extensions_;
   uint32_t count_;
 };
 

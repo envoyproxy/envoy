@@ -3,6 +3,9 @@
 #include <memory>
 #include <string>
 
+#include "envoy/config/core/v3/base.pb.h"
+#include "envoy/config/route/v3/route_components.pb.h"
+
 #include "common/buffer/buffer_impl.h"
 #include "common/http/async_client_impl.h"
 #include "common/http/context_impl.h"
@@ -46,7 +49,7 @@ public:
     message_->headers().setHost("host");
     message_->headers().setPath("/");
     ON_CALL(*cm_.conn_pool_.host_, locality())
-        .WillByDefault(ReturnRef(envoy::api::v2::core::Locality().default_instance()));
+        .WillByDefault(ReturnRef(envoy::config::core::v3::Locality().default_instance()));
   }
 
   void expectSuccess(uint64_t code) {
@@ -191,6 +194,7 @@ TEST_F(AsyncClientImplTracingTest, Basic) {
   EXPECT_CALL(*child_span,
               setTag(Eq(Tracing::Tags::get().Component), Eq(Tracing::Tags::get().Proxy)));
   EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().HttpProtocol), Eq("HTTP/1.1")));
+  EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().UpstreamAddress), Eq("10.0.0.1:443")));
   EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().UpstreamCluster), Eq("fake_cluster")));
   EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().HttpStatusCode), Eq("200")));
   EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().ResponseFlags), Eq("-")));
@@ -229,6 +233,7 @@ TEST_F(AsyncClientImplTracingTest, BasicNamedChildSpan) {
   EXPECT_CALL(*child_span,
               setTag(Eq(Tracing::Tags::get().Component), Eq(Tracing::Tags::get().Proxy)));
   EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().HttpProtocol), Eq("HTTP/1.1")));
+  EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().UpstreamAddress), Eq("10.0.0.1:443")));
   EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().UpstreamCluster), Eq("fake_cluster")));
   EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().HttpStatusCode), Eq("200")));
   EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().ResponseFlags), Eq("-")));
@@ -269,7 +274,7 @@ TEST_F(AsyncClientImplTest, BasicHashPolicy) {
   expectSuccess(200);
 
   AsyncClient::RequestOptions options;
-  Protobuf::RepeatedPtrField<envoy::api::v2::route::RouteAction::HashPolicy> hash_policy;
+  Protobuf::RepeatedPtrField<envoy::config::route::v3::RouteAction::HashPolicy> hash_policy;
   hash_policy.Add()->mutable_header()->set_header_name(":path");
   options.setHashPolicy(hash_policy);
   client_.send(std::move(message_), callbacks_, options);
@@ -859,6 +864,7 @@ TEST_F(AsyncClientImplTracingTest, CancelRequest) {
   EXPECT_CALL(*child_span,
               setTag(Eq(Tracing::Tags::get().Component), Eq(Tracing::Tags::get().Proxy)));
   EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().HttpProtocol), Eq("HTTP/1.1")));
+  EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().UpstreamAddress), Eq("10.0.0.1:443")));
   EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().UpstreamCluster), Eq("fake_cluster")));
   EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().HttpStatusCode), Eq("0")));
   EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().ResponseFlags), Eq("-")));
@@ -918,6 +924,7 @@ TEST_F(AsyncClientImplTracingTest, DestroyWithActiveRequest) {
   EXPECT_CALL(*child_span,
               setTag(Eq(Tracing::Tags::get().Component), Eq(Tracing::Tags::get().Proxy)));
   EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().HttpProtocol), Eq("HTTP/1.1")));
+  EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().UpstreamAddress), Eq("10.0.0.1:443")));
   EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().UpstreamCluster), Eq("fake_cluster")));
   EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().HttpStatusCode), Eq("0")));
   EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().ResponseFlags), Eq("-")));
@@ -1073,6 +1080,7 @@ TEST_F(AsyncClientImplTracingTest, RequestTimeout) {
   EXPECT_CALL(*child_span,
               setTag(Eq(Tracing::Tags::get().Component), Eq(Tracing::Tags::get().Proxy)));
   EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().HttpProtocol), Eq("HTTP/1.1")));
+  EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().UpstreamAddress), Eq("10.0.0.1:443")));
   EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().UpstreamCluster), Eq("fake_cluster")));
   EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().HttpStatusCode), Eq("504")));
   EXPECT_CALL(*child_span, setTag(Eq(Tracing::Tags::get().ResponseFlags), Eq("UT")));
@@ -1227,7 +1235,7 @@ class AsyncClientImplUnitTest : public testing::Test {
 public:
   AsyncStreamImpl::RouteImpl route_impl_{
       "foo", absl::nullopt,
-      Protobuf::RepeatedPtrField<envoy::api::v2::route::RouteAction::HashPolicy>()};
+      Protobuf::RepeatedPtrField<envoy::config::route::v3::RouteAction::HashPolicy>()};
   AsyncStreamImpl::NullVirtualHost vhost_;
   AsyncStreamImpl::NullConfig config_;
 };
@@ -1257,8 +1265,7 @@ TEST_F(AsyncClientImplUnitTest, RouteImplInitTest) {
   EXPECT_TRUE(route_impl_.routeEntry()->upgradeMap().empty());
   EXPECT_EQ(Router::InternalRedirectAction::PassThrough,
             route_impl_.routeEntry()->internalRedirectAction());
-  EXPECT_TRUE(route_impl_.routeEntry()->shadowPolicy().runtimeKey().empty());
-  EXPECT_EQ(0, route_impl_.routeEntry()->shadowPolicy().defaultValue().numerator());
+  EXPECT_TRUE(route_impl_.routeEntry()->shadowPolicies().empty());
   EXPECT_TRUE(route_impl_.routeEntry()->virtualHost().rateLimitPolicy().empty());
   EXPECT_EQ(nullptr, route_impl_.routeEntry()->virtualHost().corsPolicy());
   EXPECT_EQ(nullptr, route_impl_.routeEntry()->virtualHost().perFilterConfig("bar"));

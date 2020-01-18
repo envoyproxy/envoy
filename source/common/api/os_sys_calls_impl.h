@@ -1,5 +1,7 @@
 #pragma once
 
+#include <string>
+
 #include "envoy/api/os_sys_calls.h"
 
 #include "common/singleton/threadsafe_singleton.h"
@@ -11,6 +13,7 @@ class OsSysCallsImpl : public OsSysCalls {
 public:
   // Api::OsSysCalls
   SysCallIntResult bind(int sockfd, const sockaddr* addr, socklen_t addrlen) override;
+  SysCallIntResult chmod(const std::string& path, mode_t mode) override;
   SysCallIntResult ioctl(int sockfd, unsigned long int request, void* argp) override;
   SysCallSizeResult writev(int fd, const iovec* iovec, int num_iovec) override;
   SysCallSizeResult readv(int fd, const iovec* iovec, int num_iovec) override;
@@ -28,6 +31,7 @@ public:
   SysCallIntResult socket(int domain, int type, int protocol) override;
   SysCallSizeResult sendmsg(int fd, const msghdr* message, int flags) override;
   SysCallIntResult getsockname(int sockfd, sockaddr* addr, socklen_t* addrlen) override;
+  SysCallIntResult gethostname(char* name, size_t length) override;
 };
 
 using OsSysCallsSingleton = ThreadSafeSingleton<OsSysCallsImpl>;

@@ -43,7 +43,7 @@ std::vector<std::string> ReadFileContentsImpl(const std::string& dirname) {
 }
 
 // Reads the contents of |filename| as a string into |contents|.
-void ReadFileContentsImpl(QuicStringPiece filename, std::string* contents) {
+void ReadFileContentsImpl(quiche::QuicheStringPiece filename, std::string* contents) {
 #ifdef WIN32
   Envoy::Filesystem::InstanceImplWin32 fs;
 #else

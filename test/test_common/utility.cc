@@ -10,14 +10,15 @@
 #include <string>
 #include <vector>
 
-#include "envoy/api/v2/cds.pb.h"
-#include "envoy/api/v2/lds.pb.h"
-#include "envoy/api/v2/rds.pb.h"
-#include "envoy/api/v2/route/route.pb.h"
 #include "envoy/buffer/buffer.h"
 #include "envoy/common/platform.h"
+#include "envoy/config/cluster/v3/cluster.pb.h"
+#include "envoy/config/endpoint/v3/endpoint.pb.h"
+#include "envoy/config/listener/v3/listener.pb.h"
+#include "envoy/config/route/v3/route.pb.h"
+#include "envoy/config/route/v3/route_components.pb.h"
 #include "envoy/http/codec.h"
-#include "envoy/service/discovery/v2/rtds.pb.h"
+#include "envoy/service/runtime/v3/rtds.pb.h"
 
 #include "common/api/api_impl.h"
 #include "common/common/empty_string.h"
@@ -201,25 +202,26 @@ std::vector<std::string> TestUtility::listFiles(const std::string& path, bool re
 
 std::string TestUtility::xdsResourceName(const ProtobufWkt::Any& resource) {
   if (resource.type_url() == Config::TypeUrl::get().Listener) {
-    return TestUtility::anyConvert<envoy::api::v2::Listener>(resource).name();
+    return TestUtility::anyConvert<envoy::config::listener::v3::Listener>(resource).name();
   }
   if (resource.type_url() == Config::TypeUrl::get().RouteConfiguration) {
-    return TestUtility::anyConvert<envoy::api::v2::RouteConfiguration>(resource).name();
+    return TestUtility::anyConvert<envoy::config::route::v3::RouteConfiguration>(resource).name();
   }
   if (resource.type_url() == Config::TypeUrl::get().Cluster) {
-    return TestUtility::anyConvert<envoy::api::v2::Cluster>(resource).name();
+    return TestUtility::anyConvert<envoy::config::cluster::v3::Cluster>(resource).name();
   }
   if (resource.type_url() == Config::TypeUrl::get().ClusterLoadAssignment) {
-    return TestUtility::anyConvert<envoy::api::v2::ClusterLoadAssignment>(resource).cluster_name();
+    return TestUtility::anyConvert<envoy::config::endpoint::v3::ClusterLoadAssignment>(resource)
+        .cluster_name();
   }
   if (resource.type_url() == Config::TypeUrl::get().VirtualHost) {
-    return TestUtility::anyConvert<envoy::api::v2::route::VirtualHost>(resource).name();
+    return TestUtility::anyConvert<envoy::config::route::v3::VirtualHost>(resource).name();
   }
   if (resource.type_url() == Config::TypeUrl::get().Runtime) {
-    return TestUtility::anyConvert<envoy::service::discovery::v2::Runtime>(resource).name();
+    return TestUtility::anyConvert<envoy::service::runtime::v3::Runtime>(resource).name();
   }
   throw EnvoyException(
-      fmt::format("xdsResourceName does not know about type URL {}", resource.type_url()));
+      absl::StrCat("xdsResourceName does not know about type URL ", resource.type_url()));
 }
 
 std::string TestUtility::addLeftAndRightPadding(absl::string_view to_pad, int desired_length) {
@@ -373,7 +375,7 @@ void AtomicFileUpdater::update(const std::string& contents) {
   const std::string target = use_target1_ ? target1_ : target2_;
   use_target1_ = !use_target1_;
   {
-    std::ofstream file(target);
+    std::ofstream file(target, std::ios_base::binary);
     file << contents;
   }
   TestUtility::createSymlink(target, new_link_);

@@ -8,15 +8,17 @@
 
 #include "envoy/api/api.h"
 #include "envoy/buffer/buffer.h"
-#include "envoy/config/bootstrap/v2/bootstrap.pb.h"
 #include "envoy/network/address.h"
 #include "envoy/stats/stats.h"
 #include "envoy/stats/store.h"
 #include "envoy/thread/thread.h"
+#include "envoy/type/matcher/v3/string.pb.h"
+#include "envoy/type/v3/percent.pb.h"
 
 #include "common/buffer/buffer_impl.h"
 #include "common/common/c_smart_ptr.h"
 #include "common/common/thread.h"
+#include "common/config/version_converter.h"
 #include "common/http/header_map_impl.h"
 #include "common/protobuf/message_validator_impl.h"
 #include "common/protobuf/utility.h"
@@ -289,6 +291,19 @@ public:
   }
 
   /**
+   * Compare two JSON strings serialized from ProtobufWkt::Struct for equality. When two identical
+   * ProtobufWkt::Struct are serialized into JSON strings, the results have the same set of
+   * properties (values), but the positions may be different.
+   *
+   * @param lhs JSON string on LHS.
+   * @param rhs JSON string on RHS.
+   * @return bool indicating whether the JSON strings are equal.
+   */
+  static bool jsonStringEqual(const std::string& lhs, const std::string& rhs) {
+    return protoEqual(jsonToStruct(lhs), jsonToStruct(rhs));
+  }
+
+  /**
    * Symmetrically pad a string with '=' out to a desired length.
    * @param to_pad the string being padded around.
    * @param desired_length the length we want the padding to bring the string up to.
@@ -455,8 +470,8 @@ public:
    * @param string prefix.
    * @return Object StringMatcher.
    */
-  static const envoy::type::matcher::StringMatcher createPrefixMatcher(std::string str) {
-    envoy::type::matcher::StringMatcher matcher;
+  static const envoy::type::matcher::v3::StringMatcher createPrefixMatcher(std::string str) {
+    envoy::type::matcher::v3::StringMatcher matcher;
     matcher.set_prefix(str);
     return matcher;
   }
@@ -466,8 +481,8 @@ public:
    * @param string exact.
    * @return Object StringMatcher.
    */
-  static const envoy::type::matcher::StringMatcher createExactMatcher(std::string str) {
-    envoy::type::matcher::StringMatcher matcher;
+  static const envoy::type::matcher::v3::StringMatcher createExactMatcher(std::string str) {
+    envoy::type::matcher::v3::StringMatcher matcher;
     matcher.set_exact(str);
     return matcher;
   }
@@ -477,9 +492,9 @@ public:
    * @param string exact.
    * @return Object StringMatcher.
    */
-  static const envoy::type::matcher::StringMatcher createRegexMatcher(std::string str) {
-    envoy::type::matcher::StringMatcher matcher;
-    matcher.set_regex(str);
+  static const envoy::type::matcher::v3::StringMatcher createRegexMatcher(std::string str) {
+    envoy::type::matcher::v3::StringMatcher matcher;
+    matcher.set_hidden_envoy_deprecated_regex(str);
     return matcher;
   }
 
@@ -496,21 +511,32 @@ public:
       const std::vector<std::pair<absl::string_view, Stats::PrimitiveGaugeReference>>& gauges);
 
   // Strict variants of Protobuf::MessageUtil
-  static void loadFromJson(const std::string& json, Protobuf::Message& message) {
-    return MessageUtil::loadFromJson(json, message, ProtobufMessage::getStrictValidationVisitor());
+  static void loadFromJson(const std::string& json, Protobuf::Message& message,
+                           bool preserve_original_type = false) {
+    MessageUtil::loadFromJson(json, message, ProtobufMessage::getStrictValidationVisitor());
+    if (!preserve_original_type) {
+      Config::VersionConverter::eraseOriginalTypeInformation(message);
+    }
   }
 
   static void loadFromJson(const std::string& json, ProtobufWkt::Struct& message) {
-    return MessageUtil::loadFromJson(json, message);
+    MessageUtil::loadFromJson(json, message);
   }
 
-  static void loadFromYaml(const std::string& yaml, Protobuf::Message& message) {
-    return MessageUtil::loadFromYaml(yaml, message, ProtobufMessage::getStrictValidationVisitor());
+  static void loadFromYaml(const std::string& yaml, Protobuf::Message& message,
+                           bool preserve_original_type = false) {
+    MessageUtil::loadFromYaml(yaml, message, ProtobufMessage::getStrictValidationVisitor());
+    if (!preserve_original_type) {
+      Config::VersionConverter::eraseOriginalTypeInformation(message);
+    }
   }
 
-  static void loadFromFile(const std::string& path, Protobuf::Message& message, Api::Api& api) {
-    return MessageUtil::loadFromFile(path, message, ProtobufMessage::getStrictValidationVisitor(),
-                                     api);
+  static void loadFromFile(const std::string& path, Protobuf::Message& message, Api::Api& api,
+                           bool preserve_original_type = false) {
+    MessageUtil::loadFromFile(path, message, ProtobufMessage::getStrictValidationVisitor(), api);
+    if (!preserve_original_type) {
+      Config::VersionConverter::eraseOriginalTypeInformation(message);
+    }
   }
 
   template <class MessageType>
@@ -519,19 +545,14 @@ public:
   }
 
   template <class MessageType>
-  static void loadFromFileAndValidate(const std::string& path, MessageType& message) {
-    return MessageUtil::loadFromFileAndValidate(path, message,
-                                                ProtobufMessage::getStrictValidationVisitor());
-  }
-
-  template <class MessageType>
   static void loadFromYamlAndValidate(const std::string& yaml, MessageType& message) {
-    return MessageUtil::loadFromYamlAndValidate(yaml, message,
-                                                ProtobufMessage::getStrictValidationVisitor());
+    MessageUtil::loadFromYamlAndValidate(yaml, message,
+                                         ProtobufMessage::getStrictValidationVisitor());
+    Config::VersionConverter::eraseOriginalTypeInformation(message);
   }
 
   template <class MessageType> static void validate(const MessageType& message) {
-    return MessageUtil::validate(message, ProtobufMessage::getStrictValidationVisitor());
+    MessageUtil::validate(message, ProtobufMessage::getStrictValidationVisitor());
   }
 
   template <class MessageType>
@@ -546,6 +567,12 @@ public:
     ProtobufWkt::Struct tmp;
     MessageUtil::jsonConvert(source, tmp);
     MessageUtil::jsonConvert(tmp, ProtobufMessage::getStrictValidationVisitor(), dest);
+  }
+
+  static ProtobufWkt::Struct jsonToStruct(const std::string& json) {
+    ProtobufWkt::Struct message;
+    MessageUtil::loadFromJson(json, message);
+    return message;
   }
 };
 
@@ -644,6 +671,8 @@ public:
   std::string get_(const LowerCaseString& key) const;
   bool has(const std::string& key) const;
   bool has(const LowerCaseString& key) const;
+
+  void verifyByteSize() override { ASSERT(cached_byte_size_ == byteSizeInternal()); }
 };
 
 // Helper method to create a header map from an initializer list. Useful due to make_unique's
@@ -739,10 +768,24 @@ MATCHER_P(RepeatedProtoEq, expected, "") {
 }
 
 MATCHER_P(Percent, rhs, "") {
-  envoy::type::FractionalPercent expected;
+  envoy::type::v3::FractionalPercent expected;
   expected.set_numerator(rhs);
-  expected.set_denominator(envoy::type::FractionalPercent::HUNDRED);
+  expected.set_denominator(envoy::type::v3::FractionalPercent::HUNDRED);
   return TestUtility::protoEqual(expected, arg, /*ignore_repeated_field_ordering=*/false);
+}
+
+MATCHER_P(JsonStringEq, expected, "") {
+  const bool equal = TestUtility::jsonStringEqual(arg, expected);
+  if (!equal) {
+    *result_listener << "\n"
+                     << TestUtility::addLeftAndRightPadding("Expected JSON string:") << "\n"
+                     << expected
+                     << TestUtility::addLeftAndRightPadding("is not equal to actual JSON string:")
+                     << "\n"
+                     << arg << TestUtility::addLeftAndRightPadding("") // line full of padding
+                     << "\n";
+  }
+  return equal;
 }
 
 } // namespace Envoy

@@ -2,6 +2,9 @@
 
 #include <iostream>
 
+#include "envoy/config/bootstrap/v3/bootstrap.pb.h"
+#include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
+
 #include "common/http/header_map_impl.h"
 
 #include "test/integration/autonomous_upstream.h"
@@ -52,7 +55,7 @@ TEST_P(Http2UpstreamIntegrationTest, Retry) { testRetry(); }
 
 TEST_P(Http2UpstreamIntegrationTest, GrpcRetry) { testGrpcRetry(); }
 
-TEST_P(Http2UpstreamIntegrationTest, Trailers) { testTrailers(1024, 2048); }
+TEST_P(Http2UpstreamIntegrationTest, Trailers) { testTrailers(1024, 2048, true, true); }
 
 // Ensure Envoy handles streaming requests and responses simultaneously.
 void Http2UpstreamIntegrationTest::bidirectionalStreaming(uint32_t bytes) {
@@ -317,8 +320,8 @@ TEST_P(Http2UpstreamIntegrationTest, UpstreamConnectionCloseWithManyStreams) {
 // Regression test for https://github.com/envoyproxy/envoy/issues/6744
 TEST_P(Http2UpstreamIntegrationTest, HittingEncoderFilterLimitForGrpc) {
   config_helper_.addConfigModifier(
-      [&](envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager& hcm)
-          -> void {
+      [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+              hcm) -> void {
         const std::string access_log_name =
             TestEnvironment::temporaryPath(TestUtility::uniqueFilename());
         // Configure just enough of an upstream access log to reference the upstream headers.
@@ -397,7 +400,7 @@ TEST_P(Http2UpstreamIntegrationTest, TestManyResponseHeadersRejected) {
 // Tests bootstrap configuration of max response headers.
 TEST_P(Http2UpstreamIntegrationTest, ManyResponseHeadersAccepted) {
   // Set max response header count to 200.
-  config_helper_.addConfigModifier([](envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
+  config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
     auto* static_resources = bootstrap.mutable_static_resources();
     auto* cluster = static_resources->mutable_clusters(0);
     auto* http_protocol_options = cluster->mutable_common_http_protocol_options();
@@ -442,8 +445,8 @@ TEST_P(Http2UpstreamIntegrationTest, LargeResponseHeadersRejected) {
 // See https://github.com/envoyproxy/envoy/issues/8828.
 TEST_P(Http2UpstreamIntegrationTest, ConfigureHttpOverGrpcLogs) {
   config_helper_.addConfigModifier(
-      [&](envoy::config::filter::network::http_connection_manager::v2::HttpConnectionManager& hcm)
-          -> void {
+      [&](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+              hcm) -> void {
         const std::string access_log_name =
             TestEnvironment::temporaryPath(TestUtility::uniqueFilename());
         // Configure just enough of an upstream access log to reference the upstream headers.

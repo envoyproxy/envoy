@@ -116,14 +116,19 @@ HotRestartingParent::Internal::getListenSocketsForChild(const HotRestartMessage:
 // names. The problem can be solved by splitting the export up over many chunks.
 void HotRestartingParent::Internal::exportStatsToChild(HotRestartMessage::Reply::Stats* stats) {
   for (const auto& gauge : server_->stats().gauges()) {
-    (*stats->mutable_gauges())[gauge->name()] = gauge->value();
+    if (gauge->used()) {
+      (*stats->mutable_gauges())[gauge->name()] = gauge->value();
+    }
   }
+
   for (const auto& counter : server_->stats().counters()) {
-    // The hot restart parent is expected to have stopped its normal stat exporting (and so
-    // latching) by the time it begins exporting to the hot restart child.
-    uint64_t latched_value = counter->latch();
-    if (latched_value > 0) {
-      (*stats->mutable_counter_deltas())[counter->name()] = latched_value;
+    if (counter->used()) {
+      // The hot restart parent is expected to have stopped its normal stat exporting (and so
+      // latching) by the time it begins exporting to the hot restart child.
+      uint64_t latched_value = counter->latch();
+      if (latched_value > 0) {
+        (*stats->mutable_counter_deltas())[counter->name()] = latched_value;
+      }
     }
   }
   stats->set_memory_allocated(Memory::Stats::totalCurrentlyAllocated());

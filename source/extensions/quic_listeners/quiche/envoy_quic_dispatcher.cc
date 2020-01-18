@@ -19,12 +19,6 @@ EnvoyQuicDispatcher::EnvoyQuicDispatcher(
                            std::move(alarm_factory), expected_server_connection_id_length),
       connection_handler_(connection_handler), listener_config_(listener_config),
       listener_stats_(listener_stats), dispatcher_(dispatcher), listen_socket_(listen_socket) {
-  // Turn off chlo buffering in QuicDispatcher because per event loop clean
-  // up is not implemented.
-  // TODO(danzh): Add a per event loop callback to
-  // Network::UdpListenerCallbacks which should be called at the beginning
-  // of HandleReadEvent(). And this callback should call quic::Dispatcher::ProcessBufferedChlos().
-  SetQuicFlag(FLAGS_quic_allow_chlo_buffering, false);
   // Set send buffer twice of max flow control window to ensure that stream send
   // buffer always takes all the data.
   // The max amount of data buffered is the per-stream high watermark + the max
@@ -46,14 +40,14 @@ void EnvoyQuicDispatcher::OnConnectionClosed(quic::QuicConnectionId connection_i
   connection_handler_.decNumConnections();
 }
 
-quic::QuicSession* EnvoyQuicDispatcher::CreateQuicSession(
+std::unique_ptr<quic::QuicSession> EnvoyQuicDispatcher::CreateQuicSession(
     quic::QuicConnectionId server_connection_id, const quic::QuicSocketAddress& peer_address,
-    quic::QuicStringPiece /*alpn*/, const quic::ParsedQuicVersion& version) {
+    quiche::QuicheStringPiece /*alpn*/, const quic::ParsedQuicVersion& version) {
   auto quic_connection = std::make_unique<EnvoyQuicServerConnection>(
       server_connection_id, peer_address, *helper(), *alarm_factory(), writer(),
       /*owns_writer=*/false, quic::ParsedQuicVersionVector{version}, listener_config_,
       listener_stats_, listen_socket_);
-  auto quic_session = new EnvoyQuicServerSession(
+  auto quic_session = std::make_unique<EnvoyQuicServerSession>(
       config(), quic::ParsedQuicVersionVector{version}, std::move(quic_connection), this,
       session_helper(), crypto_config(), compressed_certs_cache(), dispatcher_,
       listener_config_.perConnectionBufferLimitBytes());

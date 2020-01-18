@@ -1,14 +1,18 @@
 #pragma once
 
 #include <algorithm>
+#include <functional>
 #include <map>
 #include <string>
 #include <vector>
 
 #include "envoy/common/exception.h"
+#include "envoy/config/core/v3/base.pb.h"
 
 #include "common/common/assert.h"
 #include "common/common/fmt.h"
+#include "common/common/logger.h"
+#include "common/protobuf/utility.h"
 
 #include "absl/base/attributes.h"
 #include "absl/container/flat_hash_map.h"
@@ -22,27 +26,55 @@ template <class Base> class FactoryRegistry;
 template <class T, class Base> class RegisterFactory;
 
 /**
- * Helper class to call `registeredNames` for a specialized
- * FactoryRegistry.
+ * FactoryRegistryProxy is a proxy object that provides access to the
+ * static methods of a strongly-typed factory registry.
  */
-class BaseFactoryCategoryNames {
+class FactoryRegistryProxy {
 public:
-  virtual ~BaseFactoryCategoryNames() = default;
+  virtual ~FactoryRegistryProxy() = default;
   virtual std::vector<absl::string_view> registeredNames() const PURE;
+  // Return all registered factory names, including disabled factories.
+  virtual std::vector<absl::string_view> allRegisteredNames() const PURE;
+  virtual absl::optional<envoy::config::core::v3::BuildVersion>
+  getFactoryVersion(absl::string_view name) const PURE;
+  virtual bool disableFactory(absl::string_view) PURE;
+  virtual bool isFactoryDisabled(absl::string_view) const PURE;
 };
 
-template <class Base> class FactoryCategoryNames : public BaseFactoryCategoryNames {
+template <class Base> class FactoryRegistryProxyImpl : public FactoryRegistryProxy {
 public:
   using FactoryRegistry = Envoy::Registry::FactoryRegistry<Base>;
 
   std::vector<absl::string_view> registeredNames() const override {
     return FactoryRegistry::registeredNames();
   }
+
+  std::vector<absl::string_view> allRegisteredNames() const override {
+    return FactoryRegistry::registeredNames(true);
+  }
+
+  absl::optional<envoy::config::core::v3::BuildVersion>
+  getFactoryVersion(absl::string_view name) const override {
+    return FactoryRegistry::getFactoryVersion(name);
+  }
+
+  bool disableFactory(absl::string_view name) override {
+    return FactoryRegistry::disableFactory(name);
+  }
+
+  bool isFactoryDisabled(absl::string_view name) const override {
+    return FactoryRegistry::isFactoryDisabled(name);
+  }
 };
 
+/**
+ * BaseFactoryCategoryRegistry holds the static factory map for
+ * FactoryCategoryRegistry, ensuring that friends of that class
+ * cannot get non-const access to it.
+ */
 class BaseFactoryCategoryRegistry {
 protected:
-  using MapType = std::map<std::string, BaseFactoryCategoryNames*>;
+  using MapType = absl::flat_hash_map<std::string, FactoryRegistryProxy*>;
 
   static MapType& factories() {
     static auto* factories = new MapType();
@@ -59,8 +91,6 @@ protected:
  */
 class FactoryCategoryRegistry : public BaseFactoryCategoryRegistry {
 public:
-  using MapType = BaseFactoryCategoryRegistry::MapType;
-
   /**
    * @return a read-only reference to the map of registered factory
    * registries.
@@ -70,8 +100,18 @@ public:
   /**
    * @return whether the given category name is already registered.
    */
-  static bool isRegistered(const std::string& category) {
+  static bool isRegistered(absl::string_view category) {
     return factories().find(category) != factories().end();
+  }
+
+  static bool disableFactory(absl::string_view category, absl::string_view name) {
+    auto registry = factories().find(category);
+
+    if (registry != factories().end()) {
+      return registry->second->disableFactory(name);
+    }
+
+    return false;
   }
 
 private:
@@ -79,8 +119,7 @@ private:
   // This enforces correct use of the registration machinery.
   template <class T, class Base> friend class RegisterFactory;
 
-  static void registerCategory(const std::string& category,
-                               BaseFactoryCategoryNames* factoryNames) {
+  static void registerCategory(const std::string& category, FactoryRegistryProxy* factoryNames) {
     auto result = factories().emplace(std::make_pair(category, factoryNames));
     RELEASE_ASSERT(result.second == true,
                    fmt::format("Double registration for category: '{}'", category));
@@ -105,18 +144,20 @@ template <typename T> class InjectFactory;
  * Example lookup: BaseFactoryType *factory =
  * FactoryRegistry<BaseFactoryType>::getFactory("example_factory_name");
  */
-template <class Base> class FactoryRegistry {
+template <class Base> class FactoryRegistry : public Logger::Loggable<Logger::Id::config> {
 public:
   /**
    * Return a sorted vector of registered factory names.
    */
-  static std::vector<absl::string_view> registeredNames() {
+  static std::vector<absl::string_view> registeredNames(bool include_disabled = false) {
     std::vector<absl::string_view> ret;
 
     ret.reserve(factories().size());
 
     for (const auto& factory : factories()) {
-      ret.push_back(factory.first);
+      if (factory.second || include_disabled) {
+        ret.push_back(factory.first);
+      }
     }
 
     std::sort(ret.begin(), ret.end());
@@ -132,11 +173,80 @@ public:
     return *factories;
   }
 
-  static void registerFactory(Base& factory, absl::string_view name) {
+  /**
+   * Gets the current map of vendor specific factory versions.
+   */
+  static absl::flat_hash_map<std::string, envoy::config::core::v3::BuildVersion>&
+  versioned_factories() {
+    using VersionedFactoryMap =
+        absl::flat_hash_map<std::string, envoy::config::core::v3::BuildVersion>;
+    MUTABLE_CONSTRUCT_ON_FIRST_USE(VersionedFactoryMap);
+  }
+
+  static absl::flat_hash_map<std::string, std::string>& deprecatedFactoryNames() {
+    static auto* deprecated_factory_names = new absl::flat_hash_map<std::string, std::string>;
+    return *deprecated_factory_names;
+  }
+
+  /**
+   * instead_value are used when passed name was deprecated.
+   */
+  static void registerFactory(Base& factory, absl::string_view name,
+                              absl::string_view instead_value = "") {
     auto result = factories().emplace(std::make_pair(name, &factory));
     if (!result.second) {
       throw EnvoyException(fmt::format("Double registration for name: '{}'", factory.name()));
     }
+
+    if (!instead_value.empty()) {
+      deprecatedFactoryNames().emplace(std::make_pair(name, instead_value));
+    }
+  }
+
+  /**
+   * version is used for registering vendor specific factories that are versioned
+   * independently of Envoy.
+   */
+  static void registerFactory(Base& factory, absl::string_view name,
+                              const envoy::config::core::v3::BuildVersion& version,
+                              absl::string_view instead_value = "") {
+    auto result = factories().emplace(std::make_pair(name, &factory));
+    if (!result.second) {
+      throw EnvoyException(fmt::format("Double registration for name: '{}'", factory.name()));
+    }
+    versioned_factories().emplace(std::make_pair(name, version));
+    if (!instead_value.empty()) {
+      deprecatedFactoryNames().emplace(std::make_pair(name, instead_value));
+    }
+  }
+
+  /**
+   * Permanently disables the named factory by setting the corresponding
+   * factory pointer to null. If the factory is registered under multiple
+   * (deprecated) names, all the possible names are disabled.
+   */
+  static bool disableFactory(absl::string_view name) {
+    const auto disable = [](absl::string_view name) -> bool {
+      auto it = factories().find(name);
+      if (it != factories().end()) {
+        it->second = nullptr;
+        return true;
+      }
+      return false;
+    };
+
+    // First, find the canonical name for this factory.
+    absl::string_view canonicalName = canonicalFactoryName(name);
+
+    // Next, disable the factory by all its deprecated names.
+    for (const auto& entry : deprecatedFactoryNames()) {
+      if (entry.second == canonicalName) {
+        disable(entry.first);
+      }
+    }
+
+    // Finally, disable the factory by its canonical name.
+    return disable(canonicalName);
   }
 
   /**
@@ -146,6 +256,46 @@ public:
     auto it = factories().find(name);
     if (it == factories().end()) {
       return nullptr;
+    }
+
+    checkDeprecated(name);
+    return it->second;
+  }
+
+  /**
+   * @return the canonical name of the factory. If the given name is a
+   * deprecated factory name, the canonical name is returned instead.
+   */
+  static absl::string_view canonicalFactoryName(absl::string_view name) {
+    const auto it = deprecatedFactoryNames().find(name);
+    return (it == deprecatedFactoryNames().end()) ? name : it->second;
+  }
+
+  static void checkDeprecated(absl::string_view name) {
+    auto it = deprecatedFactoryNames().find(name);
+    const bool status = it != deprecatedFactoryNames().end();
+    if (status) {
+      ENVOY_LOG(warn, "{} is deprecated, use {} instead.", it->first, it->second);
+    }
+  }
+
+  /**
+   * @return true if the named factory was disabled.
+   */
+  static bool isFactoryDisabled(absl::string_view name) {
+    auto it = factories().find(name);
+    ASSERT(it != factories().end());
+    return it->second == nullptr;
+  }
+
+  /**
+   * @return vendor specific version of a factory.
+   */
+  static absl::optional<envoy::config::core::v3::BuildVersion>
+  getFactoryVersion(absl::string_view name) {
+    auto it = versioned_factories().find(name);
+    if (it == versioned_factories().end()) {
+      return absl::nullopt;
     }
     return it->second;
   }
@@ -169,6 +319,7 @@ private:
 
     factories().emplace(factory.name(), &factory);
     RELEASE_ASSERT(getFactory(factory.name()) == &factory, "");
+
     return displaced;
   }
 
@@ -209,8 +360,9 @@ public:
     // register its category here. This means that we have to ignore
     // multiple attempts to register the same category and can't detect
     // duplicate categories.
-    if (!FactoryCategoryRegistry::isRegistered(Base::category())) {
-      FactoryCategoryRegistry::registerCategory(Base::category(), new FactoryCategoryNames<Base>());
+    if (!FactoryCategoryRegistry::isRegistered(instance_.category())) {
+      FactoryCategoryRegistry::registerCategory(instance_.category(),
+                                                new FactoryRegistryProxyImpl<Base>());
     }
   }
 
@@ -227,15 +379,60 @@ public:
 
     for (auto deprecated_name : deprecated_names) {
       ASSERT(!deprecated_name.empty());
-      FactoryRegistry<Base>::registerFactory(instance_, deprecated_name);
+      FactoryRegistry<Base>::registerFactory(instance_, deprecated_name, instance_.name());
     }
 
-    if (!FactoryCategoryRegistry::isRegistered(Base::category())) {
-      FactoryCategoryRegistry::registerCategory(Base::category(), new FactoryCategoryNames<Base>());
+    if (!FactoryCategoryRegistry::isRegistered(instance_.category())) {
+      FactoryCategoryRegistry::registerCategory(instance_.category(),
+                                                new FactoryRegistryProxyImpl<Base>());
+    }
+  }
+
+  /**
+   * Constructor that registers an instance of the factory with the FactoryRegistry along with
+   * vendor specific version.
+   */
+  RegisterFactory(uint32_t major, uint32_t minor, uint32_t patch,
+                  const std::map<std::string, std::string>& version_metadata)
+      : RegisterFactory(major, minor, patch, version_metadata, {}) {}
+
+  /**
+   * Constructor that registers an instance of the factory with the FactoryRegistry along with
+   * vendor specific version and deprecated names.
+   */
+  RegisterFactory(uint32_t major, uint32_t minor, uint32_t patch,
+                  const std::map<std::string, std::string>& version_metadata,
+                  std::initializer_list<absl::string_view> deprecated_names) {
+    auto version = makeBuildVersion(major, minor, patch, version_metadata);
+    if (instance_.name().empty()) {
+      ASSERT(deprecated_names.size() != 0);
+    } else {
+      FactoryRegistry<Base>::registerFactory(instance_, instance_.name(), version);
+    }
+
+    for (auto deprecated_name : deprecated_names) {
+      ASSERT(!deprecated_name.empty());
+      FactoryRegistry<Base>::registerFactory(instance_, deprecated_name, version, instance_.name());
+    }
+
+    if (!FactoryCategoryRegistry::isRegistered(instance_.category())) {
+      FactoryCategoryRegistry::registerCategory(instance_.category(),
+                                                new FactoryRegistryProxyImpl<Base>());
     }
   }
 
 private:
+  static envoy::config::core::v3::BuildVersion
+  makeBuildVersion(uint32_t major, uint32_t minor, uint32_t patch,
+                   const std::map<std::string, std::string>& metadata) {
+    envoy::config::core::v3::BuildVersion version;
+    version.mutable_version()->set_major_number(major);
+    version.mutable_version()->set_minor_number(minor);
+    version.mutable_version()->set_patch(patch);
+    *version.mutable_metadata() = MessageUtil::keyValueStruct(metadata);
+    return version;
+  }
+
   T instance_{};
 };
 
@@ -266,6 +463,8 @@ private:
   static Envoy::Registry::RegisterFactory</* NOLINT(fuchsia-statically-constructed-objects) */     \
                                           FACTORY, BASE>                                           \
       FACTORY##_registered
+
+#define FACTORY_VERSION(major, minor, patch, ...) major, minor, patch, __VA_ARGS__
 
 /**
  * Macro used for static registration declaration.

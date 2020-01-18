@@ -10,11 +10,14 @@
 #include "envoy/buffer/buffer.h"
 #include "envoy/common/time.h"
 #include "envoy/event/dispatcher.h"
+#include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 #include "envoy/network/drain_decision.h"
 #include "envoy/router/router.h"
 #include "envoy/ssl/connection.h"
 #include "envoy/stats/scope.h"
+#include "envoy/stream_info/filter_state.h"
 #include "envoy/tracing/http_tracer.h"
+#include "envoy/type/v3/percent.pb.h"
 
 #include "common/buffer/buffer_impl.h"
 #include "common/common/assert.h"
@@ -39,6 +42,7 @@
 
 #include "absl/strings/escaping.h"
 #include "absl/strings/match.h"
+#include "absl/strings/str_cat.h"
 
 namespace Envoy {
 namespace Http {
@@ -282,21 +286,33 @@ void ConnectionManagerImpl::handleCodecException(const char* error) {
   read_callbacks_->connection().close(Network::ConnectionCloseType::FlushWriteAndDelay);
 }
 
+void ConnectionManagerImpl::createCodec(Buffer::Instance& data) {
+  ASSERT(!codec_);
+  codec_ = config_.createCodec(read_callbacks_->connection(), data, *this);
+
+  switch (codec_->protocol()) {
+  case Protocol::Http3:
+    stats_.named_.downstream_cx_http3_total_.inc();
+    stats_.named_.downstream_cx_http3_active_.inc();
+    break;
+  case Protocol::Http2:
+    stats_.named_.downstream_cx_http2_total_.inc();
+    stats_.named_.downstream_cx_http2_active_.inc();
+    break;
+  case Protocol::Http11:
+  case Protocol::Http10:
+    stats_.named_.downstream_cx_http1_total_.inc();
+    stats_.named_.downstream_cx_http1_active_.inc();
+    break;
+  }
+}
+
 Network::FilterStatus ConnectionManagerImpl::onData(Buffer::Instance& data, bool) {
   if (!codec_) {
     // Http3 codec should have been instantiated by now.
-    codec_ = config_.createCodec(read_callbacks_->connection(), data, *this);
-    if (codec_->protocol() == Protocol::Http2) {
-      stats_.named_.downstream_cx_http2_total_.inc();
-      stats_.named_.downstream_cx_http2_active_.inc();
-    } else {
-      ASSERT(codec_->protocol() != Protocol::Http3);
-      stats_.named_.downstream_cx_http1_total_.inc();
-      stats_.named_.downstream_cx_http1_active_.inc();
-    }
+    createCodec(data);
   }
 
-  // TODO(alyssawilk) clean this up after #8352 is well vetted.
   bool redispatch;
   do {
     redispatch = false;
@@ -309,7 +325,7 @@ Network::FilterStatus ConnectionManagerImpl::onData(Buffer::Instance& data, bool
       // level logging in the HCM, similar to what we have in tcp_proxy. This will allow abuse
       // indicators to be stored in the connection level stream info, and then matched, sampled,
       // etc. when logged.
-      const envoy::type::FractionalPercent default_value; // 0
+      const envoy::type::v3::FractionalPercent default_value; // 0
       if (runtime_.snapshot().featureEnabled("http.connection_manager.log_flood_exception",
                                              default_value)) {
         ENVOY_CONN_LOG(warn, "downstream HTTP flood from IP '{}': {}",
@@ -354,10 +370,8 @@ Network::FilterStatus ConnectionManagerImpl::onNewConnection() {
   }
   // Only QUIC connection's stream_info_ specifies protocol.
   Buffer::OwnedImpl dummy;
-  codec_ = config_.createCodec(read_callbacks_->connection(), dummy, *this);
+  createCodec(dummy);
   ASSERT(codec_->protocol() == Protocol::Http3);
-  stats_.named_.downstream_cx_http3_total_.inc();
-  stats_.named_.downstream_cx_http3_active_.inc();
   // Stop iterating through each filters for QUIC. Currently a QUIC connection
   // only supports one filter, HCM, and bypasses the onData() interface. Because
   // QUICHE already handles de-multiplexing.
@@ -380,6 +394,10 @@ void ConnectionManagerImpl::resetAllStreams(
     stream.onResetStream(StreamResetReason::ConnectionTermination, absl::string_view());
     if (response_flag.has_value()) {
       stream.stream_info_.setResponseFlag(response_flag.value());
+      if (*response_flag == StreamInfo::ResponseFlag::DownstreamProtocolError) {
+        stream.stream_info_.setResponseCodeDetails(
+            stream.response_encoder_->getStream().responseDetails());
+      }
     }
   }
 }
@@ -477,8 +495,15 @@ void ConnectionManagerImpl::chargeTracingStats(const Tracing::Reason& tracing_re
     break;
   default:
     throw std::invalid_argument(
-        fmt::format("invalid tracing reason, value: {}", static_cast<int32_t>(tracing_reason)));
+        absl::StrCat("invalid tracing reason, value: ", static_cast<int32_t>(tracing_reason)));
   }
+}
+
+void ConnectionManagerImpl::RdsRouteConfigUpdateRequester::requestRouteConfigUpdate(
+    const std::string host_header, Event::Dispatcher& thread_local_dispatcher,
+    Http::RouteConfigUpdatedCallbackSharedPtr route_config_updated_cb) {
+  route_config_provider_->requestVirtualHostsUpdate(host_header, thread_local_dispatcher,
+                                                    std::move(route_config_updated_cb));
 }
 
 ConnectionManagerImpl::ActiveStream::ActiveStream(ConnectionManagerImpl& connection_manager)
@@ -486,7 +511,8 @@ ConnectionManagerImpl::ActiveStream::ActiveStream(ConnectionManagerImpl& connect
       stream_id_(connection_manager.random_generator_.random()),
       request_response_timespan_(new Stats::HistogramCompletableTimespanImpl(
           connection_manager_.stats_.named_.downstream_rq_time_, connection_manager_.timeSource())),
-      stream_info_(connection_manager_.codec_->protocol(), connection_manager_.timeSource()),
+      stream_info_(connection_manager_.codec_->protocol(), connection_manager_.timeSource(),
+                   connection_manager.filterState()),
       upstream_options_(std::make_shared<Network::Socket::Options>()) {
   ASSERT(!connection_manager.config_.isRoutable() ||
              ((connection_manager.config_.routeConfigProvider() == nullptr &&
@@ -495,7 +521,16 @@ ConnectionManagerImpl::ActiveStream::ActiveStream(ConnectionManagerImpl& connect
                connection_manager.config_.scopedRouteConfigProvider() == nullptr)),
          "Either routeConfigProvider or scopedRouteConfigProvider should be set in "
          "ConnectionManagerImpl.");
-
+  if (connection_manager_.config_.isRoutable() &&
+      connection_manager.config_.routeConfigProvider() != nullptr) {
+    route_config_update_requester_ =
+        std::make_unique<ConnectionManagerImpl::RdsRouteConfigUpdateRequester>(
+            connection_manager.config_.routeConfigProvider());
+  } else if (connection_manager_.config_.isRoutable() &&
+             connection_manager.config_.scopedRouteConfigProvider() != nullptr) {
+    route_config_update_requester_ =
+        std::make_unique<ConnectionManagerImpl::NullRouteConfigUpdateRequester>();
+  }
   ScopeTrackerScopeState scope(this,
                                connection_manager_.read_callbacks_->connection().dispatcher());
 
@@ -549,18 +584,6 @@ ConnectionManagerImpl::ActiveStream::~ActiveStream() {
   }
 
   connection_manager_.stats_.named_.downstream_rq_active_.dec();
-  // Refresh byte sizes of the HeaderMaps before logging.
-  // TODO(asraa): Remove this when entries in HeaderMap can no longer be modified by reference and
-  // HeaderMap holds an accurate internal byte size count.
-  if (request_headers_ != nullptr) {
-    request_headers_->refreshByteSize();
-  }
-  if (response_headers_ != nullptr) {
-    response_headers_->refreshByteSize();
-  }
-  if (response_trailers_ != nullptr) {
-    response_trailers_->refreshByteSize();
-  }
   for (const AccessLog::InstanceSharedPtr& access_log : connection_manager_.config_.accessLogs()) {
     access_log->log(request_headers_.get(), response_headers_.get(), response_trailers_.get(),
                     stream_info_);
@@ -778,6 +801,9 @@ void ConnectionManagerImpl::ActiveStream::decodeHeaders(HeaderMapPtr&& headers, 
       return;
     }
   }
+
+  // Verify header sanity checks which should have been performed by the codec.
+  ASSERT(HeaderUtility::requestHeadersValid(*request_headers_).has_value() == false);
 
   // Currently we only support relative paths at the application layer. We expect the codec to have
   // broken the path into pieces if applicable. NOTE: Currently the HTTP/1.1 codec only does this
@@ -1338,6 +1364,50 @@ void ConnectionManagerImpl::ActiveStream::refreshCachedRoute() {
         connection_manager_.cluster_manager_.get(stream_info_.route_entry_->clusterName());
     cached_cluster_info_ = (nullptr == local_cluster) ? nullptr : local_cluster->info();
   }
+
+  refreshCachedTracingCustomTags();
+}
+
+void ConnectionManagerImpl::ActiveStream::refreshCachedTracingCustomTags() {
+  if (!connection_manager_.config_.tracingConfig()) {
+    return;
+  }
+  const Tracing::CustomTagMap& conn_manager_tags =
+      connection_manager_.config_.tracingConfig()->custom_tags_;
+  const Tracing::CustomTagMap* route_tags = nullptr;
+  if (hasCachedRoute() && cached_route_.value()->tracingConfig()) {
+    route_tags = &cached_route_.value()->tracingConfig()->getCustomTags();
+  }
+  const bool configured_in_conn = !conn_manager_tags.empty();
+  const bool configured_in_route = route_tags && !route_tags->empty();
+  if (!configured_in_conn && !configured_in_route) {
+    return;
+  }
+  Tracing::CustomTagMap& custom_tag_map = getOrMakeTracingCustomTagMap();
+  if (configured_in_route) {
+    custom_tag_map.insert(route_tags->begin(), route_tags->end());
+  }
+  if (configured_in_conn) {
+    custom_tag_map.insert(conn_manager_tags.begin(), conn_manager_tags.end());
+  }
+}
+
+void ConnectionManagerImpl::ActiveStream::requestRouteConfigUpdate(
+    Event::Dispatcher& thread_local_dispatcher,
+    Http::RouteConfigUpdatedCallbackSharedPtr route_config_updated_cb) {
+  ASSERT(!request_headers_->Host()->value().empty());
+  const auto& host_header =
+      absl::AsciiStrToLower(request_headers_->Host()->value().getStringView());
+  route_config_update_requester_->requestRouteConfigUpdate(host_header, thread_local_dispatcher,
+                                                           std::move(route_config_updated_cb));
+}
+
+absl::optional<Router::ConfigConstSharedPtr> ConnectionManagerImpl::ActiveStream::routeConfig() {
+  if (connection_manager_.config_.routeConfigProvider() == nullptr) {
+    return {};
+  }
+  return absl::optional<Router::ConfigConstSharedPtr>(
+      connection_manager_.config_.routeConfigProvider()->config());
 }
 
 void ConnectionManagerImpl::ActiveStream::sendLocalReply(
@@ -1800,9 +1870,8 @@ Tracing::OperationName ConnectionManagerImpl::ActiveStream::operationName() cons
   return connection_manager_.config_.tracingConfig()->operation_name_;
 }
 
-const std::vector<Http::LowerCaseString>&
-ConnectionManagerImpl::ActiveStream::requestHeadersForTags() const {
-  return connection_manager_.config_.tracingConfig()->request_headers_for_tags_;
+const Tracing::CustomTagMap* ConnectionManagerImpl::ActiveStream::customTags() const {
+  return tracing_custom_tags_.get();
 }
 
 bool ConnectionManagerImpl::ActiveStream::verbose() const {
@@ -2075,6 +2144,9 @@ Router::RouteConstSharedPtr ConnectionManagerImpl::ActiveStreamFilterBase::route
 void ConnectionManagerImpl::ActiveStreamFilterBase::clearRouteCache() {
   parent_.cached_route_ = absl::optional<Router::RouteConstSharedPtr>();
   parent_.cached_cluster_info_ = absl::optional<Upstream::ClusterInfoConstSharedPtr>();
+  if (parent_.tracing_custom_tags_) {
+    parent_.tracing_custom_tags_->clear();
+  }
 }
 
 Buffer::WatermarkBufferPtr ConnectionManagerImpl::ActiveStreamDecoderFilter::createBuffer() {
@@ -2214,13 +2286,35 @@ bool ConnectionManagerImpl::ActiveStreamDecoderFilter::recreateStream() {
   HeaderMapPtr request_headers(std::move(parent_.request_headers_));
   StreamEncoder* response_encoder = parent_.response_encoder_;
   parent_.response_encoder_ = nullptr;
+  response_encoder->getStream().removeCallbacks(parent_);
   // This functionally deletes the stream (via deferred delete) so do not
   // reference anything beyond this point.
   parent_.connection_manager_.doEndStream(this->parent_);
 
   StreamDecoder& new_stream = parent_.connection_manager_.newStream(*response_encoder, true);
+  // We don't need to copy over the old parent FilterState from the old StreamInfo if it did not
+  // store any objects with a LifeSpan at or above DownstreamRequest. This is to avoid unnecessary
+  // heap allocation.
+  if (parent_.stream_info_.filter_state_->hasDataAtOrAboveLifeSpan(
+          StreamInfo::FilterState::LifeSpan::DownstreamRequest)) {
+    (*parent_.connection_manager_.streams_.begin())->stream_info_.filter_state_ =
+        std::make_shared<StreamInfo::FilterStateImpl>(
+            parent_.stream_info_.filter_state_->parent(),
+            StreamInfo::FilterState::LifeSpan::FilterChain);
+  }
+
   new_stream.decodeHeaders(std::move(request_headers), true);
   return true;
+}
+
+void ConnectionManagerImpl::ActiveStreamDecoderFilter::requestRouteConfigUpdate(
+    Http::RouteConfigUpdatedCallbackSharedPtr route_config_updated_cb) {
+  parent_.requestRouteConfigUpdate(dispatcher(), std::move(route_config_updated_cb));
+}
+
+absl::optional<Router::ConfigConstSharedPtr>
+ConnectionManagerImpl::ActiveStreamDecoderFilter::routeConfig() {
+  return parent_.routeConfig();
 }
 
 Buffer::WatermarkBufferPtr ConnectionManagerImpl::ActiveStreamEncoderFilter::createBuffer() {
@@ -2325,7 +2419,9 @@ void ConnectionManagerImpl::ActiveStreamFilterBase::resetStream() {
   parent_.connection_manager_.doEndStream(this->parent_);
 }
 
-uint64_t ConnectionManagerImpl::ActiveStreamFilterBase::streamId() { return parent_.stream_id_; }
+uint64_t ConnectionManagerImpl::ActiveStreamFilterBase::streamId() const {
+  return parent_.stream_id_;
+}
 
 } // namespace Http
 } // namespace Envoy

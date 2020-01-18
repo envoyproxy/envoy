@@ -1,5 +1,6 @@
 #include "server/overload_manager_impl.h"
 
+#include "envoy/config/overload/v3/overload.pb.h"
 #include "envoy/stats/scope.h"
 
 #include "common/common/fmt.h"
@@ -18,7 +19,7 @@ namespace {
 
 class ThresholdTriggerImpl : public OverloadAction::Trigger {
 public:
-  ThresholdTriggerImpl(const envoy::config::overload::v2alpha::ThresholdTrigger& config)
+  ThresholdTriggerImpl(const envoy::config::overload::v3::ThresholdTrigger& config)
       : threshold_(config.value()) {}
 
   bool updateValue(double value) override {
@@ -49,7 +50,7 @@ Stats::Gauge& makeGauge(Stats::Scope& scope, absl::string_view a, absl::string_v
 
 } // namespace
 
-OverloadAction::OverloadAction(const envoy::config::overload::v2alpha::OverloadAction& config,
+OverloadAction::OverloadAction(const envoy::config::overload::v3::OverloadAction& config,
                                Stats::Scope& stats_scope)
     : active_gauge_(
           makeGauge(stats_scope, config.name(), "active", Stats::Gauge::ImportMode::Accumulate)) {
@@ -57,7 +58,7 @@ OverloadAction::OverloadAction(const envoy::config::overload::v2alpha::OverloadA
     TriggerPtr trigger;
 
     switch (trigger_config.trigger_oneof_case()) {
-    case envoy::config::overload::v2alpha::Trigger::kThreshold:
+    case envoy::config::overload::v3::Trigger::TriggerOneofCase::kThreshold:
       trigger = std::make_unique<ThresholdTriggerImpl>(trigger_config.threshold());
       break;
     default:
@@ -66,7 +67,7 @@ OverloadAction::OverloadAction(const envoy::config::overload::v2alpha::OverloadA
 
     if (!triggers_.insert(std::make_pair(trigger_config.name(), std::move(trigger))).second) {
       throw EnvoyException(
-          fmt::format("Duplicate trigger resource for overload action {}", config.name()));
+          absl::StrCat("Duplicate trigger resource for overload action ", config.name()));
     }
   }
 
@@ -95,11 +96,11 @@ bool OverloadAction::updateResourcePressure(const std::string& name, double pres
 
 bool OverloadAction::isActive() const { return !fired_triggers_.empty(); }
 
-OverloadManagerImpl::OverloadManagerImpl(
-    Event::Dispatcher& dispatcher, Stats::Scope& stats_scope,
-    ThreadLocal::SlotAllocator& slot_allocator,
-    const envoy::config::overload::v2alpha::OverloadManager& config,
-    ProtobufMessage::ValidationVisitor& validation_visitor, Api::Api& api)
+OverloadManagerImpl::OverloadManagerImpl(Event::Dispatcher& dispatcher, Stats::Scope& stats_scope,
+                                         ThreadLocal::SlotAllocator& slot_allocator,
+                                         const envoy::config::overload::v3::OverloadManager& config,
+                                         ProtobufMessage::ValidationVisitor& validation_visitor,
+                                         Api::Api& api)
     : started_(false), dispatcher_(dispatcher), tls_(slot_allocator.allocateSlot()),
       refresh_interval_(
           std::chrono::milliseconds(PROTOBUF_GET_MS_OR_DEFAULT(config, refresh_interval, 1000))) {
@@ -108,7 +109,7 @@ OverloadManagerImpl::OverloadManagerImpl(
     const auto& name = resource.name();
     ENVOY_LOG(debug, "Adding resource monitor for {}", name);
     auto& factory =
-        Config::Utility::getAndCheckFactory<Configuration::ResourceMonitorFactory>(name);
+        Config::Utility::getAndCheckFactory<Configuration::ResourceMonitorFactory>(resource);
     auto config = Config::Utility::translateToFactoryConfig(resource, validation_visitor, factory);
     auto monitor = factory.createResourceMonitor(*config, context);
 
@@ -116,7 +117,7 @@ OverloadManagerImpl::OverloadManagerImpl(
         resources_.emplace(std::piecewise_construct, std::forward_as_tuple(name),
                            std::forward_as_tuple(name, std::move(monitor), *this, stats_scope));
     if (!result.second) {
-      throw EnvoyException(fmt::format("Duplicate resource monitor {}", name));
+      throw EnvoyException(absl::StrCat("Duplicate resource monitor ", name));
     }
   }
 
@@ -126,7 +127,7 @@ OverloadManagerImpl::OverloadManagerImpl(
     auto result = actions_.emplace(std::piecewise_construct, std::forward_as_tuple(name),
                                    std::forward_as_tuple(action, stats_scope));
     if (!result.second) {
-      throw EnvoyException(fmt::format("Duplicate overload action {}", name));
+      throw EnvoyException(absl::StrCat("Duplicate overload action ", name));
     }
 
     for (const auto& trigger : action.triggers()) {

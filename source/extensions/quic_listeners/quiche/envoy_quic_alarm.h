@@ -20,7 +20,8 @@ public:
   EnvoyQuicAlarm(Event::Dispatcher& dispatcher, const quic::QuicClock& clock,
                  quic::QuicArenaScopedPtr<quic::QuicAlarm::Delegate> delegate);
 
-  ~EnvoyQuicAlarm() override { ASSERT(!IsSet()); };
+  // TimerImpl destruction deletes in-flight alarm firing event.
+  ~EnvoyQuicAlarm() override {}
 
   // quic::QuicAlarm
   void CancelImpl() override;

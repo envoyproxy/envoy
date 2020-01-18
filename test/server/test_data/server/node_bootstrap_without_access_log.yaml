@@ -1,0 +1,12 @@
+node:
+  id: bootstrap_id
+  cluster: bootstrap_cluster
+  locality:
+    zone: bootstrap_zone
+    sub_zone: bootstrap_sub_zone
+admin:
+  address:
+    socket_address:
+      address: {{ ntop_ip_loopback_address }}
+      port_value: 0
+

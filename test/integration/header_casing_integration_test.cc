@@ -1,6 +1,5 @@
-#include <chrono>
-
-#include "envoy/config/bootstrap/v2/bootstrap.pb.h"
+#include "envoy/config/bootstrap/v3/bootstrap.pb.h"
+#include "envoy/extensions/filters/network/http_connection_manager/v3/http_connection_manager.pb.h"
 
 #include "common/buffer/buffer_impl.h"
 
@@ -22,12 +21,15 @@ public:
   }
 
   void initialize() override {
-    config_helper_.addConfigModifier([](envoy::config::filter::network::http_connection_manager::
-                                            v2::HttpConnectionManager& hcm) {
-      hcm.mutable_http_protocol_options()->mutable_header_key_format()->mutable_proper_case_words();
-    });
+    config_helper_.addConfigModifier(
+        [](envoy::extensions::filters::network::http_connection_manager::v3::HttpConnectionManager&
+               hcm) {
+          hcm.mutable_http_protocol_options()
+              ->mutable_header_key_format()
+              ->mutable_proper_case_words();
+        });
 
-    config_helper_.addConfigModifier([](envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
+    config_helper_.addConfigModifier([](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       bootstrap.mutable_static_resources()
           ->mutable_clusters(0)
           ->mutable_http_protocol_options()
@@ -51,8 +53,7 @@ TEST_P(HeaderCasingIntegrationTest, VerifyCasedHeaders) {
   tcp_client->write(request, false);
 
   Envoy::FakeRawConnectionPtr upstream_connection;
-  ASSERT_TRUE(
-      fake_upstreams_[0]->waitForRawConnection(upstream_connection, std::chrono::milliseconds(10)));
+  ASSERT_TRUE(fake_upstreams_[0]->waitForRawConnection(upstream_connection));
 
   // Verify that the upstream request has proper cased headers.
   std::string upstream_request;

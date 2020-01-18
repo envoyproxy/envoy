@@ -1,3 +1,5 @@
+#include "envoy/config/core/v3/base.pb.h"
+
 #include "common/network/address_impl.h"
 #include "common/network/socket_option_factory.h"
 #include "common/network/socket_option_impl.h"
@@ -67,7 +69,7 @@ TEST_F(SocketOptionFactoryTest, TestBuildSocketMarkOptions) {
       }));
 
   EXPECT_TRUE(Network::Socket::applyOptions(options, socket_mock_,
-                                            envoy::api::v2::core::SocketOption::STATE_PREBIND));
+                                            envoy::config::core::v3::SocketOption::STATE_PREBIND));
 }
 
 TEST_F(SocketOptionFactoryTest, TestBuildIpv4TransparentOptions) {
@@ -92,9 +94,9 @@ TEST_F(SocketOptionFactoryTest, TestBuildIpv4TransparentOptions) {
       }));
 
   EXPECT_TRUE(Network::Socket::applyOptions(options, socket_mock_,
-                                            envoy::api::v2::core::SocketOption::STATE_PREBIND));
+                                            envoy::config::core::v3::SocketOption::STATE_PREBIND));
   EXPECT_TRUE(Network::Socket::applyOptions(options, socket_mock_,
-                                            envoy::api::v2::core::SocketOption::STATE_BOUND));
+                                            envoy::config::core::v3::SocketOption::STATE_BOUND));
 }
 
 TEST_F(SocketOptionFactoryTest, TestBuildIpv6TransparentOptions) {
@@ -119,15 +121,15 @@ TEST_F(SocketOptionFactoryTest, TestBuildIpv6TransparentOptions) {
       }));
 
   EXPECT_TRUE(Network::Socket::applyOptions(options, socket_mock_,
-                                            envoy::api::v2::core::SocketOption::STATE_PREBIND));
+                                            envoy::config::core::v3::SocketOption::STATE_PREBIND));
   EXPECT_TRUE(Network::Socket::applyOptions(options, socket_mock_,
-                                            envoy::api::v2::core::SocketOption::STATE_BOUND));
+                                            envoy::config::core::v3::SocketOption::STATE_BOUND));
 }
 
 TEST_F(SocketOptionFactoryTest, TestBuildLiteralOptions) {
-  Protobuf::RepeatedPtrField<envoy::api::v2::core::SocketOption> socket_options_proto;
+  Protobuf::RepeatedPtrField<envoy::config::core::v3::SocketOption> socket_options_proto;
   Envoy::Protobuf::TextFormat::Parser parser;
-  envoy::api::v2::core::SocketOption socket_option_proto;
+  envoy::config::core::v3::SocketOption socket_option_proto;
   static const char linger_option_format[] = R"proto(
     state: STATE_PREBIND
     level: %d
@@ -150,7 +152,7 @@ TEST_F(SocketOptionFactoryTest, TestBuildLiteralOptions) {
   auto socket_options = SocketOptionFactory::buildLiteralOptions(socket_options_proto);
   EXPECT_EQ(2, socket_options->size());
   auto option_details = socket_options->at(0)->getOptionDetails(
-      socket_mock_, envoy::api::v2::core::SocketOption::STATE_PREBIND);
+      socket_mock_, envoy::config::core::v3::SocketOption::STATE_PREBIND);
   EXPECT_TRUE(option_details.has_value());
   EXPECT_EQ(SOL_SOCKET, option_details->name_.level());
   EXPECT_EQ(SO_LINGER, option_details->name_.option());
@@ -162,7 +164,7 @@ TEST_F(SocketOptionFactoryTest, TestBuildLiteralOptions) {
   EXPECT_EQ(linger_bstr, option_details->value_);
 
   option_details = socket_options->at(1)->getOptionDetails(
-      socket_mock_, envoy::api::v2::core::SocketOption::STATE_PREBIND);
+      socket_mock_, envoy::config::core::v3::SocketOption::STATE_PREBIND);
   EXPECT_TRUE(option_details.has_value());
   EXPECT_EQ(SOL_SOCKET, option_details->name_.level());
   EXPECT_EQ(SO_KEEPALIVE, option_details->name_.option());

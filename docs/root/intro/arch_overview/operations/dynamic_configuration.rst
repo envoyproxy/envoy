@@ -70,6 +70,13 @@ This API, when used alongside EDS and CDS, allows implementors to build a comple
 (:ref:`traffic shifting <config_http_conn_man_route_table_traffic_splitting>`, blue/green
 deployment, etc).
 
+VHDS
+----
+The :ref:`Virtual Host Discovery Service <config_http_conn_man_vhds>` allows the virtual hosts belonging
+to a route configuration to be requested as needed separately from the route configuration itself. This
+API is typically used in deployments in which there are a large number of virtual hosts in a route
+configuration.
+
 SRDS
 ----
 

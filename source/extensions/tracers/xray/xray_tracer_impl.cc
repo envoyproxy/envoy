@@ -12,8 +12,9 @@ namespace Extensions {
 namespace Tracers {
 namespace XRay {
 
-constexpr static char DefaultDaemonEndpoint[] = "127.0.0.1:2000";
-static XRayHeader parseXRayHeader(const Http::LowerCaseString& header) {
+namespace {
+constexpr auto DefaultDaemonEndpoint = "127.0.0.1:2000";
+XRayHeader parseXRayHeader(const Http::LowerCaseString& header) {
   const auto& lowered_header = header.get();
   XRayHeader result;
   for (const auto& token : StringUtil::splitToken(lowered_header, ";")) {
@@ -34,6 +35,7 @@ static XRayHeader parseXRayHeader(const Http::LowerCaseString& header) {
   }
   return result;
 }
+} // namespace
 
 Driver::Driver(const XRayConfiguration& config, Server::Instance& server)
     : xray_config_(config), tls_slot_ptr_(server.threadLocal().allocateSlot()) {
@@ -45,11 +47,13 @@ Driver::Driver(const XRayConfiguration& config, Server::Instance& server)
   sampling_strategy_ = std::make_unique<XRay::LocalizedSamplingStrategy>(
       xray_config_.sampling_rules_, server.random(), server.timeSource());
 
-  tls_slot_ptr_->set([this,
+  tls_slot_ptr_->set([this, daemon_endpoint,
                       &server](Event::Dispatcher&) -> ThreadLocal::ThreadLocalObjectSharedPtr {
     std::string span_name = xray_config_.segment_name_.empty() ? server.localInfo().clusterName()
                                                                : xray_config_.segment_name_;
-    TracerPtr tracer = std::make_unique<Tracer>(span_name, server.timeSource());
+
+    DaemonBrokerPtr broker = std::make_unique<DaemonBrokerImpl>(daemon_endpoint);
+    TracerPtr tracer = std::make_unique<Tracer>(span_name, std::move(broker), server.timeSource());
     return std::make_shared<XRay::Driver::TlsTracer>(std::move(tracer), *this);
   });
 }
@@ -59,7 +63,7 @@ Tracing::SpanPtr Driver::startSpan(const Tracing::Config& config, Http::HeaderMa
                                    const Tracing::Decision tracing_decision) {
   // First thing is to determine whether this request will be sampled or not.
   // if there's a X-Ray header and it has a sampling decision already determined (i.e. Sample=1)
-  // then we can skip, otherwise, we ask the sampling strategy whether this request should be
+  // then we can move on; otherwise, we ask the sampling strategy whether this request should be
   // sampled or not.
   //
   // The second step is create a Span.
@@ -67,7 +71,6 @@ Tracing::SpanPtr Driver::startSpan(const Tracing::Config& config, Http::HeaderMa
   // around if no TraceID (which means no x-ray header) then this is a brand new span.
 
   UNREFERENCED_PARAMETER(config);
-  UNREFERENCED_PARAMETER(start_time);
   // TODO(marcomagdy) - how do we factor this into the logic above
   UNREFERENCED_PARAMETER(tracing_decision);
   const auto* header = request_headers.get(Http::LowerCaseString(XRayTraceHeader));
@@ -97,12 +100,17 @@ Tracing::SpanPtr Driver::startSpan(const Tracing::Config& config, Http::HeaderMa
     should_trace = sampling_strategy_->shouldTrace(request);
   }
 
+  auto* tracer = tls_slot_ptr_->getTyped<Driver::TlsTracer>().tracer_.get();
   if (should_trace.value()) {
-    auto tracer = tls_slot_ptr_->getTyped<Driver::TlsTracer>().tracer_.get();
     return tracer->startSpan(xray_config_.segment_name_, operation_name, start_time,
                              header ? absl::optional<XRayHeader>(xray_header) : absl::nullopt);
   }
-  return nullptr;
+
+  // instead of returning nullptr, we return a Span that is marked as not-sampled.
+  // This is important to communicate that information to upstream services (see injectContext()).
+  // Otherwise, the upstream service can decide to sample the request regardless and we end up with
+  // more samples than we asked for.
+  return tracer->createNonSampledSpan();
 }
 
 } // namespace XRay

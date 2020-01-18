@@ -1,6 +1,8 @@
 #include <chrono>
 #include <thread>
 
+#include "envoy/extensions/filters/http/jwt_authn/v3/config.pb.h"
+
 #include "common/protobuf/utility.h"
 #include "common/stats/isolated_store_impl.h"
 
@@ -10,7 +12,7 @@
 #include "test/test_common/simulated_time_system.h"
 #include "test/test_common/utility.h"
 
-using ::envoy::config::filter::http::jwt_authn::v2alpha::JwtAuthentication;
+using envoy::extensions::filters::http::jwt_authn::v3::JwtAuthentication;
 using ::google::jwt_verify::Status;
 
 namespace Envoy {

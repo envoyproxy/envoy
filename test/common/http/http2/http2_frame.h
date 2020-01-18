@@ -69,7 +69,7 @@ public:
   enum class ResponseStatus { Unknown, Ok, NotFound };
 
   // Methods for creating HTTP2 frames
-  static Http2Frame makePingFrame(absl::string_view data = nullptr);
+  static Http2Frame makePingFrame(absl::string_view data = {});
   static Http2Frame makeEmptySettingsFrame(SettingsFlags flags = SettingsFlags::None);
   static Http2Frame makeEmptyHeadersFrame(uint32_t stream_index,
                                           HeadersFlags flags = HeadersFlags::None);

@@ -5,6 +5,7 @@
 #include <utility>
 
 #include "envoy/config/subscription.h"
+#include "envoy/service/discovery/v3/discovery.pb.h"
 
 #include "common/common/assert.h"
 #include "common/common/logger.h"
@@ -76,12 +77,17 @@ public:
   // updateWatchInterest().
   void removeWatch(Watch* watch);
 
+  // checks is a watch for an alias exists and replaces it with the resource's name
+  AddedRemoved
+  convertAliasWatchesToNameWatches(const envoy::service::discovery::v3::Resource& resource);
+
   // SubscriptionCallbacks
   void onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
                       const std::string& version_info) override;
-  void onConfigUpdate(const Protobuf::RepeatedPtrField<envoy::api::v2::Resource>& added_resources,
-                      const Protobuf::RepeatedPtrField<std::string>& removed_resources,
-                      const std::string& system_version_info) override;
+  void onConfigUpdate(
+      const Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource>& added_resources,
+      const Protobuf::RepeatedPtrField<std::string>& removed_resources,
+      const std::string& system_version_info) override;
 
   void onConfigUpdateFailed(ConfigUpdateFailureReason reason, const EnvoyException* e) override;
 

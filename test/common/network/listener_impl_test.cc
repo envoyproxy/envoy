@@ -1,3 +1,5 @@
+#include "envoy/config/core/v3/base.pb.h"
+
 #include "common/network/address_impl.h"
 #include "common/network/listener_impl.h"
 #include "common/network/utility.h"
@@ -80,7 +82,7 @@ TEST_P(ListenerImplTest, SetListeningSocketOptionsSuccess) {
       Network::Test::getCanonicalLoopbackAddress(version_), nullptr, true);
   std::shared_ptr<MockSocketOption> option = std::make_shared<MockSocketOption>();
   socket->addOption(option);
-  EXPECT_CALL(*option, setOption(_, envoy::api::v2::core::SocketOption::STATE_LISTENING))
+  EXPECT_CALL(*option, setOption(_, envoy::config::core::v3::SocketOption::STATE_LISTENING))
       .WillOnce(Return(true));
   TestListenerImpl listener(dispatcherImpl(), socket, listener_callbacks, true);
 }
@@ -94,7 +96,7 @@ TEST_P(ListenerImplTest, SetListeningSocketOptionsError) {
       Network::Test::getCanonicalLoopbackAddress(version_), nullptr, true);
   std::shared_ptr<MockSocketOption> option = std::make_shared<MockSocketOption>();
   socket->addOption(option);
-  EXPECT_CALL(*option, setOption(_, envoy::api::v2::core::SocketOption::STATE_LISTENING))
+  EXPECT_CALL(*option, setOption(_, envoy::config::core::v3::SocketOption::STATE_LISTENING))
       .WillOnce(Return(false));
   EXPECT_THROW_WITH_MESSAGE(TestListenerImpl(dispatcherImpl(), socket, listener_callbacks, true),
                             CreateListenerException,
@@ -171,7 +173,7 @@ TEST_P(ListenerImplTest, WildcardListenerUseActualDst) {
 TEST_P(ListenerImplTest, WildcardListenerIpv4Compat) {
   auto option = std::make_unique<MockSocketOption>();
   auto options = std::make_shared<std::vector<Network::Socket::OptionConstSharedPtr>>();
-  EXPECT_CALL(*option, setOption(_, envoy::api::v2::core::SocketOption::STATE_PREBIND))
+  EXPECT_CALL(*option, setOption(_, envoy::config::core::v3::SocketOption::STATE_PREBIND))
       .WillOnce(Return(true));
   options->emplace_back(std::move(option));
 
@@ -219,6 +221,7 @@ TEST_P(ListenerImplTest, DisableAndEnableListener) {
   auto socket =
       std::make_shared<TcpListenSocket>(Network::Test::getAnyAddress(version_), nullptr, true);
   MockListenerCallbacks listener_callbacks;
+  MockConnectionCallbacks connection_callbacks;
   TestListenerImpl listener(dispatcherImpl(), socket, listener_callbacks, true);
 
   // When listener is disabled, the timer should fire before any connection is accepted.
@@ -227,15 +230,15 @@ TEST_P(ListenerImplTest, DisableAndEnableListener) {
   ClientConnectionPtr client_connection =
       dispatcher_->createClientConnection(socket->localAddress(), Address::InstanceConstSharedPtr(),
                                           Network::Test::createRawBufferSocket(), nullptr);
+  client_connection->addConnectionCallbacks(connection_callbacks);
   client_connection->connect();
-  Event::TimerPtr timer = dispatcher_->createTimer([&] {
-    client_connection->close(ConnectionCloseType::NoFlush);
-    dispatcher_->exit();
-  });
-  timer->enableTimer(std::chrono::milliseconds(2000));
 
   EXPECT_CALL(listener_callbacks, onAccept_(_)).Times(0);
-  time_system_.sleep(std::chrono::milliseconds(2000));
+  EXPECT_CALL(connection_callbacks, onEvent(_))
+      .WillOnce(Invoke([&](Network::ConnectionEvent event) -> void {
+        EXPECT_EQ(event, Network::ConnectionEvent::Connected);
+        dispatcher_->exit();
+      }));
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 
   // When the listener is re-enabled, the pending connection should be accepted.
@@ -246,8 +249,12 @@ TEST_P(ListenerImplTest, DisableAndEnableListener) {
           [](int fd) -> Address::InstanceConstSharedPtr { return Address::addressFromFd(fd); }));
   EXPECT_CALL(listener_callbacks, onAccept_(_)).WillOnce(Invoke([&](ConnectionSocketPtr&) -> void {
     client_connection->close(ConnectionCloseType::NoFlush);
-    dispatcher_->exit();
   }));
+  EXPECT_CALL(connection_callbacks, onEvent(_))
+      .WillOnce(Invoke([&](Network::ConnectionEvent event) -> void {
+        EXPECT_NE(event, Network::ConnectionEvent::Connected);
+        dispatcher_->exit();
+      }));
 
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 }

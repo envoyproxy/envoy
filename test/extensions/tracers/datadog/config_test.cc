@@ -1,3 +1,6 @@
+#include "envoy/config/trace/v3/trace.pb.h"
+#include "envoy/config/trace/v3/trace.pb.validate.h"
+
 #include "extensions/tracers/datadog/config.h"
 
 #include "test/mocks/server/mocks.h"
@@ -29,7 +32,7 @@ TEST(DatadogTracerConfigTest, DatadogHttpTracer) {
       collector_cluster: fake_cluster
       service_name: fake_file
    )EOF";
-  envoy::config::trace::v2::Tracing configuration;
+  envoy::config::trace::v3::Tracing configuration;
   TestUtility::loadFromYaml(yaml_string, configuration);
 
   DatadogTracerFactory factory;

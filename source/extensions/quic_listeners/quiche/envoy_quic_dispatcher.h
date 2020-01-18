@@ -27,13 +27,6 @@ public:
   ~EnvoyQuicCryptoServerStreamHelper() override = default;
 
   // quic::QuicCryptoServerStream::Helper
-  quic::QuicConnectionId
-  GenerateConnectionIdForReject(quic::QuicTransportVersion /*version*/,
-                                quic::QuicConnectionId /*connection_id*/) const override {
-    // TODO(danzh): create reject connection id based on given connection_id.
-    return quic::QuicUtils::CreateRandomConnectionId();
-  }
-
   bool CanAcceptClientHello(const quic::CryptoHandshakeMessage& /*message*/,
                             const quic::QuicSocketAddress& /*client_address*/,
                             const quic::QuicSocketAddress& /*peer_address*/,
@@ -62,11 +55,18 @@ public:
                           const std::string& error_details,
                           quic::ConnectionCloseSource source) override;
 
+  quic::QuicConnectionId
+  GenerateNewServerConnectionId(quic::ParsedQuicVersion /*version*/,
+                                quic::QuicConnectionId /*connection_id*/) const override {
+    // TODO(danzh): create reject connection id based on given connection_id.
+    return quic::QuicUtils::CreateRandomConnectionId();
+  }
+
 protected:
-  quic::QuicSession* CreateQuicSession(quic::QuicConnectionId server_connection_id,
-                                       const quic::QuicSocketAddress& peer_address,
-                                       quic::QuicStringPiece alpn,
-                                       const quic::ParsedQuicVersion& version) override;
+  std::unique_ptr<quic::QuicSession>
+  CreateQuicSession(quic::QuicConnectionId server_connection_id,
+                    const quic::QuicSocketAddress& peer_address, quiche::QuicheStringPiece alpn,
+                    const quic::ParsedQuicVersion& version) override;
 
 private:
   Network::ConnectionHandler& connection_handler_;

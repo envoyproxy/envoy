@@ -44,7 +44,7 @@ authentication <arch_overview_ssl_auth_filter>`, etc.
 architectures that Envoy :ref:`supports <arch_overview_http_filters>` an additional HTTP L7 filter
 layer. HTTP filters can be plugged into the HTTP connection management subsystem that perform
 different tasks such as :ref:`buffering <config_http_filters_buffer>`, :ref:`rate limiting
-<arch_overview_rate_limit>`, :ref:`routing/forwarding <arch_overview_http_routing>`, sniffing
+<arch_overview_global_rate_limit>`, :ref:`routing/forwarding <arch_overview_http_routing>`, sniffing
 Amazon's :ref:`DynamoDB <arch_overview_dynamo>`, etc.
 
 **First class HTTP/2 support:** When operating in HTTP mode, Envoy :ref:`supports
@@ -96,7 +96,7 @@ components in a distributed system is a complex problem. Because Envoy is a self
 instead of a library, it is able to implement advanced load balancing techniques in a single place
 and have them be accessible to any application. Currently Envoy includes support for :ref:`automatic
 retries <arch_overview_http_routing_retry>`, :ref:`circuit breaking <arch_overview_circuit_break>`,
-:ref:`global rate limiting <arch_overview_rate_limit>` via an external rate limiting service,
+:ref:`global rate limiting <arch_overview_global_rate_limit>` via an external rate limiting service,
 :ref:`request shadowing <envoy_api_msg_route.RouteAction.RequestMirrorPolicy>`, and
 :ref:`outlier detection <arch_overview_outlier_detection>`. Future support is planned for request
 racing.

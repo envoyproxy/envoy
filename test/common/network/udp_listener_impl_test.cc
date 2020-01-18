@@ -2,6 +2,8 @@
 #include <string>
 #include <vector>
 
+#include "envoy/config/core/v3/base.pb.h"
+
 #include "common/network/address_impl.h"
 #include "common/network/socket_option_factory.h"
 #include "common/network/socket_option_impl.h"
@@ -17,6 +19,7 @@
 #include "test/test_common/threadsafe_singleton_injector.h"
 #include "test/test_common/utility.h"
 
+#include "absl/time/time.h"
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
@@ -106,7 +109,7 @@ TEST_P(UdpListenerImplTest, UdpSetListeningSocketOptionsSuccess) {
                                                            nullptr, true);
   std::shared_ptr<MockSocketOption> option = std::make_shared<MockSocketOption>();
   socket->addOption(option);
-  EXPECT_CALL(*option, setOption(_, envoy::api::v2::core::SocketOption::STATE_BOUND))
+  EXPECT_CALL(*option, setOption(_, envoy::config::core::v3::SocketOption::STATE_BOUND))
       .WillOnce(Return(true));
   UdpListenerImpl listener(dispatcherImpl(), socket, listener_callbacks,
                            dispatcherImpl().timeSource());
@@ -146,7 +149,8 @@ TEST_P(UdpListenerImplTest, UseActualDstUdp) {
                                             *send_to_addr_);
   ASSERT_EQ(send_rc.rc_, second.length());
 
-  EXPECT_CALL(listener_callbacks_, onData_(_))
+  EXPECT_CALL(listener_callbacks_, onReadReady());
+  EXPECT_CALL(listener_callbacks_, onData(_))
       .WillOnce(Invoke([&](const UdpRecvData& data) -> void {
         validateRecvCallbackParams(data);
 
@@ -160,7 +164,7 @@ TEST_P(UdpListenerImplTest, UseActualDstUdp) {
         dispatcher_->exit();
       }));
 
-  EXPECT_CALL(listener_callbacks_, onWriteReady_(_))
+  EXPECT_CALL(listener_callbacks_, onWriteReady(_))
       .WillRepeatedly(Invoke([&](const Socket& socket) {
         EXPECT_EQ(socket.ioHandle().fd(), server_socket_->ioHandle().fd());
       }));
@@ -196,7 +200,8 @@ TEST_P(UdpListenerImplTest, UdpEcho) {
 
   std::vector<std::string> server_received_data;
 
-  EXPECT_CALL(listener_callbacks_, onData_(_))
+  EXPECT_CALL(listener_callbacks_, onReadReady());
+  EXPECT_CALL(listener_callbacks_, onData(_))
       .WillOnce(Invoke([&](const UdpRecvData& data) -> void {
         validateRecvCallbackParams(data);
 
@@ -216,7 +221,7 @@ TEST_P(UdpListenerImplTest, UdpEcho) {
         server_received_data.push_back(data_str);
       }));
 
-  EXPECT_CALL(listener_callbacks_, onWriteReady_(_)).WillOnce(Invoke([&](const Socket& socket) {
+  EXPECT_CALL(listener_callbacks_, onWriteReady(_)).WillOnce(Invoke([&](const Socket& socket) {
     EXPECT_EQ(socket.ioHandle().fd(), server_socket_->ioHandle().fd());
     ASSERT_NE(test_peer_address, nullptr);
 
@@ -283,15 +288,17 @@ TEST_P(UdpListenerImplTest, UdpListenerEnableDisable) {
                                             *send_to_addr_);
   ASSERT_EQ(send_rc.rc_, second.length());
 
-  EXPECT_CALL(listener_callbacks_, onData_(_)).Times(0);
+  EXPECT_CALL(listener_callbacks_, onReadReady()).Times(0);
+  EXPECT_CALL(listener_callbacks_, onData(_)).Times(0);
 
-  EXPECT_CALL(listener_callbacks_, onWriteReady_(_)).Times(0);
+  EXPECT_CALL(listener_callbacks_, onWriteReady(_)).Times(0);
 
   dispatcher_->run(Event::Dispatcher::RunType::Block);
 
   listener_->enable();
 
-  EXPECT_CALL(listener_callbacks_, onData_(_))
+  EXPECT_CALL(listener_callbacks_, onReadReady());
+  EXPECT_CALL(listener_callbacks_, onData(_))
       .Times(2)
       .WillOnce(Return())
       .WillOnce(Invoke([&](const UdpRecvData& data) -> void {
@@ -302,7 +309,7 @@ TEST_P(UdpListenerImplTest, UdpListenerEnableDisable) {
         dispatcher_->exit();
       }));
 
-  EXPECT_CALL(listener_callbacks_, onWriteReady_(_))
+  EXPECT_CALL(listener_callbacks_, onWriteReady(_))
       .WillRepeatedly(Invoke([&](const Socket& socket) {
         EXPECT_EQ(socket.ioHandle().fd(), server_socket_->ioHandle().fd());
       }));
@@ -329,19 +336,15 @@ TEST_P(UdpListenerImplTest, UdpListenerRecvMsgError) {
                                                  nullptr, *send_to_addr_);
   ASSERT_EQ(send_rc.rc_, first.length());
 
-  EXPECT_CALL(listener_callbacks_, onData_(_)).Times(0);
+  EXPECT_CALL(listener_callbacks_, onData(_)).Times(0);
 
-  EXPECT_CALL(listener_callbacks_, onWriteReady_(_))
-      .Times(1)
-      .WillRepeatedly(Invoke([&](const Socket& socket) {
-        EXPECT_EQ(socket.ioHandle().fd(), server_socket_->ioHandle().fd());
-      }));
+  EXPECT_CALL(listener_callbacks_, onWriteReady(_)).WillOnce(Invoke([&](const Socket& socket) {
+    EXPECT_EQ(socket.ioHandle().fd(), server_socket_->ioHandle().fd());
+  }));
 
-  EXPECT_CALL(listener_callbacks_, onReceiveError_(_, _))
-      .Times(1)
-      .WillOnce(Invoke([&](const UdpListenerCallbacks::ErrorCode& err_code,
-                           Api::IoError::IoErrorCode err) -> void {
-        ASSERT_EQ(UdpListenerCallbacks::ErrorCode::SyscallError, err_code);
+  EXPECT_CALL(listener_callbacks_, onReadReady());
+  EXPECT_CALL(listener_callbacks_, onReceiveError(_))
+      .WillOnce(Invoke([&](Api::IoError::IoErrorCode err) -> void {
         ASSERT_EQ(Api::IoError::IoErrorCode::NoSupport, err);
 
         dispatcher_->exit();
@@ -411,18 +414,17 @@ TEST_P(UdpListenerImplTest, SendData) {
         client_socket_->ioHandle(), *client_socket_->localAddress(), data);
 
     bytes_read = result.rc_;
-    EXPECT_EQ(send_from_addr->asString(), data.addresses_.peer_->asString());
-
     if (bytes_read >= bytes_to_read || retry == 10 ||
         result.err_->getErrorCode() != Api::IoError::IoErrorCode::Again) {
       break;
     }
 
     retry++;
-    ::usleep(10000);
+    absl::SleepFor(absl::Milliseconds(10));
     ASSERT(bytes_read == 0);
   } while (true);
   EXPECT_EQ(bytes_to_read, bytes_read);
+  EXPECT_EQ(send_from_addr->asString(), data.addresses_.peer_->asString());
   EXPECT_EQ(data.buffer_->toString(), payload);
 }
 

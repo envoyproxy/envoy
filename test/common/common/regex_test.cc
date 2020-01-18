@@ -1,4 +1,5 @@
 #include "envoy/common/exception.h"
+#include "envoy/type/matcher/v3/regex.pb.h"
 
 #include "common/common/regex.h"
 
@@ -28,7 +29,7 @@ TEST(Utility, ParseStdRegex) {
 
 TEST(Utility, ParseRegex) {
   {
-    envoy::type::matcher::RegexMatcher matcher;
+    envoy::type::matcher::v3::RegexMatcher matcher;
     matcher.mutable_google_re2();
     matcher.set_regex("(+invalid)");
     EXPECT_THROW_WITH_MESSAGE(Utility::parseRegex(matcher), EnvoyException,
@@ -37,7 +38,7 @@ TEST(Utility, ParseRegex) {
 
   // Regression test for https://github.com/envoyproxy/envoy/issues/7728
   {
-    envoy::type::matcher::RegexMatcher matcher;
+    envoy::type::matcher::v3::RegexMatcher matcher;
     matcher.mutable_google_re2();
     matcher.set_regex("/asdf/.*");
     const auto compiled_matcher = Utility::parseRegex(matcher);
@@ -47,12 +48,16 @@ TEST(Utility, ParseRegex) {
 
   // Verify max program size.
   {
-    envoy::type::matcher::RegexMatcher matcher;
+    envoy::type::matcher::v3::RegexMatcher matcher;
     matcher.mutable_google_re2()->mutable_max_program_size()->set_value(1);
     matcher.set_regex("/asdf/.*");
-    EXPECT_THROW_WITH_MESSAGE(Utility::parseRegex(matcher), EnvoyException,
-                              "regex '/asdf/.*' RE2 program size of 24 > max program size of 1. "
-                              "Increase configured max program size if necessary.");
+#ifndef GTEST_USES_SIMPLE_RE
+    EXPECT_THROW_WITH_REGEX(Utility::parseRegex(matcher), EnvoyException,
+                            "RE2 program size of [0-9]+ > max program size of 1\\.");
+#else
+    EXPECT_THROW_WITH_REGEX(Utility::parseRegex(matcher), EnvoyException,
+                            "RE2 program size of \\d+ > max program size of 1\\.");
+#endif
   }
 }
 

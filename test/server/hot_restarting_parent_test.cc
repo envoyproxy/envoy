@@ -94,6 +94,20 @@ TEST_F(HotRestartingParentTest, exportStatsToChild) {
     EXPECT_EQ(124, stats.gauges().at("g1"));
     EXPECT_EQ(455, stats.gauges().at("g2"));
   }
+
+  // When a counter and gauge are not used, they should not be included in the message.
+  {
+    store.counter("unused_counter");
+    store.counter("used_counter").inc();
+    store.gauge("unused_gauge", Stats::Gauge::ImportMode::Accumulate);
+    store.gauge("used_gauge", Stats::Gauge::ImportMode::Accumulate).add(1);
+    HotRestartMessage::Reply::Stats stats;
+    hot_restarting_parent_.exportStatsToChild(&stats);
+    EXPECT_EQ(stats.counter_deltas().end(), stats.counter_deltas().find("unused_counter"));
+    EXPECT_EQ(1, stats.counter_deltas().at("used_counter"));
+    EXPECT_EQ(stats.gauges().end(), stats.counter_deltas().find("unused_gauge"));
+    EXPECT_EQ(1, stats.gauges().at("used_gauge"));
+  }
 }
 
 TEST_F(HotRestartingParentTest, drainListeners) {

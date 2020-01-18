@@ -6,6 +6,7 @@
 #include <vector>
 
 #include "envoy/event/timer.h"
+#include "envoy/extensions/filters/http/fault/v3/fault.pb.h"
 #include "envoy/http/codes.h"
 #include "envoy/http/header_map.h"
 #include "envoy/stats/scope.h"
@@ -32,7 +33,7 @@ struct RcDetailsValues {
 };
 using RcDetails = ConstSingleton<RcDetailsValues>;
 
-FaultSettings::FaultSettings(const envoy::config::filter::http::fault::v2::HTTPFault& fault)
+FaultSettings::FaultSettings(const envoy::extensions::filters::http::fault::v3::HTTPFault& fault)
     : fault_filter_headers_(Http::HeaderUtility::buildHeaderDataVector(fault.headers())),
       delay_percent_runtime_(PROTOBUF_GET_STRING_OR_DEFAULT(fault, delay_percent_runtime,
                                                             RuntimeKeys::get().DelayPercentKey)),
@@ -74,9 +75,9 @@ FaultSettings::FaultSettings(const envoy::config::filter::http::fault::v2::HTTPF
   }
 }
 
-FaultFilterConfig::FaultFilterConfig(const envoy::config::filter::http::fault::v2::HTTPFault& fault,
-                                     Runtime::Loader& runtime, const std::string& stats_prefix,
-                                     Stats::Scope& scope, TimeSource& time_source)
+FaultFilterConfig::FaultFilterConfig(
+    const envoy::extensions::filters::http::fault::v3::HTTPFault& fault, Runtime::Loader& runtime,
+    const std::string& stats_prefix, Stats::Scope& scope, TimeSource& time_source)
     : settings_(fault), runtime_(runtime), stats_(generateStats(stats_prefix, scope)),
       scope_(scope), time_source_(time_source),
       stat_name_set_(scope.symbolTable().makeSet("Fault")),
@@ -222,23 +223,21 @@ bool FaultFilter::isDelayEnabled() {
     return false;
   }
 
-  bool enabled = config_->runtime().snapshot().featureEnabled(
-      fault_settings_->delayPercentRuntime(), fault_settings_->requestDelay()->percentage());
   if (!downstream_cluster_delay_percent_key_.empty()) {
-    enabled |= config_->runtime().snapshot().featureEnabled(
+    return config_->runtime().snapshot().featureEnabled(
         downstream_cluster_delay_percent_key_, fault_settings_->requestDelay()->percentage());
   }
-  return enabled;
+  return config_->runtime().snapshot().featureEnabled(
+      fault_settings_->delayPercentRuntime(), fault_settings_->requestDelay()->percentage());
 }
 
 bool FaultFilter::isAbortEnabled() {
-  bool enabled = config_->runtime().snapshot().featureEnabled(
-      fault_settings_->abortPercentRuntime(), fault_settings_->abortPercentage());
   if (!downstream_cluster_abort_percent_key_.empty()) {
-    enabled |= config_->runtime().snapshot().featureEnabled(downstream_cluster_abort_percent_key_,
-                                                            fault_settings_->abortPercentage());
+    return config_->runtime().snapshot().featureEnabled(downstream_cluster_abort_percent_key_,
+                                                        fault_settings_->abortPercentage());
   }
-  return enabled;
+  return config_->runtime().snapshot().featureEnabled(fault_settings_->abortPercentRuntime(),
+                                                      fault_settings_->abortPercentage());
 }
 
 absl::optional<std::chrono::milliseconds>

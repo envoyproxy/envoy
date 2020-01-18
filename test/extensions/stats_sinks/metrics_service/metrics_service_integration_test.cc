@@ -1,5 +1,6 @@
-#include "envoy/config/metrics/v2/metrics_service.pb.h"
-#include "envoy/service/metrics/v2/metrics_service.pb.h"
+#include "envoy/config/bootstrap/v3/bootstrap.pb.h"
+#include "envoy/config/metrics/v3/metrics_service.pb.h"
+#include "envoy/service/metrics/v3/metrics_service.pb.h"
 
 #include "common/common/version.h"
 #include "common/grpc/codec.h"
@@ -31,7 +32,7 @@ public:
   }
 
   void initialize() override {
-    config_helper_.addConfigModifier([this](envoy::config::bootstrap::v2::Bootstrap& bootstrap) {
+    config_helper_.addConfigModifier([this](envoy::config::bootstrap::v3::Bootstrap& bootstrap) {
       // metrics_service cluster for Envoy gRPC.
       auto* metrics_service_cluster = bootstrap.mutable_static_resources()->add_clusters();
       metrics_service_cluster->MergeFrom(bootstrap.static_resources().clusters()[0]);
@@ -40,7 +41,7 @@ public:
       // metrics_service gRPC service definition.
       auto* metrics_sink = bootstrap.add_stats_sinks();
       metrics_sink->set_name("envoy.metrics_service");
-      envoy::config::metrics::v2::MetricsServiceConfig config;
+      envoy::config::metrics::v3::MetricsServiceConfig config;
       setGrpcService(*config.mutable_grpc_service(), "metrics_service",
                      fake_upstreams_.back()->localAddress());
       metrics_sink->mutable_typed_config()->PackFrom(config);
@@ -76,7 +77,7 @@ public:
     // TODO(ramaraochavali): Figure out a more robust way to find out all required stats have been
     // flushed.
     while (!(known_counter_exists && known_gauge_exists && known_histogram_exists)) {
-      envoy::service::metrics::v2::StreamMetricsMessage request_msg;
+      envoy::service::metrics::v3::StreamMetricsMessage request_msg;
       VERIFY_ASSERTION(metrics_service_request_->waitForGrpcMessage(*dispatcher_, request_msg));
       EXPECT_EQ("POST", metrics_service_request_->headers().Method()->value().getStringView());
       EXPECT_EQ("/envoy.service.metrics.v2.MetricsService/StreamMetrics",
@@ -161,7 +162,7 @@ TEST_P(MetricsServiceIntegrationTest, BasicFlow) {
   // Send an empty response and end the stream. This should never happen but make sure nothing
   // breaks and we make a new stream on a follow up request.
   metrics_service_request_->startGrpcStream();
-  envoy::service::metrics::v2::StreamMetricsResponse response_msg;
+  envoy::service::metrics::v3::StreamMetricsResponse response_msg;
   metrics_service_request_->sendGrpcMessage(response_msg);
   metrics_service_request_->finishGrpcStream(Grpc::Status::Ok);
 

@@ -1,3 +1,5 @@
+#include "envoy/config/tap/v3/common.pb.h"
+
 #include "extensions/common/tap/admin.h"
 
 #include "test/mocks/server/mocks.h"
@@ -19,7 +21,7 @@ public:
   MOCK_METHOD0(adminId, const absl::string_view());
   MOCK_METHOD0(clearTapConfig, void());
   MOCK_METHOD2(newTapConfig,
-               void(envoy::service::tap::v2alpha::TapConfig&& proto_config, Sink* admin_streamer));
+               void(envoy::config::tap::v3::TapConfig&& proto_config, Sink* admin_streamer));
 };
 
 class AdminHandlerTest : public testing::Test {

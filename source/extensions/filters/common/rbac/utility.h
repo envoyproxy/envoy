@@ -1,7 +1,5 @@
 #pragma once
 
-#include "envoy/config/filter/http/rbac/v2/rbac.pb.h"
-#include "envoy/config/filter/network/rbac/v2/rbac.pb.h"
 #include "envoy/stats/stats_macros.h"
 
 #include "common/singleton/const_singleton.h"
@@ -27,13 +25,11 @@ using DynamicMetadataKeysSingleton = ConstSingleton<DynamicMetadataKeys>;
 /**
  * All stats for the RBAC filter. @see stats_macros.h
  */
-// clang-format off
 #define ALL_RBAC_FILTER_STATS(COUNTER)                                                             \
   COUNTER(allowed)                                                                                 \
   COUNTER(denied)                                                                                  \
   COUNTER(shadow_allowed)                                                                          \
   COUNTER(shadow_denied)
-// clang-format on
 
 /**
  * Wrapper struct for RBAC filter stats. @see stats_macros.h

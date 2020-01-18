@@ -1,8 +1,10 @@
+#include <array>
 #include <cstdint>
 #include <string>
 
-#include "envoy/api/v2/core/protocol.pb.h"
-#include "envoy/api/v2/core/protocol.pb.validate.h"
+#include "envoy/config/core/v3/http_uri.pb.h"
+#include "envoy/config/core/v3/protocol.pb.h"
+#include "envoy/config/core/v3/protocol.pb.validate.h"
 
 #include "common/common/fmt.h"
 #include "common/http/exception.h"
@@ -247,7 +249,7 @@ TEST(HttpUtility, createSslRedirectPath) {
 namespace {
 
 Http2Settings parseHttp2SettingsFromV2Yaml(const std::string& yaml) {
-  envoy::api::v2::core::Http2ProtocolOptions http2_protocol_options;
+  envoy::config::core::v3::Http2ProtocolOptions http2_protocol_options;
   TestUtility::loadFromYamlAndValidate(yaml, http2_protocol_options);
   return Utility::parseHttp2Settings(http2_protocol_options);
 }
@@ -578,7 +580,7 @@ TEST(HttpUtility, TestExtractHostPathFromUri) {
 }
 
 TEST(HttpUtility, TestPrepareHeaders) {
-  envoy::api::v2::core::HttpUri http_uri;
+  envoy::config::core::v3::HttpUri http_uri;
   http_uri.set_uri("scheme://dns.name/x/y/z");
 
   Http::MessagePtr message = Utility::prepareHeaders(http_uri);
@@ -752,6 +754,37 @@ TEST(HttpUtility, GetMergedPerFilterConfig) {
   // make sure that the callback was called (which means that the dynamic_cast worked.)
   ASSERT_TRUE(merged_cfg.has_value());
   EXPECT_EQ(2, merged_cfg.value().state_);
+}
+
+TEST(HttpUtility, CheckIsIpAddress) {
+  std::array<std::tuple<bool, std::string, std::string, absl::optional<uint32_t>>, 15> patterns{
+      std::make_tuple(true, "1.2.3.4", "1.2.3.4", absl::nullopt),
+      std::make_tuple(true, "1.2.3.4:0", "1.2.3.4", 0),
+      std::make_tuple(true, "0.0.0.0:4000", "0.0.0.0", 4000),
+      std::make_tuple(true, "127.0.0.1:0", "127.0.0.1", 0),
+      std::make_tuple(true, "[::]:0", "::", 0),
+      std::make_tuple(true, "[::]", "::", absl::nullopt),
+      std::make_tuple(true, "[1::2:3]:0", "1::2:3", 0),
+      std::make_tuple(true, "[a::1]:0", "a::1", 0),
+      std::make_tuple(true, "[a:b:c:d::]:0", "a:b:c:d::", 0),
+      std::make_tuple(false, "example.com", "example.com", absl::nullopt),
+      std::make_tuple(false, "example.com:8000", "example.com", 8000),
+      std::make_tuple(false, "example.com:abc", "example.com:abc", absl::nullopt),
+      std::make_tuple(false, "localhost:10000", "localhost", 10000),
+      std::make_tuple(false, "localhost", "localhost", absl::nullopt)};
+
+  for (const auto& pattern : patterns) {
+    bool status_pattern = std::get<0>(pattern);
+    const auto& try_host = std::get<1>(pattern);
+    const auto& expect_host = std::get<2>(pattern);
+    const auto& expect_port = std::get<3>(pattern);
+
+    const auto host_attributes = Utility::parseAuthority(try_host);
+
+    EXPECT_EQ(status_pattern, host_attributes.is_ip_address_);
+    EXPECT_EQ(expect_host, host_attributes.host_);
+    EXPECT_EQ(expect_port, host_attributes.port_);
+  }
 }
 
 // Validates TE header is stripped if it contains an unsupported value

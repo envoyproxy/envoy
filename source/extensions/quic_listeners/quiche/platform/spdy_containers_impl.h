@@ -6,7 +6,6 @@
 // consumed or referenced directly by other Envoy code. It serves purely as a
 // porting layer for QUICHE.
 
-#include "extensions/quic_listeners/quiche/platform/spdy_string_impl.h"
 #include "extensions/quic_listeners/quiche/platform/spdy_string_piece_impl.h"
 
 #include "absl/container/flat_hash_map.h"

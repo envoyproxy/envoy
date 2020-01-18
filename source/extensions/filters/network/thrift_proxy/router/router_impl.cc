@@ -2,7 +2,7 @@
 
 #include <memory>
 
-#include "envoy/config/filter/network/thrift_proxy/v2alpha1/thrift_proxy.pb.h"
+#include "envoy/extensions/filters/network/thrift_proxy/v3/route.pb.h"
 #include "envoy/upstream/cluster_manager.h"
 #include "envoy/upstream/thread_local_cluster.h"
 
@@ -21,7 +21,7 @@ namespace ThriftProxy {
 namespace Router {
 
 RouteEntryImplBase::RouteEntryImplBase(
-    const envoy::config::filter::network::thrift_proxy::v2alpha1::Route& route)
+    const envoy::extensions::filters::network::thrift_proxy::v3::Route& route)
     : cluster_name_(route.route().cluster()),
       config_headers_(Http::HeaderUtility::buildHeaderDataVector(route.match().headers())),
       rate_limit_policy_(route.route().rate_limits()),
@@ -37,7 +37,8 @@ RouteEntryImplBase::RouteEntryImplBase(
   }
 
   if (route.route().cluster_specifier_case() ==
-      envoy::config::filter::network::thrift_proxy::v2alpha1::RouteAction::kWeightedClusters) {
+      envoy::extensions::filters::network::thrift_proxy::v3::RouteAction::ClusterSpecifierCase::
+          kWeightedClusters) {
 
     total_cluster_weight_ = 0UL;
     for (const auto& cluster : route.route().weighted_clusters().clusters()) {
@@ -79,7 +80,7 @@ bool RouteEntryImplBase::headersMatch(const Http::HeaderMap& headers) const {
 
 RouteEntryImplBase::WeightedClusterEntry::WeightedClusterEntry(
     const RouteEntryImplBase& parent,
-    const envoy::config::filter::network::thrift_proxy::v2alpha1::WeightedCluster_ClusterWeight&
+    const envoy::extensions::filters::network::thrift_proxy::v3::WeightedCluster::ClusterWeight&
         cluster)
     : parent_(parent), cluster_name_(cluster.name()),
       cluster_weight_(PROTOBUF_GET_WRAPPED_REQUIRED(cluster, weight)) {
@@ -99,7 +100,7 @@ RouteEntryImplBase::WeightedClusterEntry::WeightedClusterEntry(
 }
 
 MethodNameRouteEntryImpl::MethodNameRouteEntryImpl(
-    const envoy::config::filter::network::thrift_proxy::v2alpha1::Route& route)
+    const envoy::extensions::filters::network::thrift_proxy::v3::Route& route)
     : RouteEntryImplBase(route), method_name_(route.match().method_name()),
       invert_(route.match().invert()) {
   if (method_name_.empty() && invert_) {
@@ -122,7 +123,7 @@ RouteConstSharedPtr MethodNameRouteEntryImpl::matches(const MessageMetadata& met
 }
 
 ServiceNameRouteEntryImpl::ServiceNameRouteEntryImpl(
-    const envoy::config::filter::network::thrift_proxy::v2alpha1::Route& route)
+    const envoy::extensions::filters::network::thrift_proxy::v3::Route& route)
     : RouteEntryImplBase(route), invert_(route.match().invert()) {
   const std::string service_name = route.match().service_name();
   if (service_name.empty() && invert_) {
@@ -152,8 +153,8 @@ RouteConstSharedPtr ServiceNameRouteEntryImpl::matches(const MessageMetadata& me
 }
 
 RouteMatcher::RouteMatcher(
-    const envoy::config::filter::network::thrift_proxy::v2alpha1::RouteConfiguration& config) {
-  using envoy::config::filter::network::thrift_proxy::v2alpha1::RouteMatch;
+    const envoy::extensions::filters::network::thrift_proxy::v3::RouteConfiguration& config) {
+  using envoy::extensions::filters::network::thrift_proxy::v3::RouteMatch;
 
   for (const auto& route : config.routes()) {
     switch (route.match().match_specifier_case()) {
@@ -184,8 +185,8 @@ RouteConstSharedPtr RouteMatcher::route(const MessageMetadata& metadata,
 void Router::onDestroy() {
   if (upstream_request_ != nullptr) {
     upstream_request_->resetStream();
+    cleanup();
   }
-  cleanup();
 }
 
 void Router::setDecoderFilterCallbacks(ThriftFilters::DecoderFilterCallbacks& callbacks) {
@@ -209,13 +210,10 @@ FilterStatus Router::transportEnd() {
 }
 
 FilterStatus Router::messageBegin(MessageMetadataSharedPtr metadata) {
-  // TODO(zuercher): route stats (e.g., no_route, no_cluster, upstream_rq_maintenance_mode, no
-  // healthy upstream)
-
   route_ = callbacks_->route();
   if (!route_) {
-    ENVOY_STREAM_LOG(debug, "no cluster match for method '{}'", *callbacks_,
-                     metadata->methodName());
+    ENVOY_STREAM_LOG(debug, "no route match for method '{}'", *callbacks_, metadata->methodName());
+    stats_.route_missing_.inc();
     callbacks_->sendLocalReply(
         AppException(AppExceptionType::UnknownMethod,
                      fmt::format("no route for method '{}'", metadata->methodName())),
@@ -229,6 +227,7 @@ FilterStatus Router::messageBegin(MessageMetadataSharedPtr metadata) {
   Upstream::ThreadLocalCluster* cluster = cluster_manager_.get(cluster_name);
   if (!cluster) {
     ENVOY_STREAM_LOG(debug, "unknown cluster '{}'", *callbacks_, cluster_name);
+    stats_.unknown_cluster_.inc();
     callbacks_->sendLocalReply(AppException(AppExceptionType::InternalError,
                                             fmt::format("unknown cluster '{}'", cluster_name)),
                                true);
@@ -240,6 +239,7 @@ FilterStatus Router::messageBegin(MessageMetadataSharedPtr metadata) {
                    metadata->methodName());
 
   if (cluster_->maintenanceMode()) {
+    stats_.upstream_rq_maintenance_mode_.inc();
     callbacks_->sendLocalReply(
         AppException(AppExceptionType::InternalError,
                      fmt::format("maintenance mode for cluster '{}'", cluster_name)),
@@ -263,6 +263,7 @@ FilterStatus Router::messageBegin(MessageMetadataSharedPtr metadata) {
   Tcp::ConnectionPool::Instance* conn_pool = cluster_manager_.tcpConnPoolForCluster(
       cluster_name, Upstream::ResourcePriority::Default, this);
   if (!conn_pool) {
+    stats_.no_healthy_upstream_.inc();
     callbacks_->sendLocalReply(
         AppException(AppExceptionType::InternalError,
                      fmt::format("no healthy upstream for '{}'", cluster_name)),
@@ -354,10 +355,12 @@ void Router::onEvent(Network::ConnectionEvent event) {
 
   switch (event) {
   case Network::ConnectionEvent::RemoteClose:
+    ENVOY_STREAM_LOG(debug, "upstream remote close", *callbacks_);
     upstream_request_->onResetStream(
         Tcp::ConnectionPool::PoolFailureReason::RemoteConnectionFailure);
     break;
   case Network::ConnectionEvent::LocalClose:
+    ENVOY_STREAM_LOG(debug, "upstream local close", *callbacks_);
     upstream_request_->onResetStream(
         Tcp::ConnectionPool::PoolFailureReason::LocalConnectionFailure);
     break;
@@ -365,6 +368,8 @@ void Router::onEvent(Network::ConnectionEvent event) {
     // Connected is consumed by the connection pool.
     NOT_REACHED_GCOVR_EXCL_LINE;
   }
+
+  upstream_request_->releaseConnection(false);
 }
 
 const Network::Connection* Router::downstreamConnection() const {
@@ -389,7 +394,11 @@ Router::UpstreamRequest::UpstreamRequest(Router& parent, Tcp::ConnectionPool::In
       protocol_(NamedProtocolConfigFactory::getFactory(protocol_type).createProtocol()),
       request_complete_(false), response_started_(false), response_complete_(false) {}
 
-Router::UpstreamRequest::~UpstreamRequest() = default;
+Router::UpstreamRequest::~UpstreamRequest() {
+  if (conn_pool_handle_) {
+    conn_pool_handle_->cancel(Tcp::ConnectionPool::CancelPolicy::Default);
+  }
+}
 
 FilterStatus Router::UpstreamRequest::start() {
   Tcp::ConnectionPool::Cancellable* handle = conn_pool_.newConnection(*this);
@@ -407,17 +416,23 @@ FilterStatus Router::UpstreamRequest::start() {
   return FilterStatus::Continue;
 }
 
-void Router::UpstreamRequest::resetStream() {
+void Router::UpstreamRequest::releaseConnection(const bool close) {
   if (conn_pool_handle_) {
     conn_pool_handle_->cancel(Tcp::ConnectionPool::CancelPolicy::Default);
+    conn_pool_handle_ = nullptr;
   }
 
-  if (conn_data_ != nullptr) {
-    conn_state_ = nullptr;
-    conn_data_->connection().close(Network::ConnectionCloseType::NoFlush);
-    conn_data_.reset();
+  conn_state_ = nullptr;
+
+  // The event triggered by close will also release this connection so clear conn_data_ before
+  // closing.
+  auto conn_data = std::move(conn_data_);
+  if (close && conn_data != nullptr) {
+    conn_data->connection().close(Network::ConnectionCloseType::NoFlush);
   }
 }
+
+void Router::UpstreamRequest::resetStream() { releaseConnection(true); }
 
 void Router::UpstreamRequest::onPoolFailure(Tcp::ConnectionPool::PoolFailureReason reason,
                                             Upstream::HostDescriptionConstSharedPtr host) {

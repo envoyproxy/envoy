@@ -29,6 +29,7 @@ envoy_cc_library(
     srcs = ["configuration_impl.cc"],
     hdrs = ["configuration_impl.h"],
     deps = [
+        "//include/envoy/config:typed_config_interface",
         "//include/envoy/http:filter_interface",
         "//include/envoy/network:connection_interface",
         "//include/envoy/network:filter_interface",
@@ -48,8 +49,9 @@ envoy_cc_library(
         "//source/common/network:utility_lib",
         "//source/common/protobuf:utility_lib",
         "//source/common/tracing:http_tracer_lib",
-        "@envoy_api//envoy/config/bootstrap/v2:pkg_cc_proto",
-        "@envoy_api//envoy/config/trace/v2:pkg_cc_proto",
+        "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/metrics/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/trace/v3:pkg_cc_proto",
     ],
 )
 
@@ -81,7 +83,9 @@ envoy_cc_library(
 envoy_cc_library(
     name = "drain_manager_lib",
     srcs = ["drain_manager_impl.cc"],
-    hdrs = ["drain_manager_impl.h"],
+    hdrs = [
+        "drain_manager_impl.h",
+    ],
     deps = [
         "//include/envoy/event:dispatcher_interface",
         "//include/envoy/event:timer_interface",
@@ -90,6 +94,7 @@ envoy_cc_library(
         "//include/envoy/server:instance_interface",
         "//source/common/common:assert_lib",
         "//source/common/common:minimal_logger_lib",
+        "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",
     ],
 )
 
@@ -154,6 +159,7 @@ envoy_cc_library(
     srcs = envoy_select_hot_restart(["hot_restarting_parent.cc"]),
     hdrs = envoy_select_hot_restart(["hot_restarting_parent.h"]),
     deps = [
+        ":api_listener_lib",
         ":hot_restarting_base",
         ":listener_lib",
         "//source/common/memory:stats_lib",
@@ -212,6 +218,7 @@ envoy_cc_library(
     external_deps = ["tclap"],
     deps = [
         "//include/envoy/network:address_interface",
+        "//include/envoy/registry",
         "//include/envoy/server:options_interface",
         "//include/envoy/stats:stats_interface",
         "//source/common/api:os_sys_calls_lib",
@@ -236,7 +243,7 @@ envoy_cc_library(
         "//source/common/config:utility_lib",
         "//source/common/stats:symbol_table_lib",
         "//source/server:resource_monitor_config_lib",
-        "@envoy_api//envoy/config/overload/v2alpha:pkg_cc_proto",
+        "@envoy_api//envoy/config/overload/v3:pkg_cc_proto",
     ],
 )
 
@@ -250,12 +257,45 @@ envoy_cc_library(
         "//include/envoy/init:manager_interface",
         "//include/envoy/server:listener_manager_interface",
         "//source/common/common:cleanup_lib",
+        "//source/common/config:api_version_lib",
         "//source/common/config:resources_lib",
         "//source/common/config:utility_lib",
         "//source/common/init:target_lib",
         "//source/common/protobuf:utility_lib",
+        "@envoy_api//envoy/admin/v3:pkg_cc_proto",
+        "@envoy_api//envoy/api/v2:pkg_cc_proto",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",
+        "@envoy_api//envoy/service/discovery/v3:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
+    name = "api_listener_lib",
+    srcs = [
+        "api_listener_impl.cc",
+    ],
+    hdrs = [
+        "api_listener_impl.h",
+    ],
+    deps = [
+        ":drain_manager_lib",
+        ":filter_chain_manager_lib",
+        ":listener_manager_impl",
+        "//include/envoy/network:connection_interface",
+        "//include/envoy/server:api_listener_interface",
+        "//include/envoy/server:filter_config_interface",
+        "//include/envoy/server:listener_manager_interface",
+        "//source/common/common:empty_string",
+        "//source/common/http:conn_manager_lib",
+        "//source/common/init:manager_lib",
+        "//source/common/network:resolver_lib",
+        "//source/common/stream_info:stream_info_lib",
+        "//source/extensions/filters/network/http_connection_manager:config",
         "@envoy_api//envoy/api/v2:pkg_cc_proto",
         "@envoy_api//envoy/api/v2/listener:pkg_cc_proto",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",
     ],
 )
 
@@ -287,16 +327,21 @@ envoy_cc_library(
         "//source/common/protobuf:utility_lib",
         "//source/extensions/filters/listener:well_known_names",
         "//source/extensions/transport_sockets:well_known_names",
-        "@envoy_api//envoy/api/v2/listener:pkg_cc_proto",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",
     ],
 )
 
+# TODO(junr03): actually separate this lib from the listener and api listener lib.
+# this can be done if the parent_ in the listener and the api listener becomes the ListenerManager interface.
+# the issue right now is that the listener's reach into the listener manager's server_ instance variable.
 envoy_cc_library(
     name = "listener_manager_impl",
     srcs = [
         "listener_manager_impl.cc",
     ],
     hdrs = [
+        "api_listener_impl.h",
         "listener_impl.h",
         "listener_manager_impl.h",
     ],
@@ -313,15 +358,19 @@ envoy_cc_library(
         "//include/envoy/server:transport_socket_config_interface",
         "//include/envoy/server:worker_interface",
         "//source/common/config:utility_lib",
+        "//source/common/config:version_converter_lib",
+        "//source/common/http:conn_manager_lib",
         "//source/common/init:manager_lib",
         "//source/common/network:listen_socket_lib",
         "//source/common/network:socket_option_factory_lib",
         "//source/common/network:utility_lib",
         "//source/common/protobuf:utility_lib",
         "//source/extensions/filters/listener:well_known_names",
+        "//source/extensions/filters/network/http_connection_manager:config",
         "//source/extensions/transport_sockets:well_known_names",
-        "@envoy_api//envoy/admin/v2alpha:pkg_cc_proto",
-        "@envoy_api//envoy/api/v2/listener:pkg_cc_proto",
+        "@envoy_api//envoy/admin/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/core/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",
     ],
 )
 
@@ -330,14 +379,17 @@ envoy_cc_library(
     srcs = ["filter_chain_manager_impl.cc"],
     hdrs = ["filter_chain_manager_impl.h"],
     deps = [
+        ":filter_chain_factory_context_callback",
+        "//include/envoy/server:instance_interface",
         "//include/envoy/server:listener_manager_interface",
         "//include/envoy/server:transport_socket_config_interface",
         "//source/common/common:empty_string",
         "//source/common/config:utility_lib",
+        "//source/common/init:manager_lib",
         "//source/common/network:cidr_range_lib",
         "//source/common/network:lc_trie_lib",
         "//source/server:configuration_lib",
-        "@envoy_api//envoy/api/v2/listener:pkg_cc_proto",
+        "@envoy_api//envoy/config/listener/v3:pkg_cc_proto",
     ],
 )
 
@@ -355,9 +407,6 @@ envoy_cc_library(
         "//source/common/common:assert_lib",
         "//source/common/config:protobuf_link_hacks",
         "//source/common/protobuf",
-        "@envoy_api//envoy/api/v2:pkg_cc_proto",
-        "@envoy_api//envoy/service/discovery/v2:pkg_cc_proto",
-        "@envoy_api//envoy/service/ratelimit/v2:pkg_cc_proto",
     ],
 )
 
@@ -379,6 +428,7 @@ envoy_cc_library(
     ],
     deps = [
         ":active_raw_udp_listener_config",
+        ":api_listener_lib",
         ":configuration_lib",
         ":connection_handler_lib",
         ":guarddog_lib",
@@ -425,8 +475,8 @@ envoy_cc_library(
         "//source/common/upstream:health_discovery_service_lib",
         "//source/server:overload_manager_lib",
         "//source/server/http:admin_lib",
-        "@envoy_api//envoy/admin/v2alpha:pkg_cc_proto",
-        "@envoy_api//envoy/config/bootstrap/v2:pkg_cc_proto",
+        "@envoy_api//envoy/admin/v3:pkg_cc_proto",
+        "@envoy_api//envoy/config/bootstrap/v3:pkg_cc_proto",
     ],
 )
 
@@ -499,5 +549,15 @@ envoy_cc_library(
         ":well_known_names_lib",
         "//include/envoy/registry",
         "//include/envoy/server:active_udp_listener_config_interface",
+        "@envoy_api//envoy/api/v2/listener:pkg_cc_proto",
+    ],
+)
+
+envoy_cc_library(
+    name = "filter_chain_factory_context_callback",
+    hdrs = ["filter_chain_factory_context_callback.h"],
+    deps = [
+        "//include/envoy/server:filter_config_interface",
+        "@envoy_api//envoy/api/v2/listener:pkg_cc_proto",
     ],
 )

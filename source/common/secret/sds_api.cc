@@ -2,15 +2,21 @@
 
 #include <unordered_map>
 
-#include "envoy/api/v2/auth/cert.pb.validate.h"
+#include "envoy/api/v2/auth/cert.pb.h"
+#include "envoy/config/core/v3/config_source.pb.h"
+#include "envoy/extensions/transport_sockets/tls/v3/cert.pb.h"
+#include "envoy/extensions/transport_sockets/tls/v3/cert.pb.validate.h"
+#include "envoy/service/discovery/v3/discovery.pb.h"
 
+#include "common/common/assert.h"
+#include "common/config/api_version.h"
 #include "common/config/resources.h"
 #include "common/protobuf/utility.h"
 
 namespace Envoy {
 namespace Secret {
 
-SdsApi::SdsApi(envoy::api::v2::core::ConfigSource sds_config, absl::string_view sds_config_name,
+SdsApi::SdsApi(envoy::config::core::v3::ConfigSource sds_config, absl::string_view sds_config_name,
                Config::SubscriptionFactory& subscription_factory, TimeSource& time_source,
                ProtobufMessage::ValidationVisitor& validation_visitor, Stats::Store& stats,
                Init::Manager& init_manager, std::function<void()> destructor_cb)
@@ -30,7 +36,8 @@ SdsApi::SdsApi(envoy::api::v2::core::ConfigSource sds_config, absl::string_view 
 void SdsApi::onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& resources,
                             const std::string& version_info) {
   validateUpdateSize(resources.size());
-  auto secret = MessageUtil::anyConvert<envoy::api::v2::auth::Secret>(resources[0]);
+  auto secret =
+      MessageUtil::anyConvert<envoy::extensions::transport_sockets::tls::v3::Secret>(resources[0]);
   MessageUtil::validate(secret, validation_visitor_);
 
   if (secret.name() != sds_config_name_) {
@@ -50,8 +57,9 @@ void SdsApi::onConfigUpdate(const Protobuf::RepeatedPtrField<ProtobufWkt::Any>& 
   init_target_.ready();
 }
 
-void SdsApi::onConfigUpdate(const Protobuf::RepeatedPtrField<envoy::api::v2::Resource>& resources,
-                            const Protobuf::RepeatedPtrField<std::string>&, const std::string&) {
+void SdsApi::onConfigUpdate(
+    const Protobuf::RepeatedPtrField<envoy::service::discovery::v3::Resource>& resources,
+    const Protobuf::RepeatedPtrField<std::string>&, const std::string&) {
   validateUpdateSize(resources.size());
   Protobuf::RepeatedPtrField<ProtobufWkt::Any> unwrapped_resource;
   *unwrapped_resource.Add() = resources[0].resource();
@@ -77,10 +85,23 @@ void SdsApi::validateUpdateSize(int num_resources) {
 
 void SdsApi::initialize() {
   subscription_ = subscription_factory_.subscriptionFromConfigSource(
-      sds_config_,
-      Grpc::Common::typeUrl(envoy::api::v2::auth::Secret().GetDescriptor()->full_name()), stats_,
-      *this);
+      sds_config_, loadTypeUrl(sds_config_.resource_api_version()), stats_, *this);
   subscription_->start({sds_config_name_});
+}
+
+std::string SdsApi::loadTypeUrl(envoy::config::core::v3::ApiVersion resource_api_version) {
+  switch (resource_api_version) {
+  // automatically set api version as V2
+  case envoy::config::core::v3::ApiVersion::AUTO:
+  case envoy::config::core::v3::ApiVersion::V2:
+    return Grpc::Common::typeUrl(
+        API_NO_BOOST(envoy::api::v2::auth::Secret().GetDescriptor()->full_name()));
+  case envoy::config::core::v3::ApiVersion::V3:
+    return Grpc::Common::typeUrl(API_NO_BOOST(
+        envoy::extensions::transport_sockets::tls::v3::Secret().GetDescriptor()->full_name()));
+  default:
+    NOT_REACHED_GCOVR_EXCL_LINE;
+  }
 }
 
 SdsApi::SecretData SdsApi::secretData() { return secret_data_; }

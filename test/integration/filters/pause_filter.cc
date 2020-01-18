@@ -4,8 +4,9 @@
 
 #include "common/network/connection_impl.h"
 
-#include "extensions/filters/http/common/empty_http_filter_config.h"
 #include "extensions/filters/http/common/pass_through_filter.h"
+
+#include "test/extensions/filters/http/common/empty_http_filter_config.h"
 
 namespace Envoy {
 
@@ -26,8 +27,9 @@ public:
     if (end_stream) {
       absl::WriterMutexLock m(&encode_lock_);
       number_of_decode_calls_ref_++;
-      if (number_of_decode_calls_ref_ == 2) {
-        // If this is the second stream to decode headers, force low watermark state.
+      // If this is the second stream to decode headers and we're at high watermark. force low
+      // watermark state
+      if (number_of_decode_calls_ref_ == 2 && connection()->aboveHighWatermark()) {
         connection()->onLowWatermark();
       }
     }
@@ -38,8 +40,9 @@ public:
     if (end_stream) {
       absl::WriterMutexLock m(&encode_lock_);
       number_of_encode_calls_ref_++;
-      if (number_of_encode_calls_ref_ == 1) {
-        // If this is the first stream to encode headers, force high watermark state.
+      // If this is the first stream to encode headers and we're not at high watermark, force high
+      // watermark state.
+      if (number_of_encode_calls_ref_ == 1 && !connection()->aboveHighWatermark()) {
         connection()->onHighWatermark();
       }
     }

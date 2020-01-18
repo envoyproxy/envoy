@@ -26,18 +26,16 @@ namespace MySQLProxy {
 /**
  * All MySQL proxy stats. @see stats_macros.h
  */
-// clang-format off
-#define ALL_MYSQL_PROXY_STATS(COUNTER)                                           \
-  COUNTER(sessions)                                                              \
-  COUNTER(login_attempts)                                                        \
-  COUNTER(login_failures)                                                        \
-  COUNTER(decoder_errors)                                                        \
-  COUNTER(protocol_errors)                                                       \
-  COUNTER(upgraded_to_ssl)                                                       \
-  COUNTER(auth_switch_request)                                                   \
-  COUNTER(queries_parsed)                                                        \
-  COUNTER(queries_parse_error)                                                   \
-// clang-format on
+#define ALL_MYSQL_PROXY_STATS(COUNTER)                                                             \
+  COUNTER(sessions)                                                                                \
+  COUNTER(login_attempts)                                                                          \
+  COUNTER(login_failures)                                                                          \
+  COUNTER(decoder_errors)                                                                          \
+  COUNTER(protocol_errors)                                                                         \
+  COUNTER(upgraded_to_ssl)                                                                         \
+  COUNTER(auth_switch_request)                                                                     \
+  COUNTER(queries_parsed)                                                                          \
+  COUNTER(queries_parse_error)
 
 /**
  * Struct definition for all MySQL proxy stats. @see stats_macros.h
@@ -51,7 +49,7 @@ struct MySQLProxyStats {
  */
 class MySQLFilterConfig {
 public:
-  MySQLFilterConfig(const std::string &stat_prefix, Stats::Scope& scope);
+  MySQLFilterConfig(const std::string& stat_prefix, Stats::Scope& scope);
 
   const MySQLProxyStats& stats() { return stats_; }
 
@@ -60,10 +58,8 @@ public:
   MySQLProxyStats stats_;
 
 private:
-  MySQLProxyStats generateStats(const std::string& prefix,
-                                Stats::Scope& scope) {
-    return MySQLProxyStats{
-        ALL_MYSQL_PROXY_STATS(POOL_COUNTER_PREFIX(scope, prefix))};
+  MySQLProxyStats generateStats(const std::string& prefix, Stats::Scope& scope) {
+    return MySQLProxyStats{ALL_MYSQL_PROXY_STATS(POOL_COUNTER_PREFIX(scope, prefix))};
   }
 };
 
@@ -88,13 +84,13 @@ public:
   // MySQLProxy::DecoderCallback
   void onProtocolError() override;
   void onNewMessage(MySQLSession::State state) override;
-  void onServerGreeting(ServerGreeting&) override {};
+  void onServerGreeting(ServerGreeting&) override{};
   void onClientLogin(ClientLogin& message) override;
   void onClientLoginResponse(ClientLoginResponse& message) override;
-  void onClientSwitchResponse(ClientSwitchResponse&) override {};
+  void onClientSwitchResponse(ClientSwitchResponse&) override{};
   void onMoreClientLoginResponse(ClientLoginResponse& message) override;
   void onCommand(Command& message) override;
-  void onCommandResponse(CommandResponse&) override {};
+  void onCommandResponse(CommandResponse&) override{};
 
   void doDecode(Buffer::Instance& buffer);
   DecoderPtr createDecoder(DecoderCallbacks& callbacks);
@@ -109,7 +105,7 @@ private:
   bool sniffing_{true};
 };
 
-}  // namespace MySQLProxy
-}  // namespace NetworkFilters
-}  // namespace Extensions
-}  // namespace Envoy
+} // namespace MySQLProxy
+} // namespace NetworkFilters
+} // namespace Extensions
+} // namespace Envoy

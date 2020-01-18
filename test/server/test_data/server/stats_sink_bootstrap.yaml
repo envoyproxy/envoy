@@ -1,0 +1,15 @@
+node:
+  id: bootstrap_id
+  cluster: bootstrap_cluster
+  locality:
+    zone: bootstrap_zone
+    sub_zone: bootstrap_sub_zone
+admin:
+  access_log_path: /dev/null
+  address:
+    socket_address:
+      address: {{ ntop_ip_loopback_address }}
+      port_value: 0
+stats_sinks:
+- name: envoy.custom_stats_sink
+stats_flush_interval: 1s

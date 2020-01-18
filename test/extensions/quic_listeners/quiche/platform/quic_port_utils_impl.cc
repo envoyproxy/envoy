@@ -16,7 +16,7 @@
 
 namespace quic {
 
-int QuicPickUnusedPortOrDieImpl() {
+int QuicPickServerPortForTestsOrDieImpl() {
   std::vector<Envoy::Network::Address::IpVersion> supported_versions =
       Envoy::TestEnvironment::getIpVersionsForTest();
   ASSERT(!supported_versions.empty());

@@ -15,7 +15,9 @@ py_binary(
         "//tools/type_whisperer",
         "//tools/type_whisperer:api_type_db_proto_py_proto",
         "@com_envoyproxy_protoc_gen_validate//validate:validate_py",
+        "@com_github_cncf_udpa//udpa/annotations:pkg_py_proto",
         "@com_google_googleapis//google/api:annotations_py_proto",
         "@com_google_protobuf//:protobuf_python",
+        "@envoy_api_canonical//envoy/annotations:pkg_py_proto",
     ],
 )

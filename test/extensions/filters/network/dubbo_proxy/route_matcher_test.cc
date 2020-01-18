@@ -1,7 +1,7 @@
-#include "envoy/config/filter/network/dubbo_proxy/v2alpha1/dubbo_proxy.pb.h"
-#include "envoy/config/filter/network/dubbo_proxy/v2alpha1/dubbo_proxy.pb.validate.h"
-#include "envoy/config/filter/network/dubbo_proxy/v2alpha1/route.pb.h"
-#include "envoy/config/filter/network/dubbo_proxy/v2alpha1/route.pb.validate.h"
+#include "envoy/extensions/filters/network/dubbo_proxy/v3/dubbo_proxy.pb.h"
+#include "envoy/extensions/filters/network/dubbo_proxy/v3/dubbo_proxy.pb.validate.h"
+#include "envoy/extensions/filters/network/dubbo_proxy/v3/route.pb.h"
+#include "envoy/extensions/filters/network/dubbo_proxy/v3/route.pb.validate.h"
 
 #include "common/protobuf/protobuf.h"
 
@@ -20,17 +20,17 @@ namespace DubboProxy {
 namespace Router {
 namespace {
 
-envoy::config::filter::network::dubbo_proxy::v2alpha1::RouteConfiguration
+envoy::extensions::filters::network::dubbo_proxy::v3::RouteConfiguration
 parseRouteConfigurationFromV2Yaml(const std::string& yaml) {
-  envoy::config::filter::network::dubbo_proxy::v2alpha1::RouteConfiguration route_config;
+  envoy::extensions::filters::network::dubbo_proxy::v3::RouteConfiguration route_config;
   TestUtility::loadFromYaml(yaml, route_config);
   TestUtility::validate(route_config);
   return route_config;
 }
 
-envoy::config::filter::network::dubbo_proxy::v2alpha1::DubboProxy
+envoy::extensions::filters::network::dubbo_proxy::v3::DubboProxy
 parseDubboProxyFromV2Yaml(const std::string& yaml) {
-  envoy::config::filter::network::dubbo_proxy::v2alpha1::DubboProxy config;
+  envoy::extensions::filters::network::dubbo_proxy::v3::DubboProxy config;
   TestUtility::loadFromYaml(yaml, config);
   TestUtility::validate(config);
   return config;
@@ -54,11 +54,11 @@ routes:
         cluster: user_service_dubbo_server
 )EOF";
 
-    envoy::config::filter::network::dubbo_proxy::v2alpha1::RouteConfiguration config =
+    envoy::extensions::filters::network::dubbo_proxy::v3::RouteConfiguration config =
         parseRouteConfigurationFromV2Yaml(yaml);
 
     NiceMock<Server::Configuration::MockFactoryContext> context;
-    SignleRouteMatcherImpl matcher(config, context);
+    SingleRouteMatcherImpl matcher(config, context);
     auto invo = std::make_shared<RpcInvocationImpl>();
     MessageMetadata metadata;
     metadata.setInvocationInfo(invo);
@@ -103,11 +103,11 @@ routes:
         cluster: user_service_dubbo_server
 )EOF";
 
-    envoy::config::filter::network::dubbo_proxy::v2alpha1::RouteConfiguration config =
+    envoy::extensions::filters::network::dubbo_proxy::v3::RouteConfiguration config =
         parseRouteConfigurationFromV2Yaml(yaml);
 
     NiceMock<Server::Configuration::MockFactoryContext> context;
-    SignleRouteMatcherImpl matcher(config, context);
+    SingleRouteMatcherImpl matcher(config, context);
     auto invo = std::make_shared<RpcInvocationImpl>();
     MessageMetadata metadata;
     metadata.setInvocationInfo(invo);
@@ -139,11 +139,11 @@ routes:
         cluster: user_service_dubbo_server
 )EOF";
 
-    envoy::config::filter::network::dubbo_proxy::v2alpha1::RouteConfiguration config =
+    envoy::extensions::filters::network::dubbo_proxy::v3::RouteConfiguration config =
         parseRouteConfigurationFromV2Yaml(yaml);
 
     NiceMock<Server::Configuration::MockFactoryContext> context;
-    SignleRouteMatcherImpl matcher(config, context);
+    SingleRouteMatcherImpl matcher(config, context);
     auto invo = std::make_shared<RpcInvocationImpl>();
     MessageMetadata metadata;
     metadata.setInvocationInfo(invo);
@@ -180,11 +180,11 @@ routes:
         cluster: user_service_dubbo_server
 )EOF";
 
-    envoy::config::filter::network::dubbo_proxy::v2alpha1::RouteConfiguration config =
+    envoy::extensions::filters::network::dubbo_proxy::v3::RouteConfiguration config =
         parseRouteConfigurationFromV2Yaml(yaml);
 
     NiceMock<Server::Configuration::MockFactoryContext> context;
-    SignleRouteMatcherImpl matcher(config, context);
+    SingleRouteMatcherImpl matcher(config, context);
     auto invo = std::make_shared<RpcInvocationImpl>();
     MessageMetadata metadata;
     metadata.setInvocationInfo(invo);
@@ -216,7 +216,7 @@ routes:
         cluster: user_service_dubbo_server
 )EOF";
 
-  envoy::config::filter::network::dubbo_proxy::v2alpha1::RouteConfiguration config =
+  envoy::extensions::filters::network::dubbo_proxy::v3::RouteConfiguration config =
       parseRouteConfigurationFromV2Yaml(yaml);
   auto invo = std::make_shared<RpcInvocationImpl>();
   MessageMetadata metadata;
@@ -224,7 +224,7 @@ routes:
   invo->setServiceName("org.apache.dubbo.demo.DemoService");
 
   NiceMock<Server::Configuration::MockFactoryContext> context;
-  SignleRouteMatcherImpl matcher(config, context);
+  SingleRouteMatcherImpl matcher(config, context);
   EXPECT_EQ(nullptr, matcher.route(metadata, 0));
 
   invo->setMethodName("sub");
@@ -247,7 +247,7 @@ routes:
         cluster: user_service_dubbo_server
 )EOF";
 
-  envoy::config::filter::network::dubbo_proxy::v2alpha1::RouteConfiguration config =
+  envoy::extensions::filters::network::dubbo_proxy::v3::RouteConfiguration config =
       parseRouteConfigurationFromV2Yaml(yaml);
   auto invo = std::make_shared<RpcInvocationImpl>();
   MessageMetadata metadata;
@@ -255,7 +255,7 @@ routes:
   invo->setServiceName("org.apache.dubbo.demo.DemoService");
 
   NiceMock<Server::Configuration::MockFactoryContext> context;
-  SignleRouteMatcherImpl matcher(config, context);
+  SingleRouteMatcherImpl matcher(config, context);
   EXPECT_EQ(nullptr, matcher.route(metadata, 0));
 
   invo->setMethodName("sub");
@@ -278,7 +278,7 @@ routes:
         cluster: user_service_dubbo_server
 )EOF";
 
-  envoy::config::filter::network::dubbo_proxy::v2alpha1::RouteConfiguration config =
+  envoy::extensions::filters::network::dubbo_proxy::v3::RouteConfiguration config =
       parseRouteConfigurationFromV2Yaml(yaml);
   auto invo = std::make_shared<RpcInvocationImpl>();
   MessageMetadata metadata;
@@ -286,7 +286,7 @@ routes:
   invo->setServiceName("org.apache.dubbo.demo.DemoService");
 
   NiceMock<Server::Configuration::MockFactoryContext> context;
-  SignleRouteMatcherImpl matcher(config, context);
+  SingleRouteMatcherImpl matcher(config, context);
   EXPECT_EQ(nullptr, matcher.route(metadata, 0));
 
   invo->setMethodName("ab12test");
@@ -314,7 +314,7 @@ routes:
         cluster: user_service_dubbo_server
 )EOF";
 
-  envoy::config::filter::network::dubbo_proxy::v2alpha1::RouteConfiguration config =
+  envoy::extensions::filters::network::dubbo_proxy::v3::RouteConfiguration config =
       parseRouteConfigurationFromV2Yaml(yaml);
   auto invo = std::make_shared<RpcInvocationImpl>();
   MessageMetadata metadata;
@@ -322,7 +322,7 @@ routes:
   invo->setServiceName("org.apache.dubbo.demo.DemoService");
 
   NiceMock<Server::Configuration::MockFactoryContext> context;
-  SignleRouteMatcherImpl matcher(config, context);
+  SingleRouteMatcherImpl matcher(config, context);
   EXPECT_EQ(nullptr, matcher.route(metadata, 0));
 
   invo->setMethodName("12test");
@@ -353,7 +353,7 @@ routes:
         cluster: user_service_dubbo_server
 )EOF";
 
-  envoy::config::filter::network::dubbo_proxy::v2alpha1::RouteConfiguration config =
+  envoy::extensions::filters::network::dubbo_proxy::v3::RouteConfiguration config =
       parseRouteConfigurationFromV2Yaml(yaml);
   auto invo = std::make_shared<RpcInvocationImpl>();
   MessageMetadata metadata;
@@ -363,7 +363,7 @@ routes:
   invo->addParameterValue(0, "150");
 
   NiceMock<Server::Configuration::MockFactoryContext> context;
-  SignleRouteMatcherImpl matcher(config, context);
+  SingleRouteMatcherImpl matcher(config, context);
   EXPECT_EQ("user_service_dubbo_server", matcher.route(metadata, 0)->routeEntry()->clusterName());
 }
 
@@ -383,7 +383,7 @@ routes:
         cluster: user_service_dubbo_server
 )EOF";
 
-  envoy::config::filter::network::dubbo_proxy::v2alpha1::RouteConfiguration config =
+  envoy::extensions::filters::network::dubbo_proxy::v3::RouteConfiguration config =
       parseRouteConfigurationFromV2Yaml(yaml);
   auto invo = std::make_shared<RpcInvocationImpl>();
   MessageMetadata metadata;
@@ -393,7 +393,7 @@ routes:
   invo->addParameterValue(1, "user_id:94562");
 
   NiceMock<Server::Configuration::MockFactoryContext> context;
-  SignleRouteMatcherImpl matcher(config, context);
+  SingleRouteMatcherImpl matcher(config, context);
   EXPECT_EQ("user_service_dubbo_server", matcher.route(metadata, 0)->routeEntry()->clusterName());
 }
 
@@ -416,7 +416,7 @@ routes:
         cluster: user_service_dubbo_server
 )EOF";
 
-  envoy::config::filter::network::dubbo_proxy::v2alpha1::RouteConfiguration config =
+  envoy::extensions::filters::network::dubbo_proxy::v3::RouteConfiguration config =
       parseRouteConfigurationFromV2Yaml(yaml);
   auto invo = std::make_shared<RpcInvocationImpl>();
   MessageMetadata metadata;
@@ -430,7 +430,7 @@ routes:
   invo->addHeaderReference(test_key, test_value);
 
   NiceMock<Server::Configuration::MockFactoryContext> context;
-  SignleRouteMatcherImpl matcher(config, context);
+  SingleRouteMatcherImpl matcher(config, context);
   EXPECT_EQ(nullptr, matcher.route(metadata, 0));
 
   test_value = "456";
@@ -470,7 +470,7 @@ route_config:
             cluster: format_service
 )EOF";
 
-  envoy::config::filter::network::dubbo_proxy::v2alpha1::DubboProxy config =
+  envoy::extensions::filters::network::dubbo_proxy::v3::DubboProxy config =
       parseDubboProxyFromV2Yaml(yaml);
   auto invo = std::make_shared<RpcInvocationImpl>();
   MessageMetadata metadata;
@@ -484,7 +484,7 @@ route_config:
   EXPECT_EQ("user_service_dubbo_server", matcher.route(metadata, 0)->routeEntry()->clusterName());
 
   {
-    envoy::config::filter::network::dubbo_proxy::v2alpha1::DubboProxy invalid_config;
+    envoy::extensions::filters::network::dubbo_proxy::v3::DubboProxy invalid_config;
     MultiRouteMatcher matcher(invalid_config.route_config(), context);
     EXPECT_EQ(nullptr, matcher.route(metadata, 0));
   }
@@ -506,7 +506,7 @@ routes:
         cluster: user_service_dubbo_server
 )EOF";
 
-  envoy::config::filter::network::dubbo_proxy::v2alpha1::RouteConfiguration config =
+  envoy::extensions::filters::network::dubbo_proxy::v3::RouteConfiguration config =
       parseRouteConfigurationFromV2Yaml(yaml);
   auto invo = std::make_shared<RpcInvocationImpl>();
   MessageMetadata metadata;
@@ -516,7 +516,7 @@ routes:
 
   // There is no parameter information in metadata.
   NiceMock<Server::Configuration::MockFactoryContext> context;
-  SignleRouteMatcherImpl matcher(config, context);
+  SingleRouteMatcherImpl matcher(config, context);
   EXPECT_EQ(nullptr, matcher.route(metadata, 0));
 
   // The parameter is empty.
@@ -567,7 +567,7 @@ routes:
             weight: 5000
 )EOF";
 
-  envoy::config::filter::network::dubbo_proxy::v2alpha1::RouteConfiguration config =
+  envoy::extensions::filters::network::dubbo_proxy::v3::RouteConfiguration config =
       parseRouteConfigurationFromV2Yaml(yaml);
   auto invo = std::make_shared<RpcInvocationImpl>();
   MessageMetadata metadata;
@@ -575,7 +575,7 @@ routes:
   invo->setServiceName("org.apache.dubbo.demo.DemoService");
 
   NiceMock<Server::Configuration::MockFactoryContext> context;
-  SignleRouteMatcherImpl matcher(config, context);
+  SingleRouteMatcherImpl matcher(config, context);
 
   {
     invo->setMethodName("method1");
@@ -620,10 +620,10 @@ routes:
             weight: 5000
 )EOF";
 
-  envoy::config::filter::network::dubbo_proxy::v2alpha1::RouteConfiguration config =
+  envoy::extensions::filters::network::dubbo_proxy::v3::RouteConfiguration config =
       parseRouteConfigurationFromV2Yaml(yaml);
   NiceMock<Server::Configuration::MockFactoryContext> context;
-  EXPECT_THROW(SignleRouteMatcherImpl m(config, context), EnvoyException);
+  EXPECT_THROW(SingleRouteMatcherImpl m(config, context), EnvoyException);
 }
 
 } // namespace Router

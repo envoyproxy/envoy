@@ -1,7 +1,9 @@
 #include "extensions/common/tap/admin.h"
 
-#include "envoy/admin/v2alpha/tap.pb.h"
-#include "envoy/admin/v2alpha/tap.pb.validate.h"
+#include "envoy/admin/v3/tap.pb.h"
+#include "envoy/admin/v3/tap.pb.validate.h"
+#include "envoy/config/tap/v3/common.pb.h"
+#include "envoy/data/tap/v3/wrapper.pb.h"
 
 #include "common/buffer/buffer_impl.h"
 #include "common/protobuf/message_validator_impl.h"
@@ -48,7 +50,7 @@ Http::Code AdminHandler::handler(absl::string_view, Http::HeaderMap&, Buffer::In
     return badRequest(response, "/tap requires a JSON/YAML body");
   }
 
-  envoy::admin::v2alpha::TapRequest tap_request;
+  envoy::admin::v3::TapRequest tap_request;
   try {
     MessageUtil::loadFromYamlAndValidate(admin_stream.getRequestBody()->toString(), tap_request,
                                          ProtobufMessage::getStrictValidationVisitor());
@@ -102,10 +104,10 @@ void AdminHandler::unregisterConfig(ExtensionConfig& config) {
 }
 
 void AdminHandler::AdminPerTapSinkHandle::submitTrace(
-    TraceWrapperPtr&& trace, envoy::service::tap::v2alpha::OutputSink::Format format) {
+    TraceWrapperPtr&& trace, envoy::config::tap::v3::OutputSink::Format format) {
   ENVOY_LOG(debug, "admin submitting buffered trace to main thread");
   // Convert to a shared_ptr, so we can send it to the main thread.
-  std::shared_ptr<envoy::data::tap::v2alpha::TraceWrapper> shared_trace{std::move(trace)};
+  std::shared_ptr<envoy::data::tap::v3::TraceWrapper> shared_trace{std::move(trace)};
   // The handle can be destroyed before the cross thread post is complete. Thus, we capture a
   // reference to our parent.
   parent_.main_thread_dispatcher_.post([& parent = parent_, trace = shared_trace, format]() {
@@ -115,8 +117,8 @@ void AdminHandler::AdminPerTapSinkHandle::submitTrace(
 
     std::string output_string;
     switch (format) {
-    case envoy::service::tap::v2alpha::OutputSink::JSON_BODY_AS_STRING:
-    case envoy::service::tap::v2alpha::OutputSink::JSON_BODY_AS_BYTES:
+    case envoy::config::tap::v3::OutputSink::JSON_BODY_AS_STRING:
+    case envoy::config::tap::v3::OutputSink::JSON_BODY_AS_BYTES:
       output_string = MessageUtil::getJsonStringFromMessage(*trace, true, true);
       break;
     default:

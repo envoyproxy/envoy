@@ -13,15 +13,19 @@ API
 ASAN
 ASCII
 ASSERTs
+AST
 AWS
 BACKTRACE
 BSON
 CAS
 CB
 CDS
+CEL
 CHACHA
 CHLO
+CHMOD
 CHLOS
+CHLOs
 CIDR
 CLA
 CLI
@@ -45,6 +49,8 @@ CTXs
 CVC
 CVE
 CX
+Cxx
+CYGWIN
 DER
 DESC
 DFATAL
@@ -54,7 +60,9 @@ DNS
 DRYs
 DS
 DST
+DW
 EADDRINUSE
+EADDRNOTAVAIL
 EAGAIN
 ECDH
 ECDHE
@@ -83,10 +91,13 @@ EXPECTs
 EXPR
 FAQ
 FASTOPEN
+FB
 FCDS
+FCM
 FFFF
 FIN
 FIPS
+FIRSTHDR
 FQDN
 FREEBIND
 FUZZER
@@ -128,6 +139,7 @@ IPs
 IPv
 ITOA
 Isode
+Iters
 JSON
 JSONs
 JWKS
@@ -146,6 +158,7 @@ LDS
 LEV
 LF
 LHS
+LLVM
 LRS
 MB
 MD
@@ -161,6 +174,7 @@ NACKs
 NBF
 NBSP
 NDEBUG
+NEXTHDR
 NGHTTP
 NOAUTH
 NODELAY
@@ -283,6 +297,7 @@ UDP
 UDS
 URI
 URL
+USEVC
 UTC
 UTF
 UUID
@@ -294,10 +309,12 @@ VLOG
 VM
 WASM
 WAVM
+WIP
 WKT
 WRR
 WS
 Welford's
+Wi
 XDS
 XFCC
 XFF
@@ -380,6 +397,7 @@ builtin
 builtins
 bulkstrings
 bursty
+bytecode
 callee
 callsite
 callsites
@@ -405,6 +423,7 @@ ciphersuites
 circllhist
 CITT
 cloneable
+cloneability
 cmd
 cmsghdr
 codebase
@@ -453,6 +472,7 @@ deallocating
 deallocation
 dec
 dechunking
+decl
 decls
 decompressor
 decrement
@@ -477,6 +497,7 @@ deserialize
 deserialized
 deserializer
 deserializers
+deserializing
 dest
 destructor
 destructors
@@ -489,6 +510,7 @@ dir
 dirname
 djb
 downcasted
+downcasting
 downstreams
 dtor
 dubbo
@@ -520,11 +542,14 @@ evented
 evwatch
 exe
 execlp
+exprfor
 expectable
+extrahelp
 faceplant
 facto
 failover
 fallbacks
+fastbuild
 favicon
 fd
 fds
@@ -551,6 +576,7 @@ gcov
 genrule
 getaddrinfo
 getaffinity
+gethostname
 getifaddrs
 getpeername
 getsockname
@@ -564,6 +590,7 @@ goog
 google
 goto
 gzip
+hackery
 hacky
 handshaker
 hardcoded
@@ -593,6 +620,7 @@ idx
 ie
 ifdef
 iff
+ified
 impl
 implementors
 impls
@@ -625,6 +653,7 @@ iteratively
 javascript
 jitter
 jittered
+kafka
 keepalive
 keepalives
 ketama
@@ -640,7 +669,9 @@ lenenc
 lexically
 libc
 libevent
+libtool
 libstdc
+libtooling
 lifecycle
 lightstep
 linearization
@@ -648,6 +679,8 @@ linearize
 linearized
 linux
 livelock
+llvm
+loc
 localhost
 lockless
 login
@@ -816,6 +849,7 @@ qps
 quantile
 quantiles
 queueing
+quiesce
 quitquitquit
 qvalue
 rapidjson
@@ -850,7 +884,10 @@ referer
 refetch
 regex
 regexes
+reified
+reify
 reimplements
+rele
 releasor
 reloadable
 reparse
@@ -860,6 +897,7 @@ repicked
 repo
 requirepass
 reselecting
+reserialize
 reservable
 resize
 resized
@@ -933,6 +971,7 @@ strerr
 strerror
 stringbuf
 stringified
+stringify
 stringstream
 strtoull
 struct
@@ -966,6 +1005,8 @@ superset
 symlink
 symlinked
 symlinks
+synchronizer
+syncookie
 sys
 syscall
 syscalls
@@ -984,6 +1025,7 @@ templatizing
 testability
 testcase
 testcases
+testdata
 testee
 th
 threadsafe
@@ -991,6 +1033,7 @@ thru
 timespan
 timestamp
 timestamps
+timeval
 tm
 tmp
 tmpfile
@@ -1058,6 +1101,7 @@ unreferenced
 unregister
 unregisters
 unresolvable
+unserializable
 unsetenv
 unsubscription
 unterminated
@@ -1096,6 +1140,7 @@ vhost
 viewable
 vip
 virtualhost
+virtualize
 vptr
 wakeup
 wakeups
@@ -1123,3 +1168,6 @@ zag
 zig
 zipkin
 zlib
+OBQ
+SemVer
+SCM

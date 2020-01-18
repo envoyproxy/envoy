@@ -2,6 +2,7 @@
 #include <memory>
 #include <string>
 
+#include "envoy/config/core/v3/base.pb.h"
 #include "envoy/stats/scope.h"
 
 #include "common/buffer/buffer_impl.h"
@@ -82,8 +83,8 @@ public:
   uint64_t listenerTag() const override { return 1; }
   const std::string& name() const override { return name_; }
   const Network::ActiveUdpListenerFactory* udpListenerFactory() override { return nullptr; }
-  envoy::api::v2::core::TrafficDirection direction() const override {
-    return envoy::api::v2::core::TrafficDirection::UNSPECIFIED;
+  envoy::config::core::v3::TrafficDirection direction() const override {
+    return envoy::config::core::v3::UNSPECIFIED;
   }
   Network::ConnectionBalancer& connectionBalancer() override { return connection_balancer_; }
 
@@ -93,10 +94,19 @@ public:
   }
 
   void connect(bool read = true) {
+    int expected_callbacks = 2;
+    auto maybeExitDispatcher = [&]() -> void {
+      expected_callbacks--;
+      if (expected_callbacks == 0) {
+        dispatcher_->exit();
+      }
+    };
+
     EXPECT_CALL(factory_, createListenerFilterChain(_))
         .WillOnce(Invoke([&](Network::ListenerFilterManager& filter_manager) -> bool {
           filter_manager.addAcceptFilter(
               std::make_unique<Filter>(std::make_shared<Config>(listenerScope())));
+          maybeExitDispatcher();
           return true;
         }));
     conn_->connect();
@@ -112,7 +122,7 @@ public:
           }));
     }
     EXPECT_CALL(connection_callbacks_, onEvent(Network::ConnectionEvent::Connected))
-        .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { dispatcher_->exit(); }));
+        .WillOnce(Invoke([&](Network::ConnectionEvent) -> void { maybeExitDispatcher(); }));
     dispatcher_->run(Event::Dispatcher::RunType::Block);
   }
 
@@ -937,8 +947,8 @@ public:
   uint64_t listenerTag() const override { return 1; }
   const std::string& name() const override { return name_; }
   const Network::ActiveUdpListenerFactory* udpListenerFactory() override { return nullptr; }
-  envoy::api::v2::core::TrafficDirection direction() const override {
-    return envoy::api::v2::core::TrafficDirection::UNSPECIFIED;
+  envoy::config::core::v3::TrafficDirection direction() const override {
+    return envoy::config::core::v3::UNSPECIFIED;
   }
   Network::ConnectionBalancer& connectionBalancer() override { return connection_balancer_; }
 

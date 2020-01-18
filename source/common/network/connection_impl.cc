@@ -6,6 +6,7 @@
 
 #include "envoy/common/exception.h"
 #include "envoy/common/platform.h"
+#include "envoy/config/core/v3/base.pb.h"
 #include "envoy/event/timer.h"
 #include "envoy/network/filter.h"
 
@@ -42,15 +43,15 @@ std::atomic<uint64_t> ConnectionImpl::next_global_id_;
 
 ConnectionImpl::ConnectionImpl(Event::Dispatcher& dispatcher, ConnectionSocketPtr&& socket,
                                TransportSocketPtr&& transport_socket, bool connected)
-    : transport_socket_(std::move(transport_socket)), socket_(std::move(socket)),
+    : ConnectionImplBase(dispatcher, next_global_id_++),
+      transport_socket_(std::move(transport_socket)), socket_(std::move(socket)),
       filter_manager_(*this), stream_info_(dispatcher.timeSource()),
       write_buffer_(
           dispatcher.getWatermarkFactory().create([this]() -> void { this->onLowWatermark(); },
                                                   [this]() -> void { this->onHighWatermark(); })),
-      dispatcher_(dispatcher), id_(next_global_id_++), read_enabled_(true),
-      above_high_watermark_(false), detect_early_close_(true), enable_half_close_(false),
-      read_end_stream_raised_(false), read_end_stream_(false), write_end_stream_(false),
-      current_write_end_stream_(false), dispatch_buffered_data_(false) {
+      read_enabled_(true), above_high_watermark_(false), detect_early_close_(true),
+      enable_half_close_(false), read_end_stream_raised_(false), read_end_stream_(false),
+      write_end_stream_(false), current_write_end_stream_(false), dispatch_buffered_data_(false) {
   // Treat the lack of a valid fd (which in practice only happens if we run out of FDs) as an OOM
   // condition and just crash.
   RELEASE_ASSERT(ioHandle().fd() != -1, "");
@@ -121,7 +122,7 @@ void ConnectionImpl::close(ConnectionCloseType type) {
         file_event_->setEnabled(enable_half_close_ ? 0 : Event::FileReadyType::Closed);
       }
     } else {
-      closeSocket(ConnectionEvent::LocalClose);
+      closeConnectionImmediately();
     }
   } else {
     ASSERT(type == ConnectionCloseType::FlushWrite ||
@@ -175,6 +176,8 @@ Connection::State ConnectionImpl::state() const {
   }
 }
 
+void ConnectionImpl::closeConnectionImmediately() { closeSocket(ConnectionEvent::LocalClose); }
+
 void ConnectionImpl::closeSocket(ConnectionEvent close_type) {
   if (!ioHandle().isOpen()) {
     return;
@@ -199,8 +202,6 @@ void ConnectionImpl::closeSocket(ConnectionEvent close_type) {
 
   raiseEvent(close_type);
 }
-
-Event::Dispatcher& ConnectionImpl::dispatcher() { return dispatcher_; }
 
 void ConnectionImpl::noDelay(bool enable) {
   // There are cases where a connection to localhost can immediately fail (e.g., if the other end
@@ -237,8 +238,6 @@ void ConnectionImpl::noDelay(bool enable) {
 
   RELEASE_ASSERT(0 == rc, "");
 }
-
-uint64_t ConnectionImpl::id() const { return id_; }
 
 void ConnectionImpl::onRead(uint64_t read_buffer_size) {
   if (!read_enabled_ || inDelayedClose()) {
@@ -280,13 +279,12 @@ void ConnectionImpl::enableHalfClose(bool enabled) {
 }
 
 void ConnectionImpl::readDisable(bool disable) {
+  // Calls to readEnabled on a closed socket are considered to be an error.
   ASSERT(state() == State::Open);
-  if (state() != State::Open || file_event_ == nullptr) {
-    // If readDisable is called on a closed connection in error, do not crash.
-    return;
-  }
+  ASSERT(file_event_ != nullptr);
 
-  ENVOY_CONN_LOG(trace, "readDisable: enabled={} disable={}", *this, read_enabled_, disable);
+  ENVOY_CONN_LOG(trace, "readDisable: enabled={} disable={} state={}", *this, read_enabled_,
+                 disable, static_cast<int>(state()));
 
   // When we disable reads, we still allow for early close notifications (the equivalent of
   // EPOLLRDHUP for an epoll backend). For backends that support it, this allows us to apply
@@ -303,6 +301,11 @@ void ConnectionImpl::readDisable(bool disable) {
     ASSERT(read_enabled_);
     read_enabled_ = false;
 
+    if (state() != State::Open || file_event_ == nullptr) {
+      // If readDisable is called on a closed connection, do not crash.
+      return;
+    }
+
     // If half-close semantics are enabled, we never want early close notifications; we
     // always want to read all available data, even if the other side has closed.
     if (detect_early_close_ && !enable_half_close_) {
@@ -317,6 +320,12 @@ void ConnectionImpl::readDisable(bool disable) {
     }
     ASSERT(!read_enabled_);
     read_enabled_ = true;
+
+    if (state() != State::Open || file_event_ == nullptr) {
+      // If readDisable is called on a closed connection, do not crash.
+      return;
+    }
+
     // We never ask for both early close and read at the same time. If we are reading, we want to
     // consume all available data.
     file_event_->setEnabled(Event::FileReadyType::Read | Event::FileReadyType::Write);
@@ -331,11 +340,7 @@ void ConnectionImpl::readDisable(bool disable) {
 }
 
 void ConnectionImpl::raiseEvent(ConnectionEvent event) {
-  for (ConnectionCallbacks* callback : callbacks_) {
-    // TODO(mattklein123): If we close while raising a connected event we should not raise further
-    // connected events.
-    callback->onEvent(event);
-  }
+  ConnectionImplBase::raiseConnectionEvent(event);
   // We may have pending data in the write buffer on transport handshake
   // completion, which may also have completed in the context of onReadReady(),
   // where no check of the write buffer is made. Provide an opportunity to flush
@@ -347,9 +352,12 @@ void ConnectionImpl::raiseEvent(ConnectionEvent event) {
   }
 }
 
-bool ConnectionImpl::readEnabled() const { return read_enabled_; }
-
-void ConnectionImpl::addConnectionCallbacks(ConnectionCallbacks& cb) { callbacks_.push_back(&cb); }
+bool ConnectionImpl::readEnabled() const {
+  // Calls to readEnabled on a closed socket are considered to be an error.
+  ASSERT(state() == State::Open);
+  ASSERT(file_event_ != nullptr);
+  return read_enabled_;
+}
 
 void ConnectionImpl::addBytesSentCallback(BytesSentCb cb) {
   bytes_sent_callbacks_.emplace_back(cb);
@@ -588,7 +596,7 @@ void ConnectionImpl::onWriteReady() {
       delayed_close_timer_->enableTimer(delayed_close_timeout_);
     } else {
       ASSERT(bothSidesHalfClosed() || delayed_close_state_ == DelayedCloseState::CloseAfterFlush);
-      closeSocket(ConnectionEvent::LocalClose);
+      closeConnectionImmediately();
     }
   } else {
     ASSERT(result.action_ == PostIoAction::KeepOpen);
@@ -606,13 +614,6 @@ void ConnectionImpl::onWriteReady() {
       }
     }
   }
-}
-
-void ConnectionImpl::setConnectionStats(const ConnectionStats& stats) {
-  ASSERT(!connection_stats_,
-         "Two network filters are attempting to set connection stats. This indicates an issue "
-         "with the configured filter chain.");
-  connection_stats_ = std::make_unique<ConnectionStats>(stats);
 }
 
 void ConnectionImpl::updateReadBufferStats(uint64_t num_read, uint64_t new_size) {
@@ -640,23 +641,6 @@ bool ConnectionImpl::bothSidesHalfClosed() {
   return read_end_stream_ && write_end_stream_ && write_buffer_->length() == 0;
 }
 
-void ConnectionImpl::onDelayedCloseTimeout() {
-  delayed_close_timer_.reset();
-  ENVOY_CONN_LOG(debug, "triggered delayed close", *this);
-  if (connection_stats_ != nullptr && connection_stats_->delayed_close_timeouts_ != nullptr) {
-    connection_stats_->delayed_close_timeouts_->inc();
-  }
-  closeSocket(ConnectionEvent::LocalClose);
-}
-
-void ConnectionImpl::initializeDelayedCloseTimer() {
-  const auto timeout = delayed_close_timeout_.count();
-  ASSERT(delayed_close_timer_ == nullptr && timeout > 0);
-  delayed_close_timer_ = dispatcher_.createTimer([this]() -> void { onDelayedCloseTimeout(); });
-  ENVOY_CONN_LOG(debug, "setting delayed close timer with timeout {} ms", *this, timeout);
-  delayed_close_timer_->enableTimer(delayed_close_timeout_);
-}
-
 absl::string_view ConnectionImpl::transportFailureReason() const {
   return transport_socket_->failureReason();
 }
@@ -666,13 +650,13 @@ ClientConnectionImpl::ClientConnectionImpl(
     const Network::Address::InstanceConstSharedPtr& source_address,
     Network::TransportSocketPtr&& transport_socket,
     const Network::ConnectionSocket::OptionsSharedPtr& options)
-    : ConnectionImpl(dispatcher, std::make_unique<ClientSocketImpl>(remote_address),
+    : ConnectionImpl(dispatcher, std::make_unique<ClientSocketImpl>(remote_address, options),
                      std::move(transport_socket), false) {
   // There are no meaningful socket options or source address semantics for
   // non-IP sockets, so skip.
   if (remote_address->ip() != nullptr) {
     if (!Network::Socket::applyOptions(options, *socket_,
-                                       envoy::api::v2::core::SocketOption::STATE_PREBIND)) {
+                                       envoy::config::core::v3::SocketOption::STATE_PREBIND)) {
       // Set a special error state to ensure asynchronous close to give the owner of the
       // ConnectionImpl a chance to add callbacks and detect the "disconnect".
       immediate_error_event_ = ConnectionEvent::LocalClose;

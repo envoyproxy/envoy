@@ -7,6 +7,7 @@
 #include "envoy/buffer/buffer.h"
 #include "envoy/common/exception.h"
 #include "envoy/common/platform.h"
+#include "envoy/config/core/v3/base.pb.h"
 
 #include "common/api/os_sys_calls_impl.h"
 #include "common/common/assert.h"
@@ -36,7 +37,7 @@ UdpListenerImpl::UdpListenerImpl(Event::DispatcherImpl& dispatcher, SocketShared
   ASSERT(file_event_);
 
   if (!Network::Socket::applyOptions(socket_->options(), *socket_,
-                                     envoy::api::v2::core::SocketOption::STATE_BOUND)) {
+                                     envoy::config::core::v3::SocketOption::STATE_BOUND)) {
     throw CreateListenerException(fmt::format("cannot set post-bound socket option on socket: {}",
                                               socket_->localAddress()->asString()));
   }
@@ -68,13 +69,16 @@ void UdpListenerImpl::onSocketEvent(short flags) {
 
 void UdpListenerImpl::handleReadCallback() {
   ENVOY_UDP_LOG(trace, "handleReadCallback");
+  cb_.onReadReady();
   const Api::IoErrorPtr result = Utility::readPacketsFromSocket(
       socket_->ioHandle(), *socket_->localAddress(), *this, time_source_, packets_dropped_);
   // TODO(mattklein123): Handle no error when we limit the number of packets read.
   if (result->getErrorCode() != Api::IoError::IoErrorCode::Again) {
-    ENVOY_UDP_LOG(error, "recvmsg result {}: {}", static_cast<int>(result->getErrorCode()),
+    // TODO(mattklein123): When rate limited logging is implemented log this at error level
+    // on a periodic basis.
+    ENVOY_UDP_LOG(debug, "recvmsg result {}: {}", static_cast<int>(result->getErrorCode()),
                   result->getErrorDetails());
-    cb_.onReceiveError(UdpListenerCallbacks::ErrorCode::SyscallError, result->getErrorCode());
+    cb_.onReceiveError(result->getErrorCode());
   }
 }
 

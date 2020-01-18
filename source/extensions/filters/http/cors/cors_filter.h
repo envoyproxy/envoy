@@ -14,11 +14,9 @@ namespace Cors {
 /**
  * All CORS filter stats. @see stats_macros.h
  */
-// clang-format off
-#define ALL_CORS_STATS(COUNTER)\
-  COUNTER(origin_valid)        \
-  COUNTER(origin_invalid)      \
-// clang-format on
+#define ALL_CORS_STATS(COUNTER)                                                                    \
+  COUNTER(origin_valid)                                                                            \
+  COUNTER(origin_invalid)
 
 /**
  * Struct definition for CORS stats. @see stats_macros.h

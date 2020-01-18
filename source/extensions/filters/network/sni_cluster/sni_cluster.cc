@@ -21,7 +21,8 @@ Network::FilterStatus SniClusterFilter::onNewConnection() {
     read_callbacks_->connection().streamInfo().filterState().setData(
         TcpProxy::PerConnectionCluster::key(),
         std::make_unique<TcpProxy::PerConnectionCluster>(sni),
-        StreamInfo::FilterState::StateType::Mutable);
+        StreamInfo::FilterState::StateType::Mutable,
+        StreamInfo::FilterState::LifeSpan::DownstreamConnection);
   }
 
   return Network::FilterStatus::Continue;

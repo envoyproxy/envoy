@@ -1,5 +1,7 @@
 #pragma once
 
+#include "envoy/config/core/v3/base.pb.h"
+
 #include "common/network/address_impl.h"
 #include "common/network/socket_option_impl.h"
 
@@ -35,7 +37,7 @@ public:
 
   void testSetSocketOptionSuccess(
       Socket::Option& socket_option, Network::SocketOptionName option_name, int option_val,
-      const std::set<envoy::api::v2::core::SocketOption::SocketState>& when) {
+      const std::set<envoy::config::core::v3::SocketOption::SocketState>& when) {
     for (auto state : when) {
       if (option_name.has_value()) {
         EXPECT_CALL(os_sys_calls_,
@@ -52,13 +54,13 @@ public:
 
     // The set of SocketOption::SocketState for which this option should not be set.
     // Initialize to all the states, and remove states that are passed in.
-    std::list<envoy::api::v2::core::SocketOption::SocketState> unset_socketstates{
-        envoy::api::v2::core::SocketOption::STATE_PREBIND,
-        envoy::api::v2::core::SocketOption::STATE_BOUND,
-        envoy::api::v2::core::SocketOption::STATE_LISTENING,
+    std::list<envoy::config::core::v3::SocketOption::SocketState> unset_socketstates{
+        envoy::config::core::v3::SocketOption::STATE_PREBIND,
+        envoy::config::core::v3::SocketOption::STATE_BOUND,
+        envoy::config::core::v3::SocketOption::STATE_LISTENING,
     };
     unset_socketstates.remove_if(
-        [&](envoy::api::v2::core::SocketOption::SocketState state) -> bool {
+        [&](envoy::config::core::v3::SocketOption::SocketState state) -> bool {
           return when.find(state) != when.end();
         });
     for (auto state : unset_socketstates) {
