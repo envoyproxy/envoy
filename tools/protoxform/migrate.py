@@ -59,6 +59,7 @@ class UpgradeVisitor(visitor.Visitor):
       # TODO(htuch): this should really either go through the type database or
       # via the descriptor pool and annotations, but there are only two of these
       # we need for the initial v2 -> v3 docs cut, so hard coding for now.
+      # Tracked at https://github.com/envoyproxy/envoy/issues/9734.
       if repl_type == 'config.route.v3.RouteAction':
         if residual == 'host_rewrite':
           residual = 'host_rewrite_literal'
