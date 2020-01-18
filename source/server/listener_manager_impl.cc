@@ -22,6 +22,7 @@
 #include "common/network/utility.h"
 #include "common/protobuf/utility.h"
 
+#include "server/api_listener_impl.h"
 #include "server/configuration_impl.h"
 #include "server/drain_manager_impl.h"
 #include "server/filter_chain_manager_impl.h"
@@ -319,6 +320,23 @@ ListenerManagerStats ListenerManagerImpl::generateStats(Stats::Scope& scope) {
 
 bool ListenerManagerImpl::addOrUpdateListener(const envoy::config::listener::v3::Listener& config,
                                               const std::string& version_info, bool added_via_api) {
+
+  // TODO(junr03): currently only one ApiListener can be installed via bootstrap to avoid having to
+  // build a collection of listeners, and to have to be able to warm and drain the listeners. In the
+  // future allow multiple ApiListeners, and allow them to be created via LDS as well as bootstrap.
+  if (config.has_api_listener()) {
+    if (!api_listener_ && !added_via_api) {
+      // TODO(junr03): dispatch to different concrete constructors when there are other
+      // ApiListenerImplBase derived classes.
+      api_listener_ = std::make_unique<HttpApiListener>(config, *this, config.name());
+      return true;
+    } else {
+      ENVOY_LOG(warn, "listener {} can not be added because currently only one ApiListener is "
+                      "allowed, and it can only be added via bootstrap configuration");
+      return false;
+    }
+  }
+
   std::string name;
   if (!config.name().empty()) {
     name = config.name();
@@ -836,6 +854,10 @@ Network::ListenSocketFactorySharedPtr ListenerManagerImpl::createListenSocketFac
   return std::make_shared<ListenSocketFactoryImpl>(
       factory_, listener.address(), socket_type, listener.listenSocketOptions(),
       listener.bindToPort(), listener.name(), reuse_port);
+}
+
+ApiListenerOptRef ListenerManagerImpl::apiListener() {
+  return api_listener_ ? ApiListenerOptRef(std::ref(*api_listener_)) : absl::nullopt;
 }
 
 } // namespace Server

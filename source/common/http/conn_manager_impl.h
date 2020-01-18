@@ -11,6 +11,7 @@
 #include "envoy/access_log/access_log.h"
 #include "envoy/common/scope_tracker.h"
 #include "envoy/event/deferred_deletable.h"
+#include "envoy/http/api_listener.h"
 #include "envoy/http/codec.h"
 #include "envoy/http/codes.h"
 #include "envoy/http/context.h"
@@ -48,7 +49,8 @@ namespace Http {
 class ConnectionManagerImpl : Logger::Loggable<Logger::Id::http>,
                               public Network::ReadFilter,
                               public ServerConnectionCallbacks,
-                              public Network::ConnectionCallbacks {
+                              public Network::ConnectionCallbacks,
+                              public Http::ApiListener {
 public:
   ConnectionManagerImpl(ConnectionManagerConfig& config, const Network::DrainDecision& drain_close,
                         Runtime::RandomGenerator& random_generator, Http::Context& http_context,
@@ -65,6 +67,15 @@ public:
   static ConnectionManagerListenerStats generateListenerStats(const std::string& prefix,
                                                               Stats::Scope& scope);
   static const HeaderMapImpl& continueHeader();
+
+  // Currently the ConnectionManager creates a codec lazily when either:
+  //   a) onConnection for H3.
+  //   b) onData for H1 and H2.
+  // With the introduction of ApiListeners, neither event occurs. This function allows consumer code
+  // to manually create a codec.
+  // TODO(junr03): consider passing a synthetic codec instead of creating once. The codec in the
+  // ApiListener case is solely used to determine the protocol version.
+  void createCodec(Buffer::Instance& data);
 
   // Network::ReadFilter
   Network::FilterStatus onData(Buffer::Instance& data, bool end_stream) override;

@@ -67,6 +67,16 @@ envoy_cc_test(
 )
 
 envoy_cc_test(
+    name = "api_listener_integration_test",
+    srcs = ["api_listener_integration_test.cc"],
+    deps = [
+        ":http_integration_lib",
+        "//test/mocks/http:stream_encoder_mock",
+        "//test/server:utility_lib",
+    ],
+)
+
+envoy_cc_test(
     name = "api_version_integration_test",
     srcs = ["api_version_integration_test.cc"],
     deps = [
