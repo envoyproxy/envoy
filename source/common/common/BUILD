@@ -384,6 +384,7 @@ envoy_cc_library(
         ":thread_lib",
         ":utility_lib",
     ],
+    external_deps = ["abseil_str_format"],
 )
 
 envoy_cc_library(

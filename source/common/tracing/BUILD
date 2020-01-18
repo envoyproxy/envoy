@@ -42,4 +42,5 @@ envoy_cc_library(
         "@envoy_api//envoy/type/metadata/v2:pkg_cc_proto",
         "@envoy_api//envoy/type/tracing/v2:pkg_cc_proto",
     ],
+    external_deps = ["abseil_str_format"],
 )

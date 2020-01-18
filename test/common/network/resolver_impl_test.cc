@@ -115,7 +115,7 @@ private:
     case envoy::config::core::v3::SocketAddress::PortSpecifierCase::kPortValue:
     // default to port 0 if no port value is specified
     case envoy::config::core::v3::SocketAddress::PortSpecifierCase::PORT_SPECIFIER_NOT_SET:
-      return absl::StrCat("", socket_address.port_value());
+      return std::to_string(socket_address.port_value());
 
     default:
       throw EnvoyException(

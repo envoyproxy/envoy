@@ -21,6 +21,7 @@
 #include "common/stream_info/utility.h"
 
 #include "absl/strings/str_cat.h"
+#include "absl/strings/str_format.h"
 
 namespace Envoy {
 namespace Tracing {
@@ -334,7 +335,7 @@ void MetadataCustomTag::apply(Span& span, const CustomTagContext& ctx) const {
     span.setTag(tag(), value.bool_value() ? "true" : "false");
     return;
   case ProtobufWkt::Value::kNumberValue:
-    span.setTag(tag(), absl::StrCat("", value.number_value()));
+    span.setTag(tag(), absl::StrFormat("%g", value.number_value()));
     return;
   case ProtobufWkt::Value::kStringValue:
     span.setTag(tag(), value.string_value());
