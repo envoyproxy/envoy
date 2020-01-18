@@ -11,7 +11,7 @@ following are the command line options that Envoy supports.
   *(optional)* The path to the v2 :ref:`JSON/YAML/proto3 configuration
   file <config>`. If this flag is missing, :option:`--config-yaml` is required.
   This will be parsed as a :ref:`v2 bootstrap configuration file
-  <config_overview_v2_bootstrap>`.
+  <config_overview_bootstrap>`.
   Valid extensions are ``.json``, ``.yaml``, ``.pb`` and ``.pb_text``, which indicate
   JSON, YAML, `binary proto3
   <https://developers.google.com/protocol-buffers/docs/encoding>`_ and `text
