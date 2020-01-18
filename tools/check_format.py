@@ -218,7 +218,7 @@ def checkTools():
                             "users".format(CLANG_FORMAT_PATH))
   else:
     error_messages.append(
-        "Command {} not found. If you have clang-format in version 8.x.x "
+        "Command {} not found. If you have clang-format in version 9.x.x "
         "installed, but the binary name is different or it's not available in "
         "PATH, please use CLANG_FORMAT environment variable to specify the path. "
         "Examples:\n"
@@ -238,13 +238,13 @@ def checkTools():
                               "users".format(path))
     else:
 
-      error_messages.append(
-          "Command {} not found. If you have buildifier installed, but the binary "
-          "name is different or it's not available in $GOPATH/bin, please use "
-          "{} environment variable to specify the path. Example:\n"
-          "    export {}=/opt/bin/buildifier\n"
-          "If you don't have buildifier installed, you can install it by:\n"
-          "    go get -u github.com/bazelbuild/buildtools/{}".format(path, var, var, name))
+      error_messages.append("Command {} not found. If you have {} installed, but the binary "
+                            "name is different or it's not available in $GOPATH/bin, please use "
+                            "{} environment variable to specify the path. Example:\n"
+                            "    export {}=`which {}`\n"
+                            "If you don't have {} installed, you can install it by:\n"
+                            "    go get -u github.com/bazelbuild/buildtools/{}".format(
+                                path, name, var, var, name, name, name))
 
   checkBazelTool('buildifier', BUILDIFIER_PATH, 'BUILDIFIER_BIN')
   checkBazelTool('buildozer', BUILDOZER_PATH, 'BUILDOZER_BIN')
