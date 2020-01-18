@@ -126,6 +126,7 @@ public:
   // Network::FilterChainManager
   const Network::FilterChain*
   findFilterChain(const Network::ConnectionSocket& socket) const override;
+  std::unordered_set<const Network::FilterChain*> allFilterChains() const override;
 
   void addFilterChain(
       absl::Span<const envoy::config::listener::v3alpha::FilterChain* const> filter_chain_span,

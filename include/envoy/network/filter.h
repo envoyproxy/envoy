@@ -349,6 +349,12 @@ public:
    *         nullptr if no matching filter chain was found.
    */
   virtual const FilterChain* findFilterChain(const ConnectionSocket& socket) const PURE;
+
+  /**
+   * Return all the filter chains tracked by the filter chain manager. Used by garbage collecting
+   * stale connections.
+   */
+  virtual std::unordered_set<const FilterChain*> allFilterChains() const PURE;
 };
 
 /**

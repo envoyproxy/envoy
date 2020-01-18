@@ -392,7 +392,6 @@ void ConnectionHandlerImpl::ActiveTcpListener::newConnection(
     active_connection->connection_->addConnectionCallbacks(*active_connection);
     active_connection->moveIntoList(std::move(active_connection), active_connections.connections_);
   }
-  // TODO(lambdai): defer delete active_connections when supporting per tag drain
 }
 
 ConnectionHandlerImpl::ActiveConnections&
@@ -406,7 +405,29 @@ ConnectionHandlerImpl::ActiveTcpListener::getOrCreateActiveConnections(
 }
 
 void ConnectionHandlerImpl::ActiveTcpListener::removeUntrackedFilterChains() {
-  // TODO(lambdai): implement!
+  // need to recover the original deleting state
+  // TODO(lambdai): determine if removeUntackedFilterChains could be invoked when is_deleting
+  // TODO(lambdai): RAII
+  // alternatively, erase the iterator of connections prior to the connection removal
+  bool was_deleting = is_deleting_;
+  is_deleting_ = true;
+  const auto& tracking_chains = config_->filterChainManager().allFilterChains();
+  for (auto iter = connections_by_context_.begin(); iter != connections_by_context_.end();) {
+    if (tracking_chains.find(iter->first) != tracking_chains.end()) {
+      ++iter;
+    } else {
+      auto& connections = iter->second->connections_;
+      while (!connections.empty()) {
+        connections.front()->connection_->close(Network::ConnectionCloseType::NoFlush);
+      }
+      // since is_deleting_ is on, we need to manually remove the map value and drive the iterator
+
+      // Defer delete connection container to avoid race condition in destroying connection
+      parent_.dispatcher_.deferredDelete(std::move(iter->second));
+      iter = connections_by_context_.erase(iter);
+    }
+  }
+  is_deleting_ = was_deleting;
 }
 
 namespace {
