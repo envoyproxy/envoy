@@ -300,11 +300,21 @@ void MessageUtil::loadFromFile(const std::string& path, Protobuf::Message& messa
   }
   // If the filename ends with .pb_text, attempt to parse it as a text proto.
   if (absl::EndsWith(path, FileExtensions::get().ProtoText)) {
-    if (Protobuf::TextFormat::ParseFromString(contents, &message)) {
-      return;
-    }
-    throw EnvoyException("Unable to parse file \"" + path + "\" as a text protobuf (type " +
-                         message.GetTypeName() + ")");
+    tryWithApiBoosting(
+        [&contents, &path](Protobuf::Message& message, MessageVersion message_version) {
+          if (Protobuf::TextFormat::ParseFromString(contents, &message)) {
+            return;
+          }
+          if (message_version == MessageVersion::LATEST_VERSION) {
+            throw EnvoyException("Unable to parse file \"" + path + "\" as a text protobuf (type " +
+                                 message.GetTypeName() + ")");
+          } else {
+            throw ApiBoostRetryException(
+                "Failed to parse at earlier version, trying again at later version.");
+          }
+        },
+        message);
+    return;
   }
   if (absl::EndsWith(path, FileExtensions::get().Yaml)) {
     loadFromYaml(contents, message, validation_visitor);

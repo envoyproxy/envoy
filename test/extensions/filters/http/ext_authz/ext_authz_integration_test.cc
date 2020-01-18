@@ -83,10 +83,13 @@ public:
     auto* attributes = check_request.mutable_attributes();
     auto* http_request = attributes->mutable_request()->mutable_http();
 
+    EXPECT_TRUE(attributes->request().has_time());
+
     // Clear fields which are not relevant.
     attributes->clear_source();
     attributes->clear_destination();
     attributes->clear_metadata_context();
+    attributes->mutable_request()->clear_time();
     http_request->clear_id();
     http_request->clear_headers();
     http_request->clear_scheme();

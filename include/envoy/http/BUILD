@@ -9,6 +9,12 @@ load(
 envoy_package()
 
 envoy_cc_library(
+    name = "api_listener_interface",
+    hdrs = ["api_listener.h"],
+    deps = [":codec_interface"],
+)
+
+envoy_cc_library(
     name = "async_client_interface",
     hdrs = ["async_client.h"],
     external_deps = ["abseil_optional"],

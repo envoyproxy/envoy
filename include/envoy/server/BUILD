@@ -32,6 +32,12 @@ envoy_cc_library(
 )
 
 envoy_cc_library(
+    name = "api_listener_interface",
+    hdrs = ["api_listener.h"],
+    deps = ["//include/envoy/http:api_listener_interface"],
+)
+
+envoy_cc_library(
     name = "configuration_interface",
     hdrs = ["configuration.h"],
     external_deps = ["abseil_optional"],
@@ -189,6 +195,7 @@ envoy_cc_library(
     name = "listener_manager_interface",
     hdrs = ["listener_manager.h"],
     deps = [
+        ":api_listener_interface",
         ":drain_manager_interface",
         ":filter_config_interface",
         ":guarddog_interface",
