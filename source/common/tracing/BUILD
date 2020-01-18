@@ -16,6 +16,7 @@ envoy_cc_library(
     hdrs = [
         "http_tracer_impl.h",
     ],
+    external_deps = ["abseil_str_format"],
     deps = [
         "//include/envoy/local_info:local_info_interface",
         "//include/envoy/runtime:runtime_interface",
@@ -42,5 +43,4 @@ envoy_cc_library(
         "@envoy_api//envoy/type/metadata/v2:pkg_cc_proto",
         "@envoy_api//envoy/type/tracing/v2:pkg_cc_proto",
     ],
-    external_deps = ["abseil_str_format"],
 )
