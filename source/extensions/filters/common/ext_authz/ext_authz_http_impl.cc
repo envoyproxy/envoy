@@ -1,6 +1,5 @@
 #include "extensions/filters/common/ext_authz/ext_authz_http_impl.h"
 
-#include "common/common/matchers.h"
 #include "envoy/config/core/v3/base.pb.h"
 #include "envoy/extensions/filters/http/ext_authz/v3/ext_authz.pb.h"
 #include "envoy/service/auth/v3/external_auth.pb.h"
@@ -8,6 +7,7 @@
 
 #include "common/common/enum_to_int.h"
 #include "common/common/fmt.h"
+#include "common/common/matchers.h"
 #include "common/http/async_client_impl.h"
 #include "common/http/codes.h"
 
