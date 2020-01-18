@@ -1,5 +1,6 @@
 #include "server/connection_handler_impl.h"
 
+#include "envoy/event/deferred_task.h"
 #include "envoy/event/dispatcher.h"
 #include "envoy/event/timer.h"
 #include "envoy/network/filter.h"
@@ -68,6 +69,19 @@ void ConnectionHandlerImpl::removeListeners(uint64_t listener_tag) {
       listener = listeners_.erase(listener);
     } else {
       ++listener;
+    }
+  }
+}
+
+void ConnectionHandlerImpl::removeUntrackedFilterChains(uint64_t listener_tag,
+                                                        std::function<void()> completion) {
+  for (auto& listener : listeners_) {
+    if (listener.second.listener_->listenerTag() == listener_tag) {
+      // So far only tcp listener supports removing filter chains.
+      ASSERT(listener.second.tcp_listener_.has_value());
+      listener.second.tcp_listener_->get().removeUntrackedFilterChains();
+      Event::DeferredTaskUtil::deferredRun(dispatcher_, std::move(completion));
+      return;
     }
   }
 }
@@ -389,6 +403,10 @@ ConnectionHandlerImpl::ActiveTcpListener::getOrCreateActiveConnections(
     connections = std::make_unique<ConnectionHandlerImpl::ActiveConnections>(*this, filter_chain);
   }
   return *connections;
+}
+
+void ConnectionHandlerImpl::ActiveTcpListener::removeUntrackedFilterChains() {
+  // TODO(lambdai): implement!
 }
 
 namespace {

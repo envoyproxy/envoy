@@ -87,6 +87,15 @@ void WorkerImpl::removeListener(Network::ListenerConfig& listener,
   });
 }
 
+void WorkerImpl::removeUntrackedFilterChains(Network::ListenerConfig& listener,
+                                             std::function<void()> completion) {
+  ASSERT(thread_);
+  const uint64_t listener_tag = listener.listenerTag();
+  dispatcher_->post([this, listener_tag, completion = std::move(completion)]() -> void {
+    handler_->removeUntrackedFilterChains(listener_tag, completion);
+  });
+}
+
 void WorkerImpl::start(GuardDog& guard_dog) {
   ASSERT(!thread_);
   thread_ =
